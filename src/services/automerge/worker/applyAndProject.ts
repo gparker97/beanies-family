@@ -63,7 +63,9 @@ import type {
   CachePersistFailureDetail,
   CacheClearResult,
   WorkerSignal,
+  DispatchReply,
 } from './protocol';
+import type { ReconcileNote } from './reconcile';
 
 type Doc = Automerge.Doc<FamilyDocument>;
 type PerfCtx = Record<string, number>;
@@ -842,24 +844,27 @@ function headsEqual(a: Heads, b: Heads): boolean {
 
 /** Apply a declarative mutation; schedule a cache persist ONLY if the doc actually
  * changed. The delta rides the response (applied to the projection before the
- * caller's promise resolves). `changed:false` for a no-op (skipped `onMissing`, or
- * a named op that wrote nothing) → no cache persist here, and the caller skips the
- * Drive save (F10). */
+ * caller's promise resolves). `changed:false` for a no-op (skipped `onMissing`, a
+ * named op that wrote nothing, or a patch whose values all matched, #117) → no
+ * cache persist here, and the caller skips the Drive save (F10). The reconciler's
+ * `notes` ride the response too (only when there are any): the worker cannot
+ * telemeter, so main logs them. */
 export function mutate(op: MutationOp): {
   result: unknown;
   delta: ProjectionDelta;
   changed: boolean;
+  notes?: ReconcileNote[];
 } {
   const doc = requireDoc('mutate');
   const before = headsOf(doc);
-  const { doc: next, result, delta } = applyMutationOp(doc, op);
+  const { doc: next, result, delta, notes } = applyMutationOp(doc, op);
   const changed = !headsEqual(before, headsOf(next));
   currentDoc = next;
   if (changed) {
     schedulePersist();
     scheduleSnapshotPersist(); // coarse-coalesced; won't fire per-mutate
   }
-  return { result, delta, changed };
+  return { result, delta, changed, ...(notes.length ? { notes } : {}) };
 }
 
 /**
@@ -1664,10 +1669,7 @@ export function exportSnapshot(): { binary: Uint8Array } {
 /** Route one RPC method to its handler. Returns the `{result, delta}` envelope
  * (delta only for `mutate`). Used by BOTH `docWorker` (over the async-FIFO) and
  * the inline fallback executor — one dispatch table, no drift. */
-export async function dispatch(
-  method: string,
-  args: unknown
-): Promise<{ result?: unknown; delta?: unknown; changed?: boolean }> {
+export async function dispatch(method: string, args: unknown): Promise<DispatchReply> {
   const a = (args ?? {}) as Record<string, unknown>;
   switch (method) {
     case 'setKey':
@@ -1691,10 +1693,8 @@ export async function dispatch(
     case 'noteRemoteBaseline':
       noteRemoteBaseline(a.payload as string);
       return {};
-    case 'mutate': {
-      const { result, delta, changed } = mutate(args as MutationOp);
-      return { result, delta, changed };
-    }
+    case 'mutate':
+      return mutate(args as MutationOp);
     case 'mergeRemoteEnvelope':
       return {
         result: await mergeRemoteEnvelope(

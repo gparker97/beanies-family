@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as Automerge from '@automerge/automerge';
-import type { FamilyDocument } from '@/types/automerge';
+import type { FamilyDocument, CollectionName } from '@/types/automerge';
 import {
   migrateDoc,
   loadDoc,
@@ -18,7 +18,8 @@ import {
   registerNamedOp,
   __resetNamedOpsForTesting,
 } from '../docOps';
-import type { ProjectionDelta } from '../protocol';
+import type { MutationOp, ProjectionDelta } from '../protocol';
+import { apply, converge, fork, seeded } from './twoDevices';
 
 type Doc = Automerge.Doc<FamilyDocument>;
 const base = (): Doc => migrateDoc(Automerge.init<FamilyDocument>());
@@ -721,5 +722,442 @@ describe('docOps — core domain named ops (financial atomic RMW)', () => {
     });
     expect(result).toEqual({ applied: false });
     expect(delta).toEqual({ kind: 'multi', deltas: [] });
+  });
+});
+
+// ─── #117: merge-safe writes through `patch` / `patchSettings` ───────────────
+//
+// Every test forks one document onto two devices (`twoDevices.ts`), writes on both the way the
+// stores do (a `patch` carrying the `base` the store built it from), converges, and asserts
+// both edits survived. The `residual:` tests pin the accepted last-writer-wins cases listed in
+// the plan (`docs/plans/2026-10-01-crdt-merge-safe-writes.md`, "Residual"), so a change in
+// their behaviour is a visible test change, not a silent one.
+
+type AnyRec = Record<string, unknown>;
+
+/** A `patch` op as the repositories send it: the new values plus the snapshot they came from. */
+const patchOp = (
+  collection: CollectionName,
+  id: string,
+  patch: AnyRec,
+  snapshot?: AnyRec,
+  extra: Partial<Extract<MutationOp, { op: 'patch' }>> = {}
+): MutationOp => ({
+  op: 'patch',
+  collection,
+  id,
+  patch,
+  ...(snapshot ? { base: snapshot } : {}),
+  ...extra,
+});
+
+const setOp = (collection: CollectionName, entity: AnyRec): MutationOp => ({
+  op: 'set',
+  collection,
+  id: entity.id as string,
+  entity,
+});
+
+const settingsOp = (args: AnyRec): MutationOp => ({ op: 'named', name: 'patchSettings', args });
+
+/** One entity, read plain. */
+const read = (doc: Doc, collection: CollectionName, id: string): AnyRec =>
+  JSON.parse(JSON.stringify((doc[collection] as AnyRec)[id])) as AnyRec;
+
+const readSettings = (doc: Doc): AnyRec => JSON.parse(JSON.stringify(doc.settings)) as AnyRec;
+
+const item = (id: string, text: string, checked = false) => ({ id, text, checked });
+
+describe('docOps — merge-safe writes (#117)', () => {
+  beforeEach(() => __resetNamedOpsForTesting());
+
+  const items0 = [item('i1', 'milk'), item('i2', 'eggs')];
+  const list0 = { id: 'L', title: 'Shopping', items: items0 };
+
+  it('list: a tick on A and an add on B both survive', () => {
+    const { a, b } = fork(seeded([setOp('lists', list0)]));
+    const a1 = apply(
+      a,
+      patchOp('lists', 'L', { items: [item('i1', 'milk', true), items0[1]] }, { items: items0 })
+    );
+    const b1 = apply(
+      b,
+      patchOp('lists', 'L', { items: [...items0, item('i3', 'bread')] }, { items: items0 })
+    );
+    const { a: merged } = converge(a1, b1);
+    expect(read(merged, 'lists', 'L').items).toEqual([
+      item('i1', 'milk', true),
+      item('i2', 'eggs'),
+      item('i3', 'bread'),
+    ]);
+  });
+
+  it('list: two quick ticks built from the same stale state on ONE device both land', () => {
+    // The store reads `lists.value`, refreshed only after the write resolves, so the second
+    // tap sends an array built from the pre-first-tap state, with that same state as `base`.
+    let doc = seeded([setOp('lists', list0)]);
+    doc = apply(
+      doc,
+      patchOp('lists', 'L', { items: [item('i1', 'milk', true), items0[1]] }, { items: items0 })
+    );
+    doc = apply(
+      doc,
+      patchOp('lists', 'L', { items: [items0[0], item('i2', 'eggs', true)] }, { items: items0 })
+    );
+    expect(read(doc, 'lists', 'L').items).toEqual([
+      item('i1', 'milk', true),
+      item('i2', 'eggs', true),
+    ]);
+  });
+
+  it('vacation: two members voting on one idea both count (key memberId)', () => {
+    const ideas0 = [{ id: 'idea', title: 'Beach', votes: [] as AnyRec[] }];
+    const { a, b } = fork(seeded([setOp('vacations', { id: 'V', ideas: ideas0 })]));
+    const vote = (memberId: string) => [{ ...ideas0[0], votes: [{ memberId }] }];
+    const a1 = apply(a, patchOp('vacations', 'V', { ideas: vote('m1') }, { ideas: ideas0 }));
+    const b1 = apply(b, patchOp('vacations', 'V', { ideas: vote('m2') }, { ideas: ideas0 }));
+    const { a: merged } = converge(a1, b1);
+    const votes = (read(merged, 'vacations', 'V').ideas as Array<{ votes: AnyRec[] }>)[0]!.votes;
+    expect(votes.map((v) => v.memberId).sort()).toEqual(['m1', 'm2']);
+  });
+
+  it('vacation: a segment edit on A and a segment add on B both survive', () => {
+    const segs0 = [{ id: 's1', from: 'SIN', to: 'NRT' }];
+    const { a, b } = fork(seeded([setOp('vacations', { id: 'V', travelSegments: segs0 })]));
+    const a1 = apply(
+      a,
+      patchOp(
+        'vacations',
+        'V',
+        { travelSegments: [{ ...segs0[0], from: 'KUL' }] },
+        { travelSegments: segs0 }
+      )
+    );
+    const b1 = apply(
+      b,
+      patchOp(
+        'vacations',
+        'V',
+        { travelSegments: [...segs0, { id: 's2', from: 'NRT', to: 'SIN' }] },
+        { travelSegments: segs0 }
+      )
+    );
+    const { a: merged } = converge(a1, b1);
+    expect(read(merged, 'vacations', 'V').travelSegments).toEqual([
+      { id: 's1', from: 'KUL', to: 'NRT' },
+      { id: 's2', from: 'NRT', to: 'SIN' },
+    ]);
+  });
+
+  it('activity: two duty ticks on different dates both survive (key date)', () => {
+    const { a, b } = fork(seeded([setOp('activities', { id: 'A1', dropoffCompletions: [] })]));
+    const tick = (date: string, memberId: string) =>
+      patchOp(
+        'activities',
+        'A1',
+        { dropoffCompletions: [{ date, memberId }] },
+        { dropoffCompletions: [] }
+      );
+    const { a: merged } = converge(
+      apply(a, tick('2026-10-01', 'm1')),
+      apply(b, tick('2026-10-02', 'm2'))
+    );
+    const done = read(merged, 'activities', 'A1').dropoffCompletions as AnyRec[];
+    expect(done.map((c) => c.date).sort()).toEqual(['2026-10-01', '2026-10-02']);
+  });
+
+  it('goal: contribution history appended on both devices keeps both entries', () => {
+    const { a, b } = fork(seeded([setOp('goals', { id: 'G', manualContributions: [] })]));
+    const add = (id: string, amount: number) =>
+      patchOp('goals', 'G', { manualContributions: [{ id, amount }] }, { manualContributions: [] });
+    const { a: merged } = converge(apply(a, add('c1', 10)), apply(b, add('c2', 20)));
+    const history = read(merged, 'goals', 'G').manualContributions as AnyRec[];
+    expect(history.map((c) => c.id).sort()).toEqual(['c1', 'c2']);
+  });
+
+  it('budget: two categories edited on two devices both survive (key categoryId)', () => {
+    const cats0 = [
+      { categoryId: 'food', amount: 100 },
+      { categoryId: 'fun', amount: 50 },
+    ];
+    const { a, b } = fork(seeded([setOp('budgets', { id: 'B', categories: cats0 })]));
+    const a1 = apply(
+      a,
+      patchOp(
+        'budgets',
+        'B',
+        { categories: [{ categoryId: 'food', amount: 120 }, cats0[1]] },
+        { categories: cats0 }
+      )
+    );
+    const b1 = apply(
+      b,
+      patchOp(
+        'budgets',
+        'B',
+        { categories: [cats0[0], { categoryId: 'fun', amount: 70 }] },
+        { categories: cats0 }
+      )
+    );
+    const { a: merged } = converge(a1, b1);
+    expect(read(merged, 'budgets', 'B').categories).toEqual([
+      { categoryId: 'food', amount: 120 },
+      { categoryId: 'fun', amount: 70 },
+    ]);
+  });
+
+  it('asset: a loan field edit on A and a loan payment on B both survive (loan is per key)', () => {
+    const loan0 = { hasLoan: true, outstandingBalance: 5000, interestRate: 6, monthlyPayment: 200 };
+    const asset0 = { id: 'ast', name: 'Car', currency: 'USD', loan: loan0 };
+    const { a, b } = fork(seeded([setOp('assets', asset0)]));
+    // AssetModal sends the whole `loan` it built; only `interestRate` changed.
+    const a1 = apply(
+      a,
+      patchOp('assets', 'ast', { loan: { ...loan0, interestRate: 5 } }, { loan: loan0 })
+    );
+    const b1 = apply(b, {
+      op: 'named',
+      name: 'applyLoanPayment',
+      args: { loanId: 'ast', paymentAmount: 200, isRecurring: false },
+    });
+    const { a: merged } = converge(a1, b1);
+    expect(read(merged, 'assets', 'ast').loan).toEqual({
+      ...loan0,
+      interestRate: 5,
+      outstandingBalance: 4800,
+    });
+  });
+
+  describe('settings', () => {
+    const usdGbp = { from: 'USD', to: 'GBP', rate: 0.8 };
+    const settings0 = { baseCurrency: 'USD', exchangeRates: [usdGbp], aiApiKeys: {} };
+    const seed = (): Doc =>
+      seeded([{ op: 'named', name: 'setSettings', args: { settings: settings0 } }]);
+
+    it('an exchange rate added on each device: both survive (key from|to)', () => {
+      const { a, b } = fork(seed());
+      const add = (to: string, rate: number) =>
+        settingsOp({
+          patch: { exchangeRates: [usdGbp, { from: 'USD', to, rate }] },
+          base: { exchangeRates: [usdGbp] },
+        });
+      const { a: merged } = converge(apply(a, add('EUR', 0.9)), apply(b, add('SGD', 1.3)));
+      const rates = readSettings(merged).exchangeRates as AnyRec[];
+      expect(rates.map((r) => r.to).sort()).toEqual(['EUR', 'GBP', 'SGD']);
+    });
+
+    it('aiApiKeys for two providers set on two devices: both survive', () => {
+      const { a, b } = fork(seed());
+      const setKey = (provider: string, key: string) =>
+        settingsOp({ patch: { aiApiKeys: { [provider]: key } }, base: { aiApiKeys: {} } });
+      const { a: merged } = converge(
+        apply(a, setKey('claude', 'k1')),
+        apply(b, setKey('openai', 'k2'))
+      );
+      expect(readSettings(merged).aiApiKeys).toEqual({ claude: 'k1', openai: 'k2' });
+    });
+
+    it('a base-less patchSettings removes a rate (the document is the base)', () => {
+      // The rebase sends no `base`; the composer's value must land exactly, removals included.
+      const doc = apply(seed(), settingsOp({ patch: { exchangeRates: [] } }));
+      expect(readSettings(doc).exchangeRates).toEqual([]);
+    });
+
+    it('a supplied base that lacks the key is additive: it never removes a rate it did not see', () => {
+      // The #95 boot window: the projection is empty, so `base` is `{}`.
+      const eur = { from: 'USD', to: 'EUR', rate: 0.9 };
+      const doc = apply(seed(), settingsOp({ patch: { exchangeRates: [eur] }, base: {} }));
+      // (A new item goes after its nearest preceding `next` neighbour, here the front.)
+      expect(readSettings(doc).exchangeRates).toEqual([eur, usdGbp]);
+    });
+
+    it('updatedAt is stamped only when the patch wrote something', () => {
+      const doc = seed();
+      const heads = getHeads(doc);
+      const same = apply(
+        doc,
+        settingsOp({ patch: { baseCurrency: 'USD' }, updatedAt: '2026-10-01T00:00:00.000Z' })
+      );
+      expect(getHeads(same)).toEqual(heads);
+      expect(readSettings(same).updatedAt).toBeUndefined();
+      const moved = apply(
+        same,
+        settingsOp({ patch: { baseCurrency: 'GBP' }, updatedAt: '2026-10-01T00:00:00.000Z' })
+      );
+      expect(readSettings(moved)).toMatchObject({
+        baseCurrency: 'GBP',
+        updatedAt: '2026-10-01T00:00:00.000Z',
+      });
+    });
+  });
+
+  it('a recurrence rule edited on both devices stays ONE whole rule (a value, never per key)', () => {
+    const rule0 = { frequency: 'weekly', interval: 1, daysOfWeek: [1] };
+    const ruleA = { frequency: 'weekly', interval: 2, daysOfWeek: [1] };
+    const ruleB = { frequency: 'monthly', interval: 1, dayOfMonth: 15 };
+    const { a, b } = fork(seeded([setOp('recurringItems', { id: 'R', rule: rule0 })]));
+    const { a: merged } = converge(
+      apply(a, patchOp('recurringItems', 'R', { rule: ruleA }, { rule: rule0 })),
+      apply(b, patchOp('recurringItems', 'R', { rule: ruleB }, { rule: rule0 }))
+    );
+    expect([ruleA, ruleB]).toContainEqual(read(merged, 'recurringItems', 'R').rule);
+  });
+
+  it('a patch whose values all match writes nothing: heads unchanged, no updatedAt stamp', () => {
+    const doc = seeded([setOp('lists', { ...list0, updatedAt: '2026-01-01' })]);
+    const heads = getHeads(doc);
+    const { doc: after, notes } = applyMutation(
+      doc,
+      patchOp(
+        'lists',
+        'L',
+        { title: 'Shopping', items: items0 },
+        { title: 'Shopping', items: items0 },
+        { updatedAt: '2026-10-01', deleteKeys: ['notThere'] }
+      )
+    );
+    expect(getHeads(after)).toEqual(heads);
+    expect(read(after, 'lists', 'L').updatedAt).toBe('2026-01-01');
+    expect(notes).toEqual([]);
+  });
+
+  it("onMissing:'create' counts as a write, so updatedAt is stamped even for an empty patch", () => {
+    const { doc } = applyMutation(
+      seeded(),
+      patchOp('notificationReads', 'm1', {}, undefined, {
+        onMissing: 'create',
+        updatedAt: '2026-10-01',
+      })
+    );
+    expect(read(doc, 'notificationReads', 'm1')).toEqual({ updatedAt: '2026-10-01' });
+  });
+
+  it('a non-object entity is a programming error and throws', () => {
+    const doc = Automerge.change(seeded(), (d) => {
+      (d.todos as unknown as AnyRec).bad = 'not an entity';
+    });
+    expect(() => applyMutation(doc, patchOp('todos', 'bad', { title: 'x' }))).toThrow(
+      /is not an object/
+    );
+  });
+
+  it('reconciler notes come back scoped to <collection>.<field>', () => {
+    const doc = seeded([setOp('lists', list0)]);
+    const { notes } = applyMutation(
+      doc,
+      patchOp('lists', 'L', { items: [...items0, items0[0]] }, { items: items0 })
+    );
+    expect(notes).toEqual([{ action: 'next_duplicate_keys', kind: 'lists.items', count: 1 }]);
+  });
+
+  // ─── Residual last-writer-wins, accepted and documented (each pinned) ──────
+
+  it('residual: the same scalar changed on both devices keeps exactly one value', () => {
+    const { a, b } = fork(seeded([setOp('lists', list0)]));
+    const { a: merged } = converge(
+      apply(a, patchOp('lists', 'L', { title: 'Groceries' }, { title: 'Shopping' })),
+      apply(b, patchOp('lists', 'L', { title: 'Weekly shop' }, { title: 'Shopping' }))
+    );
+    expect(['Groceries', 'Weekly shop']).toContain(read(merged, 'lists', 'L').title);
+  });
+
+  it('residual: update vs remove of the same item: the item is gone', () => {
+    const { a, b } = fork(seeded([setOp('lists', list0)]));
+    const { a: merged } = converge(
+      apply(
+        a,
+        patchOp('lists', 'L', { items: [items0[0], item('i2', 'brown eggs')] }, { items: items0 })
+      ),
+      apply(b, patchOp('lists', 'L', { items: [items0[0]] }, { items: items0 }))
+    );
+    expect(read(merged, 'lists', 'L').items).toEqual([items0[0]]);
+  });
+
+  it('residual: move vs update of the same item: the moved item keeps its old value', () => {
+    const three = [...items0, item('i3', 'bread')];
+    const { a, b } = fork(seeded([setOp('lists', { ...list0, items: three })]));
+    const moved = [three[2], three[0], three[1]];
+    const { a: merged } = converge(
+      apply(a, patchOp('lists', 'L', { items: moved }, { items: three })),
+      apply(
+        b,
+        patchOp('lists', 'L', { items: [three[0], three[1], item('i3', 'rye')] }, { items: three })
+      )
+    );
+    // A move is a delete + insert of a copy, so B's edit landed on the deleted original. Only
+    // the dragged item is exposed; the others did not move.
+    expect(read(merged, 'lists', 'L').items).toEqual(moved);
+  });
+
+  it('residual: a keyless element edited on both devices leaves both edited versions', () => {
+    const steps0 = ['boil water', 'add pasta'];
+    const { a, b } = fork(seeded([setOp('recipes', { id: 'P', steps: steps0 })]));
+    const edit = (step: string) =>
+      patchOp('recipes', 'P', { steps: [steps0[0], step] }, { steps: steps0 });
+    const { a: merged } = converge(
+      apply(a, edit('add penne')),
+      apply(b, edit('add pasta, salt well'))
+    );
+    const steps = read(merged, 'recipes', 'P').steps as string[];
+    expect(steps).toHaveLength(3);
+    expect(steps[0]).toBe('boil water');
+    expect([...steps.slice(1)].sort()).toEqual(['add pasta, salt well', 'add penne']);
+  });
+
+  it('residual: the same member voting on two devices duplicates, and un-vote removes both', () => {
+    const ideas0 = [{ id: 'idea', title: 'Beach', votes: [] as AnyRec[] }];
+    const { a, b } = fork(seeded([setOp('vacations', { id: 'V', ideas: ideas0 })]));
+    const voted = [{ ...ideas0[0], votes: [{ memberId: 'm1' }] }];
+    const { a: merged } = converge(
+      apply(a, patchOp('vacations', 'V', { ideas: voted }, { ideas: ideas0 })),
+      apply(b, patchOp('vacations', 'V', { ideas: voted }, { ideas: ideas0 }))
+    );
+    const seen = read(merged, 'vacations', 'V').ideas as Array<{ votes: AnyRec[] }>;
+    expect(seen[0]!.votes).toEqual([{ memberId: 'm1' }, { memberId: 'm1' }]);
+    // `toggleIdeaVote` removes EVERY vote with that memberId, built from what the store shows.
+    const unvoted = [{ ...ideas0[0], votes: [] }];
+    const { doc: after, notes } = applyMutation(
+      merged,
+      patchOp('vacations', 'V', { ideas: unvoted }, { ideas: seen })
+    );
+    expect(read(after, 'vacations', 'V').ideas).toEqual(unvoted);
+    expect(notes).toEqual([{ action: 'healed_duplicate_keys', kind: 'vacations.ideas', count: 1 }]);
+  });
+
+  it('residual: a derived scalar can disagree with the merged array until the next write', () => {
+    const { a, b } = fork(seeded([setOp('lists', { ...list0, completed: false })]));
+    // Each tick alone leaves one item unticked, so each write keeps `completed: false`.
+    const { a: merged } = converge(
+      apply(
+        a,
+        patchOp(
+          'lists',
+          'L',
+          { items: [item('i1', 'milk', true), items0[1]], completed: false },
+          { items: items0, completed: false }
+        )
+      ),
+      apply(
+        b,
+        patchOp(
+          'lists',
+          'L',
+          { items: [items0[0], item('i2', 'eggs', true)], completed: false },
+          { items: items0, completed: false }
+        )
+      )
+    );
+    const list = read(merged, 'lists', 'L');
+    expect((list.items as AnyRec[]).every((i) => i.checked)).toBe(true);
+    expect(list.completed).toBe(false);
+  });
+
+  it('residual: first creation of an optional array on both devices keeps only one', () => {
+    // The conflict is on the parent map's key, which no reconciler can fix.
+    const { a, b } = fork(seeded([setOp('goals', { id: 'G' })]));
+    const add = (id: string) =>
+      patchOp('goals', 'G', { manualContributions: [{ id, amount: 10 }] }, {});
+    const { a: merged } = converge(apply(a, add('c1')), apply(b, add('c2')));
+    expect(read(merged, 'goals', 'G').manualContributions).toHaveLength(1);
   });
 });

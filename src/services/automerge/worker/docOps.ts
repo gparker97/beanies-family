@@ -38,7 +38,13 @@ import {
 } from '@/utils/loanPayment';
 import type { Asset, Account, Goal } from '@/types/models';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
-import type { MutationOp, ProjectionDelta, Heads } from './protocol';
+import type { MutationOp, ProjectionDelta, Heads, PatchSettingsArgs } from './protocol';
+import {
+  reconcileInto,
+  canonicalEqual,
+  type ReconcileContext,
+  type ReconcileNote,
+} from './reconcile';
 
 type Doc = Automerge.Doc<FamilyDocument>;
 type AnyRecord = Record<string, unknown>;
@@ -452,11 +458,57 @@ export function buildFullProjection(doc: Doc): ProjectionDelta[] {
 
 // ─── Named-op registry (nested-structure handlers, e.g. photo attach) ────────
 
-/** A named handler mutates the draft doc and returns its projection delta(s). */
+/** A named handler mutates the draft doc and returns its projection delta(s), plus any
+ * reconciler notes (#117) for main to log. */
 export type NamedOpHandler = (
   draft: FamilyDocument,
   args: Record<string, unknown>
-) => { result?: unknown; deltas: ProjectionDelta[] };
+) => { result?: unknown; deltas: ProjectionDelta[]; notes?: ReconcileNote[] };
+
+// ─── Fine-grained field writes (#117, ADR-039) ───────────────────────────────
+
+/**
+ * The base for one patched key: the caller's snapshot when it sent one, else the document's
+ * own value. ONE rule for `patch` and `patchSettings`.
+ *
+ * With no caller base, the target IS the base, so the reconciler takes the target to `next`
+ * in place: today's semantics, minus the whole-object writes. That is the path for the
+ * worker-internal rebase (whose ops are already three-way) and the scalar-only direct sites.
+ * With a caller base that lacks `k`, the base stays `undefined`: nothing is known about that
+ * key, so the write is additive and never deletes. (Without this rule a base-less rebase
+ * would be additive and silently drop a peer's removed rate or API key.)
+ */
+function baseFor(opBase: AnyRecord | undefined, target: AnyRecord, k: string): unknown {
+  return opBase ? opBase[k] : toPlain(target[k]);
+}
+
+/**
+ * The one per-key loop behind `patch` and `patchSettings`: reconcile every key of `patch`
+ * into `target`, then clear `deleteKeys`. A clear counts as a write only when the key is
+ * there (Automerge stores no `undefined`, so `=== undefined` is "absent").
+ */
+function reconcileFields(
+  target: AnyRecord,
+  patch: AnyRecord,
+  opBase: AnyRecord | undefined,
+  deleteKeys: readonly string[],
+  ctx: ReconcileContext
+): void {
+  for (const [k, v] of Object.entries(patch)) {
+    reconcileInto(target, k, v, baseFor(opBase, target, k), ctx);
+  }
+  for (const k of deleteKeys) {
+    if (target[k] === undefined) continue;
+    delete target[k];
+    ctx.writes++;
+  }
+}
+
+/** Prefix each note's field with where it happened (`lists.items`, `settings.exchangeRates`),
+ * so the one allowlisted `kind` key isolates the collection in CloudWatch. */
+function scopeNotes(where: string, notes: readonly ReconcileNote[]): ReconcileNote[] {
+  return notes.map((n) => ({ ...n, kind: n.kind ? `${where}.${n.kind}` : where }));
+}
 
 const namedRegistry = new Map<string, NamedOpHandler>();
 
@@ -574,27 +626,37 @@ const setSettingsOp: NamedOpHandler = (draft, args) => {
  * the plan token first among them. Merging here cannot read anything stale: the draft IS the
  * document. `deleteKeys` is the explicit way to clear a field; an absent key is left alone.
  */
-const patchSettingsOp: NamedOpHandler = (draft, args) => {
-  const patch = (args.patch ?? {}) as AnyRecord;
-  const deleteKeys = (args.deleteKeys as string[] | undefined) ?? [];
+const patchSettingsOp: NamedOpHandler = (draft, rawArgs) => {
+  const args = rawArgs as PatchSettingsArgs;
+  const ctx: ReconcileContext = { writes: 0, notes: [] };
   const d = draft as unknown as AnyRecord;
   // PER KEY, never a whole-map assignment: two devices patching DIFFERENT fields concurrently
   // (a pasted plan token here, a rate refresh there) must both survive the CRDT merge, and
   // Automerge only merges field-wise when the fields themselves are the writes. A whole-map
   // assignment would make the two patches a conflict on `settings` and keep one of them.
+  // And per ITEM inside each key (#117): arrays (`exchangeRates`, `preferredCurrencies`, ...)
+  // and map-like objects (`aiApiKeys`, `helpfulHintLeadDays`) are reconciled in place against
+  // `base`, so two devices each adding a rate both keep theirs.
   // A document with no settings yet (a fresh family's first write) starts from the DEFAULTS the
   // caller passes, so the document carries the full settings object, as every reader of the
   // raw document (exports, the .beanpod file, the E2E bridge) expects. Never applied to an
   // existing object: that would reset real values. Defaults come in as an argument because this
   // runs in the worker, which must not import main-thread modules.
   if (!d.settings || typeof d.settings !== 'object') {
-    d.settings = { ...((args.defaults as AnyRecord | undefined) ?? {}) };
+    d.settings = { ...(args.defaults ?? {}) };
+    ctx.writes++;
   }
-  const target = d.settings as AnyRecord;
-  for (const [k, v] of Object.entries(patch)) target[k] = v;
-  for (const key of deleteKeys) delete target[key];
+  const target = d.settings as AnyRecord; // re-read: the doc holds the proxy, not the literal
+  reconcileFields(target, args.patch ?? {}, args.base, args.deleteKeys ?? [], ctx);
+  // Only on a write, matching `patch`: an all-unchanged save leaves the heads alone, so it
+  // schedules no persist and no Drive save.
+  if (args.updatedAt && ctx.writes > 0) target.updatedAt = args.updatedAt;
   const settings = toPlain(draft.settings ?? null);
-  return { result: settings, deltas: [{ kind: 'settings', settings }] };
+  return {
+    result: settings,
+    deltas: [{ kind: 'settings', settings }],
+    notes: scopeNotes('settings', ctx.notes),
+  };
 };
 
 /** Register the core domain ops. Called at module load + re-registered after a
@@ -611,21 +673,32 @@ registerCoreNamedOps();
 
 // ─── Mutations ───────────────────────────────────────────────────────────────
 
+/**
+ * What one `applyMutation` accumulates across its (possibly batched) ops. ONE object rather
+ * than a positional parameter per accumulator, so the next one is a field, not a signature
+ * change at every recursion.
+ *  - `deltas`: named ops build their own projection deltas (structural ops' are built
+ *    afterwards from the committed doc);
+ *  - `results`: named ops' results, in order (a top-level named op returns the first);
+ *  - `notes`: reconciler findings (#117), logged on main.
+ */
+interface MutationSink {
+  deltas: ProjectionDelta[];
+  results: unknown[];
+  notes: ReconcileNote[];
+}
+
 /** Mutate the draft for one op (recurses for `batch`). Pure structural mutation
  * — the projection deltas are built afterwards from the COMMITTED doc (reading a
- * mid-change proxy is fragile). Returns named-op deltas inline (they own theirs). */
-function mutateDraft(
-  draft: FamilyDocument,
-  op: MutationOp,
-  named: ProjectionDelta[],
-  namedResults: unknown[]
-): void {
+ * mid-change proxy is fragile). Named ops contribute their deltas to the sink. */
+function mutateDraft(draft: FamilyDocument, op: MutationOp, sink: MutationSink): void {
   switch (op.op) {
     case 'set':
       (draft[op.collection] as AnyRecord)[op.id] = op.entity;
       break;
     case 'patch': {
       const col = draft[op.collection] as Record<string, AnyRecord>;
+      const ctx: ReconcileContext = { writes: 0, notes: [] };
       let entity = col[op.id];
       if (!entity) {
         switch (op.onMissing ?? 'throw') {
@@ -634,14 +707,25 @@ function mutateDraft(
           case 'create':
             col[op.id] = {};
             entity = col[op.id]; // re-read: the assigned `{}` is detached; the doc holds the proxy
+            ctx.writes++;
             break;
           default:
             throw new Error(`patch: ${op.collection}/${op.id} not found`);
         }
       }
-      for (const [k, v] of Object.entries(op.patch)) entity[k] = v;
-      for (const k of op.deleteKeys ?? []) delete entity[k];
-      if (op.updatedAt) entity.updatedAt = op.updatedAt;
+      // A programming error, never data to reconcile into: throw, so the worker's error path
+      // surfaces it (toast + report on main) rather than the edit vanishing quietly.
+      if (!isPlainObject(entity)) {
+        throw new Error(`patch: ${op.collection}/${op.id} is not an object`);
+      }
+      // Fine-grained, three-way (#117, ADR-039): only what the caller changed relative to
+      // `base` is written, in place, so a concurrent edit to the same array or object survives
+      // the merge instead of losing to a whole-value assignment.
+      reconcileFields(entity, op.patch, op.base, op.deleteKeys ?? [], ctx);
+      // Only on a write: an all-unchanged patch must leave the heads untouched so `mutate`
+      // reports `changed: false` (no persist, no Drive save).
+      if (op.updatedAt && ctx.writes > 0) entity.updatedAt = op.updatedAt;
+      sink.notes.push(...scopeNotes(op.collection, ctx.notes));
       break;
     }
     case 'delete':
@@ -660,14 +744,15 @@ function mutateDraft(
       break;
     }
     case 'batch':
-      for (const sub of op.ops) mutateDraft(draft, sub, named, namedResults);
+      for (const sub of op.ops) mutateDraft(draft, sub, sink);
       break;
     case 'named': {
       const handler = namedRegistry.get(op.name);
       if (!handler) throw new Error(`named op not registered: ${op.name}`);
-      const { result, deltas } = handler(draft, op.args);
-      named.push(...deltas);
-      namedResults.push(result);
+      const { result, deltas, notes } = handler(draft, op.args);
+      sink.deltas.push(...deltas);
+      sink.results.push(result);
+      if (notes) sink.notes.push(...notes);
       break;
     }
   }
@@ -709,27 +794,29 @@ function deltaFor(after: Doc, op: MutationOp, out: ProjectionDelta[]): unknown {
 
 /**
  * Apply a declarative mutation. Returns the new doc, the affected entity
- * (`result`, for read-after-write), and the projection delta. A `batch` (and a
+ * (`result`, for read-after-write), the projection delta, and the reconciler's
+ * `notes` (#117; empty when there is nothing to report). A `batch` (and a
  * single op) is exactly ONE `Automerge.change` → atomic: a mid-batch throw
  * commits nothing.
+ *
+ * The rebase replay (`applyAndProject`) ignores `notes` on purpose: its ops are
+ * composed from document reads, never from a caller, and its losses are
+ * already counted in `conflicts`.
  */
 export function applyMutation(
   doc: Doc,
   op: MutationOp
-): { doc: Doc; result: unknown; delta: ProjectionDelta } {
-  const namedDeltas: ProjectionDelta[] = [];
-  const namedResults: unknown[] = [];
-  const after = Automerge.change(doc, (d) =>
-    mutateDraft(d as FamilyDocument, op, namedDeltas, namedResults)
-  );
+): { doc: Doc; result: unknown; delta: ProjectionDelta; notes: ReconcileNote[] } {
+  const sink: MutationSink = { deltas: [], results: [], notes: [] };
+  const after = Automerge.change(doc, (d) => mutateDraft(d as FamilyDocument, op, sink));
   const out: ProjectionDelta[] = [];
   const structuralResult = deltaFor(after, op, out);
-  const all = [...out, ...namedDeltas];
+  const all = [...out, ...sink.deltas];
   const delta: ProjectionDelta = all.length === 1 ? all[0]! : { kind: 'multi', deltas: all };
   // A top-level `named` op returns its handler's result (the echoed entity for
   // read-after-write); structural ops return the affected entity.
-  const result = op.op === 'named' ? namedResults[0] : structuralResult;
-  return { doc: after, result, delta };
+  const result = op.op === 'named' ? sink.results[0] : structuralResult;
+  return { doc: after, result, delta, notes: sink.notes };
 }
 
 /**
@@ -742,7 +829,8 @@ export function applyMutation(
  *
  * ⚠️ IT IS STRUCTURALLY INCAPABLE OF WRITING `podLineage`. `MutationOp`'s
  * `collection` is typed `CollectionName`, which EXCLUDES the non-collection
- * keys, and the only op that writes a singleton is `named:setSettings`. That is
+ * keys, and the only op it emits that writes a singleton is
+ * `named:patchSettings`, which writes into `settings` and nothing else. That is
  * what makes it safe to replay onto the compacted document at all: an op that
  * stamped the OLD lineage onto the NEW document would be self-inflicted lineage
  * corruption with no external cause. `touchedBetween` ignoring `podLineage` is
@@ -756,10 +844,11 @@ export function applyMutation(
  * can do), so adopting the remote outright loses nothing and blocking would
  * strand it for no reason.
  *
- * Shallow field comparison is deliberate. `notificationReads[memberId]`,
- * `asset.loan` and friends are written WHOLE, which is the documented
- * last-writer-wins semantic; a deep differ would be new, untested machinery for
- * a case that resolves identically.
+ * Shallow field comparison is deliberate: the composer decides WHICH fields to
+ * carry, and the worker's `patch`/`patchSettings` reconciler (#117) then writes
+ * each one in place against the target, per item for arrays and per key for
+ * `MERGE_FIELDS` such as `asset.loan`. Arrays that BOTH sides changed stay a
+ * counted conflict here. See `docs/adr/039-fine-grained-crdt-writes.md`.
  */
 export function buildRebaseOps(
   local: Doc,
@@ -869,12 +958,14 @@ export function buildRebaseOps(
   if (scan.settingsChanged) {
     // ⚠️ FIELD-MERGED, NEVER WHOLE-REPLACED. `setSettings` replaces the
     // singleton, so emitting the peer's entire settings object would silently
-    // revert a currency, locale or theme the compactor changed.
+    // revert a currency, locale or theme the compactor changed. `patchSettings`
+    // writes only the carried fields, in place. It is sent WITHOUT a `base`, so
+    // the target is the base (`baseFor`): the composer's already-three-way value
+    // is applied exactly, including a peer's removed rate or API key.
     const changed = threeWayFields(before.settings, local.settings, target.settings);
     if (changed && (Object.keys(changed.set).length || changed.deleteKeys.length)) {
-      const merged = { ...(toPlain(target.settings) ?? {}), ...changed.set };
-      for (const key of changed.deleteKeys) delete (merged as AnyRecord)[key];
-      ops.push({ op: 'named', name: 'setSettings', args: { settings: merged } });
+      const args: PatchSettingsArgs = { patch: changed.set, deleteKeys: changed.deleteKeys };
+      ops.push({ op: 'named', name: 'patchSettings', args });
     }
     if (changed) conflicts += changed.conflicts;
   }
@@ -1022,9 +1113,10 @@ function threeWayFields(
 /** How deep the merge walks before treating a nested value as unmergeable. */
 const MAX_MERGE_DEPTH = 2;
 
-/** JSON-equality. The document model is pure JSON, so this is exact. */
+/** JSON-equality, via the worker's one equality (`canonicalEqual`, key-order blind). The
+ * document model is pure JSON, so this is exact. */
 function same(x: unknown, y: unknown): boolean {
-  return JSON.stringify(x) === JSON.stringify(y);
+  return canonicalEqual(x, y);
 }
 
 function isPlainObject(v: unknown): v is AnyRecord {

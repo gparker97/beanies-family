@@ -51,7 +51,6 @@ import {
   type RpcRequest,
   type RpcResponse,
   type WorkerSignal,
-  type ProjectionDelta,
   type MutationOp,
   type Heads,
   type CachePersistFailureDetail,
@@ -59,7 +58,9 @@ import {
   type ExportedPayload,
   type CacheClearResult,
   type MergeOutcome,
+  type DispatchReply,
 } from './protocol';
+import type { ReconcileNote } from './reconcile';
 import { ReadOnlyError, readWriteGate, setWriteGate, type WriteGateVerdict } from './writeGate';
 import type { CollectionName } from '@/types/automerge';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
@@ -76,10 +77,7 @@ export interface DocWorkerLike {
 
 /** An inline executor runs the SAME op set on the main thread (fallback when the
  * worker can't spawn). Wired in Task #6 from the shared `docOps`/`applyAndProject`. */
-export type InlineExecutor = (
-  method: string,
-  args: unknown
-) => Promise<{ result?: unknown; delta?: ProjectionDelta; changed?: boolean }>;
+export type InlineExecutor = (method: string, args: unknown) => Promise<DispatchReply>;
 
 const READY_TIMEOUT_MS = 10_000;
 const DEFAULT_RPC_TIMEOUT_MS = 45_000;
@@ -739,16 +737,25 @@ export interface RequestOpts {
   probe?: boolean;
 }
 
-/** Send one RPC (worker or inline) and return its `{result, changed}`. Applies the
+/** What `requestCore` hands its two wrappers. ONE declaration for every path that produces
+ * it (inline, worker, the timeout retry), so `notes` cannot be carried on one and dropped on
+ * another. */
+interface CoreReply {
+  result: unknown;
+  changed?: boolean;
+  notes?: ReconcileNote[];
+}
+
+/** Send one RPC (worker or inline) and return its `{result, changed, notes}`. Applies the
  * response delta to the projection before resolving (worker: via `handleResponse`;
  * inline: here). The single send/await/surface path shared by `request` (result
- * only) and `requestMutate` (result + the `changed` no-op flag). */
+ * only) and `requestMutate` (result + the `changed` no-op flag + reconciler notes). */
 async function requestCore(
   method: string,
   args: unknown,
   opts: RequestOpts,
   attempt = 1
-): Promise<{ result: unknown; changed?: boolean }> {
+): Promise<CoreReply> {
   // A1: the rehydrate RPCs are issued from INSIDE spawn()'s awaited rehydrator, so
   // they must NOT await `ensureReady()` — that awaits the very `readyPromise`
   // spawn() is still resolving → circular deadlock. Bypass the barrier for exactly
@@ -772,9 +779,9 @@ async function requestCore(
     // whole change is about. `quiet: true` preserves today's inline behaviour
     // exactly (no toast); only classification and the single report are added.
     try {
-      const { result, delta, changed } = await inlineExecutor(method, args);
+      const { result, delta, changed, notes } = await inlineExecutor(method, args);
       if (delta) applyDelta(delta);
-      return { result, changed };
+      return { result, changed, notes };
     } catch (e) {
       throw surface(e, method, true);
     }
@@ -821,7 +828,7 @@ async function requestCore(
   } catch (timeoutErr) {
     return handleRpcTimeout(timeoutErr, method, args, opts, attempt, cid);
   }
-  if (res.ok) return { result: res.result, changed: res.changed };
+  if (res.ok) return { result: res.result, changed: res.changed, notes: res.notes };
   throw surface(reconstructError(res.error, method), method, opts.quiet);
 }
 
@@ -941,7 +948,7 @@ async function handleRpcTimeout(
   opts: RequestOpts,
   attempt: number,
   cid: number
-): Promise<{ result: unknown; changed?: boolean }> {
+): Promise<CoreReply> {
   pending.delete(cid); // drop THIS call first…
 
   // A1: a rehydrate RPC that times out must reject ONLY itself. Calling
@@ -1055,13 +1062,36 @@ async function request<T = unknown>(
 }
 
 /** `mutate`-only variant that also returns the worker's `changed` flag (default
- * `true` when absent) so the caller can skip the Drive-save trigger on a no-op. */
+ * `true` when absent) so the caller can skip the Drive-save trigger on a no-op, and
+ * the reconciler's `notes` (default none). */
 async function requestMutate<T>(
   op: MutationOp,
   opts: RequestOpts = {}
-): Promise<{ result: T; changed: boolean }> {
-  const { result, changed } = await requestCore('mutate', op, opts);
-  return { result: result as T, changed: changed ?? true };
+): Promise<{ result: T; changed: boolean; notes: ReconcileNote[] }> {
+  const { result, changed, notes } = await requestCore('mutate', op, opts);
+  return { result: result as T, changed: changed ?? true, notes: notes ?? [] };
+}
+
+/**
+ * Log what the worker's reconciler reported for one write (#117). The worker cannot
+ * telemeter, so its findings ride the `mutate` response and are logged here, once, on main.
+ *  - `next_duplicate_keys` (a caller sent one array key twice) and `reconcile_verify_failed`
+ *    (Law 1 failed and the field was whole-assigned, today's write) are `warn`: a caller bug,
+ *    or a reconciler bug caught and degraded. Both must be at zero in steady state.
+ *  - `healed_duplicate_keys` is `info`: the expected aftermath of two devices inserting the
+ *    same semantic key concurrently. Its rate says how often that happens.
+ * `kind` is `<collection>.<field>` (e.g. `lists.items`, `settings.exchangeRates`), so one
+ * allowlisted key isolates the collection.
+ */
+function logReconcileNotes(notes: readonly ReconcileNote[]): void {
+  for (const note of notes) {
+    logEvent({
+      level: note.action === 'healed_duplicate_keys' ? 'info' : 'warn',
+      surface: 'crdt-reconcile',
+      message: note.action === 'healed_duplicate_keys' ? 'reconcile healed' : 'reconcile fallback',
+      context: { action: note.action, kind: note.kind, count: note.count },
+    });
+  }
 }
 
 /** The single toast-vs-firehose policy for every docClient failure site
@@ -1379,7 +1409,8 @@ export async function openCache(familyId: string): Promise<{ loaded: false }> {
  * nothing) leaves heads unchanged and schedules no save/persist (F10). */
 export async function mutate<T = unknown>(op: MutationOp, opts?: RequestOpts): Promise<T> {
   assertWritable(op, opts);
-  const { result, changed } = await requestMutate<T>(op, opts);
+  const { result, changed, notes } = await requestMutate<T>(op, opts);
+  logReconcileNotes(notes);
   if (changed) localChangeHandler?.();
   return result;
 }
