@@ -10,7 +10,12 @@
  * one intact `items` array rather than interleaving them, and why there is no
  * delete-vs-update resurrection hazard. Do not add an update path.
  */
-import { createAutomergeRepository, stripUndefined, toPlain } from '../automergeRepository';
+import {
+  createAutomergeRepository,
+  patchOp,
+  stripUndefined,
+  toPlain,
+} from '../automergeRepository';
 import { list } from '../projection';
 import { mutate } from '../worker/docClient';
 import type { MutationOp } from '../worker/protocol';
@@ -45,11 +50,10 @@ export async function archiveCycleAndReset(
       // factory does this for its own writes; a hand-built batch must do it explicitly.
       entity: toPlain(stripUndefined(cycle)),
     },
-    {
-      op: 'patch',
-      collection: 'lists',
-      id: listId,
-      patch: toPlain(stripUndefined(reset)) as Record<string, unknown>,
+    // `patchOp` attaches the list's projection `items` as the base (#117): the worker
+    // unticks item by item instead of replacing the array, so an item a peer adds
+    // concurrently survives the merge.
+    patchOp('lists', listId, toPlain(stripUndefined(reset)) as Record<string, unknown>, {
       updatedAt: nowIso,
       // `skip`, not the `throw` default. `reconcileRecurringLists` iterates a SNAPSHOT of
       // the lists it read, so a list deleted on another device and merged in afterwards
@@ -65,7 +69,7 @@ export async function archiveCycleAndReset(
       // and renders on the history shelf under a deleted list. `reconcileRecurringLists`
       // detects the skip (its verify read returns `undefined`) and deletes the cycle.
       onMissing: 'skip',
-    },
+    }),
   ];
   await mutate({ op: 'batch', ops });
 }

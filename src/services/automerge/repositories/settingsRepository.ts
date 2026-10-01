@@ -1,5 +1,7 @@
 import { getSettings as projectionGetSettings } from '../projection';
 import { mutate } from '../worker/docClient';
+import { pickBase } from '../automergeRepository';
+import type { PatchSettingsArgs } from '../worker/protocol';
 import { DEFAULT_CURRENCY } from '@/constants/currencies';
 import { DEFAULT_LANGUAGE } from '@/constants/languages';
 import { apiKeyForProvider } from '@/utils/aiApiKeys';
@@ -70,8 +72,16 @@ export async function getSettings(): Promise<Settings> {
  * authoritative document, never against the main-thread projection: in the window between the
  * worker loading the document and the projection hydrating, `getSettings()` returns the
  * defaults, and a merge-then-replace from that read wiped every field with no default (the
- * plan token, 2026-10-01). Only the fields passed here change; `updatedAt` is stamped unless
- * `preserveTimestamp` (sync bookkeeping that must not churn it).
+ * plan token, 2026-10-01). Only the fields passed here change.
+ *
+ * `base` is the projection's value of each passed field (#117, ADR-039), raw: the worker
+ * writes only what differs from it, per key and per array item, so a rate or API key a peer
+ * added meanwhile is kept. In that boot window the projection is `null`, the base is `{}`,
+ * and the write is purely additive: it cannot drop a rate or key it has not seen.
+ *
+ * `updatedAt` travels beside the patch, not in it, and the worker stamps it only when the
+ * write changed something, so a no-op save leaves the document (and Drive) alone. It is
+ * omitted under `preserveTimestamp` (sync bookkeeping that must not churn it).
  *
  * The returned object is the document's settings after the write, backfilled with defaults
  * like `getSettings()`.
@@ -82,14 +92,20 @@ export async function saveSettings(
 ): Promise<Settings> {
   const patch = structuredClone(settings) as Partial<Settings>;
   patch.id = SETTINGS_ID;
-  if (!options?.preserveTimestamp) patch.updatedAt = toISODateString(new Date());
-  else delete patch.updatedAt;
+  delete patch.updatedAt;
+  const args: PatchSettingsArgs = {
+    patch,
+    base: pickBase(projectionGetSettings(), Object.keys(patch)),
+    // `defaults` seed a document that has no settings yet (first write of a fresh family); the
+    // worker ignores them when a settings object already exists. Widened to `Partial` (a safe
+    // upcast) only because the interface has no index signature for the args' record type.
+    defaults: getDefaultSettings() as Partial<Settings>,
+  };
+  if (!options?.preserveTimestamp) args.updatedAt = toISODateString(new Date());
   const written = await mutate<Partial<Settings> | null>({
     op: 'named',
     name: 'patchSettings',
-    // `defaults` seed a document that has no settings yet (first write of a fresh family); the
-    // worker ignores them when a settings object already exists.
-    args: { patch, defaults: getDefaultSettings() },
+    args,
   });
   return withDefaults(written ?? {});
 }
