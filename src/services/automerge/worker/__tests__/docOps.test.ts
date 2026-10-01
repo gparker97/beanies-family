@@ -331,6 +331,67 @@ describe('docOps — projectionDeltasBetween (poll-merge delta)', () => {
     expect(deltas).toEqual([{ kind: 'settings', settings: { baseCurrency: 'GBP' } }]);
   });
 
+  it('patchSettings merges into the document settings (never replaces), and deleteKeys clears', () => {
+    __resetNamedOpsForTesting();
+    let doc = applyMutation(base(), {
+      op: 'named',
+      name: 'setSettings',
+      args: { settings: { baseCurrency: 'GBP', planToken: 'tok', theme: 'dark' } },
+    }).doc;
+    // A boot-time write that only knows one field must leave the others alone.
+    doc = applyMutation(doc, {
+      op: 'named',
+      name: 'patchSettings',
+      args: { patch: { exchangeRates: [], exchangeRateLastFetch: '2026-10-01T00:00:00.000Z' } },
+    }).doc;
+    expect(doc.settings).toMatchObject({
+      baseCurrency: 'GBP',
+      planToken: 'tok',
+      theme: 'dark',
+      exchangeRates: [],
+    });
+    doc = applyMutation(doc, {
+      op: 'named',
+      name: 'patchSettings',
+      args: { patch: { theme: 'light' }, deleteKeys: ['planToken'] },
+    }).doc;
+    expect(doc.settings).toMatchObject({ baseCurrency: 'GBP', theme: 'light' });
+    expect((doc.settings as unknown as Record<string, unknown>).planToken).toBeUndefined();
+    // A document with no settings yet: the patch becomes the settings (defaults are backfilled on read).
+    const fresh = applyMutation(base(), {
+      op: 'named',
+      name: 'patchSettings',
+      args: { patch: { baseCurrency: 'SGD' } },
+    }).doc;
+    expect(fresh.settings).toMatchObject({ baseCurrency: 'SGD' });
+  });
+
+  it('patchSettings from two devices on different fields both survive the merge', () => {
+    __resetNamedOpsForTesting();
+    const origin = applyMutation(base(), {
+      op: 'named',
+      name: 'setSettings',
+      args: { settings: { baseCurrency: 'GBP', theme: 'dark' } },
+    }).doc;
+    const a = applyMutation(Automerge.clone(origin), {
+      op: 'named',
+      name: 'patchSettings',
+      args: { patch: { planToken: 'tok' } },
+    }).doc;
+    const b = applyMutation(Automerge.clone(origin), {
+      op: 'named',
+      name: 'patchSettings',
+      args: { patch: { exchangeRateLastFetch: '2026-10-01T00:00:00.000Z' } },
+    }).doc;
+    const { doc: merged } = mergeDocs(a, b);
+    expect(merged.settings).toMatchObject({
+      baseCurrency: 'GBP',
+      theme: 'dark',
+      planToken: 'tok',
+      exchangeRateLastFetch: '2026-10-01T00:00:00.000Z',
+    });
+  });
+
   it('empty delta (no changes brought in) → empty array (not null)', () => {
     const origin = withTodo(base(), 'x');
     const heads = getHeads(origin);

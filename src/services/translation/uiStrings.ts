@@ -7610,7 +7610,7 @@ const STRING_DEFS = {
   // surfaces (uiStrings.test.ts): beanie values keep the real nouns and only drop case.
   // NATIVE copy carries no link, URL, price or purchase verb (Apple 3.1.3(f), Google Play).
   // `readOnly.native.*` is greg's final wording, verbatim, hyphen included.
-  'plan.title': { en: 'Your Plan', beanie: 'your plan' },
+  'plan.title': { en: 'Your beanies Plan', beanie: 'your beanies plan' },
   'plan.pill.beta': { en: 'Beta', beanie: 'beta' },
   'plan.pill.trial': { en: 'Trial', beanie: 'trial' },
   'plan.pill.active': { en: 'Active', beanie: 'active' },
@@ -7634,6 +7634,22 @@ const STRING_DEFS = {
   'plan.name.basic': { en: 'beanies basic', beanie: 'beanies basic' },
   'plan.name.full': { en: 'beanies + magic beans', beanie: 'beanies + magic beans' },
   'plan.active.renews': { en: 'Renews {date}.', beanie: 'renews {date}.' },
+  // A cancelled plan keeps everything until the paid period ends; a failed renewal keeps the
+  // plan while Stripe retries. Both are "active" to the server; the words and the CTA differ.
+  'plan.pill.ending': { en: 'Ending', beanie: 'ending' },
+  'plan.pill.paymentIssue': { en: 'Payment Issue', beanie: 'payment issue' },
+  'plan.active.ends': {
+    en: 'Cancelled. Everything stays included until {date}, then beanies.family goes read-only.',
+    beanie:
+      'cancelled. everything stays included until {date}, then beanies.family goes read-only.',
+  },
+  'plan.active.pastDue': {
+    en: "Your last payment didn't go through. Update your card to keep everything included; Stripe will keep trying for a little while.",
+    beanie:
+      "your last payment didn't go through. update your card to keep everything included; stripe will keep trying for a little while.",
+  },
+  'plan.active.restart': { en: 'Restart Plan', beanie: 'restart plan' },
+  'plan.active.updateCard': { en: 'Update Card', beanie: 'update card' },
   'plan.cohort.preV1': {
     en: 'Half price for life, for joining before v1.',
     beanie: 'half price for life, for joining before v1.',
@@ -7647,6 +7663,151 @@ const STRING_DEFS = {
     beanie: 'your plan details will show here once this device has checked in with beanies.family.',
   },
   'plan.action.seePlans': { en: 'See Plans', beanie: 'see plans' },
+  // Phase 5: the Plan page (web only), checkout, the claim, the portal and the token paste.
+  'plan.page.subtitle.trial': {
+    en: 'Day {day} of your {total}-day trial. Nothing is charged until you pick a plan.',
+    beanie: 'day {day} of your {total}-day trial. nothing is charged until you pick a plan.',
+  },
+  'plan.page.subtitle.beta': {
+    en: "You're on the beta, so everything is free for now. Pick a plan to support beanies.family; billing begins today.",
+    beanie:
+      "you're on the beta, so everything is free for now. pick a plan to support beanies.family; billing begins today.",
+  },
+  'plan.page.subtitle.readOnly': {
+    en: 'Your trial has ended. Pick a plan to keep adding to your family.',
+    beanie: 'your trial has ended. pick a plan to keep adding to your family.',
+  },
+  'plan.page.subtitle.active': {
+    en: "You're all set - your plan details are below. Thanks so much for being a beanie supporter! You will be rewarded in this life and the next.",
+    beanie:
+      "you're all set - your plan details are below. thanks so much for being a beanie supporter! you will be rewarded in this life and the next.",
+  },
+  'plan.page.subtitle.ending': {
+    en: "You've cancelled; everything stays included until {date}. Change your mind any time below.",
+    beanie:
+      "you've cancelled; everything stays included until {date}. change your mind any time below.",
+  },
+  'plan.page.subtitle.pastDue': {
+    en: "Your plan is still active, but your last payment didn't go through.",
+    beanie: "your plan is still active, but your last payment didn't go through.",
+  },
+  'plan.page.loading': { en: 'counting beans...', beanie: 'counting beans...' },
+  'plan.currency.label': { en: 'Currency', beanie: 'currency' },
+  'plan.select.aria': { en: 'Choose a plan', beanie: 'choose a plan' },
+  'plan.cohort.page.preV1.lead': {
+    en: 'Your pod joined before v1, so',
+    beanie: 'your pod joined before v1, so',
+  },
+  'plan.cohort.page.preV1.bold': {
+    en: 'every plan is half price, forever.',
+    beanie: 'every plan is half price, forever.',
+  },
+  'plan.cohort.page.firstTen.lead': {
+    en: "You're one of the first ten families, so it's",
+    beanie: "you're one of the first ten families, so it's",
+  },
+  'plan.cohort.page.firstTen.bold': {
+    en: '{price} a month, forever.',
+    beanie: '{price} a month, forever.',
+  },
+  'plan.cohort.page.noCode': { en: 'No code, nothing to do.', beanie: 'no code, nothing to do.' },
+  'plan.basic.for': {
+    en: 'The whole app for the whole family. Magic beans once a month.',
+    beanie: 'the whole app for the whole family. magic beans once a month.',
+  },
+  'plan.full.for': {
+    en: 'Everything in basic, plus beanies reads the paperwork for you.',
+    beanie: 'everything in basic, plus beanies reads the paperwork for you.',
+  },
+  'plan.per.year': { en: 'a year', beanie: 'a year' },
+  'plan.per.month': { en: 'a month', beanie: 'a month' },
+  'plan.bullets.basic1': {
+    en: 'Every feature, every member, every device',
+    beanie: 'every feature, every member, every device',
+  },
+  'plan.bullets.basic2': { en: '1 magic bean a month', beanie: '1 magic bean a month' },
+  'plan.bullets.basic3': { en: 'Your own AI key: unlimited', beanie: 'your own AI key: unlimited' },
+  'plan.bullets.full1': { en: '10 magic beans a day', beanie: '10 magic beans a day' },
+  'plan.bullets.full2': {
+    en: 'Statements, invitations, recipes, itineraries',
+    beanie: 'statements, invitations, recipes, itineraries',
+  },
+  'plan.bullets.full3': {
+    en: 'Cancel any time from this page',
+    beanie: 'cancel any time from this page',
+  },
+  'plan.cycle.label': { en: 'Billing', beanie: 'billing' },
+  'plan.cycle.yearly': { en: 'Yearly', beanie: 'yearly' },
+  'plan.cycle.monthly': { en: 'Monthly {price}', beanie: 'monthly {price}' },
+  'plan.checkout.loading': { en: 'Getting checkout ready...', beanie: 'getting checkout ready...' },
+  'plan.checkout.retry': { en: 'Try Again', beanie: 'try again' },
+  'plan.error.stripeJs': {
+    en: "Checkout couldn't load. A content blocker may be stopping Stripe; allow js.stripe.com and try again.",
+    beanie:
+      "checkout couldn't load. a content blocker may be stopping stripe; allow js.stripe.com and try again.",
+  },
+  'plan.error.checkoutUnavailable': {
+    en: "Checkout isn't available right now. Please try again in a moment, or send us feedback from Settings.",
+    beanie:
+      "checkout isn't available right now. please try again in a moment, or send us feedback from settings.",
+  },
+  'plan.error.notConfigured': {
+    en: "Checkout isn't set up on this build of beanies.family.",
+    beanie: "checkout isn't set up on this build of beanies.family.",
+  },
+  'plan.error.alreadySubscribed': {
+    en: 'This family already has a plan. Refresh the page to see it.',
+    beanie: 'this family already has a plan. refresh the page to see it.',
+  },
+  'plan.claim.working': { en: 'Setting up your plan...', beanie: 'setting up your plan...' },
+  'plan.claim.done.title': { en: 'Plan active', beanie: 'plan active' },
+  'plan.claim.done.message': {
+    en: 'Thank you. Everything is included from now on.',
+    beanie: 'thank you. everything is included from now on.',
+  },
+  'plan.claim.failed.title': {
+    en: "Payment went through, but the plan didn't finish setting up",
+    beanie: "payment went through, but the plan didn't finish setting up",
+  },
+  'plan.claim.failed.message': {
+    en: 'Nothing else to pay. Tap Try Again, or send us feedback from Settings and we will sort it out.',
+    beanie:
+      'nothing else to pay. tap try again, or send us feedback from settings and we will sort it out.',
+  },
+  'plan.claim.retry': { en: 'Try Again', beanie: 'try again' },
+  'plan.claim.dismiss': { en: 'Not Now', beanie: 'not now' },
+  'plan.claim.permanent.title': {
+    en: "That checkout couldn't be matched to this family",
+    beanie: "that checkout couldn't be matched to this family",
+  },
+  'plan.claim.permanent.message': {
+    en: 'If you were charged, send us feedback from Settings with the date and we will put it right.',
+    beanie:
+      'if you were charged, send us feedback from settings with the date and we will put it right.',
+  },
+  'plan.active.manage': { en: 'Manage Plan', beanie: 'manage plan' },
+  'plan.active.receipts': { en: 'Receipts', beanie: 'receipts' },
+  'plan.active.finePrint': {
+    en: "Manage plan opens Stripe's secure portal to change your card, switch plan or cancel.",
+    beanie: "manage plan opens stripe's secure portal to change your card, switch plan or cancel.",
+  },
+  'plan.error.portalUnavailable.title': {
+    en: "Couldn't open the plan portal",
+    beanie: "couldn't open the plan portal",
+  },
+  'plan.error.portalUnavailable.message': {
+    en: 'Please try again in a moment.',
+    beanie: 'please try again in a moment.',
+  },
+  'plan.error.portalUnavailable.badToken': {
+    en: "Something's out of step with your plan on this device. We've been told and will put it right; there is nothing you need to do.",
+    beanie:
+      "something's out of step with your plan on this device. we've been told and will put it right; there is nothing you need to do.",
+  },
+  'plan.action.details': { en: 'Plan Details', beanie: 'plan details' },
+  'plan.backToSettings': { en: 'Back to Settings', beanie: 'back to settings' },
+  'plan.allowance.meterLabel': { en: 'Magic beans left', beanie: 'magic beans left' },
+  'header.plan': { en: 'Your beanies Plan', beanie: 'your beanies plan' },
   'readOnly.native.trialEnded': {
     en: 'Your trial has ended, so beanies.family is now read-only. Everything is still yours and export always works.',
     beanie:

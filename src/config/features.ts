@@ -39,6 +39,26 @@ export const features = {
   // VITE_REGISTRY_API_URL (cloud, where one Lambda backs both surfaces).
   oauthProxy: ok(env.VITE_OAUTH_PROXY_URL) || ok(env.VITE_REGISTRY_API_URL),
   registry: ok(env.VITE_REGISTRY_API_URL) && ok(env.VITE_REGISTRY_API_KEY),
+  // Plans and the read-only gate (#95), two capabilities:
+  //   entitlement: the registry computes the family's plan state. EVERY platform, iOS and
+  //                Android included (they show the plan card and the read-only band). A vanilla
+  //                self-host has no registry, so none of this exists there; one that runs its
+  //                own registry reads `beta` from it, which is that operator's own clock.
+  //   checkout:    paying, which needs the Stripe publishable key. Web only: the native lanes
+  //                deliberately omit the key (workflowEnvParity.test.ts), so the Plan page is
+  //                absent there by construction, not by a flag.
+  // The `pricing` dev flag gates the ROLLOUT; `isPricingAvailable` / `isPlanPageReachable` in
+  // src/services/billing/pricingGate.ts combine the two.
+  entitlement: ok(env.VITE_REGISTRY_API_URL) && ok(env.VITE_REGISTRY_API_KEY),
+  // On the cloud host the key must be LIVE: until the pricing launch flips the keys, prod holds
+  // the sandbox pair, and a family must never be offered Stripe's TEST MODE checkout at
+  // app.beanies.family. Everywhere else (greg's dev build, a preview) a test key is the point.
+  checkout:
+    ok(env.VITE_REGISTRY_API_URL) &&
+    ok(env.VITE_REGISTRY_API_KEY) &&
+    ok(env.VITE_STRIPE_PUBLISHABLE_KEY) &&
+    (!CLOUD_HOSTS.has(globalThis.location?.hostname ?? '') ||
+      String(env.VITE_STRIPE_PUBLISHABLE_KEY).startsWith('pk_live_')),
   // Invite gate: retained but switched OFF in prod as of 2026-07-21, superseded by the
   // Create-pod welcome modal. NOT dead code — flip the INVITE_GATE repo variable to
   // "true" to re-gate (e.g. a future closed cohort or paid beta). See

@@ -54,7 +54,7 @@ import { docVersion, isDocLoaded } from '@/services/automerge/docService';
 import { setWriteGate } from '@/services/automerge/worker/writeGate';
 import { getSettings as projectionGetSettings } from '@/services/automerge/projection';
 import { logEvent } from '@/services/telemetry';
-import { isFlagEnabled } from '@/config/flags';
+import { isPricingAvailable } from '@/services/billing/pricingGate';
 import { useOnline } from '@/composables/useOnline';
 import { usePollWhileVisible } from '@/composables/usePollWhileVisible';
 import { OFFLINE_GRACE_DAYS } from '@/constants/entitlement';
@@ -120,11 +120,14 @@ export const useEntitlementStore = defineStore('entitlement', () => {
   const cohort = computed(() => entitlement.value?.cohort ?? null);
   const trialEndsAt = computed(() => entitlement.value?.trialEndsAt ?? null);
   const currentPeriodEnd = computed(() => entitlement.value?.currentPeriodEnd ?? null);
+  const cancelAt = computed(() => entitlement.value?.cancelAt ?? null);
+  const pastDue = computed(() => entitlement.value?.pastDue === true);
+  const interval = computed(() => entitlement.value?.interval ?? null);
 
   /** Would the client act on a read-only answer? The flag is read at call time (it changes
    *  only on reload), the server's `enforced` per answer. */
   function acts(e: Entitlement | null): boolean {
-    return isFlagEnabled('pricing') && e?.enforced === true;
+    return isPricingAvailable() && e?.enforced === true;
   }
 
   /** The one value that blocks writes (Phase 3) and shows the band. */
@@ -189,7 +192,7 @@ export const useEntitlementStore = defineStore('entitlement', () => {
       console.error(
         `[entitlement] family ${familyId} has a paid plan but no plan token in its family data; ` +
           'the Customer Portal and the full AI allowance behave as basic until it is restored. ' +
-          `Run: node scripts/billing-cohort.mjs --reissue-token ${familyId}`
+          'Recovery is the one path that mints tokens: refund the current period in the Stripe Dashboard and ask the family to choose the plan again; the claim writes a fresh token. There is deliberately no token paste or reissue.'
       );
       logEvent({
         level: 'warn',
@@ -421,6 +424,9 @@ export const useEntitlementStore = defineStore('entitlement', () => {
     cohort,
     trialEndsAt,
     currentPeriodEnd,
+    cancelAt,
+    pastDue,
+    interval,
     isReadOnly,
     wouldBeReadOnly,
     trialDaysLeft,

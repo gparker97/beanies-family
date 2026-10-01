@@ -16,6 +16,7 @@ import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry';
 import { QUICK_ADD_CONTEXT_KEYS } from '@/constants/quickAddItems';
 import { isFlagEnabled, type DevFlag } from '@/config/flags';
+import { isPlanPageReachable } from '@/services/billing/pricingGate';
 import { hardReload, isChunkLoadError, CHUNK_RELOAD_FLAG } from '@/utils/hardReload';
 import { isPodlessRecoveryQuery } from '@/components/login/resumePaths';
 
@@ -30,6 +31,13 @@ declare module 'vue-router' {
     noChrome?: boolean;
     /** Gate the route behind a dev feature flag — redirected to /nook when off. */
     requiresFlag?: DevFlag;
+    /**
+     * The Plan page (#95): reachable only per `isPlanPageReachable()` (cloud web build with
+     * Stripe, the rollout flag, not native). Native carries no purchase path at all (Apple
+     * 3.1.3(f), Google Play), so it must be unreachable there even by a typed URL or a stale
+     * deep link; a self-host has nothing to buy.
+     */
+    webOnly?: boolean;
   }
 }
 
@@ -306,6 +314,20 @@ const routes: RouteRecordRaw[] = [
     meta: { titleKey: 'nav.settings', requiresAuth: true, hideQuickAdd: true },
   },
   {
+    // Settings → Plan (#95 Phase 5). Registering this name is what switches "See plans" on in
+    // PlanCard and ReadOnlyBanner (`useReadOnlyCopy` checks `router.hasRoute(PLAN_ROUTE_NAME)`).
+    path: '/settings/plan',
+    name: 'Plan',
+    component: () => import('@/pages/PlanPage.vue'),
+    meta: {
+      titleKey: 'plan.title',
+      requiresAuth: true,
+      requiresFlag: 'pricing',
+      hideQuickAdd: true,
+      webOnly: true,
+    },
+  },
+  {
     path: '/oauth/callback',
     name: 'OAuthCallback',
     component: () => import('@/pages/OAuthCallbackPage.vue'),
@@ -559,6 +581,14 @@ router.beforeEach((to) => {
   if (to.meta.requiresFlag && !isFlagEnabled(to.meta.requiresFlag)) {
     return { path: '/nook' };
   }
+});
+
+// The Plan page (#95) exists only where a plan can be CHOSEN: a cloud web build with Stripe
+// configured, never a native shell (no purchase surface) and never a self-host (nothing to buy).
+// `isPlanPageReachable` is the same predicate "See plans" uses, so a button never leads here
+// only to bounce. Sends the user to Settings, where the plan card (if any) explains itself.
+router.beforeEach((to) => {
+  if (to.meta.webOnly && !isPlanPageReachable()) return { name: 'Settings', replace: true };
 });
 
 /**

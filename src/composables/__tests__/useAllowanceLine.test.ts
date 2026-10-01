@@ -11,7 +11,7 @@ const h = vi.hoisted(() => ({
   logEvent: vi.fn(),
 }));
 
-const entitlement = reactive({ state: 'trial' as string | null });
+const entitlement = reactive({ state: 'trial' as string | null, plan: null as string | null });
 const familyContext = reactive({ activeFamilyId: 'fam-1' as string | null });
 const capability = reactive({ tier: 'managed', planToken: null as string | null });
 
@@ -81,6 +81,20 @@ describe('useAllowanceLine', () => {
     expect(line.value).toMatch(/(am|pm)$/);
   });
 
+  it('pct is what is LEFT of the allowance for the meter, null when the line does not apply', async () => {
+    h.fetchAllowance.mockResolvedValueOnce({
+      used: 3,
+      limit: 10,
+      period: 'day',
+      resetsAt: '2026-10-02T00:00:00Z',
+      tier: 'full',
+    });
+    const { pct } = useAllowanceLine();
+    expect(pct.value).toBeNull();
+    await flushPromises();
+    expect(pct.value).toBe(70);
+  });
+
   it('basic: the month wording with the reset date', async () => {
     entitlement.state = 'active';
     h.fetchAllowance.mockResolvedValue({ used: 1, limit: 1, period: 'month', resetsAt: RESETS });
@@ -101,6 +115,43 @@ describe('useAllowanceLine', () => {
     useAllowanceLine();
     await flushPromises();
     expect(h.fetchAllowance).toHaveBeenCalledWith({ familyId: 'fam-1', planToken: 'tok-1' });
+  });
+
+  it('refetches when the plan token arrives after the first read (the family file loads late)', async () => {
+    h.fetchAllowance.mockResolvedValueOnce({
+      used: 0,
+      limit: 1,
+      period: 'month',
+      resetsAt: '2026-11-01T00:00:00Z',
+      tier: 'basic',
+    });
+    h.fetchAllowance.mockResolvedValueOnce({
+      used: 0,
+      limit: 10,
+      period: 'day',
+      resetsAt: '2026-10-02T00:00:00Z',
+      tier: 'full',
+    });
+    const { line } = useAllowanceLine();
+    await flushPromises();
+    expect(h.fetchAllowance).toHaveBeenCalledWith({ familyId: 'fam-1' });
+    expect(line.value).toContain('month');
+    capability.planToken = 'tok-late';
+    await flushPromises();
+    expect(h.fetchAllowance).toHaveBeenLastCalledWith({ familyId: 'fam-1', planToken: 'tok-late' });
+    expect(line.value).toContain('day');
+    expect(h.fetchAllowance).toHaveBeenCalledTimes(2);
+  });
+
+  it('refetches when the plan changes (a switch made in the portal)', async () => {
+    entitlement.state = 'active';
+    entitlement.plan = 'full';
+    useAllowanceLine();
+    await flushPromises();
+    expect(h.fetchAllowance).toHaveBeenCalledTimes(1);
+    entitlement.plan = 'basic';
+    await flushPromises();
+    expect(h.fetchAllowance).toHaveBeenCalledTimes(2);
   });
 
   it('does not apply (and never fetches) on BYOK, in beta, or while read-only', async () => {

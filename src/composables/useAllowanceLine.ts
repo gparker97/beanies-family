@@ -41,20 +41,27 @@ export function useAllowanceLine() {
       Boolean(familyContextStore.activeFamilyId)
   );
 
-  // Which family the line currently describes. A latch on the FAMILY, not a boolean: switching
-  // family while the card stays mounted must refetch, and a re-render must not.
+  // Which family AND token the line currently describes. A latch on both, not a boolean:
+  // switching family while the card stays mounted must refetch, a re-render must not, and the
+  // plan token ARRIVING must refetch too. On a page refresh the card mounts before the family
+  // file (and `settings.planToken` in it) has loaded, so the first read goes out without the
+  // token and the server answers the basic tier; that read must not stick.
   let loadedFor: string | null = null;
+  // ...and the PLAN: a switch in the portal (full ↔ basic) changes the allowance tier.
+  const latchKey = (familyId: string) =>
+    `${familyId}|${planToken.value ?? ''}|${entitlementStore.plan ?? ''}`;
 
   async function load(familyId: string): Promise<void> {
+    const key = latchKey(familyId);
     try {
       const answer = await fetchAllowance({
         familyId,
         ...(planToken.value ? { planToken: planToken.value } : {}),
       });
-      // A family switch while this was in flight: the answer is about the old family.
-      if (loadedFor === familyId) usage.value = answer;
+      // A family switch (or the token arriving) while this was in flight: the answer is stale.
+      if (loadedFor === key) usage.value = answer;
     } catch (err) {
-      if (loadedFor === familyId) unavailable.value = true;
+      if (loadedFor === key) unavailable.value = true;
       const code = err instanceof ExtractionProviderError ? err.code : 'unknown';
       console.warn(
         `[ai-allowance] could not read magic-beans usage (${code}). Check the ai-extract Lambda ` +
@@ -72,10 +79,10 @@ export function useAllowanceLine() {
   }
 
   watch(
-    [applies, () => familyContextStore.activeFamilyId],
+    [applies, () => familyContextStore.activeFamilyId, planToken, () => entitlementStore.plan],
     ([now, familyId]) => {
-      if (!now || !familyId || loadedFor === familyId) return;
-      loadedFor = familyId;
+      if (!now || !familyId || loadedFor === latchKey(familyId)) return;
+      loadedFor = latchKey(familyId);
       usage.value = null;
       unavailable.value = false;
       void load(familyId);
@@ -97,5 +104,13 @@ export function useAllowanceLine() {
       : fillTemplate(t('plan.allowance.day'), { left, limit: u.limit, time: reset.time });
   });
 
-  return { line };
+  /** For the meter: how much of the allowance is LEFT, 0..100 (the sentence says "left", so the
+   *  bar shrinks as beans are used), or null when the line does not apply. */
+  const pct = computed<number | null>(() => {
+    if (!applies.value || unavailable.value || !usage.value || usage.value.limit <= 0) return null;
+    const left = Math.max(0, usage.value.limit - usage.value.used);
+    return Math.min(100, Math.round((left / usage.value.limit) * 100));
+  });
+
+  return { line, pct };
 }

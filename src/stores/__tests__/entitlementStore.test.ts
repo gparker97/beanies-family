@@ -652,7 +652,7 @@ describe('plan_token_missing', () => {
       level: 'warn',
       context: { plan: 'full' },
     });
-    expect(err.mock.calls[0]![0]).toContain(`--reissue-token ${FAMILY}`);
+    expect(err.mock.calls[0]![0]).toContain('refund the current period');
     err.mockRestore();
   });
 

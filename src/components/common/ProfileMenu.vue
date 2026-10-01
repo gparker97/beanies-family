@@ -37,6 +37,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { getMemberAvatarUrl, markMemberAvatarError } from '@/composables/useMemberInfo';
 import { isFlagEnabled } from '@/config/flags';
+import { isPlanPageReachable } from '@/services/billing/pricingGate';
 import { isTemporaryEmail } from '@/utils/email';
 import { MARKETING_URL } from '@/utils/marketing';
 import { openExternal } from '@/utils/openExternal';
@@ -87,6 +88,9 @@ const canStartWall = computed(
  * and same shape, as `canStartWall`.
  */
 const canSignInDevice = computed(() => canStepUp());
+
+// Fixed for the session: features and platform do not change; the flag override needs a reload.
+const showPlan = isPlanPageReachable();
 
 function go(path: string): void {
   emit('close');
@@ -194,6 +198,19 @@ function handleOpenHelp(): void {
       >
         <BeanieIcon name="settings" size="sm" class="opacity-50" />
         {{ t('header.settings') }}
+      </button>
+
+      <!-- Your beanies Plan (#95): only where the Plan page is reachable (cloud web build,
+           flag on, never native), the same rule as the router guard and "See plans". -->
+      <button
+        v-if="showPlan"
+        type="button"
+        class="text-secondary-500 dark:text-ink-soft dark:hover:bg-surface-hover flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-gray-50"
+        data-testid="profile-plan"
+        @mousedown.prevent="go('/settings/plan')"
+      >
+        <BeanieIcon name="settings" size="sm" class="opacity-50" />
+        {{ t('header.plan') }}
       </button>
 
       <!-- Help -->

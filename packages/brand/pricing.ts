@@ -45,6 +45,12 @@ export interface PriceTable {
   /** The 50%-off-for-life figures for families who joined before v1. */
   halfBasicYearly: string;
   halfFullYearly: string;
+  halfFullMonthly: string;
+  /** The founding price for the first ten families (Stripe cohort `first_ten`): its own
+   *  Prices, not a discount, on both plans. Retired from the public page; the app still
+   *  shows it to a family greg marked with `scripts/billing-cohort.mjs --first-ten`. */
+  firstTenMonthly: string;
+  firstTenYearly: string;
   /** Yearly saving against 12x monthly on the full plan, already rounded. */
   savePct: number;
 }
@@ -59,6 +65,9 @@ export const PRICES: Record<CurrencyCode, PriceTable> = {
     fullPerMonth: '$7',
     halfBasicYearly: '$15',
     halfFullYearly: '$42.49',
+    halfFullMonthly: '$4.99',
+    firstTenMonthly: '$1',
+    firstTenYearly: '$12',
     savePct: 29,
   },
   SGD: {
@@ -70,11 +79,51 @@ export const PRICES: Record<CurrencyCode, PriceTable> = {
     fullPerMonth: 'S$9',
     halfBasicYearly: 'S$19.50',
     halfFullYearly: 'S$55',
+    halfFullMonthly: 'S$6.50',
+    firstTenMonthly: 'S$1.35',
+    firstTenYearly: 'S$16.20',
     savePct: 29,
   },
 };
 
 export const DEFAULT_CURRENCY: CurrencyCode = 'USD';
+
+/** The two plans and the two billing intervals the billing Lambda accepts (#95). */
+export type PlanId = 'basic' | 'full';
+export type PlanInterval = 'month' | 'year';
+export type PlanCohort = 'pre_v1' | 'first_ten';
+
+/**
+ * The price a family actually pays, from ONE table: list, half price (pre_v1) or the founding
+ * price (first_ten). Returns the list price beside it so a page can strike it through. `basic`
+ * is yearly only (the MODEL note above), so `basic` + `month` is never asked for.
+ */
+export function familyPrice(
+  table: PriceTable,
+  plan: PlanId,
+  interval: PlanInterval,
+  cohort: PlanCohort | null
+): { price: string; list: string } {
+  const list =
+    plan === 'basic'
+      ? table.basicYearly
+      : interval === 'month'
+        ? table.fullMonthly
+        : table.fullYearly;
+  if (cohort === 'first_ten') {
+    return { price: interval === 'month' ? table.firstTenMonthly : table.firstTenYearly, list };
+  }
+  if (cohort === 'pre_v1') {
+    const price =
+      plan === 'basic'
+        ? table.halfBasicYearly
+        : interval === 'month'
+          ? table.halfFullMonthly
+          : table.halfFullYearly;
+    return { price, list };
+  }
+  return { price: list, list };
+}
 
 /** Structured data wants a bare number, not a display string. Derived from
  *  PRICES rather than retyped, so the JSON-LD cannot drift from the page. */

@@ -82,6 +82,7 @@ import {
   shouldUseRedirectAuth,
 } from '@/services/google/googleAuth';
 import { getDeploymentBadge } from '@/config/features';
+import { isPricingAvailable } from '@/services/billing/pricingGate';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -127,7 +128,7 @@ const { canManagePod, isOwner } = usePermissions();
 const showWallCard = computed(() => isFlagEnabled('beanieWall'));
 // #95: the plan card (trial, active, read-only). Flag-gated like the wall card; the
 // entitlement store behind it is NOT (App.vue instantiates it for everyone).
-const showPlanCard = computed(() => isFlagEnabled('pricing'));
+const showPlanCard = computed(() => isPricingAvailable());
 
 const DevFlagsCard = import.meta.env.DEV
   ? defineAsyncComponent(() => import('@/components/settings/DevFeatureFlagsCard.vue'))
@@ -1788,6 +1789,10 @@ async function handleDeleteFamilyClick() {
     <!-- ── Profile Header ──────────────────────────────────────────────── -->
     <ProfileHeader />
 
+    <!-- ── Your beanies Plan (#95): above the quick-settings grid, where a paying family looks
+         first (greg, 2026-10-01). Hosted builds with the flag on; never a self-host. -->
+    <PlanCard v-if="showPlanCard" />
+
     <!-- ── Settings Card Grid ──────────────────────────────────────────── -->
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <!-- Your Account first — most common self-serve action (password,
@@ -1972,9 +1977,6 @@ async function handleDeleteFamilyClick() {
          when zero Lab features are available — the Lab stays conceptually
          permanent, this is just a display-time emptiness guard (#35). -->
     <BeanieLabSection v-if="hasAnyLabFeature" @open-ai="showAi = true" />
-
-    <!-- ── Your plan (#95, flag `pricing`) ─────────────────────────────────── -->
-    <PlanCard v-if="showPlanCard" />
 
     <!-- ── Feature Flags (dev-only, owner/admin) ───────────────────────────
          DevFlagsCard is undefined in prod (DEV-gated dynamic import above), so
