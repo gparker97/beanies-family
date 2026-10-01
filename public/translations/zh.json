@@ -28622,7 +28622,7 @@
       "lastUpdated": "2026-10-01"
     },
     "plan.checkout.retry": {
-      "translation": "再試一次",
+      "translation": "再试一次",
       "hash": "9ysxvf",
       "lastUpdated": "2026-10-01"
     },
@@ -28672,7 +28672,7 @@
       "lastUpdated": "2026-10-01"
     },
     "plan.claim.retry": {
-      "translation": "再試一次",
+      "translation": "再试一次",
       "hash": "9ysxvf",
       "lastUpdated": "2026-10-01"
     },
@@ -28812,12 +28812,12 @@
       "lastUpdated": "2026-10-01"
     },
     "plan.allowance.day": {
-      "translation": "今天剩下{limit}个魔豆中的{left}个， {time}还有更多。",
+      "translation": "今天剩下{limit}个魔豆中的{left}个。{date} {time}重置。",
       "hash": "2lx2p0",
       "lastUpdated": "2026-10-01"
     },
     "plan.allowance.month": {
-      "translation": "本月剩下{limit}个魔豆中的{left}个， {date}还有更多。",
+      "translation": "本月剩下{limit}个魔豆中的{left}个。{date} {time}重置。",
       "hash": "oe6ik0",
       "lastUpdated": "2026-10-01"
     },
