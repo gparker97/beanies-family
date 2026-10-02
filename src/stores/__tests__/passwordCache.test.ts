@@ -194,38 +194,32 @@ vi.mock('@/services/registry/registryService', () => ({
   removeFamily: vi.fn(async () => {}),
 }));
 
+// vitest 5 requires vi.mock at module top level; these were nested in the describe.
+// Sync service — uses shared auto-mock from __mocks__/syncService.ts
+vi.mock('@/services/sync/syncService');
+
+vi.mock('@/services/sync/capabilities', () => ({
+  getSyncCapabilities: () => ({ hasFileSystemAccess: true }),
+  canAutoSync: () => true,
+}));
+
+vi.mock('@/services/sync/fileSync', async (importOriginal) => ({
+  // The version DERIVATION is real even where the writers are mocked: a
+  // test-local `'4.0'` here would hide the one regression the derivation
+  // exists to prevent (a compacted pod written as 4.0).
+
+  beanpodVersionFor: (await importOriginal<typeof import('@/services/sync/fileSync')>())
+    .beanpodVersionFor,
+  exportToFile: vi.fn(async () => {}),
+  importFromFile: vi.fn(async () => ({ success: true })),
+}));
+
 describe('Password Cache - syncStore integration', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
     savedGlobalSettings = { ...mockGlobalSettings };
   });
-
-  // Sync service — uses shared auto-mock from __mocks__/syncService.ts
-  vi.mock('@/services/sync/syncService');
-
-  vi.mock('@/services/sync/capabilities', () => ({
-    getSyncCapabilities: () => ({ hasFileSystemAccess: true }),
-    canAutoSync: () => true,
-  }));
-
-  vi.mock('@/services/sync/fileSync', async (importOriginal) => ({
-    // The version DERIVATION is real even where the writers are mocked: a
-
-    // test-local `'4.0'` here would hide the one regression the derivation
-
-    // exists to prevent (a compacted pod written as 4.0).
-
-    beanpodVersionFor: (await importOriginal<typeof import('@/services/sync/fileSync')>())
-      .beanpodVersionFor,
-    exportToFile: vi.fn(async () => {}),
-    importFromFile: vi.fn(async () => ({ success: true })),
-  }));
-
-  vi.mock('@/services/registry/registryService', () => ({
-    registerFamily: vi.fn(async () => {}),
-    removeFamily: vi.fn(async () => {}),
-  }));
 
   // TODO: Rewrite for V4 format — decryptPendingFile now uses CryptoKey + PBKDF2
   // key unwrapping instead of raw password strings. These tests need real Web Crypto
