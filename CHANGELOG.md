@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-10-02
 
+### Added
+
+- Blog: "passwords are so two-thousand and late" is live, with greg's hero illustration and the long-and-short summary.
+
 ### Changed
 
 - Chinese UI text is now written by hand alongside the English instead of machine-translated; every string was rewritten.
@@ -18,6 +22,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - The nightly translation job and the in-app call to a third-party translation service.
 
+### Fixed
+
+- A stale app chunk after a deploy now recovers the same way everywhere, with a bounded number of reloads and a visible error if it cannot.
+
 ## 2026-10-01
 
 _Released in 0.90.0: web live, Android production (in Google review), iOS submitted to the App Store with auto-release. The blog entry is staged content (draft) and is not live._
@@ -25,7 +33,6 @@ _Released in 0.90.0: web live, Android production (in Google review), iOS submit
 ### Added
 
 - Help Center: "Plans, your trial, and what read-only means".
-- (unreleased) Blog: "passwords are so two-thousand and late" is staged for Friday 2 Oct, with greg's hero illustration, the long-and-short summary and a cleaned-up recovery-kit screenshot.
 
 ### Fixed
 
