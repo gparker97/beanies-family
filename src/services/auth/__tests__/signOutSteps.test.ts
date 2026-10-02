@@ -76,3 +76,27 @@ describe('SIGN_OUT_CLEARED_ELSEWHERE_STEPS (#100)', () => {
     expect(SIGN_OUT_CLEAR_STEPS).toContain('deleteFamilyDb');
   });
 });
+
+describe('clearAttribution (#118): tier 3 only', () => {
+  // Tier 2 runs inside the create flow (LoginPage "Start over"), so the campaign tag must
+  // survive it; only the clean-device "Clear data" tier drops it.
+  it('runs on the clear tier', () => {
+    expect(SIGN_OUT_CLEAR_STEPS).toContain('clearAttribution');
+  });
+
+  it('never runs on a tier-2 or eviction sign-out', () => {
+    for (const steps of [
+      SIGN_OUT_TRUSTED_STEPS,
+      SIGN_OUT_UNTRUSTED_STEPS,
+      SIGN_OUT_CLEARED_ELSEWHERE_STEPS,
+      SIGN_OUT_EVICTION_LOCK_STEPS,
+      SIGN_OUT_EVICTED_STEPS,
+    ]) {
+      expect(steps).not.toContain('clearAttribution');
+    }
+  });
+
+  it('is not key material: it never trips the sign-out kit guard', () => {
+    expect(KEY_MATERIAL_STEPS.has('clearAttribution')).toBe(false);
+  });
+});

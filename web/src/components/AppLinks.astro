@@ -1,0 +1,129 @@
+---
+// AppLinks (#118, docs/plans/2026-10-02-utm-attribution-carry-through.md, Section B).
+//
+// This component is the SINGLE OWNER of every app-bound-link concern on the site:
+//   1. tag capture: the landing URL's campaign tag is kept on the device for 30 days
+//      (first touch wins), using the shared rules in `@beanies/brand/attribution`;
+//   2. href decoration: every link into the app (`APP_URL`) carries that tag, so the app
+//      can record which of our own ads or posts brought a family;
+//   3. the CTA click event: the delegated Plausible listener for every `data-cta` element.
+//
+// The CTA listener lives here BECAUSE its `attributed` prop reads the same `fields` the
+// decorator uses. Do not split this back into per-host inline copies (BaseLayout and
+// /download each used to carry one). Render `<AppLinks />` immediately after the
+// Plausible loader + stub queue, which stay `is:inline` in each host.
+//
+// A bare (hoisted, bundled) `<script>`, not `is:inline`: it has to import the shared module.
+// The build-time guard (`src/lib/assert-cta-tagged.mjs`) checks `data-cta` only; the query
+// string is added here at runtime, so the guard cannot and should not look for it.
+---
+
+<script>
+  import {
+    ATTRIBUTION_STORAGE_KEY,
+    appendAttribution,
+    makeEnvelope,
+    parseAttribution,
+    readEnvelope,
+    type Attribution,
+  } from '@beanies/brand/attribution';
+  import { APP_URL } from '@beanies/brand/nav';
+
+  type PlausibleFn = (name: string, opts?: { props?: Record<string, string> }) => void;
+
+  /** A stored value that is not JSON reads as `corrupt` (replaced), not as a storage refusal. */
+  function parseStored(raw: string | null): unknown {
+    if (raw === null) return null;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return { v: 0 };
+    }
+  }
+
+  // 1. Capture. First touch wins: an unexpired envelope is never overwritten; a corrupt or
+  //    expired one is replaced. There is no firehose on the site; `attributed` below is the
+  //    production-visible signal when storage is refused.
+  const now = Date.now();
+  const parsed = parseAttribution(location.search);
+  let stored: Attribution | null = null;
+  try {
+    const existing = readEnvelope(parseStored(localStorage.getItem(ATTRIBUTION_STORAGE_KEY)), now);
+    if (existing.state === 'ok') stored = existing.fields;
+    else if (parsed) {
+      localStorage.setItem(ATTRIBUTION_STORAGE_KEY, JSON.stringify(makeEnvelope(parsed, now)));
+    } else if (existing.state !== 'none') {
+      // Expired or corrupt and nothing to replace it: remove it, so the tag really does leave
+      // the device after 30 days as the privacy page says, not only when a new tag arrives.
+      localStorage.removeItem(ATTRIBUTION_STORAGE_KEY);
+    }
+  } catch (err) {
+    console.warn(
+      '[attribution] localStorage refused — forwarding unattributed; check private mode/quota',
+      err
+    );
+  }
+  // Computed AFTER the capture step, so a tag captured on this very page decorates its links
+  // and reports `attributed: yes`. The single source for both the decorator and the event.
+  const fields: Attribution | null = stored ?? parsed;
+
+  // 2. Decoration. Idempotent: `appendAttribution` never overwrites a parameter already on
+  //    the link and returns off-origin hrefs unchanged.
+  function decorateAnchor(a: HTMLAnchorElement): void {
+    if (!fields) return;
+    const next = appendAttribution(a.href, fields, APP_URL);
+    if (next !== a.href) a.href = next;
+  }
+
+  // One pass on load (so hover preview, copy-link, ctrl-click and open-in-new-tab carry the
+  // tag) plus the clicked anchor in the listener below (covers a late-inserted link). The
+  // origin is quoted: the `:` in `http://` breaks an unquoted attribute selector. There is
+  // no ClientRouter/ViewTransitions on the site, so one pass per page load is enough.
+  function decorateAll(): void {
+    if (!fields) return;
+    document
+      .querySelectorAll<HTMLAnchorElement>(`a[href^="${APP_URL}"]`)
+      .forEach(decorateAnchor);
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', decorateAll, { once: true });
+  } else {
+    decorateAll();
+  }
+
+  // 3. CTA click tracking.
+  //    ONE delegated listener rather than a handler per button: CTAs live across the
+  //    homepage, the download page, guides, help and the beanstalk footer, and a
+  //    per-call-site handler is how three of them end up untracked after the next redesign.
+  //    Any element carrying data-cta fires; adding a CTA anywhere is a one-attribute change.
+  //
+  //    Distinct goal names (not one "CTA Click" with a prop) because Plausible funnels and
+  //    the goal list key on the event NAME; a single event with properties cannot be a
+  //    funnel step. `location` rides along as a property so the same CTA can be compared
+  //    across placements; `attributed` makes a dropped tag visible as a ratio.
+  //
+  //    Uses closest(), so a click on the <img> inside a store badge still resolves to the
+  //    anchor that carries the attribute.
+  document.addEventListener(
+    'click',
+    (e) => {
+      const target = e.target instanceof Element ? e.target : null;
+      if (!target) return;
+      const anchor = target.closest('a[href]');
+      if (anchor instanceof HTMLAnchorElement) decorateAnchor(anchor);
+      const el = target.closest('[data-cta]');
+      const name = el?.getAttribute('data-cta');
+      if (!el || !name) return;
+      const plausible = (window as unknown as { plausible?: PlausibleFn }).plausible;
+      plausible?.(name, {
+        props: {
+          location: el.getAttribute('data-cta-loc') || 'unknown',
+          attributed: fields ? 'yes' : 'no',
+        },
+      });
+    },
+    // Capture phase: these anchors navigate away, and a bubble-phase listener can lose the
+    // race with the unload on a slow connection.
+    true
+  );
+</script>

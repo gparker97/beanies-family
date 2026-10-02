@@ -9767,6 +9767,7 @@ const STRING_DEFS = {
   'createSurvey.optSubstack': { en: 'Substack / blog', beanie: 'substack / blog' },
   'createSurvey.optGoogle': { en: 'Google search', beanie: 'google search' },
   'createSurvey.optAppStore': { en: 'App store', beanie: 'app store' },
+  'createSurvey.optChatgptAd': { en: 'ChatGPT ad', beanie: 'a chatgpt ad' },
   'createSurvey.optAi': { en: 'ChatGPT / AI search', beanie: 'chatgpt / ai search' },
   'createSurvey.optFriend': { en: 'A friend', beanie: 'a friend' },
   'createSurvey.optOther': { en: 'Somewhere else', beanie: 'somewhere else' },

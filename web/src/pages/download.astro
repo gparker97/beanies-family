@@ -10,6 +10,7 @@
 //
 // Deliberately a minimal standalone page (NOT BaseLayout): no nav/footer.
 import { SITE_URL, STORE_URL } from '@beanies/brand/nav';
+import AppLinks from '../components/AppLinks.astro';
 
 const APP_STORE_URL = STORE_URL.ios;
 const PLAY_URL = STORE_URL.android;
@@ -91,10 +92,10 @@ const OG_IMAGE = new URL('/brand/og-default.png', SITE_URL).toString();
         font-size: 0.9rem;
       }
     </style>
-    <!-- Plausible + the CTA listener. This page is deliberately standalone (no BaseLayout),
-         which meant it carried NO analytics at all — so the two store buttons that are the
-         page's entire purpose were invisible. Same event names as the homepage badges, with a
-         different `location`, so the two placements can be compared. -->
+    <!-- Plausible + the CTA listener (in <AppLinks />). This page is deliberately standalone
+         (no BaseLayout), which meant it carried NO analytics at all — so the two store buttons
+         that are the page's entire purpose were invisible. Same event names as the homepage
+         badges, with a different `location`, so the two placements can be compared. -->
     <script is:inline async src="https://plausible.io/js/pa-3pxexgz2YF03NyMDucQKN.js"></script>
     <script is:inline>
       ((window.plausible =
@@ -104,18 +105,8 @@ const OG_IMAGE = new URL('/brand/og-default.png', SITE_URL).toString();
         }),
         (plausible.init = plausible.init || function (i) { plausible.o = i || {}; }));
       plausible.init();
-      document.addEventListener(
-        'click',
-        function (e) {
-          var el = e.target && e.target.closest && e.target.closest('[data-cta]');
-          if (!el) return;
-          window.plausible(el.getAttribute('data-cta'), {
-            props: { location: el.getAttribute('data-cta-loc') || 'unknown' },
-          });
-        },
-        true
-      );
     </script>
+    <AppLinks />
   </head>
   <body>
     <h1>get <span>beanies.family</span> on your phone</h1>

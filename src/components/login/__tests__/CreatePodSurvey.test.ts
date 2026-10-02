@@ -54,6 +54,13 @@ describe('CreatePodSurvey', () => {
     expect(actionsLogged()).not.toContain('Reddit');
   });
 
+  it('the ChatGPT ad tile resolves to its stable Slack label', async () => {
+    const w = render();
+    await w.get('[data-testid="survey-opt-chatgpt_ad"]').trigger('click');
+    await w.get('[data-testid="survey-finish"]').trigger('click');
+    expect(lastComplete(w)).toBe('ChatGPT ad');
+  });
+
   it('"somewhere else" reveals the free-text input and passes it verbatim', async () => {
     const w = render();
     expect(w.find('[data-testid="survey-other-input"]').exists()).toBe(false);

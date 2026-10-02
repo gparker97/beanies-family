@@ -4,6 +4,7 @@ import { captureHashMarkers, APPROVAL_LINK_HASH } from './services/auth/deepLink
 import App from './App.vue';
 import router from './router';
 import { initAnalytics } from './services/analytics/plausible';
+import { captureAttributionFromUrl } from './utils/attributionStash';
 import { reportError } from './utils/errorReporter';
 import { isChunkLoadError, startChunkRecovery } from './utils/hardReload';
 import { isIdbTransientError } from './utils/idbTransient';
@@ -13,6 +14,14 @@ import { applyOrientationPolicy } from './composables/useWallOrientation';
 import './style.css';
 
 initAnalytics();
+
+// ⚠️ BEFORE `app.use(router)`. The campaign tag (#118) arrives as `utm_*` / ad-id query keys on
+// the landing URL, and the router's signed-in / requiresAuth guards and App.vue's boot
+// `router.replace` calls all rebuild the URL without them. Reading `location.search` here, while
+// it is still the raw landing URL, is the only point that is guaranteed to see the tag. The same
+// read also restores it after the web OAuth hop (the return path carries it; see
+// `connectStorage.createReturnPath`). Synchronous and never throws; a no-op on native.
+captureAttributionFromUrl();
 
 // ADR-032: wire the doc worker / inline fallback before anything touches the
 // data layer (docClient lazily spawns the worker on first use, or runs inline

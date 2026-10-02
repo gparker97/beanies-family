@@ -347,6 +347,7 @@ import { useActivityStore } from '@/stores/activityStore';
 import { resetDoc } from '@/services/automerge/docService';
 import { installInlineBackend } from '@/services/automerge/worker/__tests__/inlineHarness';
 import * as docClient from '@/services/automerge/worker/docClient';
+import { ATTRIBUTION_STORAGE_KEY, makeEnvelope } from '@beanies/brand/attribution';
 
 // ---------------------------------------------------------------------------
 // Tests — full end-to-end pod creation flow
@@ -929,6 +930,85 @@ describe('pod creation: full end-to-end flow', () => {
       expect(vi.mocked(registryService.lookupFamilyResult)).toHaveBeenCalled();
       expect(vi.mocked(registryService.registerFamilyOrThrow)).toHaveBeenCalled();
       expect(vi.mocked(slackNotify)).toHaveBeenCalled();
+    });
+
+    // #118: the campaign tag rides the registry row and the Slack line, then is consumed.
+    // The REAL stash on the test's localStorage, so the read / clear contract is exercised.
+    describe('campaign tag (#118)', () => {
+      const TAG = {
+        utm_source: 'chatgpt',
+        utm_medium: 'cpc',
+        utm_campaign: 'sg-pilot-oct26',
+        utm_content: 'calm_ad~1',
+        oppref: 'o1',
+      };
+      const stashed = () => localStorage.getItem(ATTRIBUTION_STORAGE_KEY);
+
+      beforeEach(() => {
+        localStorage.setItem(
+          ATTRIBUTION_STORAGE_KEY,
+          JSON.stringify(makeEnvelope(TAG, Date.now()))
+        );
+      });
+
+      afterEach(() => {
+        localStorage.removeItem(ATTRIBUTION_STORAGE_KEY);
+      });
+
+      it('stamps the signup registry write, adds the Slack line, then clears the stash', async () => {
+        const registryService = await import('@/services/registry/registryService');
+        const { slackNotify } = await import('@/utils/slackNotify');
+
+        const result = await createPod();
+
+        expect(result.ok).toBe(true);
+        const [, entry] = vi.mocked(registryService.registerFamilyOrThrow).mock.calls.at(-1)!;
+        expect(entry.attribution).toEqual(TAG);
+        expect(entry.isSignupEvent).toBe(true);
+        const text = vi.mocked(slackNotify).mock.calls.at(-1)![0] as string;
+        expect(text).toContain('\n*Came from:* `chatgpt / sg-pilot-oct26 / calm_ad~1`');
+        expect(stashed()).toBeNull();
+      });
+
+      it('sends attribution: null and no Slack line when the device has no tag', async () => {
+        localStorage.removeItem(ATTRIBUTION_STORAGE_KEY);
+        const registryService = await import('@/services/registry/registryService');
+        const { slackNotify } = await import('@/utils/slackNotify');
+
+        await createPod();
+
+        const [, entry] = vi.mocked(registryService.registerFamilyOrThrow).mock.calls.at(-1)!;
+        expect('attribution' in entry).toBe(true);
+        expect(entry.attribution).toBeNull();
+        expect(vi.mocked(slackNotify).mock.calls.at(-1)![0]).not.toContain('Came from');
+      });
+
+      it('keeps the tag when the registry write fails, so a retry still carries it', async () => {
+        const registryService = await import('@/services/registry/registryService');
+        const { slackNotify } = await import('@/utils/slackNotify');
+        vi.mocked(registryService.registerFamilyOrThrow).mockRejectedValueOnce(
+          new Error('Registry 503')
+        );
+
+        const result = await createPod();
+
+        expect(result.ok).toBe(false);
+        expect(vi.mocked(slackNotify)).not.toHaveBeenCalled();
+        expect(stashed()).not.toBeNull();
+      });
+
+      it('demo mode reads nothing, sends nothing and leaves the stash untouched', async () => {
+        const registryService = await import('@/services/registry/registryService');
+        const { slackNotify } = await import('@/utils/slackNotify');
+        const before = stashed();
+
+        const result = await createPod({ suppressRemoteSideEffects: true });
+
+        expect(result.ok).toBe(true);
+        expect(vi.mocked(registryService.registerFamilyOrThrow)).not.toHaveBeenCalled();
+        expect(vi.mocked(slackNotify)).not.toHaveBeenCalled();
+        expect(stashed()).toBe(before);
+      });
     });
 
     it('sends the ROSTER owner as the owner, and the signed-in member as the writer', async () => {

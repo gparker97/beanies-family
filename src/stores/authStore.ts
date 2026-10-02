@@ -68,6 +68,8 @@ import type { WrappedMemberKey } from '@/types/syncFileV4';
 import { showToast } from '@/composables/useToast';
 import { sweepHandoffFiles } from '@/utils/shareOrDownloadFile';
 import { clearKeptRecipe } from '@/utils/recipeKeepStash';
+import { clearAttribution, peekAttribution } from '@/utils/attributionStash';
+import { pickPlausibleProps } from '@beanies/brand/attribution';
 import { useTranslationStore } from './translationStore';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import { track } from '@/services/analytics/plausible';
@@ -1243,7 +1245,11 @@ export const useAuthStore = defineStore('auth', () => {
       // "ready for /nook".
       podCreated.value = false;
       persistPodCreated(false);
-      track('signup');
+      // The campaign tag (#118) rides the signup event as custom props. Peeked, not consumed:
+      // this fires at the identity step, before the Drive redirect and `createNewFile`, which
+      // still need it for the registry row and the Slack line.
+      const attributionProps = pickPlausibleProps(peekAttribution());
+      track('signup', attributionProps ? { props: attributionProps } : undefined);
       track('login', { props: { method: 'pin' } });
 
       return { success: true };
@@ -3131,6 +3137,9 @@ export const useAuthStore = defineStore('auth', () => {
       // earlier cut put this on tier 3 alone, arguing the TTL and single-consume already
       // bounded it; they bound duration and repetition, not IDENTITY.)
       clearKeptRecipe: () => clearKeptRecipe(),
+      // TIER 3 ONLY — see the reasoning on `SignOutStepName` in `signOutSteps.ts` (tier 2
+      // runs inside the create flow via "Start over", where the tag must survive).
+      clearAttribution: () => clearAttribution('sign-out'),
     };
   }
 

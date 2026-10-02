@@ -65,7 +65,18 @@ export type SignOutStepName =
    * person's recipe form, inside a different family's pod. Clearing it is idempotent and
    * cannot fail, so there is no reason for any tier to skip it.
    */
-  | 'clearKeptRecipe';
+  | 'clearKeptRecipe'
+  /**
+   * The campaign tag from the link that brought this device here (#118). ON TIER 3 ONLY, the
+   * opposite of `clearKeptRecipe`, and on purpose. A kept recipe is CONTENT that would leak
+   * into the next person's pod; the tag names an ad, not a person, and its 30-day TTL plus
+   * consume-once at pod creation already bound it. The deciding fact is that tier 2 runs
+   * INSIDE the create flow: LoginPage's "Start over" calls `authStore.signOut()` (tier 2)
+   * and then routes back to `/welcome`, so a tagged visitor who hits a Drive hiccup, starts
+   * over and then creates would lose the attribution at exactly the moment it matters. The
+   * eviction tiers skip it for the same reason. Tier 3 keeps the clean-device promise.
+   */
+  | 'clearAttribution';
 
 /** Tier 2, trusted device: silent-reconnect sign-out — tokens, caches, wraps all kept. */
 export const SIGN_OUT_TRUSTED_STEPS: readonly SignOutStepName[] = [
@@ -131,6 +142,7 @@ export const SIGN_OUT_CLEAR_STEPS: readonly SignOutStepName[] = [
   'removeRosterAll',
   'sweepHandoffFiles',
   'clearKeptRecipe',
+  'clearAttribution',
 ];
 
 /**

@@ -38,6 +38,8 @@ import {
 // (see `createReturnPath`). The old `export { RESUME_SETUP_PATH }` back-compat re-export is GONE —
 // every importer takes it from `resumePaths` directly, which is where it lives.
 import { RESUME_SETUP_PATH } from '@/components/login/resumePaths';
+import { toSearchParams } from '@beanies/brand/attribution';
+import { peekAttribution } from '@/utils/attributionStash';
 
 /**
  * Begin a redirect/deep-link OAuth flow IFF the current surface needs one and we
@@ -169,7 +171,14 @@ export type DriveAuthGate =
  * on anyway.
  */
 function createReturnPath(): string {
-  return isNative() ? currentLocationPath() : RESUME_SETUP_PATH;
+  if (isNative()) return currentLocationPath();
+  // The campaign tag (#118) rides the return URL: WebKit (iOS Safari / standalone PWA) clears
+  // script-writable storage across the cross-site OAuth hop, and `main.ts` re-captures the tag
+  // from this query on the post-redirect boot (a no-op under first-touch when storage survived).
+  const attribution = peekAttribution();
+  return attribution
+    ? `${RESUME_SETUP_PATH}&${toSearchParams(attribution).toString()}`
+    : RESUME_SETUP_PATH;
 }
 
 /**
