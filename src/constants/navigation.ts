@@ -260,7 +260,7 @@ export const NAV_ITEMS: NavItemDef[] = [
   {
     labelKey: 'nav.help',
     path: '/help',
-    emoji: '\u{1F4DA}',
+    emoji: '\u{2753}',
     section: 'pinned',
     external: true,
     externalUrl: `${MARKETING_URL}/help`,

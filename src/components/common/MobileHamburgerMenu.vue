@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, toRef, watch } from 'vue';
+import { computed, ref, toRef, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import AppNavMenu from '@/components/common/AppNavMenu.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
@@ -7,6 +7,7 @@ import CloudProviderBadge from '@/components/ui/CloudProviderBadge.vue';
 import SaveStatusIndicator from '@/components/ui/SaveStatusIndicator.vue';
 import { useFullscreenOverlay } from '@/composables/useFullscreenOverlay';
 import { useMemberAvatar } from '@/composables/useMemberAvatar';
+import { useScrollOverflow } from '@/composables/useScrollOverflow';
 import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useSounds } from '@/composables/useSounds';
 import { useTranslation } from '@/composables/useTranslation';
@@ -24,6 +25,9 @@ import type { CurrencyCode, LanguageCode } from '@/types/models';
 
 const props = defineProps<{ open: boolean }>();
 const emit = defineEmits<{ close: [] }>();
+
+const panel = ref<HTMLElement | null>(null);
+const { canScroll } = useScrollOverflow(panel);
 
 const route = useRoute();
 const router = useRouter();
@@ -114,7 +118,9 @@ const encryptionLabel = computed(() => {
         >
           <div
             v-if="open"
-            class="bg-secondary-500 absolute inset-y-0 left-0 flex w-80 flex-col overflow-y-auto"
+            ref="panel"
+            class="bg-secondary-500 quiet-scroll absolute inset-y-0 left-0 flex w-80 flex-col"
+            :class="{ 'can-scroll': canScroll }"
           >
             <!-- Close button -->
             <button

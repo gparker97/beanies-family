@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sidebar density</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* Mockup for the sidebar overflow question (2026-10-02). The sidebar is Deep Slate in
+         both app themes, so one rendering covers light and dark. Tokens from packages/brand/theme.css. */
+      :root {
+        --slate: #2c3e50;
+        --orange: #f15d22;
+        --terracotta: #e67e22;
+        --accent-lift: #ff8b5e;
+        --success-lift: #5fd08a;
+        --silk-lift: #8fc7e8;
+        --page: #f8f9fa;
+        --ink: #2c3e50;
+        --ink-soft: #5b6b7a;
+        --note-bg: #ffffff;
+        --note-line: rgba(44, 62, 80, 0.12);
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--page); color: var(--ink); font-family: Inter, system-ui, sans-serif; }
+      h1 { font-family: Outfit, sans-serif; font-size: 1.5rem; margin: 24px 24px 4px; }
+      .lede { margin: 0 24px 20px; color: var(--ink-soft); max-width: 70ch; font-size: 0.95rem; }
+      .row { display: flex; gap: 28px; padding: 0 24px 32px; overflow-x: auto; align-items: flex-start; }
+      .pane { flex: 0 0 auto; }
+      .pane h2 { font-family: Outfit, sans-serif; font-size: 1rem; margin: 0 0 4px; }
+      .pane p { margin: 0 0 10px; font-size: 0.8rem; color: var(--ink-soft); max-width: 34ch; min-height: 3.6em; }
+      .frame { height: 740px; width: 256px; background: var(--slate); border-radius: 18px; padding: 16px; display: flex; flex-direction: column; box-shadow: 0 18px 40px -22px rgba(44, 62, 80, 0.55); }
+      .brand { display: flex; align-items: center; gap: 10px; padding: 2px 4px 14px; }
+      .logo { width: 44px; height: 44px; border-radius: 12px; background: #fff; display: grid; place-items: center; font-size: 22px; }
+      .brand b { font-family: Outfit, sans-serif; color: #fff; font-size: 1rem; }
+      .brand b span { color: var(--orange); }
+      .brand i { display: block; font-family: Caveat, cursive; font-style: italic; font-size: 0.8rem; color: rgba(255, 255, 255, 0.45); }
+      nav { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 2px; }
+      nav.scroll { overflow-y: auto; }
+      .sec { font-family: Outfit, sans-serif; font-weight: 700; font-size: 0.8rem; letter-spacing: 0.05em; text-transform: uppercase; display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 12px; }
+      .sec .ic { width: 24px; text-align: center; font-size: 1rem; }
+      .sec .ch { margin-left: auto; color: rgba(255, 255, 255, 0.3); font-size: 0.7rem; }
+      .t { color: var(--accent-lift); } .pb { color: var(--success-lift); } .bp { color: var(--silk-lift); }
+      .item { font-family: Outfit, sans-serif; font-weight: 500; display: flex; align-items: center; gap: 12px; padding: 8px 14px; border-radius: 16px; border-left: 4px solid transparent; color: rgba(255, 255, 255, 0.4); }
+      .item .ic { width: 24px; text-align: center; font-size: 1rem; }
+      .item.on { border-left-color: var(--orange); background: linear-gradient(90deg, rgba(241, 93, 34, 0.2), rgba(230, 126, 34, 0.1)); color: #fff; font-weight: 600; padding-left: 12px; }
+      .lg .item { font-size: 1.125rem; line-height: 1.75rem; }
+      .md .item { font-size: 1rem; line-height: 1.5rem; }
+      .md .item span:last-child, .peek .item span:last-child { white-space: nowrap; }
+      .divider { height: 1px; background: rgba(255, 255, 255, 0.08); margin: 8px 8px; }
+      /* Proposal: collapsed sections keep their pages one tap away as a peek strip. */
+      .strip { display: flex; gap: 6px; padding: 2px 10px 10px 40px; }
+      .strip a { width: 28px; height: 28px; border-radius: 9px; display: grid; place-items: center; background: rgba(255, 255, 255, 0.06); font-size: 0.9rem; text-decoration: none; }
+      .strip a:hover { background: rgba(255, 255, 255, 0.14); }
+      /* Proposal: thin scrollbar that only shows on hover, with edge fades. */
+      nav.quiet { overflow-y: auto; scrollbar-width: thin; scrollbar-color: transparent transparent; mask-image: linear-gradient(to bottom, transparent, #000 14px, #000 calc(100% - 18px), transparent); }
+      nav.quiet:hover { scrollbar-color: rgba(255, 255, 255, 0.22) transparent; }
+      nav.quiet::-webkit-scrollbar { width: 6px; }
+      nav.quiet::-webkit-scrollbar-thumb { background: transparent; border-radius: 3px; }
+      nav.quiet:hover::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.22); }
+      .member { margin-top: 12px; border-radius: 16px; background: rgba(255, 255, 255, 0.04); padding: 12px; display: flex; align-items: center; gap: 10px; }
+      .av { width: 36px; height: 36px; border-radius: 50%; background: #f6c08a; border: 2px solid var(--silk-lift); }
+      .member b { font-family: Outfit, sans-serif; color: #fff; font-size: 1rem; display: block; }
+      .member small { color: rgba(255, 255, 255, 0.35); font-size: 0.85rem; }
+      .member .tools { margin-left: auto; display: flex; gap: 6px; }
+      .member .tools a { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: rgba(255, 255, 255, 0.06); font-size: 0.85rem; text-decoration: none; }
+      .status { margin-top: 10px; padding: 0 4px; color: rgba(255, 255, 255, 0.35); font-size: 0.75rem; line-height: 1.5; }
+      .note { background: var(--note-bg); border: 1px solid var(--note-line); border-radius: 14px; padding: 12px 14px; margin: 0 24px 24px; max-width: 72ch; font-size: 0.85rem; line-height: 1.5; }
+      .note b { font-family: Outfit, sans-serif; }
+      .callout { position: absolute; right: -10px; background: var(--orange); color: #fff; font-size: 0.7rem; font-family: Outfit, sans-serif; font-weight: 600; padding: 3px 8px; border-radius: 999px; transform: translateX(100%); white-space: nowrap; }
+      .rel { position: relative; }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) { --page: #151e27; --ink: #e8edf2; --ink-soft: #a7b4c0; --note-bg: #1d2833; --note-line: rgba(255, 255, 255, 0.1); }
+      }
+      :root[data-theme="dark"] { --page: #151e27; --ink: #e8edf2; --ink-soft: #a7b4c0; --note-bg: #1d2833; --note-line: rgba(255, 255, 255, 0.1); }
+      @media (max-width: 640px) {
+        h1, .lede, .note { margin-left: 16px; margin-right: 16px; }
+        .row { padding-left: 16px; padding-right: 16px; }
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Sidebar at 740px tall (a 1366×768 laptop after browser chrome)</h1>
+    <p class="lede">
+      Left is today: three sections open, rows at 18px, so the list overruns and the native scrollbar shows; two
+      labels wrap. Middle is the proposal. Right is the fallback for the rare screen where the list still overflows.
+    </p>
+
+    <div class="row">
+      <!-- 1. Current -->
+      <div class="pane">
+        <h2>Today</h2>
+        <p>256px, rows text-lg, every section open, native scrollbar, Help and Discord as full rows.</p>
+        <div class="frame">
+          <div class="brand"><div class="logo">🫘</div><div><b>beanies<span>.family</span></b><i>every bean counts</i></div></div>
+          <nav class="scroll lg">
+            <div class="sec t"><span class="ic">🌳</span>The Treehouse<span class="ch">▼</span></div>
+            <div class="item"><span class="ic">🏡</span><span>Family Dashboard</span></div>
+            <div class="item"><span class="ic">📅</span><span>Family Activities</span></div>
+            <div class="item"><span class="ic">✈️</span><span>Travel Plans</span></div>
+            <div class="item"><span class="ic">✅</span><span>To-Dos</span></div>
+            <div class="item"><span class="ic">🧾</span><span>Beanie Lists</span></div>
+            <div class="item on"><span class="ic">🍲</span><span>Meal Planner</span></div>
+            <div class="item"><span class="ic">🙋</span><span>Who Owns What</span></div>
+            <div class="sec pb"><span class="ic">🐷</span>The Piggy Bank<span class="ch">▼</span></div>
+            <div class="item"><span class="ic">🏠</span><span>Overview</span></div>
+            <div class="item"><span class="ic">💰</span><span>Accounts</span></div>
+            <div class="item"><span class="ic">💵</span><span>Budgets</span></div>
+            <div class="item"><span class="ic">💳</span><span>Transactions</span></div>
+            <div class="item"><span class="ic">🎯</span><span>Goals</span></div>
+            <div class="item"><span class="ic">🏢</span><span>Assets</span></div>
+            <div class="sec bp"><span class="ic">🌱</span>The Bean Pod<span class="ch">▼</span></div>
+            <div class="item"><span class="ic">🧑‍🤝‍🧑</span><span>Meet the Beans</span></div>
+            <div class="item"><span class="ic">📖</span><span>Family Scrapbook</span></div>
+            <div class="item"><span class="ic">🌟</span><span>Family Milestones</span></div>
+            <div class="item"><span class="ic">🍜</span><span>Family Cookbook</span></div>
+            <div class="item"><span class="ic">🩺</span><span>Care &amp; Safety</span></div>
+            <div class="item"><span class="ic">🆘</span><span>Emergency Contacts</span></div>
+            <div class="divider"></div>
+            <div class="item"><span class="ic">📚</span><span>Help</span></div>
+            <div class="item"><span class="ic">💬</span><span>Beanies Discord</span></div>
+          </nav>
+          <div class="member"><div class="av"></div><div><b>John Doe</b><small>Owner</small></div></div>
+          <div class="status">📄 No data file<br />v0.90.0</div>
+        </div>
+      </div>
+
+      <!-- 2. Proposal -->
+      <div class="pane">
+        <h2>Proposal: one section open, the others peek</h2>
+        <p>Rows text-base, labels never wrap. The section you are in is open; the other two fold to a header plus a strip of their pages, still one tap away. Help and Discord join the member card.</p>
+        <div class="frame rel">
+          <div class="brand"><div class="logo">🫘</div><div><b>beanies<span>.family</span></b><i>every bean counts</i></div></div>
+          <nav class="md peek">
+            <div class="sec t"><span class="ic">🌳</span>The Treehouse<span class="ch">▼</span></div>
+            <div class="item"><span class="ic">🏡</span><span>Family Dashboard</span></div>
+            <div class="item"><span class="ic">📅</span><span>Family Activities</span></div>
+            <div class="item"><span class="ic">✈️</span><span>Travel Plans</span></div>
+            <div class="item"><span class="ic">✅</span><span>To-Dos</span></div>
+            <div class="item"><span class="ic">🧾</span><span>Beanie Lists</span></div>
+            <div class="item on"><span class="ic">🍲</span><span>Meal Planner</span></div>
+            <div class="item"><span class="ic">🙋</span><span>Who Owns What</span></div>
+            <div class="sec pb"><span class="ic">🐷</span>The Piggy Bank<span class="ch">▶</span></div>
+            <div class="strip"><a href="#" title="Overview">🏠</a><a href="#" title="Accounts">💰</a><a href="#" title="Budgets">💵</a><a href="#" title="Transactions">💳</a><a href="#" title="Goals">🎯</a><a href="#" title="Assets">🏢</a></div>
+            <div class="sec bp"><span class="ic">🌱</span>The Bean Pod<span class="ch">▶</span></div>
+            <div class="strip"><a href="#" title="Meet the Beans">🧑‍🤝‍🧑</a><a href="#" title="Family Scrapbook">📖</a><a href="#" title="Family Milestones">🌟</a><a href="#" title="Family Cookbook">🍜</a><a href="#" title="Care &amp; Safety">🩺</a><a href="#" title="Emergency Contacts">🆘</a></div>
+          </nav>
+          <div class="member"><div class="av"></div><div><b>John Doe</b><small>Owner</small></div><div class="tools"><a href="#" title="Help">📚</a><a href="#" title="Beanies Discord">💬</a></div></div>
+          <div class="status">📄 No data file<br />v0.90.0</div>
+        </div>
+      </div>
+
+      <!-- 3. Fallback when it still overflows -->
+      <div class="pane">
+        <h2>Fallback: quiet scrollbar + edge fade</h2>
+        <p>Same rows, but when two sections are open on a short screen (someone opened a second one), the scrollbar is thin and appears on hover, and the list fades at the edges so "there is more" is visible without chrome.</p>
+        <div class="frame">
+          <div class="brand"><div class="logo">🫘</div><div><b>beanies<span>.family</span></b><i>every bean counts</i></div></div>
+          <nav class="md peek quiet">
+            <div class="sec t"><span class="ic">🌳</span>The Treehouse<span class="ch">▼</span></div>
+            <div class="item"><span class="ic">🏡</span><span>Family Dashboard</span></div>
+            <div class="item"><span class="ic">📅</span><span>Family Activities</span></div>
+            <div class="item"><span class="ic">✈️</span><span>Travel Plans</span></div>
+            <div class="item"><span class="ic">✅</span><span>To-Dos</span></div>
+            <div class="item"><span class="ic">🧾</span><span>Beanie Lists</span></div>
+            <div class="item on"><span class="ic">🍲</span><span>Meal Planner</span></div>
+            <div class="item"><span class="ic">🙋</span><span>Who Owns What</span></div>
+            <div class="sec pb"><span class="ic">🐷</span>The Piggy Bank<span class="ch">▼</span></div>
+            <div class="item"><span class="ic">🏠</span><span>Overview</span></div>
+            <div class="item"><span class="ic">💰</span><span>Accounts</span></div>
+            <div class="item"><span class="ic">💵</span><span>Budgets</span></div>
+            <div class="item"><span class="ic">💳</span><span>Transactions</span></div>
+            <div class="item"><span class="ic">🎯</span><span>Goals</span></div>
+            <div class="item"><span class="ic">🏢</span><span>Assets</span></div>
+            <div class="sec bp"><span class="ic">🌱</span>The Bean Pod<span class="ch">▶</span></div>
+            <div class="strip"><a href="#" title="Meet the Beans">🧑‍🤝‍🧑</a><a href="#" title="Family Scrapbook">📖</a><a href="#" title="Family Milestones">🌟</a><a href="#" title="Family Cookbook">🍜</a><a href="#" title="Care &amp; Safety">🩺</a><a href="#" title="Emergency Contacts">🆘</a></div>
+          </nav>
+          <div class="member"><div class="av"></div><div><b>John Doe</b><small>Owner</small></div><div class="tools"><a href="#" title="Help">📚</a><a href="#" title="Beanies Discord">💬</a></div></div>
+          <div class="status">📄 No data file<br />v0.90.0</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="note">
+      <b>What changes, in order of effect.</b> (1) Only the section that owns the current route starts open; the other two
+      fold to a header and a peek strip of their pages, so nothing is more than one tap away and the list fits a 740px
+      viewport with room to spare. (2) Rows drop from 18px to 16px type, which is what stops Emergency Contacts and
+      Family Milestones wrapping at 256px. (3) Help and Discord become two small buttons on the member card instead of
+      two full rows. (4) When a person opens a second section on a short screen, the scrollbar is thin, hidden until
+      hover, and the list fades at its edges. Opening a section still remembers your choice, as today.
+    </div>
+  </body>
+</html>

@@ -8,7 +8,7 @@ import {
   __resetSidebarAccordionForTesting,
 } from '@/composables/useSidebarAccordion';
 
-const KEY = 'sidebar-accordion-state';
+const KEY = 'sidebar-accordion-state-v2';
 
 describe('useSidebarAccordion', () => {
   beforeEach(() => {
@@ -22,19 +22,30 @@ describe('useSidebarAccordion', () => {
     vi.restoreAllMocks();
   });
 
-  it('defaults every section to open', () => {
+  it('defaults every section to closed', () => {
     const { isOpen } = useSidebarAccordion();
-    expect(isOpen('treehouse')).toBe(true);
-    expect(isOpen('piggyBank')).toBe(true);
-    expect(isOpen('beanPod')).toBe(true);
+    expect(isOpen('treehouse')).toBe(false);
+    expect(isOpen('piggyBank')).toBe(false);
+    expect(isOpen('beanPod')).toBe(false);
   });
 
-  it('keeps stored sections and opens a section added since (beanPod for existing users)', () => {
+  it('ignores the legacy v1 key so everyone starts on the new default', () => {
+    localStorage.setItem(
+      'sidebar-accordion-state',
+      JSON.stringify({ treehouse: true, piggyBank: true, beanPod: true })
+    );
+    const { isOpen } = useSidebarAccordion();
+    expect(isOpen('treehouse')).toBe(false);
+    expect(isOpen('beanPod')).toBe(false);
+    expect(logEvent).not.toHaveBeenCalled();
+  });
+
+  it('keeps stored sections and leaves a section added since closed', () => {
     localStorage.setItem(KEY, JSON.stringify({ treehouse: false, piggyBank: true }));
     const { isOpen } = useSidebarAccordion();
     expect(isOpen('treehouse')).toBe(false);
     expect(isOpen('piggyBank')).toBe(true);
-    expect(isOpen('beanPod')).toBe(true);
+    expect(isOpen('beanPod')).toBe(false);
     expect(logEvent).not.toHaveBeenCalled();
   });
 
@@ -45,7 +56,7 @@ describe('useSidebarAccordion', () => {
   ])('falls back to defaults on %s and logs a load warning', (_label, raw) => {
     localStorage.setItem(KEY, raw);
     const { isOpen } = useSidebarAccordion();
-    expect(isOpen('treehouse')).toBe(true);
+    expect(isOpen('treehouse')).toBe(false);
     expect(logEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         level: 'warn',
@@ -58,7 +69,7 @@ describe('useSidebarAccordion', () => {
   it('persists a toggle', () => {
     const { toggle } = useSidebarAccordion();
     toggle('beanPod');
-    expect(JSON.parse(localStorage.getItem(KEY)!)).toMatchObject({ beanPod: false });
+    expect(JSON.parse(localStorage.getItem(KEY)!)).toMatchObject({ beanPod: true });
   });
 
   it('keeps toggling in memory and logs a save warning when storage refuses the write', () => {
@@ -68,7 +79,7 @@ describe('useSidebarAccordion', () => {
     });
     const { isOpen, toggle } = useSidebarAccordion();
     toggle('piggyBank');
-    expect(isOpen('piggyBank')).toBe(false);
+    expect(isOpen('piggyBank')).toBe(true);
     expect(logEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         surface: 'sidebar-accordion',
@@ -81,7 +92,7 @@ describe('useSidebarAccordion', () => {
 
   it('reveal opens a closed section and saves; on an open section it writes nothing', () => {
     const { isOpen, toggle, reveal } = useSidebarAccordion();
-    toggle('beanPod');
+    toggle('treehouse');
     const setItem = vi.spyOn(localStorage, 'setItem');
     reveal('treehouse');
     expect(setItem).not.toHaveBeenCalled();
@@ -91,10 +102,19 @@ describe('useSidebarAccordion', () => {
     setItem.mockRestore();
   });
 
+  it('reveal opens a section without closing the others', () => {
+    const { isOpen, reveal } = useSidebarAccordion();
+    reveal('treehouse');
+    reveal('piggyBank');
+    expect(isOpen('treehouse')).toBe(true);
+    expect(isOpen('piggyBank')).toBe(true);
+    expect(isOpen('beanPod')).toBe(false);
+  });
+
   it('shares one state across callers (sidebar and drawer stay in sync)', () => {
     const a = useSidebarAccordion();
     const b = useSidebarAccordion();
     a.toggle('treehouse');
-    expect(b.isOpen('treehouse')).toBe(false);
+    expect(b.isOpen('treehouse')).toBe(true);
   });
 });
