@@ -12,13 +12,12 @@
 // eslint.security.config.js, so the pre-commit `eslint --fix` strips the directive as
 // unused and the gate then fails in CI instead.)
 //
-// `computePushHash` in `activityToGoogleEvent`, `stableNotificationId` in
-// `useLocalNotifications`, and `hashString` in `uiStrings` all PERSIST their output — as
-// `lastPushedHash` on a calendar link, as
-// a scheduled notification id, and as a translation-drift marker respectively. Changing the
-// algorithm behind any of those would re-push every activity in every family's calendar,
-// orphan scheduled notifications, or invalidate every translation. They look like duplication
-// and are not: a persisted hash is a data format, not a helper.
+// `computePushHash` in `activityToGoogleEvent` and `stableNotificationId` in
+// `useLocalNotifications` both PERSIST their output — as `lastPushedHash` on a calendar
+// link and as a scheduled notification id respectively. Changing the algorithm behind
+// either would re-push every activity in every family's calendar or orphan scheduled
+// notifications. They look like duplication and are not: a persisted hash is a data
+// format, not a helper.
 //
 // What lives here is the opposite case — values that exist only for the current render and can
 // change freely between releases without consequence.

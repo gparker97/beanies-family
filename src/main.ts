@@ -5,7 +5,7 @@ import App from './App.vue';
 import router from './router';
 import { initAnalytics } from './services/analytics/plausible';
 import { reportError } from './utils/errorReporter';
-import { hardReload, isChunkLoadError, CHUNK_RELOAD_FLAG } from './utils/hardReload';
+import { isChunkLoadError, startChunkRecovery } from './utils/hardReload';
 import { isIdbTransientError } from './utils/idbTransient';
 import { isBenignBrowserError } from './utils/benignBrowserError';
 import { bootstrapDocClient } from './services/automerge/worker/bootstrap';
@@ -123,19 +123,21 @@ window.addEventListener('unhandledrejection', (event) => {
 // tells Vite we're handling the recovery; `hardReload()` evicts the SW
 // precache and replaces the URL.
 //
-// MUST use the same counter-style logic as App.vue + router.onError —
+// MUST spend the same shared budget as App.vue + router.onError —
 // previously this used `=== '1'` / `set '1'`, which actively RESET the
 // shared retry counter on every fire. With the dynamic import's rejection
 // also routing through App.vue's catch (which increments), the counter
 // cycled 1→2→reset to 1→2 indefinitely and never tripped the "exhausted"
 // branch — so the loop ran for minutes with no `app.chunkRecoveryFailed`
 // alert (greg's iPhone, 2026-05-13).
+//
+// `startChunkRecovery`, not `tryRecoverChunkLoad`: the event itself is the
+// chunk-failure signal, and its payload can be Vite's "Unable to preload CSS for
+// <dep>" error, which `isChunkLoadError` does not match. Classifying it would
+// stop recovering CSS-preload failures.
 window.addEventListener('vite:preloadError', (event) => {
   event.preventDefault();
-  const attempts = parseInt(sessionStorage.getItem(CHUNK_RELOAD_FLAG) ?? '0', 10) || 0;
-  if (attempts >= 3) return;
-  sessionStorage.setItem(CHUNK_RELOAD_FLAG, String(attempts + 1));
-  void hardReload();
+  startChunkRecovery(event.payload);
 });
 
 // E2E data bridge (dev-only, tree-shaken from production)

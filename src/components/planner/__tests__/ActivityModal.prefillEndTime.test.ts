@@ -28,7 +28,6 @@ vi.mock('@/composables/useTranslation', () => ({
     t: (k: string) => k,
     currentLanguage: ref('en'),
     isLoading: ref(false),
-    loadProgress: ref(1),
     isEnglish: ref(true),
     isBeanieMode: ref(false),
   }),

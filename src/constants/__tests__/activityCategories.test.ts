@@ -112,8 +112,8 @@ describe('activity category i18n keys mirror the constant', () => {
   it('every category id has a planner.category.<id> key (zh source text)', () => {
     // English category labels are now resolved from the constant directly
     // (`useActivityCategoryLabel` short-circuits English), so the `en` value no longer
-    // has to MATCH the name — but the key must still EXIST so the zh
-    // `npm run translate` pipeline has source text for every id.
+    // has to MATCH the name — but the key must still EXIST so every id has a
+    // translatable string (and therefore a zh value in `zh.ts`).
     const missing = ACTIVITY_CATEGORIES.filter((cat) => !en[`planner.category.${cat.id}`]).map(
       (c) => c.id
     );

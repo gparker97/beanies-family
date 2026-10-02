@@ -19,7 +19,6 @@ const ALL_ENV_KEYS = [
   'VITE_FEEDBACK_WEBHOOK_URL',
   'VITE_MARKETING_URL',
   'VITE_PLAUSIBLE_DOMAIN',
-  'VITE_MYMEMORY_EMAIL',
 ] as const;
 
 function clearAllEnv(): void {
@@ -111,13 +110,10 @@ describe('config/features', () => {
     });
 
     it('single-var features derive directly from their env vars', async () => {
-      const cases: Array<
-        [string, 'slackPodCreate' | 'errorReporter' | 'analytics' | 'translationApiUpgrade']
-      > = [
+      const cases: Array<[string, 'slackPodCreate' | 'errorReporter' | 'analytics']> = [
         ['VITE_SLACK_WEBHOOK_URL', 'slackPodCreate'],
         ['VITE_BEANIES_ERROR_WEBHOOK_URL', 'errorReporter'],
         ['VITE_PLAUSIBLE_DOMAIN', 'analytics'],
-        ['VITE_MYMEMORY_EMAIL', 'translationApiUpgrade'],
       ];
 
       for (const [envKey, featureKey] of cases) {

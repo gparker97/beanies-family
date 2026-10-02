@@ -1,6 +1,6 @@
 # ADR-008: Internationalization with Dynamic Translation
 
-**Status:** Accepted
+**Status:** Superseded by ADR-040 (2026-10-02) for the translation pipeline
 **Date:** See commit "Add multilingual translation support to all page views"
 
 ## Context

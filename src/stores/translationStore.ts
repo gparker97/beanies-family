@@ -1,19 +1,32 @@
 import { defineStore } from 'pinia';
-import { ref, computed } from 'vue';
-import * as translationCache from '@/services/indexeddb/repositories/translationCacheRepository';
-import * as translationApi from '@/services/translation/translationApi';
-import * as translationFiles from '@/services/translation/translationFiles';
-import {
-  UI_STRINGS,
-  BEANIE_STRINGS,
-  getAllKeys,
-  getSourceText,
-  getAllHashes,
-} from '@/services/translation/uiStrings';
+import { ref, shallowRef, computed } from 'vue';
+import { UI_STRINGS, BEANIE_STRINGS } from '@/services/translation/uiStrings';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import type { LanguageCode } from '@/types/models';
 import { reportError } from '@/utils/errorReporter';
+import { isChunkLoadError } from '@/utils/hardReload';
 import { showToast } from '@/composables/useToast';
+
+type Strings = Readonly<Record<UIStringKey, string>>;
+
+/**
+ * One lazy loader per non-English language. Each language is a hand-authored
+ * sibling module of `uiStrings.ts` (`zh.ts` → `ZH_STRINGS`), imported only
+ * here so Vite emits it as its own chunk (precached by the service worker) and
+ * the main bundle does not grow. Adding a language is one entry here, one
+ * `LanguageCode` member and one module.
+ */
+const LOADERS: Record<Exclude<LanguageCode, 'en'>, () => Promise<Strings>> = {
+  zh: async () => {
+    // Destructure deliberately: a rotated chunk that resolves to null (the iOS
+    // shape recorded in hardReload.ts) then throws "Cannot destructure ... null",
+    // which isChunkLoadError matches, so the failure is reported as
+    // `error_code: 'chunk_load'`; a property read would throw "Cannot read
+    // properties of null", which it does not, and the report would misclassify.
+    const { ZH_STRINGS } = await import('@/services/translation/zh');
+    return ZH_STRINGS;
+  },
+};
 
 /**
  * Cancellation pattern: each `loadTranslations` call captures `++activeLoadToken`
@@ -30,16 +43,14 @@ import { showToast } from '@/composables/useToast';
 export const useTranslationStore = defineStore('translation', () => {
   // State
   const currentLanguage = ref<LanguageCode>('en');
-  const translations = ref<Map<string, string>>(new Map());
+  // shallowRef: a 5,000+ key record must not be wrapped in a deep reactive
+  // proxy on every switch; null means "English, no table loaded".
+  const translations = shallowRef<Strings | null>(null);
   const isLoading = ref(false);
-  const error = ref<string | null>(null);
-  const loadProgress = ref(0); // 0-100
-  const translationFile = ref<translationFiles.TranslationFile | null>(null);
   const beanieMode = ref(true);
 
   // Getters
   const isEnglish = computed(() => currentLanguage.value === 'en');
-  const translationCount = computed(() => translations.value.size);
 
   // Cancellation token — closure-scoped (not in store state). Every
   // loadTranslations call captures `++activeLoadToken` at start; later
@@ -47,73 +58,46 @@ export const useTranslationStore = defineStore('translation', () => {
   let activeLoadToken = 0;
 
   /**
-   * Try one key against the API. Per-key failure is non-fatal — t() falls
-   * back to the source-language string, so a missing key just renders in
-   * English. Logged so the failure isn't silent. Returning null tells the
-   * caller "skip this entry, keep going". Defensive: translationApi.translate()
-   * currently always returns a string (its own retry logic catches failures
-   * and returns the input text), but if its contract ever changes, this
-   * try/catch ensures the loop keeps going.
-   */
-  async function tryTranslateOneKey(
-    text: string,
-    key: string,
-    language: LanguageCode
-  ): Promise<string | null> {
-    try {
-      return await translationApi.translate(text, 'en', language);
-    } catch (err) {
-      console.warn(`[translationStore] missed key "${key}" for ${language}:`, err);
-      return null;
-    }
-  }
-
-  /**
-   * Surface a catastrophic failure (JSON fetch dead, IndexedDB unavailable,
-   * etc.). Stale-load failures should be silently abandoned by the caller
-   * BEFORE reaching this; this function only runs for the active load.
+   * Surface a catastrophic failure: the language chunk failed to load, for any
+   * reason. This store never hard-reloads on a load failure, a rotated chunk
+   * included, because the load may be a language switch made mid-session and
+   * replacing the page would lose unsaved work. The user keeps a toast and
+   * English; the chunk-load shape is still told apart in the report
+   * (`error_code: 'chunk_load'`). Other recovery paths (App.vue's init catch,
+   * `router.onError`, `vite:preloadError`) keep their own reload behaviour. Stale-load failures are silently abandoned by
+   * the caller BEFORE reaching this; this function only runs for the active load.
    *
-   * Routes through the universal error reporter so catastrophic translation
-   * failures join #beanies-errors with the rest of the app's structured
-   * errors. Surfaces a user-facing toast in whatever language is currently
-   * active (the t() lookup resolves against a complete map either way).
+   * Firehose only (`severity: 'error'`): the app degrades to English. The
+   * language travels in the message; `language` is not an allowlisted context
+   * key and would be redacted.
    */
   function handleCatastrophicLoadError(language: LanguageCode, err: unknown): void {
     const wrapped = err instanceof Error ? err : new Error(String(err));
     console.error('[translationStore] loadTranslations failed:', wrapped);
-    error.value = wrapped.message;
 
     reportError({
       surface: 'translation-load',
+      severity: 'error',
       message: `Translation load failed for ${language}`,
       error: wrapped,
-      context: { language },
+      context: { error_code: isChunkLoadError(err) ? 'chunk_load' : wrapped.name || 'unknown' },
     });
 
     showToast('error', t('error.translationLoadFailed'), t('error.translationLoadFailedHelp'));
   }
 
   /**
-   * Load translations for a language.
-   * Flow (each phase guards with `isStale()` before any reactive write):
-   * 1. Bundled JSON (fast, ~50–300 ms) — cosmetic switch happens here
-   * 2. Identify missing keys (hash mismatch from uiStrings.ts source-of-truth)
-   * 3. IndexedDB cache backfill (parallel reads)
-   * 4. API backfill (~200 ms/key MyMemory rate limit)
-   * 5. Persist new entries to IndexedDB
-   *
-   * Never blocks the caller — the click handler fires this and moves on.
-   * A mid-load language switch supersedes this load via `activeLoadToken`,
-   * causing the next staleness check to early-return without writing state.
+   * Load a language: one dynamic import of its hand-authored module, then the
+   * switch. Never blocks the caller — the click handler fires this and moves
+   * on. A mid-load language switch supersedes this load via `activeLoadToken`,
+   * so a stale load returns without writing state.
    */
   async function loadTranslations(language: LanguageCode): Promise<void> {
-    // English is the source language — no translation needed
+    // English is the source language — no table to load
     if (language === 'en') {
       activeLoadToken++; // bump so any in-flight non-English load becomes stale
-      translations.value.clear();
-      translationFile.value = null;
+      translations.value = null;
       currentLanguage.value = 'en';
-      loadProgress.value = 100;
       isLoading.value = false;
       return;
     }
@@ -123,110 +107,18 @@ export const useTranslationStore = defineStore('translation', () => {
 
     try {
       isLoading.value = true;
-      error.value = null;
-      loadProgress.value = 0;
-
-      const allKeys = getAllKeys();
-      const hashMap = getAllHashes();
-      const translationsMap = new Map<string, string>();
-
-      // ─── Phase 1: bundled JSON (fast, ~50–300 ms) ───
-      const file = await translationFiles.loadTranslationFile(language);
+      const table = await LOADERS[language]();
       if (isStale()) return;
-      translationFile.value = file;
-
-      if (file) {
-        for (const key of allKeys) {
-          const hash = hashMap[key];
-          if (hash) {
-            const translation = translationFiles.getTranslation(file, key, hash);
-            if (translation) {
-              translationsMap.set(key, translation);
-            }
-          }
-        }
-      }
-
-      loadProgress.value = 20;
-
-      // Cosmetic switch — instant. Any reactive UI re-renders into the new
-      // language using whatever the bundled JSON shipped with.
-      translations.value = new Map(translationsMap);
+      translations.value = table;
       currentLanguage.value = language;
-
-      // ─── Phase 2: identify missing keys ───
-      const missingKeys = allKeys.filter((key) => !translationsMap.has(key));
-      if (missingKeys.length === 0) return; // finally clears isLoading
-
-      // ─── Phase 3: IndexedDB cache backfill (parallel reads, fast) ───
-      loadProgress.value = 40;
-      const cached = await translationCache.getTranslationsForLanguageByKeys(language, missingKeys);
-      if (isStale()) return;
-
-      for (const entry of cached) {
-        const currentHash = hashMap[entry.key as UIStringKey];
-        if (currentHash === entry.hash) {
-          translationsMap.set(entry.key, entry.translation);
-        }
-      }
-
-      const stillMissingKeys = missingKeys.filter((key) => !translationsMap.has(key));
-
-      // Apply cache results
-      if (translationsMap.size > translations.value.size) {
-        translations.value = new Map(translationsMap);
-      }
-
-      if (stillMissingKeys.length === 0) return;
-
-      // ─── Phase 4: API backfill (~200 ms/key MyMemory rate limit) ───
-      // Staleness check at the top of each iteration so a mid-load supersede
-      // aborts within ~200 ms, not after the remaining hundred seconds of
-      // fetches. We loop ourselves rather than calling translationApi.translateBatch
-      // so the staleness check can interleave with the network calls.
-      loadProgress.value = 60;
-      const newTranslations: Array<{ key: string; translation: string; hash: string }> = [];
-
-      for (let i = 0; i < stillMissingKeys.length; i++) {
-        if (isStale()) return;
-        const key = stillMissingKeys[i]!;
-        const sourceText = getSourceText(key);
-
-        const translated = await tryTranslateOneKey(sourceText, key, language);
-        if (isStale()) return;
-        if (translated === null) continue; // per-key failure → log + skip
-
-        const hash = hashMap[key] || '';
-        newTranslations.push({ key, translation: translated, hash });
-        translationsMap.set(key, translated);
-        translations.value = new Map(translationsMap);
-        loadProgress.value = 60 + Math.round(((i + 1) / stillMissingKeys.length) * 30);
-
-        // 200 ms throttle between calls — MyMemory free-tier rate limit. Do
-        // NOT remove without subscribing to a paid tier first.
-        if (i < stillMissingKeys.length - 1) {
-          await new Promise<void>((resolve) => setTimeout(resolve, 200));
-          if (isStale()) return;
-        }
-      }
-
-      loadProgress.value = 90;
-
-      // ─── Phase 5: persist new entries ───
-      if (isStale()) return;
-      if (newTranslations.length > 0) {
-        await translationCache.saveTranslationsWithHash(newTranslations, language);
-      }
-
-      loadProgress.value = 100;
     } catch (err) {
-      // Catastrophic failure (JSON fetch dead, IndexedDB unavailable, etc.).
-      // Stale loads already returned earlier — this catch only fires for the
-      // active load, so we surface it loudly.
+      // Stale loads are abandoned silently — a newer load owns the UI now.
       if (isStale()) return;
+      // Every failure, a rotated chunk included, degrades to a toast + English;
+      // never a hard reload (see handleCatastrophicLoadError).
       handleCatastrophicLoadError(language, err);
-      // Fallback: drop back to English if we never managed to apply anything
-      if (translations.value.size === 0) {
+      // Fallback: stay in English if no table was ever applied
+      if (translations.value === null) {
         currentLanguage.value = 'en';
       }
     } finally {
@@ -240,11 +132,11 @@ export const useTranslationStore = defineStore('translation', () => {
 
   /**
    * Get the translated text for a UI string key.
-   * Returns English text if translation not available.
+   * Returns English text if no table is loaded.
    *
-   * IMPORTANT: The translation pipeline always uses UI_STRINGS (plain English)
-   * as the source text. BEANIE_STRINGS are never translated and are only shown
-   * as a cosmetic overlay when language is English and beanie mode is enabled.
+   * BEANIE_STRINGS are an English-only cosmetic overlay, shown only when the
+   * language is English and beanie mode is enabled. They never apply to another
+   * language.
    */
   function t(key: UIStringKey): string {
     if (currentLanguage.value === 'en') {
@@ -253,7 +145,7 @@ export const useTranslationStore = defineStore('translation', () => {
       }
       return UI_STRINGS[key];
     }
-    return translations.value.get(key) || UI_STRINGS[key];
+    return translations.value?.[key] ?? UI_STRINGS[key];
   }
 
   /**
@@ -262,16 +154,6 @@ export const useTranslationStore = defineStore('translation', () => {
    */
   function setBeanieMode(enabled: boolean): void {
     beanieMode.value = enabled;
-  }
-
-  /**
-   * Clear the translation cache and reload current language.
-   */
-  async function clearCache(): Promise<void> {
-    await translationCache.clearAll();
-    if (currentLanguage.value !== 'en') {
-      await loadTranslations(currentLanguage.value);
-    }
   }
 
   /**
@@ -286,17 +168,13 @@ export const useTranslationStore = defineStore('translation', () => {
     // State
     currentLanguage,
     isLoading,
-    error,
-    loadProgress,
     beanieMode,
     // Getters
     isEnglish,
-    translationCount,
     // Actions
     loadTranslations,
     t,
     setBeanieMode,
-    clearCache,
     setLanguageSync,
   };
 });
