@@ -25,6 +25,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Changed
 
+- The sidebar fits a laptop screen again. Only the section you are in starts open; the other two fold to a header with a strip of their page icons, still one tap away. Rows use the same size as the phone menu so no label wraps. Help and Discord are icons on your profile card; Share feedback and Settings stay as rows. When the list does overflow, the scrollbar is thin and only appears on hover.
+
+### Changed
+
 - Chinese UI text is now written by hand alongside the English instead of machine-translated; every string was rewritten.
 
 ### Removed

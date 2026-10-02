@@ -1,11 +1,15 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import AppNavMenu from '@/components/common/AppNavMenu.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
+import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import CloudProviderBadge from '@/components/ui/CloudProviderBadge.vue';
 import SaveStatusIndicator from '@/components/ui/SaveStatusIndicator.vue';
 import { useMemberAvatar } from '@/composables/useMemberAvatar';
+import { useNavSelect } from '@/composables/useNavSelect';
+import { useScrollOverflow } from '@/composables/useScrollOverflow';
 import { useTranslation } from '@/composables/useTranslation';
+import { navItemsInSection } from '@/constants/navigation';
 import { getProductVersionLabel } from '@/utils/diagnosticContext';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useSyncStore } from '@/stores/syncStore';
@@ -18,6 +22,32 @@ const syncStore = useSyncStore();
 
 const currentMemberRef = computed(() => familyStore.currentMember ?? familyStore.owner ?? null);
 const { variant: memberVariant, color: memberColor } = useMemberAvatar(currentMemberRef);
+
+const navScroll = ref<HTMLElement | null>(null);
+const { canScroll } = useScrollOverflow(navScroll);
+
+/**
+ * Help and Beanies Discord as icon buttons on the member card, in that order;
+ * Share feedback and Settings live in the fixed footer below the sections. Actions
+ * come from `useNavSelect`, the same one the nav rows use.
+ */
+const { selectItem } = useNavSelect();
+const HIDDEN_PINNED = ['/help', '/discord'] as const;
+const tools = computed(() =>
+  HIDDEN_PINNED.flatMap((path) => {
+    const item = navItemsInSection('pinned').find((i) => i.path === path);
+    if (!item) return [];
+    return [
+      {
+        key: path.slice(1),
+        label: t(item.labelKey),
+        icon: path === '/help' ? ('help-circle' as const) : null,
+        emoji: item.emoji,
+        run: () => selectItem(item),
+      },
+    ];
+  })
+);
 
 const encryptionTitle = computed(() => {
   if (!syncStore.isConfigured) return t('sidebar.noDataFileConfigured');
@@ -46,27 +76,67 @@ const encryptionTitle = computed(() => {
       </div>
     </div>
 
-    <!-- Navigation: accordion sections + pinned footer (shared with the drawer) -->
-    <AppNavMenu density="sidebar" class="flex-1 space-y-0.5 overflow-y-auto" />
+    <!-- Navigation: the scrolling accordion sections (shared menu with the drawer) -->
+    <div
+      ref="navScroll"
+      class="sidebar-nav-scroll quiet-scroll min-h-0 flex-1"
+      :class="{ 'can-scroll': canScroll }"
+    >
+      <AppNavMenu density="sidebar" groups="sections" class="space-y-0.5" />
+    </div>
+
+    <!-- Fixed footer: Share feedback + Settings stay visible however tall the sections grow. -->
+    <div class="mt-1.5 flex-none" data-testid="sidebar-pinned">
+      <div class="mx-2 mb-1.5 h-px bg-white/[0.08]" />
+      <AppNavMenu
+        density="sidebar"
+        groups="pinned"
+        :hide-pinned="[...HIDDEN_PINNED]"
+        class="space-y-0.5"
+      />
+    </div>
 
     <!-- User Profile Card -->
-    <div v-if="currentMemberRef" class="mt-3 rounded-2xl bg-white/[0.04] p-3">
+    <div class="mt-3 rounded-2xl bg-white/[0.04] p-3">
       <div class="flex items-center gap-2.5">
-        <BeanieAvatar :variant="memberVariant" :color="memberColor" size="md" />
-        <div class="min-w-0">
-          <p class="font-outfit truncate text-base font-semibold text-white">
-            {{ currentMemberRef.name }}
-          </p>
-          <p class="truncate text-sm text-white/35">
-            {{
-              currentMemberRef.role === 'owner'
-                ? t('family.role.owner')
-                : currentMemberRef.role === 'admin'
-                  ? t('family.role.admin')
-                  : t('family.role.member')
-            }}
-          </p>
-        </div>
+        <template v-if="currentMemberRef">
+          <BeanieAvatar :variant="memberVariant" :color="memberColor" size="md" />
+          <div class="min-w-0 flex-1 truncate">
+            <p class="font-outfit truncate text-base font-semibold text-white">
+              {{ currentMemberRef.name }}
+            </p>
+            <p class="truncate text-sm text-white/35">
+              {{
+                currentMemberRef.role === 'owner'
+                  ? t('family.role.owner')
+                  : currentMemberRef.role === 'admin'
+                    ? t('family.role.admin')
+                    : t('family.role.member')
+              }}
+            </p>
+          </div>
+        </template>
+      </div>
+      <!-- Help and Discord on their own row under the name, so a long name or Large reading mode
+           never pushes them into the text. With no member the row stands alone. -->
+      <div
+        class="flex gap-1.5"
+        :class="currentMemberRef ? 'mt-2.5' : ''"
+        data-testid="sidebar-tools"
+      >
+        <button
+          v-for="tool in tools"
+          :key="tool.key"
+          type="button"
+          class="grid h-[30px] w-[30px] cursor-pointer place-items-center rounded-[9px] bg-white/[0.06] text-sm text-white/70 transition-colors duration-150 hover:bg-white/[0.14] motion-reduce:transition-none"
+          :aria-label="tool.label"
+          :title="tool.label"
+          :data-testid="`sidebar-tool-${tool.key}`"
+          @click="tool.run()"
+        >
+          <BeanieIcon v-if="tool.icon" :name="tool.icon" size="sm" aria-hidden="true" />
+          <span v-else aria-hidden="true">{{ tool.emoji }}</span>
+        </button>
       </div>
     </div>
 

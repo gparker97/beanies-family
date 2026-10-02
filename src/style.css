@@ -322,6 +322,44 @@
   }
 }
 
+/*
+ * Quiet scrollbar: thin, invisible until hover, with top/bottom edge fades while the content
+ * overflows (add `can-scroll` from useScrollOverflow). Used on the Deep Slate sidebar and
+ * hamburger drawer, which are Deep Slate in both themes, so no dark partner is needed.
+ */
+@utility quiet-scroll {
+  overflow-y: auto;
+  scrollbar-color: transparent transparent;
+  scrollbar-width: thin;
+
+  &:hover {
+    scrollbar-color: rgb(255 255 255 / 22%) transparent;
+  }
+
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 3px;
+  }
+
+  &:hover::-webkit-scrollbar-thumb {
+    background: rgb(255 255 255 / 22%);
+  }
+
+  &.can-scroll {
+    mask-image: linear-gradient(
+      to bottom,
+      transparent,
+      #000 14px,
+      #000 calc(100% - 18px),
+      transparent
+    );
+  }
+}
+
 @utility animate-beanie-bounce {
   animation: beanie-bounce 0.4s ease-out both;
 }

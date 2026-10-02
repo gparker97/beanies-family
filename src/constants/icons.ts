@@ -263,6 +263,13 @@ const STATUS_ICONS = {
   'exclamation-circle': {
     paths: ['M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'],
   },
+  'help-circle': {
+    paths: [
+      'M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
+      'M9.5 9.5a2.5 2.5 0 114.2 1.8c-.8.7-1.7 1.2-1.7 2.2',
+      'M12 17h.01',
+    ],
+  },
 } satisfies Record<string, BeanieIconDef>;
 
 // ─── Category Icons (transaction categories) ───────────────────────────────
