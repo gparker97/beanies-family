@@ -160,13 +160,12 @@ const showTransferOwnership = ref(false);
 const showAi = ref(false);
 const showCalendarSync = ref(false);
 const showReminders = ref(false);
-// beanies AI (#133) still lives inside The Beanie Lab (per-device opt-in);
-// useBeanieLab is the single source of truth for its visibility (Lab on + a
-// reader flag), shared with BeanieLabSection. Google Calendar (#32/#34)
-// graduated to an official Settings card on 2026-07-03 — it's gated on the
-// googleCalendarSync flag alone (a kill-switch), not the Lab. isFlagEnabled is
-// not reactive (flips take effect on reload), so a plain const is correct.
-const { hasAnyLabFeature, aiVisible } = useBeanieLab();
+// Magic beans (#133) and Google Calendar (#32/#34) are official Settings cards.
+// Magic beans is gated on a reader flag being alive (useBeanieLab.aiAvailable, the
+// single source of truth); Calendar on the googleCalendarSync flag alone (a
+// kill-switch). Neither depends on the Lab opt-in. isFlagEnabled is not reactive
+// (flips take effect on reload), so a plain const is correct for calendar.
+const { hasAnyLabFeature, aiAvailable } = useBeanieLab();
 const calendarAvailable = isFlagEnabled('googleCalendarSync');
 
 // ── Deep-link: open a specific card from a route query (e.g. ?open=family-data)
@@ -176,9 +175,8 @@ const cardOpenMap: Record<string, () => void> = {
     showFamilyData.value = true;
   },
   [AI_SETTINGS_OPEN]: () => {
-    // Guarded: AI lives in the Beanie Lab — no-ops unless opted in AND a reader
-    // flag (aiPhotoExtract / aiTravelExtract) is alive.
-    if (aiVisible.value) showAi.value = true;
+    // Guarded: no-ops unless a reader flag (aiPhotoExtract / aiTravelExtract) is alive.
+    if (aiAvailable.value) showAi.value = true;
   },
   [CALENDAR_SYNC_OPEN]: () => {
     // Official feature — gated on the googleCalendarSync flag (kill-switch), not the Lab.
@@ -1835,6 +1833,21 @@ async function handleDeleteFamilyClick() {
         @click="showCalendarSync = true"
       />
       <SettingsCard
+        v-if="aiAvailable"
+        :title="t('settings.card.ai')"
+        :description="t('settings.card.aiDesc')"
+        data-testid="settings-card-magic-beans"
+        @click="showAi = true"
+      >
+        <template #icon>
+          <span
+            class="from-primary-500 to-terracotta-400 flex h-full w-full items-center justify-center rounded-[14px] bg-gradient-to-br text-white"
+            aria-hidden="true"
+            >✨</span
+          >
+        </template>
+      </SettingsCard>
+      <SettingsCard
         v-if="canManagePod"
         icon="📤"
         :title="t('settings.card.dataManagement')"
@@ -1971,12 +1984,12 @@ async function handleDeleteFamilyClick() {
     </div>
 
     <!-- ── The Beanie Lab (per-device opt-in to experimental features) ──────
-         Quiet + collapsed by default; houses the beanies AI and Google Calendar
-         surfaces, revealed only when the user opts in. Mount-gated on
+         Quiet + collapsed by default; currently houses no features (magic beans and
+         Google Calendar graduated to ordinary cards). Mount-gated on
          hasAnyLabFeature so the section disappears (no empty header/glyph/toggle)
          when zero Lab features are available — the Lab stays conceptually
          permanent, this is just a display-time emptiness guard (#35). -->
-    <BeanieLabSection v-if="hasAnyLabFeature" @open-ai="showAi = true" />
+    <BeanieLabSection v-if="hasAnyLabFeature" />
 
     <!-- ── Feature Flags (dev-only, owner/admin) ───────────────────────────
          DevFlagsCard is undefined in prod (DEV-gated dynamic import above), so
@@ -2064,9 +2077,8 @@ async function handleDeleteFamilyClick() {
     <!-- ── Reminders drawer (#55) — device-scoped OS notification prefs ─── -->
     <RemindersSettings :open="showReminders" @close="showReminders = false" />
 
-    <!-- ── beanies AI drawer (Beanie Lab surface) ─────────────────────────
-         Mount-gated on aiVisible so it can never open while the Lab is off. -->
-    <AiSettings v-if="aiVisible" :open="showAi" @close="showAi = false" />
+    <!-- ── Magic beans drawer — mount-gated on aiAvailable (a reader flag is alive). -->
+    <AiSettings v-if="aiAvailable" :open="showAi" @close="showAi = false" />
     <!-- ── Google Calendar drawer (official) — gated on the googleCalendarSync
          flag (kill-switch), independent of the Lab. -->
     <CalendarSyncSettings

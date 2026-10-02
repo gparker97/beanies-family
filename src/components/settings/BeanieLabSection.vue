@@ -4,31 +4,24 @@
  * lets a user opt in (per device) to in-development features. Off by default;
  * the only persistent footprint for everyone else is one muted, collapsed row.
  *
- * Reuses existing primitives — SmoothHeight (body open/close), ConditionalSection
- * (the cards reveal), SettingsCard + BetaBadge (the feature cards + "Testing" tag),
- * SettingToggleRow (the master switch). Visibility gating lives in useBeanieLab so
- * the card list here can't drift from SettingsPage's drawer / deep-link guards.
+ * Reuses existing primitives — SmoothHeight (body open/close) and SettingToggleRow
+ * (the master switch). Visibility gating lives in
+ * useBeanieLab. No feature currently lives here (Google Calendar and magic beans
+ * graduated to ordinary Settings cards); the reveal area below is where the next
+ * experimental feature's SettingsCard goes.
  */
 import { computed, ref } from 'vue';
 import SmoothHeight from '@/components/ui/SmoothHeight.vue';
-import ConditionalSection from '@/components/ui/ConditionalSection.vue';
-import SettingsCard from '@/components/settings/SettingsCard.vue';
 import SettingToggleRow from '@/components/settings/SettingToggleRow.vue';
-import BetaBadge from '@/components/ui/BetaBadge.vue';
 import { useReducedMotion } from '@/composables/useReducedMotion';
 import { useTranslation } from '@/composables/useTranslation';
 import { useBeanieLab } from '@/composables/useBeanieLab';
 import { useSettingsStore } from '@/stores/settingsStore';
 
-// AI (Tinfoil readers) is the sole Beanie Lab feature. Google Calendar graduated
-// to an official Settings card (2026-07-03). A single card lives inline below —
-// re-introduce the array pattern if a second Lab feature ever lands.
-const emit = defineEmits<{ 'open-ai': [] }>();
-
 const { t } = useTranslation();
 const { prefersReducedMotion } = useReducedMotion();
 const settingsStore = useSettingsStore();
-const { labEnabled, aiVisible } = useBeanieLab();
+const { labEnabled } = useBeanieLab();
 
 const expanded = ref(false);
 const animateBeaker = computed(() => expanded.value && !prefersReducedMotion.value);
@@ -115,24 +108,8 @@ async function onToggleLab(enabled: boolean): Promise<void> {
           />
         </div>
 
-        <!-- Revealed feature card (AI — the sole Lab feature) -->
-        <ConditionalSection :show="labEnabled">
-          <div class="space-y-3">
-            <SettingsCard
-              v-if="aiVisible"
-              icon="&#x1F916;"
-              :title="t('settings.card.ai')"
-              :description="t('settings.card.aiDesc')"
-              icon-bg="var(--tint-silk-20)"
-              data-testid="beanie-lab-card-ai"
-              @click="emit('open-ai')"
-            >
-              <template #badge>
-                <BetaBadge label="settings.beanieLab.testingTag" />
-              </template>
-            </SettingsCard>
-          </div>
-        </ConditionalSection>
+        <!-- Revealed feature cards: none today. The next Lab feature mounts its SettingsCard
+             here inside a `ConditionalSection :show="labEnabled"`. -->
 
         <!-- Empty state when the Lab is off -->
         <p

@@ -60,9 +60,9 @@ describe('MagicReaderCard', () => {
     expect(w.findComponent({ name: 'MagicBeansDoor' }).props('claim')).toBeUndefined();
   });
 
-  it('still carries the feature name and its beta badge', () => {
+  it('carries the feature name and no beta badge', () => {
     const w = mountCard();
     expect(w.text()).toContain('ai.magic.title');
-    expect(w.findComponent({ name: 'BetaBadge' }).exists()).toBe(true);
+    expect(w.findComponent({ name: 'BetaBadge' }).exists()).toBe(false);
   });
 });

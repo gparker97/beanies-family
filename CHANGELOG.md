@@ -12,6 +12,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Added
 
+- Magic beans is out of beta. The Beta badges are gone from its surfaces, and its settings now live on an ordinary "Magic beans" card in Settings instead of inside The Beanie Lab, so the processing mode and the ask-before-photos switch are findable without enabling experimental features.
+
 - The magic link panel now has copy and share icon buttons. Share opens the phone's share sheet so a link minted on one device can be sent to another; on a desktop browser only copy is shown.
 
 - The edit-meal drawer no longer opens with an ingredients checklist on top. A Shopping List row below Who's eating shows how many batches to cook and opens the same shopping sheet the cookbook uses, at that meal's count.
