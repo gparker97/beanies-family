@@ -11914,7 +11914,7 @@ const STRING_DEFS = {
       'show a privacy check before sending a photo, document or selected text to beanies ai. a bank statement always asks the first time.',
   },
   // #133 Phase 4 — AI tier settings
-  'settings.card.ai': { en: 'beanies AI', beanie: 'beanies ai' },
+  'settings.card.ai': { en: 'Magic beans', beanie: 'magic beans' },
   'settings.card.aiDesc': {
     en: 'How AI handles your documents',
     beanie: 'how ai handles your beans',

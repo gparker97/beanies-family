@@ -1,11 +1,9 @@
 /**
- * Unit tests for useBeanieLab — the single source of truth for Beanie Lab
- * visibility. AI is the sole Lab feature (Google Calendar graduated to an
- * official Settings card on 2026-07-03). SettingsPage (section mount + AI drawer
- * guard) and BeanieLabSection (the AI card) consume these computeds:
- *   - aiAvailable    = isFlagEnabled('aiPhotoExtract') OR isFlagEnabled('aiTravelExtract')
- *   - hasAnyLabFeature = aiAvailable   (semantic alias; drives the section mount)
- *   - aiVisible      = labEnabled AND aiAvailable
+ * Unit tests for useBeanieLab. The Lab has no features (Google Calendar and magic
+ * beans graduated to ordinary Settings cards), so:
+ *   - aiAvailable      = isFlagEnabled('aiPhotoExtract') OR isFlagEnabled('aiTravelExtract'),
+ *                        independent of the Lab opt-in (gates the magic beans card)
+ *   - hasAnyLabFeature = false (the next experimental feature slots in as an OR term)
  */
 import { setActivePinia, createPinia } from 'pinia';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -38,66 +36,38 @@ describe('useBeanieLab', () => {
     mockIsFlagEnabled.mockImplementation((flag: string) => on.includes(flag));
   }
 
-  it('AI hidden when the Lab is off, regardless of the flags', () => {
+  it('aiAvailable follows the reader flags and ignores the Lab opt-in', () => {
+    for (const lab of [false, true]) {
+      setLab(lab);
+
+      only('aiPhotoExtract');
+      expect(useBeanieLab().aiAvailable.value).toBe(true);
+
+      only('aiTravelExtract');
+      expect(useBeanieLab().aiAvailable.value).toBe(true);
+
+      only(); // both reader flags off
+      expect(useBeanieLab().aiAvailable.value).toBe(false);
+    }
+  });
+
+  it('does NOT gate on googleCalendarSync', () => {
+    only('googleCalendarSync');
+    expect(useBeanieLab().aiAvailable.value).toBe(false);
+  });
+
+  it('labEnabled mirrors the persisted opt-in', () => {
+    setLab(true);
+    expect(useBeanieLab().labEnabled.value).toBe(true);
     setLab(false);
-    const { labEnabled, aiVisible } = useBeanieLab();
-    expect(labEnabled.value).toBe(false);
-    expect(aiVisible.value).toBe(false);
+    expect(useBeanieLab().labEnabled.value).toBe(false);
   });
 
-  it('AI visible when the Lab is on and a reader flag is alive', () => {
-    setLab(true);
-    mockIsFlagEnabled.mockReturnValue(true);
-    const { aiVisible } = useBeanieLab();
-    expect(aiVisible.value).toBe(true);
-  });
-
-  it('does NOT gate on googleCalendarSync (calendar is no longer a Lab feature)', () => {
-    setLab(true);
-    only('googleCalendarSync'); // only the calendar flag on, no reader flags
-    const { aiVisible, hasAnyLabFeature } = useBeanieLab();
-    expect(aiVisible.value).toBe(false);
-    expect(hasAnyLabFeature.value).toBe(false);
-  });
-
-  it('AI requires the Lab AND at least one reader flag (OR of the two readers)', () => {
-    setLab(true);
-
-    only('aiPhotoExtract');
-    expect(useBeanieLab().aiVisible.value).toBe(true);
-
-    only('aiTravelExtract');
-    expect(useBeanieLab().aiVisible.value).toBe(true);
-
-    only(); // both reader flags off
-    expect(useBeanieLab().aiVisible.value).toBe(false);
-  });
-
-  describe('hasAnyLabFeature (drives whether the section renders at all)', () => {
-    it('is false when no reader flag is available — independent of the opt-in', () => {
-      mockIsFlagEnabled.mockReturnValue(false);
-
-      setLab(false);
-      const off = useBeanieLab();
-      expect(off.hasAnyLabFeature.value).toBe(false);
-      expect(off.aiVisible.value).toBe(false);
-
-      // Even with the opt-in ON, nothing available ⟹ still empty.
-      setLab(true);
+  it('hasAnyLabFeature is false (no Lab features remain), whatever the flags and opt-in', () => {
+    for (const lab of [false, true]) {
+      setLab(lab);
+      mockIsFlagEnabled.mockReturnValue(true);
       expect(useBeanieLab().hasAnyLabFeature.value).toBe(false);
-    });
-
-    it.each(['aiPhotoExtract', 'aiTravelExtract'])(
-      'is true when only %s is available, regardless of the opt-in',
-      (flag) => {
-        only(flag);
-
-        setLab(false);
-        expect(useBeanieLab().hasAnyLabFeature.value).toBe(true);
-
-        setLab(true);
-        expect(useBeanieLab().hasAnyLabFeature.value).toBe(true);
-      }
-    );
+    }
   });
 });

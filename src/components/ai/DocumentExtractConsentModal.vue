@@ -37,7 +37,6 @@ import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { openExternal } from '@/utils/openExternal';
 import { splitAroundAccent } from '@/utils/splitAroundAccent';
-import BetaBadge from '@/components/ui/BetaBadge.vue';
 import { useAiCapability } from '@/composables/useAiCapability';
 import { useDocumentConsent, type ConsentRequest } from '@/composables/useDocumentConsent';
 import type { UIStringKey } from '@/services/translation/uiStrings';
@@ -181,11 +180,6 @@ function onConfirm(): void {
     @close="resolveConsent(false)"
     @save="onConfirm"
   >
-    <!-- Beta: the AI document readers are an early release. -->
-    <div>
-      <BetaBadge />
-    </div>
-
     <!-- "secure, private" becomes an inline link to the privacy article once it
          ships (PRIVACY_ARTICLE_LIVE); until then it renders as plain emphasised
          text so the sentence still reads correctly. -->

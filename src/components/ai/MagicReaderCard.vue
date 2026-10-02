@@ -16,7 +16,6 @@
  * and its tap together rather than leaving a button whose handler does nothing.
  */
 import MagicBeansDoor from '@/components/ai/MagicBeansDoor.vue';
-import BetaBadge from '@/components/ui/BetaBadge.vue';
 import { useTranslation } from '@/composables/useTranslation';
 
 const { t } = useTranslation();
@@ -31,7 +30,6 @@ const { t } = useTranslation();
         <h2 class="font-outfit flex items-center gap-2 text-base font-extrabold">
           <span aria-hidden="true">✨</span>
           <span>{{ t('ai.magic.title') }}</span>
-          <BetaBadge tone="onAccent" class="ml-auto" />
         </h2>
         <p class="mt-1.5 text-xs leading-snug opacity-90">{{ t('ai.magic.subtitle') }}</p>
 

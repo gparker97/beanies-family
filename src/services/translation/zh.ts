@@ -5438,7 +5438,7 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'settings.ai.askBeforePhotos': '读取照片前先询问',
   'settings.ai.askBeforePhotosHint':
     '在把照片、文件或选中的文字发送给 beanies AI 之前，先显示隐私确认。银行对账单首次读取时总会询问。',
-  'settings.card.ai': 'beanies AI',
+  'settings.card.ai': '魔法豆',
   'settings.card.aiDesc': 'AI 如何处理你的文件',
   'settings.card.calendarSync': 'Google 日历',
   'settings.card.calendarSyncDesc': '把活动推送到你的日历',
