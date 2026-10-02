@@ -325,12 +325,6 @@ vi.mock('@/services/registry/registryService', () => ({
   removeFamily: vi.fn(async () => {}),
 }));
 
-// Translation cache repo (imported by translationCacheRepository)
-vi.mock('@/services/indexeddb/repositories/translationCacheRepository', () => ({
-  getTranslationCache: vi.fn(async () => null),
-  saveTranslationCache: vi.fn(async () => {}),
-}));
-
 // Store stubs for stores only used in reloadAllStores — these don't touch the doc themselves
 vi.mock('@/stores/syncHighlightStore', () => ({
   useSyncHighlightStore: () => ({

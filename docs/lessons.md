@@ -1533,6 +1533,8 @@ await expect(dashboardPage.monthlyExpensesValue).toContainText('150', { timeout:
 
 **Rule:** Whenever you modify the structure of `uiStrings.ts` (not just adding/removing string entries), also verify and update the parser in `scripts/updateTranslations.mjs`. Run `npm run translate` to confirm the parser still extracts all keys correctly.
 
+Retired 2026-10-02: the script is gone; zh lives in zh.ts, see ADR-040.
+
 ## 6. Repo rename: GitHub redirects handle most things automatically
 
 **Date:** 2026-02-24

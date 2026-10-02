@@ -2,29 +2,17 @@
  * UI Strings Registry
  *
  * All user-facing text in the application should be defined here.
- * This enables dynamic translation of the UI.
  *
- * Each string is automatically hashed. When a string changes, its hash changes,
- * triggering re-translation of only that specific string.
+ * STRING_DEFS is the single source of truth for English. Both plain English (en)
+ * and optional beanie-themed overrides (beanie) are defined side by side;
+ * UI_STRINGS and BEANIE_STRINGS are derived automatically — no manual duplication.
  *
- * STRING_DEFS is the single source of truth. Both plain English (en) and optional
- * beanie-themed overrides (beanie) are defined side by side. UI_STRINGS and
- * BEANIE_STRINGS are derived automatically — no manual duplication.
+ * Every string has three values, written in the same edit: `en` and `beanie`
+ * here, and its Simplified Chinese value in the sibling module `zh.ts`
+ * (`ZH_STRINGS`, typed `Record<UIStringKey, string>`, so a missing or removed zh
+ * key fails type-check; a changed English meaning is only caught by editing
+ * all three together). Style and glossary: docs/TRANSLATION.md.
  */
-
-/**
- * Simple hash function for string content.
- * Used to detect when English strings have changed.
- */
-function hashString(str: string): string {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = (hash << 5) - hash + char;
-    hash = hash & hash; // Convert to 32-bit integer
-  }
-  return Math.abs(hash).toString(36);
-}
 
 type StringEntry = { en: string; beanie?: string };
 
@@ -10158,8 +10146,8 @@ const STRING_DEFS = {
   // TITLE is the item's own name, passed straight through. It deliberately has
   // no key: a value that is nothing but `{title}` is a translation-pipeline
   // hazard, and the zh auto-translation duly replaced the placeholder with the
-  // word "标题", destroying every notification title. `updateTranslations.mjs`
-  // now rejects placeholder-losing translations, but the real fix is not to
+  // word "标题", destroying every notification title. The ZH_STRINGS suite now
+  // rejects placeholder-losing translations, but the real fix is not to
   // round-trip a bare placeholder through t() at all.
   'reminders.activityBodyDropoff': {
     en: 'Time to drop off — {who}',
@@ -14312,7 +14300,6 @@ export type UIStringKey = keyof typeof STRING_DEFS;
 
 /**
  * Get the English text for a UI string key.
- * This is the source text that gets translated.
  */
 export function getSourceText(key: UIStringKey): string {
   return UI_STRINGS[key];
@@ -14323,43 +14310,4 @@ export function getSourceText(key: UIStringKey): string {
  */
 export function getAllKeys(): UIStringKey[] {
   return Object.keys(UI_STRINGS) as UIStringKey[];
-}
-
-/**
- * Get all UI strings as key-value pairs.
- */
-export function getAllStrings(): Record<UIStringKey, string> {
-  return { ...UI_STRINGS };
-}
-
-/**
- * Get the hash for a UI string key.
- * Hash is computed from the English text content.
- */
-export function getStringHash(key: UIStringKey): string {
-  return hashString(UI_STRINGS[key]);
-}
-
-/**
- * Get all UI string hashes.
- * Returns a map of key -> hash.
- */
-export function getAllHashes(): Record<UIStringKey, string> {
-  const hashes: Partial<Record<UIStringKey, string>> = {};
-  for (const key of getAllKeys()) {
-    hashes[key] = getStringHash(key);
-  }
-  return hashes as Record<UIStringKey, string>;
-}
-
-/**
- * Get UI strings with their hashes.
- * Returns array of { key, text, hash } objects.
- */
-export function getAllStringsWithHashes(): Array<{ key: UIStringKey; text: string; hash: string }> {
-  return getAllKeys().map((key) => ({
-    key,
-    text: UI_STRINGS[key],
-    hash: getStringHash(key),
-  }));
 }

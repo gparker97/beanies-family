@@ -6,10 +6,6 @@
  * for a single country, validates it, caches it in IndexedDB with a 7-day TTL,
  * and returns the holiday records — degrading gracefully (and loudly, on the
  * console) on every failure mode so the planner always renders.
- *
- * Mirrors `src/services/translation/translationFiles.ts` (the other
- * fetch-a-public-JSON loader) but collapsed, since there's a single consumer
- * (`holidayStore`).
  */
 import type { CountryCode, HolidayFile, HolidayRecord } from '@/types/models';
 import * as cache from '@/services/indexeddb/repositories/referenceDataCacheRepository';

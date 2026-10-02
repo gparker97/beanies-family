@@ -118,10 +118,6 @@ vi.mock('@/services/indexeddb/repositories/globalSettingsRepository', () => ({
   getGlobalSettings: vi.fn(async () => ({})),
   saveGlobalSettings: vi.fn(async () => ({})),
 }));
-vi.mock('@/services/indexeddb/repositories/translationCacheRepository', () => ({
-  getTranslationCache: vi.fn(async () => null),
-  saveTranslationCache: vi.fn(async () => {}),
-}));
 
 // Sync service
 vi.mock('@/services/sync/syncService', async () => {

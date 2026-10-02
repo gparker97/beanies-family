@@ -1,17 +1,19 @@
 /**
  * Traditional-Chinese characters that have a DIFFERENT simplified form.
  *
- * Detection only — this is not a converter. `public/translations/zh.json`
- * declares itself 中文 (简体), and roughly a hundred entries had drifted into
- * traditional forms, because the translation API returns whichever script it
- * feels like for a short label with no context. A zh-CN reader sees those as a
- * foreign script mid-sentence.
+ * Detection only, not a converter. `zh.ts` is Simplified Chinese (简体); a
+ * Traditional form mid-sentence reads as a foreign script to a zh-CN reader.
+ * The ZH_STRINGS suite in `uiStrings.test.ts` fails on any value that contains
+ * one of these characters.
  *
  * Deliberately EXCLUDES characters that are identical in both scripts (which is
  * most of them) and the context-dependent ones, so a match here is unambiguous
  * and the guard cannot false-positive on correct simplified text.
+ *
+ * Moved from `scripts/lib/traditionalChars.mjs` on 2026-10-02 (plan
+ * 2026-10-02-claude-authored-zh-strings) so a `src/**` test can import it.
  */
-export const TRADITIONAL_ONLY = new Set([
+export const TRADITIONAL_ONLY = new Set<string>([
   '丟',
   '亂',
   '亞',

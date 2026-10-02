@@ -93,7 +93,6 @@ export const features = {
   // way — so an unset webhook is undetectable from both ends without this.
   feedbackReporter: ok(env.VITE_FEEDBACK_WEBHOOK_URL),
   analytics: ok(env.VITE_PLAUSIBLE_DOMAIN),
-  translationApiUpgrade: ok(env.VITE_MYMEMORY_EMAIL),
 } as const;
 
 export type FeatureKey = keyof typeof features;
@@ -223,7 +222,7 @@ export function canInviteFamily(): boolean {
 
 // Discriminator for the "developer build" badge: only the two features that
 // require real infrastructure to wire up. Slack webhooks, error reporter,
-// invite gate, analytics, and translation upgrade are all optional even on
+// invite gate and analytics are all optional even on
 // greg's local dev — they don't downgrade the badge.
 const ESSENTIAL: FeatureKey[] = ['drive', 'registry'];
 

@@ -9,11 +9,13 @@
  * - Active family tracking (used by familyContextStore and sync guards)
  * - Database name utilities
  * - deleteFamilyDatabase for sign-out cleanup
+ * - deleteRetiredTranslationDatabase (one-time boot cleanup, temporary)
  */
 
 import * as docClient from '@/services/automerge/worker/docClient';
 import type { CacheClearResult } from '@/services/automerge/worker/protocol';
 import { deletePhotoQueueDatabase } from '@/services/sync/photoUploadQueue';
+import { logEvent } from '@/services/telemetry';
 
 const DB_NAME_PREFIX = 'beanies-data-';
 const AUTOMERGE_DB_PREFIX = 'beanies-automerge-';
@@ -104,22 +106,94 @@ export async function deleteFamilyDatabase(familyId: string): Promise<CacheClear
   return cache;
 }
 
-/** Helper to delete an IndexedDB by name. */
-async function deleteDB(dbName: string): Promise<void> {
-  await new Promise<void>((resolve, reject) => {
+/** The retired machine-translation cache (a separate idb database, not a store). */
+const RETIRED_TRANSLATION_DB_NAME = 'beanies-translations';
+
+/** localStorage done-marker: the retired database is gone on this device. */
+const RETIRED_TRANSLATION_DB_CLEANED_KEY = 'beanies:retired-translation-db-cleaned';
+
+function isRetiredTranslationDbCleaned(): boolean {
+  try {
+    return localStorage.getItem(RETIRED_TRANSLATION_DB_CLEANED_KEY) === '1';
+  } catch (e) {
+    console.warn('[database] retired translation cleanup marker unreadable, retrying delete:', e);
+    return false;
+  }
+}
+
+function markRetiredTranslationDbCleaned(): void {
+  try {
+    localStorage.setItem(RETIRED_TRANSLATION_DB_CLEANED_KEY, '1');
+  } catch (e) {
+    console.warn('[database] retired translation cleanup marker not saved:', e);
+  }
+}
+
+/**
+ * One-time, best-effort deletion of the orphaned `beanies-translations`
+ * database, left on existing devices when the runtime machine-translation cache
+ * was retired (plan 2026-10-02-claude-authored-zh-strings). Fired detached at
+ * boot; never throws. A localStorage marker, set once the delete succeeds, makes
+ * every later boot return before touching IndexedDB. Deleting a database that
+ * does not exist succeeds, so there is no existence probe.
+ *
+ * Telemetry: one `deleted` info event per device (so CloudWatch shows when the
+ * block below is safe to drop), `blocked` from `deleteDB`, `failed` on error.
+ *
+ * TEMPORARY: remove after 2026-12-01 (with its call in App.vue). By then every
+ * active device has booted a build that ran it.
+ */
+export async function deleteRetiredTranslationDatabase(): Promise<void> {
+  if (typeof indexedDB === 'undefined') return;
+  if (isRetiredTranslationDbCleaned()) return;
+  try {
+    if ((await deleteDB(RETIRED_TRANSLATION_DB_NAME)) !== 'deleted') return;
+    markRetiredTranslationDbCleaned();
+    logEvent({
+      level: 'info',
+      surface: 'idb-legacy-cleanup',
+      message: 'retired translation database removed',
+      context: { action: 'deleted' },
+    });
+  } catch (e) {
+    console.warn('[database] retired translation database cleanup failed (non-fatal):', e);
+    logEvent({
+      level: 'warn',
+      surface: 'idb-legacy-cleanup',
+      message: 'retired translation database cleanup failed',
+      context: { action: 'failed', error_code: e instanceof Error ? e.name : 'unknown' },
+    });
+  }
+}
+
+/**
+ * Helper to delete an IndexedDB by name. Resolves `'deleted'` on success and
+ * `'blocked'` when another connection blocks the delete (reported as an
+ * `idb-delete` warn event); rejects on error.
+ */
+async function deleteDB(dbName: string): Promise<'deleted' | 'blocked'> {
+  return new Promise<'deleted' | 'blocked'>((resolve, reject) => {
     const request = indexedDB.deleteDatabase(dbName);
-    request.onsuccess = () => resolve();
+    request.onsuccess = () => resolve('deleted');
     request.onerror = () => reject(request.error);
     request.onblocked = () => {
       // ⚠️ DEFERRED, 2026-09-07 (plan A10). This is the same shape that caused
-      // the cache-open lockout: resolving a BLOCKED delete as success leaves it
-      // queued, and any later open of the same name waits behind it forever.
-      // Left alone deliberately — these are the legacy entity DB and the photo
-      // queue, this one at least warns rather than going silent, and nothing
-      // here re-opens immediately afterwards, which is the pairing that hangs.
-      // If a re-open is ever added below, fix this first.
+      // the cache-open lockout: resolving a BLOCKED delete leaves it queued,
+      // and any later open of the same name waits behind it forever. Left
+      // alone deliberately: these are the legacy entity DB, the retired
+      // translation cache and the photo queue, the outcome is reported as
+      // `blocked` rather than passed off as success, and nothing here re-opens
+      // immediately afterwards, which is the pairing that hangs. If a re-open
+      // is ever added below, fix this first.
       console.warn(`Database ${dbName} delete blocked — closing and retrying`);
-      resolve();
+      // The name is not an allowlisted context key, so it rides in the message.
+      logEvent({
+        level: 'warn',
+        surface: 'idb-delete',
+        message: `database ${dbName} delete blocked`,
+        context: { action: 'blocked' },
+      });
+      resolve('blocked');
     };
   });
 }

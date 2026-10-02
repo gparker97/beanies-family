@@ -448,8 +448,7 @@ removal surface. Then:
 - [ ] Revert `handleNavigate`'s parameter union and `WelcomeGate`'s local
       `LoginView` union.
 - [ ] Drop the negative `workflowEnvParity` assertion and the `reviewDemo.*`
-      block in `uiStrings.ts` (plus `public/translations/zh.json` on the next
-      `npm run translate`).
+      block in `uiStrings.ts` (plus its block in `src/services/translation/zh.ts`).
 - [ ] **Keep** `src/utils/hashedCodeGate.ts`, `encoding.ts`'s `sha256*`,
       `seedDocument.ts` and `withAnalyticsSuppressed` — each has non-demo callers
       and stands alone.

@@ -1,25 +1,7 @@
 import { setActivePinia, createPinia } from 'pinia';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { useTranslationStore } from '@/stores/translationStore';
 import { UI_STRINGS, BEANIE_STRINGS } from '@/services/translation/uiStrings';
-
-// Mock the translation dependencies
-vi.mock('@/services/indexeddb/repositories/translationCacheRepository', () => ({
-  getTranslationsForLanguageByKeys: vi.fn().mockResolvedValue([]),
-  saveTranslationsWithHash: vi.fn().mockResolvedValue(undefined),
-  clearAll: vi.fn().mockResolvedValue(undefined),
-}));
-
-vi.mock('@/services/translation/translationApi', () => ({
-  translateBatch: vi.fn().mockResolvedValue([]),
-}));
-
-vi.mock('@/services/translation/translationFiles', () => ({
-  loadTranslationFile: vi.fn().mockResolvedValue(null),
-  createEmptyTranslationFile: vi.fn(),
-  updateTranslationFile: vi.fn(),
-  getTranslation: vi.fn(),
-}));
 
 describe('translationStore beanie mode', () => {
   beforeEach(() => {

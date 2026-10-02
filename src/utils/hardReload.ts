@@ -1,3 +1,15 @@
+import type { LogEventInput } from '@/services/telemetry';
+
+/**
+ * Upper bound on `hardReload()`'s SW/cache cleanup. Every await in it
+ * (`getRegistration`, `update`, `unregister`, `caches.delete`) is a browser call
+ * with no timeout of its own, and while a chunk recovery is in flight App.vue's
+ * init watchdog and spinner dismissal stand down (`isChunkRecoveryInProgress`),
+ * so a hung SW call would otherwise leave "counting beans" up forever. Past the
+ * deadline the page is replaced regardless; the cleanup is best-effort anyway.
+ */
+export const HARD_RELOAD_CLEANUP_DEADLINE_MS = 8000;
+
 /**
  * Hard-reload primitive that actively defeats stale service-worker caches.
  *
@@ -22,53 +34,77 @@
  *   - The "Sign Out & Clear Data" path
  *   - The "new version ready" action toast from the header refresh icon
  *
- * Caller-side loop protection: the auto-recovery paths set a
- * `sessionStorage` flag before invoking and clear it on the next
- * successful navigation, so if the new HTML *also* fails (e.g. network
- * down) we surface the error overlay instead of looping.
+ * Loop protection for the auto-recovery paths lives in
+ * `startChunkRecovery` / `tryRecoverChunkLoad` below: a bounded attempt
+ * counter (cleared after a confirmed successful boot) plus an in-progress
+ * flag, so if the new HTML *also* fails (e.g. network down) we surface the
+ * error overlay instead of looping.
  */
 export async function hardReload(): Promise<void> {
+  let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<'deadline'>((resolve) => {
+    deadlineTimer = setTimeout(() => resolve('deadline'), HARD_RELOAD_CLEANUP_DEADLINE_MS);
+  });
   try {
-    if ('serviceWorker' in navigator) {
-      const reg = await navigator.serviceWorker.getRegistration();
-      if (reg) {
-        try {
-          await reg.update();
-        } catch (e) {
-          console.warn('[hardReload] SW update failed (transient):', e);
-        }
-        if (reg.waiting) {
-          reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-        }
-        // Aggressive: unregister so the next nav bypasses the SW intercept
-        // entirely. The SW re-registers on the fresh load via `registerSW`
-        // in main.ts (offline support comes back within ~1 second). This is
-        // the only thing that reliably breaks iOS Safari's stale-precache
-        // loop when registerType: 'prompt' has held a new SW in waiting
-        // limbo — `update()` + `SKIP_WAITING` are no-ops there, and
-        // workbox's NavigationRoute can still serve stale `index.html`
-        // even after `caches.delete(all)`. `hardReload()` is only ever
-        // called from recovery paths (router.onError, vite:preloadError,
-        // App.vue init catch, the user-Reload button) — never on a healthy
-        // path — so the brief offline gap is always an acceptable trade.
-        try {
-          await reg.unregister();
-        } catch (e) {
-          console.warn('[hardReload] SW unregister failed (continuing):', e);
-        }
-      }
-    }
-    if ('caches' in window) {
-      const keys = await caches.keys();
-      await Promise.all(keys.map((k) => caches.delete(k)));
+    const outcome = await Promise.race([evictServiceWorkerAndCaches(), deadline]);
+    if (outcome === 'deadline') {
+      console.warn(
+        `[hardReload] SW/cache cleanup exceeded ${HARD_RELOAD_CLEANUP_DEADLINE_MS}ms, reloading anyway`
+      );
     }
   } catch (e) {
     console.warn('[hardReload] cache/SW cleanup failed, reloading anyway:', e);
   } finally {
-    // `replace` (not assign) so the broken state isn't a back-button trap.
-    // `pathname + search` re-hits the same route with a fresh fetch chain.
-    window.location.replace(window.location.pathname + window.location.search);
+    clearTimeout(deadlineTimer);
   }
+  // `replace` (not assign) so the broken state isn't a back-button trap.
+  // `pathname + search` re-hits the same route with a fresh fetch chain.
+  // It can throw (a sandboxed frame, some WebViews); rethrown so the caller
+  // learns the page is NOT about to be replaced (see `startChunkRecovery`).
+  try {
+    window.location.replace(window.location.pathname + window.location.search);
+  } catch (e) {
+    console.error('[hardReload] location.replace failed, page not reloaded:', e);
+    throw e;
+  }
+}
+
+/** The SW update/unregister + Cache Storage eviction half of `hardReload()`. */
+async function evictServiceWorkerAndCaches(): Promise<'done'> {
+  if ('serviceWorker' in navigator) {
+    const reg = await navigator.serviceWorker.getRegistration();
+    if (reg) {
+      try {
+        await reg.update();
+      } catch (e) {
+        console.warn('[hardReload] SW update failed (transient):', e);
+      }
+      if (reg.waiting) {
+        reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+      }
+      // Aggressive: unregister so the next nav bypasses the SW intercept
+      // entirely. The SW re-registers on the fresh load via `registerSW`
+      // in main.ts (offline support comes back within ~1 second). This is
+      // the only thing that reliably breaks iOS Safari's stale-precache
+      // loop when registerType: 'prompt' has held a new SW in waiting
+      // limbo — `update()` + `SKIP_WAITING` are no-ops there, and
+      // workbox's NavigationRoute can still serve stale `index.html`
+      // even after `caches.delete(all)`. `hardReload()` is only ever
+      // called from recovery paths (router.onError, vite:preloadError,
+      // App.vue init catch, the user-Reload button) — never on a healthy
+      // path — so the brief offline gap is always an acceptable trade.
+      try {
+        await reg.unregister();
+      } catch (e) {
+        console.warn('[hardReload] SW unregister failed (continuing):', e);
+      }
+    }
+  }
+  if ('caches' in window) {
+    const keys = await caches.keys();
+    await Promise.all(keys.map((k) => caches.delete(k)));
+  }
+  return 'done';
 }
 
 /**
@@ -127,11 +163,12 @@ export function isChunkLoadError(err: unknown): boolean {
 /**
  * sessionStorage *counter* the chunk-load recovery paths increment before
  * invoking `hardReload()` — bounds the recovery loop to N attempts so a
- * persistently-broken state can't reload forever. Read + incremented in
- * `App.vue`'s init catch and `router.onError`; cleared in `App.vue`'s
- * post-init health check (after a confirmed successful boot, NOT just any
- * `afterEach` — that fires on the initial nav before App.vue's onMounted
- * error has a chance to throw, defeating the bound).
+ * persistently-broken state can't reload forever. Read + incremented only by
+ * `startChunkRecovery` below (every recovery path goes through it). Cleared
+ * by the overlay's "Reload" button and by `App.vue`'s post-init health check
+ * (after a confirmed successful boot, NOT just any `afterEach`: that fires on
+ * the initial nav before App.vue's onMounted error has a chance to throw,
+ * defeating the bound).
  *
  * Name kept as "Flag" for backwards-compat with sessionStorage entries
  * from prior builds (where it was 0/1). Old "1" parses to numeric 1, so
@@ -181,10 +218,140 @@ export function writeChunkAttempts(n: number): void {
 
 /** Clear the attempt counter on both stores (called on successful boot). */
 export function resetChunkAttempts(): void {
+  // No-op mid-recovery: a recovery `hardReload()` may still be awaiting SW/cache
+  // cleanup when App.vue's boot health check passes, and resetting then would
+  // refund the attempt it just spent and turn the bounded budget into a loop.
+  if (recoveryInProgress) return;
   chunkAttemptsMemory = 0;
   try {
     sessionStorage.removeItem(CHUNK_RELOAD_FLAG);
   } catch (e) {
     console.warn('[hardReload] chunk counter reset failed', e);
   }
+}
+
+/**
+ * Silent-recovery budget for chunk-load failures: up to this many
+ * `hardReload()` attempts per tab before the failure is surfaced (iOS Safari's
+ * SW lifecycle legitimately needs 2 sometimes). Shared by `router.onError`,
+ * the `vite:preloadError` listener in `main.ts`, `App.vue`'s init catch and
+ * `tryRecoverChunkLoad` below, so every path spends the same counter against
+ * the same ceiling.
+ */
+export const CHUNK_RELOAD_MAX_ATTEMPTS = 3;
+
+/**
+ * True from the moment a chunk-recovery `hardReload()` is started until the page
+ * is replaced (a full document load resets module state). Owned here, not by any
+ * one caller, so every path that triggers recovery (the translation store,
+ * `router.onError`, `vite:preloadError`, App.vue's init catch) is visible to the
+ * paths that must stand down while it runs: App.vue's init watchdog and its
+ * `finally` (keep the "counting beans" spinner up instead of painting the
+ * stalled overlay), and `resetChunkAttempts()` (no refund of the attempt).
+ */
+let recoveryInProgress = false;
+
+/** The `exhausted` event fires once per tab, not on every failure after it. */
+let exhaustedReported = false;
+
+/** Whether a chunk-recovery reload is already swapping the page. */
+export function isChunkRecoveryInProgress(): boolean {
+  return recoveryInProgress;
+}
+
+/**
+ * The shared "attempts < max -> increment -> hardReload" step, WITHOUT error
+ * classification. For callers whose trigger is itself the chunk-failure signal
+ * (the `vite:preloadError` event, whose payload can be a CSS-preload error that
+ * `isChunkLoadError` does not match). Everyone else uses `tryRecoverChunkLoad`.
+ *
+ * Returns `true` when a recovery reload is running (started now, or already in
+ * flight: a second failure from the same stale bundle neither spends another
+ * attempt nor starts a second `hardReload()`), `false` when the budget is spent
+ * and the caller should surface the failure.
+ */
+export function startChunkRecovery(err?: unknown): boolean {
+  if (recoveryInProgress) return true;
+  const attempts = readChunkAttempts();
+  if (attempts >= CHUNK_RELOAD_MAX_ATTEMPTS) {
+    if (!exhaustedReported) {
+      exhaustedReported = true;
+      void emitChunkRecoveryEvent({
+        level: 'error',
+        surface: 'chunk-recovery',
+        message: 'chunk recovery exhausted',
+        context: { action: 'exhausted' },
+      });
+    }
+    return false;
+  }
+  const attempt = attempts + 1;
+  writeChunkAttempts(attempt);
+  recoveryInProgress = true;
+  console.warn(
+    `[hardReload] chunk-load symptom, hardReload attempt ${attempt}/${CHUNK_RELOAD_MAX_ATTEMPTS}:`,
+    err
+  );
+  // Reload only after the event is queued: on a browser with no SW and no Cache
+  // Storage, `hardReload()` replaces the page without awaiting anything, and the
+  // event would be lost. `flush` sends it before the page goes.
+  void emitChunkRecoveryEvent({
+    level: 'warn',
+    surface: 'chunk-recovery',
+    message: `hardReload attempt ${attempt}/${CHUNK_RELOAD_MAX_ATTEMPTS}`,
+    context: { action: 'reload' },
+    flush: true,
+  })
+    .then(() => hardReload())
+    .catch((e: unknown) => {
+      // The page is NOT being replaced. Clear the flag, or it would disable
+      // `resetChunkAttempts`, App.vue's watchdog and its spinner dismissal for
+      // the rest of the tab's life. The spent attempt stays spent.
+      recoveryInProgress = false;
+      console.error('[hardReload] chunk-recovery reload could not start:', e);
+      void emitChunkRecoveryEvent({
+        level: 'error',
+        surface: 'chunk-recovery',
+        message: 'hard reload could not start',
+        context: { action: 'failed', error_code: e instanceof Error ? e.name : 'unknown' },
+      });
+    });
+  return true;
+}
+
+/**
+ * Firehose event for the chunk-recovery step. Never rejects.
+ *
+ * Imported lazily because a static import is a cycle: `@/services/telemetry`
+ * reaches back to this module via diagnosticContext -> syncStore ->
+ * translationStore. The telemetry module is already in the main bundle
+ * (`main.ts` -> `errorReporter`), so this resolves from the module map without
+ * fetching a chunk, which matters on exactly the stale-bundle path that runs it.
+ */
+function emitChunkRecoveryEvent(input: LogEventInput): Promise<void> {
+  return import('@/services/telemetry')
+    .then(({ logEvent }) => logEvent(input))
+    .catch((e) => console.warn('[hardReload] chunk-recovery telemetry skipped:', e));
+}
+
+/**
+ * `startChunkRecovery` for a caught error: only a chunk-load symptom (per
+ * `isChunkLoadError`) is recovered. Returns `true` when a recovery reload is
+ * running (the caller should stop handling the error: the page is about to be
+ * replaced), `false` when the error is not a chunk-load symptom or the budget is
+ * exhausted (the caller reports it as a real failure).
+ */
+export function tryRecoverChunkLoad(err: unknown): boolean {
+  if (!isChunkLoadError(err)) return false;
+  return startChunkRecovery(err);
+}
+
+/**
+ * Test-only: clear the in-progress flag and the attempt counter. Module state
+ * otherwise only resets on a full document load, which tests never do.
+ */
+export function __resetChunkRecoveryStateForTests(): void {
+  recoveryInProgress = false;
+  exhaustedReported = false;
+  resetChunkAttempts();
 }

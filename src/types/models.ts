@@ -2168,16 +2168,6 @@ export interface Settings {
   updatedAt: ISODateString;
 }
 
-// Translation cache entry for storing translations in IndexedDB
-export interface TranslationCacheEntry {
-  id: string; // Compound: `${key}:${language}`
-  key: string;
-  language: LanguageCode;
-  translation: string;
-  version: number; // Legacy: no longer used, kept for backward compatibility
-  hash?: string; // Hash of source text, used to detect when translation is outdated
-}
-
 // --- Public holidays (read-only reference data, bundled in public/holidays/<ISO2>.json) ---
 
 // One holiday record as shipped in the per-country JSON file. `endDate` is

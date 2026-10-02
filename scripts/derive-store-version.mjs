@@ -18,7 +18,7 @@
  *     so a `set -euo pipefail` CI step fails the job rather than stamping an
  *     empty/garbage version (see .github/workflows/mobile-*-release.yml).
  *
- * Text-level parse (same technique as scripts/updateTranslations.mjs): the
+ * Text-level parse: the
  * coupling to appVersion.ts's format is intentionally simple and is guarded by a
  * real-file unit test (scripts/__tests__/derive-store-version.test.mjs) that runs
  * on every `npm run validate`, so a reformat of that file breaks CI immediately

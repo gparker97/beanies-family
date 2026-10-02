@@ -129,10 +129,6 @@ A vanilla self-hosted beanies.family has no plan card, no Plan page and never go
 
 These features have their own env vars and silently disable when unset. They work on either path.
 
-### Translation API quota — `VITE_MYMEMORY_EMAIL`
-
-The free MyMemory translation API has a 5k chars/day anonymous quota; setting your email upgrades it to 50k. For a single family with translation caching, the lower quota is usually plenty. Set this only if you hit the limit.
-
 ### Store-review demo mode — `VITE_REVIEW_DEMO*` (you do not want this)
 
 <!-- REVIEW-DEMO: delete this section at retirement. -->

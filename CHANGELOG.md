@@ -8,6 +8,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-10-02
+
+### Changed
+
+- Chinese UI text is now written by hand alongside the English instead of machine-translated; every string was rewritten.
+
+### Removed
+
+- The nightly translation job and the in-app call to a third-party translation service.
+
 ## 2026-10-01
 
 _Released in 0.90.0: web live, Android production (in Google review), iOS submitted to the App Store with auto-release. The blog entry is staged content (draft) and is not live._

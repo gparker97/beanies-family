@@ -329,6 +329,38 @@ Enforced by `src/services/translation/uiStrings.test.ts` ("important-surface bea
 
 ---
 
+## Chinese (zh) authoring
+
+Every string has three values: `en` and `beanie` in `src/services/translation/uiStrings.ts`, and `zh` in `src/services/translation/zh.ts`, all written in the same edit as the English. `zh.ts` is typed `Record<UIStringKey, string>`, so `npm run type-check` fails on a missing or removed key; a changed English meaning is only caught by editing all three values together. There is no translation script or API; the session that writes the English writes the Chinese.
+
+**Glossary.** The canonical term list is `ZH_BRAND_TERMS` in `src/services/translation/uiStrings.test.ts`. `docs/TRANSLATION.md` references it and lists the consistency renderings; do not restate the glossary here. Use the existing rendering for a term before inventing one.
+
+**Style rules**
+
+- Simplified Chinese only. Traditional characters fail a test.
+- Natural app register: how a Chinese-speaking parent would read it in a family app, not a word-for-word render. Friendly, short, no stiff officialese.
+- Preserve every `{placeholder}` token exactly (same names, same count). Word order around it may change.
+- `.one` and `.other` pairs are both written naturally; Chinese has no plural, so they are often the same text.
+- Full-width punctuation inside sentences (，。！？：；（）). Half-width stays in numbers, times and tokens.
+- No trailing punctuation unless the `en` value has it (labels, buttons and headings stay bare).
+- Brand terms stay in English (`beanies.family`, `.beanpod`, `Pod`, `Nook`, product names); see the glossary.
+
+**Worked examples**
+
+```ts
+// A label (no trailing punctuation, glossary term "member")
+'family.members': { en: 'Family Members', beanie: 'family members' }
+'family.members': '家庭成员',
+
+// A sentence with a placeholder (full-width punctuation, token preserved, "Pod" kept)
+'nook.welcomeBack': { en: 'Welcome back, {name}! Your Pod has new updates.', ... }
+'nook.welcomeBack': '欢迎回来，{name}！你的 Pod 有新动态。',
+
+// A .one/.other pair (both natural; identical is fine)
+'activities.count.one':   '{count} 项活动',
+'activities.count.other': '{count} 项活动',
+```
+
 ## Logo & Mascot Rules
 
 - **Wordmark:** "beanies.family" in Outfit 700 — "beanies" in white/Deep Slate, ".family" in Heritage Orange

@@ -73,7 +73,6 @@ vi.mock('@/config/features', () => ({
     errorReporter: false,
     marketingUrl: false,
     analytics: false,
-    translationApiUpgrade: false,
   },
   canInviteFamily: () => false,
   getDeploymentMode: () => 'self-host-limited',

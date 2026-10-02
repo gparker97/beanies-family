@@ -1,6 +1,6 @@
 # Translation System
 
-Comprehensive guide for the beanies.family translation pipeline.
+How beanies.family strings are written, enforced and loaded.
 
 ## Enforcement — no hardcoded UI strings (CI-blocking)
 
@@ -19,160 +19,89 @@ Comprehensive guide for the beanies.family translation pipeline.
 - In `.ts` files (composables/services), use `useTranslationStore().t('key')`. In a **foundational** util that may run before Pinia is active, wrap the lookup in `try/catch` with an English fallback so a translation lookup can never swallow the user's feedback (see `invokeToastAction` in `useToast.ts` / `safeT` in `useStoreActions.ts`).
 - **Rendered data in `constants/` / `composables/`**: any user-facing label/name in a data definition must resolve through `t()` at the render site (the `no-bare-render-strings` rule enforces the common keys; `name`-keyed reference data like `categories.ts` is routed via a label-resolver composable). Proper-noun reference data (airports, airlines, countries, currencies, cruise lines, institutions) is not translated.
 
-**Interpolation:** `t()` takes ONLY a key — no params object. Use `fillTemplate(t('key'), { name })` (`@/utils/fillTemplate`); keys hold `{placeholder}` tokens, which the translator preserves. Pluralization uses explicit `.one`/`.other` key pairs, chosen in-template by count (no ICU plurals).
-
-After adding/renaming keys, run `npm run translate` to generate the other languages before committing.
+**Interpolation:** `t()` takes ONLY a key — no params object. Use `fillTemplate(t('key'), { name })` (`@/utils/fillTemplate`); keys hold `{placeholder}` tokens, which every translation must preserve. Pluralization uses explicit `.one`/`.other` key pairs, chosen in-template by count (no ICU plurals).
 
 ## How It Works
 
 ```
-STRING_DEFS (uiStrings.ts)          ← Single source of truth for English strings
-       │
-       ▼
-scripts/updateTranslations.mjs      ← Batch translator (MyMemory API)
-       │
-       ▼
-public/translations/{lang}.json     ← Pre-translated JSON files
-       │
-       ▼
-Service Worker (vite-plugin-pwa)    ← Precaches JSON files for offline use
-       │
-       ▼
-useTranslation() composable         ← Runtime: checks JSON → IndexedDB cache → API fallback
-       │
-       ▼
-{{ t('key') }} in Vue templates     ← Displays translated text
+uiStrings.ts (en, beanie)  +  zh.ts (zh)
+        │                         │
+        └──────► translationStore ┘  (dynamic import('./zh'), lazy chunk)
+                        │
+                        ▼
+                      t('key')
 ```
 
-### Flow in Detail
+- `src/services/translation/uiStrings.ts` holds every key with its `en` and `beanie` values.
+- `src/services/translation/zh.ts` exports `ZH_STRINGS: Record<UIStringKey, string>`, one Simplified Chinese value per key.
+- `translationStore` loads the module for the active language with a dynamic `import('./zh')`. It becomes its own chunk, is precached by the service worker, and works offline. English and beanie mode need no load.
+- `t('key')` returns the value for the current language. There is no network call, no cache database and no fallback API.
 
-1. **Source strings** are defined in `src/services/translation/uiStrings.ts` as `STRING_DEFS` entries with `{ en: 'English text' }` format
-2. **Hash-based invalidation**: each English string is hashed using a simple hash function. When the English text changes, the hash changes, triggering re-translation
-3. **Pre-translated JSON files** in `public/translations/` contain translations with their hashes
-4. **At runtime**, `useTranslation()` checks:
-   - Pre-loaded JSON file (fastest, no network)
-   - IndexedDB cache (local, persisted)
-   - MyMemory API (online fallback, cached after first call)
-5. **Service Worker** precaches the JSON files so translations work offline
+## Adding a string (three values)
 
-## Automated Daily Pipeline
+1. Add the key to `uiStrings.ts` with `en` (Title Case for labels, Sentence case for sentences) and `beanie` (lowercase overlay).
+2. Add the same key to `zh.ts` with the Chinese value.
+3. Run `npm run type-check`. A missing key and a removed key (one that no longer exists in `uiStrings.ts`) are both compile errors that name the key. The type cannot see a Chinese value whose English later changed meaning; editing all three values in the same change is what prevents that, exactly as for `beanie`.
 
-A GitHub Actions workflow (`.github/workflows/translation-sync.yml`) runs daily at 3 AM UTC:
+Write all three in the same edit as the feature. Renaming or deleting a key means editing both files.
 
-1. Parses `STRING_DEFS` from `uiStrings.ts`
-2. Compares with existing translations in all `public/translations/*.json` files
-3. Translates missing/outdated strings via MyMemory API
-4. Removes stale keys no longer in `STRING_DEFS`
-5. If changes detected: commits and pushes to `main`
-6. If translations changed: triggers a production deploy (S3 + CloudFront)
+## Glossary
 
-### Manual Trigger
+The canonical list is `ZH_BRAND_TERMS` in `src/services/translation/uiStrings.test.ts`; this document references it rather than restating it. Check there first, then use these consistency renderings.
 
-You can trigger the workflow manually from the GitHub Actions tab:
+| English                  | Chinese  | English             | Chinese    |
+| ------------------------ | -------- | ------------------- | ---------- |
+| family                   | 家庭     | pod (in a sentence) | Pod        |
+| family file              | 家庭文件 | family data         | 家庭数据   |
+| member                   | 成员     | magic beans         | 魔法豆     |
+| bean (AI allowance unit) | 豆子     | beanie mode         | 豆豆模式   |
+| magic link               | 魔法链接 | recovery kit        | 恢复套件   |
+| sign in                  | 登录     | sign out            | 退出登录   |
+| sync                     | 同步     | device              | 设备       |
+| activity                 | 活动     | to-do               | 待办       |
+| list                     | 清单     | recipe              | 食谱       |
+| cookbook                 | 家庭食谱 | meal planner        | 餐食计划   |
+| shopping list            | 购物清单 | scrapbook           | 家庭纪念册 |
+| travel plan              | 旅行计划 | Who Owns What       | 家务分工   |
+| Finance Corner           | 财务角   | Piggy Bank          | 存钱罐     |
+| account                  | 账户     | transaction         | 交易       |
+| budget                   | 预算     | goal                | 目标       |
+| asset                    | 资产     | settings            | 设置       |
+| wall display             | 家庭看板 | care & safety       | 关爱与安全 |
+| medication               | 用药     | emergency contact   | 紧急联系人 |
 
-1. Go to **Actions** → **Translation Sync**
-2. Click **Run workflow** → **Run workflow**
+**Kept in English (brand terms):** beanies.family, The Pod / Pod, The Treehouse, Little Bean, Parent Bean, Meet the Beans, Nook, The Beanie Lab, beanies AI, Discord Beanies, .beanpod, Google Drive, Dropbox, iCloud, OneDrive.
 
-### CLI Usage
+## Style rules
 
-```bash
-# Translate all languages (default)
-npm run translate
+- Simplified Chinese only; Traditional characters fail a test.
+- Natural app register: read it as a Chinese-speaking parent would in a family app, not as a word-for-word render.
+- Preserve every `{placeholder}` token exactly; word order around it may change.
+- Write both `.one` and `.other` naturally. Chinese has no plural, so they are often identical.
+- Use full-width punctuation inside sentences (，。！？：；（）).
+- No trailing punctuation unless the `en` value has it.
+- Worked examples live in `.claude/skills/beanies-theme/SKILL.md` § Chinese (zh) authoring.
 
-# Translate a specific language
-npm run translate:zh
-```
+## Adding a language
 
-## Adding a New Language
+1. Add the code to the `LanguageCode` union.
+2. Add a `LOADERS` entry in `translationStore` that does `import('./<code>')`.
+3. Create the sibling module `src/services/translation/<code>.ts` exporting a `Record<UIStringKey, string>`.
+4. Add the language to the picker and its glossary to `docs/TRANSLATION.md`.
 
-1. **Add to `LANGUAGES`** in `scripts/updateTranslations.mjs`:
+Type-check then lists every key the new module is missing.
 
-   ```javascript
-   const LANGUAGES = {
-     zh: { code: 'zh', name: '中文 (简体)', myMemoryCode: 'zh-CN' },
-     es: { code: 'es', name: 'Español', myMemoryCode: 'es' }, // ← new
-   };
-   ```
+## What the tests enforce
 
-2. **Add npm script** in `package.json`:
+- Completeness by type: `zh.ts` is `Record<UIStringKey, string>`, so a missing or removed key fails `npm run type-check`. A changed English meaning with an untouched Chinese value is not detectable (same as `beanie`).
+- Placeholders: every `{placeholder}` in `en` appears in `zh`, and no extra ones.
+- Script: no Traditional characters in the Chinese values.
+- English passthrough: a `zh` value made only of Latin text must be a brand term, a product name or a format literal, and no value may contain a run of two or more untranslated English words outside the glossary. This bounds the worst staleness case (English pasted into `zh.ts`), not a changed meaning.
+- Glossary consistency (to-do always 待办, and so on) is NOT tested; it is a review discipline, with the renderings listed above.
+- Beanie mode: the important-surface `beanie` rule in `uiStrings.test.ts`.
 
-   ```json
-   "translate:es": "node scripts/updateTranslations.mjs es"
-   ```
+Staleness (English changed, Chinese not) is not detectable by design; the same-edit authoring rule is the control.
 
-3. **Add to app language picker** in the relevant UI configuration
+## History
 
-4. **Run the translator**:
-
-   ```bash
-   npm run translate:es
-   ```
-
-5. **Commit** the new `public/translations/es.json` file
-
-The daily pipeline will keep it updated automatically going forward.
-
-## Fixing a Bad Translation
-
-To correct a translation manually:
-
-1. Edit `public/translations/{lang}.json` directly
-2. Change only the `"translation"` value — **do not change the `"hash"`**
-3. Commit the change
-
-The translation script uses hashes to detect when the **English source** has changed. As long as the hash matches the current English text, your manual fix will be preserved and not overwritten.
-
-Example:
-
-```json
-"nav.goals": {
-  "translation": "目标",         ← Fix this value
-  "hash": "152c9s",              ← Keep this unchanged
-  "lastUpdated": "2026-02-24"
-}
-```
-
-## Hash-Based Invalidation
-
-Each English string is hashed at build time and at translation time:
-
-```
-hashString('Goals') → '152c9s'
-```
-
-- If you change the English text in `uiStrings.ts`, the hash changes
-- The translation script detects the hash mismatch and re-translates that key
-- Manual translation fixes are preserved as long as the English source hasn't changed
-
-## Stale Key Cleanup
-
-When UI strings are removed from `STRING_DEFS`, the translation script automatically removes the corresponding keys from all JSON files. This prevents stale translations from accumulating.
-
-## Troubleshooting
-
-### "Could not find STRING_DEFS in uiStrings.ts"
-
-The parser expects `const STRING_DEFS = { ... } satisfies Record<string, StringEntry>` in `uiStrings.ts`. If the format has changed, update the parser in `scripts/updateTranslations.mjs`.
-
-### API Rate Limits
-
-MyMemory allows ~50,000 characters/day with email parameter. If you hit limits:
-
-- Increase `REQUEST_DELAY_MS` in the script (default: 250ms)
-- Wait and retry the next day
-- The script only translates missing/changed strings, so subsequent runs are fast
-
-### Translations Not Updating in Production
-
-1. Check that the Service Worker has updated (the app auto-applies updates via `usePwaUpdater` and shows a confirmation toast)
-2. Clear browser cache / IndexedDB translations store
-3. Verify `public/translations/{lang}.json` has the expected content
-4. Check the GitHub Actions **Translation Sync** workflow for errors
-
-### Script Fails to Parse New Format
-
-If `uiStrings.ts` is refactored, the parser in `scripts/updateTranslations.mjs` may need updating. The parser uses a line-by-line approach and expects:
-
-- Keys as single-quoted strings: `'key.name': {`
-- English values as `en: 'text'` or `en: "text"`
-- Each entry on its own line(s) within the `STRING_DEFS` block
+Until 2026-10-02 Chinese came from a nightly MyMemory pipeline plus a live in-browser call, which produced Traditional characters, spam and dictionary dumps. It was retired and every string was rewritten by hand. See `docs/plans/2026-10-02-claude-authored-zh-strings.md` and `docs/adr/040-hand-authored-translations.md`.

@@ -17,7 +17,7 @@ import { logEvent } from '@/services/telemetry';
 import { QUICK_ADD_CONTEXT_KEYS } from '@/constants/quickAddItems';
 import { isFlagEnabled, type DevFlag } from '@/config/flags';
 import { isPlanPageReachable } from '@/services/billing/pricingGate';
-import { hardReload, isChunkLoadError, CHUNK_RELOAD_FLAG } from '@/utils/hardReload';
+import { tryRecoverChunkLoad } from '@/utils/hardReload';
 import { isPodlessRecoveryQuery } from '@/components/login/resumePaths';
 
 // First `RouteMeta` augmentation in the repo. Intentionally PARTIAL — it types
@@ -667,20 +667,14 @@ router.afterEach((to, from) => {
 // `hardReload()` evicts the workbox precache and forces a fresh
 // navigation so the user lands on the new build's chunk URLs.
 //
-// `CHUNK_RELOAD_FLAG` is a counter, not a boolean — see App.vue's init
-// catch for the full retry budget. We just increment-or-reload here.
+// The shared retry budget, throw-safe counter and in-progress flag live in
+// `tryRecoverChunkLoad` (hardReload.ts). When it declines (not a chunk-load
+// symptom, or the budget is exhausted) the error surfaces through the global
+// handler (main.ts unhandledrejection / App.vue's overlay path) instead of
+// looping silently; the Slack alert fires from App.vue's exhausted branch when
+// the next nav also fails.
 router.onError((err) => {
-  if (!isChunkLoadError(err)) return;
-  const attempts = parseInt(sessionStorage.getItem(CHUNK_RELOAD_FLAG) ?? '0', 10) || 0;
-  if (attempts >= 3) {
-    // Budget exhausted — let the error surface through the global handler
-    // (main.ts unhandledrejection / App.vue's overlay path) instead of
-    // looping silently. Slack alert will fire from App.vue's exhausted
-    // branch when the next nav also fails.
-    return;
-  }
-  sessionStorage.setItem(CHUNK_RELOAD_FLAG, String(attempts + 1));
-  void hardReload();
+  tryRecoverChunkLoad(err);
 });
 
 // NOTE: previously cleared `CHUNK_RELOAD_FLAG` here on every successful
