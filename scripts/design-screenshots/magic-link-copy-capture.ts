@@ -1,4 +1,4 @@
-import { test } from '../../e2e/fixtures/test';
+import { test, expect } from '../../e2e/fixtures/test';
 import { gotoRoute } from '../../e2e/helpers/navigation';
 
 /**
@@ -62,6 +62,8 @@ for (const theme of ['light', 'dark'] as const)
       // Third shot: the JOIN surface, which the harness renders underneath the modal.
       // Dismissing the kit is the only way to see it — a run that skipped this would have
       // reviewed one of the two surfaces that changed.
+      // The confirm is disabled until the acknowledgement tick (added after this harness).
+      await page.getByTestId('kit-acknowledged').check();
       await page.getByRole('button', { name: /saved both/i }).click();
       await page.waitForTimeout(400);
       await page.screenshot({ path: `${OUT}/join-copy-${theme}-${w.name}.png`, fullPage: true });
@@ -73,3 +75,58 @@ for (const theme of ['light', 'dark'] as const)
       await page.screenshot({ path: `${OUT}/paste-${theme}-${w.name}.png`, fullPage: true });
     });
   }
+
+/**
+ * Copy + share icon buttons on the minted-link panel. Two variants because the share
+ * button is capability-gated: present only when `navigator.share` exists (or on native),
+ * absent otherwise. The panel sits under the recovery-kit modal, so the kit is dismissed
+ * first, exactly as the matrix above does.
+ */
+for (const variant of ['with-share', 'no-share'] as const)
+  for (const theme of ['light', 'dark'] as const)
+    for (const w of WIDTHS) {
+      test(`kit-copy: link buttons ${variant} ${theme} ${w.name}`, async ({ page }) => {
+        const pageErrors: string[] = [];
+        page.on('pageerror', (e) => pageErrors.push(e.message));
+        if (variant === 'with-share') {
+          await page.addInitScript(() => {
+            Object.defineProperty(navigator, 'share', {
+              value: async () => {},
+              configurable: true,
+            });
+          });
+        }
+        await page.setViewportSize(w.size);
+        await gotoRoute(page, '/dev/magic-link-copy');
+        await page.waitForLoadState('networkidle');
+        await page.evaluate((th) => {
+          document.documentElement.classList.toggle('dark', th === 'dark');
+        }, theme);
+        await page.getByTestId('kit-acknowledged').check();
+        await page.getByRole('button', { name: /saved both/i }).click();
+        await page.waitForTimeout(400);
+
+        const copy = page.getByTestId('copy-link');
+        const share = page.getByTestId('share-link');
+        await expect(copy).toBeVisible();
+
+        if (variant === 'no-share') {
+          await expect(share).toHaveCount(0);
+          return;
+        }
+
+        await expect(share).toBeVisible();
+        await copy.scrollIntoViewIfNeeded();
+        await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+        await copy.click();
+        await expect(copy).toHaveAttribute('aria-label', /copied/i);
+        await page.screenshot({ path: `${OUT}/link-buttons-copied-${theme}-${w.name}.png` });
+
+        await share.click();
+        await page.waitForTimeout(300);
+        // The toast has no stable selector, so assert on what a failed share leaves behind:
+        // no copy-error line and no uncaught page error.
+        await expect(page.getByTestId('copy-error')).toHaveCount(0);
+        expect(pageErrors).toEqual([]);
+      });
+    }

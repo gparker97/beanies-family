@@ -10,6 +10,10 @@
  */
 import { useTranslation } from '@/composables/useTranslation';
 import { useClipboard } from '@/composables/useClipboard';
+import { useShareText } from '@/composables/useShareText';
+import { isNative } from '@/services/sync/capabilities';
+import { logEvent } from '@/services/telemetry/logEvent';
+import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import InviteLinkCard from '@/components/ui/InviteLinkCard.vue';
 
 const props = defineProps<{
@@ -34,6 +38,22 @@ const props = defineProps<{
 
 const { t } = useTranslation();
 const { copied, error, copy } = useClipboard({ surface: props.surface });
+const { share } = useShareText();
+
+// Capability probe, not UA sniffing. Computed once: neither answer changes mid-session.
+const native = isNative();
+const canShare = native || typeof navigator.share === 'function';
+
+async function shareLink() {
+  // `useShareText` owns the sheet, the cancel case and the clipboard fallback + toasts.
+  const shared = await share(t('magicLink.shareTitle'), props.link, props.surface);
+  logEvent({
+    level: 'info',
+    surface: props.surface,
+    message: 'magic link share',
+    context: { action: shared ? 'shared' : 'dismissed', kind: native ? 'native' : 'web' },
+  });
+}
 </script>
 
 <template>
@@ -60,14 +80,28 @@ const { copied, error, copy } = useClipboard({ surface: props.surface });
     <div
       class="dark:border-line dark:bg-surface-raised flex items-center gap-2 rounded-2xl border border-gray-200 bg-white p-3"
     >
-      <span class="dark:text-ink flex-1 truncate font-mono text-xs text-gray-700">{{ link }}</span>
+      <span class="dark:text-ink min-w-0 flex-1 truncate font-mono text-xs text-gray-700">{{
+        link
+      }}</span>
       <button
         type="button"
-        class="bg-primary-500 hover:bg-primary-600 rounded-xl px-3 py-1.5 text-xs font-semibold text-white"
+        class="bg-primary-500 hover:bg-primary-600 flex h-10 min-w-10 flex-none items-center justify-center rounded-xl text-white"
+        :aria-label="copied ? t('login.copied') : t('login.copyLink')"
         data-testid="copy-link"
         @click="copy(link)"
       >
-        {{ copied ? t('login.copied') : t('login.copyLink') }}
+        <BeanieIcon :name="copied ? 'check' : 'copy'" size="md" aria-hidden="true" />
+      </button>
+      <span class="sr-only" aria-live="polite">{{ copied ? t('login.copied') : '' }}</span>
+      <button
+        v-if="canShare"
+        type="button"
+        class="dark:bg-surface-hover dark:text-ink flex h-10 min-w-10 flex-none items-center justify-center rounded-xl bg-[var(--tint-slate-5)] text-[var(--color-text)]"
+        :aria-label="t('login.shareLink')"
+        data-testid="share-link"
+        @click="shareLink"
+      >
+        <BeanieIcon name="share" size="md" aria-hidden="true" />
       </button>
     </div>
 

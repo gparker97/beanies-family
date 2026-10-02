@@ -2173,6 +2173,8 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'login.inviteDesc': '把这个魔法链接分享给家人，他们就能加入你的 Pod',
   'login.copied': '已复制！',
   'login.copyLink': '复制链接',
+  'login.shareLink': '分享链接',
+  'magicLink.shareTitle': '你的 beanies.family 魔法链接',
 
   // Login v6 redesign
   'loginV6.badgeEncrypted': '端到端加密',

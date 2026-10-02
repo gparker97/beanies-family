@@ -12,6 +12,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Added
 
+- The magic link panel now has copy and share icon buttons. Share opens the phone's share sheet so a link minted on one device can be sent to another; on a desktop browser only copy is shown.
+
 - The edit-meal drawer no longer opens with an ingredients checklist on top. A Shopping List row below Who's eating shows how many batches to cook and opens the same shopping sheet the cookbook uses, at that meal's count.
 
 - Every tracker issue now carries a complexity tier (S/M/L/XL) and an execution model (which model leads, how the work is split, what review and verification it gets), scored on six risk angles at intake; the pre-plan, plan and build skills carry it through so cheaper models do the routine work and the strongest one is reserved for the risky core. The 21 open issues were scored and backfilled.

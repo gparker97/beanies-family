@@ -4213,6 +4213,11 @@ const STRING_DEFS = {
   },
   'login.copied': { en: 'Copied!', beanie: 'copied!' },
   'login.copyLink': { en: 'Copy link', beanie: 'copy link' },
+  'login.shareLink': { en: 'Share link', beanie: 'share link' },
+  'magicLink.shareTitle': {
+    en: 'Your beanies.family magic link',
+    beanie: 'your beanies.family magic link',
+  },
 
   // Login v6 redesign
   'loginV6.badgeEncrypted': { en: 'End-to-End Encrypted', beanie: 'end-to-end encrypted' },
