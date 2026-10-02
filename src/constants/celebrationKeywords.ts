@@ -2,11 +2,10 @@
  * Words that mean "this is a celebration", per locale.
  *
  * NOT in `uiStrings.ts`, deliberately — and this deviates from the approved
- * mockup, which said the word lists belong in the translation layer.
- * `scripts/updateTranslations.mjs` pipes every `uiStrings` value through the
- * MyMemory machine-translation API, and a keyword list run through machine
- * translation produces unusable matchers. These are matching DATA, not UI copy;
- * only the user-facing celebration label is a translated string.
+ * mockup, which said the word lists belong in the translation layer. These are
+ * matching DATA, not UI copy: a keyword list is a set of matchers, not a phrase
+ * to translate, and each locale needs its own colloquial forms. Only the
+ * user-facing celebration label is a translated string.
  *
  * Hand-curated per locale. The app ships `en` and `zh`, so this is two lists,
  * not a maintenance tail.

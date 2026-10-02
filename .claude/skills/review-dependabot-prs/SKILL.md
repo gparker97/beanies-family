@@ -1,6 +1,6 @@
 ---
 name: review-dependabot-prs
-description: Review, triage, and action all open bot-authored PRs — both Dependabot dependency bumps AND the monthly `automation`-labeled data-sync PRs (airport-sync, holiday-sync, translation-sync): squash-merge the safe ones, close the genuinely out-of-scope ones with an explanation (and propose an ignore entry for indefinitely-deferred majors), and surface the ones that need a human decision with a written analysis. Use when greg invokes `/review-dependabot-prs` or asks to handle / review / clean up / triage the Dependabot PRs, the dependency-update backlog, or the monthly airport / public-holiday / translation bot PRs.
+description: Review, triage, and action all open bot-authored PRs — both Dependabot dependency bumps AND the monthly `automation`-labeled data-sync PRs (airport-sync, holiday-sync): squash-merge the safe ones, close the genuinely out-of-scope ones with an explanation (and propose an ignore entry for indefinitely-deferred majors), and surface the ones that need a human decision with a written analysis. Use when greg invokes `/review-dependabot-prs` or asks to handle / review / clean up / triage the Dependabot PRs, the dependency-update backlog, or the monthly airport / public-holiday bot PRs.
 ---
 
 # review-dependabot-prs — Dependabot PR Triage
@@ -9,7 +9,7 @@ Dependabot opens a steady trickle of dependency-bump PRs (npm weekly + GitHub Ac
 
 The cost of both failure modes is real: stale deps accumulate CVEs; a careless major-version merge eats a day of breakage. The right call usually needs the same checklist every time, so it lives here.
 
-**This sweep also picks up the monthly `automation` data-sync bot PRs** — airport-sync, holiday-sync, translation-sync (see `.github/workflows/*-sync.yml`). They're the same mental mode (a bot's mechanical PR that wants a quick human skim) and greg deliberately runs them through this same review rather than auto-merging, so they belong in the same pass. They're triaged on a different axis than dependency bumps — see **Step 4b**.
+**This sweep also picks up the monthly `automation` data-sync bot PRs** — airport-sync, holiday-sync (see `.github/workflows/*-sync.yml`). They're the same mental mode (a bot's mechanical PR that wants a quick human skim) and greg deliberately runs them through this same review rather than auto-merging, so they belong in the same pass. They're triaged on a different axis than dependency bumps — see **Step 4b**.
 
 ---
 
@@ -80,13 +80,12 @@ Read `docs/STATUS.md`, section "**Major-version dependency migrations**" and "**
 
 When in doubt between two categories, pick the *safer* one: 🔶 (hold) over ✅ (merge), and 🔶 over ❌ (close). A held PR costs a follow-up; a bad merge or a wrongly-closed security fix costs more.
 
-## Step 4b: Automation data-sync PRs (airports / holidays / translations)
+## Step 4b: Automation data-sync PRs (airports / holidays)
 
-The three monthly `automation`-labeled PRs (authored by `app/github-actions`) are **data refreshes, not code changes**, so the semver / advisory / deferred-list machinery above doesn't apply — triage them on their own axis:
+The two monthly `automation`-labeled PRs (authored by `app/github-actions`) are **data refreshes, not code changes**, so the semver / advisory / deferred-list machinery above doesn't apply — triage them on their own axis:
 
 - `airport-sync.yml` → regenerates `src/constants/airports.ts` from OurAirports (public domain)
 - `holiday-sync.yml` → refreshes `public/holidays/*.json` (+ `src/constants/countries.ts`)
-- `translation-sync.yml` → refreshes translation data
 
 **Critical — these PRs bypass the app's CI, and that's expected.** They're created with the default `GITHUB_TOKEN`, and GitHub deliberately will **not** run your other workflows (`main-ci`, `e2e`, type-check) on a branch pushed by that token — a recursion guard. So expect `mergeStateStatus: UNSTABLE` with the **only** check being `GitGuardian` (a GitHub App, which does run). That is **normal, not a failure** — there's simply no build gate on these PRs. The consequence: a malformed upstream (e.g. OurAirports changing its CSV format → broken generated TS) would sail straight through. **You are the gate** — do a light diff sanity check before merging.
 

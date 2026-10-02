@@ -1,10 +1,22 @@
-import { describe, it, expect, afterEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
+// The recovery step lazy-imports telemetry; replace it so tests can assert on
+// the events and never pull the real firehose (and its store graph) in.
+vi.mock('@/services/telemetry', () => ({ logEvent: vi.fn() }));
+
+import { logEvent } from '@/services/telemetry';
 import {
+  hardReload,
+  HARD_RELOAD_CLEANUP_DEADLINE_MS,
   isChunkLoadError,
   readChunkAttempts,
   writeChunkAttempts,
   resetChunkAttempts,
+  tryRecoverChunkLoad,
+  startChunkRecovery,
+  isChunkRecoveryInProgress,
+  __resetChunkRecoveryStateForTests,
   CHUNK_RELOAD_FLAG,
+  CHUNK_RELOAD_MAX_ATTEMPTS,
 } from './hardReload';
 
 describe('isChunkLoadError', () => {
@@ -162,5 +174,178 @@ describe('chunk-reload counter (throw-safe accessors)', () => {
     // Simulate a stale-but-lower persisted value; memory should win.
     window.sessionStorage.setItem(CHUNK_RELOAD_FLAG, '1');
     expect(readChunkAttempts()).toBe(2);
+  });
+});
+
+describe('tryRecoverChunkLoad (shared chunk-reload budget)', () => {
+  const chunkError = () => new Error('Failed to fetch dynamically imported module: /assets/x.js');
+
+  beforeEach(() => {
+    __resetChunkRecoveryStateForTests();
+    vi.mocked(logEvent).mockClear();
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    __resetChunkRecoveryStateForTests();
+  });
+
+  it('spends one attempt and starts a hard reload for a chunk-load symptom', async () => {
+    resetChunkAttempts();
+    const replace = vi.spyOn(window.location, 'replace').mockImplementation(() => {});
+    expect(tryRecoverChunkLoad(chunkError())).toBe(true);
+    expect(readChunkAttempts()).toBe(1);
+    await vi.waitFor(() => expect(replace).toHaveBeenCalledTimes(1));
+  });
+
+  it('declines once the budget is spent, without reloading', () => {
+    writeChunkAttempts(CHUNK_RELOAD_MAX_ATTEMPTS);
+    const replace = vi.spyOn(window.location, 'replace').mockImplementation(() => {});
+    expect(tryRecoverChunkLoad(chunkError())).toBe(false);
+    expect(readChunkAttempts()).toBe(CHUNK_RELOAD_MAX_ATTEMPTS);
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it('declines a non-chunk error without touching the counter', () => {
+    resetChunkAttempts();
+    expect(tryRecoverChunkLoad(new Error('Cannot read properties of null'))).toBe(false);
+    expect(readChunkAttempts()).toBe(0);
+  });
+
+  it('marks recovery in progress and logs the attempt', async () => {
+    const replace = vi.spyOn(window.location, 'replace').mockImplementation(() => {});
+    expect(isChunkRecoveryInProgress()).toBe(false);
+    expect(tryRecoverChunkLoad(chunkError())).toBe(true);
+    expect(isChunkRecoveryInProgress()).toBe(true);
+    expect(console.warn).toHaveBeenCalledWith(
+      expect.stringContaining(`attempt 1/${CHUNK_RELOAD_MAX_ATTEMPTS}`),
+      expect.any(Error)
+    );
+    await vi.waitFor(() => expect(replace).toHaveBeenCalledTimes(1));
+  });
+
+  it('does not spend a second attempt or start a second reload while one is in flight', async () => {
+    const replace = vi.spyOn(window.location, 'replace').mockImplementation(() => {});
+    expect(tryRecoverChunkLoad(chunkError())).toBe(true);
+    expect(tryRecoverChunkLoad(chunkError())).toBe(true);
+    expect(startChunkRecovery(new Error('Unable to preload CSS for /assets/x.css'))).toBe(true);
+    expect(readChunkAttempts()).toBe(1);
+    await vi.waitFor(() => expect(replace).toHaveBeenCalledTimes(1));
+  });
+
+  it('resetChunkAttempts is a no-op during recovery and works after it', async () => {
+    const replace = vi.spyOn(window.location, 'replace').mockImplementation(() => {});
+    expect(tryRecoverChunkLoad(chunkError())).toBe(true);
+    // App.vue's boot health check landing while hardReload() is still awaiting
+    // SW/cache cleanup must not refund the attempt.
+    resetChunkAttempts();
+    expect(readChunkAttempts()).toBe(1);
+    expect(window.sessionStorage.getItem(CHUNK_RELOAD_FLAG)).toBe('1');
+    await vi.waitFor(() => expect(replace).toHaveBeenCalledTimes(1));
+    // Once the page is replaced (module state reset), reset works again.
+    __resetChunkRecoveryStateForTests();
+    writeChunkAttempts(2);
+    resetChunkAttempts();
+    expect(readChunkAttempts()).toBe(0);
+  });
+
+  it('budget exhaustion returns false and leaves the in-progress flag false', () => {
+    writeChunkAttempts(CHUNK_RELOAD_MAX_ATTEMPTS);
+    const replace = vi.spyOn(window.location, 'replace').mockImplementation(() => {});
+    expect(tryRecoverChunkLoad(chunkError())).toBe(false);
+    expect(startChunkRecovery()).toBe(false);
+    expect(isChunkRecoveryInProgress()).toBe(false);
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it('startChunkRecovery recovers an unclassified preload failure', async () => {
+    const replace = vi.spyOn(window.location, 'replace').mockImplementation(() => {});
+    expect(startChunkRecovery(new Error('Unable to preload CSS for /assets/x.css'))).toBe(true);
+    expect(isChunkRecoveryInProgress()).toBe(true);
+    expect(readChunkAttempts()).toBe(1);
+    await vi.waitFor(() => expect(replace).toHaveBeenCalledTimes(1));
+  });
+
+  it('emits a flushed chunk-recovery reload event naming the attempt', async () => {
+    const replace = vi.spyOn(window.location, 'replace').mockImplementation(() => {});
+    writeChunkAttempts(1);
+    expect(tryRecoverChunkLoad(chunkError())).toBe(true);
+    await vi.waitFor(() => expect(replace).toHaveBeenCalledTimes(1));
+    expect(logEvent).toHaveBeenCalledWith({
+      level: 'warn',
+      surface: 'chunk-recovery',
+      message: `hardReload attempt 2/${CHUNK_RELOAD_MAX_ATTEMPTS}`,
+      context: { action: 'reload' },
+      flush: true,
+    });
+  });
+
+  it('emits the chunk-recovery exhausted event once per tab, not per failure', async () => {
+    writeChunkAttempts(CHUNK_RELOAD_MAX_ATTEMPTS);
+    expect(tryRecoverChunkLoad(chunkError())).toBe(false);
+    expect(tryRecoverChunkLoad(chunkError())).toBe(false);
+    expect(startChunkRecovery()).toBe(false);
+    await vi.waitFor(() =>
+      expect(logEvent).toHaveBeenCalledWith({
+        level: 'error',
+        surface: 'chunk-recovery',
+        message: 'chunk recovery exhausted',
+        context: { action: 'exhausted' },
+      })
+    );
+    // Let any further (wrongly) scheduled emits settle before counting.
+    await new Promise((r) => setTimeout(r, 0));
+    expect(logEvent).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears the in-progress flag and reports when the reload cannot start', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(window.location, 'replace').mockImplementation(() => {
+      throw new DOMException('sandboxed', 'SecurityError');
+    });
+    expect(tryRecoverChunkLoad(chunkError())).toBe(true);
+    expect(isChunkRecoveryInProgress()).toBe(true);
+
+    await vi.waitFor(() => expect(isChunkRecoveryInProgress()).toBe(false));
+    await vi.waitFor(() =>
+      expect(logEvent).toHaveBeenCalledWith({
+        level: 'error',
+        surface: 'chunk-recovery',
+        message: 'hard reload could not start',
+        context: { action: 'failed', error_code: 'SecurityError' },
+      })
+    );
+    expect(error).toHaveBeenCalled();
+    // The attempt stays spent, and the counter can be reset again.
+    expect(readChunkAttempts()).toBe(1);
+    resetChunkAttempts();
+    expect(readChunkAttempts()).toBe(0);
+  });
+});
+
+describe('hardReload cleanup deadline', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    Reflect.deleteProperty(window.navigator, 'serviceWorker');
+  });
+
+  it('replaces the page once the deadline passes even if a SW call never settles', async () => {
+    vi.useFakeTimers();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const replace = vi.spyOn(window.location, 'replace').mockImplementation(() => {});
+    Object.defineProperty(window.navigator, 'serviceWorker', {
+      configurable: true,
+      value: { getRegistration: () => new Promise(() => {}) },
+    });
+
+    void hardReload();
+    await vi.advanceTimersByTimeAsync(HARD_RELOAD_CLEANUP_DEADLINE_MS - 1);
+    expect(replace).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(replace).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('exceeded'));
   });
 });

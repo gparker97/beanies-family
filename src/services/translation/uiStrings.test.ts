@@ -1,13 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import {
-  UI_STRINGS,
-  BEANIE_STRINGS,
-  getSourceText,
-  getAllKeys,
-  getStringHash,
-  getAllHashes,
-} from './uiStrings';
+import { UI_STRINGS, BEANIE_STRINGS, getSourceText, getAllKeys } from './uiStrings';
 import type { UIStringKey } from './uiStrings';
+import { ZH_STRINGS } from './zh';
+import { TRADITIONAL_ONLY } from './traditionalChars';
 
 describe('uiStrings', () => {
   describe('BEANIE_STRINGS', () => {
@@ -62,30 +57,6 @@ describe('uiStrings', () => {
     });
   });
 
-  describe('hash functions', () => {
-    it('getStringHash returns a non-empty string for all keys', () => {
-      const keys = getAllKeys();
-      for (const key of keys) {
-        const hash = getStringHash(key);
-        expect(hash.length).toBeGreaterThan(0);
-      }
-    });
-
-    it('getAllHashes returns a hash for every key', () => {
-      const keys = getAllKeys();
-      const hashes = getAllHashes();
-      for (const key of keys) {
-        expect(hashes[key]).toBeDefined();
-        expect(hashes[key].length).toBeGreaterThan(0);
-      }
-    });
-
-    it('different strings produce different hashes', () => {
-      const hash1 = getStringHash('dashboard.netWorth' as UIStringKey);
-      const hash2 = getStringHash('dashboard.assets' as UIStringKey);
-      expect(hash1).not.toBe(hash2);
-    });
-  });
   describe('important-surface beanie values', () => {
     // Beanie mode swaps register, not meaning. On surfaces where a family could
     // lose work, money, or access, the `beanie` value must keep the real nouns
@@ -273,6 +244,164 @@ describe('uiStrings', () => {
       }
       expect(bad, `beanie euphemism on an important surface:\n${bad.join('\n')}`).toEqual([]);
     });
+  });
+});
+
+/**
+ * Brand and product names that stay English inside the Chinese UI (the approved
+ * glossary). This list is the single source: docs/TRANSLATION.md and the
+ * beanies-theme skill reference it rather than restating it. It is separate from
+ * the template lint rule's brand allowlist in `eslint.config.js` (cross-linked,
+ * deliberately not merged: that one is about bare strings in templates).
+ */
+const ZH_BRAND_TERMS: readonly string[] = [
+  'beanies.family',
+  'The Pod',
+  'The Treehouse',
+  'Little Bean',
+  'Parent Bean',
+  'Meet the Beans',
+  'Nook',
+  'The Beanie Lab',
+  'beanies AI',
+  'Discord Beanies',
+  '.beanpod',
+  'Google Drive',
+  'Google Family Link',
+  'Dropbox',
+  'iCloud',
+  'OneDrive',
+  // Brand variants and role names the copy keeps in English.
+  'The Bean Pod',
+  'Beanies Discord',
+  'Big Bean',
+  'Little Beanie',
+  'beanies',
+  'Pod',
+  // Product and account-type names with no Chinese form.
+  'OpenAI',
+  'Claude',
+  'Gemini',
+  'Reddit',
+  'Product Hunt',
+  'Roth IRA',
+  'Bene IRA',
+  'SWIFT',
+  'Sort Code',
+  '401k',
+  // Apple's name for its review process, quoted in the demo-mode copy.
+  'App Review',
+];
+
+// A value kept verbatim from the English because it is a format example or a
+// code literal, never a sentence: an email, a URL, a key prefix ("sk-…"), an
+// identifier with "_" or "=". Tight on purpose so a pasted English label
+// ("Add Account") still fails the passthrough check.
+const isFormatLiteral = (zhValue: string, enValue: string) =>
+  zhValue === enValue.replace(/\.\.\./g, '…') && /@|:\/\/|…|_|=/.test(zhValue);
+
+describe('ZH_STRINGS', () => {
+  // Completeness (no missing key, no stale key) is enforced by the
+  // `Record<UIStringKey, string>` type on ZH_STRINGS, not here. These checks
+  // cover what the type cannot see. Each one collects every offender so a
+  // failure lists all of them at once.
+  const keys = getAllKeys();
+  const en = UI_STRINGS as Record<string, string>;
+  const zh = ZH_STRINGS as Record<string, string>;
+  // Placeholder token shape from the retired zhBundleIntegrity test.
+  const PLACEHOLDER_RE = /\{[a-zA-Z0-9_]+\}/g;
+  const HAN_RE = /\p{Script=Han}/u;
+  const report = (what: string, offenders: string[]) =>
+    `${offenders.length} ${what}:\n${offenders.join('\n')}`;
+
+  it('every value is non-empty and not whitespace', () => {
+    const offenders = keys.filter((k) => zh[k]!.trim().length === 0);
+    expect(offenders, report('empty zh values', offenders)).toEqual([]);
+  });
+
+  it('carries exactly the {placeholder} tokens the English has', () => {
+    // A lost token is not cosmetic: `fillTemplate` finds nothing to substitute
+    // and the value (a name, a count, a date) silently disappears. An added one
+    // renders as a raw `{token}`.
+    const tokens = (v: string) => [...new Set(v.match(PLACEHOLDER_RE) ?? [])].sort().join(' ');
+    const offenders = keys
+      .filter((k) => tokens(zh[k]!) !== tokens(en[k]!))
+      .map((k) => `${k}: en [${tokens(en[k]!)}] zh [${tokens(zh[k]!)}] -> ${zh[k]}`);
+    expect(offenders, report('placeholder mismatches', offenders)).toEqual([]);
+  });
+
+  it('keeps both halves of every .one/.other pair', () => {
+    const offenders = keys
+      .filter((k) => k.endsWith('.one'))
+      .map((k) => [k, k.replace(/\.one$/, '.other')] as const)
+      .filter(([, other]) => other in en)
+      .filter(([one, other]) => !zh[one]?.trim() || !zh[other]?.trim())
+      .map(([one]) => one);
+    expect(offenders, report('broken .one/.other pairs', offenders)).toEqual([]);
+  });
+
+  it('is Simplified: no Traditional-only characters', () => {
+    const offenders = keys
+      .filter((k) => [...zh[k]!].some((c) => TRADITIONAL_ONLY.has(c)))
+      .map((k) => `${k}: ${zh[k]}`);
+    expect(offenders, report('values with Traditional characters', offenders)).toEqual([]);
+  });
+
+  it('adds no link, href or URL the English does not have', () => {
+    const MARKERS = ['<a', 'href', 'http'];
+    const offenders = keys.flatMap((k) => {
+      const z = zh[k]!.toLowerCase();
+      const e = en[k]!.toLowerCase();
+      return MARKERS.filter((m) => z.includes(m) && !e.includes(m)).map(
+        (m) => `${k}: "${m}" -> ${zh[k]}`
+      );
+    });
+    expect(offenders, report('values with an added link or URL', offenders)).toEqual([]);
+  });
+
+  it('is never English passthrough outside the brand glossary', () => {
+    // Value-based, not a per-key allowlist (a key list would grow forever). A
+    // value with any Han character is translated and not examined. A value with
+    // none is stripped of glossary terms, placeholders, 2-4 letter uppercase
+    // tokens (currency codes and the acronyms the lint allowlist exempts: OK,
+    // ID, AI, PWA, URL, PDF, PIN, QR), emoji, digits, punctuation and symbols;
+    // any Latin letter left is untranslated English. This is also the
+    // staleness floor: an English value pasted into zh.ts fails here.
+    const terms = [...ZH_BRAND_TERMS].sort((a, b) => b.length - a.length);
+    const residue = (v: string) => {
+      let out = v;
+      for (const term of terms) out = out.split(term).join(' ');
+      return out
+        .replace(PLACEHOLDER_RE, ' ')
+        .replace(/\b[A-Z]{2,4}\b/g, ' ')
+        .replace(/\p{Extended_Pictographic}|\u{FE0F}|\u{200D}|\u{20E3}/gu, ' ')
+        .replace(/[\p{N}\p{P}\p{S}\s]/gu, '');
+    };
+    const offenders = keys
+      .filter((k) => !HAN_RE.test(zh[k]!) && !isFormatLiteral(zh[k]!, en[k]!))
+      .filter((k) => /[A-Za-z]/.test(residue(zh[k]!)))
+      .map((k) => `${k}: ${zh[k]}`);
+    expect(offenders, report('untranslated English values', offenders)).toEqual([]);
+  });
+
+  it('is never half-translated: no run of English words outside the glossary', () => {
+    // A value with Han characters still fails if, after the same stripping,
+    // two or more Latin words stand next to each other ("添加 New Account").
+    // Single Latin tokens survive on purpose: a product name inside a sentence
+    // ("Google 日历"), a unit, a code.
+    const terms = [...ZH_BRAND_TERMS].sort((a, b) => b.length - a.length);
+    // Any run of 2+ words contains an adjacent pair, so one pair is enough
+    // (and keeps the pattern free of nested quantifiers).
+    const RUN_RE = /[A-Za-z]{2,}\s+[A-Za-z]{2,}/;
+    const stripped = (v: string) => {
+      let out = v;
+      for (const term of terms) out = out.split(term).join(' ');
+      return out.replace(PLACEHOLDER_RE, ' ').replace(/\b[A-Z]{2,4}\b/g, ' ');
+    };
+    const offenders = keys
+      .filter((k) => !isFormatLiteral(zh[k]!, en[k]!) && RUN_RE.test(stripped(zh[k]!)))
+      .map((k) => `${k}: ${zh[k]}`);
+    expect(offenders, report('half-translated values', offenders)).toEqual([]);
   });
 });
 

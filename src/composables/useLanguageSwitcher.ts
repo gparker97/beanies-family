@@ -5,10 +5,10 @@ import type { LanguageCode } from '@/types/models';
 /**
  * Switch the app language without ever blocking the click handler.
  *
- * The translation store applies the language cosmetically before any API
- * work, so the switch feels instant. We intentionally do NOT `await` the
- * load — awaiting would freeze the user inside the click handler for the
- * entire ~100 s API backfill on a fresh deploy. The store's internal
+ * The translation store loads the language's code-split chunk and applies it
+ * when it resolves. We intentionally do NOT `await` the load — awaiting would
+ * hold the user inside the click handler for the chunk fetch (slow on a cold
+ * cache or a poor connection). The store's internal
  * `activeLoadToken` (see translationStore.ts) handles cancellation, so a
  * mid-load language switch supersedes a previous load cleanly.
  *

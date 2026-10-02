@@ -8,11 +8,12 @@ import { useTranslationStore } from '@/stores/translationStore';
  * Resolution order for `t(key)`:
  * 1. If language === 'en' && beanieMode && key has beanie override → beanie string
  * 2. If language === 'en' → UI_STRINGS[key] (plain English)
- * 3. Otherwise → translated string from translationStore (always sourced from UI_STRINGS, never BEANIE_STRINGS)
+ * 3. Otherwise → the loaded language's hand-authored value (e.g. ZH_STRINGS in
+ *    `zh.ts`), falling back to UI_STRINGS[key]
  *
- * IMPORTANT: The translation pipeline always uses UI_STRINGS (plain English)
- * as the source text. BEANIE_STRINGS are never translated and are only shown
- * as a cosmetic overlay when language is English and beanie mode is enabled.
+ * IMPORTANT: BEANIE_STRINGS are an English-only cosmetic overlay, shown only
+ * when language is English and beanie mode is enabled. They are never the
+ * source for another language.
  *
  * Usage:
  * ```vue
@@ -41,7 +42,6 @@ export function useTranslation() {
     t,
     currentLanguage: computed(() => translationStore.currentLanguage),
     isLoading: computed(() => translationStore.isLoading),
-    loadProgress: computed(() => translationStore.loadProgress),
     isEnglish: computed(() => translationStore.isEnglish),
     isBeanieMode: computed(() => translationStore.beanieMode),
   };

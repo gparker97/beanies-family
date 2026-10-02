@@ -68,8 +68,10 @@ import {
   hardReload,
   isChunkLoadError,
   readChunkAttempts,
-  writeChunkAttempts,
   resetChunkAttempts,
+  startChunkRecovery,
+  tryRecoverChunkLoad,
+  isChunkRecoveryInProgress,
 } from '@/utils/hardReload';
 import { breadcrumbsForReport } from '@/utils/diagnosticContext';
 import ToastContainer from '@/components/ui/ToastContainer.vue';
@@ -1079,12 +1081,6 @@ async function loadFamilyDataInner(openToken: OpenToken): Promise<'handed-off' |
 }
 /* eslint-enable no-console */
 
-// Sentinel for the init catch's chunk-recovery branch. Module-scoped (not
-// a ref) because it gates the finally block's loading-state dismissal,
-// not anything reactive. Reset only by full-page reload — which is the
-// next thing `hardReload()` does.
-let chunkReloadInProgress = false;
-
 // Init timeouts — STRICTLY INCREASING; each layer is the safety net for the one
 // above it. Do NOT reorder or collapse (a unit test pins the ordering). The
 // innermost bound is the 15s OAuth-proxy fetch abort in `oauthProxy.ts`; these
@@ -1135,7 +1131,7 @@ onMounted(async () => {
   // recovery overlay rather than freezing forever. Cleared in the finally on any
   // resolution; only fires when the body genuinely never completes.
   const initWatchdog = setTimeout(() => {
-    if (chunkReloadInProgress) return; // a hardReload is already swapping the page
+    if (isChunkRecoveryInProgress()) return; // a hardReload is already swapping the page
     if (!isInitializing.value && !isLoadingData.value) return; // already settled
     console.error('[App] init watchdog fired — setup stalled; surfacing recovery overlay');
     setGenericInitError(t('app.initError.stalled'), initBreadcrumbs.join('\n'));
@@ -1228,6 +1224,24 @@ onMounted(async () => {
       initBreadcrumbs.push('public: skipping auth and data init for public page');
       return;
     }
+
+    // TEMPORARY: remove after 2026-12-01. One-time cleanup of the retired
+    // machine-translation cache database. Fully fire-and-forget: nothing on the
+    // boot path awaits the module import or the delete.
+    void import('@/services/indexeddb/database')
+      .then((m) => m.deleteRetiredTranslationDatabase())
+      .catch((e: unknown) => {
+        console.warn('[App] retired translation DB cleanup skipped:', e);
+        // A rotated database chunk is a chunk-load symptom like any other.
+        if (!tryRecoverChunkLoad(e)) {
+          logEvent({
+            level: 'warn',
+            surface: 'idb-legacy-cleanup',
+            message: 'cleanup module import failed',
+            context: { action: 'failed', error_code: e instanceof Error ? e.name : 'unknown' },
+          });
+        }
+      });
 
     // Request persistent storage so the browser won't evict IndexedDB
     // (tokens, file handles). Installed PWAs are almost always granted; a denial
@@ -1640,27 +1654,15 @@ onMounted(async () => {
     // Suppresses the "modal flashed several times during PWA update"
     // experience reported by greg on 2026-05-10 (iPhone, mid-update).
     if (isChunkLoadError(err)) {
-      // Bounded retries via the throw-safe counter (hardReload.ts). It used to
-      // read sessionStorage inline inside a try/catch whose empty `catch`
-      // SWALLOWED a storage throw — silently skipping both `hardReload()` and
-      // the Slack page (the iPhone onboarding blocker, 2026-06-20). The
-      // accessors now fall back to an in-memory mirror, so a throwing
-      // `sessionStorage` no longer abandons recovery, and the `critical` report
-      // below is always reached when exhausted. Up to 3 silent hardReloads —
-      // iOS Safari's SW lifecycle legitimately needs 2 sometimes — then we stop,
+      // Bounded retries via `startChunkRecovery` (hardReload.ts; this branch has
+      // already classified the error). It owns the throw-safe attempt counter
+      // and the in-progress flag that the watchdog and `finally` read, so a
+      // recovery started by `router.onError` or `vite:preloadError` is honoured
+      // here too. Up to CHUNK_RELOAD_MAX_ATTEMPTS silent hardReloads (iOS
+      // Safari's SW lifecycle legitimately needs 2 sometimes), then we stop,
       // page Slack, and show the overlay. Counter cleared by a successful boot.
+      if (startChunkRecovery(err)) return;
       const attempts = readChunkAttempts();
-      const MAX_ATTEMPTS = 3;
-      if (attempts < MAX_ATTEMPTS) {
-        writeChunkAttempts(attempts + 1);
-        console.warn(
-          `[App] chunk-load symptom — hardReload attempt ${attempts + 1}/${MAX_ATTEMPTS}:`,
-          err
-        );
-        chunkReloadInProgress = true;
-        void hardReload();
-        return;
-      }
       console.error(
         `[App] chunk-load recovery exhausted after ${attempts} attempts — surfacing overlay:`,
         err
@@ -1724,7 +1726,7 @@ onMounted(async () => {
     // initial spinner visible until `location.replace()` swaps the page,
     // so the user sees a steady "counting beans..." instead of a brief
     // blank screen between init failure and the reload landing.
-    if (!chunkReloadInProgress) {
+    if (!isChunkRecoveryInProgress()) {
       isInitializing.value = false;
       isLoadingData.value = false;
     }
@@ -1754,12 +1756,15 @@ function handleReload() {
   // cached `index.html` that referenced the dead chunk in the first place,
   // putting the user right back on the error overlay.
   //
+  // A chunk recovery already in flight is about to replace the page; a second
+  // concurrent hardReload() would race its SW unregister and cache eviction.
+  if (isChunkRecoveryInProgress()) return;
   // Also clear the retry counter: the auto-recovery increments it to prevent an
-  // infinite reload loop, but a user-driven click is an explicit "try the
-  // recovery path again" signal — it shouldn't fall through to the overlay
-  // a second time because the gentle attempts were already counted.
-  // `resetChunkAttempts()` clears both the persisted flag and the in-memory
-  // mirror, and is itself throw-safe.
+  // infinite reload loop, and a user-driven click is an explicit "try the
+  // recovery path again" signal, so the attempts already counted should not
+  // send the user straight back to the overlay. (`resetChunkAttempts()` clears
+  // both the persisted counter and the in-memory mirror and is throw-safe; it
+  // is a no-op only while a recovery is in flight, which returned above.)
   resetChunkAttempts();
   void hardReload();
 }

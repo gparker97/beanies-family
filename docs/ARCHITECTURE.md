@@ -48,9 +48,9 @@ Vue's reactivity system means views subscribe to state directly — there is no 
           ┌───────────────┼───────────────┬───────────────┐
           ▼               ▼               ▼               ▼
     ┌──────────┐    ┌──────────┐    ┌─────────┐    ┌──────────┐
-    │ Local    │    │ Google   │    │Exchange │    │ MyMemory │
-    │ .beanpod │    │ Drive    │    │Rate API │    │ Translate│
-    │ File     │    │ (PKCE)   │    │ (CDN)   │    │ API      │
+    │ Local    │    │ Google   │    │Exchange │    │ zh.ts    │
+    │ .beanpod │    │ Drive    │    │Rate API │    │ (lazy)   │
+    │ File     │    │ (PKCE)   │    │ (CDN)   │    │ chunk    │
     └──────────┘    └──────────┘    └─────────┘    └──────────┘
 ```
 
@@ -88,7 +88,7 @@ Vue's reactivity system means views subscribe to state directly — there is no 
 - **google/**: OAuth PKCE proxy client (`oauthProxy.ts`), Drive API client (`driveService.ts`)
 - **exchangeRate/**: Free currency API integration with fallback
 - **recurring/**: Recurring transaction processor (runs on app startup)
-- **translation/**: MyMemory API integration for i18n
+- **translation/**: `uiStrings.ts` (en, beanie) plus `zh.ts` (Chinese), loaded by `translationStore` through a lazy `import('./zh')` chunk; no network call (ADR-040)
 - **indexeddb/**: Registry database, active family tracking, database cleanup utilities
 
 ### Composables (`src/composables/`)

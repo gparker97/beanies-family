@@ -132,7 +132,7 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
       'Set your preferred language and base currency. beanies.family supports multi-currency tracking with automatic conversion.',
     icon: '\u{1F30D}',
     readTime: 2,
-    updatedDate: '2026-03-09',
+    updatedDate: '2026-10-02',
     sections: [
       {
         type: 'heading',
@@ -172,7 +172,7 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'beanies.family currently supports <strong>English</strong> and <strong>Chinese</strong>. The app uses an automatic translation service to translate the UI. You can switch languages in Settings.',
+          'beanies.family currently supports <strong>English</strong> and <strong>Chinese</strong>. The Chinese interface is written by the beanies.family team alongside the English, and both languages work offline. You can switch languages in Settings.',
       },
     ],
   },
