@@ -17,6 +17,79 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.10.02',
+    date: '2026-10-02',
+    month: '2 october 2026',
+    summary: {
+      en: 'Magic beans is out of beta, the sidebar fits your screen, and the app now reads naturally in Chinese.',
+      beanie:
+        'magic beans is out of beta, the sidebar fits your screen, and the app now reads naturally in chinese.',
+    },
+    features: [
+      {
+        icon: '\u2728',
+        title: { en: 'Magic beans, out of beta', beanie: 'magic beans, out of beta' },
+        description: {
+          en: 'Its settings now live on a Magic beans card in Settings: how documents are processed and whether to ask before reading a photo. No experimental switch needed.',
+          beanie:
+            'its settings now live on a magic beans card in settings: how documents are processed and whether to ask before reading a photo. no experimental switch needed.',
+        },
+      },
+      {
+        icon: '\u{1F4CB}',
+        title: { en: 'A sidebar that fits your screen', beanie: 'a sidebar that fits your screen' },
+        description: {
+          en: 'Only the section you are in starts open; the other two fold to a strip of icons, still one tap away. Help and Discord sit on your profile card.',
+          beanie:
+            'only the section you are in starts open; the other two fold to a strip of icons, still one tap away. help and discord sit on your profile card.',
+        },
+      },
+      {
+        icon: '\u{1F6D2}',
+        title: { en: 'A shopping list from any meal', beanie: 'a shopping list from any meal' },
+        description: {
+          en: 'Open a planned meal and tap Shopping List: the same checklist the cookbook uses, sized for who is eating that night.',
+          beanie:
+            'open a planned meal and tap shopping list: the same checklist the cookbook uses, sized for who is eating that night.',
+        },
+      },
+      {
+        icon: '\u{1F517}',
+        title: {
+          en: 'Share a magic link to your other device',
+          beanie: 'share a magic link to your other device',
+        },
+        description: {
+          en: 'The magic link panel has copy and share buttons, so a link made on your phone can go straight to your tablet or laptop.',
+          beanie:
+            'the magic link panel has copy and share buttons, so a link made on your phone can go straight to your tablet or laptop.',
+        },
+      },
+      {
+        icon: '\u{1F30F}',
+        title: { en: 'Chinese that reads like Chinese', beanie: 'chinese that reads like chinese' },
+        description: {
+          en: 'Every string in the Chinese interface was rewritten by hand, so it reads like an app written in Chinese rather than a translation.',
+          beanie:
+            'every string in the chinese interface was rewritten by hand, so it reads like an app written in chinese rather than a translation.',
+        },
+      },
+      {
+        icon: '\u{1F4AC}',
+        title: { en: 'Join us on Discord', beanie: 'join us on discord' },
+        description: {
+          en: "Get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+          beanie:
+            "get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+        },
+        cta: {
+          label: { en: 'Join the Discord', beanie: 'join the discord' },
+          href: 'https://beanies.family/discord',
+        },
+      },
+    ],
+  },
+  {
     version: '2026.10.01',
     date: '2026-10-01',
     month: '1 october 2026',
