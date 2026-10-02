@@ -35,6 +35,8 @@ After Pass 4 the plan is ready for Phase 3 (present to user). When all four pass
 
 #### Phase 2.1 — Pass 1: Initial Draft
 
+The draft must carry the **`## Execution model`** section filled in — tier, lead, work packages by model, review level, verification. Take it from the pre-plan prompt's `Complexity:` / `Execution model:` lines when they exist; otherwise score it with the six-angle rubric (`beanies-new-issue` step 6) and say so. A plan without it leaves the build to pick its own model, which is the cost leak this section closes.
+
 Prepare a comprehensive plan following the structure in [Plan Document Format](#plan-document-format) below. The plan must include **all** context, details, and information required to implement the request in full. Do not summarize, truncate, or omit anything. Runs in the main conversation (no subagent).
 
 Key principles:
@@ -184,6 +186,17 @@ As a [role], I want [goal] so that [benefit].
 ## Approach
 
 <The accepted implementation plan. Technical details, files affected, key design decisions.>
+
+## Execution model
+
+> **MANDATORY for every plan.** This is how the plan is delivered, not what it builds. It is seeded from the tracker row's `Complexity`, `Lead Model` and `Execution Model` (carried in by `beanies-pre-plan` as the `Complexity:` and `Execution model:` lines of the prompt). When the plan has no tracker row, score the six angles yourself using the rubric in `.claude/skills/beanies-new-issue/SKILL.md` step 6 and state the scores here. `beanies-build-auto` reads this section to decide who implements each package and at what level `/code-review` runs.
+
+- **Tier**: S | M | L | XL (six-angle total, with the data-risk override noted if it applied)
+- **Lead**: Sonnet | Opus | Fable — who plans/coordinates and integrates
+- **Work packages**: one line per package (commit or phase) → the model that implements it, e.g. "commits 1-3 reconciler + law tests → Opus; commits 4-5 call sites, modal adoptions, docs → Sonnet"
+- **Review**: the `/code-review` level (low / medium / high) and how many rounds are budgeted
+- **Verification**: unit tests · browser walk · two-device · native build · store review · real money — whichever the tier demands
+- **Phases / spike**: only when there is one; name what the spike must prove before the build starts
 
 ## Files Affected
 

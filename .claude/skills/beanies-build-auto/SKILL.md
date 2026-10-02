@@ -113,6 +113,24 @@ out early means he can start thinking about it while you work, rather than being
 
 ### Phase 1: Implement
 
+**Read the plan's `## Execution model` section first, and staff the work the way it says.** It names the tier
+(S/M/L/XL), the lead, and which work packages go to which model. Honour it:
+
+- **Packages assigned to Sonnet or Opus run as subagents on that model** (`Agent` with `model: "sonnet"` /
+  `"opus"`), one self-contained brief per package: the files, the plan requirements it satisfies, the tests it
+  must add or keep green, and what NOT to touch. Independent packages launch in parallel in one message;
+  dependent ones in sequence. The session reviews every returned diff against the plan before moving on —
+  delegation is not abdication.
+- **The session keeps sequencing, integration, Phase 2 validate (once), the browser pass, review and fix-up.**
+  That is the coordinator's job whatever model the session runs on.
+- **If the session model is heavier than the plan's lead** (a Fable session on an S or M plan), delegate the
+  whole implementation to the named lead model and keep the session to review and integrate — do not do
+  Sonnet work at Fable prices because the session happened to be open. If it is lighter (a Sonnet session on an
+  L/XL plan), say so and stop: the plan asked for a stronger coordinator, and that is greg's call.
+- **A plan with no `## Execution model` section is a plan from before 2026-10-02.** Score it with the six-angle
+  rubric in `.claude/skills/beanies-new-issue/SKILL.md` step 6, state the tier in one line, and proceed on
+  that; do not silently implement everything in-session.
+
 Build what the plan says, in the order the plan says. The plan is the spec — deviating from it silently is
 the single worst thing that can happen in this phase, because the review in Phase 5 checks the code against
 the plan, so a silent deviation gets reviewed against the wrong yardstick and passes.
@@ -218,11 +236,12 @@ an apology.
 /code-review high
 ```
 
-**`high` is the default, and it is the right default for almost everything this skill builds.** Go to
+**The level comes from the plan's `## Execution model` section**: `low` for an S plan, `medium` for M, `high`
+for L and XL. `high` is also the fallback for a plan that carries no tier. Go to
 `xhigh` or `max` **only when greg asks for that level by name.** Do not escalate on your own judgement that
 the change feels big — if you think it warrants more, say so in one line and let him decide.
 
-Why `high` rather than `max`: depth is not free, and past some point it stops buying correctness and starts
+Why the ceiling is `high` rather than `max`: depth is not free, and past some point it stops buying correctness and starts
 buying *speculation*. A `max` review reaches for failure modes it cannot reach the evidence for, and the
 findings at that edge are the ones that get fixed, re-raised next round, and then withdrawn — which is
 expensive twice over, because the fix for a finding that was never real is a real change to working code.
