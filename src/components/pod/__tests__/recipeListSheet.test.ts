@@ -27,6 +27,7 @@ const h = vi.hoisted(() => ({
   toastOptions: [] as Array<Record<string, unknown> | undefined>,
   reported: [] as Array<Record<string, unknown>>,
   logged: [] as string[],
+  loggedKinds: [] as string[],
 }));
 
 vi.mock('@/composables/useTranslation', () => ({
@@ -34,7 +35,13 @@ vi.mock('@/composables/useTranslation', () => ({
     // Keys echo back, EXCEPT the ones whose template the assertions care about —
     // otherwise a test that checks the rendered "1/2" can only check the key name,
     // which would pass even if the numbers were wrong.
-    t: (k: string) => (k === 'lists.progress' ? '{done}/{total}' : k),
+    t: (k: string) =>
+      ({
+        'lists.progress': '{done}/{total}',
+        'mealPlanner.shopping.cook.times': 'Cook ×{n}',
+        'mealPlanner.shopping.cook.once': 'Cook Once',
+        'mealPlanner.shopping.forEating': 'For {n}, serves {s}',
+      })[k] ?? k,
   }),
 }));
 vi.mock('@/composables/useToast', () => ({
@@ -81,7 +88,10 @@ vi.mock('@/utils/errorReporter', () => ({
   reportError: (e: Record<string, unknown>) => h.reported.push(e),
 }));
 vi.mock('@/services/telemetry', () => ({
-  logEvent: (e: { context?: { action?: string } }) => h.logged.push(e.context?.action ?? ''),
+  logEvent: (e: { context?: { action?: string; kind?: string } }) => {
+    h.logged.push(e.context?.action ?? '');
+    if (e.context?.action === 'sheet_opened') h.loggedKinds.push(e.context.kind ?? '');
+  },
 }));
 
 import RecipeListSheet from '../RecipeListSheet.vue';
@@ -90,6 +100,7 @@ interface TestRecipe {
   id: string;
   name: string;
   ingredients: string[];
+  servings?: string;
 }
 const RECIPE: TestRecipe = {
   id: 'r1',
@@ -97,14 +108,14 @@ const RECIPE: TestRecipe = {
   ingredients: ['For the batter:', '2 cups flour', '3 eggs'],
 };
 
-function mountSheet(recipe: TestRecipe = RECIPE) {
+function mountSheet(recipe: TestRecipe = RECIPE, extra: { eating?: number; layer?: string } = {}) {
   return mount(RecipeListSheet, {
-    props: { open: true, recipe: recipe as never },
+    props: { open: true, recipe: recipe as never, ...extra } as never,
     global: {
       stubs: {
         BeanieFormModal: {
           name: 'BeanieFormModal',
-          props: ['open', 'title', 'saveLabel', 'saveDisabled', 'isSubmitting'],
+          props: ['open', 'title', 'saveLabel', 'saveDisabled', 'isSubmitting', 'layer'],
           template: '<div><slot /></div>',
         },
         InferredHint: { name: 'InferredHint', props: ['text'], template: '<p>{{ text }}</p>' },
@@ -138,6 +149,7 @@ beforeEach(() => {
   h.toastOptions = [];
   h.reported = [];
   h.logged = [];
+  h.loggedKinds = [];
   h.createList.mockClear();
   h.createList.mockResolvedValue({ id: 'new-list' });
   h.addItems.mockClear();
@@ -539,5 +551,58 @@ describe('who shops and by when', () => {
     await save(w);
     expect(seedOf().ownerId).toBe('m1');
     expect(Object.keys(seedOf())).not.toContain('dueDate');
+  });
+});
+
+describe('one meal: the `eating` prop (#116)', () => {
+  const TACOS: TestRecipe = {
+    id: 'r1',
+    name: 'Beef Tacos',
+    servings: '4',
+    ingredients: ['For the filling:', '500 g ground beef', '8 taco shells'],
+  };
+  const pill = (w: ReturnType<typeof mountSheet>) => w.find('[data-testid="cook-count-pill"]');
+
+  it('5 eating, serves 4: Cook ×2, (×2) on each line, logged and written as a meal', async () => {
+    const w = mountSheet(TACOS, { eating: 5 });
+    expect(lineTexts(w)).toEqual(['500 g ground beef (×2)', '8 taco shells (×2)']);
+    expect(pill(w).text()).toContain('Cook ×2');
+    expect(w.text()).toContain('For 5, serves 4');
+    expect(h.loggedKinds).toEqual(['meal']);
+    await save(w);
+    expect(seedTitles()).toEqual(['500 g ground beef (×2)', '8 taco shells (×2)']);
+    expect(h.logged).toContain('list_created');
+  });
+
+  it('one batch: Cook Once and no suffix', () => {
+    const w = mountSheet(TACOS, { eating: 4 });
+    expect(lineTexts(w)).toEqual(['500 g ground beef', '8 taco shells']);
+    expect(pill(w).text()).toContain('Cook Once');
+  });
+
+  it('no servings: one batch, and says so', () => {
+    const w = mountSheet({ ...TACOS, servings: undefined }, { eating: 5 });
+    expect(lineTexts(w)).toEqual(['500 g ground beef', '8 taco shells']);
+    expect(w.text()).toContain('mealPlanner.shopping.noServingsPerMeal');
+  });
+
+  it('review mode shows the same batched lines a new list would contain', () => {
+    h.lists = [existingList()];
+    const w = mountSheet(TACOS, { eating: 5 });
+    expect(w.find('textarea').exists()).toBe(false);
+    expect(w.find('ul[aria-readonly="true"]').text()).toContain('500 g ground beef (×2)');
+  });
+
+  it('forwards the stacking layer to the modal', () => {
+    const w = mountSheet(TACOS, { eating: 5, layer: 'overlay' });
+    expect(w.findComponent({ name: 'BeanieFormModal' }).props('layer')).toBe('overlay');
+  });
+
+  it('without `eating` nothing changes: x1, kind recipe, no pill', async () => {
+    const w = mountSheet(TACOS);
+    expect(lineTexts(w)).toEqual(['500 g ground beef', '8 taco shells']);
+    expect(pill(w).exists()).toBe(false);
+    expect(h.loggedKinds).toEqual(['recipe']);
+    expect(w.findComponent({ name: 'BeanieFormModal' }).props('layer')).toBe('base');
   });
 });

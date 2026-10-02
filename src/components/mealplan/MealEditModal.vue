@@ -6,8 +6,9 @@
  * CookLogFormModal; the meal flips to cooked ONLY when a new cook-log actually
  * persisted (guards against a lost log with a wrong "cooked" state).
  *
- * Hosts the read-only ingredients panel (#116, `MealIngredientsPanel`); the panel owns
- * its own list write, so this form still saves only MealPlanEntry fields.
+ * Offers the meal's Shopping List (#116) as a row under Who's eating that opens the
+ * cookbook's shared `RecipeListSheet` with this meal's live eater count (Cook ×N); the
+ * sheet owns its own list write, so this form still saves only MealPlanEntry fields.
  */
 import { ref, computed } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
@@ -17,7 +18,9 @@ import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
 import InferredHint from '@/components/ui/InferredHint.vue';
 import CookLogFormModal from '@/components/pod/CookLogFormModal.vue';
 import RecipeFormModal from '@/components/pod/RecipeFormModal.vue';
-import MealIngredientsPanel from '@/components/mealplan/MealIngredientsPanel.vue';
+import RecipeListSheet from '@/components/pod/RecipeListSheet.vue';
+import CookCountPill from '@/components/mealplan/CookCountPill.vue';
+import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import { useMealPlanStore } from '@/stores/mealPlanStore';
 import { useRecipesStore } from '@/stores/recipesStore';
 import { useTranslation } from '@/composables/useTranslation';
@@ -27,7 +30,9 @@ import { confirm } from '@/composables/useConfirm';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { isFlagEnabled } from '@/config/flags';
 import { useFamilyStore } from '@/stores/familyStore';
+import { servingsOf } from '@/utils/recipeServings';
 import {
+  batchesFor,
   eaterIdsToStore,
   eatingCount,
   hasShoppableIngredients,
@@ -75,6 +80,12 @@ const eating = computed(
     eatingCount({ eaterMemberIds: eaterIds.value, guestNames: guestNames.value }, humanIds.value)
       .eating
 );
+
+/** Cook ×N for the LIVE picker, shown on the Shopping List row. */
+const batches = computed(() =>
+  recipe.value ? batchesFor(eating.value, servingsOf(recipe.value)) : 1
+);
+const shoppingOpen = ref(false);
 
 // Who Owns What (#109): derived, nothing stored. Shows while the chosen cook is the
 // single holder of the slot's card ("Sofia holds Cooking Dinner in Who Owns What.").
@@ -253,16 +264,6 @@ async function onCookLogClosed(): Promise<void> {
             {{ t('mealPlanner.editor.editRecipe') }}
           </button>
         </div>
-        <!-- Keyed on the recipe ONLY: any update to it (an edit here, a sync from another
-             device) must not remount the panel and drop unticks, edits or "Added". The
-             panel rebuilds its lines itself when the ingredients actually change. -->
-        <MealIngredientsPanel
-          v-if="showIngredients && recipe"
-          :key="recipe.id"
-          class="mt-4"
-          :recipe="recipe"
-          :eating="eating"
-        />
       </div>
       <div v-else>
         <div class="mp-label">{{ t('mealPlanner.editor.plan') }}</div>
@@ -328,6 +329,22 @@ async function onCookLogClosed(): Promise<void> {
         </div>
       </div>
 
+      <!-- Shopping List (#116): opens the cookbook's sheet with this meal's Cook ×N. -->
+      <button
+        v-if="showIngredients && recipe"
+        type="button"
+        class="font-inter dark:bg-surface-hover dark:text-ink-soft inline-flex w-full items-center gap-2 rounded-xl bg-[var(--tint-slate-5)] px-3 py-2.5 text-left text-sm text-[var(--color-text-muted)]"
+        data-testid="meal-shopping-open"
+        @click="shoppingOpen = true"
+      >
+        <span class="dark:text-ink min-w-0 flex-1 font-semibold text-[var(--color-text)]">
+          <span aria-hidden="true">🛒</span>
+          {{ t('mealPlanner.shopping.button') }}
+        </span>
+        <CookCountPill :count="batches" />
+        <BeanieIcon name="chevron-right" size="sm" />
+      </button>
+
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           <div class="mp-label">{{ t('mealPlanner.editor.note') }}</div>
@@ -379,6 +396,15 @@ async function onCookLogClosed(): Promise<void> {
       :recipe="recipe"
       layer="overlay"
       @close="recipeEditOpen = false"
+    />
+
+    <RecipeListSheet
+      v-if="recipe"
+      :open="shoppingOpen"
+      :recipe="recipe"
+      :eating="eating"
+      layer="overlay"
+      @close="shoppingOpen = false"
     />
   </BeanieFormModal>
 </template>

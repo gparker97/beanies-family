@@ -23,8 +23,9 @@ import path from 'node:path';
  * a recurring list, then walks: the header button, the week drawer (Cook markers, (×N)
  * suffixes, the exact rice merge, ✨ Find Duplicates with the AI mocked at the BYOK provider
  * boundary, Split, untick, edit, add, Create List, Add to a List), the edit-meal drawer
- * (Cook ×2 with (×2) lines, live re-batch, everyone picked by default, Clear / Everyone,
- * the save mapping, Add / Added), the recipe page sheet, the servings stepper, and the
+ * (the Shopping List row below Who's eating with a live Cook ×N pill, the shared RecipeListSheet
+ * at this meal's count with (×2) lines, review mode after a create, everyone picked by default,
+ * Clear / Everyone, the save mapping), the recipe page sheet, the servings stepper, and the
  * magic beans sheet's hint popover above the sheet.
  * Asserts on exported data; shoots light + dark, phone + desktop.
  *
@@ -944,6 +945,9 @@ test('meal shopping list walk', async ({ page }) => {
   expect((await lists(db)).length).toBe(listCount);
 
   // ── 3. Edit-meal drawer: Tuesday's tacos ─────────────────────────────────────
+  // Since the 2026-10-02 change the drawer no longer hosts an ingredients panel: a
+  // "Shopping List" row below Who's eating carries a live Cook ×N pill and opens the
+  // cookbook's RecipeListSheet (same view as the recipe page) at this meal's count.
   await page.keyboard.press('Escape').catch(() => {});
   await page.waitForTimeout(400);
   const openMeal = async (recipeName: string) => {
@@ -956,22 +960,46 @@ test('meal shopping list walk', async ({ page }) => {
     await mealDrawer().waitFor({ timeout: 8000 });
   };
   const mealDrawer = () =>
-    page.getByRole('dialog').filter({ has: page.getByTestId('meal-ingredients-panel') });
-  const panel = () => mealDrawer().getByTestId('meal-ingredients-panel');
+    page.getByRole('dialog').filter({ has: page.getByTestId('meal-shopping-open') });
+  const openShopping = () => mealDrawer().getByTestId('meal-shopping-open');
   const cookText = async () =>
     (
-      await panel().getByTestId('cook-count-pill').locator('[aria-hidden="true"]').textContent()
+      await openShopping()
+        .getByTestId('cook-count-pill')
+        .locator('[aria-hidden="true"]')
+        .textContent()
     )?.trim();
+  const mealSheet = () =>
+    page
+      .getByRole('dialog')
+      .filter({ hasText: ui('lists.fromRecipe.title') })
+      .filter({ hasNot: page.getByTestId('meal-shopping-open') });
+  const sheetValues = () =>
+    mealSheet()
+      .getByTestId('ingredient-text')
+      .evaluateAll((els) => els.map((e) => (e as HTMLTextAreaElement).value));
   const allToggle = () => mealDrawer().getByTestId('family-chip-all-toggle');
   await openMeal('Beef Tacos');
-  console.log(
-    '[3] cook:',
-    await cookText(),
-    '| panel text:',
-    (await panel().textContent())?.replace(/\s+/g, ' ').slice(0, 300)
-  );
+  // The drawer: no checklist inline; the row sits below Who's eating with Cook ×2 (3 + 2 guests, serves 4).
+  expect(await mealDrawer().getByTestId('ingredient-text').count()).toBe(0);
   expect(await cookText()).toBe(fill('mealPlanner.shopping.cook.times', { n: '2' }));
-  expect(await valuesIn(panel())).toEqual([
+  const eatersBox = await mealDrawer().getByTestId('family-chip-all-toggle').boundingBox();
+  const rowBox = await openShopping().boundingBox();
+  console.log('[3] eaters toggle y:', eatersBox?.y, '| shopping row y:', rowBox?.y);
+  expect(rowBox!.y, 'the Shopping List row sits below Who is eating').toBeGreaterThan(eatersBox!.y);
+  // Tuesday has a stored subset (3 of 5): the toggle offers Everyone.
+  expect((await allToggle().textContent())?.trim()).toBe(ui('common.everyone'));
+  await openShopping().scrollIntoViewIfNeeded();
+  await shotMatrix(page, '03a-meal-drawer-row', () => openShopping());
+  // Open the sheet at ×2: the recipe page's view with this meal's count and suffixes.
+  await openShopping().click();
+  await mealSheet().waitFor({ timeout: 8000 });
+  const sheetCook = (
+    await mealSheet().getByTestId('cook-count-pill').locator('[aria-hidden="true"]').textContent()
+  )?.trim();
+  console.log('[3] sheet cook:', sheetCook, '| lines:', JSON.stringify(await sheetValues()));
+  expect(sheetCook).toBe(fill('mealPlanner.shopping.cook.times', { n: '2' }));
+  expect(await sheetValues()).toEqual([
     '500 g ground beef (×2)',
     '8 taco shells (×2)',
     '1/2 cup sour cream (×2)',
@@ -979,44 +1007,39 @@ test('meal shopping list walk', async ({ page }) => {
     'Salt, to taste (×2)',
     '2 tomatoes (×2)',
   ]);
-  // Tuesday has a stored subset (3 of 5): the toggle offers Everyone.
-  expect((await allToggle().textContent())?.trim()).toBe(ui('common.everyone'));
-  const destSummary = await panel().getByTestId('meal-ingredients-dest-toggle').textContent();
-  console.log('[3] default destination:', destSummary?.trim());
-  await panel().scrollIntoViewIfNeeded();
-  await shotMatrix(page, '03a-meal-panel-x2', () => panel());
-  const shells3 = await lineByValue(panel(), '8 taco shells (×2)');
-  await shells3.getByTestId('ingredient-text').fill('16 corn tortillas');
-  // Remove one member (Leo) from who's eating: 2 members + 2 guests = 4 -> Cook Once.
+  await shotMatrix(page, '03b-meal-sheet-x2');
+  await page.keyboard.press('Escape');
+  await expect(mealSheet()).toHaveCount(0, { timeout: 5000 });
+  await expect(mealDrawer()).toHaveCount(1);
+  // Remove one member (Leo): 2 members + 2 guests = 4 -> the pill reads Cook Once, live.
   const leoChip = mealDrawer().getByRole('button', { name: 'Leo' });
   await leoChip.last().click();
   await expect.poll(cookText, { timeout: 4000 }).toBe(ui('mealPlanner.shopping.cook.once'));
-  const vals3 = await valuesIn(panel());
-  console.log(
-    '[3] after eater change:',
-    JSON.stringify(vals3),
-    '| why:',
-    (await panel().textContent())?.match(/For \d+, serves \d+/)?.[0]
-  );
+  // Reopen: the sheet is built at the NEW count (no suffix). Edit a line, name a New List, create.
+  await openShopping().click();
+  await mealSheet().waitFor({ timeout: 8000 });
+  const vals3 = await sheetValues();
+  console.log('[3] after eater change:', JSON.stringify(vals3));
   expect(vals3).toContain('500 g ground beef');
-  expect(vals3).toContain('16 corn tortillas');
-  await shotMatrix(page, '03b-meal-panel-once-edited', () => panel());
-  // Destination: New List named, then Add.
-  await panel().getByTestId('meal-ingredients-dest-toggle').click();
-  await panel().getByTestId('destination-new').click();
-  await panel()
+  expect(vals3).not.toContain('500 g ground beef (×2)');
+  const shells3 = await lineByValue(mealSheet(), '8 taco shells');
+  await shells3.getByTestId('ingredient-text').fill('16 corn tortillas');
+  await mealSheet().getByTestId('destination-new').click();
+  await mealSheet()
     .getByTestId('destination-name')
     .locator('input')
-    .or(panel().getByTestId('destination-name'))
+    .or(mealSheet().getByTestId('destination-name'))
     .first()
     .fill('Tuesday Tacos');
-  const add3 = panel().getByTestId('meal-ingredients-add');
-  console.log('[3] add label:', await add3.textContent());
+  await shotMatrix(page, '03c-meal-sheet-once-edited');
+  const create3 = mealSheet().getByRole('button', {
+    name: ui('lists.destination.createList'),
+    exact: true,
+  });
   const c3 = (await lists(db)).length;
-  await add3.click();
+  await create3.click();
   await expect.poll(async () => (await lists(db)).length, { timeout: 8000 }).toBe(c3 + 1);
-  await expect(add3).toHaveText(ui('lists.destination.added'));
-  await expect(add3).toBeDisabled();
+  await expect(mealSheet()).toHaveCount(0, { timeout: 5000 });
   const tl = (await lists(db)).find((l) => l.title === 'Tuesday Tacos')!;
   console.log(
     '[3] meal list:',
@@ -1024,9 +1047,15 @@ test('meal shopping list walk', async ({ page }) => {
   );
   expect(tl.linkedRecipeId).toBe(R_TACOS);
   expect(tl.items.map((i) => i.title)).toContain('16 corn tortillas');
-  await add3.click({ force: true }).catch(() => {});
-  await page.waitForTimeout(800);
-  expect((await lists(db)).length, 'a second tap makes no second list').toBe(c3 + 1);
+  // Reopen: review mode shows the list just made, so a second tap makes no second list.
+  await openShopping().click();
+  await mealSheet().waitFor({ timeout: 8000 });
+  await expect(mealSheet().getByTestId('recipe-list-start-another')).toBeVisible();
+  await expect(mealSheet().getByText('Tuesday Tacos')).toBeVisible();
+  await shotMatrix(page, '03d-meal-sheet-review');
+  await page.keyboard.press('Escape');
+  await expect(mealSheet()).toHaveCount(0, { timeout: 5000 });
+  expect((await lists(db)).length, 'review mode made no second list').toBe(c3 + 1);
   // Cancel the meal edit: list stays, meal eaters unchanged.
   await page.keyboard.press('Escape');
   await page.waitForTimeout(600);

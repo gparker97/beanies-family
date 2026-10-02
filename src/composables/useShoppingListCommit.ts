@@ -1,7 +1,7 @@
 /**
  * Write a reviewed ingredient checklist to a family list (#116): the ONE save path behind
- * every shopping-list surface (the recipe page's sheet, the edit-meal drawer's ingredients
- * panel and the meal planner's week list).
+ * every shopping-list surface (the recipe sheet, which the edit-meal drawer also opens for
+ * one meal, and the meal planner's week list).
  *
  * It owns the guards, the write, the toasts and the telemetry; callers own only their own
  * default destination and title. `kind` is telemetry-only, so a new entry point never
@@ -85,9 +85,9 @@ function sectionsBucket(n: number): 'one' | 'two' | 'three' | 'many' {
 }
 
 /**
- * A shopping-list surface opened on purpose (the recipe sheet, the week drawer; the
- * edit-meal drawer's passive panel does not log this). `sections` = recipe sections shown
- * (1 for the recipe page), `lines` = ingredient lines offered, `exactMerges` = identical
+ * A shopping-list surface opened on purpose (the recipe sheet, including when the
+ * edit-meal drawer opens it with kind 'meal', and the week drawer). `sections` = recipe
+ * sections shown (1 for the recipe page), `lines` = ingredient lines offered, `exactMerges` = identical
  * lines merged at open into "In More Than One Meal" (always 0 for the recipe page), so how
  * often a week's recipes share a line is measurable.
  */
