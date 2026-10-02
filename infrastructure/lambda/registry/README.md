@@ -52,6 +52,13 @@ The table schema is implicit — the Lambda writes whatever fields are in the PU
   ownerEmail: string | null,
   subscribeNewsletter: boolean | null,
   createdAt: ISO timestamp,   // write-once on first PUT
+  attribution: {             // campaign tag (#118); map, nullable. Write-once: stamped only on
+    utm_source?, utm_medium?, //   the signup write (isSignupEvent), never moved by a later PUT,
+    utm_campaign?, utm_content?, // kept on the DELETE tombstone. Allowlisted keys only; each
+    utm_term?, campaign_id?,  //   value trimmed, 1-100 chars of [A-Za-z0-9._~:-], else that field
+    ad_group_id?, ad_id?,     //   is dropped. Twin of packages/brand/attribution.ts.
+    oppref?: string
+  } | null,
   updatedAt: ISO timestamp,   // updated on every PUT
 }
 ```
@@ -140,5 +147,5 @@ The Drive sign-in flow is unaffected — `VITE_OAUTH_PROXY_URL` (or `VITE_REGIST
 ## Security notes
 
 - The API key in `REGISTRY_API_KEY` is the only thing protecting the registry from arbitrary writes. Treat it like a credential — don't commit it, rotate if exposed.
-- DynamoDB rows are not encrypted at rest beyond the AWS-managed default. The data stored is: family ID, file location, family name, owner email, newsletter opt-in. No financial data, no member list, no transactions — none of which the registry sees.
+- DynamoDB rows are not encrypted at rest beyond the AWS-managed default. The data stored is: family ID, file location, family name, owner email, newsletter opt-in, and the campaign tag from the link that first brought the family to beanies.family (`attribution`, if there was one; it identifies the ad, not the person). No financial data, no member list, no transactions — none of which the registry sees.
 - CORS allowlisting + API-key gating means an attacker who finds the URL still needs the key. An attacker who finds both can DoS your registry but cannot read other users' families (different family IDs).

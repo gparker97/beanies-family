@@ -4403,6 +4403,7 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'createSurvey.optSubstack': 'Substack / 博客',
   'createSurvey.optGoogle': 'Google 搜索',
   'createSurvey.optAppStore': '应用商店',
+  'createSurvey.optChatgptAd': 'ChatGPT 广告',
   'createSurvey.optAi': 'ChatGPT / AI 搜索',
   'createSurvey.optFriend': '朋友推荐',
   'createSurvey.optOther': '其他渠道',

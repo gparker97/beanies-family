@@ -496,19 +496,19 @@ if(D.paid&&D.paid.campaigns.length){
   const money=(v,cur)=>v==null?'—':(cur==='USD'?'$':cur+' ')+Number(v).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
   const pc=v=>v==null?'—':v+'%';
   const cur=P.campaigns[0].currency||'USD';
-  const attrLabel={'plausible-app-utm':['live','<b>plausible app utm</b> — signups carry the ad\'s utm_content through to the app'],
+  const attrLabel={'registry-utm':['live','<b>registry (first-party)</b> — pods counted from the signup registry, tagged by utm_content'],'plausible-app-utm':['live','<b>plausible app utm</b> — signups carry the ad\'s utm_content through to the app'],
     'manual':['manual','<b>manual</b> — pods recorded by hand from the create-pod slack message; app-side utm attribution is empty until the carry-through ships'],
     'none':['','<b>none</b> — no signups carry a utm yet and nothing has been recorded by hand']}[P.attribution];
   $('paidPanel').style.display='';
   const spendSrcText={'openai-ads-api':`spend, impressions and clicks <b>live from the openai ads api</b>${P.apiAccount?` (${esc(P.apiAccount.currency||'')}, ${esc(P.apiAccount.timezone||'')})`:''}`,
     'ledger':`spend, impressions and clicks <b>typed in from ads manager</b> (<code>${esc(P.ledgerPath)}</code>)`,
     'none':'no spend source yet — neither the ads api nor the ledger has rows'}[P.spendSource];
-  $('paidcap').innerHTML=`${P.campaigns.length===1?`<b>${esc(P.campaigns[0].platform)}</b> · <code>${esc(P.campaigns[0].utmCampaign)}</code>`:`<b>${P.campaigns.length}</b> campaigns`} · ${spendSrcText}; visitors and cta clicks from plausible by <code>utm_content</code>; pods from the ledger's <code>pods_manual</code> until utms reach the app; window = past ${rng.days} days. <b>cpa = spend per new family</b>, not revenue.`;
+  $('paidcap').innerHTML=`${P.campaigns.length===1?`<b>${esc(P.campaigns[0].platform)}</b> · <code>${esc(P.campaigns[0].utmCampaign)}</code>`:`<b>${P.campaigns.length}</b> campaigns`} · ${spendSrcText}; visitors and cta clicks from plausible by <code>utm_content</code>; pods from the signup registry's first-party tag (fallback: plausible app utm, then the ledger's <code>pods_manual</code>); window = past ${rng.days} days. <b>cpa = spend per new family</b>, not revenue.`;
   $('paidKpis').innerHTML=[
     {n:money(P.totals.spend,cur),l:'spend',s:(P.spendSource==='openai-ads-api'?'ads api':'ledger')+' · this window',c:'flat'},
     {n:num(P.totals.clicks),l:'ad clicks',s:P.spendSource==='openai-ads-api'?'ads api':'ledger',c:'flat'},
     {n:num(P.totals.visitors),l:'site visitors',s:!P.plausibleAvailable?'no plausible token':P.totals.visitors==null?'no tagged visits yet':'plausible · tagged',c:'flat'},
-    {n:num(P.totals.pods),l:'pods created',s:P.attribution==='plausible-app-utm'?'plausible app utm':P.attribution==='manual'?'manual · from slack':'none attributed',c:'flat'},
+    {n:num(P.totals.pods),l:'pods created',s:P.attribution==='registry-utm'?'registry (first-party)':P.attribution==='plausible-app-utm'?'plausible app utm':P.attribution==='manual'?'manual · from slack':'none attributed',c:'flat'},
     {n:money(P.totals.cpa,cur),l:'cpa',s:P.totals.cpa==null?'no pods yet':'spend ÷ pods',c:'flat',accent:true},
   ].map(k=>`<div class="kpi ${k.accent?'accent':''}"><div class="n">${k.n}</div><div class="l">${k.l}</div><div class="s ${k.c}">${k.s}</div></div>`).join('');
   $('paidCampaigns').innerHTML=P.campaigns.map(c=>{
@@ -522,7 +522,7 @@ if(D.paid&&D.paid.campaigns.length){
       <td class="num">${num(a.visitors)}</td><td class="num">${a.ctaClicks==null?'—':num(a.ctaClicks)+(a.ctaRate!=null?` <span style="color:var(--ink-faint);font-weight:500">(${a.ctaRate}%)</span>`:'')}</td>
       <td class="num">${num(a.pods)}</td><td class="num">${money(a.cpa,c.currency)}</td></tr>`).join('');
     const extras=[];
-    if(t.untaggedPods)extras.push(`<b>${t.untaggedPods}</b> manual pod${t.untaggedPods===1?'':'s'} heard-via ${esc(c.platform)} but untagged — in the campaign total, not any row`);
+    if(t.untaggedPods)extras.push(P.attribution==='registry-utm'?`<b>${t.untaggedPods}</b> registry pod${t.untaggedPods===1?'':'s'} tagged with the campaign but no utm_content — in the campaign total, not any row`:`<b>${t.untaggedPods}</b> manual pod${t.untaggedPods===1?'':'s'} heard-via ${esc(c.platform)} but untagged — in the campaign total, not any row`);
     if(c.undeclaredLedger.length)extras.push(`ledger spend on undeclared ads: ${c.undeclaredLedger.map(esc).join(', ')}`);
     if(c.undeclaredPlausible.length)extras.push(`plausible saw tagged content not in the ledger: ${c.undeclaredPlausible.map(esc).join(', ')}`);
     if(P.ctaFilteredByUtmSource===false)extras.push('plausible refused the utm_source filter on cta queries — untagged rows were dropped in the build step');

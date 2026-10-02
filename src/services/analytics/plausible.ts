@@ -14,6 +14,7 @@ import { features } from '@/config/features';
 import { getPlatform } from '@/services/sync/capabilities';
 import { isDemoSession } from '@/utils/reviewDemo';
 import { logEvent } from '@/services/telemetry/logEvent';
+import { NON_UTM_ATTRIBUTION_KEYS, PLAUSIBLE_ATTRIBUTION_KEYS } from '@beanies/brand/attribution';
 
 /**
  * ── The event registry (#71) ────────────────────────────────────────────────
@@ -83,7 +84,13 @@ export type FeatureName =
  * cannot sprawl. `platform` is deliberately absent from the PUBLIC signature —
  * the seam adds it, and no call site may pass it by hand.
  */
-type PublicPropKey = 'feature' | 'method' | 'action' | 'surface';
+type PublicPropKey =
+  | 'feature'
+  | 'method'
+  | 'action'
+  | 'surface'
+  // The campaign tag on `signup` (#118), derived from the shared list so the two cannot drift.
+  | (typeof PLAUSIBLE_ATTRIBUTION_KEYS)[number];
 
 /**
  * The ONE way the app reports an analytics event.
@@ -189,6 +196,22 @@ export async function withAppInitiatedWrites<T>(fn: () => Promise<T>): Promise<T
   }
 }
 
+/**
+ * Query keys `initAnalytics`'s `transformRequest` strips from the reported pageview URL (the
+ * reasoning is at that call). The credential-bearing link keys, plus the non-UTM ad identifiers
+ * (#118: `oppref`, `campaign_id`, `ad_group_id`, `ad_id`). `utm_*` stays: Plausible consumes it
+ * natively for its UTM breakdowns.
+ */
+const SCRUBBED_URL_KEYS: readonly string[] = [
+  't',
+  'm',
+  'fam',
+  'hint',
+  'fileId',
+  'ref',
+  ...NON_UTM_ATTRIBUTION_KEYS,
+];
+
 export function initAnalytics(): void {
   if (!features.analytics) {
     // Report ONLY the anomalous branch. Logging the healthy case would fire on
@@ -243,7 +266,7 @@ export function initAnalytics(): void {
         try {
           const url = new URL(raw);
           let touched = false;
-          for (const key of ['t', 'm', 'fam', 'hint', 'fileId', 'ref']) {
+          for (const key of SCRUBBED_URL_KEYS) {
             if (url.searchParams.has(key)) {
               url.searchParams.delete(key);
               touched = true;

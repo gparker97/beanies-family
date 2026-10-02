@@ -658,17 +658,51 @@ let paidLedgerError = null;
       const ctaCampaign = (mktPaid?.ctaByCampaign || [])
         .filter((r) => r['visit:utm_campaign'] === c.utm_campaign)
         .reduce((n, r) => n + (r.visitors || 0), 0);
-      const signupsByContent = new Map();
+      // Registry (first-party) first: rows whose write-once `attribution` names
+      // this campaign, created in the window, not tombstoned, keyed on
+      // utm_content. Filtering on utm_campaign matters: a utm_content slug
+      // reused by another campaign must not leak in.
+      // A row tagged with the campaign but no utm_content is a real pod that no per-ad
+      // row can show: it goes to `untaggedPods` (the manual source's rule), never under
+      // a Map key of `undefined`. Tombstoned families never reach `fams` at all
+      // (`pull_registry.mjs` drops `deletedAt` rows feed-wide), so a self-deleted pod is
+      // absent here while Slack and Plausible still counted the conversion.
+      const registrySignups = new Map();
+      let registryUntagged = 0;
+      for (const f of fams) {
+        const a = f.attribution;
+        if (!a || a.utm_campaign !== c.utm_campaign || !f.createdAt) continue;
+        const t = Date.parse(f.createdAt) / 1000;
+        if (!(t >= NOW - WINDOW_DAYS * DAY && t <= NOW)) continue;
+        const k = a.utm_content;
+        if (notSet(k)) {
+          registryUntagged += 1;
+          continue;
+        }
+        registrySignups.set(k, (registrySignups.get(k) || 0) + 1);
+      }
+      const hasRegistry = registrySignups.size > 0 || registryUntagged > 0;
+      const plausibleSignups = new Map();
       for (const r of (appPaid?.signupsByContent || []).filter((r) => r['visit:utm_campaign'] === c.utm_campaign)) {
         const k = r['visit:utm_content'];
-        signupsByContent.set(k, (signupsByContent.get(k) || 0) + (r.visitors || 0));
+        plausibleSignups.set(k, (plausibleSignups.get(k) || 0) + (r.visitors || 0));
       }
+      const signupsByContent = hasRegistry ? registrySignups : plausibleSignups;
       const appVisitorsCampaign = (appPaid?.byCampaign || []).find((r) => r['visit:utm_campaign'] === c.utm_campaign)?.visitors ?? null;
       const campaignSignups = [...signupsByContent.values()].reduce((a, b) => a + b, 0);
       // One rule for the whole campaign, so per-ad pods and the campaign total
-      // never mix sources: Plausible app-UTM signups when ANY exist, else the
-      // hand-recorded pods, else nothing.
-      const podsSource = campaignSignups > 0 ? 'plausible-app-utm' : podsManual.length ? 'manual' : 'none';
+      // never mix sources. Precedence: registry rows (ground truth) -> Plausible
+      // app-UTM signups -> hand-recorded pods -> nothing.
+      const podsSource = hasRegistry
+        ? 'registry-utm'
+        : campaignSignups > 0
+          ? 'plausible-app-utm'
+          : podsManual.length
+            ? 'manual'
+            : 'none';
+      // Both automatic sources are per-ad signup counts keyed on utm_content;
+      // every downstream site tests this one flag, not the source names.
+      const fromSignups = podsSource === 'registry-utm' || podsSource === 'plausible-app-utm';
 
       // The ad roster: platform ads first (API fields), then ledger-only ads.
       // The ledger `ads` entry is an optional overlay — its `angle` (the API has
@@ -713,7 +747,7 @@ let paidLedgerError = null;
         const ctaClicks = ctaByContent.has(ad.utm_content) ? ctaByContent.get(ad.utm_content) : (t ? 0 : null);
         const signups = signupsByContent.get(ad.utm_content) || 0;
         const pods =
-          podsSource === 'plausible-app-utm'
+          fromSignups
             ? signups
             : podsSource === 'manual'
               ? podsManual.filter((p) => p.utm_content === ad.utm_content).length
@@ -751,7 +785,7 @@ let paidLedgerError = null;
           duration: t?.visit_duration ?? null,
           ctaClicks,
           ctaRate: r1(ctaClicks != null && visitors ? (ctaClicks / visitors) * 100 : null),
-          signups: podsSource === 'plausible-app-utm' ? signups : null,
+          signups: fromSignups ? signups : null,
           pods,
           podsSource,
           cpa: pods > 0 && spend > 0 ? r2(spend / pods) : null,
@@ -767,9 +801,20 @@ let paidLedgerError = null;
       // ad still counts toward the campaign.
       const visitorsAll = [...trafficByContent.values()].reduce((n, r) => n + (r.visitors || 0), 0);
       const hasTraffic = trafficByContent.size > 0;
-      const untaggedPods = podsSource === 'manual' ? podsManual.filter((p) => notSet(p.utm_content)).length : 0;
+      const untaggedPods =
+        podsSource === 'manual'
+          ? podsManual.filter((p) => notSet(p.utm_content)).length
+          : podsSource === 'registry-utm'
+            ? registryUntagged
+            : 0;
       const pods =
-        podsSource === 'plausible-app-utm' ? campaignSignups : podsSource === 'manual' ? podsManual.length : 0;
+        podsSource === 'registry-utm'
+          ? campaignSignups + registryUntagged
+          : fromSignups
+            ? campaignSignups
+            : podsSource === 'manual'
+              ? podsManual.length
+              : 0;
       const ctaClicks = hasTraffic ? ctaCampaign : null;
 
       // Spend on a slug no roster entry declares (ledger fallback rows only —
@@ -900,7 +945,7 @@ let paidLedgerError = null;
           appVisitors: appVisitorsCampaign,
           ctaClicks,
           ctaRate: r1(ctaClicks != null && visitorsAll ? (ctaClicks / visitorsAll) * 100 : null),
-          signups: podsSource === 'plausible-app-utm' ? campaignSignups : null,
+          signups: fromSignups ? campaignSignups : null,
           pods,
           untaggedPods,
           podsSource,
@@ -936,7 +981,9 @@ let paidLedgerError = null;
         : campaigns.some((c) => c.spendSource === 'ledger')
           ? 'ledger'
           : 'none',
-      attribution: campaigns.some((c) => c.totals.podsSource === 'plausible-app-utm')
+      attribution: campaigns.some((c) => c.totals.podsSource === 'registry-utm')
+        ? 'registry-utm'
+        : campaigns.some((c) => c.totals.podsSource === 'plausible-app-utm')
         ? 'plausible-app-utm'
         : campaigns.some((c) => c.totals.podsSource === 'manual')
           ? 'manual'

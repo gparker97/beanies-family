@@ -122,6 +122,12 @@ describe('redirectState codec', () => {
     const ok = encodeRedirectState({ returnPath: '/welcome?resume=setup', mode: 'create' });
     expect(decodeRedirectState(ok)?.returnPath).toBe('/welcome?resume=setup');
   });
+
+  it('round-trips a resume path carrying a campaign tag (#118)', () => {
+    const returnPath = '/welcome?resume=setup&utm_source=x&oppref=y';
+    const ok = encodeRedirectState({ returnPath, mode: 'create' });
+    expect(decodeRedirectState(ok)?.returnPath).toBe(returnPath);
+  });
 });
 
 describe('redirectState grant (P2)', () => {

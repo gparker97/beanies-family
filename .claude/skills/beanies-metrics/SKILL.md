@@ -66,8 +66,9 @@ schemas, identifiers, and caveats before interpreting anything.
      commit the key.** Spend is in whole units of the **account currency (SGD)**, not
      micros — see `references/data-sources.md` §5.
    - **Manual ledger** `~/.config/beanies/ad-spend.json` — now only needs
-     `pods_manual` (the create-pod Slack attributions the platform cannot know) plus
-     the campaign's `credit_usd` / `credit_deadline`. Its `ads` and `daily` are
+     `credit_usd` / `credit_deadline`, plus `pods_manual` (the create-pod Slack
+     attributions) as a fallback only: registry `attribution` rows, then Plausible app
+     UTMs, take precedence once they have data for the campaign. Its `ads` and `daily` are
      optional overrides / fallback: a slug the API knows is API-only (ledger rows for
      it are ignored and counted as superseded); a ledger-only slug keeps its rows.
    - Plausible adds visitors + CTA clicks per ad via `utm_content`. First campaign:
@@ -239,10 +240,13 @@ signal, not every field.
       spend > 0) → *under-pacing, raise daily budget to X* with X = remaining ÷ days
       left; (e) status active but review not approved → *blocked in review*. Relay them
       verbatim in the terminal report — they are the actions.
-    - **Always name the attribution source** (`totals.podsSource`): `manual` means pods
-      were recorded by greg from the create-pod Slack message (`pods_manual`), because
-      nothing carries UTMs into the app yet; `plausible-app-utm` means the app-side
-      `signup` event carried the ad's UTMs (only after the carry-through ships). Mention
+    - **Always name the attribution source** (`totals.podsSource`), precedence
+      `registry-utm` > `plausible-app-utm` > `manual` > `none`: `registry-utm` means pods
+      were counted first-party from the registry rows' write-once `attribution` map
+      (ground truth, per `utm_content`); `plausible-app-utm` means the app-side `signup`
+      event carried the ad's UTMs; `manual` means pods were recorded by greg from the
+      create-pod Slack message (`pods_manual`), used only when neither of the others has
+      data for the campaign. Mention
       `untaggedPods` — pods heard-via the platform but not tied to an ad.
     - **CPA = spend per new family (pod), not a revenue ROI.** There is no paid plan, so
       there is no revenue to divide by; say so if the word "ROI" comes up. `cpa` is
@@ -256,8 +260,8 @@ signal, not every field.
     - Call out `undeclaredLedger` / `undeclaredPlausible` / `untaggedApiAds` (ad slugs in
       one source but not the roster, or platform ads with no UTM at all) as tagging
       mistakes to fix today.
-    - **greg's daily job is now just the pods**: a `pods_manual` row per attributed
-      Slack create-pod message. Spend comes from the API; `daily` rows are only needed
+    - **greg's daily job** (only while neither registry nor Plausible attribution has
+      data for the campaign): a `pods_manual` row per attributed Slack create-pod message. Spend comes from the API; `daily` rows are only needed
       for a platform without an API (or to patch a slug the API lacks).
 10. **App usage (Plausible app)** — goals/conversions (signups, logins,
     member_joined, discord clicks…), feature_used breakdown, login-method mix.

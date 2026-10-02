@@ -182,6 +182,13 @@ function enrich(row) {
     // #71. `|| null` NOT `?? null`: an empty string is not a platform either.
     // Absent means UNKNOWN and is EXCLUDED from platform maths, never web.
     signupPlatform: row.signupPlatform || null,
+    // Write-once first-touch UTM map stamped at signup (utm_source/medium/
+    // campaign/content/term, campaign_id, ad_group_id, ad_id, oppref). Absent
+    // means UNKNOWN (pre-carry-through or untagged), never an empty map.
+    attribution:
+      row.attribution && typeof row.attribution === 'object' && !Array.isArray(row.attribution)
+        ? row.attribution
+        : null,
     beanpodSizeKb: sizeKb,
     // Roster size (2026-08-29). null = family hasn't written the registry since
     // the field shipped — report COVERAGE alongside any total, never assume 1.
@@ -331,6 +338,10 @@ async function main() {
       // here silently pins platform coverage at 0 forever — the gap check then
       // reads as "not yet possible" on every run rather than as broken.
       signupPlatform: f.signupPlatform,
+      // Consumed by build_dashboard's `registry-utm` pods source. Omitting it
+      // here silently pins registry attribution at 0 and the dashboard falls
+      // back to Plausible/manual without saying why.
+      attribution: f.attribution,
       daysSinceLogin: f.daysSinceLogin,
       lifespanDays: f.lifespanDays,
       bucket: f.bucket,

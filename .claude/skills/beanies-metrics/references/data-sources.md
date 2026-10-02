@@ -43,7 +43,10 @@ without the masking rules below.
 | `lastLoginAt` | **date-only `YYYY-MM-DD`**, stamped only on explicit `isLoginEvent` | recency / engaged buckets |
 | `beanpodSizeKb` | client-rounded pod size (KB) | data-volume proxy |
 | `signupPlatform` | `web` \| `ios` \| `android`, **write-once at row creation**; absent on rows created before 2026-08-24 | web-only conversion maths — absent means UNKNOWN and is EXCLUDED, never assumed web |
+| `attribution` | map `{utm_source?, utm_medium?, utm_campaign?, utm_content?, utm_term?, campaign_id?, ad_group_id?, ad_id?, oppref?}`, **write-once at signup**; absent/null on earlier or untagged rows | first-party pods source (`registry-utm`), see §5b |
 | `updatedAt` | ISO ts, every PUT | — |
+
+  Note (#118 review): tombstoned families are dropped from the registry feed by `pull_registry.mjs`, so a pod whose family later deleted itself is absent from `registry-utm` while the Slack message and the Plausible signup still counted the conversion. A small, known under-count; not corrected, because the feed-wide exclusion is deliberate. Also known: the source is chosen per campaign by data presence, so in the 30 days after #118 shipped (2026-10-02) a campaign with hand-recorded `pods_manual` rows from before the rollout flips to `registry-utm` on its first attributed row and the dashboard no longer adds the manual rows; read both by hand for that one window rather than carrying merge logic that is dead after it.
 
 **Caveats:**
 - `lastLoginAt` is **date-only** and only written when the client flags a real login
@@ -408,14 +411,25 @@ Plausible supplies visitors + CTA clicks per slug, the platform supplies spend.
   'insights-lifetime'`), else the sum of every row held (`'row-sum'`, only right while
   the window covers the campaign). `credit.daysElapsed` counts from the API campaign
   `startDate` (else the ledger `started`, else the first served day).
-- **`pods_manual` is the interim attribution.** Until the UTM carry-through ships, a pod
-  created by someone who came via an ad can only be attributed by greg reading the
-  create-pod Slack message (and, ideally, asking). Record it here with the ad's
-  `utm_content` when known, or `null` when only "heard via chatgpt" is known — untagged
-  rows count toward the campaign total but no ad row. The dashboard labels the source
-  (`podsSource: 'plausible-app-utm' | 'manual' | 'none'`) on every figure. The rule is
-  per campaign: once ANY app-side `signup` carries that campaign's UTMs, Plausible wins
-  for the whole campaign and `pods_manual` is ignored, so the two sources never mix.
+- **Pods source precedence** (`podsSource: 'registry-utm' | 'plausible-app-utm' | 'manual' | 'none'`,
+  labelled on every figure). The rule is per campaign, so per-ad pods and the campaign
+  total never mix sources:
+  1. `registry-utm` (first-party, ground truth): `pull_registry.mjs --raw` carries each
+     family's write-once `attribution` map (`utm_source/medium/campaign/content/term`,
+     `campaign_id`, `ad_group_id`, `ad_id`, `oppref`; null when absent) in `familiesFull`.
+     Rows with `attribution.utm_campaign === <campaign>`, `createdAt` inside the window
+     and no `deletedAt` are counted per `attribution.utm_content`. Used when ANY such row
+     exists. The campaign filter is required: a `utm_content` slug reused by another
+     campaign must not leak in.
+  2. `plausible-app-utm`: the app-side `signup` event carried the campaign's UTMs.
+  3. `manual`: `pods_manual`, the interim hand attribution from the create-pod Slack
+     message (record the ad's `utm_content` when known, or `null` when only "heard via
+     chatgpt" is known; untagged rows count toward the campaign total but no ad row).
+     **Now the fallback only**: used when neither the registry nor Plausible has data
+     for the campaign, and ignored as soon as either does.
+  4. `none`.
+  Registry rows exist only for families created after the carry-through shipped, and
+  store installs cannot carry a tag (expected unattributed).
 - **Derived columns** (`build_dashboard.mjs` → `dashboard_data.json.paid`): per campaign
   and per ad — spend, impressions, clicks, **CTR** (clicks ÷ impressions), **CPC**
   (spend ÷ clicks), visitors + bounce + duration (Plausible), **CTA clicks** and

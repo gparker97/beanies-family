@@ -547,7 +547,7 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'To find and fix bugs, beanies.family collects <strong>anonymous diagnostic logs</strong> on our own servers. These contain <strong>no</strong> names, balances, transactions, photos, or anything you type \u2014 only a random family identifier, which screen you were on, your browser and version, and technical error details. They are kept for 90 days and then deleted automatically.',
+          'To find and fix bugs, beanies.family collects <strong>anonymous diagnostic logs</strong> on our own servers. These contain <strong>no</strong> names, balances, transactions, photos, or anything you type \u2014 only a random family identifier, which screen you were on, your browser and version, and technical error details. They are kept for 90 days and then deleted automatically. If you arrived from a link carrying a campaign tag (which of our own ads or posts it was), that tag is kept on your device for up to 30 days and recorded with your family\u2019s registry entry when you create a pod. It identifies the ad, not you, and is never shared with the ad platform.',
       },
       {
         type: 'callout',

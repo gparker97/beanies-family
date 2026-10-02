@@ -33,6 +33,12 @@ vi.mock('@/services/sync/providers/googleDriveProvider', () => ({
     fromExisting: (...args: unknown[]) => mockFromExisting(...(args as [])),
   },
 }));
+// The campaign-tag stash (#118) is a deterministic "no tag" unless a test sets one; its own
+// suite covers storage. `createReturnPath` reads it on web only.
+const mockPeekAttribution = vi.fn((): Record<string, string> | null => null);
+vi.mock('@/utils/attributionStash', () => ({
+  peekAttribution: () => mockPeekAttribution(),
+}));
 vi.mock('@/services/sync/fileSync', async (importOriginal) => ({
   // The version DERIVATION is real even where the writers are mocked: a
   // test-local `'4.0'` here would hide the one regression the derivation
@@ -317,6 +323,21 @@ describe('gateCreateDriveAuth — one gate, two transports', () => {
     await expect(gateCreateDriveAuth('a@b.com')).resolves.toEqual({ kind: 'redirecting' });
     expect(mockStartRedirect).toHaveBeenCalledWith('/welcome?resume=setup', 'a@b.com', 'create');
     expect(awaitNativeOAuthReturn).not.toHaveBeenCalled();
+  });
+
+  it('WEB: the return path carries a stored campaign tag through the OAuth hop (#118)', async () => {
+    // WebKit clears script-writable storage across the cross-site hop; main.ts re-captures the
+    // tag from this query on the post-redirect boot.
+    mockShouldRedirect.mockReturnValue(true);
+    mockIsTokenValid.mockReturnValue(false);
+    mockIsNative.mockReturnValue(false);
+    mockPeekAttribution.mockReturnValue({ utm_source: 'chatgpt', oppref: 'opp.1' });
+    await expect(gateCreateDriveAuth(undefined)).resolves.toEqual({ kind: 'redirecting' });
+    expect(mockStartRedirect).toHaveBeenCalledWith(
+      '/welcome?resume=setup&utm_source=chatgpt&oppref=opp.1',
+      undefined,
+      'create'
+    );
   });
 
   it('NATIVE: awaits the round trip and proceeds in place — nothing unloaded', async () => {

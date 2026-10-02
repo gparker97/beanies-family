@@ -59,6 +59,84 @@ const SIGNUP_PLATFORMS = new Set(['web', 'ios', 'android']);
 const validPlatform = (v) => (SIGNUP_PLATFORMS.has(v) ? v : null);
 
 /**
+ * Campaign attribution (#118): the tag from the link that first brought the family to
+ * beanies.family. Client-supplied AND write-once (stamped on the signup write, then preserved
+ * forever by the merge below), so it is validated here, field by field.
+ *
+ * ⚠️ TWIN of `packages/brand/attribution.ts` (`ATTRIBUTION_KEYS`, `ATTRIBUTION_VALUE_RE`,
+ * `sanitiseAttribution`). It cannot be imported: every Lambda here is its own zip. Change the key
+ * list or the value rule there AND here; `src/utils/__tests__/attribution.test.ts` and
+ * `index.test.mjs` share the fixture strings so a rule change on one side fails the other.
+ */
+export const ATTRIBUTION_KEYS = [
+  'utm_source',
+  'utm_medium',
+  'utm_campaign',
+  'utm_content',
+  'utm_term',
+  'campaign_id',
+  'ad_group_id',
+  'ad_id',
+  'oppref',
+];
+/** After `trim()`, 1-100 chars from this set; anything else drops THAT FIELD. */
+export const ATTRIBUTION_VALUE_RE = /^[A-Za-z0-9._~:-]{1,100}$/;
+// Derived from the rule, so the drop reason cannot drift from the bound the twin test pins.
+const ATTRIBUTION_MAX_LEN = Number(/\{1,(\d+)\}/.exec(ATTRIBUTION_VALUE_RE.source)[1]);
+
+function logAttributionDropped(familyId, fields) {
+  // Drop branches only: a healthy stamp is visible in the row itself. Hash only, and never
+  // the rejected value (it is arbitrary client input).
+  // eslint-disable-next-line no-console -- structured drop line, read by CloudWatch
+  console.log(
+    JSON.stringify({
+      msg: 'attribution_dropped',
+      family_id_hash: familyIdHash(familyId),
+      ...fields,
+    })
+  );
+}
+
+/**
+ * Keep each allowlisted key whose value passes the rule; returns a fresh plain object, or null
+ * when nothing valid remains. Unknown keys are dropped SILENTLY (a newer client with an added
+ * key must not be nulled, or flood the log, on an older Lambda); an invalid value drops its own
+ * field with one `attribution_dropped` line.
+ *
+ * An omitted or `null` record is the normal case (every legacy client) and stores null with no
+ * log; only a present, non-null, non-object record logs `not-object`.
+ */
+function validAttribution(value, familyId) {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== 'object' || Array.isArray(value)) {
+    logAttributionDropped(familyId, { reason: 'not-object' });
+    return null;
+  }
+  const out = {};
+  /* eslint-disable security/detect-object-injection -- `key` comes from the constant allowlist */
+  for (const key of ATTRIBUTION_KEYS) {
+    if (!Object.hasOwn(value, key)) continue;
+    const raw = value[key];
+    if (typeof raw !== 'string') {
+      logAttributionDropped(familyId, { key, reason: 'not-string' });
+      continue;
+    }
+    const v = raw.trim();
+    if (ATTRIBUTION_VALUE_RE.test(v)) {
+      out[key] = v;
+    } else {
+      // Empty-after-trim lands in `bad-charset`: it fails the same {1,100} set rule.
+      logAttributionDropped(familyId, {
+        key,
+        reason: v.length > ATTRIBUTION_MAX_LEN ? 'too-long' : 'bad-charset',
+      });
+    }
+  }
+  /* eslint-enable security/detect-object-injection */
+  return Object.keys(out).length ? out : null;
+}
+
+/**
  * sha256 hex of a family id, for log lines. Deliberately the SAME function as
  * `ai-extract/ddb.mjs` `hash()`, so an `entitlement_computed` line joins against the usage table
  * and the metrics skill without a second derivation. (It cannot be imported: every Lambda here is
@@ -521,6 +599,15 @@ export async function handler(event) {
         signupPlatform:
           existing.signupPlatform ??
           (body.isSignupEvent === true ? validPlatform(body.signupPlatform) : null),
+        // Campaign attribution (#118): the SAME two conditions as signupPlatform above, for the
+        // same reasons (never move a stamped value; only a genuine signup write may stamp, so a
+        // row that predates this is never stamped retroactively). `existing.attribution ??` is
+        // also what carries it across every later whole-item PutItem. Validated per field by
+        // `validAttribution`, which is only reached on a stampable write, so its drop log never
+        // fires for a login/background PUT.
+        attribution:
+          existing.attribution ??
+          (body.isSignupEvent === true ? validAttribution(body.attribution, familyId) : null),
         // No `deletedAt` here, deliberately: `PutItem` replaces the whole item,
         // so reaching this point at all IS the revival. Only the owner reaches
         // it — every other writer returned above with the family still deleted.
@@ -611,6 +698,9 @@ export async function handler(event) {
               ownerEmail: existing.ownerEmail ?? null,
               country: existing.country ?? null,
               signupPlatform: existing.signupPlatform ?? null,
+              // Campaign provenance (#118): identifies the ad, not the family, and a
+              // restore must not lose which ad created the pod.
+              attribution: existing.attribution ?? null,
               // Everything else is deliberately DROPPED, and the omissions are
               // decisions: the canonical pointer (a stale pointer is worse than
               // none), the activity signals and roster size (they would keep a
