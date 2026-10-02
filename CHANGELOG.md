@@ -12,6 +12,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Added
 
+- Every tracker issue now carries a complexity tier (S/M/L/XL) and an execution model (which model leads, how the work is split, what review and verification it gets), scored on six risk angles at intake; the pre-plan, plan and build skills carry it through so cheaper models do the routine work and the strongest one is reserved for the risky core. The 21 open issues were scored and backfilled.
+
 - Blog: "passwords are so two-thousand and late" is live, with greg's hero illustration and the long-and-short summary.
 - Links from beanies.family into the app now carry the campaign tag they arrived with, and a new family's registry entry, the create-pod Slack message and the signup analytics event record which ad or post brought them. The "how did you hear about us?" step gains a "ChatGPT ad" option. The privacy page describes the tag.
 

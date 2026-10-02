@@ -105,6 +105,11 @@ References:                    <ADRs, docs/plans/*, issues, error reports — or
 Open Qs:                       <decisions to surface / things you're unsure about — or "—">
 Notes:                         <non-default constraints, gotchas — or "—">
 
+# Delivery (control — how the work is staffed, not what it does)
+Complexity:    <S | M | L | XL>  •  lead: <Sonnet | Opus | Fable>  •  <six angle scores, e.g. blast 2 · data 3 · novelty 1 · coord 2 · verify 2 · ambiguity 1 = 11, data-risk override → L>
+Execution model:
+  Lead: <…>  •  Subagents: <packages → model>  •  Review: </code-review level, rounds>  •  Verification: <…>  •  Phases/spike: <… or —>
+
 === END PRE-PLAN ===
 ```
 
@@ -122,7 +127,7 @@ A flat, linear sequence of guarded steps. Each step has one job and one explicit
    - "pre-plan the next issue" / no specific reference but NOTION is wanted → **NOTION mode** with the default filter (step 4).
    - Neither, and no content to work with → emit the blank template (above) and stop. Let the user fill it.
 
-2. **NOTION pre-check (fail loud, then fall back).** Confirm the `mcp__notion__*` tools are available (same availability pattern as `.claude/skills/start-session/SKILL.md` step 5 — if the tool isn't present, the MCP isn't connected). If not: tell the user _"Notion issue tracker not connected — run `/mcp` to authenticate, or paste a filled template instead,"_ then emit the blank template. Never run a query that would silently no-op.
+2. **NOTION pre-check (fail loud, then fall back).** Confirm the `mcp__notion-beanies__*` tools are available (same availability pattern as `.claude/skills/start-session/SKILL.md` step 5 — if the tool isn't present, the MCP isn't connected). If not: tell the user _"Notion issue tracker not connected — run `/mcp` to authenticate, or paste a filled template instead,"_ then emit the blank template. Never run a query that would silently no-op.
 
 3. **PASTE — parse.** Read the canonical fields out of the block. If the sentinels are present but the body is unparseable (no `Field:` lines), say so explicitly — _"couldn't parse a pre-plan block between the sentinels — here's a clean blank template"_ — and emit a fresh blank template. Never guess at field contents. Then go to step 5.
 
@@ -154,6 +159,7 @@ A flat, linear sequence of guarded steps. Each step has one job and one explicit
    - Append one directive line derived from the Notion `Feature gated?` select (gating is **by request only** — an empty value is the No-gate default; PASTE mode: omit unless the user stated a preference):
      - `Yes - behind feature gate in settings` → `Feature gate: YES — build the feature behind a dev feature flag registered in src/config/flagRegistry.ts (+ committed prod state in src/config/featureFlags.committed.ts) so it appears and is toggleable in Settings → Feature Flags.`
      - `No feature gate` (or empty) → `Feature gate: NO — ship ungated (the default; never add a gate that wasn't requested).`
+   - **Fill the `# Delivery` block from the row's `Complexity`, `Lead Model` and `Execution Model`** (NOTION) — carried verbatim; `Risk Assessment` supplies the six scores on the `Complexity:` line. **If any of the four is blank** (rows created before 2026-10-02, or PASTE mode), score the issue yourself in step 5 with the six-angle rubric in `.claude/skills/beanies-new-issue/SKILL.md` step 6 — from the research you have already done, citing files — show the scores to the user with the other clarifications, and (NOTION) write all four back as part of the pre-assembly backfill. `beanies-plan` turns this block into its mandatory `## Execution model` section and `beanies-build-auto` staffs the build from it, so the block is never omitted and never `—`.
    - **NOTION write-back (at handoff — the immediate writes, per the binding block):** on the captured row, `API-patch-page` to set **`beanies-plan prompt`** = the assembled block (rich_text) and **`Status`** = the _advance-to_ value (`In Progress`). Handle: **patch failed** → surface the error plus the exact text + target Status so the user can set them manually; **row id lost** → tell the user the prompt wasn't written back and give them the assembled block to paste. Never block the hand-off on the write-back. (The `plan file url` is NOT written here — it doesn't exist yet; see step 8.)
    - **Retain the captured row id** for the deferred step 8 write-back.
    - **STOP and request explicit approval — never auto-launch `beanies-plan`.** After the write-back, show the user the assembled block and confirm (NOTION mode) that the row was advanced to `In Progress` with the prompt + any backfilled columns written back. Then ask plainly, e.g.: _"Requirements are captured and written back to Notion #<ID>. Do you want to proceed to create the plan via `/beanies-plan`?"_ **Wait for the user's explicit go-ahead.** Only on an explicit yes do you invoke `/beanies-plan` in-thread with the assembled block as its Phase 1 prompt (`beanies-plan` captures it verbatim). If the user says no, defers, or wants changes, iterate on the intake (re-running step 5 as needed) — never proceed to planning without approval. When you do hand off, mention that the `plan file url` will be written back once `beanies-plan` saves the plan (step 8).
@@ -171,7 +177,7 @@ A flat, linear sequence of guarded steps. Each step has one job and one explicit
 
 The single place holding (a) the runtime ids, (b) the Status vocabulary + transitions, (c) the vocab maps, and (d) the write-back contract. Nothing elsewhere in this skill re-states these — they refer back here.
 
-> **Status: LIVE.** The "Beanies Main Issue Tracker" Notion DB exists and is wired up. NOTION mode is available whenever the `mcp__notion__*` tools are connected.
+> **Status: LIVE.** The "Beanies Main Issue Tracker" Notion DB exists and is wired up. NOTION mode is available whenever the `mcp__notion-beanies__*` tools are connected.
 
 **Binding:**
 
@@ -208,6 +214,10 @@ generate mockup? (select Yes / No) → control that triggers the step-6 mockup l
 github issue (select) → passthrough directive to beanies-plan:
   "create github issue"        → CREATE (beanies-plan opens the issue, CLAUDE.md labeling)
   "do not create github issue" → SKIP
+Complexity (select S/M/L/XL) + Lead Model (select Sonnet/Opus/Fable) + Risk Assessment + Execution Model (rich_text)
+  → the `# Delivery` block of the assembled prompt (verbatim). Blank on the row → score with the
+    six-angle rubric (beanies-new-issue step 6) in step 5 and write all four back pre-assembly.
+    Tier → lead: S Sonnet · M Opus · L/XL Fable; data-risk 3 forces at least L.
 Feature gated? (select) → passthrough directive to beanies-plan (gating is BY REQUEST ONLY):
   "Yes - behind feature gate in settings" → GATE (build behind a DevFlag registered in
                                             src/config/flagRegistry.ts + featureFlags.committed.ts;
@@ -235,6 +245,10 @@ Device Type / View / Category: carried verbatim (no remap)
 | mockup file url     | url                                       | step-6 write-back target — htmlpreview render link of the approved mockup |
 | github issue        | select (create / do not create)           | read → passthrough directive to beanies-plan         |
 | Feature gated?      | select (Yes - behind feature gate in settings / No feature gate) | read → passthrough directive to beanies-plan (empty = no gate, the default) |
+| Complexity          | select (S / M / L / XL)                   | read → `# Delivery` block; backfilled in step 5 when blank (six-angle rubric, new-issue step 6) |
+| Lead Model          | select (Sonnet / Opus / Fable)            | read → `# Delivery` block; backfilled when blank              |
+| Risk Assessment     | rich_text                                 | read → the six scores on the `Complexity:` line; backfilled when blank |
+| Execution Model     | rich_text                                 | read → `Execution model:` lines; backfilled when blank. Feeds beanies-plan `## Execution model` → beanies-build-auto staffing + review level |
 | ID                  | unique_id                                 | read-only — use to reference the issue to the user   |
 | Assignee / Raised By / Date | select / multi-select / date      | read-only metadata — ignored                         |
 

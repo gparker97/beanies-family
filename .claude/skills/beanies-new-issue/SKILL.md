@@ -1,6 +1,6 @@
 ---
 name: beanies-new-issue
-description: Turn a scattered, half-formed idea, bug report, or feature request into a complete, well-researched row in the "Beanies Main Issue Tracker" Notion DB — researching the codebase, recent commits, docs, and the web to fill every field, asking only about genuine gaps, checking for duplicates, showing the full proposed issue for approval, and then creating it as a "Not started" row that /beanies-pre-plan can pick up. Use this WHENEVER the user wants to capture, log, file, raise, open, add, or jot down an issue / bug / feature / idea / ticket / tracker item / TODO for beanies — even when they just describe a problem or wish ("the calendar feels cramped on mobile", "we should let users export their data", "remember to fix the flaky sync toast") without saying the word "issue". It is the front door to the tracker and the step BEFORE /beanies-pre-plan.
+description: Turn a scattered, half-formed idea, bug report, or feature request into a complete, well-researched row in the "Beanies Main Issue Tracker" Notion DB — researching the codebase, recent commits, docs, and the web to fill every field, asking only about genuine gaps, checking for duplicates, scoring the implementation risk and difficulty on six angles to pick a Complexity tier, Lead Model and execution approach, showing the full proposed issue for approval, and then creating it as a "Not started" row that /beanies-pre-plan can pick up. Use this WHENEVER the user wants to capture, log, file, raise, open, add, or jot down an issue / bug / feature / idea / ticket / tracker item / TODO for beanies — even when they just describe a problem or wish ("the calendar feels cramped on mobile", "we should let users export their data", "remember to fix the flaky sync toast") without saying the word "issue". It is the front door to the tracker and the step BEFORE /beanies-pre-plan.
 ---
 
 # beanies-new-issue — Capture an idea into the Beanies issue tracker
@@ -9,7 +9,7 @@ A good plan starts with a good issue, and a good issue starts long before `/bean
 
 The goal is a row so well-formed that running `/beanies-pre-plan #<ID>` on it later finds almost nothing left to clarify. This skill does the legwork up front: it reads the codebase, recent commits, and docs (and searches the web where that helps), fills every field it confidently can, asks the user only about the genuine gaps and the decisions that are truly theirs to make, shows the whole thing for approval, and only then writes it to Notion.
 
-**This skill is problem-side only.** Like `beanies-pre-plan`, it captures _what_ and _why_, never _how_. The technical approach is `beanies-plan`'s job — pre-specifying it here would short-circuit the 4-pass design reasoning downstream. The one near-the-line field, _Reuse Hints / Affected Files_, is an optional pointer for the later DRY pass — a place to look, never a solution to adopt.
+**This skill is problem-side only.** Like `beanies-pre-plan`, it captures _what_ and _why_, never _how_. The technical approach is `beanies-plan`'s job — pre-specifying it here would short-circuit the 4-pass design reasoning downstream. The one near-the-line field, _Reuse Hints / Affected Files_, is an optional pointer for the later DRY pass — a place to look, never a solution to adopt. The **Execution Model** (step 6) is not an exception to this rule: it says _who_ does the work and _how carefully_ (which model leads, how it is split, what review and verification it earns), never _what the code should do_. It is a control field in the same family as `generate mockup?` and `github issue`.
 
 ---
 
@@ -37,7 +37,7 @@ The last hop is optional and separately invoked: `/beanies-plan` still stops at 
 by running `beanies-plan` itself, or from a `docs/plans/` path — and carries it to reviewed, verified code.
 It stops short of deploying; that remains `/deploy-prod-auto`.
 
-This skill only owns the first hop. It **never** auto-runs `beanies-pre-plan`; it offers it once the row exists (see step 9).
+This skill only owns the first hop. It **never** auto-runs `beanies-pre-plan`; it offers it once the row exists (see step 10).
 
 ---
 
@@ -73,7 +73,7 @@ Then confirm the Notion MCP is connected (same availability pattern as `start-se
 
 ### 2. Read the live schema
 
-`API-retrieve-a-data-source` on the `data_source_id`. Capture the current property set and — critically — the live option lists for every select/multi-select (`Issue Type`, `Priority`, `Device Type`, `View`, `Category`, `generate mockup?`, `github issue`, `Feature gated?`, `Status`, `Assignee`, `Raised By`). Everything you write in step 8 must use option names that exist in this response. If a property you expect from pre-plan's Canonical Field Table is missing here, the schema changed — stop and tell the user rather than guessing.
+`API-retrieve-a-data-source` on the `data_source_id`. Capture the current property set and — critically — the live option lists for every select/multi-select (`Issue Type`, `Priority`, `Device Type`, `View`, `Category`, `Complexity`, `Lead Model`, `generate mockup?`, `github issue`, `Feature gated?`, `Status`, `Assignee`, `Raised By`). Everything you write in step 10 must use option names that exist in this response. If a property you expect from pre-plan's Canonical Field Table is missing here, the schema changed — stop and tell the user rather than guessing.
 
 ### 3. Classify the issue
 
@@ -95,7 +95,7 @@ This is what makes the issue _good_. Scale the effort to the issue: a one-line c
 - **Category** — the issue's nature (`data / app / UI / auth / security / new feature / feature update / permissions / android / iOS / PWA / AI` — read live). A **Required** multi-select (per pre-plan's Canonical Field Table): pick **all** that genuinely apply (e.g. a cross-account save bug is `data` + `auth`; a native chrome bug is `app` + `UI` + `android`). Derive it from the issue's own nature — don't interrogate the user unless it's genuinely ambiguous.
 - **Web search** — only when external facts genuinely help (a library's capability, a platform constraint, an accessibility/standard norm). Don't pad with web results that don't change the issue.
 
-Fill every field you can **confidently** justify from this research. Leave a field unfilled only when research genuinely can't determine it and it's a real gap for step 7. Track, for the step-9 summary, what you filled from research vs. what the user told you vs. what was intentionally left blank — so nothing is silently invented or dropped.
+Fill every field you can **confidently** justify from this research. Leave a field unfilled only when research genuinely can't determine it and it's a real gap for step 8. Track, for the step-10 summary, what you filled from research vs. what the user told you vs. what was intentionally left blank — so nothing is silently invented or dropped.
 
 ### 5. Duplicate check — always
 
@@ -107,7 +107,42 @@ Before proposing a new row, query the tracker for anything similar: `API-query-d
 
 Never silently create a near-duplicate. If nothing matches, say so briefly and continue.
 
-### 6. Decide the control fields (the user's calls)
+### 6. Assess complexity and propose the execution model
+
+This is where the issue earns the model that will build it. Fable tokens are the expensive resource; most work does not need Fable-level reasoning, but some work (CRDT merge, crypto, billing, cross-layer coordination) is far cheaper done once by a strong model than twice by a cheap one. Score the issue from what step 4 found, derive the tier, and propose how it should be delivered. **Score from evidence** — name the files, stores, Lambdas and plans the research turned up — never from the title alone.
+
+**Six angles, each 1 (low) / 2 (medium) / 3 (high):**
+
+| Angle | 1 | 2 | 3 |
+| --- | --- | --- | --- |
+| **Blast radius** | one component, copy, or a constant | a store/orchestrator or several components | data format, crypto, sync, infra (Lambda/terraform), or several layers at once |
+| **Data and correctness risk** | no persisted state touched | writes persisted state through an existing safe pattern | touches Automerge doc shape, the `.beanpod` envelope, merge/compaction, auth/session, billing/entitlement, or a migration |
+| **Novelty** | an existing repo pattern to copy | a new combination of existing pieces, or an external API already used elsewhere | a new subsystem, a new external API, a native/OAuth platform quirk, or needs a spike |
+| **Coordination** | one commit, one layer | a few commits across client layers | infra + client + marketing site, several sequenced work packages, or dependencies on other open issues |
+| **Verification cost** | unit tests suffice | a browser walk is needed | two-device sync, a native build, store review, or real money / a third-party account |
+| **Design ambiguity** | fully specified | minor UX or scope calls open | open UX decisions, a mockup needed, or unresolved open questions |
+
+**Tier** = the sum: **S** 6-8 · **M** 9-12 · **L** 13-15 · **XL** 16-18. An all-medium issue (12) is an M: L needs at least one angle at 3, and XL needs most of them there. One override: **data risk 3 forces at least L**, whatever the sum — a cheap model making one bad write to the pod costs more than any token saving. (Bands calibrated on the 21 open rows, 2026-10-02: the first draft had L start at 12 and sent every all-medium UI feature to Fable.)
+
+**Tier → Lead Model and execution shape** (the project's standing pattern, set by greg on #95 and #117, 2026-10-01):
+
+| Tier | Lead | Shape |
+| --- | --- | --- |
+| **S** | Sonnet | Sonnet does plan-lite and implementation in one pass. `/code-review low`. No Fable. |
+| **M** | Opus | Opus plans and implements. Sonnet subagents for mechanical edits, strings, docs, CHANGELOG. `/code-review medium`. |
+| **L** | Fable | Fable plans (4-pass) and coordinates. Opus implements the core and its tests; Sonnet does call sites, modal adoptions, docs. Fable reviews each diff, runs validate once, `/code-review high`. |
+| **XL** | Fable | As L, plus phased delivery, a spike first wherever novelty = 3, two review rounds budgeted, and the device / two-device verification named up front. |
+
+Write two text fields from this:
+
+- **Risk Assessment** — six lines, one per angle, each `<Angle> <score>: <one-line justification citing real files/areas>`, then `Total <n> → <tier>` (and `data-risk override` when it applied).
+- **Execution Model** — four to seven lines: `Lead:`, `Subagents:` (which packages go to which model), `Review:` (level, rounds), `Verification:` (tests / browser / two-device / native / store), `Phases/spike:` (only when there is one), `Notes:` (an existing `docs/plans/` file, a dependency that gates the order).
+
+Show the scores and the proposal in the step-9 preview. Greg may override any score or the tier; the override is recorded in _Notes_ with a word on why, so the rubric can be recalibrated later. Lower the tier only for a stated reason — never to make a row look cheaper.
+
+**Downstream:** `beanies-pre-plan` carries `Complexity`, `Lead Model` and `Execution Model` into the assembled prompt; `beanies-plan` writes them into the plan's mandatory `## Execution model` section; `beanies-build-auto` delegates work packages to the models named there and runs `/code-review` at the stated level. Scoring here is what makes that chain honest, so do not skip it for "obviously small" issues — an S that is scored is an S that gets a Sonnet session on purpose.
+
+### 7. Decide the control fields (the user's calls)
 
 Four fields are **decisions, not research** — they encode how the work should be delivered, and they're the user's to make. Propose a sensible default with your reasoning, then confirm (batch with `AskUserQuestion`):
 
@@ -116,15 +151,15 @@ Four fields are **decisions, not research** — they encode how the work should 
 - **github issue** (`create github issue` / `do not create github issue`) — propose per how the user usually works; this is a passthrough pre-plan hands to `beanies-plan`.
 - **Feature gated?** (`Yes - behind feature gate in settings` / `No feature gate`) — **gating is by request only**; default `No feature gate` unless the user wants it behind a Settings feature flag.
 
-### 7. Clarify the gaps — ask before creating
+### 8. Clarify the gaps — ask before creating
 
 Now resolve everything still open. Block and ask the user targeted questions (batch via `AskUserQuestion` where possible) for: any missing **Required** field; any missing type-driven **Conditional** field; and anything ambiguous or contradictory you couldn't settle from research. Where your research _proposes_ an answer, present it for confirmation rather than asking cold ("I think this affects the `nook` and `activities` views and the PWA — right?") — it's faster for the user and shows your work.
 
 **Do not interrogate the user about Optional fields.** Fill them from research when you can; otherwise leave them empty (they'll carry as `—`). Keep this lightweight — the whole point is that the user answers a few sharp questions, not a 20-field form. Don't restate baked-in constraints (DRY, no-silent-failures, MVO, rem-based text, i18n) — those are enforced downstream; only **non-default** constraints belong in _Notes_ / _Edge Cases_.
 
-### 8. Show the full proposed issue and get explicit approval
+### 9. Show the full proposed issue and get explicit approval
 
-Render the complete issue in an easy-to-read format (template below) — every field, in tracker order, with provenance markers so the user can see at a glance what came from where. **Stop and wait for explicit approval.** Never create the row before the user signs off; let them correct any field first (loop back to 6/7 as needed).
+Render the complete issue in an easy-to-read format (template below) — every field, in tracker order, with provenance markers so the user can see at a glance what came from where. **Stop and wait for explicit approval.** Never create the row before the user signs off; let them correct any field first (loop back to 6, 7 or 8 as needed).
 
 ```
 📋  NEW ISSUE — preview (nothing written yet)
@@ -157,6 +192,10 @@ Render the complete issue in an easy-to-read format (template below) — every f
   Open questions:      <… or —>
   Notes:               <… or —>
 
+  Complexity:   <S|M|L|XL>  (blast <n> · data <n> · novelty <n> · coord <n> · verify <n> · ambiguity <n> = <total>)
+  Lead model:   <Sonnet | Opus | Fable>
+  Execution:    <Execution Model, 4-7 lines>
+
   Controls:     Priority <…> · mockup <Yes/No> · github <create/skip> · gate <yes/no>
   Will create as:  Status "Not started" · Raised By greg
 
@@ -165,12 +204,13 @@ Render the complete issue in an easy-to-read format (template below) — every f
 Create this issue in the Beanies Main Issue Tracker? (yes / edit a field / cancel)
 ```
 
-### 9. Create the row, then offer pre-plan
+### 10. Create the row, then offer pre-plan
 
 On approval, `API-post-page` with `parent: { "database_id": "<notion-id>" }` and a `properties` object mapping each filled field to its Notion property (names + types from pre-plan's Canonical Field Table, confirmed live in step 2). Set:
 
 - **Status** → `Not started` (so `/beanies-pre-plan`'s default filter picks it up).
 - **Raised By** → `greg` (multi-select); **Assignee** → `greg` if that's the convention.
+- **Complexity** (select) and **Lead Model** (select) → the tier and lead from step 6; **Risk Assessment** and **Execution Model** (rich_text) → the two texts from step 6. Never leave these four blank on a new row.
 - Title → `Name`; selects/multi-selects → live option names; everything else → `rich_text`.
 - **Watch the 2000-char rich_text cap** — if any field's text exceeds it, split that property's value across multiple text objects in the same `rich_text` array so the call doesn't 400. (`ID`, the `unique_id`, is assigned by Notion — don't set it.)
 
@@ -193,7 +233,8 @@ Only run `/beanies-pre-plan` if the user says yes.
 - **Never interrogate Optional fields.** Fill from research or leave blank (`—`). Keep intake light; a form people abandon captures nothing.
 - **Always dedupe.** Check the tracker for similar rows before creating, and offer merge/proceed/cancel. Never silently create a near-duplicate.
 - **Live options only.** Read select/multi-select options from the data source at runtime; never hardcode `Priority`/`View`/`Device Type`/`Category`/etc. — they drift.
-- **Always set Category.** `Category` (multi-select — the issue's nature: `data / app / UI / auth / security / new feature / feature update / permissions / android / iOS / PWA / AI`) is a Required field; derive it from the issue and select all that apply. It maps to the `Category` Notion property (write it in step 9 like any other multi-select).
+- **Always assess complexity and set the execution model.** Score the six angles from research evidence (step 6), derive the tier (data risk 3 → at least L), and write `Complexity`, `Lead Model`, `Risk Assessment` and `Execution Model` on every new row. The point is to spend Fable where the work demands it and Sonnet/Opus where it does not; an unscored row defaults to whatever session happens to pick it up, which is the waste this field exists to prevent. A greg override is recorded in _Notes_, never silent.
+- **Always set Category.** `Category` (multi-select — the issue's nature: `data / app / UI / auth / security / new feature / feature update / permissions / android / iOS / PWA / AI`) is a Required field; derive it from the issue and select all that apply. It maps to the `Category` Notion property (write it in step 10 like any other multi-select).
 - **Show, then write.** Render the full proposed issue with provenance and get explicit approval before any write. Let the user edit any field first.
 - **Create as `Not started`, Raised By greg.** This is exactly what makes the row consumable by `/beanies-pre-plan`'s default filter. Don't advance Status here — that's pre-plan's job at handoff.
 - **Never fail silently.** Every Notion call (schema read, dedupe query, page create) has an explicit user-facing outcome. Surface the exact property + value on a write failure so it can be fixed.
