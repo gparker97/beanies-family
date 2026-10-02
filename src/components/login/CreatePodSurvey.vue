@@ -45,6 +45,7 @@ const HEARD_OPTIONS: ReadonlyArray<{
   },
   { id: 'google', labelKey: 'createSurvey.optGoogle', icon: '🔍', slackLabel: 'Google search' },
   { id: 'app_store', labelKey: 'createSurvey.optAppStore', icon: '📱', slackLabel: 'App store' },
+  { id: 'chatgpt_ad', labelKey: 'createSurvey.optChatgptAd', icon: '💬', slackLabel: 'ChatGPT ad' },
   { id: 'ai', labelKey: 'createSurvey.optAi', icon: '🤖', slackLabel: 'ChatGPT / AI search' },
   { id: 'friend', labelKey: 'createSurvey.optFriend', icon: '👋', slackLabel: 'A friend' },
   { id: 'other', labelKey: 'createSurvey.optOther', icon: '✨', slackLabel: null },

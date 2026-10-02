@@ -85,6 +85,71 @@ describe('services/analytics/plausible', () => {
   });
 });
 
+describe('campaign tag (#118)', () => {
+  beforeEach(() => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    delete window.plausible;
+    document.head.innerHTML = '';
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+    delete window.plausible;
+  });
+
+  it('scrubs the ad identifiers from the pageview URL and keeps utm_*', async () => {
+    vi.stubEnv('VITE_PLAUSIBLE_DOMAIN', 'mySiteHash');
+    const initAnalytics = await importInit();
+    initAnalytics();
+
+    const opts = window.plausible?.o as {
+      transformRequest: (p: Record<string, unknown>) => Record<string, unknown>;
+    };
+    const out = opts.transformRequest({
+      u:
+        'https://app.beanies.family/welcome?utm_source=chatgpt&utm_content=calm-ad1' +
+        '&oppref=o1&campaign_id=c1&ad_group_id=g1&ad_id=a1',
+    });
+    const url = new URL(String(out.u));
+    for (const key of ['oppref', 'campaign_id', 'ad_group_id', 'ad_id']) {
+      expect(url.searchParams.has(key), key).toBe(false);
+    }
+    expect(url.searchParams.get('utm_source')).toBe('chatgpt');
+    expect(url.searchParams.get('utm_content')).toBe('calm-ad1');
+    expect(url.searchParams.get('scrubbed')).toBe('1');
+  });
+
+  it('`signup` carries the four utm props from the stored tag, plus platform', async () => {
+    vi.resetModules();
+    const { track } = await import('./plausible');
+    const { pickPlausibleProps } = await import('@beanies/brand/attribution');
+    const sink = vi.fn();
+    window.plausible = sink as unknown as PlausibleQueue;
+
+    const props = pickPlausibleProps({
+      utm_source: 'chatgpt',
+      utm_medium: 'cpc',
+      utm_campaign: 'sg-pilot-oct26',
+      utm_content: 'calm-ad1',
+      utm_term: 't1',
+      oppref: 'o1',
+    });
+    track('signup', props ? { props } : undefined);
+
+    expect(sink).toHaveBeenCalledWith('signup', {
+      props: {
+        utm_source: 'chatgpt',
+        utm_medium: 'cpc',
+        utm_campaign: 'sg-pilot-oct26',
+        utm_content: 'calm-ad1',
+        platform: 'web',
+      },
+      interactive: true,
+    });
+  });
+});
+
 describe('withAnalyticsSuppressed', () => {
   afterEach(() => {
     delete window.plausible;

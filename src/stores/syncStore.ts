@@ -132,6 +132,8 @@ import type { BeanpodFileV4, WrappedMemberKey } from '@/types/syncFileV4';
 import type { StorageProvider, StorageProviderType } from '@/services/sync/storageProvider';
 import { toISODateString } from '@/utils/date';
 import { raceTimeout } from '@/utils/timing';
+import { clearAttribution, peekAttribution } from '@/utils/attributionStash';
+import { summariseAttribution, type Attribution } from '@beanies/brand/attribution';
 import { measureAsync, record as recordPerf } from '@/utils/perfTiming';
 import { deduplicateRecurringTransactions } from '@/services/recurring/recurringProcessor';
 import {
@@ -2794,7 +2796,7 @@ export const useSyncStore = defineStore('sync', () => {
    */
   function buildRegistryPayload(
     overrides: Partial<Pick<RegistryEntry, 'provider' | 'fileId' | 'displayPath'>> = {},
-    opts: { isLoginEvent?: boolean; isSignupEvent?: boolean } = {}
+    opts: { isLoginEvent?: boolean; isSignupEvent?: boolean; attribution?: Attribution | null } = {}
   ): registry.RegistryWritePayload {
     const ctx = useFamilyContextStore();
     const authStore = useAuthStore();
@@ -2866,6 +2868,10 @@ export const useSyncStore = defineStore('sync', () => {
       // function was deleted on 2026-09-08 and the Lambda tombstones a DELETE
       // rather than dropping the row, so a recreate preserves the stamp.)
       signupPlatform: registrySignupPlatform(),
+      // The campaign tag (#118). Same write-once contract as `signupPlatform`: the Lambda
+      // stamps it ONLY alongside `isSignupEvent` on a row that has none, so only
+      // `createNewFile` passes it and every other write sends `null`, which never clears it.
+      attribution: opts.attribution ?? null,
       isLoginEvent: opts.isLoginEvent === true,
       isSignupEvent: opts.isSignupEvent === true,
     };
@@ -2877,7 +2883,7 @@ export const useSyncStore = defineStore('sync', () => {
    * resume-from-registry path). The public `registerCurrentFamily` keeps its
    * fire-and-forget contract for non-critical background syncs.
    */
-  async function _registerCurrentFamilySync(): Promise<void> {
+  async function _registerCurrentFamilySync(attribution: Attribution | null): Promise<void> {
     const ctx = useFamilyContextStore();
     if (!ctx.activeFamilyId) {
       throw new Error('Cannot register family: no active family ID');
@@ -2889,8 +2895,8 @@ export const useSyncStore = defineStore('sync', () => {
     await registry.registerFamilyOrThrow(
       ctx.activeFamilyId,
       // Pod creation is the family's first login — and the ONLY write allowed to
-      // stamp `signupPlatform`.
-      buildRegistryPayload({}, { isLoginEvent: true, isSignupEvent: true })
+      // stamp `signupPlatform` and `attribution`.
+      buildRegistryPayload({}, { isLoginEvent: true, isSignupEvent: true, attribution })
     );
   }
 
@@ -3008,6 +3014,10 @@ export const useSyncStore = defineStore('sync', () => {
   ): Promise<CreatePodResult> {
     // REVIEW-DEMO: read once so the three call sites below can't diverge.
     const suppressRemote = opts?.suppressRemoteSideEffects === true;
+    // The campaign tag (#118), read ONCE from the device stash so the registry row and the
+    // Slack line cannot disagree. Read here rather than passed in (no eighth positional
+    // parameter). Demo mode sends neither, so it reads nothing and leaves the stash alone.
+    const attribution = suppressRemote ? null : peekAttribution();
     // Re-entrancy guard. The UI shouldn't be able to call this twice
     // concurrently (the storage step disables its CTA while in flight), but
     // returning a typed reason instead of throwing makes any misuse loud and
@@ -3234,7 +3244,7 @@ export const useSyncStore = defineStore('sync', () => {
       //    recovery anchor for `ResumePodSetup`'s registry-first flow).
       step = 'register';
       // REVIEW-DEMO: never plant a synthetic family in the real registry.
-      if (!suppressRemote) await _registerCurrentFamilySync();
+      if (!suppressRemote) await _registerCurrentFamilySync(attribution);
 
       // 7. TRUST THE CREATING DEVICE — WITHOUT FAIL (2026-09-23, greg). The person
       //    who creates a family is on their own device; leaving it untrusted meant a
@@ -3294,11 +3304,19 @@ export const useSyncStore = defineStore('sync', () => {
             : '(unknown)';
       // REVIEW-DEMO: a reviewer tapping the demo button must not ping #beanies.
       if (!suppressRemote) {
+        const cameFrom = attribution ? summariseAttribution(attribution) : '';
         slackNotify(
           `🎉 *Family pod created!*\n*Family:* ${familyName}\n*Owner:* ${ownerMember.name}\n*Storage:* ${storageLabel}` +
             (heardVia ? `\n*Heard via:* ${heardVia}` : '') +
+            // One code span: the value charset admits `_` `~` `:`, which Slack would render
+            // as italic / strike / emoji, and excludes the backtick, so nothing breaks out.
+            // Omitted when the tag has none of source / campaign / content (ad ids only).
+            (cameFrom ? `\n*Came from:* \`${cameFrom}\`` : '') +
             `\n*Platform:* ${getPlatformLabel()}\n*Device:* ${getDeviceLabel()}`
         );
+        // Consume once, only now that the registry row (step 6, which throws into the catch
+        // below and so leaves the tag in place for a retry) and the Slack line both have it.
+        clearAttribution('consumed');
       }
 
       return { ok: true, kit: { kitId: kit.kitId, code: kit.code } };

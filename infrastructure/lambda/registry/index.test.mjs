@@ -1,5 +1,6 @@
 /* global process */
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createHash } from 'node:crypto';
 import { marshall, unmarshall } from '@aws-sdk/util-dynamodb';
 
 // --- Mock the DynamoDB client (keep util-dynamodb's marshall/unmarshall real) ---
@@ -192,6 +193,235 @@ describe('registry PUT — signupPlatform (stamped at row creation, never moved)
 
   it('never persists the transient isSignupEvent flag', async () => {
     const { item } = await put({ provider: 'local', signupPlatform: 'web', isSignupEvent: true });
+    expect(item).not.toHaveProperty('isSignupEvent');
+  });
+});
+
+/**
+ * Shared fixture strings. These are the EXACT literals of `ATTRIBUTION_FIXTURES` in
+ * `src/utils/__tests__/attribution.test.ts` (the TS twin's test). They cannot be imported (a
+ * Lambda is its own zip and its tests stay inside it); keep both copies identical so a value-rule
+ * change on one side of the twin fails the other.
+ */
+const ATTRIBUTION_FIXTURES = {
+  tooLong: 'a'.repeat(101),
+  maxLen: 'a'.repeat(100),
+  script: '<script>alert(1)</script>',
+  padded: '  sg-pilot-oct26  ',
+  mrkdwn: 'x_y~z:1',
+  backtick: 'a`b',
+};
+
+const TAG = {
+  utm_source: 'chatgpt',
+  utm_medium: 'cpc',
+  utm_campaign: 'sg-pilot-oct26',
+  utm_content: 'calm-ad1',
+  utm_term: 'family-planner',
+  campaign_id: 'c1',
+  ad_group_id: 'g1',
+  ad_id: 'a1',
+  oppref: 'opp.123',
+};
+
+/** Every `attribution_dropped` line the last call logged, parsed. */
+function attributionDrops() {
+  return logSpy.mock.calls
+    .map((c) => {
+      try {
+        return JSON.parse(c[0]);
+      } catch {
+        return null;
+      }
+    })
+    .filter((l) => l?.msg === 'attribution_dropped');
+}
+
+describe('registry PUT — attribution (stamped at signup, never moved, validated per field)', () => {
+  const FAMILY_HASH = createHash('sha256').update(FAMILY_ID).digest('hex');
+
+  it('stamps the full tag on a genuine signup write', async () => {
+    const { res, item } = await put({ provider: 'local', attribution: TAG, isSignupEvent: true });
+    expect(res.statusCode).toBe(200);
+    expect(item.attribution).toEqual(TAG);
+    expect(attributionDrops()).toEqual([]);
+  });
+
+  it('stores a fresh object, never the request body', async () => {
+    // Only the allowlisted keys are copied out: the stored map has no path back to the input.
+    const tag = { utm_source: 'chatgpt', evil: 'x' };
+    const { item } = await put({ provider: 'local', attribution: tag, isSignupEvent: true });
+    expect(item.attribution).toEqual({ utm_source: 'chatgpt' });
+  });
+
+  it('does NOT stamp a first write that is not a signup', async () => {
+    const { item } = await put({ provider: 'local', attribution: TAG });
+    expect(item.attribution).toBeNull();
+  });
+
+  it('does NOT move when a later write sends a different tag', async () => {
+    const { item } = await put(
+      { provider: 'local', attribution: { utm_source: 'reddit' } },
+      { createdAt: '2026-01-01T00:00:00.000Z', attribution: TAG }
+    );
+    expect(item.attribution).toEqual(TAG);
+  });
+
+  it('does NOT move even if a later write claims to be a signup', async () => {
+    const { item } = await put(
+      { provider: 'local', attribution: { utm_source: 'reddit' }, isSignupEvent: true },
+      { createdAt: '2026-01-01T00:00:00.000Z', attribution: TAG }
+    );
+    expect(item.attribution).toEqual(TAG);
+  });
+
+  it('survives a later PUT that omits it (the whole-item PutItem re-emits it)', async () => {
+    const { item } = await put(
+      { provider: 'local', isLoginEvent: true },
+      { createdAt: '2026-01-01T00:00:00.000Z', attribution: TAG }
+    );
+    expect(item.attribution).toEqual(TAG);
+  });
+
+  it('never stamps a PRE-EXISTING row retroactively', async () => {
+    const { item } = await put(
+      { provider: 'local', attribution: TAG },
+      { createdAt: '2026-06-01T00:00:00.000Z', ownerEmail: 'a@b.com' }
+    );
+    expect(item.attribution).toBeNull();
+  });
+
+  it.each([
+    ['an array', ['chatgpt']],
+    ['a string', 'utm_source=chatgpt'],
+    ['a number', 42],
+    ['a boolean', true],
+  ])('stores null for %s and logs one not-object drop', async (_label, value) => {
+    const { res, item } = await put({ provider: 'local', attribution: value, isSignupEvent: true });
+    expect(res.statusCode).toBe(200);
+    expect(item.attribution).toBeNull();
+    expect(attributionDrops()).toEqual([
+      { msg: 'attribution_dropped', family_id_hash: FAMILY_HASH, reason: 'not-object' },
+    ]);
+  });
+
+  it('stores null with NO log when an older client omits it', async () => {
+    const { item } = await put({ provider: 'local', isSignupEvent: true });
+    expect(item.attribution).toBeNull();
+    expect(attributionDrops()).toEqual([]);
+  });
+
+  it('stores null with NO log when the client sends null', async () => {
+    const { item } = await put({ provider: 'local', attribution: null, isSignupEvent: true });
+    expect(item.attribution).toBeNull();
+    expect(attributionDrops()).toEqual([]);
+  });
+
+  it('drops an unknown key silently and keeps its valid siblings', async () => {
+    // A newer client with an added key must not be nulled (or log) on an older Lambda.
+    const { item } = await put({
+      provider: 'local',
+      attribution: { utm_source: 'chatgpt', utm_future: 'x', ref: 'INVITE' },
+      isSignupEvent: true,
+    });
+    expect(item.attribution).toEqual({ utm_source: 'chatgpt' });
+    expect(attributionDrops()).toEqual([]);
+  });
+
+  it('validates each shared fixture per field, logging only the drops', async () => {
+    const { tooLong, maxLen, script, padded, mrkdwn, backtick } = ATTRIBUTION_FIXTURES;
+    const { item } = await put({
+      provider: 'local',
+      attribution: {
+        utm_source: tooLong,
+        utm_medium: script,
+        utm_campaign: padded,
+        utm_content: mrkdwn,
+        ad_id: backtick,
+        campaign_id: 12345,
+        oppref: maxLen,
+      },
+      isSignupEvent: true,
+    });
+    expect(item.attribution).toEqual({
+      utm_campaign: 'sg-pilot-oct26', // trimmed
+      utm_content: mrkdwn, // _ ~ : are inside the set
+      oppref: maxLen, // exactly 100 is allowed
+    });
+    const drops = attributionDrops();
+    expect(drops).toEqual(
+      expect.arrayContaining([
+        {
+          msg: 'attribution_dropped',
+          family_id_hash: FAMILY_HASH,
+          key: 'utm_source',
+          reason: 'too-long',
+        },
+        {
+          msg: 'attribution_dropped',
+          family_id_hash: FAMILY_HASH,
+          key: 'utm_medium',
+          reason: 'bad-charset',
+        },
+        {
+          msg: 'attribution_dropped',
+          family_id_hash: FAMILY_HASH,
+          key: 'ad_id',
+          reason: 'bad-charset',
+        },
+        {
+          msg: 'attribution_dropped',
+          family_id_hash: FAMILY_HASH,
+          key: 'campaign_id',
+          reason: 'not-string',
+        },
+      ])
+    );
+    expect(drops).toHaveLength(4);
+    // The rejected value never reaches the log (it is arbitrary client input).
+    expect(JSON.stringify(drops)).not.toContain('script');
+  });
+
+  it('drops an empty-after-trim value as bad-charset', async () => {
+    const { item } = await put({
+      provider: 'local',
+      attribution: { utm_source: 'chatgpt', utm_term: '   ' },
+      isSignupEvent: true,
+    });
+    expect(item.attribution).toEqual({ utm_source: 'chatgpt' });
+    expect(attributionDrops()).toEqual([
+      {
+        msg: 'attribution_dropped',
+        family_id_hash: FAMILY_HASH,
+        key: 'utm_term',
+        reason: 'bad-charset',
+      },
+    ]);
+  });
+
+  it('stores null when every field is invalid', async () => {
+    const { item } = await put({
+      provider: 'local',
+      attribution: { utm_source: ATTRIBUTION_FIXTURES.script, utm_medium: null },
+      isSignupEvent: true,
+    });
+    expect(item.attribution).toBeNull();
+    expect(attributionDrops().map((d) => d.reason)).toEqual(['bad-charset', 'not-string']);
+  });
+
+  it('stores null for an empty object, with no log', async () => {
+    const { item } = await put({ provider: 'local', attribution: {}, isSignupEvent: true });
+    expect(item.attribution).toBeNull();
+    expect(attributionDrops()).toEqual([]);
+  });
+
+  it('never validates (or logs) on a write that cannot stamp', async () => {
+    await put({ provider: 'local', attribution: 'junk', isLoginEvent: true });
+    expect(attributionDrops()).toEqual([]);
+  });
+
+  it('never persists the transient isSignupEvent flag', async () => {
+    const { item } = await put({ provider: 'local', attribution: TAG, isSignupEvent: true });
     expect(item).not.toHaveProperty('isSignupEvent');
   });
 });
@@ -584,6 +814,7 @@ describe('registry DELETE — tombstone, not a drop', () => {
     ownerEmail: 'owner@example.com',
     country: 'SG',
     signupPlatform: 'ios',
+    attribution: { utm_source: 'chatgpt', utm_content: 'calm-ad1' },
     provider: 'google_drive',
     fileId: 'FILE-1',
     displayPath: '/beanies/pod.beanpod',
@@ -602,6 +833,7 @@ describe('registry DELETE — tombstone, not a drop', () => {
     expect(item.ownerEmail).toBe('owner@example.com');
     expect(item.country).toBe('SG');
     expect(item.signupPlatform).toBe('ios');
+    expect(item.attribution).toEqual({ utm_source: 'chatgpt', utm_content: 'calm-ad1' });
     expect(item.deletedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 
@@ -662,6 +894,7 @@ describe('registry PUT — restoring a tombstoned row', () => {
     ownerMemberId: M_A,
     ownerEmail: 'owner@example.com',
     signupPlatform: 'ios',
+    attribution: { utm_source: 'chatgpt' },
     deletedAt: '2026-09-09T00:00:00.000Z',
   };
 
@@ -676,6 +909,7 @@ describe('registry PUT — restoring a tombstoned row', () => {
         writerMemberId: M_A,
         isSignupEvent: true,
         signupPlatform: 'web',
+        attribution: { utm_source: 'reddit' },
       },
       TOMB
     );
@@ -683,6 +917,8 @@ describe('registry PUT — restoring a tombstoned row', () => {
     expect(item.ownerMemberId).toBe(M_A);
     // Signed up on iOS then re-registered from a browser: still iOS.
     expect(item.signupPlatform).toBe('ios');
+    // Created from a ChatGPT ad: a re-registration's own tag never replaces it.
+    expect(item.attribution).toEqual({ utm_source: 'chatgpt' });
   });
 
   it('clears deletedAt, so the row is live again', async () => {

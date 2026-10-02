@@ -128,6 +128,15 @@ describe('registry PUT — the writer/owner split on the wire', () => {
     expect(body.writerEmail).toBeNull();
   });
 
+  it('sends the campaign tag as one `attribution` map, untouched (#118)', async () => {
+    // The Lambda validates and stamps it write-once; the client forwards its stash verbatim.
+    const f = okFetch({ success: true, pointerAccepted: true });
+    global.fetch = f;
+    const attribution = { utm_source: 'chatgpt', utm_content: 'calm-ad1', oppref: 'o1' };
+    await registerFamilyOrThrow(FAMILY, payload({ attribution }));
+    expect(lastBody(f).attribution).toEqual(attribution);
+  });
+
   it('counts where the owner fields came from, on the SUCCESS path', async () => {
     // A counter that only fires on failure cannot give you a rate.
     global.fetch = okFetch({ success: true, pointerAccepted: true });

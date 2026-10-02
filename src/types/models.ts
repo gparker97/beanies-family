@@ -16,6 +16,7 @@ export type CountryCode = string; // ISO 3166-1 alpha-2, uppercase (e.g., 'SG', 
 // import site for entity types. Type-only, so the models<->recurrence import is
 // erased at build (no runtime cycle).
 import type { RecurrenceRule, Cadence } from './recurrence';
+import type { Attribution } from '@beanies/brand/attribution';
 export type {
   RecurrenceUnit,
   MonthlyAnchor,
@@ -2317,6 +2318,15 @@ export interface RegistryEntry {
   // every row created before 2026-08-24, which reads as UNKNOWN — exclude those
   // from platform breakdowns rather than assuming web.
   signupPlatform?: 'web' | 'ios' | 'android' | null;
+  /**
+   * #118: the campaign tag from the link that first brought this device to beanies.family
+   * (`utm_*`, the ad ids, `oppref`), if there was one. Write-once at signup: the client sends
+   * its stash on the signup PUT only, and the registry Lambda (`validAttribution`, the twin of
+   * `@beanies/brand/attribution`) validates it, stamps it on row creation, carries it across
+   * every later PUT and keeps it on the DELETE tombstone. Identifies the ad, not a person.
+   * `null` for an untagged signup and absent on rows created before 2026-10-02.
+   */
+  attribution?: Attribution | null;
   /**
    * #95: what the family is entitled to, computed server-side on every GET by
    * `infrastructure/lambda/registry/entitlement.mjs` (never stored in the row). `null` when the

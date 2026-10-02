@@ -8,6 +8,7 @@
     "./theme.css": "./theme.css",
     "./nav": "./nav.ts",
     "./pricing": "./pricing.ts",
+    "./attribution": "./attribution.ts",
     "./schema": "./schema.ts",
     "./assets/*": "./assets/*"
   },
@@ -15,6 +16,7 @@
     "theme.css",
     "nav.ts",
     "pricing.ts",
+    "attribution.ts",
     "schema.ts",
     "assets",
     "fonts"
