@@ -8,10 +8,17 @@ import { flushPromises, mount } from '@vue/test-utils';
 
 const h = vi.hoisted(() => ({
   updateMeal: vi.fn(async (_id: string, _patch: Record<string, unknown>) => ({})),
+  recipes: [] as Array<Record<string, unknown>>,
 }));
 
 vi.mock('@/composables/useTranslation', () => ({
-  useTranslation: () => ({ t: (k: string) => k }),
+  useTranslation: () => ({
+    t: (k: string) =>
+      ({
+        'mealPlanner.shopping.cook.times': 'Cook ×{n}',
+        'mealPlanner.shopping.cook.once': 'Cook Once',
+      })[k] ?? k,
+  }),
 }));
 vi.mock('@/stores/familyStore', () => ({
   useFamilyStore: () => ({ humans: ['a', 'b', 'c'].map((id) => ({ id })) }),
@@ -20,11 +27,16 @@ vi.mock('@/stores/mealPlanStore', () => ({
   useMealPlanStore: () => ({ updateMeal: h.updateMeal, deleteMeal: vi.fn() }),
 }));
 vi.mock('@/stores/recipesStore', () => ({
-  useRecipesStore: () => ({ recipes: [], cookLogs: [], cookLogsByRecipe: () => ({ value: [] }) }),
+  useRecipesStore: () => ({
+    recipes: h.recipes,
+    cookLogs: [],
+    cookLogsByRecipe: () => ({ value: [] }),
+  }),
 }));
 vi.mock('@/composables/useCardDefaultHint', () => ({
   useCardDefaultHint: () => ({ holderFor: () => undefined, holdsHint: () => '' }),
 }));
+vi.mock('@/config/flags', () => ({ isFlagEnabled: () => true }));
 vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: vi.fn() }));
 
 import MealEditModal from '../MealEditModal.vue';
@@ -57,7 +69,11 @@ function mounted(meal: Record<string, unknown>) {
         InferredHint: true,
         CookLogFormModal: true,
         RecipeFormModal: true,
-        MealIngredientsPanel: true,
+        RecipeListSheet: {
+          name: 'RecipeListSheet',
+          props: ['open', 'recipe', 'eating', 'layer'],
+          template: '<div />',
+        },
       },
     },
   });
@@ -70,7 +86,10 @@ const save = async (w: ReturnType<typeof mounted>) => {
   return h.updateMeal.mock.calls.at(-1)![1];
 };
 
-beforeEach(() => h.updateMeal.mockClear());
+beforeEach(() => {
+  h.updateMeal.mockClear();
+  h.recipes = [];
+});
 
 describe('MealEditModal who’s eating', () => {
   it('shows everyone picked when the meal stores no eaters, with the toggle on', async () => {
@@ -119,5 +138,51 @@ describe('MealEditModal who’s eating', () => {
       await flushPromises();
       expect(await save(w)).toEqual({});
     });
+  });
+});
+
+describe('MealEditModal Shopping List row (#116)', () => {
+  const RECIPE_MEAL = { ...MEAL, kind: 'recipe', recipeId: 'r1' };
+  const recipe = (over: Record<string, unknown> = {}) => ({
+    id: 'r1',
+    name: 'Beef Tacos',
+    servings: '4',
+    ingredients: ['500 g ground beef', '8 taco shells'],
+    ...over,
+  });
+  const row = (w: ReturnType<typeof mounted>) => w.find('[data-testid="meal-shopping-open"]');
+  const sheet = (w: ReturnType<typeof mounted>) => w.findComponent({ name: 'RecipeListSheet' });
+
+  it('renders for a recipe meal with shoppable ingredients, and not otherwise', async () => {
+    h.recipes = [recipe()];
+    expect(row(mounted(RECIPE_MEAL)).exists()).toBe(true);
+    expect(row(mounted(MEAL)).exists()).toBe(false); // not a recipe meal
+    h.recipes = [recipe({ ingredients: ['For the filling:'] })];
+    expect(row(mounted(RECIPE_MEAL)).exists()).toBe(false); // only a heading
+  });
+
+  it('opens the shared sheet with the live eater count, as an overlay', async () => {
+    h.recipes = [recipe()];
+    const w = mounted(RECIPE_MEAL);
+    await flushPromises();
+    expect(sheet(w).props('open')).toBe(false);
+    await row(w).trigger('click');
+    expect(sheet(w).props('open')).toBe(true);
+    expect(sheet(w).props('eating')).toBe(3);
+    expect(sheet(w).props('layer')).toBe('overlay');
+    sheet(w).vm.$emit('close');
+    await flushPromises();
+    expect(sheet(w).props('open')).toBe(false);
+  });
+
+  it('the pill follows the picker: serves 4, everyone (3) is x1, then guests tip it to x2', async () => {
+    h.recipes = [recipe({ servings: '2' })];
+    const w = mounted(RECIPE_MEAL);
+    await flushPromises();
+    expect(row(w).text()).toContain('Cook ×2'); // 3 eating, serves 2
+    eaters(w).vm.$emit('update:modelValue', ['a', 'b']);
+    await flushPromises();
+    expect(row(w).text()).toContain('Cook Once');
+    expect(sheet(w).props('eating')).toBe(2);
   });
 });

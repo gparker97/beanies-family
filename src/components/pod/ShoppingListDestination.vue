@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /**
  * Where a reviewed ingredient checklist goes (#116): a New List, or Add to a List the
- * family already has. One control, shared by the recipe page's sheet, the edit-meal
- * drawer's ingredients panel and the meal planner's week list.
+ * family already has. One control, shared by the recipe sheet (also opened from the
+ * edit-meal drawer) and the meal planner's week list.
  *
  * v-model is a `ShoppingDestination`; the caller seeds it (usually with
  * `newListDestination(currentMember)`) and hands it to `useShoppingListCommit`.

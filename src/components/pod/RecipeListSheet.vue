@@ -11,11 +11,19 @@
  * everywhere else in the app. What is ticked in the checklist is what gets written.
  *
  * Since #116 the create step is the shared `IngredientChecklist` (at the recipe's own
- * amounts, ×1) plus the shared `ShoppingListDestination` (New List, or Add to a List the
+ * amounts, ×1, or ×N for one planned meal, see below) plus the shared `ShoppingListDestination` (New List, or Add to a List the
  * family already has), and saving is `useShoppingListCommit`, the same path the meal
  * planner uses, so the guards, toasts and telemetry live in one place. The checklist's
  * line ids are transient by design: nothing is persisted until save, and they are thrown
  * away on cancel.
+ *
+ * The edit-meal drawer opens this same sheet (#116) by passing `eating` (its live count of
+ * people at the meal): the lines are then batched for that meal (`batchesFor`), the title
+ * shows "Ingredients" + Cook ×N + the why line, and the kind logged/committed is 'meal'.
+ * Without `eating` the sheet is the cookbook's, byte for byte (×1, kind 'recipe'). `layer`
+ * is forwarded to the modal so the drawer can stack it as an overlay. The lines are still
+ * a snapshot at open; the sheet is modal over the drawer, so the eaters cannot change
+ * while it is up.
  */
 import { computed, ref, watch } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
@@ -33,11 +41,28 @@ import {
   useShoppingListCommit,
   type ShoppingDestination,
 } from '@/composables/useShoppingListCommit';
-import { buildShoppingLines, linesToTitles, type ChecklistLine } from '@/utils/mealShoppingList';
+import CookCountPill from '@/components/mealplan/CookCountPill.vue';
+import {
+  batchesFor,
+  buildShoppingLines,
+  linesToTitles,
+  type ChecklistLine,
+} from '@/utils/mealShoppingList';
+import { servingsOf } from '@/utils/recipeServings';
 import { fillTemplate } from '@/utils/fillTemplate';
 import type { Recipe } from '@/types/models';
 
-const props = defineProps<{ open: boolean; recipe: Recipe }>();
+const props = withDefaults(
+  defineProps<{
+    open: boolean;
+    recipe: Recipe;
+    /** People eating at one planned meal; omitted for the cookbook's plain ×1 list. */
+    eating?: number;
+    /** Modal stacking layer, for when this opens over another drawer. */
+    layer?: 'base' | 'overlay' | 'top' | 'gate';
+  }>(),
+  { eating: undefined, layer: 'base' }
+);
 const emit = defineEmits<{ close: [] }>();
 
 const { t } = useTranslation();
@@ -51,6 +76,21 @@ const { commit, isSubmitting } = useShoppingListCommit();
  */
 const lines = ref<ChecklistLine[]>([]);
 const headingsSkipped = ref(0);
+
+const servings = computed(() => servingsOf(props.recipe));
+/** Batches to cook for this meal (1 for the cookbook). Live, but the lines are not. */
+const batches = computed(() =>
+  props.eating === undefined ? 1 : batchesFor(props.eating, servings.value)
+);
+const kind = computed(() => (props.eating === undefined ? 'recipe' : 'meal'));
+/** "For 5, serves 4", or "No servings set, so one batch per meal." */
+const whyLine = computed(() => {
+  if (servings.value === undefined) return t('mealPlanner.shopping.noServingsPerMeal');
+  return fillTemplate(t('mealPlanner.shopping.forEating'), {
+    n: String(props.eating ?? 1),
+    s: String(servings.value),
+  });
+});
 
 /** Who shops and by when (or which list). Reset on every open. */
 const destination = ref<ShoppingDestination>(newListDestination(''));
@@ -77,7 +117,7 @@ watch(
   () => props.open,
   (open) => {
     if (!open) return;
-    const built = buildShoppingLines(props.recipe, 1);
+    const built = buildShoppingLines(props.recipe, batches.value);
     lines.value = built.lines;
     headingsSkipped.value = built.headingsSkipped;
     // Reset on every open, not just the first: the sheet instance is reused across
@@ -89,7 +129,7 @@ watch(
     // the user can tell at a glance.
     mode.value = existing.value.length > 0 ? 'review' : 'create';
     logShoppingSheetOpened({
-      kind: 'recipe',
+      kind: kind.value,
       sections: 1,
       lines: built.lines.length,
       exactMerges: 0,
@@ -141,7 +181,7 @@ async function onSave(): Promise<void> {
     titles: titles.value,
     defaultTitle: defaultTitle.value,
     linkedRecipeId: props.recipe.id,
-    kind: 'recipe',
+    kind: kind.value,
     headingsSkipped: headingsSkipped.value,
     sections: 1,
   });
@@ -158,6 +198,7 @@ async function onSave(): Promise<void> {
     icon="🛒"
     icon-bg="var(--tint-orange-8)"
     size="narrow"
+    :layer="layer"
     :save-label="saveLabel"
     :save-disabled="saveDisabled"
     :is-submitting="isSubmitting"
@@ -204,7 +245,21 @@ async function onSave(): Promise<void> {
       </div>
 
       <template v-else>
-        <IngredientChecklist v-model="lines" :headings-skipped="headingsSkipped" />
+        <IngredientChecklist v-model="lines" :headings-skipped="headingsSkipped">
+          <template v-if="eating !== undefined" #title>
+            <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span
+                class="font-outfit dark:text-ink-faint text-xs font-bold tracking-wider text-[var(--color-text-muted)] uppercase"
+              >
+                {{ t('mealPlanner.shopping.ingredients') }}
+              </span>
+              <CookCountPill :count="batches" />
+            </div>
+            <p class="font-inter dark:text-ink-soft mt-0.5 text-xs text-[var(--color-text-muted)]">
+              {{ whyLine }}
+            </p>
+          </template>
+        </IngredientChecklist>
         <ShoppingListDestination v-model="destination" :default-title="defaultTitle" />
       </template>
 

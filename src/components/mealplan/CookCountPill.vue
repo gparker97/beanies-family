@@ -2,7 +2,7 @@
 /**
  * How many times a recipe gets cooked (#116): a prominent "Cook ×3" in the success green,
  * or a quiet "Cook Once". Shared by the week's shopping list (the week's total) and the
- * edit-meal ingredients panel (this meal), so the two surfaces can never disagree about
+ * edit-meal drawer's shopping sheet (this meal), so the two surfaces can never disagree about
  * what the marker means.
  *
  * Contrast: #1E8449 with white clears 4.5:1, and the fill stays the same in BOTH modes
