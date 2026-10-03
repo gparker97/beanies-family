@@ -6,9 +6,12 @@ apply plugin: 'com.android.application'
 // created, so `assembleDebug` and Gradle evaluation are completely unaffected.
 def releaseKeystorePath = System.getenv("ANDROID_KEYSTORE_PATH")
 
-// Committed stable debug keystore → a FIXED debug signing fingerprint so the
-// debug APK's App Link can be verified (native Google sign-in round-trip;
-// ADR-029). Debug keys are not sensitive (standard public creds).
+// Committed stable debug keystore → a FIXED debug signing fingerprint (ADR-029).
+// ⚠️ Its certificate is DELIBERATELY ABSENT from the production
+// `.well-known/assetlinks.json` (removed 2026-10-03, data-layer audit): the key is
+// public, so listing it would let anyone sign an APK that Android trusts for
+// beanies.family App Links (magic-link and OAuth returns). Debug builds therefore
+// do NOT verify App Links; test those on a release-signed build.
 def debugKeystoreFile = file("beanies-debug.keystore")
 
 android {
