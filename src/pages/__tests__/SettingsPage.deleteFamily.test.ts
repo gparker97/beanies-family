@@ -27,7 +27,16 @@ const {
   confirmMock,
   isNativeMock,
   requireReauthMock,
+  measureUnsavedWorkMock,
+  confirmDiscardMock,
 } = vi.hoisted(() => ({
+  measureUnsavedWorkMock: vi.fn(async () => ({
+    unsavedFamilies: 0,
+    photoUploads: 0,
+    remoteBlocked: false,
+    unknown: false,
+  })),
+  confirmDiscardMock: vi.fn(async (..._a: unknown[]) => true),
   confirmMock: vi.fn(async () => true),
   isNativeMock: vi.fn(() => false),
   requireReauthMock: vi.fn(async () => true),
@@ -131,7 +140,14 @@ vi.mock('@/stores/familyContextStore', () => ({
   }),
 }));
 vi.mock('@/stores/authStore', () => ({
-  useAuthStore: () => ({ signOutAndClearData: signOutMock, currentMember: null }),
+  useAuthStore: () => ({
+    signOutAndClearData: signOutMock,
+    currentMember: null,
+    measureUnsavedWork: measureUnsavedWorkMock,
+  }),
+}));
+vi.mock('@/composables/useDiscardUnsavedWork', () => ({
+  confirmDiscardUnsavedWork: confirmDiscardMock,
 }));
 
 // Import AFTER the mocks
@@ -209,6 +225,7 @@ describe('SettingsPage — delete family export gate', () => {
     confirmMock.mockResolvedValue(true);
     isNativeMock.mockReturnValue(false);
     requireReauthMock.mockResolvedValue(true);
+    confirmDiscardMock.mockResolvedValue(true);
     deleteLocalFamilyMock.mockResolvedValue({ deleted: true });
     setActivePinia(createPinia());
   });
@@ -243,6 +260,23 @@ describe('SettingsPage — delete family export gate', () => {
       })
     );
     expect(emitCacheKeptMock).not.toHaveBeenCalled();
+  });
+
+  it('a refused unsaved-work confirm aborts before any export or teardown', async () => {
+    confirmDiscardMock.mockResolvedValue(false);
+    const wrapper = await mountPage();
+    await runDeleteWithExport(wrapper);
+
+    expect(measureUnsavedWorkMock).toHaveBeenCalledWith({ save: true, scope: 'active' });
+    expect(confirmDiscardMock).toHaveBeenCalledWith(expect.anything(), 'delete-family');
+    expect(deliverFileMock).not.toHaveBeenCalled();
+    expect(deleteLocalFamilyMock).not.toHaveBeenCalled();
+    expect(removeFamilyMock).not.toHaveBeenCalled();
+    // isDeleting released: the Delete button is not left in its busy state.
+    const button = wrapper
+      .findAllComponents({ name: 'BaseButton' })
+      .find((b) => b.props('variant') === 'danger' && b.props('loading') === true);
+    expect(button).toBeUndefined();
   });
 
   it('destroys nothing when the step-up gate refuses', async () => {
