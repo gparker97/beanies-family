@@ -1832,14 +1832,21 @@ export interface InAppDestination {
  * indistinguishable from never tapping the button at all, and "is anybody using this?" —
  * the first question this feature has to answer — would be unanswerable.
  *
- * Exported so the card can call it at the tap while `IN_APP_ENV` stays private here.
+ * Exported so `MagicBeansDoor` can call it at the tap while `IN_APP_ENV` stays private here.
+ *
+ * `context` segments the ONE denominator by entry point instead of adding a parallel "opened"
+ * event (#119): the FAB composer passes `{ stage: 'composer', format: 'phone' | 'desktop' }`;
+ * page doors pass nothing and log exactly `{ action: 'opened' }` as before.
  */
-export function logCaptureOpened(): void {
+export function logCaptureOpened(context?: {
+  stage: 'composer';
+  format: 'phone' | 'desktop';
+}): void {
   logEvent({
     level: 'info',
     surface: IN_APP_ENV.surface,
     message: 'capture opened',
-    context: { action: 'opened' },
+    context: { action: 'opened', ...context },
   });
 }
 

@@ -1684,9 +1684,10 @@ describe('ingestInAppSource (#84)', () => {
       expect([...surfaces]).toEqual(['share-target-ingest']);
     });
 
-    // NOTE: the `opened` denominator is emitted by `MagicReaderCard` when the sheet opens,
-    // not by this function — firing it here would make the rate equal its own numerator, so
-    // abandonment would be invisible. Covered in `MagicReaderCard.test.ts`.
+    // NOTE: the `opened` denominator is emitted by `MagicBeansDoor.open()` when a door opens
+    // (for the FAB, when `QuickAddSheet` shows its composer), not by this function — firing it
+    // here would make the rate equal its own numerator, so abandonment would be invisible.
+    // Covered in `MagicBeansDoor.test.ts` and `QuickAddSheet.test.ts`.
 
     it('marks the envelope in-app, so the review surfaces can tell the doors apart', async () => {
       await paste(REAL);

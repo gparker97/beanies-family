@@ -32,7 +32,9 @@ vi.mock('@/stores/syncStore', () => ({
   },
 }));
 
+import { effectScope, ref } from 'vue';
 import { isAppQuiet } from '../appQuiet';
+import { useEscapeClose, __resetEscapeCloseForTests } from '@/composables/useEscapeClose';
 
 describe('isAppQuiet', () => {
   beforeEach(() => {
@@ -40,6 +42,7 @@ describe('isAppQuiet', () => {
     overlays.open = false;
     syncing.value = false;
     syncing.throws = false;
+    __resetEscapeCloseForTests();
   });
 
   it('is quiet when nothing is open and nothing is saving', () => {
@@ -62,5 +65,37 @@ describe('isAppQuiet', () => {
     syncing.throws = true;
     expect(() => isAppQuiet()).not.toThrow();
     expect(isAppQuiet()).toBe(false);
+  });
+
+  describe('an open Escape layer (#119: the non-modal desktop composer)', () => {
+    it('is not quiet while an Escape layer is registered and no overlay is', () => {
+      const scope = effectScope();
+      const open = ref(true);
+      scope.run(() => useEscapeClose(open, () => {}));
+      expect(isAppQuiet()).toBe(false);
+      open.value = false;
+      scope.stop();
+    });
+
+    it('is quiet again once the layer closes', async () => {
+      const scope = effectScope();
+      const open = ref(true);
+      scope.run(() => useEscapeClose(open, () => {}));
+      expect(isAppQuiet()).toBe(false);
+      open.value = false;
+      await Promise.resolve();
+      expect(isAppQuiet()).toBe(true);
+      scope.stop();
+    });
+
+    it('recovers when the owner is torn down while still open (onScopeDispose)', () => {
+      // A route-change unmount takes this path: the layer never sees `open` go false. If it
+      // leaked, every later PWA update would defer forever.
+      const scope = effectScope();
+      scope.run(() => useEscapeClose(ref(true), () => {}));
+      expect(isAppQuiet()).toBe(false);
+      scope.stop();
+      expect(isAppQuiet()).toBe(true);
+    });
   });
 });

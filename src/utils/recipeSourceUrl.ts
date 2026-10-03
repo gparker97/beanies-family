@@ -107,6 +107,20 @@ export function parseYoutubeVideoId(url: URL): string {
 }
 
 /**
+ * A single pasted token that looks like a link but will not route.
+ *
+ * Only for the single-token case: a link inside a sentence is handled by the spine's
+ * link-vs-text triage, and flagging it would second-guess that. Purely an explanation; the
+ * caller still accepts anything non-empty.
+ */
+export function looksLikeUnroutableLink(text: string): boolean {
+  const value = text.trim();
+  if (!value || /\s/.test(value)) return false;
+  if (!/^[a-z]+:\/\//i.test(value) && !value.includes('.')) return false;
+  return routeUrl(value).kind === 'invalid';
+}
+
+/**
  * Decide where a pasted string goes. Screened with `safeHttpsUrl` first, so a
  * `javascript:` or `http:` value can never reach the fetch service at all.
  */

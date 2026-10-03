@@ -159,6 +159,24 @@
   --tint-terracotta-5: rgb(230 126 34 / 5%);
   --tint-orange-4: rgb(241 93 34 / 4%);
   --tint-amber-10: rgb(245 188 80 / 10%);
+
+  /* The quick-add FAB's corner (#119): read by QuickAddFab, MobileNavBeanStack and the
+     quick-add composer card, so the three cannot disagree about where the corner is.
+     Below 768px the FAB clears MobileBottomNav (~56px) and the iOS home indicator.
+     px, not rem, on purpose: these are positions, not text, and a rem value would move
+     the FAB in Large reading mode. */
+  --fab-anchor-bottom: calc(env(safe-area-inset-bottom, 0px) + 92px);
+  --fab-anchor-side: 16px;
+}
+
+/* The 768px switch here is the CSS twin of `MOBILE_QUERY` ('(max-width: 767px)') in
+   src/composables/useBreakpoint.ts, which decides the phone/desktop overlay split in
+   useAnchoredOverlay; useAnchoredOverlay.test.ts fails if the two drift apart. */
+@media (width >= 768px) {
+  :root {
+    --fab-anchor-bottom: 24px;
+    --fab-anchor-side: 24px;
+  }
 }
 
 /* Dark mode variables */

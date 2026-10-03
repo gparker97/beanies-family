@@ -90,28 +90,56 @@ export function useAllowanceLine() {
     { immediate: true }
   );
 
+  /**
+   * What is left, or null when the line does not apply, usage could not be read or has not
+   * arrived yet. The one place `limit - used` is computed; `line`, `pct` and `brief` derive from it.
+   */
+  const remaining = computed<{
+    left: number;
+    limit: number;
+    period: AllowanceUsage['period'];
+  } | null>(() => {
+    const u = usage.value;
+    if (!applies.value || unavailable.value || !u) return null;
+    return { left: Math.max(0, u.limit - u.used), limit: u.limit, period: u.period };
+  });
+
   const line = computed<string | null>(() => {
     if (!applies.value) return null;
     if (unavailable.value) return t('plan.allowance.unavailable');
     const u = usage.value;
-    if (!u) return null;
+    const r = remaining.value;
+    if (!u || !r) return null;
     // Non-null by construction: `fetchAllowance` (`parseAllowance`) rejects an unparseable
     // `resetsAt` before it can get here, so a second fallback would be unreachable.
     const reset = allowanceResetParts(u.resetsAt)!;
-    const left = Math.max(0, u.limit - u.used);
     // Both periods name the reset date AND local time: "resets on 2 Oct at 8:00am" reads the
     // same whether the window is a day or a month.
-    const key = u.period === 'month' ? 'plan.allowance.month' : 'plan.allowance.day';
-    return fillTemplate(t(key), { left, limit: u.limit, date: reset.date, time: reset.time });
+    const key = r.period === 'month' ? 'plan.allowance.month' : 'plan.allowance.day';
+    return fillTemplate(t(key), {
+      left: r.left,
+      limit: r.limit,
+      date: reset.date,
+      time: reset.time,
+    });
   });
 
   /** For the meter: how much of the allowance is LEFT, 0..100 (the sentence says "left", so the
    *  bar shrinks as beans are used), or null when the line does not apply. */
   const pct = computed<number | null>(() => {
-    if (!applies.value || unavailable.value || !usage.value || usage.value.limit <= 0) return null;
-    const left = Math.max(0, usage.value.limit - usage.value.used);
-    return Math.min(100, Math.round((left / usage.value.limit) * 100));
+    const r = remaining.value;
+    if (!r || r.limit <= 0) return null;
+    return Math.min(100, Math.round((r.left / r.limit) * 100));
   });
 
-  return { line, pct };
+  /** The compact line for the FAB composer: no reset time (that stays on Settings/Plan), and null
+   *  whenever `remaining` is, so a failed read shows nothing there (it still logs). */
+  const brief = computed<string | null>(() => {
+    const r = remaining.value;
+    if (!r) return null;
+    const key = r.period === 'month' ? 'plan.allowance.briefMonth' : 'plan.allowance.briefDay';
+    return fillTemplate(t(key), { left: r.left, limit: r.limit });
+  });
+
+  return { line, pct, brief };
 }

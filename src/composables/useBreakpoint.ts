@@ -1,5 +1,8 @@
-import { ref, readonly, onScopeDispose } from 'vue';
+import { ref, readonly } from 'vue';
 
+// The CSS twin of this breakpoint is the `@media (width >= 768px)` block that flips
+// `--fab-anchor-bottom` / `--fab-anchor-side` in src/style.css; keep the two in step
+// (useAnchoredOverlay.test.ts asserts they agree).
 const MOBILE_QUERY = '(max-width: 767px)';
 const TABLET_QUERY = '(min-width: 768px) and (max-width: 1023px)';
 
@@ -31,13 +34,13 @@ function init() {
   tabletMedia.addEventListener('change', update);
 }
 
+/**
+ * Safe to call outside a component or effect scope (`openQuickAdd` reads it from a click
+ * handler): it registers nothing per call. The media listeners are shared singletons that live
+ * for the app's lifetime, so there is nothing to dispose.
+ */
 export function useBreakpoint() {
   init();
-
-  onScopeDispose(() => {
-    // Listeners are shared singletons — don't remove them
-    // They'll persist for the app lifetime which is fine
-  });
 
   return {
     isMobile: readonly(isMobile),

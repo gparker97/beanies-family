@@ -48,6 +48,8 @@ onMounted(() => {
     :class="{ 'fab-open': isOpen }"
     :aria-label="t('quickAdd.fab.label')"
     :aria-expanded="isOpen"
+    :aria-controls="isOpen ? 'quick-add-surface' : undefined"
+    aria-haspopup="dialog"
     @click="toggle"
   >
     <svg class="fab-icon" viewBox="0 0 120 120" aria-hidden="true" focusable="false">
@@ -63,8 +65,9 @@ onMounted(() => {
   border: 0;
   border-radius: 9999px;
 
-  /* Clears MobileBottomNav (~56px tall + safe-area). */
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 92px);
+  /* The shared FAB corner (src/style.css): clears MobileBottomNav (~56px tall +
+     safe-area) on phones, 24px from the corner at 768px and up. */
+  bottom: var(--fab-anchor-bottom);
   box-shadow:
     0 12px 28px -8px rgb(241 93 34 / 45%),
     0 4px 8px rgb(44 62 80 / 18%);
@@ -72,20 +75,13 @@ onMounted(() => {
   height: 64px;
   padding: 0;
   position: fixed;
-  right: 16px;
+  right: var(--fab-anchor-side);
   -webkit-tap-highlight-color: transparent;
   transition:
     transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1),
     box-shadow 0.25s ease-out;
   width: 64px;
   z-index: 40;
-}
-
-@media (width >= 768px) {
-  .fab {
-    bottom: 24px;
-    right: 24px;
-  }
 }
 
 .fab:hover {

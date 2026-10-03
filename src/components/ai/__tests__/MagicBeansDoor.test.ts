@@ -30,8 +30,24 @@ vi.mock('@/composables/useMagicReader', () => ({
 vi.mock('@/composables/useSharedDocumentIngest', () => ({
   IN_APP_ENV: { surface: 'magic-beans-capture', origin: 'in-app' },
   ingestInAppSource: (...args: unknown[]) => ingestInAppSource(...args),
-  logCaptureOpened: () => logCaptureOpened(),
+  logCaptureOpened: (...args: unknown[]) => logCaptureOpened(...args),
   refuseIfBusy: (...args: unknown[]) => refuseIfBusy(...args),
+}));
+
+const logEvent = vi.fn();
+vi.mock('@/services/telemetry/logEvent', () => ({
+  logEvent: (...args: unknown[]) => logEvent(...args),
+}));
+
+const reportError = vi.fn();
+vi.mock('@/utils/errorReporter', () => ({
+  reportError: (...args: unknown[]) => reportError(...args),
+}));
+
+const showToast = vi.fn();
+vi.mock('@/composables/useToast', () => ({ useToast: () => ({ showToast }) }));
+vi.mock('@/composables/useTranslation', () => ({
+  useTranslation: () => ({ t: (k: string) => k }),
 }));
 
 const pickCamera = vi.fn();
@@ -72,6 +88,8 @@ describe('MagicBeansDoor', () => {
     refuseIfBusy.mockReset().mockReturnValue(false);
     refuseManagedRead.mockReset().mockReturnValue(false);
     logCaptureOpened.mockReset();
+    logEvent.mockReset();
+    showToast.mockReset();
     pickCamera.mockReset();
     pickFile.mockReset();
   });
@@ -328,6 +346,238 @@ describe('MagicBeansDoor', () => {
       for (const kind of MAGIC_DESTINATION_KINDS) {
         expect(MAGIC_DESTINATIONS[kind].emoji).toBeTruthy();
       }
+    });
+  });
+
+  describe('declining consent at the commit is logged, once, by the door', () => {
+    it('logs consent_declined at the commit and emits closed, with no handoff', async () => {
+      requestConsent.mockResolvedValue(null);
+      const w = mountDoor();
+      await w.find('.t').trigger('click');
+      await sheet(w).vm.$emit('submit', 'a note');
+      await flushPromises();
+
+      const declines = logEvent.mock.calls.filter(
+        (c) => (c[0] as { context?: { action?: string } }).context?.action === 'consent_declined'
+      );
+      expect(declines).toHaveLength(1);
+      expect(declines[0][0]).toMatchObject({
+        surface: 'magic-beans-capture',
+        context: { action: 'consent_declined', stage: 'commit' },
+      });
+      expect(w.emitted('closed')).toHaveLength(1);
+      expect(w.emitted('handoff')).toBeUndefined();
+    });
+  });
+
+  describe('drawer mode emits handoff too, and passes no click event as context', () => {
+    it('emits handoff(paste) as the drawer closes', async () => {
+      const w = mountDoor();
+      await w.find('.t').trigger('click');
+      await sheet(w).vm.$emit('submit', 'text');
+      await flushPromises();
+      expect(w.emitted('handoff')).toEqual([['paste']]);
+    });
+
+    it('logs the denominator with NO context from a trigger tap', async () => {
+      const w = mountDoor();
+      await w.find('.t').trigger('click');
+      expect(logCaptureOpened).toHaveBeenCalledWith(undefined);
+    });
+  });
+
+  describe('inline mode (#119, the FAB composer)', () => {
+    type InlineDoor = {
+      open: (c?: { stage: 'composer'; format: 'phone' | 'desktop' }) => void;
+      send: (text: string) => void;
+      camera: () => void;
+      file: () => void;
+    };
+
+    /** A shared, ordered log: the host's handoff listener and the ingest/picker spies append. */
+    let order: string[];
+
+    function mountInline() {
+      order = [];
+      ingestInAppSource.mockImplementation(() => {
+        order.push('ingest');
+        return Promise.resolve();
+      });
+      pickCamera.mockImplementation(() => order.push('pickCamera'));
+      pickFile.mockImplementation(() => order.push('pickFile'));
+      const w = mount(MagicBeansDoor, {
+        props: {
+          inline: true,
+          onHandoff: (source: string) => order.push(`handoff:${source}`),
+        },
+      });
+      return { w, door: w.vm as unknown as InlineDoor };
+    }
+
+    it('renders the picker but no drawer and no trigger slot', () => {
+      const w = mount(MagicBeansDoor, {
+        props: { inline: true },
+        slots: { trigger: `<button class="t" />` },
+      });
+      expect(w.findComponent({ name: 'AiDocumentPicker' }).exists()).toBe(true);
+      expect(sheet(w as ReturnType<typeof mountDoor>).exists()).toBe(false);
+      expect(w.find('.t').exists()).toBe(false);
+    });
+
+    it('open(context) records the denominator with that context and opens nothing', () => {
+      const { w, door } = mountInline();
+      door.open({ stage: 'composer', format: 'phone' });
+      expect(logCaptureOpened).toHaveBeenCalledWith({ stage: 'composer', format: 'phone' });
+      expect(sheet(w as ReturnType<typeof mountDoor>).exists()).toBe(false);
+    });
+
+    it('send(text) emits handoff(paste) STRICTLY before the ingest starts', async () => {
+      const grant = { id: 'i1' };
+      requestConsent.mockResolvedValue(grant);
+      const { door } = mountInline();
+      door.send('Swimming Tue 4pm');
+      await flushPromises();
+
+      // Invariant 4: the host closes its surface in the handoff listener, before the ingest.
+      expect(order).toEqual(['handoff:paste', 'ingest']);
+      expect(ingestInAppSource).toHaveBeenCalledWith(
+        { kind: 'paste', text: 'Swimming Tue 4pm' },
+        grant,
+        undefined
+      );
+    });
+
+    it('camera() emits handoff(camera) before the picker opens', async () => {
+      const { door } = mountInline();
+      door.camera();
+      await flushPromises();
+      expect(order).toEqual(['handoff:camera', 'pickCamera']);
+    });
+
+    it('file() emits handoff(file) before the picker opens', async () => {
+      const { door } = mountInline();
+      door.file();
+      await flushPromises();
+      expect(order).toEqual(['handoff:file', 'pickFile']);
+    });
+
+    it('busy: emits closed, no handoff, no ingest', async () => {
+      refuseIfBusy.mockReturnValue(true);
+      const { w, door } = mountInline();
+      door.send('text');
+      await flushPromises();
+      expect(w.emitted('closed')).toHaveLength(1);
+      expect(w.emitted('handoff')).toBeUndefined();
+      expect(ingestInAppSource).not.toHaveBeenCalled();
+    });
+
+    it('read-only: emits closed, no handoff', async () => {
+      refuseManagedRead.mockReturnValue(true);
+      const { w, door } = mountInline();
+      door.camera();
+      await flushPromises();
+      expect(w.emitted('closed')).toHaveLength(1);
+      expect(w.emitted('handoff')).toBeUndefined();
+      expect(pickCamera).not.toHaveBeenCalled();
+    });
+
+    it('decline: emits closed, no handoff, and logs consent_declined once', async () => {
+      requestConsent.mockResolvedValue(null);
+      const { w, door } = mountInline();
+      door.send('text');
+      await flushPromises();
+      expect(w.emitted('closed')).toHaveLength(1);
+      expect(w.emitted('handoff')).toBeUndefined();
+      expect(
+        logEvent.mock.calls.filter(
+          (c) => (c[0] as { context?: { action?: string } }).context?.action === 'consent_declined'
+        )
+      ).toHaveLength(1);
+    });
+
+    it('a missing picker ref: no handoff, grant cleared, picker_missing logged, error toast', async () => {
+      const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const { w, door } = mountInline();
+      // The picker did not mount (a refactor put the door inside a false v-if).
+      (w.vm as unknown as { $: { setupState: { picker: unknown } } }).$.setupState.picker = null;
+      door.camera();
+      await flushPromises();
+
+      expect(w.emitted('handoff')).toBeUndefined();
+      expect(logEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          level: 'error',
+          surface: 'magic-beans-capture',
+          context: { action: 'picker_missing', kind: 'camera' },
+        })
+      );
+      expect(showToast).toHaveBeenCalledWith(
+        'error',
+        'ai.picker.openErrorTitle',
+        'ai.picker.openErrorBody'
+      );
+
+      // Grant cleared: a file that turns up anyway is not read under it.
+      const file = new File(['x'], 'a.png', { type: 'image/png' });
+      w.findComponent({ name: 'AiDocumentPicker' }).vm.$emit('file', file);
+      await flushPromises();
+      expect(ingestInAppSource).not.toHaveBeenCalled();
+      errSpy.mockRestore();
+    });
+
+    it('a rejecting commit is reported on the door surface with the action and toasts, not left unhandled', async () => {
+      const boom = new Error('consent prompt failed');
+      requestConsent.mockRejectedValue(boom);
+      const unhandled = vi.fn();
+      process.on('unhandledRejection', unhandled);
+      reportError.mockClear();
+      const { w, door } = mountInline();
+      door.send('text');
+      door.camera();
+      await flushPromises();
+      process.off('unhandledRejection', unhandled);
+
+      expect(w.emitted('handoff')).toBeUndefined();
+      expect(ingestInAppSource).not.toHaveBeenCalled();
+      expect(reportError.mock.calls.map((c) => c[0])).toEqual([
+        {
+          surface: 'magic-beans-capture',
+          message: 'inline door action failed',
+          severity: 'error',
+          error: boom,
+          context: { action: 'send' },
+        },
+        {
+          surface: 'magic-beans-capture',
+          message: 'inline door action failed',
+          severity: 'error',
+          error: boom,
+          context: { action: 'camera' },
+        },
+      ]);
+      // The person is told, once per failed action, with the generic AI error copy.
+      expect(showToast.mock.calls).toEqual([
+        ['error', 'ai.error.title', 'ai.error.generic'],
+        ['error', 'ai.error.title', 'ai.error.generic'],
+      ]);
+      expect(unhandled).not.toHaveBeenCalled();
+    });
+
+    it('with no reader enabled, an action logs inline_unreadable and does nothing', async () => {
+      canReadAny = false;
+      const { w, door } = mountInline();
+      door.send('text');
+      door.camera();
+      await flushPromises();
+
+      expect(refuseIfBusy).not.toHaveBeenCalled();
+      expect(requestConsent).not.toHaveBeenCalled();
+      expect(w.emitted('handoff')).toBeUndefined();
+      expect(
+        logEvent.mock.calls.filter(
+          (c) => (c[0] as { context?: { action?: string } }).context?.action === 'inline_unreadable'
+        )
+      ).toHaveLength(2);
     });
   });
 });

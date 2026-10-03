@@ -3450,7 +3450,8 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'plan.bullets.basic1': '所有功能、所有成员、所有设备',
   'plan.bullets.basic2': '每月 1 颗魔法豆',
   'plan.bullets.basic3': '使用自己的 AI 密钥：不限次数',
-  'plan.bullets.full1': '每天 10 颗魔法豆',
+  'plan.bullets.full1': '每天 {count} 颗魔法豆',
+  'plan.bullets.full1Fallback': '每天都有魔法豆额度',
   'plan.bullets.full2': '对账单、邀请函、食谱、行程单',
   'plan.bullets.full3': '随时可在本页取消',
   'plan.cycle.label': '计费周期',
@@ -5139,8 +5140,6 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
 
   // ── "beanies can do magic" AI entry points — shared magic-reader language ──
   'ai.magic.title': '魔法豆',
-  'ai.magic.subtitle': '一张照片、一个文件、一个链接或一段文字，beanies 都能识别',
-  'ai.magic.action': '帮我读一读',
   'ai.magic.perform': '魔法豆',
   'ai.magic.performHint': '拍下邀请函，beanies 帮你填好',
   'ai.magic.quickStart': '快速开始',
@@ -5205,6 +5204,8 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'ai.allowance.action': 'AI 设置',
   'plan.allowance.day': '今天还剩 {left}/{limit} 颗魔法豆，将于 {date} {time} 重置。',
   'plan.allowance.month': '本月还剩 {left}/{limit} 颗魔法豆，将于 {date} {time} 重置。',
+  'plan.allowance.briefDay': '今天还剩 {left}/{limit} 颗魔法豆',
+  'plan.allowance.briefMonth': '本月还剩 {left}/{limit} 颗魔法豆',
   'plan.allowance.unavailable': '暂时无法查看魔法豆用量。',
   'ai.picker.title': '你想怎么添加？',
   'ai.picker.orFrom': '或从这里读取',
@@ -5214,11 +5215,14 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'ai.picker.tooLarge.message':
     'beanies 最多可读取 25 MB 的文件。试试小一点的照片，或者只截取关键部分。',
   'ai.capture.title': '魔法豆',
-  'ai.capture.action': '开始读取',
+  'ai.capture.action': '发送',
+  'ai.capture.sendShortcut': 'Ctrl+Enter 发送',
+  'ai.capture.sendShortcutMac': '⌘+Enter 发送',
   'ai.capture.label': '粘贴任意内容',
   'ai.capture.placeholder': '提醒我明天上午 10 点遛狗…',
   'ai.capture.labelHint':
     '粘贴一条短信、一封邮件、一个活动、一项待办、一条给自己的提醒、一个食谱链接，或者任何你想保留的内容，我们会识别出它是什么。保存之前你都可以先核对。',
+  'ai.capture.taglineShort': '给我们点东西读',
   'ai.capture.tagline': '给我们点东西读，剩下的交给我们',
   'ai.capture.dest.event': '活动',
   'ai.capture.dest.travel': '行程',
@@ -5608,6 +5612,7 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
 
   // Quick-add FAB — group labels
   'quickAdd.groups.everyday.kicker': '🫘 日常记录',
+  'quickAdd.groups.everyday.byHand': '或者手动添加一个',
   'quickAdd.groups.everyday.subhint': '你最常添加的',
   'quickAdd.groups.family.title': '家庭',
   'quickAdd.groups.money.title': '财务',

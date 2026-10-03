@@ -12,12 +12,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Added
 
+- Magic beans is now one tap away: tap the beanies button and start typing or attach a photo straight away, then tap Send. The Everyday tiles sit underneath for adding things by hand, and the bar at the bottom stays visible while it is open.
 - The marketing site now keeps its own record of campaign events (landings and store taps), so ad and post results no longer depend on a third-party analytics tool.
 - The "how did you hear about us?" answer is now saved on the family's registry entry.
 - Native installs are now attributed: the Android app reads the Google Play install referrer once, and the founder dashboard shows inferred-attribution bands for families that arrived without a tag.
 
 ### Changed
 
+- The Full plan's daily magic beans allowance is 25 (was 10), and the number is now set on the server and shown live on the pricing page, the help article and the Plan page, so it can change without an app release.
 - The App Store link from beanies.family now carries Apple's campaign parameters per ad, and the privacy page describes the first-party campaign record, the survey answer on the registry entry and the Play install referrer.
 
 ### Fixed

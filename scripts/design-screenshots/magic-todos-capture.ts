@@ -233,21 +233,18 @@ async function probeLayout(page: Page, scope: Locator, label: string) {
 }
 
 async function openMagicAndRead(page: Page, text: string) {
-  const group = page.locator('[role="group"][aria-label="Tell us what this is"]');
-  for (let attempt = 0; attempt < 3 && !(await group.isVisible()); attempt++) {
-    const sheet = page.getByTestId('quick-add-sheet');
-    if (!(await sheet.isVisible())) {
-      await page.getByRole('button', { name: 'Quick add' }).click({ force: true });
-      await sheet.waitFor();
-    }
-    await page.waitForTimeout(400);
-    await sheet.getByRole('button', { name: /read something for me/i }).click();
-    await group.waitFor({ timeout: 4000 }).catch(() => {});
+  // Since #119 the FAB opens the magic beans composer in place (focused field, Send pill).
+  // The composer has no kind tiles: with no hint beanies works the kind out itself.
+  const sheet = page.getByTestId('quick-add-sheet');
+  if (!(await sheet.isVisible())) {
+    // The FAB animates continuously, so Playwright never sees it "stable": click through it.
+    await page.getByRole('button', { name: 'Quick add' }).click({ force: true });
+    await sheet.waitFor();
   }
-  const field = page.getByRole('dialog').filter({ has: group }).locator('textarea');
+  const field = sheet.getByTestId('magic-composer-field');
   await field.waitFor();
   await field.fill(text);
-  await page.getByRole('button', { name: ui('ai.capture.action') }).click();
+  await sheet.getByTestId('magic-composer-send').click();
   // First read on BYOK asks for consent.
   const consent = page.getByRole('dialog').filter({ hasText: ui('ai.consent.title') });
   const confirmBtn = consent.getByRole('button', { name: ui('ai.consent.confirm') });

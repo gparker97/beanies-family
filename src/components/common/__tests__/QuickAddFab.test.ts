@@ -3,12 +3,13 @@
  * quick-add option (previously it always showed and opened an empty sheet).
  */
 import { describe, it, expect, vi } from 'vitest';
-import { ref } from 'vue';
+import { nextTick, ref } from 'vue';
 import { mount } from '@vue/test-utils';
 import QuickAddFab from '../QuickAddFab.vue';
 
 const hideQuickAdd = ref(false);
 const hasAnyQuickAddOption = ref(true);
+const isOpen = ref(false);
 
 vi.mock('vue-router', () => ({
   useRoute: () => ({
@@ -20,7 +21,7 @@ vi.mock('vue-router', () => ({
   }),
 }));
 vi.mock('@/composables/useQuickAdd', () => ({
-  useQuickAdd: () => ({ isOpen: ref(false), toggle: vi.fn() }),
+  useQuickAdd: () => ({ isOpen, toggle: vi.fn() }),
 }));
 vi.mock('@/composables/useQuickAddAvailability', () => ({
   useQuickAddAvailability: () => ({ hasAnyQuickAddOption }),
@@ -50,5 +51,21 @@ describe('QuickAddFab', () => {
     hideQuickAdd.value = true;
     hasAnyQuickAddOption.value = true;
     expect(mountFab().find('button.fab').exists()).toBe(false);
+  });
+
+  it('names the surface it opens, for assistive tech (#119)', async () => {
+    hideQuickAdd.value = false;
+    hasAnyQuickAddOption.value = true;
+    isOpen.value = false;
+    const fab = mountFab().find('button.fab');
+    // The surface is v-if'd, so a closed FAB must not point at an id that is not in the DOM.
+    expect(fab.attributes('aria-controls')).toBeUndefined();
+    expect(fab.attributes('aria-haspopup')).toBe('dialog');
+    expect(fab.attributes('aria-label')).toBe('quickAdd.fab.label');
+
+    isOpen.value = true;
+    await nextTick();
+    expect(fab.attributes('aria-controls')).toBe('quick-add-surface');
+    isOpen.value = false;
   });
 });

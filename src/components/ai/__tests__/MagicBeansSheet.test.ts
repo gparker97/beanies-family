@@ -87,6 +87,12 @@ describe('MagicBeansSheet', () => {
     expect(mountSheet().find('[data-test="sources"]').exists()).toBe(true);
   });
 
+  it('labels its save "Send" (#119: the same verb as the FAB composer)', () => {
+    expect(mountSheet().findComponent({ name: 'BeanieFormModal' }).props('saveLabel')).toBe(
+      'ai.capture.action'
+    );
+  });
+
   it('focuses the field on open, so you can paste immediately', async () => {
     const w = mountSheet(false);
     await w.setProps({ open: true });
