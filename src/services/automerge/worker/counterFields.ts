@@ -31,7 +31,7 @@
  */
 import * as Automerge from '@automerge/automerge';
 import type { CollectionName, FamilyDocument } from '@/types/automerge';
-import type { MutationOp } from './protocol';
+import type { Heads, MutationOp } from './protocol';
 
 type AnyRecord = Record<string, unknown>;
 type Doc = Automerge.Doc<FamilyDocument>;
@@ -165,6 +165,22 @@ function finiteOr0(v: unknown): number {
 }
 
 /**
+ * `base + minor` in integer minor-unit space, or a float add when `base` is past the
+ * safe-integer headroom (`|base| > ~9.0e11`). THE one place a STORED absolute meets the scale:
+ * the fold, the dormant write and the unfold all go through it, so none of them can throw on a
+ * stored value that today's plain `cur + delta` accepted. Only a DELTA is held to the headroom
+ * (`toMinor`), because only a delta becomes a Counter.
+ */
+function addMinor(base: number, minor: number): number {
+  const scaled = Math.round(base * COUNTER_SCALE);
+  return Number.isSafeInteger(scaled) ? fromMinor(scaled + minor) : base + fromMinor(minor);
+}
+
+/** `value` held at `floor` (`null` = no floor). */
+const applyFloor = (value: number, floor: number | null): number =>
+  floor === null ? value : Math.max(floor, value);
+
+/**
  * THE fold arithmetic: `abs + minor`, in integer space, then the floor. Shared by `foldEntity`
  * and the goal and loan handlers so the three can never disagree on rounding or the floor.
  *
@@ -174,13 +190,7 @@ function finiteOr0(v: unknown): number {
  */
 export function foldValue(abs: unknown, minor: number, floor: number | null): number {
   const base = finiteOr0(abs);
-  let value: number;
-  if (minor === 0) value = base;
-  else {
-    const scaled = Math.round(base * COUNTER_SCALE);
-    value = Number.isSafeInteger(scaled) ? fromMinor(scaled + minor) : base + fromMinor(minor);
-  }
-  return floor === null ? value : Math.max(floor, value);
+  return applyFloor(minor === 0 ? base : addMinor(base, minor), floor);
 }
 
 // ─── Keys ────────────────────────────────────────────────────────────────────
@@ -329,7 +339,9 @@ function unfoldAt(obj: AnyRecord, abs: CounterField['abs'], minor: number): AnyR
   // Non-finite passes through: nothing can be subtracted from it, and the unfold is a
   // boundary conversion, not a validator.
   if (!parent || typeof v !== 'number' || !Number.isFinite(v)) return obj;
-  const raw = fromMinor(toMinor(v) - minor);
+  // `addMinor`, never `toMinor(v)`: `v` is a stored-scale absolute, not a delta, so one past the
+  // integer headroom takes the float path instead of throwing on a write today's code accepted.
+  const raw = addMinor(v, -minor);
   if (abs.length === 1) return { ...obj, [leaf]: raw };
   return { ...obj, [abs[0]]: { ...parent, [leaf]: raw } };
 }
@@ -377,16 +389,26 @@ export function unfoldPatch<P extends AnyRecord, B extends AnyRecord | undefined
  * `delta` becomes integer minor units FIRST, on both paths, so they agree to the last bit:
  *  - writes ON: create the writer's own key if absent, then `increment(minor)`. Throws if the
  *    draft has no `counterDeltas` map: `migrateDoc` did not run, a real programming error.
- *  - writes OFF (dormant): `abs = fromMinor(toMinor(cur) + minor)` on the absolute, never
- *    touching the map. A loan op's `newBalance − outstandingBalance` (a float subtraction of
- *    two `round2` values) therefore lands on `newBalance` exactly, where `cur + delta` could
- *    miss it by an ulp. Differs from today's float add only below the fourth decimal.
+ *  - writes OFF (dormant): `abs = max(floor, cur + minor)` in integer minor units on the
+ *    absolute, never touching the map. A loan op's `newBalance − outstandingBalance` (a float
+ *    subtraction of two `round2` values) therefore lands on `newBalance` exactly, where
+ *    `cur + delta` could miss it by an ulp. Differs from today's float add only below the fourth
+ *    decimal. The field's floor is applied to the WRITTEN value, as today's goal write
+ *    (`Math.max(0, current + delta)`) did: with no keys the read floor cannot help, because a
+ *    stored negative from pre-Phase-2 history would otherwise be written back below it. A
+ *    stored absolute past the integer headroom takes `addMinor`'s float path, never a throw.
  *
  * A zero adjustment writes nothing on either path. Throws when the entity, or the parent of a
  * nested field (an asset's `loan`), is missing: callers check existence and `onMissing` first.
  *
  * `writerId` is `Automerge.getActorId(doc)`: unique per live handle and fresh per `load`, which
  * is what makes every key single-writer (rule 1 in the header).
+ *
+ * `index`, when given, is `foldIndex(draft)` built BEFORE this write by a handler that reads the
+ * draft again afterwards (its echo). A Counter write is recorded in it, so that one index stays
+ * exactly what a fresh `foldIndex(draft)` would now return (probe m) and the handler never
+ * rebuilds it. It never changes what is written. The dormant path touches no key, so it leaves
+ * the index alone.
  */
 export function adjustField(
   draft: FamilyDocument,
@@ -394,7 +416,8 @@ export function adjustField(
   id: string,
   field: string,
   delta: number,
-  writerId: string
+  writerId: string,
+  index?: FoldIndex
 ): void {
   const spec = resolveField(collection, field);
   const minor = toMinor(delta);
@@ -423,10 +446,14 @@ export function adjustField(
     const key = counterKey(collection, id, field, writerId);
     if (map[key] === undefined) map[key] = new Automerge.Counter(0);
     map[key]!.increment(minor);
+    if (index) {
+      const k = entityFieldKey(collection, id, field);
+      (index as CounterIndex).set(k, (index.get(k) ?? 0) + minor);
+    }
     return;
   }
   const leaf = leafOf(spec.abs);
-  parent[leaf] = fromMinor(toMinor(finiteOr0(parent[leaf])) + minor);
+  parent[leaf] = applyFloor(addMinor(finiteOr0(parent[leaf]), minor), spec.floor);
 }
 
 // ─── Compaction and rebase ───────────────────────────────────────────────────
@@ -447,14 +474,30 @@ export type FoldedSource = Omit<FamilyDocument, 'counterDeltas' | 'foldedCounter
  * earlier one, or it re-emits that adjustment and counts it twice. Every parseable key is
  * ledgered, including one whose entity is gone or whose `loan` was removed (folded into
  * nothing): the ledger records that the key's value was CONSUMED, so a rebase cannot replay it.
- * A malformed key (a future build's field) is dropped unledgered; the floor must keep a build
- * that lacks a field from compacting a pod that holds it.
+ *
+ * ⚠️ THROWS WHEN THE MAP HOLDS A KEY THIS BUILD CANNOT FOLD (unparseable, a field this build's
+ * table lacks, a non-integer value). Compaction empties the map, so a key it cannot fold would
+ * be destroyed with every adjustment it carries (a future build's Counter field, compacted by a
+ * build that predates it). Refusing keeps the old document: `compactDoc` runs this inside its
+ * verify `try`, so the throw takes the same "keep the old document, classify, rethrow" path a
+ * verify difference takes. The READ side (`foldIndex`) still never throws (rule 4): only the
+ * one operation that would make the loss permanent refuses.
  *
  * `foldedCounters` is written only when it holds something, so a dormant pod's compaction
  * source is today's plus the empty map.
  */
 export function foldDoc(before: Doc): FoldedSource {
   const index = foldIndex(before);
+  if (index.malformed > 0) {
+    const offending = Object.entries(before.counterDeltas ?? {}).find(
+      ([k, v]) => !parseCounterKey(k) || counterValue(v) === null
+    )?.[0];
+    throw new Error(
+      `counterFields: cannot compact: the Counter map holds ${index.malformed} key(s) this build ` +
+        `cannot fold (first: "${String(offending)}"). Compacting would destroy those ` +
+        `adjustments. Update the app before compacting.`
+    );
+  }
   const plain = Automerge.toJS(before) as unknown as AnyRecord;
   if (index.size > 0) {
     for (const collection of Object.keys(COUNTER_FIELDS)) {
@@ -485,22 +528,35 @@ type GrowthSource = CounterSource & {
 };
 
 /**
- * The rebase's Counter pass, PURE: what `local` adjusted that `target` does not yet hold, as
- * one `increment` op per (collection, id, field). Per key, growth = local value − (the target's
+ * The rebase's Counter pass: what `local` adjusted that `target` does not yet hold, as one
+ * `increment` op per (collection, id, field). Per key, growth = local value − (the target's
  * live key ?? the target's ledger entry ?? 0), in minor units.
  *
- * Exact without a baseline view: the ledger says what any compaction already folded, so a
- * stale baseline cannot double-count. The live read comes first because a target that never
- * compacted (or was compacted by a pre-fold build, which carries the map through intact) still
- * holds the key. `onMissing: 'skip'` keeps the composer's "the compactor deleted it" rule.
- * Malformed keys are skipped.
+ * ONLY KEYS `local` CHANGED SINCE `baselineHeads` ARE CONSIDERED. A key whose value at the
+ * baseline equals its value now is skipped: either a FOREIGN writer's key (it reached `local`
+ * through a merge the baseline already covers), or an own key with nothing new. Without this,
+ * a foreign key whose local copy is STALE (lower than what the compactor folded, because its
+ * writer kept adjusting after `local` last merged) would fabricate a negative increment on
+ * another device's account: `local − ledger` is the writer's later growth, negated.
+ *
+ * For a changed key the growth is still measured against the TARGET, never the baseline: the
+ * ledger says what any compaction already folded, so a stale baseline cannot double-count an
+ * adjustment that reached Drive after it. The live read comes first because a target that
+ * never compacted (or was compacted by a pre-fold build, which carries the map through intact)
+ * still holds the key. `onMissing: 'skip'` keeps the composer's "the compactor deleted it"
+ * rule. Malformed keys are skipped.
+ *
+ * Pure except for one `Automerge.view` (plain reads on a view are heads-aware, probe f). The
+ * caller (`buildRebaseOps`) has already proved `local` holds `baselineHeads`.
  */
 export function counterGrowthOps(
-  local: GrowthSource,
-  target: GrowthSource
+  local: Doc,
+  target: GrowthSource,
+  baselineHeads: Heads
 ): { ops: MutationOp[]; count: number } {
-  const map = local.counterDeltas;
-  if (!map) return { ops: [], count: 0 };
+  const map = local.counterDeltas as Readonly<Record<string, unknown>> | undefined;
+  if (!map || Object.keys(map).length === 0) return { ops: [], count: 0 };
+  const atBaseline = (Automerge.view(local, baselineHeads) as GrowthSource).counterDeltas;
   const growth = new Map<
     string,
     { collection: CounterCollection; id: string; field: string; minor: number }
@@ -509,6 +565,7 @@ export function counterGrowthOps(
     const parsed = parseCounterKey(key);
     const mine = parsed ? counterValue(map[key]) : null;
     if (!parsed || mine === null) continue;
+    if (counterValue(atBaseline?.[key]) === mine) continue; // foreign, or nothing new
     const theirs =
       counterValue(target.counterDeltas?.[key]) ?? counterValue(target.foldedCounters?.[key]) ?? 0;
     const g = mine - theirs;

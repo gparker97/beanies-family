@@ -206,6 +206,19 @@ describe('quick contributions with history (writes on)', () => {
     }
   });
 
+  it("an undo after a concurrent contribution merged removes the ENTRY's amount, not main's delta", () => {
+    // Main sent a delta computed from a view the merge made stale (here -80: "back to before
+    // both"). The entry being spliced recorded 30, so exactly 30 goes: total − entry.amount.
+    __setCounterWritesForTesting(true);
+    const merged = bothContributed();
+    expect(goalAmountOf(merged.a)).toBe(180);
+    const undone = apply(merged.a, contribute(-80, { undoContributionId: 'ca' }));
+    expect(goalAmountOf(undone)).toBe(150);
+    expect(historyOf(undone)).toEqual(['cb:50']);
+    const after = converge(undone, merged.b);
+    for (const doc of [after.a, after.b]) expect(goalAmountOf(doc)).toBe(150);
+  });
+
   it('a second undo of the same entry, on either device after the merge, changes nothing', () => {
     __setCounterWritesForTesting(true);
     const merged = bothContributed();

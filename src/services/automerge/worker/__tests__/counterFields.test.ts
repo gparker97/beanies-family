@@ -313,6 +313,21 @@ describe('unfoldPatch', () => {
     expect(patch.balance).toBe(base.balance);
   });
 
+  it('an absolute past the integer headroom unfolds by a float subtract, never a throw', () => {
+    // 2e12 × 10^4 is not a safe integer; today's patch wrote it without complaint.
+    const huge = 2e12;
+    expect(() => toMinor(huge)).toThrow();
+    const { patch, base } = unfoldPatch(
+      'accounts',
+      'A',
+      { balance: huge },
+      { balance: huge },
+      index
+    );
+    expect(patch.balance).toBe(huge - fromMinor(-507_500));
+    expect(base.balance).toBe(patch.balance);
+  });
+
   it('Σ = 0 is the identity: the same objects, values untouched (no rounding)', () => {
     const patch = { balance: 1.23456789 };
     const base = { balance: 1 };
@@ -397,6 +412,39 @@ describe('adjustField', () => {
     expect(Object.keys(doc.counterDeltas)).toEqual([]);
   });
 
+  it('writes off: an absolute past the integer headroom takes a float add, never a throw', () => {
+    __setCounterWritesForTesting(false);
+    const huge = 2e12; // ×10^4 is not a safe integer; today's `cur + delta` accepted it
+    const doc = Automerge.change(
+      docWith((d) => {
+        (d.accounts as unknown as Record<string, Account>).A!.balance = huge;
+      }),
+      (d) => adjustField(d, 'accounts', 'A', 'balance', -20.25, 'w1')
+    );
+    expect((doc.accounts.A as Account).balance).toBe(huge - 20.25);
+    // Only the DELTA is held to the headroom.
+    expect(() =>
+      Automerge.change(doc, (d) => adjustField(d, 'accounts', 'A', 'balance', huge, 'w1'))
+    ).toThrow(/Fix the caller/);
+  });
+
+  it("writes off: the field's floor holds on the WRITTEN value, as today's goal write did", () => {
+    __setCounterWritesForTesting(false);
+    // A stored negative goal amount from pre-Phase-2 history. Today: `max(0, -30 + 10)` = 0.
+    const doc = Automerge.change(
+      docWith((d) => {
+        (d.goals as unknown as Record<string, Goal>).G!.currentAmount = -30;
+        (d.accounts as unknown as Record<string, Account>).A!.balance = -30;
+      }),
+      (d) => {
+        adjustField(d, 'goals', 'G', 'currentAmount', 10, 'w1');
+        adjustField(d, 'accounts', 'A', 'balance', 10, 'w1'); // no floor: may stay negative
+      }
+    );
+    expect((doc.goals.G as Goal).currentAmount).toBe(0);
+    expect((doc.accounts.A as Account).balance).toBe(-20);
+  });
+
   it('writes off: a loan payment lands on round2 newBalance exactly, where a float add misses', () => {
     __setCounterWritesForTesting(false);
     const cur = 394.71;
@@ -472,7 +520,6 @@ describe('foldDoc (the compaction source)', () => {
       adjustField(d, 'accounts', 'A', 'balance', -20.25, 'w1');
       adjustField(d, 'goals', 'G', 'currentAmount', 30.5, 'w1');
       adjustField(d, 'assets', 'L', 'loan.outstandingBalance', -10, 'w1');
-      (d.counterDeltas as unknown as AnyRec)['garbage'] = new Automerge.Counter(3);
     });
     const source = foldDoc(doc);
     expect((source.accounts.A as Account).balance).toBe(79.75);
@@ -519,6 +566,30 @@ describe('foldDoc (the compaction source)', () => {
     expect(source.foldedCounters).toEqual({ 'assets/L/loan.outstandingBalance/w1': -100_000 });
   });
 
+  it('THROWS on a key this build cannot fold, rather than destroy its adjustments', () => {
+    // A future build's Counter field (unknown to this table), an unparseable key, and a
+    // non-integer value: each would be dropped unledgered by the fold, and compaction empties
+    // the map, so the adjustments would be gone for good.
+    for (const [key, value] of [
+      ['accounts/A/creditLimit/w9', new Automerge.Counter(5)],
+      ['garbage', new Automerge.Counter(3)],
+    ] as const) {
+      const doc = docWith((d) => {
+        (d.counterDeltas as unknown as AnyRec)[key] = value;
+      });
+      expect(() => foldDoc(doc)).toThrow(
+        new RegExp(`cannot compact.*first: "${key}".*Update the app before compacting`)
+      );
+    }
+    // The fold on READ still never throws (rule 4): only the compaction refuses.
+    const doc = docWith((d) => {
+      (d.counterDeltas as unknown as AnyRec)['accounts/A/creditLimit/w9'] = new Automerge.Counter(
+        5
+      );
+    });
+    expect(foldIndex(doc).malformed).toBe(1);
+  });
+
   it('a dormant pod: absolutes untouched, empty map, no ledger key', () => {
     const doc = docWith();
     const source = foldDoc(doc);
@@ -528,12 +599,24 @@ describe('foldDoc (the compaction source)', () => {
 });
 
 describe('counterGrowthOps (the rebase ledger pass)', () => {
-  const local = withMap({
+  /** A copy of `from` whose map holds `keys` as Counters (minor units), as one change. Cloned,
+   *  so `from` stays usable (a changed handle is outdated). */
+  const withCounters = (from: Doc, keys: Record<string, number>): Doc =>
+    Automerge.change(Automerge.clone(from), (d) => {
+      for (const [k, v] of Object.entries(keys)) {
+        const map = d.counterDeltas as unknown as Record<string, Automerge.Counter>;
+        if (map[k] === undefined) map[k] = new Automerge.Counter(v);
+        else map[k]!.increment(v - map[k]!.value);
+      }
+    });
+
+  const baseline = docWith();
+  const baselineHeads = Automerge.getHeads(baseline);
+  const local = withCounters(baseline, {
     'accounts/A/balance/w1': -300_000, // target holds it live at -100_000 → growth -20
     'accounts/A/balance/w2': -50_000, // target ledgered it at -50_000 → no growth
     'goals/G/currentAmount/w1': 70_000, // target has neither → all of it
     'assets/L/loan.outstandingBalance/w1': -10_000, // ledgered at -4_000 → growth -0.6
-    garbage: 1, // malformed → skipped
   });
   const target = {
     counterDeltas: { 'accounts/A/balance/w1': new Automerge.Counter(-100_000) },
@@ -544,7 +627,7 @@ describe('counterGrowthOps (the rebase ledger pass)', () => {
   };
 
   it('emits local minus (live key ?? ledger ?? 0) per entity field, as skip-on-missing increments', () => {
-    const { ops, count } = counterGrowthOps(local, target);
+    const { ops, count } = counterGrowthOps(local, target, baselineHeads);
     expect(ops).toEqual([
       {
         op: 'increment',
@@ -574,10 +657,21 @@ describe('counterGrowthOps (the rebase ledger pass)', () => {
     expect(count).toBe(3);
   });
 
+  it('skips malformed keys', () => {
+    const withGarbage = withCounters(baseline, { garbage: 1, 'accounts/A/balance/w1': -10_000 });
+    expect(counterGrowthOps(withGarbage, {}, baselineHeads).ops).toEqual([
+      expect.objectContaining({ id: 'A', delta: -1 }),
+    ]);
+  });
+
   it('groups several writers of one field into one op', () => {
     const { ops } = counterGrowthOps(
-      withMap({ 'accounts/A/balance/w1': -10_000, 'accounts/A/balance/w2': -20_000 }),
-      {}
+      withCounters(baseline, {
+        'accounts/A/balance/w1': -10_000,
+        'accounts/A/balance/w2': -20_000,
+      }),
+      {},
+      baselineHeads
     );
     expect(ops).toEqual([
       {
@@ -591,9 +685,24 @@ describe('counterGrowthOps (the rebase ledger pass)', () => {
     ]);
   });
 
-  it('no map, or nothing grown, is no ops', () => {
-    expect(counterGrowthOps({}, target)).toEqual({ ops: [], count: 0 });
-    expect(counterGrowthOps(withMap({ 'accounts/A/balance/w2': -50_000 }), target).ops).toEqual([]);
+  it('no key, or nothing grown, is no ops', () => {
+    expect(counterGrowthOps(baseline, target, baselineHeads)).toEqual({ ops: [], count: 0 });
+    const level = withCounters(baseline, { 'accounts/A/balance/w2': -50_000 });
+    expect(counterGrowthOps(level, target, baselineHeads).ops).toEqual([]);
+  });
+
+  it('skips a key UNCHANGED since the baseline, however stale against the target (a foreign key)', () => {
+    // w2 is another device's key: it reached this doc through a merge the baseline covers, at
+    // -50_000; its writer kept adjusting, and the compactor ledgered -80_000. `mine − ledger`
+    // would replay that writer's later -3 NEGATED (+3) onto its account.
+    const merged = withCounters(baseline, { 'accounts/A/balance/w2': -50_000 });
+    const heads = Automerge.getHeads(merged);
+    const later = withCounters(merged, { 'accounts/A/balance/w1': -10_000 }); // own, unsynced
+    const compacted = { foldedCounters: { 'accounts/A/balance/w2': -80_000 } };
+    expect(counterGrowthOps(later, compacted, heads).ops).toEqual([
+      expect.objectContaining({ id: 'A', field: 'balance', delta: -1 }),
+    ]);
+    expect(counterGrowthOps(merged, compacted, heads).ops).toEqual([]);
   });
 
   it('works on live documents (Counter values on both sides)', () => {
@@ -602,7 +711,7 @@ describe('counterGrowthOps (the rebase ledger pass)', () => {
     const ahead = Automerge.change(Automerge.clone(origin), (d) =>
       adjustField(d, 'accounts', 'A', 'balance', -2.5, 'w1')
     );
-    expect(counterGrowthOps(ahead, origin).ops).toEqual([
+    expect(counterGrowthOps(ahead, origin, Automerge.getHeads(origin)).ops).toEqual([
       {
         op: 'increment',
         collection: 'accounts',
