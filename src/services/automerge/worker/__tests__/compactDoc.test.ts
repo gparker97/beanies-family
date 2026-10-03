@@ -61,7 +61,9 @@ const {
   getHeads,
   exportSnapshot,
   exportEncryptedPayload,
+  loadSnapshot,
 } = await import('../applyAndProject');
+const { migrateDoc } = await import('../docOps');
 
 /** A document with real history: many changes, one entity per change. */
 function seedHistory(n: number) {
@@ -304,6 +306,25 @@ describe('compactDoc folds the Counters (#117 Phase 2)', () => {
     expect(doc.counterDeltas).toEqual({});
     // ⚠️ CUMULATIVE, never replaced: a peer two compactions behind still finds its key.
     expect(doc.foldedCounters).toEqual({ [firstKey!]: -202_500, [secondKey!]: -50_000 });
+  });
+
+  it('REFUSES, keeping the old document, when the map holds a key this build cannot fold', () => {
+    // A future build's Counter field: this build's table lacks it, so the fold would drop it
+    // unledgered and the rebuilt document (an empty map) would destroy its adjustments.
+    type FDoc = import('@/types/automerge').FamilyDocument;
+    const FUTURE = 'accounts/A/creditLimit/w9';
+    const withFuture = Automerge.change(migrateDoc(Automerge.init<FDoc>()), (d) => {
+      (d.accounts as unknown as Record<string, unknown>).A = { id: 'A', balance: 100 };
+      (d.counterDeltas as unknown as Record<string, unknown>)[FUTURE] = new Automerge.Counter(5);
+    });
+    loadSnapshot(Automerge.save(withFuture));
+    const headsBefore = getHeads().heads;
+
+    // The verify gate's path: classified, rethrown, nothing installed.
+    expect(() => compactDoc()).toThrow(/Update the app before compacting/);
+    expect(getHeads().heads).toEqual(headsBefore);
+    expect(Object.keys(snapshot().counterDeltas)).toEqual([FUTURE]);
+    expect(snapshot()).not.toHaveProperty('podLineage');
   });
 
   it('a dormant pod: the source is the document as it stands plus the lineage, with no ledger', () => {

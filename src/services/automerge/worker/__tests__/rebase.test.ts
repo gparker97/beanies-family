@@ -1103,6 +1103,62 @@ describe('Counter adjustments ride the fold ledger, not the baseline (#117 Phase
     expect(balanceOf(applyMutationOp(oldBuild, built.op as Op).doc)).toBe(85);
   });
 
+  describe("a FOREIGN writer's stale key is never replayed (only keys changed since the baseline)", () => {
+    /**
+     * B's key reaches L at 80 through a merge L's baseline covers. B adds +20 and saves; C
+     * compacts (ledger K_B = 100). L, still holding K_B = 80 plus one unsynced edit, rebases.
+     * `mine − ledger` on K_B is -20: B's own later +20, negated, landing on B's account.
+     */
+    function scenario() {
+      const origin = shared();
+      const b = apply(Automerge.clone(origin), inc(8)); // K_B = 80_000
+      const l = Automerge.merge(Automerge.clone(origin), Automerge.clone(b));
+      const baseline = Automerge.getHeads(l);
+      const b2 = apply(b, inc(2)); // K_B = 100_000, saved to Drive
+      return { l, baseline, b2 };
+    }
+    const folded = (b2: FDoc) => compact(Automerge.clone(b2));
+    /** An old-build compaction: toJS/from, so the target still holds K_B LIVE at 100_000. */
+    const oldBuild = (b2: FDoc) =>
+      Automerge.from({
+        ...Automerge.toJS(Automerge.clone(b2)),
+        podLineage: { id: 'L-OLD', seq: 1 },
+      }) as FDoc;
+
+    it.each([
+      ['a folded target (ledger K_B = 100)', folded],
+      ['an old-build target (live K_B = 100)', oldBuild],
+    ] as const)('%s: no increment for K_B', (_name, shape) => {
+      const { l, baseline, b2 } = scenario();
+      const target = shape(b2);
+      expect(balanceOf(target)).toBe(110);
+
+      // The unsynced edit is not an adjustment: nothing for the ledger pass at all.
+      const edited = apply(
+        Automerge.clone(l),
+        setAccount({ id: 'C', name: 'New', type: 'savings', balance: 5 })
+      );
+      const built = buildRebaseOpsRaw(edited, baseline, target)!;
+      expect(built).toMatchObject({ count: 1, counterIncrements: 0 });
+      expect(built.op).toMatchObject({ op: 'set', id: 'C' });
+      expect(balanceOf(applyMutationOp(Automerge.clone(target), built.op as Op).doc)).toBe(110);
+
+      // An own unsynced adjustment still crosses, and ONLY it: -5, never -5 + (-20).
+      const adjusted = apply(Automerge.clone(l), inc(-5));
+      const own = buildRebaseOpsRaw(adjusted, baseline, target)!;
+      expect(own.op).toEqual({
+        op: 'increment',
+        collection: 'accounts',
+        id: 'A',
+        field: 'balance',
+        delta: -5,
+        onMissing: 'skip',
+      });
+      expect(own.counterIncrements).toBe(1);
+      expect(balanceOf(applyMutationOp(target, own.op as Op).doc)).toBe(105);
+    });
+  });
+
   describe('end to end: the real compactDoc, then mergeRemoteEnvelope', () => {
     /** Compact `doc` exactly as the app does, and return the compacted document. */
     function compactForReal(doc: FDoc): FDoc {

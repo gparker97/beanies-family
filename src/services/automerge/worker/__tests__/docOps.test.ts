@@ -865,6 +865,22 @@ describe('docOps — relative writes through adjustField (#117 Phase 2)', () => 
       expect(goalOf(bare.doc).currentAmount).toBe(50);
     });
 
+    it("a stored NEGATIVE amount (pre-Phase-2 history): writes off keeps today's write-time floor", () => {
+      // Today: `Math.max(0, current + delta)` = max(0, -30 + 10) = 0 is what is stored.
+      __setCounterWritesForTesting(false);
+      const off = contribute(goalDoc({ currentAmount: -30 }), { delta: 10 });
+      expect(off.doc.goals.g!.currentAmount).toBe(0);
+      expect(goalOf(off.doc).currentAmount).toBe(0);
+      // Writes on: the stored -30 stays (a baseline is never rewritten), the Counter holds the
+      // applied +10 (the folded amount was 0, so the floor did not trim it), and the READ floor
+      // shows max(0, -30 + 10) = 0, the same number.
+      __setCounterWritesForTesting(true);
+      const on = contribute(goalDoc({ currentAmount: -30 }), { delta: 10 });
+      expect(on.doc.goals.g!.currentAmount).toBe(-30);
+      expect(Object.values(on.doc.counterDeltas).map((c) => c.value)).toEqual([100_000]);
+      expect(goalOf(on.doc).currentAmount).toBe(0);
+    });
+
     it('auto-completes on the folded amount and never un-completes', () => {
       const done = contribute(goalDoc(), { delta: 50 });
       expect(goalOf(done.doc)).toMatchObject({ currentAmount: 100, isCompleted: true });

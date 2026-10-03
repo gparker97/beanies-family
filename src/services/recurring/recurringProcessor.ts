@@ -364,8 +364,10 @@ async function createTransactionFromRecurring(item: RecurringItem, date: Date): 
       await accountRepo.incrementBalance(item.accountId, adjustment);
     }
 
-    // Credit goal progress (relative; clamp and auto-complete happen worker-side)
-    if (input.goalAllocApplied && input.goalId) {
+    // Credit goal progress (relative; clamp and auto-complete happen worker-side). The goal can
+    // be deleted (here or by a merge) between generation and this cascade, and the worker op
+    // throws on a missing goal, so re-check and skip silently, as the absolute write did.
+    if (input.goalAllocApplied && input.goalId && (await goalRepo.getGoalById(input.goalId))) {
       await goalRepo.applyContribution(input.goalId, input.goalAllocApplied);
     }
 
@@ -383,6 +385,14 @@ async function createTransactionFromRecurring(item: RecurringItem, date: Date): 
     return true;
   } catch (e) {
     console.error('Failed to create transaction from recurring:', e);
+    // Non-critical: this instance is skipped this run. Fixed enums only; never the description.
+    reportError({
+      surface: 'recurring-processor',
+      message: 'create-transaction-failed',
+      severity: 'error',
+      error: e,
+      context: { recur_surface: 'transaction' },
+    });
     return false;
   }
 }

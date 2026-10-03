@@ -800,6 +800,11 @@ function parseGoalContributionArgs(args: Record<string, unknown>): GoalContribut
  *    `contribution` appends `{ ...entry, amount: applied }` (nothing when `applied` is 0);
  *    `undoContributionId` splices that entry out by id (`splice`, never `delete arr[i]`,
  *    ADR-039).
+ *  - AN UNDO REVERSES THE ENTRY, NOT MAIN'S DELTA. With `undoContributionId` the applied delta
+ *    is `−entry.amount` (through the same floor), read from the entry this change splices out,
+ *    so the money removed is exactly the money that entry recorded. `args.delta` is advisory
+ *    there: main computes it from its own view, which a concurrent contribution merged in
+ *    between can make stale. A mismatch is not an error; the entry wins.
  *  - MONEY AND HISTORY MOVE TOGETHER, IN BOTH DIRECTIONS. The entry is the receipt: a
  *    `contribution` whose id is already in the history (a retry), or an `undoContributionId`
  *    whose entry is absent (a second undo, or one already undone elsewhere), is a full no-op.
@@ -807,15 +812,18 @@ function parseGoalContributionArgs(args: Record<string, unknown>): GoalContribut
  *    `changed: false`.
  *
  * Every write-time read folds with the draft's own index: keys are single-writer, so the
- * draft's Σ is exact and already includes this change (probe m).
+ * draft's Σ is exact and already includes this change (probe m). The index is built ONCE, at
+ * entry; `adjustField` records its own Counter write in it, so the echo after the write reads
+ * the same Σ a rebuild would.
  */
 const applyGoalContributionOp: NamedOpHandler = (draft, rawArgs, { writerId }) => {
   const { id, delta, contribution, undoContributionId } = parseGoalContributionArgs(rawArgs);
   const goals = draft.goals as unknown as Record<string, Goal>;
   const goal = goals[id];
   if (!goal) throw new Error(`applyGoalContribution: goal ${id} not found`);
+  const index = foldIndex(draft);
   const echo = (): ReturnType<NamedOpHandler> => {
-    const d = entityDelta(draft, 'goals', id, foldIndex(draft));
+    const d = entityDelta(draft, 'goals', id, index);
     return { result: d.kind === 'upsert' ? d.entity : undefined, deltas: [d] };
   };
   if (contribution && goal.manualContributions?.some((c) => c.id === contribution.id)) {
@@ -827,13 +835,11 @@ const applyGoalContributionOp: NamedOpHandler = (draft, rawArgs, { writerId }) =
       : (goal.manualContributions?.findIndex((c) => c.id === undoContributionId) ?? -1);
   if (undoContributionId !== undefined && undoAt < 0) return echo();
 
-  const folded = foldValue(
-    goal.currentAmount,
-    sigma(foldIndex(draft), 'goals', id, 'currentAmount'),
-    0
-  );
-  const applied = Math.max(delta, -folded);
-  adjustField(draft, 'goals', id, 'currentAmount', applied, writerId);
+  const folded = foldValue(goal.currentAmount, sigma(index, 'goals', id, 'currentAmount'), 0);
+  // An undo reverses the entry's recorded amount; `delta` is advisory there (see above).
+  const requested = undoAt >= 0 ? -goal.manualContributions![undoAt]!.amount : delta;
+  const applied = Math.max(requested, -folded);
+  adjustField(draft, 'goals', id, 'currentAmount', applied, writerId, index);
   if (!goal.isCompleted && foldValue(folded, toMinor(applied), 0) >= goal.targetAmount) {
     goal.isCompleted = true;
   }
@@ -878,14 +884,16 @@ function adjustLoanBalance(
   draft: FamilyDocument,
   loan: LoanDetails,
   delta: number,
-  writerId: string
+  writerId: string,
+  index: FoldIndex
 ): { collection: CollectionName; entity: unknown; delta: EntityDelta } {
   const { collection, field } = loanHost(loan);
   // `findLoan` just found the host in this same draft, so `adjustField`'s existence throw is
-  // reachable only through a programming error.
-  adjustField(draft, collection, loan.entityId, field, delta, writerId);
+  // reachable only through a programming error. `index` is the handler's one `foldIndex(draft)`;
+  // `adjustField` records the write in it, so the echo below needs no rebuild.
+  adjustField(draft, collection, loan.entityId, field, delta, writerId, index);
   (draft[collection] as unknown as Record<string, AnyRecord>)[loan.entityId]!.updatedAt = nowIso();
-  const echo = entityDelta(draft, collection, loan.entityId, foldIndex(draft));
+  const echo = entityDelta(draft, collection, loan.entityId, index);
   return { collection, entity: echo.kind === 'upsert' ? echo.entity : undefined, delta: echo };
 }
 
@@ -895,7 +903,7 @@ function adjustLoanBalance(
  * is folded (one index lookup), never every asset and account. The payment no-op
  * (`outstandingBalance <= 0`) and the amortisation input both read this folded value.
  */
-function findLoan(draft: FamilyDocument, loanId: string): LoanDetails | null {
+function findLoan(draft: FamilyDocument, loanId: string, index: FoldIndex): LoanDetails | null {
   const loan = findLoanDetails(
     loanId,
     Object.values((draft.assets ?? {}) as unknown as Record<string, Asset>),
@@ -905,7 +913,7 @@ function findLoan(draft: FamilyDocument, loanId: string): LoanDetails | null {
   const { collection, field } = loanHost(loan);
   loan.outstandingBalance = foldValue(
     loan.outstandingBalance,
-    sigma(foldIndex(draft), collection, loan.entityId, field),
+    sigma(index, collection, loan.entityId, field),
     0
   );
   return loan;
@@ -915,7 +923,8 @@ function findLoan(draft: FamilyDocument, loanId: string): LoanDetails | null {
  * the new balance atomically, return the host entity + interest/principal split
  * (main writes those onto the transaction via the existing repo). */
 const applyLoanPaymentOp: NamedOpHandler = (draft, args, { writerId }) => {
-  const loan = findLoan(draft, args.loanId as string);
+  const index = foldIndex(draft); // once: `findLoan`'s fold and the echo both read it
+  const loan = findLoan(draft, args.loanId as string, index);
   if (!loan || loan.outstandingBalance <= 0) return { result: { applied: false }, deltas: [] };
   const res = args.isRecurring
     ? calculateAmortization(
@@ -928,7 +937,8 @@ const applyLoanPaymentOp: NamedOpHandler = (draft, args, { writerId }) => {
     draft,
     loan,
     res.newBalance - loan.outstandingBalance,
-    writerId
+    writerId,
+    index
   );
   return {
     result: {
@@ -944,14 +954,16 @@ const applyLoanPaymentOp: NamedOpHandler = (draft, args, { writerId }) => {
 
 /** Reverse a loan payment: restore the principal portion to the balance. */
 const reverseLoanPaymentOp: NamedOpHandler = (draft, args, { writerId }) => {
-  const loan = findLoan(draft, args.loanId as string);
+  const index = foldIndex(draft); // once: `findLoan`'s fold and the echo both read it
+  const loan = findLoan(draft, args.loanId as string, index);
   if (!loan) return { result: { applied: false }, deltas: [] };
   const restored = loan.outstandingBalance + (args.principalToRestore as number);
   const { collection, entity, delta } = adjustLoanBalance(
     draft,
     loan,
     restored - loan.outstandingBalance,
-    writerId
+    writerId,
+    index
   );
   return {
     result: { applied: true, hostCollection: collection, host: entity },
@@ -1363,8 +1375,9 @@ export function buildRebaseOps(
 
   // The Counter ledger pass: what the peer adjusted that the target does not yet hold (neither
   // live nor in the fold ledger), as `increment` ops. AFTER the entity ops, so an entity the peer
-  // created arrives by its raw `set` before its own adjustments land on it.
-  const growth = counterGrowthOps(local, target);
+  // created arrives by its raw `set` before its own adjustments land on it. Only keys the peer
+  // changed since `baselineHeads` count, so a foreign writer's stale key is never replayed.
+  const growth = counterGrowthOps(local, target, baselineHeads);
   ops.push(...growth.ops);
 
   // nothing to replay

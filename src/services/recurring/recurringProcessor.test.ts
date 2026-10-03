@@ -40,12 +40,15 @@ vi.mock('@/services/automerge/repositories/goalRepository', () => ({
   applyContribution: vi.fn(),
 }));
 
+vi.mock('@/utils/errorReporter', () => ({ reportError: vi.fn() }));
+
 import * as recurringRepo from '@/services/automerge/repositories/recurringItemRepository';
 import * as transactionRepo from '@/services/automerge/repositories/transactionRepository';
 import * as accountRepo from '@/services/automerge/repositories/accountRepository';
 import * as assetRepo from '@/services/automerge/repositories/assetRepository';
 import * as goalRepo from '@/services/automerge/repositories/goalRepository';
 import { logEvent } from '@/services/telemetry';
+import { reportError } from '@/utils/errorReporter';
 import { setWriteGate, __resetWriteGateForTesting } from '@/services/automerge/worker/writeGate';
 
 const mockAccount: Account = {
@@ -1110,5 +1113,86 @@ describe('recurringProcessor - paused while read-only, caught up after (#95)', (
       'recurring-ro',
       '2024-10-15'
     );
+  });
+});
+
+describe('recurringProcessor - a goal deleted between generation and the cascade (#117 Phase 2)', () => {
+  const salary: RecurringItem = {
+    id: 'recurring-goal-gone',
+    accountId: 'test-account-1',
+    type: 'income',
+    amount: 1000,
+    currency: 'USD',
+    category: 'salary',
+    description: 'Monthly Salary',
+    frequency: 'monthly',
+    dayOfMonth: 15,
+    startDate: '2024-01-01T00:00:00.000Z',
+    isActive: true,
+    goalId: 'goal-1',
+    goalAllocMode: 'percentage',
+    goalAllocValue: 20,
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z',
+  };
+  const goal = {
+    id: 'goal-1',
+    name: 'Buy a Car',
+    type: 'savings' as const,
+    targetAmount: 10000,
+    currentAmount: 0,
+    currency: 'USD',
+    priority: 'high' as const,
+    isCompleted: false,
+    createdAt: '2024-01-01T00:00:00.000Z',
+    updatedAt: '2024-01-01T00:00:00.000Z',
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2024-01-15T12:00:00.000Z'));
+    vi.mocked(recurringRepo.getActiveRecurringItems).mockResolvedValue([salary]);
+    vi.mocked(accountRepo.getAccountById).mockResolvedValue({ ...mockAccount });
+    vi.mocked(recurringRepo.updateLastProcessedDate).mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('skips the contribution silently, as the replaced getGoalById check did', async () => {
+    vi.mocked(transactionRepo.createTransaction).mockResolvedValue({} as never);
+    // Present when the allocation is computed, gone by the time the cascade credits it.
+    vi.mocked(goalRepo.getGoalById).mockResolvedValueOnce(goal).mockResolvedValueOnce(undefined);
+
+    const result = await processRecurringItems();
+
+    expect(result).toEqual({ processed: 1, errors: [] });
+    expect(transactionRepo.createTransaction).toHaveBeenCalledWith(
+      expect.objectContaining({ goalId: 'goal-1', goalAllocApplied: 200 })
+    );
+    expect(accountRepo.incrementBalance).toHaveBeenCalled();
+    expect(goalRepo.applyContribution).not.toHaveBeenCalled();
+    expect(reportError).not.toHaveBeenCalled();
+  });
+
+  it('a failed instance reaches the firehose, not only the console', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.mocked(goalRepo.getGoalById).mockResolvedValue(goal);
+    vi.mocked(transactionRepo.createTransaction).mockRejectedValue(new Error('worker down'));
+
+    const result = await processRecurringItems();
+
+    expect(result.processed).toBe(0);
+    expect(consoleError).toHaveBeenCalled();
+    expect(reportError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        surface: 'recurring-processor',
+        severity: 'error',
+        context: { recur_surface: 'transaction' },
+      })
+    );
+    consoleError.mockRestore();
   });
 });
