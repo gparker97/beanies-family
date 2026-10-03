@@ -13,8 +13,10 @@ import * as Automerge from '@automerge/automerge';
 import {
   COLLECTION_NAMES,
   NON_COLLECTION_KEYS,
+  MIGRATED_ROOT_KEYS,
   type FamilyDocument,
   type CollectionName,
+  type MigratedRootKey,
 } from '@/types/automerge';
 import type { PodLineage } from '@/types/models';
 // ⚠️ NOT a bare `crypto.randomUUID()`. It is undefined on a NON-SECURE origin —
@@ -116,7 +118,7 @@ function decodeBase64(b64: string): Uint8Array {
  * decode, or decodes to anything but one root op creating `name`, is a BUILD defect: it throws,
  * loudly, rather than silently creating the collection the old, merge-unsafe way.
  */
-function storedMigrationChange(name: CollectionName): Uint8Array {
+function storedMigrationChange(name: MigratedRootKey): Uint8Array {
   const b64 = MIGRATION_CHANGES[name];
   if (typeof b64 !== 'string') {
     throw new Error(`migrateDoc: no stored migration change for "${name}" (build defect)`);
@@ -166,8 +168,8 @@ function storedMigrationChange(name: CollectionName): Uint8Array {
  * just not merge-deterministic.
  */
 export function migrateDoc(doc: Doc): Doc {
-  const absent = COLLECTION_NAMES.filter((name) => doc[name] === undefined);
-  const nulls = COLLECTION_NAMES.filter((name) => doc[name] === null);
+  const absent = MIGRATED_ROOT_KEYS.filter((name) => doc[name] === undefined);
+  const nulls = MIGRATED_ROOT_KEYS.filter((name) => doc[name] === null);
   if (absent.length === 0 && nulls.length === 0) return doc;
   let next = doc;
   if (absent.length > 0) {
@@ -180,8 +182,9 @@ export function migrateDoc(doc: Doc): Doc {
   });
 }
 
-/** The root keys a root conflict can occur at: every collection map plus the settings seed. */
-const ROOT_CONFLICT_KEYS = [...COLLECTION_NAMES, 'settings'] as const;
+/** The root keys a root conflict can occur at: every migrated root map (each collection, plus
+ *  `counterDeltas`) and the settings seed. */
+const ROOT_CONFLICT_KEYS = [...MIGRATED_ROOT_KEYS, 'settings'] as const;
 
 /** Conflicted root keys only, each with how many concurrent values it holds (always 2+). */
 export type RootConflictSnapshot = ReadonlyMap<string, number>;

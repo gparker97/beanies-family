@@ -1156,15 +1156,18 @@ describe('layer 3: format and round trip', () => {
     expect([...getHeads(loaded)].sort()).toEqual([...getHeads(r.merged.a)].sort());
   });
 
-  it('a pre-#117 pod (collections created as d[name] = {} by a random actor) is left untouched', () => {
+  it('a pre-#117 pod (collections created as d[name] = {} by a random actor) is untouched apart from the one deterministic counterDeltas creation', () => {
     const old = Automerge.change(Automerge.init<FamilyDocument>(), (d) => {
       for (const name of COLLECTION_NAMES) (d as Any)[name] = {};
       (d as Any).settings = { id: 'app_settings', baseCurrency: 'USD', exchangeRates: [] };
       (d as Any).todos.t1 = { id: 't1', title: 'old pod todo', completed: false };
     });
     const loaded = loadDoc(saveDoc(old));
-    expect([...getHeads(loaded)].sort()).toEqual([...getHeads(old)].sort());
-    expect(Automerge.toJS(loaded)).toEqual(Automerge.toJS(old));
+    // #117 Phase 2: the stored `counterDeltas` change (deps []) is the ONE addition, so the
+    // old heads stay and exactly one concurrent head joins them. No collection is touched.
+    expect(getHeads(loaded)).toEqual(expect.arrayContaining([...getHeads(old)]));
+    expect(getHeads(loaded)).toHaveLength(getHeads(old).length + 1);
+    expect(Automerge.toJS(loaded)).toEqual({ ...Automerge.toJS(old), counterDeltas: {} });
     expect(migrateDoc(loaded)).toBe(loaded); // nothing missing: same handle
     expect(countRootConflicts(loaded)).toBe(0);
   });
