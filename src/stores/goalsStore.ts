@@ -5,7 +5,7 @@ import { createMemberFiltered } from '@/composables/useMemberFiltered';
 import { wrapAsync } from '@/composables/useStoreActions';
 import { parseIsoDateSafely } from '@/utils/safeDate';
 import * as goalRepo from '@/services/automerge/repositories/goalRepository';
-import { mutate } from '@/services/automerge/worker/docClient';
+import type { ApplyContributionOptions } from '@/services/automerge/repositories/goalRepository';
 import { trackFeature } from '@/services/analytics/plausible';
 import type {
   Goal,
@@ -27,6 +27,23 @@ export interface UpdateGoalOptions {
 }
 
 /**
+ * The one builder for a manual-contribution history entry, shared by the absolute edit path
+ * (`appendContributionIfChanged`) and the relative quick-contribute path.
+ */
+export function contributionEntry(
+  amount: number,
+  contribution: { id: UUID; author: UUID; note?: string }
+): GoalManualContribution {
+  return {
+    id: contribution.id,
+    amount,
+    at: new Date().toISOString(),
+    updatedBy: contribution.author,
+    ...(contribution.note ? { note: contribution.note } : {}),
+  };
+}
+
+/**
  * Pure helper: return a new UpdateGoalInput with a GoalManualContribution
  * appended when the contribution context + a non-zero delta are both present.
  * No mutation; returns the input unchanged otherwise.
@@ -39,13 +56,7 @@ function appendContributionIfChanged(
   if (input.currentAmount === undefined) return input;
   const delta = input.currentAmount - existing.currentAmount;
   if (delta === 0) return input;
-  const entry: GoalManualContribution = {
-    id: contribution.id,
-    amount: delta,
-    at: new Date().toISOString(),
-    updatedBy: contribution.author,
-    ...(contribution.note ? { note: contribution.note } : {}),
-  };
+  const entry = contributionEntry(delta, contribution);
   return {
     ...input,
     manualContributions: [...(existing.manualContributions ?? []), entry],
@@ -199,7 +210,11 @@ export const useGoalsStore = defineStore('goals', () => {
    * and fires the completion celebration on the !completed → completed edge
    * (celebration is inherently main-side). Used by transaction cascades.
    */
-  async function applyContribution(id: string, delta: number): Promise<Goal | null> {
+  async function applyContribution(
+    id: string,
+    delta: number,
+    opts?: ApplyContributionOptions
+  ): Promise<Goal | null> {
     const existing = goals.value.find((g) => g.id === id);
     if (!existing) return null;
     const wasCompleted = existing.isCompleted ?? false;
@@ -208,11 +223,7 @@ export const useGoalsStore = defineStore('goals', () => {
         isLoading,
         error,
         async () => {
-          const updated = await mutate<Goal>({
-            op: 'named',
-            name: 'applyGoalContribution',
-            args: { id, delta },
-          });
+          const updated = await goalRepo.applyContribution(id, delta, opts);
           goals.value = goals.value.map((g) => (g.id === id ? updated : g));
           if (updated.isCompleted && !wasCompleted) {
             celebrate(updated.type === 'debt_payoff' ? 'debt-free' : 'goal-reached');

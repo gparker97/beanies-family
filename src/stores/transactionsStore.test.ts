@@ -7,16 +7,43 @@ import { useTransactionsStore } from './transactionsStore';
 import type { Transaction, Account, Asset, Goal } from '@/types/models';
 
 // Mock the transaction repository
-vi.mock('@/services/automerge/repositories/transactionRepository', () => ({
-  getAllTransactions: vi.fn(),
-  getTransactionById: vi.fn(),
-  createTransaction: vi.fn(),
-  updateTransaction: vi.fn(),
-  deleteTransaction: vi.fn(),
-}));
+// `applyLoanPayment` mirrors the real repository op (named op via the mocked `mutate`, then the
+// portions recorded through `updateTransaction`) so the store's routing is exercised end to end.
+vi.mock('@/services/automerge/repositories/transactionRepository', async () => {
+  const { mutate: mutateOp } = await import('@/services/automerge/worker/docClient');
+  const updateTransaction = vi.fn();
+  return {
+    getAllTransactions: vi.fn(),
+    getTransactionById: vi.fn(),
+    createTransaction: vi.fn(),
+    updateTransaction,
+    deleteTransaction: vi.fn(),
+    applyLoanPayment: async (transaction: any) => {
+      const res: any = await mutateOp({
+        op: 'named',
+        name: 'applyLoanPayment',
+        args: {
+          loanId: transaction.loanId,
+          paymentAmount: transaction.amount,
+          isRecurring: !!transaction.recurringItemId,
+        },
+      });
+      if (!res.applied) return res;
+      await updateTransaction(transaction.id, {
+        loanInterestPortion: res.interestPortion,
+        loanPrincipalPortion: res.principalPortion,
+      });
+      transaction.loanInterestPortion = res.interestPortion;
+      transaction.loanPrincipalPortion = res.principalPortion;
+      return res;
+    },
+  };
+});
 
 // Mock the account repository
-vi.mock('@/services/automerge/repositories/accountRepository', () => ({
+vi.mock('@/services/automerge/repositories/accountRepository', async (importOriginal) => ({
+  // The real relative-op wrappers go through the mocked `mutate` below.
+  incrementBalance: (await importOriginal<any>()).incrementBalance,
   getAllAccounts: vi.fn(),
   getAccountById: vi.fn(),
   createAccount: vi.fn(),
@@ -40,13 +67,13 @@ vi.mock('@/utils/linkedRecurringItem', () => ({
 }));
 
 // Mock the goal repository
-vi.mock('@/services/automerge/repositories/goalRepository', () => ({
+vi.mock('@/services/automerge/repositories/goalRepository', async (importOriginal) => ({
+  applyContribution: (await importOriginal<any>()).applyContribution,
   getAllGoals: vi.fn().mockResolvedValue([]),
   getGoalById: vi.fn(),
   createGoal: vi.fn(),
   updateGoal: vi.fn(),
   deleteGoal: vi.fn(),
-  updateGoalProgress: vi.fn(),
   getGoalProgress: vi.fn(),
   getActiveGoals: vi.fn().mockResolvedValue([]),
   getFamilyGoals: vi.fn().mockResolvedValue([]),

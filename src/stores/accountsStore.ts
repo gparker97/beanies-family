@@ -7,9 +7,7 @@ import { wrapAsync } from '@/composables/useStoreActions';
 import { convertToBaseCurrency } from '@/utils/currency';
 import { accountNetWorthMultiplier, isLiabilityType } from '@/utils/finance';
 import * as accountRepo from '@/services/automerge/repositories/accountRepository';
-import { mutate } from '@/services/automerge/worker/docClient';
 import { syncEntityLinkedRecurringItem } from '@/utils/linkedRecurringItem';
-import { toISODateString } from '@/utils/date';
 import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { accountDetailTelemetry } from '@/utils/accountDetails';
@@ -214,15 +212,7 @@ export const useAccountsStore = defineStore('accounts', () => {
         isLoading,
         error,
         async () => {
-          const updated = await mutate<Account | undefined>({
-            op: 'increment',
-            collection: 'accounts',
-            id,
-            field: 'balance',
-            delta,
-            updatedAt: toISODateString(new Date()),
-            onMissing: 'skip',
-          });
+          const updated = await accountRepo.incrementBalance(id, delta);
           // Concurrent-delete race: the account vanished worker-side between the
           // guard above and the write, so the echo is undefined. Do NOT splice
           // undefined into the array; leave a warning breadcrumb (no toast — rare

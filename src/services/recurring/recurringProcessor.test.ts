@@ -20,12 +20,14 @@ vi.mock('@/services/automerge/repositories/transactionRepository', () => ({
   getAllTransactions: vi.fn().mockResolvedValue([]),
   createTransaction: vi.fn(),
   deleteTransaction: vi.fn().mockResolvedValue(true),
+  applyLoanPayment: vi.fn(),
 }));
 
 vi.mock('@/services/automerge/repositories/accountRepository', () => ({
   getAccountById: vi.fn(),
   getAllAccounts: vi.fn().mockResolvedValue([]),
   updateAccountBalance: vi.fn(),
+  incrementBalance: vi.fn(),
 }));
 
 vi.mock('@/services/automerge/repositories/assetRepository', () => ({
@@ -35,7 +37,7 @@ vi.mock('@/services/automerge/repositories/assetRepository', () => ({
 
 vi.mock('@/services/automerge/repositories/goalRepository', () => ({
   getGoalById: vi.fn(),
-  updateGoalProgress: vi.fn(),
+  applyContribution: vi.fn(),
 }));
 
 import * as recurringRepo from '@/services/automerge/repositories/recurringItemRepository';
@@ -106,7 +108,7 @@ describe('recurringProcessor - Account Balance Sync', () => {
       updatedAt: '2024-01-15T00:00:00.000Z',
     });
     vi.mocked(accountRepo.getAccountById).mockResolvedValue({ ...mockAccount });
-    vi.mocked(accountRepo.updateAccountBalance).mockResolvedValue({ ...mockAccount, balance: 950 });
+    vi.mocked(accountRepo.incrementBalance).mockResolvedValue({ ...mockAccount, balance: 950 });
     vi.mocked(recurringRepo.updateLastProcessedDate).mockResolvedValue(undefined);
 
     // Act
@@ -115,7 +117,7 @@ describe('recurringProcessor - Account Balance Sync', () => {
     // Assert
     expect(result.processed).toBe(1);
     expect(accountRepo.getAccountById).toHaveBeenCalledWith('test-account-1');
-    expect(accountRepo.updateAccountBalance).toHaveBeenCalledWith('test-account-1', 950);
+    expect(accountRepo.incrementBalance).toHaveBeenCalledWith('test-account-1', -50);
   });
 
   it('should increase account balance when processing a recurring income', async () => {
@@ -154,7 +156,7 @@ describe('recurringProcessor - Account Balance Sync', () => {
       updatedAt: '2024-01-15T00:00:00.000Z',
     });
     vi.mocked(accountRepo.getAccountById).mockResolvedValue({ ...mockAccount });
-    vi.mocked(accountRepo.updateAccountBalance).mockResolvedValue({
+    vi.mocked(accountRepo.incrementBalance).mockResolvedValue({
       ...mockAccount,
       balance: 4000,
     });
@@ -165,7 +167,7 @@ describe('recurringProcessor - Account Balance Sync', () => {
 
     // Assert
     expect(result.processed).toBe(1);
-    expect(accountRepo.updateAccountBalance).toHaveBeenCalledWith('test-account-1', 4000);
+    expect(accountRepo.incrementBalance).toHaveBeenCalledWith('test-account-1', 3000);
   });
 
   it('should process multiple recurring items and update balances correctly', async () => {
@@ -210,7 +212,7 @@ describe('recurringProcessor - Account Balance Sync', () => {
     vi.mocked(accountRepo.getAccountById)
       .mockResolvedValueOnce({ ...mockAccount, balance: 1000 })
       .mockResolvedValueOnce({ ...mockAccount, balance: 4000 }); // After income
-    vi.mocked(accountRepo.updateAccountBalance)
+    vi.mocked(accountRepo.incrementBalance)
       .mockResolvedValueOnce({ ...mockAccount, balance: 4000 })
       .mockResolvedValueOnce({ ...mockAccount, balance: 3900 });
     vi.mocked(recurringRepo.updateLastProcessedDate).mockResolvedValue(undefined);
@@ -220,7 +222,7 @@ describe('recurringProcessor - Account Balance Sync', () => {
 
     // Assert
     expect(result.processed).toBe(2);
-    expect(accountRepo.updateAccountBalance).toHaveBeenCalledTimes(2);
+    expect(accountRepo.incrementBalance).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -259,7 +261,7 @@ describe('recurringProcessor - Goal Allocation', () => {
     vi.mocked(recurringRepo.getActiveRecurringItems).mockResolvedValue([recurringIncome]);
     vi.mocked(transactionRepo.createTransaction).mockResolvedValue({} as any);
     vi.mocked(accountRepo.getAccountById).mockResolvedValue({ ...mockAccount });
-    vi.mocked(accountRepo.updateAccountBalance).mockResolvedValue({
+    vi.mocked(accountRepo.incrementBalance).mockResolvedValue({
       ...mockAccount,
       balance: 2000,
     });
@@ -276,7 +278,7 @@ describe('recurringProcessor - Goal Allocation', () => {
       createdAt: '2024-01-01T00:00:00.000Z',
       updatedAt: '2024-01-01T00:00:00.000Z',
     });
-    vi.mocked(goalRepo.updateGoalProgress).mockResolvedValue(undefined as any);
+    vi.mocked(goalRepo.applyContribution).mockResolvedValue(undefined as any);
 
     const result = await processRecurringItems();
 
@@ -291,7 +293,7 @@ describe('recurringProcessor - Goal Allocation', () => {
       })
     );
     // Goal progress should be updated
-    expect(goalRepo.updateGoalProgress).toHaveBeenCalledWith('goal-1', 200);
+    expect(goalRepo.applyContribution).toHaveBeenCalledWith('goal-1', 200);
   });
 
   it('should cap goal allocation to remaining amount', async () => {
@@ -319,7 +321,7 @@ describe('recurringProcessor - Goal Allocation', () => {
     vi.mocked(recurringRepo.getActiveRecurringItems).mockResolvedValue([recurringIncome]);
     vi.mocked(transactionRepo.createTransaction).mockResolvedValue({} as any);
     vi.mocked(accountRepo.getAccountById).mockResolvedValue({ ...mockAccount });
-    vi.mocked(accountRepo.updateAccountBalance).mockResolvedValue({
+    vi.mocked(accountRepo.incrementBalance).mockResolvedValue({
       ...mockAccount,
       balance: 2000,
     });
@@ -336,7 +338,7 @@ describe('recurringProcessor - Goal Allocation', () => {
       createdAt: '2024-01-01T00:00:00.000Z',
       updatedAt: '2024-01-01T00:00:00.000Z',
     });
-    vi.mocked(goalRepo.updateGoalProgress).mockResolvedValue(undefined as any);
+    vi.mocked(goalRepo.applyContribution).mockResolvedValue(undefined as any);
 
     await processRecurringItems();
 
@@ -346,7 +348,7 @@ describe('recurringProcessor - Goal Allocation', () => {
         goalAllocApplied: 100,
       })
     );
-    expect(goalRepo.updateGoalProgress).toHaveBeenCalledWith('goal-1', 10000);
+    expect(goalRepo.applyContribution).toHaveBeenCalledWith('goal-1', 100);
   });
 
   it('should skip allocation for completed goals', async () => {
@@ -374,7 +376,7 @@ describe('recurringProcessor - Goal Allocation', () => {
     vi.mocked(recurringRepo.getActiveRecurringItems).mockResolvedValue([recurringIncome]);
     vi.mocked(transactionRepo.createTransaction).mockResolvedValue({} as any);
     vi.mocked(accountRepo.getAccountById).mockResolvedValue({ ...mockAccount });
-    vi.mocked(accountRepo.updateAccountBalance).mockResolvedValue({
+    vi.mocked(accountRepo.incrementBalance).mockResolvedValue({
       ...mockAccount,
       balance: 2000,
     });
@@ -401,7 +403,7 @@ describe('recurringProcessor - Goal Allocation', () => {
       })
     );
     // Goal progress should NOT be updated
-    expect(goalRepo.updateGoalProgress).not.toHaveBeenCalled();
+    expect(goalRepo.applyContribution).not.toHaveBeenCalled();
   });
 });
 
@@ -499,39 +501,37 @@ describe('recurringProcessor - Loan Payment Generation', () => {
     ]);
     vi.mocked(transactionRepo.createTransaction).mockResolvedValue({} as any);
     vi.mocked(accountRepo.getAccountById).mockResolvedValue({ ...mockAccount });
-    vi.mocked(accountRepo.updateAccountBalance).mockResolvedValue({} as any);
-    vi.mocked(assetRepo.updateAsset).mockResolvedValue({} as any);
+    vi.mocked(accountRepo.incrementBalance).mockResolvedValue({} as any);
     vi.mocked(recurringRepo.updateLastProcessedDate).mockResolvedValue(undefined);
+    const createdTx = { id: 'tx-loan-1' } as any;
+    vi.mocked(transactionRepo.createTransaction).mockResolvedValue(createdTx);
+    // The worker amortises on the folded balance and echoes the new host.
+    vi.mocked(transactionRepo.applyLoanPayment).mockResolvedValue({
+      applied: true,
+      hostCollection: 'assets',
+      host: {
+        ...mockAssetWithLoan,
+        loan: { ...mockAssetWithLoan.loan!, outstandingBalance: 199500 },
+      },
+      interestPortion: 1000,
+      principalPortion: 500,
+    });
 
     const result = await processRecurringItems();
 
     expect(result.processed).toBe(1);
 
-    // Transaction should include amortization fields
-    expect(transactionRepo.createTransaction).toHaveBeenCalledWith(
-      expect.objectContaining({
-        loanId: 'asset-loan-1',
-        loanInterestPortion: expect.any(Number),
-        loanPrincipalPortion: expect.any(Number),
-      })
-    );
-
-    // Verify the interest/principal split makes sense (6% on 200k = 1000/mo interest)
+    // The transaction is only marked as a loan payment; the portions come from the worker op.
     const txInput = vi.mocked(transactionRepo.createTransaction).mock.calls[0]![0];
-    expect(txInput.loanInterestPortion).toBe(1000); // 200000 * 0.06 / 12
-    expect(txInput.loanPrincipalPortion).toBe(500); // 1500 - 1000
+    expect(txInput.loanId).toBe('asset-loan-1');
+    expect(txInput).not.toHaveProperty('loanInterestPortion');
+    expect(txInput).not.toHaveProperty('loanPrincipalPortion');
+    expect(transactionRepo.applyLoanPayment).toHaveBeenCalledWith(createdTx);
 
-    // Asset loan balance should be reduced
-    expect(assetRepo.updateAsset).toHaveBeenCalledWith(
-      'asset-loan-1',
-      expect.objectContaining({
-        loan: expect.objectContaining({
-          outstandingBalance: 199500, // 200000 - 500
-        }),
-      })
-    );
+    // No absolute write to the asset: the worker op owns the balance
+    expect(assetRepo.updateAsset).not.toHaveBeenCalled();
 
-    // Linked loan account should be synced
+    // Linked loan account mirrors the folded host value
     expect(accountRepo.updateAccountBalance).toHaveBeenCalledWith('linked-loan-account-1', 199500);
   });
 
@@ -563,24 +563,29 @@ describe('recurringProcessor - Loan Payment Generation', () => {
     ]);
     vi.mocked(transactionRepo.createTransaction).mockResolvedValue({} as any);
     vi.mocked(accountRepo.getAccountById).mockResolvedValue({ ...mockAccount });
-    vi.mocked(accountRepo.updateAccountBalance).mockResolvedValue({} as any);
+    vi.mocked(accountRepo.incrementBalance).mockResolvedValue({} as any);
     vi.mocked(recurringRepo.updateLastProcessedDate).mockResolvedValue(undefined);
+    const createdTx = { id: 'tx-car-1' } as any;
+    vi.mocked(transactionRepo.createTransaction).mockResolvedValue(createdTx);
+    vi.mocked(transactionRepo.applyLoanPayment).mockResolvedValue({
+      applied: true,
+      hostCollection: 'accounts',
+      host: { ...mockStandaloneLoanAccount, balance: 14662.5 },
+      interestPortion: 62.5,
+      principalPortion: 337.5,
+    });
 
     const result = await processRecurringItems();
 
     expect(result.processed).toBe(1);
 
-    // Transaction should include amortization fields
     const txInput = vi.mocked(transactionRepo.createTransaction).mock.calls[0]![0];
     expect(txInput.loanId).toBe('standalone-loan-1');
-    expect(txInput.loanInterestPortion).toBe(62.5); // 15000 * 0.05 / 12
-    expect(txInput.loanPrincipalPortion).toBe(337.5); // 400 - 62.5
+    expect(transactionRepo.applyLoanPayment).toHaveBeenCalledWith(createdTx);
 
-    // Standalone loan account balance should be reduced via updateAccountBalance
-    expect(accountRepo.updateAccountBalance).toHaveBeenCalledWith(
-      'standalone-loan-1',
-      14662.5 // 15000 - 337.5
-    );
+    // The worker op writes the standalone loan account itself: no absolute write from here
+    const balanceCalls = vi.mocked(accountRepo.updateAccountBalance).mock.calls;
+    expect(balanceCalls.some((c) => c[0] === 'standalone-loan-1')).toBe(false);
   });
 
   it('should skip loan allocation when loan has zero outstanding balance', async () => {
@@ -610,7 +615,7 @@ describe('recurringProcessor - Loan Payment Generation', () => {
     vi.mocked(accountRepo.getAllAccounts).mockResolvedValue([{ ...mockAccount }, paidOffLoan]);
     vi.mocked(transactionRepo.createTransaction).mockResolvedValue({} as any);
     vi.mocked(accountRepo.getAccountById).mockResolvedValue({ ...mockAccount });
-    vi.mocked(accountRepo.updateAccountBalance).mockResolvedValue({} as any);
+    vi.mocked(accountRepo.incrementBalance).mockResolvedValue({} as any);
     vi.mocked(recurringRepo.updateLastProcessedDate).mockResolvedValue(undefined);
 
     const result = await processRecurringItems();
@@ -626,10 +631,11 @@ describe('recurringProcessor - Loan Payment Generation', () => {
       })
     );
 
-    // No asset update or loan balance update should have occurred
+    // No loan payment op, asset update or loan balance update should have occurred
+    expect(transactionRepo.applyLoanPayment).not.toHaveBeenCalled();
     expect(assetRepo.updateAsset).not.toHaveBeenCalled();
     // updateAccountBalance should only be called once for the source account, not for the loan
-    const balanceCalls = vi.mocked(accountRepo.updateAccountBalance).mock.calls;
+    const balanceCalls = vi.mocked(accountRepo.incrementBalance).mock.calls;
     for (const call of balanceCalls) {
       expect(call[0]).not.toBe('standalone-loan-1');
     }
@@ -685,7 +691,7 @@ describe('recurringProcessor - Activity ID Passthrough', () => {
       updatedAt: '2024-01-15T00:00:00.000Z',
     });
     vi.mocked(accountRepo.getAccountById).mockResolvedValue({ ...mockAccount });
-    vi.mocked(accountRepo.updateAccountBalance).mockResolvedValue({ ...mockAccount, balance: 800 });
+    vi.mocked(accountRepo.incrementBalance).mockResolvedValue({ ...mockAccount, balance: 800 });
     vi.mocked(recurringRepo.updateLastProcessedDate).mockResolvedValue(undefined);
 
     const result = await processRecurringItems();
@@ -880,7 +886,7 @@ describe('recurringProcessor - a row that stands for a due date (#107)', () => {
     vi.mocked(recurringRepo.getActiveRecurringItems).mockResolvedValue([mortgage]);
     vi.mocked(transactionRepo.createTransaction).mockResolvedValue(existing('2024-01-01', false));
     vi.mocked(accountRepo.getAccountById).mockResolvedValue({ ...mockAccount });
-    vi.mocked(accountRepo.updateAccountBalance).mockResolvedValue({ ...mockAccount });
+    vi.mocked(accountRepo.incrementBalance).mockResolvedValue({ ...mockAccount });
     vi.mocked(recurringRepo.updateLastProcessedDate).mockResolvedValue(undefined);
   });
 
@@ -1045,7 +1051,7 @@ describe('recurringProcessor - paused while read-only, caught up after (#95)', (
         }) as Transaction
     );
     vi.mocked(accountRepo.getAccountById).mockResolvedValue({ ...mockAccount });
-    vi.mocked(accountRepo.updateAccountBalance).mockResolvedValue({ ...mockAccount });
+    vi.mocked(accountRepo.incrementBalance).mockResolvedValue({ ...mockAccount });
     vi.mocked(recurringRepo.updateLastProcessedDate).mockResolvedValue(undefined);
   });
 

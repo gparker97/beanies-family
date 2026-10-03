@@ -1,5 +1,11 @@
 import { createAutomergeRepository } from '../automergeRepository';
-import type { Goal, CreateGoalInput, UpdateGoalInput } from '@/types/models';
+import { mutate } from '../worker/docClient';
+import type {
+  Goal,
+  CreateGoalInput,
+  UpdateGoalInput,
+  GoalManualContribution,
+} from '@/types/models';
 
 const repo = createAutomergeRepository<'goals', Goal, CreateGoalInput, UpdateGoalInput>('goals');
 
@@ -24,14 +30,28 @@ export async function getActiveGoals(): Promise<Goal[]> {
   return goals.filter((g) => !g.isCompleted);
 }
 
-export async function updateGoalProgress(
+/** Optional history side of a relative contribution; both are applied in the same worker change. */
+export interface ApplyContributionOptions {
+  /** Appended to `manualContributions` (skipped worker-side when the applied delta is 0). */
+  contribution?: GoalManualContribution;
+  /** Spliced out of `manualContributions` by id (Undo). */
+  undoContributionId?: string;
+}
+
+/**
+ * Atomically apply a RELATIVE contribution delta (worker `applyGoalContribution` op: clamp at 0,
+ * auto-complete and the optional history edit happen in one change). Resolves to the echoed goal.
+ */
+export async function applyContribution(
   id: string,
-  currentAmount: number
-): Promise<Goal | undefined> {
-  const goal = await getGoalById(id);
-  if (!goal) return undefined;
-  const isCompleted = currentAmount >= goal.targetAmount;
-  return updateGoal(id, { currentAmount, isCompleted });
+  delta: number,
+  opts?: ApplyContributionOptions
+): Promise<Goal> {
+  return mutate<Goal>({
+    op: 'named',
+    name: 'applyGoalContribution',
+    args: { id, delta, ...opts },
+  });
 }
 
 export function getGoalProgress(goal: Goal): number {

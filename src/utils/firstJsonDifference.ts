@@ -6,6 +6,10 @@
  * no `Counter`, no `Text`), but "believed" is not good enough when the output
  * replaces a family's pod, so the compaction refuses unless this returns `null`.
  *
+ * The compaction source it is handed is FOLDED first (`foldDoc`: every Counter summed into its
+ * baseline), because the compacted document carries no Counter; the original, unfolded tree would
+ * differ at every adjusted balance (#117 Phase 2).
+ *
  * Returns a PATH, never a value: the result reaches the firehose, and the
  * firehose is PII-free. Knowing that `accounts.a17.balance` differs is enough to
  * debug; the balance itself is not ours to log.
