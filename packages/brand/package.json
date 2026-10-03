@@ -9,6 +9,7 @@
     "./nav": "./nav.ts",
     "./pricing": "./pricing.ts",
     "./attribution": "./attribution.ts",
+    "./heardVia": "./heardVia.ts",
     "./schema": "./schema.ts",
     "./assets/*": "./assets/*"
   },
@@ -17,6 +18,7 @@
     "nav.ts",
     "pricing.ts",
     "attribution.ts",
+    "heardVia.ts",
     "schema.ts",
     "assets",
     "fonts"

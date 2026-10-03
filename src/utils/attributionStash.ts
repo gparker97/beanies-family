@@ -42,7 +42,12 @@ const LABEL = 'attribution';
 const SURFACE = 'attribution';
 
 type CaptureAction =
-  'captured' | 'kept-first-touch' | 'replaced-expired' | 'replaced-corrupt' | 'dropped-invalid';
+  | 'captured'
+  | 'captured-referrer'
+  | 'kept-first-touch'
+  | 'replaced-expired'
+  | 'replaced-corrupt'
+  | 'dropped-invalid';
 
 type ClearAction = 'consumed' | 'sign-out' | 'expired' | 'corrupt' | 'absent';
 
@@ -93,7 +98,11 @@ function readStash(): AttributionEnvelopeState {
   return readEnvelope(read.value, Date.now());
 }
 
-function reportStorageFailure(stage: 'write' | 'remove', error: unknown): void {
+/**
+ * One `warning` for a refused attribution write or removal; the flow proceeds unattributed.
+ * Exported for the install-referrer marker, the same storage on the same surface.
+ */
+export function reportStorageFailure(stage: 'write' | 'remove', error: unknown): void {
   reportError({
     surface: SURFACE,
     severity: 'warning',
@@ -138,9 +147,14 @@ function removeAndLog(action: ClearAction, fields: Attribution | null): void {
  *   - Untagged URL (the healthy case on every boot): no event, unless an expired or corrupt
  *     envelope is found, which is removed with a `clear expired|corrupt` event.
  *
- * Web only in practice: a native build has no landing query and sweeps only.
+ * `via: 'referrer'` is the Android Play install referrer, which is a query string too; it
+ * differs only in the `captured-referrer` action, so the firehose tells the two apart.
+ * On a native build the landing URL has no query, so `via: 'url'` there only sweeps.
  */
-export function captureAttributionFromUrl(search: string = window.location.search): void {
+export function captureAttributionFromUrl(
+  search: string = window.location.search,
+  via: 'url' | 'referrer' = 'url'
+): void {
   const { fields, present } = parseAttributionDetailed(search);
   const existing = readStash();
 
@@ -178,7 +192,9 @@ export function captureAttributionFromUrl(search: string = window.location.searc
       ? 'replaced-expired'
       : existing.state === 'corrupt'
         ? 'replaced-corrupt'
-        : 'captured';
+        : via === 'referrer'
+          ? 'captured-referrer'
+          : 'captured';
   logCapture(action, fields);
 }
 

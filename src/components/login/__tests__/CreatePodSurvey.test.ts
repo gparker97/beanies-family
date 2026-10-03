@@ -16,6 +16,7 @@ vi.mock('@/composables/useTranslation', () => ({
 vi.mock('@/services/telemetry', () => ({ logEvent: logEventMock }));
 
 import CreatePodSurvey from '../CreatePodSurvey.vue';
+import type { HeardVia } from '@beanies/brand/heardVia';
 
 const stubs = { PageWelcomeSubtitle: { props: ['text'], template: '<p>{{ text }}</p>' } };
 
@@ -25,7 +26,7 @@ function render() {
 
 const lastComplete = (w: ReturnType<typeof render>) => {
   const events = w.emitted('complete');
-  return events?.[events.length - 1]?.[0] as string | null | undefined;
+  return events?.[events.length - 1]?.[0] as HeardVia | null | undefined;
 };
 const actionsLogged = () =>
   logEventMock.mock.calls.map((c) => (c[0] as { context?: { action?: string } }).context?.action);
@@ -48,7 +49,7 @@ describe('CreatePodSurvey', () => {
     const w = render();
     await w.get('[data-testid="survey-opt-reddit"]').trigger('click');
     await w.get('[data-testid="survey-finish"]').trigger('click');
-    expect(lastComplete(w)).toBe('Reddit');
+    expect(lastComplete(w)).toEqual({ id: 'reddit', label: 'Reddit' });
     expect(actionsLogged()).toContain('answered');
     // never leaks the channel into telemetry context
     expect(actionsLogged()).not.toContain('Reddit');
@@ -58,7 +59,7 @@ describe('CreatePodSurvey', () => {
     const w = render();
     await w.get('[data-testid="survey-opt-chatgpt_ad"]').trigger('click');
     await w.get('[data-testid="survey-finish"]').trigger('click');
-    expect(lastComplete(w)).toBe('ChatGPT ad');
+    expect(lastComplete(w)).toEqual({ id: 'chatgpt_ad', label: 'ChatGPT ad' });
   });
 
   it('"somewhere else" reveals the free-text input and passes it verbatim', async () => {
@@ -68,7 +69,7 @@ describe('CreatePodSurvey', () => {
     const input = w.get('[data-testid="survey-other-input"]');
     await input.setValue('  a coworker  ');
     await w.get('[data-testid="survey-finish"]').trigger('click');
-    expect(lastComplete(w)).toBe('a coworker');
+    expect(lastComplete(w)).toEqual({ id: 'other', label: 'a coworker' });
   });
 
   it('"somewhere else" with empty text resolves to null (skip)', async () => {

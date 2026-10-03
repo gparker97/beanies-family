@@ -85,6 +85,8 @@ dependencies {
     // the androidx.webkit + androidx.credentials* deps that backed that dead-end path
     // were removed with it (ADR-029, 2026-07-14).
     implementation "androidx.biometric:biometric:1.1.0"
+    // Play install referrer: campaign attribution for native installs (InstallReferrerPlugin.java).
+    implementation "com.android.installreferrer:installreferrer:$installReferrerVersion"
     implementation project(':capacitor-android')
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"

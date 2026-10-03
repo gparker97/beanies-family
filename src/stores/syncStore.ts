@@ -134,6 +134,7 @@ import { toISODateString } from '@/utils/date';
 import { raceTimeout } from '@/utils/timing';
 import { clearAttribution, peekAttribution } from '@/utils/attributionStash';
 import { summariseAttribution, type Attribution } from '@beanies/brand/attribution';
+import type { HeardVia, HeardViaId } from '@beanies/brand/heardVia';
 import { measureAsync, record as recordPerf } from '@/utils/perfTiming';
 import { deduplicateRecurringTransactions } from '@/services/recurring/recurringProcessor';
 import {
@@ -2796,7 +2797,12 @@ export const useSyncStore = defineStore('sync', () => {
    */
   function buildRegistryPayload(
     overrides: Partial<Pick<RegistryEntry, 'provider' | 'fileId' | 'displayPath'>> = {},
-    opts: { isLoginEvent?: boolean; isSignupEvent?: boolean; attribution?: Attribution | null } = {}
+    opts: {
+      isLoginEvent?: boolean;
+      isSignupEvent?: boolean;
+      attribution?: Attribution | null;
+      heardVia?: HeardViaId | null;
+    } = {}
   ): registry.RegistryWritePayload {
     const ctx = useFamilyContextStore();
     const authStore = useAuthStore();
@@ -2872,6 +2878,9 @@ export const useSyncStore = defineStore('sync', () => {
       // stamps it ONLY alongside `isSignupEvent` on a row that has none, so only
       // `createNewFile` passes it and every other write sends `null`, which never clears it.
       attribution: opts.attribution ?? null,
+      // The survey answer's stable id. Same write-once-at-signup contract as `attribution`:
+      // only `createNewFile` passes it, every other write sends `null`, which never clears it.
+      heardVia: opts.heardVia ?? null,
       isLoginEvent: opts.isLoginEvent === true,
       isSignupEvent: opts.isSignupEvent === true,
     };
@@ -2883,7 +2892,10 @@ export const useSyncStore = defineStore('sync', () => {
    * resume-from-registry path). The public `registerCurrentFamily` keeps its
    * fire-and-forget contract for non-critical background syncs.
    */
-  async function _registerCurrentFamilySync(attribution: Attribution | null): Promise<void> {
+  async function _registerCurrentFamilySync(
+    attribution: Attribution | null,
+    heardVia: HeardViaId | null
+  ): Promise<void> {
     const ctx = useFamilyContextStore();
     if (!ctx.activeFamilyId) {
       throw new Error('Cannot register family: no active family ID');
@@ -2895,8 +2907,8 @@ export const useSyncStore = defineStore('sync', () => {
     await registry.registerFamilyOrThrow(
       ctx.activeFamilyId,
       // Pod creation is the family's first login — and the ONLY write allowed to
-      // stamp `signupPlatform` and `attribution`.
-      buildRegistryPayload({}, { isLoginEvent: true, isSignupEvent: true, attribution })
+      // stamp `signupPlatform`, `attribution` and `heardVia`.
+      buildRegistryPayload({}, { isLoginEvent: true, isSignupEvent: true, attribution, heardVia })
     );
   }
 
@@ -2989,9 +3001,10 @@ export const useSyncStore = defineStore('sync', () => {
     memberId: string,
     familyId: string,
     familyName: string,
-    /** Optional "how did you hear about us?" answer (stable English label or free
-     *  text) — appended to the pod-created Slack notification only. Never persisted. */
-    heardVia?: string | null,
+    /** Optional "how did you hear about us?" answer. The `id` is persisted write-once on the
+     *  registry row at signup; the `label` (stable English label, or the free text of
+     *  `other`) goes to the pod-created Slack notification only and is never stored. */
+    heardVia?: HeardVia | null,
     /**
      * REVIEW-DEMO: demo/review seeding ONLY — skip every REMOTE interaction of
      * this create: the existing-pod registry LOOKUP (pre-write), the registry
@@ -3244,7 +3257,7 @@ export const useSyncStore = defineStore('sync', () => {
       //    recovery anchor for `ResumePodSetup`'s registry-first flow).
       step = 'register';
       // REVIEW-DEMO: never plant a synthetic family in the real registry.
-      if (!suppressRemote) await _registerCurrentFamilySync(attribution);
+      if (!suppressRemote) await _registerCurrentFamilySync(attribution, heardVia?.id ?? null);
 
       // 7. TRUST THE CREATING DEVICE — WITHOUT FAIL (2026-09-23, greg). The person
       //    who creates a family is on their own device; leaving it untrusted meant a
@@ -3307,7 +3320,7 @@ export const useSyncStore = defineStore('sync', () => {
         const cameFrom = attribution ? summariseAttribution(attribution) : '';
         slackNotify(
           `🎉 *Family pod created!*\n*Family:* ${familyName}\n*Owner:* ${ownerMember.name}\n*Storage:* ${storageLabel}` +
-            (heardVia ? `\n*Heard via:* ${heardVia}` : '') +
+            (heardVia?.label ? `\n*Heard via:* ${heardVia.label}` : '') +
             // One code span: the value charset admits `_` `~` `:`, which Slack would render
             // as italic / strike / emoji, and excludes the backtick, so nothing breaks out.
             // Omitted when the tag has none of source / campaign / content (ad ids only).

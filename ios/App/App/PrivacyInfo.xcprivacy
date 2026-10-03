@@ -31,7 +31,10 @@
             when the row is created, and (2026-10) the campaign tag: utm_* plus
             campaign_id/ad_group_id/ad_id/oppref from the link that first brought the
             person to beanies.family (held on-device 30 days, written once at signup;
-            identifies the ad, never shared with the ad platform). Linked to family_id.
+            identifies the ad, never shared with the ad platform), and (2026-10) heardVia: the
+            id of the "how did you hear about us" option the owner picked (a fixed enum,
+            written once at signup; the free text of "other" is never sent). Linked to
+            family_id.
         (b) Plausible Analytics (2026-08, #71) — the app now loads the same cookieless
             plausible.io script the marketing site uses, reporting a fixed event name
             (signup / login / feature_used / nudge shown+dismissed / …) plus the closed

@@ -18,6 +18,9 @@ export default defineConfig({
       'src/**/*.{test,spec}.ts',
       'scripts/**/*.{test,spec}.mjs',
       'infrastructure/lambda/registry/**/*.{test,spec}.mjs',
+      // The metrics skill's inferred-attribution scorer and its band / ROI maths (#121). Pure
+      // modules; the scorer's only write is behind --apply with a dynamic SDK import.
+      '.claude/skills/beanies-metrics/scripts/**/*.test.mjs',
       // The apex CloudFront Function's routing table. It is prod-critical,
       // hand-written ES5, and its branch ORDER is load-bearing (the /oauth/native
       // exemption must reach the .html rewrite, not 301 or 403). The test loads

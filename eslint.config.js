@@ -529,6 +529,9 @@ export default [
       // Claude skill tooling (.claude/skills/**) are standalone Node CLI scripts
       // run outside the app bundle — same rationale as scripts/** above.
       '.claude/skills/**',
+      // Git worktrees that parallel sessions create under .claude/ are separate checkouts; linting
+      // them here double-counts every file and fails the gate on code this tree does not own.
+      '.claude/worktrees/**',
       'playwright-report/**',
       'test-results/**',
       '.github/**',

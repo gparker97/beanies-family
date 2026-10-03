@@ -134,6 +134,14 @@ describe('attributionStash', () => {
       });
     });
 
+    it('logs `captured-referrer` for a referrer capture and still keeps the first touch', () => {
+      captureAttributionFromUrl('utm_source=reddit&utm_campaign=r1', 'referrer');
+      expect(lastEvent()?.context).toMatchObject({ action: 'captured-referrer', kind: 'reddit' });
+      captureAttributionFromUrl(TAGGED, 'referrer');
+      expect(lastEvent()?.context).toMatchObject({ action: 'kept-first-touch' });
+      expect((stored() as { fields: { utm_source: string } }).fields.utm_source).toBe('reddit');
+    });
+
     it('keeps an unexpired first touch and logs `kept-first-touch`', () => {
       const first = makeEnvelope({ utm_source: 'reddit' }, NOW - 1000);
       store(first);

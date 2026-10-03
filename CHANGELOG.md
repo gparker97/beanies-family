@@ -8,6 +8,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-10-03
+
+### Added
+
+- The marketing site now keeps its own record of campaign events (landings and store taps), so ad and post results no longer depend on a third-party analytics tool.
+- The "how did you hear about us?" answer is now saved on the family's registry entry.
+- Native installs are now attributed: the Android app reads the Google Play install referrer once, and the founder dashboard shows inferred-attribution bands for families that arrived without a tag.
+
 ## 2026-10-02
 
 ### Added

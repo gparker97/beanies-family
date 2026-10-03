@@ -16,3 +16,4 @@ web/.astro
 # build; not ours to format.
 android
 ios
+.vitest

@@ -17,6 +17,7 @@ export type CountryCode = string; // ISO 3166-1 alpha-2, uppercase (e.g., 'SG', 
 // erased at build (no runtime cycle).
 import type { RecurrenceRule, Cadence } from './recurrence';
 import type { Attribution } from '@beanies/brand/attribution';
+import type { HeardViaId } from '@beanies/brand/heardVia';
 export type {
   RecurrenceUnit,
   MonthlyAnchor,
@@ -2327,6 +2328,13 @@ export interface RegistryEntry {
    * `null` for an untagged signup and absent on rows created before 2026-10-02.
    */
   attribution?: Attribution | null;
+  /**
+   * The survey answer id ("how did you hear about us?", e.g. `chatgpt_ad`, `friend`, `other`).
+   * Write-once at signup, gated on `isSignupEvent` exactly like `attribution`; the registry
+   * Lambda validates it against its allowlist twin, carries it across later PUTs and keeps it on
+   * the DELETE tombstone. The free text of `other` is never sent. `null` when skipped.
+   */
+  heardVia?: HeardViaId | null;
   /**
    * #95: what the family is entitled to, computed server-side on every GET by
    * `infrastructure/lambda/registry/entitlement.mjs` (never stored in the row). `null` when the

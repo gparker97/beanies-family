@@ -3,75 +3,50 @@
 //
 // This component is the SINGLE OWNER of every app-bound-link concern on the site:
 //   1. tag capture: the landing URL's campaign tag is kept on the device for 30 days
-//      (first touch wins), using the shared rules in `@beanies/brand/attribution`;
-//   2. href decoration: every link into the app (`APP_URL`) carries that tag, so the app
-//      can record which of our own ads or posts brought a family;
-//   3. the CTA click event: the delegated Plausible listener for every `data-cta` element.
+//      (first touch wins), via `readStoredAttribution` (`lib/storedAttribution.ts`);
+//   2. the first-party `landing` event: one beacon per entry pageview (`lib/marketingEvents.ts`);
+//   3. href decoration: every link into the app (`APP_URL`) AND the site's own /ios and
+//      /android badge links carries that tag, so the app can record which of our own ads or
+//      posts brought a family, and the redirect page can record it on the `store_tap`;
+//   4. the CTA click event: the delegated Plausible listener for every `data-cta` element.
+//
+// The `store_tap` event is NOT sent here: the /ios and /android redirect pages own it
+// (`lib/storeRedirect.ts`), so a tap is counted once however the visitor reached the page.
 //
 // The CTA listener lives here BECAUSE its `attributed` prop reads the same `fields` the
 // decorator uses. Do not split this back into per-host inline copies (BaseLayout and
 // /download each used to carry one). Render `<AppLinks />` immediately after the
 // Plausible loader + stub queue, which stay `is:inline` in each host.
 //
-// A bare (hoisted, bundled) `<script>`, not `is:inline`: it has to import the shared module.
+// A bare (hoisted, bundled) script tag, not an `is:inline` one: it has to import the shared module.
 // The build-time guard (`src/lib/assert-cta-tagged.mjs`) checks `data-cta` only; the query
 // string is added here at runtime, so the guard cannot and should not look for it.
 ---
 
 <script>
-  import {
-    ATTRIBUTION_STORAGE_KEY,
-    appendAttribution,
-    makeEnvelope,
-    parseAttribution,
-    readEnvelope,
-    type Attribution,
-  } from '@beanies/brand/attribution';
+  import { appendAttribution, type Attribution } from '@beanies/brand/attribution';
   import { APP_URL } from '@beanies/brand/nav';
+  import { isEntryPageview, sendMarketingEvent } from '../lib/marketingEvents';
+  import { readStoredAttribution } from '../lib/storedAttribution';
+
+  /** The site's own store redirect pages: decorated with the tag so they can record it. */
+  const STORE_PATHS = new Set(['/ios', '/android']);
 
   type PlausibleFn = (name: string, opts?: { props?: Record<string, string> }) => void;
 
-  /** A stored value that is not JSON reads as `corrupt` (replaced), not as a storage refusal. */
-  function parseStored(raw: string | null): unknown {
-    if (raw === null) return null;
-    try {
-      return JSON.parse(raw);
-    } catch {
-      return { v: 0 };
-    }
-  }
-
-  // 1. Capture. First touch wins: an unexpired envelope is never overwritten; a corrupt or
-  //    expired one is replaced. There is no firehose on the site; `attributed` below is the
-  //    production-visible signal when storage is refused.
-  const now = Date.now();
-  const parsed = parseAttribution(location.search);
-  let stored: Attribution | null = null;
-  try {
-    const existing = readEnvelope(parseStored(localStorage.getItem(ATTRIBUTION_STORAGE_KEY)), now);
-    if (existing.state === 'ok') stored = existing.fields;
-    else if (parsed) {
-      localStorage.setItem(ATTRIBUTION_STORAGE_KEY, JSON.stringify(makeEnvelope(parsed, now)));
-    } else if (existing.state !== 'none') {
-      // Expired or corrupt and nothing to replace it: remove it, so the tag really does leave
-      // the device after 30 days as the privacy page says, not only when a new tag arrives.
-      localStorage.removeItem(ATTRIBUTION_STORAGE_KEY);
-    }
-  } catch (err) {
-    console.warn(
-      '[attribution] localStorage refused — forwarding unattributed; check private mode/quota',
-      err
-    );
-  }
-  // Computed AFTER the capture step, so a tag captured on this very page decorates its links
-  // and reports `attributed: yes`. The single source for both the decorator and the event.
-  const fields: Attribution | null = stored ?? parsed;
+  // 1. Capture (first touch wins) and the entry-pageview event. Computed once, so a tag
+  //    captured on this very page decorates its links and reports `attributed: yes`.
+  const fields: Attribution | null = readStoredAttribution(location.search);
+  if (isEntryPageview()) sendMarketingEvent({ kind: 'landing', fields, loc: location.pathname });
 
   // 2. Decoration. Idempotent: `appendAttribution` never overwrites a parameter already on
-  //    the link and returns off-origin hrefs unchanged.
+  //    the link and returns off-origin hrefs unchanged. The allowed origin is the site's own for
+  //    a /ios or /android link, the app's for everything else.
   function decorateAnchor(a: HTMLAnchorElement): void {
     if (!fields) return;
-    const next = appendAttribution(a.href, fields, APP_URL);
+    const origin =
+      STORE_PATHS.has(a.pathname) && a.origin === location.origin ? location.origin : APP_URL;
+    const next = appendAttribution(a.href, fields, origin);
     if (next !== a.href) a.href = next;
   }
 
@@ -82,7 +57,9 @@
   function decorateAll(): void {
     if (!fields) return;
     document
-      .querySelectorAll<HTMLAnchorElement>(`a[href^="${APP_URL}"]`)
+      .querySelectorAll<HTMLAnchorElement>(
+        `a[href^="${APP_URL}"], a[href="/ios"], a[href="/android"]`
+      )
       .forEach(decorateAnchor);
   }
   if (document.readyState === 'loading') {
