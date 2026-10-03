@@ -23,7 +23,7 @@ This skill creates comprehensive, implementation-ready plans and optionally GitH
 
 1. **Capture the initial prompt verbatim.** Store the user's exact words — this is the primary source of truth for intent.
 2. **Ask clarifying questions** if requirements are ambiguous. Do not assume — ask.
-3. **Default to direct implementation — no GitHub issue.** This is a one-dev project; tickets are overhead unless the user explicitly says "create an issue" / "file a ticket" / "open a ticket for this". If the user does ask for an issue, create one per Phase 5; otherwise the plan stands alone in `docs/plans/` with the full prompt history embedded.
+3. **Default to direct implementation — no GitHub issue.** This is a one-dev project; tickets are overhead unless the user explicitly says "create an issue" / "file a ticket" / "open a ticket for this". If the user does ask for an issue, create one per Phase 5; otherwise the plan stands alone in `~/projects/beanies-ops/docs/plans/` with the full prompt history embedded.
 4. Record all follow-up prompts, redirections, and refinements. Every user message that shapes the plan is part of the record.
 5. **Mockup-aware intake.** If the prompt carries an approved mockup — a `Mockup:` line (the channel `beanies-pre-plan` uses) or a `docs/mockups/…` file the user points at — **read that file in full before drafting**; it is primary design input for Pass 1 (see Phase 2.1 → _Mockup-driven drafting_). If the prompt makes clear a mockup is expected but none is provided (e.g. `beanies-plan` was invoked standalone, bypassing `beanies-pre-plan`), generate one first: invoke `/frontend-design:frontend-design` clamped to `.claude/skills/beanies-theme/SKILL.md` + the CIG (the CIG always wins over the generator's defaults), producing a self-contained `docs/mockups/<concept>-YYYY-MM-DD.html`; iterate to the user's explicit approval; commit only the approved file; then draft from it. Writing `mockup file url` back to the Notion tracker is `beanies-pre-plan`'s responsibility, never this skill's — `beanies-plan` stays Notion-agnostic.
 
@@ -100,7 +100,7 @@ Apply revisions. Record a one-line summary in `## Review Passes`. The plan is no
 
 Once the plan is fully approved:
 
-1. **Save the FULL plan** (not summarized, not truncated — exactly what the user approved) to `docs/plans/YYYY-MM-DD-<short-slug>.md`
+1. **Save the FULL plan** (not summarized, not truncated — exactly what the user approved) to `~/projects/beanies-ops/docs/plans/YYYY-MM-DD-<short-slug>.md` (the private ops repo; commit it there, never in the public repo)
 2. The plan must follow the complete [Plan Document Format](#plan-document-format) below.
 3. If no GitHub issue is being created, the plan must note this explicitly and include all information that would otherwise go in the issue (see format below).
 
@@ -154,7 +154,7 @@ These prompts are the source of truth for what Passes 2, 3, and 4 actually do. P
 
 > Date: YYYY-MM-DD
 > Related issues: #<number> (or "None — direct implementation")
-> Plan file: `docs/plans/YYYY-MM-DD-<slug>.md`
+> Plan file: `~/projects/beanies-ops/docs/plans/YYYY-MM-DD-<slug>.md`
 > Mockup: `docs/mockups/<file>.html` (include this line only when an approved mockup drove the plan; omit otherwise)
 
 ## User Story
@@ -240,7 +240,7 @@ State, concretely, the diagnostic logging this work emits so any failure can be 
 - **Failure modes covered**: for each way this feature can fail or degrade, the event that would let you diagnose it blind (which branch, which input class, what state). Confirm no bare `catch {}` / silent fallback.
 - **Success-path signal**: the counter/outcome emitted on success too (so _rates_ are measurable for future alerting), noting the `TELEMETRY_FLOOR_MS = 250` floor where relevant.
 - **Critical vs. telemetry**: which events (if any) warrant `severity: 'critical'` (Slack page — reserve for "user action failed / data at risk") vs. firehose-only `warning`/`error`.
-- **Privacy/store gate**: if any **new** `context` key ships, it MUST be added to `ALLOWED_CONTEXT_KEYS` (`logEvent.ts`) and the store data-collection declarations updated (`docs/runbooks/native-store-submission.md` + consumers) — call this out here.
+- **Privacy/store gate**: if any **new** `context` key ships, it MUST be added to `ALLOWED_CONTEXT_KEYS` (`logEvent.ts`) and the store data-collection declarations updated (`~/projects/beanies-ops/docs/runbooks/native-store-submission.md` + consumers) — call this out here.
 
 ## Acceptance Criteria
 
@@ -294,7 +294,7 @@ As a [role], I want [goal] so that [benefit].
 
 ## Plan Reference
 
-Full plan: [`docs/plans/YYYY-MM-DD-<slug>.md`](../docs/plans/YYYY-MM-DD-<slug>.md)
+Full plan: `docs/plans/YYYY-MM-DD-<slug>.md` in the private ops repo (not linkable from this public issue)
 
 > The plan contains the complete technical approach, files affected, and design decisions. Always refer to it during implementation.
 
@@ -381,4 +381,4 @@ Follow the project's labeling conventions from `CLAUDE.md`:
 - **ALWAYS include Dark Mode Coverage for UI work.** Any plan that changes what a user sees carries the `## Dark Mode Coverage` section: every surface's dark surface step, ink, `-lift` partners and background partners (inline and scoped styles included), plus any adjacent existing breakage, fixed or recorded. The CIG (slides 8-9) is the authority. Dark mode lands in the same change as light, as an acceptance criterion, never as a follow-up.
 - **ALWAYS create 2-way links** between the plan file and the GitHub issue (if one was created).
 - **ALWAYS add labels** to GitHub issues per the project conventions (when one is created).
-- Plans are saved to `docs/plans/YYYY-MM-DD-<short-slug>.md` — this is a permanent historical record.
+- Plans are saved to `~/projects/beanies-ops/docs/plans/YYYY-MM-DD-<short-slug>.md` — this is a permanent historical record.

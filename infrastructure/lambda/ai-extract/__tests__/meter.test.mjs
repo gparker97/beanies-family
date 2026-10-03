@@ -6,9 +6,6 @@
  * client can ask for something for nothing, so each guard gets a case that tries to get past it.
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, it } from 'node:test';
 
 import {
@@ -609,23 +606,7 @@ describe('refusalReason names every guard that can refuse (#49)', () => {
   });
 });
 
-describe('the alarming prefixes are asserted against terraform', () => {
-  // Resolved from import.meta.url, NOT process.cwd() — `npm run test:lambda` guarantees no cwd.
-  const tf = readFileSync(
-    join(dirname(fileURLToPath(import.meta.url)), '../../../modules/ai-extract/main.tf'),
-    'utf8'
-  );
-
-  for (const [name, prefix] of Object.entries(ALARMING_PREFIXES)) {
-    it(`${name} has a matching metric filter pattern`, () => {
-      assert.ok(
-        tf.includes(prefix),
-        `"${prefix}" has no pattern in modules/ai-extract/main.tf — the alarm would silently ` +
-          'stop firing, which is indistinguishable from having nothing to report'
-      );
-    });
-  }
-});
+// The alarm-prefix drift guard (log prefixes vs Terraform metric filters) now lives in the private ops repo's infrastructure/__tests__/.
 
 describe('the byte fence is a fence, not a suggestion (#49)', () => {
   // ⚠️ THE BUG THESE EXIST FOR. The grant's size band was written as

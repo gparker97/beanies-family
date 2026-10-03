@@ -925,7 +925,7 @@ Security is foundational but should feel safe, never scary. Security UI communic
 
 Opening a family is **two steps**, and the vocabulary must keep them apart. Getting this
 wrong is what shipped a "use password instead" link to families that have never had a
-password (see `docs/plans/2026-09-09-credential-vocabulary-and-offer-correctness.md`).
+password (see `~/projects/beanies-ops/docs/plans/2026-09-09-credential-vocabulary-and-offer-correctness.md`).
 
 | Step | Scope | Secrets | What the UI calls it |
 |---|---|---|---|

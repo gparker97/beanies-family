@@ -101,7 +101,7 @@ Out of scope (don't):
 Acceptance criteria:           <how you'll know it's right — seeds acceptance criteria, or "—">
 Edge cases / constraints:      <… or "—">
 Reuse hints / affected files:  <pointers for the DRY pass — NOT the approach — or "—">
-References:                    <ADRs, docs/plans/*, issues, error reports — or "—">
+References:                    <ADRs, ~/projects/beanies-ops/docs/plans/*, issues, error reports — or "—">
 Open Qs:                       <decisions to surface / things you're unsure about — or "—">
 Notes:                         <non-default constraints, gotchas — or "—">
 
@@ -164,7 +164,7 @@ A flat, linear sequence of guarded steps. Each step has one job and one explicit
    - **Retain the captured row id** for the deferred step 8 write-back.
    - **STOP and request explicit approval — never auto-launch `beanies-plan`.** After the write-back, show the user the assembled block and confirm (NOTION mode) that the row was advanced to `In Progress` with the prompt + any backfilled columns written back. Then ask plainly, e.g.: _"Requirements are captured and written back to Notion #<ID>. Do you want to proceed to create the plan via `/beanies-plan`?"_ **Wait for the user's explicit go-ahead.** Only on an explicit yes do you invoke `/beanies-plan` in-thread with the assembled block as its Phase 1 prompt (`beanies-plan` captures it verbatim). If the user says no, defers, or wants changes, iterate on the intake (re-running step 5 as needed) — never proceed to planning without approval. When you do hand off, mention that the `plan file url` will be written back once `beanies-plan` saves the plan (step 8).
 
-8. **Deferred `plan file url` write-back (NOTION mode only — the one non-immediate write).** The hand-off created a standing obligation keyed to the captured row id. `beanies-plan` exits to plan mode, iterates with the user, and saves the file **only on approval** — so the plan path does not exist at hand-off, and the plan may be abandoned entirely. When — and only when — `beanies-plan` reports a saved `docs/plans/…` path **in the same thread**, `API-patch-page` the captured row to set **`plan file url`** = the file's GitHub blob URL on the default branch (`https://github.com/gparker97/beanies-family/blob/main/<saved path>` — it resolves once the plan is committed + pushed). Handle:
+8. **Deferred `plan file url` write-back (NOTION mode only — the one non-immediate write).** The hand-off created a standing obligation keyed to the captured row id. `beanies-plan` exits to plan mode, iterates with the user, and saves the file **only on approval** — so the plan path does not exist at hand-off, and the plan may be abandoned entirely. When — and only when — `beanies-plan` reports a saved `~/projects/beanies-ops/docs/plans/…` path **in the same thread**, `API-patch-page` the captured row to set **`plan file url`** = the file's GitHub blob URL on the default branch (`https://github.com/gparker97/beanies-ops/blob/HEAD/docs/plans/<file>` — the private ops repo; it resolves once the plan is committed + pushed there). Handle:
    - **Patch failed** → surface the error plus the exact url + row id so the user can set it manually.
    - **Row id lost** → tell the user the url can't be written back; ask for the issue reference to re-resolve.
    - **No save ever reported** (plan abandoned / thread ended) → do nothing. `plan file url` correctly stays empty; never guess or construct a path for an unsaved plan.
@@ -204,8 +204,8 @@ Write-back — four phases:
           multiple text objects in the same property so the patch doesn't 400.)
     • Status (select)               ← advance-to value
   Deferred (only after beanies-plan saves the plan file — workflow step 8):
-    • plan file url (url)           ← GitHub blob URL of the saved docs/plans/… file
-                                       (https://github.com/gparker97/beanies-family/blob/main/<path>;
+    • plan file url (url)           ← GitHub blob URL of the saved ~/projects/beanies-ops/docs/plans/… file
+                                       (https://github.com/gparker97/beanies-ops/blob/HEAD/docs/plans/<file>;
                                         resolves once the plan is committed + pushed)
 generate mockup? (select Yes / No) → control that triggers the step-6 mockup loop:
   "Yes"          → generate via /frontend-design:frontend-design (CIG-clamped), approve, commit the

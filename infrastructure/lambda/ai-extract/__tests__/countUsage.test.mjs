@@ -1,8 +1,5 @@
 /* global process */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { after, beforeEach, describe, it } from 'node:test';
 
 import { USAGE_ATTRS, hash, usageKey } from '../ddb.mjs';
@@ -202,28 +199,5 @@ describe('countUsage', () => {
     });
   });
 
-  describe('the alarming prefixes are asserted against terraform', () => {
-    // Resolved from import.meta.url, NOT process.cwd() — `npm run test:lambda` does not
-    // guarantee a working directory.
-    const tf = readFileSync(
-      join(dirname(fileURLToPath(import.meta.url)), '../../../modules/ai-extract/main.tf'),
-      'utf8'
-    );
-
-    // ONLY the prefixes that have a filter. `ok task=` and `usage counted` are triage lines with
-    // no alarm, and an "every prefix the Lambda logs" assertion would fail on those and then be
-    // weakened to nothing.
-    for (const [name, prefix] of Object.entries({
-      COUNT_FAILED_PREFIX,
-      COUNT_SKIPPED_PREFIX,
-    })) {
-      it(`${name} appears verbatim in a metric filter pattern`, () => {
-        assert.ok(
-          tf.includes(prefix),
-          `${prefix} has no matching pattern in modules/ai-extract/main.tf — the alarm would ` +
-            'silently stop firing, which looks identical to having nothing to report'
-        );
-      });
-    }
-  });
+  // The alarm-prefix drift guard (log prefixes vs Terraform metric filters) now lives in the private ops repo's infrastructure/__tests__/.
 });

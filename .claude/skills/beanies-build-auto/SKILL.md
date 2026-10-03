@@ -7,7 +7,7 @@ description: >-
   only greg can do. Use this WHENEVER greg wants something built end-to-end rather than just designed — phrases
   like "take this to /beanies-plan and implement it", "plan it then build it", "implement this and code-review
   it", "build this properly", "go ahead and implement, then review and fix", "take this all the way", "implement
-  the plan in docs/plans/...", or an approved plan/mockup/tracker issue handed over with "go". Also use it when
+  the plan in ~/projects/beanies-ops/docs/plans/...", or an approved plan/mockup/tracker issue handed over with "go". Also use it when
   he asks to implement something and mentions reviewing, browser testing, screenshots, terraform, or fixing what
   the review finds. Trigger even if he doesn't name this skill or say "build" — a request that spans
   implementation AND verification AND review IS this skill. It never deploys to production; it stops at
@@ -16,7 +16,7 @@ description: >-
 
 # beanies-build-auto — Plan → Implement → Verify → Review → Fix
 
-The one-shot version of a prompt greg has typed by hand a dozen times (`docs/prompts/2026-09/` is full of
+The one-shot version of a prompt greg has typed by hand a dozen times (`~/projects/beanies-ops/docs/prompts/2026-09/` is full of
 them). It exists so the discipline is the same every time instead of depending on how much of it he
 remembered to type.
 
@@ -32,7 +32,7 @@ branch; shipping is a separate, deliberate act with its own decision gate.
 
 ## When to Invoke
 
-- **Via slash command**: `/beanies-build-auto` — optionally with a plan path (`/beanies-build-auto docs/plans/2026-09-14-magic-beans.md`) or a tracker id
+- **Via slash command**: `/beanies-build-auto` — optionally with a plan path (`/beanies-build-auto ~/projects/beanies-ops/docs/plans/2026-09-14-magic-beans.md`) or a tracker id
 - **Automatically**: when greg asks for something to be built end-to-end — implementation plus review, or plan plus implementation — rather than designed or planned alone
 - **Not** when he only wants a plan. "Save the plan, don't implement" means `/beanies-plan` and a full stop. If the ask is ambiguous, assume plan-only and offer this skill; starting an unwanted implementation costs far more than asking.
 
@@ -95,7 +95,7 @@ Two entry paths. Work out which one you are on before anything else:
   `ExitPlanMode`, which puts the plan in front of greg. **His approval there is the gate for everything
   below.** Do not start implementing on the strength of the slash command alone — the command authorises the
   *sequence*, the plan approval authorises the *content*.
-- **A plan already exists** (a path was given, or `docs/plans/` holds the approved plan for this work) → read
+- **A plan already exists** (a path was given, or `~/projects/beanies-ops/docs/plans/` holds the approved plan for this work) → read
   it in full and skip to Phase 1. Say which plan you are building so greg can catch a wrong one immediately.
 
 Then check the preconditions, because both failure modes here are expensive and silent:
@@ -168,13 +168,13 @@ Touched a Lambda? `npm run test:lambda` too — `validate` does not cover them.
 ### Phase 3: Infrastructure, when the plan calls for it
 
 Skip this phase entirely when no infra changed. When it did, read
-`references/terraform.md` before running anything — it carries the trap that makes a terraform plan lie, and
+`~/projects/beanies-ops/scripts/infra/README.md` (private ops repo) before running anything — it carries the trap that makes a terraform plan lie, and
 the exact gate for when an apply may proceed unattended.
 
 The short version:
 
 ```bash
-scripts/infra/tf-plan.sh                          # or: tf-plan.sh -target=module.ai_extract
+~/projects/beanies-ops/scripts/infra/tf-plan.sh    # or: tf-plan.sh -target=module.ai_extract
 ```
 
 That script sources `~/.beanies-tf.env`, runs the account guard, checks log retention, plans, and prints
@@ -183,7 +183,7 @@ That script sources `~/.beanies-tf.env`, runs the account guard, checks log rete
 Then apply the plan **only if every change is one the plan document called for**:
 
 ```bash
-scripts/infra/tf-apply.sh                         # applies the saved plan, not a fresh one
+~/projects/beanies-ops/scripts/infra/tf-apply.sh   # applies the saved plan, not a fresh one
 ```
 
 **Any unexpected resource, any destroy, any replace, or any drift → stop and show greg the diff before
@@ -257,7 +257,7 @@ a review does by default:
 3. Does it violate the project's standing rules (DRY, silent failures, i18n, dark mode, observability)?
 
 **Triage every finding, including the ones below the ship-blocker line.** A capped review list once dropped a
-real correctness bug (`docs/lessons.md`, `docs/E2E_HEALTH.md`). "Below the cut line" is a statement about
+real correctness bug (`~/projects/beanies-ops/docs/lessons.md`, `~/projects/beanies-ops/docs/E2E_HEALTH.md`). "Below the cut line" is a statement about
 priority, never about validity — record what you are not fixing and why, so it is a decision rather than an
 oversight.
 
@@ -334,7 +334,7 @@ Close with a report greg can act on in under a minute:
 
 ```markdown
 **Built:** <one line — what now works that did not before>
-**Plan:** docs/plans/<file>.md
+**Plan:** ~/projects/beanies-ops/docs/plans/<file>.md
 
 **What changed**
 - <file or area> — <what and why, one line each>
@@ -393,7 +393,7 @@ that overstates what was verified is worse than no report, because it retires th
 - **Never apply terraform with an unexpected change in the plan.** Not a destroy, not a replace, not a
   resource nobody asked for. Stop and show greg. Applying through surprise is how a live secret gets blanked
   or a console fix gets reverted.
-- **Always run terraform through `scripts/infra/`.** A `terraform plan` from a shell that did not source
+- **Always run terraform through `~/projects/beanies-ops/scripts/infra/`.** A `terraform plan` from a shell that did not source
   `~/.beanies-tf.env` produces a confident, wrong plan rather than an error. The scripts exist so that cannot
   happen; do not hand-roll the commands.
 - **Dark mode is tested and fixed in Phase 4, not left to review.** Any UI change runs the dark-mode sweep
@@ -422,7 +422,7 @@ that overstates what was verified is worse than no report, because it retires th
 
 ## Reference files
 
-- `references/terraform.md` — the infra phase in full: the lying-plan trap, the account guard, the apply gate,
+- `~/projects/beanies-ops/scripts/infra/README.md` (private ops repo) — the infra phase in full: the lying-plan trap, the account guard, the apply gate,
   and what the two scripts do. Read before Phase 3.
 - `references/browser-verification.md` — Playwright mechanics, the four configs, where a throwaway script may
   and may not live, and how to capture screenshots. Read before Phase 4.

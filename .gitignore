@@ -37,6 +37,23 @@ dist-ssr
 .claude/*
 !.claude/skills/
 
+# Private ops skills: symlinks into the private ops repo, created by its
+# scripts/link-ops-skills.sh. Never commit them (no trailing slash: a symlink is a file to git).
+/.claude/skills/beanie-video
+/.claude/skills/beanies-blog
+/.claude/skills/beanies-competitor-analysis
+/.claude/skills/beanies-metrics
+/.claude/skills/deploy-prod-auto
+/.claude/skills/deploy-prod-skip-ci
+/.claude/skills/end-session
+/.claude/skills/error-review
+/.claude/skills/good-morning
+/.claude/skills/karma-run
+/.claude/skills/launch-status
+/.claude/skills/pilot-scout
+/.claude/skills/pinterest-post
+/.claude/skills/start-session
+
 # MCP server config (contains API tokens)
 .mcp.json
 

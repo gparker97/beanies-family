@@ -20,7 +20,7 @@ function member(id: string, name: string, aliases?: string[]): FamilyMember {
 
 const ROSTER = [
   member('m-greg', 'Greg'),
-  member('m-sophia', 'Willa'),
+  member('m-willa', 'Willa'),
   member('m-leo', 'Leo', ['Leonardo']),
   member('m-sam-a', 'Sam Smith'),
   member('m-sam-b', 'Sam Jones'),
@@ -40,7 +40,7 @@ function item(over: Partial<TodoItemExtraction> = {}): TodoItemExtraction {
   };
 }
 
-const HOLDERS = new Map([['school-forms', 'm-sophia']]);
+const HOLDERS = new Map([['school-forms', 'm-willa']]);
 const ctx = (over: Partial<TodoAssigneeContext> = {}): TodoAssigneeContext => ({
   roster: ROSTER,
   holderFor: (id) => HOLDERS.get(id),
@@ -63,7 +63,7 @@ describe('resolveTodoAssignee', () => {
     // "Sam" is both Sam Smith and Sam Jones: the matcher refuses to guess.
     expect(
       resolveTodoAssignee(item({ assigneeName: 'Sam', ownerCard: 'school-forms' }), ctx())
-    ).toEqual({ assigneeIds: ['m-sophia'], reason: 'owner', ownerCardId: 'school-forms' });
+    ).toEqual({ assigneeIds: ['m-willa'], reason: 'owner', ownerCardId: 'school-forms' });
   });
 
   it('falls through an unknown name to the submitter', () => {
@@ -281,7 +281,7 @@ describe('buildTodoDrafts', () => {
     expect(drafts[0]).toMatchObject({
       title: 'Return the slip',
       dueDate: '2026-10-09',
-      assigneeIds: ['m-sophia'],
+      assigneeIds: ['m-willa'],
       reason: 'owner',
       ownerCardId: 'school-forms',
       skipped: false,

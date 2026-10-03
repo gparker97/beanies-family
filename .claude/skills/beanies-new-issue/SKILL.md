@@ -25,7 +25,7 @@ The goal is a row so well-formed that running `/beanies-pre-plan #<ID>` on it la
   /beanies-pre-plan #<ID>   ← validates every field, resolves TBCs, optional mockup, → In Progress
         │
         ▼
-  /beanies-plan   ← 4-pass design → saved docs/plans/… → optional GitHub issue
+  /beanies-plan   ← 4-pass design → saved ~/projects/beanies-ops/docs/plans/… → optional GitHub issue
         │
         ▼
   /beanies-build-auto   ← implement → validate → terraform (if needed) → browser verify
@@ -34,7 +34,7 @@ The goal is a row so well-formed that running `/beanies-pre-plan #<ID>` on it la
 
 The last hop is optional and separately invoked: `/beanies-plan` still stops at an approved, saved plan, so
 "save the plan, don't implement" stays a first-class outcome. `/beanies-build-auto` picks a plan up — either
-by running `beanies-plan` itself, or from a `docs/plans/` path — and carries it to reviewed, verified code.
+by running `beanies-plan` itself, or from a `~/projects/beanies-ops/docs/plans/` path — and carries it to reviewed, verified code.
 It stops short of deploying; that remains `/deploy-prod-auto`.
 
 This skill only owns the first hop. It **never** auto-runs `beanies-pre-plan`; it offers it once the row exists (see step 10).
@@ -90,7 +90,7 @@ If it's genuinely a refactor/chore/tech-debt item, file it as the closest of the
 This is what makes the issue _good_. Scale the effort to the issue: a one-line copy tweak needs a quick grep; a new page needs real exploration. **Use subagents liberally** (a core project principle) so the main context stays clean — launch focused, parallel `Explore`/`general-purpose` agents, one concern each, in a single message. Typical concerns:
 
 - **Codebase** — where does this live? Which components/stores/composables/pages are involved? This feeds _Surfaces (View)_, _Reuse Hints / Affected Files_, and grounds _Objective_ and _Scope_ in real structure. (MVO: pages/components = View, stores/composables = Orchestrator.)
-- **Recent commits & docs** — `git log` around the area, `docs/STATUS.md`, `docs/plans/`, `docs/adr/`, `CHANGELOG.md`. Has this been touched, planned, or decided already? Surface related work into _References_ and _Dependencies / Related Issues_.
+- **Recent commits & docs** — `git log` around the area, `~/projects/beanies-ops/docs/STATUS.md`, `~/projects/beanies-ops/docs/plans/`, `docs/adr/`, `CHANGELOG.md`. Has this been touched, planned, or decided already? Surface related work into _References_ and _Dependencies / Related Issues_.
 - **Surfaces** — which platforms (`Device Type`) and which app area(s) (`View`) does it affect? Map to the **live** options from step 2.
 - **Category** — the issue's nature (`data / app / UI / auth / security / new feature / feature update / permissions / android / iOS / PWA / AI` — read live). A **Required** multi-select (per pre-plan's Canonical Field Table): pick **all** that genuinely apply (e.g. a cross-account save bug is `data` + `auth`; a native chrome bug is `app` + `UI` + `android`). Derive it from the issue's own nature — don't interrogate the user unless it's genuinely ambiguous.
 - **Web search** — only when external facts genuinely help (a library's capability, a platform constraint, an accessibility/standard norm). Don't pad with web results that don't change the issue.
@@ -136,7 +136,7 @@ This is where the issue earns the model that will build it. Fable tokens are the
 Write two text fields from this:
 
 - **Risk Assessment** — six lines, one per angle, each `<Angle> <score>: <one-line justification citing real files/areas>`, then `Total <n> → <tier>` (and `data-risk override` when it applied).
-- **Execution Model** — four to seven lines: `Lead:`, `Subagents:` (which packages go to which model), `Review:` (level, rounds), `Verification:` (tests / browser / two-device / native / store), `Phases/spike:` (only when there is one), `Notes:` (an existing `docs/plans/` file, a dependency that gates the order).
+- **Execution Model** — four to seven lines: `Lead:`, `Subagents:` (which packages go to which model), `Review:` (level, rounds), `Verification:` (tests / browser / two-device / native / store), `Phases/spike:` (only when there is one), `Notes:` (an existing `~/projects/beanies-ops/docs/plans/` file, a dependency that gates the order).
 
 Show the scores and the proposal in the step-9 preview. Greg may override any score or the tier; the override is recorded in _Notes_ with a word on why, so the rubric can be recalibrated later. Lower the tier only for a stated reason — never to make a row look cheaper.
 

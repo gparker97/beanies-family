@@ -67,7 +67,7 @@ From each, extract:
 
 ## Step 3: Cross-reference the known-deferred list
 
-Read `docs/STATUS.md`, section "**Major-version dependency migrations**" and "**Dependabot security alerts**" (under Engineering follow-ups). That block is the running record of deps that are *intentionally* on hold — ERESOLVE-blocked majors waiting on ecosystem peers (eslint 10, stylelint 17), majors needing a focused migration with QA (astro 6, vite 8, @astrojs/mdx 5, astro-seo 1), and transitive-only CVEs whose vulnerable path isn't in our tree. **Don't re-litigate those every run** — match the PR against this list first.
+Read `~/projects/beanies-ops/docs/STATUS.md`, section "**Major-version dependency migrations**" and "**Dependabot security alerts**" (under Engineering follow-ups). That block is the running record of deps that are *intentionally* on hold — ERESOLVE-blocked majors waiting on ecosystem peers (eslint 10, stylelint 17), majors needing a focused migration with QA (astro 6, vite 8, @astrojs/mdx 5, astro-seo 1), and transitive-only CVEs whose vulnerable path isn't in our tree. **Don't re-litigate those every run** — match the PR against this list first.
 
 ## Step 4: Classify each PR
 
@@ -98,7 +98,7 @@ Skim `gh pr diff <n>` (for the 100-file holiday PR, `gh pr view <n> --json files
 
 Because CI didn't gate the PR, close the loop yourself when a **`.ts`** data file changed (`airports.ts`, `countries.ts`): either run `npm run type-check` locally *before* merging, or — since the squash-merge to `main` triggers the push-driven `main-ci` / `e2e` — glance that the post-merge run goes green and say so in the report. Pure `public/holidays/*.json` data changes are lower-risk (no compile step) but still deserve the skim.
 
-There's no "close as out-of-scope" for these — they're either clean-and-merge or hold-with-an-anomaly-note. They don't touch the `docs/STATUS.md` deferred list, so **Step 6 doesn't apply** to them.
+There's no "close as out-of-scope" for these — they're either clean-and-merge or hold-with-an-anomaly-note. They don't touch the `~/projects/beanies-ops/docs/STATUS.md` deferred list, so **Step 6 doesn't apply** to them.
 
 ## Step 5: Take action
 
@@ -112,7 +112,7 @@ Squash-merge only (repo convention; see prior dependabot merges in git history).
 ```
 gh pr comment <n> --body "@dependabot close
 
-<one short paragraph: what this is, why it's out of scope right now, and the condition under which it should be revisited — e.g. 'eslint 10 is ERESOLVE-blocked on @microsoft/eslint-plugin-sdl + typescript-eslint peer ranges; revisit when those publish eslint-10-compatible majors. Tracked in docs/STATUS.md.'>"
+<one short paragraph: what this is, why it's out of scope right now, and the condition under which it should be revisited — e.g. 'eslint 10 is ERESOLVE-blocked on @microsoft/eslint-plugin-sdl + typescript-eslint peer ranges; revisit when those publish eslint-10-compatible majors. Tracked in ~/projects/beanies-ops/docs/STATUS.md.'>"
 ```
 Then, **only for majors that should stay closed indefinitely**, propose adding an `ignore` entry under the relevant ecosystem in `.github/dependabot.yml` (the file already has a commented-out `ignore:` block showing the shape) so Dependabot stops re-opening it weekly — present the diff and let greg confirm before committing it.
 
@@ -128,9 +128,10 @@ gh pr comment <n> --body "@dependabot rebase"
 
 ## Step 6: Keep the deferred list current
 
-If you **closed** any PR as out-of-scope, or **held** a new major that wasn't already listed, append/update the relevant line in `docs/STATUS.md`'s "Major-version dependency migrations" / "Dependabot security alerts" block so the next run doesn't re-investigate it from scratch. Commit that edit together with any `.github/dependabot.yml` ignore-entry change:
+If you **closed** any PR as out-of-scope, or **held** a new major that wasn't already listed, append/update the relevant line in `~/projects/beanies-ops/docs/STATUS.md`'s "Major-version dependency migrations" / "Dependabot security alerts" block so the next run doesn't re-investigate it from scratch. STATUS lives in the private ops repo, so it is committed there; any `.github/dependabot.yml` ignore-entry change is committed here:
 ```
-git add docs/STATUS.md .github/dependabot.yml
+git -C ~/projects/beanies-ops add docs/STATUS.md && git -C ~/projects/beanies-ops commit -m "docs(status): dependabot triage" && git -C ~/projects/beanies-ops push
+git add .github/dependabot.yml
 git commit -m "chore(deps): triage dependabot PRs — <N merged, M closed, K held>" -m "<one line per closed/held PR with the reason>" -m "Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 git push
 ```
