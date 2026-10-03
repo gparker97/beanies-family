@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-10-04
+
+### Changed
+
+- Native apps older than 0.91.2 now see a one-time prompt to update, since 0.91.2 is live on both stores.
+
 ## 2026-10-03
 
 ### Security
