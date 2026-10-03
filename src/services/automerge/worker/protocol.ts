@@ -155,6 +155,8 @@ export type MutationOp =
        * supplied `base` is additive: it inserts and overwrites, never deletes. Omitted
        * entirely, the document itself is the base (the target becomes `patch` in place).
        * Never widens what a write touches: only the keys of `patch` are walked.
+       * A patch to a `COUNTER_FIELDS` field (#117 Phase 2) WITHOUT a base is applied raw (not
+       * unfolded) and is reserved for the worker's rebase composer.
        */
       base?: Record<string, unknown>;
       /** Behavior when `collection[id]` is absent (default `'throw'`):
