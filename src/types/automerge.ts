@@ -123,14 +123,16 @@ export interface FamilyDocument {
   /**
    * Concurrent-safe adjustments to the three ADJUSTED money fields (#117 Phase 2, ADR-039
    * addendum): account `balance`, goal `currentAmount`, asset `loan.outstandingBalance`. Keyed
-   * `${collection}/${id}/${field}/${writerActor}`; each value is a Counter in integer MINOR
-   * units (`COUNTER_SCALE`). The stored absolute is the baseline and the Counters hold the
-   * adjustments since; the fold in `worker/counterFields.ts` is the only reader, so main never
-   * sees a Counter.
+   * `${collection}/${id}/${field}@${decimals}/${deviceWriterId}:${actorId}`; each value is a
+   * Counter in integer MINOR units at the key's own `decimals` (the entity's currency minor
+   * unit when written, clamped to [2, 8]). The stored absolute is the baseline and the
+   * Counters hold the adjustments since; the fold in `worker/counterFields.ts` is the only
+   * reader, so main never sees a Counter.
    *
    * ⚠️ ONE WRITER PER KEY, FOR LIFE. A later increment applies to EVERY conflicting Counter at
    * a key (`automergeSemantics.test.ts`, probe e'), so a key two actors both created can never
-   * be summed correctly again. The writer is the Automerge actor, fresh per `load`, and the map
+   * be summed correctly again. The actor (fresh per `load`) makes a key single-writer; the
+   * device id (one per family cache) says which device owns it for the rebase. The map
    * itself is created by the stored migration change (`MIGRATED_ROOT_KEYS`), never by a device,
    * so every device writes into the SAME map object.
    *
@@ -138,8 +140,8 @@ export interface FamilyDocument {
    */
   counterDeltas: Record<string, Counter>;
   /**
-   * The compaction fold ledger (#117 Phase 2): Counter key → the minor units `compactDoc`
-   * folded into the absolute. CUMULATIVE across compactions (a dirty peer rebases at any
+   * The compaction fold ledger (#117 Phase 2): Counter key (scale included) → the minor units
+   * `compactDoc` folded into the absolute. CUMULATIVE across compactions (a dirty peer rebases at any
    * generation gap), written only by the compaction source, read only by the rebase
    * (`counterGrowthOps`) so a peer never re-emits an adjustment a compaction already folded.
    * Optional, like `podLineage` on legacy pods: absent until the first compaction that folds

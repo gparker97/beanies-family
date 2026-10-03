@@ -31,10 +31,11 @@ import { bufferToBase64, base64ToBuffer } from '@/utils/encoding';
 import { CorruptPayloadError, PayloadTooLargeError, PayloadLoadError } from '@/types/sync';
 import type { PayloadLoadStep } from '@/types/sync';
 import { isAllocationFailure } from '@/utils/isAllocationFailure';
-import { docInitOpts } from './docActor';
+import { docInitOpts, counterWriterId, deviceWriterIdFor } from './docActor';
 import { MIGRATION_CHANGES } from './migrationChanges';
 import {
   adjustField,
+  fieldDecimals,
   foldEntity,
   foldIndex,
   foldValue,
@@ -43,8 +44,8 @@ import {
   parseCounterKey,
   resolveField,
   sigma,
-  toMinor,
   unfoldPatch,
+  type CounterIndex,
   type FoldIndex,
 } from './counterFields';
 import {
@@ -664,8 +665,9 @@ export function buildFullProjection(doc: Doc): ProjectionDelta[] {
  * Counter field (photo attach, settings) ignore it.
  */
 export interface NamedOpContext {
-  /** `Automerge.getActorId` of the document being changed: the Counter writer id that
-   *  `adjustField` keys this change's adjustments by (unique per live handle, fresh per load). */
+  /** The Counter writer id `adjustField` keys this change's adjustments by:
+   *  `${deviceWriterId}:${actorId}` (`docActor.counterWriterId`), unique per live handle and
+   *  fresh per load. Always set: a cacheless session uses an ephemeral device id. */
   readonly writerId: string;
 }
 
@@ -835,12 +837,18 @@ const applyGoalContributionOp: NamedOpHandler = (draft, rawArgs, { writerId }) =
       : (goal.manualContributions?.findIndex((c) => c.id === undoContributionId) ?? -1);
   if (undoContributionId !== undefined && undoAt < 0) return echo();
 
-  const folded = foldValue(goal.currentAmount, sigma(index, 'goals', id, 'currentAmount'), 0);
+  const decimals = fieldDecimals(resolveField('goals', 'currentAmount'), goal);
+  const folded = foldValue(
+    goal.currentAmount,
+    sigma(index, 'goals', id, 'currentAmount'),
+    0,
+    decimals
+  );
   // An undo reverses the entry's recorded amount; `delta` is advisory there (see above).
   const requested = undoAt >= 0 ? -goal.manualContributions![undoAt]!.amount : delta;
   const applied = Math.max(requested, -folded);
   adjustField(draft, 'goals', id, 'currentAmount', applied, writerId, index);
-  if (!goal.isCompleted && foldValue(folded, toMinor(applied), 0) >= goal.targetAmount) {
+  if (!goal.isCompleted && foldValue(folded, applied, 0, decimals) >= goal.targetAmount) {
     goal.isCompleted = true;
   }
 
@@ -885,7 +893,7 @@ function adjustLoanBalance(
   loan: LoanDetails,
   delta: number,
   writerId: string,
-  index: FoldIndex
+  index: CounterIndex
 ): { collection: CollectionName; entity: unknown; delta: EntityDelta } {
   const { collection, field } = loanHost(loan);
   // `findLoan` just found the host in this same draft, so `adjustField`'s existence throw is
@@ -911,10 +919,12 @@ function findLoan(draft: FamilyDocument, loanId: string, index: FoldIndex): Loan
   );
   if (!loan) return null;
   const { collection, field } = loanHost(loan);
+  const host = (draft[collection] as unknown as Record<string, AnyRecord>)[loan.entityId];
   loan.outstandingBalance = foldValue(
     loan.outstandingBalance,
     sigma(index, collection, loan.entityId, field),
-    0
+    0,
+    fieldDecimals(resolveField(collection, field), host)
   );
   return loan;
 }
@@ -1044,8 +1054,9 @@ registerCoreNamedOps();
  *    afterwards from the committed doc);
  *  - `results`: named ops' results, in order (a top-level named op returns the first);
  *  - `notes`: reconciler findings (#117), logged on main;
- *  - `writerId`: the document's actor, read once per `applyMutation` (#117 Phase 2): the
- *    Counter writer id for `increment` and every named handler's `NamedOpContext`.
+ *  - `writerId`: `${deviceWriterId}:${actorId}` (`docActor.counterWriterId`), read once per
+ *    `applyMutation` (#117 Phase 2): the Counter writer id for `increment` and every named
+ *    handler's `NamedOpContext`. Always set (an ephemeral device id when no cache opened).
  */
 interface MutationSink {
   deltas: ProjectionDelta[];
@@ -1064,7 +1075,8 @@ interface MutationSink {
  */
 function unfoldSetEntity(draft: FamilyDocument, op: Extract<MutationOp, { op: 'set' }>): unknown {
   if (!isCounterCollection(op.collection) || !isPlainObject(op.entity)) return op.entity;
-  return unfoldPatch(op.collection, op.id, op.entity, undefined, foldIndex(draft)).patch;
+  const stored = (draft[op.collection] as AnyRecord | undefined)?.[op.id];
+  return unfoldPatch(op.collection, op.id, op.entity, undefined, foldIndex(draft), stored).patch;
 }
 
 /** Mutate the draft for one op (recurses for `batch`). Pure structural mutation
@@ -1105,7 +1117,7 @@ function mutateDraft(draft: FamilyDocument, op: MutationOp, sink: MutationSink):
       // never meets a Counter. A base-less patch is raw by contract (the rebase composer).
       const { patch, base } =
         op.base && isCounterCollection(op.collection)
-          ? unfoldPatch(op.collection, op.id, op.patch, op.base, foldIndex(draft))
+          ? unfoldPatch(op.collection, op.id, op.patch, op.base, foldIndex(draft), entity)
           : op;
       reconcileFields(entity, patch, base, op.deleteKeys ?? [], ctx);
       // Only on a write: an all-unchanged patch must leave the heads untouched so `mutate`
@@ -1191,12 +1203,13 @@ export function applyMutation(
   doc: Doc,
   op: MutationOp
 ): { doc: Doc; result: unknown; delta: ProjectionDelta; notes: ReconcileNote[] } {
-  // The actor is the Counter writer id: read once, before the change (the change keeps it).
+  // The Counter writer id (device + actor): read once, before the change (the change keeps
+  // the actor).
   const sink: MutationSink = {
     deltas: [],
     results: [],
     notes: [],
-    writerId: Automerge.getActorId(doc),
+    writerId: counterWriterId(Automerge.getActorId(doc)),
   };
   const after = Automerge.change(doc, (d) => mutateDraft(d as FamilyDocument, op, sink));
   const out: ProjectionDelta[] = [];
@@ -1373,11 +1386,12 @@ export function buildRebaseOps(
     if (changed) conflicts += changed.conflicts;
   }
 
-  // The Counter ledger pass: what the peer adjusted that the target does not yet hold (neither
-  // live nor in the fold ledger), as `increment` ops. AFTER the entity ops, so an entity the peer
-  // created arrives by its raw `set` before its own adjustments land on it. Only keys the peer
-  // changed since `baselineHeads` count, so a foreign writer's stale key is never replayed.
-  const growth = counterGrowthOps(local, target, baselineHeads);
+  // The Counter ledger pass: what THIS DEVICE adjusted that the target does not yet hold
+  // (neither live nor in the fold ledger), as `increment` ops. AFTER the entity ops, so an
+  // entity the peer created arrives by its raw `set` before its own adjustments land on it.
+  // Ownership is the key's device segment, so a foreign writer's key is never replayed. The
+  // realm's id is the cache's persisted one, or this session's ephemeral one (docActor.ts).
+  const growth = counterGrowthOps(local, target, deviceWriterIdFor(Automerge.getActorId(local)));
   ops.push(...growth.ops);
 
   // nothing to replay

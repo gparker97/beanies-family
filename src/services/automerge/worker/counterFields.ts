@@ -11,11 +11,18 @@
  *
  * ⚠️ THE FOUR RULES THIS MODULE EXISTS TO HOLD (each pinned in `automergeSemantics.test.ts`):
  *  1. ONE WRITER PER KEY, FOR LIFE. A later increment applies to EVERY conflicting Counter at a
- *     key (probe e'), so two actors creating the same key corrupts it beyond repair. The key
- *     carries the writer (the Automerge actor, fresh on every `load`, probe o), and the map
- *     itself is created by a stored migration change so every device writes into ONE object.
- *  2. INTEGER MINOR UNITS ONLY. `Counter.increment` truncates to an i64 (probe l: -20.5 stores
- *     -20, a later +0.25 is dropped), so every Counter holds `round(amount × COUNTER_SCALE)`.
+ *     key (probe e'), so two actors creating the same key corrupts it beyond repair. The key's
+ *     writer segment is `${deviceWriterId}:${actorId}`: the Automerge actor (fresh on every
+ *     `load`, probe o) makes it single-writer, and the device id (minted once per family cache,
+ *     `cache.ts`) says WHICH DEVICE owns it, which is how the rebase tells its own keys from a
+ *     peer's. The map itself is created by a stored migration change so every device writes into
+ *     ONE object.
+ *  2. INTEGER MINOR UNITS, AT THE KEY'S OWN DECIMALS. `Counter.increment` truncates to an i64
+ *     (probe l: -20.5 stores -20, a later +0.25 is dropped), so every Counter holds
+ *     `round(amount × 10^d)`, where `d` is the entity's currency minor unit at the time of the
+ *     write (`decimalsFor`, clamped to [2, 8]), and `d` is WRITTEN INTO THE KEY. A reader never
+ *     guesses a scale: a key says what its integer means, so a currency change, or a future
+ *     build with a different table, cannot reinterpret a Counter already in a pod.
  *  3. Σ = 0 IS THE IDENTITY. With no keys for an entity, the fold and the unfold pass values
  *     through untouched, so a build with writes off writes byte-for-byte what it wrote before.
  *  4. THE FOLD NEVER THROWS. A malformed or unknown key is skipped and counted: it persists
@@ -23,15 +30,18 @@
  *
  * Every Counter-specific algorithm lives here (fold, unfold, write, compaction ledger, rebase
  * growth, stats) so `docOps.ts` and `applyAndProject.ts` only call in, and no other site
- * hand-codes a field name, a key format or the scale.
+ * hand-codes a field name, a key format or a scale.
  *
- * Worker-side: imports Automerge as a value (like `docOps.ts`) and NOTHING from
- * `src/constants/`. Everything except `adjustField` (the one writer) and `foldDoc`/
+ * Worker-side: imports Automerge as a value (like `docOps.ts`). Its one `src/constants/` import
+ * is `currencies.ts`, which is pure data (a type-only import of its own), so nothing main-only
+ * reaches the worker. Everything except `adjustField` (the one writer) and `foldDoc`/
  * `counterStats` (which read a document through the Automerge API) is pure on plain values.
  */
 import * as Automerge from '@automerge/automerge';
+import { CURRENCIES } from '@/constants/currencies';
 import type { CollectionName, FamilyDocument } from '@/types/automerge';
-import type { Heads, MutationOp } from './protocol';
+import { StaleBuildCounterError } from '@/types/sync';
+import type { MutationOp } from './protocol';
 
 type AnyRecord = Record<string, unknown>;
 type Doc = Automerge.Doc<FamilyDocument>;
@@ -68,18 +78,13 @@ export function __setCounterWritesForTesting(on: boolean): void {
 
 // ─── The table ───────────────────────────────────────────────────────────────
 
-/**
- * Minor units per major unit: four decimals. Covers every ISO 4217 minor unit and the
- * four-decimal CLF; `2^53 / 10^4 ≈ 9e11` major units of headroom (enough for IDR/KRW-scale
- * balances). Changing it changes the meaning of every Counter already in a pod: never edit.
- */
-export const COUNTER_SCALE = 10_000;
-
-/** One adjusted field: the path to its stored absolute (at most two segments) and the
- *  read-time floor (`null` = none; balances may be negative). */
+/** One adjusted field: the path to its stored absolute (at most two segments), the read-time
+ *  floor (`null` = none; balances may be negative), and the path to the ENTITY's currency
+ *  code, which sets the scale its Counters are written and folded at (`decimalsFor`). */
 export interface CounterField {
   readonly abs: readonly [string] | readonly [string, string];
   readonly floor: number | null;
+  readonly currency: readonly [string];
 }
 
 /**
@@ -90,11 +95,14 @@ export interface CounterField {
  * The floor is a MERGE BACKSTOP only: the write-time goal floor and the loan clamp still decide
  * at write (on the folded value); two concurrent decrements that each passed their own check
  * can still cross 0 together, and the read floor keeps that from showing as a negative goal.
+ *
+ * `currency` is the entity's own `currency` on all three (`Account`, `Goal`, `Asset`; an asset's
+ * `loan` carries none of its own), checked against the model types in `counterFields.test.ts`.
  */
 export const COUNTER_FIELDS = {
-  accounts: [{ abs: ['balance'], floor: null }],
-  goals: [{ abs: ['currentAmount'], floor: 0 }],
-  assets: [{ abs: ['loan', 'outstandingBalance'], floor: 0 }],
+  accounts: [{ abs: ['balance'], floor: null, currency: ['currency'] }],
+  goals: [{ abs: ['currentAmount'], floor: 0, currency: ['currency'] }],
+  assets: [{ abs: ['loan', 'outstandingBalance'], floor: 0, currency: ['currency'] }],
 } as const satisfies Partial<Record<CollectionName, readonly CounterField[]>>;
 
 /** A collection that holds at least one Counter-backed field. */
@@ -133,29 +141,81 @@ export function resolveField(collection: string, field: string): CounterField {
   return spec;
 }
 
-// ─── Scale ───────────────────────────────────────────────────────────────────
+// ─── Scale: the entity's currency minor unit ─────────────────────────────────
+
+/** The narrowest and widest scale a Counter is WRITTEN at. Two decimals is the floor so a
+ *  0-decimal currency (JPY, KRW) still holds a cent of float noise rather than rounding it into
+ *  a whole unit; eight is the widest minor unit in `CURRENCIES` (BTC, ETH, SOL, DOGE). The
+ *  headroom is `2^53 / 10^d` major units: ~9e13 at two decimals, ~9e7 at eight. */
+export const MIN_COUNTER_DECIMALS = 2;
+export const MAX_COUNTER_DECIMALS = 8;
+
+const CURRENCY_DECIMALS: ReadonlyMap<string, number> = new Map(
+  CURRENCIES.map((c) => [c.code, c.decimals] as const)
+);
 
 /**
- * `amount` in integer minor units, or a THROW. NaN, Infinity and an amount past the safe-integer
- * headroom are programming errors on the write path: a Counter would truncate or wrap them
- * silently, so the worker refuses instead and names the fix. `-0` is normalised to `0`.
+ * The scale (decimal places) a currency's Counters are written at: its `CURRENCIES` minor unit,
+ * clamped to [`MIN_COUNTER_DECIMALS`, `MAX_COUNTER_DECIMALS`]. An unknown or absent code reads
+ * as the minimum, so an entity with no currency (a fixture, a legacy row) still has a scale.
+ * Pure; it decides only how a NEW write is keyed. An existing key is read at the decimals it
+ * carries, never at this.
  */
-export function toMinor(amount: number): number {
-  const minor = Math.round(amount * COUNTER_SCALE);
+export function decimalsFor(code: unknown): number {
+  const d = typeof code === 'string' ? CURRENCY_DECIMALS.get(code) : undefined;
+  return Math.min(MAX_COUNTER_DECIMALS, Math.max(MIN_COUNTER_DECIMALS, d ?? MIN_COUNTER_DECIMALS));
+}
+
+/**
+ * The decimals for `spec`'s field, from the first source that carries a currency code at
+ * `spec.currency`: a patch that changes the currency first, then the stored entity. With none,
+ * `decimalsFor(undefined)`.
+ */
+export function fieldDecimals(spec: CounterField, ...sources: unknown[]): number {
+  for (const source of sources) {
+    if (source === null || typeof source !== 'object') continue;
+    const code = (source as AnyRecord)[spec.currency[0]];
+    if (typeof code === 'string') return decimalsFor(code);
+  }
+  return decimalsFor(undefined);
+}
+
+const scaleOf = (decimals: number): number => 10 ** decimals;
+
+/**
+ * `delta` in integer minor units at `decimals`, or a THROW. NaN, Infinity and a delta past the
+ * safe-integer headroom are programming errors on the write path: a Counter would truncate or
+ * wrap them silently, so the worker refuses instead and names the fix. Only a DELTA is held to
+ * this (only a delta becomes a Counter); a stored absolute never throws. `-0` is normalised.
+ */
+export function toMinor(delta: number, decimals: number): number {
+  const minor = Math.round(delta * scaleOf(decimals));
   if (!Number.isSafeInteger(minor)) {
     throw new Error(
-      `counterFields: amount ${String(amount)} cannot be held as integer minor units ` +
-        `(×${COUNTER_SCALE} is not a safe integer). Fix the caller: a NaN/Infinity reached a ` +
-        `money field, or the amount exceeds the Counter headroom.`
+      `counterFields: amount ${String(delta)} cannot be held as integer minor units at ` +
+        `${decimals} decimals (×10^${decimals} is not a safe integer). Fix the caller: a ` +
+        `NaN/Infinity reached a money field, or the amount exceeds the Counter headroom.`
     );
   }
   return minor === 0 ? 0 : minor;
 }
 
-/** Minor units back to a major-unit number. Integer ÷ 10^4 is correctly rounded, so a value
- *  with at most four decimals round-trips exactly. */
-export function fromMinor(minor: number): number {
-  return minor / COUNTER_SCALE;
+/** Minor units at `decimals` back to a major-unit number. Integer ÷ 10^d is correctly rounded,
+ *  so a value with at most `d` decimals round-trips exactly. */
+export function fromMinor(minor: number, decimals: number): number {
+  return minor / scaleOf(decimals);
+}
+
+/**
+ * `value` rounded to `decimals` places through integer space (`round(v · 10^d) / 10^d`), or
+ * `value` itself when the scaled value is past the safe-integer headroom (never a real balance
+ * at its own currency's scale). THE one rounding rule the fold, the unfold and the dormant write
+ * share; it runs on stored absolutes, so it never throws.
+ */
+function roundTo(value: number, decimals: number): number {
+  const scaled = Math.round(value * scaleOf(decimals));
+  if (!Number.isSafeInteger(scaled)) return value;
+  return scaled === 0 ? 0 : scaled / scaleOf(decimals);
 }
 
 /** A stored absolute as a finite number: absent, non-numeric or non-finite reads as 0
@@ -164,33 +224,27 @@ function finiteOr0(v: unknown): number {
   return typeof v === 'number' && Number.isFinite(v) ? v : 0;
 }
 
-/**
- * `base + minor` in integer minor-unit space, or a float add when `base` is past the
- * safe-integer headroom (`|base| > ~9.0e11`). THE one place a STORED absolute meets the scale:
- * the fold, the dormant write and the unfold all go through it, so none of them can throw on a
- * stored value that today's plain `cur + delta` accepted. Only a DELTA is held to the headroom
- * (`toMinor`), because only a delta becomes a Counter.
- */
-function addMinor(base: number, minor: number): number {
-  const scaled = Math.round(base * COUNTER_SCALE);
-  return Number.isSafeInteger(scaled) ? fromMinor(scaled + minor) : base + fromMinor(minor);
-}
-
 /** `value` held at `floor` (`null` = no floor). */
 const applyFloor = (value: number, floor: number | null): number =>
   floor === null ? value : Math.max(floor, value);
 
 /**
- * THE fold arithmetic: `abs + minor`, in integer space, then the floor. Shared by `foldEntity`
- * and the goal and loan handlers so the three can never disagree on rounding or the floor.
+ * THE fold arithmetic: `round((abs + Σ) · 10^d) / 10^d`, then the floor. `sumMajor` is Σ in
+ * MAJOR units (`sigma`); `decimals` is the ENTITY's current scale (`fieldDecimals`), so a value
+ * the user entered with at most `d` decimals reads back exactly. Shared by `foldEntity` and the
+ * goal and loan handlers so the three can never disagree on rounding or the floor.
  *
- * `minor === 0` returns the absolute untouched (no rounding), so a write-time decision on an
- * entity with no keys sees exactly today's number. An absolute past the safe-integer headroom
- * (never a real balance) falls back to a float add rather than throwing: this runs on READ.
+ * `sumMajor === 0` returns the absolute untouched (no rounding), so a write-time decision on an
+ * entity with no keys sees exactly today's number.
  */
-export function foldValue(abs: unknown, minor: number, floor: number | null): number {
+export function foldValue(
+  abs: unknown,
+  sumMajor: number,
+  floor: number | null,
+  decimals: number
+): number {
   const base = finiteOr0(abs);
-  return applyFloor(minor === 0 ? base : addMinor(base, minor), floor);
+  return applyFloor(sumMajor === 0 ? base : roundTo(base + sumMajor, decimals), floor);
 }
 
 // ─── Keys ────────────────────────────────────────────────────────────────────
@@ -200,15 +254,18 @@ const entityFieldKey = (collection: string, id: string, field: string): string =
   `${collection}/${id}/${field}`;
 
 /**
- * The Counter key `${collection}/${id}/${field}/${writerId}`. Throws for a field not in the
- * table, or a field/writer segment that would not parse back (a `/` in it): a key the fold
- * cannot read is an adjustment that silently vanishes. The id may contain `/`; the parser
- * reads the fixed segments from both ends.
+ * The Counter key `${collection}/${id}/${field}@${decimals}/${writer}`, where `writer` is
+ * `${deviceWriterId}:${actorId}` (`docActor.counterWriterId`). Throws for a field not in the
+ * table, a writer that would not parse back (empty, or a `/` in it), or a scale outside
+ * [`MIN_COUNTER_DECIMALS`, `MAX_COUNTER_DECIMALS`]: a key the fold cannot read is an adjustment
+ * that silently vanishes. The id may contain `/`; the parser reads the fixed segments from both
+ * ends.
  */
 export function counterKey(
   collection: string,
   id: string,
   field: string,
+  decimals: number,
   writerId: string
 ): string {
   resolveField(collection, field);
@@ -218,23 +275,64 @@ export function counterKey(
         `the id and writer must be non-empty and the writer must not contain "/".`
     );
   }
-  return `${entityFieldKey(collection, id, field)}/${writerId}`;
+  if (
+    !Number.isInteger(decimals) ||
+    decimals < MIN_COUNTER_DECIMALS ||
+    decimals > MAX_COUNTER_DECIMALS
+  ) {
+    throw new Error(
+      `counterFields: cannot key ${collection}/${id}/${field} at ${String(decimals)} decimals ` +
+        `(must be an integer in [${MIN_COUNTER_DECIMALS}, ${MAX_COUNTER_DECIMALS}]).`
+    );
+  }
+  return `${entityFieldKey(collection, id, field)}@${decimals}/${writerId}`;
 }
 
-/** A key's (collection, id, field), or `null` when it does not parse or names a
- *  (collection, field) this build's table lacks (a future build's field). Never throws. */
-export function parseCounterKey(
-  key: string
-): { collection: CounterCollection; id: string; field: string } | null {
+/** A key's segments, structurally: no table check. */
+interface KeyParts {
+  collection: string;
+  id: string;
+  field: string;
+  decimals: number;
+  writer: string;
+}
+
+/** Split a key into its segments, or `null` when it is not `c/id/field@d/writer`. The writer
+ *  may contain `:` (it always does); only `/` separates segments. */
+function splitCounterKey(key: string): KeyParts | null {
   const parts = key.split('/');
   if (parts.length < 4) return null;
   const collection = parts[0]!;
-  const field = parts[parts.length - 2]!;
+  const scaled = parts[parts.length - 2]!;
   const writer = parts[parts.length - 1]!;
   const id = parts.slice(1, -2).join('/');
+  const at = scaled.lastIndexOf('@');
+  if (at < 0) return null;
+  const field = scaled.slice(0, at);
+  const digits = scaled.slice(at + 1);
   if (collection === '' || id === '' || field === '' || writer === '') return null;
-  if (!isCounterCollection(collection) || !lookupField(collection, field)) return null;
-  return { collection, id, field };
+  if (!/^\d{1,2}$/.test(digits)) return null;
+  return { collection, id, field, decimals: Number(digits), writer };
+}
+
+/** A key this build can fold. */
+export interface ParsedCounterKey {
+  collection: CounterCollection;
+  id: string;
+  field: string;
+  /** The scale its Counter's integer is at (minor units per major = 10^decimals). */
+  decimals: number;
+  /** `${deviceWriterId}:${actorId}` for every key this build writes. */
+  writer: string;
+}
+
+/** A key's segments, or `null` when it does not parse or names a (collection, field) this
+ *  build's table lacks (a future build's field). Never throws. */
+export function parseCounterKey(key: string): ParsedCounterKey | null {
+  const parts = splitCounterKey(key);
+  if (!parts || !isCounterCollection(parts.collection)) return null;
+  if (!lookupField(parts.collection, parts.field)) return null;
+  return parts as ParsedCounterKey;
 }
 
 /** A Counter's value in minor units, or `null` when it is not a safe integer. Reads a
@@ -246,53 +344,149 @@ function counterValue(v: unknown): number | null {
 
 // ─── Fold ────────────────────────────────────────────────────────────────────
 
-/** Σ minor units per (collection, id, field), plus how many keys were skipped as malformed. */
-export interface FoldIndex extends ReadonlyMap<string, number> {
-  readonly malformed: number;
+/** What a diagnostic may name about a key: its collection and field, never the entity id or
+ *  the writer (both reach the firehose unmasked through an error message). */
+export interface CounterKeyLabel {
+  readonly collection: string;
+  readonly field: string;
 }
 
-class CounterIndex extends Map<string, number> implements FoldIndex {
+/** One (collection, id, field) and its integer sums, one per scale its keys carry. */
+interface FieldSums {
+  readonly collection: CounterCollection;
+  readonly id: string;
+  readonly field: string;
+  readonly minorByDecimals: Map<number, number>;
+}
+
+/** The read-only view of a fold index every reader takes. */
+export interface FoldIndex {
+  /** (collection, id, field) entries with at least one key. */
+  readonly size: number;
+  /** Keys the fold skipped: unparseable, an unknown collection or field, a non-integer value. */
+  readonly malformed: number;
+  /** The first skipped key that is NOT a known collection's unknown field: dropped by a
+   *  compaction, because nothing can ever read it. */
+  readonly firstMalformed: CounterKeyLabel | null;
+  /** The first key naming a KNOWN Counter collection with a field this build lacks: a newer
+   *  build's field, which a compaction must refuse to destroy (`foldDoc`). */
+  readonly unknownField: CounterKeyLabel | null;
+  /** Σ for one (collection, id, field) in MAJOR units; 0 when it has no keys. */
+  major(collection: string, id: string, field: string): number;
+}
+
+/**
+ * The fold index: Σ per (collection, id, field), held as EXACT integer sums per scale and
+ * converted to major units only on read (each group `/ 10^d`, then added). Mutable only through
+ * `add`, which `foldIndex` and `adjustField` call; everyone else reads it as a `FoldIndex`.
+ */
+export class CounterIndex implements FoldIndex {
+  private readonly sums = new Map<string, FieldSums>();
   malformed = 0;
+  firstMalformed: CounterKeyLabel | null = null;
+  unknownField: CounterKeyLabel | null = null;
+
+  get size(): number {
+    return this.sums.size;
+  }
+
+  /** Record `minor` integer units at `decimals` against (collection, id, field). */
+  add(collection: CounterCollection, id: string, field: string, decimals: number, minor: number) {
+    const k = entityFieldKey(collection, id, field);
+    let entry = this.sums.get(k);
+    if (!entry) {
+      entry = { collection, id, field, minorByDecimals: new Map() };
+      this.sums.set(k, entry);
+    }
+    entry.minorByDecimals.set(decimals, (entry.minorByDecimals.get(decimals) ?? 0) + minor);
+  }
+
+  major(collection: string, id: string, field: string): number {
+    const entry = this.sums.get(entityFieldKey(collection, id, field));
+    return entry ? majorOf(entry) : 0;
+  }
+
+  /** Every (collection, id, field) with its Σ in major units, in insertion order. */
+  *fields(): IterableIterator<{
+    collection: CounterCollection;
+    id: string;
+    field: string;
+    major: number;
+  }> {
+    for (const entry of this.sums.values()) {
+      yield {
+        collection: entry.collection,
+        id: entry.id,
+        field: entry.field,
+        major: majorOf(entry),
+      };
+    }
+  }
+}
+
+/** One entry's Σ in major units: each scale's exact integer sum ÷ 10^d, then added. A single
+ *  scale (the normal case) is therefore exact; a group summing to 0 adds nothing. */
+function majorOf(entry: FieldSums): number {
+  let total = 0;
+  for (const [decimals, minor] of entry.minorByDecimals) {
+    if (minor !== 0) total += fromMinor(minor, decimals);
+  }
+  return total;
 }
 
 /** Anything that may carry the Counter map: a committed doc, an unmigrated doc, a draft. */
 type CounterSource = { readonly counterDeltas?: Readonly<Record<string, unknown>> | null };
 
+/** A key's diagnostic label: its collection and field when it splits, else neither. */
+const labelOf = (parts: KeyParts | null): CounterKeyLabel =>
+  parts
+    ? { collection: parts.collection, field: parts.field }
+    : { collection: '(unparseable)', field: '(unparseable)' };
+
 /**
- * One pass over `doc.counterDeltas`: Σ minor units per (collection, id, field). Build it ONCE
- * per materialisation call and hand it to every `foldEntity`/`sigma`.
+ * One pass over `doc.counterDeltas`: Σ per (collection, id, field). Build it ONCE per
+ * materialisation call and hand it to every `foldEntity`/`sigma`.
  *
  * Takes a committed doc, a draft (probe m: a `WriteableCounter`'s value already includes this
  * change's increments) or an UNMIGRATED doc: `decryptToDoc` does not migrate, so the map can be
  * absent (probe o), and that reads as an empty index. An empty or absent map returns without
  * iterating, which is the whole dormant cost: one `Object.keys`.
  *
- * ⚠️ NEVER THROWS. A key that does not parse, names a field this build lacks, or holds a value
- * that is not a safe integer is skipped and counted in `malformed`. The key persists until
+ * ⚠️ NEVER THROWS, AND THE ONE CLASSIFIER OF A BAD KEY. A key that does not parse, names a
+ * collection or field this build lacks, or holds a value that is not a safe integer is skipped
+ * and counted in `malformed`; the first known-collection/unknown-field key is recorded as
+ * `unknownField` (a newer build's field) and the first of the rest as `firstMalformed`.
+ * `foldDoc` and `counterStats` read those, never re-derive them. The key persists until
  * compaction, so a throw here would block the family's open for a bug only a developer can fix.
  */
-export function foldIndex(doc: CounterSource): FoldIndex {
+export function foldIndex(doc: CounterSource): CounterIndex {
   const index = new CounterIndex();
   const map = doc.counterDeltas;
   if (!map) return index;
   const keys = Object.keys(map);
   if (keys.length === 0) return index;
   for (const key of keys) {
-    const parsed = parseCounterKey(key);
-    const value = parsed ? counterValue(map[key]) : null;
-    if (!parsed || value === null) {
+    const parts = splitCounterKey(key);
+    const known = parts !== null && isCounterCollection(parts.collection);
+    if (known && !lookupField(parts.collection, parts.field)) {
       index.malformed++;
+      index.unknownField ??= labelOf(parts);
       continue;
     }
-    const k = entityFieldKey(parsed.collection, parsed.id, parsed.field);
-    index.set(k, (index.get(k) ?? 0) + value);
+    const value = known ? counterValue(map[key]) : null;
+    if (!known || value === null) {
+      index.malformed++;
+      index.firstMalformed ??= labelOf(parts);
+      continue;
+    }
+    index.add(parts.collection as CounterCollection, parts.id, parts.field, parts.decimals, value);
   }
   return index;
 }
 
-/** Σ minor units for one (collection, id, field); `0` when it has no keys. THE lookup. */
+/** Σ in MAJOR units for one (collection, id, field); `0` when it has no keys. THE lookup. */
 export function sigma(index: FoldIndex, collection: string, id: string, field: string): number {
-  return index.get(entityFieldKey(collection, id, field)) ?? 0;
+  return index.major(collection, id, field);
 }
 
 /** The object holding a field's leaf, or `null` when the parent is absent (an asset with no
@@ -307,8 +501,9 @@ const leafOf = (abs: CounterField['abs']): string => abs[abs.length - 1]!;
 
 /**
  * Fold one PLAIN entity in place and return it: each Counter field with Σ ≠ 0 becomes
- * `foldValue(abs, Σ, floor)`. A missing leaf reads as 0 + Σ; a missing PARENT (an asset that
- * stopped being a loan) folds nothing, so stale keys cannot resurface as a phantom payment.
+ * `foldValue(abs, Σ, floor, d)` at the entity's own currency scale. A missing leaf reads as
+ * 0 + Σ; a missing PARENT (an asset that stopped being a loan) folds nothing, so stale keys
+ * cannot resurface as a phantom payment.
  *
  * ⚠️ MUTATES `plain`: hand it a fresh copy (`toPlain`, `toJS`), never a live document value.
  * `id` is the MAP KEY the entity lives under (what a Counter key and an `increment` op name),
@@ -318,40 +513,50 @@ export function foldEntity<T>(collection: string, id: string, plain: T, index: F
   if (index.size === 0 || !isCounterCollection(collection)) return plain;
   if (plain === null || typeof plain !== 'object') return plain;
   for (const spec of COUNTER_FIELDS[collection] as readonly CounterField[]) {
-    const minor = sigma(index, collection, id, spec.abs.join('.'));
-    if (minor === 0) continue;
+    const sum = sigma(index, collection, id, spec.abs.join('.'));
+    if (sum === 0) continue;
     const parent = parentOf(plain as AnyRecord, spec.abs);
     if (!parent) continue;
     const leaf = leafOf(spec.abs);
-    parent[leaf] = foldValue(parent[leaf], minor, spec.floor);
+    parent[leaf] = foldValue(parent[leaf], sum, spec.floor, fieldDecimals(spec, plain));
   }
   return plain;
 }
 
 // ─── Unfold (the main → worker write boundary) ───────────────────────────────
 
-/** `obj` with the number at `abs` unfolded by `minor`, as a COPY (and a copied parent), or
- *  `obj` itself when there is no finite number there. */
-function unfoldAt(obj: AnyRecord, abs: CounterField['abs'], minor: number): AnyRecord {
+/** `obj` with the number at `abs` unfolded by `sum` (major units) at `decimals`, as a COPY (and
+ *  a copied parent), or `obj` itself when there is no finite number there. */
+function unfoldAt(
+  obj: AnyRecord,
+  abs: CounterField['abs'],
+  sum: number,
+  decimals: number
+): AnyRecord {
   const leaf = leafOf(abs);
   const parent = parentOf(obj, abs);
   const v = parent?.[leaf];
   // Non-finite passes through: nothing can be subtracted from it, and the unfold is a
   // boundary conversion, not a validator.
   if (!parent || typeof v !== 'number' || !Number.isFinite(v)) return obj;
-  // `addMinor`, never `toMinor(v)`: `v` is a stored-scale absolute, not a delta, so one past the
-  // integer headroom takes the float path instead of throwing on a write today's code accepted.
-  const raw = addMinor(v, -minor);
+  // `roundTo`, never `toMinor(v)`: `v` is an absolute, not a delta, so one past the integer
+  // headroom takes the float path instead of throwing on a write today's code accepted.
+  const raw = roundTo(v - sum, decimals);
   if (abs.length === 1) return { ...obj, [leaf]: raw };
   return { ...obj, [abs[0]]: { ...parent, [leaf]: raw } };
 }
 
 /**
  * Convert a FOLDED `patch` (and its `base`) from main into RAW space: for each Counter field
- * with Σ ≠ 0 that holds a number, `(round(v·S) − Σ) / S`. `fold(raw)` then reads back exactly
- * `v`, an unchanged field stays unchanged (both sides subtract the same Σ, so the reconciler
- * writes nothing), and a Counter that arrived between the caller's read and the write cancels
- * out. `base` may be `undefined`: the `set` case, where only the entity is converted.
+ * with Σ ≠ 0 that holds a number, `round((v − Σ) · 10^d) / 10^d`. `fold(raw)` then reads back
+ * exactly `v` (for any `v` with at most `d` decimals), an unchanged field stays unchanged (both
+ * sides subtract the same Σ at the same `d`, so the reconciler writes nothing), and a Counter
+ * that arrived between the caller's read and the write cancels out. `base` may be `undefined`:
+ * the `set` case, where only the entity is converted.
+ *
+ * `d` is the scale the fold will read the entity at AFTER this write: the patch's own currency
+ * when it carries one (a currency change in the same edit), else `stored`'s (the entity in the
+ * draft). Patch and base use the same `d`, so equal folded values stay equal raw values.
  *
  * ⚠️ Σ = 0 IS THE IDENTITY: the value passes through untouched (no rounding), so with writes
  * off, and on every create, seed and rebase `set`, the write is exactly today's.
@@ -365,16 +570,18 @@ export function unfoldPatch<P extends AnyRecord, B extends AnyRecord | undefined
   id: string,
   patch: P,
   base: B,
-  index: FoldIndex
+  index: FoldIndex,
+  stored?: unknown
 ): { patch: P; base: B } {
   if (index.size === 0 || !isCounterCollection(collection)) return { patch, base };
   let nextPatch: AnyRecord = patch;
   let nextBase: AnyRecord | undefined = base;
   for (const spec of COUNTER_FIELDS[collection] as readonly CounterField[]) {
-    const minor = sigma(index, collection, id, spec.abs.join('.'));
-    if (minor === 0) continue;
-    nextPatch = unfoldAt(nextPatch, spec.abs, minor);
-    if (nextBase !== undefined) nextBase = unfoldAt(nextBase, spec.abs, minor);
+    const sum = sigma(index, collection, id, spec.abs.join('.'));
+    if (sum === 0) continue;
+    const decimals = fieldDecimals(spec, patch, stored);
+    nextPatch = unfoldAt(nextPatch, spec.abs, sum, decimals);
+    if (nextBase !== undefined) nextBase = unfoldAt(nextBase, spec.abs, sum, decimals);
   }
   return { patch: nextPatch as P, base: nextBase as B };
 }
@@ -386,29 +593,32 @@ export function unfoldPatch<P extends AnyRecord, B extends AnyRecord | undefined
  * a change callback by `increment`, the goal contribution and both loan ops, so the three
  * cannot drift.
  *
- * `delta` becomes integer minor units FIRST, on both paths, so they agree to the last bit:
- *  - writes ON: create the writer's own key if absent, then `increment(minor)`. Throws if the
- *    draft has no `counterDeltas` map: `migrateDoc` did not run, a real programming error.
- *  - writes OFF (dormant): `abs = max(floor, cur + minor)` in integer minor units on the
+ * The scale is the entity's currency (`fieldDecimals`), and `delta` becomes integer minor units
+ * at it FIRST, on both paths (a delta that rounds to 0 at that scale writes nothing):
+ *  - writes ON: create this writer's own key `…@${d}/${writerId}` if absent, then
+ *    `increment(minor)`. Throws if the draft has no `counterDeltas` map (`migrateDoc` did not
+ *    run), a programming error.
+ *  - writes OFF (dormant): `abs = max(floor, round((cur + delta) · 10^d) / 10^d)` on the
  *    absolute, never touching the map. A loan op's `newBalance − outstandingBalance` (a float
  *    subtraction of two `round2` values) therefore lands on `newBalance` exactly, where
- *    `cur + delta` could miss it by an ulp. Differs from today's float add only below the fourth
- *    decimal. The field's floor is applied to the WRITTEN value, as today's goal write
+ *    `cur + delta` could miss it by an ulp, and an 8-decimal crypto balance keeps every decimal.
+ *    The field's floor is applied to the WRITTEN value, as today's goal write
  *    (`Math.max(0, current + delta)`) did: with no keys the read floor cannot help, because a
  *    stored negative from pre-Phase-2 history would otherwise be written back below it. A
- *    stored absolute past the integer headroom takes `addMinor`'s float path, never a throw.
+ *    stored absolute past the integer headroom takes `roundTo`'s float path, never a throw.
  *
- * A zero adjustment writes nothing on either path. Throws when the entity, or the parent of a
- * nested field (an asset's `loan`), is missing: callers check existence and `onMissing` first.
+ * Throws when the entity, or the parent of a nested field (an asset's `loan`), is missing:
+ * callers check existence and `onMissing` first.
  *
- * `writerId` is `Automerge.getActorId(doc)`: unique per live handle and fresh per `load`, which
- * is what makes every key single-writer (rule 1 in the header).
+ * `writerId` is `docActor.counterWriterId(actor)`: `${deviceWriterId}:${actorId}`, unique per
+ * live handle and fresh per `load` (rule 1 in the header). Never absent: a session whose cache
+ * never opened writes under an ephemeral device id (`docActor.ts`).
  *
  * `index`, when given, is `foldIndex(draft)` built BEFORE this write by a handler that reads the
- * draft again afterwards (its echo). A Counter write is recorded in it, so that one index stays
- * exactly what a fresh `foldIndex(draft)` would now return (probe m) and the handler never
- * rebuilds it. It never changes what is written. The dormant path touches no key, so it leaves
- * the index alone.
+ * draft again afterwards (its echo). A Counter write is recorded in it (`CounterIndex.add`), so
+ * that one index stays exactly what a fresh `foldIndex(draft)` would now return (probe m) and
+ * the handler never rebuilds it. It never changes what is written. The dormant path touches no
+ * key, so it leaves the index alone.
  */
 export function adjustField(
   draft: FamilyDocument,
@@ -417,10 +627,9 @@ export function adjustField(
   field: string,
   delta: number,
   writerId: string,
-  index?: FoldIndex
+  index?: CounterIndex
 ): void {
   const spec = resolveField(collection, field);
-  const minor = toMinor(delta);
   const entity = (draft[collection] as unknown as Record<string, AnyRecord> | undefined)?.[id];
   if (!entity) {
     throw new Error(
@@ -428,6 +637,8 @@ export function adjustField(
         `(the caller must check existence and onMissing first).`
     );
   }
+  const decimals = fieldDecimals(spec, entity);
+  const minor = toMinor(delta, decimals);
   const parent = parentOf(entity, spec.abs);
   if (!parent) {
     throw new Error(
@@ -443,17 +654,14 @@ export function adjustField(
           `${collection}/${id}/${field}). Run migrateDoc on every document before writing.`
       );
     }
-    const key = counterKey(collection, id, field, writerId);
+    const key = counterKey(collection, id, field, decimals, writerId);
     if (map[key] === undefined) map[key] = new Automerge.Counter(0);
     map[key]!.increment(minor);
-    if (index) {
-      const k = entityFieldKey(collection, id, field);
-      (index as CounterIndex).set(k, (index.get(k) ?? 0) + minor);
-    }
+    index?.add(collection as CounterCollection, id, field, decimals, minor);
     return;
   }
   const leaf = leafOf(spec.abs);
-  parent[leaf] = applyFloor(addMinor(finiteOr0(parent[leaf]), minor), spec.floor);
+  parent[leaf] = applyFloor(roundTo(finiteOr0(parent[leaf]) + delta, decimals), spec.floor);
 }
 
 // ─── Compaction and rebase ───────────────────────────────────────────────────
@@ -467,7 +675,9 @@ export type FoldedSource = Omit<FamilyDocument, 'counterDeltas' | 'foldedCounter
 
 /**
  * The compaction source for `before`: `Automerge.toJS`, every Counter field folded, then
- * `counterDeltas = {}` and the fold ledger EXTENDED with every key removed from the map.
+ * `counterDeltas = {}` and the fold ledger EXTENDED with every key removed from the map. Each
+ * ledger entry is keyed by the full Counter key, scale included, so a rebase reads it at the
+ * decimals its integer was written at.
  *
  * ⚠️ THE LEDGER IS CUMULATIVE, NEVER REPLACED. A dirty peer is rebased at ANY generation gap
  * (`podLineage.ts`), so a peer two compactions behind must still find the key folded at the
@@ -475,27 +685,30 @@ export type FoldedSource = Omit<FamilyDocument, 'counterDeltas' | 'foldedCounter
  * ledgered, including one whose entity is gone or whose `loan` was removed (folded into
  * nothing): the ledger records that the key's value was CONSUMED, so a rebase cannot replay it.
  *
- * ⚠️ THROWS WHEN THE MAP HOLDS A KEY THIS BUILD CANNOT FOLD (unparseable, a field this build's
- * table lacks, a non-integer value). Compaction empties the map, so a key it cannot fold would
- * be destroyed with every adjustment it carries (a future build's Counter field, compacted by a
- * build that predates it). Refusing keeps the old document: `compactDoc` runs this inside its
- * verify `try`, so the throw takes the same "keep the old document, classify, rethrow" path a
- * verify difference takes. The READ side (`foldIndex`) still never throws (rule 4): only the
- * one operation that would make the loss permanent refuses.
+ * ⚠️ THROWS `StaleBuildCounterError` FOR A KNOWN COLLECTION'S UNKNOWN FIELD, AND ONLY FOR IT.
+ * That is a newer build's Counter field: compaction empties the map, so folding past it would
+ * destroy every adjustment it carries, and the fix is updating the app. `compactDoc` lets the
+ * class through unclassified so the user is told exactly that. The message names the collection
+ * and field only, never the entity id or the writer: it reaches the firehose unmasked.
+ *
+ * Every OTHER bad key (unparseable, an unknown collection, a non-integer value) cannot be read
+ * by any build, so refusing would block compaction forever for nothing: it is dropped, unledgered,
+ * with ONE `console.warn` naming the first one's collection and field. The READ side
+ * (`foldIndex`) never throws (rule 4); it is also the one classifier this reads.
  *
  * `foldedCounters` is written only when it holds something, so a dormant pod's compaction
  * source is today's plus the empty map.
  */
 export function foldDoc(before: Doc): FoldedSource {
   const index = foldIndex(before);
-  if (index.malformed > 0) {
-    const offending = Object.entries(before.counterDeltas ?? {}).find(
-      ([k, v]) => !parseCounterKey(k) || counterValue(v) === null
-    )?.[0];
-    throw new Error(
-      `counterFields: cannot compact: the Counter map holds ${index.malformed} key(s) this build ` +
-        `cannot fold (first: "${String(offending)}"). Compacting would destroy those ` +
-        `adjustments. Update the app before compacting.`
+  if (index.unknownField) {
+    throw new StaleBuildCounterError(index.unknownField.collection, index.unknownField.field);
+  }
+  if (index.firstMalformed) {
+    const { collection, field } = index.firstMalformed;
+    console.warn(
+      `[counterFields] compaction drops ${index.malformed} Counter key(s) no build can fold ` +
+        `(first: ${collection}.${field}).`
     );
   }
   const plain = Automerge.toJS(before) as unknown as AnyRecord;
@@ -513,7 +726,7 @@ export function foldDoc(before: Doc): FoldedSource {
   let added = 0;
   for (const [key, v] of Object.entries(before.counterDeltas ?? {})) {
     const value = parseCounterKey(key) ? counterValue(v) : null;
-    if (value === null) continue;
+    if (value === null) continue; // a dropped key (warned above): never ledgered
     ledger[key] = value;
     added++;
   }
@@ -528,64 +741,56 @@ type GrowthSource = CounterSource & {
 };
 
 /**
- * The rebase's Counter pass: what `local` adjusted that `target` does not yet hold, as one
- * `increment` op per (collection, id, field). Per key, growth = local value − (the target's
- * live key ?? the target's ledger entry ?? 0), in minor units.
+ * The rebase's Counter pass: what THIS DEVICE adjusted that `target` does not yet hold, as one
+ * `increment` op per (collection, id, field).
  *
- * ONLY KEYS `local` CHANGED SINCE `baselineHeads` ARE CONSIDERED. A key whose value at the
- * baseline equals its value now is skipped: either a FOREIGN writer's key (it reached `local`
- * through a merge the baseline already covers), or an own key with nothing new. Without this,
- * a foreign key whose local copy is STALE (lower than what the compactor folded, because its
- * writer kept adjusting after `local` last merged) would fabricate a negative increment on
- * another device's account: `local − ledger` is the writer's later growth, negated.
+ * ⚠️ OWNERSHIP IS THE KEY'S DEVICE SEGMENT, NEVER A VALUE COMPARISON. Only keys whose writer
+ * starts with `${deviceWriterId}:` are this device's; a foreign key is NEVER replayed, however
+ * its local copy compares to the target. A foreign key's local copy can be stale-lower than
+ * what the compactor folded (its writer kept adjusting after `local` last merged), and
+ * `mine − ledger` on it would fabricate that writer's later growth, negated, on its account. A
+ * baseline view cannot tell the two apart (a baseline commit that missed Drive makes a foreign
+ * key look changed; an own key that nets back to its baseline value looks unchanged), so none
+ * is taken. Two tabs of one device share the device id (and have different actors), so each
+ * re-emits its own keys.
  *
- * For a changed key the growth is still measured against the TARGET, never the baseline: the
- * ledger says what any compaction already folded, so a stale baseline cannot double-count an
- * adjustment that reached Drive after it. The live read comes first because a target that
- * never compacted (or was compacted by a pre-fold build, which carries the map through intact)
- * still holds the key. `onMissing: 'skip'` keeps the composer's "the compactor deleted it"
- * rule. Malformed keys are skipped.
+ * Per own key, growth = local value − (the target's live key ?? the target's ledger entry ?? 0)
+ * in minor units at the key's decimals: exact, and negative when the device reversed an
+ * adjustment after the fold. The live read comes first because a target that never compacted
+ * (or was compacted by a pre-fold build, which carries the map through intact) still holds the
+ * key. `onMissing: 'skip'` keeps the composer's "the compactor deleted it" rule. Malformed keys
+ * are skipped. The emitted delta is major units (Σ per scale ÷ 10^d); the increment re-keys it
+ * under the rebasing session's own key at the entity's current scale.
  *
- * Pure except for one `Automerge.view` (plain reads on a view are heads-aware, probe f). The
- * caller (`buildRebaseOps`) has already proved `local` holds `baselineHeads`.
+ * `deviceWriterId` is the realm's id at rebase time (`docActor.deviceWriterIdFor`): the cache's
+ * persisted one, or this session's ephemeral one when the cache never opened, which is exactly
+ * the id this session's own keys carry.
  */
 export function counterGrowthOps(
-  local: Doc,
+  local: GrowthSource,
   target: GrowthSource,
-  baselineHeads: Heads
+  deviceWriterId: string
 ): { ops: MutationOp[]; count: number } {
-  const map = local.counterDeltas as Readonly<Record<string, unknown>> | undefined;
-  if (!map || Object.keys(map).length === 0) return { ops: [], count: 0 };
-  const atBaseline = (Automerge.view(local, baselineHeads) as GrowthSource).counterDeltas;
-  const growth = new Map<
-    string,
-    { collection: CounterCollection; id: string; field: string; minor: number }
-  >();
-  for (const key of Object.keys(map)) {
+  const map = local.counterDeltas;
+  if (!map) return { ops: [], count: 0 };
+  const keys = Object.keys(map);
+  if (keys.length === 0) return { ops: [], count: 0 };
+  const own = `${deviceWriterId}:`;
+  const growth = new CounterIndex();
+  for (const key of keys) {
     const parsed = parseCounterKey(key);
-    const mine = parsed ? counterValue(map[key]) : null;
-    if (!parsed || mine === null) continue;
-    if (counterValue(atBaseline?.[key]) === mine) continue; // foreign, or nothing new
+    if (!parsed || !parsed.writer.startsWith(own)) continue; // foreign (or unreadable): never
+    const mine = counterValue(map[key]);
+    if (mine === null) continue;
     const theirs =
       counterValue(target.counterDeltas?.[key]) ?? counterValue(target.foldedCounters?.[key]) ?? 0;
     const g = mine - theirs;
-    if (g === 0) continue;
-    const k = entityFieldKey(parsed.collection, parsed.id, parsed.field);
-    const acc = growth.get(k);
-    if (acc) acc.minor += g;
-    else growth.set(k, { ...parsed, minor: g });
+    if (g !== 0) growth.add(parsed.collection, parsed.id, parsed.field, parsed.decimals, g);
   }
   const ops: MutationOp[] = [];
-  for (const { collection, id, field, minor } of growth.values()) {
-    if (minor === 0) continue;
-    ops.push({
-      op: 'increment',
-      collection,
-      id,
-      field,
-      delta: fromMinor(minor),
-      onMissing: 'skip',
-    });
+  for (const { collection, id, field, major } of growth.fields()) {
+    if (major === 0) continue;
+    ops.push({ op: 'increment', collection, id, field, delta: major, onMissing: 'skip' });
   }
   return { ops, count: ops.length };
 }
@@ -605,9 +810,10 @@ export interface CounterStats {
 }
 
 /**
- * One pass over the map: key count, conflicts (`getConflicts` on the nested map, probe n:
- * `undefined` for a single value, one entry per writer otherwise), malformed keys and the ledger
- * size. O(keys), tens at most between compactions; an absent map reports zeros.
+ * One pass over the map for conflicts (`getConflicts` on the nested map, probe n: `undefined`
+ * for a single value, one entry per writer otherwise), plus `foldIndex`'s own malformed count
+ * (the one classifier) and the ledger size. O(keys), tens at most between compactions; an
+ * absent map reports zeros.
  */
 export function counterStats(doc: Doc): CounterStats {
   const map = doc.counterDeltas as Record<string, unknown> | undefined;
@@ -615,11 +821,9 @@ export function counterStats(doc: Doc): CounterStats {
   if (!map) return { keys: 0, conflicts: 0, malformed: 0, ledgerKeys };
   const keys = Object.keys(map);
   let conflicts = 0;
-  let malformed = 0;
   for (const key of keys) {
     const values = Automerge.getConflicts(map as unknown as Automerge.Doc<AnyRecord>, key);
     if (values && Object.keys(values).length > 1) conflicts++;
-    if (!parseCounterKey(key) || counterValue(map[key]) === null) malformed++;
   }
-  return { keys: keys.length, conflicts, malformed, ledgerKeys };
+  return { keys: keys.length, conflicts, malformed: foldIndex(doc).malformed, ledgerKeys };
 }

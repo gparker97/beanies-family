@@ -37,7 +37,7 @@ import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { getAuxStore } from '@/services/sync/storageProvider';
 import { safetyCopyName } from '@/constants/compaction';
-import { PayloadLoadError } from '@/types/sync';
+import { PayloadLoadError, StaleBuildCounterError } from '@/types/sync';
 import type { SyncLevel } from '@/services/sync/syncService';
 
 /** Why a compaction refused. Rides in `error_code`, so it stays queryable. */
@@ -506,12 +506,18 @@ export function usePodCompaction() {
       progressPhase.value = 'done';
     } catch (e) {
       // Steps 1-4 change nothing, so anything landing here left the pod alone.
+      // #117 Phase 2: a NEWER build's Counter field refused the rebuild (`foldDoc`). Not a
+      // corrupt rebuild and not this device's fault: the fix is updating the app, so it gets
+      // its own `error_code` (one CloudWatch filter counts the mixed-fleet window) and copy.
+      const staleBuild = e instanceof StaleBuildCounterError;
       reportError({
         surface: 'pod-compaction',
-        message: 'compaction failed before anything was published',
+        message: staleBuild
+          ? 'compaction refused: the pod holds a Counter field from a newer build'
+          : 'compaction failed before anything was published',
         error: e,
         severity: 'error',
-        context: { action: 'failed', error_code: 'rebuild-failed' },
+        context: { action: 'failed', error_code: staleBuild ? 'stale-build' : 'rebuild-failed' },
       });
       progressPhase.value = 'failed';
       progressFailure.value = {
@@ -519,7 +525,7 @@ export function usePodCompaction() {
         // This branch is reached only BEFORE anything is published, so the
         // reassurance is true here.
         subtitleKey: 'compactionProgress.failedSubtitle',
-        helpKey: 'compaction.failedHelp',
+        helpKey: staleBuild ? 'compaction.needsUpdateHelp' : 'compaction.failedHelp',
         retryable: false,
       };
     } finally {

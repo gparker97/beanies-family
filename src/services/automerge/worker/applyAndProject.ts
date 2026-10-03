@@ -23,7 +23,12 @@ import { firstJsonDifference } from '@/utils/firstJsonDifference';
 import { guardLineage, lineageBlockError, type LineageContext } from '@/services/sync/podLineage';
 import type { LineageBasis, ExportedPayload } from './protocol';
 import type { PodLineage, DriveConnection } from '@/types/models';
-import { PayloadLoadError, LocalDocUnreadableError, CacheInitError } from '@/types/sync';
+import {
+  PayloadLoadError,
+  LocalDocUnreadableError,
+  CacheInitError,
+  StaleBuildCounterError,
+} from '@/types/sync';
 import type { CacheInitLoss } from '@/types/sync';
 import { COLLECTION_NAMES, NON_COLLECTION_KEYS, type FamilyDocument } from '@/types/automerge';
 import { importFamilyKey } from '@/services/crypto/familyKeyService';
@@ -1656,6 +1661,11 @@ export function compactDoc(): {
       throw new Error(`compaction changed the document at ${maskEntityIds(differsAt)}`);
     }
   } catch (e) {
+    // #117 Phase 2: `foldDoc` refused over a newer build's Counter field. Nothing is corrupt
+    // and nothing ran out of memory, so it passes UNCLASSIFIED: `payloadFailure` would turn it
+    // into a `CorruptPayloadError` ("your data may be damaged"), when the truth is "update the
+    // app first". `usePodCompaction` maps the class to that copy.
+    if (e instanceof StaleBuildCounterError) throw e;
     // Classified, so an OOM here reads as "this device ran out of memory" with
     // the copy that is already written, rather than "your data is damaged". A
     // compaction costs MORE memory than an open (three copies resident at once),

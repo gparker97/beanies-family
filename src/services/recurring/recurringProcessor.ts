@@ -353,10 +353,16 @@ async function createTransactionFromRecurring(item: RecurringItem, date: Date): 
     }
   }
 
+  // Which step of the cascade was running when it threw: the transaction itself, then the
+  // account, goal and loan adjustments it drives. Carried on the failure event so a report says
+  // WHERE the cascade stopped (after `transaction`, the transaction exists and an adjustment is
+  // missing), never claims creation failed when it did not.
+  let stage: 'transaction' | 'account' | 'goal' | 'loan' = 'transaction';
   try {
     const transaction = await transactionRepo.createTransaction(input);
 
     // Update account balance (relative: composes with a concurrent adjustment on another device)
+    stage = 'account';
     const account = await accountRepo.getAccountById(item.accountId);
     if (account) {
       // Liability-aware: a recurring expense on a credit card raises what's owed.
@@ -367,11 +373,13 @@ async function createTransactionFromRecurring(item: RecurringItem, date: Date): 
     // Credit goal progress (relative; clamp and auto-complete happen worker-side). The goal can
     // be deleted (here or by a merge) between generation and this cascade, and the worker op
     // throws on a missing goal, so re-check and skip silently, as the absolute write did.
+    stage = 'goal';
     if (input.goalAllocApplied && input.goalId && (await goalRepo.getGoalById(input.goalId))) {
       await goalRepo.applyContribution(input.goalId, input.goalAllocApplied);
     }
 
     // Reduce loan balance (worker op: amortise on the folded balance, write the portions)
+    stage = 'loan';
     if (input.loanId) {
       const res = await transactionRepo.applyLoanPayment(transaction);
       // The linked loan account mirrors the asset loan as an absolute of the returned folded
@@ -386,12 +394,13 @@ async function createTransactionFromRecurring(item: RecurringItem, date: Date): 
   } catch (e) {
     console.error('Failed to create transaction from recurring:', e);
     // Non-critical: this instance is skipped this run. Fixed enums only; never the description.
+    // `action` names the cascade step that threw (see `stage`), so the message stays generic.
     reportError({
       surface: 'recurring-processor',
-      message: 'create-transaction-failed',
+      message: 'recurring-cascade-failed',
       severity: 'error',
       error: e,
-      context: { recur_surface: 'transaction' },
+      context: { recur_surface: 'transaction', action: stage },
     });
     return false;
   }

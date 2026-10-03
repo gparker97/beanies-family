@@ -591,6 +591,53 @@ describe('recurringProcessor - Loan Payment Generation', () => {
     expect(balanceCalls.some((c) => c[0] === 'standalone-loan-1')).toBe(false);
   });
 
+  it('a failure in the LOAN step reports where the cascade stopped, not that creation failed', async () => {
+    vi.setSystemTime(new Date('2024-01-15T12:00:00.000Z'));
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const recurringCarPayment: RecurringItem = {
+      id: 'recurring-car-fail',
+      accountId: 'test-account-1',
+      type: 'expense',
+      amount: 400,
+      currency: 'USD',
+      category: 'loan_payment',
+      description: 'Car Loan Payment',
+      frequency: 'monthly',
+      dayOfMonth: 15,
+      startDate: '2024-01-01T00:00:00.000Z',
+      isActive: true,
+      loanId: 'standalone-loan-1',
+      createdAt: '2024-01-01T00:00:00.000Z',
+      updatedAt: '2024-01-01T00:00:00.000Z',
+    };
+    vi.mocked(recurringRepo.getActiveRecurringItems).mockResolvedValue([recurringCarPayment]);
+    vi.mocked(assetRepo.getAllAssets).mockResolvedValue([]);
+    vi.mocked(accountRepo.getAllAccounts).mockResolvedValue([
+      { ...mockAccount },
+      { ...mockStandaloneLoanAccount },
+    ]);
+    vi.mocked(transactionRepo.createTransaction).mockResolvedValue({ id: 'tx-car-2' } as any);
+    vi.mocked(accountRepo.getAccountById).mockResolvedValue({ ...mockAccount });
+    vi.mocked(accountRepo.incrementBalance).mockResolvedValue({} as any);
+    vi.mocked(transactionRepo.applyLoanPayment).mockRejectedValue(new Error('worker down'));
+
+    const result = await processRecurringItems();
+
+    // The transaction and the account adjustment landed; the loan step is what threw.
+    expect(transactionRepo.createTransaction).toHaveBeenCalled();
+    expect(accountRepo.incrementBalance).toHaveBeenCalled();
+    expect(result.processed).toBe(0);
+    expect(reportError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        surface: 'recurring-processor',
+        message: 'recurring-cascade-failed',
+        severity: 'error',
+        context: { recur_surface: 'transaction', action: 'loan' },
+      })
+    );
+    consoleError.mockRestore();
+  });
+
   it('should skip loan allocation when loan has zero outstanding balance', async () => {
     vi.setSystemTime(new Date('2024-01-15T12:00:00.000Z'));
 
@@ -1190,7 +1237,7 @@ describe('recurringProcessor - a goal deleted between generation and the cascade
       expect.objectContaining({
         surface: 'recurring-processor',
         severity: 'error',
-        context: { recur_surface: 'transaction' },
+        context: { recur_surface: 'transaction', action: 'transaction' },
       })
     );
     consoleError.mockRestore();

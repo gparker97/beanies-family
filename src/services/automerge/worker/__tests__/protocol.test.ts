@@ -8,7 +8,12 @@ import {
   isWorkerSignal,
 } from '../protocol';
 import { PodLineageError, lineageBlockError } from '@/services/sync/podLineage';
-import { LocalDocUnreadableError, isRemoteBlocker, CacheInitError } from '@/types/sync';
+import {
+  LocalDocUnreadableError,
+  isRemoteBlocker,
+  CacheInitError,
+  StaleBuildCounterError,
+} from '@/types/sync';
 
 describe('protocol — error transport', () => {
   it('round-trips CorruptPayloadError preserving class + step + familyId', () => {
@@ -203,5 +208,23 @@ describe('CacheInitError across the wire', () => {
     );
 
     expect(rebuilt).toBeInstanceOf(CorruptPayloadError);
+  });
+});
+
+/**
+ * #117 Phase 2: without a codec entry a compaction refused over a newer build's Counter field
+ * arrives on main as a `DocWorkerError`, and `usePodCompaction` tells the person their rebuild
+ * failed instead of "update the app".
+ */
+describe('StaleBuildCounterError across the wire', () => {
+  it('reconstructs as the real class with collection and field, and nothing else', () => {
+    const wire = serializeError(new StaleBuildCounterError('accounts', 'futureField'));
+    expect(wire.data).toEqual({ collection: 'accounts', field: 'futureField' });
+
+    const rebuilt = reconstructError(wire);
+    expect(rebuilt).toBeInstanceOf(StaleBuildCounterError);
+    expect((rebuilt as StaleBuildCounterError).collection).toBe('accounts');
+    expect((rebuilt as StaleBuildCounterError).field).toBe('futureField');
+    expect(rebuilt.message).toMatch(/accounts\.futureField.*Update the app/);
   });
 });

@@ -96,10 +96,12 @@ const { migrateDoc, applyMutation, saveDoc, loadDoc, countRootConflicts, registe
 const { buildRebaseOps, getHeads, buildFullProjection } = docOps;
 const { attachPhotoNamedHandler } = await import('@/services/automerge/worker/photoOps');
 const { KEY_FIELDS, MERGE_FIELDS } = await import('@/services/automerge/worker/reconcile');
-const { converge, materialise } = await import('@/services/automerge/worker/__tests__/twoDevices');
+const { converge, materialise, useTestDevices, resetTestDevices, onDevice } =
+  await import('@/services/automerge/worker/__tests__/twoDevices');
 const counterFields = await import('@/services/automerge/worker/counterFields');
 const { COUNTER_FIELDS, COUNTER_WRITES_ENABLED, __setCounterWritesForTesting } = counterFields;
-const { counterStats, foldDoc, foldEntity, foldIndex, sigma, toMinor } = counterFields;
+const { counterStats, fieldDecimals, foldDoc, foldEntity, foldIndex, sigma, toMinor } =
+  counterFields;
 const { materializeFixture } = await import('@/services/demo/demoFixture');
 const { COLLECTION_NAMES } = await import('@/types/automerge');
 const ap = await import('@/services/automerge/worker/applyAndProject');
@@ -710,10 +712,12 @@ function checkCounters(originDoc: Doc, aDoc: Doc, bDoc: Doc, mDoc: Doc): string[
         // Created or removed on a side, or not a loan there: nothing to add up.
         if (raws.some((v) => typeof v !== 'number')) continue;
         if (raws[1] !== raws[0] && raws[2] !== raws[0]) continue; // set-vs-set residual
+        // Folded values (raw + Σ, unfloored), compared in minor units at the entity's scale.
         const [o, a, b, m] = raws.map(
-          (raw, i) => toMinor(raw) + sigma(ixs[i]!, collection, id, field)
+          (raw, i) => (raw as number) + sigma(ixs[i]!, collection, id, field)
         );
-        if (m! - o! !== a! - o! + (b! - o!)) {
+        const d = fieldDecimals(spec, docs[3]![collection]?.[id]);
+        if (toMinor(m! - o!, d) !== toMinor(a! - o! + (b! - o!), d)) {
           fails.push(
             `(vi) ${collection}/${id}#${field}: merged is not origin + both sides' adjustments`
           );
@@ -1010,9 +1014,19 @@ const GEN_NAMES = Object.keys(GENS);
 let BASE: Doc;
 beforeAll(async () => {
   __setCounterWritesForTesting(true); // #117 Phase 2: every adjustment is a Counter
+  // Each device's actor is its own device for the Counter writer id. B stays the realm's own
+  // (unregistered) device: layer 4 reloads B's document inside `ap`, under a fresh actor, the
+  // way a real reload keeps the device and changes the actor.
+  useTestDevices();
+  onDevice('device-origin', ACTOR.origin);
+  onDevice('device-a', ACTOR.a);
+  onDevice('device-c', ACTOR.c);
   BASE = REAL_POD ? await loadRealPod() : await buildDemoBase();
 }, 120_000);
-afterAll(() => __setCounterWritesForTesting(COUNTER_WRITES_ENABLED));
+afterAll(() => {
+  __setCounterWritesForTesting(COUNTER_WRITES_ENABLED);
+  resetTestDevices();
+});
 
 /** Fork, write on both (each its own ops), converge, run the invariants, return the merged pair. */
 async function scenario(
@@ -1257,14 +1271,14 @@ describe.skipIf(REAL_POD)('layer 1: scenario merges on the demo family', () => {
       () => increment('accounts', 'demo-account-current', 'balance', -20.25),
       () => increment('accounts', 'demo-account-current', 'balance', -30.5)
     );
-    const want = (toMinor(start) - 507500) / 10_000;
+    const want = (toMinor(start, 2) - 5075) / 100; // USD: cents
     expect(r.m.accounts['demo-account-current'].balance).toBe(want);
     const A: Device = { name: 'A', doc: r.merged.a };
     await on(A, () => increment('accounts', 'demo-account-current', 'balance', -5.05));
     const later = converge(A.doc, r.merged.b);
     for (const doc of [later.a, later.b]) {
       expect((foldDoc(doc) as Any).accounts['demo-account-current'].balance).toBe(
-        (toMinor(start) - 558000) / 10_000
+        (toMinor(start, 2) - 5580) / 100
       );
     }
     expect(r.fails).toEqual([]);
@@ -1719,10 +1733,10 @@ describe('layer 4: compaction rebase through compactDoc + mergeRemoteEnvelope', 
     const m = shown(out);
     // -1.11 folded once, -2.22 the compactor's live key, -3.33 the replayed growth, once.
     expect(m.accounts[ACC].balance).toBe(
-      (toMinor(start.accounts[ACC].balance) - 11_100 - 22_200 - 33_300) / 10_000
+      (toMinor(start.accounts[ACC].balance, 2) - 111 - 222 - 333) / 100
     );
     expect(m.goals[GOAL].currentAmount).toBe(
-      (toMinor(start.goals[GOAL].currentAmount ?? 0) + 77_700) / 10_000
+      (toMinor(start.goals[GOAL].currentAmount ?? 0, 2) + 777) / 100
     );
     expect(
       (m.goals[GOAL].manualContributions as Any[]).filter((c) => c.id === 'chaos-rebase-entry')
