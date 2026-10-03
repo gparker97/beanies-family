@@ -385,6 +385,53 @@ describe('round 3, item 1: a cross-family decrypt that fails past its key swap r
     expect(reportError).not.toHaveBeenCalledWith(expect.objectContaining({ severity: 'critical' }));
   });
 
+  it('nothing unlocked before, failing at installPendingProvider: no key lingers in syncService or the worker', async () => {
+    const docClient = await import('@/services/automerge/worker/docClient');
+    const syncService = await import('@/services/sync/syncService');
+    // Stateful keys: what syncService and the worker would each still hold afterwards.
+    let serviceKey: CryptoKey | null = null;
+    let workerKey: CryptoKey | null = null;
+    vi.mocked(syncService.setFamilyKey).mockImplementation((k) => void (serviceKey = k));
+    vi.mocked(syncService.clearFamilyKey).mockImplementation(() => void (serviceKey = null));
+    vi.mocked(syncService.getFamilyKey).mockImplementation(() => serviceKey as never);
+    vi.mocked(docClient.setFamilyKey).mockImplementation(async (k) => void (workerKey = k));
+    vi.mocked(docClient.reset).mockImplementation(async () => void (workerKey = null));
+    const release = vi.fn();
+    vi.mocked(syncService.holdSaves).mockReturnValueOnce(release);
+    persistMock.mockRejectedValueOnce(new Error('persist boom')); // installPendingProvider
+    const sync = useSyncStore();
+    sync.pendingEncryptedFile = { envelope: OTHER_FAMILY_ENVELOPE, provider: localProvider() };
+    const result = await sync.decryptPendingFile('pw', { userChoseThisFile: true });
+
+    expect(result.success).toBe(false);
+    expect(syncService.setFamilyKey).toHaveBeenCalled(); // the failed family's key got this far
+    expect(syncService.getFamilyKey()).toBeNull();
+    expect(workerKey).toBeNull();
+    expect(vi.mocked(syncService.clearFamilyKey).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(docClient.reset).mock.invocationCallOrder[0]!
+    );
+    expect(release).toHaveBeenCalledTimes(1);
+  });
+
+  it('no provider before the decrypt: the provider the failed install bound is unbound', async () => {
+    const docClient = await import('@/services/automerge/worker/docClient');
+    const syncService = await import('@/services/sync/syncService');
+    const release = vi.fn();
+    vi.mocked(syncService.holdSaves).mockReturnValueOnce(release);
+    vi.mocked(syncService.getProvider)
+      .mockReturnValueOnce(null) // captured at the start: nothing bound
+      .mockReturnValue({ type: 'local', id: 'provider-b' } as never);
+    vi.mocked(docClient.mergeRemoteEnvelope).mockRejectedValueOnce(new Error('merge boom'));
+    const sync = useSyncStore();
+    sync.familyKey = KEY_A;
+    sync.isConfigured = true;
+    sync.pendingEncryptedFile = { envelope: OTHER_FAMILY_ENVELOPE, provider: localProvider() };
+    expect((await sync.decryptPendingFile('pw', { userChoseThisFile: true })).success).toBe(false);
+    expect(syncService.clearProvider).toHaveBeenCalledTimes(1);
+    expect(setProviderMock).not.toHaveBeenCalledWith(expect.anything(), 'fam-old');
+    expect(release).toHaveBeenCalledTimes(1);
+  });
+
   /** Family A is open; the decrypt of B gets past the family switch and then fails. */
   async function lateFailure() {
     const docClient = await import('@/services/automerge/worker/docClient');

@@ -31,6 +31,7 @@ import { isNative } from '@/services/sync/capabilities';
 // import would close a real cycle).
 import { getActiveFamilyId } from '@/services/indexeddb/database';
 import { logEvent } from '@/services/telemetry/logEvent';
+import { reportError } from '@/utils/errorReporter';
 import {
   describeAuthError,
   guessAuthenticatorLabel,
@@ -226,6 +227,42 @@ export async function reclaimFamilyKeystore(familyId: string): Promise<void> {
 export async function reclaimAllKeystores(familyIds: string[]): Promise<void> {
   if (!isNative()) return;
   await nativeBiometric.nativeReclaimAllKeystores(familyIds);
+}
+
+/**
+ * Forget every device credential this device holds for ONE family: its native keystore
+ * blobs, its passkey registry records, then the WebAuthn Signal so the platform
+ * authenticator stops offering them. The single implementation behind both
+ * `familyContext.deleteLocalFamily` and the active-scope sign-out step
+ * `reclaimFamilyPasskeys`, so the two cannot drift in order or failure contract.
+ *
+ * ORDER: the keystore reclaim runs FIRST. It works from the union of the family's
+ * `native-keystore` records and the accounts it enumerates from the keychain (#82), so
+ * deleting the records first would degrade it (and on Android there is no enumeration to
+ * fall back on).
+ *
+ * FAILURE CONTRACT: the keystore reclaim is best-effort (an orphaned OS alias is inert
+ * without its registry record) but never silent, since this is the only place that
+ * reclaims it and a failure means it leaks; it must not stop the records from being
+ * removed. A registry failure throws to the caller.
+ */
+export async function reclaimPasskeysForFamily(familyId: string): Promise<void> {
+  try {
+    await reclaimFamilyKeystore(familyId);
+  } catch (e) {
+    reportError({
+      surface: 'family-context',
+      message: 'failed to reclaim native keystore blobs on family delete',
+      error: e,
+      severity: 'warning',
+      context: { action: 'reclaim_keystore' },
+    });
+  }
+
+  const passkeys = await passkeyRepo.getPasskeysByFamily(familyId);
+  for (const pk of passkeys) await passkeyRepo.removePasskeyRegistration(pk.credentialId);
+  // Tell Windows Hello / iCloud Keychain to stop showing these credentials.
+  if (passkeys.length > 0) await signalCredentialsRemoved(passkeys.map((pk) => pk.credentialId));
 }
 
 /** One member as the roster knows them. */

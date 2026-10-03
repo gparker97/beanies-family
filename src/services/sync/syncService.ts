@@ -1005,6 +1005,24 @@ export function setProvider(provider: StorageProvider, familyId?: string | null)
 }
 
 /**
+ * Unbind the in-memory provider WITHOUT touching its persisted config (round 4). The
+ * cross-family restore uses it when the session had no provider before a failed decrypt bound
+ * the other family's file: polling stops and nothing can save into that file, while the
+ * family's own provider config stays on disk for its next real sign-in. `disconnect` is the
+ * user-facing unbind and also forgets the config.
+ */
+export function clearProvider(): void {
+  cancelPendingSave();
+  stopPolling();
+  clearRemoteUnreadable();
+  pendingMarker = null;
+  currentProvider = null;
+  currentProviderFamilyId = null;
+  remoteBaseline = null;
+  updateState({ isConfigured: false, fileName: null, lastError: null });
+}
+
+/**
  * Seed the worker's envelope cache, quietly. Envelope-cache persistence is a
  * cold-start-unlock convenience, not a critical write — a failure must NOT fire
  * the critical doc-worker toast (so it's `{quiet}`), but it also must NOT vanish
@@ -1050,6 +1068,15 @@ export function setFamilyKey(familyKey: CryptoKey, envelope: BeanpodFileV4): voi
     });
     triggerDebouncedSave();
   }
+}
+
+/**
+ * Forget the family key (round 4): the cross-family restore with nothing unlocked before must
+ * not leave the failed family's key behind for a later save or merge to encrypt with.
+ */
+export function clearFamilyKey(): void {
+  currentFamilyKey = null;
+  noKeyWarnedOnce = false;
 }
 
 /**
@@ -2204,7 +2231,11 @@ async function doSave(opts: SaveOptions = {}): Promise<boolean> {
       level: 'warn',
       surface: 'sync-save',
       message: 'provider or family changed during the save; aborted without writing',
-      context: { action: 'aborted-provider-changed', stage: byEpoch ? 'abort-held' : stage },
+      context: {
+        action: 'aborted-provider-changed',
+        stage,
+        ...(byEpoch ? { detail: 'abort-held' } : {}),
+      },
     });
     return false;
   };
@@ -2410,6 +2441,13 @@ async function doSave(opts: SaveOptions = {}): Promise<boolean> {
     const providerAtWrite: StorageProvider = provider;
     const providerTypeForDiag = providerAtWrite.type;
     const familyIdAtWrite = familyId;
+    // Round 4: a key swap can land inside the write too (the hold epoch moves BEFORE the worker
+    // is handed the other family's key). The write landed, but its marker and baseline describe
+    // the old family: never learn or commit them into what is now another family's worker.
+    const epochAtWrite = holdEpoch;
+    /** The provider we wrote through is still active and no key swap landed since. */
+    const writeStillCurrent = (): boolean =>
+      currentProvider === providerAtWrite && holdEpoch === epochAtWrite;
     at.phase = 'write';
     // C14b: the write returns its own resulting revision IN the response. Narrow
     // the `WriteAck | void` union explicitly at this ONE site.
@@ -2467,8 +2505,8 @@ async function doSave(opts: SaveOptions = {}): Promise<boolean> {
     const advance = revisionAdvance(probeRevision, ackRevision);
     const raced = advance !== null && advance > 1;
 
-    if (currentProvider !== providerAtWrite) {
-      // A family switch landed mid-write — do not touch the baseline (C1).
+    if (!writeStillCurrent()) {
+      // A family switch or a key swap landed mid-write — do not touch the baseline (C1).
     } else if (raced) {
       logEvent({
         level: 'warn',
@@ -2517,7 +2555,7 @@ async function doSave(opts: SaveOptions = {}): Promise<boolean> {
       // newer data". One extra metadata call, only on a rare malformed 2xx.
       try {
         const marker = await providerAtWrite.getRemoteMarker();
-        if (currentProvider === providerAtWrite) {
+        if (writeStillCurrent()) {
           learnRemoteMarker(marker);
           // NOT `exportedHeads`. This revision was probed AFTER our write, so a peer
           // may have written in the gap — pairing their revision with our heads would
@@ -2547,7 +2585,7 @@ async function doSave(opts: SaveOptions = {}): Promise<boolean> {
       noteCachePushed(familyIdAtWrite);
       try {
         const postWriteTimestamp = await providerAtWrite.getLastModified();
-        if (postWriteTimestamp && currentProvider === providerAtWrite) {
+        if (postWriteTimestamp && writeStillCurrent()) {
           learnRemoteMarker({ revision: null, modifiedTime: postWriteTimestamp });
         }
       } catch (e) {

@@ -154,4 +154,23 @@ describe('AssetModal loan payload', () => {
     expect(loan.outstandingBalance).toBe(7000);
     expect(loan.interestRate).toBeUndefined();
   });
+
+  it('a loan removed while the modal was open is recreated whole, never sent as a partial stub', async () => {
+    const wrapper = await open(withLoan);
+    // Another device removed the loan: the projection row (the repository's base) has none.
+    applyDelta({
+      kind: 'upsert',
+      collection: 'assets',
+      id: 'a1',
+      entity: { ...base, loan: { hasLoan: false } },
+    });
+    (wrapper.vm as unknown as { interestRate: number }).interestRate = 5;
+    await nextTick();
+    expect((await save(wrapper)).loan).toEqual({
+      hasLoan: true,
+      loanAmount: 20000,
+      outstandingBalance: 10000,
+      interestRate: 5,
+    });
+  });
 });

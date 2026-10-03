@@ -34,7 +34,10 @@ describe('signOutStepsFor', () => {
 
 describe('round 3: only the menu clear sweeps every family', () => {
   // Each every-family step and the family-scoped twin the active scope runs in its place.
+  // Device-global steps with no family twin: the active scope drops them outright.
+  const DEVICE_GLOBAL: SignOutStepName[] = ['untrustDevice', 'reArmTrustPrompt'];
   const TWINS: Array<[SignOutStepName, SignOutStepName]> = [
+    ['clearAllRefreshTokens', 'clearFamilyRefreshToken'],
     ['deleteAllLocalFamilies', 'deleteFamilyDb'],
     ['clearKeyCacheAll', 'clearKeyCacheFamily'],
     ['removePinWrapsAll', 'removePinWrapsFamily'],
@@ -44,9 +47,10 @@ describe('round 3: only the menu clear sweeps every family', () => {
 
   it('the active-scope clear deletes the active family only, otherwise the same teardown', () => {
     const twinOf = new Map(TWINS);
-    // Step for step the menu clear, with each every-family step swapped in place.
+    // Step for step the menu clear, with each every-family step swapped in place and the
+    // device-global trust steps dropped.
     expect(SIGN_OUT_CLEAR_ACTIVE_STEPS).toEqual(
-      SIGN_OUT_CLEAR_STEPS.map((s) => twinOf.get(s) ?? s)
+      SIGN_OUT_CLEAR_STEPS.filter((s) => !DEVICE_GLOBAL.includes(s)).map((s) => twinOf.get(s) ?? s)
     );
     expect(dropsKeyMaterial(SIGN_OUT_CLEAR_ACTIVE_STEPS)).toBe(true);
   });
@@ -58,9 +62,14 @@ describe('round 3: only the menu clear sweeps every family', () => {
       expect(SIGN_OUT_CLEAR_ACTIVE_STEPS).toContain(family);
     }
     // No step name in the active list may be an every-family sweep.
-    expect(SIGN_OUT_CLEAR_ACTIVE_STEPS.filter((s) => /All/.test(s))).toEqual([
-      'clearAllRefreshTokens',
-    ]);
+    expect(SIGN_OUT_CLEAR_ACTIVE_STEPS.filter((s) => /All/.test(s))).toEqual([]);
+  });
+
+  it('the active-scope clear leaves device trust alone: it is global, and other families keep their keys', () => {
+    for (const step of DEVICE_GLOBAL) {
+      expect(SIGN_OUT_CLEAR_STEPS).toContain(step);
+      expect(SIGN_OUT_CLEAR_ACTIVE_STEPS).not.toContain(step);
+    }
   });
 });
 

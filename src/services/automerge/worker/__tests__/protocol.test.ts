@@ -4,6 +4,7 @@ import {
   serializeError,
   reconstructError,
   DocWorkerError,
+  NoDocumentLoadedError,
   isRpcResponse,
   isWorkerSignal,
 } from '../protocol';
@@ -86,6 +87,7 @@ describe('protocol — error transport', () => {
     for (const err of [
       new CorruptPayloadError('a', 'load', null),
       new PayloadTooLargeError('b', 'load', null),
+      new NoDocumentLoadedError("docWorker: no document loaded for 'mutate'"),
     ]) {
       expect(reconstructError(serializeError(err))).toBeInstanceOf(err.constructor);
     }

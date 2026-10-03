@@ -274,4 +274,53 @@ describe('photoUploadQueue', () => {
     await enqueueUpload(makeEntry());
     expect(await getPending()).toHaveLength(1);
   });
+
+  it('after a failed open, the next flush for the same family reopens without a new setActiveFamily', async () => {
+    await __internals.reset();
+    logEvent.mockClear();
+    const handler = vi.fn(async () => {});
+    setFlushHandler(handler);
+    const open = vi.spyOn(indexedDB, 'open').mockImplementationOnce(() => {
+      throw new Error('quota');
+    });
+    setActiveFamily(FAMILY_ID);
+    await vi.waitFor(() => expect(actions()).toContain('open-failed'));
+    open.mockRestore();
+    await putRaw(FAMILY_ID, { ...makeEntry({ familyId: FAMILY_ID }), id: 'q1', createdAt: 1 });
+
+    // No re-activation: the flush itself rebinds the handle and drains.
+    await flushQueue();
+    expect(handler).toHaveBeenCalledTimes(1);
+  });
+
+  it('after a failed open, the next enqueue names the failure and the one after reopens', async () => {
+    await __internals.reset();
+    logEvent.mockClear();
+    const open = vi.spyOn(indexedDB, 'open').mockImplementation(() => {
+      throw new Error('quota');
+    });
+    setActiveFamily(FAMILY_ID);
+    await vi.waitFor(() => expect(actions()).toContain('open-failed'));
+    // Still failing: the enqueue retried the open and says so (not "no family bound").
+    await expect(enqueueUpload(makeEntry())).rejects.toThrow(/could not be opened/);
+    open.mockRestore();
+    await enqueueUpload(makeEntry());
+    expect(await getPending()).toHaveLength(1);
+  });
+
+  it('enqueue names an unbound queue apart from a failed open', async () => {
+    await __internals.reset();
+    clearActiveFamily();
+    await expect(enqueueUpload(makeEntry())).rejects.toThrow(/no family bound/);
+  });
+
+  it('deleting the bound family queue unbinds it, so a later flush cannot recreate it', async () => {
+    setFlushHandler(vi.fn(async () => {}));
+    await deletePhotoQueueDatabase(FAMILY_ID);
+    const open = vi.spyOn(indexedDB, 'open');
+    await flushQueue();
+    await expect(enqueueUpload(makeEntry())).rejects.toThrow(/no family bound/);
+    expect(open).not.toHaveBeenCalled();
+    open.mockRestore();
+  });
 });

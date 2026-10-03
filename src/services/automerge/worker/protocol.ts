@@ -431,6 +431,20 @@ export class WorkerCrashError extends DocWorkerError {
   }
 }
 
+/**
+ * The worker refused a call because no document is loaded yet (or any more): a lifecycle
+ * state, not a fault of the caller's args. Typed so main can classify it by class
+ * (`recurringProcessor` treats it as infrastructure, never as a strike against an item)
+ * instead of matching message text. Extends `DocWorkerError`, so every existing generic
+ * catch still sees it.
+ */
+export class NoDocumentLoadedError extends DocWorkerError {
+  constructor(message: string, op?: string) {
+    super(message, op);
+    this.name = 'NoDocumentLoadedError';
+  }
+}
+
 interface ErrorCodec {
   serialize: (err: unknown) => Record<string, unknown> | undefined;
   reconstruct: (message: string, data: Record<string, unknown> | undefined) => Error;
@@ -510,6 +524,12 @@ const ERROR_REGISTRY: Record<string, ErrorCodec> = {
     reconstruct: (message) => new WorkerCrashError(message),
   },
   PodLineageError: lineageCodec,
+  // Without this entry the refusal arrives as a generic `DocWorkerError` and
+  // `recurringProcessor` counts a not-yet-loaded worker as a cascade strike.
+  NoDocumentLoadedError: {
+    serialize: () => undefined,
+    reconstruct: (message) => new NoDocumentLoadedError(message),
+  },
   // ⚠️ REQUIRED NOW THAT THE REFUSAL IS THROWN IN THE WORKER. Without an entry
   // here the class arrives on main as a generic `DocWorkerError`, `blockCode`
   // and `inlineMessageKey` are gone, `isRemoteBlocker` returns false, and every

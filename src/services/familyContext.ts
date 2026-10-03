@@ -155,47 +155,12 @@ export async function deleteLocalFamily(familyId: string): Promise<CacheClearRes
   // 1. Delete the family's IndexedDB database (data cache)
   const cache = await deleteFamilyDatabase(familyId);
 
-  // 2a. Native (installed app): reclaim the device-local hardware-Keystore blobs for this
-  // family — every member's, plus the legacy family-keyed one.
-  //
-  // ORDER STILL MATTERS, but it is no longer catastrophic (#82). The reclaim works from
-  // the UNION of the family's `native-keystore` records and the accounts it enumerates
-  // from the keychain itself, so the per-member addresses are covered independently of
-  // the registry: running this after the loop below would now DEGRADE (it would stop
-  // removing records whose blob is already gone) rather than orphan every blob while a
-  // mocked test still passed. Keep it here anyway — the records are one half of the
-  // union, and on Android there is no enumeration to fall back on.
-  //
-  // Routed through `passkeyService` so the `isNative()` guard lives in one place and no
-  // module outside `nativeBiometric` has to know how a keystore account is addressed.
-  try {
-    const { reclaimFamilyKeystore } = await import('@/services/auth/passkeyService');
-    await reclaimFamilyKeystore(familyId);
-  } catch (e) {
-    // Best-effort — an orphaned OS alias is inert without its registry record — but not
-    // silent: this is the only place that reclaims it, so a failure means it leaks.
-    reportError({
-      surface: 'family-context',
-      message: 'failed to reclaim native keystore blobs on family delete',
-      error: e,
-      severity: 'warning',
-      context: { action: 'reclaim_keystore' },
-    });
-  }
-
-  // 2b. Remove all passkey registrations and signal platform authenticator
-  const { getPasskeysByFamily, removePasskeyRegistration } =
-    await import('@/services/indexeddb/repositories/passkeyRepository');
-  const passkeys = await getPasskeysByFamily(familyId);
-  const credentialIds = passkeys.map((pk) => pk.credentialId);
-  for (const pk of passkeys) {
-    await removePasskeyRegistration(pk.credentialId);
-  }
-  // Signal to Windows Hello / iCloud Keychain to stop showing these credentials
-  if (credentialIds.length > 0) {
-    const { signalCredentialsRemoved } = await import('@/services/auth/passkeyService');
-    await signalCredentialsRemoved(credentialIds);
-  }
+  // 2. Device credentials: native keystore blobs (best-effort, reported), passkey
+  // registrations, then the platform Signal. One implementation shared with the
+  // active-scope sign-out step, so the order (keystore FIRST, #82) and the failure
+  // contract live in `passkeyService.reclaimPasskeysForFamily`.
+  const { reclaimPasskeysForFamily } = await import('@/services/auth/passkeyService');
+  await reclaimPasskeysForFamily(familyId);
 
   // 3. Clear file handle and provider config
   const { clearFileHandleForFamily, clearProviderConfig } =

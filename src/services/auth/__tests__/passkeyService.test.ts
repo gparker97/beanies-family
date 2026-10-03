@@ -45,6 +45,8 @@ const { nativeMocks } = vi.hoisted(() => ({
 }));
 vi.mock('../nativeBiometric', () => nativeMocks);
 vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: vi.fn() }));
+const { reportErrorMock } = vi.hoisted(() => ({ reportErrorMock: vi.fn() }));
+vi.mock('@/utils/errorReporter', () => ({ reportError: reportErrorMock }));
 // The active family is resolved from the REGISTRY, not a store: authStore imports
 // resolveDeviceKeys from this module, so a store import here would be a real cycle.
 const { getActiveFamilyIdMock } = vi.hoisted(() => ({
@@ -74,6 +76,7 @@ import {
   canEnrollBiometric,
   removePasskey,
   reconcileDeviceKeysWithRoster,
+  reclaimPasskeysForFamily,
   MEMBER_MISMATCH,
 } from '../passkeyService';
 import * as passkeyRepo from '@/services/indexeddb/repositories/passkeyRepository';
@@ -450,5 +453,47 @@ describe('reconcileDeviceKeysWithRoster — the guards, not the deletion (#82)',
       reconcileDeviceKeysWithRoster('family-1', roster, 'member-1')
     ).resolves.toBeUndefined();
     isNativeMock.mockReturnValue(false);
+  });
+});
+
+describe('reclaimPasskeysForFamily — the one family-scoped reclaim (deleteLocalFamily + sign-out step)', () => {
+  afterEach(() => {
+    isNativeMock.mockReturnValue(false);
+    vi.unstubAllGlobals();
+  });
+
+  it('keystore first, then records, then the Signal; a keystore failure is reported and does not stop the rest', async () => {
+    isNativeMock.mockReturnValue(true);
+    const order: string[] = [];
+    nativeMocks.nativeReclaimFamilyKeystore.mockImplementationOnce(async () => {
+      order.push('keystore');
+      throw new Error('keychain locked');
+    });
+    vi.mocked(passkeyRepo.getPasskeysByFamily).mockResolvedValueOnce([
+      makeRegistration({ credentialId: 'cred-a' }),
+      makeRegistration({ credentialId: 'cred-b', memberId: 'member-2' }),
+    ]);
+    vi.mocked(passkeyRepo.removePasskeyRegistration).mockImplementation(async (id: string) => {
+      order.push(`remove:${id}`);
+    });
+    const signal = vi.fn(async ({ credentialId }: { credentialId: string }) => {
+      order.push(`signal:${credentialId}`);
+    });
+    vi.stubGlobal('PublicKeyCredential', { signalUnknownCredential: signal });
+
+    await reclaimPasskeysForFamily('family-1');
+
+    expect(nativeMocks.nativeReclaimFamilyKeystore).toHaveBeenCalledWith('family-1');
+    expect(passkeyRepo.getPasskeysByFamily).toHaveBeenCalledWith('family-1');
+    expect(order).toEqual([
+      'keystore',
+      'remove:cred-a',
+      'remove:cred-b',
+      'signal:cred-a',
+      'signal:cred-b',
+    ]);
+    expect(reportErrorMock).toHaveBeenCalledWith(
+      expect.objectContaining({ context: { action: 'reclaim_keystore' } })
+    );
   });
 });

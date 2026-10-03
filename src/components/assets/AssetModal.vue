@@ -242,7 +242,8 @@ async function handleRemoveCustomInstitution(instName: string) {
  * processor); the store, then the open-time snapshot, are fallbacks only when the projection
  * has no row. Untouched sub-keys then equal the base and are not written, so a payment that
  * landed while the modal was open keeps its balance.
- * Creating a loan (none at open) or removing one (`hasLoan: false`) sends the form's object.
+ * Creating a loan (none at open, or none LIVE because it was removed while the modal was
+ * open) or removing one (`hasLoan: false`) sends the form's object whole.
  * `undefined` = nothing changed: no loan key at all.
  */
 function loanForSave(next: AssetLoan): AssetLoan | undefined {
@@ -253,6 +254,10 @@ function loanForSave(next: AssetLoan): AssetLoan | undefined {
   const liveAsset = id
     ? (projectionGetById('assets', id) ?? assetsStore.getAssetById(id))
     : undefined;
+  // The loan was removed while the modal was open: there is no live loan to overlay onto, and
+  // a partial stub would be read as a loan with every other sub-key cleared. Recreate it whole,
+  // as the create path does.
+  if (liveAsset && !liveAsset.loan?.hasLoan) return next;
   const whole: Record<string, unknown> = { ...((liveAsset ?? props.asset)?.loan ?? {}) };
   let changed = false;
   for (const k of new Set([...Object.keys(opened), ...Object.keys(nextRec)])) {

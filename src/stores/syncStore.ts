@@ -560,14 +560,21 @@ export const useSyncStore = defineStore('sync', () => {
    * Throws when the active family cannot be switched back.
    */
   async function restoreSessionBindings(prev: PreviousFamily): Promise<void> {
+    // The provider first: it is bound to an explicit family, so it never depends on the switch
+    // below, and a switch that throws must not leave the failed family's file bound.
+    const bound = syncService.getProvider();
+    if (prev.provider && bound !== prev.provider) {
+      syncService.setProvider(prev.provider, prev.providerFamilyId);
+    } else if (!prev.provider && bound) {
+      // No provider before: whatever is bound now is the failed family's file. Unbind it in
+      // memory only (its persisted config belongs to that family's next real sign-in).
+      syncService.clearProvider();
+    }
     const familyCtx = useFamilyContextStore();
     if (familyCtx.activeFamilyId !== prev.activeFamilyId) {
       if (!prev.activeFamilyId || !(await familyCtx.switchFamily(prev.activeFamilyId))) {
         throw new Error('previous active family could not be re-activated');
       }
-    }
-    if (prev.provider && syncService.getProvider() !== prev.provider) {
-      syncService.setProvider(prev.provider, prev.providerFamilyId);
     }
   }
 
@@ -584,6 +591,9 @@ export const useSyncStore = defineStore('sync', () => {
     if (!prev.key) {
       let errorCode = 'ok';
       try {
+        // Before the worker reset: the failed family's key must not outlive it in syncService
+        // (a later save or merge would encrypt with it).
+        syncService.clearFamilyKey();
         await docClient.reset();
         familyKey.value = null;
         if (envelope.value !== prev.envelope) {

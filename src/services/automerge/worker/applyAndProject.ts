@@ -85,6 +85,7 @@ import type {
   CacheReplay,
   InitAndLoadResult,
 } from './protocol';
+import { NoDocumentLoadedError } from './protocol';
 import { canonicalEqual, type ReconcileNote } from './reconcile';
 
 type Doc = Automerge.Doc<FamilyDocument>;
@@ -706,6 +707,15 @@ async function persistOnce(): Promise<void> {
   const doc = currentDoc;
   const key = familyKey;
   const gen = docGeneration;
+  // Round 3: a newer-lineage cache keeps its rows until this document reaches its lineage.
+  const lineageFenced = lineageFence !== null && !reachesLineage(docLineage(doc), lineageFence);
+  if (lineageFence && !lineageFenced) {
+    lineageFence = null;
+    // The fence lifts because this document reached the cache's lineage (an adopt, whose
+    // install reset the cursors to superseding). The other tab's rows on that lineage may hold
+    // edits this document lacks: this base keeps every row it does not provably contain.
+    baseSupersedes = false;
+  }
   const supersede = baseSupersedes;
   // C4a: capture the pending baseline in the SAME pre-`await` snapshot as `doc`,
   // so a newer value arriving DURING this write is not committed against this
@@ -715,9 +725,6 @@ async function persistOnce(): Promise<void> {
   // drop them from the cache's reach. Increments only, until a merge delivers the deps.
   const depsFenced = baseFence && Automerge.getMissingDeps(doc, []).length > 0;
   if (baseFence && !depsFenced) baseFence = false;
-  // Round 3: a newer-lineage cache keeps its rows until this document reaches its lineage.
-  const lineageFenced = lineageFence !== null && !reachesLineage(docLineage(doc), lineageFence);
-  if (lineageFence && !lineageFenced) lineageFence = null;
   const fenced = depsFenced || lineageFenced;
   // Track which write is in flight so the failure signal can carry `kind` — MUST be
   // explicit, not inferred from lastPersistedHeads (the re-compaction writeBase below
@@ -840,7 +847,7 @@ function countEntities(doc: Doc): number {
 // ─── Guards ──────────────────────────────────────────────────────────────────
 
 function requireDoc(method: string): Doc {
-  if (!currentDoc) throw new Error(`docWorker: no document loaded for '${method}'`);
+  if (!currentDoc) throw new NoDocumentLoadedError(`docWorker: no document loaded for '${method}'`);
   return currentDoc;
 }
 function requireKey(method: string): CryptoKey {
@@ -999,15 +1006,19 @@ export async function initAndLoadCache(id: string): Promise<InitAndLoadResult> {
     if (loaded && (await fenceShouldGiveUp(loaded.missingDeps))) {
       // `Automerge.save` KEEPS a buffered change, so a base written from this document would
       // carry the missing deps into every later open. Rebuild it from its applied history only,
-      // BEFORE quarantining: a rebuild that fails (inside this classified try: an allocation
-      // failure is a `PayloadLoadError` that cannot open) leaves the rows and the fence intact.
-      let rebuilt: Doc;
+      // BEFORE quarantining. The give-up is an optimisation: a rebuild that cannot allocate
+      // skips it (the rows, `loaded` and the fence stay exactly as an ordinary fenced open) and
+      // the open carries on. The run is cleared so the next open does not retry it every time.
+      let rebuilt: Doc | null = null;
       try {
         rebuilt = withoutQueuedChanges(loaded.doc);
       } catch (e) {
-        throw isAllocationFailure(e) ? payloadFailure('materialize', e, id, null) : e;
+        if (!isAllocationFailure(e)) throw e;
+        console.warn('[applyAndProject] fence give-up skipped: the rebuild could not allocate', e);
+        bookkeepingFailed.push(`fence-rebuild:${errName(e)}`);
+        await cache.clearMetaCounter('fence-merges').catch(() => {});
       }
-      if (await quarantineFencedRows(bookkeepingFailed)) {
+      if (rebuilt && (await quarantineFencedRows(bookkeepingFailed))) {
         loaded = { ...loaded, doc: rebuilt };
         fenceGaveUp = true;
       }
@@ -1237,11 +1248,6 @@ async function noteFenceAfterMerge(): Promise<void> {
 function sameLineage(a: CompactionLineage | null, b: CompactionLineage | null): boolean {
   if (!a || !b) return !a && !b;
   return a.id === b.id && a.seq === b.seq;
-}
-
-/** Round 3: the quarantined rows (`qinc:*`) of the open cache, for main to list. Never throws. */
-export async function listQuarantinedRows(): Promise<{ ids: string[] }> {
-  return { ids: await cache.listQuarantinedRows().catch(() => []) };
 }
 
 /** Lineage order: the compaction seq, with never-compacted (`null`) older than any compaction. */
@@ -2440,8 +2446,6 @@ export async function dispatch(method: string, args: unknown): Promise<DispatchR
       return { result: await initAndLoadCache(a.familyId as string) };
     case 'reseedCacheFromLiveDoc':
       return { result: await reseedCacheFromLiveDoc(a.familyId as string) };
-    case 'listQuarantinedRows':
-      return { result: await listQuarantinedRows() };
     case 'loadProjectionSnapshot':
       return { result: await loadProjectionSnapshot(a.familyId as string) };
     case 'openCache':
