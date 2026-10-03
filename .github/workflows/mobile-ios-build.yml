@@ -70,6 +70,10 @@ jobs:
       - name: Build web app
         run: npm run build
         env:
+          # Same fix as mobile-ios-release.yml: the macOS runner's default V8 heap (~2 GB)
+          # is smaller than the Linux runners', and `vue-tsc -b` outgrew it (FATAL
+          # "Ineffective mark-compacts near heap limit" on every push since 2026-10-01).
+          NODE_OPTIONS: --max-old-space-size=4096
           # Same client-side values the prod web bundle + the Android debug APK
           # already ship — no new exposure — so the bundled app in the simulator
           # matches what ships. NOTE: native Google sign-in won't actually
