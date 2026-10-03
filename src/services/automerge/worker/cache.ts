@@ -93,6 +93,22 @@ const INC_PREFIX = 'inc:';
 /** The char after ':' — upper bound (exclusive) for the `inc:*` key range. */
 const INC_UPPER = 'inc;';
 const INC_PAD = 12;
+/**
+ * Round 3: a QUARANTINED increment. A row the replay skipped (would not decrypt, unframe or
+ * apply), or one the missing-deps fence gave up on, is renamed `q` + its key: it leaves the
+ * `inc:*` replay range (`'q' > 'i'`) so it is neither re-tried nor re-reported on every open,
+ * and it stays on disk for a build or a key that can read it. Dropped by `clearCache`.
+ */
+const QUARANTINE_PREFIX = 'q';
+/**
+ * Round 3: small PLAINTEXT bookkeeping rows (counts and row ids, no family data), outside every
+ * read/clear range (`'m' > 'i;'`). Written best-effort: a failed write costs one repeated
+ * report or one extra open before a decision, never data.
+ */
+const META_PREFIX = 'meta:';
+export type CacheMetaCounter = 'base-decrypt-failures' | 'fence-opens';
+/** Rows waiting on missing deps that were already reported (paged) once. */
+const META_REPORTED = `${META_PREFIX}replay-reported`;
 
 /**
  * This realm's increment-key suffix (C5h). Two tabs of one device share one cache DB, each with
@@ -172,6 +188,14 @@ let incRowCount = 0;
  * hold them and deleting them was silent loss.
  */
 let containedRows = new Set<string>();
+/**
+ * Round 3: rows a non-superseding base write could not delete (another tab's, or ones waiting
+ * on deps). They are not this realm's to fold, so they do not count toward the re-compaction
+ * threshold: without this, 50 foreign rows made EVERY persist rewrite the base.
+ */
+let incRowsUncounted = 0;
+/** Round 3: the rows the last load left waiting on missing deps (the fence's give-up set). */
+let pendingRows: string[] = [];
 
 /** Who hears about a release. Registered once by `applyAndProject.configure()`. */
 type CacheReleasedListener = (reason: 'deleted' | 'upgrade') => void;
@@ -188,6 +212,8 @@ function closeHandle(): void {
   cacheDbFamilyId = null;
   incSeq = 0;
   incRowCount = 0;
+  incRowsUncounted = 0;
+  pendingRows = [];
   containedRows = new Set();
   // The id belongs to the DB it was read from: a write after the handle closed (sign-out, a
   // family switch, another tab's delete) must not key a Counter with another family's device.
@@ -285,6 +311,8 @@ export async function initPersistenceDB(familyId: string): Promise<void> {
   setDeviceWriterId(writerId);
   incSeq = scan.next;
   incRowCount = scan.count;
+  incRowsUncounted = 0;
+  pendingRows = [];
   containedRows = new Set();
 }
 
@@ -399,6 +427,7 @@ export async function persistDocBinary(
   for (const k of kept) max = Math.max(max, parseIncKey(k));
   incSeq = max + 1;
   incRowCount = kept.length;
+  incRowsUncounted = kept.length; // round 3: only growth since this base counts
   containedRows = new Set();
 }
 
@@ -422,7 +451,68 @@ export async function persistIncrement(familyKey: CryptoKey, framed: Uint8Array)
 
 /** How many increments sit on top of the current base (the re-compaction trigger). */
 export function incrementCount(): number {
-  return incRowCount;
+  return Math.max(0, incRowCount - incRowsUncounted);
+}
+
+/** Read a meta counter (0 when absent). */
+async function readMetaCount(db: IDBPDatabase<CacheDB>, name: CacheMetaCounter): Promise<number> {
+  const row = (await withIdbRetry('readMeta', () => db.get(STORE_NAME, META_PREFIX + name))) as
+    { payload?: string } | undefined;
+  const n = Number(row?.payload ?? 0);
+  return Number.isFinite(n) ? n : 0;
+}
+
+/** Round 3: bump a persisted meta counter and answer its new value. */
+export async function bumpMetaCounter(name: CacheMetaCounter): Promise<number> {
+  const db = requireHandle();
+  const next = (await readMetaCount(db, name)) + 1;
+  await withIdbRetry('writeMeta', () =>
+    db.put(STORE_NAME, { id: META_PREFIX + name, payload: String(next), updatedAt: nowIso() })
+  );
+  return next;
+}
+
+/** Round 3: reset a meta counter. No-op when the DB is closed. */
+export async function clearMetaCounter(name: CacheMetaCounter): Promise<void> {
+  const db = cacheDb;
+  if (!db) return;
+  await withIdbRetry('clearMeta', () => db.delete(STORE_NAME, META_PREFIX + name));
+}
+
+/**
+ * Round 3: move increment rows out of the replay range (`inc:*` -> `qinc:*`) in one transaction.
+ * Answers how many moved. A row already gone (another tab folded it) is skipped.
+ */
+async function quarantineRows(db: IDBPDatabase<CacheDB>, ids: readonly string[]): Promise<number> {
+  if (ids.length === 0) return 0;
+  const moved = await withIdbRetry('quarantineRows', async () => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    let n = 0;
+    for (const id of ids) {
+      const row = await store.get(id);
+      if (!row) continue;
+      await store.put({ ...row, id: QUARANTINE_PREFIX + id });
+      await store.delete(id);
+      n++;
+    }
+    await tx.done;
+    return n;
+  });
+  if (cacheDb === db) incRowCount = Math.max(0, incRowCount - moved);
+  return moved;
+}
+
+/**
+ * Round 3: the missing-deps fence gave up. Quarantine the rows the last load left waiting, so
+ * the base can be rewritten without them and they stop being replayed (and reported) forever.
+ */
+export async function quarantinePendingRows(): Promise<number> {
+  const db = requireHandle();
+  const ids = pendingRows;
+  const moved = await quarantineRows(db, ids);
+  if (cacheDb === db) pendingRows = [];
+  return moved;
 }
 
 // ─── Projection snapshot (display-only fast first paint) ──────────────────────
@@ -572,18 +662,22 @@ export async function loadCachedDoc(
   } catch (e) {
     throw payloadFailure('decrypt', e, familyId, decodedSizeOf(baseEntry.payload));
   }
+  // Round 3 (C5a): the base decrypted, so the run of consecutive base-decrypt failures that
+  // auto-reseeds the cache is broken. Best-effort.
+  await clearMetaCounter('base-decrypt-failures').catch(() => {});
   const baseDoc = loadAndVerify(baseBinary, familyId); // throws CorruptPayloadError on a bad base
 
   const incEntries = (await withIdbRetry('loadIncrements', () =>
     db.getAll(STORE_NAME, IDBKeyRange.bound(INC_PREFIX, INC_UPPER, false, true))
   )) as Array<{ id: string; payload: string }>;
-  const finish = (
+  const finish = async (
     doc: Doc,
     applied: Map<string, Uint8Array[]>,
-    dropped: number
-  ): { doc: Doc } & CacheReplay => {
+    skipped: string[]
+  ): Promise<{ doc: Doc } & CacheReplay> => {
     const missingDeps = Automerge.getMissingDeps(doc, []).length;
     const contained = new Set<string>();
+    const waiting: string[] = [];
     for (const [id, changes] of applied) {
       // With nothing missing every applied row is in the history. Otherwise check each change:
       // a buffered change is NOT in it (`hasHeads` answers false), and its row must survive.
@@ -592,18 +686,26 @@ export async function loadCachedDoc(
         changes.every((c) => Automerge.hasHeads(doc, [Automerge.decodeChange(c).hash!]))
       ) {
         contained.add(id);
+      } else {
+        waiting.push(id);
       }
     }
-    if (cacheDb === db) containedRows = contained;
+    if (cacheDb === db) {
+      containedRows = contained;
+      pendingRows = waiting;
+    }
+    const triage = await triageReplayRows(db, skipped, waiting);
     return {
       doc,
-      recovered: dropped > 0 || missingDeps > 0,
-      droppedIncrements: dropped,
+      recovered: skipped.length > 0 || missingDeps > 0,
+      droppedIncrements: skipped.length,
       missingDeps,
       incrementCount: incEntries.length,
+      ...(triage.quarantined ? { quarantined: triage.quarantined } : {}),
+      ...(skipped.length || waiting.length ? { newlyReported: triage.newlyReported } : {}),
     };
   };
-  if (incEntries.length === 0) return finish(baseDoc, new Map(), 0);
+  if (incEntries.length === 0) return finish(baseDoc, new Map(), []);
 
   /** Decrypt one increment, classifying an allocation failure as `decrypt`. */
   const openIncrement = async (payload: string): Promise<Uint8Array> => {
@@ -627,7 +729,7 @@ export async function loadCachedDoc(
       applied.set(entry.id, changes);
       all.push(...changes);
     }
-    return finish(applyChanges(baseDoc, all).doc, applied, 0);
+    return await finish(applyChanges(baseDoc, all).doc, applied, []);
   } catch (fastErr) {
     // Already classified by `openIncrement` — do not relabel it below.
     if (fastErr instanceof PayloadLoadError) throw fastErr;
@@ -651,7 +753,7 @@ export async function loadCachedDoc(
     );
     let doc = loadAndVerify(baseBinary, familyId);
     const applied = new Map<string, Uint8Array[]>();
-    let dropped = 0;
+    const skipped: string[] = [];
     for (const entry of incEntries) {
       try {
         const changes = unframeChanges(await openIncrement(entry.payload));
@@ -665,11 +767,60 @@ export async function loadCachedDoc(
           throw oomDuringReplay('materialize', incErr, familyId, baseBinary);
         }
         console.warn(`[cache] skipping increment ${entry.id} (corrupt/unapplyable).`, incErr);
-        dropped++;
+        skipped.push(entry.id);
       }
     }
-    return finish(doc, applied, dropped);
+    return finish(doc, applied, skipped);
   }
+}
+
+/**
+ * Round 3: what a damaged replay does with its rows, and how many are NEW to report.
+ *  - SKIPPED rows are quarantined (`qinc:*`), so they leave replay: never re-tried and never
+ *    re-reported. Each is reported exactly once, on the open that quarantined it.
+ *  - rows WAITING on missing deps stay (the fence needs them); the ids already reported are
+ *    remembered in a plaintext marker row, so only a row never seen before counts as new.
+ * Best-effort: a failed bookkeeping write logs and degrades to "report again next open".
+ */
+async function triageReplayRows(
+  db: IDBPDatabase<CacheDB>,
+  skipped: readonly string[],
+  waiting: readonly string[]
+): Promise<{ quarantined: number; newlyReported: number }> {
+  let quarantined = 0;
+  let newlyReported = skipped.length;
+  try {
+    quarantined = await quarantineRows(db, skipped);
+  } catch (e) {
+    console.warn('[cache] could not quarantine skipped increments (they replay again)', e);
+  }
+  try {
+    const row = (await withIdbRetry('readReported', () => db.get(STORE_NAME, META_REPORTED))) as
+      { payload?: string } | undefined;
+    let seen: string[] = [];
+    try {
+      seen = row?.payload ? (JSON.parse(row.payload) as string[]) : [];
+    } catch {
+      seen = [];
+    }
+    const known = new Set(seen);
+    newlyReported += waiting.filter((id) => !known.has(id)).length;
+    // Pruned to the rows still waiting: a quarantined or folded row never comes back.
+    if (waiting.length || seen.length) {
+      await withIdbRetry('writeReported', async () => {
+        if (waiting.length === 0) return db.delete(STORE_NAME, META_REPORTED);
+        await db.put(STORE_NAME, {
+          id: META_REPORTED,
+          payload: JSON.stringify(waiting),
+          updatedAt: nowIso(),
+        });
+      });
+    }
+  } catch (e) {
+    console.warn('[cache] replay report marker unavailable (rows may be reported again)', e);
+    newlyReported = skipped.length + waiting.length;
+  }
+  return { quarantined, newlyReported };
 }
 
 /**

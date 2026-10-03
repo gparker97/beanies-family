@@ -2036,6 +2036,8 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
     '此设备上的部分更改还没有保存到你的家庭数据文件中。如果继续，这些更改将被永久删除。请先保留它们，等家庭数据文件保存完成后再试，或先在设置中导出备份。',
   'auth.unsavedForgetMessage':
     '此设备上仍有这个家庭的更改从未保存到家庭数据文件中。在这里移除这个家庭会永久删除这些更改。请先保留它们，在此设备上打开这个家庭并让它先完成保存。',
+  'auth.unsavedPhotosSignOutMessage':
+    '你在此设备上添加的照片仍在等待上传。在未受信任的设备上退出登录会永久删除它们。请保留它们并保持登录直到上传完成，或者放弃它们并退出登录。',
   'auth.unsavedFamilies.one': '1 个家庭有未保存的更改。',
   'auth.unsavedFamilies.other': '{count} 个家庭有未保存的更改。',
   'auth.unsavedPhotos.one': '1 张照片正在等待上传，目前只保存在此设备上。',

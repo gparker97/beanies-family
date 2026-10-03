@@ -132,6 +132,12 @@ let familyKey: CryptoKey | null = null;
  * Cleared everywhere `familyKey` is, so a signed-out realm holds no key material.
  */
 let familyKeyRaw: Uint8Array | null = null;
+/**
+ * The family `familyKey` belongs to (round 3). Posted WITH the key on every `setKey`, so the
+ * worker can refuse to persist or export a document under another family's key, and can settle
+ * the old family's pending persists before a cross-family swap. Cleared with the key.
+ */
+let familyKeyFamilyId: string | null = null;
 
 /**
  * The `setKey` args, in whichever form this realm can actually deliver.
@@ -140,9 +146,12 @@ let familyKeyRaw: Uint8Array | null = null;
  * helper rather than the ternary at three post sites, so a fourth caller cannot pick the form
  * that iOS rejects.
  */
-function setKeyArgs(): { raw: Uint8Array } | { key: CryptoKey } | null {
-  if (familyKeyRaw) return { raw: familyKeyRaw };
-  return familyKey ? { key: familyKey } : null;
+function setKeyArgs():
+  | { raw: Uint8Array; familyId: string | null }
+  | { key: CryptoKey; familyId: string | null }
+  | null {
+  if (familyKeyRaw) return { raw: familyKeyRaw, familyId: familyKeyFamilyId };
+  return familyKey ? { key: familyKey, familyId: familyKeyFamilyId } : null;
 }
 /**
  * The stable device actor, retained beside the key so there is ONE lifetime.
@@ -248,6 +257,16 @@ let mutatesSinceFlush = 0;
  */
 let projectionDirty = false;
 let projectionRepushInFlight = false;
+/**
+ * Round 3: bumped by EVERY projection apply failure (delta or chunk). A re-push clears the
+ * latch only when this did not move while it streamed, so a chunk of the re-push itself
+ * failing leaves the projection marked dirty instead of claiming it is whole.
+ */
+let projectionFailureGen = 0;
+/** Round 3: re-pushes this session, capped so a deterministic apply failure cannot loop. */
+let projectionRepushes = 0;
+let projectionRepushCapLogged = false;
+const MAX_PROJECTION_REPUSHES = 3;
 
 /** The worker reported this family's cache empty. */
 function noteCacheProvenEmpty(familyId: string): void {
@@ -260,9 +279,17 @@ function noteCacheProvenEmpty(familyId: string): void {
  * writes may proceed. Every doc-installing path routes through here AFTER its RPC resolves;
  * `loadProjectionSnapshot` deliberately does not (a snapshot installs no document).
  */
-function noteDocInstalled(): void {
+function noteDocInstalled(opts?: { keepAcks?: boolean }): void {
   cacheProvenEmptyFor = null;
   markAuthoritative();
+  // Round 3 (C8 of the review): the acknowledged-write anchor describes the document that was
+  // there BEFORE this install. After an adopt, a rebase or a cache load it names heads the new
+  // document never had, so a later respawn reported a false `heads-regressed`. Only a plain
+  // merge (the document only grew) keeps it.
+  if (!opts?.keepAcks) {
+    lastAckHeads = null;
+    mutatesSinceFlush = 0;
+  }
 }
 
 /**
@@ -271,8 +298,25 @@ function noteDocInstalled(): void {
  */
 function setCurrentFamily(familyId: string | null): void {
   // Covers the family switch AND sign-out (`reset()` routes through here).
-  if (familyId !== currentFamilyId) cacheProvenEmptyFor = null;
+  if (familyId !== currentFamilyId) {
+    cacheProvenEmptyFor = null;
+    cacheReplayedCleanFor = null;
+  }
   currentFamilyId = familyId;
+}
+
+/**
+ * The family whose cache the live document was built from, with NOTHING left behind: a clean
+ * replay (no skipped row, no missing dep, no given-up fence, no re-seeded base). Only then does
+ * a document pushed to the family file provably carry whatever an earlier session left
+ * unpushed in that cache, which is what lets the save path drop the `unpushed-at-signout`
+ * marker. Cleared on a family switch / sign-out, and by any later load that was not clean.
+ */
+let cacheReplayedCleanFor: string | null = null;
+
+/** Does the live document hold everything this family's cache held? See above. */
+export function documentHoldsCacheOf(familyId: string): boolean {
+  return cacheReplayedCleanFor !== null && cacheReplayedCleanFor === familyId;
 }
 
 /** Notified when the worker's debounced cache persist fails (or recovers) — Task
@@ -379,11 +423,30 @@ function applyDeltaSafely(delta: ProjectionDelta): void {
  */
 function requestProjectionRepush(cause: 'delta' | 'chunk' | 'heads-regressed'): void {
   projectionDirty = true;
+  if (cause !== 'heads-regressed') projectionFailureGen++;
   if (projectionRepushInFlight) return;
+  // Round 3: a per-entity apply failure that is DETERMINISTIC fails again on the re-push and on
+  // every later mutate of that entity, so without a cap each edit re-streamed the whole
+  // projection. Three tries a session, then one report; the latch stays set.
+  if (projectionRepushes >= MAX_PROJECTION_REPUSHES) {
+    if (!projectionRepushCapLogged) {
+      projectionRepushCapLogged = true;
+      reportError({
+        surface: 'doc-worker-projection',
+        message: 'projection re-push cap reached — projection may stay stale until reload',
+        severity: 'error',
+        context: { action: 'projection-repush-capped', kind: cause, count: projectionRepushes },
+      });
+    }
+    return;
+  }
+  projectionRepushes++;
   projectionRepushInFlight = true;
+  const genAtStart = projectionFailureGen;
   void request<{ pushed: boolean }>('pushProjection', undefined, { quiet: true })
     .then((r) => {
-      if (r?.pushed) projectionDirty = false;
+      // Clean only if no chunk (or delta) failed while this re-push streamed.
+      if (r?.pushed && projectionFailureGen === genAtStart) projectionDirty = false;
       logEvent({
         level: 'info',
         surface: 'doc-worker-projection',
@@ -391,7 +454,7 @@ function requestProjectionRepush(cause: 'delta' | 'chunk' | 'heads-regressed'): 
         context: {
           action: 'projection-repush',
           kind: cause,
-          error_code: r?.pushed ? 'ok' : 'no-doc',
+          error_code: !r?.pushed ? 'no-doc' : projectionDirty ? 'apply-failed' : 'ok',
         },
       });
     })
@@ -552,7 +615,7 @@ async function enterInlineMode(reason: 'spawn-failed' | 'handshake-timeout'): Pr
   }
   if (familyKey) {
     try {
-      await inlineExecutor('setKey', setKeyArgs() ?? { key: familyKey });
+      await inlineExecutor('setKey', setKeyArgs() ?? { key: familyKey, familyId: null });
     } catch (e) {
       console.error('[docClient] inline setKey re-drive failed', e);
     }
@@ -601,8 +664,7 @@ function logWorkerDeath(method: string, inFlight: number): void {
  * severity with the count, then the projection is re-pushed in full so the screen stops showing
  * data the document no longer holds. Never throws.
  */
-async function checkRehydratedHeads(): Promise<void> {
-  const acked = lastAckHeads;
+async function checkRehydratedHeads(acked: Heads | null, count: number): Promise<void> {
   if (!acked || acked.length === 0) return;
   try {
     const { has, loaded } = await request<{ has: boolean; loaded: boolean }>(
@@ -615,7 +677,7 @@ async function checkRehydratedHeads(): Promise<void> {
         level: 'info',
         surface: 'doc-worker-recovery',
         message: 'rehydrated document holds every acknowledged write',
-        context: { action: 'heads-intact', recovery_method: 'respawn', count: mutatesSinceFlush },
+        context: { action: 'heads-intact', recovery_method: 'respawn', count },
       });
       return;
     }
@@ -626,7 +688,7 @@ async function checkRehydratedHeads(): Promise<void> {
       context: {
         action: 'heads-regressed',
         recovery_method: 'respawn',
-        count: mutatesSinceFlush,
+        count,
         error_code: loaded ? 'behind' : 'no-document',
       },
     });
@@ -702,9 +764,13 @@ async function spawn(): Promise<'worker' | 'inline'> {
     // `finally` on BOTH the success and throw paths (the invariant the reset test
     // guards) — toggled nowhere else.
     rehydrating = true;
+    // Captured BEFORE the rehydrate: its `initAndLoadCache` is an install, which clears them.
+    const acked = lastAckHeads;
+    const ackedCount = mutatesSinceFlush;
     try {
       await rehydrator(currentFamilyId);
-      await checkRehydratedHeads(); // C12; inside the bypass, like the rehydrate's own RPCs
+      // C12; inside the bypass, like the rehydrate's own RPCs
+      await checkRehydratedHeads(acked, ackedCount);
     } catch (e) {
       reportRehydrateFailure('respawn', e);
     } finally {
@@ -1494,6 +1560,7 @@ export async function setFamilyKey(key: CryptoKey, familyId: string): Promise<vo
   // forget, and five places to remember forever; one required parameter is
   // compiler-enforced and a future sixth caller cannot omit it.
   familyKey = key;
+  familyKeyFamilyId = familyId || null;
   // Export ONCE, here, where a failure can still be handled. A non-extractable key (nothing
   // produces one today, but nothing stops a future path) leaves `familyKeyRaw` null and the
   // post falls back to the CryptoKey — today's behaviour, and correct everywhere but iOS.
@@ -1517,7 +1584,7 @@ export async function setFamilyKey(key: CryptoKey, familyId: string): Promise<vo
   // ⚠️ ACTOR BEFORE KEY: every doc-creating op is downstream of the key, so the
   // actor has to be in the realm before any of them can run.
   await request('setActor', { actor: docActor });
-  await request('setKey', setKeyArgs() ?? { key });
+  await request('setKey', setKeyArgs() ?? { key, familyId: familyKeyFamilyId });
 }
 
 /**
@@ -1527,20 +1594,26 @@ export async function setFamilyKey(key: CryptoKey, familyId: string): Promise<vo
  * decides whether the compaction goes ahead and flushes explicitly, so a failed
  * publish is recoverable rather than half-applied.
  */
-export function compactDoc(): Promise<{
+export async function compactDoc(): Promise<{
   beforeBytes: number;
   afterBytes: number;
   changesBefore: number;
   changesAfter: number;
   actorsBefore: number;
 }> {
-  return request('compactDoc') as Promise<{
+  const { heads, ...stats } = (await request('compactDoc')) as {
     beforeBytes: number;
     afterBytes: number;
     changesBefore: number;
     changesAfter: number;
     actorsBefore: number;
-  }>;
+    heads?: Heads;
+  };
+  // Round 3: a new lineage is installed. The anchor moves to it, or a respawn before the
+  // caller's flush would compare against pre-compaction heads and report `heads-regressed`.
+  lastAckHeads = heads ?? null;
+  mutatesSinceFlush = 0;
+  return stats;
 }
 
 /** Create a fresh empty document (create-family). Pushes the full projection. */
@@ -1557,8 +1630,19 @@ export async function initDoc(): Promise<{ loaded: true }> {
  * cache and the baseline that describes it can never be read out of step (C5). */
 export async function initAndLoadCache(familyId: string): Promise<InitAndLoadResult> {
   setCurrentFamily(familyId);
+  cacheReplayedCleanFor = null; // a load that throws proves nothing
   const res = await request<InitAndLoadResult>('initAndLoadCache', { familyId });
   if (res.replay) logCacheReplay(res.replay, familyId);
+  const r = res.replay;
+  cacheReplayedCleanFor =
+    res.loaded &&
+    r &&
+    r.droppedIncrements === 0 &&
+    r.missingDeps === 0 &&
+    !r.fenceGaveUp &&
+    !r.baseReseeded
+      ? familyId
+      : null;
   // Count only a reconstruction that actually HAPPENED. Counting the
   // `automerge.cacheLoad` perf label instead would over-count, because `time2`
   // emits from a `finally` — so a cache MISS (which does zero Automerge work) and
@@ -1576,40 +1660,87 @@ export async function initAndLoadCache(familyId: string): Promise<InitAndLoadRes
 
 /**
  * Report what a cache replay did (C5c, data-layer audit 2026-10-03). ON THE SUCCESS PATH TOO,
- * so the rate of damaged replays is measurable. `critical` (Slack) when work could not be
- * replayed: a dropped increment is an edit this device cannot show, and a missing dep is one
- * waiting on changes it does not hold. Both are KEPT on disk by the worker, which is why a
- * human needs to look rather than the device quietly carrying on.
+ * so the rate of damaged replays is measurable.
+ *
+ * Round 3: `critical` (Slack) only on the FIRST sighting of a damaged row (`newlyReported`,
+ * which the worker keeps in a marker row; a skipped row is quarantined and never comes back).
+ * A row already reported, a replaced base (`corruptBaseReplaced`: the live document became the
+ * cache, nothing was lost) and a stale-lineage cache are logged at `warn`, never paged.
  */
 function logCacheReplay(replay: CacheReplay, familyId: string): void {
   const detail =
     `recovered=${replay.recovered},dropped=${replay.droppedIncrements},` +
     `missing_deps=${replay.missingDeps},increments=${replay.incrementCount}` +
-    (replay.corruptBaseReplaced ? ',corrupt_base_replaced=true' : '');
+    (replay.quarantined ? `,quarantined=${replay.quarantined}` : '') +
+    (replay.newlyReported !== undefined ? `,new=${replay.newlyReported}` : '') +
+    (replay.fenceGaveUp ? ',fence_gave_up=true' : '') +
+    (replay.corruptBaseReplaced ? ',corrupt_base_replaced=true' : '') +
+    (replay.baseReseeded ? `,base_reseeded=${replay.baseReseeded}` : '');
   const context = {
     action: 'cache-replay',
     count: replay.incrementCount,
     detail,
     family_id: familyId,
   };
-  if (replay.droppedIncrements > 0 || replay.missingDeps > 0 || replay.corruptBaseReplaced) {
+  if (replay.lineageStale) {
+    logEvent({
+      level: 'warn',
+      surface: 'cache-replay',
+      message: 'cache held another lineage; kept the live document and superseded the cache',
+      context: { ...context, action: 'cache-lineage-stale' },
+    });
+    return;
+  }
+  if (replay.fenceGaveUp) {
+    // The decision itself, separately filterable from the damage report below.
+    logEvent({
+      level: 'warn',
+      surface: 'cache-replay',
+      message: 'missing-deps fence gave up; waiting rows quarantined and the base rewritten',
+      context: { ...context, action: 'fence-gave-up' },
+    });
+  }
+  const damaged = replay.droppedIncrements > 0 || replay.missingDeps > 0;
+  const errorCode =
+    replay.droppedIncrements > 0
+      ? 'dropped-increments'
+      : replay.missingDeps > 0
+        ? 'missing-deps'
+        : replay.baseReseeded
+          ? 'base-reseeded'
+          : 'corrupt-base-replaced';
+  // An older worker that does not report `newlyReported` keeps today's paging.
+  const firstSighting = damaged && (replay.newlyReported ?? 1) > 0;
+  if (firstSighting) {
     reportError({
       surface: 'cache-replay',
       message: 'cache replay could not apply every increment',
       severity: 'critical',
-      context: {
-        ...context,
-        error_code:
-          replay.droppedIncrements > 0
-            ? 'dropped-increments'
-            : replay.missingDeps > 0
-              ? 'missing-deps'
-              : 'corrupt-base-replaced',
-      },
+      context: { ...context, error_code: errorCode },
+    });
+    return;
+  }
+  if (damaged || replay.corruptBaseReplaced) {
+    logEvent({
+      level: 'warn',
+      surface: 'cache-replay',
+      message: damaged
+        ? 'cache replay still holds rows already reported'
+        : 'cache base replaced from the live document',
+      context: { ...context, error_code: errorCode },
     });
     return;
   }
   logEvent({ level: 'info', surface: 'cache-replay', message: 'cache replayed', context });
+}
+
+/**
+ * Round 3 (C5a): after the person chose the family file over an unreadable cache, delete that
+ * cache and re-seed it from the adopted document. Never throws for a blocked delete
+ * (`reseeded: false`); the caller logs the outcome.
+ */
+export function reseedCacheFromLiveDoc(familyId: string): Promise<{ reseeded: boolean }> {
+  return request('reseedCacheFromLiveDoc', { familyId }, { quiet: true });
 }
 
 /**
@@ -1823,8 +1954,9 @@ export async function mergeRemoteEnvelope(
   if (res.rebaseUnavailable) noteRebaseUnavailable(familyId, res.action, res.rebaseConflictKind);
   noteRemovedMembersCarried(res, familyId);
   // The worker installed a document for this family, so whatever we knew about
-  // an empty cache is stale. (`kept-local` too: it kept a document it holds.)
-  noteDocInstalled();
+  // an empty cache is stale. (`kept-local` too: it kept a document it holds.) A plain merge or
+  // a kept-local leaves every acknowledged write in the document, so the anchor stays.
+  noteDocInstalled({ keepAcks: res.action === 'merged' || res.action === 'kept-local' });
   // Resolved ⇒ the remote was decrypted and Automerge-loaded. A throw (corrupt
   // payload, worker timeout) is NOT a reconstruction and must not be counted.
   bumpOpenCycle('reconstruction');
@@ -2087,9 +2219,12 @@ export async function reset(): Promise<void> {
   setCurrentFamily(null);
   familyKey = null;
   familyKeyRaw = null;
+  familyKeyFamilyId = null;
   docActor = null;
   lastAckHeads = null;
   mutatesSinceFlush = 0;
+  projectionRepushes = 0;
+  projectionRepushCapLogged = false;
   releaseActorLease();
   await request('reset');
   // Clear the main-thread mirror too — a worker-only reset would leave a stale
@@ -2162,14 +2297,19 @@ export function __resetDocClientForTesting(): void {
   mode = 'worker';
   familyKey = null;
   familyKeyRaw = null;
+  familyKeyFamilyId = null;
   docActor = null;
   releaseActorLease();
   currentFamilyId = null;
   cacheProvenEmptyFor = null;
+  cacheReplayedCleanFor = null;
   lastAckHeads = null;
   mutatesSinceFlush = 0;
   projectionDirty = false;
   projectionRepushInFlight = false;
+  projectionFailureGen = 0;
+  projectionRepushes = 0;
+  projectionRepushCapLogged = false;
   needsRehydrate = false;
   rehydrating = false;
   inlineExecutor = null;

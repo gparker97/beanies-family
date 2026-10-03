@@ -197,6 +197,36 @@ describe('joinFamily claim fence (C10)', () => {
     );
   });
 
+  it("continues over the joiner's OWN earlier claim (their PIN opens the stored hash)", async () => {
+    // A previous attempt wrote this PIN and then failed (or the same person joins again).
+    h.members = [member({ pinHash: 'hash:123456' })];
+    h.projection.set('m-1', { id: 'm-1', pinHash: 'hash:123456' });
+
+    const result = await useAuthStore().joinFamily({
+      memberId: 'm-1',
+      pin: '123456',
+      familyId: 'fam-1',
+    });
+
+    expect(result.success).toBe(true);
+    expect(h.reportError).not.toHaveBeenCalledWith(
+      expect.objectContaining({ context: expect.objectContaining({ action: 'claim_conflict' }) })
+    );
+    expect(h.logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ context: { action: 'claim_own_earlier', stage: 'after-observe' } })
+    );
+  });
+
+  it('still refuses a password-claimed member, whatever the PIN', async () => {
+    h.members = [member({ passwordHash: 'hash:123456' })];
+    const result = await useAuthStore().joinFamily({
+      memberId: 'm-1',
+      pin: '123456',
+      familyId: 'fam-1',
+    });
+    expect(result).toMatchObject({ success: false, code: 'claim_conflict' });
+  });
+
   it('observes the remote BEFORE claiming an unclaimed member', async () => {
     h.members = [member()];
     const result = await useAuthStore().joinFamily({

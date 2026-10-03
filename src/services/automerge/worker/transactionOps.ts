@@ -14,7 +14,8 @@
  *    id is a retry: nothing is applied again.
  *  - `update`: patch the row; reverse + re-apply its effects ONLY when a money field changed
  *    (`MONEY_FIELDS`), keeping the stored derived fields otherwise.
- *  - `delete`: reverse the effects from the STORED derived fields, then delete the row.
+ *  - `delete`: reverse the effects from the STORED derived fields, then delete the row (a
+ *    `dedup` delete reverses only when Counter writes are on: see `TransactionCascadeArgs`).
  *
  * Pure + vue-free + main-thread-free, like `docOps`. Registered by `registerTransactionOps()`
  * from `applyAndProject.configure` (never at module load: `docOps` is a sibling in a possible
@@ -38,6 +39,7 @@ import {
   foldEntity,
   foldIndex,
   foldValue,
+  counterWritesOn,
   resolveField,
   sigma,
   type CounterIndex,
@@ -60,7 +62,18 @@ export type TransactionCascadeArgs =
       deleteKeys?: string[];
       updatedAt: string;
     }
-  | { mode: 'delete'; id: string };
+  | {
+      mode: 'delete';
+      id: string;
+      /**
+       * The recurring duplicate sweep. Whether a merge-born duplicate's effects SURVIVED the
+       * merge depends on how they were written: as Counters (writes on) both forks'
+       * increments land and the duplicate must be reversed; as absolutes (the dormant build)
+       * the two forks' sets collapse to ONE by last-writer-wins, so the balance moved once
+       * and reversing would undo the survivor. The worker decides from `counterWritesOn()`.
+       */
+      dedup?: boolean;
+    };
 
 /** A reference the cascade could not honour because the entity is absent from the document. */
 export interface CascadeSkip {
@@ -79,6 +92,8 @@ export interface TransactionCascadeResult {
   goals: Goal[];
   assets: Asset[];
   skipped: CascadeSkip[];
+  /** `delete` only: whether the row's effects were reversed (a dormant dedup removes the row only). */
+  reversed?: boolean;
 }
 
 /** The fields whose change moves money: an edit touching none of these patches the row only. */
@@ -93,8 +108,19 @@ export const MONEY_FIELDS: readonly (keyof Transaction)[] = [
   'goalAllocMode',
   'goalAllocValue',
   'loanId',
-  'recurringItemId', // decides amortisation vs extra payment
 ];
+
+/**
+ * `recurringItemId` decides amortisation (linked) vs extra payment (one-time), so it moves
+ * money only when its TRUTHINESS changes. A relink to another item id keeps the same
+ * arithmetic, and reversing + re-amortising would recompute the portions on today's balance.
+ */
+function recurringLinkFlipped(before: AnyRecord, after: AnyRecord): boolean {
+  return !!before.recurringItemId !== !!after.recurringItemId;
+}
+
+/** Name of the args-validation error, matched by the recurring processor (crosses the wire). */
+export const CASCADE_ARGS_ERROR = 'CascadeArgsError';
 
 /** Owned by the cascade: computed here, never accepted from a patch. */
 const DERIVED_FIELDS = ['goalAllocApplied', 'loanInterestPortion', 'loanPrincipalPortion'] as const;
@@ -122,7 +148,8 @@ const TRANSACTION_TYPES = new Set(['income', 'expense', 'transfer', 'balance_adj
 
 /** A malformed shape is a programming error on main: throw, never half-apply a money write. */
 function parseArgs(args: Record<string, unknown>): TransactionCascadeArgs {
-  const fail = (why: string): Error => new Error(`commitTransactionCascade: ${why}`);
+  const fail = (why: string): Error =>
+    Object.assign(new Error(`commitTransactionCascade: ${why}`), { name: CASCADE_ARGS_ERROR });
   const { mode } = args;
   if (mode === 'create') {
     const tx = args.transaction;
@@ -148,7 +175,7 @@ function parseArgs(args: Record<string, unknown>): TransactionCascadeArgs {
   }
   if (mode === 'delete') {
     if (!isNonEmptyString(args.id)) throw fail('`id` must be a non-empty string.');
-    return { mode, id: args.id };
+    return { mode, id: args.id, ...(args.dedup === true ? { dedup: true } : {}) };
   }
   throw fail(`unknown mode ${String(mode)}.`);
 }
@@ -167,6 +194,8 @@ function loanHost(loan: LoanDetails): { collection: 'assets' | 'accounts'; field
  */
 class Cascade {
   private readonly touched = new Map<string, { collection: CollectionName; id: string }>();
+  /** Goals this cascade reversed an allocation on: the re-apply skips the completed gate. */
+  private readonly reversedGoals = new Set<string>();
   readonly skipped: CascadeSkip[] = [];
   private readonly now = nowIso();
   private readonly draft: FamilyDocument;
@@ -283,7 +312,10 @@ class Cascade {
       this.skipped.push({ kind: 'goal', id: tx.goalId });
       return 0;
     }
-    if (goal.isCompleted) return 0;
+    // The completed gate stops a NEW allocation to a finished goal. It must not stop the
+    // re-apply of an edit: the allocation this cascade just reversed is the one that may have
+    // completed the goal, and `contributeToGoal` never clears `isCompleted` on the way down.
+    if (goal.isCompleted && !this.reversedGoals.has(tx.goalId)) return 0;
     const raw = computeGoalAllocRaw(tx.goalAllocMode, tx.goalAllocValue, tx.amount);
     const { folded } = this.foldedGoalAmount(goal, tx.goalId);
     const applied = Math.min(raw, Math.max(0, goal.targetAmount - folded));
@@ -383,6 +415,7 @@ class Cascade {
     this.applyBalances(stored, -1);
     if (stored.goalId && stored.goalAllocApplied) {
       this.contributeToGoal(stored.goalId, -stored.goalAllocApplied);
+      this.reversedGoals.add(stored.goalId);
     }
     this.reverseLoan(stored);
   }
@@ -444,7 +477,7 @@ const commitTransactionCascadeOp: NamedOpHandler = (draft, rawArgs, { writerId }
   const index = foldIndex(draft);
   const cascade = new Cascade(draft, writerId, index);
 
-  const finish = (found: boolean, id: string): ReturnType<NamedOpHandler> => {
+  const finish = (found: boolean, id: string, reversed?: boolean): ReturnType<NamedOpHandler> => {
     const live = rows[id];
     const transaction = live === undefined ? undefined : (toPlain(live) as unknown as Transaction);
     const echo = cascade.echoes();
@@ -459,6 +492,7 @@ const commitTransactionCascadeOp: NamedOpHandler = (draft, rawArgs, { writerId }
       goals: echo.goals,
       assets: echo.assets,
       skipped: cascade.skipped,
+      ...(reversed !== undefined ? { reversed } : {}),
     };
     return { result, deltas: [rowDelta, ...echo.deltas] };
   };
@@ -478,9 +512,10 @@ const commitTransactionCascadeOp: NamedOpHandler = (draft, rawArgs, { writerId }
     case 'delete': {
       const live = rows[args.id];
       if (live === undefined) return finish(false, args.id);
-      cascade.reverseEffects(toPlain(live) as unknown as Transaction);
+      const reverse = !args.dedup || counterWritesOn();
+      if (reverse) cascade.reverseEffects(toPlain(live) as unknown as Transaction);
       delete rows[args.id];
-      return finish(true, args.id);
+      return finish(true, args.id, reverse);
     }
     case 'update': {
       const live = rows[args.id];
@@ -494,9 +529,9 @@ const commitTransactionCascadeOp: NamedOpHandler = (draft, rawArgs, { writerId }
       const before = toPlain(live) as unknown as Transaction;
       const after: AnyRecord = { ...(before as unknown as AnyRecord), ...patch };
       for (const k of deleteKeys) delete after[k];
-      const moneyChanged = MONEY_FIELDS.some(
-        (f) => !canonicalEqual((before as unknown as AnyRecord)[f], after[f])
-      );
+      const moneyChanged =
+        MONEY_FIELDS.some((f) => !canonicalEqual((before as unknown as AnyRecord)[f], after[f])) ||
+        recurringLinkFlipped(before as unknown as AnyRecord, after);
 
       if (moneyChanged) {
         cascade.reverseEffects(before);

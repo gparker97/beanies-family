@@ -149,4 +149,64 @@ describe('photoUploadQueue', () => {
     setActiveFamily(FAMILY_ID);
     expect(await getPending()).toHaveLength(1);
   });
+
+  // Round 3: a drain belongs to ONE family, from start to finish.
+  describe('family safety', () => {
+    const OTHER = 'fam-queue-other';
+    afterEach(async () => {
+      await deletePhotoQueueDatabase(OTHER);
+    });
+
+    it('hands each entry the family the drain started for', async () => {
+      await enqueueUpload(makeEntry());
+      const handler = vi.fn(async () => {});
+      setFlushHandler(handler);
+      await flushQueue();
+      expect(handler).toHaveBeenCalledWith(expect.objectContaining({}), FAMILY_ID);
+    });
+
+    it('stops before the next entry when the active family changed mid-drain', async () => {
+      await enqueueUpload(makeEntry({ entityId: 'a1' }));
+      await enqueueUpload(makeEntry({ entityId: 'a2' }));
+      const handler = vi.fn(async () => {
+        // The person switches family while the first upload is running.
+        setActiveFamily(OTHER);
+      });
+      setFlushHandler(handler);
+      await flushQueue();
+      expect(handler).toHaveBeenCalledTimes(1);
+      // The finished entry was removed from the CAPTURED family's queue; the other stays there.
+      setActiveFamily(FAMILY_ID);
+      expect(await getPending()).toHaveLength(1);
+      // Nothing leaked into the other family's queue.
+      setActiveFamily(OTHER);
+      expect(await getPending()).toHaveLength(0);
+    });
+
+    it('single-flight is per family: a flush for a new family is not joined to the old drain', async () => {
+      await enqueueUpload(makeEntry());
+      let release!: () => void;
+      const gate = new Promise<void>((r) => (release = r));
+      const seen: string[] = [];
+      let started!: () => void;
+      const handlerStarted = new Promise<void>((r) => (started = r));
+      setFlushHandler(async (_e, familyId) => {
+        seen.push(familyId);
+        if (familyId === FAMILY_ID) {
+          started();
+          await gate;
+        }
+      });
+      const first = flushQueue();
+      await handlerStarted; // the old family's drain is mid-entry
+      setActiveFamily(OTHER);
+      await enqueueUpload(makeEntry());
+      const second = flushQueue();
+      expect(second).not.toBe(first);
+      await second;
+      release();
+      await first;
+      expect(seen.sort()).toEqual([FAMILY_ID, OTHER].sort());
+    });
+  });
 });

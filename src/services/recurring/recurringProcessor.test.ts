@@ -3,6 +3,7 @@ import {
   processRecurringItems,
   deduplicateRecurringTransactions,
   projectRecurringTransactions,
+  __resetRecurringFailureCountsForTesting,
 } from './recurringProcessor';
 import type { RecurringItem, Account, Transaction, CreateTransactionInput } from '@/types/models';
 import type { TransactionCascadeResult } from '@/services/automerge/repositories/transactionRepository';
@@ -86,9 +87,10 @@ function echoCreate(input: CreateTransactionInput): TransactionCascadeResult {
     skipped: [],
   };
 }
-const echoDelete = (found = true): TransactionCascadeResult => ({
+const echoDelete = (found = true, reversed = true): TransactionCascadeResult => ({
   mode: 'delete',
   found,
+  reversed,
   accounts: [],
   goals: [],
   assets: [],
@@ -229,6 +231,7 @@ describe('recurringProcessor - the cursor stops at the first failure (audit C7)'
 
   beforeEach(() => {
     vi.clearAllMocks();
+    __resetRecurringFailureCountsForTesting();
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2024-10-15T12:00:00.000Z'));
     arm([salary]);
@@ -261,10 +264,81 @@ describe('recurringProcessor - the cursor stops at the first failure (audit C7)'
         surface: 'recurring-processor',
         message: 'recurring-cascade-failed',
         severity: 'error',
-        context: { recur_surface: 'transaction', action: 'create' },
+        context: { recur_surface: 'transaction', action: 'create', consecutive_failures: 1 },
       })
     );
     consoleError.mockRestore();
+  });
+
+  it('an args-validation refusal is SKIPPED (logged) and the cursor advances past it', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.mocked(transactionRepo.createTransactionCascade).mockImplementation(async (input) => {
+      // As it arrives on main from the worker: an unregistered name rides in the message.
+      if (input.date === '2024-09-15') {
+        throw new Error(
+          'CascadeArgsError: commitTransactionCascade: `transaction.amount` must be a finite number.'
+        );
+      }
+      return echoCreate(input);
+    });
+
+    const result = await processRecurringItems();
+
+    expect(result.errors).toEqual([]);
+    expect(sentInputs().map((i) => i.date)).toEqual(['2024-08-15', '2024-09-15', '2024-10-15']);
+    expect(recurringRepo.updateLastProcessedDate).toHaveBeenCalledWith(
+      'recurring-cursor',
+      '2024-10-15'
+    );
+    expect(reportError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'recurring-cascade-invalid',
+        context: { recur_surface: 'transaction', action: 'skip-invalid' },
+      })
+    );
+  });
+
+  it('a transient failure stops the cursor; the third consecutive one skips the date with a critical report', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.mocked(transactionRepo.createTransactionCascade).mockRejectedValue(new Error('worker down'));
+
+    await processRecurringItems();
+    await processRecurringItems();
+    expect(recurringRepo.updateLastProcessedDate).not.toHaveBeenCalled();
+    expect(reportError).not.toHaveBeenCalledWith(expect.objectContaining({ severity: 'critical' }));
+
+    // Third run: the July 15 cursor's first due date (Aug 15) gives up and is skipped; the
+    // following dates are then attempted (and fail once each, stopping at Sep 15).
+    await processRecurringItems();
+    expect(reportError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'recurring-cascade-gave-up',
+        severity: 'critical',
+        context: {
+          recur_surface: 'transaction',
+          action: 'skip-after-retries',
+          consecutive_failures: 3,
+        },
+      })
+    );
+    expect(recurringRepo.updateLastProcessedDate).toHaveBeenCalledWith(
+      'recurring-cursor',
+      '2024-08-15'
+    );
+  });
+
+  it('a success resets the consecutive-failure count', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.mocked(transactionRepo.createTransactionCascade).mockRejectedValue(new Error('worker down'));
+    await processRecurringItems();
+    await processRecurringItems();
+    vi.mocked(transactionRepo.createTransactionCascade).mockImplementation(async (input) =>
+      echoCreate(input)
+    );
+    await processRecurringItems();
+    vi.mocked(transactionRepo.createTransactionCascade).mockRejectedValue(new Error('worker down'));
+    await processRecurringItems();
+    expect(reportError).not.toHaveBeenCalledWith(expect.objectContaining({ severity: 'critical' }));
   });
 
   it('does not touch the cursor when the FIRST due date fails', async () => {
@@ -339,14 +413,23 @@ describe('deduplicateRecurringTransactions', () => {
     const deleted = await deduplicateRecurringTransactions();
 
     expect(deleted).toBe(2);
-    expect(transactionRepo.deleteTransactionCascade).toHaveBeenCalledWith('tx-2');
-    expect(transactionRepo.deleteTransactionCascade).toHaveBeenCalledWith('tx-3');
-    expect(transactionRepo.deleteTransactionCascade).not.toHaveBeenCalledWith('tx-1');
+    // `dedup`: the worker decides whether the duplicate's effects survived the merge.
+    expect(transactionRepo.deleteTransactionCascade).toHaveBeenCalledWith('tx-2', { dedup: true });
+    expect(transactionRepo.deleteTransactionCascade).toHaveBeenCalledWith('tx-3', { dedup: true });
+    expect(transactionRepo.deleteTransactionCascade).not.toHaveBeenCalledWith(
+      'tx-1',
+      expect.anything()
+    );
     expect(logEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         level: 'info',
         surface: 'recurring-dedup',
-        context: { recur_surface: 'transaction', action: 'complete', perf_entity_count: 2 },
+        context: {
+          recur_surface: 'transaction',
+          action: 'complete',
+          detail: 'reversed',
+          perf_entity_count: 2,
+        },
       })
     );
   });
@@ -374,7 +457,12 @@ describe('deduplicateRecurringTransactions', () => {
       expect.objectContaining({
         level: 'warn',
         surface: 'recurring-dedup',
-        context: { recur_surface: 'transaction', action: 'partial', perf_entity_count: 1 },
+        context: {
+          recur_surface: 'transaction',
+          action: 'partial',
+          detail: 'reversed',
+          perf_entity_count: 1,
+        },
       })
     );
   });
@@ -506,7 +594,9 @@ describe('recurringProcessor - a row that stands for a due date (#107)', () => {
       { ...existing('2024-01-28', false), id: 'device-b', createdAt: '2024-01-28T00:00:00.000Z' },
     ]);
     expect(await deduplicateRecurringTransactions()).toBe(1);
-    expect(transactionRepo.deleteTransactionCascade).toHaveBeenCalledWith('device-b');
+    expect(transactionRepo.deleteTransactionCascade).toHaveBeenCalledWith('device-b', {
+      dedup: true,
+    });
   });
 
   it('keeps the original same-date rule', async () => {

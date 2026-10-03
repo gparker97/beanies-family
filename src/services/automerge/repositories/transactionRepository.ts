@@ -88,10 +88,17 @@ export async function updateTransactionCascade(
   });
 }
 
-/** Delete a transaction, reversing its effects from the STORED derived fields, in one change. */
-export async function deleteTransactionCascade(id: string): Promise<TransactionCascadeResult> {
+/**
+ * Delete a transaction, reversing its effects from the STORED derived fields, in one change.
+ * `dedup` (the recurring duplicate sweep) lets the worker skip the reversal on the dormant
+ * build, where a merge-born duplicate's absolute writes collapsed into one (see the op).
+ */
+export async function deleteTransactionCascade(
+  id: string,
+  opts: { dedup?: boolean } = {}
+): Promise<TransactionCascadeResult> {
   if (!projectionGetById('transactions', id)) return notFound('delete');
-  return commitCascade({ mode: 'delete', id });
+  return commitCascade({ mode: 'delete', id, ...(opts.dedup ? { dedup: true } : {}) });
 }
 
 export async function getTransactionsByAccountId(accountId: string): Promise<Transaction[]> {

@@ -9,8 +9,20 @@ import { hasUnsavedWork, type UnsavedWorkReport } from '@/services/auth/unsavedW
 import { useTranslationStore } from '@/stores/translationStore';
 import { logEvent } from '@/services/telemetry';
 
-/** Where a destructive delete was about to run, for the decision log and the copy. */
-export type DiscardSite = 'sign-out-clear' | 'clear-data' | 'forget-family' | 'delete-family';
+/**
+ * Where a destructive delete was about to run, for the decision log and the copy. `sign-out`
+ * is the untrusted keep-data sign-out, which asks about its queued photos only (round 3).
+ */
+export type DiscardSite =
+  'sign-out' | 'sign-out-clear' | 'clear-data' | 'forget-family' | 'delete-family';
+
+const MESSAGE_FOR_SITE = {
+  'sign-out': 'auth.unsavedPhotosSignOutMessage',
+  'sign-out-clear': 'auth.unsavedMessage',
+  'clear-data': 'auth.unsavedMessage',
+  'forget-family': 'auth.unsavedForgetMessage',
+  'delete-family': 'auth.unsavedMessage',
+} as const satisfies Record<DiscardSite, string>;
 
 /**
  * The ONE "this delete would lose unsaved work" decision (C6), shared by the sign-out
@@ -50,7 +62,7 @@ export async function confirmDiscardUnsavedWork(
   if (report.unknown) parts.push(t('auth.unsavedUnknown'));
   const discard = await confirm({
     title: 'auth.unsavedTitle',
-    message: site === 'forget-family' ? 'auth.unsavedForgetMessage' : 'auth.unsavedMessage',
+    message: MESSAGE_FOR_SITE[site],
     detail: parts.join(' '),
     detailTone: 'caution',
     variant: 'danger',

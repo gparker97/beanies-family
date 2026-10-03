@@ -205,7 +205,8 @@ watch(
       photoStore.deactivate();
       return;
     }
-    void photoStore.activate(familyId);
+    // Never an unhandled rejection: a failed activation is logged (`activate-failed`).
+    photoStore.activateInBackground(familyId);
   },
   { immediate: true }
 );

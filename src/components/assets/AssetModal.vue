@@ -12,6 +12,7 @@ import BaseInput from '@/components/ui/BaseInput.vue';
 import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import { BaseCombobox } from '@/components/ui';
 import { useFamilyStore } from '@/stores/familyStore';
+import { useAssetsStore } from '@/stores/assetsStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFormModal } from '@/composables/useFormModal';
@@ -44,6 +45,7 @@ const emit = defineEmits<{
 
 const { t } = useTranslation();
 const familyStore = useFamilyStore();
+const assetsStore = useAssetsStore();
 const settingsStore = useSettingsStore();
 const { options: institutionOptions, removeCustomInstitution } = useInstitutionOptions();
 const countryOptions = COUNTRIES.map((c) => ({ value: c.code, label: c.name }));
@@ -230,34 +232,29 @@ async function handleRemoveCustomInstitution(instName: string) {
 }
 
 /**
- * `loan` is diffed one level deep against the open-time snapshot, so a payment that lands while
- * the modal is open (the repository reads the live base at save time) is never overwritten by
- * the stale `outstandingBalance` the form opened with. A sub-key absent from the patch is left
- * untouched by the worker. Creating a loan (none at open) or removing one (`hasLoan: false`)
- * sends the whole object. A CLEARED sub-key cannot travel in a nested patch (undefined is
- * dropped), so that case sends the whole object with every untouched sub-key taken from the
- * live asset rather than the open-time form value.
+ * `loan` is a MERGE field whose reconcile base is the WHOLE live loan, so a partial
+ * `{ loan: { interestRate } }` reads as "every other sub-key was cleared" and wipes the loan.
+ * The edit therefore always sends the whole loan, built from the LIVE asset at save time
+ * (the store, not the open-time snapshot the page handed in) with only the sub-keys the
+ * person changed since the form opened overlaid. Untouched sub-keys then equal the base and
+ * are not written, so a payment that landed while the modal was open keeps its balance.
+ * Creating a loan (none at open) or removing one (`hasLoan: false`) sends the form's object.
+ * `undefined` = nothing changed: no loan key at all.
  */
-function loanChanges(next: AssetLoan): AssetLoan | Partial<AssetLoan> | undefined {
+function loanForSave(next: AssetLoan): AssetLoan | undefined {
   const opened = openLoan as unknown as Record<string, unknown> | null;
   if (!opened?.hasLoan || !next.hasLoan) return next;
   const nextRec = next as unknown as Record<string, unknown>;
-  const changed: Record<string, unknown> = {};
-  let cleared = false;
+  const liveAsset = props.asset ? assetsStore.getAssetById(props.asset.id) : undefined;
+  const whole: Record<string, unknown> = { ...((liveAsset ?? props.asset)?.loan ?? {}) };
+  let changed = false;
   for (const k of new Set([...Object.keys(opened), ...Object.keys(nextRec)])) {
     if (opened[k] === nextRec[k]) continue;
-    if (nextRec[k] === undefined) cleared = true;
-    else changed[k] = nextRec[k];
+    changed = true;
+    if (nextRec[k] === undefined) delete whole[k];
+    else whole[k] = nextRec[k];
   }
-  if (cleared) {
-    const live = (props.asset?.loan ?? {}) as Record<string, unknown>;
-    const whole: Record<string, unknown> = { ...nextRec };
-    for (const k of Object.keys(nextRec)) {
-      if (!(k in changed) && live[k] !== undefined) whole[k] = live[k];
-    }
-    return whole as unknown as AssetLoan;
-  }
-  return Object.keys(changed).length ? (changed as Partial<AssetLoan>) : undefined;
+  return changed ? (whole as unknown as AssetLoan) : undefined;
 }
 
 async function handleSave() {
@@ -272,8 +269,8 @@ async function handleSave() {
     if (isEditing.value && props.asset) {
       const changes = formDiff.changes(data) as UpdateAssetInput;
       if (changes.loan) {
-        const loan = loanChanges(data.loan);
-        if (loan) changes.loan = loan as AssetLoan;
+        const loan = loanForSave(data.loan);
+        if (loan) changes.loan = loan;
         else delete changes.loan;
       }
       emit('save', { id: props.asset.id, data: changes });

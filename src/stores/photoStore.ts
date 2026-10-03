@@ -282,6 +282,24 @@ export const usePhotoStore = defineStore('photos', () => {
     }
   }
 
+  /**
+   * `activate` for a caller that cannot await it (App.vue's family watcher). Never an
+   * unhandled rejection: a failed activation (the queue database would not open) leaves the
+   * queue put, to drain on the next activation or `online` event, and is logged so a family
+   * whose photos never drain is visible in the firehose.
+   */
+  function activateInBackground(familyId: string): void {
+    activate(familyId).catch((e) => {
+      logEvent({
+        level: 'warn',
+        surface: 'photo-upload-flush',
+        message: 'photo queue activation failed',
+        error: e,
+        context: { action: 'activate-failed' },
+      });
+    });
+  }
+
   function deactivate(): void {
     activeFamilyId.value = null;
     clearQueueFamily();
@@ -388,6 +406,8 @@ export const usePhotoStore = defineStore('photos', () => {
       throw new Error('photoStore: cloud sync is required to attach photos.');
     }
 
+    // The family this photo belongs to, captured before any await (round 3).
+    const familyId = familyContextStore.activeFamilyId;
     const photoId = crypto.randomUUID();
 
     // Two kinds flow through this one path:
@@ -456,7 +476,7 @@ export const usePhotoStore = defineStore('photos', () => {
     // queue's flushHandler IS finalizeUpload, so retry semantics are
     // identical to a fresh offline-queued entry.
     try {
-      await finalizeUpload(payload);
+      await finalizeUpload(payload, { familyId });
       return { photoId, status: 'completed' };
     } catch (e) {
       if (!isTransientUploadError(e)) {
@@ -589,8 +609,11 @@ export const usePhotoStore = defineStore('photos', () => {
    */
   async function finalizeUpload(
     payload: Omit<QueuedPhotoUpload, 'id' | 'createdAt'>,
-    opts: { fromQueue?: boolean } = {}
+    opts: { fromQueue?: boolean; familyId: string | null }
   ): Promise<void> {
+    // Round 3: the upload belongs to ONE family. A queued entry drained after a switch (or a
+    // direct upload that outlived one) must never land in another family's doc or folder.
+    assertActiveFamily(opts.familyId, 'start');
     const already = photos.value[payload.photoId];
     if (already?.driveFileId) {
       await mutate({
@@ -613,7 +636,18 @@ export const usePhotoStore = defineStore('photos', () => {
     const token = await requestAccessToken();
     let fileId: string | null = null;
     if (opts.fromQueue) {
-      const found = await listFilesInFolder(token, folderId, payload.filename).catch(() => []);
+      // The reuse lookup is what stops a retry creating a second file. If it fails the entry
+      // must stay queued (rethrow), never fall through to a fresh create.
+      const found = await listFilesInFolder(token, folderId, payload.filename).catch((e) => {
+        photoEvent(
+          'photo-upload',
+          'warn',
+          'reuse lookup failed; the entry stays queued',
+          { action: 'finalize-reuse-lookup-failed', http_status: httpStatus(e) },
+          e
+        );
+        throw e;
+      });
       fileId = found.find((f) => f.name === payload.filename)?.id ?? null;
       if (fileId) {
         photoEvent('photo-upload', 'info', 'finalize reused the file a prior attempt created', {
@@ -638,6 +672,10 @@ export const usePhotoStore = defineStore('photos', () => {
     // itself. See ADR-021 "public-link access" section. Failure is
     // non-fatal — the file is uploaded; the migration sweep will retry.
     await grantPublicLink(token, fileId, 'upload');
+    // The Drive work took real time: re-check before the doc write. No rollback on a
+    // mismatch: the file sits in the uploading family's folder, where that family's next
+    // drain reuses it (the deterministic filename lookup above).
+    assertActiveFamily(opts.familyId, 'before-write');
 
     try {
       const now = new Date().toISOString();
@@ -677,14 +715,7 @@ export const usePhotoStore = defineStore('photos', () => {
       // Rollback — but only when the record is genuinely absent. A rejected `mutate` can be a
       // late reply on a write the worker already committed (C12); deleting the file then would
       // leave a live record pointing at nothing, which is the one loss worse than an orphan.
-      const landed = projectionGetById('photos', payload.photoId) as PhotoAttachment | undefined;
-      if (landed?.driveFileId === fileId) {
-        photoEvent('photo-upload', 'warn', 'doc write rejected after the record landed; kept', {
-          action: 'rollback-skipped-record-present',
-        });
-      } else {
-        await rollbackDriveFile(token, fileId, 'photo-upload');
-      }
+      await rollbackUnlessRecorded(token, payload.photoId, fileId, 'photo-upload');
       throw writeErr;
     }
 
@@ -693,10 +724,72 @@ export const usePhotoStore = defineStore('photos', () => {
     unresolvedIds.value.delete(payload.photoId);
   }
 
-  /** The photoUploadQueue flush handler — finalizes a queued entry. */
-  async function handleQueuedUpload(entry: QueuedPhotoUpload): Promise<void> {
-    await finalizeUpload(entry, { fromQueue: true });
+  /** The photoUploadQueue flush handler — finalizes a queued entry for the family it drains. */
+  async function handleQueuedUpload(entry: QueuedPhotoUpload, familyId: string): Promise<void> {
+    await finalizeUpload(entry, { fromQueue: true, familyId });
     await refreshPending();
+  }
+
+  /** Throw (logged) when `familyId` is not the family open now; the caller's work stops. */
+  function assertActiveFamily(familyId: string | null, stage: string): void {
+    const active = familyContextStore.activeFamilyId;
+    if (familyId && familyId === active) return;
+    photoEvent('photo-upload', 'warn', 'finalize refused: not the active family', {
+      action: 'finalize-family-mismatch',
+      stage,
+    });
+    throw new Error('photoStore: the upload belongs to a family that is not open');
+  }
+
+  /**
+   * Is `fileId` the file the WORKER doc's record for `photoId` names? Read through the worker
+   * (an empty, skip-on-missing patch writes nothing and echoes the stored record), never the
+   * projection: a rejected `mutate` can be a late reply on a write the worker already
+   * committed, whose delta the projection has not seen. `null` when the doc cannot be read.
+   */
+  async function workerRecordNames(photoId: string, fileId: string): Promise<boolean | null> {
+    try {
+      const stored = await mutate<PhotoAttachment | undefined>(
+        { op: 'patch', collection: 'photos', id: photoId, patch: {}, onMissing: 'skip' },
+        { quiet: true }
+      );
+      return stored?.driveFileId === fileId;
+    } catch (e) {
+      photoEvent(
+        'photo-upload',
+        'warn',
+        'could not re-read the record before a rollback',
+        {
+          action: 'rollback-read-failed',
+        },
+        e
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Rollback for a failed doc write: delete the just-created Drive file ONLY when the worker
+   * doc provably does not name it. Present → kept (deleting would leave a live record pointing
+   * at nothing). Unreadable → kept too: an orphan file is the lesser loss, and GC reclaims it.
+   */
+  async function rollbackUnlessRecorded(
+    token: string,
+    photoId: string,
+    fileId: string,
+    surface: 'photo-upload' | 'photo-replace'
+  ): Promise<void> {
+    const named = await workerRecordNames(photoId, fileId);
+    if (named === false) {
+      await rollbackDriveFile(token, fileId, surface);
+      return;
+    }
+    photoEvent(
+      surface,
+      'warn',
+      named ? 'doc write rejected after the record landed; kept' : 'rollback skipped: unverified',
+      { action: named ? 'rollback-skipped-record-present' : 'rollback-skipped-unverified' }
+    );
   }
 
   // --- URL resolution --------------------------------------------------
@@ -926,8 +1019,7 @@ export const usePhotoStore = defineStore('photos', () => {
       if (createdBy) record.createdBy = createdBy;
       await mutate({ op: 'set', collection: 'photos', id: photoId, entity: record });
     } catch (writeErr) {
-      const landed = projectionGetById('photos', photoId) as PhotoAttachment | undefined;
-      if (landed?.driveFileId !== fileId) await rollbackDriveFile(token, fileId, 'photo-upload');
+      await rollbackUnlessRecorded(token, photoId, fileId, 'photo-upload');
       throw writeErr;
     }
 
@@ -986,10 +1078,7 @@ export const usePhotoStore = defineStore('photos', () => {
       });
     } catch (writeErr) {
       // The record still names the previous file, so the NEW upload is the orphan.
-      const landed = projectionGetById('photos', photoId) as PhotoAttachment | undefined;
-      if (landed?.driveFileId !== newDriveFileId) {
-        await rollbackDriveFile(token, newDriveFileId, 'photo-replace');
-      }
+      await rollbackUnlessRecorded(token, photoId, newDriveFileId, 'photo-replace');
       throw writeErr;
     }
 
@@ -1331,6 +1420,7 @@ export const usePhotoStore = defineStore('photos', () => {
     pendingUploads,
     // lifecycle
     activate,
+    activateInBackground,
     deactivate,
     // actions
     addPhoto,

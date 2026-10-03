@@ -473,24 +473,114 @@ export const useSyncStore = defineStore('sync', () => {
    * an envelope/provider family mismatch, but the worker's document carries no family id
    * that check could compare, so the hold is what closes the window.
    *
-   * Returns the release (a no-op for a same-family decrypt) and whether it was
-   * cross-family, so the caller clears the old envelope before installing the new one.
+   * Returns whether it was cross-family (the caller clears the old envelope before installing
+   * the new one) and three steps (round 3):
+   *  - `postKey(fk, famId)` posts the new key to the worker. Cross-family, it first AWAITS any
+   *    save or merge already running (`syncService.whenIdle`), so nothing started under the old
+   *    family reaches the worker after the swap; the hold epoch aborts a straggler anyway.
+   *  - `succeeded()` releases the hold once provider and envelope name the new family.
+   *  - `finish()` (every exit): when the key was swapped and the decrypt did NOT succeed, the
+   *    previous family is put back (key, cache and document, envelope) BEFORE the hold
+   *    releases. If that restore fails the hold stays latched, the fatal overlay is raised and
+   *    the page reloads, so neither family's document can be saved through the wrong file.
    */
   function beginPendingDecrypt(pending: NonNullable<(typeof pendingEncryptedFile)['value']>): {
     crossFamily: boolean;
-    release: () => void;
+    postKey: (fk: CryptoKey, famId: string) => Promise<void>;
+    succeeded: () => void;
+    finish: () => Promise<void>;
   } {
     const incoming = pending.envelope.familyId;
     const held = authoritativeEnvelope()?.familyId ?? syncService.getProviderFamilyId();
     const crossFamily = !!incoming && !!held && incoming !== held;
-    if (!crossFamily) return { crossFamily: false, release: () => {} };
+    if (!crossFamily) {
+      return {
+        crossFamily: false,
+        postKey: (fk, famId) => docClient.setFamilyKey(fk, famId),
+        succeeded: () => {},
+        finish: async () => {},
+      };
+    }
     logEvent({
       level: 'info',
       surface: 'sync-envelope',
       message: 'cross-family decrypt: saves held, envelope will be cleared',
       context: { action: 'cross-family-decrypt' },
     });
-    return { crossFamily: true, release: syncService.holdSaves('cross-family-decrypt') };
+    const release = syncService.holdSaves('cross-family-decrypt');
+    const previous = { key: familyKey.value, familyId: held, envelope: envelope.value };
+    let keySwapped = false;
+    let done = false;
+    return {
+      crossFamily: true,
+      postKey: async (fk, famId) => {
+        await syncService.whenIdle();
+        keySwapped = true; // before the post: a throw inside it may already have swapped
+        await docClient.setFamilyKey(fk, famId);
+      },
+      succeeded: () => {
+        done = true;
+        release();
+      },
+      finish: async () => {
+        if (done) return;
+        done = true;
+        if (keySwapped && !(await restorePreviousFamily(previous))) return; // latched
+        release();
+      },
+    };
+  }
+
+  /**
+   * Put the previous family back in the worker after a cross-family decrypt failed past its
+   * key swap (round 3). Answers whether it worked; on failure it raises the fatal overlay and
+   * reloads, and the caller keeps the save hold latched. Never throws.
+   */
+  async function restorePreviousFamily(prev: {
+    key: CryptoKey | null;
+    familyId: string | null;
+    envelope: BeanpodFileV4 | null;
+  }): Promise<boolean> {
+    try {
+      if (!prev.key || !prev.familyId) throw new Error('no previous family key to restore');
+      await docClient.setFamilyKey(prev.key, prev.familyId);
+      const res = await docClient.initAndLoadCache(prev.familyId);
+      // A miss leaves the failed family's document installed: that is not a restore.
+      if (!res.loaded) throw new Error('previous family cache did not load');
+      familyKey.value = prev.key;
+      if (prev.envelope) {
+        envelope.value = prev.envelope;
+        syncService.setFamilyKey(prev.key, prev.envelope);
+      }
+      logEvent({
+        level: 'info',
+        surface: 'sync-envelope',
+        message: 'cross-family decrypt failed; previous family restored',
+        context: { action: 'cross-family-restored' },
+      });
+      return true;
+    } catch (e) {
+      reportError({
+        surface: 'sync-envelope',
+        message: 'cross-family decrypt failed and the previous family could not be restored',
+        error: e,
+        severity: 'critical',
+        context: { action: 'cross-family-restore-failed' },
+      });
+      const { useFatalErrorStore } = await import('@/stores/fatalErrorStore');
+      useFatalErrorStore().setFatal(
+        useTranslationStore().t('error.unexpectedFailureHelp'),
+        JSON.stringify({ action: 'cross-family-restore-failed' }),
+        // Clearing would delete the only local copy of either family's unsaved work.
+        { clearDataHelps: false }
+      );
+      try {
+        window.location.reload();
+      } catch (reloadErr) {
+        console.error('[syncStore] reload after a failed cross-family restore failed', reloadErr);
+      }
+      return false;
+    }
   }
 
   /** Null the envelope on sign-out / disconnect. */
@@ -1766,6 +1856,27 @@ export const useSyncStore = defineStore('sync', () => {
           { kind: 'user-file', heads: baselineHeads }
         : { kind: 'baseline', heads: baselineHeads };
     const merged = await docClient.mergeRemoteEnvelope(remoteEnvelope, familyId, basis);
+    // Round 3 (C5a): the person chose the family file over a cache this device could not read.
+    // The adopted document must become the new cache base, or (a cold load-stage failure CLOSED
+    // the handle) the session runs cache-less for good and the unreadable cache is met again on
+    // every open. Logged on both arms; a failure keeps the session usable (Drive is current).
+    if (!loadedFromCache && cacheReadFailedWithDocIntact && chosenByUser) {
+      const reseed = await Promise.resolve()
+        .then(() => docClient.reseedCacheFromLiveDoc(familyId))
+        .catch(() => ({ reseeded: false }));
+      logEvent({
+        level: reseed.reseeded ? 'info' : 'warn',
+        surface: 'pod-open-degrade',
+        message: reseed.reseeded
+          ? 'unreadable cache replaced by the chosen family file'
+          : 'unreadable cache could not be replaced by the chosen family file',
+        context: {
+          action: 'cache-reseeded-user-choice',
+          error_code: reseed.reseeded ? 'ok' : (cacheErrorName ?? 'unknown'),
+          detail: cacheInitDetail ?? undefined,
+        },
+      });
+    }
     if (merged.action === 'kept-local') {
       keepLocalDocumentAndAdoptEnvelopeKeys(remoteEnvelope, key);
       // ⚠️ A DISTINCT SENTINEL, not `null`. `null` means "we merged but cannot
@@ -2511,8 +2622,9 @@ export const useSyncStore = defineStore('sync', () => {
       // BEFORE the worker gets the new key: from this line the worker may hold the new
       // family's document while the old family's provider is still bound.
       decryptGuard = beginPendingDecrypt(pending);
-      // Post the just-unwrapped key + the stable actor so it can decrypt + merge.
-      await docClient.setFamilyKey(fk, famId ?? '');
+      // Post the just-unwrapped key + the stable actor so it can decrypt + merge. Cross-family,
+      // this first waits for any save or merge still running under the old family.
+      await decryptGuard.postKey(fk, famId ?? '');
 
       // Adopt the payload (+ recover any unsynced cache) to prevent data loss.
       if (famId) {
@@ -2572,7 +2684,7 @@ export const useSyncStore = defineStore('sync', () => {
 
       await installPendingProvider(pending, activeFamilyId, opts.keepCurrentPod === true);
       // Provider and envelope now name the same family: saves may run again.
-      decryptGuard.release();
+      decryptGuard.succeeded();
 
       // Clear pending
       pendingEncryptedFile.value = null;
@@ -2692,8 +2804,9 @@ export const useSyncStore = defineStore('sync', () => {
       }
       return { success: false, error: errorMessage };
     } finally {
-      // Every exit releases a hold this call took (idempotent after the success path's).
-      decryptGuard?.release();
+      // Every exit releases a hold this call took (idempotent after the success path's), and
+      // a failure past the key swap restores the previous family first (round 3).
+      await decryptGuard?.finish();
     }
   }
 
@@ -3569,8 +3682,9 @@ export const useSyncStore = defineStore('sync', () => {
       // Hoisted above the post so the actor can be derived for the RIGHT family
       // — a pure move, no behaviour change.
       const famId = pending.envelope.familyId || useFamilyContextStore().activeFamilyId;
-      // Post the key + the stable actor so it can decrypt + merge/adopt.
-      await docClient.setFamilyKey(fk, famId ?? '');
+      // Post the key + the stable actor so it can decrypt + merge/adopt (cross-family: after
+      // any in-flight save or merge settles, round 3).
+      await decryptGuard.postKey(fk, famId ?? '');
       if (famId) {
         // The helper may arm a publish (kept-local, an adopt whose migration
         // emitted a change, or a rebase that replayed offline work). The
@@ -3628,7 +3742,7 @@ export const useSyncStore = defineStore('sync', () => {
       }
 
       await installPendingProvider(pending, activeFamilyId, false);
-      decryptGuard.release();
+      decryptGuard.succeeded();
 
       // Clear pending
       pendingEncryptedFile.value = null;
@@ -3710,7 +3824,7 @@ export const useSyncStore = defineStore('sync', () => {
       }
       return { success: false, error: (e as Error).message };
     } finally {
-      decryptGuard.release();
+      await decryptGuard.finish();
     }
   }
 
@@ -3968,10 +4082,11 @@ export const useSyncStore = defineStore('sync', () => {
       throw new Error('No family key — cannot export');
     }
     // The worker encrypts the current doc → payload; main assembles the envelope.
-    const { payload, lineage } = await docClient.exportEncryptedPayload();
+    const { payload, lineage, hasCounters } = await docClient.exportEncryptedPayload();
     const date = new Date().toISOString().split('T')[0];
     return {
-      json: reEncryptEnvelope(envelope.value, payload, lineage, opts),
+      // Round 3: `hasCounters` from the same export, so a Counter pod's backup stays 6.0.
+      json: reEncryptEnvelope(envelope.value, payload, lineage, { ...opts, hasCounters }),
       filename: `my-family-${date}.beanpod`,
     };
   }
