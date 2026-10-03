@@ -36,6 +36,7 @@ import {
   foldIndex,
 } from '../counterFields';
 import type { MutationOp, ProjectionDelta } from '../protocol';
+import { calculateExtraPayment } from '@/utils/loanPayment';
 import { apply, converge, fork, seeded } from './twoDevices';
 
 type Doc = Automerge.Doc<FamilyDocument>;
@@ -759,6 +760,266 @@ describe('docOps — core domain named ops (financial atomic RMW)', () => {
     expect(delta).toEqual({ kind: 'multi', deltas: [] });
   });
 });
+
+// ─── #117 Phase 2: the relative writes behind `adjustField` ──────────────────
+//
+// The cases above run with the switch OFF (the shipped default) and pass unchanged: the dormant
+// path is today's absolute read-modify-write, in minor units. The two-device merges with writes
+// ON live in `counterMerge.test.ts`.
+
+describe('docOps — relative writes through adjustField (#117 Phase 2)', () => {
+  afterEach(() => __setCounterWritesForTesting(COUNTER_WRITES_ENABLED));
+
+  const AT = '2026-10-03T10:00:00.000Z';
+  const entry = (id: string, amount: number, note?: string) => ({
+    id,
+    amount,
+    at: AT,
+    updatedBy: 'member-1',
+    ...(note ? { note } : {}),
+  });
+  const goalDoc = (extra: Record<string, unknown> = {}): Doc =>
+    seeded([
+      {
+        op: 'set',
+        collection: 'goals',
+        id: 'g',
+        entity: { id: 'g', currentAmount: 50, targetAmount: 100, isCompleted: false, ...extra },
+      },
+    ]);
+  const contribute = (doc: Doc, args: Record<string, unknown>) =>
+    applyMutation(doc, { op: 'named', name: 'applyGoalContribution', args: { id: 'g', ...args } });
+  const goalOf = (doc: Doc) =>
+    materializeCollection(doc, 'goals', foldIndex(doc))[0]![1] as {
+      currentAmount: number;
+      isCompleted: boolean;
+      manualContributions?: Array<Record<string, unknown>>;
+    };
+
+  describe('applyGoalContribution history args', () => {
+    it('appends the entry in the same change, creating the array when absent', () => {
+      const r = contribute(goalDoc(), { delta: 30, contribution: entry('c1', 30, 'birthday') });
+      expect(r.result).toMatchObject({
+        currentAmount: 80,
+        manualContributions: [entry('c1', 30, 'birthday')],
+      });
+      expect(goalOf(r.doc).manualContributions).toEqual([entry('c1', 30, 'birthday')]);
+      const r2 = contribute(r.doc, { delta: 5.25, contribution: entry('c2', 5.25) });
+      expect(goalOf(r2.doc)).toMatchObject({ currentAmount: 85.25 });
+      expect(goalOf(r2.doc).manualContributions!.map((c) => c.id)).toEqual(['c1', 'c2']);
+    });
+
+    it('records the APPLIED amount: a reversal past zero is floored, and so is its entry', () => {
+      const r = contribute(goalDoc(), { delta: -80, contribution: entry('c1', -80) });
+      expect(goalOf(r.doc).currentAmount).toBe(0);
+      expect(goalOf(r.doc).manualContributions).toEqual([entry('c1', -50)]);
+    });
+
+    it('a retried contribution id is a full no-op: no second amount, no second entry, no write', () => {
+      const once = contribute(goalDoc(), { delta: 30, contribution: entry('c1', 30) });
+      const heads = getHeads(once.doc);
+      const again = contribute(once.doc, { delta: 30, contribution: entry('c1', 30) });
+      expect(getHeads(again.doc)).toEqual(heads);
+      expect(again.result).toMatchObject({ currentAmount: 80 });
+      expect(goalOf(again.doc).manualContributions).toHaveLength(1);
+    });
+
+    it('a zero applied delta appends nothing (a reversal on an empty goal, or a zero delta)', () => {
+      const empty = contribute(goalDoc({ currentAmount: 0 }), {
+        delta: -10,
+        contribution: entry('c1', -10),
+      });
+      expect(goalOf(empty.doc).currentAmount).toBe(0);
+      expect(goalOf(empty.doc).manualContributions).toBeUndefined();
+      const zero = contribute(goalDoc({ manualContributions: [] }), {
+        delta: 0,
+        contribution: entry('c2', 0),
+      });
+      expect(goalOf(zero.doc)).toMatchObject({ currentAmount: 50, manualContributions: [] });
+    });
+
+    it('undo splices exactly that entry by id and reverses its amount', () => {
+      let d = contribute(goalDoc(), { delta: 30, contribution: entry('c1', 30) }).doc;
+      d = contribute(d, { delta: 20, contribution: entry('c2', 20) }).doc;
+      const undone = contribute(d, { delta: -30, undoContributionId: 'c1' });
+      expect(goalOf(undone.doc).currentAmount).toBe(70);
+      expect(goalOf(undone.doc).manualContributions).toEqual([entry('c2', 20)]);
+    });
+
+    it('an undo whose entry is absent is a full no-op: no amount, no history edit, no write', () => {
+      let d = contribute(goalDoc(), { delta: 30, contribution: entry('c1', 30) }).doc;
+      d = contribute(d, { delta: 20, contribution: entry('c2', 20) }).doc;
+      d = contribute(d, { delta: -30, undoContributionId: 'c1' }).doc;
+      const heads = getHeads(d);
+      // A second undo of the same id, and an undo of an id that never existed.
+      for (const undoContributionId of ['c1', 'nope']) {
+        const again = contribute(d, { delta: -30, undoContributionId });
+        expect(getHeads(again.doc)).toEqual(heads);
+        expect(again.result).toMatchObject({ currentAmount: 70 });
+        expect(goalOf(again.doc).manualContributions).toEqual([entry('c2', 20)]);
+      }
+      // A goal with no history at all: still nothing moves.
+      const g = goalDoc();
+      const bare = contribute(g, { delta: -10, undoContributionId: 'c9' });
+      expect(getHeads(bare.doc)).toEqual(getHeads(g));
+      expect(goalOf(bare.doc).currentAmount).toBe(50);
+    });
+
+    it('auto-completes on the folded amount and never un-completes', () => {
+      const done = contribute(goalDoc(), { delta: 50 });
+      expect(goalOf(done.doc)).toMatchObject({ currentAmount: 100, isCompleted: true });
+      const back = contribute(done.doc, { delta: -40 });
+      expect(goalOf(back.doc)).toMatchObject({ currentAmount: 60, isCompleted: true });
+    });
+
+    it.each([
+      [{ delta: 'ten' }, /`delta` must be a finite number/],
+      [{ delta: Number.NaN }, /`delta` must be a finite number/],
+      [{ delta: 1, contribution: { id: 'c1', amount: 1 } }, /`contribution` must be a Goal/],
+      [{ delta: 1, contribution: { ...entry('c1', 1), note: 7 } }, /`contribution` must be/],
+      [{ delta: 1, undoContributionId: '' }, /`undoContributionId` must be a non-empty/],
+      [{ delta: 1, contribution: entry('c1', 1), undoContributionId: 'c0' }, /never both/],
+    ])('a malformed args shape throws and commits nothing (%o)', (args, message) => {
+      const d = goalDoc();
+      expect(() => contribute(d, args)).toThrow(message);
+      expect(goalOf(d).currentAmount).toBe(50);
+    });
+
+    it('drops a key main added by mistake rather than writing it into the history', () => {
+      const r = contribute(goalDoc(), {
+        delta: 1,
+        contribution: { ...entry('c1', 1), stray: 'x', note: undefined },
+      });
+      expect(goalOf(r.doc).manualContributions).toEqual([entry('c1', 1)]);
+    });
+  });
+
+  it('increment: an unknown field throws before the existence check, even on skip', () => {
+    expect(() =>
+      applyMutation(base(), {
+        op: 'increment',
+        collection: 'accounts',
+        id: 'gone',
+        field: 'balanec',
+        delta: 1,
+        onMissing: 'skip',
+      })
+    ).toThrow(/not a Counter field of "accounts"/);
+  });
+
+  it('named handlers receive the document actor as ctx.writerId', () => {
+    let seen: string | undefined;
+    registerNamedOp('probeCtx', (_draft, _args, ctx) => {
+      seen = ctx.writerId;
+      return { deltas: [] };
+    });
+    const d = base();
+    applyMutation(d, { op: 'named', name: 'probeCtx', args: {} });
+    expect(seen).toBe(Automerge.getActorId(d));
+  });
+
+  it('a loan payment written dormant lands on res.newBalance exactly (no float drift)', () => {
+    // 1.2 − 1.1: `calculateExtraPayment` returns round2's 0.1, and today's float add
+    // `cur + (newBalance − cur)` would store 0.10000000000000009.
+    const want = calculateExtraPayment(1.2, 1.1).newBalance;
+    expect(1.2 + (want - 1.2)).not.toBe(want);
+    const d = seeded([
+      {
+        op: 'set',
+        collection: 'assets',
+        id: 'ast',
+        entity: {
+          id: 'ast',
+          loan: { hasLoan: true, outstandingBalance: 1.2, interestRate: 0, monthlyPayment: 1 },
+        },
+      },
+    ]);
+    const r = applyMutation(d, {
+      op: 'named',
+      name: 'applyLoanPayment',
+      args: { loanId: 'ast', paymentAmount: 1.1, isRecurring: false },
+    });
+    expect(
+      (r.doc.assets as unknown as Record<string, AnyRecLoan>).ast!.loan.outstandingBalance
+    ).toBe(want);
+  });
+
+  it('the dormant path never touches the counterDeltas map', () => {
+    expect(COUNTER_WRITES_ENABLED).toBe(false);
+    const d = apply(
+      seeded([
+        { op: 'set', collection: 'accounts', id: 'a', entity: { id: 'a', balance: 100 } },
+        {
+          op: 'set',
+          collection: 'accounts',
+          id: 'loan',
+          entity: { id: 'loan', type: 'loan', balance: 1000, interestRate: 12 },
+        },
+        { op: 'set', collection: 'goals', id: 'g', entity: { id: 'g', currentAmount: 5 } },
+      ]),
+      { op: 'increment', collection: 'accounts', id: 'a', field: 'balance', delta: -20.25 },
+      { op: 'named', name: 'applyGoalContribution', args: { id: 'g', delta: 1.5 } },
+      {
+        op: 'named',
+        name: 'applyLoanPayment',
+        args: { loanId: 'loan', paymentAmount: 100, isRecurring: true },
+      },
+      { op: 'named', name: 'reverseLoanPayment', args: { loanId: 'loan', principalToRestore: 90 } }
+    );
+    expect(Object.keys(d.counterDeltas)).toEqual([]);
+    expect(read(d, 'accounts', 'a').balance).toBe(79.75);
+    expect(read(d, 'goals', 'g').currentAmount).toBe(6.5);
+    expect(read(d, 'accounts', 'loan').balance).toBe(1000);
+  });
+
+  it('with writes on, each op writes its own key and leaves the baseline alone', () => {
+    __setCounterWritesForTesting(true);
+    const d = apply(
+      seeded([
+        { op: 'set', collection: 'accounts', id: 'a', entity: { id: 'a', balance: 100 } },
+        {
+          op: 'set',
+          collection: 'goals',
+          id: 'g',
+          entity: { id: 'g', currentAmount: 50, targetAmount: 100, isCompleted: false },
+        },
+        {
+          op: 'set',
+          collection: 'assets',
+          id: 'ast',
+          entity: { id: 'ast', loan: { hasLoan: true, outstandingBalance: 100, interestRate: 0 } },
+        },
+      ]),
+      { op: 'increment', collection: 'accounts', id: 'a', field: 'balance', delta: -20.25 },
+      {
+        op: 'named',
+        name: 'applyGoalContribution',
+        args: { id: 'g', delta: 60, contribution: entry('c1', 60) },
+      },
+      {
+        op: 'named',
+        name: 'applyLoanPayment',
+        args: { loanId: 'ast', paymentAmount: 30.5, isRecurring: false },
+      }
+    );
+    const actor = Automerge.getActorId(d);
+    expect(JSON.parse(JSON.stringify(d.counterDeltas))).toEqual({
+      [`accounts/a/balance/${actor}`]: -202500,
+      [`goals/g/currentAmount/${actor}`]: 600000,
+      [`assets/ast/loan.outstandingBalance/${actor}`]: -305000,
+    });
+    expect(read(d, 'accounts', 'a').balance).toBe(100);
+    expect(read(d, 'goals', 'g')).toMatchObject({ currentAmount: 50, isCompleted: true });
+    expect(goalOf(d)).toMatchObject({ currentAmount: 110, manualContributions: [entry('c1', 60)] });
+    expect(
+      (materializeCollection(d, 'assets', foldIndex(d))[0]![1] as AnyRecLoan).loan
+        .outstandingBalance
+    ).toBe(69.5);
+    expect(counterStats(d)).toMatchObject({ keys: 3, conflicts: 0, malformed: 0 });
+  });
+});
+
+type AnyRecLoan = { loan: { outstandingBalance: number } };
 
 // ─── #117: merge-safe writes through `patch` / `patchSettings` ───────────────
 //

@@ -34,10 +34,15 @@ import { isAllocationFailure } from '@/utils/isAllocationFailure';
 import { docInitOpts } from './docActor';
 import { MIGRATION_CHANGES } from './migrationChanges';
 import {
+  adjustField,
   foldEntity,
   foldIndex,
+  foldValue,
   isCounterCollection,
   parseCounterKey,
+  resolveField,
+  sigma,
+  toMinor,
   unfoldPatch,
   type FoldIndex,
 } from './counterFields';
@@ -47,7 +52,7 @@ import {
   findLoanDetails,
   type LoanDetails,
 } from '@/utils/loanPayment';
-import type { Asset, Account, Goal } from '@/types/models';
+import type { Asset, Account, Goal, GoalManualContribution } from '@/types/models';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
 import type { MutationOp, ProjectionDelta, Heads, PatchSettingsArgs } from './protocol';
 import {
@@ -651,11 +656,24 @@ export function buildFullProjection(doc: Doc): ProjectionDelta[] {
 
 // ─── Named-op registry (nested-structure handlers, e.g. photo attach) ────────
 
+/**
+ * What `applyMutation` hands every named handler beside the draft and its args (#117 Phase 2).
+ * ONE object rather than a positional parameter per field, for the same reason `MutationSink`
+ * is: the next one is a field, not a signature change at every handler. Handlers that write no
+ * Counter field (photo attach, settings) ignore it.
+ */
+export interface NamedOpContext {
+  /** `Automerge.getActorId` of the document being changed: the Counter writer id that
+   *  `adjustField` keys this change's adjustments by (unique per live handle, fresh per load). */
+  readonly writerId: string;
+}
+
 /** A named handler mutates the draft doc and returns its projection delta(s), plus any
  * reconciler notes (#117) for main to log. */
 export type NamedOpHandler = (
   draft: FamilyDocument,
-  args: Record<string, unknown>
+  args: Record<string, unknown>,
+  ctx: NamedOpContext
 ) => { result?: unknown; deltas: ProjectionDelta[]; notes?: ReconcileNote[] };
 
 // ─── Fine-grained field writes (#117, ADR-039) ───────────────────────────────
@@ -719,59 +737,183 @@ export function registerNamedOp(name: string, handler: NamedOpHandler): void {
 
 const nowIso = (): string => new Date().toISOString();
 
-/** Goal contribution: clamp at 0, auto-complete at target. Returns the goal. */
-const applyGoalContributionOp: NamedOpHandler = (draft, args) => {
-  const id = args.id as string;
-  const delta = args.delta as number;
+/** The `applyGoalContribution` args (built by `goalRepository.applyContribution`). */
+interface GoalContributionArgs {
+  id: string;
+  /** The requested change to the folded `currentAmount` (signed). */
+  delta: number;
+  /** A history entry to append for this change (`amount` is replaced by the applied delta). */
+  contribution?: GoalManualContribution;
+  /** The id of a history entry to remove (Undo). */
+  undoContributionId?: string;
+}
+
+const isNonEmptyString = (v: unknown): v is string => typeof v === 'string' && v !== '';
+
+function isContributionEntry(v: unknown): v is GoalManualContribution {
+  if (!isPlainObject(v)) return false;
+  return (
+    isNonEmptyString(v.id) &&
+    typeof v.amount === 'number' &&
+    Number.isFinite(v.amount) &&
+    isNonEmptyString(v.at) &&
+    isNonEmptyString(v.updatedBy) &&
+    (v.note === undefined || typeof v.note === 'string')
+  );
+}
+
+/**
+ * Validate the args main sent. A malformed shape is a programming error on main: throw (the
+ * worker error path surfaces it as a toast + report), never half-apply a money write.
+ */
+function parseGoalContributionArgs(args: Record<string, unknown>): GoalContributionArgs {
+  const { id, delta, contribution, undoContributionId } = args;
+  const fail = (why: string): Error => new Error(`applyGoalContribution: ${why}`);
+  if (!isNonEmptyString(id)) throw fail('`id` must be a non-empty string.');
+  if (typeof delta !== 'number' || !Number.isFinite(delta)) {
+    throw fail(`\`delta\` must be a finite number (got ${String(delta)}).`);
+  }
+  if (contribution !== undefined && undoContributionId !== undefined) {
+    throw fail('pass `contribution` or `undoContributionId`, never both.');
+  }
+  if (contribution !== undefined && !isContributionEntry(contribution)) {
+    throw fail(
+      '`contribution` must be a GoalManualContribution ({ id, amount, at, updatedBy, note? }); ' +
+        'build it with goalsStore.contributionEntry.'
+    );
+  }
+  if (undoContributionId !== undefined && !isNonEmptyString(undoContributionId)) {
+    throw fail('`undoContributionId` must be a non-empty string.');
+  }
+  return { id, delta, contribution, undoContributionId };
+}
+
+/**
+ * Goal contribution, RELATIVE (#117 Phase 2): decided on the FOLDED amount and written through
+ * `adjustField` (a Counter with writes on, today's absolute with writes off), so two devices'
+ * contributions both land after a merge. Returns the goal, folded.
+ *
+ *  - Floor: `applied = max(delta, −folded)`, today's `max(0, current + delta)` as a delta.
+ *  - Auto-complete on `folded + applied ≥ targetAmount`; sets true only (as `goalsStore` does).
+ *  - The history edit rides the SAME change, so the amount and its entry stay one atomic op:
+ *    `contribution` appends `{ ...entry, amount: applied }` (nothing when `applied` is 0);
+ *    `undoContributionId` splices that entry out by id (`splice`, never `delete arr[i]`,
+ *    ADR-039).
+ *  - MONEY AND HISTORY MOVE TOGETHER, IN BOTH DIRECTIONS. The entry is the receipt: a
+ *    `contribution` whose id is already in the history (a retry), or an `undoContributionId`
+ *    whose entry is absent (a second undo, or one already undone elsewhere), is a full no-op.
+ *    No amount, no history edit, no `updatedAt`, so the change is empty and `mutate` reports
+ *    `changed: false`.
+ *
+ * Every write-time read folds with the draft's own index: keys are single-writer, so the
+ * draft's Σ is exact and already includes this change (probe m).
+ */
+const applyGoalContributionOp: NamedOpHandler = (draft, rawArgs, { writerId }) => {
+  const { id, delta, contribution, undoContributionId } = parseGoalContributionArgs(rawArgs);
   const goals = draft.goals as unknown as Record<string, Goal>;
   const goal = goals[id];
   if (!goal) throw new Error(`applyGoalContribution: goal ${id} not found`);
-  const current = typeof goal.currentAmount === 'number' ? goal.currentAmount : 0;
-  goal.currentAmount = Math.max(0, current + delta);
-  if (!goal.isCompleted && goal.currentAmount >= goal.targetAmount) goal.isCompleted = true;
+  const echo = (): ReturnType<NamedOpHandler> => {
+    const d = entityDelta(draft, 'goals', id, foldIndex(draft));
+    return { result: d.kind === 'upsert' ? d.entity : undefined, deltas: [d] };
+  };
+  if (contribution && goal.manualContributions?.some((c) => c.id === contribution.id)) {
+    return echo();
+  }
+  const undoAt =
+    undoContributionId === undefined
+      ? -1
+      : (goal.manualContributions?.findIndex((c) => c.id === undoContributionId) ?? -1);
+  if (undoContributionId !== undefined && undoAt < 0) return echo();
+
+  const folded = foldValue(
+    goal.currentAmount,
+    sigma(foldIndex(draft), 'goals', id, 'currentAmount'),
+    0
+  );
+  const applied = Math.max(delta, -folded);
+  adjustField(draft, 'goals', id, 'currentAmount', applied, writerId);
+  if (!goal.isCompleted && foldValue(folded, toMinor(applied), 0) >= goal.targetAmount) {
+    goal.isCompleted = true;
+  }
+
+  if (contribution && applied !== 0) {
+    const entry: GoalManualContribution = {
+      id: contribution.id,
+      amount: applied,
+      at: contribution.at,
+      updatedBy: contribution.updatedBy,
+      // Field by field: Automerge rejects an `undefined` value, and a key main added by
+      // mistake has no business in the document.
+      ...(contribution.note !== undefined ? { note: contribution.note } : {}),
+    };
+    if (goal.manualContributions) goal.manualContributions.push(entry);
+    else goal.manualContributions = [entry];
+  } else if (undoAt >= 0) {
+    goal.manualContributions!.splice(undoAt, 1);
+  }
+
   goal.updatedAt = nowIso();
-  const echo = entityDelta(draft, 'goals', id, foldIndex(draft));
-  return { result: echo.kind === 'upsert' ? echo.entity : undefined, deltas: [echo] };
+  return echo();
 };
 
-/** Write `newBalance` to the loan host (nested asset-loan or account) + echo it, materialised
- * through the funnel (`entityDelta`), so the echo and the delta carry the folded value. */
-function writeLoanBalance(
-  draft: FamilyDocument,
-  loan: LoanDetails,
-  newBalance: number
-): { collection: CollectionName; entity: unknown; delta: EntityDelta } {
-  let collection: CollectionName;
-  if (loan.type === 'asset') {
-    collection = 'assets';
-    const asset = (draft.assets as unknown as Record<string, Asset>)[loan.entityId];
-    if (asset?.loan) {
-      asset.loan.outstandingBalance = newBalance;
-      asset.updatedAt = nowIso();
-    }
-  } else {
-    collection = 'accounts';
-    const account = (draft.accounts as unknown as Record<string, Account>)[loan.entityId];
-    if (account) {
-      account.balance = newBalance;
-      account.updatedAt = nowIso();
-    }
-  }
-  const delta = entityDelta(draft, collection, loan.entityId, foldIndex(draft));
-  return { collection, entity: delta.kind === 'upsert' ? delta.entity : undefined, delta };
+/** Where a loan's balance lives: the nested asset loan, or a loan account's `balance`. */
+function loanHost(loan: LoanDetails): { collection: 'assets' | 'accounts'; field: string } {
+  return loan.type === 'asset'
+    ? { collection: 'assets', field: 'loan.outstandingBalance' }
+    : { collection: 'accounts', field: 'balance' };
 }
 
-const findLoan = (draft: FamilyDocument, loanId: string): LoanDetails | null =>
-  findLoanDetails(
+/**
+ * Move the loan host's balance by `delta` through `adjustField` (a Counter with writes on,
+ * today's absolute with writes off), stamp `updatedAt`, and echo the host through the funnel
+ * (`entityDelta`), so the echo and the delta carry the folded value.
+ *
+ * Relative, never `= newBalance`, so two devices' payments against one loan both land after a
+ * merge. With writes off, `toMinor` rounds the float `newBalance − outstandingBalance` to four
+ * decimals, so the stored value lands on the `round2` `newBalance` exactly.
+ */
+function adjustLoanBalance(
+  draft: FamilyDocument,
+  loan: LoanDetails,
+  delta: number,
+  writerId: string
+): { collection: CollectionName; entity: unknown; delta: EntityDelta } {
+  const { collection, field } = loanHost(loan);
+  // `findLoan` just found the host in this same draft, so `adjustField`'s existence throw is
+  // reachable only through a programming error.
+  adjustField(draft, collection, loan.entityId, field, delta, writerId);
+  (draft[collection] as unknown as Record<string, AnyRecord>)[loan.entityId]!.updatedAt = nowIso();
+  const echo = entityDelta(draft, collection, loan.entityId, foldIndex(draft));
+  return { collection, entity: echo.kind === 'upsert' ? echo.entity : undefined, delta: echo };
+}
+
+/**
+ * The loan `loanId` names, with its `outstandingBalance` FOLDED. `findLoanDetails` reads the
+ * draft's proxies as today and returns a fresh plain object, so only the one number it carries
+ * is folded (one index lookup), never every asset and account. The payment no-op
+ * (`outstandingBalance <= 0`) and the amortisation input both read this folded value.
+ */
+function findLoan(draft: FamilyDocument, loanId: string): LoanDetails | null {
+  const loan = findLoanDetails(
     loanId,
     Object.values((draft.assets ?? {}) as unknown as Record<string, Asset>),
     Object.values((draft.accounts ?? {}) as unknown as Record<string, Account>)
   );
+  if (!loan) return null;
+  const { collection, field } = loanHost(loan);
+  loan.outstandingBalance = foldValue(
+    loan.outstandingBalance,
+    sigma(foldIndex(draft), collection, loan.entityId, field),
+    0
+  );
+  return loan;
+}
 
 /** Apply a loan payment: amortize (recurring) or extra-payment (one-time), write
  * the new balance atomically, return the host entity + interest/principal split
  * (main writes those onto the transaction via the existing repo). */
-const applyLoanPaymentOp: NamedOpHandler = (draft, args) => {
+const applyLoanPaymentOp: NamedOpHandler = (draft, args, { writerId }) => {
   const loan = findLoan(draft, args.loanId as string);
   if (!loan || loan.outstandingBalance <= 0) return { result: { applied: false }, deltas: [] };
   const res = args.isRecurring
@@ -781,7 +923,12 @@ const applyLoanPaymentOp: NamedOpHandler = (draft, args) => {
         args.paymentAmount as number
       )
     : calculateExtraPayment(loan.outstandingBalance, args.paymentAmount as number);
-  const { collection, entity, delta } = writeLoanBalance(draft, loan, res.newBalance);
+  const { collection, entity, delta } = adjustLoanBalance(
+    draft,
+    loan,
+    res.newBalance - loan.outstandingBalance,
+    writerId
+  );
   return {
     result: {
       applied: true,
@@ -795,11 +942,16 @@ const applyLoanPaymentOp: NamedOpHandler = (draft, args) => {
 };
 
 /** Reverse a loan payment: restore the principal portion to the balance. */
-const reverseLoanPaymentOp: NamedOpHandler = (draft, args) => {
+const reverseLoanPaymentOp: NamedOpHandler = (draft, args, { writerId }) => {
   const loan = findLoan(draft, args.loanId as string);
   if (!loan) return { result: { applied: false }, deltas: [] };
   const restored = loan.outstandingBalance + (args.principalToRestore as number);
-  const { collection, entity, delta } = writeLoanBalance(draft, loan, restored);
+  const { collection, entity, delta } = adjustLoanBalance(
+    draft,
+    loan,
+    restored - loan.outstandingBalance,
+    writerId
+  );
   return {
     result: { applied: true, hostCollection: collection, host: entity },
     deltas: [delta],
@@ -878,12 +1030,15 @@ registerCoreNamedOps();
  *  - `deltas`: named ops build their own projection deltas (structural ops' are built
  *    afterwards from the committed doc);
  *  - `results`: named ops' results, in order (a top-level named op returns the first);
- *  - `notes`: reconciler findings (#117), logged on main.
+ *  - `notes`: reconciler findings (#117), logged on main;
+ *  - `writerId`: the document's actor, read once per `applyMutation` (#117 Phase 2): the
+ *    Counter writer id for `increment` and every named handler's `NamedOpContext`.
  */
 interface MutationSink {
   deltas: ProjectionDelta[];
   results: unknown[];
   notes: ReconcileNote[];
+  readonly writerId: string;
 }
 
 /**
@@ -950,14 +1105,17 @@ function mutateDraft(draft: FamilyDocument, op: MutationOp, sink: MutationSink):
       delete (draft[op.collection] as AnyRecord)[op.id];
       break;
     case 'increment': {
-      // Read-modify-write ATOMIC inside the change — no interleave with a merge.
+      // An unknown field throws FIRST, even on `onMissing: 'skip'`: a numeric field outside
+      // `COUNTER_FIELDS` would otherwise take an absolute path and lose concurrent adjustments.
+      resolveField(op.collection, op.field);
       const entity = (draft[op.collection] as Record<string, AnyRecord>)[op.id];
       if (!entity) {
         if ((op.onMissing ?? 'throw') === 'skip') return; // concurrent-delete race → no-op
         throw new Error(`increment: ${op.collection}/${op.id} not found`);
       }
-      const cur = typeof entity[op.field] === 'number' ? (entity[op.field] as number) : 0;
-      entity[op.field] = cur + op.delta;
+      // #117 Phase 2: a Counter increment with writes on (merge-safe), today's atomic
+      // read-modify-write of the absolute with writes off; both in integer minor units.
+      adjustField(draft, op.collection, op.id, op.field, op.delta, sink.writerId);
       if (op.updatedAt) entity.updatedAt = op.updatedAt;
       break;
     }
@@ -967,7 +1125,7 @@ function mutateDraft(draft: FamilyDocument, op: MutationOp, sink: MutationSink):
     case 'named': {
       const handler = namedRegistry.get(op.name);
       if (!handler) throw new Error(`named op not registered: ${op.name}`);
-      const { result, deltas, notes } = handler(draft, op.args);
+      const { result, deltas, notes } = handler(draft, op.args, { writerId: sink.writerId });
       sink.deltas.push(...deltas);
       sink.results.push(result);
       if (notes) sink.notes.push(...notes);
@@ -1020,7 +1178,13 @@ export function applyMutation(
   doc: Doc,
   op: MutationOp
 ): { doc: Doc; result: unknown; delta: ProjectionDelta; notes: ReconcileNote[] } {
-  const sink: MutationSink = { deltas: [], results: [], notes: [] };
+  // The actor is the Counter writer id: read once, before the change (the change keeps it).
+  const sink: MutationSink = {
+    deltas: [],
+    results: [],
+    notes: [],
+    writerId: Automerge.getActorId(doc),
+  };
   const after = Automerge.change(doc, (d) => mutateDraft(d as FamilyDocument, op, sink));
   const out: ProjectionDelta[] = [];
   const structuralResult = deltaFor(after, op, out, foldIndex(after));

@@ -182,6 +182,12 @@ function setKeyArgs(): { raw: Uint8Array } | { key: CryptoKey } | null {
  * never lag Drive, or a collision self-heals by replaying the divergent changes
  * onto a fresh actor (the same rebase machinery Tier 3 needs). Flipping it
  * without one of those reintroduces a save-blocking defect.
+ *
+ * ⚠️ AND RE-ENABLING REQUIRES THE LINEAGE SEQ IN THE COUNTER KEY (#117 Phase 2,
+ * `counterFields.ts`): Counter keys are named by the actor and are single-writer
+ * per lineage only because every `load` mints a fresh one, so a pinned device
+ * could re-create a key the compaction fold ledger already holds and have its
+ * adjustment skipped or counted twice.
  */
 const ACTOR_PINNING_ENABLED = false;
 
