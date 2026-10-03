@@ -253,6 +253,27 @@ describe('absolute writes and adjustments', () => {
     expect(balanceOf(merged.b)).toBe(479.75);
   });
 
+  it('merge-safety proof: increment and absolute set on either device, merged either way, lose nothing', () => {
+    // The roles swapped AND the merge direction swapped: four runs, one answer. The rebase twin
+    // (across a compaction) is in `rebase.test.ts`.
+    __setCounterWritesForTesting(true);
+    const setTo = (v: number): MutationOp => ({
+      op: 'patch',
+      collection: 'accounts',
+      id: 'A',
+      patch: { balance: v },
+      base: { balance: 100 },
+    });
+    for (const incrementOnA of [true, false]) {
+      const { a, b } = fork(origin());
+      const a1 = apply(a, incrementOnA ? increment(-20.25) : setTo(500));
+      const b1 = apply(b, incrementOnA ? setTo(500) : increment(-20.25));
+      const ab = converge(Automerge.clone(a1), Automerge.clone(b1));
+      const ba = converge(b1, a1);
+      for (const doc of [ab.a, ab.b, ba.a, ba.b]) expect(balanceOf(doc)).toBe(479.75);
+    }
+  });
+
   it('mixed fleet: a writes-off device and a writes-on device converge to the right fold', () => {
     const { a, b } = fork(origin());
     __setCounterWritesForTesting(false);

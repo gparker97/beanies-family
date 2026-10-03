@@ -9,11 +9,12 @@
  * against it would produce an unreadable cache.
  */
 import 'fake-indexeddb/auto';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as Automerge from '@automerge/automerge';
 import { PayloadTooLargeError } from '@/types/sync';
 
-const diffHook = vi.hoisted(() => ({ path: null as string | null }));
+// `source` records what the verify was handed, so a test can pin the compaction SOURCE itself.
+const diffHook = vi.hoisted(() => ({ path: null as string | null, source: null as unknown }));
 // An ESM namespace property is not configurable, so `vi.spyOn(Automerge, 'from')`
 // throws. Mock the module and drive `from` through a hook the tests set.
 const fromHook = vi.hoisted(() => ({ throws: null as Error | null }));
@@ -39,12 +40,15 @@ vi.mock('@automerge/automerge', async (importOriginal) => {
 vi.mock('@/utils/firstJsonDifference', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/utils/firstJsonDifference')>();
   return {
-    firstJsonDifference: (a: unknown, b: unknown) =>
-      diffHook.path ?? actual.firstJsonDifference(a, b),
+    firstJsonDifference: (a: unknown, b: unknown) => {
+      diffHook.source = a;
+      return diffHook.path ?? actual.firstJsonDifference(a, b);
+    },
   };
 });
 
 const cache = await import('../cache');
+const { COUNTER_WRITES_ENABLED, __setCounterWritesForTesting } = await import('../counterFields');
 const { setDocActor, resetDocActor } = await import('../docActor');
 const {
   configure,
@@ -69,6 +73,7 @@ function seedHistory(n: number) {
 
 beforeEach(() => {
   diffHook.path = null;
+  diffHook.source = null;
   fromHook.throws = null;
   statsHook.throwsOnCompacted = null;
   statsHook.seen = 0;
@@ -259,6 +264,63 @@ describe('compactDoc', () => {
       Automerge.getAllChanges(doc).map((c) => Automerge.decodeChange(c).actor)
     );
     expect([...actors]).toEqual([ACTOR]);
+  });
+});
+
+describe('compactDoc folds the Counters (#117 Phase 2)', () => {
+  type Snapshot = {
+    accounts: Record<string, { balance: number }>;
+    counterDeltas: Record<string, unknown>;
+    foldedCounters?: Record<string, number>;
+  };
+  const snapshot = () => Automerge.toJS(Automerge.load(exportSnapshot().binary)) as Snapshot;
+  const inc = (delta: number) =>
+    mutate({ op: 'increment', collection: 'accounts', id: 'A', field: 'balance', delta });
+
+  beforeEach(() => __setCounterWritesForTesting(true));
+  afterEach(() => __setCounterWritesForTesting(COUNTER_WRITES_ENABLED));
+
+  it('preserves the folded value, empties the map, and EXTENDS the ledger across two compactions', () => {
+    initDoc();
+    mutate({ op: 'set', collection: 'accounts', id: 'A', entity: { id: 'A', balance: 100 } });
+    inc(-20.25);
+    const [firstKey] = Object.keys(snapshot().counterDeltas);
+    expect(firstKey).toMatch(/^accounts\/A\/balance\//);
+
+    // The real verify runs (no hook path): the folded source round-trips exactly.
+    expect(compactDoc().changesAfter).toBe(1);
+    let doc = snapshot();
+    expect(doc.accounts.A!.balance).toBe(79.75);
+    expect(doc.counterDeltas).toEqual({});
+    expect(doc.foldedCounters).toEqual({ [firstKey!]: -202_500 });
+
+    // A fresh actor after the rebuild, so the next adjustment is a NEW key.
+    inc(-5);
+    const [secondKey] = Object.keys(snapshot().counterDeltas);
+    expect(secondKey).not.toBe(firstKey);
+    expect(compactDoc().changesAfter).toBe(1);
+    doc = snapshot();
+    expect(doc.accounts.A!.balance).toBe(74.75);
+    expect(doc.counterDeltas).toEqual({});
+    // ⚠️ CUMULATIVE, never replaced: a peer two compactions behind still finds its key.
+    expect(doc.foldedCounters).toEqual({ [firstKey!]: -202_500, [secondKey!]: -50_000 });
+  });
+
+  it('a dormant pod: the source is the document as it stands plus the lineage, with no ledger', () => {
+    __setCounterWritesForTesting(false);
+    initDoc();
+    mutate({ op: 'set', collection: 'accounts', id: 'A', entity: { id: 'A', balance: 100 } });
+    inc(-20.25); // the dormant path writes the absolute and never touches the map
+    const today = snapshot();
+    expect(today.counterDeltas).toEqual({});
+
+    compactDoc();
+    const { podLineage, ...rest } = diffHook.source as Record<string, unknown>;
+    expect(podLineage).toEqual({ id: expect.any(String), seq: 1 });
+    // `migrateDoc` already created the empty map, so the fold adds nothing and no ledger key.
+    expect(rest).toEqual(today);
+    expect(rest).not.toHaveProperty('foldedCounters');
+    expect(snapshot().accounts.A!.balance).toBe(79.75);
   });
 });
 

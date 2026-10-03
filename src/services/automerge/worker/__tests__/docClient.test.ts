@@ -308,7 +308,7 @@ describe('docClient', () => {
         context: expect.objectContaining({
           action: 'rebased',
           family_id: 'fam-1',
-          detail: 'replayed=7,conflicts=2',
+          detail: 'replayed=7,conflicts=2,counter_increments=0',
         }),
       })
     );
@@ -321,7 +321,7 @@ describe('docClient', () => {
         level: 'info',
         // ⚠️ ON THE SUCCESS PATH TOO, or the RATE is unmeasurable and only
         // failures are visible.
-        context: expect.objectContaining({ detail: 'replayed=3,conflicts=0' }),
+        context: expect.objectContaining({ detail: 'replayed=3,conflicts=0,counter_increments=0' }),
       })
     );
 
@@ -362,9 +362,63 @@ describe('docClient', () => {
     last = vi.mocked(logEvent).mock.calls.at(-1)![0];
     expect(last.level).toBe('info');
     expect(last.context).toMatchObject({
-      detail: 'replayed=3,conflicts=0,root_conflicts=0,added=0',
+      detail: 'replayed=3,conflicts=0,counter_increments=0,root_conflicts=0,added=0',
     });
     expect(Object.keys(last.context ?? {}).sort()).toEqual(['action', 'detail', 'family_id']);
+  });
+
+  it('appends the Counter figures on every action, counter_increments on a rebase, and warns only on a shared key (#117 Phase 2)', () => {
+    const stats = { keys: 4, conflicts: 0, malformed: 0, ledgerKeys: 9 };
+    logMergeTerminus('poll terminus', { action: 'merged', counterStats: stats }, 'fam-1');
+    let last = vi.mocked(logEvent).mock.calls.at(-1)![0];
+    expect(last.level).toBe('info');
+    expect(last.context).toMatchObject({
+      action: 'merged',
+      detail: 'counter_keys=4,counter_conflicts=0,counter_malformed=0,ledger_keys=9',
+    });
+
+    // A rebase reports what the ledger pass carried, after its own counts and before the
+    // document-health figures, all on the one allowlisted `detail` key.
+    logMergeTerminus(
+      'open terminus',
+      {
+        action: 'rebased',
+        replayed: 5,
+        conflicts: 0,
+        counterIncrements: 2,
+        rootConflicts: { total: 0, added: 0 },
+        counterStats: { keys: 0, conflicts: 0, malformed: 0, ledgerKeys: 3 },
+      },
+      'fam-1'
+    );
+    last = vi.mocked(logEvent).mock.calls.at(-1)![0];
+    expect(last.level).toBe('info');
+    expect(last.context).toMatchObject({
+      detail:
+        'replayed=5,conflicts=0,counter_increments=2,root_conflicts=0,added=0,' +
+        'counter_keys=0,counter_conflicts=0,counter_malformed=0,ledger_keys=3',
+    });
+    expect(Object.keys(last.context ?? {}).sort()).toEqual(['action', 'detail', 'family_id']);
+
+    // A malformed key persists until compaction, so it is information, never a per-poll warn.
+    logMergeTerminus(
+      'poll terminus',
+      { action: 'merged', counterStats: { keys: 2, conflicts: 0, malformed: 1, ledgerKeys: 0 } },
+      'fam-1'
+    );
+    last = vi.mocked(logEvent).mock.calls.at(-1)![0];
+    expect(last.level).toBe('info');
+    expect(last.context).toMatchObject({ detail: expect.stringContaining('counter_malformed=1') });
+
+    // Two writers shared a key: construction forbids it, so it is news on any action.
+    logMergeTerminus(
+      'poll terminus',
+      { action: 'adopted', counterStats: { keys: 2, conflicts: 1, malformed: 0, ledgerKeys: 0 } },
+      'fam-1'
+    );
+    last = vi.mocked(logEvent).mock.calls.at(-1)![0];
+    expect(last.level).toBe('warn');
+    expect(last.context).toMatchObject({ detail: expect.stringContaining('counter_conflicts=1') });
   });
 
   it('reports a rebase that could not run — on the BLOCKED half', async () => {

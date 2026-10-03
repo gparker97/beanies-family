@@ -1615,6 +1615,69 @@ describe('layer 4: compaction rebase through compactDoc + mergeRemoteEnvelope', 
     report.push(`rebase: replayed=${res.replayed} conflicts=${res.conflicts} action=${res.action}`);
   });
 
+  it('compaction with unsynced increments (switch on): the peer adjustment lands exactly once', async () => {
+    const key = await generateFamilyKey();
+    ap.reset();
+    ap.configure({
+      pushChunk() {},
+      perf() {},
+      cachePersistFailed() {},
+      cacheReleased() {},
+    } as never);
+    await ap.setKey(key);
+    const ACC = 'demo-account-current';
+    const GOAL = 'chaos-goal-history';
+    const shown = (doc: Doc) => foldDoc(doc) as Any;
+    const start = shown(BASE);
+
+    // The peer adjusts and that reaches Drive: its key is in the document the compactor folds.
+    const peer: Device = { name: 'peer', doc: Automerge.clone(BASE, { actor: ACTOR.b }) };
+    await on(peer, () => increment('accounts', ACC, 'balance', -1.11));
+    const baselineHeads = getHeads(peer.doc);
+
+    // The compactor folds it (the real compactDoc), then adjusts the same account on the new lineage.
+    ap.loadSnapshot(Automerge.save(peer.doc));
+    ap.compactDoc();
+    const compacted = Automerge.load<FamilyDocument>(ap.exportSnapshot().binary);
+    expect(Object.keys((compacted as Any).counterDeltas)).toEqual([]);
+    expect(Object.keys((compacted as Any).foldedCounters ?? {})).toHaveLength(1);
+    const target: Device = {
+      name: 'compactor',
+      doc: Automerge.clone(compacted, { actor: ACTOR.a }),
+    };
+    await on(target, () => increment('accounts', ACC, 'balance', -2.22));
+
+    // The peer, still on the old lineage and offline, keeps adjusting on its OWN key (growth
+    // past the ledger entry) and contributes to a goal it never adjusted before.
+    await on(peer, () => increment('accounts', ACC, 'balance', -3.33));
+    await on(peer, () => quickContribute(GOAL, 7.77, 'chaos-rebase-entry', OWNER));
+
+    ap.loadSnapshot(Automerge.save(peer.doc));
+    const res = await ap.mergeRemoteEnvelope((await envelopeFor(target.doc, key)) as never, 'fam', {
+      kind: 'baseline',
+      heads: baselineHeads,
+    });
+    expect(res.action).toBe('rebased');
+    expect(res.counterIncrements).toBe(2);
+    expect(res.counterStats).toMatchObject({ conflicts: 0, malformed: 0, ledgerKeys: 1 });
+    const out = Automerge.load<FamilyDocument>(ap.exportSnapshot().binary);
+    expect(counterHealth(out)).toEqual([]);
+    const m = shown(out);
+    // -1.11 folded once, -2.22 the compactor's live key, -3.33 the replayed growth, once.
+    expect(m.accounts[ACC].balance).toBe(
+      (toMinor(start.accounts[ACC].balance) - 11_100 - 22_200 - 33_300) / 10_000
+    );
+    expect(m.goals[GOAL].currentAmount).toBe(
+      (toMinor(start.goals[GOAL].currentAmount ?? 0) + 77_700) / 10_000
+    );
+    expect(
+      (m.goals[GOAL].manualContributions as Any[]).filter((c) => c.id === 'chaos-rebase-entry')
+    ).toHaveLength(1);
+    report.push(
+      `rebase with Counters: replayed=${res.replayed} conflicts=${res.conflicts} counter_increments=${res.counterIncrements} ledger_keys=${res.counterStats?.ledgerKeys}`
+    );
+  });
+
   it.skipIf(REAL_POD)(
     'documented: both sides changed the SAME list array -> counted conflict, saved copy stays',
     async () => {
