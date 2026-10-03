@@ -1,15 +1,17 @@
 /**
- * AssetModal sends the WHOLE loan built from the LIVE asset (the store at save time) with only
+ * AssetModal sends the WHOLE loan built from the LIVE asset (the projection row the repository
+ * reconciles against; the store only when the projection has none) with only
  * the sub-keys changed since open overlaid: `loan` is a merge field whose base is the whole
  * live loan, so a partial loan would clear every omitted sub-key, and the stale open-time
  * balance must never revert a payment that landed while the modal was open.
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { setActivePinia, createPinia } from 'pinia';
 import { nextTick } from 'vue';
 import AssetModal from '@/components/assets/AssetModal.vue';
 import { useAssetsStore } from '@/stores/assetsStore';
+import { applyDelta, resetProjection } from '@/services/automerge/projection';
 import type { Asset } from '@/types/models';
 
 vi.mock('@/composables/useTranslation', () => ({
@@ -62,6 +64,28 @@ async function save(wrapper: Awaited<ReturnType<typeof open>>) {
 }
 
 describe('AssetModal loan payload', () => {
+  afterEach(() => resetProjection());
+
+  it('builds on the PROJECTION row over a stale store: a cascade payment is kept', async () => {
+    const wrapper = await open(withLoan);
+    // The cascade moved the projection (the repository's base); the store has not reloaded.
+    useAssetsStore().assets = [withLoan];
+    applyDelta({
+      kind: 'upsert',
+      collection: 'assets',
+      id: 'a1',
+      entity: { ...withLoan, loan: { ...withLoan.loan!, outstandingBalance: 6000 } },
+    });
+    (wrapper.vm as unknown as { interestRate: number }).interestRate = 5;
+    await nextTick();
+    expect((await save(wrapper)).loan).toEqual({
+      hasLoan: true,
+      loanAmount: 20000,
+      outstandingBalance: 6000,
+      interestRate: 5,
+    });
+  });
+
   it('editing only interestRate sends the whole loan, never a partial one', async () => {
     const wrapper = await open(withLoan);
     (wrapper.vm as unknown as { interestRate: number }).interestRate = 5;

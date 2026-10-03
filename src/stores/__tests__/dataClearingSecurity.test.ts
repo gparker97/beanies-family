@@ -126,6 +126,18 @@ vi.mock('@/services/telemetry/loginFlowEvents', async (importOriginal) => ({
   emitSignoutTier: (...a: unknown[]) => mockEmitSignoutTier(...a),
   emitCacheKept: (...a: unknown[]) => mockEmitCacheKept(...a),
 }));
+// Spy the firehose, still calling through to the real implementation.
+const mockLogEvent = vi.fn();
+vi.mock('@/services/telemetry/logEvent', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@/services/telemetry/logEvent')>();
+  return {
+    ...real,
+    logEvent: (...a: Parameters<typeof real.logEvent>) => {
+      mockLogEvent(...a);
+      return real.logEvent(...a);
+    },
+  };
+});
 const mockClearAllData = vi.fn(async () => {});
 const mockGetActiveFamilyId = vi.fn(() => 'family-123');
 
@@ -725,6 +737,35 @@ describe('Sensitive Data Clearing Security', () => {
       expect(vi.mocked(triggerDebouncedSave)).toHaveBeenCalledTimes(1);
     });
 
+    it('a probe save that did not land is logged on sign-out with why (timeout, failed, nothing)', async () => {
+      const { auth } = populateAllStores();
+      const probeDetails = () =>
+        mockLogEvent.mock.calls
+          .map((c) => c[0] as { surface: string; context?: Record<string, unknown> })
+          .filter((e) => e.surface === 'sign-out' && e.context?.action === 'unsaved_probe_save')
+          .map((e) => e.context!.detail);
+
+      mockLogEvent.mockClear();
+      vi.mocked(saveNow).mockResolvedValueOnce(false);
+      await auth.measureUnsavedWork({ save: true, scope: 'active' });
+      vi.mocked(saveNow).mockRejectedValueOnce(new Error('Drive 500'));
+      await auth.measureUnsavedWork({ save: true, scope: 'active' });
+      vi.mocked(saveNow).mockResolvedValueOnce(true);
+      await auth.measureUnsavedWork({ save: true, scope: 'active' });
+      expect(probeDetails()).toEqual(['nothing', 'failed']);
+
+      vi.useFakeTimers();
+      try {
+        vi.mocked(saveNow).mockReturnValueOnce(new Promise<boolean>(() => {}));
+        const probe = auth.measureUnsavedWork({ save: true, scope: 'active' });
+        await vi.runAllTimersAsync();
+        await probe;
+      } finally {
+        vi.useRealTimers();
+      }
+      expect(probeDetails()).toEqual(['nothing', 'failed', 'timeout']);
+    });
+
     it('round 3: a probe save that landed does not re-arm', async () => {
       const { auth } = populateAllStores();
       vi.mocked(cancelPendingSave).mockReturnValueOnce(true);
@@ -847,7 +888,8 @@ describe('Sensitive Data Clearing Security', () => {
       ];
       const { auth } = populateAllStores();
 
-      await auth.signOutAndClearData();
+      // The every-family sweep is the menu's "clear all data" (`scope: 'all'`) only.
+      await auth.signOutAndClearData({ scope: 'all' });
 
       expect(reclaimAllKeystoresSpy).toHaveBeenCalledTimes(1);
       const passed = vi.mocked(reclaimAllKeystoresSpy).mock.calls[0] as unknown as [string[]];
@@ -866,9 +908,27 @@ describe('Sensitive Data Clearing Security', () => {
       ];
       const { auth } = populateAllStores();
 
-      await auth.signOutAndClearData();
+      await auth.signOutAndClearData({ scope: 'all' });
 
       expect(registryPasskeys.rows).toHaveLength(0);
+    });
+
+    it("an active-scope clear reclaims only the active family's passkeys and keys", async () => {
+      registryPasskeys.rows = [
+        { credentialId: 'native:family-123:member-1', familyId: 'family-123' },
+        { credentialId: 'native:family-999:member-9', familyId: 'family-999' },
+      ];
+      const { auth, settings } = populateAllStores();
+      await settings.setTrustedDevice(true);
+      await settings.cacheFamilyKey(KEY_A, 'family-999');
+
+      await auth.signOutAndClearData(); // default scope: active
+
+      expect(reclaimAllKeystoresSpy).not.toHaveBeenCalled();
+      expect(registryPasskeys.rows).toEqual([
+        { credentialId: 'native:family-999:member-9', familyId: 'family-999' },
+      ]);
+      expect(await settings.getCachedFamilyKey('family-999')).toBe(KEY_A);
     });
 
     describe('#100: whether the cache is actually gone reaches the caller', () => {

@@ -232,7 +232,52 @@ describe('round 3, item 10: the projection re-push is honest and capped', () => 
     expect(repush?.context).toMatchObject({ error_code: 'apply-failed' });
   });
 
+  /** A re-push whose own stream fails a chunk (the deterministic case), then answers. */
+  const uncleanRepush =
+    (workers: () => FakeWorker | undefined): Responder =>
+    (req) => {
+      if (req.method === 'getHeads') return ok(req, { heads: [] });
+      if (req.method === 'pushProjection') {
+        vi.mocked(applyChunk).mockImplementationOnce(() => {
+          throw new Error('still bad');
+        });
+        queueMicrotask(() => {
+          workers()?.emit({
+            signal: 'projection',
+            delta: { kind: 'settings', settings: {} },
+            final: true,
+          });
+          queueMicrotask(() => workers()?.emit(ok(req, { pushed: true })));
+        });
+        return null;
+      }
+      return null;
+    };
+  const settle = async () => {
+    for (let i = 0; i < 4; i++) await new Promise((r) => setTimeout(r, 0));
+  };
+  const cappedReports = () =>
+    vi
+      .mocked(reportError)
+      .mock.calls.filter(
+        ([e]) => (e.context as { action?: string }).action === 'projection-repush-capped'
+      );
+
   it('a deterministic apply failure re-pushes at most 3 times, then reports once', async () => {
+    const workers: FakeWorker[] = useWorkers([uncleanRepush(() => workers[0])]);
+    await getHeads();
+    for (let i = 0; i < 6; i++) {
+      vi.mocked(applyChunk).mockImplementationOnce(() => {
+        throw new Error('always bad');
+      });
+      failChunk();
+      await settle();
+    }
+    expect(workers[0]!.posted.filter((m) => m.method === 'pushProjection')).toHaveLength(3);
+    expect(cappedReports()).toHaveLength(1);
+  });
+
+  it('a re-push that lands CLEAN resets the run: a later transient failure re-pushes again', async () => {
     const workers = useWorkers([
       (req) =>
         req.method === 'pushProjection'
@@ -244,19 +289,48 @@ describe('round 3, item 10: the projection re-push is honest and capped', () => 
     await getHeads();
     for (let i = 0; i < 6; i++) {
       vi.mocked(applyChunk).mockImplementationOnce(() => {
+        throw new Error('transient');
+      });
+      failChunk();
+      await settle();
+    }
+    expect(workers[0]!.posted.filter((m) => m.method === 'pushProjection')).toHaveLength(6);
+    expect(cappedReports()).toHaveLength(0);
+  });
+
+  it('heads-regressed is exempt from the cap: a respawn that lost a write still re-pushes', async () => {
+    const first: Responder = (req) => {
+      if (req.method === 'initAndLoadCache') return ok(req, { loaded: true, remoteBaseline: null });
+      if (req.method === 'mutate') return ok(req, true, MUTATE_REPLY);
+      return uncleanRepush(() => workers[0])(req);
+    };
+    const second: Responder = (req) => {
+      if (req.method === 'initAndLoadCache') return ok(req, { loaded: true, remoteBaseline: null });
+      if (req.method === 'hasHeads') return ok(req, { has: false, loaded: true });
+      if (req.method === 'pushProjection') return ok(req, { pushed: true });
+      if (req.method === 'getHeads') return ok(req, { heads: ['older'] });
+      return null;
+    };
+    const workers = useWorkers([first, second]);
+    setRehydrator(async (familyId) => {
+      await initAndLoadCache(familyId);
+    });
+    await initAndLoadCache('fam');
+    await mutate({ op: 'delete', collection: 'todos', id: 'x' });
+    for (let i = 0; i < 4; i++) {
+      vi.mocked(applyChunk).mockImplementationOnce(() => {
         throw new Error('always bad');
       });
       failChunk();
-      await new Promise((r) => setTimeout(r, 0));
-      await new Promise((r) => setTimeout(r, 0));
+      await settle();
     }
-    expect(workers[0]!.posted.filter((m) => m.method === 'pushProjection')).toHaveLength(3);
-    const capped = vi
-      .mocked(reportError)
-      .mock.calls.filter(
-        ([e]) => (e.context as { action?: string }).action === 'projection-repush-capped'
-      );
-    expect(capped).toHaveLength(1);
+    expect(cappedReports()).toHaveLength(1); // the apply-failure run is capped
+    workers[0]!.onerror?.(new Error('reaped'));
+    await getHeads(); // respawn -> rehydrate -> heads-regressed
+    await vi.waitFor(() =>
+      expect(workers[1]!.posted.some((m) => m.method === 'pushProjection')).toBe(true)
+    );
+    setRehydrator(null);
   });
 });
 
@@ -332,6 +406,31 @@ describe('round 3, item 6: the cache-replay event pages only on a first sighting
     await initAndLoadCache('fam');
     expect(eventsWith('fence-gave-up')).toHaveLength(1);
     expect(critical()).toHaveLength(0);
+  });
+
+  it('cache-lineage-stale says which way it went; bookkeeping failures and the quarantine total are logged', async () => {
+    replayWith({
+      recovered: false,
+      droppedIncrements: 0,
+      missingDeps: 0,
+      incrementCount: 2,
+      lineageStale: true,
+      lineageDirection: 'cache-newer',
+      quarantinedTotal: 2,
+      bookkeepingFailed: ['lineage-baseline-clear:InvalidStateError'],
+    });
+    await initAndLoadCache('fam');
+    const stale = eventsWith('cache-lineage-stale');
+    expect(stale).toHaveLength(1);
+    expect(String(stale[0]!.context!.detail)).toMatch(/^cache-newer;.*quarantined_total=2/);
+    expect(eventsWith('cache-bookkeeping-failed')[0]).toMatchObject({
+      level: 'warn',
+      context: {
+        count: 1,
+        detail: 'lineage-baseline-clear:InvalidStateError',
+        family_id: 'fam',
+      },
+    });
   });
 });
 

@@ -278,7 +278,20 @@ export const usePhotoStore = defineStore('photos', () => {
     setQueueFlushHandler(handleQueuedUpload);
     await refreshPending();
     if (navigator.onLine) {
-      void flushPhotoQueue().finally(() => refreshPending());
+      flushPhotoQueue()
+        .finally(() => refreshPending())
+        .catch((e) => {
+          logEvent({
+            level: 'warn',
+            surface: 'photo-upload-flush',
+            message: 'photo queue refresh after drain failed',
+            error: e,
+            context: {
+              action: 'drain-failed',
+              error_code: e instanceof Error ? e.name : 'unknown',
+            },
+          });
+        });
     }
   }
 
@@ -465,7 +478,7 @@ export const usePhotoStore = defineStore('photos', () => {
     // Offline path: queue for later. Metadata is only written to Automerge
     // after the upload actually succeeds (avoids half-baked records).
     if (!navigator.onLine) {
-      await enqueueWithWrap(payload);
+      await enqueueWithWrap(payload, familyId);
       await refreshPending();
       return { photoId, status: 'queued' };
     }
@@ -493,7 +506,7 @@ export const usePhotoStore = defineStore('photos', () => {
         { action: 'transient-fallback-queued', http_status: httpStatus(e) },
         e
       );
-      await enqueueWithWrap(payload);
+      await enqueueWithWrap(payload, familyId);
       await refreshPending();
       return { photoId, status: 'queued' };
     }
@@ -505,12 +518,29 @@ export const usePhotoStore = defineStore('photos', () => {
    * the caller can branch on. Without this, an underlying DOMException leaks
    * out and `usePhotos` couldn't distinguish "Drive failed AND we couldn't
    * even save it for later" from "Drive failed".
+   *
+   * `familyId` is the family captured when `addPhoto` started. If another family is open by
+   * now (a switch during compression or the failed upload), the queue is bound to THAT
+   * family's database, so the entry is refused (the same queue-failed result) rather than
+   * filed under the wrong family. The entry carries its family so a drain can tell, too.
    */
   async function enqueueWithWrap(
-    payload: Omit<QueuedPhotoUpload, 'id' | 'createdAt'>
+    payload: Omit<QueuedPhotoUpload, 'id' | 'createdAt' | 'familyId'>,
+    familyId: string | null
   ): Promise<void> {
+    if (!familyId || familyContextStore.activeFamilyId !== familyId) {
+      const err = new QueueWriteFailedError('Failed to queue photo upload: the family changed');
+      reportError({
+        surface: 'photo-upload',
+        message: 'photo not queued: the family it belongs to is no longer open',
+        severity: 'error',
+        error: err,
+        context: { action: 'queue-family-mismatch' },
+      });
+      throw err;
+    }
     try {
-      await enqueueUpload(payload);
+      await enqueueUpload({ ...payload, familyId });
     } catch (queueErr) {
       // A user action failed and the photo is gone: page it.
       reportError({

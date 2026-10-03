@@ -67,6 +67,8 @@ export const cancelPendingSave = vi.fn();
 export const holdSaves = vi.fn((_reason: string) => () => {});
 // Round 3: the cross-family decrypt waits for in-flight saves and merges before the key swap.
 export const whenIdle = vi.fn(async () => {});
+// Round 3: the cross-family decrypt marks the worker key swap right before posting the key.
+export const advanceHoldEpoch = vi.fn();
 export const flushPendingSave = vi.fn(async () => {});
 
 // Load operations

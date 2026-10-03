@@ -119,8 +119,9 @@ vi.mock('@/stores/syncStore', () => ({
   useSyncStore: () => ({ driveFileId: 'beanpod-file-1' }),
 }));
 
+const familyCtx = vi.hoisted(() => ({ activeFamilyId: 'fam-photostore-test' }));
 vi.mock('@/stores/familyContextStore', () => ({
-  useFamilyContextStore: () => ({ activeFamilyId: 'fam-photostore-test' }),
+  useFamilyContextStore: () => familyCtx,
 }));
 
 // --- Imports (after mocks are set up) --------------------------------
@@ -200,6 +201,7 @@ describe('photoStore', () => {
     setActivePinia(createPinia());
     await installInlineBackend();
     setOnlineStatus(true);
+    familyCtx.activeFamilyId = 'fam-photostore-test';
 
     // Reset mocks
     driveMocks.createFile.mockReset().mockResolvedValue({ fileId: 'drive-file-1', name: 'x' });
@@ -608,6 +610,34 @@ describe('photoStore', () => {
 
       const result = await store.addPhoto(makeFile(), 'activities', 'act-abort');
       expect(result.status).toBe('queued');
+    });
+
+    it('refuses to queue (no entry, reported) when another family opened during the upload', async () => {
+      storeInternals.registerPhotoCollection('activities');
+      await ensureEntity('activities', 'act-switch');
+      driveMocks.createFile.mockReset().mockImplementationOnce(async () => {
+        familyCtx.activeFamilyId = 'fam-photostore-other'; // the person switches family
+        throw new Error('Drive upload failed: 503 Service Unavailable');
+      });
+      const store = usePhotoStore();
+
+      await expect(store.addPhoto(makeFile(), 'activities', 'act-switch')).rejects.toThrow(
+        /queue photo upload/
+      );
+      expect(telemetryMocks.reportError).toHaveBeenCalledWith(
+        expect.objectContaining({ context: { action: 'queue-family-mismatch' } })
+      );
+      await store.refreshPending();
+      expect(store.pendingUploadsFor('activities', 'act-switch')).toHaveLength(0);
+    });
+
+    it('a queued entry carries the family it belongs to', async () => {
+      setOnlineStatus(false);
+      storeInternals.registerPhotoCollection('activities');
+      await ensureEntity('activities', 'act-fam');
+      const store = usePhotoStore();
+      await store.addPhoto(makeFile(), 'activities', 'act-fam');
+      expect(store.pendingUploadsFor('activities', 'act-fam')[0]!.familyId).toBe(FAMILY_ID);
     });
 
     it('re-throws non-transient errors (Drive 400) without queueing', async () => {

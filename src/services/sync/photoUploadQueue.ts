@@ -39,6 +39,8 @@ export interface QueuedPhotoUpload {
   fileName?: string; // original user filename (PDFs) — preserved across the offline path
   createdBy?: string;
   createdAt: number; // epoch ms
+  /** The family the upload belongs to. Absent on entries queued before 2026-10. */
+  familyId?: string;
 }
 
 /**
@@ -62,13 +64,26 @@ export function setActiveFamily(familyId: string): void {
   // different family closes the old one, which would otherwise block that queue's delete.
   if (currentFamilyId !== familyId || !dbPromise) {
     retireHandle(currentFamilyId, dbPromise);
-    dbPromise = openDB(familyId);
+    const handle = openDB(familyId);
+    dbPromise = handle;
+    // A failed open (quota, private mode, a blocked upgrade) is logged, never an unhandled
+    // rejection, and forgets the dead handle so the next activation or flush reopens it.
+    handle.catch((e: unknown) => {
+      logEvent({
+        level: 'warn',
+        surface: 'photo-upload-flush',
+        message: 'photo queue database could not be opened',
+        error: e,
+        context: { action: 'open-failed', error_code: errorCode(e) },
+      });
+      if (dbPromise === handle) dbPromise = null;
+    });
   }
   currentFamilyId = familyId;
   startListening();
   // Attempt an immediate flush in case entries are already pending.
   if (navigator.onLine && flushHandler) {
-    void flushQueue();
+    flushInBackground();
   }
 }
 
@@ -113,7 +128,7 @@ export function setFlushHandler(handler: FlushHandler): void {
   flushHandler = handler;
   // If entries are already pending and we're online, flush immediately.
   if (navigator.onLine && currentFamilyId) {
-    void flushQueue();
+    flushInBackground();
   }
 }
 
@@ -125,6 +140,9 @@ export async function enqueueUpload(
 ): Promise<string> {
   const id = crypto.randomUUID();
   const full: QueuedPhotoUpload = { ...entry, id, createdAt: Date.now() };
+  if (entry.familyId && entry.familyId !== currentFamilyId) {
+    throw new Error('photoUploadQueue: the entry belongs to a family the queue is not bound to.');
+  }
   const db = await requireDB();
   await withStore(db, 'readwrite', (store) => store.put(full));
   return id;
@@ -173,9 +191,21 @@ export function flushQueue(): Promise<void> {
   // joined by a flush for the new one (it would stop at its next entry and drain nothing).
   const running = inFlightFlush.get(familyId);
   if (running) return running;
-  const run = drainOnce(familyId, db).finally(() => {
-    if (inFlightFlush.get(familyId) === run) inFlightFlush.delete(familyId);
-  });
+  // Never rejects: a handle that failed to open, or a store read that failed, is logged here
+  // so a fire-and-forget trigger cannot surface it as an unhandled rejection.
+  const run = drainOnce(familyId, db)
+    .catch((e: unknown) => {
+      logEvent({
+        level: 'warn',
+        surface: 'photo-upload-flush',
+        message: 'photo queue drain could not read the queue',
+        error: e,
+        context: { action: 'drain-failed', error_code: errorCode(e) },
+      });
+    })
+    .finally(() => {
+      if (inFlightFlush.get(familyId) === run) inFlightFlush.delete(familyId);
+    });
   inFlightFlush.set(familyId, run);
   return run;
 }
@@ -213,6 +243,17 @@ async function drainOnce(familyId: string, dbHandle: Promise<IDBDatabase>): Prom
       });
       return;
     }
+    if (entry.familyId && entry.familyId !== familyId) {
+      // Filed under the wrong family's queue: never uploaded into this family, never deleted
+      // (it is still someone's photo). Logged so a stranded entry is visible.
+      logEvent({
+        level: 'warn',
+        surface: 'photo-upload-flush',
+        message: 'skipped a queued upload that belongs to another family',
+        context: { action: 'drain-skipped-foreign-entry' },
+      });
+      continue;
+    }
     try {
       await handler(entry, familyId);
       await withStore(db, 'readwrite', (store) => store.delete(entry.id));
@@ -236,7 +277,7 @@ async function drainOnce(familyId: string, dbHandle: Promise<IDBDatabase>): Prom
   if (anyFailed && currentFamilyId === familyId) {
     retryTimer = setTimeout(() => {
       retryTimer = null;
-      if (navigator.onLine) void flushQueue();
+      if (navigator.onLine) flushInBackground();
     }, 5000);
   }
 }
@@ -332,7 +373,24 @@ function withStore<T = void>(
 }
 
 function handleOnline(): void {
-  void flushQueue();
+  flushInBackground();
+}
+
+/** Fire-and-forget drain. `flushQueue` already logs its own failures; this catch is the floor. */
+function flushInBackground(): void {
+  flushQueue().catch((e: unknown) => {
+    logEvent({
+      level: 'warn',
+      surface: 'photo-upload-flush',
+      message: 'background photo queue flush failed',
+      error: e,
+      context: { action: 'drain-failed', error_code: errorCode(e) },
+    });
+  });
+}
+
+function errorCode(e: unknown): string {
+  return e instanceof Error ? e.name || 'Error' : 'unknown';
 }
 
 function startListening(): void {

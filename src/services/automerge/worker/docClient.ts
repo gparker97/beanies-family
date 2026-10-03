@@ -427,8 +427,11 @@ function requestProjectionRepush(cause: 'delta' | 'chunk' | 'heads-regressed'): 
   if (projectionRepushInFlight) return;
   // Round 3: a per-entity apply failure that is DETERMINISTIC fails again on the re-push and on
   // every later mutate of that entity, so without a cap each edit re-streamed the whole
-  // projection. Three tries a session, then one report; the latch stays set.
-  if (projectionRepushes >= MAX_PROJECTION_REPUSHES) {
+  // projection. Three consecutive unclean tries, then one report; the latch stays set. A clean
+  // re-push resets the run, and `heads-regressed` (a document replaced under the projection, not
+  // an apply failure) is never capped: it is the only repair for that state.
+  const capped = cause !== 'heads-regressed';
+  if (capped && projectionRepushes >= MAX_PROJECTION_REPUSHES) {
     if (!projectionRepushCapLogged) {
       projectionRepushCapLogged = true;
       reportError({
@@ -440,13 +443,17 @@ function requestProjectionRepush(cause: 'delta' | 'chunk' | 'heads-regressed'): 
     }
     return;
   }
-  projectionRepushes++;
+  if (capped) projectionRepushes++;
   projectionRepushInFlight = true;
   const genAtStart = projectionFailureGen;
   void request<{ pushed: boolean }>('pushProjection', undefined, { quiet: true })
     .then((r) => {
       // Clean only if no chunk (or delta) failed while this re-push streamed.
-      if (r?.pushed && projectionFailureGen === genAtStart) projectionDirty = false;
+      if (r?.pushed && projectionFailureGen === genAtStart) {
+        projectionDirty = false;
+        projectionRepushes = 0;
+        projectionRepushCapLogged = false;
+      }
       logEvent({
         level: 'info',
         surface: 'doc-worker-projection',
@@ -939,6 +946,8 @@ const RETRYABLE_METHODS = new Set([
   // C12: a pure read, and an idempotent re-stream of the projection.
   'hasHeads',
   'pushProjection',
+  // Round 3: a pure key-range read of the open cache.
+  'listQuarantinedRows',
 ]);
 
 // Methods where a USER-VISIBLE edit is in doubt when they fail: the user tapped
@@ -1675,19 +1684,41 @@ function logCacheReplay(replay: CacheReplay, familyId: string): void {
     (replay.newlyReported !== undefined ? `,new=${replay.newlyReported}` : '') +
     (replay.fenceGaveUp ? ',fence_gave_up=true' : '') +
     (replay.corruptBaseReplaced ? ',corrupt_base_replaced=true' : '') +
-    (replay.baseReseeded ? `,base_reseeded=${replay.baseReseeded}` : '');
+    (replay.baseReseeded ? `,base_reseeded=${replay.baseReseeded}` : '') +
+    (replay.quarantinedTotal ? `,quarantined_total=${replay.quarantinedTotal}` : '');
   const context = {
     action: 'cache-replay',
     count: replay.incrementCount,
     detail,
     family_id: familyId,
   };
-  if (replay.lineageStale) {
+  // Round 3: the worker's best-effort bookkeeping has no telemetry of its own; one event per open.
+  if (replay.bookkeepingFailed?.length) {
     logEvent({
       level: 'warn',
       surface: 'cache-replay',
-      message: 'cache held another lineage; kept the live document and superseded the cache',
-      context: { ...context, action: 'cache-lineage-stale' },
+      message: 'cache replay bookkeeping step failed',
+      context: {
+        action: 'cache-bookkeeping-failed',
+        count: replay.bookkeepingFailed.length,
+        detail: replay.bookkeepingFailed.join(','),
+        family_id: familyId,
+      },
+    });
+  }
+  if (replay.lineageStale) {
+    const cacheNewer = replay.lineageDirection === 'cache-newer';
+    logEvent({
+      level: 'warn',
+      surface: 'cache-replay',
+      message: cacheNewer
+        ? 'cache held a newer lineage; kept the live document and fenced base writes'
+        : 'cache held another lineage; kept the live document and superseded the cache',
+      context: {
+        ...context,
+        action: 'cache-lineage-stale',
+        detail: `${replay.lineageDirection ?? 'live-newer'};${detail}`,
+      },
     });
     return;
   }
@@ -1741,6 +1772,15 @@ function logCacheReplay(replay: CacheReplay, familyId: string): void {
  */
 export function reseedCacheFromLiveDoc(familyId: string): Promise<{ reseeded: boolean }> {
   return request('reseedCacheFromLiveDoc', { familyId }, { quiet: true });
+}
+
+/**
+ * Round 3: the open cache's quarantined rows (`qinc:*`), by key. They never replay, so this (and
+ * `quarantined_total` on the `cache-replay` event) is how they stay visible. Never throws in the
+ * worker; empty when no cache is open.
+ */
+export function listQuarantinedRows(): Promise<{ ids: string[] }> {
+  return request('listQuarantinedRows', undefined, { quiet: true });
 }
 
 /**

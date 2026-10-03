@@ -477,13 +477,27 @@ export const useSyncStore = defineStore('sync', () => {
    * the new one) and three steps (round 3):
    *  - `postKey(fk, famId)` posts the new key to the worker. Cross-family, it first AWAITS any
    *    save or merge already running (`syncService.whenIdle`), so nothing started under the old
-   *    family reaches the worker after the swap; the hold epoch aborts a straggler anyway.
+   *    family reaches the worker after the swap; the hold epoch, advanced right before the
+   *    swap, aborts a straggler anyway (and its save intent is re-armed on release).
    *  - `succeeded()` releases the hold once provider and envelope name the new family.
    *  - `finish()` (every exit): when the key was swapped and the decrypt did NOT succeed, the
-   *    previous family is put back (key, cache and document, envelope) BEFORE the hold
-   *    releases. If that restore fails the hold stays latched, the fatal overlay is raised and
-   *    the page reloads, so neither family's document can be saved through the wrong file.
+   *    previous family is put back (key, cache and document, envelope, active family,
+   *    provider) BEFORE the hold releases. If that restore fails the hold stays latched, the
+   *    fatal overlay is raised and the page reloads, so neither family's document can be saved
+   *    through the wrong file. When nothing was unlocked before (a locked cold boot loading
+   *    another family from the login screen) there is nothing to restore: the worker is reset
+   *    so the failed family's key and document do not linger, and the hold releases.
    */
+  /** What a cross-family decrypt puts back when it fails past its key swap. */
+  type PreviousFamily = {
+    key: CryptoKey | null;
+    familyId: string | null;
+    envelope: BeanpodFileV4 | null;
+    activeFamilyId: string | null;
+    provider: ReturnType<typeof syncService.getProvider>;
+    providerFamilyId: string | null;
+  };
+
   function beginPendingDecrypt(pending: NonNullable<(typeof pendingEncryptedFile)['value']>): {
     crossFamily: boolean;
     postKey: (fk: CryptoKey, famId: string) => Promise<void>;
@@ -508,13 +522,22 @@ export const useSyncStore = defineStore('sync', () => {
       context: { action: 'cross-family-decrypt' },
     });
     const release = syncService.holdSaves('cross-family-decrypt');
-    const previous = { key: familyKey.value, familyId: held, envelope: envelope.value };
+    const previous: PreviousFamily = {
+      key: familyKey.value,
+      familyId: held,
+      envelope: envelope.value,
+      activeFamilyId: useFamilyContextStore().activeFamilyId,
+      provider: syncService.getProvider(),
+      providerFamilyId: syncService.getProviderFamilyId(),
+    };
     let keySwapped = false;
     let done = false;
     return {
       crossFamily: true,
       postKey: async (fk, famId) => {
         await syncService.whenIdle();
+        // The swap itself: anything still running under the old family aborts from here.
+        syncService.advanceHoldEpoch();
         keySwapped = true; // before the post: a throw inside it may already have swapped
         await docClient.setFamilyKey(fk, famId);
       },
@@ -532,21 +555,62 @@ export const useSyncStore = defineStore('sync', () => {
   }
 
   /**
-   * Put the previous family back in the worker after a cross-family decrypt failed past its
-   * key swap (round 3). Answers whether it worked; on failure it raises the fatal overlay and
-   * reloads, and the caller keeps the save hold latched. Never throws.
+   * Put the session's family bindings back: the active family (the decrypt may have switched
+   * to the failed family) and the provider (`installPendingProvider` may have bound its file).
+   * Throws when the active family cannot be switched back.
    */
-  async function restorePreviousFamily(prev: {
-    key: CryptoKey | null;
-    familyId: string | null;
-    envelope: BeanpodFileV4 | null;
-  }): Promise<boolean> {
+  async function restoreSessionBindings(prev: PreviousFamily): Promise<void> {
+    const familyCtx = useFamilyContextStore();
+    if (familyCtx.activeFamilyId !== prev.activeFamilyId) {
+      if (!prev.activeFamilyId || !(await familyCtx.switchFamily(prev.activeFamilyId))) {
+        throw new Error('previous active family could not be re-activated');
+      }
+    }
+    if (prev.provider && syncService.getProvider() !== prev.provider) {
+      syncService.setProvider(prev.provider, prev.providerFamilyId);
+    }
+  }
+
+  /**
+   * Put the previous family back after a cross-family decrypt failed past its key swap
+   * (round 3). Answers whether it worked; on failure it raises the fatal overlay and reloads,
+   * and the caller keeps the save hold latched. Never throws.
+   *
+   * Nothing unlocked before (no previous key: a locked cold boot loading another family from
+   * the login screen) is not a failure: the worker is reset so the failed family's key and
+   * document do not linger, the bindings are put back best-effort, and the hold may release.
+   */
+  async function restorePreviousFamily(prev: PreviousFamily): Promise<boolean> {
+    if (!prev.key) {
+      let errorCode = 'ok';
+      try {
+        await docClient.reset();
+        familyKey.value = null;
+        if (envelope.value !== prev.envelope) {
+          envelope.value = prev.envelope;
+          syncService.setEnvelope(prev.envelope); // the worker cache is closed: nothing persists
+        }
+        await restoreSessionBindings(prev);
+      } catch (e) {
+        errorCode = e instanceof Error ? e.name : 'unknown';
+      }
+      logEvent({
+        level: errorCode === 'ok' ? 'info' : 'warn',
+        surface: 'sync-envelope',
+        message: 'cross-family decrypt failed with nothing unlocked before; worker reset',
+        context: { action: 'cross-family-nothing-to-restore', error_code: errorCode },
+      });
+      return true;
+    }
     try {
-      if (!prev.key || !prev.familyId) throw new Error('no previous family key to restore');
+      if (!prev.familyId) throw new Error('no previous family to restore');
       await docClient.setFamilyKey(prev.key, prev.familyId);
       const res = await docClient.initAndLoadCache(prev.familyId);
       // A miss leaves the failed family's document installed: that is not a restore.
       if (!res.loaded) throw new Error('previous family cache did not load');
+      // A failure past the family switch must not leave saves silently refused (provider and
+      // active family disagreeing): switch back, or take the fatal route below.
+      await restoreSessionBindings(prev);
       familyKey.value = prev.key;
       if (prev.envelope) {
         envelope.value = prev.envelope;
@@ -1861,9 +1925,14 @@ export const useSyncStore = defineStore('sync', () => {
     // the handle) the session runs cache-less for good and the unreadable cache is met again on
     // every open. Logged on both arms; a failure keeps the session usable (Drive is current).
     if (!loadedFromCache && cacheReadFailedWithDocIntact && chosenByUser) {
+      // The reseed's OWN failure is the error code; the original cache cause goes in `detail`.
+      let reseedError: string | null = null;
       const reseed = await Promise.resolve()
         .then(() => docClient.reseedCacheFromLiveDoc(familyId))
-        .catch(() => ({ reseeded: false }));
+        .catch((e: unknown) => {
+          reseedError = e instanceof Error ? e.name : 'unknown';
+          return { reseeded: false };
+        });
       logEvent({
         level: reseed.reseeded ? 'info' : 'warn',
         surface: 'pod-open-degrade',
@@ -1872,8 +1941,8 @@ export const useSyncStore = defineStore('sync', () => {
           : 'unreadable cache could not be replaced by the chosen family file',
         context: {
           action: 'cache-reseeded-user-choice',
-          error_code: reseed.reseeded ? 'ok' : (cacheErrorName ?? 'unknown'),
-          detail: cacheInitDetail ?? undefined,
+          error_code: reseed.reseeded ? 'ok' : (reseedError ?? 'delete-blocked'),
+          detail: `cause=${cacheErrorName ?? 'unknown'}${cacheInitDetail ? `/${cacheInitDetail}` : ''}`,
         },
       });
     }

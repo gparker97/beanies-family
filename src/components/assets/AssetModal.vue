@@ -13,6 +13,7 @@ import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import { BaseCombobox } from '@/components/ui';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useAssetsStore } from '@/stores/assetsStore';
+import { getById as projectionGetById } from '@/services/automerge/projection';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFormModal } from '@/composables/useFormModal';
@@ -235,9 +236,12 @@ async function handleRemoveCustomInstitution(instName: string) {
  * `loan` is a MERGE field whose reconcile base is the WHOLE live loan, so a partial
  * `{ loan: { interestRate } }` reads as "every other sub-key was cleared" and wipes the loan.
  * The edit therefore always sends the whole loan, built from the LIVE asset at save time
- * (the store, not the open-time snapshot the page handed in) with only the sub-keys the
- * person changed since the form opened overlaid. Untouched sub-keys then equal the base and
- * are not written, so a payment that landed while the modal was open keeps its balance.
+ * with only the sub-keys the person changed since the form opened overlaid. "Live" is the
+ * EXACT base the repository reconciles against (the projection row), not the store, which
+ * can lag a cascade that moved the projection (a payment applied by the recurring
+ * processor); the store, then the open-time snapshot, are fallbacks only when the projection
+ * has no row. Untouched sub-keys then equal the base and are not written, so a payment that
+ * landed while the modal was open keeps its balance.
  * Creating a loan (none at open) or removing one (`hasLoan: false`) sends the form's object.
  * `undefined` = nothing changed: no loan key at all.
  */
@@ -245,7 +249,10 @@ function loanForSave(next: AssetLoan): AssetLoan | undefined {
   const opened = openLoan as unknown as Record<string, unknown> | null;
   if (!opened?.hasLoan || !next.hasLoan) return next;
   const nextRec = next as unknown as Record<string, unknown>;
-  const liveAsset = props.asset ? assetsStore.getAssetById(props.asset.id) : undefined;
+  const id = props.asset?.id;
+  const liveAsset = id
+    ? (projectionGetById('assets', id) ?? assetsStore.getAssetById(id))
+    : undefined;
   const whole: Record<string, unknown> = { ...((liveAsset ?? props.asset)?.loan ?? {}) };
   let changed = false;
   for (const k of new Set([...Object.keys(opened), ...Object.keys(nextRec)])) {
