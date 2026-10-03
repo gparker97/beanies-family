@@ -793,3 +793,70 @@ describe('managedProvider: the magic-beans allowance (#95)', () => {
     });
   });
 });
+
+describe('managedProvider: fetchPlanLimits (#120)', () => {
+  const BODY = {
+    trial: { period: 'day', limit: 1 },
+    basic: { period: 'month', limit: 1 },
+    full: { period: 'day', limit: 25 },
+    source: 'env',
+  };
+
+  it('GETs the keyless limits route and parses the answer', async () => {
+    const fetchMock = vi.fn(async () => respond(200, BODY));
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const { fetchPlanLimits } = await import('../managedProvider');
+    const limits = await fetchPlanLimits();
+    expect(limits.full.limit).toBe(25);
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit | undefined];
+    expect(url).toBe('https://api.example.test/ai-allowance-limits');
+    expect(init?.method ?? 'GET').toBe('GET');
+    expect(JSON.stringify(init?.headers ?? {})).not.toContain('x-api-key');
+  });
+
+  it('maps a non-2xx to not_available, naming the status', async () => {
+    globalThis.fetch = vi.fn(async () =>
+      respond(429, { message: 'Too Many Requests' })
+    ) as unknown as typeof fetch;
+    const { fetchPlanLimits } = await import('../managedProvider');
+    await expect(fetchPlanLimits()).rejects.toMatchObject({
+      code: 'not_available',
+      message: expect.stringContaining('429'),
+    });
+  });
+
+  it('maps a body that is not the shape to malformed_output', async () => {
+    globalThis.fetch = vi.fn(async () => respond(200, { full: 25 })) as unknown as typeof fetch;
+    const { fetchPlanLimits } = await import('../managedProvider');
+    await expect(fetchPlanLimits()).rejects.toMatchObject({ code: 'malformed_output' });
+  });
+
+  it('maps a network failure to provider_error', async () => {
+    globalThis.fetch = vi.fn(async () => {
+      throw new TypeError('offline');
+    }) as unknown as typeof fetch;
+    const { fetchPlanLimits } = await import('../managedProvider');
+    await expect(fetchPlanLimits()).rejects.toMatchObject({ code: 'provider_error' });
+  });
+
+  it('reuses the memo after a success', async () => {
+    const fetchMock = vi.fn(async () => respond(200, BODY));
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const { fetchPlanLimits } = await import('../managedProvider');
+    await fetchPlanLimits();
+    await fetchPlanLimits();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears the memo after a failure so the next call retries', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(respond(503, {}))
+      .mockResolvedValueOnce(respond(200, BODY));
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const { fetchPlanLimits } = await import('../managedProvider');
+    await expect(fetchPlanLimits()).rejects.toMatchObject({ code: 'not_available' });
+    await expect(fetchPlanLimits()).resolves.toMatchObject({ source: 'env' });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+});

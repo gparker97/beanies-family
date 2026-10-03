@@ -17,7 +17,7 @@
 
 import { COUNT_FAILED_PREFIX, COUNT_SKIPPED_PREFIX, countUsage } from './countUsage.mjs';
 import { USAGE_ATTRS } from './ddb.mjs';
-import { ALLOWANCE_STORE_ERROR_PREFIX } from './allowance.mjs';
+import { ALLOWANCE_CONFIG_ERROR_PREFIX, ALLOWANCE_STORE_ERROR_PREFIX } from './allowance.mjs';
 import {
   GRANT_MISMATCH_PREFIX,
   refusalAllowsHint,
@@ -54,6 +54,8 @@ export const ALARMING_PREFIXES = Object.freeze({
   grantSizeMismatch: GRANT_SIZE_MISMATCH_PREFIX,
   // #95: the allowance pre-check failed open, so managed reads are going through unchecked.
   allowanceStoreError: ALLOWANCE_STORE_ERROR_PREFIX,
+  // #120: AI_FULL_ALLOWANCE_PER_DAY is unset or malformed, so the Full allowance fell back.
+  allowanceConfigError: ALLOWANCE_CONFIG_ERROR_PREFIX,
 });
 
 /**

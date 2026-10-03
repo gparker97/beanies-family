@@ -5,17 +5,22 @@
  *
  * The cases that matter most, because getting either wrong is silent:
  *   - the token alone never makes a read `full` (a basic subscriber with a token stays basic);
- *   - a throwing store FAILS OPEN and says so under the alarmed prefix.
+ *   - a throwing store FAILS OPEN and says so under the alarmed prefix;
+ *   - a missing or malformed Full allowance env value FAILS CLOSED to the fallback, never
+ *     unlimited, and says so under its own alarmed prefix (#120).
  */
 
 import { afterEach, beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  ALLOWANCE_CONFIG_ERROR_PREFIX,
   ALLOWANCE_STORE_ERROR_PREFIX,
-  PLAN_ALLOWANCE,
+  FULL_PER_DAY_FALLBACK,
   allowanceRefusalBody,
   checkAllowance,
+  planAllowance,
+  publicLimits,
   readAllowance,
   resetsAtFor,
   safeEqual,
@@ -28,6 +33,8 @@ const TOKEN = 'plan-token-abc';
 const NOW = Date.UTC(2026, 8, 30, 15, 45); // 2026-09-30 15:45 UTC
 const BILLING = 'beanies-billing-test';
 const USAGE = 'beanies-usage-test';
+/** The Terraform-fed Full allowance the tier tests run under (#120). Not the fallback. */
+const FULL_PER_DAY_ENV = '25';
 
 class GetItemCommand {
   constructor(input) {
@@ -82,6 +89,7 @@ describe('allowance', () => {
   beforeEach(() => {
     process.env.BILLING_TABLE_NAME = BILLING;
     process.env.USAGE_TABLE = USAGE;
+    process.env.AI_FULL_ALLOWANCE_PER_DAY = FULL_PER_DAY_ENV;
     delete process.env.AI_ALLOWANCE_ENFORCE;
     lines = [];
     errors = [];
@@ -94,6 +102,7 @@ describe('allowance', () => {
     console.error = original.error;
     delete process.env.BILLING_TABLE_NAME;
     delete process.env.USAGE_TABLE;
+    delete process.env.AI_FULL_ALLOWANCE_PER_DAY;
     delete process.env.AI_ALLOWANCE_ENFORCE;
   });
 
@@ -138,13 +147,14 @@ describe('allowance', () => {
   });
 
   describe('checkAllowance', () => {
-    it('full: 10 a day, read from today’s `n` only', async () => {
+    it('full: the env-fed allowance a day, read from today’s `n` only', async () => {
       const s = stub({ billing: FULL_ROW, day: 3 });
       const v = await checkAllowance({ familyId: FAMILY, planToken: TOKEN, now: NOW, ddb: s.ddb });
       assert.deepEqual(
         { allowed: v.allowed, tier: v.tier, period: v.period, used: v.used, limit: v.limit },
-        { allowed: true, tier: 'full', period: 'day', used: 3, limit: PLAN_ALLOWANCE.full.perDay }
+        { allowed: true, tier: 'full', period: 'day', used: 3, limit: Number(FULL_PER_DAY_ENV) }
       );
+      assert.equal(planAllowance().full.perDay, Number(FULL_PER_DAY_ENV));
       assert.equal(v.resetsAt, '2026-10-01T00:00:00.000Z');
       const usageGet = s.calls.find((c) => c.input.TableName === USAGE);
       assert.equal(usageGet.kind, 'get');
@@ -372,6 +382,149 @@ describe('allowance', () => {
         resetsAt: '2026-10-01T00:00:00.000Z',
         tier: 'trial',
       }
+    );
+  });
+});
+
+describe('publicLimits: the keyless GET body (#120)', () => {
+  const original = { log: console.log, error: console.error };
+  let lines;
+
+  beforeEach(() => {
+    process.env.AI_FULL_ALLOWANCE_PER_DAY = FULL_PER_DAY_ENV;
+    lines = [];
+    console.log = (...a) => lines.push(JSON.parse(a.map(String).join(' ')));
+    console.error = () => {};
+  });
+
+  afterEach(() => {
+    console.log = original.log;
+    console.error = original.error;
+    delete process.env.AI_FULL_ALLOWANCE_PER_DAY;
+  });
+
+  it('is the planLimits.ts shape: three tiers with period + limit, and the source', () => {
+    assert.deepEqual(publicLimits(), {
+      trial: { period: 'day', limit: 1 },
+      basic: { period: 'month', limit: 1 },
+      full: { period: 'day', limit: Number(FULL_PER_DAY_ENV) },
+      source: 'env',
+    });
+  });
+
+  it('logs allowance_limits_read on every call, with no family hash', () => {
+    publicLimits();
+    publicLimits();
+    const reads = lines.filter((l) => l.msg === 'allowance_limits_read');
+    assert.equal(reads.length, 2);
+    assert.deepEqual(reads[0], {
+      msg: 'allowance_limits_read',
+      outcome: 'ok',
+      full_per_day: Number(FULL_PER_DAY_ENV),
+      source: 'env',
+    });
+    assert.ok(lines.every((l) => !('family_id_hash' in l)));
+  });
+});
+
+describe('the Full allowance env value (#120)', () => {
+  // ⚠️ Each case imports a FRESH module: the `allowance_config_loaded` latch is module state, so
+  // with the shared top-level import a "loaded once" assertion would depend on the raw value the
+  // previous case left behind (the handler.test.mjs pattern). The error line is NOT latched.
+  const fresh = () => import(`../allowance.mjs?t=${Date.now()}-${Math.random()}`);
+  const original = { log: console.log, error: console.error };
+  let lines;
+  let errors;
+
+  beforeEach(() => {
+    delete process.env.AI_FULL_ALLOWANCE_PER_DAY;
+    lines = [];
+    errors = [];
+    console.log = (...a) => lines.push(JSON.parse(a.map(String).join(' ')));
+    console.error = (...a) => errors.push(a);
+  });
+
+  afterEach(() => {
+    console.log = original.log;
+    console.error = original.error;
+    delete process.env.AI_FULL_ALLOWANCE_PER_DAY;
+  });
+
+  const loaded = () => lines.filter((l) => l.msg === 'allowance_config_loaded');
+
+  it('honours a positive whole number, with no error and one loaded line', async () => {
+    process.env.AI_FULL_ALLOWANCE_PER_DAY = '7';
+    const mod = await fresh();
+    assert.equal(mod.planAllowance().full.perDay, 7);
+    assert.equal(mod.publicLimits().source, 'env');
+    assert.equal(errors.length, 0);
+    assert.deepEqual(loaded(), [
+      { msg: 'allowance_config_loaded', full_per_day: 7, source: 'env' },
+    ]);
+  });
+
+  for (const [label, raw] of [
+    ['abc', 'abc'],
+    ['0', '0'],
+    ['-3', '-3'],
+    ['2.5', '2.5'],
+    ['1e1 (exponent)', '1e1'],
+    ['0x19 (hex)', '0x19'],
+    ['25.0 (trailing decimal)', '25.0'],
+    ['" 25 " (padded)', ' 25 '],
+    ['empty', ''],
+    ['unset', undefined],
+  ]) {
+    it(`${label}: falls back to ${FULL_PER_DAY_FALLBACK} with an alarmed error line per read, never throws`, async () => {
+      if (raw !== undefined) process.env.AI_FULL_ALLOWANCE_PER_DAY = raw;
+      const mod = await fresh();
+      assert.equal(mod.FULL_PER_DAY_FALLBACK, FULL_PER_DAY_FALLBACK);
+      assert.equal(mod.planAllowance().full.perDay, FULL_PER_DAY_FALLBACK);
+      const body = mod.publicLimits();
+      assert.equal(body.full.limit, FULL_PER_DAY_FALLBACK);
+      assert.equal(body.source, 'fallback');
+
+      assert.equal(errors.length, 2, 'one error line per fallback read (two reads above)');
+      const [message, context] = errors[0];
+      assert.deepEqual(errors[1], errors[0]);
+      assert.ok(message.startsWith(ALLOWANCE_CONFIG_ERROR_PREFIX));
+      assert.equal(mod.ALLOWANCE_CONFIG_ERROR_PREFIX, ALLOWANCE_CONFIG_ERROR_PREFIX);
+      assert.match(message, /TF_VAR_ai_full_allowance_per_day/);
+      assert.match(message, /\.beanies-tf\.env\.example/);
+      assert.match(message, /Changing the magic beans allowance/);
+      assert.deepEqual(context, {
+        raw: raw === undefined ? null : raw,
+        reason: raw === undefined || raw === '' ? 'unset' : 'not_a_positive_whole_number',
+      });
+      assert.deepEqual(loaded(), [
+        { msg: 'allowance_config_loaded', full_per_day: FULL_PER_DAY_FALLBACK, source: 'fallback' },
+      ]);
+    });
+  }
+
+  it('within one module: the error fires on every fallback read, the loaded line once per distinct value', async () => {
+    const mod = await fresh();
+    process.env.AI_FULL_ALLOWANCE_PER_DAY = 'abc';
+    mod.planAllowance();
+    mod.planAllowance();
+    assert.equal(errors.length, 2, 'the error is not latched: the alarm must stay in ALARM');
+
+    process.env.AI_FULL_ALLOWANCE_PER_DAY = 'xyz';
+    mod.planAllowance();
+    assert.equal(errors.length, 3);
+
+    process.env.AI_FULL_ALLOWANCE_PER_DAY = '25';
+    assert.equal(mod.planAllowance().full.perDay, 25);
+    mod.planAllowance();
+    assert.equal(errors.length, 3, 'a good value logs no error');
+    assert.deepEqual(
+      loaded().map((l) => [l.full_per_day, l.source]),
+      [
+        [FULL_PER_DAY_FALLBACK, 'fallback'],
+        [FULL_PER_DAY_FALLBACK, 'fallback'],
+        [25, 'env'],
+      ],
+      'one loaded line per distinct raw value: abc, xyz, 25'
     );
   });
 });

@@ -38,6 +38,8 @@ import PlanChoiceCard from '@/components/billing/PlanChoiceCard.vue';
 import AllowanceMeter from '@/components/billing/AllowanceMeter.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import { useRouter } from 'vue-router';
+import { usePlanLimits } from '@/composables/usePlanLimits';
+import type { UIStringKey } from '@/services/translation/uiStrings';
 import { usePlanSummary } from '@/composables/usePlanSummary';
 import { useReadOnlyCopy } from '@/composables/useReadOnlyCopy';
 import { formatDate } from '@/utils/date';
@@ -76,7 +78,14 @@ const BASIC_BULLETS = [
   'plan.bullets.basic2',
   'plan.bullets.basic3',
 ] as const;
-const FULL_BULLETS = ['plan.bullets.full1', 'plan.bullets.full2', 'plan.bullets.full3'] as const;
+// The Full allowance is a Terraform value served live (#120): the number when it is known, a
+// wordless line when it is not, so the page never states a stale figure.
+const { fullPerDay } = usePlanLimits();
+const FULL_BULLETS = computed<UIStringKey[]>(() => [
+  fullPerDay.value === null ? 'plan.bullets.full1Fallback' : 'plan.bullets.full1',
+  'plan.bullets.full2',
+  'plan.bullets.full3',
+]);
 
 function choose(next: PlanId): void {
   plan.value = next;
@@ -502,6 +511,7 @@ watch(
           :list="fullPrice.list"
           :per-key="interval === 'month' ? 'plan.per.month' : 'plan.per.year'"
           :bullets="FULL_BULLETS"
+          :vars="{ count: fullPerDay }"
           @choose="choose"
         >
           <div

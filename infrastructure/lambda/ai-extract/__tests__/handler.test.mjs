@@ -50,8 +50,10 @@ function makeEvent({
   headers = {},
   body,
   origin = 'https://beanies.family',
+  routeKey,
 } = {}) {
   return {
+    ...(routeKey === undefined ? {} : { routeKey }),
     requestContext: { http: { method } },
     headers: { origin, ...headers },
     body: body === undefined ? '{}' : typeof body === 'string' ? body : JSON.stringify(body),
@@ -116,6 +118,43 @@ describe('ai-extract Lambda handler', () => {
     it('returns 405 for GET', async () => {
       const res = await handler(makeEvent({ method: 'GET', headers: keyHeader }));
       assert.equal(res.statusCode, 405);
+    });
+
+    it('returns 405 for any other GET route, key or not (#120)', async () => {
+      const res = await handler(
+        makeEvent({ method: 'GET', headers: keyHeader, routeKey: 'GET /other' })
+      );
+      assert.equal(res.statusCode, 405);
+    });
+
+    it('GET /ai-allowance-limits: 200 with no key, the planLimits.ts shape, cached (#120)', async () => {
+      process.env.AI_FULL_ALLOWANCE_PER_DAY = '25';
+      try {
+        const res = parseResponse(
+          await handler(
+            makeEvent({ method: 'GET', body: '', routeKey: 'GET /ai-allowance-limits' })
+          )
+        );
+        assert.equal(res.statusCode, 200);
+        assert.equal(res.headers['Cache-Control'], 'public, max-age=300');
+        assert.match(res.headers['Access-Control-Allow-Methods'], /\bGET\b/);
+        assert.equal(res.headers['Content-Type'], 'application/json');
+        // The `parsePlanLimits` contract (packages/brand/planLimits.ts), asserted field by field.
+        const body = res.parsedBody;
+        assert.deepEqual(Object.keys(body).sort(), ['basic', 'full', 'source', 'trial']);
+        for (const tier of ['trial', 'basic', 'full']) {
+          assert.ok(['day', 'month'].includes(body[tier].period), tier);
+          assert.ok(Number.isInteger(body[tier].limit) && body[tier].limit >= 1, tier);
+        }
+        assert.deepEqual(body, {
+          trial: { period: 'day', limit: 1 },
+          basic: { period: 'month', limit: 1 },
+          full: { period: 'day', limit: 25 },
+          source: 'env',
+        });
+      } finally {
+        delete process.env.AI_FULL_ALLOWANCE_PER_DAY;
+      }
     });
 
     it('returns 401 with no api key', async () => {

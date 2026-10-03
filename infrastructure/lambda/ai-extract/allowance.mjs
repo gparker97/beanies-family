@@ -8,14 +8,15 @@
  * period, then allowed or not:
  *
  *   full   subscribed (active | trialing | past_due), on the `full` plan, AND the request carries
- *          the family's plan token (sha256 matches `planTokenHash`). 10 a UTC day.
+ *          the family's plan token (sha256 matches `planTokenHash`). `AI_FULL_ALLOWANCE_PER_DAY`
+ *          a UTC day (Terraform-fed, #120; see `readFullPerDay`).
  *   basic  subscribed without that: the basic plan, or a full plan whose token is missing or
  *          wrong. 1 a UTC month.
  *   trial  everything else, INCLUDING a family whose trial has ended. 1 a UTC day.
  *
  * ⚠️ THE TOKEN ALONE NEVER MAKES A READ `full`. Every paying family is issued a token at claim,
  * basic ones included, so "subscribed + matching token" without the plan check would hand a basic
- * subscriber ten beans a day. The token proves the caller is the family; the row's `plan` says
+ * subscriber the full daily allowance. The token proves the caller is the family; the row's `plan` says
  * what the family bought. Both are required.
  *
  * ⚠️ NO TRIAL CLOCK HERE, and no registry read. This Lambda has no Origin-keyed dev/prod table
@@ -54,16 +55,113 @@ import { dayIso } from './countUsage.mjs';
 import { USAGE_ATTRS, hash, marshalKey, resolveClient, usageKey } from './ddb.mjs';
 
 /**
- * The allowance per tier. ⚠️ Must equal `MAGIC_BEANS` in `packages/brand/pricing.ts` (the numbers
- * the pricing page sells); `lambdaContractParity.test.ts` asserts it. It lives HERE rather than in
- * the registry's entitlement module because this Lambda is its only consumer and every Lambda is
- * its own zip.
+ * The allowance per tier, built by `planAllowance()`. Trial and Basic are fixed here and ⚠️ must
+ * equal `MAGIC_BEANS` in `packages/brand/pricing.ts` (the numbers the pricing page sells);
+ * `lambdaContractParity.test.ts` asserts it. It lives HERE rather than in the registry's
+ * entitlement module because this Lambda is its only consumer and every Lambda is its own zip.
+ *
+ * The Full per-day value is NOT in the repo (#120). Terraform feeds it from
+ * `TF_VAR_ai_full_allowance_per_day` (greg's private `~/.beanies-tf.env`) as the env var
+ * `AI_FULL_ALLOWANCE_PER_DAY`, read at CALL time like `tables()` and `enforce`, so changing it is
+ * one apply and no release. The site and the app learn it from `GET /ai-allowance-limits`
+ * (`publicLimits()` below; the consumer twin is `packages/brand/planLimits.ts`).
+ *
+ * ⚠️ A missing or malformed value FAILS CLOSED to `FULL_PER_DAY_FALLBACK`, the last enforced value:
+ * never unlimited (an undefined `limit` would make `used >= limit` false forever) and never a
+ * refusal. EVERY read that falls back logs under `ALLOWANCE_CONFIG_ERROR_PREFIX`, which a CloudWatch
+ * metric filter alarms on, so the alarm stays in ALARM for as long as any warm container serves the
+ * fallback (the route throttle bounds the volume), and every limits read reports
+ * `source: 'fallback'` until it is fixed.
  */
-export const PLAN_ALLOWANCE = Object.freeze({
-  trial: Object.freeze({ perDay: 1 }),
-  basic: Object.freeze({ perMonth: 1 }),
-  full: Object.freeze({ perDay: 10 }),
-});
+export const FULL_PER_DAY_FALLBACK = 10;
+
+/**
+ * ⚠️ The exact prefix the CloudWatch metric filter matches (`allowance_config_error` in
+ * `modules/ai-extract/main.tf`). It is in `meter.mjs` `ALARMING_PREFIXES`, so `meter.test.mjs`
+ * fails if the two drift.
+ */
+export const ALLOWANCE_CONFIG_ERROR_PREFIX = '[ai-extract] allowance_config_error';
+
+const ALLOWANCE_CONFIG_REMEDIATION =
+  'Set TF_VAR_ai_full_allowance_per_day to a positive whole number in ~/.beanies-tf.env (template: ' +
+  'infrastructure/.beanies-tf.env.example), then plan and apply module.ai_extract as described in ' +
+  'docs/runbooks/pricing-launch.md "Changing the magic beans allowance".';
+
+/** Longest raw env value echoed into a log line. A real value is a few digits. */
+const MAX_LOGGED_RAW_CHARS = 64;
+
+/**
+ * The raw env value the `allowance_config_loaded` line was last logged for. A sentinel to start, so
+ * an UNSET variable (raw `undefined`) still logs on the first read. Latching on the raw value means
+ * a cold start logs the success line exactly once, and a test that changes the env logs again
+ * without a reset hook. ⚠️ The error line is NOT latched: it fires on every fallback read, so the
+ * alarm cannot return to OK while the value is still broken.
+ */
+const NOT_YET_LOGGED = Symbol('not-yet-logged');
+let lastLoggedRaw = NOT_YET_LOGGED;
+
+/** Only a plain run of decimal digits is a whole number here: no sign, exponent, hex or decimals. */
+const WHOLE_NUMBER = /^\d+$/;
+
+/**
+ * The Full per-day limit, parsed from the env on every call (one regex and one `Number()`; no memo,
+ * so the value can never go stale behind a warm container). The ONLY reader of the env var.
+ *
+ * Accepts only a plain digit string (`"1e1"`, `"0x19"`, `"25.0"` and `" 25 "` all fall back), then
+ * requires `n >= 1` and a safe integer.
+ *
+ * @returns {{ perDay: number, source: 'env' | 'fallback' }}
+ */
+function readFullPerDay() {
+  const raw = process.env.AI_FULL_ALLOWANCE_PER_DAY;
+  let reason = null;
+  let n = NaN;
+  if (raw === undefined || String(raw).trim() === '') {
+    reason = 'unset';
+  } else {
+    n = WHOLE_NUMBER.test(String(raw)) ? Number(raw) : NaN;
+    if (!Number.isSafeInteger(n) || n < 1) reason = 'not_a_positive_whole_number';
+  }
+  const result = reason
+    ? { perDay: FULL_PER_DAY_FALLBACK, source: 'fallback' }
+    : { perDay: n, source: 'env' };
+
+  if (reason) {
+    const why = reason === 'unset' ? 'unset' : 'not a positive whole number';
+    console.error(
+      `${ALLOWANCE_CONFIG_ERROR_PREFIX}: AI_FULL_ALLOWANCE_PER_DAY is ${why}, so the Full plan ` +
+        `allowance fell back to ${FULL_PER_DAY_FALLBACK} a day.\n${ALLOWANCE_CONFIG_REMEDIATION}`,
+      { raw: raw === undefined ? null : String(raw).slice(0, MAX_LOGGED_RAW_CHARS), reason }
+    );
+  }
+  if (raw !== lastLoggedRaw) {
+    lastLoggedRaw = raw;
+    // The success-path line (on the fallback too), so the live value is visible per cold start.
+    logLine('allowance_config_loaded', undefined, {
+      full_per_day: result.perDay,
+      source: result.source,
+    });
+  }
+  return result;
+}
+
+/** The frozen per-tier table for a given Full per-day value. */
+function allowanceTable(fullPerDay) {
+  return Object.freeze({
+    trial: Object.freeze({ perDay: 1 }),
+    basic: Object.freeze({ perMonth: 1 }),
+    full: Object.freeze({ perDay: fullPerDay }),
+  });
+}
+
+/**
+ * The allowance per tier, with the Full value read from the env NOW.
+ *
+ * @returns {Readonly<{ trial: { perDay: number }, basic: { perMonth: number }, full: { perDay: number } }>}
+ */
+export function planAllowance() {
+  return allowanceTable(readFullPerDay().perDay);
+}
 
 /** Billing statuses that count as paying. `past_due` is still paying (Smart Retries running). */
 export const SUBSCRIBED_STATUSES = Object.freeze(new Set(['active', 'trialing', 'past_due']));
@@ -121,9 +219,9 @@ export function tierFor(billing, planToken) {
   return billing.plan === 'full' && tokenMatches ? 'full' : 'basic';
 }
 
-/** `{ period, limit }` for a tier, straight from PLAN_ALLOWANCE. */
-function periodFor(tier) {
-  const rule = PLAN_ALLOWANCE[tier];
+/** `{ period, limit }` for a tier, straight from `planAllowance()` (or a table already read). */
+function periodFor(tier, table = planAllowance()) {
+  const rule = table[tier];
   return rule.perMonth !== undefined
     ? { period: 'month', limit: rule.perMonth }
     : { period: 'day', limit: rule.perDay };
@@ -246,10 +344,43 @@ async function computeUsage({ familyId, planToken, now, ddb, table }) {
   return { tier, period, limit, used, resetsAt: resetsAtFor(period, now) };
 }
 
-/** One structured JSON line, the registry's `entitlement_computed` shape. Hash only, never the id. */
+/**
+ * One structured JSON line, the registry's `entitlement_computed` shape. Hash only, never the id.
+ * A family-less line (`familyId` undefined: config, public limits) carries no `family_id_hash`
+ * rather than the sha256 of the string "undefined".
+ */
 function logLine(msg, familyId, fields) {
+  const family = familyId === undefined ? {} : { family_id_hash: hash(familyId) };
   // eslint-disable-next-line no-console -- structured success-path decision line, read by CloudWatch
-  console.log(JSON.stringify({ msg, family_id_hash: hash(familyId), ...fields }));
+  console.log(JSON.stringify({ msg, ...family, ...fields }));
+}
+
+/**
+ * The body of the keyless `GET /ai-allowance-limits` (#120): the three public numbers and where
+ * the Full one came from. The ONLY builder of this shape; `index.mjs` routes to it and adds
+ * nothing. ⚠️ Must match `parsePlanLimits` in `packages/brand/planLimits.ts` (the consumer twin;
+ * a Lambda is its own zip and cannot import it). No family data, no store access.
+ *
+ * Logs `allowance_limits_read` on every call, so the read rate and the live value are visible.
+ *
+ * @returns {{ trial: { period: 'day', limit: number }, basic: { period: 'month', limit: number },
+ *   full: { period: 'day', limit: number }, source: 'env' | 'fallback' }}
+ */
+export function publicLimits() {
+  const { perDay, source } = readFullPerDay();
+  const table = allowanceTable(perDay);
+  const body = {
+    trial: periodFor('trial', table),
+    basic: periodFor('basic', table),
+    full: periodFor('full', table),
+    source,
+  };
+  logLine('allowance_limits_read', undefined, {
+    outcome: 'ok',
+    full_per_day: body.full.limit,
+    source,
+  });
+  return body;
 }
 
 /** Only a string id within bounds can key a usage row. Absent ⇒ nothing to count against. */

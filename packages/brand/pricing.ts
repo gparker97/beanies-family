@@ -137,8 +137,9 @@ export const numericPrice = (price: string): string => price.replace(/[^0-9.]/g,
 export const TRIAL_DAYS = 90;
 
 /** Magic beans allowances. The trial gets a taste; basic keeps one a month so
- *  the feature is discoverable rather than invisible. */
-export const MAGIC_BEANS = { trialPerDay: 1, basicPerMonth: 1, fullPerDay: 10 } as const;
+ *  the feature is discoverable rather than invisible. The Full plan's daily number is
+ *  deliberately absent: it is a Terraform value served live (`planLimits.ts`, #120). */
+export const MAGIC_BEANS = { trialPerDay: 1, basicPerMonth: 1 } as const;
 
 /** Competitor pricing cited on the page. Dated on purpose: a dated figure ages
  *  into a historical fact, an undated one ages into a false claim. */

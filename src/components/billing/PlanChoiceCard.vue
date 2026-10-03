@@ -6,6 +6,7 @@
  */
 import type { PlanId } from '@beanies/brand/pricing';
 import { useTranslation } from '@/composables/useTranslation';
+import { fillTemplate } from '@/utils/fillTemplate';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 
 const props = defineProps<{
@@ -18,6 +19,8 @@ const props = defineProps<{
   list: string;
   perKey: UIStringKey;
   bullets: readonly UIStringKey[];
+  /** Placeholder values for the bullets (e.g. the live Full allowance `{count}`). */
+  vars?: Record<string, unknown>;
 }>();
 
 const emit = defineEmits<{ (e: 'choose', plan: PlanId): void }>();
@@ -79,7 +82,7 @@ function onKey(e: KeyboardEvent): void {
         <span aria-hidden="true" class="text-primary-500 dark:text-accent-lift text-xs leading-5"
           >●</span
         >
-        {{ t(k) }}
+        {{ fillTemplate(t(k), vars ?? {}) }}
       </li>
     </ul>
   </div>

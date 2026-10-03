@@ -103,6 +103,10 @@ const { sections } = Astro.props;
 </div>
 
 <script>
+  import { hydrateBeanLimits } from '../lib/planLimits';
+
+  void hydrateBeanLimits();
+
   // Copy-to-clipboard for code blocks in the help article renderer.
   for (const root of document.querySelectorAll<HTMLElement>('[data-help-code]')) {
     const btn = root.querySelector<HTMLButtonElement>('[data-help-copy]');
