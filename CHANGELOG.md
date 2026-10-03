@@ -16,6 +16,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - The "how did you hear about us?" answer is now saved on the family's registry entry.
 - Native installs are now attributed: the Android app reads the Google Play install referrer once, and the founder dashboard shows inferred-attribution bands for families that arrived without a tag.
 
+### Changed
+
+- The App Store link from beanies.family now carries Apple's campaign parameters per ad, and the privacy page describes the first-party campaign record, the survey answer on the registry entry and the Play install referrer.
+
+### Fixed
+
+- The iOS simulator build lane no longer runs out of Node heap on the macOS runner (it now has the same 4 GB limit as the release lane).
+
 ## 2026-10-02
 
 ### Added
