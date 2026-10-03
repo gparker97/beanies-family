@@ -81,7 +81,7 @@ export interface UsePhotosOptions {
    * specific ID removed on remove). Integration plans pass the entity store's
    * update function here, e.g. `(ids) => activityStore.update(entity.id, { photoIds: ids })`.
    */
-  updatePhotoIds: (ids: UUID[]) => void;
+  updatePhotoIds: (ids: UUID[]) => void | Promise<unknown>;
   /**
    * Per-entity cap override. Defaults to MAX_PHOTOS_PER_SET (4).
    * Medication bottles and cook-log dish snaps pass `max: 1`.
@@ -115,8 +115,11 @@ export interface UsePhotosReturn {
   uploading: Ref<number>;
   /** Attach one or more files (files come from useFilePicker / useFileDrop). */
   add: (files: File[]) => Promise<UUID[]>;
-  /** Mark a photo deleted (tombstone) and drop its reference from this entity. */
-  remove: (photoId: UUID) => void;
+  /**
+   * Drop the photo from this entity, then tombstone it ONLY if no other host still
+   * references it (`photoStore.markDeleted` checks). Resolves once both have been attempted.
+   */
+  remove: (photoId: UUID) => Promise<void>;
 }
 
 export function usePhotos(options: UsePhotosOptions): UsePhotosReturn {
@@ -284,13 +287,14 @@ export function usePhotos(options: UsePhotosOptions): UsePhotosReturn {
     return [...completedIds, ...queuedIds];
   }
 
-  function remove(photoId: UUID): void {
-    // Tombstone the photo AND drop it from this entity's photoIds so the
-    // tile disappears immediately (the 24h GC grace handles the final
-    // Drive + Automerge cleanup).
-    store.markDeleted(photoId);
+  async function remove(photoId: UUID): Promise<void> {
+    // Detach FIRST (the tile disappears immediately), and only then ask the store to
+    // tombstone: it writes `deletedAt` solely when no host references the id any more, so a
+    // photo shared with another entity survives this removal. A failed host update (the
+    // binding rolls it back) leaves the reference in the doc and the tombstone is refused.
     const currentIds = unref(options.photoIds) ?? [];
-    options.updatePhotoIds(currentIds.filter((id) => id !== photoId));
+    await options.updatePhotoIds(currentIds.filter((id) => id !== photoId));
+    await store.markDeleted(photoId);
   }
 
   return { photos, pending, canAdd, atCap, uploading, add, remove };

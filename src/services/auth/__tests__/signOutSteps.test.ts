@@ -73,7 +73,49 @@ describe('SIGN_OUT_CLEARED_ELSEWHERE_STEPS (#100)', () => {
   });
 
   it('the clear tier still deletes', () => {
-    expect(SIGN_OUT_CLEAR_STEPS).toContain('deleteFamilyDb');
+    expect(SIGN_OUT_CLEAR_STEPS).toContain('deleteAllLocalFamilies');
+  });
+
+  it('never announces the end of the session (an echo would ping-pong between tabs)', () => {
+    expect(SIGN_OUT_CLEARED_ELSEWHERE_STEPS).not.toContain('announceSessionEnded');
+  });
+});
+
+describe('C6: tier 3 forgets EVERY family, not only the active one', () => {
+  it('runs the every-family delete in place of the active-family one', () => {
+    expect(SIGN_OUT_CLEAR_STEPS).toContain('deleteAllLocalFamilies');
+    expect(SIGN_OUT_CLEAR_STEPS).not.toContain('deleteFamilyDb');
+    // It needs the active id resolved first (a legacy session may never have registered it).
+    expect(SIGN_OUT_CLEAR_STEPS.indexOf('resolveFamilyId')).toBeLessThan(
+      SIGN_OUT_CLEAR_STEPS.indexOf('deleteAllLocalFamilies')
+    );
+  });
+
+  it('counts as dropping key material (it forgets keys, wraps and passkeys per family)', () => {
+    expect(KEY_MATERIAL_STEPS.has('deleteAllLocalFamilies')).toBe(true);
+  });
+});
+
+describe('C10: every non-trusted tier tells the other tabs the session ended', () => {
+  it('untrusted, clear and both eviction tiers announce, AFTER any delete attempt', () => {
+    for (const steps of [
+      SIGN_OUT_UNTRUSTED_STEPS,
+      SIGN_OUT_CLEAR_STEPS,
+      SIGN_OUT_EVICTION_LOCK_STEPS,
+      SIGN_OUT_EVICTED_STEPS,
+    ]) {
+      expect(steps).toContain('announceSessionEnded');
+    }
+    expect(SIGN_OUT_UNTRUSTED_STEPS.indexOf('deleteFamilyDb')).toBeLessThan(
+      SIGN_OUT_UNTRUSTED_STEPS.indexOf('announceSessionEnded')
+    );
+    expect(SIGN_OUT_CLEAR_STEPS.indexOf('deleteAllLocalFamilies')).toBeLessThan(
+      SIGN_OUT_CLEAR_STEPS.indexOf('announceSessionEnded')
+    );
+  });
+
+  it('a trusted sign-out keeps the device signed in elsewhere, so it never announces', () => {
+    expect(SIGN_OUT_TRUSTED_STEPS).not.toContain('announceSessionEnded');
   });
 });
 

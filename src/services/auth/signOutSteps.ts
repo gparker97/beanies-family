@@ -12,8 +12,10 @@
  *
  * Documented exceptions to "tier N+1 is a strict superset of tier N" (asserted, as
  * exceptions, by the unit test):
- *   - `resetDocClient` runs in tier 2 only — tier 3's `deleteFamilyDb` →
+ *   - `resetDocClient` runs in tier 2 only — tier 3's `deleteAllLocalFamilies` →
  *     `clearCache` resets the worker doc anyway; running both is redundant churn.
+ *   - `deleteFamilyDb` runs in tier 2 only — tier 3 runs `deleteAllLocalFamilies`, its
+ *     every-family superset (C6: tier 3 used to clear only the ACTIVE family's cache).
  *
  * Every step is individually caught by the runner: a hung Drive call or broken
  * IndexedDB must never block the sign-out (a user who can't sign out is much worse
@@ -34,6 +36,20 @@ export type SignOutStepName =
   | 'resetDocClient'
   | 'resolveFamilyId'
   | 'deleteFamilyDb'
+  /**
+   * Tier 3 (C6): forget EVERY family this device holds — the registry's families plus any
+   * `beanies-automerge-*` / photo-queue database the registry no longer lists — through
+   * `familyContext.deleteLocalFamily`, recording each outcome into `cacheDeleted`. The
+   * active-family-only `deleteFamilyDb` left every other family's cache on a "clean" device.
+   */
+  | 'deleteAllLocalFamilies'
+  /**
+   * Tell this family's other tabs the session ended here (C10), WHETHER OR NOT the cache
+   * delete ran: a kept cache must not leave the person signed in next door. Every
+   * non-trusted tier runs it; the trusted and cleared-elsewhere tiers never do (a trusted
+   * sign-out keeps the device's sessions by design, and an echo would ping-pong).
+   */
+  | 'announceSessionEnded'
   | 'clearKeyCacheFamily'
   | 'clearKeyCacheAll'
   | 'removePinWrapsFamily'
@@ -112,6 +128,7 @@ export const SIGN_OUT_UNTRUSTED_STEPS: readonly SignOutStepName[] = [
   'resetDocClient',
   'resolveFamilyId',
   'deleteFamilyDb',
+  'announceSessionEnded',
   'clearKeyCacheFamily',
   'removePinWrapsFamily',
   'removeRosterFamily',
@@ -130,7 +147,8 @@ export const SIGN_OUT_CLEAR_STEPS: readonly SignOutStepName[] = [
   'resetSyncState',
   'clearDepartedArtifacts',
   'resolveFamilyId',
-  'deleteFamilyDb',
+  'deleteAllLocalFamilies',
+  'announceSessionEnded',
   'untrustDevice',
   // Right after `untrustDevice`, which marks the trust question ANSWERED as a side effect
   // of `setTrustedDevice(false)`. Without the re-arm, the next person to sign in on a
@@ -163,6 +181,7 @@ export const SIGN_OUT_EVICTION_LOCK_STEPS: readonly SignOutStepName[] = [
   'cancelReminders',
   'resetSyncState',
   'resetDocClient',
+  'announceSessionEnded',
   'clearKeyCacheFamily',
   'sweepHandoffFiles',
   'clearKeptRecipe',
@@ -199,6 +218,7 @@ export const KEY_MATERIAL_STEPS: ReadonlySet<SignOutStepName> = new Set<SignOutS
   'removePinWrapsFamily',
   'removePinWrapsAll',
   'forgetLocalFamily',
+  'deleteAllLocalFamilies',
 ]);
 
 /** Whether running these steps leaves this device unable to reopen the pod unattended. */

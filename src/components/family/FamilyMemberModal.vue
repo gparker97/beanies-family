@@ -254,7 +254,7 @@ function onAvatarRemoved(photoId: UUID) {
   // pre-existing avatar (if that's what was removed) is tombstoned on
   // save instead, since the user may still hit Cancel and revert.
   if (uploadedButNotSaved.value.includes(photoId)) {
-    photoStore.markDeleted(photoId);
+    void photoStore.markDeleted(photoId);
     uploadedButNotSaved.value = uploadedButNotSaved.value.filter((id) => id !== photoId);
   }
 }
@@ -279,12 +279,20 @@ async function handleClose(): Promise<void> {
     if (!ok) return;
   }
   for (const id of uploadedButNotSaved.value) {
-    photoStore.markDeleted(id);
+    void photoStore.markDeleted(id);
   }
   uploadedButNotSaved.value = [];
   initialSnapshot.value = '';
   emit('close');
 }
+
+/**
+ * How long the previous avatar's tombstone waits for the member save to land. The modal
+ * emits `save` and the PARENT persists it, so success is observed in the doc (the member no
+ * longer references the old photo), not returned here. Past this the old avatar is left
+ * alive — a stale file on Drive, never a member with a missing face.
+ */
+const AVATAR_RELEASE_WAIT_MS = 15_000;
 
 const isOwnerMember = computed(() => props.member?.role === 'owner');
 
@@ -325,13 +333,12 @@ function handleSave() {
 
     // Avatar photo: include the current selection (or explicit undefined to
     // clear a removed avatar — automergeRepository treats explicit
-    // undefined as "delete this key"). Tombstone the PREVIOUS avatar if it
-    // was replaced or removed; the new one (if any) is now referenced by
-    // this member so it stays.
+    // undefined as "delete this key"). The PREVIOUS avatar, if replaced or
+    // removed, is released AFTER the save is emitted (below): the store
+    // tombstones it only once the member no longer references it, i.e.
+    // only once the parent's save has landed. A failed save keeps it.
     const previousId = initialAvatarPhotoId.value;
-    if (previousId && previousId !== avatarPhotoId.value) {
-      photoStore.markDeleted(previousId);
-    }
+    const releasePrevious = !!previousId && previousId !== avatarPhotoId.value;
     // The current avatar (if it's one we just uploaded) is about to be
     // saved as a reference on the member — it's no longer an orphan.
     uploadedButNotSaved.value = uploadedButNotSaved.value.filter(
@@ -342,7 +349,7 @@ function handleSave() {
     // the old one on each new upload? No — re-upload doesn't auto-tombstone
     // the previous session upload. Clean those up here.
     for (const id of uploadedButNotSaved.value) {
-      photoStore.markDeleted(id);
+      void photoStore.markDeleted(id);
     }
     uploadedButNotSaved.value = [];
 
@@ -373,6 +380,9 @@ function handleSave() {
         // CREATE only: every new member starts as 'member'.
         role: 'member' as const,
       } as CreateFamilyMemberInput);
+    }
+    if (releasePrevious && previousId) {
+      void photoStore.markDeleted(previousId, { awaitDetachMs: AVATAR_RELEASE_WAIT_MS });
     }
   } finally {
     isSubmitting.value = false;

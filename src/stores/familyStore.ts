@@ -14,6 +14,8 @@ import { computeInitials } from '@/utils/memberInitials';
 import { sameAccount } from '@/utils/email';
 import { isBlankMemberColor } from '@/constants/memberColors';
 import { logEvent } from '@/services/telemetry/logEvent';
+import { showToast } from '@/composables/useToast';
+import { useTranslationStore } from '@/stores/translationStore';
 import { REQUIRED_EPOCH } from '@/services/pod/podSoak';
 import { APP_VERSION } from '@/constants/appVersion';
 import {
@@ -745,6 +747,16 @@ export const useFamilyStore = defineStore('family', () => {
     });
     if (staged === undefined) return { removed: false, refusal: 'error' }; // wrapAsync toasted
     if (staged === null) return refuse('not-found', id);
+    if (staged.unattributedKits > 0) {
+      // Audit C10: kits with no `createdBy` stay live on a removal; nudge the remover.
+      showToast('info', useTranslationStore().t('family.removedMemberKitsNudge'));
+      logEvent({
+        level: 'info',
+        surface: 'member-removal',
+        message: 'unattributed_kits_nudge',
+        context: { action: 'remove', count: staged.unattributedKits },
+      });
+    }
 
     const saveStatus = await syncStore.syncNowDurable(syncStore.CREDENTIAL_PUBLISH_TIMEOUT_MS);
     if (saveStatus !== 'saved') {
@@ -932,6 +944,16 @@ export const useFamilyStore = defineStore('family', () => {
 
     const merge = (id: string, p: Patch) => patches.set(id, { ...(patches.get(id) ?? {}), ...p });
 
+    // ⚠️ THE STORED FLAG, NOT THE DEFAULTED ONE (C10). `list` has been through the
+    // repository's `applyDefaults`, which fills a missing `canManagePod` with
+    // `role === 'owner'` — so for a legacy admin with no stored flag it already reads
+    // `false`, and `m.canManagePod ?? true` could never reach its `true`. Every legacy
+    // admin was migrated to a member WITHOUT pod management. Read the raw projection row
+    // for the flag being preserved; absent there means "never stored", which is the case
+    // the migration exists for.
+    const storedCanManagePod = (id: string): boolean | undefined =>
+      (projectionGetById('familyMembers', id) as Partial<FamilyMember> | undefined)?.canManagePod;
+
     // 1. Ensure exactly one owner.
     const owners = list.filter((m) => m.role === 'owner');
     if (owners.length > 1) {
@@ -974,7 +996,7 @@ export const useFamilyStore = defineStore('family', () => {
       if (m.role === 'admin') {
         merge(m.id, {
           role: 'member',
-          canManagePod: m.canManagePod ?? true,
+          canManagePod: storedCanManagePod(m.id) ?? true,
         });
       }
     }

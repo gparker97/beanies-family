@@ -12,8 +12,6 @@
 
 const DEFAULT_MAX_DIMENSION = 2048;
 const DEFAULT_JPEG_QUALITY = 0.85;
-/** Below this size AND already a small JPEG, skip recompression. */
-const SMALL_BYTES_THRESHOLD = 256 * 1024;
 
 export interface CompressedImage {
   blob: Blob;
@@ -57,13 +55,13 @@ export async function compress(
   try {
     const { width, height } = bitmap;
     const longEdge = Math.max(width, height);
-    const isJpeg = file.type === 'image/jpeg' || file.type === 'image/jpg';
 
-    // Early return: small JPEGs that are already within the dimension cap
-    // don't need recompression — we'd just re-encode for no benefit.
-    if (isJpeg && file.size <= SMALL_BYTES_THRESHOLD && longEdge <= maxDimension) {
-      return { blob: file, width, height, mime: 'image/jpeg' };
-    }
+    // EVERY input goes through the canvas, including a small JPEG already within the cap
+    // (C11). The former "small JPEG" early return shipped the original bytes, and a phone
+    // JPEG carries EXIF — GPS, capture time, device serial — which then sat behind an
+    // anyone-with-link URL. A canvas re-encode writes pixels only. `createImageBitmap`
+    // honours the EXIF orientation by default, so the re-encode is upright. There is no
+    // type that could skip this: every non-JPEG is re-encoded to JPEG anyway.
 
     const scale = longEdge > maxDimension ? maxDimension / longEdge : 1;
     const targetWidth = Math.round(width * scale);

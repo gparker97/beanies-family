@@ -42,6 +42,7 @@ import {
   hasUnpushedChanges,
   headsFingerprint,
   decodeHeadsFingerprint,
+  revisionAdvance,
 } from './remoteBaseline';
 import { isChunkName } from './chunkNames';
 import { LocalStorageProvider } from './providers/localProvider';
@@ -51,7 +52,8 @@ import { TokenExpiredError } from '@/services/google/googleAuth';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
 import { mergeEnvelopes, withoutPayload } from './envelopeMerge';
 import { logRecoveryKitsExhausted, logRevokedEntriesFiltered } from './revocationLog';
-import { setFlushProvider, setResaveHandler } from './offlineQueue';
+import { enqueueOfflineSave, setFlushProvider, setResaveHandler } from './offlineQueue';
+import { isNetworkError } from '@/utils/isNetworkError';
 import {
   usePollWhileVisible,
   type PollWhileVisibleHandle,
@@ -338,6 +340,69 @@ let currentProviderFamilyId: string | null = null;
 let currentFamilyKey: CryptoKey | null = null;
 let currentEnvelope: BeanpodFileV4 | null = null;
 let noKeyWarnedOnce = false;
+
+/**
+ * A save was asked for while no family key was installed (audit C12). The intent is real
+ * (an edit before unlock, a cold-start autosave), and dropping it on the floor meant the
+ * edit waited for some unrelated later change to reach the file. `setFamilyKey` re-arms it.
+ */
+let saveDeferred = false;
+
+function noteSaveDeferredNoKey(where: 'save' | 'autosave' | 'save-now' | 'flush'): void {
+  if (saveDeferred) return;
+  saveDeferred = true;
+  logEvent({
+    level: 'info',
+    surface: 'sync-save',
+    message: 'save deferred until a family key is installed',
+    context: { action: 'save-deferred-no-key', detail: where },
+  });
+}
+
+/**
+ * Save holds (audit C3). While any hold is live no save may run: a cross-family decrypt
+ * installs the NEW family's key and document in the worker while the OLD family's provider
+ * is still bound, and a debounced save landing in that window would write one household's
+ * document into the other's file. A save asked for during a hold is remembered and re-armed
+ * when the last hold releases (by then provider and envelope agree again). Tokens, not a
+ * counter, so `reset()` can drop every hold without a late release going negative.
+ */
+const saveHolds = new Set<symbol>();
+let heldSaveIntent = false;
+
+/**
+ * Hold every save until the returned release runs. Cancels (and remembers) an armed
+ * debounced save. Release is idempotent.
+ */
+export function holdSaves(reason: string): () => void {
+  const token = Symbol(reason);
+  saveHolds.add(token);
+  if (cancelPendingSave()) heldSaveIntent = true;
+  logEvent({
+    level: 'info',
+    surface: 'sync-save',
+    message: 'saves held',
+    context: { action: 'saves-held', detail: reason },
+  });
+  return () => {
+    if (!saveHolds.delete(token)) return;
+    if (saveHolds.size > 0 || !heldSaveIntent) return;
+    heldSaveIntent = false;
+    triggerDebouncedSave();
+  };
+}
+
+/** A typed refusal from the save path. The message reaches `lastError`; `code` is for logs. */
+export type SaveRefusalCode = 'family-mismatch';
+export class SaveRefusedError extends Error {
+  readonly code: SaveRefusalCode;
+  constructor(code: SaveRefusalCode, message: string) {
+    super(message);
+    // Literal: the prod build minifies class names.
+    this.name = 'SaveRefusedError';
+    this.code = code;
+  }
+}
 /**
  * The last `version=…,seq=…` this device wrote, so `pod-version` is emitted on
  * TRANSITION only. A family saves constantly; a per-save event would be a large
@@ -915,6 +980,18 @@ export function setFamilyKey(familyKey: CryptoKey, envelope: BeanpodFileV4): voi
   // that keeps ONE write path for the in-memory envelope, so the payload strip
   // (and the cache seed) cannot be applied on one path and missed on the other.
   setEnvelope(envelope);
+  // A save that arrived before any key existed is put back now (audit C12). Debounced,
+  // and still subject to every guard in `doSave` (holds, family match, the merge).
+  if (saveDeferred) {
+    saveDeferred = false;
+    logEvent({
+      level: 'info',
+      surface: 'sync-save',
+      message: 'deferred save re-armed by the family key',
+      context: { action: 'save-deferred-rearmed' },
+    });
+    triggerDebouncedSave();
+  }
 }
 
 /**
@@ -984,6 +1061,12 @@ export function reset(): void {
   currentFamilyKey = null;
   currentEnvelope = null;
   noKeyWarnedOnce = false;
+  // Per family, like everything else here: a deferred save, a held intent or a pending
+  // race re-merge must not follow a sign-out or a switch into the next family.
+  saveDeferred = false;
+  saveHolds.clear();
+  heldSaveIntent = false;
+  raceRemergeArmed = false;
   remoteBaseline = null;
   lastPersistedBytes = null;
   probeFailureReason = null;
@@ -1627,7 +1710,18 @@ export async function selectNativeLocalFile(baseName = 'my-family'): Promise<boo
  * Save the current Automerge document to the sync file.
  * Encrypts with the family key and writes the V4 envelope.
  */
-export async function save(): Promise<boolean> {
+export interface SaveOptions {
+  /**
+   * Force Save on a LOCAL provider whose file is corrupt (audit C13). A torn local write
+   * makes every pre-save read fail as `CorruptPayloadError`, and the refusal then blocks
+   * the one save that would repair the file. With this set — and only from the user's
+   * explicit Force Save — that single class is written over. Never a lineage or merge
+   * block, never a wrong-key failure (`keyMayBeWrong`), never Drive.
+   */
+  repairCorruptLocal?: boolean;
+}
+
+export async function save(opts: SaveOptions = {}): Promise<boolean> {
   if (saveInProgress) {
     try {
       await saveInProgress;
@@ -1636,7 +1730,7 @@ export async function save(): Promise<boolean> {
     }
   }
 
-  const promise = doSave();
+  const promise = doSave(opts);
   saveInProgress = promise;
 
   try {
@@ -1655,7 +1749,29 @@ export async function save(): Promise<boolean> {
  * storage client). Provider opts in via `supportsLocalPolling()` returning
  * true; absent or false means "this provider doesn't participate".
  */
-async function fetchAndMergeRemote(): Promise<void> {
+interface FetchMergeOptions {
+  /**
+   * SAVE PATH ONLY (audit C4): a change probe that cannot answer (`unknown`) means "must
+   * read". The poll paths keep the old meaning — skip — so a persistent provider error
+   * cannot turn a 10s poll into a read storm; but the save path writes the WHOLE file
+   * next, and a write over a remote nobody read is a blind save that loses whatever a
+   * peer wrote since our last read.
+   */
+  readOnUnknown?: boolean;
+}
+
+interface FetchMergeResult {
+  /**
+   * The revision the change probe sampled before any read (`null` when there was no probe
+   * or no revision). `doSave` compares its write ack against it to detect a write that
+   * raced another writer.
+   */
+  probeRevision: string | null;
+}
+
+const NO_PROBE: FetchMergeResult = { probeRevision: null };
+
+async function fetchAndMergeRemote(opts: FetchMergeOptions = {}): Promise<FetchMergeResult> {
   // Latched: re-reading cannot help and is expensive. `setLocalChangeHandler`
   // wires a debounced save to every keystroke-level mutation, so without this a
   // typing user on the device this change targets caused a multi-megabyte read
@@ -1663,15 +1779,18 @@ async function fetchAndMergeRemote(): Promise<void> {
   // indefinitely. Throwing (rather than returning) keeps `doSave`'s refusal
   // intact — a silent return would let the save through.
   if (remoteBlocked) throw remoteBlocked;
-  if (!currentProvider) return;
+  if (!currentProvider) return NO_PROBE;
   // Drive's save path always calls this (legacy direct call); the polling
   // watcher only activates for providers that opt in. Both paths converge
   // here. The capability check guards against future providers that
   // shouldn't merge (e.g. a one-shot import-only provider).
-  const opts = currentProvider.supportsLocalPolling?.();
+  const polls = currentProvider.supportsLocalPolling?.();
   const isDrive = currentProvider.type === 'google_drive';
-  if (!isDrive && !opts) return;
-  if (!currentFamilyKey || !currentEnvelope) return;
+  if (!isDrive && !polls) return NO_PROBE;
+  if (!currentFamilyKey || !currentEnvelope) return NO_PROBE;
+  // C1, moved up to ENTRY: every await below can straddle a sign-out or a family switch,
+  // and nothing read through one provider may be installed into another's session.
+  const providerAtRead = currentProvider;
 
   // Change-log chunk transport was RETIRED 2026-07-15 — every save writes the full
   // compacted base, so it already carries every peer's edits; we go straight to the
@@ -1681,22 +1800,24 @@ async function fetchAndMergeRemote(): Promise<void> {
 
   // Fast path: read iff the remote actually changed (revision basis on Drive,
   // mtime fallback elsewhere) — one comparator for the whole app (#61 C14). On a
-  // poll/save path `unknown` deliberately does NOT read: a persistent provider
-  // error must not turn the 10s poll into a read storm (C14 caller table).
+  // POLL path `unknown` deliberately does NOT read: a persistent provider error
+  // must not turn the 10s poll into a read storm (C14 caller table). The SAVE path
+  // passes `readOnUnknown` and reads: it is about to overwrite the whole file.
   const change = await remoteChanged();
-  if (change.status !== 'changed') return; // unchanged OR unknown → skip the full read
-
-  // C1: capture the provider we read THROUGH, to guard the baseline commit below
-  // against a family-switch landing during the multi-second read+merge.
-  const providerAtRead = currentProvider;
+  if (currentProvider !== providerAtRead) return NO_PROBE; // switched mid-probe
+  if (change.status === 'unchanged') return { probeRevision: change.revision };
+  if (change.status === 'unknown' && !opts.readOnUnknown) return NO_PROBE;
 
   // Remote has newer data — fetch, decrypt, and merge. INVARIANT (ADR-032 addendum):
   // the base is the sole source of a peer's edits (change-chunks retired 2026-07-15).
   // This whole-doc read + merge is how every peer's changes reach us — do not gate or
   // skip it on the assumption a delta layer will carry them.
   bumpOpenCycle('driveRead'); // the poll/save-path whole-file read — also counted
-  const text = await currentProvider.read();
-  if (!text) return;
+  // A read FAILURE propagates, unwrapped, so its class (auth, 404, network) reaches the
+  // caller's classifier intact. On the save path it refuses the write (audit C4).
+  const text = await providerAtRead.read();
+  if (currentProvider !== providerAtRead) return NO_PROBE; // switched mid-read
+  if (!text) return { probeRevision: change.revision };
 
   // ⚠️ CLASSIFIED, not bare. A torn upload or a pod written by a newer app
   // version throws here — AFTER the bytes were read — and a plain `Error`
@@ -1720,6 +1841,23 @@ async function fetchAndMergeRemote(): Promise<void> {
           );
     noteRemoteUnreadable(err);
     throw err;
+  }
+
+  // ⚠️ THE FILE BEHIND THIS PROVIDER BELONGS TO ANOTHER FAMILY (audit C3). Merging it would
+  // CRDT-merge one household's document into another's, and `mergeEnvelopes` would then
+  // discard our envelope as foreign and install theirs. Refuse; the save path refuses the
+  // write with it, so neither file is touched.
+  if (currentEnvelope && remoteEnvelope.familyId !== currentEnvelope.familyId) {
+    logEvent({
+      level: 'error',
+      surface: 'sync-save',
+      message: 'remote file belongs to a different family than this session',
+      context: { action: 'family-mismatch', stage: 'remote-read' },
+    });
+    throw new SaveRefusedError(
+      'family-mismatch',
+      'The bound file belongs to a different family; refusing to merge or write it'
+    );
   }
 
   // ⚠️ LINEAGE GUARD (terminus 3), and this is the one that makes a compaction
@@ -1791,6 +1929,17 @@ async function fetchAndMergeRemote(): Promise<void> {
     noteMergeFailed(blocked);
     throw blocked;
   }
+  // A sign-out or switch landed during the multi-second merge. Nothing below may run: the
+  // envelope adoption would install this file's keys into the next family's session.
+  if (currentProvider !== providerAtRead) {
+    logEvent({
+      level: 'warn',
+      surface: 'sync-save',
+      message: 'provider changed during the pre-save merge; result discarded',
+      context: { action: 'aborted-provider-changed', stage: 'merge' },
+    });
+    return NO_PROBE;
+  }
   /**
    * Adopt the remote's KEY DICTS while leaving the payload decision to the
    * caller. Both termini below do exactly this and for the same reason — it is
@@ -1839,7 +1988,7 @@ async function fetchAndMergeRemote(): Promise<void> {
     // store's own 10s read. `saveInProgress` is the promise that means exactly
     // "a save is running", which is what this guard is about.
     if (!saveInProgress) triggerDebouncedSave();
-    return;
+    return { probeRevision: change.revision };
   }
   const { dirty, remoteHeads } = merged;
 
@@ -1895,19 +2044,58 @@ async function fetchAndMergeRemote(): Promise<void> {
   // this very merge before its own upload.
   if (dirty) triggerDebouncedSave();
   else if (envelopeNeedsPublish && !saveInProgress) triggerDebouncedSave();
+  return { probeRevision: change.revision };
 }
 
 /**
  * Internal save implementation
  */
-async function doSave(): Promise<boolean> {
-  if (!currentProvider) {
+/** How a pre-save READ failure is handled (audit C4). Never a write. */
+function classifyReadFailure(e: unknown): {
+  kind: 'network' | 'auth' | 'error';
+  errorCode: string;
+  httpStatus?: number;
+} {
+  const httpStatus = e instanceof DriveApiError ? e.status : undefined;
+  if (e instanceof TokenExpiredError || httpStatus === 401) {
+    return { kind: 'auth', errorCode: 'auth', httpStatus };
+  }
+  // The provider's own offline classes: a 5xx that survived its retries, or the fetch
+  // never reaching the server. These are what `GoogleDriveProvider.write` queues.
+  if ((httpStatus !== undefined && httpStatus >= 500) || isNetworkError(e)) {
+    return { kind: 'network', errorCode: 'network', httpStatus };
+  }
+  return { kind: 'error', errorCode: e instanceof Error ? e.name : 'unknown', httpStatus };
+}
+
+async function doSave(opts: SaveOptions = {}): Promise<boolean> {
+  // ⚠️ CAPTURED ONCE, HERE (audit C3/C4). Every await below can straddle a sign-out or a
+  // family switch (`reset()` explicitly abandons an in-flight save), so everything after
+  // an await is checked against these and the save ABORTS — no write, no latch, no failure
+  // count — rather than writing one family's bytes through another family's provider.
+  const provider = currentProvider;
+  if (!provider) {
     updateState({ lastError: 'No file configured' });
     return false;
   }
 
-  if (!currentFamilyKey || !currentEnvelope) {
+  const envelopeAtEntry = currentEnvelope;
+  if (!currentFamilyKey || !envelopeAtEntry) {
     console.warn('[syncService] save() blocked: no family key or envelope set');
+    noteSaveDeferredNoKey('save');
+    return false;
+  }
+  const familyId = envelopeAtEntry.familyId;
+
+  if (saveHolds.size > 0) {
+    // Not a failure and not dropped: remembered, and re-armed when the hold releases.
+    heldSaveIntent = true;
+    logEvent({
+      level: 'info',
+      surface: 'sync-save',
+      message: 'save requested during a save hold; deferred',
+      context: { action: 'save-held' },
+    });
     return false;
   }
 
@@ -1920,28 +2108,90 @@ async function doSave(): Promise<boolean> {
     return false;
   }
 
+  /** Same provider, same family as at entry. */
+  const stillCurrent = (): boolean =>
+    currentProvider === provider && currentEnvelope?.familyId === familyId;
+  const abort = (stage: string): false => {
+    updateState({ isSyncing: false });
+    logEvent({
+      level: 'warn',
+      surface: 'sync-save',
+      message: 'provider or family changed during the save; aborted without writing',
+      context: { action: 'aborted-provider-changed', stage },
+    });
+    return false;
+  };
+  /** Which phase a failure came from, for the one failure event in the catch below. */
+  // An object, not a `let`: control-flow narrowing does not follow assignments into the
+  // catch, and a narrowed `let` would make the read arm below unreachable to the compiler.
+  const at: { phase: 'merge' | 'read' | 'write' } = { phase: 'merge' };
+
   updateState({ isSyncing: true, lastError: null });
 
   try {
+    // ⚠️ THE ENVELOPE'S FAMILY MUST BE THE PROVIDER'S (audit C3). The active-family check
+    // above compares the PROVIDER with the registry's active id, which a cross-family
+    // decrypt moves only after it has installed the new family's key and envelope — so in
+    // that window the envelope said family B, the provider and the active id both said A,
+    // and a write would put B's pod into A's file. A `null` binding passes, as everywhere.
+    if (currentProviderFamilyId && familyId !== currentProviderFamilyId) {
+      throw new SaveRefusedError(
+        'family-mismatch',
+        'Refusing to save: the loaded family does not own the bound file'
+      );
+    }
+
     // Only the web (handle-based) LocalStorageProvider needs a file-permission
     // check before writing. CapacitorFileProvider (native, app-private path-based
     // storage) has no FileSystemFileHandle and needs no permission gate — gating
     // on `instanceof` (not `type === 'local'`, which both providers share) skips
     // it natively and avoids calling the handle-only getHandle(). See ADR-029.
-    if (currentProvider instanceof LocalStorageProvider) {
-      const localProvider = currentProvider;
-      const permissionGranted = await verifyPermission(localProvider.getHandle(), 'readwrite');
+    if (provider instanceof LocalStorageProvider) {
+      const permissionGranted = await verifyPermission(provider.getHandle(), 'readwrite');
+      if (!stillCurrent()) return abort('permission');
       if (!permissionGranted) {
         console.warn('[syncService] doSave: file permission denied — save skipped');
         updateState({ isSyncing: false, lastError: 'Permission denied' });
+        logEvent({
+          level: 'warn',
+          surface: 'sync-save',
+          message: 'save skipped: file permission denied',
+          context: { action: 'permission-denied', provider_type: provider.type },
+        });
         return false;
       }
     }
 
     // Fetch-merge-save: merge any remote changes before writing to prevent overwrites.
-    // Non-fatal — if merge fails, we still save local state (better than losing it).
+    //
+    // ⚠️ NO "SAVE LOCAL ANYWAY" ANY MORE (audit C4). Every failure here REFUSES the write.
+    // A read that failed after the probe said `changed` (or could not say) means a remote
+    // nobody has seen, and Drive has no write precondition: the upload below would replace
+    // it, and a peer's envelope-only write (a join's wrap, an invite) never comes back on
+    // its own. Transport failures keep the intent in the offline queue exactly as a failed
+    // WRITE does, so the reconnect re-runs this save, read first.
+    let probeRevision: string | null = null;
     try {
-      await fetchAndMergeRemote();
+      try {
+        ({ probeRevision } = await fetchAndMergeRemote({ readOnUnknown: true }));
+      } catch (e) {
+        // The user's Force Save over a TORN LOCAL file (audit C13): the "remote" is this
+        // device's own unreadable copy, so writing the document over it IS the repair.
+        // Exactly one class qualifies; everything else falls to the refusal below.
+        const repairable =
+          opts.repairCorruptLocal === true &&
+          provider.type === 'local' &&
+          e instanceof CorruptPayloadError &&
+          !e.keyMayBeWrong;
+        if (!repairable) throw e;
+        clearRemoteUnreadable();
+        logEvent({
+          level: 'warn',
+          surface: 'sync-save',
+          message: 'Force Save writing over a corrupt local pod file',
+          context: { action: 'force-save-over-corrupt-local', error_code: e.step },
+        });
+      }
     } catch (e) {
       // ⚠️ ONE EXCEPTION, AND IT IS THE WHOLE REASON THIS BRANCH EXISTS.
       //
@@ -1980,11 +2230,44 @@ async function doSave(): Promise<boolean> {
         if (e instanceof PodLineageError && !isRemoteBlocked()) noteLineageBlocked(e);
         throw e;
       }
-      console.warn('[syncService] fetchAndMergeRemote failed (non-fatal):', e);
+      if (e instanceof SaveRefusedError) throw e;
+      // A READ failure. Abort quietly if the session moved underneath it: the failure
+      // belongs to a provider this save no longer serves.
+      if (!stillCurrent()) return abort('read');
+      at.phase = 'read';
+      const cls = classifyReadFailure(e);
+      console.warn(
+        `[syncService] doSave: pre-save read failed (${cls.kind}) — refusing a blind write`,
+        e
+      );
+      if (cls.kind === 'network') {
+        // Offline: the same contract as a queued WRITE. The intent goes in the queue and
+        // this is not counted as a failure (an offline person is not shown a red banner
+        // for being offline); the reconnect trigger re-runs this save, read first.
+        enqueueOfflineSave('network');
+        updateState({ isSyncing: false });
+        logEvent({
+          level: 'info',
+          surface: 'sync-save',
+          message: 'pre-save read failed offline; write refused and queued',
+          context: {
+            action: 'read-failed-queued',
+            error_code: cls.errorCode,
+            ...(cls.httpStatus !== undefined ? { http_status: cls.httpStatus } : {}),
+            provider_type: provider.type,
+          },
+        });
+        return false;
+      }
+      // Auth: queued too (the token-acquired trigger flushes it) AND counted, exactly like
+      // an auth-rejected write, so the reconnect banner can appear.
+      if (cls.kind === 'auth') enqueueOfflineSave('auth');
+      throw e;
     }
+    if (!stillCurrent()) return abort('merge');
 
     // Re-encrypt the Automerge doc with the family key and update the envelope
-    const inviteKeyCount = currentEnvelope.inviteKeys
+    const inviteKeyCount = currentEnvelope?.inviteKeys
       ? Object.keys(currentEnvelope.inviteKeys).length
       : 0;
     if (inviteKeyCount > 0) {
@@ -1995,7 +2278,11 @@ async function doSave(): Promise<boolean> {
     // #65: `exportedHeads` are the heads of EXACTLY these serialized bytes — the
     // only sound Drive-baseline value on the write path.
     const { payload, heads: exportedHeads, lineage } = await docClient.exportEncryptedPayload();
-    const fileContent = reEncryptEnvelope(currentEnvelope, payload, lineage);
+    if (!stillCurrent()) return abort('export');
+    // The envelope as it stands NOW (same family, checked just above): the merge may have
+    // adopted a peer's keys into it, and writing the entry snapshot would drop them.
+    const envelopeToWrite = currentEnvelope as BeanpodFileV4;
+    const fileContent = reEncryptEnvelope(envelopeToWrite, payload, lineage);
     // The writer says which version it ACTUALLY chose. Calling the pure
     // derivation a second time is not a second implementation: the logic has
     // one home, and a second call cannot disagree with the first.
@@ -2028,9 +2315,10 @@ async function doSave(): Promise<boolean> {
     // baseline into the NEW family's state afterwards would poison it (the module
     // baseline is family-untagged). Learn/commit ONLY while the active provider is
     // still the one we wrote through.
-    const providerAtWrite: StorageProvider = currentProvider;
+    const providerAtWrite: StorageProvider = provider;
     const providerTypeForDiag = providerAtWrite.type;
-    const familyIdAtWrite = currentEnvelope.familyId;
+    const familyIdAtWrite = familyId;
+    at.phase = 'write';
     // C14b: the write returns its own resulting revision IN the response. Narrow
     // the `WriteAck | void` union explicitly at this ONE site.
     const ack = await providerAtWrite.write(fileContent);
@@ -2051,7 +2339,7 @@ async function doSave(): Promise<boolean> {
       updateState({ isSyncing: false });
       logEvent({
         level: 'info',
-        surface: 'pod-save',
+        surface: 'sync-save',
         message: 'save queued offline — not recorded as saved',
         context: { action: 'save-queued', provider_type: providerTypeForDiag },
       });
@@ -2077,8 +2365,35 @@ async function doSave(): Promise<boolean> {
     recordPersistedBytes(fileContent); // capture size for the registry usage signal
     const ackRevision = ack ? ack.revision : null;
 
+    // ⚠️ DID ANOTHER WRITER LAND INSIDE OUR WINDOW? (audit C4) Drive has no write
+    // precondition, so a peer's upload between our probe and our write is overwritten with
+    // neither side knowing. Our own write moves `version` by one; more means something else
+    // landed in between. The overwritten bytes cannot be read back from the file, so this
+    // does not pretend to recover them: it refuses to certify a baseline it cannot vouch
+    // for and re-merges once, which publishes again only if the re-read shows we lack
+    // something. The peer still holds its edit and re-pushes it on its next save.
+    const advance = revisionAdvance(probeRevision, ackRevision);
+    const raced = advance !== null && advance > 1;
+
     if (currentProvider !== providerAtWrite) {
       // A family switch landed mid-write — do not touch the baseline (C1).
+    } else if (raced) {
+      logEvent({
+        level: 'warn',
+        surface: 'sync-save',
+        message: 'write raced another writer; re-merging',
+        context: {
+          action: 'write-raced',
+          provider_type: providerTypeForDiag,
+          detail: `advance=${advance}`,
+        },
+      });
+      // NOT `learnRemoteMarker(ack)`: that would make the re-merge's probe answer
+      // 'unchanged' and skip the very read it exists for. A null baseline reads, and the
+      // null fingerprint keeps the lineage context `dirty` until that read proves otherwise.
+      remoteBaseline = null;
+      commitRemoteBaseline(null);
+      scheduleRaceRemerge(providerAtWrite);
     } else if (ackRevision !== null) {
       // Terminus 3 (C10): the file IS what we just wrote. Learn our own write's
       // revision and commit — for Drive this REPLACES the old post-write metadata
@@ -2156,8 +2471,72 @@ async function doSave(): Promise<boolean> {
     const errorMsg = (e as Error).message;
     updateState({ isSyncing: false, lastError: errorMsg });
     recordSaveFailure(errorMsg);
+    // ONE event per failed save, classified by phase, so a single `sync-save` filter
+    // gives the refusal and failure rates (audit C4/C12).
+    const httpStatus = e instanceof DriveApiError ? e.status : undefined;
+    const action =
+      e instanceof SaveRefusedError
+        ? e.code
+        : isRemoteBlocker(e)
+          ? 'refused-remote-blocked'
+          : at.phase === 'read'
+            ? 'refused-read-failed'
+            : at.phase === 'merge'
+              ? 'merge-failed'
+              : 'write-failed';
+    logEvent({
+      level: 'warn',
+      surface: 'sync-save',
+      message: 'save failed',
+      error: e instanceof Error ? e : undefined,
+      context: {
+        action,
+        error_code: isRemoteBlocker(e) ? e.blockCode : e instanceof Error ? e.name : 'unknown',
+        ...(httpStatus !== undefined ? { http_status: httpStatus } : {}),
+        provider_type: provider.type,
+      },
+    });
     return false;
   }
+}
+
+/** One race re-merge at a time; cleared by `reset()`. */
+let raceRemergeArmed = false;
+
+/**
+ * Re-read and merge once after a raced write (the `write-raced` branch of `doSave`).
+ * Runs the ordinary merge, which arms a publish only when the re-read leaves us dirty — so
+ * a false positive (a metadata change bumping `version`) costs one read, never a loop of
+ * writes. Waits behind a running save; dropped if the provider changed meanwhile.
+ */
+function scheduleRaceRemerge(provider: StorageProvider): void {
+  if (raceRemergeArmed) return;
+  raceRemergeArmed = true;
+  setTimeout(() => {
+    void (async () => {
+      try {
+        if (saveInProgress) await saveInProgress.catch(() => false);
+        if (currentProvider !== provider || !raceRemergeArmed) return;
+        await fetchAndMergeRemote({ readOnUnknown: true });
+      } catch (e) {
+        // Blockers latch and report themselves; anything else is logged here.
+        if (!isRemoteBlocker(e)) {
+          logEvent({
+            level: 'warn',
+            surface: 'sync-save',
+            message: 'race re-merge failed',
+            error: e instanceof Error ? e : undefined,
+            context: {
+              action: 'race-remerge-failed',
+              error_code: e instanceof Error ? e.name : 'unknown',
+            },
+          });
+        }
+      } finally {
+        raceRemergeArmed = false;
+      }
+    })();
+  }, 0);
 }
 
 /**
@@ -2171,6 +2550,7 @@ export async function load(): Promise<string | null> {
   }
 
   updateState({ isSyncing: true, lastError: null });
+  const providerTypeAtLoad = currentProvider.type;
 
   try {
     // Only the web (handle-based) LocalStorageProvider needs a permission check
@@ -2205,6 +2585,7 @@ export async function load(): Promise<string | null> {
       pendingMarker = await probeRemoteMarker();
       learnRemoteMarker(pendingMarker);
     } catch (e) {
+      // Not the load's failure: the read below proceeds and re-raises any real error.
       console.warn(
         '[syncService] load: pre-read marker probe failed — no change-detection baseline, callers do a full read; check Drive token/network:',
         e
@@ -2230,14 +2611,39 @@ export async function load(): Promise<string | null> {
     updateState({ isSyncing: false, lastError: null });
     return text;
   } catch (e) {
-    if ((e as Error).name === 'NotFoundError' || (e as Error).message.includes('JSON')) {
+    // Every exit is logged (audit C12): a load failure used to leave only `lastError`,
+    // which nothing outside the session can read.
+    const httpStatus = e instanceof DriveApiError ? e.status : undefined;
+    const logLoadFailure = (action: string): void =>
+      logEvent({
+        level: 'warn',
+        surface: 'sync-load',
+        message: 'pod read failed',
+        error: e instanceof Error ? e : undefined,
+        context: {
+          action,
+          error_code: e instanceof Error ? e.name : 'unknown',
+          ...(httpStatus !== undefined ? { http_status: httpStatus } : {}),
+          ...(providerTypeAtLoad ? { provider_type: providerTypeAtLoad } : {}),
+        },
+      });
+    // ⚠️ THE TYPED ERROR, not a message substring. The File System Access read throws a
+    // `NotFoundError` DOMException for a file that is gone — an EMPTY pod, not a failure.
+    // The `message.includes('JSON')` that sat beside it matched nothing the read path
+    // throws (it returns raw text; parsing happens later, with its own typed errors) and
+    // could only ever turn an unrelated error whose text mentioned JSON into a silent
+    // "no file".
+    if (e instanceof Error && e.name === 'NotFoundError') {
+      logLoadFailure('read-not-found');
       updateState({ isSyncing: false, lastError: null });
       return null;
     }
     if (e instanceof DriveApiError && e.status === 404) {
+      logLoadFailure('read-not-found');
       updateState({ isSyncing: false, lastError: `DriveApiError:404:${(e as Error).message}` });
       return null;
     }
+    logLoadFailure('read-failed');
     updateState({ isSyncing: false, lastError: (e as Error).message });
     return null;
   }
@@ -2415,12 +2821,21 @@ function openFileFailure(e: unknown): OpenFileResult {
 }
 
 export async function openAndLoadFile(): Promise<OpenFileResult> {
-  cancelPendingSave();
+  // ⚠️ CANCEL, BUT PUT IT BACK (audit C12). The cancel buys a quiet window while the
+  // picker is open; it is not a decision that the current family's pending save was
+  // unwanted. Every exit here leaves the session exactly as it was — a cancelled pick, an
+  // empty or unreadable file, or a picked file still waiting for its password (which the
+  // person may abandon) — so its pending save comes back. A later cross-family decrypt is
+  // covered by `holdSaves`, and `doSave` refuses a family/provider mismatch regardless.
+  const armed = cancelPendingSave();
+  const result = supportsFileSystemAccess()
+    ? await openAndLoadFileWithPicker()
+    : await openAndLoadFileFallback();
+  if (armed) triggerDebouncedSave();
+  return result;
+}
 
-  if (!supportsFileSystemAccess()) {
-    return openAndLoadFileFallback();
-  }
-
+async function openAndLoadFileWithPicker(): Promise<OpenFileResult> {
   try {
     const handles = await window.showOpenFilePicker({ multiple: false });
     const handle = handles[0];
@@ -2457,7 +2872,6 @@ export async function openAndLoadFile(): Promise<OpenFileResult> {
  */
 async function openAndLoadFileFallback(): Promise<OpenFileResult> {
   try {
-    cancelPendingSave();
     const file = await openFilePicker();
     // ⚠️ THIS IS THE DISMISSAL PATH ON EVERY SHIPPING PLATFORM. The File System
     // Access branch above needs `showOpenFilePicker`, which is Chromium desktop
@@ -2497,7 +2911,17 @@ export async function loadDroppedFile(
   file: File,
   fileHandle?: FileSystemFileHandle
 ): Promise<OpenFileResult> {
-  cancelPendingSave();
+  // Same contract as `openAndLoadFile`: the cancelled save is restored on every exit.
+  const armed = cancelPendingSave();
+  const result = await loadDroppedFileInner(file, fileHandle);
+  if (armed) triggerDebouncedSave();
+  return result;
+}
+
+async function loadDroppedFileInner(
+  file: File,
+  fileHandle?: FileSystemFileHandle
+): Promise<OpenFileResult> {
   try {
     updateState({ isSyncing: true, lastError: null });
     const text = await file.text();
@@ -2541,6 +2965,11 @@ export function registerDocPersistCallback(): void {
 export function triggerDebouncedSave(): void {
   // When merging inside doSave(), suppress redundant save scheduling
   if (suppressAutoSave) return;
+  // Held (a cross-family decrypt is mid-flight): remember, re-arm on release.
+  if (saveHolds.size > 0) {
+    heldSaveIntent = true;
+    return;
+  }
 
   if (saveDebounceTimer) {
     clearTimeout(saveDebounceTimer);
@@ -2554,6 +2983,7 @@ export function triggerDebouncedSave(): void {
         console.warn('[syncService] Auto-save skipped: no family key or envelope');
         noKeyWarnedOnce = true;
       }
+      noteSaveDeferredNoKey('autosave');
       return;
     }
     save().catch((err) => {
@@ -2573,6 +3003,7 @@ export async function saveNow(): Promise<boolean> {
       console.warn('[syncService] saveNow skipped: no family key or envelope');
       noKeyWarnedOnce = true;
     }
+    noteSaveDeferredNoKey('save-now');
     return false;
   }
   return save();
@@ -2628,6 +3059,7 @@ export async function flushPendingSave(): Promise<void> {
     saveDebounceTimer = null;
     if (!currentFamilyKey || !currentEnvelope) {
       console.warn('[syncService] Flush skipped: no family key or envelope');
+      noteSaveDeferredNoKey('flush');
       return;
     }
     await save();

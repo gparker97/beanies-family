@@ -1,7 +1,24 @@
 import { openDB, type IDBPDatabase } from 'idb';
 import { getActiveFamilyId } from '@/services/indexeddb/database';
 import { reportError } from '@/utils/errorReporter';
+import { logEvent } from '@/services/telemetry/logEvent';
 import type { StorageProviderType } from './storageProvider';
+
+/**
+ * The firehose twin of this module's console warnings (audit C12). These stores are
+ * best-effort mirrors whose failures are usually private-browsing or quota noise, so they
+ * log at `info` and never page; but a console line is invisible to triage, and a run of
+ * them is exactly what an eviction or a blocked origin looks like from the outside.
+ * No family id, no token: `action` and the error's class only.
+ */
+function logStoreFailure(action: string, e: unknown): void {
+  logEvent({
+    level: 'info',
+    surface: 'file-handle-store',
+    message: 'file-handle store operation failed',
+    context: { action, error_code: e instanceof Error ? e.name : 'unknown' },
+  });
+}
 
 const HANDLE_DB_NAME = 'beanies-file-handles';
 const HANDLE_DB_VERSION = 1;
@@ -74,7 +91,9 @@ export async function getFileHandle(): Promise<FileSystemFileHandle | null> {
     const handle = await db.get(HANDLE_STORE, key);
     console.log('[fileHandleStore] getFileHandle key:', key, 'found:', !!handle);
     return handle ?? null;
-  } catch {
+  } catch (e) {
+    // Reads as "no handle" (the caller re-prompts), but an IDB failure is not an absence.
+    logStoreFailure('handle-read-failed', e);
     return null;
   }
 }
@@ -132,7 +151,8 @@ export async function hasValidFileHandle(): Promise<boolean> {
   try {
     const permission = await handle.queryPermission({ mode: 'readwrite' });
     return permission === 'granted';
-  } catch {
+  } catch (e) {
+    logStoreFailure('handle-permission-query-failed', e);
     return false;
   }
 }
@@ -174,6 +194,7 @@ export async function storeProviderConfig(
     localStorage.setItem(`${LS_PROVIDER_CONFIG_PREFIX}${familyId}`, JSON.stringify(config));
   } catch (e) {
     console.warn('[fileHandleStore] localStorage provider-config write failed', e);
+    logStoreFailure('provider-config-ls-write-failed', e);
   }
 }
 
@@ -210,6 +231,7 @@ export async function getProviderConfig(familyId: string): Promise<PersistedProv
     return isPersistedProviderConfig(parsed) ? (parsed as PersistedProviderConfig) : null;
   } catch (e) {
     console.warn('[fileHandleStore] localStorage provider-config read failed', e);
+    logStoreFailure('provider-config-ls-read-failed', e);
     return null;
   }
 }
@@ -232,6 +254,7 @@ export async function clearProviderConfig(familyId: string): Promise<void> {
       localStorage.removeItem(`${LS_PROVIDER_CONFIG_PREFIX}${familyId}`);
     } catch (e) {
       console.warn('[fileHandleStore] localStorage provider-config clear failed', e);
+      logStoreFailure('provider-config-ls-clear-failed', e);
     }
   }
 }
@@ -304,6 +327,7 @@ export async function storeGoogleRefreshToken(
     localStorage.setItem(`${LS_REFRESH_TOKEN_PREFIX}${familyId}`, refreshToken);
   } catch (e) {
     console.warn('[fileHandleStore] localStorage refresh-token write failed', e);
+    logStoreFailure('refresh-token-ls-write-failed', e);
   }
 }
 
@@ -343,6 +367,7 @@ export async function getGoogleRefreshToken(familyId: string): Promise<StoredRef
     return fallback ? { token: fallback, issuedAt: null } : null;
   } catch (e) {
     console.warn('[fileHandleStore] localStorage refresh-token read failed', e);
+    logStoreFailure('refresh-token-ls-read-failed', e);
     return null;
   }
 }
@@ -373,6 +398,7 @@ export async function clearGoogleRefreshToken(familyId: string): Promise<void> {
     localStorage.removeItem(`${LS_REFRESH_TOKEN_PREFIX}${familyId}`);
   } catch (e) {
     console.warn('[fileHandleStore] localStorage refresh-token clear failed', e);
+    logStoreFailure('refresh-token-ls-clear-failed', e);
   }
 }
 
@@ -403,6 +429,7 @@ export function getLastGoogleAccount(): LastGoogleAccount | null {
     return null; // malformed → treat as absent (next write overwrites)
   } catch (e) {
     console.warn('[fileHandleStore] last-google-account read failed', e);
+    logStoreFailure('last-account-read-failed', e);
     return null;
   }
 }
@@ -412,6 +439,7 @@ export function setLastGoogleAccount(email: string, familyId: string): void {
     localStorage.setItem(LS_LAST_GOOGLE_ACCOUNT, JSON.stringify({ email, familyId }));
   } catch (e) {
     console.warn('[fileHandleStore] last-google-account write failed', e);
+    logStoreFailure('last-account-write-failed', e);
   }
 }
 
@@ -420,5 +448,6 @@ export function clearLastGoogleAccount(): void {
     localStorage.removeItem(LS_LAST_GOOGLE_ACCOUNT);
   } catch (e) {
     console.warn('[fileHandleStore] last-google-account clear failed', e);
+    logStoreFailure('last-account-clear-failed', e);
   }
 }

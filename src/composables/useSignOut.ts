@@ -10,9 +10,12 @@
  *      and `phase` leaves 'confirm' in the same tick, which is what blocks a double tap.
  *   2. If the guard fires, SignOutKitGuard asks the user to create a kit; dismissing it
  *      changes nothing (the tick has not been applied yet).
- *   3. Only then is a changed tick applied (`authStore.setDeviceTrust`). A failed write
+ *   3. Clear tier only (C6): "save first", then measure what the clear would lose
+ *      (`authStore.measureUnsavedWork`); when anything is at risk the person must choose
+ *      "discard" in `confirmDiscardUnsavedWork` (phase 'unsaved') or nothing happens.
+ *   4. Only then is a changed tick applied (`authStore.setDeviceTrust`). A failed write
  *      aborts before any teardown; the action already showed and reported why.
- *   4. The store sign-out for the tier, the store reset, the route to /login.
+ *   5. The store sign-out for the tier, the store reset, the route to /login.
  * One try/catch/finally around all of it: a throw anywhere is reported once and shown as
  * an error toast, and the user stays where they were.
  *
@@ -27,6 +30,12 @@
  */
 import { ref, readonly } from 'vue';
 import router from '@/router';
+import { hasUnsavedWork } from '@/services/auth/unsavedWork';
+import { confirmDiscardUnsavedWork } from '@/composables/useDiscardUnsavedWork';
+import { setSessionEndedHandler } from '@/services/auth/sessionChannel';
+
+// Re-exported: the clear tier's callers already import from here.
+export { confirmDiscardUnsavedWork, type DiscardSite } from '@/composables/useDiscardUnsavedWork';
 import { useAuthStore } from '@/stores/authStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -45,7 +54,11 @@ import {
   emitCacheKept,
 } from '@/services/telemetry/loginFlowEvents';
 
-export type SignOutPhase = 'idle' | 'confirm' | 'guard' | 'signing-out';
+/**
+ * `unsaved` (C6): the clear tier is waiting on the person's "discard unsaved changes"
+ * answer. No overlay is shown in it, so the confirm is never hidden behind the spinner.
+ */
+export type SignOutPhase = 'idle' | 'confirm' | 'guard' | 'unsaved' | 'signing-out';
 export type KitGuardOutcome = 'kit_saved' | 'sign_out_anyway' | 'cancelled' | 'superseded';
 export type SignOutResult = 'signed-out' | 'cancelled' | 'failed';
 
@@ -86,6 +99,9 @@ function cancelSignOut(): void {
 function abandonSignOut(): void {
   if (phase.value === 'confirm') phase.value = 'idle';
   else if (phase.value === 'guard') resolveGuard?.('cancelled');
+  // The unsaved-work confirm (C6) resolves on its own; leaving the phase tells the parked
+  // sign-out it was superseded, so a late "discard" cannot tear down a session that is gone.
+  else if (phase.value === 'unsaved') phase.value = 'idle';
 }
 
 /**
@@ -214,6 +230,7 @@ function signOut(tier: SignOutTier, opts: { trust: boolean }): Promise<SignOutRe
 }
 
 async function runSignOut(tier: SignOutTier, opts: { trust: boolean }): Promise<SignOutResult> {
+  let supersededWhileAsking = false;
   try {
     // Synchronous, before any await: a second tap now fails the check above.
     const guard = evaluateKitGuard(tier, opts.trust);
@@ -224,6 +241,22 @@ async function runSignOut(tier: SignOutTier, opts: { trust: boolean }): Promise<
       if (outcome === 'cancelled' || outcome === 'superseded') return 'cancelled';
       phase.value = 'signing-out';
     }
+    if (tier === 'clear') {
+      // C6: "save first" (one bounded save inside the probe), then the person decides.
+      const report = await useAuthStore().measureUnsavedWork({ save: true, scope: 'all' });
+      if (hasUnsavedWork(report)) {
+        phase.value = 'unsaved';
+        const discard = await confirmDiscardUnsavedWork(report, 'sign-out-clear');
+        // Another tab ended this session while the confirm was open (#100): its teardown
+        // owns the phase now, so leave without touching it.
+        if (phase.value !== 'unsaved') {
+          supersededWhileAsking = true;
+          return 'cancelled';
+        }
+        if (!discard) return 'cancelled';
+        phase.value = 'signing-out';
+      }
+    }
     if (!(await applyTrustTick(tier, opts.trust))) return 'failed';
     await runTeardown(tier);
     return 'signed-out';
@@ -231,7 +264,7 @@ async function runSignOut(tier: SignOutTier, opts: { trust: boolean }): Promise<
     failSignOut(error, tier);
     return 'failed';
   } finally {
-    phase.value = 'idle';
+    if (!supersededWhileAsking) phase.value = 'idle';
     resolveGuard = null;
   }
 }
@@ -262,6 +295,29 @@ export async function endSessionClearedElsewhere(): Promise<void> {
   }
   await trackLeaving(runClearedElsewhere());
 }
+
+/**
+ * Another tab announced an untrusted sign-out of this family on the session channel (C10).
+ * Same teardown as a cleared cache, but only while this tab still holds a session (or is
+ * mid-teardown): when the cache-release signal already ended it, the announcement is the
+ * echo of the same event and must not run the teardown twice.
+ */
+export async function endSessionEndedElsewhere(): Promise<void> {
+  if (!useAuthStore().isAuthenticated && phase.value !== 'signing-out') {
+    logEvent({
+      level: 'info',
+      surface: 'sign-out',
+      message: 'session-ended announcement ignored: no session here',
+      context: { action: 'session_ended_elsewhere_ignored' },
+    });
+    return;
+  }
+  await endSessionClearedElsewhere();
+}
+
+setSessionEndedHandler(() => {
+  void endSessionEndedElsewhere();
+});
 
 /** One event per release, naming the decision taken (CLAUDE.md observability rule 1). */
 function logReleased(detail: 'direct' | 'deferred-already-ended' | 'deferred-then-ran'): void {

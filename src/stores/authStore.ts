@@ -5,7 +5,7 @@ import {
   getRemoteBaselineHeadsFp,
 } from '@/services/sync/syncService';
 import { PayloadLoadError, type RemoteBlocker } from '@/types/sync';
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { hashPassword, verifyPassword } from '@/services/auth/passwordService';
 import {
   registerPasskeyForMember,
@@ -38,7 +38,20 @@ import {
   deleteFamilyDatabase,
   familyCacheExists,
   getActiveFamilyId as getActiveFamilyIdFromDb,
+  setUnpushedAtSignOutMarker,
+  clearUnpushedAtSignOutMarker,
+  listLocalFamilyDatabaseIds,
 } from '@/services/indexeddb/database';
+import { announceSessionEnded, bindSessionChannel } from '@/services/auth/sessionChannel';
+import { getById as projectionGetById } from '@/services/automerge/projection';
+import {
+  combineUnsavedWork,
+  hasUnsavedWork,
+  measureFamilyAtRest,
+  measureLiveFamily,
+  NOTHING_UNSAVED,
+  type UnsavedWorkReport,
+} from '@/services/auth/unsavedWork';
 import { saveNow, cancelPendingSave } from '@/services/sync/syncService';
 import * as docClient from '@/services/automerge/worker/docClient';
 import { clearGoogleSessionState, getGoogleAccountEmail } from '@/services/google/googleAuth';
@@ -73,6 +86,32 @@ import { pickPlausibleProps } from '@beanies/brand/attribution';
 import { useTranslationStore } from './translationStore';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import { track } from '@/services/analytics/plausible';
+
+/** Budget for the "save first" attempt before a destructive delete (C6). */
+const UNSAVED_PROBE_SAVE_TIMEOUT_MS = 8000;
+
+/** A fixed, PII-free summary of an unsaved-work report for the firehose `detail` field. */
+function describeUnsaved(r: UnsavedWorkReport): string {
+  const parts: string[] = [];
+  if (r.unsavedFamilies > 0) parts.push(`doc:${r.unsavedFamilies}`);
+  if (r.photoUploads > 0) parts.push('photos');
+  if (r.remoteBlocked) parts.push('remote-blocked');
+  if (r.unknown) parts.push('unknown');
+  return parts.length ? parts.join(',') : 'clean';
+}
+
+/**
+ * Does this member already hold a sign-in credential (C10 claim fence)? Reads the RAW
+ * projection row first (current the moment a merge lands, with no store reload in between)
+ * and the store roster as a second witness; either holding a PIN or password hash counts.
+ * The deferred-password sentinel is the empty string, so it never reads as claimed.
+ */
+function memberIsClaimed(memberId: string): boolean {
+  const raw = projectionGetById('familyMembers', memberId) as
+    Pick<FamilyMember, 'pinHash' | 'passwordHash'> | undefined;
+  const store = useFamilyStore().members.find((m) => m.id === memberId);
+  return [raw, store].some((m) => !!m && (!!m.pinHash || !!m.passwordHash));
+}
 
 /**
  * Sentinel `passwordHash` for an owner created in deferred-password mode
@@ -214,7 +253,7 @@ async function rotateMemberPassword(
   // failed durable save can restore it byte-for-byte (transactional rotation).
   const member = familyStore.members.find((m) => m.id === memberId);
   const old: RotationSnapshot = {
-    wrappedKeyEntry: syncStore.envelope?.wrappedKeys?.[memberId],
+    wrappedKeyEntry: syncStore.authoritativeEnvelope()?.wrappedKeys?.[memberId],
     passwordHash: member?.passwordHash ?? '',
     requiresPassword: member?.requiresPassword ?? true,
   };
@@ -408,7 +447,7 @@ async function healStaleWrappedKey(memberId: string, password: string): Promise<
     const { useSyncStore } = await import('@/stores/syncStore');
     const { unwrapWrappedKey } = await import('@/services/sync/fileSync');
     const syncStore = useSyncStore();
-    const env = syncStore.envelope;
+    const env = syncStore.authoritativeEnvelope();
     if (!env || !syncStore.familyKey) return; // passkey / cache-only sign-in — no password-shaped repair possible
     const entry = env.wrappedKeys?.[memberId];
     if (entry && (await unwrapWrappedKey(entry, password))) return; // fresh — no heal needed
@@ -1141,6 +1180,16 @@ export const useAuthStore = defineStore('auth', () => {
       if (!member) return { success: false, error: 'Failed to rebuild owner member' };
       return { success: true };
     } catch (e) {
+      // Never silent (C10): the owner's PIN or the owner row itself did not land, on the
+      // create flow's finish surface — a user action failed and the pod has no owner
+      // credential yet. Critical: it pages, because the person is stuck at create.
+      reportError({
+        surface: 'login-flow',
+        message: 'owner rehydrate failed on the create finish surface',
+        error: e,
+        severity: 'critical',
+        context: { action: 'owner_rehydrate_failed' },
+      });
       return { success: false, error: e instanceof Error ? e.message : 'Failed to rebuild owner' };
     }
   }
@@ -1539,7 +1588,12 @@ export const useAuthStore = defineStore('auth', () => {
       if (!syncStore.familyKey || !familyId) return { success: false };
       const enrolled = await enrollPinUnlock({
         familyId,
-        member: { id: member.id, name: member.name, pinVersion: member.pinVersion ?? 1 },
+        member: {
+          id: member.id,
+          name: member.name,
+          pinVersion: member.pinVersion ?? 1,
+          pinHash: member.pinHash,
+        },
         pin,
         familyKey: syncStore.familyKey,
         keyId: syncStore.envelope?.keyId ?? '',
@@ -1577,7 +1631,7 @@ export const useAuthStore = defineStore('auth', () => {
   ): Promise<{ success: boolean; error?: string }> {
     const translationStore = useTranslationStore();
     try {
-      const { isValidPin, enrollPinUnlock } = await import('@/services/auth/deviceUnlock');
+      const { isValidPin } = await import('@/services/auth/deviceUnlock');
       if (!isValidPin(pin)) {
         return { success: false, error: translationStore.t('pin.invalidFormat') };
       }
@@ -1593,37 +1647,28 @@ export const useAuthStore = defineStore('auth', () => {
         }
       }
 
-      const pinHash = await hashPassword(pin);
-      const pinVersion = (member.pinVersion ?? 0) + 1;
-      await familyStore.updateMemberCredentials(memberId, { pinHash, pinVersion });
+      // ⚠️ THE ONE CHECKED SET-PIN BODY (C10). This used to hash, write and enrol inline
+      // and IGNORE the write's result: `updateMemberCredentials` resolves `null` on a failed
+      // write, so a change that never landed still enrolled this device's wrap under the NEW
+      // PIN, against a doc that still held the OLD hash, and reported success. The person
+      // then had two PINs that each worked in a different place. `applyPinReset` checks the
+      // write and returns failure BEFORE the enrolment, so a failed change changes nothing.
+      const result = await applyPinReset(memberId, pin, 'change');
+      if (!result.success) return { success: false, error: result.error };
 
-      // Device wrap: only possible while the pod is open (we hold the family key).
+      // Best-effort push so the doc-side hash reaches other devices. The change already
+      // landed locally and rides the next save, so a miss is not a failure for the person,
+      // but it IS the window in which another device still accepts the old PIN: count it.
       const { useSyncStore } = await import('./syncStore');
-      const syncStore = useSyncStore();
-      const familyContextStore = useFamilyContextStore();
-      const familyId = familyContextStore.activeFamilyId;
-      if (syncStore.familyKey && familyId) {
-        const enrolled = await enrollPinUnlock({
-          familyId,
-          member: { id: member.id, name: member.name, pinVersion },
-          pin,
-          familyKey: syncStore.familyKey,
-          keyId: syncStore.envelope?.keyId ?? '',
+      const pushed = await useSyncStore().syncNowBounded();
+      if (!pushed) {
+        logEvent({
+          level: 'warn',
+          surface: 'login-flow',
+          message: 'PIN changed locally; the push to the family file was deferred',
+          context: { action: 'pin_change_push_deferred' },
         });
-        if (!enrolled.success) {
-          // The doc-side hash IS set (the PIN works family-wide); only this device's
-          // fast-unlock wrap failed. Say so rather than pretending total failure.
-          reportError({
-            surface: 'login-flow',
-            message: 'PIN set but device-unlock enrolment failed on this device',
-            severity: 'warning',
-            context: { action: 'enroll_after_set_failed' },
-          });
-        }
       }
-
-      // Ride the next save; best-effort push so the doc-side hash reaches other devices.
-      await syncStore.syncNowBounded();
       return { success: true };
     } catch (e) {
       reportError({
@@ -1656,7 +1701,8 @@ export const useAuthStore = defineStore('auth', () => {
    */
   async function applyPinReset(
     memberId: string,
-    newPin: string
+    newPin: string,
+    kind: 'join' | 'recovery' | 'admin' | 'change' = 'recovery'
   ): Promise<
     | { success: true; member: FamilyMember; pinVersion: number; familyId: string | null }
     | { success: false; error: string }
@@ -1687,8 +1733,8 @@ export const useAuthStore = defineStore('auth', () => {
       reportError({
         surface: 'login-flow',
         severity: 'critical',
-        message: 'PIN write did not land; the claim was not made',
-        context: { action: 'pin_write_failed', member_id_tail: memberId.slice(-8) },
+        message: 'PIN write did not land; nothing was changed',
+        context: { action: 'pin_write_failed', kind, member_id_tail: memberId.slice(-8) },
       });
       return { success: false, error: translationStore.t('auth.signInFailed') };
     }
@@ -1700,7 +1746,7 @@ export const useAuthStore = defineStore('auth', () => {
     if (syncStore.familyKey && familyId) {
       const enrolled = await enrollPinUnlock({
         familyId,
-        member: { id: member.id, name: member.name, pinVersion },
+        member: { id: member.id, name: member.name, pinVersion, pinHash },
         pin: newPin,
         familyKey: syncStore.familyKey,
         keyId: syncStore.envelope?.keyId ?? '',
@@ -1735,7 +1781,7 @@ export const useAuthStore = defineStore('auth', () => {
       return { success: false, error: refused };
     }
     try {
-      const result = await applyPinReset(targetMemberId, newPin);
+      const result = await applyPinReset(targetMemberId, newPin, 'admin');
       if (!result.success) return result;
       // Review R2-F7: this surface REPLACED the admin password reset, and its use
       // case includes "I think their password is compromised". A legacy target's old
@@ -1812,7 +1858,7 @@ export const useAuthStore = defineStore('auth', () => {
   ): Promise<{ success: boolean; error?: string }> {
     const translationStore = useTranslationStore();
     try {
-      const result = await applyPinReset(memberId, newPin);
+      const result = await applyPinReset(memberId, newPin, 'recovery');
       if (!result.success) return result;
       const { member, familyId } = result;
       const familyStore = useFamilyStore();
@@ -2130,7 +2176,7 @@ export const useAuthStore = defineStore('auth', () => {
     memberId: string;
     pin: string;
     familyId: string;
-  }): Promise<{ success: boolean; error?: string }> {
+  }): Promise<{ success: boolean; error?: string; code?: 'claim_conflict' }> {
     isLoading.value = true;
     error.value = null;
 
@@ -2141,6 +2187,50 @@ export const useAuthStore = defineStore('auth', () => {
       if (!joiningMember) {
         return { success: false, error: useTranslationStore().t('auth.memberNotFound') };
       }
+
+      // ⚠️ SOMEONE ELSE MAY HAVE CLAIMED THIS BEAN SINCE THE GRID WAS DRAWN (C10). The
+      // claim is a plain overwrite of `pinHash`, so two joiners picking the same bean each
+      // "won" locally and the later save silently replaced the first person's PIN: they
+      // were locked out of a family they had just joined. Observe the remote first (merge
+      // in whatever was published), then refuse a member that now holds a credential.
+      // Re-checked against the raw projection immediately before the claim as well.
+      const { useSyncStore } = await import('./syncStore');
+      const joinSync = useSyncStore();
+      if (typeof joinSync.observeRemote === 'function') {
+        const observed = await joinSync.observeRemote();
+        if (!observed) {
+          // Not fatal (an offline joiner can still claim; the race window is the same as
+          // before), but counted, because it is exactly when a conflict can slip through.
+          logEvent({
+            level: 'warn',
+            surface: 'join-flow',
+            message: 'could not observe the family file before claiming a member',
+            context: { action: 'join_observe_degraded' },
+          });
+        }
+      }
+      const refuseIfClaimed = (
+        stage: string
+      ): { success: false; error: string; code: 'claim_conflict' } | null => {
+        if (!memberIsClaimed(params.memberId)) return null;
+        reportError({
+          surface: 'join-flow',
+          severity: 'warning',
+          message: 'join refused: the member was claimed by someone else first',
+          context: {
+            action: 'claim_conflict',
+            stage,
+            member_id_tail: params.memberId.slice(-8),
+          },
+        });
+        return {
+          success: false,
+          error: useTranslationStore().t('join.error.memberClaimed'),
+          code: 'claim_conflict',
+        };
+      };
+      const conflictBeforeMapping = refuseIfClaimed('after-observe');
+      if (conflictBeforeMapping) return conflictBeforeMapping;
 
       // ⚠️ EVERYTHING THAT CAN FAIL RUNS BEFORE THE CLAIM. Writing `pinHash` is the one
       // irreversible step here: `requiresPassword` is derived as `!passwordHash && !pinHash`, so
@@ -2173,7 +2263,9 @@ export const useAuthStore = defineStore('auth', () => {
       // here; a wrap failure is reported inside and is non-fatal.
       //
       // ⚠️ THE CLAIM. Keep it last among the fallible steps — see the block above.
-      const pinResult = await applyPinReset(params.memberId, params.pin);
+      const conflictBeforeClaim = refuseIfClaimed('before-claim');
+      if (conflictBeforeClaim) return conflictBeforeClaim;
+      const pinResult = await applyPinReset(params.memberId, params.pin, 'join');
       if (!pinResult.success) return pinResult;
 
       // TRUST THE JOINING DEVICE (2026-09-23, greg: "let's have joined devices be trusted
@@ -2946,9 +3038,12 @@ export const useAuthStore = defineStore('auth', () => {
      * was attempted; `false` = attempted and the encrypted cache is still on
      * disk (another tab could not release it in time, or the delete threw).
      * The clear-data tier hands this to the UI so the person is never told
-     * their data left the browser when it did not.
+     * their data left the browser when it did not. On tier 3 it is the AND of
+     * every family's outcome (`deleteAllLocalFamilies`).
      */
     cacheDeleted: boolean | null;
+    /** Every family `deleteAllLocalFamilies` forgot (tier 3), for the cross-tab announce. */
+    clearedFamilyIds?: string[];
   }): SignOutStepImpls {
     const settingsStore = useSettingsStore();
     return {
@@ -2977,6 +3072,15 @@ export const useAuthStore = defineStore('auth', () => {
           console.warn('[authStore] could not measure unpushed work at sign-out', e);
           ctx.unpushedAtSignOut = 'dirty';
         }
+        // C6: leave the answer where "forget family" can read it after this session is
+        // gone. Any tier that ends dirty KEEPS this family's database (trusted: always;
+        // untrusted: by the guard in `deleteFamilyDb`), and the picker's forget has no
+        // live document to measure, so without the marker it deleted the only copy.
+        const markerFamilyId = resolveSignOutFamilyId();
+        if (markerFamilyId) {
+          if (ctx.unpushedAtSignOut === 'dirty') setUnpushedAtSignOutMarker(markerFamilyId);
+          else clearUnpushedAtSignOutMarker(markerFamilyId);
+        }
       },
       beginQuietTeardown: () => docClient.beginQuietTeardown(),
       cancelReminders: () => cancelRemindersForSignOut(),
@@ -3003,13 +3107,7 @@ export const useAuthStore = defineStore('auth', () => {
       clearDepartedArtifacts: () => clearDepartedGoogleArtifacts(ctx.departedEmail),
       resetDocClient: () => docClient.reset(),
       resolveFamilyId: () => {
-        // Fallback chain (review F14): a legacy session may lack familyId, and the
-        // security-critical clears must never be gated on an optional.
-        ctx.familyId =
-          currentUser.value?.familyId ??
-          useFamilyContextStore().activeFamilyId ??
-          getActiveFamilyIdFromDb() ??
-          undefined;
+        ctx.familyId = resolveSignOutFamilyId();
       },
       deleteFamilyDb: async () => {
         if (!ctx.familyId) return;
@@ -3026,6 +3124,7 @@ export const useAuthStore = defineStore('auth', () => {
         // any reason, including one nothing latched. NEVER on the clear-data
         // tier: see `userAskedToClear`.
         if (!ctx.userAskedToClear && ctx.unpushedAtSignOut === 'dirty') {
+          setUnpushedAtSignOutMarker(ctx.familyId);
           reportError({
             surface: 'pod-load-failure',
             message: 'sign-out kept the local database: the final save did not push everything',
@@ -3039,6 +3138,7 @@ export const useAuthStore = defineStore('auth', () => {
         }
         const unreadable = ctx.userAskedToClear ? null : ctx.remoteWasUnreadable;
         if (unreadable) {
+          setUnpushedAtSignOutMarker(ctx.familyId);
           reportError({
             surface: 'pod-load-failure',
             message: 'sign-out kept the local database: the remote pod is unreadable',
@@ -3061,8 +3161,89 @@ export const useAuthStore = defineStore('auth', () => {
         // cleared". A result with no `deleted` field follows the same
         // unknown-means-not-deleted rule as `docClient.clearCache`.
         ctx.cacheDeleted = false;
-        const result = await deleteFamilyDatabase(ctx.familyId);
+        // A keep-data sign-out never drops the offline photo queue (C6): a queued upload
+        // is a photo that exists nowhere else yet. Only a confirmed clear may.
+        const result = ctx.userAskedToClear
+          ? await deleteFamilyDatabase(ctx.familyId)
+          : await deleteFamilyDatabase(ctx.familyId, { keepPhotoQueue: true });
         ctx.cacheDeleted = result?.deleted === true;
+        logEvent({
+          level: 'info',
+          surface: 'sign-out',
+          message: 'sign-out deleted the family cache',
+          context: {
+            action: 'signout_cache_delete',
+            detail: ctx.cacheDeleted ? 'deleted' : 'kept-by-other-tab',
+            kind: ctx.userAskedToClear ? 'clear' : 'sign-out',
+          },
+        });
+      },
+      deleteAllLocalFamilies: async () => {
+        // C6: the clean-device promise covers EVERY family on this device, not only the
+        // active one. The ids are the registry's families, the active one (a legacy
+        // session may never have registered it) and every cache/photo-queue database
+        // found by NAME, so a family the registry forgot is still reached.
+        const familyContext = await import('@/services/familyContext');
+        let registered: { id: string }[] = [];
+        try {
+          registered = await familyContext.getAllFamilies();
+        } catch (e) {
+          reportError({
+            surface: 'sign-out',
+            message: 'clear-all could not read the family registry; sweeping by name only',
+            error: e,
+            severity: 'warning',
+            context: { action: 'clear_all_registry_unreadable' },
+          });
+        }
+        const ids = new Set<string>(registered.map((f) => f.id));
+        if (ctx.familyId) ids.add(ctx.familyId);
+        for (const id of await listLocalFamilyDatabaseIds()) ids.add(id);
+        ctx.clearedFamilyIds = [...ids];
+        if (ids.size === 0) return;
+        // `false` BEFORE the loop: the unknown-means-not-deleted rule `deleteFamilyDb` uses.
+        ctx.cacheDeleted = false;
+        let allDeleted = true;
+        for (const id of ids) {
+          let outcome: 'deleted' | 'kept' | 'failed';
+          try {
+            const result = await familyContext.deleteLocalFamily(id);
+            outcome = result?.deleted === true ? 'deleted' : 'kept';
+          } catch (e) {
+            outcome = 'failed';
+            reportError({
+              surface: 'family-context',
+              message: 'clear-all could not forget a family; continuing with the rest',
+              error: e,
+              severity: 'error',
+              context: { action: 'clear_all_family_failed' },
+            });
+          }
+          if (outcome !== 'deleted') allDeleted = false;
+          logEvent({
+            level: outcome === 'deleted' ? 'info' : 'warn',
+            surface: 'sign-out',
+            message: 'clear-all family outcome',
+            context: {
+              action: 'clear_all_family',
+              detail: outcome,
+              kind: id === ctx.familyId ? 'active' : 'other',
+            },
+          });
+        }
+        ctx.cacheDeleted = allDeleted;
+        // Keep the in-memory picker list in step with the registry just emptied.
+        try {
+          await useFamilyContextStore().reload?.();
+        } catch (e) {
+          console.warn('[authStore] family list reload after clear-all failed', e);
+        }
+      },
+      announceSessionEnded: () => {
+        // Regardless of the delete's outcome (C10): see the step's note in signOutSteps.ts.
+        const ids = new Set<string>(ctx.clearedFamilyIds ?? []);
+        if (ctx.familyId) ids.add(ctx.familyId);
+        for (const id of ids) announceSessionEnded(id);
       },
       clearKeyCacheFamily: async () => {
         if (ctx.familyId) await settingsStore.clearCachedFamilyKey(ctx.familyId);
@@ -3180,7 +3361,21 @@ export const useAuthStore = defineStore('auth', () => {
       remoteWasUnreadable: isRemoteBlocked(),
       unpushedAtSignOut: null as 'clean' | 'dirty' | null,
       cacheDeleted: null as boolean | null,
+      clearedFamilyIds: undefined as string[] | undefined,
     };
+  }
+
+  /**
+   * The family a sign-out acts on. Fallback chain (review F14): a legacy session may lack
+   * familyId, and the security-critical clears must never be gated on an optional.
+   */
+  function resolveSignOutFamilyId(): string | undefined {
+    return (
+      currentUser.value?.familyId ??
+      useFamilyContextStore().activeFamilyId ??
+      getActiveFamilyIdFromDb() ??
+      undefined
+    );
   }
 
   /** Run one sign-out tier's steps, record it, and end the session. */
@@ -3390,6 +3585,80 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
+   * What would a destructive delete lose right now (C6)? Every caller that is about to
+   * delete a family's cache asks this first and, when `hasUnsavedWork`, gets the person's
+   * explicit "discard" (`useSignOut.confirmDiscardUnsavedWork`) before going on.
+   *
+   *   - `save: true` is the "save first" half: one bounded force-save of the open family
+   *     BEFORE measuring, so a delete is only ever offered against what could not land.
+   *     The session stays live: the person may still cancel.
+   *   - `scope: 'all'` (tier 3) adds every OTHER family on this device, measured at rest
+   *     (the marker a previous sign-out left, and its queued photos).
+   *
+   * Never throws; an answer it cannot get reads as at-risk. Logged with the outcome.
+   */
+  async function measureUnsavedWork(opts: {
+    save: boolean;
+    scope: 'active' | 'all';
+  }): Promise<UnsavedWorkReport> {
+    const activeId = resolveSignOutFamilyId() ?? null;
+    if (opts.save && activeId) await forceSaveWithTimeout(UNSAVED_PROBE_SAVE_TIMEOUT_MS);
+    let report = activeId ? await measureLiveFamily(activeId) : { ...NOTHING_UNSAVED };
+    if (opts.scope === 'all') {
+      const ids = new Set<string>();
+      try {
+        const { getAllFamilies } = await import('@/services/familyContext');
+        for (const f of await getAllFamilies()) ids.add(f.id);
+      } catch (e) {
+        console.warn('[authStore] family registry unreadable during the unsaved probe', e);
+        report = { ...report, unknown: true };
+      }
+      for (const id of await listLocalFamilyDatabaseIds()) ids.add(id);
+      if (activeId) ids.delete(activeId);
+      for (const id of ids) report = combineUnsavedWork(report, await measureFamilyAtRest(id));
+    }
+    logEvent({
+      level: hasUnsavedWork(report) ? 'warn' : 'info',
+      surface: 'sign-out',
+      message: 'unsaved work measured before a delete',
+      context: {
+        action: 'unsaved_probe',
+        detail: describeUnsaved(report),
+        kind: opts.scope,
+        file_count: report.photoUploads,
+      },
+    });
+    return report;
+  }
+
+  /** The at-rest measure for ONE family that is not open here (forget family on the picker). */
+  async function measureUnsavedWorkForFamily(familyId: string): Promise<UnsavedWorkReport> {
+    const report = await measureFamilyAtRest(familyId);
+    logEvent({
+      level: hasUnsavedWork(report) ? 'warn' : 'info',
+      surface: 'family-context',
+      message: 'unsaved work measured before forgetting a family',
+      context: {
+        action: 'unsaved_probe',
+        detail: describeUnsaved(report),
+        kind: 'forget-family',
+        file_count: report.photoUploads,
+      },
+    });
+    return report;
+  }
+
+  /**
+   * Settings "Clear Data" (C6): the SAME teardown-and-force-save the sign-out tiers open
+   * with (`quietTeardownAndForceSave`), run before its delete. It never saved at all, so a
+   * pending debounce or a failed autosave was simply deleted with the cache.
+   */
+  async function teardownForLocalClear(): Promise<void> {
+    docClient.beginQuietTeardown();
+    await forceSaveWithTimeout(3000);
+  }
+
+  /**
    * Tier 3 — Sign out & clear data: the clean-device promise. Full LOCAL teardown
    * (every family's tokens, caches, wraps, passkeys, rosters) — and still NO revoke
    * at Google (device-local action; whole-grant revoke would kill every other device
@@ -3407,6 +3676,15 @@ export const useAuthStore = defineStore('auth', () => {
     // tells the person rather than letting "clear data" read as clean.
     return { cacheDeleted: ctx.cacheDeleted };
   }
+
+  // C10 cross-tab: listen on this family's session channel while signed in to it, so an
+  // untrusted sign-out in another tab ends this one too (see `sessionChannel.ts`). Bound
+  // to the family id, so switching family moves the listener and a sign-out stops it.
+  watch(
+    () => (isAuthenticated.value ? (currentUser.value?.familyId ?? null) : null),
+    (familyId) => bindSessionChannel(familyId),
+    { immediate: true }
+  );
 
   return {
     // State
@@ -3462,6 +3740,9 @@ export const useAuthStore = defineStore('auth', () => {
     signOut,
     signOutAndClearData,
     endSessionClearedElsewhere,
+    measureUnsavedWork,
+    measureUnsavedWorkForFamily,
+    teardownForLocalClear,
     setDeviceTrust,
     restoreE2EAuth,
   };

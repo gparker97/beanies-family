@@ -348,3 +348,31 @@ export function withinTrustWindow(checkedAtIso: string | null, nowMs: number): b
   if (checkedAtMs > nowMs) return false; // future clock => expired
   return nowMs - checkedAtMs < BASELINE_MAX_TRUST_MS;
 }
+
+/**
+ * How far a stored revision moved from `from` to `to`, or `null` when either side is not a
+ * comparable `ver:` revision. PURE.
+ *
+ * The write-race check (audit C4) asks "did anything land between the probe this save read
+ * against and the write it just made?". Our own write moves the counter by one; more than
+ * that means another writer (or a metadata change) landed inside the window. Ordering is
+ * done in BigInt because Drive's `version` is an int64 that JSON delivers as a string —
+ * the reason `compareMarkers` refuses to order revisions at all. `null` is the honest
+ * answer for anything else, and callers treat it as "no evidence", never as a race.
+ */
+export function revisionAdvance(
+  from: string | null | undefined,
+  to: string | null | undefined
+): number | null {
+  // `unknown`, not `string | null`: this reads a provider's write ack, and a partial or
+  // older ack must degrade to "no evidence" — never throw AFTER a write that landed.
+  const parse = (r: unknown): bigint | null => {
+    if (typeof r !== 'string' || !r.startsWith(REVISION_PREFIX)) return null;
+    const digits = r.slice(REVISION_PREFIX.length);
+    return /^\d+$/.test(digits) ? BigInt(digits) : null;
+  };
+  const a = parse(from);
+  const b = parse(to);
+  if (a === null || b === null) return null;
+  return Number(b - a);
+}

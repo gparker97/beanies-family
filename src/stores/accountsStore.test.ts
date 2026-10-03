@@ -9,10 +9,12 @@ vi.mock('@/services/automerge/repositories/accountRepository', () => ({
   getAccountById: vi.fn(),
   createAccount: vi.fn(),
   updateAccount: vi.fn(),
-  deleteAccount: vi.fn(),
+  deleteAccountCascade: vi.fn(),
 }));
 
 import * as accountRepo from '@/services/automerge/repositories/accountRepository';
+import { useAssetsStore } from './assetsStore';
+import { useRecurringStore } from './recurringStore';
 
 const mockAccount: Account = {
   id: 'test-account-1',
@@ -149,6 +151,97 @@ describe('accountsStore', () => {
       // Assert
       expect(result).toBeNull();
       expect(store.error).toBe('Database error');
+    });
+  });
+
+  describe('deleteAccount (audit C7: detaches what fed the account, in one change)', () => {
+    const recurring = (id: string, extra: Record<string, unknown>) => ({
+      id,
+      accountId: 'other',
+      type: 'expense' as const,
+      amount: 10,
+      currency: 'USD' as const,
+      category: 'x',
+      description: 'x',
+      frequency: 'monthly' as const,
+      dayOfMonth: 1,
+      startDate: '2024-01-01',
+      isActive: true,
+      createdAt: '2024-01-01T00:00:00.000Z',
+      updatedAt: '2024-01-01T00:00:00.000Z',
+      ...extra,
+    });
+
+    it('names the dependents and clears them locally once the cascade landed', async () => {
+      const store = useAccountsStore();
+      const recurringStore = useRecurringStore();
+      const assetsStore = useAssetsStore();
+      store.accounts.push(
+        { ...mockAccount },
+        { ...mockAccount, id: 'car-loan', type: 'loan', payFromAccountId: 'test-account-1' },
+        { ...mockAccount, id: 'untouched', payFromAccountId: 'someone-else' }
+      );
+      recurringStore.recurringItems.push(
+        recurring('paid-from', { accountId: 'test-account-1' }),
+        recurring('amortises', { loanId: 'test-account-1' }),
+        recurring('inactive', { accountId: 'test-account-1', isActive: false }),
+        recurring('unrelated', {})
+      );
+      assetsStore.assets.push({
+        id: 'house',
+        memberId: 'member-1',
+        type: 'real_estate',
+        name: 'House',
+        purchaseValue: 1,
+        currentValue: 1,
+        currency: 'USD',
+        includeInNetWorth: true,
+        loan: { hasLoan: true, outstandingBalance: 100, payFromAccountId: 'test-account-1' },
+        createdAt: '2024-01-01T00:00:00.000Z',
+        updatedAt: '2024-01-01T00:00:00.000Z',
+      });
+      vi.mocked(accountRepo.deleteAccountCascade).mockResolvedValue(true);
+      vi.spyOn(recurringStore, 'loadRecurringItems').mockResolvedValue(undefined);
+
+      expect(await store.deleteAccount('test-account-1')).toBe(true);
+
+      expect(accountRepo.deleteAccountCascade).toHaveBeenCalledWith('test-account-1', {
+        recurringItemIds: ['paid-from', 'amortises'],
+        loanAccountIds: ['car-loan'],
+        assets: [expect.objectContaining({ id: 'house' })],
+      });
+      expect(store.accounts.map((a) => a.id)).toEqual(['car-loan', 'untouched']);
+      expect(store.getAccountById('car-loan')).not.toHaveProperty('payFromAccountId');
+      expect(store.getAccountById('untouched')!.payFromAccountId).toBe('someone-else');
+      expect(assetsStore.getAssetById('house')!.loan).not.toHaveProperty('payFromAccountId');
+      expect(recurringStore.loadRecurringItems).toHaveBeenCalled();
+    });
+
+    it('a plain account with no dependents sends an empty cascade and leaves the siblings alone', async () => {
+      const store = useAccountsStore();
+      const recurringStore = useRecurringStore();
+      store.accounts.push({ ...mockAccount });
+      vi.mocked(accountRepo.deleteAccountCascade).mockResolvedValue(true);
+      vi.spyOn(recurringStore, 'loadRecurringItems').mockResolvedValue(undefined);
+
+      expect(await store.deleteAccount('test-account-1')).toBe(true);
+
+      expect(accountRepo.deleteAccountCascade).toHaveBeenCalledWith('test-account-1', {
+        recurringItemIds: [],
+        loanAccountIds: [],
+        assets: [],
+      });
+      expect(store.accounts).toHaveLength(0);
+      expect(recurringStore.loadRecurringItems).not.toHaveBeenCalled();
+    });
+
+    it('returns false and changes nothing when the account is not there', async () => {
+      const store = useAccountsStore();
+      store.accounts.push({ ...mockAccount });
+      vi.mocked(accountRepo.deleteAccountCascade).mockResolvedValue(false);
+
+      expect(await store.deleteAccount('missing')).toBe(false);
+      expect(store.accounts).toHaveLength(1);
     });
   });
 

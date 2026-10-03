@@ -413,6 +413,20 @@ export function usePodCompaction() {
       // next step needs the room. See the note where it is built.
       built = null;
 
+      // DEFENCE IN DEPTH: the backup took time, so re-prove we are level
+      // immediately before the one-way rebuild. Nothing has moved yet, so this
+      // is an ordinary refusal.
+      const levelBeforeCompact = await syncService.syncLevel();
+      if (levelBeforeCompact !== 'level') {
+        logEvent({
+          level: 'warn',
+          surface: 'pod-compaction',
+          message: 'device no longer level with Drive before compaction',
+          context: { action: 'refused', error_code: levelBeforeCompact },
+        });
+        return refuse(REFUSAL_FOR[levelBeforeCompact]);
+      }
+
       progressStep.value = 2; // tidying up the history
       // 4. Rebuild + verify, in the worker. Throws (keeping the old document)
       //    on any difference; nothing has moved yet if it does.
@@ -438,12 +452,28 @@ export function usePodCompaction() {
         // writes. That ordering — flush BEFORE the stamp — was the hazard, and
         // it disappears with the step it was protecting.
         await docClient.flush();
+        // Defence in depth behind the worker's `fromHeads` publish block: a
+        // remote that moved since the compaction's source heads must not be
+        // published over. The compaction itself makes the device 'unpushed',
+        // so only 'remote-moved' is a stop here.
+        const levelBeforePublish = await syncService.syncLevel();
+        if (levelBeforePublish === 'remote-moved') {
+          logEvent({
+            level: 'warn',
+            surface: 'pod-compaction',
+            message: 'remote moved before compaction publish',
+            context: { action: 'refused', error_code: levelBeforePublish },
+          });
+          throw new Error('remote moved before publish');
+        }
         if (!(await syncStore.syncNow(false))) throw new Error('publish failed');
       } catch (e) {
         // The one place a human should look. The recoverable state is a cached,
         // unpublished compaction: the next open reads `ours-newer`, the policy
         // says `publish-local`, and it republishes itself if the remote has not
-        // moved. If a peer wrote meanwhile it blocks visibly, and the honest
+        // moved. If a peer wrote meanwhile the worker blocks the publish (it
+        // compares the remote against the compaction's source `fromHeads`) and
+        // the check just before it stops it first; either way, the honest
         // recovery is the `.beanpod` step 3 proved exists.
         reportError({
           surface: 'pod-compaction',

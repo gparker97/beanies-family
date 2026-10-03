@@ -110,6 +110,8 @@ const lenderCountry = ref<string | undefined>(undefined);
 const loanStartDate = ref('');
 const createRecurringPayment = ref(false);
 const loanPayFromAccountId = ref('');
+/** The loan as the form opened (edit), the baseline `loanChanges` diffs against. */
+let openLoan: AssetLoan | null = null;
 
 // Reset form when modal opens
 // Every field is emitted so an edit can diff against the open-time snapshot. `loan` stays ONE
@@ -159,6 +161,7 @@ const { isEditing, isSubmitting, formDiff } = useFormModal<Asset, AssetPayload>(
       loanStartDate.value = asset.loan?.loanStartDate ?? '';
       createRecurringPayment.value = !!asset.loan?.linkedRecurringItemId;
       loanPayFromAccountId.value = asset.loan?.payFromAccountId ?? '';
+      openLoan = cleanLoan();
     },
     onNew: () => {
       assetEmoji.value = props.defaults?.type ? typeToEmoji[props.defaults.type] || '' : '';
@@ -226,6 +229,37 @@ async function handleRemoveCustomInstitution(instName: string) {
   await removeCustomInstitution(instName);
 }
 
+/**
+ * `loan` is diffed one level deep against the open-time snapshot, so a payment that lands while
+ * the modal is open (the repository reads the live base at save time) is never overwritten by
+ * the stale `outstandingBalance` the form opened with. A sub-key absent from the patch is left
+ * untouched by the worker. Creating a loan (none at open) or removing one (`hasLoan: false`)
+ * sends the whole object. A CLEARED sub-key cannot travel in a nested patch (undefined is
+ * dropped), so that case sends the whole object with every untouched sub-key taken from the
+ * live asset rather than the open-time form value.
+ */
+function loanChanges(next: AssetLoan): AssetLoan | Partial<AssetLoan> | undefined {
+  const opened = openLoan as unknown as Record<string, unknown> | null;
+  if (!opened?.hasLoan || !next.hasLoan) return next;
+  const nextRec = next as unknown as Record<string, unknown>;
+  const changed: Record<string, unknown> = {};
+  let cleared = false;
+  for (const k of new Set([...Object.keys(opened), ...Object.keys(nextRec)])) {
+    if (opened[k] === nextRec[k]) continue;
+    if (nextRec[k] === undefined) cleared = true;
+    else changed[k] = nextRec[k];
+  }
+  if (cleared) {
+    const live = (props.asset?.loan ?? {}) as Record<string, unknown>;
+    const whole: Record<string, unknown> = { ...nextRec };
+    for (const k of Object.keys(nextRec)) {
+      if (!(k in changed) && live[k] !== undefined) whole[k] = live[k];
+    }
+    return whole as unknown as AssetLoan;
+  }
+  return Object.keys(changed).length ? (changed as Partial<AssetLoan>) : undefined;
+}
+
 async function handleSave() {
   if (!canSave.value) return;
   isSubmitting.value = true;
@@ -236,7 +270,13 @@ async function handleSave() {
     const data = buildPayload();
 
     if (isEditing.value && props.asset) {
-      emit('save', { id: props.asset.id, data: formDiff.changes(data) as UpdateAssetInput });
+      const changes = formDiff.changes(data) as UpdateAssetInput;
+      if (changes.loan) {
+        const loan = loanChanges(data.loan);
+        if (loan) changes.loan = loan as AssetLoan;
+        else delete changes.loan;
+      }
+      emit('save', { id: props.asset.id, data: changes });
     } else {
       emit('save', data as CreateAssetInput);
     }

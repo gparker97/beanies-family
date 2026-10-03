@@ -134,7 +134,8 @@ describe('compactDoc', () => {
     expect((await exportEncryptedPayload()).lineage).toBeNull();
     compactDoc();
     const after = await exportEncryptedPayload();
-    expect(after.lineage).toEqual({ id: expect.any(String), seq: 1 });
+    // C1: the stamp also carries the heads the compaction was built from.
+    expect(after.lineage).toEqual({ id: expect.any(String), seq: 1, fromHeads: expect.any(Array) });
     expect(after.payload.length).toBeGreaterThan(0);
   });
 
@@ -377,7 +378,7 @@ describe('compactDoc folds the Counters (#117 Phase 2)', () => {
 
     compactDoc();
     const { podLineage, ...rest } = diffHook.source as Record<string, unknown>;
-    expect(podLineage).toEqual({ id: expect.any(String), seq: 1 });
+    expect(podLineage).toEqual({ id: expect.any(String), seq: 1, fromHeads: expect.any(Array) });
     // `migrateDoc` already created the empty map, so the fold adds nothing and no ledger key.
     expect(rest).toEqual(today);
     expect(rest).not.toHaveProperty('foldedCounters');

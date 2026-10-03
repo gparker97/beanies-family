@@ -17,7 +17,11 @@ import type { RpcRequest } from '../protocol';
 
 vi.mock('@/composables/useToast', () => ({ showToast: vi.fn() }));
 vi.mock('@/utils/perfTiming', () => ({ record: vi.fn() }));
-vi.mock('../../projection', () => ({ applyDelta: vi.fn(), resetProjection: vi.fn() }));
+vi.mock('../../projection', () => ({
+  applyDelta: vi.fn(),
+  resetProjection: vi.fn(),
+  markAuthoritative: vi.fn(),
+}));
 vi.mock('@/utils/errorReporter', () => ({ reportError: vi.fn() }));
 vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: vi.fn() }));
 vi.mock('@/utils/visibilityTracker', () => ({

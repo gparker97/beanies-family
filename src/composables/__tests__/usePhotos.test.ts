@@ -40,13 +40,18 @@ const driveMocks = vi.hoisted(() => {
       this.status = status;
     }
   }
+  class DriveApiError extends DriveFileNotFoundError {}
   return {
     createFile: vi.fn(),
     deleteFile: vi.fn(),
+    deletePermission: vi.fn(async () => undefined),
     downloadFileBlob: vi.fn(),
     findOrCreateFolder: vi.fn(),
     getFileMetadata: vi.fn(),
+    listFilePermissions: vi.fn(async () => []),
+    listFilesInFolder: vi.fn(async () => []),
     setPublicLinkPermission: vi.fn(async () => undefined),
+    DriveApiError,
     DriveFileNotFoundError,
   };
 });
@@ -54,12 +59,18 @@ const driveMocks = vi.hoisted(() => {
 vi.mock('@/services/google/driveService', () => ({
   createFile: driveMocks.createFile,
   deleteFile: driveMocks.deleteFile,
+  deletePermission: driveMocks.deletePermission,
   downloadFileBlob: driveMocks.downloadFileBlob,
   findOrCreateFolder: driveMocks.findOrCreateFolder,
   getFileMetadata: driveMocks.getFileMetadata,
+  listFilePermissions: driveMocks.listFilePermissions,
+  listFilesInFolder: driveMocks.listFilesInFolder,
   setPublicLinkPermission: driveMocks.setPublicLinkPermission,
+  DriveApiError: driveMocks.DriveApiError,
   DriveFileNotFoundError: driveMocks.DriveFileNotFoundError,
 }));
+vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: vi.fn() }));
+vi.mock('@/utils/errorReporter', () => ({ reportError: vi.fn() }));
 
 vi.mock('@/services/photos/photoCompression', () => ({
   compress: vi.fn(async () => ({
@@ -230,7 +241,7 @@ describe('usePhotos', () => {
     expect(ids).toHaveLength(1);
   });
 
-  it('remove calls markDeleted AND updates the caller photoIds', async () => {
+  it('remove detaches from the caller first, then tombstones an unreferenced photo', async () => {
     const photoIds = ref<string[]>(['p-keep', 'p-delete']);
     const updates: string[][] = [];
     const { remove } = usePhotos({
@@ -260,8 +271,48 @@ describe('usePhotos', () => {
       },
     });
 
-    remove('p-delete');
+    await remove('p-delete');
     expect(updates[0]).toEqual(['p-keep']);
+    const store = usePhotoStore();
+    expect(store.photos['p-delete']!.deletedAt).toBeDefined();
+  });
+
+  it('remove does NOT tombstone a photo another host still references (C11)', async () => {
+    await mutate({
+      op: 'set',
+      collection: 'activities',
+      id: 'act-other',
+      entity: { id: 'act-other', photoIds: ['p-shared'] },
+    });
+    await mutate({
+      op: 'set',
+      collection: 'photos',
+      id: 'p-shared',
+      entity: {
+        id: 'p-shared',
+        driveFileId: 'x',
+        mime: 'image/jpeg',
+        width: 1,
+        height: 1,
+        sizeBytes: 1,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    });
+    const photoIds = ref<string[]>(['p-shared']);
+    const { remove } = usePhotos({
+      collection: 'activities',
+      entityId: ref('act-1'),
+      photoIds,
+      updatePhotoIds: (ids) => {
+        photoIds.value = ids;
+      },
+    });
+
+    await remove('p-shared');
+
+    expect(photoIds.value).toEqual([]);
+    expect(usePhotoStore().photos['p-shared']!.deletedAt).toBeUndefined();
   });
 
   it('MAX_PHOTOS_PER_SET is 4', () => {

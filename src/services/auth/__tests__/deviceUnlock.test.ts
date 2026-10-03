@@ -20,6 +20,9 @@ import {
   getPinUnlockRecord,
   isValidPin,
   MAX_PIN_ATTEMPTS,
+  pinHashFingerprint,
+  pinWrapIsStale,
+  type DeviceUnlockRecordWithFp,
 } from '@/services/auth/deviceUnlock';
 import { generateFamilyKey, exportFamilyKey } from '@/services/crypto/familyKeyService';
 
@@ -157,5 +160,43 @@ describe('deviceUnlock', () => {
     expect((await unlockWithPin({ familyId: 'fam-1', memberId: 'm-2', pin: '222222' })).ok).toBe(
       true
     );
+  });
+});
+
+// C10: `pinVersion` is a scalar two devices can bump to the SAME number while setting
+// DIFFERENT PINs. The wrap now carries a fingerprint of the hash it was made against, so the
+// "changed elsewhere" check sees a same-version change too.
+describe('deviceUnlock pinHash fingerprint (pinVersion fence)', () => {
+  beforeEach(async () => {
+    await removeAllPinUnlocks();
+  });
+
+  it('enrolment stores a fingerprint of the doc-side hash beside the version', async () => {
+    const fk = await generateFamilyKey();
+    await enrollPinUnlock({
+      familyId: 'fam-fp',
+      member: { ...member, pinVersion: 2, pinHash: 'salt:hash-A' },
+      pin: '123456',
+      familyKey: fk,
+      keyId: 'k',
+    });
+    const record = (await getPinUnlockRecord('fam-fp', 'm-1')) as DeviceUnlockRecordWithFp;
+    expect(record.pinHashFp).toBe(await pinHashFingerprint('salt:hash-A'));
+    expect(record.pinHashFp).toMatch(/^[0-9a-f]{16}$/);
+  });
+
+  it('a same-version change on another device is stale; the same hash is not', async () => {
+    const record = { pinVersion: 2, pinHashFp: await pinHashFingerprint('salt:hash-A') };
+    expect(await pinWrapIsStale(record, { pinVersion: 2, pinHash: 'salt:hash-B' })).toBe(true);
+    expect(await pinWrapIsStale(record, { pinVersion: 2, pinHash: 'salt:hash-A' })).toBe(false);
+  });
+
+  it('a version change is stale on its own; a pre-fingerprint record falls back to the version', async () => {
+    expect(
+      await pinWrapIsStale({ pinVersion: 1, pinHashFp: undefined }, { pinVersion: 2, pinHash: 'x' })
+    ).toBe(true);
+    expect(
+      await pinWrapIsStale({ pinVersion: 2, pinHashFp: undefined }, { pinVersion: 2, pinHash: 'x' })
+    ).toBe(false);
   });
 });

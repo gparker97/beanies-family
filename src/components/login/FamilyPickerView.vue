@@ -8,6 +8,8 @@ import { getProviderConfig } from '@/services/sync/fileHandleStore';
 import { confirm as showConfirm } from '@/composables/useConfirm';
 import { showToast } from '@/composables/useToast';
 import { notifyCacheKept } from '@/composables/useSignOut';
+import { confirmDiscardUnsavedWork } from '@/composables/useDiscardUnsavedWork';
+import { hasUnsavedWork } from '@/services/auth/unsavedWork';
 import type { PersistedProviderConfig } from '@/services/sync/fileHandleStore';
 import type { PasskeyRegistration } from '@/types/models';
 
@@ -90,10 +92,17 @@ function selectFamily(family: FamilyEntry) {
 }
 
 async function deleteFamily(family: FamilyEntry) {
-  const confirmed = await showConfirm({
-    title: 'confirm.deleteLocalFamilyTitle',
-    message: 'confirm.deleteLocalFamily',
-  });
+  // C6: a previous sign-out may have KEPT this family's database because it held work the
+  // family data file never got (or photos still waiting to upload). Forgetting it here
+  // used to delete that only copy behind the generic confirm. When anything is at risk,
+  // the specific confirm, which names what goes, replaces the generic one.
+  const unsaved = await authStore.measureUnsavedWorkForFamily(family.id);
+  const confirmed = hasUnsavedWork(unsaved)
+    ? await confirmDiscardUnsavedWork(unsaved, 'forget-family')
+    : await showConfirm({
+        title: 'confirm.deleteLocalFamilyTitle',
+        message: 'confirm.deleteLocalFamily',
+      });
   if (!confirmed) return;
 
   const result = await familyContextStore.deleteLocalFamily(family.id);

@@ -111,11 +111,14 @@ import {
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import {
   applyRevokedKeys,
+  ENVELOPE_KEY_DICTS,
   mergeEnvelopes,
   mergeRevokedKeys,
   memberHasKeyMaterial,
+  monotonicCreatedAt,
   revocationKey,
   revocationTombstonesForMember,
+  sameFamily,
   withoutPayload,
 } from '@/services/sync/envelopeMerge';
 import { summarizeRecoveryKits } from '@/services/auth/recoveryKit';
@@ -418,11 +421,21 @@ export const useSyncStore = defineStore('sync', () => {
     envelope: BeanpodFileV4;
     needsPublish: boolean;
   } {
-    const {
-      envelope: mergedFull,
-      needsPublish,
-      filtered,
-    } = mergeEnvelopes(incoming, envelope.value);
+    // ⚠️ AUTHORITATIVE, not `envelope.value` (audit C2). A poll merge updates only
+    // syncService's copy, so merging against the store ref silently dropped whatever that
+    // merge had brought in — a peer's passkey, a peer's tombstone — on the next replace.
+    const local = authoritativeEnvelope();
+    if (local && !sameFamily(incoming, local)) {
+      // `mergeEnvelopes` discards it (audit C3); say so, because reaching here means a
+      // cross-family load did not clear the envelope first, which is the caller's bug.
+      logEvent({
+        level: 'warn',
+        surface: 'sync-envelope',
+        message: 'envelope from another family ignored at merge',
+        context: { action: 'cross-family-local-ignored' },
+      });
+    }
+    const { envelope: mergedFull, needsPublish, filtered } = mergeEnvelopes(incoming, local);
     logRevokedEntriesFiltered(filtered, 'merge');
     logRecoveryKitsExhausted(mergedFull, 'merge');
     // Stripped: this is the long-lived copy, and nothing reads the payload back
@@ -446,6 +459,38 @@ export const useSyncStore = defineStore('sync', () => {
     logRevokedEntriesFiltered(filtered, 'pending');
     logRecoveryKitsExhausted(clean, 'pending');
     pendingEncryptedFile.value = { ...pending, envelope: clean };
+  }
+
+  /**
+   * Prepare to decrypt a pending file (audit C3). When the file belongs to a DIFFERENT
+   * family than the one this session holds (its envelope, or failing that its bound
+   * provider), every save is HELD until the caller releases — after
+   * `installPendingProvider` has bound the new family's provider, or on failure.
+   *
+   * Why the hold: the decrypt installs the new family's key and document in the worker
+   * BEFORE the provider moves, so a debounced save firing in that window would serialise
+   * family B's document and write it through family A's provider. `doSave` also refuses
+   * an envelope/provider family mismatch, but the worker's document carries no family id
+   * that check could compare, so the hold is what closes the window.
+   *
+   * Returns the release (a no-op for a same-family decrypt) and whether it was
+   * cross-family, so the caller clears the old envelope before installing the new one.
+   */
+  function beginPendingDecrypt(pending: NonNullable<(typeof pendingEncryptedFile)['value']>): {
+    crossFamily: boolean;
+    release: () => void;
+  } {
+    const incoming = pending.envelope.familyId;
+    const held = authoritativeEnvelope()?.familyId ?? syncService.getProviderFamilyId();
+    const crossFamily = !!incoming && !!held && incoming !== held;
+    if (!crossFamily) return { crossFamily: false, release: () => {} };
+    logEvent({
+      level: 'info',
+      surface: 'sync-envelope',
+      message: 'cross-family decrypt: saves held, envelope will be cleared',
+      context: { action: 'cross-family-decrypt' },
+    });
+    return { crossFamily: true, release: syncService.holdSaves('cross-family-decrypt') };
   }
 
   /** Null the envelope on sign-out / disconnect. */
@@ -521,9 +566,42 @@ export const useSyncStore = defineStore('sync', () => {
   ): { committed: boolean; previous: EnvelopeEntryOf<F> | undefined } {
     const base = authoritativeEnvelope();
     if (!base) return { committed: false, previous: undefined };
-    const { next, previous } = withEntry(base, dict, key, value);
+    const { next, previous } = withEntry(base, dict, key, stampNewestWins(base, dict, key, value));
     commitEnvelope(next);
     return { committed: true, previous };
+  }
+
+  /**
+   * Clamp a mint into a `newest-wins` dict to `max(now, previous + 1ms)` (audit C12).
+   *
+   * The merge resolves a tie (or an older stamp) AGAINST the entry being minted, so a device
+   * whose clock is behind the one that wrote the slot's current entry would publish a
+   * replacement that loses the merge everywhere — a rotated link or approval that silently
+   * un-happens. The callers already try to stamp past what they saw; this is the one
+   * chokepoint that guarantees it, and the only place that can tell the firehose how often
+   * a device's clock is behind a peer's.
+   */
+  function stampNewestWins<F extends EnvelopeKeyDictField>(
+    base: BeanpodFileV4,
+    dict: F,
+    key: string,
+    value: EnvelopeEntryOf<F> | null
+  ): EnvelopeEntryOf<F> | null {
+    // eslint-disable-next-line security/detect-object-injection -- dict is a registry key
+    if (value === null || ENVELOPE_KEY_DICTS[dict].rule !== 'newest-wins') return value;
+    const stamped = value as EnvelopeEntryOf<F> & { createdAt?: string };
+    // eslint-disable-next-line security/detect-object-injection -- registry key, then the caller's entry key
+    const previous = (base[dict] as Record<string, { createdAt?: string }> | undefined)?.[key];
+    if (!previous?.createdAt || !stamped.createdAt) return value;
+    if (stamped.createdAt > previous.createdAt) return value;
+    const { createdAt } = monotonicCreatedAt(previous.createdAt, Date.parse(stamped.createdAt));
+    logEvent({
+      level: 'warn',
+      surface: 'sync-envelope',
+      message: 'mint stamped at or before the entry it replaces; clamped',
+      context: { action: 'clock-behind-peer', kind: dict },
+    });
+    return { ...stamped, createdAt } as EnvelopeEntryOf<F>;
   }
 
   /**
@@ -1352,7 +1430,9 @@ export const useSyncStore = defineStore('sync', () => {
    * Force sync - save current data to file, overwriting any newer data
    */
   async function forceSyncNow(): Promise<boolean> {
-    return syncNow(true);
+    // The user's explicit Force Save is the ONE caller allowed to write over a torn LOCAL
+    // pod file (audit C13); `syncService` decides the narrow class that qualifies.
+    return syncService.save({ repairCorruptLocal: true });
   }
 
   /**
@@ -1882,9 +1962,15 @@ export const useSyncStore = defineStore('sync', () => {
     // once settled / on native. See docs/plans/2026-07-07-ios-redirect-auth-race.md.
     await whenRedirectAuthSettled();
 
+    // ⚠️ CANCEL, BUT REMEMBER (audit C12). The merge branch cancels the pending save for
+    // a quiet window; every SUCCESS exit below re-arms whatever the merge left to publish,
+    // but a failure exit (a read error, `auth`, `not-found`, `needsPassword`, a throw) used
+    // to drop the intent outright, leaving a local edit with nothing scheduled to push it.
+    // `finally` puts it back unless a success exit cleared the flag.
+    let restorePendingSave = false;
     if (merging) {
       isReloading = true;
-      syncService.cancelPendingSave();
+      restorePendingSave = syncService.cancelPendingSave();
     }
 
     // ⚠️ CAPTURE BEFORE `load()`, WHICH DESTROYS IT. `load()` nulls
@@ -2014,6 +2100,7 @@ export const useSyncStore = defineStore('sync', () => {
             if (mergeResult.action === 'kept-local') {
               // Our unpublished compaction stands; the next save carries it up.
               keepLocalDocumentAndAdoptEnvelopeKeys(remoteEnvelope, liveKey);
+              restorePendingSave = false; // the helper armed the publish
               return { success: true }; // commit NO baseline — see the helper
             }
             // ⚠️ THE POLL TERMINUS WAS SILENT, and it is the path a reconnecting
@@ -2056,6 +2143,7 @@ export const useSyncStore = defineStore('sync', () => {
                 // `isFullySynced` can never be true again), `reloadAllStores`
                 // calls `cancelPendingSave`, and `confirmRemoteMerged` certifies
                 // a baseline this document provably does not contain.
+                restorePendingSave = false;
                 return { success: true };
               }
               driveHeads = recovered;
@@ -2163,6 +2251,7 @@ export const useSyncStore = defineStore('sync', () => {
           // baseline would be dropped on the next check and every open would do
           // a full read.
           syncService.confirmRemoteMerged();
+          restorePendingSave = false; // the merge's own `dirty` arm decided above
           await runPostLoadDriveHousekeeping();
           return { success: true };
         } catch (e) {
@@ -2214,6 +2303,7 @@ export const useSyncStore = defineStore('sync', () => {
       if (merging && isReloading) {
         isReloading = false;
       }
+      if (restorePendingSave) syncService.triggerDebouncedSave();
     }
   }
 
@@ -2394,6 +2484,9 @@ export const useSyncStore = defineStore('sync', () => {
       return { success: false, error: 'No pending encrypted file' };
     }
 
+    // Saves are held from here to `installPendingProvider` when this is another
+    // family's file (audit C3); released in `finally` on every exit.
+    let decryptGuard: ReturnType<typeof beginPendingDecrypt> | null = null;
     try {
       // Try to unwrap the family key using the password. memberIds is the
       // list of every member whose wrappedKey successfully unwrapped with
@@ -2415,6 +2508,9 @@ export const useSyncStore = defineStore('sync', () => {
       // Hoisted above the post so the actor can be derived for the RIGHT family
       // — a pure move, no behaviour change.
       const famId = pending.envelope.familyId || useFamilyContextStore().activeFamilyId;
+      // BEFORE the worker gets the new key: from this line the worker may hold the new
+      // family's document while the old family's provider is still bound.
+      decryptGuard = beginPendingDecrypt(pending);
       // Post the just-unwrapped key + the stable actor so it can decrypt + merge.
       await docClient.setFamilyKey(fk, famId ?? '');
 
@@ -2438,6 +2534,9 @@ export const useSyncStore = defineStore('sync', () => {
       // (merges any local-only entries); at this point `envelope.value` is
       // typically null (fresh decrypt), so the merge is a no-op — but using
       // the uniform pattern keeps the invariant grep-checkable.
+      // ⚠️ A DIFFERENT FAMILY'S ENVELOPE IS CLEARED FIRST (audit C3), so not one of its
+      // wraps, invites or its recovery passphrase can be carried into this file.
+      if (decryptGuard.crossFamily) clearEnvelope();
       familyKey.value = fk;
       const mergedEnvelope = replaceEnvelope(pending.envelope);
       syncService.setFamilyKey(fk, mergedEnvelope);
@@ -2472,6 +2571,8 @@ export const useSyncStore = defineStore('sync', () => {
       }
 
       await installPendingProvider(pending, activeFamilyId, opts.keepCurrentPod === true);
+      // Provider and envelope now name the same family: saves may run again.
+      decryptGuard.release();
 
       // Clear pending
       pendingEncryptedFile.value = null;
@@ -2590,6 +2691,9 @@ export const useSyncStore = defineStore('sync', () => {
         };
       }
       return { success: false, error: errorMessage };
+    } finally {
+      // Every exit releases a hold this call took (idempotent after the success path's).
+      decryptGuard?.release();
     }
   }
 
@@ -3459,6 +3563,8 @@ export const useSyncStore = defineStore('sync', () => {
     const pending = pendingEncryptedFile.value;
     if (!pending) return { success: false, error: 'No pending file' };
 
+    // See `decryptPendingFile`: saves held across a cross-family decrypt (audit C3).
+    const decryptGuard = beginPendingDecrypt(pending);
     try {
       // Hoisted above the post so the actor can be derived for the RIGHT family
       // — a pure move, no behaviour change.
@@ -3485,6 +3591,8 @@ export const useSyncStore = defineStore('sync', () => {
         });
       }
 
+      // A different family's envelope is cleared first (audit C3).
+      if (decryptGuard.crossFamily) clearEnvelope();
       familyKey.value = fk;
       const decryptedMerged = replaceEnvelope(pending.envelope);
       syncService.setFamilyKey(fk, decryptedMerged);
@@ -3520,6 +3628,7 @@ export const useSyncStore = defineStore('sync', () => {
       }
 
       await installPendingProvider(pending, activeFamilyId, false);
+      decryptGuard.release();
 
       // Clear pending
       pendingEncryptedFile.value = null;
@@ -3600,6 +3709,8 @@ export const useSyncStore = defineStore('sync', () => {
         return { success: false, error: (e as Error).message, payloadError: e };
       }
       return { success: false, error: (e as Error).message };
+    } finally {
+      decryptGuard.release();
     }
   }
 
@@ -3632,17 +3743,62 @@ export const useSyncStore = defineStore('sync', () => {
     memberId: string,
     entry: { wrapped: string; salt: string } | undefined
   ): Promise<void> {
-    if (!envelope.value) throw new Error('No envelope loaded');
-    const env = { ...envelope.value };
-    const wrappedKeys = { ...env.wrappedKeys };
-    if (entry) {
-      wrappedKeys[memberId] = { wrapped: entry.wrapped, salt: entry.salt };
-    } else {
-      delete wrappedKeys[memberId];
+    // ⚠️ AUTHORITATIVE, and through the entry helper (audit C2). This used to spread
+    // `envelope.value`, which a poll merge never updates — so a rotation written just after
+    // a background sync erased whatever that sync had brought in (a peer's passkey, a peer's
+    // invite) and reinstated anything it had revoked.
+    const base = authoritativeEnvelope();
+    if (!base) throw new Error('No envelope loaded');
+    // eslint-disable-next-line security/detect-object-injection -- memberId is the caller's member
+    const previous = base.wrappedKeys?.[memberId];
+    if (entry && previous?.wrapped && previous.wrapped !== entry.wrapped) {
+      const restoredKey = revocationKey('wrappedKeys', memberId, entry.wrapped);
+      if (restoredKey in (base.revokedKeys ?? {})) {
+        // A ROLLBACK: the exact bytes being written were retired by this device's own
+        // rotation a moment ago (`authStore.restoreCredential`). Wrap ciphertexts carry a
+        // random IV, so identical bytes can only be a restore, never a fresh mint. Lift the
+        // local tombstone, or the restored wrap is filtered out at the next merge and the
+        // member is left with NO password wrap. If the rotation did land remotely, the
+        // remote's copy of the tombstone wins the union again — that is the convergence
+        // case `rotateMemberPassword` already pages on.
+        liftLocalTombstone(restoredKey);
+        logEvent({
+          level: 'info',
+          surface: 'sync-envelope',
+          message: 'rotation rolled back; local tombstone for the restored wrap lifted',
+          context: { action: 'rotation-tombstone-lifted', member_id_tail: memberId.slice(-8) },
+        });
+      } else {
+        // ⚠️ TOMBSTONE THE OLD WRAP BEFORE WRITING THE NEW ONE. `wrappedKeys` merges
+        // local-wins, so without this any other signed-in device still holding the old
+        // wrap republishes it on its next save and the rotation silently un-happens — the
+        // old password keeps opening the pod. VALUE-PINNED, so only that exact wrap dies
+        // and the member's new one (and any later re-wrap) is untouched.
+        revokeEnvelopeEntries({
+          [revocationKey('wrappedKeys', memberId, previous.wrapped)]: {
+            revokedAt: new Date().toISOString(),
+            wrapped: previous.wrapped,
+          },
+        });
+      }
     }
-    env.wrappedKeys = wrappedKeys;
-    envelope.value = env;
-    syncService.setEnvelope(env); // also RPCs the worker to persist the envelope cache
+    setEnvelopeEntry(
+      'wrappedKeys',
+      memberId,
+      entry ? { wrapped: entry.wrapped, salt: entry.salt } : null
+    );
+  }
+
+  /**
+   * Remove ONE tombstone from this device's envelope. Only for undoing this device's own
+   * not-yet-confirmed rotation (`setMemberWrappedKey`); a tombstone a peer published comes
+   * straight back with the next merge, by design.
+   */
+  function liftLocalTombstone(key: string): void {
+    const base = authoritativeEnvelope();
+    if (!base?.revokedKeys || !(key in base.revokedKeys)) return;
+    const { [key]: _lifted, ...rest } = base.revokedKeys;
+    commitEnvelope({ ...base, revokedKeys: rest });
   }
 
   /**
@@ -3727,17 +3883,20 @@ export const useSyncStore = defineStore('sync', () => {
    * save. Left alone, a rename only reaches the LOCAL registry (familyContext),
    * which a fresh load rebuilds from `envelope.familyName` (see syncService's
    * load path), so the new name is silently lost on a new device, a cleared
-   * cache, or the in-memory review demo. This updates the in-memory envelope via
-   * `replaceEnvelope` (per the write invariant — it also pushes the envelope to
-   * the worker/service cache the durable save reads) and forces a save so the
-   * file the NEXT load reads carries the new name.
+   * cache, or the in-memory review demo. This commits the rename onto the
+   * AUTHORITATIVE envelope via `commitEnvelope` (which also pushes it to the
+   * worker/service cache the durable save reads) and forces a save so the file
+   * the NEXT load reads carries the new name.
    *
    * Returns whether the durable save succeeded. A `false` is non-fatal: the new
    * name is already staged in the service envelope, so the next successful save
    * (any doc change) will carry it. Never throws.
    */
   async function persistFamilyName(name: string): Promise<boolean> {
-    if (!envelope.value) {
+    // Authoritative, not `envelope.value` (audit C2): building the rename from the
+    // pre-merge snapshot republished it over whatever a poll merge had just brought in.
+    const base = authoritativeEnvelope();
+    if (!base) {
       // No durable pod yet (pre-creation) or an in-memory review-demo session —
       // there is no file to persist into; the local registry update is all there is.
       logEvent({
@@ -3748,9 +3907,9 @@ export const useSyncStore = defineStore('sync', () => {
       });
       return false;
     }
-    if (envelope.value.familyName === name) return true;
+    if (base.familyName === name) return true;
 
-    replaceEnvelope({ ...envelope.value, familyName: name });
+    commitEnvelope({ ...base, familyName: name });
     const saved = await syncNow(true);
     // Mirror the new name into the remote registry so the account's family list
     // reflects it without waiting for the next login event. Best-effort (the call
@@ -4360,6 +4519,9 @@ export const useSyncStore = defineStore('sync', () => {
     if (!isConfigured.value || needsPermission.value || isReloading || isCheckingFile) return false;
 
     isCheckingFile = true;
+    // Cancelled below for the reload; restored on every exit that did not reload (C12).
+    let armedBeforeReload = false;
+    let reloaded = false;
     try {
       // #61 C14: reload only when the file actually CHANGED. `unknown` (transient
       // provider error) does NOT reload — a persistent error must not turn this
@@ -4378,13 +4540,14 @@ export const useSyncStore = defineStore('sync', () => {
       }
       if (change.status !== 'changed') return false;
 
-      syncService.cancelPendingSave();
+      armedBeforeReload = syncService.cancelPendingSave();
 
       isCrossDeviceReload = true;
       try {
         const loadResult = await loadFromFile({ merge: true });
         if (loadResult.success) {
           clearPodUnopenable(); // a read really succeeded
+          reloaded = true;
           return true;
         }
 
@@ -4393,6 +4556,7 @@ export const useSyncStore = defineStore('sync', () => {
           if (familyKey.value && pendingEncryptedFile.value) {
             try {
               await hydrateFromEnvelope(pendingEncryptedFile.value.envelope);
+              reloaded = true;
               return true;
             } catch (e) {
               // ⚠️ `keyMayBeWrong` gates this, exactly as in the twin in
@@ -4422,7 +4586,10 @@ export const useSyncStore = defineStore('sync', () => {
 
           // Try cached family key
           const success = await tryDecryptWithCachedKey();
-          if (success === true) return true;
+          if (success === true) {
+            reloaded = true;
+            return true;
+          }
           if (success !== false) {
             // A payload failure. Keep the envelope (nulling it breaks the
             // decrypt modal's computeds) and latch the poller off.
@@ -4461,9 +4628,20 @@ export const useSyncStore = defineStore('sync', () => {
         return false;
       }
       console.warn('[syncStore] reloadIfFileChanged failed:', e);
+      logEvent({
+        level: 'warn',
+        surface: 'sync-load',
+        message: 'background reload failed',
+        error: e instanceof Error ? e : undefined,
+        context: {
+          action: 'reload-failed',
+          error_code: e instanceof Error ? e.name : 'unknown',
+        },
+      });
       return false;
     } finally {
       isCheckingFile = false;
+      if (armedBeforeReload && !reloaded) syncService.triggerDebouncedSave();
     }
   }
 
@@ -6579,7 +6757,23 @@ export const useSyncStore = defineStore('sync', () => {
     // `setEnvelopeEntry`: this is a SCALAR field, not a key dict.
     const base = authoritativeEnvelope();
     if (!base) return;
-    commitEnvelope({ ...base, recoveryPassphrase: pkg });
+    // Newest-wins by `createdAt`, exactly like the newest-wins dicts: clamp past the wrap
+    // this replaces, or a slow clock makes the change lose to the old passphrase (C12).
+    const prev = base.recoveryPassphrase?.createdAt;
+    let stamped = pkg;
+    if (prev && pkg.createdAt && pkg.createdAt <= prev) {
+      stamped = {
+        ...pkg,
+        createdAt: monotonicCreatedAt(prev, Date.parse(pkg.createdAt)).createdAt,
+      };
+      logEvent({
+        level: 'warn',
+        surface: 'sync-envelope',
+        message: 'mint stamped at or before the entry it replaces; clamped',
+        context: { action: 'clock-behind-peer', kind: 'recoveryPassphrase' },
+      });
+    }
+    commitEnvelope({ ...base, recoveryPassphrase: stamped });
   }
 
   /**
@@ -6694,6 +6888,12 @@ export const useSyncStore = defineStore('sync', () => {
     tombstonesWritten: number;
     entriesDropped: number;
     unattributedPasskeys: number;
+    /**
+     * Recovery kits with no `createdBy`, left live on a REMOVE because they cannot be tied
+     * to the departing member (audit C10). Non-zero means the remover should be nudged to
+     * review recovery kits / change the recovery passphrase. Always 0 on unclaim.
+     */
+    unattributedKits: number;
     passkeySecretsCleared: number;
     /** True when there was no envelope at all — nothing was even attempted. */
     noEnvelope: boolean;
@@ -6703,7 +6903,12 @@ export const useSyncStore = defineStore('sync', () => {
     const passkeySecretsCleared = before - passkeySecrets.value.length;
 
     const base = authoritativeEnvelope();
-    const empty = { tombstonesWritten: 0, entriesDropped: 0, unattributedPasskeys: 0 };
+    const empty = {
+      tombstonesWritten: 0,
+      entriesDropped: 0,
+      unattributedPasskeys: 0,
+      unattributedKits: 0,
+    };
     if (!base) {
       reportError({
         surface: 'envelope-revocation',
@@ -6714,10 +6919,16 @@ export const useSyncStore = defineStore('sync', () => {
       return { ...empty, passkeySecretsCleared, noEnvelope: true };
     }
 
-    const { tombstones, unattributedPasskeys } = revocationTombstonesForMember(base, memberId, {
+    const {
+      tombstones,
+      unattributedPasskeys,
+      unattributedKits: kitsLeftLive,
+    } = revocationTombstonesForMember(base, memberId, {
       mode,
       now: new Date().toISOString(),
     });
+    // Only a removal retires kits, so only a removal has unattributed ones worth a nudge.
+    const unattributedKits = mode === 'remove' ? (kitsLeftLive ?? 0) : 0;
     const tombstonesWritten = Object.keys(tombstones).length;
     const { filtered: entriesDropped } =
       tombstonesWritten > 0 ? revokeEnvelopeEntries(tombstones) : { filtered: 0 };
@@ -6729,7 +6940,7 @@ export const useSyncStore = defineStore('sync', () => {
         action: 'entries_revoked',
         kind: mode,
         count: tombstonesWritten,
-        detail: `dropped=${entriesDropped} unattributed_passkeys=${unattributedPasskeys}`,
+        detail: `dropped=${entriesDropped} unattributed_passkeys=${unattributedPasskeys} unattributed_kits=${unattributedKits}`,
         member_id_tail: memberId.slice(-8),
       },
     });
@@ -6737,6 +6948,7 @@ export const useSyncStore = defineStore('sync', () => {
       tombstonesWritten,
       entriesDropped,
       unattributedPasskeys,
+      unattributedKits,
       passkeySecretsCleared,
       noEnvelope: false,
     };
@@ -6867,6 +7079,9 @@ export const useSyncStore = defineStore('sync', () => {
     pendingEncryptedFile,
     familyKey,
     envelope,
+    // Read through this, not `envelope`, wherever the answer feeds a WRITE: a poll merge
+    // updates syncService's copy and never the ref (audit C2).
+    authoritativeEnvelope,
     // Computed
     capabilities,
     supportsAutoSync,

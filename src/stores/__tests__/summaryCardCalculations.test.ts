@@ -21,7 +21,7 @@ vi.mock('@/services/automerge/repositories/accountRepository', () => ({
       updatedAt: '2024-01-01T00:00:00.000Z',
     })
   ),
-  deleteAccount: vi.fn().mockResolvedValue(true),
+  deleteAccountCascade: vi.fn().mockResolvedValue(true),
 }));
 
 vi.mock('@/services/automerge/repositories/assetRepository', () => ({
@@ -42,7 +42,7 @@ vi.mock('@/services/automerge/repositories/assetRepository', () => ({
       updatedAt: '2024-01-01T00:00:00.000Z',
     })
   ),
-  deleteAsset: vi.fn().mockResolvedValue(true),
+  deleteAssetCascade: vi.fn().mockResolvedValue(true),
 }));
 
 vi.mock('@/services/automerge/repositories/settingsRepository', () => ({

@@ -199,6 +199,7 @@ const ALL_ERROR_CODES: JoinErrorCode[] = [
   'MAGIC_LINK_INCOMPLETE',
   'INVITE_LINK_UNPARSEABLE',
   'NO_UNCLAIMED_MEMBERS',
+  'MEMBER_ALREADY_CLAIMED',
 ];
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
@@ -1328,6 +1329,27 @@ describe('useJoinFlow', () => {
       expect(flow.currentStep.value).toBe('set-pin');
       expect(flow.currentError.value?.code).toBe('FILE_DECRYPT_FAILED');
       expect(mockSyncStore.wrapFamilyKeyForMember).not.toHaveBeenCalled();
+    });
+
+    it('a claim conflict sends the joiner back to the grid with its own copy (C10)', async () => {
+      // Someone else claimed this member first; joinFamily refused to overwrite their PIN.
+      // Retrying the same form can only fail again, and "ask for a new link" is untrue.
+      const { useJoinFlow } = await import('../useJoinFlow');
+      const flow = useJoinFlow();
+      familyMembers.push({ id: 'm1', requiresPassword: true, isPet: false });
+      mockAuthStore.joinFamily = vi.fn(async () => ({
+        success: false,
+        error: 'join.error.memberClaimed',
+        code: 'claim_conflict' as const,
+      }));
+
+      flow.handleSelectMember(familyMembers[0]! as never);
+      const ok = await flow.handleSubmitPin('123456');
+
+      expect(ok).toBe(false);
+      expect(flow.currentError.value?.code).toBe('MEMBER_ALREADY_CLAIMED');
+      expect(flow.currentStep.value).toBe('pick-member');
+      expect(flow.selectedMember.value).toBeNull();
     });
   });
 

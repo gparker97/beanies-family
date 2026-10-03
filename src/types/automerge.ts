@@ -220,6 +220,19 @@ const COLLECTION_NAME_SEED: Record<CollectionName, 0> = {
 export const COLLECTION_NAMES = Object.keys(COLLECTION_NAME_SEED) as CollectionName[];
 
 /**
+ * The collections that hold a Counter-backed money field (#117 Phase 2): account `balance`, goal
+ * `currentAmount`, asset `loan.outstandingBalance`. A PURE list, so a module that must stay
+ * Automerge-free (`photoOps.ts`, imported by a main-thread store) can ask without importing
+ * `counterFields.ts`, which imports Automerge as a value. `COUNTER_FIELDS` is typed against it in
+ * both directions, so the two cannot drift.
+ */
+export const COUNTER_COLLECTION_NAMES = [
+  'accounts',
+  'goals',
+  'assets',
+] as const satisfies readonly CollectionName[];
+
+/**
  * Every root key `migrateDoc` creates with a stored, deterministic change when it is ABSENT
  * (#117, ADR-039 §10): each collection map, plus the Phase 2 `counterDeltas` map. The
  * `MIGRATION_CHANGES` table is typed `Record<MigratedRootKey, string>`, so a key listed here

@@ -56,6 +56,45 @@ const withGone = () =>
     },
   });
 
+describe('a removed member’s recovery kits leave with them (audit C10)', () => {
+  const kit = (createdBy?: string) => ({
+    salt: 's',
+    wrapped: `kit-${createdBy ?? 'legacy'}`,
+    createdAt: NOW,
+    ...(createdBy ? { createdBy } : {}),
+  });
+  const base = () =>
+    env({
+      recoveryKeys: { kGone: kit('gone'), kStay: kit('stay'), kLegacy: kit() } as never,
+    });
+
+  it('remove: slot-tombstones every kit the member created, and only those', () => {
+    const { tombstones } = revocationTombstonesForMember(base(), 'gone', {
+      mode: 'remove',
+      now: NOW,
+    });
+    expect(tombstones).toHaveProperty(revocationKey('recoveryKeys', 'kGone'));
+    expect(tombstones).not.toHaveProperty(revocationKey('recoveryKeys', 'kStay'));
+    expect(tombstones).not.toHaveProperty(revocationKey('recoveryKeys', 'kLegacy'));
+    const after = applyRevokedKeys({ ...base(), revokedKeys: tombstones }).envelope;
+    expect(Object.keys(after.recoveryKeys ?? {}).sort()).toEqual(['kLegacy', 'kStay']);
+  });
+
+  it('reports the unattributed kits it had to leave live, so the caller can nudge', () => {
+    expect(
+      revocationTombstonesForMember(base(), 'gone', { mode: 'remove', now: NOW }).unattributedKits
+    ).toBe(1);
+  });
+
+  it('unclaim never touches kits (the member stays)', () => {
+    const { tombstones } = revocationTombstonesForMember(base(), 'gone', {
+      mode: 'unclaim',
+      now: NOW,
+    });
+    expect(Object.keys(tombstones).some((k) => k.startsWith('recoveryKeys:'))).toBe(false);
+  });
+});
+
 function removalOf(base: BeanpodFileV4, memberId: string): BeanpodFileV4 {
   const { tombstones } = revocationTombstonesForMember(base, memberId, {
     mode: 'remove',

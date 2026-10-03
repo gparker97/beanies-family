@@ -20,15 +20,22 @@
 import * as Automerge from '@automerge/automerge';
 import { docInitOpts, setDocActor, resetDocActor } from './docActor';
 import { firstJsonDifference } from '@/utils/firstJsonDifference';
-import { guardLineage, lineageBlockError, type LineageContext } from '@/services/sync/podLineage';
+import {
+  guardLineage,
+  lineageBlockError,
+  type CompactionLineage,
+  type LineageContext,
+} from '@/services/sync/podLineage';
 import type { LineageBasis, ExportedPayload } from './protocol';
-import type { PodLineage, DriveConnection } from '@/types/models';
+import type { PodLineage, DriveConnection, RemovedMember } from '@/types/models';
 import {
   PayloadLoadError,
+  CorruptPayloadError,
   LocalDocUnreadableError,
   CacheInitError,
   StaleBuildCounterError,
 } from '@/types/sync';
+import { withTimeout } from '@/utils/timing';
 import type { CacheInitLoss } from '@/types/sync';
 import { COLLECTION_NAMES, NON_COLLECTION_KEYS, type FamilyDocument } from '@/types/automerge';
 import { importFamilyKey } from '@/services/crypto/familyKeyService';
@@ -61,6 +68,7 @@ import {
   type RootConflictSnapshot,
 } from './docOps';
 import { attachPhotoNamedHandler, collectReferencedPhotoIds as collectPhotoIds } from './photoOps';
+import { registerTransactionOps } from './transactionOps';
 import { foldDoc, foldIndex, counterStats, type CounterStats } from './counterFields';
 import * as cache from './cache';
 import type { RemoteBaselineRow } from '@/services/sync/remoteBaseline';
@@ -73,8 +81,10 @@ import type {
   CacheClearResult,
   WorkerSignal,
   DispatchReply,
+  CacheReplay,
+  InitAndLoadResult,
 } from './protocol';
-import type { ReconcileNote } from './reconcile';
+import { canonicalEqual, type ReconcileNote } from './reconcile';
 
 type Doc = Automerge.Doc<FamilyDocument>;
 type PerfCtx = Record<string, number>;
@@ -191,13 +201,18 @@ function openStageLoss(): CacheInitLoss {
 }
 
 /**
- * The LOAD stage: `dropDoc()` has already run unconditionally, so `currentDoc` is
- * null and tells us nothing. The only thing that can still be lost is what is on
- * DISK, and the one fact that settles it is whether the reseed actually deleted
- * the database.
+ * The LOAD stage (C5a, data-layer audit 2026-10-03): the cache is cleared ONLY when its
+ * payload is PROVEN corrupt — a `CorruptPayloadError` from the `load`/`materialize` step that
+ * cannot be a wrong key. Everything else (an IndexedDB error, a wrong-key decrypt, an
+ * unclassified throw) used to reseed too, and then reported `nothing-to-lose`, so main
+ * installed the remote wholesale over a cache that was merely unreachable for a moment.
  */
-function loadStageLoss(cacheWasReset: boolean): CacheInitLoss {
-  return cacheWasReset ? 'nothing-to-lose' : 'something-to-lose';
+function isProvenCorrupt(e: unknown): boolean {
+  return (
+    e instanceof CorruptPayloadError &&
+    !e.keyMayBeWrong &&
+    (e.step === 'load' || e.step === 'materialize')
+  );
 }
 let sink: WorkerSink = NOOP_SINK;
 
@@ -236,6 +251,42 @@ let lastSnapshotHeads: Heads | null = null;
 let pendingRemoteBaseline: string | null = null;
 
 /**
+ * Which document INSTALL the cursors above describe (C5d, data-layer audit 2026-10-03).
+ * Bumped by `resetDocCursors` and by every other install site; NEVER by an ordinary edit or
+ * merge, which only grow the same document.
+ *
+ * It replaces the `currentDoc === doc` guards. Automerge documents are immutable values, so a
+ * mutation landing during a persist's IDB write made `currentDoc !== doc` true, the cursor was
+ * never advanced, and every later persist re-wrote the same increment and re-compacted the
+ * base. Identity answered "did anything change", where the question is "was the document
+ * replaced".
+ */
+let docGeneration = 0;
+/**
+ * The next base write SUPERSEDES the cache (a new document generation was installed), so it
+ * may delete every increment row; otherwise it deletes only the rows the document provably
+ * contains (`cache.persistDocBinary`, C5h). Set by `resetDocCursors`, cleared by the first
+ * base write of the generation and by a cache-load install.
+ */
+let baseSupersedes = true;
+/**
+ * The replayed cache was missing deps (C5c): never rewrite the base while the document
+ * still depends on changes it does not hold. Re-checked on every persist, so a merge that
+ * delivers the deps lifts it. Cleared at every install.
+ */
+let baseFence = false;
+/**
+ * The family whose document `currentDoc` is, when this realm knows it: set by a cache load,
+ * `openCache`, and a merge or install for a named family; cleared by `initDoc`, `dropDoc` and
+ * `reset`. Read only to recognise a SAME-family live document (C5e) and to decide whether a
+ * pending persist may be flushed into the open cache.
+ */
+let docFamilyId: string | null = null;
+
+/** How long a teardown or a cache re-point waits for an in-flight persist (C5f/g). */
+const SETTLE_TIMEOUT_MS = 5_000;
+
+/**
  * Null every in-memory, doc-derived cursor in one place.
  *
  * These cursors describe "what has already been written for the doc currently in
@@ -254,6 +305,50 @@ function resetDocCursors(): void {
   lastPersistedHeads = null;
   lastSnapshotHeads = null;
   pendingRemoteBaseline = null;
+  // C5d: any persist still in flight describes the document that was just replaced; its
+  // cursor advance must not land on this one.
+  docGeneration++;
+  baseSupersedes = true;
+  baseFence = false;
+}
+
+/**
+ * Let the persist chains settle before the cache handle is closed or re-pointed (C5f/g),
+ * bounded so a wedged IndexedDB can never hold a sign-out hostage. Never throws.
+ *
+ * `flushPending` also writes what the debounce was still holding, which is only correct when
+ * the open cache is this document's own family's: flushing a different family's document into
+ * it is the cross-family write the C18 guards exist to prevent.
+ */
+async function settlePersists(flushPending: boolean): Promise<void> {
+  cancelPendingPersists();
+  const work = flushPending ? enqueuePersist() : persistInFlight;
+  try {
+    await withTimeout(
+      Promise.all([work, snapshotInFlight]).then(() => undefined),
+      SETTLE_TIMEOUT_MS,
+      `cache persist did not settle within ${SETTLE_TIMEOUT_MS}ms`,
+      'PersistSettleTimeoutError'
+    );
+  } catch (e) {
+    console.warn('[applyAndProject] pending cache persist did not settle in time', e);
+  }
+}
+
+/** Is the open cache this document's own family's? Only then may a pending persist be flushed. */
+function docOwnsOpenCache(): boolean {
+  return currentDoc !== null && docFamilyId !== null && docFamilyId === cache.cacheFamilyId();
+}
+
+/**
+ * Open (or reuse) `id`'s cache DB. A re-point to ANOTHER family first lets the previous
+ * family's persists finish against their own handle (C5g), so none of them can land in the
+ * new one.
+ */
+async function openCacheFor(id: string): Promise<void> {
+  const open = cache.cacheFamilyId();
+  if (open !== null && open !== id) await settlePersists(docOwnsOpenCache());
+  await cache.initPersistenceDB(id);
 }
 
 /** Wire the sink once (worker startup / inline adapter init). Also registers the
@@ -263,6 +358,8 @@ function resetDocCursors(): void {
 export function configure(nextSink: WorkerSink): void {
   sink = nextSink;
   registerNamedOp('attachPhotoToEntity', attachPhotoNamedHandler);
+  // C7: the atomic transaction cascade (create/update/delete in ONE change).
+  registerTransactionOps();
   // #100: another tab deleted this family's cache and `cache.ts` has already
   // closed the connection. Stop scheduling writes against it; the doc and key
   // are KEPT, because the teardown main is about to run still does a bounded
@@ -343,6 +440,7 @@ async function persistSnapshotOnce(): Promise<void> {
   if (!currentDoc || !familyKey || !cache.isCacheReady()) return;
   const doc = currentDoc;
   const key = familyKey;
+  const gen = docGeneration;
   // Entry snapshot — everything below is computed from THIS doc, so a mutation
   // landing mid-write cannot make us record the wrong heads (same discipline as
   // `persistOnce`).
@@ -363,7 +461,7 @@ async function persistSnapshotOnce(): Promise<void> {
     // Advance ONLY on success, and only if the doc we captured is still the live
     // one — this function swallows failures, so an eager or cross-doc advance
     // would silently disable snapshots for the rest of the session.
-    if (currentDoc === doc) lastSnapshotHeads = captureHeads;
+    if (docGeneration === gen) lastSnapshotHeads = captureHeads;
     sink.perf('snapshot.persist', performance.now() - start, {
       perf_entity_count: countEntities(doc),
     });
@@ -384,7 +482,7 @@ async function persistSnapshotOnce(): Promise<void> {
  */
 async function loadProjectionSnapshot(id: string): Promise<{ hit: boolean; reason?: string }> {
   try {
-    await cache.initPersistenceDB(id);
+    await openCacheFor(id);
     const key = requireKey('loadProjectionSnapshot');
     const snap = await time2('snapshot.workerLoad', () => cache.loadProjectionSnapshot(key));
     if (!snap) return { hit: false, reason: 'absent' };
@@ -467,17 +565,17 @@ async function reseedCacheAfterCorruption(id: string): Promise<boolean> {
  * `markPersistOk()` (C4c: doc write → baseline → markPersistOk).
  *
  * - `pending === null` → nothing to commit (never persist an mtime / absent rev).
- * - `currentDoc !== doc` → the doc was replaced/reset mid-write; committing now
- *   would write this revision into a DIFFERENT family's cache (C11). Skip.
+ * - the document generation moved → the doc was replaced/reset mid-write; committing
+ *   now would write this revision into a DIFFERENT family's cache (C11). Skip.
  * - Its OWN try/catch (C4b): a failed baseline write is advisory — at most one
  *   extra Drive read next open — and must NEVER raise the local-durability
  *   banner. Console-only (the worker's only local channel).
  * - Clears the module var ONLY if it still `=== pending` (C4a): a newer
  *   `noteRemoteBaseline` landing during the write must survive to its own commit.
  */
-async function commitPendingBaseline(pending: string | null, doc: Doc): Promise<void> {
+async function commitPendingBaseline(pending: string | null, gen: number): Promise<void> {
   if (pending === null) return;
-  if (currentDoc !== doc) return;
+  if (docGeneration !== gen) return;
   try {
     await cache.writeRemoteBaseline(pending);
     if (pendingRemoteBaseline === pending) pendingRemoteBaseline = null;
@@ -493,13 +591,16 @@ async function commitPendingBaseline(pending: string | null, doc: Doc): Promise<
  * cursor. Used for the first persist of a doc, after adopt/replace, on recovery,
  * and for re-compaction. `doc` is the entry snapshot — stable across the await even
  * if a concurrent `reset()`/replace nulls or swaps `currentDoc`. */
-async function writeBase(key: CryptoKey, doc: Doc): Promise<void> {
+async function writeBase(key: CryptoKey, doc: Doc, gen: number, supersede: boolean): Promise<void> {
   const captureHeads = headsOf(doc);
   const start = performance.now();
   const binary = saveDoc(doc);
   sink.perf('automerge.saveBase', performance.now() - start, { perf_doc_bytes: binary.byteLength });
-  await cache.persistDocBinary(key, binary);
-  if (currentDoc === doc) lastPersistedHeads = captureHeads;
+  await cache.persistDocBinary(key, binary, { supersede });
+  if (docGeneration === gen) {
+    lastPersistedHeads = captureHeads;
+    baseSupersedes = false;
+  }
 }
 
 /**
@@ -515,25 +616,36 @@ async function writeBase(key: CryptoKey, doc: Doc): Promise<void> {
  * `changes`, all read before the first `await`). The cursor advances to
  * `captureHeads` (the snapshot's heads), NEVER a post-await re-read of `currentDoc`
  * — a mutation landing during the IDB write must not be skipped from the next
- * capture. The `currentDoc === doc` guard drops a stale cursor advance if the doc
- * was replaced/reset mid-write.
+ * capture. The `docGeneration` guard drops a stale cursor advance if the doc was
+ * replaced/reset mid-write (C5d).
  */
 async function persistOnce(): Promise<void> {
   if (!currentDoc || !familyKey || !cache.isCacheReady()) return;
   const doc = currentDoc;
   const key = familyKey;
+  const gen = docGeneration;
+  const supersede = baseSupersedes;
   // C4a: capture the pending baseline in the SAME pre-`await` snapshot as `doc`,
   // so a newer value arriving DURING this write is not committed against this
   // (older) doc state. Committed only via `commitPendingBaseline` below.
   const pending = pendingRemoteBaseline;
+  // C5c: while the document still depends on changes it does not hold, a base write would
+  // drop them from the cache's reach. Increments only, until a merge delivers the deps.
+  const fenced = baseFence && Automerge.getMissingDeps(doc, []).length > 0;
+  if (baseFence && !fenced) baseFence = false;
   // Track which write is in flight so the failure signal can carry `kind` — MUST be
   // explicit, not inferred from lastPersistedHeads (the re-compaction writeBase below
   // runs with a non-null lastPersistedHeads and would be mislabeled 'increment').
   let writeKind: 'base' | 'increment' = 'base';
   try {
     if (lastPersistedHeads === null) {
+      if (fenced) {
+        // Unreachable by construction: the fence is only ever raised beside a real cursor.
+        console.warn('[applyAndProject] base write refused: the document is missing deps');
+        return;
+      }
       writeKind = 'base';
-      await writeBase(key, doc);
+      await writeBase(key, doc, gen, supersede);
     } else {
       const captureHeads = headsOf(doc);
       const changes = changesSince(doc, lastPersistedHeads);
@@ -542,7 +654,7 @@ async function persistOnce(): Promise<void> {
         // contains the merged remote state that set `pending`), so this is a valid
         // commit terminus (C10a: `noteRemoteBaseline` schedules a persist precisely
         // to reach here on a read-only merge).
-        await commitPendingBaseline(pending, doc);
+        await commitPendingBaseline(pending, gen);
         markPersistOk();
         return;
       }
@@ -553,14 +665,15 @@ async function persistOnce(): Promise<void> {
       sink.perf('automerge.saveIncremental', performance.now() - start, {
         perf_chunk_bytes: framed.byteLength,
       });
-      if (currentDoc === doc) lastPersistedHeads = captureHeads;
-      if (cache.incrementCount() >= INCREMENT_COMPACTION_THRESHOLD) {
+      if (docGeneration === gen) lastPersistedHeads = captureHeads;
+      if (!fenced && cache.incrementCount() >= INCREMENT_COMPACTION_THRESHOLD) {
         writeKind = 'base';
-        await writeBase(key, doc); // re-compaction: fresh base drops the increments
+        // Re-compaction of the SAME document: drops only the rows it contains.
+        await writeBase(key, doc, gen, false);
       }
     }
     // C4c: the doc write above has succeeded and the cache now holds `doc`.
-    await commitPendingBaseline(pending, doc);
+    await commitPendingBaseline(pending, gen);
     markPersistOk();
   } catch (e) {
     // A durable-cache write failure is the "local durability broken" signal —
@@ -581,6 +694,12 @@ async function persistOnce(): Promise<void> {
         '[applyAndProject] cache write failed after the handle was released; the session is ending',
         e
       );
+      return;
+    }
+    // C5g: the handle was re-pointed or closed while this write was encrypting. Nothing was
+    // written and the cursor did not move, so the next persist re-captures the same delta.
+    if (e instanceof Error && e.name === 'CacheHandleChangedError') {
+      console.warn('[applyAndProject] cache write abandoned: the handle changed mid-write', e);
       return;
     }
     raiseCachePersistFailure(writeKind, e instanceof Error ? e.name : 'UnknownError');
@@ -675,6 +794,7 @@ export function setActor(actor: string | null): void {
 export function initDoc(): { loaded: true } {
   currentDoc = migrateDoc(Automerge.init<FamilyDocument>(docInitOpts()));
   resetDocCursors(); // fresh doc → first persist writes a base, first snapshot writes fresh
+  docFamilyId = null; // a new family's document; `openCache` names it
   pushProjection(currentDoc);
   scheduleSnapshotPersist();
   return { loaded: true };
@@ -700,8 +820,12 @@ export async function openCache(id: string): Promise<{ loaded: false }> {
   // a stale cursor here would silently suppress this family's snapshot for the
   // whole session — invisible, and it costs the fast first paint. resetDocCursors
   // also clears `pendingRemoteBaseline` (C18 scope clear).
+  // C5g: a previous family's persist must finish against ITS handle first. Never flushed here:
+  // the document in memory is the NEW family's, and the open cache may be the old one's.
+  if (cache.cacheFamilyId() !== null && cache.cacheFamilyId() !== id) await settlePersists(false);
   resetDocCursors();
   await cache.initPersistenceDB(id);
+  docFamilyId = currentDoc ? id : null; // createNewFile: the document it built IS this family's
   // C16: this is the deliberate don't-load path (createNewFile). A baseline row
   // left by a prior/interrupted create describes a doc we are about to discard —
   // a baseline row may exist ONLY alongside a cache that was actually loaded.
@@ -709,16 +833,21 @@ export async function openCache(id: string): Promise<{ loaded: false }> {
   return { loaded: false };
 }
 
-export async function initAndLoadCache(
-  id: string
-): Promise<{ loaded: boolean; remoteBaseline: RemoteBaselineRow | null }> {
-  // C18: clear any leftover pending baseline for the PREVIOUS family's doc as the
-  // first statement, BEFORE the DB re-point — else the next persist for THIS
-  // family's doc would commit it (the currentDoc===doc guard passes; it is this
-  // family's own doc, so C11 cannot catch it).
+export async function initAndLoadCache(id: string): Promise<InitAndLoadResult> {
+  // ⚠️ C5e: A SAME-FAMILY LIVE DOCUMENT IS MERGED WITH, NEVER REPLACED. Two live-session paths
+  // reach here over a document that holds this session's edits (`replaceDocWithCacheRecovery`
+  // and the Settings grant-permission reload). This used to cancel the pending persist without
+  // writing it and then REPLACE the document with the cache, so the last ~120 ms of edits, and
+  // on any load failure the whole document (`dropDoc`), were gone. Now: write what is pending
+  // (bounded), read the cache, and merge it in.
+  const live = currentDoc !== null && docFamilyId === id;
+  if (live) await settlePersists(docOwnsOpenCache());
+  // C18: clear any leftover pending baseline for the PREVIOUS family's doc BEFORE the DB
+  // re-point — else the next persist for THIS family's doc would commit it. (After the settle
+  // above, so a same-family live document's own pending baseline was committed first.)
   pendingRemoteBaseline = null;
   try {
-    await cache.initPersistenceDB(id);
+    await openCacheFor(id);
   } catch (e) {
     // ⚠️ THE SAME HOLE `reseedCacheAfterCorruption` GUARDS, on the opening call.
     // Now that this can reject rather than hang, a device whose cache never
@@ -736,86 +865,89 @@ export async function initAndLoadCache(
     throw new CacheInitError('open', openStageLoss(), name);
   }
   const key = requireKey('initAndLoadCache');
-  let loaded: { doc: Doc; recovered: boolean } | null;
+  let loaded: ({ doc: Doc } & CacheReplay) | null;
   try {
     loaded = await time2('automerge.cacheLoad', () => cache.loadCachedDoc(key, id));
   } catch (e) {
-    // An OUT-OF-MEMORY failure must NOT clear the cache. The cached bytes are
-    // fine — this device could not allocate enough to inflate them — so
-    // deleting them cannot help, and it throws away the one copy that might
-    // have loaded (a smaller cached base, or the same doc after a reload frees
-    // memory). The retry would then re-download and fail identically, having
-    // destroyed data for nothing.
-    //
-    // Deliberately a DENYLIST, not the tidier `if (e instanceof
-    // CorruptPayloadError) clear()`: this catch also fires for IndexedDB and
-    // key errors, and flipping to an allowlist would silently change their
-    // behaviour too. Narrow change, one class. Do not "simplify" this.
-    //
-    // DROP THE DOC — do not merely reset the cursors. `initPersistenceDB(id)`
-    // above already re-pointed the DB at THIS family, so on every failure path
-    // whatever `currentDoc` holds belongs to a DIFFERENT family and must never
-    // be written here. A bare `resetDocCursors()` would be actively worse than
-    // leaving them stale: it nulls `lastPersistedHeads`, and `persistOnce`
-    // reads exactly that to decide to write a BASE — and `persistDocBinary`
-    // deletes every `inc:*` row in the same transaction. On the too-large
-    // branch, which skips the clear precisely to KEEP those bytes, that would
-    // hand the next flush a mandate to delete them (and to write the other
-    // family's document as this family's base).
-    //
-    // `dropDoc()` resets the cursors too, and `persistOnce` early-returns on a
-    // null `currentDoc`, so no write can target this DB until a real load
-    // installs a real doc. All three callers are cold-open paths that hold no
-    // doc worth keeping.
-    dropDoc();
-    // ⚠️ DEFAULTS TO FALSE — "we did not prove the cache is empty". The OOM arm
-    // below skips the reseed deliberately, precisely to KEEP those bytes, so a
-    // default of `true` would tell the caller they are expendable.
-    let cacheWasReset = false;
-    if (!(e instanceof PayloadLoadError) || !e.deviceCannotOpen) {
-      // Corrupt cache: clear it so a fresh Drive load can re-seed a clean cache,
-      // then rethrow so the caller (and telemetry) sees the CorruptPayloadError.
-      // `clearCache` deletes the whole DB — base AND snapshot rows — which is
-      // why the cursors above had to go: only one of this function's three
-      // callers recovers with `dropDoc()`; the other two just log.
-      cacheWasReset = await reseedCacheAfterCorruption(id); // never throws; see its contract
-    }
-    // ⚠️ `PayloadLoadError` IS NOT WRAPPED. `syncStore.ts` needs
-    // `e instanceof PayloadLoadError && e.deviceCannotOpen` to keep working, and
-    // four other sites dispatch on the class; the OOM rethrow is the one that
-    // protects a device that cannot allocate.
-    if (e instanceof PayloadLoadError) {
-      throw e; // whole DB cleared → baseline row gone with it (C16 self-healing)
-    }
-    throw new CacheInitError(
-      'load',
-      loadStageLoss(cacheWasReset),
-      e instanceof Error ? e.name : 'UnknownError'
-    );
+    return loadFailed(e, id, live);
   }
+
   if (!loaded) {
-    // Reached AFTER `initPersistenceDB(id)` re-pointed the DB, so the cursors still
+    // Reached AFTER `openCacheFor(id)` re-pointed the DB, so the cursors still
     // describe the previous family's doc. Reset before returning.
     resetDocCursors();
+    if (live) {
+      // An EMPTY cache under this family's live document: the document is the whole truth,
+      // and it is still loaded. Answering `loaded:false` here sent main down the
+      // `no-local-document` path, which installs the remote WHOLESALE over it.
+      docFamilyId = id;
+      void enqueuePersist(); // seed the empty cache from the live document (a base)
+      return { loaded: true, remoteBaseline: null, replay: emptyReplay() };
+    }
     return { loaded: false, remoteBaseline: null };
   }
+  const replay: CacheReplay = {
+    recovered: loaded.recovered,
+    droppedIncrements: loaded.droppedIncrements,
+    missingDeps: loaded.missingDeps,
+    incrementCount: loaded.incrementCount,
+  };
+  // C-5/C16: a recovered cache no longer holds the doc state the baseline row describes.
+  // DELETE it — returning null alone would leave it on disk to mislead the next open into
+  // skipping a read it must do. Read on every other path in the same round-trip as the cache.
+  const baselineFor = async (): Promise<RemoteBaselineRow | null> => {
+    if (!loaded!.recovered) return cache.readRemoteBaseline();
+    await cache.clearRemoteBaseline().catch(() => {});
+    return null;
+  };
+
+  if (live) {
+    // C5e: MERGE. `mergeDocs` keeps the live document's actor and history and adds whatever
+    // the cache holds that it lacks (another tab's increments, a write this realm missed).
+    const local = currentDoc!;
+    const localHeads = headsOf(local);
+    const cacheHeads = headsOf(loaded.doc);
+    const merged = time('automerge.merge', () => mergeDocs(local, loaded!.doc));
+    currentDoc = merged.doc;
+    // The cache provably holds exactly `cacheHeads` (plus anything still pending, which the
+    // fence below protects), so the next increment is precisely the live document's own work.
+    // A new generation so an in-flight persist from before the merge cannot overwrite it.
+    docGeneration++;
+    lastPersistedHeads = cacheHeads;
+    lastSnapshotHeads = null;
+    baseSupersedes = false;
+    baseFence = loaded.missingDeps > 0;
+    const doc = currentDoc;
+    pushDeltas(projectionDeltasBetween(doc, localHeads, merged.heads) ?? buildFullProjection(doc));
+    schedulePersist();
+    scheduleSnapshotPersist();
+    return { loaded: true, remoteBaseline: await baselineFor(), replay };
+  }
+
   // Capture the reconstructed heads BEFORE migrate (which consumes the handle). A
   // migrate delta, if any, then persists as an increment on the next tick; the
   // cursor is DERIVED here from the reconstructed doc, never a stored value.
   const preHeads = headsOf(loaded.doc);
   currentDoc = migrateDoc(loaded.doc);
-  // A different doc is now live, so the snapshot cursor is stale. (The persist
-  // cursor is set per-branch below — it has a real derived value on the clean path.)
+  // A different doc is now live: a new generation, and the snapshot cursor is stale. (The
+  // persist cursor is set per-branch below — it has a real derived value on the clean path.)
+  docGeneration++;
   lastSnapshotHeads = null;
-  if (loaded.recovered) {
-    // A corrupt increment was skipped on load — rewrite a clean base to drop the
-    // corrupt tail rows (base-write clears all increments). Immediate: dropping
-    // corrupt rows ASAP matters here.
+  baseSupersedes = false; // this IS the cache's document: a base write keeps what it lacks
+  baseFence = false;
+  docFamilyId = id;
+  if (loaded.missingDeps > 0) {
+    // C5c: the replay buffered changes whose deps are absent. They stay on disk (their rows
+    // are not `contained`), and the base is NEVER rewritten while the document depends on
+    // them: increments only, from the heads the cache provably holds.
+    lastPersistedHeads = preHeads;
+    baseFence = true;
+    schedulePersist();
+  } else if (loaded.recovered) {
+    // A corrupt increment was skipped on load — rewrite a clean base. The base write deletes
+    // only the rows this document contains, so the skipped row stays for a build (or a key)
+    // that can read it. Immediate: a smaller replay next open matters here.
     lastPersistedHeads = null;
-    // C-5/C16: the baseline row describes a doc state this recovered cache no
-    // longer holds. DELETE it — returning null alone would leave it on disk to
-    // mislead the next open into skipping a read it must do.
-    await cache.clearRemoteBaseline().catch(() => {});
     void enqueuePersist();
   } else if (cache.incrementCount() > INCREMENT_COMPACTION_THRESHOLD) {
     // Over-threshold on a clean load — e.g. a device that accumulated many
@@ -837,13 +969,67 @@ export async function initAndLoadCache(
     perf_entity_count: countEntities(doc),
   });
   scheduleSnapshotPersist(); // refresh the fast-paint snapshot from the authoritative load
-  // C-5: read the baseline row on the LOADED paths (clean + over-threshold
-  // compaction, which is still a complete, verified load — only the persist
-  // cursor was reset). The recovered path deleted it above → null. The row and
-  // the cached doc are read in this one round-trip so they can never be read out
-  // of step.
-  const remoteBaseline = loaded.recovered ? null : await cache.readRemoteBaseline();
-  return { loaded: true, remoteBaseline };
+  return { loaded: true, remoteBaseline: await baselineFor(), replay };
+}
+
+const emptyReplay = (): CacheReplay => ({
+  recovered: false,
+  droppedIncrements: 0,
+  missingDeps: 0,
+  incrementCount: 0,
+});
+
+/**
+ * `initAndLoadCache`'s load-stage failure (C5a/C5e). Throws, except where a same-family live
+ * document replaces a proven-corrupt cache and so the load, in effect, succeeded.
+ *
+ *  - PROVEN corrupt (`isProvenCorrupt`): the cache is deleted and re-seeded. With a live
+ *    same-family document that document becomes the new cache (it IS this family's data);
+ *    cold, the `CorruptPayloadError` is rethrown so a fresh remote load re-seeds it.
+ *  - out of memory: the bytes are fine, the device could not inflate them; rethrown, cache kept.
+ *  - ANYTHING ELSE (an IndexedDB error, a wrong-key decrypt, an unclassified throw): the cache
+ *    is KEPT and `CacheInitError('load', 'something-to-lose')` tells main not to install over
+ *    it. Cold, the handle is also CLOSED, so a fresh empty document installed next (App's
+ *    path 3) cannot write its base over the rows this failure kept.
+ *  - A same-family live document is NEVER dropped.
+ */
+async function loadFailed(e: unknown, id: string, live: boolean): Promise<InitAndLoadResult> {
+  const name = e instanceof Error ? e.name : 'UnknownError';
+  const proven = isProvenCorrupt(e);
+  if (live) {
+    if (proven && (await reseedCacheAfterCorruption(id))) {
+      resetDocCursors(); // the next persist writes the live document as the new base
+      docFamilyId = id;
+      void enqueuePersist();
+      return {
+        loaded: true,
+        remoteBaseline: null,
+        replay: { ...emptyReplay(), recovered: true, corruptBaseReplaced: true },
+      };
+    }
+    if (e instanceof PayloadLoadError && e.deviceCannotOpen) throw e;
+    throw new CacheInitError('load', 'something-to-lose', name);
+  }
+  // DROP THE DOC (cold). `openCacheFor(id)` already re-pointed the DB at THIS family, so
+  // whatever `currentDoc` holds belongs to a DIFFERENT family (or none) and must never be
+  // written here. A bare `resetDocCursors()` would be actively worse: it nulls
+  // `lastPersistedHeads`, which makes the next persist write a BASE over this family's cache.
+  dropDoc();
+  if (proven) {
+    // Corrupt cache: clear it so a fresh Drive load can re-seed a clean cache, then rethrow
+    // so the caller (and telemetry) sees the CorruptPayloadError. `reseedCacheAfterCorruption`
+    // never throws; a blocked delete is reported through the durability signal.
+    await reseedCacheAfterCorruption(id);
+    // ⚠️ `PayloadLoadError` IS NOT WRAPPED. `syncStore.ts` and App.vue dispatch on the class.
+    throw e;
+  }
+  // An OUT-OF-MEMORY failure must NOT clear the cache: the cached bytes are fine, this device
+  // could not allocate enough to inflate them. Rethrown unwrapped (`deviceCannotOpen` is what
+  // main dead-ends on); the handle stays open exactly as before.
+  if (e instanceof PayloadLoadError && e.deviceCannotOpen) throw e;
+  cache.closeCacheDB();
+  raiseCachePersistFailure('open', name);
+  throw new CacheInitError('load', 'something-to-lose', name);
 }
 
 /** Compare two Automerge heads (deterministic sorted change-hash arrays). */
@@ -863,6 +1049,7 @@ export function mutate(op: MutationOp): {
   delta: ProjectionDelta;
   changed: boolean;
   notes?: ReconcileNote[];
+  heads: Heads;
 } {
   const doc = requireDoc('mutate');
   const before = headsOf(doc);
@@ -873,7 +1060,28 @@ export function mutate(op: MutationOp): {
     schedulePersist();
     scheduleSnapshotPersist(); // coarse-coalesced; won't fire per-mutate
   }
-  return { result, delta, changed, ...(notes.length ? { notes } : {}) };
+  // `heads` (C12): main remembers the last acknowledged write, so a respawn that rehydrates a
+  // document WITHOUT it is caught (`hasHeads`) instead of silently showing older data.
+  return { result, delta, changed, ...(notes.length ? { notes } : {}), heads: headsOf(next) };
+}
+
+/**
+ * Does the live document contain every change in `heads`? (C12.) Main asks after a respawn's
+ * rehydrate with the heads of the last write it was told landed: `false` means the cache the
+ * rehydrate read is BEHIND an acknowledged write (a persist that never landed), which is data
+ * the person was shown and that is now gone from this device.
+ */
+export function hasHeads(heads: Heads): { has: boolean; loaded: boolean } {
+  if (!currentDoc) return { has: false, loaded: false };
+  return { has: Automerge.hasHeads(currentDoc, heads), loaded: true };
+}
+
+/** Re-stream the full projection of the live document (C12): main asks after a projection
+ *  apply failure or a heads regression, so its mirror cannot stay diverged. */
+export function pushFullProjection(): { pushed: boolean } {
+  if (!currentDoc) return { pushed: false };
+  pushProjection(currentDoc);
+  return { pushed: true };
 }
 
 /**
@@ -953,10 +1161,12 @@ function rebaseOntoRemote(
    * exit there is". Reproduced against @automerge/automerge 3.4.1.
    */
   target: Doc
-): RebaseResult | null {
+): RebaseResult | { blockedBy: 'transactions' } | null {
   try {
     const ops = buildRebaseOps(local, baselineHeads, target);
     if (!ops) return null; // cannot compose → the caller blocks
+    // C8: a transaction conflict makes the replay unavailable rather than partial.
+    if (ops.blockedBy) return { blockedBy: ops.blockedBy };
     // Nothing to replay: the peer is level with its baseline, so the remote can
     // simply be adopted. Blocking here would strand a device that has lost
     // nothing — and `migrateDoc` alone can move heads without any user edit.
@@ -1018,6 +1228,57 @@ function mergeHealth(
     rootConflicts: rootConflictsSince(conflictsBefore, doc),
     counterStats: counterStats(doc),
   };
+}
+
+/**
+ * Does `remote` hold any change the compaction stamped with `fromHeads` was not built from?
+ * (C1.) True when any remote head is not one of `fromHeads`:
+ *  - the remote contains `fromHeads` and has heads beyond them: a peer wrote after the
+ *    compaction's source was captured. Definitely moved;
+ *  - the remote LACKS part of `fromHeads` and has a head outside them: either it is merely
+ *    behind (its head is an ancestor of the source) or it diverged. The source's history is
+ *    gone, so the two cannot be told apart, and the answer is the safe one: moved. The level
+ *    check before `compactDoc` makes this arm rare; blocking it never loses work.
+ * False only when every remote head is a source head, which proves the remote is a subset of
+ * the compacted history.
+ */
+function remoteMovedPast(remote: Doc, fromHeads: readonly string[]): boolean {
+  const source = new Set(fromHeads);
+  return headsOf(remote).some((h) => !source.has(h));
+}
+
+/** A document's `removedMembers` tombstones as plain values (empty when absent). */
+function removedMembersOf(doc: Doc | null): Record<string, RemovedMember> {
+  const map = (doc as { removedMembers?: Record<string, RemovedMember> } | null)?.removedMembers;
+  return map ? (JSON.parse(JSON.stringify(map)) as Record<string, RemovedMember>) : {};
+}
+
+/**
+ * Union `prior` into the draft's `removedMembers` and delete every `familyMembers` row the union
+ * names (C10). Returns the counts for the merge outcome, or `null` when nothing changed.
+ */
+function carryRemovedMembers(
+  d: FamilyDocument,
+  prior: Record<string, RemovedMember>
+): { carried: number; rowsDeleted: number } | null {
+  const tombstones = d.removedMembers as Record<string, RemovedMember> | undefined;
+  if (!tombstones) return null; // `migrateDoc` creates it; absent only on a malformed pod
+  let carried = 0;
+  for (const [id, rec] of Object.entries(prior)) {
+    if (tombstones[id] === undefined) {
+      tombstones[id] = rec;
+      carried++;
+    }
+  }
+  let rowsDeleted = 0;
+  const members = d.familyMembers as Record<string, unknown> | undefined;
+  for (const id of Object.keys(tombstones)) {
+    if (members?.[id] !== undefined) {
+      delete members[id];
+      rowsDeleted++;
+    }
+  }
+  return carried || rowsDeleted ? { carried, rowsDeleted } : null;
 }
 
 function lineageContextFor(basis: LineageBasis, doc: Doc): LineageContext {
@@ -1150,6 +1411,8 @@ export async function mergeRemoteEnvelope(
   let installWholesale = toldToInstallWholesale;
   /** The policy asked for a rebase and it could not run. Diagnostic only. */
   let rebaseUnavailable = false;
+  /** Why it could not run, when the composer said (C8). Diagnostic only. */
+  let conflictKind: 'transactions' | undefined;
   /**
    * ⚠️ A RESTORE IS A LINEAGE EVENT. Set ONLY inside the guarded block, when
    * the verdict was `ours-newer` under `user-file`: a human chose a file whose
@@ -1179,7 +1442,7 @@ export async function mergeRemoteEnvelope(
    */
   let migratedRemote: Doc | null = null;
   const migrateRemoteOnce = (): Doc => (migratedRemote ??= migrateDoc(remote));
-  let priorLineage: PodLineage | null = null;
+  let priorLineage: CompactionLineage | null = null;
   // `currentDoc` is non-null here by the assertion above; the check is kept as a
   // type narrowing, not as a second decision.
   if (currentDoc && !toldToInstallWholesale) {
@@ -1190,6 +1453,18 @@ export async function mergeRemoteEnvelope(
     const { action: act, verdict } = guardLineage(docLineage(remote), priorLineage, lineageCtx);
     stampNewGeneration = act === 'adopt' && verdict === 'ours-newer' && lineageCtx === 'user-file';
     if (act === 'publish-local') {
+      // ⚠️ C1 (data-layer audit 2026-10-03): `ours-newer` is a fact about LINEAGES, not about
+      // what the remote holds. A peer can write to the old lineage after the compactor's level
+      // check (the backup share sheet, the confirm, a failed publish all widen the window), and
+      // publishing here would put the compacted document over those edits for the whole
+      // family. When the compaction recorded the heads it was built from, refuse unless every
+      // head the remote holds is one of them. Legacy stamps (no `fromHeads`) keep today's path.
+      const fromHeads = priorLineage?.fromHeads;
+      if (verdict === 'ours-newer' && Array.isArray(fromHeads)) {
+        if (remoteMovedPast(remote, fromHeads)) {
+          throw lineageBlockError('ours-newer', { remoteMovedAfterCompaction: true });
+        }
+      }
       // Our document is the newer lineage. Touch NOTHING — not the document,
       // not the cursors, not the cache. The caller keeps its own document and
       // publishes it; it must also NOT commit a Drive baseline for bytes we
@@ -1230,7 +1505,9 @@ export async function mergeRemoteEnvelope(
       let rebased: RebaseResult | null = null;
       if (baseline) {
         try {
-          rebased = rebaseOntoRemote(currentDoc, baseline, migrateRemoteOnce());
+          const attempt = rebaseOntoRemote(currentDoc, baseline, migrateRemoteOnce());
+          if (attempt && 'blockedBy' in attempt) conflictKind = attempt.blockedBy;
+          else rebased = attempt;
         } catch (e) {
           console.warn('[applyAndProject] rebase unavailable — the migrate threw:', e);
         }
@@ -1241,6 +1518,7 @@ export async function mergeRemoteEnvelope(
         const driveHeads = headsOf(remote);
         currentDoc = rebased.doc;
         resetDocCursors();
+        if (id) docFamilyId = id;
         const heads = headsOf(currentDoc);
         schedulePersist();
         scheduleSnapshotPersist();
@@ -1284,7 +1562,7 @@ export async function mergeRemoteEnvelope(
       // `user-file` adopt below. `docClient.mergeRemoteEnvelope` logs both.
       rebaseUnavailable = true;
       if (lineageCtx !== 'user-file') {
-        throw lineageBlockError('adopt-remote', { rebaseUnavailable: true });
+        throw lineageBlockError('adopt-remote', { rebaseUnavailable: true, conflictKind });
       }
     }
     // `rebase` reaches here only via the `user-file` fallback above.
@@ -1301,8 +1579,6 @@ export async function mergeRemoteEnvelope(
   // so the returned `heads` can be strictly AHEAD of Drive. That over-claim is
   // the false-skip #65 exists to prevent.
   const remoteHeads = headsOf(remote);
-
-  void id; // familyId is tracked inside `cache`; kept in the signature for the wire contract
 
   // Two projection strategies, keyed on `currentDoc`:
   //  • first-load adopt (no local doc) — every entity is new → a FULL projection is
@@ -1322,12 +1598,20 @@ export async function mergeRemoteEnvelope(
     // rebuilding here would destroy the history the restore exists to recover.
     // A throw inside the change leaves the old document installed.
     const adopted = migrateRemoteOnce();
+    // C10: a RESTORE must not un-remove a member. The chosen file predates the removal, so
+    // adopting it as-is brings the member back (row and access) on every device that adopts the
+    // new generation. `removedMembers` is write-once and unions, so carry this device's
+    // tombstones across and delete the matching rows in the same change as the stamp.
+    const priorRemoved = stampNewGeneration ? removedMembersOf(currentDoc) : {};
+    let removedCarry: { carried: number; rowsDeleted: number } | null = null;
     currentDoc = stampNewGeneration
       ? Automerge.change(adopted, (d) => {
+          removedCarry = carryRemovedMembers(d, priorRemoved);
           (d as { podLineage?: PodLineage | null }).podLineage = nextLineage(priorLineage);
         })
       : adopted;
     resetDocCursors(); // adopted a fresh doc → first persist writes a base
+    docFamilyId = id;
     const heads = headsOf(currentDoc);
     schedulePersist();
     scheduleSnapshotPersist();
@@ -1358,6 +1642,8 @@ export async function mergeRemoteEnvelope(
       // Only ever true on the `user-file` fallback: this adopt is standing in
       // for a rebase that could not run, and the soak needs to see that.
       ...(rebaseUnavailable ? { rebaseUnavailable: true as const } : {}),
+      ...(conflictKind ? { rebaseConflictKind: conflictKind } : {}),
+      ...(removedCarry ? { removedMembers: removedCarry } : {}),
     };
   }
 
@@ -1373,6 +1659,7 @@ export async function mergeRemoteEnvelope(
   const localHeads = headsOf(local);
   const merged = time('automerge.merge', () => mergeDocs(local, remote));
   currentDoc = merged.doc;
+  if (id) docFamilyId = id;
   schedulePersist();
   scheduleSnapshotPersist();
   const health = mergeHealth(conflictsBefore, currentDoc);
@@ -1531,28 +1818,47 @@ export async function flush(): Promise<void> {
  * into a stale one). Used when loading a file to REPLACE, not merge. */
 export function dropDoc(): void {
   currentDoc = null;
+  docFamilyId = null;
   resetDocCursors();
 }
 
-/** Drop the in-memory doc + cancel the debounce (sign-out). Does NOT delete the
- * cache — `clearCache` does that — but DOES close the connection to it: a
- * signed-out tab has no reason to hold one, and holding it is what blocks
- * another tab's delete (#100). Every open site reopens idempotently on a null
- * handle. The main-thread projection is cleared by the caller (`docClient.reset`). */
-export function reset(): void {
+/** Drop the in-memory doc (sign-out). Does NOT delete the cache — `clearCache` does that —
+ * but DOES close the connection to it: a signed-out tab has no reason to hold one, and
+ * holding it is what blocks another tab's delete (#100). Every open site reopens
+ * idempotently on a null handle. The main-thread projection is cleared by the caller
+ * (`docClient.reset`).
+ *
+ * ⚠️ C5f: IT FLUSHES FIRST (bounded), unless `clearing` says the data is being deleted
+ * anyway. It used to CANCEL the debounced persist, so a keep-data sign-out within ~120 ms of
+ * an edit lost that edit from the only durable copy this device had. Either way an in-flight
+ * persist is awaited (bounded) before the handle closes (C5g).
+ *
+ * Synchronous when no cache is open (nothing can be persisted, so there is nothing to wait
+ * for), so a caller that does not await still sees the realm torn down on return. */
+export function reset(opts?: { clearing?: boolean }): Promise<void> {
+  if (!cache.isCacheReady()) {
+    teardownRealm();
+    return Promise.resolve();
+  }
+  return settlePersists(!opts?.clearing && docOwnsOpenCache()).then(teardownRealm);
+}
+
+function teardownRealm(): void {
   cancelPendingPersists();
   cache.closeCacheDB();
   currentDoc = null;
   familyKey = null;
+  docFamilyId = null;
   cachePersistFailed = false;
   // One lifetime, not two: the actor is retained beside the key and dies with it.
   resetDocActor();
   resetDocCursors();
 }
 
-/** Sign-out / family-switch: drop the doc AND close-then-delete the cache DB. */
+/** Sign-out / family-switch: drop the doc AND close-then-delete the cache DB. Clearing, so
+ * nothing pending is flushed into a database about to be deleted. */
 export async function clearCache(id: string): Promise<CacheClearResult> {
-  reset();
+  await reset({ clearing: true });
   return cache.clearCache(id);
 }
 
@@ -1563,6 +1869,7 @@ export function loadSnapshot(binary: Uint8Array): { loaded: true } {
   if (!import.meta.env.DEV) throw new Error('loadSnapshot is DEV-only');
   currentDoc = loadDoc(binary);
   resetDocCursors(); // fresh doc → first persist writes a base
+  docFamilyId = null;
   pushProjection(currentDoc);
   return { loaded: true };
 }
@@ -1640,7 +1947,13 @@ export function compactDoc(): {
     // rebuilt document is a single change; and it would force the verify below
     // to run against an unstamped copy, so the check would no longer describe
     // the bytes actually installed.
-    const source = { ...plain, podLineage: nextLineage(docLineage(before)) };
+    // C1: the stamp carries the heads of the document it was built FROM, so a later merge can
+    // tell "the remote is the history I compacted" from "a peer wrote after I compacted"
+    // (`remoteMovedPast`). Inside the stamp, so it travels with the history it describes.
+    const source = {
+      ...plain,
+      podLineage: { ...nextLineage(docLineage(before)), fromHeads: headsOf(before) },
+    };
     compacted = Automerge.from(source, docInitOpts()) as Doc;
     // Proves the rebuild round-tripped EXACTLY — including the stamp, which is
     // the one field we deliberately changed and therefore the one worth
@@ -1659,6 +1972,20 @@ export function compactDoc(): {
       // collection and the leaf are what a person triaging needs; the id in
       // between never is.
       throw new Error(`compaction changed the document at ${maskEntityIds(differsAt)}`);
+    }
+    // C9b: the round trip above proves the REBUILD; this proves the FOLD. `foldDoc` rewrites
+    // every Counter-backed absolute, so the source is not the document's JSON, and only the
+    // materialised view, what every person in the family actually sees, can say the fold was
+    // exact. Compared per delta (one per collection, plus settings) so the error names WHERE,
+    // never a value; each collection as an id-keyed map, because entity ORDER is not data (the
+    // rebuild may enumerate a map in a different order).
+    const viewBefore = buildFullProjection(before).map(viewKey);
+    const viewAfter = buildFullProjection(compacted).map(viewKey);
+    for (let i = 0; i < Math.max(viewBefore.length, viewAfter.length); i++) {
+      if (!canonicalEqual(viewBefore[i]?.value, viewAfter[i]?.value)) {
+        const where = (viewBefore[i] ?? viewAfter[i])?.where ?? 'unknown';
+        throw new Error(`compaction changed the materialised ${where}`);
+      }
     }
   } catch (e) {
     // #117 Phase 2: `foldDoc` refused over a newer build's Counter field. Nothing is corrupt
@@ -1732,6 +2059,12 @@ export function compactDoc(): {
   return stats;
 }
 
+/** One projection delta as an order-blind value for the compaction's view compare (C9b). */
+function viewKey(d: ProjectionDelta): { where: string; value: unknown } {
+  if (d.kind === 'bulk') return { where: d.collection, value: Object.fromEntries(d.entities) };
+  return { where: d.kind, value: d };
+}
+
 /** Serialize the doc to a raw (unencrypted) binary. DEV/E2E-only snapshot path. */
 export function exportSnapshot(): { binary: Uint8Array } {
   if (!import.meta.env.DEV) throw new Error('exportSnapshot is DEV-only');
@@ -1785,6 +2118,10 @@ export async function dispatch(method: string, args: unknown): Promise<DispatchR
       return { result: await readDriveConnections(a.envelope as BeanpodFileV4) };
     case 'getHeads':
       return { result: getHeads() };
+    case 'hasHeads':
+      return { result: hasHeads((a.heads as Heads) ?? []) };
+    case 'pushProjection':
+      return { result: pushFullProjection() };
     case 'applyChanges':
       return { result: applyChanges(a.changes as Uint8Array[]) };
     case 'collectReferencedPhotoIds':
@@ -1805,7 +2142,7 @@ export async function dispatch(method: string, args: unknown): Promise<DispatchR
       dropDoc();
       return {};
     case 'reset':
-      reset();
+      await reset({ clearing: a.clearing === true });
       return {};
     case 'clearCache':
       return { result: await clearCache(a.familyId as string) };
@@ -1835,6 +2172,7 @@ export function __resetApplyAndProjectForTesting(): void {
   snapshotInFlight = Promise.resolve();
   currentDoc = null;
   familyKey = null;
+  docFamilyId = null;
   cachePersistFailed = false;
   resetDocCursors();
   persistInFlight = Promise.resolve();

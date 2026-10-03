@@ -53,6 +53,7 @@ import PodUnreadableBanner from '@/components/common/PodUnreadableBanner.vue';
 import ReviewDemoBanner from '@/components/common/ReviewDemoBanner.vue';
 import PodAccessBanner from '@/components/common/PodAccessBanner.vue';
 import { useEnsurePhotosPublic } from '@/composables/useEnsurePhotosPublic';
+import { usePhotoStore } from '@/stores/photoStore';
 import { formatDeviceInfo } from '@/utils/diagnostics';
 import { reportError } from '@/utils/errorReporter';
 import { beginOpen, setOpenPath, endOpen } from '@/services/telemetry/openCycle';
@@ -89,7 +90,7 @@ import {
   forceUpdateRates,
   pickRateRefreshAction,
 } from '@/services/exchangeRate';
-import { isLoaded as isDocLoaded } from '@/services/automerge/projection';
+import { isAuthoritativeLoaded as isAuthoritativeDocLoaded } from '@/services/automerge/projection';
 import { processRecurringItems } from '@/services/recurring/recurringProcessor';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useAssetsStore } from '@/stores/assetsStore';
@@ -188,6 +189,26 @@ const { isMobile, isDesktop } = useBreakpoint();
 // photo this user owns. Makes family-member photo rendering work
 // without requiring drive.file scope coverage (ADR-021).
 useEnsurePhotosPublic();
+
+// Offline photo-upload queue lifecycle (C11). `photoStore.activate` binds the per-family
+// IndexedDB queue and drains it; nothing called it before 2026-10, so an offline photo was
+// written and never flushed. Bound once the family is known, the person is signed in AND the
+// family file is resolved (a flush needs the `.beanpod` to find its photos folder); released
+// on sign-out or a family switch so one family's queue never drains into another's doc.
+const photoStore = usePhotoStore();
+watch(
+  () =>
+    authStore.isAuthenticated && syncStore.driveFileId ? familyContextStore.activeFamilyId : null,
+  (familyId, previous) => {
+    if (familyId === previous) return;
+    if (!familyId) {
+      photoStore.deactivate();
+      return;
+    }
+    void photoStore.activate(familyId);
+  },
+  { immediate: true }
+);
 
 const isInitializing = ref(true);
 
@@ -634,7 +655,7 @@ function refreshExchangeRatesIfNeeded() {
   // its doc is in; a family arriving mid-session already has its doc loaded.
   const hasRates = !!settingsStore.exchangeRates && settingsStore.exchangeRates.length > 0;
   const action = pickRateRefreshAction({
-    docLoaded: isDocLoaded(),
+    docLoaded: isAuthoritativeDocLoaded(),
     hasRates,
     autoUpdate: settingsStore.exchangeRateAutoUpdate,
   });

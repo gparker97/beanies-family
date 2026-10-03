@@ -122,6 +122,17 @@ export class GoogleDriveProvider implements StorageProvider {
         '[GoogleDriveProvider] mimeType migration check failed (non-critical, will retry next session):',
         (e as Error).message
       );
+      // Non-critical (the file stays usable), but never console-only (audit C12).
+      logEvent({
+        level: 'info',
+        surface: 'drive-provider',
+        message: 'mimeType migration check failed; retried next session',
+        context: {
+          action: 'mime-migration-failed',
+          error_code: e instanceof Error ? e.name : 'unknown',
+          ...(e instanceof DriveApiError ? { http_status: e.status } : {}),
+        },
+      });
     }
   }
 
@@ -214,7 +225,7 @@ export class GoogleDriveProvider implements StorageProvider {
           const ack = await withRetry(() => updateFile(silentToken, this.fileId, content));
           return { revision: toStoredRevision(ack.version) };
         }
-        enqueueOfflineSave(content);
+        enqueueOfflineSave('auth');
         throw new TokenExpiredError(
           'Drive write failed: token rejected and silent refresh failed; save queued offline'
         );
@@ -224,7 +235,7 @@ export class GoogleDriveProvider implements StorageProvider {
       // the save so it flushes when the user reconnects, then re-throw so
       // syncStore surfaces the reconnect banner.
       if (e instanceof TokenExpiredError) {
-        enqueueOfflineSave(content);
+        enqueueOfflineSave('auth');
         throw e;
       }
 
@@ -250,7 +261,7 @@ export class GoogleDriveProvider implements StorageProvider {
           error: e,
           context: { http_status: e.status, action: 'queue-offline' },
         });
-        enqueueOfflineSave(content);
+        enqueueOfflineSave('server');
         // NOT a success: say so, or the caller stamps "Last Saved" for bytes
         // that never left this device. See `WriteAck.queued`.
         return { revision: null, queued: true };
@@ -261,7 +272,7 @@ export class GoogleDriveProvider implements StorageProvider {
       // too; the old `.includes('fetch')` missed it and the save was LOST
       // instead of queued (2026-06-19, finding 6).
       if (isNetworkError(e)) {
-        enqueueOfflineSave(content);
+        enqueueOfflineSave('network');
         // NOT a success: say so, or the caller stamps "Last Saved" for bytes
         // that never left this device. See `WriteAck.queued`.
         return { revision: null, queued: true };
@@ -377,7 +388,20 @@ export class GoogleDriveProvider implements StorageProvider {
     try {
       await requestAccessToken();
       return true;
-    } catch {
+    } catch (e) {
+      // `false` is the contract (the caller shows its own reconnect copy), but WHY the
+      // grant failed — a dismissed popup, a blocked one, a network error — only exists
+      // here (audit C12).
+      logEvent({
+        level: 'warn',
+        surface: 'drive-provider',
+        message: 'Drive access request failed',
+        error: e instanceof Error ? e : undefined,
+        context: {
+          action: 'request-access-failed',
+          error_code: e instanceof Error ? e.name : 'unknown',
+        },
+      });
       return false;
     }
   }

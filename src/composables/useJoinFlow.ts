@@ -115,7 +115,10 @@ export type JoinErrorCode =
   | 'FILE_FAMILY_MISMATCH'
   | 'INVITE_TOKEN_EXPIRED'
   | 'INVITE_TOKEN_INVALID'
-  | 'NO_UNCLAIMED_MEMBERS';
+  | 'NO_UNCLAIMED_MEMBERS'
+  // C10: another joiner claimed the picked member first (`authStore.joinFamily` refused
+  // the overwrite). The way out is picking again, so the step returns to the grid.
+  | 'MEMBER_ALREADY_CLAIMED';
 
 /**
  * A failed decrypt, as the error `tryStep` should record.
@@ -440,6 +443,13 @@ export const JOIN_ERRORS = {
     // No in-app recovery — the user must contact a family admin out-of-band.
     // Empty recoveries render no buttons; the prose copy carries the action.
     messageKey: 'join.error.noUnclaimed',
+    recoveries: [],
+    severity: 'warning',
+  },
+  MEMBER_ALREADY_CLAIMED: {
+    // No button: the member grid is back on screen (minus the claimed bean), and the copy
+    // says to pick again. Warning: a race between two people, not a fault in the app.
+    messageKey: 'join.error.memberClaimed',
     recoveries: [],
     severity: 'warning',
   },
@@ -1396,7 +1406,13 @@ export function useJoinFlow() {
         pin,
         familyId: familyContextStore.activeFamilyId ?? targetFamilyId.value,
       });
-      if (!result.success) throw new Error(result.error ?? 'Join failed');
+      if (!result.success) {
+        // Refine the code (tryStep reads `joinCode`): a claim conflict is not a decrypt
+        // failure, and its copy must send the person back to the grid, not to the inviter.
+        throw Object.assign(new Error(result.error ?? 'Join failed'), {
+          joinCode: result.code === 'claim_conflict' ? 'MEMBER_ALREADY_CLAIMED' : undefined,
+        });
+      }
       // ⚠️ NO PUBLISH HERE. It used to `await syncStore.syncNow(true)` to persist the PIN
       // hash, and then the magic-link mint ~200ms later published the ENTIRE pod a second
       // time. The second upload queued behind the first on syncService's save mutex, which
@@ -1416,6 +1432,14 @@ export function useJoinFlow() {
       // person really is in the pod on this device, and the claim converges to the shared file
       // on the next save. Rolling it back would sign them out of a join that worked. The
       // rollback that matters lives inside `joinFamily`, for a failure DURING the claim.
+      //
+      // Except a claim conflict (C10): that member is someone else's now, so retrying the
+      // same form can only fail again. Back to the grid, which no longer offers them.
+      if (currentError.value?.code === 'MEMBER_ALREADY_CLAIMED') {
+        selectedMember.value = null;
+        currentStep.value = 'pick-member';
+        return false;
+      }
       currentStep.value = 'set-pin';
       return false;
     }

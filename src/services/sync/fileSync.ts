@@ -27,12 +27,25 @@ const COMPACTED_VERSION: BeanpodVersion = '5.0';
 const LEGACY_VERSION: BeanpodVersion = '4.0';
 
 /**
+ * A pod holding Counter keys or a fold ledger (#117). READ-ONLY in this build — the reader
+ * half of the flip gate, shipped a release AHEAD of any writer (the ADR-036 pattern, as 5.0
+ * was): the flip release derives 6.0 from "the document holds Counter keys or a fold
+ * ledger", so a build older than THIS one refuses such a file instead of merging Counter
+ * operations it cannot interpret, while this build can already open what the flip writes.
+ *
+ * ⚠️ NO WRITER. `beanpodVersionFor` must not return this until the flip itself, and the
+ * derivation must stay a pure function of the document (never carried on the envelope).
+ */
+const COUNTER_VERSION: BeanpodVersion = '6.0';
+
+/**
  * The versions this build can read. ONE reader: `parseBeanpodV4`. There is no
  * second version test anywhere in the app for this to drift from.
  */
 const KNOWN_BEANPOD_VERSIONS: ReadonlySet<string> = new Set<BeanpodVersion>([
   LEGACY_VERSION,
   COMPACTED_VERSION,
+  COUNTER_VERSION,
 ]);
 
 /**

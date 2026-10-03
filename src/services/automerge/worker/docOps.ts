@@ -19,6 +19,7 @@ import {
   type MigratedRootKey,
 } from '@/types/automerge';
 import type { PodLineage } from '@/types/models';
+import type { CompactionLineage } from '@/services/sync/podLineage';
 // ⚠️ NOT a bare `crypto.randomUUID()`. It is undefined on a NON-SECURE origin —
 // which is exactly how a tablet is tested (`npm run dev -- --host` on a LAN IP)
 // — and the resulting TypeError matches none of `isAllocationFailure`'s
@@ -45,6 +46,9 @@ import {
   resolveField,
   sigma,
   unfoldPatch,
+  shiftAbsolute,
+  COUNTER_FIELDS,
+  type CounterField,
   type CounterIndex,
   type FoldIndex,
 } from './counterFields';
@@ -60,6 +64,7 @@ import type { MutationOp, ProjectionDelta, Heads, PatchSettingsArgs } from './pr
 import {
   reconcileInto,
   canonicalEqual,
+  KEY_FIELDS,
   type ReconcileContext,
   type ReconcileNote,
 } from './reconcile';
@@ -131,8 +136,8 @@ function entityDelta(
  * present) onto every caller, and `compareLineage` deliberately accepts only
  * two. So: read it HERE, or not at all.
  */
-export function docLineage(doc: Doc): PodLineage | null {
-  return (doc as { podLineage?: PodLineage | null }).podLineage ?? null;
+export function docLineage(doc: Doc): CompactionLineage | null {
+  return (doc as { podLineage?: CompactionLineage | null }).podLineage ?? null;
 }
 
 /**
@@ -847,12 +852,18 @@ const applyGoalContributionOp: NamedOpHandler = (draft, rawArgs, { writerId }) =
   // An undo reverses the entry's recorded amount; `delta` is advisory there (see above).
   const requested = undoAt >= 0 ? -goal.manualContributions![undoAt]!.amount : delta;
   const applied = Math.max(requested, -folded);
-  adjustField(draft, 'goals', id, 'currentAmount', applied, writerId, index);
+  // C9c: what actually moved. `updatedAt` is stamped only when something did, so a no-op
+  // (a delta that rounds to 0, a clamp onto the value already stored) leaves the heads alone.
+  const wrote = adjustField(draft, 'goals', id, 'currentAmount', applied, writerId, index);
+  let changed = wrote;
   if (!goal.isCompleted && foldValue(folded, applied, 0, decimals) >= goal.targetAmount) {
     goal.isCompleted = true;
+    changed = true;
   }
 
-  if (contribution && applied !== 0) {
+  // The receipt is appended only when the money moved: an entry for an amount that rounded to
+  // nothing would be history with no money behind it.
+  if (contribution && wrote) {
     const entry: GoalManualContribution = {
       id: contribution.id,
       amount: applied,
@@ -864,11 +875,13 @@ const applyGoalContributionOp: NamedOpHandler = (draft, rawArgs, { writerId }) =
     };
     if (goal.manualContributions) goal.manualContributions.push(entry);
     else goal.manualContributions = [entry];
+    changed = true;
   } else if (undoAt >= 0) {
     goal.manualContributions!.splice(undoAt, 1);
+    changed = true;
   }
 
-  goal.updatedAt = nowIso();
+  if (changed) goal.updatedAt = nowIso();
   return echo();
 };
 
@@ -894,12 +907,14 @@ function adjustLoanBalance(
   delta: number,
   writerId: string,
   index: CounterIndex
-): { collection: CollectionName; entity: unknown; delta: EntityDelta } {
+): { collection: CollectionName; entity: unknown; delta: EntityDelta } | null {
   const { collection, field } = loanHost(loan);
   // `findLoan` just found the host in this same draft, so `adjustField`'s existence throw is
   // reachable only through a programming error. `index` is the handler's one `foldIndex(draft)`;
   // `adjustField` records the write in it, so the echo below needs no rebuild.
-  adjustField(draft, collection, loan.entityId, field, delta, writerId, index);
+  // C9c: `null` when nothing was written, so the handler reports `applied: false` and stamps
+  // nothing, instead of moving the heads for a payment that changed no balance.
+  if (!adjustField(draft, collection, loan.entityId, field, delta, writerId, index)) return null;
   (draft[collection] as unknown as Record<string, AnyRecord>)[loan.entityId]!.updatedAt = nowIso();
   const echo = entityDelta(draft, collection, loan.entityId, index);
   return { collection, entity: echo.kind === 'upsert' ? echo.entity : undefined, delta: echo };
@@ -943,13 +958,15 @@ const applyLoanPaymentOp: NamedOpHandler = (draft, args, { writerId }) => {
         args.paymentAmount as number
       )
     : calculateExtraPayment(loan.outstandingBalance, args.paymentAmount as number);
-  const { collection, entity, delta } = adjustLoanBalance(
+  const moved = adjustLoanBalance(
     draft,
     loan,
     res.newBalance - loan.outstandingBalance,
     writerId,
     index
   );
+  if (!moved) return { result: { applied: false }, deltas: [] };
+  const { collection, entity, delta } = moved;
   return {
     result: {
       applied: true,
@@ -968,13 +985,9 @@ const reverseLoanPaymentOp: NamedOpHandler = (draft, args, { writerId }) => {
   const loan = findLoan(draft, args.loanId as string, index);
   if (!loan) return { result: { applied: false }, deltas: [] };
   const restored = loan.outstandingBalance + (args.principalToRestore as number);
-  const { collection, entity, delta } = adjustLoanBalance(
-    draft,
-    loan,
-    restored - loan.outstandingBalance,
-    writerId,
-    index
-  );
+  const moved = adjustLoanBalance(draft, loan, restored - loan.outstandingBalance, writerId, index);
+  if (!moved) return { result: { applied: false }, deltas: [] };
+  const { collection, entity, delta } = moved;
   return {
     result: { applied: true, hostCollection: collection, host: entity },
     deltas: [delta],
@@ -1140,8 +1153,9 @@ function mutateDraft(draft: FamilyDocument, op: MutationOp, sink: MutationSink):
       }
       // #117 Phase 2: a Counter increment with writes on (merge-safe), today's atomic
       // read-modify-write of the absolute with writes off; both in integer minor units.
-      adjustField(draft, op.collection, op.id, op.field, op.delta, sink.writerId);
-      if (op.updatedAt) entity.updatedAt = op.updatedAt;
+      // C9c: stamp only on a real write, so a zero-delta adjustment leaves the heads alone.
+      const wrote = adjustField(draft, op.collection, op.id, op.field, op.delta, sink.writerId);
+      if (wrote && op.updatedAt) entity.updatedAt = op.updatedAt;
       break;
     }
     case 'batch':
@@ -1251,8 +1265,21 @@ export function applyMutation(
  * Shallow field comparison is deliberate: the composer decides WHICH fields to
  * carry, and the worker's `patch`/`patchSettings` reconciler (#117) then writes
  * each one in place against the target, per item for arrays and per key for
- * `MERGE_FIELDS` such as `asset.loan`. Arrays that BOTH sides changed stay a
- * counted conflict here. See `docs/adr/039-fine-grained-crdt-writes.md`.
+ * `MERGE_FIELDS` such as `asset.loan`. See `docs/adr/039-fine-grained-crdt-writes.md`.
+ *
+ * Three rules from the data-layer audit (2026-10-03), each pinned in `rebase.test.ts`:
+ *  - C8: AN ID-KEYED ARRAY BOTH SIDES CHANGED IS UNIONED, NOT DROPPED. `manualContributions`,
+ *    `exchangeRates` and every array whose items carry an `id` (or a `KEY_FIELDS` key) ride a
+ *    SECOND, BASED patch (`base` = the peer's baseline value), so the list reconciler applies
+ *    the peer's own inserts and removals and leaves the compactor's alone. A keyless array still
+ *    counts a conflict.
+ *  - C8: A TRANSACTION CONFLICT MAKES THE REBASE UNAVAILABLE. A transaction and its balance,
+ *    goal or loan effects are written as a pair; settling the transaction as a conflict while
+ *    its Counter growth crosses would move money with no record (or a record with no money).
+ *    `blockedBy: 'transactions'` sends the caller to the block it would otherwise have raised.
+ *    And a goal's Counter growth is emitted only when its contribution history crossed with it.
+ *  - C9d/g: `updatedAt` is never a conflict (it is carried, newest wins, only beside a real
+ *    field), and a Counter-backed ABSOLUTE both sides moved is carried as a SHIFT.
  */
 export function buildRebaseOps(
   local: Doc,
@@ -1265,6 +1292,8 @@ export function buildRebaseOps(
   conflicts: number;
   /** Of `count`, the `increment` ops the Counter ledger pass emitted. */
   counterIncrements: number;
+  /** Set when the replay must not run at all (C8): the caller blocks, as for `null`. */
+  blockedBy?: 'transactions';
 } | null {
   // ⚠️ AN EMPTY BASELINE IS NOT "THE BEGINNING OF TIME", IT IS "UNKNOWN".
   // `decodeHeadsFingerprint('')` legitimately answers `[]` for a document with
@@ -1293,6 +1322,15 @@ export function buildRebaseOps(
   const ops: MutationOp[] = [];
   /** Writes that could not be carried across. The saved value stayed. */
   let conflicts = 0;
+  /** C8: a transaction lost a write, so the whole replay is unavailable. */
+  let blockedBy: 'transactions' | undefined;
+  const noteConflicts = (collection: CollectionName, n: number): void => {
+    if (n <= 0) return;
+    conflicts += n;
+    if (collection === 'transactions') blockedBy = 'transactions';
+  };
+  /** C8: goals whose contribution history did NOT cross; their Counter growth must not either. */
+  const growthHeldBack = new Set<string>();
   // ⚠️ COUNTER-ONLY TOUCHES FALL THROUGH THIS LOOP ON PURPOSE (#117 Phase 2). `touchedBetween`
   // reports an entity whose only change is a Counter key; it reaches `threeWayFields` with no
   // field difference (the absolute did not move) and is skipped. If the compactor deleted it,
@@ -1314,9 +1352,10 @@ export function buildRebaseOps(
       // compactor had deleted resurrected it. Same inversion the field rule
       // exists to prevent, one level up.
       if (now === undefined) {
+        if (collection === 'goals') growthHeldBack.add(id); // the peer deleted it
         if (!inTarget) continue; // already gone there — nothing to say
         if (!same(beforeColl[id], targetColl[id])) {
-          conflicts++; // the compactor wrote it after compacting; its copy stays
+          noteConflicts(collection, 1); // the compactor wrote it after compacting; its copy stays
           continue;
         }
         ops.push({ op: 'delete', collection, id });
@@ -1328,7 +1367,7 @@ export function buildRebaseOps(
         // resurrecting a deletion is not — the delete is already saved for the
         // whole family, and one device's edit must not undo it silently.
         if (wasPresent) {
-          conflicts++;
+          noteConflicts(collection, 1);
           continue;
         }
         ops.push({ op: 'set', collection, id, entity: toPlain(now) });
@@ -1353,21 +1392,37 @@ export function buildRebaseOps(
       // being replaced. The comment above was right; the call under it did the
       // opposite.
       const patch = wasPresent
-        ? threeWayFields(beforeColl[id], now, targetColl[id])
+        ? threeWayFields(
+            beforeColl[id],
+            now,
+            targetColl[id],
+            0,
+            shiftFor(collection, now, targetColl[id])
+          )
         : carryOnlyNewFields(now, targetColl[id]);
+      if (collection === 'goals' && !historyCrossed(beforeColl[id], now, targetColl[id], patch)) {
+        growthHeldBack.add(id);
+      }
       if (!patch) continue;
-      conflicts += patch.conflicts;
-      if (!Object.keys(patch.set).length && !patch.deleteKeys.length) continue;
-      ops.push({
-        op: 'patch',
-        collection,
-        id,
-        patch: patch.set,
-        ...(patch.deleteKeys.length ? { deleteKeys: patch.deleteKeys } : {}),
-        // Present in the target by the check above, and this runs synchronously
-        // against a local document, so it cannot vanish in between.
-        onMissing: 'skip',
-      });
+      noteConflicts(collection, patch.conflicts);
+      if (Object.keys(patch.set).length || patch.deleteKeys.length) {
+        ops.push({
+          op: 'patch',
+          collection,
+          id,
+          patch: patch.set,
+          ...(patch.deleteKeys.length ? { deleteKeys: patch.deleteKeys } : {}),
+          // Present in the target by the check above, and this runs synchronously
+          // against a local document, so it cannot vanish in between.
+          onMissing: 'skip',
+        });
+      }
+      // C8: the id-keyed arrays both sides changed, as a BASED patch: the reconciler applies
+      // only the peer's own changes relative to `base`, so both sides' entries survive. A
+      // separate op because a based patch on a Counter collection is unfolded (main-thread
+      // space), and the RAW scalars above must not be.
+      const based = basedPatch(patch.based);
+      if (based) ops.push({ op: 'patch', collection, id, ...based, onMissing: 'skip' });
     }
   }
 
@@ -1383,16 +1438,27 @@ export function buildRebaseOps(
       const args: PatchSettingsArgs = { patch: changed.set, deleteKeys: changed.deleteKeys };
       ops.push({ op: 'named', name: 'patchSettings', args });
     }
+    // C8: `exchangeRates` and other keyed arrays both sides changed, unioned through `base`.
+    const based = changed ? basedPatch(changed.based) : null;
+    if (based) ops.push({ op: 'named', name: 'patchSettings', args: based });
     if (changed) conflicts += changed.conflicts;
   }
+
+  // C8: a transaction that could not be carried whole means no partial replay at all.
+  if (blockedBy) return { op: null, count: 0, conflicts, counterIncrements: 0, blockedBy };
 
   // The Counter ledger pass: what THIS DEVICE adjusted that the target does not yet hold
   // (neither live nor in the fold ledger), as `increment` ops. AFTER the entity ops, so an
   // entity the peer created arrives by its raw `set` before its own adjustments land on it.
   // Ownership is the key's device segment, so a foreign writer's key is never replayed. The
   // realm's id is the cache's persisted one, or this session's ephemeral one (docActor.ts).
+  // C8: a goal whose contribution history could not cross keeps its growth back too, so the
+  // money and its receipt either both arrive or both stay.
   const growth = counterGrowthOps(local, target, deviceWriterIdFor(Automerge.getActorId(local)));
-  ops.push(...growth.ops);
+  const growthOps = growth.ops.filter(
+    (op) => !(op.op === 'increment' && op.collection === 'goals' && growthHeldBack.has(op.id))
+  );
+  ops.push(...growthOps);
 
   // nothing to replay
   if (ops.length === 0) return { op: null, count: 0, conflicts, counterIncrements: 0 };
@@ -1400,8 +1466,88 @@ export function buildRebaseOps(
     op: ops.length === 1 ? ops[0]! : { op: 'batch', ops },
     count: ops.length,
     conflicts,
-    counterIncrements: growth.count,
+    counterIncrements: growthOps.length,
   };
+}
+
+/** What a field merge carries: plain writes, deletes, the conflict count, and (C8) the id-keyed
+ *  arrays to reconcile against the peer's baseline value. */
+interface FieldCarry {
+  set: Record<string, unknown>;
+  deleteKeys: string[];
+  conflicts: number;
+  based: Record<string, { next: unknown; base: unknown }>;
+}
+
+/** A `based` carry as the `patch` + `base` pair a based write takes, or `null` when empty. */
+function basedPatch(
+  based: FieldCarry['based']
+): { patch: Record<string, unknown>; base: Record<string, unknown> } | null {
+  const keys = Object.keys(based);
+  if (keys.length === 0) return null;
+  const patch: Record<string, unknown> = {};
+  const base: Record<string, unknown> = {};
+  for (const k of keys) {
+    patch[k] = based[k]!.next;
+    base[k] = based[k]!.base;
+  }
+  return { patch, base };
+}
+
+/** The Counter-backed absolutes of `collection`, as `threeWayFields` paths, with the entity's
+ *  scale (C9g). `undefined` for a collection with none. */
+interface ShiftSpec {
+  readonly paths: readonly (readonly string[])[];
+  readonly decimals: number;
+}
+
+function shiftFor(collection: string, now: unknown, target: unknown): ShiftSpec | undefined {
+  if (!isCounterCollection(collection)) return undefined;
+  const specs = COUNTER_FIELDS[collection] as readonly CounterField[];
+  // Every Counter field of a collection is scaled by the same entity `currency`.
+  return {
+    paths: specs.map((f) => [...f.abs]),
+    decimals: fieldDecimals(specs[0]!, toPlain(target), toPlain(now)),
+  };
+}
+
+/**
+ * Did a goal's contribution history make it across (C8)? True when the peer did not change it,
+ * the target already agrees, or the carry includes it. False only when the peer's history
+ * edit was LOST, which is when its Counter growth must stay behind with it.
+ */
+function historyCrossed(
+  before: unknown,
+  now: unknown,
+  target: unknown,
+  carry: FieldCarry | null
+): boolean {
+  const k = 'manualContributions';
+  const a = (before as AnyRecord | undefined)?.[k];
+  const b = (now as AnyRecord | undefined)?.[k];
+  const t = (target as AnyRecord | undefined)?.[k];
+  if (same(a, b) || same(b, t)) return true;
+  if (!carry) return false;
+  return k in carry.set || k in carry.based || carry.deleteKeys.includes(k);
+}
+
+/**
+ * An array the list reconciler can merge item by item (C8): every item on every side is a
+ * plain object identified by a string `id` or by its `KEY_FIELDS` entry. A keyless array (plain
+ * strings, value objects) has no identity a union could respect, so it stays a conflict.
+ */
+function isKeyedArray(field: string, ...arrays: unknown[]): boolean {
+  const keys = KEY_FIELDS[field];
+  return arrays.every(
+    (arr) =>
+      Array.isArray(arr) &&
+      arr.every(
+        (item) =>
+          isPlainObject(item) &&
+          (typeof item.id === 'string' ||
+            (keys !== undefined && keys.every((f) => typeof item[f] === 'string')))
+      )
+  );
 }
 
 /**
@@ -1419,15 +1565,140 @@ export function buildRebaseOps(
  * So each changed field is classified against the TARGET as well:
  *  - the compactor did not touch it → take the peer's value;
  *  - both changed, and both are plain objects → recurse one level and merge;
- *  - both changed, and it cannot be merged (an array, a scalar, a type change)
- *    → KEEP THE TARGET'S. The family file already holds it, and no machine can
- *    reconcile two whole-value writes. Counted, so the loss is measurable.
+ *  - both changed, a Counter-backed absolute (C9g) → the peer's change as a SHIFT;
+ *  - both changed, an id-keyed array (C8) → carried in `based` for the list reconciler;
+ *  - both changed, and it cannot be merged (a keyless array, a scalar, a type
+ *    change) → KEEP THE TARGET'S. The family file already holds it, and no machine
+ *    can reconcile two whole-value writes. Counted, so the loss is measurable.
  *
- * Arrays are the honest limitation. A same-lineage merge would reconcile a
- * shopping list element by element through Automerge's list CRDT; the op union
- * has no splice, so a rebase can only write one whole array. Preferring the
- * saved one loses the peer's edit to that one list rather than the family's.
+ * ⚠️ `updatedAt` IS NEVER A CONFLICT (C9d). Every write stamps it, so two devices that edited
+ * DIFFERENT fields always "both changed" it, and counting that made every rebased edit look
+ * like lost work (and, for a transaction, blocked the rebase outright). It is carried only
+ * beside a real field, and only when the peer's stamp is the newer one.
  */
+function threeWayFields(
+  before: unknown,
+  now: unknown,
+  target: unknown,
+  depth = 0,
+  shift?: ShiftSpec
+): FieldCarry | null {
+  const a = (toPlain(before) ?? {}) as AnyRecord;
+  const b = (toPlain(now) ?? {}) as AnyRecord;
+  const t = (toPlain(target) ?? {}) as AnyRecord;
+  const set: Record<string, unknown> = {};
+  const deleteKeys: string[] = [];
+  const based: FieldCarry['based'] = {};
+  let conflicts = 0;
+  const isStamp = (key: string): boolean => depth === 0 && key === 'updatedAt';
+
+  for (const key of Object.keys(b)) {
+    if (isStamp(key)) continue; // carried below, never counted
+    if (same(a[key], b[key])) continue; // the peer did not change it
+    // ⚠️ AGREEMENT IS NOT A CONFLICT. Without this, two devices that wrote the
+    // SAME value both counted as unmergeable — so `conflicts` measured "fields
+    // where the two sides agreed", not "work that was lost". The realistic
+    // trigger is a peer whose session reached Drive but whose baseline commit
+    // did not land: every field it wrote would have read as a conflict.
+    if (same(b[key], t[key])) continue;
+    if (same(a[key], t[key])) {
+      set[key] = b[key]; // the compactor did not change it — the peer's wins
+      continue;
+    }
+    // C9g: a Counter-backed absolute both sides moved. The compaction's fold moves the
+    // target's absolute without anyone editing it, so "both changed" is the NORMAL state
+    // there, and keeping the target's dropped the peer's offline "set to X". The peer's own
+    // change, applied to the target's value, keeps both.
+    if (
+      shift?.paths.some((p) => p.length === 1 && p[0] === key) &&
+      typeof a[key] === 'number' &&
+      typeof b[key] === 'number' &&
+      typeof t[key] === 'number'
+    ) {
+      const v = shiftAbsolute(t[key] as number, a[key] as number, b[key] as number, shift.decimals);
+      if (v !== t[key]) set[key] = v;
+      continue;
+    }
+    // ⚠️ A DEPTH CAP. The plan says "one level"; unbounded recursion on the
+    // low-memory device this tier exists to spare is not what it asked for, and
+    // a pathologically nested value should degrade to a conflict rather than a
+    // deep walk.
+    if (
+      depth < MAX_MERGE_DEPTH &&
+      isPlainObject(a[key]) &&
+      isPlainObject(b[key]) &&
+      isPlainObject(t[key])
+    ) {
+      const inner = threeWayFields(a[key], b[key], t[key], depth + 1, subShift(shift, key));
+      if (inner) {
+        conflicts += inner.conflicts;
+        // ⚠️ ONLY WRITE IF SOMETHING ACTUALLY MOVED. A conflicts-only recursion
+        // used to assign `{...target[key]}` — writing the sub-object back to
+        // exactly what it already held. That is a no-op that inflates the
+        // replayed count, mints a fresh Automerge object identity, and moves the
+        // heads, which flips `dirty` into a full pod re-encrypt and upload for
+        // nothing.
+        if (Object.keys(inner.set).length || inner.deleteKeys.length) {
+          const merged = { ...(t[key] as AnyRecord), ...inner.set };
+          for (const k of inner.deleteKeys) delete merged[k];
+          set[key] = merged;
+        }
+      }
+      continue;
+    }
+    // C8: an id-keyed array (a goal's `manualContributions`, `exchangeRates`) both sides
+    // changed. The list reconciler unions it item by item against the peer's baseline value.
+    if (depth === 0 && isKeyedArray(key, a[key] ?? [], b[key], t[key])) {
+      based[key] = { next: b[key], base: a[key] ?? [] };
+      continue;
+    }
+    conflicts++; // both wrote it and it cannot be merged — the saved value stays
+  }
+
+  for (const key of Object.keys(a)) {
+    if (key in b || isStamp(key)) continue;
+    // The peer deleted it. Honour that only if the compactor left it alone —
+    // and COUNT the case where it did not, or a delete that lost to a saved
+    // write is invisible in exactly the way the field rule exists to expose.
+    if (same(a[key], t[key])) deleteKeys.push(key);
+    else conflicts++;
+  }
+
+  const carried =
+    Object.keys(set).length > 0 || deleteKeys.length > 0 || Object.keys(based).length > 0;
+  if (depth === 0 && carried) carryStamp(set, a.updatedAt, b.updatedAt, t.updatedAt);
+
+  return carried || conflicts ? { set, deleteKeys, conflicts, based } : null;
+}
+
+/** `shift`'s paths under `key`, one level down (`loan.outstandingBalance` → `outstandingBalance`). */
+function subShift(shift: ShiftSpec | undefined, key: string): ShiftSpec | undefined {
+  if (!shift) return undefined;
+  const paths = shift.paths.filter((p) => p.length > 1 && p[0] === key).map((p) => p.slice(1));
+  return paths.length ? { paths, decimals: shift.decimals } : undefined;
+}
+
+/**
+ * Carry the peer's `updatedAt` beside a real field (C9d): when only the peer moved it, theirs;
+ * when both did, the NEWER of the two (an ISO string, so lexical order is time order); when the
+ * peer did not move it, nothing.
+ */
+function carryStamp(
+  set: Record<string, unknown>,
+  before: unknown,
+  peer: unknown,
+  target: unknown
+): void {
+  if (peer === undefined || same(before, peer) || same(peer, target)) return;
+  if (same(before, target)) {
+    set.updatedAt = peer;
+    return;
+  }
+  if (typeof peer === 'string' && (typeof target !== 'string' || peer > target)) {
+    set.updatedAt = peer;
+  }
+}
+
 /**
  * The same entity id on both sides, with NO baseline that ever held it.
  *
@@ -1446,16 +1717,14 @@ export function buildRebaseOps(
  * Deliberately NOT `threeWayFields(target, now, target)`. That is the inverse
  * of this rule, not a shorthand for it — see the call site.
  */
-function carryOnlyNewFields(
-  now: unknown,
-  target: unknown
-): { set: Record<string, unknown>; deleteKeys: string[]; conflicts: number } | null {
+function carryOnlyNewFields(now: unknown, target: unknown): FieldCarry | null {
   const b = (toPlain(now) ?? {}) as AnyRecord;
   const t = (toPlain(target) ?? {}) as AnyRecord;
   const set: Record<string, unknown> = {};
   let conflicts = 0;
 
   for (const key of Object.keys(b)) {
+    if (key === 'updatedAt') continue; // C9d: a stamp, never a conflict; carried below
     if (!(key in t)) {
       set[key] = b[key];
       continue;
@@ -1463,76 +1732,11 @@ function carryOnlyNewFields(
     if (same(b[key], t[key])) continue;
     conflicts++; // both hold it, differently, and nothing can attribute it
   }
+  // No baseline: the peer's stamp crosses only beside a real field, and only if it is newer.
+  if (Object.keys(set).length) carryStamp(set, undefined, b.updatedAt, t.updatedAt);
 
-  return Object.keys(set).length || conflicts ? { set, deleteKeys: [], conflicts } : null;
-}
-
-function threeWayFields(
-  before: unknown,
-  now: unknown,
-  target: unknown,
-  depth = 0
-): { set: Record<string, unknown>; deleteKeys: string[]; conflicts: number } | null {
-  const a = (toPlain(before) ?? {}) as AnyRecord;
-  const b = (toPlain(now) ?? {}) as AnyRecord;
-  const t = (toPlain(target) ?? {}) as AnyRecord;
-  const set: Record<string, unknown> = {};
-  const deleteKeys: string[] = [];
-  let conflicts = 0;
-
-  for (const key of Object.keys(b)) {
-    if (same(a[key], b[key])) continue; // the peer did not change it
-    // ⚠️ AGREEMENT IS NOT A CONFLICT. Without this, two devices that wrote the
-    // SAME value both counted as unmergeable — so `conflicts` measured "fields
-    // where the two sides agreed", not "work that was lost". The realistic
-    // trigger is a peer whose session reached Drive but whose baseline commit
-    // did not land: every field it wrote would have read as a conflict.
-    if (same(b[key], t[key])) continue;
-    if (same(a[key], t[key])) {
-      set[key] = b[key]; // the compactor did not change it — the peer's wins
-      continue;
-    }
-    // ⚠️ A DEPTH CAP. The plan says "one level"; unbounded recursion on the
-    // low-memory device this tier exists to spare is not what it asked for, and
-    // a pathologically nested value should degrade to a conflict rather than a
-    // deep walk.
-    if (
-      depth < MAX_MERGE_DEPTH &&
-      isPlainObject(a[key]) &&
-      isPlainObject(b[key]) &&
-      isPlainObject(t[key])
-    ) {
-      const inner = threeWayFields(a[key], b[key], t[key], depth + 1);
-      if (inner) {
-        conflicts += inner.conflicts;
-        // ⚠️ ONLY WRITE IF SOMETHING ACTUALLY MOVED. A conflicts-only recursion
-        // used to assign `{...target[key]}` — writing the sub-object back to
-        // exactly what it already held. That is a no-op that inflates the
-        // replayed count, mints a fresh Automerge object identity, and moves the
-        // heads, which flips `dirty` into a full pod re-encrypt and upload for
-        // nothing.
-        if (Object.keys(inner.set).length || inner.deleteKeys.length) {
-          const merged = { ...(t[key] as AnyRecord), ...inner.set };
-          for (const k of inner.deleteKeys) delete merged[k];
-          set[key] = merged;
-        }
-      }
-      continue;
-    }
-    conflicts++; // both wrote it and it cannot be merged — the saved value stays
-  }
-
-  for (const key of Object.keys(a)) {
-    if (key in b) continue;
-    // The peer deleted it. Honour that only if the compactor left it alone —
-    // and COUNT the case where it did not, or a delete that lost to a saved
-    // write is invisible in exactly the way the field rule exists to expose.
-    if (same(a[key], t[key])) deleteKeys.push(key);
-    else conflicts++;
-  }
-
-  return Object.keys(set).length || deleteKeys.length || conflicts
-    ? { set, deleteKeys, conflicts }
+  return Object.keys(set).length || conflicts
+    ? { set, deleteKeys: [], conflicts, based: {} }
     : null;
 }
 

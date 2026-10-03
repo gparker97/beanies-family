@@ -80,6 +80,7 @@ vi.mock('@/stores/syncStore', () => ({
     get envelope() {
       return syncStoreState.envelope;
     },
+    authoritativeEnvelope: () => syncStoreState.envelope,
     wrapFamilyKeyForMember: wrapForMemberMock,
     setMemberWrappedKey: setMemberWrappedKeyMock,
     syncNow: syncNowMock,

@@ -84,12 +84,16 @@ describe('photoCompression.compress', () => {
     expect(Math.max(result.width, result.height)).toBeLessThanOrEqual(2048);
   });
 
-  it('early-returns the original file when it is a small JPEG within the cap', async () => {
+  it('re-encodes a small JPEG within the cap through the canvas (EXIF/GPS stripped, C11)', async () => {
+    // The former early return shipped the ORIGINAL bytes, EXIF and all, behind a public link.
     const bitmap = mockBitmap(1024, 768);
-    stubCanvasAndBitmap(bitmap);
+    const { drawImage } = stubCanvasAndBitmap(bitmap);
     const original = makeFile(100 * 1024, 'image/jpeg'); // 100KB
     const result = await compress(original);
-    expect(result.blob).toBe(original);
+    expect(result.blob).not.toBe(original);
+    expect(drawImage).toHaveBeenCalled();
+    expect(result.mime).toBe('image/jpeg');
+    // Dimensions are kept: within the cap means no downscale, only a re-encode.
     expect(result.width).toBe(1024);
     expect(result.height).toBe(768);
   });

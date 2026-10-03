@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { celebrate } from '@/composables/useCelebration';
 import { useAssetsStore } from './assetsStore';
+import { useRecurringStore } from './recurringStore';
 import { createMemberFiltered } from '@/composables/useMemberFiltered';
 import { wrapAsync } from '@/composables/useStoreActions';
 import { convertToBaseCurrency } from '@/utils/currency';
@@ -239,14 +240,64 @@ export const useAccountsStore = defineStore('accounts', () => {
     accounts.value = accounts.value.map((a) => (a.id === account.id ? account : a));
   }
 
+  /** Drop an account from the local array WITHOUT writing the doc (the asset delete cascade
+   * already removed it atomically). */
+  function applyRemoved(id: string): void {
+    accounts.value = accounts.value.filter((a) => a.id !== id);
+  }
+
+  /**
+   * Delete an account and, in the SAME Automerge change, detach what fed it (audit C7): the
+   * recurring items paid from it (or amortising it) are deactivated, and a loan account's or an
+   * asset loan's `payFromAccountId` naming it is cleared. A deleted account used to keep
+   * generating recurring instances until someone noticed.
+   */
   async function deleteAccount(id: string): Promise<boolean> {
     const result = await wrapAsync(
       isLoading,
       error,
       async () => {
-        const success = await accountRepo.deleteAccount(id);
+        const recurringStore = useRecurringStore();
+        const assetsStore = useAssetsStore();
+        const recurringItemIds = recurringStore.recurringItems
+          .filter((i) => i.isActive && (i.accountId === id || i.loanId === id))
+          .map((i) => i.id);
+        const loanAccountIds = accounts.value
+          .filter((a) => a.id !== id && a.payFromAccountId === id)
+          .map((a) => a.id);
+        const assets = assetsStore.assets.filter((a) => a.loan?.payFromAccountId === id);
+        const success = await accountRepo.deleteAccountCascade(id, {
+          recurringItemIds,
+          loanAccountIds,
+          assets,
+        });
         if (success) {
-          accounts.value = accounts.value.filter((a) => a.id !== id);
+          accounts.value = accounts.value
+            .filter((a) => a.id !== id)
+            .map((a) => {
+              if (!loanAccountIds.includes(a.id)) return a;
+              const { payFromAccountId: _cleared, ...rest } = a;
+              return rest;
+            });
+          for (const asset of assets) {
+            const { payFromAccountId: _cleared, ...loan } = asset.loan!;
+            assetsStore.applyEchoed({ ...asset, loan });
+          }
+          // The deactivated items are re-read from the projection (the batch's deltas landed
+          // before the mutate resolved); nothing to re-read when there were none.
+          if (recurringItemIds.length > 0) await recurringStore.loadRecurringItems();
+          logEvent({
+            level: 'info',
+            surface: 'account-delete',
+            message: 'account deleted',
+            context: {
+              action: 'cascade',
+              kind:
+                recurringItemIds.length + loanAccountIds.length + assets.length > 0
+                  ? 'with-dependents'
+                  : 'plain',
+            },
+          });
         }
         return success;
       },
@@ -296,6 +347,7 @@ export const useAccountsStore = defineStore('accounts', () => {
     updateAccount,
     incrementBalance,
     applyEchoed,
+    applyRemoved,
     deleteAccount,
     getAccountById,
     getAccountsByMemberId,

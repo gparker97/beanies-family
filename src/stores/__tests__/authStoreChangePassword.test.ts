@@ -44,6 +44,7 @@ vi.mock('@/stores/syncStore', () => ({
     get envelope() {
       return null;
     },
+    authoritativeEnvelope: () => null,
     wrapFamilyKeyForMember: wrapForMemberMock,
     setMemberWrappedKey: setMemberWrappedKeyMock,
     syncNow: syncNowMock,

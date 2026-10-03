@@ -121,6 +121,14 @@ vi.mock('@/utils/beanpodFilename', () => ({
   isConflictFilename: vi.fn(() => false),
 }));
 
+// The queue is a collaborator here, not the subject: a real one starts listeners (and
+// imports the auth layer) the moment anything is queued.
+vi.mock('@/services/sync/offlineQueue', () => ({
+  enqueueOfflineSave: vi.fn(),
+  setFlushProvider: vi.fn(),
+  setResaveHandler: vi.fn(),
+}));
+
 import * as syncService from '../syncService';
 import { UnsupportedBeanpodVersionError, CorruptPayloadError } from '@/types/sync';
 import { reportError } from '@/utils/errorReporter';
@@ -649,24 +657,62 @@ describe('a merge that refuses AFTER the remote was read', () => {
     );
   });
 
-  it('a TRANSPORT failure before the bytes were read still saves (pinned)', async () => {
-    // The branch this fix narrows must keep its original job: the remote is
-    // still there, nothing was read, the next save re-merges.
-    let written = '';
+  it('a TRANSPORT failure on the pre-save read REFUSES the write and queues it (audit C4)', async () => {
+    // ⚠️ DELIBERATE BEHAVIOUR CHANGE. This used to be pinned as "still saves": a read
+    // that failed was followed by a full-file write over a remote nobody had read, and
+    // Drive has no write precondition, so whatever a peer wrote since our last read was
+    // gone. Offline is now the same contract as a queued WRITE: refused, queued, and not
+    // counted as a failure (no red banner for being offline).
+    const { enqueueOfflineSave } = await import('@/services/sync/offlineQueue');
     const provider = makeProvider({
       remoteText: '',
       remoteTimestamp: '2026-05-16T10:00:00Z',
-      onWrite: (c) => {
-        written = c;
-      },
+      onWrite: () => {},
     });
     provider.read.mockRejectedValueOnce(new Error('network down'));
     syncService.setProvider(provider as never);
     syncService.setFamilyKey(fakeKey, buildEnvelope());
 
-    await expect(syncService.save()).resolves.toBe(true);
-    expect(written).not.toBe('');
+    await expect(syncService.save()).resolves.toBe(false);
+    expect(provider.write).not.toHaveBeenCalled();
+    expect(enqueueOfflineSave).toHaveBeenCalledWith('network');
+    expect(syncService.getConsecutiveSaveFailures()).toBe(0);
     expect(syncService.isRemoteBlocked()).toBeNull();
+  });
+
+  it('a NON-transport read failure refuses the write AND counts as a failure', async () => {
+    const provider = makeProvider({
+      remoteText: '',
+      remoteTimestamp: '2026-05-16T10:00:00Z',
+      onWrite: () => {},
+    });
+    provider.read.mockRejectedValueOnce(new Error('disk exploded'));
+    syncService.setProvider(provider as never);
+    syncService.setFamilyKey(fakeKey, buildEnvelope());
+
+    await expect(syncService.save()).resolves.toBe(false);
+    expect(provider.write).not.toHaveBeenCalled();
+    expect(syncService.getConsecutiveSaveFailures()).toBe(1);
+  });
+
+  it('a probe that cannot answer (`unknown`) READS on the save path instead of writing blind', async () => {
+    // getLastModified failing => `unknown`. The poll path skips; the save path must read.
+    const provider = makeProvider({
+      remoteText: JSON.stringify(
+        buildEnvelope({ wrappedKeys: { peer: { wrapped: 'p', salt: 's' } } })
+      ),
+      remoteTimestamp: '2026-05-16T10:00:00Z',
+      onWrite: () => {},
+    });
+    provider.getLastModified.mockResolvedValue(null as never);
+    syncService.setProvider(provider as never);
+    syncService.setFamilyKey(fakeKey, buildEnvelope());
+
+    await expect(syncService.save()).resolves.toBe(true);
+    expect(provider.read).toHaveBeenCalledTimes(1);
+    // ...and what it read (a peer's wrap) is in what it wrote.
+    const written = JSON.parse(provider.write.mock.calls[0]![0] as string) as BeanpodFileV4;
+    expect(written.wrappedKeys).toHaveProperty('peer');
   });
 });
 

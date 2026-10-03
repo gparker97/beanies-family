@@ -27,6 +27,7 @@ import type { PayloadLoadError, PayloadLoadStep } from '@/types/sync';
 import { PodLineageError, type LineageVerdict } from '@/services/sync/podLineage';
 import type { PodLineage } from '@/types/models';
 import type { ReconcileNote } from './reconcile';
+import type { RemoteBaselineRow } from '@/services/sync/remoteBaseline';
 // Type-only: erased on main, so the main bundle never pulls `counterFields`' Automerge import.
 import type { CounterStats } from './counterFields';
 
@@ -126,6 +127,14 @@ export interface MergeOutcome {
    * branches on it. `user-file` adopts only; every other context throws.
    */
   rebaseUnavailable?: true;
+  /** Why the rebase could not run, when the composer said (C8): `'transactions'`. */
+  rebaseConflictKind?: 'transactions';
+  /**
+   * A RESTORE (`ours-newer` × `user-file` adopt) carried this device's `removedMembers`
+   * tombstones into the chosen file and deleted the matching member rows (C10), so a restore
+   * cannot un-remove a member. Absent when it changed nothing.
+   */
+  removedMembers?: { carried: number; rowsDeleted: number };
   /**
    * Root keys (`COLLECTION_NAMES` + `settings`) holding more than one concurrent value after
    * this operation, and how many of those it introduced (#117, plan F; `countRootConflicts`).
@@ -144,6 +153,30 @@ export interface MergeOutcome {
   counterStats?: CounterStats;
   /** Of `replayed`, the Counter `increment` ops the rebase's ledger pass emitted. `rebased` only. */
   counterIncrements?: number;
+}
+
+/** What a cache replay did (C5c, data-layer audit 2026-10-03). Main logs it as `cache-replay`. */
+export interface CacheReplay {
+  /** Anything was skipped or left pending: `droppedIncrements > 0 || missingDeps > 0`. */
+  recovered: boolean;
+  /** Increment rows that would not decrypt, unframe or apply. Kept on disk, never replayed. */
+  droppedIncrements: number;
+  /** Change hashes the replayed document depends on and does not hold (`getMissingDeps`). */
+  missingDeps: number;
+  /** Increment rows read. */
+  incrementCount: number;
+  /**
+   * The cache's BASE was proven corrupt under a live same-family document, so the cache was
+   * deleted and re-seeded from that document (C5e). Absent otherwise.
+   */
+  corruptBaseReplaced?: true;
+}
+
+/** What `initAndLoadCache` answers. `replay` is present whenever a cache was read. */
+export interface InitAndLoadResult {
+  loaded: boolean;
+  remoteBaseline: RemoteBaselineRow | null;
+  replay?: CacheReplay;
 }
 
 // ─── Mutation ops (main → worker; the `changeDoc` closures, made declarative) ─
@@ -242,6 +275,9 @@ export interface RpcOk {
    * telemeter, so its findings ride the response and `docClient.mutate` logs them. Absent
    * when there is nothing to report. */
   notes?: ReconcileNote[];
+  /** `mutate` only: the document's heads after the write (C12), so main can tell a respawn's
+   * rehydrate that lost an acknowledged write. */
+  heads?: Heads;
 }
 
 /** What one dispatched RPC hands back before the envelope wraps it: `RpcOk` minus the
@@ -406,7 +442,12 @@ const payloadCodec = (Ctor: PayloadErrorCtor): ErrorCodec => ({
 const lineageCodec: ErrorCodec = {
   serialize: (err) =>
     err instanceof PodLineageError
-      ? { verdict: err.verdict, rebaseUnavailable: err.rebaseUnavailable }
+      ? {
+          verdict: err.verdict,
+          rebaseUnavailable: err.rebaseUnavailable,
+          remoteMovedAfterCompaction: err.remoteMovedAfterCompaction,
+          conflictKind: err.conflictKind,
+        }
       : undefined,
   reconstruct: (message, data) => {
     const err = new PodLineageError((data?.verdict as LineageVerdict) ?? 'conflict', message);
@@ -416,6 +457,8 @@ const lineageCodec: ErrorCodec = {
     // `toBeUndefined()` cannot tell absent from present-and-undefined — so the
     // test would not catch the day something does.
     if (data?.rebaseUnavailable === true) err.rebaseUnavailable = true;
+    if (data?.remoteMovedAfterCompaction === true) err.remoteMovedAfterCompaction = true;
+    if (typeof data?.conflictKind === 'string') err.conflictKind = data.conflictKind;
     return err;
   },
 };

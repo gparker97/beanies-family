@@ -1828,6 +1828,8 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'family.deleteConfirm':
     '从现在起，对方将无法在任何设备上访问你的家庭数据。对方设备上已保存的内容会保留在对方那里。',
   'family.removeDone': '已移除家庭成员。',
+  'family.removedMemberKitsNudge':
+    '部分恢复套件无法关联到具体成员。请检查你的恢复套件，并考虑更换家庭恢复口令。',
   'family.removeSavePending': '已在此设备上移除。下次家庭数据保存后，其他设备也会看到这一变化。',
   'family.removeOfflineTitle': '你已离线',
   'family.removeOffline': '请重新联网后再移除家庭成员，确保所有设备都能同步这次移除。',
@@ -2028,7 +2030,20 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'auth.signOutFailed': '退出登录未完成。请重试，或刷新应用。',
   'auth.trustSetFailed': '无法更新此设备的信任设置。请重试，或在“设置”中更改。',
   'auth.signOutClearDataHint':
-    '清除这台电脑上你数据的所有痕迹，适合在共用设备上使用。你的家庭数据本身不受影响，你可以在这里或其他任何地方重新登录。',
+    '从这台设备上移除其中每个家庭的数据副本，以及相关的密钥和登录信息，适合在共用设备上使用。你的家庭数据文件不会被删除，你可以在这里或其他任何地方重新登录。尚未保存到该文件的更改会丢失；如果有这样的更改，我们会先询问你。',
+  'auth.unsavedTitle': '此设备上有未保存的更改',
+  'auth.unsavedMessage':
+    '此设备上的部分更改还没有保存到你的家庭数据文件中。如果继续，这些更改将被永久删除。请先保留它们，等家庭数据文件保存完成后再试，或先在设置中导出备份。',
+  'auth.unsavedForgetMessage':
+    '此设备上仍有这个家庭的更改从未保存到家庭数据文件中。在这里移除这个家庭会永久删除这些更改。请先保留它们，在此设备上打开这个家庭并让它先完成保存。',
+  'auth.unsavedFamilies.one': '1 个家庭有未保存的更改。',
+  'auth.unsavedFamilies.other': '{count} 个家庭有未保存的更改。',
+  'auth.unsavedPhotos.one': '1 张照片正在等待上传，目前只保存在此设备上。',
+  'auth.unsavedPhotos.other': '{count} 张照片正在等待上传，目前只保存在此设备上。',
+  'auth.unsavedBlocked': '你的家庭数据文件目前无法读取，因此无法向其中保存任何内容。',
+  'auth.unsavedUnknown': '我们无法确认此设备上的所有内容是否都已保存。',
+  'auth.unsavedDiscard': '放弃未保存的更改',
+  'auth.unsavedKeep': '保留我的更改',
   'settings.familyData.signedInAs': '登录账户',
   'settings.familyData.switchAccount': '切换 Google 账户',
   'settings.familyData.switchAccountFailed': '无法切换账户，请重试。',
@@ -2607,6 +2622,7 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'recovery.useKitLink': '使用恢复套件',
   'recovery.kitEnterBody': '输入恢复套件上的恢复码（连字符可加可不加）。',
   'recovery.kitWrongCode': '这个恢复码与本家庭的恢复套件不匹配。',
+  'recovery.kitUnusable': '我们无法用本家庭的恢复套件核对这个恢复码。请重试，或换一种方式登录。',
   'recovery.kitNoKits': '这个家庭还没有登记恢复套件。',
   'recovery.unlock': '解锁我的 Beanpod',
   'recovery.resetPinTitle': '设置新的 PIN',
@@ -2883,6 +2899,8 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'join.error.tokenExpired': '这个邀请已过期。请向邀请人要一个新链接。',
   'join.error.tokenInvalid': '无法识别这个邀请链接。请向邀请人要一个新的。',
   'join.error.noUnclaimed': '这个家庭的所有成员都已被认领。请家庭管理员把你加进来。',
+  'join.error.memberClaimed':
+    '刚刚有其他人以这个成员的身份加入了。请重新选择你自己，或请家庭管理员把你加进来。',
 
   // Recovery action button labels.
   'join.recovery.retry': '重试',

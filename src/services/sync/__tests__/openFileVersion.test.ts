@@ -67,7 +67,7 @@ vi.mock('@/services/telemetry', () => ({ logEvent: vi.fn() }));
 import * as syncService from '../syncService';
 import { UnsupportedBeanpodVersionError } from '@/types/sync';
 
-function envelope(version: BeanpodFileV4['version'] | '6.0'): string {
+function envelope(version: BeanpodFileV4['version'] | '7.0'): string {
   return JSON.stringify({
     version,
     familyId: 'fam-1',
@@ -91,7 +91,8 @@ describe('loadDroppedFile and the envelope version', () => {
   });
 
   it('accepts a 4.0 file and a 5.0 file alike, handing back the envelope for the password step', async () => {
-    for (const v of ['4.0', '5.0'] as const) {
+    // '6.0' too: this build is the READER half of the #117 flip gate (no writer yet).
+    for (const v of ['4.0', '5.0', '6.0'] as const) {
       const r = await syncService.loadDroppedFile(fileOf(envelope(v)));
       expect(r.needsPassword).toBe(true);
       expect(r.envelope?.version).toBe(v);
@@ -111,7 +112,7 @@ describe('loadDroppedFile and the envelope version', () => {
     //
     // The contract that replaces it: `payloadError` is the sole channel for a
     // blocker, so every reader must test it BEFORE `syncStore.error`.
-    const r = await syncService.loadDroppedFile(fileOf(envelope('6.0')));
+    const r = await syncService.loadDroppedFile(fileOf(envelope('7.0')));
     expect(r.success).toBe(false);
     expect(r.needsPassword).toBeUndefined();
     expect(r.payloadError).toBeInstanceOf(UnsupportedBeanpodVersionError);

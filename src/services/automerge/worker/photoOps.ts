@@ -13,6 +13,7 @@
  * inside the worker's `Automerge.change` via the `attachPhotoToEntity` named op;
  * `collectReferencedPhotoIds` runs on the worker doc for `gcOrphans`.
  */
+import { COUNTER_COLLECTION_NAMES } from '@/types/automerge';
 import type { FamilyDocument, CollectionName } from '@/types/automerge';
 import type {
   FamilyVacation,
@@ -173,16 +174,35 @@ export const avatarPhotoHooks: PhotoCollectionHooks = {
 
 // ─── Attach / collect (doc-walking) ──────────────────────────────────────────
 
-/** Attach a photo to an entity via its registered hook (flat fallback for
- * unregistered). A throwing hook is logged, NEVER thrown — a benign miss (e.g. a
- * mid-wizard vacation) must not fail the upload batch or trigger a Drive rollback. */
+/** Attach a photo to an entity via its registered hook. A throwing hook is logged, NEVER
+ * thrown — a benign miss (e.g. a mid-wizard vacation) must not fail the upload batch or trigger
+ * a Drive rollback.
+ *
+ * ⚠️ BUT AN UNREGISTERED OR COUNTER-BACKED HOST THROWS (C9f, data-layer audit 2026-10-03), as a
+ * programming error the worker error path surfaces. This handler echoes its host with this
+ * file's private `toPlain`, not the `docOps` fold funnel (this file must stay Automerge-free), so
+ * a Counter-backed host (`accounts`, `goals`, `assets`) would hand main a RAW baseline as its
+ * balance. And an unregistered name used to fall back to the flat shape, which wrote `photoIds`
+ * into any collection at all (and `gcOrphans` never collects from it, so the photo is deleted). */
 export function attachPhotoToEntity(
   doc: FamilyDocument,
   entityCollection: string,
   entityId: string,
   photoId: UUID
 ): void {
-  const hooks = photoCollections.get(entityCollection) ?? flatHooks(entityCollection);
+  if ((COUNTER_COLLECTION_NAMES as readonly string[]).includes(entityCollection)) {
+    throw new Error(
+      `photoOps: "${entityCollection}" holds Counter-backed money fields and cannot host photos ` +
+        `through attachPhotoToEntity (its echo would bypass the fold).`
+    );
+  }
+  const hooks = photoCollections.get(entityCollection);
+  if (!hooks) {
+    throw new Error(
+      `photoOps: "${entityCollection}" is not a registered photo host. ` +
+        `Call registerPhotoCollection("${entityCollection}") in photoOps.ts first.`
+    );
+  }
   try {
     hooks.attach(doc, entityId, photoId);
   } catch (e) {

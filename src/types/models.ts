@@ -1681,6 +1681,12 @@ export interface PhotoAttachment {
   createdAt: ISODateString;
   updatedAt: ISODateString;
   deletedAt?: ISODateString; // tombstone for GC sweep
+  /**
+   * Drive file ids a `replacePhotoFile` retired (C11). The previous file is not deleted at
+   * replace time (a peer may still render it); the GC sweep reclaims these once the record's
+   * `updatedAt` is past the grace window.
+   */
+  retiredDriveFileIds?: string[];
 }
 
 // ──────────────────────────────────────────────────────────────────

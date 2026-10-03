@@ -7,6 +7,10 @@ import {
   getSettings,
   resetProjection,
   docVersion,
+  bumpDocVersion,
+  isLoaded,
+  isAuthoritativeLoaded,
+  markAuthoritative,
 } from '../projection';
 import type { ProjectionDelta } from '../worker/protocol';
 
@@ -96,5 +100,15 @@ describe('projection', () => {
     resetProjection();
     expect(count('transactions')).toBe(0);
     expect(getSettings()).toBeNull();
+  });
+
+  it('a snapshot fast-paint is loaded but not authoritative until markAuthoritative', () => {
+    bumpDocVersion();
+    expect(isLoaded()).toBe(true);
+    expect(isAuthoritativeLoaded()).toBe(false);
+    markAuthoritative();
+    expect(isAuthoritativeLoaded()).toBe(true);
+    resetProjection();
+    expect(isAuthoritativeLoaded()).toBe(false);
   });
 });

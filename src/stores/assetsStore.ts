@@ -6,6 +6,7 @@ import { convertToBaseCurrency } from '@/utils/currency';
 import * as assetRepo from '@/services/automerge/repositories/assetRepository';
 import { syncEntityLinkedRecurringItem } from '@/utils/linkedRecurringItem';
 import { useAccountsStore } from './accountsStore';
+import { useRecurringStore } from './recurringStore';
 import { trackFeature, withAppInitiatedWrites } from '@/services/analytics/plausible';
 import type {
   Asset,
@@ -14,6 +15,9 @@ import type {
   AccountType,
   CurrencyCode,
 } from '@/types/models';
+
+/** Whether `migrateLinkedLoanAccounts` has run this session (see its comment). */
+let linkedLoanMigrationRan = false;
 
 export const useAssetsStore = defineStore('assets', () => {
   // State
@@ -154,14 +158,6 @@ export const useAssetsStore = defineStore('assets', () => {
     }
   }
 
-  async function deleteLinkedLoanAccount(assetId: string) {
-    const accountsStore = useAccountsStore();
-    const existing = accountsStore.accounts.find((a) => a.linkedAssetId === assetId);
-    if (existing) {
-      await accountsStore.deleteAccount(existing.id);
-    }
-  }
-
   // One-time migration: create linked accounts for existing assets with loans
   //
   // Runs from `loadAssets`, so it fires on app open with no user involved. The
@@ -169,6 +165,11 @@ export const useAssetsStore = defineStore('assets', () => {
   // three loan-bearing assets would otherwise emit three interactive events
   // before touching anything, and `account` adoption would track loan ownership
   // rather than account use.
+  //
+  // Gated to ONE run per session (`linkedLoanMigrationRan`, cleared by `resetState` so the
+  // next family signed in on this tab gets its own run): it used to walk every asset on every
+  // reload. A persisted one-shot settings flag is the follow-up; the settings model is outside
+  // this change.
   async function migrateLinkedLoanAccounts() {
     const accountsStore = useAccountsStore();
     await withAppInitiatedWrites(async () => {
@@ -189,7 +190,10 @@ export const useAssetsStore = defineStore('assets', () => {
       assets.value = await assetRepo.getAllAssets();
     });
     // Run migration after loading (creates linked loan accounts for existing assets)
-    await migrateLinkedLoanAccounts();
+    if (!linkedLoanMigrationRan) {
+      linkedLoanMigrationRan = true;
+      await migrateLinkedLoanAccounts();
+    }
   }
 
   async function createAsset(input: CreateAssetInput): Promise<Asset | null> {
@@ -228,26 +232,31 @@ export const useAssetsStore = defineStore('assets', () => {
     assets.value = assets.value.map((a) => (a.id === asset.id ? asset : a));
   }
 
+  /** Delete an asset with its linked loan account and linked recurring payment item in ONE
+   * Automerge change (audit C7): three separate deletes could leave a mirror account behind. */
   async function deleteAsset(id: string): Promise<boolean> {
-    const assetToDelete = assets.value.find((a) => a.id === id);
-    if (assetToDelete?.loan?.linkedRecurringItemId) {
-      await syncEntityLinkedRecurringItem({
-        enabled: false,
-        existingItemId: assetToDelete.loan.linkedRecurringItemId,
-        amount: 0,
-        currency: assetToDelete.currency as CurrencyCode,
-        category: '',
-        description: '',
-      });
-    }
-    await deleteLinkedLoanAccount(id);
-    const result = await wrapAsync(isLoading, error, async () => {
-      const success = await assetRepo.deleteAsset(id);
-      if (success) {
-        assets.value = assets.value.filter((a) => a.id !== id);
-      }
-      return success;
-    });
+    const result = await wrapAsync(
+      isLoading,
+      error,
+      async () => {
+        const accountsStore = useAccountsStore();
+        const asset = assets.value.find((a) => a.id === id);
+        const linkedAccountId = accountsStore.accounts.find((a) => a.linkedAssetId === id)?.id;
+        const linkedRecurringItemId = asset?.loan?.linkedRecurringItemId;
+        const success = await assetRepo.deleteAssetCascade(id, {
+          accountId: linkedAccountId,
+          recurringItemId: linkedRecurringItemId,
+        });
+        if (success) {
+          assets.value = assets.value.filter((a) => a.id !== id);
+          if (linkedAccountId) accountsStore.applyRemoved(linkedAccountId);
+          // The batch's delta already removed the item from the projection; re-read it.
+          if (linkedRecurringItemId) await useRecurringStore().loadRecurringItems();
+        }
+        return success;
+      },
+      { action: 'assetsStore:deleteAsset' }
+    );
     return result ?? false;
   }
 
@@ -263,6 +272,7 @@ export const useAssetsStore = defineStore('assets', () => {
     assets.value = [];
     isLoading.value = false;
     error.value = null;
+    linkedLoanMigrationRan = false;
   }
 
   return {

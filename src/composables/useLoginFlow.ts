@@ -824,7 +824,13 @@ export function useLoginFlow(opts: {
                   m.getPinUnlockRecord(s.familyId, s.person.id)
                 )
               : undefined;
-          if (record && live?.pinVersion && record.pinVersion !== live.pinVersion) {
+          if (
+            record &&
+            live &&
+            (await import('@/services/auth/deviceUnlock').then((m) =>
+              m.pinWrapIsStale(record, live)
+            ))
+          ) {
             proveError.value = t('pin.changedElsewhere');
           } else {
             proveError.value = result.error ?? t('pin.incorrect');
@@ -838,7 +844,12 @@ export function useLoginFlow(opts: {
         if (live && syncStore.familyKey) {
           await enrollPinUnlock({
             familyId: s.familyId,
-            member: { id: live.id, name: live.name, pinVersion: live.pinVersion ?? 1 },
+            member: {
+              id: live.id,
+              name: live.name,
+              pinVersion: live.pinVersion ?? 1,
+              pinHash: live.pinHash,
+            },
             pin,
             familyKey: syncStore.familyKey,
             keyId: syncStore.envelope?.keyId ?? '',

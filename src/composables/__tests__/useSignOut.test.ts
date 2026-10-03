@@ -31,6 +31,13 @@ const h = vi.hoisted(() => ({
   emitCacheKept: vi.fn(),
   logEvent: vi.fn(),
   reportError: vi.fn(),
+  measureUnsavedWork: vi.fn(async () => ({
+    unsavedFamilies: 0,
+    photoUploads: 0,
+    remoteBlocked: false,
+    unknown: false,
+  })),
+  confirm: vi.fn(async () => true),
 }));
 
 vi.mock('@/router', () => ({ default: { replace: h.routerReplace } }));
@@ -44,7 +51,14 @@ vi.mock('@/stores/authStore', () => ({
     signOutAndClearData: h.signOutAndClearData,
     endSessionClearedElsewhere: h.endSessionClearedElsewhere,
     setDeviceTrust: h.setDeviceTrust,
+    measureUnsavedWork: h.measureUnsavedWork,
   }),
+}));
+vi.mock('@/composables/useConfirm', () => ({ confirm: h.confirm }));
+vi.mock('@/services/sync/syncService', () => ({
+  docPushedAgainst: vi.fn(),
+  getRemoteBaselineHeadsFp: vi.fn(),
+  isRemoteBlocked: vi.fn(() => null),
 }));
 vi.mock('@/stores/familyStore', () => ({
   useFamilyStore: () => ({ members: h.members, owner: h.owner }),
@@ -72,11 +86,14 @@ vi.mock('@/services/telemetry/loginFlowEvents', () => ({
 }));
 vi.mock('@/utils/errorReporter', () => ({ reportError: h.reportError }));
 vi.mock('@/services/telemetry', () => ({ logEvent: h.logEvent }));
+vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: h.logEvent }));
 
 import {
   useSignOut,
   useSignOutHost,
   endSessionClearedElsewhere,
+  endSessionEndedElsewhere,
+  confirmDiscardUnsavedWork,
   __resetSignOutForTests,
 } from '@/composables/useSignOut';
 
@@ -95,6 +112,104 @@ beforeEach(() => {
   h.signOut.mockResolvedValue({ cacheDeleted: null });
   h.signOutAndClearData.mockResolvedValue({ cacheDeleted: true });
   h.endSessionClearedElsewhere.mockResolvedValue(undefined);
+  h.measureUnsavedWork.mockResolvedValue({
+    unsavedFamilies: 0,
+    photoUploads: 0,
+    remoteBlocked: false,
+    unknown: false,
+  });
+  h.confirm.mockResolvedValue(true);
+});
+
+// C6: the clear tier never deletes unsaved work without the person's explicit "discard".
+describe('useSignOut clear tier: unsaved work (C6)', () => {
+  const atRisk = { unsavedFamilies: 1, photoUploads: 2, remoteBlocked: false, unknown: false };
+  // The clear tier drops key material, so the kit guard opens first; get it out of the way.
+  const clearPastGuard = () => {
+    const pending = useSignOut().signOut('clear', { trust: false });
+    useSignOutHost().resolveKitGuard('kit_saved');
+    return pending;
+  };
+
+  it('saves first and measures every family before the clear', async () => {
+    useSignOut().requestSignOut();
+    expect(await clearPastGuard()).toBe('signed-out');
+    expect(h.measureUnsavedWork).toHaveBeenCalledWith({ save: true, scope: 'all' });
+    expect(h.confirm).not.toHaveBeenCalled(); // nothing at risk, nothing to ask
+    expect(h.signOutAndClearData).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeping the changes cancels the clear and deletes nothing', async () => {
+    h.measureUnsavedWork.mockResolvedValueOnce(atRisk);
+    h.confirm.mockResolvedValueOnce(false);
+    const { requestSignOut, phase } = useSignOut();
+    requestSignOut();
+    expect(await clearPastGuard()).toBe('cancelled');
+    expect(h.signOutAndClearData).not.toHaveBeenCalled();
+    expect(phase.value).toBe('idle');
+    expect(h.logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        context: expect.objectContaining({
+          action: 'unsaved_discard_declined',
+          kind: 'sign-out-clear',
+        }),
+      })
+    );
+  });
+
+  it('an explicit discard, naming what is lost, lets the clear run', async () => {
+    h.measureUnsavedWork.mockResolvedValueOnce(atRisk);
+    useSignOut().requestSignOut();
+    expect(await clearPastGuard()).toBe('signed-out');
+    expect(h.confirm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'auth.unsavedTitle',
+        confirmLabel: 'auth.unsavedDiscard',
+        detail: expect.stringContaining('auth.unsavedPhotos.other'),
+      })
+    );
+    expect(h.signOutAndClearData).toHaveBeenCalledTimes(1);
+  });
+
+  it('a keep-data sign-out never asks (it deletes nothing unsaved)', async () => {
+    const { requestSignOut, signOut } = useSignOut();
+    requestSignOut();
+    await signOut('sign-out', { trust: true });
+    expect(h.measureUnsavedWork).not.toHaveBeenCalled();
+  });
+});
+
+describe('confirmDiscardUnsavedWork (C6)', () => {
+  it('resolves true without asking when nothing is at risk', async () => {
+    const clean = { unsavedFamilies: 0, photoUploads: 0, remoteBlocked: false, unknown: false };
+    expect(await confirmDiscardUnsavedWork(clean, 'clear-data')).toBe(true);
+    expect(h.confirm).not.toHaveBeenCalled();
+  });
+
+  it('forget family uses its own copy; "could not check" is at risk too', async () => {
+    const unknown = { unsavedFamilies: 0, photoUploads: 0, remoteBlocked: false, unknown: true };
+    await confirmDiscardUnsavedWork(unknown, 'forget-family');
+    expect(h.confirm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'auth.unsavedForgetMessage',
+        detail: 'auth.unsavedUnknown',
+      })
+    );
+  });
+});
+
+// C10: an untrusted sign-out in another tab, announced on the family's session channel.
+describe('endSessionEndedElsewhere (C10)', () => {
+  it('runs the cleared-elsewhere teardown while this tab holds a session', async () => {
+    await endSessionEndedElsewhere();
+    expect(h.endSessionClearedElsewhere).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores the echo when the cache-release signal already ended this session', async () => {
+    h.isAuthenticated = false;
+    await endSessionEndedElsewhere();
+    expect(h.endSessionClearedElsewhere).not.toHaveBeenCalled();
+  });
 });
 
 describe('useSignOut', () => {

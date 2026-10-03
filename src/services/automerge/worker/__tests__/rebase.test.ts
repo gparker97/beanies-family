@@ -968,12 +968,16 @@ describe('Counter adjustments ride the fold ledger, not the baseline (#117 Phase
     id: entity.id,
     entity,
   });
+  /** As production sends it (`transactionRepository`, `accountsStore`): stamped. Every
+   *  adjustment moves `updatedAt`, which is exactly what made it a false conflict (C9d). */
+  let stampSeq = 0;
   const inc = (delta: number, id = 'A'): Op => ({
     op: 'increment',
     collection: 'accounts',
     id,
     field: 'balance',
     delta,
+    updatedAt: `2026-10-03T00:00:${String(stampSeq++ % 60).padStart(2, '0')}.000Z`,
   });
   /** The modal's "set balance to X": a based patch in folded space. */
   const setBalanceTo = (value: number, base: number): Op => ({
@@ -1299,18 +1303,19 @@ describe('Counter adjustments ride the fold ledger, not the baseline (#117 Phase
       expect(balanceOf(out)).toBe(479.75);
     });
 
-    it('residual: an adjustment the compaction FOLDED vs a peer absolute set is a counted conflict (as in Phase 1)', async () => {
-      // The fold moved the target's absolute, so the three-way rule sees both sides change
-      // `balance` and keeps the saved value, counting it. Same answer as before Counters: the
-      // fold makes the compactor's adjustment an absolute, and absolute-vs-absolute keeps one.
+    it('C9g: an adjustment the compaction FOLDED vs a peer absolute set: the set crosses as a shift', async () => {
+      // ⚠️ BEHAVIOUR CHANGED (data-layer audit 2026-10-03). The fold moved the target's
+      // absolute, so the three-way rule saw both sides change `balance`, kept the saved value
+      // and counted a conflict: the peer's offline "set balance to 500" was simply lost. The
+      // peer's own change (+400) now lands on the target's value, so both survive.
       const origin = shared();
       const baseline = Automerge.getHeads(origin);
       const remote = compactForReal(apply(Automerge.clone(origin), inc(-20.25)));
       const peer = apply(Automerge.clone(origin), setBalanceTo(500, 100));
 
       const { res, out } = await rebase(peer, baseline, remote);
-      expect(res).toMatchObject({ action: 'rebased', conflicts: 1, counterIncrements: 0 });
-      expect(balanceOf(out)).toBe(79.75);
+      expect(res).toMatchObject({ action: 'rebased', conflicts: 0, counterIncrements: 0 });
+      expect(balanceOf(out)).toBe(479.75);
     });
   });
 });

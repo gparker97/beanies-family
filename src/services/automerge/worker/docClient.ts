@@ -41,7 +41,13 @@ import { PodLineageError } from '@/services/sync/podLineage';
 import type { DriveConnection } from '@/types/models';
 import { deviceMemoryScalar } from '@/utils/diagnostics';
 import { getPlatform } from '@/services/sync/capabilities';
-import { applyDelta, applyChunk, bumpDocVersion, resetProjection } from '../projection';
+import {
+  applyDelta,
+  applyChunk,
+  bumpDocVersion,
+  resetProjection,
+  markAuthoritative,
+} from '../projection';
 import {
   isRpcResponse,
   isWorkerSignal,
@@ -59,12 +65,14 @@ import {
   type CacheClearResult,
   type MergeOutcome,
   type DispatchReply,
+  type InitAndLoadResult,
+  type CacheReplay,
+  type ProjectionDelta,
 } from './protocol';
 import type { ReconcileNote } from './reconcile';
 import { ReadOnlyError, readWriteGate, setWriteGate, type WriteGateVerdict } from './writeGate';
 import type { CollectionName } from '@/types/automerge';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
-import type { RemoteBaselineRow } from '@/services/sync/remoteBaseline';
 import { bump as bumpOpenCycle } from '@/services/telemetry/openCycle';
 
 /** Minimal Worker surface — real `Worker` satisfies it; tests inject a fake. */
@@ -224,14 +232,37 @@ let rehydrating = false;
  */
 let cacheProvenEmptyFor: string | null = null;
 
+/**
+ * C12 (data-layer audit 2026-10-03): what main knows about writes the worker ACKNOWLEDGED.
+ * `lastAckHeads` is the document's heads after the last `mutate` that changed it, and
+ * `mutatesSinceFlush` counts such writes since the last completed `flush()` — the writes a
+ * worker death can take with it, because the cache persist is debounced. A respawn's rehydrate
+ * is checked against `lastAckHeads`.
+ */
+let lastAckHeads: Heads | null = null;
+let mutatesSinceFlush = 0;
+
+/**
+ * C12: the projection mirror failed to apply a delta or chunk, so it may disagree with the
+ * worker's document. Latched until a full re-push lands; one request in flight at a time.
+ */
+let projectionDirty = false;
+let projectionRepushInFlight = false;
+
 /** The worker reported this family's cache empty. */
 function noteCacheProvenEmpty(familyId: string): void {
   cacheProvenEmptyFor = familyId;
 }
 
-/** A document is now installed — whatever we knew about an empty cache is stale. */
+/**
+ * A document is now installed — whatever we knew about an empty cache is stale, and the
+ * projection now mirrors an AUTHORITATIVE document (`markAuthoritative`), so pre-hydration
+ * writes may proceed. Every doc-installing path routes through here AFTER its RPC resolves;
+ * `loadProjectionSnapshot` deliberately does not (a snapshot installs no document).
+ */
 function noteDocInstalled(): void {
   cacheProvenEmptyFor = null;
+  markAuthoritative();
 }
 
 /**
@@ -299,25 +330,94 @@ function onMessage(data: unknown): void {
   if (isWorkerSignal(data)) return receiveSignal(data);
   if (!isRpcResponse(data)) return; // ignore malformed
   const p = pending.get(data.cid);
-  if (!p) return; // late reply to a timed-out/cancelled call — discard by cid
+  if (!p) {
+    // ⚠️ C12: A LATE REPLY IS NOT NOTHING. A timed-out `mutate` that the worker finished anyway
+    // DID change the document; dropping its delta left the projection without an edit the
+    // worker holds (and no Drive save scheduled for it). Only a mutate reply carries a delta.
+    if (data.ok && data.delta) {
+      applyDeltaSafely(data.delta);
+      logEvent({
+        level: 'warn',
+        surface: 'doc-worker-recovery',
+        message: 'a mutate reply arrived after its call timed out; its delta was applied',
+        context: { action: 'late-mutate-landed', recovery_method: 'late-reply' },
+      });
+      if (data.changed !== false) noteAcknowledgedWrite(data.heads);
+      if (data.changed !== false) localChangeHandler?.();
+    }
+    return; // nothing awaits it any more
+  }
   pending.delete(data.cid);
   // Apply the projection delta BEFORE resolving so read-after-write is safe.
-  if (data.ok && data.delta) {
-    try {
-      applyDelta(data.delta);
-    } catch (e) {
-      // Post-cutover the projection is the sole main-thread read model — a delta
-      // that fails to apply after a successful mutate silently diverges the UI
-      // from the worker's doc, so this must telemeter, not just console.warn.
+  if (data.ok && data.delta) applyDeltaSafely(data.delta);
+  p.resolve(data);
+}
+
+/** Apply one response delta; a failure is reported and latches a full re-push (C12). */
+function applyDeltaSafely(delta: ProjectionDelta): void {
+  try {
+    applyDelta(delta);
+  } catch (e) {
+    // Post-cutover the projection is the sole main-thread read model — a delta
+    // that fails to apply after a successful mutate silently diverges the UI
+    // from the worker's doc, so this must telemeter, not just console.warn.
+    reportError({
+      surface: 'doc-worker-projection',
+      message: 'applyDelta failed — projection may be stale',
+      error: e,
+      severity: 'error',
+      context: { action: 'projection-apply-failed', kind: 'delta' },
+    });
+    requestProjectionRepush('delta');
+  }
+}
+
+/**
+ * Latch the projection dirty and ask the worker for a full re-push (C12), once at a time. The
+ * latch clears when the re-push lands; a failed re-push is reported and leaves it set, so the
+ * next apply failure asks again. Never throws.
+ */
+function requestProjectionRepush(cause: 'delta' | 'chunk' | 'heads-regressed'): void {
+  projectionDirty = true;
+  if (projectionRepushInFlight) return;
+  projectionRepushInFlight = true;
+  void request<{ pushed: boolean }>('pushProjection', undefined, { quiet: true })
+    .then((r) => {
+      if (r?.pushed) projectionDirty = false;
+      logEvent({
+        level: 'info',
+        surface: 'doc-worker-projection',
+        message: 'full projection re-pushed',
+        context: {
+          action: 'projection-repush',
+          kind: cause,
+          error_code: r?.pushed ? 'ok' : 'no-doc',
+        },
+      });
+    })
+    .catch((e) => {
       reportError({
         surface: 'doc-worker-projection',
-        message: 'applyDelta failed — projection may be stale',
+        message: 'full projection re-push failed — projection may be stale',
         error: e,
         severity: 'error',
+        context: { action: 'projection-repush', kind: cause },
       });
-    }
-  }
-  p.resolve(data);
+    })
+    .finally(() => {
+      projectionRepushInFlight = false;
+    });
+}
+
+/** Record a write the worker acknowledged as changing the document (C12). */
+function noteAcknowledgedWrite(heads: Heads | undefined): void {
+  if (heads) lastAckHeads = heads;
+  mutatesSinceFlush++;
+}
+
+/** Test-only: is the projection latched dirty? */
+export function __isProjectionDirtyForTesting(): boolean {
+  return projectionDirty;
 }
 
 /**
@@ -349,7 +449,9 @@ export function receiveSignal(sig: WorkerSignal): void {
           message: 'applyChunk failed — projection may be stale',
           error: e,
           severity: 'error',
+          context: { action: 'projection-apply-failed', kind: 'chunk' },
         });
+        requestProjectionRepush('chunk');
       }
       break;
     case 'cache-persist-failed':
@@ -402,6 +504,9 @@ function recoverDeadWorker(reason: string): void {
 function onWorkerError(err: unknown): void {
   const message = err instanceof Error ? err.message : 'worker crashed';
   console.error('[docClient] worker error — rejecting pending + scheduling recovery', err);
+  // C12: EVERY death, idle or not. An idle crash used to be console-only, so a device whose
+  // worker died between writes (taking the debounced persist with it) left nothing behind.
+  logWorkerDeath('onerror', pending.size);
   // Surface the crash ONCE here (only when calls were actually awaiting — a crash
   // with no in-flight work self-heals on the next request's re-spawn, console-only).
   // Fired BEFORE the drain, since `recoverDeadWorker` empties `pending`. Every
@@ -425,8 +530,16 @@ function onWorkerError(err: unknown): void {
  * crypto op throws `family key not set`. (First-unlock inline is already covered
  * by the normal setFamilyKey→request('setKey') flow; guard the key re-post
  * to the retained key so we don't double-post on that path.) */
-async function enterInlineMode(): Promise<void> {
+async function enterInlineMode(reason: 'spawn-failed' | 'handshake-timeout'): Promise<void> {
   mode = 'inline';
+  // C12: Automerge now runs on the MAIN THREAD for the rest of the session, the shape of a boot
+  // that stalls on a large pod. It used to reach the console only.
+  logEvent({
+    level: 'warn',
+    surface: 'doc-worker-recovery',
+    message: 'doc worker unavailable — running inline on the main thread',
+    context: { action: 'inline-fallback', recovery_method: reason },
+  });
   if (!inlineExecutor) return; // not wired yet (bootstrap pending / tests)
   // ⚠️ ACTOR BEFORE KEY, and both before the rehydrator below: the rehydrator
   // LOADS the document, and an actor arriving after that has pinned nothing.
@@ -462,6 +575,73 @@ async function enterInlineMode(): Promise<void> {
  * call sites used to record that in `console.error` alone: nothing in CloudWatch,
  * on the one failure where you most need to know the device ended up empty.
  */
+/**
+ * One event per worker death (C12), on the success path of nothing: a rate needs every death.
+ * `count` is the acknowledged writes since the last flush, i.e. what the death may have taken
+ * if the debounced persist had not run.
+ */
+function logWorkerDeath(method: string, inFlight: number): void {
+  logEvent({
+    level: 'warn',
+    surface: 'doc-worker-recovery',
+    message: 'doc worker died',
+    context: {
+      action: 'worker-death',
+      recovery_method: method,
+      lost_siblings: inFlight > 0,
+      count: mutatesSinceFlush,
+    },
+  });
+}
+
+/**
+ * After a respawn's rehydrate: does the new worker's document hold the last write the old one
+ * acknowledged? (C12.) A rehydrate reads the cache, and the cache persist is debounced, so a
+ * death inside the debounce window loses writes the person already saw land. Reported at error
+ * severity with the count, then the projection is re-pushed in full so the screen stops showing
+ * data the document no longer holds. Never throws.
+ */
+async function checkRehydratedHeads(): Promise<void> {
+  const acked = lastAckHeads;
+  if (!acked || acked.length === 0) return;
+  try {
+    const { has, loaded } = await request<{ has: boolean; loaded: boolean }>(
+      'hasHeads',
+      { heads: acked },
+      { quiet: true }
+    );
+    if (has) {
+      logEvent({
+        level: 'info',
+        surface: 'doc-worker-recovery',
+        message: 'rehydrated document holds every acknowledged write',
+        context: { action: 'heads-intact', recovery_method: 'respawn', count: mutatesSinceFlush },
+      });
+      return;
+    }
+    reportError({
+      surface: 'doc-worker-recovery',
+      message: 'rehydrated document is missing acknowledged writes',
+      severity: 'error',
+      context: {
+        action: 'heads-regressed',
+        recovery_method: 'respawn',
+        count: mutatesSinceFlush,
+        error_code: loaded ? 'behind' : 'no-document',
+      },
+    });
+    requestProjectionRepush('heads-regressed');
+  } catch (e) {
+    reportError({
+      surface: 'doc-worker-recovery',
+      message: 'could not compare the rehydrated document with the last acknowledged write',
+      severity: 'warning',
+      error: e,
+      context: { action: 'heads-check-failed', recovery_method: 'respawn' },
+    });
+  }
+}
+
 function reportRehydrateFailure(where: 'respawn' | 'inline', e: unknown): void {
   console.error(`[docClient] re-hydrate after ${where} failed`, e);
   reportError({
@@ -479,12 +659,16 @@ async function spawn(): Promise<'worker' | 'inline'> {
     w = workerFactory();
   } catch (e) {
     console.error('[docClient] worker spawn failed — falling back to inline', e);
-    await enterInlineMode();
+    await enterInlineMode('spawn-failed');
     return 'inline';
   }
   const ready = new Promise<void>((resolve) => {
     w.onmessage = (e) => {
       if (isWorkerSignal(e.data) && (e.data as WorkerSignal).signal === 'ready') resolve();
+      // A worker that was torn down speaks for nothing: its document is gone, so a late
+      // reply from it must not touch the projection (C12 applies late replies, from the LIVE
+      // worker only).
+      if (worker !== w) return;
       onMessage(e.data);
     };
   });
@@ -500,7 +684,7 @@ async function spawn(): Promise<'worker' | 'inline'> {
       /* noop */
     }
     worker = null;
-    await enterInlineMode();
+    await enterInlineMode('handshake-timeout');
     return 'inline';
   }
   mode = 'worker';
@@ -520,6 +704,7 @@ async function spawn(): Promise<'worker' | 'inline'> {
     rehydrating = true;
     try {
       await rehydrator(currentFamilyId);
+      await checkRehydratedHeads(); // C12; inside the bypass, like the rehydrate's own RPCs
     } catch (e) {
       reportRehydrateFailure('respawn', e);
     } finally {
@@ -685,6 +870,9 @@ const RETRYABLE_METHODS = new Set([
   // takes no arguments.
   'collectReferencedPhotoIds',
   'ping',
+  // C12: a pure read, and an idempotent re-stream of the projection.
+  'hasHeads',
+  'pushProjection',
 ]);
 
 // Methods where a USER-VISIBLE edit is in doubt when they fail: the user tapped
@@ -750,6 +938,7 @@ interface CoreReply {
   result: unknown;
   changed?: boolean;
   notes?: ReconcileNote[];
+  heads?: Heads;
 }
 
 /** Send one RPC (worker or inline) and return its `{result, changed, notes}`. Applies the
@@ -785,9 +974,9 @@ async function requestCore(
     // whole change is about. `quiet: true` preserves today's inline behaviour
     // exactly (no toast); only classification and the single report are added.
     try {
-      const { result, delta, changed, notes } = await inlineExecutor(method, args);
-      if (delta) applyDelta(delta);
-      return { result, changed, notes };
+      const { result, delta, changed, notes, heads } = await inlineExecutor(method, args);
+      if (delta) applyDeltaSafely(delta);
+      return { result, changed, notes, heads };
     } catch (e) {
       throw surface(e, method, true);
     }
@@ -834,7 +1023,8 @@ async function requestCore(
   } catch (timeoutErr) {
     return handleRpcTimeout(timeoutErr, method, args, opts, attempt, cid);
   }
-  if (res.ok) return { result: res.result, changed: res.changed, notes: res.notes };
+  if (res.ok)
+    return { result: res.result, changed: res.changed, notes: res.notes, heads: res.heads };
   throw surface(reconstructError(res.error, method), method, opts.quiet);
 }
 
@@ -1026,6 +1216,7 @@ async function handleRpcTimeout(
   // signal posted from the worker around `loadCachedDoc`, which is a change to
   // the worker protocol and did not belong in a lockout hotfix. The cache-open
   // deadline removed the unbounded wait; this remains real.
+  logWorkerDeath(`rpc-timeout:${method}`, drainedMethods.length + 1); // C12
   recoverDeadWorker(`rpc-timeout:${method}`); // drains siblings (quiet) + tears down → next request re-spawns
   reportError({
     surface: 'doc-worker-recovery',
@@ -1073,9 +1264,9 @@ async function request<T = unknown>(
 async function requestMutate<T>(
   op: MutationOp,
   opts: RequestOpts = {}
-): Promise<{ result: T; changed: boolean; notes: ReconcileNote[] }> {
-  const { result, changed, notes } = await requestCore('mutate', op, opts);
-  return { result: result as T, changed: changed ?? true, notes: notes ?? [] };
+): Promise<{ result: T; changed: boolean; notes: ReconcileNote[]; heads?: Heads }> {
+  const { result, changed, notes, heads } = await requestCore('mutate', op, opts);
+  return { result: result as T, changed: changed ?? true, notes: notes ?? [], heads };
 }
 
 /**
@@ -1353,24 +1544,21 @@ export function compactDoc(): Promise<{
 }
 
 /** Create a fresh empty document (create-family). Pushes the full projection. */
-export function initDoc(): Promise<{ loaded: true }> {
+export async function initDoc(): Promise<{ loaded: true }> {
   // A fresh doc means a fresh session — restore normal toast policy immediately.
   quietTeardownUntil = 0;
+  const res = await request<{ loaded: true }>('initDoc');
   noteDocInstalled();
-  return request('initDoc');
+  return res;
 }
 
 /** Init the worker cache + load the cached doc; pushes the full projection. Also
  * returns the open-guard baseline row (#61) read in the SAME round-trip, so the
  * cache and the baseline that describes it can never be read out of step (C5). */
-export async function initAndLoadCache(
-  familyId: string
-): Promise<{ loaded: boolean; remoteBaseline: RemoteBaselineRow | null }> {
+export async function initAndLoadCache(familyId: string): Promise<InitAndLoadResult> {
   setCurrentFamily(familyId);
-  const res = await request<{ loaded: boolean; remoteBaseline: RemoteBaselineRow | null }>(
-    'initAndLoadCache',
-    { familyId }
-  );
+  const res = await request<InitAndLoadResult>('initAndLoadCache', { familyId });
+  if (res.replay) logCacheReplay(res.replay, familyId);
   // Count only a reconstruction that actually HAPPENED. Counting the
   // `automerge.cacheLoad` perf label instead would over-count, because `time2`
   // emits from a `finally` — so a cache MISS (which does zero Automerge work) and
@@ -1384,6 +1572,44 @@ export async function initAndLoadCache(
   if (res.loaded) noteDocInstalled();
   else noteCacheProvenEmpty(familyId);
   return res;
+}
+
+/**
+ * Report what a cache replay did (C5c, data-layer audit 2026-10-03). ON THE SUCCESS PATH TOO,
+ * so the rate of damaged replays is measurable. `critical` (Slack) when work could not be
+ * replayed: a dropped increment is an edit this device cannot show, and a missing dep is one
+ * waiting on changes it does not hold. Both are KEPT on disk by the worker, which is why a
+ * human needs to look rather than the device quietly carrying on.
+ */
+function logCacheReplay(replay: CacheReplay, familyId: string): void {
+  const detail =
+    `recovered=${replay.recovered},dropped=${replay.droppedIncrements},` +
+    `missing_deps=${replay.missingDeps},increments=${replay.incrementCount}` +
+    (replay.corruptBaseReplaced ? ',corrupt_base_replaced=true' : '');
+  const context = {
+    action: 'cache-replay',
+    count: replay.incrementCount,
+    detail,
+    family_id: familyId,
+  };
+  if (replay.droppedIncrements > 0 || replay.missingDeps > 0 || replay.corruptBaseReplaced) {
+    reportError({
+      surface: 'cache-replay',
+      message: 'cache replay could not apply every increment',
+      severity: 'critical',
+      context: {
+        ...context,
+        error_code:
+          replay.droppedIncrements > 0
+            ? 'dropped-increments'
+            : replay.missingDeps > 0
+              ? 'missing-deps'
+              : 'corrupt-base-replaced',
+      },
+    });
+    return;
+  }
+  logEvent({ level: 'info', surface: 'cache-replay', message: 'cache replayed', context });
 }
 
 /**
@@ -1415,9 +1641,12 @@ export async function openCache(familyId: string): Promise<{ loaded: false }> {
  * nothing) leaves heads unchanged and schedules no save/persist (F10). */
 export async function mutate<T = unknown>(op: MutationOp, opts?: RequestOpts): Promise<T> {
   assertWritable(op, opts);
-  const { result, changed, notes } = await requestMutate<T>(op, opts);
+  const { result, changed, notes, heads } = await requestMutate<T>(op, opts);
   logReconcileNotes(notes);
-  if (changed) localChangeHandler?.();
+  if (changed) {
+    noteAcknowledgedWrite(heads);
+    localChangeHandler?.();
+  }
   return result;
 }
 
@@ -1524,7 +1753,22 @@ export async function mergeRemoteEnvelope(
     // resolved side would leave the COMMON case dark. Rethrown untouched — this
     // observes, it does not handle.
     if (err instanceof PodLineageError && err.rebaseUnavailable) {
-      noteRebaseUnavailable(familyId, 'blocked');
+      noteRebaseUnavailable(familyId, 'blocked', err.conflictKind);
+    }
+    // C1: a compaction refused to publish over peer edits made on the old lineage after it.
+    // Its own event, so "compaction blocked by a moved remote" is countable apart from the
+    // lineage block the user sees (which is identical either way).
+    if (err instanceof PodLineageError && err.remoteMovedAfterCompaction) {
+      logEvent({
+        level: 'warn',
+        surface: 'pod-lineage',
+        message: 'compacted document not published: the remote moved after the compaction',
+        context: {
+          action: 'remote-moved-after-compaction',
+          error_code: err.verdict,
+          ...(familyId ? { family_id: familyId } : {}),
+        },
+      });
     }
     // ⚠️ MAIN NEVER ASSERTS ABSENCE; IT ONLY CORROBORATES THE WORKER'S.
     //
@@ -1567,14 +1811,17 @@ export async function mergeRemoteEnvelope(
         { envelope, familyId, basis: { kind: 'no-local-document' } satisfies LineageBasis },
         opts
       );
-      if (res.rebaseUnavailable) noteRebaseUnavailable(familyId, res.action);
+      if (res.rebaseUnavailable)
+        noteRebaseUnavailable(familyId, res.action, res.rebaseConflictKind);
+      noteRemovedMembersCarried(res, familyId);
       noteDocInstalled();
       bumpOpenCycle('reconstruction');
       return res;
     }
     throw err;
   }
-  if (res.rebaseUnavailable) noteRebaseUnavailable(familyId, res.action);
+  if (res.rebaseUnavailable) noteRebaseUnavailable(familyId, res.action, res.rebaseConflictKind);
+  noteRemovedMembersCarried(res, familyId);
   // The worker installed a document for this family, so whatever we knew about
   // an empty cache is stale. (`kept-local` too: it kept a document it holds.)
   noteDocInstalled();
@@ -1684,7 +1931,12 @@ export function logMergeTerminus(
  * outcome it would have got before the rebase existed. It is a degradation of a
  * safety net, which is exactly what a soak wants to count.
  */
-function noteRebaseUnavailable(familyId: string | null, outcome: string): void {
+function noteRebaseUnavailable(
+  familyId: string | null,
+  outcome: string,
+  /** C8: what the composer refused over (`'transactions'`), when it said. */
+  conflictKind?: string
+): void {
   logEvent({
     level: 'warn',
     surface: 'pod-rebase',
@@ -1692,6 +1944,24 @@ function noteRebaseUnavailable(familyId: string | null, outcome: string): void {
     context: {
       action: 'rebase-unavailable',
       error_code: outcome,
+      ...(conflictKind ? { detail: `conflict_kind=${conflictKind}` } : {}),
+      ...(familyId ? { family_id: familyId } : {}),
+    },
+  });
+}
+
+/** C10: a restore carried removed-member tombstones (and deleted the rows) into the chosen
+ *  file. Its own event, so "a restore would have un-removed a member" is countable. */
+function noteRemovedMembersCarried(res: MergeOutcome, familyId: string | null): void {
+  if (!res.removedMembers) return;
+  logEvent({
+    level: 'info',
+    surface: 'pod-lineage',
+    message: 'restore kept removed members removed',
+    context: {
+      action: 'removed-members-carried',
+      count: res.removedMembers.carried,
+      detail: `rows_deleted=${res.removedMembers.rowsDeleted}`,
       ...(familyId ? { family_id: familyId } : {}),
     },
   });
@@ -1726,9 +1996,10 @@ export function readDriveConnections(
 }
 
 /** DEV/E2E-only: load a raw (unencrypted) Automerge binary as the doc. */
-export function loadSnapshot(binary: Uint8Array): Promise<{ loaded: true }> {
+export async function loadSnapshot(binary: Uint8Array): Promise<{ loaded: true }> {
+  const res = await request<{ loaded: true }>('loadSnapshot', { binary });
   noteDocInstalled();
-  return request('loadSnapshot', { binary });
+  return res;
 }
 /** DEV/E2E-only: serialize the doc to a raw (unencrypted) binary. */
 export function exportSnapshot(): Promise<{ binary: Uint8Array }> {
@@ -1769,8 +2040,11 @@ export function readEnvelope(): Promise<{ envelope: BeanpodFileV4 | null }> {
 }
 
 /** Force an immediate cache persist (backgrounding flush). */
-export function flush(): Promise<void> {
-  return request('flush');
+export async function flush(): Promise<void> {
+  const before = mutatesSinceFlush;
+  await request('flush');
+  // Only what was acknowledged BEFORE the flush is now persisted (C12).
+  mutatesSinceFlush = Math.max(0, mutatesSinceFlush - before);
 }
 
 /** Probe worker liveness; recover if it doesn't answer promptly. A no-op unless
@@ -1814,6 +2088,8 @@ export async function reset(): Promise<void> {
   familyKey = null;
   familyKeyRaw = null;
   docActor = null;
+  lastAckHeads = null;
+  mutatesSinceFlush = 0;
   releaseActorLease();
   await request('reset');
   // Clear the main-thread mirror too — a worker-only reset would leave a stale
@@ -1890,6 +2166,10 @@ export function __resetDocClientForTesting(): void {
   releaseActorLease();
   currentFamilyId = null;
   cacheProvenEmptyFor = null;
+  lastAckHeads = null;
+  mutatesSinceFlush = 0;
+  projectionDirty = false;
+  projectionRepushInFlight = false;
   needsRehydrate = false;
   rehydrating = false;
   inlineExecutor = null;

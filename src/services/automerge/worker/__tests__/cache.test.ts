@@ -278,7 +278,7 @@ describe('worker/cache', () => {
     );
   });
 
-  it('recovers base + increments before the first bad one (corrupt tail, not all-discarded)', async () => {
+  it('skips a bad increment and keeps replaying the rest (C5c: it used to STOP there)', async () => {
     const d0 = setAccount(base(), 'a1', 1);
     await persistDocBinary(key, saveDoc(d0));
     const d1 = setAccount(d0, 'a2', 2);
@@ -290,9 +290,14 @@ describe('worker/cache', () => {
 
     const loaded = await loadCachedDoc(key, FAMILY_ID);
     expect(loaded!.recovered).toBe(true);
-    // Base + inc:0 recovered (a1, a2); inc:2 dropped because replay stopped at inc:1.
+    expect(loaded!.droppedIncrements).toBe(1);
+    expect(loaded!.missingDeps).toBe(0);
+    expect(loaded!.incrementCount).toBe(3);
+    // ⚠️ BEHAVIOUR CHANGED (data-layer audit C5c): the replay used to STOP at the bad row, and
+    // the caller's base rewrite then deleted inc:2 for good. It now skips inc:1 and applies
+    // inc:2, whose deps (inc:0) are present.
     expect(materializeCollection(loaded!.doc, 'accounts', foldIndex(loaded!.doc))).toEqual(
-      materializeCollection(d1, 'accounts', foldIndex(d1))
+      materializeCollection(d2, 'accounts', foldIndex(d2))
     );
   });
 

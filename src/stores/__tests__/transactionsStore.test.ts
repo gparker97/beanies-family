@@ -4,9 +4,10 @@ import type { Transaction, CreateTransactionInput } from '@/types/models';
 
 vi.mock('@/services/automerge/repositories/transactionRepository', () => ({
   getAllTransactions: vi.fn().mockResolvedValue([]),
-  createTransaction: vi.fn(),
-  updateTransaction: vi.fn(),
-  deleteTransaction: vi.fn(),
+  getTransactionById: vi.fn(),
+  createTransactionCascade: vi.fn(),
+  updateTransactionCascade: vi.fn(),
+  deleteTransactionCascade: vi.fn(),
 }));
 
 vi.mock('@/stores/accountsStore', () => ({
@@ -173,14 +174,26 @@ describe('transactionsStore — createTransaction balance_adjustment invariants'
     vi.clearAllMocks();
   });
 
+  /** A cascade echo for the row the store sent, as the worker would stamp it. */
+  const echoCreate = (id: string) =>
+    vi.mocked(transactionRepo.createTransactionCascade).mockImplementation(async (input) => ({
+      mode: 'create',
+      found: true,
+      transaction: {
+        ...input,
+        id,
+        createdAt: '2026-04-21T00:00:00.000Z',
+        updatedAt: '2026-04-21T00:00:00.000Z',
+      } as Transaction,
+      accounts: [],
+      goals: [],
+      assets: [],
+      skipped: [],
+    }));
+
   it('forces isReconciled: true for balance_adjustment type', async () => {
     const store = useTransactionsStore();
-    vi.mocked(transactionRepo.createTransaction).mockImplementation(async (input) => ({
-      ...input,
-      id: 'adj-new',
-      createdAt: '2026-04-21T00:00:00.000Z',
-      updatedAt: '2026-04-21T00:00:00.000Z',
-    }));
+    echoCreate('adj-new');
 
     const input: CreateTransactionInput = {
       accountId: 'acc-1',
@@ -196,19 +209,14 @@ describe('transactionsStore — createTransaction balance_adjustment invariants'
 
     await store.createTransaction(input);
 
-    expect(transactionRepo.createTransaction).toHaveBeenCalledWith(
+    expect(transactionRepo.createTransactionCascade).toHaveBeenCalledWith(
       expect.objectContaining({ isReconciled: true })
     );
   });
 
   it('preserves caller isReconciled for income/expense transactions', async () => {
     const store = useTransactionsStore();
-    vi.mocked(transactionRepo.createTransaction).mockImplementation(async (input) => ({
-      ...input,
-      id: 'tx-new',
-      createdAt: '2026-04-21T00:00:00.000Z',
-      updatedAt: '2026-04-21T00:00:00.000Z',
-    }));
+    echoCreate('tx-new');
 
     await store.createTransaction({
       accountId: 'acc-1',
@@ -221,7 +229,7 @@ describe('transactionsStore — createTransaction balance_adjustment invariants'
       isReconciled: false,
     });
 
-    expect(transactionRepo.createTransaction).toHaveBeenCalledWith(
+    expect(transactionRepo.createTransactionCascade).toHaveBeenCalledWith(
       expect.objectContaining({ isReconciled: false })
     );
   });

@@ -235,6 +235,17 @@ export const useGoalsStore = defineStore('goals', () => {
     );
   }
 
+  /** Update the local array from a worker-echoed goal WITHOUT re-writing the doc (the
+   * transaction cascade already moved it atomically). Fires the completion celebration on the
+   * !completed → completed edge, as `applyContribution` does; celebration is main-side. */
+  function applyEchoed(goal: Goal): void {
+    const wasCompleted = goals.value.find((g) => g.id === goal.id)?.isCompleted ?? false;
+    goals.value = goals.value.map((g) => (g.id === goal.id ? goal : g));
+    if (goal.isCompleted && !wasCompleted) {
+      celebrate(goal.type === 'debt_payoff' ? 'debt-free' : 'goal-reached');
+    }
+  }
+
   function getGoalById(id: string): Goal | undefined {
     return goals.value.find((g) => g.id === id);
   }
@@ -277,6 +288,7 @@ export const useGoalsStore = defineStore('goals', () => {
     deleteGoal,
     updateProgress,
     applyContribution,
+    applyEchoed,
     getGoalById,
     getGoalsByMemberId,
     getGoalProgress,

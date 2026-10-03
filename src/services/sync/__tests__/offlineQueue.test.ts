@@ -56,6 +56,9 @@ vi.mock('@/utils/errorReporter', () => ({
   reportError: vi.fn(),
 }));
 
+const { logEventMock } = vi.hoisted(() => ({ logEventMock: vi.fn() }));
+vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: logEventMock }));
+
 // Must reset modules between tests to clear module-level state
 let offlineQueue: typeof import('../offlineQueue');
 
@@ -78,7 +81,7 @@ function installFlushTarget(write: ReturnType<typeof vi.fn<(c: unknown) => unkno
     typeof offlineQueue.setFlushProvider
   >[0]);
   offlineQueue.setResaveHandler(async () => {
-    await write(sessionStorage.getItem('beanies_offline_queue'));
+    await write('resaved');
     return true;
   });
 }
@@ -103,31 +106,33 @@ describe('offlineQueue', () => {
   describe('enqueueOfflineSave', () => {
     it('marks queue as having a pending save', () => {
       expect(offlineQueue.hasPendingSave()).toBe(false);
-      offlineQueue.enqueueOfflineSave('{"data":"test"}');
+      offlineQueue.enqueueOfflineSave();
       expect(offlineQueue.hasPendingSave()).toBe(true);
     });
 
-    it('persists content to sessionStorage', () => {
-      offlineQueue.enqueueOfflineSave('{"data":"persisted"}');
-      expect(sessionStorage.getItem('beanies_offline_queue')).toBe('{"data":"persisted"}');
+    it('persists a small MARKER to sessionStorage, never the envelope bytes', () => {
+      offlineQueue.enqueueOfflineSave('server');
+      const raw = sessionStorage.getItem('beanies_offline_queue')!;
+      expect(JSON.parse(raw)).toMatchObject({ v: 1, reason: 'server' });
+      expect(raw.length).toBeLessThan(200);
     });
 
     it('replaces previously queued content', () => {
-      offlineQueue.enqueueOfflineSave('{"version":"1"}');
-      offlineQueue.enqueueOfflineSave('{"version":"2"}');
-      expect(sessionStorage.getItem('beanies_offline_queue')).toBe('{"version":"2"}');
+      offlineQueue.enqueueOfflineSave('network');
+      offlineQueue.enqueueOfflineSave('auth');
+      expect(JSON.parse(sessionStorage.getItem('beanies_offline_queue')!).reason).toBe('auth');
     });
   });
 
   describe('clearQueue', () => {
     it('clears in-memory queue', () => {
-      offlineQueue.enqueueOfflineSave('{"data":"test"}');
+      offlineQueue.enqueueOfflineSave();
       offlineQueue.clearQueue();
       expect(offlineQueue.hasPendingSave()).toBe(false);
     });
 
     it('clears sessionStorage', () => {
-      offlineQueue.enqueueOfflineSave('{"data":"test"}');
+      offlineQueue.enqueueOfflineSave();
       offlineQueue.clearQueue();
       expect(sessionStorage.getItem('beanies_offline_queue')).toBeNull();
     });
@@ -140,7 +145,7 @@ describe('offlineQueue', () => {
     });
 
     it("returns 'nothing-to-flush' when no flush provider", async () => {
-      offlineQueue.enqueueOfflineSave('{"data":"test"}');
+      offlineQueue.enqueueOfflineSave();
       const result = await offlineQueue.flushQueue();
       expect(result).toBe('nothing-to-flush');
     });
@@ -158,7 +163,7 @@ describe('offlineQueue', () => {
       offlineQueue.setFlushProvider(mockProvider);
       offlineQueue.setResaveHandler(resave);
 
-      offlineQueue.enqueueOfflineSave('{"data":"flushed"}');
+      offlineQueue.enqueueOfflineSave();
 
       const result = await offlineQueue.flushQueue();
 
@@ -179,13 +184,13 @@ describe('offlineQueue', () => {
       offlineQueue.setFlushProvider({ write: mockWrite } as unknown as Parameters<
         typeof offlineQueue.setFlushProvider
       >[0]);
-      offlineQueue.enqueueOfflineSave('{"data":"stale"}');
+      offlineQueue.enqueueOfflineSave();
 
       await expect(offlineQueue.flushQueue()).rejects.toThrow('no resave handler');
 
       expect(mockWrite).not.toHaveBeenCalled();
       expect(offlineQueue.hasPendingSave()).toBe(true);
-      expect(sessionStorage.getItem('beanies_offline_queue')).toBe('{"data":"stale"}');
+      expect(sessionStorage.getItem('beanies_offline_queue')).not.toBeNull();
     });
 
     it("reports 'declined' — NOT 'nothing-to-flush' — when the save refuses", async () => {
@@ -200,7 +205,7 @@ describe('offlineQueue', () => {
       // rather than an offline retry. A lineage block or a refused merge leaves
       // the pending content exactly as it was.
       offlineQueue.setResaveHandler(vi.fn().mockResolvedValue(false));
-      offlineQueue.enqueueOfflineSave('{"data":"blocked"}');
+      offlineQueue.enqueueOfflineSave();
 
       expect(await offlineQueue.flushQueue()).toBe('declined');
       expect(offlineQueue.hasPendingSave()).toBe(true);
@@ -211,20 +216,20 @@ describe('offlineQueue', () => {
       offlineQueue.setFlushProvider({ write: vi.fn() } as any);
       offlineQueue.setResaveHandler(resave);
 
-      offlineQueue.enqueueOfflineSave('{"data":"retry"}');
+      offlineQueue.enqueueOfflineSave();
 
       // flushQueue propagates the underlying error so the offline-queue-flush
       // surface can include the real cause in Slack.
       await expect(offlineQueue.flushQueue()).rejects.toThrow('Network error');
 
       expect(offlineQueue.hasPendingSave()).toBe(true);
-      expect(sessionStorage.getItem('beanies_offline_queue')).toBe('{"data":"retry"}');
+      expect(sessionStorage.getItem('beanies_offline_queue')).not.toBeNull();
     });
   });
 
   describe('setFlushProvider auto-flush', () => {
     it('auto-flushes when pending content exists and online', async () => {
-      offlineQueue.enqueueOfflineSave('{"data":"auto"}');
+      offlineQueue.enqueueOfflineSave();
 
       Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
 
@@ -232,12 +237,12 @@ describe('offlineQueue', () => {
       installFlushTarget(mockWrite);
 
       // Allow the async flushQueue to complete
-      await vi.waitFor(() => expect(mockWrite).toHaveBeenCalledWith('{"data":"auto"}'));
+      await vi.waitFor(() => expect(mockWrite).toHaveBeenCalledWith('resaved'));
       expect(offlineQueue.hasPendingSave()).toBe(false);
     });
 
     it('does not auto-flush when offline', () => {
-      offlineQueue.enqueueOfflineSave('{"data":"offline"}');
+      offlineQueue.enqueueOfflineSave();
 
       Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
 
@@ -265,7 +270,7 @@ describe('offlineQueue', () => {
         typeof offlineQueue.setFlushProvider
       >[0]);
       offlineQueue.setResaveHandler(async () => false);
-      offlineQueue.enqueueOfflineSave('{"data":"blocked"}');
+      offlineQueue.enqueueOfflineSave();
 
       window.dispatchEvent(new Event('online'));
       await new Promise((r) => setTimeout(r, 0));
@@ -298,10 +303,10 @@ describe('offlineQueue', () => {
       // write). A content comparison reads identical bytes as "nothing was
       // queued"; only a tick survives it.
       offlineQueue.setResaveHandler(async () => {
-        offlineQueue.enqueueOfflineSave('{"data":"original"}');
+        offlineQueue.enqueueOfflineSave();
         return false;
       });
-      offlineQueue.enqueueOfflineSave('{"data":"original"}');
+      offlineQueue.enqueueOfflineSave();
 
       window.dispatchEvent(new Event('online'));
       await new Promise((r) => setTimeout(r, 0));
@@ -330,7 +335,7 @@ describe('offlineQueue', () => {
         typeof offlineQueue.setFlushProvider
       >[0]);
       offlineQueue.setResaveHandler(async () => true);
-      offlineQueue.enqueueOfflineSave('{"data":"ok"}');
+      offlineQueue.enqueueOfflineSave();
 
       // An auth-gated trigger ('visible'), held open...
       Object.defineProperty(document, 'visibilityState', {
@@ -355,7 +360,7 @@ describe('offlineQueue', () => {
 
       const mockWrite = vi.fn().mockRejectedValue(new Error('fail'));
       installFlushTarget(mockWrite);
-      offlineQueue.enqueueOfflineSave('{"data":"retry"}');
+      offlineQueue.enqueueOfflineSave();
 
       // Simulate online event
       window.dispatchEvent(new Event('online'));
@@ -381,7 +386,7 @@ describe('offlineQueue', () => {
 
       const mockWrite = vi.fn().mockResolvedValue(undefined);
       installFlushTarget(mockWrite);
-      offlineQueue.enqueueOfflineSave('{"data":"ok"}');
+      offlineQueue.enqueueOfflineSave();
 
       window.dispatchEvent(new Event('online'));
 
@@ -401,7 +406,7 @@ describe('offlineQueue', () => {
 
       const mockWrite = vi.fn().mockRejectedValue(new Error('fail'));
       installFlushTarget(mockWrite);
-      offlineQueue.enqueueOfflineSave('{"data":"cancel"}');
+      offlineQueue.enqueueOfflineSave();
 
       window.dispatchEvent(new Event('online'));
       await vi.advanceTimersByTimeAsync(0);
@@ -431,25 +436,25 @@ describe('offlineQueue', () => {
     it('flushes queue when onTokenAcquired callback fires', async () => {
       const mockWrite = vi.fn().mockResolvedValue(undefined);
       installFlushTarget(mockWrite);
-      offlineQueue.enqueueOfflineSave('{"data":"auth-recovery"}');
+      offlineQueue.enqueueOfflineSave();
 
       // setFlushProvider auto-flushed (online), so clear the call history
       // and start from a known state.
       await Promise.resolve();
       mockWrite.mockClear();
       // Re-queue (auto-flush above cleared the queue if it succeeded)
-      offlineQueue.enqueueOfflineSave('{"data":"auth-recovery"}');
+      offlineQueue.enqueueOfflineSave();
 
       expect(tokenAcquiredCallbackHolder.cb).toBeTruthy();
       tokenAcquiredCallbackHolder.cb!();
 
-      await vi.waitFor(() => expect(mockWrite).toHaveBeenCalledWith('{"data":"auth-recovery"}'));
+      await vi.waitFor(() => expect(mockWrite).toHaveBeenCalledWith('resaved'));
     });
 
     it('does not flush after clearQueue removes the subscription', async () => {
       const mockWrite = vi.fn().mockResolvedValue(undefined);
       installFlushTarget(mockWrite);
-      offlineQueue.enqueueOfflineSave('{"data":"will-clear"}');
+      offlineQueue.enqueueOfflineSave();
 
       // Subscription registered via startListening above. Clear it.
       await Promise.resolve();
@@ -462,7 +467,7 @@ describe('offlineQueue', () => {
 
     it('does not throw when provider is unset by the time the hook fires', () => {
       // Enqueue first to register the subscription, then never set a provider.
-      offlineQueue.enqueueOfflineSave('{"data":"no-provider"}');
+      offlineQueue.enqueueOfflineSave();
 
       expect(tokenAcquiredCallbackHolder.cb).toBeTruthy();
       // tryFlush bails on the no-provider check; must not throw.
@@ -473,7 +478,7 @@ describe('offlineQueue', () => {
       const { reportError } = await import('@/utils/errorReporter');
       // First enqueue with no provider so the subscription registers without
       // an immediate auto-flush triggering reportError.
-      offlineQueue.enqueueOfflineSave('{"data":"will-fail"}');
+      offlineQueue.enqueueOfflineSave();
 
       const mockWrite = vi.fn().mockRejectedValue(new Error('Network down'));
       // setFlushProvider auto-flushes if onLine; navigate around that by
@@ -498,7 +503,7 @@ describe('offlineQueue', () => {
 
     it('forwards the underlying write error into the Slack alert', async () => {
       const { reportError } = await import('@/utils/errorReporter');
-      offlineQueue.enqueueOfflineSave('{"data":"will-fail"}');
+      offlineQueue.enqueueOfflineSave();
 
       const underlying = new Error('TokenExpiredError: Drive write failed');
       const mockWrite = vi.fn().mockRejectedValue(underlying);
@@ -540,10 +545,10 @@ describe('offlineQueue', () => {
         order.push('write');
       });
       installFlushTarget(mockWrite);
-      offlineQueue.enqueueOfflineSave('{"data":"gated"}');
+      offlineQueue.enqueueOfflineSave();
       await Promise.resolve();
       mockWrite.mockClear();
-      offlineQueue.enqueueOfflineSave('{"data":"gated"}');
+      offlineQueue.enqueueOfflineSave();
 
       Object.defineProperty(document, 'hidden', { value: false, configurable: true });
       document.dispatchEvent(new Event('visibilitychange'));
@@ -560,11 +565,11 @@ describe('offlineQueue', () => {
     it('does NOT gate a `token-acquired` flush (it would deadlock recovery)', async () => {
       const mockWrite = vi.fn().mockResolvedValue(undefined);
       installFlushTarget(mockWrite);
-      offlineQueue.enqueueOfflineSave('{"data":"recovered"}');
+      offlineQueue.enqueueOfflineSave();
       await Promise.resolve();
       mockWrite.mockClear();
       whenRedirectAuthSettledMock.mockClear();
-      offlineQueue.enqueueOfflineSave('{"data":"recovered"}');
+      offlineQueue.enqueueOfflineSave();
 
       tokenAcquiredCallbackHolder.cb?.();
 
@@ -579,10 +584,10 @@ describe('offlineQueue', () => {
       );
       const mockWrite = vi.fn().mockResolvedValue(undefined);
       installFlushTarget(mockWrite);
-      offlineQueue.enqueueOfflineSave('{"data":"once"}');
+      offlineQueue.enqueueOfflineSave();
       await Promise.resolve();
       mockWrite.mockClear();
-      offlineQueue.enqueueOfflineSave('{"data":"once"}');
+      offlineQueue.enqueueOfflineSave();
 
       Object.defineProperty(document, 'hidden', { value: false, configurable: true });
       document.dispatchEvent(new Event('visibilitychange'));
@@ -599,28 +604,28 @@ describe('offlineQueue', () => {
     it('flushes queue when tab becomes visible', async () => {
       const mockWrite = vi.fn().mockResolvedValue(undefined);
       installFlushTarget(mockWrite);
-      offlineQueue.enqueueOfflineSave('{"data":"visible-recovery"}');
+      offlineQueue.enqueueOfflineSave();
 
       // Drain auto-flush.
       await Promise.resolve();
       mockWrite.mockClear();
-      offlineQueue.enqueueOfflineSave('{"data":"visible-recovery"}');
+      offlineQueue.enqueueOfflineSave();
 
       // Tab not hidden → visibility handler triggers a flush.
       Object.defineProperty(document, 'hidden', { value: false, configurable: true });
       document.dispatchEvent(new Event('visibilitychange'));
 
-      await vi.waitFor(() => expect(mockWrite).toHaveBeenCalledWith('{"data":"visible-recovery"}'));
+      await vi.waitFor(() => expect(mockWrite).toHaveBeenCalledWith('resaved'));
     });
 
     it('does not flush when tab becomes hidden', async () => {
       const mockWrite = vi.fn().mockResolvedValue(undefined);
       installFlushTarget(mockWrite);
-      offlineQueue.enqueueOfflineSave('{"data":"stay-queued"}');
+      offlineQueue.enqueueOfflineSave();
 
       await Promise.resolve();
       mockWrite.mockClear();
-      offlineQueue.enqueueOfflineSave('{"data":"stay-queued"}');
+      offlineQueue.enqueueOfflineSave();
 
       Object.defineProperty(document, 'hidden', { value: true, configurable: true });
       document.dispatchEvent(new Event('visibilitychange'));
@@ -633,7 +638,7 @@ describe('offlineQueue', () => {
     it('clearQueue removes the visibility listener', async () => {
       const mockWrite = vi.fn().mockResolvedValue(undefined);
       installFlushTarget(mockWrite);
-      offlineQueue.enqueueOfflineSave('{"data":"will-clear"}');
+      offlineQueue.enqueueOfflineSave();
 
       await Promise.resolve();
       offlineQueue.clearQueue();
@@ -645,6 +650,70 @@ describe('offlineQueue', () => {
 
       await Promise.resolve();
       expect(mockWrite).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('an AUTH re-queue is a stuck queue, not "still offline" (audit C4)', () => {
+    it('counts toward the streak and pages at the threshold', async () => {
+      const { reportError } = await import('@/utils/errorReporter');
+      vi.mocked(reportError).mockClear();
+      offlineQueue.setFlushProvider({ write: vi.fn() } as unknown as Parameters<
+        typeof offlineQueue.setFlushProvider
+      >[0]);
+      // The provider re-queues with reason 'auth' when the token is rejected.
+      offlineQueue.setResaveHandler(async () => {
+        offlineQueue.enqueueOfflineSave('auth');
+        return false;
+      });
+      offlineQueue.enqueueOfflineSave('auth');
+
+      window.dispatchEvent(new Event('online'));
+      await vi.waitFor(() => expect(vi.mocked(reportError)).toHaveBeenCalledTimes(1));
+      window.dispatchEvent(new Event('online'));
+      await vi.waitFor(() => expect(vi.mocked(reportError)).toHaveBeenCalledTimes(2));
+
+      const calls = vi.mocked(reportError).mock.calls.map((c) => c[0]);
+      expect(calls[1]!.severity).toBe('critical');
+      expect((calls[0]!.error as Error).name).toBe('TokenExpiredError');
+      expect(offlineQueue.hasPendingSave()).toBe(true);
+    });
+  });
+
+  describe('sessionStorage marker', () => {
+    it('rewrites a LEGACY envelope-bytes entry as a marker on load (frees the quota)', async () => {
+      sessionStorage.setItem(
+        'beanies_offline_queue',
+        '{"version":"4.0","encryptedPayload":"AAAA"}'
+      );
+      vi.resetModules();
+      const freshQueue = await import('../offlineQueue');
+      expect(freshQueue.hasPendingSave()).toBe(true);
+      expect(JSON.parse(sessionStorage.getItem('beanies_offline_queue')!)).toMatchObject({ v: 1 });
+      freshQueue.clearQueue();
+    });
+
+    it('logs a quota failure instead of swallowing it', async () => {
+      logEventMock.mockClear();
+      const spy = logEventMock;
+      const setItem = vi.spyOn(sessionStorage, 'setItem').mockImplementation(() => {
+        throw new DOMException('quota', 'QuotaExceededError');
+      });
+      try {
+        offlineQueue.enqueueOfflineSave();
+      } finally {
+        setItem.mockRestore();
+      }
+      expect(spy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          surface: 'offline-queue',
+          context: expect.objectContaining({
+            action: 'session-persist-failed',
+            error_code: 'QuotaExceededError',
+          }),
+        })
+      );
+      // Still queued in memory for this page's life.
+      expect(offlineQueue.hasPendingSave()).toBe(true);
     });
   });
 
@@ -710,7 +779,7 @@ describe('offlineQueue', () => {
 
       // Force offline through provider-attach to avoid the startup auto-flush
       // consuming our coalescing window.
-      offlineQueue.enqueueOfflineSave('{"data":"cold-start"}');
+      offlineQueue.enqueueOfflineSave();
       Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
       installFlushTarget(mockWrite);
       Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
@@ -746,7 +815,7 @@ describe('offlineQueue', () => {
       });
       const mockWrite = vi.fn().mockReturnValue(writePromise);
 
-      offlineQueue.enqueueOfflineSave('{"data":"cold-start-fail"}');
+      offlineQueue.enqueueOfflineSave();
       Object.defineProperty(navigator, 'onLine', { value: false, configurable: true });
       installFlushTarget(mockWrite);
       Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
@@ -783,7 +852,7 @@ describe('offlineQueue', () => {
       // Pending content already restored (simulating PWA cold-start with
       // sessionStorage-restored queue). Provider attaches with onLine=true,
       // which should kick off tryFlush('startup').
-      offlineQueue.enqueueOfflineSave('{"data":"startup-fail"}');
+      offlineQueue.enqueueOfflineSave();
       Object.defineProperty(navigator, 'onLine', { value: true, configurable: true });
 
       vi.mocked(reportError).mockClear();
@@ -809,7 +878,7 @@ describe('offlineQueue', () => {
         const reportErrorMock = reportError as ReturnType<typeof vi.fn>;
         reportErrorMock.mockClear();
 
-        offlineQueue.enqueueOfflineSave('{"data":"auth-blocked"}');
+        offlineQueue.enqueueOfflineSave();
         const tokenErr = new TokenExpiredError();
         const mockWrite = vi.fn().mockRejectedValue(tokenErr);
         installFlushTarget(mockWrite);
@@ -835,7 +904,7 @@ describe('offlineQueue', () => {
         const reportErrorMock = reportError as ReturnType<typeof vi.fn>;
         reportErrorMock.mockClear();
 
-        offlineQueue.enqueueOfflineSave('{"data":"drive-404"}');
+        offlineQueue.enqueueOfflineSave();
         const mockWrite = vi.fn().mockRejectedValue(new Error('Drive 404 — file not found'));
         installFlushTarget(mockWrite);
 

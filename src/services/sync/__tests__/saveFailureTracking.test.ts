@@ -51,7 +51,7 @@ vi.mock('@/services/telemetry', () => ({ logEvent: vi.fn() }));
 const fakeFamilyKey = {} as CryptoKey;
 const fakeEnvelope = {
   version: '4.0' as const,
-  familyId: 'test-family',
+  familyId: 'test-family-id', // the provider binds to the active family; a mismatch is refused (audit C3)
   familyName: 'Test',
   keyId: 'k1',
   wrappedKeys: {},

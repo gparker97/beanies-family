@@ -4,12 +4,15 @@ import {
   deduplicateRecurringTransactions,
   projectRecurringTransactions,
 } from './recurringProcessor';
-import type { RecurringItem, Account, Asset, Transaction } from '@/types/models';
+import type { RecurringItem, Account, Transaction, CreateTransactionInput } from '@/types/models';
+import type { TransactionCascadeResult } from '@/services/automerge/repositories/transactionRepository';
 
 // #95: the read-only pause reads the REAL write-gate slot; tests install a verdict and clear it.
 vi.mock('@/services/telemetry', () => ({ logEvent: vi.fn() }));
 
-// Mock the repositories
+// Mock the repositories. Every money movement goes through the ONE cascade op (audit C7), so
+// the processor only names the links; the worker's arithmetic is covered in
+// `worker/__tests__/transactionOps.test.ts`.
 vi.mock('@/services/automerge/repositories/recurringItemRepository', () => ({
   getActiveRecurringItems: vi.fn(),
   updateRecurringItem: vi.fn(),
@@ -18,26 +21,12 @@ vi.mock('@/services/automerge/repositories/recurringItemRepository', () => ({
 
 vi.mock('@/services/automerge/repositories/transactionRepository', () => ({
   getAllTransactions: vi.fn().mockResolvedValue([]),
-  createTransaction: vi.fn(),
-  deleteTransaction: vi.fn().mockResolvedValue(true),
-  applyLoanPayment: vi.fn(),
+  createTransactionCascade: vi.fn(),
+  deleteTransactionCascade: vi.fn(),
 }));
 
 vi.mock('@/services/automerge/repositories/accountRepository', () => ({
   getAccountById: vi.fn(),
-  getAllAccounts: vi.fn().mockResolvedValue([]),
-  updateAccountBalance: vi.fn(),
-  incrementBalance: vi.fn(),
-}));
-
-vi.mock('@/services/automerge/repositories/assetRepository', () => ({
-  getAllAssets: vi.fn().mockResolvedValue([]),
-  updateAsset: vi.fn(),
-}));
-
-vi.mock('@/services/automerge/repositories/goalRepository', () => ({
-  getGoalById: vi.fn(),
-  applyContribution: vi.fn(),
 }));
 
 vi.mock('@/utils/errorReporter', () => ({ reportError: vi.fn() }));
@@ -45,8 +34,6 @@ vi.mock('@/utils/errorReporter', () => ({ reportError: vi.fn() }));
 import * as recurringRepo from '@/services/automerge/repositories/recurringItemRepository';
 import * as transactionRepo from '@/services/automerge/repositories/transactionRepository';
 import * as accountRepo from '@/services/automerge/repositories/accountRepository';
-import * as assetRepo from '@/services/automerge/repositories/assetRepository';
-import * as goalRepo from '@/services/automerge/repositories/goalRepository';
 import { logEvent } from '@/services/telemetry';
 import { reportError } from '@/utils/errorReporter';
 import { setWriteGate, __resetWriteGateForTesting } from '@/services/automerge/worker/writeGate';
@@ -65,850 +52,364 @@ const mockAccount: Account = {
   updatedAt: '2024-01-01T00:00:00.000Z',
 };
 
-describe('recurringProcessor - Account Balance Sync', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    vi.useFakeTimers();
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it('should decrease account balance when processing a recurring expense', async () => {
-    // Set current date
-    vi.setSystemTime(new Date('2024-01-15T12:00:00.000Z'));
-
-    const recurringExpense: RecurringItem = {
-      id: 'recurring-1',
-      accountId: 'test-account-1',
-      type: 'expense',
-      amount: 50,
-      currency: 'USD',
-      category: 'subscription',
-      description: 'Netflix',
-      frequency: 'monthly',
-      dayOfMonth: 15,
-      startDate: '2024-01-01T00:00:00.000Z',
-      isActive: true,
-      createdAt: '2024-01-01T00:00:00.000Z',
-      updatedAt: '2024-01-01T00:00:00.000Z',
-    };
-
-    vi.mocked(recurringRepo.getActiveRecurringItems).mockResolvedValue([recurringExpense]);
-    vi.mocked(transactionRepo.createTransaction).mockResolvedValue({
-      id: 'tx-1',
-      accountId: 'test-account-1',
-      type: 'expense',
-      amount: 50,
-      currency: 'USD',
-      category: 'subscription',
-      date: '2024-01-15T00:00:00.000Z',
-      description: 'Netflix',
-      isReconciled: false,
-      recurringItemId: 'recurring-1',
-      createdAt: '2024-01-15T00:00:00.000Z',
-      updatedAt: '2024-01-15T00:00:00.000Z',
-    });
-    vi.mocked(accountRepo.getAccountById).mockResolvedValue({ ...mockAccount });
-    vi.mocked(accountRepo.incrementBalance).mockResolvedValue({ ...mockAccount, balance: 950 });
-    vi.mocked(recurringRepo.updateLastProcessedDate).mockResolvedValue(undefined);
-
-    // Act
-    const result = await processRecurringItems();
-
-    // Assert
-    expect(result.processed).toBe(1);
-    expect(accountRepo.getAccountById).toHaveBeenCalledWith('test-account-1');
-    expect(accountRepo.incrementBalance).toHaveBeenCalledWith('test-account-1', -50);
-  });
-
-  it('should increase account balance when processing a recurring income', async () => {
-    // Set current date
-    vi.setSystemTime(new Date('2024-01-15T12:00:00.000Z'));
-
-    const recurringIncome: RecurringItem = {
-      id: 'recurring-2',
-      accountId: 'test-account-1',
-      type: 'income',
-      amount: 3000,
-      currency: 'USD',
-      category: 'salary',
-      description: 'Monthly Salary',
-      frequency: 'monthly',
-      dayOfMonth: 15,
-      startDate: '2024-01-01T00:00:00.000Z',
-      isActive: true,
-      createdAt: '2024-01-01T00:00:00.000Z',
-      updatedAt: '2024-01-01T00:00:00.000Z',
-    };
-
-    vi.mocked(recurringRepo.getActiveRecurringItems).mockResolvedValue([recurringIncome]);
-    vi.mocked(transactionRepo.createTransaction).mockResolvedValue({
-      id: 'tx-2',
-      accountId: 'test-account-1',
-      type: 'income',
-      amount: 3000,
-      currency: 'USD',
-      category: 'salary',
-      date: '2024-01-15T00:00:00.000Z',
-      description: 'Monthly Salary',
-      isReconciled: false,
-      recurringItemId: 'recurring-2',
-      createdAt: '2024-01-15T00:00:00.000Z',
-      updatedAt: '2024-01-15T00:00:00.000Z',
-    });
-    vi.mocked(accountRepo.getAccountById).mockResolvedValue({ ...mockAccount });
-    vi.mocked(accountRepo.incrementBalance).mockResolvedValue({
-      ...mockAccount,
-      balance: 4000,
-    });
-    vi.mocked(recurringRepo.updateLastProcessedDate).mockResolvedValue(undefined);
-
-    // Act
-    const result = await processRecurringItems();
-
-    // Assert
-    expect(result.processed).toBe(1);
-    expect(accountRepo.incrementBalance).toHaveBeenCalledWith('test-account-1', 3000);
-  });
-
-  it('should process multiple recurring items and update balances correctly', async () => {
-    // Set current date
-    vi.setSystemTime(new Date('2024-01-15T12:00:00.000Z'));
-
-    const recurringItems: RecurringItem[] = [
-      {
-        id: 'recurring-1',
-        accountId: 'test-account-1',
-        type: 'income',
-        amount: 3000,
-        currency: 'USD',
-        category: 'salary',
-        description: 'Monthly Salary',
-        frequency: 'monthly',
-        dayOfMonth: 15,
-        startDate: '2024-01-01T00:00:00.000Z',
-        isActive: true,
-        createdAt: '2024-01-01T00:00:00.000Z',
-        updatedAt: '2024-01-01T00:00:00.000Z',
-      },
-      {
-        id: 'recurring-2',
-        accountId: 'test-account-1',
-        type: 'expense',
-        amount: 100,
-        currency: 'USD',
-        category: 'utilities',
-        description: 'Electric Bill',
-        frequency: 'monthly',
-        dayOfMonth: 15,
-        startDate: '2024-01-01T00:00:00.000Z',
-        isActive: true,
-        createdAt: '2024-01-01T00:00:00.000Z',
-        updatedAt: '2024-01-01T00:00:00.000Z',
-      },
-    ];
-
-    vi.mocked(recurringRepo.getActiveRecurringItems).mockResolvedValue(recurringItems);
-    vi.mocked(transactionRepo.createTransaction).mockResolvedValue({} as any);
-    vi.mocked(accountRepo.getAccountById)
-      .mockResolvedValueOnce({ ...mockAccount, balance: 1000 })
-      .mockResolvedValueOnce({ ...mockAccount, balance: 4000 }); // After income
-    vi.mocked(accountRepo.incrementBalance)
-      .mockResolvedValueOnce({ ...mockAccount, balance: 4000 })
-      .mockResolvedValueOnce({ ...mockAccount, balance: 3900 });
-    vi.mocked(recurringRepo.updateLastProcessedDate).mockResolvedValue(undefined);
-
-    // Act
-    const result = await processRecurringItems();
-
-    // Assert
-    expect(result.processed).toBe(2);
-    expect(accountRepo.incrementBalance).toHaveBeenCalledTimes(2);
-  });
+const item = (overrides: Partial<RecurringItem> = {}): RecurringItem => ({
+  id: 'recurring-1',
+  accountId: 'test-account-1',
+  type: 'expense',
+  amount: 50,
+  currency: 'USD',
+  category: 'subscription',
+  description: 'Netflix',
+  frequency: 'monthly',
+  dayOfMonth: 15,
+  startDate: '2024-01-01T00:00:00.000Z',
+  isActive: true,
+  createdAt: '2024-01-01T00:00:00.000Z',
+  updatedAt: '2024-01-01T00:00:00.000Z',
+  ...overrides,
 });
 
-describe('recurringProcessor - Goal Allocation', () => {
+/** A cascade echo for the input the processor sent (the worker stamps the id). */
+function echoCreate(input: CreateTransactionInput): TransactionCascadeResult {
+  return {
+    mode: 'create',
+    found: true,
+    transaction: {
+      ...input,
+      id: `tx-${input.date}`,
+      createdAt: input.date,
+      updatedAt: input.date,
+    } as Transaction,
+    accounts: [],
+    goals: [],
+    assets: [],
+    skipped: [],
+  };
+}
+const echoDelete = (found = true): TransactionCascadeResult => ({
+  mode: 'delete',
+  found,
+  accounts: [],
+  goals: [],
+  assets: [],
+  skipped: [],
+});
+
+const sentInputs = () =>
+  vi.mocked(transactionRepo.createTransactionCascade).mock.calls.map(([input]) => input);
+
+function arm(items: RecurringItem[]): void {
+  vi.mocked(recurringRepo.getActiveRecurringItems).mockResolvedValue(items);
+  vi.mocked(accountRepo.getAccountById).mockResolvedValue({ ...mockAccount });
+  vi.mocked(transactionRepo.createTransactionCascade).mockImplementation(async (input) =>
+    echoCreate(input)
+  );
+  vi.mocked(recurringRepo.updateLastProcessedDate).mockResolvedValue(undefined);
+}
+
+describe('recurringProcessor - one cascade per instance', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
+    vi.setSystemTime(new Date('2024-01-15T12:00:00.000Z'));
   });
 
   afterEach(() => {
     vi.useRealTimers();
   });
 
-  it('should apply goal allocation when processing recurring income', async () => {
-    vi.setSystemTime(new Date('2024-01-15T12:00:00.000Z'));
-
-    const recurringIncome: RecurringItem = {
-      id: 'recurring-goal-1',
-      accountId: 'test-account-1',
-      type: 'income',
-      amount: 1000,
-      currency: 'USD',
-      category: 'salary',
-      description: 'Monthly Salary',
-      frequency: 'monthly',
-      dayOfMonth: 15,
-      startDate: '2024-01-01T00:00:00.000Z',
-      isActive: true,
-      goalId: 'goal-1',
-      goalAllocMode: 'percentage',
-      goalAllocValue: 20,
-      createdAt: '2024-01-01T00:00:00.000Z',
-      updatedAt: '2024-01-01T00:00:00.000Z',
-    };
-
-    vi.mocked(recurringRepo.getActiveRecurringItems).mockResolvedValue([recurringIncome]);
-    vi.mocked(transactionRepo.createTransaction).mockResolvedValue({} as any);
-    vi.mocked(accountRepo.getAccountById).mockResolvedValue({ ...mockAccount });
-    vi.mocked(accountRepo.incrementBalance).mockResolvedValue({
-      ...mockAccount,
-      balance: 2000,
-    });
-    vi.mocked(recurringRepo.updateLastProcessedDate).mockResolvedValue(undefined);
-    vi.mocked(goalRepo.getGoalById).mockResolvedValue({
-      id: 'goal-1',
-      name: 'Buy a Car',
-      type: 'savings',
-      targetAmount: 10000,
-      currentAmount: 0,
-      currency: 'USD',
-      priority: 'high',
-      isCompleted: false,
-      createdAt: '2024-01-01T00:00:00.000Z',
-      updatedAt: '2024-01-01T00:00:00.000Z',
-    });
-    vi.mocked(goalRepo.applyContribution).mockResolvedValue(undefined as any);
+  it('sends a recurring expense as ONE cascade naming the account; the worker moves the balance', async () => {
+    arm([item()]);
 
     const result = await processRecurringItems();
 
-    expect(result.processed).toBe(1);
-    // Transaction should include goal allocation fields
-    expect(transactionRepo.createTransaction).toHaveBeenCalledWith(
+    expect(result).toEqual({ processed: 1, errors: [] });
+    expect(accountRepo.getAccountById).toHaveBeenCalledWith('test-account-1');
+    expect(sentInputs()).toEqual([
       expect.objectContaining({
+        accountId: 'test-account-1',
+        type: 'expense',
+        amount: 50,
+        date: '2024-01-15',
+        recurringItemId: 'recurring-1',
+        isReconciled: false,
+      }),
+    ]);
+    expect(recurringRepo.updateLastProcessedDate).toHaveBeenCalledWith('recurring-1', '2024-01-15');
+  });
+
+  it('processes several items, one cascade each', async () => {
+    arm([
+      item({ id: 'recurring-1', type: 'income', amount: 3000, category: 'salary' }),
+      item({ id: 'recurring-2', type: 'expense', amount: 100, category: 'utilities' }),
+    ]);
+
+    const result = await processRecurringItems();
+
+    expect(result.processed).toBe(2);
+    expect(sentInputs().map((i) => [i.recurringItemId, i.type, i.amount])).toEqual([
+      ['recurring-1', 'income', 3000],
+      ['recurring-2', 'expense', 100],
+    ]);
+  });
+
+  it('names the goal link; the worker caps and records the allocation itself', async () => {
+    arm([
+      item({
+        type: 'income',
+        amount: 1000,
         goalId: 'goal-1',
         goalAllocMode: 'percentage',
         goalAllocValue: 20,
-        goalAllocApplied: 200, // 20% of 1000
-      })
-    );
-    // Goal progress should be updated
-    expect(goalRepo.applyContribution).toHaveBeenCalledWith('goal-1', 200);
-  });
-
-  it('should cap goal allocation to remaining amount', async () => {
-    vi.setSystemTime(new Date('2024-01-15T12:00:00.000Z'));
-
-    const recurringIncome: RecurringItem = {
-      id: 'recurring-goal-2',
-      accountId: 'test-account-1',
-      type: 'income',
-      amount: 1000,
-      currency: 'USD',
-      category: 'salary',
-      description: 'Monthly Salary',
-      frequency: 'monthly',
-      dayOfMonth: 15,
-      startDate: '2024-01-01T00:00:00.000Z',
-      isActive: true,
-      goalId: 'goal-1',
-      goalAllocMode: 'percentage',
-      goalAllocValue: 50, // 50% = $500
-      createdAt: '2024-01-01T00:00:00.000Z',
-      updatedAt: '2024-01-01T00:00:00.000Z',
-    };
-
-    vi.mocked(recurringRepo.getActiveRecurringItems).mockResolvedValue([recurringIncome]);
-    vi.mocked(transactionRepo.createTransaction).mockResolvedValue({} as any);
-    vi.mocked(accountRepo.getAccountById).mockResolvedValue({ ...mockAccount });
-    vi.mocked(accountRepo.incrementBalance).mockResolvedValue({
-      ...mockAccount,
-      balance: 2000,
-    });
-    vi.mocked(recurringRepo.updateLastProcessedDate).mockResolvedValue(undefined);
-    vi.mocked(goalRepo.getGoalById).mockResolvedValue({
-      id: 'goal-1',
-      name: 'Buy a Car',
-      type: 'savings',
-      targetAmount: 10000,
-      currentAmount: 9900, // Only $100 remaining
-      currency: 'USD',
-      priority: 'high',
-      isCompleted: false,
-      createdAt: '2024-01-01T00:00:00.000Z',
-      updatedAt: '2024-01-01T00:00:00.000Z',
-    });
-    vi.mocked(goalRepo.applyContribution).mockResolvedValue(undefined as any);
+      }),
+    ]);
 
     await processRecurringItems();
 
-    // Should cap at $100 (remaining), not $500 (50% of 1000)
-    expect(transactionRepo.createTransaction).toHaveBeenCalledWith(
-      expect.objectContaining({
-        goalAllocApplied: 100,
-      })
-    );
-    expect(goalRepo.applyContribution).toHaveBeenCalledWith('goal-1', 100);
-  });
-
-  it('should skip allocation for completed goals', async () => {
-    vi.setSystemTime(new Date('2024-01-15T12:00:00.000Z'));
-
-    const recurringIncome: RecurringItem = {
-      id: 'recurring-goal-3',
-      accountId: 'test-account-1',
-      type: 'income',
-      amount: 1000,
-      currency: 'USD',
-      category: 'salary',
-      description: 'Monthly Salary',
-      frequency: 'monthly',
-      dayOfMonth: 15,
-      startDate: '2024-01-01T00:00:00.000Z',
-      isActive: true,
+    const [input] = sentInputs();
+    expect(input).toMatchObject({
       goalId: 'goal-1',
       goalAllocMode: 'percentage',
       goalAllocValue: 20,
-      createdAt: '2024-01-01T00:00:00.000Z',
-      updatedAt: '2024-01-01T00:00:00.000Z',
-    };
+    });
+    expect(input).not.toHaveProperty('goalAllocApplied');
+  });
 
-    vi.mocked(recurringRepo.getActiveRecurringItems).mockResolvedValue([recurringIncome]);
-    vi.mocked(transactionRepo.createTransaction).mockResolvedValue({} as any);
-    vi.mocked(accountRepo.getAccountById).mockResolvedValue({ ...mockAccount });
-    vi.mocked(accountRepo.incrementBalance).mockResolvedValue({
-      ...mockAccount,
-      balance: 2000,
-    });
-    vi.mocked(recurringRepo.updateLastProcessedDate).mockResolvedValue(undefined);
-    vi.mocked(goalRepo.getGoalById).mockResolvedValue({
-      id: 'goal-1',
-      name: 'Buy a Car',
-      type: 'savings',
-      targetAmount: 10000,
-      currentAmount: 10000,
-      currency: 'USD',
-      priority: 'high',
-      isCompleted: true, // Goal already completed
-      createdAt: '2024-01-01T00:00:00.000Z',
-      updatedAt: '2024-01-01T00:00:00.000Z',
-    });
+  it("names the loan link only; the portions and the linked account mirror are the worker's", async () => {
+    arm([item({ amount: 1500, category: 'loan_payment', loanId: 'asset-loan-1' })]);
 
     await processRecurringItems();
 
-    // Transaction should NOT include goal allocation
-    expect(transactionRepo.createTransaction).toHaveBeenCalledWith(
-      expect.not.objectContaining({
-        goalAllocApplied: expect.any(Number),
+    const [input] = sentInputs();
+    expect(input.loanId).toBe('asset-loan-1');
+    expect(input.recurringItemId).toBe('recurring-1'); // → amortisation, not an extra payment
+    expect(input).not.toHaveProperty('loanInterestPortion');
+    expect(input).not.toHaveProperty('loanPrincipalPortion');
+  });
+
+  it('passes activityId through to the generated transaction', async () => {
+    arm([item({ category: 'lesson_fees', activityId: 'activity-swim-1' })]);
+
+    await processRecurringItems();
+
+    expect(sentInputs()[0]).toMatchObject({
+      activityId: 'activity-swim-1',
+      recurringItemId: 'recurring-1',
+    });
+  });
+
+  it('an item whose account is gone is skipped and logged, never materialised; the cursor still advances', async () => {
+    arm([item()]);
+    vi.mocked(accountRepo.getAccountById).mockResolvedValue(undefined);
+
+    const result = await processRecurringItems();
+
+    expect(result).toEqual({ processed: 0, errors: [] });
+    expect(transactionRepo.createTransactionCascade).not.toHaveBeenCalled();
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        surface: 'recurring-processor',
+        message: 'account-missing',
+        context: { recur_surface: 'transaction', action: 'skip' },
       })
     );
-    // Goal progress should NOT be updated
-    expect(goalRepo.applyContribution).not.toHaveBeenCalled();
+    expect(recurringRepo.updateLastProcessedDate).toHaveBeenCalledWith('recurring-1', '2024-01-15');
   });
 });
 
-// --- Loan Payment Generation ---
+describe('recurringProcessor - the cursor stops at the first failure (audit C7)', () => {
+  // Last generated on 15 July; "today" is 15 October, so three instances are due.
+  const salary = item({
+    id: 'recurring-cursor',
+    type: 'income',
+    amount: 3000,
+    category: 'salary',
+    lastProcessedDate: '2024-07-15',
+  });
 
-const mockAssetWithLoan: Asset = {
-  id: 'asset-loan-1',
-  memberId: 'member-1',
-  type: 'real_estate',
-  name: 'Test House',
-  purchaseValue: 300000,
-  currentValue: 320000,
-  currency: 'USD',
-  includeInNetWorth: true,
-  loan: {
-    hasLoan: true,
-    loanAmount: 250000,
-    outstandingBalance: 200000,
-    interestRate: 6,
-    monthlyPayment: 1500,
-    loanTermMonths: 360,
-    lender: 'Test Bank',
-  },
-  createdAt: '2024-01-01T00:00:00.000Z',
-  updatedAt: '2024-01-01T00:00:00.000Z',
-};
-
-const mockLinkedLoanAccount: Account = {
-  id: 'linked-loan-account-1',
-  memberId: 'member-1',
-  name: 'Test House Loan',
-  type: 'loan',
-  currency: 'USD',
-  balance: 200000,
-  institution: 'Test Bank',
-  isActive: true,
-  includeInNetWorth: true,
-  linkedAssetId: 'asset-loan-1',
-  createdAt: '2024-01-01T00:00:00.000Z',
-  updatedAt: '2024-01-01T00:00:00.000Z',
-};
-
-const mockStandaloneLoanAccount: Account = {
-  id: 'standalone-loan-1',
-  memberId: 'member-1',
-  name: 'Car Loan',
-  type: 'loan',
-  currency: 'USD',
-  balance: 15000,
-  institution: 'Test Credit Union',
-  isActive: true,
-  includeInNetWorth: true,
-  interestRate: 5,
-  monthlyPayment: 400,
-  loanTermMonths: 48,
-  createdAt: '2024-01-01T00:00:00.000Z',
-  updatedAt: '2024-01-01T00:00:00.000Z',
-};
-
-describe('recurringProcessor - Loan Payment Generation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
+    vi.setSystemTime(new Date('2024-10-15T12:00:00.000Z'));
+    arm([salary]);
   });
 
   afterEach(() => {
     vi.useRealTimers();
   });
 
-  it('should apply amortization to asset-linked recurring loan payment', async () => {
-    vi.setSystemTime(new Date('2024-01-15T12:00:00.000Z'));
-
-    const recurringLoanPayment: RecurringItem = {
-      id: 'recurring-mortgage-1',
-      accountId: 'test-account-1',
-      type: 'expense',
-      amount: 1500,
-      currency: 'USD',
-      category: 'loan_payment',
-      description: 'Mortgage Payment',
-      frequency: 'monthly',
-      dayOfMonth: 15,
-      startDate: '2024-01-01T00:00:00.000Z',
-      isActive: true,
-      loanId: 'asset-loan-1',
-      createdAt: '2024-01-01T00:00:00.000Z',
-      updatedAt: '2024-01-01T00:00:00.000Z',
-    };
-
-    vi.mocked(recurringRepo.getActiveRecurringItems).mockResolvedValue([recurringLoanPayment]);
-    vi.mocked(assetRepo.getAllAssets).mockResolvedValue([{ ...mockAssetWithLoan }]);
-    vi.mocked(accountRepo.getAllAccounts).mockResolvedValue([
-      { ...mockAccount },
-      { ...mockLinkedLoanAccount },
-    ]);
-    vi.mocked(transactionRepo.createTransaction).mockResolvedValue({} as any);
-    vi.mocked(accountRepo.getAccountById).mockResolvedValue({ ...mockAccount });
-    vi.mocked(accountRepo.incrementBalance).mockResolvedValue({} as any);
-    vi.mocked(recurringRepo.updateLastProcessedDate).mockResolvedValue(undefined);
-    const createdTx = { id: 'tx-loan-1' } as any;
-    vi.mocked(transactionRepo.createTransaction).mockResolvedValue(createdTx);
-    // The worker amortises on the folded balance and echoes the new host.
-    vi.mocked(transactionRepo.applyLoanPayment).mockResolvedValue({
-      applied: true,
-      hostCollection: 'assets',
-      host: {
-        ...mockAssetWithLoan,
-        loan: { ...mockAssetWithLoan.loan!, outstandingBalance: 199500 },
-      },
-      interestPortion: 1000,
-      principalPortion: 500,
-    });
-
-    const result = await processRecurringItems();
-
-    expect(result.processed).toBe(1);
-
-    // The transaction is only marked as a loan payment; the portions come from the worker op.
-    const txInput = vi.mocked(transactionRepo.createTransaction).mock.calls[0]![0];
-    expect(txInput.loanId).toBe('asset-loan-1');
-    expect(txInput).not.toHaveProperty('loanInterestPortion');
-    expect(txInput).not.toHaveProperty('loanPrincipalPortion');
-    expect(transactionRepo.applyLoanPayment).toHaveBeenCalledWith(createdTx);
-
-    // No absolute write to the asset: the worker op owns the balance
-    expect(assetRepo.updateAsset).not.toHaveBeenCalled();
-
-    // Linked loan account mirrors the folded host value
-    expect(accountRepo.updateAccountBalance).toHaveBeenCalledWith('linked-loan-account-1', 199500);
-  });
-
-  it('should reduce standalone loan account balance for recurring payment', async () => {
-    vi.setSystemTime(new Date('2024-01-15T12:00:00.000Z'));
-
-    const recurringCarPayment: RecurringItem = {
-      id: 'recurring-car-1',
-      accountId: 'test-account-1',
-      type: 'expense',
-      amount: 400,
-      currency: 'USD',
-      category: 'loan_payment',
-      description: 'Car Loan Payment',
-      frequency: 'monthly',
-      dayOfMonth: 15,
-      startDate: '2024-01-01T00:00:00.000Z',
-      isActive: true,
-      loanId: 'standalone-loan-1',
-      createdAt: '2024-01-01T00:00:00.000Z',
-      updatedAt: '2024-01-01T00:00:00.000Z',
-    };
-
-    vi.mocked(recurringRepo.getActiveRecurringItems).mockResolvedValue([recurringCarPayment]);
-    vi.mocked(assetRepo.getAllAssets).mockResolvedValue([]);
-    vi.mocked(accountRepo.getAllAccounts).mockResolvedValue([
-      { ...mockAccount },
-      { ...mockStandaloneLoanAccount },
-    ]);
-    vi.mocked(transactionRepo.createTransaction).mockResolvedValue({} as any);
-    vi.mocked(accountRepo.getAccountById).mockResolvedValue({ ...mockAccount });
-    vi.mocked(accountRepo.incrementBalance).mockResolvedValue({} as any);
-    vi.mocked(recurringRepo.updateLastProcessedDate).mockResolvedValue(undefined);
-    const createdTx = { id: 'tx-car-1' } as any;
-    vi.mocked(transactionRepo.createTransaction).mockResolvedValue(createdTx);
-    vi.mocked(transactionRepo.applyLoanPayment).mockResolvedValue({
-      applied: true,
-      hostCollection: 'accounts',
-      host: { ...mockStandaloneLoanAccount, balance: 14662.5 },
-      interestPortion: 62.5,
-      principalPortion: 337.5,
-    });
-
-    const result = await processRecurringItems();
-
-    expect(result.processed).toBe(1);
-
-    const txInput = vi.mocked(transactionRepo.createTransaction).mock.calls[0]![0];
-    expect(txInput.loanId).toBe('standalone-loan-1');
-    expect(transactionRepo.applyLoanPayment).toHaveBeenCalledWith(createdTx);
-
-    // The worker op writes the standalone loan account itself: no absolute write from here
-    const balanceCalls = vi.mocked(accountRepo.updateAccountBalance).mock.calls;
-    expect(balanceCalls.some((c) => c[0] === 'standalone-loan-1')).toBe(false);
-  });
-
-  it('a failure in the LOAN step reports where the cascade stopped, not that creation failed', async () => {
-    vi.setSystemTime(new Date('2024-01-15T12:00:00.000Z'));
+  it('advances only past the dates that landed and reports the failure', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const recurringCarPayment: RecurringItem = {
-      id: 'recurring-car-fail',
-      accountId: 'test-account-1',
-      type: 'expense',
-      amount: 400,
-      currency: 'USD',
-      category: 'loan_payment',
-      description: 'Car Loan Payment',
-      frequency: 'monthly',
-      dayOfMonth: 15,
-      startDate: '2024-01-01T00:00:00.000Z',
-      isActive: true,
-      loanId: 'standalone-loan-1',
-      createdAt: '2024-01-01T00:00:00.000Z',
-      updatedAt: '2024-01-01T00:00:00.000Z',
-    };
-    vi.mocked(recurringRepo.getActiveRecurringItems).mockResolvedValue([recurringCarPayment]);
-    vi.mocked(assetRepo.getAllAssets).mockResolvedValue([]);
-    vi.mocked(accountRepo.getAllAccounts).mockResolvedValue([
-      { ...mockAccount },
-      { ...mockStandaloneLoanAccount },
-    ]);
-    vi.mocked(transactionRepo.createTransaction).mockResolvedValue({ id: 'tx-car-2' } as any);
-    vi.mocked(accountRepo.getAccountById).mockResolvedValue({ ...mockAccount });
-    vi.mocked(accountRepo.incrementBalance).mockResolvedValue({} as any);
-    vi.mocked(transactionRepo.applyLoanPayment).mockRejectedValue(new Error('worker down'));
+    vi.mocked(transactionRepo.createTransactionCascade).mockImplementation(async (input) => {
+      if (input.date === '2024-09-15') throw new Error('worker down');
+      return echoCreate(input);
+    });
 
     const result = await processRecurringItems();
 
-    // The transaction and the account adjustment landed; the loan step is what threw.
-    expect(transactionRepo.createTransaction).toHaveBeenCalled();
-    expect(accountRepo.incrementBalance).toHaveBeenCalled();
-    expect(result.processed).toBe(0);
+    expect(result.processed).toBe(1);
+    expect(result.errors).toHaveLength(1);
+    // August landed, September threw, October was never attempted.
+    expect(sentInputs().map((i) => i.date)).toEqual(['2024-08-15', '2024-09-15']);
+    expect(recurringRepo.updateLastProcessedDate).toHaveBeenCalledTimes(1);
+    expect(recurringRepo.updateLastProcessedDate).toHaveBeenCalledWith(
+      'recurring-cursor',
+      '2024-08-15'
+    );
     expect(reportError).toHaveBeenCalledWith(
       expect.objectContaining({
         surface: 'recurring-processor',
         message: 'recurring-cascade-failed',
         severity: 'error',
-        context: { recur_surface: 'transaction', action: 'loan' },
+        context: { recur_surface: 'transaction', action: 'create' },
       })
     );
     consoleError.mockRestore();
   });
 
-  it('should skip loan allocation when loan has zero outstanding balance', async () => {
-    vi.setSystemTime(new Date('2024-01-15T12:00:00.000Z'));
-
-    const recurringPaidOff: RecurringItem = {
-      id: 'recurring-paidoff-1',
-      accountId: 'test-account-1',
-      type: 'expense',
-      amount: 400,
-      currency: 'USD',
-      category: 'loan_payment',
-      description: 'Paid Off Loan Payment',
-      frequency: 'monthly',
-      dayOfMonth: 15,
-      startDate: '2024-01-01T00:00:00.000Z',
-      isActive: true,
-      loanId: 'standalone-loan-1',
-      createdAt: '2024-01-01T00:00:00.000Z',
-      updatedAt: '2024-01-01T00:00:00.000Z',
-    };
-
-    const paidOffLoan = { ...mockStandaloneLoanAccount, balance: 0 };
-
-    vi.mocked(recurringRepo.getActiveRecurringItems).mockResolvedValue([recurringPaidOff]);
-    vi.mocked(assetRepo.getAllAssets).mockResolvedValue([]);
-    vi.mocked(accountRepo.getAllAccounts).mockResolvedValue([{ ...mockAccount }, paidOffLoan]);
-    vi.mocked(transactionRepo.createTransaction).mockResolvedValue({} as any);
-    vi.mocked(accountRepo.getAccountById).mockResolvedValue({ ...mockAccount });
-    vi.mocked(accountRepo.incrementBalance).mockResolvedValue({} as any);
-    vi.mocked(recurringRepo.updateLastProcessedDate).mockResolvedValue(undefined);
+  it('does not touch the cursor when the FIRST due date fails', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.mocked(transactionRepo.createTransactionCascade).mockRejectedValue(new Error('worker down'));
 
     const result = await processRecurringItems();
 
-    expect(result.processed).toBe(1);
-
-    // Transaction should NOT include loan fields (zero balance → skipped)
-    expect(transactionRepo.createTransaction).toHaveBeenCalledWith(
-      expect.not.objectContaining({
-        loanId: expect.any(String),
-        loanInterestPortion: expect.any(Number),
-        loanPrincipalPortion: expect.any(Number),
-      })
-    );
-
-    // No loan payment op, asset update or loan balance update should have occurred
-    expect(transactionRepo.applyLoanPayment).not.toHaveBeenCalled();
-    expect(assetRepo.updateAsset).not.toHaveBeenCalled();
-    // updateAccountBalance should only be called once for the source account, not for the loan
-    const balanceCalls = vi.mocked(accountRepo.incrementBalance).mock.calls;
-    for (const call of balanceCalls) {
-      expect(call[0]).not.toBe('standalone-loan-1');
-    }
-  });
-});
-
-// --- Activity ID Passthrough ---
-
-describe('recurringProcessor - Activity ID Passthrough', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    vi.useFakeTimers();
+    expect(result.processed).toBe(0);
+    expect(transactionRepo.createTransactionCascade).toHaveBeenCalledTimes(1);
+    expect(recurringRepo.updateLastProcessedDate).not.toHaveBeenCalled();
   });
 
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it('should pass activityId through to the generated transaction', async () => {
-    vi.setSystemTime(new Date('2024-01-15T12:00:00.000Z'));
-
-    const recurringWithActivity: RecurringItem = {
-      id: 'recurring-activity-1',
-      accountId: 'test-account-1',
-      type: 'expense',
-      amount: 200,
-      currency: 'USD',
-      category: 'lesson_fees',
-      description: 'Swimming Lessons',
-      frequency: 'monthly',
-      dayOfMonth: 15,
-      startDate: '2024-01-01T00:00:00.000Z',
-      isActive: true,
-      activityId: 'activity-swim-1',
-      createdAt: '2024-01-01T00:00:00.000Z',
-      updatedAt: '2024-01-01T00:00:00.000Z',
-    };
-
-    vi.mocked(recurringRepo.getActiveRecurringItems).mockResolvedValue([recurringWithActivity]);
-    vi.mocked(transactionRepo.createTransaction).mockResolvedValue({
-      id: 'tx-activity-1',
-      accountId: 'test-account-1',
-      type: 'expense',
-      amount: 200,
-      currency: 'USD',
-      category: 'lesson_fees',
-      date: '2024-01-15T00:00:00.000Z',
-      description: 'Swimming Lessons',
-      isReconciled: false,
-      recurringItemId: 'recurring-activity-1',
-      activityId: 'activity-swim-1',
-      createdAt: '2024-01-15T00:00:00.000Z',
-      updatedAt: '2024-01-15T00:00:00.000Z',
-    });
-    vi.mocked(accountRepo.getAccountById).mockResolvedValue({ ...mockAccount });
-    vi.mocked(accountRepo.incrementBalance).mockResolvedValue({ ...mockAccount, balance: 800 });
-    vi.mocked(recurringRepo.updateLastProcessedDate).mockResolvedValue(undefined);
+  it('a date already accounted for counts as settled, so the cursor passes it', async () => {
+    vi.mocked(transactionRepo.getAllTransactions).mockResolvedValue([
+      {
+        ...echoCreate({
+          accountId: 'test-account-1',
+          type: 'income',
+          amount: 3000,
+          currency: 'USD',
+          category: 'salary',
+          date: '2024-08-15',
+          description: 'x',
+          isReconciled: false,
+          recurringItemId: 'recurring-cursor',
+        }).transaction!,
+      },
+    ]);
 
     const result = await processRecurringItems();
 
-    expect(result.processed).toBe(1);
-    // Verify the transaction input includes activityId
-    expect(transactionRepo.createTransaction).toHaveBeenCalledWith(
-      expect.objectContaining({
-        activityId: 'activity-swim-1',
-        recurringItemId: 'recurring-activity-1',
-      })
+    expect(result.processed).toBe(2);
+    expect(sentInputs().map((i) => i.date)).toEqual(['2024-09-15', '2024-10-15']);
+    expect(recurringRepo.updateLastProcessedDate).toHaveBeenCalledWith(
+      'recurring-cursor',
+      '2024-10-15'
     );
+    vi.mocked(transactionRepo.getAllTransactions).mockResolvedValue([]);
   });
 });
 
 describe('deduplicateRecurringTransactions', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+  const dup = (id: string, createdAt: string, extra: Partial<Transaction> = {}): Transaction => ({
+    id,
+    accountId: 'acc-1',
+    type: 'income',
+    amount: 5000,
+    currency: 'EUR',
+    category: 'salary',
+    date: '2026-04-01',
+    description: 'Salary',
+    recurringItemId: 'rec-1',
+    isReconciled: false,
+    createdAt,
+    updatedAt: createdAt,
+    ...extra,
   });
 
-  it('should remove duplicate recurring transactions keeping earliest', async () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(transactionRepo.deleteTransactionCascade).mockResolvedValue(echoDelete());
+  });
+
+  it('removes the later-created duplicates THROUGH the delete cascade (effects reversed) and logs the sweep', async () => {
     vi.mocked(transactionRepo.getAllTransactions).mockResolvedValue([
-      {
-        id: 'tx-1',
-        accountId: 'acc-1',
-        type: 'income',
-        amount: 5000,
-        currency: 'EUR',
-        category: 'salary',
-        date: '2026-04-01',
-        description: 'Salary',
-        recurringItemId: 'rec-1',
-        isReconciled: false,
-        createdAt: '2026-04-01T08:00:00.000Z',
-        updatedAt: '2026-04-01T08:00:00.000Z',
-      },
-      {
-        id: 'tx-2',
-        accountId: 'acc-1',
-        type: 'income',
-        amount: 5000,
-        currency: 'EUR',
-        category: 'salary',
-        date: '2026-04-01',
-        description: 'Salary',
-        recurringItemId: 'rec-1',
-        isReconciled: false,
-        createdAt: '2026-04-01T09:00:00.000Z',
-        updatedAt: '2026-04-01T09:00:00.000Z',
-      },
-      {
-        id: 'tx-3',
-        accountId: 'acc-1',
-        type: 'income',
-        amount: 5000,
-        currency: 'EUR',
-        category: 'salary',
-        date: '2026-04-01',
-        description: 'Salary',
-        recurringItemId: 'rec-1',
-        isReconciled: false,
-        createdAt: '2026-04-01T10:00:00.000Z',
-        updatedAt: '2026-04-01T10:00:00.000Z',
-      },
-    ] as any);
+      dup('tx-1', '2026-04-01T08:00:00.000Z'),
+      dup('tx-2', '2026-04-01T09:00:00.000Z'),
+      dup('tx-3', '2026-04-01T10:00:00.000Z'),
+    ]);
 
     const deleted = await deduplicateRecurringTransactions();
 
     expect(deleted).toBe(2);
-    // Should delete the two later-created duplicates
-    expect(transactionRepo.deleteTransaction).toHaveBeenCalledWith('tx-2');
-    expect(transactionRepo.deleteTransaction).toHaveBeenCalledWith('tx-3');
-    // Should NOT delete the earliest one
-    expect(transactionRepo.deleteTransaction).not.toHaveBeenCalledWith('tx-1');
+    expect(transactionRepo.deleteTransactionCascade).toHaveBeenCalledWith('tx-2');
+    expect(transactionRepo.deleteTransactionCascade).toHaveBeenCalledWith('tx-3');
+    expect(transactionRepo.deleteTransactionCascade).not.toHaveBeenCalledWith('tx-1');
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'info',
+        surface: 'recurring-dedup',
+        context: { recur_surface: 'transaction', action: 'complete', perf_entity_count: 2 },
+      })
+    );
+  });
+
+  it('a duplicate deleted meanwhile is not counted; a failed delete is reported and the sweep goes on', async () => {
+    vi.mocked(transactionRepo.getAllTransactions).mockResolvedValue([
+      dup('tx-1', '2026-04-01T08:00:00.000Z'),
+      dup('tx-2', '2026-04-01T09:00:00.000Z'),
+      dup('tx-3', '2026-04-01T10:00:00.000Z'),
+      dup('tx-4', '2026-04-01T11:00:00.000Z'),
+    ]);
+    vi.mocked(transactionRepo.deleteTransactionCascade)
+      .mockResolvedValueOnce(echoDelete(false))
+      .mockRejectedValueOnce(new Error('worker down'))
+      .mockResolvedValueOnce(echoDelete());
+
+    const deleted = await deduplicateRecurringTransactions();
+
+    expect(deleted).toBe(1);
+    expect(transactionRepo.deleteTransactionCascade).toHaveBeenCalledTimes(3);
+    expect(reportError).toHaveBeenCalledWith(
+      expect.objectContaining({ surface: 'recurring-dedup', message: 'duplicate-delete-failed' })
+    );
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'warn',
+        surface: 'recurring-dedup',
+        context: { recur_surface: 'transaction', action: 'partial', perf_entity_count: 1 },
+      })
+    );
   });
 
   it('should not delete non-recurring transactions', async () => {
     vi.mocked(transactionRepo.getAllTransactions).mockResolvedValue([
-      {
-        id: 'tx-1',
-        accountId: 'acc-1',
-        type: 'expense',
-        amount: 50,
-        currency: 'EUR',
-        category: 'food',
-        date: '2026-04-01',
-        description: 'Groceries',
-        isReconciled: false,
-        createdAt: '2026-04-01T08:00:00.000Z',
-        updatedAt: '2026-04-01T08:00:00.000Z',
-      },
-      {
-        id: 'tx-2',
-        accountId: 'acc-1',
-        type: 'expense',
-        amount: 30,
-        currency: 'EUR',
-        category: 'food',
-        date: '2026-04-01',
-        description: 'More groceries',
-        isReconciled: false,
-        createdAt: '2026-04-01T09:00:00.000Z',
-        updatedAt: '2026-04-01T09:00:00.000Z',
-      },
-    ] as any);
+      dup('tx-1', '2026-04-01T08:00:00.000Z', { recurringItemId: undefined, type: 'expense' }),
+      dup('tx-2', '2026-04-01T09:00:00.000Z', { recurringItemId: undefined, type: 'expense' }),
+    ]);
 
-    const deleted = await deduplicateRecurringTransactions();
-
-    expect(deleted).toBe(0);
-    expect(transactionRepo.deleteTransaction).not.toHaveBeenCalled();
+    expect(await deduplicateRecurringTransactions()).toBe(0);
+    expect(transactionRepo.deleteTransactionCascade).not.toHaveBeenCalled();
+    expect(logEvent).not.toHaveBeenCalled();
   });
 
   it('should handle different recurring items on same date independently', async () => {
     vi.mocked(transactionRepo.getAllTransactions).mockResolvedValue([
-      {
-        id: 'tx-1',
-        accountId: 'acc-1',
-        type: 'income',
-        amount: 5000,
-        currency: 'EUR',
-        category: 'salary',
-        date: '2026-04-01',
-        description: 'Salary',
-        recurringItemId: 'rec-1',
-        isReconciled: false,
-        createdAt: '2026-04-01T08:00:00.000Z',
-        updatedAt: '2026-04-01T08:00:00.000Z',
-      },
-      {
-        id: 'tx-2',
-        accountId: 'acc-2',
-        type: 'expense',
-        amount: 100,
-        currency: 'EUR',
-        category: 'subscription',
-        date: '2026-04-01',
-        description: 'Rent',
-        recurringItemId: 'rec-2',
-        isReconciled: false,
-        createdAt: '2026-04-01T08:00:00.000Z',
-        updatedAt: '2026-04-01T08:00:00.000Z',
-      },
-    ] as any);
+      dup('tx-1', '2026-04-01T08:00:00.000Z'),
+      dup('tx-2', '2026-04-01T08:00:00.000Z', { recurringItemId: 'rec-2', accountId: 'acc-2' }),
+    ]);
 
-    const deleted = await deduplicateRecurringTransactions();
-
-    expect(deleted).toBe(0);
-    expect(transactionRepo.deleteTransaction).not.toHaveBeenCalled();
+    expect(await deduplicateRecurringTransactions()).toBe(0);
+    expect(transactionRepo.deleteTransactionCascade).not.toHaveBeenCalled();
   });
 });
 
 describe('recurringProcessor - a row that stands for a due date (#107)', () => {
-  const mortgage: RecurringItem = {
+  const mortgage = item({
     id: 'recurring-mortgage',
-    accountId: 'test-account-1',
-    type: 'expense',
     amount: 2000,
-    currency: 'USD',
     category: 'mortgage',
     description: 'Mortgage',
-    frequency: 'monthly',
     dayOfMonth: 1,
     startDate: '2024-01-01',
-    isActive: true,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z',
-  };
+  });
 
   function existing(date: string, isReconciled: boolean, recurringDueDate?: string): Transaction {
     return {
@@ -933,11 +434,8 @@ describe('recurringProcessor - a row that stands for a due date (#107)', () => {
     vi.useFakeTimers();
     // Due date in range: 2024-01-01 only.
     vi.setSystemTime(new Date('2024-01-20T12:00:00.000Z'));
-    vi.mocked(recurringRepo.getActiveRecurringItems).mockResolvedValue([mortgage]);
-    vi.mocked(transactionRepo.createTransaction).mockResolvedValue(existing('2024-01-01', false));
-    vi.mocked(accountRepo.getAccountById).mockResolvedValue({ ...mockAccount });
-    vi.mocked(accountRepo.incrementBalance).mockResolvedValue({ ...mockAccount });
-    vi.mocked(recurringRepo.updateLastProcessedDate).mockResolvedValue(undefined);
+    arm([mortgage]);
+    vi.mocked(transactionRepo.deleteTransactionCascade).mockResolvedValue(echoDelete());
   });
 
   afterEach(() => {
@@ -951,7 +449,7 @@ describe('recurringProcessor - a row that stands for a due date (#107)', () => {
     ]);
     const result = await processRecurringItems();
     expect(result.processed).toBe(0);
-    expect(transactionRepo.createTransaction).not.toHaveBeenCalled();
+    expect(transactionRepo.createTransactionCascade).not.toHaveBeenCalled();
   });
 
   it('a reconciled row in the month with NO due date does not suppress anything', async () => {
@@ -996,7 +494,6 @@ describe('recurringProcessor - a row that stands for a due date (#107)', () => {
       { ...existing('2024-01-24', true, '2024-01-28'), id: 'merged' },
       { ...existing('2024-01-24', false), id: 'real-24' },
     ]);
-    vi.mocked(transactionRepo.deleteTransaction).mockResolvedValue(true as never);
     expect(await deduplicateRecurringTransactions()).toBe(0);
     // And a merged row standing for the 28th plus a device-created row ON the 28th ARE the
     // same instance: one is swept.
@@ -1009,7 +506,7 @@ describe('recurringProcessor - a row that stands for a due date (#107)', () => {
       { ...existing('2024-01-28', false), id: 'device-b', createdAt: '2024-01-28T00:00:00.000Z' },
     ]);
     expect(await deduplicateRecurringTransactions()).toBe(1);
-    expect(transactionRepo.deleteTransaction).toHaveBeenCalledWith('device-b');
+    expect(transactionRepo.deleteTransactionCascade).toHaveBeenCalledWith('device-b');
   });
 
   it('keeps the original same-date rule', async () => {
@@ -1022,24 +519,14 @@ describe('recurringProcessor - a row that stands for a due date (#107)', () => {
 });
 
 describe('projectRecurringTransactions', () => {
-  const item: RecurringItem = {
-    id: 'rec-1',
-    accountId: 'acc-1',
-    type: 'expense',
-    amount: 50,
-    currency: 'USD',
-    category: 'subscription',
-    description: 'Netflix',
-    frequency: 'monthly',
-    dayOfMonth: 15,
-    startDate: '2024-01-01',
-    isActive: true,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z',
-  };
+  const netflix = item({ id: 'rec-1', accountId: 'acc-1', startDate: '2024-01-01' });
 
   it('emits one projected row per due date with the stable id shape', () => {
-    const rows = projectRecurringTransactions([item], new Date(2024, 1, 1), new Date(2024, 2, 31));
+    const rows = projectRecurringTransactions(
+      [netflix],
+      new Date(2024, 1, 1),
+      new Date(2024, 2, 31)
+    );
     expect(rows.map((r) => r.id)).toEqual([
       'projected-rec-1-2024-02-15',
       'projected-rec-1-2024-03-15',
@@ -1059,50 +546,32 @@ describe('projectRecurringTransactions', () => {
   });
 
   it('honours an id prefix (the next-month preview namespace)', () => {
-    const rows = projectRecurringTransactions([item], new Date(2024, 1, 1), new Date(2024, 1, 29), {
-      idPrefix: 'next-projected',
-    });
+    const rows = projectRecurringTransactions(
+      [netflix],
+      new Date(2024, 1, 1),
+      new Date(2024, 1, 29),
+      { idPrefix: 'next-projected' }
+    );
     expect(rows.map((r) => r.id)).toEqual(['next-projected-rec-1-2024-02-15']);
   });
 });
 
 describe('recurringProcessor - paused while read-only, caught up after (#95)', () => {
   // Last generated on 15 July; "today" is 15 October, so three instances are due.
-  const salary: RecurringItem = {
+  const salary = item({
     id: 'recurring-ro',
-    accountId: 'test-account-1',
     type: 'income',
     amount: 3000,
-    currency: 'USD',
     category: 'salary',
-    description: 'Monthly Salary',
-    frequency: 'monthly',
-    dayOfMonth: 15,
-    startDate: '2024-01-01T00:00:00.000Z',
     lastProcessedDate: '2024-07-15',
-    isActive: true,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z',
-  };
+  });
 
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2024-10-15T12:00:00.000Z'));
-    vi.mocked(recurringRepo.getActiveRecurringItems).mockResolvedValue([salary]);
+    arm([salary]);
     vi.mocked(transactionRepo.getAllTransactions).mockResolvedValue([]);
-    vi.mocked(transactionRepo.createTransaction).mockImplementation(
-      async (input) =>
-        ({
-          ...input,
-          id: `tx-${input.date}`,
-          createdAt: input.date,
-          updatedAt: input.date,
-        }) as Transaction
-    );
-    vi.mocked(accountRepo.getAccountById).mockResolvedValue({ ...mockAccount });
-    vi.mocked(accountRepo.incrementBalance).mockResolvedValue({ ...mockAccount });
-    vi.mocked(recurringRepo.updateLastProcessedDate).mockResolvedValue(undefined);
   });
 
   /** What the installed gate reports; flipped by each test. */
@@ -1138,8 +607,8 @@ describe('recurringProcessor - paused while read-only, caught up after (#95)', (
     // Nothing was even read, so nothing could be written.
     expect(recurringRepo.getActiveRecurringItems).not.toHaveBeenCalled();
     expect(transactionRepo.getAllTransactions).not.toHaveBeenCalled();
-    expect(transactionRepo.createTransaction).not.toHaveBeenCalled();
-    expect(transactionRepo.deleteTransaction).not.toHaveBeenCalled();
+    expect(transactionRepo.createTransactionCascade).not.toHaveBeenCalled();
+    expect(transactionRepo.deleteTransactionCascade).not.toHaveBeenCalled();
     expect(recurringRepo.updateLastProcessedDate).not.toHaveBeenCalled();
     expect(skippedEvents()).toHaveLength(1);
   });
@@ -1152,94 +621,10 @@ describe('recurringProcessor - paused while read-only, caught up after (#95)', (
     const result = await processRecurringItems();
 
     expect(result.processed).toBe(3);
-    const dates = vi
-      .mocked(transactionRepo.createTransaction)
-      .mock.calls.map(([input]) => input.date.slice(0, 10));
-    expect(dates).toEqual(['2024-08-15', '2024-09-15', '2024-10-15']);
+    expect(sentInputs().map((i) => i.date)).toEqual(['2024-08-15', '2024-09-15', '2024-10-15']);
     expect(recurringRepo.updateLastProcessedDate).toHaveBeenCalledWith(
       'recurring-ro',
       '2024-10-15'
     );
-  });
-});
-
-describe('recurringProcessor - a goal deleted between generation and the cascade (#117 Phase 2)', () => {
-  const salary: RecurringItem = {
-    id: 'recurring-goal-gone',
-    accountId: 'test-account-1',
-    type: 'income',
-    amount: 1000,
-    currency: 'USD',
-    category: 'salary',
-    description: 'Monthly Salary',
-    frequency: 'monthly',
-    dayOfMonth: 15,
-    startDate: '2024-01-01T00:00:00.000Z',
-    isActive: true,
-    goalId: 'goal-1',
-    goalAllocMode: 'percentage',
-    goalAllocValue: 20,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z',
-  };
-  const goal = {
-    id: 'goal-1',
-    name: 'Buy a Car',
-    type: 'savings' as const,
-    targetAmount: 10000,
-    currentAmount: 0,
-    currency: 'USD',
-    priority: 'high' as const,
-    isCompleted: false,
-    createdAt: '2024-01-01T00:00:00.000Z',
-    updatedAt: '2024-01-01T00:00:00.000Z',
-  };
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2024-01-15T12:00:00.000Z'));
-    vi.mocked(recurringRepo.getActiveRecurringItems).mockResolvedValue([salary]);
-    vi.mocked(accountRepo.getAccountById).mockResolvedValue({ ...mockAccount });
-    vi.mocked(recurringRepo.updateLastProcessedDate).mockResolvedValue(undefined);
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it('skips the contribution silently, as the replaced getGoalById check did', async () => {
-    vi.mocked(transactionRepo.createTransaction).mockResolvedValue({} as never);
-    // Present when the allocation is computed, gone by the time the cascade credits it.
-    vi.mocked(goalRepo.getGoalById).mockResolvedValueOnce(goal).mockResolvedValueOnce(undefined);
-
-    const result = await processRecurringItems();
-
-    expect(result).toEqual({ processed: 1, errors: [] });
-    expect(transactionRepo.createTransaction).toHaveBeenCalledWith(
-      expect.objectContaining({ goalId: 'goal-1', goalAllocApplied: 200 })
-    );
-    expect(accountRepo.incrementBalance).toHaveBeenCalled();
-    expect(goalRepo.applyContribution).not.toHaveBeenCalled();
-    expect(reportError).not.toHaveBeenCalled();
-  });
-
-  it('a failed instance reaches the firehose, not only the console', async () => {
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-    vi.mocked(goalRepo.getGoalById).mockResolvedValue(goal);
-    vi.mocked(transactionRepo.createTransaction).mockRejectedValue(new Error('worker down'));
-
-    const result = await processRecurringItems();
-
-    expect(result.processed).toBe(0);
-    expect(consoleError).toHaveBeenCalled();
-    expect(reportError).toHaveBeenCalledWith(
-      expect.objectContaining({
-        surface: 'recurring-processor',
-        severity: 'error',
-        context: { recur_surface: 'transaction', action: 'transaction' },
-      })
-    );
-    consoleError.mockRestore();
   });
 });

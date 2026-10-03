@@ -289,7 +289,7 @@ describe('GoogleDriveProvider', () => {
       expect(attemptSilentRefresh).toHaveBeenCalled();
       // Must NOT open an unsolicited popup.
       expect(requestAccessToken).not.toHaveBeenCalled();
-      expect(enqueueOfflineSave).toHaveBeenCalledWith('{"data":"test"}');
+      expect(enqueueOfflineSave).toHaveBeenCalledWith('auth');
     });
 
     it('when getValidTokenSilent throws TokenExpiredError: queues offline + re-throws (no popup)', async () => {
@@ -304,7 +304,7 @@ describe('GoogleDriveProvider', () => {
       await expect(provider.write('{"data":"test"}')).rejects.toBeInstanceOf(TokenExpiredError);
 
       expect(requestAccessToken).not.toHaveBeenCalled();
-      expect(enqueueOfflineSave).toHaveBeenCalledWith('{"data":"test"}');
+      expect(enqueueOfflineSave).toHaveBeenCalledWith('auth');
     });
 
     it('queues for offline when network error persists across retries', async () => {
@@ -316,7 +316,7 @@ describe('GoogleDriveProvider', () => {
 
       await provider.write('{"data":"offline"}');
 
-      expect(enqueueOfflineSave).toHaveBeenCalledWith('{"data":"offline"}');
+      expect(enqueueOfflineSave).toHaveBeenCalledWith('network');
     }, 20_000); // exponential backoff: 1s + 2s + 4s = 7s of retries
 
     it('recovers silently when transient network error resolves on retry', async () => {
@@ -347,7 +347,7 @@ describe('GoogleDriveProvider', () => {
 
       await provider.write('{"data":"ios"}');
 
-      expect(enqueueOfflineSave).toHaveBeenCalledWith('{"data":"ios"}');
+      expect(enqueueOfflineSave).toHaveBeenCalledWith('network');
     }, 20_000);
   });
 

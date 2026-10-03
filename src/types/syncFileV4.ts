@@ -173,7 +173,11 @@ export interface EnvelopeTombstone {
   revokedBy?: string;
 }
 
-export type BeanpodVersion = '4.0' | '5.0';
+/**
+ * `'6.0'` is READ-ONLY here (the reader half of the #117 flip gate): this build parses a
+ * 6.0 file but never writes one. See `KNOWN_BEANPOD_VERSIONS` in `fileSync.ts`.
+ */
+export type BeanpodVersion = '4.0' | '5.0' | '6.0';
 
 /** Beanpod file format v4.0 (envelope), at either `BeanpodVersion`. */
 export interface BeanpodFileV4 {
