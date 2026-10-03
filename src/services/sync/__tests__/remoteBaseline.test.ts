@@ -19,6 +19,7 @@ import {
   withinTrustWindow,
   type RemoteBaseline,
   type RemoteMarker,
+  revisionAdvance,
 } from '../remoteBaseline';
 
 const baseline = (over: Partial<RemoteBaseline> = {}): RemoteBaseline => ({
@@ -282,5 +283,22 @@ describe('baseline payload round-trip', () => {
       revision: 'ver:1',
       headsFp: null,
     });
+  });
+});
+
+describe('revisionAdvance (audit C4 write-race check)', () => {
+  it('measures how far a Drive revision moved, in BigInt (int64 strings)', () => {
+    expect(revisionAdvance('ver:10', 'ver:11')).toBe(1);
+    expect(revisionAdvance('ver:10', 'ver:13')).toBe(3);
+    expect(revisionAdvance('ver:9007199254740993', 'ver:9007199254740995')).toBe(2);
+  });
+  it('answers null — "no evidence", never a race — for anything not comparable', () => {
+    expect(revisionAdvance(null, 'ver:2')).toBeNull();
+    expect(revisionAdvance('ver:1', null)).toBeNull();
+    expect(revisionAdvance('ver:1', undefined)).toBeNull();
+    expect(revisionAdvance('ver:1', 'rev:2')).toBeNull();
+    expect(revisionAdvance('ver:x', 'ver:2')).toBeNull();
+    // A partial ack (not even a string) must not throw after a write that landed.
+    expect(revisionAdvance('ver:1', 42 as never)).toBeNull();
   });
 });

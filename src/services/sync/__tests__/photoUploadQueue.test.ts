@@ -78,6 +78,31 @@ describe('photoUploadQueue', () => {
     expect(await getPending()).toHaveLength(0);
   });
 
+  it('flushQueue is single-flight: overlapping triggers hand each entry to the handler once', async () => {
+    // Two drains in the same tick used to each read the same pending set and upload the same
+    // photo twice (C11). The second call must join the first's promise, not start another.
+    let release: () => void = () => {};
+    const gate = new Promise<void>((r) => (release = r));
+    const handler = vi.fn(async () => {
+      await gate;
+    });
+    setFlushHandler(handler);
+    await enqueueUpload(makeEntry({ photoId: 'p1' }));
+    await enqueueUpload(makeEntry({ photoId: 'p2' }));
+
+    const first = flushQueue();
+    const second = flushQueue();
+    expect(second).toBe(first);
+    release();
+    await Promise.all([first, second]);
+
+    expect(handler).toHaveBeenCalledTimes(2);
+    expect(await getPending()).toHaveLength(0);
+    // A later call starts a fresh drain (nothing left, so the handler is not called again).
+    await flushQueue();
+    expect(handler).toHaveBeenCalledTimes(2);
+  });
+
   it('flushQueue keeps failed entries for retry', async () => {
     // Handler fails only for the 'p-fail' entry. IDB iteration order is
     // key-sorted (UUIDs), not insertion order, so key the behavior on

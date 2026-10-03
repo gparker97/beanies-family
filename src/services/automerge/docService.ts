@@ -12,7 +12,7 @@
  * `mergeDoc`/`replaceDoc`/`onDocPersistNeeded`) has been retired — every caller
  * now uses `docClient` (worker RPC) + `projection` (sync reads).
  */
-import { docVersion, isLoaded } from './projection';
+import { docVersion, isAuthoritativeLoaded, isLoaded } from './projection';
 import * as docClient from './worker/docClient';
 
 export { docVersion };
@@ -22,6 +22,12 @@ export { docVersion };
  * the docVersion-computed stores) that guard on a ready doc. */
 export function isDocLoaded(): boolean {
   return isLoaded();
+}
+
+/** True only once the worker holds a real document (not merely a snapshot fast-paint).
+ * Gate pre-hydration WRITES on this; `isDocLoaded()` stays the display-readiness check. */
+export function isAuthoritativeDocLoaded(): boolean {
+  return isAuthoritativeLoaded();
 }
 
 /** Sign-out / family-switch: drop the worker's doc AND clear the main-thread

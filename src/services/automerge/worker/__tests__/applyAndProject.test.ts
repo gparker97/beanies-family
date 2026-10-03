@@ -128,7 +128,8 @@ describe('worker/applyAndProject', () => {
       mutate({ op: 'set', collection: 'accounts', id: 'a1', entity: { id: 'a1', balance: 7 } });
       await flush(); // folds the coarse snapshot persist
       // Drop the current doc: prove the snapshot streams from cache alone (no doc).
-      reset();
+      // Awaited: with a cache open, `reset` now flushes before it tears down (C5f).
+      await reset();
       configure({
         pushChunk: (delta, final) => chunks.push({ delta, final }),
         perf: (label) => perf.push(label),
@@ -327,7 +328,8 @@ describe('worker/applyAndProject', () => {
       setKey(key);
       await initAndLoadCache(FAMILY_ID);
       expect(cache.isCacheReady()).toBe(true);
-      reset();
+      // Awaited: `reset` now lets a pending persist land before it closes (C5f).
+      await reset();
       expect(cache.isCacheReady()).toBe(false);
     });
   });
@@ -741,8 +743,9 @@ describe('worker/applyAndProject', () => {
     expect(cache.incrementCount()).toBe(OVER);
 
     // Fresh session: reset in-memory state, then load. Over-threshold + not-recovered
-    // → the else-branch schedules a one-time compaction (debounced).
-    reset();
+    // → the else-branch schedules a one-time compaction (debounced). Awaited: `reset` now
+    // flushes before it closes the handle (C5f).
+    await reset();
     setKey(key);
     perf.length = 0;
     const res = await initAndLoadCache(FAMILY_ID);

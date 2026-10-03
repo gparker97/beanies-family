@@ -88,7 +88,10 @@ vi.mock('@/services/sync/fileSync', async (importOriginal) => ({
   importFromFile: vi.fn(async () => ({ success: true })),
 }));
 
-vi.mock('@/services/sync/envelopeMerge', () => ({
+vi.mock('@/services/sync/envelopeMerge', async (importOriginal) => ({
+  // Pure helpers the store reads but these tests do not stub (the registry, the
+  // family-identity check, the monotonic stamp) come from the real module.
+  ...(await importOriginal<typeof import('@/services/sync/envelopeMerge')>()),
   preserveLocalKeyDicts: vi.fn((remote: unknown) => remote),
   keyDictSize: vi.fn(() => 0),
   mergeEnvelopes: vi.fn((remote: unknown) => ({
@@ -99,7 +102,6 @@ vi.mock('@/services/sync/envelopeMerge', () => ({
   applyRevokedKeys: vi.fn((env: unknown) => ({ envelope: env, filtered: 0 })),
   mergeRevokedKeys: vi.fn((a: unknown, b: unknown) => ({ ...(a ?? {}), ...(b ?? {}) })),
   revocationTombstonesForMember: vi.fn(() => ({ tombstones: {}, unattributedPasskeys: 0 })),
-  revocationKey: vi.fn((field: string, key: string) => `${field}:${key}`),
   slotTombstoneEntryKey: vi.fn(() => null),
   // Real behaviour, not a pass-through: `replaceEnvelope` strips the payload
   // from the long-lived envelope, and a stub that skipped it would hide a
@@ -344,5 +346,127 @@ describe('revokeRecoveryKit — the last-kit guard runs on the freshly merged en
     const r = await store.revokeRecoveryKit('kitB');
     // Not rolled back: the tombstone is staged and rides the next save.
     expect(r).toEqual({ committed: true, outcome: 'failed', observed: false, liveRemaining: 2 });
+  });
+});
+
+/**
+ * Audit C2: every envelope writer builds from the AUTHORITATIVE envelope. A poll merge
+ * updates syncService's copy and never `syncStore.envelope.value`, so a writer that
+ * spread the store ref republished a pre-merge snapshot.
+ */
+describe('envelope writers build from the authoritative envelope (audit C2)', () => {
+  const PEER_PASSKEY = { wrapped: 'peer-wrap', hkdfSalt: 'h', memberId: 'm-peer' };
+  /** The envelope as syncService holds it after a poll merge brought a peer's passkey in. */
+  const POLL_MERGED = {
+    version: '4.0',
+    familyId: 'family-123',
+    familyName: 'Old Name',
+    keyId: 'key-1',
+    encryptedPayload: '',
+    wrappedKeys: { m1: { wrapped: 'OLD-w', salt: 'OLD-s' } },
+    passkeyWrappedKeys: { 'cred-peer': PEER_PASSKEY },
+    inviteKeys: {},
+  };
+
+  /** syncService's envelope as live state: what `setEnvelope` stores, `getEnvelope` returns. */
+  function liveServiceEnvelope(initial: Record<string, unknown>): () => Record<string, unknown> {
+    let current = initial;
+    vi.mocked(syncService.getEnvelope).mockImplementation(() => current as never);
+    vi.mocked(syncService.setEnvelope).mockImplementation((env) => {
+      current = env as unknown as Record<string, unknown>;
+    });
+    return () => current;
+  }
+
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+  });
+
+  it('a poll-merged peer passkey survives a later password rotation on this device', async () => {
+    const live = liveServiceEnvelope({ ...POLL_MERGED });
+    const store = useSyncStore();
+
+    await store.setMemberWrappedKey('m1', { wrapped: 'NEW-w', salt: 'NEW-s' });
+
+    const after = live();
+    expect(after.passkeyWrappedKeys).toEqual({ 'cred-peer': PEER_PASSKEY });
+    expect((after.wrappedKeys as Record<string, unknown>).m1).toEqual({
+      wrapped: 'NEW-w',
+      salt: 'NEW-s',
+    });
+    // The OLD wrap is tombstoned, value-pinned, BEFORE the new one is written: a peer still
+    // holding OLD-w cannot republish it (see envelopeMerge.test.ts for the merge side).
+    expect(after.revokedKeys).toHaveProperty(['wrappedKeys:m1:OLD-w']);
+    expect(after.revokedKeys).not.toHaveProperty(['wrappedKeys:m1:NEW-w']);
+  });
+
+  it('a rotation ROLLBACK lifts the local tombstone, so the restored wrap is not filtered out', async () => {
+    const live = liveServiceEnvelope({ ...POLL_MERGED });
+    const store = useSyncStore();
+    await store.setMemberWrappedKey('m1', { wrapped: 'NEW-w', salt: 'NEW-s' });
+    // authStore.restoreCredential: the durable save failed, put the old wrap back.
+    await store.setMemberWrappedKey('m1', { wrapped: 'OLD-w', salt: 'OLD-s' });
+
+    const after = live();
+    expect((after.wrappedKeys as Record<string, unknown>).m1).toEqual({
+      wrapped: 'OLD-w',
+      salt: 'OLD-s',
+    });
+    expect(after.revokedKeys ?? {}).not.toHaveProperty(['wrappedKeys:m1:OLD-w']);
+    // And the rolled-back NEW wrap is not tombstoned either: if the rotation did land
+    // remotely, the convergence path decides, not a second tombstone from here.
+    expect(after.revokedKeys ?? {}).not.toHaveProperty(['wrappedKeys:m1:NEW-w']);
+    expect(after.passkeyWrappedKeys).toEqual({ 'cred-peer': PEER_PASSKEY });
+  });
+
+  it('a first-time password set (no previous wrap) writes no tombstone', async () => {
+    const live = liveServiceEnvelope({ ...POLL_MERGED, wrappedKeys: {} });
+    await useSyncStore().setMemberWrappedKey('m1', { wrapped: 'NEW-w', salt: 'NEW-s' });
+    expect(live().revokedKeys).toBeUndefined();
+  });
+
+  it('persistFamilyName renames the authoritative envelope, keeping the merged peer passkey', async () => {
+    const live = liveServiceEnvelope({ ...POLL_MERGED });
+    vi.mocked(syncService.save).mockResolvedValue(true);
+    const store = useSyncStore();
+
+    await store.persistFamilyName('New Name');
+
+    expect(live().familyName).toBe('New Name');
+    expect(live().passkeyWrappedKeys).toEqual({ 'cred-peer': PEER_PASSKEY });
+  });
+
+  it('clamps a newest-wins mint stamped at or before the entry it replaces (audit C12)', async () => {
+    const EXISTING = '2026-10-03T12:00:00.000Z';
+    const live = liveServiceEnvelope({
+      ...POLL_MERGED,
+      memberLinkKeys: {
+        m1: {
+          salt: 's',
+          wrapped: 'old-link',
+          tokenHash: 'h0',
+          keyId: 'key-1',
+          createdAt: EXISTING,
+          expiresAt: '2026-10-10T00:00:00.000Z',
+        },
+      },
+    });
+    vi.mocked(syncService.save).mockResolvedValue(true);
+    const store = useSyncStore();
+
+    // A device whose clock is an hour behind the one that minted the existing link.
+    await store.setMemberLinkWrap('m1', {
+      salt: 's',
+      wrapped: 'new-link',
+      tokenHash: 'h1',
+      keyId: 'key-1',
+      createdAt: '2026-10-03T11:00:00.000Z',
+      expiresAt: '2026-10-10T00:00:00.000Z',
+    } as never);
+
+    const links = live().memberLinkKeys as Record<string, { wrapped: string; createdAt: string }>;
+    expect(links.m1!.wrapped).toBe('new-link');
+    expect(links.m1!.createdAt).toBe('2026-10-03T12:00:00.001Z');
   });
 });

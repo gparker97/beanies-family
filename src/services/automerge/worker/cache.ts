@@ -31,7 +31,7 @@ import { withTimeout } from '@/utils/timing';
 import { generateUUID } from '@/utils/id';
 import { setDeviceWriterId } from './docActor';
 import type { RemoteBaselineRow } from '@/services/sync/remoteBaseline';
-import type { CacheClearResult } from './protocol';
+import type { CacheClearResult, CacheReplay } from './protocol';
 import {
   loadAndVerify,
   applyChanges,
@@ -85,14 +85,31 @@ const REMOTE_BASELINE_KEY = 'remote-baseline';
  * everything else by `clearCache`'s whole-DB delete.
  */
 const DEVICE_WRITER_KEY = 'device-writer';
-/** Increment rows key on `inc:<zero-padded seq>` so IDB's lexical key order == seq order. */
+/**
+ * Increment rows key on `inc:<zero-padded seq>:<realm>` so IDB's lexical key order == seq order.
+ * Rows written before C5 (data-layer audit 2026-10-03) carry no realm suffix and still parse.
+ */
 const INC_PREFIX = 'inc:';
 /** The char after ':' — upper bound (exclusive) for the `inc:*` key range. */
 const INC_UPPER = 'inc;';
 const INC_PAD = 12;
 
-const incKey = (seq: number): string => `${INC_PREFIX}${String(seq).padStart(INC_PAD, '0')}`;
-const parseIncKey = (key: string): number => Number(key.slice(INC_PREFIX.length));
+/**
+ * This realm's increment-key suffix (C5h). Two tabs of one device share one cache DB, each with
+ * its own worker, and both counted `incSeq` from the same max: their `put`s landed on the same
+ * key and the later one silently replaced the earlier tab's increment. A per-realm suffix makes
+ * the keys disjoint, and `add()` (never `put`) makes any residual collision a loud
+ * `ConstraintError` instead of a clobber. Interim: a single elected writer is the follow-up.
+ */
+const REALM_ID = generateUUID().replace(/-/g, '').slice(0, 12);
+
+const incKey = (seq: number): string =>
+  `${INC_PREFIX}${String(seq).padStart(INC_PAD, '0')}:${REALM_ID}`;
+const parseIncKey = (key: string): number => {
+  const rest = key.slice(INC_PREFIX.length);
+  const colon = rest.indexOf(':');
+  return Number(colon < 0 ? rest : rest.slice(0, colon));
+};
 
 const DB_PREFIX = 'beanies-automerge-';
 
@@ -143,8 +160,18 @@ let cacheDb: IDBPDatabase<CacheDB> | null = null;
 let cacheDbFamilyId: string | null = null;
 /** Next increment seq to write. Initialized from the max existing `inc:*` key on
  * open (a respawn must NOT reuse a seq and clobber a not-yet-superseded increment);
- * reset to 0 whenever a fresh base is written (which clears all increments). */
+ * reset past the highest KEPT row whenever a fresh base is written. */
 let incSeq = 0;
+/** How many `inc:*` rows are on disk (the re-compaction trigger, `incrementCount`). */
+let incRowCount = 0;
+/**
+ * The increment rows the in-memory document provably CONTAINS (C5h): every row this realm
+ * replayed cleanly at load, plus every row it wrote since. A base write that is not a
+ * supersede deletes ONLY these. A row another tab wrote after our load, a row that would not
+ * decrypt, and a row whose deps are missing are KEPT, because the base being written does not
+ * hold them and deleting them was silent loss.
+ */
+let containedRows = new Set<string>();
 
 /** Who hears about a release. Registered once by `applyAndProject.configure()`. */
 type CacheReleasedListener = (reason: 'deleted' | 'upgrade') => void;
@@ -160,6 +187,8 @@ function closeHandle(): void {
   cacheDb = null;
   cacheDbFamilyId = null;
   incSeq = 0;
+  incRowCount = 0;
+  containedRows = new Set();
   // The id belongs to the DB it was read from: a write after the handle closed (sign-out, a
   // family switch, another tab's delete) must not key a Counter with another family's device.
   setDeviceWriterId(null);
@@ -233,15 +262,20 @@ export async function initPersistenceDB(familyId: string): Promise<void> {
   // #117 Phase 2: read (or mint, once) this device's Counter writer id BEFORE the handle is
   // installed, so an open that cannot read its own id is an open that failed. Once posted, it
   // supersedes any ephemeral id a cacheless stretch of this session minted (`docActor.ts`).
+  // C5b: EVERY read the handle depends on runs before ANY of it is installed. The increment
+  // scan used to run after `cacheDb` was assigned, so a scan that failed left a live handle
+  // with `incSeq = 0`, and the next persist overwrote `inc:000000000000`.
   let writerId: string;
+  let scan: { next: number; count: number };
   try {
     writerId = await ensureDeviceWriterId(db);
+    scan = await scanIncrements(db);
   } catch (e) {
     db.close();
     throw e;
   }
 
-  // ⚠️ ASSIGNED ONLY ON SUCCESS, and load-bearing twice. `isCacheReady()` is
+  // ⚠️ ASSIGNED ONLY ON SUCCESS, TOGETHER, and load-bearing twice. `isCacheReady()` is
   // exactly `cacheDb !== null`, so a timeout must leave it null or a write will
   // target a DB we do not hold; and a late open cannot install itself as another
   // family's handle minutes later.
@@ -249,7 +283,33 @@ export async function initPersistenceDB(familyId: string): Promise<void> {
   cacheDb = db;
   cacheDbFamilyId = familyId;
   setDeviceWriterId(writerId);
-  incSeq = await maxIncSeq(cacheDb);
+  incSeq = scan.next;
+  incRowCount = scan.count;
+  containedRows = new Set();
+}
+
+/** The family whose cache DB is open, or `null`. */
+export function cacheFamilyId(): string | null {
+  return cacheDbFamilyId;
+}
+
+/**
+ * The live handle, or a throw naming the call. Every write captures it BEFORE its first
+ * `await` (C5g) and re-checks with `assertSameHandle` after: a family switch, a sign-out or
+ * another tab's delete during an encrypt used to send the write to whatever handle was open
+ * by then, which could be another family's database.
+ */
+function requireHandle(): IDBPDatabase<CacheDB> {
+  if (!cacheDb) throw new Error('Cache DB not initialized. Call initPersistenceDB() first.');
+  return cacheDb;
+}
+
+function assertSameHandle(db: IDBPDatabase<CacheDB>, op: string): void {
+  if (cacheDb === db) return;
+  const err = new Error(`cache handle changed during ${op}; the write was abandoned`);
+  // Literal: the prod build minifies class names. `applyAndProject.persistOnce` keys on it.
+  err.name = 'CacheHandleChangedError';
+  throw err;
 }
 
 /**
@@ -281,60 +341,88 @@ export async function readDeviceWriterId(): Promise<string | null> {
   return entry?.payload || null;
 }
 
-/** Read the next free increment seq (= max existing `inc:*` index + 1, or 0). */
-async function maxIncSeq(db: IDBPDatabase<CacheDB>): Promise<number> {
+/** The next free increment seq (= max existing `inc:*` seq + 1, or 0) and the row count. */
+async function scanIncrements(db: IDBPDatabase<CacheDB>): Promise<{ next: number; count: number }> {
   const keys = (await withIdbRetry('maxIncSeq', () =>
     db.getAllKeys(STORE_NAME, IDBKeyRange.bound(INC_PREFIX, INC_UPPER, false, true))
   )) as string[];
-  if (keys.length === 0) return 0;
-  return parseIncKey(keys[keys.length - 1]!) + 1;
+  let max = -1;
+  for (const k of keys) max = Math.max(max, parseIncKey(k));
+  return { next: max + 1, count: keys.length };
 }
 
 /**
- * Write the whole-doc BASE snapshot (encrypted), clearing every existing increment
- * and the legacy row. This is both the first persist for a doc and a re-compaction:
- * afterwards the base alone reconstructs the doc, and increments resume from seq 0.
+ * Write the whole-doc BASE snapshot (encrypted) and drop the legacy row, deleting the
+ * increments the new base makes redundant, in the same transaction.
+ *
+ * Which increments that is depends on what the base IS (C5h):
+ *  - `supersede: true` (a NEW document generation was installed: a fresh family, an adopt, a
+ *    rebase, a compaction): every increment. They describe a history the new base replaces,
+ *    and replaying them over it would only buffer changes whose deps never arrive.
+ *  - otherwise (a re-compaction or a recovery of the SAME document): only the rows the
+ *    in-memory document provably contains (`containedRows`). A row another tab wrote, a row
+ *    that would not decrypt and a row waiting on missing deps are KEPT.
  * (Kept named `persistDocBinary` — tests seed a base doc through it.)
  */
-export async function persistDocBinary(familyKey: CryptoKey, binary: Uint8Array): Promise<void> {
-  if (!cacheDb) throw new Error('Cache DB not initialized. Call initPersistenceDB() first.');
+export async function persistDocBinary(
+  familyKey: CryptoKey,
+  binary: Uint8Array,
+  opts?: { supersede?: boolean }
+): Promise<void> {
+  const db = requireHandle(); // C5g: before the first await
+  const supersede = opts?.supersede === true;
   const encrypted = await encryptPayload(familyKey, binary);
   const payload = bufferToBase64(encrypted);
-  const db = cacheDb;
+  assertSameHandle(db, 'persistBase');
+  const deletable = containedRows;
 
-  await withIdbRetry('persistBase', async () => {
+  const kept = await withIdbRetry('persistBase', async () => {
     const tx = db.transaction(STORE_NAME, 'readwrite');
     const store = tx.objectStore(STORE_NAME);
     await store.put({ id: BASE_KEY, payload, updatedAt: nowIso() });
-    // Clear superseded increments + any legacy whole-doc row in the same tx so a
-    // reader never sees a base without its matching (empty) increment set.
+    // Clear redundant increments + any legacy whole-doc row in the same tx so a
+    // reader never sees a base without its matching increment set.
+    const keptKeys: string[] = [];
     let cursor = await store.openCursor(IDBKeyRange.bound(INC_PREFIX, INC_UPPER, false, true));
     while (cursor) {
-      await cursor.delete();
+      const k = String(cursor.key);
+      if (supersede || deletable.has(k)) await cursor.delete();
+      else keptKeys.push(k);
       cursor = await cursor.continue();
     }
     await store.delete(LEGACY_DOC_KEY);
     await tx.done;
+    return keptKeys;
   });
-  incSeq = 0;
+  if (cacheDb !== db) return; // closed meanwhile: the counters belong to the next open
+  let max = -1;
+  for (const k of kept) max = Math.max(max, parseIncKey(k));
+  incSeq = max + 1;
+  incRowCount = kept.length;
+  containedRows = new Set();
 }
 
-/** Append one encrypted increment (a framed change chunk). */
+/**
+ * Append one encrypted increment (a framed change chunk) under this realm's own key, with
+ * `add()`, so a collision fails loudly instead of replacing another tab's row (C5h).
+ */
 export async function persistIncrement(familyKey: CryptoKey, framed: Uint8Array): Promise<void> {
-  if (!cacheDb) throw new Error('Cache DB not initialized. Call initPersistenceDB() first.');
+  const db = requireHandle(); // C5g: before the first await
+  const id = incKey(incSeq++); // reserved now: a concurrent writer can never take it
   const encrypted = await encryptPayload(familyKey, framed);
   const payload = bufferToBase64(encrypted);
-  const db = cacheDb;
-  const id = incKey(incSeq);
+  assertSameHandle(db, 'persistIncrement');
   await withIdbRetry('persistIncrement', () =>
-    db.put(STORE_NAME, { id, payload, updatedAt: nowIso() })
+    db.add(STORE_NAME, { id, payload, updatedAt: nowIso() })
   );
-  incSeq += 1;
+  if (cacheDb !== db) return;
+  containedRows.add(id);
+  incRowCount += 1;
 }
 
 /** How many increments sit on top of the current base (the re-compaction trigger). */
 export function incrementCount(): number {
-  return incSeq;
+  return incRowCount;
 }
 
 // ─── Projection snapshot (display-only fast first paint) ──────────────────────
@@ -351,7 +439,9 @@ export function incrementCount(): number {
  * On any mismatch the snapshot is ignored and the authoritative rebuild is the sole
  * source — so a forgotten manual bump only costs a one-open fallback, never a crash.
  */
-const SNAPSHOT_MANUAL_REV = 1;
+// 2 (data-layer audit C9, 2026-10-03): `foldDoc` now stores the UNFLOORED absolute, so a
+// snapshot written by an earlier build can hold a floored value a fresh rebuild would not.
+const SNAPSHOT_MANUAL_REV = 2;
 function collectionsFingerprint(): number {
   const s = [...COLLECTION_NAMES].sort().join(',');
   let h = 2166136261;
@@ -378,12 +468,13 @@ export async function persistProjectionSnapshot(
   familyKey: CryptoKey,
   snapshot: ProjectionSnapshot
 ): Promise<void> {
-  if (!cacheDb) throw new Error('Cache DB not initialized. Call initPersistenceDB() first.');
+  const db = requireHandle(); // C5g: before the first await
   const bytes = new TextEncoder().encode(JSON.stringify(snapshot));
   const encrypted = await encryptPayload(familyKey, bytes);
   const payload = bufferToBase64(encrypted);
+  assertSameHandle(db, 'persistSnapshot');
   await withIdbRetry('persistSnapshot', () =>
-    cacheDb!.put(STORE_NAME, { id: SNAPSHOT_KEY, payload, updatedAt: nowIso() })
+    db.put(STORE_NAME, { id: SNAPSHOT_KEY, payload, updatedAt: nowIso() })
   );
 }
 
@@ -432,9 +523,9 @@ export async function readRemoteBaseline(): Promise<RemoteBaselineRow | null> {
  * `encodeBaselinePayload`; this function never inspects it.
  */
 export async function writeRemoteBaseline(payload: string): Promise<void> {
-  if (!cacheDb) throw new Error('Cache DB not initialized. Call initPersistenceDB() first.');
+  const db = requireHandle(); // C5g: a retry must not re-read a handle that moved
   await withIdbRetry('writeRemoteBaseline', () =>
-    cacheDb!.put(STORE_NAME, { id: REMOTE_BASELINE_KEY, payload, updatedAt: nowIso() })
+    db.put(STORE_NAME, { id: REMOTE_BASELINE_KEY, payload, updatedAt: nowIso() })
   );
 }
 
@@ -450,18 +541,22 @@ export async function clearRemoteBaseline(): Promise<void> {
  *
  * Fast path applies all increments in one `applyChanges` call. On ANY increment
  * failure (decrypt / unframe / apply) it falls back to applying increments one at
- * a time and STOPS at the first bad one — recovering base + `[0..k-1]` rather than
- * discarding every persisted mutation after a single mid-log corruption (a finances
- * doc). `recovered:true` tells the caller to rewrite a clean base. A base that
- * decrypts but won't materialize still throws `CorruptPayloadError` (the caller
- * clears-and-rebuilds) — a corrupt BASE is unrecoverable, unlike a corrupt tail.
+ * a time and SKIPS each bad one (C5c: it used to STOP there, and the caller's base
+ * rewrite then deleted every good row after it). Either way it then asks
+ * `getMissingDeps`: Automerge buffers a change whose deps are absent without
+ * throwing, so a replay can "succeed" while holding work it cannot show. The answer
+ * rides back in the `CacheReplay` fields; `recovered:true` covers both.
+ *
+ * Also records which rows the reconstructed document provably CONTAINS
+ * (`containedRows`), which is all a later non-superseding base write may delete.
+ * A base that decrypts but won't materialize still throws `CorruptPayloadError` (the
+ * caller clears-and-rebuilds) — a corrupt BASE is unrecoverable, unlike a corrupt tail.
  */
 export async function loadCachedDoc(
   familyKey: CryptoKey,
   familyId: string | null
-): Promise<{ doc: Doc; recovered: boolean } | null> {
-  if (!cacheDb) throw new Error('Cache DB not initialized. Call initPersistenceDB() first.');
-  const db = cacheDb;
+): Promise<({ doc: Doc } & CacheReplay) | null> {
+  const db = requireHandle();
 
   const baseEntry =
     (await withIdbRetry('loadBase', () => db.get(STORE_NAME, BASE_KEY))) ??
@@ -482,7 +577,33 @@ export async function loadCachedDoc(
   const incEntries = (await withIdbRetry('loadIncrements', () =>
     db.getAll(STORE_NAME, IDBKeyRange.bound(INC_PREFIX, INC_UPPER, false, true))
   )) as Array<{ id: string; payload: string }>;
-  if (incEntries.length === 0) return { doc: baseDoc, recovered: false };
+  const finish = (
+    doc: Doc,
+    applied: Map<string, Uint8Array[]>,
+    dropped: number
+  ): { doc: Doc } & CacheReplay => {
+    const missingDeps = Automerge.getMissingDeps(doc, []).length;
+    const contained = new Set<string>();
+    for (const [id, changes] of applied) {
+      // With nothing missing every applied row is in the history. Otherwise check each change:
+      // a buffered change is NOT in it (`hasHeads` answers false), and its row must survive.
+      if (
+        missingDeps === 0 ||
+        changes.every((c) => Automerge.hasHeads(doc, [Automerge.decodeChange(c).hash!]))
+      ) {
+        contained.add(id);
+      }
+    }
+    if (cacheDb === db) containedRows = contained;
+    return {
+      doc,
+      recovered: dropped > 0 || missingDeps > 0,
+      droppedIncrements: dropped,
+      missingDeps,
+      incrementCount: incEntries.length,
+    };
+  };
+  if (incEntries.length === 0) return finish(baseDoc, new Map(), 0);
 
   /** Decrypt one increment, classifying an allocation failure as `decrypt`. */
   const openIncrement = async (payload: string): Promise<Uint8Array> => {
@@ -499,54 +620,55 @@ export async function loadCachedDoc(
 
   // Fast path: decrypt + unframe every increment, apply in one call.
   try {
+    const applied = new Map<string, Uint8Array[]>();
     const all: Uint8Array[] = [];
     for (const entry of incEntries) {
-      all.push(...unframeChanges(await openIncrement(entry.payload)));
+      const changes = unframeChanges(await openIncrement(entry.payload));
+      applied.set(entry.id, changes);
+      all.push(...changes);
     }
-    return { doc: applyChanges(baseDoc, all).doc, recovered: false };
+    return finish(applyChanges(baseDoc, all).doc, applied, 0);
   } catch (fastErr) {
     // Already classified by `openIncrement` — do not relabel it below.
     if (fastErr instanceof PayloadLoadError) throw fastErr;
     // ⚠️ OUT OF MEMORY IS NOT CORRUPTION, AND THE SLOW PATH DESTROYS DATA FOR IT.
     //
     // If the fast path failed because the device could not allocate, EVERY
-    // single-increment apply below fails the same way, so replay stops at the
-    // FIRST increment and returns `recovered: true` — which tells the caller to
-    // rewrite a clean base, and a base write clears every increment. On a
-    // memory-constrained tablet that is silent, permanent loss of edits that
-    // may never have been synced. The increments are fine; this device just
-    // couldn't inflate them. Surface it so `initAndLoadCache` takes its
+    // single-increment apply below fails the same way, so replay would drop EVERY
+    // increment and return `recovered: true`. The increments are fine; this device
+    // just couldn't inflate them. Surface it so `initAndLoadCache` takes its
     // preserve-the-cache branch and the bytes survive for a device (or a
     // reload) that can.
     if (isAllocationFailure(fastErr)) {
       throw oomDuringReplay('materialize', fastErr, familyId, baseBinary);
     }
 
-    // Slow path: apply increments one at a time from a fresh base, stop at the
-    // first failure, keep the prefix. Never a silent partial (breadcrumb below).
+    // Slow path: apply increments one at a time from a fresh base, SKIP each bad one, keep
+    // everything else. Never a silent partial: the counts ride back to main.
     console.warn(
-      '[cache] increment apply failed — recovering base + increments before the first bad one.',
+      '[cache] increment apply failed — replaying one at a time and skipping the bad rows.',
       fastErr
     );
     let doc = loadAndVerify(baseBinary, familyId);
+    const applied = new Map<string, Uint8Array[]>();
+    let dropped = 0;
     for (const entry of incEntries) {
       try {
-        doc = applyChanges(doc, unframeChanges(await openIncrement(entry.payload))).doc;
+        const changes = unframeChanges(await openIncrement(entry.payload));
+        doc = applyChanges(doc, changes).doc;
+        applied.set(entry.id, changes);
       } catch (incErr) {
         // Same reasoning as above: running out of memory partway through replay
-        // must not be recorded as "everything from here on is corrupt".
+        // must not be recorded as "this row is corrupt".
         if (incErr instanceof PayloadLoadError) throw incErr;
         if (isAllocationFailure(incErr)) {
           throw oomDuringReplay('materialize', incErr, familyId, baseBinary);
         }
-        console.warn(
-          `[cache] stopping increment replay at ${entry.id} (corrupt/unapplyable).`,
-          incErr
-        );
-        break;
+        console.warn(`[cache] skipping increment ${entry.id} (corrupt/unapplyable).`, incErr);
+        dropped++;
       }
     }
-    return { doc, recovered: true };
+    return finish(doc, applied, dropped);
   }
 }
 

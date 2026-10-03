@@ -27,6 +27,7 @@ import { GoogleDriveProvider } from '@/services/sync/providers/googleDriveProvid
 import * as syncService from '@/services/sync/syncService';
 import { supportsFileSystemAccess, isNative } from '@/services/sync/capabilities';
 import { withTimeout } from '@/utils/timing';
+import { logEvent } from '@/services/telemetry/logEvent';
 import {
   FileNameCollisionError,
   CollisionCheckUnavailableError,
@@ -210,8 +211,24 @@ export async function gateCreateDriveAuth(loginHint: string | undefined): Promis
       ? { kind: 'proceed' }
       : { kind: 'failed', error: outcome.error };
   } catch (e) {
+    logConnectFailure('drive-auth-gate-threw', e);
     return { kind: 'failed', error: e instanceof Error ? e : new Error(String(e)) };
   }
+}
+
+/**
+ * Every unclassified failure out of this module reaches the firehose (audit C12). The
+ * typed arms (cancel, collision, consent) are decisions the caller renders; THIS is the
+ * remainder, which used to leave only a string in the caller's state.
+ */
+function logConnectFailure(action: string, e: unknown): void {
+  logEvent({
+    level: 'warn',
+    surface: 'connect-storage',
+    message: 'storage connect step failed',
+    error: e instanceof Error ? e : undefined,
+    context: { action, error_code: e instanceof Error ? e.name : 'unknown' },
+  });
 }
 
 /**
@@ -317,6 +334,7 @@ export async function connectDriveStorage(
         cancelled: true,
       };
     }
+    logConnectFailure('drive-connect-failed', e);
     return { status: 'failed', error: e instanceof Error ? e.message : String(e) };
   }
 }
@@ -364,6 +382,7 @@ export async function resolveExistingBeanpod(collision: {
   } catch (e) {
     // Fail safe: ask the user rather than silently adopting, and never re-throw.
     console.warn('[connectStorage] stub probe inconclusive — treating as populated:', e);
+    logConnectFailure('stub-probe-inconclusive', e);
     return { kind: 'adopt-existing', fileId: collision.fileId };
   }
 }
@@ -426,6 +445,7 @@ export async function connectLocalStorage(
         ? { status: 'connected', type: 'local' }
         : { status: 'failed', error: 'Could not set up local file storage' };
     } catch (e) {
+      logConnectFailure('native-local-connect-failed', e);
       return { status: 'failed', error: e instanceof Error ? e.message : String(e) };
     }
   }
@@ -446,6 +466,7 @@ export async function connectLocalStorage(
     if (ok) return { status: 'connected', type: 'local' };
     return { status: 'failed', error: 'File picker cancelled', cancelled: true };
   } catch (e) {
+    logConnectFailure('local-connect-failed', e);
     return { status: 'failed', error: e instanceof Error ? e.message : String(e) };
   }
 }

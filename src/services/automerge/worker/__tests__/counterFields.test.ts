@@ -741,7 +741,11 @@ describe('foldDoc (the compaction source)', () => {
     expect(foldIndex(doc).malformed).toBe(1);
   });
 
-  it('DROPS a key no build can read (unparseable, unknown collection, non-integer), with ONE warning', () => {
+  it('DROPS a key no build can read (unparseable, non-integer), with ONE warning', () => {
+    // ⚠️ BEHAVIOUR CHANGED (C9e, data-layer audit 2026-10-03): an UNKNOWN COLLECTION used to be
+    // dropped here too. A key that splits is a newer build's Counter whichever segment is
+    // unknown, so it now refuses (pinned below); only a key that does not split, or a value no
+    // build can read, is dropped.
     __setCounterWritesForTesting(true);
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     try {
@@ -749,7 +753,6 @@ describe('foldDoc (the compaction source)', () => {
         adjustField(d, 'accounts', 'A', 'balance', -20.25, W1);
         const map = d.counterDeltas as unknown as AnyRec;
         map['garbage'] = new Automerge.Counter(3);
-        map['todos/T/balance@2/dev:x'] = new Automerge.Counter(3);
         map['accounts/SECRET-ID/balance@2/dev:y'] = 1.5; // not a safe integer
       });
       const source = foldDoc(doc);
@@ -757,11 +760,22 @@ describe('foldDoc (the compaction source)', () => {
       expect(source.counterDeltas).toEqual({});
       expect(source.foldedCounters).toEqual({ 'accounts/A/balance@2/dev:w1': -2025 });
       expect(warn).toHaveBeenCalledTimes(1);
-      expect(String(warn.mock.calls[0]![0])).toMatch(/drops 3 Counter key/);
+      expect(String(warn.mock.calls[0]![0])).toMatch(/drops 2 Counter key/);
       expect(String(warn.mock.calls[0]![0])).not.toMatch(/SECRET-ID|dev:y/);
     } finally {
       warn.mockRestore();
     }
+  });
+
+  it('REFUSES a structurally valid key for an UNKNOWN COLLECTION (C9e), naming no id', () => {
+    __setCounterWritesForTesting(true);
+    const doc = docWith((d) => {
+      const map = d.counterDeltas as unknown as AnyRec;
+      map['todos/SECRET-ID/balance@2/dev:x'] = new Automerge.Counter(3);
+    });
+    expect(() => foldDoc(doc)).toThrow(StaleBuildCounterError);
+    expect(() => foldDoc(doc)).toThrow(/todos\.balance/);
+    expect(() => foldDoc(doc)).not.toThrow(/SECRET-ID/);
   });
 
   it('a dormant pod: absolutes untouched, empty map, no ledger key', () => {

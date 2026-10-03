@@ -103,7 +103,10 @@ vi.mock('@/services/sync/fileSync', async (importOriginal) => ({
   importFromFile: vi.fn(async () => ({ success: true })),
 }));
 
-vi.mock('@/services/sync/envelopeMerge', () => ({
+vi.mock('@/services/sync/envelopeMerge', async (importOriginal) => ({
+  // Pure helpers the store reads but these tests do not stub (the registry, the
+  // family-identity check, the monotonic stamp) come from the real module.
+  ...(await importOriginal<typeof import('@/services/sync/envelopeMerge')>()),
   preserveLocalKeyDicts: vi.fn((remote: unknown) => remote),
   keyDictSize: vi.fn(() => 0),
   mergeEnvelopes: vi.fn((remote: unknown) => ({

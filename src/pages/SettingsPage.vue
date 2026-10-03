@@ -71,6 +71,7 @@ import { payloadErrorMessageKey } from '@/types/sync';
 import { reportPayloadFailure } from '@/utils/payloadFailureSurface';
 import { deleteFamilyDatabase } from '@/services/indexeddb/database';
 import { emitCacheKept } from '@/services/telemetry/loginFlowEvents';
+import { confirmDiscardUnsavedWork } from '@/composables/useDiscardUnsavedWork';
 import type { CacheFailureCause } from '@/utils/cacheFailureCause';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import { deliverFile } from '@/utils/deliverFile';
@@ -1351,9 +1352,17 @@ async function handleClearData() {
   // be no resolved member or no credential to prove with. Failing closed here would trap
   // them. Low stakes anyway — this clears LOCAL data; the .beanpod on Drive survives.
   if (canStepUp() && !(await requireReauth())) return;
+  // C6: "save first", then ask before deleting anything that could not be saved. This
+  // used to delete the cache with no save at all, so a pending or failed autosave went
+  // with it. Never throws; an unmeasurable answer reads as at-risk, and the confirm lets
+  // the person discard, so the escape hatch above is never trapped.
+  const unsaved = await authStore.measureUnsavedWork({ save: true, scope: 'active' });
+  if (!(await confirmDiscardUnsavedWork(unsaved, 'clear-data'))) return;
   // null = no active family, so no cache to delete (not "kept").
   let cacheDeleted: boolean | null = null;
   try {
+    // The same teardown-and-force-save the sign-out tiers open with (C6).
+    await authStore.teardownForLocalClear();
     await settingsStore.clearCachedFamilyKey();
     await settingsStore.setTrustedDevice(false);
     // Re-arm the trust question (setTrustedDevice marks it answered): the next person to
@@ -1440,6 +1449,18 @@ async function handleDeleteFamilyClick() {
     // Not an error: a cancel, a wrong PIN run out of attempts, or no credential at all.
     // `useReauth` records the outcome and explains itself on screen, so the only thing
     // owed here is releasing the button and leaving the confirm modal exactly as it was.
+    isDeleting.value = false;
+    return;
+  }
+
+  // Unsaved work is never deleted silently (audit C6): measure after one bounded save and
+  // ask by name before anything is removed.
+  if (
+    !(await confirmDiscardUnsavedWork(
+      await authStore.measureUnsavedWork({ save: true, scope: 'active' }),
+      'delete-family'
+    ))
+  ) {
     isDeleting.value = false;
     return;
   }

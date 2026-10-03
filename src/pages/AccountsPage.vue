@@ -383,15 +383,18 @@ async function handleAccountSave(
 
 async function handleAccountDelete(id: string) {
   closeEditModal();
-  if (
-    await showConfirm({ title: 'confirm.deleteAccountTitle', message: 'accounts.deleteConfirm' })
-  ) {
-    await accountsStore.deleteAccount(id);
-    playWhoosh();
-  }
+  await deleteAccount(id);
 }
 
 async function deleteAccount(id: string) {
+  // A linked loan account mirrors its asset's loan and is deleted WITH the asset (one change,
+  // `assetsStore.deleteAsset`): deleting it alone would leave the asset's loan with no mirror.
+  // Same redirect as edit/view.
+  if (accountsStore.getAccountById(id)?.linkedAssetId) {
+    showToast('info', t('accounts.editOnAssetsPage'));
+    router.push('/assets');
+    return;
+  }
   if (
     await showConfirm({ title: 'confirm.deleteAccountTitle', message: 'accounts.deleteConfirm' })
   ) {

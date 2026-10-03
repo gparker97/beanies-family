@@ -3347,6 +3347,11 @@ const STRING_DEFS = {
       'they will lose access to your family’s data on every device from now on. anything already saved on their own device stays with them.',
   },
   'family.removeDone': { en: 'Family member removed.', beanie: 'member removed.' },
+  'family.removedMemberKitsNudge': {
+    en: 'Some recovery kits could not be tied to a member. Review your recovery kits and consider changing the family recovery passphrase.',
+    beanie:
+      'some recovery kits could not be tied to a member. review your recovery kits and consider changing the family recovery passphrase.',
+  },
   'family.removeSavePending': {
     en: 'Removed on this device. Other devices will see it the next time your family data saves.',
     beanie:
@@ -3867,10 +3872,61 @@ const STRING_DEFS = {
     en: "We couldn't update this device's trust setting. Try again, or change it in Settings.",
     beanie: "we couldn't update this device's trust setting. try again, or change it in settings.",
   },
+  // C6 (2026-10-03): the old copy promised "all traces" cleared (tier 3 cleared only the
+  // active family's cache) and "family data untouched" (unsaved changes were deleted). It
+  // now says what the clear removes, what survives, and that unsaved changes ask first.
   'auth.signOutClearDataHint': {
-    en: 'Clears all traces of your data from this computer. Useful if you\u2019re on a shared device. Your family data itself is untouched, so you can sign back in here or anywhere else.',
+    en: 'Removes this device\u2019s copy of every family on it, with their keys and sign-ins. Useful on a shared device. Your family data file is not deleted, so you can sign back in here or anywhere else. Changes not yet saved to that file are lost, and if there are any we\u2019ll ask you first.',
     beanie:
-      'clears all traces of your data from this computer. useful if you\u2019re on a shared device. your family data itself is untouched, so you can sign back in here or anywhere else.',
+      'removes this device\u2019s copy of every family on it, with their keys and sign-ins. useful on a shared device. your family data file is not deleted, so you can sign back in here or anywhere else. changes not yet saved to that file are lost, and if there are any we\u2019ll ask you first.',
+  },
+  // C6: the ONE "this delete would lose unsaved work" confirm (sign-out clear, Settings
+  // Clear Data, forget family). Important surface: real nouns in beanie mode.
+  'auth.unsavedTitle': {
+    en: 'Unsaved Changes on This Device',
+    beanie: 'unsaved changes on this device',
+  },
+  'auth.unsavedMessage': {
+    en: 'Some changes on this device haven\u2019t reached your family data file yet. If you go ahead they are deleted for good. Keep them, then try again once the family data file has saved, or export a backup from Settings first.',
+    beanie:
+      'some changes on this device haven\u2019t reached your family data file yet. if you go ahead they are deleted for good. keep them, then try again once the family data file has saved, or export a backup from settings first.',
+  },
+  'auth.unsavedForgetMessage': {
+    en: 'This device still holds changes for this family that never reached its family data file. Forgetting the family here deletes them for good. Keep them, then open the family on this device and let it save first.',
+    beanie:
+      'this device still holds changes for this family that never reached its family data file. forgetting the family here deletes them for good. keep them, then open the family on this device and let it save first.',
+  },
+  'auth.unsavedFamilies.one': {
+    en: 'Unsaved changes for 1 family.',
+    beanie: 'unsaved changes for 1 family.',
+  },
+  'auth.unsavedFamilies.other': {
+    en: 'Unsaved changes for {count} families.',
+    beanie: 'unsaved changes for {count} families.',
+  },
+  'auth.unsavedPhotos.one': {
+    en: '1 photo is waiting to upload and exists only on this device.',
+    beanie: '1 photo is waiting to upload and exists only on this device.',
+  },
+  'auth.unsavedPhotos.other': {
+    en: '{count} photos are waiting to upload and exist only on this device.',
+    beanie: '{count} photos are waiting to upload and exist only on this device.',
+  },
+  'auth.unsavedBlocked': {
+    en: 'Your family data file can\u2019t be read right now, so nothing can be saved to it.',
+    beanie: 'your family data file can\u2019t be read right now, so nothing can be saved to it.',
+  },
+  'auth.unsavedUnknown': {
+    en: 'We couldn\u2019t check whether everything on this device was saved.',
+    beanie: 'we couldn\u2019t check whether everything on this device was saved.',
+  },
+  'auth.unsavedDiscard': {
+    en: 'Discard Unsaved Changes',
+    beanie: 'discard unsaved changes',
+  },
+  'auth.unsavedKeep': {
+    en: 'Keep My Changes',
+    beanie: 'keep my changes',
   },
   'settings.familyData.signedInAs': {
     en: 'Signed in with',
@@ -5503,6 +5559,13 @@ const STRING_DEFS = {
     en: "That code doesn't match this family's recovery kit.",
     beanie: "that code doesn't match this family's recovery kit.",
   },
+  // C10: a kit entry in the family file could not be tried at all (damaged, unreadable),
+  // which is NOT the person typing the code wrong.
+  'recovery.kitUnusable': {
+    en: "We couldn't check that code against this family's recovery kits. Try again, or use another way to sign in.",
+    beanie:
+      "we couldn't check that code against this family's recovery kits. try again, or use another way to sign in.",
+  },
   'recovery.kitNoKits': {
     en: "This family doesn't have a recovery kit on file.",
     beanie: "this family doesn't have a recovery kit on file.",
@@ -6455,6 +6518,12 @@ const STRING_DEFS = {
   'join.error.noUnclaimed': {
     en: 'Every member in this family has already been claimed. Ask a family admin to add you.',
     beanie: 'every member in this pod has already been claimed. ask a family admin to add you.',
+  },
+  // C10: two joiners picked the same member; the other one claimed it first.
+  'join.error.memberClaimed': {
+    en: 'Someone else just joined as this member. Pick yourself again, or ask a family admin to add you.',
+    beanie:
+      'someone else just joined as this member. pick yourself again, or ask a family admin to add you.',
   },
 
   // Recovery action button labels.

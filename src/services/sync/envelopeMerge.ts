@@ -60,6 +60,40 @@ export function mergeKeyDict<T>(
 }
 
 /**
+ * Do two envelopes belong to the same family? A local side that does not is DISCARDED by
+ * every merge here (audit C3) — see `mergeEnvelopes`.
+ */
+export function sameFamily(
+  incoming: Pick<BeanpodFileV4, 'familyId'>,
+  local: Pick<BeanpodFileV4, 'familyId'> | null | undefined
+): boolean {
+  return !!local && local.familyId === incoming.familyId;
+}
+
+/**
+ * A `createdAt` for a mint into a `newest-wins` slot: `max(now, previous + 1ms)`.
+ *
+ * `pickNewerByCreatedAt` resolves an exact tie to the incoming side, and a device whose
+ * clock is behind the one that wrote the entry it replaces would otherwise stamp OLDER and
+ * lose the merge, leaving the replaced credential alive. `clamped` says the wall clock was
+ * behind the previous stamp — the caller logs it (`clock-behind-peer`); this module stays
+ * pure because the worker imports it.
+ *
+ * ⚠️ Monotonic only against the entry the CALLER passes. A remote entry nobody has merged
+ * yet is invisible here; `observeRemote` before the mint is what closes that.
+ */
+export function monotonicCreatedAt(
+  previous: string | undefined,
+  nowMs: number = Date.now()
+): { createdAt: string; clamped: boolean } {
+  const prevMs = previous ? Date.parse(previous) : NaN;
+  if (Number.isNaN(prevMs) || nowMs > prevMs) {
+    return { createdAt: new Date(nowMs).toISOString(), clamped: false };
+  }
+  return { createdAt: new Date(prevMs + 1).toISOString(), clamped: true };
+}
+
+/**
  * Local-wins merge of the three envelope key dicts. Returns a fresh envelope.
  *
  * Use whenever an in-memory envelope is replaced by a fetched one — preserves
@@ -171,7 +205,8 @@ export function preserveLocalKeyDicts(
   incoming: BeanpodFileV4,
   local: BeanpodFileV4 | null | undefined
 ): BeanpodFileV4 {
-  if (!local) return incoming;
+  // A different family's envelope contributes nothing (audit C3; see `mergeEnvelopes`).
+  if (!local || !sameFamily(incoming, local)) return incoming;
 
   // Every dict comes from the ONE registry. A dict added to the type but not to
   // `ENVELOPE_KEY_DICTS` fails type-check rather than being silently dropped here.
@@ -387,8 +422,15 @@ export function applyRevokedKeys(envelope: BeanpodFileV4): {
  */
 export function mergeEnvelopes(
   incoming: BeanpodFileV4,
-  local: BeanpodFileV4 | null | undefined
+  localIn: BeanpodFileV4 | null | undefined
 ): { envelope: BeanpodFileV4; needsPublish: boolean; filtered: number } {
+  // ⚠️ A LOCAL SIDE FROM ANOTHER FAMILY IS NO LOCAL SIDE AT ALL (audit C3). The union below
+  // has no notion of whose keys it is carrying, so loading family B's file while signed into
+  // A used to union A's wrapped keys, invites and recovery passphrase into B's envelope and
+  // publish them in B's file. Treated exactly like a fresh decrypt: the incoming envelope
+  // stands alone. `familyId` is a required field on both sides, so a mismatch is never a
+  // missing-value accident.
+  const local = sameFamily(incoming, localIn) ? localIn : null;
   // ⚠️ FILTER EACH SIDE BEFORE THE UNION, not after. `local-wins` would otherwise let a
   // REVOKED local entry shadow a LIVE incoming one in the same slot — a stale peer's
   // pre-unclaim wrap beating the re-claimed member's new one — and the filter would then
@@ -417,7 +459,9 @@ export function mergeEnvelopes(
  *
  * - `'remove'`: `member:<id>` (every attributed entry, seen or not) plus a slot tombstone
  *   for EVERY `inviteKeys` entry — invites carry no memberId, and expiry is only a client
- *   check, so an expired wrap still opens with its token.
+ *   check, so an expired wrap still opens with its token. Also a slot tombstone for every
+ *   `recoveryKeys` kit whose `createdBy` is the member (kits are family-scoped, so the
+ *   member tombstone cannot reach them).
  * - `'unclaim'`: VALUE-PINNED tombstones for the member's current `wrappedKeys` entry and
  *   attributed passkey wraps only. The member stays, and re-claiming re-wraps the same
  *   slots; a slot-wide or member tombstone would lock them out for good.
@@ -429,7 +473,16 @@ export function revocationTombstonesForMember(
   envelope: BeanpodFileV4,
   memberId: string,
   opts: { mode: 'remove' | 'unclaim'; now: string }
-): { tombstones: Record<string, EnvelopeTombstone>; unattributedPasskeys: number } {
+): {
+  tombstones: Record<string, EnvelopeTombstone>;
+  unattributedPasskeys: number;
+  /**
+   * Recovery kits with no `createdBy` (minted before attribution existed). They cannot be
+   * tied to the departing member and are left alone, but each one may be a code that
+   * person holds, so the caller nudges a recovery-passphrase / kit review.
+   */
+  unattributedKits: number;
+} {
   const tombstones: Record<string, EnvelopeTombstone> = {};
   const stamp = (key: string, wrapped?: string) => {
     // eslint-disable-next-line security/detect-object-injection -- key built by revocationKey
@@ -439,13 +492,22 @@ export function revocationTombstonesForMember(
   const unattributedPasskeys = Object.values(envelope.passkeyWrappedKeys ?? {}).filter(
     (p) => !p.memberId
   ).length;
+  const kits = Object.entries(envelope.recoveryKeys ?? {});
+  const unattributedKits = kits.filter(([, k]) => !k.createdBy).length;
 
   if (opts.mode === 'remove') {
     stamp(memberRevocationKey(memberId));
     for (const hash of Object.keys(envelope.inviteKeys ?? {})) {
       stamp(revocationKey('inviteKeys', hash));
     }
-    return { tombstones, unattributedPasskeys };
+    // ⚠️ KITS THE MEMBER MINTED LEAVE WITH THEM (audit C10). `recoveryKeys` is
+    // family-scoped (`attributedBy: null`), so `member:<id>` never reaches it, and a kit is
+    // a printed code that opens the whole pod: without this a removed member kept a working
+    // way back in. Slot tombstones, by `createdBy`; unattributed kits are counted instead.
+    for (const [kitId, kit] of kits) {
+      if (kit.createdBy === memberId) stamp(revocationKey('recoveryKeys', kitId));
+    }
+    return { tombstones, unattributedPasskeys, unattributedKits };
   }
 
   // eslint-disable-next-line security/detect-object-injection -- memberId is the caller's member
@@ -456,7 +518,7 @@ export function revocationTombstonesForMember(
       stamp(revocationKey('passkeyWrappedKeys', credId, p.wrapped), p.wrapped);
     }
   }
-  return { tombstones, unattributedPasskeys };
+  return { tombstones, unattributedPasskeys, unattributedKits };
 }
 
 /**

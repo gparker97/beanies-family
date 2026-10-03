@@ -106,8 +106,17 @@ vi.mock('@/services/automerge/repositories/settingsRepository', () => ({
 // Resolves the real shape (#100): the store reads `deleted` to tell the person whether
 // the cache is actually gone.
 const mockDeleteFamilyDatabase = vi.fn(
-  async (_familyId?: string): Promise<{ deleted: boolean } | undefined> => ({ deleted: true })
+  async (
+    _familyId?: string,
+    _opts?: { keepPhotoQueue?: boolean }
+  ): Promise<{ deleted: boolean } | undefined> => ({ deleted: true })
 );
+// C6: the unpushed-at-signout marker, the photo-queue probe and the name sweep.
+const c6 = vi.hoisted(() => ({
+  markers: new Set<string>(),
+  sweptIds: [] as string[],
+  registryFamilies: [] as { id: string; name: string }[],
+}));
 
 // Capture the sign-out telemetry while keeping every other export real.
 const mockEmitSignoutTier = vi.fn();
@@ -122,7 +131,13 @@ const mockGetActiveFamilyId = vi.fn(() => 'family-123');
 
 const mockFamilyCacheExists = vi.fn(async (_familyId: string): Promise<boolean | null> => false);
 vi.mock('@/services/indexeddb/database', () => ({
-  deleteFamilyDatabase: (familyId?: string) => mockDeleteFamilyDatabase(familyId),
+  deleteFamilyDatabase: (familyId?: string, opts?: { keepPhotoQueue?: boolean }) =>
+    opts ? mockDeleteFamilyDatabase(familyId, opts) : mockDeleteFamilyDatabase(familyId),
+  setUnpushedAtSignOutMarker: (id: string) => c6.markers.add(id),
+  clearUnpushedAtSignOutMarker: (id: string) => c6.markers.delete(id),
+  hasUnpushedAtSignOutMarker: (id: string) => c6.markers.has(id),
+  countQueuedPhotoUploads: vi.fn(async () => 0),
+  listLocalFamilyDatabaseIds: vi.fn(async () => c6.sweptIds),
   familyCacheExists: (familyId: string) => mockFamilyCacheExists(familyId),
   clearAllData: () => mockClearAllData(),
   getActiveFamilyId: () => mockGetActiveFamilyId(),
@@ -265,6 +280,14 @@ vi.mock('@/services/automerge/repositories/recurringItemRepository', () => ({
   createRecurringItem: vi.fn(),
   updateRecurringItem: vi.fn(),
   deleteRecurringItem: vi.fn(),
+}));
+
+// The family registry service, at its boundary: tier 3 forgets every family through
+// `deleteLocalFamily`, which is the real cache delete (mocked above) plus registry cleanup.
+const mockDeleteLocalFamily = vi.fn(async (id: string) => mockDeleteFamilyDatabase(id));
+vi.mock('@/services/familyContext', () => ({
+  getAllFamilies: vi.fn(async () => c6.registryFamilies),
+  deleteLocalFamily: (id: string) => mockDeleteLocalFamily(id),
 }));
 
 vi.mock('@/stores/familyContextStore', () => ({
@@ -522,6 +545,124 @@ describe('Sensitive Data Clearing Security', () => {
     autoOpenState.map.clear();
     registryPasskeys.rows = [];
     reclaimAllKeystoresSpy.mockClear();
+    c6.markers.clear();
+    c6.sweptIds = [];
+    c6.registryFamilies = [];
+  });
+
+  // =========================================================================
+  // C6 (2026-10-03): no destructive delete loses unsaved work silently
+  // =========================================================================
+  describe('C6: tier 3 forgets every family on the device', () => {
+    it('reaches the registry families, the active one and caches found only by name', async () => {
+      c6.registryFamilies = [{ id: 'family-other', name: 'Other' }];
+      c6.sweptIds = ['family-orphan'];
+      const { auth } = populateAllStores();
+
+      await expect(auth.signOutAndClearData()).resolves.toEqual({ cacheDeleted: true });
+
+      const forgotten = mockDeleteLocalFamily.mock.calls.map((c) => c[0]).sort();
+      expect(forgotten).toEqual(['family-123', 'family-orphan', 'family-other']);
+    });
+
+    it('reports NOT deleted when any one family kept its cache, and still forgets the rest', async () => {
+      c6.registryFamilies = [{ id: 'family-other', name: 'Other' }];
+      mockDeleteLocalFamily.mockImplementation(async (id: string) =>
+        id === 'family-other' ? { deleted: false } : { deleted: true }
+      );
+      const { auth } = populateAllStores();
+
+      await expect(auth.signOutAndClearData()).resolves.toEqual({ cacheDeleted: false });
+      expect(mockDeleteLocalFamily).toHaveBeenCalledTimes(2);
+      mockDeleteLocalFamily.mockImplementation(async (id: string) => mockDeleteFamilyDatabase(id));
+    });
+
+    it('a family whose forget throws does not stop the others', async () => {
+      c6.registryFamilies = [
+        { id: 'family-broken', name: 'B' },
+        { id: 'family-ok', name: 'O' },
+      ];
+      mockDeleteLocalFamily.mockImplementation(async (id: string) => {
+        if (id === 'family-broken') throw new Error('IDB locked');
+        return { deleted: true };
+      });
+      const { auth } = populateAllStores();
+
+      await expect(auth.signOutAndClearData()).resolves.toEqual({ cacheDeleted: false });
+      expect(mockDeleteLocalFamily.mock.calls.map((c) => c[0])).toContain('family-ok');
+      mockDeleteLocalFamily.mockImplementation(async (id: string) => mockDeleteFamilyDatabase(id));
+    });
+  });
+
+  describe('C6: a keep-data sign-out never drops unsaved work', () => {
+    it('an untrusted sign-out keeps the offline photo queue', async () => {
+      const { auth } = populateAllStores();
+      await auth.signOut();
+      expect(mockDeleteFamilyDatabase).toHaveBeenCalledWith('family-123', { keepPhotoQueue: true });
+    });
+
+    it('leaves the unpushed marker when it KEEPS the database, for forget family to read', async () => {
+      const { docPushedAgainst } = await import('@/services/sync/syncService');
+      vi.mocked(docPushedAgainst).mockResolvedValue('dirty');
+      const { auth } = populateAllStores();
+
+      await auth.signOut();
+
+      expect(mockDeleteFamilyDatabase).not.toHaveBeenCalled();
+      expect(c6.markers.has('family-123')).toBe(true);
+      vi.mocked(docPushedAgainst).mockResolvedValue('clean');
+    });
+
+    it('a clean sign-out clears a marker an earlier session left', async () => {
+      const { docPushedAgainst } = await import('@/services/sync/syncService');
+      vi.mocked(docPushedAgainst).mockResolvedValue('clean');
+      c6.markers.add('family-123');
+      const { auth, settings } = populateAllStores();
+      await settings.setTrustedDevice(true);
+
+      await auth.signOut();
+
+      expect(c6.markers.has('family-123')).toBe(false);
+    });
+  });
+
+  describe('C10: other tabs are told the session ended, even when the cache was KEPT', () => {
+    it('an untrusted sign-out that keeps the database still announces on the family channel', async () => {
+      const { docPushedAgainst } = await import('@/services/sync/syncService');
+      vi.mocked(docPushedAgainst).mockResolvedValue('dirty');
+      const otherTab = new BroadcastChannel('beanies-session:family-123');
+      const received = vi.fn();
+      otherTab.onmessage = (e) => received(e.data);
+      const { auth } = populateAllStores();
+
+      await auth.signOut();
+      await new Promise((r) => setTimeout(r, 20));
+
+      expect(mockDeleteFamilyDatabase).not.toHaveBeenCalled();
+      expect(received).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'session-ended', familyId: 'family-123' })
+      );
+      otherTab.close();
+      vi.mocked(docPushedAgainst).mockResolvedValue('clean');
+    });
+  });
+
+  describe('C6: measureUnsavedWork (the probe every destructive delete asks first)', () => {
+    it('saves first, then names the unpushed work and other families left dirty', async () => {
+      const { docPushedAgainst } = await import('@/services/sync/syncService');
+      vi.mocked(docPushedAgainst).mockResolvedValue('dirty');
+      c6.registryFamilies = [{ id: 'family-other', name: 'Other' }];
+      c6.markers.add('family-other');
+      const { auth } = populateAllStores();
+
+      const report = await auth.measureUnsavedWork({ save: true, scope: 'all' });
+
+      expect(vi.mocked(saveNow)).toHaveBeenCalled();
+      expect(report.unsavedFamilies).toBe(2);
+      // The session is still live: the person may yet cancel.
+      expect(auth.isAuthenticated).toBe(true);
+      vi.mocked(docPushedAgainst).mockResolvedValue('clean');
+    });
   });
 
   // =========================================================================
@@ -782,7 +923,8 @@ describe('Sensitive Data Clearing Security', () => {
 
       await auth.signOut();
 
-      expect(mockDeleteFamilyDatabase).toHaveBeenCalledWith('family-123');
+      // Keep-data sign-out (C6): the cache goes, the offline photo queue stays.
+      expect(mockDeleteFamilyDatabase).toHaveBeenCalledWith('family-123', { keepPhotoQueue: true });
     });
 
     it('clears the CACHED FAMILY KEY, not just the cache it decrypts', async () => {
@@ -1234,10 +1376,13 @@ describe('Sensitive Data Clearing Security', () => {
         clearKeyCacheFamily: 'clearKeyCacheAll',
         removePinWrapsFamily: 'removePinWrapsAll',
         removeRosterFamily: 'removeRosterAll',
+        // Documented exception 2 (C6): tier 3 forgets EVERY family, the superset of the
+        // active-family cache delete.
+        deleteFamilyDb: 'deleteAllLocalFamilies',
       };
       for (const step of SIGN_OUT_UNTRUSTED_STEPS) {
         if (step === 'resetDocClient') {
-          // Documented exception 1: tier-2 only — tier 3's deleteFamilyDb path
+          // Documented exception 1: tier-2 only — tier 3's deleteAllLocalFamilies path
           // resets the worker doc anyway.
           expect(SIGN_OUT_CLEAR_STEPS).not.toContain('resetDocClient');
           continue;

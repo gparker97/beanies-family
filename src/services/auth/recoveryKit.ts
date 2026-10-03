@@ -19,6 +19,7 @@ import { slotTombstoneEntryKey } from '@/services/sync/envelopeMerge';
 import { toISODateString } from '@/utils/date';
 import { shareableOrigin } from '@/utils/shareableOrigin';
 import { KIT_LINK_HASH, readHashMarker } from '@/services/auth/deepLinks';
+import { logEvent } from '@/services/telemetry/logEvent';
 
 /** Crockford base32 — no I, L, O, U; unambiguous to read back from paper. */
 // eslint-disable-next-line no-secrets/no-secrets -- a PUBLIC alphabet constant, not a secret
@@ -186,10 +187,27 @@ function stampOf(kit: RecoveryKitSummary): string {
 }
 
 /**
+ * The ONE failure that means "this code does not open this entry": AES-KW's integrity
+ * check refusing the unwrap, which WebCrypto raises as a DOMException named
+ * `OperationError`. Read by name, not `instanceof`, so it holds across realms and test DOMs.
+ */
+function isWrongKeyUnwrap(e: unknown): boolean {
+  return !!e && typeof e === 'object' && (e as { name?: unknown }).name === 'OperationError';
+}
+
+/**
  * Redeem a kit code against an envelope: tries every `recoveryKeys` entry. An entry
  * stays valid until a `recoveryKeys:<kitId>` slot tombstone retires it (tracker #99);
  * revoked wraps are filtered out of every envelope before this function is reached, so
  * an invalidated kit fails here as `wrong-code` (or `no-kits`).
+ *
+ * ⚠️ ONLY A WRONG-KEY UNWRAP IS "NOT THIS ENTRY" (C10). Every other failure (a salt that
+ * is not base64, a wrap that is not, a KDF the platform refuses) used to be swallowed into
+ * the same `catch {}` and come out as `wrong-code`, so a person holding the RIGHT kit was
+ * told they typed it wrong, forever, and nothing reached CloudWatch. Such an entry is now
+ * recorded and logged (`kit_entry_unusable`), the remaining entries are still tried (one
+ * damaged kit must not block another), and if none opens the answer is `error`, not
+ * `wrong-code`.
  */
 export async function redeemRecoveryKit(
   envelope: Pick<BeanpodFileV4, 'recoveryKeys'>,
@@ -198,19 +216,28 @@ export async function redeemRecoveryKit(
   const entries = Object.entries(envelope.recoveryKeys ?? {});
   if (entries.length === 0) return { ok: false, reason: 'no-kits' };
   const code = normalizeKitCode(input);
-  try {
-    for (const [kitId, pkg] of entries) {
-      try {
-        const salt = Uint8Array.from(atob(pkg.salt), (c) => c.charCodeAt(0));
-        const wrapKey = await deriveKitKey(code, salt);
-        const familyKey = await unwrapFamilyKey(pkg.wrapped, wrapKey);
-        return { ok: true, familyKey, kitId };
-      } catch {
-        // Not this entry — try the next (multiple kits can coexist by design).
-      }
+  let unusable = 0;
+  for (const [kitId, pkg] of entries) {
+    try {
+      const salt = Uint8Array.from(atob(pkg.salt), (c) => c.charCodeAt(0));
+      const wrapKey = await deriveKitKey(code, salt);
+      const familyKey = await unwrapFamilyKey(pkg.wrapped, wrapKey);
+      return { ok: true, familyKey, kitId };
+    } catch (e) {
+      // Not this entry — try the next (multiple kits can coexist by design).
+      if (isWrongKeyUnwrap(e)) continue;
+      unusable += 1;
+      logEvent({
+        level: 'warn',
+        surface: 'login-flow',
+        message: 'a recovery kit entry could not be tried',
+        error: e,
+        context: {
+          action: 'kit_entry_unusable',
+          error_code: e instanceof Error ? e.name : typeof e,
+        },
+      });
     }
-    return { ok: false, reason: 'wrong-code' };
-  } catch {
-    return { ok: false, reason: 'error' };
   }
+  return { ok: false, reason: unusable > 0 ? 'error' : 'wrong-code' };
 }

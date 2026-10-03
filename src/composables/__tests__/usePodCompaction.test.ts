@@ -578,6 +578,32 @@ describe('who is on an older version is a notice, never a gate', () => {
   });
 });
 
+describe('level re-checks around the one-way steps (audit C1)', () => {
+  it('refuses before compactDoc when the device stopped being level during the backup', async () => {
+    const sync = await import('@/services/sync/syncService');
+    vi.mocked(sync.syncLevel)
+      .mockResolvedValueOnce('level') // step 2c
+      .mockResolvedValueOnce('remote-moved'); // immediately before compactDoc
+    const c = usePodCompaction();
+    await c.compact();
+    expect(docClient.compactDoc).not.toHaveBeenCalled();
+    expect(c.progressFailure.value?.helpKey).toBe('compaction.refused.not-synced');
+  });
+
+  it('does not publish when the remote moved after the rebuild', async () => {
+    const sync = await import('@/services/sync/syncService');
+    vi.mocked(sync.syncLevel)
+      .mockResolvedValueOnce('level')
+      .mockResolvedValueOnce('level')
+      .mockResolvedValueOnce('remote-moved'); // immediately before the publish
+    const c = usePodCompaction();
+    await c.compact();
+    expect(docClient.compactDoc).toHaveBeenCalled();
+    expect(syncNow).not.toHaveBeenCalled();
+    expect(c.progressFailure.value?.subtitleKey).toBe('compaction.publishFailed');
+  });
+});
+
 describe('a newer build in the family (#117 Phase 2)', () => {
   it('a Counter field from a newer build says "update the app", not "rebuild failed"', async () => {
     const { StaleBuildCounterError } = await import('@/types/sync');

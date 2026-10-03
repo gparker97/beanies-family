@@ -24,8 +24,10 @@
  * cold-start would fire 2-3 alerts per occurrence (one per trigger that
  * arrives during the startup window) — see #beanies-errors history.
  *
- * Persists to sessionStorage so queued saves survive page refreshes
- * (but not full browser restarts — session-scoped is appropriate).
+ * Persists a small MARKER to sessionStorage so a queued save survives a page refresh
+ * (but not a full browser restart — session-scoped is appropriate). It used to persist
+ * the whole multi-megabyte envelope, which the queue has not replayed since the resave
+ * redesign below: pure quota pressure, and a quota failure silently lost the marker too.
  */
 import type { StorageProvider } from './storageProvider';
 import {
@@ -35,36 +37,67 @@ import {
 } from '@/services/google/googleAuth';
 import { buildSilentRefreshAlertContext } from '@/services/google/silentRefreshAlertContext';
 import { reportError } from '@/utils/errorReporter';
+import { logEvent } from '@/services/telemetry/logEvent';
 import { assertNever } from '@/utils/assertNever';
 
 const SESSION_STORAGE_KEY = 'beanies_offline_queue';
 
-// In-memory queue (only keeps latest)
-let pendingContent: string | null = null;
+/**
+ * Why the save could not reach the remote. `auth` is not "offline": the token was
+ * rejected and silent refresh failed, so the queue will not drain until someone
+ * reconnects, and a flush that re-queues for that reason is a FAILURE for the streak
+ * (it used to read as the benign "still offline" and could never page).
+ */
+export type QueueReason = 'network' | 'server' | 'auth';
+
+/**
+ * The queued FACT: this device has unsaved work. Never the bytes (see `flushQueue`).
+ * `null` = nothing queued.
+ */
+let pendingMarker: { reason: QueueReason; queuedAt: string } | null = null;
 let flushProvider: StorageProvider | null = null;
 let isListening = false;
 
-// Restore from sessionStorage on module load
+// Restore from sessionStorage on module load. Any non-empty value counts as "work is
+// queued", including a LEGACY value that held the whole envelope; it is rewritten as a
+// marker so the megabytes are released.
 try {
   const cached = sessionStorage.getItem(SESSION_STORAGE_KEY);
   if (cached) {
-    pendingContent = cached;
+    pendingMarker = parseMarker(cached);
+    persistToSession();
     startListening();
   }
 } catch {
   // Ignore — sessionStorage may not be available
 }
 
+function parseMarker(raw: string): { reason: QueueReason; queuedAt: string } {
+  try {
+    const m = JSON.parse(raw) as { v?: unknown; reason?: unknown; queuedAt?: unknown };
+    if (
+      m.v === 1 &&
+      (m.reason === 'network' || m.reason === 'server' || m.reason === 'auth') &&
+      typeof m.queuedAt === 'string'
+    ) {
+      return { reason: m.reason, queuedAt: m.queuedAt };
+    }
+  } catch {
+    // A legacy envelope, or anything else: still a queued save.
+  }
+  return { reason: 'network', queuedAt: new Date().toISOString() };
+}
+
 /**
- * Enqueue content for offline save.
- * Replaces any previously queued content.
+ * Record that a save could not reach the remote and must be re-run when it can.
+ * Replaces any previously queued marker; the newest reason wins.
  */
-export function enqueueOfflineSave(content: string): void {
+export function enqueueOfflineSave(reason: QueueReason = 'network'): void {
   enqueueSeq += 1;
-  pendingContent = content;
+  pendingMarker = { reason, queuedAt: new Date().toISOString() };
   persistToSession();
   startListening();
-  console.warn('[offlineQueue] Save queued for when connection resumes');
+  console.warn(`[offlineQueue] Save queued for when connection resumes (${reason})`);
 }
 
 /**
@@ -101,7 +134,7 @@ export function setResaveHandler(fn: (() => Promise<boolean>) | null): void {
  */
 export function setFlushProvider(provider: StorageProvider): void {
   flushProvider = provider;
-  if (pendingContent && navigator.onLine) {
+  if (pendingMarker && navigator.onLine) {
     tryFlush('startup');
   }
 }
@@ -110,7 +143,7 @@ export function setFlushProvider(provider: StorageProvider): void {
  * Check if there's a pending offline save.
  */
 export function hasPendingSave(): boolean {
-  return pendingContent !== null;
+  return pendingMarker !== null;
 }
 
 /**
@@ -135,7 +168,8 @@ export function hasPendingSave(): boolean {
  * re-queued during our own flush, so the pending content is no longer the
  * content we started with.
  */
-export type FlushOutcome = 'flushed' | 'nothing-to-flush' | 'requeued' | 'declined';
+export type FlushOutcome =
+  'flushed' | 'nothing-to-flush' | 'requeued' | 'auth-rejected' | 'declined';
 
 /**
  * Flush the queued save.
@@ -145,7 +179,7 @@ export type FlushOutcome = 'flushed' | 'nothing-to-flush' | 'requeued' | 'declin
  * `'declined'` and a throw, for the next recovery trigger to retry.
  */
 export async function flushQueue(): Promise<FlushOutcome> {
-  if (!pendingContent || !flushProvider) return 'nothing-to-flush';
+  if (!pendingMarker || !flushProvider) return 'nothing-to-flush';
 
   // ⚠️ RE-SAVE, NEVER REPLAY THE BYTES. This used to be
   // `await flushProvider.write(pendingContent)` — a blind write of a payload
@@ -189,6 +223,12 @@ export async function flushQueue(): Promise<FlushOutcome> {
   const seqBefore = enqueueSeq;
   const saved = await resaveHandler();
   if (!saved) {
+    if (enqueueSeq !== seqBefore && pendingMarker?.reason === 'auth') {
+      // Re-queued, but because the TOKEN was rejected, not because we are offline. That
+      // does not clear by waiting; it is a stuck queue and must count toward the page.
+      console.warn('[offlineQueue] Resave re-queued on an auth rejection — counting as a failure');
+      return 'auth-rejected';
+    }
     if (enqueueSeq !== seqBefore) {
       // The save ran, could not reach the remote, and put fresh bytes back in
       // this queue. Nothing declined and nothing is stuck — this is the offline
@@ -207,7 +247,7 @@ export async function flushQueue(): Promise<FlushOutcome> {
   // serialize to the same bytes must not read as "nothing was queued", or the
   // clear drops work that was only just added.
   if (enqueueSeq === seqBefore) {
-    pendingContent = null;
+    pendingMarker = null;
     clearFromSession();
   }
   console.log('[offlineQueue] Queued work re-saved through the normal save path');
@@ -218,7 +258,7 @@ export async function flushQueue(): Promise<FlushOutcome> {
  * Clear the queue (e.g. on disconnect).
  */
 export function clearQueue(): void {
-  pendingContent = null;
+  pendingMarker = null;
   consecutiveFlushFailures = 0; // nothing queued → no streak
   clearFromSession();
   stopListening();
@@ -227,19 +267,42 @@ export function clearQueue(): void {
 // --- sessionStorage helpers ---
 
 function persistToSession(): void {
-  if (!pendingContent) return;
+  if (!pendingMarker) return;
   try {
-    sessionStorage.setItem(SESSION_STORAGE_KEY, pendingContent);
-  } catch {
-    // Ignore — sessionStorage may not be available or quota exceeded
+    sessionStorage.setItem(
+      SESSION_STORAGE_KEY,
+      JSON.stringify({ v: 1, reason: pendingMarker.reason, queuedAt: pendingMarker.queuedAt })
+    );
+  } catch (e) {
+    // Never silent (audit C12): without the marker a refresh forgets that unsaved work
+    // exists. The in-memory queue still holds it for this page's life.
+    logEvent({
+      level: 'warn',
+      surface: 'offline-queue',
+      message: 'offline-queue marker could not be persisted',
+      error: e instanceof Error ? e : undefined,
+      context: {
+        action: 'session-persist-failed',
+        error_code: e instanceof Error ? e.name : 'unknown',
+      },
+    });
   }
 }
 
 function clearFromSession(): void {
   try {
     sessionStorage.removeItem(SESSION_STORAGE_KEY);
-  } catch {
-    // Ignore
+  } catch (e) {
+    // A stale marker only causes one redundant resave after a refresh; logged, not fatal.
+    logEvent({
+      level: 'info',
+      surface: 'offline-queue',
+      message: 'offline-queue marker could not be cleared',
+      context: {
+        action: 'session-clear-failed',
+        error_code: e instanceof Error ? e.name : 'unknown',
+      },
+    });
   }
 }
 
@@ -339,12 +402,12 @@ const AUTH_GATED_REASONS: ReadonlySet<FlushReason> = new Set<FlushReason>(['star
  * is inside `flushInFlight`, so a slow gate can't admit a second flush.
  */
 function tryFlush(reason: FlushReason): void {
-  if (!pendingContent || !flushProvider) return;
+  if (!pendingMarker || !flushProvider) return;
   if (flushInFlight) return;
 
   // `whenRedirectAuthSettled` is non-throwing and bounded (20s timeout), and
   // resolves immediately when no redirect is in flight — so on the common path
-  // this costs nothing. `flushQueue` re-checks `pendingContent`/`flushProvider`,
+  // this costs nothing. `flushQueue` re-checks `pendingMarker`/`flushProvider`,
   // so a sign-out during the gate is handled.
   const gate = AUTH_GATED_REASONS.has(reason) ? whenRedirectAuthSettled() : Promise.resolve();
 
@@ -362,6 +425,14 @@ function tryFlush(reason: FlushReason): void {
           // Still offline. The work is safe, the queue holds it, and the next
           // trigger will try again. Neither a success (do not reset the streak,
           // or a genuine failure either side of it is forgotten) nor a failure.
+          return;
+        case 'auth-rejected':
+          // The token was rejected and silent refresh failed: waiting will not drain
+          // this. Counted, and reported with the silent-refresh diagnostics.
+          reportFlushFailure(
+            reason,
+            new TokenExpiredError('resave re-queued: token rejected — queued work still pending')
+          );
           return;
         case 'declined':
           // ⚠️ THE ARM THAT WAS MISSING. The save path refused (a lineage block,
@@ -395,7 +466,7 @@ function handleOnline(): void {
   const settled = flushInFlight;
   if (!settled) return;
   void settled.then(() => {
-    if (pendingContent) {
+    if (pendingMarker) {
       retryTimer = setTimeout(() => {
         retryTimer = null;
         tryFlush('online');

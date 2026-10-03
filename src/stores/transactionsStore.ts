@@ -9,17 +9,14 @@ import { useGoalsStore } from '@/stores/goalsStore';
 import { useMemberFilterStore } from '@/stores/memberFilterStore';
 import { wrapAsync } from '@/composables/useStoreActions';
 import { convertToBaseCurrency, getRate } from '@/utils/currency';
-import { computeGoalAllocRaw, signedAccountDelta } from '@/utils/finance';
 import { reportError } from '@/utils/errorReporter';
 import { useSettingsStore } from '@/stores/settingsStore';
-import { mutate } from '@/services/automerge/worker/docClient';
+import type { TransactionCascadeResult } from '@/services/automerge/repositories/transactionRepository';
 import type {
   Transaction,
   CreateTransactionInput,
   UpdateTransactionInput,
   ISODateString,
-  Account,
-  Asset,
   CurrencyCode,
 } from '@/types/models';
 import { getStartOfMonth, getEndOfMonth, toDateInputValue, isDateBetween } from '@/utils/date';
@@ -218,15 +215,6 @@ export const useTransactionsStore = defineStore('transactions', () => {
   });
 
   /**
-   * Update account balance in both store and database.
-   */
-  async function adjustAccountBalance(accountId: string, adjustment: number): Promise<void> {
-    // Atomic relative adjustment (worker `increment` op) — no lost update if a
-    // poll-merge lands a peer's balance change between read and write.
-    await useAccountsStore().incrementBalance(accountId, adjustment);
-  }
-
-  /**
    * The amount to credit a transfer's DESTINATION, in the destination's own
    * currency. Same currency → the raw amount; different currency → converted at
    * the current rate. This is the sole authority for a transfer's `toAmount`.
@@ -258,41 +246,25 @@ export const useTransactionsStore = defineStore('transactions', () => {
   }
 
   /**
-   * Apply (`direction: 1`) or reverse (`direction: -1`) a transaction's effect
-   * on account balances — the SINGLE place balance signs + the transfer
-   * destination live. Liability-aware via `signedAccountDelta` (a card purchase
-   * raises owed; a transfer to a card lowers it); the destination of a transfer
-   * is credited its stored `toAmount` (converted). Mirrors the store's existing
-   * apply/reverse symmetry for goals and loans, so create/update/delete each
-   * reduce to one or two calls instead of three parallel copies of the math.
-   *
-   * A missing (deleted) account is warned and skipped, matching the app's
-   * existing tolerance of dangling references.
+   * Fold a cascade's echo into the sibling stores: every account, goal and asset the worker
+   * moved arrives folded, so the local arrays are replaced, never re-derived. A reference the
+   * worker could not honour (an account or goal deleted by another device) is a breadcrumb,
+   * never a toast: the row still landed, and the divergence stays diagnosable.
    */
-  async function applyTransactionToBalances(tx: Transaction, direction: 1 | -1): Promise<void> {
+  function absorbCascade(res: TransactionCascadeResult, action: string): void {
     const accountsStore = useAccountsStore();
-    const source = accountsStore.accounts.find((a) => a.id === tx.accountId);
-    if (source) {
-      const delta = signedAccountDelta(tx.type, tx.amount, source.type, true) * direction;
-      if (delta !== 0) await adjustAccountBalance(tx.accountId, delta);
-    } else {
-      console.warn(
-        '[transactionsStore] source account not found; balance not adjusted:',
-        tx.accountId
-      );
-    }
-    if (tx.type === 'transfer' && tx.toAccountId) {
-      const dest = accountsStore.accounts.find((a) => a.id === tx.toAccountId);
-      if (dest) {
-        const magnitude = tx.toAmount ?? tx.amount;
-        const delta = signedAccountDelta('transfer', magnitude, dest.type, false) * direction;
-        if (delta !== 0) await adjustAccountBalance(tx.toAccountId, delta);
-      } else {
-        console.warn(
-          '[transactionsStore] transfer destination not found; balance not adjusted:',
-          tx.toAccountId
-        );
-      }
+    const goalsStore = useGoalsStore();
+    const assetsStore = useAssetsStore();
+    for (const account of res.accounts) accountsStore.applyEchoed(account);
+    for (const goal of res.goals) goalsStore.applyEchoed(goal);
+    for (const asset of res.assets) assetsStore.applyEchoed(asset);
+    if (res.skipped.length > 0) {
+      reportError({
+        surface: 'transactions.cascade-skipped',
+        message: 'transaction cascade skipped a reference missing from the document',
+        severity: 'warning',
+        context: { action, kind: res.skipped.map((s) => s.kind).join(',') },
+      });
     }
   }
 
@@ -321,96 +293,6 @@ export const useTransactionsStore = defineStore('transactions', () => {
       : original.toAmount;
   }
 
-  /**
-   * Adjust a linked goal's progress by a relative delta. The worker
-   * `applyGoalContribution` op clamps at 0 + auto-completes atomically.
-   */
-  async function adjustGoalProgress(
-    goalId: string | undefined,
-    appliedAmount: number | undefined,
-    reverse = false
-  ): Promise<void> {
-    if (!goalId || !appliedAmount) return;
-    const delta = reverse ? -appliedAmount : appliedAmount;
-    await useGoalsStore().applyContribution(goalId, delta);
-  }
-
-  /**
-   * Compute and apply goal allocation for a transaction, with guardrail.
-   * Returns the applied amount (0 if no allocation).
-   */
-  async function applyGoalAllocation(transaction: Transaction): Promise<number> {
-    if (!transaction.goalId || !transaction.goalAllocMode || !transaction.goalAllocValue) return 0;
-    const goalsStore = useGoalsStore();
-    const goal = goalsStore.goals.find((g) => g.id === transaction.goalId);
-    if (!goal) return 0;
-    const raw = computeGoalAllocRaw(
-      transaction.goalAllocMode,
-      transaction.goalAllocValue,
-      transaction.amount
-    );
-    const remaining = Math.max(0, goal.targetAmount - goal.currentAmount);
-    const applied = Math.min(raw, remaining);
-    if (applied > 0) {
-      await transactionRepo.updateTransaction(transaction.id, { goalAllocApplied: applied });
-      transaction.goalAllocApplied = applied;
-      await adjustGoalProgress(transaction.goalId, applied);
-    }
-    return applied;
-  }
-
-  /**
-   * Apply loan payment: calculate amortization, store interest/principal on tx, reduce loan balance.
-   * Recurring payments use standard amortization; one-time payments are extra (full to principal).
-   */
-  /** Route the echoed loan host into the owning store's local array (the doc was
-   * already mutated atomically by the named op — no re-write / re-read race). */
-  function applyLoanHost(hostCollection: string | undefined, host: unknown): void {
-    if (!host) return;
-    if (hostCollection === 'assets') useAssetsStore().applyEchoed(host as Asset);
-    else useAccountsStore().applyEchoed(host as Account);
-  }
-
-  async function applyLoanPayment(transaction: Transaction): Promise<void> {
-    if (!transaction.loanId) return;
-    try {
-      // The worker `applyLoanPayment` op (via the repository) reads the loan host, amortizes
-      // and writes the new balance atomically; the repository also records the interest and
-      // principal portions on the transaction. We only route the echoed host.
-      const res = await transactionRepo.applyLoanPayment(transaction);
-      if (!res.applied) return;
-      applyLoanHost(res.hostCollection, res.host);
-    } catch (e) {
-      console.error('Failed to apply loan payment:', e);
-    }
-  }
-
-  /**
-   * Reverse a loan payment: add the principal portion back to the loan balance
-   * (atomic worker `reverseLoanPayment` op).
-   */
-  async function reverseLoanPayment(transaction: Transaction): Promise<void> {
-    if (!transaction.loanId || !transaction.loanPrincipalPortion) return;
-    try {
-      const res = await mutate<{
-        applied: boolean;
-        hostCollection?: string;
-        host?: Account | Asset;
-      }>({
-        op: 'named',
-        name: 'reverseLoanPayment',
-        args: {
-          loanId: transaction.loanId,
-          principalToRestore: transaction.loanPrincipalPortion,
-        },
-      });
-      if (!res.applied) return;
-      applyLoanHost(res.hostCollection, res.host);
-    } catch (e) {
-      console.error('Failed to reverse loan payment:', e);
-    }
-  }
-
   // Actions
   async function loadTransactions() {
     await wrapAsync(
@@ -431,44 +313,36 @@ export const useTransactionsStore = defineStore('transactions', () => {
       isLoading,
       error,
       async () => {
-        // Balance adjustments are audit echoes of an already-applied balance change.
-        // Skip all cascading side effects (balance mutation, goal/loan application)
-        // and force isReconciled: true so the invariant lives in one place.
-        if (input.type === 'balance_adjustment') {
-          const normalized = { ...input, isReconciled: true };
-          const transaction = await transactionRepo.createTransaction(normalized);
-          transactions.value = [...transactions.value, transaction];
-          return transaction;
-        }
-
-        // For a transfer, resolve the destination amount up-front (converts
-        // cross-currency; THROWS on a missing rate so nothing is persisted).
+        // Balance adjustments are audit echoes of an already-applied balance change: the
+        // worker applies no effects for them, and isReconciled is forced here so the invariant
+        // lives in one place.
+        // For a transfer, resolve the destination amount up-front (converts cross-currency;
+        // THROWS on a missing rate so nothing is persisted).
         const createInput: CreateTransactionInput =
-          input.type === 'transfer' && input.toAccountId
-            ? {
-                ...input,
-                toAmount: resolveTransferToAmount(input.currency, input.toAccountId, input.amount),
-              }
-            : input;
+          input.type === 'balance_adjustment'
+            ? { ...input, isReconciled: true }
+            : input.type === 'transfer' && input.toAccountId
+              ? {
+                  ...input,
+                  toAmount: resolveTransferToAmount(
+                    input.currency,
+                    input.toAccountId,
+                    input.amount
+                  ),
+                }
+              : input;
 
-        const transaction = await transactionRepo.createTransaction(createInput);
+        // ONE Automerge change: the row, its balance movement(s), the goal allocation and the
+        // loan amortisation (with the linked loan account mirror) land whole or not at all.
+        const res = await transactionRepo.createTransactionCascade(createInput);
+        const transaction = res.transaction!;
         const isFirst = transactions.value.length === 0;
         // Immutable update: assign a new array so downstream computeds re-evaluate
         transactions.value = [...transactions.value, transaction];
+        absorbCascade(res, 'create');
         if (isFirst) {
           celebrate('first-transaction');
         }
-
-        // Update account balance(s) — liability-aware, transfer destination
-        // credited its converted toAmount (single shared routine).
-        await applyTransactionToBalances(transaction, 1);
-
-        // Apply goal allocation (if linked)
-        await applyGoalAllocation(transaction);
-
-        // Apply loan payment (if linked)
-        await applyLoanPayment(transaction);
-
         return transaction;
       },
       { action: 'transactionsStore:createTransaction' }
@@ -485,57 +359,36 @@ export const useTransactionsStore = defineStore('transactions', () => {
       isLoading,
       error,
       async () => {
-        // Get the original transaction to calculate balance adjustments
-        const original = transactions.value.find((t) => t.id === id);
+        // The original decides the transfer destination amount; the worker reads the stored row
+        // for everything else (and reverses from the stored portions, never from this copy).
+        const original =
+          transactions.value.find((t) => t.id === id) ??
+          (await transactionRepo.getTransactionById(id));
+        if (!original) return null;
 
-        const updated = await transactionRepo.updateTransaction(id, input);
-        if (updated) {
-          // Immutable update: assign a new array so downstream computeds re-evaluate
-          transactions.value = transactions.value.map((t) => (t.id === id ? updated : t));
-
-          // Balance adjustments carry no side effects (see createTransaction for rationale).
-          // Skip the reverse-and-reapply dance for both the original and updated shape.
-          if (original?.type === 'balance_adjustment' || updated.type === 'balance_adjustment') {
-            return updated;
-          }
-
-          // If amount, type, account, destination, or currency changed, adjust balances
-          if (original) {
-            // Resolve the updated shape's toAmount FIRST (may THROW on a missing
-            // rate) so the whole cascade aborts before any balance is touched —
-            // never a reversed-but-not-reapplied (half-applied) state.
-            const resolvedToAmount = resolveUpdatedTransferToAmount(original, updated, input);
-            const updatedForCascade: Transaction = { ...updated, toAmount: resolvedToAmount };
-
-            // Reverse the original effect, then apply the updated effect — both
-            // via the single liability-aware routine (dest uses each shape's toAmount).
-            await applyTransactionToBalances(original, -1);
-            await applyTransactionToBalances(updatedForCascade, 1);
-
-            // Persist the corrected toAmount when it changed on a transfer result.
-            if (
-              updatedForCascade.type === 'transfer' &&
-              updatedForCascade.toAmount !== updated.toAmount
-            ) {
-              await transactionRepo.updateTransaction(id, { toAmount: updatedForCascade.toAmount });
-              transactions.value = transactions.value.map((t) =>
-                t.id === id ? { ...t, toAmount: updatedForCascade.toAmount } : t
-              );
-            }
-
-            // Reverse old goal allocation
-            await adjustGoalProgress(original.goalId, original.goalAllocApplied, true);
-
-            // Reverse old loan payment
-            await reverseLoanPayment(original);
-          }
-
-          // Apply new goal allocation (if linked)
-          await applyGoalAllocation(updated);
-
-          // Apply new loan payment (if linked)
-          await applyLoanPayment(updated);
+        // Resolve the updated shape's toAmount FIRST (may THROW on a missing rate) so the
+        // cascade is never sent half-formed. `toAmount` travels in the patch only when it
+        // changes, or is cleared when the row stops being a transfer; an unrelated edit
+        // (description, date) carries no money field, so the worker patches the row only.
+        const updatedShape: Transaction = { ...original, ...stripUndefinedInput(input) };
+        const resolvedToAmount = resolveUpdatedTransferToAmount(original, updatedShape, input);
+        const patch: UpdateTransactionInput = { ...input };
+        if (resolvedToAmount !== undefined) {
+          if (resolvedToAmount !== original.toAmount) patch.toAmount = resolvedToAmount;
+        } else if (original.toAmount !== undefined) {
+          patch.toAmount = undefined;
         }
+
+        const res = await transactionRepo.updateTransactionCascade(id, patch);
+        if (!res.found) {
+          // A concurrent delete: the row is gone, so the edit has nothing to land on.
+          transactions.value = transactions.value.filter((t) => t.id !== id);
+          return null;
+        }
+        const updated = res.transaction!;
+        // Immutable update: assign a new array so downstream computeds re-evaluate
+        transactions.value = transactions.value.map((t) => (t.id === id ? updated : t));
+        absorbCascade(res, 'update');
         return updated;
       },
       { action: 'transactionsStore:updateTransaction' }
@@ -543,35 +396,26 @@ export const useTransactionsStore = defineStore('transactions', () => {
     return result ?? null;
   }
 
+  /** `input` with its explicit clears (`undefined` values) removed, for a merged preview. */
+  function stripUndefinedInput(input: UpdateTransactionInput): Partial<Transaction> {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(input)) if (v !== undefined) out[k] = v;
+    return out as Partial<Transaction>;
+  }
+
   async function deleteTransaction(id: string): Promise<boolean> {
     const result = await wrapAsync(
       isLoading,
       error,
       async () => {
-        // Get the transaction before deleting to reverse balance
-        const transaction = transactions.value.find((t) => t.id === id);
-
-        const success = await transactionRepo.deleteTransaction(id);
-        if (success) {
+        // The worker reverses the balance, goal and loan effects from the STORED row (its own
+        // portions, never a possibly stale local copy) and deletes it, in one change.
+        const res = await transactionRepo.deleteTransactionCascade(id);
+        if (res.found) {
           transactions.value = transactions.value.filter((t) => t.id !== id);
-
-          // Balance adjustments carry no side effects — skip reversal.
-          if (transaction?.type === 'balance_adjustment') {
-            return success;
-          }
-
-          // Reverse the transaction's effect on account balance(s)
-          if (transaction) {
-            await applyTransactionToBalances(transaction, -1);
-
-            // Reverse goal allocation
-            await adjustGoalProgress(transaction.goalId, transaction.goalAllocApplied, true);
-
-            // Reverse loan payment
-            await reverseLoanPayment(transaction);
-          }
+          absorbCascade(res, 'delete');
         }
-        return success;
+        return res.found;
       },
       { action: 'transactionsStore:deleteTransaction' }
     );
@@ -585,13 +429,11 @@ export const useTransactionsStore = defineStore('transactions', () => {
       async () => {
         const toDelete = transactions.value.filter((t) => t.recurringItemId === recurringItemId);
         let count = 0;
+        // One cascade per row (each atomic: balance, goal AND loan reversed with the delete).
         for (const tx of toDelete) {
-          const success = await transactionRepo.deleteTransaction(tx.id);
-          if (success) {
-            // Reverse balance (liability-aware; recurring items are income/expense)
-            await applyTransactionToBalances(tx, -1);
-            // Reverse goal allocation
-            await adjustGoalProgress(tx.goalId, tx.goalAllocApplied, true);
+          const res = await transactionRepo.deleteTransactionCascade(tx.id);
+          if (res.found) {
+            absorbCascade(res, 'delete');
             count++;
           }
         }

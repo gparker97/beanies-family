@@ -40,8 +40,15 @@ vi.mock('../cache', async (importOriginal) => {
 });
 
 const cache = await import('../cache');
-const { configure, setKey, initAndLoadCache, __resetApplyAndProjectForTesting } =
-  await import('../applyAndProject');
+const {
+  configure,
+  setKey,
+  initAndLoadCache,
+  initDoc,
+  openCache,
+  __hasDocForTesting,
+  __resetApplyAndProjectForTesting,
+} = await import('../applyAndProject');
 
 const FAMILY_ID = 'fam-oom';
 
@@ -78,22 +85,33 @@ describe('initAndLoadCache — cache preservation', () => {
     expect(cache.clearCache).toHaveBeenCalledWith(FAMILY_ID);
   });
 
-  it('STILL clears for an unrecognised error, and wraps it so the CAUSE survives', async () => {
-    // Anything not positively identified as an allocation failure keeps taking
-    // the existing path, including IndexedDB and key errors.
+  it('KEEPS the cache for an unrecognised error, wraps it so the CAUSE survives, and closes the handle', async () => {
+    // ⚠️ BEHAVIOUR CHANGED (C5a, data-layer audit 2026-10-03). This used to CLEAR the cache
+    // for anything that was not an allocation failure, a transient iOS IndexedDB error
+    // included, and then report `nothing-to-lose` so main installed the remote wholesale.
+    // Only a PROVEN-corrupt payload clears now. The handle is closed so the empty document
+    // App's path 3 installs next cannot write its base over the rows this kept.
     //
     // It is WRAPPED rather than rethrown, because main used to guess whether
     // this device still held anything worth protecting from the error's class —
     // and guessed wrong in both directions. The failure class must still reach
     // telemetry, which is what `cause` is for.
+    const close = vi.spyOn(cache, 'closeCacheDB');
     loadHook.err = Object.assign(new Error('IndexedDB is closing'), { name: 'InvalidStateError' });
 
     const err = await initAndLoadCache(FAMILY_ID).catch((e) => e);
     expect(err).toBeInstanceOf(CacheInitError);
     expect(err.stage).toBe('load');
+    expect(err.loss).toBe('something-to-lose');
     expect(err.cause).toBe('InvalidStateError');
 
-    expect(cache.clearCache).toHaveBeenCalledWith(FAMILY_ID);
+    expect(cache.clearCache).not.toHaveBeenCalled();
+    expect(close).toHaveBeenCalled();
+    expect(cachePersistFailed).toHaveBeenCalledWith(true, {
+      kind: 'open',
+      errorName: 'InvalidStateError',
+    });
+    close.mockRestore();
   });
 
   it('says `something-to-lose` when the reseed could NOT delete the cache', async () => {
@@ -106,7 +124,8 @@ describe('initAndLoadCache — cache preservation', () => {
     // the cache hold anything", and so answered `nothing-to-lose` here —
     // authorising a wholesale install that leaves `lastPersistedHeads` null, so
     // the next persist deletes every one of those rows.
-    vi.mocked(cache.clearCache).mockResolvedValueOnce({ deleted: false });
+    // (C5a: an unrecognised error no longer reseeds at all, so the delete is never attempted;
+    // the verdict is the same, and now holds whether or not a delete would have been blocked.)
     loadHook.err = Object.assign(new Error('nope'), { name: 'InvalidStateError' });
 
     const err = await initAndLoadCache(FAMILY_ID).catch((e) => e);
@@ -115,28 +134,43 @@ describe('initAndLoadCache — cache preservation', () => {
     expect(cache.initPersistenceDB).toHaveBeenCalledTimes(1); // the initial open only
   });
 
-  it('says `nothing-to-lose` once the reseed has PROVED the cache empty', async () => {
-    // The delete landed, so this device holds nothing: refusing here would tell
-    // the person their unsaved work is still present over a document `dropDoc()`
-    // discarded and a cache that was wiped. Same answer the `PayloadLoadError`
-    // arm has always given, for the same reason.
-    vi.mocked(cache.clearCache).mockResolvedValueOnce({ deleted: true });
-    loadHook.err = Object.assign(new Error('nope'), { name: 'InvalidStateError' });
+  it('KEEPS the cache for a wrong-key decrypt: `keyMayBeWrong` is not proof of corruption', async () => {
+    // C5a: a decrypt failure is the classic "the cached key is stale" case. The bytes are
+    // very likely fine; deleting them destroyed the only copy of anything unsynced.
+    loadHook.err = new CorruptPayloadError('cannot decrypt', 'decrypt', FAMILY_ID);
 
     const err = await initAndLoadCache(FAMILY_ID).catch((e) => e);
-    expect(err.loss).toBe('nothing-to-lose');
+    expect(err).toBeInstanceOf(CacheInitError);
+    expect(err.loss).toBe('something-to-lose');
+    expect(cache.clearCache).not.toHaveBeenCalled();
   });
 
-  it('does NOT let a live handle from a re-open override the delete', async () => {
-    // The reseed deletes AND re-opens, so a handle is open at the throw. That
-    // handle describes an EMPTY database; treating it as evidence of something
-    // to protect is exactly the inversion this file exists to stop.
-    vi.mocked(cache.clearCache).mockResolvedValueOnce({ deleted: true });
-    vi.spyOn(cache, 'isCacheReady').mockReturnValue(true);
+  it('NEVER drops a same-family live document on a load failure (C5e)', async () => {
+    // A live session (Settings reload, `replaceDocWithCacheRecovery`) holds this family's
+    // document with this session's edits in it. A load failure used to `dropDoc()` it.
+    initDoc();
+    await openCache(FAMILY_ID); // names the document's family
     loadHook.err = Object.assign(new Error('nope'), { name: 'InvalidStateError' });
 
     const err = await initAndLoadCache(FAMILY_ID).catch((e) => e);
-    expect(err.loss).toBe('nothing-to-lose');
+    expect(err).toBeInstanceOf(CacheInitError);
+    expect(err.loss).toBe('something-to-lose');
+    expect(__hasDocForTesting()).toBe(true);
+    expect(cache.clearCache).not.toHaveBeenCalled();
+  });
+
+  it('a PROVEN-corrupt cache under a live document is replaced BY that document (C5e)', async () => {
+    initDoc();
+    await openCache(FAMILY_ID);
+    loadHook.err = new CorruptPayloadError('bad bytes', 'materialize', FAMILY_ID);
+
+    const res = await initAndLoadCache(FAMILY_ID);
+    expect(cache.clearCache).toHaveBeenCalledWith(FAMILY_ID);
+    // The live document is still installed and main is told the family is loaded, so it
+    // merges the remote into it rather than installing the remote wholesale over it.
+    expect(__hasDocForTesting()).toBe(true);
+    expect(res.loaded).toBe(true);
+    expect(res.replay).toMatchObject({ recovered: true, corruptBaseReplaced: true });
   });
 
   it('wraps an OPEN-stage failure, and a cold boot there has nothing to lose', async () => {

@@ -66,6 +66,31 @@ describe('recoveryKit', () => {
     ).toEqual({ ok: false, reason: 'wrong-code' });
   });
 
+  // C10: only an AES-KW wrong-key unwrap means "not this entry". A damaged entry used to be
+  // swallowed into the same catch and reported as a mistyped code, forever, with no trace.
+  it('a damaged entry is reported as an error, not as a wrong code', async () => {
+    const fk = await generateFamilyKey();
+    const kit = await generateRecoveryKit(fk);
+    const damaged = { ...kit.pkg, salt: '%%% not base64 %%%' };
+    expect(await redeemRecoveryKit({ recoveryKeys: { [kit.kitId]: damaged } }, kit.code)).toEqual({
+      ok: false,
+      reason: 'error',
+    });
+  });
+
+  it('a damaged entry does not block a good kit beside it', async () => {
+    const fk = await generateFamilyKey();
+    const good = await generateRecoveryKit(fk);
+    const bad = await generateRecoveryKit(fk);
+    const envelope = {
+      recoveryKeys: { [bad.kitId]: { ...bad.pkg, wrapped: '%%%' }, [good.kitId]: good.pkg },
+    };
+    expect(await redeemRecoveryKit(envelope, good.code)).toMatchObject({
+      ok: true,
+      kitId: good.kitId,
+    });
+  });
+
   it('normalizeKitCode maps Crockford aliases', () => {
     expect(normalizeKitCode('ab-Ol i1')).toBe('AB0111');
   });

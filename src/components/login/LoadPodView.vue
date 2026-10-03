@@ -908,7 +908,9 @@ async function handleKitRedeem() {
         ? t('recovery.kitWrongCodeOrInvalidated')
         : result.reason === 'no-kits'
           ? t('recovery.kitNoKits')
-          : t('recovery.kitWrongCode');
+          : result.reason === 'error'
+            ? t('recovery.kitUnusable')
+            : t('recovery.kitWrongCode');
       emitKitRedeemed({ outcome: 'failed', errorCode: result.reason });
       return;
     }

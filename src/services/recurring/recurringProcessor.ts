@@ -1,14 +1,7 @@
 import * as accountRepo from '@/services/automerge/repositories/accountRepository';
-import * as assetRepo from '@/services/automerge/repositories/assetRepository';
-import * as goalRepo from '@/services/automerge/repositories/goalRepository';
 import * as recurringRepo from '@/services/automerge/repositories/recurringItemRepository';
 import * as transactionRepo from '@/services/automerge/repositories/transactionRepository';
-import type {
-  Asset,
-  RecurringItem,
-  CreateTransactionInput,
-  DisplayTransaction,
-} from '@/types/models';
+import type { RecurringItem, CreateTransactionInput, DisplayTransaction } from '@/types/models';
 import {
   toDateInputValue,
   addDays,
@@ -17,11 +10,10 @@ import {
   getStartOfDay,
   parseLocalDate,
 } from '@/utils/date';
-import { computeGoalAllocRaw, signedAccountDelta } from '@/utils/finance';
-import { findLoanDetails } from '@/utils/loanPayment';
 import { firstDueOnOrAfter, nextDueAfter } from '@/services/recurrence/recurrenceEngine';
 import { resolveTransactionRule } from '@/services/recurrence/adapters';
 import { reportError } from '@/utils/errorReporter';
+import { logEvent } from '@/services/telemetry';
 import * as perfTiming from '@/utils/perfTiming';
 import { recurringInstanceDate, recurringInstanceKey } from '@/utils/recurringInstance';
 import { skipWhileReadOnly } from '@/services/automerge/worker/writeGate';
@@ -69,6 +61,10 @@ export async function processRecurringItems(): Promise<ProcessResult> {
         // Calculate all due dates since last processed
         const dueDates = getDueDatesSince(item, today);
 
+        // The cursor advances only past dates that are fully accounted for (created, already
+        // present, or deliberately skipped) and STOPS at the first failure, so a failed date is
+        // retried next run instead of being skipped forever (audit C7).
+        let lastSettled: Date | null = null;
         for (const dueDate of dueDates) {
           // Dedup: skip if this due date's instance is already accounted for: a transaction for
           // this item exists ON the due date, or one STANDS FOR it (`recurringDueDate`, #107: a
@@ -78,21 +74,19 @@ export async function processRecurringItems(): Promise<ProcessResult> {
           const alreadyExists = allTransactions.some(
             (tx) => tx.recurringItemId === item.id && recurringInstanceDate(tx) === dateStr
           );
-          if (alreadyExists) continue;
-
-          // Create transaction for this due date
-          const success = await createTransactionFromRecurring(item, dueDate);
-          if (success) {
-            result.processed++;
+          if (!alreadyExists) {
+            const outcome = await createTransactionFromRecurring(item, dueDate);
+            if (outcome === 'failed') {
+              result.errors.push(`Failed to generate ${item.description} for ${dateStr}`);
+              break;
+            }
+            if (outcome === 'created') result.processed++;
           }
+          lastSettled = dueDate;
         }
 
-        // Update last processed date
-        if (dueDates.length > 0) {
-          const lastDue = dueDates[dueDates.length - 1];
-          if (lastDue) {
-            await recurringRepo.updateLastProcessedDate(item.id, toDateInputValue(lastDue));
-          }
+        if (lastSettled) {
+          await recurringRepo.updateLastProcessedDate(item.id, toDateInputValue(lastSettled));
         }
       } catch (e) {
         result.errors.push(`Failed to process ${item.description}: ${(e as Error).message}`);
@@ -307,10 +301,33 @@ function getNextDueDate(item: RecurringItem, afterDate: Date): Date | null {
   }
 }
 
+/** What one due date came to: `skipped` is settled (never retried), `failed` halts the item. */
+type InstanceOutcome = 'created' | 'skipped' | 'failed';
+
 /**
- * Create a transaction from a recurring item.
+ * Create a transaction from a recurring item: ONE worker cascade (`createTransactionCascade`),
+ * so the row, its balance movement, the goal allocation and the loan amortisation (with the
+ * linked loan account mirror) land together or not at all. The worker computes the allocation
+ * cap and the loan portions on the FOLDED balances; this side only names the links.
+ *
+ * An item whose account is gone is skipped and logged, never materialised: a row against a
+ * deleted account would move no balance and could never be reversed. (`accountsStore.
+ * deleteAccount` deactivates such items; this covers data from before it did.)
  */
-async function createTransactionFromRecurring(item: RecurringItem, date: Date): Promise<boolean> {
+async function createTransactionFromRecurring(
+  item: RecurringItem,
+  date: Date
+): Promise<InstanceOutcome> {
+  if (!(await accountRepo.getAccountById(item.accountId))) {
+    logEvent({
+      level: 'warn',
+      surface: 'recurring-processor',
+      message: 'account-missing',
+      context: { recur_surface: 'transaction', action: 'skip' },
+    });
+    return 'skipped';
+  }
+
   const input: CreateTransactionInput = {
     accountId: item.accountId,
     type: item.type,
@@ -322,87 +339,35 @@ async function createTransactionFromRecurring(item: RecurringItem, date: Date): 
     isReconciled: false,
     recurringItemId: item.id,
     ...(item.activityId ? { activityId: item.activityId } : {}),
+    // The goal link: the worker caps the allocation at what the goal still needs (nothing for
+    // a completed or deleted goal) and writes `goalAllocApplied` itself.
+    ...(item.goalId && item.goalAllocMode && item.goalAllocValue
+      ? {
+          goalId: item.goalId,
+          goalAllocMode: item.goalAllocMode,
+          goalAllocValue: item.goalAllocValue,
+        }
+      : {}),
+    // The loan link: the worker amortises on the folded balance (a paid-off loan earns no
+    // portions) and mirrors an asset loan onto its linked account, relatively.
+    ...(item.loanId ? { loanId: item.loanId } : {}),
   };
 
-  // Goal allocation (compute at generation time with guardrail)
-  if (item.goalId && item.goalAllocMode && item.goalAllocValue) {
-    const goal = await goalRepo.getGoalById(item.goalId);
-    if (goal && !goal.isCompleted) {
-      const raw = computeGoalAllocRaw(item.goalAllocMode, item.goalAllocValue, item.amount);
-      const remaining = Math.max(0, goal.targetAmount - goal.currentAmount);
-      const applied = Math.min(raw, remaining);
-      if (applied > 0) {
-        input.goalId = item.goalId;
-        input.goalAllocMode = item.goalAllocMode;
-        input.goalAllocValue = item.goalAllocValue;
-        input.goalAllocApplied = applied;
-      }
-    }
-  }
-
-  let linkedLoanAccountId: string | undefined;
-  // Loan payment allocation: only mark the transaction as a loan payment here. The worker op
-  // below amortises on the folded balance and the transaction receives the portions.
-  if (item.loanId) {
-    const allAssets = await assetRepo.getAllAssets();
-    const allAccounts = await accountRepo.getAllAccounts();
-    const loan = findLoanDetails(item.loanId, allAssets, allAccounts);
-    if (loan && loan.outstandingBalance > 0) {
-      input.loanId = item.loanId;
-      linkedLoanAccountId = loan.type === 'asset' ? loan.linkedAccountId : undefined;
-    }
-  }
-
-  // Which step of the cascade was running when it threw: the transaction itself, then the
-  // account, goal and loan adjustments it drives. Carried on the failure event so a report says
-  // WHERE the cascade stopped (after `transaction`, the transaction exists and an adjustment is
-  // missing), never claims creation failed when it did not.
-  let stage: 'transaction' | 'account' | 'goal' | 'loan' = 'transaction';
   try {
-    const transaction = await transactionRepo.createTransaction(input);
-
-    // Update account balance (relative: composes with a concurrent adjustment on another device)
-    stage = 'account';
-    const account = await accountRepo.getAccountById(item.accountId);
-    if (account) {
-      // Liability-aware: a recurring expense on a credit card raises what's owed.
-      const adjustment = signedAccountDelta(item.type, item.amount, account.type);
-      await accountRepo.incrementBalance(item.accountId, adjustment);
-    }
-
-    // Credit goal progress (relative; clamp and auto-complete happen worker-side). The goal can
-    // be deleted (here or by a merge) between generation and this cascade, and the worker op
-    // throws on a missing goal, so re-check and skip silently, as the absolute write did.
-    stage = 'goal';
-    if (input.goalAllocApplied && input.goalId && (await goalRepo.getGoalById(input.goalId))) {
-      await goalRepo.applyContribution(input.goalId, input.goalAllocApplied);
-    }
-
-    // Reduce loan balance (worker op: amortise on the folded balance, write the portions)
-    stage = 'loan';
-    if (input.loanId) {
-      const res = await transactionRepo.applyLoanPayment(transaction);
-      // The linked loan account mirrors the asset loan as an absolute of the returned folded
-      // balance (a residual, see plan #117 phase 2 section F).
-      const folded = (res.host as Asset | undefined)?.loan?.outstandingBalance;
-      if (res.applied && res.hostCollection === 'assets' && linkedLoanAccountId && folded != null) {
-        await accountRepo.updateAccountBalance(linkedLoanAccountId, folded);
-      }
-    }
-
-    return true;
+    await transactionRepo.createTransactionCascade(input);
+    return 'created';
   } catch (e) {
     console.error('Failed to create transaction from recurring:', e);
-    // Non-critical: this instance is skipped this run. Fixed enums only; never the description.
-    // `action` names the cascade step that threw (see `stage`), so the message stays generic.
+    // Non-critical: this instance is retried next run (the cursor stops here). Fixed enums
+    // only; never the description or the date. `action` names the one cascade mode.
     reportError({
       surface: 'recurring-processor',
       message: 'recurring-cascade-failed',
       severity: 'error',
       error: e,
-      context: { recur_surface: 'transaction', action: stage },
+      context: { recur_surface: 'transaction', action: 'create' },
     });
-    return false;
+    return 'failed';
   }
 }
 
@@ -484,20 +449,43 @@ export async function deduplicateRecurringTransactions(): Promise<number> {
     }
   }
 
-  // Delete duplicates (keep the earliest-created transaction per group)
+  // Delete duplicates (keep the earliest-created transaction per group). Each delete is the
+  // cascade (audit C7): a duplicate moved a balance (and a goal, and a loan) when it was
+  // generated, so sweeping the row alone left those movements in place.
   let deleted = 0;
+  let failed = 0;
   for (const entries of groups.values()) {
     if (entries.length <= 1) continue;
     // Sort by createdAt ascending — keep the first, delete the rest
     entries.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     for (let i = 1; i < entries.length; i++) {
-      await transactionRepo.deleteTransaction(entries[i]!.id);
-      deleted++;
+      try {
+        if ((await transactionRepo.deleteTransactionCascade(entries[i]!.id)).found) deleted++;
+      } catch (e) {
+        failed++;
+        reportError({
+          surface: 'recurring-dedup',
+          message: 'duplicate-delete-failed',
+          severity: 'error',
+          error: e,
+          context: { recur_surface: 'transaction', action: 'delete' },
+        });
+      }
     }
   }
 
-  if (deleted > 0) {
+  if (deleted > 0 || failed > 0) {
     console.warn(`[recurringProcessor] Removed ${deleted} duplicate recurring transaction(s)`);
+    logEvent({
+      level: failed > 0 ? 'warn' : 'info',
+      surface: 'recurring-dedup',
+      message: 'duplicates swept',
+      context: {
+        recur_surface: 'transaction',
+        action: failed > 0 ? 'partial' : 'complete',
+        perf_entity_count: deleted,
+      },
+    });
   }
   return deleted;
 }

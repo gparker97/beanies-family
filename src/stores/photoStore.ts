@@ -11,18 +11,22 @@
  * and Drive consistent.
  */
 import { defineStore } from 'pinia';
-import { computed, ref, shallowRef, triggerRef } from 'vue';
+import { computed, ref, shallowRef, triggerRef, watch } from 'vue';
 import {
   createFile,
   deleteFile,
+  deletePermission,
   downloadFileBlob,
   findOrCreateFolder,
   getFileMetadata,
+  listFilePermissions,
+  listFilesInFolder,
   setPublicLinkPermission,
   DriveApiError,
   DriveFileNotFoundError,
 } from '@/services/google/driveService';
 import { logEvent } from '@/services/telemetry/logEvent';
+import { reportError } from '@/utils/errorReporter';
 import { requestAccessToken } from '@/services/google/googleAuth';
 import { compress, CompressionError } from '@/services/photos/photoCompression';
 import {
@@ -60,8 +64,35 @@ import { PDF_MIME } from '@/utils/attachmentKind';
 
 const THUMB_TTL_MS = 30 * 60 * 1000; // 30 minutes
 const TOMBSTONE_GRACE_MS = 24 * 60 * 60 * 1000; // 24 hours
+/**
+ * A record with no host reference is only an orphan once it is older than this. A fresh
+ * upload is unreferenced for the window between the `photos` record landing and the host's
+ * `photoIds` write (the eager-create modals, a queue flush mid-wizard, a peer's attach that
+ * has not synced yet); without a grace the sweep would delete a photo the person just added.
+ */
+const ORPHAN_GRACE_MS = 24 * 60 * 60 * 1000; // 24 hours
 const DEFAULT_THUMB_SIZE = 400;
 const DEFAULT_FULL_SIZE = 2048;
+
+/** HTTP status off a Drive error, for the `http_status` context key. */
+function httpStatus(e: unknown): number | undefined {
+  return e instanceof DriveApiError ? e.status : undefined;
+}
+
+/**
+ * The photo pipeline's diagnostic events. One greppable surface per stage
+ * (`photo-upload`, `photo-public-link`, `photo-detach`, `photo-replace`, `photo-gc`); the
+ * context carries only allowlisted keys (`action`, `http_status`, `file_count`, `kind`).
+ */
+function photoEvent(
+  surface: 'photo-upload' | 'photo-public-link' | 'photo-detach' | 'photo-replace' | 'photo-gc',
+  level: 'info' | 'warn' | 'error',
+  message: string,
+  context: Record<string, unknown>,
+  error?: unknown
+): void {
+  logEvent({ level, surface, message, context, ...(error !== undefined ? { error } : {}) });
+}
 
 /**
  * Discriminated result for `addPhoto`. Lets callers distinguish:
@@ -231,7 +262,18 @@ export const usePhotoStore = defineStore('photos', () => {
 
   // --- Lifecycle --------------------------------------------------------
 
+  /** The family the offline queue is bound to; `null` between sign-out and the next open. */
+  const activeFamilyId = ref<string | null>(null);
+
+  /**
+   * Bind the offline upload queue to `familyId` and drain anything it holds. Wired from
+   * App.vue's family watcher (C11): until 2026-10 nothing called this, so an offline upload
+   * was written to IndexedDB and never flushed. Idempotent per family — a repeat call for the
+   * family already bound only re-drains; a different family deactivates the previous one first.
+   */
   async function activate(familyId: string): Promise<void> {
+    if (activeFamilyId.value && activeFamilyId.value !== familyId) deactivate();
+    activeFamilyId.value = familyId;
     setQueueFamily(familyId);
     setQueueFlushHandler(handleQueuedUpload);
     await refreshPending();
@@ -241,6 +283,7 @@ export const usePhotoStore = defineStore('photos', () => {
   }
 
   function deactivate(): void {
+    activeFamilyId.value = null;
     clearQueueFamily();
     unresolvedIds.value = new Set();
     canonicalFolderId.value = null;
@@ -423,7 +466,13 @@ export const usePhotoStore = defineStore('photos', () => {
       }
       // Transient: queue for later retry. If THAT also fails, we wrap and
       // re-throw so the caller can distinguish from a clean upload failure.
-      console.warn('[photoStore] Drive upload failed transiently; falling back to queue', e);
+      photoEvent(
+        'photo-upload',
+        'warn',
+        'Drive upload failed transiently; queued for retry',
+        { action: 'transient-fallback-queued', http_status: httpStatus(e) },
+        e
+      );
       await enqueueWithWrap(payload);
       await refreshPending();
       return { photoId, status: 'queued' };
@@ -443,8 +492,81 @@ export const usePhotoStore = defineStore('photos', () => {
     try {
       await enqueueUpload(payload);
     } catch (queueErr) {
-      console.error('[photoStore] enqueueUpload failed — photo cannot be saved', queueErr);
+      // A user action failed and the photo is gone: page it.
+      reportError({
+        surface: 'photo-upload',
+        message: 'photo could not be queued for later upload',
+        severity: 'critical',
+        error: queueErr,
+        context: { action: 'queue-write-failed' },
+      });
       throw new QueueWriteFailedError('Failed to queue photo upload', queueErr);
+    }
+  }
+
+  /** Grant anyone-with-link read; non-fatal, logged (see `finalizeUpload` for the rationale). */
+  async function grantPublicLink(token: string, fileId: string, stage: string): Promise<void> {
+    await setPublicLinkPermission(token, fileId).catch((e) => {
+      photoEvent(
+        'photo-public-link',
+        'warn',
+        'public-link grant failed; the session sweep will retry',
+        { action: 'grant-failed', stage, http_status: httpStatus(e) },
+        e
+      );
+    });
+  }
+
+  /**
+   * Remove the anyone-with-link grant from a file at tombstone time (C11). Until the GC sweep
+   * reclaims the bytes (24h grace, and the sweep is not yet scheduled) the file stays on Drive,
+   * so without this a "deleted" photo stayed world-readable to anyone holding its CDN URL.
+   * Best-effort and logged either way; a 403 means another member owns the file and their
+   * device revokes it when the tombstone syncs to them (see `useEnsurePhotosPublic` for the
+   * mirror-image grant sweep).
+   */
+  async function revokePublicLink(driveFileId: string): Promise<void> {
+    let revoked = 0;
+    try {
+      const token = await requestAccessToken();
+      const perms = await listFilePermissions(token, driveFileId);
+      for (const p of perms) {
+        if (p.type !== 'anyone') continue;
+        await deletePermission(token, driveFileId, p.id);
+        revoked++;
+      }
+      photoEvent('photo-public-link', 'info', 'public-link revoked at tombstone', {
+        action: 'revoke',
+        file_count: revoked,
+      });
+    } catch (e) {
+      photoEvent(
+        'photo-public-link',
+        'warn',
+        'public-link revoke failed at tombstone',
+        { action: 'revoke-failed', http_status: httpStatus(e), file_count: revoked },
+        e
+      );
+    }
+  }
+
+  /** Delete a Drive file that must not outlive a failed write; the failure is logged, not thrown. */
+  async function rollbackDriveFile(
+    token: string,
+    fileId: string,
+    surface: 'photo-upload' | 'photo-replace'
+  ): Promise<void> {
+    try {
+      await deleteFile(token, fileId);
+    } catch (deleteErr) {
+      if (deleteErr instanceof DriveFileNotFoundError) return;
+      reportError({
+        surface,
+        message: 'rollback delete of the Drive file failed; the file is orphaned',
+        severity: 'warning',
+        error: deleteErr,
+        context: { action: 'rollback-delete-failed', http_status: httpStatus(deleteErr) },
+      });
     }
   }
 
@@ -452,19 +574,62 @@ export const usePhotoStore = defineStore('photos', () => {
    * Completes an upload (the finalization step for both the online path and
    * the queue flush handler). Atomic: if the Automerge write fails, the
    * just-uploaded Drive file is deleted so we don't leave orphans.
+   *
+   * Idempotent per photoId (C11), because a queued entry can be retried after a partial
+   * success (the tab died between `createFile` and the doc write, or the write landed in the
+   * worker but its reply was lost):
+   *   - a `photos` record that already carries a `driveFileId` means the upload finished;
+   *     only the host attach is re-issued (a no-op when it already holds the id);
+   *   - on a RETRY (`fromQueue`), the deterministic filename is looked up in the photos folder
+   *     before a new file is created, so a crash mid-way does not leave a second copy.
+   *
+   * PDFs ride this path byte-for-byte (no re-encode), so their document metadata (author,
+   * producer) stays in the file behind the public link. Follow-up: decide whether booking
+   * documents should get the public-link grant at all, or render through `getFileBlob`.
    */
   async function finalizeUpload(
-    payload: Omit<QueuedPhotoUpload, 'id' | 'createdAt'>
+    payload: Omit<QueuedPhotoUpload, 'id' | 'createdAt'>,
+    opts: { fromQueue?: boolean } = {}
   ): Promise<void> {
+    const already = photos.value[payload.photoId];
+    if (already?.driveFileId) {
+      await mutate({
+        op: 'named',
+        name: 'attachPhotoToEntity',
+        args: {
+          entityCollection: payload.entityCollection,
+          entityId: payload.entityId,
+          photoId: payload.photoId,
+        },
+      });
+      photoEvent('photo-upload', 'info', 'finalize skipped: record already holds a Drive file', {
+        action: 'finalize-already-done',
+      });
+      unresolvedIds.value.delete(payload.photoId);
+      return;
+    }
+
     const folderId = await resolvePhotosFolderId();
     const token = await requestAccessToken();
-    const { fileId } = await createFile(
-      token,
-      folderId,
-      payload.filename,
-      payload.blob,
-      payload.mime
-    );
+    let fileId: string | null = null;
+    if (opts.fromQueue) {
+      const found = await listFilesInFolder(token, folderId, payload.filename).catch(() => []);
+      fileId = found.find((f) => f.name === payload.filename)?.id ?? null;
+      if (fileId) {
+        photoEvent('photo-upload', 'info', 'finalize reused the file a prior attempt created', {
+          action: 'finalize-reused-file',
+        });
+      }
+    }
+    if (!fileId) {
+      ({ fileId } = await createFile(
+        token,
+        folderId,
+        payload.filename,
+        payload.blob,
+        payload.mime
+      ));
+    }
 
     // Grant anyone-with-link read so family members whose `drive.file`
     // scope doesn't cover this file can still fetch bytes by URL. The
@@ -472,13 +637,7 @@ export const usePhotoStore = defineStore('photos', () => {
     // key, so effective exposure is the same trust boundary as the doc
     // itself. See ADR-021 "public-link access" section. Failure is
     // non-fatal — the file is uploaded; the migration sweep will retry.
-    await setPublicLinkPermission(token, fileId).catch((e) => {
-      console.warn('[photoStore] public-link setup failed on upload', {
-        photoId: payload.photoId,
-        fileId,
-        error: e,
-      });
-    });
+    await grantPublicLink(token, fileId, 'upload');
 
     try {
       const now = new Date().toISOString();
@@ -515,11 +674,16 @@ export const usePhotoStore = defineStore('photos', () => {
         ],
       });
     } catch (writeErr) {
-      // Rollback: try to delete the Drive file we just created.
-      try {
-        await deleteFile(token, fileId);
-      } catch (deleteErr) {
-        console.warn('[photoStore] Rollback delete failed', deleteErr);
+      // Rollback — but only when the record is genuinely absent. A rejected `mutate` can be a
+      // late reply on a write the worker already committed (C12); deleting the file then would
+      // leave a live record pointing at nothing, which is the one loss worse than an orphan.
+      const landed = projectionGetById('photos', payload.photoId) as PhotoAttachment | undefined;
+      if (landed?.driveFileId === fileId) {
+        photoEvent('photo-upload', 'warn', 'doc write rejected after the record landed; kept', {
+          action: 'rollback-skipped-record-present',
+        });
+      } else {
+        await rollbackDriveFile(token, fileId, 'photo-upload');
       }
       throw writeErr;
     }
@@ -531,7 +695,7 @@ export const usePhotoStore = defineStore('photos', () => {
 
   /** The photoUploadQueue flush handler — finalizes a queued entry. */
   async function handleQueuedUpload(entry: QueuedPhotoUpload): Promise<void> {
-    await finalizeUpload(entry);
+    await finalizeUpload(entry, { fromQueue: true });
     await refreshPending();
   }
 
@@ -745,13 +909,7 @@ export const usePhotoStore = defineStore('photos', () => {
     );
 
     // Public-link grant — see finalizeUpload for rationale.
-    await setPublicLinkPermission(token, fileId).catch((e) => {
-      console.warn('[photoStore] public-link setup failed on avatar upload', {
-        photoId,
-        fileId,
-        error: e,
-      });
-    });
+    await grantPublicLink(token, fileId, 'avatar');
 
     try {
       const now = new Date().toISOString();
@@ -768,11 +926,8 @@ export const usePhotoStore = defineStore('photos', () => {
       if (createdBy) record.createdBy = createdBy;
       await mutate({ op: 'set', collection: 'photos', id: photoId, entity: record });
     } catch (writeErr) {
-      try {
-        await deleteFile(token, fileId);
-      } catch (deleteErr) {
-        console.warn('[photoStore] Avatar rollback delete failed', deleteErr);
-      }
+      const landed = projectionGetById('photos', photoId) as PhotoAttachment | undefined;
+      if (landed?.driveFileId !== fileId) await rollbackDriveFile(token, fileId, 'photo-upload');
       throw writeErr;
     }
 
@@ -803,66 +958,173 @@ export const usePhotoStore = defineStore('photos', () => {
     );
 
     // Public-link grant — see finalizeUpload for rationale.
-    await setPublicLinkPermission(token, newDriveFileId).catch((e) => {
-      console.warn('[photoStore] public-link setup failed on replace', {
-        photoId,
-        fileId: newDriveFileId,
-        error: e,
-      });
-    });
+    await grantPublicLink(token, newDriveFileId, 'replace');
 
+    // The previous file is RETIRED, not deleted: a peer that has not received this patch
+    // still renders the old `driveFileId`, and a replace whose patch loses a merge would
+    // point at a deleted file. The id goes onto the record's grace list and the GC sweep
+    // reclaims it once the record's `updatedAt` is past the grace window.
     const previousDriveFileId = existing.driveFileId;
-    await mutate({
-      op: 'patch',
-      collection: 'photos',
-      id: photoId,
-      patch: {
-        driveFileId: newDriveFileId,
-        mime: compressed.mime,
-        width: compressed.width,
-        height: compressed.height,
-        sizeBytes: compressed.blob.size,
-      },
-      updatedAt: new Date().toISOString(),
-    });
+    const retired = [...(existing.retiredDriveFileIds ?? [])];
+    if (previousDriveFileId && !retired.includes(previousDriveFileId)) {
+      retired.push(previousDriveFileId);
+    }
+    try {
+      await mutate({
+        op: 'patch',
+        collection: 'photos',
+        id: photoId,
+        patch: {
+          driveFileId: newDriveFileId,
+          mime: compressed.mime,
+          width: compressed.width,
+          height: compressed.height,
+          sizeBytes: compressed.blob.size,
+          retiredDriveFileIds: retired,
+        },
+        updatedAt: new Date().toISOString(),
+      });
+    } catch (writeErr) {
+      // The record still names the previous file, so the NEW upload is the orphan.
+      const landed = projectionGetById('photos', photoId) as PhotoAttachment | undefined;
+      if (landed?.driveFileId !== newDriveFileId) {
+        await rollbackDriveFile(token, newDriveFileId, 'photo-replace');
+      }
+      throw writeErr;
+    }
 
     thumbUrlCache.delete(previousDriveFileId);
     thumbUrlCache.delete(newDriveFileId);
+    blobCache.delete(previousDriveFileId);
     unresolvedIds.value.delete(photoId);
     triggerRef(unresolvedIds);
+    photoEvent('photo-replace', 'info', 'photo file replaced; previous file retired', {
+      action: 'replaced',
+      file_count: retired.length,
+    });
+  }
 
-    // Best-effort: clean up the previous Drive file. If it was already
-    // missing (unresolved), this will 404 harmlessly.
-    if (previousDriveFileId) {
-      try {
-        await deleteFile(token, previousDriveFileId);
-      } catch (e) {
-        if (!(e instanceof DriveFileNotFoundError)) {
-          console.warn('[photoStore] Could not delete previous Drive file', e);
-        }
-      }
+  /**
+   * Is `photoId` referenced by any host right now? Reads the worker doc, so it sees every
+   * attach and detach that has been applied. `'unknown'` when a collect hook threw — the
+   * caller must then treat the photo as referenced (never tombstone on a partial answer).
+   */
+  async function referenceState(photoId: UUID): Promise<'referenced' | 'unreferenced' | 'unknown'> {
+    try {
+      const { ids } = await collectPhotoIdsRpc({ quiet: true });
+      return ids.includes(photoId) ? 'referenced' : 'unreferenced';
+    } catch (e) {
+      photoEvent(
+        'photo-detach',
+        'warn',
+        'reference check failed; photo kept',
+        { action: 'reference-check-failed' },
+        e
+      );
+      return 'unknown';
     }
   }
 
-  function markDeleted(photoId: UUID): void {
+  /**
+   * Tombstone a photo — but ONLY once no host references it (C11). Detach is the primitive:
+   * the caller removes the id from its own host's `photoIds` first; this then checks every
+   * registered host (`collectReferencedPhotoIds`) and writes `deletedAt` only when the id is
+   * unreferenced. A photo shared across hosts (one itinerary PDF linked to several booking
+   * segments, a milestone photo re-used on a scrapbook spread) therefore survives a removal
+   * from one of them, where it used to be tombstoned for all of them.
+   *
+   * `awaitDetachMs`: when the host write is not awaitable by the caller (the avatar modal
+   * emits `save` and the parent persists it), wait up to this long for a doc change that
+   * drops the reference, re-checking on every `docVersion` bump. Times out to `false`, which
+   * leaves the photo alive — the safe side.
+   *
+   * At tombstone time the anyone-with-link grant is revoked immediately; the bytes stay until
+   * the GC grace elapses, and a tombstoned photo must not stay world-readable meanwhile.
+   *
+   * Returns whether a tombstone was written (or was already present).
+   */
+  async function markDeleted(
+    photoId: UUID,
+    opts: { awaitDetachMs?: number } = {}
+  ): Promise<boolean> {
     const photo = photos.value[photoId];
-    if (!photo) return;
+    if (!photo) return false;
+    if (photo.deletedAt) return true;
+
+    let state = await referenceState(photoId);
+    if (state === 'referenced' && opts.awaitDetachMs) {
+      state = await waitForDetach(photoId, opts.awaitDetachMs);
+    }
+    if (state !== 'unreferenced') {
+      photoEvent('photo-detach', 'info', 'photo detached from a host but still referenced', {
+        action: state === 'unknown' ? 'kept-unknown' : 'kept-referenced',
+      });
+      return false;
+    }
+
     const now = new Date().toISOString();
-    fireAndForgetMutate({
+    await mutate({
       op: 'patch',
       collection: 'photos',
       id: photoId,
       patch: { deletedAt: now },
       updatedAt: now,
+      onMissing: 'skip',
+    });
+    thumbUrlCache.delete(photo.driveFileId);
+    blobCache.delete(photo.driveFileId);
+    photoEvent('photo-detach', 'info', 'photo tombstoned', { action: 'tombstoned' });
+    await revokePublicLink(photo.driveFileId);
+    return true;
+  }
+
+  /** Re-check the reference on each doc change until it drops or `timeoutMs` elapses. */
+  function waitForDetach(
+    photoId: UUID,
+    timeoutMs: number
+  ): Promise<'referenced' | 'unreferenced' | 'unknown'> {
+    return new Promise((resolve) => {
+      let settled = false;
+      let checking = false;
+      const finish = (state: 'referenced' | 'unreferenced' | 'unknown'): void => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        stop();
+        resolve(state);
+      };
+      const timer = setTimeout(() => finish('referenced'), timeoutMs);
+      const stop = watch(docVersion, async () => {
+        if (settled || checking) return;
+        checking = true;
+        const state = await referenceState(photoId);
+        checking = false;
+        if (state !== 'referenced') finish(state);
+      });
     });
   }
 
   // --- Garbage collection ---------------------------------------------
 
-  async function gcOrphans(): Promise<{ scanned: number; deleted: number }> {
+  /**
+   * Reclaim Drive bytes and `photos` records nobody can reach any more:
+   *   - a tombstone past its 24h grace that NO host references (a re-attach clears
+   *     `deletedAt`, and a tombstone a concurrent attach raced is never collected);
+   *   - a record with no host reference that is older than the orphan grace;
+   *   - every `retiredDriveFileIds` entry on a record whose `updatedAt` is past the grace.
+   *
+   * ⚠️ UNWIRED. No scheduler calls this yet (C11). Wire it only once the offline queue has
+   * soaked: `photoStore.activate` first shipped in 2026-10, so a queue entry written before
+   * then can still flush a photo whose host attach happens AFTER the record lands. The soak
+   * condition is: two releases with `photo-upload-flush` showing no stuck entries and no
+   * `photo-upload` `rollback-skipped-record-present` events, after which a daily sweep on
+   * family activation is safe.
+   */
+  async function gcOrphans(): Promise<{ scanned: number; deleted: number; reclaimed: number }> {
     const all = projectionList('photos');
     const now = Date.now();
     const toDelete: PhotoAttachment[] = [];
+    const empty = { scanned: all.length, deleted: 0, reclaimed: 0 };
 
     // Fail-safe: if ANY collect hook throws (surfaced as an RPC rejection) we
     // cannot reliably tell which photos are referenced — deleting on a partial
@@ -872,42 +1134,104 @@ export const usePhotoStore = defineStore('photos', () => {
     try {
       const { ids } = await collectPhotoIdsRpc({ quiet: true });
       referenced = new Set(ids);
-    } catch {
-      return { scanned: all.length, deleted: 0 };
+    } catch (e) {
+      photoEvent(
+        'photo-gc',
+        'warn',
+        'sweep aborted: reference collect failed',
+        {
+          action: 'sweep-aborted',
+        },
+        e
+      );
+      return empty;
     }
 
     const hosts = hasPhotoCollections();
+    const retirements: Array<{ photo: PhotoAttachment; fileIds: string[] }> = [];
     for (const photo of all) {
+      if (referenced.has(photo.id)) {
+        // Live record: only its retired files are candidates.
+        const retired = photo.retiredDriveFileIds ?? [];
+        if (retired.length > 0 && now - Date.parse(photo.updatedAt) > TOMBSTONE_GRACE_MS) {
+          retirements.push({ photo, fileIds: [...retired] });
+        }
+        continue;
+      }
       const tombstoneExpired =
-        photo.deletedAt && now - Date.parse(photo.deletedAt) > TOMBSTONE_GRACE_MS;
-      const orphaned = hosts && !referenced.has(photo.id);
+        !!photo.deletedAt && now - Date.parse(photo.deletedAt) > TOMBSTONE_GRACE_MS;
+      const orphaned =
+        hosts && !photo.deletedAt && now - Date.parse(photo.createdAt) > ORPHAN_GRACE_MS;
       if (tombstoneExpired || orphaned) toDelete.push(photo);
     }
 
-    if (toDelete.length === 0) return { scanned: all.length, deleted: 0 };
+    if (toDelete.length === 0 && retirements.length === 0) return empty;
 
+    // No token means no Drive delete, and the record must NOT go either: a record deleted
+    // ahead of its file leaves bytes on Drive that nothing can ever find again.
     const token = await requestAccessToken().catch(() => null);
-    for (const photo of toDelete) {
-      if (token) {
-        try {
-          await deleteFile(token, photo.driveFileId);
-        } catch (e) {
-          if (!(e instanceof DriveFileNotFoundError)) {
-            console.warn('[photoStore] gc: Drive delete failed', photo.id, e);
-            // Don't drop the Automerge record — retry next sweep.
-            continue;
-          }
-        }
+    if (!token) {
+      photoEvent('photo-gc', 'warn', 'sweep skipped: no access token', {
+        action: 'sweep-no-token',
+        file_count: toDelete.length,
+      });
+      return empty;
+    }
+
+    /** Delete one Drive file; `true` when it is gone (deleted or already 404). */
+    async function reclaimFile(fileId: string): Promise<boolean> {
+      try {
+        await deleteFile(token!, fileId);
+        return true;
+      } catch (e) {
+        if (e instanceof DriveFileNotFoundError) return true;
+        photoEvent(
+          'photo-gc',
+          'warn',
+          'Drive delete failed; retried next sweep',
+          { action: 'drive-delete-failed', http_status: httpStatus(e) },
+          e
+        );
+        return false;
       }
-      // Delete the record only AFTER the Drive file is gone (or 404s) — the
-      // worker owns the doc, so this is a single-id delete RPC per survivor.
+    }
+
+    let deleted = 0;
+    for (const photo of toDelete) {
+      const gone = await reclaimFile(photo.driveFileId);
+      for (const retiredId of photo.retiredDriveFileIds ?? []) await reclaimFile(retiredId);
+      // Don't drop the Automerge record until the Drive file is gone — retry next sweep.
+      if (!gone) continue;
+      // The worker owns the doc, so this is a single-id delete RPC per survivor.
       await mutate({ op: 'delete', collection: 'photos', id: photo.id });
       thumbUrlCache.delete(photo.driveFileId);
       unresolvedIds.value.delete(photo.id);
+      deleted++;
+    }
+
+    let reclaimed = 0;
+    for (const { photo, fileIds } of retirements) {
+      const remaining: string[] = [];
+      for (const fileId of fileIds) {
+        if (await reclaimFile(fileId)) reclaimed++;
+        else remaining.push(fileId);
+      }
+      if (remaining.length === fileIds.length) continue;
+      await mutate({
+        op: 'patch',
+        collection: 'photos',
+        id: photo.id,
+        patch: { retiredDriveFileIds: remaining },
+        onMissing: 'skip',
+      });
     }
 
     triggerRef(unresolvedIds);
-    return { scanned: all.length, deleted: toDelete.length };
+    photoEvent('photo-gc', 'info', 'sweep complete', {
+      action: 'sweep-complete',
+      file_count: deleted + reclaimed,
+    });
+    return { scanned: all.length, deleted, reclaimed };
   }
 
   // --- Pending uploads -------------------------------------------------
@@ -978,9 +1302,25 @@ export const usePhotoStore = defineStore('photos', () => {
    */
   function linkPhotoToEntity(entityCollection: string, entityId: string, photoId: UUID): void {
     fireAndForgetMutate({
-      op: 'named',
-      name: 'attachPhotoToEntity',
-      args: { entityCollection, entityId, photoId },
+      op: 'batch',
+      ops: [
+        {
+          op: 'named',
+          name: 'attachPhotoToEntity',
+          args: { entityCollection, entityId, photoId },
+        },
+        // A re-attach revives a tombstone (C11): the id is referenced again, so `deletedAt`
+        // must go or the GC sweep would reclaim a photo a host now points at. `deleteKeys` on
+        // an untombstoned record is a no-op write (`changed: false`).
+        {
+          op: 'patch',
+          collection: 'photos',
+          id: photoId,
+          patch: {},
+          deleteKeys: ['deletedAt'],
+          onMissing: 'skip',
+        },
+      ],
     });
   }
 

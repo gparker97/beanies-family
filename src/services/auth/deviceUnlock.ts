@@ -64,6 +64,46 @@ export function isValidPin(pin: string): boolean {
 }
 
 /**
+ * A device unlock record as stored, with the C10 value fence beside the version fence.
+ * `pinHashFp` is absent on records enrolled before it existed (the version alone decides
+ * for those). Local to this module so the shared model type stays unchanged.
+ */
+export type DeviceUnlockRecordWithFp = DeviceUnlockRecord & { pinHashFp?: string };
+
+/**
+ * A short fingerprint of a member's doc-side `pinHash` (C10, the pinVersion fence).
+ *
+ * `pinVersion` is a scalar two devices can both bump to the SAME number while setting
+ * DIFFERENT PINs (each reads n, each writes n+1, last writer wins the hash). A wrap made on
+ * the losing device then matches the doc's version but not its PIN, and the "changed
+ * elsewhere" check stayed silent. Comparing the value too closes it: different hashes are
+ * different fingerprints whatever the version says.
+ *
+ * 64 bits of SHA-256 over the stored hash string. Not secret-bearing on its own: the hash
+ * it is derived from is salted PBKDF2, and the salt lives inside the encrypted doc.
+ */
+export async function pinHashFingerprint(pinHash: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pinHash));
+  return Array.from(new Uint8Array(digest).slice(0, 8))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+/**
+ * Was this device's wrap made for a PIN the doc no longer holds? True when the version
+ * differs, or (when both sides carry one) when the hash fingerprint differs. A record or a
+ * member with no fingerprint input falls back to the version alone.
+ */
+export async function pinWrapIsStale(
+  record: Pick<DeviceUnlockRecordWithFp, 'pinVersion' | 'pinHashFp'>,
+  live: Pick<FamilyMember, 'pinVersion' | 'pinHash'>
+): Promise<boolean> {
+  if (live.pinVersion && record.pinVersion !== live.pinVersion) return true;
+  if (!record.pinHashFp || !live.pinHash) return false;
+  return record.pinHashFp !== (await pinHashFingerprint(live.pinHash));
+}
+
+/**
  * Derive the AES-KW wrap key for a PIN. On the fallback path the PIN is first stretched
  * with PBKDF2 (the extractable secret bytes make offline grinding cheaper, so the PIN
  * side gets the extra work); the HKDF `info` then carries the stretched value.
@@ -107,7 +147,12 @@ async function deriveWrapKeyForPin(
  */
 export async function enrollPinUnlock(params: {
   familyId: string;
-  member: Pick<FamilyMember, 'id' | 'name' | 'pinVersion'>;
+  /**
+   * `pinHash` (C10): the doc-side hash this wrap is made against, fingerprinted beside the
+   * version so a same-version change on another device is still detected. Optional only
+   * for callers that do not hold it; they get the version fence alone.
+   */
+  member: Pick<FamilyMember, 'id' | 'name' | 'pinVersion'> & { pinHash?: string };
   pin: string;
   familyKey: CryptoKey;
   /** Envelope keyId at wrap time (#117 rotation hook). */
@@ -119,7 +164,7 @@ export async function enrollPinUnlock(params: {
     const wrapKey = await deriveWrapKeyForPin(params.pin, hkdfSalt, baseKey, kdf);
     const wrappedFK = await wrapDEK(params.familyKey, wrapKey);
 
-    const record: DeviceUnlockRecord = {
+    const record: DeviceUnlockRecordWithFp = {
       id: deviceUnlockId(params.familyId, params.member.id),
       familyId: params.familyId,
       memberId: params.member.id,
@@ -131,6 +176,9 @@ export async function enrollPinUnlock(params: {
       failCount: 0,
       kdf,
       createdAt: toISODateString(new Date()),
+      ...(params.member.pinHash
+        ? { pinHashFp: await pinHashFingerprint(params.member.pinHash) }
+        : {}),
     };
     await saveDeviceUnlock(record);
     logEvent({

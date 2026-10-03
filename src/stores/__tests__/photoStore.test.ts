@@ -48,21 +48,31 @@ vi.mock('@/services/automerge/worker/docClient', async (importOriginal) => {
 });
 
 const driveMocks = vi.hoisted(() => {
-  class DriveFileNotFoundError extends Error {
+  class DriveApiError extends Error {
     readonly status: number;
     constructor(message: string, status: number) {
       super(message);
-      this.name = 'DriveFileNotFoundError';
+      this.name = 'DriveApiError';
       this.status = status;
+    }
+  }
+  class DriveFileNotFoundError extends DriveApiError {
+    constructor(message: string, status: number) {
+      super(message, status);
+      this.name = 'DriveFileNotFoundError';
     }
   }
   return {
     createFile: vi.fn(),
     deleteFile: vi.fn(),
+    deletePermission: vi.fn(),
     downloadFileBlob: vi.fn(),
     findOrCreateFolder: vi.fn(),
     getFileMetadata: vi.fn(),
+    listFilePermissions: vi.fn(),
+    listFilesInFolder: vi.fn(),
     setPublicLinkPermission: vi.fn(),
+    DriveApiError,
     DriveFileNotFoundError,
   };
 });
@@ -72,12 +82,21 @@ const { DriveFileNotFoundError } = driveMocks;
 vi.mock('@/services/google/driveService', () => ({
   createFile: driveMocks.createFile,
   deleteFile: driveMocks.deleteFile,
+  deletePermission: driveMocks.deletePermission,
   downloadFileBlob: driveMocks.downloadFileBlob,
   findOrCreateFolder: driveMocks.findOrCreateFolder,
   getFileMetadata: driveMocks.getFileMetadata,
+  listFilePermissions: driveMocks.listFilePermissions,
+  listFilesInFolder: driveMocks.listFilesInFolder,
   setPublicLinkPermission: driveMocks.setPublicLinkPermission,
+  DriveApiError: driveMocks.DriveApiError,
   DriveFileNotFoundError: driveMocks.DriveFileNotFoundError,
 }));
+
+// The diagnostic firehose + error reporter: captured so a test can pin the event a path emits.
+const telemetryMocks = vi.hoisted(() => ({ logEvent: vi.fn(), reportError: vi.fn() }));
+vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: telemetryMocks.logEvent }));
+vi.mock('@/utils/errorReporter', () => ({ reportError: telemetryMocks.reportError }));
 
 vi.mock('@/services/photos/photoCompression', async () => {
   const actual = await vi.importActual<typeof import('@/services/photos/photoCompression')>(
@@ -107,8 +126,12 @@ vi.mock('@/stores/familyContextStore', () => ({
 // --- Imports (after mocks are set up) --------------------------------
 
 import { usePhotoStore, __internals as storeInternals } from '../photoStore';
-import { __internals as queueInternals } from '@/services/sync/photoUploadQueue';
-import { deletePhotoQueueDatabase } from '@/services/sync/photoUploadQueue';
+import {
+  __internals as queueInternals,
+  deletePhotoQueueDatabase,
+  enqueueUpload,
+  flushQueue,
+} from '@/services/sync/photoUploadQueue';
 
 // --- Helpers ---------------------------------------------------------
 
@@ -147,6 +170,27 @@ async function settleMutations(): Promise<void> {
   await new Promise((r) => setTimeout(r, 0));
 }
 
+/** Drop every photoId from a flat activity host. */
+async function detach(activityId: string): Promise<void> {
+  await mutate({ op: 'patch', collection: 'activities', id: activityId, patch: { photoIds: [] } });
+}
+
+function hoursAgo(h: number): string {
+  return new Date(Date.now() - h * 60 * 60 * 1000).toISOString();
+}
+
+/** Rewrite timestamps on a photos record (the sweep's grace windows read them). */
+async function backdate(photoId: string, patch: Record<string, string>): Promise<void> {
+  await mutate({ op: 'patch', collection: 'photos', id: photoId, patch });
+}
+
+function eventsFor(surface: string, action: string): Array<Record<string, unknown>> {
+  return telemetryMocks.logEvent.mock.calls
+    .map((c) => c[0] as { surface: string; context?: Record<string, unknown> })
+    .filter((e) => e.surface === surface && e.context?.action === action)
+    .map((e) => e.context ?? {});
+}
+
 // --- Tests -----------------------------------------------------------
 
 describe('photoStore', () => {
@@ -164,6 +208,11 @@ describe('photoStore', () => {
     driveMocks.findOrCreateFolder.mockReset().mockResolvedValue('folder-nested');
     driveMocks.getFileMetadata.mockReset().mockResolvedValue({ parents: ['folder-1'] });
     driveMocks.setPublicLinkPermission.mockReset().mockResolvedValue(undefined);
+    driveMocks.listFilePermissions.mockReset().mockResolvedValue([]);
+    driveMocks.deletePermission.mockReset().mockResolvedValue(undefined);
+    driveMocks.listFilesInFolder.mockReset().mockResolvedValue([]);
+    telemetryMocks.logEvent.mockClear();
+    telemetryMocks.reportError.mockClear();
 
     // Photo collections are now statically registered in worker/photoOps.ts
     // (no per-test clear needed). [ADR-032 consolidated test pass pending]
@@ -426,18 +475,21 @@ describe('photoStore', () => {
     expect(record.driveFileId).toBe('drive-replacement');
     expect(record.createdAt).toBe(originalCreatedAt);
     expect(record.updatedAt).not.toBe(originalCreatedAt);
-    expect(driveMocks.deleteFile).toHaveBeenCalledWith('mock-token', 'drive-original');
+    // C11: the previous file is RETIRED onto the record's grace list, never deleted inline —
+    // a peer that has not received the patch still renders it.
+    expect(driveMocks.deleteFile).not.toHaveBeenCalledWith('mock-token', 'drive-original');
+    expect(record.retiredDriveFileIds).toEqual(['drive-original']);
   });
 
-  it('markDeleted sets deletedAt (tombstone) without touching Drive', async () => {
+  it('markDeleted tombstones an unreferenced photo without touching the Drive bytes', async () => {
     storeInternals.registerPhotoCollection('activities');
     await ensureEntity('activities', 'act-1');
     const store = usePhotoStore();
 
     const { photoId } = await store.addPhoto(makeFile(), 'activities', 'act-1');
+    await detach('act-1');
     driveMocks.deleteFile.mockClear();
-    store.markDeleted(photoId);
-    await settleMutations();
+    expect(await store.markDeleted(photoId)).toBe(true);
 
     expect(projection.getById('photos', photoId)!.deletedAt).toBeDefined();
     expect(driveMocks.deleteFile).not.toHaveBeenCalled();
@@ -449,14 +501,9 @@ describe('photoStore', () => {
     const store = usePhotoStore();
 
     const { photoId } = await store.addPhoto(makeFile(), 'activities', 'act-1');
+    await detach('act-1');
     // Manually backdate the tombstone so it's past the grace period.
-    const longAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
-    await mutate({
-      op: 'patch',
-      collection: 'photos',
-      id: photoId,
-      patch: { deletedAt: longAgo },
-    });
+    await backdate(photoId, { deletedAt: hoursAgo(48) });
     driveMocks.deleteFile.mockClear();
 
     const result = await store.gcOrphans();
@@ -471,8 +518,8 @@ describe('photoStore', () => {
     const store = usePhotoStore();
 
     const { photoId } = await store.addPhoto(makeFile(), 'activities', 'act-1');
-    store.markDeleted(photoId); // recent tombstone
-    await settleMutations();
+    await detach('act-1');
+    await store.markDeleted(photoId); // recent tombstone
 
     const result = await store.gcOrphans();
     expect(result.deleted).toBe(0);
@@ -485,12 +532,27 @@ describe('photoStore', () => {
     const store = usePhotoStore();
     const { photoId } = await store.addPhoto(makeFile(), 'activities', 'act-1');
 
-    // Manually detach the photo from the entity → zero references.
-    await mutate({ op: 'patch', collection: 'activities', id: 'act-1', patch: { photoIds: [] } });
+    // Manually detach the photo from the entity → zero references, and age it past the
+    // orphan grace (a fresh unreferenced record is an upload whose attach is still landing).
+    await detach('act-1');
+    await backdate(photoId, { createdAt: hoursAgo(25) });
 
     const result = await store.gcOrphans();
     expect(result.deleted).toBe(1);
     expect(projection.getById('photos', photoId)).toBeUndefined();
+  });
+
+  it('gcOrphans keeps a FRESH unreferenced record (24h orphan grace, C11)', async () => {
+    storeInternals.registerPhotoCollection('activities');
+    await ensureEntity('activities', 'act-1');
+    const store = usePhotoStore();
+    const { photoId } = await store.addPhoto(makeFile(), 'activities', 'act-1');
+    await detach('act-1');
+
+    const result = await store.gcOrphans();
+    expect(result.deleted).toBe(0);
+    expect(projection.getById('photos', photoId)).toBeDefined();
+    expect(driveMocks.deleteFile).not.toHaveBeenCalled();
   });
 
   it('gcOrphans retains a photo that is still referenced by its entity', async () => {
@@ -559,6 +621,331 @@ describe('photoStore', () => {
       await expect(store.addPhoto(makeFile(), 'activities', 'act-400')).rejects.toThrow(/400/);
       // No queue entry — non-transient failures don't get retried.
       expect(store.pendingUploadsFor('activities', 'act-400')).toHaveLength(0);
+    });
+  });
+
+  describe('C11 — detach is the primitive', () => {
+    it('markDeleted refuses while another host still references the photo', async () => {
+      storeInternals.registerPhotoCollection('activities');
+      await ensureEntity('activities', 'act-1');
+      await ensureEntity('activities', 'act-2');
+      const store = usePhotoStore();
+      const { photoId } = await store.addPhoto(makeFile(), 'activities', 'act-1');
+      store.linkPhotoToEntity('activities', 'act-2', photoId);
+      await settleMutations();
+
+      // Removed from act-1 only: act-2 still shows it, so no tombstone.
+      await detach('act-1');
+      expect(await store.markDeleted(photoId)).toBe(false);
+      expect(projection.getById('photos', photoId)!.deletedAt).toBeUndefined();
+      expect(eventsFor('photo-detach', 'kept-referenced')).toHaveLength(1);
+
+      // Removed from the last host: tombstoned.
+      await detach('act-2');
+      expect(await store.markDeleted(photoId)).toBe(true);
+      expect(projection.getById('photos', photoId)!.deletedAt).toBeDefined();
+    });
+
+    it('a shared itinerary removed from one booking segment survives on the other', async () => {
+      const store = usePhotoStore();
+      await ensureEntity('activities', 'act-src');
+      const { photoId } = await store.addPhoto(makeFile(), 'activities', 'act-src');
+      await detach('act-src');
+      // One extracted document linked to two legs of the same trip (#30).
+      await mutate({
+        op: 'set',
+        collection: 'vacations',
+        id: 'vac-1',
+        entity: {
+          id: 'vac-1',
+          travelSegments: [
+            { id: 'seg-a', photoIds: [photoId] },
+            { id: 'seg-b', photoIds: [photoId] },
+          ],
+          accommodations: [],
+          transportation: [],
+        },
+      });
+
+      // TravelPlansPage's order: the segment write first, then the gated tombstone.
+      await mutate({
+        op: 'patch',
+        collection: 'vacations',
+        id: 'vac-1',
+        patch: {
+          travelSegments: [
+            { id: 'seg-a', photoIds: [] },
+            { id: 'seg-b', photoIds: [photoId] },
+          ],
+        },
+      });
+      expect(await store.markDeleted(photoId)).toBe(false);
+      expect(projection.getById('photos', photoId)!.deletedAt).toBeUndefined();
+    });
+
+    it('markDeleted keeps the photo when the reference check itself fails', async () => {
+      storeInternals.registerPhotoCollection('boom', {
+        attach: () => {},
+        collect: () => {
+          throw new Error('hook blew up');
+        },
+      });
+      storeInternals.registerPhotoCollection('activities');
+      await ensureEntity('activities', 'act-1');
+      const store = usePhotoStore();
+      const { photoId } = await store.addPhoto(makeFile(), 'activities', 'act-1');
+      await detach('act-1');
+
+      expect(await store.markDeleted(photoId)).toBe(false);
+      expect(projection.getById('photos', photoId)!.deletedAt).toBeUndefined();
+      expect(eventsFor('photo-detach', 'kept-unknown')).toHaveLength(1);
+    });
+
+    it('markDeleted with awaitDetachMs tombstones once the host write lands', async () => {
+      storeInternals.registerPhotoCollection('activities');
+      await ensureEntity('activities', 'act-1');
+      const store = usePhotoStore();
+      const { photoId } = await store.addPhoto(makeFile(), 'activities', 'act-1');
+
+      // The avatar modal's shape: the tombstone is requested BEFORE the parent's save lands.
+      const pending = store.markDeleted(photoId, { awaitDetachMs: 2000 });
+      await new Promise((r) => setTimeout(r, 5));
+      expect(projection.getById('photos', photoId)!.deletedAt).toBeUndefined();
+      await detach('act-1');
+
+      expect(await pending).toBe(true);
+      expect(projection.getById('photos', photoId)!.deletedAt).toBeDefined();
+    });
+
+    it('markDeleted with awaitDetachMs gives up (photo kept) when the save never lands', async () => {
+      storeInternals.registerPhotoCollection('activities');
+      await ensureEntity('activities', 'act-1');
+      const store = usePhotoStore();
+      const { photoId } = await store.addPhoto(makeFile(), 'activities', 'act-1');
+
+      expect(await store.markDeleted(photoId, { awaitDetachMs: 20 })).toBe(false);
+      expect(projection.getById('photos', photoId)!.deletedAt).toBeUndefined();
+    });
+
+    it('a re-attach clears the tombstone', async () => {
+      storeInternals.registerPhotoCollection('activities');
+      await ensureEntity('activities', 'act-1');
+      await ensureEntity('activities', 'act-2');
+      const store = usePhotoStore();
+      const { photoId } = await store.addPhoto(makeFile(), 'activities', 'act-1');
+      await detach('act-1');
+      expect(await store.markDeleted(photoId)).toBe(true);
+
+      store.linkPhotoToEntity('activities', 'act-2', photoId);
+      await settleMutations();
+
+      expect(projection.getById('activities', 'act-2')!.photoIds).toContain(photoId);
+      expect(projection.getById('photos', photoId)!.deletedAt).toBeUndefined();
+    });
+
+    it('tombstoning revokes the anyone-with-link permission immediately', async () => {
+      storeInternals.registerPhotoCollection('activities');
+      await ensureEntity('activities', 'act-1');
+      const store = usePhotoStore();
+      const { photoId } = await store.addPhoto(makeFile(), 'activities', 'act-1');
+      await detach('act-1');
+      driveMocks.listFilePermissions.mockResolvedValue([
+        { id: 'perm-owner', type: 'user', role: 'owner', emailAddress: 'a@b.c' },
+        { id: 'perm-anyone', type: 'anyone', role: 'reader' },
+      ]);
+
+      await store.markDeleted(photoId);
+
+      expect(driveMocks.deletePermission).toHaveBeenCalledTimes(1);
+      expect(driveMocks.deletePermission).toHaveBeenCalledWith(
+        'mock-token',
+        'drive-file-1',
+        'perm-anyone'
+      );
+      expect(eventsFor('photo-public-link', 'revoke')).toEqual([
+        expect.objectContaining({ file_count: 1 }),
+      ]);
+    });
+
+    it('a failed revoke is logged on photo-public-link, never thrown', async () => {
+      storeInternals.registerPhotoCollection('activities');
+      await ensureEntity('activities', 'act-1');
+      const store = usePhotoStore();
+      const { photoId } = await store.addPhoto(makeFile(), 'activities', 'act-1');
+      await detach('act-1');
+      driveMocks.listFilePermissions.mockRejectedValue(
+        new driveMocks.DriveApiError('Drive 500', 500)
+      );
+
+      expect(await store.markDeleted(photoId)).toBe(true);
+      expect(eventsFor('photo-public-link', 'revoke-failed')).toEqual([
+        expect.objectContaining({ http_status: 500 }),
+      ]);
+    });
+  });
+
+  describe('C11 — gcOrphans guards', () => {
+    it('never collects a tombstone that a host still references, even past the grace', async () => {
+      storeInternals.registerPhotoCollection('activities');
+      await ensureEntity('activities', 'act-1');
+      const store = usePhotoStore();
+      const { photoId } = await store.addPhoto(makeFile(), 'activities', 'act-1');
+      // A tombstone a concurrent re-attach raced: deletedAt set while act-1 references it.
+      await backdate(photoId, { deletedAt: hoursAgo(48) });
+
+      const result = await store.gcOrphans();
+      expect(result.deleted).toBe(0);
+      expect(projection.getById('photos', photoId)).toBeDefined();
+      expect(driveMocks.deleteFile).not.toHaveBeenCalled();
+    });
+
+    it('skips the record delete when no token is available', async () => {
+      storeInternals.registerPhotoCollection('activities');
+      await ensureEntity('activities', 'act-1');
+      const store = usePhotoStore();
+      const { photoId } = await store.addPhoto(makeFile(), 'activities', 'act-1');
+      await detach('act-1');
+      await backdate(photoId, { deletedAt: hoursAgo(48) });
+      const { requestAccessToken } = await import('@/services/google/googleAuth');
+      vi.mocked(requestAccessToken).mockRejectedValueOnce(new Error('no session'));
+
+      const result = await store.gcOrphans();
+      expect(result.deleted).toBe(0);
+      expect(projection.getById('photos', photoId)).toBeDefined();
+      expect(eventsFor('photo-gc', 'sweep-no-token')).toHaveLength(1);
+    });
+
+    it('reclaims retired Drive files once the record is past the grace window', async () => {
+      storeInternals.registerPhotoCollection('activities');
+      await ensureEntity('activities', 'act-1');
+      const store = usePhotoStore();
+      driveMocks.createFile
+        .mockResolvedValueOnce({ fileId: 'drive-original', name: 'x' })
+        .mockResolvedValueOnce({ fileId: 'drive-replacement', name: 'x' });
+      const { photoId } = await store.addPhoto(makeFile(), 'activities', 'act-1');
+      await store.replacePhotoFile(photoId, makeFile('new.jpg'));
+
+      // Inside the grace: nothing reclaimed, the record is live (still referenced).
+      expect((await store.gcOrphans()).reclaimed).toBe(0);
+      expect(driveMocks.deleteFile).not.toHaveBeenCalled();
+
+      await backdate(photoId, { updatedAt: hoursAgo(25) });
+      const result = await store.gcOrphans();
+      expect(result.reclaimed).toBe(1);
+      expect(result.deleted).toBe(0);
+      expect(driveMocks.deleteFile).toHaveBeenCalledWith('mock-token', 'drive-original');
+      const record = projection.getById('photos', photoId)!;
+      expect(record.driveFileId).toBe('drive-replacement');
+      expect(record.retiredDriveFileIds).toEqual([]);
+    });
+  });
+
+  describe('C11 — upload idempotency and rollback', () => {
+    const queued = (photoId: string, entityId = 'act-1') => ({
+      photoId,
+      entityCollection: 'activities',
+      entityId,
+      blob: new Blob([new Uint8Array([1])]),
+      filename: `beanies-photo-${photoId}.jpg`,
+      mime: 'image/jpeg',
+      width: 1,
+      height: 1,
+      sizeBytes: 1,
+    });
+
+    it('a queued retry of an already-finalized photo re-attaches without a second upload', async () => {
+      storeInternals.registerPhotoCollection('activities');
+      await ensureEntity('activities', 'act-1');
+      const store = usePhotoStore();
+      const { photoId } = await store.addPhoto(makeFile(), 'activities', 'act-1');
+      expect(driveMocks.createFile).toHaveBeenCalledTimes(1);
+      // The entry a prior session left behind for the SAME photo (its reply was lost).
+      await enqueueUpload(queued(photoId));
+
+      await flushQueue();
+
+      expect(driveMocks.createFile).toHaveBeenCalledTimes(1);
+      await store.refreshPending();
+      expect(store.pendingUploadsFor('activities', 'act-1')).toHaveLength(0);
+      expect(projection.getById('photos', photoId)!.driveFileId).toBe('drive-file-1');
+      expect(eventsFor('photo-upload', 'finalize-already-done')).toHaveLength(1);
+    });
+
+    it('a queued retry reuses the file a crashed attempt already created', async () => {
+      storeInternals.registerPhotoCollection('activities');
+      await ensureEntity('activities', 'act-1');
+      usePhotoStore();
+      const photoId = 'photo-crashed';
+      const filename = `beanies-photo-${photoId}.jpg`;
+      driveMocks.listFilesInFolder.mockResolvedValue([{ id: 'drive-prior', name: filename }]);
+      await enqueueUpload(queued(photoId));
+
+      await flushQueue();
+
+      expect(driveMocks.createFile).not.toHaveBeenCalled();
+      expect(driveMocks.listFilesInFolder).toHaveBeenCalledWith(
+        'mock-token',
+        'folder-nested',
+        filename
+      );
+      expect(projection.getById('photos', photoId)!.driveFileId).toBe('drive-prior');
+      expect(projection.getById('activities', 'act-1')!.photoIds).toContain(photoId);
+    });
+
+    it('rollback keeps the Drive file when the rejected write actually landed', async () => {
+      storeInternals.registerPhotoCollection('activities');
+      await ensureEntity('activities', 'act-1');
+      const store = usePhotoStore();
+      driveMocks.createFile.mockResolvedValue({ fileId: 'drive-late', name: 'x' });
+      // A late reply (C12): the worker committed the batch, the RPC still rejected.
+      const real = vi.mocked(mutate).getMockImplementation()!;
+      vi.mocked(mutate).mockImplementationOnce(async (op, opts) => {
+        await real(op, opts);
+        throw new Error('reply lost');
+      });
+
+      await expect(store.addPhoto(makeFile(), 'activities', 'act-1')).rejects.toThrow(/reply lost/);
+
+      expect(driveMocks.deleteFile).not.toHaveBeenCalled();
+      expect(eventsFor('photo-upload', 'rollback-skipped-record-present')).toHaveLength(1);
+    });
+
+    it('replacePhotoFile deletes the NEW file and keeps the record when its write fails', async () => {
+      storeInternals.registerPhotoCollection('activities');
+      await ensureEntity('activities', 'act-1');
+      const store = usePhotoStore();
+      driveMocks.createFile
+        .mockResolvedValueOnce({ fileId: 'drive-original', name: 'x' })
+        .mockResolvedValueOnce({ fileId: 'drive-replacement', name: 'x' });
+      const { photoId } = await store.addPhoto(makeFile(), 'activities', 'act-1');
+      vi.mocked(mutate).mockRejectedValueOnce(new Error('forced write failure'));
+
+      await expect(store.replacePhotoFile(photoId, makeFile('new.jpg'))).rejects.toThrow();
+
+      expect(driveMocks.deleteFile).toHaveBeenCalledWith('mock-token', 'drive-replacement');
+      expect(driveMocks.deleteFile).not.toHaveBeenCalledWith('mock-token', 'drive-original');
+      const record = projection.getById('photos', photoId)!;
+      expect(record.driveFileId).toBe('drive-original');
+      expect(record.retiredDriveFileIds).toBeUndefined();
+    });
+
+    it('a failed queue write pages as critical on photo-upload', async () => {
+      setOnlineStatus(false);
+      storeInternals.registerPhotoCollection('activities');
+      await ensureEntity('activities', 'act-1');
+      const store = usePhotoStore();
+      store.deactivate(); // no bound queue → enqueue throws
+
+      await expect(store.addPhoto(makeFile(), 'activities', 'act-1')).rejects.toThrow(
+        /queue photo upload/
+      );
+      expect(telemetryMocks.reportError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          surface: 'photo-upload',
+          severity: 'critical',
+          context: { action: 'queue-write-failed' },
+        })
+      );
     });
   });
 });

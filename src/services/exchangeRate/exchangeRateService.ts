@@ -1,6 +1,8 @@
 import { SUPPORTED_CURRENCY_CODES } from '@/constants/currencies';
 import * as settingsRepo from '@/services/automerge/repositories/settingsRepository';
 import * as globalSettingsRepo from '@/services/indexeddb/repositories/globalSettingsRepository';
+import { isAuthoritativeDocLoaded } from '@/services/automerge/docService';
+import { logEvent } from '@/services/telemetry/logEvent';
 import type { CurrencyCode, ExchangeRate } from '@/types/models';
 import { toISODateString } from '@/utils/date';
 
@@ -176,6 +178,17 @@ export function pickRateRefreshAction(opts: {
 }
 
 export async function updateRatesIfStale(): Promise<UpdateResult> {
+  // A snapshot fast-paint reports the projection loaded before the worker holds a document;
+  // a rate write then fails. Nothing to do until the authoritative load lands.
+  if (!isAuthoritativeDocLoaded()) {
+    logEvent({
+      level: 'info',
+      surface: 'exchange-rate',
+      message: 'rate refresh skipped: authoritative document not loaded',
+      context: { action: 'skipped_pre_hydration' },
+    });
+    return { success: true, ratesUpdated: 0 };
+  }
   const stale = await areRatesStale();
 
   if (!stale) {
@@ -222,6 +235,13 @@ export async function forceUpdateRates(): Promise<UpdateResult> {
       ratesUpdated: result.rates.length,
     };
   } catch (e) {
+    logEvent({
+      level: 'error',
+      surface: 'exchange-rate',
+      message: 'saving exchange rates failed',
+      context: { action: 'save_rates', error_code: e instanceof Error ? e.name : 'unknown' },
+      error: e,
+    });
     return {
       success: false,
       ratesUpdated: 0,

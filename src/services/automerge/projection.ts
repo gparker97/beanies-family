@@ -37,6 +37,19 @@ export function isLoaded(): boolean {
   return loaded;
 }
 
+/** True only once the worker holds an AUTHORITATIVE document (create / cache load / merge /
+ * snapshot load). A projection SNAPSHOT fast-paint streams the same `projection` chunks and
+ * flips `loaded`, but installs no document, so a write then throws `no document loaded`.
+ * Written by `docClient` via `markAuthoritative()` at the points it already records a doc
+ * install; cleared by `resetProjection`. Gate pre-hydration WRITES on this, not `isLoaded`. */
+let authoritative = false;
+export function isAuthoritativeLoaded(): boolean {
+  return authoritative;
+}
+export function markAuthoritative(): void {
+  authoritative = true;
+}
+
 function mapFor(collection: CollectionName): ShallowRef<EntityMap> {
   const ref = maps.get(collection);
   if (!ref) throw new Error(`[projection] unknown collection: ${collection}`);
@@ -143,5 +156,6 @@ export function resetProjection(): void {
   for (const name of COLLECTION_NAMES) mapFor(name).value = new Map();
   settingsRef.value = null;
   loaded = false;
+  authoritative = false;
   docVersion.value += 1;
 }

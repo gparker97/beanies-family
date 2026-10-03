@@ -1611,7 +1611,7 @@ describe('layer 4: compaction rebase through compactDoc + mergeRemoteEnvelope', 
     });
   }
 
-  it('the peer keeps its offline edits on the compacted lineage; conflicts are exactly the updatedAt collisions', async () => {
+  it('the peer keeps its offline edits on the compacted lineage; updatedAt collisions are NOT conflicts', async () => {
     const key = await generateFamilyKey();
     ap.reset();
     ap.configure({
@@ -1652,13 +1652,12 @@ describe('layer 4: compaction rebase through compactDoc + mergeRemoteEnvelope', 
     report.push(
       `rebase (a) composer: count=${ops!.count} conflicts=${ops!.conflicts}; fields both sides changed: [${clash.join(', ')}]`
     );
-    // FOLLOW-UP: the rebase composer counts updatedAt collisions as conflicts; exclude them in a
-    // later change. Until then `conflicts` must equal EXACTLY the number of `updatedAt`-only
-    // collisions (both devices stamped the same entity/settings), and no user-data field may
-    // collide. Precise, not weaker: any other conflict, or a missing one, fails here.
+    // C9d (data-layer audit 2026-10-03), the former FOLLOW-UP: the composer used to count
+    // `updatedAt` collisions (both devices stamped the same entity/settings) as conflicts. It no
+    // longer does, so with no user-data field colliding, `conflicts` must be exactly 0.
     const stampClashes = clash.filter((f) => f.endsWith('.updatedAt'));
     expect(clash.filter((f) => !f.endsWith('.updatedAt'))).toEqual([]);
-    expect(ops!.conflicts).toBe(stampClashes.length);
+    expect(ops!.conflicts).toBe(0);
     if (!REAL_POD) expect(stampClashes).toEqual(['settings.updatedAt']);
     const rebased = applyMutation(targetA, ops!.op as MutationOp).doc;
     const m1 = Automerge.toJS(rebased) as Any;
@@ -1675,7 +1674,7 @@ describe('layer 4: compaction rebase through compactDoc + mergeRemoteEnvelope', 
     expect(res.action).toBe('rebased');
     expect(res.replayed).toBe(ops!.count);
     expect(res.dirty).toBe(true);
-    expect(res.conflicts ?? 0).toBe(stampClashes.length); // see the FOLLOW-UP above
+    expect(res.conflicts ?? 0).toBe(0); // C9d: a stamp is never a conflict
     expect(res.rootConflicts?.added ?? 0).toBe(0);
     const m2 = Automerge.toJS(Automerge.load(ap.exportSnapshot().binary)) as Any;
     expect(peerProbes.map((p) => p(m2))).toEqual(peerProbes.map(() => true));
@@ -1747,7 +1746,7 @@ describe('layer 4: compaction rebase through compactDoc + mergeRemoteEnvelope', 
   });
 
   it.skipIf(REAL_POD)(
-    'documented: both sides changed the SAME list array -> counted conflict, saved copy stays',
+    'C8: both sides changed the SAME id-keyed list array -> unioned through base, both edits kept',
     async () => {
       const compacted = Automerge.from(
         { ...(Automerge.toJS(BASE) as Any), podLineage: { id: 'L-NEW', seq: 1 } },
@@ -1764,12 +1763,22 @@ describe('layer 4: compaction rebase through compactDoc + mergeRemoteEnvelope', 
         target.doc
       );
       report.push(
-        `rebase same-array both sides: conflicts=${ops?.conflicts} fields=[${clash.join(', ')}] op=${ops?.op ? 'present' : 'none'} (documented out-of-scope)`
+        `rebase same-array both sides: conflicts=${ops?.conflicts} fields=[${clash.join(', ')}] op=${ops?.op ? 'present' : 'none'}`
       );
-      // The array clash is the documented limitation; the updatedAt one is the FOLLOW-UP overcount
-      // (the rebase composer counts updatedAt collisions as conflicts; exclude them in a later change).
+      // ⚠️ BEHAVIOUR CHANGED (C8/C9d, data-layer audit 2026-10-03): this used to be a counted
+      // conflict (2, with the `updatedAt` overcount) that kept the saved copy and dropped the
+      // peer's tick. The list's items carry ids, so the rebase now unions them through `base`.
       expect(clash).toEqual(['lists.items', 'lists.updatedAt']);
-      expect(ops?.conflicts).toBe(2);
+      expect(ops?.conflicts).toBe(0);
+      const out = Automerge.toJS(
+        applyMutation(migrateDoc(Automerge.clone(target.doc)), ops!.op as MutationOp).doc
+      ) as Any;
+      const itemOf = (m: Any, id: string) =>
+        (m.lists[LIST].items as Any[]).find((i) => i.id === id);
+      const peerM = Automerge.toJS(peer.doc) as Any;
+      const targetM = Automerge.toJS(target.doc) as Any;
+      expect(itemOf(out, 'demo-list-item-3')).toEqual(itemOf(peerM, 'demo-list-item-3'));
+      expect(itemOf(out, 'demo-list-item-5')).toEqual(itemOf(targetM, 'demo-list-item-5'));
     }
   );
 });

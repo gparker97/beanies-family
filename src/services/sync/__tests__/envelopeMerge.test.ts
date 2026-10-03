@@ -2,9 +2,12 @@ import { describe, it, expect } from 'vitest';
 import {
   ENVELOPE_KEY_DICTS,
   keyDictSize,
+  mergeEnvelopes,
   mergeKeyDict,
   mergeNewestWinsDict,
+  monotonicCreatedAt,
   preserveLocalKeyDicts,
+  revocationKey,
 } from '@/services/sync/envelopeMerge';
 import type { EnvelopeKeyDictField, MergeRule } from '@/services/sync/envelopeMerge';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
@@ -121,14 +124,12 @@ describe('preserveLocalKeyDicts', () => {
     expect(result.wrappedKeys).not.toBe(local.wrappedKeys);
   });
 
-  it('preserves non-key envelope fields from incoming (familyId, payload, etc.)', () => {
+  it('preserves non-key envelope fields from incoming (familyName, payload, etc.)', () => {
     const incoming = buildEnvelope({
-      familyId: 'remote-fam',
       familyName: 'Remote Family',
       encryptedPayload: 'remote-payload',
     });
     const local = buildEnvelope({
-      familyId: 'local-fam',
       familyName: 'Local Family',
       encryptedPayload: 'local-payload',
       wrappedKeys: { m1: sampleWrapped },
@@ -136,10 +137,115 @@ describe('preserveLocalKeyDicts', () => {
     const result = preserveLocalKeyDicts(incoming, local);
     // Non-key fields come from incoming (fetched envelope is the source of
     // truth for the encrypted payload; only key dicts get local-wins merge).
-    expect(result.familyId).toBe('remote-fam');
     expect(result.familyName).toBe('Remote Family');
     expect(result.encryptedPayload).toBe('remote-payload');
     expect(result.wrappedKeys.m1).toEqual(sampleWrapped);
+  });
+});
+
+describe('a local side from ANOTHER family contributes nothing (audit C3)', () => {
+  // Loading family B's file while signed into A used to union A's wrapped keys, invites
+  // and recovery passphrase into B's envelope, which the next save then published.
+  const familyA = () =>
+    buildEnvelope({
+      familyId: 'fam-A',
+      wrappedKeys: { a1: { wrapped: 'A-w', salt: 'A-s' } },
+      inviteKeys: { invA: { salt: 's', wrapped: 'A-inv', expiresAt: '2026-01-01T00:00:00Z' } },
+      recoveryPassphrase: { wrapped: 'A-pp', salt: 's', createdAt: '2026-09-01T00:00:00Z' },
+      revokedKeys: { 'member:a9': { revokedAt: '2026-09-01T00:00:00Z' } },
+    });
+  const familyB = () =>
+    buildEnvelope({ familyId: 'fam-B', wrappedKeys: { b1: { wrapped: 'B-w', salt: 'B-s' } } });
+
+  it('mergeEnvelopes returns B alone: no A wrap, invite, passphrase or tombstone', () => {
+    const { envelope, needsPublish } = mergeEnvelopes(familyB(), familyA());
+    expect(envelope.familyId).toBe('fam-B');
+    expect(Object.keys(envelope.wrappedKeys)).toEqual(['b1']);
+    expect(envelope.inviteKeys).toEqual({});
+    expect(envelope.recoveryPassphrase).toBeUndefined();
+    expect(envelope.revokedKeys).toBeUndefined();
+    // Nothing of A's is ours to publish into B's file.
+    expect(needsPublish).toBe(false);
+  });
+
+  it('preserveLocalKeyDicts returns the incoming envelope untouched', () => {
+    const incoming = familyB();
+    expect(preserveLocalKeyDicts(incoming, familyA())).toBe(incoming);
+  });
+
+  it('a SAME-family local side still merges (the guard is not a blanket refusal)', () => {
+    const local = buildEnvelope({
+      familyId: 'fam-B',
+      wrappedKeys: { b2: { wrapped: 'w', salt: 's' } },
+    });
+    const { envelope } = mergeEnvelopes(familyB(), local);
+    expect(Object.keys(envelope.wrappedKeys).sort()).toEqual(['b1', 'b2']);
+  });
+});
+
+describe('password rotation is not reverted by a stale peer (audit C2)', () => {
+  // The rotating device stamps a VALUE-PINNED tombstone for the old wrap before writing
+  // the new one (`syncStore.setMemberWrappedKey`). `wrappedKeys` merges local-wins, so
+  // without it a peer still holding the old wrap republished it and the old password kept
+  // opening the pod.
+  const rotatedRemote = () =>
+    buildEnvelope({
+      wrappedKeys: { m1: { wrapped: 'NEW-w', salt: 'NEW-s' } },
+      revokedKeys: {
+        [revocationKey('wrappedKeys', 'm1', 'OLD-w')]: {
+          revokedAt: '2026-10-03T00:00:00Z',
+          wrapped: 'OLD-w',
+        },
+      },
+    });
+  const stalePeer = () =>
+    buildEnvelope({ wrappedKeys: { m1: { wrapped: 'OLD-w', salt: 'OLD-s' } } });
+
+  it('a stale peer merging the rotated remote keeps the NEW wrap, not its own old one', () => {
+    const { envelope } = mergeEnvelopes(rotatedRemote(), stalePeer());
+    expect(envelope.wrappedKeys.m1).toEqual({ wrapped: 'NEW-w', salt: 'NEW-s' });
+    // And the tombstone travels on, so the peer's next save cannot republish OLD.
+    expect(envelope.revokedKeys).toHaveProperty(revocationKey('wrappedKeys', 'm1', 'OLD-w'));
+  });
+
+  it('and the stale peer publishing over the rotated file cannot resurrect the old wrap', () => {
+    // The peer has merged the tombstone; its envelope is the LOCAL side of the next merge.
+    const peerAfterMerge = mergeEnvelopes(rotatedRemote(), stalePeer()).envelope;
+    const { envelope } = mergeEnvelopes(stalePeer(), peerAfterMerge);
+    expect(envelope.wrappedKeys.m1?.wrapped).toBe('NEW-w');
+  });
+
+  it('a pinned tombstone never touches the member’s NEXT wrap (re-rotation still works)', () => {
+    // A later rotation on this device (NEWER-w) merged against the file carrying the
+    // OLD-w tombstone: value-pinned, so it kills OLD-w only and NEWER-w stands.
+    const { envelope } = mergeEnvelopes(
+      rotatedRemote(),
+      buildEnvelope({ wrappedKeys: { m1: { wrapped: 'NEWER-w', salt: 's' } } })
+    );
+    expect(envelope.wrappedKeys.m1?.wrapped).toBe('NEWER-w');
+  });
+});
+
+describe('monotonicCreatedAt (audit C12)', () => {
+  const T = Date.parse('2026-10-03T10:00:00.000Z');
+  it('uses the wall clock when it is ahead of the entry being replaced', () => {
+    expect(monotonicCreatedAt('2026-10-03T09:00:00.000Z', T)).toEqual({
+      createdAt: '2026-10-03T10:00:00.000Z',
+      clamped: false,
+    });
+  });
+  it('clamps to previous + 1ms when this device’s clock is behind (and says so)', () => {
+    expect(monotonicCreatedAt('2026-10-03T11:00:00.000Z', T)).toEqual({
+      createdAt: '2026-10-03T11:00:00.001Z',
+      clamped: true,
+    });
+  });
+  it('clamps an exact tie too — a tie resolves to the incoming side and loses', () => {
+    expect(monotonicCreatedAt('2026-10-03T10:00:00.000Z', T).clamped).toBe(true);
+  });
+  it('treats a missing or unparseable previous stamp as nothing to beat', () => {
+    expect(monotonicCreatedAt(undefined, T).clamped).toBe(false);
+    expect(monotonicCreatedAt('garbage', T).clamped).toBe(false);
   });
 });
 

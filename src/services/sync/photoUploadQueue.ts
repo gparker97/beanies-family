@@ -121,11 +121,27 @@ export async function removeFromQueue(id: string): Promise<void> {
   await withStore(db, 'readwrite', (store) => store.delete(id));
 }
 
+/** The drain in progress, so overlapping triggers share one pass (see `flushQueue`). */
+let inFlightFlush: Promise<void> | null = null;
+
 /**
  * Attempt to drain every pending entry through the registered handler.
  * Successful entries are removed; failures stay queued.
+ *
+ * Single-flight (C11): `setActiveFamily`, `setFlushHandler`, the `online` event, the retry
+ * timer and `photoStore.activate` can all fire within the same tick, and two concurrent
+ * drains handed the SAME entry to the handler twice — two Drive files for one photo. A call
+ * that lands while a drain is running joins that drain's promise instead.
  */
-export async function flushQueue(): Promise<void> {
+export function flushQueue(): Promise<void> {
+  if (inFlightFlush) return inFlightFlush;
+  inFlightFlush = drainOnce().finally(() => {
+    inFlightFlush = null;
+  });
+  return inFlightFlush;
+}
+
+async function drainOnce(): Promise<void> {
   if (!flushHandler || !dbPromise) return;
   if (retryTimer) {
     clearTimeout(retryTimer);
@@ -134,7 +150,12 @@ export async function flushQueue(): Promise<void> {
   const entries = await getPending();
   if (entries.length === 0) return;
 
-  console.warn(`[photoUploadQueue] Draining ${entries.length} pending upload(s)`);
+  logEvent({
+    level: 'info',
+    surface: 'photo-upload-flush',
+    message: 'draining pending photo uploads',
+    context: { action: 'drain-start', file_count: entries.length },
+  });
   let anyFailed = false;
   for (const entry of entries) {
     try {
@@ -174,16 +195,44 @@ export async function deletePhotoQueueDatabase(familyId: string): Promise<void> 
     try {
       const db = await dbPromise;
       db.close();
-    } catch {
-      // ignore
+    } catch (e) {
+      // The open itself failed (quota, private mode): nothing to close, but the delete below
+      // still runs. Logged, because a queue that cannot be opened is also one that cannot drain.
+      logEvent({
+        level: 'warn',
+        surface: 'photo-upload-flush',
+        message: 'photo queue handle could not be closed before delete',
+        error: e,
+        context: { action: 'queue-close-failed' },
+      });
     }
     dbPromise = null;
   }
+  // Never rejects: sign-out must not stall on queue cleanup. A refused or blocked delete is
+  // reported so a queue that survives sign-out (and would flush under the next sign-in of a
+  // DIFFERENT family on this device) is visible in the firehose.
   await new Promise<void>((resolve) => {
     const req = indexedDB.deleteDatabase(DB_PREFIX + familyId);
     req.onsuccess = () => resolve();
-    req.onerror = () => resolve();
-    req.onblocked = () => resolve();
+    req.onerror = () => {
+      logEvent({
+        level: 'warn',
+        surface: 'photo-upload-flush',
+        message: 'photo queue database delete failed',
+        error: req.error,
+        context: { action: 'queue-delete-failed', error_code: 'error' },
+      });
+      resolve();
+    };
+    req.onblocked = () => {
+      logEvent({
+        level: 'warn',
+        surface: 'photo-upload-flush',
+        message: 'photo queue database delete blocked by another tab',
+        context: { action: 'queue-delete-failed', error_code: 'blocked' },
+      });
+      resolve();
+    };
   });
 }
 

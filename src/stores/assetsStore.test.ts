@@ -10,7 +10,7 @@ vi.mock('@/services/automerge/repositories/assetRepository', () => ({
   getAssetById: vi.fn(),
   createAsset: vi.fn(),
   updateAsset: vi.fn(),
-  deleteAsset: vi.fn(),
+  deleteAssetCascade: vi.fn(),
 }));
 
 // Mock the settings repository to prevent actual DB calls
@@ -223,18 +223,54 @@ describe('assetsStore', () => {
         const store = useAssetsStore();
         store.assets.push(createMockAsset());
 
-        vi.mocked(assetRepo.deleteAsset).mockResolvedValue(true);
+        vi.mocked(assetRepo.deleteAssetCascade).mockResolvedValue(true);
 
         const result = await store.deleteAsset('test-asset-1');
 
         expect(result).toBe(true);
         expect(store.assets).toHaveLength(0);
+        expect(assetRepo.deleteAssetCascade).toHaveBeenCalledWith('test-asset-1', {
+          accountId: undefined,
+          recurringItemId: undefined,
+        });
+      });
+
+      it('deletes the linked loan account and payment item in the SAME change (audit C7)', async () => {
+        const { useAccountsStore } = await import('./accountsStore');
+        const accountsStore = useAccountsStore();
+        const store = useAssetsStore();
+        store.assets.push(
+          createMockAsset({ loan: createMockLoan({ linkedRecurringItemId: 'rec-house' }) })
+        );
+        accountsStore.accounts.push({
+          id: 'acc-loan-1',
+          memberId: 'member-1',
+          name: 'Test House Loan',
+          type: 'loan',
+          currency: 'USD',
+          balance: 200000,
+          isActive: true,
+          includeInNetWorth: true,
+          linkedAssetId: 'test-asset-1',
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-01T00:00:00.000Z',
+        });
+        vi.mocked(assetRepo.deleteAssetCascade).mockResolvedValue(true);
+
+        expect(await store.deleteAsset('test-asset-1')).toBe(true);
+
+        expect(assetRepo.deleteAssetCascade).toHaveBeenCalledWith('test-asset-1', {
+          accountId: 'acc-loan-1',
+          recurringItemId: 'rec-house',
+        });
+        expect(store.assets).toHaveLength(0);
+        expect(accountsStore.accounts).toHaveLength(0);
       });
 
       it('should return false when deletion fails', async () => {
         const store = useAssetsStore();
 
-        vi.mocked(assetRepo.deleteAsset).mockResolvedValue(false);
+        vi.mocked(assetRepo.deleteAssetCascade).mockResolvedValue(false);
 
         const result = await store.deleteAsset('non-existent');
 

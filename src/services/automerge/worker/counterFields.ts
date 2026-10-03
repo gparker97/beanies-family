@@ -39,7 +39,7 @@
  */
 import * as Automerge from '@automerge/automerge';
 import { CURRENCIES } from '@/constants/currencies';
-import type { CollectionName, FamilyDocument } from '@/types/automerge';
+import type { CollectionName, FamilyDocument, COUNTER_COLLECTION_NAMES } from '@/types/automerge';
 import { StaleBuildCounterError } from '@/types/sync';
 import type { MutationOp } from './protocol';
 
@@ -103,7 +103,9 @@ export const COUNTER_FIELDS = {
   accounts: [{ abs: ['balance'], floor: null, currency: ['currency'] }],
   goals: [{ abs: ['currentAmount'], floor: 0, currency: ['currency'] }],
   assets: [{ abs: ['loan', 'outstandingBalance'], floor: 0, currency: ['currency'] }],
-} as const satisfies Partial<Record<CollectionName, readonly CounterField[]>>;
+  // Exactly the collections `COUNTER_COLLECTION_NAMES` lists (both directions: a missing key and
+  // an extra key are compile errors), so the pure list `photoOps` reads cannot drift from this.
+} as const satisfies Record<(typeof COUNTER_COLLECTION_NAMES)[number], readonly CounterField[]>;
 
 /** A collection that holds at least one Counter-backed field. */
 export type CounterCollection = keyof typeof COUNTER_FIELDS;
@@ -189,7 +191,7 @@ const scaleOf = (decimals: number): number => 10 ** decimals;
  * this (only a delta becomes a Counter); a stored absolute never throws. `-0` is normalised.
  */
 export function toMinor(delta: number, decimals: number): number {
-  const minor = Math.round(delta * scaleOf(decimals));
+  const minor = roundHalfAway(delta * scaleOf(decimals));
   if (!Number.isSafeInteger(minor)) {
     throw new Error(
       `counterFields: amount ${String(delta)} cannot be held as integer minor units at ` +
@@ -212,10 +214,30 @@ export function fromMinor(minor: number, decimals: number): number {
  * at its own currency's scale). THE one rounding rule the fold, the unfold and the dormant write
  * share; it runs on stored absolutes, so it never throws.
  */
-function roundTo(value: number, decimals: number): number {
-  const scaled = Math.round(value * scaleOf(decimals));
+export function roundTo(value: number, decimals: number): number {
+  const scaled = roundHalfAway(value * scaleOf(decimals));
   if (!Number.isSafeInteger(scaled)) return value;
   return scaled === 0 ? 0 : scaled / scaleOf(decimals);
+}
+
+/**
+ * Round to the nearest integer, HALF AWAY FROM ZERO (C9h, data-layer audit 2026-10-03).
+ * `Math.round` rounds half towards +∞, so a -2.5 withdrawal became -2 minor units while a +2.5
+ * deposit became +3: the two directions of the same money disagreed by a minor unit.
+ */
+function roundHalfAway(x: number): number {
+  return x < 0 ? -Math.round(-x) : Math.round(x);
+}
+
+/**
+ * The rebase's carry for a Counter-backed ABSOLUTE that both the peer and the target moved
+ * (C9g): the peer's raw change applied as a SHIFT, `t + (b − a)`, rounded at the entity's
+ * scale. A compaction folds Counters into the absolute, so the target's absolute moves even
+ * when nobody edited it; a three-way "both changed" conflict there dropped the peer's offline
+ * "set balance to X" for good.
+ */
+export function shiftAbsolute(t: number, a: number, b: number, decimals: number): number {
+  return roundTo(t + (b - a), decimals);
 }
 
 /** A stored absolute as a finite number: absent, non-numeric or non-finite reads as 0
@@ -365,11 +387,11 @@ export interface FoldIndex {
   readonly size: number;
   /** Keys the fold skipped: unparseable, an unknown collection or field, a non-integer value. */
   readonly malformed: number;
-  /** The first skipped key that is NOT a known collection's unknown field: dropped by a
-   *  compaction, because nothing can ever read it. */
+  /** The first skipped key that does not split into `c/id/field@d/writer`, or that holds a
+   *  value no build can read: dropped by a compaction, because nothing can ever read it. */
   readonly firstMalformed: CounterKeyLabel | null;
-  /** The first key naming a KNOWN Counter collection with a field this build lacks: a newer
-   *  build's field, which a compaction must refuse to destroy (`foldDoc`). */
+  /** The first STRUCTURALLY VALID key whose collection OR field this build's table lacks: a
+   *  newer build's Counter, which a compaction must refuse to destroy (`foldDoc`, C9e). */
   readonly unknownField: CounterKeyLabel | null;
   /** Σ for one (collection, id, field) in MAJOR units; 0 when it has no keys. */
   major(collection: string, id: string, field: string): number;
@@ -467,14 +489,18 @@ export function foldIndex(doc: CounterSource): CounterIndex {
   if (keys.length === 0) return index;
   for (const key of keys) {
     const parts = splitCounterKey(key);
-    const known = parts !== null && isCounterCollection(parts.collection);
-    if (known && !lookupField(parts.collection, parts.field)) {
+    // C9e: a key that SPLITS but names a collection or a field this build does not know is a
+    // newer build's Counter, never garbage, whichever of the two it is.
+    if (
+      parts !== null &&
+      (!isCounterCollection(parts.collection) || !lookupField(parts.collection, parts.field))
+    ) {
       index.malformed++;
       index.unknownField ??= labelOf(parts);
       continue;
     }
-    const value = known ? counterValue(map[key]) : null;
-    if (!known || value === null) {
+    const value = parts !== null ? counterValue(map[key]) : null;
+    if (parts === null || value === null) {
       index.malformed++;
       index.firstMalformed ??= labelOf(parts);
       continue;
@@ -509,16 +535,34 @@ const leafOf = (abs: CounterField['abs']): string => abs[abs.length - 1]!;
  * `id` is the MAP KEY the entity lives under (what a Counter key and an `increment` op name),
  * passed explicitly rather than read from `plain.id`.
  */
-export function foldEntity<T>(collection: string, id: string, plain: T, index: FoldIndex): T {
-  if (index.size === 0 || !isCounterCollection(collection)) return plain;
+export function foldEntity<T>(
+  collection: string,
+  id: string,
+  plain: T,
+  index: FoldIndex,
+  /** `foldDoc` only: write `abs + Σ` WITHOUT the read floor (C9b). */
+  unfloored = false
+): T {
+  if (!isCounterCollection(collection)) return plain;
   if (plain === null || typeof plain !== 'object') return plain;
   for (const spec of COUNTER_FIELDS[collection] as readonly CounterField[]) {
-    const sum = sigma(index, collection, id, spec.abs.join('.'));
-    if (sum === 0) continue;
+    const sum = index.size === 0 ? 0 : sigma(index, collection, id, spec.abs.join('.'));
     const parent = parentOf(plain as AnyRecord, spec.abs);
     if (!parent) continue;
     const leaf = leafOf(spec.abs);
-    parent[leaf] = foldValue(parent[leaf], sum, spec.floor, fieldDecimals(spec, plain));
+    if (sum === 0) {
+      // ⚠️ THE READ FLOOR HOLDS WITH NO KEYS TOO (C9b). The floor is read-only, so the stored
+      // absolute may sit below it: two concurrent decrements that crossed 0, folded by a
+      // compaction into an unfloored absolute. Reading it raw after the fold would show the
+      // negative the floor existed to hide. A non-number passes through untouched (rule 3).
+      const v = parent[leaf];
+      if (!unfloored && spec.floor !== null && typeof v === 'number' && v < spec.floor) {
+        parent[leaf] = spec.floor;
+      }
+      continue;
+    }
+    const floor = unfloored ? null : spec.floor;
+    parent[leaf] = foldValue(parent[leaf], sum, floor, fieldDecimals(spec, plain));
   }
   return plain;
 }
@@ -607,6 +651,10 @@ export function unfoldPatch<P extends AnyRecord, B extends AnyRecord | undefined
  *    stored negative from pre-Phase-2 history would otherwise be written back below it. A
  *    stored absolute past the integer headroom takes `roundTo`'s float path, never a throw.
  *
+ * Returns whether it WROTE anything (C9c): false for a delta that rounds to 0 and for a dormant
+ * write the floor clamps to the value already stored, so a caller stamps `updatedAt` (and
+ * reports a loan payment as applied) only for a real write.
+ *
  * Throws when the entity, or the parent of a nested field (an asset's `loan`), is missing:
  * callers check existence and `onMissing` first.
  *
@@ -628,7 +676,7 @@ export function adjustField(
   delta: number,
   writerId: string,
   index?: CounterIndex
-): void {
+): boolean {
   const spec = resolveField(collection, field);
   const entity = (draft[collection] as unknown as Record<string, AnyRecord> | undefined)?.[id];
   if (!entity) {
@@ -645,7 +693,7 @@ export function adjustField(
       `counterFields: cannot adjust ${collection}/${id}/${field}: it has no "${spec.abs[0]}".`
     );
   }
-  if (minor === 0) return;
+  if (minor === 0) return false;
   if (countersOn) {
     const map = (draft as { counterDeltas?: Record<string, Automerge.Counter> }).counterDeltas;
     if (!map) {
@@ -658,10 +706,21 @@ export function adjustField(
     if (map[key] === undefined) map[key] = new Automerge.Counter(0);
     map[key]!.increment(minor);
     index?.add(collection as CounterCollection, id, field, decimals, minor);
-    return;
+    return true;
   }
   const leaf = leafOf(spec.abs);
-  parent[leaf] = applyFloor(roundTo(finiteOr0(parent[leaf]) + delta, decimals), spec.floor);
+  // ⚠️ C9a: THE FLOOR IS ON THE FOLDED VALUE, so in raw space it is `floor − Σ`. A mixed fleet
+  // (this build dormant, a peer writing Counters) can hold raw 0 with Σ = +50: a −30 withdrawal
+  // must land as raw −30 (folded 20), and clamping the RAW value at 0 dropped it entirely.
+  const sum = (index ?? foldIndex(draft)).major(collection, id, field);
+  const rawFloor = spec.floor === null ? null : spec.floor - sum;
+  const before = parent[leaf];
+  const next = applyFloor(roundTo(finiteOr0(before) + delta, decimals), rawFloor);
+  // C9c: report whether anything was WRITTEN, so a clamped no-op leaves the heads (and
+  // `updatedAt`) alone.
+  if (before === next) return false;
+  parent[leaf] = next;
+  return true;
 }
 
 // ─── Compaction and rebase ───────────────────────────────────────────────────
@@ -685,16 +744,21 @@ export type FoldedSource = Omit<FamilyDocument, 'counterDeltas' | 'foldedCounter
  * ledgered, including one whose entity is gone or whose `loan` was removed (folded into
  * nothing): the ledger records that the key's value was CONSUMED, so a rebase cannot replay it.
  *
- * ⚠️ THROWS `StaleBuildCounterError` FOR A KNOWN COLLECTION'S UNKNOWN FIELD, AND ONLY FOR IT.
- * That is a newer build's Counter field: compaction empties the map, so folding past it would
- * destroy every adjustment it carries, and the fix is updating the app. `compactDoc` lets the
- * class through unclassified so the user is told exactly that. The message names the collection
- * and field only, never the entity id or the writer: it reaches the firehose unmasked.
+ * ⚠️ THROWS `StaleBuildCounterError` FOR ANY STRUCTURALLY VALID KEY WHOSE COLLECTION OR FIELD
+ * THIS BUILD LACKS (C9e; it used to refuse only an unknown FIELD and silently drop an unknown
+ * COLLECTION). Either is a newer build's Counter: compaction empties the map, so folding past
+ * it would destroy every adjustment it carries, and the fix is updating the app. `compactDoc`
+ * lets the class through unclassified so the user is told exactly that. The message names the
+ * collection and field only, never the entity id or the writer: it reaches the firehose unmasked.
  *
- * Every OTHER bad key (unparseable, an unknown collection, a non-integer value) cannot be read
- * by any build, so refusing would block compaction forever for nothing: it is dropped, unledgered,
- * with ONE `console.warn` naming the first one's collection and field. The READ side
- * (`foldIndex`) never throws (rule 4); it is also the one classifier this reads.
+ * A key that does not even split (or a known key holding a value that is not a safe integer)
+ * cannot be read by any build, so refusing would block compaction forever for nothing: it is
+ * dropped, unledgered, with ONE `console.warn`. The READ side (`foldIndex`) never throws (rule
+ * 4); it is also the one classifier this reads.
+ *
+ * ⚠️ THE STORED ABSOLUTE IS `abs + Σ`, UNFLOORED (C9b). The floor is a READ-time backstop; baking
+ * it into the stored value turned "two decrements crossed 0" into a lost amount that no later
+ * adjustment could recover. `foldEntity` applies the floor on every read, keys or not.
  *
  * `foldedCounters` is written only when it holds something, so a dormant pod's compaction
  * source is today's plus the empty map.
@@ -717,7 +781,7 @@ export function foldDoc(before: Doc): FoldedSource {
       const entities = plain[collection];
       if (entities === null || typeof entities !== 'object') continue;
       for (const [id, entity] of Object.entries(entities as AnyRecord)) {
-        foldEntity(collection, id, entity, index);
+        foldEntity(collection, id, entity, index, true);
       }
     }
   }

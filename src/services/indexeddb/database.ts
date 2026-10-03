@@ -9,6 +9,9 @@
  * - Active family tracking (used by familyContextStore and sync guards)
  * - Database name utilities
  * - deleteFamilyDatabase for sign-out cleanup
+ * - the unsaved-work probes every destructive delete asks first (C6, 2026-10-03):
+ *   the per-family `unpushed-at-signout` marker, the queued photo upload count, and
+ *   the name sweep that finds a family's cache even when the registry forgot it
  * - deleteRetiredTranslationDatabase (one-time boot cleanup, temporary)
  */
 
@@ -19,6 +22,16 @@ import { logEvent } from '@/services/telemetry';
 
 const DB_NAME_PREFIX = 'beanies-data-';
 const AUTOMERGE_DB_PREFIX = 'beanies-automerge-';
+/**
+ * The offline photo queue's database prefix. MIRRORS `DB_PREFIX` in
+ * `photoUploadQueue.ts` (which does not export it): the probes below must read a
+ * family's queue WITHOUT binding that module to the family, because binding it
+ * opens the database and starts a flush. Pinned by `database.unsaved.test.ts`.
+ */
+const PHOTO_QUEUE_DB_PREFIX = 'beanies-photo-queue-';
+const PHOTO_QUEUE_STORE = 'uploads';
+/** localStorage key prefix of the per-family "a session ended with unpushed work" marker. */
+const UNPUSHED_MARKER_PREFIX = 'beanies:unpushed-at-signout:';
 
 let currentFamilyId: string | null = null;
 
@@ -86,7 +99,17 @@ export async function closeDatabase(): Promise<void> {
  * every caller acts on it: `false` means another tab or window still held it at
  * the deadline, so the person must not be told their data left the browser.
  */
-export async function deleteFamilyDatabase(familyId: string): Promise<CacheClearResult> {
+export async function deleteFamilyDatabase(
+  familyId: string,
+  opts: {
+    /**
+     * Keep the offline photo queue (C6). A keep-data sign-out passes it: a queued
+     * upload is a photo that exists NOWHERE else yet, so only a delete the person
+     * explicitly confirmed (clear data, forget family, delete family) may drop it.
+     */
+    keepPhotoQueue?: boolean;
+  } = {}
+): Promise<CacheClearResult> {
   // Delete the Automerge persistence cache via the worker (close-then-delete).
   // THIS tab's connection lives in the worker, but every OTHER open tab holds
   // its own; `docClient.clearCache` waits (bounded) for them to release it and
@@ -97,13 +120,133 @@ export async function deleteFamilyDatabase(familyId: string): Promise<CacheClear
   const legacyDbName = getFamilyDatabaseName(familyId);
   await deleteDB(legacyDbName);
 
-  // Delete any pending offline photo uploads for this family.
-  await deletePhotoQueueDatabase(familyId);
+  // Delete any pending offline photo uploads for this family — unless the caller
+  // is a keep-data sign-out (see `keepPhotoQueue`).
+  if (!opts.keepPhotoQueue) await deletePhotoQueueDatabase(familyId);
+
+  // The cache the marker warned about is gone, so the warning is spent.
+  if (cache?.deleted === true) clearUnpushedAtSignOutMarker(familyId);
 
   if (currentFamilyId === familyId) {
     currentFamilyId = null;
   }
   return cache;
+}
+
+// ── Unsaved-work probes (C6) ────────────────────────────────────────────────
+
+/**
+ * Record that this family's last session on this device ended with work the
+ * family file has not got, so its local database was KEPT. Read by "forget
+ * family" on the picker, where there is no live document left to measure.
+ * Never throws: a lost marker only weakens a warning, it never deletes anything.
+ */
+export function setUnpushedAtSignOutMarker(familyId: string): void {
+  try {
+    localStorage.setItem(UNPUSHED_MARKER_PREFIX + familyId, new Date().toISOString());
+  } catch (e) {
+    console.warn('[database] unpushed-at-signout marker not saved:', e);
+  }
+}
+
+/** The work reached the family file (or the cache is gone): drop the marker. Never throws. */
+export function clearUnpushedAtSignOutMarker(familyId: string): void {
+  try {
+    localStorage.removeItem(UNPUSHED_MARKER_PREFIX + familyId);
+  } catch (e) {
+    console.warn('[database] unpushed-at-signout marker not cleared:', e);
+  }
+}
+
+/** Did this family's last session here end with unpushed work? Unreadable reads as `false`. */
+export function hasUnpushedAtSignOutMarker(familyId: string): boolean {
+  try {
+    return localStorage.getItem(UNPUSHED_MARKER_PREFIX + familyId) !== null;
+  } catch (e) {
+    console.warn('[database] unpushed-at-signout marker unreadable:', e);
+    return false;
+  }
+}
+
+/**
+ * How many photo uploads are queued for this family on this device: photos that
+ * exist nowhere else yet. Opens the queue read-only and NEVER creates it (an
+ * upgrade means it did not exist, so the open is aborted). `0` when the browser
+ * has no IndexedDB; a failed read THROWS so the caller can treat "unknown" as
+ * at-risk rather than as empty.
+ */
+export async function countQueuedPhotoUploads(familyId: string): Promise<number> {
+  if (typeof indexedDB === 'undefined') return 0;
+  return new Promise<number>((resolve, reject) => {
+    const req = indexedDB.open(PHOTO_QUEUE_DB_PREFIX + familyId);
+    let created = false;
+    req.onupgradeneeded = () => {
+      // No queue database existed: abort so the probe leaves nothing behind.
+      created = true;
+      req.transaction?.abort();
+    };
+    req.onsuccess = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(PHOTO_QUEUE_STORE)) {
+        db.close();
+        resolve(0);
+        return;
+      }
+      try {
+        const countReq = db
+          .transaction(PHOTO_QUEUE_STORE, 'readonly')
+          .objectStore(PHOTO_QUEUE_STORE)
+          .count();
+        countReq.onsuccess = () => {
+          db.close();
+          resolve(countReq.result);
+        };
+        countReq.onerror = () => {
+          db.close();
+          reject(countReq.error);
+        };
+      } catch (e) {
+        db.close();
+        reject(e);
+      }
+    };
+    req.onerror = () => (created ? resolve(0) : reject(req.error));
+    req.onblocked = () => reject(new Error('photo queue probe blocked'));
+  });
+}
+
+/**
+ * Every family id that has an encrypted cache or a photo queue in this browser,
+ * found by database NAME rather than through the family registry, so a clean
+ * device stays clean after the registry forgot a family (a reinstall, a failed
+ * forget). `[]` when the browser cannot list databases.
+ */
+export async function listLocalFamilyDatabaseIds(): Promise<string[]> {
+  if (typeof indexedDB === 'undefined' || typeof indexedDB.databases !== 'function') return [];
+  try {
+    const ids = new Set<string>();
+    for (const { name } of await indexedDB.databases()) {
+      if (!name) continue;
+      for (const prefix of [AUTOMERGE_DB_PREFIX, PHOTO_QUEUE_DB_PREFIX]) {
+        if (name.startsWith(prefix) && name.length > prefix.length) {
+          ids.add(name.slice(prefix.length));
+        }
+      }
+    }
+    return [...ids];
+  } catch (e) {
+    console.warn('[database] indexedDB.databases() failed during the family sweep', e);
+    logEvent({
+      level: 'warn',
+      surface: 'family-context',
+      message: 'local family database sweep failed',
+      context: {
+        action: 'family_db_sweep_failed',
+        error_code: e instanceof Error ? e.name : 'unknown',
+      },
+    });
+    return [];
+  }
 }
 
 /** The retired machine-translation cache (a separate idb database, not a store). */

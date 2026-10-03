@@ -295,18 +295,20 @@ function openAttachmentViewer(segmentId: string, photoIds: string[], photoId: st
 }
 
 /**
- * Remove a booking document from the open segment. Mirrors `usePhotos.remove`:
- * tombstone the photo (24h GC reclaims Drive + Automerge) and detach it from the
- * segment's `photoIds`. The viewer closes itself after emitting remove.
+ * Remove a booking document from the open segment. Mirrors `usePhotos.remove`: detach it
+ * from THIS segment's `photoIds` first, then let the store tombstone it only if no other
+ * segment still links it. One itinerary PDF is linked to every segment it was extracted
+ * into (#30), so removing it from one leg must not blank it on the others. The viewer
+ * closes itself after emitting remove.
  */
 async function onAttachmentRemove(photoId: string): Promise<void> {
   const vacationId = selectedVacationId.value;
   const segmentId = viewerSegmentId.value;
   if (!vacationId || !segmentId) return;
-  photoStore.markDeleted(photoId);
   const nextIds = viewerPhotoIds.value.filter((id) => id !== photoId);
   viewerPhotoIds.value = nextIds;
   await vacationStore.updateSegmentPhotoIds(vacationId, segmentId, nextIds);
+  await photoStore.markDeleted(photoId);
 }
 
 // Linked Beanie List opened from the embed — shown as a drawer over this page

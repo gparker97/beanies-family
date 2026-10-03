@@ -23,6 +23,20 @@
 import type { PodLineage } from '@/types/models';
 import type { PodBlockMessageKey, RemoteBlocker } from '@/types/sync';
 
+/**
+ * A document's lineage stamp as `compactDoc` writes it (C1, data-layer audit 2026-10-03):
+ * the identity plus the heads of the SOURCE document the compaction was built from.
+ *
+ * `fromHeads` is what lets the compactor tell "the remote is the history I compacted" from
+ * "a peer wrote to the old lineage after I compacted". Without it the `ours-newer` verdict
+ * published the compacted document over those peer edits, and every peer then adopted it.
+ * Optional: absent on every lineage minted before it shipped, on a restore stamp, and on any
+ * pod a legacy build compacted. Absent means today's behaviour, never a block.
+ */
+export interface CompactionLineage extends PodLineage {
+  fromHeads?: string[];
+}
+
 /** How the two lineages relate. A fact, with no policy in it. */
 export type LineageVerdict = 'same' | 'adopt-remote' | 'ours-newer' | 'conflict';
 
@@ -93,6 +107,18 @@ export class PodLineageError extends Error implements RemoteBlocker {
   // `'rebaseUnavailable' in err` and `{...err}` report it as present on every
   // ordinary block. The flag must be absent unless something sets it.
   declare rebaseUnavailable?: boolean;
+  /**
+   * Diagnostic only, like `rebaseUnavailable` (and `declare`d for the same reason): the
+   * verdict was `ours-newer`, but the remote holds changes the compaction never saw, so
+   * publishing would have destroyed them (C1). Set by `lineageBlockError`.
+   */
+  declare remoteMovedAfterCompaction?: boolean;
+  /**
+   * Diagnostic only: what made a rebase unavailable, when the composer said (C8, data-layer
+   * audit 2026-10-03). `'transactions'`: a transaction could not be replayed whole, so no part
+   * of the replay ran.
+   */
+  declare conflictKind?: string;
   constructor(verdict: LineageVerdict, message: string) {
     super(message);
     // ⚠️ LITERAL, never `new.target.name`. The worker error registry keys on
@@ -237,9 +263,15 @@ export function lineageBlockError(
    * refused" looked the same. Carried on the error so the ONE main-thread
    * chokepoint (`docClient.mergeRemoteEnvelope`) can tell them apart.
    */
-  opts?: { rebaseUnavailable?: boolean }
+  opts?: {
+    rebaseUnavailable?: boolean;
+    remoteMovedAfterCompaction?: boolean;
+    conflictKind?: string;
+  }
 ): PodLineageError {
   const err = new PodLineageError(verdict, `Pod lineage blocked: ${WHY[verdict]}`);
   if (opts?.rebaseUnavailable) err.rebaseUnavailable = true;
+  if (opts?.remoteMovedAfterCompaction) err.remoteMovedAfterCompaction = true;
+  if (opts?.conflictKind) err.conflictKind = opts.conflictKind;
   return err;
 }

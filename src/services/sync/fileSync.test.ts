@@ -144,7 +144,7 @@ describe('fileSync V4 format', () => {
       // self-heal deletes the cache on, and "update beanies" deletes nothing.
       let err: unknown;
       try {
-        parseBeanpodV4(JSON.stringify({ version: '6.0', ...fields }));
+        parseBeanpodV4(JSON.stringify({ version: '7.0', ...fields }));
       } catch (e) {
         err = e;
       }
@@ -157,8 +157,8 @@ describe('fileSync V4 format', () => {
       expect(e.keyMayBeWrong).toBe(false);
       expect(e.deviceCannotOpen).toBe(false);
       expect(e.needsAppUpdate).toBe(true);
-      expect(e.fileVersion).toBe('6.0');
-      expect(e.blockDetail).toBe('version=6.0');
+      expect(e.fileVersion).toBe('7.0');
+      expect(e.blockDetail).toBe('version=7.0');
       expect(e.name).toBe('UnsupportedBeanpodVersionError');
     });
     it('clamps a hostile version string before it can reach telemetry', () => {
@@ -183,6 +183,16 @@ describe('fileSync V4 format', () => {
       } catch (e2) {
         expect((e2 as UnsupportedBeanpodVersionError).blockDetail).toBe('version=6.0.1');
       }
+    });
+
+    it('READS a 6.0 envelope (the reader half of the #117 flip gate) but never derives one', () => {
+      // Shipped a release ahead of any writer (ADR-036 pattern). The writer derivation
+      // must stay 4.0/5.0 until the flip itself — a 6.0 written now would lock every
+      // build older than this one out of the family.
+      expect(parseBeanpodV4(JSON.stringify({ version: '6.0', ...fields })).version).toBe('6.0');
+      expect(beanpodVersionFor(null)).toBe('4.0');
+      expect(beanpodVersionFor({ seq: 1 } as never)).toBe('5.0');
+      expect(beanpodVersionFor(null, { compactionBackup: true })).toBe('5.0');
     });
 
     it('still treats a missing version as not-a-beanpod, not as newer', () => {

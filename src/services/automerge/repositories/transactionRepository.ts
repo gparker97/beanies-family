@@ -2,13 +2,12 @@ import { createAutomergeRepository, stripUndefined, toPlain } from '../automerge
 import { getById as projectionGetById } from '../projection';
 import { mutate } from '../worker/docClient';
 import type { MutationOp } from '../worker/protocol';
+import type { TransactionCascadeArgs, TransactionCascadeResult } from '../worker/transactionOps';
 import { incrementBalanceOp } from './accountRepository';
 import { ImportNotVisibleError } from './importErrors';
 import { generateUUID } from '@/utils/id';
 import { toISODateString } from '@/utils/date';
 import type {
-  Account,
-  Asset,
   Transaction,
   CreateTransactionInput,
   UpdateTransactionInput,
@@ -29,38 +28,70 @@ export const createTransaction = repo.create;
 export const updateTransaction = repo.update;
 export const deleteTransaction = repo.remove;
 
-export interface LoanPaymentResult {
-  applied: boolean;
-  hostCollection?: string;
-  host?: Account | Asset;
-  interestPortion?: number;
-  principalPortion?: number;
+export type { TransactionCascadeResult } from '../worker/transactionOps';
+
+/** The one sender of the cascade op (`worker/transactionOps.ts`). */
+function commitCascade(args: TransactionCascadeArgs): Promise<TransactionCascadeResult> {
+  return mutate<TransactionCascadeResult>({ op: 'named', name: 'commitTransactionCascade', args });
+}
+
+/** The echo for a row that was not there to update or delete: nothing ran, nothing moved. */
+const notFound = (mode: 'update' | 'delete'): TransactionCascadeResult => ({
+  mode,
+  found: false,
+  accounts: [],
+  goals: [],
+  assets: [],
+  skipped: [],
+});
+
+/**
+ * Create a transaction AND apply its balance, goal and loan effects in ONE Automerge change
+ * (the worker `commitTransactionCascade` op, audit C7). The row is stamped here exactly as the
+ * factory's `create` stamps one; the worker computes the derived fields (`goalAllocApplied`,
+ * the loan portions) and echoes the row plus every entity it moved, folded.
+ */
+export async function createTransactionCascade(
+  input: CreateTransactionInput
+): Promise<TransactionCascadeResult> {
+  const now = toISODateString(new Date());
+  const transaction = toPlain(
+    stripUndefined({
+      ...(input as unknown as Record<string, unknown>),
+      id: generateUUID(),
+      createdAt: now,
+      updatedAt: now,
+    })
+  ) as unknown as Transaction;
+  return commitCascade({ mode: 'create', transaction });
 }
 
 /**
- * Atomically apply a loan payment (worker `applyLoanPayment` op: amortises on the folded balance
- * and writes the new balance in one change) and, when applied, record the interest/principal
- * portions on the just-created transaction (no concurrent writer, so an ordinary update).
- * Mutates `transaction` in place to carry the portions. The caller routes the echoed `host`.
+ * Patch a transaction; the worker reverses and re-applies its effects only when a money field
+ * changed (`MONEY_FIELDS`), keeping the stored derived fields otherwise. A key set to
+ * `undefined` is deleted, as in the factory's `update`. Resolves `found: false` (no write) when
+ * the row is not in the projection.
  */
-export async function applyLoanPayment(transaction: Transaction): Promise<LoanPaymentResult> {
-  const res = await mutate<LoanPaymentResult>({
-    op: 'named',
-    name: 'applyLoanPayment',
-    args: {
-      loanId: transaction.loanId,
-      paymentAmount: transaction.amount,
-      isRecurring: !!transaction.recurringItemId,
-    },
+export async function updateTransactionCascade(
+  id: string,
+  input: UpdateTransactionInput
+): Promise<TransactionCascadeResult> {
+  if (!projectionGetById('transactions', id)) return notFound('update');
+  const raw = input as Record<string, unknown>;
+  const deleteKeys = Object.keys(raw).filter((key) => raw[key] === undefined);
+  return commitCascade({
+    mode: 'update',
+    id,
+    patch: toPlain(stripUndefined(raw)),
+    deleteKeys,
+    updatedAt: toISODateString(new Date()),
   });
-  if (!res.applied) return res;
-  await updateTransaction(transaction.id, {
-    loanInterestPortion: res.interestPortion,
-    loanPrincipalPortion: res.principalPortion,
-  });
-  transaction.loanInterestPortion = res.interestPortion;
-  transaction.loanPrincipalPortion = res.principalPortion;
-  return res;
+}
+
+/** Delete a transaction, reversing its effects from the STORED derived fields, in one change. */
+export async function deleteTransactionCascade(id: string): Promise<TransactionCascadeResult> {
+  if (!projectionGetById('transactions', id)) return notFound('delete');
+  return commitCascade({ mode: 'delete', id });
 }
 
 export async function getTransactionsByAccountId(accountId: string): Promise<Transaction[]> {
