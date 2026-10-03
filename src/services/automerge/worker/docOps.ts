@@ -33,7 +33,14 @@ import type { PayloadLoadStep } from '@/types/sync';
 import { isAllocationFailure } from '@/utils/isAllocationFailure';
 import { docInitOpts } from './docActor';
 import { MIGRATION_CHANGES } from './migrationChanges';
-import { foldEntity, foldIndex, parseCounterKey, type FoldIndex } from './counterFields';
+import {
+  foldEntity,
+  foldIndex,
+  isCounterCollection,
+  parseCounterKey,
+  unfoldPatch,
+  type FoldIndex,
+} from './counterFields';
 import {
   calculateAmortization,
   calculateExtraPayment,
@@ -879,13 +886,26 @@ interface MutationSink {
   notes: ReconcileNote[];
 }
 
+/**
+ * The entity a `set` assigns: for a Counter collection, the caller's (folded) entity unfolded
+ * into raw space, so it reads back as sent even under an id with stale Counter keys (#117
+ * Phase 2, plan §C). The identity whenever the entity has no keys (every create, seed and
+ * rebase `set`), and `unfoldPatch` copies rather than mutates: inline mode hands the worker
+ * the caller's own op object. `deltaFor`'s echo keeps returning `op.entity`, which is what the
+ * fold of the stored raw value reads back as.
+ */
+function unfoldSetEntity(draft: FamilyDocument, op: Extract<MutationOp, { op: 'set' }>): unknown {
+  if (!isCounterCollection(op.collection) || !isPlainObject(op.entity)) return op.entity;
+  return unfoldPatch(op.collection, op.id, op.entity, undefined, foldIndex(draft)).patch;
+}
+
 /** Mutate the draft for one op (recurses for `batch`). Pure structural mutation
  * — the projection deltas are built afterwards from the COMMITTED doc (reading a
  * mid-change proxy is fragile). Named ops contribute their deltas to the sink. */
 function mutateDraft(draft: FamilyDocument, op: MutationOp, sink: MutationSink): void {
   switch (op.op) {
     case 'set':
-      (draft[op.collection] as AnyRecord)[op.id] = op.entity;
+      (draft[op.collection] as AnyRecord)[op.id] = unfoldSetEntity(draft, op);
       break;
     case 'patch': {
       const col = draft[op.collection] as Record<string, AnyRecord>;
@@ -912,7 +932,14 @@ function mutateDraft(draft: FamilyDocument, op: MutationOp, sink: MutationSink):
       // Fine-grained, three-way (#117, ADR-039): only what the caller changed relative to
       // `base` is written, in place, so a concurrent edit to the same array or object survives
       // the merge instead of losing to a whole-value assignment.
-      reconcileFields(entity, op.patch, op.base, op.deleteKeys ?? [], ctx);
+      // #117 Phase 2: a BASED patch is main-thread (folded) space; the unfold converts its
+      // Counter fields to raw (stored) space first, so the reconciler compares raw to raw and
+      // never meets a Counter. A base-less patch is raw by contract (the rebase composer).
+      const { patch, base } =
+        op.base && isCounterCollection(op.collection)
+          ? unfoldPatch(op.collection, op.id, op.patch, op.base, foldIndex(draft))
+          : op;
+      reconcileFields(entity, patch, base, op.deleteKeys ?? [], ctx);
       // Only on a write: an all-unchanged patch must leave the heads untouched so `mutate`
       // reports `changed: false` (no persist, no Drive save).
       if (op.updatedAt && ctx.writes > 0) entity.updatedAt = op.updatedAt;
