@@ -1195,8 +1195,10 @@ test('meal shopping list walk', async ({ page }) => {
   expect(tac.servings).toBe('6');
   await shotMatrix(page, '05c-recipe-detail-serves');
 
-  // ── 6. Magic beans sheet: placeholder + the "?" hint popover ABOVE the sheet ──
-  await gotoRoute(page, '/meal-planner');
+  // ── 6. Magic beans drawer: placeholder + the "?" hint popover ABOVE the drawer ──
+  // Since #119 the FAB opens the composer (no "?" hint), so the drawer is opened from the
+  // To-dos page's magic beans button instead.
+  await gotoRoute(page, '/todo');
   for (const [vp, vpName, dark] of [
     [PHONE, 'phone', false],
     [PHONE, 'phone', true],
@@ -1204,11 +1206,12 @@ test('meal shopping list walk', async ({ page }) => {
   ] as const) {
     await page.setViewportSize(vp);
     await setDark(page, dark);
-    const quick = page.getByTestId('quick-add-sheet');
-    await page.getByRole('button', { name: 'Quick add' }).click({ force: true });
-    await quick.waitFor({ timeout: 8000 });
     await page.waitForTimeout(400);
-    await quick.getByRole('button', { name: /read something for me/i }).click();
+    await page
+      .getByRole('button', { name: new RegExp(ui('ai.magic.perform')) })
+      .filter({ visible: true })
+      .first()
+      .click();
     const hintBtn = page
       .getByRole('button', { name: ui('common.moreInfo') })
       .filter({ visible: true });

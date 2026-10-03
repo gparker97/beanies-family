@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { routeUrl, pickRecipeLinks } from '@/utils/recipeSourceUrl';
+import { routeUrl, pickRecipeLinks, looksLikeUnroutableLink } from '@/utils/recipeSourceUrl';
 
 describe('routeUrl', () => {
   const ID = 'dQw4w9WgXcQ';
@@ -85,4 +85,21 @@ describe('pickRecipeLinks', () => {
     expect(pickRecipeLinks('')).toEqual([]);
     expect(pickRecipeLinks('no links at all here')).toEqual([]);
   });
+});
+
+describe('looksLikeUnroutableLink', () => {
+  it.each(['', '   ', 'hello', 'walk the dog tomorrow', 'https://example.com/recipe'])(
+    'is false for %j',
+    (v) => {
+      expect(looksLikeUnroutableLink(v)).toBe(false);
+    }
+  );
+
+  // eslint-disable-next-line @microsoft/sdl/no-insecure-url -- the insecure scheme IS the unroutable case under test
+  it.each(['http://example.com', 'ftp://example.com'])(
+    'is true for the link-shaped, unroutable %j',
+    (v) => {
+      expect(looksLikeUnroutableLink(v)).toBe(true);
+    }
+  );
 });

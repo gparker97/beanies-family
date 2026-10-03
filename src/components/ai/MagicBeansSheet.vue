@@ -60,7 +60,8 @@ import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
 import AiSourceButtons from '@/components/ai/AiSourceButtons.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { MAGIC_DESTINATIONS, magicTileCols } from '@/constants/magicDestinations';
-import { routeUrl } from '@/utils/recipeSourceUrl';
+import { looksLikeUnroutableLink } from '@/utils/recipeSourceUrl';
+import { FOCUS_RING, MAGIC_TILE_AT_REST, MAGIC_TILE_SELECTED } from '@/constants/tileStyles';
 import type { ShareKind } from '@/types/magicPayload';
 
 const props = defineProps<{
@@ -105,31 +106,8 @@ const hint = computed(() =>
 /** Columns, from the count; the rule is shared with the reading overlay (`magicTileCols`). */
 const cols = computed(() => magicTileCols(props.kinds.length));
 
-/**
- * The selected look is the same light recipe `ChipButton` ships (Heritage Orange text, border
- * and `--tint-orange-8`), so the app has one "selected" vocabulary. On dark the tile sits on
- * `surface-overlay`, so its selected background is the next surface step and the accent takes
- * its `-lift` partner — never a darker orange, per the CIG.
- */
-const TILE_AT_REST =
-  'dark:bg-surface-overlay dark:hover:bg-surface-hover border-transparent bg-[var(--tint-slate-5)] hover:bg-[var(--tint-slate-10)]';
-const TILE_SELECTED =
-  'border-primary-500 dark:border-accent-lift dark:bg-surface-hover bg-[var(--tint-orange-8)]';
-
-/**
- * A single pasted token that looks like a link but will not route.
- *
- * Only for the single-token case: a link inside a sentence is handled by the spine's
- * link-vs-text triage, and flagging it here would second-guess that. This is purely an
- * explanation — `handleSave` still accepts anything non-empty.
- */
-const showBadLinkHint = computed(() => {
-  const value = text.value.trim();
-  if (!value || /\s/.test(value)) return false;
-  if (!/^[a-z]+:\/\//i.test(value) && !value.includes('.')) return false;
-  return routeUrl(value).kind === 'invalid';
-});
-const fieldWrap = ref<HTMLElement | null>(null);
+const showBadLinkHint = computed(() => looksLikeUnroutableLink(text.value));
+const field = ref<InstanceType<typeof BaseTextarea> | null>(null);
 
 watch(
   () => props.open,
@@ -140,9 +118,11 @@ watch(
     // a door that opens pre-picked (#107) seeds it fresh on every open instead.
     pickedKind.value = props.initialHint;
     // Focused on open — the whole point of this layout is that you can paste immediately.
-    // Guarded because BaseTextarea may not have mounted on the first tick.
+    // Through BaseTextarea's exposed `focus()`, the same way the quick-add composer focuses its
+    // field, rather than reaching into the child's DOM. Guarded because BaseTextarea may not
+    // have mounted on the first tick.
     await nextTick();
-    fieldWrap.value?.querySelector('textarea')?.focus();
+    field.value?.focus();
   }
 );
 
@@ -190,7 +170,7 @@ function handleSave(): void {
           <span aria-hidden="true">✨</span>{{ t('ai.capture.title') }}
         </p>
         <p
-          class="text-primary-500 dark:text-accent-lift relative z-[1] mt-0.5 mb-0 font-[Caveat,Outfit,cursive] text-base leading-snug font-bold"
+          class="text-primary-500 dark:text-accent-lift font-caveat relative z-[1] mt-0.5 mb-0 text-base leading-snug font-bold"
         >
           {{ t('ai.capture.tagline') }}
         </p>
@@ -201,13 +181,16 @@ function handleSave(): void {
       <template #label-extra>
         <InfoHintBadge :text="t('ai.capture.labelHint')" />
       </template>
-      <div ref="fieldWrap">
-        <!-- A TEXTAREA, not an input: a pasted class-group message is several lines, and a
-             single-line field that scrolls sideways makes it impossible to check what you
-             pasted. Keyboard avoidance is inherited from BaseSidePanel's full-height
-             scrolling column — no visualViewport code belongs here. -->
-        <BaseTextarea v-model="text" :rows="4" :placeholder="t('ai.capture.placeholder')" />
-      </div>
+      <!-- A TEXTAREA, not an input: a pasted class-group message is several lines, and a
+           single-line field that scrolls sideways makes it impossible to check what you
+           pasted. Keyboard avoidance is inherited from BaseSidePanel's full-height
+           scrolling column — no visualViewport code belongs here. -->
+      <BaseTextarea
+        ref="field"
+        v-model="text"
+        :rows="4"
+        :placeholder="t('ai.capture.placeholder')"
+      />
       <!-- Non-blocking. The sheet refuses ONLY emptiness — deciding what the content is IS the
            feature — so a link that will not route is explained, never disallowed. -->
       <p
@@ -253,8 +236,8 @@ function handleSave(): void {
           :key="kind"
           type="button"
           :aria-pressed="pickedKind === kind"
-          class="dark:focus-visible:ring-offset-surface-raised cursor-pointer rounded-[14px] border-2 px-1 pt-2.5 pb-2 text-center transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#AED6F1] focus-visible:ring-offset-2 motion-reduce:transition-none"
-          :class="pickedKind === kind ? TILE_SELECTED : TILE_AT_REST"
+          class="cursor-pointer rounded-[14px] border-2 px-1 pt-2.5 pb-2 text-center transition-colors motion-reduce:transition-none"
+          :class="[pickedKind === kind ? MAGIC_TILE_SELECTED : MAGIC_TILE_AT_REST, FOCUS_RING]"
           @click="togglePick(kind)"
         >
           <span aria-hidden="true" class="block text-xl leading-none">{{

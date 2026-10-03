@@ -109,6 +109,10 @@ export const ALLOWED_CONTEXT_KEYS = new Set<string>([
   // Plan export (#67, surface 'plan-export', reused by #66). Both PII-free fixed
   // enums — no plan content ever ships: `format` (image|pdf), `stage`
   // (render|rasterize|pdf|deliver). Same Diagnostics category already declared.
+  // Reused by the magic-beans FAB composer (#119), still fixed enums: `format`
+  // (phone|desktop) on 'magic-beans-capture' `capture opened`; `stage` (composer on
+  // that event, commit on the door's consent decline, applied|unsupported on
+  // 'quick-add-composer' keyboard avoidance).
   'format',
   'stage',
   'http_status',

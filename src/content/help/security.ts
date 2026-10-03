@@ -830,7 +830,7 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
       'Hand beanies a "magic bean" — a photo or booking — and it sprouts the details for you. Here is exactly what we send, where it goes, and what we keep (which is nothing).',
     icon: '\u{1FAD8}',
     readTime: 5,
-    updatedDate: '2026-09-30',
+    updatedDate: '2026-10-03',
     sections: [
       {
         type: 'heading',
@@ -841,7 +841,7 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          "Tap <strong>✨ Magic beans</strong> and give beanies one thing — a photo, a file, a link, or some text you pasted. A party invitation, a flight itinerary, a hotel confirmation, the details from a class-group message. beanies works out what it is for you, pulls out the key details, and opens a pre-filled activity, trip or recipe to check and save, or, for a bank statement, a list of its transactions to check before anything is added. You never have to say which it is first. As you probably guessed, it's not actually magic: it's secure, private AI. It only ever runs on the one thing you pick, and only when you ask.",
+          "Tap the orange <strong>+</strong> button (or a <strong>✨ Magic beans</strong> button on a page), then type or paste into the box that opens, or attach a photo or file, and tap <strong>Send</strong>. Give beanies one thing — a photo, a file, a link, or some text you pasted. A party invitation, a flight itinerary, a hotel confirmation, the details from a class-group message. beanies works out what it is for you, pulls out the key details, and opens a pre-filled activity, trip or recipe to check and save, or, for a bank statement, a list of its transactions to check before anything is added. You never have to say which it is first. As you probably guessed, it's not actually magic: it's secure, private AI. It only ever runs on the one thing you pick, and nothing is sent until you tap <strong>Send</strong>.",
       },
       {
         type: 'callout',

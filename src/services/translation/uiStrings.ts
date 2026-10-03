@@ -7720,7 +7720,11 @@ const STRING_DEFS = {
   },
   'plan.bullets.basic2': { en: '1 magic bean a month', beanie: '1 magic bean a month' },
   'plan.bullets.basic3': { en: 'Your own AI key: unlimited', beanie: 'your own AI key: unlimited' },
-  'plan.bullets.full1': { en: '10 magic beans a day', beanie: '10 magic beans a day' },
+  'plan.bullets.full1': { en: '{count} magic beans a day', beanie: '{count} magic beans a day' },
+  'plan.bullets.full1Fallback': {
+    en: 'A daily allowance of magic beans',
+    beanie: 'a daily allowance of magic beans',
+  },
   'plan.bullets.full2': {
     en: 'Statements, invitations, recipes, itineraries',
     beanie: 'statements, invitations, recipes, itineraries',
@@ -11152,11 +11156,6 @@ const STRING_DEFS = {
   'ai.magic.title': { en: 'Magic beans', beanie: 'magic beans' },
   // Names the four SOURCES, not three types. The whole point of #84 is that the user never
   // declares what the thing is — so the copy must not ask them to either.
-  'ai.magic.subtitle': {
-    en: 'A photo, a file, a link or some text — beanies works out what it is',
-    beanie: 'a photo, a file, a link or some text — beanies works out what it is',
-  },
-  'ai.magic.action': { en: 'Read something for me', beanie: 'read something for me' },
   'ai.magic.perform': { en: 'Magic beans', beanie: 'magic beans' },
   'ai.magic.performHint': {
     en: 'Snap an invite, beanies fills it in',
@@ -11305,6 +11304,15 @@ const STRING_DEFS = {
     en: '{left} of {limit} magic beans left this month. Resets on {date} at {time}.',
     beanie: '{left} of {limit} magic beans left this month. resets on {date} at {time}.',
   },
+  // The compact line beside Send in the FAB composer (#119); the reset time stays on Settings/Plan.
+  'plan.allowance.briefDay': {
+    en: '{left} of {limit} magic beans left today',
+    beanie: '{left} of {limit} magic beans left today',
+  },
+  'plan.allowance.briefMonth': {
+    en: '{left} of {limit} magic beans left this month',
+    beanie: '{left} of {limit} magic beans left this month',
+  },
   'plan.allowance.unavailable': {
     en: "Magic beans usage isn't available right now.",
     beanie: "magic beans usage isn't available right now.",
@@ -11331,7 +11339,9 @@ const STRING_DEFS = {
   },
   // The magic-beans sheet (#84) — one button, four sources, no type question.
   'ai.capture.title': { en: 'Magic beans', beanie: 'magic beans' },
-  'ai.capture.action': { en: 'Read it', beanie: 'read it' },
+  'ai.capture.action': { en: 'Send', beanie: 'send' },
+  'ai.capture.sendShortcut': { en: 'Ctrl+Enter to send', beanie: 'ctrl+enter to send' },
+  'ai.capture.sendShortcutMac': { en: '⌘+Enter to send', beanie: '⌘+enter to send' },
   'ai.capture.label': { en: 'Paste anything', beanie: 'paste anything' },
   'ai.capture.placeholder': {
     en: 'Remind me to walk the dog tomorrow at 10am…',
@@ -11350,6 +11360,11 @@ const STRING_DEFS = {
   'ai.capture.tagline': {
     en: "give us something to read and we'll work out the rest",
     beanie: "give us something to read and we'll work out the rest",
+  },
+  // The FAB composer's header tagline (#119): the short form of the drawer band's tagline.
+  'ai.capture.taglineShort': {
+    en: 'give us something to read',
+    beanie: 'give us something to read',
   },
   // The destination tiles' ACCESSIBLE names — the tiles are visually unlabelled, but an
   // icon-only tile with no name is unusable with a screen reader. Keyed by ShareKind so the
@@ -12331,6 +12346,11 @@ const STRING_DEFS = {
   'quickAdd.groups.everyday.subhint': {
     en: 'what you add most',
     beanie: 'what you add most',
+  },
+  // Subhint under the FAB composer: contrasts the tiles with typing (#119).
+  'quickAdd.groups.everyday.byHand': {
+    en: 'or add one by hand',
+    beanie: 'or add one by hand',
   },
   'quickAdd.groups.family.title': { en: 'Family', beanie: 'family' },
   'quickAdd.groups.money.title': { en: 'Money', beanie: 'money' },

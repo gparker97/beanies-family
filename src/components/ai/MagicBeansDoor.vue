@@ -24,14 +24,32 @@
  *  3. THE PICKER IS MOUNTED HERE, never inside the sheet. On native the camera intent
  *     backgrounds the app; if the component holding the hidden input unmounts while that is
  *     happening, the `change` callback lands on a dead input and the photo silently vanishes.
- *     This component stays mounted while the drawer is open, so the ref stays live.
+ *     This component stays mounted while the drawer is open, so the ref stays live. An `inline`
+ *     host mounts the door OUTSIDE whatever surface it closes on handoff (the quick-add sheet
+ *     mounts it at its root, outside its Teleport), for the same reason.
  *
- *  4. EVERY ACTION CLOSES THE SHEET BEFORE THE INGEST STARTS. See `MagicBeansSheet`'s header
- *     for the reasons; they are load-bearing and not to be relaxed.
+ *  4. EVERY ACTION CLOSES THE SHEET, OR EMITS `handoff` SO AN `inline` HOST CLOSES ITS SURFACE,
+ *     BEFORE THE INGEST STARTS. The host MUST close synchronously in its `handoff` listener
+ *     (Vue runs emit listeners synchronously, so the close completes before the next line calls
+ *     the ingest or the picker). See `MagicBeansSheet`'s header for the reasons; they are
+ *     load-bearing and not to be relaxed.
  *
  *  5. `logCaptureOpened()` FIRES AT THE TAP, not at the ingest. It is the denominator for the
  *     whole in-app funnel, so abandonment is only measurable if it is recorded before the user
- *     has a chance to abandon.
+ *     has a chance to abandon. For an `inline` host, `open()` is called when the composer is
+ *     shown (the FAB tap), and only records the denominator.
+ *
+ * INLINE MODE (#119). The FAB's quick-add surface draws its own composer (a chat-style field,
+ * attach, camera, Send) instead of opening this door's drawer. It is a MODE of the one door,
+ * not a second door, because the protocol above must exist exactly once: the host renders the
+ * view and drives the door through the exposed `send` / `camera` / `file`, and every invariant
+ * still runs here. With `inline` the door renders only its picker (no drawer, no trigger slot)
+ * and tells the host to close via `handoff`.
+ *
+ * `inline` is the ONLY mode flag this door will ever gain. A second host-driven variation must
+ * be a new decision, not another prop: the `inline` branches are confined to the template's
+ * two `v-if`s and one line of `open()` (`handOff` serves both modes), so removing either mode
+ * later is a local edit.
  *
  * THE GATE. `canReadAny`, uniformly. The per-kind gates the pages used (`canReadPhoto` on the
  * planner, `canReadDocument` on travel) are gone: after unification every door can produce every
@@ -46,6 +64,7 @@ import { computed, onBeforeUnmount, ref } from 'vue';
 import { useToast } from '@/composables/useToast';
 import { useTranslation } from '@/composables/useTranslation';
 import { logEvent } from '@/services/telemetry/logEvent';
+import { reportError } from '@/utils/errorReporter';
 import AiDocumentPicker from '@/components/ai/AiDocumentPicker.vue';
 import MagicBeansSheet from '@/components/ai/MagicBeansSheet.vue';
 import { deferConsentForStatement, useDocumentConsent } from '@/composables/useDocumentConsent';
@@ -68,6 +87,12 @@ const emit = defineEmits<{
    * drop it here, or the next capture from any other door inherits it.
    */
   (e: 'closed'): void;
+  /**
+   * A capture was committed (grant in hand, or the deferred statement marker) and the ingest or
+   * picker starts on the next line. Emitted in both modes; an `inline` host MUST close its
+   * surface synchronously here (invariant 4).
+   */
+  (e: 'handoff', source: 'paste' | 'camera' | 'file'): void;
 }>();
 
 const props = defineProps<{
@@ -84,6 +109,11 @@ const props = defineProps<{
    * still change or clear it. Only the app-wide doors (the quick-add sheet) leave it unset.
    */
   hint?: ShareKind;
+  /**
+   * The host draws its own composer and drives the door through the exposed `send` / `camera` /
+   * `file` (#119, the FAB). The door then renders only its picker: no drawer, no trigger slot.
+   */
+  inline?: boolean;
 }>();
 
 const { canReadAny } = useMagicReader();
@@ -150,9 +180,27 @@ function holdGrant(grant: ConsentGrant | DeferredStatementConsent, hint?: ShareK
 
 onBeforeUnmount(clearGrant);
 
-function open(): void {
-  logCaptureOpened();
-  sheetOpen.value = true;
+/**
+ * Record the denominator and, in drawer mode, open the drawer. In `inline` mode it means "the
+ * composer was shown" and only records the denominator; `context` segments it by entry point.
+ */
+function open(context?: { stage: 'composer'; format: 'phone' | 'desktop' }): void {
+  logCaptureOpened(context);
+  if (!props.inline) sheetOpen.value = true;
+}
+
+/** The slot's `open`, zero-argument so a `@click="open"` never passes its event as `context`. */
+function openFromTrigger(): void {
+  open();
+}
+
+/**
+ * The commit is done and the capture starts on the caller's next line: close the drawer, or
+ * tell an `inline` host to close its surface (invariant 4).
+ */
+function handOff(source: 'paste' | 'camera' | 'file'): void {
+  sheetOpen.value = false;
+  emit('handoff', source);
 }
 
 function closeSheet(): void {
@@ -190,14 +238,24 @@ async function commit(hint?: ShareKind): Promise<ConsentGrant | DeferredStatemen
   // A refusal or a decline ends this capture. The sheet stays open (the user may try again),
   // but any tap-time state a page is holding for it must be released now — otherwise a target
   // chosen here silently attaches the NEXT capture, from any door, to the wrong thing.
-  if (!granted) emit('closed');
+  if (!granted) {
+    // The one refusal nobody else logs (busy and read-only log in their own helpers), so every
+    // refused Send is visible once, in the layer that owns it.
+    logEvent({
+      level: 'info',
+      surface: IN_APP_ENV.surface,
+      message: 'consent declined at the door',
+      context: { action: 'consent_declined', stage: 'commit' },
+    });
+    emit('closed');
+  }
   return granted ?? null;
 }
 
 async function handlePaste(text: string, hint?: ShareKind): Promise<void> {
   const grant = await commit(hint);
   if (!grant) return;
-  sheetOpen.value = false;
+  handOff('paste');
   // Deliberately not awaited: the ingest owns its own errors and runs for several seconds
   // behind the global reading overlay. Awaiting would keep this handler alive across a
   // navigation for no benefit.
@@ -211,12 +269,28 @@ async function handlePaste(text: string, hint?: ShareKind): Promise<void> {
 async function commitToPicker(pick: 'pickCamera' | 'pickFile', hint?: ShareKind): Promise<void> {
   const grant = await commit(hint);
   if (!grant) return;
+  // A missing picker used to be a silent `?.` no-op that held the grant, closed the sheet and
+  // did nothing. Checked BEFORE the handoff so the surface stays open with the person's work.
+  if (!picker.value) {
+    clearGrant();
+    console.error(
+      '[MagicBeansDoor] picker ref missing; the AiDocumentPicker did not mount (is the door inside a v-if that is false?)'
+    );
+    logEvent({
+      level: 'error',
+      surface: IN_APP_ENV.surface,
+      message: 'picker ref missing at commit',
+      context: { action: 'picker_missing', kind: pick === 'pickCamera' ? 'camera' : 'file' },
+    });
+    showToast('error', t('ai.picker.openErrorTitle'), t('ai.picker.openErrorBody'));
+    return;
+  }
   holdGrant(grant, hint);
-  sheetOpen.value = false;
+  handOff(pick === 'pickCamera' ? 'camera' : 'file');
   // `pickCamera` is the image-only `capture` input, NOT the mixed accept: in a Capacitor
   // WebView an `image/*,application/pdf` accept routes to the documents picker, which has no
   // camera entry.
-  picker.value?.[pick]();
+  picker.value[pick]();
 }
 
 function handlePickedFile(file: File): void {
@@ -249,15 +323,62 @@ function handlePickedFile(file: File): void {
   );
 }
 
-defineExpose({ open });
+/**
+ * The `inline` host's actions share ONE guard. The host never renders its composer while no
+ * reader is enabled, so this is a no-dead-tap net, not a path: it logs and does nothing.
+ *
+ * The exposed actions are fire-and-forget for the host, so a rejection anywhere in the commit
+ * (a throw in the busy / read-only checks, the consent prompt, the picker) is caught HERE and
+ * reported on this door's surface with the action, rather than escaping to the global
+ * `unhandledrejection` catch-all, which knows neither, and the person gets an error toast.
+ */
+function whenReadable(action: 'send' | 'camera' | 'file', fn: () => Promise<void>): void {
+  if (!canReadAny.value) {
+    logEvent({
+      level: 'warn',
+      surface: IN_APP_ENV.surface,
+      message: 'inline door action while no reader is enabled',
+      context: { action: 'inline_unreadable' },
+    });
+    return;
+  }
+  fn().catch((error: unknown) => {
+    reportError({
+      surface: IN_APP_ENV.surface,
+      message: 'inline door action failed',
+      severity: 'error',
+      error,
+      context: { action },
+    });
+    // The person tapped and nothing happened: say so. Generic AI copy, not the picker-missing
+    // keys, because those name the camera / file picker and this also catches Send.
+    showToast('error', t('ai.error.title'), t('ai.error.generic'));
+  });
+}
+
+/** Send pasted text through the protocol (the composer's Send). */
+function send(text: string): void {
+  whenReadable('send', () => handlePaste(text, props.hint));
+}
+
+function camera(): void {
+  whenReadable('camera', () => commitToPicker('pickCamera', props.hint));
+}
+
+function file(): void {
+  whenReadable('file', () => commitToPicker('pickFile', props.hint));
+}
+
+defineExpose({ open, send, camera, file });
 </script>
 
 <template>
   <template v-if="canReadAny">
-    <slot name="trigger" :open="open" />
+    <slot v-if="!inline" name="trigger" :open="openFromTrigger" />
 
     <AiDocumentPicker ref="picker" @file="handlePickedFile" />
     <MagicBeansSheet
+      v-if="!inline"
       :open="sheetOpen"
       :kinds="kinds"
       :initial-hint="props.hint"

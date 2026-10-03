@@ -512,7 +512,7 @@ export const THE_POD_ARTICLES: HelpArticle[] = [
       'Point beanies at a photo, a PDF, a recipe link or a cooking video, and it writes the recipe into your cookbook for you to check.',
     icon: '🍳',
     readTime: 5,
-    updatedDate: '2026-09-27',
+    updatedDate: '2026-10-03',
     popular: true,
     sections: [
       {
@@ -544,14 +544,14 @@ export const THE_POD_ARTICLES: HelpArticle[] = [
           'Open <strong>The Bean Pod → Family Cookbook</strong>',
           'Tap <strong>Read a Recipe</strong> at the top of the page (next to <strong>Add a recipe</strong>)',
           'The first time, beanies asks your permission to send this one recipe to be read — have a look at what it says, then agree',
-          'Paste your link straight into the box that opens, then tap <strong>Read It</strong>. Reading from a photo or a PDF instead? <strong>Take a photo</strong> and <strong>Choose a file</strong> are just underneath.',
+          'Paste your link straight into the box that opens, then tap <strong>Send</strong>. Reading from a photo or a PDF instead? <strong>Take a photo</strong> and <strong>Choose a file</strong> are just underneath.',
           'You can also start from a link inside <strong>Add a recipe</strong> itself — there’s a <strong>Start from a link</strong> box at the top of the blank form, and it works the same way from the meal planner.',
         ],
       },
       {
         type: 'infoBox',
         content:
-          'You can also start from the <strong>+</strong> button anywhere in the app — look for the <strong>Magic beans</strong> card and tap it. Give beanies the recipe as a photo, a file, a link or pasted text; it works out that it is a recipe and takes you to the cookbook with the reader open. Tap the <strong>Recipe</strong> tile first if you like, and beanies reads it as a recipe straight away.',
+          'You can also start from the <strong>+</strong> button anywhere in the app: the magic beans box opens straight away. Give beanies the recipe as a photo, a file, a link or pasted text and tap <strong>Send</strong>; it works out that it is a recipe and takes you to the cookbook with the reader open. To tell beanies it is a recipe up front, tap <strong>✨ Magic beans</strong> on the Family Cookbook page, which picks Recipe for you.',
         title: 'A shortcut from anywhere',
         icon: '✨',
       },

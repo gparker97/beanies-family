@@ -116,8 +116,9 @@ describe('every full-height overlay declares its safe-area inset', () => {
     ],
     // Anchored 56px from the top, which is LESS than a notched inset.
     ['components/common/GlobalSearch.vue', [/paddingTop:\s*'env\(safe-area-inset-top/]],
-    // Bottom-anchored beside QuickAddFab, which already accounts for the indicator.
-    ['components/common/MobileNavBeanStack.vue', [/env\(safe-area-inset-bottom, 0px\) \+ 92px/]],
+    // Bottom-anchored beside QuickAddFab, on the shared FAB corner (#119), which carries the
+    // inset; the definition itself is asserted below.
+    ['components/common/MobileNavBeanStack.vue', [/var\(--fab-anchor-bottom\)/]],
     // The FIRST screen of a fresh install, and the App Review path: a `fixed;
     // inset: 0` overlay with Back/Skip/Next on the bottom edge. Missed by the
     // first sweep because it is not a BaseModal/BaseSidePanel consumer.
@@ -134,11 +135,20 @@ describe('every full-height overlay declares its safe-area inset', () => {
     for (const pattern of needs) expect(text).toMatch(pattern);
   });
 
-  it('🔴 the two bottom-anchored siblings use the SAME offset expression', () => {
-    // `QuickAddFab` and `MobileNavBeanStack` hang off the same nav from the same
-    // edge. The stack used a bare `92px` and sat over the home indicator.
-    const expr = 'env(safe-area-inset-bottom, 0px) + 92px';
-    expect(src('components/common/QuickAddFab.vue')).toContain(expr);
-    expect(src('components/common/MobileNavBeanStack.vue')).toContain(expr);
+  it('🔴 the bottom-anchored siblings share ONE offset, and it carries the inset', () => {
+    // `QuickAddFab`, `MobileNavBeanStack` and the quick-add card hang off the same nav from
+    // the same edge. The stack once used a bare `92px` and sat over the home indicator; since
+    // #119 the expression is defined once, as `--fab-anchor-bottom` in style.css.
+    expect(src('style.css')).toMatch(
+      /--fab-anchor-bottom:\s*calc\(env\(safe-area-inset-bottom, 0px\) \+ 92px\)/
+    );
+    for (const file of [
+      'components/common/QuickAddFab.vue',
+      'components/common/MobileNavBeanStack.vue',
+      'components/common/QuickAddSheet.vue',
+    ]) {
+      expect(src(file)).toContain('var(--fab-anchor-bottom)');
+      expect(src(file)).not.toContain('+ 92px');
+    }
   });
 });

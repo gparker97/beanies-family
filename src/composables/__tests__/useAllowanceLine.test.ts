@@ -34,7 +34,11 @@ vi.mock('@/composables/useTranslation', () => ({
         ? 'day {left}/{limit} {date} {time}'
         : k === 'plan.allowance.month'
           ? 'month {left}/{limit} {date} {time}'
-          : k,
+          : k === 'plan.allowance.briefDay'
+            ? 'brief-day {left}/{limit}'
+            : k === 'plan.allowance.briefMonth'
+              ? 'brief-month {left}/{limit}'
+              : k,
   }),
 }));
 vi.mock('@/services/ai/providers/managedProvider', () => ({
@@ -95,6 +99,37 @@ describe('useAllowanceLine', () => {
     expect(pct.value).toBeNull();
     await flushPromises();
     expect(pct.value).toBe(70);
+  });
+
+  it('brief is the compact line (no reset time), per period, null until usage arrives', async () => {
+    h.fetchAllowance.mockResolvedValueOnce({ used: 3, limit: 10, period: 'day', resetsAt: RESETS });
+    const day = useAllowanceLine();
+    expect(day.brief.value).toBeNull();
+    await flushPromises();
+    expect(day.brief.value).toBe('brief-day 7/10');
+
+    entitlement.state = 'active';
+    h.fetchAllowance.mockResolvedValueOnce({
+      used: 1,
+      limit: 5,
+      period: 'month',
+      resetsAt: RESETS,
+    });
+    const month = useAllowanceLine();
+    await flushPromises();
+    expect(month.brief.value).toBe('brief-month 4/5');
+  });
+
+  it('brief is null when the line does not apply or usage could not be read', async () => {
+    capability.tier = 'byok' as never;
+    expect(useAllowanceLine().brief.value).toBeNull();
+
+    capability.tier = 'managed';
+    h.fetchAllowance.mockRejectedValue(new ExtractionProviderError('not_available', 'nope'));
+    const failed = useAllowanceLine();
+    await flushPromises();
+    expect(failed.line.value).toBe('plan.allowance.unavailable');
+    expect(failed.brief.value).toBeNull();
   });
 
   it('basic: the month wording with the reset date', async () => {

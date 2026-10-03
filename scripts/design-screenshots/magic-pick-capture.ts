@@ -1,6 +1,6 @@
 import { test, expect } from '../../e2e/fixtures/test';
 import { bypassLoginIfNeeded } from '../../e2e/helpers/auth';
-import { gotoRoot } from '../../e2e/helpers/navigation';
+import { gotoRoot, gotoRoute } from '../../e2e/helpers/navigation';
 import type { Page } from '@playwright/test';
 
 /**
@@ -9,7 +9,8 @@ import type { Page } from '@playwright/test';
  * `e2e/specs/` on purpose (see capture.ts). Run it deliberately:
  *   npx playwright test -c playwright.design.config.ts --grep "magic pick"
  *
- * Opens the REAL sheet from the quick-add FAB, so the tiles are the component's own
+ * Opens the REAL drawer from the To-dos page's magic beans button (the FAB's composer has
+ * no tiles since #119, so only a page door shows them), so the tiles are the component's own
  * markup on the compiled stylesheet, then walks: nothing picked → one picked → picked
  * again (cleared) → keyboard focus ring → a SIX-kind fixture (real tiles cloned in the
  * DOM, same classes) to prove the grid re-flows at phone width with no truncation and
@@ -30,14 +31,15 @@ async function shot(page: Page, name: string) {
 }
 
 async function openSheet(page: Page) {
-  // The FAB animates continuously, so Playwright never sees it "stable": click through it.
-  await page.getByRole('button', { name: 'Quick add' }).click({ force: true });
-  await page.getByTestId('quick-add-sheet').waitFor();
+  // A page door pre-picks its own kind (To-dos picks To-do); tap it once to clear, so the
+  // walk still starts from "nothing picked".
   await page
-    .getByTestId('quick-add-sheet')
-    .getByRole('button', { name: /read something for me/i })
+    .getByRole('button', { name: /magic beans/i })
+    .first()
     .click();
   await page.locator('[role="group"][aria-label="Tell us what this is"]').waitFor();
+  const pre = tiles(page).and(page.locator('[aria-pressed="true"]'));
+  if (await pre.count()) await pre.first().click();
 }
 
 const tiles = (page: Page) =>
@@ -50,6 +52,7 @@ for (const theme of ['light', 'dark'] as const)
       await page.setViewportSize(w.size);
       await gotoRoot(page);
       await bypassLoginIfNeeded(page);
+      await gotoRoute(page, '/todo');
       await page.evaluate((t) => {
         document.documentElement.classList.toggle('dark', t === 'dark');
       }, theme);

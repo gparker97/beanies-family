@@ -1926,7 +1926,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       'Send a photo, screenshot, PDF, link or selected text from any app on your phone into beanies, and it works out whether it is an activity, a trip, a recipe, a bank statement or a to-do.',
     icon: '\u{1F4E4}',
     readTime: 6,
-    updatedDate: '2026-09-29',
+    updatedDate: '2026-10-03',
     sections: [
       {
         type: 'heading',
@@ -2151,7 +2151,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'infoBox',
         content:
-          'Inside the app, the <strong>Magic beans</strong> sheet has a row of tiles under the paste box. If you already know what you are handing over, tap its tile (activity, trip, recipe, bank statement or to-do) before you read it and beanies reads it as that straight away. Picking <strong>To-do</strong> gives you only the to-dos; picking <strong>Activity</strong> still brings along any to-dos that come with it. Opened from a page, the sheet picks that page\u2019s tile for you (Transactions on the Transactions page, Trip on Travel Plans); tap it again to clear it. With no tile picked, beanies works it out. Either way, <strong>Not right?</strong> at the bottom of the review still lets you change it afterwards.',
+          'Inside the app, opened from a page\u2019s <strong>✨ Magic beans</strong> button, the magic beans drawer has a row of tiles under the paste box. If you already know what you are handing over, tap its tile (activity, trip, recipe, bank statement or to-do) before you read it and beanies reads it as that straight away. Picking <strong>To-do</strong> gives you only the to-dos; picking <strong>Activity</strong> still brings along any to-dos that come with it. Opened from a page, the drawer picks that page\u2019s tile for you (Transactions on the Transactions page, Trip on Travel Plans); tap it again to clear it. The box behind the <strong>+</strong> button has no tiles: type or attach, tap <strong>Send</strong>, and beanies works it out. With no tile picked, beanies works it out. Either way, <strong>Not right?</strong> at the bottom of the review still lets you change it afterwards.',
         title: 'Tell beanies what it is first, if you like',
         icon: '\u2728',
       },
@@ -2165,7 +2165,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       'Hand beanies a bank or card statement and check the transactions it finds before anything is added, with the ones you already entered matched up instead of doubled.',
     icon: '\u{1F3E6}',
     readTime: 5,
-    updatedDate: '2026-09-25',
+    updatedDate: '2026-10-03',
     sections: [
       {
         type: 'paragraph',
@@ -2189,7 +2189,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         type: 'steps',
         content: '',
         items: [
-          'Open <strong>Budgets</strong> and tap <strong>Import a statement</strong>, or tap <strong>✨ Magic beans</strong> anywhere and choose the <strong>Transactions</strong> tile',
+          'Open <strong>Budgets</strong> and tap <strong>Import a statement</strong>, or tap the <strong>+</strong> button anywhere, attach the statement (or paste its text) and tap <strong>Send</strong>: beanies recognizes a statement and reads it page by page',
           'Paste the text, take a photo, or choose the file',
           'beanies tells you how many pages it will read and what it sends. Tap <strong>Read my statement</strong> (with the privacy check switched off in Settings, this step appears only the first time)',
           'Check the account at the top. beanies picks it from the statement when it can; change it if it is wrong',
@@ -2861,7 +2861,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         content: '',
         items: [
           '<strong>beanies basic</strong>: the whole app for the whole family, sold by the year. Includes one magic bean a month, so the paperwork reader is there when you need it.',
-          '<strong>beanies + magic beans</strong>: everything in basic, plus ten magic beans a day, so statements, invitations, recipes and itineraries can be read straight into the app. Monthly or yearly.',
+          '<strong>beanies + magic beans</strong>: everything in basic, plus <span data-bean-limit="full" data-live="{count} magic beans a day">a daily allowance of magic beans</span>, so statements, invitations, recipes and itineraries can be read straight into the app. Monthly or yearly.',
         ],
       },
       {

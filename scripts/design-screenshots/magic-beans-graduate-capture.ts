@@ -12,7 +12,7 @@ import type { Page } from '@playwright/test';
  *   1. Settings shows a "Magic beans" card among the ordinary cards and NO Beanie Lab section;
  *   2. the card opens the AI drawer with the magic beans title (the ?open=ai deep link is
  *      not drivable here, see the note in the walk);
- *   3. the quick-add sheet's magic reader card carries no Beta badge.
+ *   3. the quick-add composer (magic beans, since #119) carries no Beta badge.
  */
 const SHOTS = 'screenshots/magic-beans-graduate';
 const PHONE = { width: 390, height: 844 };
@@ -58,7 +58,7 @@ for (const [vp, vpName] of [
       // `?open=` query before the page mounts (probed 2026-10-02 with `security` and
       // `family-data` too). The gate swap is covered by reading + useBeanieLab tests.
 
-      // The quick-add sheet's magic reader card: no Beta badge.
+      // The quick-add composer (the FAB's magic beans card): no Beta badge.
       await gotoRoute(page, '/nook');
       await page.waitForLoadState('networkidle');
       // Theme again: the app's theme init resets the class on a page load.
@@ -77,7 +77,7 @@ for (const [vp, vpName] of [
         await sheet.waitFor({ timeout: 8000 });
         const sheetText = (await sheet.innerText()).toLowerCase();
         expect(sheetText).toContain('magic beans');
-        expect(sheetText, 'no Beta badge on the magic reader card').not.toMatch(/\bbeta\b/);
+        expect(sheetText, 'no Beta badge on the magic beans composer').not.toMatch(/\bbeta\b/);
         await page.waitForTimeout(300);
         await page.screenshot({ path: `${SHOTS}/03-quick-add-${tag}.png` });
       } else {

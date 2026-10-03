@@ -9,7 +9,7 @@
  * etc.) to the underlying `<textarea>` rather than the wrapper div —
  * matches BaseInput.
  */
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 
 defineOptions({ inheritAttrs: false });
 
@@ -60,6 +60,21 @@ const textareaClasses = computed(() => {
 function handleInput(event: Event): void {
   emit('update:modelValue', (event.target as HTMLTextAreaElement).value);
 }
+
+const field = ref<HTMLTextAreaElement | null>(null);
+
+/**
+ * Focus the textarea (a `ref` on this component is the instance, not the element), the same
+ * contract `AutoGrowTextarea` exposes. Returns whether there was a field to focus, so a host
+ * that owns focus can fall back rather than leave a keyboard user on `<body>`.
+ */
+function focus(): boolean {
+  if (!field.value) return false;
+  field.value.focus();
+  return true;
+}
+
+defineExpose({ focus });
 </script>
 
 <template>
@@ -75,6 +90,7 @@ function handleInput(event: Event): void {
 
     <textarea
       :id="textareaId"
+      ref="field"
       :value="modelValue"
       :placeholder="placeholder"
       :disabled="disabled"

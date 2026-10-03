@@ -63,11 +63,12 @@ const stackId = `mobile-nav-stack-${props.category.id}`;
 /**
  * Clears MobileBottomNav (~56px) AND the iOS home indicator.
  *
- * The bare `92px` this replaces omitted the inset, so the lowest bean sat over the
- * home indicator on a notched iPhone. Same expression as `QuickAddFab`, which
- * anchors to the same nav from the same edge — the two must not drift apart.
+ * The bare `92px` this replaced omitted the inset, so the lowest bean sat over the
+ * home indicator on a notched iPhone. Reads the shared `--fab-anchor-bottom` (src/style.css),
+ * the same corner `QuickAddFab` and the quick-add composer anchor to, so the three cannot
+ * drift apart. The stack only renders on phones, where the value is unchanged.
  */
-const STACK_BOTTOM = 'calc(env(safe-area-inset-bottom, 0px) + 92px)';
+const STACK_BOTTOM = 'var(--fab-anchor-bottom)';
 
 // Side-flip state: which side of the bean does the text card extend toward?
 const side = ref<'left' | 'right'>('right');

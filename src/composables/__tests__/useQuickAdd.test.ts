@@ -4,7 +4,7 @@
  * here we verify the state transitions and the main ↔ picker branching
  * in `triggerQuickAddAction`.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { RouteLocationNormalizedLoaded } from 'vue-router';
 
 // --- Mocks must be set up BEFORE importing the module under test ---------
@@ -24,8 +24,14 @@ const hoisted = vi.hoisted(() => {
     push: vi.fn().mockResolvedValue(undefined),
     replace: vi.fn().mockResolvedValue(undefined),
     hasOpenOverlays: vi.fn(() => false),
+    /** The breakpoint: phone (the modal surface, with a history marker) unless a test says not. */
+    mobile: { value: true },
   };
 });
+
+vi.mock('@/composables/useBreakpoint', () => ({
+  useBreakpoint: () => ({ isMobile: hoisted.mobile }),
+}));
 
 vi.mock('@/utils/overlayStack', () => ({
   hasOpenOverlays: hoisted.hasOpenOverlays,
@@ -60,6 +66,7 @@ import {
   startQuickAddItem,
   commitPickerSelection,
   cancelPicker,
+  quickAddPushedHistoryMarker,
 } from '../useQuickAdd';
 import { reportError } from '@/utils/errorReporter';
 import type { QuickAddItem } from '@/constants/quickAddItems';
@@ -207,6 +214,124 @@ describe('useQuickAdd — history integration (back gesture)', () => {
     expect(isOpen.value).toBe(false);
     expect(backSpy).not.toHaveBeenCalled();
     backSpy.mockRestore();
+  });
+});
+
+describe('useQuickAdd — re-open while open (#119, the non-modal desktop surface)', () => {
+  beforeEach(() => {
+    mockedHasOpenOverlays.mockReturnValue(false);
+    window.history.replaceState(null, '');
+    closeQuickAdd();
+    window.history.replaceState(null, '');
+  });
+
+  it('does not push a second marker, still re-scopes, and advances openSeq', () => {
+    const { allowedActions, openSeq } = useQuickAdd();
+    const pushSpy = vi.spyOn(window.history, 'pushState');
+    openQuickAdd();
+    const seq = openSeq.value;
+    openQuickAdd({ filter: ['add-saying'] });
+
+    // One marker only: a second would be a dead back step after the close pops just one.
+    expect(pushSpy).toHaveBeenCalledTimes(1);
+    expect(allowedActions.value).toEqual(['add-saying']);
+    expect(openSeq.value).toBe(seq + 1);
+    pushSpy.mockRestore();
+  });
+
+  it('advances openSeq on every successful open, and not on a refused one', () => {
+    const { openSeq } = useQuickAdd();
+    const before = openSeq.value;
+    openQuickAdd();
+    expect(openSeq.value).toBe(before + 1);
+    closeQuickAdd();
+    mockedHasOpenOverlays.mockReturnValue(true);
+    openQuickAdd();
+    expect(openSeq.value).toBe(before + 1);
+  });
+});
+
+describe('useQuickAdd — the history marker is phone-only (#119)', () => {
+  beforeEach(() => {
+    mockedHasOpenOverlays.mockReturnValue(false);
+    push.mockClear();
+    replace.mockClear();
+    mockRoute.path = '/dashboard';
+    mockRoute.params = {};
+    window.history.replaceState(null, '');
+    closeQuickAdd();
+    window.history.replaceState(null, '');
+  });
+  afterEach(() => {
+    hoisted.mobile.value = true;
+    vi.restoreAllMocks();
+  });
+
+  it('desktop: open pushes no marker, and close pops nothing', () => {
+    hoisted.mobile.value = false;
+    const { isOpen } = useQuickAdd();
+    const pushSpy = vi.spyOn(window.history, 'pushState');
+    const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {});
+
+    openQuickAdd();
+    expect(isOpen.value).toBe(true);
+    expect(pushSpy).not.toHaveBeenCalled();
+    expect(quickAddPushedHistoryMarker()).toBe(false);
+
+    // The × and Escape both land in closeQuickAdd.
+    closeQuickAdd();
+    expect(isOpen.value).toBe(false);
+    expect(backSpy).not.toHaveBeenCalled();
+  });
+
+  it('desktop: close never pops a marker this open did not push', () => {
+    hoisted.mobile.value = false;
+    openQuickAdd();
+    // A stale marker entry (e.g. one a phone-width open left behind) is not ours to pop.
+    window.history.replaceState({ __beanieQuickAddOpen: true }, '');
+    const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {});
+    closeQuickAdd();
+    expect(backSpy).not.toHaveBeenCalled();
+  });
+
+  it('phone: open pushes the marker, and the back gesture closes without re-popping', () => {
+    const { isOpen } = useQuickAdd();
+    const pushSpy = vi.spyOn(window.history, 'pushState');
+    openQuickAdd();
+    expect(pushSpy).toHaveBeenCalledTimes(1);
+    expect(window.history.state).toMatchObject({ __beanieQuickAddOpen: true });
+    expect(quickAddPushedHistoryMarker()).toBe(true);
+
+    const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {});
+    window.history.replaceState(null, ''); // the pop leaves the marker entry
+    window.dispatchEvent(new PopStateEvent('popstate'));
+    expect(isOpen.value).toBe(false);
+    expect(quickAddPushedHistoryMarker()).toBe(false);
+    expect(backSpy).not.toHaveBeenCalled();
+  });
+
+  it('desktop: a tile tap pushes the cross-route intent (no marker to replace)', () => {
+    hoisted.mobile.value = false;
+    openQuickAdd();
+    triggerQuickAddAction(item());
+    expect(push).toHaveBeenCalledWith({
+      path: '/pod/scrapbook',
+      query: { action: 'add-saying' },
+    });
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it('desktop: a picker commit pushes the intent with the picked id', () => {
+    hoisted.mobile.value = false;
+    const { isOpen } = useQuickAdd();
+    startQuickAddItem('add-medication');
+    expect(isOpen.value).toBe(true);
+    mockRoute.path = '/dashboard';
+    commitPickerSelection('m1');
+    expect(isOpen.value).toBe(false);
+    expect(push).toHaveBeenCalledTimes(1);
+    expect(push.mock.calls[0]?.[0]).toMatchObject({ query: { memberId: 'm1' } });
+    expect(replace).not.toHaveBeenCalled();
   });
 });
 

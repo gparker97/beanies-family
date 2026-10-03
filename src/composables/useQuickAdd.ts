@@ -23,6 +23,7 @@
 import { computed, ref } from 'vue';
 import type { RouteLocationNormalizedLoaded } from 'vue-router';
 import router from '@/router';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { hasOpenOverlays } from '@/utils/overlayStack';
 import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry/logEvent';
@@ -48,6 +49,14 @@ const stage = ref<QuickAddStage>({ mode: 'main' });
  */
 const allowedActions = ref<readonly QuickAddAction[] | null>(null);
 
+/**
+ * Advances on EVERY successful `openQuickAdd`, including a re-open while already open (only
+ * reachable on desktop, where the surface is non-modal: a Scrapbook scoped add, a Care & Safety
+ * `startItem`). `isOpen` cannot signal that re-open; this is what tells the composer session it
+ * is a new open (#119).
+ */
+const openSeq = ref(0);
+
 // --- History integration --------------------------------------------------
 
 /**
@@ -55,8 +64,27 @@ const allowedActions = ref<readonly QuickAddAction[] | null>(null);
  * tell our own pushed entry apart from arbitrary navigations in the
  * `popstate` handler, and tells navigation flows whether to replace
  * vs push so the back stack doesn't accumulate dead sheet-open entries.
+ *
+ * PHONE ONLY (#119). The marker exists so the back gesture dismisses a surface that blocks the
+ * viewport. On desktop (768px and up) the surface is non-modal: the page behind stays usable
+ * and can navigate, and a marker there would be left under that navigation as a dead Back step.
+ * So a desktop open pushes nothing, and `QuickAddSheet` closes the surface on a path change
+ * (its `router.afterEach`) instead. The breakpoint is `useBreakpoint`'s, the same one
+ * `useAnchoredOverlay` uses to pick the modal vs non-modal contract.
  */
 const HISTORY_MARKER_KEY = '__beanieQuickAddOpen';
+
+/** True while the current open pushed a marker (a phone open); cleared on every close path. */
+let markerPushed = false;
+
+/**
+ * Whether the current open pushed the history marker. Lets `QuickAddSheet` tell a navigation
+ * that landed over the marker (the marker is gone though this open pushed one) from a desktop
+ * open that never had one.
+ */
+export function quickAddPushedHistoryMarker(): boolean {
+  return markerPushed;
+}
 
 export function hasSheetHistoryMarker(): boolean {
   if (typeof window === 'undefined') return false;
@@ -80,6 +108,7 @@ if (typeof window !== 'undefined') {
   window.addEventListener('popstate', () => {
     if (isOpen.value) {
       isOpen.value = false;
+      markerPushed = false;
       stage.value = { mode: 'main' };
       allowedActions.value = null;
     }
@@ -93,9 +122,9 @@ if (typeof window !== 'undefined') {
  * has focus — stacking the sheet on top of a modal would produce
  * confusing focus ordering and double-backdrop stacking.
  *
- * Also pushes a synthetic history entry so a device back gesture (PWA
- * swipe, browser back button) dismisses the sheet instead of leaving
- * the app.
+ * On phones, also pushes a synthetic history entry so a device back
+ * gesture (PWA swipe, browser back button) dismisses the sheet instead
+ * of leaving the app. Desktop pushes nothing (see `HISTORY_MARKER_KEY`).
  */
 export function openQuickAdd(options?: { filter?: readonly QuickAddAction[] }): void {
   if (hasOpenOverlays()) {
@@ -148,19 +177,28 @@ export function openQuickAdd(options?: { filter?: readonly QuickAddAction[] }): 
     allowedActions.value = null;
   }
 
+  // A re-open while already open (desktop, non-modal) re-scopes the surface but must not stack a
+  // second marker: that would be a dead back step after the close pops only one.
+  const wasOpen = isOpen.value;
   stage.value = { mode: 'main' };
   isOpen.value = true;
-  pushSheetHistoryMarker();
+  openSeq.value += 1;
+  if (!wasOpen && useBreakpoint().isMobile.value) {
+    pushSheetHistoryMarker();
+    markerPushed = true;
+  }
 }
 
 /**
- * Close the sheet. If we pushed a history marker on open, pop it via
- * `history.back()` so the stack doesn't leak dead entries. The popstate
- * handler fires async but no-ops because `isOpen` is already false.
+ * Close the sheet. If this open pushed a history marker (phone) and it is
+ * still the current entry, pop it via `history.back()` so the stack doesn't
+ * leak dead entries. A desktop open pushed none, so it pops nothing. The
+ * popstate handler fires async but no-ops because `isOpen` is already false.
  */
 export function closeQuickAdd(): void {
-  const shouldPop = isOpen.value && hasSheetHistoryMarker();
+  const shouldPop = isOpen.value && markerPushed && hasSheetHistoryMarker();
   isOpen.value = false;
+  markerPushed = false;
   stage.value = { mode: 'main' };
   allowedActions.value = null;
   if (shouldPop) {
@@ -177,6 +215,7 @@ export function closeQuickAdd(): void {
  */
 export function closeSheetForNavigation(): void {
   isOpen.value = false;
+  markerPushed = false;
   stage.value = { mode: 'main' };
   allowedActions.value = null;
 }
@@ -234,11 +273,13 @@ export function buildIntentQuery(
  *   1. Same-route taps — no history churn from repeated quick-adds on
  *      the page you're already on.
  *   2. Sheet-marker on the history stack — the sheet pushed an entry
- *      on open, and we want the target to REPLACE that entry so back
+ *      on open (phones only), and we want the target to REPLACE that entry so back
  *      from the target goes to the pre-sheet page (not a dead
  *      sheet-open marker pointing at the same URL).
  *
- * Cross-route taps with no marker push (normal router behavior).
+ * Cross-route taps with no marker push (normal router behavior). That
+ * includes every desktop open: it pushed no marker, so there is no dead
+ * entry to overwrite.
  *
  * Runs OUTSIDE `setup()` (click handler / picker-commit context), so
  * we use the imported router singleton rather than `useRouter()`.
@@ -383,6 +424,8 @@ export function useQuickAdd() {
     isOpen: computed(() => isOpen.value),
     stage: computed(() => stage.value),
     allowedActions: computed(() => allowedActions.value),
+    /** Advances on every successful open, including a re-open while open (desktop). */
+    openSeq: computed(() => openSeq.value),
     open: openQuickAdd,
     close: closeQuickAdd,
     toggle: toggleQuickAdd,
