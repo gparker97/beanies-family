@@ -891,3 +891,8 @@ export function counterStats(doc: Doc): CounterStats {
   }
   return { keys: keys.length, conflicts, malformed: foldIndex(doc).malformed, ledgerKeys };
 }
+
+/** Read-only view of the module's Counter-write switch (`__setCounterWritesForTesting` flips it). */
+export function counterWritesOn(): boolean {
+  return countersOn;
+}

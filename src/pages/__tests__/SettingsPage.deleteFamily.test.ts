@@ -326,6 +326,8 @@ describe('SettingsPage — delete family export gate', () => {
 
     expect(deliverFileMock).toHaveBeenCalledTimes(1);
     expect(deleteLocalFamilyMock).toHaveBeenCalledWith('fam-1');
+    // Round 3: deleting ONE family never sweeps the device's other families.
+    expect(signOutMock).toHaveBeenCalledWith();
 
     // ⚠️ NOT REMOVED, and this assertion has now been wrong in both directions.
     // Nothing deleted a pod file on this path — the Drive checkbox is unticked —

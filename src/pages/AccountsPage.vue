@@ -331,8 +331,17 @@ useQuickAddIntent((action) => {
   if (action === 'add-account') openAddWithDefaults();
 });
 
+/**
+ * A loan account mirroring a LIVE asset is owned by the Assets page (edit, view and delete
+ * redirect there). An orphan mirror, whose asset is gone, is an ordinary account again:
+ * otherwise nothing could ever edit or delete it.
+ */
+function ownedByAsset(account: Pick<Account, 'linkedAssetId'> | undefined): boolean {
+  return !!account?.linkedAssetId && !!assetsStore.getAssetById(account.linkedAssetId);
+}
+
 function openEditModal(account: Account) {
-  if (account.linkedAssetId) {
+  if (ownedByAsset(account)) {
     showToast('info', t('accounts.editOnAssetsPage'));
     router.push('/assets');
     return;
@@ -353,7 +362,7 @@ function closeEditModal() {
 function openViewModal(account: Account) {
   // Linked-to-asset accounts redirect to the Assets page (same behaviour as
   // opening edit) — the Assets page owns the full view for those.
-  if (account.linkedAssetId) {
+  if (ownedByAsset(account)) {
     showToast('info', t('accounts.editOnAssetsPage'));
     router.push('/assets');
     return;
@@ -389,8 +398,8 @@ async function handleAccountDelete(id: string) {
 async function deleteAccount(id: string) {
   // A linked loan account mirrors its asset's loan and is deleted WITH the asset (one change,
   // `assetsStore.deleteAsset`): deleting it alone would leave the asset's loan with no mirror.
-  // Same redirect as edit/view.
-  if (accountsStore.getAccountById(id)?.linkedAssetId) {
+  // Same redirect as edit/view, but ONLY while that asset exists (`ownedByAsset`).
+  if (ownedByAsset(accountsStore.getAccountById(id))) {
     showToast('info', t('accounts.editOnAssetsPage'));
     router.push('/assets');
     return;

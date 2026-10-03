@@ -910,6 +910,94 @@ describe('photoStore', () => {
       expect(eventsFor('photo-upload', 'rollback-skipped-record-present')).toHaveLength(1);
     });
 
+    it('round 3: rollback re-reads the WORKER doc (a skip-on-missing empty patch), not the projection', async () => {
+      storeInternals.registerPhotoCollection('activities');
+      await ensureEntity('activities', 'act-1');
+      const store = usePhotoStore();
+      driveMocks.createFile.mockResolvedValue({ fileId: 'drive-late', name: 'x' });
+      const real = vi.mocked(mutate).getMockImplementation()!;
+      vi.mocked(mutate).mockImplementationOnce(async (op, opts) => {
+        await real(op, opts);
+        throw new Error('reply lost');
+      });
+
+      await expect(store.addPhoto(makeFile(), 'activities', 'act-1')).rejects.toThrow(/reply lost/);
+
+      expect(vi.mocked(mutate)).toHaveBeenCalledWith(
+        expect.objectContaining({
+          op: 'patch',
+          collection: 'photos',
+          patch: {},
+          onMissing: 'skip',
+        }),
+        { quiet: true }
+      );
+      expect(driveMocks.deleteFile).not.toHaveBeenCalled();
+    });
+
+    it('round 3: rollback keeps the file (logged) when the worker doc cannot be read', async () => {
+      storeInternals.registerPhotoCollection('activities');
+      await ensureEntity('activities', 'act-1');
+      const store = usePhotoStore();
+      vi.mocked(mutate)
+        .mockRejectedValueOnce(new Error('forced write failure'))
+        .mockRejectedValueOnce(new Error('worker gone'));
+
+      await expect(store.addPhoto(makeFile(), 'activities', 'act-1')).rejects.toThrow(/forced/);
+
+      expect(driveMocks.deleteFile).not.toHaveBeenCalled();
+      expect(eventsFor('photo-upload', 'rollback-skipped-unverified')).toHaveLength(1);
+    });
+
+    it('round 3: a failed reuse lookup keeps the entry queued and creates no second file', async () => {
+      storeInternals.registerPhotoCollection('activities');
+      await ensureEntity('activities', 'act-1');
+      const store = usePhotoStore();
+      driveMocks.listFilesInFolder.mockRejectedValue(new Error('Drive 503'));
+      await enqueueUpload(queued('photo-lookup'));
+
+      await flushQueue();
+
+      expect(driveMocks.createFile).not.toHaveBeenCalled();
+      await store.refreshPending();
+      expect(store.pendingUploadsFor('activities', 'act-1')).toHaveLength(1);
+      expect(eventsFor('photo-upload', 'finalize-reuse-lookup-failed')).toHaveLength(1);
+    });
+
+    it('round 3: a queue drained for a family that is not open is refused; nothing uploads', async () => {
+      storeInternals.registerPhotoCollection('activities');
+      await ensureEntity('activities', 'act-1');
+      const store = usePhotoStore();
+      // The queue is bound to another family than the one open (familyContextStore says
+      // 'fam-photostore-test').
+      await store.activate('fam-photostore-other');
+      await enqueueUpload(queued('photo-wrong-family'));
+
+      await flushQueue();
+
+      expect(driveMocks.createFile).not.toHaveBeenCalled();
+      expect(projection.getById('photos', 'photo-wrong-family')).toBeUndefined();
+      expect(eventsFor('photo-upload', 'finalize-family-mismatch')).toHaveLength(1);
+      await store.refreshPending();
+      expect(store.pendingUploadsFor('activities', 'act-1')).toHaveLength(1);
+      await queueInternals.reset();
+      await deletePhotoQueueDatabase('fam-photostore-other');
+    });
+
+    it('round 3: a failed background activation is logged, never an unhandled rejection', async () => {
+      const store = usePhotoStore();
+      store.deactivate();
+      const open = vi.spyOn(globalThis.indexedDB, 'open').mockImplementationOnce(() => {
+        throw new Error('quota');
+      });
+
+      store.activateInBackground('fam-photostore-broken');
+      await vi.waitFor(() =>
+        expect(eventsFor('photo-upload-flush', 'activate-failed')).toHaveLength(1)
+      );
+      open.mockRestore();
+    });
+
     it('replacePhotoFile deletes the NEW file and keeps the record when its write fails', async () => {
       storeInternals.registerPhotoCollection('activities');
       await ensureEntity('activities', 'act-1');

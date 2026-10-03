@@ -41,7 +41,11 @@ export interface QueuedPhotoUpload {
   createdAt: number; // epoch ms
 }
 
-type FlushHandler = (entry: QueuedPhotoUpload) => Promise<void>;
+/**
+ * Drains one entry. `familyId` is the family the drain was started for: the handler must
+ * refuse (throw, so the entry stays queued) when that is no longer the active family.
+ */
+type FlushHandler = (entry: QueuedPhotoUpload, familyId: string) => Promise<void>;
 
 let currentFamilyId: string | null = null;
 let dbPromise: Promise<IDBDatabase> | null = null;
@@ -54,8 +58,13 @@ let retryTimer: ReturnType<typeof setTimeout> | null = null;
  * online listener. Call on sign-in after the Automerge doc is loaded.
  */
 export function setActiveFamily(familyId: string): void {
+  // Round 3: re-binding the SAME family keeps its handle (a drain in flight holds it); a
+  // different family closes the old one, which would otherwise block that queue's delete.
+  if (currentFamilyId !== familyId || !dbPromise) {
+    retireHandle(currentFamilyId, dbPromise);
+    dbPromise = openDB(familyId);
+  }
   currentFamilyId = familyId;
-  dbPromise = openDB(familyId);
   startListening();
   // Attempt an immediate flush in case entries are already pending.
   if (navigator.onLine && flushHandler) {
@@ -69,8 +78,31 @@ export function setActiveFamily(familyId: string): void {
  */
 export function clearActiveFamily(): void {
   stopListening();
+  // Close, not just forget: a leaked connection blocks `deletePhotoQueueDatabase` (sign-out,
+  // forget family) for as long as the tab lives. A drain still running on it finishes its
+  // current entry, then stops at the family check.
+  retireHandle(currentFamilyId, dbPromise);
   dbPromise = null;
   currentFamilyId = null;
+}
+
+/**
+ * Close a handle the module no longer names. A drain still running for that family holds it
+ * to remove the entry it is finishing, so the close waits for that drain to settle.
+ */
+function retireHandle(familyId: string | null, handle: Promise<IDBDatabase> | null): void {
+  const running = familyId ? inFlightFlush.get(familyId) : undefined;
+  if (running) void running.finally(() => closeHandle(handle));
+  else closeHandle(handle);
+}
+
+/** Close a queue handle once it opens; an open that failed has nothing to close. */
+function closeHandle(handle: Promise<IDBDatabase> | null): void {
+  if (!handle) return;
+  handle.then(
+    (db) => db.close(),
+    () => {}
+  );
 }
 
 /**
@@ -121,8 +153,8 @@ export async function removeFromQueue(id: string): Promise<void> {
   await withStore(db, 'readwrite', (store) => store.delete(id));
 }
 
-/** The drain in progress, so overlapping triggers share one pass (see `flushQueue`). */
-let inFlightFlush: Promise<void> | null = null;
+/** The drain in progress PER FAMILY, so overlapping triggers share one pass (`flushQueue`). */
+const inFlightFlush = new Map<string, Promise<void>>();
 
 /**
  * Attempt to drain every pending entry through the registered handler.
@@ -134,20 +166,33 @@ let inFlightFlush: Promise<void> | null = null;
  * that lands while a drain is running joins that drain's promise instead.
  */
 export function flushQueue(): Promise<void> {
-  if (inFlightFlush) return inFlightFlush;
-  inFlightFlush = drainOnce().finally(() => {
-    inFlightFlush = null;
+  const familyId = currentFamilyId;
+  const db = dbPromise;
+  if (!familyId || !db || !flushHandler) return Promise.resolve();
+  // Keyed by family (round 3): a drain still finishing for the PREVIOUS family must not be
+  // joined by a flush for the new one (it would stop at its next entry and drain nothing).
+  const running = inFlightFlush.get(familyId);
+  if (running) return running;
+  const run = drainOnce(familyId, db).finally(() => {
+    if (inFlightFlush.get(familyId) === run) inFlightFlush.delete(familyId);
   });
-  return inFlightFlush;
+  inFlightFlush.set(familyId, run);
+  return run;
 }
 
-async function drainOnce(): Promise<void> {
-  if (!flushHandler || !dbPromise) return;
+/**
+ * One pass over `familyId`'s queue, against the database handle captured when it started
+ * (round 3). The family can change mid-drain (a switch, a sign-out): every entry is checked
+ * against the ACTIVE family before it is handed over, the drain stops at the first mismatch,
+ * and removal goes to the captured database, never to whatever `dbPromise` names by then.
+ */
+async function drainOnce(familyId: string, dbHandle: Promise<IDBDatabase>): Promise<void> {
   if (retryTimer) {
     clearTimeout(retryTimer);
     retryTimer = null;
   }
-  const entries = await getPending();
+  const db = await dbHandle;
+  const entries = await withStore<QueuedPhotoUpload[]>(db, 'readonly', (store) => store.getAll());
   if (entries.length === 0) return;
 
   logEvent({
@@ -158,9 +203,19 @@ async function drainOnce(): Promise<void> {
   });
   let anyFailed = false;
   for (const entry of entries) {
+    const handler = flushHandler;
+    if (currentFamilyId !== familyId || !handler) {
+      logEvent({
+        level: 'info',
+        surface: 'photo-upload-flush',
+        message: 'drain stopped: the active family changed',
+        context: { action: 'drain-stopped-family-changed' },
+      });
+      return;
+    }
     try {
-      await flushHandler(entry);
-      await removeFromQueue(entry.id);
+      await handler(entry, familyId);
+      await withStore(db, 'readwrite', (store) => store.delete(entry.id));
     } catch (e) {
       console.warn('[photoUploadQueue] Flush failed for entry', entry.id, e);
       anyFailed = true;
@@ -178,7 +233,7 @@ async function drainOnce(): Promise<void> {
 
   // If anything failed (typically because we're offline again), schedule a
   // short retry so we don't sit idle until the next online event.
-  if (anyFailed) {
+  if (anyFailed && currentFamilyId === familyId) {
     retryTimer = setTimeout(() => {
       retryTimer = null;
       if (navigator.onLine) void flushQueue();
@@ -311,5 +366,6 @@ export const __internals = {
     dbPromise = null;
     currentFamilyId = null;
     flushHandler = null;
+    inFlightFlush.clear();
   },
 };

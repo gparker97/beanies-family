@@ -362,6 +362,68 @@ describe('update', () => {
     expect(tx(doc)!.loanPrincipalPortion).toBe(480); // recomputed, not the patch's 1
   });
 
+  it('a re-apply after reversing is not gated by the completion the reversed allocation caused', () => {
+    // Fixed 900 completes the goal (100 + 900 = 1000) and marks it completed.
+    const before = run(world(), {
+      mode: 'create',
+      transaction: row({
+        amount: 1000,
+        goalId: 'g',
+        goalAllocMode: 'fixed',
+        goalAllocValue: 900,
+      }) as never,
+    }).doc;
+    expect(goalAmount(before)).toBe(1000);
+    expect(shown(before, 'goals', 'g')!.isCompleted).toBe(true);
+    const { doc } = run(before, {
+      mode: 'update',
+      id: 't1',
+      patch: { amount: 1200 },
+      updatedAt: '2026-10-04T00:00:00.000Z',
+    });
+    // Reversed to 100, then re-applied: the allocation is NOT dropped.
+    expect(goalAmount(doc)).toBe(1000);
+    expect(tx(doc)!.goalAllocApplied).toBe(900);
+  });
+
+  it('the completed gate still applies on create (a finished goal earns nothing new)', () => {
+    const done = apply(world(), set('goals', { ...GOAL, currentAmount: 1000, isCompleted: true }));
+    const { doc } = run(done, {
+      mode: 'create',
+      transaction: row({ goalId: 'g', goalAllocMode: 'fixed', goalAllocValue: 50 }) as never,
+    });
+    expect(goalAmount(doc)).toBe(1000);
+    expect(tx(doc)!.goalAllocApplied).toBeUndefined();
+  });
+
+  it('relinking to another recurring item does not reverse or re-amortise', () => {
+    const before = seededWithLoanRow();
+    const { doc, result } = run(before, {
+      mode: 'update',
+      id: 't1',
+      patch: { recurringItemId: 'r2' },
+      updatedAt: '2026-10-04T00:00:00.000Z',
+    });
+    expect(tx(doc)!.recurringItemId).toBe('r2');
+    expect(balance(doc, 'car-loan')).toBe(1520);
+    expect(tx(doc)).toMatchObject({ loanInterestPortion: 20, loanPrincipalPortion: 480 });
+    expect(result.accounts).toEqual([]);
+  });
+
+  it('unlinking the recurring item switches amortisation to an extra payment', () => {
+    const before = seededWithLoanRow();
+    const { doc } = run(before, {
+      mode: 'update',
+      id: 't1',
+      patch: {},
+      deleteKeys: ['recurringItemId'],
+      updatedAt: '2026-10-04T00:00:00.000Z',
+    });
+    // Reversed to 2000, then 500 as an extra payment: all principal → 1500.
+    expect(balance(doc, 'car-loan')).toBe(1500);
+    expect(tx(doc)).toMatchObject({ loanInterestPortion: 0, loanPrincipalPortion: 500 });
+  });
+
   it('a row deleted meanwhile: found false, nothing written', () => {
     const before = world();
     const { doc, result } = run(before, {
@@ -419,6 +481,44 @@ describe('delete', () => {
     const { doc } = run(two, { mode: 'delete', id: 'dup-b' });
     expect(balance(doc, 'chk')).toBe(900);
     expect(tx(doc, 'dup-a')).toBeDefined();
+  });
+
+  it('dedup on the dormant build: a merge-born duplicate moved the balance ONCE, so only the row goes', () => {
+    const { a, b } = fork(world());
+    const onA = run(a, {
+      mode: 'create',
+      transaction: row({ id: 'dup-a', recurringItemId: 'r1' }) as never,
+    }).doc;
+    const onB = run(b, {
+      mode: 'create',
+      transaction: row({ id: 'dup-b', recurringItemId: 'r1' }) as never,
+    }).doc;
+    const merged = converge(onA, onB);
+    // Both forks wrote the absolute 900: last-writer-wins keeps one movement.
+    expect(balance(merged.a, 'chk')).toBe(900);
+    const { doc, result } = run(merged.a, { mode: 'delete', id: 'dup-b', dedup: true });
+    expect(result.reversed).toBe(false);
+    expect(tx(doc, 'dup-b')).toBeUndefined();
+    expect(tx(doc, 'dup-a')).toBeDefined();
+    expect(balance(doc, 'chk')).toBe(900);
+  });
+
+  it('dedup with Counter writes on: both movements survived the merge, so the duplicate is reversed', () => {
+    __setCounterWritesForTesting(true);
+    const { a, b } = fork(world());
+    const onA = run(a, {
+      mode: 'create',
+      transaction: row({ id: 'dup-a', recurringItemId: 'r1' }) as never,
+    }).doc;
+    const onB = run(b, {
+      mode: 'create',
+      transaction: row({ id: 'dup-b', recurringItemId: 'r1' }) as never,
+    }).doc;
+    const merged = converge(onA, onB);
+    expect(balance(merged.a, 'chk')).toBe(800);
+    const { doc, result } = run(merged.a, { mode: 'delete', id: 'dup-b', dedup: true });
+    expect(result.reversed).toBe(true);
+    expect(balance(doc, 'chk')).toBe(900);
   });
 
   it('deleting a missing row is a no-op (found false)', () => {

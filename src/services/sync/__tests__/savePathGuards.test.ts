@@ -22,7 +22,10 @@ vi.mock('@/services/sync/fileSync', async (importOriginal) => ({
   parseBeanpodV4: vi.fn((text: string) => JSON.parse(text) as BeanpodFileV4),
   openFilePicker: vi.fn(async () => null),
 }));
-vi.mock('@/services/indexeddb/database', () => ({ getActiveFamilyId: vi.fn(() => 'fam') }));
+vi.mock('@/services/indexeddb/database', () => ({
+  getActiveFamilyId: vi.fn(() => 'fam'),
+  clearUnpushedAtSignOutMarker: vi.fn(),
+}));
 vi.mock('@/services/familyContext', () => ({ createFamilyWithId: vi.fn(async () => {}) }));
 vi.mock('@/services/automerge/worker/docClient', () => ({
   setFamilyKey: vi.fn(),
@@ -34,6 +37,7 @@ vi.mock('@/services/automerge/worker/docClient', () => ({
   noteRemoteBaseline: vi.fn(),
   logMergeTerminus: vi.fn(),
   getHeads: vi.fn(async () => ({ heads: ['h'] })),
+  documentHoldsCacheOf: vi.fn(() => true),
 }));
 vi.mock('@/services/sync/offlineQueue', () => ({
   enqueueOfflineSave: vi.fn(),
@@ -52,6 +56,7 @@ import * as syncService from '../syncService';
 import * as docClient from '@/services/automerge/worker/docClient';
 import { logEvent } from '@/services/telemetry';
 import { CorruptPayloadError, RemoteMergeError } from '@/types/sync';
+import { clearUnpushedAtSignOutMarker } from '@/services/indexeddb/database';
 
 const KEY = {} as CryptoKey;
 
@@ -97,19 +102,33 @@ beforeEach(() => {
 describe('write race detection (audit C4)', () => {
   it('a revision that jumped by MORE than one is logged as write-raced and re-merged once', async () => {
     const p = drive({ probe: 'ver:10', ack: 'ver:13' });
+    // The file really is at the ack's revision once the write lands.
+    p.write.mockImplementation(async () => {
+      p.getRemoteMarker.mockImplementation(async () => ({
+        revision: 'ver:13',
+        modifiedTime: null,
+      }));
+      return { revision: 'ver:13' };
+    });
     syncService.setProvider(p as never, 'fam');
     syncService.setFamilyKey(KEY, envelope());
 
     await expect(syncService.save()).resolves.toBe(true); // the write DID land
     expect(actions()).toContain('write-raced');
-    // No baseline is certified for a window it cannot vouch for.
-    expect(vi.mocked(docClient.noteRemoteBaseline).mock.calls.at(-1)?.[0]).toBe(
-      JSON.stringify({ r: null, h: null })
-    );
+    // Round 3: the raced ack neither certifies nor NULLS the baseline. The last commit is
+    // still the pre-write merge's (the probe revision), never `{r:null}`.
+    const committed = () =>
+      vi.mocked(docClient.noteRemoteBaseline).mock.calls.map((c) => c[0] as string);
+    expect(committed()).not.toContain(JSON.stringify({ r: null, h: null }));
+    expect(committed().at(-1)).toBe(JSON.stringify({ r: 'ver:10', h: 'h' }));
 
-    // The scheduled re-merge reads again (the baseline was dropped, so the probe says
-    // "changed") and merges; it publishes only if that read leaves us dirty.
+    // The scheduled re-merge reads again (the file's revision moved past the baseline's),
+    // compares heads in the merge, and only THEN commits the file's revision.
     await vi.waitFor(() => expect(p.read).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() =>
+      expect(committed().at(-1)).toBe(JSON.stringify({ r: 'ver:13', h: 'h' }))
+    );
+    expect(committed()).not.toContain(JSON.stringify({ r: null, h: null }));
     expect(p.write).toHaveBeenCalledTimes(1);
   });
 
@@ -120,6 +139,11 @@ describe('write race detection (audit C4)', () => {
 
     await expect(syncService.save()).resolves.toBe(true);
     expect(actions()).not.toContain('write-raced');
+    // Round 3: the success path logs its advance too, so a race RATE is measurable.
+    const advance = vi
+      .mocked(logEvent)
+      .mock.calls.find((c) => (c[0].context as { action?: string }).action === 'write-advance');
+    expect(advance?.[0].context).toMatchObject({ detail: 'advance=1' });
     expect(vi.mocked(docClient.noteRemoteBaseline).mock.calls.at(-1)?.[0]).toBe(
       JSON.stringify({ r: 'ver:11', h: 'h' })
     );
@@ -142,6 +166,82 @@ describe('state captured at doSave entry (audit C4/C3)', () => {
     expect(syncService.getConsecutiveSaveFailures()).toBe(0);
     expect(syncService.isRemoteBlocked()).toBeNull();
     expect(actions()).toContain('aborted-provider-changed');
+  });
+});
+
+describe('round 3: the unpushed-at-signout marker is cleared once a save certifies the cache', () => {
+  it('a certified write from a document that replayed this family cache clears the marker', async () => {
+    const p = drive({ probe: 'ver:10', ack: 'ver:11' });
+    syncService.setProvider(p as never, 'fam');
+    syncService.setFamilyKey(KEY, envelope());
+    await expect(syncService.save()).resolves.toBe(true);
+    expect(clearUnpushedAtSignOutMarker).toHaveBeenCalledWith('fam');
+  });
+
+  it('NOT when the document did not replay the cache cleanly, and NOT on a raced write', async () => {
+    vi.mocked(docClient.documentHoldsCacheOf).mockReturnValueOnce(false);
+    const p = drive({ probe: 'ver:10', ack: 'ver:11' });
+    syncService.setProvider(p as never, 'fam');
+    syncService.setFamilyKey(KEY, envelope());
+    await expect(syncService.save()).resolves.toBe(true);
+    expect(clearUnpushedAtSignOutMarker).not.toHaveBeenCalled();
+
+    syncService.reset();
+    const raced = drive({ probe: 'ver:10', ack: 'ver:13' });
+    syncService.setProvider(raced as never, 'fam');
+    syncService.setFamilyKey(KEY, envelope());
+    await expect(syncService.save()).resolves.toBe(true);
+    expect(clearUnpushedAtSignOutMarker).not.toHaveBeenCalled();
+  });
+});
+
+describe('round 3, item 1: a save hold taken mid-save aborts the save; whenIdle waits for it', () => {
+  it('a save that STRADDLES a hold aborts at its next await (hold epoch), writing nothing', async () => {
+    const p = drive({ probe: 'ver:1', ack: 'ver:2' });
+    syncService.setProvider(p as never, 'fam');
+    syncService.setFamilyKey(KEY, envelope());
+    let release: (() => void) | null = null;
+    // The cross-family decrypt takes its hold while the worker is serialising.
+    vi.mocked(docClient.exportEncryptedPayload).mockImplementationOnce(async () => {
+      release = syncService.holdSaves('cross-family-decrypt');
+      return { payload: 'p==', heads: ['h'], lineage: null } as never;
+    });
+    await expect(syncService.save()).resolves.toBe(false);
+    expect(p.write).not.toHaveBeenCalled();
+    expect(actions()).toContain('aborted-provider-changed');
+    release!();
+  });
+
+  it('whenIdle resolves only after the running save settles, and logs the wait', async () => {
+    const p = drive({ probe: 'ver:1', ack: 'ver:2' });
+    let land: (() => void) | null = null;
+    p.write.mockImplementation(
+      () => new Promise((resolve) => (land = () => resolve({ revision: 'ver:2' })))
+    );
+    syncService.setProvider(p as never, 'fam');
+    syncService.setFamilyKey(KEY, envelope());
+    const saving = syncService.save();
+    await vi.waitFor(() => expect(p.write).toHaveBeenCalled());
+    let idle = false;
+    const waiting = syncService.whenIdle().then(() => (idle = true));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(idle).toBe(false);
+    land!();
+    await waiting;
+    await saving;
+    expect(idle).toBe(true);
+    expect(actions()).toContain('await-idle');
+  });
+
+  it('no remote merge runs while a hold is live', async () => {
+    const p = drive({ probe: 'ver:1', ack: 'ver:2' });
+    syncService.setProvider(p as never, 'fam');
+    syncService.setFamilyKey(KEY, envelope());
+    const release = syncService.holdSaves('cross-family-decrypt');
+    await expect(syncService.save()).resolves.toBe(false); // held
+    expect(p.read).not.toHaveBeenCalled();
+    expect(docClient.mergeRemoteEnvelope).not.toHaveBeenCalled();
+    release();
   });
 });
 

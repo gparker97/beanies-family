@@ -15,7 +15,9 @@
  *   - `resetDocClient` runs in tier 2 only — tier 3's `deleteAllLocalFamilies` →
  *     `clearCache` resets the worker doc anyway; running both is redundant churn.
  *   - `deleteFamilyDb` runs in tier 2 only — tier 3 runs `deleteAllLocalFamilies`, its
- *     every-family superset (C6: tier 3 used to clear only the ACTIVE family's cache).
+ *     every-family superset (C6: tier 3 used to clear only the ACTIVE family's cache). Only
+ *     the menu's "sign out and clear all data" runs that list; every other clear runs
+ *     `SIGN_OUT_CLEAR_ACTIVE_STEPS`, which keeps `deleteFamilyDb` (round 3).
  *
  * Every step is individually caught by the runner: a hung Drive call or broken
  * IndexedDB must never block the sign-out (a user who can't sign out is much worse
@@ -45,9 +47,10 @@ export type SignOutStepName =
   | 'deleteAllLocalFamilies'
   /**
    * Tell this family's other tabs the session ended here (C10), WHETHER OR NOT the cache
-   * delete ran: a kept cache must not leave the person signed in next door. Every
-   * non-trusted tier runs it; the trusted and cleared-elsewhere tiers never do (a trusted
-   * sign-out keeps the device's sessions by design, and an echo would ping-pong).
+   * delete ran: a kept cache must not leave the person signed in next door. The untrusted
+   * and clear tiers run it; the trusted, cleared-elsewhere and eviction tiers never do (a
+   * trusted sign-out keeps the device's sessions by design, an echo would ping-pong, and an
+   * eviction must not sign out the family's remaining members in other tabs).
    */
   | 'announceSessionEnded'
   | 'clearKeyCacheFamily'
@@ -164,6 +167,20 @@ export const SIGN_OUT_CLEAR_STEPS: readonly SignOutStepName[] = [
 ];
 
 /**
+ * Tier 3 scoped to the ACTIVE family: the same clean-device teardown, but the cache delete is
+ * `deleteFamilyDb` (this family only) instead of the every-family sweep. The default for every
+ * `signOutAndClearData` caller that is NOT the person choosing "sign out and clear all data"
+ * from the menu: delete-family, the fatal overlay's clear, and the demo seed's teardown. None
+ * of them asked about the device's OTHER families, so none may delete them (round 3).
+ */
+export const SIGN_OUT_CLEAR_ACTIVE_STEPS: readonly SignOutStepName[] = SIGN_OUT_CLEAR_STEPS.map(
+  (s): SignOutStepName => (s === 'deleteAllLocalFamilies' ? 'deleteFamilyDb' : s)
+);
+
+/** Which families a tier-3 clear deletes: the open one (default) or every one on the device. */
+export type ClearScope = 'active' | 'all';
+
+/**
  * Lock (tracker #77): a REMOVED member proved themselves on this device, but the family
  * cannot be forgotten here — someone still in it uses the device, or this copy holds work
  * the family file has not got. Close the pod and drop the key this device can open it with
@@ -181,7 +198,9 @@ export const SIGN_OUT_EVICTION_LOCK_STEPS: readonly SignOutStepName[] = [
   'cancelReminders',
   'resetSyncState',
   'resetDocClient',
-  'announceSessionEnded',
+  // NO `announceSessionEnded` (round 3): the channel is per FAMILY, and the people still in
+  // the family keep using this device. Announcing would sign every other tab out, including
+  // a member who was never removed. The removed member's own tabs end through the eviction.
   'clearKeyCacheFamily',
   'sweepHandoffFiles',
   'clearKeptRecipe',
@@ -233,8 +252,13 @@ export type SignOutTier = 'sign-out' | 'clear';
  * The ONE place a user-facing sign-out picks its step list. `authStore.signOut` /
  * `signOutAndClearData` and the kit guard (`useSignOut`) all select through it.
  */
-export function signOutStepsFor(tier: SignOutTier, trusted: boolean): readonly SignOutStepName[] {
-  if (tier === 'clear') return SIGN_OUT_CLEAR_STEPS;
+export function signOutStepsFor(
+  tier: SignOutTier,
+  trusted: boolean,
+  scope: ClearScope = 'all'
+): readonly SignOutStepName[] {
+  // The menu's clear tier is the all-families sweep; other clears pass `active`.
+  if (tier === 'clear') return scope === 'all' ? SIGN_OUT_CLEAR_STEPS : SIGN_OUT_CLEAR_ACTIVE_STEPS;
   return trusted ? SIGN_OUT_TRUSTED_STEPS : SIGN_OUT_UNTRUSTED_STEPS;
 }
 

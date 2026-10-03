@@ -27,7 +27,7 @@ import type { DriveConnection } from '@/types/models';
 import type { CachePersistFailureDetail } from '@/services/automerge/worker/protocol';
 import { logEvent } from '@/services/telemetry';
 import { bump as bumpOpenCycle } from '@/services/telemetry/openCycle';
-import { getActiveFamilyId } from '@/services/indexeddb/database';
+import { getActiveFamilyId, clearUnpushedAtSignOutMarker } from '@/services/indexeddb/database';
 import { createFamilyWithId } from '@/services/familyContext';
 import type { StorageProvider, StorageProviderType } from './storageProvider';
 import { getAuxStore } from './storageProvider';
@@ -369,6 +369,17 @@ function noteSaveDeferredNoKey(where: 'save' | 'autosave' | 'save-now' | 'flush'
  */
 const saveHolds = new Set<symbol>();
 let heldSaveIntent = false;
+/**
+ * Round 3: bumped by every `holdSaves`. `doSave` captures it at entry and its `stillCurrent()`
+ * re-checks it after every await, so a save that STRADDLES a hold (entered before it, still
+ * running when the worker's key is swapped) aborts instead of exporting and writing whatever
+ * the worker then holds.
+ */
+let holdEpoch = 0;
+/** Round 3: pre-save / poll merges in flight, so `whenIdle` can wait for them too. */
+const remoteMergesInFlight = new Set<Promise<unknown>>();
+/** Round 3: how long `whenIdle` waits before giving up (the epoch still aborts a straggler). */
+const WHEN_IDLE_TIMEOUT_MS = 15_000;
 
 /**
  * Hold every save until the returned release runs. Cancels (and remembers) an armed
@@ -377,6 +388,7 @@ let heldSaveIntent = false;
 export function holdSaves(reason: string): () => void {
   const token = Symbol(reason);
   saveHolds.add(token);
+  holdEpoch++;
   if (cancelPendingSave()) heldSaveIntent = true;
   logEvent({
     level: 'info',
@@ -390,6 +402,38 @@ export function holdSaves(reason: string): () => void {
     heldSaveIntent = false;
     triggerDebouncedSave();
   };
+}
+
+/**
+ * Resolve once no save and no remote merge is running (round 3). The cross-family decrypt calls
+ * it AFTER taking its hold and BEFORE posting the other family's key to the worker, so nothing
+ * started under the old family can reach the worker after the swap. Bounded: a wedged write
+ * cannot hold a sign-in hostage, and the hold epoch makes any straggler abort at its next
+ * await. Never throws; the outcome is logged on both arms so a rate is measurable.
+ */
+export async function whenIdle(): Promise<void> {
+  const work = [saveInProgress, ...remoteMergesInFlight].filter(Boolean) as Promise<unknown>[];
+  if (work.length === 0) return;
+  const start = Date.now();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const settled = await Promise.race([
+    Promise.allSettled(work).then(() => true),
+    new Promise<boolean>((resolve) => {
+      timer = setTimeout(() => resolve(false), WHEN_IDLE_TIMEOUT_MS);
+    }),
+  ]);
+  if (timer) clearTimeout(timer);
+  logEvent({
+    level: settled ? 'info' : 'warn',
+    surface: 'sync-save',
+    message: settled ? 'in-flight sync work settled' : 'in-flight sync work did not settle in time',
+    context: {
+      action: 'await-idle',
+      error_code: settled ? 'ok' : 'timeout',
+      count: work.length,
+      detail: `ms=${Date.now() - start}`,
+    },
+  });
 }
 
 /** A typed refusal from the save path. The message reaches `lastError`; `code` is for logs. */
@@ -1067,6 +1111,7 @@ export function reset(): void {
   saveHolds.clear();
   heldSaveIntent = false;
   raceRemergeArmed = false;
+  remoteMergesInFlight.clear();
   remoteBaseline = null;
   lastPersistedBytes = null;
   probeFailureReason = null;
@@ -1771,7 +1816,17 @@ interface FetchMergeResult {
 
 const NO_PROBE: FetchMergeResult = { probeRevision: null };
 
-async function fetchAndMergeRemote(opts: FetchMergeOptions = {}): Promise<FetchMergeResult> {
+function fetchAndMergeRemote(opts: FetchMergeOptions = {}): Promise<FetchMergeResult> {
+  const run = fetchAndMergeRemoteOnce(opts);
+  remoteMergesInFlight.add(run);
+  void run.then(
+    () => remoteMergesInFlight.delete(run),
+    () => remoteMergesInFlight.delete(run)
+  );
+  return run;
+}
+
+async function fetchAndMergeRemoteOnce(opts: FetchMergeOptions): Promise<FetchMergeResult> {
   // Latched: re-reading cannot help and is expensive. `setLocalChangeHandler`
   // wires a debounced save to every keystroke-level mutation, so without this a
   // typing user on the device this change targets caused a multi-megabyte read
@@ -1779,6 +1834,9 @@ async function fetchAndMergeRemote(opts: FetchMergeOptions = {}): Promise<FetchM
   // indefinitely. Throwing (rather than returning) keeps `doSave`'s refusal
   // intact — a silent return would let the save through.
   if (remoteBlocked) throw remoteBlocked;
+  // Round 3: a merge decrypts with the WORKER's key, which a held cross-family decrypt is about
+  // to swap. Nothing merges while a hold is live (a save path re-runs it when the hold lifts).
+  if (saveHolds.size > 0) return NO_PROBE;
   if (!currentProvider) return NO_PROBE;
   // Drive's save path always calls this (legacy direct call); the polling
   // watcher only activates for providers that opt in. Both paths converge
@@ -1881,6 +1939,8 @@ async function fetchAndMergeRemote(opts: FetchMergeOptions = {}): Promise<FetchM
     kind: 'baseline',
     heads: decodeHeadsFingerprint(remoteBaseline?.headsFp ?? null),
   };
+  // Round 3: the read took time; a hold taken meanwhile wins over this merge.
+  if (saveHolds.size > 0) return NO_PROBE;
 
   // The worker decrypts, runs the LINEAGE GUARD (the only place both documents
   // exist), then merges or adopts, and returns which it did. `adopted` returns
@@ -2108,9 +2168,12 @@ async function doSave(opts: SaveOptions = {}): Promise<boolean> {
     return false;
   }
 
-  /** Same provider, same family as at entry. */
+  /** Same provider, same family as at entry, and no save hold taken since (round 3). */
+  const epochAtEntry = holdEpoch;
   const stillCurrent = (): boolean =>
-    currentProvider === provider && currentEnvelope?.familyId === familyId;
+    currentProvider === provider &&
+    currentEnvelope?.familyId === familyId &&
+    holdEpoch === epochAtEntry;
   const abort = (stage: string): false => {
     updateState({ isSyncing: false });
     logEvent({
@@ -2277,12 +2340,17 @@ async function doSave(opts: SaveOptions = {}): Promise<boolean> {
     // the envelope (keys never leave main for the upload path).
     // #65: `exportedHeads` are the heads of EXACTLY these serialized bytes — the
     // only sound Drive-baseline value on the write path.
-    const { payload, heads: exportedHeads, lineage } = await docClient.exportEncryptedPayload();
+    const {
+      payload,
+      heads: exportedHeads,
+      lineage,
+      hasCounters,
+    } = await docClient.exportEncryptedPayload();
     if (!stillCurrent()) return abort('export');
     // The envelope as it stands NOW (same family, checked just above): the merge may have
     // adopted a peer's keys into it, and writing the entry snapshot would drop them.
     const envelopeToWrite = currentEnvelope as BeanpodFileV4;
-    const fileContent = reEncryptEnvelope(envelopeToWrite, payload, lineage);
+    const fileContent = reEncryptEnvelope(envelopeToWrite, payload, lineage, { hasCounters });
     // The writer says which version it ACTUALLY chose. Calling the pure
     // derivation a second time is not a second implementation: the logic has
     // one home, and a second call cannot disagree with the first.
@@ -2296,7 +2364,7 @@ async function doSave(opts: SaveOptions = {}): Promise<boolean> {
     // halves from the same optional (the first cut) made `version=4.0` occur
     // exactly when `seq=none`, so the stated alarm could never fire.
     const seqDetail = lineage === undefined ? 'missing' : lineage === null ? 'none' : lineage.seq;
-    const versionDetail = `version=${beanpodVersionFor(lineage ?? null)},seq=${seqDetail}`;
+    const versionDetail = `version=${beanpodVersionFor(lineage ?? null, { hasCounters })},seq=${seqDetail}`;
 
     // INVARIANT (ADR-032 addendum, 2026-07-15): every save writes the FULL compacted
     // base. Change-log/delta chunks were retired on the strength of this — the base
@@ -2388,13 +2456,25 @@ async function doSave(opts: SaveOptions = {}): Promise<boolean> {
           detail: `advance=${advance}`,
         },
       });
-      // NOT `learnRemoteMarker(ack)`: that would make the re-merge's probe answer
-      // 'unchanged' and skip the very read it exists for. A null baseline reads, and the
-      // null fingerprint keeps the lineage context `dirty` until that read proves otherwise.
-      remoteBaseline = null;
-      commitRemoteBaseline(null);
+      // Round 3: the baseline is LEFT AS IT WAS (the probe's revision), not nulled. Not
+      // `learnRemoteMarker(ack)` either: that would make the re-merge's probe answer
+      // 'unchanged' and skip the very read it exists for. The old revision differs from the
+      // file's, so the re-merge reads, compares the remote's heads with ours in the worker,
+      // and only then commits a baseline (its merge terminus) or publishes (dirty). Nulling
+      // here made every open until then a full read and dropped the persisted row for nothing.
       scheduleRaceRemerge(providerAtWrite);
     } else if (ackRevision !== null) {
+      // Round 3: the success-path counterpart of `write-raced`, so the race RATE is measurable.
+      logEvent({
+        level: 'info',
+        surface: 'sync-save',
+        message: 'write landed',
+        context: {
+          action: 'write-advance',
+          provider_type: providerTypeForDiag,
+          detail: `advance=${advance ?? 'unknown'}`,
+        },
+      });
       // Terminus 3 (C10): the file IS what we just wrote. Learn our own write's
       // revision and commit — for Drive this REPLACES the old post-write metadata
       // read, removing one network round-trip per save.
@@ -2405,6 +2485,7 @@ async function doSave(opts: SaveOptions = {}): Promise<boolean> {
       // successful save into a reported failure that advances the save-failure
       // escalation ladder.
       commitRemoteBaseline(exportedHeads ?? null);
+      noteCachePushed(familyIdAtWrite);
     } else if (providerAtWrite.getRemoteMarker) {
       // Drive write whose ack body was unparseable: RE-PROBE the real revision
       // rather than nulling the basis. Nulling would re-download our own 2-3MB
@@ -2497,6 +2578,22 @@ async function doSave(opts: SaveOptions = {}): Promise<boolean> {
       },
     });
     return false;
+  }
+}
+
+/**
+ * A write landed and was certified (terminus 3) from a document that replayed this family's
+ * cache cleanly, so whatever an earlier session left unpushed in that cache is now in the
+ * family file: drop the `unpushed-at-signout` marker, or a later "forget family" warns about
+ * work that has since been pushed. Best-effort and never throws: a landed save must never be
+ * reported as failed over a marker (round 3).
+ */
+function noteCachePushed(familyId: string): void {
+  try {
+    if (!docClient.documentHoldsCacheOf(familyId)) return;
+    clearUnpushedAtSignOutMarker(familyId);
+  } catch (e) {
+    console.warn('[syncService] unpushed-at-signout marker not cleared after a save:', e);
   }
 }
 

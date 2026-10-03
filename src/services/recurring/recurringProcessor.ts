@@ -305,6 +305,35 @@ function getNextDueDate(item: RecurringItem, afterDate: Date): Date | null {
 type InstanceOutcome = 'created' | 'skipped' | 'failed';
 
 /**
+ * Consecutive transient failures per recurring item, this session. A transient failure (worker
+ * down, RPC timeout) stops the cursor so the date is retried next run; but an instance that
+ * fails EVERY run would pin the cursor forever and silently stop the series, so after
+ * `MAX_CONSECUTIVE_FAILURES` the date is skipped with a critical report. Reset on success.
+ */
+const MAX_CONSECUTIVE_FAILURES = 3;
+const consecutiveFailures = new Map<string, number>();
+
+/** Test seam: forget the per-item failure counts. */
+export function __resetRecurringFailureCountsForTesting(): void {
+  consecutiveFailures.clear();
+}
+
+/**
+ * Did the cascade refuse its ARGS (e.g. a non-finite amount)? That is deterministic: a retry
+ * sends the same args and fails the same way, so it is a skip, never a retry. The worker names
+ * the error `CascadeArgsError` (`transactionOps.CASCADE_ARGS_ERROR`); across the worker
+ * boundary an unregistered name survives only as the message prefix, so both are checked.
+ */
+function isCascadeArgsError(e: unknown): boolean {
+  if (!(e instanceof Error)) return false;
+  return (
+    e.name === 'CascadeArgsError' ||
+    e.message.includes('CascadeArgsError') ||
+    e.message.startsWith('commitTransactionCascade: ')
+  );
+}
+
+/**
  * Create a transaction from a recurring item: ONE worker cascade (`createTransactionCascade`),
  * so the row, its balance movement, the goal allocation and the loan amortisation (with the
  * linked loan account mirror) land together or not at all. The worker computes the allocation
@@ -355,17 +384,50 @@ async function createTransactionFromRecurring(
 
   try {
     await transactionRepo.createTransactionCascade(input);
+    consecutiveFailures.delete(item.id);
     return 'created';
   } catch (e) {
     console.error('Failed to create transaction from recurring:', e);
-    // Non-critical: this instance is retried next run (the cursor stops here). Fixed enums
-    // only; never the description or the date. `action` names the one cascade mode.
+    // Fixed enums only; never the description or the date.
+    if (isCascadeArgsError(e)) {
+      // Deterministic: the same args fail the same way next run. Skip the date (the cursor
+      // advances) rather than pin the series forever.
+      consecutiveFailures.delete(item.id);
+      reportError({
+        surface: 'recurring-processor',
+        message: 'recurring-cascade-invalid',
+        severity: 'error',
+        error: e,
+        context: { recur_surface: 'transaction', action: 'skip-invalid' },
+      });
+      return 'skipped';
+    }
+    const failures = (consecutiveFailures.get(item.id) ?? 0) + 1;
+    if (failures >= MAX_CONSECUTIVE_FAILURES) {
+      // The same instance failed every attempt: stop retrying it so the series continues.
+      // Critical: a recurring payment the family expects did not land.
+      consecutiveFailures.delete(item.id);
+      reportError({
+        surface: 'recurring-processor',
+        message: 'recurring-cascade-gave-up',
+        severity: 'critical',
+        error: e,
+        context: {
+          recur_surface: 'transaction',
+          action: 'skip-after-retries',
+          consecutive_failures: failures,
+        },
+      });
+      return 'skipped';
+    }
+    consecutiveFailures.set(item.id, failures);
+    // Transient: this instance is retried next run (the cursor stops here).
     reportError({
       surface: 'recurring-processor',
       message: 'recurring-cascade-failed',
       severity: 'error',
       error: e,
-      context: { recur_surface: 'transaction', action: 'create' },
+      context: { recur_surface: 'transaction', action: 'create', consecutive_failures: failures },
     });
     return 'failed';
   }
@@ -450,9 +512,11 @@ export async function deduplicateRecurringTransactions(): Promise<number> {
   }
 
   // Delete duplicates (keep the earliest-created transaction per group). Each delete is the
-  // cascade (audit C7): a duplicate moved a balance (and a goal, and a loan) when it was
-  // generated, so sweeping the row alone left those movements in place.
+  // cascade in `dedup` mode (audit C7): with Counter writes on, both forks' movements survived
+  // the merge and the duplicate's are reversed; on the dormant build the forks' absolute writes
+  // collapsed into ONE, so the worker deletes the row only (reversing would undo the survivor).
   let deleted = 0;
+  let reversed = 0;
   let failed = 0;
   for (const entries of groups.values()) {
     if (entries.length <= 1) continue;
@@ -460,7 +524,11 @@ export async function deduplicateRecurringTransactions(): Promise<number> {
     entries.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     for (let i = 1; i < entries.length; i++) {
       try {
-        if ((await transactionRepo.deleteTransactionCascade(entries[i]!.id)).found) deleted++;
+        const res = await transactionRepo.deleteTransactionCascade(entries[i]!.id, {
+          dedup: true,
+        });
+        if (res.found) deleted++;
+        if (res.found && res.reversed) reversed++;
       } catch (e) {
         failed++;
         reportError({
@@ -483,6 +551,7 @@ export async function deduplicateRecurringTransactions(): Promise<number> {
       context: {
         recur_surface: 'transaction',
         action: failed > 0 ? 'partial' : 'complete',
+        detail: reversed > 0 ? 'reversed' : 'row-only',
         perf_entity_count: deleted,
       },
     });

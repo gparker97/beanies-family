@@ -1,7 +1,7 @@
 import { setActivePinia, createPinia } from 'pinia';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { GlobalSettings } from '@/types/models';
-import { saveNow } from '@/services/sync/syncService';
+import { saveNow, cancelPendingSave, triggerDebouncedSave } from '@/services/sync/syncService';
 import * as docClient from '@/services/automerge/worker/docClient';
 
 // ---------------------------------------------------------------------------
@@ -168,6 +168,14 @@ vi.mock('@/services/automerge/worker/docClient', () => ({
 
 // Sync service — uses shared auto-mock from __mocks__/syncService.ts
 vi.mock('@/services/sync/syncService');
+
+// Round 3: an untrusted sign-out whose person discarded the queued photos drops the queue
+// even when it keeps the database.
+const mockDeletePhotoQueueDatabase = vi.hoisted(() => vi.fn(async (_id: string) => {}));
+vi.mock('@/services/sync/photoUploadQueue', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/services/sync/photoUploadQueue')>()),
+  deletePhotoQueueDatabase: mockDeletePhotoQueueDatabase,
+}));
 
 // Spread the original rather than enumerating: `capabilities.ts` exports 14 functions,
 // and this graph reaches more of them than it used to. `reclaimAllPasskeys` now calls the
@@ -559,10 +567,25 @@ describe('Sensitive Data Clearing Security', () => {
       c6.sweptIds = ['family-orphan'];
       const { auth } = populateAllStores();
 
-      await expect(auth.signOutAndClearData()).resolves.toEqual({ cacheDeleted: true });
+      await expect(auth.signOutAndClearData({ scope: 'all' })).resolves.toEqual({
+        cacheDeleted: true,
+      });
 
       const forgotten = mockDeleteLocalFamily.mock.calls.map((c) => c[0]).sort();
       expect(forgotten).toEqual(['family-123', 'family-orphan', 'family-other']);
+    });
+
+    it('round 3: the DEFAULT scope deletes the active family only (delete-family, fatal, demo)', async () => {
+      c6.registryFamilies = [{ id: 'family-other', name: 'Other' }];
+      c6.sweptIds = ['family-orphan'];
+      const { auth } = populateAllStores();
+
+      await expect(auth.signOutAndClearData()).resolves.toEqual({ cacheDeleted: true });
+
+      expect(mockDeleteLocalFamily).not.toHaveBeenCalled();
+      // The confirmed clear also drops this family's photo queue (no keepPhotoQueue).
+      expect(mockDeleteFamilyDatabase).toHaveBeenCalledTimes(1);
+      expect(mockDeleteFamilyDatabase).toHaveBeenCalledWith('family-123');
     });
 
     it('reports NOT deleted when any one family kept its cache, and still forgets the rest', async () => {
@@ -572,7 +595,9 @@ describe('Sensitive Data Clearing Security', () => {
       );
       const { auth } = populateAllStores();
 
-      await expect(auth.signOutAndClearData()).resolves.toEqual({ cacheDeleted: false });
+      await expect(auth.signOutAndClearData({ scope: 'all' })).resolves.toEqual({
+        cacheDeleted: false,
+      });
       expect(mockDeleteLocalFamily).toHaveBeenCalledTimes(2);
       mockDeleteLocalFamily.mockImplementation(async (id: string) => mockDeleteFamilyDatabase(id));
     });
@@ -588,7 +613,9 @@ describe('Sensitive Data Clearing Security', () => {
       });
       const { auth } = populateAllStores();
 
-      await expect(auth.signOutAndClearData()).resolves.toEqual({ cacheDeleted: false });
+      await expect(auth.signOutAndClearData({ scope: 'all' })).resolves.toEqual({
+        cacheDeleted: false,
+      });
       expect(mockDeleteLocalFamily.mock.calls.map((c) => c[0])).toContain('family-ok');
       mockDeleteLocalFamily.mockImplementation(async (id: string) => mockDeleteFamilyDatabase(id));
     });
@@ -613,7 +640,7 @@ describe('Sensitive Data Clearing Security', () => {
       vi.mocked(docPushedAgainst).mockResolvedValue('clean');
     });
 
-    it('a clean sign-out clears a marker an earlier session left', async () => {
+    it('round 3: a clean measurement never CLEARS a marker (only the cache delete spends it)', async () => {
       const { docPushedAgainst } = await import('@/services/sync/syncService');
       vi.mocked(docPushedAgainst).mockResolvedValue('clean');
       c6.markers.add('family-123');
@@ -621,8 +648,29 @@ describe('Sensitive Data Clearing Security', () => {
       await settings.setTrustedDevice(true);
 
       await auth.signOut();
+      expect(c6.markers.has('family-123')).toBe(true);
 
-      expect(c6.markers.has('family-123')).toBe(false);
+      // The cleared-elsewhere tier measures too, and must not spend another tab's warning.
+      await auth.endSessionClearedElsewhere();
+      expect(c6.markers.has('family-123')).toBe(true);
+    });
+
+    it('round 3: a discarded photo queue is dropped on an untrusted sign-out', async () => {
+      const { auth } = populateAllStores();
+      await auth.signOut({ dropPhotoQueue: true });
+      expect(mockDeleteFamilyDatabase).toHaveBeenCalledWith('family-123');
+    });
+
+    it('round 3: ...even when the database is KEPT for unpushed work', async () => {
+      const { docPushedAgainst } = await import('@/services/sync/syncService');
+      vi.mocked(docPushedAgainst).mockResolvedValue('dirty');
+      const { auth } = populateAllStores();
+
+      await auth.signOut({ dropPhotoQueue: true });
+
+      expect(mockDeleteFamilyDatabase).not.toHaveBeenCalled();
+      expect(mockDeletePhotoQueueDatabase).toHaveBeenCalledWith('family-123');
+      vi.mocked(docPushedAgainst).mockResolvedValue('clean');
     });
   });
 
@@ -662,6 +710,29 @@ describe('Sensitive Data Clearing Security', () => {
       // The session is still live: the person may yet cancel.
       expect(auth.isAuthenticated).toBe(true);
       vi.mocked(docPushedAgainst).mockResolvedValue('clean');
+    });
+
+    it('round 3: the probe save never cancels the autosave afterwards, and re-arms one it displaced', async () => {
+      const { auth } = populateAllStores();
+      // A debounced save was pending, and the probe's save did not land.
+      vi.mocked(cancelPendingSave).mockReturnValueOnce(true);
+      vi.mocked(saveNow).mockResolvedValueOnce(false);
+
+      await auth.measureUnsavedWork({ save: true, scope: 'active' });
+
+      // One call: the "was a save pending?" question asked BEFORE the save.
+      expect(vi.mocked(cancelPendingSave)).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(triggerDebouncedSave)).toHaveBeenCalledTimes(1);
+    });
+
+    it('round 3: a probe save that landed does not re-arm', async () => {
+      const { auth } = populateAllStores();
+      vi.mocked(cancelPendingSave).mockReturnValueOnce(true);
+      vi.mocked(saveNow).mockResolvedValueOnce(true);
+
+      await auth.measureUnsavedWork({ save: true, scope: 'active' });
+
+      expect(vi.mocked(triggerDebouncedSave)).not.toHaveBeenCalled();
     });
   });
 

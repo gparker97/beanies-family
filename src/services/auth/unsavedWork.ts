@@ -95,6 +95,16 @@ export async function measureLiveFamily(familyId: string | null): Promise<Unsave
   };
 }
 
+/**
+ * The photo queue ALONE (round 3): an untrusted keep-data sign-out keeps the encrypted cache
+ * when it holds unpushed work (that is safe: ciphertext), but a queued photo is plaintext, so
+ * that sign-out asks about the queue only.
+ */
+export async function measurePhotoQueue(familyId: string): Promise<UnsavedWorkReport> {
+  const photos = await photoCount(familyId);
+  return { ...NOTHING_UNSAVED, photoUploads: photos.count, unknown: photos.unknown };
+}
+
 /** A family that is NOT open here: the marker a previous sign-out left, plus its photos. */
 export async function measureFamilyAtRest(familyId: string): Promise<UnsavedWorkReport> {
   const photos = await photoCount(familyId);

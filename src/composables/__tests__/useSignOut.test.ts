@@ -37,6 +37,12 @@ const h = vi.hoisted(() => ({
     remoteBlocked: false,
     unknown: false,
   })),
+  measureQueuedPhotoUploads: vi.fn(async () => ({
+    unsavedFamilies: 0,
+    photoUploads: 0,
+    remoteBlocked: false,
+    unknown: false,
+  })),
   confirm: vi.fn(async () => true),
 }));
 
@@ -52,6 +58,7 @@ vi.mock('@/stores/authStore', () => ({
     endSessionClearedElsewhere: h.endSessionClearedElsewhere,
     setDeviceTrust: h.setDeviceTrust,
     measureUnsavedWork: h.measureUnsavedWork,
+    measureQueuedPhotoUploads: h.measureQueuedPhotoUploads,
   }),
 }));
 vi.mock('@/composables/useConfirm', () => ({ confirm: h.confirm }));
@@ -118,6 +125,12 @@ beforeEach(() => {
     remoteBlocked: false,
     unknown: false,
   });
+  h.measureQueuedPhotoUploads.mockResolvedValue({
+    unsavedFamilies: 0,
+    photoUploads: 0,
+    remoteBlocked: false,
+    unknown: false,
+  });
   h.confirm.mockResolvedValue(true);
 });
 
@@ -137,6 +150,8 @@ describe('useSignOut clear tier: unsaved work (C6)', () => {
     expect(h.measureUnsavedWork).toHaveBeenCalledWith({ save: true, scope: 'all' });
     expect(h.confirm).not.toHaveBeenCalled(); // nothing at risk, nothing to ask
     expect(h.signOutAndClearData).toHaveBeenCalledTimes(1);
+    // Round 3: the menu clear is the ONE caller of the every-family sweep.
+    expect(h.signOutAndClearData).toHaveBeenCalledWith({ scope: 'all' });
   });
 
   it('keeping the changes cancels the clear and deletes nothing', async () => {
@@ -176,6 +191,62 @@ describe('useSignOut clear tier: unsaved work (C6)', () => {
     requestSignOut();
     await signOut('sign-out', { trust: true });
     expect(h.measureUnsavedWork).not.toHaveBeenCalled();
+  });
+});
+
+// Round 3: an untrusted keep-data sign-out never keeps queued (plaintext) photos silently.
+describe('useSignOut untrusted sign-out: queued photos', () => {
+  const photos = { unsavedFamilies: 0, photoUploads: 2, remoteBlocked: false, unknown: false };
+  // An untrusted sign-out drops key material, so the kit guard opens first.
+  const signOutUntrusted = () => {
+    const pending = useSignOut().signOut('sign-out', { trust: false });
+    useSignOutHost().resolveKitGuard('kit_saved');
+    return pending;
+  };
+
+  beforeEach(() => {
+    h.isTrustedDevice = false;
+  });
+
+  it('asks about the queue only; nothing queued signs out without a prompt, keeping it', async () => {
+    useSignOut().requestSignOut();
+    expect(await signOutUntrusted()).toBe('signed-out');
+    expect(h.measureQueuedPhotoUploads).toHaveBeenCalledTimes(1);
+    expect(h.measureUnsavedWork).not.toHaveBeenCalled();
+    expect(h.confirm).not.toHaveBeenCalled();
+    expect(h.signOut).toHaveBeenCalledWith({ dropPhotoQueue: false });
+  });
+
+  it('queued photos: discarding them signs out AND drops the queue', async () => {
+    h.measureQueuedPhotoUploads.mockResolvedValueOnce(photos);
+    useSignOut().requestSignOut();
+    expect(await signOutUntrusted()).toBe('signed-out');
+    expect(h.confirm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'auth.unsavedPhotosSignOutMessage',
+        detail: 'auth.unsavedPhotos.other',
+      })
+    );
+    expect(h.signOut).toHaveBeenCalledWith({ dropPhotoQueue: true });
+  });
+
+  it('queued photos: keeping them cancels the sign-out (stay signed in until they upload)', async () => {
+    h.measureQueuedPhotoUploads.mockResolvedValueOnce(photos);
+    h.confirm.mockResolvedValueOnce(false);
+    const { requestSignOut, phase } = useSignOut();
+    requestSignOut();
+    expect(await signOutUntrusted()).toBe('cancelled');
+    expect(h.signOut).not.toHaveBeenCalled();
+    expect(phase.value).toBe('idle');
+  });
+
+  it('a trusted sign-out keeps everything, so it never asks', async () => {
+    h.isTrustedDevice = true;
+    const { requestSignOut, signOut } = useSignOut();
+    requestSignOut();
+    expect(await signOut('sign-out', { trust: true })).toBe('signed-out');
+    expect(h.measureQueuedPhotoUploads).not.toHaveBeenCalled();
+    expect(h.signOut).toHaveBeenCalledWith({ dropPhotoQueue: false });
   });
 });
 

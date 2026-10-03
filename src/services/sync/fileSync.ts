@@ -27,14 +27,16 @@ const COMPACTED_VERSION: BeanpodVersion = '5.0';
 const LEGACY_VERSION: BeanpodVersion = '4.0';
 
 /**
- * A pod holding Counter keys or a fold ledger (#117). READ-ONLY in this build — the reader
- * half of the flip gate, shipped a release AHEAD of any writer (the ADR-036 pattern, as 5.0
- * was): the flip release derives 6.0 from "the document holds Counter keys or a fold
- * ledger", so a build older than THIS one refuses such a file instead of merging Counter
- * operations it cannot interpret, while this build can already open what the flip writes.
+ * A pod holding Counter keys or a fold ledger (#117): the reader half of the flip gate,
+ * shipped a release AHEAD of any Counter writer (the ADR-036 pattern, as 5.0 was), so a build
+ * older than this one refuses such a file instead of merging Counter operations it cannot
+ * interpret.
  *
- * ⚠️ NO WRITER. `beanpodVersionFor` must not return this until the flip itself, and the
- * derivation must stay a pure function of the document (never carried on the envelope).
+ * Round 3: DERIVED NOW, not at the flip. `beanpodVersionFor` returns it whenever the document
+ * holds Counter keys or a fold ledger (`ExportedPayload.hasCounters`). This build never
+ * creates either (`COUNTER_WRITES_ENABLED` is off), so the label only PRESERVES what a flip
+ * build wrote: re-saving such a pod here must not relabel it 5.0/4.0 and let an older build
+ * merge it. Still a pure function of the document, never carried on the envelope.
  */
 const COUNTER_VERSION: BeanpodVersion = '6.0';
 
@@ -77,8 +79,10 @@ const KNOWN_BEANPOD_VERSIONS: ReadonlySet<string> = new Set<BeanpodVersion>([
  */
 export function beanpodVersionFor(
   lineage: PodLineage | null,
-  opts?: { compactionBackup?: true }
+  opts?: { compactionBackup?: true; hasCounters?: boolean }
 ): BeanpodVersion {
+  // The highest version the payload needs: Counters (6.0) outrank a lineage or backup (5.0).
+  if (opts?.hasCounters) return COUNTER_VERSION;
   return lineage || opts?.compactionBackup ? COMPACTED_VERSION : LEGACY_VERSION;
 }
 
@@ -481,7 +485,8 @@ export function reEncryptEnvelope(
    * `beanpodVersionFor`.
    */
   lineage: PodLineage | null,
-  opts?: { compactionBackup?: true }
+  /** `hasCounters`: from the same `exportEncryptedPayload` as `encryptedPayload` (6.0). */
+  opts?: { compactionBackup?: true; hasCounters?: boolean }
 ): string {
   // ADR-032: `encryptedPayload` comes from docClient.exportEncryptedPayload().
   // Re-stamp writerVersion so the re-written file reflects the version that re-wrote

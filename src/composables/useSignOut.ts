@@ -30,8 +30,8 @@
  */
 import { ref, readonly } from 'vue';
 import router from '@/router';
-import { hasUnsavedWork } from '@/services/auth/unsavedWork';
-import { confirmDiscardUnsavedWork } from '@/composables/useDiscardUnsavedWork';
+import { hasUnsavedWork, type UnsavedWorkReport } from '@/services/auth/unsavedWork';
+import { confirmDiscardUnsavedWork, type DiscardSite } from '@/composables/useDiscardUnsavedWork';
 import { setSessionEndedHandler } from '@/services/auth/sessionChannel';
 
 // Re-exported: the clear tier's callers already import from here.
@@ -205,12 +205,15 @@ function failSignOut(error: unknown, kind: SignOutTier | 'cleared-elsewhere'): v
   showToast('error', useTranslationStore().t('auth.signOutFailed'), undefined, { silent: true });
 }
 
-async function runTeardown(tier: SignOutTier): Promise<void> {
+async function runTeardown(tier: SignOutTier, opts: { dropPhotoQueue: boolean }): Promise<void> {
   const authStore = useAuthStore();
   // BOTH tiers can delete the cache: clear-data always, and an ordinary sign-out on an
-  // untrusted device (`SIGN_OUT_UNTRUSTED_STEPS` runs `deleteFamilyDb`).
+  // untrusted device (`SIGN_OUT_UNTRUSTED_STEPS` runs `deleteFamilyDb`). The menu's clear is
+  // the ONE caller of the every-family sweep (round 3): it measured every family first.
   const { cacheDeleted } =
-    tier === 'clear' ? await authStore.signOutAndClearData() : await authStore.signOut();
+    tier === 'clear'
+      ? await authStore.signOutAndClearData({ scope: 'all' })
+      : await authStore.signOut({ dropPhotoQueue: opts.dropPhotoQueue });
   // `null` (no delete attempted, e.g. a trusted sign-out) is not "kept"; only a delete
   // that ran and did not finish is. COUNTED before the route, so a navigation that
   // throws cannot lose it; SHOWN after, so it is read on the login screen.
@@ -229,8 +232,39 @@ function signOut(tier: SignOutTier, opts: { trust: boolean }): Promise<SignOutRe
   return trackLeaving(runSignOut(tier, opts));
 }
 
+/**
+ * Ask the person before a delete that would lose something (C6, round 3). `measure` runs
+ * first; when it finds nothing at risk this resolves `'clean'` without a prompt. Otherwise the
+ * phase parks on 'unsaved' while the shared confirm is open: `'discard'` = discard chosen,
+ * `'keep'` = they kept it (the sign-out does not run), `'superseded'` = another tab ended
+ * this session meanwhile and its teardown owns the phase now.
+ */
+async function askBeforeDiscard(
+  measure: () => Promise<UnsavedWorkReport>,
+  site: DiscardSite
+): Promise<'clean' | 'discard' | 'keep' | 'superseded'> {
+  const report = await measure();
+  if (!hasUnsavedWork(report)) return 'clean';
+  phase.value = 'unsaved';
+  const discard = await confirmDiscardUnsavedWork(report, site);
+  if (phase.value !== 'unsaved') return 'superseded';
+  if (!discard) return 'keep';
+  phase.value = 'signing-out';
+  return 'discard';
+}
+
+/**
+ * Will this keep-data sign-out run the UNTRUSTED steps? The tick decides, except in the App
+ * Review demo, whose tick is never applied (`applyTrustTick`).
+ */
+function endsUntrusted(tier: SignOutTier, trust: boolean): boolean {
+  if (tier !== 'sign-out') return false;
+  return !(isDemoSession.value ? useSettingsStore().isTrustedDevice : trust);
+}
+
 async function runSignOut(tier: SignOutTier, opts: { trust: boolean }): Promise<SignOutResult> {
   let supersededWhileAsking = false;
+  let dropPhotoQueue = false;
   try {
     // Synchronous, before any await: a second tap now fails the check above.
     const guard = evaluateKitGuard(tier, opts.trust);
@@ -241,24 +275,29 @@ async function runSignOut(tier: SignOutTier, opts: { trust: boolean }): Promise<
       if (outcome === 'cancelled' || outcome === 'superseded') return 'cancelled';
       phase.value = 'signing-out';
     }
-    if (tier === 'clear') {
-      // C6: "save first" (one bounded save inside the probe), then the person decides.
-      const report = await useAuthStore().measureUnsavedWork({ save: true, scope: 'all' });
-      if (hasUnsavedWork(report)) {
-        phase.value = 'unsaved';
-        const discard = await confirmDiscardUnsavedWork(report, 'sign-out-clear');
-        // Another tab ended this session while the confirm was open (#100): its teardown
-        // owns the phase now, so leave without touching it.
-        if (phase.value !== 'unsaved') {
-          supersededWhileAsking = true;
-          return 'cancelled';
-        }
-        if (!discard) return 'cancelled';
-        phase.value = 'signing-out';
+    // C6: the clear tier "saves first" (one bounded save inside the probe) and asks about
+    // every family. Round 3: an UNTRUSTED keep-data sign-out keeps the encrypted cache when
+    // it holds unpushed work, but a queued photo is plaintext, so it asks about the queue and
+    // never keeps it silently: discard drops it, keep cancels the sign-out.
+    const ask =
+      tier === 'clear'
+        ? () => useAuthStore().measureUnsavedWork({ save: true, scope: 'all' })
+        : endsUntrusted(tier, opts.trust)
+          ? () => useAuthStore().measureQueuedPhotoUploads()
+          : null;
+    if (ask) {
+      const answer = await askBeforeDiscard(ask, tier === 'clear' ? 'sign-out-clear' : 'sign-out');
+      if (answer === 'superseded') {
+        supersededWhileAsking = true;
+        return 'cancelled';
       }
+      if (answer === 'keep') return 'cancelled';
+      // Only an explicit discard drops the queue: a photo queued after a clean measurement
+      // must never go without being asked about.
+      dropPhotoQueue = tier === 'sign-out' && answer === 'discard';
     }
     if (!(await applyTrustTick(tier, opts.trust))) return 'failed';
-    await runTeardown(tier);
+    await runTeardown(tier, { dropPhotoQueue });
     return 'signed-out';
   } catch (error) {
     failSignOut(error, tier);

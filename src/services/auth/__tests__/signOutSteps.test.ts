@@ -10,6 +10,7 @@ vi.mock('@/utils/errorReporter', () => ({ reportError: vi.fn() }));
 
 import {
   KEY_MATERIAL_STEPS,
+  SIGN_OUT_CLEAR_ACTIVE_STEPS,
   SIGN_OUT_CLEAR_STEPS,
   SIGN_OUT_CLEARED_ELSEWHERE_STEPS,
   SIGN_OUT_EVICTED_STEPS,
@@ -27,6 +28,21 @@ describe('signOutStepsFor', () => {
     expect(signOutStepsFor('sign-out', false)).toBe(SIGN_OUT_UNTRUSTED_STEPS);
     expect(signOutStepsFor('clear', true)).toBe(SIGN_OUT_CLEAR_STEPS);
     expect(signOutStepsFor('clear', false)).toBe(SIGN_OUT_CLEAR_STEPS);
+    expect(signOutStepsFor('clear', false, 'active')).toBe(SIGN_OUT_CLEAR_ACTIVE_STEPS);
+  });
+});
+
+describe('round 3: only the menu clear sweeps every family', () => {
+  it('the active-scope clear deletes the active family only, otherwise the same teardown', () => {
+    expect(SIGN_OUT_CLEAR_ACTIVE_STEPS).toContain('deleteFamilyDb');
+    expect(SIGN_OUT_CLEAR_ACTIVE_STEPS).not.toContain('deleteAllLocalFamilies');
+    expect(SIGN_OUT_CLEAR_ACTIVE_STEPS.filter((s) => s !== 'deleteFamilyDb')).toEqual(
+      SIGN_OUT_CLEAR_STEPS.filter((s) => s !== 'deleteAllLocalFamilies')
+    );
+    expect(SIGN_OUT_CLEAR_ACTIVE_STEPS.indexOf('deleteFamilyDb')).toBe(
+      SIGN_OUT_CLEAR_STEPS.indexOf('deleteAllLocalFamilies')
+    );
+    expect(dropsKeyMaterial(SIGN_OUT_CLEAR_ACTIVE_STEPS)).toBe(true);
   });
 });
 
@@ -97,12 +113,11 @@ describe('C6: tier 3 forgets EVERY family, not only the active one', () => {
 });
 
 describe('C10: every non-trusted tier tells the other tabs the session ended', () => {
-  it('untrusted, clear and both eviction tiers announce, AFTER any delete attempt', () => {
+  it('untrusted and both clear tiers announce, AFTER any delete attempt', () => {
     for (const steps of [
       SIGN_OUT_UNTRUSTED_STEPS,
       SIGN_OUT_CLEAR_STEPS,
-      SIGN_OUT_EVICTION_LOCK_STEPS,
-      SIGN_OUT_EVICTED_STEPS,
+      SIGN_OUT_CLEAR_ACTIVE_STEPS,
     ]) {
       expect(steps).toContain('announceSessionEnded');
     }
@@ -116,6 +131,11 @@ describe('C10: every non-trusted tier tells the other tabs the session ended', (
 
   it('a trusted sign-out keeps the device signed in elsewhere, so it never announces', () => {
     expect(SIGN_OUT_TRUSTED_STEPS).not.toContain('announceSessionEnded');
+  });
+
+  it('an eviction never announces: the remaining members keep their tabs (round 3)', () => {
+    expect(SIGN_OUT_EVICTION_LOCK_STEPS).not.toContain('announceSessionEnded');
+    expect(SIGN_OUT_EVICTED_STEPS).not.toContain('announceSessionEnded');
   });
 });
 

@@ -291,3 +291,65 @@ describe('the recovery-kit sign-in binds identity too (the owner-with-no-permiss
     expect(fn).not.toContain('familyStore.setCurrentMember(');
   });
 });
+
+describe('round 3, item 1: a cross-family decrypt that fails past its key swap restores the previous family', () => {
+  const KEY_A = { id: 'key-a' } as unknown as CryptoKey;
+
+  async function failingCrossFamilyDecrypt() {
+    const docClient = await import('@/services/automerge/worker/docClient');
+    const syncService = await import('@/services/sync/syncService');
+    const release = vi.fn();
+    vi.mocked(syncService.holdSaves).mockReturnValueOnce(release);
+    // The merge of the OTHER family's file fails after its key was posted.
+    vi.mocked(docClient.mergeRemoteEnvelope).mockRejectedValueOnce(new Error('merge boom'));
+    const sync = useSyncStore();
+    sync.familyKey = KEY_A;
+    sync.isConfigured = true;
+    sync.pendingEncryptedFile = { envelope: OTHER_FAMILY_ENVELOPE, provider: localProvider() };
+    const result = await sync.decryptPendingFile('pw', { userChoseThisFile: true });
+    return { docClient, syncService, release, result, sync };
+  }
+
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+    memberIds.value = ['m-new'];
+    providerType.value = 'local';
+    providerFamilyId.value = 'fam-old';
+  });
+
+  it('waits for in-flight sync work, swaps, then puts family A back BEFORE the hold releases', async () => {
+    const { docClient, syncService, release, result, sync } = await failingCrossFamilyDecrypt();
+    expect(result.success).toBe(false);
+    const keyPosts = vi.mocked(docClient.setFamilyKey).mock.calls.map((c) => c[1]);
+    expect(keyPosts).toEqual(['fam-new', 'fam-old']);
+    expect(vi.mocked(syncService.whenIdle).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(docClient.setFamilyKey).mock.invocationCallOrder[0]!
+    );
+    expect(vi.mocked(docClient.initAndLoadCache).mock.calls.at(-1)).toEqual(['fam-old']);
+    expect(release).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(docClient.initAndLoadCache).mock.invocationCallOrder.at(-1)).toBeLessThan(
+      release.mock.invocationCallOrder[0]!
+    );
+    expect(sync.familyKey).toBe(KEY_A);
+  });
+
+  it('a restore that cannot reload family A keeps the hold latched and raises the fatal overlay', async () => {
+    const docClient = await import('@/services/automerge/worker/docClient');
+    vi.mocked(docClient.initAndLoadCache)
+      .mockResolvedValueOnce({ loaded: true, remoteBaseline: null }) // family B's cache
+      .mockResolvedValueOnce({ loaded: false, remoteBaseline: null }); // family A's: a miss
+    const { release, result } = await failingCrossFamilyDecrypt();
+    expect(result.success).toBe(false);
+    expect(release).not.toHaveBeenCalled();
+    const { useFatalErrorStore } = await import('@/stores/fatalErrorStore');
+    expect(useFatalErrorStore().message).not.toBeNull();
+    const { reportError } = await import('@/utils/errorReporter');
+    expect(reportError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        severity: 'critical',
+        context: expect.objectContaining({ action: 'cross-family-restore-failed' }),
+      })
+    );
+  });
+});

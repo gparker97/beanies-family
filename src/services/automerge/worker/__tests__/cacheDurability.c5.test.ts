@@ -59,6 +59,16 @@ async function incKeys(): Promise<string[]> {
   }
 }
 
+/** Every row key on disk. */
+async function allKeys(): Promise<string[]> {
+  const raw = await openDB(DB_NAME, 1);
+  try {
+    return (await raw.getAllKeys('doc')) as string[];
+  } finally {
+    raw.close();
+  }
+}
+
 /** Write a row as ANOTHER TAB would: its own realm suffix, a change made on its own fork. */
 async function writeForeignRow(seq: number, fork: Doc, since: string[]): Promise<string> {
   const id = `inc:${String(seq).padStart(12, '0')}:othertab`;
@@ -144,8 +154,9 @@ describe('C5c: replay continues past a bad row and never rewrites the base over 
     expect(todoIds(exportSnapshot().binary)).toEqual(['a', 'b']);
     await flush(); // the recovery base write
     // Our own row is folded into the new base; the unreadable one is kept for a build or key
-    // that can read it.
-    expect(await incKeys()).toEqual(['inc:000000000500:othertab']);
+    // that can read it, QUARANTINED out of replay (round 3) so it is not re-tried every open.
+    expect(await incKeys()).toEqual([]);
+    expect(await allKeys()).toContain('qinc:000000000500:othertab');
   });
 });
 

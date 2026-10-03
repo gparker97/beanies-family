@@ -3896,6 +3896,11 @@ const STRING_DEFS = {
     beanie:
       'this device still holds changes for this family that never reached its family data file. forgetting the family here deletes them for good. keep them, then open the family on this device and let it save first.',
   },
+  'auth.unsavedPhotosSignOutMessage': {
+    en: 'Photos you added on this device are still waiting to upload. Signing out on a device that isn\u2019t trusted deletes them for good. Keep them and stay signed in until they upload, or discard them and sign out.',
+    beanie:
+      'photos you added on this device are still waiting to upload. signing out on a device that isn\u2019t trusted deletes them for good. keep them and stay signed in until they upload, or discard them and sign out.',
+  },
   'auth.unsavedFamilies.one': {
     en: 'Unsaved changes for 1 family.',
     beanie: 'unsaved changes for 1 family.',

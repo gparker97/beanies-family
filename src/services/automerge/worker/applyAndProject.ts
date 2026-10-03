@@ -282,6 +282,13 @@ let baseFence = false;
  * pending persist may be flushed into the open cache.
  */
 let docFamilyId: string | null = null;
+/**
+ * The family the installed `familyKey` belongs to, as `setKey` was told (round 3). `null` when
+ * unknown (an older caller, an empty id). Read by `familyMismatch`: a persist or an export
+ * refuses when the live document is not the key's family, so a key swapped in for another
+ * family can never encrypt this document into anything.
+ */
+let keyFamilyId: string | null = null;
 
 /** How long a teardown or a cache re-point waits for an in-flight persist (C5f/g). */
 const SETTLE_TIMEOUT_MS = 5_000;
@@ -338,6 +345,34 @@ async function settlePersists(flushPending: boolean): Promise<void> {
 /** Is the open cache this document's own family's? Only then may a pending persist be flushed. */
 function docOwnsOpenCache(): boolean {
   return currentDoc !== null && docFamilyId !== null && docFamilyId === cache.cacheFamilyId();
+}
+
+/**
+ * Round 3 (defence in depth for the cross-family decrypt): which family fact disagrees with the
+ * live document's, or `null` when nothing does. Unknown values never disagree, so a realm that
+ * was never told a family behaves exactly as before.
+ *  - `key`: the installed key is another family's (`setKey` swapped it in for a decrypt).
+ *  - `cache`: the open cache is another family's (a cross-family load that has not installed
+ *    its document yet).
+ */
+function familyMismatch(): 'key' | 'cache' | null {
+  if (docFamilyId === null) return null;
+  if (keyFamilyId !== null && keyFamilyId !== docFamilyId) return 'key';
+  const open = cache.cacheFamilyId();
+  if (open !== null && open !== docFamilyId) return 'cache';
+  return null;
+}
+
+/** The classified refusal `familyMismatch` raises. Name literal: the prod build minifies. */
+export class FamilyKeyMismatchError extends Error {
+  readonly mismatch: 'key' | 'cache';
+  constructor(op: string, mismatch: 'key' | 'cache') {
+    super(
+      `refused ${op}: the live document is not the ${mismatch === 'key' ? 'key' : 'open cache'}'s family`
+    );
+    this.name = 'FamilyKeyMismatchError';
+    this.mismatch = mismatch;
+  }
 }
 
 /**
@@ -438,6 +473,11 @@ function enqueueSnapshotPersist(): Promise<void> {
  * Drive remain durable, so a missing snapshot only costs a slow next open. */
 async function persistSnapshotOnce(): Promise<void> {
   if (!currentDoc || !familyKey || !cache.isCacheReady()) return;
+  // Round 3: display-only, so a refusal is console-only; it never crosses a family.
+  if (familyMismatch()) {
+    console.warn('[applyAndProject] projection snapshot skipped: family mismatch');
+    return;
+  }
   const doc = currentDoc;
   const key = familyKey;
   const gen = docGeneration;
@@ -621,6 +661,17 @@ async function writeBase(key: CryptoKey, doc: Doc, gen: number, supersede: boole
  */
 async function persistOnce(): Promise<void> {
   if (!currentDoc || !familyKey || !cache.isCacheReady()) return;
+  // Round 3: never encrypt this document under another family's key, or into another family's
+  // cache. Nothing is written and the cursor does not move, so the next persist under the
+  // right key re-captures the same delta. Surfaced through the durability signal (the
+  // worker's only telemetered channel), classified by name.
+  const mismatch = familyMismatch();
+  if (mismatch) {
+    const refusal = new FamilyKeyMismatchError('cache persist', mismatch);
+    console.error('[applyAndProject]', refusal.message);
+    raiseCachePersistFailure('increment', refusal.name);
+    return;
+  }
   const doc = currentDoc;
   const key = familyKey;
   const gen = docGeneration;
@@ -775,8 +826,20 @@ function requireKey(method: string): CryptoKey {
  * `CryptoKey` arm is still live and is NOT dead code: inline mode hands the key over directly
  * with no clone in the way, and it is also the fallback when a key cannot be exported.
  */
-export async function setKey(key: CryptoKey | Uint8Array): Promise<void> {
-  familyKey = key instanceof Uint8Array ? await importFamilyKey(key) : key;
+export async function setKey(key: CryptoKey | Uint8Array, familyId?: string | null): Promise<void> {
+  const next = key instanceof Uint8Array ? await importFamilyKey(key) : key;
+  const nextFamily = familyId || null;
+  // Round 3: a key for ANOTHER family than the live document's. Whatever the debounce still
+  // holds for that document is settled under the key it was written for, BEFORE the swap
+  // (bounded), and only when that key and the open cache are the document's own; otherwise the
+  // pending work is cancelled, never flushed across the change. The snapshot timer is cancelled
+  // with it. A same-family re-post (respawn, rotation) changes nothing here.
+  if (familyKey && docFamilyId !== null && nextFamily !== null && nextFamily !== docFamilyId) {
+    const keyIsDocs = keyFamilyId === null || keyFamilyId === docFamilyId;
+    await settlePersists(keyIsDocs && docOwnsOpenCache());
+  }
+  familyKey = next;
+  keyFamilyId = nextFamily;
 }
 
 /**
@@ -831,6 +894,25 @@ export async function openCache(id: string): Promise<{ loaded: false }> {
   // a baseline row may exist ONLY alongside a cache that was actually loaded.
   await cache.clearRemoteBaseline().catch(() => {});
   return { loaded: false };
+}
+
+/**
+ * Round 3 (C5a): the person chose the family file after this device's cache could not be read
+ * (`something-to-lose` at the load stage, overridden by `chosenByUser`). The remote is now the
+ * live document; this deletes the unreadable cache and re-seeds it from that document, so the
+ * session is not left cache-less (a cold load-stage failure CLOSED the handle). Only for the
+ * live document's own family. Never throws: a blocked delete answers `false` and is reported
+ * through the durability signal by `reseedCacheAfterCorruption`.
+ */
+export async function reseedCacheFromLiveDoc(id: string): Promise<{ reseeded: boolean }> {
+  if (!currentDoc || docFamilyId !== id) return { reseeded: false };
+  await settlePersists(false); // nothing may land in the handle the delete is about to close
+  if (!(await reseedCacheAfterCorruption(id)) || !cache.isCacheReady()) return { reseeded: false };
+  resetDocCursors(); // a new generation: the next persist is a superseding base
+  docFamilyId = id;
+  void enqueuePersist();
+  scheduleSnapshotPersist();
+  return { reseeded: true };
 }
 
 export async function initAndLoadCache(id: string): Promise<InitAndLoadResult> {
@@ -891,7 +973,19 @@ export async function initAndLoadCache(id: string): Promise<InitAndLoadResult> {
     droppedIncrements: loaded.droppedIncrements,
     missingDeps: loaded.missingDeps,
     incrementCount: loaded.incrementCount,
+    ...(loaded.quarantined ? { quarantined: loaded.quarantined } : {}),
+    ...(loaded.newlyReported !== undefined ? { newlyReported: loaded.newlyReported } : {}),
   };
+  // Round 3: the missing-deps fence is not forever. Rows still waiting after
+  // FENCE_GIVE_UP_OPENS consecutive opens will not get their deps from this device: quarantine
+  // them (kept on disk, out of replay) and let the base be rewritten. Main logs the decision.
+  const fenceGaveUp = await fenceGiveUp(loaded.missingDeps);
+  if (fenceGaveUp) {
+    replay.fenceGaveUp = true;
+    // `Automerge.save` KEEPS a buffered change, so a base written from this document would
+    // carry the missing deps into every later open. Rebuild it from its applied history only.
+    loaded = { ...loaded, doc: withoutQueuedChanges(loaded.doc) };
+  }
   // C-5/C16: a recovered cache no longer holds the doc state the baseline row describes.
   // DELETE it — returning null alone would leave it on disk to mislead the next open into
   // skipping a read it must do. Read on every other path in the same round-trip as the cache.
@@ -900,6 +994,24 @@ export async function initAndLoadCache(id: string): Promise<InitAndLoadResult> {
     await cache.clearRemoteBaseline().catch(() => {});
     return null;
   };
+
+  if (live && !sameLineage(docLineage(loaded.doc), docLineage(currentDoc!))) {
+    // Round 3: the cache is ANOTHER LINEAGE than the live document (a compaction, rebase or
+    // restore installed a new generation and its superseding base never landed). Merging the
+    // two would graft the old history back onto the new one, which is the cross-lineage merge
+    // the lineage guard exists to refuse. The live document is the truth: keep it, and make
+    // the next base write SUPERSEDE the stale cache. The baseline row describes the cache's
+    // document, not ours, so it goes too.
+    resetDocCursors();
+    docFamilyId = id;
+    await cache.clearRemoteBaseline().catch(() => {});
+    void enqueuePersist();
+    return {
+      loaded: true,
+      remoteBaseline: null,
+      replay: { ...replay, lineageStale: true },
+    };
+  }
 
   if (live) {
     // C5e: MERGE. `mergeDocs` keeps the live document's actor and history and adds whatever
@@ -916,7 +1028,9 @@ export async function initAndLoadCache(id: string): Promise<InitAndLoadResult> {
     lastPersistedHeads = cacheHeads;
     lastSnapshotHeads = null;
     baseSupersedes = false;
-    baseFence = loaded.missingDeps > 0;
+    baseFence = loaded.missingDeps > 0 && !fenceGaveUp;
+    // A given-up fence rewrites the base (non-superseding: the waiting rows are already out).
+    if (fenceGaveUp) lastPersistedHeads = null;
     const doc = currentDoc;
     pushDeltas(projectionDeltasBetween(doc, localHeads, merged.heads) ?? buildFullProjection(doc));
     schedulePersist();
@@ -936,7 +1050,7 @@ export async function initAndLoadCache(id: string): Promise<InitAndLoadResult> {
   baseSupersedes = false; // this IS the cache's document: a base write keeps what it lacks
   baseFence = false;
   docFamilyId = id;
-  if (loaded.missingDeps > 0) {
+  if (loaded.missingDeps > 0 && !fenceGaveUp) {
     // C5c: the replay buffered changes whose deps are absent. They stay on disk (their rows
     // are not `contained`), and the base is NEVER rewritten while the document depends on
     // them: increments only, from the heads the cache provably holds.
@@ -972,6 +1086,46 @@ export async function initAndLoadCache(id: string): Promise<InitAndLoadResult> {
   return { loaded: true, remoteBaseline: await baselineFor(), replay };
 }
 
+/** `doc` without the changes it buffered for missing deps: its applied history, re-applied. */
+function withoutQueuedChanges(doc: Doc): Doc {
+  return applyChangesOp(Automerge.init<FamilyDocument>(docInitOpts()), Automerge.getAllChanges(doc))
+    .doc;
+}
+
+/** Consecutive opens a missing-deps fence may hold before it gives up (round 3). */
+const FENCE_GIVE_UP_OPENS = 3;
+/** Consecutive unproven BASE decrypt failures before the cache is re-seeded (round 3, C5a). */
+const BASE_DECRYPT_RESEED_OPENS = 3;
+
+/**
+ * Count this open against the missing-deps fence and decide whether it gives up (round 3).
+ * A clean replay resets the run. Every IndexedDB step is best-effort: a failed count keeps the
+ * fence (today's behaviour), never gives up early.
+ */
+async function fenceGiveUp(missingDeps: number): Promise<boolean> {
+  if (missingDeps === 0) {
+    await cache.clearMetaCounter('fence-opens').catch(() => {});
+    return false;
+  }
+  const opens = await cache.bumpMetaCounter('fence-opens').catch(() => 0);
+  if (opens < FENCE_GIVE_UP_OPENS) return false;
+  try {
+    await cache.quarantinePendingRows();
+  } catch (e) {
+    console.warn('[applyAndProject] fence give-up: could not quarantine the waiting rows', e);
+    return false; // keep fencing: the base must not be rewritten over rows still in replay
+  }
+  await cache.clearMetaCounter('fence-opens').catch(() => {});
+  console.warn(`[applyAndProject] missing-deps fence gave up after ${opens} opens`);
+  return true;
+}
+
+/** Same compaction generation: both never-compacted, or the same lineage id at the same seq. */
+function sameLineage(a: CompactionLineage | null, b: CompactionLineage | null): boolean {
+  if (!a || !b) return !a && !b;
+  return a.id === b.id && a.seq === b.seq;
+}
+
 const emptyReplay = (): CacheReplay => ({
   recovered: false,
   droppedIncrements: 0,
@@ -996,15 +1150,22 @@ const emptyReplay = (): CacheReplay => ({
 async function loadFailed(e: unknown, id: string, live: boolean): Promise<InitAndLoadResult> {
   const name = e instanceof Error ? e.name : 'UnknownError';
   const proven = isProvenCorrupt(e);
+  // Round 3 (C5a): an UNPROVEN base decrypt failure that keeps recurring is treated as proven.
+  const repeated = !proven && (await repeatedBaseDecryptFailure(e));
   if (live) {
-    if (proven && (await reseedCacheAfterCorruption(id))) {
+    if ((proven || repeated) && (await reseedCacheAfterCorruption(id))) {
       resetDocCursors(); // the next persist writes the live document as the new base
       docFamilyId = id;
       void enqueuePersist();
       return {
         loaded: true,
         remoteBaseline: null,
-        replay: { ...emptyReplay(), recovered: true, corruptBaseReplaced: true },
+        replay: {
+          ...emptyReplay(),
+          recovered: true,
+          corruptBaseReplaced: true,
+          ...(repeated ? { baseReseeded: 'repeated-decrypt-failure' as const } : {}),
+        },
       };
     }
     if (e instanceof PayloadLoadError && e.deviceCannotOpen) throw e;
@@ -1027,9 +1188,30 @@ async function loadFailed(e: unknown, id: string, live: boolean): Promise<InitAn
   // could not allocate enough to inflate them. Rethrown unwrapped (`deviceCannotOpen` is what
   // main dead-ends on); the handle stays open exactly as before.
   if (e instanceof PayloadLoadError && e.deviceCannotOpen) throw e;
+  // Round 3 (C5a): the base has refused this key on BASE_DECRYPT_RESEED_OPENS consecutive
+  // opens. Keeping it protects nothing this device can ever read, and keeping it ran every
+  // session cache-less. The document was dropped above, so once the delete lands there is
+  // nothing local to lose: say so, and main installs the remote into a fresh cache. The cause
+  // names the decision, and main logs it (`pod-open-degrade`, `error_code`).
+  if (repeated && (await reseedCacheAfterCorruption(id))) {
+    throw new CacheInitError('load', 'nothing-to-lose', 'BaseDecryptRepeated');
+  }
   cache.closeCacheDB();
   raiseCachePersistFailure('open', name);
   throw new CacheInitError('load', 'something-to-lose', name);
+}
+
+/**
+ * Round 3 (C5a): count an unproven BASE decrypt failure (`keyMayBeWrong`: the only decrypt step
+ * a load can raise is the base's) and answer whether the run reached the reseed threshold. A
+ * successful base decrypt resets the run (`cache.loadCachedDoc`). A failed count never reseeds.
+ */
+async function repeatedBaseDecryptFailure(e: unknown): Promise<boolean> {
+  if (!(e instanceof PayloadLoadError) || e.step !== 'decrypt' || !e.keyMayBeWrong) return false;
+  const n = await cache.bumpMetaCounter('base-decrypt-failures').catch(() => 0);
+  if (n < BASE_DECRYPT_RESEED_OPENS) return false;
+  console.warn(`[applyAndProject] cache base would not decrypt on ${n} opens; re-seeding`);
+  return true;
 }
 
 /** Compare two Automerge heads (deterministic sorted change-hash arrays). */
@@ -1743,13 +1925,34 @@ export async function readDriveConnections(
 export async function exportEncryptedPayload(): Promise<ExportedPayload> {
   const doc = requireDoc('exportEncryptedPayload');
   const key = requireKey('exportEncryptedPayload');
+  // Round 3: the bytes this returns are uploaded to the file main has bound. A document that is
+  // not the key's (or the open cache's) family must never leave as a payload.
+  const mismatch = familyMismatch();
+  if (mismatch) {
+    const refusal = new FamilyKeyMismatchError('export', mismatch);
+    console.error('[applyAndProject]', refusal.message);
+    throw refusal;
+  }
   const heads = headsOf(doc);
   // Read from the SAME `doc` const the heads come from, so the lineage
   // describes exactly the bytes being exported. Main derives the envelope
   // version from it (`beanpodVersionFor`); it is never carried on the envelope.
   const lineage = docLineage(doc);
   const payload = await time2('automerge.save', () => encryptDocPayload(doc, key));
-  return { payload, heads, lineage };
+  return { payload, heads, lineage, hasCounters: docHasCounters(doc) };
+}
+
+/**
+ * Does the document hold Counter keys or a fold ledger (#117)? Read from the same `doc` as the
+ * payload, so main's `beanpodVersionFor` labels exactly these bytes. This build never creates
+ * Counter keys (`COUNTER_WRITES_ENABLED` is off); the label only PRESERVES the 6.0 a flip build
+ * wrote, so an older build keeps refusing the file after this one re-saves it.
+ */
+function docHasCounters(doc: Doc): boolean {
+  const d = doc as { counterDeltas?: object; foldedCounters?: object };
+  return (
+    Object.keys(d.counterDeltas ?? {}).length > 0 || Object.keys(d.foldedCounters ?? {}).length > 0
+  );
 }
 
 // ─── Change-aware transport (Plan B — incremental delta sync) ────────────────
@@ -1848,6 +2051,7 @@ function teardownRealm(): void {
   cache.closeCacheDB();
   currentDoc = null;
   familyKey = null;
+  keyFamilyId = null;
   docFamilyId = null;
   cachePersistFailed = false;
   // One lifetime, not two: the actor is retained beside the key and dies with it.
@@ -1911,6 +2115,8 @@ export function compactDoc(): {
   changesBefore: number;
   changesAfter: number;
   actorsBefore: number;
+  /** Round 3: the installed document's heads, so main re-anchors its acknowledged-write check. */
+  heads: Heads;
 } {
   const before = requireDoc('compactDoc');
   // ⚠️ INSIDE the classifier. `saveDoc(before)` is a full serialize of the
@@ -2056,7 +2262,7 @@ export function compactDoc(): {
     resetDocCursors();
     throw payloadFailure('materialize', e, null, beforeBytes);
   }
-  return stats;
+  return { ...stats, heads: headsOf(compacted) };
 }
 
 /** One projection delta as an order-blind value for the compaction's view compare (C9b). */
@@ -2082,7 +2288,10 @@ export async function dispatch(method: string, args: unknown): Promise<DispatchR
     case 'setKey':
       // ⚠️ AWAITED. Importing raw bytes is async, and a floating promise here would let the
       // rehydrate that follows run against a realm whose key has not landed yet.
-      await setKey((a.raw ?? a.key) as CryptoKey | Uint8Array);
+      await setKey(
+        (a.raw ?? a.key) as CryptoKey | Uint8Array,
+        (a.familyId as string | null | undefined) ?? null
+      );
       return {};
     case 'compactDoc':
       return { result: compactDoc() };
@@ -2093,6 +2302,8 @@ export async function dispatch(method: string, args: unknown): Promise<DispatchR
       return { result: initDoc() };
     case 'initAndLoadCache':
       return { result: await initAndLoadCache(a.familyId as string) };
+    case 'reseedCacheFromLiveDoc':
+      return { result: await reseedCacheFromLiveDoc(a.familyId as string) };
     case 'loadProjectionSnapshot':
       return { result: await loadProjectionSnapshot(a.familyId as string) };
     case 'openCache':
@@ -2172,6 +2383,7 @@ export function __resetApplyAndProjectForTesting(): void {
   snapshotInFlight = Promise.resolve();
   currentDoc = null;
   familyKey = null;
+  keyFamilyId = null;
   docFamilyId = null;
   cachePersistFailed = false;
   resetDocCursors();

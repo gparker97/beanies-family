@@ -39,9 +39,9 @@ import {
   familyCacheExists,
   getActiveFamilyId as getActiveFamilyIdFromDb,
   setUnpushedAtSignOutMarker,
-  clearUnpushedAtSignOutMarker,
   listLocalFamilyDatabaseIds,
 } from '@/services/indexeddb/database';
+import { deletePhotoQueueDatabase } from '@/services/sync/photoUploadQueue';
 import { announceSessionEnded, bindSessionChannel } from '@/services/auth/sessionChannel';
 import { getById as projectionGetById } from '@/services/automerge/projection';
 import {
@@ -49,10 +49,11 @@ import {
   hasUnsavedWork,
   measureFamilyAtRest,
   measureLiveFamily,
+  measurePhotoQueue,
   NOTHING_UNSAVED,
   type UnsavedWorkReport,
 } from '@/services/auth/unsavedWork';
-import { saveNow, cancelPendingSave } from '@/services/sync/syncService';
+import { saveNow, cancelPendingSave, triggerDebouncedSave } from '@/services/sync/syncService';
 import * as docClient from '@/services/automerge/worker/docClient';
 import { clearGoogleSessionState, getGoogleAccountEmail } from '@/services/google/googleAuth';
 import { clearDriveConnectionForAccount } from '@/services/google/driveTokenRecovery';
@@ -71,6 +72,7 @@ import type { DurableSaveOutcome } from './syncStore';
 import {
   runSignOutSteps,
   signOutStepsFor,
+  type ClearScope,
   SIGN_OUT_CLEARED_ELSEWHERE_STEPS,
   SIGN_OUT_EVICTED_STEPS,
   SIGN_OUT_EVICTION_LOCK_STEPS,
@@ -106,11 +108,27 @@ function describeUnsaved(r: UnsavedWorkReport): string {
  * and the store roster as a second witness; either holding a PIN or password hash counts.
  * The deferred-password sentinel is the empty string, so it never reads as claimed.
  */
-function memberIsClaimed(memberId: string): boolean {
+/**
+ * Is `memberId` claimed by SOMEONE ELSE? A credential this joiner's own `pin` opens is their
+ * earlier claim (a join that wrote the PIN and then failed or was retried, or the same person
+ * on a second device): continuing re-applies the same PIN and is not a conflict (round 3).
+ * Only a credential this PIN does not open (another PIN, or a password) is someone else's.
+ * Reads both the raw projection and the store copy, as the claim fence did before.
+ */
+async function claimedByAnother(memberId: string, pin: string): Promise<'free' | 'own' | 'other'> {
   const raw = projectionGetById('familyMembers', memberId) as
     Pick<FamilyMember, 'pinHash' | 'passwordHash'> | undefined;
   const store = useFamilyStore().members.find((m) => m.id === memberId);
-  return [raw, store].some((m) => !!m && (!!m.pinHash || !!m.passwordHash));
+  const claimed = [raw, store].filter(
+    (m): m is Pick<FamilyMember, 'pinHash' | 'passwordHash'> =>
+      !!m && (!!m.pinHash || !!m.passwordHash)
+  );
+  if (claimed.length === 0) return 'free';
+  for (const m of claimed) {
+    if (m.passwordHash || !m.pinHash) return 'other';
+    if (!(await verifyPassword(pin, m.pinHash))) return 'other';
+  }
+  return 'own';
 }
 
 /**
@@ -2209,10 +2227,21 @@ export const useAuthStore = defineStore('auth', () => {
           });
         }
       }
-      const refuseIfClaimed = (
+      const refuseIfClaimed = async (
         stage: string
-      ): { success: false; error: string; code: 'claim_conflict' } | null => {
-        if (!memberIsClaimed(params.memberId)) return null;
+      ): Promise<{ success: false; error: string; code: 'claim_conflict' } | null> => {
+        const claim = await claimedByAnother(params.memberId, params.pin);
+        if (claim === 'free') return null;
+        if (claim === 'own') {
+          // Their own earlier claim (this PIN opens it): carry on, re-applying the same PIN.
+          logEvent({
+            level: 'info',
+            surface: 'join-flow',
+            message: 'join continued over the joiner\u2019s own earlier claim',
+            context: { action: 'claim_own_earlier', stage },
+          });
+          return null;
+        }
         reportError({
           surface: 'join-flow',
           severity: 'warning',
@@ -2229,7 +2258,7 @@ export const useAuthStore = defineStore('auth', () => {
           code: 'claim_conflict',
         };
       };
-      const conflictBeforeMapping = refuseIfClaimed('after-observe');
+      const conflictBeforeMapping = await refuseIfClaimed('after-observe');
       if (conflictBeforeMapping) return conflictBeforeMapping;
 
       // ⚠️ EVERYTHING THAT CAN FAIL RUNS BEFORE THE CLAIM. Writing `pinHash` is the one
@@ -2263,7 +2292,7 @@ export const useAuthStore = defineStore('auth', () => {
       // here; a wrap failure is reported inside and is non-fatal.
       //
       // ⚠️ THE CLAIM. Keep it last among the fallible steps — see the block above.
-      const conflictBeforeClaim = refuseIfClaimed('before-claim');
+      const conflictBeforeClaim = await refuseIfClaimed('before-claim');
       if (conflictBeforeClaim) return conflictBeforeClaim;
       const pinResult = await applyPinReset(params.memberId, params.pin, 'join');
       if (!pinResult.success) return pinResult;
@@ -3044,6 +3073,12 @@ export const useAuthStore = defineStore('auth', () => {
     cacheDeleted: boolean | null;
     /** Every family `deleteAllLocalFamilies` forgot (tier 3), for the cross-tab announce. */
     clearedFamilyIds?: string[];
+    /**
+     * The person chose to DISCARD the queued photos on an untrusted keep-data sign-out
+     * (round 3, `useSignOut`). A queued photo is plaintext, so on that device it is never
+     * kept silently: either this is set, or the sign-out did not run.
+     */
+    dropPhotoQueue?: boolean;
   }): SignOutStepImpls {
     const settingsStore = useSettingsStore();
     return {
@@ -3076,10 +3111,15 @@ export const useAuthStore = defineStore('auth', () => {
         // gone. Any tier that ends dirty KEEPS this family's database (trusted: always;
         // untrusted: by the guard in `deleteFamilyDb`), and the picker's forget has no
         // live document to measure, so without the marker it deleted the only copy.
+        //
+        // SET ONLY, NEVER CLEARED HERE (round 3). A "clean" measured by THIS tab says
+        // nothing about work another tab left in the shared cache: on the cleared-elsewhere
+        // tier the tab that set the marker may still hold that work. The marker is spent
+        // where the evidence is: `deleteFamilyDatabase` clears it when the cache is really
+        // gone (or a save from a doc that loaded the cache pushes everything).
         const markerFamilyId = resolveSignOutFamilyId();
-        if (markerFamilyId) {
-          if (ctx.unpushedAtSignOut === 'dirty') setUnpushedAtSignOutMarker(markerFamilyId);
-          else clearUnpushedAtSignOutMarker(markerFamilyId);
+        if (markerFamilyId && ctx.unpushedAtSignOut === 'dirty') {
+          setUnpushedAtSignOutMarker(markerFamilyId);
         }
       },
       beginQuietTeardown: () => docClient.beginQuietTeardown(),
@@ -3125,6 +3165,7 @@ export const useAuthStore = defineStore('auth', () => {
         // tier: see `userAskedToClear`.
         if (!ctx.userAskedToClear && ctx.unpushedAtSignOut === 'dirty') {
           setUnpushedAtSignOutMarker(ctx.familyId);
+          await dropDiscardedPhotoQueue(ctx);
           reportError({
             surface: 'pod-load-failure',
             message: 'sign-out kept the local database: the final save did not push everything',
@@ -3139,6 +3180,7 @@ export const useAuthStore = defineStore('auth', () => {
         const unreadable = ctx.userAskedToClear ? null : ctx.remoteWasUnreadable;
         if (unreadable) {
           setUnpushedAtSignOutMarker(ctx.familyId);
+          await dropDiscardedPhotoQueue(ctx);
           reportError({
             surface: 'pod-load-failure',
             message: 'sign-out kept the local database: the remote pod is unreadable',
@@ -3162,10 +3204,12 @@ export const useAuthStore = defineStore('auth', () => {
         // unknown-means-not-deleted rule as `docClient.clearCache`.
         ctx.cacheDeleted = false;
         // A keep-data sign-out never drops the offline photo queue (C6): a queued upload
-        // is a photo that exists nowhere else yet. Only a confirmed clear may.
-        const result = ctx.userAskedToClear
-          ? await deleteFamilyDatabase(ctx.familyId)
-          : await deleteFamilyDatabase(ctx.familyId, { keepPhotoQueue: true });
+        // is a photo that exists nowhere else yet. Only a confirmed clear may, or the
+        // person's explicit "discard" on an untrusted sign-out (round 3).
+        const result =
+          ctx.userAskedToClear || ctx.dropPhotoQueue
+            ? await deleteFamilyDatabase(ctx.familyId)
+            : await deleteFamilyDatabase(ctx.familyId, { keepPhotoQueue: true });
         ctx.cacheDeleted = result?.deleted === true;
         logEvent({
           level: 'info',
@@ -3236,7 +3280,13 @@ export const useAuthStore = defineStore('auth', () => {
         try {
           await useFamilyContextStore().reload?.();
         } catch (e) {
-          console.warn('[authStore] family list reload after clear-all failed', e);
+          logEvent({
+            level: 'warn',
+            surface: 'sign-out',
+            message: 'family list reload after clear-all failed',
+            error: e,
+            context: { action: 'clear_all_registry_reload_failed' },
+          });
         }
       },
       announceSessionEnded: () => {
@@ -3330,13 +3380,16 @@ export const useAuthStore = defineStore('auth', () => {
    * tokens + caches + wraps (silent reconnect); untrusted devices get the full
    * family-scoped local teardown. The step ORDER is data in `signOutSteps.ts`.
    */
-  async function signOut(): Promise<{ cacheDeleted: boolean | null }> {
+  async function signOut(
+    opts: { dropPhotoQueue?: boolean } = {}
+  ): Promise<{ cacheDeleted: boolean | null }> {
     const trusted = useSettingsStore().isTrustedDevice;
     const ctx = await runSignOutTier({
       tier: 'sign-out',
       steps: signOutStepsFor('sign-out', trusted),
       userAskedToClear: false,
       trusted,
+      dropPhotoQueue: opts.dropPhotoQueue === true,
     });
     // Untrusted devices delete the cache too; `null` on a trusted one (#100).
     return { cacheDeleted: ctx.cacheDeleted };
@@ -3362,7 +3415,21 @@ export const useAuthStore = defineStore('auth', () => {
       unpushedAtSignOut: null as 'clean' | 'dirty' | null,
       cacheDeleted: null as boolean | null,
       clearedFamilyIds: undefined as string[] | undefined,
+      dropPhotoQueue: false,
     };
+  }
+
+  /**
+   * The person discarded the queued photos (untrusted sign-out) but the database is being
+   * KEPT for unpushed work: drop the queue anyway, so their "discard" is honoured. Never
+   * throws (`deletePhotoQueueDatabase` logs its own failures).
+   */
+  async function dropDiscardedPhotoQueue(ctx: {
+    familyId: string | undefined;
+    dropPhotoQueue?: boolean;
+  }): Promise<void> {
+    if (!ctx.dropPhotoQueue || !ctx.familyId) return;
+    await deletePhotoQueueDatabase(ctx.familyId);
   }
 
   /**
@@ -3384,8 +3451,10 @@ export const useAuthStore = defineStore('auth', () => {
     steps: readonly SignOutStepName[];
     userAskedToClear: boolean;
     trusted: boolean;
+    dropPhotoQueue?: boolean;
   }): Promise<ReturnType<typeof buildSignOutCtx>> {
     const ctx = buildSignOutCtx(opts.userAskedToClear);
+    ctx.dropPhotoQueue = opts.dropPhotoQueue === true;
     await runSignOutSteps(opts.steps, buildSignOutStepImpls(ctx));
     emitSignoutTier({
       tier: opts.tier,
@@ -3447,6 +3516,28 @@ export const useAuthStore = defineStore('auth', () => {
    * missed final save is acceptable; a user trapped on the page is not.
    */
   async function forceSaveWithTimeout(timeoutMs: number): Promise<void> {
+    await boundedSaveNow(timeoutMs);
+    // Cancel any debounced save still pending so it doesn't fire after
+    // sign-out clears auth state. Idempotent if no timer is set.
+    cancelPendingSave();
+  }
+
+  /**
+   * "Save first" for `measureUnsavedWork` (round 3). The session stays LIVE (the person may
+   * still keep their data, an export may abort, a later step may fail), so unlike the
+   * teardown save it must not cancel the debounced save: it never cancels afterwards, and
+   * when a save was pending and this one did not land, it re-arms it so the autosave intent
+   * survives. A flow that does proceed to teardown cancels it there (`forceSaveWithTimeout`).
+   */
+  async function probeSaveWithTimeout(timeoutMs: number): Promise<void> {
+    // `saveNow` cancels the pending timer itself; ask first, so the intent can be restored.
+    const hadPending = cancelPendingSave();
+    const saved = await boundedSaveNow(timeoutMs);
+    if (hadPending && !saved) triggerDebouncedSave();
+  }
+
+  /** One bounded `saveNow`; resolves whether it saved. Never throws. */
+  async function boundedSaveNow(timeoutMs: number): Promise<boolean> {
     try {
       const saved = await Promise.race([
         saveNow(),
@@ -3463,12 +3554,11 @@ export const useAuthStore = defineStore('auth', () => {
         // can confirm whether the final save reached Drive.
         console.warn('[authStore] force-save on sign-out saved nothing (no durable state to save)');
       }
+      return saved;
     } catch (e) {
       console.warn('[authStore] force-save failed — proceeding with sign-out', e);
+      return false;
     }
-    // Cancel any debounced save still pending so it doesn't fire after
-    // sign-out clears auth state. Idempotent if no timer is set.
-    cancelPendingSave();
   }
 
   /**
@@ -3602,7 +3692,7 @@ export const useAuthStore = defineStore('auth', () => {
     scope: 'active' | 'all';
   }): Promise<UnsavedWorkReport> {
     const activeId = resolveSignOutFamilyId() ?? null;
-    if (opts.save && activeId) await forceSaveWithTimeout(UNSAVED_PROBE_SAVE_TIMEOUT_MS);
+    if (opts.save && activeId) await probeSaveWithTimeout(UNSAVED_PROBE_SAVE_TIMEOUT_MS);
     let report = activeId ? await measureLiveFamily(activeId) : { ...NOTHING_UNSAVED };
     if (opts.scope === 'all') {
       const ids = new Set<string>();
@@ -3610,7 +3700,13 @@ export const useAuthStore = defineStore('auth', () => {
         const { getAllFamilies } = await import('@/services/familyContext');
         for (const f of await getAllFamilies()) ids.add(f.id);
       } catch (e) {
-        console.warn('[authStore] family registry unreadable during the unsaved probe', e);
+        logEvent({
+          level: 'warn',
+          surface: 'sign-out',
+          message: 'family registry unreadable during the unsaved probe',
+          error: e,
+          context: { action: 'unsaved_probe_failed', stage: 'registry' },
+        });
         report = { ...report, unknown: true };
       }
       for (const id of await listLocalFamilyDatabaseIds()) ids.add(id);
@@ -3625,6 +3721,27 @@ export const useAuthStore = defineStore('auth', () => {
         action: 'unsaved_probe',
         detail: describeUnsaved(report),
         kind: opts.scope,
+        file_count: report.photoUploads,
+      },
+    });
+    return report;
+  }
+
+  /**
+   * The open family's queued photo uploads ONLY (round 3): what an untrusted keep-data
+   * sign-out asks about before it deletes the queue. Logged like the full probe.
+   */
+  async function measureQueuedPhotoUploads(): Promise<UnsavedWorkReport> {
+    const familyId = resolveSignOutFamilyId();
+    const report = familyId ? await measurePhotoQueue(familyId) : { ...NOTHING_UNSAVED };
+    logEvent({
+      level: hasUnsavedWork(report) ? 'warn' : 'info',
+      surface: 'sign-out',
+      message: 'queued photos measured before an untrusted sign-out',
+      context: {
+        action: 'unsaved_probe',
+        detail: describeUnsaved(report),
+        kind: 'sign-out',
         file_count: report.photoUploads,
       },
     });
@@ -3665,10 +3782,16 @@ export const useAuthStore = defineStore('auth', () => {
    * on the account — the explicit Settings disconnect is the sole revoke site).
    * Step ORDER is data in `signOutSteps.ts`.
    */
-  async function signOutAndClearData(): Promise<{ cacheDeleted: boolean | null }> {
+  async function signOutAndClearData(
+    opts: { scope?: ClearScope } = {}
+  ): Promise<{ cacheDeleted: boolean | null }> {
     const ctx = await runSignOutTier({
       tier: 'sign-out-clear',
-      steps: signOutStepsFor('clear', false),
+      // Round 3: `active` unless the caller is the person's own "clear all data" choice (the
+      // menu's clear tier passes `all`, behind `measureUnsavedWork({ scope: 'all' })` and the
+      // discard confirm). Delete-family, the fatal overlay and the demo teardown never asked
+      // about the device's other families, so they never delete them.
+      steps: signOutStepsFor('clear', false, opts.scope ?? 'active'),
       userAskedToClear: true, // the human typed the consent — honour it
       trusted: false,
     });
@@ -3742,6 +3865,7 @@ export const useAuthStore = defineStore('auth', () => {
     endSessionClearedElsewhere,
     measureUnsavedWork,
     measureUnsavedWorkForFamily,
+    measureQueuedPhotoUploads,
     teardownForLocalClear,
     setDeviceTrust,
     restoreE2EAuth,

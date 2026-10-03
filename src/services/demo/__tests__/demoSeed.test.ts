@@ -281,6 +281,8 @@ describe('seedDemoFamily — failure paths', () => {
     const result = await seedDemoFamily();
     expect(result).toEqual({ ok: false, code: 'signup' });
     expect(h.signOutAndClearData).toHaveBeenCalledTimes(1);
+    // Round 3: the demo teardown never asks for the every-family sweep (default: active).
+    expect(h.signOutAndClearData).toHaveBeenCalledWith();
   });
 
   it("passes createNewFile's own failure reason straight through", async () => {

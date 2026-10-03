@@ -34,6 +34,7 @@ import type { PayloadLoadStep } from '@/types/sync';
 import { isAllocationFailure } from '@/utils/isAllocationFailure';
 import { docInitOpts, counterWriterId, deviceWriterIdFor } from './docActor';
 import { MIGRATION_CHANGES } from './migrationChanges';
+import { rebaseBlockingTransactionConflict } from './transactionFields';
 import {
   adjustField,
   fieldDecimals,
@@ -1277,6 +1278,8 @@ export function applyMutation(
  *    goal or loan effects are written as a pair; settling the transaction as a conflict while
  *    its Counter growth crosses would move money with no record (or a record with no money).
  *    `blockedBy: 'transactions'` sends the caller to the block it would otherwise have raised.
+ *    Round 3 narrowed it: only an EXISTENCE conflict or a conflict on a money/derived field
+ *    (`transactionFields.ts`) blocks; a note or category conflict settles target-wins, counted.
  *    And a goal's Counter growth is emitted only when its contribution history crossed with it.
  *  - C9d/g: `updatedAt` is never a conflict (it is carried, newest wins, only beside a real
  *    field), and a Counter-backed ABSOLUTE both sides moved is carried as a SHIFT.
@@ -1324,10 +1327,16 @@ export function buildRebaseOps(
   let conflicts = 0;
   /** C8: a transaction lost a write, so the whole replay is unavailable. */
   let blockedBy: 'transactions' | undefined;
-  const noteConflicts = (collection: CollectionName, n: number): void => {
+  /**
+   * Round 3 (C8 narrowing): an EXISTENCE conflict (delete vs edit, a resurrection) on a
+   * transaction always blocks; a FIELD conflict blocks only on a money or derived field
+   * (`rebaseBlockingTransactionConflict`). Every other conflict settles target-wins and is
+   * counted, exactly as on any other collection. `blocks` says which this is.
+   */
+  const noteConflicts = (collection: CollectionName, n: number, blocks = true): void => {
     if (n <= 0) return;
     conflicts += n;
-    if (collection === 'transactions') blockedBy = 'transactions';
+    if (collection === 'transactions' && blocks) blockedBy = 'transactions';
   };
   /** C8: goals whose contribution history did NOT cross; their Counter growth must not either. */
   const growthHeldBack = new Set<string>();
@@ -1404,7 +1413,15 @@ export function buildRebaseOps(
         growthHeldBack.add(id);
       }
       if (!patch) continue;
-      noteConflicts(collection, patch.conflicts);
+      const nowPlain = (toPlain(now) ?? {}) as AnyRecord;
+      const targetPlain = (toPlain(targetColl[id]) ?? {}) as AnyRecord;
+      noteConflicts(
+        collection,
+        patch.conflicts,
+        patch.conflictKeys.some((k) =>
+          rebaseBlockingTransactionConflict(k, nowPlain[k], targetPlain[k])
+        )
+      );
       if (Object.keys(patch.set).length || patch.deleteKeys.length) {
         ops.push({
           op: 'patch',
@@ -1477,6 +1494,12 @@ interface FieldCarry {
   deleteKeys: string[];
   conflicts: number;
   based: Record<string, { next: unknown; base: unknown }>;
+  /**
+   * Round 3 (C8 narrowing): the TOP-LEVEL keys a conflict was counted under (a nested conflict
+   * is attributed to its top-level key). Lets the transaction rule block only on the fields
+   * that move money (`transactionFields.ts`) instead of on any conflict at all.
+   */
+  conflictKeys: string[];
 }
 
 /** A `based` carry as the `patch` + `base` pair a based write takes, or `null` when empty. */
@@ -1590,6 +1613,7 @@ function threeWayFields(
   const deleteKeys: string[] = [];
   const based: FieldCarry['based'] = {};
   let conflicts = 0;
+  const conflictKeys: string[] = [];
   const isStamp = (key: string): boolean => depth === 0 && key === 'updatedAt';
 
   for (const key of Object.keys(b)) {
@@ -1632,6 +1656,7 @@ function threeWayFields(
       const inner = threeWayFields(a[key], b[key], t[key], depth + 1, subShift(shift, key));
       if (inner) {
         conflicts += inner.conflicts;
+        if (inner.conflicts > 0) conflictKeys.push(key);
         // ⚠️ ONLY WRITE IF SOMETHING ACTUALLY MOVED. A conflicts-only recursion
         // used to assign `{...target[key]}` — writing the sub-object back to
         // exactly what it already held. That is a no-op that inflates the
@@ -1653,6 +1678,7 @@ function threeWayFields(
       continue;
     }
     conflicts++; // both wrote it and it cannot be merged — the saved value stays
+    conflictKeys.push(key);
   }
 
   for (const key of Object.keys(a)) {
@@ -1661,14 +1687,17 @@ function threeWayFields(
     // and COUNT the case where it did not, or a delete that lost to a saved
     // write is invisible in exactly the way the field rule exists to expose.
     if (same(a[key], t[key])) deleteKeys.push(key);
-    else conflicts++;
+    else {
+      conflicts++;
+      conflictKeys.push(key);
+    }
   }
 
   const carried =
     Object.keys(set).length > 0 || deleteKeys.length > 0 || Object.keys(based).length > 0;
   if (depth === 0 && carried) carryStamp(set, a.updatedAt, b.updatedAt, t.updatedAt);
 
-  return carried || conflicts ? { set, deleteKeys, conflicts, based } : null;
+  return carried || conflicts ? { set, deleteKeys, conflicts, based, conflictKeys } : null;
 }
 
 /** `shift`'s paths under `key`, one level down (`loan.outstandingBalance` → `outstandingBalance`). */
@@ -1722,6 +1751,7 @@ function carryOnlyNewFields(now: unknown, target: unknown): FieldCarry | null {
   const t = (toPlain(target) ?? {}) as AnyRecord;
   const set: Record<string, unknown> = {};
   let conflicts = 0;
+  const conflictKeys: string[] = [];
 
   for (const key of Object.keys(b)) {
     if (key === 'updatedAt') continue; // C9d: a stamp, never a conflict; carried below
@@ -1731,12 +1761,13 @@ function carryOnlyNewFields(now: unknown, target: unknown): FieldCarry | null {
     }
     if (same(b[key], t[key])) continue;
     conflicts++; // both hold it, differently, and nothing can attribute it
+    conflictKeys.push(key);
   }
   // No baseline: the peer's stamp crosses only beside a real field, and only if it is newer.
   if (Object.keys(set).length) carryStamp(set, undefined, b.updatedAt, t.updatedAt);
 
   return Object.keys(set).length || conflicts
-    ? { set, deleteKeys: [], conflicts, based: {} }
+    ? { set, deleteKeys: [], conflicts, based: {}, conflictKeys }
     : null;
 }
 

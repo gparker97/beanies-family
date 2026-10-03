@@ -47,6 +47,11 @@ export interface ExportedPayload {
   heads: Heads;
   /** The document's lineage at export; `null` for a never-compacted family. */
   lineage: PodLineage | null;
+  /**
+   * The document holds Counter keys or a fold ledger (#117): `beanpodVersionFor` writes 6.0.
+   * Optional so an older worker double degrades to "no" (today's label), never a throw.
+   */
+  hasCounters?: boolean;
 }
 
 // ─── Projection deltas (worker → main, applied before an RPC resolves) ───────
@@ -170,6 +175,23 @@ export interface CacheReplay {
    * deleted and re-seeded from that document (C5e). Absent otherwise.
    */
   corruptBaseReplaced?: true;
+  /**
+   * Round 3: the cache held another LINEAGE than the live same-family document, so it was not
+   * merged in; the live document was kept and the cache superseded. Main logs
+   * `cache-lineage-stale`.
+   */
+  lineageStale?: true;
+  /** Round 3 (C5a): the base would not decrypt on 3 consecutive opens and was re-seeded. */
+  baseReseeded?: 'repeated-decrypt-failure';
+  /**
+   * Round 3: rows reported for the FIRST time this open (newly quarantined, or newly seen
+   * waiting on missing deps). Only these page; a row already reported is logged, not paged.
+   */
+  newlyReported?: number;
+  /** Round 3: increment rows moved out of replay (`qinc:*`) this open. */
+  quarantined?: number;
+  /** Round 3: the missing-deps fence gave up after 3 opens and the base was rewritten. */
+  fenceGaveUp?: true;
 }
 
 /** What `initAndLoadCache` answers. `replay` is present whenever a cache was read. */

@@ -78,6 +78,38 @@ describe('fileSync V4 format', () => {
 
   // ── the version: derived from the document, accepted at both values ──
 
+  describe('round 3, item 7: a document holding Counters is a 6.0 file', () => {
+    const lineage = { id: 'L', seq: 1 };
+    it('derives 6.0 from hasCounters, outranking a lineage or a backup', () => {
+      expect(beanpodVersionFor(null, { hasCounters: true })).toBe('6.0');
+      expect(beanpodVersionFor(lineage, { hasCounters: true })).toBe('6.0');
+      expect(beanpodVersionFor(null, { compactionBackup: true, hasCounters: true })).toBe('6.0');
+      expect(beanpodVersionFor(lineage, { hasCounters: false })).toBe('5.0');
+      expect(beanpodVersionFor(null, { hasCounters: false })).toBe('4.0');
+    });
+    it('reEncryptEnvelope writes 6.0, and this build reads it back', () => {
+      const env = JSON.parse(
+        reEncryptEnvelope(
+          {
+            version: '5.0',
+            familyId: 'f',
+            familyName: 'F',
+            keyId: 'k',
+            wrappedKeys: {},
+            passkeyWrappedKeys: {},
+            inviteKeys: {},
+            encryptedPayload: 'old',
+          },
+          'p',
+          lineage,
+          { hasCounters: true }
+        )
+      );
+      expect(env.version).toBe('6.0');
+      expect(parseBeanpodV4(JSON.stringify(env)).version).toBe('6.0');
+    });
+  });
+
   describe('beanpodVersionFor is the ONE place a version is chosen', () => {
     const lineage = { id: 'L', seq: 1 };
     it('derives 4.0 for a never-compacted document and 5.0 for a compacted one', () => {

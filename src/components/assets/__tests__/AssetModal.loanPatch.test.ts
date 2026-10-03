@@ -1,12 +1,15 @@
 /**
- * AssetModal sends `loan` as a sub-key diff against the open-time snapshot, so a loan payment
- * that lands while the modal is open is never reverted by the stale open-time balance.
+ * AssetModal sends the WHOLE loan built from the LIVE asset (the store at save time) with only
+ * the sub-keys changed since open overlaid: `loan` is a merge field whose base is the whole
+ * live loan, so a partial loan would clear every omitted sub-key, and the stale open-time
+ * balance must never revert a payment that landed while the modal was open.
  */
 import { describe, it, expect, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { setActivePinia, createPinia } from 'pinia';
 import { nextTick } from 'vue';
 import AssetModal from '@/components/assets/AssetModal.vue';
+import { useAssetsStore } from '@/stores/assetsStore';
 import type { Asset } from '@/types/models';
 
 vi.mock('@/composables/useTranslation', () => ({
@@ -59,11 +62,34 @@ async function save(wrapper: Awaited<ReturnType<typeof open>>) {
 }
 
 describe('AssetModal loan payload', () => {
-  it('editing only interestRate leaves outstandingBalance out of the patch', async () => {
+  it('editing only interestRate sends the whole loan, never a partial one', async () => {
     const wrapper = await open(withLoan);
     (wrapper.vm as unknown as { interestRate: number }).interestRate = 5;
     await nextTick();
-    expect(await save(wrapper)).toEqual({ loan: { interestRate: 5 } });
+    expect(await save(wrapper)).toEqual({
+      loan: { hasLoan: true, loanAmount: 20000, outstandingBalance: 10000, interestRate: 5 },
+    });
+  });
+
+  it('builds on the LIVE asset in the store: a payment that landed while open is kept', async () => {
+    const wrapper = await open(withLoan);
+    // The page handed in an open-time snapshot; the store now holds the paid-down loan plus a
+    // sub-key the form does not even show.
+    useAssetsStore().assets = [
+      {
+        ...withLoan,
+        loan: { ...withLoan.loan!, outstandingBalance: 7000, linkedRecurringItemId: 'rec-1' },
+      },
+    ];
+    (wrapper.vm as unknown as { interestRate: number }).interestRate = 5;
+    await nextTick();
+    expect((await save(wrapper)).loan).toEqual({
+      hasLoan: true,
+      loanAmount: 20000,
+      outstandingBalance: 7000,
+      interestRate: 5,
+      linkedRecurringItemId: 'rec-1',
+    });
   });
 
   it('an untouched loan sends no loan key at all', async () => {
