@@ -21,8 +21,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - The Full plan's daily magic beans allowance is 25 (was 10), and the number is now set on the server and shown live on the pricing page, the help article and the Plan page, so it can change without an app release.
 
-### Changed
-
 - Account, goal and loan balances are now read through a merge-safe fold, so adjustments made on two devices can both be kept once the switch is turned on.
 - The App Store link from beanies.family now carries Apple's campaign parameters per ad, and the privacy page describes the first-party campaign record, the survey answer on the registry entry and the Play install referrer.
 
