@@ -37,6 +37,7 @@ import {
   clearRemoteBaseline,
 } from '../cache';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
+import { foldIndex } from '../counterFields';
 
 const FAMILY_ID = 'cache-test-family';
 const base = () => migrateDoc(Automerge.init<FamilyDocument>());
@@ -79,7 +80,7 @@ describe('worker/cache', () => {
 
     expect(loaded).not.toBeNull();
     expect(loaded!.recovered).toBe(false);
-    expect(materializeCollection(loaded!.doc, 'accounts')).toEqual([
+    expect(materializeCollection(loaded!.doc, 'accounts', foldIndex(loaded!.doc))).toEqual([
       ['a1', { id: 'a1', balance: 42 }],
     ]);
   });
@@ -110,7 +111,7 @@ describe('worker/cache', () => {
       // loadCachedDoc reconstructs the doc and never reads/consumes the baseline row.
       const loaded = await loadCachedDoc(key, FAMILY_ID);
       expect(loaded).not.toBeNull();
-      expect(materializeCollection(loaded!.doc, 'accounts').length).toBe(2);
+      expect(materializeCollection(loaded!.doc, 'accounts', foldIndex(loaded!.doc)).length).toBe(2);
       expect((await readRemoteBaseline())?.payload).toBe('ver:9');
     });
 
@@ -189,8 +190,8 @@ describe('worker/cache', () => {
 
     const loaded = await loadCachedDoc(key, FAMILY_ID);
     expect(loaded!.recovered).toBe(false);
-    expect(materializeCollection(loaded!.doc, 'accounts')).toEqual(
-      materializeCollection(d2, 'accounts')
+    expect(materializeCollection(loaded!.doc, 'accounts', foldIndex(loaded!.doc))).toEqual(
+      materializeCollection(d2, 'accounts', foldIndex(d2))
     );
   });
 
@@ -207,7 +208,7 @@ describe('worker/cache', () => {
     raw.close();
 
     const loaded = await loadCachedDoc(key, FAMILY_ID);
-    expect(materializeCollection(loaded!.doc, 'accounts')).toEqual([
+    expect(materializeCollection(loaded!.doc, 'accounts', foldIndex(loaded!.doc))).toEqual([
       ['a1', { id: 'a1', balance: 5 }],
     ]);
   });
@@ -227,8 +228,8 @@ describe('worker/cache', () => {
 
     const loaded = await loadCachedDoc(key, FAMILY_ID);
     expect(loaded!.recovered).toBe(false);
-    expect(materializeCollection(loaded!.doc, 'accounts')).toEqual(
-      materializeCollection(d2, 'accounts')
+    expect(materializeCollection(loaded!.doc, 'accounts', foldIndex(loaded!.doc))).toEqual(
+      materializeCollection(d2, 'accounts', foldIndex(d2))
     );
   });
 
@@ -245,8 +246,8 @@ describe('worker/cache', () => {
     const loaded = await loadCachedDoc(key, FAMILY_ID);
     expect(loaded!.recovered).toBe(true);
     // Base + inc:0 recovered (a1, a2); inc:2 dropped because replay stopped at inc:1.
-    expect(materializeCollection(loaded!.doc, 'accounts')).toEqual(
-      materializeCollection(d1, 'accounts')
+    expect(materializeCollection(loaded!.doc, 'accounts', foldIndex(loaded!.doc))).toEqual(
+      materializeCollection(d1, 'accounts', foldIndex(d1))
     );
   });
 
@@ -269,7 +270,7 @@ describe('worker/cache', () => {
     await seedIncrement(key, d2, d3);
     const loaded = await loadCachedDoc(key, FAMILY_ID);
     expect(
-      materializeCollection(loaded!.doc, 'accounts')
+      materializeCollection(loaded!.doc, 'accounts', foldIndex(loaded!.doc))
         .map(([id]) => id)
         .sort()
     ).toEqual(['a1', 'a2', 'a3', 'a4']);

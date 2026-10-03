@@ -7,13 +7,16 @@ import { describe, it, expect } from 'vitest';
 import * as Automerge from '@automerge/automerge';
 import { materializeCollection } from '../docOps';
 import { apply, converge, fork, materialise, seeded } from './twoDevices';
+import { foldIndex } from '../counterFields';
 
 const todo = (id: string, title: string) => ({ id, title, completed: false });
 
 describe('twoDevices harness', () => {
   it('seeded builds a migrated document carrying the seed ops', () => {
     const doc = seeded([{ op: 'set', collection: 'todos', id: 't1', entity: todo('t1', 'milk') }]);
-    expect(materializeCollection(doc, 'todos')).toEqual([['t1', todo('t1', 'milk')]]);
+    expect(materializeCollection(doc, 'todos', foldIndex(doc))).toEqual([
+      ['t1', todo('t1', 'milk')],
+    ]);
     expect(doc.accounts).toEqual({});
   });
 
@@ -37,7 +40,7 @@ describe('twoDevices harness', () => {
       patch: { completed: true },
     });
     const after = converge(a1, b1);
-    expect(materializeCollection(after.a, 'todos')).toEqual([
+    expect(materializeCollection(after.a, 'todos', foldIndex(after.a))).toEqual([
       ['t1', { ...todo('t1', 'milk'), completed: true }],
       ['t2', todo('t2', 'eggs')],
     ]);
@@ -55,6 +58,8 @@ describe('twoDevices harness', () => {
       entity: todo('t9', 'x'),
     });
     const again = converge(a2, after.b);
-    expect(materializeCollection(again.b, 'todos')).toEqual([['t9', todo('t9', 'x')]]);
+    expect(materializeCollection(again.b, 'todos', foldIndex(again.b))).toEqual([
+      ['t9', todo('t9', 'x')],
+    ]);
   });
 });

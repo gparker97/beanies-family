@@ -16,6 +16,7 @@ import {
   vacationSegmentEntityId,
 } from '../photoOps';
 import { apply, converge, fork, seeded } from './twoDevices';
+import { foldIndex } from '../counterFields';
 
 const base = () => migrateDoc(Automerge.init<FamilyDocument>());
 const attach = (entityCollection: string, entityId: string, photoId: string) => ({
@@ -37,7 +38,8 @@ describe('photoOps — attach named op', () => {
     }).doc;
     const { doc, delta } = applyMutation(d, attach('activities', 'a1', 'p1'));
     expect(
-      (materializeCollection(doc, 'activities')[0]![1] as { photoIds: string[] }).photoIds
+      (materializeCollection(doc, 'activities', foldIndex(doc))[0]![1] as { photoIds: string[] })
+        .photoIds
     ).toEqual(['p1']);
     expect(delta).toMatchObject({ kind: 'upsert', collection: 'activities', id: 'a1' });
   });
@@ -53,7 +55,7 @@ describe('photoOps — attach named op', () => {
       d,
       attach('vacations', vacationSegmentEntityId('v1', 's1'), 'p2')
     );
-    const vac = materializeCollection(doc, 'vacations')[0]![1] as {
+    const vac = materializeCollection(doc, 'vacations', foldIndex(doc))[0]![1] as {
       travelSegments: Array<{ photoIds?: string[] }>;
     };
     expect(vac.travelSegments[0]!.photoIds).toEqual(['p2']);
@@ -100,7 +102,9 @@ describe('photoOps — attach named op', () => {
       apply(a, attach('recipes', 'r1', 'pA'), attach('vacations', seg, 'sA')),
       apply(b, attach('recipes', 'r1', 'pB'), attach('vacations', seg, 'sB'))
     );
-    const recipe = materializeCollection(merged, 'recipes')[0]![1] as { photoIds: string[] };
+    const recipe = materializeCollection(merged, 'recipes', foldIndex(merged))[0]![1] as {
+      photoIds: string[];
+    };
     expect([...recipe.photoIds].sort()).toEqual(['pA', 'pB']);
     // `gcOrphans` deletes every stored photo NOT in this set: nothing either device attached.
     const referenced = collectReferencedPhotoIds(merged);

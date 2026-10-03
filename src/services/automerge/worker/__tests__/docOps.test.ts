@@ -59,7 +59,9 @@ describe('docOps — lifecycle', () => {
       entity: txn('t1'),
     }).doc;
     const reloaded = loadDoc(saveDoc(withOne));
-    expect(materializeCollection(reloaded, 'transactions')).toEqual([['t1', txn('t1')]]);
+    expect(materializeCollection(reloaded, 'transactions', foldIndex(reloaded))).toEqual([
+      ['t1', txn('t1')],
+    ]);
   });
 });
 
@@ -90,8 +92,8 @@ describe('docOps — change primitives (B1/B2 incremental)', () => {
     const framed = frameChanges(getChangesSince(d1, heads0));
     // Apply onto a FRESH base (the real cache-reload path: base from disk + increments).
     const rebuilt = applyChanges(loadDoc(d0bin), unframeChanges(framed)).doc;
-    expect(materializeCollection(rebuilt, 'accounts')).toEqual(
-      materializeCollection(d1, 'accounts')
+    expect(materializeCollection(rebuilt, 'accounts', foldIndex(rebuilt))).toEqual(
+      materializeCollection(d1, 'accounts', foldIndex(d1))
     );
   });
 
@@ -103,8 +105,8 @@ describe('docOps — change primitives (B1/B2 incremental)', () => {
     const changes = getChangesSince(d1, heads0);
     const once = applyChanges(loadDoc(d1bin), changes).doc; // d1 already has these changes
     const expected = loadDoc(d1bin);
-    expect(materializeCollection(once, 'accounts')).toEqual(
-      materializeCollection(expected, 'accounts')
+    expect(materializeCollection(once, 'accounts', foldIndex(once))).toEqual(
+      materializeCollection(expected, 'accounts', foldIndex(expected))
     );
     expect(getHeads(once)).toEqual(getHeads(expected));
   });
@@ -143,7 +145,7 @@ describe('docOps — mutations', () => {
       updatedAt: '2026-02-02',
     });
     d = doc;
-    expect(materializeCollection(d, 'todos')[0]![1]).toEqual({
+    expect(materializeCollection(d, 'todos', foldIndex(d))[0]![1]).toEqual({
       id: 'x',
       title: 'new',
       updatedAt: '2026-02-02',
@@ -163,7 +165,7 @@ describe('docOps — mutations', () => {
       entity: { id: 'g' },
     }).doc;
     const { doc, delta } = applyMutation(d, { op: 'delete', collection: 'goals', id: 'g' });
-    expect(materializeCollection(doc, 'goals')).toEqual([]);
+    expect(materializeCollection(doc, 'goals', foldIndex(doc))).toEqual([]);
     expect(delta).toEqual({ kind: 'remove', collection: 'goals', id: 'g' });
   });
 
@@ -189,7 +191,9 @@ describe('docOps — mutations', () => {
       delta: -10,
     });
     // 100 → 90 → 80 (each increment reads the current balance, not a stale absolute)
-    expect((materializeCollection(doc, 'accounts')[0]![1] as { balance: number }).balance).toBe(80);
+    expect(
+      (materializeCollection(doc, 'accounts', foldIndex(doc))[0]![1] as { balance: number }).balance
+    ).toBe(80);
     expect((result as { balance: number }).balance).toBe(80);
   });
 
@@ -207,8 +211,10 @@ describe('docOps — mutations', () => {
         { op: 'increment', collection: 'accounts', id: 'a', field: 'balance', delta: 10 },
       ],
     });
-    expect(materializeCollection(doc, 'transactions')).toHaveLength(1);
-    expect((materializeCollection(doc, 'accounts')[0]![1] as { balance: number }).balance).toBe(60);
+    expect(materializeCollection(doc, 'transactions', foldIndex(doc))).toHaveLength(1);
+    expect(
+      (materializeCollection(doc, 'accounts', foldIndex(doc))[0]![1] as { balance: number }).balance
+    ).toBe(60);
     expect(delta.kind).toBe('multi');
     expect((delta as { deltas: ProjectionDelta[] }).deltas).toHaveLength(2);
   });
@@ -225,7 +231,7 @@ describe('docOps — mutations', () => {
       })
     ).toThrow(/not found/);
     // The original doc is untouched — the valid `set` did not leak through.
-    expect(materializeCollection(d, 'transactions')).toEqual([]);
+    expect(materializeCollection(d, 'transactions', foldIndex(d))).toEqual([]);
   });
 });
 
@@ -494,7 +500,9 @@ describe('docOps — projection + named ops', () => {
       patch: { n1: '2026-01-01' },
       onMissing: 'create',
     });
-    expect(materializeCollection(doc, 'notificationReads')).toEqual([['m1', { n1: '2026-01-01' }]]);
+    expect(materializeCollection(doc, 'notificationReads', foldIndex(doc))).toEqual([
+      ['m1', { n1: '2026-01-01' }],
+    ]);
   });
 
   it("patch onMissing:'skip' is a delta-safe no-op on an absent entity (concurrent delete)", () => {
@@ -508,7 +516,7 @@ describe('docOps — projection + named ops', () => {
     });
     // No throw; nothing created; echoes undefined; delta is a `remove` (not an
     // upsert of undefined, which would throw in toPlain).
-    expect(materializeCollection(doc, 'accounts')).toEqual([]);
+    expect(materializeCollection(doc, 'accounts', foldIndex(doc))).toEqual([]);
     expect(result).toBeUndefined();
     expect(delta).toEqual({ kind: 'remove', collection: 'accounts', id: 'gone' });
   });
@@ -529,7 +537,7 @@ describe('docOps — projection + named ops', () => {
       delta: -30,
       updatedAt: '2026-02-02',
     }).doc;
-    expect(materializeCollection(d, 'accounts')[0]![1]).toEqual({
+    expect(materializeCollection(d, 'accounts', foldIndex(d))[0]![1]).toEqual({
       id: 'a1',
       balance: 70,
       updatedAt: '2026-02-02',
@@ -598,7 +606,9 @@ describe('docOps — projection + named ops', () => {
       entity: { id: 'x' },
     }).doc;
     const { doc, delta } = applyMutation(d, { op: 'named', name: 'tagTodo', args: { id: 'x' } });
-    expect((materializeCollection(doc, 'todos')[0]![1] as { tagged: boolean }).tagged).toBe(true);
+    expect(
+      (materializeCollection(doc, 'todos', foldIndex(doc))[0]![1] as { tagged: boolean }).tagged
+    ).toBe(true);
     expect(delta).toEqual({
       kind: 'upsert',
       collection: 'todos',
@@ -634,7 +644,8 @@ describe('docOps — core domain named ops (financial atomic RMW)', () => {
     expect((result as { isCompleted: boolean }).isCompleted).toBe(false);
     expect(delta).toMatchObject({ kind: 'upsert', collection: 'goals', id: 'g' });
     expect(
-      (materializeCollection(doc, 'goals')[0]![1] as { currentAmount: number }).currentAmount
+      (materializeCollection(doc, 'goals', foldIndex(doc))[0]![1] as { currentAmount: number })
+        .currentAmount
     ).toBe(80);
   });
 
@@ -669,7 +680,11 @@ describe('docOps — core domain named ops (financial atomic RMW)', () => {
       args: { id: 'g', delta: -500 },
     }).doc;
     expect(
-      (materializeCollection(floored, 'goals')[0]![1] as { currentAmount: number }).currentAmount
+      (
+        materializeCollection(floored, 'goals', foldIndex(floored))[0]![1] as {
+          currentAmount: number;
+        }
+      ).currentAmount
     ).toBe(0);
   });
 
@@ -694,16 +709,19 @@ describe('docOps — core domain named ops (financial atomic RMW)', () => {
       principalPortion: 90,
     });
     d = pay.doc;
-    expect((materializeCollection(d, 'accounts')[0]![1] as { balance: number }).balance).toBe(910);
+    expect(
+      (materializeCollection(d, 'accounts', foldIndex(d))[0]![1] as { balance: number }).balance
+    ).toBe(910);
 
     const rev = applyMutation(d, {
       op: 'named',
       name: 'reverseLoanPayment',
       args: { loanId: 'acc', principalToRestore: 90 },
     });
-    expect((materializeCollection(rev.doc, 'accounts')[0]![1] as { balance: number }).balance).toBe(
-      1000
-    );
+    expect(
+      (materializeCollection(rev.doc, 'accounts', foldIndex(rev.doc))[0]![1] as { balance: number })
+        .balance
+    ).toBe(1000);
   });
 
   it('applyLoanPayment writes the NESTED asset-loan balance (extra payment)', () => {
@@ -725,7 +743,7 @@ describe('docOps — core domain named ops (financial atomic RMW)', () => {
       args: { loanId: 'ast', paymentAmount: 200, isRecurring: false },
     });
     expect((result as { principalPortion: number }).principalPortion).toBe(200);
-    const host = materializeCollection(doc, 'assets')[0]![1] as {
+    const host = materializeCollection(doc, 'assets', foldIndex(doc))[0]![1] as {
       loan: { outstandingBalance: number };
     };
     expect(host.loan.outstandingBalance).toBe(4800);
