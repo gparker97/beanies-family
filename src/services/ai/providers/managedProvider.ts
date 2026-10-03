@@ -65,6 +65,7 @@ function isServerVerdict(err: unknown): boolean {
       err.code === 'allowance_exceeded')
   );
 }
+import { PLAN_LIMITS_PATH, parsePlanLimits, type PlanLimits } from '@beanies/brand/planLimits';
 import { buildSignal, parseChatCompletion } from './openaiCompatible';
 import { invalidateEnclaveVerification, verifyEnclave } from '../enclave/attestation';
 import { openSealed, sealForEnclave } from '../enclave/seal';
@@ -128,6 +129,7 @@ async function enclaveModel(): Promise<string> {
 /** Test seam, and used by the provider when a sealed request fails for any reason. */
 export function __resetManagedModelForTesting(): void {
   modelPromise = null;
+  planLimitsPromise = null;
 }
 
 /**
@@ -538,6 +540,59 @@ export async function fetchAllowance(args: {
     );
   }
   return usage;
+}
+
+/** Memoised per session, cleared on rejection (the `modelPromise` pattern). */
+let planLimitsPromise: Promise<PlanLimits> | null = null;
+
+/**
+ * The public plan limits (#120): `GET /ai-allowance-limits`, keyless and cached. Read-only and
+ * carrying no family data, so no key or family id rides along. Throws a typed
+ * `ExtractionProviderError` on any failure; the caller keeps its wordless fallback copy.
+ */
+export function fetchPlanLimits(signal?: AbortSignal): Promise<PlanLimits> {
+  planLimitsPromise ??= (async () => {
+    if (!PROXY_URL) {
+      throw new ExtractionProviderError(
+        'not_available',
+        'Managed AI tier is not configured (proxy endpoint unset)'
+      );
+    }
+    let res: Response;
+    try {
+      res = await fetch(new URL(PLAN_LIMITS_PATH, PROXY_URL).href, { signal: buildSignal(signal) });
+    } catch (err) {
+      if (
+        err instanceof DOMException &&
+        (err.name === 'TimeoutError' || err.name === 'AbortError')
+      ) {
+        throw new ExtractionProviderError('timeout', 'Plan limits read timed out', err);
+      }
+      throw new ExtractionProviderError('provider_error', 'Network error reading plan limits', err);
+    }
+    if (!res.ok) {
+      throw new ExtractionProviderError(
+        'not_available',
+        `Plan limits are not available (HTTP ${res.status})`
+      );
+    }
+    let body: unknown;
+    try {
+      body = await res.json();
+    } catch (err) {
+      throw new ExtractionProviderError('malformed_output', 'Plan limits answer was not JSON', err);
+    }
+    const limits = parsePlanLimits(body);
+    if (!limits) {
+      throw new ExtractionProviderError('malformed_output', 'Plan limits answer was not the shape');
+    }
+    return limits;
+  })().catch((err) => {
+    // Never cache a failure, or one blip hides the number for the session.
+    planLimitsPromise = null;
+    throw err;
+  });
+  return planLimitsPromise;
 }
 
 export const managedProvider: ExtractionProvider = {

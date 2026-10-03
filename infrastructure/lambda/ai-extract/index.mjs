@@ -9,7 +9,9 @@
  * Mirrors the registry/telemetry contract: origin-allowlisted CORS via getHeaders(),
  * `x-api-key` soft-auth → 401, OPTIONS → 204, body-size guard → 413, malformed JSON → 400,
  * top-level try/catch → 500. The body cap is deliberately MUCH larger than telemetry's 256 KB
- * because the payload is a base64 image data-URL (~1.33× the compressed bytes).
+ * because the payload is a base64 image data-URL (~1.33× the compressed bytes). One exception to
+ * the key: the read-only `GET /ai-allowance-limits` (#120) answers the public plan limits before the
+ * key check, built entirely by `publicLimits()` in `allowance.mjs`.
  *
  * GATE 3 (#49): see ADR-030 § Gates for the current status. Do NOT restate it here.
  *
@@ -38,6 +40,7 @@ import {
   ALLOWANCE_PROTOCOL,
   allowanceRefusalBody,
   checkAllowance,
+  publicLimits,
   readAllowance,
 } from './allowance.mjs';
 import { HARD_REFUSAL_REASONS } from './correctionGrant.mjs';
@@ -83,14 +86,14 @@ function getHeaders(event) {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': allowedOrigin,
     'Access-Control-Allow-Headers': 'Content-Type, x-api-key',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   };
 }
 
-function response(statusCode, body, event) {
+function response(statusCode, body, event, extraHeaders) {
   return {
     statusCode,
-    headers: getHeaders(event),
+    headers: { ...getHeaders(event), ...extraHeaders },
     body: body === null ? '' : JSON.stringify(body),
   };
 }
@@ -131,6 +134,11 @@ function parseModelJson(content) {
 export async function handler(event) {
   const method = event?.requestContext?.http?.method;
   if (method === 'OPTIONS') return response(204, null, event);
+  // #120: the keyless, read-only public limits (no body, no store, no key). Exact routeKey match,
+  // the registry's convention; the 5-minute cache and the route throttle are its only caps.
+  if (event?.routeKey === 'GET /ai-allowance-limits') {
+    return response(200, publicLimits(), event, { 'Cache-Control': 'public, max-age=300' });
+  }
   if (method !== 'POST') return response(405, { error: 'Method not allowed' }, event);
 
   // Soft API key (in the public bundle; deters casual abuse, mirrors registry/telemetry).

@@ -10,7 +10,7 @@
  * alarm that means the FEATURE is broken rather than someone probing it. So it is asserted
  * against the server's own function, on both source kinds.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   sourceFingerprint,
@@ -29,7 +29,9 @@ import {
   // @ts-expect-error: as above.
 } from '../../../../infrastructure/lambda/registry/entitlement.mjs';
 import {
-  PLAN_ALLOWANCE,
+  planAllowance,
+  FULL_PER_DAY_FALLBACK,
+  ALLOWANCE_CONFIG_ERROR_PREFIX,
   SUBSCRIBED_STATUSES as ALLOWANCE_SUBSCRIBED_STATUSES,
   // @ts-expect-error: as above.
 } from '../../../../infrastructure/lambda/ai-extract/allowance.mjs';
@@ -219,14 +221,27 @@ describe('client / Lambda contract parity', () => {
     expect(SERVER_TRIAL_DAYS).toBe(TRIAL_DAYS);
   });
 
-  it('enforces the same magic-beans allowances the pricing page sells (#95)', () => {
-    // `MAGIC_BEANS` is what /pricing and the app promise; `PLAN_ALLOWANCE` is what the ai-extract
-    // Lambda refuses at. A drift is a family refused below what it paid for, or given more.
-    expect(PLAN_ALLOWANCE).toEqual({
-      trial: { perDay: MAGIC_BEANS.trialPerDay },
-      basic: { perMonth: MAGIC_BEANS.basicPerMonth },
-      full: { perDay: MAGIC_BEANS.fullPerDay },
-    });
+  it('enforces the same magic-beans allowances the pricing page sells (#95, #120)', () => {
+    // `MAGIC_BEANS` is what /pricing and the app promise for trial and basic; the Full number is a
+    // Terraform value the Lambda reads at call time and every surface fetches live. With the env
+    // unset the Lambda must fall back, loudly, and the other tiers must still match.
+    vi.stubEnv('AI_FULL_ALLOWANCE_PER_DAY', '');
+    delete process.env.AI_FULL_ALLOWANCE_PER_DAY;
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    try {
+      expect(planAllowance()).toEqual({
+        trial: { perDay: MAGIC_BEANS.trialPerDay },
+        basic: { perMonth: MAGIC_BEANS.basicPerMonth },
+        full: { perDay: FULL_PER_DAY_FALLBACK },
+      });
+      expect(error).toHaveBeenCalledTimes(1);
+      expect(String(error.mock.calls[0]![0])).toContain(ALLOWANCE_CONFIG_ERROR_PREFIX);
+    } finally {
+      error.mockRestore();
+      log.mockRestore();
+      vi.unstubAllEnvs();
+    }
   });
 
   it('counts the same Stripe statuses as paying in the registry and in ai-extract (#95)', () => {

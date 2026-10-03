@@ -188,7 +188,14 @@ const faqSchema = {
                 </p>
                 <ul>
                   <li><span>✅</span><span>everything in beanies basic</span></li>
-                  <li><span>✅</span><span>up to ten magic beans <em>every day</em></span></li>
+                  <li>
+                    <span>✅</span
+                    ><span
+                      ><span data-bean-limit="full" data-live="up to {count} magic beans"
+                        >plenty of magic beans</span
+                      > <em>every day</em></span
+                    >
+                  </li>
                   <li><span>✅</span><span>early access to exclusive new features</span></li>
                 </ul>
                 <a
@@ -392,6 +399,11 @@ const faqSchema = {
         </section>
   </div>
 </BaseLayout>
+
+<script>
+  import { hydrateBeanLimits } from '../lib/planLimits';
+  void hydrateBeanLimits();
+</script>
 
 <script define:vars={{ PRICES, DEFAULT_CURRENCY }}>
   // One table, one currency at a time. The server rendered USD; this swaps
