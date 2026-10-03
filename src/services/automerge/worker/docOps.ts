@@ -38,6 +38,7 @@ import {
   foldEntity,
   foldIndex,
   foldValue,
+  counterGrowthOps,
   isCounterCollection,
   parseCounterKey,
   resolveField,
@@ -1211,7 +1212,8 @@ export function applyMutation(
  * what makes it safe to replay onto the compacted document at all: an op that
  * stamped the OLD lineage onto the NEW document would be self-inflicted lineage
  * corruption with no external cause. `touchedBetween` ignoring `podLineage` is
- * the second belt.
+ * the second belt. The Counter ledger pass (#117 Phase 2) emits plain `increment`
+ * ops, whose only non-collection write is `counterDeltas` under the TARGET's actor.
  *
  * ⚠️ TWO DIFFERENT EMPTY ANSWERS, and conflating them costs a family a working
  * sync. `null` means CANNOT COMPOSE — an unexpected diff shape, or a baseline
@@ -1231,7 +1233,14 @@ export function buildRebaseOps(
   local: Doc,
   baselineHeads: Heads,
   target: Doc
-): { op: MutationOp | null; count: number; conflicts: number } | null {
+): {
+  op: MutationOp | null;
+  /** Ops replayed, Counter increments included. */
+  count: number;
+  conflicts: number;
+  /** Of `count`, the `increment` ops the Counter ledger pass emitted. */
+  counterIncrements: number;
+} | null {
   // ⚠️ AN EMPTY BASELINE IS NOT "THE BEGINNING OF TIME", IT IS "UNKNOWN".
   // `decodeHeadsFingerprint('')` legitimately answers `[]` for a document with
   // no heads, and `Automerge.hasHeads(doc, [])` is TRUE, so without this the
@@ -1259,6 +1268,11 @@ export function buildRebaseOps(
   const ops: MutationOp[] = [];
   /** Writes that could not be carried across. The saved value stayed. */
   let conflicts = 0;
+  // ⚠️ COUNTER-ONLY TOUCHES FALL THROUGH THIS LOOP ON PURPOSE (#117 Phase 2). `touchedBetween`
+  // reports an entity whose only change is a Counter key; it reaches `threeWayFields` with no
+  // field difference (the absolute did not move) and is skipped. If the compactor deleted it,
+  // it counts as a conflict below, which is honest: its adjustment is dropped by the ledger
+  // pass's `onMissing: 'skip'`. The Counter work itself is that ledger pass, after this loop.
   for (const [collection, ids] of scan.touched) {
     const localColl = (local[collection] ?? {}) as AnyRecord;
     const beforeColl = (before[collection] ?? {}) as AnyRecord;
@@ -1347,11 +1361,19 @@ export function buildRebaseOps(
     if (changed) conflicts += changed.conflicts;
   }
 
-  if (ops.length === 0) return { op: null, count: 0, conflicts }; // nothing to replay
+  // The Counter ledger pass: what the peer adjusted that the target does not yet hold (neither
+  // live nor in the fold ledger), as `increment` ops. AFTER the entity ops, so an entity the peer
+  // created arrives by its raw `set` before its own adjustments land on it.
+  const growth = counterGrowthOps(local, target);
+  ops.push(...growth.ops);
+
+  // nothing to replay
+  if (ops.length === 0) return { op: null, count: 0, conflicts, counterIncrements: 0 };
   return {
     op: ops.length === 1 ? ops[0]! : { op: 'batch', ops },
     count: ops.length,
     conflicts,
+    counterIncrements: growth.count,
   };
 }
 

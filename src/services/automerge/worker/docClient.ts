@@ -1588,7 +1588,7 @@ export async function mergeRemoteEnvelope(
  * What a merge terminus needs to report. A DELIBERATELY LOOSER view of
  * `MergeOutcome` (`protocol.ts`), which is the source of truth for the shape.
  *
- * ⚠️ EXACTLY THESE FOUR KEYS, all but `action` optional. Callers pass fresh object
+ * ⚠️ EXACTLY THESE SIX KEYS, all but `action` optional. Callers pass fresh object
  * literals (see `docClient.test.ts`), so widening the `Pick` to `heads`/`dirty`/
  * `changed`/`remoteHeads` would break them — and the terminus genuinely does not need them.
  * `carried`/`carryFailed` are excluded for a second reason: the carry is reported
@@ -1597,7 +1597,7 @@ export async function mergeRemoteEnvelope(
  */
 export type MergeTerminusOutcome = Pick<
   MergeOutcome,
-  'action' | 'replayed' | 'conflicts' | 'rootConflicts'
+  'action' | 'replayed' | 'conflicts' | 'rootConflicts' | 'counterStats' | 'counterIncrements'
 >;
 
 /**
@@ -1624,7 +1624,12 @@ export function logMergeTerminus(
   // is itself the answer to "did a rebase happen".
   const parts: string[] = [];
   if (outcome.action === 'rebased') {
-    parts.push(`replayed=${outcome.replayed ?? 0}`, `conflicts=${outcome.conflicts ?? 0}`);
+    parts.push(
+      `replayed=${outcome.replayed ?? 0}`,
+      `conflicts=${outcome.conflicts ?? 0}`,
+      // #117 Phase 2: of `replayed`, the Counter adjustments the ledger pass carried across.
+      `counter_increments=${outcome.counterIncrements ?? 0}`
+    );
   }
   // #117 plan F: root conflicts on every action the worker reported them for. A
   // root conflict hides one map's entities and never goes away, so `total` alone
@@ -1634,11 +1639,27 @@ export function logMergeTerminus(
   if (outcome.rootConflicts) {
     parts.push(`root_conflicts=${outcome.rootConflicts.total}`, `added=${rootAdded}`);
   }
+  // #117 Phase 2: the Counter map's shape on every action. `counter_keys` is growth between
+  // compactions, `ledger_keys` the cumulative fold ledger (pruning is decided on this figure).
+  // `counter_conflicts` means two writers shared a key, which construction forbids: a bug, so
+  // `warn`. `counter_malformed` (a key this build cannot read, e.g. a newer build's field)
+  // stays `info`: the key persists until compaction, so a warn would fire on every poll for the
+  // whole mixed-fleet window. Findable by grep on `counter_malformed=`.
+  const counterConflicts = outcome.counterStats?.conflicts ?? 0;
+  if (outcome.counterStats) {
+    const c = outcome.counterStats;
+    parts.push(
+      `counter_keys=${c.keys}`,
+      `counter_conflicts=${c.conflicts}`,
+      `counter_malformed=${c.malformed}`,
+      `ledger_keys=${c.ledgerKeys}`
+    );
+  }
   logEvent({
     // A rebase that dropped a write is not routine: `conflicts` counts edits the
     // replay could not carry, so a family that lost something is findable
-    // without a repro. Nor is a merge that created a root conflict.
-    level: outcome.conflicts || rootAdded > 0 ? 'warn' : 'info',
+    // without a repro. Nor is a merge that created a root conflict, nor a shared Counter key.
+    level: outcome.conflicts || rootAdded > 0 || counterConflicts > 0 ? 'warn' : 'info',
     surface: 'pod-lineage',
     message: `${where} ${outcome.action}`,
     context: {

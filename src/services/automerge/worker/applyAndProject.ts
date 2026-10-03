@@ -56,7 +56,7 @@ import {
   type RootConflictSnapshot,
 } from './docOps';
 import { attachPhotoNamedHandler, collectReferencedPhotoIds as collectPhotoIds } from './photoOps';
-import { foldIndex } from './counterFields';
+import { foldDoc, foldIndex, counterStats, type CounterStats } from './counterFields';
 import * as cache from './cache';
 import type { RemoteBaselineRow } from '@/services/sync/remoteBaseline';
 import type {
@@ -911,6 +911,16 @@ export function noteRemoteBaseline(payload: string): void {
  * closes a real window: answered on main before the RPC, a mutation landing in
  * between yields a stale `clean` and therefore a wrong ADOPT that discards it.
  */
+/** A completed rebase: the new document and what the replay carried. */
+interface RebaseResult {
+  doc: Doc;
+  /** Ops replayed, Counter increments included. */
+  replayed: number;
+  conflicts: number;
+  /** Of `replayed`, the `increment` ops the Counter ledger pass emitted (#117 Phase 2). */
+  counterIncrements: number;
+}
+
 /**
  * Replay the peer's unsynced work onto the remote's lineage — or answer `null`.
  *
@@ -938,18 +948,20 @@ function rebaseOntoRemote(
    * exit there is". Reproduced against @automerge/automerge 3.4.1.
    */
   target: Doc
-): { doc: Doc; replayed: number; conflicts: number } | null {
+): RebaseResult | null {
   try {
     const ops = buildRebaseOps(local, baselineHeads, target);
     if (!ops) return null; // cannot compose → the caller blocks
     // Nothing to replay: the peer is level with its baseline, so the remote can
     // simply be adopted. Blocking here would strand a device that has lost
     // nothing — and `migrateDoc` alone can move heads without any user edit.
-    if (!ops.op) return { doc: target, replayed: 0, conflicts: ops.conflicts };
+    if (!ops.op)
+      return { doc: target, replayed: 0, conflicts: ops.conflicts, counterIncrements: 0 };
     return {
       doc: applyMutationOp(target, ops.op).doc,
       replayed: ops.count,
       conflicts: ops.conflicts,
+      counterIncrements: ops.counterIncrements,
     };
   } catch (e) {
     console.warn('[applyAndProject] rebase unavailable — falling back to the block:', e);
@@ -984,6 +996,23 @@ function maskEntityIds(path: string): string {
   // the first and last segments is total: whatever the id is made of, it cannot
   // survive.
   return `${root}.<id>.${parts[parts.length - 1]}`;
+}
+
+/**
+ * The document-health figures every merge outcome carries: the root conflicts this operation
+ * ADDED (#117 plan F) and the Counter map's shape (#117 Phase 2). One function spread into all
+ * four returns of `mergeRemoteEnvelope`, so the next diagnostic is a field here rather than a
+ * fifth edit at four sites. Reporting only: nothing branches on it except the merge path's
+ * `rootConflicts.added` full-projection gate.
+ */
+function mergeHealth(
+  conflictsBefore: RootConflictSnapshot,
+  doc: Doc
+): { rootConflicts: { total: number; added: number }; counterStats: CounterStats } {
+  return {
+    rootConflicts: rootConflictsSince(conflictsBefore, doc),
+    counterStats: counterStats(doc),
+  };
 }
 
 function lineageContextFor(basis: LineageBasis, doc: Doc): LineageContext {
@@ -1166,7 +1195,7 @@ export async function mergeRemoteEnvelope(
         dirty: true,
         changed: false,
         remoteHeads: headsOf(remote),
-        rootConflicts: rootConflictsSince(conflictsBefore, currentDoc),
+        ...mergeHealth(conflictsBefore, currentDoc),
       };
     }
     // ⚠️ THE REBASE COMPOSES AND APPLIES BEFORE IT INSTALLS. ONE ASSIGNMENT.
@@ -1193,7 +1222,7 @@ export async function mergeRemoteEnvelope(
       // an adopted-but-un-rebased document"). Caught by that very test. The
       // fallback is identical either way: `null`, which blocks, or adopts under
       // `user-file`.
-      let rebased: { doc: Doc; replayed: number; conflicts: number } | null = null;
+      let rebased: RebaseResult | null = null;
       if (baseline) {
         try {
           rebased = rebaseOntoRemote(currentDoc, baseline, migrateRemoteOnce());
@@ -1224,8 +1253,9 @@ export async function mergeRemoteEnvelope(
           remoteHeads: driveHeads,
           replayed: rebased.replayed,
           conflicts: rebased.conflicts,
+          counterIncrements: rebased.counterIncrements,
           // Already a full projection above, so this is reporting only.
-          rootConflicts: rootConflictsSince(conflictsBefore, doc),
+          ...mergeHealth(conflictsBefore, doc),
         };
       }
       // ⚠️ WHERE THE FALLBACK GOES DEPENDS ON WHO ASKED. For an ordinary poll
@@ -1319,7 +1349,7 @@ export async function mergeRemoteEnvelope(
       changed: true,
       remoteHeads,
       // Already a full projection above, so this is reporting only.
-      rootConflicts: rootConflictsSince(conflictsBefore, doc),
+      ...mergeHealth(conflictsBefore, doc),
       // Only ever true on the `user-file` fallback: this adopt is standing in
       // for a rebase that could not run, and the soak needs to see that.
       ...(rebaseUnavailable ? { rebaseUnavailable: true as const } : {}),
@@ -1340,7 +1370,7 @@ export async function mergeRemoteEnvelope(
   currentDoc = merged.doc;
   schedulePersist();
   scheduleSnapshotPersist();
-  const rootConflicts = rootConflictsSince(conflictsBefore, currentDoc);
+  const health = mergeHealth(conflictsBefore, currentDoc);
   // ⚠️ A NEW ROOT CONFLICT FORCES THE FULL PROJECTION (#117, plan F). When a merge changes
   // which map wins at a collection key, the diff is `put [collection]` (a root-level patch,
   // which `projectionDeltasBetween` skips) plus the winner's entities, and NOTHING for the
@@ -1352,7 +1382,9 @@ export async function mergeRemoteEnvelope(
   // projection. `?? buildFullProjection` is NULLISH: an empty (but valid) delta
   // set streams nothing rather than triggering a spurious full rebuild.
   const deltas =
-    rootConflicts.added > 0 ? null : projectionDeltasBetween(currentDoc, localHeads, merged.heads);
+    health.rootConflicts.added > 0
+      ? null
+      : projectionDeltasBetween(currentDoc, localHeads, merged.heads);
   pushDeltas(deltas ?? buildFullProjection(currentDoc));
   // Reuses the same `headsEqual` the persist path uses, against the localHeads
   // captured before the merge — so `changed` means precisely "our doc moved".
@@ -1362,7 +1394,7 @@ export async function mergeRemoteEnvelope(
     dirty: merged.dirty,
     changed: !headsEqual(localHeads, merged.heads),
     remoteHeads,
-    rootConflicts,
+    ...health,
   };
 }
 
@@ -1545,8 +1577,8 @@ export function loadSnapshot(binary: Uint8Array): { loaded: true } {
  *
  * ⚠️ THREE things here are load-bearing:
  *
- *  1. **Verify before installing.** The document is pure JSON, so `toJS -> from`
- *     is type-safe by construction — but "by construction" is not good enough
+ *  1. **Verify before installing.** The source is pure JSON (`foldDoc` folds every
+ *     Counter into its absolute first), so `fold -> from` is type-safe by construction — but "by construction" is not good enough
  *     when the output replaces a family's pod. On any difference the OLD doc is
  *     kept and the path of the first difference is thrown (a path, never a
  *     value: this reaches the firehose).
@@ -1586,7 +1618,12 @@ export function compactDoc(): {
 
   let compacted: Doc;
   try {
-    const plain = Automerge.toJS(before) as unknown as Record<string, unknown>;
+    // #117 Phase 2: the source is FOLDED, never a bare `toJS`. `foldDoc` writes every Counter
+    // key into its absolute, empties `counterDeltas` and EXTENDS the `foldedCounters` ledger (the
+    // rebase reads it to re-emit only growth since this compaction). A bare `toJS` would carry
+    // the map through as live Counters, which the rebuilt history then owns under the
+    // compactor's actor; and the verify below would compare Counter instances, not JSON.
+    const plain = foldDoc(before);
     // The new identity, written INTO the document — see ADR-036. It travels
     // with the history it describes and cannot drift from it, which is the whole
     // reason this moved off the envelope. `docLineage` normalises the legacy

@@ -26,6 +26,8 @@ import type { PayloadLoadError, PayloadLoadStep } from '@/types/sync';
 import { PodLineageError, type LineageVerdict } from '@/services/sync/podLineage';
 import type { PodLineage } from '@/types/models';
 import type { ReconcileNote } from './reconcile';
+// Type-only: erased on main, so the main bundle never pulls `counterFields`' Automerge import.
+import type { CounterStats } from './counterFields';
 
 /** Automerge heads — the change-frontier hashes. Opaque to the main thread. */
 export type Heads = string[];
@@ -132,6 +134,15 @@ export interface MergeOutcome {
    * optional so the deliberately looser views (`MergeTerminusOutcome`) can omit it.
    */
   rootConflicts?: { total: number; added: number };
+  /**
+   * The Counter map's shape after this operation (#117 Phase 2, `counterStats`): live keys,
+   * keys two writers shared (`conflicts`, a bug, raises the terminus to `warn`), keys this build
+   * cannot read (`malformed`, info only: they persist until compaction) and the fold ledger's
+   * size. Present on every action the worker returns; optional for the looser views.
+   */
+  counterStats?: CounterStats;
+  /** Of `replayed`, the Counter `increment` ops the rebase's ledger pass emitted. `rebased` only. */
+  counterIncrements?: number;
 }
 
 // ─── Mutation ops (main → worker; the `changeDoc` closures, made declarative) ─
