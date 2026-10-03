@@ -33,6 +33,8 @@ export type SignOutStepName =
   | 'clearGoogleSessionKeepTokens'
   | 'clearGoogleSessionDropTokens'
   | 'clearAllRefreshTokens'
+  /** `clearAllRefreshTokens` for the resolved family only (the active-scope clear's twin). */
+  | 'clearFamilyRefreshToken'
   | 'resetSyncState'
   | 'clearDepartedArtifacts'
   | 'resetDocClient'
@@ -174,19 +176,31 @@ export const SIGN_OUT_CLEAR_STEPS: readonly SignOutStepName[] = [
  * `signOutAndClearData` caller that is NOT the person choosing "sign out and clear all data"
  * from the menu: delete-family, the fatal overlay's clear, and the demo seed's teardown. None
  * of them asked about the device's OTHER families, so none may delete them (round 3), and
- * that covers their key material too: every `*All` key step runs as its family-scoped twin,
- * or deleting one family would drop every other family's trusted-open key, PIN wraps,
- * passkeys and roster on this device.
+ * that covers their key material too: every `*All` step runs as its family-scoped twin, or
+ * deleting one family would drop every other family's refresh token, trusted-open key, PIN
+ * wraps, passkeys and roster on this device.
+ *
+ * A `null` entry DROPS the step from the active scope. `untrustDevice` / `reArmTrustPrompt`
+ * have no family twin: device trust is one GLOBAL setting, and the active scope keeps every
+ * other family's key material on this device, so untrusting it would silently change how
+ * those families open (and re-ask a trust question the person already answered for them).
  */
-const ACTIVE_SCOPE_STEP: Partial<Record<SignOutStepName, SignOutStepName>> = {
+const ACTIVE_SCOPE_STEP: Partial<Record<SignOutStepName, SignOutStepName | null>> = {
+  clearAllRefreshTokens: 'clearFamilyRefreshToken',
   deleteAllLocalFamilies: 'deleteFamilyDb',
+  untrustDevice: null,
+  reArmTrustPrompt: null,
   clearKeyCacheAll: 'clearKeyCacheFamily',
   removePinWrapsAll: 'removePinWrapsFamily',
   reclaimAllPasskeys: 'reclaimFamilyPasskeys',
   removeRosterAll: 'removeRosterFamily',
 };
-export const SIGN_OUT_CLEAR_ACTIVE_STEPS: readonly SignOutStepName[] = SIGN_OUT_CLEAR_STEPS.map(
-  (s): SignOutStepName => ACTIVE_SCOPE_STEP[s] ?? s
+export const SIGN_OUT_CLEAR_ACTIVE_STEPS: readonly SignOutStepName[] = SIGN_OUT_CLEAR_STEPS.flatMap(
+  (s): SignOutStepName[] => {
+    const twin = ACTIVE_SCOPE_STEP[s];
+    if (twin === null) return [];
+    return [twin ?? s];
+  }
 );
 
 /** Which families a tier-3 clear deletes: the open one (default) or every one on the device. */

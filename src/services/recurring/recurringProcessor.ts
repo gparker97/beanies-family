@@ -17,7 +17,7 @@ import { logEvent } from '@/services/telemetry';
 import * as perfTiming from '@/utils/perfTiming';
 import { recurringInstanceDate, recurringInstanceKey } from '@/utils/recurringInstance';
 import { ReadOnlyError, skipWhileReadOnly } from '@/services/automerge/worker/writeGate';
-import { WorkerCrashError } from '@/services/automerge/worker/protocol';
+import { NoDocumentLoadedError, WorkerCrashError } from '@/services/automerge/worker/protocol';
 import { isRemoteBlocker } from '@/types/sync';
 
 export interface ProcessResult {
@@ -324,14 +324,16 @@ export function __resetRecurringFailureCountsForTesting(): void {
 }
 
 /**
- * Did the write fail for a reason outside this item: the worker crashed or timed out, the
- * family is read-only, or the document itself is refused (a remote blocker)? Classified by
+ * Did the write fail for a reason outside this item: the worker crashed or timed out, has no
+ * document loaded, the family is read-only, or the document itself is refused (a remote blocker)? Classified by
  * class/name, since these arrive on main as their real classes or as docClient's own errors.
  */
 function isInfrastructureError(e: unknown): boolean {
   if (!(e instanceof Error)) return false;
   if (e instanceof WorkerCrashError || e.name === 'WorkerCrashError') return true;
   if (e instanceof ReadOnlyError || e.name === 'ReadOnlyError') return true;
+  // The worker has no document loaded (boot, family switch, sign-out): a lifecycle state.
+  if (e instanceof NoDocumentLoadedError || e.name === 'NoDocumentLoadedError') return true;
   if (isRemoteBlocker(e)) return true;
   // docClient's RPC deadline (`requestCore`) and its no-backend refusal are plain errors.
   return /^doc-worker (unavailable|'[^']*' (timed out|exceeded absolute deadline))/.test(e.message);

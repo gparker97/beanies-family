@@ -262,12 +262,35 @@ describe('round 3, item 1: the key swap aborts a straddling save; whenIdle waits
     expect(p.write).not.toHaveBeenCalled();
     expect(logEvent).toHaveBeenCalledWith(
       expect.objectContaining({
-        context: { action: 'aborted-provider-changed', stage: 'abort-held' },
+        context: { action: 'aborted-provider-changed', stage: 'export', detail: 'abort-held' },
       })
     );
     expect(syncService.cancelPendingSave()).toBe(false); // held, not armed yet
     release!(); // the previous family is back: the aborted intent re-arms
     expect(syncService.cancelPendingSave()).toBe(true);
+  });
+
+  it.each([
+    ['the ack revision', { revision: 'ver:2' }],
+    ['the re-probed marker (unparseable ack)', undefined],
+  ])('a write that lands after the key swap commits no baseline (%s)', async (_label, ack) => {
+    const p = drive({ probe: 'ver:1', ack: 'ver:2' });
+    let release: (() => void) | null = null;
+    p.write.mockImplementation(async () => {
+      release = syncService.holdSaves('cross-family-decrypt');
+      syncService.advanceHoldEpoch(); // the worker key swap lands inside the write
+      p.getRemoteMarker.mockImplementation(async () => ({ revision: 'ver:2', modifiedTime: null }));
+      return ack as never;
+    });
+    syncService.setProvider(p as never, 'fam');
+    syncService.setFamilyKey(KEY, envelope());
+    await expect(syncService.save()).resolves.toBe(true); // the write DID land
+    expect(p.write).toHaveBeenCalledTimes(1);
+    // Only the pre-write merge's baseline (the probe revision); nothing for our write.
+    const committed = vi.mocked(docClient.noteRemoteBaseline).mock.calls.map((c) => String(c[0]));
+    expect(committed.every((c) => !c.includes('ver:2'))).toBe(true);
+    expect(actions()).not.toContain('write-advance');
+    release!();
   });
 
   it('the swap latch clears with the hold, so the next save merges and lands', async () => {

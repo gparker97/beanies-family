@@ -450,11 +450,31 @@ describe('final pass, item 4: a stale-lineage cache is superseded only when the 
     }
     expect(writeBase).not.toHaveBeenCalled();
 
+    // The other tab keeps writing on its (newer) lineage: an edit this realm never sees.
+    const tabEdit = Automerge.change(newer, (d) => {
+      (d.todos as Record<string, unknown>).tab2 = { id: 'tab2', title: 'tab2' };
+    });
+    const otherTabRow = 'inc:000000000999:othertab';
+    await putRaw(
+      otherTabRow,
+      bufferToBase64(
+        await encryptPayload(key, frameChanges(getChangesSince(tabEdit, getHeads(newer))))
+      )
+    );
+
     // Installing the newer lineage (here wholesale; a peer merge adopts or rebases) lifts it.
     await ap.mergeRemoteEnvelope(newerEnvelope, FAMILY, { kind: 'no-local-document' });
     await ap.flush();
     expect(writeBase).toHaveBeenCalled();
     expect(docLineage(loadDoc(ap.exportSnapshot().binary))).toMatchObject({ id: 'other-tab' });
+    // The lift's base is non-superseding: the other tab's same-lineage row survives, while this
+    // realm's own (contained) increments are gone.
+    expect(writeBase.mock.calls.every(([, , opts]) => opts?.supersede !== true)).toBe(true);
+    const keys = await allKeys();
+    expect(keys.filter((k) => k.startsWith('inc:'))).toEqual([otherTabRow]);
+    await reload();
+    await ap.initAndLoadCache(FAMILY);
+    expect(liveTodos()).toEqual(['a', 'tab2']);
   });
 
   it('a failed baseline clear rides the replay as bookkeeping', async () => {
@@ -498,7 +518,7 @@ describe('final pass, item 6: only a session that merged and still missed the de
       if (i < 2) await ap.mergeRemoteEnvelope(remote, FAMILY, BASELINE);
       await ap.flush();
     }
-    expect(await ap.listQuarantinedRows()).toEqual({ ids: [`q${orphan}`] });
+    expect(await cache.listQuarantinedRows()).toEqual([`q${orphan}`]);
     await reload();
     expect((await ap.initAndLoadCache(FAMILY)).replay).toMatchObject({ quarantinedTotal: 1 });
   });
@@ -522,8 +542,8 @@ describe('final pass, item 6: only a session that merged and still missed the de
   });
 });
 
-describe('final pass, item 7: the give-up rebuild is classified and runs before the quarantine', () => {
-  it('an allocation failure in the rebuild is a PayloadLoadError that cannot open; the rows stay', async () => {
+describe('final pass, item 7: the give-up rebuild runs before the quarantine and never blocks the open', () => {
+  it('an allocation failure in the rebuild skips the give-up: the open succeeds, the rows stay inc:*', async () => {
     const { remote, orphan } = await seedOrphanRow();
     for (let i = 0; i < 2; i++) {
       await reload();
@@ -533,15 +553,30 @@ describe('final pass, item 7: the give-up rebuild is classified and runs before 
     }
     const real = docOps.applyChanges;
     // Only the rebuild applies onto an EMPTY document; the replay applies onto the base.
-    vi.spyOn(docOps, 'applyChanges').mockImplementation((doc, changes) => {
+    const applySpy = vi.spyOn(docOps, 'applyChanges').mockImplementation((doc, changes) => {
       if (Automerge.getHeads(doc).length === 0) {
         throw new RangeError('Array buffer allocation failed');
       }
       return real(doc, changes);
     });
     await reload();
-    await expect(ap.initAndLoadCache(FAMILY)).rejects.toMatchObject({ deviceCannotOpen: true });
-    expect(await allKeys()).toContain(orphan); // nothing was quarantined
+    const res = await ap.initAndLoadCache(FAMILY);
+    expect(res.loaded).toBe(true);
+    expect(res.replay).toMatchObject({ missingDeps: 1 });
+    expect(res.replay?.fenceGaveUp).toBeUndefined();
+    expect(res.replay?.bookkeepingFailed).toEqual(['fence-rebuild:RangeError']);
+    expect(liveTodos()).toEqual(['a']);
+    await ap.flush();
+    const keys = await allKeys();
+    expect(keys).toContain(orphan); // nothing was quarantined
+    expect(keys.filter((k) => k.startsWith('q'))).toEqual([]);
+    // The run is cleared, so the next open does not retry the give-up.
+    expect(await cache.readMetaCounter('fence-merges')).toBe(0);
+    applySpy.mockRestore();
+    await reload();
+    const next = await ap.initAndLoadCache(FAMILY);
+    expect(next.replay?.fenceGaveUp).toBeUndefined();
+    expect(await allKeys()).toContain(orphan);
   });
 });
 

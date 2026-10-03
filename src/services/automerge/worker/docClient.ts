@@ -138,6 +138,12 @@ let familyKeyRaw: Uint8Array | null = null;
  * the old family's pending persists before a cross-family swap. Cleared with the key.
  */
 let familyKeyFamilyId: string | null = null;
+/**
+ * Bumped by `reset` (round 4). `setFamilyKey` captures it before its awaits and drops its post
+ * when it moved: a key whose session was reset meanwhile (a failed cross-family decrypt with
+ * nothing unlocked before) must not land in the worker after the reset cleared it.
+ */
+let keyGeneration = 0;
 
 /**
  * The `setKey` args, in whichever form this realm can actually deliver.
@@ -946,8 +952,6 @@ const RETRYABLE_METHODS = new Set([
   // C12: a pure read, and an idempotent re-stream of the projection.
   'hasHeads',
   'pushProjection',
-  // Round 3: a pure key-range read of the open cache.
-  'listQuarantinedRows',
 ]);
 
 // Methods where a USER-VISIBLE edit is in doubt when they fail: the user tapped
@@ -1570,15 +1574,30 @@ export async function setFamilyKey(key: CryptoKey, familyId: string): Promise<vo
   // compiler-enforced and a future sixth caller cannot omit it.
   familyKey = key;
   familyKeyFamilyId = familyId || null;
+  const gen = keyGeneration;
+  /** A `reset` landed during an await: this key belongs to a session that is gone. */
+  const superseded = (step: string): boolean => {
+    if (gen === keyGeneration) return false;
+    logEvent({
+      level: 'info',
+      surface: 'doc-worker',
+      message: 'family key post dropped: the session was reset meanwhile',
+      context: { action: 'set-key-superseded', stage: step },
+    });
+    return true;
+  };
   // Export ONCE, here, where a failure can still be handled. A non-extractable key (nothing
   // produces one today, but nothing stops a future path) leaves `familyKeyRaw` null and the
   // post falls back to the CryptoKey — today's behaviour, and correct everywhere but iOS.
+  let raw: Uint8Array | null;
   try {
-    familyKeyRaw = await exportFamilyKey(key);
+    raw = await exportFamilyKey(key);
   } catch (e) {
-    familyKeyRaw = null;
+    raw = null;
     console.warn('[docClient] family key is not exportable; posting the CryptoKey instead', e);
   }
+  if (superseded('export')) return;
+  familyKeyRaw = raw;
   // ⚠️ ACTOR PINNING IS OFF. See `ACTOR_PINNING_ENABLED` below — it is one
   // constant, and everything it gates (the lease, the derivation, their tests)
   // is intact and ready for the day the invariant it needs actually holds.
@@ -1586,13 +1605,16 @@ export async function setFamilyKey(key: CryptoKey, familyId: string): Promise<vo
   // When on: only the realm holding the lease pins the device actor; every
   // other realm passes no actor and Automerge mints a random one. Neither call
   // throws — an actor-derivation or lease failure must never stop a pod opening.
-  docActor =
+  const actor =
     ACTOR_PINNING_ENABLED && (await acquireActorLease(familyId))
       ? await deviceActorId(familyId)
       : null;
+  if (superseded('actor')) return;
+  docActor = actor;
   // ⚠️ ACTOR BEFORE KEY: every doc-creating op is downstream of the key, so the
   // actor has to be in the realm before any of them can run.
   await request('setActor', { actor: docActor });
+  if (superseded('set-actor')) return;
   await request('setKey', setKeyArgs() ?? { key, familyId: familyKeyFamilyId });
 }
 
@@ -1772,15 +1794,6 @@ function logCacheReplay(replay: CacheReplay, familyId: string): void {
  */
 export function reseedCacheFromLiveDoc(familyId: string): Promise<{ reseeded: boolean }> {
   return request('reseedCacheFromLiveDoc', { familyId }, { quiet: true });
-}
-
-/**
- * Round 3: the open cache's quarantined rows (`qinc:*`), by key. They never replay, so this (and
- * `quarantined_total` on the `cache-replay` event) is how they stay visible. Never throws in the
- * worker; empty when no cache is open.
- */
-export function listQuarantinedRows(): Promise<{ ids: string[] }> {
-  return request('listQuarantinedRows', undefined, { quiet: true });
 }
 
 /**
@@ -2257,6 +2270,7 @@ export async function reset(): Promise<void> {
   // reset() during the quiet window is the teardown itself; nothing to change here —
   // the next initDoc (below) re-arms normal toast policy.
   setCurrentFamily(null);
+  keyGeneration++;
   familyKey = null;
   familyKeyRaw = null;
   familyKeyFamilyId = null;

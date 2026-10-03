@@ -27,11 +27,13 @@ export const getProviderType = vi.fn(() => null);
 export const getProvider = vi.fn(() => null);
 export const getProviderFamilyId = vi.fn<() => string | null>(() => null);
 export const setProvider = vi.fn();
+export const clearProvider = vi.fn();
 export const selectNativeLocalFile = vi.fn(async () => true);
 
 // Family key / envelope (V4)
 export const setFamilyKey = vi.fn();
 export const getFamilyKey = vi.fn(() => null);
+export const clearFamilyKey = vi.fn();
 export const hasFamilyKey = vi.fn(() => false);
 export const getEnvelope = vi.fn(() => null);
 export const setEnvelope = vi.fn();

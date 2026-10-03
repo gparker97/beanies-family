@@ -42,7 +42,12 @@ import {
   __resetWriteGateForTesting,
   ReadOnlyError,
 } from '@/services/automerge/worker/writeGate';
-import { WorkerCrashError } from '@/services/automerge/worker/protocol';
+import {
+  NoDocumentLoadedError,
+  WorkerCrashError,
+  reconstructError,
+  serializeError,
+} from '@/services/automerge/worker/protocol';
 
 const mockAccount: Account = {
   id: 'test-account-1',
@@ -352,12 +357,19 @@ describe('recurringProcessor - the cursor stops at the first failure (audit C7)'
     expect(reportError).not.toHaveBeenCalledWith(expect.objectContaining({ severity: 'critical' }));
   });
 
-  it('infrastructure failures (worker crash, RPC timeout, read-only) stop the cursor but never count toward giving up', async () => {
+  it('infrastructure failures (worker crash, RPC timeout, read-only, no document) stop the cursor but never count toward giving up', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
+    // The worker's "no document loaded" refusal as main actually receives it: across the wire.
+    const noDoc = reconstructError(
+      serializeError(new NoDocumentLoadedError("docWorker: no document loaded for 'mutate'")),
+      'mutate'
+    );
+    expect(noDoc).toBeInstanceOf(NoDocumentLoadedError);
     const infra = [
       new WorkerCrashError('doc-worker crashed'),
       new Error("doc-worker 'mutate' timed out"),
       new ReadOnlyError('transactions'),
+      noDoc,
       new WorkerCrashError('doc-worker crashed'),
     ];
     for (const err of infra) {

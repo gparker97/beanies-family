@@ -64,10 +64,30 @@ export function setActiveFamily(familyId: string): void {
   // different family closes the old one, which would otherwise block that queue's delete.
   if (currentFamilyId !== familyId || !dbPromise) {
     retireHandle(currentFamilyId, dbPromise);
-    const handle = openDB(familyId);
+    dbPromise = null;
+    currentFamilyId = familyId;
+    bindDB();
+  }
+  startListening();
+  // Attempt an immediate flush in case entries are already pending.
+  if (navigator.onLine && flushHandler) {
+    flushInBackground();
+  }
+}
+
+/**
+ * Open the bound family's database if no handle is held: on activation, and again on the
+ * next flush or enqueue after an open that failed (the failed handle is forgotten, so a
+ * transient failure does not need a fresh `setActiveFamily` to recover). Returns the handle,
+ * or null when no family is bound.
+ */
+function bindDB(): Promise<IDBDatabase> | null {
+  if (!dbPromise && currentFamilyId) {
+    const handle = openDB(currentFamilyId);
     dbPromise = handle;
     // A failed open (quota, private mode, a blocked upgrade) is logged, never an unhandled
-    // rejection, and forgets the dead handle so the next activation or flush reopens it.
+    // rejection, and forgets the dead handle so the next activation, flush or enqueue
+    // reopens it through here.
     handle.catch((e: unknown) => {
       logEvent({
         level: 'warn',
@@ -79,12 +99,7 @@ export function setActiveFamily(familyId: string): void {
       if (dbPromise === handle) dbPromise = null;
     });
   }
-  currentFamilyId = familyId;
-  startListening();
-  // Attempt an immediate flush in case entries are already pending.
-  if (navigator.onLine && flushHandler) {
-    flushInBackground();
-  }
+  return dbPromise;
 }
 
 /**
@@ -184,9 +199,10 @@ const inFlightFlush = new Map<string, Promise<void>>();
  * that lands while a drain is running joins that drain's promise instead.
  */
 export function flushQueue(): Promise<void> {
+  if (!currentFamilyId || !flushHandler) return Promise.resolve();
   const familyId = currentFamilyId;
-  const db = dbPromise;
-  if (!familyId || !db || !flushHandler) return Promise.resolve();
+  const db = bindDB();
+  if (!db) return Promise.resolve();
   // Keyed by family (round 3): a drain still finishing for the PREVIOUS family must not be
   // joined by a flush for the new one (it would stop at its next entry and drain nothing).
   const running = inFlightFlush.get(familyId);
@@ -303,6 +319,9 @@ export async function deletePhotoQueueDatabase(familyId: string): Promise<void> 
       });
     }
     dbPromise = null;
+    // Unbind too: `bindDB` reopens a bound family's missing handle on the next flush or
+    // enqueue, which here would recreate the queue this call is deleting.
+    currentFamilyId = null;
   }
   // Never rejects: sign-out must not stall on queue cleanup. A refused or blocked delete is
   // reported so a queue that survives sign-out (and would flush under the next sign-in of a
@@ -349,12 +368,17 @@ function openDB(familyId: string): Promise<IDBDatabase> {
 }
 
 async function requireDB(): Promise<IDBDatabase> {
-  if (!dbPromise) {
-    throw new Error(
-      'photoUploadQueue: no active family. Call setActiveFamily() before enqueueing.'
-    );
+  const handle = bindDB();
+  if (!handle) {
+    throw new Error('photoUploadQueue: no family bound. Call setActiveFamily() before enqueueing.');
   }
-  return dbPromise;
+  try {
+    return await handle;
+  } catch (e) {
+    throw new Error(`photoUploadQueue: the queue database could not be opened (${errorCode(e)}).`, {
+      cause: e,
+    });
+  }
 }
 
 function withStore<T = void>(

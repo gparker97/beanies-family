@@ -17,7 +17,11 @@ import type { RpcRequest } from '../protocol';
 
 vi.mock('@/composables/useToast', () => ({ showToast: vi.fn() }));
 vi.mock('@/utils/perfTiming', () => ({ record: vi.fn() }));
-vi.mock('../../projection', () => ({ applyDelta: vi.fn(), markAuthoritative: vi.fn() }));
+vi.mock('../../projection', () => ({
+  applyDelta: vi.fn(),
+  markAuthoritative: vi.fn(),
+  resetProjection: vi.fn(),
+}));
 vi.mock('@/utils/errorReporter', () => ({ reportError: vi.fn() }));
 vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: vi.fn() }));
 vi.mock('@/utils/visibilityTracker', () => ({
@@ -25,7 +29,7 @@ vi.mock('@/utils/visibilityTracker', () => ({
   getHiddenDurationMs: vi.fn(() => null),
 }));
 
-import { setWorkerFactory, setFamilyKey, __resetDocClientForTesting } from '../docClient';
+import { setWorkerFactory, setFamilyKey, reset, __resetDocClientForTesting } from '../docClient';
 import { generateFamilyKey, exportFamilyKey } from '@/services/crypto/familyKeyService';
 
 /** A worker whose `postMessage` refuses a `CryptoKey`, the way iOS WKWebView does. */
@@ -122,5 +126,23 @@ describe('docClient — the family key crosses to the worker as raw bytes', () =
     const args = (posted.find((p) => p.method === 'setKey')!.args ?? {}) as Record<string, unknown>;
     expect(args.raw).toBeUndefined();
     expect(args.key).toBe(nonExtractable);
+  });
+});
+
+describe('docClient — a key whose session was reset meanwhile never reaches the worker (round 4)', () => {
+  beforeEach(() => {
+    __resetDocClientForTesting();
+  });
+
+  it('setFamilyKey in flight, then reset(): no setKey is posted after the reset', async () => {
+    const fw = new WebKitLikeWorker();
+    setWorkerFactory(() => fw);
+    const key = await generateFamilyKey();
+    const posting = setFamilyKey(key, 'fam-failed'); // fire-and-forget, as syncService does
+    await reset(); // lands while the key is still being exported
+    await posting;
+    const methods = fw.posted.map((p) => p.method);
+    expect(methods).toContain('reset');
+    expect(methods).not.toContain('setKey');
   });
 });

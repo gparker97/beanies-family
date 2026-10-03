@@ -3140,6 +3140,14 @@ export const useAuthStore = defineStore('auth', () => {
         const families = await getAllFamilies();
         await Promise.allSettled(families.map((f) => clearGoogleRefreshToken(f.id)));
       },
+      clearFamilyRefreshToken: async () => {
+        // The active-scope twin: only the departing family's token. It runs before
+        // `resolveFamilyId` in the tier order, so resolve here rather than read `ctx`.
+        const familyId = ctx.familyId ?? resolveSignOutFamilyId();
+        if (!familyId) return;
+        const { clearGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
+        await clearGoogleRefreshToken(familyId);
+      },
       resetSyncState: async () => {
         const { useSyncStore } = await import('./syncStore');
         useSyncStore().resetState();
@@ -3348,18 +3356,10 @@ export const useAuthStore = defineStore('auth', () => {
       },
       reclaimFamilyPasskeys: async () => {
         // `reclaimAllPasskeys` scoped to the resolved family (an active-scope clear must not
-        // touch another family's passkeys): keystore blobs, then records, then the Signal.
+        // touch another family's passkeys). The same implementation `deleteLocalFamily` runs.
         if (!ctx.familyId) return;
-        const { reclaimFamilyKeystore, signalCredentialsRemoved } =
-          await import('@/services/auth/passkeyService');
-        const { getPasskeysByFamily, removePasskeyRegistration } =
-          await import('@/services/indexeddb/repositories/passkeyRepository');
-        await reclaimFamilyKeystore(ctx.familyId);
-        const passkeys = await getPasskeysByFamily(ctx.familyId);
-        for (const pk of passkeys) await removePasskeyRegistration(pk.credentialId);
-        if (passkeys.length > 0) {
-          await signalCredentialsRemoved(passkeys.map((pk) => pk.credentialId));
-        }
+        const { reclaimPasskeysForFamily } = await import('@/services/auth/passkeyService');
+        await reclaimPasskeysForFamily(ctx.familyId);
       },
       forgetLocalFamily: async () => {
         if (!ctx.familyId) throw new Error('forgetLocalFamily: no familyId');

@@ -855,14 +855,23 @@ describe('Sensitive Data Clearing Security', () => {
       expect(await settings.getCachedFamilyKey('family-123')).toBeNull();
     });
 
-    it('resets isTrustedDevice to false', async () => {
+    it('the clear-all-data choice resets isTrustedDevice to false', async () => {
       const { auth, settings } = populateAllStores();
       await settings.setTrustedDevice(true);
       expect(settings.isTrustedDevice).toBe(true);
 
-      await auth.signOutAndClearData();
+      await auth.signOutAndClearData({ scope: 'all' });
 
       expect(settings.isTrustedDevice).toBe(false);
+    });
+
+    it('an active-scope clear leaves device trust alone (global; other families keep their keys)', async () => {
+      const { auth, settings } = populateAllStores();
+      await settings.setTrustedDevice(true);
+
+      await auth.signOutAndClearData();
+
+      expect(settings.isTrustedDevice).toBe(true);
     });
 
     it('clears currentUser (email, memberId, familyId) and isAuthenticated', async () => {
@@ -942,9 +951,10 @@ describe('Sensitive Data Clearing Security', () => {
         await settings.setTrustedDevice(true);
         mockDeleteFamilyDatabase.mockResolvedValueOnce({ deleted: false });
 
+        registryPasskeys.rows = [{ credentialId: 'cred-1', familyId: 'family-123' }];
         await expect(auth.signOutAndClearData()).resolves.toEqual({ cacheDeleted: false });
-        // The steps after `deleteFamilyDb` were not skipped.
-        expect(settings.isTrustedDevice).toBe(false);
+        // The steps after `deleteFamilyDb` were not skipped (the passkey reclaim runs later).
+        expect(registryPasskeys.rows).toEqual([]);
         expect(auth.isAuthenticated).toBe(false);
       });
 
