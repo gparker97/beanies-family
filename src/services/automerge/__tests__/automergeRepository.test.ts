@@ -512,6 +512,31 @@ describe('createAutomergeRepository', () => {
     });
   });
 
+  describe('goals are born with manualContributions: [] (#117 Phase 2)', () => {
+    const goalRepo = createAutomergeRepository<'goals', import('@/types/models').Goal>('goals');
+    const goal = {
+      name: 'Holiday',
+      type: 'savings',
+      targetAmount: 1000,
+      currentAmount: 0,
+      currency: 'USD',
+      priority: 'medium',
+      isCompleted: false,
+    } as any;
+
+    it('create seeds an empty history so two first contributions both keep their row', async () => {
+      const created = await goalRepo.create(goal);
+      const stored = projGetById('goals', created.id) as unknown as Record<string, unknown>;
+      expect(stored.manualContributions).toEqual([]);
+    });
+
+    it('keeps a history the input already carries', async () => {
+      const entry = { id: 'c-1', amount: 5, date: '2026-10-03', author: 'm-1' };
+      const created = await goalRepo.create({ ...goal, manualContributions: [entry] });
+      expect(projGetById('goals', created.id)!.manualContributions).toEqual([entry]);
+    });
+  });
+
   describe('photo hosts are born with photoIds: [] (#117)', () => {
     const recipeRepo = createAutomergeRepository<'recipes', import('@/types/models').Recipe>(
       'recipes'

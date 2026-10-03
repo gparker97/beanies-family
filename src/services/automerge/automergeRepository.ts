@@ -100,6 +100,15 @@ export function patchOp(
  * (already `Promise`-returning). Array-ref stores keep their own surgical update
  * from the echoed return.
  */
+/**
+ * Optional arrays created empty with the entity so a first concurrent append on two devices
+ * merges instead of racing on the key (#117). Photo hosts are handled by `isFlatPhotoHost`;
+ * this table is for everything else.
+ */
+const SEEDED_ARRAYS: Partial<Record<CollectionName, readonly string[]>> = {
+  goals: ['manualContributions'],
+};
+
 export function createAutomergeRepository<
   K extends CollectionName,
   Entity extends CollectionEntity<K> = CollectionEntity<K>,
@@ -145,17 +154,26 @@ export function createAutomergeRepository<
 
   /**
    * The stored shape of a new entity: input + id + both timestamps, plain and undefined-free.
-   * A flat photo host is born with `photoIds: []` (#117), so its first attach is a list insert
-   * that merges, not the creation of the key, which two devices would race on (one device's
-   * photo id lost, then the photo itself collected by the next GC).
+   *
+   * Arrays that two devices may append to concurrently are BORN EMPTY (#117): the first append
+   * is then a list insert that merges, not the creation of the key, which two devices would race
+   * on and one side would lose. A flat photo host is born with `photoIds: []` (one device's photo
+   * id lost, then the photo itself collected by the next GC); a goal is born with
+   * `manualContributions: []` (Phase 2: two first contributions kept the amount but only one
+   * history row, so the drawer's total did not add up to its rows). Add to `SEEDED_ARRAYS`
+   * when a collection gains another concurrently-appended optional array.
    */
   function stampNew(id: string, input: CreateInput, now: string): Entity {
     const raw = input as Record<string, unknown>;
-    const seedPhotoIds = raw.photoIds === undefined && isFlatPhotoHost(collectionName);
+    const seeded: Record<string, unknown[]> = {};
+    if (raw.photoIds === undefined && isFlatPhotoHost(collectionName)) seeded.photoIds = [];
+    for (const field of SEEDED_ARRAYS[collectionName] ?? []) {
+      if (raw[field] === undefined) seeded[field] = [];
+    }
     return toPlain(
       stripUndefined({
         ...raw,
-        ...(seedPhotoIds ? { photoIds: [] } : undefined),
+        ...seeded,
         id,
         createdAt: now,
         updatedAt: now,
