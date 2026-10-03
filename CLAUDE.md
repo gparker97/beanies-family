@@ -38,7 +38,7 @@
 > - `~/projects/beanies-ops/docs/investigations/`, `~/projects/beanies-ops/docs/runbooks/`: incident write-ups and operational runbooks
 > - `~/projects/beanies-ops/infrastructure/` + `~/projects/beanies-ops/scripts/infra/tf-plan.sh` / `tf-apply.sh`: the Terraform; it deploys the Lambda and CloudFront Function code that stays here in `infrastructure/`
 >
-> **Ops skills load through symlinks.** `/deploy-prod-auto`, `/end-session`, `/good-morning`, `/beanies-metrics` and the other ops/marketing skills live in `~/projects/beanies-ops/.claude/skills/`. Run `~/projects/beanies-ops/scripts/link-ops-skills.sh [checkout-or-worktree]` once per checkout (it is idempotent) to link them into `.claude/skills/`; `.gitignore` keeps the links out of commits. Never copy an ops skill back into this repo.
+> **Ops skills load through symlinks.** `/deploy-prod-auto`, `/end-session`, `/good-morning`, `/beanies-metrics`, `/beanies-new-issue`, `/beanies-pre-plan` (the two tracker-bound skills carry the Notion ids) and the other ops/marketing skills live in `~/projects/beanies-ops/.claude/skills/`. Run `~/projects/beanies-ops/scripts/link-ops-skills.sh [checkout-or-worktree]` once per checkout (it is idempotent) to link them into `.claude/skills/`; `.gitignore` keeps the links out of commits. Never copy an ops skill back into this repo.
 >
 > **Old citations are not broken links.** Code comments, ADRs, CHANGELOG entries and native config cite `docs/plans/…`, `docs/investigations/…`, `docs/runbooks/…`, `docs/STATUS.md`, `docs/E2E_HEALTH.md`, `docs/lessons.md`, `scripts/infra/…` and `infrastructure/modules/<name>/main.tf`. Those paths now resolve inside `~/projects/beanies-ops`; leave existing citations as they are.
 >

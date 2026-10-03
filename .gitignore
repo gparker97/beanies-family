@@ -43,6 +43,8 @@ dist-ssr
 /.claude/skills/beanies-blog
 /.claude/skills/beanies-competitor-analysis
 /.claude/skills/beanies-metrics
+/.claude/skills/beanies-new-issue
+/.claude/skills/beanies-pre-plan
 /.claude/skills/deploy-prod-auto
 /.claude/skills/deploy-prod-skip-ci
 /.claude/skills/end-session
