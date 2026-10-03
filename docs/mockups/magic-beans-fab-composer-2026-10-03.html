@@ -1,0 +1,846 @@
+<title>Magic Beans, One Tap</title>
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     Magic beans one tap away: the FAB opens in place as a composer (2026-10-03)
+
+     Tracker #119. Today the path is FAB → centred "What would you like to add?"
+     modal → "Read something for me" → MagicBeansSheet drawer: three taps to a
+     textarea. This proposes the FAB itself becoming the composer, so one tap
+     lands you in a focused field with attach, camera and Send, and the
+     Everyday beans tiles still directly below as the manual path.
+
+     Direction A, approved by greg 2026-10-03: the composer sits ABOVE the bottom tab bar
+     (the bar stays visible under a dim). The rejected direction B (a sheet covering the
+     bar) was removed from this file after approval.
+
+     CIG-clamped. Every token below comes from .claude/skills/beanies-theme/SKILL.md
+     or packages/brand/theme.css. Nothing invented:
+       Heritage Orange #F15D22 · Terracotta #E67E22 · Deep Slate #2C3E50
+       Sky Silk #AED6F1 · Cloud White #F8F9FA · growth green #27AE60
+       FAB sprite: radial #FF824A→#DD4D14 (light), #3B506A→#1C2A3B (dark)
+       dark: surface-ground #151E27 · surface-raised #1E2A36 · surface-overlay #26343F
+             ink #F2F5F7 · ink-soft #C3CED6 · ink-faint #9AA9B4 · line #4A5B69
+             accent-lift #FF8B5E · terracotta-lift #F0A05A
+     Outfit (headings) · Inter (body) · Caveat (the tagline only, once per screen).
+     Squircle radii, diffused shadows only, no Alert Red anywhere.
+
+     Authored body-only so it both opens via file:// and publishes as an Artifact.
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Inter:wght@400;500;600&family=Caveat:wght@700&display=swap"
+  rel="stylesheet"
+/>
+
+<style>
+  /* ── page chrome only (NOT the design). Theme-aware per artifact rules. ───── */
+  :root {
+    --page-bg: #eef1f4;
+    --page-card: #ffffff;
+    --page-ink: #2c3e50;
+    --page-ink-soft: #4d5d6c;
+    --page-line: rgb(44 62 80 / 10%);
+    --page-shadow: 0 4px 20px rgb(44 62 80 / 6%);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) {
+      --page-bg: #101820;
+      --page-card: #1a242e;
+      --page-ink: #f2f5f7;
+      --page-ink-soft: #9aa9b4;
+      --page-line: rgb(255 255 255 / 10%);
+      --page-shadow: 0 4px 20px rgb(0 0 0 / 30%);
+    }
+  }
+  :root[data-theme='dark'] {
+    --page-bg: #101820;
+    --page-card: #1a242e;
+    --page-ink: #f2f5f7;
+    --page-ink-soft: #9aa9b4;
+    --page-line: rgb(255 255 255 / 10%);
+    --page-shadow: 0 4px 20px rgb(0 0 0 / 30%);
+  }
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    margin: 0;
+    background: var(--page-bg);
+    color: var(--page-ink);
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 28px 20px 72px;
+  }
+  h1 {
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.5rem;
+    font-weight: 800;
+    margin: 0 0 6px;
+    letter-spacing: -0.01em;
+  }
+  h1 em {
+    font-style: normal;
+    color: #f15d22;
+  }
+  .lede,
+  .sub {
+    font-size: 0.875rem;
+    line-height: 1.6;
+    color: var(--page-ink-soft);
+    max-width: 72ch;
+    margin: 0 0 4px;
+  }
+  .sub {
+    font-size: 0.8125rem;
+    margin-bottom: 18px;
+  }
+  h2 {
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.125rem;
+    font-weight: 700;
+    margin: 40px 0 4px;
+  }
+  h2 .n {
+    color: #f15d22;
+    margin-right: 8px;
+  }
+  .row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 22px;
+    align-items: flex-start;
+  }
+  .cap {
+    font-size: 0.75rem;
+    color: var(--page-ink-soft);
+    margin: 8px 0 0;
+    max-width: 288px;
+    line-height: 1.5;
+  }
+  .cap b {
+    color: var(--page-ink);
+    font-weight: 600;
+  }
+  .note {
+    background: var(--page-card);
+    border-radius: 20px;
+    padding: 16px 18px;
+    box-shadow: var(--page-shadow);
+    font-size: 0.8125rem;
+    line-height: 1.6;
+    max-width: 74ch;
+  }
+  .note ul {
+    margin: 6px 0 0;
+    padding-left: 18px;
+  }
+  .note li + li {
+    margin-top: 4px;
+  }
+  .pick {
+    display: inline-block;
+    font-family: 'Outfit', sans-serif;
+    font-weight: 700;
+    font-size: 0.75rem;
+    color: #fff;
+    background: linear-gradient(135deg, #f15d22, #e67e22);
+    border-radius: 999px;
+    padding: 3px 10px;
+    margin-left: 8px;
+    vertical-align: middle;
+  }
+
+  /* ── phone frame: 390 × 844 drawn at 0.74 ───────────────────────────────── */
+  .phone {
+    background: #1f2d3a;
+    border-radius: 30px;
+    padding: 9px;
+    width: 306px;
+    flex: 0 0 auto;
+  }
+  .screen {
+    border-radius: 22px;
+    overflow: hidden;
+    height: 624px;
+    position: relative;
+    font-size: 0.75rem;
+    background: #f8f9fa;
+    color: #2c3e50;
+  }
+  .screen.dark {
+    background: #151e27;
+    color: #f2f5f7;
+  }
+
+  /* app chrome behind the composer */
+  .appbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 14px 8px;
+    font-family: 'Outfit', sans-serif;
+    font-weight: 700;
+    font-size: 0.9rem;
+  }
+  .appbar .burger {
+    width: 24px;
+    height: 24px;
+    border-radius: 8px;
+    display: grid;
+    gap: 3px;
+    align-content: center;
+    padding: 0 5px;
+  }
+  .appbar .burger i {
+    display: block;
+    height: 2px;
+    border-radius: 2px;
+    background: rgb(44 62 80 / 50%);
+  }
+  .appbar .burger i:last-child {
+    width: 60%;
+    background: #f15d22;
+  }
+  .dark .appbar .burger i {
+    background: rgb(242 245 247 / 50%);
+  }
+  .dark .appbar .burger i:last-child {
+    background: #ff8b5e;
+  }
+  .nook {
+    padding: 4px 14px;
+    display: grid;
+    gap: 10px;
+  }
+  .nook .card {
+    background: #fff;
+    border-radius: 18px;
+    padding: 12px;
+    box-shadow: 0 4px 20px rgb(44 62 80 / 5%);
+    min-height: 58px;
+  }
+  .dark .nook .card {
+    background: #1e2a36;
+    box-shadow: none;
+  }
+  .nook .card h4 {
+    margin: 0 0 6px;
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.75rem;
+  }
+  .nook .line {
+    height: 8px;
+    border-radius: 4px;
+    background: rgb(44 62 80 / 8%);
+    margin-top: 6px;
+  }
+  .dark .nook .line {
+    background: rgb(242 245 247 / 8%);
+  }
+  .nook .line.s {
+    width: 60%;
+  }
+
+  /* bottom tab bar: fixed, 56px + safe area, z-40 */
+  .tabbar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 58px;
+    padding-bottom: 8px;
+    background: #fff;
+    border-top: 1px solid rgb(44 62 80 / 8%);
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    align-items: center;
+    text-align: center;
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.5625rem;
+    font-weight: 600;
+    color: #4d5d6c;
+    z-index: 40;
+  }
+  .dark .tabbar {
+    background: #1e2a36;
+    border-top-color: #4a5b69;
+    color: #c3ced6;
+  }
+  .tabbar span {
+    display: grid;
+    gap: 2px;
+  }
+  .tabbar span b {
+    font-size: 1rem;
+    font-weight: 400;
+  }
+  .tabbar .on {
+    color: #f15d22;
+  }
+  .dark .tabbar .on {
+    color: #ff8b5e;
+  }
+
+  /* the FAB at rest: 64px, +92px above the bar, right 16 */
+  .fab {
+    position: absolute;
+    right: 12px;
+    bottom: 68px;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 50% 38%, #ff824a, #dd4d14);
+    box-shadow: 0 8px 24px rgb(241 93 34 / 45%);
+    display: grid;
+    place-items: center;
+    color: #fff;
+    font-size: 1.5rem;
+    line-height: 1;
+    z-index: 40;
+  }
+  .dark .fab {
+    background: radial-gradient(circle at 50% 38%, #3b506a, #1c2a3b);
+    box-shadow: 0 8px 24px rgb(0 0 0 / 45%);
+  }
+  .fab::after {
+    content: '+';
+    font-family: 'Outfit', sans-serif;
+    font-weight: 600;
+    margin-top: -2px;
+  }
+
+  /* dim behind an open composer */
+  .dim {
+    position: absolute;
+    inset: 0;
+    background: rgb(44 62 80 / 35%);
+    z-index: 45;
+  }
+  .dark .dim {
+    background: rgb(0 0 0 / 50%);
+  }
+
+  /* ── the composer card (shared by A and B) ─────────────────────────────── */
+  .composer {
+    position: absolute;
+    z-index: 50;
+    background: #fff;
+    color: #2c3e50;
+    border-radius: 24px;
+    box-shadow: 0 8px 40px rgb(44 62 80 / 18%);
+    padding: 14px 14px 12px;
+    display: grid;
+    gap: 10px;
+  }
+  .dark .composer {
+    background: #1e2a36;
+    color: #f2f5f7;
+    box-shadow: 0 8px 40px rgb(0 0 0 / 50%);
+  }
+  /* A: anchored to the FAB corner, above the bar */
+  .composer.a {
+    left: 12px;
+    right: 12px;
+    bottom: 68px;
+    transform-origin: 100% 100%;
+  }
+  /* B: a sheet from the bottom edge, covers the bar */
+  .composer.b {
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: 24px 24px 0 0;
+    padding-bottom: 18px;
+  }
+  .handle {
+    width: 36px;
+    height: 4px;
+    border-radius: 2px;
+    background: rgb(44 62 80 / 20%);
+    margin: -4px auto 2px;
+  }
+  .dark .handle {
+    background: #4a5b69;
+  }
+  .chead {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .chead .t {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 700;
+    font-size: 0.875rem;
+    white-space: nowrap;
+  }
+  .chead .tag {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-family: 'Caveat', cursive;
+    font-size: 0.9rem;
+    color: #e67e22;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .dark .chead .tag {
+    color: #f0a05a;
+  }
+  .chead .x {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    color: #4d5d6c;
+    background: rgb(44 62 80 / 6%);
+    font-size: 0.75rem;
+    flex: 0 0 auto;
+  }
+  .dark .chead .x {
+    color: #c3ced6;
+    background: #26343f;
+  }
+  .field {
+    border: 1.5px solid #aed6f1;
+    border-radius: 14px;
+    padding: 10px 12px;
+    min-height: 74px;
+    font-size: 0.8125rem;
+    line-height: 1.45;
+    color: #7a8794;
+    box-shadow: 0 0 0 3px rgb(174 214 241 / 35%);
+    position: relative;
+    background: #fff;
+  }
+  .dark .field {
+    background: #26343f;
+    border-color: #aed6f1;
+    color: #9aa9b4;
+    box-shadow: 0 0 0 3px rgb(174 214 241 / 18%);
+  }
+  .field .caret {
+    display: inline-block;
+    width: 1.5px;
+    height: 14px;
+    background: #f15d22;
+    vertical-align: -2px;
+    margin-right: 2px;
+  }
+  .field.typed {
+    color: #2c3e50;
+  }
+  .dark .field.typed {
+    color: #f2f5f7;
+  }
+  .tools {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .ico {
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+    border: 1.5px solid rgb(44 62 80 / 14%);
+    display: grid;
+    place-items: center;
+    color: #2c3e50;
+    font-size: 0.95rem;
+    background: #fff;
+  }
+  .dark .ico {
+    border-color: #4a5b69;
+    background: #26343f;
+    color: #f2f5f7;
+  }
+  .allow {
+    margin-left: auto;
+    font-size: 0.6875rem;
+    color: #4d5d6c;
+    text-align: right;
+    line-height: 1.3;
+  }
+  .dark .allow {
+    color: #c3ced6;
+  }
+  .allow .bar {
+    height: 3px;
+    border-radius: 2px;
+    background: rgb(44 62 80 / 8%);
+    margin-top: 4px;
+    overflow: hidden;
+  }
+  .dark .allow .bar {
+    background: rgb(242 245 247 / 10%);
+  }
+  .allow .bar i {
+    display: block;
+    height: 100%;
+    width: 92%;
+    background: linear-gradient(90deg, #f15d22, #e67e22);
+  }
+  .send {
+    height: 36px;
+    padding: 0 14px 0 12px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #f15d22, #e67e22);
+    color: #fff;
+    font-family: 'Outfit', sans-serif;
+    font-weight: 700;
+    font-size: 0.8125rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    box-shadow: 0 6px 18px rgb(241 93 34 / 30%);
+    flex: 0 0 auto;
+  }
+  .send svg {
+    width: 14px;
+    height: 14px;
+    fill: #fff;
+  }
+  .send.off {
+    opacity: 0.45;
+    box-shadow: none;
+  }
+  .everyday {
+    border-top: 1px solid rgb(44 62 80 / 8%);
+    padding-top: 10px;
+    display: grid;
+    gap: 8px;
+  }
+  .dark .everyday {
+    border-top-color: #4a5b69;
+  }
+  .everyday .k {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 700;
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #4d5d6c;
+    display: flex;
+    justify-content: space-between;
+  }
+  .dark .everyday .k {
+    color: #c3ced6;
+  }
+  .everyday .k em {
+    font-style: normal;
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 500;
+    font-family: 'Inter', sans-serif;
+  }
+  .tiles {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+  .tile {
+    border-radius: 14px;
+    background: #f8f9fa;
+    padding: 8px 4px;
+    text-align: center;
+    display: grid;
+    gap: 3px;
+    font-size: 0.6875rem;
+    font-weight: 500;
+  }
+  .dark .tile {
+    background: #26343f;
+  }
+  .tile b {
+    font-size: 1rem;
+    font-weight: 400;
+  }
+  .more {
+    text-align: center;
+    font-size: 0.6875rem;
+    color: #f15d22;
+    font-weight: 600;
+  }
+  .dark .more {
+    color: #ff8b5e;
+  }
+
+  /* ── desktop frame 1280 × 800 at 0.62 ───────────────────────────────────── */
+  .desk {
+    width: 794px;
+    max-width: 100%;
+    height: 496px;
+    border-radius: 16px;
+    overflow: hidden;
+    position: relative;
+    background: #f8f9fa;
+    box-shadow: var(--page-shadow);
+    display: flex;
+    font-size: 0.75rem;
+    color: #2c3e50;
+  }
+  .desk.dark {
+    background: #151e27;
+    color: #f2f5f7;
+  }
+  .side {
+    width: 150px;
+    background: #2c3e50;
+    color: #fff;
+    padding: 16px 12px;
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.7rem;
+    display: grid;
+    gap: 8px;
+    align-content: start;
+  }
+  .desk.dark .side {
+    background: #1e2a36;
+  }
+  .side .logo {
+    font-weight: 800;
+    font-size: 0.85rem;
+    margin-bottom: 8px;
+  }
+  .side .logo em {
+    font-style: normal;
+    color: #f15d22;
+  }
+  .side .it {
+    padding: 6px 8px;
+    border-radius: 10px;
+    opacity: 0.8;
+  }
+  .side .it.on {
+    background: linear-gradient(90deg, rgb(241 93 34 / 35%), transparent);
+    border-left: 3px solid #f15d22;
+    opacity: 1;
+  }
+  .main {
+    flex: 1;
+    padding: 20px 24px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    align-content: start;
+  }
+  .main .card {
+    background: #fff;
+    border-radius: 18px;
+    min-height: 90px;
+    box-shadow: 0 4px 20px rgb(44 62 80 / 5%);
+  }
+  .desk.dark .main .card {
+    background: #1e2a36;
+    box-shadow: none;
+  }
+  .desk .fab {
+    right: 16px;
+    bottom: 16px;
+  }
+  .desk .composer {
+    right: 16px;
+    bottom: 16px;
+    left: auto;
+    width: 320px;
+    border-radius: 24px;
+  }
+  .desk .dim {
+    display: none;
+  }
+
+  /* reduced motion: nothing here animates, but keep the hook honest */
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      transition: none !important;
+    }
+  }
+</style>
+
+<div class="wrap">
+  <h1>Magic beans, <em>one tap away</em></h1>
+  <p class="lede">
+    Tracker #119. Today reaching the magic beans composer takes three taps: the FAB, then a centred
+    "What would you like to add?" modal, then "Read something for me", then the drawer. This makes the
+    FAB itself the door. One tap, and you are typing.
+  </p>
+  <p class="sub">
+    greg approved direction A on 2026-10-03: the expanded FAB sits above the bottom tab bar, which
+    stays visible under a dim. The rejected alternative (a bottom sheet covering the bar) is not kept
+    here. Phone frames are 390 wide, drawn at 74%. Desktop is 1280, drawn at 62%.
+  </p>
+
+  <h2><span class="n">1</span>Rest state, for reference</h2>
+  <p class="sub">
+    Unchanged from today: a 64px FAB at +92px above the tab bar, so the bar and the bean stack keep their
+    anchor. Only what happens on tap changes.
+  </p>
+  <div class="row">
+    <div>
+      <div class="phone">
+        <div class="screen">
+          <div class="appbar">
+            <span class="burger"><i></i><i></i><i></i></span><span>Hi, greg</span><span>🔔</span>
+          </div>
+          <div class="nook">
+            <div class="card"><h4>Today</h4><div class="line"></div><div class="line s"></div></div>
+            <div class="card"><h4>This week</h4><div class="line"></div><div class="line s"></div></div>
+            <div class="card"><h4>Beans</h4><div class="line"></div></div>
+          </div>
+          <div class="fab" aria-hidden="true"></div>
+          <div class="tabbar">
+            <span class="on"><b>🏡</b>Nook</span><span><b>🌳</b>Planning</span><span><b>📅</b>Calendar</span><span><b>🐷</b>Money</span><span><b>👨‍👩‍👦</b>Pod</span>
+          </div>
+        </div>
+      </div>
+      <p class="cap">The Nook with the FAB at rest. Light.</p>
+    </div>
+  </div>
+
+  <h2><span class="n">2</span>The composer sits above the tab bar <span class="pick">approved 2026-10-03</span></h2>
+  <p class="sub">
+    The FAB grows from its own corner into a card that stops where the FAB stopped, +92px up. The tab bar
+    stays visible under a dim, so the page never feels replaced; it feels like the button opened. The
+    field is focused on open with today's placeholder. Attach and camera are compact icon buttons; the
+    allowance sits beside Send so the cost is visible before it is spent. Everyday beans are directly
+    below, above the fold at 390.
+  </p>
+  <div class="row">
+    <div>
+      <div class="phone">
+        <div class="screen">
+          <div class="appbar">
+            <span class="burger"><i></i><i></i><i></i></span><span>Hi, greg</span><span>🔔</span>
+          </div>
+          <div class="nook">
+            <div class="card"><h4>Today</h4><div class="line"></div><div class="line s"></div></div>
+            <div class="card"><h4>This week</h4><div class="line"></div><div class="line s"></div></div>
+          </div>
+          <div class="dim"></div>
+          <div class="composer a">
+            <div class="chead">
+              <span class="t">Magic beans</span>
+              <span class="tag">give us something to read</span>
+              <span class="x">✕</span>
+            </div>
+            <div class="field"><span class="caret"></span>Remind me to walk the dog tomorrow at 10am…</div>
+            <div class="tools">
+              <span class="ico">📎</span><span class="ico">📷</span>
+              <span class="allow">23 of 25 magic beans left today<div class="bar"><i></i></div></span>
+              <span class="send off"><svg viewBox="0 0 24 24"><path d="M4 4l16 8-16 8 3-8z" /></svg>Send</span>
+            </div>
+            <div class="everyday">
+              <div class="k">🫘 Everyday beans <em>or add one by hand</em></div>
+              <div class="tiles">
+                <span class="tile"><b>📅</b>Activity</span><span class="tile"><b>✅</b>To-do</span><span class="tile"><b>🧾</b>Transaction</span>
+                <span class="tile"><b>💳</b>Account</span><span class="tile"><b>✈️</b>Trip</span><span class="tile"><b>👨‍🍳</b>Recipe</span>
+              </div>
+              <div class="more">Family · Money · Care</div>
+            </div>
+          </div>
+          <div class="tabbar">
+            <span class="on"><b>🏡</b>Nook</span><span><b>🌳</b>Planning</span><span><b>📅</b>Calendar</span><span><b>🐷</b>Money</span><span><b>👨‍👩‍👦</b>Pod</span>
+          </div>
+        </div>
+      </div>
+      <p class="cap"><b>Open, empty.</b> Send is quiet until there is text. The tab bar is still there under the dim.</p>
+    </div>
+
+    <div>
+      <div class="phone">
+        <div class="screen dark">
+          <div class="appbar">
+            <span class="burger"><i></i><i></i><i></i></span><span>Hi, greg</span><span>🔔</span>
+          </div>
+          <div class="nook">
+            <div class="card"><h4>Today</h4><div class="line"></div><div class="line s"></div></div>
+            <div class="card"><h4>This week</h4><div class="line"></div><div class="line s"></div></div>
+          </div>
+          <div class="dim"></div>
+          <div class="composer a">
+            <div class="chead">
+              <span class="t">Magic beans</span>
+              <span class="tag">give us something to read</span>
+              <span class="x">✕</span>
+            </div>
+            <div class="field typed">Swimming for Joey every Tuesday 4pm at Katong, from next week<span class="caret"></span></div>
+            <div class="tools">
+              <span class="ico">📎</span><span class="ico">📷</span>
+              <span class="allow">23 of 25 magic beans left today<div class="bar"><i></i></div></span>
+              <span class="send"><svg viewBox="0 0 24 24"><path d="M4 4l16 8-16 8 3-8z" /></svg>Send</span>
+            </div>
+            <div class="everyday">
+              <div class="k">🫘 Everyday beans <em>or add one by hand</em></div>
+              <div class="tiles">
+                <span class="tile"><b>📅</b>Activity</span><span class="tile"><b>✅</b>To-do</span><span class="tile"><b>🧾</b>Transaction</span>
+                <span class="tile"><b>💳</b>Account</span><span class="tile"><b>✈️</b>Trip</span><span class="tile"><b>👨‍🍳</b>Recipe</span>
+              </div>
+              <div class="more">Family · Money · Care</div>
+            </div>
+          </div>
+          <div class="tabbar">
+            <span class="on"><b>🏡</b>Nook</span><span><b>🌳</b>Planning</span><span><b>📅</b>Calendar</span><span><b>🐷</b>Money</span><span><b>👨‍👩‍👦</b>Pod</span>
+          </div>
+        </div>
+      </div>
+      <p class="cap"><b>Typed, dark.</b> Send lights up in the house gradient. Surfaces step ground → raised → overlay; accents lift.</p>
+    </div>
+  </div>
+
+  <h2><span class="n">3</span>On desktop</h2>
+  <p class="sub">
+    There is no tab bar at 768px and up, so the composer grows from the FAB's corner into a 420px card.
+    No backdrop: the page stays usable behind it, like a chat window.
+  </p>
+  <div class="row">
+    <div class="desk">
+      <div class="side">
+        <div class="logo">beanies<em>.family</em></div>
+        <div class="it on">🏡 The Nook</div><div class="it">📅 Planner</div><div class="it">✅ To-dos</div><div class="it">🐷 Piggy Bank</div><div class="it">👨‍👩‍👦 The Pod</div>
+      </div>
+      <div class="main">
+        <div class="card"></div><div class="card"></div><div class="card"></div>
+        <div class="card"></div><div class="card"></div><div class="card"></div>
+      </div>
+      <div class="composer">
+        <div class="chead">
+          <span class="t">Magic beans</span>
+          <span class="tag">give us something to read</span>
+          <span class="x">✕</span>
+        </div>
+        <div class="field typed">Dentist for all three boys, 14 Nov 3pm, Parkway Parade<span class="caret"></span></div>
+        <div class="tools">
+          <span class="ico">📎</span><span class="ico">📷</span>
+          <span class="allow">23 of 25 magic beans left today<div class="bar"><i></i></div></span>
+          <span class="send"><svg viewBox="0 0 24 24"><path d="M4 4l16 8-16 8 3-8z" /></svg>Send</span>
+        </div>
+        <div class="everyday">
+          <div class="k">🫘 Everyday beans <em>or add one by hand</em></div>
+          <div class="tiles">
+            <span class="tile"><b>📅</b>Activity</span><span class="tile"><b>✅</b>To-do</span><span class="tile"><b>🧾</b>Transaction</span>
+            <span class="tile"><b>💳</b>Account</span><span class="tile"><b>✈️</b>Trip</span><span class="tile"><b>👨‍🍳</b>Recipe</span>
+          </div>
+          <div class="more">Family · Money · Care</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2><span class="n">4</span>What stays exactly as it is</h2>
+  <div class="note">
+    The composer is a new face on the existing door, not a new door.
+    <ul>
+      <li>MagicBeansDoor's five invariants hold: refuse-if-busy and consent happen at Send, the picker is mounted outside the composer, the composer closes before the ingest starts, and the capture-opened event fires at the FAB tap.</li>
+      <li>Send produces today's result drawer. "Read it" and "Read something for me" retire; the verb is Send wherever the composer is reached (en, beanie, zh).</li>
+      <li>The per-page ✨ doors (calendar, cookbook, travel, budget, to-dos) keep the side drawer and their category hints.</li>
+      <li>The allowance line is the existing one from Settings; it is hidden for BYOK, beta and read-only, as today. A read-only family sees the composer but Send is refused with the existing copy. The 402 quota toast is unchanged.</li>
+      <li>Scoped sheets (Scrapbook, Timeline with a filter) open the tiles only, with no composer, as they hide the reader card today.</li>
+      <li>Routes with hideQuickAdd still hide the FAB.</li>
+    </ul>
+  </div>
+</div>
