@@ -195,21 +195,90 @@ describe('round 3: the unpushed-at-signout marker is cleared once a save certifi
   });
 });
 
-describe('round 3, item 1: a save hold taken mid-save aborts the save; whenIdle waits for it', () => {
-  it('a save that STRADDLES a hold aborts at its next await (hold epoch), writing nothing', async () => {
+describe('the marker on a non-Drive (local/native) save', () => {
+  const local = () => ({
+    type: 'local' as const,
+    read: vi.fn(async () => null),
+    write: vi.fn(async () => undefined),
+    getLastModified: vi.fn(async () => null),
+    getDisplayName: () => 'pod.beanpod',
+    getFileId: () => null,
+    getAccountEmail: () => null,
+    supportsLocalPolling: () => false,
+  });
+
+  it('a landed local write clears the marker too (the local file IS the family file)', async () => {
+    syncService.setProvider(local() as never, 'fam');
+    syncService.setFamilyKey(KEY, envelope());
+    await expect(syncService.save()).resolves.toBe(true);
+    expect(clearUnpushedAtSignOutMarker).toHaveBeenCalledWith('fam');
+  });
+
+  it('a marker that cannot be cleared is logged, and the save still lands', async () => {
+    vi.mocked(clearUnpushedAtSignOutMarker).mockImplementationOnce(() => {
+      throw new Error('storage gone');
+    });
+    syncService.setProvider(local() as never, 'fam');
+    syncService.setFamilyKey(KEY, envelope());
+    await expect(syncService.save()).resolves.toBe(true);
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        surface: 'sync-save',
+        context: { action: 'marker-clear-failed', error_code: 'Error' },
+      })
+    );
+  });
+});
+
+describe('round 3, item 1: the key swap aborts a straddling save; whenIdle waits for it', () => {
+  it('a save already running when the hold is taken completes under its family (no swap yet)', async () => {
     const p = drive({ probe: 'ver:1', ack: 'ver:2' });
     syncService.setProvider(p as never, 'fam');
     syncService.setFamilyKey(KEY, envelope());
     let release: (() => void) | null = null;
-    // The cross-family decrypt takes its hold while the worker is serialising.
+    // The cross-family decrypt takes its hold while the worker is serialising; the key has
+    // not moved, so this save is still family A's and lands.
     vi.mocked(docClient.exportEncryptedPayload).mockImplementationOnce(async () => {
       release = syncService.holdSaves('cross-family-decrypt');
       return { payload: 'p==', heads: ['h'], lineage: null } as never;
     });
+    await expect(syncService.save()).resolves.toBe(true);
+    expect(p.write).toHaveBeenCalledTimes(1);
+    expect(actions()).not.toContain('aborted-provider-changed');
+    release!();
+  });
+
+  it('a straggler past the key swap aborts (abort-held), writing nothing, and release re-arms it', async () => {
+    const p = drive({ probe: 'ver:1', ack: 'ver:2' });
+    syncService.setProvider(p as never, 'fam');
+    syncService.setFamilyKey(KEY, envelope());
+    let release: (() => void) | null = null;
+    vi.mocked(docClient.exportEncryptedPayload).mockImplementationOnce(async () => {
+      release = syncService.holdSaves('cross-family-decrypt');
+      syncService.advanceHoldEpoch(); // the worker key swap
+      return { payload: 'p==', heads: ['h'], lineage: null } as never;
+    });
     await expect(syncService.save()).resolves.toBe(false);
     expect(p.write).not.toHaveBeenCalled();
-    expect(actions()).toContain('aborted-provider-changed');
-    release!();
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        context: { action: 'aborted-provider-changed', stage: 'abort-held' },
+      })
+    );
+    expect(syncService.cancelPendingSave()).toBe(false); // held, not armed yet
+    release!(); // the previous family is back: the aborted intent re-arms
+    expect(syncService.cancelPendingSave()).toBe(true);
+  });
+
+  it('the swap latch clears with the hold, so the next save merges and lands', async () => {
+    const p = drive({ probe: 'ver:1', ack: 'ver:2' });
+    syncService.setProvider(p as never, 'fam');
+    syncService.setFamilyKey(KEY, envelope());
+    const release = syncService.holdSaves('cross-family-decrypt');
+    syncService.advanceHoldEpoch();
+    release();
+    // Hold lifted: the swap latch clears, so an ordinary save merges again.
+    await expect(syncService.save()).resolves.toBe(true);
   });
 
   it('whenIdle resolves only after the running save settles, and logs the wait', async () => {

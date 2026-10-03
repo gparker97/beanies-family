@@ -16,7 +16,9 @@ import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry';
 import * as perfTiming from '@/utils/perfTiming';
 import { recurringInstanceDate, recurringInstanceKey } from '@/utils/recurringInstance';
-import { skipWhileReadOnly } from '@/services/automerge/worker/writeGate';
+import { ReadOnlyError, skipWhileReadOnly } from '@/services/automerge/worker/writeGate';
+import { WorkerCrashError } from '@/services/automerge/worker/protocol';
+import { isRemoteBlocker } from '@/types/sync';
 
 export interface ProcessResult {
   processed: number;
@@ -305,10 +307,13 @@ function getNextDueDate(item: RecurringItem, afterDate: Date): Date | null {
 type InstanceOutcome = 'created' | 'skipped' | 'failed';
 
 /**
- * Consecutive transient failures per recurring item, this session. A transient failure (worker
- * down, RPC timeout) stops the cursor so the date is retried next run; but an instance that
- * fails EVERY run would pin the cursor forever and silently stop the series, so after
- * `MAX_CONSECUTIVE_FAILURES` the date is skipped with a critical report. Reset on success.
+ * Consecutive cascade failures per recurring item, this session. A failure stops the cursor so
+ * the date is retried next run; but an instance whose cascade fails EVERY run would pin the
+ * cursor forever and silently stop the series, so after `MAX_CONSECUTIVE_FAILURES` the date is
+ * skipped with a critical report. Reset on success. Only errors the cascade raised for THIS
+ * item count: an infrastructure failure (`isInfrastructureError`) says nothing about the item,
+ * so it stops the cursor without counting, and a slow week of worker trouble can never skip a
+ * payment the family expects.
  */
 const MAX_CONSECUTIVE_FAILURES = 3;
 const consecutiveFailures = new Map<string, number>();
@@ -316,6 +321,20 @@ const consecutiveFailures = new Map<string, number>();
 /** Test seam: forget the per-item failure counts. */
 export function __resetRecurringFailureCountsForTesting(): void {
   consecutiveFailures.clear();
+}
+
+/**
+ * Did the write fail for a reason outside this item: the worker crashed or timed out, the
+ * family is read-only, or the document itself is refused (a remote blocker)? Classified by
+ * class/name, since these arrive on main as their real classes or as docClient's own errors.
+ */
+function isInfrastructureError(e: unknown): boolean {
+  if (!(e instanceof Error)) return false;
+  if (e instanceof WorkerCrashError || e.name === 'WorkerCrashError') return true;
+  if (e instanceof ReadOnlyError || e.name === 'ReadOnlyError') return true;
+  if (isRemoteBlocker(e)) return true;
+  // docClient's RPC deadline (`requestCore`) and its no-backend refusal are plain errors.
+  return /^doc-worker (unavailable|'[^']*' (timed out|exceeded absolute deadline))/.test(e.message);
 }
 
 /**
@@ -402,6 +421,21 @@ async function createTransactionFromRecurring(
       });
       return 'skipped';
     }
+    if (isInfrastructureError(e)) {
+      // Not this item's fault: the date is retried next run and the give-up count is untouched.
+      reportError({
+        surface: 'recurring-processor',
+        message: 'recurring-cascade-deferred',
+        severity: 'warning',
+        error: e,
+        context: {
+          recur_surface: 'transaction',
+          action: 'defer-infrastructure',
+          error_code: e instanceof Error ? e.name : 'unknown',
+        },
+      });
+      return 'failed';
+    }
     const failures = (consecutiveFailures.get(item.id) ?? 0) + 1;
     if (failures >= MAX_CONSECUTIVE_FAILURES) {
       // The same instance failed every attempt: stop retrying it so the series continues.
@@ -421,7 +455,7 @@ async function createTransactionFromRecurring(
       return 'skipped';
     }
     consecutiveFailures.set(item.id, failures);
-    // Transient: this instance is retried next run (the cursor stops here).
+    // This instance is retried next run (the cursor stops here).
     reportError({
       surface: 'recurring-processor',
       message: 'recurring-cascade-failed',

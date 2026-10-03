@@ -3346,6 +3346,21 @@ export const useAuthStore = defineStore('auth', () => {
           await signalCredentialsRemoved(passkeys.map((pk) => pk.credentialId));
         }
       },
+      reclaimFamilyPasskeys: async () => {
+        // `reclaimAllPasskeys` scoped to the resolved family (an active-scope clear must not
+        // touch another family's passkeys): keystore blobs, then records, then the Signal.
+        if (!ctx.familyId) return;
+        const { reclaimFamilyKeystore, signalCredentialsRemoved } =
+          await import('@/services/auth/passkeyService');
+        const { getPasskeysByFamily, removePasskeyRegistration } =
+          await import('@/services/indexeddb/repositories/passkeyRepository');
+        await reclaimFamilyKeystore(ctx.familyId);
+        const passkeys = await getPasskeysByFamily(ctx.familyId);
+        for (const pk of passkeys) await removePasskeyRegistration(pk.credentialId);
+        if (passkeys.length > 0) {
+          await signalCredentialsRemoved(passkeys.map((pk) => pk.credentialId));
+        }
+      },
       forgetLocalFamily: async () => {
         if (!ctx.familyId) throw new Error('forgetLocalFamily: no familyId');
         const result = await useFamilyContextStore().deleteLocalFamily(ctx.familyId);
@@ -3538,26 +3553,44 @@ export const useAuthStore = defineStore('auth', () => {
 
   /** One bounded `saveNow`; resolves whether it saved. Never throws. */
   async function boundedSaveNow(timeoutMs: number): Promise<boolean> {
+    // Every non-saving outcome reaches the firehose, so a lost-last-edit report can tell a
+    // hung save from a failed one from one with nothing to write.
+    const logUnsaved = (detail: 'timeout' | 'failed' | 'nothing', error?: unknown) =>
+      logEvent({
+        level: detail === 'nothing' ? 'info' : 'warn',
+        surface: 'sign-out',
+        message: 'save before sign-out did not land',
+        error,
+        context: { action: 'unsaved_probe_save', detail },
+      });
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let timedOut = false;
     try {
       const saved = await Promise.race([
         saveNow(),
         new Promise<boolean>((resolve) => {
-          setTimeout(() => {
+          timer = setTimeout(() => {
+            timedOut = true;
             console.warn('[authStore] force-save timed out — proceeding with sign-out');
             resolve(false);
           }, timeoutMs);
         }),
       ]);
-      if (!saved) {
-        // Not an error — no key/envelope yet (mid-create), nothing dirty, or the
-        // timeout won the race. Logged (never silent) so a lost-last-edit repro
-        // can confirm whether the final save reached Drive.
+      if (timedOut) {
+        logUnsaved('timeout');
+      } else if (!saved) {
+        // Not an error — no key/envelope yet (mid-create) or nothing dirty. Logged (never
+        // silent) so a lost-last-edit repro can confirm whether the final save reached Drive.
         console.warn('[authStore] force-save on sign-out saved nothing (no durable state to save)');
+        logUnsaved('nothing');
       }
       return saved;
     } catch (e) {
       console.warn('[authStore] force-save failed — proceeding with sign-out', e);
+      logUnsaved('failed', e);
       return false;
+    } finally {
+      clearTimeout(timer);
     }
   }
 

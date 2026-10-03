@@ -60,6 +60,8 @@ export type SignOutStepName =
   | 'removeRosterFamily'
   | 'removeRosterAll'
   | 'reclaimAllPasskeys'
+  /** `reclaimAllPasskeys` for the resolved family only: its keystore blobs and passkey records. */
+  | 'reclaimFamilyPasskeys'
   | 'untrustDevice'
   | 'reArmTrustPrompt'
   | 'sweepHandoffFiles'
@@ -171,10 +173,20 @@ export const SIGN_OUT_CLEAR_STEPS: readonly SignOutStepName[] = [
  * `deleteFamilyDb` (this family only) instead of the every-family sweep. The default for every
  * `signOutAndClearData` caller that is NOT the person choosing "sign out and clear all data"
  * from the menu: delete-family, the fatal overlay's clear, and the demo seed's teardown. None
- * of them asked about the device's OTHER families, so none may delete them (round 3).
+ * of them asked about the device's OTHER families, so none may delete them (round 3), and
+ * that covers their key material too: every `*All` key step runs as its family-scoped twin,
+ * or deleting one family would drop every other family's trusted-open key, PIN wraps,
+ * passkeys and roster on this device.
  */
+const ACTIVE_SCOPE_STEP: Partial<Record<SignOutStepName, SignOutStepName>> = {
+  deleteAllLocalFamilies: 'deleteFamilyDb',
+  clearKeyCacheAll: 'clearKeyCacheFamily',
+  removePinWrapsAll: 'removePinWrapsFamily',
+  reclaimAllPasskeys: 'reclaimFamilyPasskeys',
+  removeRosterAll: 'removeRosterFamily',
+};
 export const SIGN_OUT_CLEAR_ACTIVE_STEPS: readonly SignOutStepName[] = SIGN_OUT_CLEAR_STEPS.map(
-  (s): SignOutStepName => (s === 'deleteAllLocalFamilies' ? 'deleteFamilyDb' : s)
+  (s): SignOutStepName => ACTIVE_SCOPE_STEP[s] ?? s
 );
 
 /** Which families a tier-3 clear deletes: the open one (default) or every one on the device. */

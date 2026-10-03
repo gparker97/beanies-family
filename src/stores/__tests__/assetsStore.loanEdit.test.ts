@@ -126,4 +126,47 @@ describe('assetsStore.updateAsset: loan edit through the modal (inline backend)'
     // The mirror follows the live balance, not the stale open-time one.
     expect((projectionGetById('accounts', 'house-loan') as Account).balance).toBe(9600);
   });
+
+  it('a cascade payment that moved the projection but not the store survives an interest-rate edit', async () => {
+    const store = useAssetsStore();
+    const snapshot = JSON.parse(JSON.stringify(store.getAssetById('house'))) as Asset;
+    const wrapper = mount(AssetModal, {
+      props: { open: false, asset: snapshot },
+      global: {
+        stubs: {
+          BeanieFormModal: {
+            emits: ['save'],
+            template: '<div><slot /><button class="save" @click="$emit(\'save\')" /></div>',
+          },
+        },
+      },
+    });
+    await wrapper.setProps({ open: true });
+    await nextTick();
+    await nextTick();
+
+    // The payment cascade lands in the doc (and so the projection) but the store is NOT
+    // reloaded: `getAssetById` still reports the open-time 10000.
+    await mutate({
+      op: 'patch',
+      collection: 'assets',
+      id: 'house',
+      patch: { loan: { ...house.loan!, outstandingBalance: 9200 } },
+    });
+    expect(store.getAssetById('house')!.loan!.outstandingBalance).toBe(10000);
+
+    (wrapper.vm as unknown as { interestRate: number }).interestRate = 5;
+    await nextTick();
+    await wrapper.find('button.save').trigger('click');
+    await vi.waitFor(async () => {
+      await flushPromises();
+      expect(wrapper.emitted('save')).toBeTruthy();
+    });
+    const evs = wrapper.emitted('save')!;
+    const { id, data } = evs[evs.length - 1]![0] as { id: string; data: UpdateAssetInput };
+    await store.updateAsset(id, data);
+
+    expect(stored().loan!.outstandingBalance).toBe(9200);
+    expect(stored().loan!.interestRate).toBe(5);
+  });
 });

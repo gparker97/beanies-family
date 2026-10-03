@@ -20,6 +20,7 @@ import {
   docLineage,
   buildRebaseOps,
 } from '../docOps';
+import * as docOps from '../docOps';
 import * as cache from '../cache';
 import * as ap from '../applyAndProject';
 import { foldDoc } from '../counterFields';
@@ -87,6 +88,8 @@ const liveTodos = () =>
   Object.keys(
     (Automerge.toJS(loadDoc(ap.exportSnapshot().binary)) as { todos: object }).todos
   ).sort();
+
+const BASELINE = { kind: 'baseline', heads: null } as const;
 
 async function envelopeOf(doc: Doc) {
   return {
@@ -158,7 +161,7 @@ describe('round 3, item 2: a live document never merges a cache of another linea
     const before = Automerge.getAllChanges(loadDoc(ap.exportSnapshot().binary)).length;
 
     const res = await ap.initAndLoadCache(FAMILY);
-    expect(res.replay).toMatchObject({ lineageStale: true });
+    expect(res.replay).toMatchObject({ lineageStale: true, lineageDirection: 'live-newer' });
     expect(res.remoteBaseline).toBeNull();
     const live = loadDoc(ap.exportSnapshot().binary);
     // The old history was not grafted on, and the live lineage stands.
@@ -238,6 +241,35 @@ describe('round 3, item 3 (C5a): an unreadable cache is re-seeded, never left fo
   });
 });
 
+/**
+ * A cache holding todo `a`, plus an increment row from another tab whose dep never arrived (a
+ * missing-deps row). `remote` is an envelope that lacks the dep too: the remote this device
+ * keeps reaching. Captured before `d1`, because an Automerge change consumes `d0`'s handle.
+ */
+async function seedOrphanRow(): Promise<{
+  remote: Awaited<ReturnType<typeof envelopeOf>>;
+  orphan: string;
+}> {
+  ap.initDoc();
+  await ap.openCache(FAMILY);
+  setTodo('a');
+  await ap.flush();
+  const d0 = loadDoc(ap.exportSnapshot().binary);
+  const remote = await envelopeOf(d0);
+  const d1 = Automerge.change(d0, (d) => {
+    (d.todos as Record<string, unknown>).b = { id: 'b', title: 'b' };
+  });
+  const d2 = Automerge.change(d1, (d) => {
+    (d.todos as Record<string, unknown>).c = { id: 'c', title: 'c' };
+  });
+  const orphan = 'inc:000000000900:othertab';
+  await putRaw(
+    orphan,
+    bufferToBase64(await encryptPayload(key, frameChanges(getChangesSince(d2, getHeads(d1)))))
+  );
+  return { remote, orphan };
+}
+
 describe('round 3, item 6: damaged replay rows are reported once and leave replay', () => {
   it('a skipped row is quarantined and reported only on the open that found it', async () => {
     ap.initDoc();
@@ -261,27 +293,14 @@ describe('round 3, item 6: damaged replay rows are reported once and leave repla
   });
 
   it('a missing-deps row is reported once, fenced twice, and given up on the third open', async () => {
-    ap.initDoc();
-    await ap.openCache(FAMILY);
-    setTodo('a');
-    await ap.flush();
-    const d0 = loadDoc(ap.exportSnapshot().binary);
-    const d1 = Automerge.change(d0, (d) => {
-      (d.todos as Record<string, unknown>).b = { id: 'b', title: 'b' };
-    });
-    const d2 = Automerge.change(d1, (d) => {
-      (d.todos as Record<string, unknown>).c = { id: 'c', title: 'c' };
-    });
-    const orphan = 'inc:000000000900:othertab';
-    await putRaw(
-      orphan,
-      bufferToBase64(await encryptPayload(key, frameChanges(getChangesSince(d2, getHeads(d1)))))
-    );
+    const { remote, orphan } = await seedOrphanRow();
 
     const seen: Array<Record<string, unknown> | undefined> = [];
     for (let i = 0; i < 3; i++) {
       await reload();
       seen.push((await ap.initAndLoadCache(FAMILY)).replay as never);
+      // Each session reaches the remote, which does not hold the missing deps either.
+      if (i < 2) await ap.mergeRemoteEnvelope(remote, FAMILY, BASELINE);
       await ap.flush();
     }
     expect(seen[0]).toMatchObject({ missingDeps: 1, newlyReported: 1 });
@@ -388,5 +407,150 @@ describe('round 3, item 5 (C8 narrowing): only money fields or existence block a
     const peer = apply(Automerge.clone(o), patchTx({ description: 'peer' }));
     const target = apply(compact(o), { op: 'delete', collection: 'transactions', id: 'T' });
     expect(buildRebaseOps(peer, baseline, target)).toMatchObject({ blockedBy: 'transactions' });
+  });
+});
+
+describe('final pass, item 2: a flush never crosses a key swap', () => {
+  it('A fully flushed, setKey(B), initAndLoadCache(B): no durability failure', async () => {
+    ap.initDoc();
+    await ap.openCache(FAMILY);
+    setTodo('a');
+    await ap.flush();
+    persistSignals.length = 0;
+    await ap.setKey(await generateFamilyKey(), OTHER);
+    await ap.flush(); // an empty delta under the other key is not a refusal
+    await ap.initAndLoadCache(OTHER); // the re-point does not flush A under B's key
+    expect(persistSignals.filter((s) => s.failed)).toEqual([]);
+  });
+});
+
+describe('final pass, item 4: a stale-lineage cache is superseded only when the live side is newer', () => {
+  it('cache-newer: the live document is kept, no base is written over the cache, and adopting lifts the fence', async () => {
+    ap.initDoc();
+    await ap.openCache(FAMILY);
+    setTodo('a');
+    await ap.flush();
+    // Another tab moved the cache on to a newer lineage.
+    const newer = Automerge.change(loadDoc(ap.exportSnapshot().binary), (d) => {
+      (d as { podLineage?: unknown }).podLineage = { id: 'other-tab', seq: 1 };
+    });
+    const newerEnvelope = await envelopeOf(newer);
+    await cache.persistDocBinary(key, saveDoc(newer), { supersede: true });
+    setTodo('live'); // an edit on the older live document
+
+    const res = await ap.initAndLoadCache(FAMILY);
+    expect(res.replay).toMatchObject({ lineageStale: true, lineageDirection: 'cache-newer' });
+    expect(liveTodos()).toEqual(['a', 'live']);
+
+    // Past the re-compaction threshold, still no base write: the cache keeps its newer base.
+    const writeBase = vi.spyOn(cache, 'persistDocBinary');
+    for (let i = 0; i < 51; i++) {
+      setTodo(`e${i}`);
+      await ap.flush();
+    }
+    expect(writeBase).not.toHaveBeenCalled();
+
+    // Installing the newer lineage (here wholesale; a peer merge adopts or rebases) lifts it.
+    await ap.mergeRemoteEnvelope(newerEnvelope, FAMILY, { kind: 'no-local-document' });
+    await ap.flush();
+    expect(writeBase).toHaveBeenCalled();
+    expect(docLineage(loadDoc(ap.exportSnapshot().binary))).toMatchObject({ id: 'other-tab' });
+  });
+
+  it('a failed baseline clear rides the replay as bookkeeping', async () => {
+    ap.initDoc();
+    await ap.openCache(FAMILY);
+    setTodo('a');
+    await ap.flush();
+    ap.compactDoc(); // live-newer, and its superseding base never lands
+    vi.spyOn(cache, 'persistDocBinary').mockRejectedValue(
+      Object.assign(new Error('quota'), { name: 'QuotaExceededError' })
+    );
+    vi.spyOn(cache, 'clearRemoteBaseline').mockRejectedValue(
+      Object.assign(new Error('gone'), { name: 'InvalidStateError' })
+    );
+    const res = await ap.initAndLoadCache(FAMILY);
+    expect(res.replay).toMatchObject({
+      lineageDirection: 'live-newer',
+      bookkeepingFailed: ['lineage-baseline-clear:InvalidStateError'],
+    });
+  });
+});
+
+describe('final pass, item 6: only a session that merged and still missed the deps counts', () => {
+  it('offline opens (no merge) never give the fence up', async () => {
+    const { orphan } = await seedOrphanRow();
+    for (let i = 0; i < 4; i++) {
+      await reload();
+      const res = await ap.initAndLoadCache(FAMILY);
+      expect(res.replay).toMatchObject({ missingDeps: 1 });
+      expect(res.replay?.fenceGaveUp).toBeUndefined();
+      await ap.flush();
+    }
+    expect(await allKeys()).toContain(orphan);
+  });
+
+  it('the quarantined rows are listed, and counted on every later open', async () => {
+    const { remote, orphan } = await seedOrphanRow();
+    for (let i = 0; i < 3; i++) {
+      await reload();
+      await ap.initAndLoadCache(FAMILY);
+      if (i < 2) await ap.mergeRemoteEnvelope(remote, FAMILY, BASELINE);
+      await ap.flush();
+    }
+    expect(await ap.listQuarantinedRows()).toEqual({ ids: [`q${orphan}`] });
+    await reload();
+    expect((await ap.initAndLoadCache(FAMILY)).replay).toMatchObject({ quarantinedTotal: 1 });
+  });
+
+  it('a failed quarantine keeps the fence and is reported as bookkeeping', async () => {
+    const { remote, orphan } = await seedOrphanRow();
+    for (let i = 0; i < 2; i++) {
+      await reload();
+      await ap.initAndLoadCache(FAMILY);
+      await ap.mergeRemoteEnvelope(remote, FAMILY, BASELINE);
+      await ap.flush();
+    }
+    vi.spyOn(cache, 'quarantinePendingRows').mockRejectedValue(
+      Object.assign(new Error('tx'), { name: 'AbortError' })
+    );
+    await reload();
+    const res = await ap.initAndLoadCache(FAMILY);
+    expect(res.replay?.fenceGaveUp).toBeUndefined();
+    expect(res.replay?.bookkeepingFailed).toEqual(['fence-quarantine:AbortError']);
+    expect(await allKeys()).toContain(orphan);
+  });
+});
+
+describe('final pass, item 7: the give-up rebuild is classified and runs before the quarantine', () => {
+  it('an allocation failure in the rebuild is a PayloadLoadError that cannot open; the rows stay', async () => {
+    const { remote, orphan } = await seedOrphanRow();
+    for (let i = 0; i < 2; i++) {
+      await reload();
+      await ap.initAndLoadCache(FAMILY);
+      await ap.mergeRemoteEnvelope(remote, FAMILY, BASELINE);
+      await ap.flush();
+    }
+    const real = docOps.applyChanges;
+    // Only the rebuild applies onto an EMPTY document; the replay applies onto the base.
+    vi.spyOn(docOps, 'applyChanges').mockImplementation((doc, changes) => {
+      if (Automerge.getHeads(doc).length === 0) {
+        throw new RangeError('Array buffer allocation failed');
+      }
+      return real(doc, changes);
+    });
+    await reload();
+    await expect(ap.initAndLoadCache(FAMILY)).rejects.toMatchObject({ deviceCannotOpen: true });
+    expect(await allKeys()).toContain(orphan); // nothing was quarantined
+  });
+});
+
+describe('final pass, item 8: an unreadable report marker is bookkeeping, not silence', () => {
+  it('replay-reported-unparseable rides the replay', async () => {
+    await seedOrphanRow();
+    await putRaw('meta:replay-reported', '{not json');
+    await reload();
+    const res = await ap.initAndLoadCache(FAMILY);
+    expect(res.replay?.bookkeepingFailed).toEqual(['replay-reported-unparseable:SyntaxError']);
   });
 });

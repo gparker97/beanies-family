@@ -33,16 +33,34 @@ describe('signOutStepsFor', () => {
 });
 
 describe('round 3: only the menu clear sweeps every family', () => {
+  // Each every-family step and the family-scoped twin the active scope runs in its place.
+  const TWINS: Array<[SignOutStepName, SignOutStepName]> = [
+    ['deleteAllLocalFamilies', 'deleteFamilyDb'],
+    ['clearKeyCacheAll', 'clearKeyCacheFamily'],
+    ['removePinWrapsAll', 'removePinWrapsFamily'],
+    ['reclaimAllPasskeys', 'reclaimFamilyPasskeys'],
+    ['removeRosterAll', 'removeRosterFamily'],
+  ];
+
   it('the active-scope clear deletes the active family only, otherwise the same teardown', () => {
-    expect(SIGN_OUT_CLEAR_ACTIVE_STEPS).toContain('deleteFamilyDb');
-    expect(SIGN_OUT_CLEAR_ACTIVE_STEPS).not.toContain('deleteAllLocalFamilies');
-    expect(SIGN_OUT_CLEAR_ACTIVE_STEPS.filter((s) => s !== 'deleteFamilyDb')).toEqual(
-      SIGN_OUT_CLEAR_STEPS.filter((s) => s !== 'deleteAllLocalFamilies')
-    );
-    expect(SIGN_OUT_CLEAR_ACTIVE_STEPS.indexOf('deleteFamilyDb')).toBe(
-      SIGN_OUT_CLEAR_STEPS.indexOf('deleteAllLocalFamilies')
+    const twinOf = new Map(TWINS);
+    // Step for step the menu clear, with each every-family step swapped in place.
+    expect(SIGN_OUT_CLEAR_ACTIVE_STEPS).toEqual(
+      SIGN_OUT_CLEAR_STEPS.map((s) => twinOf.get(s) ?? s)
     );
     expect(dropsKeyMaterial(SIGN_OUT_CLEAR_ACTIVE_STEPS)).toBe(true);
+  });
+
+  it("the active-scope clear touches no other family's key material", () => {
+    for (const [all, family] of TWINS) {
+      expect(SIGN_OUT_CLEAR_STEPS).toContain(all);
+      expect(SIGN_OUT_CLEAR_ACTIVE_STEPS).not.toContain(all);
+      expect(SIGN_OUT_CLEAR_ACTIVE_STEPS).toContain(family);
+    }
+    // No step name in the active list may be an every-family sweep.
+    expect(SIGN_OUT_CLEAR_ACTIVE_STEPS.filter((s) => /All/.test(s))).toEqual([
+      'clearAllRefreshTokens',
+    ]);
   });
 });
 

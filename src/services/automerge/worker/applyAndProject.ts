@@ -36,6 +36,7 @@ import {
   StaleBuildCounterError,
 } from '@/types/sync';
 import { withTimeout } from '@/utils/timing';
+import { isAllocationFailure } from '@/utils/isAllocationFailure';
 import type { CacheInitLoss } from '@/types/sync';
 import { COLLECTION_NAMES, NON_COLLECTION_KEYS, type FamilyDocument } from '@/types/automerge';
 import { importFamilyKey } from '@/services/crypto/familyKeyService';
@@ -276,6 +277,19 @@ let baseSupersedes = true;
  */
 let baseFence = false;
 /**
+ * Round 3: the open cache holds a NEWER lineage than the live document (`initAndLoadCache`'s
+ * `cache-newer` arm). No base write (which would delete its rows) until the live document
+ * reaches that lineage, normally by adopting it through a remote merge. Re-checked on every
+ * persist against the live document's lineage; cleared on a re-point to another family's cache
+ * and at teardown, NOT by `resetDocCursors` (an adopt that is still older must stay fenced).
+ */
+let lineageFence: CompactionLineage | null = null;
+/**
+ * Round 3: this session already counted the missing-deps fence after a remote merge
+ * (`fence-merges`). Once per open, so a 10s poll cannot count the same session many times.
+ */
+let fenceMergeCounted = false;
+/**
  * The family whose document `currentDoc` is, when this realm knows it: set by a cache load,
  * `openCache`, and a merge or install for a named family; cleared by `initDoc`, `dropDoc` and
  * `reset`. Read only to recognise a SAME-family live document (C5e) and to decide whether a
@@ -342,9 +356,18 @@ async function settlePersists(flushPending: boolean): Promise<void> {
   }
 }
 
-/** Is the open cache this document's own family's? Only then may a pending persist be flushed. */
+/**
+ * Are the open cache AND the installed key this document's own family's? Only then may a pending
+ * persist be flushed (the key half is `setKey`'s predicate: a flush after a cross-family key swap
+ * would only be refused by `persistOnce`, as a false durability failure).
+ */
 function docOwnsOpenCache(): boolean {
-  return currentDoc !== null && docFamilyId !== null && docFamilyId === cache.cacheFamilyId();
+  return (
+    currentDoc !== null &&
+    docFamilyId !== null &&
+    docFamilyId === cache.cacheFamilyId() &&
+    (keyFamilyId === null || keyFamilyId === docFamilyId)
+  );
 }
 
 /**
@@ -382,7 +405,10 @@ export class FamilyKeyMismatchError extends Error {
  */
 async function openCacheFor(id: string): Promise<void> {
   const open = cache.cacheFamilyId();
-  if (open !== null && open !== id) await settlePersists(docOwnsOpenCache());
+  if (open !== null && open !== id) {
+    await settlePersists(docOwnsOpenCache());
+    lineageFence = null; // it described the previous family's cache
+  }
   await cache.initPersistenceDB(id);
 }
 
@@ -667,6 +693,11 @@ async function persistOnce(): Promise<void> {
   // worker's only telemetered channel), classified by name.
   const mismatch = familyMismatch();
   if (mismatch) {
+    // Nothing to write is not a refusal: a fully flushed document under another family's key
+    // (a cross-family decrypt mid-flight) has no delta to protect.
+    if (lastPersistedHeads !== null && changesSince(currentDoc, lastPersistedHeads).length === 0) {
+      return;
+    }
     const refusal = new FamilyKeyMismatchError('cache persist', mismatch);
     console.error('[applyAndProject]', refusal.message);
     raiseCachePersistFailure('increment', refusal.name);
@@ -682,8 +713,12 @@ async function persistOnce(): Promise<void> {
   const pending = pendingRemoteBaseline;
   // C5c: while the document still depends on changes it does not hold, a base write would
   // drop them from the cache's reach. Increments only, until a merge delivers the deps.
-  const fenced = baseFence && Automerge.getMissingDeps(doc, []).length > 0;
-  if (baseFence && !fenced) baseFence = false;
+  const depsFenced = baseFence && Automerge.getMissingDeps(doc, []).length > 0;
+  if (baseFence && !depsFenced) baseFence = false;
+  // Round 3: a newer-lineage cache keeps its rows until this document reaches its lineage.
+  const lineageFenced = lineageFence !== null && !reachesLineage(docLineage(doc), lineageFence);
+  if (lineageFence && !lineageFenced) lineageFence = null;
+  const fenced = depsFenced || lineageFenced;
   // Track which write is in flight so the failure signal can carry `kind` — MUST be
   // explicit, not inferred from lastPersistedHeads (the re-compaction writeBase below
   // runs with a non-null lastPersistedHeads and would be mislabeled 'increment').
@@ -691,8 +726,11 @@ async function persistOnce(): Promise<void> {
   try {
     if (lastPersistedHeads === null) {
       if (fenced) {
-        // Unreachable by construction: the fence is only ever raised beside a real cursor.
-        console.warn('[applyAndProject] base write refused: the document is missing deps');
+        // The deps fence is only ever raised beside a real cursor; the lineage fence reaches
+        // here when an install reset the cursor but the document is still the older lineage.
+        console.warn(
+          `[applyAndProject] base write refused: ${lineageFenced ? 'the cache holds a newer lineage' : 'the document is missing deps'}`
+        );
         return;
       }
       writeKind = 'base';
@@ -835,8 +873,7 @@ export async function setKey(key: CryptoKey | Uint8Array, familyId?: string | nu
   // pending work is cancelled, never flushed across the change. The snapshot timer is cancelled
   // with it. A same-family re-post (respawn, rotation) changes nothing here.
   if (familyKey && docFamilyId !== null && nextFamily !== null && nextFamily !== docFamilyId) {
-    const keyIsDocs = keyFamilyId === null || keyFamilyId === docFamilyId;
-    await settlePersists(keyIsDocs && docOwnsOpenCache());
+    await settlePersists(docOwnsOpenCache());
   }
   familyKey = next;
   keyFamilyId = nextFamily;
@@ -928,6 +965,9 @@ export async function initAndLoadCache(id: string): Promise<InitAndLoadResult> {
   // re-point — else the next persist for THIS family's doc would commit it. (After the settle
   // above, so a same-family live document's own pending baseline was committed first.)
   pendingRemoteBaseline = null;
+  // Round 3: both describe the previous open; this one re-derives them from what it reads.
+  lineageFence = null;
+  fenceMergeCounted = false;
   try {
     await openCacheFor(id);
   } catch (e) {
@@ -948,8 +988,30 @@ export async function initAndLoadCache(id: string): Promise<InitAndLoadResult> {
   }
   const key = requireKey('initAndLoadCache');
   let loaded: ({ doc: Doc } & CacheReplay) | null;
+  const bookkeepingFailed: string[] = [];
+  // Round 3: the missing-deps fence is not forever. Rows still waiting after
+  // FENCE_GIVE_UP_MERGES sessions that merged a remote and still missed their deps will not get
+  // them from this device: quarantine them (kept on disk, out of replay) and let the base be
+  // rewritten. Main logs the decision.
+  let fenceGaveUp = false;
   try {
     loaded = await time2('automerge.cacheLoad', () => cache.loadCachedDoc(key, id));
+    if (loaded && (await fenceShouldGiveUp(loaded.missingDeps))) {
+      // `Automerge.save` KEEPS a buffered change, so a base written from this document would
+      // carry the missing deps into every later open. Rebuild it from its applied history only,
+      // BEFORE quarantining: a rebuild that fails (inside this classified try: an allocation
+      // failure is a `PayloadLoadError` that cannot open) leaves the rows and the fence intact.
+      let rebuilt: Doc;
+      try {
+        rebuilt = withoutQueuedChanges(loaded.doc);
+      } catch (e) {
+        throw isAllocationFailure(e) ? payloadFailure('materialize', e, id, null) : e;
+      }
+      if (await quarantineFencedRows(bookkeepingFailed)) {
+        loaded = { ...loaded, doc: rebuilt };
+        fenceGaveUp = true;
+      }
+    }
   } catch (e) {
     return loadFailed(e, id, live);
   }
@@ -976,16 +1038,16 @@ export async function initAndLoadCache(id: string): Promise<InitAndLoadResult> {
     ...(loaded.quarantined ? { quarantined: loaded.quarantined } : {}),
     ...(loaded.newlyReported !== undefined ? { newlyReported: loaded.newlyReported } : {}),
   };
-  // Round 3: the missing-deps fence is not forever. Rows still waiting after
-  // FENCE_GIVE_UP_OPENS consecutive opens will not get their deps from this device: quarantine
-  // them (kept on disk, out of replay) and let the base be rewritten. Main logs the decision.
-  const fenceGaveUp = await fenceGiveUp(loaded.missingDeps);
-  if (fenceGaveUp) {
-    replay.fenceGaveUp = true;
-    // `Automerge.save` KEEPS a buffered change, so a base written from this document would
-    // carry the missing deps into every later open. Rebuild it from its applied history only.
-    loaded = { ...loaded, doc: withoutQueuedChanges(loaded.doc) };
+  if (fenceGaveUp) replay.fenceGaveUp = true;
+  bookkeepingFailed.unshift(...(loaded.bookkeepingFailed ?? []));
+  // Quarantined rows never replay, so this count is the only way they stay visible.
+  try {
+    const total = (await cache.listQuarantinedRows()).length;
+    if (total > 0) replay.quarantinedTotal = total;
+  } catch (e) {
+    bookkeepingFailed.push(`list-quarantined:${errName(e)}`);
   }
+  if (bookkeepingFailed.length) replay.bookkeepingFailed = bookkeepingFailed;
   // C-5/C16: a recovered cache no longer holds the doc state the baseline row describes.
   // DELETE it — returning null alone would leave it on disk to mislead the next open into
   // skipping a read it must do. Read on every other path in the same round-trip as the cache.
@@ -995,21 +1057,44 @@ export async function initAndLoadCache(id: string): Promise<InitAndLoadResult> {
     return null;
   };
 
-  if (live && !sameLineage(docLineage(loaded.doc), docLineage(currentDoc!))) {
-    // Round 3: the cache is ANOTHER LINEAGE than the live document (a compaction, rebase or
-    // restore installed a new generation and its superseding base never landed). Merging the
-    // two would graft the old history back onto the new one, which is the cross-lineage merge
-    // the lineage guard exists to refuse. The live document is the truth: keep it, and make
-    // the next base write SUPERSEDE the stale cache. The baseline row describes the cache's
-    // document, not ours, so it goes too.
-    resetDocCursors();
+  const cacheLineage = docLineage(loaded.doc);
+  if (live && !sameLineage(cacheLineage, docLineage(currentDoc!))) {
+    // Round 3: the cache is ANOTHER LINEAGE than the live document. Merging the two would graft
+    // one history onto the other, which is the cross-lineage merge the lineage guard exists to
+    // refuse, so the live document is kept either way. Which side is NEWER decides the cache:
+    //  - live-newer (a compaction, rebase or restore installed a new generation and its
+    //    superseding base never landed): the next base write SUPERSEDES the stale cache.
+    //  - cache-newer (another tab already moved the cache on): nothing is deleted. The live
+    //    document keeps writing increments, and its base writes are fenced until it reaches the
+    //    cache's lineage, which its next remote merge adopts.
+    // Either way the baseline row describes the cache's document, not ours, so it goes too (a
+    // kept baseline could also let the next read be skipped, and that read is the adopt).
+    const liveNewer = lineageRank(docLineage(currentDoc!)) > lineageRank(cacheLineage);
+    if (liveNewer) {
+      resetDocCursors();
+    } else {
+      docGeneration++; // an in-flight persist from before this open must not move the cursor
+      lastPersistedHeads = headsOf(currentDoc!);
+      baseSupersedes = false;
+      baseFence = false;
+      lineageFence = cacheLineage;
+    }
     docFamilyId = id;
-    await cache.clearRemoteBaseline().catch(() => {});
-    void enqueuePersist();
+    try {
+      await cache.clearRemoteBaseline();
+    } catch (e) {
+      bookkeepingFailed.push(`lineage-baseline-clear:${errName(e)}`);
+    }
+    if (liveNewer) void enqueuePersist();
     return {
       loaded: true,
       remoteBaseline: null,
-      replay: { ...replay, lineageStale: true },
+      replay: {
+        ...replay,
+        lineageStale: true,
+        lineageDirection: liveNewer ? 'live-newer' : 'cache-newer',
+        ...(bookkeepingFailed.length ? { bookkeepingFailed } : {}),
+      },
     };
   }
 
@@ -1092,38 +1177,86 @@ function withoutQueuedChanges(doc: Doc): Doc {
     .doc;
 }
 
-/** Consecutive opens a missing-deps fence may hold before it gives up (round 3). */
-const FENCE_GIVE_UP_OPENS = 3;
+/**
+ * Sessions that merged a remote and STILL missed the deps before the next open gives the
+ * missing-deps fence up (round 3): fenced twice, given up on the third open. An offline or cold
+ * open (no merge) never counts, so a device that simply has not reached Drive keeps its rows.
+ */
+const FENCE_GIVE_UP_MERGES = 2;
 /** Consecutive unproven BASE decrypt failures before the cache is re-seeded (round 3, C5a). */
 const BASE_DECRYPT_RESEED_OPENS = 3;
 
 /**
- * Count this open against the missing-deps fence and decide whether it gives up (round 3).
- * A clean replay resets the run. Every IndexedDB step is best-effort: a failed count keeps the
- * fence (today's behaviour), never gives up early.
+ * Does this open give the missing-deps fence up (round 3)? Only after FENCE_GIVE_UP_MERGES
+ * sessions merged a remote and still missed the deps (`noteFenceAfterMerge` counts them). A
+ * clean replay resets the run. Best-effort: a failed read keeps the fence, never gives up early.
  */
-async function fenceGiveUp(missingDeps: number): Promise<boolean> {
+async function fenceShouldGiveUp(missingDeps: number): Promise<boolean> {
   if (missingDeps === 0) {
-    await cache.clearMetaCounter('fence-opens').catch(() => {});
+    await cache.clearMetaCounter('fence-merges').catch(() => {});
     return false;
   }
-  const opens = await cache.bumpMetaCounter('fence-opens').catch(() => 0);
-  if (opens < FENCE_GIVE_UP_OPENS) return false;
+  const merges = await cache.readMetaCounter('fence-merges').catch(() => 0);
+  return merges >= FENCE_GIVE_UP_MERGES;
+}
+
+/**
+ * The fence gave up: quarantine the rows the load left waiting. A failure keeps fencing (the
+ * base must not be rewritten over rows still in replay) and is reported through `failed`.
+ */
+async function quarantineFencedRows(failed: string[]): Promise<boolean> {
   try {
     await cache.quarantinePendingRows();
   } catch (e) {
     console.warn('[applyAndProject] fence give-up: could not quarantine the waiting rows', e);
-    return false; // keep fencing: the base must not be rewritten over rows still in replay
+    failed.push(`fence-quarantine:${errName(e)}`);
+    return false;
   }
-  await cache.clearMetaCounter('fence-opens').catch(() => {});
-  console.warn(`[applyAndProject] missing-deps fence gave up after ${opens} opens`);
+  await cache.clearMetaCounter('fence-merges').catch(() => {});
+  console.warn('[applyAndProject] missing-deps fence gave up');
   return true;
+}
+
+/**
+ * Round 3: after a remote merge into a fenced document, count this session toward the give-up
+ * when the deps are STILL missing (once per open), or clear the run when the merge delivered
+ * them. Only against this document's own open cache. Best-effort.
+ */
+async function noteFenceAfterMerge(): Promise<void> {
+  if (!baseFence || fenceMergeCounted || !currentDoc) return;
+  if (docFamilyId === null || docFamilyId !== cache.cacheFamilyId()) return;
+  fenceMergeCounted = true;
+  if (Automerge.getMissingDeps(currentDoc, []).length > 0) {
+    await cache.bumpMetaCounter('fence-merges').catch(() => 0);
+  } else {
+    await cache.clearMetaCounter('fence-merges').catch(() => {});
+  }
 }
 
 /** Same compaction generation: both never-compacted, or the same lineage id at the same seq. */
 function sameLineage(a: CompactionLineage | null, b: CompactionLineage | null): boolean {
   if (!a || !b) return !a && !b;
   return a.id === b.id && a.seq === b.seq;
+}
+
+/** Round 3: the quarantined rows (`qinc:*`) of the open cache, for main to list. Never throws. */
+export async function listQuarantinedRows(): Promise<{ ids: string[] }> {
+  return { ids: await cache.listQuarantinedRows().catch(() => []) };
+}
+
+/** Lineage order: the compaction seq, with never-compacted (`null`) older than any compaction. */
+function lineageRank(l: CompactionLineage | null): number {
+  return l ? l.seq : -1;
+}
+
+/** Has `doc`'s lineage reached `target`: the same generation, or a later one. */
+function reachesLineage(doc: CompactionLineage | null, target: CompactionLineage): boolean {
+  return sameLineage(doc, target) || lineageRank(doc) > lineageRank(target);
+}
+
+/** An error's class name for a bookkeeping code (`name` survives minification as a literal). */
+function errName(e: unknown): string {
+  return e instanceof Error ? e.name : 'unknown';
 }
 
 const emptyReplay = (): CacheReplay => ({
@@ -1842,6 +1975,7 @@ export async function mergeRemoteEnvelope(
   const merged = time('automerge.merge', () => mergeDocs(local, remote));
   currentDoc = merged.doc;
   if (id) docFamilyId = id;
+  await noteFenceAfterMerge();
   schedulePersist();
   scheduleSnapshotPersist();
   const health = mergeHealth(conflictsBefore, currentDoc);
@@ -2054,6 +2188,8 @@ function teardownRealm(): void {
   keyFamilyId = null;
   docFamilyId = null;
   cachePersistFailed = false;
+  lineageFence = null;
+  fenceMergeCounted = false;
   // One lifetime, not two: the actor is retained beside the key and dies with it.
   resetDocActor();
   resetDocCursors();
@@ -2304,6 +2440,8 @@ export async function dispatch(method: string, args: unknown): Promise<DispatchR
       return { result: await initAndLoadCache(a.familyId as string) };
     case 'reseedCacheFromLiveDoc':
       return { result: await reseedCacheFromLiveDoc(a.familyId as string) };
+    case 'listQuarantinedRows':
+      return { result: await listQuarantinedRows() };
     case 'loadProjectionSnapshot':
       return { result: await loadProjectionSnapshot(a.familyId as string) };
     case 'openCache':
@@ -2386,6 +2524,8 @@ export function __resetApplyAndProjectForTesting(): void {
   keyFamilyId = null;
   docFamilyId = null;
   cachePersistFailed = false;
+  lineageFence = null;
+  fenceMergeCounted = false;
   resetDocCursors();
   persistInFlight = Promise.resolve();
   sink = NOOP_SINK;

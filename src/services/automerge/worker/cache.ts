@@ -106,7 +106,8 @@ const QUARANTINE_PREFIX = 'q';
  * report or one extra open before a decision, never data.
  */
 const META_PREFIX = 'meta:';
-export type CacheMetaCounter = 'base-decrypt-failures' | 'fence-opens';
+/** `fence-merges`: sessions that MERGED a remote and still missed the deps (never an offline open). */
+export type CacheMetaCounter = 'base-decrypt-failures' | 'fence-merges';
 /** Rows waiting on missing deps that were already reported (paged) once. */
 const META_REPORTED = `${META_PREFIX}replay-reported`;
 
@@ -479,6 +480,25 @@ export async function clearMetaCounter(name: CacheMetaCounter): Promise<void> {
   await withIdbRetry('clearMeta', () => db.delete(STORE_NAME, META_PREFIX + name));
 }
 
+/** Round 3: read a meta counter without changing it (0 when absent). */
+export async function readMetaCounter(name: CacheMetaCounter): Promise<number> {
+  return readMetaCount(requireHandle(), name);
+}
+
+/**
+ * Round 3: the quarantined rows (`qinc:*`) still on disk, by key. Kept out of replay, so this is
+ * the only way they are visible at all. Empty when the DB is closed.
+ */
+export async function listQuarantinedRows(): Promise<string[]> {
+  const db = cacheDb;
+  if (!db) return [];
+  const lower = QUARANTINE_PREFIX + INC_PREFIX;
+  const upper = QUARANTINE_PREFIX + INC_UPPER;
+  return (await withIdbRetry('listQuarantined', () =>
+    db.getAllKeys(STORE_NAME, IDBKeyRange.bound(lower, upper, false, true))
+  )) as string[];
+}
+
 /**
  * Round 3: move increment rows out of the replay range (`inc:*` -> `qinc:*`) in one transaction.
  * Answers how many moved. A row already gone (another tab folded it) is skipped.
@@ -703,6 +723,7 @@ export async function loadCachedDoc(
       incrementCount: incEntries.length,
       ...(triage.quarantined ? { quarantined: triage.quarantined } : {}),
       ...(skipped.length || waiting.length ? { newlyReported: triage.newlyReported } : {}),
+      ...(triage.bookkeepingFailed.length ? { bookkeepingFailed: triage.bookkeepingFailed } : {}),
     };
   };
   if (incEntries.length === 0) return finish(baseDoc, new Map(), []);
@@ -786,9 +807,11 @@ async function triageReplayRows(
   db: IDBPDatabase<CacheDB>,
   skipped: readonly string[],
   waiting: readonly string[]
-): Promise<{ quarantined: number; newlyReported: number }> {
+): Promise<{ quarantined: number; newlyReported: number; bookkeepingFailed: string[] }> {
   let quarantined = 0;
   let newlyReported = skipped.length;
+  /** Rides the replay result so main can log it: the worker has no telemetry of its own. */
+  const bookkeepingFailed: string[] = [];
   try {
     quarantined = await quarantineRows(db, skipped);
   } catch (e) {
@@ -800,7 +823,11 @@ async function triageReplayRows(
     let seen: string[] = [];
     try {
       seen = row?.payload ? (JSON.parse(row.payload) as string[]) : [];
-    } catch {
+    } catch (e) {
+      // An unreadable marker re-reports every waiting row as new; say so.
+      bookkeepingFailed.push(
+        `replay-reported-unparseable:${e instanceof Error ? e.name : 'unknown'}`
+      );
       seen = [];
     }
     const known = new Set(seen);
@@ -820,7 +847,7 @@ async function triageReplayRows(
     console.warn('[cache] replay report marker unavailable (rows may be reported again)', e);
     newlyReported = skipped.length + waiting.length;
   }
-  return { quarantined, newlyReported };
+  return { quarantined, newlyReported, bookkeepingFailed };
 }
 
 /**

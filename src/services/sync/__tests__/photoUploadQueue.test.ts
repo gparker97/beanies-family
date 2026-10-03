@@ -1,6 +1,9 @@
 // @vitest-environment node
 import 'fake-indexeddb/auto';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+
+const logEvent = vi.hoisted(() => vi.fn());
+vi.mock('@/services/telemetry', () => ({ logEvent }));
 import {
   setActiveFamily,
   clearActiveFamily,
@@ -27,7 +30,27 @@ function makeEntry(overrides: Partial<Omit<QueuedPhotoUpload, 'id' | 'createdAt'
     height: overrides.height ?? 600,
     sizeBytes: overrides.sizeBytes ?? 3,
     createdBy: overrides.createdBy,
+    ...(overrides.familyId ? { familyId: overrides.familyId } : {}),
   };
+}
+
+const actions = () =>
+  logEvent.mock.calls.map((c) => (c[0] as { context?: { action?: string } }).context?.action);
+
+/** Write an entry straight into a family's queue database, bypassing `enqueueUpload`'s guard. */
+async function putRaw(familyId: string, entry: QueuedPhotoUpload): Promise<void> {
+  const db = await new Promise<IDBDatabase>((resolve, reject) => {
+    const req = indexedDB.open('beanies-photo-queue-' + familyId, 1);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction('uploads', 'readwrite');
+    tx.objectStore('uploads').put(entry);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+  db.close();
 }
 
 describe('photoUploadQueue', () => {
@@ -208,5 +231,47 @@ describe('photoUploadQueue', () => {
       await first;
       expect(seen.sort()).toEqual([FAMILY_ID, OTHER].sort());
     });
+
+    it('enqueue refuses an entry stamped with a family the queue is not bound to', async () => {
+      await expect(enqueueUpload(makeEntry({ familyId: OTHER }))).rejects.toThrow(/not bound/);
+      expect(await getPending()).toHaveLength(0);
+    });
+
+    it('a drain skips (keeps, logs) an entry stamped with another family', async () => {
+      await getPending(); // the bound handle has opened, so the raw write below is not racing it
+      await putRaw(FAMILY_ID, {
+        ...makeEntry({ photoId: 'foreign', familyId: OTHER }),
+        id: 'foreign-entry',
+        createdAt: 1,
+      });
+      await enqueueUpload(makeEntry({ photoId: 'mine', familyId: FAMILY_ID }));
+      const handler = vi.fn(async () => {});
+      setFlushHandler(handler);
+      await flushQueue();
+      expect(handler).toHaveBeenCalledTimes(1);
+      expect(handler).toHaveBeenCalledWith(expect.objectContaining({ photoId: 'mine' }), FAMILY_ID);
+      const left = await getPending();
+      expect(left.map((e) => e.photoId)).toEqual(['foreign']);
+      expect(actions()).toContain('drain-skipped-foreign-entry');
+    });
+  });
+
+  it('a failed open is logged, never rejects a flush, and is retried on the next activation', async () => {
+    await __internals.reset();
+    logEvent.mockClear();
+    const open = vi.spyOn(indexedDB, 'open').mockImplementationOnce(() => {
+      throw new Error('quota');
+    });
+    setFlushHandler(vi.fn(async () => {}));
+    setActiveFamily(FAMILY_ID); // fires a background flush against the failed handle
+    await expect(flushQueue()).resolves.toBeUndefined();
+    await vi.waitFor(() => expect(actions()).toContain('open-failed'));
+    expect(actions()).toContain('drain-failed');
+    open.mockRestore();
+
+    // The dead handle was forgotten: the same family re-binds with a fresh open.
+    setActiveFamily(FAMILY_ID);
+    await enqueueUpload(makeEntry());
+    expect(await getPending()).toHaveLength(1);
   });
 });

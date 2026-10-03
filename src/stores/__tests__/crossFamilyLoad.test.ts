@@ -105,6 +105,7 @@ vi.mock('@/services/automerge/worker/docClient', () => ({
     remoteHeads: [],
   })),
   persistEnvelope: vi.fn(async () => {}),
+  reseedCacheFromLiveDoc: vi.fn(async () => ({ reseeded: true })),
   verifyEnvelope: vi.fn(async () => {}),
   exportEncryptedPayload: vi.fn(async () => ({ payload: 'base64==' })),
   dropDoc: vi.fn(async () => {}),
@@ -349,6 +350,124 @@ describe('round 3, item 1: a cross-family decrypt that fails past its key swap r
       expect.objectContaining({
         severity: 'critical',
         context: expect.objectContaining({ action: 'cross-family-restore-failed' }),
+      })
+    );
+  });
+
+  it('the swap is marked (hold epoch) after whenIdle and before the key post', async () => {
+    const { docClient, syncService } = await failingCrossFamilyDecrypt();
+    const idle = vi.mocked(syncService.whenIdle).mock.invocationCallOrder[0]!;
+    const epoch = vi.mocked(syncService.advanceHoldEpoch).mock.invocationCallOrder[0]!;
+    const post = vi.mocked(docClient.setFamilyKey).mock.invocationCallOrder[0]!;
+    expect(idle).toBeLessThan(epoch);
+    expect(epoch).toBeLessThan(post);
+  });
+
+  it('nothing unlocked before (loading B from the login screen): reset the worker, release, no fatal', async () => {
+    const docClient = await import('@/services/automerge/worker/docClient');
+    const syncService = await import('@/services/sync/syncService');
+    const release = vi.fn();
+    vi.mocked(syncService.holdSaves).mockReturnValueOnce(release);
+    vi.mocked(docClient.mergeRemoteEnvelope).mockRejectedValueOnce(new Error('merge boom'));
+    const sync = useSyncStore();
+    // A cold boot restored family A's provider; nothing is unlocked (no family key).
+    sync.pendingEncryptedFile = { envelope: OTHER_FAMILY_ENVELOPE, provider: localProvider() };
+    const result = await sync.decryptPendingFile('pw', { userChoseThisFile: true });
+
+    expect(result.success).toBe(false);
+    expect(docClient.reset).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(docClient.setFamilyKey).mock.calls.map((c) => c[1])).toEqual(['fam-new']);
+    expect(release).toHaveBeenCalledTimes(1);
+    expect(sync.familyKey).toBeNull();
+    const { useFatalErrorStore } = await import('@/stores/fatalErrorStore');
+    expect(useFatalErrorStore().message).toBeNull();
+    const { reportError } = await import('@/utils/errorReporter');
+    expect(reportError).not.toHaveBeenCalledWith(expect.objectContaining({ severity: 'critical' }));
+  });
+
+  /** Family A is open; the decrypt of B gets past the family switch and then fails. */
+  async function lateFailure() {
+    const docClient = await import('@/services/automerge/worker/docClient');
+    const syncService = await import('@/services/sync/syncService');
+    const familyContext = await import('@/services/familyContext');
+    const release = vi.fn();
+    vi.mocked(syncService.holdSaves).mockReturnValueOnce(release);
+    const providerA = { type: 'local', id: 'provider-a' } as never;
+    // Bound at the start; whatever the failed install left bound afterwards is someone else's.
+    vi.mocked(syncService.getProvider)
+      .mockReturnValueOnce(providerA)
+      .mockReturnValue({ type: 'local', id: 'provider-b' } as never);
+    persistMock.mockRejectedValueOnce(new Error('persist boom')); // installPendingProvider
+    useFamilyContextStore().activeFamily = {
+      id: 'fam-old',
+      name: 'Our Family',
+      createdAt: '2026-01-01',
+      updatedAt: '2026-01-01',
+    };
+    const sync = useSyncStore();
+    sync.familyKey = KEY_A;
+    sync.isConfigured = true;
+    sync.pendingEncryptedFile = { envelope: OTHER_FAMILY_ENVELOPE, provider: localProvider() };
+    const run = () => sync.decryptPendingFile('pw', { userChoseThisFile: true });
+    return { docClient, familyContext, release, providerA, run, sync };
+  }
+
+  it('a failure after the family switch puts the active family and the provider back', async () => {
+    const { familyContext, release, providerA, run, sync } = await lateFailure();
+    vi.mocked(familyContext.activateFamily).mockImplementation(async (id: string) => ({
+      id,
+      name: 'Our Family',
+      createdAt: '2026-01-01',
+      updatedAt: '2026-01-01',
+    }));
+    expect((await run()).success).toBe(false);
+    expect(useFamilyContextStore().activeFamilyId).toBe('fam-old');
+    expect(setProviderMock).toHaveBeenLastCalledWith(providerA, 'fam-old');
+    expect(sync.familyKey).toBe(KEY_A);
+    expect(release).toHaveBeenCalledTimes(1);
+  });
+
+  it('a failure after the family switch that cannot switch back takes the fatal route', async () => {
+    const { familyContext, release, run } = await lateFailure();
+    vi.mocked(familyContext.activateFamily).mockResolvedValue(null);
+    expect((await run()).success).toBe(false);
+    expect(release).not.toHaveBeenCalled(); // saves stay held
+    const { useFatalErrorStore } = await import('@/stores/fatalErrorStore');
+    expect(useFatalErrorStore().message).not.toBeNull();
+  });
+});
+
+describe('final pass, item 8: the reseed after a chosen family file logs its own failure', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+    providerType.value = 'local';
+    providerFamilyId.value = 'fam-old';
+  });
+
+  it('error_code is the reseed error, detail carries the original cache cause', async () => {
+    const docClient = await import('@/services/automerge/worker/docClient');
+    const { CacheInitError } = await import('@/types/sync');
+    const { logEvent } = await import('@/services/telemetry/logEvent');
+    vi.mocked(docClient.initAndLoadCache).mockRejectedValueOnce(
+      new CacheInitError('load', 'something-to-lose', 'QuotaExceededError')
+    );
+    vi.mocked(docClient.reseedCacheFromLiveDoc).mockRejectedValueOnce(
+      Object.assign(new Error('blocked'), { name: 'InvalidStateError' })
+    );
+    const sync = useSyncStore();
+    sync.pendingEncryptedFile = {
+      envelope: { ...OTHER_FAMILY_ENVELOPE, familyId: 'fam-old' },
+      provider: localProvider(),
+    };
+    await sync.decryptPendingFile('pw', { userChoseThisFile: true });
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        context: {
+          action: 'cache-reseeded-user-choice',
+          error_code: 'InvalidStateError',
+          detail: 'cause=QuotaExceededError/load/something-to-lose',
+        },
       })
     );
   });

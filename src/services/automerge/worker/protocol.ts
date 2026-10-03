@@ -177,10 +177,19 @@ export interface CacheReplay {
   corruptBaseReplaced?: true;
   /**
    * Round 3: the cache held another LINEAGE than the live same-family document, so it was not
-   * merged in; the live document was kept and the cache superseded. Main logs
-   * `cache-lineage-stale`.
+   * merged in; the live document was kept. Main logs `cache-lineage-stale`.
    */
   lineageStale?: true;
+  /**
+   * Which way the stale lineage went: `live-newer` superseded the cache; `cache-newer` kept it
+   * (no row deleted) and fenced this realm's base writes until the live document adopts the
+   * cache's lineage through a remote merge.
+   */
+  lineageDirection?: 'live-newer' | 'cache-newer';
+  /** Quarantined rows (`qinc:*`) on disk after this open, when there are any. */
+  quarantinedTotal?: number;
+  /** Best-effort bookkeeping steps that failed this open (`<step>:<error name>`). Logged by main. */
+  bookkeepingFailed?: string[];
   /** Round 3 (C5a): the base would not decrypt on 3 consecutive opens and was re-seeded. */
   baseReseeded?: 'repeated-decrypt-failure';
   /**
@@ -190,7 +199,10 @@ export interface CacheReplay {
   newlyReported?: number;
   /** Round 3: increment rows moved out of replay (`qinc:*`) this open. */
   quarantined?: number;
-  /** Round 3: the missing-deps fence gave up after 3 opens and the base was rewritten. */
+  /**
+   * Round 3: the missing-deps fence gave up (two sessions merged a remote and still missed the
+   * deps) and the base was rewritten.
+   */
   fenceGaveUp?: true;
 }
 

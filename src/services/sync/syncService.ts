@@ -370,12 +370,15 @@ function noteSaveDeferredNoKey(where: 'save' | 'autosave' | 'save-now' | 'flush'
 const saveHolds = new Set<symbol>();
 let heldSaveIntent = false;
 /**
- * Round 3: bumped by every `holdSaves`. `doSave` captures it at entry and its `stillCurrent()`
- * re-checks it after every await, so a save that STRADDLES a hold (entered before it, still
- * running when the worker's key is swapped) aborts instead of exporting and writing whatever
- * the worker then holds.
+ * Round 3: bumped by `advanceHoldEpoch`, in the step right BEFORE the worker's key is swapped
+ * (not when the hold is taken). `doSave` and the remote merge capture it at entry and re-check
+ * it after every await, so work that STRADDLES the swap aborts instead of exporting or merging
+ * whatever the worker then holds, while a save that began under the old family and finishes
+ * before the swap completes under that family.
  */
 let holdEpoch = 0;
+/** From a key swap taken under a hold until the last hold releases: no new merge may start. */
+let keySwappedUnderHold = false;
 /** Round 3: pre-save / poll merges in flight, so `whenIdle` can wait for them too. */
 const remoteMergesInFlight = new Set<Promise<unknown>>();
 /** Round 3: how long `whenIdle` waits before giving up (the epoch still aborts a straggler). */
@@ -388,7 +391,6 @@ const WHEN_IDLE_TIMEOUT_MS = 15_000;
 export function holdSaves(reason: string): () => void {
   const token = Symbol(reason);
   saveHolds.add(token);
-  holdEpoch++;
   if (cancelPendingSave()) heldSaveIntent = true;
   logEvent({
     level: 'info',
@@ -398,10 +400,22 @@ export function holdSaves(reason: string): () => void {
   });
   return () => {
     if (!saveHolds.delete(token)) return;
-    if (saveHolds.size > 0 || !heldSaveIntent) return;
+    if (saveHolds.size > 0) return;
+    keySwappedUnderHold = false;
+    if (!heldSaveIntent) return;
     heldSaveIntent = false;
     triggerDebouncedSave();
   };
+}
+
+/**
+ * Mark the worker key swap (round 3). The cross-family decrypt calls it AFTER `whenIdle` and
+ * immediately before posting the other family's key, so anything still running under the old
+ * family aborts at its next await (a save's intent is re-armed by `release`).
+ */
+export function advanceHoldEpoch(): void {
+  holdEpoch++;
+  if (saveHolds.size > 0) keySwappedUnderHold = true;
 }
 
 /**
@@ -1110,6 +1124,7 @@ export function reset(): void {
   saveDeferred = false;
   saveHolds.clear();
   heldSaveIntent = false;
+  keySwappedUnderHold = false;
   raceRemergeArmed = false;
   remoteMergesInFlight.clear();
   remoteBaseline = null;
@@ -1834,9 +1849,11 @@ async function fetchAndMergeRemoteOnce(opts: FetchMergeOptions): Promise<FetchMe
   // indefinitely. Throwing (rather than returning) keeps `doSave`'s refusal
   // intact — a silent return would let the save through.
   if (remoteBlocked) throw remoteBlocked;
-  // Round 3: a merge decrypts with the WORKER's key, which a held cross-family decrypt is about
-  // to swap. Nothing merges while a hold is live (a save path re-runs it when the hold lifts).
-  if (saveHolds.size > 0) return NO_PROBE;
+  // Round 3: a merge decrypts with the WORKER's key, which a held cross-family decrypt swaps.
+  // It keeps reading until that swap (so a save that began under the old family completes
+  // under it); once the key has moved, nothing merges until the hold lifts.
+  if (keySwappedUnderHold) return NO_PROBE;
+  const epochAtEntry = holdEpoch;
   if (!currentProvider) return NO_PROBE;
   // Drive's save path always calls this (legacy direct call); the polling
   // watcher only activates for providers that opt in. Both paths converge
@@ -1939,8 +1956,8 @@ async function fetchAndMergeRemoteOnce(opts: FetchMergeOptions): Promise<FetchMe
     kind: 'baseline',
     heads: decodeHeadsFingerprint(remoteBaseline?.headsFp ?? null),
   };
-  // Round 3: the read took time; a hold taken meanwhile wins over this merge.
-  if (saveHolds.size > 0) return NO_PROBE;
+  // Round 3: the read took time; a key swap taken meanwhile wins over this merge.
+  if (holdEpoch !== epochAtEntry) return NO_PROBE;
 
   // The worker decrypts, runs the LINEAGE GUARD (the only place both documents
   // exist), then merges or adopts, and returns which it did. `adopted` returns
@@ -2176,11 +2193,18 @@ async function doSave(opts: SaveOptions = {}): Promise<boolean> {
     holdEpoch === epochAtEntry;
   const abort = (stage: string): false => {
     updateState({ isSyncing: false });
+    // A key swap under a hold is not a lost save: the intent is remembered, and `release`
+    // re-arms it once provider and envelope agree again (round 3).
+    const byEpoch = holdEpoch !== epochAtEntry;
+    if (byEpoch) {
+      if (saveHolds.size > 0) heldSaveIntent = true;
+      else triggerDebouncedSave();
+    }
     logEvent({
       level: 'warn',
       surface: 'sync-save',
       message: 'provider or family changed during the save; aborted without writing',
-      context: { action: 'aborted-provider-changed', stage },
+      context: { action: 'aborted-provider-changed', stage: byEpoch ? 'abort-held' : stage },
     });
     return false;
   };
@@ -2518,6 +2542,9 @@ async function doSave(opts: SaveOptions = {}): Promise<boolean> {
     } else {
       // Non-Drive provider (no revision): refresh the in-memory MTIME basis ONLY —
       // stops a local-file poll re-reading its own write. Never a persisted baseline.
+      // The write itself landed, and a local/native file IS the family file, so the
+      // cache it replayed is pushed: clear the marker here as the Drive branch does.
+      noteCachePushed(familyIdAtWrite);
       try {
         const postWriteTimestamp = await providerAtWrite.getLastModified();
         if (postWriteTimestamp && currentProvider === providerAtWrite) {
@@ -2593,7 +2620,16 @@ function noteCachePushed(familyId: string): void {
     if (!docClient.documentHoldsCacheOf(familyId)) return;
     clearUnpushedAtSignOutMarker(familyId);
   } catch (e) {
-    console.warn('[syncService] unpushed-at-signout marker not cleared after a save:', e);
+    logEvent({
+      level: 'warn',
+      surface: 'sync-save',
+      message: 'unpushed-at-signout marker not cleared after a save',
+      error: e instanceof Error ? e : undefined,
+      context: {
+        action: 'marker-clear-failed',
+        error_code: e instanceof Error ? e.name : 'unknown',
+      },
+    });
   }
 }
 

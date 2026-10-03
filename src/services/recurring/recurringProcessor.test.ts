@@ -37,7 +37,12 @@ import * as transactionRepo from '@/services/automerge/repositories/transactionR
 import * as accountRepo from '@/services/automerge/repositories/accountRepository';
 import { logEvent } from '@/services/telemetry';
 import { reportError } from '@/utils/errorReporter';
-import { setWriteGate, __resetWriteGateForTesting } from '@/services/automerge/worker/writeGate';
+import {
+  setWriteGate,
+  __resetWriteGateForTesting,
+  ReadOnlyError,
+} from '@/services/automerge/worker/writeGate';
+import { WorkerCrashError } from '@/services/automerge/worker/protocol';
 
 const mockAccount: Account = {
   id: 'test-account-1',
@@ -244,7 +249,7 @@ describe('recurringProcessor - the cursor stops at the first failure (audit C7)'
   it('advances only past the dates that landed and reports the failure', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.mocked(transactionRepo.createTransactionCascade).mockImplementation(async (input) => {
-      if (input.date === '2024-09-15') throw new Error('worker down');
+      if (input.date === '2024-09-15') throw new Error('cascade failed');
       return echoCreate(input);
     });
 
@@ -300,7 +305,9 @@ describe('recurringProcessor - the cursor stops at the first failure (audit C7)'
 
   it('a transient failure stops the cursor; the third consecutive one skips the date with a critical report', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
-    vi.mocked(transactionRepo.createTransactionCascade).mockRejectedValue(new Error('worker down'));
+    vi.mocked(transactionRepo.createTransactionCascade).mockRejectedValue(
+      new Error('cascade failed')
+    );
 
     await processRecurringItems();
     await processRecurringItems();
@@ -329,21 +336,63 @@ describe('recurringProcessor - the cursor stops at the first failure (audit C7)'
 
   it('a success resets the consecutive-failure count', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
-    vi.mocked(transactionRepo.createTransactionCascade).mockRejectedValue(new Error('worker down'));
+    vi.mocked(transactionRepo.createTransactionCascade).mockRejectedValue(
+      new Error('cascade failed')
+    );
     await processRecurringItems();
     await processRecurringItems();
     vi.mocked(transactionRepo.createTransactionCascade).mockImplementation(async (input) =>
       echoCreate(input)
     );
     await processRecurringItems();
-    vi.mocked(transactionRepo.createTransactionCascade).mockRejectedValue(new Error('worker down'));
+    vi.mocked(transactionRepo.createTransactionCascade).mockRejectedValue(
+      new Error('cascade failed')
+    );
     await processRecurringItems();
     expect(reportError).not.toHaveBeenCalledWith(expect.objectContaining({ severity: 'critical' }));
   });
 
+  it('infrastructure failures (worker crash, RPC timeout, read-only) stop the cursor but never count toward giving up', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const infra = [
+      new WorkerCrashError('doc-worker crashed'),
+      new Error("doc-worker 'mutate' timed out"),
+      new ReadOnlyError('transactions'),
+      new WorkerCrashError('doc-worker crashed'),
+    ];
+    for (const err of infra) {
+      vi.mocked(transactionRepo.createTransactionCascade).mockRejectedValue(err);
+      await processRecurringItems();
+    }
+    expect(recurringRepo.updateLastProcessedDate).not.toHaveBeenCalled();
+    expect(reportError).not.toHaveBeenCalledWith(expect.objectContaining({ severity: 'critical' }));
+    expect(reportError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'recurring-cascade-deferred',
+        context: expect.objectContaining({
+          action: 'defer-infrastructure',
+          error_code: 'WorkerCrashError',
+        }),
+      })
+    );
+    // A cascade error after all that is the FIRST strike, not the fifth.
+    vi.mocked(transactionRepo.createTransactionCascade).mockRejectedValue(
+      new Error('cascade failed')
+    );
+    await processRecurringItems();
+    expect(reportError).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        message: 'recurring-cascade-failed',
+        context: expect.objectContaining({ consecutive_failures: 1 }),
+      })
+    );
+  });
+
   it('does not touch the cursor when the FIRST due date fails', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
-    vi.mocked(transactionRepo.createTransactionCascade).mockRejectedValue(new Error('worker down'));
+    vi.mocked(transactionRepo.createTransactionCascade).mockRejectedValue(
+      new Error('cascade failed')
+    );
 
     const result = await processRecurringItems();
 
@@ -443,7 +492,7 @@ describe('deduplicateRecurringTransactions', () => {
     ]);
     vi.mocked(transactionRepo.deleteTransactionCascade)
       .mockResolvedValueOnce(echoDelete(false))
-      .mockRejectedValueOnce(new Error('worker down'))
+      .mockRejectedValueOnce(new Error('cascade failed'))
       .mockResolvedValueOnce(echoDelete());
 
     const deleted = await deduplicateRecurringTransactions();
