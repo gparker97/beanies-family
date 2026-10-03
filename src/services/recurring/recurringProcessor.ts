@@ -3,7 +3,12 @@ import * as assetRepo from '@/services/automerge/repositories/assetRepository';
 import * as goalRepo from '@/services/automerge/repositories/goalRepository';
 import * as recurringRepo from '@/services/automerge/repositories/recurringItemRepository';
 import * as transactionRepo from '@/services/automerge/repositories/transactionRepository';
-import type { RecurringItem, CreateTransactionInput, DisplayTransaction } from '@/types/models';
+import type {
+  Asset,
+  RecurringItem,
+  CreateTransactionInput,
+  DisplayTransaction,
+} from '@/types/models';
 import {
   toDateInputValue,
   addDays,
@@ -13,7 +18,7 @@ import {
   parseLocalDate,
 } from '@/utils/date';
 import { computeGoalAllocRaw, signedAccountDelta } from '@/utils/finance';
-import { calculateAmortization, findLoanDetails } from '@/utils/loanPayment';
+import { findLoanDetails } from '@/utils/loanPayment';
 import { firstDueOnOrAfter, nextDueAfter } from '@/services/recurrence/recurrenceEngine';
 import { resolveTransactionRule } from '@/services/recurrence/adapters';
 import { reportError } from '@/utils/errorReporter';
@@ -335,62 +340,43 @@ async function createTransactionFromRecurring(item: RecurringItem, date: Date): 
     }
   }
 
-  // Loan payment allocation (compute amortization at generation time)
+  let linkedLoanAccountId: string | undefined;
+  // Loan payment allocation: only mark the transaction as a loan payment here. The worker op
+  // below amortises on the folded balance and the transaction receives the portions.
   if (item.loanId) {
     const allAssets = await assetRepo.getAllAssets();
     const allAccounts = await accountRepo.getAllAccounts();
     const loan = findLoanDetails(item.loanId, allAssets, allAccounts);
     if (loan && loan.outstandingBalance > 0) {
-      const result = calculateAmortization(loan.outstandingBalance, loan.interestRate, item.amount);
       input.loanId = item.loanId;
-      input.loanInterestPortion = result.interestPortion;
-      input.loanPrincipalPortion = result.principalPortion;
+      linkedLoanAccountId = loan.type === 'asset' ? loan.linkedAccountId : undefined;
     }
   }
 
   try {
-    await transactionRepo.createTransaction(input);
+    const transaction = await transactionRepo.createTransaction(input);
 
-    // Update account balance
+    // Update account balance (relative: composes with a concurrent adjustment on another device)
     const account = await accountRepo.getAccountById(item.accountId);
     if (account) {
       // Liability-aware: a recurring expense on a credit card raises what's owed.
       const adjustment = signedAccountDelta(item.type, item.amount, account.type);
-      await accountRepo.updateAccountBalance(item.accountId, account.balance + adjustment);
+      await accountRepo.incrementBalance(item.accountId, adjustment);
     }
 
-    // Credit goal progress
+    // Credit goal progress (relative; clamp and auto-complete happen worker-side)
     if (input.goalAllocApplied && input.goalId) {
-      const goal = await goalRepo.getGoalById(input.goalId);
-      if (goal) {
-        await goalRepo.updateGoalProgress(
-          input.goalId,
-          goal.currentAmount + input.goalAllocApplied
-        );
-      }
+      await goalRepo.applyContribution(input.goalId, input.goalAllocApplied);
     }
 
-    // Reduce loan balance
-    if (input.loanPrincipalPortion && input.loanId) {
-      const allAssets = await assetRepo.getAllAssets();
-      const allAccounts = await accountRepo.getAllAccounts();
-      const loan = findLoanDetails(input.loanId, allAssets, allAccounts);
-      if (loan) {
-        const newBalance = Math.max(0, loan.outstandingBalance - input.loanPrincipalPortion);
-        if (loan.type === 'asset') {
-          const asset = allAssets.find((a) => a.id === loan.entityId);
-          if (asset?.loan) {
-            await assetRepo.updateAsset(loan.entityId, {
-              loan: { ...asset.loan, outstandingBalance: newBalance },
-            });
-            // syncLinkedLoanAccount won't fire from repo call — sync linked account manually
-            if (loan.linkedAccountId) {
-              await accountRepo.updateAccountBalance(loan.linkedAccountId, newBalance);
-            }
-          }
-        } else {
-          await accountRepo.updateAccountBalance(loan.entityId, newBalance);
-        }
+    // Reduce loan balance (worker op: amortise on the folded balance, write the portions)
+    if (input.loanId) {
+      const res = await transactionRepo.applyLoanPayment(transaction);
+      // The linked loan account mirrors the asset loan as an absolute of the returned folded
+      // balance (a residual, see plan #117 phase 2 section F).
+      const folded = (res.host as Asset | undefined)?.loan?.outstandingBalance;
+      if (res.applied && res.hostCollection === 'assets' && linkedLoanAccountId && folded != null) {
+        await accountRepo.updateAccountBalance(linkedLoanAccountId, folded);
       }
     }
 

@@ -1,4 +1,4 @@
-import { useGoalsStore } from '@/stores/goalsStore';
+import { useGoalsStore, contributionEntry } from '@/stores/goalsStore';
 import { useAuthoringMember } from '@/composables/useAuthoringMember';
 import { useTranslation } from '@/composables/useTranslation';
 import { showToast } from '@/composables/useToast';
@@ -40,10 +40,8 @@ export function useContributeToGoal() {
 
   async function _apply(
     goalId: UUID,
-    newCurrentAmount: number,
-    extraInput: Partial<UpdateGoalInput>,
-    note: string | undefined,
-    fireUndoToast: boolean
+    fireUndoToast: boolean,
+    write: (author: UUID, mintedId: string) => Promise<Goal | null>
   ): Promise<ApplyResult> {
     const goalBefore = goalsStore.goals.find((g) => g.id === goalId);
     if (!goalBefore) {
@@ -62,11 +60,7 @@ export function useContributeToGoal() {
     // Minted HERE so Undo targets exactly this device's entry: once concurrent appends merge,
     // "the last entry" can be another device's, and undoing that would delete their history.
     const mintedId = generateUUID();
-    const updated = await goalsStore.updateGoal(
-      goalId,
-      { ...extraInput, currentAmount: newCurrentAmount },
-      { contribution: { id: mintedId, author, note } }
-    );
+    const updated = await write(author, mintedId);
     if (!updated) return { success: false };
 
     const appliedDelta = updated.currentAmount - goalBefore.currentAmount;
@@ -103,7 +97,13 @@ export function useContributeToGoal() {
       showToast('error', t('goalView.notFound'));
       return { success: false };
     }
-    return _apply(goalId, goal.currentAmount + input.amount, {}, input.note, true);
+    // Relative: the worker adds `amount` to the live (folded) balance and appends the entry in
+    // the same change, so a concurrent contribution from another device is never overwritten.
+    return _apply(goalId, true, (author, mintedId) =>
+      goalsStore.applyContribution(goalId, input.amount, {
+        contribution: contributionEntry(input.amount, { id: mintedId, author, note: input.note }),
+      })
+    );
   }
 
   /** Full edit: fields from GoalModal. If currentAmount changed, contribution is recorded. */
@@ -113,7 +113,14 @@ export function useContributeToGoal() {
       const updated = await goalsStore.updateGoal(goalId, input);
       return { success: !!updated, goal: updated ?? undefined };
     }
-    return _apply(goalId, input.currentAmount, input, undefined, false);
+    const newCurrentAmount = input.currentAmount;
+    return _apply(goalId, false, (author, mintedId) =>
+      goalsStore.updateGoal(
+        goalId,
+        { ...input, currentAmount: newCurrentAmount },
+        { contribution: { id: mintedId, author } }
+      )
+    );
   }
 
   /**
@@ -132,10 +139,8 @@ export function useContributeToGoal() {
       showToast('error', t('goalContribute.undoFailed'));
       return;
     }
-    const filteredHistory = (goal.manualContributions ?? []).filter((c) => c.id !== contributionId);
-    const updated = await goalsStore.updateGoal(goalId, {
-      currentAmount: goal.currentAmount - amount,
-      manualContributions: filteredHistory,
+    const updated = await goalsStore.applyContribution(goalId, -amount, {
+      undoContributionId: contributionId,
     });
     if (updated) {
       showToast('success', t('goalContribute.revertedToast'));

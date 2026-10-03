@@ -374,34 +374,12 @@ export const useTransactionsStore = defineStore('transactions', () => {
   async function applyLoanPayment(transaction: Transaction): Promise<void> {
     if (!transaction.loanId) return;
     try {
-      // The worker `applyLoanPayment` op reads the loan host, amortizes, and
-      // writes the new balance atomically — closing the async lost-update the
-      // old read-then-absolute-write had. It returns the echoed host + split.
-      const res = await mutate<{
-        applied: boolean;
-        hostCollection?: string;
-        host?: Account | Asset;
-        interestPortion?: number;
-        principalPortion?: number;
-      }>({
-        op: 'named',
-        name: 'applyLoanPayment',
-        args: {
-          loanId: transaction.loanId,
-          paymentAmount: transaction.amount,
-          isRecurring: !!transaction.recurringItemId,
-        },
-      });
+      // The worker `applyLoanPayment` op (via the repository) reads the loan host, amortizes
+      // and writes the new balance atomically; the repository also records the interest and
+      // principal portions on the transaction. We only route the echoed host.
+      const res = await transactionRepo.applyLoanPayment(transaction);
       if (!res.applied) return;
       applyLoanHost(res.hostCollection, res.host);
-      // The interest/principal portions belong to the just-created transaction
-      // (no concurrent writer) → write them the ordinary way.
-      await transactionRepo.updateTransaction(transaction.id, {
-        loanInterestPortion: res.interestPortion,
-        loanPrincipalPortion: res.principalPortion,
-      });
-      transaction.loanInterestPortion = res.interestPortion;
-      transaction.loanPrincipalPortion = res.principalPortion;
     } catch (e) {
       console.error('Failed to apply loan payment:', e);
     }

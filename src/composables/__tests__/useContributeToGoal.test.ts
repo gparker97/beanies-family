@@ -24,9 +24,18 @@ const goalsState = {
   goals: [] as Goal[],
   updateGoal:
     vi.fn<(id: string, input: Partial<Goal>, options?: unknown) => Promise<Goal | null>>(),
+  applyContribution: vi.fn<(id: string, delta: number, opts?: unknown) => Promise<Goal | null>>(),
 };
 vi.mock('@/stores/goalsStore', () => ({
   useGoalsStore: () => goalsState,
+  // Same shape as the real helper (its own behaviour is covered by the store tests).
+  contributionEntry: (amount: number, c: { id: string; author: string; note?: string }) => ({
+    id: c.id,
+    amount,
+    at: 'now',
+    updatedBy: c.author,
+    ...(c.note ? { note: c.note } : {}),
+  }),
 }));
 
 import { useContributeToGoal } from '../useContributeToGoal';
@@ -54,13 +63,13 @@ describe('useContributeToGoal.contribute', () => {
     celebrateMock.mockClear();
     resolveOrToastMock.mockReset().mockReturnValue('member-1');
     goalsState.goals = [goal()];
-    goalsState.updateGoal.mockReset();
+    goalsState.applyContribution.mockReset();
   });
 
   /** Mimic the store: record the caller-minted contribution id on the returned goal. */
   function echoMintedId(currentAmount: number, amount: number, followedBy: string[] = []) {
-    goalsState.updateGoal.mockImplementation(async (_id, _input, options) => {
-      const minted = (options as { contribution: { id: string } }).contribution.id;
+    goalsState.applyContribution.mockImplementation(async (_id, _delta, opts) => {
+      const minted = (opts as { contribution: { id: string } }).contribution.id;
       return goal({
         currentAmount,
         manualContributions: [
@@ -78,14 +87,20 @@ describe('useContributeToGoal.contribute', () => {
     const result = await contribute('g-1', { amount: 100 });
 
     expect(result.success).toBe(true);
-    const minted = goalsState.updateGoal.mock.calls[0]![2] as { contribution: { id: string } };
+    const minted = goalsState.applyContribution.mock.calls[0]![2] as {
+      contribution: { id: string };
+    };
     expect(result.contributionId).toBe(minted.contribution.id);
     expect(result.appliedDelta).toBe(100);
-    expect(goalsState.updateGoal).toHaveBeenCalledWith(
-      'g-1',
-      expect.objectContaining({ currentAmount: 600 }),
-      { contribution: { id: expect.any(String), author: 'member-1', note: undefined } }
-    );
+    // Relative write: the delta (not a pre-computed absolute) plus the history entry.
+    expect(goalsState.applyContribution).toHaveBeenCalledWith('g-1', 100, {
+      contribution: expect.objectContaining({
+        id: minted.contribution.id,
+        amount: 100,
+        updatedBy: 'member-1',
+      }),
+    });
+    expect(goalsState.updateGoal).not.toHaveBeenCalled();
     // Toast with action button
     expect(showToastMock).toHaveBeenCalledWith(
       'success',
@@ -103,8 +118,9 @@ describe('useContributeToGoal.contribute', () => {
     echoMintedId(600, 100, ['c-other-device']);
     const { contribute } = useContributeToGoal();
     const result = await contribute('g-1', { amount: 100 });
-    const minted = (goalsState.updateGoal.mock.calls[0]![2] as { contribution: { id: string } })
-      .contribution.id;
+    const minted = (
+      goalsState.applyContribution.mock.calls[0]![2] as { contribution: { id: string } }
+    ).contribution.id;
     expect(result.contributionId).toBe(minted);
     expect(result.contributionId).not.toBe('c-other-device');
 
@@ -118,18 +134,16 @@ describe('useContributeToGoal.contribute', () => {
         ],
       }),
     ];
-    goalsState.updateGoal.mockReset().mockResolvedValue(goal());
+    goalsState.applyContribution.mockReset().mockResolvedValue(goal());
     const toastOpts = showToastMock.mock.calls.find(
       (c) => c[1] === 'goalContribute.successToast'
     )![3];
     await toastOpts.actionFn();
-    expect(goalsState.updateGoal).toHaveBeenCalledWith(
-      'g-1',
-      expect.objectContaining({
-        currentAmount: 505,
-        manualContributions: [expect.objectContaining({ id: 'c-other-device' })],
-      })
-    );
+    // Undo is relative and names the entry by id; the worker splices it, so the other
+    // device's entry is untouched.
+    expect(goalsState.applyContribution).toHaveBeenCalledWith('g-1', -100, {
+      undoContributionId: minted,
+    });
   });
 
   it('zero / negative amount → warn + returns false (no store call)', async () => {
@@ -139,7 +153,7 @@ describe('useContributeToGoal.contribute', () => {
     expect((await contribute('g-1', { amount: 0 })).success).toBe(false);
     expect((await contribute('g-1', { amount: -50 })).success).toBe(false);
 
-    expect(goalsState.updateGoal).not.toHaveBeenCalled();
+    expect(goalsState.applyContribution).not.toHaveBeenCalled();
     expect(warnSpy).toHaveBeenCalled();
     warnSpy.mockRestore();
   });
@@ -150,7 +164,7 @@ describe('useContributeToGoal.contribute', () => {
     const result = await contribute('g-missing', { amount: 100 });
     expect(result.success).toBe(false);
     expect(showToastMock).toHaveBeenCalledWith('error', 'goalView.notFound');
-    expect(goalsState.updateGoal).not.toHaveBeenCalled();
+    expect(goalsState.applyContribution).not.toHaveBeenCalled();
   });
 
   it('no author (resolveOrToast returns null) → return false, no store call', async () => {
@@ -158,11 +172,11 @@ describe('useContributeToGoal.contribute', () => {
     const { contribute } = useContributeToGoal();
     const result = await contribute('g-1', { amount: 100 });
     expect(result.success).toBe(false);
-    expect(goalsState.updateGoal).not.toHaveBeenCalled();
+    expect(goalsState.applyContribution).not.toHaveBeenCalled();
   });
 
   it('contribution with note → note passed through to store options', async () => {
-    goalsState.updateGoal.mockResolvedValue(
+    goalsState.applyContribution.mockResolvedValue(
       goal({
         currentAmount: 600,
         manualContributions: [{ id: 'c-new', amount: 100, at: '...', updatedBy: 'member-1' }],
@@ -170,15 +184,18 @@ describe('useContributeToGoal.contribute', () => {
     );
     const { contribute } = useContributeToGoal();
     await contribute('g-1', { amount: 100, note: "mom's birthday money" });
-    expect(goalsState.updateGoal).toHaveBeenCalledWith('g-1', expect.any(Object), {
-      contribution: { id: expect.any(String), author: 'member-1', note: "mom's birthday money" },
+    expect(goalsState.applyContribution).toHaveBeenCalledWith('g-1', 100, {
+      contribution: expect.objectContaining({
+        note: "mom's birthday money",
+        updatedBy: 'member-1',
+      }),
     });
   });
 
   it('crossing a 25/50/75/100 milestone fires celebrate', async () => {
     // Goal target 1000; current 400 → contribute 150 → new current 550 → crosses 50%
     goalsState.goals = [goal({ currentAmount: 400 })];
-    goalsState.updateGoal.mockResolvedValue(goal({ currentAmount: 550 }));
+    goalsState.applyContribution.mockResolvedValue(goal({ currentAmount: 550 }));
     const { contribute } = useContributeToGoal();
     await contribute('g-1', { amount: 150 });
     expect(celebrateMock).toHaveBeenCalledWith('goal-milestone');
@@ -186,7 +203,7 @@ describe('useContributeToGoal.contribute', () => {
 
   it('not crossing a milestone does not fire celebrate', async () => {
     goalsState.goals = [goal({ currentAmount: 600 })];
-    goalsState.updateGoal.mockResolvedValue(goal({ currentAmount: 650 }));
+    goalsState.applyContribution.mockResolvedValue(goal({ currentAmount: 650 }));
     const { contribute } = useContributeToGoal();
     await contribute('g-1', { amount: 50 });
     expect(celebrateMock).not.toHaveBeenCalled();
@@ -194,14 +211,14 @@ describe('useContributeToGoal.contribute', () => {
 
   it('targetAmount of 0 → no milestone check (guard against divide-by-zero)', async () => {
     goalsState.goals = [goal({ targetAmount: 0, currentAmount: 0 })];
-    goalsState.updateGoal.mockResolvedValue(goal({ targetAmount: 0, currentAmount: 100 }));
+    goalsState.applyContribution.mockResolvedValue(goal({ targetAmount: 0, currentAmount: 100 }));
     const { contribute } = useContributeToGoal();
     await contribute('g-1', { amount: 100 });
     expect(celebrateMock).not.toHaveBeenCalled();
   });
 
   it('store failure → success:false', async () => {
-    goalsState.updateGoal.mockResolvedValue(null);
+    goalsState.applyContribution.mockResolvedValue(null);
     const { contribute } = useContributeToGoal();
     const result = await contribute('g-1', { amount: 100 });
     expect(result.success).toBe(false);
@@ -260,21 +277,17 @@ describe('useContributeToGoal.undoContribution', () => {
         ],
       }),
     ];
-    goalsState.updateGoal.mockReset();
+    goalsState.applyContribution.mockReset();
   });
 
-  it('reverses the delta + splices by id + toasts success', async () => {
-    goalsState.updateGoal.mockResolvedValue(goal({ currentAmount: 500 }));
+  it('reverses the delta relatively + names the entry to splice + toasts success', async () => {
+    goalsState.applyContribution.mockResolvedValue(goal({ currentAmount: 500 }));
     const { undoContribution } = useContributeToGoal();
     await undoContribution('g-1', 'c-undo-me', 100);
 
-    expect(goalsState.updateGoal).toHaveBeenCalledWith(
-      'g-1',
-      expect.objectContaining({
-        currentAmount: 500,
-        manualContributions: [expect.objectContaining({ id: 'c-prev' })],
-      })
-    );
+    expect(goalsState.applyContribution).toHaveBeenCalledWith('g-1', -100, {
+      undoContributionId: 'c-undo-me',
+    });
     expect(showToastMock).toHaveBeenCalledWith('success', 'goalContribute.revertedToast');
   });
 
@@ -284,7 +297,7 @@ describe('useContributeToGoal.undoContribution', () => {
     const { undoContribution } = useContributeToGoal();
     await undoContribution('g-missing', 'c-any', 100);
 
-    expect(goalsState.updateGoal).not.toHaveBeenCalled();
+    expect(goalsState.applyContribution).not.toHaveBeenCalled();
     expect(showToastMock).toHaveBeenCalledWith('error', 'goalContribute.undoFailed');
     expect(warnSpy).toHaveBeenCalled();
     warnSpy.mockRestore();

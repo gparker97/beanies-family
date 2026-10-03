@@ -1,4 +1,7 @@
 import { createAutomergeRepository } from '../automergeRepository';
+import { mutate } from '../worker/docClient';
+import type { MutationOp } from '../worker/protocol';
+import { toISODateString } from '@/utils/date';
 import { accountNetWorthMultiplier } from '@/utils/finance';
 import type { Account, AccountType, CreateAccountInput, UpdateAccountInput } from '@/types/models';
 
@@ -32,6 +35,29 @@ export async function updateAccountBalance(
   newBalance: number
 ): Promise<Account | undefined> {
   return updateAccount(id, { balance: newBalance });
+}
+
+/**
+ * The one builder for a RELATIVE balance adjustment. `onMissing: 'skip'` so an account deleted
+ * by another device mid-write (or mid-import) does not fail the whole mutation; callers that
+ * need to know check the echo / projection.
+ */
+export function incrementBalanceOp(id: string, delta: number, now: string): MutationOp {
+  return {
+    op: 'increment',
+    collection: 'accounts',
+    id,
+    field: 'balance',
+    delta,
+    updatedAt: now,
+    onMissing: 'skip',
+  };
+}
+
+/** Atomically adjust a balance by a relative delta; resolves to the echoed account, or
+ * undefined when the account no longer exists worker-side. */
+export async function incrementBalance(id: string, delta: number): Promise<Account | undefined> {
+  return mutate<Account | undefined>(incrementBalanceOp(id, delta, toISODateString(new Date())));
 }
 
 export async function getTotalBalance(memberId?: string): Promise<number> {

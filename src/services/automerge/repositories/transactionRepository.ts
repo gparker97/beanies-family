@@ -2,10 +2,13 @@ import { createAutomergeRepository, stripUndefined, toPlain } from '../automerge
 import { getById as projectionGetById } from '../projection';
 import { mutate } from '../worker/docClient';
 import type { MutationOp } from '../worker/protocol';
+import { incrementBalanceOp } from './accountRepository';
 import { ImportNotVisibleError } from './importErrors';
 import { generateUUID } from '@/utils/id';
 import { toISODateString } from '@/utils/date';
 import type {
+  Account,
+  Asset,
   Transaction,
   CreateTransactionInput,
   UpdateTransactionInput,
@@ -25,6 +28,40 @@ export const getTransactionById = repo.getById;
 export const createTransaction = repo.create;
 export const updateTransaction = repo.update;
 export const deleteTransaction = repo.remove;
+
+export interface LoanPaymentResult {
+  applied: boolean;
+  hostCollection?: string;
+  host?: Account | Asset;
+  interestPortion?: number;
+  principalPortion?: number;
+}
+
+/**
+ * Atomically apply a loan payment (worker `applyLoanPayment` op: amortises on the folded balance
+ * and writes the new balance in one change) and, when applied, record the interest/principal
+ * portions on the just-created transaction (no concurrent writer, so an ordinary update).
+ * Mutates `transaction` in place to carry the portions. The caller routes the echoed `host`.
+ */
+export async function applyLoanPayment(transaction: Transaction): Promise<LoanPaymentResult> {
+  const res = await mutate<LoanPaymentResult>({
+    op: 'named',
+    name: 'applyLoanPayment',
+    args: {
+      loanId: transaction.loanId,
+      paymentAmount: transaction.amount,
+      isRecurring: !!transaction.recurringItemId,
+    },
+  });
+  if (!res.applied) return res;
+  await updateTransaction(transaction.id, {
+    loanInterestPortion: res.interestPortion,
+    loanPrincipalPortion: res.principalPortion,
+  });
+  transaction.loanInterestPortion = res.interestPortion;
+  transaction.loanPrincipalPortion = res.principalPortion;
+  return res;
+}
 
 export async function getTransactionsByAccountId(accountId: string): Promise<Transaction[]> {
   const transactions = await getAllTransactions();
@@ -143,17 +180,9 @@ export async function commitStatementAdds(
   }
   for (const { accountId, delta } of increments) {
     if (delta === 0) continue;
-    ops.push({
-      op: 'increment',
-      collection: 'accounts',
-      id: accountId,
-      field: 'balance',
-      delta,
-      updatedAt: now,
-      // An account deleted by another device mid-import must not fail the whole import; the
-      // caller reports the skip so a balance divergence is diagnosable.
-      onMissing: 'skip',
-    });
+    // `onMissing: 'skip'`: an account deleted by another device mid-import must not fail the
+    // whole import; the caller reports the skip so a balance divergence is diagnosable.
+    ops.push(incrementBalanceOp(accountId, delta, now));
   }
 
   await mutate({ op: 'batch', ops });
