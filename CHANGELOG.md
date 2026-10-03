@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-10-03
 
+### Security
+
+- Operational documents, prompt logs and personal data are no longer part of the public repository or its history; they moved to a private repository.
+
 ### Added
 
 - Magic beans is now one tap away: tap the beanies button and start typing or attach a photo straight away, then tap Send. The Everyday tiles sit underneath for adding things by hand, and the bar at the bottom stays visible while it is open.
