@@ -1,0 +1,3 @@
+# beanies.family infrastructure code
+
+This directory holds the server-side code that beanies.family runs: the Lambda handlers in `lambda/` and the CloudFront Functions in `modules/web/functions/`, each with its tests. The Terraform that deploys the hosted `app.beanies.family` stack lives in a private operations repo and is not needed to self-host. Self-hosters follow [docs/SELF_HOSTING.md](../docs/SELF_HOSTING.md): Path A needs no backend at all, and Path B deploys the Lambdas by hand from their own guides, [lambda/oauth/README.md](./lambda/oauth/README.md) (with the runtime-agnostic contract in [lambda/oauth/SPEC.md](./lambda/oauth/SPEC.md)) and the optional [lambda/registry/README.md](./lambda/registry/README.md).
