@@ -96,3 +96,6 @@ scratch-shots/
 # .jpg/.png masters. The masters stay in git; these do not.
 /public/help/pwa-install/*.webp
 /web/public/help/pwa-install/*.webp
+
+# vitest JSON reporter output (written by review tooling; never committed)
+.vitest/

@@ -1,6 +1,10 @@
 /**
  * The one place a price lives.
  *
+ * Also imported directly by Node (the beanies-metrics skill's ROI maths, via Node 24 type
+ * stripping), so this file must stay erasable TypeScript only: no enums, namespaces, parameter
+ * properties or other syntax that needs transpiling, and no import Node cannot resolve.
+ *
  * The rendered plans table, the client-side currency switcher, the early-family
  * discount lines and the FAQPage JSON-LD all read from here, so a price change
  * is one edit and cannot drift between the number a person sees and the number

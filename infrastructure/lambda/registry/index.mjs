@@ -1,31 +1,48 @@
 /* global process */
-import { createHash } from 'node:crypto';
+import { Buffer } from 'node:buffer';
+import { createHash, randomUUID } from 'node:crypto';
 import { DynamoDBClient, GetItemCommand, PutItemCommand } from '@aws-sdk/client-dynamodb';
 import { marshall, unmarshall } from '@aws-sdk/util-dynamodb';
 import { computeEntitlement, isValidInstant } from './entitlement.mjs';
+import {
+  EVENT_KINDS,
+  MAX_BODY_BYTES,
+  PLATFORMS,
+  buildItem,
+  reduceUserAgent,
+  validateEvent,
+} from './events.mjs';
 
 const client = new DynamoDBClient({});
-const PROD_TABLE = process.env.TABLE_NAME;
-const DEV_TABLE = process.env.DEV_TABLE_NAME || PROD_TABLE; // safe fallback
+// Each table pair falls back to prod when no dev table is configured (safe fallback).
+const REGISTRY_TABLES = {
+  prod: process.env.TABLE_NAME,
+  dev: process.env.DEV_TABLE_NAME || process.env.TABLE_NAME,
+};
+// Marketing-events ledger (#121). Same dev/prod split, picked by the same `tableForOrigin`.
+const EVENTS_TABLES = {
+  prod: process.env.EVENTS_TABLE_NAME,
+  dev: process.env.EVENTS_DEV_TABLE_NAME || process.env.EVENTS_TABLE_NAME,
+};
 const API_KEY = process.env.REGISTRY_API_KEY;
 const ALLOWED_ORIGINS = (process.env.CORS_ORIGIN || 'https://beanies.family')
   .split(',')
   .map((o) => o.trim());
 const DEV_ORIGINS = new Set(
-  (process.env.DEV_ORIGINS || 'http://localhost:5173,http://localhost:4173')
+  (process.env.DEV_ORIGINS || 'http://localhost:5173,http://localhost:4173,http://localhost:4321')
     .split(',')
     .map((o) => o.trim())
     .filter(Boolean)
 );
 
 /**
- * Pick the DynamoDB table based on the request Origin. Localhost origins
- * write to the dev table; everything else writes to prod. Unknown origins
+ * Pick a table from a `{ dev, prod }` pair based on the request Origin. Localhost
+ * origins use the dev table; everything else uses prod. Unknown origins
  * default to prod for safety — but they would also fail CORS upstream so
  * in practice only allowlisted origins ever reach the Lambda body.
  */
-function tableForOrigin(origin) {
-  return origin && DEV_ORIGINS.has(origin) ? DEV_TABLE : PROD_TABLE;
+function tableForOrigin(origin, { dev, prod }) {
+  return origin && DEV_ORIGINS.has(origin) ? dev : prod;
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -37,7 +54,7 @@ function getHeaders(event) {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': allowedOrigin,
     'Access-Control-Allow-Headers': 'Content-Type, x-api-key',
-    'Access-Control-Allow-Methods': 'GET, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, PUT, POST, DELETE, OPTIONS',
   };
 }
 
@@ -86,12 +103,13 @@ const ATTRIBUTION_MAX_LEN = Number(/\{1,(\d+)\}/.exec(ATTRIBUTION_VALUE_RE.sourc
 
 function logAttributionDropped(familyId, fields) {
   // Drop branches only: a healthy stamp is visible in the row itself. Hash only, and never
-  // the rejected value (it is arbitrary client input).
+  // the rejected value (it is arbitrary client input). No family on the `POST /events` path
+  // (#121), so the hash is omitted there rather than hashing a null.
   // eslint-disable-next-line no-console -- structured drop line, read by CloudWatch
   console.log(
     JSON.stringify({
       msg: 'attribution_dropped',
-      family_id_hash: familyIdHash(familyId),
+      ...(familyId ? { family_id_hash: familyIdHash(familyId) } : {}),
       ...fields,
     })
   );
@@ -134,6 +152,46 @@ function validAttribution(value, familyId) {
   }
   /* eslint-enable security/detect-object-injection */
   return Object.keys(out).length ? out : null;
+}
+
+/**
+ * The "how did you hear about us?" survey answer (#121): the stable option id only. The label and
+ * the free text of `other` stay Slack-only. Client-supplied AND write-once (stamped on the signup
+ * write, gated on `isSignupEvent` exactly like `attribution`), so it is allowlisted here.
+ *
+ * ⚠️ TWIN of `packages/brand/heardVia.ts` (`HEARD_VIA_IDS`). It cannot be imported: every Lambda
+ * here is its own zip. Change the list there AND here, in the same order;
+ * `src/utils/__tests__/attributionTwinDrift.test.ts` fails if they drift.
+ */
+export const HEARD_VIA_IDS = [
+  'reddit',
+  'product_hunt',
+  'substack',
+  'google',
+  'app_store',
+  'chatgpt_ad',
+  'ai',
+  'friend',
+  'other',
+];
+
+/**
+ * An allowlisted id, or null. Omitted / null is the normal case (a skipped survey, every legacy
+ * client) and logs nothing; anything else that is not an allowlisted id logs one
+ * `heard_via_dropped` line (hash only, never the rejected value) and stores null.
+ */
+function validHeardVia(value, familyId) {
+  if (value === undefined || value === null) return null;
+  if (typeof value === 'string' && HEARD_VIA_IDS.includes(value)) return value;
+  // eslint-disable-next-line no-console -- structured drop line, read by CloudWatch
+  console.log(
+    JSON.stringify({
+      msg: 'heard_via_dropped',
+      family_id_hash: familyIdHash(familyId),
+      reason: typeof value === 'string' ? 'unknown-id' : 'not-string',
+    })
+  );
+  return null;
 }
 
 /**
@@ -267,7 +325,116 @@ function entitlementFor(familyId, row, billingRead) {
   return entitlement;
 }
 
+/**
+ * One structured line per `POST /events` request, success path included, so the acceptance rate
+ * per kind is a CloudWatch count. `kind` / `platform` are logged only when they are allowlisted
+ * values: a rejected body's raw values are arbitrary client input and never reach the log.
+ */
+function logMarketingEvent({
+  kind = null,
+  platform = null,
+  tagged = null,
+  outcome,
+  reason = null,
+}) {
+  // eslint-disable-next-line no-console -- structured outcome line, read by CloudWatch
+  console.log(
+    JSON.stringify({
+      msg: 'marketing_event',
+      kind: EVENT_KINDS.includes(kind) ? kind : null,
+      platform: PLATFORMS.includes(platform) ? platform : null,
+      tagged,
+      outcome,
+      reason,
+    })
+  );
+}
+
+/**
+ * `POST /events` (#121): the marketing site's first-party ledger beacon. KEYLESS by design (the
+ * site has no API key, and shipping the app's public soft key in a second bundle buys nothing).
+ * Its protections, in order: an `Origin` that must be present AND allowlisted (403, not the
+ * fallback echo the other routes do; browsers always send Origin on a POST, so an absent one is a
+ * non-browser client); a 2 KB cap on the decoded body; strict validation; the stage's per-route
+ * throttle. A polluted event can only ever attach to a pod that really was created, so the worst
+ * outcome is a mis-scored dashboard, never data exposure.
+ *
+ * The body arrives as `text/plain` (a `sendBeacon` string, so there is no CORS preflight) and is
+ * parsed as JSON whatever the content type says. Fire-and-forget: the site never retries.
+ */
+async function handleEvents(event) {
+  const origin = event.headers?.origin;
+  if (!origin || !ALLOWED_ORIGINS.includes(origin)) {
+    logMarketingEvent({ outcome: 'rejected', reason: 'origin_not_allowed' });
+    return response(403, { error: 'origin_not_allowed' }, event);
+  }
+
+  // API Gateway v2 may base64-encode a body (the billing Lambda's `rawBodyOf` idiom). The size
+  // check runs on the decoded bytes, before any parsing.
+  const raw =
+    typeof event.body !== 'string'
+      ? Buffer.alloc(0)
+      : event.isBase64Encoded
+        ? Buffer.from(event.body, 'base64')
+        : Buffer.from(event.body, 'utf8');
+  if (raw.length > MAX_BODY_BYTES) {
+    logMarketingEvent({ outcome: 'rejected', reason: 'body_too_large' });
+    return response(400, { error: 'body_too_large' }, event);
+  }
+
+  let body;
+  try {
+    body = JSON.parse(raw.toString('utf8'));
+  } catch {
+    logMarketingEvent({ outcome: 'rejected', reason: 'bad_json' });
+    return response(400, { error: 'bad_json' }, event);
+  }
+
+  const verdict = validateEvent(body, (fields) => validAttribution(fields, null));
+  if (!verdict.ok) {
+    logMarketingEvent({
+      kind: body?.kind,
+      platform: body?.platform,
+      outcome: 'rejected',
+      reason: verdict.reason,
+    });
+    return response(400, { error: verdict.reason }, event);
+  }
+
+  const { kind, platform, tagged } = verdict.event;
+  const item = buildItem(verdict.event, {
+    now: Date.now(),
+    origin,
+    device: reduceUserAgent(event.headers?.['user-agent']),
+    eventId: randomUUID(),
+  });
+  const tableName = tableForOrigin(origin, EVENTS_TABLES);
+
+  try {
+    await client.send(
+      new PutItemCommand({
+        TableName: tableName,
+        Item: marshall(item, { removeUndefinedValues: true }),
+      })
+    );
+  } catch (err) {
+    console.error(
+      '[registry] marketing_event write failed: check EVENTS_TABLE_NAME / EVENTS_DEV_TABLE_NAME and dynamodb:PutItem on the events tables',
+      err
+    );
+    logMarketingEvent({ kind, platform, tagged, outcome: 'error', reason: 'ddb_error' });
+    return response(500, { error: 'Internal server error' }, event);
+  }
+
+  logMarketingEvent({ kind, platform, tagged, outcome: 'stored' });
+  return { statusCode: 204, headers: getHeaders(event) };
+}
+
 export async function handler(event) {
+  // The keyless marketing-events beacon (#121) has no API key and no familyId, so it branches
+  // BEFORE both checks below. Every other route keeps the key + UUID gate.
+  if (event.routeKey === 'POST /events') return handleEvents(event);
+
   // API key check
   const key = event.headers?.['x-api-key'];
   if (key !== API_KEY) {
@@ -280,7 +447,7 @@ export async function handler(event) {
   }
 
   const method = event.requestContext?.http?.method;
-  const tableName = tableForOrigin(event.headers?.origin);
+  const tableName = tableForOrigin(event.headers?.origin, REGISTRY_TABLES);
 
   try {
     if (method === 'GET') {
@@ -308,7 +475,11 @@ export async function handler(event) {
       // Additive: every existing reader ignores the extra key, and `entitlement: null` means
       // "could not be computed this time", which the client answers by keeping its cache.
       const entitlement = entitlementFor(familyId, row, billingRead);
-      return response(200, { ...row, entitlement }, event);
+      // `attributionInferred` (#121) is derived ops data owned by the metrics skill's scorer,
+      // not part of the app's wire contract, so its shape can change without touching the app.
+      const publicRow = { ...row };
+      delete publicRow.attributionInferred;
+      return response(200, { ...publicRow, entitlement }, event);
     }
 
     if (method === 'PUT') {
@@ -608,6 +779,16 @@ export async function handler(event) {
         attribution:
           existing.attribution ??
           (body.isSignupEvent === true ? validAttribution(body.attribution, familyId) : null),
+        // Survey answer id (#121): the same two conditions as `attribution` above, for the same
+        // reasons. Validated only on a stampable write, so `heard_via_dropped` never fires for a
+        // login/background PUT.
+        heardVia:
+          existing.heardVia ??
+          (body.isSignupEvent === true ? validHeardVia(body.heardVia, familyId) : null),
+        // Inferred attribution (#121): written ONLY by the metrics skill's conditional
+        // `UpdateItem`. Never read from the body (a client cannot set or clear it); carried here
+        // because this whole-item PutItem would otherwise erase it on the next login.
+        attributionInferred: existing.attributionInferred ?? null,
         // No `deletedAt` here, deliberately: `PutItem` replaces the whole item,
         // so reaching this point at all IS the revival. Only the owner reaches
         // it — every other writer returned above with the family still deleted.
@@ -701,6 +882,10 @@ export async function handler(event) {
               // Campaign provenance (#118): identifies the ad, not the family, and a
               // restore must not lose which ad created the pod.
               attribution: existing.attribution ?? null,
+              // The survey answer and the scorer's inferred ad (#121): provenance of the same
+              // kind, so a restore keeps them too.
+              heardVia: existing.heardVia ?? null,
+              attributionInferred: existing.attributionInferred ?? null,
               // Everything else is deliberately DROPPED, and the omissions are
               // decisions: the canonical pointer (a stale pointer is worse than
               // none), the activity signals and roster size (they would keep a

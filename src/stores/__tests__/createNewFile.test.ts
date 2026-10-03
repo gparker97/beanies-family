@@ -348,6 +348,7 @@ import { resetDoc } from '@/services/automerge/docService';
 import { installInlineBackend } from '@/services/automerge/worker/__tests__/inlineHarness';
 import * as docClient from '@/services/automerge/worker/docClient';
 import { ATTRIBUTION_STORAGE_KEY, makeEnvelope } from '@beanies/brand/attribution';
+import type { HeardViaId } from '@beanies/brand/heardVia';
 
 // ---------------------------------------------------------------------------
 // Tests — full end-to-end pod creation flow
@@ -872,7 +873,10 @@ describe('pod creation: full end-to-end flow', () => {
    * silently unregistered real families.
    */
   describe('createNewFile — REVIEW-DEMO remote side-effect suppression', () => {
-    async function createPod(opts?: { suppressRemoteSideEffects?: boolean }) {
+    async function createPod(
+      opts?: { suppressRemoteSideEffects?: boolean },
+      heardVia: { id: HeardViaId; label: string } | null = null
+    ) {
       const authStore = useAuthStore();
       const syncStore = useSyncStore();
 
@@ -903,7 +907,7 @@ describe('pod creation: full end-to-end flow', () => {
         // id; using anything else fails verify with a familyId mismatch.
         'fam-test-1',
         'Demo Family',
-        null,
+        heardVia,
         opts
       );
     }
@@ -930,6 +934,29 @@ describe('pod creation: full end-to-end flow', () => {
       expect(vi.mocked(registryService.lookupFamilyResult)).toHaveBeenCalled();
       expect(vi.mocked(registryService.registerFamilyOrThrow)).toHaveBeenCalled();
       expect(vi.mocked(slackNotify)).toHaveBeenCalled();
+    });
+
+    it('persists the survey answer id on the signup write; the label stays Slack-only', async () => {
+      const registryService = await import('@/services/registry/registryService');
+      const { slackNotify } = await import('@/utils/slackNotify');
+
+      const result = await createPod(undefined, { id: 'chatgpt_ad', label: 'ChatGPT ad' });
+
+      expect(result.ok).toBe(true);
+      const [, entry] = vi.mocked(registryService.registerFamilyOrThrow).mock.calls.at(-1)!;
+      expect(entry.heardVia).toBe('chatgpt_ad');
+      expect(JSON.stringify(entry)).not.toContain('ChatGPT ad');
+      expect(vi.mocked(slackNotify).mock.calls.at(-1)![0]).toContain('\n*Heard via:* ChatGPT ad');
+    });
+
+    it('sends heardVia: null when the survey was skipped', async () => {
+      const registryService = await import('@/services/registry/registryService');
+
+      await createPod();
+
+      const [, entry] = vi.mocked(registryService.registerFamilyOrThrow).mock.calls.at(-1)!;
+      expect('heardVia' in entry).toBe(true);
+      expect(entry.heardVia).toBeNull();
     });
 
     // #118: the campaign tag rides the registry row and the Slack line, then is consumed.

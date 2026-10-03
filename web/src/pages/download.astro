@@ -6,14 +6,13 @@
 //
 // Redirects are done in JS (no meta-refresh) because desktop should NOT redirect
 // — it should show both options. The per-store destinations live in /ios and
-// /android; this page forwards to those so there is a single source of truth.
+// /android; this page forwards to those (carrying `location.search`) so there is a single
+// source of truth AND a single place that records the `store_tap` event and builds the
+// tagged store URL.
 //
 // Deliberately a minimal standalone page (NOT BaseLayout): no nav/footer.
-import { SITE_URL, STORE_URL } from '@beanies/brand/nav';
+import { SITE_URL } from '@beanies/brand/nav';
 import AppLinks from '../components/AppLinks.astro';
-
-const APP_STORE_URL = STORE_URL.ios;
-const PLAY_URL = STORE_URL.android;
 
 const DESCRIPTION =
   'one app to manage your family\u2019s money, activities, and all the little beans. private, encrypted, no ads.';
@@ -115,11 +114,30 @@ const OG_IMAGE = new URL('/brand/og-default.png', SITE_URL).toString();
       <a href="/android" rel="noopener" data-cta="CTA: App Store (Android)" data-cta-loc="download-page">🤖 Google Play — Android</a>
     </div>
     <p class="muted">no phone handy? open <strong>app.beanies.family</strong> in your browser — it works there too.</p>
-    <script is:inline define:vars={{ APP_STORE_URL, PLAY_URL }}>
+    <!-- Hoisted (bundled module) script, NOT `is:inline`, on purpose: an inline script runs during
+         parsing, before AppLinks' module script, so the phone redirect would leave the page before
+         the `landing` beacon was sent (and /ios would then see a same-origin referrer and send
+         none). Module scripts run in document order, and AppLinks (above) already sends the
+         landing, so this one only redirects. -->
+    <!-- Fallback if the bundled module above never loads (stale CDN chunk, blocked script): after
+         2s, send phones on unless the module already redirected. -->
+    <script is:inline>
+      setTimeout(function () {
+        if (window.__beaniesStoreRedirected) return;
+        var ua = navigator.userAgent || '';
+        if (/iPhone|iPad|iPod/i.test(ua)) location.replace('/ios' + location.search);
+        else if (/Android/i.test(ua)) location.replace('/android' + location.search);
+      }, 2000);
+    </script>
+    <script>
       // On a phone, skip the chooser and go straight to the right store.
-      var ua = navigator.userAgent || '';
-      if (/iPhone|iPad|iPod/i.test(ua)) window.location.replace(APP_STORE_URL);
-      else if (/Android/i.test(ua)) window.location.replace(PLAY_URL);
+      const ua = navigator.userAgent || '';
+      const flagAndGo = (path: string) => {
+        (window as unknown as { __beaniesStoreRedirected?: boolean }).__beaniesStoreRedirected = true;
+        location.replace(path + location.search);
+      };
+      if (/iPhone|iPad|iPod/i.test(ua)) flagAndGo('/ios');
+      else if (/Android/i.test(ua)) flagAndGo('/android');
       // Desktop / unknown: leave the two choices visible.
     </script>
   </body>

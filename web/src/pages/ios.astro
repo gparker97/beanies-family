@@ -2,8 +2,13 @@
 // Stable short link to the beanies.family App Store listing. Every "get the iOS
 // app" CTA (homepage badge, Pinterest pins, print collateral) points at
 // beanies.family/ios so the destination can be rotated here — a small web
-// deploy — without touching the app. Store links are NOT decorated with campaign tags (a
-// store install cannot carry one); see docs/plans/2026-10-02-utm-attribution-carry-through.md.
+// deploy — without touching the app.
+//
+// This page is also the SINGLE PATH to the store (badges, pins, print collateral and /download's
+// phone redirect all land here), so it records the first-party `store_tap` event and builds the
+// final store URL with the visitor's campaign tag (`lib/storeRedirect.ts`; see
+// docs/plans/2026-10-03-marketing-events-ledger-inferred-attribution.md). The meta refresh lives
+// in <noscript> (plus a 2s fallback meta) so it cannot navigate away before the script has queued the beacon.
 //
 // Deliberately a minimal standalone page (NOT BaseLayout): no nav/footer, a pure
 // forward. Mirrors src/pages/discord.astro.
@@ -20,7 +25,12 @@ const APP_STORE_URL = STORE_URL.ios;
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta http-equiv="refresh" content={`0; url=${APP_STORE_URL}`} />
+    <!-- No-JS: forward immediately. JS-enabled: a 2-second meta refresh is the fallback if the
+         bundled module chunk never loads (stale CDN edge, blocked script, flaky in-app browser).
+         2s is deliberate: the module runs well before that, queues the beacon and navigates
+         first via location.replace, so the meta only fires when the script could not run. -->
+    <noscript><meta http-equiv="refresh" content={`0; url=${APP_STORE_URL}`} /></noscript>
+    <meta http-equiv="refresh" content={`2; url=${APP_STORE_URL}`} />
     <link rel="canonical" href={APP_STORE_URL} />
     <meta name="robots" content="noindex" />
     <title>Opening beanies.family on the App Store…</title>
@@ -48,11 +58,11 @@ const APP_STORE_URL = STORE_URL.ios;
   <body>
     <p>taking you to the app store… 🫘</p>
     <p>
-      not redirected? <a href={APP_STORE_URL} rel="noopener">tap here to open the app store</a>.
+      not redirected? <a id="store-fallback" href={APP_STORE_URL} rel="noopener">tap here to open the app store</a>.
     </p>
-    <script is:inline define:vars={{ APP_STORE_URL }}>
-      // Belt-and-braces: also redirect via JS in case meta-refresh is delayed.
-      window.location.replace(APP_STORE_URL);
+    <script>
+      import { redirectToStore } from '../lib/storeRedirect';
+      redirectToStore('ios');
     </script>
   </body>
 </html>

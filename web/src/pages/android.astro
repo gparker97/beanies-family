@@ -2,8 +2,13 @@
 // Stable short link to the beanies.family Google Play listing. Every "get the
 // Android app" CTA (homepage badge, Pinterest pins, print collateral) points at
 // beanies.family/android so the destination can be rotated here — a small web
-// deploy — without touching the app. Store links are NOT decorated with campaign tags (a
-// store install cannot carry one); see docs/plans/2026-10-02-utm-attribution-carry-through.md.
+// deploy — without touching the app.
+//
+// This page is also the SINGLE PATH to the store (badges, pins, print collateral and /download's
+// phone redirect all land here), so it records the first-party `store_tap` event and builds the
+// final store URL with the visitor's campaign tag (`lib/storeRedirect.ts`; see
+// docs/plans/2026-10-03-marketing-events-ledger-inferred-attribution.md). The meta refresh lives
+// in <noscript> (plus a 2s fallback meta) so it cannot navigate away before the script has queued the beacon.
 //
 // Deliberately a minimal standalone page (NOT BaseLayout): no nav/footer, a pure
 // forward. Mirrors src/pages/discord.astro.
@@ -19,7 +24,12 @@ const PLAY_URL = STORE_URL.android;
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta http-equiv="refresh" content={`0; url=${PLAY_URL}`} />
+    <!-- No-JS: forward immediately. JS-enabled: a 2-second meta refresh is the fallback if the
+         bundled module chunk never loads (stale CDN edge, blocked script, flaky in-app browser).
+         2s is deliberate: the module runs well before that, queues the beacon and navigates
+         first via location.replace, so the meta only fires when the script could not run. -->
+    <noscript><meta http-equiv="refresh" content={`0; url=${PLAY_URL}`} /></noscript>
+    <meta http-equiv="refresh" content={`2; url=${PLAY_URL}`} />
     <link rel="canonical" href={PLAY_URL} />
     <meta name="robots" content="noindex" />
     <title>Opening beanies.family on Google Play…</title>
@@ -47,11 +57,11 @@ const PLAY_URL = STORE_URL.android;
   <body>
     <p>taking you to google play… 🫘</p>
     <p>
-      not redirected? <a href={PLAY_URL} rel="noopener">tap here to open google play</a>.
+      not redirected? <a id="store-fallback" href={PLAY_URL} rel="noopener">tap here to open google play</a>.
     </p>
-    <script is:inline define:vars={{ PLAY_URL }}>
-      // Belt-and-braces: also redirect via JS in case meta-refresh is delayed.
-      window.location.replace(PLAY_URL);
+    <script>
+      import { redirectToStore } from '../lib/storeRedirect';
+      redirectToStore('android');
     </script>
   </body>
 </html>

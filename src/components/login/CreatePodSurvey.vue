@@ -5,6 +5,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { logEvent } from '@/services/telemetry';
 import { reportError } from '@/utils/errorReporter';
 import type { UIStringKey } from '@/services/translation/uiStrings';
+import { HEARD_VIA_IDS, type HeardVia, type HeardViaId } from '@beanies/brand/heardVia';
 
 /**
  * "How did you hear about us?" — a brief, skippable single-question step shown
@@ -14,8 +15,8 @@ import type { UIStringKey } from '@/services/translation/uiStrings';
  * docs/plans/2026-07-21-remove-invite-gate-create-welcome-modal.md.
  */
 const emit = defineEmits<{
-  /** Resolved answer: a stable English Slack label, free text, or null (skip). */
-  complete: [heardVia: string | null];
+  /** Resolved answer: the stable id (registry) + its Slack label or free text, or null (skip). */
+  complete: [heardVia: HeardVia | null];
 }>();
 
 const { t } = useTranslation();
@@ -24,8 +25,8 @@ const { t } = useTranslation();
  * Single source of truth for the channel options: id → localized label + emoji +
  * a STABLE English Slack label ('other' resolves to the free-text value instead).
  */
-const HEARD_OPTIONS: ReadonlyArray<{
-  id: string;
+const HEARD_OPTION_DEFS: ReadonlyArray<{
+  id: HeardViaId;
   labelKey: UIStringKey;
   icon: string;
   slackLabel: string | null;
@@ -51,28 +52,39 @@ const HEARD_OPTIONS: ReadonlyArray<{
   { id: 'other', labelKey: 'createSurvey.optOther', icon: '✨', slackLabel: null },
 ];
 
-const selectedId = ref<string | null>(null);
+// The ids come from the shared list (the registry twin pins it); order follows it.
+const HEARD_OPTIONS = HEARD_VIA_IDS.map((id) => {
+  const def = HEARD_OPTION_DEFS.find((o) => o.id === id);
+  if (!def) throw new Error(`createSurvey: no option definition for heardVia id '${id}'`);
+  return def;
+});
+
+const selectedId = ref<HeardViaId | null>(null);
 const otherText = ref('');
 const showOther = computed(() => selectedId.value === 'other');
 
-function select(id: string) {
+function select(id: HeardViaId) {
   // Single-select; tapping the selected tile clears it.
   selectedId.value = selectedId.value === id ? null : id;
 }
 
-/** Resolve the selection to the Slack string (or null = no attribution). */
-function resolve(): string | null {
+/**
+ * Resolve the selection to `{ id, label }` (or null = skipped). `label` is the Slack string:
+ * the stable English label, or for `other` the trimmed free text. `other` with no text typed is
+ * a skip (null), as before.
+ */
+function resolve(): HeardVia | null {
   if (!selectedId.value) return null;
   const opt = HEARD_OPTIONS.find((o) => o.id === selectedId.value);
   if (!opt) return null;
   if (opt.id === 'other') {
     const txt = otherText.value.trim();
-    return txt.length ? txt : null;
+    return txt.length ? { id: opt.id, label: txt } : null;
   }
-  return opt.slackLabel;
+  return opt.slackLabel ? { id: opt.id, label: opt.slackLabel } : null;
 }
 
-function complete(payload: string | null) {
+function complete(payload: HeardVia | null) {
   // Only the answered/skipped OUTCOME goes to the firehose — never the channel
   // or free text (those go to Slack only; logging them would need a new
   // allowlisted context key + privacy-manifest churn).
@@ -86,7 +98,7 @@ function complete(payload: string | null) {
 }
 
 function finish() {
-  let payload: string | null = null;
+  let payload: HeardVia | null = null;
   try {
     payload = resolve();
   } catch (error) {

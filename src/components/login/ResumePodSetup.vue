@@ -96,6 +96,7 @@ import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry';
 import { confirm } from '@/composables/useConfirm';
 import { consumeResumeReason } from '@/components/login/resumePaths';
+import type { HeardVia } from '@beanies/brand/heardVia';
 
 const { t } = useTranslation();
 const authStore = useAuthStore();
@@ -155,9 +156,9 @@ const kitCode = ref('');
 /** The owner's magic link for the combined save step. One-time, like the kit code. */
 /** A `uiStrings` key when the mint failed — the step degrades, it never blocks. */
 const kitId = ref('');
-// "How did you hear about us?" answer (a stable English Slack label or free text;
-// null = skipped). Captured in the `survey` phase, threaded into createNewFile.
-const heardVia = ref<string | null>(null);
+// "How did you hear about us?" answer (`{ id, label }`; null = skipped). Captured in the
+// `survey` phase, threaded into createNewFile.
+const heardVia = ref<HeardVia | null>(null);
 const formError = ref<string | null>(null);
 const busy = ref(false);
 const showLocalFileWarning = ref(false);
@@ -683,7 +684,7 @@ async function proceedToFinalize() {
  * Survey complete/skip — record the answer (may be null) and proceed to finalize.
  * A survey failure must NEVER block pod creation (see `onErrorCaptured` below).
  */
-function handleSurveyComplete(heard: string | null) {
+function handleSurveyComplete(heard: HeardVia | null) {
   heardVia.value = heard;
   void proceedToFinalize();
 }

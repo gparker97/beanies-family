@@ -24,6 +24,8 @@ public class MainActivity extends BridgeActivity {
         // the system share sheet. launchMode="singleTask" (manifest) means a warm app gets
         // the intent via onNewIntent, which Capacitor routes to the plugin.
         registerPlugin(ShareIntentPlugin.class);
+        // Play install referrer (campaign attribution for native installs); read once by JS.
+        registerPlugin(InstallReferrerPlugin.class);
         super.onCreate(savedInstanceState);
         // Portrait on phones, free rotation on tablets. The manifest used to carry a
         // blanket android:screenOrientation="portrait", which locked tablets too — but a

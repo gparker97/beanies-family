@@ -50,6 +50,7 @@ import LegalLayout from '../layouts/LegalLayout.astro';
       <li><strong>usage signals:</strong> the date the family was created, the date of the most recent sign-in (a date, not a time), which platform the family signed up on (web, iOS or Android), the approximate size of the encrypted family file, and how many members the family has (a number only, never names)</li>
       <li><strong>random ids</strong> for the family and its owner, generated on your device</li>
       <li><strong>the campaign tag</strong> from the link that first brought you to beanies.family, if there was one (for example which of our own ads or posts); it identifies the ad, not you</li>
+      <li><strong>your answer to "how did you hear about us"</strong>, if you answered (which option you picked, never anything you typed in)</li>
     </ul>
     <p>
       we use it to run the app and to understand how beanies.family is used overall. we do not sell
@@ -117,6 +118,20 @@ import LegalLayout from '../layouts/LegalLayout.astro';
       recorded with your <a href="#family-registry">family registry</a> entry when you create your
       family, so we know which of our own ads and posts actually work. it is first-party and
       cookie-free, it is never shared with the ad platform, and it identifies the ad, not you.
+    </p>
+    <p>
+      <strong>first-party event record:</strong> when you first arrive on beanies.family (from an ad
+      or otherwise) and when you tap an App Store or Google Play badge on our website, our own
+      server records one small event:
+      the campaign tag (if there was one), which store you chose, the kind of device (phone, tablet
+      or desktop) and its operating system family (never the version), and the time. it holds no IP
+      address, no cookie and nothing that identifies you, and it is kept for up to 13 months. we use it
+      only to work out which of our own ads bring families.
+    </p>
+    <p>
+      <strong>google play install referrer:</strong> on Android, the ad's own utm tags (never any ad or click
+      id) travel through the Google Play install and are read once, on first launch after install (and ignored when the install is older than 30 days or the device already has a family). Google's own
+      marker for installs that did not come from one of our links is ignored.
     </p>
   </section>
 
@@ -256,7 +271,8 @@ import LegalLayout from '../layouts/LegalLayout.astro';
       <li><strong>Plausible Analytics:</strong> privacy-friendly, cookie-free analytics — on the website and in the apps</li>
       <li><strong>Google Drive:</strong> only if you explicitly enable it — encrypted data only</li>
       <li><strong>Google OAuth:</strong> only when you choose to sign in</li>
-      <li><strong>Amazon Web Services:</strong> hosts the family registry and our diagnostic logs</li>
+      <li><strong>Amazon Web Services:</strong> hosts the family registry, our diagnostic logs and the first-party event record</li>
+      <li><strong>Google Play's install referrer:</strong> Android only; Google passes our own utm tags from the Play link to the app on first launch</li>
       <li>
         <strong>Stripe:</strong> only if you choose a plan, from the website. Stripe takes the payment and
         keeps your card details, a customer record (your email) and your receipts; beanies.family never

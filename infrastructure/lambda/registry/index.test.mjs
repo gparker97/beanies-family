@@ -1,7 +1,9 @@
 /* global process */
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { Buffer } from 'node:buffer';
 import { createHash } from 'node:crypto';
 import { marshall, unmarshall } from '@aws-sdk/util-dynamodb';
+import { LEDGER_TTL_MS, MAX_LOC_LENGTH, reduceUserAgent } from './events.mjs';
 
 // --- Mock the DynamoDB client (keep util-dynamodb's marshall/unmarshall real) ---
 const sendMock = vi.fn();
@@ -45,8 +47,13 @@ beforeAll(async () => {
   process.env.TABLE_NAME = 'registry-prod';
   process.env.DEV_TABLE_NAME = 'registry-dev';
   process.env.REGISTRY_API_KEY = API_KEY;
-  process.env.CORS_ORIGIN = 'https://app.beanies.family';
+  // The app origin stays FIRST: `getHeaders` falls back to the first entry. The site and the dev
+  // origin are allowlisted so the keyless `POST /events` route (#121) can be driven from both.
+  process.env.CORS_ORIGIN =
+    'https://app.beanies.family,https://beanies.family,http://localhost:5173';
   process.env.DEV_ORIGINS = 'http://localhost:5173';
+  process.env.EVENTS_TABLE_NAME = 'events-prod';
+  process.env.EVENTS_DEV_TABLE_NAME = 'events-dev';
   ({ handler } = await import('./index.mjs'));
 });
 
@@ -1706,5 +1713,579 @@ describe('registry GET: entitlement (#95)', () => {
     expect(body.entitlement.state).toBe('trial');
     expect(warnSpy.mock.calls[0][0]).toContain('entitlement_created_at_invalid');
     expect(JSON.stringify(warnSpy.mock.calls)).not.toContain(FAMILY_ID);
+  });
+});
+
+// ─── Marketing-events ledger (#121) ─────────────────────────────────────────
+
+const SITE_ORIGIN = 'https://beanies.family';
+const DEV_SITE_ORIGIN = 'http://localhost:5173';
+
+/** Real-world User-Agent strings. None of their versions may ever reach a stored item. */
+const UA = {
+  iphoneSafari:
+    'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Mobile/15E148 Safari/604.1',
+  iphoneChrome:
+    'Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/140.0.7339.122 Mobile/15E148 Safari/604.1',
+  // Chrome's reduced UA: the OS version is frozen to `Android 10; K` whatever the device runs.
+  androidChrome:
+    'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Mobile Safari/537.36',
+  androidTablet:
+    'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36',
+  desktopChromeWindows:
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36',
+  desktopChromeMac:
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36',
+  ipad: 'Mozilla/5.0 (iPad; CPU OS 17_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.7 Mobile/15E148 Safari/604.1',
+  // iPadOS Safari's default "desktop website" UA: indistinguishable from a Mac, accepted.
+  ipadDesktopMode:
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.6 Safari/605.1.15',
+  linuxFirefox: 'Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0',
+};
+
+const SOURCE_IP = '203.0.113.7';
+
+/**
+ * Drive a `POST /events` through the handler. Keyless: no `x-api-key`, no familyId. `raw`
+ * overrides the JSON-encoded body; `base64` sends it the way API Gateway v2 may.
+ */
+async function postEvent(
+  body,
+  { origin = SITE_ORIGIN, ua = UA.iphoneSafari, raw, base64 = false, ddbError } = {}
+) {
+  sendMock.mockReset();
+  sendMock.mockImplementation(() => (ddbError ? Promise.reject(ddbError) : Promise.resolve({})));
+  const text = raw ?? JSON.stringify(body);
+  const res = await handler({
+    routeKey: 'POST /events',
+    headers: {
+      ...(origin ? { origin } : {}),
+      ...(ua ? { 'user-agent': ua } : {}),
+      'content-type': 'text/plain;charset=UTF-8',
+    },
+    requestContext: { http: { method: 'POST', sourceIp: SOURCE_IP, userAgent: ua } },
+    body: base64 ? Buffer.from(text, 'utf8').toString('base64') : text,
+    isBase64Encoded: base64,
+  });
+  const putCall = sendMock.mock.calls.find((c) => c[0].constructor.name === 'PutItemCommand');
+  return {
+    res,
+    item: putCall ? unmarshall(putCall[0].input.Item) : null,
+    table: putCall ? putCall[0].input.TableName : null,
+  };
+}
+
+/** Every structured line with this `msg` the last call logged, parsed. */
+function linesFor(msg) {
+  return logSpy.mock.calls
+    .map((c) => {
+      try {
+        return JSON.parse(c[0]);
+      } catch {
+        return null;
+      }
+    })
+    .filter((l) => l?.msg === msg);
+}
+
+const marketingLines = () => linesFor('marketing_event');
+
+describe('registry POST /events — accepted events (#121)', () => {
+  it('stores a tagged store_tap, keyless, and logs one stored line', async () => {
+    const { res, item, table } = await postEvent({
+      kind: 'store_tap',
+      platform: 'ios',
+      fields: TAG,
+      loc: '/ios',
+    });
+    expect(res.statusCode).toBe(204);
+    expect(res.body).toBeUndefined();
+    expect(table).toBe('events-prod');
+    expect(item).toMatchObject({
+      kind: 'store_tap',
+      platform: 'ios',
+      tagged: true,
+      fields: TAG,
+      loc: '/ios',
+      origin: SITE_ORIGIN,
+      device: { class: 'phone', os: 'ios' },
+    });
+    expect(item.eventId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+    );
+    expect(item.ts).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+    expect(item.tsEpoch).toBe(Math.floor(Date.parse(item.ts) / 1000));
+    expect(marketingLines()).toEqual([
+      {
+        msg: 'marketing_event',
+        kind: 'store_tap',
+        platform: 'ios',
+        tagged: true,
+        outcome: 'stored',
+        reason: null,
+      },
+    ]);
+  });
+
+  it('stores an untagged landing with tagged:false and no fields or platform', async () => {
+    const { res, item } = await postEvent({ kind: 'landing', fields: null, loc: '/' });
+    expect(res.statusCode).toBe(204);
+    expect(item.kind).toBe('landing');
+    expect(item.tagged).toBe(false);
+    expect(item).not.toHaveProperty('fields');
+    expect(item).not.toHaveProperty('platform');
+    expect(marketingLines()).toEqual([
+      {
+        msg: 'marketing_event',
+        kind: 'landing',
+        platform: null,
+        tagged: false,
+        outcome: 'stored',
+        reason: null,
+      },
+    ]);
+  });
+
+  it('ignores a platform sent on a landing rather than rejecting the event', async () => {
+    const { res, item } = await postEvent({ kind: 'landing', platform: 'windows-phone', loc: '/' });
+    expect(res.statusCode).toBe(204);
+    expect(item).not.toHaveProperty('platform');
+  });
+
+  it('server-generates a fresh eventId per event, never the client’s', async () => {
+    const a = await postEvent({ kind: 'landing', eventId: 'client-chosen', loc: '/' });
+    const b = await postEvent({ kind: 'landing', eventId: 'client-chosen', loc: '/' });
+    expect(a.item.eventId).not.toBe('client-chosen');
+    expect(a.item.eventId).not.toBe(b.item.eventId);
+  });
+
+  it('writes a dev-origin event to the dev events table', async () => {
+    const { res, item, table } = await postEvent(
+      { kind: 'store_tap', platform: 'android', loc: '/android' },
+      { origin: DEV_SITE_ORIGIN, ua: UA.androidChrome }
+    );
+    expect(res.statusCode).toBe(204);
+    expect(table).toBe('events-dev');
+    expect(item.origin).toBe(DEV_SITE_ORIGIN);
+    expect(item.device).toEqual({ class: 'phone', os: 'android' });
+  });
+
+  it('decodes a base64 body before parsing it', async () => {
+    const { res, item } = await postEvent(
+      { kind: 'store_tap', platform: 'android', fields: { utm_source: 'chatgpt' }, loc: '/' },
+      { base64: true }
+    );
+    expect(res.statusCode).toBe(204);
+    expect(item.platform).toBe('android');
+    expect(item.fields).toEqual({ utm_source: 'chatgpt' });
+  });
+
+  it('caps the size on the DECODED bytes, so a base64 body under 2 KB is accepted', async () => {
+    // ~1.9 KB decoded is ~2.6 KB base64-encoded: measuring the encoded string would reject it.
+    const body = { kind: 'landing', loc: '/', pad: 'x'.repeat(1900) };
+    expect(JSON.stringify(body).length).toBeLessThanOrEqual(2048);
+    const { res } = await postEvent(body, { base64: true });
+    expect(res.statusCode).toBe(204);
+  });
+
+  it('stamps expires_at about 390 days out, in epoch seconds', async () => {
+    const before = Date.now();
+    const { item } = await postEvent({ kind: 'landing', loc: '/' });
+    const after = Date.now();
+    expect(LEDGER_TTL_MS).toBe(390 * 24 * 60 * 60 * 1000);
+    expect(item.expires_at).toBeGreaterThanOrEqual(Math.floor((before + LEDGER_TTL_MS) / 1000));
+    expect(item.expires_at).toBeLessThanOrEqual(Math.floor((after + LEDGER_TTL_MS) / 1000));
+    expect(item.expires_at - item.tsEpoch).toBe(390 * 24 * 60 * 60);
+  });
+
+  it('stores a reduced device and never the User-Agent, a version or the IP', async () => {
+    const { item } = await postEvent(
+      { kind: 'store_tap', platform: 'ios', fields: TAG, loc: '/ios' },
+      { ua: UA.iphoneChrome }
+    );
+    expect(item.device).toEqual({ class: 'phone', os: 'ios' });
+    const stored = JSON.stringify(item);
+    for (const leaked of ['Mozilla', 'CriOS', '18_6', '140.0', SOURCE_IP]) {
+      expect(stored).not.toContain(leaked);
+    }
+    expect(Object.keys(item).sort()).toEqual(
+      [
+        'device',
+        'eventId',
+        'expires_at',
+        'fields',
+        'kind',
+        'loc',
+        'origin',
+        'platform',
+        'tagged',
+        'ts',
+        'tsEpoch',
+      ].sort()
+    );
+  });
+
+  it('omits device when the request carries no User-Agent', async () => {
+    const { res, item } = await postEvent({ kind: 'landing', loc: '/' }, { ua: null });
+    expect(res.statusCode).toBe(204);
+    expect(item).not.toHaveProperty('device');
+  });
+
+  it('allows POST in the CORS response headers', async () => {
+    const { res } = await postEvent({ kind: 'landing', loc: '/' });
+    expect(res.headers['Access-Control-Allow-Methods']).toContain('POST');
+    expect(res.headers['Access-Control-Allow-Origin']).toBe(SITE_ORIGIN);
+  });
+});
+
+describe('registry POST /events — loc is bounded, never a rejection reason', () => {
+  it('truncates a long path to MAX_LOC_LENGTH and still stores the tap', async () => {
+    const long = '/blog/' + 'a'.repeat(400);
+    const { res, item } = await postEvent({ kind: 'store_tap', platform: 'ios', loc: long });
+    expect(res.statusCode).toBe(204);
+    expect(MAX_LOC_LENGTH).toBe(120);
+    expect(item.loc).toBe(long.slice(0, 120));
+  });
+
+  it.each([
+    ['missing', undefined],
+    ['null', null],
+    ['a number', 42],
+    ['an object', { path: '/ios' }],
+    ['an absolute URL', 'https://evil.example/ios'],
+    ['empty', ''],
+  ])('stores `/` when loc is %s', async (_label, loc) => {
+    const { res, item } = await postEvent({ kind: 'store_tap', platform: 'android', loc });
+    expect(res.statusCode).toBe(204);
+    expect(item.loc).toBe('/');
+  });
+});
+
+describe('registry POST /events — fields are validated per field, never reject a tap', () => {
+  it('drops one bad-charset field, logs it without a family hash, and stores the rest', async () => {
+    const { res, item } = await postEvent({
+      kind: 'store_tap',
+      platform: 'ios',
+      fields: { utm_source: 'chatgpt', utm_content: 'calm-ad1', utm_term: 'a b<c>' },
+      loc: '/ios',
+    });
+    expect(res.statusCode).toBe(204);
+    expect(item.tagged).toBe(true);
+    expect(item.fields).toEqual({ utm_source: 'chatgpt', utm_content: 'calm-ad1' });
+    expect(linesFor('attribution_dropped')).toEqual([
+      { msg: 'attribution_dropped', key: 'utm_term', reason: 'bad-charset' },
+    ]);
+  });
+
+  it('stores the event untagged when no field survives', async () => {
+    const { res, item } = await postEvent({
+      kind: 'store_tap',
+      platform: 'ios',
+      fields: { utm_source: ATTRIBUTION_FIXTURES.script, utm_medium: 7 },
+      loc: '/ios',
+    });
+    expect(res.statusCode).toBe(204);
+    expect(item.tagged).toBe(false);
+    expect(item).not.toHaveProperty('fields');
+    expect(marketingLines()[0]).toMatchObject({ outcome: 'stored', tagged: false });
+  });
+
+  it('drops unknown keys silently', async () => {
+    const { item } = await postEvent({
+      kind: 'landing',
+      fields: { utm_source: 'chatgpt', gclid: 'abc' },
+      loc: '/',
+    });
+    expect(item.fields).toEqual({ utm_source: 'chatgpt' });
+    expect(linesFor('attribution_dropped')).toEqual([]);
+  });
+});
+
+describe('registry POST /events — rejections', () => {
+  /** Assert one rejected line with this reason and nothing written. */
+  function expectRejected(res, status, reason) {
+    expect(res.statusCode).toBe(status);
+    expect(JSON.parse(res.body)).toEqual({ error: reason });
+    expect(sendMock).not.toHaveBeenCalled();
+    const lines = marketingLines();
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({ msg: 'marketing_event', outcome: 'rejected', reason });
+  }
+
+  it('rejects a foreign origin with 403 before reading the body', async () => {
+    const { res } = await postEvent(
+      { kind: 'landing', loc: '/' },
+      { origin: 'https://evil.example', raw: 'not json at all' }
+    );
+    expectRejected(res, 403, 'origin_not_allowed');
+  });
+
+  it('rejects an absent origin with 403 (browsers always send one on POST)', async () => {
+    const { res } = await postEvent({ kind: 'landing', loc: '/' }, { origin: null });
+    expectRejected(res, 403, 'origin_not_allowed');
+  });
+
+  it('rejects an unknown kind, without logging the raw value', async () => {
+    const { res } = await postEvent({ kind: 'purchase<script>', loc: '/' });
+    expectRejected(res, 400, 'bad_kind');
+    expect(marketingLines()[0].kind).toBeNull();
+    expect(JSON.stringify(logSpy.mock.calls)).not.toContain('purchase');
+  });
+
+  it.each([
+    ['an array', '[]'],
+    ['a string', '"landing"'],
+    ['null', 'null'],
+  ])('rejects a body that is %s as bad_kind', async (_label, raw) => {
+    const { res } = await postEvent(null, { raw });
+    expectRejected(res, 400, 'bad_kind');
+  });
+
+  it.each([
+    ['missing', undefined],
+    ['unknown', 'windows-phone'],
+    ['web', 'web'],
+  ])('rejects a store_tap whose platform is %s', async (_label, platform) => {
+    const { res } = await postEvent({ kind: 'store_tap', platform, loc: '/ios' });
+    expectRejected(res, 400, 'bad_platform');
+    expect(marketingLines()[0]).toMatchObject({ kind: 'store_tap', platform: null });
+  });
+
+  it('rejects a body over 2 KB', async () => {
+    const { res } = await postEvent({ kind: 'landing', loc: '/', pad: 'x'.repeat(2100) });
+    expectRejected(res, 400, 'body_too_large');
+  });
+
+  it('rejects malformed JSON', async () => {
+    const { res } = await postEvent(null, { raw: '{"kind":"landing",' });
+    expectRejected(res, 400, 'bad_json');
+  });
+
+  it('rejects an empty body as bad_json', async () => {
+    const { res } = await postEvent(null, { raw: '' });
+    expectRejected(res, 400, 'bad_json');
+  });
+
+  it.each([
+    ['an array', ['chatgpt']],
+    ['a string', 'utm_source=chatgpt'],
+    ['a number', 42],
+  ])('rejects fields that are %s', async (_label, fields) => {
+    const { res } = await postEvent({ kind: 'store_tap', platform: 'ios', fields, loc: '/ios' });
+    expectRejected(res, 400, 'bad_fields');
+  });
+
+  it('answers 500 and logs ddb_error when the write fails', async () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { res } = await postEvent(
+      { kind: 'store_tap', platform: 'ios', fields: TAG, loc: '/ios' },
+      { ddbError: new Error('ProvisionedThroughputExceededException') }
+    );
+    expect(res.statusCode).toBe(500);
+    expect(marketingLines()).toEqual([
+      {
+        msg: 'marketing_event',
+        kind: 'store_tap',
+        platform: 'ios',
+        tagged: true,
+        outcome: 'error',
+        reason: 'ddb_error',
+      },
+    ]);
+    expect(err).toHaveBeenCalled();
+    err.mockRestore();
+  });
+
+  it('keeps the key gate on every other route', async () => {
+    sendMock.mockReset();
+    const res = await handler({
+      routeKey: 'GET /family/{familyId}',
+      headers: { origin: SITE_ORIGIN },
+      pathParameters: { familyId: FAMILY_ID },
+      requestContext: { http: { method: 'GET' } },
+    });
+    expect(res.statusCode).toBe(401);
+    expect(sendMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('reduceUserAgent', () => {
+  it.each([
+    ['iPhone Safari', UA.iphoneSafari, { class: 'phone', os: 'ios' }],
+    ['iPhone Chrome', UA.iphoneChrome, { class: 'phone', os: 'ios' }],
+    ['Android Chrome (reduced UA)', UA.androidChrome, { class: 'phone', os: 'android' }],
+    ['Android tablet', UA.androidTablet, { class: 'tablet', os: 'android' }],
+    ['desktop Chrome on Windows', UA.desktopChromeWindows, { class: 'desktop', os: 'windows' }],
+    ['desktop Chrome on macOS', UA.desktopChromeMac, { class: 'desktop', os: 'macos' }],
+    ['iPad', UA.ipad, { class: 'tablet', os: 'ios' }],
+    ['iPadOS Safari in desktop mode', UA.ipadDesktopMode, { class: 'desktop', os: 'macos' }],
+    ['Linux Firefox', UA.linuxFirefox, { class: 'desktop', os: 'other' }],
+  ])('%s', (_label, ua, expected) => {
+    const out = reduceUserAgent(ua);
+    expect(out).toEqual(expected);
+    // Class and OS family only: never a version, never the raw string.
+    expect(Object.keys(out).sort()).toEqual(['class', 'os']);
+  });
+
+  it.each([
+    ['absent', undefined],
+    ['null', null],
+    ['empty', ''],
+    ['whitespace', '   '],
+    ['not a string', 42],
+  ])('returns null when the header is %s', (_label, ua) => {
+    expect(reduceUserAgent(ua)).toBeNull();
+  });
+});
+
+describe('registry PUT — heardVia (survey id, stamped at signup, never moved)', () => {
+  const FAMILY_HASH = createHash('sha256').update(FAMILY_ID).digest('hex');
+
+  it('stamps an allowlisted id on a genuine signup write', async () => {
+    const { res, item } = await put({
+      provider: 'local',
+      heardVia: 'chatgpt_ad',
+      isSignupEvent: true,
+    });
+    expect(res.statusCode).toBe(200);
+    expect(item.heardVia).toBe('chatgpt_ad');
+    expect(linesFor('heard_via_dropped')).toEqual([]);
+  });
+
+  it('does NOT stamp a write that is not a signup', async () => {
+    const { item } = await put({ provider: 'local', heardVia: 'reddit' });
+    expect(item.heardVia).toBeNull();
+  });
+
+  it('is preserved by a later login PUT that omits it', async () => {
+    const { item } = await put(
+      { provider: 'local', isLoginEvent: true, heardVia: null },
+      { createdAt: '2026-01-01T00:00:00.000Z', heardVia: 'chatgpt_ad' }
+    );
+    expect(item.heardVia).toBe('chatgpt_ad');
+  });
+
+  it('does NOT move even if a later write claims to be a signup', async () => {
+    const { item } = await put(
+      { provider: 'local', heardVia: 'reddit', isSignupEvent: true },
+      { createdAt: '2026-01-01T00:00:00.000Z', heardVia: 'chatgpt_ad' }
+    );
+    expect(item.heardVia).toBe('chatgpt_ad');
+  });
+
+  it.each([
+    ['an unknown id', 'tiktok', 'unknown-id'],
+    ['a label instead of an id', 'ChatGPT ad', 'unknown-id'],
+    ['a number', 7, 'not-string'],
+    ['an object', { id: 'chatgpt_ad', label: 'ChatGPT ad' }, 'not-string'],
+  ])('drops %s with one hashed log line', async (_label, heardVia, reason) => {
+    const { res, item } = await put({ provider: 'local', heardVia, isSignupEvent: true });
+    expect(res.statusCode).toBe(200);
+    expect(item.heardVia).toBeNull();
+    expect(linesFor('heard_via_dropped')).toEqual([
+      { msg: 'heard_via_dropped', family_id_hash: FAMILY_HASH, reason },
+    ]);
+  });
+
+  it('stores null with NO log when the survey was skipped', async () => {
+    const { item } = await put({ provider: 'local', heardVia: null, isSignupEvent: true });
+    expect(item.heardVia).toBeNull();
+    expect(linesFor('heard_via_dropped')).toEqual([]);
+  });
+
+  it('is carried through the DELETE tombstone', async () => {
+    const { item } = await del(
+      { createdAt: '2025-03-01T00:00:00.000Z', ownerMemberId: M_A, heardVia: 'chatgpt_ad' },
+      { writerMemberId: M_A }
+    );
+    expect(item.deletedAt).toBeTruthy();
+    expect(item.heardVia).toBe('chatgpt_ad');
+  });
+});
+
+describe('registry — attributionInferred (scorer-owned, preserved, never client-set)', () => {
+  const INFERRED = {
+    fields: { utm_source: 'chatgpt', utm_content: 'calm-ad1' },
+    confidence: 0.85,
+    band: 'high',
+    method: 'store-tap-v1',
+    eventId: '99999999-8888-4777-8666-555555555555',
+    gapMinutes: 5,
+    candidates: 1,
+    scoredAt: '2026-10-03T00:00:00.000Z',
+  };
+
+  it('is preserved across a client PUT that omits it', async () => {
+    const { item } = await put(
+      { provider: 'local', isLoginEvent: true },
+      { createdAt: '2026-01-01T00:00:00.000Z', attributionInferred: INFERRED }
+    );
+    expect(item.attributionInferred).toEqual(INFERRED);
+  });
+
+  it('is never set from a client body', async () => {
+    const { item } = await put({
+      provider: 'local',
+      isSignupEvent: true,
+      attributionInferred: INFERRED,
+    });
+    expect(item.attributionInferred).toBeNull();
+  });
+
+  it('is never replaced or cleared by a client body', async () => {
+    const forged = { ...INFERRED, fields: { utm_source: 'reddit' }, band: 'high' };
+    const replaced = await put(
+      { provider: 'local', attributionInferred: forged },
+      { createdAt: '2026-01-01T00:00:00.000Z', attributionInferred: INFERRED }
+    );
+    expect(replaced.item.attributionInferred).toEqual(INFERRED);
+    const cleared = await put(
+      { provider: 'local', attributionInferred: null },
+      { createdAt: '2026-01-01T00:00:00.000Z', attributionInferred: INFERRED }
+    );
+    expect(cleared.item.attributionInferred).toEqual(INFERRED);
+  });
+
+  it('is carried through the DELETE tombstone', async () => {
+    const { item } = await del(
+      {
+        createdAt: '2025-03-01T00:00:00.000Z',
+        ownerMemberId: M_A,
+        attributionInferred: INFERRED,
+      },
+      { writerMemberId: M_A }
+    );
+    expect(item.attributionInferred).toEqual(INFERRED);
+  });
+
+  it('survives an owner restoring a tombstoned row, alongside heardVia', async () => {
+    const { item } = await put(
+      { provider: 'local', ownerMemberId: M_A, writerMemberId: M_A, isLoginEvent: true },
+      {
+        createdAt: '2025-03-01T00:00:00.000Z',
+        ownerMemberId: M_A,
+        heardVia: 'chatgpt_ad',
+        attributionInferred: INFERRED,
+        deletedAt: '2026-09-09T00:00:00.000Z',
+      }
+    );
+    expect(item.deletedAt).toBeUndefined();
+    expect(item.heardVia).toBe('chatgpt_ad');
+    expect(item.attributionInferred).toEqual(INFERRED);
+  });
+
+  it('is absent from the GET response, which still carries the rest of the row', async () => {
+    const { res, body } = await get({
+      provider: 'google_drive',
+      fileId: 'FILE-1',
+      heardVia: 'chatgpt_ad',
+      attribution: null,
+      attributionInferred: INFERRED,
+    });
+    expect(res.statusCode).toBe(200);
+    expect(body).not.toHaveProperty('attributionInferred');
+    expect(body.fileId).toBe('FILE-1');
+    expect(body.heardVia).toBe('chatgpt_ad');
+    expect(body).toHaveProperty('entitlement');
   });
 });

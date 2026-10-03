@@ -5,6 +5,8 @@ import App from './App.vue';
 import router from './router';
 import { initAnalytics } from './services/analytics/plausible';
 import { captureAttributionFromUrl } from './utils/attributionStash';
+import { readInstallReferrerOnce } from './utils/installReferrer';
+import { getPlatform } from '@/services/sync/capabilities';
 import { reportError } from './utils/errorReporter';
 import { isChunkLoadError, startChunkRecovery } from './utils/hardReload';
 import { isIdbTransientError } from './utils/idbTransient';
@@ -22,6 +24,8 @@ initAnalytics();
 // read also restores it after the web OAuth hop (the return path carries it; see
 // `connectStorage.createReturnPath`). Synchronous and never throws; a no-op on native.
 captureAttributionFromUrl();
+// Android only: the Play install referrer is the native install's campaign tag (one-shot).
+if (getPlatform() === 'android') void readInstallReferrerOnce();
 
 // ADR-032: wire the doc worker / inline fallback before anything touches the
 // data layer (docClient lazily spawns the worker on first use, or runs inline
