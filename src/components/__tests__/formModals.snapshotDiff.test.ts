@@ -143,17 +143,12 @@ describe('AssetModal', () => {
     expect(data.notes).toBeUndefined();
   });
 
-  it('keeps loan as ONE key, sent whole when any sub-field changed', async () => {
+  it('diffs loan one sub-key deep: only the changed sub-key is sent', async () => {
     const w = await mountOpen(AssetModal, { asset });
     (w.vm as Vm).outstandingBalance = 140000;
     const data = await saveEmitted(w);
     expect(Object.keys(data)).toEqual(['loan']);
-    expect(data.loan).toEqual({
-      hasLoan: true,
-      loanAmount: 200000,
-      outstandingBalance: 140000,
-      interestRate: 4,
-    });
+    expect(data.loan).toEqual({ outstandingBalance: 140000 });
   });
 });
 

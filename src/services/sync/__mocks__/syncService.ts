@@ -63,6 +63,8 @@ export const save = vi.fn(async () => true);
 export const saveNow = vi.fn(async () => true);
 export const triggerDebouncedSave = vi.fn();
 export const cancelPendingSave = vi.fn();
+// Audit C3: a cross-family decrypt holds saves until the new provider is bound.
+export const holdSaves = vi.fn((_reason: string) => () => {});
 export const flushPendingSave = vi.fn(async () => {});
 
 // Load operations

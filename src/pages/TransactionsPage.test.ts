@@ -21,6 +21,9 @@ vi.mock('@/services/automerge/repositories/transactionRepository', () => ({
   createTransaction: vi.fn(),
   updateTransaction: vi.fn(),
   deleteTransaction: vi.fn(),
+  createTransactionCascade: vi.fn(),
+  updateTransactionCascade: vi.fn(),
+  deleteTransactionCascade: vi.fn(),
 }));
 
 vi.mock('@/services/automerge/repositories/accountRepository', () => ({
@@ -1063,11 +1066,17 @@ describe('TransactionsPage — Unified Ledger', () => {
         }
       );
 
-      vi.mocked(transactionRepo.updateTransaction).mockImplementation(
+      // The store sends one cascade op per update; the worker echoes the patched row.
+      vi.mocked(transactionRepo.updateTransactionCascade).mockImplementation(
         async (id: string, input: any) => {
           const existing = transactionsStore.transactions.find((t: Transaction) => t.id === id);
-          if (!existing) return undefined as any;
-          return { ...existing, ...input, updatedAt: new Date().toISOString() };
+          const base = { mode: 'update', accounts: [], goals: [], assets: [], skipped: [] };
+          if (!existing) return { ...base, found: false } as any;
+          return {
+            ...base,
+            found: true,
+            transaction: { ...existing, ...input, updatedAt: new Date().toISOString() },
+          } as any;
         }
       );
     }
@@ -1075,7 +1084,7 @@ describe('TransactionsPage — Unified Ledger', () => {
     afterEach(() => {
       // Reset implementations to avoid bleeding into other test blocks
       vi.mocked(recurringItemRepo.updateRecurringItem).mockReset();
-      vi.mocked(transactionRepo.updateTransaction).mockReset();
+      vi.mocked(transactionRepo.updateTransactionCascade).mockReset();
     });
 
     it('should update transaction date in UI when dayOfMonth changes', async () => {
