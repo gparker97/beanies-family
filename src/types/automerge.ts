@@ -1,3 +1,4 @@
+import type { Counter } from '@automerge/automerge';
 import type {
   FamilyMember,
   Account,
@@ -119,6 +120,33 @@ export interface FamilyDocument {
    * directly, so absent-or-null is normalised in ONE place.
    */
   podLineage: PodLineage | null;
+  /**
+   * Concurrent-safe adjustments to the three ADJUSTED money fields (#117 Phase 2, ADR-039
+   * addendum): account `balance`, goal `currentAmount`, asset `loan.outstandingBalance`. Keyed
+   * `${collection}/${id}/${field}/${writerActor}`; each value is a Counter in integer MINOR
+   * units (`COUNTER_SCALE`). The stored absolute is the baseline and the Counters hold the
+   * adjustments since; the fold in `worker/counterFields.ts` is the only reader, so main never
+   * sees a Counter.
+   *
+   * ⚠️ ONE WRITER PER KEY, FOR LIFE. A later increment applies to EVERY conflicting Counter at
+   * a key (`automergeSemantics.test.ts`, probe e'), so a key two actors both created can never
+   * be summed correctly again. The writer is the Automerge actor, fresh per `load`, and the map
+   * itself is created by the stored migration change (`MIGRATED_ROOT_KEYS`), never by a device,
+   * so every device writes into the SAME map object.
+   *
+   * Type-only `Counter` import: erased on main, which never holds a Counter.
+   */
+  counterDeltas: Record<string, Counter>;
+  /**
+   * The compaction fold ledger (#117 Phase 2): Counter key → the minor units `compactDoc`
+   * folded into the absolute. CUMULATIVE across compactions (a dirty peer rebases at any
+   * generation gap), written only by the compaction source, read only by the rebase
+   * (`counterGrowthOps`) so a peer never re-emits an adjustment a compaction already folded.
+   * Optional, like `podLineage` on legacy pods: absent until the first compaction that folds
+   * a key, and never migrated in (its only writer builds the whole document with
+   * `Automerge.from`).
+   */
+  foldedCounters?: Record<string, number>;
 }
 
 /**
@@ -135,6 +163,8 @@ export interface FamilyDocument {
 export const NON_COLLECTION_KEYS = [
   'settings',
   'podLineage',
+  'counterDeltas',
+  'foldedCounters',
 ] as const satisfies readonly (keyof FamilyDocument)[];
 
 /** Collection names (excludes the singletons — see `NON_COLLECTION_KEYS`) */
@@ -186,3 +216,19 @@ const COLLECTION_NAME_SEED: Record<CollectionName, 0> = {
   responsibilityCheckIns: 0,
 };
 export const COLLECTION_NAMES = Object.keys(COLLECTION_NAME_SEED) as CollectionName[];
+
+/**
+ * Every root key `migrateDoc` creates with a stored, deterministic change when it is ABSENT
+ * (#117, ADR-039 §10): each collection map, plus the Phase 2 `counterDeltas` map. The
+ * `MIGRATION_CHANGES` table is typed `Record<MigratedRootKey, string>`, so a key listed here
+ * without a stored change is a compile error.
+ *
+ * ⚠️ `counterDeltas` IS HERE, `settings`/`podLineage`/`foldedCounters` ARE NOT. A map that two
+ * devices write keys into must be ONE object on every device, or one device's keys vanish at
+ * the merge; the singletons are written whole or only by `Automerge.from`, and seeding them
+ * would emit a change into every legacy pod for nothing.
+ */
+export const MIGRATED_ROOT_KEYS = [...COLLECTION_NAMES, 'counterDeltas'] as const;
+
+/** A root key with a stored migration change. See `MIGRATED_ROOT_KEYS`. */
+export type MigratedRootKey = (typeof MIGRATED_ROOT_KEYS)[number];

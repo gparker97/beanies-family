@@ -1,6 +1,11 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as Automerge from '@automerge/automerge';
-import { COLLECTION_NAMES, type FamilyDocument, type CollectionName } from '@/types/automerge';
+import {
+  COLLECTION_NAMES,
+  MIGRATED_ROOT_KEYS,
+  type FamilyDocument,
+  type CollectionName,
+} from '@/types/automerge';
 import {
   migrateDoc,
   loadDoc,
@@ -22,6 +27,14 @@ import {
   rootConflictsSince,
 } from '../docOps';
 import { MIGRATION_CHANGES } from '../migrationChanges';
+import {
+  COUNTER_WRITES_ENABLED,
+  __setCounterWritesForTesting,
+  adjustField,
+  counterStats,
+  foldEntity,
+  foldIndex,
+} from '../counterFields';
 import type { MutationOp, ProjectionDelta } from '../protocol';
 import { apply, converge, fork, seeded } from './twoDevices';
 
@@ -1180,11 +1193,11 @@ describe('docOps — deterministic collection creation (#117, plan F)', () => {
   const todo = (id: string): MutationOp => setOp('todos', { id, title: id });
   const lastChange = (doc: Doc) => Automerge.decodeChange(Automerge.getLastLocalChange(doc)!);
 
-  it('every device creates an absent collection as the SAME object (the stored change)', () => {
+  it('every device creates an absent root map as the SAME object (the stored change)', () => {
     const one = migrateDoc(Automerge.init<FamilyDocument>());
     const two = migrateDoc(Automerge.init<FamilyDocument>());
     expect(Automerge.getActorId(one)).not.toBe(Automerge.getActorId(two));
-    for (const name of COLLECTION_NAMES) {
+    for (const name of MIGRATED_ROOT_KEYS) {
       expect(Automerge.getObjectId(one[name])).toBe(Automerge.getObjectId(two[name]));
     }
   });
@@ -1204,6 +1217,40 @@ describe('docOps — deterministic collection creation (#117, plan F)', () => {
     const { a: merged } = converge(a1, b1);
     expect(Object.keys(merged.todos).sort()).toEqual(['e1', 'e2']);
     expect(countRootConflicts(merged)).toBe(0);
+  });
+
+  describe('the Phase 2 counterDeltas map (#117 Phase 2)', () => {
+    afterEach(() => __setCounterWritesForTesting(COUNTER_WRITES_ENABLED));
+
+    it('two devices migrating an old pod get ONE counterDeltas object; keys written on both merge', () => {
+      __setCounterWritesForTesting(true);
+      // An old pod: every collection present, no counterDeltas, one account at 100.
+      const pod = apply(oldPod(), setOp('accounts', { id: 'A', balance: 100 }));
+      expect(pod.counterDeltas).toBeUndefined();
+      const { a, b } = fork(pod);
+      // Divergent histories before the migration, as on two real devices.
+      const a0 = migrateDoc(apply(a, setOp('todos', { id: 'ta', title: 'a' })));
+      const b0 = migrateDoc(apply(b, setOp('todos', { id: 'tb', title: 'b' })));
+      expect(Automerge.getObjectId(a0.counterDeltas)).toBe(Automerge.getObjectId(b0.counterDeltas));
+      const adjust = (doc: Doc, delta: number) =>
+        Automerge.change(doc, (d) =>
+          adjustField(d, 'accounts', 'A', 'balance', delta, Automerge.getActorId(doc))
+        );
+      const { a: merged } = converge(adjust(a0, -20.25), adjust(b0, -30.5));
+      expect(Object.keys(merged.counterDeltas)).toHaveLength(2);
+      expect(countRootConflicts(merged)).toBe(0);
+      expect(counterStats(merged)).toMatchObject({ keys: 2, conflicts: 0, malformed: 0 });
+      const acct = JSON.parse(JSON.stringify(merged.accounts.A)) as AnyRec;
+      expect(foldEntity('accounts', 'A', acct, foldIndex(merged)).balance).toBe(49.25);
+    });
+
+    it('a pod that already holds counterDeltas is untouched (same handle, heads unchanged)', () => {
+      const doc = base();
+      expect(doc.counterDeltas).toEqual({});
+      const heads = getHeads(doc);
+      expect(migrateDoc(doc)).toBe(doc);
+      expect(getHeads(doc)).toEqual(heads);
+    });
   });
 
   it('a `null` collection migrates via an ordinary change and is usable', () => {

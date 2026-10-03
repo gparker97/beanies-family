@@ -12,7 +12,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import * as Automerge from '@automerge/automerge';
-import { COLLECTION_NAMES, type FamilyDocument } from '@/types/automerge';
+import { MIGRATED_ROOT_KEYS, type FamilyDocument } from '@/types/automerge';
 import { setDocActor, resetDocActor, docInitOpts } from '../docActor';
 import { loadDoc, saveDoc, applyMutation, migrateDoc } from '../docOps';
 
@@ -27,10 +27,11 @@ const actorCount = (doc: Automerge.Doc<FamilyDocument>) =>
 
 /**
  * The fixed actors of the committed migration changes (#117, plan F): `migrateDoc` creates each
- * absent collection with its stored change, one actor per collection. A CONSTANT, not growth:
- * every device applies the same changes, so they never add a lane after the first migrate.
+ * absent root map (each collection, plus the Phase 2 `counterDeltas`) with its stored change, one
+ * actor per key. A CONSTANT, not growth: every device applies the same changes, so they never
+ * add a lane after the first migrate.
  */
-const MIGRATION_ACTORS = COLLECTION_NAMES.length;
+const MIGRATION_ACTORS = MIGRATED_ROOT_KEYS.length;
 
 beforeEach(() => resetDocActor());
 

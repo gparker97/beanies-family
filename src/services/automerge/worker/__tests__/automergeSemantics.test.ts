@@ -25,6 +25,27 @@
  *  (d) `getConflicts` reports both values for a root key both devices assigned.
  *  (e) Phase 2: two devices concurrently creating a Counter at the same entity
  *      key are both readable through `getConflicts` on the nested object.
+ *
+ * Phase 2 (plan `docs/plans/2026-10-03-crdt-counters-117-phase-2.md`, Assumption 2). These
+ * are why `counterFields.ts` keeps ONE writer per key, in integer minor units, in a root map:
+ *  (e') a later increment applies to EVERY conflicting Counter at a key, so a key two actors
+ *       created can never be summed correctly again (the lazy-Counter sketch was unsafe).
+ *  (f) plain reads on `view(doc, heads)` are heads-aware; `getConflicts` on a view is not.
+ *  (g) `toJS` keeps a Counter as a `Counter`, `from` re-imports it as one, and a folded plain
+ *      source (empty map, plain-number ledger) imports as plain values.
+ *  (h) `diff` reports a Counter creation as `put` (a Counter) and an increment as `inc` (a
+ *      number) at `[counterDeltas, key]`, so `touchedBetween` sees the key.
+ *  (j) an absolute set concurrent with an increment merges to `set + delta`.
+ *  (k) Counters survive `save`/`load`.
+ *  (l) a Counter truncates a non-integer increment and holds integers exactly up to
+ *      `MAX_SAFE_INTEGER`: the minor-unit scale is mandatory and sufficient.
+ *  (m) inside a change callback a draft Counter's `.value` already includes this change's
+ *      increments, so a handler may fold on the draft.
+ *  (n) `JSON.stringify` of a Counter is its number (`toPlain` folds a single-writer key for
+ *      free); `getConflicts` on the nested map is `undefined` for one writer, one entry each
+ *      for a conflict.
+ *  (o) the actor is stable across `merge` and fresh on every `load` (no actor pinned), and an
+ *      absent root key reads `undefined`.
  */
 import { createHash } from 'node:crypto';
 import { describe, it, expect } from 'vitest';
@@ -249,5 +270,190 @@ describe('automerge semantics (e): concurrent lazy Counter creation (Phase 2)', 
     expect(values).toHaveLength(2);
     const sum = values.reduce<number>((s, v) => s + (v as Automerge.Counter).value, 0);
     expect(sum).toBe(-50);
+  });
+});
+
+// ─── Phase 2: single-writer Counters in a root map ──────────────────────────────
+
+type CounterDoc = { counterDeltas: Record<string, Automerge.Counter> } & AnyRecord;
+const KEY = 'accounts/A/balance/w';
+
+/** A doc whose `counterDeltas` map is ONE object on every fork (as the stored change makes it). */
+function counterOrigin(): Automerge.Doc<CounterDoc> {
+  return Automerge.from<CounterDoc>({
+    counterDeltas: {},
+    accounts: { A: { id: 'A', balance: 100 } },
+  });
+}
+
+/** Increment `key` by `by` in one change, creating the Counter first when `create`. */
+const bump = (doc: Automerge.Doc<CounterDoc>, key: string, by: number, create = false) =>
+  Automerge.change(doc, (d) => {
+    if (create) d.counterDeltas[key] = new Automerge.Counter();
+    d.counterDeltas[key]!.increment(by);
+  });
+
+const counterValues = (doc: Automerge.Doc<CounterDoc>, key: string): number[] =>
+  Object.values(Automerge.getConflicts(doc.counterDeltas, key) ?? {})
+    .map((v) => (v as Automerge.Counter).value)
+    .sort((x, y) => x - y);
+
+describe("automerge semantics (e'): a later increment double-applies to conflicting Counters", () => {
+  it('two lazily created Counters (-20, -30) plus one increment of -5 read -25 and -35', () => {
+    const { a, b } = fork(counterOrigin());
+    const merged = converge(bump(a, KEY, -20, true), bump(b, KEY, -30, true));
+    // The true total after the increment is -55. The sum of conflicts is -60 and the winner is
+    // one of them: neither read is right, and the error grows with every later increment.
+    expect(counterValues(bump(merged, KEY, -5), KEY)).toEqual([-35, -25]);
+  });
+});
+
+describe('automerge semantics (f): view reads are heads-aware, getConflicts on a view is not', () => {
+  it('a key absent at older heads reads undefined on the view; getConflicts still reports now', () => {
+    const origin = counterOrigin();
+    const baseline = Automerge.getHeads(origin);
+    const { a, b } = fork(origin);
+    const merged = converge(bump(a, KEY, -20, true), bump(b, KEY, -30, true));
+    const old = Automerge.view(merged, baseline);
+    expect(old.counterDeltas[KEY]).toBeUndefined();
+    expect(counterValues(old, KEY)).toEqual([-30, -20]);
+  });
+});
+
+describe('automerge semantics (g): toJS / from carry Counters; a folded source is plain', () => {
+  it('toJS keeps a Counter instance, from re-imports it as a working Counter', () => {
+    const doc = bump(counterOrigin(), KEY, -202_500, true);
+    const js = Automerge.toJS(doc);
+    expect(js.counterDeltas[KEY]).toBeInstanceOf(Automerge.Counter);
+    expect(js.counterDeltas[KEY]!.value).toBe(-202_500);
+    const rebuilt = Automerge.from<CounterDoc>(js);
+    expect(rebuilt.counterDeltas[KEY]).toBeInstanceOf(Automerge.Counter);
+    expect(bump(rebuilt, KEY, -1).counterDeltas[KEY]!.value).toBe(-202_501);
+  });
+
+  it('a folded source (empty map, plain-number ledger) imports as plain values', () => {
+    const source = {
+      counterDeltas: {},
+      foldedCounters: { [KEY]: -202_500 },
+      accounts: { A: { id: 'A', balance: 79.75 } },
+    };
+    const rebuilt = Automerge.from<AnyRecord>(structuredClone(source));
+    const ledger = rebuilt.foldedCounters as Record<string, unknown>;
+    expect(ledger[KEY]).toBe(-202_500);
+    expect(ledger[KEY]).not.toBeInstanceOf(Automerge.Counter);
+    expect(plain(rebuilt)).toEqual(source);
+  });
+});
+
+describe('automerge semantics (h): diff reports Counter writes at [counterDeltas, key]', () => {
+  it('creation is `put` with a Counter, an increment is `inc` with a number', () => {
+    const origin = counterOrigin();
+    const created = bump(origin, KEY, 0, true);
+    const incremented = bump(created, KEY, -7);
+    const puts = Automerge.diff(
+      incremented,
+      Automerge.getHeads(origin),
+      Automerge.getHeads(created)
+    );
+    expect(puts).toHaveLength(1);
+    expect(puts[0]).toMatchObject({ action: 'put', path: ['counterDeltas', KEY] });
+    expect((puts[0] as { value: unknown }).value).toBeInstanceOf(Automerge.Counter);
+    const incs = Automerge.diff(
+      incremented,
+      Automerge.getHeads(created),
+      Automerge.getHeads(incremented)
+    );
+    expect(incs).toEqual([{ action: 'inc', path: ['counterDeltas', KEY], value: -7 }]);
+  });
+});
+
+describe('automerge semantics (j): an absolute set concurrent with an increment', () => {
+  it('merges to set + delta (both survive: the transaction happened, so it is counted)', () => {
+    const { a, b } = fork(counterOrigin());
+    const setOnA = Automerge.change(a, (d) => {
+      (d.accounts as Record<string, AnyRecord>).A!.balance = 200;
+    });
+    const merged = converge(setOnA, bump(b, KEY, -202_500, true)); // -20.25 in minor units
+    const balance = (merged.accounts as Record<string, AnyRecord>).A!.balance as number;
+    const minor = merged.counterDeltas[KEY]!.value;
+    expect([balance, minor]).toEqual([200, -202_500]);
+    expect((Math.round(balance * 10_000) + minor) / 10_000).toBe(179.75);
+  });
+});
+
+describe('automerge semantics (k): Counters survive save/load', () => {
+  it('a loaded Counter keeps its value and stays incrementable', () => {
+    const loaded = Automerge.load<CounterDoc>(
+      Automerge.save(bump(counterOrigin(), KEY, -202_500, true))
+    );
+    expect(loaded.counterDeltas[KEY]).toBeInstanceOf(Automerge.Counter);
+    expect(loaded.counterDeltas[KEY]!.value).toBe(-202_500);
+    expect(bump(loaded, KEY, 2_500).counterDeltas[KEY]!.value).toBe(-200_000);
+  });
+});
+
+describe('automerge semantics (l): Counters are integer-only', () => {
+  it('a non-integer increment is truncated, and a fractional one is dropped', () => {
+    const halved = bump(counterOrigin(), KEY, -20.5, true);
+    expect(halved.counterDeltas[KEY]!.value).toBe(-20);
+    expect(bump(halved, KEY, 0.25).counterDeltas[KEY]!.value).toBe(-20);
+  });
+
+  it('holds integers exactly up to MAX_SAFE_INTEGER (through save/load)', () => {
+    const big = 9_007_199_254_739_980;
+    const doc = Automerge.load<CounterDoc>(Automerge.save(bump(counterOrigin(), KEY, big, true)));
+    expect(doc.counterDeltas[KEY]!.value).toBe(big);
+    expect(bump(doc, KEY, -big).counterDeltas[KEY]!.value).toBe(0);
+  });
+});
+
+describe('automerge semantics (m): a draft Counter reads its own change', () => {
+  it("Object.entries(draft.counterDeltas) yields Counters whose value includes this change's increments", () => {
+    const origin = bump(counterOrigin(), KEY, -10, true);
+    let seen: number[] = [];
+    Automerge.change(origin, (d) => {
+      d.counterDeltas[KEY]!.increment(-5);
+      d.counterDeltas['goals/G/currentAmount/w'] = new Automerge.Counter();
+      d.counterDeltas['goals/G/currentAmount/w']!.increment(7);
+      seen = Object.entries(d.counterDeltas).map(([, c]) => {
+        expect(c).toBeInstanceOf(Automerge.Counter);
+        return c.value;
+      });
+    });
+    expect(seen.sort((x, y) => x - y)).toEqual([-15, 7]);
+  });
+});
+
+describe('automerge semantics (n): JSON of a Counter, and conflicts on a nested map', () => {
+  it('JSON.stringify of a map holding a Counter yields the plain number', () => {
+    const doc = bump(counterOrigin(), KEY, -202_500, true);
+    expect(JSON.parse(JSON.stringify(doc.counterDeltas))).toEqual({ [KEY]: -202_500 });
+  });
+
+  it('getConflicts on the nested map: undefined for one writer, one entry per writer otherwise', () => {
+    const single = bump(counterOrigin(), KEY, -1, true);
+    expect(Automerge.getConflicts(single.counterDeltas, KEY)).toBeUndefined();
+    const { a, b } = fork(counterOrigin());
+    const merged = converge(bump(a, KEY, -1, true), bump(b, KEY, -2, true));
+    expect(counterValues(merged, KEY)).toEqual([-2, -1]);
+  });
+});
+
+describe('automerge semantics (o): actor lifetime, and an absent root key', () => {
+  it('the actor is stable across merge and fresh on every load (no actor pinned)', () => {
+    const { a, b } = fork(counterOrigin());
+    const actor = Automerge.getActorId(a);
+    const merged = Automerge.merge(a, bump(b, KEY, 1, true));
+    expect(Automerge.getActorId(merged)).toBe(actor);
+    const bytes = Automerge.save(merged);
+    const one = Automerge.load<CounterDoc>(bytes);
+    const two = Automerge.load<CounterDoc>(bytes);
+    expect(Automerge.getActorId(one)).not.toBe(actor);
+    expect(Automerge.getActorId(one)).not.toBe(Automerge.getActorId(two));
+  });
+
+  it('an absent counterDeltas reads undefined on a plain read', () => {
+    const legacy = Automerge.from<AnyRecord>({ accounts: {} });
+    expect(legacy.counterDeltas).toBeUndefined();
   });
 });
