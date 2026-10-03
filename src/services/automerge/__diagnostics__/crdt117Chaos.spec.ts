@@ -465,6 +465,10 @@ interface Shape {
   leaves: Map<string, string | undefined>;
   leafMeta: Map<string, Meta>;
   containers: Set<string>;
+  /** Leaves holding a live Automerge conflict: every concurrent value, canonicalised. Collected
+   * only for the MERGED document (`withConflicts`). A conflict there means two devices wrote the
+   * leaf since the last converge: a later single write would have superseded an older one. */
+  conflicted: Map<string, Set<string | undefined>>;
 }
 
 /** The reconciler's identity rule (`keyOf`): a string `id`, else the `KEY_FIELDS` entry. */
@@ -477,20 +481,35 @@ function elementKey(field: string, el: unknown): string | null {
   return null;
 }
 
-function shapeOf(doc: Doc): Shape {
+function shapeOf(doc: Doc, withConflicts = false): Shape {
   const s: Shape = {
     nodes: new Map(),
     dups: new Set(),
     leaves: new Map(),
     leafMeta: new Map(),
     containers: new Set(),
+    conflicted: new Map(),
   };
   const root = Automerge.toJS(doc) as Any;
   const addNode = (p: string, meta: Meta) => {
     if (s.nodes.has(p)) s.dups.add(p);
     s.nodes.set(p, meta);
   };
-  const walk = (o: Any, node: string, anc: string[], conts: string[], prefix: string) => {
+  /** Record a leaf's live conflict, reading the document proxy that parallels `o`. */
+  const noteConflict = (live: Any | undefined, k: string, leaf: string) => {
+    if (!live) return;
+    const values = Automerge.getConflicts(live as never, k);
+    if (values && Object.keys(values).length > 1)
+      s.conflicted.set(leaf, new Set(Object.values(values).map((x) => canon(plain(x)))));
+  };
+  const walk = (
+    o: Any,
+    node: string,
+    anc: string[],
+    conts: string[],
+    prefix: string,
+    live?: Any
+  ) => {
     for (const [k, v] of Object.entries(o)) {
       const leaf = `${node}#${prefix}${k}`;
       if (Array.isArray(v)) {
@@ -502,7 +521,7 @@ function shapeOf(doc: Doc): Shape {
           v.forEach((el, i) => {
             const p = `${node}/${prefix}${k}[${keys[i]}]`;
             addNode(p, { ancestors: [...anc, p], containers: cs });
-            walk(el, p, [...anc, p], cs, '');
+            walk(el, p, [...anc, p], cs, '', live?.[k]?.[i]);
           });
         } else if (v.every((el) => el === null || typeof el !== 'object')) {
           const seen = new Map<string, number>();
@@ -517,14 +536,16 @@ function shapeOf(doc: Doc): Shape {
           // A keyless array of objects is a value (value identity in the reconciler).
           s.leaves.set(leaf, canon(v));
           s.leafMeta.set(leaf, { ancestors: anc, containers: conts });
+          noteConflict(live, k, leaf);
         }
       } else if (isObj(v) && MERGE_FIELDS.has(k)) {
         const cont = leaf;
         s.containers.add(cont);
-        walk(v, node, anc, [...conts, cont], `${prefix}${k}.`);
+        walk(v, node, anc, [...conts, cont], `${prefix}${k}.`, live?.[k]);
       } else {
         s.leaves.set(leaf, canon(v));
         s.leafMeta.set(leaf, { ancestors: anc, containers: conts });
+        noteConflict(live, k, leaf);
       }
     }
   };
@@ -532,12 +553,19 @@ function shapeOf(doc: Doc): Shape {
     for (const [id, e] of Object.entries((root[col] ?? {}) as Any)) {
       const p = `${col}/${id}`;
       addNode(p, { ancestors: [p], containers: [] });
-      if (isObj(e)) walk(e, p, [p], [], '');
+      if (isObj(e)) walk(e, p, [p], [], '', withConflicts ? (doc as Any)[col]?.[id] : undefined);
     }
   }
   if (isObj(root.settings)) {
     addNode('settings', { ancestors: ['settings'], containers: [] });
-    walk(root.settings, 'settings', ['settings'], [], '');
+    walk(
+      root.settings,
+      'settings',
+      ['settings'],
+      [],
+      '',
+      withConflicts ? (doc as Any).settings : undefined
+    );
   }
   return s;
 }
@@ -570,7 +598,7 @@ function checkMerge(originDoc: Doc, aDoc: Doc, bDoc: Doc, mDoc: Doc, residuals: 
   const O = shapeOf(originDoc);
   const A = shapeOf(aDoc);
   const B = shapeOf(bDoc);
-  const M = shapeOf(mDoc);
+  const M = shapeOf(mDoc, true);
   const fails: string[] = [];
   const removedBy = (S: Shape, p: string) => O.nodes.has(p) && !S.nodes.has(p);
   const firstCreated = (conts: string[]) =>
@@ -634,7 +662,18 @@ function checkMerge(originDoc: Doc, aDoc: Doc, bDoc: Doc, mDoc: Doc, residuals: 
       continue;
     }
     const [side, want] = a !== o ? ['A', a] : ['B', b];
-    if (m !== want) fails.push(`(iii) ${side} alone changed ${l}; merged does not hold its value`);
+    if (m !== want) {
+      // A NET-ZERO write on the other side (toggle then un-toggle in one round) leaves its value
+      // equal to the origin, so value comparison calls this one-sided; but it is a real
+      // concurrent write, and the merged leaf then holds a live conflict carrying BOTH values.
+      // That is the accepted same-scalar residual, not a lost write. Without the conflict (a
+      // genuinely one-sided write) the check stays strict.
+      if (M.conflicted.get(l)?.has(want)) {
+        bump(residuals, `same-scalar both sides, one net-zero (${fieldOf(l)})`);
+        continue;
+      }
+      fails.push(`(iii) ${side} alone changed ${l}; merged does not hold its value`);
+    }
   }
 
   // (iv) no undefined anywhere in the materialised document
@@ -1036,6 +1075,21 @@ describe.skipIf(REAL_POD)('layer 1: scenario merges on the demo family', () => {
       completed: true,
       completedBy: PARTNER,
     });
+    expect(r.fails).toEqual([]);
+  });
+
+  it('residual: a tick-and-untick on A concurrent with a tick on B is a same-scalar clash, classified', async () => {
+    // The seed-1/300-round finding: A's net-zero toggle leaves its value equal to the origin, so
+    // a value-only check reads B's tick as one-sided. A's later op wins the clash here.
+    const r = await scenario(
+      async () => {
+        await toggleListItem(LIST, 'demo-list-item-3', OWNER);
+        await toggleListItem(LIST, 'demo-list-item-3', OWNER);
+      },
+      () => toggleListItem(LIST, 'demo-list-item-3', PARTNER)
+    );
+    expect(itemOf(r.m, 'demo-list-item-3')?.completed).toBe(false);
+    expect(r.residuals.get('same-scalar both sides, one net-zero (completed)')).toBe(1);
     expect(r.fails).toEqual([]);
   });
 
