@@ -484,7 +484,7 @@
   /* ---------- data ---------- */
   const M = {
     greg: { n: 'Greg', c: '#3b82f6' },
-    sophia: { n: 'Willa', c: '#ec4899' },
+    willa: { n: 'Willa', c: '#ec4899' },
     leo: { n: 'Leo', c: '#22c55e' },
     max: { n: 'Max', c: '#f59e0b' },
     sam: { n: 'Sam', c: '#14b8a6' },
@@ -508,7 +508,7 @@
     `<div class="linkrow${purple ? ' purple' : ''}"><span class="fav" aria-hidden="true">S</span><span class="linktext">${text}</span>${ICON.ext}</div>`;
 
   const TODOS = [
-    { t: 'Return the signed permission slip', who: 'sophia', why: 'owns School Forms', due: 'Fri 9 Oct', note: '' },
+    { t: 'Return the signed permission slip', who: 'willa', why: 'owns School Forms', due: 'Fri 9 Oct', note: '' },
     { t: 'Pay the $12 trip fee', who: 'greg', why: 'you shared it', due: 'Mon 12 Oct', note: '(day before)', link: 'portal.example-school.org/trips' },
     { t: 'Pack sunscreen, a hat and a packed lunch', who: 'greg', why: 'you shared it', due: 'Tue 13 Oct', note: '(trip day)' },
   ];
@@ -669,8 +669,8 @@
       <div class="todolist">
         ${trow('Pay the $12 trip fee', 'Mon 12 Oct', 'greg')}
         ${trow('Pack sunscreen, a hat and a packed lunch', 'Tue 13 Oct', 'greg')}
-        <div class="trow"><span class="tcheck" aria-hidden="true"></span><div style="min-width:0;flex:1"><p class="ttitle">Book Sam's swim lessons</p><div class="tmeta"><span class="tdate">&#128197; Thu 1 Oct</span><span class="ownerstack">${av('sophia')}</span></div></div></div>
-        ${trow('Return the signed permission slip', 'Fri 9 Oct', 'sophia', true)}
+        <div class="trow"><span class="tcheck" aria-hidden="true"></span><div style="min-width:0;flex:1"><p class="ttitle">Book Sam's swim lessons</p><div class="tmeta"><span class="tdate">&#128197; Thu 1 Oct</span><span class="ownerstack">${av('willa')}</span></div></div></div>
+        ${trow('Return the signed permission slip', 'Fri 9 Oct', 'willa', true)}
       </div>`;
   }
   function viewPanel(isPhone) {

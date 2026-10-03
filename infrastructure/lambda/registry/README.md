@@ -122,7 +122,7 @@ zip -r lambda.zip index.mjs entitlement.mjs events.mjs node_modules
   - `DEV_TABLE_NAME` (optional) — separate dev table for `localhost` origins
   - `DEV_ORIGINS` (optional) — comma-separated dev origins; defaults to `http://localhost:5173,http://localhost:4173,http://localhost:4321`
   - `EVENTS_TABLE_NAME`, `EVENTS_DEV_TABLE_NAME` (optional) — the marketing-events ledger tables for `POST /events`; the dev one falls back to the prod one. Leave unset if you do not route `POST /events`.
-  - `BILLING_TABLE_NAME`, `V1_LAUNCH_AT`, `BILLING_ENFORCE`: the hosted service's plan state. **The Terraform path requires the billing table**: `modules/registry` takes `billing_table_name`/`billing_table_arn` and always grants `dynamodb:GetItem` on it, so wire `module "billing"` (see `infrastructure/main.tf`). Only this hand-zipped self-host path may leave `BILLING_TABLE_NAME` unset, and then only while `V1_LAUNCH_AT` is also unset: every GET returns `entitlement.state: 'beta'` and nothing is ever read-only. (Setting `V1_LAUNCH_AT` without a billing table makes the GET return `entitlement: null`. A subscription or a `trialEndsAt` override in the billing table counts even before `V1_LAUNCH_AT` is set; only the launch-based 90-day clock waits for it.)
+  - `BILLING_TABLE_NAME`, `V1_LAUNCH_AT`, `BILLING_ENFORCE`: the hosted service's plan state. The hosted deployment always provisions a billing DynamoDB table and grants this Lambda `dynamodb:GetItem` on it. A self-host deployment may leave `BILLING_TABLE_NAME` unset, and then only while `V1_LAUNCH_AT` is also unset: every GET returns `entitlement.state: 'beta'` and nothing is ever read-only. (Setting `V1_LAUNCH_AT` without a billing table makes the GET return `entitlement: null`. A subscription or a `trialEndsAt` override in the billing table counts even before `V1_LAUNCH_AT` is set; only the launch-based 90-day clock waits for it.)
 - **IAM permissions:** the Lambda's execution role needs `dynamodb:GetItem`, `dynamodb:PutItem`, `dynamodb:DeleteItem` on your table's ARN, plus `dynamodb:GetItem` on the billing table's ARN when `BILLING_TABLE_NAME` is set, plus `dynamodb:PutItem` on the events tables when `POST /events` is routed.
 
 Upload `lambda.zip`.
@@ -189,7 +189,7 @@ The item (`events.mjs` `buildItem`):
 
 `device` is reduced server-side from the `User-Agent` header (class and OS family only). The raw User-Agent, any OS or browser version, the IP address, cookies and anything that would link two events from one person are never stored. iPadOS Safari presents as a Mac and is recorded as `desktop` / `macos`.
 
-Tables (`modules/registry`): `beanies-family-marketing-events-prod` and `beanies-family-marketing-events-dev`, hash key `eventId`, TTL on `expires_at`, point-in-time recovery on, deletion protection in prod. The name grammar is `eventsTableName(env)` in `events.mjs`, which the metrics skill imports. The stage throttles the route at burst 20 / rate 10.
+Tables (provisioned by the hosted deployment): `beanies-family-marketing-events-prod` and `beanies-family-marketing-events-dev`, hash key `eventId`, TTL on `expires_at`, point-in-time recovery on, deletion protection in prod. The name grammar is `eventsTableName(env)` in `events.mjs`, which the metrics skill imports. The stage throttles the route at burst 20 / rate 10.
 
 ---
 

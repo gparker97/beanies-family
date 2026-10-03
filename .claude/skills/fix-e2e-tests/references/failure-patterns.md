@@ -1,6 +1,6 @@
 # E2E Failure Pattern Catalog
 
-The recurring failure shapes this project's Playwright suite has seen, distilled from `docs/E2E_HEALTH.md`. Most red E2E runs are one of these — match the symptom, apply the proven structural fix, and don't reinvent. Each entry: **symptom → root cause → structural fix → code location**.
+The recurring failure shapes this project's Playwright suite has seen, distilled from `~/projects/beanies-ops/docs/E2E_HEALTH.md`. Most red E2E runs are one of these — match the symptom, apply the proven structural fix, and don't reinvent. Each entry: **symptom → root cause → structural fix → code location**.
 
 The throughline: almost every recurring failure is **WebKit under CI contention**, and every one has a *structural* remedy (a readiness gate, a reorder, a retry helper). None is fixed with `waitForTimeout`. If your fix is "wait longer," you haven't found the root cause yet.
 

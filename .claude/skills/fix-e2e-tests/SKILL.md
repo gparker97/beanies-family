@@ -150,7 +150,7 @@ Loop: a failure → back to Step 4 for that test → fix → re-run. Keep going 
 
 **The only sanctioned way to exit with a still-failing webkit test** is the quarantine path from "The exit bar" above: known chronic flake + structural fix exhausted + at/over the cull threshold + **greg approved** + logged in `E2E_HEALTH.md`. Otherwise, keep fixing.
 
-### Step 7 — Log every outcome in `docs/E2E_HEALTH.md`
+### Step 7 — Log every outcome in `~/projects/beanies-ops/docs/E2E_HEALTH.md`
 
 The health journal is what makes the suite self-correcting — it's how a third recurrence of the same flake becomes a decision to cull. Append a row for each failure you handled, matching the existing table format (`| Date | Test | Category | Notes |`):
 - **Date** ISO (`YYYY-MM-DD`), **Test** as `spec.spec.ts:line` (list multiple for a shared flake), **Category** `(a)`/`(b)`/`(c)` (combine like `(a) + (c)` when one run revealed both).

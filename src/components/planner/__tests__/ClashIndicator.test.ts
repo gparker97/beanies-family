@@ -48,8 +48,8 @@ describe('ClashIndicator', () => {
       props: { clash: makeClash(), variant: 'chip' },
     });
     expect(wrapper.text()).not.toContain(CALENDAR);
-    expect(wrapper.text()).not.toContain('gregsophia');
-    // ...and not a truncated version either — a name compressed to "greg…" costs
+    expect(wrapper.text()).not.toContain('owner');
+    // ...and not a truncated version either — a name compressed to "owner…" costs
     // nearly the same title space and communicates nothing.
     expect(wrapper.text().trim()).toBe('');
   });

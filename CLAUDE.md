@@ -1,13 +1,13 @@
 # beanies.family
 
 > **IMPORTANT — Read before starting any work:**
-> Always read `docs/STATUS.md` before beginning or continuing work on this project. It contains the latest project status, what is in progress, and recent decisions. Update it when completing significant work or making architectural decisions.
+> Always read `~/projects/beanies-ops/docs/STATUS.md` (in the private ops repo, see below) before beginning or continuing work on this project. It contains the latest project status, what is in progress, and recent decisions. Update it when completing significant work or making architectural decisions.
 >
 > **IMPORTANT — Deployment:**
 > NEVER deploy to production unless the user explicitly asks you to deploy. The deploy workflow (`Deploy beanies PROD`) is manual-only (`workflow_dispatch`). Do not trigger it proactively — wait for an explicit instruction like "deploy to prod" or "push to prod".
 >
 > **IMPORTANT — Launch & Marketing Content:**
-> NEVER save launch plans, marketing strategy, post drafts, subreddit content, Reddit/social media strategy, or any launch-related material to the repo. All launch and marketing content lives ONLY in Notion. The repo is for code, product docs, and architecture only. This includes `docs/launch/`, `docs/plans/` (for launch items), or any other directory. If asked to create launch content, write it to Notion, not the filesystem.
+> NEVER save launch plans, marketing strategy, post drafts, subreddit content, Reddit/social media strategy, or any launch-related material to the repo. All launch and marketing content lives ONLY in Notion. The repo is for code, product docs, and architecture only. This includes `docs/launch/`, `~/projects/beanies-ops/docs/plans/` (for launch items), or any other directory. If asked to create launch content, write it to Notion, not the filesystem.
 >
 > **IMPORTANT — Non-repo file artifacts (Google Drive):**
 > Rendered file artifacts that must NOT be committed to the repo but are worth keeping (marketing collateral, pamphlets, flyers, Pinterest pins, exported images/PDFs, one-off design outputs) go to Google Drive, which is rclone-mounted in WSL at `~/gdrive-gparker97/Projects/beanies.family/<subfolder>` (persists across machines; accessible to both greg and Claude). Do NOT leave them in `~/Downloads`, a local `~/beanies-*` directory, or the ephemeral scratchpad.
@@ -18,18 +18,29 @@
 >
 > This is the file store only — launch **strategy/plans/copy** still live ONLY in Notion (rule above); the strategy rule is unchanged.
 >
-> **Key project documents in `docs/`:**
+> **Key project documents in `docs/` (this public repo):**
 >
-> - `docs/STATUS.md` — Current project status and progress
-> - `docs/ARCHITECTURE.md` — System architecture, data flow, and key patterns
-> - `docs/PERFORMANCE.md` — Client-side performance thresholds and mitigation strategies
-> - `docs/adr/` — Architectural Decision Records (ADRs) for all major design decisions
-> - `docs/plans/` — Accepted implementation plans (saved before work begins, kept as historical record)
-> - `docs/prompts/` — Prompt archive (all user prompts logged per task with timestamps and categories)
-> - `CHANGELOG.md` — Human-readable changelog (updated every push)
-> - `docs/E2E_HEALTH.md` — E2E test failure tracking log
-> - `docs/lessons.md` — Lessons learned from corrections (this project's version of the global `tasks/lessons.md` convention; review at session start, append to after corrections)
-> - `docs/mockups/` — HTML mockups and design explorations (one file per concept)
+> - `docs/ARCHITECTURE.md`: System architecture, data flow, and key patterns
+> - `docs/PERFORMANCE.md`: Client-side performance thresholds and mitigation strategies
+> - `docs/TRANSLATION.md`: Translation glossary and style rules
+> - `docs/SELF_HOSTING.md`: Self-hosting guide (the only operations doc self-hosters need)
+> - `docs/adr/`: Architectural Decision Records (ADRs) for all major design decisions
+> - `CHANGELOG.md`: Human-readable changelog (updated every push)
+> - `docs/mockups/`: HTML mockups and design explorations (one file per concept)
+>
+> **Private operations repo (`~/projects/beanies-ops`, cloned beside this one):** status, plans, prompts, lessons, investigations, runbooks, the E2E health log, the Terraform tree and the ops skills moved there on 2026-10-03 so the public repo carries code and product docs only. Read and write them at these paths, and commit them in that repo:
+>
+> - `~/projects/beanies-ops/docs/STATUS.md`: Current project status and progress
+> - `~/projects/beanies-ops/docs/plans/`: Accepted implementation plans (saved before work begins, kept as historical record)
+> - `~/projects/beanies-ops/docs/prompts/`: Prompt archive (all user prompts logged per task with timestamps and categories)
+> - `~/projects/beanies-ops/docs/lessons.md`: Lessons learned from corrections (this project's version of the global `tasks/lessons.md` convention; review at session start, append to after corrections)
+> - `~/projects/beanies-ops/docs/E2E_HEALTH.md`: E2E test failure tracking log
+> - `~/projects/beanies-ops/docs/investigations/`, `~/projects/beanies-ops/docs/runbooks/`: incident write-ups and operational runbooks
+> - `~/projects/beanies-ops/infrastructure/` + `~/projects/beanies-ops/scripts/infra/tf-plan.sh` / `tf-apply.sh`: the Terraform; it deploys the Lambda and CloudFront Function code that stays here in `infrastructure/`
+>
+> **Ops skills load through symlinks.** `/deploy-prod-auto`, `/end-session`, `/good-morning`, `/beanies-metrics` and the other ops/marketing skills live in `~/projects/beanies-ops/.claude/skills/`. Run `~/projects/beanies-ops/scripts/link-ops-skills.sh [checkout-or-worktree]` once per checkout (it is idempotent) to link them into `.claude/skills/`; `.gitignore` keeps the links out of commits. Never copy an ops skill back into this repo.
+>
+> **Old citations are not broken links.** Code comments, ADRs, CHANGELOG entries and native config cite `docs/plans/…`, `docs/investigations/…`, `docs/runbooks/…`, `docs/STATUS.md`, `docs/E2E_HEALTH.md`, `docs/lessons.md`, `scripts/infra/…` and `infrastructure/modules/<name>/main.tf`. Those paths now resolve inside `~/projects/beanies-ops`; leave existing citations as they are.
 >
 > **Brand:**
 >
@@ -334,7 +345,7 @@ series that each answer one, and never re-run a search to re-read output already
   - **Dev-only UI** (e.g. `DevFeatureFlagsCard.vue`, gated to `import.meta.env.DEV`) is exempt via a scoped override in `eslint.config.js` — its copy is developer-facing.
   - **English-first surfaces** (the Astro marketing site `web/`, blog, help center) are intentionally out of scope and not linted by this rule.
 - **Every string has three values**: `en` and `beanie` in `src/services/translation/uiStrings.ts`, and `zh` (Simplified Chinese) in `src/services/translation/zh.ts`, all written in the same edit as the feature. `npm run type-check` fails on a missing or removed `zh` key; a changed English meaning is only caught by editing all three values together. The glossary and style rules live in `docs/TRANSLATION.md`; there is no translation script or API, so never leave a `zh` entry for later.
-- **Plans**: When plan mode is used, save the accepted plan to `docs/plans/` before implementation begins (see Plans Archive below).
+- **Plans**: When plan mode is used, save the accepted plan to `~/projects/beanies-ops/docs/plans/` before implementation begins (see Plans Archive below).
 - **Cloud Auth UX**: When inviting a member or asking the user to authenticate to a cloud provider, pre-populate the account chooser via `loginHint` whenever the expected identity is known (e.g. forward the invitee's email from the invite URL into `requestAccessToken({ loginHint })` and `startRedirectAuth(returnPath, loginHint)`). **Never pre-warn users that a flow might fail** — no upfront capability banners, no UA-sniff disablements. Surface friction only when failure is actually observed, with a clear message and concrete recovery actions. See ADR-024 for the join-flow's structured error registry pattern.
 - **DRY (Don't Repeat Yourself)**: This is a **core principle** — enforce it rigorously across all code:
   - **Shared components**: When the same UI pattern (modal, form, card) appears in 2+ locations, extract it into a shared component. Use prop-driven visibility and self-contained internal state. See `TodoViewEditModal.vue` and `ActivityModal.vue` as reference patterns.
@@ -360,7 +371,7 @@ Observability is a **first-class deliverable**, not an afterthought. Every featu
 2. **No silent failures** (reinforces the existing rule): every `catch` classifies + logs. Critical (user action failed / data at risk) → `reportError({ severity: 'critical' })` (Slack + toast). Non-critical → `reportError`/`logEvent` at `warning`/`error` with a documented fallback. Never a bare `catch {}`.
 3. **`surface` is kebab-case and greppable** — name it so one CloudWatch filter isolates this feature's events (e.g. `'calendar-sync'`, `'doc-worker-recovery'`).
 4. **Structured `context`, never string-interpolated data.** Put queryable fields in `context: { ... }` so CloudWatch (and future alerts) can filter on them — do not bake them into `message`.
-5. **Privacy + store-declaration gate.** The firehose context is **allowlisted** (`ALLOWED_CONTEXT_KEYS` in `logEvent.ts`) and redacted, and the shipped fields are **declared to Apple & Google as collected Diagnostics**. Adding a new context key means: add it to the allowlist AND update the data-collection table in `docs/runbooks/native-store-submission.md` + its consumers (`PrivacyInfo.xcprivacy`, the store Data-Safety/App-Privacy answers, `privacy.astro`). NEVER log secrets, tokens, `.beanpod` contents, or PII beyond the allowlist.
+5. **Privacy + store-declaration gate.** The firehose context is **allowlisted** (`ALLOWED_CONTEXT_KEYS` in `logEvent.ts`) and redacted, and the shipped fields are **declared to Apple & Google as collected Diagnostics**. Adding a new context key means: add it to the allowlist AND update the data-collection table in `~/projects/beanies-ops/docs/runbooks/native-store-submission.md` + its consumers (`PrivacyInfo.xcprivacy`, the store Data-Safety/App-Privacy answers, `privacy.astro`). NEVER log secrets, tokens, `.beanpod` contents, or PII beyond the allowlist.
 6. **Design for alerting.** Emit the counter/outcome on the **success** path too (below the perf floor if needed) so _rates_ are measurable — an event that only fires on failure can't tell you the failure rate.
 
 Every `/beanies-plan` plan must include an **Observability Coverage** section naming the diagnostic events the feature emits and why they suffice to triage its failure modes blind. This is an acceptance criterion, not a follow-up.
@@ -504,7 +515,7 @@ This project commits straight to `main` (linear history, deploys run from `main`
 **The rule: delete a branch the moment it is merged, superseded, or abandoned.** Local _and_ remote, in the same breath as the merge. Never leave one lying around "just in case" — `main`'s history and the reflog already are the just-in-case.
 
 - **On merge** — delete both refs immediately: `git branch -d <name>` and `git push origin --delete <name>`.
-- **On abandon** — delete it too, and record why in `docs/STATUS.md` or the relevant plan's Outcome section. A branch is a terrible place to store intent; prose is where intent belongs.
+- **On abandon** — delete it too, and record why in `~/projects/beanies-ops/docs/STATUS.md` or the relevant plan's Outcome section. A branch is a terrible place to store intent; prose is where intent belongs.
 - **Never delete a branch backing an open PR** (all `dependabot/**` branches) — that closes the PR. Those are the one standing exception.
 - **Run a sweep during `/end-session`** so stale refs cannot accumulate across sessions.
 
@@ -519,7 +530,7 @@ comm -23 <(git ls-tree -r --name-only <branch> | sort) \
 git merge-base --is-ancestor <sha> main               # exit 0 => that commit is on main
 ```
 
-If the content is on `main`, the branch is merged regardless of what the counts say. See `docs/lessons.md`.
+If the content is on `main`, the branch is merged regardless of what the counts say. See `~/projects/beanies-ops/docs/lessons.md`.
 
 ## Changelog
 
@@ -547,9 +558,9 @@ Every issue must have relevant labels applied. When creating or triaging issues,
 
 ## Prompt Archive
 
-All user prompts must be logged to `docs/prompts/`. See `docs/prompts/README.md` for the full format and conventions. In brief:
+All user prompts must be logged to `~/projects/beanies-ops/docs/prompts/` (the private ops repo; commit them there, never in this repo). See `~/projects/beanies-ops/docs/prompts/README.md` for the full format and conventions. In brief:
 
-1. **One file per task/feature/bug** in `docs/prompts/YYYY-MM/YYYY-MM-DD-<short-slug>.md`
+1. **One file per task/feature/bug** in `~/projects/beanies-ops/docs/prompts/YYYY-MM/YYYY-MM-DD-<short-slug>.md`
 2. **Log every user prompt** (verbatim or close paraphrase) with a timestamp
 3. **Include frontmatter**: `date`, `category`, `issue`, `plan`, `tags`
 4. **Add an Outcome section** once work is complete
@@ -557,14 +568,14 @@ All user prompts must be logged to `docs/prompts/`. See `docs/prompts/README.md`
 
 ## Plans Archive
 
-Implementation plans created during plan mode must be saved to `docs/plans/` **before** implementation begins. This provides a version-controlled record of what was planned and why, enabling future reference when improving or extending features.
+Implementation plans created during plan mode must be saved to `~/projects/beanies-ops/docs/plans/` **before** implementation begins. This provides a version-controlled record of what was planned and why, enabling future reference when improving or extending features.
 
 **Workflow:**
 
 1. Plan mode produces a plan document
-2. Once the user approves the plan, save it to `docs/plans/YYYY-MM-DD-<short-slug>.md` (e.g., `docs/plans/2026-02-22-currency-chips-and-language-picker.md`)
+2. Once the user approves the plan, save it to `~/projects/beanies-ops/docs/plans/YYYY-MM-DD-<short-slug>.md` (e.g., `~/projects/beanies-ops/docs/plans/2026-02-22-currency-chips-and-language-picker.md`)
 3. Begin implementation
-4. The plan file stays in the repo permanently — it is a historical record
+4. The plan file stays in the ops repo permanently (commit it there, never in this repo); it is a historical record
 
 **Plan file format:**
 
@@ -604,7 +615,7 @@ E2E tests live in `e2e/specs/` and cover **critical user journeys only**. See `d
 - One clear user goal per test, 5–8 steps max.
 - No testing your own mocks. No `waitForTimeout`.
 - CI runs **Chromium only**. Use `--project=firefox` locally for cross-browser checks.
-- Log E2E failures in `docs/E2E_HEALTH.md` as (a) bug caught, (b) intentional change, or (c) flake.
+- Log E2E failures in `~/projects/beanies-ops/docs/E2E_HEALTH.md` as (a) bug caught, (b) intentional change, or (c) flake.
 
 ## Notes for AI Assistants
 
@@ -619,5 +630,5 @@ E2E tests live in `e2e/specs/` and cover **critical user journeys only**. See `d
 - Test changes with `npm run dev`
 - **DRY is mandatory**: Before writing new code, check for existing components, composables, and utilities that already solve the problem. Consolidate duplicates on sight. If unsure whether to extract shared logic, ask.
 - **i18n**: Never hardcode user-visible English text in Vue templates. Always add strings to `src/services/translation/uiStrings.ts` and use `t('key')` via `useTranslation()`.
-- **Plans**: When exiting plan mode, save the accepted plan to `docs/plans/` before writing any code.
+- **Plans**: When exiting plan mode, save the accepted plan to `~/projects/beanies-ops/docs/plans/` before writing any code.
 - **Prettier**: `docs/brand/` HTML files are excluded from Prettier formatting (see `.prettierignore`). Do not reformat them.

@@ -25,7 +25,7 @@
  *
  * Requires AWS creds in env (same profile as terraform apply: `source ~/.beanies-tf.env`).
  *
- * Tables (hardcoded, like scripts/migrate-registry-dev-rows.mjs; change if names differ):
+ * Tables (hardcoded,; change if names differ):
  *   registry: beanies-family-registry-prod
  *   billing:  beanies-family-billing-prod   (must exist: apply modules/billing first)
  */
