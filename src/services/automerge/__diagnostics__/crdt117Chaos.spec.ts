@@ -9,6 +9,13 @@
  *
  * Plan: `docs/plans/2026-10-01-crdt-merge-safe-writes.md`. ADR-039.
  *
+ * #117 Phase 2 (`docs/plans/2026-10-03-crdt-counters-117-phase-2.md`, Testing §3): runs with
+ * Counter writes ON. The projection edge and every read the checker asserts on are FOLDED
+ * (`foldEntity`/`foldDoc`), as main sees them; the shape invariants (ii)-(v) read the RAW document,
+ * where a Counter adjustment leaves the absolute untouched, and a sixth invariant checks that every
+ * Counter field adds up across each merge. `counterStats` must report 0 conflicts and 0 malformed
+ * keys after every merge.
+ *
  * ── How writes reach the document ──────────────────────────────────────────────
  *
  * Through the REAL repositories (`createAutomergeRepository`, `saveSettings`, `patchOp`). Only
@@ -22,7 +29,8 @@
  * ── Layers ─────────────────────────────────────────────────────────────────────
  *
  *  1. Scenario merges on the demo family (fixture-only).
- *  2. Seeded chaos: N rounds of 1-4 random writes per device, then converge, with five invariants.
+ *  2. Seeded chaos: N rounds of 1-4 random writes per device, then converge, with six invariants;
+ *     a third device joins half way through.
  *  3. Format: save/load round trip; a pre-#117 (`d[name] = {}`) pod is left untouched.
  *  4. Compaction rebase through the real `compactDoc` and `mergeRemoteEnvelope`.
  *  5. Old-build interop: a whole-value writer merged with a reconciling writer (reported).
@@ -41,7 +49,7 @@
  */
 /* eslint-disable @typescript-eslint/no-explicit-any -- a diagnostic that walks arbitrary documents */
 import 'fake-indexeddb/auto';
-import { describe, it, expect, vi, beforeAll } from 'vitest';
+import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import { readFileSync } from 'node:fs';
 import * as Automerge from '@automerge/automerge';
 
@@ -65,11 +73,16 @@ vi.mock('@/services/automerge/worker/docClient', () => ({
 
 vi.mock('@/services/automerge/projection', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/services/automerge/projection')>();
+  // #117 Phase 2: the projection holds FOLDED entities (the worker's materialisation funnel), so
+  // every `base` a repository picks is in folded space, exactly as in the app.
+  const { foldEntity, foldIndex } = await import('@/services/automerge/worker/counterFields');
   const plain = (v: unknown) => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)));
+  const entity = (c: string, id: string) =>
+    foldEntity(c, id, plain((sim.doc as any)?.[c]?.[id]), foldIndex(sim.doc as any));
   return {
     ...actual,
-    getById: (c: string, id: string) => plain((sim.doc as any)?.[c]?.[id]),
-    list: (c: string) => Object.values(plain((sim.doc as any)?.[c] ?? {}) as object),
+    getById: entity,
+    list: (c: string) => Object.keys((sim.doc as any)?.[c] ?? {}).map((id) => entity(c, id)),
     getSettings: () => plain((sim.doc as any)?.settings ?? null) ?? null,
   };
 });
@@ -84,6 +97,9 @@ const { buildRebaseOps, getHeads, buildFullProjection } = docOps;
 const { attachPhotoNamedHandler } = await import('@/services/automerge/worker/photoOps');
 const { KEY_FIELDS, MERGE_FIELDS } = await import('@/services/automerge/worker/reconcile');
 const { converge, materialise } = await import('@/services/automerge/worker/__tests__/twoDevices');
+const counterFields = await import('@/services/automerge/worker/counterFields');
+const { COUNTER_FIELDS, COUNTER_WRITES_ENABLED, __setCounterWritesForTesting } = counterFields;
+const { counterStats, foldDoc, foldEntity, foldIndex, sigma, toMinor } = counterFields;
 const { materializeFixture } = await import('@/services/demo/demoFixture');
 const { COLLECTION_NAMES } = await import('@/types/automerge');
 const ap = await import('@/services/automerge/worker/applyAndProject');
@@ -93,6 +109,7 @@ const { bufferToBase64, base64ToBuffer } = await import('@/utils/encoding');
 
 import type { FamilyDocument, CollectionName } from '@/types/automerge';
 import type { MutationOp } from '@/services/automerge/worker/protocol';
+import type { CounterField } from '@/services/automerge/worker/counterFields';
 
 type Doc = Automerge.Doc<FamilyDocument>;
 type Any = Record<string, any>;
@@ -110,7 +127,12 @@ const ITERATIONS = Number(process.env.CRDT_CHAOS_ITERATIONS ?? 40);
 const SEED = Number(process.env.CRDT_CHAOS_SEED ?? 117);
 
 // Deterministic actors, so a seed replays the same merge tie-breaks (LWW orders by actor).
-const ACTOR = { origin: '00'.repeat(16), a: 'aa'.repeat(16), b: 'bb'.repeat(16) };
+const ACTOR = {
+  origin: '00'.repeat(16),
+  a: 'aa'.repeat(16),
+  b: 'bb'.repeat(16),
+  c: 'cc'.repeat(16),
+};
 const OWNER = 'demo-member-owner';
 const NOW = '2026-10-01T09:00:00.000Z';
 
@@ -153,9 +175,14 @@ const repo = (c: CollectionName) => {
   return r;
 };
 
+/** The device `on` is running, so a generator can keep per-device state (its own Undo-able
+ * contributions). */
+let activeDevice = '';
+
 /** Run `fn` with `dev` as the active device (the worker doc + the projection). Sequential only. */
 async function on<T>(dev: Device, fn: () => Promise<T>): Promise<T> {
   sim.doc = dev.doc;
+  activeDevice = dev.name;
   try {
     return await fn();
   } finally {
@@ -163,8 +190,9 @@ async function on<T>(dev: Device, fn: () => Promise<T>): Promise<T> {
   }
 }
 
-/** The active device's plain view of an entity (what the store would hold). */
-const get = (c: CollectionName, id: string): Any | undefined => plain((sim.doc as any)?.[c]?.[id]);
+/** The active device's plain view of an entity (what the store would hold): FOLDED. */
+const get = (c: CollectionName, id: string): Any | undefined =>
+  foldEntity(c, id, plain((sim.doc as any)?.[c]?.[id]), foldIndex(sim.doc as Doc));
 const ids = (c: CollectionName): string[] => Object.keys((sim.doc as any)?.[c] ?? {});
 const settingsNow = (): Any => plain((sim.doc as any)?.settings ?? {}) ?? {};
 
@@ -237,7 +265,8 @@ async function toggleDuty(actId: string, duty: 'dropoff' | 'pickup', date: strin
     : [...current, { date, completedBy: by, completedAt: new Date().toISOString() }];
   return repo('activities').update(actId, { [field]: next } as never);
 }
-/** goalsStore.updateGoal with a contribution (`appendContributionIfChanged`). */
+/** goalsStore.updateGoal with a contribution (`appendContributionIfChanged`): the GoalModal full
+ * edit, an ABSOLUTE amount (two of these concurrently is the set-vs-set residual). */
 async function contribute(goalId: string, delta: number, entryId: string, by: string) {
   const goal = get('goals', goalId)!;
   const entry = { id: entryId, amount: delta, at: new Date().toISOString(), updatedBy: by };
@@ -246,6 +275,41 @@ async function contribute(goalId: string, delta: number, entryId: string, by: st
     manualContributions: [...(goal.manualContributions ?? []), entry],
   } as never);
 }
+/** Contributions this device made through `quickContribute`, newest last: the only entries its
+ * Undo toast can reach (the toast is on the contributing device only). */
+const ownContributions = new Map<string, Array<{ goalId: string; id: string; amount: number }>>();
+
+/** useContributeToGoal.contribute (the quick modal): the RELATIVE named op with its history entry
+ * (`contributionEntry`), so the amount and the entry land in one change. */
+async function quickContribute(goalId: string, amount: number, entryId: string, by: string) {
+  const entry = { id: entryId, amount, at: new Date().toISOString(), updatedBy: by };
+  const goal = (await mutate({
+    op: 'named',
+    name: 'applyGoalContribution',
+    args: { id: goalId, delta: amount, contribution: entry },
+  })) as Any;
+  const landed = (goal.manualContributions as Any[] | undefined)?.find((c) => c.id === entryId);
+  if (landed) {
+    const own = ownContributions.get(activeDevice) ?? [];
+    own.push({ goalId, id: entryId, amount: landed.amount });
+    ownContributions.set(activeDevice, own);
+  }
+  return goal;
+}
+/** useContributeToGoal.undoContribution: reverse this device's latest quick contribution. */
+async function quickUndo(): Promise<boolean> {
+  const last = ownContributions.get(activeDevice)?.pop();
+  if (!last) return false;
+  await mutate({
+    op: 'named',
+    name: 'applyGoalContribution',
+    args: { id: last.goalId, delta: -last.amount, undoContributionId: last.id },
+  });
+  return true;
+}
+/** Cents, as a transaction amount: `(n − half) / 100`, never 0. */
+const cents = (rng: Rng, span: number) => (rng.int(span) - span / 2) / 100 || 0.01;
+
 const increment = (collection: CollectionName, id: string, field: string, delta: number) =>
   mutate({ op: 'increment', collection, id, field, delta, updatedAt: new Date().toISOString() });
 const attachPhoto = (entityCollection: string, entityId: string, photoId: string) =>
@@ -579,7 +643,55 @@ function checkMerge(originDoc: Doc, aDoc: Doc, bDoc: Doc, mDoc: Doc, residuals: 
   // root conflicts
   const rc = countRootConflicts(mDoc);
   if (rc !== 0) fails.push(`root conflicts: ${rc}`);
+  // (vi) Counter fields add up, and the map is healthy
+  fails.push(...checkCounters(originDoc, aDoc, bDoc, mDoc), ...counterHealth(mDoc));
   return fails;
+}
+
+/**
+ * (vi) #117 Phase 2: every Counter field ADDS UP across a merge. In unfloored minor units,
+ * `M − O = (A − O) + (B − O)` for each Counter field the merged document holds, unless BOTH sides
+ * wrote the raw absolute (set-vs-set: one absolute wins, the residual (iii) already classifies).
+ * A set on one side and adjustments on the other still add up (probe j: set + delta). Reads
+ * through `toJS`, as `shapeOf` does, so a handle a merge has since spent reads its own state.
+ */
+function checkCounters(originDoc: Doc, aDoc: Doc, bDoc: Doc, mDoc: Doc): string[] {
+  const docs = [originDoc, aDoc, bDoc, mDoc].map((d) => Automerge.toJS(d) as Any);
+  const ixs = docs.map((d) => foldIndex(d));
+  const fails: string[] = [];
+  for (const [collection, specs] of Object.entries(COUNTER_FIELDS)) {
+    for (const id of Object.keys(docs[3]![collection] ?? {})) {
+      for (const spec of specs as readonly CounterField[]) {
+        const field = spec.abs.join('.');
+        const raws = docs.map((d) => {
+          const e = d[collection]?.[id];
+          const parent = spec.abs.length === 1 ? e : e?.[spec.abs[0]];
+          return parent?.[spec.abs[spec.abs.length - 1]!];
+        });
+        // Created or removed on a side, or not a loan there: nothing to add up.
+        if (raws.some((v) => typeof v !== 'number')) continue;
+        if (raws[1] !== raws[0] && raws[2] !== raws[0]) continue; // set-vs-set residual
+        const [o, a, b, m] = raws.map(
+          (raw, i) => toMinor(raw) + sigma(ixs[i]!, collection, id, field)
+        );
+        if (m! - o! !== a! - o! + (b! - o!)) {
+          fails.push(
+            `(vi) ${collection}/${id}#${field}: merged is not origin + both sides' adjustments`
+          );
+        }
+      }
+    }
+  }
+  return fails;
+}
+
+/** Counter health after a merge: no key written by two actors, none the fold cannot read. */
+function counterHealth(doc: Doc): string[] {
+  const { conflicts, malformed } = counterStats(doc);
+  return [
+    ...(conflicts ? [`counterStats.conflicts = ${conflicts}`] : []),
+    ...(malformed ? [`counterStats.malformed = ${malformed}`] : []),
+  ];
 }
 
 const redact = (msg: string) =>
@@ -709,6 +821,20 @@ const GENS: Record<string, Gen> = {
     await contribute(goalId, 5 + rng.int(100), mint('contrib'), rng.pick(members())!);
     return 'contribution';
   },
+  async quickContribution(rng, mint) {
+    const goalId = rng.pick(ids('goals'));
+    if (!goalId) return null;
+    await quickContribute(
+      goalId,
+      (500 + rng.int(10000)) / 100,
+      mint('quick'),
+      rng.pick(members())!
+    );
+    return 'quickContribution';
+  },
+  async quickUndo() {
+    return (await quickUndo()) ? 'quickUndo' : null;
+  },
   async budgetCategory(rng) {
     const budgetId = rng.pick(ids('budgets'));
     if (!budgetId) return null;
@@ -735,8 +861,18 @@ const GENS: Record<string, Gen> = {
   async balanceIncrement(rng) {
     const acc = rng.pick(ids('accounts'));
     if (!acc) return null;
-    await increment('accounts', acc, 'balance', rng.int(200) - 100);
+    await increment('accounts', acc, 'balance', cents(rng, 20000));
     return 'balanceIncrement';
+  },
+  /** The account modal's "set balance to X": an absolute, in folded space. */
+  async balanceSet(rng) {
+    const acc = rng.pick(ids('accounts'));
+    if (!acc) return null;
+    const now = get('accounts', acc)!.balance as number;
+    await repo('accounts').update(acc, {
+      balance: Math.round((now + cents(rng, 50000)) * 100) / 100,
+    } as never);
+    return 'balanceSet';
   },
   async photoAttach(rng, mint) {
     const col = rng.pick(
@@ -834,8 +970,10 @@ const GEN_NAMES = Object.keys(GENS);
 
 let BASE: Doc;
 beforeAll(async () => {
+  __setCounterWritesForTesting(true); // #117 Phase 2: every adjustment is a Counter
   BASE = REAL_POD ? await loadRealPod() : await buildDemoBase();
 }, 120_000);
+afterAll(() => __setCounterWritesForTesting(COUNTER_WRITES_ENABLED));
 
 /** Fork, write on both (each its own ops), converge, run the invariants, return the merged pair. */
 async function scenario(
@@ -853,7 +991,11 @@ async function scenario(
   const notes = sim.notes.slice(notesBefore);
   expect(notes.filter((n) => n.action === 'reconcile_verify_failed')).toEqual([]);
   expect(countRootConflicts(merged.a)).toBe(0);
-  return { A, B, merged, m: Automerge.toJS(merged.a) as Any, fails, residuals, notes };
+  for (const doc of [merged.a, merged.b]) {
+    expect(counterStats(doc)).toMatchObject({ conflicts: 0, malformed: 0 });
+  }
+  // Folded, as main sees it: a balance reads baseline + every Counter adjustment.
+  return { A, B, merged, m: foldDoc(merged.a) as Any, fails, residuals, notes };
 }
 
 const LIST = 'demo-list-groceries';
@@ -991,7 +1133,44 @@ describe.skipIf(REAL_POD)('layer 1: scenario merges on the demo family', () => {
     expect(r.fails).toEqual([]); // the loss is classified as first-creation, not a failure
   });
 
-  it('goal: contribution on both devices keeps both history entries', async () => {
+  it('goal: quick contribution on both devices: both amounts and both entries land (was the Phase 2 residual)', async () => {
+    const r = await scenario(
+      () => quickContribute('chaos-goal-history', 30, 'contrib-a', OWNER),
+      () => quickContribute('chaos-goal-history', 50.25, 'contrib-b', PARTNER)
+    );
+    const g = r.m.goals['chaos-goal-history'];
+    const history = g.manualContributions as Any[];
+    expect(history.map((c) => c.id).sort()).toEqual(
+      ['chaos-contrib-0', 'contrib-a', 'contrib-b'].sort()
+    );
+    expect(g.currentAmount).toBe(200.25);
+    expect(history.reduce((s, c) => s + c.amount, 0)).toBe(g.currentAmount);
+    expect(r.fails).toEqual([]);
+  });
+
+  it('goal: an Undo on each device after the merge removes exactly its own entry and amount', async () => {
+    const r = await scenario(
+      () => quickContribute('chaos-goal-history', 30, 'contrib-a', OWNER),
+      () => quickContribute('chaos-goal-history', 50, 'contrib-b', PARTNER)
+    );
+    const A: Device = { name: 'A', doc: r.merged.a };
+    const B: Device = { name: 'B', doc: r.merged.b };
+    await on(A, () =>
+      mutate({
+        op: 'named',
+        name: 'applyGoalContribution',
+        args: { id: 'chaos-goal-history', delta: -30, undoContributionId: 'contrib-a' },
+      })
+    );
+    const again = converge(A.doc, B.doc);
+    const g = (foldDoc(again.b) as Any).goals['chaos-goal-history'];
+    expect(g.currentAmount).toBe(170);
+    expect((g.manualContributions as Any[]).map((c) => c.id).sort()).toEqual(
+      ['chaos-contrib-0', 'contrib-b'].sort()
+    );
+  });
+
+  it('residual: the GoalModal absolute edit on both devices keeps both entries but one amount', async () => {
     const r = await scenario(
       () => contribute('chaos-goal-history', 30, 'contrib-a', OWNER),
       () => contribute('chaos-goal-history', 50, 'contrib-b', PARTNER)
@@ -1000,9 +1179,49 @@ describe.skipIf(REAL_POD)('layer 1: scenario merges on the demo family', () => {
     expect((g.manualContributions as Any[]).map((c) => c.id).sort()).toEqual(
       ['chaos-contrib-0', 'contrib-a', 'contrib-b'].sort()
     );
+    expect([150, 170]).toContain(g.currentAmount);
+    expect(r.residuals.get('same-scalar both sides (currentAmount)')).toBe(1);
     report.push(
-      `goal both-side contribution: currentAmount=${g.currentAmount} (sum of history = ${(g.manualContributions as Any[]).reduce((s, c) => s + c.amount, 0)}; Phase 2 residual)`
+      `goal both-side GoalModal edit: currentAmount=${g.currentAmount} (sum of history = ${(g.manualContributions as Any[]).reduce((s, c) => s + c.amount, 0)}; set-vs-set residual)`
     );
+    expect(r.fails).toEqual([]);
+  });
+
+  it('loan: a payment on each device: both principals land', async () => {
+    const r = await scenario(
+      () => loanPayment('chaos-asset-house', 1300),
+      () => loanPayment('chaos-asset-house', 1300)
+    );
+    // Each device: interest round2(200000 × 4.5% / 12) = 750, principal 550.
+    expect(r.m.assets['chaos-asset-house'].loan.outstandingBalance).toBe(198900);
+    expect(r.fails).toEqual([]);
+  });
+
+  it('account: cents on both devices sum exactly; a later increment after the merge stays exact', async () => {
+    const start = (foldDoc(BASE) as Any).accounts['demo-account-current'].balance as number;
+    const r = await scenario(
+      () => increment('accounts', 'demo-account-current', 'balance', -20.25),
+      () => increment('accounts', 'demo-account-current', 'balance', -30.5)
+    );
+    const want = (toMinor(start) - 507500) / 10_000;
+    expect(r.m.accounts['demo-account-current'].balance).toBe(want);
+    const A: Device = { name: 'A', doc: r.merged.a };
+    await on(A, () => increment('accounts', 'demo-account-current', 'balance', -5.05));
+    const later = converge(A.doc, r.merged.b);
+    for (const doc of [later.a, later.b]) {
+      expect((foldDoc(doc) as Any).accounts['demo-account-current'].balance).toBe(
+        (toMinor(start) - 558000) / 10_000
+      );
+    }
+    expect(r.fails).toEqual([]);
+  });
+
+  it('account: "set balance to X" on A vs a transaction on B merge to X + delta', async () => {
+    const r = await scenario(
+      () => repo('accounts').update('demo-account-current', { balance: 5000 } as never),
+      () => increment('accounts', 'demo-account-current', 'balance', -40.25)
+    );
+    expect(r.m.accounts['demo-account-current'].balance).toBe(4959.75);
     expect(r.fails).toEqual([]);
   });
 
@@ -1065,10 +1284,15 @@ describe.skipIf(REAL_POD)('layer 1: scenario merges on the demo family', () => {
 });
 
 describe('layer 2: seeded chaos', () => {
-  it(`${ITERATIONS} rounds, seed ${SEED}: converge, union survival, one-sided scalars, no undefined, no verify failure`, async () => {
+  it(`${ITERATIONS} rounds, seed ${SEED}: converge, union survival, one-sided scalars, no undefined, no verify failure, Counters add up`, async () => {
     const rng = lcg(SEED);
     const t0 = performance.now();
+    ownContributions.clear(); // layer 1's devices share these names; their entries are not here
     let { A, B } = fork(BASE);
+    // #117 Phase 2: a third device joins half way, forked from the converged pod with its own
+    // actor, so its Counter keys are a third writer's and every later merge is three-way.
+    let C: Device | null = null;
+    const JOIN_AT = Math.max(1, Math.floor(ITERATIONS / 2));
     let origin = BASE;
     let counter = 0;
     const residuals: Tally = new Map();
@@ -1078,8 +1302,9 @@ describe('layer 2: seeded chaos', () => {
     let totalOps = 0;
     for (let it = 0; it < ITERATIONS; it++) {
       const mint = (p: string) => `chaos-${p}-${it}-${counter++}`;
-      const log: Record<string, string[]> = { A: [], B: [] };
-      for (const dev of [A, B]) {
+      if (it === JOIN_AT) C = { name: 'C', doc: Automerge.clone(origin, { actor: ACTOR.c }) };
+      const log: Record<string, string[]> = { A: [], B: [], C: [] };
+      for (const dev of C ? [A, B, C] : [A, B]) {
         const n = 1 + rng.int(4);
         for (let k = 0; k < n; k++) {
           let done: string | null = null;
@@ -1108,13 +1333,32 @@ describe('layer 2: seeded chaos', () => {
       }
       const fails = checkMerge(origin, A.doc, B.doc, merged.a, residuals);
       if (verifyFails.length) fails.push(`(v) reconcile_verify_failed x${verifyFails.length}`);
+      let next = { a: merged.a, b: merged.b, c: null as Doc | null };
+      if (C) {
+        // Three-way: A+B (checked above) as one side, C as the other, then B catches up.
+        try {
+          const abc = converge(merged.a, C.doc);
+          fails.push(
+            ...checkMerge(origin, merged.a, C.doc, abc.a, residuals).map((f) => `[C] ${f}`)
+          );
+          const b = docOps.mergeDocs(merged.b, abc.a).doc;
+          expect([...getHeads(b)].sort()).toEqual([...getHeads(abc.a)].sort());
+          next = { a: abc.a, b, c: abc.b };
+        } catch (e) {
+          failures.push(`it ${it}: (i) C did not converge: ${(e as Error).message.slice(0, 200)}`);
+          break;
+        }
+      }
       for (const f of fails)
         failures.push(
-          redact(`seed ${SEED} it ${it}: ${f} | A=[${log.A.join(', ')}] B=[${log.B.join(', ')}]`)
+          redact(
+            `seed ${SEED} it ${it}: ${f} | A=[${log.A.join(', ')}] B=[${log.B.join(', ')}] C=[${log.C.join(', ')}]`
+          )
         );
-      A = { name: 'A', doc: merged.a };
-      B = { name: 'B', doc: merged.b };
-      origin = merged.a;
+      A = { name: 'A', doc: next.a };
+      B = { name: 'B', doc: next.b };
+      if (C && next.c) C = { name: 'C', doc: next.c };
+      origin = next.a;
     }
     const ms = Math.round(performance.now() - t0);
     const notes: Tally = new Map();
@@ -1128,7 +1372,7 @@ describe('layer 2: seeded chaos', () => {
     process.stdout.write(
       [
         '',
-        `── crdt117 chaos: seed ${SEED}, ${ITERATIONS} rounds, ${totalOps} writes, ${ms}ms (${REAL_POD ? 'real pod' : 'demo family'})`,
+        `── crdt117 chaos: seed ${SEED}, ${ITERATIONS} rounds, ${totalOps} writes, ${ms}ms (${REAL_POD ? 'real pod' : 'demo family'}; third device from round ${JOIN_AT})`,
         '  writes by kind:',
         fmt(opTally),
         '  reconciler notes (action @ scope):',
@@ -1415,6 +1659,18 @@ describe.skipIf(REAL_POD)('layer 5: old-build interop (mixed fleet), reported', 
     const m = converge(A.doc, B.doc);
     const fails = checkMerge(BASE, A.doc, B.doc, m.a, new Map());
     expect(fails.some((f) => f.startsWith('(iii)') && f.includes('#completed'))).toBe(true);
+  });
+
+  it('checker sensitivity: (vi) fails when a Counter adjustment is missing from the merge', async () => {
+    const { A, B } = fork(BASE);
+    await on(A, () => increment('accounts', 'demo-account-current', 'balance', -20.25));
+    await on(B, () => increment('accounts', 'demo-account-current', 'balance', -30.5));
+    // A "merge" that kept only A's side must fail; the real merge must not.
+    const lost = checkCounters(BASE, A.doc, B.doc, A.doc);
+    expect(lost).toEqual([
+      "(vi) accounts/demo-account-current#balance: merged is not origin + both sides' adjustments",
+    ]);
+    expect(checkCounters(BASE, A.doc, B.doc, converge(A.doc, B.doc).a)).toEqual([]);
   });
 
   it('whole-array writer (old build) vs reconciling writer (new build): no crash, no undefined, no root conflict', async () => {
