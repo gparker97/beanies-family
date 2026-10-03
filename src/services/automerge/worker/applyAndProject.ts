@@ -56,6 +56,7 @@ import {
   type RootConflictSnapshot,
 } from './docOps';
 import { attachPhotoNamedHandler, collectReferencedPhotoIds as collectPhotoIds } from './photoOps';
+import { foldIndex } from './counterFields';
 import * as cache from './cache';
 import type { RemoteBaselineRow } from '@/services/sync/remoteBaseline';
 import type {
@@ -1395,8 +1396,11 @@ export async function readDriveConnections(
 ): Promise<{ connections: DriveConnection[] }> {
   const key = requireKey('readDriveConnections');
   const doc = await decryptToDoc(envelope, key);
+  // `decryptToDoc` does not migrate, so the Counter map may be absent: `foldIndex` reads that as
+  // empty, and `driveConnections` has no Counter fields anyway. Passed because the funnel's
+  // index is required, never optional.
   return {
-    connections: materializeCollection(doc, 'driveConnections').map(
+    connections: materializeCollection(doc, 'driveConnections', foldIndex(doc)).map(
       ([, entity]) => entity as DriveConnection
     ),
   };

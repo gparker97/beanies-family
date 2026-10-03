@@ -22,6 +22,7 @@ import {
 } from '@/services/automerge/worker/docOps';
 import type { FamilyDocument } from '@/types/automerge';
 import type { SayingItem } from '@/types/models';
+import { foldIndex } from '@/services/automerge/worker/counterFields';
 
 type Doc = Automerge.Doc<FamilyDocument>;
 
@@ -43,7 +44,10 @@ function saying(id: string, words: string, extra: Partial<SayingItem> = {}): Say
 
 /** Read the sayings collection as an id→entity record. */
 function sayingsOf(doc: Doc): Record<string, SayingItem> {
-  return Object.fromEntries(materializeCollection(doc, 'sayings')) as Record<string, SayingItem>;
+  return Object.fromEntries(materializeCollection(doc, 'sayings', foldIndex(doc))) as Record<
+    string,
+    SayingItem
+  >;
 }
 
 describe('sayings — concurrent edits merge cleanly', () => {

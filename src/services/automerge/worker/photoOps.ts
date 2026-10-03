@@ -213,6 +213,16 @@ export function hasPhotoCollections(): boolean {
   return photoCollections.size > 0;
 }
 
+/**
+ * The registered photo host collections. Read by the #117 Phase 2 pin that no photo host is a
+ * Counter collection: the attach handler materialises its host with this file's private
+ * `toPlain` (this file must stay Automerge-free, so it cannot use the `docOps` funnel), which
+ * would hand main a RAW baseline for a Counter-backed field.
+ */
+export function registeredPhotoCollections(): string[] {
+  return [...photoCollections.keys()];
+}
+
 // ─── The `attachPhotoToEntity` named-op handler ──────────────────────────────
 //
 // Registered with `docOps` by `applyAndProject` (which owns `registerNamedOp`).

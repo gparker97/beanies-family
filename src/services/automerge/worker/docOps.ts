@@ -33,6 +33,7 @@ import type { PayloadLoadStep } from '@/types/sync';
 import { isAllocationFailure } from '@/utils/isAllocationFailure';
 import { docInitOpts } from './docActor';
 import { MIGRATION_CHANGES } from './migrationChanges';
+import { foldEntity, foldIndex, parseCounterKey, type FoldIndex } from './counterFields';
 import {
   calculateAmortization,
   calculateExtraPayment,
@@ -63,6 +64,42 @@ function toPlain<T>(value: T): T {
   // field: it escaped to the fallback and raised the block R1 exists to remove.
   if (value === undefined) return undefined as T;
   return JSON.parse(JSON.stringify(value)) as T;
+}
+
+/**
+ * THE materialisation funnel (#117 Phase 2, plan §B): a live document value → the plain entity
+ * main sees, with every Counter-backed field FOLDED (`abs + Σ`). Every entity that leaves this
+ * module for the projection, a delta or an op echo goes through here, so main never sees a raw
+ * baseline and never computes a sum.
+ *
+ * `index` is `foldIndex(doc)` of the SAME document `live` was read from, built once by the
+ * caller per materialisation call (never per entity). `id` is the map key the entity lives
+ * under, which is what a Counter key names.
+ *
+ * NOT for the rebase composer (`buildRebaseOps`, `threeWayFields`, `carryOnlyNewFields`): it
+ * works in RAW space, and folding there would count every Counter twice.
+ */
+function materialiseEntity<T>(collection: string, id: string, live: T, index: FoldIndex): T {
+  return foldEntity(collection, id, toPlain(live), index);
+}
+
+/** An entity's projection delta: a folded `upsert` when it is present, else a `remove`. */
+type EntityDelta = Extract<ProjectionDelta, { kind: 'upsert' } | { kind: 'remove' }>;
+
+/**
+ * THE one "entity present → materialised upsert, else remove" rule, for the poll delta, the
+ * structural op echo and the goal/loan named handlers. `doc` may be a committed document or a
+ * draft (a draft's Counters already include this change's increments, probe m).
+ */
+function entityDelta(
+  doc: Readonly<FamilyDocument>,
+  collection: CollectionName,
+  id: string,
+  index: FoldIndex
+): EntityDelta {
+  const live = (doc[collection] as AnyRecord | undefined)?.[id];
+  if (live === undefined) return { kind: 'remove', collection, id };
+  return { kind: 'upsert', collection, id, entity: materialiseEntity(collection, id, live, index) };
 }
 
 // ─── Doc lifecycle ───────────────────────────────────────────────────────────
@@ -353,6 +390,9 @@ export function mergeDocs(local: Doc, remote: Doc): { doc: Doc; dirty: boolean; 
  * write look like a settings change to the rebase, which would then carry the
  * peer's settings over the compactor's.
  */
+/** The root map holding the Counters (#117 Phase 2); `satisfies` pins the name to the type. */
+const COUNTER_ROOT = 'counterDeltas' satisfies keyof FamilyDocument;
+
 export function touchedBetween(
   doc: Doc,
   fromHeads: Heads,
@@ -361,10 +401,32 @@ export function touchedBetween(
   const patches = Automerge.diff(doc, fromHeads, toHeads);
   const touched = new Map<CollectionName, Set<string>>();
   let settingsChanged = false;
+  const touch = (collection: CollectionName, id: string): void => {
+    let ids = touched.get(collection);
+    if (!ids) {
+      ids = new Set();
+      touched.set(collection, ids);
+    }
+    ids.add(id);
+  };
   for (const patch of patches) {
     const top = patch.path[0];
     if (top === 'settings') {
       settingsChanged = true;
+      continue;
+    }
+    // #117 Phase 2: a Counter key (`[counterDeltas, key]`, a create `put` or an `inc`) changes
+    // its ENTITY's folded value, so it touches that entity: a merge that brings a peer's
+    // Counter must re-emit the entity's upsert. Checked BEFORE the non-collection skip below,
+    // which would otherwise swallow it; the migrate's own length-1 `put [counterDeltas]` still
+    // falls through to that skip. A key this build cannot parse (a future build's field, a
+    // malformed key) is warned and skipped, never a `null`: the fold skips it too, so a full
+    // rebuild would show exactly the same values.
+    if (top === COUNTER_ROOT && patch.path.length >= 2) {
+      const key = String(patch.path[1]);
+      const parsed = parseCounterKey(key);
+      if (parsed) touch(parsed.collection, parsed.id);
+      else console.warn(`[docOps] touchedBetween: skipping unparseable Counter key "${key}".`);
       continue;
     }
     if (typeof top === 'string' && (NON_COLLECTION_KEYS as readonly string[]).includes(top)) {
@@ -377,14 +439,7 @@ export function touchedBetween(
       );
       return null;
     }
-    const collection = top as CollectionName;
-    const id = String(patch.path[1]);
-    let ids = touched.get(collection);
-    if (!ids) {
-      ids = new Set();
-      touched.set(collection, ids);
-    }
-    ids.add(id);
+    touch(top as CollectionName, String(patch.path[1]));
   }
   return { touched, settingsChanged };
 }
@@ -399,13 +454,9 @@ export function projectionDeltasBetween(
     if (!scan) return null; // unexpected shape → full rebuild, as before
     const { touched, settingsChanged } = scan;
     const deltas: ProjectionDelta[] = [];
+    const index = foldIndex(doc);
     for (const [collection, ids] of touched) {
-      const coll = (doc[collection] ?? {}) as AnyRecord;
-      for (const id of ids) {
-        const raw = coll[id];
-        if (raw === undefined) deltas.push({ kind: 'remove', collection, id });
-        else deltas.push({ kind: 'upsert', collection, id, entity: toPlain(raw) });
-      }
+      for (const id of ids) deltas.push(entityDelta(doc, collection, id, index));
     }
     // One settings delta regardless of how many settings.* keys changed
     // (re-materializing the singleton is idempotent).
@@ -555,13 +606,23 @@ export async function encryptDocPayload(doc: Doc, familyKey: CryptoKey): Promise
 
 // ─── Materialization → projection ────────────────────────────────────────────
 
-/** Plain `[id, entity]` pairs for a collection (structured-clone-safe). */
+/**
+ * Plain, folded `[id, entity]` pairs for a collection (structured-clone-safe).
+ *
+ * ⚠️ `index` IS REQUIRED: pass `foldIndex(doc)` of this same `doc`, built once per call site
+ * and shared across collections. An optional parameter whose omission silently changes the
+ * result (raw baselines instead of folded values) is a trap.
+ */
 export function materializeCollection(
   doc: Doc,
-  collection: CollectionName
+  collection: CollectionName,
+  index: FoldIndex
 ): Array<[string, unknown]> {
   const coll = (doc[collection] ?? {}) as AnyRecord;
-  return Object.entries(coll).map(([id, entity]) => [id, toPlain(entity)]);
+  return Object.entries(coll).map(([id, entity]) => [
+    id,
+    materialiseEntity(collection, id, entity, index),
+  ]);
 }
 
 /**
@@ -570,11 +631,12 @@ export function materializeCollection(
  * so the main-thread receive never becomes a long task.
  */
 export function buildFullProjection(doc: Doc): ProjectionDelta[] {
+  const index = foldIndex(doc); // once, for every collection
   const deltas: ProjectionDelta[] = COLLECTION_NAMES.map((collection) => ({
     kind: 'bulk',
     collection,
     reset: true,
-    entities: materializeCollection(doc, collection),
+    entities: materializeCollection(doc, collection, index),
   }));
   deltas.push({ kind: 'settings', settings: toPlain(doc.settings ?? null) });
   return deltas;
@@ -661,30 +723,35 @@ const applyGoalContributionOp: NamedOpHandler = (draft, args) => {
   goal.currentAmount = Math.max(0, current + delta);
   if (!goal.isCompleted && goal.currentAmount >= goal.targetAmount) goal.isCompleted = true;
   goal.updatedAt = nowIso();
-  const entity = toPlain(goals[id]);
-  return { result: entity, deltas: [{ kind: 'upsert', collection: 'goals', id, entity }] };
+  const echo = entityDelta(draft, 'goals', id, foldIndex(draft));
+  return { result: echo.kind === 'upsert' ? echo.entity : undefined, deltas: [echo] };
 };
 
-/** Write `newBalance` to the loan host (nested asset-loan or account) + echo it. */
+/** Write `newBalance` to the loan host (nested asset-loan or account) + echo it, materialised
+ * through the funnel (`entityDelta`), so the echo and the delta carry the folded value. */
 function writeLoanBalance(
   draft: FamilyDocument,
   loan: LoanDetails,
   newBalance: number
-): { collection: CollectionName; entity: unknown } {
+): { collection: CollectionName; entity: unknown; delta: EntityDelta } {
+  let collection: CollectionName;
   if (loan.type === 'asset') {
+    collection = 'assets';
     const asset = (draft.assets as unknown as Record<string, Asset>)[loan.entityId];
     if (asset?.loan) {
       asset.loan.outstandingBalance = newBalance;
       asset.updatedAt = nowIso();
     }
-    return { collection: 'assets', entity: toPlain(asset) };
+  } else {
+    collection = 'accounts';
+    const account = (draft.accounts as unknown as Record<string, Account>)[loan.entityId];
+    if (account) {
+      account.balance = newBalance;
+      account.updatedAt = nowIso();
+    }
   }
-  const account = (draft.accounts as unknown as Record<string, Account>)[loan.entityId];
-  if (account) {
-    account.balance = newBalance;
-    account.updatedAt = nowIso();
-  }
-  return { collection: 'accounts', entity: toPlain(account) };
+  const delta = entityDelta(draft, collection, loan.entityId, foldIndex(draft));
+  return { collection, entity: delta.kind === 'upsert' ? delta.entity : undefined, delta };
 }
 
 const findLoan = (draft: FamilyDocument, loanId: string): LoanDetails | null =>
@@ -707,7 +774,7 @@ const applyLoanPaymentOp: NamedOpHandler = (draft, args) => {
         args.paymentAmount as number
       )
     : calculateExtraPayment(loan.outstandingBalance, args.paymentAmount as number);
-  const { collection, entity } = writeLoanBalance(draft, loan, res.newBalance);
+  const { collection, entity, delta } = writeLoanBalance(draft, loan, res.newBalance);
   return {
     result: {
       applied: true,
@@ -716,7 +783,7 @@ const applyLoanPaymentOp: NamedOpHandler = (draft, args) => {
       interestPortion: res.interestPortion,
       principalPortion: res.principalPortion,
     },
-    deltas: [{ kind: 'upsert', collection, id: loan.entityId, entity }],
+    deltas: [delta],
   };
 };
 
@@ -725,10 +792,10 @@ const reverseLoanPaymentOp: NamedOpHandler = (draft, args) => {
   const loan = findLoan(draft, args.loanId as string);
   if (!loan) return { result: { applied: false }, deltas: [] };
   const restored = loan.outstandingBalance + (args.principalToRestore as number);
-  const { collection, entity } = writeLoanBalance(draft, loan, restored);
+  const { collection, entity, delta } = writeLoanBalance(draft, loan, restored);
   return {
     result: { applied: true, hostCollection: collection, host: entity },
-    deltas: [{ kind: 'upsert', collection, id: loan.entityId, entity }],
+    deltas: [delta],
   };
 };
 
@@ -882,33 +949,28 @@ function mutateDraft(draft: FamilyDocument, op: MutationOp, sink: MutationSink):
   }
 }
 
-/** Build the projection delta for one op by reading the COMMITTED post-change doc. */
-function deltaFor(after: Doc, op: MutationOp, out: ProjectionDelta[]): unknown {
+/** Build the projection delta for one op by reading the COMMITTED post-change doc. `index` is
+ * `foldIndex(after)`, built once per `applyMutation` and shared down the batch recursion. */
+function deltaFor(after: Doc, op: MutationOp, out: ProjectionDelta[], index: FoldIndex): unknown {
   switch (op.op) {
     case 'set':
       out.push({ kind: 'upsert', collection: op.collection, id: op.id, entity: op.entity });
       return op.entity;
     case 'patch':
     case 'increment': {
-      const raw = (after[op.collection] as Record<string, unknown>)[op.id];
-      if (raw === undefined) {
-        // The target is absent post-change — the op was skipped (onMissing:'skip')
-        // or the entity was deleted earlier in the same batch. Sync the projection
-        // to reality with a `remove` instead of round-tripping `undefined` (which
-        // would throw in toPlain). Only reachable for a skipped/deleted target,
-        // never a live entity. Echo `undefined` so callers can detect the skip.
-        out.push({ kind: 'remove', collection: op.collection, id: op.id });
-        return undefined;
-      }
-      const entity = toPlain(raw);
-      out.push({ kind: 'upsert', collection: op.collection, id: op.id, entity });
-      return entity;
+      // An absent target post-change means the op was skipped (onMissing:'skip') or the entity
+      // was deleted earlier in the same batch: `entityDelta` syncs the projection to reality
+      // with a `remove`, and the echo is `undefined` so callers can detect the skip. Only
+      // reachable for a skipped/deleted target, never a live entity.
+      const delta = entityDelta(after, op.collection, op.id, index);
+      out.push(delta);
+      return delta.kind === 'upsert' ? delta.entity : undefined;
     }
     case 'delete':
       out.push({ kind: 'remove', collection: op.collection, id: op.id });
       return true;
     case 'batch': {
-      for (const sub of op.ops) deltaFor(after, sub, out);
+      for (const sub of op.ops) deltaFor(after, sub, out, index);
       return undefined;
     }
     case 'named':
@@ -934,7 +996,7 @@ export function applyMutation(
   const sink: MutationSink = { deltas: [], results: [], notes: [] };
   const after = Automerge.change(doc, (d) => mutateDraft(d as FamilyDocument, op, sink));
   const out: ProjectionDelta[] = [];
-  const structuralResult = deltaFor(after, op, out);
+  const structuralResult = deltaFor(after, op, out, foldIndex(after));
   const all = [...out, ...sink.deltas];
   const delta: ProjectionDelta = all.length === 1 ? all[0]! : { kind: 'multi', deltas: all };
   // A top-level `named` op returns its handler's result (the echoed entity for
