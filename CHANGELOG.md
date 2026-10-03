@@ -26,6 +26,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
+- The end-to-end clear-data test now answers the new unsaved-changes confirm.
 - The iOS simulator build lane no longer runs out of Node heap on the macOS runner (it now has the same 4 GB limit as the release lane).
 
 ## 2026-10-02

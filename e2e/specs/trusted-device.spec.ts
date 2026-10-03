@@ -225,6 +225,23 @@ test.describe('Trusted Device Password Cache', () => {
     await confirmBtn.waitFor({ state: 'visible', timeout: 3000 });
     await confirmBtn.click();
 
+    // Clear Data asks before deleting unsaved work (audit C6, 2026-10-03). This pod has
+    // no data file configured, so whether the probe reports the never-saved document as
+    // unsaved depends on timing (it did on CI, not locally). Either the discard confirm
+    // appears, or the clear proceeds and the reload detaches the confirm button.
+    const discardBtn = page.getByRole('button', { name: ui('auth.unsavedDiscard') });
+    const outcome = await Promise.race([
+      discardBtn
+        .waitFor({ state: 'visible', timeout: 15000 })
+        .then(() => 'ask' as const)
+        .catch(() => 'timeout' as const),
+      confirmBtn
+        .waitFor({ state: 'hidden', timeout: 15000 })
+        .then(() => 'cleared' as const)
+        .catch(() => 'timeout' as const),
+    ]);
+    if (outcome === 'ask') await discardBtn.click();
+
     // Wait for app to process clear + reload
     await page.waitForTimeout(2000);
 
