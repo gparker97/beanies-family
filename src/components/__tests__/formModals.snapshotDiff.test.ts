@@ -143,12 +143,15 @@ describe('AssetModal', () => {
     expect(data.notes).toBeUndefined();
   });
 
-  it('diffs loan one sub-key deep: only the changed sub-key is sent', async () => {
+  it('sends the WHOLE loan built from the live asset with only the changed sub-key overlaid', async () => {
+    // `loan` is a MERGE_FIELD whose base is the whole live loan: a partial object would make
+    // the reconciler delete every omitted sub-key (audit round 3). Untouched sub-keys equal
+    // the base and are not written; only the changed one moves.
     const w = await mountOpen(AssetModal, { asset });
     (w.vm as Vm).outstandingBalance = 140000;
     const data = await saveEmitted(w);
     expect(Object.keys(data)).toEqual(['loan']);
-    expect(data.loan).toEqual({ outstandingBalance: 140000 });
+    expect(data.loan).toEqual({ ...asset.loan, outstandingBalance: 140000 });
   });
 });
 
