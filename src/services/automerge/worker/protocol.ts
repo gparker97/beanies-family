@@ -20,6 +20,7 @@ import {
   PayloadTooLargeError,
   LocalDocUnreadableError,
   CacheInitError,
+  StaleBuildCounterError,
 } from '@/types/sync';
 import type { CacheInitStage, CacheInitLoss } from '@/types/sync';
 import type { PayloadLoadError, PayloadLoadStep } from '@/types/sync';
@@ -466,6 +467,20 @@ const ERROR_REGISTRY: Record<string, ErrorCodec> = {
           ? 'nothing-to-lose'
           : 'something-to-lose') as CacheInitLoss,
         typeof data?.cause === 'string' ? data.cause : 'unknown'
+      ),
+  },
+  // #117 Phase 2: a compaction refused over a newer build's Counter field. Without this entry
+  // it arrives on main as a `DocWorkerError` and `usePodCompaction` reports it as a corrupt
+  // rebuild, when the honest answer is "update the app".
+  StaleBuildCounterError: {
+    serialize: (err) =>
+      err instanceof StaleBuildCounterError
+        ? { collection: err.collection, field: err.field }
+        : undefined,
+    reconstruct: (_message, data) =>
+      new StaleBuildCounterError(
+        typeof data?.collection === 'string' ? data.collection : 'unknown',
+        typeof data?.field === 'string' ? data.field : 'unknown'
       ),
   },
 };

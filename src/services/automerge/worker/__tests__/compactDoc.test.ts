@@ -11,7 +11,7 @@
 import 'fake-indexeddb/auto';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as Automerge from '@automerge/automerge';
-import { PayloadTooLargeError } from '@/types/sync';
+import { PayloadTooLargeError, PayloadLoadError, StaleBuildCounterError } from '@/types/sync';
 
 // `source` records what the verify was handed, so a test can pin the compaction SOURCE itself.
 const diffHook = vi.hoisted(() => ({ path: null as string | null, source: null as unknown }));
@@ -49,7 +49,7 @@ vi.mock('@/utils/firstJsonDifference', async (importOriginal) => {
 
 const cache = await import('../cache');
 const { COUNTER_WRITES_ENABLED, __setCounterWritesForTesting } = await import('../counterFields');
-const { setDocActor, resetDocActor } = await import('../docActor');
+const { setDocActor, resetDocActor, setDeviceWriterId } = await import('../docActor');
 const {
   configure,
   compactDoc,
@@ -279,22 +279,29 @@ describe('compactDoc folds the Counters (#117 Phase 2)', () => {
   const inc = (delta: number) =>
     mutate({ op: 'increment', collection: 'accounts', id: 'A', field: 'balance', delta });
 
-  beforeEach(() => __setCounterWritesForTesting(true));
-  afterEach(() => __setCounterWritesForTesting(COUNTER_WRITES_ENABLED));
+  beforeEach(() => {
+    __setCounterWritesForTesting(true);
+    setDeviceWriterId('device-compact'); // what an opened cache posts
+  });
+  afterEach(() => {
+    __setCounterWritesForTesting(COUNTER_WRITES_ENABLED);
+    setDeviceWriterId(null);
+  });
 
   it('preserves the folded value, empties the map, and EXTENDS the ledger across two compactions', () => {
     initDoc();
     mutate({ op: 'set', collection: 'accounts', id: 'A', entity: { id: 'A', balance: 100 } });
     inc(-20.25);
     const [firstKey] = Object.keys(snapshot().counterDeltas);
-    expect(firstKey).toMatch(/^accounts\/A\/balance\//);
+    // `${collection}/${id}/${field}@${decimals}/${device}:${actor}`: no currency, two decimals.
+    expect(firstKey).toMatch(/^accounts\/A\/balance@2\/device-compact:[0-9a-f]+$/);
 
     // The real verify runs (no hook path): the folded source round-trips exactly.
     expect(compactDoc().changesAfter).toBe(1);
     let doc = snapshot();
     expect(doc.accounts.A!.balance).toBe(79.75);
     expect(doc.counterDeltas).toEqual({});
-    expect(doc.foldedCounters).toEqual({ [firstKey!]: -202_500 });
+    expect(doc.foldedCounters).toEqual({ [firstKey!]: -2025 });
 
     // A fresh actor after the rebuild, so the next adjustment is a NEW key.
     inc(-5);
@@ -305,14 +312,14 @@ describe('compactDoc folds the Counters (#117 Phase 2)', () => {
     expect(doc.accounts.A!.balance).toBe(74.75);
     expect(doc.counterDeltas).toEqual({});
     // ⚠️ CUMULATIVE, never replaced: a peer two compactions behind still finds its key.
-    expect(doc.foldedCounters).toEqual({ [firstKey!]: -202_500, [secondKey!]: -50_000 });
+    expect(doc.foldedCounters).toEqual({ [firstKey!]: -2025, [secondKey!]: -500 });
   });
 
-  it('REFUSES, keeping the old document, when the map holds a key this build cannot fold', () => {
+  it("REFUSES a newer build's Counter field, keeping the old document, with its own class", () => {
     // A future build's Counter field: this build's table lacks it, so the fold would drop it
     // unledgered and the rebuilt document (an empty map) would destroy its adjustments.
     type FDoc = import('@/types/automerge').FamilyDocument;
-    const FUTURE = 'accounts/A/creditLimit/w9';
+    const FUTURE = 'accounts/A/creditLimit@2/dev:w9';
     const withFuture = Automerge.change(migrateDoc(Automerge.init<FDoc>()), (d) => {
       (d.accounts as unknown as Record<string, unknown>).A = { id: 'A', balance: 100 };
       (d.counterDeltas as unknown as Record<string, unknown>)[FUTURE] = new Automerge.Counter(5);
@@ -320,11 +327,44 @@ describe('compactDoc folds the Counters (#117 Phase 2)', () => {
     loadSnapshot(Automerge.save(withFuture));
     const headsBefore = getHeads().heads;
 
-    // The verify gate's path: classified, rethrown, nothing installed.
-    expect(() => compactDoc()).toThrow(/Update the app before compacting/);
+    // Nothing installed, and NOT classified as corrupt: `usePodCompaction` maps the class to
+    // "update the app", never to "your data may be damaged".
+    let thrown: unknown;
+    try {
+      compactDoc();
+    } catch (e) {
+      thrown = e;
+    }
+    expect(thrown).toBeInstanceOf(StaleBuildCounterError);
+    expect(thrown).not.toBeInstanceOf(PayloadLoadError);
+    expect((thrown as Error).message).toMatch(/accounts\.creditLimit.*Update the app/);
+    expect((thrown as Error).message).not.toMatch(/dev:w9/);
     expect(getHeads().heads).toEqual(headsBefore);
     expect(Object.keys(snapshot().counterDeltas)).toEqual([FUTURE]);
     expect(snapshot()).not.toHaveProperty('podLineage');
+  });
+
+  it('DROPS a key no build can read and compacts anyway (refusing would block it forever)', () => {
+    type FDoc = import('@/types/automerge').FamilyDocument;
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const withGarbage = Automerge.change(migrateDoc(Automerge.init<FDoc>()), (d) => {
+        (d.accounts as unknown as Record<string, unknown>).A = { id: 'A', balance: 100 };
+        (d.counterDeltas as unknown as Record<string, unknown>)['garbage'] = new Automerge.Counter(
+          5
+        );
+      });
+      loadSnapshot(Automerge.save(withGarbage));
+      expect(compactDoc().changesAfter).toBe(1);
+      expect(snapshot().counterDeltas).toEqual({});
+      expect(snapshot()).not.toHaveProperty('foldedCounters');
+      expect(snapshot().accounts.A!.balance).toBe(100);
+      expect(warn.mock.calls.filter(([m]) => String(m).includes('compaction drops'))).toHaveLength(
+        1
+      );
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it('a dormant pod: the source is the document as it stands plus the lineage, with no ledger', () => {

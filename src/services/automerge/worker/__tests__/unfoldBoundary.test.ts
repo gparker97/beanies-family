@@ -5,7 +5,8 @@
  *
  * Main sends FOLDED values (what the user sees: baseline + Σ Counters); the document stores RAW
  * absolutes. A based `patch` and a `set` on a Counter collection are unfolded in the worker
- * (`raw = (round(v·S) − Σ) / S`) before the reconciler runs, so:
+ * (`raw = round((v − Σ) · 10^d) / 10^d`, `d` the entity's currency scale) before the reconciler
+ * runs, so:
  *  - an unchanged folded field is an unchanged raw field and writes nothing;
  *  - a changed field reads back as exactly what was sent;
  *  - with Σ = 0 the value passes through untouched (no rounding);
@@ -139,14 +140,14 @@ describe('based patch: the unfold at the boundary', () => {
   it.each(FIELDS)('%s/%s.%s: a changed field folds back to exactly `next`', (c, id, f) => {
     const doc = adjustAll(base3(), -20.25);
     const prev = { ...LOAN, outstandingBalance: 79.75 };
-    const next = 123.4567;
+    const next = 123.45; // at most the entity's scale (two decimals: no currency on the fixture)
     const res = applyMutation(
       doc,
       patch(c, id, withValue(f, next, prev), withValue(f, 79.75, prev))
     );
     expect(valueAt(res.result, f)).toBe(next); // the echo
     expect(valueAt(projected(res.doc, c, id), f)).toBe(next); // the full projection
-    expect(valueAt(stored(res.doc, c, id), f)).toBe(143.7067); // raw = next − Σ
+    expect(valueAt(stored(res.doc, c, id), f)).toBe(143.7); // raw = next − Σ
     expect(counterMap(res.doc)).toEqual(counterMap(doc)); // the map is never written
   });
 
@@ -159,7 +160,7 @@ describe('based patch: the unfold at the boundary', () => {
 
   it('with Σ = 0 the stored value is byte-for-byte what was sent (no rounding)', () => {
     const doc = base3();
-    const odd = 0.1 + 0.2; // 0.30000000000000004: four-decimal rounding would change it
+    const odd = 0.1 + 0.2; // 0.30000000000000004: rounding to the scale would change it
     const res = applyMutation(doc, patch('accounts', 'A', { balance: odd }, { balance: 100 }));
     expect(stored(res.doc, 'accounts', 'A').balance).toBe(odd);
     expect(projected(res.doc, 'accounts', 'A')?.balance).toBe(odd);

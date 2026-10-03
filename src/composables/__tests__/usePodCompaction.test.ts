@@ -577,3 +577,42 @@ describe('who is on an older version is a notice, never a gate', () => {
     expect(c.progressFailure.value?.subtitleKey).not.toBe('compactionProgress.failedSubtitle');
   });
 });
+
+describe('a newer build in the family (#117 Phase 2)', () => {
+  it('a Counter field from a newer build says "update the app", not "rebuild failed"', async () => {
+    const { StaleBuildCounterError } = await import('@/types/sync');
+    vi.mocked(docClient.compactDoc).mockRejectedValueOnce(
+      new StaleBuildCounterError('accounts', 'futureField')
+    );
+
+    const c = usePodCompaction();
+    await c.compact();
+
+    expect(c.progressPhase.value).toBe('failed');
+    expect(c.progressFailure.value).toEqual({
+      titleKey: 'compactionProgress.failedTitle',
+      subtitleKey: 'compactionProgress.failedSubtitle',
+      helpKey: 'compaction.needsUpdateHelp',
+      retryable: false,
+    });
+    expect(reportError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        surface: 'pod-compaction',
+        severity: 'error',
+        context: { action: 'failed', error_code: 'stale-build' },
+      })
+    );
+  });
+
+  it('any other rebuild failure keeps the generic copy and code', async () => {
+    vi.mocked(docClient.compactDoc).mockRejectedValueOnce(new Error('boom'));
+
+    const c = usePodCompaction();
+    await c.compact();
+
+    expect(c.progressFailure.value?.helpKey).toBe('compaction.failedHelp');
+    expect(reportError).toHaveBeenCalledWith(
+      expect.objectContaining({ context: { action: 'failed', error_code: 'rebuild-failed' } })
+    );
+  });
+});

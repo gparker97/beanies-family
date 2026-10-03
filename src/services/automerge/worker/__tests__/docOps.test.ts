@@ -25,19 +25,30 @@ import {
   countRootConflicts,
   rootConflictSnapshot,
   rootConflictsSince,
+  buildRebaseOps,
 } from '../docOps';
 import { MIGRATION_CHANGES } from '../migrationChanges';
+import { deviceWriterIdFor, isDeviceWriterIdEphemeral, setDeviceWriterId } from '../docActor';
 import {
   COUNTER_WRITES_ENABLED,
   __setCounterWritesForTesting,
   adjustField,
   counterStats,
+  foldDoc,
   foldEntity,
   foldIndex,
 } from '../counterFields';
 import type { MutationOp, ProjectionDelta } from '../protocol';
 import { calculateExtraPayment } from '@/utils/loanPayment';
-import { apply, converge, fork, seeded } from './twoDevices';
+import {
+  TEST_DEVICE,
+  apply,
+  converge,
+  fork,
+  resetTestDevices,
+  seeded,
+  useTestDevices,
+} from './twoDevices';
 
 type Doc = Automerge.Doc<FamilyDocument>;
 const base = (): Doc => migrateDoc(Automerge.init<FamilyDocument>());
@@ -768,7 +779,11 @@ describe('docOps — core domain named ops (financial atomic RMW)', () => {
 // ON live in `counterMerge.test.ts`.
 
 describe('docOps — relative writes through adjustField (#117 Phase 2)', () => {
-  afterEach(() => __setCounterWritesForTesting(COUNTER_WRITES_ENABLED));
+  beforeEach(() => useTestDevices());
+  afterEach(() => {
+    __setCounterWritesForTesting(COUNTER_WRITES_ENABLED);
+    resetTestDevices();
+  });
 
   const AT = '2026-10-03T10:00:00.000Z';
   const entry = (id: string, amount: number, note?: string) => ({
@@ -877,7 +892,7 @@ describe('docOps — relative writes through adjustField (#117 Phase 2)', () => 
       __setCounterWritesForTesting(true);
       const on = contribute(goalDoc({ currentAmount: -30 }), { delta: 10 });
       expect(on.doc.goals.g!.currentAmount).toBe(-30);
-      expect(Object.values(on.doc.counterDeltas).map((c) => c.value)).toEqual([100_000]);
+      expect(Object.values(on.doc.counterDeltas).map((c) => c.value)).toEqual([1000]);
       expect(goalOf(on.doc).currentAmount).toBe(0);
     });
 
@@ -923,7 +938,7 @@ describe('docOps — relative writes through adjustField (#117 Phase 2)', () => 
     ).toThrow(/not a Counter field of "accounts"/);
   });
 
-  it('named handlers receive the document actor as ctx.writerId', () => {
+  it('named handlers receive `${device}:${actor}` as ctx.writerId', () => {
     let seen: string | undefined;
     registerNamedOp('probeCtx', (_draft, _args, ctx) => {
       seen = ctx.writerId;
@@ -931,7 +946,52 @@ describe('docOps — relative writes through adjustField (#117 Phase 2)', () => 
     });
     const d = base();
     applyMutation(d, { op: 'named', name: 'probeCtx', args: {} });
-    expect(seen).toBe(Automerge.getActorId(d));
+    expect(seen).toBe(`${TEST_DEVICE}:${Automerge.getActorId(d)}`);
+  });
+
+  describe('no family cache opened: an EPHEMERAL device id, never a throw', () => {
+    const accountDoc = () =>
+      seeded([{ op: 'set', collection: 'accounts', id: 'a', entity: { id: 'a', balance: 100 } }]);
+    const inc = (delta: number) =>
+      ({ op: 'increment', collection: 'accounts', id: 'a', field: 'balance', delta }) as const;
+    const keyWriters = (doc: Doc) =>
+      Object.keys(doc.counterDeltas).map((k) => k.slice(k.lastIndexOf('/') + 1));
+
+    beforeEach(() => {
+      resetTestDevices(); // the realm's own id, as production
+      setDeviceWriterId(null); // and no cache: nothing persisted was ever posted
+      __setCounterWritesForTesting(true);
+    });
+    afterEach(() => setDeviceWriterId(null));
+
+    it('a write with writes on keys under the ephemeral id; the rebase replays it as own', () => {
+      const origin = accountDoc();
+      const baseline = getHeads(origin);
+      const peer = apply(Automerge.clone(origin), inc(-1));
+      expect(isDeviceWriterIdEphemeral()).toBe(true);
+      const eph = deviceWriterIdFor(Automerge.getActorId(peer));
+      expect(keyWriters(peer)).toEqual([`${eph}:${Automerge.getActorId(peer)}`]);
+      // Same session, a compacted target: the ephemeral keys are this device's own.
+      const target = Automerge.from({
+        ...(foldDoc(origin) as object),
+        podLineage: { id: 'L-NEW', seq: 1 },
+      }) as unknown as Doc;
+      const built = buildRebaseOps(peer, baseline, target)!;
+      expect(built.op).toMatchObject({ op: 'increment', id: 'a', delta: -1 });
+      expect(built.counterIncrements).toBe(1);
+    });
+
+    it('once the cache posts its persisted id, new keys use it (the ephemeral id is dropped)', () => {
+      let doc = apply(accountDoc(), inc(-1));
+      const eph = deviceWriterIdFor('x');
+      setDeviceWriterId('persisted-device');
+      expect(isDeviceWriterIdEphemeral()).toBe(false);
+      doc = apply(Automerge.clone(doc), inc(-2));
+      const writers = keyWriters(doc).map((w) => w.slice(0, w.indexOf(':')));
+      expect(writers.sort()).toEqual([eph, 'persisted-device'].sort());
+      // The old ephemeral key is now foreign to this realm: only the persisted one replays.
+      expect(deviceWriterIdFor('x')).toBe('persisted-device');
+    });
   });
 
   it('a loan payment written dormant lands on res.newBalance exactly (no float drift)', () => {
@@ -1018,11 +1078,12 @@ describe('docOps — relative writes through adjustField (#117 Phase 2)', () => 
         args: { loanId: 'ast', paymentAmount: 30.5, isRecurring: false },
       }
     );
-    const actor = Automerge.getActorId(d);
+    // `${collection}/${id}/${field}@${decimals}/${device}:${actor}`, cents (no currency set).
+    const writer = `${TEST_DEVICE}:${Automerge.getActorId(d)}`;
     expect(JSON.parse(JSON.stringify(d.counterDeltas))).toEqual({
-      [`accounts/a/balance/${actor}`]: -202500,
-      [`goals/g/currentAmount/${actor}`]: 600000,
-      [`assets/ast/loan.outstandingBalance/${actor}`]: -305000,
+      [`accounts/a/balance@2/${writer}`]: -2025,
+      [`goals/g/currentAmount@2/${writer}`]: 6000,
+      [`assets/ast/loan.outstandingBalance@2/${writer}`]: -3050,
     });
     expect(read(d, 'accounts', 'a').balance).toBe(100);
     expect(read(d, 'goals', 'g')).toMatchObject({ currentAmount: 50, isCompleted: true });
@@ -1529,7 +1590,7 @@ describe('docOps — deterministic collection creation (#117, plan F)', () => {
       expect(Automerge.getObjectId(a0.counterDeltas)).toBe(Automerge.getObjectId(b0.counterDeltas));
       const adjust = (doc: Doc, delta: number) =>
         Automerge.change(doc, (d) =>
-          adjustField(d, 'accounts', 'A', 'balance', delta, Automerge.getActorId(doc))
+          adjustField(d, 'accounts', 'A', 'balance', delta, `dev:${Automerge.getActorId(doc)}`)
         );
       const { a: merged } = converge(adjust(a0, -20.25), adjust(b0, -30.5));
       expect(Object.keys(merged.counterDeltas)).toHaveLength(2);

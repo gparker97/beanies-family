@@ -35,9 +35,11 @@ import {
   readRemoteBaseline,
   writeRemoteBaseline,
   clearRemoteBaseline,
+  readDeviceWriterId,
 } from '../cache';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
 import { foldIndex } from '../counterFields';
+import { deviceWriterIdFor, isDeviceWriterIdEphemeral } from '../docActor';
 
 const FAMILY_ID = 'cache-test-family';
 const base = () => migrateDoc(Automerge.init<FamilyDocument>());
@@ -121,6 +123,49 @@ describe('worker/cache', () => {
       expect(await readRemoteBaseline()).toBeNull();
       await clearRemoteBaseline(); // idempotent
       expect(await readRemoteBaseline()).toBeNull();
+    });
+  });
+
+  describe('device writer id row (#117 Phase 2)', () => {
+    it('is minted on the first open, persisted, and posted into the realm', async () => {
+      const id = await readDeviceWriterId();
+      expect(id).toMatch(/^[0-9a-f-]{36}$/);
+      // Production ignores the actor: every handle in the realm is this one device.
+      expect(deviceWriterIdFor('any-actor')).toBe(id);
+      expect(isDeviceWriterIdEphemeral()).toBe(false);
+    });
+
+    it('is STABLE across a reopen (a reload is the same device), and survives a base write', async () => {
+      const id = await readDeviceWriterId();
+      await persistDocBinary(key, saveDoc(setAccount(base(), 'a1', 1))); // increment sweep
+      closeCacheDB();
+      // The closed handle takes its id with it: the realm falls back to an ephemeral one.
+      expect(isDeviceWriterIdEphemeral()).toBe(true);
+      expect(deviceWriterIdFor('x')).not.toBe(id);
+      await initPersistenceDB(FAMILY_ID);
+      expect(await readDeviceWriterId()).toBe(id);
+      expect(deviceWriterIdFor('x')).toBe(id);
+    });
+
+    it('dies with the cache: after clearCache the next open is a NEW device', async () => {
+      const id = await readDeviceWriterId();
+      await clearCache(FAMILY_ID);
+      expect(isDeviceWriterIdEphemeral()).toBe(true);
+      await initPersistenceDB(FAMILY_ID);
+      const next = await readDeviceWriterId();
+      expect(next).not.toBe(id);
+      expect(deviceWriterIdFor('x')).toBe(next);
+    });
+
+    it('is per family: another family cache has its own id', async () => {
+      const id = await readDeviceWriterId();
+      await initPersistenceDB('cache-test-other-family');
+      try {
+        expect(await readDeviceWriterId()).not.toBe(id);
+      } finally {
+        await clearCache('cache-test-other-family');
+        await initPersistenceDB(FAMILY_ID);
+      }
     });
   });
 

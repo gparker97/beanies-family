@@ -33,6 +33,11 @@ function fakeDb() {
     close: vi.fn(),
     getAllKeys: vi.fn(async () => []),
     objectStoreNames: { contains: () => true },
+    // #117 Phase 2: the open reads (or mints) the device writer id in one transaction.
+    transaction: () => ({
+      objectStore: () => ({ get: async () => undefined, put: async () => undefined }),
+      done: Promise.resolve(),
+    }),
   };
 }
 

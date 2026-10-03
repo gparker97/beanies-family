@@ -756,6 +756,32 @@ export type CacheInitStage = 'open' | 'load';
 export type CacheInitLoss = 'nothing-to-lose' | 'something-to-lose';
 
 /**
+ * Compaction refused: the family's Counter map holds an adjustment on a field this build does
+ * not know, in a collection it does (#117 Phase 2, `counterFields.foldDoc`). A NEWER build wrote
+ * it. Compaction empties the map, so folding past that key would destroy the adjustment for
+ * good; the only fix is updating the app, which is what `usePodCompaction` tells the person.
+ *
+ * Its own class, never a `PayloadLoadError`: nothing is corrupt and nothing ran out of memory,
+ * so `compactDoc` lets it through unclassified. It carries the collection and field ONLY, never
+ * the entity id or the writer: the message reaches the firehose unmasked.
+ */
+export class StaleBuildCounterError extends Error {
+  readonly collection: string;
+  readonly field: string;
+
+  constructor(collection: string, field: string) {
+    super(
+      `counterFields: cannot compact: a Counter on ${collection}.${field} comes from a newer ` +
+        `build than this one. Compacting would destroy that adjustment. Update the app first.`
+    );
+    // Literal, never `new.target.name`: the prod build minifies class names.
+    this.name = 'StaleBuildCounterError';
+    this.collection = collection;
+    this.field = field;
+  }
+}
+
+/**
  * `initAndLoadCache` could not bring this family's cached document up.
  *
  * ⚠️ IT CARRIES A VERDICT, NOT A MEASUREMENT, and that is the whole point. Main

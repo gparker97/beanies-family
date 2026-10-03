@@ -4976,6 +4976,11 @@ const STRING_DEFS = {
     beanie:
       'nothing has changed and your data is safe. if it keeps happening, send support@beanies.family the details.',
   },
+  'compaction.needsUpdateHelp': {
+    en: 'This family file holds changes made by a newer version of beanies. Update beanies on this device, then compact again. Nothing has changed and your data is safe.',
+    beanie:
+      'this family file holds changes made by a newer version of beanies. update beanies on this device, then compact again. nothing has changed and your data is safe.',
+  },
   'compaction.publishFailed': {
     en: 'The compacted file was not saved to the cloud',
     beanie: 'the compacted file was not saved to the cloud',

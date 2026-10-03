@@ -2414,6 +2414,8 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
     'beanies 暂时无法写入你的家庭文件，因此没有做任何改动。请重新连接存储，或重新授予文件访问权限，然后再整理一次。',
   'compaction.failedHelp':
     '什么都没有改动，你的数据很安全。如果反复出现这个问题，请把详细信息发送到 support@beanies.family。',
+  'compaction.needsUpdateHelp':
+    '这个家庭文件里有更新版本的 beanies 做出的更改。请先在这台设备上更新 beanies，然后再压缩。什么都没有改动，你的数据很安全。',
   'compaction.publishFailed': '压缩后的文件没有保存到云端',
   'compaction.publishFailedHelp':
     '备份就在这台设备上，你的数据很安全。刷新 beanies，它会完成剩下的工作。',

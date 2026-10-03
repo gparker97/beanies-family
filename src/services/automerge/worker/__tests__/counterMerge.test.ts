@@ -7,7 +7,7 @@
  * Every converge also asserts `counterStats(...).conflicts === 0`: no key is ever written by two
  * actors (probe e' shows why a shared key would be unrecoverable).
  */
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, beforeEach } from 'vitest';
 import * as Automerge from '@automerge/automerge';
 import type { CollectionName } from '@/types/automerge';
 import { materializeCollection, getHeads } from '../docOps';
@@ -18,11 +18,23 @@ import {
   foldIndex,
 } from '../counterFields';
 import type { MutationOp } from '../protocol';
-import { apply, converge as convergeRaw, fork, seeded, type Doc } from './twoDevices';
+import {
+  apply,
+  converge as convergeRaw,
+  fork,
+  resetTestDevices,
+  seeded,
+  useTestDevices,
+  type Doc,
+} from './twoDevices';
 
 type AnyRec = Record<string, unknown>;
 
-afterEach(() => __setCounterWritesForTesting(COUNTER_WRITES_ENABLED));
+beforeEach(() => useTestDevices());
+afterEach(() => {
+  __setCounterWritesForTesting(COUNTER_WRITES_ENABLED);
+  resetTestDevices();
+});
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

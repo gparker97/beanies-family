@@ -28,6 +28,8 @@ import { encryptPayload, decryptPayload } from '@/services/crypto/familyKeyServi
 import { bufferToBase64, base64ToBuffer } from '@/utils/encoding';
 import { withIdbRetry } from '@/utils/idbTransient';
 import { withTimeout } from '@/utils/timing';
+import { generateUUID } from '@/utils/id';
+import { setDeviceWriterId } from './docActor';
 import type { RemoteBaselineRow } from '@/services/sync/remoteBaseline';
 import type { CacheClearResult } from './protocol';
 import {
@@ -73,6 +75,16 @@ const SNAPSHOT_KEY = 'projection-snapshot';
  * silently extend trust. Dropped with everything else by `clearCache`.
  */
 const REMOTE_BASELINE_KEY = 'remote-baseline';
+/**
+ * This device's Counter writer id (#117 Phase 2): an opaque random id, minted ONCE per family
+ * cache by `initPersistenceDB` and posted into the realm (`docActor.setDeviceWriterId`). Every
+ * Counter key this device writes carries it, and the rebase replays only keys that do, so it
+ * must outlive a reload (the Automerge actor does not) and die with the cache (a signed-out or
+ * cleared device is a new device). PLAINTEXT like the baseline row beside it: a random id
+ * carries no family data. Outside every read/clear key range (`'d' < 'i'`). Dropped with
+ * everything else by `clearCache`'s whole-DB delete.
+ */
+const DEVICE_WRITER_KEY = 'device-writer';
 /** Increment rows key on `inc:<zero-padded seq>` so IDB's lexical key order == seq order. */
 const INC_PREFIX = 'inc:';
 /** The char after ':' — upper bound (exclusive) for the `inc:*` key range. */
@@ -148,6 +160,9 @@ function closeHandle(): void {
   cacheDb = null;
   cacheDbFamilyId = null;
   incSeq = 0;
+  // The id belongs to the DB it was read from: a write after the handle closed (sign-out, a
+  // family switch, another tab's delete) must not key a Counter with another family's device.
+  setDeviceWriterId(null);
 }
 
 /** Open (or reuse) the cache IndexedDB for the given family. */
@@ -215,6 +230,17 @@ export async function initPersistenceDB(familyId: string): Promise<void> {
     throw e;
   }
 
+  // #117 Phase 2: read (or mint, once) this device's Counter writer id BEFORE the handle is
+  // installed, so an open that cannot read its own id is an open that failed. Once posted, it
+  // supersedes any ephemeral id a cacheless stretch of this session minted (`docActor.ts`).
+  let writerId: string;
+  try {
+    writerId = await ensureDeviceWriterId(db);
+  } catch (e) {
+    db.close();
+    throw e;
+  }
+
   // ⚠️ ASSIGNED ONLY ON SUCCESS, and load-bearing twice. `isCacheReady()` is
   // exactly `cacheDb !== null`, so a timeout must leave it null or a write will
   // target a DB we do not hold; and a late open cannot install itself as another
@@ -222,7 +248,37 @@ export async function initPersistenceDB(familyId: string): Promise<void> {
   handle = db;
   cacheDb = db;
   cacheDbFamilyId = familyId;
+  setDeviceWriterId(writerId);
   incSeq = await maxIncSeq(cacheDb);
+}
+
+/**
+ * This cache's device writer id, minted on first open (#117 Phase 2, `DEVICE_WRITER_KEY`).
+ * Read and create-if-absent in ONE readwrite transaction: two tabs opening a fresh cache at once
+ * serialise on the store, so the second reads the first's id instead of minting a rival one
+ * (which would orphan the first tab's keys from this device after a reload). `generateUUID`,
+ * never a bare `crypto.randomUUID()` (undefined on a non-secure origin; see `docOps.ts`).
+ */
+async function ensureDeviceWriterId(db: IDBPDatabase<CacheDB>): Promise<string> {
+  return withIdbRetry('ensureDeviceWriterId', async () => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    const existing = ((await store.get(DEVICE_WRITER_KEY)) as { payload?: string } | undefined)
+      ?.payload;
+    const id = existing || generateUUID();
+    if (!existing) await store.put({ id: DEVICE_WRITER_KEY, payload: id, updatedAt: nowIso() });
+    await tx.done;
+    return id;
+  });
+}
+
+/** This cache's device writer id row, or `null` when absent (never, after an open). */
+export async function readDeviceWriterId(): Promise<string | null> {
+  if (!cacheDb) throw new Error('Cache DB not initialized. Call initPersistenceDB() first.');
+  const entry = (await withIdbRetry('readDeviceWriterId', () =>
+    cacheDb!.get(STORE_NAME, DEVICE_WRITER_KEY)
+  )) as { payload?: string } | undefined;
+  return entry?.payload || null;
 }
 
 /** Read the next free increment seq (= max existing `inc:*` index + 1, or 0). */
