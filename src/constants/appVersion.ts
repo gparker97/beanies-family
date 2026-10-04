@@ -40,4 +40,4 @@
 // deliberately lags this constant: a normal release does not raise it. Raise it only
 // when there is a reason everyone should move.
 // See `docs/runbooks/native-store-submission.md` § 7. Raising the update floor.
-export const APP_VERSION = '0.91.2';
+export const APP_VERSION = '0.91.3';
