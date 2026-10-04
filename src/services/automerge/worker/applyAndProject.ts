@@ -74,6 +74,7 @@ import {
   foldDoc,
   foldIndex,
   counterStats,
+  setCounterWrites,
   type CounterStats,
   type LedgerFigures,
 } from './counterFields';
@@ -2475,6 +2476,9 @@ export async function dispatch(method: string, args: unknown): Promise<DispatchR
       return { result: compactDoc() };
     case 'setActor':
       setActor((a.actor as string | null) ?? null);
+      return {};
+    case 'setCounterWrites':
+      setCounterWrites((a.on as boolean | null) ?? null);
       return {};
     case 'initDoc':
       return { result: initDoc() };

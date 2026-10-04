@@ -68,6 +68,7 @@ import {
   type InitAndLoadResult,
   type CacheReplay,
   type ProjectionDelta,
+  type SetCounterWritesArgs,
 } from './protocol';
 import type { ReconcileNote } from './reconcile';
 import { ReadOnlyError, readWriteGate, setWriteGate, type WriteGateVerdict } from './writeGate';
@@ -215,6 +216,17 @@ function setKeyArgs():
 const ACTOR_PINNING_ENABLED = false;
 
 let docActor: string | null = null;
+/**
+ * The served Counter-write policy (#117 writer flip), retained like `docActor` and re-posted
+ * beside it on every realm the worker gets: `setFamilyKey`, the respawn re-drive and the inline
+ * re-drive. `null` = no policy has reached this device yet; the worker then uses
+ * `COUNTER_WRITES_DEFAULT`. Set by `setCounterWrites` from `counterWritesPolicy.ts`.
+ *
+ * ⚠️ NOT cleared by `reset()`. It is a device-wide policy served to the whole fleet, not realm
+ * state: a sign-out followed by a sign-in in the same page must still post it, and the registry
+ * observer hands a value over only when it changes, so nothing would re-supply it.
+ */
+let counterWrites: boolean | null = null;
 let currentFamilyId: string | null = null;
 let rehydrator: ((familyId: string) => Promise<void>) | null = null;
 let needsRehydrate = false;
@@ -626,6 +638,16 @@ async function enterInlineMode(reason: 'spawn-failed' | 'handshake-timeout'): Pr
       console.error('[docClient] inline setActor re-drive failed', e);
     }
   }
+  // The Counter policy rides with the actor (both are retained realm state the dead worker had
+  // and the inline realm does not). A fresh realm already holds the default, so `null` is skipped.
+  if (counterWrites !== null) {
+    try {
+      const args: SetCounterWritesArgs = { on: counterWrites };
+      await inlineExecutor('setCounterWrites', args);
+    } catch (e) {
+      reportCounterWritesPostFailed('inline', e);
+    }
+  }
   if (familyKey) {
     try {
       await inlineExecutor('setKey', setKeyArgs() ?? { key: familyKey, familyId: null });
@@ -767,6 +789,11 @@ async function spawn(): Promise<'worker' | 'inline'> {
   // worker. ⚠️ ACTOR FIRST — the rehydrator below loads the document, so an
   // actor posted after it has pinned nothing.
   if (docActor) postRaw({ cid: nextCid++, method: 'setActor', args: { actor: docActor } });
+  // The Counter policy beside the actor, before the rehydrate (a fresh worker holds the default).
+  if (counterWrites !== null) {
+    const args: SetCounterWritesArgs = { on: counterWrites };
+    postRaw({ cid: nextCid++, method: 'setCounterWrites', args });
+  }
   const keyArgs = setKeyArgs();
   if (keyArgs) postRaw({ cid: nextCid++, method: 'setKey', args: keyArgs });
   if (needsRehydrate && currentFamilyId && rehydrator) {
@@ -942,6 +969,9 @@ const RETRYABLE_METHODS = new Set([
   // deliberately NOT in JSON_SAFE — its arg is a plain string, and that set
   // means "args that could carry a Vue proxy".
   'setActor',
+  // #117: the same shape as `setActor`, a retained state post. Re-issuing it sets the same
+  // boolean, and its arg is a plain `{ on }` (not JSON_SAFE for the same reason).
+  'setCounterWrites',
   // ⚠️ `compactDoc` is deliberately ABSENT. A transparent re-issue after a
   // respawn would re-compact a document that has already been replaced, so the
   // second run would verify a compaction against itself and install a doc whose
@@ -1615,7 +1645,67 @@ export async function setFamilyKey(key: CryptoKey, familyId: string): Promise<vo
   // actor has to be in the realm before any of them can run.
   await request('setActor', { actor: docActor });
   if (superseded('set-actor')) return;
+  // #117: the served Counter policy, right after the actor and before the key, so it is in the
+  // realm before any write can reach `adjustField`. A failed post is reported and never stops a
+  // pod opening: the worker then keeps its current value (the default on a fresh realm).
+  await postCounterWrites('set-family-key');
+  if (superseded('set-counter-writes')) return;
   await request('setKey', setKeyArgs() ?? { key, familyId: familyKeyFamilyId });
+}
+
+/** Where a `setCounterWrites` post was attempted from, for the failure report. */
+type CounterWritesPostStage = 'live' | 'set-family-key' | 'inline';
+
+/**
+ * A `setCounterWrites` post that failed. Reported, never thrown: the policy is a rollout switch,
+ * and a failed post leaves the realm on its previous value (the default on a fresh one), which is
+ * the safe side. `warning`, not `critical`: no user action failed and no data is at risk.
+ */
+function reportCounterWritesPostFailed(stage: CounterWritesPostStage, e: unknown): void {
+  console.error(`[docClient] setCounterWrites post failed (${stage})`, e);
+  reportError({
+    surface: 'counter-policy',
+    message:
+      'Counter-write policy did not reach the doc worker; it keeps its previous value. ' +
+      'Check the setCounterWrites re-drive (setFamilyKey, respawn, inline) in docClient.ts.',
+    error: e,
+    severity: 'warning',
+    context: { action: 'post_failed', stage },
+  });
+}
+
+/** Post the retained policy to the live realm. Never throws (see the reporter above). */
+async function postCounterWrites(stage: CounterWritesPostStage): Promise<void> {
+  const args: SetCounterWritesArgs = { on: counterWrites };
+  try {
+    await request('setCounterWrites', args, { quiet: true });
+  } catch (e) {
+    reportCounterWritesPostFailed(stage, e);
+  }
+}
+
+/**
+ * Record the served Counter-write policy (#117 writer flip) and, in a live session, deliver it.
+ *
+ * Called by `counterWritesPolicy.ts` once per boot (the persisted value, or `null` for "never
+ * served") and again whenever the registry serves a different value. The value is RETAINED so
+ * `setFamilyKey` and both re-drives can post it; it is posted now ONLY when a family key is set,
+ * because `request` spawns the worker and a signed-out boot must not spawn one (the worker is
+ * first spawned at unlock). Never throws.
+ */
+export async function setCounterWrites(
+  on: boolean | null,
+  source: 'registry' | 'persisted' | 'default'
+): Promise<void> {
+  counterWrites = on;
+  logEvent({
+    level: 'info',
+    surface: 'counter-policy',
+    message: 'counter-write policy applied',
+    context: { action: 'applied', detail: `on=${String(on)},source=${source}` },
+  });
+  if (!familyKey) return;
+  await postCounterWrites('live');
 }
 
 /**
@@ -2373,6 +2463,7 @@ export function __resetDocClientForTesting(): void {
   familyKeyRaw = null;
   familyKeyFamilyId = null;
   docActor = null;
+  counterWrites = null;
   releaseActorLease();
   currentFamilyId = null;
   cacheProvenEmptyFor = null;

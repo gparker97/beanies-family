@@ -48,7 +48,7 @@ import { defineStore } from 'pinia';
 import { computed, ref, watch } from 'vue';
 import { TRIAL_DAYS } from '@beanies/brand/pricing';
 import type { Entitlement, EntitlementState, RegistryEntry } from '@/types/models';
-import { lookupFamilyResult, setRegistryEntryObserver } from '@/services/registry/registryService';
+import { addRegistryEntryObserver, lookupFamilyResult } from '@/services/registry/registryService';
 import { readEntitlementCache, writeEntitlementCache } from '@/services/billing/entitlementCache';
 import { docVersion, isDocLoaded } from '@/services/automerge/docService';
 import { setWriteGate } from '@/services/automerge/worker/writeGate';
@@ -380,7 +380,7 @@ export const useEntitlementStore = defineStore('entitlement', () => {
   }
 
   // ── Wiring ─────────────────────────────────────────────────────────────────
-  setRegistryEntryObserver(onRegistryEntry);
+  addRegistryEntryObserver(onRegistryEntry);
   // Phase 3: `docClient.mutate` asks this before every family-data write. Read at call time, so
   // it always reflects the current flag, answer and clock; `wouldBlock` feeds the dry-run soak.
   setWriteGate(() => ({ block: isReadOnly.value, wouldBlock: wouldBeReadOnly.value }));

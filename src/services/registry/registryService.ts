@@ -106,38 +106,47 @@ export type RegistryLookup =
   | { status: 'unavailable'; error?: unknown };
 
 /**
- * One observer of every successful registry GET (#95). `entitlementStore`
- * installs it so the entitlement block rides the lookups `syncStore` already
- * makes (four call sites, all funnelled through `lookupFamilyResult`) without
- * `syncStore` knowing entitlement exists. The same inversion as
- * `setLocalChangeHandler` in `docClient.ts`: this module imports no store.
+ * The observers of every successful registry GET. `entitlementStore` (#95)
+ * reads the entitlement block and `counterWritesPolicy` (#117) reads
+ * `dataPolicy`, so both ride the lookups `syncStore` already makes (four call
+ * sites, all funnelled through `lookupFamilyResult`) without `syncStore`
+ * knowing either exists. The same inversion as `setLocalChangeHandler` in
+ * `docClient.ts`: this module imports no store.
  */
 type RegistryEntryObserver = (entry: RegistryEntry) => void;
-let registryEntryObserver: RegistryEntryObserver | null = null;
+const registryEntryObservers = new Set<RegistryEntryObserver>();
 
-/** Install (or clear, with `null`) the observer of every `found` lookup. */
-export function setRegistryEntryObserver(fn: RegistryEntryObserver | null): void {
-  registryEntryObserver = fn;
+/**
+ * Add an observer of every `found` lookup. Returns its remover; adding the
+ * same function twice registers it once.
+ */
+export function addRegistryEntryObserver(fn: RegistryEntryObserver): () => void {
+  registryEntryObservers.add(fn);
+  return () => {
+    registryEntryObservers.delete(fn);
+  };
 }
 
 /**
- * Hand a found entry to the observer. An observer that throws must never turn
- * a successful lookup into a failed one: the canonical-pod check and
- * recovery-from-registry depend on this answer, entitlement does not.
+ * Hand a found entry to every observer. An observer that throws must never
+ * turn a successful lookup into a failed one, nor keep the entry from the
+ * observers after it: the canonical-pod check and recovery-from-registry depend
+ * on this answer, entitlement and the Counter policy do not.
  */
 function notifyObserver(entry: RegistryEntry): void {
-  if (!registryEntryObserver) return;
-  try {
-    registryEntryObserver(entry);
-  } catch (err) {
-    console.warn('[registry] entry observer threw; the lookup result is unaffected', err);
-    logEvent({
-      level: 'warn',
-      surface: 'registry',
-      message: 'registry entry observer threw',
-      context: { action: 'observer_failed' },
-      error: err,
-    });
+  for (const observer of registryEntryObservers) {
+    try {
+      observer(entry);
+    } catch (err) {
+      console.warn('[registry] entry observer threw; the lookup result is unaffected', err);
+      logEvent({
+        level: 'warn',
+        surface: 'registry',
+        message: 'registry entry observer threw',
+        context: { action: 'observer_failed' },
+        error: err,
+      });
+    }
   }
 }
 

@@ -23,4 +23,8 @@ export const STORAGE_KEYS = {
   /** Who Owns What: the deal pile's phone swipe hint, `show` until the first swipe, then
    *  `seen`. Device-local; not read by the `index.html` bootstrap. */
   WHO_OWNS_WHAT_SWIPE_HINT: 'beanies:whoOwnsWhatSwipeHint',
+  /** #117: the last Counter-write policy the registry served (`dataPolicy.counterWrites`),
+   *  so a boot before the registry answers uses it. Device-local, never in the pod; not read
+   *  by the `index.html` bootstrap. */
+  COUNTER_WRITES: 'beanies:counterWrites',
 } as const;

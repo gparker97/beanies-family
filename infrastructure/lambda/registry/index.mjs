@@ -25,6 +25,9 @@ const EVENTS_TABLES = {
   dev: process.env.EVENTS_DEV_TABLE_NAME || process.env.EVENTS_TABLE_NAME,
 };
 const API_KEY = process.env.REGISTRY_API_KEY;
+// The served Counter-write policy (#117 writer flip). Terraform `counter_writes_enabled` sets it;
+// only the exact string "true" turns writes on, so an unset or mistyped value stays off.
+const COUNTER_WRITES = process.env.COUNTER_WRITES_ENABLED === 'true';
 const ALLOWED_ORIGINS = (process.env.CORS_ORIGIN || 'https://beanies.family')
   .split(',')
   .map((o) => o.trim());
@@ -479,7 +482,13 @@ export async function handler(event) {
       // not part of the app's wire contract, so its shape can change without touching the app.
       const publicRow = { ...row };
       delete publicRow.attributionInferred;
-      return response(200, { ...publicRow, entitlement }, event);
+      // `dataPolicy` (#117) is a response-only field like `entitlement`: the client persists it
+      // device-locally and hands it to the doc worker; it is never a row attribute.
+      return response(
+        200,
+        { ...publicRow, entitlement, dataPolicy: { counterWrites: COUNTER_WRITES } },
+        event
+      );
     }
 
     if (method === 'PUT') {

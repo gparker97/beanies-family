@@ -1416,6 +1416,59 @@ describe('registry PUT — an empty string never latches a write-once identity',
   });
 });
 
+describe('registry GET: dataPolicy (#117 served Counter-write policy)', () => {
+  const ROW = {
+    provider: 'google_drive',
+    fileId: 'FILE-1',
+    createdAt: '2026-10-01T00:00:00.000Z',
+    ownerEmail: 'owner@example.com',
+  };
+
+  // The policy is read once at module load, like the Lambda's other env reads, so each env value
+  // needs a fresh import. The file-level handler is restored after every test.
+  let fileHandler;
+  beforeAll(() => {
+    fileHandler = handler;
+  });
+  afterEach(() => {
+    handler = fileHandler;
+    delete process.env.COUNTER_WRITES_ENABLED;
+  });
+
+  async function loadWith(value) {
+    if (value === undefined) delete process.env.COUNTER_WRITES_ENABLED;
+    else process.env.COUNTER_WRITES_ENABLED = value;
+    vi.resetModules();
+    ({ handler } = await import('./index.mjs'));
+  }
+
+  it('serves counterWrites: true when COUNTER_WRITES_ENABLED is "true"', async () => {
+    await loadWith('true');
+    const { res, body } = await get(ROW);
+    expect(res.statusCode).toBe(200);
+    expect(body.dataPolicy).toEqual({ counterWrites: true });
+  });
+
+  it('serves counterWrites: false when COUNTER_WRITES_ENABLED is "false"', async () => {
+    await loadWith('false');
+    const { res, body } = await get(ROW);
+    expect(res.statusCode).toBe(200);
+    expect(body.dataPolicy).toEqual({ counterWrites: false });
+  });
+
+  it('serves counterWrites: false when COUNTER_WRITES_ENABLED is unset', async () => {
+    await loadWith(undefined);
+    expect((await get(ROW)).body.dataPolicy).toEqual({ counterWrites: false });
+  });
+
+  it('carries no dataPolicy on a 404 (no row to observe)', async () => {
+    await loadWith('true');
+    const { res, body } = await get(null);
+    expect(res.statusCode).toBe(404);
+    expect(body.dataPolicy).toBeUndefined();
+  });
+});
+
 describe('registry GET: entitlement (#95)', () => {
   const ROW = {
     provider: 'google_drive',

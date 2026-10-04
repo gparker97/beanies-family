@@ -13,7 +13,7 @@
  *     and is dropped by enough intermediaries to be a bad bet, and when the
  *     server starts refusing, a caller that sends none is refused every time.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 const { logEvent } = vi.hoisted(() => ({ logEvent: vi.fn() }));
 vi.mock('@/services/telemetry', () => ({ logEvent }));
@@ -24,7 +24,7 @@ import {
   removeFamily,
   registerFamily,
   registerFamilyOrThrow,
-  setRegistryEntryObserver,
+  addRegistryEntryObserver,
   type RegistryWritePayload,
 } from '../registryService';
 
@@ -244,30 +244,52 @@ describe('registry DELETE — the writer id rides the query string', () => {
   });
 });
 
-describe('registry GET: the entry observer (#95)', () => {
-  // `entitlementStore` learns the family's plan from lookups other callers make. The seam must
-  // see every successful one and must never be able to break one.
+describe('registry GET: the entry observers (#95, #117)', () => {
+  // `entitlementStore` learns the family's plan, and `counterWritesPolicy` the Counter-write
+  // policy, from lookups other callers make. The seam must hand every successful one to every
+  // observer and must never be able to break one.
+  const removers: Array<() => void> = [];
+  function observe(fn: (e: unknown) => void): void {
+    removers.push(addRegistryEntryObserver(fn));
+  }
+
   beforeEach(() => {
     vi.clearAllMocks();
-    setRegistryEntryObserver(null);
+  });
+  afterEach(() => {
+    while (removers.length) removers.pop()!();
   });
 
   const entry = { familyId: FAMILY, provider: 'google_drive', updatedAt: '2026-09-30' };
 
-  it('hands every found entry to the observer', async () => {
+  it('hands every found entry to every observer', async () => {
     global.fetch = okFetch(entry);
-    const seen = vi.fn();
-    setRegistryEntryObserver(seen);
+    const first = vi.fn();
+    const second = vi.fn();
+    observe(first);
+    observe(second);
 
     const r = await lookupFamilyResult(FAMILY);
 
     expect(r).toEqual({ status: 'found', entry });
-    expect(seen).toHaveBeenCalledWith(entry);
+    expect(first).toHaveBeenCalledWith(entry);
+    expect(second).toHaveBeenCalledWith(entry);
   });
 
-  it('does not call the observer for an absent or unavailable family', async () => {
+  it('a removed observer is no longer called', async () => {
+    global.fetch = okFetch(entry);
     const seen = vi.fn();
-    setRegistryEntryObserver(seen);
+    const remove = addRegistryEntryObserver(seen);
+    remove();
+
+    await lookupFamilyResult(FAMILY);
+
+    expect(seen).not.toHaveBeenCalled();
+  });
+
+  it('does not call an observer for an absent or unavailable family', async () => {
+    const seen = vi.fn();
+    observe(seen);
 
     global.fetch = failFetch(404);
     expect(await lookupFamilyResult(FAMILY)).toEqual({ status: 'absent' });
@@ -277,16 +299,19 @@ describe('registry GET: the entry observer (#95)', () => {
     expect(seen).not.toHaveBeenCalled();
   });
 
-  it('a throwing observer never turns a found lookup into a failure, and is logged', async () => {
+  it('a throwing observer never fails the lookup nor starves the next observer, and is logged', async () => {
     global.fetch = okFetch(entry);
-    setRegistryEntryObserver(() => {
+    const after = vi.fn();
+    observe(() => {
       throw new Error('observer bug');
     });
+    observe(after);
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     const r = await lookupFamilyResult(FAMILY);
 
     expect(r).toEqual({ status: 'found', entry });
+    expect(after).toHaveBeenCalledWith(entry);
     expect(logEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         level: 'warn',

@@ -2356,6 +2356,13 @@ export interface RegistryEntry {
    * keeps its cached answer in both cases (`entitlementStore`).
    */
   entitlement?: Entitlement | null;
+  /**
+   * #117: the served data-layer policy, set by Terraform `counter_writes_enabled` through the
+   * registry Lambda's env (never stored in the row). `counterWrites` turns Counter adjustments
+   * on for every device. Absent from a Lambda older than the writer flip; the client then keeps
+   * its last persisted value (`counterWritesPolicy.ts`).
+   */
+  dataPolicy?: { counterWrites: boolean };
   updatedAt: ISODateString;
 }
 

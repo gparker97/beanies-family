@@ -101,6 +101,7 @@ import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useGoalsStore } from '@/stores/goalsStore';
 import { useMemberFilterStore } from '@/stores/memberFilterStore';
 import { useEntitlementStore } from '@/stores/entitlementStore';
+import { installCounterWritesPolicy } from '@/services/registry/counterWritesPolicy';
 import { useRecurringStore } from '@/stores/recurringStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTodoStore } from '@/stores/todoStore';
@@ -178,6 +179,9 @@ const memberFilterStore = useMemberFilterStore();
 // observer and the hourly poll install in prod. A lazy first use from a flagged component would
 // mean no dry-run soak at all. Nothing reads it in this file.
 useEntitlementStore();
+// #117: the served Counter-write policy. Installed beside the entitlement observer, before any
+// unlock can reach `setFamilyKey`, so the worker gets the persisted value with the key.
+installCounterWritesPolicy();
 
 const authStore = useAuthStore();
 const notificationsStore = useNotificationsStore();

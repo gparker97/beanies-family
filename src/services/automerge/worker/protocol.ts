@@ -332,6 +332,13 @@ export type PatchSettingsArgs = {
 
 // ─── Envelope ────────────────────────────────────────────────────────────────
 
+/**
+ * `setCounterWrites` (#117 writer flip): the served Counter-write policy, retained by `docClient`
+ * and re-posted with `setActor` at the same three sites. `null` means no policy has ever reached
+ * this device, and the worker falls back to `COUNTER_WRITES_DEFAULT`.
+ */
+export type SetCounterWritesArgs = { on: boolean | null };
+
 /** A request from main → worker. `method` names the handler; `args` is its input. */
 export interface RpcRequest {
   cid: number;

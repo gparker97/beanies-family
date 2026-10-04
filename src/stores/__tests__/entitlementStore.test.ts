@@ -38,8 +38,9 @@ const h = vi.hoisted(() => ({
 vi.mock('@/services/telemetry', () => ({ logEvent: h.logEvent }));
 vi.mock('@/services/registry/registryService', () => ({
   lookupFamilyResult: h.lookupFamilyResult,
-  setRegistryEntryObserver: (fn: (e: unknown) => void) => {
+  addRegistryEntryObserver: (fn: (e: unknown) => void) => {
     h.observer = fn;
+    return () => {};
   },
 }));
 vi.mock('@/config/flags', () => ({ isFlagEnabled: () => h.flagOn }));

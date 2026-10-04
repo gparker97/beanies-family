@@ -3,6 +3,7 @@ import { reactive, isReactive } from 'vue';
 import { CorruptPayloadError, PayloadTooLargeError } from '@/types/sync';
 import { PodLineageError, lineageBlockError } from '@/services/sync/podLineage';
 import { serializeError, type RpcRequest } from '../protocol';
+import { generateFamilyKey } from '@/services/crypto/familyKeyService';
 
 vi.mock('@/composables/useToast', () => ({ showToast: vi.fn() }));
 vi.mock('@/utils/perfTiming', () => ({ record: vi.fn() }));
@@ -46,6 +47,8 @@ import {
   setCacheReleasedHandler,
   setCachePersistFailedHandler,
   receiveSignal,
+  setFamilyKey,
+  setCounterWrites,
   type DocWorkerLike,
 } from '../docClient';
 
@@ -1544,5 +1547,151 @@ describe('#100: cache release + the delete outcome', () => {
         context: { action: 'clear-cache', error_code: 'unknown-result' },
       })
     );
+  });
+});
+
+describe('docClient — the served Counter-write policy (#117 writer flip)', () => {
+  beforeEach(() => {
+    __resetDocClientForTesting();
+    vi.clearAllMocks();
+  });
+
+  /** Answers every request with an empty success, like a realm that accepts all state posts. */
+  const acceptAll: Responder = (req) => ({ cid: req.cid, ok: true, result: null });
+  const methods = (fw: FakeWorker | undefined) => fw?.posted.map((m) => m.method) ?? [];
+  const policyPosts = (fw: FakeWorker | undefined) =>
+    fw?.posted.filter((m) => m.method === 'setCounterWrites').map((m) => m.args) ?? [];
+  const policyFailures = () =>
+    vi.mocked(reportError).mock.calls.filter(([e]) => e.surface === 'counter-policy');
+
+  it('retains the value and logs it, but never spawns a worker before a family key', async () => {
+    const spawn = vi.fn(() => new FakeWorker());
+    setWorkerFactory(spawn);
+
+    await setCounterWrites(true, 'persisted');
+
+    expect(spawn).not.toHaveBeenCalled();
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'info',
+        surface: 'counter-policy',
+        context: { action: 'applied', detail: 'on=true,source=persisted' },
+      })
+    );
+  });
+
+  it('posts the retained value in setFamilyKey, after setActor and before setKey', async () => {
+    const { created } = useWorkers([acceptAll]);
+    await setCounterWrites(true, 'registry');
+
+    await setFamilyKey(await generateFamilyKey(), 'fam-1');
+
+    // The spawn this call triggers re-posts retained state first (as it does the key), then
+    // setFamilyKey's own sequence runs: setActor, setCounterWrites, setKey.
+    const order = methods(created[0]);
+    const posts = policyPosts(created[0]);
+    expect(posts.length).toBeGreaterThan(0);
+    expect(posts.every((a) => (a as { on: boolean }).on === true)).toBe(true);
+    const actorAt = order.indexOf('setActor');
+    const policyAt = order.lastIndexOf('setCounterWrites');
+    expect(actorAt).toBeGreaterThan(-1);
+    expect(actorAt).toBeLessThan(policyAt);
+    expect(policyAt).toBeLessThan(order.lastIndexOf('setKey'));
+  });
+
+  it('posts null (the worker default) in setFamilyKey when no policy was ever served', async () => {
+    const { created } = useWorkers([acceptAll]);
+    await setFamilyKey(await generateFamilyKey(), 'fam-1');
+    expect(policyPosts(created[0])).toEqual([{ on: null }]);
+  });
+
+  it('posts a change made while the session is live', async () => {
+    const { created } = useWorkers([acceptAll]);
+    await setFamilyKey(await generateFamilyKey(), 'fam-1');
+
+    await setCounterWrites(true, 'registry');
+
+    expect(policyPosts(created[0])).toEqual([{ on: null }, { on: true }]);
+  });
+
+  it('re-drives the retained value on a respawned worker, before its setKey', async () => {
+    const { created } = useWorkers([acceptAll, acceptAll]);
+    await setCounterWrites(false, 'persisted');
+    await setFamilyKey(await generateFamilyKey(), 'fam-1');
+
+    created[0]!.onerror?.(new Error('reaped'));
+    await getHeads();
+
+    const order = methods(created[1]);
+    expect(policyPosts(created[1])).toEqual([{ on: false }]);
+    expect(order.indexOf('setCounterWrites')).toBeLessThan(order.indexOf('setKey'));
+  });
+
+  it('re-drives the retained value on the inline fallback, before the key', async () => {
+    const calls: Array<{ method: string; args: unknown }> = [];
+    setInlineExecutor(async (method, args) => {
+      calls.push({ method, args });
+      return {};
+    });
+    setWorkerFactory(() => {
+      throw new Error('no workers here');
+    });
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    await setCounterWrites(true, 'persisted');
+
+    await setFamilyKey(await generateFamilyKey(), 'fam-1');
+
+    const order = calls.map((c) => c.method);
+    const first = order.indexOf('setCounterWrites');
+    expect(first).toBeGreaterThan(-1);
+    expect(calls.find((c) => c.method === 'setCounterWrites')?.args).toEqual({ on: true });
+    expect(first).toBeLessThan(order.indexOf('setKey'));
+    setInlineExecutor(null);
+  });
+
+  it('a failed post is reported as a counter-policy warning and never rejects', async () => {
+    useWorkers([
+      (req) =>
+        req.method === 'setCounterWrites'
+          ? { cid: req.cid, ok: false, error: serializeError(new Error('worker said no')) }
+          : acceptAll(req),
+    ]);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    // The pod still opens: the key reaches the worker even though the policy post failed.
+    await expect(setFamilyKey(await generateFamilyKey(), 'fam-1')).resolves.toBeUndefined();
+    await expect(setCounterWrites(true, 'registry')).resolves.toBeUndefined();
+
+    const failures = policyFailures();
+    expect(failures).toHaveLength(2);
+    expect(failures[0]![0]).toMatchObject({
+      severity: 'warning',
+      context: { action: 'post_failed', stage: 'set-family-key' },
+    });
+    expect(failures[1]![0]).toMatchObject({ context: { stage: 'live' } });
+    expect(showToast).not.toHaveBeenCalled();
+  });
+
+  it('a failed inline re-drive is reported, not swallowed', async () => {
+    setInlineExecutor(async (method) => {
+      if (method === 'setCounterWrites') throw new Error('inline realm refused');
+      return {};
+    });
+    setWorkerFactory(() => {
+      throw new Error('no workers here');
+    });
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    await setCounterWrites(true, 'persisted');
+
+    await setFamilyKey(await generateFamilyKey(), 'fam-1');
+
+    expect(policyFailures().map(([e]) => (e.context as { stage: string }).stage)).toContain(
+      'inline'
+    );
+    setInlineExecutor(null);
+  });
+
+  it('is an idempotent state post, safe to replay after a respawn', () => {
+    expect(__RETRYABLE_METHODS_FOR_TESTING.has('setCounterWrites')).toBe(true);
   });
 });
