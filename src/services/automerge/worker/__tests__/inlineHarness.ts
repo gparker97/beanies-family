@@ -17,7 +17,6 @@ import {
 } from '../docClient';
 import { __resetApplyAndProjectForTesting } from '../applyAndProject';
 import { __resetCacheForTesting } from '../cache';
-import { setDeviceWriterId } from '../docActor';
 import { resetProjection } from '../../projection';
 import type { MutationOp } from '../protocol';
 
@@ -27,9 +26,6 @@ export async function installInlineBackend(): Promise<void> {
   __resetApplyAndProjectForTesting();
   __resetInlineBridgeForTesting();
   __resetCacheForTesting();
-  // The cache never opens here, so nothing mints the device writer id (#117 Phase 2): set the
-  // one this realm's device would have, or a Counter write with writes on would throw.
-  setDeviceWriterId('device-inline-test');
   resetProjection();
   setInlineExecutor(inlineExecutor);
   // Same wiring as `bootstrap.ts`: inline signals reach docClient's one handler.

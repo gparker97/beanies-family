@@ -48,7 +48,7 @@ vi.mock('@/utils/firstJsonDifference', async (importOriginal) => {
 });
 
 const cache = await import('../cache');
-const { COUNTER_WRITES_ENABLED, __setCounterWritesForTesting } = await import('../counterFields');
+const { setCounterWrites } = await import('../counterFields');
 const { setDocActor, resetDocActor, setDeviceWriterId } = await import('../docActor');
 const {
   configure,
@@ -281,11 +281,11 @@ describe('compactDoc folds the Counters (#117 Phase 2)', () => {
     mutate({ op: 'increment', collection: 'accounts', id: 'A', field: 'balance', delta });
 
   beforeEach(() => {
-    __setCounterWritesForTesting(true);
+    setCounterWrites(true);
     setDeviceWriterId('device-compact'); // what an opened cache posts
   });
   afterEach(() => {
-    __setCounterWritesForTesting(COUNTER_WRITES_ENABLED);
+    setCounterWrites(null);
     setDeviceWriterId(null);
   });
 
@@ -369,7 +369,7 @@ describe('compactDoc folds the Counters (#117 Phase 2)', () => {
   });
 
   it('a dormant pod: the source is the document as it stands plus the lineage, with no ledger', () => {
-    __setCounterWritesForTesting(false);
+    setCounterWrites(false);
     initDoc();
     mutate({ op: 'set', collection: 'accounts', id: 'A', entity: { id: 'A', balance: 100 } });
     inc(-20.25); // the dormant path writes the absolute and never touches the map

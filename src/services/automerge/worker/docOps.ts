@@ -32,7 +32,7 @@ import { bufferToBase64, base64ToBuffer } from '@/utils/encoding';
 import { CorruptPayloadError, PayloadTooLargeError, PayloadLoadError } from '@/types/sync';
 import type { PayloadLoadStep } from '@/types/sync';
 import { isAllocationFailure } from '@/utils/isAllocationFailure';
-import { docInitOpts, counterWriterId, deviceWriterIdFor } from './docActor';
+import { docInitOpts } from './docActor';
 import { MIGRATION_CHANGES } from './migrationChanges';
 import { rebaseBlockingTransactionConflict } from './transactionFields';
 import {
@@ -1218,13 +1218,13 @@ export function applyMutation(
   doc: Doc,
   op: MutationOp
 ): { doc: Doc; result: unknown; delta: ProjectionDelta; notes: ReconcileNote[] } {
-  // The Counter writer id (device + actor): read once, before the change (the change keeps
-  // the actor).
+  // The Counter writer id (the actor alone, #117 writer flip): read once, before the change
+  // (the change keeps the actor).
   const sink: MutationSink = {
     deltas: [],
     results: [],
     notes: [],
-    writerId: counterWriterId(Automerge.getActorId(doc)),
+    writerId: Automerge.getActorId(doc),
   };
   const after = Automerge.change(doc, (d) => mutateDraft(d as FamilyDocument, op, sink));
   const out: ProjectionDelta[] = [];

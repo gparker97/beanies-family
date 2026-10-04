@@ -1,8 +1,9 @@
 // @vitest-environment node
 /**
  * The Counter-field module (#117 Phase 2, plan `docs/plans/2026-10-03-crdt-counters-117-phase-2.md`
- * §A). Pure table, per-currency scale, fold/unfold, the one write primitive in both switch
- * positions, the compaction fold and the rebase growth pass. The Automerge behaviours these rest
+ * §A; writer flip, plan `docs/plans/2026-10-04-crdt-counters-117-writer-flip.md` §A-D). Pure
+ * table, per-currency scale, fold/unfold, the one write primitive in both switch positions,
+ * carry-register keys, the bounded compaction ledger, rebase knowledge and the carry pass. The Automerge behaviours these rest
  * on are pinned separately in `automergeSemantics.test.ts` (probes e'..o).
  *
  * Fixture entities carry no `currency` unless a test says otherwise, so they are at the default
@@ -17,14 +18,17 @@ import { StaleBuildCounterError } from '@/types/sync';
 import { calculateExtraPayment } from '@/utils/loanPayment';
 import {
   COUNTER_FIELDS,
-  COUNTER_WRITES_ENABLED,
+  COUNTER_WRITES_DEFAULT,
+  LEDGER_WINDOW,
   MAX_COUNTER_DECIMALS,
   MIN_COUNTER_DECIMALS,
-  __setCounterWritesForTesting,
   adjustField,
+  baselineKnowledge,
+  carryKeyFor,
   counterGrowthOps,
   counterKey,
   counterStats,
+  counterWritesOn,
   decimalsFor,
   fieldDecimals,
   foldDoc,
@@ -33,22 +37,27 @@ import {
   foldValue,
   fromMinor,
   isCounterCollection,
+  ledgerSeq,
+  ledgerValue,
   parseCounterKey,
   resolveField,
+  setCounterWrites,
   sigma,
+  targetKnowledge,
   toMinor,
   unfoldPatch,
   type CounterCollection,
+  type Knowledge,
 } from '../counterFields';
 import { migrateDoc } from '../docOps';
 
 type Doc = Automerge.Doc<FamilyDocument>;
 type AnyRec = Record<string, unknown>;
 
-/** This test's device and its writer segment (`${device}:${actor}`). */
-const W1 = 'dev:w1';
+/** This test's writer segment: an actor id (the actor is the whole writer, #117 writer flip). */
+const W1 = 'w1';
 
-afterEach(() => __setCounterWritesForTesting(COUNTER_WRITES_ENABLED));
+afterEach(() => setCounterWrites(null));
 
 /** A migrated doc holding one account, goal and loan asset (plus a BTC account), plus `edit`. */
 function docWith(edit?: (d: FamilyDocument) => void): Doc {
@@ -205,18 +214,20 @@ describe('foldValue', () => {
 });
 
 describe('counterKey / parseCounterKey', () => {
-  it('round-trips every table field, the scale and a device:actor writer', () => {
+  it('round-trips every table field, the scale and an actor writer', () => {
     for (const [collection, fields] of Object.entries(COUNTER_FIELDS)) {
       for (const f of fields) {
         const field = f.abs.join('.');
-        const key = counterKey(collection, 'id-1', field, 6, 'dev-1:abc123');
-        expect(key).toBe(`${collection}/id-1/${field}@6/dev-1:abc123`);
+        const key = counterKey(collection, 'id-1', field, 6, 'abc123');
+        expect(key).toBe(`${collection}/id-1/${field}@6/abc123`);
         expect(parseCounterKey(key)).toEqual({
           collection,
           id: 'id-1',
           field,
           decimals: 6,
-          writer: 'dev-1:abc123',
+          writer: 'abc123',
+          carry: null,
+          canonical: key,
         });
       }
     }
@@ -229,7 +240,56 @@ describe('counterKey / parseCounterKey', () => {
       field: 'balance',
       decimals: 2,
       writer: 'd:w',
+      carry: null,
+      canonical: 'accounts/a/b@c/balance@2/d:w',
     });
+  });
+
+  it('parses a carry register: carry.of, carry.seq and the canonical key it stands for', () => {
+    expect(parseCounterKey('accounts/a/b/balance@2/carry.abc123.7')).toEqual({
+      collection: 'accounts',
+      id: 'a/b',
+      field: 'balance',
+      decimals: 2,
+      writer: 'carry.abc123.7',
+      carry: { of: 'abc123', seq: 7 },
+      canonical: 'accounts/a/b/balance@2/abc123',
+    });
+    // `of` is everything up to the LAST dot; a segment with no trailing digits is no carry.
+    expect(parseCounterKey('goals/G/currentAmount@2/carry.x.y.12')?.carry).toEqual({
+      of: 'x.y',
+      seq: 12,
+    });
+    expect(parseCounterKey('goals/G/currentAmount@2/carry.x')?.carry).toBeNull();
+    expect(parseCounterKey('goals/G/currentAmount@2/carry.x.')?.carry).toBeNull();
+  });
+
+  it('carryKeyFor round-trips through parseCounterKey and is stamped with the generation', () => {
+    const canonical = counterKey('assets', 'L', 'loan.outstandingBalance', 8, 'abc123');
+    const name = carryKeyFor(canonical, 4);
+    expect(name).toBe('assets/L/loan.outstandingBalance@8/carry.abc123.4');
+    expect(parseCounterKey(name)).toMatchObject({
+      collection: 'assets',
+      id: 'L',
+      field: 'loan.outstandingBalance',
+      decimals: 8,
+      carry: { of: 'abc123', seq: 4 },
+      canonical,
+    });
+    // Two generations, two names: the name-keyed ledger can never overwrite one with another.
+    expect(carryKeyFor(canonical, 5)).not.toBe(name);
+    // A carried carry is re-stamped from its canonical key, never nested.
+    expect(carryKeyFor(parseCounterKey(name)!.canonical, 5)).toBe(
+      'assets/L/loan.outstandingBalance@8/carry.abc123.5'
+    );
+    expect(carryKeyFor(canonical, 0)).toMatch(/carry\.abc123\.0$/);
+  });
+
+  it('carryKeyFor refuses a register, an unparseable key and a bad generation', () => {
+    expect(() => carryKeyFor('accounts/A/balance@2/carry.x.1', 2)).toThrow(/canonical/);
+    expect(() => carryKeyFor('garbage', 2)).toThrow(/canonical/);
+    expect(() => carryKeyFor('accounts/A/balance@2/x', -1)).toThrow(/non-negative/);
+    expect(() => carryKeyFor('accounts/A/balance@2/x', 1.5)).toThrow(/non-negative/);
   });
 
   it('returns null for unparseable keys and for fields this build lacks', () => {
@@ -250,6 +310,8 @@ describe('counterKey / parseCounterKey', () => {
 
   it('counterKey refuses a key that could not parse back, or an unwritable scale', () => {
     expect(() => counterKey('accounts', 'A', 'balance', 2, 'a/b')).toThrow(/must not contain/);
+    // The carry-register namespace is closed to increments (rule 5).
+    expect(() => counterKey('accounts', 'A', 'balance', 2, 'carry.x.1')).toThrow(/carry-register/);
     expect(() => counterKey('accounts', '', 'balance', 2, 'w')).toThrow(/non-empty/);
     expect(() => counterKey('accounts', 'A', 'nope', 2, 'w')).toThrow(/COUNTER_FIELDS/);
     expect(() => counterKey('accounts', 'A', 'balance', 1, 'w')).toThrow(/decimals/);
@@ -320,7 +382,7 @@ describe('foldIndex / sigma', () => {
   });
 
   it('reads live Counters from a document', () => {
-    __setCounterWritesForTesting(true);
+    setCounterWrites(true);
     const doc = docWith((d) => adjustField(d, 'accounts', 'A', 'balance', -20.25, W1));
     expect(sigma(foldIndex(doc), 'accounts', 'A', 'balance')).toBe(-20.25);
   });
@@ -501,7 +563,7 @@ describe('adjustField', () => {
   const read = (doc: Doc) => JSON.parse(JSON.stringify(doc)) as AnyRec;
 
   it("writes on: creates the writer's key at the entity scale, increments, leaves the absolute", () => {
-    __setCounterWritesForTesting(true);
+    setCounterWrites(true);
     let doc = docWith((d) => adjustField(d, 'accounts', 'A', 'balance', -20.25, W1));
     doc = Automerge.change(doc, (d) => adjustField(d, 'accounts', 'A', 'balance', -0.5, W1));
     doc = Automerge.change(doc, (d) =>
@@ -510,15 +572,15 @@ describe('adjustField', () => {
     doc = Automerge.change(doc, (d) => adjustField(d, 'accounts', 'BTC', 'balance', 0.00004, W1));
     expect((doc.accounts.A as Account).balance).toBe(100);
     expect(read(doc).counterDeltas).toEqual({
-      'accounts/A/balance@2/dev:w1': -2075,
-      'assets/L/loan.outstandingBalance@2/dev:w1': -1000,
-      'accounts/BTC/balance@8/dev:w1': 4000,
+      'accounts/A/balance@2/w1': -2075,
+      'assets/L/loan.outstandingBalance@2/w1': -1000,
+      'accounts/BTC/balance@8/w1': 4000,
     });
-    expect(doc.counterDeltas['accounts/A/balance@2/dev:w1']).toBeInstanceOf(Automerge.Counter);
+    expect(doc.counterDeltas['accounts/A/balance@2/w1']).toBeInstanceOf(Automerge.Counter);
   });
 
   it('writes on: throws when the map is missing (migrateDoc did not run)', () => {
-    __setCounterWritesForTesting(true);
+    setCounterWrites(true);
     const unmigrated = Automerge.change(Automerge.init<FamilyDocument>(), (d) => {
       (d as unknown as AnyRec).accounts = { A: { id: 'A', balance: 1 } };
     });
@@ -528,7 +590,7 @@ describe('adjustField', () => {
   });
 
   it('writes off: rounded to the entity scale on the absolute, never touching the map', () => {
-    __setCounterWritesForTesting(false);
+    setCounterWrites(false);
     const doc = docWith((d) => {
       adjustField(d, 'accounts', 'A', 'balance', -20.25, W1);
       adjustField(d, 'goals', 'G', 'currentAmount', 0.1, W1);
@@ -539,7 +601,7 @@ describe('adjustField', () => {
   });
 
   it('writes off: a 0.00004 BTC delta moves an 8-decimal balance, and keeps all eight', () => {
-    __setCounterWritesForTesting(false);
+    setCounterWrites(false);
     let doc = docWith((d) => adjustField(d, 'accounts', 'BTC', 'balance', 0.00004, W1));
     expect((doc.accounts.BTC as Account).balance).toBe(0.50004);
     doc = Automerge.change(doc, (d) =>
@@ -549,7 +611,7 @@ describe('adjustField', () => {
   });
 
   it('writes off: an absolute past the integer headroom takes a float add, never a throw', () => {
-    __setCounterWritesForTesting(false);
+    setCounterWrites(false);
     const huge = 2e14; // ×10^2 is not a safe integer; today's `cur + delta` accepted it
     const doc = Automerge.change(
       docWith((d) => {
@@ -565,7 +627,7 @@ describe('adjustField', () => {
   });
 
   it("writes off: the field's floor holds on the WRITTEN value, as today's goal write did", () => {
-    __setCounterWritesForTesting(false);
+    setCounterWrites(false);
     // A stored negative goal amount from pre-Phase-2 history. Today: `max(0, -30 + 10)` = 0.
     const doc = Automerge.change(
       docWith((d) => {
@@ -582,7 +644,7 @@ describe('adjustField', () => {
   });
 
   it('writes off: a loan payment lands on round2 newBalance exactly, where a float add misses', () => {
-    __setCounterWritesForTesting(false);
+    setCounterWrites(false);
     const cur = 394.71;
     const res = calculateExtraPayment(cur, 393.01);
     const delta = res.newBalance - cur;
@@ -599,7 +661,7 @@ describe('adjustField', () => {
 
   it('both modes fold to the same value', () => {
     const run = (on: boolean, id: string, delta: number) => {
-      __setCounterWritesForTesting(on);
+      setCounterWrites(on);
       const doc = docWith((d) => adjustField(d, 'accounts', id, 'balance', delta, W1));
       const acct = JSON.parse(JSON.stringify(doc.accounts[id])) as AnyRec;
       return foldEntity('accounts', id, acct, foldIndex(doc)).balance;
@@ -611,7 +673,7 @@ describe('adjustField', () => {
   });
 
   it('records a Counter write in the index it is handed, as a rebuild would', () => {
-    __setCounterWritesForTesting(true);
+    setCounterWrites(true);
     let recorded: number | null = null;
     const doc = docWith((d) => {
       const index = foldIndex(d);
@@ -624,7 +686,7 @@ describe('adjustField', () => {
 
   it('a zero adjustment (at the entity scale) writes nothing, in either mode', () => {
     for (const on of [true, false]) {
-      __setCounterWritesForTesting(on);
+      setCounterWrites(on);
       const origin = docWith();
       const after = Automerge.change(origin, (d) =>
         adjustField(d, 'accounts', 'A', 'balance', 0.001, W1)
@@ -635,7 +697,7 @@ describe('adjustField', () => {
 
   it('throws for a missing entity, a missing loan, an unknown field and a NaN delta', () => {
     for (const on of [true, false]) {
-      __setCounterWritesForTesting(on);
+      setCounterWrites(on);
       const tryAdjust = (edit: (d: FamilyDocument) => void) => () =>
         Automerge.change(
           docWith((d) => {
@@ -658,65 +720,170 @@ describe('adjustField', () => {
     }
   });
 
-  it('the switch ships off', () => {
-    expect(COUNTER_WRITES_ENABLED).toBe(false);
+  it('the switch ships off, and setCounterWrites(null) restores the default', () => {
+    expect(COUNTER_WRITES_DEFAULT).toBe(false);
+    expect(counterWritesOn()).toBe(false);
+    setCounterWrites(true);
+    expect(counterWritesOn()).toBe(true);
+    setCounterWrites(false);
+    expect(counterWritesOn()).toBe(false);
+    setCounterWrites(true);
+    setCounterWrites(null);
+    expect(counterWritesOn()).toBe(COUNTER_WRITES_DEFAULT);
   });
 });
 
 describe('foldDoc (the compaction source)', () => {
-  it('folds every field, empties the map and ledgers every parsed key with its scale', () => {
-    __setCounterWritesForTesting(true);
+  it('folds every field, empties the map and ledgers every parsed key as { v, s: newSeq }', () => {
+    setCounterWrites(true);
     const doc = docWith((d) => {
       adjustField(d, 'accounts', 'A', 'balance', -20.25, W1);
       adjustField(d, 'accounts', 'BTC', 'balance', 0.00004, W1);
       adjustField(d, 'goals', 'G', 'currentAmount', 30.5, W1);
       adjustField(d, 'assets', 'L', 'loan.outstandingBalance', -10, W1);
     });
-    const source = foldDoc(doc);
+    const source = foldDoc(doc, 3);
     expect((source.accounts.A as Account).balance).toBe(79.75);
     expect((source.accounts.BTC as Account).balance).toBe(0.50004);
     expect((source.goals.G as Goal).currentAmount).toBe(130.5);
     expect((source.assets.L as Asset).loan!.outstandingBalance).toBe(90);
     expect(source.counterDeltas).toEqual({});
     expect(source.foldedCounters).toEqual({
-      'accounts/A/balance@2/dev:w1': -2025,
-      'accounts/BTC/balance@8/dev:w1': 4000,
-      'goals/G/currentAmount@2/dev:w1': 3050,
-      'assets/L/loan.outstandingBalance@2/dev:w1': -1000,
+      'accounts/A/balance@2/w1': { v: -2025, s: 3 },
+      'accounts/BTC/balance@8/w1': { v: 4000, s: 3 },
+      'goals/G/currentAmount@2/w1': { v: 3050, s: 3 },
+      'assets/L/loan.outstandingBalance@2/w1': { v: -1000, s: 3 },
     });
+    expect(source.ledger).toEqual({ pruned: 0, normalised: 0, collisions: 0 });
     // No Counter instance anywhere: the source is pure JSON.
     expect(JSON.parse(JSON.stringify(source))).toEqual(source);
   });
 
-  it('the ledger is CUMULATIVE across compactions, never replaced', () => {
-    __setCounterWritesForTesting(true);
+  it('the ledger figures are never a document key (non-enumerable: spread and from drop them)', () => {
+    setCounterWrites(true);
+    const source = foldDoc(
+      docWith((d) => adjustField(d, 'accounts', 'A', 'balance', -1, W1)),
+      1
+    );
+    expect(source.ledger.pruned).toBe(0);
+    expect(Object.keys(source)).not.toContain('ledger');
+    expect('ledger' in { ...source }).toBe(false);
+    const doc = Automerge.from(source as unknown as AnyRec);
+    expect(Object.keys(doc)).not.toContain('ledger');
+  });
+
+  it('carries prior entries across compactions, each keeping the generation it was folded at', () => {
+    setCounterWrites(true);
     const first = Automerge.from(
       foldDoc(
-        docWith((d) => adjustField(d, 'accounts', 'A', 'balance', -1, W1))
+        docWith((d) => adjustField(d, 'accounts', 'A', 'balance', -1, W1)),
+        1
       ) as unknown as AnyRec
     ) as unknown as Doc;
     const second = Automerge.change(first, (d) =>
-      adjustField(d, 'accounts', 'A', 'balance', -2, 'dev:w2')
+      adjustField(d, 'accounts', 'A', 'balance', -2, 'w2')
     );
-    const source = foldDoc(second);
+    const source = foldDoc(second, 2);
     expect((source.accounts.A as Account).balance).toBe(97);
     expect(source.foldedCounters).toEqual({
-      'accounts/A/balance@2/dev:w1': -100,
-      'accounts/A/balance@2/dev:w2': -200,
+      'accounts/A/balance@2/w1': { v: -100, s: 1 },
+      'accounts/A/balance@2/w2': { v: -200, s: 2 },
     });
   });
 
+  it('normalises a bare-number (0.91.2) entry as { v, s: newSeq }, and counts it', () => {
+    const doc = docWith((d) => {
+      (d as unknown as AnyRec).foldedCounters = { 'accounts/A/balance@2/old': -500 };
+    });
+    const source = foldDoc(doc, 7);
+    expect(source.foldedCounters).toEqual({ 'accounts/A/balance@2/old': { v: -500, s: 7 } });
+    expect(source.ledger).toEqual({ pruned: 0, normalised: 1, collisions: 0 });
+  });
+
+  it('prunes entries folded more than LEDGER_WINDOW generations ago and keeps the boundary', () => {
+    const newSeq = 20;
+    const edge = newSeq - LEDGER_WINDOW; // s === edge is kept; s < edge is pruned
+    const doc = docWith((d) => {
+      (d as unknown as AnyRec).foldedCounters = {
+        'accounts/A/balance@2/gone': { v: 1, s: edge - 1 },
+        'accounts/A/balance@2/edge': { v: 2, s: edge },
+        'accounts/A/balance@2/young': { v: 3, s: newSeq - 1 },
+      };
+    });
+    const source = foldDoc(doc, newSeq);
+    expect(source.foldedCounters).toEqual({
+      'accounts/A/balance@2/edge': { v: 2, s: edge },
+      'accounts/A/balance@2/young': { v: 3, s: newSeq - 1 },
+    });
+    expect(source.ledger).toEqual({ pruned: 1, normalised: 0, collisions: 0 });
+    // Pruning everything still writes the (now empty) ledger: it held something before.
+    const all = foldDoc(doc, newSeq + LEDGER_WINDOW + 1);
+    expect(all.foldedCounters).toEqual({});
+    expect(all.ledger.pruned).toBe(3);
+  });
+
+  it('folds a carry register into the absolute and ledgers it under its own full name', () => {
+    const doc = docWith((d) => {
+      (d.counterDeltas as unknown as AnyRec)['accounts/A/balance@2/carry.x.4'] = 250;
+    });
+    const source = foldDoc(doc, 5);
+    expect((source.accounts.A as Account).balance).toBe(102.5);
+    expect(source.foldedCounters).toEqual({
+      'accounts/A/balance@2/carry.x.4': { v: 250, s: 5 },
+    });
+  });
+
+  it('counts and warns a name collision (the newer value wins), naming collection and field only', () => {
+    setCounterWrites(true);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const doc = docWith((d) => {
+        (d as unknown as AnyRec).foldedCounters = { 'accounts/A/balance@2/w1': { v: -1, s: 2 } };
+        adjustField(d, 'accounts', 'A', 'balance', -5, W1);
+      });
+      const source = foldDoc(doc, 3);
+      expect(source.foldedCounters).toEqual({ 'accounts/A/balance@2/w1': { v: -500, s: 3 } });
+      expect(source.ledger).toEqual({ pruned: 0, normalised: 0, collisions: 1 });
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0]![0])).toMatch(/accounts\.balance.*newer value wins/);
+      expect(String(warn.mock.calls[0]![0])).not.toMatch(/w1|\/A\//);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('drops a prior ledger entry of neither shape, with one warning', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const doc = docWith((d) => {
+        (d as unknown as AnyRec).foldedCounters = {
+          'accounts/A/balance@2/bad': 'x',
+          'accounts/A/balance@2/ok': { v: 4, s: 1 },
+        };
+      });
+      expect(foldDoc(doc, 2).foldedCounters).toEqual({
+        'accounts/A/balance@2/ok': { v: 4, s: 1 },
+      });
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0]![0])).toMatch(/drops 1 fold-ledger entry/);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it('ledgers a key whose entity or loan is gone (consumed, so a rebase cannot replay it)', () => {
-    __setCounterWritesForTesting(true);
+    setCounterWrites(true);
     const doc = Automerge.change(
       docWith((d) => adjustField(d, 'assets', 'L', 'loan.outstandingBalance', -10, W1)),
       (d) => {
         delete (d.assets as unknown as Record<string, Asset>).L!.loan;
       }
     );
-    const source = foldDoc(doc);
+    const source = foldDoc(doc, 1);
     expect(source.assets.L).toEqual({ id: 'L' });
-    expect(source.foldedCounters).toEqual({ 'assets/L/loan.outstandingBalance@2/dev:w1': -1000 });
+    expect(source.foldedCounters).toEqual({
+      'assets/L/loan.outstandingBalance@2/w1': { v: -1000, s: 1 },
+    });
   });
 
   it("REFUSES a newer build's field (known collection, unknown field), naming collection and field only", () => {
@@ -728,7 +895,7 @@ describe('foldDoc (the compaction source)', () => {
     });
     let thrown: unknown;
     try {
-      foldDoc(doc);
+      foldDoc(doc, 1);
     } catch (e) {
       thrown = e;
     }
@@ -746,7 +913,7 @@ describe('foldDoc (the compaction source)', () => {
     // dropped here too. A key that splits is a newer build's Counter whichever segment is
     // unknown, so it now refuses (pinned below); only a key that does not split, or a value no
     // build can read, is dropped.
-    __setCounterWritesForTesting(true);
+    setCounterWrites(true);
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     try {
       const doc = docWith((d) => {
@@ -755,10 +922,10 @@ describe('foldDoc (the compaction source)', () => {
         map['garbage'] = new Automerge.Counter(3);
         map['accounts/SECRET-ID/balance@2/dev:y'] = 1.5; // not a safe integer
       });
-      const source = foldDoc(doc);
+      const source = foldDoc(doc, 1);
       expect((source.accounts.A as Account).balance).toBe(79.75);
       expect(source.counterDeltas).toEqual({});
-      expect(source.foldedCounters).toEqual({ 'accounts/A/balance@2/dev:w1': -2025 });
+      expect(source.foldedCounters).toEqual({ 'accounts/A/balance@2/w1': { v: -2025, s: 1 } });
       expect(warn).toHaveBeenCalledTimes(1);
       expect(String(warn.mock.calls[0]![0])).toMatch(/drops 2 Counter key/);
       expect(String(warn.mock.calls[0]![0])).not.toMatch(/SECRET-ID|dev:y/);
@@ -768,158 +935,307 @@ describe('foldDoc (the compaction source)', () => {
   });
 
   it('REFUSES a structurally valid key for an UNKNOWN COLLECTION (C9e), naming no id', () => {
-    __setCounterWritesForTesting(true);
+    setCounterWrites(true);
     const doc = docWith((d) => {
       const map = d.counterDeltas as unknown as AnyRec;
       map['todos/SECRET-ID/balance@2/dev:x'] = new Automerge.Counter(3);
     });
-    expect(() => foldDoc(doc)).toThrow(StaleBuildCounterError);
-    expect(() => foldDoc(doc)).toThrow(/todos\.balance/);
-    expect(() => foldDoc(doc)).not.toThrow(/SECRET-ID/);
+    expect(() => foldDoc(doc, 1)).toThrow(StaleBuildCounterError);
+    expect(() => foldDoc(doc, 1)).toThrow(/todos\.balance/);
+    expect(() => foldDoc(doc, 1)).not.toThrow(/SECRET-ID/);
   });
 
   it('a dormant pod: absolutes untouched, empty map, no ledger key', () => {
     const doc = docWith();
-    const source = foldDoc(doc);
+    const source = foldDoc(doc, 1);
     expect(source).toEqual({ ...JSON.parse(JSON.stringify(doc)), counterDeltas: {} });
     expect('foldedCounters' in source).toBe(false);
   });
 });
 
-describe('counterGrowthOps (the rebase ledger pass)', () => {
-  /** A copy of `from` whose map holds `keys` as Counters (minor units), as one change. Cloned,
-   *  so `from` stays usable (a changed handle is outdated). */
-  const withCounters = (from: Doc, keys: Record<string, number>): Doc =>
-    Automerge.change(Automerge.clone(from), (d) => {
-      for (const [k, v] of Object.entries(keys)) {
-        const map = d.counterDeltas as unknown as Record<string, Automerge.Counter>;
-        if (map[k] === undefined) map[k] = new Automerge.Counter(v);
-        else map[k]!.increment(v - map[k]!.value);
-      }
-    });
-
-  const baseline = docWith();
-  const local = withCounters(baseline, {
-    'accounts/A/balance@2/dev:w1': -3000, // target holds it live at -1000 → growth -20
-    'accounts/A/balance@2/dev:w2': -500, // target ledgered it at -500 → no growth
-    'goals/G/currentAmount@2/dev:w1': 700, // target has neither → all of it
-    'assets/L/loan.outstandingBalance@2/dev:w1': -100, // ledgered at -40 → growth -0.6
-    'accounts/A/balance@2/peer:w9': -9000, // FOREIGN: never replayed, whatever the target says
+describe('ledgerValue / ledgerSeq: the two readers of the entry union', () => {
+  it('reads both shapes; a bare number has no generation', () => {
+    expect(ledgerValue(-500)).toBe(-500);
+    expect(ledgerSeq(-500)).toBeNull();
+    expect(ledgerValue({ v: 7, s: 3 })).toBe(7);
+    expect(ledgerSeq({ v: 7, s: 3 })).toBe(3);
   });
+
+  it('anything else reads as null, never a throw', () => {
+    for (const bad of [null, undefined, 'x', 1.5, {}, { v: 'x', s: 'y' }, { v: 1.5, s: 0.5 }]) {
+      expect(ledgerValue(bad)).toBeNull();
+      expect(ledgerSeq(bad)).toBeNull();
+    }
+  });
+});
+
+/** Canonical (actor) keys used by the knowledge and growth tests. */
+const KX = 'accounts/A/balance@2/x';
+const carryX = (seq: number) => carryKeyFor(KX, seq);
+
+describe('targetKnowledge: the target holds what was folded after the peer generation', () => {
+  // Peer on P = 3, target on T = 5.
+  const P = 3;
+  const T = 5;
   const target = {
-    counterDeltas: { 'accounts/A/balance@2/dev:w1': new Automerge.Counter(-1000) },
     foldedCounters: {
-      'accounts/A/balance@2/dev:w2': -500,
-      'assets/L/loan.outstandingBalance@2/dev:w1': -40,
+      [KX]: { v: 800, s: 4 }, // same name as a peer name → included
+      [carryX(4)]: { v: 100, s: 5 }, // a carry onto 4 ≥ P → included
+      [carryX(3)]: { v: 10, s: 4 }, // a carry onto 3 ≥ P → included
+      [carryX(2)]: { v: 1000, s: 3 }, // a carry onto 2 < P: the peer already discounts it
+      'accounts/A/balance@2/y': 50, // another canonical key, a bare number
+      garbage: 99,
+    },
+    counterDeltas: {
+      [carryX(T)]: 7, // the current-generation register: the register rule owns it
     },
   };
+  const k = targetKnowledge(target, P, T);
 
-  it('emits own local minus (live key ?? ledger ?? 0) per entity field, as skip-on-missing increments', () => {
-    const { ops, count } = counterGrowthOps(local, target, 'dev');
+  it('sums same-name entries and later-generation carries of the canonical key only', () => {
+    expect(k.of(KX, new Set([KX]))).toBe(800 + 100 + 10);
+  });
+
+  it('an earlier-generation carry is excluded, and the current-generation register too', () => {
+    // With the actor key not live on the peer, only the carries onto ≥ P count.
+    expect(k.of(KX, new Set())).toBe(100 + 10);
+  });
+
+  it('an entry matching both conditions is counted once (two local names, one canonical key)', () => {
+    expect(k.of(KX, new Set([KX, carryX(4)]))).toBe(800 + 100 + 10);
+  });
+
+  it('reads a bare-number entry by value, keyed under its own canonical key', () => {
+    expect(k.of('accounts/A/balance@2/y', new Set(['accounts/A/balance@2/y']))).toBe(50);
+    expect(k.of('accounts/A/balance@2/y', new Set())).toBe(0);
+  });
+
+  it('includes a carried-through live copy (a pre-fold compaction kept the map)', () => {
+    const carried = targetKnowledge(
+      { counterDeltas: { [KX]: new Automerge.Counter(300), [carryX(3)]: 20 } },
+      P,
+      T
+    );
+    expect(carried.of(KX, new Set([KX]))).toBe(320);
+  });
+
+  it('a target with neither map knows nothing', () => {
+    expect(targetKnowledge({}, P, T).of(KX, new Set([KX]))).toBe(0);
+  });
+});
+
+describe('baselineKnowledge: the restore rule reads the peer own baseline by exact name', () => {
+  it('sums the baseline value of each name, absent as 0', () => {
+    const k = baselineKnowledge({
+      counterDeltas: { [KX]: new Automerge.Counter(1000), [carryX(2)]: 40 },
+    });
+    expect(k.of(KX, new Set([KX]))).toBe(1000);
+    expect(k.of(KX, new Set([KX, carryX(2)]))).toBe(1040);
+    expect(k.of(KX, new Set(['accounts/A/balance@2/z']))).toBe(0);
+    expect(baselineKnowledge({}).of(KX, new Set([KX]))).toBe(0);
+  });
+});
+
+describe('counterGrowthOps (the rebase carry pass)', () => {
+  const baseline = docWith();
+  const T = 5;
+
+  /** A fresh copy of the baseline (its own actor `own`) holding `counters` as Counters and
+   *  `registers` as plain integers; both may name keys with the copy's own actor. */
+  function peer(
+    keys: (own: string) => { counters?: Record<string, number>; registers?: Record<string, number> }
+  ): { doc: Doc; own: string } {
+    const fresh = Automerge.clone(baseline);
+    const own = Automerge.getActorId(fresh);
+    const { counters = {}, registers = {} } = keys(own);
+    const doc = Automerge.change(fresh, (d) => {
+      const map = d.counterDeltas as unknown as AnyRec;
+      for (const [key, v] of Object.entries(counters)) map[key] = new Automerge.Counter(v);
+      for (const [key, v] of Object.entries(registers)) map[key] = v;
+    });
+    return { doc, own };
+  }
+
+  /** Knowledge from a fixed table: canonical → known. */
+  const knows = (table: Record<string, number>): Knowledge => ({
+    of: (canonical) => table[canonical] ?? 0,
+  });
+
+  it('groups two live names of one canonical key into ONE op over their sum', () => {
+    const { doc, own } = peer((o) => ({
+      counters: { [`accounts/A/balance@2/${o}`]: 1200 },
+      registers: { [`accounts/A/balance@2/carry.${o}.3`]: 200 },
+    }));
+    const K = `accounts/A/balance@2/${own}`;
+    const seen: Array<[string, string[]]> = [];
+    const knowledge: Knowledge = {
+      of(canonical, names) {
+        seen.push([canonical, [...names].sort()]);
+        return 900;
+      },
+    };
+    const { ops, skippedNegative } = counterGrowthOps(doc, knowledge, false, T);
     expect(ops).toEqual([
       {
-        op: 'increment',
+        op: 'carry',
         collection: 'accounts',
         id: 'A',
-        field: 'balance',
-        delta: -20,
-        onMissing: 'skip',
+        name: carryKeyFor(K, T),
+        minor: 1200 + 200 - 900,
+        exact: true,
       },
+    ]);
+    expect(skippedNegative).toBe(0);
+    // The knowledge was asked ONCE for the canonical key, with the whole name set.
+    expect(seen).toEqual([[K, [`accounts/A/balance@2/carry.${own}.3`, K].sort()]]);
+  });
+
+  it('a foreign negative is carried when foreignNegatives, and skipped and counted otherwise', () => {
+    const { doc } = peer(() => ({ counters: { [KX]: 500 } }));
+    const table = knows({ [KX]: 800 });
+    expect(counterGrowthOps(doc, table, true, T)).toEqual({
+      ops: [
+        {
+          op: 'carry',
+          collection: 'accounts',
+          id: 'A',
+          name: carryX(T),
+          minor: -300,
+          exact: false,
+        },
+      ],
+      skippedNegative: 0,
+    });
+    expect(counterGrowthOps(doc, table, false, T)).toEqual({ ops: [], skippedNegative: 1 });
+  });
+
+  it('a foreign POSITIVE is always carried; an own negative is always carried', () => {
+    const { doc, own } = peer((o) => ({
+      counters: { [KX]: 900, [`goals/G/currentAmount@2/${o}`]: -50 },
+    }));
+    const K = `goals/G/currentAmount@2/${own}`;
+    const { ops, skippedNegative } = counterGrowthOps(doc, knows({ [KX]: 800, [K]: 0 }), false, T);
+    expect(ops).toEqual([
+      { op: 'carry', collection: 'accounts', id: 'A', name: carryX(T), minor: 100, exact: false },
       {
-        op: 'increment',
+        op: 'carry',
         collection: 'goals',
         id: 'G',
-        field: 'currentAmount',
-        delta: 7,
-        onMissing: 'skip',
-      },
-      {
-        op: 'increment',
-        collection: 'assets',
-        id: 'L',
-        field: 'loan.outstandingBalance',
-        delta: -0.6,
-        onMissing: 'skip',
+        name: carryKeyFor(K, T),
+        minor: -50,
+        exact: true,
       },
     ]);
-    expect(count).toBe(3);
+    expect(skippedNegative).toBe(0);
   });
 
-  it('ownership is the device PREFIX of the writer, not a substring or another device', () => {
-    // `dev` must not claim `devX:…`, and the peer's own pass claims only its key.
-    const keys = withCounters(baseline, {
-      'accounts/A/balance@2/devX:w1': -100,
-      'accounts/A/balance@2/peer:w9': -200,
+  it('a register of the own actor alone is not exact (only the live actor key makes it so)', () => {
+    // A session that continues under a new actor is foreign to its own earlier keys.
+    const { doc } = peer(() => ({ registers: { [carryX(3)]: -40 } }));
+    expect(counterGrowthOps(doc, knows({}), false, T)).toEqual({ ops: [], skippedNegative: 1 });
+  });
+
+  it('one op per canonical key: two actors, two scales and two entities are separate', () => {
+    const { doc } = peer(() => ({
+      counters: {
+        [KX]: 100,
+        'accounts/A/balance@2/y': 200,
+        'accounts/A/balance@8/x': 4000,
+        'assets/L/loan.outstandingBalance@2/x': -60,
+      },
+    }));
+    const { ops } = counterGrowthOps(doc, knows({}), true, T);
+    expect(ops.map((o) => [o.name, o.minor])).toEqual([
+      [carryX(T), 100],
+      ['accounts/A/balance@2/carry.y.5', 200],
+      ['accounts/A/balance@8/carry.x.5', 4000],
+      ['assets/L/loan.outstandingBalance@2/carry.x.5', -60],
+    ]);
+  });
+
+  it('against a baseline knowledge: signed growth over the view, nothing for an unchanged key', () => {
+    const { doc } = peer(() => ({ counters: { [KX]: 1300, 'accounts/A/balance@2/y': 70 } }));
+    const before = { counterDeltas: { [KX]: 1000, 'accounts/A/balance@2/y': 70 } };
+    expect(counterGrowthOps(doc, baselineKnowledge(before), true, T).ops).toEqual([
+      { op: 'carry', collection: 'accounts', id: 'A', name: carryX(T), minor: 300, exact: false },
+    ]);
+    const lower = { counterDeltas: { [KX]: 1500 } };
+    expect(counterGrowthOps(doc, baselineKnowledge(lower), true, T).ops).toEqual([
+      expect.objectContaining({ name: carryX(T), minor: -200 }),
+      expect.objectContaining({ name: 'accounts/A/balance@2/carry.y.5', minor: 70 }),
+    ]);
+  });
+
+  it('the restore-generation scenario: two live names, folded together, carry nothing', () => {
+    // A restored file holds K live on R; a pre-restore peer put carry.X.R = 2 beside it; D
+    // compacts R → R+1. Peer F on R holds both live and rebases onto R+1: zero growth.
+    const R = 4;
+    const { doc } = peer(() => ({ counters: { [KX]: 1000 }, registers: { [carryX(R)]: 200 } }));
+    const target = {
+      foldedCounters: { [KX]: { v: 1000, s: R + 1 }, [carryX(R)]: { v: 200, s: R + 1 } },
+    };
+    expect(counterGrowthOps(doc, targetKnowledge(target, R, R + 1), true, R + 1)).toEqual({
+      ops: [],
+      skippedNegative: 0,
     });
-    expect(counterGrowthOps(keys, {}, 'dev').ops).toEqual([]);
-    expect(counterGrowthOps(keys, {}, 'peer').ops).toEqual([
-      expect.objectContaining({ id: 'A', delta: -2 }),
+  });
+
+  it('the three-generation scenario: another peer carried and folded growth is subtracted', () => {
+    // S (actor X) holds K = 10 on P; D folded 8 at T; B carried 1 onto T; T+1 folded it. S
+    // rebasing onto T+1 knows 8 + 1 and carries 1, so the fold at T+2 is 10, never 11.
+    const P = 2;
+    const { doc } = peer(() => ({ counters: { [KX]: 1000 } }));
+    const target = {
+      foldedCounters: { [KX]: { v: 800, s: P + 1 }, [carryX(P + 1)]: { v: 100, s: P + 2 } },
+    };
+    const { ops } = counterGrowthOps(doc, targetKnowledge(target, P, P + 2), true, P + 2);
+    expect(ops).toEqual([expect.objectContaining({ name: carryX(P + 2), minor: 100 })]);
+    // A carry folded from a generation BEFORE the peer's is not subtracted.
+    const older = {
+      foldedCounters: { [KX]: { v: 800, s: P + 1 }, [carryX(P - 1)]: { v: 100, s: P } },
+    };
+    expect(counterGrowthOps(doc, targetKnowledge(older, P, P + 2), true, P + 2).ops).toEqual([
+      expect.objectContaining({ minor: 200 }),
     ]);
   });
 
-  it('skips malformed keys', () => {
-    const withGarbage = withCounters(baseline, {
-      garbage: 1,
-      'accounts/A/balance@2/dev:w1': -100,
-    });
-    expect(counterGrowthOps(withGarbage, {}, 'dev').ops).toEqual([
-      expect.objectContaining({ id: 'A', delta: -1 }),
+  it('skips malformed keys and non-integer values', () => {
+    const { doc } = peer(() => ({
+      counters: { garbage: 1, 'accounts/A/creditLimit@2/x': 5, [KX]: 100 },
+      registers: { 'accounts/A/balance@2/carry.z.1': 1.5 },
+    }));
+    expect(counterGrowthOps(doc, knows({}), true, T).ops).toEqual([
+      expect.objectContaining({ name: carryX(T), minor: 100 }),
     ]);
-  });
-
-  it('groups several own writers (two tabs of one device) of one field into one op', () => {
-    const { ops } = counterGrowthOps(
-      withCounters(baseline, {
-        'accounts/A/balance@2/dev:tab1': -100,
-        'accounts/A/balance@2/dev:tab2': -200,
-      }),
-      {},
-      'dev'
-    );
-    expect(ops).toEqual([
-      {
-        op: 'increment',
-        collection: 'accounts',
-        id: 'A',
-        field: 'balance',
-        delta: -3,
-        onMissing: 'skip',
-      },
-    ]);
-  });
-
-  it('sums keys at different scales exactly per scale (a currency changed between writes)', () => {
-    const { ops } = counterGrowthOps(
-      withCounters(baseline, {
-        'accounts/A/balance@2/dev:w1': -2025,
-        'accounts/A/balance@8/dev:w2': 4000,
-      }),
-      {},
-      'dev'
-    );
-    expect(ops).toEqual([expect.objectContaining({ id: 'A', delta: -20.25 + 0.00004 })]);
   });
 
   it('no key, or nothing grown, is no ops', () => {
-    expect(counterGrowthOps(baseline, target, 'dev')).toEqual({ ops: [], count: 0 });
-    const level = withCounters(baseline, { 'accounts/A/balance@2/dev:w2': -500 });
-    expect(counterGrowthOps(level, target, 'dev').ops).toEqual([]);
+    expect(counterGrowthOps(baseline, knows({}), true, T)).toEqual({ ops: [], skippedNegative: 0 });
+    const { doc } = peer(() => ({ counters: { [KX]: 500 } }));
+    expect(counterGrowthOps(doc, knows({ [KX]: 500 }), false, T)).toEqual({
+      ops: [],
+      skippedNegative: 0,
+    });
   });
 
-  it('works on live documents (Counter values on both sides)', () => {
-    __setCounterWritesForTesting(true);
-    const origin = docWith((d) => adjustField(d, 'accounts', 'A', 'balance', -1, W1));
-    const ahead = Automerge.change(Automerge.clone(origin), (d) =>
-      adjustField(d, 'accounts', 'A', 'balance', -2.5, W1)
-    );
-    expect(counterGrowthOps(ahead, origin, 'dev').ops).toEqual([
+  it('works on live documents written through adjustField (the own key is exact)', () => {
+    setCounterWrites(true);
+    const live = Automerge.clone(baseline);
+    const own = Automerge.getActorId(live);
+    const ahead = Automerge.change(live, (d) => {
+      adjustField(d, 'accounts', 'A', 'balance', -1, own);
+      adjustField(d, 'accounts', 'A', 'balance', -2.5, own);
+    });
+    const K = `accounts/A/balance@2/${own}`;
+    const target = { foldedCounters: { [K]: { v: -100, s: 1 } } };
+    expect(counterGrowthOps(ahead, targetKnowledge(target, 0, 1), false, 1).ops).toEqual([
       {
-        op: 'increment',
+        op: 'carry',
         collection: 'accounts',
         id: 'A',
-        field: 'balance',
-        delta: -2.5,
-        onMissing: 'skip',
+        name: carryKeyFor(K, 1),
+        minor: -250,
+        exact: true,
       },
     ]);
   });
@@ -927,13 +1243,24 @@ describe('counterGrowthOps (the rebase ledger pass)', () => {
 
 describe('counterStats', () => {
   it("counts keys, conflicts, the fold's malformed keys and the ledger", () => {
-    __setCounterWritesForTesting(true);
+    setCounterWrites(true);
     const origin = docWith((d) => {
       adjustField(d, 'accounts', 'A', 'balance', -1, W1);
       (d.counterDeltas as unknown as AnyRec)['garbage'] = new Automerge.Counter(1);
-      (d as unknown as AnyRec).foldedCounters = { 'accounts/A/balance@2/dev:old': -5 };
+      (d as unknown as AnyRec).foldedCounters = {
+        'accounts/A/balance@2/old': { v: -5, s: 4 },
+        'accounts/A/balance@2/older': { v: -6, s: 2 },
+        'accounts/A/balance@2/bare': -7,
+      };
     });
-    expect(counterStats(origin)).toEqual({ keys: 2, conflicts: 0, malformed: 1, ledgerKeys: 1 });
+    expect(counterStats(origin)).toEqual({
+      keys: 2,
+      conflicts: 0,
+      carryConflicts: 0,
+      malformed: 1,
+      ledgerKeys: 3,
+      ledgerOldest: 2,
+    });
     // Two actors creating the SAME key: the bug the key design exists to prevent.
     const a = Automerge.change(Automerge.clone(origin), (d) => {
       d.counterDeltas['accounts/A/balance@2/dev:shared'] = new Automerge.Counter(1);
@@ -941,15 +1268,36 @@ describe('counterStats', () => {
     const b = Automerge.change(Automerge.clone(origin), (d) => {
       d.counterDeltas['accounts/A/balance@2/dev:shared'] = new Automerge.Counter(2);
     });
-    expect(counterStats(Automerge.merge(a, b)).conflicts).toBe(1);
+    expect(counterStats(Automerge.merge(a, b))).toMatchObject({ conflicts: 1, carryConflicts: 0 });
+  });
+
+  it('two concurrent puts of one carry register count as carryConflicts, not conflicts', () => {
+    const origin = docWith();
+    const put = (v: number) =>
+      Automerge.change(Automerge.clone(origin), (d) => {
+        (d.counterDeltas as unknown as AnyRec)[carryX(3)] = v;
+      });
+    expect(counterStats(Automerge.merge(put(5), put(7)))).toMatchObject({
+      conflicts: 0,
+      carryConflicts: 1,
+    });
+  });
+
+  it('ledgerOldest is null for a ledger of bare entries only', () => {
+    const doc = docWith((d) => {
+      (d as unknown as AnyRec).foldedCounters = { 'accounts/A/balance@2/bare': -7 };
+    });
+    expect(counterStats(doc)).toMatchObject({ ledgerKeys: 1, ledgerOldest: null });
   });
 
   it('an absent map reports zeros', () => {
     expect(counterStats(Automerge.init<FamilyDocument>())).toEqual({
       keys: 0,
       conflicts: 0,
+      carryConflicts: 0,
       malformed: 0,
       ledgerKeys: 0,
+      ledgerOldest: null,
     });
   });
 });

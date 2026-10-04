@@ -29,7 +29,6 @@ import { bufferToBase64, base64ToBuffer } from '@/utils/encoding';
 import { withIdbRetry } from '@/utils/idbTransient';
 import { withTimeout } from '@/utils/timing';
 import { generateUUID } from '@/utils/id';
-import { setDeviceWriterId } from './docActor';
 import type { RemoteBaselineRow } from '@/services/sync/remoteBaseline';
 import type { CacheClearResult, CacheReplay } from './protocol';
 import {
@@ -76,13 +75,10 @@ const SNAPSHOT_KEY = 'projection-snapshot';
  */
 const REMOTE_BASELINE_KEY = 'remote-baseline';
 /**
- * This device's Counter writer id (#117 Phase 2): an opaque random id, minted ONCE per family
- * cache by `initPersistenceDB` and posted into the realm (`docActor.setDeviceWriterId`). Every
- * Counter key this device writes carries it, and the rebase replays only keys that do, so it
- * must outlive a reload (the Automerge actor does not) and die with the cache (a signed-out or
- * cleared device is a new device). PLAINTEXT like the baseline row beside it: a random id
- * carries no family data. Outside every read/clear key range (`'d' < 'i'`). Dropped with
- * everything else by `clearCache`'s whole-DB delete.
+ * A DEAD row (#117 writer flip, 2026-10-04): the device Counter writer id the 0.91.2 build
+ * minted once per family cache. Counter keys are now owned by nobody (the writer segment is the
+ * Automerge actor alone, `counterFields.ts`), so the row is never read; `persistDocBinary`
+ * deletes it inside its base-write transaction, so the next base write cleans an old cache.
  */
 const DEVICE_WRITER_KEY = 'device-writer';
 /**
@@ -216,9 +212,6 @@ function closeHandle(): void {
   incRowsUncounted = 0;
   pendingRows = [];
   containedRows = new Set();
-  // The id belongs to the DB it was read from: a write after the handle closed (sign-out, a
-  // family switch, another tab's delete) must not key a Counter with another family's device.
-  setDeviceWriterId(null);
 }
 
 /** Open (or reuse) the cache IndexedDB for the given family. */
@@ -286,16 +279,11 @@ export async function initPersistenceDB(familyId: string): Promise<void> {
     throw e;
   }
 
-  // #117 Phase 2: read (or mint, once) this device's Counter writer id BEFORE the handle is
-  // installed, so an open that cannot read its own id is an open that failed. Once posted, it
-  // supersedes any ephemeral id a cacheless stretch of this session minted (`docActor.ts`).
   // C5b: EVERY read the handle depends on runs before ANY of it is installed. The increment
   // scan used to run after `cacheDb` was assigned, so a scan that failed left a live handle
   // with `incSeq = 0`, and the next persist overwrote `inc:000000000000`.
-  let writerId: string;
   let scan: { next: number; count: number };
   try {
-    writerId = await ensureDeviceWriterId(db);
     scan = await scanIncrements(db);
   } catch (e) {
     db.close();
@@ -309,7 +297,6 @@ export async function initPersistenceDB(familyId: string): Promise<void> {
   handle = db;
   cacheDb = db;
   cacheDbFamilyId = familyId;
-  setDeviceWriterId(writerId);
   incSeq = scan.next;
   incRowCount = scan.count;
   incRowsUncounted = 0;
@@ -339,35 +326,6 @@ function assertSameHandle(db: IDBPDatabase<CacheDB>, op: string): void {
   // Literal: the prod build minifies class names. `applyAndProject.persistOnce` keys on it.
   err.name = 'CacheHandleChangedError';
   throw err;
-}
-
-/**
- * This cache's device writer id, minted on first open (#117 Phase 2, `DEVICE_WRITER_KEY`).
- * Read and create-if-absent in ONE readwrite transaction: two tabs opening a fresh cache at once
- * serialise on the store, so the second reads the first's id instead of minting a rival one
- * (which would orphan the first tab's keys from this device after a reload). `generateUUID`,
- * never a bare `crypto.randomUUID()` (undefined on a non-secure origin; see `docOps.ts`).
- */
-async function ensureDeviceWriterId(db: IDBPDatabase<CacheDB>): Promise<string> {
-  return withIdbRetry('ensureDeviceWriterId', async () => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    const store = tx.objectStore(STORE_NAME);
-    const existing = ((await store.get(DEVICE_WRITER_KEY)) as { payload?: string } | undefined)
-      ?.payload;
-    const id = existing || generateUUID();
-    if (!existing) await store.put({ id: DEVICE_WRITER_KEY, payload: id, updatedAt: nowIso() });
-    await tx.done;
-    return id;
-  });
-}
-
-/** This cache's device writer id row, or `null` when absent (never, after an open). */
-export async function readDeviceWriterId(): Promise<string | null> {
-  if (!cacheDb) throw new Error('Cache DB not initialized. Call initPersistenceDB() first.');
-  const entry = (await withIdbRetry('readDeviceWriterId', () =>
-    cacheDb!.get(STORE_NAME, DEVICE_WRITER_KEY)
-  )) as { payload?: string } | undefined;
-  return entry?.payload || null;
 }
 
 /** The next free increment seq (= max existing `inc:*` seq + 1, or 0) and the row count. */
@@ -410,7 +368,8 @@ export async function persistDocBinary(
     const store = tx.objectStore(STORE_NAME);
     await store.put({ id: BASE_KEY, payload, updatedAt: nowIso() });
     // Clear redundant increments + any legacy whole-doc row in the same tx so a
-    // reader never sees a base without its matching increment set.
+    // reader never sees a base without its matching increment set. The dead 0.91.2
+    // device-writer row goes in the same tx (#117 writer flip): no new transaction.
     const keptKeys: string[] = [];
     let cursor = await store.openCursor(IDBKeyRange.bound(INC_PREFIX, INC_UPPER, false, true));
     while (cursor) {
@@ -420,6 +379,7 @@ export async function persistDocBinary(
       cursor = await cursor.continue();
     }
     await store.delete(LEGACY_DOC_KEY);
+    await store.delete(DEVICE_WRITER_KEY);
     await tx.done;
     return keptKeys;
   });

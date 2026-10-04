@@ -35,11 +35,9 @@ import {
   readRemoteBaseline,
   writeRemoteBaseline,
   clearRemoteBaseline,
-  readDeviceWriterId,
 } from '../cache';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
 import { foldIndex } from '../counterFields';
-import { deviceWriterIdFor, isDeviceWriterIdEphemeral } from '../docActor';
 
 const FAMILY_ID = 'cache-test-family';
 const base = () => migrateDoc(Automerge.init<FamilyDocument>());
@@ -126,46 +124,27 @@ describe('worker/cache', () => {
     });
   });
 
-  describe('device writer id row (#117 Phase 2)', () => {
-    it('is minted on the first open, persisted, and posted into the realm', async () => {
-      const id = await readDeviceWriterId();
-      expect(id).toMatch(/^[0-9a-f-]{36}$/);
-      // Production ignores the actor: every handle in the realm is this one device.
-      expect(deviceWriterIdFor('any-actor')).toBe(id);
-      expect(isDeviceWriterIdEphemeral()).toBe(false);
+  describe('dead device-writer row (#117 writer flip)', () => {
+    it('a base write deletes an existing device-writer row, in its own transaction', async () => {
+      // A 0.91.2 cache minted this row; nothing reads it any more (the actor is the whole
+      // Counter writer), so the next base write cleans it beside the legacy doc row.
+      const raw = await openDB(`beanies-automerge-${FAMILY_ID}`, 1);
+      await raw.put('doc', { id: 'device-writer', payload: 'old-device', updatedAt: 'x' });
+      expect(await raw.get('doc', 'device-writer')).toBeDefined();
+      await persistDocBinary(key, saveDoc(setAccount(base(), 'a1', 1)));
+      expect(await raw.get('doc', 'device-writer')).toBeUndefined();
+      raw.close();
+      // And the cache still round-trips.
+      const loaded = await loadCachedDoc(key, FAMILY_ID);
+      expect(materializeCollection(loaded!.doc, 'accounts', foldIndex(loaded!.doc))).toEqual([
+        ['a1', { id: 'a1', balance: 1 }],
+      ]);
     });
 
-    it('is STABLE across a reopen (a reload is the same device), and survives a base write', async () => {
-      const id = await readDeviceWriterId();
-      await persistDocBinary(key, saveDoc(setAccount(base(), 'a1', 1))); // increment sweep
-      closeCacheDB();
-      // The closed handle takes its id with it: the realm falls back to an ephemeral one.
-      expect(isDeviceWriterIdEphemeral()).toBe(true);
-      expect(deviceWriterIdFor('x')).not.toBe(id);
-      await initPersistenceDB(FAMILY_ID);
-      expect(await readDeviceWriterId()).toBe(id);
-      expect(deviceWriterIdFor('x')).toBe(id);
-    });
-
-    it('dies with the cache: after clearCache the next open is a NEW device', async () => {
-      const id = await readDeviceWriterId();
-      await clearCache(FAMILY_ID);
-      expect(isDeviceWriterIdEphemeral()).toBe(true);
-      await initPersistenceDB(FAMILY_ID);
-      const next = await readDeviceWriterId();
-      expect(next).not.toBe(id);
-      expect(deviceWriterIdFor('x')).toBe(next);
-    });
-
-    it('is per family: another family cache has its own id', async () => {
-      const id = await readDeviceWriterId();
-      await initPersistenceDB('cache-test-other-family');
-      try {
-        expect(await readDeviceWriterId()).not.toBe(id);
-      } finally {
-        await clearCache('cache-test-other-family');
-        await initPersistenceDB(FAMILY_ID);
-      }
+    it('an open never mints one', async () => {
+      const raw = await openDB(`beanies-automerge-${FAMILY_ID}`, 1);
+      expect(await raw.get('doc', 'device-writer')).toBeUndefined();
+      raw.close();
     });
   });
 

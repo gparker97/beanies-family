@@ -9,14 +9,17 @@
  * sees `baseline + Σ Counters` (the FOLD); every absolute write from main is converted back by
  * subtracting Σ (the UNFOLD). Main never sees a Counter and never computes a sum.
  *
- * ⚠️ THE FOUR RULES THIS MODULE EXISTS TO HOLD (each pinned in `automergeSemantics.test.ts`):
- *  1. ONE WRITER PER KEY, FOR LIFE. A later increment applies to EVERY conflicting Counter at a
- *     key (probe e'), so two actors creating the same key corrupts it beyond repair. The key's
- *     writer segment is `${deviceWriterId}:${actorId}`: the Automerge actor (fresh on every
- *     `load`, probe o) makes it single-writer, and the device id (minted once per family cache,
- *     `cache.ts`) says WHICH DEVICE owns it, which is how the rebase tells its own keys from a
- *     peer's. The map itself is created by a stored migration change so every device writes into
- *     ONE object.
+ * ⚠️ THE FIVE RULES THIS MODULE EXISTS TO HOLD (rules 1, 2 and 5 pinned in
+ *    `automergeSemantics.test.ts`):
+ *  1. ONE WRITER PER KEY, FOR LIFE, AND THE ACTOR IS THE WHOLE WRITER. A later increment applies
+ *     to EVERY conflicting Counter at a key (probe e'), so two actors creating the same key
+ *     corrupts it beyond repair. The key's writer segment is the Automerge actor alone
+ *     (`${collection}/${id}/${field}@${d}/${actorId}`, #117 writer flip, plan
+ *     `docs/plans/2026-10-04-crdt-counters-117-writer-flip.md` §A): the actor is fresh on every
+ *     `load` (probe o) and every adopt, rebase and compaction installs a freshly loaded or built
+ *     document, so a key name is never continued by a second handle or across lineages. NO KEY
+ *     HAS AN OWNER: there is no device id, and the rebase carries every live key (rule 5). The
+ *     map itself is created by a stored migration change so every device writes into ONE object.
  *  2. INTEGER MINOR UNITS, AT THE KEY'S OWN DECIMALS. `Counter.increment` truncates to an i64
  *     (probe l: -20.5 stores -20, a later +0.25 is dropped), so every Counter holds
  *     `round(amount × 10^d)`, where `d` is the entity's currency minor unit at the time of the
@@ -27,6 +30,31 @@
  *     through untouched, so a build with writes off writes byte-for-byte what it wrote before.
  *  4. THE FOLD NEVER THROWS. A malformed or unknown key is skipped and counted: it persists
  *     until compaction, and a throw on read would block the family's whole open.
+ *  5. A REBASE CARRIES, IT NEVER INCREMENTS (probe p). A dirty peer rebasing onto a compacted
+ *     target writes the growth the target lacks as a CARRY REGISTER: a put-only plain integer at
+ *     `…@${d}/carry.${writer}.${targetSeq}` (`carryKeyFor`), where `writer` is the actor the key
+ *     stands for and `targetSeq` the target generation. Two peers carrying one key onto one
+ *     generation write ONE name (Automerge keeps one value, never two Counters that add); two
+ *     generations write two names, so the name-keyed ledger never overwrites one register with
+ *     another. A register is never incremented: a plain integer makes `.increment` a TypeError.
+ *     Increments only ever go to the session's own actor key.
+ *
+ *     THE CANONICAL-KNOWLEDGE RULE: growth is per CANONICAL key (the key with any carry prefix
+ *     and generation stripped), the SUM of the peer's live names for it minus the target's
+ *     knowledge of it folded AFTER the peer's generation `P`, which the names alone identify: a
+ *     target entry counts iff its name is one of the peer's live names (live on `P`, so first
+ *     folded at `≥ P+1`) or it is a carry onto a generation `≥ P` (`targetKnowledge`); the
+ *     current-generation register is excluded (the register rule owns it). Why canonical, not
+ *     exact-name: session S (actor X) holds `K = 10` on `P`; compactor D held 8 and compacted to
+ *     `T` (ledger `K = 8`); peer B held 9, rebased onto `T` and put `carry.X.T = 1`; `T+1`
+ *     ledgers it. S rebasing onto `T+1` per exact name sees 8, carries 2, and the fold reads 11
+ *     for a true 10; per canonical key it knows 8 + 1 = 9, carries 1, and the fold reads 10.
+ *     Why the SUM over names, once per canonical key: a restore keeps the chosen file's history,
+ *     so `K` can be live on the restore generation `R` beside a pre-restore peer's
+ *     `carry.X.R = 2`. Peer F on `R` holds both; D compacts to `R+1` (ledger `K = 10`,
+ *     `carry.X.R = 2`). Per name and summed, F computes −2 for `K` and 0 for the register, a
+ *     phantom reversal; over the name set, 12 − (10 + 2) = 0. With one live name per canonical
+ *     key the two formulations are identical.
  *
  * Every Counter-specific algorithm lives here (fold, unfold, write, compaction ledger, rebase
  * growth, stats) so `docOps.ts` and `applyAndProject.ts` only call in, and no other site
@@ -41,7 +69,6 @@ import * as Automerge from '@automerge/automerge';
 import { CURRENCIES } from '@/constants/currencies';
 import type { CollectionName, FamilyDocument, COUNTER_COLLECTION_NAMES } from '@/types/automerge';
 import { StaleBuildCounterError } from '@/types/sync';
-import type { MutationOp } from './protocol';
 
 type AnyRecord = Record<string, unknown>;
 type Doc = Automerge.Doc<FamilyDocument>;
@@ -49,31 +76,30 @@ type Doc = Automerge.Doc<FamilyDocument>;
 // ─── The switch ──────────────────────────────────────────────────────────────
 
 /**
- * Whether adjustments are WRITTEN as Counters. The READER side (fold, map creation, ledger,
- * projection touch) is always on; only the writer waits behind this.
+ * Whether adjustments are WRITTEN as Counters when no policy has ever reached this realm (a
+ * self-host without a registry, a first boot before the registry answers). The READER side
+ * (fold, map creation, ledger, carries, projection touch) is always on; only the writer waits.
  *
- * ⚠️ RELEASE ORDER, NEVER COMPRESSED (runbook `docs/runbooks/native-store-submission.md` §7):
- *  1. ship the fold-capable build (this one, `false`) everywhere;
- *  2. raise the update floor (`promptBelowVersion`) to that build;
- *  3. flip this to `true` in the NEXT release, together with the `SNAPSHOT_MANUAL_REV` bump in
- *     `cache.ts` (a pre-fold build's persisted snapshot holds unfolded absolutes only once a
- *     newer build has written Counters, which is after the flip).
- * Never flip in the same release that first ships the fold: a pre-fold build cannot read a
- * Counter, displays balances missing every adjustment written as one, and turns its own
- * "set balance to X" into `X + Σ`. The floor only PROMPTS, so the build that flips must be
- * at least one release after the build that reads.
- *
- * A compile-time constant, not a runtime flag or a Beanie Lab toggle: it is an ordering
- * control. Its only reader is `adjustField`, through module state the test seam below sets.
+ * ⚠️ THE SWITCH IS A SERVED POLICY (#117 writer flip, plan §F). The registry GET carries
+ * `dataPolicy.counterWrites`; main persists the last-known value and the worker receives it
+ * through `setCounterWrites` at `setFamilyKey`, on a respawn or inline re-drive, and on a live
+ * change. The flip and the rollback are a Terraform variable, never a release. Release order
+ * (runbook `docs/runbooks/native-store-submission.md` §7): ship this build with the policy off,
+ * wait until it is live on both stores and the floor is raised to it, then flip the variable.
+ * A later release may flip THIS default once the hosted fleet has soaked.
  */
-export const COUNTER_WRITES_ENABLED = false;
+export const COUNTER_WRITES_DEFAULT = false;
 
-let countersOn: boolean = COUNTER_WRITES_ENABLED;
+let countersOn: boolean = COUNTER_WRITES_DEFAULT;
 
-/** Test seam: run `adjustField` with writes on or off. Reset to `COUNTER_WRITES_ENABLED` in an
- *  `afterEach`; module state leaks between tests in one file otherwise. */
-export function __setCounterWritesForTesting(on: boolean): void {
-  countersOn = on;
+/**
+ * THE setter for the Counter-write switch: the policy the worker was handed, or `null` for "no
+ * policy" (`COUNTER_WRITES_DEFAULT`). The worker's `setCounterWrites` RPC calls it, and tests
+ * use it as their seam: reset with `setCounterWrites(null)` in an `afterEach`, because module
+ * state leaks between tests in one file otherwise.
+ */
+export function setCounterWrites(on: boolean | null): void {
+  countersOn = on ?? COUNTER_WRITES_DEFAULT;
 }
 
 // ─── The table ───────────────────────────────────────────────────────────────
@@ -275,10 +301,17 @@ export function foldValue(
 const entityFieldKey = (collection: string, id: string, field: string): string =>
   `${collection}/${id}/${field}`;
 
+/** The carry-register namespace. Written only by `carryKeyFor`; refused by `counterKey`. */
+const CARRY_PREFIX = 'carry.';
+
+/** `carry.<of>.<seq>`: `of` is everything up to the LAST `.`, `seq` the decimal digits after. */
+const CARRY_SEGMENT = /^carry\.(.+)\.(\d{1,15})$/;
+
 /**
- * The Counter key `${collection}/${id}/${field}@${decimals}/${writer}`, where `writer` is
- * `${deviceWriterId}:${actorId}` (`docActor.counterWriterId`). Throws for a field not in the
- * table, a writer that would not parse back (empty, or a `/` in it), or a scale outside
+ * The Counter key `${collection}/${id}/${field}@${decimals}/${writer}`, where `writer` is the
+ * writing handle's Automerge actor (rule 1). Throws for a field not in the table, a writer that
+ * would not parse back (empty, or a `/` in it) or that would read as a carry register (it
+ * starts with `carry.`, a namespace only `carryKeyFor` writes), or a scale outside
  * [`MIN_COUNTER_DECIMALS`, `MAX_COUNTER_DECIMALS`]: a key the fold cannot read is an adjustment
  * that silently vanishes. The id may contain `/`; the parser reads the fixed segments from both
  * ends.
@@ -291,10 +324,11 @@ export function counterKey(
   writerId: string
 ): string {
   resolveField(collection, field);
-  if (id === '' || writerId === '' || writerId.includes('/')) {
+  if (id === '' || writerId === '' || writerId.includes('/') || writerId.startsWith(CARRY_PREFIX)) {
     throw new Error(
       `counterFields: cannot key ${collection}/${id}/${field} for writer "${writerId}": ` +
-        `the id and writer must be non-empty and the writer must not contain "/".`
+        `the id and writer must be non-empty, the writer must not contain "/" and must not ` +
+        `start with "${CARRY_PREFIX}" (the carry-register namespace).`
     );
   }
   if (
@@ -320,7 +354,7 @@ interface KeyParts {
 }
 
 /** Split a key into its segments, or `null` when it is not `c/id/field@d/writer`. The writer
- *  may contain `:` (it always does); only `/` separates segments. */
+ *  may contain `:` or `.` (a carry register's does); only `/` separates segments. */
 function splitCounterKey(key: string): KeyParts | null {
   const parts = key.split('/');
   if (parts.length < 4) return null;
@@ -344,8 +378,15 @@ export interface ParsedCounterKey {
   field: string;
   /** The scale its Counter's integer is at (minor units per major = 10^decimals). */
   decimals: number;
-  /** `${deviceWriterId}:${actorId}` for every key this build writes. */
+  /** The writer segment: an actor id for an increment key, `carry.<of>.<seq>` for a register.
+   *  (A 0.91.2-shaped `${deviceId}:${actorId}` segment also parses; no build ever wrote one.) */
   writer: string;
+  /** Set when the writer segment is a carry register `carry.<of>.<seq>`: `of` is the writer of
+   *  the key it stands for, `seq` the generation it was put on. `null` for an increment key. */
+  carry: { of: string; seq: number } | null;
+  /** The key with the writer replaced by `carry.of` (a register), or the key itself: every
+   *  name for one writer's adjustment of one field at one scale shares it (rule 5). */
+  canonical: string;
 }
 
 /** A key's segments, or `null` when it does not parse or names a (collection, field) this
@@ -354,7 +395,31 @@ export function parseCounterKey(key: string): ParsedCounterKey | null {
   const parts = splitCounterKey(key);
   if (!parts || !isCounterCollection(parts.collection)) return null;
   if (!lookupField(parts.collection, parts.field)) return null;
-  return parts as ParsedCounterKey;
+  const m = CARRY_SEGMENT.exec(parts.writer);
+  const carry = m ? { of: m[1]!, seq: Number(m[2]) } : null;
+  const canonical = carry
+    ? `${entityFieldKey(parts.collection, parts.id, parts.field)}@${parts.decimals}/${carry.of}`
+    : key;
+  return { ...(parts as Omit<ParsedCounterKey, 'carry' | 'canonical'>), carry, canonical };
+}
+
+/**
+ * The carry-register name for `canonicalKey` put on generation `targetSeq`:
+ * `${collection}/${id}/${field}@${d}/carry.${writer}.${targetSeq}` (rule 5). THE only place a
+ * register name is built. Throws for a key that does not parse, that is itself a register (a
+ * caller must pass the canonical key), or a generation that is not a non-negative integer.
+ */
+export function carryKeyFor(canonicalKey: string, targetSeq: number): string {
+  const parsed = parseCounterKey(canonicalKey);
+  if (!parsed || parsed.carry !== null || !Number.isSafeInteger(targetSeq) || targetSeq < 0) {
+    throw new Error(
+      `counterFields: cannot build a carry register for generation ${String(targetSeq)}: the ` +
+        `key must be a canonical (non-carry) Counter key this build can parse and the ` +
+        `generation a non-negative integer.`
+    );
+  }
+  const { collection, id, field, decimals, writer } = parsed;
+  return `${entityFieldKey(collection, id, field)}@${decimals}/${CARRY_PREFIX}${writer}.${targetSeq}`;
 }
 
 /** A Counter's value in minor units, or `null` when it is not a safe integer. Reads a
@@ -658,9 +723,10 @@ export function unfoldPatch<P extends AnyRecord, B extends AnyRecord | undefined
  * Throws when the entity, or the parent of a nested field (an asset's `loan`), is missing:
  * callers check existence and `onMissing` first.
  *
- * `writerId` is `docActor.counterWriterId(actor)`: `${deviceWriterId}:${actorId}`, unique per
- * live handle and fresh per `load` (rule 1 in the header). Never absent: a session whose cache
- * never opened writes under an ephemeral device id (`docActor.ts`).
+ * `writerId` is the writing handle's Automerge actor (`Automerge.getActorId(doc)`, read once per
+ * mutation by `applyMutation`): unique per live handle and fresh per `load`, so it is the whole
+ * writer (rule 1). It never names a carry register (`counterKey` refuses `carry.`), so an
+ * increment can never land on one (rule 5).
  *
  * `index`, when given, is `foldIndex(draft)` built BEFORE this write by a handler that reads the
  * draft again afterwards (its echo). A Counter write is recorded in it (`CounterIndex.add`), so
@@ -725,24 +791,77 @@ export function adjustField(
 
 // ─── Compaction and rebase ───────────────────────────────────────────────────
 
+/**
+ * One fold-ledger entry: `{ v: minorUnits, s: foldedAtSeq }` (#117 writer flip, plan §D), or a
+ * bare number written by a 0.91.2 compaction (normalised by this build's next `foldDoc`).
+ * Read ONLY through `ledgerValue` / `ledgerSeq`.
+ */
+export type LedgerEntry = number | { v: number; s: number };
+
+/** How many generations a ledger entry is kept after the compaction that folded it. A dirty
+ *  peer further behind than this cannot compute exact growth and is blocked (`ledger-window`). */
+export const LEDGER_WINDOW = 12;
+
+/** A ledger entry's value in minor units (either shape), or `null` when it is neither shape. */
+export function ledgerValue(e: unknown): number | null {
+  if (typeof e === 'number') return Number.isSafeInteger(e) ? e : null;
+  if (e !== null && typeof e === 'object') {
+    const v = (e as { v?: unknown }).v;
+    return typeof v === 'number' && Number.isSafeInteger(v) ? v : null;
+  }
+  return null;
+}
+
+/** The generation a ledger entry was folded at, or `null` for a bare number (0.91.2) or an
+ *  entry with no readable `s`. Read by pruning and `counterStats` only, never by growth. */
+export function ledgerSeq(e: unknown): number | null {
+  if (e === null || typeof e !== 'object') return null;
+  const s = (e as { s?: unknown }).s;
+  return typeof s === 'number' && Number.isSafeInteger(s) ? s : null;
+}
+
+/** What one compaction did to the ledger, for the compaction log. */
+export interface LedgerFigures {
+  /** Entries dropped because they were folded more than `LEDGER_WINDOW` generations ago. */
+  pruned: number;
+  /** Bare-number (0.91.2) entries rewritten as `{ v, s: newSeq }`. */
+  normalised: number;
+  /** Folded keys whose name was already in the prior ledger: a name reuse (a bug), warned. */
+  collisions: number;
+}
+
 /** The compaction source: a plain document with every Counter folded, the map empty and the
- *  ledger extended. No `Counter` instance anywhere in it. */
+ *  ledger rebuilt. No `Counter` instance anywhere in it. */
 export type FoldedSource = Omit<FamilyDocument, 'counterDeltas' | 'foldedCounters'> & {
   counterDeltas: Record<string, never>;
-  foldedCounters?: Record<string, number>;
+  foldedCounters?: Record<string, { v: number; s: number }>;
+  /**
+   * What this compaction did to the ledger. ⚠️ NON-ENUMERABLE, so it is never a document key:
+   * `{ ...source }` and `Automerge.from(source)` both drop it (a new root key would degrade a
+   * 0.91.2 peer's incremental projection, `docOps.touchedBetween`). Read it off the returned
+   * object before spreading.
+   */
+  readonly ledger: LedgerFigures;
 };
 
 /**
- * The compaction source for `before`: `Automerge.toJS`, every Counter field folded, then
- * `counterDeltas = {}` and the fold ledger EXTENDED with every key removed from the map. Each
- * ledger entry is keyed by the full Counter key, scale included, so a rebase reads it at the
- * decimals its integer was written at.
+ * The compaction source for `before`, compacting to generation `newSeq`: `Automerge.toJS`, every
+ * Counter field folded, then `counterDeltas = {}` and the fold ledger REBUILT. Each ledger entry
+ * is keyed by the full Counter key, scale included (a carry register under its own full name),
+ * so a rebase reads it at the decimals its integer was written at.
  *
- * ⚠️ THE LEDGER IS CUMULATIVE, NEVER REPLACED. A dirty peer is rebased at ANY generation gap
- * (`podLineage.ts`), so a peer two compactions behind must still find the key folded at the
- * earlier one, or it re-emits that adjustment and counts it twice. Every parseable key is
- * ledgered, including one whose entity is gone or whose `loan` was removed (folded into
- * nothing): the ledger records that the key's value was CONSUMED, so a rebase cannot replay it.
+ * ⚠️ THE LEDGER IS BOUNDED BY GENERATION (#117 writer flip, plan §D). Every key folded here is
+ * written `{ v, s: newSeq }`; a prior entry is kept (a bare 0.91.2 number rewritten as
+ * `{ v, s: newSeq }`, conservative: it lives a full window from now) unless its `s` is older
+ * than `newSeq − LEDGER_WINDOW`, when it is pruned. A dirty peer is rebased only within the
+ * window (`blockedBy: 'ledger-window'` beyond it), and every entry its growth reads was folded
+ * at a generation after its own, so a pruned entry is never one a rebase still needs. Every
+ * parseable key is ledgered, including one whose entity is gone or whose `loan` was removed
+ * (folded into nothing): the ledger records that the key's value was CONSUMED.
+ *
+ * A folded key whose name is already in the prior ledger is a NAME REUSE (impossible with fresh
+ * actors and generation-stamped registers): counted in `ledger.collisions`, warned once, and the
+ * newer value wins, so nothing is silent.
  *
  * ⚠️ THROWS `StaleBuildCounterError` FOR ANY STRUCTURALLY VALID KEY WHOSE COLLECTION OR FIELD
  * THIS BUILD LACKS (C9e; it used to refuse only an unknown FIELD and silently drop an unknown
@@ -754,16 +873,17 @@ export type FoldedSource = Omit<FamilyDocument, 'counterDeltas' | 'foldedCounter
  * A key that does not even split (or a known key holding a value that is not a safe integer)
  * cannot be read by any build, so refusing would block compaction forever for nothing: it is
  * dropped, unledgered, with ONE `console.warn`. The READ side (`foldIndex`) never throws (rule
- * 4); it is also the one classifier this reads.
+ * 4); it is also the one classifier this reads. A prior ledger entry of neither shape is dropped
+ * the same way, with one warning.
  *
  * ⚠️ THE STORED ABSOLUTE IS `abs + Σ`, UNFLOORED (C9b). The floor is a READ-time backstop; baking
  * it into the stored value turned "two decrements crossed 0" into a lost amount that no later
  * adjustment could recover. `foldEntity` applies the floor on every read, keys or not.
  *
- * `foldedCounters` is written only when it holds something, so a dormant pod's compaction
- * source is today's plus the empty map.
+ * `foldedCounters` is written only when it holds something (or held something before), so a
+ * dormant pod's compaction source is today's plus the empty map.
  */
-export function foldDoc(before: Doc): FoldedSource {
+export function foldDoc(before: Doc, newSeq: number): FoldedSource {
   const index = foldIndex(before);
   if (index.unknownField) {
     throw new StaleBuildCounterError(index.unknownField.collection, index.unknownField.field);
@@ -785,78 +905,238 @@ export function foldDoc(before: Doc): FoldedSource {
       }
     }
   }
-  const prior = plain.foldedCounters as Record<string, number> | undefined;
-  const ledger: Record<string, number> = { ...prior };
+  const prior = plain.foldedCounters as Record<string, unknown> | undefined;
+  const ledger: Record<string, { v: number; s: number }> = {};
+  const figures: LedgerFigures = { pruned: 0, normalised: 0, collisions: 0 };
+  const pruneBelow = newSeq - LEDGER_WINDOW;
+  let unreadable = 0;
+  for (const [name, e] of Object.entries(prior ?? {})) {
+    const v = ledgerValue(e);
+    if (v === null) {
+      unreadable++;
+      continue;
+    }
+    const s = ledgerSeq(e);
+    if (s !== null && s < pruneBelow) {
+      figures.pruned++;
+      continue;
+    }
+    if (s === null) figures.normalised++;
+    ledger[name] = { v, s: s ?? newSeq };
+  }
+  if (unreadable > 0) {
+    console.warn(
+      `[counterFields] compaction drops ${unreadable} fold-ledger entr${unreadable === 1 ? 'y' : 'ies'} ` +
+        `that hold no readable value.`
+    );
+  }
   let added = 0;
+  let firstCollision: CounterKeyLabel | null = null;
   for (const [key, v] of Object.entries(before.counterDeltas ?? {})) {
-    const value = parseCounterKey(key) ? counterValue(v) : null;
-    if (value === null) continue; // a dropped key (warned above): never ledgered
-    ledger[key] = value;
+    const parsed = parseCounterKey(key);
+    const value = parsed ? counterValue(v) : null;
+    if (parsed === null || value === null) continue; // a dropped key (warned above): never ledgered
+    if (prior !== undefined && Object.hasOwn(prior, key)) {
+      figures.collisions++;
+      firstCollision ??= { collection: parsed.collection, field: parsed.field };
+    }
+    ledger[key] = { v: value, s: newSeq };
     added++;
+  }
+  if (firstCollision) {
+    console.warn(
+      `[counterFields] compaction folded ${figures.collisions} Counter key name(s) already in ` +
+        `the fold ledger (first: ${firstCollision.collection}.${firstCollision.field}); the ` +
+        `newer value wins. A key name was reused, which fresh actors and generation-stamped ` +
+        `carry registers should make impossible.`
+    );
   }
   plain.counterDeltas = {};
   if (added > 0 || prior !== undefined) plain.foldedCounters = ledger;
+  Object.defineProperty(plain, 'ledger', { value: figures, enumerable: false });
   return plain as unknown as FoldedSource;
 }
 
 /** Anything carrying the map and (optionally) the ledger: a doc or a plain source. */
-type GrowthSource = CounterSource & {
+export type GrowthSource = CounterSource & {
   readonly foldedCounters?: Readonly<Record<string, unknown>> | null;
 };
 
 /**
- * The rebase's Counter pass: what THIS DEVICE adjusted that `target` does not yet hold, as one
- * `increment` op per (collection, id, field).
+ * What a rebase target already holds of one canonical key, in minor units at that key's scale,
+ * given the set of names the dirty peer holds live for it. Built ONCE per rebase by
+ * `targetKnowledge` (ledger mode) or `baselineKnowledge` (restore mode); `counterGrowthOps`
+ * subtracts it from the peer's live sum.
+ */
+export interface Knowledge {
+  of(canonical: string, names: ReadonlySet<string>): number;
+}
+
+/** One target entry for a canonical key: its name, its carry generation, its value. */
+interface KnownEntry {
+  readonly name: string;
+  readonly carrySeq: number | null;
+  readonly value: number;
+}
+
+/**
+ * The target's knowledge for a peer on generation `localSeq` rebasing onto generation
+ * `targetSeq` (rule 5, plan Requirement 3). One pass over the target's ledger and one over its
+ * live map, grouped by canonical key; `of(K, names)` sums the entries of `K` whose name is one
+ * of `names` (live on the peer's generation, so first folded after it) OR that are a carry onto
+ * a generation `≥ localSeq` (first folded after the peer's generation). Everything older is
+ * knowledge the peer's own values already discount.
  *
- * ⚠️ OWNERSHIP IS THE KEY'S DEVICE SEGMENT, NEVER A VALUE COMPARISON. Only keys whose writer
- * starts with `${deviceWriterId}:` are this device's; a foreign key is NEVER replayed, however
- * its local copy compares to the target. A foreign key's local copy can be stale-lower than
- * what the compactor folded (its writer kept adjusting after `local` last merged), and
- * `mine − ledger` on it would fabricate that writer's later growth, negated, on its account. A
- * baseline view cannot tell the two apart (a baseline commit that missed Drive makes a foreign
- * key look changed; an own key that nets back to its baseline value looks unchanged), so none
- * is taken. Two tabs of one device share the device id (and have different actors), so each
- * re-emits its own keys.
+ * The live current-generation register `carryKeyFor(K, targetSeq)` is EXCLUDED: the register
+ * rule owns it (an own-actor carry overwrites it, a foreign carry is skipped outright). Any
+ * other live name on a compacted target is a below-floor pre-fold compaction's carried-through
+ * copy and is knowledge like a ledger entry. Unparseable names and unreadable values are
+ * skipped. `s` is never read: growth is decided by names alone.
+ */
+export function targetKnowledge(
+  target: GrowthSource,
+  localSeq: number,
+  targetSeq: number
+): Knowledge {
+  const byCanonical = new Map<string, KnownEntry[]>();
+  const record = (name: string, value: number | null, parsed: ParsedCounterKey) => {
+    if (value === null) return;
+    let list = byCanonical.get(parsed.canonical);
+    if (!list) {
+      list = [];
+      byCanonical.set(parsed.canonical, list);
+    }
+    list.push({ name, carrySeq: parsed.carry?.seq ?? null, value });
+  };
+  for (const [name, e] of Object.entries(target.foldedCounters ?? {})) {
+    const parsed = parseCounterKey(name);
+    if (parsed) record(name, ledgerValue(e), parsed);
+  }
+  for (const [name, v] of Object.entries(target.counterDeltas ?? {})) {
+    const parsed = parseCounterKey(name);
+    if (!parsed) continue;
+    if (parsed.carry !== null && parsed.carry.seq === targetSeq) continue; // the register rule's
+    record(name, counterValue(v), parsed);
+  }
+  return {
+    of(canonical, names) {
+      let known = 0;
+      for (const e of byCanonical.get(canonical) ?? []) {
+        if (names.has(e.name) || (e.carrySeq !== null && e.carrySeq >= localSeq)) known += e.value;
+      }
+      return known;
+    },
+  };
+}
+
+/**
+ * The restore rule's knowledge (plan Requirement 6): the peer's OWN baseline view `before`,
+ * looked up by exact name (same document, same lineage), so growth is only what this peer has
+ * not yet synced and adjustments a restore rolled back are not re-applied.
+ */
+export function baselineKnowledge(before: CounterSource): Knowledge {
+  return {
+    of(_canonical, names) {
+      let known = 0;
+      for (const n of names) known += counterValue(before.counterDeltas?.[n]) ?? 0;
+      return known;
+    },
+  };
+}
+
+/**
+ * One rebase carry (rule 5): put `minor` (integer minor units at the scale `name` carries) as
+ * the plain-integer register `name` on entity `(collection, id)`. `exact` is true when one of
+ * the peer's live names for the canonical key is the rebasing document's own actor key: such a
+ * carry OVERWRITES an existing register; a foreign one is skipped when a register exists.
  *
- * Per own key, growth = local value − (the target's live key ?? the target's ledger entry ?? 0)
- * in minor units at the key's decimals: exact, and negative when the device reversed an
- * adjustment after the fold. The live read comes first because a target that never compacted
- * (or was compacted by a pre-fold build, which carries the map through intact) still holds the
- * key. `onMissing: 'skip'` keeps the composer's "the compactor deleted it" rule. Malformed keys
- * are skipped. The emitted delta is major units (Σ per scale ÷ 10^d); the increment re-keys it
- * under the rebasing session's own key at the entity's current scale.
+ * Worker-only, like the rebase's raw `patch`. WP2 of the writer-flip plan adds it to
+ * `protocol.ts`'s `MutationOp` union; until then it is declared here.
+ */
+export interface CarryOp {
+  op: 'carry';
+  collection: CounterCollection;
+  id: string;
+  name: string;
+  minor: number;
+  exact: boolean;
+}
+
+/** One canonical key's live names on the rebasing peer, summed. */
+interface CanonicalGroup {
+  readonly collection: CounterCollection;
+  readonly id: string;
+  readonly names: Set<string>;
+  sum: number;
+  exact: boolean;
+}
+
+/**
+ * The rebase's Counter pass: the growth `target` lacks, as ONE `carry` op per canonical key
+ * (rule 5, plan Requirements 2-4). Nobody owns a key: EVERY live parseable key the peer holds is
+ * considered, own or foreign.
  *
- * `deviceWriterId` is the realm's id at rebase time (`docActor.deviceWriterIdFor`): the cache's
- * persisted one, or this session's ephemeral one when the cache never opened, which is exactly
- * the id this session's own keys carry.
+ * First pass: group the peer's parseable live names by canonical key (`sum` of their values;
+ * `exact` when one of them is the peer's own actor key, `Automerge.getActorId(local)`). Second
+ * pass, per group: `g = sum − knowledge.of(canonical, names)`; `g = 0` emits nothing; a FOREIGN
+ * group with `g < 0` is a reversal only when `foreignNegatives` (the peer holds every change the
+ * compactor folded, or restore mode), else it may be a stale copy and is skipped and counted in
+ * `skippedNegative`; everything else becomes one `carry` op named `carryKeyFor(K, targetSeq)`.
+ * The caller decides the knowledge and the sign rule once; there is no mode switch here.
+ *
+ * Malformed keys (unparseable, unknown field, a value that is not a safe integer) are skipped.
+ * `onMissing` is the `carry` op's own rule: an entity the compactor deleted is skipped there.
  */
 export function counterGrowthOps(
-  local: GrowthSource,
-  target: GrowthSource,
-  deviceWriterId: string
-): { ops: MutationOp[]; count: number } {
-  const map = local.counterDeltas;
-  if (!map) return { ops: [], count: 0 };
+  local: Doc,
+  knowledge: Knowledge,
+  foreignNegatives: boolean,
+  targetSeq: number
+): { ops: CarryOp[]; skippedNegative: number } {
+  const map = local.counterDeltas as Readonly<Record<string, unknown>> | undefined;
+  if (!map) return { ops: [], skippedNegative: 0 };
   const keys = Object.keys(map);
-  if (keys.length === 0) return { ops: [], count: 0 };
-  const own = `${deviceWriterId}:`;
-  const growth = new CounterIndex();
+  if (keys.length === 0) return { ops: [], skippedNegative: 0 };
+  const own = Automerge.getActorId(local);
+  const groups = new Map<string, CanonicalGroup>();
   for (const key of keys) {
     const parsed = parseCounterKey(key);
-    if (!parsed || !parsed.writer.startsWith(own)) continue; // foreign (or unreadable): never
-    const mine = counterValue(map[key]);
-    if (mine === null) continue;
-    const theirs =
-      counterValue(target.counterDeltas?.[key]) ?? counterValue(target.foldedCounters?.[key]) ?? 0;
-    const g = mine - theirs;
-    if (g !== 0) growth.add(parsed.collection, parsed.id, parsed.field, parsed.decimals, g);
+    const value = parsed ? counterValue(map[key]) : null;
+    if (parsed === null || value === null) continue;
+    let group = groups.get(parsed.canonical);
+    if (!group) {
+      group = {
+        collection: parsed.collection,
+        id: parsed.id,
+        names: new Set(),
+        sum: 0,
+        exact: false,
+      };
+      groups.set(parsed.canonical, group);
+    }
+    group.names.add(key);
+    group.sum += value;
+    group.exact ||= parsed.carry === null && parsed.writer === own;
   }
-  const ops: MutationOp[] = [];
-  for (const { collection, id, field, major } of growth.fields()) {
-    if (major === 0) continue;
-    ops.push({ op: 'increment', collection, id, field, delta: major, onMissing: 'skip' });
+  const ops: CarryOp[] = [];
+  let skippedNegative = 0;
+  for (const [canonical, group] of groups) {
+    const g = group.sum - knowledge.of(canonical, group.names);
+    if (g === 0) continue;
+    if (g < 0 && !group.exact && !foreignNegatives) {
+      skippedNegative++;
+      continue;
+    }
+    ops.push({
+      op: 'carry',
+      collection: group.collection,
+      id: group.id,
+      name: carryKeyFor(canonical, targetSeq),
+      minor: g,
+      exact: group.exact,
+    });
   }
-  return { ops, count: ops.length };
+  return { ops, skippedNegative };
 }
 
 // ─── Stats ───────────────────────────────────────────────────────────────────
@@ -865,34 +1145,59 @@ export function counterGrowthOps(
 export interface CounterStats {
   /** Keys in the live map (growth between compactions). */
   keys: number;
-  /** Keys holding more than one concurrent value: two writers shared a key. A bug. */
+  /** Increment keys holding more than one concurrent value: two writers shared a key. A bug. */
   conflicts: number;
+  /** Carry registers holding more than one concurrent value: two peers put the same register
+   *  without having merged each other first. The documented residual (Automerge's pick). */
+  carryConflicts: number;
   /** Keys the fold skipped (unparseable, unknown field, non-integer value). */
   malformed: number;
-  /** Entries in the cumulative fold ledger. */
+  /** Entries in the bounded fold ledger. */
   ledgerKeys: number;
+  /** The oldest generation a ledger entry was folded at, or `null` (empty, or bare entries only). */
+  ledgerOldest: number | null;
 }
 
 /**
  * One pass over the map for conflicts (`getConflicts` on the nested map, probe n: `undefined`
- * for a single value, one entry per writer otherwise), plus `foldIndex`'s own malformed count
- * (the one classifier) and the ledger size. O(keys), tens at most between compactions; an
- * absent map reports zeros.
+ * for a single value, one entry per writer otherwise), split into increment keys (a bug) and
+ * carry registers (the residual) by `parseCounterKey(key).carry`, plus `foldIndex`'s own
+ * malformed count (the one classifier) and the ledger's size and oldest generation. O(keys),
+ * tens at most between compactions; an absent map reports zeros.
  */
 export function counterStats(doc: Doc): CounterStats {
   const map = doc.counterDeltas as Record<string, unknown> | undefined;
-  const ledgerKeys = Object.keys(doc.foldedCounters ?? {}).length;
-  if (!map) return { keys: 0, conflicts: 0, malformed: 0, ledgerKeys };
+  const ledger = (doc.foldedCounters ?? {}) as Readonly<Record<string, unknown>>;
+  const ledgerNames = Object.keys(ledger);
+  let ledgerOldest: number | null = null;
+  for (const name of ledgerNames) {
+    const s = ledgerSeq(ledger[name]);
+    if (s !== null && (ledgerOldest === null || s < ledgerOldest)) ledgerOldest = s;
+  }
+  const ledgerKeys = ledgerNames.length;
+  if (!map) {
+    return { keys: 0, conflicts: 0, carryConflicts: 0, malformed: 0, ledgerKeys, ledgerOldest };
+  }
   const keys = Object.keys(map);
   let conflicts = 0;
+  let carryConflicts = 0;
   for (const key of keys) {
     const values = Automerge.getConflicts(map as unknown as Automerge.Doc<AnyRecord>, key);
-    if (values && Object.keys(values).length > 1) conflicts++;
+    if (!values || Object.keys(values).length <= 1) continue;
+    if (parseCounterKey(key)?.carry) carryConflicts++;
+    else conflicts++;
   }
-  return { keys: keys.length, conflicts, malformed: foldIndex(doc).malformed, ledgerKeys };
+  return {
+    keys: keys.length,
+    conflicts,
+    carryConflicts,
+    malformed: foldIndex(doc).malformed,
+    ledgerKeys,
+    ledgerOldest,
+  };
 }
 
-/** Read-only view of the module's Counter-write switch (`__setCounterWritesForTesting` flips it). */
+/** Read-only view of the module's Counter-write switch (`setCounterWrites` sets it). */
 export function counterWritesOn(): boolean {
   return countersOn;
 }

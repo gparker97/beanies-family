@@ -30,8 +30,8 @@ import {
 import { MIGRATION_CHANGES } from '../migrationChanges';
 import { deviceWriterIdFor, isDeviceWriterIdEphemeral, setDeviceWriterId } from '../docActor';
 import {
-  COUNTER_WRITES_ENABLED,
-  __setCounterWritesForTesting,
+  COUNTER_WRITES_DEFAULT,
+  setCounterWrites,
   adjustField,
   counterStats,
   foldDoc,
@@ -781,7 +781,7 @@ describe('docOps — core domain named ops (financial atomic RMW)', () => {
 describe('docOps — relative writes through adjustField (#117 Phase 2)', () => {
   beforeEach(() => useTestDevices());
   afterEach(() => {
-    __setCounterWritesForTesting(COUNTER_WRITES_ENABLED);
+    setCounterWrites(null);
     resetTestDevices();
   });
 
@@ -882,14 +882,14 @@ describe('docOps — relative writes through adjustField (#117 Phase 2)', () => 
 
     it("a stored NEGATIVE amount (pre-Phase-2 history): writes off keeps today's write-time floor", () => {
       // Today: `Math.max(0, current + delta)` = max(0, -30 + 10) = 0 is what is stored.
-      __setCounterWritesForTesting(false);
+      setCounterWrites(false);
       const off = contribute(goalDoc({ currentAmount: -30 }), { delta: 10 });
       expect(off.doc.goals.g!.currentAmount).toBe(0);
       expect(goalOf(off.doc).currentAmount).toBe(0);
       // Writes on: the stored -30 stays (a baseline is never rewritten), the Counter holds the
       // applied +10 (the folded amount was 0, so the floor did not trim it), and the READ floor
       // shows max(0, -30 + 10) = 0, the same number.
-      __setCounterWritesForTesting(true);
+      setCounterWrites(true);
       const on = contribute(goalDoc({ currentAmount: -30 }), { delta: 10 });
       expect(on.doc.goals.g!.currentAmount).toBe(-30);
       expect(Object.values(on.doc.counterDeltas).map((c) => c.value)).toEqual([1000]);
@@ -960,7 +960,7 @@ describe('docOps — relative writes through adjustField (#117 Phase 2)', () => 
     beforeEach(() => {
       resetTestDevices(); // the realm's own id, as production
       setDeviceWriterId(null); // and no cache: nothing persisted was ever posted
-      __setCounterWritesForTesting(true);
+      setCounterWrites(true);
     });
     afterEach(() => setDeviceWriterId(null));
 
@@ -1021,7 +1021,7 @@ describe('docOps — relative writes through adjustField (#117 Phase 2)', () => 
   });
 
   it('the dormant path never touches the counterDeltas map', () => {
-    expect(COUNTER_WRITES_ENABLED).toBe(false);
+    expect(COUNTER_WRITES_DEFAULT).toBe(false);
     const d = apply(
       seeded([
         { op: 'set', collection: 'accounts', id: 'a', entity: { id: 'a', balance: 100 } },
@@ -1049,7 +1049,7 @@ describe('docOps — relative writes through adjustField (#117 Phase 2)', () => 
   });
 
   it('with writes on, each op writes its own key and leaves the baseline alone', () => {
-    __setCounterWritesForTesting(true);
+    setCounterWrites(true);
     const d = apply(
       seeded([
         { op: 'set', collection: 'accounts', id: 'a', entity: { id: 'a', balance: 100 } },
@@ -1576,10 +1576,10 @@ describe('docOps — deterministic collection creation (#117, plan F)', () => {
   });
 
   describe('the Phase 2 counterDeltas map (#117 Phase 2)', () => {
-    afterEach(() => __setCounterWritesForTesting(COUNTER_WRITES_ENABLED));
+    afterEach(() => setCounterWrites(null));
 
     it('two devices migrating an old pod get ONE counterDeltas object; keys written on both merge', () => {
-      __setCounterWritesForTesting(true);
+      setCounterWrites(true);
       // An old pod: every collection present, no counterDeltas, one account at 100.
       const pod = apply(oldPod(), setOp('accounts', { id: 'A', balance: 100 }));
       expect(pod.counterDeltas).toBeUndefined();

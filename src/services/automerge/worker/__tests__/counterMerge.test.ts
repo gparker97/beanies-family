@@ -11,12 +11,7 @@ import { describe, it, expect, afterEach, beforeEach } from 'vitest';
 import * as Automerge from '@automerge/automerge';
 import type { CollectionName } from '@/types/automerge';
 import { materializeCollection, getHeads } from '../docOps';
-import {
-  COUNTER_WRITES_ENABLED,
-  __setCounterWritesForTesting,
-  counterStats,
-  foldIndex,
-} from '../counterFields';
+import { setCounterWrites, counterStats, foldIndex } from '../counterFields';
 import type { MutationOp } from '../protocol';
 import {
   apply,
@@ -32,7 +27,7 @@ type AnyRec = Record<string, unknown>;
 
 beforeEach(() => useTestDevices());
 afterEach(() => {
-  __setCounterWritesForTesting(COUNTER_WRITES_ENABLED);
+  setCounterWrites(null);
   resetTestDevices();
 });
 
@@ -133,7 +128,7 @@ const historyOf = (doc: Doc) =>
 
 describe('concurrent adjustments merge to their sum (writes on)', () => {
   it('-20.25 and -30.50 on 100 give 49.25 on all three fields; a later -5.05 reads 44.20 on both', () => {
-    __setCounterWritesForTesting(true);
+    setCounterWrites(true);
     const { a, b } = fork(origin());
     const merged = converge(adjustAll(a, 20.25), adjustAll(b, 30.5));
     for (const doc of [merged.a, merged.b]) {
@@ -157,7 +152,7 @@ describe('concurrent adjustments merge to their sum (writes on)', () => {
   });
 
   it('merges in both orders to the same value, and a reversed loan payment lands too', () => {
-    __setCounterWritesForTesting(true);
+    setCounterWrites(true);
     const { a, b } = fork(origin());
     const a1 = apply(a, extraPayment(10.1), reversePayment(4.04));
     const b1 = apply(b, extraPayment(0.01));
@@ -168,7 +163,7 @@ describe('concurrent adjustments merge to their sum (writes on)', () => {
   });
 
   it('a loan payment on a loan ACCOUNT adjusts its balance on both devices', () => {
-    __setCounterWritesForTesting(true);
+    setCounterWrites(true);
     const loanAccount = { id: 'LA', type: 'loan', balance: 1000, interestRate: 12 };
     const { a, b } = fork(seeded([set('accounts', loanAccount)]));
     const pay: MutationOp = {
@@ -194,7 +189,7 @@ describe('quick contributions with history (writes on)', () => {
   }
 
   it('30 on A and 50 on B merge to the sum with both history entries', () => {
-    __setCounterWritesForTesting(true);
+    setCounterWrites(true);
     const merged = bothContributed();
     for (const doc of [merged.a, merged.b]) {
       expect(goalAmountOf(doc)).toBe(180);
@@ -207,7 +202,7 @@ describe('quick contributions with history (writes on)', () => {
     ['B undoes its own entry', 'b', 'cb', 50, 130, ['ca:30']],
     ['A undoes the entry B made', 'a', 'cb', 50, 130, ['ca:30']],
   ] as const)('%s: exactly that entry and amount go', (_n, side, id, amount, want, history) => {
-    __setCounterWritesForTesting(true);
+    setCounterWrites(true);
     const merged = bothContributed();
     const undone = apply(merged[side], contribute(-amount, { undoContributionId: id }));
     const other = side === 'a' ? merged.b : merged.a;
@@ -221,7 +216,7 @@ describe('quick contributions with history (writes on)', () => {
   it("an undo after a concurrent contribution merged removes the ENTRY's amount, not main's delta", () => {
     // Main sent a delta computed from a view the merge made stale (here -80: "back to before
     // both"). The entry being spliced recorded 30, so exactly 30 goes: total − entry.amount.
-    __setCounterWritesForTesting(true);
+    setCounterWrites(true);
     const merged = bothContributed();
     expect(goalAmountOf(merged.a)).toBe(180);
     const undone = apply(merged.a, contribute(-80, { undoContributionId: 'ca' }));
@@ -232,7 +227,7 @@ describe('quick contributions with history (writes on)', () => {
   });
 
   it('a second undo of the same entry, on either device after the merge, changes nothing', () => {
-    __setCounterWritesForTesting(true);
+    setCounterWrites(true);
     const merged = bothContributed();
     const undone = converge(
       apply(merged.a, contribute(-30, { undoContributionId: 'ca' })),
@@ -248,7 +243,7 @@ describe('quick contributions with history (writes on)', () => {
   });
 
   it('a retried contribution id appends nothing and adds nothing, on either device', () => {
-    __setCounterWritesForTesting(true);
+    setCounterWrites(true);
     const merged = bothContributed();
     const heads = getHeads(merged.b);
     const retried = apply(merged.b, contribute(30, { contribution: entry('ca', 30) }));
@@ -263,7 +258,7 @@ describe('quick contributions with history (writes on)', () => {
 
 describe('absolute writes and adjustments', () => {
   it('set-vs-increment: a "set balance to 500" on A and -20.25 on B merge to 479.75', () => {
-    __setCounterWritesForTesting(true);
+    setCounterWrites(true);
     const { a, b } = fork(origin());
     // The modal save: a based patch in folded space.
     const setTo = (v: number): MutationOp => ({
@@ -281,7 +276,7 @@ describe('absolute writes and adjustments', () => {
   it('merge-safety proof: increment and absolute set on either device, merged either way, lose nothing', () => {
     // The roles swapped AND the merge direction swapped: four runs, one answer. The rebase twin
     // (across a compaction) is in `rebase.test.ts`.
-    __setCounterWritesForTesting(true);
+    setCounterWrites(true);
     const setTo = (v: number): MutationOp => ({
       op: 'patch',
       collection: 'accounts',
@@ -301,9 +296,9 @@ describe('absolute writes and adjustments', () => {
 
   it('mixed fleet: a writes-off device and a writes-on device converge to the right fold', () => {
     const { a, b } = fork(origin());
-    __setCounterWritesForTesting(false);
+    setCounterWrites(false);
     const off = adjustAll(a, 20.25); // today's absolutes: 79.75 written into the baseline
-    __setCounterWritesForTesting(true);
+    setCounterWrites(true);
     const on = adjustAll(b, 30.5); // Counters on top of the untouched baseline
     expect(Object.keys(off.counterDeltas)).toEqual([]);
     const merged = converge(off, on);
@@ -318,7 +313,7 @@ describe('absolute writes and adjustments', () => {
   });
 
   it('residual: two absolute GoalModal amount edits keep one, plus every adjustment on top', () => {
-    __setCounterWritesForTesting(true);
+    setCounterWrites(true);
     const { a, b } = fork(origin());
     const edit = (v: number): MutationOp => ({
       op: 'patch',
@@ -336,7 +331,7 @@ describe('absolute writes and adjustments', () => {
   });
 
   it('residual: the first history entry created on both devices keeps one entry, but both amounts', () => {
-    __setCounterWritesForTesting(true);
+    setCounterWrites(true);
     const { manualContributions: _none, ...noHistory } = GOAL;
     const { a, b } = fork(seeded([set('goals', noHistory)]));
     const merged = converge(
@@ -348,7 +343,7 @@ describe('absolute writes and adjustments', () => {
   });
 
   it('residual: a merge that crosses the target leaves isCompleted false until the next contribution', () => {
-    __setCounterWritesForTesting(true);
+    setCounterWrites(true);
     const { a, b } = fork(
       seeded([set('goals', { ...GOAL, currentAmount: 50, targetAmount: 100 })])
     );

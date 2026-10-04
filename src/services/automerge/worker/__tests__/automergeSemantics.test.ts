@@ -46,10 +46,18 @@
  *      for a conflict.
  *  (o) the actor is stable across `merge` and fresh on every `load` (no actor pinned), and an
  *      absent root key reads `undefined`.
+ *
+ * Writer flip (plan `docs/plans/2026-10-04-crdt-counters-117-writer-flip.md`, Assumption 3, the
+ * gate for the carry design):
+ *  (p) a plain integer put at a `counterDeltas` key is stored as an int: it reads back through
+ *      the fold (`counterValue`), `toJS` and `save`/`load` unchanged; two concurrent puts at one
+ *      key converge to ONE visible value with `getConflicts` listing both; and `.increment` on
+ *      it throws, which is why a carry register is a plain integer and never a `Counter`.
  */
 import { createHash } from 'node:crypto';
 import { describe, it, expect } from 'vitest';
 import * as Automerge from '@automerge/automerge';
+import { foldIndex } from '../counterFields';
 
 type AnyRecord = Record<string, unknown>;
 type Item = { id: string; name: string; done?: boolean };
@@ -455,5 +463,61 @@ describe('automerge semantics (o): actor lifetime, and an absent root key', () =
   it('an absent counterDeltas reads undefined on a plain read', () => {
     const legacy = Automerge.from<AnyRecord>({ accounts: {} });
     expect(legacy.counterDeltas).toBeUndefined();
+  });
+});
+
+describe('automerge semantics (p): a plain-integer carry register (writer flip gate)', () => {
+  const REG = 'accounts/A/balance@2/carry.abc.3';
+  /** Put the plain integer `v` at `key` in one change. */
+  const put = (doc: Automerge.Doc<CounterDoc>, key: string, v: number) =>
+    Automerge.change(doc, (d) => {
+      (d.counterDeltas as unknown as AnyRecord)[key] = v;
+    });
+
+  it('reads back through the fold, toJS and save/load as the same integer', () => {
+    const doc = put(counterOrigin(), REG, 5);
+    const raw = (doc.counterDeltas as unknown as AnyRecord)[REG];
+    expect(raw).toBe(5);
+    expect(raw).not.toBeInstanceOf(Automerge.Counter);
+    // The fold reads it through `counterValue` (5 minor units at two decimals).
+    expect(foldIndex(doc).major('accounts', 'A', 'balance')).toBe(0.05);
+    const js = Automerge.toJS(doc) as AnyRecord;
+    expect((js.counterDeltas as AnyRecord)[REG]).toBe(5);
+    const loaded = Automerge.load<CounterDoc>(Automerge.save(doc));
+    expect((loaded.counterDeltas as unknown as AnyRecord)[REG]).toBe(5);
+    expect(foldIndex(loaded).major('accounts', 'A', 'balance')).toBe(0.05);
+    // `from` of a `toJS` source keeps it a plain integer (the compaction path).
+    const reimported = Automerge.from(js);
+    expect((reimported.counterDeltas as AnyRecord)[REG]).toBe(5);
+  });
+
+  it('two concurrent puts converge to ONE visible value, with getConflicts listing both', () => {
+    const { a, b } = fork(counterOrigin());
+    const five = put(a, REG, 5);
+    const seven = put(b, REG, 7);
+    // `converge` merges both ways and asserts both orders read the same.
+    const merged = converge(five, seven);
+    const shown = (merged.counterDeltas as unknown as AnyRecord)[REG];
+    expect([5, 7]).toContain(shown);
+    const all = Object.values(Automerge.getConflicts(merged.counterDeltas, REG) ?? {});
+    expect(all.sort()).toEqual([5, 7]);
+    // The fold sees exactly one of them, never their sum.
+    expect([0.05, 0.07]).toContain(foldIndex(merged).major('accounts', 'A', 'balance'));
+  });
+
+  it('a later put overwrites it in place (the own-actor register rule), no conflict', () => {
+    const doc = put(put(counterOrigin(), REG, 5), REG, 9);
+    expect((doc.counterDeltas as unknown as AnyRecord)[REG]).toBe(9);
+    expect(Automerge.getConflicts(doc.counterDeltas, REG)).toBeUndefined();
+  });
+
+  it('`.increment` on it throws instead of corrupting it (why a register is never a Counter)', () => {
+    const doc = put(counterOrigin(), REG, 5);
+    expect(() =>
+      Automerge.change(doc, (d) => {
+        (d.counterDeltas[REG] as Automerge.Counter).increment(1);
+      })
+    ).toThrow(TypeError);
+    expect((doc.counterDeltas as unknown as AnyRecord)[REG]).toBe(5);
   });
 });

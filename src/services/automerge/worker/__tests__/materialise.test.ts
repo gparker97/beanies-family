@@ -25,13 +25,7 @@ import {
   migrateDoc,
   projectionDeltasBetween,
 } from '../docOps';
-import {
-  COUNTER_FIELDS,
-  COUNTER_WRITES_ENABLED,
-  __setCounterWritesForTesting,
-  adjustField,
-  foldIndex,
-} from '../counterFields';
+import { COUNTER_FIELDS, setCounterWrites, adjustField, foldIndex } from '../counterFields';
 import { registeredPhotoCollections } from '../photoOps';
 import type { MutationOp, ProjectionDelta } from '../protocol';
 import { converge, fork, seeded, type Doc } from './twoDevices';
@@ -39,7 +33,7 @@ import { converge, fork, seeded, type Doc } from './twoDevices';
 type AnyRec = Record<string, unknown>;
 
 afterEach(() => {
-  __setCounterWritesForTesting(COUNTER_WRITES_ENABLED);
+  setCounterWrites(null);
   vi.restoreAllMocks();
 });
 
@@ -71,14 +65,14 @@ const FIELDS = [
 /** One device adjusting all three fields by `delta`, through the real write primitive with
  *  Counter writes ON, keyed by that device's own actor. */
 function adjustAll(doc: Doc, delta: number): Doc {
-  __setCounterWritesForTesting(true);
+  setCounterWrites(true);
   try {
     const writer = Automerge.getActorId(doc);
     return Automerge.change(doc, (d) => {
       for (const [c, id, f] of FIELDS) adjustField(d, c, id, f, delta, writer);
     });
   } finally {
-    __setCounterWritesForTesting(COUNTER_WRITES_ENABLED);
+    setCounterWrites(null);
   }
 }
 

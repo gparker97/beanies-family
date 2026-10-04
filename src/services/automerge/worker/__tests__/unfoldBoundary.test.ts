@@ -21,11 +21,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as Automerge from '@automerge/automerge';
 import type { CollectionName } from '@/types/automerge';
 import { applyMutation, buildFullProjection, getHeads } from '../docOps';
-import {
-  COUNTER_WRITES_ENABLED,
-  __setCounterWritesForTesting,
-  adjustField,
-} from '../counterFields';
+import { setCounterWrites, adjustField } from '../counterFields';
 import type { MutationOp } from '../protocol';
 import { apply, converge, fork, seeded, type Doc } from './twoDevices';
 
@@ -45,7 +41,7 @@ vi.mock('../reconcile', async (importOriginal) => {
 });
 
 afterEach(() => {
-  __setCounterWritesForTesting(COUNTER_WRITES_ENABLED);
+  setCounterWrites(null);
   verify.faulty = false;
 });
 
@@ -75,12 +71,12 @@ const FIELDS = [
 
 /** One device's adjustment, through the real write primitive with Counter writes ON. */
 function adjust(doc: Doc, collection: CollectionName, id: string, field: string, delta: number) {
-  __setCounterWritesForTesting(true);
+  setCounterWrites(true);
   try {
     const writer = Automerge.getActorId(doc);
     return Automerge.change(doc, (d) => adjustField(d, collection, id, field, delta, writer));
   } finally {
-    __setCounterWritesForTesting(COUNTER_WRITES_ENABLED);
+    setCounterWrites(null);
   }
 }
 

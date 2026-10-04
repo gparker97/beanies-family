@@ -61,7 +61,7 @@ beforeEach(async () => {
   useTestDevices();
 });
 afterEach(() => {
-  cf.__setCounterWritesForTesting(cf.COUNTER_WRITES_ENABLED);
+  cf.setCounterWrites(null);
   resetTestDevices();
 });
 
@@ -104,7 +104,7 @@ describe('C8: the rebase never splits a paired write', () => {
   });
 
   it("a goal's contribution history UNIONS (both entries kept) and its Counter growth crosses with it", () => {
-    cf.__setCounterWritesForTesting(true);
+    cf.setCounterWrites(true);
     const o = seeded([
       {
         op: 'set',
@@ -129,7 +129,7 @@ describe('C8: the rebase never splits a paired write', () => {
   });
 
   it('a goal whose history could NOT cross keeps its Counter growth back too (no money without a receipt)', () => {
-    cf.__setCounterWritesForTesting(true);
+    cf.setCounterWrites(true);
     const o = seeded([
       {
         op: 'set',
@@ -154,7 +154,7 @@ describe('C8: the rebase never splits a paired write', () => {
 
 describe('C9: Counter hardening', () => {
   const goalWith = (raw: number, keyed: number) => {
-    cf.__setCounterWritesForTesting(true);
+    cf.setCounterWrites(true);
     let d = seeded([
       {
         op: 'set',
@@ -177,7 +177,7 @@ describe('C9: Counter hardening', () => {
 
   it('(a) the dormant floor clamps the FOLDED value: a withdrawal in a mixed fleet lands', () => {
     const d = goalWith(0, 50); // raw 0, a peer's Counter +50: folded 50
-    cf.__setCounterWritesForTesting(false);
+    cf.setCounterWrites(false);
     const out = apply(d, {
       op: 'increment',
       collection: 'goals',
@@ -196,7 +196,7 @@ describe('C9: Counter hardening', () => {
     const after = compact(d);
     expect(shown(after, 'goals', 'G').currentAmount).toBe(0);
     // And a later +8 reads 3 (the true sum), not 8.
-    cf.__setCounterWritesForTesting(false);
+    cf.setCounterWrites(false);
     const later = apply(after, {
       op: 'increment',
       collection: 'goals',
@@ -212,7 +212,7 @@ describe('C9: Counter hardening', () => {
 
   it('(c) a no-op adjustment writes nothing: no updatedAt stamp, the heads do not move', () => {
     const d = goalWith(0, 0);
-    cf.__setCounterWritesForTesting(false);
+    cf.setCounterWrites(false);
     const res = applyMutation(d, {
       op: 'increment',
       collection: 'goals',

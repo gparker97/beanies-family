@@ -39,8 +39,7 @@ const {
   applyMutation: applyMutationOp,
   materializeCollection,
 } = await import('../docOps');
-const { COUNTER_WRITES_ENABLED, __setCounterWritesForTesting, counterStats, foldDoc, foldIndex } =
-  await import('../counterFields');
+const { setCounterWrites, counterStats, foldDoc, foldIndex } = await import('../counterFields');
 const { seeded, onDevice, useTestDevices, resetTestDevices } = await import('./twoDevices');
 // The composer is typed on `FamilyDocument`; these fixtures are deliberately a
 // minimal subset, so the cast is at the boundary rather than inside the tests.
@@ -1003,11 +1002,11 @@ describe('Counter adjustments ride the fold ledger, not the baseline (#117 Phase
   // Every unregistered handle (a plain clone, the `ap` realm's fresh load) is this test's own
   // device; a peer is put on another device with `onDevice`.
   beforeEach(() => {
-    __setCounterWritesForTesting(true);
+    setCounterWrites(true);
     useTestDevices();
   });
   afterEach(() => {
-    __setCounterWritesForTesting(COUNTER_WRITES_ENABLED);
+    setCounterWrites(null);
     resetTestDevices();
   });
 

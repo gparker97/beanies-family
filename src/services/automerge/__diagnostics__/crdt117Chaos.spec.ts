@@ -99,7 +99,7 @@ const { KEY_FIELDS, MERGE_FIELDS } = await import('@/services/automerge/worker/r
 const { converge, materialise, useTestDevices, resetTestDevices, onDevice } =
   await import('@/services/automerge/worker/__tests__/twoDevices');
 const counterFields = await import('@/services/automerge/worker/counterFields');
-const { COUNTER_FIELDS, COUNTER_WRITES_ENABLED, __setCounterWritesForTesting } = counterFields;
+const { COUNTER_FIELDS, setCounterWrites } = counterFields;
 const { counterStats, fieldDecimals, foldDoc, foldEntity, foldIndex, sigma, toMinor } =
   counterFields;
 const { materializeFixture } = await import('@/services/demo/demoFixture');
@@ -1013,7 +1013,7 @@ const GEN_NAMES = Object.keys(GENS);
 
 let BASE: Doc;
 beforeAll(async () => {
-  __setCounterWritesForTesting(true); // #117 Phase 2: every adjustment is a Counter
+  setCounterWrites(true); // #117 Phase 2: every adjustment is a Counter
   // Each device's actor is its own device for the Counter writer id. B stays the realm's own
   // (unregistered) device: layer 4 reloads B's document inside `ap`, under a fresh actor, the
   // way a real reload keeps the device and changes the actor.
@@ -1024,7 +1024,7 @@ beforeAll(async () => {
   BASE = REAL_POD ? await loadRealPod() : await buildDemoBase();
 }, 120_000);
 afterAll(() => {
-  __setCounterWritesForTesting(COUNTER_WRITES_ENABLED);
+  setCounterWrites(null);
   resetTestDevices();
 });
 
