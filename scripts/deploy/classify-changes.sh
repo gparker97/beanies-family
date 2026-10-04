@@ -57,32 +57,63 @@
 #       CHANGELOG, LICENSE, SECURITY, TRADEMARK, POSTMORTEM
 #
 # packages/** feeds BOTH web workflows (brand tokens each app consumes).
+#
+# ── Baselines that are not in this clone ─────────────────────────────────────
+# A pipeline's last-shipped SHA can be missing locally: after a history rewrite
+# (2026-10-03: every pre-rewrite SHA vanished) or a force-push. The old fallback
+# diffed only the tip commit, so on 2026-10-04 a `web/public/` floor change two
+# commits back read WEB: no and the Astro deploy was skipped. Now each baseline
+# walks back through recent successful runs to the newest SHA this clone has
+# (diffing from an OLDER ship is a superset, so it can over-deploy, never
+# under-deploy). If none of them exist here, the target reads "yes" with a warning.
 
 set -euo pipefail
 
 HEAD_SHA=$(git rev-parse --short HEAD)
 
-# Last SHA each distributable shipped from. `// ""` yields empty when a pipeline has
-# never had a successful run (a never-released platform), handled as "yes" below.
-LAST_VUE_SHA=$(gh run list --workflow=deploy.yml --status=success --limit=1 --json headSha --jq '.[0].headSha // ""')
-LAST_WEB_SHA=$(gh run list --workflow=deploy-web.yml --status=success --limit=1 --json headSha --jq '.[0].headSha // ""')
-LAST_IOS_SHA=$(gh run list --workflow=mobile-ios-release.yml --status=success --limit=1 --json headSha --jq '.[0].headSha // ""')
-LAST_ANDROID_SHA=$(gh run list --workflow=mobile-android-release.yml --status=success --limit=1 --json headSha --jq '.[0].headSha // ""')
+have_commit() {
+  [ -n "$1" ] && git rev-parse --quiet --verify "${1}^{commit}" >/dev/null 2>&1
+}
 
+# Resolve one pipeline's baseline. Prints "<sha> <state>":
+#   exact        the latest successful run's SHA exists here
+#   older        the latest is missing; <sha> is the newest earlier ship that exists
+#   unreachable  no recent ship exists here; <sha> is the latest (for display)
+#   never        the pipeline has never succeeded; <sha> is "-"
+resolve_baseline() {
+  local workflow="$1" shas sha latest=""
+  shas=$(gh run list --workflow="$workflow" --status=success --limit=30 --json headSha --jq '.[].headSha')
+  for sha in $shas; do
+    [ -z "$latest" ] && latest="$sha"
+    if have_commit "$sha"; then
+      if [ "$sha" = "$latest" ]; then echo "$sha exact"; else echo "$sha older"; fi
+      return
+    fi
+  done
+  if [ -z "$latest" ]; then echo "- never"; else echo "$latest unreachable"; fi
+}
+
+read -r LAST_VUE_SHA VUE_BASE <<<"$(resolve_baseline deploy.yml)"
+read -r LAST_WEB_SHA WEB_BASE <<<"$(resolve_baseline deploy-web.yml)"
+read -r LAST_IOS_SHA IOS_BASE <<<"$(resolve_baseline mobile-ios-release.yml)"
+read -r LAST_ANDROID_SHA ANDROID_BASE <<<"$(resolve_baseline mobile-android-release.yml)"
+[ "$LAST_VUE_SHA" = "-" ] && LAST_VUE_SHA=""
+[ "$LAST_WEB_SHA" = "-" ] && LAST_WEB_SHA=""
+[ "$LAST_IOS_SHA" = "-" ] && LAST_IOS_SHA=""
+[ "$LAST_ANDROID_SHA" = "-" ] && LAST_ANDROID_SHA=""
+
+# Only a baseline that exists here is diffed. A missing one yields no file list and
+# forces "yes" below (no baseline means we cannot prove the target is current).
 diff_since() {
   local sha="$1"
-  if [ -n "$sha" ] && git rev-parse --quiet --verify "${sha}^{commit}" >/dev/null 2>&1; then
+  if have_commit "$sha"; then
     git diff --name-only "$sha" HEAD
-  else
-    # No prior ship on record, or SHA no longer reachable (history rewrite).
-    # Fall back to the files in the tip commit so we don't silently skip.
-    git show HEAD --name-only --pretty=format:
   fi
 }
 
 commits_behind() {
   local sha="$1"
-  if [ -n "$sha" ] && git rev-parse --quiet --verify "${sha}^{commit}" >/dev/null 2>&1; then
+  if have_commit "$sha"; then
     git rev-list --count "${sha}..HEAD"
   else
     echo "?"
@@ -141,12 +172,29 @@ print_hits() {
   echo
 }
 
+base_note() {
+  case "$1" in
+    older) echo "  [latest ship not in this clone; diffing from an older ship]" ;;
+    unreachable) echo "  [NO recent ship in this clone; baseline unknown]" ;;
+    *) echo "" ;;
+  esac
+}
+
 echo "HEAD:                $HEAD_SHA"
-echo "Last Vue deploy:     ${LAST_VUE_SHA:-(never shipped)}  ($(commits_behind "$LAST_VUE_SHA") commit(s) behind)"
-echo "Last Web deploy:     ${LAST_WEB_SHA:-(never shipped)}  ($(commits_behind "$LAST_WEB_SHA") commit(s) behind)"
-echo "Last iOS release:    ${LAST_IOS_SHA:-(never released)}  ($(commits_behind "$LAST_IOS_SHA") commit(s) behind)"
-echo "Last Android release:${LAST_ANDROID_SHA:-(never released)}  ($(commits_behind "$LAST_ANDROID_SHA") commit(s) behind)"
+echo "Last Vue deploy:     ${LAST_VUE_SHA:-(never shipped)}  ($(commits_behind "$LAST_VUE_SHA") commit(s) behind)$(base_note "$VUE_BASE")"
+echo "Last Web deploy:     ${LAST_WEB_SHA:-(never shipped)}  ($(commits_behind "$LAST_WEB_SHA") commit(s) behind)$(base_note "$WEB_BASE")"
+echo "Last iOS release:    ${LAST_IOS_SHA:-(never released)}  ($(commits_behind "$LAST_IOS_SHA") commit(s) behind)$(base_note "$IOS_BASE")"
+echo "Last Android release:${LAST_ANDROID_SHA:-(never released)}  ($(commits_behind "$LAST_ANDROID_SHA") commit(s) behind)$(base_note "$ANDROID_BASE")"
 echo
+
+for pair in "Vue:$VUE_BASE" "Web:$WEB_BASE" "iOS:$IOS_BASE" "Android:$ANDROID_BASE"; do
+  if [ "${pair#*:}" = "unreachable" ]; then
+    echo "WARNING: ${pair%%:*} last shipped from a commit this clone does not have (history"
+    echo "         rewrite or force-push?), and no older ship is here either. Reporting"
+    echo "         \"yes\" because there is no baseline to prove it is current."
+    echo
+  fi
+done
 
 print_hits "Vue-app files needing redeploy" "$VUE_COUNT" "$VUE_HITS"
 print_hits "Astro-site files needing redeploy" "$WEB_COUNT" "$WEB_HITS"
@@ -161,10 +209,20 @@ if [ "$IOS_COUNT" -gt 0 ] || [ "$ANDROID_COUNT" -gt 0 ] || [ -z "$LAST_IOS_SHA" 
   echo
 fi
 
-# A never-released platform (empty marker) reports "yes": there is no build at all, so
-# a first release is warranted regardless of the (fallback) diff.
+# "yes" when files changed since the baseline, OR when there is no usable baseline:
+# a never-shipped pipeline (a first release is warranted) or one whose recent ships
+# are all missing from this clone (we cannot prove it is current).
+target_flag() {
+  local count="$1" state="$2"
+  if [ "$count" -gt 0 ] || [ "$state" = "never" ] || [ "$state" = "unreachable" ]; then
+    echo yes
+  else
+    echo no
+  fi
+}
+
 echo "=== Deploy targets ==="
-if [ "$VUE_COUNT" -gt 0 ]; then echo "VUE: yes"; else echo "VUE: no"; fi
-if [ "$WEB_COUNT" -gt 0 ]; then echo "WEB: yes"; else echo "WEB: no"; fi
-if [ -z "$LAST_IOS_SHA" ] || [ "$IOS_COUNT" -gt 0 ]; then echo "MOBILE_IOS: yes"; else echo "MOBILE_IOS: no"; fi
-if [ -z "$LAST_ANDROID_SHA" ] || [ "$ANDROID_COUNT" -gt 0 ]; then echo "MOBILE_ANDROID: yes"; else echo "MOBILE_ANDROID: no"; fi
+echo "VUE: $(target_flag "$VUE_COUNT" "$VUE_BASE")"
+echo "WEB: $(target_flag "$WEB_COUNT" "$WEB_BASE")"
+echo "MOBILE_IOS: $(target_flag "$IOS_COUNT" "$IOS_BASE")"
+echo "MOBILE_ANDROID: $(target_flag "$ANDROID_COUNT" "$ANDROID_BASE")"

@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-10-05
+
+### Fixed
+
+- The deploy classifier no longer skips the marketing site (or any target) when its last deploy came from a commit that is missing after a history rewrite; it diffs from the newest older deploy it can find, or reports the target as needing a deploy.
+
 ## 2026-10-04
 
 ### Changed
