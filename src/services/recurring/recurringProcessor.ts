@@ -548,23 +548,29 @@ export async function deduplicateRecurringTransactions(): Promise<number> {
   }
 
   // Delete duplicates (keep the earliest-created transaction per group). Each delete is the
-  // cascade in `dedup` mode (audit C7): with Counter writes on, both forks' movements survived
-  // the merge and the duplicate's are reversed; on the dormant build the forks' absolute writes
-  // collapsed into ONE, so the worker deletes the row only (reversing would undo the survivor).
+  // cascade in `dedup` mode (audit C7), naming the kept twin: the worker decides PER PAIR
+  // (#117 writer flip). When either twin's movements were Counter increments both survived the
+  // merge and the duplicate's are reversed; when both were absolute writes they collapsed into
+  // ONE, so the worker deletes the row only (reversing would undo the survivor).
   let deleted = 0;
   let reversed = 0;
+  let rowOnly = 0;
   let failed = 0;
   for (const entries of groups.values()) {
     if (entries.length <= 1) continue;
     // Sort by createdAt ascending — keep the first, delete the rest
     entries.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    const survivorId = entries[0]!.id;
     for (let i = 1; i < entries.length; i++) {
       try {
         const res = await transactionRepo.deleteTransactionCascade(entries[i]!.id, {
-          dedup: true,
+          dedup: { survivorId },
         });
-        if (res.found) deleted++;
-        if (res.found && res.reversed) reversed++;
+        if (res.found) {
+          deleted++;
+          if (res.reversed) reversed++;
+          else rowOnly++;
+        }
       } catch (e) {
         failed++;
         reportError({
@@ -587,7 +593,8 @@ export async function deduplicateRecurringTransactions(): Promise<number> {
       context: {
         recur_surface: 'transaction',
         action: failed > 0 ? 'partial' : 'complete',
-        detail: reversed > 0 ? 'reversed' : 'row-only',
+        // Both counts, so a wrong pair decision is countable per sweep.
+        detail: `reversed=${reversed},row_only=${rowOnly}`,
         perf_entity_count: deleted,
       },
     });

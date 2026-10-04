@@ -464,19 +464,27 @@ describe('deduplicateRecurringTransactions', () => {
     vi.mocked(transactionRepo.deleteTransactionCascade).mockResolvedValue(echoDelete());
   });
 
-  it('removes the later-created duplicates THROUGH the delete cascade (effects reversed) and logs the sweep', async () => {
+  it('removes the later-created duplicates THROUGH the delete cascade, naming the kept twin, and counts reversed vs row-only', async () => {
     vi.mocked(transactionRepo.getAllTransactions).mockResolvedValue([
       dup('tx-1', '2026-04-01T08:00:00.000Z'),
-      dup('tx-2', '2026-04-01T09:00:00.000Z'),
       dup('tx-3', '2026-04-01T10:00:00.000Z'),
+      dup('tx-2', '2026-04-01T09:00:00.000Z'),
     ]);
+    // The worker decides per pair: tx-2's pair reversed, tx-3's pair collapsed (row only).
+    vi.mocked(transactionRepo.deleteTransactionCascade)
+      .mockResolvedValueOnce(echoDelete(true, true))
+      .mockResolvedValueOnce(echoDelete(true, false));
 
     const deleted = await deduplicateRecurringTransactions();
 
     expect(deleted).toBe(2);
-    // `dedup`: the worker decides whether the duplicate's effects survived the merge.
-    expect(transactionRepo.deleteTransactionCascade).toHaveBeenCalledWith('tx-2', { dedup: true });
-    expect(transactionRepo.deleteTransactionCascade).toHaveBeenCalledWith('tx-3', { dedup: true });
+    // `dedup.survivorId`: the EARLIEST-created row, the same twin for every duplicate.
+    expect(transactionRepo.deleteTransactionCascade).toHaveBeenNthCalledWith(1, 'tx-2', {
+      dedup: { survivorId: 'tx-1' },
+    });
+    expect(transactionRepo.deleteTransactionCascade).toHaveBeenNthCalledWith(2, 'tx-3', {
+      dedup: { survivorId: 'tx-1' },
+    });
     expect(transactionRepo.deleteTransactionCascade).not.toHaveBeenCalledWith(
       'tx-1',
       expect.anything()
@@ -488,7 +496,7 @@ describe('deduplicateRecurringTransactions', () => {
         context: {
           recur_surface: 'transaction',
           action: 'complete',
-          detail: 'reversed',
+          detail: 'reversed=1,row_only=1',
           perf_entity_count: 2,
         },
       })
@@ -521,7 +529,8 @@ describe('deduplicateRecurringTransactions', () => {
         context: {
           recur_surface: 'transaction',
           action: 'partial',
-          detail: 'reversed',
+          // The not-found and the failed delete count as neither.
+          detail: 'reversed=1,row_only=0',
           perf_entity_count: 1,
         },
       })
@@ -656,7 +665,7 @@ describe('recurringProcessor - a row that stands for a due date (#107)', () => {
     ]);
     expect(await deduplicateRecurringTransactions()).toBe(1);
     expect(transactionRepo.deleteTransactionCascade).toHaveBeenCalledWith('device-b', {
-      dedup: true,
+      dedup: { survivorId: 'merged' },
     });
   });
 

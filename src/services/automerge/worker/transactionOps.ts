@@ -15,7 +15,8 @@
  *  - `update`: patch the row; reverse + re-apply its effects ONLY when a money field changed
  *    (`MONEY_FIELDS`), keeping the stored derived fields otherwise.
  *  - `delete`: reverse the effects from the STORED derived fields, then delete the row (a
- *    `dedup` delete reverses only when Counter writes are on: see `TransactionCascadeArgs`).
+ *    `dedup` delete reverses only when either twin's movements were Counter increments, read
+ *    from the worker-derived `balanceEffect` stamp: see `TransactionCascadeArgs`).
  *
  * Pure + vue-free + main-thread-free, like `docOps`. Registered by `registerTransactionOps()`
  * from `applyAndProject.configure` (never at module load: `docOps` is a sibling in a possible
@@ -66,18 +67,25 @@ export type TransactionCascadeArgs =
       mode: 'delete';
       id: string;
       /**
-       * The recurring duplicate sweep. Whether a merge-born duplicate's effects SURVIVED the
-       * merge depends on how they were written: as Counters (writes on) both forks'
-       * increments land and the duplicate must be reversed; as absolutes (the dormant build)
-       * the two forks' sets collapse to ONE by last-writer-wins, so the balance moved once
-       * and reversing would undo the survivor. The worker decides from `counterWritesOn()`.
+       * The recurring duplicate sweep, naming the twin it keeps. Whether a merge-born
+       * duplicate's effects SURVIVED the merge is a property of the PAIR, not of this build
+       * (#117 writer flip): a row whose movements landed as Counter increments carries
+       * `balanceEffect: 'counter'`, and an increment always adds to whatever the other fork
+       * wrote, so counter+counter and counter+absolute moved the balance twice and the
+       * duplicate is reversed; absolute+absolute collapsed to ONE by last-writer-wins, so
+       * reversing would undo the survivor and only the row goes. The worker decides from the
+       * two rows' stamps; a survivor deleted meanwhile is reported in `skipped` and the
+       * deleted row's own stamp decides alone.
        */
-      dedup?: boolean;
+      dedup?: { survivorId: string };
     };
 
-/** A reference the cascade could not honour because the entity is absent from the document. */
+/**
+ * A reference the cascade could not honour because the entity is absent from the document.
+ * `transaction` is a `dedup` delete's survivor, deleted concurrently.
+ */
 export interface CascadeSkip {
-  kind: 'account' | 'goal' | 'loan';
+  kind: 'account' | 'goal' | 'loan' | 'transaction';
   id: string;
 }
 
@@ -92,7 +100,8 @@ export interface TransactionCascadeResult {
   goals: Goal[];
   assets: Asset[];
   skipped: CascadeSkip[];
-  /** `delete` only: whether the row's effects were reversed (a dormant dedup removes the row only). */
+  /** `delete` only: whether the row's effects were reversed (an absolute+absolute dedup pair
+   *  removes the row only). */
   reversed?: boolean;
 }
 
@@ -123,12 +132,19 @@ function recurringLinkFlipped(before: AnyRecord, after: AnyRecord): boolean {
 export const CASCADE_ARGS_ERROR = 'CascadeArgsError';
 
 /** Owned by the cascade: computed here, never accepted from a patch. */
-const DERIVED_FIELDS = ['goalAllocApplied', 'loanInterestPortion', 'loanPrincipalPortion'] as const;
+const DERIVED_FIELDS = [
+  'goalAllocApplied',
+  'loanInterestPortion',
+  'loanPrincipalPortion',
+  'balanceEffect',
+] as const;
 
 interface Derived {
   goalAllocApplied?: number;
   loanInterestPortion?: number;
   loanPrincipalPortion?: number;
+  /** The row's movements landed as Counter increments (the dedup pair decision reads it). */
+  balanceEffect?: 'counter';
 }
 
 const nowIso = (): string => new Date().toISOString();
@@ -174,8 +190,14 @@ function parseArgs(args: Record<string, unknown>): TransactionCascadeArgs {
     return { mode, id, patch, deleteKeys: deleteKeys as string[] | undefined, updatedAt };
   }
   if (mode === 'delete') {
-    if (!isNonEmptyString(args.id)) throw fail('`id` must be a non-empty string.');
-    return { mode, id: args.id, ...(args.dedup === true ? { dedup: true } : {}) };
+    const { id, dedup } = args;
+    if (!isNonEmptyString(id)) throw fail('`id` must be a non-empty string.');
+    if (dedup === undefined) return { mode, id };
+    if (!isPlainObject(dedup) || !isNonEmptyString(dedup.survivorId)) {
+      throw fail('`dedup.survivorId` must be a non-empty string.');
+    }
+    if (dedup.survivorId === id) throw fail('`dedup.survivorId` must name the OTHER twin.');
+    return { mode, id, dedup: { survivorId: dedup.survivorId } };
   }
   throw fail(`unknown mode ${String(mode)}.`);
 }
@@ -196,6 +218,11 @@ class Cascade {
   private readonly touched = new Map<string, { collection: CollectionName; id: string }>();
   /** Goals this cascade reversed an allocation on: the re-apply skips the completed gate. */
   private readonly reversedGoals = new Set<string>();
+  /**
+   * Whether any `adjustField` since the last `applyEffects` began reported a write. Read only
+   * by `applyEffects`, which resets it first, so an update's reversal never stamps the row.
+   */
+  private wrote = false;
   readonly skipped: CascadeSkip[] = [];
   private readonly now = nowIso();
   private readonly draft: FamilyDocument;
@@ -216,6 +243,13 @@ class Cascade {
     this.touched.set(`${collection}/${id}`, { collection, id });
   }
 
+  /** THE write funnel for this cascade: `adjustField` on the shared index, noting a write. */
+  private adjust(collection: CollectionName, id: string, field: string, delta: number): boolean {
+    const wrote = adjustField(this.draft, collection, id, field, delta, this.writerId, this.index);
+    if (wrote) this.wrote = true;
+    return wrote;
+  }
+
   /** Move an account's balance by `delta`; a missing account is recorded, never a throw. */
   private adjustAccount(id: string, delta: number): void {
     const account = this.collection<AnyRecord>('accounts')[id];
@@ -223,10 +257,8 @@ class Cascade {
       this.skipped.push({ kind: 'account', id });
       return;
     }
-    if (delta !== 0) {
-      if (adjustField(this.draft, 'accounts', id, 'balance', delta, this.writerId, this.index)) {
-        account.updatedAt = this.now;
-      }
+    if (delta !== 0 && this.adjust('accounts', id, 'balance', delta)) {
+      account.updatedAt = this.now;
     }
     this.touch('accounts', id);
   }
@@ -285,15 +317,7 @@ class Cascade {
     const { folded, decimals } = this.foldedGoalAmount(goal, goalId);
     const applied = Math.max(delta, -folded);
     if (applied !== 0) {
-      let changed = adjustField(
-        this.draft,
-        'goals',
-        goalId,
-        'currentAmount',
-        applied,
-        this.writerId,
-        this.index
-      );
+      let changed = this.adjust('goals', goalId, 'currentAmount', applied);
       if (!goal.isCompleted && foldValue(folded, applied, 0, decimals) >= goal.targetAmount) {
         goal.isCompleted = true;
         changed = true;
@@ -352,17 +376,8 @@ class Cascade {
       this.adjustAccount(loan.entityId, delta);
       return;
     }
-    if (delta !== 0) {
-      const wrote = adjustField(
-        this.draft,
-        'assets',
-        loan.entityId,
-        'loan.outstandingBalance',
-        delta,
-        this.writerId,
-        this.index
-      );
-      if (wrote) this.collection<AnyRecord>('assets')[loan.entityId]!.updatedAt = this.now;
+    if (delta !== 0 && this.adjust('assets', loan.entityId, 'loan.outstandingBalance', delta)) {
+      this.collection<AnyRecord>('assets')[loan.entityId]!.updatedAt = this.now;
     }
     this.touch('assets', loan.entityId);
     if (loan.linkedAccountId) this.adjustAccount(loan.linkedAccountId, delta);
@@ -397,15 +412,25 @@ class Cascade {
     this.adjustLoan(loan, tx.loanPrincipalPortion);
   }
 
-  /** Apply a row's effects and return the derived fields it earns. A balance adjustment is an
-   *  audit echo of a balance already written: no effects. */
+  /**
+   * Apply a row's effects and return the derived fields it earns. A balance adjustment is an
+   * audit echo of a balance already written: no effects.
+   *
+   * `balanceEffect: 'counter'` when this application's movements landed as Counter increments
+   * (writes on AND at least one `adjustField` wrote), and absent otherwise (an absolute write,
+   * or nothing written). The cascade reads the switch indirectly through `adjustField`; this is
+   * its one direct read, and the switch cannot change inside the synchronous change.
+   */
   applyEffects(tx: Transaction): Derived {
     if (tx.type === 'balance_adjustment') return {};
+    this.wrote = false;
     this.applyBalances(tx, 1);
     const goalAllocApplied = this.allocateGoal(tx);
+    const loan = this.applyLoan(tx);
     return {
       ...(goalAllocApplied > 0 ? { goalAllocApplied } : {}),
-      ...this.applyLoan(tx),
+      ...loan,
+      ...(counterWritesOn() && this.wrote ? { balanceEffect: 'counter' as const } : {}),
     };
   }
 
@@ -512,7 +537,18 @@ const commitTransactionCascadeOp: NamedOpHandler = (draft, rawArgs, { writerId }
     case 'delete': {
       const live = rows[args.id];
       if (live === undefined) return finish(false, args.id);
-      const reverse = !args.dedup || counterWritesOn();
+      let survivor: AnyRecord | undefined;
+      if (args.dedup) {
+        survivor = rows[args.dedup.survivorId];
+        // Deleted concurrently: reported, never silent; the deleted row's stamp decides alone.
+        if (survivor === undefined) {
+          cascade.skipped.push({ kind: 'transaction', id: args.dedup.survivorId });
+        }
+      }
+      // Per pair (see `TransactionCascadeArgs`): counter+counter and counter+absolute moved the
+      // balance twice; absolute+absolute collapsed to one by last-writer-wins.
+      const reverse =
+        !args.dedup || live.balanceEffect === 'counter' || survivor?.balanceEffect === 'counter';
       if (reverse) cascade.reverseEffects(toPlain(live) as unknown as Transaction);
       delete rows[args.id];
       return finish(true, args.id, reverse);

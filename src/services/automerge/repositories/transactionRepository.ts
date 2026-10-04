@@ -90,15 +90,20 @@ export async function updateTransactionCascade(
 
 /**
  * Delete a transaction, reversing its effects from the STORED derived fields, in one change.
- * `dedup` (the recurring duplicate sweep) lets the worker skip the reversal on the dormant
- * build, where a merge-born duplicate's absolute writes collapsed into one (see the op).
+ * `dedup` (the recurring duplicate sweep) names the twin it keeps: the worker reverses only
+ * when either twin's movements were Counter increments, and deletes the row only when both
+ * were absolute writes that collapsed into one (see the op).
  */
 export async function deleteTransactionCascade(
   id: string,
-  opts: { dedup?: boolean } = {}
+  opts: { dedup?: { survivorId: string } } = {}
 ): Promise<TransactionCascadeResult> {
   if (!projectionGetById('transactions', id)) return notFound('delete');
-  return commitCascade({ mode: 'delete', id, ...(opts.dedup ? { dedup: true } : {}) });
+  return commitCascade({
+    mode: 'delete',
+    id,
+    ...(opts.dedup ? { dedup: { survivorId: opts.dedup.survivorId } } : {}),
+  });
 }
 
 export async function getTransactionsByAccountId(accountId: string): Promise<Transaction[]> {

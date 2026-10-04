@@ -10,31 +10,19 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
 import type { CollectionName } from '@/types/automerge';
 import { applyMutation, materializeCollection, getHeads, getChangesSince } from '../docOps';
-import { COUNTER_WRITES_ENABLED, __setCounterWritesForTesting, foldIndex } from '../counterFields';
+import { foldIndex, setCounterWrites } from '../counterFields';
 import {
   registerTransactionOps,
   type TransactionCascadeArgs,
   type TransactionCascadeResult,
 } from '../transactionOps';
 import type { MutationOp } from '../protocol';
-import {
-  apply,
-  converge,
-  fork,
-  resetTestDevices,
-  seeded,
-  useTestDevices,
-  type Doc,
-} from './twoDevices';
+import { apply, converge, fork, seeded, type Doc } from './twoDevices';
 
 type AnyRec = Record<string, unknown>;
 
 beforeAll(() => registerTransactionOps());
-beforeEach(() => useTestDevices());
-afterEach(() => {
-  __setCounterWritesForTesting(COUNTER_WRITES_ENABLED);
-  resetTestDevices();
-});
+afterEach(() => setCounterWrites(null));
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -483,42 +471,83 @@ describe('delete', () => {
     expect(tx(doc, 'dup-a')).toBeDefined();
   });
 
-  it('dedup on the dormant build: a merge-born duplicate moved the balance ONCE, so only the row goes', () => {
+  /**
+   * A merge-born duplicate pair: the kept twin `dup-a` written on one fork, the swept `dup-b`
+   * on the other, each with its own build's switch (a mixed fleet), then merged.
+   */
+  function mergedPair(survivorCounter: boolean, deletedCounter: boolean): Doc {
     const { a, b } = fork(world());
+    setCounterWrites(survivorCounter);
     const onA = run(a, {
       mode: 'create',
       transaction: row({ id: 'dup-a', recurringItemId: 'r1' }) as never,
     }).doc;
+    setCounterWrites(deletedCounter);
     const onB = run(b, {
       mode: 'create',
       transaction: row({ id: 'dup-b', recurringItemId: 'r1' }) as never,
     }).doc;
-    const merged = converge(onA, onB);
-    // Both forks wrote the absolute 900: last-writer-wins keeps one movement.
-    expect(balance(merged.a, 'chk')).toBe(900);
-    const { doc, result } = run(merged.a, { mode: 'delete', id: 'dup-b', dedup: true });
-    expect(result.reversed).toBe(false);
-    expect(tx(doc, 'dup-b')).toBeUndefined();
-    expect(tx(doc, 'dup-a')).toBeDefined();
-    expect(balance(doc, 'chk')).toBe(900);
+    return converge(onA, onB).a;
+  }
+
+  // [survivor, deleted, balance after the merge, reversed]. An increment always adds to what
+  // the other fork wrote, so any Counter twin means the balance moved twice; two absolutes
+  // collapse to one by last-writer-wins and reversing would undo the survivor.
+  it.each([
+    ['counter', 'counter', 800, true],
+    ['absolute', 'counter', 800, true],
+    ['counter', 'absolute', 800, true],
+    ['absolute', 'absolute', 900, false],
+  ] as const)(
+    'dedup decides per pair: survivor %s + deleted %s',
+    (survivorKind, deletedKind, mergedBalance, expectReversed) => {
+      // The deleting build's own switch decides nothing: run each pair under BOTH (a fresh
+      // pair each time; a changed Automerge document cannot be changed again).
+      for (const deleterOn of [false, true]) {
+        const merged = mergedPair(survivorKind === 'counter', deletedKind === 'counter');
+        expect(balance(merged, 'chk')).toBe(mergedBalance);
+        setCounterWrites(deleterOn);
+        const { doc, result } = run(merged, {
+          mode: 'delete',
+          id: 'dup-b',
+          dedup: { survivorId: 'dup-a' },
+        });
+        expect(result.reversed).toBe(expectReversed);
+        expect(result.skipped).toEqual([]);
+        expect(tx(doc, 'dup-b')).toBeUndefined();
+        expect(tx(doc, 'dup-a')).toBeDefined();
+        expect(balance(doc, 'chk')).toBe(900);
+      }
+    }
+  );
+
+  it('dedup whose survivor was deleted meanwhile: reported in `skipped`, the deleted row decides alone', () => {
+    for (const deletedCounter of [true, false]) {
+      setCounterWrites(deletedCounter);
+      const created = run(world(), {
+        mode: 'create',
+        transaction: row({ id: 'dup-b', recurringItemId: 'r1' }) as never,
+      }).doc;
+      setCounterWrites(false);
+      const { doc, result } = run(created, {
+        mode: 'delete',
+        id: 'dup-b',
+        dedup: { survivorId: 'dup-a' },
+      });
+      expect(result.skipped).toEqual([{ kind: 'transaction', id: 'dup-a' }]);
+      expect(result.reversed).toBe(deletedCounter);
+      expect(tx(doc, 'dup-b')).toBeUndefined();
+      expect(balance(doc, 'chk')).toBe(deletedCounter ? 1000 : 900);
+    }
   });
 
-  it('dedup with Counter writes on: both movements survived the merge, so the duplicate is reversed', () => {
-    __setCounterWritesForTesting(true);
-    const { a, b } = fork(world());
-    const onA = run(a, {
-      mode: 'create',
-      transaction: row({ id: 'dup-a', recurringItemId: 'r1' }) as never,
-    }).doc;
-    const onB = run(b, {
-      mode: 'create',
-      transaction: row({ id: 'dup-b', recurringItemId: 'r1' }) as never,
-    }).doc;
-    const merged = converge(onA, onB);
-    expect(balance(merged.a, 'chk')).toBe(800);
-    const { doc, result } = run(merged.a, { mode: 'delete', id: 'dup-b', dedup: true });
-    expect(result.reversed).toBe(true);
-    expect(balance(doc, 'chk')).toBe(900);
+  it('a malformed dedup throws and commits nothing', () => {
+    const before = run(world(), { mode: 'create', transaction: row() as never }).doc;
+    const del = (dedup: unknown) => () => run(before, { mode: 'delete', id: 't1', dedup } as never);
+    expect(del(true)).toThrow(/survivorId/);
+    expect(del({ survivorId: '' })).toThrow(/survivorId/);
+    expect(del({ survivorId: 't1' })).toThrow(/OTHER twin/);
+    expect(tx(before)).toBeDefined();
   });
 
   it('deleting a missing row is a no-op (found false)', () => {
@@ -526,6 +555,72 @@ describe('delete', () => {
     const { doc, result } = run(before, { mode: 'delete', id: 'missing' });
     expect(result.found).toBe(false);
     expect(getHeads(doc)).toEqual(getHeads(before));
+  });
+});
+
+// ─── balanceEffect ───────────────────────────────────────────────────────────
+
+describe('balanceEffect (the per-pair dedup stamp)', () => {
+  const create = (extra: AnyRec = {}): Doc =>
+    run(world(), { mode: 'create', transaction: row(extra) as never }).doc;
+  const update = (doc: Doc, patch: AnyRec, deleteKeys?: string[]): Doc =>
+    run(doc, {
+      mode: 'update',
+      id: 't1',
+      patch,
+      ...(deleteKeys ? { deleteKeys } : {}),
+      updatedAt: '2026-10-04T00:00:00.000Z',
+    }).doc;
+
+  it('is stamped when the movements land as Counter increments (writes on)', () => {
+    setCounterWrites(true);
+    expect(tx(create())!.balanceEffect).toBe('counter');
+    // A loan payment (balance, loan host) is stamped the same way.
+    expect(tx(create({ loanId: 'car-loan' }))!.balanceEffect).toBe('counter');
+  });
+
+  it('is absent under writes off, and when nothing was written under writes on', () => {
+    setCounterWrites(false);
+    expect(tx(create())!).not.toHaveProperty('balanceEffect');
+    setCounterWrites(true);
+    // A sub-minor-unit amount writes no increment; a balance adjustment has no effects.
+    expect(tx(create({ amount: 0.001 }))!).not.toHaveProperty('balanceEffect');
+    expect(tx(create({ type: 'balance_adjustment' }))!).not.toHaveProperty('balanceEffect');
+  });
+
+  it('is never accepted from main: a create or a patch carrying it is stripped', () => {
+    setCounterWrites(false);
+    const created = create({ balanceEffect: 'counter' });
+    expect(tx(created)!).not.toHaveProperty('balanceEffect');
+    setCounterWrites(true);
+    const stamped = create();
+    expect(tx(update(stamped, { description: 'x' }, ['balanceEffect']))!.balanceEffect).toBe(
+      'counter'
+    );
+  });
+
+  it('is kept across a non-money update, whatever the switch reads now', () => {
+    setCounterWrites(true);
+    const stamped = create();
+    setCounterWrites(false);
+    const edited = update(stamped, { description: 'renamed' });
+    expect(tx(edited)!.description).toBe('renamed');
+    expect(tx(edited)!.balanceEffect).toBe('counter');
+  });
+
+  it('is recomputed across a money update from THAT application, never from the reversal', () => {
+    setCounterWrites(true);
+    const stamped = create();
+    setCounterWrites(false);
+    expect(tx(update(stamped, { amount: 300 }))!).not.toHaveProperty('balanceEffect');
+
+    setCounterWrites(false);
+    const absolute = create();
+    const absoluteToo = create();
+    setCounterWrites(true);
+    expect(tx(update(absolute, { amount: 300 }))!.balanceEffect).toBe('counter');
+    // Writes on, but the new amount moves nothing: the reversal's increments do not stamp it.
+    expect(tx(update(absoluteToo, { amount: 0.001 }))!).not.toHaveProperty('balanceEffect');
   });
 });
 
@@ -556,7 +651,7 @@ describe('asset loan mirror', () => {
   });
 
   it('the mirror is relative: a concurrent edit of the mirror balance survives the merge (writes on)', () => {
-    __setCounterWritesForTesting(true);
+    setCounterWrites(true);
     const { a, b } = fork(world());
     const paidA = run(a, payment()).doc;
     const editedB = apply(b, {
@@ -575,7 +670,7 @@ describe('asset loan mirror', () => {
 // ─── Two devices ─────────────────────────────────────────────────────────────
 
 describe('two devices (writes on)', () => {
-  beforeEach(() => __setCounterWritesForTesting(true));
+  beforeEach(() => setCounterWrites(true));
 
   it('two concurrent cascades on one account both land after the merge', () => {
     const { a, b } = fork(world());

@@ -512,6 +512,14 @@ export interface Transaction {
   goalAllocMode?: 'percentage' | 'fixed'; // How to compute allocation
   goalAllocValue?: number; // 20 for 20%, or 200 for $200 fixed
   goalAllocApplied?: number; // Actual amount credited to goal (after guardrail)
+  /**
+   * Worker-derived (#117 writer flip), like `goalAllocApplied` and the loan portions: set by
+   * the transaction cascade when the row's balance movements landed as Counter increments,
+   * absent when they were absolute writes (or written by a build without the stamp). Main never
+   * sets or clears it; the recurring duplicate sweep reads it to decide, per pair, whether a
+   * merge-born duplicate's effects are reversed.
+   */
+  balanceEffect?: 'counter';
   type: TransactionType;
   amount: number;
   currency: CurrencyCode;
