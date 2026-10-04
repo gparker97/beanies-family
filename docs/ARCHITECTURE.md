@@ -254,7 +254,7 @@ FamilyMember (0..1) ───▶ (N) Goal
 - **Never hand-build a CRDT op at a call site**, and never rebuild-and-reassign an array or object. Send the new value and let the worker work out the edits.
 - `set` is for **creates and whole-invariant entities only** (for example responsibility cards). It replaces the entity whole by design.
 - Edit modals send only what the user changed: pass `snapshot` to `useFormModal` and save with `formDiff.changes(payload)`, which diffs against a snapshot taken when the form opened.
-- **Balances, goal progress and loan balances are adjusted, never absolute-written.** Send the delta through the repository's relative op (`incrementBalance`, `applyContribution`, `applyLoanPayment`); the worker folds the adjustment into a merge-safe Counter (ADR-039 Phase 2 addendum).
+- **Balances, goal progress and loan balances are adjusted, never absolute-written.** Send the delta through the repository's relative op (`incrementBalance`, `applyContribution`, `applyLoanPayment`); the worker folds the adjustment into a merge-safe Counter (ADR-039 Phase 2 addendum). A rebase replaces increments with put-only carry registers, and whether Counters are written at all is a registry-served switch, default off (ADR-039 writer flip addendum).
 - See [ADR-039](adr/039-fine-grained-crdt-writes.md) for the four laws, the `base` contract and the accepted residuals.
 
 ### Recurring Transactions

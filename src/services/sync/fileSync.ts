@@ -34,8 +34,8 @@ const LEGACY_VERSION: BeanpodVersion = '4.0';
  *
  * Round 3: DERIVED NOW, not at the flip. `beanpodVersionFor` returns it whenever the document
  * holds Counter keys or a fold ledger (`ExportedPayload.hasCounters`). This build never
- * creates either (`COUNTER_WRITES_ENABLED` is off), so the label only PRESERVES what a flip
- * build wrote: re-saving such a pod here must not relabel it 5.0/4.0 and let an older build
+ * creates either (`COUNTER_WRITES_DEFAULT` is off until the registry policy turns it on), so the label PRESERVES what a
+ * Counter-writing build wrote: re-saving such a pod here must not relabel it 5.0/4.0 and let an older build
  * merge it. Still a pure function of the document, never carried on the envelope.
  */
 const COUNTER_VERSION: BeanpodVersion = '6.0';

@@ -20,9 +20,9 @@
  * `getFullVersionLabel`). Bump this constant as the first step of a prod release so
  * the shown version never goes stale the way the old hardcoded "v1.0.0 - MVP" did.
  *
- * Release-order pointer: `COUNTER_WRITES_ENABLED` (`services/automerge/worker/counterFields.ts`)
- * flips only in the release AFTER the update floor reaches the first fold-capable build, together
- * with the `SNAPSHOT_MANUAL_REV` bump, never both in one release (runbook section 7).
+ * Release-order pointer: `COUNTER_WRITES_DEFAULT` (`services/automerge/worker/counterFields.ts`)
+ * stays false; the writer is switched on by the registry policy `dataPolicy.counterWrites` only
+ * after the update floor reaches the writer-flip build (runbook section 7). No release flips it.
  */
 // ⚠️ AN `R<n>` SUFFIX CANNOT REACH THE APP STORE TWICE WITHIN ONE BASE VERSION.
 //

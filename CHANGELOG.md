@@ -13,6 +13,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 ### Changed
 
 - Native apps older than 0.91.2 now see a one-time prompt to update, since 0.91.2 is live on both stores.
+- Balance adjustments made on two devices now merge safely once the family's Counter writes are switched on; the switch is server-controlled.
 
 ## 2026-10-03
 

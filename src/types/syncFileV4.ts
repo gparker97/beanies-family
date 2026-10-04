@@ -174,8 +174,9 @@ export interface EnvelopeTombstone {
 }
 
 /**
- * `'6.0'` is READ-ONLY here (the reader half of the #117 flip gate): this build parses a
- * 6.0 file but never writes one. See `KNOWN_BEANPOD_VERSIONS` in `fileSync.ts`.
+ * `'6.0'` is written only once Counter writes are on (the registry-served policy, #117 writer
+ * flip; off by default): this build parses a 6.0 file always and can write one when the policy
+ * is on. See `KNOWN_BEANPOD_VERSIONS` in `fileSync.ts`.
  */
 export type BeanpodVersion = '4.0' | '5.0' | '6.0';
 
