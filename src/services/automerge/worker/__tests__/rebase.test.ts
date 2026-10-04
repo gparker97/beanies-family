@@ -1609,10 +1609,17 @@ describe('Counter adjustments ride the fold ledger, not the baseline (#117 Phase
     it('the merge takes the rebase-unavailable path with conflictKind ledger-window', async () => {
       const origin = shared();
       const baseline = Automerge.getHeads(origin);
-      const peer = apply(Automerge.clone(origin), inc(-1));
       const remote = at(origin, LEDGER_WINDOW + 1);
+      // The adjustment is written by the LIVE session (the worker's own actor): only an own key
+      // reads the ledger when the peer is not fresh, so only it is window-blocked. A key loaded
+      // from a snapshot is a previous actor's, takes the baseline rule, and is never blocked
+      // (the next case; review round 1).
+      const writeLive = () => {
+        ap.loadSnapshot(Automerge.save(origin));
+        ap.mutate(inc(-1));
+      };
 
-      ap.loadSnapshot(Automerge.save(peer));
+      writeLive();
       await expect(
         ap.mergeRemoteEnvelope(
           await envelopeFor(remote as unknown as Automerge.Doc<Doc>, key),
@@ -1622,7 +1629,7 @@ describe('Counter adjustments ride the fold ledger, not the baseline (#117 Phase
       ).rejects.toMatchObject({ conflictKind: 'ledger-window' });
 
       // A human's file choice still never dead-ends: it adopts, and says why.
-      ap.loadSnapshot(Automerge.save(peer));
+      writeLive();
       const res = await ap.mergeRemoteEnvelope(
         await envelopeFor(remote as unknown as Automerge.Doc<Doc>, key),
         'fam',
@@ -1634,6 +1641,21 @@ describe('Counter adjustments ride the fold ledger, not the baseline (#117 Phase
         rebaseConflictKind: 'ledger-window',
       });
     });
+  });
+
+  it('a peer far beyond the window holding only an EARLIER actor key (a reload) rebases by the baseline rule, never blocked', async () => {
+    const origin = shared();
+    const baseline = Automerge.getHeads(origin);
+    const peer = apply(Automerge.clone(origin), inc(-1)); // written before the reload
+    const remote = withLineage(compact(origin), { id: 'L-far', seq: LEDGER_WINDOW + 5 });
+    ap.loadSnapshot(Automerge.save(peer)); // the reload: a fresh actor, so the key is foreign
+    const res = await ap.mergeRemoteEnvelope(
+      await envelopeFor(remote as unknown as Automerge.Doc<Doc>, key),
+      'fam',
+      { kind: 'baseline', heads: baseline }
+    );
+    expect(res).toMatchObject({ action: 'rebased' });
+    expect(res.counterRebase).toMatchObject({ mode: 'ledger+baseline', fresh: false, carries: 1 });
   });
 
   it('nextLineage carries restoreSeq forward unchanged, and adds none when there was none', () => {

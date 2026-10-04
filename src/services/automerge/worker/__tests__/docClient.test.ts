@@ -48,7 +48,7 @@ import {
   setCachePersistFailedHandler,
   receiveSignal,
   setFamilyKey,
-  setCounterWrites,
+  applyCounterWritesPolicy,
   type DocWorkerLike,
 } from '../docClient';
 
@@ -1568,7 +1568,7 @@ describe('docClient — the served Counter-write policy (#117 writer flip)', () 
     const spawn = vi.fn(() => new FakeWorker());
     setWorkerFactory(spawn);
 
-    await setCounterWrites(true, 'persisted');
+    await applyCounterWritesPolicy(true, 'persisted');
 
     expect(spawn).not.toHaveBeenCalled();
     expect(logEvent).toHaveBeenCalledWith(
@@ -1582,7 +1582,7 @@ describe('docClient — the served Counter-write policy (#117 writer flip)', () 
 
   it('posts the retained value in setFamilyKey, after setActor and before setKey', async () => {
     const { created } = useWorkers([acceptAll]);
-    await setCounterWrites(true, 'registry');
+    await applyCounterWritesPolicy(true, 'registry');
 
     await setFamilyKey(await generateFamilyKey(), 'fam-1');
 
@@ -1609,14 +1609,14 @@ describe('docClient — the served Counter-write policy (#117 writer flip)', () 
     const { created } = useWorkers([acceptAll]);
     await setFamilyKey(await generateFamilyKey(), 'fam-1');
 
-    await setCounterWrites(true, 'registry');
+    await applyCounterWritesPolicy(true, 'registry');
 
     expect(policyPosts(created[0])).toEqual([{ on: null }, { on: true }]);
   });
 
   it('re-drives the retained value on a respawned worker, before its setKey', async () => {
     const { created } = useWorkers([acceptAll, acceptAll]);
-    await setCounterWrites(false, 'persisted');
+    await applyCounterWritesPolicy(false, 'persisted');
     await setFamilyKey(await generateFamilyKey(), 'fam-1');
 
     created[0]!.onerror?.(new Error('reaped'));
@@ -1637,7 +1637,7 @@ describe('docClient — the served Counter-write policy (#117 writer flip)', () 
       throw new Error('no workers here');
     });
     vi.spyOn(console, 'error').mockImplementation(() => {});
-    await setCounterWrites(true, 'persisted');
+    await applyCounterWritesPolicy(true, 'persisted');
 
     await setFamilyKey(await generateFamilyKey(), 'fam-1');
 
@@ -1660,7 +1660,7 @@ describe('docClient — the served Counter-write policy (#117 writer flip)', () 
 
     // The pod still opens: the key reaches the worker even though the policy post failed.
     await expect(setFamilyKey(await generateFamilyKey(), 'fam-1')).resolves.toBeUndefined();
-    await expect(setCounterWrites(true, 'registry')).resolves.toBeUndefined();
+    await expect(applyCounterWritesPolicy(true, 'registry')).resolves.toBeUndefined();
 
     const failures = policyFailures();
     expect(failures).toHaveLength(2);
@@ -1681,7 +1681,7 @@ describe('docClient — the served Counter-write policy (#117 writer flip)', () 
       throw new Error('no workers here');
     });
     vi.spyOn(console, 'error').mockImplementation(() => {});
-    await setCounterWrites(true, 'persisted');
+    await applyCounterWritesPolicy(true, 'persisted');
 
     await setFamilyKey(await generateFamilyKey(), 'fam-1');
 

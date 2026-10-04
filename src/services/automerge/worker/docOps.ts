@@ -56,6 +56,7 @@ import {
   type CounterField,
   type CounterIndex,
   type FoldIndex,
+  hasOwnCounterKey,
 } from './counterFields';
 import {
   calculateAmortization,
@@ -1409,14 +1410,15 @@ export function buildRebaseOps(
     : fresh
       ? 'ledger'
       : 'ledger+baseline';
-  const baseline = baselineKnowledge(before);
-  const ledger = restoreRule ? baseline : targetKnowledge(target, localSeq, targetSeq);
-  const knowledge: GrowthKnowledge = { exact: ledger, foreign: fresh ? ledger : baseline };
   // Only where the ledger is read: beyond the window a folded key may have been pruned, and its
-  // absence would read as "never folded" (a double count). A peer with no Counter keys has
-  // nothing the ledger decides, so it rebases at any distance.
+  // absence would read as "never folded" (a double count). A fresh peer reads it for every key; a
+  // non-fresh one only for its OWN keys (foreign keys take the baseline rule), so a peer far behind
+  // that merely holds other writers' keys rebases at any distance (review round 1).
   const windowBlocked =
-    !restoreRule && tl !== null && tl.seq - localSeq > LEDGER_WINDOW && foldIndex(local).size > 0;
+    !restoreRule &&
+    tl !== null &&
+    tl.seq - localSeq > LEDGER_WINDOW &&
+    (fresh ? foldIndex(local).size > 0 : hasOwnCounterKey(local));
   const counterFigures = { rebaseMode, fresh };
 
   const ops: MutationOp[] = [];
@@ -1571,7 +1573,12 @@ export function buildRebaseOps(
   // C8: a goal whose contribution history could not cross keeps its growth back too, so the
   // money and its receipt either both arrive or both stay. (Every growth op is a `carry`, so
   // this is the increment filter's shape, by the op's own `(collection, id)`.)
-  const growthOps = counterGrowthOps(local, knowledge, targetSeq).filter(
+  // The knowledge is built HERE, only when the pass runs (a blocked rebase never pays for it).
+  const baseline = baselineKnowledge(before);
+  const ledger = restoreRule ? baseline : targetKnowledge(target, localSeq, targetSeq);
+  const knowledge: GrowthKnowledge = { exact: ledger, foreign: fresh ? ledger : baseline };
+  const targetLive = (target as { counterDeltas?: Record<string, unknown> }).counterDeltas;
+  const growthOps = counterGrowthOps(local, knowledge, targetSeq, targetLive).filter(
     (op) => !(op.collection === 'goals' && growthHeldBack.has(op.id))
   );
   ops.push(...growthOps);

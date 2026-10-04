@@ -12,7 +12,7 @@
  * Imports no store, like `registryService`: it is installed once from `App.vue`.
  */
 import { STORAGE_KEYS } from '@/constants/storageKeys';
-import { setCounterWrites } from '@/services/automerge/worker/docClient';
+import { applyCounterWritesPolicy } from '@/services/automerge/worker/docClient';
 import { addRegistryEntryObserver } from '@/services/registry/registryService';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { readStoredJson, removeStoredJson, writeStoredJson } from '@/utils/storedJson';
@@ -85,7 +85,7 @@ function onRegistryEntry(entry: RegistryEntry): void {
   if (served === lastValue) return;
   lastValue = served;
   persist(served);
-  void setCounterWrites(served, 'registry');
+  void applyCounterWritesPolicy(served, 'registry');
 }
 
 /**
@@ -97,7 +97,7 @@ export function installCounterWritesPolicy(): void {
   if (removeObserver) return;
   const persisted = readPersisted();
   lastValue = persisted;
-  void setCounterWrites(persisted, persisted === null ? 'default' : 'persisted');
+  void applyCounterWritesPolicy(persisted, persisted === null ? 'default' : 'persisted');
   removeObserver = addRegistryEntryObserver(onRegistryEntry);
 }
 

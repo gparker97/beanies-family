@@ -15,8 +15,8 @@
  *  - `update`: patch the row; reverse + re-apply its effects ONLY when a money field changed
  *    (`MONEY_FIELDS`), keeping the stored derived fields otherwise.
  *  - `delete`: reverse the effects from the STORED derived fields, then delete the row (a
- *    `dedup` delete reverses only when either twin's movements were Counter increments, read
- *    from the worker-derived `balanceEffect` stamp: see `TransactionCascadeArgs`).
+ *    `dedup` delete reverses per the duplicate GROUP, read from the worker-derived
+ *    `balanceEffect` stamps: see `TransactionCascadeArgs`).
  *
  * Pure + vue-free + main-thread-free, like `docOps`. Registered by `registerTransactionOps()`
  * from `applyAndProject.configure` (never at module load: `docOps` is a sibling in a possible
@@ -48,6 +48,7 @@ import {
 import { registerNamedOp, type NamedOpHandler } from './docOps';
 import { canonicalEqual } from './reconcile';
 import type { ProjectionDelta } from './protocol';
+import { recurringInstanceKey } from '@/utils/recurringInstance';
 
 type AnyRecord = Record<string, unknown>;
 
@@ -68,14 +69,14 @@ export type TransactionCascadeArgs =
       id: string;
       /**
        * The recurring duplicate sweep, naming the twin it keeps. Whether a merge-born
-       * duplicate's effects SURVIVED the merge is a property of the PAIR, not of this build
-       * (#117 writer flip): a row whose movements landed as Counter increments carries
-       * `balanceEffect: 'counter'`, and an increment always adds to whatever the other fork
-       * wrote, so counter+counter and counter+absolute moved the balance twice and the
-       * duplicate is reversed; absolute+absolute collapsed to ONE by last-writer-wins, so
-       * reversing would undo the survivor and only the row goes. The worker decides from the
-       * two rows' stamps; a survivor deleted meanwhile is reported in `skipped` and the
-       * deleted row's own stamp decides alone.
+       * duplicate's effects SURVIVED the merge depends on how each twin was written, not on this
+       * build (#117 writer flip): a row whose movements landed as Counter increments carries
+       * `balanceEffect: 'counter'` and moved the balance on its own; every unstamped (absolute)
+       * twin of the instance collapsed into ONE movement by last-writer-wins. So a deleted
+       * Counter twin is always reversed; a deleted absolute twin is reversed only when the
+       * survivor is a Counter twin and no other absolute twin of the instance remains (the
+       * group's one absolute movement is reversed exactly once). A survivor deleted meanwhile is
+       * reported in `skipped`, and the deleted row is then reversed only if it is a Counter twin.
        */
       dedup?: { survivorId: string };
     };
@@ -100,7 +101,7 @@ export interface TransactionCascadeResult {
   goals: Goal[];
   assets: Asset[];
   skipped: CascadeSkip[];
-  /** `delete` only: whether the row's effects were reversed (an absolute+absolute dedup pair
+  /** `delete` only: whether the row's effects were reversed (an absolute twin that is not the last
    *  removes the row only). */
   reversed?: boolean;
 }
@@ -132,6 +133,28 @@ function recurringLinkFlipped(before: AnyRecord, after: AnyRecord): boolean {
 export const CASCADE_ARGS_ERROR = 'CascadeArgsError';
 
 /** Owned by the cascade: computed here, never accepted from a patch. */
+/**
+ * Whether another ABSOLUTE twin of `live`'s recurring instance (same `recurringInstanceKey`, no
+ * `balanceEffect` stamp) is still in `rows`, other than `live` and the survivor. The dedup sweep
+ * deletes twins one cascade call at a time, so the group's shape is read from the rows as they
+ * stand: the last absolute twin to go carries the one reversal their shared movement needs.
+ */
+function otherAbsoluteTwinRemains(
+  rows: Record<string, AnyRecord>,
+  liveId: string,
+  survivorId: string,
+  live: AnyRecord
+): boolean {
+  const key = recurringInstanceKey(live as unknown as Transaction);
+  if (key === null) return false;
+  for (const [id, row] of Object.entries(rows)) {
+    if (id === liveId || id === survivorId) continue;
+    if (row.balanceEffect === 'counter') continue;
+    if (recurringInstanceKey(row as unknown as Transaction) === key) return true;
+  }
+  return false;
+}
+
 const DERIVED_FIELDS = [
   'goalAllocApplied',
   'loanInterestPortion',
@@ -143,7 +166,7 @@ interface Derived {
   goalAllocApplied?: number;
   loanInterestPortion?: number;
   loanPrincipalPortion?: number;
-  /** The row's movements landed as Counter increments (the dedup pair decision reads it). */
+  /** The row's movements landed as Counter increments (the dedup group decision reads it). */
   balanceEffect?: 'counter';
 }
 
@@ -545,10 +568,17 @@ const commitTransactionCascadeOp: NamedOpHandler = (draft, rawArgs, { writerId }
           cascade.skipped.push({ kind: 'transaction', id: args.dedup.survivorId });
         }
       }
-      // Per pair (see `TransactionCascadeArgs`): counter+counter and counter+absolute moved the
-      // balance twice; absolute+absolute collapsed to one by last-writer-wins.
+      // Per GROUP (see `TransactionCascadeArgs`). Every Counter twin moved the balance on its
+      // own; ALL absolute twins together moved it once (last-writer-wins collapsed them). So a
+      // deleted Counter twin always reverses; a deleted absolute twin reverses only when the
+      // survivor is a Counter twin (the absolute movement must go) AND it is the LAST absolute
+      // twin of this instance still present, so that one shared movement is reversed exactly
+      // once however many absolute twins there were (review round 1: three twins over-reversed).
       const reverse =
-        !args.dedup || live.balanceEffect === 'counter' || survivor?.balanceEffect === 'counter';
+        !args.dedup ||
+        live.balanceEffect === 'counter' ||
+        (survivor?.balanceEffect === 'counter' &&
+          !otherAbsoluteTwinRemains(rows, args.id, args.dedup.survivorId, live));
       if (reverse) cascade.reverseEffects(toPlain(live) as unknown as Transaction);
       delete rows[args.id];
       return finish(true, args.id, reverse);

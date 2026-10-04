@@ -221,7 +221,7 @@ let docActor: string | null = null;
  * The served Counter-write policy (#117 writer flip), retained like `docActor` and re-posted
  * beside it on every realm the worker gets: `setFamilyKey`, the respawn re-drive and the inline
  * re-drive. `null` = no policy has reached this device yet; the worker then uses
- * `COUNTER_WRITES_DEFAULT`. Set by `setCounterWrites` from `counterWritesPolicy.ts`.
+ * `COUNTER_WRITES_DEFAULT`. Set by `applyCounterWritesPolicy` from `counterWritesPolicy.ts`.
  *
  * ⚠️ NOT cleared by `reset()`. It is a device-wide policy served to the whole fleet, not realm
  * state: a sign-out followed by a sign-in in the same page must still post it, and the registry
@@ -1694,7 +1694,7 @@ async function postCounterWrites(stage: CounterWritesPostStage): Promise<void> {
  * because `request` spawns the worker and a signed-out boot must not spawn one (the worker is
  * first spawned at unlock). Never throws.
  */
-export async function setCounterWrites(
+export async function applyCounterWritesPolicy(
   on: boolean | null,
   source: 'registry' | 'persisted' | 'default'
 ): Promise<void> {

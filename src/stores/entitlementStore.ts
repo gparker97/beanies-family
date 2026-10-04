@@ -70,6 +70,9 @@ export const REFRESH_MIN_INTERVAL_MS = 5 * 60 * 1000;
  *  registry GET route has no throttle of its own. */
 export const ENTITLEMENT_POLL_MS = 60 * 60 * 1000;
 
+/** The live store's registry observer remover (module scope: survives store re-creation). */
+let removeEntryObserver: (() => void) | null = null;
+
 export const useEntitlementStore = defineStore('entitlement', () => {
   const familyContextStore = useFamilyContextStore();
   const { isOnline } = useOnline();
@@ -380,7 +383,10 @@ export const useEntitlementStore = defineStore('entitlement', () => {
   }
 
   // ── Wiring ─────────────────────────────────────────────────────────────────
-  addRegistryEntryObserver(onRegistryEntry);
+  // ONE observer per app: a re-created store (each Pinia in tests) replaces its predecessor's
+  // rather than stacking another beside it (review round 1).
+  removeEntryObserver?.();
+  removeEntryObserver = addRegistryEntryObserver(onRegistryEntry);
   // Phase 3: `docClient.mutate` asks this before every family-data write. Read at call time, so
   // it always reflects the current flag, answer and clock; `wouldBlock` feeds the dry-run soak.
   setWriteGate(() => ({ block: isReadOnly.value, wouldBlock: wouldBeReadOnly.value }));

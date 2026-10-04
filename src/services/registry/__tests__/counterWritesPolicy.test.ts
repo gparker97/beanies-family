@@ -8,13 +8,13 @@ import { STORAGE_KEYS } from '@/constants/storageKeys';
 import type { RegistryEntry } from '@/types/models';
 
 const h = vi.hoisted(() => ({
-  setCounterWrites: vi.fn(async () => {}),
+  applyCounterWritesPolicy: vi.fn(async () => {}),
   logEvent: vi.fn(),
   observers: [] as Array<(e: RegistryEntry) => void>,
 }));
 
 vi.mock('@/services/automerge/worker/docClient', () => ({
-  setCounterWrites: h.setCounterWrites,
+  applyCounterWritesPolicy: h.applyCounterWritesPolicy,
 }));
 vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: h.logEvent }));
 vi.mock('@/services/registry/registryService', () => ({
@@ -75,20 +75,20 @@ afterEach(() => {
 describe('counterWritesPolicy: the boot hand-over', () => {
   it('hands null with source "default" when nothing was ever persisted', () => {
     installCounterWritesPolicy();
-    expect(h.setCounterWrites).toHaveBeenCalledTimes(1);
-    expect(h.setCounterWrites).toHaveBeenCalledWith(null, 'default');
+    expect(h.applyCounterWritesPolicy).toHaveBeenCalledTimes(1);
+    expect(h.applyCounterWritesPolicy).toHaveBeenCalledWith(null, 'default');
   });
 
   it('hands the persisted value with source "persisted"', () => {
     localStorage.setItem(KEY, 'true');
     installCounterWritesPolicy();
-    expect(h.setCounterWrites).toHaveBeenCalledWith(true, 'persisted');
+    expect(h.applyCounterWritesPolicy).toHaveBeenCalledWith(true, 'persisted');
   });
 
   it('installs once: a second call neither re-hands nor adds a second observer', () => {
     installCounterWritesPolicy();
     installCounterWritesPolicy();
-    expect(h.setCounterWrites).toHaveBeenCalledTimes(1);
+    expect(h.applyCounterWritesPolicy).toHaveBeenCalledTimes(1);
     expect(h.observers).toHaveLength(1);
   });
 });
@@ -96,42 +96,42 @@ describe('counterWritesPolicy: the boot hand-over', () => {
 describe('counterWritesPolicy: the registry observer', () => {
   it('persists and hands over a served value, then only on change', () => {
     installCounterWritesPolicy();
-    h.setCounterWrites.mockClear();
+    h.applyCounterWritesPolicy.mockClear();
 
     serve({ counterWrites: true });
-    expect(h.setCounterWrites).toHaveBeenCalledWith(true, 'registry');
+    expect(h.applyCounterWritesPolicy).toHaveBeenCalledWith(true, 'registry');
     expect(localStorage.getItem(KEY)).toBe('true');
 
     serve({ counterWrites: true });
-    expect(h.setCounterWrites).toHaveBeenCalledTimes(1);
+    expect(h.applyCounterWritesPolicy).toHaveBeenCalledTimes(1);
 
     serve({ counterWrites: false });
-    expect(h.setCounterWrites).toHaveBeenLastCalledWith(false, 'registry');
-    expect(h.setCounterWrites).toHaveBeenCalledTimes(2);
+    expect(h.applyCounterWritesPolicy).toHaveBeenLastCalledWith(false, 'registry');
+    expect(h.applyCounterWritesPolicy).toHaveBeenCalledTimes(2);
     expect(localStorage.getItem(KEY)).toBe('false');
   });
 
   it('does not re-hand a served value equal to the persisted one', () => {
     localStorage.setItem(KEY, 'false');
     installCounterWritesPolicy();
-    h.setCounterWrites.mockClear();
+    h.applyCounterWritesPolicy.mockClear();
 
     serve({ counterWrites: false });
-    expect(h.setCounterWrites).not.toHaveBeenCalled();
+    expect(h.applyCounterWritesPolicy).not.toHaveBeenCalled();
   });
 
   it('hands over a first served false even with nothing persisted (null to false is a change)', () => {
     installCounterWritesPolicy();
-    h.setCounterWrites.mockClear();
+    h.applyCounterWritesPolicy.mockClear();
 
     serve({ counterWrites: false });
-    expect(h.setCounterWrites).toHaveBeenCalledWith(false, 'registry');
+    expect(h.applyCounterWritesPolicy).toHaveBeenCalledWith(false, 'registry');
   });
 
   it('warns `missing` once per session for a Lambda without dataPolicy, and keeps the value', () => {
     localStorage.setItem(KEY, 'true');
     installCounterWritesPolicy();
-    h.setCounterWrites.mockClear();
+    h.applyCounterWritesPolicy.mockClear();
 
     serve(undefined);
     serve(undefined);
@@ -139,7 +139,7 @@ describe('counterWritesPolicy: the registry observer', () => {
     const missing = eventsWith('missing');
     expect(missing).toHaveLength(1);
     expect(missing[0]!.level).toBe('warn');
-    expect(h.setCounterWrites).not.toHaveBeenCalled();
+    expect(h.applyCounterWritesPolicy).not.toHaveBeenCalled();
     expect(localStorage.getItem(KEY)).toBe('true');
   });
 });
@@ -158,12 +158,12 @@ describe('counterWritesPolicy: storage', () => {
 
   it('still hands a served value over when persisting it is refused', () => {
     installCounterWritesPolicy();
-    h.setCounterWrites.mockClear();
+    h.applyCounterWritesPolicy.mockClear();
     refuseStorageWrites(new Error('denied'));
 
     serve({ counterWrites: true });
 
-    expect(h.setCounterWrites).toHaveBeenCalledWith(true, 'registry');
+    expect(h.applyCounterWritesPolicy).toHaveBeenCalledWith(true, 'registry');
     expect(eventsWith('persist_failed')).toHaveLength(1);
   });
 
@@ -183,7 +183,7 @@ describe('counterWritesPolicy: storage', () => {
     localStorage.setItem(KEY, '"yes"');
     installCounterWritesPolicy();
 
-    expect(h.setCounterWrites).toHaveBeenCalledWith(null, 'default');
+    expect(h.applyCounterWritesPolicy).toHaveBeenCalledWith(null, 'default');
     expect(localStorage.getItem(KEY)).toBeNull();
     expect(eventsWith('persisted_invalid')[0]).toMatchObject({
       context: { detail: 'not_boolean' },

@@ -36,7 +36,9 @@ const LEGACY_VERSION: BeanpodVersion = '4.0';
  * holds Counter keys or a fold ledger (`ExportedPayload.hasCounters`). This build never
  * creates either (`COUNTER_WRITES_DEFAULT` is off until the registry policy turns it on), so the label PRESERVES what a
  * Counter-writing build wrote: re-saving such a pod here must not relabel it 5.0/4.0 and let an older build
- * merge it. Still a pure function of the document, never carried on the envelope.
+ * merge it. Still a pure function of the document, never carried on the envelope: once every key is
+ * folded and the bounded ledger (#117 writer flip, LEDGER_WINDOW) has pruned every entry, the document
+ * holds nothing a pre-fold build cannot read, and it is labelled 5.0/4.0 again, by design.
  */
 const COUNTER_VERSION: BeanpodVersion = '6.0';
 

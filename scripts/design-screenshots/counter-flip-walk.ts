@@ -24,7 +24,7 @@ import type { Browser, BrowserContext, Page } from '@playwright/test';
  * adoption, rebase and restore goes through the REAL worker entry points (`compactDoc`,
  * `mergeRemoteEnvelope` with a `baseline` or `user-file` basis), so the lineage guard and the
  * Counter carry pass run exactly as on a device. Counter writes are turned on per realm through
- * `docClient.setCounterWrites(true, 'persisted')` (and the persisted policy key, so a reload or a
+ * `docClient.applyCounterWritesPolicy(true, 'persisted')` (and the persisted policy key, so a reload or a
  * new tab boots on). Every balance ADJUSTMENT is a real-UI transaction (Transactions page, add
  * modal): an Accounts-page balance edit is an absolute set by design (`useAdjustBalance`), so it
  * cannot sum across devices; the Accounts page is where every balance is READ (the card's figure)
@@ -38,9 +38,7 @@ import type { Browser, BrowserContext, Page } from '@playwright/test';
  * number does not move; (f) policy off -> on -> off: increments stop and resume, no jump.
  */
 
-const SHOTS =
-  process.env.WALK_SHOTS ??
-  '/tmp/claude-1000/-home-greg-projects-beanies-family/d4e19b36-d9b3-463e-adea-647f5e47a83b/scratchpad/walk';
+const SHOTS = process.env.SHOT_DIR ?? 'screenshots/counter-flip-walk';
 const ACCOUNT = 'Shared Checking';
 const START = 1000;
 const COUNTER_POLICY_KEY = 'beanies:counterWrites'; // STORAGE_KEYS.COUNTER_WRITES
@@ -52,7 +50,6 @@ type Data = {
 };
 type CounterRebase = {
   carries: number;
-  skipped: number;
   superseded: number;
   mode: string;
   fresh: boolean;
@@ -152,7 +149,7 @@ async function openTab(ctx: BrowserContext, bin: Uint8Array): Promise<Page> {
 
 /**
  * Give the realm a family key (the E2E pod may not hold one after a reload) and turn Counter
- * writes on through the real setter. `setCounterWrites` retains the value and posts it only when
+ * writes on through the real setter. `applyCounterWritesPolicy` retains the value and posts it only when
  * a key is set, so the key goes first.
  */
 async function arm(page: Page, on = true) {
@@ -169,14 +166,14 @@ async function arm(page: Page, on = true) {
     const familyId = getActiveFamilyId() ?? 'walk-family';
     w.__walkFamilyId = familyId;
     await dc.setFamilyKey(key, familyId);
-    await dc.setCounterWrites(on, 'persisted');
+    await dc.applyCounterWritesPolicy(on, 'persisted');
   }, on);
 }
 
 async function setPolicy(page: Page, on: boolean) {
   await page.evaluate(async (on) => {
     const dc = await import('/src/services/automerge/worker/docClient.ts');
-    await dc.setCounterWrites(on, 'persisted');
+    await dc.applyCounterWritesPolicy(on, 'persisted');
   }, on);
 }
 

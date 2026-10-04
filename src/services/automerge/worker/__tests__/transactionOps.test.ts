@@ -521,6 +521,38 @@ describe('delete', () => {
     }
   );
 
+  it('dedup is decided per GROUP: a Counter survivor and TWO absolute twins reverse the absolute movement once (review round 1)', () => {
+    // Three devices materialise one instance concurrently: A with writes on (kept), B and C dormant.
+    // B and C both set the absolute, which collapses to ONE movement; A's increment is a second.
+    const { a: forkA, b: rest } = fork(world());
+    const { a: forkB, b: forkC } = fork(rest);
+    setCounterWrites(true);
+    const onA = run(forkA, {
+      mode: 'create',
+      transaction: row({ id: 'dup-a', recurringItemId: 'r1' }) as never,
+    }).doc;
+    setCounterWrites(false);
+    const onB = run(forkB, {
+      mode: 'create',
+      transaction: row({ id: 'dup-b', recurringItemId: 'r1' }) as never,
+    }).doc;
+    const onC = run(forkC, {
+      mode: 'create',
+      transaction: row({ id: 'dup-c', recurringItemId: 'r1' }) as never,
+    }).doc;
+    const merged = converge(converge(onA, onB).a, onC).a;
+    expect(balance(merged, 'chk')).toBe(800);
+    // The first absolute twin goes without a reversal (another absolute twin still stands for
+    // the shared movement); the last one carries the single reversal.
+    const first = run(merged, { mode: 'delete', id: 'dup-b', dedup: { survivorId: 'dup-a' } });
+    expect(first.result.reversed).toBe(false);
+    expect(balance(first.doc, 'chk')).toBe(800);
+    const last = run(first.doc, { mode: 'delete', id: 'dup-c', dedup: { survivorId: 'dup-a' } });
+    expect(last.result.reversed).toBe(true);
+    expect(balance(last.doc, 'chk')).toBe(900);
+    expect(tx(last.doc, 'dup-a')).toBeDefined();
+  });
+
   it('dedup whose survivor was deleted meanwhile: reported in `skipped`, the deleted row decides alone', () => {
     for (const deletedCounter of [true, false]) {
       setCounterWrites(deletedCounter);

@@ -26,6 +26,7 @@ import {
   baselineKnowledge,
   carryKeyFor,
   counterGrowthOps,
+  hasOwnCounterKey,
   counterKey,
   counterStats,
   counterWritesOn,
@@ -1063,6 +1064,37 @@ describe('counterGrowthOps (the rebase carry pass)', () => {
   });
   /** The same knowledge for own and foreign keys (a fresh peer, or the restore rule). */
   const both = (k: Knowledge): GrowthKnowledge => ({ exact: k, foreign: k });
+
+  it('own key with ZERO growth overwrites a live register on the target with 0 (review round 1)', () => {
+    // Tab 2 filled carry.<own>.T with a stale +1; this session withdrew back to the folded value,
+    // so its growth is 0. Without the zero carry the stale register would stand (fold 9, true 8).
+    const { doc, own } = peer((o) => ({ counters: { [`accounts/A/balance@2/${o}`]: 800 } }));
+    const K = `accounts/A/balance@2/${own}`;
+    const name = carryKeyFor(K, T);
+    const ops = counterGrowthOps(doc, both(knows({ [K]: 800 })), T, { [name]: 100 });
+    expect(ops).toEqual([
+      { op: 'carry', collection: 'accounts', id: 'A', name, minor: 0, exact: true },
+    ]);
+    // No register on the target: zero growth carries nothing.
+    expect(counterGrowthOps(doc, both(knows({ [K]: 800 })), T, {})).toEqual([]);
+  });
+
+  it('a FOREIGN key with zero growth never emits, even when a register exists', () => {
+    const foreignK = 'accounts/A/balance@2/abc123';
+    const { doc } = peer(() => ({ counters: { [foreignK]: 800 } }));
+    const name = carryKeyFor(foreignK, T);
+    expect(counterGrowthOps(doc, both(knows({ [foreignK]: 800 })), T, { [name]: 100 })).toEqual([]);
+  });
+
+  it('hasOwnCounterKey sees only an own-actor increment key, never a carry or a foreign key', () => {
+    const mine = peer((o) => ({ counters: { [`accounts/A/balance@2/${o}`]: 5 } }));
+    expect(hasOwnCounterKey(mine.doc)).toBe(true);
+    const foreignOnly = peer(() => ({
+      counters: { 'accounts/A/balance@2/abc123': 5 },
+      registers: { 'accounts/A/balance@2/carry.abc123.3': 2 },
+    }));
+    expect(hasOwnCounterKey(foreignOnly.doc)).toBe(false);
+  });
 
   it('groups two live names of one canonical key into ONE op over their sum', () => {
     const { doc, own } = peer((o) => ({

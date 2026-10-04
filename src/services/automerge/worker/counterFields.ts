@@ -1111,7 +1111,8 @@ interface CanonicalGroup {
 export function counterGrowthOps(
   local: Doc,
   knowledge: GrowthKnowledge,
-  targetSeq: number
+  targetSeq: number,
+  targetLive?: Readonly<Record<string, unknown>> | null
 ): CarryOp[] {
   const map = local.counterDeltas as Readonly<Record<string, unknown>> | undefined;
   if (!map) return [];
@@ -1142,17 +1143,38 @@ export function counterGrowthOps(
   for (const [canonical, group] of groups) {
     const source = group.exact ? knowledge.exact : knowledge.foreign;
     const g = group.sum - source.of(canonical, group.names);
-    if (g === 0) continue;
+    const name = carryKeyFor(canonical, targetSeq);
+    // Zero growth carries nothing, EXCEPT for the key's own session when the target already holds
+    // a register for it: "own overwrites" must fire with 0 too, or a foreign carrier's staler
+    // register stands (a withdrawal back to the folded value would be lost; review round 1).
+    if (g === 0 && !(group.exact && targetLive?.[name] !== undefined)) continue;
     ops.push({
       op: 'carry',
       collection: group.collection,
       id: group.id,
-      name: carryKeyFor(canonical, targetSeq),
+      name,
       minor: g,
       exact: group.exact,
     });
   }
   return ops;
+}
+
+/**
+ * Whether `local` holds a live Counter key written by its OWN actor: the only keys whose growth
+ * reads the target's ledger when the peer is not fresh (foreign keys then take the baseline rule).
+ * The ledger-window block asks this, so a peer far behind that merely holds other writers' keys
+ * still rebases (review round 1).
+ */
+export function hasOwnCounterKey(local: Doc): boolean {
+  const map = local.counterDeltas as Readonly<Record<string, unknown>> | undefined;
+  if (!map) return false;
+  const own = Automerge.getActorId(local);
+  for (const key of Object.keys(map)) {
+    const parsed = parseCounterKey(key);
+    if (parsed && parsed.carry === null && parsed.writer === own) return true;
+  }
+  return false;
 }
 
 // ─── Stats ───────────────────────────────────────────────────────────────────
