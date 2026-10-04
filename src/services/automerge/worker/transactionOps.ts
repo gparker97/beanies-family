@@ -132,7 +132,6 @@ function recurringLinkFlipped(before: AnyRecord, after: AnyRecord): boolean {
 /** Name of the args-validation error, matched by the recurring processor (crosses the wire). */
 export const CASCADE_ARGS_ERROR = 'CascadeArgsError';
 
-/** Owned by the cascade: computed here, never accepted from a patch. */
 /**
  * Whether another ABSOLUTE twin of `live`'s recurring instance (same `recurringInstanceKey`, no
  * `balanceEffect` stamp) is still in `rows`, other than `live` and the survivor. The dedup sweep
@@ -155,6 +154,7 @@ function otherAbsoluteTwinRemains(
   return false;
 }
 
+/** Owned by the cascade: computed here, never accepted from a patch. */
 const DERIVED_FIELDS = [
   'goalAllocApplied',
   'loanInterestPortion',

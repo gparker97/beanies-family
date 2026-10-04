@@ -45,7 +45,7 @@
  * `enforced`, and an effective state of `read_only`.
  */
 import { defineStore } from 'pinia';
-import { computed, ref, watch } from 'vue';
+import { computed, ref, watch, onScopeDispose } from 'vue';
 import { TRIAL_DAYS } from '@beanies/brand/pricing';
 import type { Entitlement, EntitlementState, RegistryEntry } from '@/types/models';
 import { addRegistryEntryObserver, lookupFamilyResult } from '@/services/registry/registryService';
@@ -386,7 +386,13 @@ export const useEntitlementStore = defineStore('entitlement', () => {
   // ONE observer per app: a re-created store (each Pinia in tests) replaces its predecessor's
   // rather than stacking another beside it (review round 1).
   removeEntryObserver?.();
-  removeEntryObserver = addRegistryEntryObserver(onRegistryEntry);
+  const removeMine = addRegistryEntryObserver(onRegistryEntry);
+  removeEntryObserver = removeMine;
+  // A disposed store (`$dispose`, HMR) takes its observer with it (review round 2).
+  onScopeDispose(() => {
+    removeMine();
+    if (removeEntryObserver === removeMine) removeEntryObserver = null;
+  });
   // Phase 3: `docClient.mutate` asks this before every family-data write. Read at call time, so
   // it always reflects the current flag, answer and clock; `wouldBlock` feeds the dry-run soak.
   setWriteGate(() => ({ block: isReadOnly.value, wouldBlock: wouldBeReadOnly.value }));

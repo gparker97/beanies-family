@@ -1079,6 +1079,19 @@ describe('counterGrowthOps (the rebase carry pass)', () => {
     expect(counterGrowthOps(doc, both(knows({ [K]: 800 })), T, {})).toEqual([]);
   });
 
+  it('skips a carry whose register already holds exactly that value (a retried rebase; review round 2)', () => {
+    const { doc, own } = peer((o) => ({ counters: { [`accounts/A/balance@2/${o}`]: 900 } }));
+    const K = `accounts/A/balance@2/${own}`;
+    const name = carryKeyFor(K, T);
+    expect(counterGrowthOps(doc, both(knows({ [K]: 800 })), T, { [name]: 100 })).toEqual([]);
+    expect(counterGrowthOps(doc, both(knows({ [K]: 800 })), T, { [name]: 0 })).toHaveLength(1);
+  });
+
+  it('hasOwnCounterKey ignores an own key whose value the growth pass would skip (review round 2)', () => {
+    const { doc } = peer((o) => ({ registers: { [`accounts/A/balance@2/${o}`]: 1.5 } }));
+    expect(hasOwnCounterKey(doc)).toBe(false);
+  });
+
   it('a FOREIGN key with zero growth never emits, even when a register exists', () => {
     const foreignK = 'accounts/A/balance@2/abc123';
     const { doc } = peer(() => ({ counters: { [foreignK]: 800 } }));

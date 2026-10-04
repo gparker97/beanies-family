@@ -516,8 +516,8 @@ export interface Transaction {
    * Worker-derived (#117 writer flip), like `goalAllocApplied` and the loan portions: set by
    * the transaction cascade when the row's balance movements landed as Counter increments,
    * absent when they were absolute writes (or written by a build without the stamp). Main never
-   * sets or clears it; the recurring duplicate sweep reads it to decide, per pair, whether a
-   * merge-born duplicate's effects are reversed.
+   * sets or clears it; the recurring duplicate sweep reads it to decide, per duplicate group,
+   * whether a merge-born duplicate's effects are reversed.
    */
   balanceEffect?: 'counter';
   type: TransactionType;

@@ -1121,9 +1121,9 @@ export function counterGrowthOps(
   const own = Automerge.getActorId(local);
   const groups = new Map<string, CanonicalGroup>();
   for (const key of keys) {
-    const parsed = parseCounterKey(key);
-    const value = parsed ? counterValue(map[key]) : null;
-    if (parsed === null || value === null) continue;
+    const live = liveKey(map, key);
+    if (live === null) continue;
+    const { parsed, value } = live;
     let group = groups.get(parsed.canonical);
     if (!group) {
       group = {
@@ -1137,17 +1137,22 @@ export function counterGrowthOps(
     }
     group.names.add(key);
     group.sum += value;
-    group.exact ||= parsed.carry === null && parsed.writer === own;
+    group.exact ||= isOwnKey(parsed, own);
   }
   const ops: CarryOp[] = [];
   for (const [canonical, group] of groups) {
     const source = group.exact ? knowledge.exact : knowledge.foreign;
     const g = group.sum - source.of(canonical, group.names);
+    if (g === 0 && !group.exact) continue; // the common case: no name built, nothing carried
     const name = carryKeyFor(canonical, targetSeq);
+    const held = targetLive?.[name];
     // Zero growth carries nothing, EXCEPT for the key's own session when the target already holds
     // a register for it: "own overwrites" must fire with 0 too, or a foreign carrier's staler
     // register stands (a withdrawal back to the folded value would be lost; review round 1).
-    if (g === 0 && !(group.exact && targetLive?.[name] !== undefined)) continue;
+    if (g === 0 && held === undefined) continue;
+    // A register already holding exactly this value (a retried rebase): writing it again would
+    // only turn an adopt into a replay and inflate the carry count (review round 2).
+    if (held !== undefined && counterValue(held) === g) continue;
     ops.push({
       op: 'carry',
       collection: group.collection,
@@ -1171,10 +1176,27 @@ export function hasOwnCounterKey(local: Doc): boolean {
   if (!map) return false;
   const own = Automerge.getActorId(local);
   for (const key of Object.keys(map)) {
-    const parsed = parseCounterKey(key);
-    if (parsed && parsed.carry === null && parsed.writer === own) return true;
+    const live = liveKey(map, key);
+    if (live !== null && isOwnKey(live.parsed, own)) return true;
   }
   return false;
+}
+
+/** A key the growth pass reads: parseable and holding a safe integer. THE one test, shared by
+ *  `counterGrowthOps` and `hasOwnCounterKey` so the window block and the pass cannot drift. */
+function liveKey(
+  map: Readonly<Record<string, unknown>>,
+  key: string
+): { parsed: NonNullable<ReturnType<typeof parseCounterKey>>; value: number } | null {
+  const parsed = parseCounterKey(key);
+  if (parsed === null) return null;
+  const value = counterValue(map[key]);
+  return value === null ? null : { parsed, value };
+}
+
+/** An increment key written by `own` (the session's actor): the only kind whose growth is exact. */
+function isOwnKey(parsed: NonNullable<ReturnType<typeof parseCounterKey>>, own: string): boolean {
+  return parsed.carry === null && parsed.writer === own;
 }
 
 // ─── Stats ───────────────────────────────────────────────────────────────────

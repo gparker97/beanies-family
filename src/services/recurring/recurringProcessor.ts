@@ -548,10 +548,11 @@ export async function deduplicateRecurringTransactions(): Promise<number> {
   }
 
   // Delete duplicates (keep the earliest-created transaction per group). Each delete is the
-  // cascade in `dedup` mode (audit C7), naming the kept twin: the worker decides PER PAIR
-  // (#117 writer flip). When either twin's movements were Counter increments both survived the
-  // merge and the duplicate's are reversed; when both were absolute writes they collapsed into
-  // ONE, so the worker deletes the row only (reversing would undo the survivor).
+  // cascade in `dedup` mode (audit C7), naming the kept twin: the worker decides PER GROUP
+  // (#117 writer flip). A Counter twin moved the balance on its own and is always reversed; all
+  // absolute twins together moved it ONCE, so that movement is reversed only when the survivor
+  // is a Counter twin, and only by the LAST absolute twin to go (the earlier ones remove the row
+  // only). A failed delete here leaves that reversal to the next sweep, which sees the rest.
   let deleted = 0;
   let reversed = 0;
   let rowOnly = 0;
@@ -593,7 +594,7 @@ export async function deduplicateRecurringTransactions(): Promise<number> {
       context: {
         recur_surface: 'transaction',
         action: failed > 0 ? 'partial' : 'complete',
-        // Both counts, so a wrong pair decision is countable per sweep.
+        // Both counts, so a wrong group decision is countable per sweep.
         detail: `reversed=${reversed},row_only=${rowOnly}`,
         perf_entity_count: deleted,
       },
