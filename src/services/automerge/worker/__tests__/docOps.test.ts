@@ -1000,7 +1000,7 @@ describe('docOps — relative writes through adjustField (#117 Phase 2)', () => 
         minor: -100,
         exact: true,
       });
-      expect(built).toMatchObject({ counterCarries: 1, carrySkipped: 0, rebaseMode: 'ledger' });
+      expect(built).toMatchObject({ counterCarries: 1, rebaseMode: 'ledger+baseline' });
     });
   });
 

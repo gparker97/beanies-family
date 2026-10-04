@@ -45,6 +45,7 @@ import {
   targetKnowledge,
   baselineKnowledge,
   LEDGER_WINDOW,
+  type GrowthKnowledge,
   isCounterCollection,
   parseCounterKey,
   resolveField,
@@ -70,6 +71,7 @@ import type {
   Heads,
   PatchSettingsArgs,
   RebaseBlock,
+  CounterRebaseMode,
 } from './protocol';
 import {
   reconcileInto,
@@ -1314,11 +1316,14 @@ export function applyMutation(
  *  - RESTORE RULE (`baseline`): the target's `restoreSeq` is above the peer's own `seq`, so the
  *    peer predates a restore; growth is `local − before` per canonical key (only what this peer
  *    has not synced), signed for every key. Never window-blocked (it reads no ledger).
- *  - LEDGER RULE (`ledger`): growth against the target's fold ledger (`targetKnowledge`). A
- *    foreign negative is carried only when the peer is FRESH (it holds every `fromHeads` change
- *    the compactor folded, `Automerge.hasHeads`); otherwise it may be a stale copy and is
- *    skipped and counted. A peer more than `LEDGER_WINDOW` generations behind that holds
- *    Counter keys is blocked (`ledger-window`): a pruned entry would read as "never folded".
+ *  - LEDGER RULE (`ledger`): growth against the target's fold ledger (`targetKnowledge`) for
+ *    every key, when the peer is FRESH (it holds every `fromHeads` change the compactor folded,
+ *    `Automerge.hasHeads`).
+ *  - LEDGER + BASELINE (`ledger+baseline`): a non-fresh peer keeps the ledger rule for its OWN
+ *    keys and takes the baseline rule for foreign ones, whose copy may be stale in either
+ *    direction (plan Requirement 4, amended in the build). Nothing is skipped or sign-filtered.
+ *  A ledger-reading peer more than `LEDGER_WINDOW` generations behind that holds Counter keys is
+ *  blocked (`ledger-window`): a pruned entry would read as "never folded".
  *
  * ⚠️ TWO DIFFERENT EMPTY ANSWERS, and conflating them costs a family a working
  * sync. `null` means CANNOT COMPOSE — an unexpected diff shape, or a baseline
@@ -1360,11 +1365,9 @@ export function buildRebaseOps(
   conflicts: number;
   /** Of `count`, the `carry` ops the Counter pass emitted (one per canonical key). */
   counterCarries: number;
-  /** Foreign negative growth skipped because the peer was not fresh (ledger mode only). */
-  carrySkipped: number;
-  /** Which knowledge the Counter pass subtracted: the fold ledger, or the restore baseline. */
-  rebaseMode: 'ledger' | 'baseline';
-  /** Ledger mode: the peer held every `fromHeads` change (foreign reversals carried). */
+  /** Which knowledge the Counter pass subtracted (`CounterRebaseMode`). */
+  rebaseMode: CounterRebaseMode;
+  /** The peer held every `fromHeads` change, so its foreign keys read the ledger too. */
   fresh: boolean;
   /** Set when the replay must not run at all (`RebaseBlock`): the caller blocks, as for `null`. */
   blockedBy?: RebaseBlock;
@@ -1393,31 +1396,28 @@ export function buildRebaseOps(
   const scan = touchedBetween(local, baselineHeads, getHeads(local));
   if (!scan) return null;
 
-  // #117 writer flip: the Counter pass's mode, knowledge and sign rule, decided ONCE (plan §C).
-  // `before` IS the restore rule's baseline; no second `Automerge.view`.
+  // #117 writer flip: the Counter pass's knowledge per kind of key, decided ONCE (plan §C and
+  // Requirement 4). `before` IS the baseline rule's knowledge; no second `Automerge.view`.
   const tl = docLineage(target);
   const localSeq = docLineage(local)?.seq ?? 0;
   const targetSeq = tl?.seq ?? 0;
-  const rebaseMode: 'ledger' | 'baseline' =
-    tl?.restoreSeq !== undefined && tl.restoreSeq > localSeq ? 'baseline' : 'ledger';
+  const restoreRule = tl?.restoreSeq !== undefined && tl.restoreSeq > localSeq;
   const fresh =
-    rebaseMode === 'ledger' &&
-    Array.isArray(tl?.fromHeads) &&
-    Automerge.hasHeads(local, tl.fromHeads);
-  const knowledge =
-    rebaseMode === 'baseline'
-      ? baselineKnowledge(before)
-      : targetKnowledge(target, localSeq, targetSeq);
-  const foreignNegatives = rebaseMode === 'baseline' || fresh;
-  // Ledger mode only: beyond the window a folded key may have been pruned, and its absence
-  // would read as "never folded" (a double count). A peer with no Counter keys has nothing the
-  // ledger decides, so it rebases at any distance.
+    !restoreRule && Array.isArray(tl?.fromHeads) && Automerge.hasHeads(local, tl.fromHeads);
+  const rebaseMode: CounterRebaseMode = restoreRule
+    ? 'baseline'
+    : fresh
+      ? 'ledger'
+      : 'ledger+baseline';
+  const baseline = baselineKnowledge(before);
+  const ledger = restoreRule ? baseline : targetKnowledge(target, localSeq, targetSeq);
+  const knowledge: GrowthKnowledge = { exact: ledger, foreign: fresh ? ledger : baseline };
+  // Only where the ledger is read: beyond the window a folded key may have been pruned, and its
+  // absence would read as "never folded" (a double count). A peer with no Counter keys has
+  // nothing the ledger decides, so it rebases at any distance.
   const windowBlocked =
-    rebaseMode === 'ledger' &&
-    tl !== null &&
-    tl.seq - localSeq > LEDGER_WINDOW &&
-    foldIndex(local).size > 0;
-  const counterFigures = { carrySkipped: 0, rebaseMode, fresh };
+    !restoreRule && tl !== null && tl.seq - localSeq > LEDGER_WINDOW && foldIndex(local).size > 0;
+  const counterFigures = { rebaseMode, fresh };
 
   const ops: MutationOp[] = [];
   /** Writes that could not be carried across. The saved value stayed. */
@@ -1571,9 +1571,7 @@ export function buildRebaseOps(
   // C8: a goal whose contribution history could not cross keeps its growth back too, so the
   // money and its receipt either both arrive or both stay. (Every growth op is a `carry`, so
   // this is the increment filter's shape, by the op's own `(collection, id)`.)
-  const growth = counterGrowthOps(local, knowledge, foreignNegatives, targetSeq);
-  counterFigures.carrySkipped = growth.skippedNegative;
-  const growthOps = growth.ops.filter(
+  const growthOps = counterGrowthOps(local, knowledge, targetSeq).filter(
     (op) => !(op.collection === 'goals' && growthHeldBack.has(op.id))
   );
   ops.push(...growthOps);

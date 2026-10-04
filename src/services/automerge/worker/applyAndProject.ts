@@ -1500,7 +1500,6 @@ function rebaseOntoRemote(
     if (ops.blockedBy) return { blockedBy: ops.blockedBy };
     const counterRebase = (superseded: number): CounterRebase => ({
       carries: ops.counterCarries,
-      skipped: ops.carrySkipped,
       superseded,
       mode: ops.rebaseMode,
       fresh: ops.fresh,

@@ -2152,17 +2152,18 @@ export function logMergeTerminus(
   const parts: string[] = [];
   if (outcome.action === 'rebased') {
     // #117 writer flip: what the Counter pass did. `counter_carries` is one per canonical key
-    // with growth; `carry_skipped` foreign negatives dropped while behind (`fresh=0` says why);
-    // `carry_superseded` foreign carries that met an existing register; `rebase_mode=baseline`
-    // is the restore rule. Present on every rebase (a measured zero), never defaulted away.
+    // with growth; `carry_superseded` foreign carries that met an existing register;
+    // `rebase_mode` is `ledger` (fresh: every key against the fold ledger), `ledger+baseline`
+    // (not fresh: foreign keys against this peer's own baseline) or `baseline` (the restore
+    // rule); `none` only from a worker that reported no Counter pass. Present on every rebase
+    // (a measured zero), never defaulted away.
     const r = outcome.counterRebase;
     parts.push(
       `replayed=${outcome.replayed ?? 0}`,
       `conflicts=${outcome.conflicts ?? 0}`,
       `counter_carries=${r?.carries ?? 0}`,
-      `carry_skipped=${r?.skipped ?? 0}`,
       `carry_superseded=${r?.superseded ?? 0}`,
-      `rebase_mode=${r?.mode ?? 'ledger'}`,
+      `rebase_mode=${r?.mode ?? 'none'}`,
       `fresh=${r?.fresh ? 1 : 0}`
     );
   }

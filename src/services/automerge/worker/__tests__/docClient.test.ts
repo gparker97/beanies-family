@@ -316,7 +316,7 @@ describe('docClient', () => {
           action: 'rebased',
           family_id: 'fam-1',
           detail:
-            'replayed=7,conflicts=2,counter_carries=0,carry_skipped=0,carry_superseded=0,rebase_mode=ledger,fresh=0',
+            'replayed=7,conflicts=2,counter_carries=0,carry_superseded=0,rebase_mode=none,fresh=0',
         }),
       })
     );
@@ -331,7 +331,7 @@ describe('docClient', () => {
         // failures are visible.
         context: expect.objectContaining({
           detail:
-            'replayed=3,conflicts=0,counter_carries=0,carry_skipped=0,carry_superseded=0,rebase_mode=ledger,fresh=0',
+            'replayed=3,conflicts=0,counter_carries=0,carry_superseded=0,rebase_mode=none,fresh=0',
         }),
       })
     );
@@ -374,7 +374,7 @@ describe('docClient', () => {
     expect(last.level).toBe('info');
     expect(last.context).toMatchObject({
       detail:
-        'replayed=3,conflicts=0,counter_carries=0,carry_skipped=0,carry_superseded=0,rebase_mode=ledger,fresh=0,root_conflicts=0,added=0',
+        'replayed=3,conflicts=0,counter_carries=0,carry_superseded=0,rebase_mode=none,fresh=0,root_conflicts=0,added=0',
     });
     expect(Object.keys(last.context ?? {}).sort()).toEqual(['action', 'detail', 'family_id']);
   });
@@ -406,7 +406,7 @@ describe('docClient', () => {
         action: 'rebased',
         replayed: 5,
         conflicts: 0,
-        counterRebase: { carries: 2, skipped: 1, superseded: 1, mode: 'baseline', fresh: false },
+        counterRebase: { carries: 2, superseded: 1, mode: 'ledger+baseline', fresh: false },
         rootConflicts: { total: 0, added: 0 },
         counterStats: {
           keys: 0,
@@ -423,8 +423,8 @@ describe('docClient', () => {
     expect(last.level).toBe('info');
     expect(last.context).toMatchObject({
       detail:
-        'replayed=5,conflicts=0,counter_carries=2,carry_skipped=1,carry_superseded=1,' +
-        'rebase_mode=baseline,fresh=0,root_conflicts=0,added=0,' +
+        'replayed=5,conflicts=0,counter_carries=2,carry_superseded=1,' +
+        'rebase_mode=ledger+baseline,fresh=0,root_conflicts=0,added=0,' +
         'counter_keys=0,counter_conflicts=0,carry_conflicts=0,counter_malformed=0,' +
         'ledger_keys=0,ledger_oldest=none',
     });
@@ -437,7 +437,7 @@ describe('docClient', () => {
         action: 'rebased',
         replayed: 1,
         conflicts: 0,
-        counterRebase: { carries: 1, skipped: 0, superseded: 0, mode: 'ledger', fresh: true },
+        counterRebase: { carries: 1, superseded: 0, mode: 'ledger', fresh: true },
       },
       'fam-1'
     );

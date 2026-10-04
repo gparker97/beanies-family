@@ -178,15 +178,22 @@ export type RebaseBlock = 'transactions' | 'ledger-window';
 export interface CounterRebase {
   /** `carry` ops replayed (one per canonical key with growth), of `replayed`. */
   carries: number;
-  /** Foreign negative growth skipped while behind (no `fromHeads` proof): a possible stale copy. */
-  skipped: number;
   /** Foreign carries that met an existing register on the target and stood down. */
   superseded: number;
-  /** `ledger`: growth against the target's fold ledger; `baseline`: the restore rule. */
-  mode: 'ledger' | 'baseline';
-  /** Ledger mode: the peer held every `fromHeads` change, so foreign reversals were carried. */
+  /** Which knowledge the growth was computed against (`CounterRebaseMode`). */
+  mode: CounterRebaseMode;
+  /** The peer held every `fromHeads` change, so its foreign keys read the ledger too. */
   fresh: boolean;
 }
+
+/**
+ * Which knowledge a rebase's Counter pass subtracted (#117 writer flip, plan Requirements 4, 6):
+ *  - `ledger`: every key against the target's fold ledger (a fresh peer);
+ *  - `ledger+baseline`: own keys against the ledger, foreign keys against this peer's own
+ *    baseline (a non-fresh peer, whose foreign copies may be stale in either direction);
+ *  - `baseline`: every key against this peer's own baseline (the peer predates a restore).
+ */
+export type CounterRebaseMode = 'ledger' | 'ledger+baseline' | 'baseline';
 
 /** What a cache replay did (C5c, data-layer audit 2026-10-03). Main logs it as `cache-replay`. */
 export interface CacheReplay {

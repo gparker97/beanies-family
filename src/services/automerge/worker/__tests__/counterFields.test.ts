@@ -48,6 +48,7 @@ import {
   unfoldPatch,
   type CounterCollection,
   type Knowledge,
+  type GrowthKnowledge,
 } from '../counterFields';
 import { migrateDoc } from '../docOps';
 
@@ -1060,6 +1061,8 @@ describe('counterGrowthOps (the rebase carry pass)', () => {
   const knows = (table: Record<string, number>): Knowledge => ({
     of: (canonical) => table[canonical] ?? 0,
   });
+  /** The same knowledge for own and foreign keys (a fresh peer, or the restore rule). */
+  const both = (k: Knowledge): GrowthKnowledge => ({ exact: k, foreign: k });
 
   it('groups two live names of one canonical key into ONE op over their sum', () => {
     const { doc, own } = peer((o) => ({
@@ -1074,7 +1077,7 @@ describe('counterGrowthOps (the rebase carry pass)', () => {
         return 900;
       },
     };
-    const { ops, skippedNegative } = counterGrowthOps(doc, knowledge, false, T);
+    const ops = counterGrowthOps(doc, both(knowledge), T);
     expect(ops).toEqual([
       {
         op: 'carry',
@@ -1085,38 +1088,20 @@ describe('counterGrowthOps (the rebase carry pass)', () => {
         exact: true,
       },
     ]);
-    expect(skippedNegative).toBe(0);
     // The knowledge was asked ONCE for the canonical key, with the whole name set.
     expect(seen).toEqual([[K, [`accounts/A/balance@2/carry.${own}.3`, K].sort()]]);
   });
 
-  it('a foreign negative is carried when foreignNegatives, and skipped and counted otherwise', () => {
-    const { doc } = peer(() => ({ counters: { [KX]: 500 } }));
-    const table = knows({ [KX]: 800 });
-    expect(counterGrowthOps(doc, table, true, T)).toEqual({
-      ops: [
-        {
-          op: 'carry',
-          collection: 'accounts',
-          id: 'A',
-          name: carryX(T),
-          minor: -300,
-          exact: false,
-        },
-      ],
-      skippedNegative: 0,
-    });
-    expect(counterGrowthOps(doc, table, false, T)).toEqual({ ops: [], skippedNegative: 1 });
-  });
-
-  it('a foreign POSITIVE is always carried; an own negative is always carried', () => {
+  it('an exact group reads `knowledge.exact`, a foreign group `knowledge.foreign`; nothing is sign-filtered', () => {
     const { doc, own } = peer((o) => ({
-      counters: { [KX]: 900, [`goals/G/currentAmount@2/${o}`]: -50 },
+      counters: { [KX]: 500, [`goals/G/currentAmount@2/${o}`]: -50 },
     }));
     const K = `goals/G/currentAmount@2/${own}`;
-    const { ops, skippedNegative } = counterGrowthOps(doc, knows({ [KX]: 800, [K]: 0 }), false, T);
-    expect(ops).toEqual([
-      { op: 'carry', collection: 'accounts', id: 'A', name: carryX(T), minor: 100, exact: false },
+    const ledger = knows({ [KX]: 800, [K]: 0 });
+    const baselineView = knows({ [KX]: 500, [K]: 999 });
+    // Fresh: both read the ledger, and a foreign negative (a real reversal) is carried.
+    expect(counterGrowthOps(doc, both(ledger), T)).toEqual([
+      { op: 'carry', collection: 'accounts', id: 'A', name: carryX(T), minor: -300, exact: false },
       {
         op: 'carry',
         collection: 'goals',
@@ -1126,13 +1111,40 @@ describe('counterGrowthOps (the rebase carry pass)', () => {
         exact: true,
       },
     ]);
-    expect(skippedNegative).toBe(0);
+    // Not fresh: the foreign key reads the baseline (a pure copy grows by 0), the own key the
+    // ledger (its -50 is exact whatever the baseline says).
+    expect(counterGrowthOps(doc, { exact: ledger, foreign: baselineView }, T)).toEqual([
+      {
+        op: 'carry',
+        collection: 'goals',
+        id: 'G',
+        name: carryKeyFor(K, T),
+        minor: -50,
+        exact: true,
+      },
+    ]);
+  });
+
+  it('a stale-HIGH foreign copy (the writer spent since) carries +491 against the ledger, 0 against the baseline (chaos layer 6, seed 2)', () => {
+    // B holds D's key at 1000 through Drive; D spends 491 and compacts (ledger 509). B is not
+    // fresh: against the ledger its stale copy reads +491 and would undo the expense.
+    const { doc } = peer(() => ({ counters: { [KX]: 1000 } }));
+    const ledger = knows({ [KX]: 509 });
+    expect(counterGrowthOps(doc, both(ledger), T)).toEqual([
+      expect.objectContaining({ name: carryX(T), minor: 491, exact: false }),
+    ]);
+    const before = { counterDeltas: { [KX]: 1000 } };
+    expect(counterGrowthOps(doc, { exact: ledger, foreign: baselineKnowledge(before) }, T)).toEqual(
+      []
+    );
   });
 
   it('a register of the own actor alone is not exact (only the live actor key makes it so)', () => {
-    // A session that continues under a new actor is foreign to its own earlier keys.
+    // A session that continues under a new actor is foreign to its own earlier keys: the
+    // foreign knowledge decides its growth.
     const { doc } = peer(() => ({ registers: { [carryX(3)]: -40 } }));
-    expect(counterGrowthOps(doc, knows({}), false, T)).toEqual({ ops: [], skippedNegative: 1 });
+    const ops = counterGrowthOps(doc, { exact: knows({ [KX]: -40 }), foreign: knows({}) }, T);
+    expect(ops).toEqual([expect.objectContaining({ minor: -40, exact: false })]);
   });
 
   it('one op per canonical key: two actors, two scales and two entities are separate', () => {
@@ -1144,7 +1156,7 @@ describe('counterGrowthOps (the rebase carry pass)', () => {
         'assets/L/loan.outstandingBalance@2/x': -60,
       },
     }));
-    const { ops } = counterGrowthOps(doc, knows({}), true, T);
+    const ops = counterGrowthOps(doc, both(knows({})), T);
     expect(ops.map((o) => [o.name, o.minor])).toEqual([
       [carryX(T), 100],
       ['accounts/A/balance@2/carry.y.5', 200],
@@ -1156,11 +1168,11 @@ describe('counterGrowthOps (the rebase carry pass)', () => {
   it('against a baseline knowledge: signed growth over the view, nothing for an unchanged key', () => {
     const { doc } = peer(() => ({ counters: { [KX]: 1300, 'accounts/A/balance@2/y': 70 } }));
     const before = { counterDeltas: { [KX]: 1000, 'accounts/A/balance@2/y': 70 } };
-    expect(counterGrowthOps(doc, baselineKnowledge(before), true, T).ops).toEqual([
+    expect(counterGrowthOps(doc, both(baselineKnowledge(before)), T)).toEqual([
       { op: 'carry', collection: 'accounts', id: 'A', name: carryX(T), minor: 300, exact: false },
     ]);
     const lower = { counterDeltas: { [KX]: 1500 } };
-    expect(counterGrowthOps(doc, baselineKnowledge(lower), true, T).ops).toEqual([
+    expect(counterGrowthOps(doc, both(baselineKnowledge(lower)), T)).toEqual([
       expect.objectContaining({ name: carryX(T), minor: -200 }),
       expect.objectContaining({ name: 'accounts/A/balance@2/carry.y.5', minor: 70 }),
     ]);
@@ -1174,10 +1186,7 @@ describe('counterGrowthOps (the rebase carry pass)', () => {
     const target = {
       foldedCounters: { [KX]: { v: 1000, s: R + 1 }, [carryX(R)]: { v: 200, s: R + 1 } },
     };
-    expect(counterGrowthOps(doc, targetKnowledge(target, R, R + 1), true, R + 1)).toEqual({
-      ops: [],
-      skippedNegative: 0,
-    });
+    expect(counterGrowthOps(doc, both(targetKnowledge(target, R, R + 1)), R + 1)).toEqual([]);
   });
 
   it('the three-generation scenario: another peer carried and folded growth is subtracted', () => {
@@ -1188,13 +1197,13 @@ describe('counterGrowthOps (the rebase carry pass)', () => {
     const target = {
       foldedCounters: { [KX]: { v: 800, s: P + 1 }, [carryX(P + 1)]: { v: 100, s: P + 2 } },
     };
-    const { ops } = counterGrowthOps(doc, targetKnowledge(target, P, P + 2), true, P + 2);
+    const ops = counterGrowthOps(doc, both(targetKnowledge(target, P, P + 2)), P + 2);
     expect(ops).toEqual([expect.objectContaining({ name: carryX(P + 2), minor: 100 })]);
     // A carry folded from a generation BEFORE the peer's is not subtracted.
     const older = {
       foldedCounters: { [KX]: { v: 800, s: P + 1 }, [carryX(P - 1)]: { v: 100, s: P } },
     };
-    expect(counterGrowthOps(doc, targetKnowledge(older, P, P + 2), true, P + 2).ops).toEqual([
+    expect(counterGrowthOps(doc, both(targetKnowledge(older, P, P + 2)), P + 2)).toEqual([
       expect.objectContaining({ minor: 200 }),
     ]);
   });
@@ -1204,18 +1213,15 @@ describe('counterGrowthOps (the rebase carry pass)', () => {
       counters: { garbage: 1, 'accounts/A/creditLimit@2/x': 5, [KX]: 100 },
       registers: { 'accounts/A/balance@2/carry.z.1': 1.5 },
     }));
-    expect(counterGrowthOps(doc, knows({}), true, T).ops).toEqual([
+    expect(counterGrowthOps(doc, both(knows({})), T)).toEqual([
       expect.objectContaining({ name: carryX(T), minor: 100 }),
     ]);
   });
 
   it('no key, or nothing grown, is no ops', () => {
-    expect(counterGrowthOps(baseline, knows({}), true, T)).toEqual({ ops: [], skippedNegative: 0 });
+    expect(counterGrowthOps(baseline, both(knows({})), T)).toEqual([]);
     const { doc } = peer(() => ({ counters: { [KX]: 500 } }));
-    expect(counterGrowthOps(doc, knows({ [KX]: 500 }), false, T)).toEqual({
-      ops: [],
-      skippedNegative: 0,
-    });
+    expect(counterGrowthOps(doc, both(knows({ [KX]: 500 })), T)).toEqual([]);
   });
 
   it('works on live documents written through adjustField (the own key is exact)', () => {
@@ -1228,7 +1234,9 @@ describe('counterGrowthOps (the rebase carry pass)', () => {
     });
     const K = `accounts/A/balance@2/${own}`;
     const target = { foldedCounters: { [K]: { v: -100, s: 1 } } };
-    expect(counterGrowthOps(ahead, targetKnowledge(target, 0, 1), false, 1).ops).toEqual([
+    expect(
+      counterGrowthOps(ahead, { exact: targetKnowledge(target, 0, 1), foreign: knows({}) }, 1)
+    ).toEqual([
       {
         op: 'carry',
         collection: 'accounts',

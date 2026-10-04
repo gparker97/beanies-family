@@ -1467,11 +1467,13 @@ describe('layer 6: Counter carries across compactions, reloads and restores (#11
    *
    * The truth is what Drive SHOULD hold for each account: the start, plus every device's own
    * adjustments as each sync lands, reset to the restored file's fold on a restore. Invariants
-   * after every move: no carry register is ever a `Counter`; no name holds two concurrent values
-   * (`counterStats` conflicts and carry conflicts both 0) and no compaction reports a ledger
-   * name collision; and the fold equals the truth whenever no rebase so far counted a residual
-   * (`carry_skipped`), else |fold − truth| ≤ the magnitude of the counted residuals, so a double
-   * count can never hide behind the bound.
+   * after every move: no carry register is ever a `Counter`; no increment key holds two
+   * concurrent values (`counterStats.conflicts` 0, nothing malformed) and no compaction reports a
+   * ledger name collision; and the fold EQUALS the truth whenever Drive holds no carry conflict
+   * (`carry_conflicts=0`), else |fold − truth| ≤ the unsynced magnitude of the rebases that
+   * introduced one (Automerge's pick between two concurrent views), so a double count can never
+   * hide behind the bound. Since amended Requirement 4 nothing is skipped: a non-fresh peer's
+   * foreign keys take the baseline rule, so there is no other residual to bound.
    */
   it(`${ITERATIONS} rounds, seed ${SEED}: registers are integers, one value per name, the fold equals every device's own adjustments`, () => {
     const rng = lcg((SEED ^ 0x5eed) >>> 0);
@@ -1515,6 +1517,7 @@ describe('layer 6: Counter carries across compactions, reloads and restores (#11
       );
 
     let lossBound = 0;
+    let carryConflictsSeen = 0;
     const failures: string[] = [];
     const tally: Tally = new Map();
     /** What happened, round by round (counts, seqs and figures only): printed on a failure. */
@@ -1534,14 +1537,18 @@ describe('layer 6: Counter carries across compactions, reloads and restores (#11
         }
       }
       const stats = counterStats(drive);
-      if (stats.conflicts || stats.carryConflicts || stats.malformed) {
+      tally.set(
+        'max carry_conflicts',
+        Math.max(tally.get('max carry_conflicts') ?? 0, stats.carryConflicts)
+      );
+      if (stats.conflicts || stats.malformed) {
         failures.push(
           `${where}: counterStats conflicts=${stats.conflicts} carry=${stats.carryConflicts} malformed=${stats.malformed}`
         );
       }
       for (const id of ACCS) {
         const diff = balance(drive, id) - truth.get(id)!;
-        if (lossBound === 0 ? diff !== 0 : Math.abs(diff) > lossBound) {
+        if (stats.carryConflicts === 0 ? diff !== 0 : Math.abs(diff) > lossBound) {
           failures.push(`${where}: ${id} fold − truth = ${diff} (bound ${lossBound})`);
         }
       }
@@ -1576,14 +1583,15 @@ describe('layer 6: Counter carries across compactions, reloads and restores (#11
         drive = Automerge.clone(out.doc, { actor: actor() });
         bump(tally, `rebase ${built.rebaseMode}${built.fresh ? ' fresh' : ''}`);
         trace.push(
-          `  ${dev.name} rebase ${seqOf(dev.doc)}<-: mode=${built.rebaseMode} fresh=${built.fresh} carries=${built.counterCarries} skipped=${built.carrySkipped} superseded=${out.carrySuperseded} ops=${JSON.stringify(opsOfRebase(built.op))}`
+          `  ${dev.name} rebase ${seqOf(dev.doc)}<-: mode=${built.rebaseMode} fresh=${built.fresh} carries=${built.counterCarries} superseded=${out.carrySuperseded} ops=${JSON.stringify(opsOfRebase(built.op))}`
         );
         bump(tally, 'carries', built.counterCarries);
-        bump(tally, 'carry_skipped', built.carrySkipped);
         bump(tally, 'carry_superseded', out.carrySuperseded);
-        // A skipped negative is either a stale copy (no loss) or a reloaded session's own
-        // reversal (the documented residual): bound it by everything this device had unsynced.
-        if (built.carrySkipped > 0) lossBound += dev.unsyncedAbs;
+        // The one residual: a carry conflict this rebase introduced (two concurrent first puts)
+        // keeps one of two views. Bound it by everything this device had unsynced.
+        const conflictsNow = counterStats(drive).carryConflicts;
+        if (conflictsNow > carryConflictsSeen) lossBound += dev.unsyncedAbs;
+        carryConflictsSeen = conflictsNow;
       }
       for (const [id, n] of dev.unsynced) truth.set(id, truth.get(id)! + n);
       dev.unsynced.clear();
@@ -1973,11 +1981,10 @@ describe('layer 4: compaction rebase through compactDoc + mergeRemoteEnvelope', 
     });
     expect(res.action).toBe('rebased');
     // The peer's keys are foreign to the reloaded session (a fresh actor inside `ap`), and they
-    // cross anyway: nobody owns a key. The -3.33 is a negative, carried because the session
+    // cross anyway: nobody owns a key. The -3.33 is read against the ledger because the session
     // holds every change the compactor folded (`fromHeads`): fresh.
     expect(res.counterRebase).toMatchObject({
       carries: 2,
-      skipped: 0,
       mode: 'ledger',
       fresh: true,
     });

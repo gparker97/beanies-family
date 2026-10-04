@@ -56,6 +56,13 @@
  *     phantom reversal; over the name set, 12 − (10 + 2) = 0. With one live name per canonical
  *     key the two formulations are identical.
  *
+ *     THE FRESHNESS RULE (plan Requirement 4, amended in the build): a FOREIGN key is compared to
+ *     the ledger only when the peer holds every change the compactor folded (`fromHeads`).
+ *     Otherwise its copy may be stale in EITHER direction: B holds D's key at `v`, D spends 491
+ *     and compacts (ledger `v − 491`), and B, behind, would compute `+491` and undo the expense.
+ *     So a non-fresh peer takes the BASELINE rule for foreign keys (`local − before`, 0 for a
+ *     pure copy received through Drive), and keeps the ledger rule for its own (`GrowthKnowledge`).
+ *
  * Every Counter-specific algorithm lives here (fold, unfold, write, compaction ledger, rebase
  * growth, stats) so `docOps.ts` and `applyAndProject.ts` only call in, and no other site
  * hand-codes a field name, a key format or a scale.
@@ -967,8 +974,8 @@ export type GrowthSource = CounterSource & {
 /**
  * What a rebase target already holds of one canonical key, in minor units at that key's scale,
  * given the set of names the dirty peer holds live for it. Built ONCE per rebase by
- * `targetKnowledge` (ledger mode) or `baselineKnowledge` (restore mode); `counterGrowthOps`
- * subtracts it from the peer's live sum.
+ * `targetKnowledge` (the ledger rule) or `baselineKnowledge` (the baseline rule: a restore, or
+ * a non-fresh peer's foreign keys); `counterGrowthOps` subtracts it from the peer's live sum.
  */
 export interface Knowledge {
   of(canonical: string, names: ReadonlySet<string>): number;
@@ -1057,6 +1064,22 @@ export function baselineKnowledge(before: CounterSource): Knowledge {
  */
 export type CarryOp = Extract<MutationOp, { op: 'carry' }>;
 
+/**
+ * Which knowledge a rebase subtracts, per kind of canonical key (plan Requirements 4 and 6),
+ * chosen ONCE by the composer:
+ *  - restore rule: both are `baselineKnowledge(before)`;
+ *  - ledger rule, fresh peer: both are `targetKnowledge(...)`;
+ *  - ledger rule, non-fresh peer (`ledger+baseline`): `exact` is `targetKnowledge(...)` (the own
+ *    session holds its complete key) and `foreign` is `baselineKnowledge(before)` (a foreign
+ *    copy may be stale either way, so only what this peer has not synced is carried).
+ */
+export interface GrowthKnowledge {
+  /** For a canonical key one of whose live names is the rebasing document's own actor key. */
+  readonly exact: Knowledge;
+  /** For every other canonical key. */
+  readonly foreign: Knowledge;
+}
+
 /** One canonical key's live names on the rebasing peer, summed. */
 interface CanonicalGroup {
   readonly collection: CounterCollection;
@@ -1073,25 +1096,27 @@ interface CanonicalGroup {
  *
  * First pass: group the peer's parseable live names by canonical key (`sum` of their values;
  * `exact` when one of them is the peer's own actor key, `Automerge.getActorId(local)`). Second
- * pass, per group: `g = sum − knowledge.of(canonical, names)`; `g = 0` emits nothing; a FOREIGN
- * group with `g < 0` is a reversal only when `foreignNegatives` (the peer holds every change the
- * compactor folded, or restore mode), else it may be a stale copy and is skipped and counted in
- * `skippedNegative`; everything else becomes one `carry` op named `carryKeyFor(K, targetSeq)`.
- * The caller decides the knowledge and the sign rule once; there is no mode switch here.
+ * pass, per group: `g = sum − source.of(canonical, names)`, where `source` is `knowledge.exact`
+ * for an exact group and `knowledge.foreign` otherwise; `g = 0` emits nothing; everything else
+ * becomes one `carry` op named `carryKeyFor(K, targetSeq)`. NOTHING IS SKIPPED AND NOTHING IS
+ * SIGN-FILTERED (plan Requirement 4, amended in the build): a stale foreign copy can read high
+ * as well as low (an expense is a negative increment), so a sign rule cannot tell a stale copy
+ * from a reversal. The caller makes a foreign key safe by choosing its knowledge instead: the
+ * target's ledger when the peer is fresh (it holds every change the compactor folded), else the
+ * peer's own baseline, under which a pure copy received through Drive grows by exactly 0.
  *
  * Malformed keys (unparseable, unknown field, a value that is not a safe integer) are skipped.
  * `onMissing` is the `carry` op's own rule: an entity the compactor deleted is skipped there.
  */
 export function counterGrowthOps(
   local: Doc,
-  knowledge: Knowledge,
-  foreignNegatives: boolean,
+  knowledge: GrowthKnowledge,
   targetSeq: number
-): { ops: CarryOp[]; skippedNegative: number } {
+): CarryOp[] {
   const map = local.counterDeltas as Readonly<Record<string, unknown>> | undefined;
-  if (!map) return { ops: [], skippedNegative: 0 };
+  if (!map) return [];
   const keys = Object.keys(map);
-  if (keys.length === 0) return { ops: [], skippedNegative: 0 };
+  if (keys.length === 0) return [];
   const own = Automerge.getActorId(local);
   const groups = new Map<string, CanonicalGroup>();
   for (const key of keys) {
@@ -1114,14 +1139,10 @@ export function counterGrowthOps(
     group.exact ||= parsed.carry === null && parsed.writer === own;
   }
   const ops: CarryOp[] = [];
-  let skippedNegative = 0;
   for (const [canonical, group] of groups) {
-    const g = group.sum - knowledge.of(canonical, group.names);
+    const source = group.exact ? knowledge.exact : knowledge.foreign;
+    const g = group.sum - source.of(canonical, group.names);
     if (g === 0) continue;
-    if (g < 0 && !group.exact && !foreignNegatives) {
-      skippedNegative++;
-      continue;
-    }
     ops.push({
       op: 'carry',
       collection: group.collection,
@@ -1131,7 +1152,7 @@ export function counterGrowthOps(
       exact: group.exact,
     });
   }
-  return { ops, skippedNegative };
+  return ops;
 }
 
 // ─── Stats ───────────────────────────────────────────────────────────────────
