@@ -69,6 +69,8 @@ import * as Automerge from '@automerge/automerge';
 import { CURRENCIES } from '@/constants/currencies';
 import type { CollectionName, FamilyDocument, COUNTER_COLLECTION_NAMES } from '@/types/automerge';
 import { StaleBuildCounterError } from '@/types/sync';
+// Type-only (a cycle with `protocol.ts`'s type-only `CounterStats` import, erased both ways).
+import type { MutationOp } from './protocol';
 
 type AnyRecord = Record<string, unknown>;
 type Doc = Automerge.Doc<FamilyDocument>;
@@ -1050,17 +1052,10 @@ export function baselineKnowledge(before: CounterSource): Knowledge {
  * the peer's live names for the canonical key is the rebasing document's own actor key: such a
  * carry OVERWRITES an existing register; a foreign one is skipped when a register exists.
  *
- * Worker-only, like the rebase's raw `patch`. WP2 of the writer-flip plan adds it to
- * `protocol.ts`'s `MutationOp` union; until then it is declared here.
+ * Worker-only, like the rebase's raw `patch`: the `carry` kind of `protocol.ts`'s `MutationOp`
+ * (declared there, beside `increment`), applied by `docOps.mutateDraft`.
  */
-export interface CarryOp {
-  op: 'carry';
-  collection: CounterCollection;
-  id: string;
-  name: string;
-  minor: number;
-  exact: boolean;
-}
+export type CarryOp = Extract<MutationOp, { op: 'carry' }>;
 
 /** One canonical key's live names on the rebasing peer, summed. */
 interface CanonicalGroup {

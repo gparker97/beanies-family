@@ -17,14 +17,14 @@ const { buildRebaseOps, applyMutation, materializeCollection } = await import('.
 const cf = await import('../counterFields');
 const { SNAPSHOT_VERSION } = await import('../cache');
 const { attachPhotoToEntity } = await import('../photoOps');
-const { seeded, apply, onDevice, useTestDevices, resetTestDevices } = await import('./twoDevices');
+const { seeded, apply } = await import('./twoDevices');
 
 type Doc = Automerge.Doc<FamilyDocument>;
 type Any = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
 /** The compaction source exactly as `compactDoc` builds it, as a new lineage. */
 const compact = (doc: Doc): Doc =>
-  Automerge.from({ ...cf.foldDoc(doc), podLineage: { id: 'L-NEW', seq: 1 } }) as unknown as Doc;
+  Automerge.from({ ...cf.foldDoc(doc, 1), podLineage: { id: 'L-NEW', seq: 1 } }) as unknown as Doc;
 const js = (doc: Doc) => Automerge.toJS(doc) as Any;
 const shown = (doc: Doc, collection: 'goals' | 'accounts', id: string) =>
   materializeCollection(doc, collection, cf.foldIndex(doc)).find(([k]) => k === id)![1] as Any;
@@ -58,12 +58,8 @@ beforeEach(async () => {
   ap.__resetApplyAndProjectForTesting();
   ap.configure({ pushChunk() {}, perf() {}, cachePersistFailed() {}, cacheReleased() {} });
   await ap.setKey(key);
-  useTestDevices();
 });
-afterEach(() => {
-  cf.setCounterWrites(null);
-  resetTestDevices();
-});
+afterEach(() => cf.setCounterWrites(null));
 
 describe('C8: the rebase never splits a paired write', () => {
   const TX = { id: 'T', accountId: 'A', amount: 10, description: 'groceries', type: 'expense' };
@@ -114,7 +110,7 @@ describe('C8: the rebase never splits a paired write', () => {
       },
     ]);
     const baseline = Automerge.getHeads(o);
-    const peer = apply(onDevice('device-peer', Automerge.clone(o)), contribute('G', 'c-peer', 5));
+    const peer = apply(Automerge.clone(o), contribute('G', 'c-peer', 5));
     const target = apply(compact(o), contribute('G', 'c-saved', 7));
 
     const ops = buildRebaseOps(peer, baseline, target)!;
@@ -139,14 +135,14 @@ describe('C8: the rebase never splits a paired write', () => {
       },
     ]);
     const baseline = Automerge.getHeads(o);
-    const peer = apply(onDevice('device-peer', Automerge.clone(o)), contribute('G', 'c-peer', 5));
+    const peer = apply(Automerge.clone(o), contribute('G', 'c-peer', 5));
     // The saved copy holds an entry with no identity: the list cannot be unioned.
     const target = Automerge.change(compact(o), (d) => {
       (d.goals as Any).G.manualContributions.push({ amount: 3, at: 'x', updatedBy: 'm2' });
     });
     const ops = buildRebaseOps(peer, baseline, target)!;
     expect(ops.conflicts).toBe(1);
-    expect(ops.counterIncrements).toBe(0);
+    expect(ops.counterCarries).toBe(0);
     // Nothing else changed, so nothing replays at all: the +5 stays on the peer with its entry.
     expect(ops.op).toBeNull();
   });
@@ -192,7 +188,7 @@ describe('C9: Counter hardening', () => {
   it('(b) foldDoc stores the UNFLOORED sum; the read floor still holds after the fold', () => {
     const d = goalWith(10, -15); // two decrements crossed 0: folded max(0, -5) = 0
     expect(shown(d, 'goals', 'G').currentAmount).toBe(0);
-    expect(cf.foldDoc(d).goals.G!.currentAmount).toBe(-5);
+    expect(cf.foldDoc(d, 1).goals.G!.currentAmount).toBe(-5);
     const after = compact(d);
     expect(shown(after, 'goals', 'G').currentAmount).toBe(0);
     // And a later +8 reads 3 (the true sum), not 8.

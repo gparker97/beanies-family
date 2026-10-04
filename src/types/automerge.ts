@@ -123,32 +123,38 @@ export interface FamilyDocument {
   /**
    * Concurrent-safe adjustments to the three ADJUSTED money fields (#117 Phase 2, ADR-039
    * addendum): account `balance`, goal `currentAmount`, asset `loan.outstandingBalance`. Keyed
-   * `${collection}/${id}/${field}@${decimals}/${deviceWriterId}:${actorId}`; each value is a
-   * Counter in integer MINOR units at the key's own `decimals` (the entity's currency minor
-   * unit when written, clamped to [2, 8]). The stored absolute is the baseline and the
-   * Counters hold the adjustments since; the fold in `worker/counterFields.ts` is the only
-   * reader, so main never sees a Counter.
+   * `${collection}/${id}/${field}@${decimals}/${actorId}`; each value is a Counter in integer
+   * MINOR units at the key's own `decimals` (the entity's currency minor unit when written,
+   * clamped to [2, 8]). The stored absolute is the baseline and the Counters hold the
+   * adjustments since; the fold in `worker/counterFields.ts` is the only reader, so main never
+   * sees a Counter. A rebase also puts CARRY REGISTERS here (#117 writer flip):
+   * `…@${decimals}/carry.${writer}.${targetSeq}`, a plain integer, never incremented (typed
+   * `Counter` here for the increment keys every writer handles; readers go through
+   * `counterValue`, which accepts both).
    *
    * ⚠️ ONE WRITER PER KEY, FOR LIFE. A later increment applies to EVERY conflicting Counter at
    * a key (`automergeSemantics.test.ts`, probe e'), so a key two actors both created can never
-   * be summed correctly again. The actor (fresh per `load`) makes a key single-writer; the
-   * device id (one per family cache) says which device owns it for the rebase. The map
-   * itself is created by the stored migration change (`MIGRATED_ROOT_KEYS`), never by a device,
-   * so every device writes into the SAME map object.
+   * be summed correctly again. The actor (fresh per `load`) is the whole writer; no key has an
+   * owner, and the rebase carries every live key. The map itself is created by the stored
+   * migration change (`MIGRATED_ROOT_KEYS`), never by a device, so every device writes into the
+   * SAME map object.
    *
    * Type-only `Counter` import: erased on main, which never holds a Counter.
    */
   counterDeltas: Record<string, Counter>;
   /**
-   * The compaction fold ledger (#117 Phase 2): Counter key (scale included) → the minor units
-   * `compactDoc` folded into the absolute. CUMULATIVE across compactions (a dirty peer rebases at any
-   * generation gap), written only by the compaction source, read only by the rebase
-   * (`counterGrowthOps`) so a peer never re-emits an adjustment a compaction already folded.
-   * Optional, like `podLineage` on legacy pods: absent until the first compaction that folds
-   * a key, and never migrated in (its only writer builds the whole document with
+   * The compaction fold ledger (#117 Phase 2): Counter key (scale included, a carry register
+   * under its own full name) → `{ v: minorUnits, s: foldedAtSeq }`, or a bare number written by
+   * a 0.91.2 compaction. BOUNDED BY GENERATION (#117 writer flip, plan §D): `foldDoc` writes
+   * `s` for every key it folds, normalises bare numbers and prunes entries older than
+   * `LEDGER_WINDOW` generations; a dirty peer further behind is blocked (`ledger-window`).
+   * Written only by the compaction source, read only through `ledgerValue`/`ledgerSeq` by the
+   * rebase (`targetKnowledge`) so a peer never re-emits an adjustment a compaction already
+   * folded. Optional, like `podLineage` on legacy pods: absent until the first compaction that
+   * folds a key, and never migrated in (its only writer builds the whole document with
    * `Automerge.from`).
    */
-  foldedCounters?: Record<string, number>;
+  foldedCounters?: Record<string, number | { v: number; s: number }>;
 }
 
 /**

@@ -28,7 +28,6 @@ import {
   buildRebaseOps,
 } from '../docOps';
 import { MIGRATION_CHANGES } from '../migrationChanges';
-import { deviceWriterIdFor, isDeviceWriterIdEphemeral, setDeviceWriterId } from '../docActor';
 import {
   COUNTER_WRITES_DEFAULT,
   setCounterWrites,
@@ -40,15 +39,7 @@ import {
 } from '../counterFields';
 import type { MutationOp, ProjectionDelta } from '../protocol';
 import { calculateExtraPayment } from '@/utils/loanPayment';
-import {
-  TEST_DEVICE,
-  apply,
-  converge,
-  fork,
-  resetTestDevices,
-  seeded,
-  useTestDevices,
-} from './twoDevices';
+import { apply, converge, fork, seeded } from './twoDevices';
 
 type Doc = Automerge.Doc<FamilyDocument>;
 const base = (): Doc => migrateDoc(Automerge.init<FamilyDocument>());
@@ -779,11 +770,7 @@ describe('docOps — core domain named ops (financial atomic RMW)', () => {
 // ON live in `counterMerge.test.ts`.
 
 describe('docOps — relative writes through adjustField (#117 Phase 2)', () => {
-  beforeEach(() => useTestDevices());
-  afterEach(() => {
-    setCounterWrites(null);
-    resetTestDevices();
-  });
+  afterEach(() => setCounterWrites(null));
 
   const AT = '2026-10-03T10:00:00.000Z';
   const entry = (id: string, amount: number, note?: string) => ({
@@ -938,7 +925,7 @@ describe('docOps — relative writes through adjustField (#117 Phase 2)', () => 
     ).toThrow(/not a Counter field of "accounts"/);
   });
 
-  it('named handlers receive `${device}:${actor}` as ctx.writerId', () => {
+  it('named handlers receive the actor alone as ctx.writerId (#117 writer flip)', () => {
     let seen: string | undefined;
     registerNamedOp('probeCtx', (_draft, _args, ctx) => {
       seen = ctx.writerId;
@@ -946,51 +933,74 @@ describe('docOps — relative writes through adjustField (#117 Phase 2)', () => 
     });
     const d = base();
     applyMutation(d, { op: 'named', name: 'probeCtx', args: {} });
-    expect(seen).toBe(`${TEST_DEVICE}:${Automerge.getActorId(d)}`);
+    expect(seen).toBe(Automerge.getActorId(d));
   });
 
-  describe('no family cache opened: an EPHEMERAL device id, never a throw', () => {
+  describe('the rebase `carry` op: a plain-integer register under the register rule (#117 writer flip)', () => {
     const accountDoc = () =>
       seeded([{ op: 'set', collection: 'accounts', id: 'a', entity: { id: 'a', balance: 100 } }]);
-    const inc = (delta: number) =>
-      ({ op: 'increment', collection: 'accounts', id: 'a', field: 'balance', delta }) as const;
-    const keyWriters = (doc: Doc) =>
-      Object.keys(doc.counterDeltas).map((k) => k.slice(k.lastIndexOf('/') + 1));
+    const NAME = 'accounts/a/balance@2/carry.abc.3';
+    const carry = (minor: number, exact: boolean, id = 'a') =>
+      ({ op: 'carry', collection: 'accounts', id, name: NAME, minor, exact }) as const;
+    const raw = (doc: Doc) => (doc.counterDeltas as unknown as Record<string, unknown>)[NAME];
 
-    beforeEach(() => {
-      resetTestDevices(); // the realm's own id, as production
-      setDeviceWriterId(null); // and no cache: nothing persisted was ever posted
-      setCounterWrites(true);
+    it('puts a PLAIN INTEGER (never a Counter) and the fold reads it; the echo is the entity', () => {
+      const res = applyMutation(accountDoc(), carry(250, false));
+      expect(raw(res.doc)).toBe(250);
+      expect(raw(res.doc)).not.toBeInstanceOf(Automerge.Counter);
+      expect(res.carrySuperseded).toBe(0);
+      expect(res.result).toMatchObject({ id: 'a', balance: 102.5 });
+      // A register is put-only: an increment on it is a TypeError, never probe e' corruption.
+      expect(() =>
+        Automerge.change(res.doc, (d) => {
+          (d.counterDeltas as unknown as Record<string, Automerge.Counter>)[NAME]!.increment(1);
+        })
+      ).toThrow(TypeError);
     });
-    afterEach(() => setDeviceWriterId(null));
 
-    it('a write with writes on keys under the ephemeral id; the rebase replays it as own', () => {
+    it('a FOREIGN carry onto an existing register is skipped and counted; the first stands', () => {
+      const first = applyMutation(accountDoc(), carry(250, false)).doc;
+      const res = applyMutation(first, carry(400, false));
+      expect(res.carrySuperseded).toBe(1);
+      expect(raw(res.doc)).toBe(250);
+    });
+
+    it("the key's OWN actor overwrites an existing register (its view is complete)", () => {
+      const first = applyMutation(accountDoc(), carry(250, false)).doc;
+      const res = applyMutation(first, carry(400, true));
+      expect(res.carrySuperseded).toBe(0);
+      expect(raw(res.doc)).toBe(400);
+    });
+
+    it('an entity the compactor deleted is skipped (no throw, no register)', () => {
+      const res = applyMutation(accountDoc(), carry(250, true, 'gone'));
+      expect(raw(res.doc)).toBeUndefined();
+      expect(res.result).toBeUndefined();
+    });
+
+    it("the rebase carries the session's own actor key as an exact carry, keyed by generation", () => {
+      setCounterWrites(true);
+      const inc = (delta: number) =>
+        ({ op: 'increment', collection: 'accounts', id: 'a', field: 'balance', delta }) as const;
       const origin = accountDoc();
       const baseline = getHeads(origin);
       const peer = apply(Automerge.clone(origin), inc(-1));
-      expect(isDeviceWriterIdEphemeral()).toBe(true);
-      const eph = deviceWriterIdFor(Automerge.getActorId(peer));
-      expect(keyWriters(peer)).toEqual([`${eph}:${Automerge.getActorId(peer)}`]);
-      // Same session, a compacted target: the ephemeral keys are this device's own.
+      const [own] = Object.keys(peer.counterDeltas);
+      expect(own).toBe(`accounts/a/balance@2/${Automerge.getActorId(peer)}`);
       const target = Automerge.from({
-        ...(foldDoc(origin) as object),
-        podLineage: { id: 'L-NEW', seq: 1 },
+        ...(foldDoc(origin, 4) as object),
+        podLineage: { id: 'L-NEW', seq: 4 },
       }) as unknown as Doc;
       const built = buildRebaseOps(peer, baseline, target)!;
-      expect(built.op).toMatchObject({ op: 'increment', id: 'a', delta: -1 });
-      expect(built.counterIncrements).toBe(1);
-    });
-
-    it('once the cache posts its persisted id, new keys use it (the ephemeral id is dropped)', () => {
-      let doc = apply(accountDoc(), inc(-1));
-      const eph = deviceWriterIdFor('x');
-      setDeviceWriterId('persisted-device');
-      expect(isDeviceWriterIdEphemeral()).toBe(false);
-      doc = apply(Automerge.clone(doc), inc(-2));
-      const writers = keyWriters(doc).map((w) => w.slice(0, w.indexOf(':')));
-      expect(writers.sort()).toEqual([eph, 'persisted-device'].sort());
-      // The old ephemeral key is now foreign to this realm: only the persisted one replays.
-      expect(deviceWriterIdFor('x')).toBe('persisted-device');
+      expect(built.op).toEqual({
+        op: 'carry',
+        collection: 'accounts',
+        id: 'a',
+        name: `accounts/a/balance@2/carry.${Automerge.getActorId(peer)}.4`,
+        minor: -100,
+        exact: true,
+      });
+      expect(built).toMatchObject({ counterCarries: 1, carrySkipped: 0, rebaseMode: 'ledger' });
     });
   });
 
@@ -1078,8 +1088,8 @@ describe('docOps — relative writes through adjustField (#117 Phase 2)', () => 
         args: { loanId: 'ast', paymentAmount: 30.5, isRecurring: false },
       }
     );
-    // `${collection}/${id}/${field}@${decimals}/${device}:${actor}`, cents (no currency set).
-    const writer = `${TEST_DEVICE}:${Automerge.getActorId(d)}`;
+    // `${collection}/${id}/${field}@${decimals}/${actor}`, cents (no currency set).
+    const writer = Automerge.getActorId(d);
     expect(JSON.parse(JSON.stringify(d.counterDeltas))).toEqual({
       [`accounts/a/balance@2/${writer}`]: -2025,
       [`goals/g/currentAmount@2/${writer}`]: 6000,

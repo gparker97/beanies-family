@@ -24,7 +24,7 @@ import * as docOps from '../docOps';
 import * as cache from '../cache';
 import * as ap from '../applyAndProject';
 import { foldDoc } from '../counterFields';
-import { seeded, apply, useTestDevices, resetTestDevices } from './twoDevices';
+import { seeded, apply } from './twoDevices';
 
 const FAMILY = 'r3-family';
 const OTHER = 'r3-other';
@@ -354,11 +354,9 @@ describe('round 3, item 8: compactDoc reports the installed heads', () => {
 
 describe('round 3, item 5 (C8 narrowing): only money fields or existence block a transaction', () => {
   const TX = { id: 'T', accountId: 'A', amount: 10, description: 'groceries', type: 'expense' };
-  beforeEach(() => useTestDevices());
-  afterEach(() => resetTestDevices());
   const origin = () => seeded([{ op: 'set', collection: 'transactions', id: 'T', entity: TX }]);
   const compact = (doc: Doc): Doc =>
-    Automerge.from({ ...foldDoc(doc), podLineage: { id: 'L-NEW', seq: 1 } }) as unknown as Doc;
+    Automerge.from({ ...foldDoc(doc, 1), podLineage: { id: 'L-NEW', seq: 1 } }) as unknown as Doc;
   const patchTx = (patch: Record<string, unknown>) =>
     ({ op: 'patch', collection: 'transactions', id: 'T', patch }) as const;
 

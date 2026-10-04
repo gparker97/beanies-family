@@ -2428,4 +2428,14 @@ export interface PodLineage {
   id: string;
   /** Monotonic, and ONLY for direction. Never an identity on its own. */
   seq: number;
+  /**
+   * The `seq` of the most recent RESTORE generation at or before this one (#117 writer flip,
+   * plan Requirement 6). A restore stamp sets it to its own new `seq`; `nextLineage` carries it
+   * forward unchanged on every later compaction. A dirty peer whose own `seq` is below it
+   * predates the restore, so its Counter growth is computed against its own baseline (only
+   * what it has not synced) instead of the target's fold ledger, and adjustments the restore
+   * rolled back are not re-applied. Absent on a pod that never restored, and dropped by a
+   * 0.91.2 compaction (a recorded residual). `compareLineage` ignores it.
+   */
+  restoreSeq?: number;
 }

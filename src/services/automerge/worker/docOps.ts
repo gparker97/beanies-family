@@ -42,6 +42,9 @@ import {
   foldIndex,
   foldValue,
   counterGrowthOps,
+  targetKnowledge,
+  baselineKnowledge,
+  LEDGER_WINDOW,
   isCounterCollection,
   parseCounterKey,
   resolveField,
@@ -61,7 +64,13 @@ import {
 } from '@/utils/loanPayment';
 import type { Asset, Account, Goal, GoalManualContribution } from '@/types/models';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
-import type { MutationOp, ProjectionDelta, Heads, PatchSettingsArgs } from './protocol';
+import type {
+  MutationOp,
+  ProjectionDelta,
+  Heads,
+  PatchSettingsArgs,
+  RebaseBlock,
+} from './protocol';
 import {
   reconcileInto,
   canonicalEqual,
@@ -153,9 +162,17 @@ export function docLineage(doc: Doc): CompactionLineage | null {
  *    `Automerge.change` to an already-built document, because rebuilding there
  *    would destroy the history the restore exists to recover;
  *  - the env-gated `beanpodProfile` diagnostic, like `compactDoc`.
+ *
+ * #117 writer flip: `restoreSeq` (the last restore generation) is carried forward unchanged, so
+ * a peer that predates a restore still takes the restore rule after any number of later
+ * compactions. The restore stamp itself overrides it with the new `seq`.
  */
 export function nextLineage(prev: PodLineage | null): PodLineage {
-  return { id: generateUUID(), seq: (prev?.seq ?? 0) + 1 };
+  return {
+    id: generateUUID(),
+    seq: (prev?.seq ?? 0) + 1,
+    ...(prev?.restoreSeq !== undefined ? { restoreSeq: prev.restoreSeq } : {}),
+  };
 }
 
 /**
@@ -671,9 +688,8 @@ export function buildFullProjection(doc: Doc): ProjectionDelta[] {
  * Counter field (photo attach, settings) ignore it.
  */
 export interface NamedOpContext {
-  /** The Counter writer id `adjustField` keys this change's adjustments by:
-   *  `${deviceWriterId}:${actorId}` (`docActor.counterWriterId`), unique per live handle and
-   *  fresh per load. Always set: a cacheless session uses an ephemeral device id. */
+  /** The Counter writer id `adjustField` keys this change's adjustments by: the handle's
+   *  Automerge actor alone (#117 writer flip), unique per live handle and fresh per load. */
   readonly writerId: string;
 }
 
@@ -1068,15 +1084,17 @@ registerCoreNamedOps();
  *    afterwards from the committed doc);
  *  - `results`: named ops' results, in order (a top-level named op returns the first);
  *  - `notes`: reconciler findings (#117), logged on main;
- *  - `writerId`: `${deviceWriterId}:${actorId}` (`docActor.counterWriterId`), read once per
- *    `applyMutation` (#117 Phase 2): the Counter writer id for `increment` and every named
- *    handler's `NamedOpContext`. Always set (an ephemeral device id when no cache opened).
+ *  - `writerId`: the Automerge actor, read once per `applyMutation` (#117 writer flip): the
+ *    Counter writer id for `increment` and every named handler's `NamedOpContext`;
+ *  - `carrySuperseded`: foreign `carry` ops that met an existing register and stood down (the
+ *    register rule, #117 writer flip). Only the rebase emits carries.
  */
 interface MutationSink {
   deltas: ProjectionDelta[];
   results: unknown[];
   notes: ReconcileNote[];
   readonly writerId: string;
+  carrySuperseded: number;
 }
 
 /**
@@ -1159,6 +1177,32 @@ function mutateDraft(draft: FamilyDocument, op: MutationOp, sink: MutationSink):
       if (wrote && op.updatedAt) entity.updatedAt = op.updatedAt;
       break;
     }
+    case 'carry': {
+      // #117 writer flip: a rebase CARRY REGISTER (counterFields rule 5). The composer built the
+      // full name; nothing is parsed or named here. An entity the compactor deleted is skipped,
+      // exactly as `onMissing: 'skip'` does for the entity ops.
+      const entity = (draft[op.collection] as unknown as Record<string, AnyRecord> | undefined)?.[
+        op.id
+      ];
+      if (!entity) return;
+      const map = (draft as { counterDeltas?: Record<string, unknown> }).counterDeltas;
+      if (!map) {
+        throw new Error(
+          `carry: the document has no counterDeltas map (${op.collection}). ` +
+            `Run migrateDoc on every document before writing.`
+        );
+      }
+      // THE REGISTER RULE: own actor overwrites (its growth was computed without the register,
+      // so the fold becomes exactly its view), foreign fills. Between two foreign copies
+      // nothing says which is fresher, so the first stands and this one is counted.
+      if (map[op.name] !== undefined && !op.exact) {
+        sink.carrySuperseded++;
+        return;
+      }
+      // A PLAIN INTEGER, never a Counter and never `.increment`: a register is put-only.
+      map[op.name] = op.minor;
+      break;
+    }
     case 'batch':
       for (const sub of op.ops) mutateDraft(draft, sub, sink);
       break;
@@ -1182,7 +1226,8 @@ function deltaFor(after: Doc, op: MutationOp, out: ProjectionDelta[], index: Fol
       out.push({ kind: 'upsert', collection: op.collection, id: op.id, entity: op.entity });
       return op.entity;
     case 'patch':
-    case 'increment': {
+    case 'increment':
+    case 'carry': {
       // An absent target post-change means the op was skipped (onMissing:'skip') or the entity
       // was deleted earlier in the same batch: `entityDelta` syncs the projection to reality
       // with a `remove`, and the echo is `undefined` so callers can detect the skip. Only
@@ -1217,7 +1262,14 @@ function deltaFor(after: Doc, op: MutationOp, out: ProjectionDelta[], index: Fol
 export function applyMutation(
   doc: Doc,
   op: MutationOp
-): { doc: Doc; result: unknown; delta: ProjectionDelta; notes: ReconcileNote[] } {
+): {
+  doc: Doc;
+  result: unknown;
+  delta: ProjectionDelta;
+  notes: ReconcileNote[];
+  /** Foreign `carry` ops the register rule stood down (#117 writer flip; rebase only). */
+  carrySuperseded: number;
+} {
   // The Counter writer id (the actor alone, #117 writer flip): read once, before the change
   // (the change keeps the actor).
   const sink: MutationSink = {
@@ -1225,6 +1277,7 @@ export function applyMutation(
     results: [],
     notes: [],
     writerId: Automerge.getActorId(doc),
+    carrySuperseded: 0,
   };
   const after = Automerge.change(doc, (d) => mutateDraft(d as FamilyDocument, op, sink));
   const out: ProjectionDelta[] = [];
@@ -1234,7 +1287,7 @@ export function applyMutation(
   // A top-level `named` op returns its handler's result (the echoed entity for
   // read-after-write); structural ops return the affected entity.
   const result = op.op === 'named' ? sink.results[0] : structuralResult;
-  return { doc: after, result, delta, notes: sink.notes };
+  return { doc: after, result, delta, notes: sink.notes, carrySuperseded: sink.carrySuperseded };
 }
 
 /**
@@ -1252,8 +1305,20 @@ export function applyMutation(
  * what makes it safe to replay onto the compacted document at all: an op that
  * stamped the OLD lineage onto the NEW document would be self-inflicted lineage
  * corruption with no external cause. `touchedBetween` ignoring `podLineage` is
- * the second belt. The Counter ledger pass (#117 Phase 2) emits plain `increment`
- * ops, whose only non-collection write is `counterDeltas` under the TARGET's actor.
+ * the second belt. The Counter pass (#117 writer flip) emits `carry` ops, whose
+ * only non-collection write is a plain-integer register in `counterDeltas`.
+ *
+ * ⚠️ THE COUNTER PASS CARRIES, IT NEVER INCREMENTS, AND NO KEY HAS AN OWNER (#117 writer
+ * flip, plan §B-C; `counterFields` rule 5). The mode is decided ONCE, from the target's
+ * lineage, reusing `before` as the baseline:
+ *  - RESTORE RULE (`baseline`): the target's `restoreSeq` is above the peer's own `seq`, so the
+ *    peer predates a restore; growth is `local − before` per canonical key (only what this peer
+ *    has not synced), signed for every key. Never window-blocked (it reads no ledger).
+ *  - LEDGER RULE (`ledger`): growth against the target's fold ledger (`targetKnowledge`). A
+ *    foreign negative is carried only when the peer is FRESH (it holds every `fromHeads` change
+ *    the compactor folded, `Automerge.hasHeads`); otherwise it may be a stale copy and is
+ *    skipped and counted. A peer more than `LEDGER_WINDOW` generations behind that holds
+ *    Counter keys is blocked (`ledger-window`): a pruned entry would read as "never folded".
  *
  * ⚠️ TWO DIFFERENT EMPTY ANSWERS, and conflating them costs a family a working
  * sync. `null` means CANNOT COMPOSE — an unexpected diff shape, or a baseline
@@ -1290,13 +1355,19 @@ export function buildRebaseOps(
   target: Doc
 ): {
   op: MutationOp | null;
-  /** Ops replayed, Counter increments included. */
+  /** Ops replayed, Counter carries included. */
   count: number;
   conflicts: number;
-  /** Of `count`, the `increment` ops the Counter ledger pass emitted. */
-  counterIncrements: number;
-  /** Set when the replay must not run at all (C8): the caller blocks, as for `null`. */
-  blockedBy?: 'transactions';
+  /** Of `count`, the `carry` ops the Counter pass emitted (one per canonical key). */
+  counterCarries: number;
+  /** Foreign negative growth skipped because the peer was not fresh (ledger mode only). */
+  carrySkipped: number;
+  /** Which knowledge the Counter pass subtracted: the fold ledger, or the restore baseline. */
+  rebaseMode: 'ledger' | 'baseline';
+  /** Ledger mode: the peer held every `fromHeads` change (foreign reversals carried). */
+  fresh: boolean;
+  /** Set when the replay must not run at all (`RebaseBlock`): the caller blocks, as for `null`. */
+  blockedBy?: RebaseBlock;
 } | null {
   // ⚠️ AN EMPTY BASELINE IS NOT "THE BEGINNING OF TIME", IT IS "UNKNOWN".
   // `decodeHeadsFingerprint('')` legitimately answers `[]` for a document with
@@ -1322,11 +1393,37 @@ export function buildRebaseOps(
   const scan = touchedBetween(local, baselineHeads, getHeads(local));
   if (!scan) return null;
 
+  // #117 writer flip: the Counter pass's mode, knowledge and sign rule, decided ONCE (plan §C).
+  // `before` IS the restore rule's baseline; no second `Automerge.view`.
+  const tl = docLineage(target);
+  const localSeq = docLineage(local)?.seq ?? 0;
+  const targetSeq = tl?.seq ?? 0;
+  const rebaseMode: 'ledger' | 'baseline' =
+    tl?.restoreSeq !== undefined && tl.restoreSeq > localSeq ? 'baseline' : 'ledger';
+  const fresh =
+    rebaseMode === 'ledger' &&
+    Array.isArray(tl?.fromHeads) &&
+    Automerge.hasHeads(local, tl.fromHeads);
+  const knowledge =
+    rebaseMode === 'baseline'
+      ? baselineKnowledge(before)
+      : targetKnowledge(target, localSeq, targetSeq);
+  const foreignNegatives = rebaseMode === 'baseline' || fresh;
+  // Ledger mode only: beyond the window a folded key may have been pruned, and its absence
+  // would read as "never folded" (a double count). A peer with no Counter keys has nothing the
+  // ledger decides, so it rebases at any distance.
+  const windowBlocked =
+    rebaseMode === 'ledger' &&
+    tl !== null &&
+    tl.seq - localSeq > LEDGER_WINDOW &&
+    foldIndex(local).size > 0;
+  const counterFigures = { carrySkipped: 0, rebaseMode, fresh };
+
   const ops: MutationOp[] = [];
   /** Writes that could not be carried across. The saved value stayed. */
   let conflicts = 0;
   /** C8: a transaction lost a write, so the whole replay is unavailable. */
-  let blockedBy: 'transactions' | undefined;
+  let blockedBy: RebaseBlock | undefined;
   /**
    * Round 3 (C8 narrowing): an EXISTENCE conflict (delete vs edit, a resurrection) on a
    * transaction always blocks; a FIELD conflict blocks only on a money or derived field
@@ -1461,29 +1558,36 @@ export function buildRebaseOps(
     if (changed) conflicts += changed.conflicts;
   }
 
-  // C8: a transaction that could not be carried whole means no partial replay at all.
-  if (blockedBy) return { op: null, count: 0, conflicts, counterIncrements: 0, blockedBy };
+  // C8: a transaction that could not be carried whole means no partial replay at all. The
+  // window block rides the same exit (a transaction block, when both apply, is reported).
+  if (!blockedBy && windowBlocked) blockedBy = 'ledger-window';
+  if (blockedBy) {
+    return { op: null, count: 0, conflicts, counterCarries: 0, ...counterFigures, blockedBy };
+  }
 
-  // The Counter ledger pass: what THIS DEVICE adjusted that the target does not yet hold
-  // (neither live nor in the fold ledger), as `increment` ops. AFTER the entity ops, so an
-  // entity the peer created arrives by its raw `set` before its own adjustments land on it.
-  // Ownership is the key's device segment, so a foreign writer's key is never replayed. The
-  // realm's id is the cache's persisted one, or this session's ephemeral one (docActor.ts).
+  // The Counter pass: the growth the target does not hold, as ONE `carry` op per canonical key
+  // (every live key the peer holds, own or foreign; nobody owns a key). AFTER the entity ops, so
+  // an entity the peer created arrives by its raw `set` before its registers land on it.
   // C8: a goal whose contribution history could not cross keeps its growth back too, so the
-  // money and its receipt either both arrive or both stay.
-  const growth = counterGrowthOps(local, target, deviceWriterIdFor(Automerge.getActorId(local)));
+  // money and its receipt either both arrive or both stay. (Every growth op is a `carry`, so
+  // this is the increment filter's shape, by the op's own `(collection, id)`.)
+  const growth = counterGrowthOps(local, knowledge, foreignNegatives, targetSeq);
+  counterFigures.carrySkipped = growth.skippedNegative;
   const growthOps = growth.ops.filter(
-    (op) => !(op.op === 'increment' && op.collection === 'goals' && growthHeldBack.has(op.id))
+    (op) => !(op.collection === 'goals' && growthHeldBack.has(op.id))
   );
   ops.push(...growthOps);
 
   // nothing to replay
-  if (ops.length === 0) return { op: null, count: 0, conflicts, counterIncrements: 0 };
+  if (ops.length === 0) {
+    return { op: null, count: 0, conflicts, counterCarries: 0, ...counterFigures };
+  }
   return {
     op: ops.length === 1 ? ops[0]! : { op: 'batch', ops },
     count: ops.length,
     conflicts,
-    counterIncrements: growthOps.length,
+    counterCarries: growthOps.length,
+    ...counterFigures,
   };
 }
 

@@ -34,6 +34,8 @@
  *  3. Format: save/load round trip; a pre-#117 (`d[name] = {}`) pod is left untouched.
  *  4. Compaction rebase through the real `compactDoc` and `mergeRemoteEnvelope`.
  *  5. Old-build interop: a whole-value writer merged with a reconciling writer (reported).
+ *  6. #117 writer flip: Counter carries across seeded compactions, reloads and restores, with
+ *     the register, ledger and fold-equals-truth invariants (bounded when a residual counted).
  *
  * ── Running it ─────────────────────────────────────────────────────────────────
  *
@@ -96,12 +98,13 @@ const { migrateDoc, applyMutation, saveDoc, loadDoc, countRootConflicts, registe
 const { buildRebaseOps, getHeads, buildFullProjection } = docOps;
 const { attachPhotoNamedHandler } = await import('@/services/automerge/worker/photoOps');
 const { KEY_FIELDS, MERGE_FIELDS } = await import('@/services/automerge/worker/reconcile');
-const { converge, materialise, useTestDevices, resetTestDevices, onDevice } =
-  await import('@/services/automerge/worker/__tests__/twoDevices');
+const { converge, materialise } = await import('@/services/automerge/worker/__tests__/twoDevices');
 const counterFields = await import('@/services/automerge/worker/counterFields');
 const { COUNTER_FIELDS, setCounterWrites } = counterFields;
 const { counterStats, fieldDecimals, foldDoc, foldEntity, foldIndex, sigma, toMinor } =
   counterFields;
+/** The folded view main sees (the ledger generation is irrelevant to a read). */
+const foldedView = (doc: Doc) => foldDoc(doc, (docOps.docLineage(doc)?.seq ?? 0) + 1);
 const { materializeFixture } = await import('@/services/demo/demoFixture');
 const { COLLECTION_NAMES } = await import('@/types/automerge');
 const ap = await import('@/services/automerge/worker/applyAndProject');
@@ -1014,19 +1017,12 @@ const GEN_NAMES = Object.keys(GENS);
 let BASE: Doc;
 beforeAll(async () => {
   setCounterWrites(true); // #117 Phase 2: every adjustment is a Counter
-  // Each device's actor is its own device for the Counter writer id. B stays the realm's own
-  // (unregistered) device: layer 4 reloads B's document inside `ap`, under a fresh actor, the
-  // way a real reload keeps the device and changes the actor.
-  useTestDevices();
-  onDevice('device-origin', ACTOR.origin);
-  onDevice('device-a', ACTOR.a);
-  onDevice('device-c', ACTOR.c);
+  // Each device's actor is the whole Counter writer (#117 writer flip). Layer 4 reloads B's
+  // document inside `ap` under a fresh actor, so B's earlier keys are foreign to that session
+  // and cross as carries like anyone's.
   BASE = REAL_POD ? await loadRealPod() : await buildDemoBase();
 }, 120_000);
-afterAll(() => {
-  setCounterWrites(null);
-  resetTestDevices();
-});
+afterAll(() => setCounterWrites(null));
 
 /** Fork, write on both (each its own ops), converge, run the invariants, return the merged pair. */
 async function scenario(
@@ -1048,7 +1044,7 @@ async function scenario(
     expect(counterStats(doc)).toMatchObject({ conflicts: 0, malformed: 0 });
   }
   // Folded, as main sees it: a balance reads baseline + every Counter adjustment.
-  return { A, B, merged, m: foldDoc(merged.a) as Any, fails, residuals, notes };
+  return { A, B, merged, m: foldedView(merged.a) as Any, fails, residuals, notes };
 }
 
 const LIST = 'demo-list-groceries';
@@ -1231,7 +1227,7 @@ describe.skipIf(REAL_POD)('layer 1: scenario merges on the demo family', () => {
       })
     );
     const again = converge(A.doc, B.doc);
-    const g = (foldDoc(again.b) as Any).goals['chaos-goal-history'];
+    const g = (foldedView(again.b) as Any).goals['chaos-goal-history'];
     expect(g.currentAmount).toBe(170);
     expect((g.manualContributions as Any[]).map((c) => c.id).sort()).toEqual(
       ['chaos-contrib-0', 'contrib-b'].sort()
@@ -1266,7 +1262,7 @@ describe.skipIf(REAL_POD)('layer 1: scenario merges on the demo family', () => {
   });
 
   it('account: cents on both devices sum exactly; a later increment after the merge stays exact', async () => {
-    const start = (foldDoc(BASE) as Any).accounts['demo-account-current'].balance as number;
+    const start = (foldedView(BASE) as Any).accounts['demo-account-current'].balance as number;
     const r = await scenario(
       () => increment('accounts', 'demo-account-current', 'balance', -20.25),
       () => increment('accounts', 'demo-account-current', 'balance', -30.5)
@@ -1277,7 +1273,7 @@ describe.skipIf(REAL_POD)('layer 1: scenario merges on the demo family', () => {
     await on(A, () => increment('accounts', 'demo-account-current', 'balance', -5.05));
     const later = converge(A.doc, r.merged.b);
     for (const doc of [later.a, later.b]) {
-      expect((foldDoc(doc) as Any).accounts['demo-account-current'].balance).toBe(
+      expect((foldedView(doc) as Any).accounts['demo-account-current'].balance).toBe(
         (toMinor(start, 2) - 5580) / 100
       );
     }
@@ -1449,6 +1445,257 @@ describe('layer 2: seeded chaos', () => {
         fmt(residuals),
         `  failures: ${failures.length}`,
         ...failures.slice(0, 15).map((f) => `    ${f}`),
+        '',
+      ].join('\n')
+    );
+    expect(failures).toEqual([]);
+  }, 600_000);
+});
+
+describe('layer 6: Counter carries across compactions, reloads and restores (#117 writer flip)', () => {
+  /**
+   * Plan `docs/plans/2026-10-04-crdt-counters-117-writer-flip.md`, Testing §7. Three devices
+   * and a Drive copy (the hub every sync goes through), on a small two-account pod. Each round
+   * picks one move: ADJUST (a Counter increment on the device's own actor key), SYNC (merge on
+   * the same lineage, or REBASE onto a newer one through the real `buildRebaseOps` +
+   * `applyMutation`, landing under a fresh actor exactly as `applyAndProject` does), COMPACT
+   * (the device syncs, then folds Drive as `compactDoc` does: `nextLineage` once, `foldDoc` at
+   * that seq, `fromHeads` stamped), RELOAD (the device's document under a new actor, same
+   * history: its earlier keys become foreign to it) and RESTORE (the device syncs, then installs
+   * an earlier-generation Drive snapshot stamped `{ ...nextLineage, restoreSeq: seq }`, rolling
+   * back everything saved after that file).
+   *
+   * The truth is what Drive SHOULD hold for each account: the start, plus every device's own
+   * adjustments as each sync lands, reset to the restored file's fold on a restore. Invariants
+   * after every move: no carry register is ever a `Counter`; no name holds two concurrent values
+   * (`counterStats` conflicts and carry conflicts both 0) and no compaction reports a ledger
+   * name collision; and the fold equals the truth whenever no rebase so far counted a residual
+   * (`carry_skipped`), else |fold − truth| ≤ the magnitude of the counted residuals, so a double
+   * count can never hide behind the bound.
+   */
+  it(`${ITERATIONS} rounds, seed ${SEED}: registers are integers, one value per name, the fold equals every device's own adjustments`, () => {
+    const rng = lcg((SEED ^ 0x5eed) >>> 0);
+    const actor = () =>
+      Array.from({ length: 16 }, () => rng.int(256).toString(16).padStart(2, '0')).join('');
+    const ACCS = ['chaos6-acc-1', 'chaos6-acc-2'];
+    const START = 100_000; // minor units (USD cents)
+    interface Dev {
+      name: string;
+      doc: Doc;
+      baseline: string[];
+      unsynced: Map<string, number>;
+      unsyncedAbs: number;
+    }
+
+    let drive = migrateDoc(Automerge.init<FamilyDocument>({ actor: actor() }));
+    for (const id of ACCS) {
+      drive = applyMutation(drive, {
+        op: 'set',
+        collection: 'accounts',
+        id,
+        entity: { id, name: id, type: 'checking', currency: 'USD', balance: START / 100 },
+      }).doc;
+    }
+    const truth = new Map(ACCS.map((id) => [id, START]));
+    const history: Uint8Array[] = [saveDoc(drive)];
+    const devs: Dev[] = ['D1', 'D2', 'D3'].map((name) => ({
+      name,
+      doc: Automerge.clone(drive, { actor: actor() }),
+      baseline: getHeads(drive),
+      unsynced: new Map(),
+      unsyncedAbs: 0,
+    }));
+    const lineage = (doc: Doc) => docOps.docLineage(doc);
+    const seqOf = (doc: Doc) => lineage(doc)?.seq ?? 0;
+    const balance = (doc: Doc, id: string) =>
+      toMinor(
+        foldEntity('accounts', id, (Automerge.toJS(doc) as Any).accounts[id], foldIndex(doc))
+          .balance as number,
+        2
+      );
+
+    let lossBound = 0;
+    const failures: string[] = [];
+    const tally: Tally = new Map();
+    /** What happened, round by round (counts, seqs and figures only): printed on a failure. */
+    const trace: string[] = [];
+    let firstFailAt = 0;
+    const check = (it: number, move: string) => {
+      const where = `seed ${SEED} it ${it} (${move})`;
+      const live = (drive.counterDeltas ?? {}) as unknown as Record<string, unknown>;
+      for (const [name, v] of Object.entries(live)) {
+        const parsed = counterFields.parseCounterKey(name);
+        if (!parsed?.carry) continue;
+        if (v instanceof Automerge.Counter || typeof v !== 'number') {
+          failures.push(`${where}: carry register ${name.slice(-24)} is not a plain integer`);
+        }
+        if (parsed.carry.seq > seqOf(drive)) {
+          failures.push(`${where}: a register for a generation Drive has not reached`);
+        }
+      }
+      const stats = counterStats(drive);
+      if (stats.conflicts || stats.carryConflicts || stats.malformed) {
+        failures.push(
+          `${where}: counterStats conflicts=${stats.conflicts} carry=${stats.carryConflicts} malformed=${stats.malformed}`
+        );
+      }
+      for (const id of ACCS) {
+        const diff = balance(drive, id) - truth.get(id)!;
+        if (lossBound === 0 ? diff !== 0 : Math.abs(diff) > lossBound) {
+          failures.push(`${where}: ${id} fold − truth = ${diff} (bound ${lossBound})`);
+        }
+      }
+    };
+
+    const sync = (dev: Dev) => {
+      const dl = lineage(drive);
+      const ll = lineage(dev.doc);
+      if ((dl?.id ?? null) === (ll?.id ?? null)) {
+        const merged = docOps.mergeDocs(dev.doc, drive).doc;
+        dev.doc = merged;
+        drive = Automerge.clone(merged, { actor: actor() });
+        bump(tally, 'sync merge');
+      } else {
+        const built = buildRebaseOps(dev.doc, dev.baseline, drive);
+        if (!built) {
+          failures.push(`seed ${SEED}: ${dev.name} rebase could not compose`);
+          return;
+        }
+        if (built.blockedBy) {
+          // The user-file adopt: the human chose the newer file, so the unsynced work is let go.
+          bump(tally, `rebase blocked ${built.blockedBy}`);
+          dev.doc = Automerge.clone(drive, { actor: actor() });
+          dev.baseline = getHeads(drive);
+          dev.unsynced.clear();
+          dev.unsyncedAbs = 0;
+          return;
+        }
+        const onto = Automerge.clone(drive, { actor: actor() }); // a fresh load, as the worker
+        const out = built.op ? applyMutation(onto, built.op) : { doc: onto, carrySuperseded: 0 };
+        dev.doc = out.doc;
+        drive = Automerge.clone(out.doc, { actor: actor() });
+        bump(tally, `rebase ${built.rebaseMode}${built.fresh ? ' fresh' : ''}`);
+        trace.push(
+          `  ${dev.name} rebase ${seqOf(dev.doc)}<-: mode=${built.rebaseMode} fresh=${built.fresh} carries=${built.counterCarries} skipped=${built.carrySkipped} superseded=${out.carrySuperseded} ops=${JSON.stringify(opsOfRebase(built.op))}`
+        );
+        bump(tally, 'carries', built.counterCarries);
+        bump(tally, 'carry_skipped', built.carrySkipped);
+        bump(tally, 'carry_superseded', out.carrySuperseded);
+        // A skipped negative is either a stale copy (no loss) or a reloaded session's own
+        // reversal (the documented residual): bound it by everything this device had unsynced.
+        if (built.carrySkipped > 0) lossBound += dev.unsyncedAbs;
+      }
+      for (const [id, n] of dev.unsynced) truth.set(id, truth.get(id)! + n);
+      dev.unsynced.clear();
+      dev.unsyncedAbs = 0;
+      dev.baseline = getHeads(drive);
+      history.push(saveDoc(drive));
+    };
+
+    const opsOfRebase = (op: MutationOp | null): unknown[] =>
+      (op === null ? [] : op.op === 'batch' ? op.ops : [op])
+        .filter((o) => o.op === 'carry')
+        .map((o) => (o.op === 'carry' ? `${o.id.slice(-1)}:${o.minor}${o.exact ? '!' : ''}` : ''));
+    const onDriveLineage = (dev: Dev) =>
+      (lineage(drive)?.id ?? null) === (lineage(dev.doc)?.id ?? null);
+
+    for (let it = 0; it < ITERATIONS; it++) {
+      const dev = rng.pick(devs)!;
+      const roll = rng.int(100);
+      let move: string;
+      if (roll < 40) {
+        move = 'adjust';
+        const id = rng.pick(ACCS)!;
+        const minor = rng.int(2001) - 1000 || 1;
+        dev.doc = applyMutation(dev.doc, {
+          op: 'increment',
+          collection: 'accounts',
+          id,
+          field: 'balance',
+          delta: minor / 100,
+        }).doc;
+        dev.unsynced.set(id, (dev.unsynced.get(id) ?? 0) + minor);
+        dev.unsyncedAbs += Math.abs(minor);
+      } else if (roll < 70) {
+        move = 'sync';
+        sync(dev);
+      } else if (roll < 82) {
+        move = 'compact';
+        if (!onDriveLineage(dev)) {
+          sync(dev); // catch up first; a device compacts only the pod it holds
+        } else {
+          sync(dev);
+          const next = docOps.nextLineage(lineage(drive));
+          const folded = foldDoc(drive, next.seq);
+          if (folded.ledger.collisions > 0) {
+            failures.push(
+              `seed ${SEED} it ${it}: ledger name collision x${folded.ledger.collisions}`
+            );
+          }
+          bump(tally, 'ledger_pruned', folded.ledger.pruned);
+          drive = Automerge.from(
+            { ...folded, podLineage: { ...next, fromHeads: getHeads(drive) } },
+            { actor: actor() }
+          ) as unknown as Doc;
+          dev.doc = Automerge.clone(drive, { actor: actor() });
+          dev.baseline = getHeads(drive);
+          history.push(saveDoc(drive));
+          bump(tally, 'compactions');
+        }
+      } else if (roll < 92) {
+        move = 'reload';
+        dev.doc = Automerge.clone(dev.doc, { actor: actor() });
+        bump(tally, 'reloads');
+      } else {
+        move = 'restore';
+        if (onDriveLineage(dev)) sync(dev);
+        const older = history.map((bytes) => loadDoc(bytes)).filter((d) => seqOf(d) < seqOf(drive));
+        const file = rng.pick(older);
+        if (file && onDriveLineage(dev)) {
+          const next = docOps.nextLineage(lineage(drive));
+          drive = Automerge.change(Automerge.clone(file, { actor: actor() }), (d) => {
+            (d as unknown as { podLineage: unknown }).podLineage = {
+              ...next,
+              restoreSeq: next.seq,
+            };
+          });
+          for (const id of ACCS) truth.set(id, balance(file, id)); // rolled back to the file
+          dev.doc = Automerge.clone(drive, { actor: actor() });
+          dev.baseline = getHeads(drive);
+          history.push(saveDoc(drive));
+          bump(tally, 'restores');
+        }
+      }
+      trace.push(
+        `it ${it} ${dev.name} ${move}: drive seq=${seqOf(drive)} restoreSeq=${lineage(drive)?.restoreSeq ?? '-'} dev seq=${seqOf(dev.doc)} truth=${ACCS.map((id) => truth.get(id)).join('/')} fold=${ACCS.map((id) => balance(drive, id)).join('/')}`
+      );
+      const before = failures.length;
+      check(it, move);
+      if (before === 0 && failures.length > 0) firstFailAt = trace.length;
+      if (failures.length > 10) break;
+    }
+    // Drain: every device syncs, so every adjustment has reached Drive.
+    for (const dev of devs) sync(dev);
+    check(ITERATIONS, 'drain');
+
+    const fmt = (t: Tally) =>
+      [...t]
+        .sort((x, y) => (x[0] < y[0] ? -1 : 1))
+        .map(([k, v]) => `    ${v.toString().padStart(5)}  ${k}`)
+        .join('\n') || '    (none)';
+    process.stdout.write(
+      [
+        '',
+        `── crdt117 chaos layer 6: seed ${SEED}, ${ITERATIONS} rounds, Drive at generation ${seqOf(drive)}, loss bound ${lossBound}`,
+        fmt(tally),
+        `  failures: ${failures.length}`,
+        ...failures.slice(0, 15).map((f) => `    ${f}`),
+        ...(failures.length && !REAL_POD
+          ? [
+              '  trace (up to the first failure):',
+              ...trace.slice(Math.max(0, firstFailAt - 40), firstFailAt),
+            ]
+          : []),
         '',
       ].join('\n')
     );
@@ -1694,7 +1941,7 @@ describe('layer 4: compaction rebase through compactDoc + mergeRemoteEnvelope', 
     await ap.setKey(key);
     const ACC = 'demo-account-current';
     const GOAL = 'chaos-goal-history';
-    const shown = (doc: Doc) => foldDoc(doc) as Any;
+    const shown = (doc: Doc) => foldedView(doc) as Any;
     const start = shown(BASE);
 
     // The peer adjusts and that reaches Drive: its key is in the document the compactor folds.
@@ -1725,12 +1972,20 @@ describe('layer 4: compaction rebase through compactDoc + mergeRemoteEnvelope', 
       heads: baselineHeads,
     });
     expect(res.action).toBe('rebased');
-    expect(res.counterIncrements).toBe(2);
+    // The peer's keys are foreign to the reloaded session (a fresh actor inside `ap`), and they
+    // cross anyway: nobody owns a key. The -3.33 is a negative, carried because the session
+    // holds every change the compactor folded (`fromHeads`): fresh.
+    expect(res.counterRebase).toMatchObject({
+      carries: 2,
+      skipped: 0,
+      mode: 'ledger',
+      fresh: true,
+    });
     expect(res.counterStats).toMatchObject({ conflicts: 0, malformed: 0, ledgerKeys: 1 });
     const out = Automerge.load<FamilyDocument>(ap.exportSnapshot().binary);
     expect(counterHealth(out)).toEqual([]);
     const m = shown(out);
-    // -1.11 folded once, -2.22 the compactor's live key, -3.33 the replayed growth, once.
+    // -1.11 folded once, -2.22 the compactor's live key, -3.33 the carried growth, once.
     expect(m.accounts[ACC].balance).toBe(
       (toMinor(start.accounts[ACC].balance, 2) - 111 - 222 - 333) / 100
     );
@@ -1741,7 +1996,7 @@ describe('layer 4: compaction rebase through compactDoc + mergeRemoteEnvelope', 
       (m.goals[GOAL].manualContributions as Any[]).filter((c) => c.id === 'chaos-rebase-entry')
     ).toHaveLength(1);
     report.push(
-      `rebase with Counters: replayed=${res.replayed} conflicts=${res.conflicts} counter_increments=${res.counterIncrements} ledger_keys=${res.counterStats?.ledgerKeys}`
+      `rebase with Counters: replayed=${res.replayed} conflicts=${res.conflicts} counter_carries=${res.counterRebase?.carries} ledger_keys=${res.counterStats?.ledgerKeys}`
     );
   });
 

@@ -32,6 +32,12 @@ import type { PodBlockMessageKey, RemoteBlocker } from '@/types/sync';
  * published the compacted document over those peer edits, and every peer then adopted it.
  * Optional: absent on every lineage minted before it shipped, on a restore stamp, and on any
  * pod a legacy build compacted. Absent means today's behaviour, never a block.
+ *
+ * #117 writer flip: `fromHeads` is ALSO the rebase's freshness proof. A dirty peer that holds
+ * every one of them (`Automerge.hasHeads`) holds every change the compactor folded, so a
+ * foreign Counter key's negative growth is a real reversal and is carried; a peer missing any
+ * (or a target without `fromHeads`) carries positives only. The inherited `restoreSeq`
+ * (`PodLineage`) selects the restore rule instead. Neither field affects `compareLineage`.
  */
 export interface CompactionLineage extends PodLineage {
   fromHeads?: string[];

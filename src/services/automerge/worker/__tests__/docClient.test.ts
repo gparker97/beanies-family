@@ -312,7 +312,8 @@ describe('docClient', () => {
         context: expect.objectContaining({
           action: 'rebased',
           family_id: 'fam-1',
-          detail: 'replayed=7,conflicts=2,counter_increments=0',
+          detail:
+            'replayed=7,conflicts=2,counter_carries=0,carry_skipped=0,carry_superseded=0,rebase_mode=ledger,fresh=0',
         }),
       })
     );
@@ -325,7 +326,10 @@ describe('docClient', () => {
         level: 'info',
         // ⚠️ ON THE SUCCESS PATH TOO, or the RATE is unmeasurable and only
         // failures are visible.
-        context: expect.objectContaining({ detail: 'replayed=3,conflicts=0,counter_increments=0' }),
+        context: expect.objectContaining({
+          detail:
+            'replayed=3,conflicts=0,counter_carries=0,carry_skipped=0,carry_superseded=0,rebase_mode=ledger,fresh=0',
+        }),
       })
     );
 
@@ -366,22 +370,32 @@ describe('docClient', () => {
     last = vi.mocked(logEvent).mock.calls.at(-1)![0];
     expect(last.level).toBe('info');
     expect(last.context).toMatchObject({
-      detail: 'replayed=3,conflicts=0,counter_increments=0,root_conflicts=0,added=0',
+      detail:
+        'replayed=3,conflicts=0,counter_carries=0,carry_skipped=0,carry_superseded=0,rebase_mode=ledger,fresh=0,root_conflicts=0,added=0',
     });
     expect(Object.keys(last.context ?? {}).sort()).toEqual(['action', 'detail', 'family_id']);
   });
 
-  it('appends the Counter figures on every action, counter_increments on a rebase, and warns only on a shared key (#117 Phase 2)', () => {
-    const stats = { keys: 4, conflicts: 0, malformed: 0, ledgerKeys: 9 };
+  it('appends the Counter figures on every action, the carry figures on a rebase, and warns only on a shared increment key (#117 writer flip)', () => {
+    const stats = {
+      keys: 4,
+      conflicts: 0,
+      carryConflicts: 0,
+      malformed: 0,
+      ledgerKeys: 9,
+      ledgerOldest: 3,
+    };
     logMergeTerminus('poll terminus', { action: 'merged', counterStats: stats }, 'fam-1');
     let last = vi.mocked(logEvent).mock.calls.at(-1)![0];
     expect(last.level).toBe('info');
     expect(last.context).toMatchObject({
       action: 'merged',
-      detail: 'counter_keys=4,counter_conflicts=0,counter_malformed=0,ledger_keys=9',
+      detail:
+        'counter_keys=4,counter_conflicts=0,carry_conflicts=0,counter_malformed=0,' +
+        'ledger_keys=9,ledger_oldest=3',
     });
 
-    // A rebase reports what the ledger pass carried, after its own counts and before the
+    // A rebase reports what the Counter pass did, after its own counts and before the
     // document-health figures, all on the one allowlisted `detail` key.
     logMergeTerminus(
       'open terminus',
@@ -389,9 +403,16 @@ describe('docClient', () => {
         action: 'rebased',
         replayed: 5,
         conflicts: 0,
-        counterIncrements: 2,
+        counterRebase: { carries: 2, skipped: 1, superseded: 1, mode: 'baseline', fresh: false },
         rootConflicts: { total: 0, added: 0 },
-        counterStats: { keys: 0, conflicts: 0, malformed: 0, ledgerKeys: 3 },
+        counterStats: {
+          keys: 0,
+          conflicts: 0,
+          carryConflicts: 0,
+          malformed: 0,
+          ledgerKeys: 0,
+          ledgerOldest: null,
+        },
       },
       'fam-1'
     );
@@ -399,25 +420,53 @@ describe('docClient', () => {
     expect(last.level).toBe('info');
     expect(last.context).toMatchObject({
       detail:
-        'replayed=5,conflicts=0,counter_increments=2,root_conflicts=0,added=0,' +
-        'counter_keys=0,counter_conflicts=0,counter_malformed=0,ledger_keys=3',
+        'replayed=5,conflicts=0,counter_carries=2,carry_skipped=1,carry_superseded=1,' +
+        'rebase_mode=baseline,fresh=0,root_conflicts=0,added=0,' +
+        'counter_keys=0,counter_conflicts=0,carry_conflicts=0,counter_malformed=0,' +
+        'ledger_keys=0,ledger_oldest=none',
     });
     expect(Object.keys(last.context ?? {}).sort()).toEqual(['action', 'detail', 'family_id']);
+
+    // A fresh ledger-mode rebase says so.
+    logMergeTerminus(
+      'poll terminus',
+      {
+        action: 'rebased',
+        replayed: 1,
+        conflicts: 0,
+        counterRebase: { carries: 1, skipped: 0, superseded: 0, mode: 'ledger', fresh: true },
+      },
+      'fam-1'
+    );
+    last = vi.mocked(logEvent).mock.calls.at(-1)![0];
+    expect(last.context).toMatchObject({
+      detail: expect.stringContaining('rebase_mode=ledger,fresh=1'),
+    });
 
     // A malformed key persists until compaction, so it is information, never a per-poll warn.
     logMergeTerminus(
       'poll terminus',
-      { action: 'merged', counterStats: { keys: 2, conflicts: 0, malformed: 1, ledgerKeys: 0 } },
+      { action: 'merged', counterStats: { ...stats, keys: 2, malformed: 1 } },
       'fam-1'
     );
     last = vi.mocked(logEvent).mock.calls.at(-1)![0];
     expect(last.level).toBe('info');
     expect(last.context).toMatchObject({ detail: expect.stringContaining('counter_malformed=1') });
 
-    // Two writers shared a key: construction forbids it, so it is news on any action.
+    // Two peers put one carry register concurrently: the documented residual, information.
     logMergeTerminus(
       'poll terminus',
-      { action: 'adopted', counterStats: { keys: 2, conflicts: 1, malformed: 0, ledgerKeys: 0 } },
+      { action: 'merged', counterStats: { ...stats, carryConflicts: 1 } },
+      'fam-1'
+    );
+    last = vi.mocked(logEvent).mock.calls.at(-1)![0];
+    expect(last.level).toBe('info');
+    expect(last.context).toMatchObject({ detail: expect.stringContaining('carry_conflicts=1') });
+
+    // Two writers shared an increment key: construction forbids it, so it is news on any action.
+    logMergeTerminus(
+      'poll terminus',
+      { action: 'adopted', counterStats: { ...stats, keys: 2, conflicts: 1 } },
       'fam-1'
     );
     last = vi.mocked(logEvent).mock.calls.at(-1)![0];
@@ -452,6 +501,35 @@ describe('docClient', () => {
           action: 'rebase-unavailable',
           error_code: 'blocked',
           family_id: 'fam-1',
+        }),
+      })
+    );
+  });
+
+  it('names a ledger-window block on the rebase-unavailable event (#117 writer flip)', async () => {
+    // A peer beyond the fold ledger's window: a new `conflict_kind` value, no new event.
+    useWorker((req) => ({
+      cid: req.cid,
+      ok: false,
+      error: serializeError(
+        lineageBlockError('adopt-remote', {
+          rebaseUnavailable: true,
+          conflictKind: 'ledger-window',
+        })
+      ),
+    }));
+    await expect(
+      mergeRemoteEnvelope({ encryptedPayload: 'ZmFrZQ==' } as never, 'fam-1', {
+        kind: 'baseline',
+        heads: ['h1'],
+      })
+    ).rejects.toBeInstanceOf(PodLineageError);
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        surface: 'pod-rebase',
+        context: expect.objectContaining({
+          error_code: 'blocked',
+          detail: 'conflict_kind=ledger-window',
         }),
       })
     );

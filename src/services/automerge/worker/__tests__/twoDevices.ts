@@ -14,7 +14,6 @@ import * as Automerge from '@automerge/automerge';
 import type { FamilyDocument } from '@/types/automerge';
 import { migrateDoc, applyMutation, mergeDocs, buildFullProjection } from '../docOps';
 import type { MutationOp } from '../protocol';
-import { __setDeviceWriterResolverForTesting } from '../docActor';
 
 export type Doc = Automerge.Doc<FamilyDocument>;
 
@@ -24,39 +23,9 @@ export interface Devices {
   b: Doc;
 }
 
-// ─── Simulated devices (#117 Phase 2) ────────────────────────────────────────
-//
-// In production every handle in a realm belongs to ONE device (the id `cache.ts` mints), and a
-// Counter key's writer is `${deviceWriterId}:${actorId}`. A test puts several devices in one
-// realm, so it maps each handle's ACTOR to a device instead: `fork` registers its two forks, a
-// test registers any other handle with `onDevice`, and every unregistered actor (a plain
-// `clone`, a fresh `load` inside `applyAndProject`) is `TEST_DEVICE`, the test's own device.
-
-/** The device every unregistered actor belongs to. */
-export const TEST_DEVICE = 'device-test';
-
-const deviceOfActor = new Map<string, string>();
-
-/** Install the actor → device resolver with an empty registry. Call in a `beforeEach` of any
- *  test that writes Counters through `applyMutation`; pair with `resetTestDevices`. */
-export function useTestDevices(): void {
-  deviceOfActor.clear();
-  __setDeviceWriterResolverForTesting((actor) => deviceOfActor.get(actor) ?? TEST_DEVICE);
-}
-
-/** Remove the resolver (the realm's single id applies again) and forget every registration. */
-export function resetTestDevices(): void {
-  deviceOfActor.clear();
-  __setDeviceWriterResolverForTesting(null);
-}
-
-/** Put the handle `doc` (or the raw `actor`) on `device` and return it. A merge keeps the
- *  receiving handle's actor, so the device follows the handle through `converge`. */
-export function onDevice<D extends Doc | string>(device: string, docOrActor: D): D {
-  const actor = typeof docOrActor === 'string' ? docOrActor : Automerge.getActorId(docOrActor);
-  deviceOfActor.set(actor, device);
-  return docOrActor;
-}
+// A Counter key's writer is the handle's Automerge actor alone (#117 writer flip): every handle
+// (`fork`'s two clones, any other `clone`, a fresh `load` inside `applyAndProject`) is its own
+// writer, so a test needs no device registry. "Which device" is simply "which handle".
 
 /** Apply `ops` in order, each as its own change (one `applyMutation` per op). */
 export function apply(doc: Doc, ...ops: MutationOp[]): Doc {
@@ -70,13 +39,12 @@ export function seeded(ops: MutationOp[] = []): Doc {
 
 /**
  * Put `origin` on two devices. `Automerge.clone` forks with a fresh random actor, so the two
- * devices' writes are genuinely concurrent (the `docOps.test.ts` merge model), and each fork is
- * registered as its own device (`device-a`, `device-b`) for the Counter writer id (effective
- * once `useTestDevices` installed the resolver). `origin` stays usable.
+ * devices' writes are genuinely concurrent (the `docOps.test.ts` merge model), and each fork
+ * writes its Counter keys under its own actor. `origin` stays usable.
  */
 export function fork(origin: Doc): Devices {
-  const a = onDevice('device-a', Automerge.clone(origin));
-  const b = onDevice('device-b', Automerge.clone(origin));
+  const a = Automerge.clone(origin);
+  const b = Automerge.clone(origin);
   expect(Automerge.getActorId(a)).not.toBe(Automerge.getActorId(b));
   return { a, b };
 }

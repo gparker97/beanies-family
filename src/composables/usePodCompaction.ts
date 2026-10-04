@@ -431,14 +431,19 @@ export function usePodCompaction() {
       // 4. Rebuild + verify, in the worker. Throws (keeping the old document)
       //    on any difference; nothing has moved yet if it does.
       const stats = await docClient.compactDoc();
+      // #117 writer flip: the bounded fold ledger's figures ride the same event. A name
+      // collision (a reused Counter key name, which construction forbids) raises it to `warn`.
+      const ledger = stats.ledger ?? { pruned: 0, normalised: 0, collisions: 0 };
       logEvent({
-        level: 'info',
+        level: ledger.collisions > 0 ? 'warn' : 'info',
         surface: 'pod-compaction',
         message: 'compaction verified',
         context: {
           action: 'verified',
           perf_doc_bytes: stats.afterBytes,
-          detail: `before=${Math.round(stats.beforeBytes / 1024)},changes=${stats.changesBefore},actors=${stats.actorsBefore}`,
+          detail:
+            `before=${Math.round(stats.beforeBytes / 1024)},changes=${stats.changesBefore},actors=${stats.actorsBefore}` +
+            `,ledger_pruned=${ledger.pruned},ledger_normalised=${ledger.normalised},ledger_collisions=${ledger.collisions}`,
         },
       });
 

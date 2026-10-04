@@ -70,7 +70,13 @@ import {
 } from './docOps';
 import { attachPhotoNamedHandler, collectReferencedPhotoIds as collectPhotoIds } from './photoOps';
 import { registerTransactionOps } from './transactionOps';
-import { foldDoc, foldIndex, counterStats, type CounterStats } from './counterFields';
+import {
+  foldDoc,
+  foldIndex,
+  counterStats,
+  type CounterStats,
+  type LedgerFigures,
+} from './counterFields';
 import * as cache from './cache';
 import type { RemoteBaselineRow } from '@/services/sync/remoteBaseline';
 import type {
@@ -78,6 +84,8 @@ import type {
   ProjectionDelta,
   Heads,
   MergeOutcome,
+  RebaseBlock,
+  CounterRebase,
   CachePersistFailureDetail,
   CacheClearResult,
   WorkerSignal,
@@ -1448,11 +1456,11 @@ export function noteRemoteBaseline(payload: string): void {
 /** A completed rebase: the new document and what the replay carried. */
 interface RebaseResult {
   doc: Doc;
-  /** Ops replayed, Counter increments included. */
+  /** Ops replayed, Counter carries included. */
   replayed: number;
   conflicts: number;
-  /** Of `replayed`, the `increment` ops the Counter ledger pass emitted (#117 Phase 2). */
-  counterIncrements: number;
+  /** What the Counter pass did (#117 writer flip): carries, skips, supersessions, mode. */
+  counterRebase: CounterRebase;
 }
 
 /**
@@ -1482,22 +1490,37 @@ function rebaseOntoRemote(
    * exit there is". Reproduced against @automerge/automerge 3.4.1.
    */
   target: Doc
-): RebaseResult | { blockedBy: 'transactions' } | null {
+): RebaseResult | { blockedBy: RebaseBlock } | null {
   try {
     const ops = buildRebaseOps(local, baselineHeads, target);
     if (!ops) return null; // cannot compose → the caller blocks
-    // C8: a transaction conflict makes the replay unavailable rather than partial.
+    // C8: a transaction conflict makes the replay unavailable rather than partial; so does a
+    // peer beyond the fold ledger's window (#117 writer flip).
     if (ops.blockedBy) return { blockedBy: ops.blockedBy };
+    const counterRebase = (superseded: number): CounterRebase => ({
+      carries: ops.counterCarries,
+      skipped: ops.carrySkipped,
+      superseded,
+      mode: ops.rebaseMode,
+      fresh: ops.fresh,
+    });
     // Nothing to replay: the peer is level with its baseline, so the remote can
     // simply be adopted. Blocking here would strand a device that has lost
     // nothing — and `migrateDoc` alone can move heads without any user edit.
-    if (!ops.op)
-      return { doc: target, replayed: 0, conflicts: ops.conflicts, counterIncrements: 0 };
+    if (!ops.op) {
+      return {
+        doc: target,
+        replayed: 0,
+        conflicts: ops.conflicts,
+        counterRebase: counterRebase(0),
+      };
+    }
+    const applied = applyMutationOp(target, ops.op);
     return {
-      doc: applyMutationOp(target, ops.op).doc,
+      doc: applied.doc,
       replayed: ops.count,
       conflicts: ops.conflicts,
-      counterIncrements: ops.counterIncrements,
+      counterRebase: counterRebase(applied.carrySuperseded),
     };
   } catch (e) {
     console.warn('[applyAndProject] rebase unavailable — falling back to the block:', e);
@@ -1733,7 +1756,7 @@ export async function mergeRemoteEnvelope(
   /** The policy asked for a rebase and it could not run. Diagnostic only. */
   let rebaseUnavailable = false;
   /** Why it could not run, when the composer said (C8). Diagnostic only. */
-  let conflictKind: 'transactions' | undefined;
+  let conflictKind: RebaseBlock | undefined;
   /**
    * ⚠️ A RESTORE IS A LINEAGE EVENT. Set ONLY inside the guarded block, when
    * the verdict was `ours-newer` under `user-file`: a human chose a file whose
@@ -1857,7 +1880,7 @@ export async function mergeRemoteEnvelope(
           remoteHeads: driveHeads,
           replayed: rebased.replayed,
           conflicts: rebased.conflicts,
-          counterIncrements: rebased.counterIncrements,
+          counterRebase: rebased.counterRebase,
           // Already a full projection above, so this is reporting only.
           ...mergeHealth(conflictsBefore, doc),
         };
@@ -1928,7 +1951,11 @@ export async function mergeRemoteEnvelope(
     currentDoc = stampNewGeneration
       ? Automerge.change(adopted, (d) => {
           removedCarry = carryRemovedMembers(d, priorRemoved);
-          (d as { podLineage?: PodLineage | null }).podLineage = nextLineage(priorLineage);
+          // #117 writer flip: a restore generation records itself as `restoreSeq`, and every
+          // later `nextLineage` carries it, so a peer that predates this restore rebases its
+          // Counter growth against its own baseline (rolled-back amounts stay rolled back).
+          const next = nextLineage(priorLineage);
+          (d as { podLineage?: PodLineage | null }).podLineage = { ...next, restoreSeq: next.seq };
         })
       : adopted;
     resetDocCursors(); // adopted a fresh doc → first persist writes a base
@@ -2084,9 +2111,10 @@ export async function exportEncryptedPayload(): Promise<ExportedPayload> {
 
 /**
  * Does the document hold Counter keys or a fold ledger (#117)? Read from the same `doc` as the
- * payload, so main's `beanpodVersionFor` labels exactly these bytes. This build never creates
- * Counter keys (`COUNTER_WRITES_ENABLED` is off); the label only PRESERVES the 6.0 a flip build
- * wrote, so an older build keeps refusing the file after this one re-saves it.
+ * payload, so main's `beanpodVersionFor` labels exactly these bytes. This build creates Counter
+ * keys only when the served policy turns writes on (`COUNTER_WRITES_DEFAULT` is off); the label
+ * also PRESERVES the 6.0 a writing build wrote, so an older build keeps refusing the file after
+ * this one re-saves it.
  */
 function docHasCounters(doc: Doc): boolean {
   const d = doc as { counterDeltas?: object; foldedCounters?: object };
@@ -2259,6 +2287,8 @@ export function compactDoc(): {
   actorsBefore: number;
   /** Round 3: the installed document's heads, so main re-anchors its acknowledged-write check. */
   heads: Heads;
+  /** #117 writer flip: what this compaction did to the bounded fold ledger (`foldDoc`). */
+  ledger: LedgerFigures;
 } {
   const before = requireDoc('compactDoc');
   // ⚠️ INSIDE the classifier. `saveDoc(before)` is a full serialize of the
@@ -2277,13 +2307,19 @@ export function compactDoc(): {
   }
 
   let compacted: Doc;
+  let ledger: LedgerFigures;
   try {
     // #117 Phase 2: the source is FOLDED, never a bare `toJS`. `foldDoc` writes every Counter
-    // key into its absolute, empties `counterDeltas` and EXTENDS the `foldedCounters` ledger (the
-    // rebase reads it to re-emit only growth since this compaction). A bare `toJS` would carry
+    // key into its absolute, empties `counterDeltas` and REBUILDS the bounded `foldedCounters`
+    // ledger (the rebase reads it to carry only growth since this compaction). A bare `toJS` would carry
     // the map through as live Counters, which the rebuilt history then owns under the
     // compactor's actor; and the verify below would compare Counter instances, not JSON.
-    const plain = foldDoc(before);
+    // #117 writer flip: the new generation is minted ONCE, so the ledger's `s` and the stamp's
+    // `seq` cannot disagree. `ledger` is NON-ENUMERABLE on the source: read it before the
+    // spread below drops it (it must never become a document key).
+    const lineage = nextLineage(docLineage(before));
+    const plain = foldDoc(before, lineage.seq);
+    ledger = plain.ledger;
     // The new identity, written INTO the document — see ADR-036. It travels
     // with the history it describes and cannot drift from it, which is the whole
     // reason this moved off the envelope. `docLineage` normalises the legacy
@@ -2300,7 +2336,7 @@ export function compactDoc(): {
     // (`remoteMovedPast`). Inside the stamp, so it travels with the history it describes.
     const source = {
       ...plain,
-      podLineage: { ...nextLineage(docLineage(before)), fromHeads: headsOf(before) },
+      podLineage: { ...lineage, fromHeads: headsOf(before) },
     };
     compacted = Automerge.from(source, docInitOpts()) as Doc;
     // Proves the rebuild round-tripped EXACTLY — including the stamp, which is
@@ -2404,7 +2440,7 @@ export function compactDoc(): {
     resetDocCursors();
     throw payloadFailure('materialize', e, null, beforeBytes);
   }
-  return { ...stats, heads: headsOf(compacted) };
+  return { ...stats, heads: headsOf(compacted), ledger };
 }
 
 /** One projection delta as an order-blind value for the compaction's view compare (C9b). */

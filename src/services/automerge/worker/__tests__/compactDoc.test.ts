@@ -49,7 +49,7 @@ vi.mock('@/utils/firstJsonDifference', async (importOriginal) => {
 
 const cache = await import('../cache');
 const { setCounterWrites } = await import('../counterFields');
-const { setDocActor, resetDocActor, setDeviceWriterId } = await import('../docActor');
+const { setDocActor, resetDocActor } = await import('../docActor');
 const {
   configure,
   compactDoc,
@@ -274,35 +274,32 @@ describe('compactDoc folds the Counters (#117 Phase 2)', () => {
   type Snapshot = {
     accounts: Record<string, { balance: number }>;
     counterDeltas: Record<string, unknown>;
-    foldedCounters?: Record<string, number>;
+    foldedCounters?: Record<string, number | { v: number; s: number }>;
+    podLineage?: { id: string; seq: number; restoreSeq?: number; fromHeads?: string[] };
   };
   const snapshot = () => Automerge.toJS(Automerge.load(exportSnapshot().binary)) as Snapshot;
   const inc = (delta: number) =>
     mutate({ op: 'increment', collection: 'accounts', id: 'A', field: 'balance', delta });
 
-  beforeEach(() => {
-    setCounterWrites(true);
-    setDeviceWriterId('device-compact'); // what an opened cache posts
-  });
-  afterEach(() => {
-    setCounterWrites(null);
-    setDeviceWriterId(null);
-  });
+  beforeEach(() => setCounterWrites(true));
+  afterEach(() => setCounterWrites(null));
 
-  it('preserves the folded value, empties the map, and EXTENDS the ledger across two compactions', () => {
+  it('preserves the folded value, empties the map, and KEEPS the ledger across two compactions', () => {
     initDoc();
     mutate({ op: 'set', collection: 'accounts', id: 'A', entity: { id: 'A', balance: 100 } });
     inc(-20.25);
     const [firstKey] = Object.keys(snapshot().counterDeltas);
-    // `${collection}/${id}/${field}@${decimals}/${device}:${actor}`: no currency, two decimals.
-    expect(firstKey).toMatch(/^accounts\/A\/balance@2\/device-compact:[0-9a-f]+$/);
+    // `${collection}/${id}/${field}@${decimals}/${actor}`: no currency, two decimals, and the
+    // actor is the whole writer (#117 writer flip).
+    expect(firstKey).toMatch(/^accounts\/A\/balance@2\/[0-9a-f]+$/);
 
     // The real verify runs (no hook path): the folded source round-trips exactly.
     expect(compactDoc().changesAfter).toBe(1);
     let doc = snapshot();
     expect(doc.accounts.A!.balance).toBe(79.75);
     expect(doc.counterDeltas).toEqual({});
-    expect(doc.foldedCounters).toEqual({ [firstKey!]: -2025 });
+    // `{ v, s }`: folded at generation 1 (#117 writer flip, plan §D).
+    expect(doc.foldedCounters).toEqual({ [firstKey!]: { v: -2025, s: 1 } });
 
     // A fresh actor after the rebuild, so the next adjustment is a NEW key.
     inc(-5);
@@ -312,8 +309,12 @@ describe('compactDoc folds the Counters (#117 Phase 2)', () => {
     doc = snapshot();
     expect(doc.accounts.A!.balance).toBe(74.75);
     expect(doc.counterDeltas).toEqual({});
-    // ⚠️ CUMULATIVE, never replaced: a peer two compactions behind still finds its key.
-    expect(doc.foldedCounters).toEqual({ [firstKey!]: -2025, [secondKey!]: -500 });
+    // ⚠️ KEPT within the window, never replaced: a peer two compactions behind still finds its
+    // key, each entry stamped with the generation that folded it.
+    expect(doc.foldedCounters).toEqual({
+      [firstKey!]: { v: -2025, s: 1 },
+      [secondKey!]: { v: -500, s: 2 },
+    });
   });
 
   it("REFUSES a newer build's Counter field, keeping the old document, with its own class", () => {
@@ -379,10 +380,100 @@ describe('compactDoc folds the Counters (#117 Phase 2)', () => {
     compactDoc();
     const { podLineage, ...rest } = diffHook.source as Record<string, unknown>;
     expect(podLineage).toEqual({ id: expect.any(String), seq: 1, fromHeads: expect.any(Array) });
+    expect(podLineage).not.toHaveProperty('restoreSeq');
     // `migrateDoc` already created the empty map, so the fold adds nothing and no ledger key.
     expect(rest).toEqual(today);
     expect(rest).not.toHaveProperty('foldedCounters');
     expect(snapshot().accounts.A!.balance).toBe(79.75);
+  });
+});
+
+describe('compactDoc bounds the fold ledger (#117 writer flip, plan §D)', () => {
+  type FDoc = import('@/types/automerge').FamilyDocument;
+  type Snap = {
+    accounts: Record<string, { balance: number }>;
+    counterDeltas: Record<string, unknown>;
+    foldedCounters?: Record<string, unknown>;
+    podLineage?: { id: string; seq: number; restoreSeq?: number; fromHeads?: string[] };
+  };
+  const snapshot = () => Automerge.toJS(Automerge.load(exportSnapshot().binary)) as Snap;
+  const LIVE = 'accounts/A/balance@2/aaaa';
+  /** A pod on generation `seq` holding a prior ledger and one live key worth `live`. */
+  const podAt = (
+    lineage: { id: string; seq: number; restoreSeq?: number },
+    ledger: Record<string, unknown>,
+    live: number
+  ) =>
+    Automerge.change(migrateDoc(Automerge.init<FDoc>()), (d) => {
+      (d.accounts as unknown as Record<string, unknown>).A = { id: 'A', balance: 100 };
+      (d as unknown as { podLineage: unknown }).podLineage = lineage;
+      (d as unknown as { foldedCounters: unknown }).foldedCounters = ledger;
+      (d.counterDeltas as unknown as Record<string, unknown>)[LIVE] = new Automerge.Counter(live);
+    });
+
+  it('writes { v, s }, normalises a 0.91.2 bare number, prunes past the window, keeps the boundary', () => {
+    // Compacting seq 20 -> 21: prune below 21 - 12 = 9.
+    loadSnapshot(
+      Automerge.save(
+        podAt(
+          { id: 'L20', seq: 20 },
+          {
+            'accounts/A/balance@2/old': { v: 1, s: 8 }, // 8 < 9: pruned
+            'accounts/A/balance@2/edge': { v: 2, s: 9 }, // exactly at the window: kept
+            'accounts/A/balance@2/bare': 3, // a 0.91.2 entry: normalised to s = 21
+          },
+          -500
+        )
+      )
+    );
+    const res = compactDoc();
+    expect(res.ledger).toEqual({ pruned: 1, normalised: 1, collisions: 0 });
+    const doc = snapshot();
+    expect(doc.foldedCounters).toEqual({
+      'accounts/A/balance@2/edge': { v: 2, s: 9 },
+      'accounts/A/balance@2/bare': { v: 3, s: 21 },
+      [LIVE]: { v: -500, s: 21 },
+    });
+    expect(doc.accounts.A!.balance).toBe(95);
+    expect(doc.podLineage?.seq).toBe(21);
+  });
+
+  it('a folded name already in the ledger is counted and warned, and the newer value wins', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      loadSnapshot(Automerge.save(podAt({ id: 'L3', seq: 3 }, { [LIVE]: { v: 7, s: 3 } }, 9)));
+      const res = compactDoc();
+      expect(res.ledger.collisions).toBe(1);
+      expect(snapshot().foldedCounters).toEqual({ [LIVE]: { v: 9, s: 4 } });
+      expect(warn.mock.calls.some(([m]) => String(m).includes('already in the fold ledger'))).toBe(
+        true
+      );
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('a 0.91.2-shaped lineage (no restoreSeq) compacts, and a restoreSeq is carried through', () => {
+    loadSnapshot(Automerge.save(podAt({ id: 'L5', seq: 5 }, {}, 1)));
+    compactDoc();
+    expect(snapshot().podLineage).toEqual({
+      id: expect.any(String),
+      seq: 6,
+      fromHeads: expect.any(Array),
+    });
+
+    loadSnapshot(Automerge.save(podAt({ id: 'L7', seq: 7, restoreSeq: 6 }, {}, 1)));
+    compactDoc();
+    const lineage = snapshot().podLineage;
+    expect(lineage?.seq).toBe(8);
+    expect(lineage?.restoreSeq).toBe(6);
+  });
+
+  it('the ledger figures are non-enumerable on the source: never a document key', () => {
+    loadSnapshot(Automerge.save(podAt({ id: 'L1', seq: 1 }, {}, 1)));
+    compactDoc();
+    expect(diffHook.source).not.toHaveProperty('ledger');
+    expect(snapshot()).not.toHaveProperty('ledger');
   });
 });
 

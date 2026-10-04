@@ -1631,6 +1631,9 @@ export async function compactDoc(): Promise<{
   changesBefore: number;
   changesAfter: number;
   actorsBefore: number;
+  /** #117 writer flip: what the compaction did to the bounded fold ledger (pruned, normalised,
+   *  name collisions). Optional: a worker from before the flip does not send it. */
+  ledger?: { pruned: number; normalised: number; collisions: number };
 }> {
   const { heads, ...stats } = (await request('compactDoc')) as {
     beforeBytes: number;
@@ -1639,6 +1642,7 @@ export async function compactDoc(): Promise<{
     changesAfter: number;
     actorsBefore: number;
     heads?: Heads;
+    ledger?: { pruned: number; normalised: number; collisions: number };
   };
   // Round 3: a new lineage is installed. The anchor moves to it, or a respawn before the
   // caller's flush would compare against pre-compaction heads and report `heads-regressed`.
@@ -2029,7 +2033,7 @@ export async function mergeRemoteEnvelope(
  */
 export type MergeTerminusOutcome = Pick<
   MergeOutcome,
-  'action' | 'replayed' | 'conflicts' | 'rootConflicts' | 'counterStats' | 'counterIncrements'
+  'action' | 'replayed' | 'conflicts' | 'rootConflicts' | 'counterStats' | 'counterRebase'
 >;
 
 /**
@@ -2056,11 +2060,19 @@ export function logMergeTerminus(
   // is itself the answer to "did a rebase happen".
   const parts: string[] = [];
   if (outcome.action === 'rebased') {
+    // #117 writer flip: what the Counter pass did. `counter_carries` is one per canonical key
+    // with growth; `carry_skipped` foreign negatives dropped while behind (`fresh=0` says why);
+    // `carry_superseded` foreign carries that met an existing register; `rebase_mode=baseline`
+    // is the restore rule. Present on every rebase (a measured zero), never defaulted away.
+    const r = outcome.counterRebase;
     parts.push(
       `replayed=${outcome.replayed ?? 0}`,
       `conflicts=${outcome.conflicts ?? 0}`,
-      // #117 Phase 2: of `replayed`, the Counter adjustments the ledger pass carried across.
-      `counter_increments=${outcome.counterIncrements ?? 0}`
+      `counter_carries=${r?.carries ?? 0}`,
+      `carry_skipped=${r?.skipped ?? 0}`,
+      `carry_superseded=${r?.superseded ?? 0}`,
+      `rebase_mode=${r?.mode ?? 'ledger'}`,
+      `fresh=${r?.fresh ? 1 : 0}`
     );
   }
   // #117 plan F: root conflicts on every action the worker reported them for. A
@@ -2072,19 +2084,23 @@ export function logMergeTerminus(
     parts.push(`root_conflicts=${outcome.rootConflicts.total}`, `added=${rootAdded}`);
   }
   // #117 Phase 2: the Counter map's shape on every action. `counter_keys` is growth between
-  // compactions, `ledger_keys` the cumulative fold ledger (pruning is decided on this figure).
-  // `counter_conflicts` means two writers shared a key, which construction forbids: a bug, so
-  // `warn`. `counter_malformed` (a key this build cannot read, e.g. a newer build's field)
-  // stays `info`: the key persists until compaction, so a warn would fire on every poll for the
-  // whole mixed-fleet window. Findable by grep on `counter_malformed=`.
+  // compactions, `ledger_keys` the bounded fold ledger and `ledger_oldest` its oldest fold
+  // generation (`none` when empty). `counter_conflicts` means two writers shared an INCREMENT
+  // key, which construction forbids: a bug, so `warn`. `carry_conflicts` (two peers put one
+  // carry register without having merged each other) is the documented residual: `info`.
+  // `counter_malformed` (a key this build cannot read, e.g. a newer build's field) stays `info`:
+  // the key persists until compaction, so a warn would fire on every poll for the whole
+  // mixed-fleet window. Findable by grep on `counter_malformed=`.
   const counterConflicts = outcome.counterStats?.conflicts ?? 0;
   if (outcome.counterStats) {
     const c = outcome.counterStats;
     parts.push(
       `counter_keys=${c.keys}`,
       `counter_conflicts=${c.conflicts}`,
+      `carry_conflicts=${c.carryConflicts}`,
       `counter_malformed=${c.malformed}`,
-      `ledger_keys=${c.ledgerKeys}`
+      `ledger_keys=${c.ledgerKeys}`,
+      `ledger_oldest=${c.ledgerOldest ?? 'none'}`
     );
   }
   logEvent({
@@ -2119,7 +2135,11 @@ export function logMergeTerminus(
 function noteRebaseUnavailable(
   familyId: string | null,
   outcome: string,
-  /** C8: what the composer refused over (`'transactions'`), when it said. */
+  /**
+   * What the composer refused over (a `RebaseBlock`: `'transactions'` or `'ledger-window'`),
+   * when it said. Typed `string` because the blocked path reads it off a deserialised
+   * `PodLineageError`, whose field is a plain string; the value is always a `RebaseBlock`.
+   */
   conflictKind?: string
 ): void {
   logEvent({

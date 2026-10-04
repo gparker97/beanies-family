@@ -437,7 +437,10 @@ describe('round 3, item 6: the cache-replay event pages only on a first sighting
 describe("round 3, item 1: setKey carries the key's family", () => {
   it('posts familyId with the key', async () => {
     const workers = useWorkers([
-      (req) => (req.method === 'setKey' || req.method === 'setActor' ? ok(req, null) : null),
+      (req) =>
+        req.method === 'setKey' || req.method === 'setActor' || req.method === 'setCounterWrites'
+          ? ok(req, null)
+          : null,
     ]);
     await setFamilyKey(await generateFamilyKey(), 'fam-b');
     const post = workers[0]!.posted.find((m) => m.method === 'setKey');

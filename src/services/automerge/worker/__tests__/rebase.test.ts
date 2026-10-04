@@ -38,16 +38,19 @@ const {
   buildRebaseOps: buildRebaseOpsRaw,
   applyMutation: applyMutationOp,
   materializeCollection,
+  nextLineage,
+  docLineage,
 } = await import('../docOps');
-const { setCounterWrites, counterStats, foldDoc, foldIndex } = await import('../counterFields');
-const { seeded, onDevice, useTestDevices, resetTestDevices } = await import('./twoDevices');
+const { setCounterWrites, counterStats, foldDoc, foldIndex, LEDGER_WINDOW } =
+  await import('../counterFields');
+const { seeded } = await import('./twoDevices');
 // The composer is typed on `FamilyDocument`; these fixtures are deliberately a
 // minimal subset, so the cast is at the boundary rather than inside the tests.
 const buildRebaseOps = buildRebaseOpsRaw as unknown as (
   local: Automerge.Doc<Doc>,
   heads: string[],
   target: Automerge.Doc<Doc>
-) => { op: unknown; count: number; conflicts: number; counterIncrements: number } | null;
+) => { op: unknown; count: number; conflicts: number; counterCarries: number } | null;
 
 type Doc = Record<string, unknown>;
 type Coll = Record<string, Record<string, unknown>>;
@@ -68,12 +71,24 @@ function base(): Automerge.Doc<Doc> {
  * that omits it silently tests nothing about the rebase.
  *
  * The source is `foldDoc`, exactly as `compactDoc` builds it (#117 Phase 2): Counters folded into
- * their absolutes, the map emptied, the ledger extended. A bare `toJS` here would be the
- * old-build compaction shape, which one test below builds on purpose.
+ * their absolutes, the map emptied, the bounded ledger rebuilt at the NEXT generation
+ * (`nextLineage` of the document's own, so `restoreSeq` is carried as in production; #117
+ * writer flip). A bare `toJS` here would be the old-build compaction shape, which one test
+ * below builds on purpose. `fromHeads: true` stamps the source heads exactly as `compactDoc`
+ * does, so a peer holding them is FRESH; omitted, every peer is "behind" (positives only).
  */
-function compact<T>(doc: Automerge.Doc<T>, id = 'L-NEW'): Automerge.Doc<T> {
-  const folded = foldDoc(doc as unknown as Parameters<typeof foldDoc>[0]);
-  return Automerge.from({ ...folded, podLineage: { id, seq: 1 } }) as unknown as Automerge.Doc<T>;
+function compact<T>(
+  doc: Automerge.Doc<T>,
+  id = 'L-NEW',
+  opts: { fromHeads?: boolean } = {}
+): Automerge.Doc<T> {
+  const d = doc as unknown as Parameters<typeof foldDoc>[0];
+  const lineage = { ...nextLineage(docLineage(d)), id };
+  const folded = foldDoc(d, lineage.seq);
+  return Automerge.from({
+    ...folded,
+    podLineage: { ...lineage, ...(opts.fromHeads ? { fromHeads: Automerge.getHeads(doc) } : {}) },
+  }) as unknown as Automerge.Doc<T>;
 }
 
 async function envelopeFor(doc: Automerge.Doc<Doc>, key: CryptoKey) {
@@ -821,7 +836,15 @@ describe('the composer cannot corrupt the lineage it lands on', () => {
   it('reports nothing to replay when the peer is level with its baseline', async () => {
     const shared = base();
     const built = buildRebaseOps(shared, Automerge.getHeads(shared), compact(shared));
-    expect(built).toEqual({ op: null, count: 0, conflicts: 0, counterIncrements: 0 });
+    expect(built).toEqual({
+      op: null,
+      count: 0,
+      conflicts: 0,
+      counterCarries: 0,
+      carrySkipped: 0,
+      rebaseMode: 'ledger',
+      fresh: false,
+    });
   });
 });
 
@@ -834,7 +857,7 @@ describe('a restore is a lineage event', () => {
    */
   function lineageOf() {
     return (Automerge.toJS(Automerge.load(ap.exportSnapshot().binary)) as { podLineage?: unknown })
-      .podLineage as { id: string; seq: number } | undefined;
+      .podLineage as { id: string; seq: number; restoreSeq?: number } | undefined;
   }
 
   it('mints a NEW generation on a user-file adopt of an OLDER lineage, and marks it dirty to publish', async () => {
@@ -849,8 +872,14 @@ describe('a restore is a lineage event', () => {
     const after = lineageOf();
     expect(after?.seq).toBe(2);
     expect(after?.id).not.toBe('L-1');
+    // #117 writer flip: the restore generation records itself, so a pre-restore peer takes the
+    // baseline rule for its Counter growth.
+    expect(after?.restoreSeq).toBe(2);
     // The stamp moved the heads past the file's, so the caller publishes it.
     expect(res.dirty).toBe(true);
+    // And every later compaction carries it forward.
+    ap.compactDoc();
+    expect(lineageOf()).toMatchObject({ seq: 3, restoreSeq: 2 });
   });
 
   it('is what makes a peer ADOPT the restore instead of reverting it', async () => {
@@ -996,21 +1025,37 @@ describe('Counter adjustments ride the fold ledger, not the baseline (#117 Phase
       }
     ).balance;
   const shared = () => seeded([setAccount(ACCOUNT)]);
+  /** The ledger's values (minor units), whichever entry shape holds them. */
   const ledgerOf = (doc: FDoc) =>
-    (Automerge.toJS(doc).foldedCounters ?? {}) as Record<string, number>;
+    Object.fromEntries(
+      Object.entries(Automerge.toJS(doc).foldedCounters ?? {}).map(([k, e]) => [
+        k,
+        typeof e === 'number' ? e : e.v,
+      ])
+    );
+  const actorOf = (doc: FDoc) => Automerge.getActorId(doc);
+  /** A carry register's name for writer `writer` put on generation `seq`. */
+  const carryName = (writer: string, seq: number, id = 'A') =>
+    `accounts/${id}/balance@2/carry.${writer}.${seq}`;
+  /** The carry registers a document holds live (plain integers). */
+  const registers = (doc: FDoc) =>
+    Object.fromEntries(
+      Object.entries(Automerge.toJS(doc).counterDeltas as Record<string, unknown>).filter(([k]) =>
+        k.includes('/carry.')
+      )
+    );
+  const withLineage = (doc: FDoc, lineage: Record<string, unknown>): FDoc =>
+    Automerge.change(doc, (d) => {
+      (d as unknown as { podLineage: unknown }).podLineage = lineage;
+    });
+  const opsOf = (op: Op | null | undefined): Op[] =>
+    op == null ? [] : op.op === 'batch' ? op.ops : [op];
 
-  // Every unregistered handle (a plain clone, the `ap` realm's fresh load) is this test's own
-  // device; a peer is put on another device with `onDevice`.
-  beforeEach(() => {
-    setCounterWrites(true);
-    useTestDevices();
-  });
-  afterEach(() => {
-    setCounterWrites(null);
-    resetTestDevices();
-  });
+  // Every handle is its own writer (the actor alone, #117 writer flip): no device registry.
+  beforeEach(() => setCounterWrites(true));
+  afterEach(() => setCounterWrites(null));
 
-  it('re-emits an unsynced adjustment as an increment, and the touched entity as nothing else', () => {
+  it('carries an unsynced adjustment as ONE exact carry register, and the touched entity as nothing else', () => {
     const origin = shared();
     const baseline = Automerge.getHeads(origin);
     const peer = apply(Automerge.clone(origin), inc(-20.25));
@@ -1018,20 +1063,29 @@ describe('Counter adjustments ride the fold ledger, not the baseline (#117 Phase
 
     const built = buildRebaseOpsRaw(peer, baseline, target)!;
     // ⚠️ ONE op: the account is touched only through its Counter key, so the entity loop finds
-    // no field difference and emits no patch. The adjustment is the ledger pass's alone.
+    // no field difference and emits no patch. The adjustment is the Counter pass's alone, as a
+    // put-only register named for the key's actor and the TARGET's generation.
     expect(built.op).toEqual({
-      op: 'increment',
+      op: 'carry',
       collection: 'accounts',
       id: 'A',
-      field: 'balance',
-      delta: -20.25,
-      onMissing: 'skip',
+      name: carryName(actorOf(peer), 1),
+      minor: -2025,
+      exact: true,
     });
-    expect(built).toMatchObject({ count: 1, conflicts: 0, counterIncrements: 1 });
-    expect(balanceOf(applyMutationOp(target, built.op as Op).doc)).toBe(79.75);
+    expect(built).toMatchObject({
+      count: 1,
+      conflicts: 0,
+      counterCarries: 1,
+      carrySkipped: 0,
+      rebaseMode: 'ledger',
+    });
+    const out = applyMutationOp(target, built.op as Op).doc;
+    expect(balanceOf(out)).toBe(79.75);
+    expect(registers(out)).toEqual({ [carryName(actorOf(peer), 1)]: -2025 });
   });
 
-  it('re-emits NOTHING for an adjustment the compaction already folded, even from a stale baseline', () => {
+  it('carries NOTHING for an adjustment the compaction already folded, even from a stale baseline', () => {
     // The baseline predates the adjustment, but Drive got it and the compactor folded it. A
     // baseline view would call it unsynced and double-count; the ledger knows better.
     const origin = shared();
@@ -1045,35 +1099,38 @@ describe('Counter adjustments ride the fold ledger, not the baseline (#117 Phase
       op: null,
       count: 0,
       conflicts: 0,
-      counterIncrements: 0,
+      counterCarries: 0,
+      carrySkipped: 0,
+      rebaseMode: 'ledger',
+      fresh: false,
     });
 
     // And only the growth since the fold, once the peer adjusts again on its own key.
     const later = apply(peer, inc(-5));
     const built = buildRebaseOpsRaw(later, staleBaseline, target)!;
-    expect(built.op).toMatchObject({ op: 'increment', delta: -5 });
+    expect(built.op).toMatchObject({ op: 'carry', minor: -500, exact: true });
     expect(balanceOf(applyMutationOp(target, built.op as Op).doc)).toBe(74.75);
   });
 
-  it('a peer TWO compactions behind re-emits only the growth since the compaction that folded its key', () => {
+  it('a peer TWO compactions behind carries only the growth since the compaction that folded its key', () => {
     const origin = shared();
     const synced = apply(Automerge.clone(origin), inc(-10)); // the peer's -10 reached Drive
     const baseline = Automerge.getHeads(synced);
     // Generation 1 folds the peer's key; the family adjusts on it; generation 2 folds that too.
     const gen1 = apply(compact(Automerge.clone(synced), 'L-1'), inc(-1));
     const gen2 = compact(gen1, 'L-2');
-    // ⚠️ CUMULATIVE: generation 2's ledger still holds generation 0's key. A replaced ledger
-    // would hold only gen 1's, and the peer below would re-emit its whole -15 (reading 74).
+    // Within the window, generation 2's ledger still holds generation 1's fold. Dropped, the
+    // peer below would carry its whole -15 (reading 74).
     expect(Object.values(ledgerOf(gen2)).sort((x, y) => x - y)).toEqual([-1000, -100]);
 
     const peer = apply(synced, inc(-5)); // still on generation 0, offline
     const built = buildRebaseOpsRaw(peer, baseline, gen2)!;
-    expect(built.op).toMatchObject({ op: 'increment', delta: -5 });
-    expect(built.counterIncrements).toBe(1);
+    expect(built.op).toMatchObject({ op: 'carry', minor: -500, name: carryName(actorOf(peer), 2) });
+    expect(built.counterCarries).toBe(1);
     expect(balanceOf(applyMutationOp(gen2, built.op as Op).doc)).toBe(84);
   });
 
-  it('carries a new entity by its RAW set, then its own adjustments on top', () => {
+  it('carries a new entity by its RAW set, then its register on top', () => {
     const origin = shared();
     const baseline = Automerge.getHeads(origin);
     const peer = apply(
@@ -1084,14 +1141,14 @@ describe('Counter adjustments ride the fold ledger, not the baseline (#117 Phase
     const target = compact(origin);
 
     const built = buildRebaseOpsRaw(peer, baseline, target)!;
-    const ops = (built.op as { op: 'batch'; ops: Op[] }).ops;
+    const ops = opsOf(built.op);
     // Raw space: the `set` carries the stored absolute (50), never the folded 30, or the
-    // increment after it would count the -20 twice. Ordered set-then-increment, so the
-    // increment finds the entity.
-    expect(ops.map((o) => o.op)).toEqual(['set', 'increment']);
+    // register after it would count the -20 twice. Ordered set-then-carry, so the carry finds
+    // the entity.
+    expect(ops.map((o) => o.op)).toEqual(['set', 'carry']);
     expect((ops[0] as { entity: { balance: number } }).entity.balance).toBe(50);
-    expect(ops[1]).toMatchObject({ id: 'B', delta: -20 });
-    expect(built).toMatchObject({ count: 2, counterIncrements: 1 });
+    expect(ops[1]).toMatchObject({ id: 'B', minor: -2000 });
+    expect(built).toMatchObject({ count: 2, counterCarries: 1 });
     expect(balanceOf(applyMutationOp(target, built.op as Op).doc, 'B')).toBe(30);
   });
 
@@ -1109,26 +1166,27 @@ describe('Counter adjustments ride the fold ledger, not the baseline (#117 Phase
 
     const peer = apply(synced, inc(-5));
     const built = buildRebaseOpsRaw(peer, baseline, oldBuild)!;
-    expect(built.op).toMatchObject({ op: 'increment', delta: -5 });
-    // The live -10 plus the target's own new key for the -5.
+    expect(built.op).toMatchObject({ op: 'carry', minor: -500 });
+    // The live -10 plus the register for the -5.
     expect(balanceOf(applyMutationOp(oldBuild, built.op as Op).doc)).toBe(85);
   });
 
-  describe("ownership is the key's DEVICE, never a baseline comparison", () => {
+  describe('a foreign key: carried with its sign decided by freshness, never by ownership', () => {
     /**
      * B's key reaches L at 8 through a merge L's baseline covers. B adds +2 and saves; C
      * compacts (ledger K_B = 10). L, still holding K_B = 8 plus one unsynced edit, rebases.
-     * `mine − ledger` on K_B is -2: B's own later +2, negated, landing on B's account.
+     * `8 − 10` is -2: a foreign NEGATIVE from a peer that does not hold the compactor's view,
+     * so it may be a stale copy (here it is): skipped and counted, never carried.
      */
     function scenario() {
       const origin = shared();
-      const b = apply(onDevice('device-B', Automerge.clone(origin)), inc(8)); // K_B = 800
+      const b = apply(Automerge.clone(origin), inc(8)); // K_B = 800
       const l = Automerge.merge(Automerge.clone(origin), Automerge.clone(b));
       const baseline = Automerge.getHeads(l);
       const b2 = apply(b, inc(2)); // K_B = 1000, saved to Drive
       return { l, baseline, b2 };
     }
-    const folded = (b2: FDoc) => compact(Automerge.clone(b2));
+    const folded = (b2: FDoc) => compact(Automerge.clone(b2), 'L-NEW', { fromHeads: true });
     /** An old-build compaction: toJS/from, so the target still holds K_B LIVE at 1000. */
     const oldBuild = (b2: FDoc) =>
       Automerge.from({
@@ -1137,20 +1195,20 @@ describe('Counter adjustments ride the fold ledger, not the baseline (#117 Phase
       }) as FDoc;
 
     it.each([
-      ['a folded target (ledger K_B = 100)', folded],
-      ['an old-build target (live K_B = 100)', oldBuild],
-    ] as const)('%s: no increment for K_B', (_name, shape) => {
+      ['a folded target (ledger K_B = 1000)', folded],
+      ['an old-build target (live K_B = 1000)', oldBuild],
+    ] as const)('%s: the stale -2 on K_B is skipped and counted', (_name, shape) => {
       const { l, baseline, b2 } = scenario();
       const target = shape(b2);
       expect(balanceOf(target)).toBe(110);
 
-      // The unsynced edit is not an adjustment: nothing for the ledger pass at all.
+      // The unsynced edit is not an adjustment; K_B's stale negative is counted, not carried.
       const edited = apply(
         Automerge.clone(l),
         setAccount({ id: 'C', name: 'New', type: 'savings', balance: 5 })
       );
       const built = buildRebaseOpsRaw(edited, baseline, target)!;
-      expect(built).toMatchObject({ count: 1, counterIncrements: 0 });
+      expect(built).toMatchObject({ count: 1, counterCarries: 0, carrySkipped: 1, fresh: false });
       expect(built.op).toMatchObject({ op: 'set', id: 'C' });
       expect(balanceOf(applyMutationOp(Automerge.clone(target), built.op as Op).doc)).toBe(110);
 
@@ -1158,23 +1216,21 @@ describe('Counter adjustments ride the fold ledger, not the baseline (#117 Phase
       const adjusted = apply(Automerge.clone(l), inc(-5));
       const own = buildRebaseOpsRaw(adjusted, baseline, target)!;
       expect(own.op).toEqual({
-        op: 'increment',
+        op: 'carry',
         collection: 'accounts',
         id: 'A',
-        field: 'balance',
-        delta: -5,
-        onMissing: 'skip',
+        name: carryName(actorOf(adjusted), 1),
+        minor: -500,
+        exact: true,
       });
-      expect(own.counterIncrements).toBe(1);
+      expect(own).toMatchObject({ counterCarries: 1, carrySkipped: 1 });
       expect(balanceOf(applyMutationOp(target, own.op as Op).doc)).toBe(105);
     });
 
-    it('a foreign key changed since a STALE baseline (the session reached Drive, the baseline commit did not) is never replayed', () => {
-      // L's baseline predates its merge of B's key, so K_B is "changed since the baseline" on
-      // L: the old value rule would have replayed it as 8 − 10 = -2 on B's account.
+    it('a foreign key changed since a STALE baseline is never carried as a negative while behind', () => {
       const origin = shared();
       const staleBaseline = Automerge.getHeads(origin);
-      const b = apply(onDevice('device-B', Automerge.clone(origin)), inc(8));
+      const b = apply(Automerge.clone(origin), inc(8));
       const l = Automerge.merge(Automerge.clone(origin), Automerge.clone(b));
       const target = compact(Automerge.clone(apply(b, inc(2)))); // ledger K_B = 1000
       expect(balanceOf(target)).toBe(110);
@@ -1183,15 +1239,61 @@ describe('Counter adjustments ride the fold ledger, not the baseline (#117 Phase
         op: null,
         count: 0,
         conflicts: 0,
-        counterIncrements: 0,
+        counterCarries: 0,
+        carrySkipped: 1,
+        rebaseMode: 'ledger',
+        fresh: false,
       });
+    });
+
+    it('a FRESH peer (holds every fromHeads change) carries a foreign reversal exactly; a behind one skips it; an own negative crosses either way', () => {
+      const origin = shared();
+      const baseline = Automerge.getHeads(origin);
+      const b1 = apply(Automerge.clone(origin), inc(10)); // K_B = 1000
+      const c = Automerge.merge(Automerge.clone(origin), Automerge.clone(b1)); // the compactor
+      const withProof = compact(c, 'L-NEW', { fromHeads: true }); // ledger K_B = 1000
+      const noProof = compact(c);
+      const b2 = apply(b1, inc(-3)); // B reverses 3 after the compactor's snapshot
+      const l = Automerge.merge(Automerge.clone(origin), Automerge.clone(b2)); // holds all c had
+
+      const fresh = buildRebaseOpsRaw(l, baseline, withProof)!;
+      expect(fresh).toMatchObject({ fresh: true, counterCarries: 1, carrySkipped: 0 });
+      expect(fresh.op).toEqual({
+        op: 'carry',
+        collection: 'accounts',
+        id: 'A',
+        name: carryName(actorOf(b1), 1),
+        minor: -300,
+        exact: false,
+      });
+      expect(balanceOf(applyMutationOp(Automerge.clone(withProof), fresh.op as Op).doc)).toBe(107);
+
+      // Without the proof the same negative may be a stale copy: positives only, counted.
+      expect(buildRebaseOpsRaw(l, baseline, noProof)).toMatchObject({
+        op: null,
+        fresh: false,
+        carrySkipped: 1,
+      });
+
+      // An OWN negative is exact whether or not the peer is fresh.
+      const own = apply(Automerge.clone(l), inc(-1));
+      for (const t of [withProof, noProof]) {
+        expect(opsOf(buildRebaseOpsRaw(own, baseline, t)!.op)).toContainEqual({
+          op: 'carry',
+          collection: 'accounts',
+          id: 'A',
+          name: carryName(actorOf(own), 1),
+          minor: -100,
+          exact: true,
+        });
+      }
     });
   });
 
-  it('an OWN key that nets back to its baseline value after an intermediate sync still re-emits (mine - ledger)', () => {
+  it('an OWN key that nets back to its baseline value after an intermediate sync still carries (mine - ledger)', () => {
     // Own K = -10 at the baseline; +5 reached Drive and C folded it (ledger -5); then -5
     // offline brings K back to -10, its value AT the baseline. The old "unchanged since the
-    // baseline" skip dropped that -5; ownership by device reads mine - ledger = -5.
+    // baseline" skip dropped that -5; growth against the ledger reads -10 - (-5) = -5.
     const origin = shared();
     const l = apply(Automerge.clone(origin), inc(-10));
     const baseline = Automerge.getHeads(l);
@@ -1203,40 +1305,309 @@ describe('Counter adjustments ride the fold ledger, not the baseline (#117 Phase
     const offline = apply(synced, inc(-5));
     const built = buildRebaseOpsRaw(offline, baseline, target)!;
     expect(built.op).toEqual({
-      op: 'increment',
+      op: 'carry',
       collection: 'accounts',
       id: 'A',
-      field: 'balance',
-      delta: -5,
-      onMissing: 'skip',
+      name: carryName(actorOf(offline), 1),
+      minor: -500,
+      exact: true,
     });
     expect(balanceOf(applyMutationOp(target, built.op as Op).doc)).toBe(90);
   });
 
-  it('two tabs of ONE device (one device id, two actors) both re-emit their own growth', () => {
-    const origin = shared();
-    const baseline = Automerge.getHeads(origin);
-    const tab1 = apply(onDevice('device-L', Automerge.clone(origin)), inc(-1));
-    const tab2 = apply(onDevice('device-L', Automerge.clone(origin)), inc(-2));
-    // The tabs share the cache, so the local document holds both keys (tab1's handle).
-    const local = Automerge.merge(tab1, tab2);
-    expect(Object.keys(local.counterDeltas)).toHaveLength(2);
-    const target = compact(origin);
+  describe('two tabs of one device: one register per key, own overwrites, foreign fills', () => {
+    /**
+     * Tab 1 (actor X1) adjusts +1, tab 2 merges it (its K1 copy stays at +1) and adjusts +2 on
+     * its own K2; tab 1 then adjusts +4 more (K1 = +5) and never sees K2. Both are dirty on the
+     * old lineage when one compaction lands. Today's ownership model double-counted here.
+     */
+    function tabs() {
+      const origin = shared();
+      const baseline = Automerge.getHeads(origin);
+      const tab1a = apply(Automerge.clone(origin), inc(1));
+      const tab2 = apply(Automerge.merge(Automerge.clone(origin), Automerge.clone(tab1a)), inc(2));
+      const tab1 = apply(tab1a, inc(4));
+      return { baseline, tab1, tab2, target: compact(origin) };
+    }
+    const rebaseOnto = (local: FDoc, baseline: string[], target: FDoc) => {
+      const built = buildRebaseOpsRaw(local, baseline, target)!;
+      const applied = applyMutationOp(Automerge.clone(target), built.op as Op);
+      return { built, doc: applied.doc, superseded: applied.carrySuperseded };
+    };
 
-    const built = buildRebaseOpsRaw(local, baseline, target)!;
-    expect(built.op).toMatchObject({ op: 'increment', id: 'A', delta: -3 });
-    expect(built.counterIncrements).toBe(1);
-    expect(balanceOf(applyMutationOp(target, built.op as Op).doc)).toBe(97);
+    it('tab 1 then tab 2 (tab 2 merged tab 1 first): the foreign copy is superseded, the fold is each own view', () => {
+      const { baseline, tab1, tab2, target } = tabs();
+      const [x1, x2] = [actorOf(tab1), actorOf(tab2)];
+      const first = rebaseOnto(tab1, baseline, target);
+      expect(first.built.op).toMatchObject({ name: carryName(x1, 1), minor: 500, exact: true });
+      const second = rebaseOnto(tab2, baseline, first.doc);
+      expect(second.built.counterCarries).toBe(2);
+      expect(second.superseded).toBe(1); // tab 2's stale K1 copy met tab 1's register
+      expect(registers(second.doc)).toEqual({ [carryName(x1, 1)]: 500, [carryName(x2, 1)]: 200 });
+      expect(balanceOf(second.doc)).toBe(107);
+      expect(counterStats(second.doc)).toMatchObject({ conflicts: 0, carryConflicts: 0 });
+    });
+
+    it('tab 2 then tab 1: the stale foreign copy fills first, then the own actor overwrites it', () => {
+      const { baseline, tab1, tab2, target } = tabs();
+      const [x1, x2] = [actorOf(tab1), actorOf(tab2)];
+      const first = rebaseOnto(tab2, baseline, target);
+      expect(registers(first.doc)).toEqual({ [carryName(x1, 1)]: 100, [carryName(x2, 1)]: 200 });
+      const second = rebaseOnto(tab1, baseline, first.doc);
+      expect(second.superseded).toBe(0);
+      expect(registers(second.doc)).toEqual({ [carryName(x1, 1)]: 500, [carryName(x2, 1)]: 200 });
+      expect(balanceOf(second.doc)).toBe(107);
+    });
+
+    it('CONCURRENT (neither merged the other): one register, never two, counted as a carry conflict', () => {
+      const { baseline, tab1, tab2, target } = tabs();
+      const a = rebaseOnto(tab1, baseline, target).doc;
+      const b = rebaseOnto(tab2, baseline, target).doc;
+      const ab = Automerge.merge(Automerge.clone(a), Automerge.clone(b));
+      const ba = Automerge.merge(Automerge.clone(b), Automerge.clone(a));
+      expect(Object.keys(registers(ab))).toHaveLength(2); // one name per key
+      expect(counterStats(ab)).toMatchObject({ conflicts: 0, carryConflicts: 1 });
+      // Automerge's deterministic pick: one of the two views (own +5 or tab 2's stale +1),
+      // the same on both sides, and never their sum.
+      expect([107, 103]).toContain(balanceOf(ab));
+      expect(balanceOf(ba)).toBe(balanceOf(ab));
+    });
   });
 
-  it('no cache opened: keys written under the EPHEMERAL id replay as own within the session', () => {
-    resetTestDevices(); // the realm's own id; no cache in this file, so it is ephemeral
+  it("a reload (new actor) carries the old actor's positive growth; its negative only when fresh", () => {
     const origin = shared();
     const baseline = Automerge.getHeads(origin);
-    const peer = apply(Automerge.clone(origin), inc(-1));
-    expect(Object.keys(peer.counterDeltas)[0]).toMatch(/@2\/[0-9a-f-]{36}:[0-9a-f]+$/);
-    const built = buildRebaseOpsRaw(peer, baseline, compact(origin))!;
-    expect(built.op).toMatchObject({ op: 'increment', id: 'A', delta: -1 });
+    const wrote = apply(Automerge.clone(origin), inc(3));
+    const reloaded = Automerge.load(Automerge.save(wrote)) as FDoc;
+    expect(actorOf(reloaded)).not.toBe(actorOf(wrote));
+    expect(buildRebaseOpsRaw(reloaded, baseline, compact(origin))!.op).toEqual({
+      op: 'carry',
+      collection: 'accounts',
+      id: 'A',
+      name: carryName(actorOf(wrote), 1),
+      minor: 300,
+      exact: false, // foreign to the reloaded session, carried anyway: nobody owns a key
+    });
+
+    const reversed = Automerge.load(
+      Automerge.save(apply(Automerge.clone(origin), inc(-3)))
+    ) as FDoc;
+    expect(buildRebaseOpsRaw(reversed, baseline, compact(origin))).toMatchObject({
+      op: null,
+      counterCarries: 0,
+      carrySkipped: 1,
+      fresh: false,
+    });
+    const fresh = buildRebaseOpsRaw(
+      reversed,
+      baseline,
+      compact(origin, 'L-NEW', { fromHeads: true })
+    )!;
+    expect(fresh).toMatchObject({ counterCarries: 1, carrySkipped: 0, fresh: true });
+    expect(fresh.op).toMatchObject({ op: 'carry', minor: -300, exact: false });
+  });
+
+  it('three generations: a carry folded at T+1 is subtracted from its own session (fold = its view); one folded before a peer generation is not', () => {
+    const origin = shared();
+    const baseline = Automerge.getHeads(origin);
+    const s8 = apply(Automerge.clone(origin), inc(8)); // session S (actor X): K = 800
+    const x = actorOf(s8);
+    const d = Automerge.clone(s8); // compactor D holds 8
+    const s9 = apply(s8, inc(1));
+    const b = Automerge.merge(Automerge.clone(origin), Automerge.clone(s9)); // B holds X's K at 9
+    const s10 = apply(s9, inc(1)); // S's own view: 10
+
+    const t1 = compact(d, 'L-1', { fromHeads: true }); // ledger K = 800
+    const fromB = buildRebaseOpsRaw(b, baseline, t1)!;
+    expect(fromB.op).toEqual({
+      op: 'carry',
+      collection: 'accounts',
+      id: 'A',
+      name: carryName(x, 1),
+      minor: 100,
+      exact: false,
+    });
+    const t2 = compact(applyMutationOp(t1, fromB.op as Op).doc, 'L-2');
+    expect(Automerge.toJS(t2).foldedCounters).toEqual({
+      [`accounts/A/balance@2/${x}`]: { v: 800, s: 1 },
+      [carryName(x, 1)]: { v: 100, s: 2 },
+    });
+
+    // Per canonical key S knows 800 + 100 = 900 of its 1000: it carries 100, never 200.
+    const fromS = buildRebaseOpsRaw(s10, baseline, t2)!;
+    expect(fromS.op).toEqual({
+      op: 'carry',
+      collection: 'accounts',
+      id: 'A',
+      name: carryName(x, 2),
+      minor: 100,
+      exact: true,
+    });
+    const t2s = applyMutationOp(t2, fromS.op as Op).doc;
+    expect(balanceOf(t2s)).toBe(110); // S's own view, never 111
+
+    // Two generations' registers never collide in the ledger: distinct names, both kept.
+    const next = foldDoc(t2s, 3);
+    expect(next.ledger.collisions).toBe(0);
+    expect(Object.keys(next.foldedCounters!)).toEqual(
+      expect.arrayContaining([carryName(x, 1), carryName(x, 2)])
+    );
+
+    // A peer on T+1 holding the T+1 register live, fresh against T+2: `carry.X.1` was folded
+    // BEFORE its generation, so it is not subtracted (it would read a phantom -100).
+    const q = Automerge.clone(t2s);
+    const t3 = compact(Automerge.clone(t2s), 'L-3', { fromHeads: true });
+    expect(buildRebaseOpsRaw(q, Automerge.getHeads(t2s), t3)).toMatchObject({
+      op: null,
+      counterCarries: 0,
+      carrySkipped: 0,
+      fresh: true,
+    });
+  });
+
+  describe('restore-aware growth (plan Requirement 6)', () => {
+    /**
+     * S (actor X) adjusts +6 (the file later restored), then +4 (synced: E's baseline sees 10),
+     * then +2, which E merged but never synced. The user restores the +6 file: generation 2,
+     * `restoreSeq: 2`, with X's K LIVE at 600. E is on generation 1.
+     */
+    function restoreScenario() {
+      const origin = shared();
+      const s6 = apply(Automerge.clone(origin), inc(6));
+      const x = actorOf(s6);
+      const file = Automerge.clone(s6);
+      const s10 = apply(s6, inc(4));
+      const e0 = withLineage(Automerge.merge(Automerge.clone(origin), Automerge.clone(s10)), {
+        id: 'L-1',
+        seq: 1,
+      });
+      const eBaseline = Automerge.getHeads(e0);
+      const s12 = apply(s10, inc(2));
+      const e = Automerge.merge(Automerge.clone(e0), Automerge.clone(s12));
+      const restored = withLineage(file, { id: 'L-R', seq: 2, restoreSeq: 2 });
+      return { x, e, eBaseline, restored };
+    }
+
+    it('a peer from before the restore carries only local − baseline (rolled-back amounts stay rolled back)', () => {
+      const { x, e, eBaseline, restored } = restoreScenario();
+      const built = buildRebaseOpsRaw(e, eBaseline, restored)!;
+      expect(built).toMatchObject({ rebaseMode: 'baseline', counterCarries: 1 });
+      // The ledger rule would read 1200 − 600 and re-apply the restore's rolled-back +4.
+      expect(built.op).toEqual({
+        op: 'carry',
+        collection: 'accounts',
+        id: 'A',
+        name: carryName(x, 2),
+        minor: 200,
+        exact: false,
+      });
+      expect(balanceOf(applyMutationOp(restored, built.op as Op).doc)).toBe(108);
+    });
+
+    it('a later compaction keeps restoreSeq, and that peer still takes the baseline rule', () => {
+      const { x, e, eBaseline, restored } = restoreScenario();
+      const t3 = compact(restored, 'L-3');
+      expect(Automerge.toJS(t3).podLineage).toMatchObject({ seq: 3, restoreSeq: 2 });
+      const built = buildRebaseOpsRaw(e, eBaseline, t3)!;
+      expect(built.rebaseMode).toBe('baseline');
+      expect(built.op).toMatchObject({ name: carryName(x, 3), minor: 200 });
+      expect(balanceOf(applyMutationOp(t3, built.op as Op).doc)).toBe(108);
+    });
+
+    it('two live names on the restore generation: a fresh peer holding both computes ZERO growth at R+1', () => {
+      const { e, eBaseline, restored } = restoreScenario();
+      const built = buildRebaseOpsRaw(e, eBaseline, restored)!;
+      const f = applyMutationOp(restored, built.op as Op).doc; // K = 600 live beside carry.X.2 = 200
+      expect(Object.keys(f.counterDeltas)).toHaveLength(2);
+      const peer = Automerge.clone(f);
+      const next = compact(Automerge.clone(f), 'L-3', { fromHeads: true });
+      expect(balanceOf(next)).toBe(108);
+      expect(buildRebaseOpsRaw(peer, Automerge.getHeads(f), next)).toMatchObject({
+        op: null,
+        counterCarries: 0,
+        carrySkipped: 0,
+        rebaseMode: 'ledger',
+        fresh: true,
+      });
+    });
+
+    it('baseline mode is never window-blocked', () => {
+      const { e, eBaseline, restored } = restoreScenario();
+      const far = withLineage(compact(restored, 'L-far'), {
+        id: 'L-far',
+        seq: 1 + LEDGER_WINDOW + 5,
+        restoreSeq: 1 + LEDGER_WINDOW + 5,
+      });
+      const built = buildRebaseOpsRaw(e, eBaseline, far)!;
+      expect(built.blockedBy).toBeUndefined();
+      expect(built).toMatchObject({ rebaseMode: 'baseline', counterCarries: 1 });
+    });
+  });
+
+  describe('the ledger window (plan Requirement 7)', () => {
+    const at = (doc: FDoc, seq: number) => withLineage(compact(doc), { id: `L-${seq}`, seq });
+
+    it('blocks a peer more than LEDGER_WINDOW generations behind that holds Counter keys; one exactly at the window rebases', () => {
+      const origin = shared();
+      const baseline = Automerge.getHeads(origin);
+      const peer = apply(Automerge.clone(origin), inc(-1));
+      expect(buildRebaseOpsRaw(peer, baseline, at(origin, LEDGER_WINDOW + 1))).toMatchObject({
+        op: null,
+        counterCarries: 0,
+        blockedBy: 'ledger-window',
+      });
+      const edge = buildRebaseOpsRaw(peer, baseline, at(origin, LEDGER_WINDOW))!;
+      expect(edge.blockedBy).toBeUndefined();
+      expect(edge.counterCarries).toBe(1);
+
+      // A peer with no Counter keys has nothing the ledger decides: never blocked.
+      const plain = apply(
+        Automerge.clone(origin),
+        setAccount({ id: 'B', name: 'New', type: 'savings', balance: 5 })
+      );
+      const far = buildRebaseOpsRaw(plain, baseline, at(origin, LEDGER_WINDOW + 5))!;
+      expect(far.blockedBy).toBeUndefined();
+      expect(far.count).toBe(1);
+    });
+
+    it('the merge takes the rebase-unavailable path with conflictKind ledger-window', async () => {
+      const origin = shared();
+      const baseline = Automerge.getHeads(origin);
+      const peer = apply(Automerge.clone(origin), inc(-1));
+      const remote = at(origin, LEDGER_WINDOW + 1);
+
+      ap.loadSnapshot(Automerge.save(peer));
+      await expect(
+        ap.mergeRemoteEnvelope(
+          await envelopeFor(remote as unknown as Automerge.Doc<Doc>, key),
+          'fam',
+          { kind: 'baseline', heads: baseline }
+        )
+      ).rejects.toMatchObject({ conflictKind: 'ledger-window' });
+
+      // A human's file choice still never dead-ends: it adopts, and says why.
+      ap.loadSnapshot(Automerge.save(peer));
+      const res = await ap.mergeRemoteEnvelope(
+        await envelopeFor(remote as unknown as Automerge.Doc<Doc>, key),
+        'fam',
+        { kind: 'user-file', heads: baseline }
+      );
+      expect(res).toMatchObject({
+        action: 'adopted',
+        rebaseUnavailable: true,
+        rebaseConflictKind: 'ledger-window',
+      });
+    });
+  });
+
+  it('nextLineage carries restoreSeq forward unchanged, and adds none when there was none', () => {
+    expect(nextLineage({ id: 'a', seq: 3, restoreSeq: 2 })).toEqual({
+      id: expect.any(String),
+      seq: 4,
+      restoreSeq: 2,
+    });
+    expect(nextLineage({ id: 'a', seq: 3 })).toEqual({ id: expect.any(String), seq: 4 });
+    expect(nextLineage(null)).toEqual({ id: expect.any(String), seq: 1 });
   });
 
   describe('end to end: the real compactDoc, then mergeRemoteEnvelope', () => {
@@ -1270,9 +1641,15 @@ describe('Counter adjustments ride the fold ledger, not the baseline (#117 Phase
 
       const { res, out } = await rebase(peer, baseline, remote);
       expect(res.action).toBe('rebased');
-      expect(res.counterIncrements).toBe(1);
+      expect(res.counterRebase).toEqual({
+        carries: 1,
+        skipped: 0,
+        superseded: 0,
+        mode: 'ledger',
+        fresh: true,
+      });
       expect(res.counterStats).toMatchObject({ conflicts: 0, malformed: 0, ledgerKeys: 1 });
-      // -1.11 once (folded), -2.22 (the family's live key), -3.33 once (the replayed growth).
+      // -1.11 once (folded), -2.22 (the family's live key), -3.33 once (the carried growth).
       expect(balanceOf(out)).toBe(93.34);
       expect(counterStats(out)).toMatchObject({ keys: 2, conflicts: 0 });
     });
@@ -1286,7 +1663,11 @@ describe('Counter adjustments ride the fold ledger, not the baseline (#117 Phase
       const peer = apply(Automerge.clone(origin), inc(-20.25));
 
       const { res, out } = await rebase(peer, baseline, remote);
-      expect(res).toMatchObject({ action: 'rebased', conflicts: 0, counterIncrements: 1 });
+      expect(res).toMatchObject({
+        action: 'rebased',
+        conflicts: 0,
+        counterRebase: expect.objectContaining({ carries: 1 }),
+      });
       expect(balanceOf(out)).toBe(479.75);
     });
 
@@ -1298,7 +1679,11 @@ describe('Counter adjustments ride the fold ledger, not the baseline (#117 Phase
 
       const { res, out } = await rebase(peer, baseline, remote);
       // The peer's absolute crosses as a raw base-less patch; the family's Counter sits on top.
-      expect(res).toMatchObject({ action: 'rebased', conflicts: 0, counterIncrements: 0 });
+      expect(res).toMatchObject({
+        action: 'rebased',
+        conflicts: 0,
+        counterRebase: expect.objectContaining({ carries: 0 }),
+      });
       expect(balanceOf(out)).toBe(479.75);
     });
 
@@ -1313,7 +1698,11 @@ describe('Counter adjustments ride the fold ledger, not the baseline (#117 Phase
       const peer = apply(Automerge.clone(origin), setBalanceTo(500, 100));
 
       const { res, out } = await rebase(peer, baseline, remote);
-      expect(res).toMatchObject({ action: 'rebased', conflicts: 0, counterIncrements: 0 });
+      expect(res).toMatchObject({
+        action: 'rebased',
+        conflicts: 0,
+        counterRebase: expect.objectContaining({ carries: 0 }),
+      });
       expect(balanceOf(out)).toBe(479.75);
     });
   });

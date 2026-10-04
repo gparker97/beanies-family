@@ -29,7 +29,7 @@ import type { PodLineage } from '@/types/models';
 import type { ReconcileNote } from './reconcile';
 import type { RemoteBaselineRow } from '@/services/sync/remoteBaseline';
 // Type-only: erased on main, so the main bundle never pulls `counterFields`' Automerge import.
-import type { CounterStats } from './counterFields';
+import type { CounterStats, CounterCollection } from './counterFields';
 
 /** Automerge heads — the change-frontier hashes. Opaque to the main thread. */
 export type Heads = string[];
@@ -132,8 +132,8 @@ export interface MergeOutcome {
    * branches on it. `user-file` adopts only; every other context throws.
    */
   rebaseUnavailable?: true;
-  /** Why the rebase could not run, when the composer said (C8): `'transactions'`. */
-  rebaseConflictKind?: 'transactions';
+  /** Why the rebase could not run, when the composer said (`RebaseBlock`). */
+  rebaseConflictKind?: RebaseBlock;
   /**
    * A RESTORE (`ours-newer` × `user-file` adopt) carried this device's `removedMembers`
    * tombstones into the chosen file and deleted the matching member rows (C10), so a restore
@@ -156,8 +156,36 @@ export interface MergeOutcome {
    * size. Present on every action the worker returns; optional for the looser views.
    */
   counterStats?: CounterStats;
-  /** Of `replayed`, the Counter `increment` ops the rebase's ledger pass emitted. `rebased` only. */
-  counterIncrements?: number;
+  /** What the rebase's Counter pass did (#117 writer flip). `rebased` only. */
+  counterRebase?: CounterRebase;
+}
+
+/**
+ * Why the rebase composer refused to replay at all; the merge then takes the rebase-unavailable
+ * path (block, or adopt under `user-file`). ONE union for the composer, the worker's merge, the
+ * lineage error and `docClient.noteRebaseUnavailable`:
+ *  - `'transactions'` (C8): a transaction lost a write, so its balance effects must not cross.
+ *  - `'ledger-window'` (#117 writer flip, plan §C): the peer is more than `LEDGER_WINDOW`
+ *    generations behind the target and holds Counter keys, so a pruned ledger entry would read
+ *    as "never folded" and its growth would be double-counted. Ledger mode only.
+ */
+export type RebaseBlock = 'transactions' | 'ledger-window';
+
+/**
+ * The rebase's Counter pass, as one object so the next figure is a field, not a property at
+ * four sites (#117 writer flip, plan §B). Reported on the `rebased` terminus.
+ */
+export interface CounterRebase {
+  /** `carry` ops replayed (one per canonical key with growth), of `replayed`. */
+  carries: number;
+  /** Foreign negative growth skipped while behind (no `fromHeads` proof): a possible stale copy. */
+  skipped: number;
+  /** Foreign carries that met an existing register on the target and stood down. */
+  superseded: number;
+  /** `ledger`: growth against the target's fold ledger; `baseline`: the restore rule. */
+  mode: 'ledger' | 'baseline';
+  /** Ledger mode: the peer held every `fromHeads` change, so foreign reversals were carried. */
+  fresh: boolean;
 }
 
 /** What a cache replay did (C5c, data-layer audit 2026-10-03). Main logs it as `cache-replay`. */
@@ -260,6 +288,24 @@ export type MutationOp =
       delta: number;
       updatedAt?: string;
       onMissing?: 'throw' | 'skip';
+    }
+  /**
+   * WORKER-INTERNAL (like the rebase's base-less raw `patch`): one rebase CARRY (#117 writer
+   * flip, plan §B; `counterGrowthOps`). Puts `minor` (integer minor units at the scale `name`
+   * carries) as the plain-integer carry register `name` (`carryKeyFor`) on entity
+   * `(collection, id)`. Never an increment and never a `Counter`: a register is put-only, so an
+   * accidental `.increment` on it is a TypeError rather than probe e' corruption. THE REGISTER
+   * RULE: when the target already holds `name`, an `exact` carry (the peer's own actor key)
+   * OVERWRITES it and a foreign one is skipped and counted (`carrySuperseded`). An absent
+   * entity is skipped (the compactor deleted it). Main never sends one.
+   */
+  | {
+      op: 'carry';
+      collection: CounterCollection;
+      id: string;
+      name: string;
+      minor: number;
+      exact: boolean;
     }
   | { op: 'batch'; ops: MutationOp[] }
   /** Named handlers whose domain logic lives in the worker (e.g. photo attach). */
