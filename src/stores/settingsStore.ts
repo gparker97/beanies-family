@@ -181,6 +181,10 @@ export const useSettingsStore = defineStore('settings', () => {
     ...HINT_LEAD_DAYS,
     ...(settings.value.helpfulHintLeadDays ?? {}),
   }));
+  // #40: hintKey → event date. A dismissed hint is never regenerated (family-wide).
+  const dismissedHintKeys = computed<Record<string, string>>(
+    () => settings.value.dismissedHintKeys ?? {}
+  );
   // #45: when true, the periodic in-app feedback/NPS prompt never auto-opens.
   // Family-scoped (synced); default OFF (prompts enabled).
   const feedbackOptOut = computed<boolean>(() => settings.value.feedbackOptOut ?? false);
@@ -638,6 +642,38 @@ export const useSettingsStore = defineStore('settings', () => {
       })
     );
 
+  // Dismissed hint keys: family-synced map, merged per key in the worker (MERGE_FIELDS),
+  // so two devices dismissing different hints at once both land. A person's dismissal is
+  // a user action: report-on-failure chain (toast + rethrow).
+  const recordDismissedHint = (hintKey: string, eventDate: string) =>
+    persistAiSetting('settings.helpfulHints.label', 'dismissedHintKeys', () =>
+      settingsRepo.addDismissedHintKey(hintKey, eventDate)
+    );
+  /** Undo of a person's dismissal: the hint may be generated again. */
+  const forgetDismissedHint = (hintKey: string) =>
+    persistAiSetting('settings.helpfulHints.label', 'dismissedHintKeys', () =>
+      settingsRepo.removeDismissedHintKeys([hintKey])
+    );
+  /**
+   * Background housekeeping (the reconcile engine's prune of past events): never toasts,
+   * never touches `isLoading`. A failure is logged and retried on the next reconcile.
+   */
+  async function pruneDismissedHints(hintKeys: readonly string[]): Promise<boolean> {
+    try {
+      settings.value = await settingsRepo.removeDismissedHintKeys(hintKeys);
+      return true;
+    } catch (error) {
+      reportError({
+        surface: 'helpful-hints',
+        severity: 'warning',
+        message: 'dismissed hint prune failed; retried on the next reconcile',
+        error,
+        context: { count: hintKeys.length },
+      });
+      return false;
+    }
+  }
+
   // #109: the check-in rhythm. Report-on-failure chain (toasts, then RE-THROWS), so the
   // caller (`responsibilityStore.setRhythm`) never toasts a second time.
   const setResponsibilityCheckInWeeks = (weeks: 0 | 2 | 4 | 8) =>
@@ -1059,6 +1095,7 @@ export const useSettingsStore = defineStore('settings', () => {
     helpfulHintsEnabled,
     helpfulHintNotifyByType,
     helpfulHintLeadDays,
+    dismissedHintKeys,
     feedbackOptOut,
     responsibilityCheckInWeeks,
     isTrustedDevice,
@@ -1081,6 +1118,9 @@ export const useSettingsStore = defineStore('settings', () => {
     setResponsibilityCheckInWeeks,
     setHelpfulHintNotifyType,
     setHelpfulHintLead,
+    recordDismissedHint,
+    forgetDismissedHint,
+    pruneDismissedHints,
     setAIProvider,
     setAITier,
     setAIApiKey,

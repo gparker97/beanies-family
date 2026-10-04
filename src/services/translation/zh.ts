@@ -3096,6 +3096,8 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'todo.hint.learnMore': '了解更多',
   'todo.hint.keep': '保留',
   'todo.hint.dismiss': '忽略',
+  'todo.hint.dismissedToast': '已忽略提示',
+  'todo.hint.drawerPrompt': '这是一条贴心提示。可以保留为待办，也可以忽略。',
   'todo.hint.title.birthdayPresent': '为{name}准备生日礼物（{date}）',
   'todo.hint.title.birthdayPartyGift': '给{name}买份礼物（{date}）',
   'todo.hint.title.celebrationGift': '给{name}准备礼物或贺卡（{date}）',
@@ -3619,6 +3621,7 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'nook.criticalTodoAssignedNoDue': '{creator} 拜托你：{task}',
   'nook.criticalTodoSelfNoDue': '别忘了：{task}',
   'nook.criticalHint': '小提示：{task}',
+  'nook.briefing.dismiss': '忽略',
   'nook.criticalTodoAssignedOverdue':
     '{creator} 拜托你：{task}，原定 {date} 完成，有空时再做就好！',
   'nook.criticalTodoSelfOverdue': '温馨提醒：{task}，原定 {date} 完成',

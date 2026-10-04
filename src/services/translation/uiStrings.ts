@@ -7090,6 +7090,11 @@ const STRING_DEFS = {
   'todo.hint.learnMore': { en: 'Learn more', beanie: 'learn more' },
   'todo.hint.keep': { en: 'Keep', beanie: 'keep' },
   'todo.hint.dismiss': { en: 'Dismiss', beanie: 'dismiss' },
+  'todo.hint.dismissedToast': { en: 'Hint dismissed', beanie: 'hint dismissed' },
+  'todo.hint.drawerPrompt': {
+    en: 'A helpful hint. Keep it as a to-do, or dismiss it.',
+    beanie: 'a helpful hint. keep it as a to-do, or dismiss it.',
+  },
   'todo.hint.title.birthdayPresent': {
     en: 'Plan a birthday present for {name} ({date})',
     beanie: 'plan a birthday present for {name} ({date})',
@@ -8252,6 +8257,7 @@ const STRING_DEFS = {
     en: 'Helpful hint: {task}',
     beanie: 'helpful hint: {task}',
   },
+  'nook.briefing.dismiss': { en: 'Dismiss', beanie: 'dismiss' },
   'nook.criticalTodoAssignedOverdue': {
     en: '{creator} asked you: {task} — it was due {date}, whenever you get a chance!',
     beanie: '{creator} asked you: {task} — was due {date}, no rush!',

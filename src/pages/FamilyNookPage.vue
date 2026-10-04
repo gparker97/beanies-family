@@ -32,7 +32,6 @@ import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useMedicationsStore } from '@/stores/medicationsStore';
 import { useMealPlanStore } from '@/stores/mealPlanStore';
-import { useNotificationsStore } from '@/stores/notificationsStore';
 import { confirm } from '@/composables/useConfirm';
 import { confirmAndDeleteActivity } from '@/composables/useActivityDelete';
 import { useSounds } from '@/composables/useSounds';
@@ -60,8 +59,6 @@ const transactionsStore = useTransactionsStore();
 const vacationStore = useVacationStore();
 const medicationsStore = useMedicationsStore();
 const mealPlanStore = useMealPlanStore();
-// Who Owns What (#109): briefing card-move / check-in dismissals are read-state keys.
-const notificationsStore = useNotificationsStore();
 const { playWhoosh } = useSounds();
 
 // ── Meal editor — opened from the "Today's meals" card and from a cook-
@@ -234,7 +231,6 @@ async function handleTransactionDelete(id: string) {
       @open-meal="openMealById"
       @complete-duty="handleDutyComplete"
       @complete-todo="handleTodoComplete"
-      @dismiss="notificationsStore.markRead($event)"
       @open-route="router.push($event)"
     />
 

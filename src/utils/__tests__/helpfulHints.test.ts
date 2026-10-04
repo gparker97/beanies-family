@@ -12,6 +12,8 @@ import {
   UNKNOWN_HINT_EMOJI,
   type DesiredHint,
   type HelpfulHintsInput,
+  pastDismissedHintKeys,
+  isFreshHint,
 } from '@/utils/helpfulHints';
 
 const TODAY = '2026-07-24';
@@ -279,6 +281,23 @@ describe('reconcileHints', () => {
     expect(toRemove.map((t) => t.hintKey)).toEqual(['gone']);
   });
 
+  it('never recreates a dismissed hint (it was deleted, so only the record blocks it)', () => {
+    const { toCreate } = reconcileHints([...desired], [], today, new Set(['k1']));
+    expect(toCreate).toHaveLength(0);
+  });
+
+  it('removes an open copy of a dismissed hint, but never a kept or completed one', () => {
+    const copy = hintTodo({ id: 'c', hintKey: 'k1', hintEventDate: '2026-07-26' });
+    const kept = hintTodo({
+      id: 'k',
+      hintKey: 'k1',
+      hintEventDate: '2026-07-26',
+      hintAcknowledged: true,
+    });
+    const { toRemove } = reconcileHints([...desired], [copy, kept], today, new Set(['k1']));
+    expect(toRemove.map((t) => t.id)).toEqual(['c']);
+  });
+
   it('never removes acknowledged or completed hints', () => {
     const kept = hintTodo({
       hintKey: 'k-ack',
@@ -406,5 +425,46 @@ describe('computeDesiredHints — Who Owns What card holders (#109)', () => {
     const { toCreate, toRemove } = reconcileHints(hints, [existing], TODAY);
     expect(toCreate).toHaveLength(0);
     expect(toRemove).toHaveLength(0);
+  });
+});
+
+describe('pastDismissedHintKeys', () => {
+  it('returns the entries whose event date has passed; the key itself is never parsed', () => {
+    const past = pastDismissedHintKeys(
+      {
+        'opaque-a': '2026-07-19', // past
+        'opaque-b': '2026-07-24', // today: still relevant
+        'opaque-c': '2026-08-01', // future
+        'opaque-d': 'not-a-date', // kept, never dropped on a guess
+      },
+      '2026-07-24'
+    );
+    expect(past).toEqual(['opaque-a']);
+  });
+
+  it('is empty when nothing has passed, so nothing is written', () => {
+    expect(pastDismissedHintKeys({ k: '2026-08-01' }, '2026-07-24')).toEqual([]);
+    expect(pastDismissedHintKeys({}, '2026-07-24')).toEqual([]);
+  });
+});
+
+describe('isFreshHint', () => {
+  const base = {
+    id: 'h',
+    title: 't',
+    completed: false,
+    createdBy: 'a',
+    createdAt: '',
+    updatedAt: '',
+  };
+  it('is an open hint nobody has kept', () => {
+    expect(isFreshHint({ ...base, hintType: 'trip-packing' } as TodoItem)).toBe(true);
+    expect(
+      isFreshHint({ ...base, hintType: 'trip-packing', hintAcknowledged: true } as TodoItem)
+    ).toBe(false);
+    expect(isFreshHint({ ...base, hintType: 'trip-packing', completed: true } as TodoItem)).toBe(
+      false
+    );
+    expect(isFreshHint(base as TodoItem)).toBe(false);
   });
 });

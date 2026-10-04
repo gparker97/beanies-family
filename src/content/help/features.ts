@@ -346,7 +346,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         content: '',
         items: [
           '<strong>Keep it</strong> (the 📌 button) — the hint becomes a normal to-do you own: assign it, add a due time, tick it off. It keeps a small marker so you remember where it came from.',
-          '<strong>Dismiss it</strong> (the ✕ button) — one tap and it is gone, no confirmation.',
+          '<strong>Dismiss it</strong> (the ✕ button on your to-do list, in the to-do\u2019s details, or in your daily briefing) — one tap and it is gone for the whole family, no confirmation, with an Undo in the message that follows. It will not come back for that event.',
           '<strong>Ignore it</strong> — do nothing, and the hint quietly disappears on its own once the event has passed. It never nags and never turns red.',
         ],
       },

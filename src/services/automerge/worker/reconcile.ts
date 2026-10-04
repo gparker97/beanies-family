@@ -68,6 +68,7 @@ export const MERGE_FIELDS: ReadonlySet<string> = new Set([
   'loan',
   'aiApiKeys',
   'helpfulHintLeadDays',
+  'dismissedHintKeys',
 ]);
 
 /**

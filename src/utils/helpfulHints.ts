@@ -159,6 +159,11 @@ export function isHint(todo: TodoItem): todo is HintTodo {
   return !!todo.hintType;
 }
 
+/** An open hint nobody has kept yet: it offers Keep / Dismiss (to-do row, drawer, briefing). */
+export function isFreshHint(todo: TodoItem): boolean {
+  return isHint(todo) && !todo.hintAcknowledged && !todo.completed;
+}
+
 /** The single producer of the dedup key. Opaque downstream — compared only for
  *  equality, never parsed. Locale-independent, so locale changes never churn. */
 export function buildHintKey(
@@ -167,6 +172,18 @@ export function buildHintKey(
   eventDateISO: string
 ): string {
   return `${hintType}:${scopeId}:${eventDateISO}`;
+}
+
+/** The dismissed-hint entries (`hintKey` → event date) whose event has passed: nothing
+ *  can regenerate them any more, so they only grow the document. The key is opaque and
+ *  never parsed; an entry whose value is not a plain date is kept. */
+export function pastDismissedHintKeys(
+  dismissed: Readonly<Record<string, string>>,
+  today: string
+): string[] {
+  return Object.entries(dismissed)
+    .filter(([, eventDate]) => /^\d{4}-\d{2}-\d{2}$/.test(eventDate) && eventDate < today)
+    .map(([key]) => key);
 }
 
 /** What happened to a mapped card holder on a generated hint (#109). */
@@ -369,23 +386,28 @@ export function computeDesiredHints(input: HelpfulHintsInput): ComputeResult {
  *
  *  `existing` must be ALL hint to-dos — including COMPLETED ones — so a completed
  *  hint's `hintKey` blocks regeneration (completing a hint = keeping it).
+ *  `dismissed` is the family's dismissed hint keys: a dismissed hint was DELETED, so
+ *  without it the key would look new and come straight back.
  *
- *  - toCreate: desired hints with no existing hint of the same `hintKey`.
+ *  - toCreate: desired hints with no existing hint of the same `hintKey`, and not
+ *    dismissed.
  *  - toRemove (only ever UN-acknowledged, UN-completed hints — the family's own
  *    kept/completed hints are never auto-removed):
  *    - cross-device DUPLICATE copies (same `hintKey`, different id): keep one
  *      primary (an acknowledged/completed copy if any, else the earliest-created)
  *      and remove the safe extras — otherwise buildTodoReminders double-notifies.
  *    - EXPIRED: the event has passed (`hintEventDate < today`).
- *    - STALE: no longer desired (source deleted / moved out of window). */
+ *    - STALE: no longer desired (source deleted / moved out of window).
+ *    - DISMISSED: its key is dismissed (a copy an older build regenerated). */
 export function reconcileHints(
   desired: DesiredHint[],
   existing: TodoItem[],
-  today: string
+  today: string,
+  dismissed: ReadonlySet<string> = new Set()
 ): { toCreate: DesiredHint[]; toRemove: TodoItem[] } {
   const desiredKeys = new Set(desired.map((d) => d.hintKey));
   const existingKeys = new Set(existing.map((t) => t.hintKey).filter(Boolean));
-  const toCreate = desired.filter((d) => !existingKeys.has(d.hintKey));
+  const toCreate = desired.filter((d) => !existingKeys.has(d.hintKey) && !dismissed.has(d.hintKey));
 
   const removable = (t: TodoItem) => !t.hintAcknowledged && !t.completed;
 
@@ -409,6 +431,7 @@ export function reconcileHints(
 
   const toRemove = existing.filter((t) => {
     if (!removable(t)) return false;
+    if (t.hintKey && dismissed.has(t.hintKey)) return true; // dismissed elsewhere
     if (t.hintKey && winnerByKey.get(t.hintKey) !== t) return true; // duplicate copy
     if (t.hintEventDate && t.hintEventDate < today) return true; // expired
     if (!t.hintKey || !desiredKeys.has(t.hintKey)) return true; // stale

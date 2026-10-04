@@ -11,13 +11,15 @@ import {
 } from '@/composables/useCriticalItems';
 import { useExpandableList } from '@/composables/useExpandableList';
 import { useToday } from '@/composables/useToday';
+import { useSounds } from '@/composables/useSounds';
 import ShowMoreToggle from '@/components/ui/ShowMoreToggle.vue';
 import SmoothHeight from '@/components/ui/SmoothHeight.vue';
 
 const { t } = useTranslation();
 const todoStore = useTodoStore();
 const activityStore = useActivityStore();
-const { criticalItems } = useCriticalItems();
+const { criticalItems, dismissItem } = useCriticalItems();
+const { playWhoosh } = useSounds();
 const {
   visible: shownItems,
   total: criticalTotal,
@@ -35,20 +37,21 @@ const emit = defineEmits<{
   'open-meal': [id: string];
   'complete-duty': [id: string, dutyType: string, occurrenceDate: string];
   'complete-todo': [id: string];
-  /** A row with a generic `dismissKey`: the tick is the dismiss. */
-  dismiss: [key: string];
   /** A row with a generic `route`: the page routes. */
   'open-route': [route: RouteLocationRaw];
 }>();
 
 function handleComplete(item: CriticalItem) {
-  if (item.dismissKey) {
-    emit('dismiss', item.dismissKey);
-  } else if (item.dutyType) {
+  if (item.dutyType) {
     emit('complete-duty', item.id, item.dutyType, item.occurrenceDate ?? '');
   } else if (item.type === 'todo') {
     emit('complete-todo', item.id);
   }
+}
+
+/** The row's ✕: hides it from this member's briefing (a hint is dismissed outright). */
+async function handleDismiss(item: CriticalItem) {
+  if (await dismissItem(item)) playWhoosh();
 }
 
 const { today } = useToday();
@@ -220,6 +223,30 @@ function handleItemClick(item: CriticalItem) {
               stroke-linejoin="round"
             />
           </svg>
+
+          <!-- Dismiss: every row can leave today's briefing -->
+          <button
+            v-if="item.dismissKey || item.dismissHint"
+            type="button"
+            class="briefing-dismiss"
+            :title="t('nook.briefing.dismiss')"
+            :aria-label="t('nook.briefing.dismiss')"
+            data-testid="briefing-dismiss"
+            @click.stop="handleDismiss(item)"
+          >
+            <svg class="h-3 w-3 shrink-0" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+              <path
+                d="M3 3l6 6M9 3l-6 6"
+                stroke="currentColor"
+                stroke-width="1.75"
+                stroke-linecap="round"
+              />
+            </svg>
+            <!-- The word where there is room; the ✕ alone on a phone -->
+            <span class="hidden text-xs font-semibold sm:inline" aria-hidden="true">
+              {{ t('nook.briefing.dismiss') }}
+            </span>
+          </button>
         </button>
       </SmoothHeight>
 
@@ -335,6 +362,36 @@ function handleItemClick(item: CriticalItem) {
   height: 30px;
   justify-content: center;
   width: 30px;
+}
+
+/* Row dismiss: a ✕ on a phone, "✕ Dismiss" where there is room */
+.briefing-dismiss {
+  align-items: center;
+  border-radius: 9999px;
+  color: rgb(255 255 255 / 80%);
+  display: flex;
+  flex-shrink: 0;
+  gap: 4px;
+  height: 28px;
+  justify-content: center;
+  margin: -4px -6px -4px -2px;
+  min-width: 28px;
+  transition:
+    background-color 150ms ease,
+    color 150ms ease;
+}
+
+@media (width >= 640px) {
+  .briefing-dismiss {
+    background: rgb(255 255 255 / 10%);
+    padding: 0 10px 0 8px;
+  }
+}
+
+.briefing-dismiss:hover,
+.briefing-dismiss:focus-visible {
+  background: rgb(255 255 255 / 18%);
+  color: white;
 }
 
 /* Staggered entrance */

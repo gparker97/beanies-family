@@ -15,6 +15,8 @@ import { useMemberInfo } from '@/composables/useMemberInfo';
 import { useResponsibilityCardLabel } from '@/composables/useResponsibilityCardLabel';
 import { buildCardBriefingRows, ymdOf, type CardBriefingRow } from '@/utils/responsibilityDeck';
 import { useTranslation } from '@/composables/useTranslation';
+import { BRIEFING_HIDE_PREFIX } from '@/utils/notifications';
+import { logEvent } from '@/services/telemetry/logEvent';
 import {
   formatTime12,
   formatDateShort,
@@ -35,7 +37,7 @@ import {
 import { isListDue } from '@/utils/listLifecycle';
 import { isFlagEnabled } from '@/config/flags';
 import { getActivityFallbackEmoji } from '@/constants/activityCategories';
-import { hintEmoji } from '@/utils/helpfulHints';
+import { hintEmoji, isFreshHint } from '@/utils/helpfulHints';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 
 export interface CriticalItem {
@@ -49,8 +51,14 @@ export interface CriticalItem {
   completed?: boolean; // whether this item is done
   dutyType?: 'dropoff' | 'pickup' | 'dropoff-pickup'; // for duty items only
   caption?: string; // optional subtitle below the message (used by 'holiday')
-  /** Generic: ticking the row writes this read key (notificationsStore.markRead). */
+  /**
+   * The row's ✕ writes this per-member read key (notificationsStore.markRead): a Who
+   * Owns What row's own key, else a `briefing-hide:` key for this day or occurrence.
+   * Absent only on a hint row, whose ✕ dismisses the hint itself (`dismissHint`).
+   */
   dismissKey?: string;
+  /** An un-kept Helpful Hint row: the ✕ dismisses the hint family-wide, as on the to-do page. */
+  dismissHint?: boolean;
   /** Generic: tapping the row routes here (never falls through to open-activity). */
   route?: RouteLocationRaw;
 }
@@ -477,6 +485,9 @@ export function useCriticalItems() {
           time: '',
           completable: true,
           completed: false,
+          // Only an un-kept hint is dismissed outright. A KEPT hint is the family's own
+          // to-do now: its ✕ just hides it for today, like any other to-do.
+          dismissHint: isFreshHint(hint),
         });
       }
     }
@@ -509,8 +520,53 @@ export function useCriticalItems() {
       }
     }
 
-    return items;
+    // Every row the member can dismiss for the day gets its hide key; rows already
+    // hidden drop out. Card rows carry their own keys and their own snooze rule
+    // (`buildCardBriefingRows` already filtered them), so they skip this filter.
+    const readState = notificationsStore.readState;
+    return items.flatMap((item) => {
+      if (item.dismissHint || item.dismissKey) return [item];
+      const dismissKey = hideKey(item, todayStr.value);
+      return readState[dismissKey] ? [] : [{ ...item, dismissKey }];
+    });
   });
+
+  /**
+   * A dismissed row's key. Activities key on their occurrence, so the dismissal is
+   * for that session only; everything else keys on today, so a to-do that is still
+   * overdue (or a dose still owed) is back in tomorrow's briefing.
+   */
+  function hideKey(item: CriticalItem, today: string): string {
+    return `${BRIEFING_HIDE_PREFIX}${item.type}:${item.id}:${item.occurrenceDate ?? today}`;
+  }
+
+  /**
+   * The row's ✕. A hint is dismissed family-wide (`discardTodo`, never regenerated);
+   * any other row is hidden from this member's briefing. Resolves true once the
+   * write was issued (the read-state write reports its own failure).
+   */
+  async function dismissItem(item: CriticalItem): Promise<boolean> {
+    let action: 'hint' | 'card' | 'hide' | 'hide-done';
+    let ok: boolean;
+    if (item.dismissHint) {
+      action = 'hint';
+      ok = await todoStore.discardTodo(item.id); // logs its own helpful-hints outcome too
+    } else if (item.dismissKey) {
+      action = item.type === 'card' ? 'card' : item.completed ? 'hide-done' : 'hide';
+      notificationsStore.markRead(item.dismissKey); // reports its own write failure
+      ok = true;
+    } else {
+      return false;
+    }
+    // One event per tap, after the outcome. `hide-done` = a row the member had ticked.
+    logEvent({
+      level: ok ? 'info' : 'warn',
+      surface: 'daily-briefing',
+      message: ok ? 'briefing item dismissed' : 'briefing item dismiss failed',
+      context: { kind: item.type, action },
+    });
+    return ok;
+  }
 
   /** One card row → one briefing item. No deck logic here, only copy and routing. */
   function cardItem(row: CardBriefingRow): CriticalItem {
@@ -528,8 +584,6 @@ export function useCriticalItems() {
             date: formatNookDate(ymdOf(row.move.at)),
           }),
           icon: '🙋',
-          completable: true,
-          completed: false,
           dismissKey: row.dismissKey,
           route: { path: WHO_OWNS_WHAT_PATH, query: { card: row.cardId } },
         };
@@ -541,8 +595,6 @@ export function useCriticalItems() {
           message: t('whoOwnsWhat.briefing.checkIn'),
           caption: t('whoOwnsWhat.briefing.checkInCaption'),
           icon: '🗓️',
-          completable: true,
-          completed: false,
           dismissKey: row.dismissKey,
           route: WHO_OWNS_WHAT_PATH,
         };
@@ -564,5 +616,5 @@ export function useCriticalItems() {
     return str.charAt(0).toLowerCase() + str.slice(1);
   }
 
-  return { criticalItems };
+  return { criticalItems, dismissItem };
 }

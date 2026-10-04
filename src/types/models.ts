@@ -2155,6 +2155,7 @@ export interface Settings {
   calendarClashNudgeEnabled?: boolean; // #34: warn when an activity clashes with a connected calendar's free/busy (default: true). Family-scoped.
   helpfulHintsEnabled?: boolean; // #40: master on/off for auto-generated Helpful Hint to-dos (default: true). Family-scoped.
   helpfulHintLeadDays?: Partial<Record<HelpfulHintType, number>>; // #40: per-type days-before-event override; missing type → HINT_LEAD_DAYS default. Family-scoped.
+  dismissedHintKeys?: Record<string, string>; // #40: hintKey → that hint's event date (YYYY-MM-DD). A hint someone dismissed (or deleted) is never regenerated. Merged per key (MERGE_FIELDS); the entry is pruned once its event has passed. Family-scoped.
   feedbackOptOut?: boolean; // #45: when true, the periodic in-app feedback/NPS prompt never auto-opens (default: false). Family-scoped.
   /** Phase 4 (login rethink): ISO timestamp of the family's "I stored my recovery
    *  kit" confirmation (wizard kit step or Settings). Inside the ciphertext, synced.

@@ -5,7 +5,11 @@ import { useTranslation } from '@/composables/useTranslation';
 import { effectiveAssignees } from '@/utils/assignees';
 import { formatNookDate } from '@/utils/date';
 import { isTodoOverdue, isTodoDueToday } from '@/utils/todo';
-import { isHint, hintEmoji as hintEmojiFor } from '@/utils/helpfulHints';
+import {
+  isHint,
+  isFreshHint as isFreshHintTodo,
+  hintEmoji as hintEmojiFor,
+} from '@/utils/helpfulHints';
 import { useResponsibilityStore } from '@/stores/responsibilityStore';
 import { MARKETING_URL } from '@/utils/marketing';
 import ActivityOwnerStack from '@/components/ui/ActivityOwnerStack.vue';
@@ -49,11 +53,12 @@ const isDone = computed(() => !!props.todo.completed);
 const isOverdue = computed(() => isTodoOverdue(props.todo));
 const isDueToday = computed(() => isTodoDueToday(props.todo));
 // #40: `isHintRow` = any hint (drives the persistent subtle marker). `isFreshHint`
-// = an un-acknowledged hint (gets the gentle wash + Keep/Dismiss + explainer, and
+// = an open, un-kept hint (the shared `isFreshHint`; a completed hint counts as kept)
+// (gets the gentle wash + Keep/Dismiss + explainer, and
 // suppresses the normal date badges so it never reads as overdue). Once kept, a
 // hint behaves like a normal to-do but keeps its marker.
 const isHintRow = computed(() => isHint(props.todo));
-const isFreshHint = computed(() => isHintRow.value && !props.todo.hintAcknowledged);
+const isFreshHint = computed(() => isFreshHintTodo(props.todo));
 const hintEmoji = computed(() => hintEmojiFor(props.todo.hintType));
 // Who Owns What (#109): derived, never stored. The hint's sole assignee is the single
 // holder of its mapped card, so explain where the assignment came from.

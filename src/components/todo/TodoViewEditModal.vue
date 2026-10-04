@@ -23,6 +23,7 @@ import { extractUrls } from '@/utils/url';
 import { formatDateWithDay } from '@/utils/date';
 import { normalizeAssignees, toAssigneePayload } from '@/utils/assignees';
 import { isTodoOverdue, isTodoDueToday } from '@/utils/todo';
+import { isFreshHint as isFreshHintTodo } from '@/utils/helpfulHints';
 import type { TodoItem } from '@/types/models';
 
 type EditableField = 'title' | 'dueDate' | 'dueTime' | 'assignee' | 'description';
@@ -242,6 +243,25 @@ async function handleToggleComplete() {
   }
 }
 
+// #40: an open, un-kept Helpful Hint gets Keep + Dismiss here too, as on the to-do page.
+const isFreshHint = computed(() => !!todo.value && isFreshHintTodo(todo.value));
+
+async function handleKeepHint() {
+  if (!todo.value) return;
+  await todoStore.acknowledgeHint(todo.value.id);
+}
+
+/** One tap, no confirm (a hint is a suggestion, not the family's own data). */
+async function handleDismissHint() {
+  if (!todo.value) return;
+  const id = todo.value.id;
+  emit('close');
+  if (await todoStore.discardTodo(id)) {
+    playWhoosh();
+    emit('deleted', id);
+  }
+}
+
 // Close/Done/Delete handlers
 function handleClose() {
   saveAndClose();
@@ -264,9 +284,11 @@ async function handleDelete() {
       variant: 'danger',
     })
   ) {
-    await todoStore.deleteTodo(id);
-    playWhoosh();
-    emit('deleted', id);
+    // `discardTodo`: a hint deleted here (kept or not) must not be regenerated.
+    if (await todoStore.discardTodo(id)) {
+      playWhoosh();
+      emit('deleted', id);
+    }
   }
 }
 </script>
@@ -332,6 +354,35 @@ async function handleDelete() {
           </div>
         </template>
       </InlineEditField>
+
+      <!-- #40: Keep or Dismiss a fresh Helpful Hint without leaving the drawer -->
+      <div
+        v-if="isFreshHint"
+        class="flex items-center gap-2 rounded-2xl border border-[var(--tint-orange-15)] bg-[var(--tint-orange-8)] p-3"
+        data-testid="todo-drawer-hint-actions"
+      >
+        <span class="dark:text-ink-soft flex-1 text-xs leading-snug text-[var(--color-text)]">
+          {{ t('todo.hint.drawerPrompt') }}
+        </span>
+        <button
+          type="button"
+          class="font-outfit dark:bg-surface-overlay dark:text-ink dark:hover:bg-surface-hover inline-flex items-center gap-1 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[var(--color-text)] transition-colors hover:bg-[var(--tint-orange-15)]"
+          data-testid="todo-drawer-hint-keep"
+          @click="handleKeepHint"
+        >
+          <!-- eslint-disable-next-line vue/no-bare-strings-in-template -->
+          <span aria-hidden="true">📌</span> {{ t('todo.hint.keep') }}
+        </button>
+        <button
+          type="button"
+          class="font-outfit dark:bg-surface-overlay dark:text-ink dark:hover:bg-surface-hover inline-flex items-center gap-1 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[var(--color-text)] transition-colors hover:bg-[var(--tint-orange-15)]"
+          data-testid="todo-drawer-hint-dismiss"
+          @click="handleDismissHint"
+        >
+          <!-- eslint-disable-next-line vue/no-bare-strings-in-template -->
+          <span aria-hidden="true">✕</span> {{ t('todo.hint.dismiss') }}
+        </button>
+      </div>
 
       <!-- Track as: To-do vs. Someday · Maybe (hidden once completed) -->
       <FormFieldGroup v-if="!todo.completed" :label="t('todo.kind')">

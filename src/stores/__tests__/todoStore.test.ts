@@ -10,6 +10,7 @@ vi.mock('@/services/automerge/repositories/todoRepository', () => ({
   createTodosWithIds: vi.fn(),
   patchTodos: vi.fn(),
   deleteTodos: vi.fn(),
+  createTodoWithId: vi.fn(),
 }));
 
 // `openTodosForActivity` resolves the soft `activityId` against the activity store.
@@ -27,6 +28,15 @@ const { showToastMock } = vi.hoisted(() => ({ showToastMock: vi.fn() }));
 vi.mock('@/composables/useToast', () => ({ showToast: showToastMock }));
 
 vi.mock('@/composables/useCelebration', () => ({ celebrate: vi.fn() }));
+
+// `discardTodo` records a dismissed hint's key in the family settings.
+const { recordDismissedHint, forgetDismissedHint } = vi.hoisted(() => ({
+  recordDismissedHint: vi.fn(),
+  forgetDismissedHint: vi.fn(),
+}));
+vi.mock('@/stores/settingsStore', () => ({
+  useSettingsStore: () => ({ recordDismissedHint, forgetDismissedHint }),
+}));
 
 // Telemetry spy — hoisted because `vi.mock` factories run before `const`s.
 const { logEventMock } = vi.hoisted(() => ({ logEventMock: vi.fn() }));
@@ -278,6 +288,109 @@ describe('todoStore — Helpful Hints (#40)', () => {
     expect(logEventMock).toHaveBeenCalledWith(
       expect.objectContaining({ level: 'warn', surface: 'todos' })
     );
+  });
+});
+
+describe('todoStore — discardTodo (a person removing a to-do)', () => {
+  const hint = () =>
+    todo({
+      id: 'h-1',
+      hintType: 'trip-packing',
+      hintKey: 'trip-packing:v1:2026-07-26',
+      hintEventDate: '2026-07-26',
+    });
+
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+    vi.mocked(todoRepo.deleteTodo).mockResolvedValue(true);
+    recordDismissedHint.mockResolvedValue(undefined);
+  });
+
+  it('records a hint key before deleting, so the engine never brings it back', async () => {
+    const store = useTodoStore();
+    store.todos.push(hint());
+    await expect(store.discardTodo('h-1')).resolves.toBe(true);
+    expect(recordDismissedHint).toHaveBeenCalledWith('trip-packing:v1:2026-07-26', '2026-07-26');
+    expect(recordDismissedHint.mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(todoRepo.deleteTodo).mock.invocationCallOrder[0]!
+    );
+    expect(store.todos).toHaveLength(0);
+    expect(logEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        surface: 'helpful-hints',
+        message: 'hint dismissed',
+        context: expect.objectContaining({ hint_op: 'dismiss', hint_type: 'trip-packing' }),
+      })
+    );
+  });
+
+  it('still deletes the hint when the record fails, and logs a warning', async () => {
+    recordDismissedHint.mockRejectedValue(new Error('write failed'));
+    const store = useTodoStore();
+    store.todos.push(hint());
+    await expect(store.discardTodo('h-1')).resolves.toBe(true);
+    expect(store.todos).toHaveLength(0);
+    expect(logEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({ level: 'warn', surface: 'helpful-hints' })
+    );
+  });
+
+  it('offers the house Undo toast; Undo forgets the key BEFORE restoring the hint', async () => {
+    forgetDismissedHint.mockResolvedValue(undefined);
+    vi.mocked(todoRepo.createTodoWithId).mockImplementation(
+      async (id, input) => ({ id, ...input, createdAt: 'c', updatedAt: 'u' }) as TodoItem
+    );
+    const store = useTodoStore();
+    store.todos.push(hint());
+    await store.discardTodo('h-1');
+    expect(showToastMock).toHaveBeenCalledTimes(1);
+    const [type, , , options] = showToastMock.mock.calls[0]!;
+    expect(type).toBe('info');
+    expect(options).toEqual(expect.objectContaining({ durationMs: 6000 }));
+    await options.actionFn();
+    expect(forgetDismissedHint).toHaveBeenCalledWith('trip-packing:v1:2026-07-26');
+    expect(forgetDismissedHint.mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(todoRepo.createTodoWithId).mock.invocationCallOrder[0]!
+    );
+    expect(store.todos.map((t) => t.id)).toEqual(['h-1']);
+    expect(logEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'hint dismiss undone' })
+    );
+  });
+
+  it('Undo does not restore when the key could not be forgotten (it would be removed again)', async () => {
+    forgetDismissedHint.mockRejectedValue(new Error('write failed'));
+    const store = useTodoStore();
+    store.todos.push(hint());
+    await store.discardTodo('h-1');
+    await showToastMock.mock.calls[0]![3].actionFn();
+    expect(todoRepo.createTodoWithId).not.toHaveBeenCalled();
+    expect(logEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({ level: 'warn', message: 'hint dismiss undo failed' })
+    );
+  });
+
+  it('a failed delete logs a failure, never a dismissal', async () => {
+    vi.mocked(todoRepo.deleteTodo).mockRejectedValue(new Error('boom'));
+    const store = useTodoStore();
+    store.todos.push(hint());
+    await expect(store.discardTodo('h-1')).resolves.toBe(false);
+    expect(logEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({ level: 'warn', message: 'hint dismiss failed' })
+    );
+    expect(logEventMock).not.toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'hint dismissed' })
+    );
+  });
+
+  it('a normal to-do is just deleted, with no hint record', async () => {
+    const store = useTodoStore();
+    store.todos.push(todo());
+    await expect(store.discardTodo('t-1')).resolves.toBe(true);
+    expect(recordDismissedHint).not.toHaveBeenCalled();
+    expect(showToastMock).not.toHaveBeenCalled(); // its own confirm already happened
+    expect(store.todos).toHaveLength(0);
   });
 });
 

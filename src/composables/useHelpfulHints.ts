@@ -24,7 +24,7 @@ import { isFlagEnabled } from '@/config/flags';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { reportError } from '@/utils/errorReporter';
 import { assembleOccurrencesByDate } from '@/utils/occurrenceAssembly';
-import { computeDesiredHints, reconcileHints } from '@/utils/helpfulHints';
+import { computeDesiredHints, pastDismissedHintKeys, reconcileHints } from '@/utils/helpfulHints';
 import { createChangeGate } from '@/services/telemetry/emitPolicy';
 import { toAssigneePayload } from '@/utils/assignees';
 import { fillTemplate } from '@/utils/fillTemplate';
@@ -96,6 +96,20 @@ export function useHelpfulHints(): void {
   let inFlight = false;
   let rerunQueued = false;
 
+  /** Drop dismissed keys whose event has passed (they can never regenerate). */
+  async function pruneDismissed(record: Record<string, string>, todayStr: string): Promise<void> {
+    const past = pastDismissedHintKeys(record, todayStr);
+    if (past.length === 0) return;
+    if (await settingsStore.pruneDismissedHints(past)) {
+      logEvent({
+        level: 'debug',
+        surface: SURFACE,
+        message: 'dismissed hint keys pruned',
+        context: { count: past.length },
+      });
+    }
+  }
+
   async function removeAll(hints: TodoItem[]): Promise<number> {
     let removed = 0;
     for (const h of hints) {
@@ -166,7 +180,11 @@ export function useHelpfulHints(): void {
       cardHolders: cardHolders(),
     });
 
-    const { toCreate, toRemove } = reconcileHints(hints, existing, todayStr);
+    // Dismissed keys (family-wide): never regenerated. Past events are pruned so the
+    // record stays bounded by the lead window.
+    const dismissedRecord = settingsStore.dismissedHintKeys;
+    const dismissed = new Set(Object.keys(dismissedRecord));
+    const { toCreate, toRemove } = reconcileHints(hints, existing, todayStr, dismissed);
 
     // Notification fire date: the next 09:00 that has NOT already passed (today if
     // it's still before 09:00, else tomorrow), never after the event. An all-day
@@ -204,14 +222,29 @@ export function useHelpfulHints(): void {
       }
     });
 
-    // Remove (expired + stale). Split the count for triage.
+    // Remove (expired + stale + dismissed copies). Split the count for triage.
+    const isDismissedCopy = (h: TodoItem) => !!h.hintKey && dismissed.has(h.hintKey);
+    const dismissedCopies = toRemove.filter(isDismissedCopy).length;
     const expiredCount = toRemove.filter(
-      (h) => h.hintEventDate && h.hintEventDate < todayStr
+      (h) => !isDismissedCopy(h) && h.hintEventDate && h.hintEventDate < todayStr
     ).length;
+    if (dismissedCopies > 0) {
+      // A copy of a dismissed hint existed: an older build regenerated it, or two
+      // devices raced. Rare; worth seeing.
+      logEvent({
+        level: 'info',
+        surface: SURFACE,
+        message: 'dismissed hint copies removed',
+        context: { count: dismissedCopies },
+      });
+    }
     const removed = await removeAll(toRemove);
+    // Housekeeping AFTER the plan is applied, and not awaited: it must never delay or
+    // race the create/remove above. Its own failures are logged, never toasted.
+    void pruneDismissed(dismissedRecord, todayStr);
 
     const expired = Math.min(expiredCount, removed);
-    const prunedStale = Math.max(removed - expiredCount, 0);
+    const prunedStale = Math.max(removed - expiredCount - dismissedCopies, 0);
     const total = existing.length - removed + generated;
     // Signature covers every field below, so nothing can change silently.
     const signature = `on|${generated}|${expired}|${prunedStale}|${total}|${skipped}|${Object.entries(
@@ -314,6 +347,8 @@ export function useHelpfulHints(): void {
       () => vacationStore.upcomingVacations,
       () => settingsStore.helpfulHintsEnabled,
       () => settingsStore.helpfulHintLeadDays,
+      // A dismissal synced from another device removes this device's copy promptly.
+      () => settingsStore.dismissedHintKeys,
       cardHolderKey,
     ],
     queueReconcile,

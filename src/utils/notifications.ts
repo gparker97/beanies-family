@@ -64,7 +64,10 @@ const PRUNE_EXEMPT_PREFIXES = [
  */
 export const CARD_MOVE_PREFIX = 'card-move:';
 export const CARD_CHECKIN_PREFIX = 'card-checkin:';
-const AGED_EXEMPT_PREFIXES = [CARD_MOVE_PREFIX, CARD_CHECKIN_PREFIX] as const;
+/** A daily-briefing row the member dismissed: `briefing-hide:<type>:<id>:<date>`. Only
+ *  that day's (or that occurrence's) key matters, so 30 days is far more than enough. */
+export const BRIEFING_HIDE_PREFIX = 'briefing-hide:';
+const AGED_EXEMPT_PREFIXES = [CARD_MOVE_PREFIX, CARD_CHECKIN_PREFIX, BRIEFING_HIDE_PREFIX] as const;
 export const AGED_EXEMPT_MAX_DAYS = 30;
 
 /** The shared occurrence shape (`calendar/occurrence.ts`). */

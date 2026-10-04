@@ -485,7 +485,12 @@ describe('copies and helpers', () => {
       exchangeRates: ['from', 'to'],
       categories: ['categoryId'],
     });
-    expect([...MERGE_FIELDS].sort()).toEqual(['aiApiKeys', 'helpfulHintLeadDays', 'loan']);
+    expect([...MERGE_FIELDS].sort()).toEqual([
+      'aiApiKeys',
+      'dismissedHintKeys',
+      'helpfulHintLeadDays',
+      'loan',
+    ]);
   });
 });
 

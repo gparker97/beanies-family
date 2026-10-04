@@ -62,14 +62,16 @@ vi.mock('@/config/flags', async (importOriginal) => {
 
 // Who Owns What (#109): the briefing reads card-move / check-in dismissals from the
 // viewer's read-state slice. Driven per test.
-const { readStateBox } = vi.hoisted(() => ({
+const { readStateBox, markRead } = vi.hoisted(() => ({
   readStateBox: { value: {} as Record<string, string> },
+  markRead: vi.fn(),
 }));
 vi.mock('@/stores/notificationsStore', () => ({
   useNotificationsStore: () => ({
     get readState() {
       return readStateBox.value;
     },
+    markRead,
   }),
 }));
 
@@ -1194,7 +1196,7 @@ describe('useCriticalItems', () => {
       expect(rows.map((r) => r.id)).not.toContain('card-mine');
       expect(rows.map((r) => r.id)).not.toContain('card-nobody');
       const [moved, checkIn] = rows;
-      expect(moved!.completable).toBe(true);
+      expect(moved!.completable).toBeFalsy(); // the ✕ is the dismiss, no tick
       expect(moved!.dismissKey).toBe('card-move:laundry:main:2026-03-09T10:00:00.000Z');
       expect(moved!.route).toEqual({ path: '/who-owns-what', query: { card: 'laundry' } });
       expect(checkIn!.dismissKey).toMatch(/^card-checkin:/);
@@ -1283,6 +1285,81 @@ describe('useCriticalItems', () => {
         [before[1]!.dismissKey!]: '2026-03-09T12:00:00.000Z',
       };
       expect(cardRows()).toHaveLength(0);
+    });
+  });
+
+  describe('dismissing a row', () => {
+    const hint = () =>
+      makeTodo({
+        id: 'hint-1',
+        title: "Get a present for Emma's party (12 Mar)",
+        hintType: 'birthday-party-gift',
+        hintKey: 'birthday-party-gift:act-1:2026-03-12',
+        hintEventDate: '2026-03-12',
+        dueDate: '2026-03-08',
+        assigneeIds: ['parent-1'],
+        createdBy: 'parent-1',
+      });
+
+    it('gives an activity a key for its occurrence and a to-do a key for today', () => {
+      familyStore.setCurrentMember('parent-1');
+      activityStore.activities.push(makeActivity({ pickupMemberId: 'parent-1' }));
+      todoStore.todos.push(makeTodo({ assigneeIds: ['parent-1'], dueDate: TODAY }));
+      const { criticalItems } = useCriticalItems();
+      const keys = criticalItems.value.map((i) => i.dismissKey);
+      expect(keys).toContain(`briefing-hide:activity:activity-1:${TODAY}`);
+      expect(keys).toContain(`briefing-hide:todo:todo-1:${TODAY}`);
+    });
+
+    it('drops a row whose hide key is read, and keeps the rest', () => {
+      familyStore.setCurrentMember('parent-1');
+      activityStore.activities.push(makeActivity({ pickupMemberId: 'parent-1' }));
+      todoStore.todos.push(makeTodo({ assigneeIds: ['parent-1'], dueDate: TODAY }));
+      readStateBox.value = { [`briefing-hide:activity:activity-1:${TODAY}`]: NOW };
+      const { criticalItems } = useCriticalItems();
+      expect(criticalItems.value.map((i) => i.id)).toEqual(['todo-1']);
+    });
+
+    it("yesterday's hide key does not hide today's row", () => {
+      familyStore.setCurrentMember('parent-1');
+      todoStore.todos.push(makeTodo({ assigneeIds: ['parent-1'], dueDate: '2026-03-01' }));
+      readStateBox.value = { 'briefing-hide:todo:todo-1:2026-03-09': NOW };
+      const { criticalItems } = useCriticalItems();
+      expect(criticalItems.value.map((i) => i.id)).toEqual(['todo-1']);
+    });
+
+    it('a hint row dismisses the hint itself, not a read key', async () => {
+      familyStore.setCurrentMember('parent-1');
+      todoStore.todos.push(hint());
+      const discard = vi.spyOn(todoStore, 'discardTodo').mockResolvedValue(true);
+      const { criticalItems, dismissItem } = useCriticalItems();
+      const row = criticalItems.value.find((i) => i.id === 'hint-1')!;
+      expect(row.dismissHint).toBe(true);
+      expect(row.dismissKey).toBeUndefined();
+      await expect(dismissItem(row)).resolves.toBe(true);
+      expect(discard).toHaveBeenCalledWith('hint-1');
+      expect(markRead).not.toHaveBeenCalled();
+    });
+
+    it("a KEPT hint is the family's own to-do now: its ✕ only hides it for today", async () => {
+      familyStore.setCurrentMember('parent-1');
+      todoStore.todos.push({ ...hint(), hintAcknowledged: true });
+      const discard = vi.spyOn(todoStore, 'discardTodo');
+      const { criticalItems, dismissItem } = useCriticalItems();
+      const row = criticalItems.value.find((i) => i.id === 'hint-1')!;
+      expect(row.dismissHint).toBe(false);
+      expect(row.dismissKey).toBe(`briefing-hide:todo:hint-1:${TODAY}`);
+      await dismissItem(row);
+      expect(discard).not.toHaveBeenCalled();
+      expect(markRead).toHaveBeenCalledWith(`briefing-hide:todo:hint-1:${TODAY}`);
+    });
+
+    it('any other row writes its hide key', async () => {
+      familyStore.setCurrentMember('parent-1');
+      activityStore.activities.push(makeActivity({ pickupMemberId: 'parent-1' }));
+      const { criticalItems, dismissItem } = useCriticalItems();
+      await expect(dismissItem(criticalItems.value[0]!)).resolves.toBe(true);
+      expect(markRead).toHaveBeenCalledWith(`briefing-hide:activity:activity-1:${TODAY}`);
     });
   });
 });

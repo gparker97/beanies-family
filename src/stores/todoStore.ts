@@ -27,6 +27,9 @@ import { toISODateString } from '@/utils/date';
 import { trackFeature } from '@/services/analytics/plausible';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { useActivityStore } from '@/stores/activityStore';
+import { useSettingsStore } from '@/stores/settingsStore';
+import { useTranslationStore } from '@/stores/translationStore';
+import { showToast } from '@/composables/useToast';
 
 // Sort comparators — newest-created first / most-recently-completed first.
 const byCreatedDesc = (a: TodoItem, b: TodoItem) => b.createdAt.localeCompare(a.createdAt);
@@ -36,9 +39,9 @@ const byCompletedDesc = (a: TodoItem, b: TodoItem) =>
 // #40: the ONE consumption counter for hints, emitted from `toggleComplete` so
 // every surface (briefing tick, to-do row, modal, Nook widget, wall job) is
 // covered by one implementation. It counts TICKS, not net completions: an
-// undo-then-retick logs twice and un-completing logs nothing (deliberate —
-// `hint_op` is a closed enum with one value). `route_path` says which surface
-// ticked it (`/nook` = the briefing, `/todo` = the to-do page) — it is not
+// undo-then-retick logs twice and un-completing logs nothing (deliberate).
+// `hint_op` is a closed enum: 'complete' (here), 'dismiss' and 'undo' (`discardTodo`).
+// `route_path` says which surface ticked it (`/nook` = the briefing, `/todo` = the to-do page) — it is not
 // auto-enriched, so it is read here exactly as OAuthNativeBridgePage does.
 // Pairs with the `reconcile` generation event on the same surface. No emit
 // gate: a tick is a discrete user action, not a re-emitted watcher outcome.
@@ -206,6 +209,85 @@ export const useTodoStore = defineStore('todos', () => {
       { action: 'todoStore:deleteTodo' }
     );
     return result ?? false;
+  }
+
+  /**
+   * A person removing a to-do (the to-do page, its drawer, the daily briefing). For a
+   * Helpful Hint (#40) the key is recorded first, family-wide, so the engine never
+   * regenerates it: deleting alone is not enough, because the next reconcile sees a
+   * desired key with no to-do and recreates it. The engine's own expiry/stale removals
+   * call `deleteTodo` directly and must not come through here.
+   *
+   * If recording fails (already toasted + reported by the settings chain) the hint is
+   * still deleted, and may come back on a later reconcile.
+   */
+  async function discardTodo(id: string): Promise<boolean> {
+    const todo = todos.value.find((t) => t.id === id);
+    if (!todo || !isHint(todo) || !todo.hintKey) return deleteTodo(id);
+
+    let recorded = true;
+    try {
+      // The value is the event date, so the engine can prune the entry once it passes.
+      await useSettingsStore().recordDismissedHint(
+        todo.hintKey,
+        todo.hintEventDate ?? todo.dueDate?.slice(0, 10) ?? ''
+      );
+    } catch {
+      recorded = false; // already toasted + reported by the settings chain
+    }
+    const deleted = await deleteTodo(id);
+    // One event, after the outcome: `recorded` false = it may regenerate; `deleted` false
+    // = it is still on screen (deleteTodo has toasted).
+    logEvent({
+      level: recorded && deleted ? 'info' : 'warn',
+      surface: 'helpful-hints',
+      message: !deleted
+        ? 'hint dismiss failed'
+        : recorded
+          ? 'hint dismissed'
+          : 'hint dismissed; dismissal not recorded',
+      context: {
+        hint_type: todo.hintType,
+        hint_op: 'dismiss',
+        route_path: window.location.pathname,
+      },
+    });
+    // The house Undo toast (6s, like every other undoable removal). The snapshot is the
+    // hint as it was, so Undo restores it under the same id.
+    if (deleted) {
+      const t = useTranslationStore().t;
+      showToast('info', t('todo.hint.dismissedToast'), undefined, {
+        actionLabel: t('action.undo'),
+        actionFn: () => undoHintDismiss(todo),
+        durationMs: 6000,
+      });
+    }
+    return deleted;
+  }
+
+  /**
+   * Undo a hint dismissal. The dismissed key is forgotten FIRST: while it is recorded,
+   * the reconcile engine treats any copy of the hint as one to remove, so restoring
+   * first would have the restored hint deleted again on the next reconcile.
+   */
+  async function undoHintDismiss(snapshot: HintTodo): Promise<void> {
+    let forgotten = true;
+    try {
+      await useSettingsStore().forgetDismissedHint(snapshot.hintKey!);
+    } catch {
+      forgotten = false; // already toasted + reported by the settings chain
+    }
+    const restored = forgotten ? await restoreTodo(snapshot) : null;
+    logEvent({
+      level: restored ? 'info' : 'warn',
+      surface: 'helpful-hints',
+      message: restored ? 'hint dismiss undone' : 'hint dismiss undo failed',
+      context: {
+        hint_type: snapshot.hintType,
+        hint_op: 'undo',
+        route_path: window.location.pathname,
+      },
+    });
   }
 
   /**
@@ -456,6 +538,7 @@ export const useTodoStore = defineStore('todos', () => {
     todosForActivitySession,
     updateTodo,
     deleteTodo,
+    discardTodo,
     restoreTodo,
     toggleComplete,
     setSomeday,

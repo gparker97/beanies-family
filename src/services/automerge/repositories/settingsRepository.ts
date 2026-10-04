@@ -162,6 +162,23 @@ export async function setHelpfulHintLeadDays(
   return saveSettings({ helpfulHintLeadDays: leadDays });
 }
 
+/**
+ * #40: record one dismissed hint (`hintKey` → its event date). Built from `getSettings()`,
+ * the projection `saveSettings` takes its merge base from, so a key that landed there
+ * (a quick second dismissal, or a peer's) is never mistaken for a deletion.
+ */
+export async function addDismissedHintKey(hintKey: string, eventDate: string): Promise<Settings> {
+  const current = (await getSettings()).dismissedHintKeys ?? {};
+  return saveSettings({ dismissedHintKeys: { ...current, [hintKey]: eventDate } });
+}
+
+/** #40: drop dismissed-hint entries (the reconcile engine's prune of past events). */
+export async function removeDismissedHintKeys(hintKeys: readonly string[]): Promise<Settings> {
+  const next = { ...((await getSettings()).dismissedHintKeys ?? {}) };
+  for (const key of hintKeys) delete next[key];
+  return saveSettings({ dismissedHintKeys: next });
+}
+
 export async function setFeedbackOptOut(optOut: boolean): Promise<Settings> {
   return saveSettings({ feedbackOptOut: optOut });
 }

@@ -10,7 +10,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-10-05
 
+### Added
+
+- Every item in your daily briefing now has a ✕ to clear it once it is done, including pickups, activities, to-dos and Who Owns What notes. Clearing only affects your own briefing.
+- A helpful hint can now be kept or dismissed from its to-do details, as well as from the to-do list and the daily briefing, and a dismissal can be undone from the toast that follows.
+
 ### Fixed
+
+- A dismissed helpful hint no longer comes back the next day.
 
 - The deploy classifier no longer skips the marketing site (or any target) when its last deploy came from a commit that is missing after a history rewrite; it diffs from the newest older deploy it can find, or reports the target as needing a deploy.
 

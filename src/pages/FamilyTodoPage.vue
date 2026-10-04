@@ -278,16 +278,15 @@ async function handleDelete(id: string) {
       variant: 'danger',
     })
   ) {
-    await todoStore.deleteTodo(id);
-    playWhoosh();
+    // `discardTodo`: a kept hint deleted here must not be regenerated either.
+    if (await todoStore.discardTodo(id)) playWhoosh();
   }
 }
 
 // #40: hints dismiss in ONE tap (no confirm — they're suggestions, not the
 // family's own data), and "keep" promotes a hint to a permanent normal to-do.
 async function handleHintDismiss(id: string) {
-  await todoStore.deleteTodo(id);
-  playWhoosh();
+  if (await todoStore.discardTodo(id)) playWhoosh();
 }
 
 async function handleAcknowledge(id: string) {

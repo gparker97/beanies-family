@@ -445,8 +445,8 @@ export const HOW_IT_WORKS_ARTICLES: HelpArticle[] = [
         type: 'list',
         content: '',
         items: [
-          '<strong>A card moved</strong> \u{1F64B}: When someone else re-deals a card to you or away from you, you see a note like <em>"Laundry moved to Sofia on Mon, 21 Sep."</em> or <em>"You now hold Laundry, from Sofia."</em> for a week. Tick it to dismiss it any time; it stays dismissed on all your devices. You never get a note for a change you made yourself.',
-          '<strong>Family check-in due</strong> \u{1F5D3}\uFE0F: For grown-ups, a reminder appears from the day a check-in is due until your family finishes it. Tick it to be reminded again in a week. It never appears when check-ins are turned off. See <a href="/help/features/family-check-in">how the family check-in works</a>.',
+          '<strong>A card moved</strong> \u{1F64B}: When someone else re-deals a card to you or away from you, you see a note like <em>"Laundry moved to Sofia on Mon, 21 Sep."</em> or <em>"You now hold Laundry, from Sofia."</em> for a week. Tap the ✕ to dismiss it any time; it stays dismissed on all your devices. You never get a note for a change you made yourself.',
+          '<strong>Family check-in due</strong> \u{1F5D3}\uFE0F: For grown-ups, a reminder appears from the day a check-in is due until your family finishes it. Tap the ✕ to be reminded again in a week. It never appears when check-ins are turned off. See <a href="/help/features/family-check-in">how the family check-in works</a>.',
         ],
       },
       {
@@ -465,7 +465,7 @@ export const HOW_IT_WORKS_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'Ahead of a birthday, party or trip, beanies can add a gentle suggested to-do for you, called a helpful hint. It appears in your briefing as <em>"Helpful hint: get a present for Emma’s party (3 Oct)"</em> with the hint’s own icon, and it sits after your other items for the day. A hint never turns into an overdue nudge. Tick it to mark it done (it leaves your to-do list too), or tap it to open it. A birthday-present hint is only ever shown to the other grown-ups, never to the person whose birthday it is. <a href="/help/features/helpful-hints">Learn more about helpful hints</a>.',
+          'Ahead of a birthday, party or trip, beanies can add a gentle suggested to-do for you, called a helpful hint. It appears in your briefing as <em>"Helpful hint: get a present for Emma’s party (3 Oct)"</em> with the hint’s own icon, and it sits after your other items for the day. A hint never turns into an overdue nudge. Tick it to mark it done (it leaves your to-do list too), tap the ✕ to dismiss it for the whole family (it will not come back for that event), or tap it to open it. A birthday-present hint is only ever shown to the other grown-ups, never to the person whose birthday it is. <a href="/help/features/helpful-hints">Learn more about helpful hints</a>.',
       },
       {
         type: 'heading',
@@ -477,6 +477,17 @@ export const HOW_IT_WORKS_ARTICLES: HelpArticle[] = [
         type: 'paragraph',
         content:
           'If someone in the family has a medication with a set number of daily doses, a reminder appears — <em>"Don’t forget: Antibiotics for Noah (2 more today)"</em> — and it counts down as doses get logged. Everyone sees these, so whoever’s doing the giving is covered, and the reminder disappears once today’s doses are all logged. Tap it to open the medication and log a dose.',
+      },
+      {
+        type: 'heading',
+        content: 'Clearing items from your briefing',
+        level: 2,
+        id: 'dismissing',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Every item in your briefing has a small ✕ on the right. Tap it once you are done with something, or when it does not need your attention today, and it leaves your briefing on all your devices. It only clears it for you: nothing is deleted, and nobody else’s briefing changes. A pickup or an activity stays cleared for that day; a to-do or a medication reminder comes back tomorrow if it still needs doing. The one exception is a helpful hint: its ✕ dismisses the hint itself, for the whole family, just like dismissing it from your to-do list.',
       },
       {
         type: 'heading',
