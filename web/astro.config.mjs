@@ -57,7 +57,11 @@ export default defineConfig({
     sitemap({
       // /oauth/* is the native OAuth return bridge — a machine-facing redirect
       // surface that must never be indexed or surfaced to a human via search.
-      filter: (page) => !page.includes('/og/') && !page.includes('/oauth/'),
+      // /unsubscribe carries a token in its URL and is noindex for the same reason.
+      filter: (page) =>
+        !page.includes('/og/') &&
+        !page.includes('/oauth/') &&
+        !/\/unsubscribe(\.html|\/)?$/.test(new URL(page).pathname),
     }),
     // Fails the build if any link into the app lacks data-cta. See the file
     // header for why this is checked on built HTML rather than in lint.

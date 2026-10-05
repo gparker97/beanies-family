@@ -12,6 +12,8 @@
   What beanies collects (nothing for ads or tracking):
     - Email + Name: ONLY on the low-volume critical-error path to the maintainer's
       alerting channel (so we can contact the family about a data-at-risk failure).
+      Email is also held in the family registry and used for occasional owner emails
+      (#115, 2026-10), hence the DeveloperAdvertising (marketing) purpose on email.
     - Crash + Other Diagnostic Data: crash/error reports + a diagnostic firehose
       used solely to keep the app working. The firehose itself is PII-free
       (correlated by a random family_id); the critical-error path additionally
@@ -75,6 +77,7 @@
 			<key>NSPrivacyCollectedDataTypePurposes</key>
 			<array>
 				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+				<string>NSPrivacyCollectedDataTypePurposeDeveloperAdvertising</string>
 			</array>
 		</dict>
 		<dict>
@@ -135,6 +138,7 @@
 			<key>NSPrivacyCollectedDataTypePurposes</key>
 			<array>
 				<string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
+				<string>NSPrivacyCollectedDataTypePurposeDeveloperAdvertising</string>
 			</array>
 		</dict>
 	</array>

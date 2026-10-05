@@ -1,0 +1,95 @@
+---
+// Landing page for the unsubscribe link in owner emails.
+//
+// SECURITY: the unsubscribe token transits this URL. Nothing here may transmit it to a third
+// party, so there is no BaseLayout (no analytics), same reasoning as oauth/native.astro. The
+// page never displays the token or an address. English only, like the rest of the marketing site.
+import '../styles/global.css';
+import '@fontsource-variable/outfit';
+import '@fontsource-variable/inter';
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="color-scheme" content="light dark" />
+    <!-- The URL carries an unsubscribe token: never send it on as a Referer (e.g. via the home link). -->
+    <meta name="referrer" content="no-referrer" />
+    <title>unsubscribe · beanies.family</title>
+    <link rel="icon" type="image/png" href="/brand/beanies_small_bean_favicon_32x32.png" />
+  </head>
+  <body
+    class="bg-cloud-white text-secondary-500 dark:bg-surface-ground dark:text-ink-soft flex min-h-dvh items-center justify-center p-6"
+  >
+    <main class="flex max-w-sm flex-col items-center text-center" id="unsub" data-state="working">
+      <img
+        src="/brand/beanies_family_hugging_transparent_192x192.png"
+        alt=""
+        width="192"
+        height="192"
+        class="mb-4 h-[7.5rem] w-[7.5rem]"
+      />
+
+      <p id="unsub-working" class="font-sans text-base">one moment…</p>
+
+      <div id="unsub-done" hidden>
+        <h1 class="dark:text-ink mb-2 font-outfit text-2xl font-bold">
+          you're unsubscribed
+        </h1>
+        <p class="mb-3 text-base">we won't send you emails like that one again.</p>
+        <p class="text-secondary-400 dark:text-ink-soft mb-3 text-sm">
+          we'll still write if there's ever a serious problem with your family's account. your
+          family and its data are untouched.
+        </p>
+        <p class="text-secondary-400 dark:text-ink-soft mb-3 text-sm">
+          changed your mind? just reply to any email from
+          <a
+            href="mailto:cbc@beanies.family"
+            class="text-primary-500 dark:text-accent-lift underline">cbc@beanies.family</a
+          >.
+        </p>
+      </div>
+
+      <div id="unsub-failed" hidden>
+        <h1 class="dark:text-ink mb-2 font-outfit text-2xl font-bold">
+          we couldn't confirm that.
+        </h1>
+        <p class="mb-3 text-base">
+          reply to any email from
+          <a
+            href="mailto:cbc@beanies.family"
+            class="text-primary-500 dark:text-accent-lift underline">cbc@beanies.family</a
+          >
+          and greg will take you off by hand.
+        </p>
+      </div>
+
+      <a
+        href="/"
+        class="border-secondary-100 text-secondary-500 dark:bg-surface-raised dark:border-line-strong dark:text-ink mt-4 inline-block rounded-2xl border bg-white px-5 py-2.5 text-sm font-semibold"
+        >go to beanies.family</a
+      >
+    </main>
+
+    <script>
+      import { confirmUnsubscribe } from '../lib/unsubscribe';
+
+      const root = document.getElementById('unsub');
+      const show = (state: 'done' | 'failed') => {
+        root?.setAttribute('data-state', state);
+        document.getElementById('unsub-working')?.setAttribute('hidden', '');
+        document.getElementById(`unsub-${state}`)?.removeAttribute('hidden');
+      };
+      const token = new URLSearchParams(location.search).get('t');
+      if (token) {
+        void confirmUnsubscribe(token).then(show);
+      } else {
+        console.warn('[unsubscribe] not confirmed: no token in the link');
+        show('failed');
+      }
+    </script>
+  </body>
+</html>

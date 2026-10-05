@@ -42,6 +42,7 @@ dist-ssr
 /.claude/skills/beanie-video
 /.claude/skills/beanies-blog
 /.claude/skills/beanies-books
+/.claude/skills/beanies-email
 /.claude/skills/beanies-competitor-analysis
 /.claude/skills/beanies-metrics
 /.claude/skills/beanies-new-issue

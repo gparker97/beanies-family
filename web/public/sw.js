@@ -15,6 +15,10 @@
  * update check.
  */
 
+// Apex pages a pre-cutover client must reload in place rather than be bounced to the app
+// origin (the app has no such route, so the visit would silently do nothing).
+const APEX_OWNED_PATHS = ['/unsubscribe'];
+
 self.addEventListener('install', () => self.skipWaiting());
 
 self.addEventListener('activate', (event) => {
@@ -33,6 +37,13 @@ self.addEventListener('activate', (event) => {
         // land on the matching app route.
         try {
           const url = new URL(client.url);
+          // Pages that now belong to the apex itself are reloaded in place, not sent to the app:
+          // an owner's emailed unsubscribe link (/unsubscribe?t=...) must reach the page that
+          // records it, or the click silently does nothing (#115).
+          if (APEX_OWNED_PATHS.some((p) => url.pathname === p || url.pathname.startsWith(p + '/'))) {
+            client.navigate(client.url);
+            return;
+          }
           const target = 'https://app.beanies.family' + url.pathname + url.search + url.hash;
           client.navigate(target);
         } catch {

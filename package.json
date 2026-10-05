@@ -21,7 +21,7 @@
     "pretest:run": "npm run sync-brand-assets",
     "test": "vitest",
     "test:run": "vitest run",
-    "test:lambda": "node --test infrastructure/lambda/telemetry/__tests__/*.test.mjs infrastructure/lambda/ai-extract/__tests__/*.test.mjs infrastructure/lambda/oauth/__tests__/*.test.mjs infrastructure/lambda/content-fetch/__tests__/*.test.mjs infrastructure/lambda/alarm-slack/__tests__/*.test.mjs infrastructure/lambda/billing/__tests__/*.test.mjs",
+    "test:lambda": "node --test infrastructure/lambda/telemetry/__tests__/*.test.mjs infrastructure/lambda/ai-extract/__tests__/*.test.mjs infrastructure/lambda/oauth/__tests__/*.test.mjs infrastructure/lambda/content-fetch/__tests__/*.test.mjs infrastructure/lambda/alarm-slack/__tests__/*.test.mjs infrastructure/lambda/billing/__tests__/*.test.mjs infrastructure/lambda/email-unsubscribe/__tests__/*.test.mjs",
     "billing:local": "node infrastructure/lambda/billing/local.mjs",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
@@ -87,6 +87,7 @@
   "devDependencies": {
     "@automerge/automerge-legacy": "npm:@automerge/automerge@3.2.6",
     "@aws-sdk/client-dynamodb": "^3.1140.0",
+    "@aws-sdk/client-sesv2": "^3.1146.0",
     "@aws-sdk/util-dynamodb": "^3.996.9",
     "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^8.5.1",

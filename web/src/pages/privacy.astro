@@ -6,7 +6,7 @@ import LegalLayout from '../layouts/LegalLayout.astro';
   title="privacy policy — beanies.family"
   description="beanies.family is local-first. your family's data lives on your device. we don't collect it, we don't store it, and we don't sell it. ever."
   canonicalPath="/privacy"
-  lastUpdated="2 October 2026"
+  lastUpdated="5 October 2026"
   breadcrumbLabel="privacy policy"
 >
   <section>
@@ -42,10 +42,10 @@ import LegalLayout from '../layouts/LegalLayout.astro';
     </p>
     <p>each entry holds:</p>
     <ul>
-      <li><strong>the family owner's email address</strong>, taken from the owner's profile, so we can reach the owner about a serious problem with their family</li>
+      <li><strong>the family owner's email address</strong>, taken from the owner's profile, so we can reach the owner about a serious problem with their family, and to send the owner occasional emails about beanies.family (product news, offers, asking for feedback); every one has a one-click unsubscribe</li>
       <li><strong>your family's name</strong>, as you typed it when you created the family</li>
       <li><strong>where the family file lives:</strong> whether it's kept on your device or in Google Drive, the file's name and, for Google Drive, its file id</li>
-      <li><strong>whether the owner opted in to our newsletter</strong></li>
+      <li><strong>whether the owner opted in to our newsletter</strong>; that choice also covers our occasional owner emails, so unticking it at sign-up opts the owner out of both</li>
       <li><strong>your country</strong>, if you set one in Settings</li>
       <li><strong>usage signals:</strong> the date the family was created, the date of the most recent sign-in (a date, not a time), which platform the family signed up on (web, iOS or Android), the approximate size of the encrypted family file, and how many members the family has (a number only, never names)</li>
       <li><strong>random ids</strong> for the family and its owner, generated on your device</li>
@@ -53,8 +53,14 @@ import LegalLayout from '../layouts/LegalLayout.astro';
       <li><strong>your answer to "how did you hear about us"</strong>, if you answered (which option you picked, never anything you typed in)</li>
     </ul>
     <p>
-      we use it to run the app and to understand how beanies.family is used overall. we do not sell
-      it or use it for advertising. it is stored with Amazon Web Services.
+      we use it to run the app and to understand how beanies.family is used overall. we don't sell
+      it or use it for third-party advertising. it is stored with Amazon Web Services.
+    </p>
+    <p>
+      <strong>unsubscribing:</strong> every owner email has a one-click unsubscribe. when someone
+      unsubscribes we keep a one-way fingerprint of their email address (not the address itself),
+      the date, and how they unsubscribed (from the email or from the unsubscribe page). we keep it
+      indefinitely, including after the family is deleted, so the unsubscribe keeps being honored.
     </p>
     <p>
       <strong>retention and deletion:</strong> the entry has no automatic expiry, because it is what
@@ -174,8 +180,11 @@ import LegalLayout from '../layouts/LegalLayout.astro';
         correlated only by a random family id, not by your name or email
       </li>
       <li>
-        <strong>what we do with it:</strong> we use it solely to diagnose and fix problems and keep
-        the app working. we do not sell it, use it for advertising, or build profiles from it
+        <strong>what we do with it:</strong> we use it to diagnose and fix problems and keep the
+        app working. one narrow exception: whether a family has used the app at all in the last
+        30 days (a yes or no, nothing more) decides whether its owner gets one of our occasional
+        "we miss you" emails. we do not sell it, use it for third-party advertising, or build
+        profiles from it
       </li>
       <li>
         <strong>retention:</strong> we keep this information only for as long as we need it to
@@ -271,7 +280,8 @@ import LegalLayout from '../layouts/LegalLayout.astro';
       <li><strong>Plausible Analytics:</strong> privacy-friendly, cookie-free analytics — on the website and in the apps</li>
       <li><strong>Google Drive:</strong> only if you explicitly enable it — encrypted data only</li>
       <li><strong>Google OAuth:</strong> only when you choose to sign in</li>
-      <li><strong>Amazon Web Services:</strong> hosts the family registry, our diagnostic logs and the first-party event record</li>
+      <li><strong>Amazon Web Services:</strong> hosts the family registry, our diagnostic logs and the first-party event record, and sends our occasional owner emails (Amazon SES)</li>
+      <li><strong>Substack:</strong> receives the owner's email address if they opt in to our newsletter at sign-up</li>
       <li><strong>Google Play's install referrer:</strong> Android only; Google passes our own utm tags from the Play link to the app on first launch</li>
       <li>
         <strong>Stripe:</strong> only if you choose a plan, from the website. Stripe takes the payment and
