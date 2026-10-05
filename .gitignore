@@ -41,6 +41,7 @@ dist-ssr
 # scripts/link-ops-skills.sh. Never commit them (no trailing slash: a symlink is a file to git).
 /.claude/skills/beanie-video
 /.claude/skills/beanies-blog
+/.claude/skills/beanies-books
 /.claude/skills/beanies-competitor-analysis
 /.claude/skills/beanies-metrics
 /.claude/skills/beanies-new-issue
