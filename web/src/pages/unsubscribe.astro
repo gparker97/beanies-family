@@ -4,9 +4,19 @@
 // SECURITY: the unsubscribe token transits this URL. Nothing here may transmit it to a third
 // party, so there is no BaseLayout (no analytics), same reasoning as oauth/native.astro. The
 // page never displays the token or an address. English only, like the rest of the marketing site.
+//
+// States (data-state on <main>): working -> unsubscribed | already | failed on load; the
+// re-subscribe button (explicit click only, never on load) -> resubscribed; "unsubscribe again"
+// -> unsubscribed | already | failed. Each [data-show] block lists the states it appears in.
 import '../styles/global.css';
 import '@fontsource-variable/outfit';
 import '@fontsource-variable/inter';
+
+const focusRing =
+  'focus-visible:ring-sky-silk-300 dark:focus-visible:ring-offset-surface-ground focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none';
+const secondaryButton = `border-secondary-100 text-secondary-500 hover:bg-cloud-white dark:bg-surface-raised dark:border-line-strong dark:text-ink dark:hover:bg-surface-hover inline-flex min-h-11 items-center justify-center rounded-2xl border bg-white px-5 py-2.5 text-sm font-semibold aria-busy:cursor-wait ${focusRing}`;
+const heading = 'dark:text-ink mb-2 font-outfit text-2xl font-bold focus:outline-none';
+const mailLink = 'text-primary-500 dark:text-accent-lift underline';
 ---
 
 <!doctype html>
@@ -33,59 +43,108 @@ import '@fontsource-variable/inter';
         class="mb-4 h-[7.5rem] w-[7.5rem]"
       />
 
-      <p id="unsub-working" class="font-sans text-base">one moment…</p>
+      <p data-show="working" class="font-sans text-base">one moment…</p>
 
-      <div id="unsub-done" hidden>
-        <h1 class="dark:text-ink mb-2 font-outfit text-2xl font-bold">
-          you're unsubscribed
-        </h1>
+      <div data-show="unsubscribed" hidden>
+        <h1 class={heading} tabindex="-1">you're unsubscribed</h1>
         <p class="mb-3 text-base">we won't send you emails like that one again.</p>
-        <p class="text-secondary-400 dark:text-ink-soft mb-3 text-sm">
+      </div>
+
+      <div data-show="already" hidden>
+        <h1 class={heading} tabindex="-1">you're already unsubscribed</h1>
+        <p class="mb-3 text-base">we won't send you emails like that one.</p>
+      </div>
+
+      <div data-show="unsubscribed already" hidden>
+        <p class="text-secondary-400 dark:text-ink-soft mb-4 text-sm">
           we'll still write if there's ever a serious problem with your family's account. your
           family and its data are untouched.
         </p>
-        <p class="text-secondary-400 dark:text-ink-soft mb-3 text-sm">
-          changed your mind? just reply to any email from
-          <a
-            href="mailto:cbc@beanies.family"
-            class="text-primary-500 dark:text-accent-lift underline">cbc@beanies.family</a
-          >.
+        <button type="button" id="resub-button" class={secondaryButton}>
+          made a mistake? re-subscribe
+        </button>
+        <p id="resub-error" role="alert" class="dark:text-ink mt-3 text-sm" hidden>
+          that didn't work. reply to any email from
+          <a href="mailto:cbc@beanies.family" class={mailLink}>cbc@beanies.family</a>
+          and greg will sort it out.
         </p>
       </div>
 
-      <div id="unsub-failed" hidden>
-        <h1 class="dark:text-ink mb-2 font-outfit text-2xl font-bold">
-          we couldn't confirm that.
-        </h1>
+      <div data-show="resubscribed" hidden>
+        <h1 class={heading} tabindex="-1">you're subscribed again</h1>
+        <p class="mb-2 text-base">
+          thanks for sticking around. you'll keep getting the occasional email from greg.
+        </p>
+        <button
+          type="button"
+          id="unsub-again"
+          class={`text-secondary-400 dark:text-ink-faint inline-flex min-h-11 items-center rounded-lg px-2 text-sm underline aria-busy:cursor-wait ${focusRing}`}
+        >
+          unsubscribe again
+        </button>
+      </div>
+
+      <div data-show="failed" hidden>
+        <h1 class={heading} tabindex="-1">we couldn't confirm that.</h1>
         <p class="mb-3 text-base">
           reply to any email from
-          <a
-            href="mailto:cbc@beanies.family"
-            class="text-primary-500 dark:text-accent-lift underline">cbc@beanies.family</a
-          >
+          <a href="mailto:cbc@beanies.family" class={mailLink}>cbc@beanies.family</a>
           and greg will take you off by hand.
         </p>
       </div>
 
-      <a
-        href="/"
-        class="border-secondary-100 text-secondary-500 dark:bg-surface-raised dark:border-line-strong dark:text-ink mt-4 inline-block rounded-2xl border bg-white px-5 py-2.5 text-sm font-semibold"
-        >go to beanies.family</a
-      >
+      <a href="/" class={`mt-4 ${secondaryButton}`}>go to beanies.family</a>
     </main>
 
     <script>
-      import { confirmUnsubscribe } from '../lib/unsubscribe';
+      import { confirmUnsubscribe, resubscribe } from '../lib/unsubscribe';
+
+      type State = 'working' | 'unsubscribed' | 'already' | 'resubscribed' | 'failed';
 
       const root = document.getElementById('unsub');
-      const show = (state: 'done' | 'failed') => {
+      const resubButton = document.getElementById('resub-button') as HTMLButtonElement | null;
+      const resubError = document.getElementById('resub-error');
+      const againButton = document.getElementById('unsub-again') as HTMLButtonElement | null;
+
+      /** Shows the blocks for `state`. After a click, moves focus to the new heading. */
+      const show = (state: State, focusHeading = false) => {
         root?.setAttribute('data-state', state);
-        document.getElementById('unsub-working')?.setAttribute('hidden', '');
-        document.getElementById(`unsub-${state}`)?.removeAttribute('hidden');
+        root?.querySelectorAll<HTMLElement>('[data-show]').forEach((el) => {
+          el.hidden = !(el.dataset.show ?? '').split(' ').includes(state);
+        });
+        if (resubError) resubError.hidden = true;
+        if (focusHeading) root?.querySelector<HTMLElement>(`[data-show~="${state}"] h1`)?.focus();
       };
+
+      /** Disables the button and says "one moment…" while `run` is in flight. */
+      const whileBusy = async <T,>(button: HTMLButtonElement, run: () => Promise<T>) => {
+        const label = button.textContent;
+        button.disabled = true;
+        button.setAttribute('aria-busy', 'true');
+        button.textContent = 'one moment…';
+        try {
+          return await run();
+        } finally {
+          button.disabled = false;
+          button.removeAttribute('aria-busy');
+          button.textContent = label;
+        }
+      };
+
       const token = new URLSearchParams(location.search).get('t');
       if (token) {
-        void confirmUnsubscribe(token).then(show);
+        void confirmUnsubscribe(token).then((result) => show(result));
+
+        resubButton?.addEventListener('click', async () => {
+          if (resubError) resubError.hidden = true;
+          const result = await whileBusy(resubButton, () => resubscribe(token));
+          if (result === 'resubscribed') show('resubscribed', true);
+          else if (resubError) resubError.hidden = false;
+        });
+
+        againButton?.addEventListener('click', async () => {
+          show(await whileBusy(againButton, () => confirmUnsubscribe(token)), true);
+        });
       } else {
         console.warn('[unsubscribe] not confirmed: no token in the link');
         show('failed');

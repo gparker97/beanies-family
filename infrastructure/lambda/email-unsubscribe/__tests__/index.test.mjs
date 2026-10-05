@@ -1,7 +1,13 @@
 /* global process, Buffer */
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { handler, __setDdbClientForTests, ALARMING_PREFIXES, PAGE_URL } from '../index.mjs';
+import {
+  handler,
+  __setDdbClientForTests,
+  ALARMING_PREFIXES,
+  PAGE_URL,
+  RESUBSCRIBE_REMEDIATION,
+} from '../index.mjs';
 import { signUnsubToken, emailHash } from '../token.mjs';
 
 const SECRET = 'test-secret-do-not-use';
@@ -13,27 +19,43 @@ const HASH = emailHash(SECRET, EMAIL);
 const originalLog = console.log;
 const originalError = console.error;
 
-// ── A tiny DynamoDB double: one table keyed by emailHash, conditional PutItem honoured ───────
+// ── A tiny DynamoDB double: one table keyed by emailHash, conditional Put/Delete honoured ────
 class PutItemCommand {
   constructor(input) {
     this.input = input;
   }
 }
-function fakeDdb({ rows = {}, putThrows = null } = {}) {
+class DeleteItemCommand {
+  constructor(input) {
+    this.input = input;
+  }
+}
+const conditionFailed = () =>
+  Object.assign(new Error('The conditional request failed'), {
+    name: 'ConditionalCheckFailedException',
+  });
+function fakeDdb({ rows = {}, putThrows = null, deleteThrows = null } = {}) {
   const calls = [];
   return {
     calls,
     rows,
     ddb: {
-      commands: { PutItemCommand },
+      commands: { PutItemCommand, DeleteItemCommand },
       async send(cmd) {
         calls.push(cmd);
+        if (cmd instanceof DeleteItemCommand) {
+          if (deleteThrows) throw deleteThrows;
+          const key = cmd.input.Key.emailHash.S;
+          if (cmd.input.ConditionExpression === 'attribute_exists(emailHash)' && !rows[key]) {
+            throw conditionFailed();
+          }
+          delete rows[key];
+          return {};
+        }
         if (putThrows) throw putThrows;
         const key = cmd.input.Item.emailHash.S;
         if (cmd.input.ConditionExpression === 'attribute_not_exists(emailHash)' && rows[key]) {
-          const e = new Error('The conditional request failed');
-          e.name = 'ConditionalCheckFailedException';
-          throw e;
+          throw conditionFailed();
         }
         rows[key] = Object.fromEntries(Object.entries(cmd.input.Item).map(([k, v]) => [k, v.S]));
         return {};
@@ -42,13 +64,20 @@ function fakeDdb({ rows = {}, putThrows = null } = {}) {
   };
 }
 
-const event = (method, { t, body, isBase64Encoded = false } = {}) => ({
-  requestContext: { http: { method } },
-  queryStringParameters: t === undefined ? undefined : { t },
-  body,
-  isBase64Encoded,
-});
+const event = (method, { t, action, body, isBase64Encoded = false } = {}) => {
+  const qs = {
+    ...(t === undefined ? {} : { t }),
+    ...(action === undefined ? {} : { action }),
+  };
+  return {
+    requestContext: { http: { method } },
+    queryStringParameters: Object.keys(qs).length ? qs : undefined,
+    body,
+    isBase64Encoded,
+  };
+};
 const post = (opts) => event('POST', opts);
+const resub = (opts) => post({ action: 'resubscribe', ...opts });
 
 let logs;
 let errors;
@@ -78,7 +107,7 @@ describe('POST /unsubscribe', () => {
     const res = await handler(post({ t: TOKEN }));
     assert.equal(res.statusCode, 200);
     assert.equal(res.headers['content-type'], 'application/json');
-    assert.deepEqual(bodyOf(res), { ok: true });
+    assert.deepEqual(bodyOf(res), { ok: true, status: 'unsubscribed' });
 
     assert.equal(fake.calls.length, 1);
     const { input } = fake.calls[0];
@@ -106,7 +135,7 @@ describe('POST /unsubscribe', () => {
     const first = fake.rows[HASH].unsubscribedAt;
     const res = await handler(post({ t: TOKEN, body: 'List-Unsubscribe=One-Click' }));
     assert.equal(res.statusCode, 200);
-    assert.deepEqual(bodyOf(res), { ok: true });
+    assert.deepEqual(bodyOf(res), { ok: true, status: 'already' });
     assert.equal(fake.rows[HASH].unsubscribedAt, first);
     assert.equal(fake.rows[HASH].source, 'page');
     assert.equal(logs[1].outcome, 'already');
@@ -200,6 +229,138 @@ describe('POST /unsubscribe', () => {
 
   it('never logs the token or an address', async () => {
     await handler(post({ t: TOKEN }));
+    const text = JSON.stringify(logs);
+    assert.ok(!text.includes(TOKEN) && !text.includes(HASH) && !text.includes(EMAIL));
+  });
+});
+
+describe('POST /unsubscribe?action=resubscribe', () => {
+  it('deletes the opt-out row with a conditional delete', async () => {
+    await handler(post({ t: TOKEN }));
+    assert.ok(fake.rows[HASH]);
+    const res = await handler(resub({ t: TOKEN }));
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(bodyOf(res), { ok: true, status: 'resubscribed' });
+    assert.equal(fake.rows[HASH], undefined);
+
+    const { input } = fake.calls[1];
+    assert.ok(fake.calls[1] instanceof DeleteItemCommand);
+    assert.deepEqual(input, {
+      TableName: TABLE,
+      Key: { emailHash: { S: HASH } },
+      ConditionExpression: 'attribute_exists(emailHash)',
+    });
+    assert.deepEqual(logs[1], {
+      msg: 'email-unsubscribe',
+      outcome: 'resubscribed',
+      source: 'page',
+      reason: null,
+      hashTail: HASH.slice(-6),
+    });
+    assert.equal(errors.length, 0);
+  });
+
+  it('is `not_unsubscribed` 200 when there is no opt-out row', async () => {
+    const res = await handler(resub({ t: TOKEN }));
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(bodyOf(res), { ok: true, status: 'not_unsubscribed' });
+    assert.equal(logs[0].outcome, 'not_unsubscribed');
+    assert.equal(errors.length, 0);
+  });
+
+  it('unsubscribe -> re-subscribe -> unsubscribe again stores a fresh row', async () => {
+    await handler(post({ t: TOKEN }));
+    await handler(resub({ t: TOKEN }));
+    const res = await handler(post({ t: TOKEN }));
+    assert.deepEqual(bodyOf(res), { ok: true, status: 'unsubscribed' });
+    assert.ok(fake.rows[HASH]);
+    assert.deepEqual(
+      logs.map((l) => l.outcome),
+      ['stored', 'resubscribed', 'stored']
+    );
+  });
+
+  it('a DynamoDB error is 500 resubscribe_failed with its own alarmed prefix', async () => {
+    const boom = Object.assign(new Error('AccessDenied'), { name: 'AccessDeniedException' });
+    fake = fakeDdb({ rows: { [HASH]: { emailHash: HASH } }, deleteThrows: boom });
+    __setDdbClientForTests(fake.ddb);
+    const res = await handler(resub({ t: TOKEN }));
+    assert.equal(res.statusCode, 500);
+    assert.deepEqual(bodyOf(res), { error: 'resubscribe_failed' });
+    assert.equal(logs[0].outcome, 'resubscribe_failed');
+    assert.equal(logs[0].reason, 'AccessDeniedException');
+    // The full hash is on the line, so greg can re-subscribe the owner by hand from the log.
+    assert.equal(logs[0].emailHash, HASH);
+    assert.equal(errors.length, 1);
+    assert.ok(errors[0][0].startsWith(ALARMING_PREFIXES.resubscribeFailed));
+    assert.ok(!errors[0][0].startsWith(ALARMING_PREFIXES.storeFailed));
+    assert.ok(errors[0][0].includes(HASH));
+    assert.ok(errors[0][0].includes(RESUBSCRIBE_REMEDIATION));
+    assert.match(errors[0][0], /dynamodb:DeleteItem/);
+    assert.equal(errors[0][1], boom);
+  });
+
+  it('without the secret: 500 resubscribe_failed, alarmed, no delete', async () => {
+    delete process.env.UNSUB_TOKEN_SECRET;
+    const res = await handler(resub({ t: TOKEN }));
+    assert.equal(res.statusCode, 500);
+    assert.deepEqual(bodyOf(res), { error: 'resubscribe_failed' });
+    assert.equal(fake.calls.length, 0);
+    assert.equal(logs[0].reason, 'secret_unset');
+    assert.equal(errors.length, 1);
+    assert.ok(errors[0][0].startsWith(ALARMING_PREFIXES.resubscribeFailed));
+  });
+
+  it('rejects invalid tokens with 400 and the same reasons, no delete', async () => {
+    const res = await handler(resub({}));
+    const res2 = await handler(resub({ t: 'garbage' }));
+    const res3 = await handler(resub({ t: signUnsubToken('another-secret', EMAIL) }));
+    for (const r of [res, res2, res3]) {
+      assert.equal(r.statusCode, 400);
+      assert.deepEqual(bodyOf(r), { error: 'invalid_token' });
+    }
+    assert.equal(fake.calls.length, 0);
+    assert.deepEqual(
+      logs.map((l) => [l.outcome, l.reason]),
+      [
+        ['invalid_token', 'missing'],
+        ['invalid_token', 'malformed'],
+        ['invalid_token', 'bad_signature'],
+      ]
+    );
+  });
+
+  it('an unknown action is 400 bad_action with no write, whatever the token', async () => {
+    for (const action of ['', 'unsubscribe', 'RESUBSCRIBE', 'delete']) {
+      const res = await handler(post({ t: TOKEN, action }));
+      assert.equal(res.statusCode, 400, `action ${JSON.stringify(action)}`);
+      assert.deepEqual(bodyOf(res), { error: 'bad_action' });
+    }
+    assert.equal(fake.calls.length, 0);
+    assert.ok(logs.every((l) => l.outcome === 'bad_action' && l.hashTail === null));
+  });
+
+  it('the action parameter alone decides: a one-click body cannot turn into a re-subscribe', async () => {
+    // A mail client's RFC 8058 POST goes to the List-Unsubscribe URL, which never has `action`,
+    // so it can only unsubscribe. The body never changes the operation either way.
+    const oneClick = 'List-Unsubscribe=One-Click';
+    await handler(post({ t: TOKEN, body: oneClick }));
+    assert.equal(fake.calls[0].constructor, PutItemCommand);
+    await handler(resub({ t: TOKEN, body: oneClick }));
+    assert.equal(fake.calls[1].constructor, DeleteItemCommand);
+    assert.deepEqual(
+      logs.map((l) => [l.outcome, l.source]),
+      [
+        ['stored', 'one-click'],
+        ['resubscribed', 'one-click'],
+      ]
+    );
+  });
+
+  it('never logs the token, the full hash or an address on success', async () => {
+    await handler(post({ t: TOKEN }));
+    await handler(resub({ t: TOKEN }));
+    await handler(resub({ t: TOKEN }));
     const text = JSON.stringify(logs);
     assert.ok(!text.includes(TOKEN) && !text.includes(HASH) && !text.includes(EMAIL));
   });

@@ -8,6 +8,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-10-06
+
+### Added
+
+- The email unsubscribe page now has a one-tap re-subscribe, and says so when you are already unsubscribed.
+
+### Changed
+
+- The privacy policy now makes clear that owner emails are separate from the Substack newsletter, and that the only activity used to choose who gets a "we miss you" email is a count of app uses.
+
 ## 2026-10-05
 
 ### Security
