@@ -27,7 +27,7 @@ import {
   DriveFileNotFoundError,
   DriveApiError,
 } from '@/services/google/driveService';
-import { requestAccessToken } from '@/services/google/googleAuth';
+import { getValidTokenSilent } from '@/services/google/googleAuth';
 import { docVersion, isDocLoaded } from '@/services/automerge/docService';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { useSyncStore } from '@/stores/syncStore';
@@ -89,7 +89,11 @@ export async function runSweep(driveFileId: string): Promise<boolean> {
 
     let token: string;
     try {
-      token = await requestAccessToken();
+      // ⚠️ SILENT ONLY. This is background work nobody asked for, so it must never
+      // start an interactive sign-in: `requestAccessToken` opens a popup first, and
+      // on Android that popup became full Chrome on a blank page on every cold start
+      // (2026-10-05). No silent token means skip and retry next session.
+      token = await getValidTokenSilent();
     } catch (e) {
       logEvent({
         level: 'warn',

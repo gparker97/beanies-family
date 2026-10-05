@@ -872,11 +872,32 @@ export async function loadGIS(): Promise<void> {
 }
 
 /**
+ * The native refusal kinds already reported this session. Once per kind: a lapsed
+ * grant makes every per-photo caller refuse, and an unthrottled warn per call would
+ * spend the shared `native-oauth` rate budget the redirect diagnostics need.
+ */
+const nativeRefusalsLogged = new Set<string>();
+
+function noteNativeRefusal(
+  detail: 'choose-account' | 'force-consent' | 'refresh-failed' | 'no-refresh-token'
+): void {
+  if (nativeRefusalsLogged.has(detail)) return;
+  nativeRefusalsLogged.add(detail);
+  logEvent({
+    level: 'warn',
+    surface: 'native-oauth',
+    message: 'native token request needs a reconnect; no popup on native',
+    context: { action: 'native-interactive-refused', detail },
+  });
+}
+
+/**
  * Request an OAuth access token via PKCE popup flow.
  *
  * If a valid token exists, returns it immediately.
  * If a refresh token is available, tries silent refresh first.
- * Otherwise, opens the Google consent popup.
+ * Otherwise, opens the Google consent popup (web only: on native it never opens a
+ * popup or iframe, and a request that would need one throws `TokenExpiredError`).
  *
  * Concurrent calls are deduplicated — only one popup auth flow runs at a time.
  * Additional callers receive the same promise. This prevents PKCE verifier
@@ -931,6 +952,42 @@ export async function requestAccessToken(options?: {
     throw new Error(
       'Google Client ID not configured. Set VITE_GOOGLE_CLIENT_ID in your .env file.'
     );
+  }
+
+  // ⚠️ NO POPUP, AND NO SILENT IFRAME, ON NATIVE. Capacitor Android hands every
+  // WebView navigation whose host is not the app's to the OS as an ACTION_VIEW
+  // intent, so the web path's `window.open('about:blank')` opened FULL CHROME on a
+  // blank page, and the silent auth-code iframe would open Chrome on Google's URL.
+  // The popup could never complete here either: native interactive auth is the
+  // system-browser redirect (`startRedirectAuth`). Shipped as a blank Chrome page on
+  // every Android cold start once the photo public-link sweep began asking for a
+  // token in the background (2026-10-05). On native the only paths are the cached
+  // token and the refresh token; anything more is a reconnect, which callers
+  // already handle from `TokenExpiredError`.
+  //
+  // ABOVE the `wantsFreshGrant` clear, deliberately: a fresh grant cannot be
+  // obtained here, so refusing must not first throw away a working token. And the
+  // refresh is attempted without checking `currentRefreshToken`, because
+  // `attemptSilentRefresh` reloads it from IndexedDB on a cold start.
+  if (isNative()) {
+    const freshGrant = Boolean(options?.forceConsent || options?.chooseAccount);
+    if (!freshGrant) {
+      if (isTokenValid()) return accessToken!;
+      const silentToken = await attemptSilentRefresh();
+      if (silentToken) return silentToken;
+      // A reconnect can land while this request waited on the refresh above.
+      if (isTokenValid()) return accessToken!;
+    }
+    noteNativeRefusal(
+      options?.chooseAccount
+        ? 'choose-account'
+        : options?.forceConsent
+          ? 'force-consent'
+          : currentRefreshToken
+            ? 'refresh-failed'
+            : 'no-refresh-token'
+    );
+    throw new TokenExpiredError();
   }
 
   // ⚠️ `chooseAccount` MUST BYPASS EVERY SILENT PATH BELOW, not just the consent screen.
@@ -1974,6 +2031,15 @@ export async function getValidToken(): Promise<string> {
   // Try silent refresh first (no popup)
   const silentToken = await attemptSilentRefresh();
   if (silentToken) return silentToken;
+
+  // Native has no interactive fallback (see `requestAccessToken`'s native block), and
+  // handing over would run a SECOND full refresh on the same token: double the wait,
+  // and a double count on the failure counter that escalates to the reconnect banner
+  // from a single call. The one attempt above is the whole native answer.
+  if (isNative()) {
+    noteNativeRefusal(currentRefreshToken ? 'refresh-failed' : 'no-refresh-token');
+    throw new TokenExpiredError();
+  }
 
   // Fall back to interactive auth.
   // Force consent when we have no refresh token — Google only issues
@@ -3443,6 +3509,7 @@ async function completeNativeAuthRedirect(
 
 /** Test-only — remove the native auth listeners + reset install state and any armed trip. */
 export function __resetNativeAuthForTesting(): void {
+  nativeRefusalsLogged.clear();
   void nativeAuthListenerHandle?.remove();
   nativeAuthListenerHandle = null;
   nativeAuthListenerInstalled = false;

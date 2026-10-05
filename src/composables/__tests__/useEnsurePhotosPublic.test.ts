@@ -9,6 +9,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   isDocLoaded: vi.fn(() => true),
   setPublicLinkPermission: vi.fn(async () => undefined),
+  getValidTokenSilent: vi.fn(async () => 'tok'),
   requestAccessToken: vi.fn(async () => 'tok'),
   logEvent: vi.fn(),
   photos: {} as Record<string, { id: string; driveFileId: string; deletedAt?: string }>,
@@ -33,7 +34,10 @@ vi.mock('@/services/google/driveService', () => {
     DriveFileNotFoundError,
   };
 });
-vi.mock('@/services/google/googleAuth', () => ({ requestAccessToken: mocks.requestAccessToken }));
+vi.mock('@/services/google/googleAuth', () => ({
+  getValidTokenSilent: mocks.getValidTokenSilent,
+  requestAccessToken: mocks.requestAccessToken,
+}));
 vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: mocks.logEvent }));
 vi.mock('@/stores/syncStore', () => ({ useSyncStore: () => ({ driveFileId: 'pod-1' }) }));
 vi.mock('@/stores/photoStore', () => ({ usePhotoStore: () => ({ photos: mocks.photos }) }));
@@ -65,6 +69,7 @@ describe('useEnsurePhotosPublic.runSweep', () => {
     session.clear();
     mocks.isDocLoaded.mockReturnValue(true);
     mocks.setPublicLinkPermission.mockReset().mockResolvedValue(undefined);
+    mocks.getValidTokenSilent.mockReset().mockResolvedValue('tok');
     mocks.requestAccessToken.mockReset().mockResolvedValue('tok');
     mocks.logEvent.mockClear();
     for (const k of Object.keys(mocks.photos)) delete mocks.photos[k];
@@ -98,8 +103,17 @@ describe('useEnsurePhotosPublic.runSweep', () => {
     expect(mocks.setPublicLinkPermission).not.toHaveBeenCalled();
   });
 
+  it('never starts an interactive sign-in (background work: silent token only)', async () => {
+    // `requestAccessToken` opens a popup first; on Android that popup became full Chrome on
+    // a blank page on every cold start (2026-10-05).
+    mocks.getValidTokenSilent.mockRejectedValueOnce(new Error('silent refresh failed'));
+    expect(await runSweep(id)).toBe(false);
+    expect(await runSweep(id)).toBe(true);
+    expect(mocks.requestAccessToken).not.toHaveBeenCalled();
+  });
+
   it('a token failure leaves the session unmarked so the next trigger retries', async () => {
-    mocks.requestAccessToken.mockRejectedValueOnce(new Error('no session'));
+    mocks.getValidTokenSilent.mockRejectedValueOnce(new Error('no session'));
     expect(await runSweep(id)).toBe(false);
     expect(session.size).toBe(0);
     expect(events('sweep-skipped')).toEqual([{ action: 'sweep-skipped', error_code: 'no-token' }]);

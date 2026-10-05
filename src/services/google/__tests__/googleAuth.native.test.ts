@@ -630,4 +630,109 @@ describe('googleAuth — native (Capacitor) OAuth deep-link (ADR-029 A2)', () =>
       );
     });
   });
+
+  // ── requestAccessToken on native: no popup, no silent iframe (2026-10-05) ──
+  // Capacitor Android hands every off-origin WebView navigation to the OS, so the
+  // web popup's `window.open('about:blank')` opened full Chrome on a blank page on
+  // every Android cold start (the photo sweep asks for a token in the background).
+
+  it('requestAccessToken (native, no refresh token) throws TokenExpiredError and opens nothing', async () => {
+    const open = vi.spyOn(window, 'open');
+    const appendChild = vi.spyOn(document.body, 'appendChild');
+    await expect(googleAuth.requestAccessToken()).rejects.toBeInstanceOf(
+      googleAuth.TokenExpiredError
+    );
+    expect(open).not.toHaveBeenCalled();
+    expect(appendChild).not.toHaveBeenCalled(); // no silent auth-code iframe either
+    expect(browserOpen).not.toHaveBeenCalled();
+    open.mockRestore();
+    appendChild.mockRestore();
+  });
+
+  it('requestAccessToken (native) still returns a token from the refresh token, with no popup', async () => {
+    const { refreshAccessToken } = await import('../oauthProxy');
+    (refreshAccessToken as ReturnType<typeof vi.fn>).mockResolvedValue({
+      access_token: 'refreshed',
+      expires_in: 3600,
+      token_type: 'Bearer',
+      scope: 'drive.file userinfo.email',
+    });
+    googleAuth.primeRefreshToken('fam-1', { token: 'rt', issuedAt: Date.now() });
+    const open = vi.spyOn(window, 'open');
+    await expect(googleAuth.requestAccessToken()).resolves.toBe('refreshed');
+    expect(open).not.toHaveBeenCalled();
+    open.mockRestore();
+  });
+
+  it('requestAccessToken (native, chooseAccount) never opens a popup', async () => {
+    const open = vi.spyOn(window, 'open');
+    await expect(googleAuth.requestAccessToken({ chooseAccount: true })).rejects.toBeInstanceOf(
+      googleAuth.TokenExpiredError
+    );
+    expect(open).not.toHaveBeenCalled();
+    open.mockRestore();
+  });
+
+  it('requestAccessToken (native) refreshes from the IndexedDB token on a cold start (nothing in memory yet)', async () => {
+    const { refreshAccessToken } = await import('../oauthProxy');
+    (refreshAccessToken as ReturnType<typeof vi.fn>).mockResolvedValue({
+      access_token: 'from-idb',
+      expires_in: 3600,
+      token_type: 'Bearer',
+      scope: 'drive.file userinfo.email',
+    });
+    const { getGoogleRefreshToken } = await import('@/services/sync/fileHandleStore');
+    (getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockResolvedValue({
+      token: 'rt-on-disk',
+      issuedAt: Date.now(),
+    });
+    await expect(googleAuth.requestAccessToken()).resolves.toBe('from-idb');
+  });
+
+  it('a native forceConsent refusal does not throw away a working token', async () => {
+    const { refreshAccessToken } = await import('../oauthProxy');
+    (refreshAccessToken as ReturnType<typeof vi.fn>).mockResolvedValue({
+      access_token: 'working',
+      expires_in: 3600,
+      token_type: 'Bearer',
+      scope: 'drive.file userinfo.email',
+    });
+    googleAuth.primeRefreshToken('fam-1', { token: 'rt', issuedAt: Date.now() });
+    await expect(googleAuth.requestAccessToken()).resolves.toBe('working');
+    await expect(googleAuth.requestAccessToken({ forceConsent: true })).rejects.toBeInstanceOf(
+      googleAuth.TokenExpiredError
+    );
+    (refreshAccessToken as ReturnType<typeof vi.fn>).mockClear();
+    await expect(googleAuth.requestAccessToken()).resolves.toBe('working');
+    expect(refreshAccessToken).not.toHaveBeenCalled(); // the cached token survived
+  });
+
+  it('logs a native refusal once per kind per session, not once per call', async () => {
+    const { logEvent } = await import('@/services/telemetry');
+    for (let i = 0; i < 3; i++) {
+      await expect(googleAuth.requestAccessToken()).rejects.toBeInstanceOf(
+        googleAuth.TokenExpiredError
+      );
+    }
+    const refusals = (logEvent as ReturnType<typeof vi.fn>).mock.calls.filter(
+      (c) =>
+        (c[0] as { context?: { action?: string } }).context?.action === 'native-interactive-refused'
+    );
+    expect(refusals).toHaveLength(1);
+  });
+
+  it('getValidToken (native) refuses after its own one attempt, labelled by cause (no second refresh via requestAccessToken)', async () => {
+    const { logEvent } = await import('@/services/telemetry');
+    const open = vi.spyOn(window, 'open');
+    await expect(googleAuth.getValidToken()).rejects.toBeInstanceOf(googleAuth.TokenExpiredError);
+    const details = (logEvent as ReturnType<typeof vi.fn>).mock.calls
+      .map((c) => c[0] as { context?: { action?: string; detail?: string } })
+      .filter((e) => e.context?.action === 'native-interactive-refused')
+      .map((e) => e.context?.detail);
+    // Before the fix this went through requestAccessToken({ forceConsent: true }) and was
+    // mislabelled 'force-consent' for a device that simply has no refresh token.
+    expect(details).toEqual(['no-refresh-token']);
+    expect(open).not.toHaveBeenCalled();
+    open.mockRestore();
+  });
 });
