@@ -24,7 +24,10 @@
  * `syncStore` call sites and this store's own `refresh()`), so `syncStore` needs no edit and
  * any GET it makes also refreshes the plan. `syncStore.checkCanonicalPod` makes one per family
  * per session on EVERY provider (local-file included) once a provider is set and the device is
- * online, then latches.
+ * online, then latches. It has two triggers: App init's boot health check, which every
+ * successful open reaches (cache-first included), and `verifyPodAccess` on sign-in. Until
+ * 2026-10-05 only the sign-in trigger existed, so a returning device read its plan from cache
+ * until the hourly poll (`docs/plans/2026-10-05-boot-registry-check.md`).
  *
  * This store starts its own lookups in exactly ONE place, `ask(reason)`, and for four reasons:
  *   - `activation`: a family became active and this device has NO usable cache for it;

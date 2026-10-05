@@ -21,6 +21,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
+- The Android app no longer opens a blank browser page each time it starts.
+- The app now picks up family settings every time it opens, not only after signing in.
 - A dismissed helpful hint no longer comes back the next day.
 
 - The deploy classifier no longer skips the marketing site (or any target) when its last deploy came from a commit that is missing after a history rewrite; it diffs from the newest older deploy it can find, or reports the target as needing a deploy.

@@ -1539,6 +1539,13 @@ onMounted(async () => {
       if (!isLoaded()) throw new Error('no document loaded');
       docLoaded = true;
       initBreadcrumbs.push('health: automerge doc OK');
+      // The session's registry read, on EVERY successful boot. This is the one
+      // point all of `loadFamilyData`'s paths converge on, cache-first included;
+      // before 2026-10-05 only a sign-in (`verifyPodAccess`) ran it, so a returning
+      // device never received the Counter-write policy, a plan change, or the
+      // canonical-pod check. Fire-and-forget, latched per family, fail-open, and
+      // it cannot throw into this `try` (async, with its own catch).
+      void syncStore.checkCanonicalPod('boot');
       // App booted successfully — reset the chunk-load retry counter so
       // the next deploy gap gets its own full budget. (This used to live
       // in router.afterEach, but firing-on-every-nav defeated the

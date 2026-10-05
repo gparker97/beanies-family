@@ -273,6 +273,12 @@ vi.mock('@/services/telemetry/logEvent', () => ({
 }));
 
 vi.mock('@/services/sync/offlineQueue', () => ({ clearQueue: vi.fn() }));
+// Only `verifyEnvelope` is replaced (the worker cannot run here), so a rebind can
+// reach its success path; every other docClient export is the real one.
+vi.mock('@/services/automerge/worker/docClient', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/services/automerge/worker/docClient')>()),
+  verifyEnvelope: vi.fn(async () => undefined),
+}));
 vi.mock('@/services/indexeddb/database', () => ({
   getActiveFamilyId: vi.fn(() => 'family-123'),
   closeDatabase: vi.fn(async () => {}),
@@ -326,8 +332,14 @@ vi.mock('@/stores/syncHighlightStore', () => ({
     clearHighlights: vi.fn(),
   }),
 }));
+// Mutable: the canonical check reads the active family at call time and again
+// after its lookup, so the no-family and family-switch cases need to move it.
+const familyCtx = vi.hoisted(() => ({
+  activeFamilyId: 'family-123' as string | null,
+  activeFamilyName: 'Test Family',
+}));
 vi.mock('@/stores/familyContextStore', () => ({
-  useFamilyContextStore: () => ({ activeFamilyId: 'family-123', activeFamilyName: 'Test Family' }),
+  useFamilyContextStore: () => familyCtx,
 }));
 
 import { useSyncStore } from '@/stores/syncStore';
@@ -358,6 +370,7 @@ describe('syncStore.verifyPodAccess', () => {
     mockGetProviderFamilyId.mockReturnValue('family-123');
     mockGetProviderType.mockReturnValue('google_drive');
     mockGetProvider.mockReturnValue(makeDriveProvider());
+    familyCtx.activeFamilyId = 'family-123';
   });
 
   // ── The inverted tests: the exact behaviour that caused the incident ───────
@@ -513,7 +526,7 @@ describe('syncStore.verifyPodAccess', () => {
   });
 
   it('checks the canonical pod at most once per family per session', async () => {
-    // verifyPodAccess runs on every load path INCLUDING retry, so an unguarded
+    // verifyPodAccess runs on every sign-in and every banner retry, so an unguarded
     // check turns a retry loop into a registry request loop.
     const store = useSyncStore();
     await store.verifyPodAccess();
@@ -522,6 +535,205 @@ describe('syncStore.verifyPodAccess', () => {
     await new Promise((r) => setTimeout(r, 0));
     expect(mockLookupFamilyResult).toHaveBeenCalledTimes(1);
   });
+
+  it('shares the latch between the boot trigger and a later sign-in', async () => {
+    // The boot health check reads the registry; a sign-in in the same session must
+    // not GET again.
+    const store = useSyncStore();
+    await store.checkCanonicalPod('boot');
+    await store.verifyPodAccess();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(mockLookupFamilyResult).toHaveBeenCalledTimes(1);
+  });
+
+  // ── The boot trigger (2026-10-05: a returning device never read the registry) ──
+
+  /** The `canonical-check` events logged so far, as `[action, detail]` pairs. */
+  function canonicalEvents(): Array<[unknown, unknown]> {
+    return mockLogEvent.mock.calls
+      .map((c) => c[0] as { surface?: string; context?: { action?: unknown; detail?: unknown } })
+      .filter((e) => e.surface === 'canonical-check')
+      .map((e) => [e.context?.action, e.context?.detail]);
+  }
+
+  const MISMATCH_ENTRY = {
+    status: 'found',
+    entry: {
+      familyId: 'family-123',
+      provider: 'google_drive',
+      fileId: 'THE-REAL-FAMILY-FILE',
+      displayPath: 'Family.beanpod',
+      updatedAt: '2026-08-10',
+    },
+  };
+
+  it('pins the registry read for a LOCAL provider (it feeds entitlement and Counter policy)', async () => {
+    // Narrowing the check to Drive would silently stop plan and Counter-policy
+    // delivery to every local family.
+    mockGetProviderType.mockReturnValue('local');
+    mockLookupFamilyResult.mockResolvedValue({
+      status: 'found',
+      entry: { familyId: 'family-123', provider: 'local', updatedAt: '2026-10-05' },
+    });
+    const store = useSyncStore();
+    await store.checkCanonicalPod('boot');
+    expect(mockLookupFamilyResult).toHaveBeenCalledTimes(1);
+    expect(canonicalEvents()).toEqual([['found', 'boot']]);
+  });
+
+  it('does not GET or latch while offline at boot, so a later sign-in still checks', async () => {
+    const store = useSyncStore();
+    const onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    try {
+      await store.checkCanonicalPod('boot');
+    } finally {
+      onLine.mockRestore();
+    }
+    expect(mockLookupFamilyResult).not.toHaveBeenCalled();
+    expect(canonicalEvents()).toEqual([['skipped-offline', 'boot']]);
+
+    await store.verifyPodAccess();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(mockLookupFamilyResult).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not GET or latch at boot with no provider installed', async () => {
+    // Only the boot trigger reaches this gate: verifyPodAccess returns NO_HOME first.
+    mockGetProvider.mockReturnValue(null);
+    const store = useSyncStore();
+    await store.checkCanonicalPod('boot');
+    expect(mockLookupFamilyResult).not.toHaveBeenCalled();
+    expect(canonicalEvents()).toEqual([['skipped-no-provider', 'boot']]);
+
+    mockGetProvider.mockReturnValue(makeDriveProvider());
+    await store.checkCanonicalPod('boot');
+    expect(mockLookupFamilyResult).toHaveBeenCalledTimes(1);
+  });
+
+  it('never compares a provider that belongs to ANOTHER family', async () => {
+    mockGetProviderFamilyId.mockReturnValue('some-other-family');
+    mockLookupFamilyResult.mockResolvedValue(MISMATCH_ENTRY);
+    const store = useSyncStore();
+    await store.checkCanonicalPod('boot');
+    expect(mockLookupFamilyResult).not.toHaveBeenCalled();
+    expect(store.podAccessError).toBeNull();
+    expect(canonicalEvents()).toEqual([['skipped-no-provider', 'boot']]);
+  });
+
+  it('logs one canonical-check event per run, with outcome and trigger, and none when latched', async () => {
+    familyCtx.activeFamilyId = null;
+    const store = useSyncStore();
+    await store.checkCanonicalPod('boot');
+    familyCtx.activeFamilyId = 'family-123';
+
+    mockLookupFamilyResult.mockResolvedValueOnce({ status: 'unavailable' });
+    await store.checkCanonicalPod('boot');
+    await store.checkCanonicalPod('pod-access'); // latched: not logged
+
+    expect(canonicalEvents()).toEqual([
+      ['skipped-no-family', 'boot'],
+      ['unavailable', 'boot'],
+    ]);
+  });
+
+  it.each([
+    ['absent', { status: 'absent' }],
+    [
+      'found',
+      {
+        status: 'found',
+        entry: {
+          familyId: 'family-123',
+          provider: 'google_drive',
+          fileId: 'drive-file-id',
+          updatedAt: '2026-10-05',
+        },
+      },
+    ],
+    ['mismatch', MISMATCH_ENTRY],
+  ])('reports %s from the lookup answer', async (outcome, answer) => {
+    mockLookupFamilyResult.mockResolvedValue(answer);
+    const store = useSyncStore();
+    await store.checkCanonicalPod('pod-access');
+    expect(canonicalEvents()).toEqual([[outcome, 'pod-access']]);
+  });
+
+  it('drops an answer that lands after the session moved on (superseded)', async () => {
+    // A sign-out or family switch during the boot GET must never raise the old
+    // family's mismatch in the new session.
+    let answer!: (v: unknown) => void;
+    mockLookupFamilyResult.mockImplementation(() => new Promise((resolve) => (answer = resolve)));
+    const store = useSyncStore();
+    const running = store.checkCanonicalPod('boot');
+    await vi.waitFor(() => expect(mockLookupFamilyResult).toHaveBeenCalledTimes(1));
+
+    store.resetState();
+    answer(MISMATCH_ENTRY);
+    await running;
+
+    expect(store.podAccessError).toBeNull();
+    expect(canonicalEvents()).toEqual([['superseded', 'boot']]);
+  });
+
+  it('a successful rebind re-arms the latch, so the next verify compares the new file', async () => {
+    // The pod moved, so the once-per-session answer is stale. Without the re-arm a boot
+    // answer dropped as `superseded` by the rebind's provider swap left the session
+    // marked checked, and a rebind onto a copy was never compared.
+    const store = useSyncStore();
+    await store.checkCanonicalPod('boot');
+    expect(mockLookupFamilyResult).toHaveBeenCalledTimes(1);
+
+    store.familyKey = {} as CryptoKey;
+    store.envelope = { familyId: 'family-123' } as never;
+    mockFromExisting.mockReturnValueOnce({
+      ...makeDriveProvider(),
+      read: async () => '{"version":"4.0"}',
+    });
+    vi.mocked(parseBeanpodV4).mockReturnValueOnce({ familyId: 'family-123' } as never);
+    const result = await store.rebindPodFile('file-new', 'Family.beanpod');
+    expect(result.ok).toBe(true);
+
+    await store.verifyPodAccess();
+    await vi.waitFor(() => expect(mockLookupFamilyResult).toHaveBeenCalledTimes(2));
+    store.resetState(); // stops the file polling the successful rebind started
+  });
+
+  // ── A boot-raised mismatch is never silently lost ──────────────────────────
+
+  it('re-derives a boot mismatch when a later ok verify replaces it', async () => {
+    mockLookupFamilyResult.mockResolvedValue(MISMATCH_ENTRY);
+    const store = useSyncStore();
+    await store.checkCanonicalPod('boot');
+    expect(store.podAccessError?.code).toBe('CANONICAL_MISMATCH');
+
+    await store.verifyPodAccess();
+    await vi.waitFor(() => expect(store.podAccessError?.code).toBe('CANONICAL_MISMATCH'));
+    expect(mockLookupFamilyResult).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([
+    ['CONSENT_EXPIRED', () => mockTryGetSilentToken.mockResolvedValueOnce(null)],
+    [
+      'VERIFY_UNAVAILABLE',
+      () => mockTryGetSilentToken.mockRejectedValueOnce(new Error('token layer threw')),
+    ],
+  ])(
+    're-derives a boot mismatch after a %s verify and then an ok one',
+    async (failureCode, failNextVerify) => {
+      mockLookupFamilyResult.mockResolvedValue(MISMATCH_ENTRY);
+      const store = useSyncStore();
+      await store.checkCanonicalPod('boot');
+
+      failNextVerify();
+      await store.verifyPodAccess();
+      expect(store.podAccessError?.code).toBe(failureCode);
+      expect(mockLookupFamilyResult).toHaveBeenCalledTimes(1);
+
+      await store.verifyPodAccess();
+      await vi.waitFor(() => expect(store.podAccessError?.code).toBe('CANONICAL_MISMATCH'));
+      expect(mockLookupFamilyResult).toHaveBeenCalledTimes(2);
+    }
+  );
 
   // ── The invariant ─────────────────────────────────────────────────────────
 

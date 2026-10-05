@@ -79,7 +79,7 @@ Clients mark deliberate re-points with `pointerIntent: true`. A refused _deliber
 
 - #47's restored-backup case no longer self-heals. A `.beanpod` opened with no provider reports `NO_HOME` and offers `pickFamilyFile`; the user must choose a file. That is one extra tap in a rare flow, traded for never forking a family's data — the right trade, but it is a real regression in convenience and worth watching for confusion.
 - `switchToCanonical` can fail on a device that has never opened the canonical file (no `drive.file` scope for it). It falls back to the picker, which grants scope as a side effect — an extra step in an already-degraded state.
-- The canonical check costs one registry round-trip per family per session. Bounded deliberately: `verifyPodAccess` runs on every load path including `retry`, so an unguarded check would turn a retry loop into a request loop.
+- The canonical check costs one registry round-trip per family per session. Bounded deliberately: it runs from App init's boot health check and from `verifyPodAccess` (every sign-in and every banner `retry`), so an unguarded check would double the boot GET on a sign-in and turn a retry loop into a request loop. (The boot trigger was added 2026-10-05; before it, a returning device never ran the check at all.)
 - Families already forked by the old code are **not** repaired by this change. Recovery is operational — see the plan's Remediation section.
 
 ## Related

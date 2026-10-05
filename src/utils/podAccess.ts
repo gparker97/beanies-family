@@ -298,6 +298,28 @@ export interface PodAccessFailure {
 
 export type PodAccessResult = { ok: true } | PodAccessFailure;
 
+/**
+ * What started a `syncStore.checkCanonicalPod` run: App init's boot health check,
+ * or `verifyPodAccess` (sign-in and banner retries). Rides `detail` on the
+ * `canonical-check` event.
+ */
+export type CanonicalCheckTrigger = 'boot' | 'pod-access';
+
+/**
+ * Where a canonical check stopped; rides `action` on the `canonical-check` event.
+ * `latched` (already checked this session) is the one outcome never logged.
+ */
+export type CanonicalCheckOutcome =
+  | 'skipped-no-family'
+  | 'latched'
+  | 'skipped-no-provider'
+  | 'skipped-offline'
+  | 'superseded'
+  | 'absent'
+  | 'unavailable'
+  | 'found'
+  | 'mismatch';
+
 /** Shape of the `getFileMetadata(…, 'capabilities/canEdit,trashed')` response. */
 export interface PodFileMetadata {
   /**

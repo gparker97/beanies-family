@@ -93,6 +93,8 @@ import {
   classifyDriveFailure,
   driveStatusOf,
   evaluatePodMetadata,
+  type CanonicalCheckOutcome,
+  type CanonicalCheckTrigger,
   type PodAccessErrorCode,
   type PodAccessFailure,
   type PodAccessResult,
@@ -923,7 +925,8 @@ export const useSyncStore = defineStore('sync', () => {
 
   /**
    * The one piece of pod-access state. Set by `verifyPodAccess` /
-   * `checkCanonicalPod`, cleared by `rebindPodFile` and `resetState`, rendered by
+   * `checkCanonicalPod`; cleared by `rebindPodFile`, `resetState` and an ok
+   * `verifyPodAccess` (through `replacePodAccessError`); rendered by
    * exactly one component (`PodAccessBanner`). `LoadPodView` sets it and renders
    * nothing — two renderers for one condition drift, can appear simultaneously,
    * and double every future copy change.
@@ -1022,9 +1025,10 @@ export const useSyncStore = defineStore('sync', () => {
   let configHealInFlight = false;
   // Guards `verifyPodAccess` against overlapping runs (repeated `retry` taps).
   let verifyInFlight = false;
-  // The canonical check runs at most once per family per session — `verifyPodAccess`
-  // runs on every load path including `retry`, so an unguarded check would turn a
-  // retry loop into a registry request loop.
+  // The canonical check runs at most once per family per session. It has two
+  // triggers, App init's boot health check and `verifyPodAccess` (sign-in and every
+  // banner `retry`), so an unguarded check would double the boot GET on a sign-in
+  // and turn a retry loop into a registry request loop.
   let checkedCanonicalFor: string | null = null;
 
   /**
@@ -1033,11 +1037,16 @@ export const useSyncStore = defineStore('sync', () => {
    * ⚠️ THE LATCH HAS TO BE CLEARED BY THE EVENTS THAT INVALIDATE IT, and it was
    * cleared only by `resetState`. The check runs at most once per family per
    * session (an unguarded one turns a retry loop into a registry request loop —
-   * `verifyPodAccess` runs on every load path including `retry`), so anything
+   * `verifyPodAccess` runs on every sign-in and every banner `retry`), so anything
    * that MOVES the family's pod leaves the guard latched on a stale answer for
    * the rest of the session. A storage migration is exactly that: after "Move
    * to Google Drive" the one check that catches a device writing to a copy
    * instead of the family's real file was silently disabled.
+   *
+   * Callers, one per invalidating event: `resetState` (sign-out / family switch),
+   * `migrateStorage` and `rebindPodFile` (the pod moved), and
+   * `replacePodAccessError` (a verify replacing a `CANONICAL_MISMATCH` that the
+   * boot check raised, so the verify's own check re-derives it).
    *
    * A named function rather than four raw assignments to a module-level string,
    * because that is how a latch quietly stops being cleared.
@@ -5295,22 +5304,38 @@ export const useSyncStore = defineStore('sync', () => {
     verifyInFlight = true;
     try {
       const result = await runPodAccessCheck();
-      podAccessError.value = result.ok ? null : result;
+      replacePodAccessError(result.ok ? null : result);
       logPodAccessResult(result);
       // Fire-and-forget: a network round-trip the user must never wait on, and
       // which must never throw into the load path.
-      if (result.ok) void checkCanonicalPod();
+      if (result.ok) void checkCanonicalPod('pod-access');
       return result;
     } catch (e) {
       // A throw here must never block the user reaching already-decrypted data.
       console.error('[syncStore.verifyPodAccess] unexpected failure:', e);
-      const result: PodAccessResult = { ok: false, code: 'VERIFY_UNAVAILABLE' };
-      podAccessError.value = result;
+      const result: PodAccessFailure = { ok: false, code: 'VERIFY_UNAVAILABLE' };
+      replacePodAccessError(result);
       logPodAccessResult(result, e);
       return result;
     } finally {
       verifyInFlight = false;
     }
+  }
+
+  /**
+   * `verifyPodAccess`'s only way to replace the banner state.
+   *
+   * ⚠️ A `CANONICAL_MISMATCH` CAN BE RAISED BEFORE ANY VERIFY RUNS. The boot
+   * health check runs the canonical check without `verifyPodAccess`, so a later
+   * verify (a sign-in, a banner reconnect) may be the thing that replaces it. The
+   * latch would then keep the check from ever raising it again, and a critical
+   * banner would vanish for the rest of the session. Re-arming the latch here
+   * means the verify's own ok-path check re-derives the mismatch from a fresh
+   * registry answer, or correctly leaves it cleared if the registry was repaired.
+   */
+  function replacePodAccessError(next: PodAccessFailure | null): void {
+    if (podAccessError.value?.code === 'CANONICAL_MISMATCH') invalidateCanonicalCheck();
+    podAccessError.value = next;
   }
 
   /** The decision itself, split out so `verifyPodAccess` owns only state + logging. */
@@ -5351,104 +5376,40 @@ export const useSyncStore = defineStore('sync', () => {
   }
 
   /**
-   * Is the file we're writing to actually the one the family shares?
+   * Is the file we're writing to actually the one the family shares? And, in the
+   * same GET, the session's one read of the family registry.
+   *
+   * ⚠️ THIS IS THE PER-SESSION REGISTRY READ, NOT ONLY A CANONICAL CHECK. Every
+   * observer on `registryService` is fed by its lookup: `entitlementStore` (the
+   * plan) and `counterWritesPolicy` (the #117 Counter-write switch) rely on it for
+   * EVERY provider, local included. Narrowing it to Drive families would silently
+   * stop plan and Counter-policy delivery everywhere else.
+   *
+   * Two triggers (`CanonicalCheckTrigger`): App init's boot health check, which
+   * every successful open reaches, cache-first included; and `verifyPodAccess`,
+   * which runs on sign-in and every banner `retry`. Until 2026-10-05 only the
+   * second existed, so a returning device never read the registry at all
+   * (`docs/plans/2026-10-05-boot-registry-check.md`).
    *
    * Fail-open in every uncertain case. `lookupFamilyResult` distinguishes "no such
    * row" from "couldn't ask" precisely so a registry hiccup can't accuse a user of
-   * working on a copy. Runs at most once per family per session — `verifyPodAccess`
-   * runs on every load path including `retry`, so an unguarded check would turn a
-   * retry loop into a registry request loop.
+   * working on a copy. Runs at most once per family per session (the latch).
+   *
+   * Owns only logging; `runCanonicalCheck` decides, and returns where it stopped,
+   * so every exit is reported by the one `canonical-check` event below.
    */
-  async function checkCanonicalPod(): Promise<void> {
+  async function checkCanonicalPod(trigger: CanonicalCheckTrigger): Promise<void> {
     try {
-      const ctx = useFamilyContextStore();
-      const familyId = ctx.activeFamilyId;
-      if (!familyId || checkedCanonicalFor === familyId) return;
-      const provider = syncService.getProvider();
-      if (!provider) return;
-      const providerType = syncService.getProviderType();
-      if (!providerType) return;
-      // ⚠️ THE LATCH IS SET AFTER THE PROVIDER GATE BUT BEFORE THE DRIVE ONE,
-      // and that ordering is deliberate. The Drive-only early return used to sit
-      // ABOVE this line, so a local family returned without latching. Moving the
-      // gate below it (to make room for the provider-mismatch diagnostic) would
-      // have latched for local families too — and since `checkedCanonicalFor` is
-      // cleared only by `resetState` and the two invalidation points, a family
-      // that later ran "Move to Google Drive" would have the canonical check
-      // silently disabled for the rest of the session, on exactly the surface
-      // that catches a device writing to a copy. The diagnostic below runs for
-      // every provider; the latch is what it costs, so it is taken here, once.
-      //
-      // ⚠️ AND WHAT IT COSTS, IN FULL, BESIDE THE LATCH IT COSTS IT FOR. The
-      // diagnostic IS the registry lookup, so keeping the signal means one small
-      // uncached GET per family per session on EVERY provider — local-file and
-      // native families included, which previously made none. That is the price
-      // of the only signal that would catch a re-homed family, and it is paid
-      // knowingly. If it ever has to go, the alternative is folding the provider
-      // check into the registry write a local family already performs; moving
-      // this gate back above the latch is NOT the alternative — that is the hole
-      // described above.
-      //
-      // ⚠️ THE OFFLINE GATE IS ABOVE THE LATCH, DELIBERATELY. Below it, a device
-      // that happens to be offline at this moment latches as "checked" and the
-      // lookup never runs again for the rest of the session — losing the signal
-      // on precisely the devices most likely to have drifted.
-      if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
-      checkedCanonicalFor = familyId;
-
-      const lookup = await registry.lookupFamilyResult(familyId);
-      if (lookup.status !== 'found') return; // absent or unavailable → raise nothing
-      const entry = lookup.entry;
-
-      // ⚠️ DIAGNOSTIC ONLY, AND DELIBERATELY NOT A BANNER. The registry says the
-      // family lives on one kind of storage and this device is on another —
-      // which is exactly the stranding that used to happen when loading a file
-      // silently re-homed a Drive family to a local one. `keepCurrentPod` should
-      // now make it unreachable; this is how we would find out if it is not.
-      //
-      // It cannot become a `CANONICAL_MISMATCH` banner, because that banner's
-      // recovery is `switchToCanonical` → `rebindPodFile(fileId)`, and a local
-      // pointer has no fileId to rebind to. Offering a button that cannot work
-      // is worse than saying nothing to the user and everything to the firehose.
-      if (entry.provider && entry.provider !== providerType) {
-        logEvent({
-          level: 'warn',
-          surface: 'pod-access',
-          message: 'registry provider disagrees with this device',
-          context: {
-            action: 'canonical-provider-mismatch',
-            error_code: entry.provider,
-            provider_type: providerType,
-          },
-        });
-      }
-
-      // ⚠️ THE FILEID COMPARISON IS DRIVE-ONLY BY CONSTRUCTION, not by choice.
-      // `RegistryEntry.fileId` is a Google Drive file id and
-      // `StorageProvider.getFileId()` is null for a local provider, so on a
-      // local family the two are always equal and the check below can never
-      // fire. Comparing `displayPath` instead would false-positive on every
-      // device whose local path differs — which is most of them — and then offer
-      // a recovery that cannot act. So the banner path stays Drive-only, and the
-      // provider mismatch above is what covers everything else.
-      if (providerType !== 'google_drive') return;
-      if (entry.provider !== 'google_drive' || !entry.fileId) return;
-      if (entry.fileId === provider.getFileId()) return;
-
-      const result: PodAccessResult = {
-        ok: false,
-        code: 'CANONICAL_MISMATCH',
-        // View state, NOT telemetry — `switchToCanonical` needs the full fileId to
-        // call `rebindPodFile`. `logPodAccessResult` never spreads `data` into a
-        // report; it derives `file_id_tail` explicitly. `file_id` is not in
-        // ALLOWED_CONTEXT_KEYS, but relying on the stripper is not a policy.
-        data: {
-          canonicalFileId: entry.fileId,
-          canonicalName: entry.displayPath ?? `${entry.familyName ?? 'pod'}.beanpod`,
-        },
-      };
-      podAccessError.value = result;
-      logPodAccessResult(result);
+      const outcome = await runCanonicalCheck();
+      // `latched` is a sign-in after a boot check, or a banner retry: the check
+      // working as intended, and noise if logged.
+      if (outcome === 'latched') return;
+      logEvent({
+        level: 'info',
+        surface: 'canonical-check',
+        message: 'session registry check',
+        context: { action: outcome, detail: trigger },
+      });
     } catch (e) {
       // The one intentional swallow in this path — and it still logs.
       console.warn('[syncStore.checkCanonicalPod] canonical check failed:', e);
@@ -5456,10 +5417,122 @@ export const useSyncStore = defineStore('sync', () => {
         level: 'warn',
         surface: 'pod-access',
         message: 'canonical pod check failed',
-        context: { action: 'canonical-check-failed' },
+        context: { action: 'canonical-check-failed', detail: trigger },
         error: e,
       });
     }
+  }
+
+  /** The decision itself; returns the branch it stopped at. */
+  async function runCanonicalCheck(): Promise<CanonicalCheckOutcome> {
+    const ctx = useFamilyContextStore();
+    const familyId = ctx.activeFamilyId;
+    if (!familyId) return 'skipped-no-family';
+    if (checkedCanonicalFor === familyId) return 'latched';
+    const provider = syncService.getProvider();
+    const providerType = syncService.getProviderType();
+    // Family-scoped, as in `runPodAccessCheck`: the boot trigger does not pass
+    // through verify's NO_HOME gate, and a stale provider from a previously active
+    // family must never be compared against this family's registry row.
+    if (!provider || !providerType || syncService.getProviderFamilyId() !== familyId) {
+      return 'skipped-no-provider';
+    }
+    // ⚠️ THE LATCH IS SET AFTER THE PROVIDER GATE BUT BEFORE THE DRIVE ONE,
+    // and that ordering is deliberate. The Drive-only early return used to sit
+    // ABOVE this line, so a local family returned without latching. Moving the
+    // gate below it (to make room for the provider-mismatch diagnostic) would
+    // have latched for local families too — and since `checkedCanonicalFor` is
+    // cleared only by the `invalidateCanonicalCheck` callers listed there, a family
+    // that later ran "Move to Google Drive" would have the canonical check
+    // silently disabled for the rest of the session, on exactly the surface
+    // that catches a device writing to a copy. The diagnostic below runs for
+    // every provider; the latch is what it costs, so it is taken here, once.
+    //
+    // ⚠️ AND WHAT IT COSTS, IN FULL, BESIDE THE LATCH IT COSTS IT FOR. The
+    // diagnostic IS the registry lookup, so keeping the signal means one small
+    // uncached GET per family per session on EVERY provider — local-file and
+    // native families included, which previously made none. That is the price
+    // of the only signal that would catch a re-homed family, and it is paid
+    // knowingly. If it ever has to go, the alternative is folding the provider
+    // check into the registry write a local family already performs; moving
+    // this gate back above the latch is NOT the alternative — that is the hole
+    // described above.
+    //
+    // ⚠️ THE OFFLINE GATE IS ABOVE THE LATCH, DELIBERATELY. Below it, a device
+    // that happens to be offline at this moment latches as "checked" and the
+    // lookup never runs again for the rest of the session — losing the signal
+    // on precisely the devices most likely to have drifted.
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return 'skipped-offline';
+    checkedCanonicalFor = familyId;
+
+    const lookup = await registry.lookupFamilyResult(familyId);
+    // ⚠️ THE WORLD CAN MOVE DURING THE GET. A sign-out or family switch
+    // (`resetState`), a storage migration or a `rebindPodFile` provider swap can
+    // all land while the boot lookup is in flight. Acting on the answer then
+    // would raise family A's mismatch in family B's session, and
+    // `switchToCanonical` would rebind B onto A's file. Each of those events
+    // clears the latch or swaps the provider, so either change means "stale".
+    // Nothing is lost: the registry observers were fed inside the lookup.
+    if (
+      checkedCanonicalFor !== familyId ||
+      ctx.activeFamilyId !== familyId ||
+      syncService.getProvider() !== provider
+    ) {
+      return 'superseded';
+    }
+    if (lookup.status !== 'found') return lookup.status; // absent or unavailable → raise nothing
+    const entry = lookup.entry;
+
+    // ⚠️ DIAGNOSTIC ONLY, AND DELIBERATELY NOT A BANNER. The registry says the
+    // family lives on one kind of storage and this device is on another —
+    // which is exactly the stranding that used to happen when loading a file
+    // silently re-homed a Drive family to a local one. `keepCurrentPod` should
+    // now make it unreachable; this is how we would find out if it is not.
+    //
+    // It cannot become a `CANONICAL_MISMATCH` banner, because that banner's
+    // recovery is `switchToCanonical` → `rebindPodFile(fileId)`, and a local
+    // pointer has no fileId to rebind to. Offering a button that cannot work
+    // is worse than saying nothing to the user and everything to the firehose.
+    if (entry.provider && entry.provider !== providerType) {
+      logEvent({
+        level: 'warn',
+        surface: 'pod-access',
+        message: 'registry provider disagrees with this device',
+        context: {
+          action: 'canonical-provider-mismatch',
+          error_code: entry.provider,
+          provider_type: providerType,
+        },
+      });
+    }
+
+    // ⚠️ THE FILEID COMPARISON IS DRIVE-ONLY BY CONSTRUCTION, not by choice.
+    // `RegistryEntry.fileId` is a Google Drive file id and
+    // `StorageProvider.getFileId()` is null for a local provider, so on a
+    // local family the two are always equal and the check below can never
+    // fire. Comparing `displayPath` instead would false-positive on every
+    // device whose local path differs — which is most of them — and then offer
+    // a recovery that cannot act. So the banner path stays Drive-only, and the
+    // provider mismatch above is what covers everything else.
+    if (providerType !== 'google_drive') return 'found';
+    if (entry.provider !== 'google_drive' || !entry.fileId) return 'found';
+    if (entry.fileId === provider.getFileId()) return 'found';
+
+    const result: PodAccessFailure = {
+      ok: false,
+      code: 'CANONICAL_MISMATCH',
+      // View state, NOT telemetry — `switchToCanonical` needs the full fileId to
+      // call `rebindPodFile`. `logPodAccessResult` never spreads `data` into a
+      // report; it derives `file_id_tail` explicitly. `file_id` is not in
+      // ALLOWED_CONTEXT_KEYS, but relying on the stripper is not a policy.
+      data: {
+        canonicalFileId: entry.fileId,
+        canonicalName: entry.displayPath ?? `${entry.familyName ?? 'pod'}.beanpod`,
+      },
+    };
+    podAccessError.value = result;
+    logPodAccessResult(result);
+    return 'mismatch';
   }
 
   /**
@@ -6292,6 +6365,11 @@ export const useSyncStore = defineStore('sync', () => {
       // recovery rebind where local-only entries from `envelope.value`
       // typically don't differ from `env`.
       syncService.setProvider(provider);
+      // The family's pod just moved, so the once-per-session canonical answer is
+      // stale (see `invalidateCanonicalCheck`). It also makes a boot check still in
+      // flight drop its answer as `superseded` WITHOUT leaving the session marked
+      // checked, so the next `verifyPodAccess` compares the new file.
+      invalidateCanonicalCheck();
       const rebindMerged = replaceEnvelope(env);
       syncService.setFamilyKey(familyKey.value, rebindMerged);
       fileName.value = fileName_param;
@@ -7314,6 +7392,7 @@ export const useSyncStore = defineStore('sync', () => {
     initialize,
     requestPermission,
     verifyPodAccess,
+    checkCanonicalPod,
     podAccessError,
     shouldShowPodAccessBanner,
     migrateStorage,
