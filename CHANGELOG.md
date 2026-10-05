@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-10-05
 
+### Changed
+
+- Native apps older than 0.91.3 now see a one-time prompt to update, since 0.91.3 is live on both stores.
+
 ### Added
 
 - Every item in your daily briefing now has a ✕ to clear it once it is done, including pickups, activities, to-dos and Who Owns What notes. Clearing only affects your own briefing; the item itself stays open, and the message that follows has Undo and opens the item when tapped.
