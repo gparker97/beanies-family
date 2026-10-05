@@ -17,6 +17,16 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.10.05',
+    date: '2026-10-05',
+    month: '5 october 2026',
+    summary: {
+      en: 'Anything in your daily briefing can now be cleared once it is done, and the Android app no longer opens a blank browser page when it starts.',
+      beanie:
+        'anything in your daily briefing can now be cleared once it is done, and the android app no longer opens a blank browser page when it starts.',
+    },
+  },
+  {
     version: '2026.10.04',
     date: '2026-10-04',
     month: '4 october 2026',
