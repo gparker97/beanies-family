@@ -49,9 +49,16 @@ function handleComplete(item: CriticalItem) {
   }
 }
 
-/** The row's ✕: hides it from this member's briefing (a hint is dismissed outright). */
+/** Rows with somewhere to go when tapped (see `handleItemClick`). */
+function canOpen(item: CriticalItem): boolean {
+  return !(item.type === 'holiday' || (item.type === 'card' && !item.route));
+}
+
+/** The row's ✕: hides it from this member's briefing (a hint is dismissed outright).
+ *  The toast that follows opens the row's own target when tapped. */
 async function handleDismiss(item: CriticalItem) {
-  if (await dismissItem(item)) playWhoosh();
+  const open = canOpen(item) ? () => handleItemClick(item) : undefined;
+  if (await dismissItem(item, open)) playWhoosh();
 }
 
 const { today } = useToday();

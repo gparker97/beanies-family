@@ -39,6 +39,7 @@ import { isFlagEnabled } from '@/config/flags';
 import { getActivityFallbackEmoji } from '@/constants/activityCategories';
 import { hintEmoji, isFreshHint } from '@/utils/helpfulHints';
 import type { UIStringKey } from '@/services/translation/uiStrings';
+import { showToast } from '@/composables/useToast';
 
 export interface CriticalItem {
   id: string;
@@ -61,6 +62,21 @@ export interface CriticalItem {
   dismissHint?: boolean;
   /** Generic: tapping the row routes here (never falls through to open-activity). */
   route?: RouteLocationRaw;
+}
+
+/** The hide toast's second line: says the item itself is untouched (still open). */
+const HIDDEN_TOAST_KEYS = {
+  todo: 'nook.briefing.hidden.todo',
+  activity: 'nook.briefing.hidden.activity',
+  other: 'nook.briefing.hidden.other',
+  plain: 'nook.briefing.hidden.plain', // nothing to open (a holiday note)
+} satisfies Record<string, UIStringKey>;
+
+function hiddenToastKey(item: CriticalItem, canOpen: boolean): UIStringKey {
+  if (!canOpen) return HIDDEN_TOAST_KEYS.plain;
+  if (item.type === 'todo') return HIDDEN_TOAST_KEYS.todo;
+  if (item.type === 'activity') return HIDDEN_TOAST_KEYS.activity;
+  return HIDDEN_TOAST_KEYS.other;
 }
 
 /** How many briefing items show before the "Show all N" disclosure appears. */
@@ -541,31 +557,56 @@ export function useCriticalItems() {
   }
 
   /**
-   * The row's ✕. A hint is dismissed family-wide (`discardTodo`, never regenerated);
-   * any other row is hidden from this member's briefing. Resolves true once the
-   * write was issued (the read-state write reports its own failure).
+   * The row's ✕. A fresh hint is dismissed family-wide (`discardTodo`, never
+   * regenerated; it shows its own Undo toast). Any other row is hidden from this
+   * member's briefing, with the house Undo toast saying the item itself is still
+   * open; tapping that toast runs `open` (the row's own tap target, from the view).
    */
-  async function dismissItem(item: CriticalItem): Promise<boolean> {
+  async function dismissItem(item: CriticalItem, open?: () => void): Promise<boolean> {
     let action: 'hint' | 'card' | 'hide' | 'hide-done';
     let ok: boolean;
     if (item.dismissHint) {
       action = 'hint';
       ok = await todoStore.discardTodo(item.id); // logs its own helpful-hints outcome too
     } else if (item.dismissKey) {
+      const key = item.dismissKey;
       action = item.type === 'card' ? 'card' : item.completed ? 'hide-done' : 'hide';
-      notificationsStore.markRead(item.dismissKey); // reports its own write failure
+      notificationsStore.markRead(key); // reports its own write failure
       ok = true;
+      showToast('info', t('nook.briefing.hiddenToast'), t(hiddenToastKey(item, !!open)), {
+        actionLabel: t('action.undo'),
+        actionFn: () => {
+          notificationsStore.markUnread(key);
+          logBriefing('info', 'briefing item restored', item.type, 'undo');
+        },
+        openFn: open
+          ? () => {
+              logBriefing('info', 'briefing item opened from toast', item.type, 'open');
+              open();
+            }
+          : undefined,
+        durationMs: 6000,
+      });
     } else {
       return false;
     }
     // One event per tap, after the outcome. `hide-done` = a row the member had ticked.
-    logEvent({
-      level: ok ? 'info' : 'warn',
-      surface: 'daily-briefing',
-      message: ok ? 'briefing item dismissed' : 'briefing item dismiss failed',
-      context: { kind: item.type, action },
-    });
+    logBriefing(
+      ok ? 'info' : 'warn',
+      ok ? 'briefing item dismissed' : 'briefing item dismiss failed',
+      item.type,
+      action
+    );
     return ok;
+  }
+
+  function logBriefing(
+    level: 'info' | 'warn',
+    message: string,
+    kind: CriticalItem['type'],
+    action: string
+  ): void {
+    logEvent({ level, surface: 'daily-briefing', message, context: { kind, action } });
   }
 
   /** One card row → one briefing item. No deck logic here, only copy and routing. */

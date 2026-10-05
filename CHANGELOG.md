@@ -12,7 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Added
 
-- Every item in your daily briefing now has a ✕ to clear it once it is done, including pickups, activities, to-dos and Who Owns What notes. Clearing only affects your own briefing.
+- Every item in your daily briefing now has a ✕ to clear it once it is done, including pickups, activities, to-dos and Who Owns What notes. Clearing only affects your own briefing; the item itself stays open, and the message that follows has Undo and opens the item when tapped.
 - A helpful hint can now be kept or dismissed from its to-do details, as well as from the to-do list and the daily briefing, and a dismissal can be undone from the toast that follows.
 
 ### Fixed

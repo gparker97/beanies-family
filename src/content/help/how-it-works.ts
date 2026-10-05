@@ -487,7 +487,7 @@ export const HOW_IT_WORKS_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'Every item in your briefing has a small ✕ on the right. Tap it once you are done with something, or when it does not need your attention today, and it leaves your briefing on all your devices. It only clears it for you: nothing is deleted, and nobody else’s briefing changes. A pickup or an activity stays cleared for that day; a to-do or a medication reminder comes back tomorrow if it still needs doing. The one exception is a helpful hint: its ✕ dismisses the hint itself, for the whole family, just like dismissing it from your to-do list.',
+          'Every item in your briefing has a Dismiss button on the right (just a ✕ on a phone). Tap it once you are done with something, or when it does not need your attention today, and it leaves your briefing on all your devices. It only clears it for you: nothing is deleted, and nobody else’s briefing changes. A message confirms it with an Undo button, and tapping the message opens the item. A pickup or an activity stays cleared for that day; a to-do or a medication reminder comes back tomorrow if it still needs doing. The one exception is a helpful hint: its ✕ dismisses the hint itself, for the whole family, just like dismissing it from your to-do list.',
       },
       {
         type: 'heading',

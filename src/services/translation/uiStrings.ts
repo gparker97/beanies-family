@@ -8258,6 +8258,26 @@ const STRING_DEFS = {
     beanie: 'helpful hint: {task}',
   },
   'nook.briefing.dismiss': { en: 'Dismiss', beanie: 'dismiss' },
+  'nook.briefing.hiddenToast': {
+    en: 'Removed from your daily briefing',
+    beanie: 'removed from your daily briefing',
+  },
+  'nook.briefing.hidden.todo': {
+    en: 'The to-do is still open. Tap here to view it.',
+    beanie: 'the to-do is still open. tap here to view it.',
+  },
+  'nook.briefing.hidden.activity': {
+    en: 'It is still on your calendar. Tap here to view it.',
+    beanie: 'it is still on your calendar. tap here to view it.',
+  },
+  'nook.briefing.hidden.other': {
+    en: 'Nothing else has changed. Tap here to view it.',
+    beanie: 'nothing else has changed. tap here to view it.',
+  },
+  'nook.briefing.hidden.plain': {
+    en: 'Nothing else has changed.',
+    beanie: 'nothing else has changed.',
+  },
   'nook.criticalTodoAssignedOverdue': {
     en: '{creator} asked you: {task} — it was due {date}, whenever you get a chance!',
     beanie: '{creator} asked you: {task} — was due {date}, no rush!',

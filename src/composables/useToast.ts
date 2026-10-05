@@ -14,6 +14,12 @@ export interface ToastActionOptions {
    */
   actionFn?: () => void | Promise<void>;
   /**
+   * Makes the toast's text tappable: tapping it dismisses the toast, then runs this
+   * (e.g. open the item the toast is about). Independent of the action button, which
+   * keeps its own job (e.g. Undo). Errors are surfaced like `actionFn`'s.
+   */
+  openFn?: () => void | Promise<void>;
+  /**
    * Override the auto-dismiss delay (ms). Useful when an action button
    * is present and the user needs more time to react (e.g., 6000 for
    * an Undo flow). Error toasts ignore this — they stay sticky.
@@ -64,6 +70,7 @@ export interface Toast {
   timestamp: number;
   actionLabel?: string;
   actionFn?: () => void | Promise<void>;
+  openFn?: () => void | Promise<void>;
   /** True if the reporter was fired for this toast. Drives the
    *  "Support has been notified" line in the toast component. */
   reported: boolean;
@@ -154,6 +161,7 @@ export function showToast(
     timestamp: Date.now(),
     actionLabel: options?.actionLabel,
     actionFn: options?.actionFn,
+    openFn: options?.openFn,
     reported,
   };
 
@@ -201,14 +209,21 @@ export function hasToastAction(id: number): boolean {
  * surface their own errors, but this guard covers unwrapped handlers
  * and guarantees no silent failure.
  */
-export async function invokeToastAction(id: number): Promise<void> {
-  const toast = toasts.value.find((t) => t.id === id);
-  if (!toast?.actionFn) {
-    dismissToast(id);
-    return;
-  }
-  const fn = toast.actionFn;
+export function invokeToastAction(id: number): Promise<void> {
+  return runAfterDismiss(id, toasts.value.find((t) => t.id === id)?.actionFn);
+}
+
+/** Tapping the toast's text: dismiss it, then run its `openFn` (same error guard). */
+export function invokeToastOpen(id: number): Promise<void> {
+  return runAfterDismiss(id, toasts.value.find((t) => t.id === id)?.openFn);
+}
+
+async function runAfterDismiss(
+  id: number,
+  fn: (() => void | Promise<void>) | undefined
+): Promise<void> {
   dismissToast(id);
+  if (!fn) return;
   try {
     await fn();
   } catch (err) {
@@ -230,5 +245,5 @@ export async function invokeToastAction(id: number): Promise<void> {
 }
 
 export function useToast() {
-  return { toasts, showToast, dismissToast, invokeToastAction };
+  return { toasts, showToast, dismissToast, invokeToastAction, invokeToastOpen };
 }

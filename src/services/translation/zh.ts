@@ -3622,6 +3622,11 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'nook.criticalTodoSelfNoDue': '别忘了：{task}',
   'nook.criticalHint': '小提示：{task}',
   'nook.briefing.dismiss': '忽略',
+  'nook.briefing.hiddenToast': '已从今日简报中移除',
+  'nook.briefing.hidden.todo': '这条待办仍未完成。点按此处查看。',
+  'nook.briefing.hidden.activity': '它仍在你的日历上。点按此处查看。',
+  'nook.briefing.hidden.other': '其他内容都没有改变。点按此处查看。',
+  'nook.briefing.hidden.plain': '其他内容都没有改变。',
   'nook.criticalTodoAssignedOverdue':
     '{creator} 拜托你：{task}，原定 {date} 完成，有空时再做就好！',
   'nook.criticalTodoSelfOverdue': '温馨提醒：{task}，原定 {date} 完成',

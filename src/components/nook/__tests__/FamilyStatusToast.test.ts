@@ -40,7 +40,10 @@ describe('FamilyStatusToast generic card rows', () => {
     // The only nested button is the ✕ (the card row is not completable).
     expect(wrapper.findAll('.critical-item button')).toHaveLength(1);
     await wrapper.get('[data-testid="briefing-dismiss"]').trigger('click');
-    expect(dismissItem).toHaveBeenCalledWith(expect.objectContaining({ id: 'card-move:x' }));
+    expect(dismissItem).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'card-move:x' }),
+      expect.any(Function) // the toast's tap target: this row's own route
+    );
     expect(wrapper.emitted('complete-todo')).toBeUndefined();
     expect(wrapper.emitted('open-route')).toBeUndefined();
   });

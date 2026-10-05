@@ -6,7 +6,14 @@ vi.mock('@/utils/errorReporter', () => ({
   reportError: vi.fn(),
 }));
 
-import { showToast, dismissToast, hasToastAction, invokeToastAction, useToast } from '../useToast';
+import {
+  showToast,
+  dismissToast,
+  hasToastAction,
+  invokeToastAction,
+  invokeToastOpen,
+  useToast,
+} from '../useToast';
 import { reportError } from '@/utils/errorReporter';
 
 describe('useToast — action-button extension', () => {
@@ -68,6 +75,19 @@ describe('useToast — action-button extension', () => {
     await invokeToastAction(id);
 
     expect(fn).toHaveBeenCalledOnce();
+    expect(toasts.value.find((t) => t.id === id)).toBeUndefined();
+  });
+
+  it('invokeToastOpen runs openFn, never actionFn, and dismisses', async () => {
+    const undo = vi.fn();
+    const open = vi.fn();
+    showToast('info', 'Removed', undefined, { actionLabel: 'Undo', actionFn: undo, openFn: open });
+    const id = toasts.value.at(-1)!.id;
+
+    await invokeToastOpen(id);
+
+    expect(open).toHaveBeenCalledOnce();
+    expect(undo).not.toHaveBeenCalled();
     expect(toasts.value.find((t) => t.id === id)).toBeUndefined();
   });
 

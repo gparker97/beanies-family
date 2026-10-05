@@ -62,16 +62,20 @@ vi.mock('@/config/flags', async (importOriginal) => {
 
 // Who Owns What (#109): the briefing reads card-move / check-in dismissals from the
 // viewer's read-state slice. Driven per test.
-const { readStateBox, markRead } = vi.hoisted(() => ({
+const { readStateBox, markRead, markUnread, showToastSpy } = vi.hoisted(() => ({
   readStateBox: { value: {} as Record<string, string> },
   markRead: vi.fn(),
+  markUnread: vi.fn(),
+  showToastSpy: vi.fn(),
 }));
+vi.mock('@/composables/useToast', () => ({ showToast: showToastSpy }));
 vi.mock('@/stores/notificationsStore', () => ({
   useNotificationsStore: () => ({
     get readState() {
       return readStateBox.value;
     },
     markRead,
+    markUnread,
   }),
 }));
 
@@ -1352,6 +1356,34 @@ describe('useCriticalItems', () => {
       await dismissItem(row);
       expect(discard).not.toHaveBeenCalled();
       expect(markRead).toHaveBeenCalledWith(`briefing-hide:todo:hint-1:${TODAY}`);
+    });
+
+    it('a hide shows the house Undo toast; Undo un-hides, a tap opens the row', async () => {
+      familyStore.setCurrentMember('parent-1');
+      todoStore.todos.push(makeTodo({ assigneeIds: ['parent-1'], dueDate: TODAY }));
+      const open = vi.fn();
+      const { criticalItems, dismissItem } = useCriticalItems();
+      await dismissItem(criticalItems.value[0]!, open);
+      expect(showToastSpy).toHaveBeenCalledTimes(1);
+      const [type, title, message, options] = showToastSpy.mock.calls[0]!;
+      expect(type).toBe('info');
+      expect(title).toMatch(/removed from your daily briefing/i);
+      expect(message).toMatch(/still open/i);
+      expect(options.durationMs).toBe(6000);
+      options.actionFn();
+      expect(markUnread).toHaveBeenCalledWith(`briefing-hide:todo:todo-1:${TODAY}`);
+      options.openFn();
+      expect(open).toHaveBeenCalledOnce();
+    });
+
+    it('a row with nothing to open gets no tap target and says so', async () => {
+      familyStore.setCurrentMember('parent-1');
+      todoStore.todos.push(makeTodo({ assigneeIds: ['parent-1'], dueDate: TODAY }));
+      const { criticalItems, dismissItem } = useCriticalItems();
+      await dismissItem(criticalItems.value[0]!);
+      const [, , message, options] = showToastSpy.mock.calls[0]!;
+      expect(options.openFn).toBeUndefined();
+      expect(message).not.toMatch(/tap/i);
     });
 
     it('any other row writes its hide key', async () => {

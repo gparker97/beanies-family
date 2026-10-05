@@ -144,17 +144,37 @@ test('briefing dismiss: every row, hints stay gone', async ({ page }) => {
   await expect(row(/swim class/i)).toHaveCount(0);
 
   // 2. To-do: ✕ hides it from the briefing; the to-do itself is untouched.
-  await row(/school forms/i)
-    .getByTestId('briefing-dismiss')
-    .click();
-  await expect(row(/school forms/i)).toHaveCount(0);
+  // The toast says it is still open; Undo brings the row back.
+  const formsRow = () => row(/school forms/i);
+  const toastBody = () => page.getByTestId('toast-body').filter({ hasText: /still open/i });
+  await formsRow().getByTestId('briefing-dismiss').click();
+  await expect(formsRow()).toHaveCount(0);
   expect((await db.exportData()).todos.some((t) => t.id === 'todo-forms')).toBe(true);
+  await toastBody().waitFor({ state: 'visible', timeout: 5000 });
+  await shot(page, '05b-hide-toast');
+  await page
+    .getByRole('button', { name: /^undo$/i })
+    .last()
+    .click();
+  await expect(formsRow()).toHaveCount(1);
+  console.log('[ui] hide toast: still-open copy shown; Undo restored the row');
+  // Hide it again, then tap the toast: the to-do opens.
+  await formsRow().getByTestId('briefing-dismiss').click();
+  await expect(formsRow()).toHaveCount(0);
+  await toastBody().click();
+  const todoDrawer = page.locator('[role="dialog"]').last();
+  await expect(todoDrawer).toContainText('Sign the school forms');
+  await shot(page, '05c-toast-opened-todo');
+  await page.keyboard.press('Escape');
+  await todoDrawer.waitFor({ state: 'hidden', timeout: 10000 });
+  await expect(formsRow()).toHaveCount(0);
+  console.log('[ui] tapping the hide toast opened the to-do');
 
   // 3. Party hint: ✕ deletes it, records its key family-wide, and offers Undo.
   const partyRow = () => row(/helpful hint:.*party/i);
   await partyRow().getByTestId('briefing-dismiss').click();
   await expect(partyRow()).toHaveCount(0);
-  const undo = page.getByRole('button', { name: /^undo$/i });
+  const undo = page.getByRole('button', { name: /^undo$/i }).last();
   await undo.waitFor({ state: 'visible', timeout: 5000 });
   await shot(page, '06a-undo-toast');
   await undo.click();

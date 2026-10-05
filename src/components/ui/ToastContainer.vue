@@ -2,7 +2,7 @@
 import { useToast, type ToastType } from '@/composables/useToast';
 import { useTranslation } from '@/composables/useTranslation';
 
-const { toasts, dismissToast, invokeToastAction } = useToast();
+const { toasts, dismissToast, invokeToastAction, invokeToastOpen } = useToast();
 const { t } = useTranslation();
 
 const typeConfig: Record<ToastType, { icon: string; bgClass: string; borderClass: string }> = {
@@ -71,7 +71,15 @@ const titleColorClass: Record<ToastType, string> = {
       >
         {{ typeConfig[toast.type].icon }}
       </div>
-      <div class="min-w-0 flex-1">
+      <!-- With an `openFn` the text is a button: tapping it opens what the toast is about. -->
+      <component
+        :is="toast.openFn ? 'button' : 'div'"
+        :type="toast.openFn ? 'button' : undefined"
+        class="min-w-0 flex-1 text-left"
+        :class="toast.openFn ? 'cursor-pointer rounded-lg hover:opacity-80' : ''"
+        data-testid="toast-body"
+        @click="toast.openFn && invokeToastOpen(toast.id)"
+      >
         <p class="font-outfit text-sm font-semibold" :class="titleColorClass[toast.type]">
           {{ toast.title }}
         </p>
@@ -81,7 +89,7 @@ const titleColorClass: Record<ToastType, string> = {
         <p v-if="toast.reported" class="dark:text-ink-faint mt-1 text-xs text-gray-500 italic">
           {{ t('error.supportNotified') }}
         </p>
-      </div>
+      </component>
       <button
         v-if="toast.actionLabel"
         class="font-outfit shrink-0 self-center rounded-lg px-2.5 py-1 text-xs font-bold text-[var(--heritage-orange)] underline-offset-2 transition-colors hover:bg-[var(--tint-orange-8)] hover:underline focus:bg-[var(--tint-orange-8)] focus:underline focus:outline-none"
