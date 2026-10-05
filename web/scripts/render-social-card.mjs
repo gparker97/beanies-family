@@ -223,7 +223,7 @@ try {
       { waitUntil: 'networkidle' }
     );
     await assertFontLoaded(pw);
-    const sheetOut = resolve(ROOT, 'docs/mockups/social-card-variants.png');
+    const sheetOut = resolve(ROOT, 'screenshots/social-card/social-card-variants.png');
     await pw.locator('.sheet').screenshot({ path: sheetOut });
     console.log(`  sheet     -> ${sheetOut.replace(ROOT + '/', '')}`);
   }

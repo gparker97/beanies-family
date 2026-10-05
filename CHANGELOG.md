@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-10-05
 
+### Security
+
+- Design mockups, research notes and internal security notes are no longer part of the public repository or its history; they moved to the private repository.
+
 ### Changed
 
 - Native apps older than 0.91.3 now see a one-time prompt to update, since 0.91.3 is live on both stores.

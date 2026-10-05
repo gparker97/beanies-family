@@ -97,6 +97,12 @@ scripts/store-screenshots/.tmp/
 # Design-review screenshots (rendered artifacts — see CLAUDE.md: these belong on Drive)
 screenshots/
 
+# Moved to the private ops repo (2026-10-03/05); ignored so nothing re-publishes them.
+/docs/mockups/
+/docs/research/
+/docs/test-plans/
+/docs/wireframes/
+
 # Wall grid capture output — rendered artifacts belong in Drive, not here.
 scratch-shots/
 

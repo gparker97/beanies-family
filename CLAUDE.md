@@ -26,9 +26,8 @@
 > - `docs/SELF_HOSTING.md`: Self-hosting guide (the only operations doc self-hosters need)
 > - `docs/adr/`: Architectural Decision Records (ADRs) for all major design decisions
 > - `CHANGELOG.md`: Human-readable changelog (updated every push)
-> - `docs/mockups/`: HTML mockups and design explorations (one file per concept)
 >
-> **Private operations repo (`~/projects/beanies-ops`, cloned beside this one):** status, plans, prompts, lessons, investigations, runbooks, the E2E health log, the Terraform tree and the ops skills moved there on 2026-10-03 so the public repo carries code and product docs only. Read and write them at these paths, and commit them in that repo:
+> **Private operations repo (`~/projects/beanies-ops`, cloned beside this one):** status, plans, prompts, lessons, investigations, runbooks, the E2E health log, the Terraform tree and the ops skills moved there on 2026-10-03, and the design mockups, research notes and internal security notes followed on 2026-10-05, so the public repo carries code and product docs only. Read and write them at these paths, and commit them in that repo:
 >
 > - `~/projects/beanies-ops/docs/STATUS.md`: Current project status and progress
 > - `~/projects/beanies-ops/docs/plans/`: Accepted implementation plans (saved before work begins, kept as historical record)
@@ -36,11 +35,13 @@
 > - `~/projects/beanies-ops/docs/lessons.md`: Lessons learned from corrections (this project's version of the global `tasks/lessons.md` convention; review at session start, append to after corrections)
 > - `~/projects/beanies-ops/docs/E2E_HEALTH.md`: E2E test failure tracking log
 > - `~/projects/beanies-ops/docs/investigations/`, `~/projects/beanies-ops/docs/runbooks/`: incident write-ups and operational runbooks
+> - `~/projects/beanies-ops/docs/mockups/`: HTML mockups and design explorations (one self-contained file per concept; `.gitignore` keeps `docs/mockups/` out of this repo)
+> - `~/projects/beanies-ops/docs/research/`: research notes behind ADRs and product decisions
 > - `~/projects/beanies-ops/infrastructure/` + `~/projects/beanies-ops/scripts/infra/tf-plan.sh` / `tf-apply.sh`: the Terraform; it deploys the Lambda and CloudFront Function code that stays here in `infrastructure/`
 >
 > **Ops skills load through symlinks.** `/deploy-prod-auto`, `/end-session`, `/good-morning`, `/beanies-metrics`, `/beanies-new-issue`, `/beanies-pre-plan` (the two tracker-bound skills carry the Notion ids) and the other ops/marketing skills live in `~/projects/beanies-ops/.claude/skills/`. Run `~/projects/beanies-ops/scripts/link-ops-skills.sh [checkout-or-worktree]` once per checkout (it is idempotent) to link them into `.claude/skills/`; `.gitignore` keeps the links out of commits. Never copy an ops skill back into this repo.
 >
-> **Old citations are not broken links.** Code comments, ADRs, CHANGELOG entries and native config cite `docs/plans/…`, `docs/investigations/…`, `docs/runbooks/…`, `docs/STATUS.md`, `docs/E2E_HEALTH.md`, `docs/lessons.md`, `scripts/infra/…` and `infrastructure/modules/<name>/main.tf`. Those paths now resolve inside `~/projects/beanies-ops`; leave existing citations as they are.
+> **Old citations are not broken links.** A `docs/…`, `scripts/infra/…` or `infrastructure/…` path cited anywhere (code comments, ADRs, CHANGELOG, native config, memory, plans) that no longer exists here resolves at the same relative path under `~/projects/beanies-ops`. Leave such citations as they are.
 >
 > **Brand:**
 >

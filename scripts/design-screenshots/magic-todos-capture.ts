@@ -715,18 +715,3 @@ test('magic todos walk', async ({ page }) => {
 
   console.log('[calls]', JSON.stringify(calls));
 });
-
-/** The approved mockup, rendered for side-by-side comparison. */
-test('magic todos mockup', async ({ page }) => {
-  for (const [vp, name] of [
-    [PHONE, 'phone'],
-    [DESKTOP, 'desktop'],
-  ] as const) {
-    await page.setViewportSize(vp);
-    await page.goto(
-      `file://${process.cwd()}/docs/mockups/magic-beans-todos-shared-2026-09-29.html`
-    );
-    await page.waitForTimeout(800);
-    await page.screenshot({ path: `${SHOTS}/00-mockup-${name}.png`, fullPage: true });
-  }
-});

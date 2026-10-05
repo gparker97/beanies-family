@@ -8,8 +8,6 @@ public
 playwright-report
 test-results
 docs/brand
-docs/mockups
-docs/wireframes
 README.md
 web/.astro
 # Capacitor-generated native projects (ADR-029) — generated config + copied web

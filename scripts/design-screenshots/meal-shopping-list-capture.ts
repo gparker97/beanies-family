@@ -7,7 +7,6 @@ import { ui } from '../../e2e/helpers/ui-strings';
 import { openAddActivity } from '../../e2e/helpers/activity-modal';
 import type { Locator, Page, Route } from '@playwright/test';
 import type { FamilyList, MealPlanEntry, Recipe } from '../../src/types/models';
-import path from 'node:path';
 
 /**
  * NOT a test: the browser walk for #116, the weekly shopping list from the meal planner
@@ -282,14 +281,6 @@ test('meal shopping list walk', async ({ page }) => {
         console.log(`[console.${m.type()}] ${txt.slice(0, 300)}`);
     }
   });
-
-  // The approved mockup, for side-by-side comparison.
-  const mock = await page.context().newPage();
-  const mockUrl = 'file://' + path.resolve('docs/mockups/meal-shopping-list-2026-09-29.html');
-  await mock.setViewportSize(DESKTOP);
-  await mock.goto(mockUrl);
-  await mock.screenshot({ path: `${SHOTS}/00-mockup-desktop.png`, fullPage: true });
-  await mock.close();
 
   await page.setViewportSize(DESKTOP);
   await gotoRoot(page);
