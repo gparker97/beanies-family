@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { CalendarEventLink, FamilyActivity } from '@/types/models';
 import { planReconcile } from '../reconcilePlan';
 import { computeExceptionHash } from '../activityToGoogleEvent';
+import { TEST_HASH_CTX } from './helpers/hashContext';
 
 const TODAY = '2026-06-10';
 
@@ -53,7 +54,7 @@ const master = makeActivity({
 describe('planReconcile — per-occurrence exceptions', () => {
   it('an ACTIVE edit-one child of a synced master → one modify exceptionUpsert, no top-level upsert', () => {
     const child = makeActivity({ id: 'child', parentActivityId: 'master', date: '2026-06-17' });
-    const plan = planReconcile([master, child], [], TODAY);
+    const plan = planReconcile([master, child], [], TODAY, TEST_HASH_CTX);
 
     expect(plan.upserts.map((u) => u.activity.id)).toEqual(['master']); // child NOT a top-level upsert
     expect(plan.exceptionUpserts).toHaveLength(1);
@@ -71,7 +72,7 @@ describe('planReconcile — per-occurrence exceptions', () => {
       date: '2026-06-17',
       isActive: false,
     });
-    const plan = planReconcile([master, child], [], TODAY);
+    const plan = planReconcile([master, child], [], TODAY, TEST_HASH_CTX);
     expect(plan.exceptionUpserts[0]!.mode).toBe('cancel');
     expect(plan.deletes).toHaveLength(0);
   });
@@ -83,18 +84,18 @@ describe('planReconcile — per-occurrence exceptions', () => {
       date: '2026-06-20', // moved to Saturday
       originalOccurrenceDate: '2026-06-17', // original Wednesday
     });
-    const plan = planReconcile([master, child], [], TODAY);
+    const plan = planReconcile([master, child], [], TODAY, TEST_HASH_CTX);
     expect(plan.exceptionUpserts[0]!.occurrenceYmd).toBe('2026-06-17');
   });
 
   it('carries the existing link hash + instance id for idempotency', () => {
     const child = makeActivity({ id: 'child', parentActivityId: 'master', date: '2026-06-17' });
-    const hash = computeExceptionHash(child, '2026-06-17', 'modify');
+    const hash = computeExceptionHash(child, '2026-06-17', 'modify', TEST_HASH_CTX);
     const link = exceptionLink('child', 'master', '2026-06-17', {
       lastPushedHash: hash,
       googleEventId: 'stored-instance-id',
     });
-    const plan = planReconcile([master, child], [link], TODAY);
+    const plan = planReconcile([master, child], [link], TODAY, TEST_HASH_CTX);
     const e = plan.exceptionUpserts[0]!;
     expect(e.hash).toBe(hash); // unchanged → engine no-ops
     expect(e.existingHash).toBe(hash);
@@ -103,7 +104,7 @@ describe('planReconcile — per-occurrence exceptions', () => {
 
   it('an exception link whose child is GONE → an exceptionRestore (master still pushable)', () => {
     const link = exceptionLink('gone-child', 'master', '2026-06-17');
-    const plan = planReconcile([master], [link], TODAY); // child not in activities
+    const plan = planReconcile([master], [link], TODAY, TEST_HASH_CTX); // child not in activities
     expect(plan.exceptionUpserts).toHaveLength(0);
     expect(plan.exceptionRestores).toHaveLength(1);
     expect(plan.exceptionRestores[0]!.master?.id).toBe('master');
@@ -116,7 +117,7 @@ describe('planReconcile — per-occurrence exceptions', () => {
       parentActivityId: 'gone-master',
       date: '2026-06-17',
     });
-    const plan = planReconcile([child], [link], TODAY); // master not present → unpushable
+    const plan = planReconcile([child], [link], TODAY, TEST_HASH_CTX); // master not present → unpushable
     expect(plan.exceptionRestores).toHaveLength(1);
     expect(plan.exceptionRestores[0]!.master).toBeNull();
   });
@@ -127,7 +128,7 @@ describe('planReconcile — per-occurrence exceptions', () => {
       parentActivityId: 'absent-master',
       date: '2026-06-17',
     });
-    const plan = planReconcile([child], [], TODAY);
+    const plan = planReconcile([child], [], TODAY, TEST_HASH_CTX);
     expect(plan.exceptionUpserts).toHaveLength(0);
     expect(plan.upserts).toHaveLength(0); // and never a top-level event
   });
@@ -137,7 +138,7 @@ describe('planReconcile — per-occurrence exceptions', () => {
     // (child id not in pushableIds) must not be swept into `deletes`.
     const exLink = exceptionLink('child', 'master', '2026-06-17');
     const child = makeActivity({ id: 'child', parentActivityId: 'master', date: '2026-06-17' });
-    const plan = planReconcile([master, child], [exLink], TODAY);
+    const plan = planReconcile([master, child], [exLink], TODAY, TEST_HASH_CTX);
     expect(plan.deletes).toHaveLength(0);
     // the exception link is governed by exceptionUpserts/-Restores, not deletes
     expect(plan.exceptionUpserts).toHaveLength(1);

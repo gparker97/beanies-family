@@ -28,7 +28,8 @@ import {
   type ImportEntry,
 } from '@/services/automerge/repositories/calendarRepository';
 import { computePushHash } from '@/utils/calendar/activityToGoogleEvent';
-import { makeMemberNameResolver } from '@/utils/calendar/memberNames';
+import { makePushHashContext } from '@/utils/calendar/pushHashContext';
+import { pushHashContextForLink } from '@/utils/calendar/linkOwnership';
 import {
   planImport,
   redateToOccurrence,
@@ -39,6 +40,7 @@ import { useActivityStore } from '@/stores/activityStore';
 import { useCalendarSyncStore } from '@/stores/calendarSyncStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useAuthStore } from '@/stores/authStore';
+import { useSettingsStore } from '@/stores/settingsStore';
 import { logEvent } from '@/services/telemetry';
 import { reportError } from '@/utils/errorReporter';
 import { trackFeature } from '@/services/analytics/plausible';
@@ -182,7 +184,8 @@ export const useCalendarImportStore = defineStore('calendarImport', () => {
     id: string,
     list: ImportCandidate[],
     timeMin: string,
-    timeMax: string
+    timeMax: string,
+    homeTimeZone: string
   ): Promise<ImportCandidate[]> {
     // Only the ones that actually need it: a master whose start is already in the
     // future is showing a sensible date, and re-dating it would spend a request to
@@ -209,15 +212,18 @@ export const useCalendarImportStore = defineStore('calendarImport', () => {
 
     for (const { c, i } of targets) {
       try {
+        // `timeZone` is redundant here (the conversion below is instant-based) but
+        // the parameter is required, so it is the same home zone, not a second one.
         const instances = await client.listInstances(
           id,
           c.calendarId,
           c.googleEventId,
           timeMin,
-          timeMax
+          timeMax,
+          homeTimeZone
         );
         const next = instances.find((inst) => inst.status !== 'cancelled' && inst.start);
-        if (next) out[i] = redateToOccurrence(c, next.start, next.end);
+        if (next) out[i] = redateToOccurrence(c, next.start, next.end, homeTimeZone);
       } catch {
         failed += 1;
       }
@@ -304,10 +310,25 @@ export const useCalendarImportStore = defineStore('calendarImport', () => {
       if (!memberId)
         throw new Error('calendar import: no family member to own the imported activities');
 
+      // Resolved ONCE per scan, so every candidate (and every re-dated occurrence)
+      // is read in the same zone even if the device crosses one mid-scan.
+      const home = useSettingsStore().resolveHomeTimeZoneNow();
+      if (home.invalidStored) {
+        // The conversion falls back to this device's clock for a zone the engine
+        // cannot format (`googleTimesToActivityFields`); say so, without the id.
+        logEvent({
+          level: 'warn',
+          surface: 'home-time-zone',
+          message: 'home_time_zone_invalid_stored',
+          context: { action: 'invalid-stored', kind: home.source, detail: 'import' },
+        });
+      }
+
       const links = await getAllCalendarEventLinks();
       const plan = planImport(sources, links, {
         memberId,
         destinationCalendarId: connection?.destinationCalendarId ?? 'primary',
+        homeTimeZone: home.zone,
       });
 
       // ⚠️ The cap counts only what the user can ACT on. Slicing the raw list first
@@ -331,7 +352,7 @@ export const useCalendarImportStore = defineStore('calendarImport', () => {
         capped.push(c);
       }
       truncated.value = beyondCap > 0;
-      candidates.value = await withNextOccurrences(id, capped, timeMin, timeMax);
+      candidates.value = await withNextOccurrences(id, capped, timeMin, timeMax, home.zone);
       // Everything actionable is ticked when the review opens (greg, 2026-09-11).
       selectedIds.value = new Set(
         candidates.value.filter((c) => !c.alreadyImported).map((c) => c.googleEventId)
@@ -436,13 +457,14 @@ export const useCalendarImportStore = defineStore('calendarImport', () => {
 
     phase.value = 'importing';
     try {
-      // ⚠️ The resolver is MANDATORY. `computePushHash` folds resolved member names
-      // into the payload only when it is passed, and `reconcileConnection` always
-      // passes one. Every imported activity has a non-empty `assigneeIds`, so
-      // hashing without it yields a DIFFERENT hash from the one the next reconcile
-      // computes, and all N events would be pushed straight back to Google for no
-      // reason. For an adopted event that push rewrites the user's real event body.
-      const memberName = makeMemberNameResolver();
+      // ⚠️ The context MUST be the one reconcile builds (`makePushHashContext`, the
+      // same member resolver), or the hash recorded here differs from the one the
+      // next reconcile computes and all N events are pushed straight back to Google
+      // for no reason. For an adopted event that push rewrites the user's real event
+      // body. The zone fold is decided per link by `pushHashContextForLink`, the same rule
+      // `planReconcile` applies (committed links are `adopted`/`external`, so it does not
+      // fold today), so the two cannot drift apart if an origin is ever added.
+      const pushCtx = makePushHashContext();
       const now = toISODateString(new Date());
 
       const entries: ImportEntry[] = picked.map((c) => ({
@@ -450,7 +472,10 @@ export const useCalendarImportStore = defineStore('calendarImport', () => {
         link: {
           connectionId: id,
           googleEventId: c.googleEventId,
-          lastPushedHash: computePushHash(c.draft as never, memberName),
+          lastPushedHash: computePushHash(
+            c.draft as never,
+            pushHashContextForLink(pushCtx, { origin: c.origin })
+          ),
           lastPushedAt: now,
           origin: c.origin,
         },

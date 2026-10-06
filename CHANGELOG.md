@@ -13,9 +13,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 ### Added
 
 - The email unsubscribe page now has a one-tap re-subscribe, and says so when you are already unsubscribed.
+- Settings has a home time zone for the family, and members in another time zone see a note on the planner.
 
 ### Fixed
 
+- Google Calendar events are now written in the family's home time zone, whichever device syncs them, and events that a device in another time zone had moved are put back.
 - Trip and holiday colours show again on the desktop month calendar.
 - Visits to www.beanies.family are now counted by the site's first-party visit ledger.
 - The family's registered owner now stays in step with the pod's actual owner, including after an ownership transfer or the owner changing their email.
@@ -23,6 +25,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Changed
 
+- Settings "Country & Holidays" is now "Region & Holidays".
 - Today now stands out on the calendar's month and week views, and a day you opened no longer stays highlighted when you switch back to the month.
 - Native apps older than 0.91.4 now see a one-time prompt to update, since 0.91.4 is live on both stores.
 - The privacy policy now makes clear that owner emails are separate from the Substack newsletter, and that the only activity used to choose who gets a "we miss you" email is a count of app uses.

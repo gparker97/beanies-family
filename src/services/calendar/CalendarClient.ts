@@ -189,13 +189,19 @@ export interface CalendarClient {
    * timeMaxIso)` (`events.instances`). Used to DISCOVER the instance id for a
    * beanies override's occurrence (once — the id is then stored + reused). Throws
    * `not_found` if the master isn't on Google yet (caller treats as benign-skip).
+   *
+   * `timeZone` (REQUIRED; the family's resolved home zone) is the zone Google
+   * renders the returned `dateTime`s in. Without it Google uses the CALENDAR's own
+   * zone, so on a calendar whose zone differs from the home zone an instance's date
+   * slice lands on the wrong day and `matchInstanceForDate` never matches it.
    */
   listInstances(
     connectionId: string,
     calendarId: string,
     masterEventId: string,
     timeMinIso: string,
-    timeMaxIso: string
+    timeMaxIso: string,
+    timeZone: string
   ): Promise<CalendarInstance[]>;
   /** Delete an event. A missing event (404/410) resolves silently (idempotent). */
   deleteEvent(connectionId: string, calendarId: string, eventId: string): Promise<void>;

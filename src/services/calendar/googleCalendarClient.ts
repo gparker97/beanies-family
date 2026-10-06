@@ -401,7 +401,7 @@ export function createGoogleCalendarClient(tokenProvider: TokenProvider): Calend
       });
     },
 
-    async listInstances(connectionId, calendarId, masterEventId, timeMinIso, timeMaxIso) {
+    async listInstances(connectionId, calendarId, masterEventId, timeMinIso, timeMaxIso, timeZone) {
       const out: CalendarInstance[] = [];
       let pageToken: string | undefined;
       let pages = 0;
@@ -409,6 +409,9 @@ export function createGoogleCalendarClient(tokenProvider: TokenProvider): Calend
         const params = new URLSearchParams({
           timeMin: timeMinIso,
           timeMax: timeMaxIso,
+          // Render instance times in the family's HOME zone, not the calendar's
+          // (see `CalendarClient.listInstances`).
+          timeZone,
           // Belt-and-suspenders — discovery always runs while the instance is still
           // confirmed, so cancelled instances are never load-bearing here.
           showDeleted: 'true',

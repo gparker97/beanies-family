@@ -88,5 +88,5 @@ export function usePermissions() {
     }
   });
 
-  return { isOwner, canManagePod, canViewFinances, canEditActivities };
+  return { isOwner, canManagePod, canViewFinances, canEditActivities, rosterLoaded };
 }

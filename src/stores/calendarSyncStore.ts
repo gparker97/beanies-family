@@ -73,6 +73,7 @@ import {
   toInstanceBody,
   type ActivityMapContext,
   type GoogleEventResource,
+  type PushHashContext,
 } from '@/utils/calendar/activityToGoogleEvent';
 import {
   planReconcile,
@@ -80,10 +81,12 @@ import {
   type ReconcileExceptionUpsert,
 } from '@/utils/calendar/reconcilePlan';
 import { beaniesMayDelete } from '@/utils/calendar/linkOwnership';
-import { makeMemberNameResolver } from '@/utils/calendar/memberNames';
+import { makePushHashContext } from '@/utils/calendar/pushHashContext';
+import { sameOffsetNow, knownDeviceTimeZone, type HomeTimeZoneSource } from '@/utils/timeZone';
 // Records who connected an integration, so a dead grant prompts the person who can
-// repair it. Not a new coupling in substance: `makeMemberNameResolver` above already
-// reaches `useFamilyStore()` through `useMemberInfo` inside these same actions.
+// repair it. Not a new coupling in substance: `makePushHashContext` above already
+// reaches `useFamilyStore()` (through `makeMemberNameResolver` → `useMemberInfo`)
+// inside these same actions.
 import { useFamilyStore } from '@/stores/familyStore';
 import { matchInstanceForDate } from '@/utils/calendar/matchInstanceForDate';
 import { logEvent } from '@/services/telemetry';
@@ -172,16 +175,37 @@ function rejectionKey(connectionId: string, activityId: string): string {
 }
 
 /**
+ * Exceptions whose "no Google instance matches" deferral was already LOGGED this
+ * session: `rejectionKey(connectionId, childId)` → the exception hash it deferred on.
+ * Logged again only when the hash changes (an edit, a zone change).
+ *
+ * It suppresses a LOG, never a push: the retry still runs every poll, so the "Do not
+ * add a second map" rule on `rejectedPushHashes` does not apply. Without it one stuck
+ * exception logged ~288 warns per device per day (the Oct 1 spike was ~3,500/day).
+ * Cleared in `stop()`.
+ */
+const deferredExceptionLogged = new Map<string, string>();
+
+/** `${source}|${differs}` pairs whose `home-time-zone` `resolve` was logged this
+ *  session. Once per distinct pair, so a 5-minute poll cannot spam it, yet a device
+ *  that crosses zones (or a family that sets its zone) logs the new state. Cleared in
+ *  `stop()`. */
+const resolveLogged = new Set<string>();
+/** Whether `invalid-stored` was logged this session (once is the whole signal). */
+let invalidStoredLogged = false;
+
+/**
  * The memoised value: what Google refused, in enough detail that fixing ANY of it
  * retries the push.
  *
  * ⚠️ `computePushHash` alone is not enough, and assuming it was is a real trap.
- * It hashes the ACTIVITY's own fields and deliberately excludes the map context —
- * but `timeZone` and `appOrigin` are both serialized into every body
- * (`buildMapContext`). So a rejection CAUSED by the context (a device whose IANA
- * zone Google rejects, a malformed origin) would have an unchanging activity hash,
- * and the skip would hold forever even after the cause was fixed. Folding the
- * context in means the memo is keyed on what was actually sent.
+ * It hashes the ACTIVITY's own fields plus only the PERSISTED home zone, and only for
+ * beanies-created links (`hashFoldsHomeZone`) — but the stamped `timeZone` (which may
+ * be country-derived or the device's own) and `appOrigin` are serialized into every
+ * body (`buildMapContext`). So a rejection CAUSED by the context (a zone Google
+ * rejects, a malformed origin) could have an unchanging hash, and the skip would hold
+ * forever even after the cause was fixed. Folding the context in means the memo is
+ * keyed on what was actually sent.
  *
  * Still not covered: an exception rejected because of its MASTER's recurrence.
  * `computeExceptionHash` carries no master state, so fixing the master does not
@@ -258,10 +282,20 @@ function paddedDayWindow(occurrenceYmd: string): [string, string] {
   ];
 }
 
-/** App origin + timezone for the event mapper, with the (shared) member resolver. */
-function buildMapContext(memberName: (id: string) => string | undefined): ActivityMapContext {
+/**
+ * The map + hash context for one reconcile: app origin, the family's resolved HOME
+ * zone (stamped on every timed event, whichever device pushes), the shared member
+ * resolver and the hash's zone. One object, so the body and the hash can never be
+ * built from two different resolutions.
+ *
+ * Logs `home-time-zone` `resolve` once per session per (source, device-differs) pair:
+ * the success-path signal for how many devices push on fallback, or from abroad.
+ */
+function buildMapContext(): ActivityMapContext & PushHashContext {
+  const { source, invalidStored, ...hashCtx } = makePushHashContext();
+  logHomeZoneResolution(source, hashCtx.timeZone, invalidStored);
   return {
-    memberName,
+    ...hashCtx,
     // ⚠️ `shareableOrigin()`, never `window.location.origin`. This is written into the
     // DESCRIPTION BODY of every event beanies syncs to Google, so it is read on other
     // devices, by other people the calendar is shared with, and it PERSISTS in Google's
@@ -269,8 +303,49 @@ function buildMapContext(memberName: (id: string) => string | undefined): Activi
     // `location.origin` is `capacitor://app.beanies.family` and every one of those links is
     // dead. The fallback is unchanged.
     appOrigin: shareableOrigin(),
-    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
   };
+}
+
+/** The `resolve` / `invalid-stored` telemetry for {@link buildMapContext}. No raw
+ *  IANA id leaves the device: only the source and whether the offsets differ. */
+function logHomeZoneResolution(
+  source: HomeTimeZoneSource,
+  zone: string,
+  invalidStored: boolean
+): void {
+  // `unknown` when either side cannot be compared: a stored zone this engine cannot
+  // format (`sameOffsetNow` would answer true), or an engine that reports no device zone
+  // (`deviceTimeZone()` would compare against a synthetic 'UTC'). Neither may be counted
+  // as same or different, or the foreign-zone push rate is wrong.
+  const device = knownDeviceTimeZone();
+  const detail =
+    invalidStored || !device
+      ? 'unknown'
+      : sameOffsetNow(zone, device)
+        ? 'device-same'
+        : 'device-differs';
+  const key = `${source}|${detail}`;
+  if (!resolveLogged.has(key)) {
+    resolveLogged.add(key);
+    logEvent({
+      level: 'info',
+      surface: 'home-time-zone',
+      message: 'home_time_zone_resolved',
+      context: { action: 'resolve', kind: source, detail },
+    });
+  }
+  if (invalidStored && !invalidStoredLogged) {
+    invalidStoredLogged = true;
+    // Still pushed and hashed as stored (Google is the judge, and a fallback here
+    // would ping-pong the hash against devices that know the zone). A value Google
+    // also rejects surfaces through the 400 quarantine below; re-pick in Settings.
+    logEvent({
+      level: 'warn',
+      surface: 'home-time-zone',
+      message: 'home_time_zone_invalid_stored',
+      context: { action: 'invalid-stored', kind: source },
+    });
+  }
 }
 
 /** Run a per-connection critical section under a best-effort single-writer lock. */
@@ -529,7 +604,10 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
           calendarId,
           masterEventId,
           timeMin,
-          timeMax
+          timeMax,
+          // Render instances in the HOME zone the master was pushed in; the calendar's
+          // own zone would shift a late-evening instance's date slice a day.
+          ctx.timeZone
         );
       } catch (err) {
         // Master not on Google yet → converge on the next reconcile (not an error).
@@ -556,17 +634,23 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
       if (!inst) {
         // NOTE: this defers on EVERY poll and never converges if the occurrence
         // ymd is not a real slot of the series. Logged at `warn` (not debug) so
-        // a permanently-stuck exception is visible in CloudWatch.
-        logEvent({
-          surface: 'calendar-sync',
-          level: 'warn',
-          message: 'Exception deferred: no Google instance matches this occurrence date',
-          context: {
-            action: 'exception-deferred',
-            recur_occurrence_ymd: e.occurrenceYmd,
-            recur_outcome: 'no-instance',
-          },
-        });
+        // a permanently-stuck exception is visible in CloudWatch, but ONCE per
+        // exception hash per session (`deferredExceptionLogged`); the retry above
+        // still runs every poll.
+        const deferKey = rejectionKey(connectionId, e.child.id);
+        if (deferredExceptionLogged.get(deferKey) !== e.hash) {
+          deferredExceptionLogged.set(deferKey, e.hash);
+          logEvent({
+            surface: 'calendar-sync',
+            level: 'warn',
+            message: 'Exception deferred: no Google instance matches this occurrence date',
+            context: {
+              action: 'exception-deferred',
+              recur_occurrence_ymd: e.occurrenceYmd,
+              recur_outcome: 'no-instance',
+            },
+          });
+        }
         return false;
       }
       instanceId = inst.id;
@@ -723,11 +807,11 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     await withConnectionLock(connectionId, async () => {
       const client = getCalendarClient();
       const calendarId = connection.destinationCalendarId || 'primary';
-      const memberName = makeMemberNameResolver(); // one memoized resolver for ctx + hash
-      const ctx = buildMapContext(memberName);
+      // ONE context for the bodies AND the hashes (same resolver, same home zone).
+      const ctx = buildMapContext();
       const activities = await getAllActivities();
       const links = await getCalendarEventLinksForConnection(connectionId);
-      const plan = planReconcile(activities, links, todayYmd(), memberName);
+      const plan = planReconcile(activities, links, todayYmd(), ctx);
 
       /**
        * How many activities the planner refused to push at all.
@@ -1642,6 +1726,9 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     invalidGrantCounters.clear();
     reconcileErrorCounters.clear();
     rejectedPushHashes.clear();
+    deferredExceptionLogged.clear();
+    resolveLogged.clear();
+    invalidStoredLogged = false;
   }
 
   return {

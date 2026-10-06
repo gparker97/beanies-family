@@ -25,6 +25,7 @@ import type { CalendarEventFull } from '@/services/calendar/CalendarClient';
 import { parseRecurrence } from './parseRrule';
 import { googleTimesToActivityFields } from './activityToGoogleEvent';
 import { activityShadowFromRule } from '@/services/recurrence/adapters';
+import { wallClockInZone } from '@/utils/timeZone';
 
 /** What the review row tells the user will happen to this event. */
 export type ImportOutcome = 'adopt' | 'copy' | 'unsupported-recurrence';
@@ -75,14 +76,16 @@ export interface ImportCandidate {
  * resolves the occurrence via `listInstances`; this applies it.
  *
  * Pure, and deliberately narrow: it re-dates and nothing else, so the title, notes,
- * location, assignees and every other field stay exactly as planned.
+ * location, assignees and every other field stay exactly as planned. `zone` is the
+ * family's home zone, the same one `planImport` converted the master's times in.
  */
 export function redateToOccurrence(
   candidate: ImportCandidate,
   start: { date?: string; dateTime?: string } | undefined,
-  end: { date?: string; dateTime?: string } | undefined
+  end: { date?: string; dateTime?: string } | undefined,
+  zone: string
 ): ImportCandidate {
-  const times = googleTimesToActivityFields(start, end);
+  const times = googleTimesToActivityFields(start, end, zone);
   if (!times) return candidate;
   // Drop the OLD span fields before spreading the new ones, or a master that had
   // an `endDate` would keep it while `date` moved forward.
@@ -102,6 +105,9 @@ export interface ImportDefaults {
   memberId: UUID;
   /** Destination calendar of this connection, already normalized off 'primary'. */
   destinationCalendarId: string;
+  /** The family's resolved HOME zone: what an imported event's wall clock is read in
+   *  (`settingsStore.resolveHomeTimeZoneNow().zone`, once per scan). */
+  homeTimeZone: string;
 }
 
 export interface ImportSource {
@@ -161,8 +167,10 @@ function recurrenceAnchorYmd(ev: CalendarEventFull): string | null {
     return m ? m[1] : null;
   }
   try {
-    // `en-CA` yields YYYY-MM-DD, which is the shape the rest of the app uses.
-    return new Intl.DateTimeFormat('en-CA', { timeZone: zone }).format(at);
+    // ⚠️ The EVENT's zone, NOT the family home zone the activity's own fields are
+    // read in: BYDAY is anchored where the series was authored. Same formatter as
+    // the home-zone conversion, different zone.
+    return wallClockInZone(at, zone).ymd;
   } catch {
     // An unknown IANA zone must not fail the whole scan; fall back to the offset.
     const m = /^(\d{4}-\d{2}-\d{2})/.exec(dt);
@@ -223,7 +231,7 @@ export function planImport(
         continue;
       }
 
-      const times = googleTimesToActivityFields(ev.start, ev.end);
+      const times = googleTimesToActivityFields(ev.start, ev.end, defaults.homeTimeZone);
       if (!times) {
         skipped.push({ id: ev.id, reason: 'unreadable-times' });
         continue;
@@ -238,9 +246,9 @@ export function planImport(
       const adoptable = ev.isOrganizer && onDestination;
 
       // ⚠️ The recurrence anchor is the event's OWN start date, not the importing
-      // device's local date. `times.date` is device-local wall clock (correct for
-      // the activity's own fields), but an RRULE's BYDAY/BYMONTHDAY is anchored in
-      // the event's zone. Using the device date meant a Singapore 16:00 Tuesday
+      // device's local date. `times.date` is wall clock in the family's HOME zone
+      // (correct for the activity's own fields), but an RRULE's BYDAY/BYMONTHDAY is
+      // anchored in the event's zone. Using the device date meant a Singapore 16:00 Tuesday
       // series, imported from a device west of that zone, resolved to Monday and
       // was silently demoted to `unsupported-recurrence`; a bare FREQ=MONTHLY was
       // worse, landing on the wrong day of every month with no refusal at all.

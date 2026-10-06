@@ -401,3 +401,30 @@ describe('googleCalendarClient authedFetch — 403 is ambiguous (2026-09-13)', (
     expect((err as Error).message).toContain('rateLimitExceeded: Rate Limit Exceeded');
   });
 });
+
+describe('googleCalendarClient listInstances — renders in the requested zone (2026-10-06)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('sends the `timeZone` query param, so instances come back in the family home zone', async () => {
+    // Without it Google renders in the CALENDAR's zone, and an instance whose wall
+    // clock differs from that zone has a date slice that never matches its occurrence.
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, { items: [] }));
+    vi.stubGlobal('fetch', fetchMock);
+    const client = createGoogleCalendarClient(makeTokenProvider().provider);
+
+    await client.listInstances(
+      'conn-1',
+      'primary',
+      'master',
+      '2026-09-04T00:00:00Z',
+      '2026-09-07T00:00:00Z',
+      'Asia/Singapore'
+    );
+
+    const url = new URL(String(fetchMock.mock.calls[0]![0]));
+    expect(url.searchParams.get('timeZone')).toBe('Asia/Singapore');
+  });
+});

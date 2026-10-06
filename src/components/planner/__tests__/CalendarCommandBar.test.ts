@@ -53,9 +53,10 @@ const stubs = {
   },
 };
 
-function mountBar() {
+function mountBar(extra: { note?: string } = {}) {
   return mount(CalendarCommandBar, {
     props: {
+      ...extra,
       label: 'May 2026',
       activeView: 'month' as const,
       canAdd: true,
@@ -107,5 +108,17 @@ describe('CalendarCommandBar', () => {
     const trip = w.find('.stub-trip');
     expect(trip.exists()).toBe(true);
     expect(trip.classes()).not.toContain('is-inline');
+  });
+
+  it('renders the optional note as a caption, and nothing when absent', () => {
+    expect(mountBar().find('p.text-xs').exists()).toBe(false);
+
+    const w = mountBar({ note: 'Times are in Singapore Standard Time' });
+    const note = w.find('p.text-xs');
+    expect(note.text()).toBe('Times are in Singapore Standard Time');
+    // Readable ink with a dark partner, no opacity modifier.
+    expect(note.classes()).toEqual(
+      expect.arrayContaining(['text-secondary-500', 'dark:text-ink-soft'])
+    );
   });
 });

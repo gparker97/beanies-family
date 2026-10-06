@@ -7,6 +7,7 @@ import {
   activityToGoogleEvent,
   toInstanceBody,
 } from '../activityToGoogleEvent';
+import { TEST_HASH_CTX } from './helpers/hashContext';
 
 const ctx = {
   memberName: (id: string) => ({ m1: 'Mia' })[id],
@@ -82,22 +83,22 @@ describe('toInstanceBody', () => {
 describe('computeExceptionHash', () => {
   it('changes across mode (modify ↔ cancel) for the same child + occurrence', () => {
     const child = makeActivity({ id: 'child', recurrence: 'none', parentActivityId: 'master' });
-    const modify = computeExceptionHash(child, '2026-06-17', 'modify');
-    const cancel = computeExceptionHash(child, '2026-06-17', 'cancel');
+    const modify = computeExceptionHash(child, '2026-06-17', 'modify', TEST_HASH_CTX);
+    const cancel = computeExceptionHash(child, '2026-06-17', 'cancel', TEST_HASH_CTX);
     expect(modify).not.toBe(cancel);
   });
 
   it('changes across occurrence date', () => {
     const child = makeActivity({ id: 'child', recurrence: 'none', parentActivityId: 'master' });
-    expect(computeExceptionHash(child, '2026-06-17', 'modify')).not.toBe(
-      computeExceptionHash(child, '2026-06-24', 'modify')
+    expect(computeExceptionHash(child, '2026-06-17', 'modify', TEST_HASH_CTX)).not.toBe(
+      computeExceptionHash(child, '2026-06-24', 'modify', TEST_HASH_CTX)
     );
   });
 
   it('is stable for identical inputs', () => {
     const child = makeActivity({ id: 'child', recurrence: 'none', parentActivityId: 'master' });
-    expect(computeExceptionHash(child, '2026-06-17', 'modify')).toBe(
-      computeExceptionHash(child, '2026-06-17', 'modify')
+    expect(computeExceptionHash(child, '2026-06-17', 'modify', TEST_HASH_CTX)).toBe(
+      computeExceptionHash(child, '2026-06-17', 'modify', TEST_HASH_CTX)
     );
   });
 });

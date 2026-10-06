@@ -61,6 +61,8 @@ import { usePermissions } from '@/composables/usePermissions';
 import { usePWA } from '@/composables/usePWA';
 import { useCurrencyOptions } from '@/composables/useCurrencyOptions';
 import { useCountryOptions } from '@/composables/useCountryOptions';
+import { useTimeZoneOptions } from '@/composables/useTimeZoneOptions';
+import { useToday } from '@/composables/useToday';
 import { CURRENCIES, getCurrencyInfo } from '@/constants/currencies';
 import {
   list as projectionList,
@@ -310,9 +312,23 @@ const wantExport = ref(false);
 const wantDeleteDrive = ref(false);
 const isDeleting = ref(false);
 
-// ── Country & holidays ───────────────────────────────────────────────────────
+// ── Region & holidays (country, home time zone, public holidays) ─────────────
 const { countryOptions } = useCountryOptions();
-// Shown inside the Country & Holidays drawer when a holiday fetch has failed
+const { lastVisibleAt } = useToday();
+// The Home Time Zone picker shows the RESOLVED zone, but nothing when it is only the
+// device fallback (the placeholder says so). Re-evaluated on foreground: the device
+// zone is not reactive, and a device may have crossed zones while backgrounded.
+const homeTimeZoneModel = computed(() => {
+  void lastVisibleAt.value;
+  const resolved = settingsStore.resolveHomeTimeZoneNow();
+  return resolved.source === 'device-fallback' ? '' : resolved.zone;
+});
+const { timeZoneOptions } = useTimeZoneOptions(
+  computed(() => settingsStore.familyCountry),
+  computed(() => homeTimeZoneModel.value || undefined),
+  showCountryHolidays
+);
+// Shown inside the Region & Holidays drawer when a holiday fetch has failed
 // (transient network error with no cached fallback) — informative, with
 // recovery direction. The store's online watcher retries automatically.
 const showHolidayRetryHint = computed(() => !!settingsStore.country && holidayStore.loadFailed);
@@ -323,6 +339,25 @@ async function onPickCountry(value: string) {
   } catch {
     // persistDualSetting already surfaced this (toast + console.error) and
     // re-threw so the picker can revert its visual state — nothing more to do.
+  }
+}
+
+async function onPickHomeTimeZone(value: string) {
+  if (!value) return;
+  try {
+    await settingsStore.setHomeTimeZone(value);
+  } catch {
+    // persistAiSetting already surfaced this (toast + console.error) and re-threw so
+    // the picker can revert its visual state — nothing more to do.
+  }
+}
+
+async function onToggleShowPublicHolidays(show: boolean) {
+  try {
+    await settingsStore.setShowPublicHolidays(show);
+  } catch {
+    // persistAiSetting already surfaced this (toast + console.error); the toggle
+    // reads the store value, so it reverts on its own.
   }
 }
 
@@ -2321,7 +2356,7 @@ async function handleDeleteFamilyClick() {
       </div>
     </BeanieFormModal>
 
-    <!-- ── Country & Holidays Modal ────────────────────────────────────── -->
+    <!-- ── Region & Holidays Modal ─────────────────────────────────────── -->
     <BeanieFormModal
       variant="drawer"
       :open="showCountryHolidays"
@@ -2345,7 +2380,19 @@ async function handleDeleteFamilyClick() {
         @update:model-value="onPickCountry"
       />
 
-      <p v-if="showHolidayRetryHint" class="text-secondary-500/70 dark:text-ink-soft text-xs">
+      <BaseCombobox
+        :model-value="homeTimeZoneModel"
+        :options="timeZoneOptions"
+        :label="t('settings.homeTimeZone')"
+        :hint="t('settings.homeTimeZoneHelp')"
+        :placeholder="t('settings.homeTimeZoneNotSet')"
+        :search-placeholder="t('settings.homeTimeZone')"
+        :disabled="!canManagePod"
+        :clearable="false"
+        @update:model-value="onPickHomeTimeZone"
+      />
+
+      <p v-if="showHolidayRetryHint" class="dark:text-ink-soft text-secondary-500 text-xs">
         {{ t('holiday.loadFailedRetryHint') }}
       </p>
 
@@ -2364,7 +2411,7 @@ async function handleDeleteFamilyClick() {
         <ToggleSwitch
           :model-value="settingsStore.showPublicHolidays"
           :disabled="!settingsStore.country || !canManagePod"
-          @update:model-value="settingsStore.setShowPublicHolidays($event)"
+          @update:model-value="onToggleShowPublicHolidays"
         />
       </div>
     </BeanieFormModal>

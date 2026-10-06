@@ -9,8 +9,12 @@ import { isRepeatingActivity, pushBlockReason } from '@/utils/calendar/activityD
 import type { CalendarEventLink, FamilyActivity } from '@/types/models';
 import { addDaysYmd } from '@/utils/date';
 import { masterEventId } from './deterministicEventId';
-import { beaniesMayDelete, beaniesMayPush } from './linkOwnership';
-import { computePushHash, computeExceptionHash } from './activityToGoogleEvent';
+import { beaniesMayDelete, beaniesMayPush, pushHashContextForLink } from './linkOwnership';
+import {
+  computePushHash,
+  computeExceptionHash,
+  type PushHashContext,
+} from './activityToGoogleEvent';
 import { overrideOccurrenceYmd } from './overrideOccurrenceYmd';
 
 /** Forward/backward window bounds (days). Pushing is limited to this range so the
@@ -138,15 +142,21 @@ export function isPushable(activity: FamilyActivity, todayYmd: string): boolean 
 
 /**
  * Build the reconcile plan. Pure. `links` is this connection's existing links.
- * `memberName` (optional) resolves member ids → names so the push hash reflects
- * resolved names (a member rename re-pushes the affected activities — #32 F3).
+ * `hash` (REQUIRED, from `makePushHashContext()`) carries the member-name resolver
+ * (a member rename re-pushes the affected activities — #32 F3) and the persisted home
+ * zone, which is folded per link by `hashFoldsHomeZone` (adopted events never fold it).
  */
 export function planReconcile(
   activities: FamilyActivity[],
   links: CalendarEventLink[],
   todayYmd: string,
-  memberName?: (id: string) => string | undefined
+  hash: PushHashContext
 ): ReconcilePlan {
+  // The hash context for ONE link: the home zone folds only for an event beanies
+  // created (see `hashFoldsHomeZone`). Masters pass their own link; exceptions pass
+  // the MASTER's, because the instance lives in the master's event.
+  const zoneCtx = (link?: CalendarEventLink): PushHashContext => pushHashContextForLink(hash, link);
+
   // Partition links by kind up front. This is mandatory: `deletes` filters by
   // `pushableIds` (which never contains an override-child id), so an exception link
   // left in the master pool would be misclassified as a stray master link and its
@@ -199,7 +209,7 @@ export function planReconcile(
       return {
         activity,
         eventId: masterEventId(link, activity.id),
-        hash: computePushHash(activity, memberName),
+        hash: computePushHash(activity, zoneCtx(link)),
         existingHash: link?.lastPushedHash,
         origin: link?.origin,
       };
@@ -239,15 +249,16 @@ export function planReconcile(
     const occurrenceYmd = overrideOccurrenceYmd(child);
     const mode: 'modify' | 'cancel' = child.isActive ? 'modify' : 'cancel';
     const link = exceptionLinkByChild.get(child.id);
+    const masterLink = linkByActivity.get(master.id);
     exceptionUpserts.push({
       child,
       master,
       occurrenceYmd,
-      hash: computeExceptionHash(child, occurrenceYmd, mode, memberName),
+      hash: computeExceptionHash(child, occurrenceYmd, mode, zoneCtx(masterLink)),
       existingHash: link?.lastPushedHash,
       existingInstanceId: link?.googleEventId,
       mode,
-      masterEventId: masterEventId(linkByActivity.get(master.id), master.id),
+      masterEventId: masterEventId(masterLink, master.id),
     });
   }
 

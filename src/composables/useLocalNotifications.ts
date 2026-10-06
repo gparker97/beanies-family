@@ -12,6 +12,7 @@ import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry';
 import { handleReminderTap, type ReminderExtra } from '@/composables/useReminderTapResume';
 import { useToday } from '@/composables/useToday';
+import { deviceTimeZone } from '@/utils/timeZone';
 import { showToast } from '@/composables/useToast';
 import { useTranslationStore } from '@/stores/translationStore';
 import {
@@ -487,10 +488,12 @@ export function useLocalNotifications(): void {
   // and OEM alarm purges; the tz comparison only decides whether to log.
   // Reuses `useToday`'s wake sink — it owns the app's only visibilitychange
   // listener and every other consumer watches it rather than adding its own.
-  let lastTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  // The DEVICE zone on purpose: alarms fire on this device's clock. (Not the family
+  // home zone; reminders stay device-local, see the 2026-10-06 home-zone plan.)
+  let lastTz = deviceTimeZone();
   watch(isVisible, (visible) => {
     if (!visible) return;
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const tz = deviceTimeZone();
     if (tz !== lastTz) {
       lastTz = tz;
       logEvent({

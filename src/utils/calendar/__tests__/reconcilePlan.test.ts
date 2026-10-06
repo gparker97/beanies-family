@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import type { CalendarEventLink, FamilyActivity } from '@/types/models';
 import { activityInWindow, isPushable, planReconcile } from '../reconcilePlan';
 import { deterministicEventId } from '../deterministicEventId';
-import { computePushHash } from '../activityToGoogleEvent';
+import { computePushHash, computeExceptionHash } from '../activityToGoogleEvent';
+import { TEST_HASH_CTX } from './helpers/hashContext';
 
 const TODAY = '2026-06-10';
 
@@ -29,7 +30,7 @@ function linkFor(activity: FamilyActivity, connectionId = 'c1'): CalendarEventLi
     connectionId,
     activityId: activity.id,
     googleEventId: deterministicEventId(activity.id),
-    lastPushedHash: computePushHash(activity),
+    lastPushedHash: computePushHash(activity, TEST_HASH_CTX),
     lastPushedAt: '2026-06-01T00:00:00.000Z',
     createdAt: '2026-06-01T00:00:00.000Z',
     updatedAt: '2026-06-01T00:00:00.000Z',
@@ -85,7 +86,7 @@ describe('isPushable', () => {
 describe('planReconcile', () => {
   it('upserts a new activity with no existing hash', () => {
     const a = makeActivity();
-    const plan = planReconcile([a], [], TODAY);
+    const plan = planReconcile([a], [], TODAY, TEST_HASH_CTX);
     expect(plan.upserts).toHaveLength(1);
     expect(plan.upserts[0].existingHash).toBeUndefined();
     expect(plan.upserts[0].eventId).toBe(deterministicEventId(a.id));
@@ -94,23 +95,28 @@ describe('planReconcile', () => {
 
   it('marks an unchanged activity (existingHash === hash) and a changed one', () => {
     const a = makeActivity();
-    const unchanged = planReconcile([a], [linkFor(a)], TODAY);
+    const unchanged = planReconcile([a], [linkFor(a)], TODAY, TEST_HASH_CTX);
     expect(unchanged.upserts[0].existingHash).toBe(unchanged.upserts[0].hash);
 
     const edited = makeActivity({ title: 'New title' });
-    const changed = planReconcile([edited], [linkFor(makeActivity())], TODAY);
+    const changed = planReconcile([edited], [linkFor(makeActivity())], TODAY, TEST_HASH_CTX);
     expect(changed.upserts[0].existingHash).not.toBe(changed.upserts[0].hash);
   });
 
   it('deletes a link whose activity is inactive / out-of-window / gone', () => {
     const a = makeActivity();
     // activity now inactive → not pushable → its link is a delete
-    const inactivePlan = planReconcile([makeActivity({ isActive: false })], [linkFor(a)], TODAY);
+    const inactivePlan = planReconcile(
+      [makeActivity({ isActive: false })],
+      [linkFor(a)],
+      TODAY,
+      TEST_HASH_CTX
+    );
     expect(inactivePlan.deletes).toHaveLength(1);
     expect(inactivePlan.upserts).toHaveLength(0);
 
     // activity removed entirely → orphan link → delete
-    const orphanPlan = planReconcile([], [linkFor(a)], TODAY);
+    const orphanPlan = planReconcile([], [linkFor(a)], TODAY, TEST_HASH_CTX);
     expect(orphanPlan.deletes).toHaveLength(1);
   });
 });
@@ -132,7 +138,7 @@ function importedLink(
 describe('adoption: the link decides where the event lives', () => {
   it('targets the link’s foreign Google id, not a derived one', () => {
     const a = makeActivity({ title: 'Swim' });
-    const plan = planReconcile([a], [importedLink(a, 'adopted')], TODAY);
+    const plan = planReconcile([a], [importedLink(a, 'adopted')], TODAY, TEST_HASH_CTX);
 
     expect(plan.upserts).toHaveLength(1);
     expect(plan.upserts[0].eventId).toBe('Google_Original_ID_123');
@@ -142,13 +148,13 @@ describe('adoption: the link decides where the event lives', () => {
 
   it('carries origin onto the upsert so the engine can self-heal a vanished event', () => {
     const a = makeActivity();
-    const plan = planReconcile([a], [importedLink(a, 'adopted')], TODAY);
+    const plan = planReconcile([a], [importedLink(a, 'adopted')], TODAY, TEST_HASH_CTX);
     expect(plan.upserts[0].origin).toBe('adopted');
   });
 
   it('still derives the id for an activity beanies has never pushed', () => {
     const a = makeActivity();
-    const plan = planReconcile([a], [], TODAY);
+    const plan = planReconcile([a], [], TODAY, TEST_HASH_CTX);
     expect(plan.upserts[0].eventId).toBe(deterministicEventId(a.id));
     expect(plan.upserts[0].origin).toBeUndefined();
   });
@@ -163,7 +169,7 @@ describe('MIGRATION SAFETY: masterEventId is a no-op for every link ever written
     const a = makeActivity();
     const storeShapedLink = linkFor(a); // googleEventId = deterministicEventId(a.id)
 
-    const plan = planReconcile([a], [storeShapedLink], TODAY);
+    const plan = planReconcile([a], [storeShapedLink], TODAY, TEST_HASH_CTX);
 
     expect(plan.upserts[0].eventId).toBe(deterministicEventId(a.id));
     expect(plan.upserts[0].eventId).toBe(storeShapedLink.googleEventId);
@@ -174,7 +180,7 @@ describe('DATA LOSS GUARD: an imported link is never a remote delete', () => {
   it('an external link whose activity is suppressed is NOT in deletes', () => {
     // This is the one that would delete a school's event from a parent's calendar.
     const a = makeActivity();
-    const plan = planReconcile([a], [importedLink(a, 'external')], TODAY);
+    const plan = planReconcile([a], [importedLink(a, 'external')], TODAY, TEST_HASH_CTX);
 
     expect(plan.deletes).toHaveLength(0);
     expect(plan.upserts).toHaveLength(0); // suppressed: beanies never writes it
@@ -184,7 +190,7 @@ describe('DATA LOSS GUARD: an imported link is never a remote delete', () => {
     // Dropping it here would let a later re-entry into the window mint a fresh
     // deterministic id beside the user's original event.
     const a = makeActivity({ isActive: false });
-    const plan = planReconcile([a], [importedLink(a, 'external')], TODAY);
+    const plan = planReconcile([a], [importedLink(a, 'external')], TODAY, TEST_HASH_CTX);
 
     expect(plan.deletes).toHaveLength(0);
     expect(plan.unlinks).toHaveLength(0);
@@ -192,7 +198,7 @@ describe('DATA LOSS GUARD: an imported link is never a remote delete', () => {
 
   it('unlinks (never deletes) once the activity itself is gone', () => {
     const a = makeActivity();
-    const plan = planReconcile([], [importedLink(a, 'external')], TODAY);
+    const plan = planReconcile([], [importedLink(a, 'external')], TODAY, TEST_HASH_CTX);
 
     expect(plan.deletes).toHaveLength(0);
     expect(plan.unlinks).toHaveLength(1);
@@ -201,7 +207,7 @@ describe('DATA LOSS GUARD: an imported link is never a remote delete', () => {
 
   it('an ADOPTED link is also never remotely deleted when its activity goes', () => {
     const a = makeActivity();
-    const plan = planReconcile([], [importedLink(a, 'adopted')], TODAY);
+    const plan = planReconcile([], [importedLink(a, 'adopted')], TODAY, TEST_HASH_CTX);
     expect(plan.deletes).toHaveLength(0);
     expect(plan.unlinks).toHaveLength(1);
   });
@@ -209,7 +215,7 @@ describe('DATA LOSS GUARD: an imported link is never a remote delete', () => {
   it('a beanies-created link still deletes normally', () => {
     // The existing behaviour must be completely untouched.
     const a = makeActivity();
-    const plan = planReconcile([], [linkFor(a)], TODAY);
+    const plan = planReconcile([], [linkFor(a)], TODAY, TEST_HASH_CTX);
     expect(plan.deletes).toHaveLength(1);
     expect(plan.unlinks).toHaveLength(0);
   });
@@ -225,7 +231,12 @@ describe('an external master never has its Google instances touched', () => {
       date: TODAY,
     });
 
-    const plan = planReconcile([master, child], [importedLink(master, 'external')], TODAY);
+    const plan = planReconcile(
+      [master, child],
+      [importedLink(master, 'external')],
+      TODAY,
+      TEST_HASH_CTX
+    );
 
     // Patching or cancelling an instance here would be writing to someone else's
     // recurring event.
@@ -241,9 +252,82 @@ describe('an external master never has its Google instances touched', () => {
       date: TODAY,
     });
 
-    const plan = planReconcile([master, child], [importedLink(master, 'adopted')], TODAY);
+    const plan = planReconcile(
+      [master, child],
+      [importedLink(master, 'adopted')],
+      TODAY,
+      TEST_HASH_CTX
+    );
 
     expect(plan.exceptionUpserts).toHaveLength(1);
     expect(plan.exceptionUpserts[0].masterEventId).toBe('Google_Original_ID_123');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The family home zone in the hash (2026-10-06). The persisted zone folds ONLY for
+// events beanies created: persisting it re-pushes those once (the repair for a
+// foreign-zone stamp), and leaves adopted events, whose re-push would rewrite the
+// family's own body and reminders, untouched.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('home time zone: which links fold the persisted zone', () => {
+  const HOME_CTX = { ...TEST_HASH_CTX, hashZone: 'Asia/Singapore' };
+
+  it('a beanies-created link re-pushes once when the home zone is persisted', () => {
+    const a = makeActivity();
+    const plan = planReconcile([a], [linkFor(a)], TODAY, HOME_CTX);
+    // linkFor records the pre-zone hash, exactly what every stored link carries today.
+    expect(plan.upserts[0].hash).not.toBe(plan.upserts[0].existingHash);
+    expect(plan.upserts[0].hash).toBe(computePushHash(a, HOME_CTX));
+  });
+
+  it('an ADOPTED link’s hash is unchanged when the home zone is persisted', () => {
+    const a = makeActivity();
+    const plan = planReconcile([a], [importedLink(a, 'adopted')], TODAY, HOME_CTX);
+    expect(plan.upserts[0].hash).toBe(plan.upserts[0].existingHash);
+    expect(plan.upserts[0].hash).toBe(computePushHash(a, TEST_HASH_CTX));
+  });
+
+  it('an activity with no link yet folds the zone (beanies will create it)', () => {
+    const a = makeActivity();
+    const plan = planReconcile([a], [], TODAY, HOME_CTX);
+    expect(plan.upserts[0].hash).toBe(computePushHash(a, HOME_CTX));
+  });
+
+  it("hashZone '' plans exactly as before for every link kind (deploy alone re-pushes nothing)", () => {
+    const a = makeActivity();
+    for (const link of [linkFor(a), importedLink(a, 'adopted')]) {
+      const plan = planReconcile([a], [link], TODAY, TEST_HASH_CTX);
+      expect(plan.upserts[0].hash).toBe(plan.upserts[0].existingHash);
+    }
+  });
+
+  it('an exception follows its MASTER link’s ownership, not its own', () => {
+    const master = makeActivity({ id: 'm1', recurrence: 'weekly' });
+    const child = makeActivity({
+      id: 'c1',
+      parentActivityId: 'm1',
+      originalOccurrenceDate: TODAY,
+      date: TODAY,
+    });
+
+    // Adopted master: the instance lives in the family's own event → no fold, even
+    // though the child itself has no link (which on its own would fold).
+    const adopted = planReconcile(
+      [master, child],
+      [importedLink(master, 'adopted')],
+      TODAY,
+      HOME_CTX
+    );
+    expect(adopted.exceptionUpserts[0].hash).toBe(
+      computeExceptionHash(child, TODAY, 'modify', TEST_HASH_CTX)
+    );
+
+    // Beanies-created master → folds.
+    const owned = planReconcile([master, child], [linkFor(master)], TODAY, HOME_CTX);
+    expect(owned.exceptionUpserts[0].hash).toBe(
+      computeExceptionHash(child, TODAY, 'modify', HOME_CTX)
+    );
   });
 });

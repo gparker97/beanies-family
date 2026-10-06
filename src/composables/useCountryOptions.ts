@@ -4,7 +4,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import type { ComboboxOption } from '@/components/ui/BaseCombobox.vue';
 
 /**
- * Country options for the `BaseCombobox` used by the Settings "Country &
+ * Country options for the `BaseCombobox` used by the Settings "Region &
  * Holidays" card and the onboarding step-1 picker. Alpha-sorted by English
  * name (COUNTRIES is already sorted), with a leading "Not set" sentinel (value
  * `''`) so the family can clear their country. The search-friendly `label`

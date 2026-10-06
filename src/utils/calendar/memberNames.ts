@@ -3,11 +3,12 @@
  * import (#94).
  *
  * It matters that both use the SAME one. `computePushHash` folds resolved member
- * names into the hash when, and only when, a resolver is passed, so a caller that
- * omits it produces a different hash for the same activity. The import records that
- * hash on the link precisely so the next reconcile sees the hashes agree and does
- * nothing; a mismatch would push every imported event straight back to Google, and
- * for an ADOPTED event that push rewrites the user's real event body.
+ * names into the hash, so two resolvers that disagree produce different hashes for
+ * the same activity. The import records that hash on the link precisely so the next
+ * reconcile sees the hashes agree and does nothing; a mismatch would push every
+ * imported event straight back to Google, and for an ADOPTED event that push
+ * rewrites the user's real event body. Both reach it through `makePushHashContext()`
+ * (`pushHashContext.ts`), whose context `computePushHash` REQUIRES.
  *
  * Memoized because resolving 1-3 ids across N activities would otherwise re-scan
  * `familyStore.members` every time (O(N*M)). Preserves `undefined` for unknown ids

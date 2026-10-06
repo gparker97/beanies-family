@@ -6,13 +6,14 @@
  * event beanies had inserted under a `deterministicEventId`. The import breaks
  * that, because it links activities to events the family already had.
  *
- * These two predicates are the ONLY sanctioned way to read `link.origin`. Do not
+ * These predicates are the ONLY sanctioned way to read `link.origin`. Do not
  * branch on the raw value at a call site: four sites each testing an optional
  * string literal is a rule that decays the first time a fifth is added, and the
  * fifth one here would delete a family's real Google events.
  */
 
 import type { CalendarEventLink } from '@/types/models';
+import type { PushHashContext } from './activityToGoogleEvent';
 
 /**
  * May beanies DELETE this event from Google?
@@ -37,4 +38,32 @@ export function beaniesMayDelete(link: CalendarEventLink): boolean {
  */
 export function beaniesMayPush(link: CalendarEventLink): boolean {
   return link.origin !== 'external';
+}
+
+/**
+ * Does this link's push hash fold the family's home time zone?
+ *
+ * Only for events beanies created (or will create: no link yet). An ADOPTED event
+ * gets its full beanies body on any hash change, which replaces the family's own
+ * description and RRULE and clears their Google reminders, so a reason-less zone
+ * fold would rewrite every imported event the day `homeTimeZone` is persisted. It
+ * keeps the zone its author gave it in Google until the activity is next edited in
+ * beanies, when the push stamps the home zone. `'external'` events are never pushed,
+ * so folding there would only churn a hash nothing reads.
+ *
+ * For an EXCEPTION, pass the MASTER's link: the instance belongs to the master's
+ * event, whoever owns the override child.
+ */
+export function hashFoldsHomeZone(link?: Pick<CalendarEventLink, 'origin'>): boolean {
+  return !link || link.origin === undefined;
+}
+
+/** The push-hash context for ONE link (see `hashFoldsHomeZone`). The single rule both
+ *  `planReconcile` and the import commit use, so the hash import records always equals
+ *  the one the next reconcile computes. */
+export function pushHashContextForLink<T extends PushHashContext>(
+  ctx: T,
+  link?: Pick<CalendarEventLink, 'origin'>
+): T {
+  return hashFoldsHomeZone(link) ? ctx : { ...ctx, hashZone: '' };
 }

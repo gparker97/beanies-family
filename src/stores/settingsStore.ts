@@ -4,7 +4,18 @@ import { showToast } from '@/composables/useToast';
 import { useTranslation } from '@/composables/useTranslation';
 import { STORAGE_KEYS } from '@/constants/storageKeys';
 import * as settingsRepo from '@/services/automerge/repositories/settingsRepository';
-import { isDocLoaded } from '@/services/automerge/docService';
+import { isDocLoaded, isAuthoritativeDocLoaded } from '@/services/automerge/docService';
+import { getSettings as getProjectedSettings } from '@/services/automerge/projection';
+import {
+  decideHomeTimeZoneBackfill,
+  deviceTimeZone,
+  isValidTimeZone,
+  knownDeviceTimeZone,
+  resolveHomeTimeZone,
+  singleZoneFor,
+  zonesForCountry,
+  type ResolvedHomeTimeZone,
+} from '@/utils/timeZone';
 import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { toISODateString } from '@/utils/date';
@@ -147,6 +158,9 @@ export const useSettingsStore = defineStore('settings', () => {
   const showPublicHolidays = computed<boolean>(() =>
     country.value ? (settings.value.showPublicHolidays ?? true) : false
   );
+  // The FAMILY-scoped country (CRDT projection), never the device mirror `country` above.
+  // Zone decisions (picker options, backfill, resolution) read this one.
+  const familyCountry = computed<CountryCode | null>(() => getProjectedSettings()?.country ?? null);
   // #133: when true, the photo→activity AI consent modal is skipped (auto-consented).
   // Family-scoped (synced); default false so the first use always prompts.
   const skipDocumentConsentPrompt = computed<boolean>(
@@ -458,7 +472,146 @@ export const useSettingsStore = defineStore('settings', () => {
   // Country is dual-persisted (device + family) like language — a new device
   // can resolve it and pre-fetch holidays before the family doc syncs.
   // Passing `undefined` clears it on both layers (treated as "not set").
-  const setCountry = (v: CountryCode | null) => persistDualSetting('country', v ?? undefined);
+  // CHANGING to a single-zone country also moves an ALREADY-stored home zone to it (SG ->
+  // GB follows); a multi-zone country leaves it, and re-picking the SAME country never
+  // touches it (a deliberate Europe/Dublin under GB survives). While the zone is unset the
+  // reactive backfill (`ensureHomeTimeZone`, re-run by App.vue's watch on the projected
+  // settings singleton) is the one writer.
+  async function setCountry(v: CountryCode | null): Promise<void> {
+    const previousCountry = getProjectedSettings()?.country ?? null;
+    await persistDualSetting('country', v ?? undefined);
+    if (!isAuthoritativeDocLoaded() || (v ?? null) === previousCountry) return;
+    const stored = getProjectedSettings()?.homeTimeZone;
+    const zone = singleZoneFor(v);
+    if (stored && zone && zone !== stored) {
+      await setHomeTimeZone(zone, 'country-pick');
+    } else if (stored && v && zonesForCountry(v).length === 0) {
+      // This engine has no zone data for the new country, so the stored zone stays put
+      // (the owner can re-pick it). Log the decision so a stale zone is explainable.
+      logEvent({
+        level: 'info',
+        surface: 'home-time-zone',
+        message: 'country changed; home time zone left unchanged (zones unknown on this engine)',
+        context: { action: 'set', kind: 'country-pick', detail: 'skipped-zones-unknown' },
+      });
+    }
+  }
+
+  /**
+   * The family's home time zone RIGHT NOW: stored `homeTimeZone` → the family
+   * country's single zone → this device's zone (`resolveHomeTimeZone`). The ONE
+   * resolution entry point; the calendar push/import (`makePushHashContext`), the
+   * Settings picker and the planner caption all call it.
+   *
+   * ⚠️ A plain function, deliberately NOT a computed: the device zone is not
+   * reactive (a device that crossed zones must be re-read on demand). Pages that
+   * need reactivity wrap it in a computed that also reads `useToday().lastVisibleAt`.
+   *
+   * ⚠️ Reads `projection.getSettings()`, NOT `settings.value` and NOT the `country`
+   * computed above. The Pinia mirror lags the CRDT until `reloadAll`, and the
+   * `country` computed falls back to the DEVICE mirror: either would let two devices
+   * of one family resolve different zones from the same doc. The projection is the
+   * snapshot the calendar links come from, so the zone and the links always agree.
+   */
+  function resolveHomeTimeZoneNow(): ResolvedHomeTimeZone {
+    const s = getProjectedSettings();
+    return resolveHomeTimeZone({
+      stored: s?.homeTimeZone,
+      country: s?.country,
+      deviceZone: deviceTimeZone(),
+    });
+  }
+
+  // Persist the family's home time zone from a USER action (Settings picker, or a
+  // single-zone country pick). Validates before writing: a typo must never reach the
+  // CRDT, where it would be pushed to Google and hashed on every device. Same
+  // report-on-failure contract as the other drawer settings (toast + rethrow).
+  async function setHomeTimeZone(zone: string, kind: 'user' | 'country-pick' = 'user') {
+    await persistAiSetting('settings.homeTimeZone', 'homeTimeZone', async () => {
+      if (!isValidTimeZone(zone)) throw new Error(`[settingsStore] invalid IANA zone '${zone}'`);
+      return settingsRepo.saveSettings({ homeTimeZone: zone });
+    });
+    logEvent({
+      level: 'info',
+      surface: 'home-time-zone',
+      message: 'home time zone set',
+      context: { action: 'set', kind },
+    });
+  }
+
+  // Skip outcomes of the backfill log once per session per detail: the trigger watches
+  // six sources, so an unchanged skip must not repeat. `persisted` and failures always log.
+  const loggedBackfillSkips = new Set<string>();
+  let backfillInFlight: Promise<void> | null = null;
+
+  /**
+   * Seed the family's unset `homeTimeZone` (rules: `decideHomeTimeZoneBackfill`).
+   * Background write, the `recordFeedbackPrompted` pattern: guard, try/catch, report,
+   * NEVER throws. Guarded on the AUTHORITATIVE doc (a snapshot fast-paint flips
+   * `isDocLoaded` while writes still throw) and a loaded roster (`isOwner` falls back to
+   * the session role before the roster exists). Reads the stored zone and the FAMILY
+   * country from the projection, never the device-mirrored `country` computed.
+   */
+  function ensureHomeTimeZone(input: {
+    isOwner: boolean;
+    canManagePod: boolean;
+    rosterLoaded: boolean;
+  }): Promise<void> {
+    if (backfillInFlight) return backfillInFlight;
+    if (!isAuthoritativeDocLoaded() || !input.rosterLoaded) return Promise.resolve();
+    const projected = getProjectedSettings();
+    // ⚠️ A null projection is NOT "no zone stored". It is either a family that has never
+    // written a setting or the boot window before settings hydrate, and in the second case
+    // the write's base is `{}`, so it would overwrite a zone a peer already persisted. Wait
+    // for the singleton: App.vue's trigger watches it, so the first settings write re-runs this.
+    if (!projected || projected.homeTimeZone) return Promise.resolve();
+
+    // ⚠️ Clear the slot in a `.finally` chained AFTER the assignment. A `finally` inside
+    // the IIFE runs synchronously when no branch awaits (every skip path), i.e. BEFORE the
+    // assignment, which then pinned an already-resolved promise and blocked every later
+    // run for the session.
+    const run = (async () => {
+      try {
+        const decision = decideHomeTimeZoneBackfill({
+          country: projected.country,
+          deviceZone: knownDeviceTimeZone(),
+          isOwner: input.isOwner,
+          canManagePod: input.canManagePod,
+        });
+        if (decision.persist === null) {
+          if (loggedBackfillSkips.has(decision.detail)) return;
+          loggedBackfillSkips.add(decision.detail);
+          logEvent({
+            level: 'info',
+            surface: 'home-time-zone',
+            message: 'home time zone backfill skipped',
+            context: { action: 'backfill', detail: decision.detail },
+          });
+          return;
+        }
+        settings.value = await settingsRepo.saveSettings({ homeTimeZone: decision.persist });
+        logEvent({
+          level: 'info',
+          surface: 'home-time-zone',
+          message: 'home time zone backfilled',
+          context: { action: 'backfill', kind: decision.kind, detail: 'persisted' },
+        });
+      } catch (e) {
+        reportError({
+          surface: 'home-time-zone',
+          severity: 'warning',
+          message: 'failed to backfill the family home time zone',
+          error: e,
+          context: { action: 'backfill' },
+        });
+      }
+    })();
+    const inFlight: Promise<void> = run.finally(() => {
+      if (backfillInFlight === inFlight) backfillInFlight = null;
+    });
+    backfillInFlight = inFlight;
+    return inFlight;
+  }
 
   async function setSyncEnabled(enabled: boolean): Promise<void> {
     isLoading.value = true;
@@ -805,13 +958,11 @@ export const useSettingsStore = defineStore('settings', () => {
 
   // Family-only preference (no device mirror): whether to show public holidays
   // on the planner. Only meaningful once a country is set.
-  async function setShowPublicHolidays(show: boolean): Promise<void> {
-    try {
-      settings.value = await settingsRepo.setShowPublicHolidays(show);
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to update holiday display setting';
-    }
-  }
+  // Report-on-failure contract (toast + rethrow) so the toggle reverts on a failed write.
+  const setShowPublicHolidays = (show: boolean) =>
+    persistAiSetting('settings.showPublicHolidays', 'showPublicHolidays', () =>
+      settingsRepo.setShowPublicHolidays(show)
+    );
 
   // #133: family-scoped consent skip for the photo→activity AI flow. Throws on failure
   // so the caller (the consent flow) can log it without leaving the wedge stranded.
@@ -1043,6 +1194,8 @@ export const useSettingsStore = defineStore('settings', () => {
     settings.value = settingsRepo.getDefaultSettings();
     isLoading.value = false;
     error.value = null;
+    loggedBackfillSkips.clear();
+    backfillInFlight = null;
   }
 
   async function convertAmount(
@@ -1138,6 +1291,10 @@ export const useSettingsStore = defineStore('settings', () => {
     markRecoveryKitConfirmed,
     setWeekStartDay,
     setCountry,
+    familyCountry,
+    resolveHomeTimeZoneNow,
+    setHomeTimeZone,
+    ensureHomeTimeZone,
     setShowPublicHolidays,
     setSkipDocumentConsentPrompt,
     addCustomInstitution,

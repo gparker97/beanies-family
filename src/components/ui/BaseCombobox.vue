@@ -36,6 +36,8 @@ interface Props {
   error?: string;
   hint?: string;
   disabled?: boolean;
+  /** Show the clear (×) control. Off for a value that must always be set. */
+  clearable?: boolean;
   required?: boolean;
   otherValue?: string;
   otherLabel?: string;
@@ -55,6 +57,7 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   disabled: false,
+  clearable: true,
   required: false,
   placeholder: 'Select...',
   otherLabel: 'Other',
@@ -383,7 +386,7 @@ function clearSelection() {
         </span>
         <!-- Clear button -->
         <button
-          v-if="hasSelection && !disabled"
+          v-if="clearable && hasSelection && !disabled"
           type="button"
           data-testid="combobox-clear"
           class="dark:hover:text-ink-soft rounded p-0.5 text-gray-400 hover:text-gray-600"

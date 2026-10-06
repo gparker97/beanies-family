@@ -90,7 +90,10 @@ import {
   forceUpdateRates,
   pickRateRefreshAction,
 } from '@/services/exchangeRate';
-import { isAuthoritativeLoaded as isAuthoritativeDocLoaded } from '@/services/automerge/projection';
+import {
+  isAuthoritativeLoaded as isAuthoritativeDocLoaded,
+  getSettings as getProjectedSettings,
+} from '@/services/automerge/projection';
 import { processRecurringItems } from '@/services/recurring/recurringProcessor';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useAssetsStore } from '@/stores/assetsStore';
@@ -158,7 +161,7 @@ const activityStore = useActivityStore();
 // Read in setup, not inside the async post-init closure: usePermissions()
 // registers a `watch` on every call, and one created outside a component's
 // effect scope is never disposed.
-const { canEditActivities } = usePermissions();
+const { canEditActivities, isOwner, canManagePod, rosterLoaded } = usePermissions();
 const vacationStore = useVacationStore();
 const budgetStore = useBudgetStore();
 const favoritesStore = useFavoritesStore();
@@ -171,6 +174,30 @@ const mealPlanStore = useMealPlanStore();
 const responsibilityStore = useResponsibilityStore();
 const emergencyContactsStore = useEmergencyContactsStore();
 const settingsStore = useSettingsStore();
+// Seed the family's unset home time zone (calendar sync + import resolve through it).
+// ONE reactive trigger: `isAuthoritativeDocLoaded` is the authoritative flag (a
+// snapshot fast-paint is NOT writable), `rosterLoaded` keeps `isOwner` from resting on
+// the session-role fallback. `ensureHomeTimeZone` re-reads the projection itself and
+// never throws.
+watch(
+  [
+    isAuthoritativeDocLoaded,
+    rosterLoaded,
+    isOwner,
+    canManagePod,
+    // The projected singleton itself, not the Pinia mirrors: the mirrors lag the projection
+    // until `reloadAll`, and a family's FIRST settings write (any field) must re-run the
+    // backfill, which a `homeTimeZone`/`country` watch would miss.
+    getProjectedSettings,
+  ],
+  () =>
+    void settingsStore.ensureHomeTimeZone({
+      isOwner: isOwner.value,
+      canManagePod: canManagePod.value,
+      rosterLoaded: rosterLoaded.value,
+    }),
+  { immediate: true }
+);
 const syncStore = useSyncStore();
 const recurringStore = useRecurringStore();
 const translationStore = useTranslationStore();

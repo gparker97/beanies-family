@@ -56,6 +56,9 @@ import {
 } from '@/utils/date';
 import { useWeekNavigation } from '@/composables/useCalendarNavigation';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { fillTemplate } from '@/utils/fillTemplate';
+import { uiLocale } from '@/utils/uiLocale';
+import { deviceTimeZone, sameOffsetNow, zoneDisplayName } from '@/utils/timeZone';
 import { useCalendarClashStore } from '@/stores/calendarClashStore';
 import { findDuplicateActivity, mergeExtractionIntoActivity } from '@/utils/activityDuplicate';
 import VacationWizard from '@/components/vacation/VacationWizard.vue';
@@ -231,7 +234,21 @@ function handleHolidayClick(holiday: HolidayOccurrence) {
 }
 
 /** Reactive today, so an open birthday drawer does not go stale over midnight. */
-const { today: todayStr } = useToday();
+const { today: todayStr, lastVisibleAt } = useToday();
+
+// "Times are in {zone}" caption for a member whose device is in a different zone from
+// the family's home zone (the calendar renders bare wall-clock times = home wall clock).
+// Shown only for a real home zone (family / country), never the device fallback, and
+// only when the UTC OFFSETS differ (Kuala Lumpur device, Singapore home: nothing).
+// Reads `lastVisibleAt` so a device that crossed zones re-evaluates on foreground.
+const homeTimeZoneNote = computed(() => {
+  void lastVisibleAt.value;
+  const { zone, source } = settingsStore.resolveHomeTimeZoneNow();
+  if (source === 'device-fallback' || sameOffsetNow(zone, deviceTimeZone())) return undefined;
+  return fillTemplate(t('planner.homeTimeZoneNote'), {
+    zone: zoneDisplayName(zone, uiLocale(settingsStore.language)),
+  });
+});
 
 // Read-only birthday details popup. A birthday is DERIVED from the bean's
 // profile rather than stored, so this drawer shows and explains; it never edits.
@@ -1083,6 +1100,7 @@ function handleActivitySwapped(newId: string) {
          + trip ribbon. The calendar is the page hero; nothing above it. -->
     <CalendarCommandBar
       :label="label"
+      :note="homeTimeZoneNote"
       :active-view="activeView"
       :can-add="canEditActivities"
       :is-all-active="isAllActive"

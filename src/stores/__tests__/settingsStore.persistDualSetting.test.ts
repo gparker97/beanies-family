@@ -67,6 +67,7 @@ vi.mock('@/services/automerge/repositories/settingsRepository', () => ({
 
 vi.mock('@/services/automerge/docService', () => ({
   isDocLoaded: mockIsDocLoaded,
+  isAuthoritativeDocLoaded: () => false,
 }));
 
 // ---------------------------------------------------------------------------

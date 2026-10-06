@@ -2672,10 +2672,10 @@ const STRING_DEFS = {
   'settings.card.familyDataDesc': { en: 'Cloud storage & sync', beanie: 'your family file & sync' },
   'settings.card.dataManagement': { en: 'Data Management', beanie: 'data management' },
   'settings.card.dataManagementDesc': { en: 'Export & clear data', beanie: 'export & clear data' },
-  'settings.card.countryHolidays': { en: 'Country & Holidays', beanie: 'country & holidays' },
+  'settings.card.countryHolidays': { en: 'Region & Holidays', beanie: 'region & holidays' },
   'settings.card.countryHolidaysDesc': {
-    en: 'Where your family lives & public-holiday display',
-    beanie: 'where your family lives & public-holiday display',
+    en: 'Your country, home time zone and public holidays',
+    beanie: 'your country, home time zone and public holidays',
   },
   'settings.quickToggles': { en: 'Quick Settings', beanie: 'quick settings' },
   'settings.darkMode': { en: 'Dark Mode', beanie: 'dark mode' },
@@ -2722,6 +2722,15 @@ const STRING_DEFS = {
     en: "We'll show your country's public holidays on the Family Planner. Nothing about your location ever leaves your device.",
     beanie:
       "we'll show your country's public holidays on the family planner. nothing about your location ever leaves your device.",
+  },
+  'settings.homeTimeZone': { en: 'Home Time Zone', beanie: 'home time zone' },
+  'settings.homeTimeZoneHelp': {
+    en: 'Google Calendar sync and imports use this time zone, wherever each device is.',
+    beanie: 'google calendar sync and imports use this time zone, wherever each device is.',
+  },
+  'settings.homeTimeZoneNotSet': {
+    en: "Not set (this device's time zone)",
+    beanie: "not set (this device's time zone)",
   },
   'settings.showPublicHolidays': {
     en: 'Show public holidays on the planner',
@@ -8948,6 +8957,7 @@ const STRING_DEFS = {
     beanie: 'add your first family activity to get started!',
   },
   'planner.today': { en: 'Today', beanie: 'today' },
+  'planner.homeTimeZoneNote': { en: 'Times are in {zone}', beanie: 'times are in {zone}' },
   'planner.prevPeriod': { en: 'Previous period', beanie: 'previous period' },
   'planner.nextPeriod': { en: 'Next period', beanie: 'next period' },
   'planner.openAgenda': { en: 'Open agenda view', beanie: 'open agenda view' },

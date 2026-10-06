@@ -12,7 +12,7 @@ const CALENDAR_SYNC_ARTICLE: HelpArticle = {
     'Connect a Google calendar and your family activities appear there automatically — one-way, with beanies as the source of truth.',
   icon: '\u{1F4C5}',
   readTime: 5,
-  updatedDate: '2026-07-12',
+  updatedDate: '2026-10-06',
   sections: [
     { type: 'heading', content: 'How it works', level: 2, id: 'how-it-works' },
     {
@@ -31,6 +31,17 @@ const CALENDAR_SYNC_ARTICLE: HelpArticle = {
       type: 'paragraph',
       content:
         'beanies sends the activity’s title, date and time, and packs the extra details it tracks (who is going, drop-off and pick-up, instructor, cost, and notes) into the event’s description, formatted to read cleanly. Every event beanies creates is marked <strong>“Synced from beanies.family”</strong> and links back to the activity in the app.',
+    },
+    {
+      type: 'heading',
+      content: 'Which time zone events are written in',
+      level: 2,
+      id: 'time-zone',
+    },
+    {
+      type: 'paragraph',
+      content:
+        'Events beanies creates are written in your family’s <strong>home time zone</strong>, whichever device does the syncing. A relative visiting from another time zone opens the app and nothing in your calendar moves. Set the home time zone in <strong>Settings → Region &amp; Holidays</strong>. If you change it, beanies sends the events it created again within a few minutes so they match. Events you imported from Google keep their own time zone until you edit them in beanies.',
     },
     { type: 'heading', content: 'Editing and removing', level: 2, id: 'editing' },
     {

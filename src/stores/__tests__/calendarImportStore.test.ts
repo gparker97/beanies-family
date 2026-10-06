@@ -3,9 +3,10 @@
  * destructive if they regressed:
  *
  *  1. The commit writes NOTHING to Google. Zero client calls.
- *  2. `lastPushedHash` is computed WITH the member-name resolver, or the next
- *     reconcile disagrees and pushes every imported event straight back, which for
- *     an adopted event rewrites the user's real event body.
+ *  2. `lastPushedHash` is computed with the SAME context reconcile uses (member
+ *     resolver, home zone rules), or the next reconcile disagrees and pushes every
+ *     imported event straight back, which for an adopted event rewrites the user's
+ *     real event body.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
@@ -19,6 +20,8 @@ const {
   loadActivitiesMock,
   logEventMock,
   reportErrorMock,
+  listInstancesMock,
+  homeZoneMock,
 } = vi.hoisted(() => ({
   listEventsForImportMock: vi.fn(),
   listCalendarsForMock: vi.fn(),
@@ -27,7 +30,17 @@ const {
   loadActivitiesMock: vi.fn(),
   logEventMock: vi.fn(),
   reportErrorMock: vi.fn(),
+  listInstancesMock: vi.fn(),
+  homeZoneMock: vi.fn(),
 }));
+
+/** The family's resolved home zone, as `settingsStore.resolveHomeTimeZoneNow()` returns it. */
+const SG_PERSISTED = {
+  zone: 'Asia/Singapore',
+  source: 'family',
+  hashZone: 'Asia/Singapore',
+  invalidStored: false,
+} as const;
 
 /** Every client method, so an unexpected WRITE is a loud failure not a stub hit. */
 const clientCalls: string[] = [];
@@ -37,6 +50,12 @@ const client = new Proxy({} as Record<string, unknown>, {
       return (...args: unknown[]) => {
         clientCalls.push('listEventsForImport');
         return listEventsForImportMock(...args);
+      };
+    }
+    if (prop === 'listInstances') {
+      return (...args: unknown[]) => {
+        clientCalls.push('listInstances');
+        return listInstancesMock(...args);
       };
     }
     return () => {
@@ -76,10 +95,15 @@ vi.mock('@/utils/errorReporter', () => ({ reportError: reportErrorMock }));
 vi.mock('@/utils/calendar/memberNames', () => ({
   makeMemberNameResolver: () => (id: string) => (id === 'me' ? 'Greg' : undefined),
 }));
+vi.mock('@/stores/settingsStore', () => ({
+  useSettingsStore: () => ({ resolveHomeTimeZoneNow: homeZoneMock }),
+}));
 
 import { useCalendarImportStore, IMPORT_MAX_CANDIDATES } from '../calendarImportStore';
 import { ImportNotVisibleError } from '@/services/automerge/repositories/calendarRepository';
 import { computePushHash } from '@/utils/calendar/activityToGoogleEvent';
+import { planReconcile } from '@/utils/calendar/reconcilePlan';
+import type { CalendarEventLink, FamilyActivity } from '@/types/models';
 
 const timedEvent = (over: Record<string, unknown> = {}) => ({
   id: 'g-1',
@@ -103,6 +127,8 @@ beforeEach(() => {
   createImportedActivitiesMock.mockImplementation(async (entries: unknown[]) =>
     entries.map((_e, i) => ({ id: `a${i}` }))
   );
+  listInstancesMock.mockResolvedValue([]);
+  homeZoneMock.mockReturnValue(SG_PERSISTED);
 });
 
 describe('choosing calendars', () => {
@@ -209,6 +235,76 @@ describe('scanning', () => {
   });
 });
 
+describe('the family home zone (2026-10-06)', () => {
+  it('an LA device importing 2026-09-05T10:45:00+08:00 with home Asia/Singapore yields 10:45 that day', async () => {
+    listEventsForImportMock.mockResolvedValue([
+      timedEvent({
+        start: { dateTime: '2026-09-05T10:45:00+08:00', timeZone: 'Asia/Singapore' },
+        end: { dateTime: '2026-09-05T11:30:00+08:00', timeZone: 'Asia/Singapore' },
+      }),
+    ]);
+    const store = useCalendarImportStore();
+    await store.open('c1');
+    await store.scan();
+    expect(store.candidates[0].draft).toMatchObject({
+      date: '2026-09-05',
+      startTime: '10:45',
+      endTime: '11:30',
+    });
+  });
+
+  it('re-dates a past unsupported series via listInstances in the HOME zone', async () => {
+    listEventsForImportMock.mockResolvedValue([
+      timedEvent({
+        id: 'series',
+        start: { dateTime: '2019-09-17T16:00:00+08:00', timeZone: 'Asia/Singapore' },
+        end: { dateTime: '2019-09-17T16:45:00+08:00', timeZone: 'Asia/Singapore' },
+        recurrence: ['RRULE:FREQ=MONTHLY;BYMONTHDAY=28,29,30;BYSETPOS=-1'],
+      }),
+    ]);
+    listInstancesMock.mockResolvedValue([
+      {
+        id: 'series_1',
+        status: 'confirmed',
+        start: { dateTime: '2026-10-30T16:00:00+08:00' },
+        end: { dateTime: '2026-10-30T16:45:00+08:00' },
+      },
+    ]);
+    const store = useCalendarImportStore();
+    await store.open('c1');
+    await store.scan();
+
+    // The REQUIRED zone param carries the resolved home zone.
+    expect(listInstancesMock).toHaveBeenCalledTimes(1);
+    expect(listInstancesMock.mock.calls[0][5]).toBe('Asia/Singapore');
+    expect(store.candidates[0].draft).toMatchObject({ date: '2026-10-30', startTime: '16:00' });
+  });
+
+  it('resolves the zone ONCE per scan', async () => {
+    const store = useCalendarImportStore();
+    await store.open('c1');
+    await store.scan();
+    expect(homeZoneMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('logs invalid-stored (no raw zone id) when the stored zone is unknown to this engine', async () => {
+    homeZoneMock.mockReturnValue({
+      ...SG_PERSISTED,
+      zone: 'Mars/X',
+      hashZone: 'Mars/X',
+      invalidStored: true,
+    });
+    const store = useCalendarImportStore();
+    await store.open('c1');
+    await store.scan();
+    const call = logEventMock.mock.calls.find(
+      ([e]) => e.surface === 'home-time-zone' && e.context?.action === 'invalid-stored'
+    );
+    expect(call).toBeDefined();
+    expect(JSON.stringify(call)).not.toContain('Mars/X');
+  });
+});
+
 describe('selection', () => {
   it('toggles one row and toggles all', async () => {
     const store = useCalendarImportStore();
@@ -250,19 +346,51 @@ describe('the commit', () => {
     expect(entries[0].link.origin).toBe('adopted');
   });
 
-  it('hashes WITH the member resolver, so the next reconcile does not re-push', async () => {
+  /** The committed activity + link, shaped as the NEXT reconcile reads them. */
+  async function commitOne(): Promise<{ activity: FamilyActivity; link: CalendarEventLink }> {
     const store = useCalendarImportStore();
     await store.open('c1');
     await store.scan();
     await store.commit();
+    const [entry] = createImportedActivitiesMock.mock.calls[0][0];
+    const activity = { ...entry.activity, id: 'a0' } as FamilyActivity;
+    const link = { ...entry.link, id: 'c1:a0', activityId: 'a0' } as CalendarEventLink;
+    return { activity, link };
+  }
+  const resolver = (id: string) => (id === 'me' ? 'Greg' : undefined);
 
-    const entries = createImportedActivitiesMock.mock.calls[0][0];
-    const draft = entries[0].activity;
-    const resolver = (id: string) => (id === 'me' ? 'Greg' : undefined);
+  it('records exactly the hash the next reconcile computes, WITH a persisted home zone', async () => {
+    // The structural guarantee: import and reconcile share `makePushHashContext`, and
+    // the zone rules (`hashFoldsHomeZone`) agree for the link it just wrote.
+    const { activity, link } = await commitOne();
+    const plan = planReconcile([activity], [link], activity.date, {
+      memberName: resolver,
+      hashZone: SG_PERSISTED.hashZone,
+    });
+    expect(plan.upserts).toHaveLength(1);
+    expect(plan.upserts[0].hash).toBe(plan.upserts[0].existingHash);
+    // Non-vacuous: the resolver is folded (a resolver-less context would differ).
+    expect(link.lastPushedHash).not.toBe(
+      computePushHash(activity, { memberName: () => undefined, hashZone: '' })
+    );
+  });
 
-    expect(entries[0].link.lastPushedHash).toBe(computePushHash(draft, resolver));
-    // And it must NOT equal the resolver-less hash, or this test proves nothing.
-    expect(entries[0].link.lastPushedHash).not.toBe(computePushHash(draft));
+  it('an ADOPTED link’s hash does not change when the home zone is persisted later', async () => {
+    // Imported while the zone was unset; the family then persists one. The adopted
+    // event must not be re-pushed for it (its body + reminders would be rewritten).
+    homeZoneMock.mockReturnValue({
+      zone: 'America/Los_Angeles',
+      source: 'device-fallback',
+      hashZone: '',
+      invalidStored: false,
+    });
+    const { activity, link } = await commitOne();
+    expect(link.origin).toBe('adopted');
+    const later = planReconcile([activity], [link], activity.date, {
+      memberName: resolver,
+      hashZone: 'Asia/Singapore',
+    });
+    expect(later.upserts[0].hash).toBe(later.upserts[0].existingHash);
   });
 
   it('re-mirrors the activity array ONCE, not once per row', async () => {

@@ -41,13 +41,15 @@ export function isLoaded(): boolean {
  * snapshot load). A projection SNAPSHOT fast-paint streams the same `projection` chunks and
  * flips `loaded`, but installs no document, so a write then throws `no document loaded`.
  * Written by `docClient` via `markAuthoritative()` at the points it already records a doc
- * install; cleared by `resetProjection`. Gate pre-hydration WRITES on this, not `isLoaded`. */
-let authoritative = false;
+ * install; cleared by `resetProjection`. Gate pre-hydration WRITES on this, not `isLoaded`.
+ * A `shallowRef` (unlike `loaded`) so a computed or watch that reads
+ * `isAuthoritativeLoaded()` re-runs when the doc becomes authoritative. */
+const authoritative = shallowRef(false);
 export function isAuthoritativeLoaded(): boolean {
-  return authoritative;
+  return authoritative.value;
 }
 export function markAuthoritative(): void {
-  authoritative = true;
+  authoritative.value = true;
 }
 
 function mapFor(collection: CollectionName): ShallowRef<EntityMap> {
@@ -156,6 +158,6 @@ export function resetProjection(): void {
   for (const name of COLLECTION_NAMES) mapFor(name).value = new Map();
   settingsRef.value = null;
   loaded = false;
-  authoritative = false;
+  authoritative.value = false;
   docVersion.value += 1;
 }

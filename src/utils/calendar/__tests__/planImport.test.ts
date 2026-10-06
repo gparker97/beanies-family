@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { planImport, type ImportSource } from '../planImport';
+import { planImport, redateToOccurrence, type ImportSource } from '../planImport';
 import type { CalendarEventFull } from '@/services/calendar/CalendarClient';
 import type { CalendarEventLink } from '@/types/models';
 import { deterministicEventId } from '../deterministicEventId';
@@ -8,7 +8,10 @@ import { deterministicEventId } from '../deterministicEventId';
 const ME = 'member-1';
 const DEST = 'primary-cal';
 
-const defaults = { memberId: ME, destinationCalendarId: DEST };
+// The family's home zone. Explicit, so every date/time below is the same on any
+// device (`TZ`) the suite runs under.
+const HOME = 'Asia/Singapore';
+const defaults = { memberId: ME, destinationCalendarId: DEST, homeTimeZone: HOME };
 
 function ev(overrides: Partial<CalendarEventFull> = {}): CalendarEventFull {
   return {
@@ -100,11 +103,9 @@ describe('recurrence', () => {
   });
 
   it('keeps a long-running series whose first occurrence is years ago', () => {
-    // The most valuable thing this feature imports. Deliberately does NOT assert a
-    // literal date: `draft.date` is device-local wall clock by design (the activity
-    // model carries no timezone), so a +08:00 event genuinely lands a day earlier
-    // when read from a device west of that zone. Asserting the date here made this
-    // suite fail under TZ=Pacific/Honolulu, which is a test bug, not a product one.
+    // The most valuable thing this feature imports. `draft.date` is wall clock in
+    // the family's HOME zone (Singapore here), so it no longer depends on the
+    // importing device: under TZ=Pacific/Honolulu this used to land a day earlier.
     const { candidates } = plan([
       ev({
         start: { dateTime: '2024-09-17T16:00:00+08:00', timeZone: 'Asia/Singapore' },
@@ -113,22 +114,30 @@ describe('recurrence', () => {
       }),
     ]);
     expect(candidates).toHaveLength(1);
-    expect(candidates[0].draft.date < '2024-09-18').toBe(true);
+    expect(candidates[0].draft.date).toBe('2024-09-17');
     // The point of the test: the SERIES survived, rather than being demoted.
     expect(candidates[0].draft.recurrence).toBe('weekly');
   });
 
-  it('anchors the RRULE on the EVENT’s zone, not the importing device’s', () => {
-    // A Singapore Tuesday series imported from a device far west of Singapore.
-    // Before this, `times.date` resolved to Monday, the BYDAY=TU agreement check
-    // failed, and a two-year weekly series was silently demoted to a single event.
-    const { candidates } = plan([
-      ev({
-        start: { dateTime: '2026-09-15T06:00:00+08:00', timeZone: 'Asia/Singapore' },
-        end: { dateTime: '2026-09-15T07:00:00+08:00', timeZone: 'Asia/Singapore' },
-        recurrence: ['RRULE:FREQ=WEEKLY;BYDAY=TU'],
-      }),
-    ]);
+  it('anchors the RRULE on the EVENT’s zone, not the home (or device) zone', () => {
+    // A Singapore Tuesday series imported into a family whose HOME zone is far west
+    // of Singapore. `times.date` is Monday there, so anchoring on it would fail the
+    // BYDAY=TU agreement check and silently demote a two-year weekly series to a
+    // single event. The anchor must stay in the event's own zone.
+    const { candidates } = planImport(
+      [
+        source([
+          ev({
+            start: { dateTime: '2026-09-15T06:00:00+08:00', timeZone: 'Asia/Singapore' },
+            end: { dateTime: '2026-09-15T07:00:00+08:00', timeZone: 'Asia/Singapore' },
+            recurrence: ['RRULE:FREQ=WEEKLY;BYDAY=TU'],
+          }),
+        ]),
+      ],
+      [],
+      { ...defaults, homeTimeZone: 'Pacific/Honolulu' }
+    );
+    expect(candidates[0].draft.date).toBe('2026-09-14'); // Monday in Honolulu
     expect(candidates[0].outcome).not.toBe('unsupported-recurrence');
     expect(candidates[0].draft.rule?.unit).toBe('week');
   });
@@ -174,11 +183,26 @@ describe('field mapping', () => {
     expect(candidates[0].draft.description).toBeUndefined();
   });
 
-  it('maps a timed event to local wall clock', () => {
+  it('maps a timed event to wall clock in the HOME zone', () => {
     const { draft } = plan([ev()]).candidates[0];
     expect(draft.isAllDay).toBe(false);
-    expect(draft.startTime).toMatch(/^\d{2}:\d{2}$/);
-    expect(draft.endTime).toMatch(/^\d{2}:\d{2}$/);
+    expect(draft.date).toBe('2026-09-15');
+    expect(draft.startTime).toBe('16:00');
+    expect(draft.endTime).toBe('16:45');
+  });
+
+  it('an LA device importing a Singapore 10:45 keeps 10:45 on the same day (home SG)', () => {
+    // Device-independent by construction; the suite is also run under
+    // TZ=America/Los_Angeles, where the device clock would read 2026-09-04 19:45.
+    const { draft } = plan([
+      ev({
+        start: { dateTime: '2026-09-05T10:45:00+08:00', timeZone: 'Asia/Singapore' },
+        end: { dateTime: '2026-09-05T11:30:00+08:00', timeZone: 'Asia/Singapore' },
+      }),
+    ]).candidates[0];
+    expect(draft.date).toBe('2026-09-05');
+    expect(draft.startTime).toBe('10:45');
+    expect(draft.endTime).toBe('11:30');
   });
 
   it('maps an all-day event and converts Google’s exclusive end', () => {
@@ -297,5 +321,23 @@ describe('multiple calendars merge into one list', () => {
     expect(result.candidates.map((c) => c.googleEventId)).toEqual(['b', 'a']);
     expect(result.candidates[0].calendarLabel).toBe('Family');
     expect(result.candidates[1].calendarLabel).toBe('Greg Brambleworth');
+  });
+});
+
+describe('redateToOccurrence reads the occurrence in the home zone', () => {
+  it('re-dates a master onto its next occurrence in the family’s wall clock', () => {
+    const [candidate] = plan([
+      ev({
+        start: { dateTime: '2019-09-17T16:00:00+08:00', timeZone: 'Asia/Singapore' },
+        end: { dateTime: '2019-09-17T16:45:00+08:00', timeZone: 'Asia/Singapore' },
+      }),
+    ]).candidates;
+    const moved = redateToOccurrence(
+      candidate!,
+      { dateTime: '2026-10-06T16:00:00+08:00' },
+      { dateTime: '2026-10-06T16:45:00+08:00' },
+      HOME
+    );
+    expect(moved.draft).toMatchObject({ date: '2026-10-06', startTime: '16:00', endTime: '16:45' });
   });
 });

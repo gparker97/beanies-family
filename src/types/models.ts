@@ -2149,6 +2149,14 @@ export interface Settings {
   weekStartDay?: 0 | 1; // 0=Sunday, 1=Monday (default: 1)
   country?: CountryCode; // family's country of residence — drives public-holiday display on the planner
   showPublicHolidays?: boolean; // default true once `country` is set; lets the family hide holidays
+  /** The family's HOME time zone (IANA id): what an activity's bare wall-clock
+   *  `startTime`/`endTime` means. Family-scoped (synced), deliberately NOT
+   *  dual-persisted: every consumer runs with the doc loaded. The Google push stamps
+   *  it whichever device writes, and the push hash FOLDS it (beanies-created links
+   *  only), so persisting or changing it re-pushes those events once. Read it through
+   *  `settingsStore.resolveHomeTimeZoneNow()`, never raw. See
+   *  `~/projects/beanies-ops/docs/plans/2026-10-06-calendar-home-time-zone.md`. */
+  homeTimeZone?: string;
   skipDocumentConsentPrompt?: boolean; // #133: when true, the photo→activity AI consent modal is auto-confirmed (default: ask). Family-scoped.
   aiStatementConsentAcknowledgedAt?: ISODateString; // #107: when the family first confirmed the bank-statement consent (its merchant-list disclosure is new, so a family that skips the generic prompt still sees it once). Family-scoped.
   aiIngredientsConsentAcknowledgedAt?: ISODateString; // #116: when the family ticked "don't ask again" on the shopping-list ingredients consent. Its own skip: the family-wide document skip neither covers nor is set by it (a list is not a document). Family-scoped.

@@ -700,7 +700,7 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'You can pick your country during the first-run setup (step 1, next to the currency picker), or any time afterwards in <strong>Settings \u2192 Country &amp; Holidays</strong>. Choose your country from the list and that\u2019s it \u2014 holidays appear on the planner straight away.',
+          'You can pick your country during the first-run setup (step 1, next to the currency picker), or any time afterwards in <strong>Settings \u2192 Region &amp; Holidays</strong>. Choose your country from the list and that\u2019s it \u2014 holidays appear on the planner straight away.',
       },
       {
         type: 'heading',
@@ -732,7 +732,7 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'In <strong>Settings \u2192 Country &amp; Holidays</strong> you can pick a different country, or choose <strong>Not set</strong> to turn the feature off entirely. There\u2019s also a <strong>Show public holidays on the planner</strong> toggle so you can hide them without forgetting which country you picked.',
+          'In <strong>Settings \u2192 Region &amp; Holidays</strong> you can pick a different country, or choose <strong>Not set</strong> to turn the feature off entirely. There\u2019s also a <strong>Show public holidays on the planner</strong> toggle so you can hide them without forgetting which country you picked.',
       },
       {
         type: 'infoBox',

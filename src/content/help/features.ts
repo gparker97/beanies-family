@@ -2255,7 +2255,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       'Import the events you already have in Google, once, choosing exactly which ones come across and what happens to each afterwards.',
     icon: '\u{1F4C5}',
     readTime: 5,
-    updatedDate: '2026-09-11',
+    updatedDate: '2026-10-06',
     sections: [
       {
         type: 'paragraph',
@@ -2318,6 +2318,17 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
           'An event marked "copy only" stays labelled in your planner afterwards, so months later you are never left wondering why an edit you made in beanies did not show up in Google. It is not a fault: beanies genuinely cannot change an event that someone else created.',
         title: 'Why some edits do not reach Google',
         icon: 'ℹ️',
+      },
+      {
+        type: 'heading',
+        content: 'Time zones',
+        level: 2,
+        id: 'time-zones',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Imported events are converted into your family’s <strong>home time zone</strong>, so a 10:45 swimming lesson stays at 10:45 on every device, wherever it is. Set the home time zone in <strong>Settings → Region &amp; Holidays</strong>. An event you imported keeps its own time zone in Google until you edit it in beanies. After that, beanies writes it in the home time zone.',
       },
       {
         type: 'heading',

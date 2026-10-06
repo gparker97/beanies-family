@@ -23,6 +23,7 @@ import type { CalendarEventLink, FamilyActivity } from '@/types/models';
 import { planReconcile } from '../reconcilePlan';
 import { deterministicEventId } from '../deterministicEventId';
 import { computePushHash } from '../activityToGoogleEvent';
+import { TEST_HASH_CTX } from './helpers/hashContext';
 
 const TODAY = '2026-06-10';
 
@@ -49,7 +50,7 @@ function linkFor(activity: FamilyActivity, connectionId = 'c1'): CalendarEventLi
     connectionId,
     activityId: activity.id,
     googleEventId: deterministicEventId(activity.id),
-    lastPushedHash: computePushHash(activity),
+    lastPushedHash: computePushHash(activity, TEST_HASH_CTX),
     lastPushedAt: '2026-06-01T00:00:00.000Z',
     createdAt: '2026-06-01T00:00:00.000Z',
     updatedAt: '2026-06-01T00:00:00.000Z',
@@ -61,19 +62,19 @@ const BAD_TIME = { startTime: '9am' };
 
 describe('a blocked activity is left out of the push', () => {
   it('does not appear in upserts', () => {
-    const plan = planReconcile([makeActivity(BAD_TIME)], [], TODAY);
+    const plan = planReconcile([makeActivity(BAD_TIME)], [], TODAY, TEST_HASH_CTX);
     expect(plan.upserts).toHaveLength(0);
   });
 
   it('but the same activity with a valid time DOES', () => {
-    const plan = planReconcile([makeActivity({ startTime: '09:00' })], [], TODAY);
+    const plan = planReconcile([makeActivity({ startTime: '09:00' })], [], TODAY, TEST_HASH_CTX);
     expect(plan.upserts).toHaveLength(1);
   });
 
   it('does not block its siblings', () => {
     const good = makeActivity({ id: 'act-good', startTime: '09:00' });
     const bad = makeActivity({ id: 'act-bad', ...BAD_TIME });
-    const plan = planReconcile([good, bad], [], TODAY);
+    const plan = planReconcile([good, bad], [], TODAY, TEST_HASH_CTX);
     expect(plan.upserts.map((u) => u.activity.id)).toEqual(['act-good']);
   });
 });
@@ -84,7 +85,7 @@ describe('🔴 a blocked activity is NEVER removed from Google', () => {
     // corrupted, having its Google event deleted because it fell out of the set
     // the delete loop reads.
     const a = makeActivity(BAD_TIME);
-    const plan = planReconcile([a], [linkFor(a)], TODAY);
+    const plan = planReconcile([a], [linkFor(a)], TODAY, TEST_HASH_CTX);
 
     expect(plan.deletes).toHaveLength(0);
     expect(plan.unlinks).toHaveLength(0);
@@ -94,7 +95,7 @@ describe('🔴 a blocked activity is NEVER removed from Google', () => {
   it('still deletes a genuinely orphaned link, so the guard is not too wide', () => {
     // Anti-vacuity: prove `deletes` can still fire in this suite's setup.
     const a = makeActivity(BAD_TIME);
-    const plan = planReconcile([], [linkFor(a)], TODAY);
+    const plan = planReconcile([], [linkFor(a)], TODAY, TEST_HASH_CTX);
     expect(plan.deletes).toHaveLength(1);
   });
 });
@@ -130,14 +131,14 @@ describe('exception children', () => {
   it('a blocked CHILD is skipped', () => {
     const m = master();
     const c = child(BAD_TIME);
-    const plan = planReconcile([m, c], [linkFor(m)], TODAY);
+    const plan = planReconcile([m, c], [linkFor(m)], TODAY, TEST_HASH_CTX);
     expect(plan.exceptionUpserts).toHaveLength(0);
   });
 
   it('a blocked MASTER skips its children too', () => {
     const m = master(BAD_TIME);
     const c = child();
-    const plan = planReconcile([m, c], [linkFor(m)], TODAY);
+    const plan = planReconcile([m, c], [linkFor(m)], TODAY, TEST_HASH_CTX);
     expect(plan.exceptionUpserts).toHaveLength(0);
   });
 
@@ -147,7 +148,12 @@ describe('exception children', () => {
     // the engine answers by deleting the link and orphaning the Google instance.
     const m = master(BAD_TIME);
     const c = child();
-    const plan = planReconcile([m, c], [linkFor(m), exceptionLink(c.id, m.id)], TODAY);
+    const plan = planReconcile(
+      [m, c],
+      [linkFor(m), exceptionLink(c.id, m.id)],
+      TODAY,
+      TEST_HASH_CTX
+    );
 
     expect(plan.exceptionRestores).toHaveLength(0);
     expect(plan.deletes).toHaveLength(0);
@@ -157,7 +163,12 @@ describe('exception children', () => {
   it('still restores when the child is genuinely gone, so the guard is not too wide', () => {
     // Anti-vacuity for the assertion above.
     const m = master();
-    const plan = planReconcile([m], [linkFor(m), exceptionLink('child-gone', m.id)], TODAY);
+    const plan = planReconcile(
+      [m],
+      [linkFor(m), exceptionLink('child-gone', m.id)],
+      TODAY,
+      TEST_HASH_CTX
+    );
     expect(plan.exceptionRestores).toHaveLength(1);
   });
 });

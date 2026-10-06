@@ -33,6 +33,9 @@ import type { PlannerView } from '@/composables/usePlannerNavigation';
 
 defineProps<{
   label: string;
+  /** Optional caption under the period row (e.g. "Times are in Singapore Standard Time").
+   *  Renders nothing when absent. */
+  note?: string;
   activeView: PlannerView;
   canAdd: boolean;
   isAllActive: boolean;
@@ -292,6 +295,10 @@ onBeforeUnmount(() => {
         </div>
       </div>
     </div>
+
+    <!-- Optional caption under the period row. Caption level, `ink-soft` pair, no paint.
+         Its height is picked up by the ResizeObserver above (--planner-cmdbar-h). -->
+    <p v-if="note" class="dark:text-ink-soft text-secondary-500 mt-1.5 text-xs">{{ note }}</p>
 
     <!-- Desktop member chips on their own row (mobile uses the pinned filter above) -->
     <div v-if="!headerReclaimed" class="mt-3 hidden sm:flex">

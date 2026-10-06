@@ -4,7 +4,7 @@
  */
 import { describe, it, expect } from 'vitest';
 
-import { beaniesMayDelete, beaniesMayPush } from '../linkOwnership';
+import { beaniesMayDelete, beaniesMayPush, hashFoldsHomeZone } from '../linkOwnership';
 import type { CalendarEventLink } from '@/types/models';
 
 const link = (origin?: CalendarEventLink['origin']): CalendarEventLink => ({
@@ -54,5 +54,23 @@ describe('the two axes are genuinely independent', () => {
   it('adopted is writable but NOT deletable', () => {
     expect(beaniesMayPush(link('adopted'))).toBe(true);
     expect(beaniesMayDelete(link('adopted'))).toBe(false);
+  });
+});
+
+describe('hashFoldsHomeZone', () => {
+  it('folds for an event beanies created', () => {
+    expect(hashFoldsHomeZone(link(undefined))).toBe(true);
+  });
+
+  it('folds when there is no link yet (beanies is about to create the event)', () => {
+    expect(hashFoldsHomeZone(undefined)).toBe(true);
+  });
+
+  it('does NOT fold for an adopted event: a zone-only re-push would rewrite the family’s own event', () => {
+    expect(hashFoldsHomeZone(link('adopted'))).toBe(false);
+  });
+
+  it('does NOT fold for an external event, which beanies never pushes', () => {
+    expect(hashFoldsHomeZone(link('external'))).toBe(false);
   });
 });

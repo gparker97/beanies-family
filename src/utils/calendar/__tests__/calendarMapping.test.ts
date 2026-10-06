@@ -7,8 +7,11 @@ import { buildEventDescription, SYNCED_MARKER } from '../eventDescription';
 import {
   activityToGoogleEvent,
   computePushHash,
+  computeExceptionHash,
   googleTimesToActivityFields,
 } from '../activityToGoogleEvent';
+import { TEST_HASH_CTX } from './helpers/hashContext';
+import { toDateInputValue, toTimeInputValue } from '@/utils/date';
 
 // Minimal FamilyActivity factory — only fields the mapper reads matter.
 function makeActivity(overrides: Partial<FamilyActivity> = {}): FamilyActivity {
@@ -212,12 +215,16 @@ describe('activityToGoogleEvent', () => {
 describe('computePushHash', () => {
   it('is stable and changes when a pushed field changes', () => {
     const a = makeActivity();
-    expect(computePushHash(a)).toBe(computePushHash(makeActivity()));
-    expect(computePushHash(a)).not.toBe(computePushHash(makeActivity({ title: 'Changed' })));
-    expect(computePushHash(a)).not.toBe(computePushHash(makeActivity({ startTime: '09:00' })));
+    expect(computePushHash(a, TEST_HASH_CTX)).toBe(computePushHash(makeActivity(), TEST_HASH_CTX));
+    expect(computePushHash(a, TEST_HASH_CTX)).not.toBe(
+      computePushHash(makeActivity({ title: 'Changed' }), TEST_HASH_CTX)
+    );
+    expect(computePushHash(a, TEST_HASH_CTX)).not.toBe(
+      computePushHash(makeActivity({ startTime: '09:00' }), TEST_HASH_CTX)
+    );
     // `link` is rendered into the description, so a link edit must re-push (F4).
-    expect(computePushHash(a)).not.toBe(
-      computePushHash(makeActivity({ link: 'https://new.example.com' }))
+    expect(computePushHash(a, TEST_HASH_CTX)).not.toBe(
+      computePushHash(makeActivity({ link: 'https://new.example.com' }), TEST_HASH_CTX)
     );
   });
 
@@ -226,17 +233,21 @@ describe('computePushHash', () => {
     const before = (id: string) => ({ m1: 'Mia' })[id];
     const after = (id: string) => ({ m1: 'Amelia' })[id];
     // Renaming m1 changes the hash of an activity that references m1...
-    expect(computePushHash(a, before)).not.toBe(computePushHash(a, after));
+    const ctxOf = (memberName: (id: string) => string | undefined) => ({
+      memberName,
+      hashZone: '',
+    });
+    expect(computePushHash(a, ctxOf(before))).not.toBe(computePushHash(a, ctxOf(after)));
     // ...but not an activity that references no members.
     const noPeople = makeActivity({ assigneeIds: [] });
-    expect(computePushHash(noPeople, before)).toBe(computePushHash(noPeople, after));
+    expect(computePushHash(noPeople, ctxOf(before))).toBe(computePushHash(noPeople, ctxOf(after)));
   });
 
   it('ignores fields that do not affect the pushed event', () => {
     const a = makeActivity();
     // updatedAt is not a pushed-relevant field
-    expect(computePushHash(a)).toBe(
-      computePushHash(makeActivity({ updatedAt: '2030-01-01T00:00:00.000Z' }))
+    expect(computePushHash(a, TEST_HASH_CTX)).toBe(
+      computePushHash(makeActivity({ updatedAt: '2030-01-01T00:00:00.000Z' }), TEST_HASH_CTX)
     );
   });
 
@@ -244,9 +255,9 @@ describe('computePushHash', () => {
     // Guards the #55 decision: reminders are never pushed to Google, so a
     // reminder-time edit must not re-push a byte-identical event. Including this
     // field in the hash meant every such edit cost a Google patch call, forever.
-    const base = computePushHash(makeActivity({ reminderMinutes: 0 }));
-    expect(computePushHash(makeActivity({ reminderMinutes: 30 }))).toBe(base);
-    expect(computePushHash(makeActivity({ reminderMinutes: 1440 }))).toBe(base);
+    const base = computePushHash(makeActivity({ reminderMinutes: 0 }), TEST_HASH_CTX);
+    expect(computePushHash(makeActivity({ reminderMinutes: 30 }), TEST_HASH_CTX)).toBe(base);
+    expect(computePushHash(makeActivity({ reminderMinutes: 1440 }), TEST_HASH_CTX)).toBe(base);
   });
 });
 
@@ -266,27 +277,29 @@ describe('computePushHash covers the canonical rule (#70)', () => {
   };
 
   it('changing only monthlyDay changes the hash', () => {
-    expect(computePushHash(withRule(base))).not.toBe(
-      computePushHash(withRule({ ...base, monthlyDay: 20 }))
+    expect(computePushHash(withRule(base), TEST_HASH_CTX)).not.toBe(
+      computePushHash(withRule({ ...base, monthlyDay: 20 }), TEST_HASH_CTX)
     );
   });
 
   it('changing only the interval changes the hash', () => {
-    expect(computePushHash(withRule(base))).not.toBe(
-      computePushHash(withRule({ ...base, interval: 3 }))
+    expect(computePushHash(withRule(base), TEST_HASH_CTX)).not.toBe(
+      computePushHash(withRule({ ...base, interval: 3 }), TEST_HASH_CTX)
     );
   });
 
   it('changing only the end kind changes the hash', () => {
     // The legacy shadow is byte-identical across these two (no recurrenceEndDate
     // either way), so the hash can only differ if `rule` is part of it.
-    expect(computePushHash(withRule(base))).not.toBe(
-      computePushHash(withRule({ ...base, end: { kind: 'afterCount', count: 10 } }))
+    expect(computePushHash(withRule(base), TEST_HASH_CTX)).not.toBe(
+      computePushHash(withRule({ ...base, end: { kind: 'afterCount', count: 10 } }), TEST_HASH_CTX)
     );
   });
 
   it('an identical rule still hashes identically (no spurious re-push)', () => {
-    expect(computePushHash(withRule(base))).toBe(computePushHash(withRule({ ...base })));
+    expect(computePushHash(withRule(base), TEST_HASH_CTX)).toBe(
+      computePushHash(withRule({ ...base }), TEST_HASH_CTX)
+    );
   });
 });
 
@@ -323,7 +336,9 @@ describe('computePushHash is key-order independent (#94)', () => {
       rule: { end: { kind: 'never' }, interval: 1, unit: 'week', weekdays: [2] },
     } as FamilyActivity;
 
-    expect(computePushHash(roundTripped)).toBe(computePushHash(authored));
+    expect(computePushHash(roundTripped, TEST_HASH_CTX)).toBe(
+      computePushHash(authored, TEST_HASH_CTX)
+    );
   });
 
   it('still changes when a rule VALUE changes', () => {
@@ -344,36 +359,140 @@ describe('computePushHash is key-order independent (#94)', () => {
         rule: { unit: 'week', interval, weekdays: [2], end: { kind: 'never' } },
       }) as unknown as FamilyActivity;
 
-    expect(computePushHash(mk(1))).not.toBe(computePushHash(mk(2)));
+    expect(computePushHash(mk(1), TEST_HASH_CTX)).not.toBe(computePushHash(mk(2), TEST_HASH_CTX));
+  });
+});
+
+/**
+ * The hash format is a CONTRACT with every link already stored in every family's
+ * CRDT: a change to the payload re-pushes every linked event in every family. These
+ * values were computed from the code BEFORE the home-zone fold existed (2026-10-06),
+ * so `hashZone: ''` must reproduce them byte-for-byte, or the deploy itself is a
+ * re-push burst.
+ */
+describe('computePushHash — pinned pre-home-zone format', () => {
+  const pinned = {
+    id: 'a1b2c3d4-e5f6-4789-a0b1-c2d3e4f5a6b7',
+    title: 'Piano lesson',
+    date: '2026-09-05',
+    startTime: '10:45',
+    endTime: '11:30',
+    recurrence: 'weekly',
+    daysOfWeek: [6],
+    rule: { unit: 'week', interval: 1, weekdays: [6], end: { kind: 'never' } },
+    category: 'music',
+    feeSchedule: 'none',
+    reminderMinutes: 0,
+    isActive: true,
+    createdBy: 'm0',
+    assigneeIds: ['m1', 'm2'],
+    pickupMemberId: 'm3',
+    location: 'Studio 5',
+    createdAt: '2026-09-01T00:00:00.000Z',
+    updatedAt: '2026-09-01T00:00:00.000Z',
+  } as unknown as FamilyActivity;
+  const pinnedChild = {
+    ...pinned,
+    recurrence: 'none',
+    rule: undefined,
+    daysOfWeek: undefined,
+    parentActivityId: 'p1',
+  } as unknown as FamilyActivity;
+  const names = (id: string) => ({ m1: 'Mia', m2: 'Dad', m3: 'Mum' })[id];
+  const noZone = { memberName: names, hashZone: '' };
+  const homeZone = { memberName: names, hashZone: 'Asia/Singapore' };
+
+  it("hashZone '' is byte-identical to the pre-change master hash", () => {
+    expect(computePushHash(pinned, noZone)).toBe('7e2befd2');
+  });
+
+  it("hashZone '' is byte-identical to the pre-change exception hash", () => {
+    expect(computeExceptionHash(pinnedChild, '2026-09-12', 'modify', noZone)).toBe(
+      'd4239d99|2026-09-12|modify'
+    );
+  });
+
+  it('a persisted home zone changes the hash (the one-time repair re-push)', () => {
+    expect(computePushHash(pinned, homeZone)).not.toBe('7e2befd2');
+    expect(computeExceptionHash(pinnedChild, '2026-09-12', 'modify', homeZone)).not.toBe(
+      'd4239d99|2026-09-12|modify'
+    );
+  });
+
+  it('two different persisted zones hash differently, the same zone identically', () => {
+    expect(computePushHash(pinned, homeZone)).toBe(computePushHash(pinned, { ...homeZone }));
+    expect(computePushHash(pinned, homeZone)).not.toBe(
+      computePushHash(pinned, { memberName: names, hashZone: 'Europe/London' })
+    );
+  });
+
+  it('hashes a stored zone this engine does not know exactly like any other stored id', () => {
+    // Caveat 7: an older engine missing a zone must still hash the stored id, or it
+    // would ping-pong against devices that know it. The hash never validates.
+    const unknown = { memberName: names, hashZone: 'Mars/Olympus_Mons' };
+    expect(computePushHash(pinned, unknown)).not.toBe('7e2befd2');
+    expect(computePushHash(pinned, unknown)).toBe(computePushHash(pinned, { ...unknown }));
   });
 });
 
 describe('googleTimesToActivityFields — the inverse, for the one-time import (#94)', () => {
-  // The device zone is whatever the test runner has; every assertion below is
-  // written against an offset that matches it, so the wall clock is unambiguous.
-  const tz = new Date('2026-09-15T00:00:00Z').getTimezoneOffset();
-  const off = (min: number) => {
-    const sign = min <= 0 ? '+' : '-';
-    const a = Math.abs(min);
-    return `${sign}${String(Math.floor(a / 60)).padStart(2, '0')}:${String(a % 60).padStart(2, '0')}`;
-  };
-  const local = (ymd: string, hm: string) => `${ymd}T${hm}:00${off(tz)}`;
+  // Zone-explicit: the wall clock is read in the HOME zone passed in, whatever zone
+  // the test runner (device) is in. Run under several `TZ`s to prove it.
+  const HOME = 'Asia/Singapore';
+  const sgt = (ymd: string, hm: string) => `${ymd}T${hm}:00+08:00`;
 
   it('keeps a same-day timed event on one day', () => {
     expect(
       googleTimesToActivityFields(
-        { dateTime: local('2026-09-15', '16:00') },
-        { dateTime: local('2026-09-15', '16:45') }
+        { dateTime: sgt('2026-09-15', '16:00') },
+        { dateTime: sgt('2026-09-15', '16:45') },
+        HOME
       )
     ).toEqual({ date: '2026-09-15', isAllDay: false, startTime: '16:00', endTime: '16:45' });
+  });
+
+  it('reads an offset-bearing time in the HOME zone, not the device zone (LA device, SG home)', () => {
+    // The bug: on a Los Angeles device this came back as 2026-09-04 19:45.
+    expect(
+      googleTimesToActivityFields(
+        { dateTime: '2026-09-05T10:45:00+08:00' },
+        { dateTime: '2026-09-05T11:30:00+08:00' },
+        HOME
+      )
+    ).toEqual({ date: '2026-09-05', isAllDay: false, startTime: '10:45', endTime: '11:30' });
+  });
+
+  it('converts an event authored in ANOTHER zone into the home wall clock', () => {
+    // 10:00 in London (BST, +01:00) is 17:00 in Singapore.
+    expect(
+      googleTimesToActivityFields(
+        { dateTime: '2026-09-15T10:00:00+01:00' },
+        { dateTime: '2026-09-15T11:00:00+01:00' },
+        HOME
+      )
+    ).toMatchObject({ date: '2026-09-15', startTime: '17:00', endTime: '18:00' });
+  });
+
+  it('falls back to the device clock when the engine cannot format the zone', () => {
+    const start = '2026-09-15T16:00:00+08:00';
+    const at = new Date(start);
+    expect(
+      googleTimesToActivityFields({ dateTime: start }, undefined, 'Mars/Olympus_Mons')
+    ).toEqual({
+      date: toDateInputValue(at),
+      isAllDay: false,
+      startTime: toTimeInputValue(at),
+      endTime: toTimeInputValue(at),
+    });
   });
 
   it('carries an explicit endDate for a MULTI-DAY timed event', () => {
     // A three-day conference. Without endDate this collapsed to the first night.
     expect(
       googleTimesToActivityFields(
-        { dateTime: local('2026-09-15', '09:00') },
-        { dateTime: local('2026-09-17', '17:00') }
+        { dateTime: sgt('2026-09-15', '09:00') },
+        { dateTime: sgt('2026-09-17', '17:00') },
+        HOME
       )
     ).toEqual({
       date: '2026-09-15',
@@ -388,14 +507,17 @@ describe('googleTimesToActivityFields — the inverse, for the one-time import (
     // 10:00 is not < 10:00, so the model's implicit overnight roll never fired and
     // the span read back as start == end.
     const out = googleTimesToActivityFields(
-      { dateTime: local('2026-09-15', '10:00') },
-      { dateTime: local('2026-09-16', '10:00') }
+      { dateTime: sgt('2026-09-15', '10:00') },
+      { dateTime: sgt('2026-09-16', '10:00') },
+      HOME
     );
     expect(out).toMatchObject({ date: '2026-09-15', endDate: '2026-09-16' });
   });
 
   it('maps an all-day span off Google exclusive end onto an inclusive endDate', () => {
-    expect(googleTimesToActivityFields({ date: '2026-09-15' }, { date: '2026-09-18' })).toEqual({
+    expect(
+      googleTimesToActivityFields({ date: '2026-09-15' }, { date: '2026-09-18' }, HOME)
+    ).toEqual({
       date: '2026-09-15',
       endDate: '2026-09-17',
       isAllDay: true,
@@ -403,7 +525,9 @@ describe('googleTimesToActivityFields — the inverse, for the one-time import (
   });
 
   it('leaves a single all-day event without an endDate', () => {
-    expect(googleTimesToActivityFields({ date: '2026-09-15' }, { date: '2026-09-16' })).toEqual({
+    expect(
+      googleTimesToActivityFields({ date: '2026-09-15' }, { date: '2026-09-16' }, HOME)
+    ).toEqual({
       date: '2026-09-15',
       isAllDay: true,
     });

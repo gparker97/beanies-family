@@ -161,3 +161,17 @@ describe('BaseCombobox — cap + exact-badge promotion', () => {
     expect(visibleOptionValues(wrapper)).toEqual(['apple', 'apricot']);
   });
 });
+
+describe('BaseCombobox clearable', () => {
+  beforeEach(() => setActivePinia(createPinia()));
+
+  it('shows the clear control for a selection by default', () => {
+    const wrapper = factory(makeOptions(3), { modelValue: 'option-1' });
+    expect(wrapper.find('[data-testid="combobox-clear"]').exists()).toBe(true);
+  });
+
+  it('hides the clear control when clearable is false', () => {
+    const wrapper = factory(makeOptions(3), { modelValue: 'option-1', clearable: false });
+    expect(wrapper.find('[data-testid="combobox-clear"]').exists()).toBe(false);
+  });
+});

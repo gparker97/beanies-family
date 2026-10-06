@@ -12,6 +12,7 @@
 import type { FamilyActivity } from '@/types/models';
 import { normalizeAssignees } from '@/utils/assignees';
 import { addDaysYmd, toDateInputValue, toTimeInputValue } from '@/utils/date';
+import { wallClockInZone } from '@/utils/timeZone';
 import { resolveActivityDays, isAllDayActivity } from './activityDays';
 import { buildRecurrenceRule } from './recurrenceRrule';
 import { buildEventDescription, type EventDescriptionContext } from './eventDescription';
@@ -37,8 +38,28 @@ export type GoogleEventDateTime =
   | { dateTime: string; timeZone: string }; // timed (local wall time + IANA tz)
 
 export interface ActivityMapContext extends EventDescriptionContext {
-  /** IANA timezone for timed events (caller: `Intl.DateTimeFormat().resolvedOptions().timeZone`). */
+  /** IANA timezone for timed events: the family's resolved HOME zone
+   *  (`makePushHashContext().timeZone`), never the pushing device's own zone. */
   timeZone: string;
+}
+
+/**
+ * What the push hash depends on beyond the activity's own fields. REQUIRED at every
+ * call site, on purpose: an optional resolver was the trap that let the import and
+ * reconcile hash the same activity two ways (an adopted event then re-pushed for no
+ * reason, rewriting the family's real Google event). Build it with
+ * `makePushHashContext()`; never export a default from production code.
+ */
+export interface PushHashContext {
+  /** Resolves member ids → names rendered into the description (#32 F3). */
+  memberName: (id: string) => string | undefined;
+  /**
+   * The PERSISTED family `homeTimeZone`, or `''` (no fold). Never a device or
+   * country-derived zone: those differ per device / per engine and would ping-pong
+   * the hash between devices. `''` keeps the payload byte-identical to the
+   * pre-home-zone hash, so a deploy alone re-pushes nothing.
+   */
+  hashZone: string;
 }
 
 /**
@@ -178,11 +199,11 @@ export function masterOccurrenceBody(
  * link (`lastPushedHash`) so reconcile skips unchanged activities. Pure +
  * deterministic; a change to any pushed-relevant field changes the hash.
  * (djb2 — fast, collision-rare enough for change detection, not security.)
+ *
+ * `hash.hashZone` is folded only when non-empty; which links fold it at all is
+ * `hashFoldsHomeZone`'s call (adopted events never do), made by the CALLER.
  */
-export function computePushHash(
-  activity: FamilyActivity,
-  memberName?: (id: string) => string | undefined
-): string {
+export function computePushHash(activity: FamilyActivity, hash: PushHashContext): string {
   const relevant = {
     title: activity.title,
     date: activity.date,
@@ -245,20 +266,23 @@ export function computePushHash(
   // Fold the RESOLVED member names rendered into the description, so a member rename
   // (which changes no activity field) still changes the hash and re-pushes only the
   // activities that reference that member. (F3)
-  if (memberName) {
-    const ids = [
-      ...normalizeAssignees(activity),
-      activity.pickupMemberId,
-      activity.dropoffMemberId,
-    ].filter((id): id is string => !!id);
-    payload += '|names:' + ids.map((id) => memberName(id) ?? '').join(',');
-  }
-  let hash = 5381;
+  const ids = [
+    ...normalizeAssignees(activity),
+    activity.pickupMemberId,
+    activity.dropoffMemberId,
+  ].filter((id): id is string => !!id);
+  payload += '|names:' + ids.map((id) => hash.memberName(id) ?? '').join(',');
+  // ⚠️ BYTE-EXACT, and AFTER `|names:`. With `hashZone === ''` the payload is
+  // identical to the pre-home-zone hash (pinned by a fixture test), so shipping this
+  // re-pushes nothing; persisting `homeTimeZone` then re-pushes every beanies-created
+  // event once, in the home zone (the repair for a foreign-zone stamp).
+  if (hash.hashZone) payload += '|tz:' + hash.hashZone;
+  let h = 5381;
   for (let i = 0; i < payload.length; i++) {
-    hash = (hash * 33) ^ payload.charCodeAt(i);
+    h = (h * 33) ^ payload.charCodeAt(i);
   }
   // Unsigned hex.
-  return (hash >>> 0).toString(16);
+  return (h >>> 0).toString(16);
 }
 
 /**
@@ -272,9 +296,9 @@ export function computeExceptionHash(
   child: FamilyActivity,
   occurrenceYmd: string,
   mode: 'modify' | 'cancel',
-  memberName?: (id: string) => string | undefined
+  hash: PushHashContext
 ): string {
-  return `${computePushHash(child, memberName)}|${occurrenceYmd}|${mode}`;
+  return `${computePushHash(child, hash)}|${occurrenceYmd}|${mode}`;
 }
 
 /**
@@ -288,13 +312,15 @@ export function computeExceptionHash(
  * field names lets the planner spread the result directly.
  *
  * Timezone: `FamilyActivity` has no timezone field. `startTime`/`endTime` are bare
- * local wall-clock `HH:mm`, and the push re-stamps the DEVICE's zone on the way
- * out. So an offset-bearing Google `dateTime` is converted to local wall clock on
- * the importing device, which is the same convention the rest of the app uses.
+ * wall-clock `HH:mm` in the family's HOME zone, and the push stamps that zone on the
+ * way out. So an offset-bearing Google `dateTime` is converted to wall clock in
+ * `zone` (the resolved home zone), wherever the importing device is: a Singapore
+ * 10:45 imported on a Los Angeles laptop stays 10:45, not 19:45 the day before.
  */
 export function googleTimesToActivityFields(
   start: { date?: string; dateTime?: string } | undefined,
-  end: { date?: string; dateTime?: string } | undefined
+  end: { date?: string; dateTime?: string } | undefined,
+  zone: string
 ): Pick<FamilyActivity, 'date' | 'endDate' | 'isAllDay' | 'startTime' | 'endTime'> | null {
   if (!start) return null;
 
@@ -321,14 +347,16 @@ export function googleTimesToActivityFields(
   const endAt = end?.dateTime ? new Date(end.dateTime) : startAt;
   if (Number.isNaN(endAt.getTime())) return null;
 
-  const startYmd = toDateInputValue(startAt);
-  const endYmd = toDateInputValue(endAt);
+  const startWall = wallClockOrDevice(startAt, zone);
+  const endWall = wallClockOrDevice(endAt, zone);
+  const startYmd = startWall.ymd;
+  const endYmd = endWall.ymd;
 
   return {
     date: startYmd,
     isAllDay: false,
-    startTime: toTimeInputValue(startAt),
-    endTime: toTimeInputValue(endAt),
+    startTime: startWall.hhmm,
+    endTime: endWall.hhmm,
     // A timed span that ends on a LATER day carries an explicit `endDate`. The
     // model's implicit overnight roll (`endTime < startTime` with no `endDate`)
     // only ever adds ONE day and only when the clock wraps, so relying on it alone
@@ -337,4 +365,19 @@ export function googleTimesToActivityFields(
     // `resolveActivityDays` reads `endDate` back as the end day directly.
     ...(endYmd > startYmd ? { endDate: endYmd } : {}),
   };
+}
+
+/**
+ * Wall clock in `zone`, or on THIS device's clock when the engine cannot format the
+ * zone (a stored id an older engine lacks). The device fallback is the pre-home-zone
+ * behaviour, so the worst case is today's, never a failed import.
+ */
+function wallClockOrDevice(at: Date, zone: string): { ymd: string; hhmm: string } {
+  try {
+    return wallClockInZone(at, zone);
+  } catch {
+    // Not reported here (pure module): the caller's resolver already logs
+    // `home-time-zone` `invalid-stored` for exactly this case.
+    return { ymd: toDateInputValue(at), hhmm: toTimeInputValue(at) };
+  }
 }

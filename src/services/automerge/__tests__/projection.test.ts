@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import { computed } from 'vue';
 import {
   applyDelta,
   list,
@@ -110,5 +111,14 @@ describe('projection', () => {
     expect(isAuthoritativeLoaded()).toBe(true);
     resetProjection();
     expect(isAuthoritativeLoaded()).toBe(false);
+  });
+
+  it('isAuthoritativeLoaded is reactive: a computed tracks markAuthoritative and resetProjection', () => {
+    const seen = computed(() => isAuthoritativeLoaded());
+    expect(seen.value).toBe(false);
+    markAuthoritative();
+    expect(seen.value).toBe(true);
+    resetProjection();
+    expect(seen.value).toBe(false);
   });
 });
