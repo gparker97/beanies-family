@@ -21,6 +21,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Changed
 
+- Native apps older than 0.91.4 now see a one-time prompt to update, since 0.91.4 is live on both stores.
 - The privacy policy now makes clear that owner emails are separate from the Substack newsletter, and that the only activity used to choose who gets a "we miss you" email is a count of app uses.
 
 ## 2026-10-05

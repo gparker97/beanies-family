@@ -1,5 +1,5 @@
 {
-  "promptBelowVersion": "0.91.3",
-  "reason": "Raised 0.91.2 -> 0.91.3 on 2026-10-05 for the #117 writer flip, once 0.91.3 was live on BOTH stores (Play production 2026-10-04; App Store auto-release after approval, live 2026-10-05). 0.91.3 is the first build with the writer-flip carry registers and the per-group recurring dedup (balanceEffect); Counter writes are switched on from the registry right after this floor is live, and a build below it cannot reverse a counter pair. Same rules as before: raise only to a version live on both stores, never to one carrying an R suffix. Previous: raised 0.21.1 -> 0.91.2 on 2026-10-04 (first fold-capable build, #117 Phase 2); raised 0.18 -> 0.21.1 on 2026-09-16 (compaction fallout).",
+  "promptBelowVersion": "0.91.4",
+  "reason": "Raised 0.91.3 -> 0.91.4 on 2026-10-06 once 0.91.4 was live on BOTH stores (App Store live 2026-10-05 21:55Z, US/SG/GB lookup; Play production listing shows 0.91.4, updated Oct 5). 0.91.4 is the first build with the boot registry check, so a returning device actually receives the #117 counter-write policy (0.91.3 devices never fetch it), plus the Android blank-Chrome cold-start fix. Same rules as before: raise only to a version live on both stores, never to one carrying an R suffix. Previous: raised 0.91.2 -> 0.91.3 on 2026-10-05 (#117 writer flip); 0.21.1 -> 0.91.2 on 2026-10-04 (first fold-capable build); 0.18 -> 0.21.1 on 2026-09-16 (compaction fallout).",
   "_docs": "docs/runbooks/native-store-submission.md#7-raising-the-update-floor"
 }
