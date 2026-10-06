@@ -169,6 +169,7 @@ describe('syncStore.loadFromFile — terminus 1 commits the DRIVE heads (#65)', 
       fileName: 'my-family.beanpod',
       isSyncing: false,
       lastError: null,
+      saveQueued: false,
     });
 
     vi.mocked(docClient.initAndLoadCache).mockResolvedValue({ loaded: true } as never);
@@ -307,6 +308,7 @@ describe('syncStore — registry owner sync wiring', () => {
       fileName: 'my-family.beanpod',
       isSyncing: false,
       lastError: null,
+      saveQueued: false,
     });
     vi.mocked(docClient.initAndLoadCache).mockResolvedValue({ loaded: true } as never);
     vi.mocked(docClient.dropDoc).mockResolvedValue(undefined as never);

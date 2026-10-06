@@ -243,6 +243,45 @@ describe('syncService — save failure tracking', () => {
       expect(syncService.getLastPersistedBytes()).toBeGreaterThan(0);
     });
 
+    describe('saveQueued ("a save attempt has ended queued since the last landed save")', () => {
+      const queuedAck = { revision: null, queued: true, queuedReason: 'timeout' };
+
+      it('is false initially, set by a queued write, and a queued timeout is not counted as a failure', async () => {
+        expect(syncService.getState().saveQueued).toBe(false);
+        syncService.setProvider(okProvider(queuedAck));
+
+        await expect(syncService.save()).resolves.toBe(false);
+
+        expect(syncService.getState().saveQueued).toBe(true);
+        expect(syncService.getConsecutiveSaveFailures()).toBe(0);
+        expect(syncService.getSaveFailureLevel()).toBe('none');
+      });
+
+      it('is left alone by a later failed attempt, and cleared by a landed save', async () => {
+        syncService.setProvider(okProvider(queuedAck));
+        await syncService.save();
+        expect(syncService.getState().saveQueued).toBe(true);
+
+        const failing = okProvider(undefined);
+        failing.write.mockRejectedValue(new Error('Network error'));
+        syncService.setProvider(failing);
+        await expect(syncService.save()).resolves.toBe(false);
+        expect(syncService.getState().saveQueued).toBe(true);
+
+        syncService.setProvider(okProvider({ revision: 'ver:2' }));
+        await expect(syncService.save()).resolves.toBe(true);
+        expect(syncService.getState().saveQueued).toBe(false);
+      });
+
+      it('is cleared by reset()', async () => {
+        syncService.setProvider(okProvider(queuedAck));
+        await syncService.save();
+        expect(syncService.getState().saveQueued).toBe(true);
+        syncService.reset();
+        expect(syncService.getState().saveQueued).toBe(false);
+      });
+    });
+
     it('does NOT pair a re-probed revision with our heads (it may be a peer write)', async () => {
       // Malformed 2xx => the ack carries no revision => syncService re-probes. A peer
       // may have written in that gap, so the revision is not necessarily ours.

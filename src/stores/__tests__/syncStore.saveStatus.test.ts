@@ -29,6 +29,7 @@ const {
           fileName: string | null;
           isSyncing: boolean;
           lastError: string | null;
+          saveQueued: boolean;
         }) => void)
       | null,
   },
@@ -182,6 +183,7 @@ const CONFIGURED = {
   fileName: 'test.beanpod',
   isSyncing: false,
   lastError: null,
+  saveQueued: false,
 };
 
 describe('syncStore — saveStatus projection', () => {
@@ -287,5 +289,59 @@ describe('syncStore — saveStatus projection', () => {
         /^sampled-1-in-\d+$/
       );
     }
+  });
+
+  it('queued sits between degraded and saved: saving > critical > degraded > queued > saved', () => {
+    const store = useSyncStore();
+    stateChangeCallbackHolder.cb!({ ...CONFIGURED });
+    saveCompleteCallbackHolder.cb!('2026-08-06T00:00:00.000Z');
+    expect(store.saveStatus).toBe('saved');
+
+    stateChangeCallbackHolder.cb!({ ...CONFIGURED, saveQueued: true });
+    expect(store.saveStatus).toBe('queued');
+
+    // A later failure count of 1 does not displace it; 2 escalates to degraded.
+    saveAttemptCallbackHolder.cb!(1);
+    expect(store.saveStatus).toBe('queued');
+    saveAttemptCallbackHolder.cb!(2);
+    expect(store.saveStatus).toBe('degraded');
+    saveAttemptCallbackHolder.cb!(0);
+    expect(store.saveStatus).toBe('queued');
+
+    // In flight beats queued; a landed save (flag cleared) returns to saved.
+    stateChangeCallbackHolder.cb!({ ...CONFIGURED, saveQueued: true, isSyncing: true });
+    expect(store.saveStatus).toBe('saving');
+    stateChangeCallbackHolder.cb!({ ...CONFIGURED, saveQueued: false });
+    expect(store.saveStatus).toBe('saved');
+  });
+
+  it('logs queued -> saving unsampled (leaving trouble is never a routine pair)', async () => {
+    useSyncStore();
+    stateChangeCallbackHolder.cb!({ ...CONFIGURED });
+    saveCompleteCallbackHolder.cb!('2026-08-06T00:00:00.000Z');
+    await nextTick();
+
+    // Burn the sampler's first (always-emitted) slot on an unrelated routine pair.
+    stateChangeCallbackHolder.cb!({ ...CONFIGURED, isSyncing: true });
+    await nextTick();
+    stateChangeCallbackHolder.cb!({ ...CONFIGURED, isSyncing: false });
+    await nextTick();
+
+    stateChangeCallbackHolder.cb!({ ...CONFIGURED, saveQueued: true });
+    await nextTick();
+    logEventMock.mockClear();
+
+    for (let i = 0; i < 3; i++) {
+      stateChangeCallbackHolder.cb!({ ...CONFIGURED, saveQueued: true, isSyncing: true });
+      await nextTick();
+      stateChangeCallbackHolder.cb!({ ...CONFIGURED, saveQueued: true, isSyncing: false });
+      await nextTick();
+    }
+    const calls = logEventMock.mock.calls
+      .map((c) => c[0] as { surface?: string; context: { save_status: string; detail: string } })
+      .filter((c) => c.surface === 'save-status');
+    const savings = calls.filter((c) => c.context.save_status === 'saving');
+    expect(savings).toHaveLength(3);
+    for (const c of savings) expect(c.context.detail).toBe('full');
   });
 });

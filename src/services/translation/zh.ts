@@ -1778,6 +1778,8 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'saveStatus.lastGoodSave': '上次成功保存',
   'saveStatus.never': '尚未保存',
   'saveStatus.manageConnection': '管理连接',
+  'saveStatus.waiting': '等待保存',
+  'saveStatus.reassuranceQueued': '你的更改已安全保存在此设备上，网络允许时会自动保存。',
   'saveStatus.reassuranceOk': '一切正常保存中。',
   'saveStatus.reassuranceDegradedOwner': '你最近的更改已安全保存在此设备上，下次保存成功后会同步。',
   'saveStatus.reassuranceDegradedMember':

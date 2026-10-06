@@ -190,6 +190,7 @@ vi.mock('@/services/sync/syncService', async () => {
         fileName: null,
         isSyncing: false,
         lastError: null,
+        saveQueued: false,
       });
     }),
   };
@@ -386,6 +387,7 @@ describe('preferred currency persistence', () => {
       fileName: 'test.beanpod',
       isSyncing: false,
       lastError: null,
+      saveQueued: false,
     });
 
     // loadFromFile calls reloadAllStores internally

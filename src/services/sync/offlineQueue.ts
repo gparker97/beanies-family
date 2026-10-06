@@ -1,7 +1,8 @@
 /**
  * Offline queue for Google Drive saves.
  *
- * When a Drive write() fails due to network error, the content is queued here.
+ * When a Drive write() fails transiently (timeout / server / network) or on auth, the
+ * save is queued here.
  * Only the latest save is kept (each is a full file replacement).
  *
  * Four recovery paths trigger a flush attempt — the queue can be stuck
@@ -39,20 +40,38 @@ import { buildSilentRefreshAlertContext } from '@/services/google/silentRefreshA
 import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { assertNever } from '@/utils/assertNever';
+import { TRANSIENT_FAILURES } from '@/utils/transientFailure';
 
 const SESSION_STORAGE_KEY = 'beanies_offline_queue';
 
 /**
- * Why the save could not reach the remote. `auth` is not "offline": the token was
- * rejected and silent refresh failed, so the queue will not drain until someone
- * reconnects, and a flush that re-queues for that reason is a FAILURE for the streak
- * (it used to read as the benign "still offline" and could never page).
+ * Why the save could not reach the remote: every transient class the shared classifier
+ * knows (`timeout` / `server` / `network`, `src/utils/transientFailure.ts`) plus `auth`.
+ * Built FROM `TRANSIENT_FAILURES`, so a class added to the classifier is automatically a
+ * valid, persisted queue reason (and `REQUEUE_OUTCOME` below forces its escalation
+ * choice at compile time).
+ *
+ * `auth` is not "offline": the token was rejected and silent refresh failed, so the
+ * queue will not drain until someone reconnects, and a flush that re-queues for that
+ * reason is a FAILURE for the streak (it used to read as the benign "still offline" and
+ * could never page). `timeout` is not "offline" either: see `'timeout-requeued'`.
  */
-export type QueueReason = 'network' | 'server' | 'auth';
+export const QUEUE_REASONS = [...TRANSIENT_FAILURES, 'auth'] as const;
+export type QueueReason = (typeof QUEUE_REASONS)[number];
+
+function isQueueReason(x: unknown): x is QueueReason {
+  return (QUEUE_REASONS as readonly unknown[]).includes(x);
+}
 
 /**
  * The queued FACT: this device has unsaved work. Never the bytes (see `flushQueue`).
  * `null` = nothing queued.
+ */
+/**
+ * `queuedAt` is when work was FIRST queued since the queue was last drained by a flush
+ * (or `clearQueue`). Re-enqueues keep it, so a page can say how long the work has been
+ * held ("queued since"). An ordinary landed save does not reset it (the marker is only
+ * cleared by a flush), so it reads "queued since", never "unsaved since".
  */
 let pendingMarker: { reason: QueueReason; queuedAt: string } | null = null;
 let flushProvider: StorageProvider | null = null;
@@ -77,7 +96,9 @@ function parseMarker(raw: string): { reason: QueueReason; queuedAt: string } {
     const m = JSON.parse(raw) as { v?: unknown; reason?: unknown; queuedAt?: unknown };
     if (
       m.v === 1 &&
-      (m.reason === 'network' || m.reason === 'server' || m.reason === 'auth') &&
+      // The guard, not a hard-coded list: a persisted `'timeout'` marker must not be
+      // silently degraded to `'network'` (which would also make it unpageable).
+      isQueueReason(m.reason) &&
       typeof m.queuedAt === 'string'
     ) {
       return { reason: m.reason, queuedAt: m.queuedAt };
@@ -90,11 +111,13 @@ function parseMarker(raw: string): { reason: QueueReason; queuedAt: string } {
 
 /**
  * Record that a save could not reach the remote and must be re-run when it can.
- * Replaces any previously queued marker; the newest reason wins.
+ * The newest reason wins; the FIRST `queuedAt` is kept while a marker exists, so a
+ * sustained-flush page reports how long the work has really been held (overwriting it
+ * would print the time of the failed resave itself).
  */
 export function enqueueOfflineSave(reason: QueueReason = 'network'): void {
   enqueueSeq += 1;
-  pendingMarker = { reason, queuedAt: new Date().toISOString() };
+  pendingMarker = { reason, queuedAt: pendingMarker?.queuedAt ?? new Date().toISOString() };
   persistToSession();
   startListening();
   console.warn(`[offlineQueue] Save queued for when connection resumes (${reason})`);
@@ -147,9 +170,17 @@ export function hasPendingSave(): boolean {
 }
 
 /**
- * What a flush attempt actually did.
+ * What a flush attempt actually did. Six outcomes:
  *
- * ⚠️ THREE OUTCOMES, NOT A BOOLEAN, AND THAT IS THE FIX. `flushQueue` returned
+ *   - `'flushed'`          — the resave landed; the streak resets.
+ *   - `'nothing-to-flush'` — no marker or no provider (e.g. a sign-out inside the gate).
+ *   - `'requeued'`         — the resave re-queued as `network` / `server`: offline or a
+ *                            Google 5xx, which self-heals. Neutral.
+ *   - `'timeout-requeued'` — the resave re-queued as `timeout`. Counted (see below).
+ *   - `'auth-rejected'`    — the resave re-queued as `auth`. Counted.
+ *   - `'declined'`         — the save path refused without re-queuing. Counted.
+ *
+ * ⚠️ AN OUTCOME, NOT A BOOLEAN, AND THAT IS THE FIX. `flushQueue` returned
  * `false` for two unrelated things — "there was nothing to flush" and "the save
  * path declined and the work is still stuck here" — and `tryFlush` reset the
  * failure streak on ANY resolution. So a permanently declining resave never
@@ -167,9 +198,39 @@ export function hasPendingSave(): boolean {
  * WITHOUT guessing at `navigator.onLine` (which lies both ways): the save path
  * re-queued during our own flush, so the pending content is no longer the
  * content we started with.
+ *
+ * ⚠️ `'timeout-requeued'` IS SPLIT FROM `'requeued'` (#127). A timeout means this
+ * device could not push this pod over this link inside the sized deadline. Unlike
+ * offline it does NOT self-heal: a pod that has outgrown a device's uplink would show
+ * "Waiting to Save" forever and never page. "A declining queue must page"
+ * (`c5236555`), so it counts toward the flush streak like `'declined'` and pages at the
+ * second consecutive one.
  */
 export type FlushOutcome =
-  'flushed' | 'nothing-to-flush' | 'requeued' | 'auth-rejected' | 'declined';
+  'flushed' | 'nothing-to-flush' | 'requeued' | 'timeout-requeued' | 'auth-rejected' | 'declined';
+
+/**
+ * How a flush whose resave RE-QUEUED is classified, by the reason of the marker that
+ * survived it. The question per class: does waiting fix it? `network` (offline) and
+ * `server` (Google 5xx) self-heal, so they are neutral; `timeout` (this pod cannot cross
+ * this link) and `auth` (the token was rejected) do not, so they count toward the page.
+ *
+ * ⚠️ A `Record`, NOT an "otherwise → requeued" default. A default would quietly make
+ * any future class (e.g. `'throttle'`) neutral and unpageable, the exact silent drift
+ * `c5236555` fixed; the `Record` forces the choice at compile time, like the provider's
+ * `TRANSIENT_RETRIES`.
+ *
+ * The marker looked up is the newest one written during the flush window: by the
+ * flush's own resave, or by an in-flight save that single-flight made it wait behind.
+ * Both are this device failing to push, so both count; it is never a stale pre-flush
+ * reason.
+ */
+const REQUEUE_OUTCOME: Record<QueueReason, 'requeued' | 'auth-rejected' | 'timeout-requeued'> = {
+  network: 'requeued',
+  server: 'requeued',
+  timeout: 'timeout-requeued',
+  auth: 'auth-rejected',
+};
 
 /**
  * Flush the queued save.
@@ -223,18 +284,16 @@ export async function flushQueue(): Promise<FlushOutcome> {
   const seqBefore = enqueueSeq;
   const saved = await resaveHandler();
   if (!saved) {
-    if (enqueueSeq !== seqBefore && pendingMarker?.reason === 'auth') {
-      // Re-queued, but because the TOKEN was rejected, not because we are offline. That
-      // does not clear by waiting; it is a stuck queue and must count toward the page.
-      console.warn('[offlineQueue] Resave re-queued on an auth rejection — counting as a failure');
-      return 'auth-rejected';
-    }
     if (enqueueSeq !== seqBefore) {
-      // The save ran, could not reach the remote, and put fresh bytes back in
-      // this queue. Nothing declined and nothing is stuck — this is the offline
-      // path doing its job, and reporting it would page for being offline.
-      console.warn('[offlineQueue] Resave could not reach the remote — re-queued for later');
-      return 'requeued';
+      // The save ran, could not reach the remote, and re-queued. Whether that is the
+      // offline path doing its job (neutral) or a stuck queue (counted) depends on WHY,
+      // which the surviving marker records; see `REQUEUE_OUTCOME`. `?? 'network'` keeps
+      // today's neutral `'requeued'` when a sign-out cleared the marker mid-resave.
+      const outcome = REQUEUE_OUTCOME[pendingMarker?.reason ?? 'network'];
+      console.warn(
+        `[offlineQueue] Resave re-queued (${pendingMarker?.reason ?? 'cleared'}) → ${outcome}`
+      );
+      return outcome;
     }
     // The save path declined (a lineage block, a refused merge, an auth
     // failure). It has already classified and reported; the queue stays so the
@@ -246,12 +305,51 @@ export async function flushQueue(): Promise<FlushOutcome> {
   // the tick for the same reason as above: a newer edit that happens to
   // serialize to the same bytes must not read as "nothing was queued", or the
   // clear drops work that was only just added.
-  if (enqueueSeq === seqBefore) {
-    pendingMarker = null;
-    clearFromSession();
-  }
+  clearMarkerIfUnchanged(seqBefore);
   console.log('[offlineQueue] Queued work re-saved through the normal save path');
   return 'flushed';
+}
+
+/**
+ * Drop the marker, but only if nothing NEWER was queued since `seqAtStart` (asked
+ * through the tick, never through the bytes: a newer edit that happens to serialize to
+ * the same content must not read as "nothing was queued"). Shared by the flush path and
+ * by an ordinary landed save (`noteSaveLanded`).
+ */
+function clearMarkerIfUnchanged(seqAtStart: number): boolean {
+  if (enqueueSeq !== seqAtStart || !pendingMarker) return false;
+  pendingMarker = null;
+  clearFromSession();
+  return true;
+}
+
+/** The enqueue tick now; pass it back to `noteSaveLanded` after the save lands. */
+export function enqueueSeqNow(): number {
+  return enqueueSeq;
+}
+
+/**
+ * A landed save (ordinary OR the resave a flush runs: the resave handler is `save`, so a
+ * successful flush reaches here first and `flushQueue`'s own clear is then a no-op) wrote a
+ * full base that includes every edit made before it started, so any marker queued before
+ * `seqAtStart` is satisfied. Without this an ordinary landed save left the marker in place: the
+ * marker outlived the work it stood for: the next `visible` / `online` trigger re-uploaded
+ * the whole pod with nothing unsaved, and under the counted `'timeout-requeued'` outcome a
+ * slow link then produced a false "Waiting to Save" and a false sustained page for a
+ * device with zero unsaved edits. The failure streak resets with the marker, for the same
+ * reason `clearQueue` resets it: the queue is drained, so the next failure is a new streak.
+ */
+export function noteSaveLanded(seqAtStart: number): void {
+  const reason = pendingMarker?.reason;
+  if (!clearMarkerIfUnchanged(seqAtStart)) return;
+  consecutiveFlushFailures = 0;
+  console.log('[offlineQueue] Queued marker cleared by a landed save');
+  logEvent({
+    level: 'info',
+    surface: 'offline-queue',
+    message: 'queued marker cleared by a landed save',
+    context: { action: 'marker-cleared-by-save', detail: reason ?? 'unknown' },
+  });
 }
 
 /**
@@ -317,7 +415,7 @@ let visibilityHandler: (() => void) | null = null;
 // `visible` firing 10ms apart on PWA cold-start) share the existing
 // attempt instead of stacking duplicate Drive writes and duplicate Slack
 // alerts. The first trigger's reason wins for the failure report.
-let flushInFlight: Promise<void> | null = null;
+let flushInFlight: Promise<FlushOutcome | 'rejected'> | null = null;
 
 // Sustained-only paging: a single flush failure is usually a reconnect-race
 // transient that the next trigger / 5s retry clears. Only a queue that stays
@@ -416,16 +514,31 @@ function tryFlush(reason: FlushReason): void {
       switch (outcome) {
         case 'flushed':
           consecutiveFlushFailures = 0; // queue drained — streak resets
-          return;
+          return outcome;
         case 'nothing-to-flush':
           // A sign-out landed inside the auth gate. Reporting this as a failure
           // would manufacture a page for a queue that is legitimately empty.
-          return;
+          return outcome;
         case 'requeued':
           // Still offline. The work is safe, the queue holds it, and the next
           // trigger will try again. Neither a success (do not reset the streak,
           // or a genuine failure either side of it is forgotten) nor a failure.
-          return;
+          return outcome;
+        case 'timeout-requeued':
+          // The resave timed out again: this device cannot push this pod on this link,
+          // and waiting does not fix that (#127). Counted, so the second consecutive one
+          // pages; the message carries how long the work has been held. Only FLUSHES
+          // advance the streak: ordinary saves that queue show "Waiting to Save" but never
+          // page. The second counted flush must be an INDEPENDENT trigger (`visible`, a
+          // later `online`, `token-acquired`, `startup`): `handleOnline` skips its own 5 s
+          // retry after this outcome, so one reconnect cannot page by itself.
+          reportFlushFailure(
+            reason,
+            new Error(
+              `resave timed out — queued work still pending (queued since ${pendingMarker?.queuedAt ?? 'unknown'})`
+            )
+          );
+          return outcome;
         case 'auth-rejected':
           // The token was rejected and silent refresh failed: waiting will not drain
           // this. Counted, and reported with the silent-refresh diagnostics.
@@ -433,7 +546,7 @@ function tryFlush(reason: FlushReason): void {
             reason,
             new TokenExpiredError('resave re-queued: token rejected — queued work still pending')
           );
-          return;
+          return outcome;
         case 'declined':
           // ⚠️ THE ARM THAT WAS MISSING. The save path refused (a lineage block,
           // a refused merge, an auth failure) and the work is STILL on this
@@ -441,12 +554,15 @@ function tryFlush(reason: FlushReason): void {
           // success and zeroed the streak — the queue could stay stuck forever
           // without ever paging.
           reportFlushFailure(reason, new Error('resave declined — queued work still pending'));
-          return;
+          return outcome;
         default:
           return assertNever(outcome, 'offlineQueue.tryFlush');
       }
     },
-    (e) => reportFlushFailure(reason, e)
+    (e) => {
+      reportFlushFailure(reason, e);
+      return 'rejected' as const;
+    }
   );
   flushInFlight = p;
   void p.finally(() => {
@@ -465,7 +581,24 @@ function handleOnline(): void {
   // it'll coalesce with anything else triggered in that window.
   const settled = flushInFlight;
   if (!settled) return;
-  void settled.then(() => {
+  void settled.then((outcome) => {
+    // Keyed on THIS flush's outcome, not on the marker: a `'timeout-requeued'` flush means
+    // this link could not finish the upload within the sized deadline, so a retry 5 s
+    // later on the same link is a wasted full upload AND would be the second counted
+    // flush that pages (#127); the next real trigger (`visible`, a later `online`, a
+    // token refresh, the next edit) retries it. Any other outcome (a reconnect-race auth
+    // rejection, a neutral offline requeue) keeps the retry even when an older `timeout`
+    // marker is what is queued, because that retry is exactly what clears those races.
+    if (outcome === 'timeout-requeued') {
+      console.warn('[offlineQueue] Skipping the 5 s retry after a timed-out resave');
+      logEvent({
+        level: 'info',
+        surface: 'offline-queue',
+        message: 'online retry skipped after a timed-out resave',
+        context: { action: 'online-retry-skipped', detail: outcome },
+      });
+      return;
+    }
     if (pendingMarker) {
       retryTimer = setTimeout(() => {
         retryTimer = null;

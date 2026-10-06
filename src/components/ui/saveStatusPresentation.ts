@@ -42,7 +42,18 @@ export const SAVE_STATUS_PRESENTATION: Record<SaveStatus, SaveStatusPresentation
     usesRelativeTime: false,
     dotClass: 'bg-[#AED6F1]',
     pulse: true,
-    textClass: 'text-[#AED6F1]/85',
+    textClass: 'text-[#AED6F1]',
+    visible: true,
+    attention: false,
+  },
+  // Queued: a save is held on this device awaiting the connection. Same calm tokens as
+  // `saving` (not the orange alarm), without the pulse because nothing is in flight.
+  queued: {
+    labelKey: 'saveStatus.waiting',
+    usesRelativeTime: false,
+    dotClass: 'bg-[#AED6F1]',
+    pulse: false,
+    textClass: 'text-[#AED6F1]',
     visible: true,
     attention: false,
   },

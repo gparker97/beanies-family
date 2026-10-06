@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { GoogleDriveProvider } from '../googleDriveProvider';
 
 // Mock dependencies
@@ -62,6 +62,20 @@ vi.mock('../../fileHandleStore', () => ({
   clearProviderConfig: vi.fn(async () => {}),
   clearFileHandleForFamily: vi.fn(async () => {}),
 }));
+
+// Spy that calls through, so the `drive-write` queue event can be asserted without
+// changing what the real telemetry module does for every other test here.
+const { logEventSpy } = vi.hoisted(() => ({ logEventSpy: vi.fn() }));
+vi.mock('@/services/telemetry', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/services/telemetry')>();
+  return {
+    ...actual,
+    logEvent: (...args: Parameters<typeof actual.logEvent>) => {
+      logEventSpy(...args);
+      return actual.logEvent(...args);
+    },
+  };
+});
 
 vi.mock('../../offlineQueue', () => ({
   enqueueOfflineSave: vi.fn(),
@@ -521,6 +535,217 @@ describe('GoogleDriveProvider', () => {
     });
   });
 
+  describe('write — transient failures queue, never hard-fail (#127)', () => {
+    /** What `driveService.driveRequest` throws when OUR sized deadline fires. */
+    async function driveTimeout(): Promise<Error> {
+      const { DriveApiError: MockDriveApiError } = await import('@/services/google/driveService');
+      return Object.assign(
+        new MockDriveApiError(
+          'Drive request timed out after 61000 ms (2850000 bytes sent) — slow or stalled connection',
+          408
+        ),
+        { name: 'DriveTimeoutError', timedOut: true, timeoutMs: 61_000, bodyBytes: 2_850_000 }
+      );
+    }
+
+    function queueEvents() {
+      return logEventSpy.mock.calls
+        .map((c) => c[0] as { surface: string; message: string; context?: Record<string, unknown> })
+        .filter((e) => e.surface === 'drive-write');
+    }
+
+    beforeEach(async () => {
+      vi.useFakeTimers();
+      mockUpdateFile.mockReset();
+      logEventSpy.mockClear();
+      const { enqueueOfflineSave } = await import('../../offlineQueue');
+      vi.mocked(enqueueOfflineSave).mockClear();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('a DriveTimeoutError is retried ONCE, then queued as `timeout` (no throw)', async () => {
+      const { enqueueOfflineSave } = await import('../../offlineQueue');
+      mockUpdateFile.mockRejectedValue(await driveTimeout());
+
+      const p = provider.write('{"data":"big"}');
+      await vi.advanceTimersByTimeAsync(1000);
+      const ack = await p;
+
+      expect(mockUpdateFile).toHaveBeenCalledTimes(2);
+      expect(ack).toEqual({ revision: null, queued: true, queuedReason: 'timeout' });
+      expect(enqueueOfflineSave).toHaveBeenCalledTimes(1);
+      expect(enqueueOfflineSave).toHaveBeenCalledWith('timeout');
+      const events = queueEvents();
+      expect(events).toHaveLength(1);
+      expect(events[0]).toMatchObject({
+        message: 'Drive write queued offline',
+        context: {
+          action: 'queue-offline',
+          detail: 'timeout',
+          http_status: 408,
+          // Which timer fired: OUR sized deadline.
+          error_code: 'DriveTimeoutError',
+        },
+      });
+    });
+
+    it("the PLATFORM's own timeout (status-less `TypeError('The request timed out.')`) is a timeout too", async () => {
+      const { enqueueOfflineSave } = await import('../../offlineQueue');
+      mockUpdateFile.mockRejectedValue(new TypeError('The request timed out.'));
+
+      const p = provider.write('{"data":"big"}');
+      await vi.advanceTimersByTimeAsync(1000);
+      const ack = await p;
+
+      expect(mockUpdateFile).toHaveBeenCalledTimes(2);
+      expect(ack).toEqual({ revision: null, queued: true, queuedReason: 'timeout' });
+      expect(enqueueOfflineSave).toHaveBeenCalledWith('timeout');
+      const [event] = queueEvents();
+      // `TypeError` = the platform aborted first (iOS ~60 s), not our deadline.
+      expect(event!.context).toMatchObject({ detail: 'timeout', error_code: 'TypeError' });
+      expect(event!.context).not.toHaveProperty('http_status');
+    });
+
+    it('a timeout on the 401 silent-refresh RETRY is queued too (it used to escape the arms)', async () => {
+      const { DriveApiError: MockDriveApiError } = await import('@/services/google/driveService');
+      const { attemptSilentRefresh } = await import('@/services/google/googleAuth');
+      const { enqueueOfflineSave } = await import('../../offlineQueue');
+      mockUpdateFile.mockRejectedValueOnce(new MockDriveApiError('Unauthorized', 401));
+      mockUpdateFile.mockRejectedValue(await driveTimeout());
+      vi.mocked(attemptSilentRefresh).mockResolvedValueOnce('silent-token');
+
+      const p = provider.write('{"data":"big"}');
+      await vi.advanceTimersByTimeAsync(1000);
+      const ack = await p;
+
+      expect(mockUpdateFile).toHaveBeenCalledTimes(3);
+      expect(mockUpdateFile).toHaveBeenLastCalledWith('silent-token', 'file-123', '{"data":"big"}');
+      expect(ack).toEqual({ revision: null, queued: true, queuedReason: 'timeout' });
+      expect(enqueueOfflineSave).toHaveBeenCalledWith('timeout');
+      expect(enqueueOfflineSave).not.toHaveBeenCalledWith('auth');
+    });
+
+    it('5xx keeps its budget of 3 retries, then queues as `server` with the constant message', async () => {
+      const { DriveApiError: MockDriveApiError } = await import('@/services/google/driveService');
+      const { enqueueOfflineSave } = await import('../../offlineQueue');
+      mockUpdateFile.mockRejectedValue(new MockDriveApiError('Backend Error', 503));
+
+      const p = provider.write('{"data":"x"}');
+      await vi.advanceTimersByTimeAsync(1000 + 2000 + 4000);
+      const ack = await p;
+
+      expect(mockUpdateFile).toHaveBeenCalledTimes(4);
+      expect(ack).toEqual({ revision: null, queued: true, queuedReason: 'server' });
+      expect(enqueueOfflineSave).toHaveBeenCalledWith('server');
+      expect(queueEvents()[0]).toMatchObject({
+        message: 'Drive write queued offline',
+        context: { action: 'queue-offline', detail: 'server', http_status: 503 },
+      });
+    });
+
+    it('a GENUINE Google 408 (no `timedOut`) is `server`, not a client timeout', async () => {
+      const { DriveApiError: MockDriveApiError } = await import('@/services/google/driveService');
+      mockUpdateFile.mockRejectedValue(new MockDriveApiError('Request Timeout', 408));
+
+      const p = provider.write('{"data":"x"}');
+      await vi.advanceTimersByTimeAsync(7000);
+      const ack = await p;
+
+      expect(mockUpdateFile).toHaveBeenCalledTimes(4);
+      expect(ack).toEqual({ revision: null, queued: true, queuedReason: 'server' });
+      expect(queueEvents()[0]!.context).toMatchObject({ detail: 'server', http_status: 408 });
+    });
+
+    it('a network failure keeps its budget and now LOGS `drive-write` (it was silent)', async () => {
+      const { enqueueOfflineSave } = await import('../../offlineQueue');
+      mockUpdateFile.mockRejectedValue(new TypeError('Failed to fetch'));
+
+      const p = provider.write('{"data":"x"}');
+      await vi.advanceTimersByTimeAsync(7000);
+      const ack = await p;
+
+      expect(mockUpdateFile).toHaveBeenCalledTimes(4);
+      expect(ack).toEqual({ revision: null, queued: true, queuedReason: 'network' });
+      expect(enqueueOfflineSave).toHaveBeenCalledWith('network');
+      const events = queueEvents();
+      expect(events).toHaveLength(1);
+      expect(events[0]).toMatchObject({
+        message: 'Drive write queued offline',
+        context: { action: 'queue-offline', detail: 'network', error_code: 'TypeError' },
+      });
+    });
+
+    it('a non-transient failure (400) throws at once: no retry, no queue, no queue event', async () => {
+      const { DriveApiError: MockDriveApiError } = await import('@/services/google/driveService');
+      const { enqueueOfflineSave } = await import('../../offlineQueue');
+      mockUpdateFile.mockRejectedValue(new MockDriveApiError('Bad Request', 400));
+
+      await expect(provider.write('{"data":"x"}')).rejects.toThrow('Bad Request');
+      expect(mockUpdateFile).toHaveBeenCalledTimes(1);
+      expect(enqueueOfflineSave).not.toHaveBeenCalled();
+      expect(queueEvents()).toHaveLength(0);
+    });
+
+    it('the auth arm keeps its message contract ("silent refresh failed")', async () => {
+      // `syncStore.isAuthTransientSyncError` matches on this text.
+      const { DriveApiError: MockDriveApiError } = await import('@/services/google/driveService');
+      const { attemptSilentRefresh } = await import('@/services/google/googleAuth');
+      const { enqueueOfflineSave } = await import('../../offlineQueue');
+      mockUpdateFile.mockRejectedValueOnce(new MockDriveApiError('Unauthorized', 401));
+      vi.mocked(attemptSilentRefresh).mockResolvedValueOnce(null);
+
+      await expect(provider.write('{"data":"x"}')).rejects.toThrow('silent refresh failed');
+      expect(enqueueOfflineSave).toHaveBeenCalledWith('auth');
+      expect(queueEvents()).toHaveLength(0);
+    });
+
+    it('an instant network failure does not spend the timeout retry: net, timeout, timeout → queued at 3 calls', async () => {
+      const timeout = await driveTimeout();
+      mockUpdateFile
+        .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+        .mockRejectedValueOnce(timeout)
+        .mockRejectedValueOnce(timeout);
+      const p = provider.write('{"data":"test"}');
+      await vi.advanceTimersByTimeAsync(1000);
+      await vi.advanceTimersByTimeAsync(2000);
+      await expect(p).resolves.toMatchObject({ queued: true, queuedReason: 'timeout' });
+      expect(mockUpdateFile).toHaveBeenCalledTimes(3);
+    });
+
+    it('three network failures then a timeout hit the attempt cap: queued as timeout at 4 calls', async () => {
+      const timeout = await driveTimeout();
+      mockUpdateFile
+        .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+        .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+        .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+        .mockRejectedValueOnce(timeout);
+      const p = provider.write('{"data":"test"}');
+      await vi.advanceTimersByTimeAsync(1000);
+      await vi.advanceTimersByTimeAsync(2000);
+      await vi.advanceTimersByTimeAsync(4000);
+      await expect(p).resolves.toMatchObject({ queued: true, queuedReason: 'timeout' });
+      expect(mockUpdateFile).toHaveBeenCalledTimes(4);
+    });
+
+    it('read(): a timeout is retried once, then rethrown RAW for classifyReadFailure', async () => {
+      const timeout = await driveTimeout();
+      mockReadFile.mockRejectedValue(timeout);
+      try {
+        const p = provider.read();
+        const settled = expect(p).rejects.toBe(timeout);
+        await vi.advanceTimersByTimeAsync(1000);
+        await settled;
+        expect(mockReadFile).toHaveBeenCalledTimes(2);
+      } finally {
+        mockReadFile.mockReset();
+        mockReadFile.mockResolvedValue('{"version":"4.0"}');
+      }
+    });
+  });
+
   describe('write — 404 handling', () => {
     it('re-throws 404 errors (file deleted)', async () => {
       const { DriveApiError: MockDriveApiError } = await import('@/services/google/driveService');
@@ -590,7 +815,10 @@ describe('GoogleDriveProvider', () => {
     });
 
     it('writeAux creates a sibling chunk file in the .beanpod folder', async () => {
-      mockCreateFile.mockResolvedValueOnce({ fileId: 'chunk-1', name: 'changes/a-0.beanchanges' });
+      mockCreateFile.mockResolvedValueOnce({
+        fileId: 'chunk-1',
+        name: 'changes/a-0.beanchanges',
+      });
       await provider.writeAux('changes/a-0.beanchanges', 'CIPHERTEXT');
       expect(mockCreateFile).toHaveBeenCalledWith(
         'mock-token',

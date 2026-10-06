@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 // Folder cache is bound to the active Google account email — mock the
 // googleAuth functions driveService consults so tests can simulate
@@ -29,7 +29,10 @@ import {
   setPublicLinkPermission,
   DriveApiError,
   DriveFileNotFoundError,
+  DriveTimeoutError,
+  requestTimeoutMs,
 } from '../driveService';
+import { classifyTransientFailure } from '@/utils/transientFailure';
 
 const mockToken = 'mock-access-token';
 
@@ -766,5 +769,153 @@ describe('driveRequest — a 401 drops the cached access token', () => {
     await getFileModifiedTime(mockToken, 'file-1');
 
     expect(mockInvalidateAccessToken).not.toHaveBeenCalled();
+  });
+});
+
+describe('driveRequest — the deadline is sized to the request body (#127)', () => {
+  /**
+   * ⚠️ WHY THE DEADLINE IS SIZED. The timer clears when response headers
+   * arrive, and Drive answers an upload only after it has the whole body, so
+   * the deadline caps the ENTIRE upload. A flat 15 s needed ~1.5 Mbps sustained
+   * uplink for a 2.85 MB pod; a phone on a congested link failed every save and
+   * the retries repeated the same impossible upload.
+   */
+  const MiB = 1024 * 1024;
+
+  describe('requestTimeoutMs', () => {
+    it.each([
+      ['a bodyless request', 0, 15_000],
+      ['one byte', 1, 16_000],
+      ['exactly 64 KiB', 64 * 1024, 16_000],
+      ['one byte over 64 KiB', 64 * 1024 + 1, 17_000],
+      ['a 2.85 MB pod', Math.round(2.85 * MiB), 61_000],
+      ['a 20 MB body (capped)', 20 * MiB, 180_000],
+    ])('%s → %i bytes → %i ms', (_label, bytes, expected) => {
+      expect(requestTimeoutMs(bytes)).toBe(expected);
+    });
+
+    it('never exceeds the 180 s cap', () => {
+      expect(requestTimeoutMs(Number.MAX_SAFE_INTEGER)).toBe(180_000);
+    });
+  });
+
+  describe('abort', () => {
+    /** A fetch that never answers, and rejects the way browsers do when its signal aborts. */
+    function hangingFetch() {
+      return vi.fn(
+        (_url: string, init?: RequestInit) =>
+          new Promise<Response>((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () =>
+              reject(new DOMException('The operation was aborted.', 'AbortError'))
+            );
+          })
+      );
+    }
+
+    /** Start a request, run fake time to its deadline, and return what it rejected with. */
+    async function timeoutOf(send: () => Promise<unknown>): Promise<DriveTimeoutError> {
+      const settled = send().then(
+        () => {
+          throw new Error('expected the request to time out');
+        },
+        (e: unknown) => e as DriveTimeoutError
+      );
+      await vi.advanceTimersByTimeAsync(180_000);
+      return settled;
+    }
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      globalThis.fetch = hangingFetch() as unknown as typeof fetch;
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('throws DriveTimeoutError (408, timedOut) carrying the deadline and the bytes sent', async () => {
+      const pod = 'x'.repeat(Math.round(2.85 * MiB));
+      const e = await timeoutOf(() => updateFile(mockToken, 'file-1', pod));
+
+      expect(e).toBeInstanceOf(DriveTimeoutError);
+      expect(e).toBeInstanceOf(DriveApiError);
+      expect(e.name).toBe('DriveTimeoutError');
+      expect(e.status).toBe(408);
+      expect(e.timedOut).toBe(true);
+      expect(e.bodyBytes).toBe(pod.length);
+      expect(e.timeoutMs).toBe(61_000);
+      expect(classifyTransientFailure(e)).toBe('timeout');
+    });
+
+    it('does not fire before the sized deadline', async () => {
+      const pod = 'x'.repeat(Math.round(2.85 * MiB));
+      let rejected = false;
+      const p = updateFile(mockToken, 'file-1', pod).catch((e: unknown) => {
+        rejected = true;
+        return e;
+      });
+
+      await vi.advanceTimersByTimeAsync(60_999);
+      expect(rejected).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(1);
+      expect(rejected).toBe(true);
+      expect(await p).toBeInstanceOf(DriveTimeoutError);
+    });
+
+    it('a bodyless read keeps the 15 s deadline', async () => {
+      const e = await timeoutOf(() => readFile(mockToken, 'file-1'));
+      expect(e.bodyBytes).toBe(0);
+      expect(e.timeoutMs).toBe(15_000);
+    });
+
+    it('measures a string body in UTF-8 bytes, not UTF-16 code units', async () => {
+      const content = '保存'.repeat(1000); // 2000 code units, 6000 bytes
+      const e = await timeoutOf(() => updateFile(mockToken, 'file-1', content));
+      expect(e.bodyBytes).toBe(6000);
+    });
+
+    it('measures a Blob body by its size (a photo / new-pod createFile, no call-site change)', async () => {
+      const photo = new Blob([new Uint8Array(200 * 1024)], { type: 'image/jpeg' });
+      const e = await timeoutOf(() =>
+        createFile(mockToken, 'folder-1', 'beanies-photo-abc.jpg', photo, 'image/jpeg')
+      );
+      // The multipart body is metadata + photo + trailer, all one Blob.
+      expect(e.bodyBytes).toBeGreaterThan(200 * 1024);
+      expect(e.bodyBytes).toBeLessThan(200 * 1024 + 1024);
+      expect(e.timeoutMs).toBe(requestTimeoutMs(e.bodyBytes));
+      expect(e.timeoutMs).toBe(19_000);
+    });
+
+    it('measures ArrayBuffer and typed-array bodies by byteLength', async () => {
+      // `updateFile` hands its content straight to `fetch` as the body; the casts
+      // drive a binary body through the one shared `driveRequest` door.
+      const view = new Uint8Array(100 * 1024);
+      const fromView = await timeoutOf(() =>
+        updateFile(mockToken, 'file-1', view as unknown as string)
+      );
+      expect(fromView.bodyBytes).toBe(100 * 1024);
+
+      const fromBuffer = await timeoutOf(() =>
+        updateFile(mockToken, 'file-1', view.buffer as unknown as string)
+      );
+      expect(fromBuffer.bodyBytes).toBe(100 * 1024);
+      expect(fromBuffer.timeoutMs).toBe(17_000);
+    });
+
+    it('the message states the transport fact only, never what a caller will do next', async () => {
+      const e = await timeoutOf(() => updateFile(mockToken, 'file-1', 'abc'));
+      expect(e.message).toBe(
+        'Drive request timed out after 16000 ms (3 bytes sent) — slow or stalled connection'
+      );
+      // driveService is called directly by callers that do not queue or retry.
+      expect(e.message).not.toMatch(/queue|retr|offline|will /i);
+    });
+
+    it('a non-abort fetch rejection passes through untouched', async () => {
+      const offline = new TypeError('Load failed');
+      globalThis.fetch = vi.fn().mockRejectedValue(offline);
+      await expect(readFile(mockToken, 'file-1')).rejects.toBe(offline);
+    });
   });
 });

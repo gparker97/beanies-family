@@ -49,25 +49,26 @@ describe('syncService — persisted byte-size tracking', () => {
     expect(syncService.getLastPersistedBytes()).toBeNull();
   });
 
-  it('records the UTF-8 byte length of the envelope string', () => {
-    syncService.recordPersistedBytes('abcde'); // 5 ASCII bytes
+  it('records the byte count it is given', () => {
+    syncService.recordPersistedBytes(5);
     expect(syncService.getLastPersistedBytes()).toBe(5);
   });
 
-  it('counts multibyte characters by their true UTF-8 byte length, not code units', () => {
+  it('records the true UTF-8 byte length when callers measure with utf8ByteLength', async () => {
     // '✓' is one UTF-16 code unit but three UTF-8 bytes — String.length would lie.
-    syncService.recordPersistedBytes('a✓');
+    const { utf8ByteLength } = await import('@/utils/encoding');
+    syncService.recordPersistedBytes(utf8ByteLength('a✓'));
     expect(syncService.getLastPersistedBytes()).toBe(4);
   });
 
   it('overwrites the previous value on each record', () => {
-    syncService.recordPersistedBytes('abcde');
-    syncService.recordPersistedBytes('ab');
+    syncService.recordPersistedBytes(5);
+    syncService.recordPersistedBytes(2);
     expect(syncService.getLastPersistedBytes()).toBe(2);
   });
 
   it('clears to null on reset()', () => {
-    syncService.recordPersistedBytes('abcde');
+    syncService.recordPersistedBytes(5);
     syncService.reset();
     expect(syncService.getLastPersistedBytes()).toBeNull();
   });

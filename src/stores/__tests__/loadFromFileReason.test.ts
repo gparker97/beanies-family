@@ -108,6 +108,7 @@ function setDriveFailure(lastError: string | null) {
     fileName: 'my-family.beanpod',
     isSyncing: false,
     lastError,
+    saveQueued: false,
   });
 }
 

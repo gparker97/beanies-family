@@ -18,6 +18,7 @@ export const getState = vi.fn(() => ({
   fileName: null,
   isSyncing: false,
   lastError: null,
+  saveQueued: false,
 }));
 export const onSaveComplete = vi.fn(() => () => {});
 export const onSaveFailureChange = vi.fn(() => () => {});

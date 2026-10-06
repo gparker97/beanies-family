@@ -3262,6 +3262,11 @@ const STRING_DEFS = {
   'saveStatus.lastGoodSave': { en: 'Last good save', beanie: 'last good save' },
   'saveStatus.never': { en: 'Not saved yet', beanie: 'not saved yet' },
   'saveStatus.manageConnection': { en: 'Manage connection', beanie: 'manage connection' },
+  'saveStatus.waiting': { en: 'Waiting to Save', beanie: 'waiting to save' },
+  'saveStatus.reassuranceQueued': {
+    en: 'Your changes are held safely on this device and will save when the connection allows.',
+    beanie: 'your changes are held safely on this device and will save when the connection allows.',
+  },
   'saveStatus.reassuranceOk': {
     en: 'Everything is saving normally.',
     beanie: 'everything is saving normally.',

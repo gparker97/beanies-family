@@ -8,6 +8,7 @@
 import type { StorageProvider } from '../storageProvider';
 import { toStoredRevision } from '../remoteBaseline';
 import type { WriteAck, RemoteMarker } from '../remoteBaseline';
+import type { TransientFailure } from '@/utils/transientFailure';
 import {
   storeProviderConfig,
   clearProviderConfig,
@@ -42,37 +43,92 @@ import {
 } from '@/services/google/driveService';
 import { enqueueOfflineSave } from '../offlineQueue';
 import { FileNameCollisionError, CollisionCheckUnavailableError } from '@/types/sync';
-import { isNetworkError } from '@/utils/isNetworkError';
+import { classifyTransientFailure } from '@/utils/transientFailure';
+import { delay } from '@/utils/timing';
 import { logEvent } from '@/services/telemetry';
 
 /**
- * Retry a Drive API call with exponential backoff on transient failures.
+ * In-provider retry budget per transient class (#127): how many RETRIES (after the
+ * first attempt) a failure of that class earns. A `Record`, so a class added to
+ * `TRANSIENT_FAILURES` is a compile error here until its budget is chosen.
  *
- * Retryable:
- *   - 5xx / 408 (server-side transient)
- *   - TypeError from fetch (network-side transient: DNS, TLS, offline blip,
- *     SW activation race during a deploy). The browser's fetch() throws a
- *     TypeError for these — common right after sign-in if the network is
- *     still warming up.
+ *   - `timeout: 1` — a second full-size attempt rarely beats a sized deadline the first
+ *     one already missed, and every attempt re-sends the whole body over the same slow
+ *     uplink (the old budget of 3 turned one slow save into 67 s of guaranteed failure).
+ *     One retry absorbs a blip; after that the write is QUEUED and the offline queue
+ *     re-runs the save on the next trigger (online / visible / token refresh / edit).
+ *   - `server: 3`, `network: 3` — unchanged: Google 5xx waves and offline blips clear
+ *     with backoff (1 s, 2 s, 4 s).
  *
- * Not retryable: 4xx (incl. 401 — caller handles auth refresh separately).
+ * ⚠️ DURABLE-BOUND INVARIANT. A client timeout does not prove the write did not land,
+ * yet a queued timeout returns `false`, which `familyStore.syncNowDurable` reads as
+ * "nothing reached Drive". That is safe ONLY because every durable bound
+ * (`DURABLE_ROTATION_SAVE_TIMEOUT_MS` 12 s, `CREDENTIAL_PUBLISH_TIMEOUT_MS` 20 s,
+ * `POST_AUTH_SAVE_TIMEOUT_MS` 5 s) is shorter than the earliest a queued TIMEOUT can
+ * return. The budget is counted PER CLASS (a near-instant network failure must not spend
+ * the timeout's retry), and total attempts are capped at `MAX_ATTEMPTS`, so a timeout is
+ * the thrown class only after either two timed-out attempts (2 × 15 s + 1 s = 31 s) or
+ * three instant network failures plus one timeout (1 + 2 + 4 + 15 = 22 s). Do not raise
+ * a durable bound to 22 s or more, or this timeout budget, without first making a
+ * timed-out write report `'unknown'`. `earliestQueuedTimeoutMs` derives the bound from
+ * these constants and `durableBounds.test.ts` asserts every durable bound stays under it.
+ *
+ * Scope of the argument: it covers the client-timeout class only. A `server` class
+ * (5xx) queues after ~7 s, inside every durable bound, and a 5xx on a media upload also
+ * does not prove the write did not land. That exposure predates #127 (5xx queued the same
+ * way before) and is recorded, not solved, here: durable callers that need certainty must
+ * treat any `queued` ack as unknown, not as "nothing reached Drive".
  */
-async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
-  let lastError: unknown;
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+export const TRANSIENT_RETRIES: Record<TransientFailure, number> = {
+  timeout: 1,
+  server: 3,
+  network: 3,
+};
+/** Hard ceiling on attempts whatever the classes seen (today's 1 + 3). */
+export const MAX_ATTEMPTS = 4;
+
+/**
+ * The earliest a queued TIMEOUT can come back from `withRetry`, given the base deadline:
+ * either two timed-out attempts (one backoff between), or the attempt cap reached by
+ * instant non-timeout failures (each within its own budget) followed by one timeout.
+ */
+export function earliestQueuedTimeoutMs(baseTimeoutMs: number): number {
+  const twoTimeouts = 2 * baseTimeoutMs + 1000;
+  const instantFailures = Math.min(
+    MAX_ATTEMPTS - 1,
+    TRANSIENT_RETRIES.network + TRANSIENT_RETRIES.server
+  );
+  let backoff = 0;
+  for (let attempt = 0; attempt < instantFailures; attempt++) backoff += 1000 * 2 ** attempt;
+  return Math.min(twoTimeouts, backoff + baseTimeoutMs);
+}
+
+/**
+ * Retry a Drive API call with exponential backoff (1 s, 2 s, 4 s) on transient failures.
+ *
+ * What is transient, and in which class, comes ONLY from `classifyTransientFailure`
+ * (`src/utils/transientFailure.ts`); the budget is `TRANSIENT_RETRIES` for the class of
+ * the LATEST failure, counted against total attempts (so a timeout after two network
+ * retries is not retried again). A non-transient failure (4xx incl. 401, which the
+ * caller handles with a silent refresh; 429 / 403 throttles) throws immediately.
+ */
+async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
+  const seen: Partial<Record<TransientFailure, number>> = {};
+  for (let attempt = 0; ; attempt++) {
     try {
       return await fn();
     } catch (e) {
-      lastError = e;
-      const isRetryable =
-        (e instanceof DriveApiError && (e.status >= 500 || e.status === 408)) ||
-        (e instanceof TypeError && isNetworkError(e));
-      if (!isRetryable || attempt === maxRetries) throw e;
-      // Exponential backoff: 1s, 2s, 4s
-      await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt));
+      const kind = classifyTransientFailure(e);
+      if (!kind) throw e;
+      // eslint-disable-next-line security/detect-object-injection -- `kind` is a closed TransientFailure union
+      const failuresOfKind = (seen[kind] ?? 0) + 1;
+      // eslint-disable-next-line security/detect-object-injection -- `kind` is a closed TransientFailure union
+      seen[kind] = failuresOfKind;
+      // eslint-disable-next-line security/detect-object-injection -- `kind` is a closed TransientFailure union
+      if (failuresOfKind > TRANSIENT_RETRIES[kind] || attempt + 1 >= MAX_ATTEMPTS) throw e;
+      await delay(1000 * 2 ** attempt);
     }
   }
-  throw lastError; // unreachable, satisfies TS
 }
 
 export class GoogleDriveProvider implements StorageProvider {
@@ -137,12 +193,6 @@ export class GoogleDriveProvider implements StorageProvider {
   }
 
   /**
-   * Write content to Google Drive.
-   * On 401: try silent refresh first, then interactive auth, then throw.
-   * On 5xx: retry up to 3 times with exponential backoff.
-   * On network error: queue for offline flush.
-   */
-  /**
    * Account-drift predicate (2026-06-19, finding 9). This provider is bound to
    * ONE Drive account (`this.accountEmail`) that owns `this.fileId`. Returns true
    * only when BOTH the bound email and the live session email are known and
@@ -206,39 +256,27 @@ export class GoogleDriveProvider implements StorageProvider {
     return true;
   }
 
+  /**
+   * Write content to Google Drive.
+   *
+   * ONE flat classification of whatever `writeWithAuthRetry` throws:
+   *   - `TokenExpiredError` (no token, or a 401 that silent refresh could not fix) →
+   *     queue as `auth` and rethrow, so syncStore surfaces the reconnect banner.
+   *   - 404 → account-mismatch check (may throw the reconnect error), else rethrow for
+   *     missing-file recovery.
+   *   - any transient class (`timeout` / `server` / `network`, retries exhausted) →
+   *     QUEUED, never a hard failure: returns `{ queued: true, queuedReason }`.
+   *   - anything else → rethrow (a counted save failure).
+   * The same arms apply to the silent-refresh retry, which used to escape them.
+   */
   async write(content: string): Promise<WriteAck | void> {
     try {
-      const token = await getValidTokenSilent();
-      const ack = await withRetry(() => updateFile(token, this.fileId, content));
-      return { revision: toStoredRevision(ack.version) };
+      return await this.writeWithAuthRetry(content);
     } catch (e) {
-      // 401 — server says the in-memory token is invalid. Try one silent
-      // refresh in case it raced with token expiry; on failure, queue the
-      // save and surface a TokenExpiredError so the reconnect banner
-      // appears. Never open an unsolicited popup mid-save.
-      if (e instanceof DriveApiError && e.status === 401) {
-        const silentToken = await attemptSilentRefresh();
-        if (silentToken) {
-          // C14b: the silent-refresh retry MUST propagate the ack too — a bare
-          // `return` here silently disabled the open-guard optimisation for
-          // every token-refresh save.
-          const ack = await withRetry(() => updateFile(silentToken, this.fileId, content));
-          return { revision: toStoredRevision(ack.version) };
-        }
-        enqueueOfflineSave('auth');
-        throw new TokenExpiredError(
-          'Drive write failed: token rejected and silent refresh failed; save queued offline'
-        );
-      }
-
-      // Silent token path threw TokenExpiredError before any API call — queue
-      // the save so it flushes when the user reconnects, then re-throw so
-      // syncStore surfaces the reconnect banner.
       if (e instanceof TokenExpiredError) {
         enqueueOfflineSave('auth');
         throw e;
       }
-
       // 404 — file gone (deleted/moved) OR the live session account can't reach
       // it. Classify (finding 9): an account mismatch → reconnect banner for the
       // bound account; otherwise let the caller run missing-file recovery.
@@ -246,46 +284,92 @@ export class GoogleDriveProvider implements StorageProvider {
         this.reconnectIfAccountMismatch();
         throw e;
       }
-
-      // 5xx — all retries exhausted, queue for offline flush
-      if (e instanceof DriveApiError && e.status >= 500) {
-        console.warn(
-          `[GoogleDriveProvider] write failed after retries (${e.status}), queueing offline`
-        );
-        // Console-only until now — surface Drive instability to the firehose so
-        // recurring 5xx waves are visible/queryable (not lost to the console).
-        logEvent({
-          level: 'warn',
-          surface: 'drive-write',
-          message: `Drive write failed after retries (${e.status}), queued offline`,
-          error: e,
-          context: { http_status: e.status, action: 'queue-offline' },
-        });
-        enqueueOfflineSave('server');
-        // NOT a success: say so, or the caller stamps "Last Saved" for bytes
-        // that never left this device. See `WriteAck.queued`.
-        return { revision: null, queued: true };
-      }
-
-      // Network error — queue for offline flush. Uses the shared classifier so
-      // Safari/iOS `TypeError: Load failed` (no "fetch" substring) is caught
-      // too; the old `.includes('fetch')` missed it and the save was LOST
-      // instead of queued (2026-06-19, finding 6).
-      if (isNetworkError(e)) {
-        enqueueOfflineSave('network');
-        // NOT a success: say so, or the caller stamps "Last Saved" for bytes
-        // that never left this device. See `WriteAck.queued`.
-        return { revision: null, queued: true };
-      }
-
+      const kind = classifyTransientFailure(e);
+      if (kind) return this.queueWrite(kind, e);
       throw e;
     }
   }
 
   /**
+   * The upload itself, with the one 401 recovery: the in-memory token may have raced
+   * its expiry, so try ONE silent refresh and retry. Never an unsolicited popup
+   * mid-save; with no token, throw `TokenExpiredError` for `write()` to queue as `auth`.
+   *
+   * ⚠️ The TokenExpiredError message must keep "silent refresh failed":
+   * `syncStore.isAuthTransientSyncError` matches on it.
+   */
+  private async writeWithAuthRetry(content: string): Promise<WriteAck> {
+    // C14b: every path MUST propagate the ack — a bare `return` on the silent-refresh
+    // retry once silently disabled the open-guard optimisation for every refresh save.
+    const upload = async (token: string): Promise<WriteAck> => {
+      const ack = await withRetry(() => updateFile(token, this.fileId, content));
+      return { revision: toStoredRevision(ack.version) };
+    };
+    const token = await getValidTokenSilent();
+    try {
+      return await upload(token);
+    } catch (e) {
+      if (!(e instanceof DriveApiError && e.status === 401)) throw e;
+      const silentToken = await attemptSilentRefresh();
+      if (!silentToken) {
+        throw new TokenExpiredError(
+          'Drive write failed: token rejected and silent refresh failed; save queued offline'
+        );
+      }
+      return await upload(silentToken);
+    }
+  }
+
+  /**
+   * THE ONLY queue branch of `write()`: a transient failure that survived the retry
+   * budget. Logged (every class — the network branch used to be silent), queued with
+   * its class as the reason, and returned as NOT a success, or the caller stamps "Last
+   * Saved" for bytes that never left this device (see `WriteAck.queued`).
+   */
+  private queueWrite(kind: TransientFailure, e: unknown): WriteAck {
+    const httpStatus = e instanceof DriveApiError ? e.status : undefined;
+    const errorCode = e instanceof Error ? e.name : 'unknown';
+    const { timeoutMs, bodyBytes } = (e ?? {}) as { timeoutMs?: unknown; bodyBytes?: unknown };
+    const timeoutHint =
+      kind === 'timeout'
+        ? typeof timeoutMs === 'number'
+          ? ` Our sized deadline fired (${timeoutMs} ms for ${String(bodyBytes)} bytes).`
+          : ' The platform aborted the request before our sized deadline (e.g. iOS ~60 s).'
+        : '';
+    console.warn(
+      `[GoogleDriveProvider] Drive write queued offline (class: ${kind}${
+        httpStatus !== undefined ? `, http_status: ${httpStatus}` : ''
+      }, ${errorCode}).${timeoutHint} The offline queue re-runs the save on the next ` +
+        'trigger (online / visible / token refresh / next edit).' +
+        (kind === 'timeout'
+          ? ' If this persists for one family, check the pod size (see the resumable-upload follow-up, #127).'
+          : ''),
+      e
+    );
+    logEvent({
+      level: 'warn',
+      surface: 'drive-write',
+      // CONSTANT: the message is the rate-limit / dedup key; the facts ride in context.
+      message: 'Drive write queued offline',
+      error: e,
+      context: {
+        action: 'queue-offline',
+        detail: kind,
+        // `DriveTimeoutError` = our sized deadline; `TypeError` = the platform's own abort.
+        error_code: errorCode,
+        ...(httpStatus !== undefined ? { http_status: httpStatus } : {}),
+      },
+    });
+    enqueueOfflineSave(kind);
+    return { revision: null, queued: true, queuedReason: kind };
+  }
+
+  /**
    * Read file content from Google Drive.
    * On 401: try silent refresh first, then interactive auth (consistent with write()).
-   * On 5xx: retry up to 3 times with exponential backoff.
+   * Transient failures retry per `TRANSIENT_RETRIES` (a timeout once), then rethrow
+   * raw: `syncService.classifyReadFailure` classifies them with the same classifier and
+   * queues the save instead of counting a failure.
    */
   async read(): Promise<string | null> {
     try {

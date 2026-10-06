@@ -24,6 +24,7 @@ vi.mock('@/services/sync/syncService', async () => {
       fileName: 'test.beanpod',
       isSyncing: false,
       lastError: null,
+      saveQueued: false,
     })),
     initialize: vi.fn(async () => true),
     getProviderType: vi.fn(() => 'google_drive'),

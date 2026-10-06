@@ -68,7 +68,9 @@ const lastSavedLabelKey = computed(() =>
 const lastSavedValue = computed(() => relativeSaved.value || t('saveStatus.never'));
 
 // Reassurance note when there's no recovery action to show.
+const isQueued = computed(() => syncStore.saveStatus === 'queued');
 const reassuranceKey = computed(() => {
+  if (isQueued.value) return 'saveStatus.reassuranceQueued';
   if (!isDegraded.value) return 'saveStatus.reassuranceOk';
   return canManagePod.value
     ? 'saveStatus.reassuranceDegradedOwner'
@@ -210,10 +212,14 @@ onUnmounted(() => {
               :class="
                 isDegraded
                   ? 'dark:text-accent-lift text-[#F15D22]'
-                  : 'dark:text-success-lift text-[#1F8F5F]'
+                  : isQueued
+                    ? 'text-[var(--color-text)]'
+                    : 'dark:text-success-lift text-[#1F8F5F]'
               "
             >
-              {{ isDegraded ? t('saveStatus.reconnecting') : t('saveStatus.connected') }}
+              {{
+                isDegraded || isQueued ? t('saveStatus.reconnecting') : t('saveStatus.connected')
+              }}
             </span>
           </div>
           <div class="flex items-center justify-between gap-3 text-xs">

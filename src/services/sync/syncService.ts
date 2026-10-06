@@ -26,6 +26,7 @@ import * as docClient from '@/services/automerge/worker/docClient';
 import type { DriveConnection } from '@/types/models';
 import type { CachePersistFailureDetail } from '@/services/automerge/worker/protocol';
 import { logEvent } from '@/services/telemetry';
+import { utf8ByteLength } from '@/utils/encoding';
 import { bump as bumpOpenCycle } from '@/services/telemetry/openCycle';
 import { getActiveFamilyId, clearUnpushedAtSignOutMarker } from '@/services/indexeddb/database';
 import { createFamilyWithId } from '@/services/familyContext';
@@ -52,8 +53,15 @@ import { TokenExpiredError } from '@/services/google/googleAuth';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
 import { mergeEnvelopes, withoutPayload } from './envelopeMerge';
 import { logRecoveryKitsExhausted, logRevokedEntriesFiltered } from './revocationLog';
-import { enqueueOfflineSave, setFlushProvider, setResaveHandler } from './offlineQueue';
-import { isNetworkError } from '@/utils/isNetworkError';
+import {
+  enqueueOfflineSave,
+  enqueueSeqNow,
+  noteSaveLanded,
+  setFlushProvider,
+  setResaveHandler,
+} from './offlineQueue';
+import { classifyTransientFailure, type TransientFailure } from '@/utils/transientFailure';
+import { createTrailingSingleFlight } from '@/utils/trailingSingleFlight';
 import {
   usePollWhileVisible,
   type PollWhileVisibleHandle,
@@ -94,14 +102,50 @@ export interface SyncServiceState {
   fileName: string | null;
   isSyncing: boolean;
   lastError: string | null;
+  /**
+   * A save attempt has ended queued since the last landed save. Set only at `doSave`'s two
+   * queued returns; cleared only by a landed save, `reset()` and `disconnect()` (a later
+   * failed or aborted attempt leaves it as is).
+   *
+   * Deliberately NOT derived from `offlineQueue.hasPendingSave()`: that marker is cleared only
+   * by a successful flush or `clearQueue()`, and an ordinary save that lands leaves it in place
+   * until the next flush trigger, so a marker-driven UI would show "Waiting to Save" after a
+   * save had landed. Do not simplify this into the marker without first making a landed save
+   * clear the marker (with the `enqueueSeq` guard).
+   */
+  saveQueued: boolean;
 }
 
 // Debounce timer for auto-save
 let saveDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 const DEBOUNCE_MS = 2000;
 
-// Write mutex — prevents concurrent save() calls from interleaving writes
-let saveInProgress: Promise<boolean> | null = null;
+// Single-flight save: at most ONE `doSave` in flight, and every caller arriving during it
+// shares ONE trailing run that starts after it settles (#127). N concurrent callers used to
+// run N full uploads of the same document, splitting a phone's uplink and guaranteeing the
+// timeout. `saveFlight.pending()` is "the promise that means a save is running" for every
+// reader below (`whenIdle`, the merge-arming guards, `scheduleRaceRemerge`), and it stays
+// non-null for the whole of the trailing run so a guard asked from INSIDE that run is told
+// the truth. See `trailingSingleFlight.ts` for the two-slot state machine and ADR-032
+// (addendum 2026-10-06) for why coalescing REQUESTS respects the full-base invariant.
+//
+// ⚠️ No re-entrancy: `doSave` and anything it awaits must never await `save()`; the call
+// would join the trailing slot, which waits for the very run awaiting it (a deadlock).
+// Fire-and-forget paths (`triggerDebouncedSave`, `tryFlush`) are safe because they are not
+// awaited inside `doSave`.
+const saveFlight = createTrailingSingleFlight<SaveOptions, boolean>(
+  (opts) => doSave(opts),
+  (queued, incoming) => ({
+    repairCorruptLocal: queued.repairCorruptLocal || incoming.repairCorruptLocal,
+  }),
+  (callers) =>
+    logEvent({
+      level: 'info',
+      surface: 'sync-save',
+      message: 'concurrent saves coalesced',
+      context: { action: 'coalesced', count: callers },
+    })
+);
 
 // Current storage provider (in-memory for session) and the family it belongs to
 /**
@@ -426,7 +470,9 @@ export function advanceHoldEpoch(): void {
  * await. Never throws; the outcome is logged on both arms so a rate is measurable.
  */
 export async function whenIdle(): Promise<void> {
-  const work = [saveInProgress, ...remoteMergesInFlight].filter(Boolean) as Promise<unknown>[];
+  const work = [saveFlight.pending(), ...remoteMergesInFlight].filter(
+    Boolean
+  ) as Promise<unknown>[];
   if (work.length === 0) return;
   const start = Date.now();
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -852,6 +898,7 @@ let state: SyncServiceState = {
   fileName: null,
   isSyncing: false,
   lastError: null,
+  saveQueued: false,
 };
 
 function updateState(updates: Partial<SyncServiceState>): void {
@@ -880,13 +927,12 @@ export function getState(): SyncServiceState {
 }
 
 /**
- * Record the byte size of a .beanpod envelope string we just persisted or
- * loaded. Single write path for `lastPersistedBytes` — the UTF-8 encode lives
- * here only, so every caller records the same (true on-disk) unit. `encode`
- * cannot throw on a string, so no error handling is warranted.
+ * Record the byte size of a .beanpod envelope we just persisted or loaded. Single write
+ * path for `lastPersistedBytes`; callers measure with `utf8ByteLength` so every one records
+ * the same (true on-disk) unit, and a caller that already measured it passes that number.
  */
-export function recordPersistedBytes(envelope: string): void {
-  lastPersistedBytes = new TextEncoder().encode(envelope).byteLength;
+export function recordPersistedBytes(bytes: number): void {
+  lastPersistedBytes = bytes;
 }
 
 /**
@@ -1168,6 +1214,7 @@ export function reset(): void {
     fileName: null,
     isSyncing: false,
     lastError: null,
+    saveQueued: false,
   });
 }
 
@@ -1808,25 +1855,16 @@ export interface SaveOptions {
   repairCorruptLocal?: boolean;
 }
 
-export async function save(opts: SaveOptions = {}): Promise<boolean> {
-  if (saveInProgress) {
-    try {
-      await saveInProgress;
-    } catch {
-      // Previous save failed — proceed with ours
-    }
-  }
-
-  const promise = doSave(opts);
-  saveInProgress = promise;
-
-  try {
-    return await promise;
-  } finally {
-    if (saveInProgress === promise) {
-      saveInProgress = null;
-    }
-  }
+/**
+ * Single-flight (#127): an idle call starts `doSave` synchronously; a call made while a save
+ * is in flight joins ONE trailing run that starts after it settles (options merged,
+ * `repairCorruptLocal` OR-ed) and resolves with THAT run's boolean. Every caller is covered
+ * by a run whose read-merge and export start after the call, so nothing a caller asked to
+ * publish is skipped; only requests that would have exported identical-or-older state are
+ * folded. Never await `save()` from inside `doSave` (see `saveFlight`).
+ */
+export function save(opts: SaveOptions = {}): Promise<boolean> {
+  return saveFlight.call(opts);
 }
 
 /**
@@ -2084,14 +2122,15 @@ async function fetchAndMergeRemoteOnce(opts: FetchMergeOptions): Promise<FetchMe
       message: 'kept local document on the poll path; publishing it',
       context: { action: 'kept-local', family_id: remoteEnvelope.familyId },
     });
-    // ⚠️ `saveInProgress`, NOT `state.isSyncing`. `doSave` calls this very
+    // ⚠️ `saveFlight.pending()`, NOT `state.isSyncing`. `doSave` calls this very
     // function as its pre-save merge and goes on to upload our document anyway,
     // so arming here would queue a second identical upload — but `isSyncing` is
     // also set for every READ (`load`, `openAndLoadFile`, `loadFromNewFile`), so
     // testing it suppressed the publish whenever a poll landed inside the
-    // store's own 10s read. `saveInProgress` is the promise that means exactly
-    // "a save is running", which is what this guard is about.
-    if (!saveInProgress) triggerDebouncedSave();
+    // store's own 10s read. `pending()` is the promise that means exactly
+    // "a save is running" (in-flight OR the promoted trailing run), which is
+    // what this guard is about.
+    if (!saveFlight.pending()) triggerDebouncedSave();
     return { probeRevision: change.revision };
   }
   const { dirty, remoteHeads } = merged;
@@ -2144,35 +2183,46 @@ async function fetchAndMergeRemoteOnce(opts: FetchMergeOptions): Promise<FetchMe
   // Plus the envelope's own signal (#77): a revocation tombstone the file lacks, or a
   // file an old client re-polluted with revoked wraps, is invisible to the heads-derived
   // `dirty`, and without this the file keeps the wraps until some unrelated edit.
-  // `saveInProgress`, for the reason given on the kept-local branch above: `doSave` runs
-  // this very merge before its own upload.
+  // `saveFlight.pending()`, for the reason given on the kept-local branch above: `doSave`
+  // runs this very merge before its own upload.
   if (dirty) triggerDebouncedSave();
-  else if (envelopeNeedsPublish && !saveInProgress) triggerDebouncedSave();
+  else if (envelopeNeedsPublish && !saveFlight.pending()) triggerDebouncedSave();
   return { probeRevision: change.revision };
 }
 
 /**
  * Internal save implementation
  */
-/** How a pre-save READ failure is handled (audit C4). Never a write. */
-function classifyReadFailure(e: unknown): {
-  kind: 'network' | 'auth' | 'error';
-  errorCode: string;
-  httpStatus?: number;
-} {
+/**
+ * How a pre-save READ failure is handled (audit C4). Never a write.
+ *
+ * `transient` comes from the SAME classifier `GoogleDriveProvider.write` queues on
+ * (`classifyTransientFailure`), so a read and a write of the same failure class always
+ * agree: a timeout (our 15 s time-to-first-byte deadline, or the platform's), a 5xx or a
+ * genuine 408 that survived the provider's retries, or the fetch never reaching the
+ * server. These used to disagree about 408, which made a slow link a counted failure.
+ */
+type ReadFailureClass =
+  | { kind: 'transient'; reason: TransientFailure; httpStatus?: number }
+  | { kind: 'auth'; httpStatus?: number }
+  | { kind: 'error'; errorCode: string; httpStatus?: number };
+
+function classifyReadFailure(e: unknown): ReadFailureClass {
   const httpStatus = e instanceof DriveApiError ? e.status : undefined;
   if (e instanceof TokenExpiredError || httpStatus === 401) {
-    return { kind: 'auth', errorCode: 'auth', httpStatus };
+    return { kind: 'auth', httpStatus };
   }
-  // The provider's own offline classes: a 5xx that survived its retries, or the fetch
-  // never reaching the server. These are what `GoogleDriveProvider.write` queues.
-  if ((httpStatus !== undefined && httpStatus >= 500) || isNetworkError(e)) {
-    return { kind: 'network', errorCode: 'network', httpStatus };
-  }
+  const reason = classifyTransientFailure(e);
+  if (reason) return { kind: 'transient', reason, httpStatus };
   return { kind: 'error', errorCode: e instanceof Error ? e.name : 'unknown', httpStatus };
 }
 
 async function doSave(opts: SaveOptions = {}): Promise<boolean> {
+  // Snapshot the offline-queue tick BEFORE any await: a landed save satisfies every marker
+  // queued before it started, and `noteSaveLanded` clears the marker only if the tick is
+  // unchanged (a marker queued DURING this save is newer work, or this save's own read
+  // failure, and stays).
+  const queueSeqAtEntry = enqueueSeqNow();
   // ⚠️ CAPTURED ONCE, HERE (audit C3/C4). Every await below can straddle a sign-out or a
   // family switch (`reset()` explicitly abandons an in-flight save), so everything after
   // an await is checked against these and the save ABORTS — no write, no latch, no failure
@@ -2242,7 +2292,20 @@ async function doSave(opts: SaveOptions = {}): Promise<boolean> {
   /** Which phase a failure came from, for the one failure event in the catch below. */
   // An object, not a `let`: control-flow narrowing does not follow assignments into the
   // catch, and a narrowed `let` would make the read arm below unreachable to the compiler.
-  const at: { phase: 'merge' | 'read' | 'write' } = { phase: 'merge' };
+  const at: { phase: 'merge' | 'read' | 'write'; bytes?: number; writeStartMs?: number } = {
+    phase: 'merge',
+  };
+  /**
+   * Perf context for the events that describe the write: empty until the write started, then
+   * the file size and the whole `provider.write` call (incl. in-provider retries and backoff).
+   */
+  const writePerf = (): { perf_doc_bytes?: number; perf_duration_ms?: number } =>
+    at.writeStartMs === undefined
+      ? {}
+      : {
+          perf_doc_bytes: at.bytes,
+          perf_duration_ms: Math.round(performance.now() - at.writeStartMs),
+        };
 
   updateState({ isSyncing: true, lastError: null });
 
@@ -2358,19 +2421,21 @@ async function doSave(opts: SaveOptions = {}): Promise<boolean> {
         `[syncService] doSave: pre-save read failed (${cls.kind}) — refusing a blind write`,
         e
       );
-      if (cls.kind === 'network') {
-        // Offline: the same contract as a queued WRITE. The intent goes in the queue and
-        // this is not counted as a failure (an offline person is not shown a red banner
-        // for being offline); the reconnect trigger re-runs this save, read first.
-        enqueueOfflineSave('network');
-        updateState({ isSyncing: false });
+      if (cls.kind === 'transient') {
+        // Offline, slow or a Google blip: the same contract as a queued WRITE. The intent
+        // goes in the queue with its class and this is not counted as a failure (nobody is
+        // shown a red banner for a slow or absent connection); the next trigger re-runs
+        // this save, read first. A `timeout` marker still escalates through the flush
+        // streak (`offlineQueue` `'timeout-requeued'`).
+        enqueueOfflineSave(cls.reason);
+        updateState({ isSyncing: false, saveQueued: true });
         logEvent({
           level: 'info',
           surface: 'sync-save',
           message: 'pre-save read failed offline; write refused and queued',
           context: {
             action: 'read-failed-queued',
-            error_code: cls.errorCode,
+            error_code: cls.reason,
             ...(cls.httpStatus !== undefined ? { http_status: cls.httpStatus } : {}),
             provider_type: provider.type,
           },
@@ -2406,6 +2471,8 @@ async function doSave(opts: SaveOptions = {}): Promise<boolean> {
     // adopted a peer's keys into it, and writing the entry snapshot would drop them.
     const envelopeToWrite = currentEnvelope as BeanpodFileV4;
     const fileContent = reEncryptEnvelope(envelopeToWrite, payload, lineage, { hasCounters });
+    const fileBytes = utf8ByteLength(fileContent);
+    at.bytes = fileBytes;
     // The writer says which version it ACTUALLY chose. Calling the pure
     // derivation a second time is not a second implementation: the logic has
     // one home, and a second call cannot disagree with the first.
@@ -2427,6 +2494,13 @@ async function doSave(opts: SaveOptions = {}): Promise<boolean> {
     // coalesce, skip, or reduce the frequency of this write without first
     // re-introducing a delta mechanism AND re-deriving the convergence argument,
     // or a peer can silently miss another device's edits.
+    //
+    // Single-flight `save()` (ADR-032 addendum 2026-10-06, #127) is consistent with
+    // this: it coalesces concurrent save REQUESTS, never edits. Every caller is covered
+    // by a run whose read-merge and export START after the call, so every edit made
+    // before any `save()` call is in a published full base no later than before; the
+    // only runs folded are ones that would have exported identical-or-older state.
+    // A dirty-skip (not uploading at all) remains forbidden.
     bumpOpenCycle('driveWrite'); // counted per attempt; no-op outside an open window
     // Capture BEFORE the awaits below. `currentProvider` is a nullable module var
     // that `reset()` / `disconnect()` clear with no serialization against an
@@ -2451,6 +2525,7 @@ async function doSave(opts: SaveOptions = {}): Promise<boolean> {
     at.phase = 'write';
     // C14b: the write returns its own resulting revision IN the response. Narrow
     // the `WriteAck | void` union explicitly at this ONE site.
+    at.writeStartMs = performance.now();
     const ack = await providerAtWrite.write(fileContent);
     // ⚠️ AFTER THE ACK, NOT BEFORE. Emitting beside the derivation logged a
     // version that had not landed, and committed the transition memo with it —
@@ -2466,12 +2541,17 @@ async function doSave(opts: SaveOptions = {}): Promise<boolean> {
     // holds the intent, the reconnect re-runs this save through the normal path,
     // and there is nothing here for a person to act on yet.
     if (ack?.queued === true) {
-      updateState({ isSyncing: false });
+      updateState({ isSyncing: false, saveQueued: true });
       logEvent({
         level: 'info',
         surface: 'sync-save',
         message: 'save queued offline — not recorded as saved',
-        context: { action: 'save-queued', provider_type: providerTypeForDiag },
+        context: {
+          action: 'save-queued',
+          provider_type: providerTypeForDiag,
+          detail: ack.queuedReason,
+          ...writePerf(),
+        },
       });
       return false;
     }
@@ -2492,7 +2572,7 @@ async function doSave(opts: SaveOptions = {}): Promise<boolean> {
     // as a failed save for a write that actually landed, with no baseline
     // committed. Same hazard C1 guards for the provider below.
     noteWrittenVersion(versionDetail, familyIdAtWrite);
-    recordPersistedBytes(fileContent); // capture size for the registry usage signal
+    recordPersistedBytes(fileBytes); // capture size for the registry usage signal
     const ackRevision = ack ? ack.revision : null;
 
     // ⚠️ DID ANOTHER WRITER LAND INSIDE OUR WINDOW? (audit C4) Drive has no write
@@ -2516,6 +2596,7 @@ async function doSave(opts: SaveOptions = {}): Promise<boolean> {
           action: 'write-raced',
           provider_type: providerTypeForDiag,
           detail: `advance=${advance}`,
+          ...writePerf(),
         },
       });
       // Round 3: the baseline is LEFT AS IT WAS (the probe's revision), not nulled. Not
@@ -2535,6 +2616,7 @@ async function doSave(opts: SaveOptions = {}): Promise<boolean> {
           action: 'write-advance',
           provider_type: providerTypeForDiag,
           detail: `advance=${advance ?? 'unknown'}`,
+          ...writePerf(),
         },
       });
       // Terminus 3 (C10): the file IS what we just wrote. Learn our own write's
@@ -2603,7 +2685,8 @@ async function doSave(opts: SaveOptions = {}): Promise<boolean> {
       }
     }
 
-    updateState({ isSyncing: false, lastError: null });
+    updateState({ isSyncing: false, lastError: null, saveQueued: false });
+    noteSaveLanded(queueSeqAtEntry);
 
     // Track save success
     recordSaveSuccess();
@@ -2640,6 +2723,7 @@ async function doSave(opts: SaveOptions = {}): Promise<boolean> {
         error_code: isRemoteBlocker(e) ? e.blockCode : e instanceof Error ? e.name : 'unknown',
         ...(httpStatus !== undefined ? { http_status: httpStatus } : {}),
         provider_type: provider.type,
+        ...writePerf(),
       },
     });
     return false;
@@ -2686,7 +2770,8 @@ function scheduleRaceRemerge(provider: StorageProvider): void {
   setTimeout(() => {
     void (async () => {
       try {
-        if (saveInProgress) await saveInProgress.catch(() => false);
+        const inFlight = saveFlight.pending();
+        if (inFlight) await inFlight.catch(() => false);
         if (currentProvider !== provider || !raceRemergeArmed) return;
         await fetchAndMergeRemote({ readOnUnknown: true });
       } catch (e) {
@@ -2777,7 +2862,7 @@ export async function load(): Promise<string | null> {
       updateState({ isSyncing: false, lastError: null });
       return null;
     }
-    recordPersistedBytes(text); // capture size for the registry usage signal
+    recordPersistedBytes(utf8ByteLength(text)); // capture size for the registry usage signal
 
     updateState({ isSyncing: false, lastError: null });
     return text;
@@ -3270,6 +3355,7 @@ export async function disconnect(): Promise<void> {
     isConfigured: false,
     fileName: null,
     lastError: null,
+    saveQueued: false,
   });
 }
 

@@ -8,6 +8,8 @@
 import { getGoogleAccountEmail, fetchGoogleUserEmail, invalidateAccessToken } from './googleAuth';
 import { extractGoogleError, isGoogleThrottleReason } from '@/utils/googleApiError';
 import { sameAccount } from '@/utils/email';
+import { utf8ByteLength } from '@/utils/encoding';
+import { delay } from '@/utils/timing';
 
 const DRIVE_API = 'https://www.googleapis.com/drive/v3';
 const DRIVE_UPLOAD_API = 'https://www.googleapis.com/upload/drive/v3';
@@ -669,22 +671,56 @@ function mapFileResults(
   }));
 }
 
-/** Simple delay helper. */
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-/** Default timeout for Drive API requests (15 seconds). */
-const DRIVE_REQUEST_TIMEOUT_MS = 15_000;
+/** Base timeout for every Drive API request, and the whole of it for a bodyless one (15 s). */
+export const DRIVE_REQUEST_TIMEOUT_MS = 15_000;
 
 /**
- * Make a Drive API request with error handling and timeout.
+ * The slowest uplink a request body is budgeted for: 64 KiB/s (~512 kbps).
+ * Each started 64 KiB of body adds one second to the deadline.
+ */
+const MIN_UPLINK_BYTES_PER_SEC = 64 * 1024;
+
+/** The sized deadline never exceeds 3 minutes, however large the body. */
+const MAX_REQUEST_TIMEOUT_MS = 180_000;
+
+/**
+ * The deadline for a Drive request carrying `bodyBytes` of body, in ms:
+ * `15 s + 1 s per started 64 KiB`, capped at 180 s.
+ *
+ * ⚠️ The timer covers the WHOLE upload. `driveRequest` clears it when response
+ * headers arrive, and a server answers only after it has the full body, so a
+ * flat 15 s capped every upload at ~1.5 Mbps sustained for a 2.85 MB pod and a
+ * slow phone uplink failed every save (#127). Sizing it here, in the one door
+ * every Drive call goes through, covers the pod, aux files, photos and a
+ * new-pod `createFile` with no call-site change. A bodyless or small JSON
+ * request keeps ~15 s. Exported for tests; pure.
+ */
+export function requestTimeoutMs(bodyBytes: number): number {
+  return Math.min(
+    MAX_REQUEST_TIMEOUT_MS,
+    DRIVE_REQUEST_TIMEOUT_MS + Math.ceil(bodyBytes / MIN_UPLINK_BYTES_PER_SEC) * 1000
+  );
+}
+
+/** Bytes `fetch` will send for this body. Unknown body types (FormData, streams, none) count as 0. */
+function bodyBytes(body: BodyInit | null | undefined): number {
+  if (typeof body === 'string') return utf8ByteLength(body);
+  if (typeof Blob !== 'undefined' && body instanceof Blob) return body.size;
+  if (body instanceof ArrayBuffer || ArrayBuffer.isView(body)) return body.byteLength;
+  return 0;
+}
+
+/**
+ * Make a Drive API request with error handling and a body-sized timeout.
  * Throws DriveApiError on non-2xx responses.
- * Throws on timeout (AbortError) to prevent indefinite hangs.
+ * Throws DriveTimeoutError when the sized deadline (`requestTimeoutMs`) fires
+ * before response headers arrive, to prevent indefinite hangs.
  */
 async function driveRequest(token: string, url: string, init?: RequestInit): Promise<Response> {
+  const bytes = bodyBytes(init?.body);
+  const timeoutMs = requestTimeoutMs(bytes);
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), DRIVE_REQUEST_TIMEOUT_MS);
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   let res: Response;
   try {
@@ -699,7 +735,7 @@ async function driveRequest(token: string, url: string, init?: RequestInit): Pro
   } catch (e) {
     clearTimeout(timeoutId);
     if ((e as Error).name === 'AbortError') {
-      throw new DriveApiError('Request timed out', 408);
+      throw new DriveTimeoutError(timeoutMs, bytes);
     }
     throw e;
   }
@@ -817,5 +853,36 @@ export class DriveFileNotFoundError extends DriveApiError {
   constructor(message: string, status: number) {
     super(message, status);
     this.name = 'DriveFileNotFoundError';
+  }
+}
+
+/**
+ * Thrown when OUR sized request deadline (`requestTimeoutMs`) fires before
+ * Drive answers. Not a Google 408: status 408 is kept so existing
+ * `.status === 408` duck-typing (`podAccess`, `refreshFailure`) still reads it
+ * as a timeout, and `timedOut` is what tells it apart from a genuine Google 408
+ * in `classifyTransientFailure` (`@/utils/transientFailure`).
+ *
+ * The message states only the transport fact. It never says what happens next:
+ * `driveService` is called directly by stores and flows that do not queue, so
+ * caller-specific guidance (retry, queue) belongs at the caller.
+ *
+ * ⚠️ A timeout does not prove the request did not land: the abort can fire
+ * after Drive received the whole body.
+ */
+export class DriveTimeoutError extends DriveApiError {
+  readonly timedOut = true;
+  readonly timeoutMs: number;
+  readonly bodyBytes: number;
+  constructor(timeoutMs: number, bodyBytes: number) {
+    super(
+      `Drive request timed out after ${timeoutMs} ms (${bodyBytes} bytes sent) — slow or stalled connection`,
+      408
+    );
+    // Literal, never the class name: the prod build minifies, and telemetry
+    // reports `error.name` as `error_code`.
+    this.name = 'DriveTimeoutError';
+    this.timeoutMs = timeoutMs;
+    this.bodyBytes = bodyBytes;
   }
 }

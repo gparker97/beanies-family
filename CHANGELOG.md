@@ -17,6 +17,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
+- Saves on a slow connection are now held and retried as "Waiting to Save" instead of raising an alarm, and large files get a longer time to upload.
 - Google Calendar events are now written in the family's home time zone, whichever device syncs them, and events that a device in another time zone had moved are put back.
 - Trip and holiday colours show again on the desktop month calendar.
 - Visits to www.beanies.family are now counted by the site's first-party visit ledger.

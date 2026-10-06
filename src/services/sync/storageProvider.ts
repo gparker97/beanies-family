@@ -4,6 +4,8 @@
  * Both local filesystem (File System Access API) and Google Drive
  * implement this interface, making the sync engine backend-agnostic.
  */
+import type { TransientFailure } from '@/utils/transientFailure';
+
 /**
  * Cheap metadata probe result (#61): a monotonic revision counter (null when the
  * backend has none) plus mtime, from ONE round-trip. Part of the provider
@@ -32,6 +34,13 @@ export interface WriteAck {
    * anything downstream (a revision, a baseline) as established.
    */
   queued?: true;
+  /**
+   * Set with `queued`: the transient class that queued it (`timeout` / `server` /
+   * `network`, from `classifyTransientFailure`). `doSave` logs it as `detail` on
+   * `save-queued`, so a pod that keeps timing out is distinguishable from an offline
+   * device in telemetry.
+   */
+  queuedReason?: TransientFailure;
 }
 
 export interface StorageProvider {

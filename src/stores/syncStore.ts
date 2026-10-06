@@ -42,6 +42,7 @@ import { features } from '@/config/features';
 import * as registry from '@/services/registry/registryService';
 import { createRegistryOwnerSync } from '@/services/registry/registryOwnerSync';
 import { realEmail } from '@/utils/email';
+import { utf8ByteLength } from '@/utils/encoding';
 import type { RegistryEntry } from '@/types/models';
 import * as syncService from '@/services/sync/syncService';
 import { GoogleDriveProvider } from '@/services/sync/providers/googleDriveProvider';
@@ -195,7 +196,7 @@ export type MigrateStorageResult =
  */
 export type DurableSaveOutcome = 'saved' | 'failed' | 'timeout' | 'unknown';
 
-export type SaveStatus = 'saving' | 'critical' | 'degraded' | 'saved' | 'hidden';
+export type SaveStatus = 'saving' | 'critical' | 'degraded' | 'queued' | 'saved' | 'hidden';
 
 /** Classified cause of a failed background/manual Drive read. */
 export type BackgroundSyncErrorKind =
@@ -372,6 +373,16 @@ export const BANNERED_BLOCKER_KINDS: ReadonlySet<NonNullable<BackgroundSyncError
 /** The installed registry owner-sync observer's remover (one per app; see its install below). */
 let removeOwnerSyncObserver: (() => void) | null = null;
 
+/**
+ * Durable-save bounds. Every one of these MUST stay below the earliest a queued Drive
+ * TIMEOUT can return (`earliestQueuedTimeoutMs` in googleDriveProvider, 22 s today), or a
+ * timed-out write that may have landed reads as "nothing reached Drive". Asserted in
+ * `src/services/sync/__tests__/durableBounds.test.ts`; the doc for each lives at its use.
+ */
+export const POST_AUTH_SAVE_TIMEOUT_MS = 5000;
+export const DURABLE_ROTATION_SAVE_TIMEOUT_MS = 12000;
+export const CREDENTIAL_PUBLISH_TIMEOUT_MS = 20000;
+
 export const useSyncStore = defineStore('sync', () => {
   // State
   const isInitialized = ref(false);
@@ -386,6 +397,8 @@ export const useSyncStore = defineStore('sync', () => {
   const configHealFailed = ref(false);
   const fileName = ref<string | null>(null);
   const isSyncing = ref(false);
+  /** Mirror of `SyncServiceState.saveQueued`: a save attempt ended queued since the last landed save. */
+  const isSaveQueued = ref(false);
   const error = ref<string | null>(null);
   const lastSync = ref<string | null>(null);
   const needsPermission = ref(false);
@@ -1149,6 +1162,7 @@ export const useSyncStore = defineStore('sync', () => {
     if (isSyncing.value) return 'saving';
     if (saveFailureLevel.value === 'critical') return 'critical';
     if (consecutiveSaveFailures.value >= 2) return 'degraded';
+    if (isSaveQueued.value) return 'queued';
     if (isConfigured.value && lastSync.value) return 'saved';
     return 'hidden';
   });
@@ -1159,6 +1173,7 @@ export const useSyncStore = defineStore('sync', () => {
     isConfigured.value = state.isConfigured;
     fileName.value = state.fileName;
     isSyncing.value = state.isSyncing;
+    isSaveQueued.value = state.saveQueued;
     storageProviderType.value = syncService.getProviderType();
     providerAccountEmail.value = syncService.getProvider()?.getAccountEmail() ?? null;
     refreshSessionAccountEmail();
@@ -1202,7 +1217,8 @@ export const useSyncStore = defineStore('sync', () => {
       (next === 'saving' || next === 'saved') &&
       consecutiveSaveFailures.value === 0 &&
       prev !== 'degraded' &&
-      prev !== 'critical';
+      prev !== 'critical' &&
+      prev !== 'queued';
     if (routine && !sampleRoutineSave()) return;
     logEvent({
       level: 'info',
@@ -1477,13 +1493,13 @@ export const useSyncStore = defineStore('sync', () => {
    * the bound; false (deferred) on timeout — the push rides the next auto-sync. The
    * single home for the `raceTimeout(syncNow(true), …)` pattern (was duplicated across
    * the login-completion sites + password rotation). */
-  const POST_AUTH_SAVE_TIMEOUT_MS = 5000;
+  // `POST_AUTH_SAVE_TIMEOUT_MS` is a module constant above (exported for `durableBounds.test.ts`).
   /** Longer bound for the DURABLE password-rotation save: the user is shown a
    * "saving your new password…" spinner while this blocks, and on not-saved the
    * rotation fully rolls back (see authStore.rotateMemberPassword). Bigger than
    * the best-effort post-auth bound because here we are trading spinner time for
    * a hard durability guarantee, not merely avoiding a wedge. */
-  const DURABLE_ROTATION_SAVE_TIMEOUT_MS = 12000;
+  // `DURABLE_ROTATION_SAVE_TIMEOUT_MS` is a module constant above (exported for `durableBounds.test.ts`).
   /**
    * Budget for publishing a credential the user is WAITING to be handed.
    *
@@ -1494,13 +1510,13 @@ export const useSyncStore = defineStore('sync', () => {
    * routinely expires before the upload has even started, and the joiner is told "your link
    * wasn't saved" on a connection that is working perfectly — the reported bug.
    *
-   * 20s because `withRetry` alone can legitimately spend 15s on one attempt
-   * (`driveService` aborts a request at 15s). There is nothing behind this step: the whole
+   * 20s because `withRetry` alone can legitimately spend a full request deadline on one
+   * attempt (`driveService` allows 15 s plus 1 s per 64 KiB of body, capped at 180 s). There is nothing behind this step: the whole
    * point of it is that the joiner waits for their link, so trading spinner time for a real
    * durability answer is the right trade. It stays BOUNDED so a stalled Drive degrades to
    * a Settings pointer instead of hanging the join forever.
    */
-  const CREDENTIAL_PUBLISH_TIMEOUT_MS = 20000;
+  // `CREDENTIAL_PUBLISH_TIMEOUT_MS` is a module constant above (exported for `durableBounds.test.ts`).
 
   /**
    * Three-state bounded save — the SINGLE implementation of the
@@ -3567,7 +3583,7 @@ export const useSyncStore = defineStore('sync', () => {
       // Capture size for the registry usage signal. This create write bypasses
       // syncService.doSave, so record it here — before step 'register' below —
       // so the create-path registration carries a real beanpodSizeKb, not null.
-      syncService.recordPersistedBytes(envelopeJson);
+      syncService.recordPersistedBytes(utf8ByteLength(envelopeJson));
       partialFileId = provider.getFileId() ?? null;
 
       // 3. Verify the bytes we just wrote round-trip cleanly. Throws
@@ -7456,6 +7472,7 @@ export const useSyncStore = defineStore('sync', () => {
     supportsAutoSync,
     syncStatus,
     saveStatus,
+    isSaveQueued,
     consecutiveSaveFailures,
     hasSessionPassword,
     hasPendingEncryptedFile,

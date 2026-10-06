@@ -49,6 +49,7 @@ const {
           isConfigured: boolean;
           fileName: string | null;
           isSyncing: boolean;
+          saveQueued: boolean;
         }) => void)
       | null,
   },
@@ -62,6 +63,7 @@ const {
     fileName: 'test.beanpod',
     isSyncing: false,
     lastError: null as string | null,
+    saveQueued: false,
   })),
   getLastSilentRefreshDiagnosticsMock: vi.fn(
     () =>
@@ -246,6 +248,7 @@ describe('syncStore — save-failure banner visibility', () => {
       fileName: 'test.beanpod',
       isSyncing: false,
       lastError: null,
+      saveQueued: false,
     });
 
     setActivePinia(createPinia());
@@ -475,6 +478,7 @@ describe('syncStore — save-failure banner visibility', () => {
         fileName: 'test.beanpod',
         isSyncing: false,
         lastError: 'Drive read failed: token rejected and silent refresh failed',
+        saveQueued: false,
       });
       loadMock.mockResolvedValue(null);
       getStateMock.mockReturnValue({
@@ -483,6 +487,7 @@ describe('syncStore — save-failure banner visibility', () => {
         fileName: 'test.beanpod',
         isSyncing: false,
         lastError: 'Drive read failed: token rejected and silent refresh failed',
+        saveQueued: false,
       });
       await store.backgroundSyncFromFile();
     }
@@ -544,6 +549,7 @@ describe('syncStore — save-failure banner visibility', () => {
         fileName: 'test.beanpod',
         isSyncing: false,
         lastError: 'Network unreachable',
+        saveQueued: false,
       });
       getStateMock.mockReturnValue({
         isInitialized: true,
@@ -551,6 +557,7 @@ describe('syncStore — save-failure banner visibility', () => {
         fileName: 'test.beanpod',
         isSyncing: false,
         lastError: 'Network unreachable',
+        saveQueued: false,
       });
       loadMock.mockResolvedValue(null);
 

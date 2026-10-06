@@ -717,6 +717,91 @@ describe('offlineQueue', () => {
     });
   });
 
+  describe('queue reasons are derived from the transient classifier (#127)', () => {
+    async function reload(raw: string) {
+      sessionStorage.setItem('beanies_offline_queue', raw);
+      vi.resetModules();
+      return import('../offlineQueue');
+    }
+
+    it("a persisted 'timeout' marker survives a reload (not degraded to 'network')", async () => {
+      const queuedAt = '2026-10-06T06:12:00.000Z';
+      const fresh = await reload(JSON.stringify({ v: 1, reason: 'timeout', queuedAt }));
+      expect(fresh.hasPendingSave()).toBe(true);
+      expect(JSON.parse(sessionStorage.getItem('beanies_offline_queue')!)).toEqual({
+        v: 1,
+        reason: 'timeout',
+        queuedAt,
+      });
+      fresh.clearQueue();
+    });
+
+    it('every TRANSIENT_FAILURES member (and auth) round-trips', async () => {
+      const { TRANSIENT_FAILURES } = await import('@/utils/transientFailure');
+      expect(offlineQueue.QUEUE_REASONS).toEqual([...TRANSIENT_FAILURES, 'auth']);
+      for (const reason of offlineQueue.QUEUE_REASONS) {
+        const queuedAt = '2026-10-06T00:00:00.000Z';
+        const fresh = await reload(JSON.stringify({ v: 1, reason, queuedAt }));
+        expect(JSON.parse(sessionStorage.getItem('beanies_offline_queue')!)).toEqual({
+          v: 1,
+          reason,
+          queuedAt,
+        });
+        fresh.clearQueue();
+      }
+    });
+
+    it("an unknown reason still degrades to 'network' (and is still a queued save)", async () => {
+      const fresh = await reload(
+        JSON.stringify({ v: 1, reason: 'throttle', queuedAt: '2026-10-06T00:00:00.000Z' })
+      );
+      expect(fresh.hasPendingSave()).toBe(true);
+      expect(JSON.parse(sessionStorage.getItem('beanies_offline_queue')!).reason).toBe('network');
+      fresh.clearQueue();
+    });
+
+    it('keeps the FIRST queuedAt across re-enqueues; the newest reason still wins', () => {
+      vi.useFakeTimers();
+      try {
+        vi.setSystemTime(new Date('2026-10-06T06:12:00.000Z'));
+        offlineQueue.enqueueOfflineSave('network');
+        vi.setSystemTime(new Date('2026-10-06T06:15:00.000Z'));
+        offlineQueue.enqueueOfflineSave('timeout');
+        expect(JSON.parse(sessionStorage.getItem('beanies_offline_queue')!)).toMatchObject({
+          reason: 'timeout',
+          queuedAt: '2026-10-06T06:12:00.000Z',
+        });
+        // Drained → the next enqueue starts a new hold.
+        offlineQueue.clearQueue();
+        offlineQueue.enqueueOfflineSave('timeout');
+        expect(JSON.parse(sessionStorage.getItem('beanies_offline_queue')!).queuedAt).toBe(
+          '2026-10-06T06:15:00.000Z'
+        );
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it.each([
+      ['timeout', 'timeout-requeued'],
+      ['network', 'requeued'],
+      ['server', 'requeued'],
+      ['auth', 'auth-rejected'],
+    ] as const)("flushQueue(): a resave that re-queues as '%s' → '%s'", async (reason, outcome) => {
+      offlineQueue.setFlushProvider({ write: vi.fn() } as unknown as Parameters<
+        typeof offlineQueue.setFlushProvider
+      >[0]);
+      offlineQueue.setResaveHandler(async () => {
+        offlineQueue.enqueueOfflineSave(reason);
+        return false;
+      });
+      offlineQueue.enqueueOfflineSave('network');
+
+      expect(await offlineQueue.flushQueue()).toBe(outcome);
+      expect(offlineQueue.hasPendingSave()).toBe(true);
+    });
+  });
+
   describe('sessionStorage restoration on module load', () => {
     it('restores pending content from sessionStorage', async () => {
       // Pre-populate sessionStorage before importing the module

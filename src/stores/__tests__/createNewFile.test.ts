@@ -186,6 +186,7 @@ vi.mock('@/services/sync/syncService', async () => {
         fileName: 'test.beanpod',
         isSyncing: false,
         lastError: null,
+        saveQueued: false,
       });
       return (mockSelectSyncFile as (...a: unknown[]) => unknown)(...args);
     },
@@ -248,6 +249,7 @@ vi.mock('@/services/crypto/familyKeyService', () => ({
 vi.mock('@/utils/encoding', () => ({
   bufferToBase64: vi.fn(() => 'base64salt'),
   base64ToBuffer: vi.fn(() => new ArrayBuffer(16)),
+  utf8ByteLength: vi.fn((v: string) => v.length),
 }));
 
 // ADR-032: the doc + persistence live in the worker, driven via docClient. This
@@ -459,6 +461,7 @@ describe('pod creation: full end-to-end flow', () => {
       fileName: 'test.beanpod',
       isSyncing: false,
       lastError: null,
+      saveQueued: false,
     });
 
     // --- Step 2b: Create new file (handleStep2Next) ---
@@ -582,6 +585,7 @@ describe('pod creation: full end-to-end flow', () => {
       fileName: 'test.beanpod',
       isSyncing: false,
       lastError: null,
+      saveQueued: false,
     });
     return { authStore, memberId: authStore.currentUser!.memberId };
   }
@@ -900,6 +904,7 @@ describe('pod creation: full end-to-end flow', () => {
         fileName: 'demo.beanpod',
         isSyncing: false,
         lastError: null,
+        saveQueued: false,
       });
 
       return syncStore.createNewFile(
@@ -1173,6 +1178,7 @@ describe('pod creation: full end-to-end flow', () => {
         fileName: 'trust.beanpod',
         isSyncing: false,
         lastError: null,
+        saveQueued: false,
       });
       return useSyncStore().createNewFile(
         'trust.beanpod',
@@ -1367,6 +1373,7 @@ describe('unified create flow: deferred password (signUp â†’ rehydrateOwnerDoc â
       fileName: 'test.beanpod',
       isSyncing: false,
       lastError: null,
+      saveQueued: false,
     });
     mockProvider.write.mockClear();
 
@@ -1406,6 +1413,7 @@ describe('unified create flow: deferred password (signUp â†’ rehydrateOwnerDoc â
       fileName: 'test.beanpod',
       isSyncing: false,
       lastError: null,
+      saveQueued: false,
     });
 
     const result = await syncStore.createNewFile(

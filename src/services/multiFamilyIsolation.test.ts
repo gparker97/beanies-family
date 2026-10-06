@@ -47,6 +47,8 @@ vi.mock('@/services/automerge/worker/docClient', () => ({
 }));
 vi.mock('@/services/sync/offlineQueue', () => ({
   enqueueOfflineSave: vi.fn(),
+  enqueueSeqNow: vi.fn(() => 0),
+  noteSaveLanded: vi.fn(),
   setFlushProvider: vi.fn(),
   setResaveHandler: vi.fn(),
 }));

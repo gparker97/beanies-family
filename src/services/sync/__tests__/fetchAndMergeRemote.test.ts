@@ -107,6 +107,19 @@ vi.mock('@/services/google/driveService', () => ({
   },
 }));
 
+// Calls through: the read-timeout case asserts the `read-failed-queued` event.
+const { logEventSpy } = vi.hoisted(() => ({ logEventSpy: vi.fn() }));
+vi.mock('@/services/telemetry', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/services/telemetry')>();
+  return {
+    ...actual,
+    logEvent: (...args: Parameters<typeof actual.logEvent>) => {
+      logEventSpy(...args);
+      return actual.logEvent(...args);
+    },
+  };
+});
+
 vi.mock('@/stores/translationStore', () => ({
   useTranslationStore: () => ({ t: (k: string) => k }),
 }));
@@ -125,6 +138,8 @@ vi.mock('@/utils/beanpodFilename', () => ({
 // imports the auth layer) the moment anything is queued.
 vi.mock('@/services/sync/offlineQueue', () => ({
   enqueueOfflineSave: vi.fn(),
+  enqueueSeqNow: vi.fn(() => 0),
+  noteSaveLanded: vi.fn(),
   setFlushProvider: vi.fn(),
   setResaveHandler: vi.fn(),
 }));
@@ -678,6 +693,43 @@ describe('a merge that refuses AFTER the remote was read', () => {
     expect(enqueueOfflineSave).toHaveBeenCalledWith('network');
     expect(syncService.getConsecutiveSaveFailures()).toBe(0);
     expect(syncService.isRemoteBlocked()).toBeNull();
+  });
+
+  it('a read TIMEOUT is queued as `timeout`, not counted (#127)', async () => {
+    // What `GoogleDriveProvider.read` rethrows RAW after its one timeout retry: the
+    // `DriveTimeoutError` from `driveRequest` (408 + `timedOut`). It used to classify as
+    // a plain `error` (408 is not >= 500 and "timed out" is not a network word), so a
+    // slow link was a counted `refused-read-failed` and a critical banner.
+    const { enqueueOfflineSave } = await import('@/services/sync/offlineQueue');
+    const { DriveApiError } = await import('@/services/google/driveService');
+    vi.mocked(enqueueOfflineSave).mockClear();
+    logEventSpy.mockClear();
+    const provider = makeProvider({
+      remoteText: '',
+      remoteTimestamp: '2026-05-16T10:00:00Z',
+      onWrite: () => {},
+    });
+    provider.read.mockRejectedValueOnce(
+      Object.assign(
+        new DriveApiError('Drive request timed out after 15000 ms (0 bytes sent)', 408),
+        {
+          name: 'DriveTimeoutError',
+          timedOut: true,
+        }
+      )
+    );
+    syncService.setProvider(provider as never);
+    syncService.setFamilyKey(fakeKey, buildEnvelope());
+
+    await expect(syncService.save()).resolves.toBe(false);
+    expect(provider.write).not.toHaveBeenCalled();
+    expect(enqueueOfflineSave).toHaveBeenCalledWith('timeout');
+    expect(enqueueOfflineSave).not.toHaveBeenCalledWith('network');
+    expect(syncService.getConsecutiveSaveFailures()).toBe(0);
+    const queued = logEventSpy.mock.calls
+      .map((c) => c[0] as { surface: string; context?: Record<string, unknown> })
+      .find((e) => e.context?.action === 'read-failed-queued');
+    expect(queued?.context).toMatchObject({ error_code: 'timeout', http_status: 408 });
   });
 
   it('a NON-transport read failure refuses the write AND counts as a failure', async () => {

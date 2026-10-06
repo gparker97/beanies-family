@@ -41,6 +41,8 @@ vi.mock('@/services/automerge/worker/docClient', () => ({
 }));
 vi.mock('@/services/sync/offlineQueue', () => ({
   enqueueOfflineSave: vi.fn(),
+  enqueueSeqNow: vi.fn(() => 0),
+  noteSaveLanded: vi.fn(),
   setFlushProvider: vi.fn(),
   setResaveHandler: vi.fn(),
 }));
@@ -468,5 +470,153 @@ describe('a cancelled pick restores the pending save it cancelled (audit C12)', 
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('write perf context and queued class (save-queued / save failed)', () => {
+  const ctxOf = (action: string) =>
+    vi
+      .mocked(logEvent)
+      .mock.calls.map((c) => c[0])
+      .find((e) => (e.context as { action?: string } | undefined)?.action === action)?.context as
+      Record<string, unknown> | undefined;
+
+  it('save-queued carries the queued class as detail plus the document size and write duration', async () => {
+    const p = drive({ probe: 'ver:10', ack: 'ver:11' });
+    p.write.mockImplementation(
+      async () =>
+        ({
+          revision: null,
+          queued: true,
+          queuedReason: 'timeout',
+        }) as never
+    );
+    syncService.setProvider(p as never, 'fam');
+    syncService.setFamilyKey(KEY, envelope());
+
+    await expect(syncService.save()).resolves.toBe(false);
+
+    const ctx = ctxOf('save-queued');
+    expect(ctx).toMatchObject({ detail: 'timeout' });
+    expect(ctx?.perf_doc_bytes).toBeGreaterThan(0);
+    expect(typeof ctx?.perf_duration_ms).toBe('number');
+  });
+
+  it('write-advance carries the same perf fields', async () => {
+    syncService.setProvider(drive({ probe: 'ver:10', ack: 'ver:11' }) as never, 'fam');
+    syncService.setFamilyKey(KEY, envelope());
+    await expect(syncService.save()).resolves.toBe(true);
+    const ctx = ctxOf('write-advance');
+    expect(ctx?.perf_doc_bytes).toBeGreaterThan(0);
+    expect(typeof ctx?.perf_duration_ms).toBe('number');
+  });
+
+  it('a failure in the WRITE phase carries perf; a pre-write (merge-phase) failure does not', async () => {
+    const failing = drive({ probe: 'ver:10', ack: 'ver:11' });
+    failing.write.mockRejectedValue(new Error('boom'));
+    syncService.setProvider(failing as never, 'fam');
+    syncService.setFamilyKey(KEY, envelope());
+    await expect(syncService.save()).resolves.toBe(false);
+    const writeCtx = ctxOf('write-failed');
+    expect(writeCtx?.perf_doc_bytes).toBeGreaterThan(0);
+    expect(typeof writeCtx?.perf_duration_ms).toBe('number');
+
+    vi.clearAllMocks();
+    syncService.reset();
+    const mergeFail = drive({ probe: 'ver:10', ack: 'ver:11' });
+    vi.mocked(docClient.mergeRemoteEnvelope).mockRejectedValueOnce(new Error('merge boom'));
+    syncService.setProvider(mergeFail as never, 'fam');
+    syncService.setFamilyKey(KEY, envelope());
+    await expect(syncService.save()).resolves.toBe(false);
+    const mergeCtx = ctxOf('refused-remote-blocked');
+    expect(mergeCtx).toBeDefined();
+    expect(mergeCtx).not.toHaveProperty('perf_doc_bytes');
+    expect(mergeCtx).not.toHaveProperty('perf_duration_ms');
+    expect(mergeFail.write).not.toHaveBeenCalled();
+  });
+});
+
+describe('single-flight save() with one trailing run (#127)', () => {
+  /** A Drive provider whose probe always matches the last acked revision, so every save is a clean +1. */
+  function sequencedDrive() {
+    let rev = 1;
+    const p = drive({ probe: 'ver:1', ack: 'ver:2' });
+    p.getRemoteMarker.mockImplementation(async () => ({
+      revision: `ver:${rev}`,
+      modifiedTime: null,
+    }));
+    const pendingLands: Array<() => void> = [];
+    p.write.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          pendingLands.push(() => {
+            rev += 1;
+            resolve({ revision: `ver:${rev}` });
+          });
+        })
+    );
+    return { p, land: () => pendingLands.shift()?.() };
+  }
+
+  it('three concurrent save() calls run exactly one in-flight and one trailing upload', async () => {
+    const { p, land } = sequencedDrive();
+    syncService.setProvider(p as never, 'fam');
+    syncService.setFamilyKey(KEY, envelope());
+
+    const first = syncService.save();
+    const second = syncService.save();
+    const third = syncService.save();
+    expect(second).toBe(third); // the same trailing run
+
+    await vi.waitFor(() => expect(p.write).toHaveBeenCalledTimes(1));
+    land();
+    await expect(first).resolves.toBe(true);
+
+    await vi.waitFor(() => expect(p.write).toHaveBeenCalledTimes(2));
+    land();
+    await expect(second).resolves.toBe(true);
+    await expect(third).resolves.toBe(true);
+    expect(p.write).toHaveBeenCalledTimes(2); // never a third upload
+    const coalesced = vi
+      .mocked(logEvent)
+      .mock.calls.find((c) => (c[0].context as { action?: unknown })?.action === 'coalesced');
+    expect(coalesced?.[0].context).toMatchObject({ action: 'coalesced', count: 2 });
+  });
+
+  it("a caller during the in-flight run gets the TRAILING run's boolean, even when the first fails", async () => {
+    const { p, land } = sequencedDrive();
+    syncService.setProvider(p as never, 'fam');
+    syncService.setFamilyKey(KEY, envelope());
+    p.write.mockImplementationOnce(() => Promise.reject(new Error('write exploded')));
+
+    const first = syncService.save();
+    const trailing = syncService.save();
+    await expect(first).resolves.toBe(false); // the failed run reports false
+    await vi.waitFor(() => expect(p.write).toHaveBeenCalledTimes(2));
+    land();
+    await expect(trailing).resolves.toBe(true);
+  });
+
+  it('whenIdle waits for the trailing run, not just the in-flight one', async () => {
+    const { p, land } = sequencedDrive();
+    syncService.setProvider(p as never, 'fam');
+    syncService.setFamilyKey(KEY, envelope());
+
+    const first = syncService.save();
+    const trailing = syncService.save();
+    await vi.waitFor(() => expect(p.write).toHaveBeenCalledTimes(1));
+
+    let idle = false;
+    const waiting = syncService.whenIdle().then(() => (idle = true));
+    land();
+    await first;
+    await new Promise((r) => setTimeout(r, 0));
+    expect(idle).toBe(false); // the trailing run is still in flight
+
+    await vi.waitFor(() => expect(p.write).toHaveBeenCalledTimes(2));
+    land();
+    await trailing;
+    await waiting;
+    expect(idle).toBe(true);
   });
 });

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { SAVE_STATUS_PRESENTATION } from '@/components/ui/saveStatusPresentation';
 import type { SaveStatus } from '@/stores/syncStore';
 
-const ALL_STATUSES: SaveStatus[] = ['saving', 'critical', 'degraded', 'saved', 'hidden'];
+const ALL_STATUSES: SaveStatus[] = ['saving', 'critical', 'degraded', 'queued', 'saved', 'hidden'];
 
 describe('SAVE_STATUS_PRESENTATION', () => {
   it('is total — one entry per SaveStatus, so a total saveStatus never indexes a missing key', () => {
@@ -18,18 +18,27 @@ describe('SAVE_STATUS_PRESENTATION', () => {
     expect(SAVE_STATUS_PRESENTATION.saved.attention).toBe(false);
     expect(SAVE_STATUS_PRESENTATION.saving.attention).toBe(false);
     expect(SAVE_STATUS_PRESENTATION.hidden.attention).toBe(false);
+    expect(SAVE_STATUS_PRESENTATION.queued.attention).toBe(false);
+  });
+
+  it('queued reuses the calm saving tokens (never the orange alarm) with its own label and no pulse', () => {
+    const { labelKey, pulse, ...queuedTokens } = SAVE_STATUS_PRESENTATION.queued;
+    const { labelKey: _l, pulse: _p, ...savingTokens } = SAVE_STATUS_PRESENTATION.saving;
+    expect(queuedTokens).toEqual(savingTokens);
+    expect(labelKey).toBe('saveStatus.waiting');
+    expect(pulse).toBe(false);
   });
 
   it('renders nothing only for the hidden state', () => {
     expect(SAVE_STATUS_PRESENTATION.hidden.visible).toBe(false);
-    for (const status of ['saving', 'critical', 'degraded', 'saved'] as SaveStatus[]) {
+    for (const status of ['saving', 'critical', 'degraded', 'queued', 'saved'] as SaveStatus[]) {
       expect(SAVE_STATUS_PRESENTATION[status].visible).toBe(true);
     }
   });
 
   it('interpolates relative time only for the saved state', () => {
     expect(SAVE_STATUS_PRESENTATION.saved.usesRelativeTime).toBe(true);
-    for (const status of ['saving', 'critical', 'degraded', 'hidden'] as SaveStatus[]) {
+    for (const status of ['saving', 'critical', 'degraded', 'queued', 'hidden'] as SaveStatus[]) {
       expect(SAVE_STATUS_PRESENTATION[status].usesRelativeTime).toBe(false);
     }
   });

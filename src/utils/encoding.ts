@@ -127,6 +127,16 @@ export function base64urlToBuffer(base64url: string): ArrayBuffer {
   return base64ToBuffer(base64);
 }
 
+/**
+ * The UTF-8 byte length of a string: what `fetch` actually sends for a string
+ * body, which `s.length` (UTF-16 code units) under-counts for any non-ASCII
+ * text. A lone surrogate is counted as the 3-byte U+FFFD that `TextEncoder`
+ * (and therefore `fetch`) substitutes for it.
+ */
+export function utf8ByteLength(s: string): number {
+  return new TextEncoder().encode(s).byteLength;
+}
+
 // ─── SHA-256 digests ─────────────────────────────────────────────────────────
 //
 // Shared because more than one gate needs "hash this string and compare it to a
