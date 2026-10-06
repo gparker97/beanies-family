@@ -1,9 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { normEmail, onCanonicalPointer, realEmail, resolveOwnerFields } from './owner.mjs';
+import {
+  normEmail,
+  onCanonicalPointer,
+  ownerVersionCondition,
+  realEmail,
+  resolveOwnerFields,
+} from './owner.mjs';
 
 const FAMILY_ID = '11111111-2222-4333-8444-555555555555';
 const OWNER_ID = 'aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa';
 const NEW_OWNER_ID = 'bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb';
+const NOW = '2026-10-06T09:00:00.000Z';
+const EARLIER = '2026-09-01T00:00:00.000Z';
 
 const ROW = Object.freeze({
   familyId: FAMILY_ID,
@@ -79,6 +87,7 @@ describe('resolveOwnerFields — no ownerSync flag (write-once, today)', () => {
       expect(r).toEqual({
         ownerMemberId: OWNER_ID,
         ownerEmail: 'owner@example.com',
+        ownerHandoverAt: null,
         write: true,
         sync: null,
       });
@@ -238,10 +247,12 @@ describe('resolveOwnerFields — ownerSync outcomes', () => {
       existing: ROW,
       body: syncBody({ ownerMemberId: NEW_OWNER_ID, ownerEmail: ' new@example.com ' }),
       isOwner: true,
+      now: NOW,
     });
     expect(r).toEqual({
       ownerMemberId: NEW_OWNER_ID,
       ownerEmail: 'new@example.com',
+      ownerHandoverAt: NOW,
       write: true,
       sync: { outcome: 'handover', fromTail: OWNER_ID.slice(-6), toTail: NEW_OWNER_ID.slice(-6) },
     });
@@ -272,6 +283,7 @@ describe('resolveOwnerFields — ownerSync outcomes', () => {
     expect(r).toEqual({
       ownerMemberId: OWNER_ID,
       ownerEmail: 'Renamed@Example.com',
+      ownerHandoverAt: null,
       write: true,
       sync: { outcome: 'email-synced', fromTail: OWNER_ID.slice(-6), toTail: OWNER_ID.slice(-6) },
     });
@@ -305,5 +317,151 @@ describe('resolveOwnerFields — ownerSync outcomes', () => {
       isOwner: true,
     });
     expect(r.sync).toEqual({ outcome: 'refused-deleted', fromTail: null, toTail: null });
+  });
+});
+
+describe('resolveOwnerFields — the handover lock (ownerHandoverAt, ownerSyncReason)', () => {
+  const LOCKED = Object.freeze({ ...ROW, ownerHandoverAt: EARLIER });
+  const handoverBody = (over = {}) =>
+    syncBody({ ownerMemberId: NEW_OWNER_ID, ownerEmail: 'new@example.com', ...over });
+
+  it('a transfer hands over even when the row is locked, and re-stamps the lock', () => {
+    const r = resolveOwnerFields({
+      existing: LOCKED,
+      body: handoverBody({ ownerSyncReason: 'transfer' }),
+      isOwner: true,
+      now: NOW,
+    });
+    expect(r).toMatchObject({
+      ownerMemberId: NEW_OWNER_ID,
+      ownerEmail: 'new@example.com',
+      ownerHandoverAt: NOW,
+      write: true,
+      sync: { outcome: 'handover' },
+    });
+  });
+
+  it.each([['drift'], [undefined], ['other'], [null]])(
+    'a drift handover (reason %s) is allowed once on a never-handed-over row and stamps it',
+    (ownerSyncReason) => {
+      const r = resolveOwnerFields({
+        existing: ROW,
+        body: handoverBody({ ownerSyncReason }),
+        isOwner: true,
+        now: NOW,
+      });
+      expect(r).toMatchObject({
+        ownerMemberId: NEW_OWNER_ID,
+        ownerHandoverAt: NOW,
+        write: true,
+        sync: { outcome: 'handover' },
+      });
+    }
+  );
+
+  it.each([['drift'], [undefined], ['other']])(
+    'a drift handover (reason %s) is refused once the row has been handed over',
+    (ownerSyncReason) => {
+      const r = resolveOwnerFields({
+        existing: LOCKED,
+        body: handoverBody({ ownerSyncReason }),
+        isOwner: true,
+        now: NOW,
+      });
+      expect(r).toEqual({
+        ownerMemberId: OWNER_ID,
+        ownerEmail: 'owner@example.com',
+        ownerHandoverAt: EARLIER,
+        write: false,
+        sync: {
+          outcome: 'refused-handover-locked',
+          fromTail: OWNER_ID.slice(-6),
+          toTail: NEW_OWNER_ID.slice(-6),
+        },
+      });
+    }
+  );
+
+  it('the lock is checked after refused-invalid-target (and after every authority refusal)', () => {
+    expect(
+      resolveOwnerFields({
+        existing: LOCKED,
+        body: syncBody({ ownerMemberId: 'not-a-uuid' }),
+        isOwner: true,
+        now: NOW,
+      }).sync.outcome
+    ).toBe('refused-invalid-target');
+    expect(
+      resolveOwnerFields({
+        existing: LOCKED,
+        body: handoverBody({ ownerSyncReason: 'transfer', writerMemberId: NEW_OWNER_ID }),
+        isOwner: false,
+        now: NOW,
+      }).sync.outcome
+    ).toBe('refused-not-owner');
+  });
+
+  it('email sync is unaffected by the lock and keeps the stored stamp', () => {
+    const r = resolveOwnerFields({
+      existing: LOCKED,
+      body: syncBody({ ownerEmail: 'renamed@example.com', ownerSyncReason: 'drift' }),
+      isOwner: true,
+      now: NOW,
+    });
+    expect(r).toMatchObject({
+      ownerMemberId: OWNER_ID,
+      ownerEmail: 'renamed@example.com',
+      ownerHandoverAt: EARLIER,
+      write: true,
+      sync: { outcome: 'email-synced' },
+    });
+  });
+
+  it('every non-handover outcome and every ambient PUT keeps the stored stamp', () => {
+    const ambient = resolveOwnerFields({
+      existing: LOCKED,
+      body: { ownerMemberId: NEW_OWNER_ID },
+      isOwner: true,
+      now: NOW,
+    });
+    expect(ambient.ownerHandoverAt).toBe(EARLIER);
+    const unchanged = resolveOwnerFields({
+      existing: LOCKED,
+      body: syncBody(),
+      isOwner: true,
+      now: NOW,
+    });
+    expect(unchanged).toMatchObject({ ownerHandoverAt: EARLIER, write: false });
+    expect(
+      resolveOwnerFields({ existing: ROW, body: {}, isOwner: true, now: NOW }).ownerHandoverAt
+    ).toBeNull();
+  });
+});
+
+describe('ownerVersionCondition (every PUT is optimistic on the owner version)', () => {
+  it('a stored ownerHandoverAt must still be that value', () => {
+    expect(ownerVersionCondition({ ...ROW, ownerHandoverAt: EARLIER })).toEqual({
+      expression: 'ownerHandoverAt = :ownerVersion',
+      values: { ':ownerVersion': EARLIER },
+    });
+  });
+
+  it.each([
+    ['absent (written before the lock shipped)', ROW],
+    ['stored NULL (never handed over)', { ...ROW, ownerHandoverAt: null }],
+    ['a tombstone that was never handed over', { ...ROW, deletedAt: EARLIER }],
+  ])('%s: must still be absent or NULL', (_label, existing) => {
+    expect(ownerVersionCondition(existing)).toEqual({
+      expression:
+        'attribute_not_exists(ownerHandoverAt) OR attribute_type(ownerHandoverAt, :nullType)',
+      values: { ':nullType': 'NULL' },
+    });
+  });
+
+  it('no row read: the row must still not exist (a create on an empty key is unchanged)', () => {
+    expect(ownerVersionCondition(null)).toEqual({
+      expression: 'attribute_not_exists(familyId)',
+      values: null,
+    });
   });
 });

@@ -2407,6 +2407,7 @@ describe('registry PUT — owner sync (opt-in ownerSync, ownership-only)', () =>
       success: true,
       pointerAccepted: true,
       owner: { memberId: NEW_OWNER, email: 'new@example.com' },
+      outcome: 'handover',
     });
     expect(ownerSyncLines()).toEqual([
       {
@@ -2438,6 +2439,7 @@ describe('registry PUT — owner sync (opt-in ownerSync, ownership-only)', () =>
       success: true,
       pointerAccepted: false,
       owner: { memberId: M_A, email: 'owner@example.com' },
+      outcome: 'refused-off-canonical',
     });
     expect(ownerSyncLines().map((l) => l.outcome)).toEqual(['refused-off-canonical']);
   });
@@ -2452,6 +2454,7 @@ describe('registry PUT — owner sync (opt-in ownerSync, ownership-only)', () =>
       success: true,
       pointerAccepted: false,
       owner: { memberId: null, email: null },
+      outcome: 'refused-deleted',
     });
     expect(ownerSyncLines().map((l) => l.outcome)).toEqual(['refused-deleted']);
   });
@@ -2463,6 +2466,7 @@ describe('registry PUT — owner sync (opt-in ownerSync, ownership-only)', () =>
       success: true,
       pointerAccepted: false,
       owner: { memberId: null, email: null },
+      outcome: 'refused-deleted',
     });
     expect(ownerSyncLines().map((l) => l.outcome)).toEqual(['refused-deleted']);
   });
@@ -2484,7 +2488,232 @@ describe('registry PUT — owner sync (opt-in ownerSync, ownership-only)', () =>
       success: true,
       pointerAccepted: true,
       owner: { memberId: M_A, email: 'owner@example.com' },
+      outcome: 'unchanged',
     });
     expect(ownerSyncLines().map((l) => l.outcome)).toEqual(['unchanged']);
+  });
+
+  it('stamps ownerHandoverAt on a handover and never stores ownerSync / ownerSyncReason', async () => {
+    const { item } = await put(
+      syncBody({
+        ownerMemberId: NEW_OWNER,
+        ownerEmail: 'new@example.com',
+        ownerSyncReason: 'drift',
+      }),
+      ROW
+    );
+    expect(item.ownerMemberId).toBe(NEW_OWNER);
+    expect(item.ownerHandoverAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(item.updatedAt).toBe(item.ownerHandoverAt);
+    expect(item).not.toHaveProperty('ownerSync');
+    expect(item).not.toHaveProperty('ownerSyncReason');
+  });
+
+  it('refuses a drift handover on a handed-over row (refused-handover-locked), writing nothing', async () => {
+    const locked = { ...ROW, ownerHandoverAt: '2026-09-01T00:00:00.000Z' };
+    const { res, item } = await put(
+      syncBody({
+        ownerMemberId: NEW_OWNER,
+        ownerEmail: 'new@example.com',
+        ownerSyncReason: 'drift',
+      }),
+      locked
+    );
+    expect(item).toBeNull();
+    expect(JSON.parse(res.body)).toEqual({
+      success: true,
+      pointerAccepted: true,
+      owner: { memberId: M_A, email: 'owner@example.com' },
+      outcome: 'refused-handover-locked',
+    });
+    expect(ownerSyncLines().map((l) => l.outcome)).toEqual(['refused-handover-locked']);
+  });
+
+  it('lets a transfer through a locked row and re-stamps the lock', async () => {
+    const locked = { ...ROW, ownerHandoverAt: '2026-09-01T00:00:00.000Z' };
+    const { item } = await put(
+      syncBody({
+        ownerMemberId: NEW_OWNER,
+        ownerEmail: 'new@example.com',
+        ownerSyncReason: 'transfer',
+      }),
+      locked
+    );
+    expect(item.ownerMemberId).toBe(NEW_OWNER);
+    expect(item.ownerHandoverAt).not.toBe(locked.ownerHandoverAt);
+    expect(item).not.toHaveProperty('ownerSyncReason');
+    expect(ownerSyncLines().map((l) => l.outcome)).toEqual(['handover']);
+  });
+
+  it('preserves ownerHandoverAt through an ambient PUT', async () => {
+    const locked = { ...ROW, ownerHandoverAt: '2026-09-01T00:00:00.000Z' };
+    const { item } = await put(
+      syncBody({ ownerSync: undefined, isLoginEvent: true, country: 'SG' }),
+      locked
+    );
+    expect(item.ownerHandoverAt).toBe('2026-09-01T00:00:00.000Z');
+  });
+
+  it('keeps ownerHandoverAt on the DELETE tombstone', async () => {
+    const { item } = await del(
+      { ...ROW, ownerHandoverAt: '2026-09-01T00:00:00.000Z' },
+      { writerMemberId: M_A }
+    );
+    expect(item.deletedAt).toBeTruthy();
+    expect(item.ownerHandoverAt).toBe('2026-09-01T00:00:00.000Z');
+  });
+
+  describe('every PUT is optimistic on the owner version (ownerHandoverAt)', () => {
+    const HANDED = {
+      ...ROW,
+      ownerMemberId: NEW_OWNER,
+      ownerEmail: 'new@example.com',
+      ownerHandoverAt: '2026-10-06T08:00:00.000Z',
+    };
+    const conflict = () =>
+      Object.assign(new Error('The conditional request failed'), {
+        name: 'ConditionalCheckFailedException',
+      });
+
+    /**
+     * Drive a PUT whose reads return `reads` in turn (the last repeats) and whose writes behave
+     * as `writes` in turn ('ok' or 'conflict'; the last repeats). Returns every PutItem input.
+     */
+    async function racingPut(body, reads, writes) {
+      sendMock.mockReset();
+      let r = 0;
+      let w = 0;
+      sendMock.mockImplementation((command) => {
+        if (command.constructor.name === 'GetItemCommand') {
+          const row = reads[Math.min(r++, reads.length - 1)];
+          return Promise.resolve({ Item: row ? marshall(row) : undefined });
+        }
+        const outcome = writes[Math.min(w++, writes.length - 1)];
+        return outcome === 'conflict' ? Promise.reject(conflict()) : Promise.resolve({});
+      });
+      const res = await handler({
+        headers: { 'x-api-key': API_KEY, origin: 'https://app.beanies.family' },
+        pathParameters: { familyId: FAMILY_ID },
+        requestContext: { http: { method: 'PUT' } },
+        body: JSON.stringify(body),
+      });
+      const puts = sendMock.mock.calls
+        .filter((c) => c[0].constructor.name === 'PutItemCommand')
+        .map((c) => c[0].input);
+      const gets = sendMock.mock.calls.filter((c) => c[0].constructor.name === 'GetItemCommand');
+      return { res, puts, gets };
+    }
+
+    it('an ambient PUT that read before a handover re-reads and keeps the NEW owner', async () => {
+      const ambient = syncBody({ ownerSync: undefined, isLoginEvent: true });
+      const { res, puts, gets } = await racingPut(ambient, [ROW, HANDED], ['conflict', 'ok']);
+      expect(res.statusCode).toBe(200);
+      expect(gets).toHaveLength(2);
+      expect(gets.every((g) => g[0].input.ConsistentRead === true)).toBe(true);
+      expect(puts).toHaveLength(2);
+      // The losing round was conditioned on the never-handed-over version it read...
+      expect(puts[0].ConditionExpression).toBe(
+        'attribute_not_exists(ownerHandoverAt) OR attribute_type(ownerHandoverAt, :nullType)'
+      );
+      expect(unmarshall(puts[0].ExpressionAttributeValues)).toEqual({ ':nullType': 'NULL' });
+      // ...and the retry merged into the handed-over row, on ITS version.
+      const written = unmarshall(puts[1].Item);
+      expect(written.ownerMemberId).toBe(NEW_OWNER);
+      expect(written.ownerEmail).toBe('new@example.com');
+      expect(written.ownerHandoverAt).toBe(HANDED.ownerHandoverAt);
+      expect(puts[1].ConditionExpression).toBe('ownerHandoverAt = :ownerVersion');
+      expect(unmarshall(puts[1].ExpressionAttributeValues)).toEqual({
+        ':ownerVersion': HANDED.ownerHandoverAt,
+      });
+    });
+
+    it('three conflicts answer the ordinary failed-write 500, logged as an owner-version conflict', async () => {
+      const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const { res, puts, gets } = await racingPut(
+        syncBody({ ownerSync: undefined }),
+        [ROW],
+        ['conflict']
+      );
+      expect(res.statusCode).toBe(500);
+      expect(JSON.parse(res.body)).toEqual({ error: 'Internal server error' });
+      expect(puts).toHaveLength(3);
+      expect(gets).toHaveLength(3);
+      expect(errSpy).toHaveBeenCalledWith(
+        '[registry] owner-version conflict: giving up',
+        FAMILY_ID,
+        '3 attempts'
+      );
+      expect(
+        warnSpy.mock.calls.filter((c) =>
+          String(c[0]).startsWith('[registry] owner-version conflict')
+        )
+      ).toHaveLength(2);
+      errSpy.mockRestore();
+      warnSpy.mockRestore();
+    });
+
+    it('an owner sync that raced logs ONE line, the last round, with the retry noted', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      // A drift handover read the unlocked row; a transfer landed first; the retry is locked.
+      const drift = syncBody({
+        ownerMemberId: NEW_OWNER,
+        ownerEmail: 'new@example.com',
+        ownerSyncReason: 'drift',
+      });
+      const third = 'dddddddd-4444-4444-8444-dddddddddddd';
+      const lockedElsewhere = { ...HANDED, ownerMemberId: M_A, ownerEmail: 'owner@example.com' };
+      const { res, puts } = await racingPut(
+        drift,
+        [ROW, { ...lockedElsewhere, ownerHandoverAt: third }],
+        ['conflict']
+      );
+      expect(puts).toHaveLength(1);
+      expect(JSON.parse(res.body)).toMatchObject({ outcome: 'refused-handover-locked' });
+      const lines = ownerSyncLines();
+      expect(lines).toHaveLength(1);
+      expect(lines[0]).toMatchObject({ outcome: 'refused-handover-locked', conflict_retries: 1 });
+      expect(lines[0]).not.toHaveProperty('conflict_exhausted');
+      warnSpy.mockRestore();
+    });
+
+    it('a conflict-free owner sync line carries no conflict fields', async () => {
+      await put(syncBody({ ownerMemberId: NEW_OWNER, ownerEmail: 'new@example.com' }), ROW);
+      const [line] = ownerSyncLines();
+      expect(line).not.toHaveProperty('conflict_retries');
+      expect(line).not.toHaveProperty('conflict_exhausted');
+    });
+
+    it('a first write is conditioned on the row still not existing', async () => {
+      const { puts } = await racingPut({ provider: 'local' }, [null], ['ok']);
+      expect(puts[0].ConditionExpression).toBe('attribute_not_exists(familyId)');
+      expect(puts[0]).not.toHaveProperty('ExpressionAttributeValues');
+    });
+
+    it('a non-conflict DynamoDB failure is not retried', async () => {
+      const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      sendMock.mockReset();
+      sendMock.mockImplementation((command) =>
+        command.constructor.name === 'GetItemCommand'
+          ? Promise.resolve({ Item: marshall(ROW) })
+          : Promise.reject(
+              Object.assign(new Error('throttled'), {
+                name: 'ProvisionedThroughputExceededException',
+              })
+            )
+      );
+      const res = await handler({
+        headers: { 'x-api-key': API_KEY, origin: 'https://app.beanies.family' },
+        pathParameters: { familyId: FAMILY_ID },
+        requestContext: { http: { method: 'PUT' } },
+        body: JSON.stringify(syncBody({ ownerSync: undefined })),
+      });
+      expect(res.statusCode).toBe(500);
+      expect(
+        sendMock.mock.calls.filter((c) => c[0].constructor.name === 'PutItemCommand')
+      ).toHaveLength(1);
+      expect(errSpy).toHaveBeenCalledWith('Registry error:', expect.any(Error));
+      errSpy.mockRestore();
+    });
   });
 });

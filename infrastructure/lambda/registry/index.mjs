@@ -12,7 +12,13 @@ import {
   reduceUserAgent,
   validateEvent,
 } from './events.mjs';
-import { UUID_RE, normEmail, onCanonicalPointer, resolveOwnerFields } from './owner.mjs';
+import {
+  UUID_RE,
+  normEmail,
+  onCanonicalPointer,
+  ownerVersionCondition,
+  resolveOwnerFields,
+} from './owner.mjs';
 
 const client = new DynamoDBClient({});
 // Each table pair falls back to prod when no dev table is configured (safe fallback).
@@ -432,6 +438,482 @@ async function handleEvents(event) {
   return { statusCode: 204, headers: getHeaders(event) };
 }
 
+/**
+ * Extra read-merge-write rounds a PUT gets when the owner version moved between its read and its
+ * write (see `handlePut`). Three attempts in all.
+ */
+const OWNER_VERSION_RETRIES = 2;
+
+/**
+ * The PUT arm: one read-merge-write (`putOnce`), re-run from the read when the row's owner version
+ * moved underneath it.
+ *
+ * ⚠️ EVERY PUT IS OPTIMISTIC ON THE OWNER VERSION, ambient and `ownerSync` alike. The item below is
+ * rebuilt from a read and written with a whole-item `PutItem`, so a PUT that read the row BEFORE a
+ * handover and landed AFTER it would write the old `ownerMemberId` / `ownerEmail` /
+ * `ownerHandoverAt` straight back: an ordinary login undoing a transfer. `putOnce` therefore
+ * conditions its write on the `ownerHandoverAt` it read (owner.mjs `ownerVersionCondition`; every
+ * handover stamps a new one), and a `ConditionalCheckFailedException` re-runs the whole round
+ * against the new row. After `OWNER_VERSION_RETRIES` more conflicts it answers exactly like any
+ * other failed write (500), so a caller's existing failure handling applies unchanged.
+ *
+ * The `registry_owner_sync` line is logged here, once per request (not once per round), from the
+ * last round's decision, with `conflict_retries` / `conflict_exhausted` when a retry happened.
+ */
+async function handlePut(event, familyId, tableName) {
+  const body = JSON.parse(event.body || '{}');
+  const now = new Date().toISOString();
+  const today = now.slice(0, 10); // YYYY-MM-DD — date-only login stamp
+
+  let sync = null;
+  let retries = 0;
+  let exhausted = false;
+  try {
+    for (;;) {
+      const round = await putOnce({
+        event,
+        familyId,
+        tableName,
+        body,
+        now,
+        today,
+        noteSync: (s) => {
+          sync = s;
+        },
+      });
+      if (!round.conflict) return round.res;
+      if (retries === OWNER_VERSION_RETRIES) {
+        exhausted = true;
+        console.error(
+          '[registry] owner-version conflict: giving up',
+          familyId,
+          `${retries + 1} attempts`
+        );
+        return response(500, { error: 'Internal server error' }, event);
+      }
+      retries += 1;
+      console.warn('[registry] owner-version conflict: retrying', familyId, `retry ${retries}`);
+    }
+  } finally {
+    if (sync) {
+      // eslint-disable-next-line no-console -- structured owner-sync line, read by CloudWatch
+      console.log(
+        JSON.stringify({
+          msg: 'registry_owner_sync',
+          family_id_hash: familyIdHash(familyId),
+          outcome: sync.outcome,
+          from_tail: sync.fromTail,
+          to_tail: sync.toTail,
+          // Only when the owner version moved mid-request: the outcome above is the LAST round's.
+          ...(retries > 0 ? { conflict_retries: retries } : {}),
+          ...(exhausted ? { conflict_exhausted: true } : {}),
+        })
+      );
+    }
+  }
+}
+
+/**
+ * One read-merge-write round of the PUT arm. Resolves `{ res }` with the response, or
+ * `{ conflict: true }` when the conditional `PutItem` found the owner version moved since the read
+ * (`handlePut` re-runs the round). Any other failure throws to the handler's catch, as before.
+ * `noteSync` receives the owner-sync decision (null for an ordinary PUT) for `handlePut`'s log.
+ */
+async function putOnce({ event, familyId, tableName, body, now, today, noteSync }) {
+  // Read existing row to preserve write-once fields (createdAt, ownerEmail,
+  // subscribeNewsletter). registerFamily() fires on every sync-config change,
+  // so only the first write should stamp these.
+  const { Item: existingRaw } = await client.send(
+    new GetItemCommand({
+      TableName: tableName,
+      Key: marshall({ familyId }),
+      // Strongly consistent, and this one is load-bearing: the result feeds a
+      // full-row PutItem, so a stale miss does not merely read wrong — it
+      // CLOBBERS every write-once field (createdAt, ownerMemberId,
+      // ownerEmail, signupPlatform) with the defaults below.
+      ConsistentRead: true,
+    })
+  );
+  const existing = existingRaw ? unmarshall(existingRaw) : {};
+
+  // ─── Canonical-pointer guard (2026-08-10) ────────────────────────────
+  //
+  // Only the family's registered owner may move the canonical pointer
+  // (provider / fileId / displayPath). Members still write activity and
+  // metadata (lastLoginAt, country, beanpodSizeKb, familyName) — those are
+  // per-family facts any device can report. The pointer is not.
+  //
+  // This lives here, not in the client, because the client cannot close the
+  // hole: the propagation vector is ALREADY DEPLOYED. Native and cached web
+  // builds running the pre-fix code keep sending pointer writes for as long
+  // as they run, and a client-side guard protects only devices that already
+  // took the fix — i.e. not the ones causing the damage. A curl gets the same
+  // answer here too. See docs/plans/2026-08-10-never-fork-a-family-pod.md §5.
+  //
+  // AUTHORITY IS `ownerMemberId`, NOT `ownerEmail`.
+  //
+  // `ownerEmail` was added (2026-04-12) as an ops/contact capture, alongside
+  // the newsletter opt-in — "who do we email about this family". It is the
+  // signed-in member's PROFILE email, which the user can edit in the app. Using
+  // it as the permission check would mean an owner who edits their own email
+  // sends a new address on their next write, gets refused, and — because the
+  // field is write-once — has no way back. `memberId` is a stable UUID from the
+  // family document and survives any profile edit, so it is the real identity.
+  //
+  // Three tiers, in order:
+  //   1. Row has ownerMemberId  -> compare memberId. The normal path.
+  //   2. Row has only ownerEmail (registered between 2026-04-12 and this
+  //      change) -> compare email, and stamp ownerMemberId on the way through
+  //      so the row upgrades itself the first time its owner writes.
+  //   3. Row has neither (pre-2026-04-12, dormant since) -> fall open, exactly
+  //      as today, and stamp both.
+  // (`normEmail` is imported from owner.mjs, the one definition.)
+
+  // ─── WHO IS WRITING, vs who the row says OWNS the family ───────────────
+  //
+  // Until 2026-09-09 these were one field. The client sent the signed-in
+  // member's id AS `ownerMemberId`, so "the owner is whoever is writing" was
+  // baked into the wire format, and a member device writing to a row the
+  // registry had just lost stamped itself owner. `ownerMemberId` now means
+  // the OWNER FROM THE POD ROSTER and `writerMemberId` means this device's
+  // signed-in member; the guard asks the second and protects the first.
+  //
+  // The fallback is presence-based, NOT `??`, and the distinction is the
+  // whole point:
+  //
+  //   - Field ABSENT  => a client that predates the split. It is sending its
+  //     own session id as `ownerMemberId`, which is exactly the value the
+  //     old guard compared, so judging it on that keeps it working. Without
+  //     this, deploying the guard refuses the pointer for the whole fleet at
+  //     once.
+  //   - Field PRESENT but null => a current client with NO signed-in member.
+  //     `??` would fall back to `ownerMemberId` — the roster owner, a value
+  //     any device holding the decrypted pod can compute — and hand the
+  //     guard's own answer to an unauthenticated writer. Presence keeps that
+  //     shut: no writer id, no pointer move.
+  //
+  // Remove the fallback only once no pre-split client is in the field.
+  const writerMemberId = 'writerMemberId' in body ? body.writerMemberId : body.ownerMemberId;
+
+  // ⚠️ TIER 2 NEEDS THE SAME SPLIT, and missing it opened a hole rather than
+  // closing one. The email arm below is the LEGACY authority for rows
+  // registered between 2026-04-12 and 2026-08-10, which have `ownerEmail` and
+  // no `ownerMemberId`. It used to compare the SIGNED-IN member's email,
+  // because that is what the client sent — so a member device sent its own
+  // address and was refused.
+  //
+  // Once `ownerEmail` started coming from the pod roster, every device sent
+  // the OWNER'S address, which of course matches: the arm would have accepted
+  // a pointer move from any member on every legacy row, which is the exact
+  // family-fork the guard exists to prevent, reported as `pointerAccepted:
+  // true` so nothing pages. Same presence rule as the id above.
+  const writerEmail = 'writerEmail' in body ? body.writerEmail : body.ownerEmail;
+
+  const isOwner = existing.ownerMemberId
+    ? writerMemberId === existing.ownerMemberId
+    : !existing.ownerEmail ||
+      (!!normEmail(writerEmail) && normEmail(writerEmail) === normEmail(existing.ownerEmail));
+
+  // ─── WHO OWNS THE FAMILY: write-once, or an explicit owner sync ─────────
+  //
+  // The decision lives in owner.mjs (pure). Without `body.ownerSync === true`
+  // these are today's write-once values. With it, the request is
+  // OWNERSHIP-ONLY: it writes only for `handover` / `email-synced`, which
+  // require a live row, the registered owner and the stored pointer, so it
+  // never creates a row, never lifts a tombstone and never moves the
+  // pointer. A handover also needs `ownerSyncReason: 'transfer'` once the row
+  // has been handed over before (`ownerHandoverAt`; owner.mjs explains the
+  // lock). `ownerSyncReason`, like the flag, is never stored: the item below
+  // is an explicit list. Everything else (every refusal, and `unchanged`) returns HERE,
+  // before the tombstone guard below and before any PutItem, so the guard
+  // and the item build are untouched for it.
+  const owner = resolveOwnerFields({ existing, body, isOwner, now });
+  // `handlePut` logs the `registry_owner_sync` line from this (once per request).
+  noteSync(owner.sync);
+  if (body.ownerSync === true && !owner.write) {
+    // Nothing written, so the pointer was "accepted" only in the no-op sense the
+    // guard below uses: the request echoed the live row's stored pointer.
+    const pointerAccepted =
+      owner.sync.outcome !== 'refused-deleted' && onCanonicalPointer(body, existing);
+    return {
+      res: response(
+        200,
+        {
+          success: true,
+          pointerAccepted,
+          // From owner.mjs: the stored owner, or null for a missing or deleted row.
+          owner: { memberId: owner.ownerMemberId, email: owner.ownerEmail },
+          // Which refusal (or `unchanged`), so the client can act on it (a transfer to a
+          // deleted family is abandoned, not retried).
+          outcome: owner.sync.outcome,
+        },
+        event
+      ),
+    };
+  }
+
+  // ─── A DELETED FAMILY IS NOT WRITEABLE EXCEPT BY ITS OWNER ────────────
+  //
+  // ⚠️ THIS GUARD IS `isOwner`, NOT `pointerAccepted`, AND THE FIRST CUT GOT
+  // THAT WRONG IN A WAY THAT LOOKED RIGHT. `pointerAccepted` is
+  // `isOwner || samePointer`, and `samePointer` is VACUOUSLY TRUE against a
+  // tombstone: the DELETE arm deliberately drops `provider`/`fileId`/
+  // `displayPath`, so a device that sends a null pointer — a cold boot, an
+  // evicted provider config, an `ensureRegistered` mid-boot — compares
+  // 'local' to 'local' and null to null, matches, and lifts the tombstone.
+  // The family came back LIVE pointing at nothing.
+  //
+  // ⚠️ AND IT RETURNS RATHER THAN MERGING. Preserving only `deletedAt` was
+  // not enough either: the same `PutItem` re-stamps `familyName`,
+  // `subscribeNewsletter`, `country`, `memberCount`, `beanpodSizeKb` and, on
+  // a login, `lastLoginAt: today` — every field the DELETE arm dropped ON
+  // PURPOSE, because they are family content, a marketing consent, and
+  // activity signals that would keep a deleted family alive in the metrics.
+  // A member's ordinary background register would have resurrected the
+  // deleted family's NAME and its newsletter opt-in, invisibly, because GET
+  // still 404s.
+  //
+  // So: nothing to merge, nothing to write. The family is deleted, and the
+  // caller gets the same success a write to a deleted row has always got.
+  //
+  // ⚠️ `ownerKnown` GATES THE REFUSAL, NOT THE WRITE, and the first cut had
+  // it the other way round. Requiring a KNOWN owner in order to write BRICKED
+  // the row: a family whose owner fields were never stamped — a background
+  // register mid-boot sends both null — could not be restored once deleted by
+  // ANYONE, its real owner included. The tombstone never lifted, GET kept
+  // 404ing, and the client was told 200 success so restore never learned its
+  // recovery anchor had been refused. Only a manual DynamoDB edit healed it.
+  //
+  // So an ownerless tombstone falls open exactly as an ownerless LIVE row
+  // does. That is the trade the pointer guard already makes everywhere else,
+  // and it is the right one here too: a family with no recorded owner has no
+  // authority to check a writer against, and refusing everyone is strictly
+  // worse than admitting the first writer — which is the state the row was
+  // already in before it was deleted.
+  const ownerKnown = !!existing.ownerMemberId || !!existing.ownerEmail;
+  if (existing.deletedAt && ownerKnown && !isOwner) {
+    // Rule 1: a security-relevant branch says why. Without this the rate of
+    // devices writing to deleted families is unobservable — which is exactly
+    // the signal that would have caught the resurrection this branch fixes.
+    // Masked to tails, like the pointer-refusal warn it returns above.
+    console.warn(
+      '[registry] write to a deleted family refused',
+      familyId,
+      String(writerMemberId ?? '').slice(-6) || 'no-writer-id'
+    );
+    return { res: response(200, { success: true, pointerAccepted: false }, event) };
+  }
+
+  // A write that would not CHANGE the pointer is a no-op, not a refusal.
+  // This matters: the common case is a member device re-picking the family's
+  // correct file, or simply logging in and echoing the pointer back. Reporting
+  // those as refused would page the team every time a member recovers normally,
+  // and would drown the one signal that means something — a device actually
+  // trying to MOVE the family's pointer somewhere it shouldn't.
+  const samePointer =
+    (body.provider || 'local') === (existing.provider || 'local') &&
+    (body.fileId || null) === (existing.fileId ?? null) &&
+    (body.displayPath || null) === (existing.displayPath ?? null);
+
+  const pointerAccepted = isOwner || samePointer;
+
+  if (!pointerAccepted) {
+    // Domains + id tails only — never full member emails or ids in CloudWatch.
+    console.warn(
+      '[registry] pointer write refused',
+      familyId,
+      String(existing.ownerEmail).split('@')[1],
+      String(writerEmail).split('@')[1],
+      String(existing.ownerMemberId ?? '').slice(-6),
+      String(writerMemberId ?? '').slice(-6)
+    );
+  }
+
+  const item = {
+    familyId,
+    provider: pointerAccepted ? body.provider || 'local' : existing.provider || 'local',
+    fileId: pointerAccepted ? body.fileId || null : (existing.fileId ?? null),
+    displayPath: pointerAccepted ? body.displayPath || null : (existing.displayPath ?? null),
+    // Preserve-on-omit (2026-08-10): an omitted name previously nulled a
+    // stored one. Same semantics as country/subscribeNewsletter below.
+    familyName: body.familyName || existing.familyName || null,
+    createdAt: existing.createdAt || now,
+    // Write-once. Previously `body.ownerEmail ?? existing.ownerEmail` let the
+    // last writer win, so a member device could take over the row. This stays
+    // an ops/contact field (see the guard above) but is also the LEGACY
+    // authority for rows registered before `ownerMemberId` existed, so it must
+    // be stable either way.
+    // ⚠️ `|| null` ON THE BODY, because this field is WRITE-ONCE and `''` is
+    // not nullish. An empty string from any client — deployed ones included,
+    // which is why the guard is here and not only in the client — would latch
+    // permanently, and the legacy pointer tier reads `!existing.ownerEmail`
+    // as TRUE, falling open for every writer on that row forever.
+    // ⚠️ `||` ON BOTH SIDES. Guarding only the body prevents NEW poisoning and
+    // leaves rows already holding `''` broken forever: `'' ?? x` is `''`, so
+    // the write-once merge preserved it even when the real owner later sent a
+    // genuine address — and the legacy pointer tier reads `!existing.ownerEmail`
+    // as TRUE for `''`, falling open for every writer on that row. Deployed
+    // clients did send empty strings, so such rows exist; this repairs them
+    // rather than only preventing new ones.
+    // The value comes from owner.mjs `resolveOwnerFields`: this write-once
+    // idiom (`existing.ownerEmail || realEmail(body.ownerEmail) || null`, so a
+    // placeholder never latches either), or an `ownerSync` email sync/handover.
+    ownerEmail: owner.ownerEmail,
+    // Write-once, and the real pointer authority. Stamped on a row's first
+    // accepted write — including the first write by the owner of a legacy
+    // email-only row, which upgrades that row off the mutable email.
+    // ⚠️ `isOwner`, NOT `pointerAccepted`. This is a WRITE-ONCE field, so a
+    // wrong value is permanent and there is no in-app route back. Gating it
+    // on `pointerAccepted` let `samePointer` do the stamping: every member
+    // device echoes the family's real pointer on every login, so on a legacy
+    // (email-only) row a member running a still-deployed PRE-SPLIT client —
+    // which sends its own id as `ownerMemberId` — matched on the pointer and
+    // stamped ITSELF as the family's permanent registry owner. The real owner
+    // then fails tier 1 forever and every deliberate re-point pages Slack.
+    //
+    // The tier-2 comment above already says what this should be: stamp "the
+    // first time its OWNER writes".
+    // Same repair as `ownerEmail` above: a stored `''` was falsy at tier 1 (so
+    // the guard never engaged) yet non-nullish at the merge (so it never
+    // healed). `||` on both sides lets a real id land later.
+    // The value comes from owner.mjs `resolveOwnerFields`: this write-once
+    // idiom (`existing.ownerMemberId || (isOwner ? body.ownerMemberId || null :
+    // null)`), or an `ownerSync` handover.
+    ownerMemberId: owner.ownerMemberId,
+    // When an owner sync last HANDED the row on (owner.mjs): set only by a handover,
+    // preserved by every other write. Its presence locks drift handovers, so a device on a
+    // stale roster cannot hand ownership back; a deliberate `transfer` still goes through.
+    ownerHandoverAt: owner.ownerHandoverAt,
+    subscribeNewsletter:
+      typeof body.subscribeNewsletter === 'boolean'
+        ? body.subscribeNewsletter
+        : (existing.subscribeNewsletter ?? null),
+    // Same preserved-merge semantics as subscribeNewsletter: a write that
+    // omits `country` (older client, member device without the local
+    // setting) preserves the existing value. A `null` body.country also
+    // preserves — clearing country is a deliberate ops action, not a side
+    // effect of registering.
+    country: typeof body.country === 'string' ? body.country : (existing.country ?? null),
+    // Usage signals (metadata, never content). Same preserve-on-omit
+    // semantics as country/subscribeNewsletter above.
+    //
+    // lastLoginAt: server-stamped (never client-supplied — no clock trust)
+    // and moved ONLY when the client marks a genuine login/resume via the
+    // transient `isLoginEvent` flag. Every other PUT (country change, Drive
+    // connect, background sync) preserves it, so it stays a clean activity
+    // signal distinct from `updatedAt`. `isLoginEvent` itself is never stored.
+    lastLoginAt: body.isLoginEvent === true ? today : (existing.lastLoginAt ?? null),
+    // beanpodSizeKb: client-rounded approximate .beanpod size. Number-guarded
+    // so a malformed/negative value is ignored (preserve existing), never fatal.
+    beanpodSizeKb:
+      typeof body.beanpodSizeKb === 'number' && body.beanpodSizeKb >= 0
+        ? Math.round(body.beanpodSizeKb)
+        : (existing.beanpodSizeKb ?? null),
+    // memberCount: how many members the family roster holds — a bare integer
+    // for analytics (total users across families), never names or ids. Sent
+    // by clients from the decrypted in-memory roster (the unencrypted
+    // envelope would undercount: unclaimed beans carry no wrappedKey).
+    // Same guarded preserve-on-omit idiom as beanpodSizeKb; refreshes on
+    // every write so it tracks the roster as families grow.
+    memberCount:
+      typeof body.memberCount === 'number' && body.memberCount >= 1
+        ? Math.round(body.memberCount)
+        : (existing.memberCount ?? null),
+    // Which platform the family signed up ON. Two independent conditions, and
+    // BOTH are load-bearing:
+    //
+    //   1. `existing.signupPlatform ??` — never move a value already stamped.
+    //      Note this is NOT the plain `existing.x ?? body.x` write-once idiom
+    //      by itself: that alone would stamp every row created before this
+    //      shipped with whichever device wrote next, relabelling a family
+    //      created on iOS as `web` the first time its owner opened a browser.
+    //   2. `body.isSignupEvent` — only a genuine family-creation write may
+    //      stamp at all. Row EXISTENCE is NOT a usable proxy for "this is a
+    //      signup". This used to cite `syncStore.disconnect()`, which dropped
+    //      the row outright from an ordinary Settings action; that function is
+    //      deleted and the DELETE arm below tombstones rather than drops, so a
+    //      deleted-then-recreated family now comes back with its original
+    //      stamp. The flag stays anyway: the guarantee must not rest on which
+    //      callers happen to exist this week, and a row can still be removed
+    //      by hand in ops.
+    //
+    // Together: absent stays absent, and absent means UNKNOWN — excluded from
+    // platform breakdowns, never assumed web. A pod creation whose registry
+    // write fails (offline) simply leaves the field unknown rather than
+    // letting some later device's platform stand in for it.
+    //
+    // Two concurrent first writes no longer race: the Put is conditioned
+    // (`handlePut`; a first write on `attribute_not_exists(familyId)`), so the
+    // loser re-reads the row the winner created and merges into it with these
+    // same idioms, rather than overwriting it.
+    signupPlatform:
+      existing.signupPlatform ??
+      (body.isSignupEvent === true ? validPlatform(body.signupPlatform) : null),
+    // Campaign attribution (#118): the SAME two conditions as signupPlatform above, for the
+    // same reasons (never move a stamped value; only a genuine signup write may stamp, so a
+    // row that predates this is never stamped retroactively). `existing.attribution ??` is
+    // also what carries it across every later whole-item PutItem. Validated per field by
+    // `validAttribution`, which is only reached on a stampable write, so its drop log never
+    // fires for a login/background PUT.
+    attribution:
+      existing.attribution ??
+      (body.isSignupEvent === true ? validAttribution(body.attribution, familyId) : null),
+    // Survey answer id (#121): the same two conditions as `attribution` above, for the same
+    // reasons. Validated only on a stampable write, so `heard_via_dropped` never fires for a
+    // login/background PUT.
+    heardVia:
+      existing.heardVia ??
+      (body.isSignupEvent === true ? validHeardVia(body.heardVia, familyId) : null),
+    // Inferred attribution (#121): written ONLY by the metrics skill's conditional
+    // `UpdateItem`. Never read from the body (a client cannot set or clear it); carried here
+    // because this whole-item PutItem would otherwise erase it on the next login.
+    attributionInferred: existing.attributionInferred ?? null,
+    // No `deletedAt` here, deliberately: `PutItem` replaces the whole item,
+    // so reaching this point at all IS the revival. Only the owner reaches
+    // it — every other writer returned above with the family still deleted.
+    updatedAt: now,
+  };
+  // Conditioned on the owner version this round READ (see `handlePut`): a handover that landed
+  // since then fails the write, and the round re-runs against the handed-over row instead of
+  // writing the previous owner back.
+  const version = ownerVersionCondition(existingRaw ? existing : null);
+  try {
+    await client.send(
+      new PutItemCommand({
+        TableName: tableName,
+        Item: marshall(item, { removeUndefinedValues: true }),
+        ConditionExpression: version.expression,
+        ...(version.values ? { ExpressionAttributeValues: marshall(version.values) } : {}),
+      })
+    );
+  } catch (err) {
+    if (err?.name === 'ConditionalCheckFailedException') return { conflict: true };
+    throw err;
+  }
+  // `pointerAccepted` lets the client distinguish a refused DELIBERATE
+  // re-point (data at risk — the registry now disagrees with where the pod
+  // actually is) from the boring ambient case (every member device sends
+  // pointer fields on every login because the payload is uniform). Clients
+  // that predate this field treat its absence as accepted.
+  // An `ownerSync` request also gets the stored `owner` after the write and the
+  // outcome, so the client can tell applied from refused; every other PUT's
+  // response is unchanged.
+  return {
+    res: response(
+      200,
+      body.ownerSync === true
+        ? {
+            success: true,
+            pointerAccepted,
+            owner: { memberId: item.ownerMemberId, email: item.ownerEmail },
+            outcome: owner.sync.outcome,
+          }
+        : { success: true, pointerAccepted },
+      event
+    ),
+  };
+}
+
 export async function handler(event) {
   // The keyless marketing-events beacon (#121) has no API key and no familyId, so it branches
   // BEFORE both checks below. Every other route keeps the key + UUID gate.
@@ -490,389 +972,7 @@ export async function handler(event) {
       );
     }
 
-    if (method === 'PUT') {
-      const body = JSON.parse(event.body || '{}');
-      const now = new Date().toISOString();
-      const today = now.slice(0, 10); // YYYY-MM-DD — date-only login stamp
-
-      // Read existing row to preserve write-once fields (createdAt, ownerEmail,
-      // subscribeNewsletter). registerFamily() fires on every sync-config change,
-      // so only the first write should stamp these.
-      const { Item: existingRaw } = await client.send(
-        new GetItemCommand({
-          TableName: tableName,
-          Key: marshall({ familyId }),
-          // Strongly consistent, and this one is load-bearing: the result feeds a
-          // full-row PutItem, so a stale miss does not merely read wrong — it
-          // CLOBBERS every write-once field (createdAt, ownerMemberId,
-          // ownerEmail, signupPlatform) with the defaults below.
-          ConsistentRead: true,
-        })
-      );
-      const existing = existingRaw ? unmarshall(existingRaw) : {};
-
-      // ─── Canonical-pointer guard (2026-08-10) ────────────────────────────
-      //
-      // Only the family's registered owner may move the canonical pointer
-      // (provider / fileId / displayPath). Members still write activity and
-      // metadata (lastLoginAt, country, beanpodSizeKb, familyName) — those are
-      // per-family facts any device can report. The pointer is not.
-      //
-      // This lives here, not in the client, because the client cannot close the
-      // hole: the propagation vector is ALREADY DEPLOYED. Native and cached web
-      // builds running the pre-fix code keep sending pointer writes for as long
-      // as they run, and a client-side guard protects only devices that already
-      // took the fix — i.e. not the ones causing the damage. A curl gets the same
-      // answer here too. See docs/plans/2026-08-10-never-fork-a-family-pod.md §5.
-      //
-      // AUTHORITY IS `ownerMemberId`, NOT `ownerEmail`.
-      //
-      // `ownerEmail` was added (2026-04-12) as an ops/contact capture, alongside
-      // the newsletter opt-in — "who do we email about this family". It is the
-      // signed-in member's PROFILE email, which the user can edit in the app. Using
-      // it as the permission check would mean an owner who edits their own email
-      // sends a new address on their next write, gets refused, and — because the
-      // field is write-once — has no way back. `memberId` is a stable UUID from the
-      // family document and survives any profile edit, so it is the real identity.
-      //
-      // Three tiers, in order:
-      //   1. Row has ownerMemberId  -> compare memberId. The normal path.
-      //   2. Row has only ownerEmail (registered between 2026-04-12 and this
-      //      change) -> compare email, and stamp ownerMemberId on the way through
-      //      so the row upgrades itself the first time its owner writes.
-      //   3. Row has neither (pre-2026-04-12, dormant since) -> fall open, exactly
-      //      as today, and stamp both.
-      // (`normEmail` is imported from owner.mjs, the one definition.)
-
-      // ─── WHO IS WRITING, vs who the row says OWNS the family ───────────────
-      //
-      // Until 2026-09-09 these were one field. The client sent the signed-in
-      // member's id AS `ownerMemberId`, so "the owner is whoever is writing" was
-      // baked into the wire format, and a member device writing to a row the
-      // registry had just lost stamped itself owner. `ownerMemberId` now means
-      // the OWNER FROM THE POD ROSTER and `writerMemberId` means this device's
-      // signed-in member; the guard asks the second and protects the first.
-      //
-      // The fallback is presence-based, NOT `??`, and the distinction is the
-      // whole point:
-      //
-      //   - Field ABSENT  => a client that predates the split. It is sending its
-      //     own session id as `ownerMemberId`, which is exactly the value the
-      //     old guard compared, so judging it on that keeps it working. Without
-      //     this, deploying the guard refuses the pointer for the whole fleet at
-      //     once.
-      //   - Field PRESENT but null => a current client with NO signed-in member.
-      //     `??` would fall back to `ownerMemberId` — the roster owner, a value
-      //     any device holding the decrypted pod can compute — and hand the
-      //     guard's own answer to an unauthenticated writer. Presence keeps that
-      //     shut: no writer id, no pointer move.
-      //
-      // Remove the fallback only once no pre-split client is in the field.
-      const writerMemberId = 'writerMemberId' in body ? body.writerMemberId : body.ownerMemberId;
-
-      // ⚠️ TIER 2 NEEDS THE SAME SPLIT, and missing it opened a hole rather than
-      // closing one. The email arm below is the LEGACY authority for rows
-      // registered between 2026-04-12 and 2026-08-10, which have `ownerEmail` and
-      // no `ownerMemberId`. It used to compare the SIGNED-IN member's email,
-      // because that is what the client sent — so a member device sent its own
-      // address and was refused.
-      //
-      // Once `ownerEmail` started coming from the pod roster, every device sent
-      // the OWNER'S address, which of course matches: the arm would have accepted
-      // a pointer move from any member on every legacy row, which is the exact
-      // family-fork the guard exists to prevent, reported as `pointerAccepted:
-      // true` so nothing pages. Same presence rule as the id above.
-      const writerEmail = 'writerEmail' in body ? body.writerEmail : body.ownerEmail;
-
-      const isOwner = existing.ownerMemberId
-        ? writerMemberId === existing.ownerMemberId
-        : !existing.ownerEmail ||
-          (!!normEmail(writerEmail) && normEmail(writerEmail) === normEmail(existing.ownerEmail));
-
-      // ─── WHO OWNS THE FAMILY: write-once, or an explicit owner sync ─────────
-      //
-      // The decision lives in owner.mjs (pure). Without `body.ownerSync === true`
-      // these are today's write-once values. With it, the request is
-      // OWNERSHIP-ONLY: it writes only for `handover` / `email-synced`, which
-      // require a live row, the registered owner and the stored pointer, so it
-      // never creates a row, never lifts a tombstone and never moves the
-      // pointer. Everything else (every refusal, and `unchanged`) returns HERE,
-      // before the tombstone guard below and before any PutItem, so the guard
-      // and the item build are untouched for it.
-      const owner = resolveOwnerFields({ existing, body, isOwner });
-      if (body.ownerSync === true) {
-        // eslint-disable-next-line no-console -- structured owner-sync line, read by CloudWatch
-        console.log(
-          JSON.stringify({
-            msg: 'registry_owner_sync',
-            family_id_hash: familyIdHash(familyId),
-            outcome: owner.sync.outcome,
-            from_tail: owner.sync.fromTail,
-            to_tail: owner.sync.toTail,
-          })
-        );
-        if (!owner.write) {
-          // Nothing written, so the pointer was "accepted" only in the no-op sense the
-          // guard below uses: the request echoed the live row's stored pointer.
-          const pointerAccepted =
-            owner.sync.outcome !== 'refused-deleted' && onCanonicalPointer(body, existing);
-          return response(
-            200,
-            {
-              success: true,
-              pointerAccepted,
-              // From owner.mjs: the stored owner, or null for a missing or deleted row.
-              owner: { memberId: owner.ownerMemberId, email: owner.ownerEmail },
-            },
-            event
-          );
-        }
-      }
-
-      // ─── A DELETED FAMILY IS NOT WRITEABLE EXCEPT BY ITS OWNER ────────────
-      //
-      // ⚠️ THIS GUARD IS `isOwner`, NOT `pointerAccepted`, AND THE FIRST CUT GOT
-      // THAT WRONG IN A WAY THAT LOOKED RIGHT. `pointerAccepted` is
-      // `isOwner || samePointer`, and `samePointer` is VACUOUSLY TRUE against a
-      // tombstone: the DELETE arm deliberately drops `provider`/`fileId`/
-      // `displayPath`, so a device that sends a null pointer — a cold boot, an
-      // evicted provider config, an `ensureRegistered` mid-boot — compares
-      // 'local' to 'local' and null to null, matches, and lifts the tombstone.
-      // The family came back LIVE pointing at nothing.
-      //
-      // ⚠️ AND IT RETURNS RATHER THAN MERGING. Preserving only `deletedAt` was
-      // not enough either: the same `PutItem` re-stamps `familyName`,
-      // `subscribeNewsletter`, `country`, `memberCount`, `beanpodSizeKb` and, on
-      // a login, `lastLoginAt: today` — every field the DELETE arm dropped ON
-      // PURPOSE, because they are family content, a marketing consent, and
-      // activity signals that would keep a deleted family alive in the metrics.
-      // A member's ordinary background register would have resurrected the
-      // deleted family's NAME and its newsletter opt-in, invisibly, because GET
-      // still 404s.
-      //
-      // So: nothing to merge, nothing to write. The family is deleted, and the
-      // caller gets the same success a write to a deleted row has always got.
-      //
-      // ⚠️ `ownerKnown` GATES THE REFUSAL, NOT THE WRITE, and the first cut had
-      // it the other way round. Requiring a KNOWN owner in order to write BRICKED
-      // the row: a family whose owner fields were never stamped — a background
-      // register mid-boot sends both null — could not be restored once deleted by
-      // ANYONE, its real owner included. The tombstone never lifted, GET kept
-      // 404ing, and the client was told 200 success so restore never learned its
-      // recovery anchor had been refused. Only a manual DynamoDB edit healed it.
-      //
-      // So an ownerless tombstone falls open exactly as an ownerless LIVE row
-      // does. That is the trade the pointer guard already makes everywhere else,
-      // and it is the right one here too: a family with no recorded owner has no
-      // authority to check a writer against, and refusing everyone is strictly
-      // worse than admitting the first writer — which is the state the row was
-      // already in before it was deleted.
-      const ownerKnown = !!existing.ownerMemberId || !!existing.ownerEmail;
-      if (existing.deletedAt && ownerKnown && !isOwner) {
-        // Rule 1: a security-relevant branch says why. Without this the rate of
-        // devices writing to deleted families is unobservable — which is exactly
-        // the signal that would have caught the resurrection this branch fixes.
-        // Masked to tails, like the pointer-refusal warn it returns above.
-        console.warn(
-          '[registry] write to a deleted family refused',
-          familyId,
-          String(writerMemberId ?? '').slice(-6) || 'no-writer-id'
-        );
-        return response(200, { success: true, pointerAccepted: false }, event);
-      }
-
-      // A write that would not CHANGE the pointer is a no-op, not a refusal.
-      // This matters: the common case is a member device re-picking the family's
-      // correct file, or simply logging in and echoing the pointer back. Reporting
-      // those as refused would page the team every time a member recovers normally,
-      // and would drown the one signal that means something — a device actually
-      // trying to MOVE the family's pointer somewhere it shouldn't.
-      const samePointer =
-        (body.provider || 'local') === (existing.provider || 'local') &&
-        (body.fileId || null) === (existing.fileId ?? null) &&
-        (body.displayPath || null) === (existing.displayPath ?? null);
-
-      const pointerAccepted = isOwner || samePointer;
-
-      if (!pointerAccepted) {
-        // Domains + id tails only — never full member emails or ids in CloudWatch.
-        console.warn(
-          '[registry] pointer write refused',
-          familyId,
-          String(existing.ownerEmail).split('@')[1],
-          String(writerEmail).split('@')[1],
-          String(existing.ownerMemberId ?? '').slice(-6),
-          String(writerMemberId ?? '').slice(-6)
-        );
-      }
-
-      const item = {
-        familyId,
-        provider: pointerAccepted ? body.provider || 'local' : existing.provider || 'local',
-        fileId: pointerAccepted ? body.fileId || null : (existing.fileId ?? null),
-        displayPath: pointerAccepted ? body.displayPath || null : (existing.displayPath ?? null),
-        // Preserve-on-omit (2026-08-10): an omitted name previously nulled a
-        // stored one. Same semantics as country/subscribeNewsletter below.
-        familyName: body.familyName || existing.familyName || null,
-        createdAt: existing.createdAt || now,
-        // Write-once. Previously `body.ownerEmail ?? existing.ownerEmail` let the
-        // last writer win, so a member device could take over the row. This stays
-        // an ops/contact field (see the guard above) but is also the LEGACY
-        // authority for rows registered before `ownerMemberId` existed, so it must
-        // be stable either way.
-        // ⚠️ `|| null` ON THE BODY, because this field is WRITE-ONCE and `''` is
-        // not nullish. An empty string from any client — deployed ones included,
-        // which is why the guard is here and not only in the client — would latch
-        // permanently, and the legacy pointer tier reads `!existing.ownerEmail`
-        // as TRUE, falling open for every writer on that row forever.
-        // ⚠️ `||` ON BOTH SIDES. Guarding only the body prevents NEW poisoning and
-        // leaves rows already holding `''` broken forever: `'' ?? x` is `''`, so
-        // the write-once merge preserved it even when the real owner later sent a
-        // genuine address — and the legacy pointer tier reads `!existing.ownerEmail`
-        // as TRUE for `''`, falling open for every writer on that row. Deployed
-        // clients did send empty strings, so such rows exist; this repairs them
-        // rather than only preventing new ones.
-        // The value comes from owner.mjs `resolveOwnerFields`: this write-once
-        // idiom (`existing.ownerEmail || realEmail(body.ownerEmail) || null`, so a
-        // placeholder never latches either), or an `ownerSync` email sync/handover.
-        ownerEmail: owner.ownerEmail,
-        // Write-once, and the real pointer authority. Stamped on a row's first
-        // accepted write — including the first write by the owner of a legacy
-        // email-only row, which upgrades that row off the mutable email.
-        // ⚠️ `isOwner`, NOT `pointerAccepted`. This is a WRITE-ONCE field, so a
-        // wrong value is permanent and there is no in-app route back. Gating it
-        // on `pointerAccepted` let `samePointer` do the stamping: every member
-        // device echoes the family's real pointer on every login, so on a legacy
-        // (email-only) row a member running a still-deployed PRE-SPLIT client —
-        // which sends its own id as `ownerMemberId` — matched on the pointer and
-        // stamped ITSELF as the family's permanent registry owner. The real owner
-        // then fails tier 1 forever and every deliberate re-point pages Slack.
-        //
-        // The tier-2 comment above already says what this should be: stamp "the
-        // first time its OWNER writes".
-        // Same repair as `ownerEmail` above: a stored `''` was falsy at tier 1 (so
-        // the guard never engaged) yet non-nullish at the merge (so it never
-        // healed). `||` on both sides lets a real id land later.
-        // The value comes from owner.mjs `resolveOwnerFields`: this write-once
-        // idiom (`existing.ownerMemberId || (isOwner ? body.ownerMemberId || null :
-        // null)`), or an `ownerSync` handover.
-        ownerMemberId: owner.ownerMemberId,
-        subscribeNewsletter:
-          typeof body.subscribeNewsletter === 'boolean'
-            ? body.subscribeNewsletter
-            : (existing.subscribeNewsletter ?? null),
-        // Same preserved-merge semantics as subscribeNewsletter: a write that
-        // omits `country` (older client, member device without the local
-        // setting) preserves the existing value. A `null` body.country also
-        // preserves — clearing country is a deliberate ops action, not a side
-        // effect of registering.
-        country: typeof body.country === 'string' ? body.country : (existing.country ?? null),
-        // Usage signals (metadata, never content). Same preserve-on-omit
-        // semantics as country/subscribeNewsletter above.
-        //
-        // lastLoginAt: server-stamped (never client-supplied — no clock trust)
-        // and moved ONLY when the client marks a genuine login/resume via the
-        // transient `isLoginEvent` flag. Every other PUT (country change, Drive
-        // connect, background sync) preserves it, so it stays a clean activity
-        // signal distinct from `updatedAt`. `isLoginEvent` itself is never stored.
-        lastLoginAt: body.isLoginEvent === true ? today : (existing.lastLoginAt ?? null),
-        // beanpodSizeKb: client-rounded approximate .beanpod size. Number-guarded
-        // so a malformed/negative value is ignored (preserve existing), never fatal.
-        beanpodSizeKb:
-          typeof body.beanpodSizeKb === 'number' && body.beanpodSizeKb >= 0
-            ? Math.round(body.beanpodSizeKb)
-            : (existing.beanpodSizeKb ?? null),
-        // memberCount: how many members the family roster holds — a bare integer
-        // for analytics (total users across families), never names or ids. Sent
-        // by clients from the decrypted in-memory roster (the unencrypted
-        // envelope would undercount: unclaimed beans carry no wrappedKey).
-        // Same guarded preserve-on-omit idiom as beanpodSizeKb; refreshes on
-        // every write so it tracks the roster as families grow.
-        memberCount:
-          typeof body.memberCount === 'number' && body.memberCount >= 1
-            ? Math.round(body.memberCount)
-            : (existing.memberCount ?? null),
-        // Which platform the family signed up ON. Two independent conditions, and
-        // BOTH are load-bearing:
-        //
-        //   1. `existing.signupPlatform ??` — never move a value already stamped.
-        //      Note this is NOT the plain `existing.x ?? body.x` write-once idiom
-        //      by itself: that alone would stamp every row created before this
-        //      shipped with whichever device wrote next, relabelling a family
-        //      created on iOS as `web` the first time its owner opened a browser.
-        //   2. `body.isSignupEvent` — only a genuine family-creation write may
-        //      stamp at all. Row EXISTENCE is NOT a usable proxy for "this is a
-        //      signup". This used to cite `syncStore.disconnect()`, which dropped
-        //      the row outright from an ordinary Settings action; that function is
-        //      deleted and the DELETE arm below tombstones rather than drops, so a
-        //      deleted-then-recreated family now comes back with its original
-        //      stamp. The flag stays anyway: the guarantee must not rest on which
-        //      callers happen to exist this week, and a row can still be removed
-        //      by hand in ops.
-        //
-        // Together: absent stays absent, and absent means UNKNOWN — excluded from
-        // platform breakdowns, never assumed web. A pod creation whose registry
-        // write fails (offline) simply leaves the field unknown rather than
-        // letting some later device's platform stand in for it.
-        //
-        // Residual, accepted: the Put is unconditioned (as are the other six merge
-        // idioms here), so two concurrent first writes could race. Only the single
-        // pod-creation call site sends `isSignupEvent`, which makes the window
-        // very small, and the cost of losing it is one coarse label. Adding a
-        // ConditionExpression means reworking every merge idiom in a component
-        // that deploys on its own cadence — deliberately not done here.
-        signupPlatform:
-          existing.signupPlatform ??
-          (body.isSignupEvent === true ? validPlatform(body.signupPlatform) : null),
-        // Campaign attribution (#118): the SAME two conditions as signupPlatform above, for the
-        // same reasons (never move a stamped value; only a genuine signup write may stamp, so a
-        // row that predates this is never stamped retroactively). `existing.attribution ??` is
-        // also what carries it across every later whole-item PutItem. Validated per field by
-        // `validAttribution`, which is only reached on a stampable write, so its drop log never
-        // fires for a login/background PUT.
-        attribution:
-          existing.attribution ??
-          (body.isSignupEvent === true ? validAttribution(body.attribution, familyId) : null),
-        // Survey answer id (#121): the same two conditions as `attribution` above, for the same
-        // reasons. Validated only on a stampable write, so `heard_via_dropped` never fires for a
-        // login/background PUT.
-        heardVia:
-          existing.heardVia ??
-          (body.isSignupEvent === true ? validHeardVia(body.heardVia, familyId) : null),
-        // Inferred attribution (#121): written ONLY by the metrics skill's conditional
-        // `UpdateItem`. Never read from the body (a client cannot set or clear it); carried here
-        // because this whole-item PutItem would otherwise erase it on the next login.
-        attributionInferred: existing.attributionInferred ?? null,
-        // No `deletedAt` here, deliberately: `PutItem` replaces the whole item,
-        // so reaching this point at all IS the revival. Only the owner reaches
-        // it — every other writer returned above with the family still deleted.
-        updatedAt: now,
-      };
-      await client.send(
-        new PutItemCommand({
-          TableName: tableName,
-          Item: marshall(item, { removeUndefinedValues: true }),
-        })
-      );
-      // `pointerAccepted` lets the client distinguish a refused DELIBERATE
-      // re-point (data at risk — the registry now disagrees with where the pod
-      // actually is) from the boring ambient case (every member device sends
-      // pointer fields on every login because the payload is uniform). Clients
-      // that predate this field treat its absence as accepted.
-      // An `ownerSync` request also gets the stored `owner` after the write, so the
-      // client can tell applied from refused; every other PUT's response is unchanged.
-      return response(
-        200,
-        body.ownerSync === true
-          ? {
-              success: true,
-              pointerAccepted,
-              owner: { memberId: item.ownerMemberId, email: item.ownerEmail },
-            }
-          : { success: true, pointerAccepted },
-        event
-      );
-    }
+    if (method === 'PUT') return await handlePut(event, familyId, tableName);
 
     if (method === 'DELETE') {
       // ─── TOMBSTONE, NOT A DROP (2026-09-09) ──────────────────────────────
@@ -943,6 +1043,9 @@ export async function handler(event) {
               createdAt: existing.createdAt ?? null,
               ownerMemberId: existing.ownerMemberId ?? null,
               ownerEmail: existing.ownerEmail ?? null,
+              // The drift-handover lock (owner.mjs) survives a delete, so a restored family
+              // cannot have its ownership handed back by a stale roster either.
+              ownerHandoverAt: existing.ownerHandoverAt ?? null,
               country: existing.country ?? null,
               signupPlatform: existing.signupPlatform ?? null,
               // Campaign provenance (#118): identifies the ad, not the family, and a
