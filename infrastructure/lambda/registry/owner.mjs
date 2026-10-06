@@ -1,0 +1,127 @@
+/**
+ * Who the registry row says OWNS the family (`ownerMemberId`, `ownerEmail`), and when a PUT may
+ * change that.
+ *
+ * WRITE-ONCE BY DEFAULT, OPT-IN SYNC
+ * Both fields are write-once on every ordinary PUT (sign-in, country, rename, pointer moves,
+ * pre-split clients): the first stamp sticks. They change ONLY on a PUT carrying the transient
+ * `ownerSync: true` flag (never stored, like `isLoginEvent`), and then only when every condition
+ * below holds. An ambient write therefore can never move ownership, however stale the roster
+ * cache that built it. See `~/projects/beanies-ops/docs/plans/2026-10-06-registry-owner-sync.md`.
+ *
+ * PURE, ON PURPOSE (the `entitlement.mjs` pattern)
+ * No AWS imports, no `process.env`, no clock, no logging. `index.mjs` owns the I/O: it logs the
+ * `registry_owner_sync` line from `sync`, and skips the PutItem when `write` is false.
+ */
+
+/** A family / member id. Shared with `index.mjs`, which imports it from here (one definition). */
+export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Case-folded, trimmed email for comparison; null for a non-string. Shared with `index.mjs`. */
+export const normEmail = (e) => (typeof e === 'string' ? e.trim().toLowerCase() : null);
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PLACEHOLDER_SUFFIXES = ['@temp.beanies.family', '@setup.local'];
+
+/**
+ * The address worth storing as the owner's contact email, or `null`: trimmed, at most 254 chars,
+ * shaped like an address, and not one of the placeholders the app invents for members with no
+ * address yet (`<ts>@temp.beanies.family`, `pending-*@setup.local`).
+ *
+ * ⚠️ TWIN of src/utils/email.ts realEmail — pinned by src/utils/__tests__/attributionTwinDrift.test.ts
+ * (it cannot be imported: every Lambda here is its own zip). Change them together.
+ */
+export function realEmail(s) {
+  if (typeof s !== 'string') return null;
+  const trimmed = s.trim();
+  if (!trimmed || trimmed.length > 254 || !EMAIL_RE.test(trimmed)) return null;
+  const lower = trimmed.toLowerCase();
+  if (PLACEHOLDER_SUFFIXES.some((suffix) => lower.endsWith(suffix))) return null;
+  return trimmed;
+}
+
+/**
+ * Does the body's pointer name the row's stored canonical pod? Provider and fileId only, with the
+ * PUT arm's own normalisation (`samePointer` in `index.mjs`); `displayPath` is cosmetic and ignored.
+ */
+export function onCanonicalPointer(body, existing) {
+  return (
+    (body.provider || 'local') === (existing.provider || 'local') &&
+    (body.fileId || null) === (existing.fileId ?? null)
+  );
+}
+
+const tail = (id) => (typeof id === 'string' && id ? id.slice(-6) : null);
+
+/**
+ * The owner fields for this PUT's item, whether the PUT may write at all, and (for an `ownerSync`
+ * request) the outcome to log.
+ *
+ * @param {{ existing: object, body: object, isOwner: boolean }} args
+ *   `existing` is the stored row (`{}` when there is none), `body` the parsed request, `isOwner`
+ *   the PUT arm's pointer-authority answer for this writer.
+ * @returns {{ ownerMemberId: string|null, ownerEmail: string|null, write: boolean,
+ *   sync: null | { outcome: string, fromTail: string|null, toTail: string|null } }}
+ *   `write` false means: write NOTHING (no create, no revive, no metadata refresh). Only an
+ *   `ownerSync` request can get false, and only `handover` / `email-synced` get true. With
+ *   `write` false, `ownerMemberId` / `ownerEmail` are what the response may report: the stored
+ *   owner, or null for `refused-deleted` (a tombstone's owner is never echoed).
+ */
+export function resolveOwnerFields({ existing, body, isOwner }) {
+  if (body.ownerSync !== true) {
+    // Today's write-once values. `||` on both sides so a stored `''` heals (see index.mjs);
+    // `realEmail` on the body so a placeholder or malformed address can never latch.
+    return {
+      ownerMemberId: existing.ownerMemberId || (isOwner ? body.ownerMemberId || null : null),
+      ownerEmail: existing.ownerEmail || realEmail(body.ownerEmail) || null,
+      write: true,
+      sync: null,
+    };
+  }
+
+  const storedId = existing?.ownerMemberId ?? null;
+  const storedEmail = existing?.ownerEmail ?? null;
+  const fromTail = tail(storedId);
+  const toTail = tail(body.ownerMemberId);
+  const keep = (outcome) => ({
+    ownerMemberId: storedId,
+    ownerEmail: storedEmail,
+    write: false,
+    sync: { outcome, fromTail, toTail },
+  });
+
+  // No create and no revive: an ownership sync only ever edits a live row. The owner it reports
+  // is null, never a tombstone's stored owner: a deleted family's owner is not this caller's to read.
+  if (!existing || !existing.familyId || existing.deletedAt) {
+    return { ...keep('refused-deleted'), ownerMemberId: null, ownerEmail: null };
+  }
+  // A pre-split client sends its own session id as `ownerMemberId`; it is never an owner claim.
+  if (!('writerMemberId' in body)) return keep('refused-pre-split');
+  // No registered owner id means no authority to check the writer against (legacy tiers 2/3).
+  if (!storedId) return keep('refused-no-owner-id');
+  // Only the registered owner can hand ownership on or edit the contact address.
+  if (!isOwner) return keep('refused-not-owner');
+  // A device on a copy of the pod must not undo a transfer made on the canonical one.
+  if (!onCanonicalPointer(body, existing)) return keep('refused-off-canonical');
+  if (!UUID_RE.test(body.ownerMemberId ?? '')) return keep('refused-invalid-target');
+
+  const email = realEmail(body.ownerEmail);
+  if (body.ownerMemberId !== storedId) {
+    // Never leave the previous owner's address next to the new owner's id.
+    return {
+      ownerMemberId: body.ownerMemberId,
+      ownerEmail: email ?? null,
+      write: true,
+      sync: { outcome: 'handover', fromTail, toTail },
+    };
+  }
+  if (email && normEmail(email) !== normEmail(storedEmail)) {
+    return {
+      ownerMemberId: storedId,
+      ownerEmail: email,
+      write: true,
+      sync: { outcome: 'email-synced', fromTail, toTail },
+    };
+  }
+  return keep('unchanged');
+}

@@ -12,6 +12,7 @@ import {
   reduceUserAgent,
   validateEvent,
 } from './events.mjs';
+import { UUID_RE, normEmail, onCanonicalPointer, resolveOwnerFields } from './owner.mjs';
 
 const client = new DynamoDBClient({});
 // Each table pair falls back to prod when no dev table is configured (safe fallback).
@@ -47,8 +48,6 @@ const DEV_ORIGINS = new Set(
 function tableForOrigin(origin, { dev, prod }) {
   return origin && DEV_ORIGINS.has(origin) ? dev : prod;
 }
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function getHeaders(event) {
   const origin = event?.headers?.origin || ALLOWED_ORIGINS[0];
@@ -543,7 +542,7 @@ export async function handler(event) {
       //      so the row upgrades itself the first time its owner writes.
       //   3. Row has neither (pre-2026-04-12, dormant since) -> fall open, exactly
       //      as today, and stamp both.
-      const normEmail = (e) => (typeof e === 'string' ? e.trim().toLowerCase() : null);
+      // (`normEmail` is imported from owner.mjs, the one definition.)
 
       // ─── WHO IS WRITING, vs who the row says OWNS the family ───────────────
       //
@@ -589,6 +588,46 @@ export async function handler(event) {
         ? writerMemberId === existing.ownerMemberId
         : !existing.ownerEmail ||
           (!!normEmail(writerEmail) && normEmail(writerEmail) === normEmail(existing.ownerEmail));
+
+      // ─── WHO OWNS THE FAMILY: write-once, or an explicit owner sync ─────────
+      //
+      // The decision lives in owner.mjs (pure). Without `body.ownerSync === true`
+      // these are today's write-once values. With it, the request is
+      // OWNERSHIP-ONLY: it writes only for `handover` / `email-synced`, which
+      // require a live row, the registered owner and the stored pointer, so it
+      // never creates a row, never lifts a tombstone and never moves the
+      // pointer. Everything else (every refusal, and `unchanged`) returns HERE,
+      // before the tombstone guard below and before any PutItem, so the guard
+      // and the item build are untouched for it.
+      const owner = resolveOwnerFields({ existing, body, isOwner });
+      if (body.ownerSync === true) {
+        // eslint-disable-next-line no-console -- structured owner-sync line, read by CloudWatch
+        console.log(
+          JSON.stringify({
+            msg: 'registry_owner_sync',
+            family_id_hash: familyIdHash(familyId),
+            outcome: owner.sync.outcome,
+            from_tail: owner.sync.fromTail,
+            to_tail: owner.sync.toTail,
+          })
+        );
+        if (!owner.write) {
+          // Nothing written, so the pointer was "accepted" only in the no-op sense the
+          // guard below uses: the request echoed the live row's stored pointer.
+          const pointerAccepted =
+            owner.sync.outcome !== 'refused-deleted' && onCanonicalPointer(body, existing);
+          return response(
+            200,
+            {
+              success: true,
+              pointerAccepted,
+              // From owner.mjs: the stored owner, or null for a missing or deleted row.
+              owner: { memberId: owner.ownerMemberId, email: owner.ownerEmail },
+            },
+            event
+          );
+        }
+      }
 
       // ─── A DELETED FAMILY IS NOT WRITEABLE EXCEPT BY ITS OWNER ────────────
       //
@@ -693,7 +732,10 @@ export async function handler(event) {
         // as TRUE for `''`, falling open for every writer on that row. Deployed
         // clients did send empty strings, so such rows exist; this repairs them
         // rather than only preventing new ones.
-        ownerEmail: existing.ownerEmail || body.ownerEmail || null,
+        // The value comes from owner.mjs `resolveOwnerFields`: this write-once
+        // idiom (`existing.ownerEmail || realEmail(body.ownerEmail) || null`, so a
+        // placeholder never latches either), or an `ownerSync` email sync/handover.
+        ownerEmail: owner.ownerEmail,
         // Write-once, and the real pointer authority. Stamped on a row's first
         // accepted write — including the first write by the owner of a legacy
         // email-only row, which upgrades that row off the mutable email.
@@ -711,7 +753,10 @@ export async function handler(event) {
         // Same repair as `ownerEmail` above: a stored `''` was falsy at tier 1 (so
         // the guard never engaged) yet non-nullish at the merge (so it never
         // healed). `||` on both sides lets a real id land later.
-        ownerMemberId: existing.ownerMemberId || (isOwner ? body.ownerMemberId || null : null),
+        // The value comes from owner.mjs `resolveOwnerFields`: this write-once
+        // idiom (`existing.ownerMemberId || (isOwner ? body.ownerMemberId || null :
+        // null)`), or an `ownerSync` handover.
+        ownerMemberId: owner.ownerMemberId,
         subscribeNewsletter:
           typeof body.subscribeNewsletter === 'boolean'
             ? body.subscribeNewsletter
@@ -814,7 +859,19 @@ export async function handler(event) {
       // actually is) from the boring ambient case (every member device sends
       // pointer fields on every login because the payload is uniform). Clients
       // that predate this field treat its absence as accepted.
-      return response(200, { success: true, pointerAccepted }, event);
+      // An `ownerSync` request also gets the stored `owner` after the write, so the
+      // client can tell applied from refused; every other PUT's response is unchanged.
+      return response(
+        200,
+        body.ownerSync === true
+          ? {
+              success: true,
+              pointerAccepted,
+              owner: { memberId: item.ownerMemberId, email: item.ownerEmail },
+            }
+          : { success: true, pointerAccepted },
+        event
+      );
     }
 
     if (method === 'DELETE') {

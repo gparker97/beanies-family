@@ -80,10 +80,14 @@ describe('membersOnOlderVersions', () => {
 describe('anyDeviceReportedTooLarge', () => {
   it('is true when a device could not open the pod for want of memory', () => {
     // A real failure outranks the size heuristic.
-    expect(anyDeviceReportedTooLarge([member({ podTooLargeSeenAt: '2026-09-05' })])).toBe(true);
+    expect(
+      anyDeviceReportedTooLarge([member({ podTooLargeSeenAt: '2026-09-05' })], { today: TODAY })
+    ).toBe(true);
   });
 
   it('is false when nobody has hit it', () => {
-    expect(anyDeviceReportedTooLarge([member({ lastLoginAt: '2026-09-05' })])).toBe(false);
+    expect(
+      anyDeviceReportedTooLarge([member({ lastLoginAt: '2026-09-05' })], { today: TODAY })
+    ).toBe(false);
   });
 });

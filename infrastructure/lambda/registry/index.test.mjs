@@ -2342,3 +2342,149 @@ describe('registry — attributionInferred (scorer-owned, preserved, never clien
     expect(body).toHaveProperty('entitlement');
   });
 });
+
+describe('registry PUT — owner sync (opt-in ownerSync, ownership-only)', () => {
+  const NEW_OWNER = 'cccccccc-3333-4333-8333-cccccccccccc';
+  const ROW = {
+    familyId: FAMILY_ID,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    provider: 'google_drive',
+    fileId: 'CANON',
+    displayPath: 'Family.beanpod',
+    ownerMemberId: M_A,
+    ownerEmail: 'owner@example.com',
+    familyName: 'The Brambleworth Beanies',
+  };
+  /** The registered owner's current client, on the canonical pointer. */
+  const syncBody = (over = {}) => ({
+    provider: 'google_drive',
+    fileId: 'CANON',
+    displayPath: 'Family.beanpod',
+    writerMemberId: M_A,
+    writerEmail: 'owner@example.com',
+    ownerMemberId: M_A,
+    ownerEmail: 'owner@example.com',
+    ownerSync: true,
+    ...over,
+  });
+
+  /** Every `registry_owner_sync` line the last call logged, parsed. */
+  function ownerSyncLines() {
+    return logSpy.mock.calls
+      .map((c) => {
+        try {
+          return JSON.parse(c[0]);
+        } catch {
+          return null;
+        }
+      })
+      .filter((l) => l?.msg === 'registry_owner_sync');
+  }
+
+  it('an ambient owner PUT (current client, no flag) changes neither owner field', async () => {
+    // The stale-cache case: a roster read before the authoritative load must never move ownership.
+    const { res, item } = await put(
+      syncBody({ ownerSync: undefined, ownerMemberId: NEW_OWNER, ownerEmail: 'new@example.com' }),
+      ROW
+    );
+    expect(item.ownerMemberId).toBe(M_A);
+    expect(item.ownerEmail).toBe('owner@example.com');
+    expect(JSON.parse(res.body)).toEqual({ success: true, pointerAccepted: true });
+    expect(ownerSyncLines()).toEqual([]);
+  });
+
+  it('hands ownership over: new id + its email, pointer unchanged, response carries owner', async () => {
+    const { res, item } = await put(
+      syncBody({ ownerMemberId: NEW_OWNER, ownerEmail: 'new@example.com' }),
+      ROW
+    );
+    expect(item.ownerMemberId).toBe(NEW_OWNER);
+    expect(item.ownerEmail).toBe('new@example.com');
+    expect(item.fileId).toBe('CANON');
+    expect(item.createdAt).toBe(ROW.createdAt);
+    expect(item).not.toHaveProperty('ownerSync');
+    expect(JSON.parse(res.body)).toEqual({
+      success: true,
+      pointerAccepted: true,
+      owner: { memberId: NEW_OWNER, email: 'new@example.com' },
+    });
+    expect(ownerSyncLines()).toEqual([
+      {
+        msg: 'registry_owner_sync',
+        family_id_hash: createHash('sha256').update(FAMILY_ID).digest('hex'),
+        outcome: 'handover',
+        from_tail: M_A.slice(-6),
+        to_tail: NEW_OWNER.slice(-6),
+      },
+    ]);
+  });
+
+  it('syncs an owner email edit: new email stored, id and pointer unchanged', async () => {
+    const { res, item } = await put(syncBody({ ownerEmail: 'renamed@example.com' }), ROW);
+    expect(item.ownerMemberId).toBe(M_A);
+    expect(item.ownerEmail).toBe('renamed@example.com');
+    expect(item.provider).toBe('google_drive');
+    expect(item.fileId).toBe('CANON');
+    expect(item.displayPath).toBe('Family.beanpod');
+    expect(item).not.toHaveProperty('ownerSync');
+    expect(JSON.parse(res.body).owner).toEqual({ memberId: M_A, email: 'renamed@example.com' });
+    expect(ownerSyncLines().map((l) => l.outcome)).toEqual(['email-synced']);
+  });
+
+  it('refuses a different fileId (refused-off-canonical) and writes nothing', async () => {
+    const { res, item } = await put(syncBody({ fileId: 'COPY', ownerMemberId: NEW_OWNER }), ROW);
+    expect(item).toBeNull();
+    expect(JSON.parse(res.body)).toEqual({
+      success: true,
+      pointerAccepted: false,
+      owner: { memberId: M_A, email: 'owner@example.com' },
+    });
+    expect(ownerSyncLines().map((l) => l.outcome)).toEqual(['refused-off-canonical']);
+  });
+
+  it('refuses a tombstoned row (refused-deleted), never revives it and never echoes its owner', async () => {
+    const { res, item } = await put(syncBody({ ownerMemberId: NEW_OWNER, isLoginEvent: true }), {
+      ...ROW,
+      deletedAt: '2026-09-09T00:00:00.000Z',
+    });
+    expect(item).toBeNull();
+    expect(JSON.parse(res.body)).toEqual({
+      success: true,
+      pointerAccepted: false,
+      owner: { memberId: null, email: null },
+    });
+    expect(ownerSyncLines().map((l) => l.outcome)).toEqual(['refused-deleted']);
+  });
+
+  it('refuses a missing row (refused-deleted) and never creates one', async () => {
+    const { res, item } = await put(syncBody({ ownerMemberId: NEW_OWNER }), null);
+    expect(item).toBeNull();
+    expect(JSON.parse(res.body)).toEqual({
+      success: true,
+      pointerAccepted: false,
+      owner: { memberId: null, email: null },
+    });
+    expect(ownerSyncLines().map((l) => l.outcome)).toEqual(['refused-deleted']);
+  });
+
+  it('refuses a member device (refused-not-owner) and writes nothing', async () => {
+    const { res, item } = await put(
+      syncBody({ writerMemberId: M_B, ownerMemberId: M_B, ownerEmail: 'member@example.com' }),
+      ROW
+    );
+    expect(item).toBeNull();
+    expect(JSON.parse(res.body).owner).toEqual({ memberId: M_A, email: 'owner@example.com' });
+    expect(ownerSyncLines().map((l) => l.outcome)).toEqual(['refused-not-owner']);
+  });
+
+  it('an unchanged ownerSync writes nothing, not even a metadata refresh', async () => {
+    const { res, item } = await put(syncBody({ isLoginEvent: true, country: 'SG' }), ROW);
+    expect(item).toBeNull();
+    expect(JSON.parse(res.body)).toEqual({
+      success: true,
+      pointerAccepted: true,
+      owner: { memberId: M_A, email: 'owner@example.com' },
+    });
+    expect(ownerSyncLines().map((l) => l.outcome)).toEqual(['unchanged']);
+  });
+});
