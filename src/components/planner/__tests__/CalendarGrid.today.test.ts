@@ -59,8 +59,7 @@ function setToday(date: string): void {
 
 function markedTodayDates(wrapper: VueWrapper): string[] {
   return wrapper
-    .findAll('[data-date]')
-    .filter((el) => el.classes().includes('border-l-[3px]'))
+    .findAll('[data-date][aria-current="date"]')
     .map((el) => el.attributes('data-date') ?? '');
 }
 
@@ -92,7 +91,7 @@ describe('CalendarGrid today marker — live midnight rollover', () => {
     expect(markedTodayDates(wrapper)).toEqual(['2026-04-15']);
 
     // A May date is not a current-month April cell → no today marker, degrades
-    // cleanly to "no border" (todayInView → false).
+    // cleanly to "no marker" (no cell is today).
     setToday('2026-05-20');
     await nextTick();
 

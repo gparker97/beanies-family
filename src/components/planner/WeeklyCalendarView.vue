@@ -48,11 +48,11 @@ import WeekStripNav, {
 import { useActivityChipClass } from '@/composables/useActivityChipClass';
 import { relativeWeekLabelKey } from '@/utils/calendarWeek';
 import type { FamilyActivity, TodoItem, HolidayOccurrence } from '@/types/models';
+import { CALENDAR_TODAY, calendarDayBackground } from '@/constants/tileStyles';
 
 const props = defineProps<{
   /** Controlled period — the page owns the canonical date (props down). */
   referenceDate: Date;
-  selectedDate?: string;
   /** Bumped by the page on every "Today" tap — re-scrolls the timeline to the
    *  current hour even when the reference date is unchanged (already on this
    *  week), which a `watch(referenceDate)` alone would miss. */
@@ -132,6 +132,15 @@ const selectedMobileDay = computed(() => toDateInputValue(props.referenceDate));
 // whether a day is a holiday.
 function holidayForDay(dateStr: string): HolidayOccurrence | undefined {
   return (extrasByDate.value.get(dateStr) ?? []).find((e) => e.kind === 'holiday')?.holiday;
+}
+
+/** Week header background: one decision via the shared helper (holiday tint > today wash > resting). */
+function headerBackground(day: { dateStr: string; isToday: boolean }): string {
+  return calendarDayBackground(
+    holidayForDay(day.dateStr) ? 'holiday' : undefined,
+    day.isToday,
+    'dark:hover:bg-surface-hover/50 hover:bg-gray-50'
+  );
 }
 
 /**
@@ -698,13 +707,12 @@ function onStripDayClick(dateStr: string) {
             v-for="day in weekDays"
             :key="day.dateStr"
             type="button"
-            class="cursor-pointer rounded-xl py-2 text-center transition-colors"
+            class="cursor-pointer rounded-xl border-2 py-2 text-center transition-colors"
             :class="[
-              holidayForDay(day.dateStr)
-                ? 'bg-[var(--holiday-clay-tint)]'
-                : 'dark:hover:bg-surface-hover/50 hover:bg-gray-50',
-              selectedDate === day.dateStr ? 'ring-primary-500 ring-2 ring-inset' : '',
+              day.isToday ? CALENDAR_TODAY.outline : 'border-transparent',
+              headerBackground(day),
             ]"
+            :aria-current="day.isToday ? 'date' : undefined"
             :title="holidayForDay(day.dateStr)?.name"
             @click="emit('select-date', day.dateStr)"
           >
@@ -715,13 +723,16 @@ function onStripDayClick(dateStr: string) {
             </span>
             <span
               class="font-outfit mt-0.5 inline-flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold"
-              :class="
-                day.isToday
-                  ? 'from-primary-500 to-terracotta-400 bg-gradient-to-br text-white shadow-[0_2px_6px_rgba(241,93,34,0.3)]'
-                  : 'text-secondary-500 dark:text-ink'
-              "
+              :class="day.isToday ? CALENDAR_TODAY.pill : 'text-secondary-500 dark:text-ink'"
             >
               {{ day.date.getDate() }}
+            </span>
+            <span
+              v-if="day.isToday"
+              class="font-outfit block text-xs font-bold"
+              :class="CALENDAR_TODAY.text"
+            >
+              {{ t('planner.today') }}
             </span>
           </button>
         </div>
@@ -863,7 +874,12 @@ function onStripDayClick(dateStr: string) {
           </div>
 
           <!-- Day columns -->
-          <div v-for="day in weekDays" :key="'col-' + day.dateStr" class="relative">
+          <div
+            v-for="day in weekDays"
+            :key="'col-' + day.dateStr"
+            class="relative"
+            :class="day.isToday ? CALENDAR_TODAY.columnWash : ''"
+          >
             <!-- Hour row borders (clickable to add activity) -->
             <div
               v-for="(hour, hi) in hours"

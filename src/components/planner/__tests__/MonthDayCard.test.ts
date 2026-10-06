@@ -5,6 +5,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import MonthDayCard from '../MonthDayCard.vue';
 import type { MonthDayCellData } from '../MonthDayCard.vue';
 import type { FamilyActivity, FamilyMember, HolidayOccurrence } from '@/types/models';
+import { CALENDAR_DAY_TINT, CALENDAR_TODAY } from '@/constants/tileStyles';
 
 vi.mock('@/composables/useTranslation', () => ({
   useTranslation: () => ({
@@ -122,8 +123,6 @@ afterEach(() => {
 const baseProps = {
   allDayCap: 2,
   timedCap: 4,
-  selected: false,
-  bgClass: '',
 };
 
 describe('MonthDayCard structure', () => {
@@ -157,11 +156,45 @@ describe('MonthDayCard structure', () => {
     expect(wrapper.html()).toContain('from-primary-500');
   });
 
-  it('shows ring on selected state', () => {
+  it('marks today with aria-current, the outline and the Today word, even with timed items', () => {
     const wrapper = mount(MonthDayCard, {
-      props: { cell: makeCell(), ...baseProps, selected: true },
+      props: {
+        cell: makeCell({
+          isToday: true,
+          timedOccurrences: [{ activity: makeActivity(), date: '2026-05-19' }],
+        }),
+        ...baseProps,
+      },
     });
-    expect(wrapper.html()).toContain('ring-2');
+    const root = wrapper.get('button');
+    expect(root.attributes('aria-current')).toBe('date');
+    for (const cls of CALENDAR_TODAY.outline.split(' ')) expect(root.classes()).toContain(cls);
+    expect(wrapper.text()).toContain('planner.today');
+  });
+
+  it('paints the today wash when no tint is set', () => {
+    const wrapper = mount(MonthDayCard, {
+      props: { cell: makeCell({ isToday: true }), ...baseProps },
+    });
+    expect(wrapper.get('button').classes()).toContain(CALENDAR_TODAY.wash);
+  });
+
+  it('lets a vacation tint win the background but keeps the today outline', () => {
+    const wrapper = mount(MonthDayCard, {
+      props: { cell: makeCell({ isToday: true }), ...baseProps, tint: 'vacation' },
+    });
+    const classes = wrapper.get('button').classes();
+    expect(classes).toContain(CALENDAR_DAY_TINT.vacation);
+    expect(classes).not.toContain(CALENDAR_TODAY.wash);
+    for (const cls of CALENDAR_TODAY.outline.split(' ')) expect(classes).toContain(cls);
+  });
+
+  it('has no aria-current and no Today word on other days', () => {
+    const wrapper = mount(MonthDayCard, {
+      props: { cell: makeCell(), ...baseProps },
+    });
+    expect(wrapper.get('button').attributes('aria-current')).toBeUndefined();
+    expect(wrapper.text()).not.toContain('planner.today');
   });
 });
 

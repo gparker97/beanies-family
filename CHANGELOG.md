@@ -16,11 +16,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
+- Trip and holiday colours show again on the desktop month calendar.
 - Visits to www.beanies.family are now counted by the site's first-party visit ledger.
 - The family's registered owner now stays in step with the pod's actual owner, including after an ownership transfer or the owner changing their email.
 
 ### Changed
 
+- Today now stands out on the calendar's month and week views, and a day you opened no longer stays highlighted when you switch back to the month.
 - Native apps older than 0.91.4 now see a one-time prompt to update, since 0.91.4 is live on both stores.
 - The privacy policy now makes clear that owner emails are separate from the Substack newsletter, and that the only activity used to choose who gets a "we miss you" email is a count of app uses.
 

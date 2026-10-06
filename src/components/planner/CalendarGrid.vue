@@ -16,12 +16,12 @@ import { useBreakpoint } from '@/composables/useBreakpoint';
 import { ALL_DAY_VISIBLE_CAP, TIMED_VISIBLE_CAP } from '@/constants/calendarCaps';
 import { useToday } from '@/composables/useToday';
 import type { HolidayOccurrence } from '@/types/models';
+import type { CalendarDayTint } from '@/constants/tileStyles';
 
 const props = defineProps<{
   /** Controlled period — the page owns the canonical date; the grid derives
    *  its displayed month from it (props down, no internal nav state). */
   referenceDate: Date;
-  selectedDate?: string;
 }>();
 
 const emit = defineEmits<{
@@ -45,7 +45,7 @@ const settingsStore = useSettingsStore();
 // timer + visibilitychange + bfcache restore. Using a frozen `new Date()` here
 // caused the "ghost today border": a tab left open across midnight kept marking
 // yesterday as today (and denied today its border). See issue #25.
-const { today: todayStr, startOfToday } = useToday();
+const { today: todayStr } = useToday();
 const currentYear = computed(() => props.referenceDate.getFullYear());
 const currentMonth = computed(() => props.referenceDate.getMonth());
 
@@ -66,28 +66,6 @@ const allDayLabels = [
 const dayLabels = computed(() => {
   const start = settingsStore.weekStartDay;
   return Array.from({ length: 7 }, (_, i) => allDayLabels[(i + start) % 7]!());
-});
-
-// Single source of truth for "the reactive today falls inside the month the grid
-// is currently showing." Both the today-week-row tint and the mobile
-// scroll-to-today helper read this so the predicate can never drift between them.
-// Degrades to `false` (no row tint, no scroll) rather than throwing —
-// `startOfToday` is always a valid local-midnight Date.
-const todayInView = computed(() => {
-  const t = startOfToday.value;
-  return t.getMonth() === currentMonth.value && t.getFullYear() === currentYear.value;
-});
-
-// Get the week number (0-indexed row) of a date within the month
-function getWeekRow(dayDate: Date): number {
-  const firstDayOfMonth = new Date(currentYear.value, currentMonth.value, 1);
-  const firstDayOffset = (firstDayOfMonth.getDay() - settingsStore.weekStartDay + 7) % 7;
-  return Math.floor((dayDate.getDate() + firstDayOffset - 1) / 7);
-}
-
-const todayWeekRow = computed(() => {
-  if (!todayInView.value) return -1;
-  return getWeekRow(startOfToday.value);
 });
 
 // Desktop month grid cells. The heavy lifting lives in the pure `monthCells`
@@ -137,16 +115,14 @@ const vacationDateSet = computed(() => monthData.value.vacationDates);
 const holidayDateSet = computed(() => monthData.value.holidayDates);
 
 /**
- * Background class for a day cell. Precedence (highest first): vacation > holiday
- * > today's week-row > default. (A holiday during a trip still surfaces — via the
- * holiday chip — just not via the cell background.)
+ * Which day tint (if any) a cell asks the card to paint. Vacation outranks holiday; the
+ * full precedence (tint > today wash > resting) lives in `calendarDayBackground`. (A
+ * holiday during a trip still surfaces via its holiday chip, just not via the cell background.)
  */
-function cellBgClass(cell: { date: string; weekRow: number; isCurrentMonth: boolean }): string {
-  if (vacationDateSet.value.has(cell.date)) return 'md:bg-[var(--vacation-teal-tint)]';
-  if (holidayDateSet.value.has(cell.date)) return 'md:bg-[var(--holiday-clay-tint)]';
-  if (cell.weekRow === todayWeekRow.value && cell.isCurrentMonth)
-    return 'md:bg-[rgba(241,93,34,0.04)]';
-  return 'md:hover:bg-gray-50 md:dark:hover:bg-surface-hover/50';
+function cellTint(cell: { date: string }): CalendarDayTint | undefined {
+  if (vacationDateSet.value.has(cell.date)) return 'vacation';
+  if (holidayDateSet.value.has(cell.date)) return 'holiday';
+  return undefined;
 }
 
 function handleDayClick(date: string) {
@@ -212,8 +188,7 @@ useCalendarSlide(swipeRef, {
           :cell="cell"
           :all-day-cap="ALL_DAY_VISIBLE_CAP"
           :timed-cap="TIMED_VISIBLE_CAP"
-          :selected="props.selectedDate === cell.date"
-          :bg-class="cellBgClass(cell)"
+          :tint="cellTint(cell)"
           @select-date="handleDayClick"
           @view-activity="(id, date) => emit('view-activity', id, date)"
           @holiday-click="(h) => emit('holiday-click', h)"

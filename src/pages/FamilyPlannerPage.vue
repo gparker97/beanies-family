@@ -208,8 +208,6 @@ function isDateShown(ymd: string): boolean {
 function showDate(ymd: string): boolean {
   if (isDateShown(ymd)) return false;
   referenceDate.value = parseLocalDate(ymd);
-  // Same as paging: a drilled-in day highlight from the old period would be stale.
-  focusedDate.value = null;
   return true;
 }
 
@@ -223,11 +221,6 @@ const showModal = ref(false);
 const editingActivity = ref<FamilyActivity | null>(null);
 const editingOccurrenceDate = ref<string | undefined>(undefined);
 const selectedDate = ref<string | undefined>(undefined);
-// Highlighted day on the monthly/weekly grid + the day the daily view
-// jumps to when the user clicks a cell. Separate from `sidebarDate`
-// (which drives the agenda drawer) so the two affordances don't
-// share state.
-const focusedDate = ref<string | null>(null);
 const sidebarDate = ref<string | null>(null);
 const defaultStartTime = ref<string | undefined>(undefined);
 
@@ -750,14 +743,12 @@ useQuickAddIntent((action) => {
 function handleCalendarDateClick(date: string) {
   // Clicking a day in the monthly/weekly grid drills into that day's
   // timeline. Sets the shared reference date so the Day view opens on it.
-  focusedDate.value = date;
   referenceDate.value = parseLocalDate(date);
   activeView.value = 'day';
 }
 
-// Mobile week-strip day pick — change the focused day but STAY in week view.
+// Mobile week-strip day pick: move the reference date but STAY in week view.
 function handleSelectDay(date: string) {
-  focusedDate.value = date;
   referenceDate.value = parseLocalDate(date);
 }
 
@@ -777,16 +768,13 @@ function bumpStreamAnchor(target: AnchorTarget) {
  * period) stays honest. The stream's re-anchor rule makes this loop-safe: it
  * ignores a reference-date change that names the month already in view.
  */
-// Period navigation (command bar + view swipe). Clearing focusedDate drops the
-// drilled-in day highlight when the user explicitly pages the period.
+// Period navigation (command bar + view swipe).
 function handlePrev() {
   goPrev();
-  focusedDate.value = null;
   bumpStreamAnchor('month-start');
 }
 function handleNext() {
   goNext();
-  focusedDate.value = null;
   bumpStreamAnchor('month-start');
 }
 // Bumped on every "Today" tap so the views always re-scroll to today — even
@@ -795,7 +783,6 @@ function handleNext() {
 const todayTick = ref(0);
 function handleToday() {
   goToday();
-  focusedDate.value = null;
   todayTick.value++;
   bumpStreamAnchor('today');
 }
@@ -1119,7 +1106,6 @@ function handleActivitySwapped(newId: string) {
     <CalendarMonthStream
       v-if="activeView === 'month' && isMobile"
       :reference-date="referenceDate"
-      :selected-date="focusedDate ?? undefined"
       :anchor="streamAnchor"
       @select-date="handleCalendarDateClick"
       @prev="handlePrev"
@@ -1135,7 +1121,6 @@ function handleActivitySwapped(newId: string) {
     <CalendarGrid
       v-else-if="activeView === 'month'"
       :reference-date="referenceDate"
-      :selected-date="focusedDate ?? undefined"
       @select-date="handleCalendarDateClick"
       @prev="handlePrev"
       @next="handleNext"
@@ -1149,7 +1134,6 @@ function handleActivitySwapped(newId: string) {
     <WeeklyCalendarView
       v-else-if="activeView === 'week'"
       :reference-date="referenceDate"
-      :selected-date="focusedDate ?? undefined"
       :today-tick="todayTick"
       @select-date="handleCalendarDateClick"
       @select-day="handleSelectDay"

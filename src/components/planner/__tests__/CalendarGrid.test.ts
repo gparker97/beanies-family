@@ -251,11 +251,9 @@ describe('CalendarGrid today marker', () => {
     // re-reads new Date() at mount, so "today" resolves to 2026-04-15.
     const wrapper = mount(CalendarGrid, { props: { referenceDate: new Date() } });
 
-    // The today marker is the `border-l-[3px]` class on the day-cell <button>
+    // The today marker is `aria-current="date"` on the day-cell <button>
     // (MonthDayCard.vue). Only the isToday branch emits it.
-    const marked = wrapper
-      .findAll('[data-date]')
-      .filter((el) => el.classes().includes('border-l-[3px]'));
+    const marked = wrapper.findAll('[data-date][aria-current="date"]');
 
     expect(marked.length).toBe(1);
     expect(marked[0]!.attributes('data-date')).toBe('2026-04-15');

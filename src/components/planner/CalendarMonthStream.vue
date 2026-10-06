@@ -58,7 +58,6 @@ export type AnchorTarget = 'today' | 'month-start';
 const props = defineProps<{
   /** Controlled period — the page owns the canonical date (props down). */
   referenceDate: Date;
-  selectedDate?: string;
   /**
    * ONE imperative channel for every "reposition the stream" request. Replaces
    * the old `todayTick`: bumping `tick` runs `anchorTo` for `target`, so a
@@ -426,8 +425,6 @@ defineExpose({ anchorTo });
             :cell="cell"
             :all-day-cap="ALL_DAY_VISIBLE_CAP"
             :timed-cap="TIMED_VISIBLE_CAP"
-            :selected="props.selectedDate === cell.date"
-            :bg-class="''"
             @select-date="(d) => emit('selectDate', d)"
             @view-activity="(id, date) => emit('view-activity', id, date)"
             @holiday-click="(h) => emit('holiday-click', h)"

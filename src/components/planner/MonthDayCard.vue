@@ -28,6 +28,11 @@ import TravelSegmentChip from '@/components/planner/TravelSegmentChip.vue';
 import MonthChip from '@/components/planner/MonthChip.vue';
 import type { FamilyActivity, HolidayOccurrence } from '@/types/models';
 import type { TravelSegmentOccurrence } from '@/utils/vacation';
+import {
+  CALENDAR_TODAY,
+  calendarDayBackground,
+  type CalendarDayTint,
+} from '@/constants/tileStyles';
 
 export interface CellAllDayItem {
   activity: FamilyActivity;
@@ -72,10 +77,9 @@ const props = defineProps<{
   allDayCap: number;
   /** Visible cap for the timed chip row. */
   timedCap: number;
-  /** Highlight class for the selected date (parent owns the selection ref). */
-  selected: boolean;
-  /** Cell background class (parent computes from vacation/holiday/today rules). */
-  bgClass: string;
+  /** Parent-chosen day tint (desktop vacation/holiday); when set it replaces the today wash
+      and the resting surface. */
+  tint?: CalendarDayTint;
 }>();
 
 const emit = defineEmits<{
@@ -159,7 +163,7 @@ const allDayOverflow = computed(() =>
 );
 
 /** A day with nothing on it — collapsed to a thin "nothing planned" line on
- *  mobile (today is never collapsed; it keeps its anchor + "TODAY" caption). */
+ *  mobile (today is never collapsed; it keeps its outline, wash and "Today" caption). */
 const isEmptyDay = computed(
   () =>
     props.cell.timedOccurrences.length === 0 &&
@@ -167,6 +171,25 @@ const isEmptyDay = computed(
     props.cell.extras.length === 0 &&
     props.cell.segments.length === 0 &&
     props.cell.vacations.length === 0
+);
+
+/**
+ * Border and background of the card root. Each is ONE class set per property per
+ * breakpoint: Tailwind v4 orders base < `md:` < `dark:` < `md:dark:`, so two classes
+ * setting the same property would resolve by variant, not template order. Mobile-only
+ * resting classes use `max-md:` so they never compete with the desktop tint.
+ */
+const borderClass = computed(() =>
+  props.cell.isToday
+    ? CALENDAR_TODAY.outline
+    : 'border-transparent max-md:border max-md:border-gray-200/60 max-md:dark:border-line/60'
+);
+const backgroundClass = computed(() =>
+  calendarDayBackground(
+    props.tint,
+    props.cell.isToday,
+    'max-md:bg-white max-md:dark:bg-surface-raised/40 md:hover:bg-gray-50 md:dark:hover:bg-surface-hover/50'
+  )
 );
 
 function onCellClick() {
@@ -186,68 +209,50 @@ function onMoreClick(event: MouseEvent) {
   <button
     :data-date="cell.date"
     type="button"
-    class="font-outfit dark:bg-surface-raised/40 relative flex w-full min-w-0 cursor-pointer flex-row gap-3 rounded-xl border bg-white p-2.5 text-left transition-colors md:h-auto md:min-h-[140px] md:flex-col md:items-center md:gap-1 md:rounded-xl md:border-0 md:bg-transparent md:px-1.5 md:pt-1.5 md:pb-1 md:dark:bg-transparent"
+    class="font-outfit relative flex w-full min-w-0 cursor-pointer flex-row gap-3 rounded-xl border-2 p-2.5 text-left transition-colors md:h-auto md:min-h-[140px] md:flex-col md:items-center md:gap-1 md:px-1.5 md:pt-1.5 md:pb-1"
     :class="[
       cell.isCurrentMonth
         ? 'text-secondary-500 dark:text-ink'
-        : 'text-secondary-500/30 dark:text-ink-faint md:bg-transparent',
-      bgClass,
-      // Today on mobile gets a 3px orange left bar + soft orange wash so it
-      // stands out in the vertical day-stack even when there are zero events.
-      // Desktop suppresses the border (md:!border-transparent + md:!bg-...) since
-      // the gradient day-number pill below already carries the today marker.
-      cell.isToday
-        ? 'border-primary-500 border-l-[3px] bg-[rgba(241,93,34,0.04)] md:!border-transparent md:!bg-transparent'
-        : 'dark:border-line/60 border-gray-200/60',
-      selected ? 'ring-primary-500 ring-2 ring-inset' : '',
+        : 'text-secondary-500/30 dark:text-ink-faint',
+      borderClass,
+      backgroundClass,
     ]"
+    :aria-current="cell.isToday ? 'date' : undefined"
     @click="onCellClick"
   >
-    <!-- Mobile-only DOW + day-number column on the left -->
+    <!-- Mobile-only DOW + day-number column on the left. Today's caption sits at
+         the top so the row reads as today even when its events column is empty. -->
     <div class="flex w-10 flex-shrink-0 flex-col items-center gap-0.5 pt-0.5 md:hidden">
+      <span v-if="cell.isToday" class="text-xs font-bold" :class="CALENDAR_TODAY.text">
+        {{ t('planner.today') }}
+      </span>
       <span
         class="text-[0.625rem] font-bold tracking-[0.14em] uppercase"
-        :class="
-          cell.isToday
-            ? 'text-primary-500 dark:text-accent-lift'
-            : 'text-secondary-500/50 dark:text-ink-faint'
-        "
+        :class="cell.isToday ? CALENDAR_TODAY.text : 'text-secondary-500/50 dark:text-ink-faint'"
       >
         {{ dowLabel }}
       </span>
       <span
         class="text-lg leading-none font-semibold"
-        :class="cell.isToday ? 'text-primary-500 dark:text-accent-lift' : ''"
+        :class="cell.isToday ? CALENDAR_TODAY.text : ''"
       >
         {{ cell.day }}
       </span>
-      <!-- Empty-day "today" badge: when today has no events, the events
-           column is collapsed; this small caption makes the row read as
-           an intentional placeholder rather than blank space. -->
+    </div>
+
+    <!-- Desktop-only centered day-number pill, with the "Today" word beside it (wraps
+         under the pill on a narrow column) -->
+    <div class="hidden flex-wrap items-center justify-center gap-x-1.5 md:flex">
       <span
-        v-if="
-          cell.isToday &&
-          cell.timedOccurrences.length === 0 &&
-          cell.allDayItems.length === 0 &&
-          cell.extras.length === 0
-        "
-        class="text-primary-500 dark:text-accent-lift mt-0.5 text-[0.5625rem] font-bold tracking-[0.12em] uppercase"
+        class="flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold"
+        :class="cell.isToday ? CALENDAR_TODAY.pill : ''"
       >
+        {{ cell.day }}
+      </span>
+      <span v-if="cell.isToday" class="text-xs font-bold" :class="CALENDAR_TODAY.text">
         {{ t('planner.today') }}
       </span>
     </div>
-
-    <!-- Desktop-only centered day-number pill -->
-    <span
-      class="hidden h-7 w-7 items-center justify-center rounded-full text-sm font-semibold md:flex"
-      :class="
-        cell.isToday
-          ? 'from-primary-500 to-terracotta-400 bg-gradient-to-br text-white shadow-[0_2px_6px_rgba(241,93,34,0.3)]'
-          : ''
-      "
-    >
-      {{ cell.day }}
-    </span>
 
     <!-- Events column — right of day-num on mobile, stacked below on desktop -->
     <div class="flex min-w-0 flex-1 flex-col gap-1 md:w-full md:gap-px">
