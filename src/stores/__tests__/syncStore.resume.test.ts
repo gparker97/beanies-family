@@ -37,6 +37,8 @@ const { mockLookupFamily, mockProviderRead, mockProvider } = vi.hoisted(() => {
 });
 
 vi.mock('@/services/registry/registryService', () => ({
+  // syncStore installs the registry owner-sync observer at setup.
+  addRegistryEntryObserver: () => () => {},
   lookupFamily: mockLookupFamily,
   registerFamily: vi.fn(async () => {}),
   registerFamilyOrThrow: vi.fn(async () => {}),

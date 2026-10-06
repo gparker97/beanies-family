@@ -13,6 +13,9 @@ import { ATTRIBUTION_KEYS, ATTRIBUTION_VALUE_RE } from '@beanies/brand/attributi
 import { HEARD_VIA_IDS } from '@beanies/brand/heardVia';
 // @ts-expect-error — no type declarations for the Lambda source.
 import * as registryLambda from '../../../infrastructure/lambda/registry/index.mjs';
+// @ts-expect-error — no type declarations for the Lambda source.
+import { realEmail as lambdaRealEmail } from '../../../infrastructure/lambda/registry/owner.mjs';
+import { realEmail } from '../email';
 
 describe('attribution twins (#118)', () => {
   it('the Lambda allowlists exactly the shared keys, in the same order', () => {
@@ -41,5 +44,36 @@ describe('registry twins', () => {
     expect(match, 'HEARD_VIA_IDS literal not found in the registry Lambda').not.toBeNull();
     const ids = [...match![1]!.matchAll(/'([^']+)'/g)].map((m) => m[1]);
     expect(ids).toEqual([...HEARD_VIA_IDS]);
+  });
+});
+
+/**
+ * The owner-email filter twin (registry owner sync). The client sends
+ * `ownerEmail: realEmail(rosterOwner.email)` and the Lambda's `owner.mjs` re-applies its own
+ * `realEmail` to every stamp, so a placeholder can never latch. If the two rules drift, the
+ * client's in-sync comparison and the server's stored value disagree and the owner sync
+ * re-sends every session. One table, both functions, identical answers.
+ */
+describe('registry owner email twin', () => {
+  const table: Array<[string, string | null | undefined]> = [
+    ['valid', 'user@example.com'],
+    ['padded', '  user@example.com  '],
+    ['uppercase', 'User@Example.COM'],
+    ['placeholder temp', '1717171717@temp.beanies.family'],
+    ['placeholder setup', 'pending-abc@setup.local'],
+    ['uppercase placeholder', 'Pending-ABC@Setup.LOCAL'],
+    ['padded placeholder', '  1717171717@temp.beanies.family '],
+    ['empty', ''],
+    ['null', null],
+    ['no at', 'no-at'],
+    ['255 chars', 'a'.repeat(243) + '@example.com'],
+  ];
+
+  it('the 255-char row really is 255 chars', () => {
+    expect(table.find(([name]) => name === '255 chars')![1]!.length).toBe(255);
+  });
+
+  it.each(table)('client and Lambda agree on %s', (_name, input) => {
+    expect((lambdaRealEmail as (s: unknown) => string | null)(input)).toBe(realEmail(input));
   });
 });

@@ -186,6 +186,115 @@ describe('registry PUT — the writer/owner split on the wire', () => {
   });
 });
 
+describe('registry PUT — the owner-sync response', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('sends ownerSync on the wire when the payload carries it', async () => {
+    const f = okFetch({ success: true, pointerAccepted: true });
+    global.fetch = f;
+
+    await registerFamilyOrThrow(FAMILY, payload({ ownerSync: true }));
+
+    expect(lastBody(f).ownerSync).toBe(true);
+  });
+
+  it('returns the stored owner from the response, through both write paths', async () => {
+    const owner = { memberId: OWNER, email: 'owner@example.com' };
+    global.fetch = okFetch({ success: true, pointerAccepted: true, owner });
+    expect(await registerFamilyOrThrow(FAMILY, payload())).toEqual({
+      pointerAccepted: true,
+      owner,
+    });
+
+    global.fetch = okFetch({ success: true, pointerAccepted: true, owner });
+    expect(await registerFamily(FAMILY, payload())).toEqual({ pointerAccepted: true, owner });
+  });
+
+  it('keeps null owner fields as null', async () => {
+    global.fetch = okFetch({ success: true, owner: { memberId: OWNER, email: null } });
+    const result = await registerFamilyOrThrow(FAMILY, payload());
+    expect(result.owner).toEqual({ memberId: OWNER, email: null });
+  });
+
+  it('an ownerSync write logs neither the ambient put count nor a refused pointer', async () => {
+    global.fetch = okFetch({
+      success: true,
+      pointerAccepted: false,
+      owner: { memberId: null, email: null },
+    });
+    const result = await registerFamilyOrThrow(FAMILY, payload({ ownerSync: true }));
+
+    expect(result).toEqual({ pointerAccepted: false, owner: { memberId: null, email: null } });
+    // `registryOwnerSync` logs its own outcome; this layer stays silent for that write.
+    expect(logEvent).not.toHaveBeenCalled();
+  });
+
+  it('an ownerSync write returns the outcome; a non-string outcome is dropped', async () => {
+    global.fetch = okFetch({
+      success: true,
+      pointerAccepted: true,
+      owner: { memberId: OWNER, email: 'owner@example.com' },
+      outcome: 'refused-handover-locked',
+    });
+    expect(await registerFamilyOrThrow(FAMILY, payload({ ownerSync: true }))).toEqual({
+      pointerAccepted: true,
+      owner: { memberId: OWNER, email: 'owner@example.com' },
+      outcome: 'refused-handover-locked',
+    });
+
+    global.fetch = okFetch({ success: true, pointerAccepted: true, outcome: 42 });
+    expect(await registerFamilyOrThrow(FAMILY, payload({ ownerSync: true }))).toEqual({
+      pointerAccepted: true,
+    });
+  });
+
+  it('sends ownerSyncReason on the wire with the flag', async () => {
+    const f = okFetch({ success: true, pointerAccepted: true });
+    global.fetch = f;
+    await registerFamilyOrThrow(FAMILY, payload({ ownerSync: true, ownerSyncReason: 'transfer' }));
+    expect(lastBody(f).ownerSyncReason).toBe('transfer');
+  });
+
+  it('a swallowed ownerSync failure is counted as owner-sync-put-failed, not put-failed', async () => {
+    global.fetch = failFetch(500);
+
+    expect(await registerFamily(FAMILY, payload({ ownerSync: true }))).toBeNull();
+
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ level: 'warn', context: { action: 'owner-sync-put-failed' } })
+    );
+    expect(logEvent).not.toHaveBeenCalledWith(
+      expect.objectContaining({ context: { action: 'put-failed' } })
+    );
+  });
+
+  it('an ambient write still logs its put count and a refused pointer', async () => {
+    global.fetch = okFetch({ success: true, pointerAccepted: false });
+    await registerFamilyOrThrow(FAMILY, payload());
+
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ context: { action: 'put', count: 1 } })
+    );
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ level: 'warn', context: { action: 'refused' } })
+    );
+  });
+
+  it('leaves owner absent for an older Lambda or a malformed block', async () => {
+    for (const body of [
+      { success: true },
+      { success: true, owner: null },
+      { success: true, owner: 'x' },
+      { success: true, owner: { memberId: 42, email: null } },
+    ]) {
+      global.fetch = okFetch(body);
+      const result = await registerFamilyOrThrow(FAMILY, payload());
+      expect(result).toEqual({ pointerAccepted: true });
+      expect('owner' in result).toBe(false);
+    }
+  });
+});
+
 describe('registry DELETE — the writer id rides the query string', () => {
   beforeEach(() => vi.clearAllMocks());
 

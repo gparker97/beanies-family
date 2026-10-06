@@ -59,3 +59,25 @@ export function isUnshareableEmail(email: string): boolean {
 export function sameAccount(a: string | null | undefined, b: string | null | undefined): boolean {
   return !!a && !!b && a.toLowerCase() === b.toLowerCase();
 }
+
+/**
+ * The address worth storing as somebody's contact email, or `null`.
+ *
+ * Trims, then rejects anything `isValidEmail` would and the placeholders the app
+ * invents for members with no address yet (`isTemporaryEmail`). Used where an
+ * address leaves the device as a contact record (the registry's `ownerEmail`),
+ * so a placeholder can never be latched as the owner's mailbox.
+ *
+ * ⚠️ TWIN: the registry Lambda's `realEmail` in
+ * `infrastructure/lambda/registry/owner.mjs` applies the same rule server-side
+ * (it cannot import this file). `attributionTwinDrift.test.ts` runs one shared
+ * table through both; change them together.
+ */
+export function realEmail(email: string | null | undefined): string | null {
+  if (typeof email !== 'string') return null;
+  const trimmed = email.trim();
+  // Case-folded for the placeholder test only (domains are case-insensitive, and the Lambda
+  // twin folds too); the address itself is returned with its case intact.
+  if (!isValidEmail(trimmed) || isTemporaryEmail(trimmed.toLowerCase())) return null;
+  return trimmed;
+}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isValidEmail, isTemporaryEmail } from '../email';
+import { isValidEmail, isTemporaryEmail, realEmail } from '../email';
 
 describe('isValidEmail', () => {
   it.each(['user@example.com', 'a@b.co', 'user+tag@domain.org', 'first.last@sub.domain.com'])(
@@ -36,5 +36,33 @@ describe('isTemporaryEmail', () => {
 
   it('returns false for real emails', () => {
     expect(isTemporaryEmail('user@example.com')).toBe(false);
+  });
+});
+
+describe('realEmail', () => {
+  it('returns a valid address unchanged', () => {
+    expect(realEmail('user@example.com')).toBe('user@example.com');
+  });
+
+  it('returns the trimmed address, keeping its case', () => {
+    expect(realEmail('  User@Example.com  ')).toBe('User@Example.com');
+  });
+
+  it.each([
+    'abc@temp.beanies.family',
+    'pending-abc@setup.local',
+    '  pending-abc@setup.local  ',
+    'ABC@Temp.Beanies.Family',
+    '',
+    '   ',
+    'no-at-sign',
+    'a'.repeat(255) + '@example.com',
+  ])('returns null for a placeholder or invalid address: %j', (email) => {
+    expect(realEmail(email)).toBeNull();
+  });
+
+  it('returns null for null and undefined', () => {
+    expect(realEmail(null)).toBeNull();
+    expect(realEmail(undefined)).toBeNull();
   });
 });

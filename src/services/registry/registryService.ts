@@ -15,6 +15,18 @@ import { logEvent } from '@/services/telemetry';
  */
 export interface RegistryWriteResult {
   pointerAccepted: boolean;
+  /**
+   * The row's owner AFTER the write, as the Lambda stored it. Returned only for an
+   * `ownerSync` write (`registryOwnerSync` reads it to confirm a transfer landed);
+   * ABSENT on every other write and from a Lambda older than owner sync.
+   */
+  owner?: { memberId: string | null; email: string | null };
+  /**
+   * The Lambda's owner-sync outcome (`handover`, `email-synced`, `unchanged` or a
+   * `refused-*` reason; `owner.mjs`). Returned only for an `ownerSync` write; absent
+   * from a Lambda that predates it.
+   */
+  outcome?: string;
 }
 
 /**
@@ -68,7 +80,26 @@ export type RegistryWritePayload = Omit<RegistryEntry, 'familyId' | 'updatedAt'>
    * happen to exist this week.)
    */
   isSignupEvent?: boolean;
+  /**
+   * Transient, like `isSignupEvent` — never stored. Asks the Lambda to bring the
+   * row's `ownerMemberId` / `ownerEmail` in line with this payload's pod owner. Ownership changes ONLY on a write carrying it (every other write keeps
+   * the owner fields write-once), and the Lambda honours it only from the
+   * registered owner on the canonical pointer. `registryOwnerSync` is the one
+   * place that sets it.
+   */
+  ownerSync?: boolean;
+  /**
+   * Transient, sent only with `ownerSync`. Why the sync was sent, which decides
+   * whether a HANDOVER may go through once the row has been handed over before
+   * (the Lambda's `ownerHandoverAt` lock, `owner.mjs`): `'transfer'` (this device
+   * just transferred ownership and saved it) always may; `'drift'` (the client
+   * sends it for an owner email sync, same owner id) never needs to.
+   */
+  ownerSyncReason?: RegistryOwnerSyncReason;
 };
+
+/** Why an owner-sync write was sent; see `ownerSyncReason` on the payload. */
+export type RegistryOwnerSyncReason = 'transfer' | 'drift';
 
 const API_URL = import.meta.env.VITE_REGISTRY_API_URL;
 const API_KEY = import.meta.env.VITE_REGISTRY_API_KEY;
@@ -228,11 +259,16 @@ export async function registerFamily(
     // fleet-wide, and the investigation had to reconstruct it from Lambda logs.
     // Swallowing the failure for the CALLER is the contract; hiding it from the
     // firehose was never part of it.
+    // An owner-sync write gets its own action, so the ambient `put-failed` rate
+    // stays a rate of ambient writes and a failed ownership repair is greppable.
+    const ownerSync = entry.ownerSync === true;
     logEvent({
       level: 'warn',
       surface: 'registry',
-      message: 'family register failed — registry unavailable',
-      context: { action: 'put-failed' },
+      message: ownerSync
+        ? 'owner sync register failed — registry unavailable'
+        : 'family register failed — registry unavailable',
+      context: { action: ownerSync ? 'owner-sync-put-failed' : 'put-failed' },
       error: err,
     });
     return null; // swallowed a failure — the caller learns nothing about the pointer
@@ -269,8 +305,27 @@ export async function registerFamilyOrThrow(
   // ABSENT MEANS ACCEPTED. A self-hoster on an older Lambda — and the prod window
   // between the server hotfix and the client shipping — must not generate false
   // `critical` reports. Only an explicit `false` is a refusal.
-  const parsed = (await res.json().catch(() => ({}))) as { pointerAccepted?: boolean };
+  const parsed = (await res.json().catch(() => ({}))) as {
+    pointerAccepted?: boolean;
+    owner?: unknown;
+    outcome?: unknown;
+  };
   const pointerAccepted = parsed?.pointerAccepted !== false;
+  const owner = parseOwner(parsed?.owner);
+
+  // ⚠️ NOT FOR AN `ownerSync` WRITE. `registryOwnerSync` logs that write's own
+  // outcome, and it is ownership-only: it never
+  // asks to move the pointer, so a no-op `pointerAccepted: false` on it (a
+  // tombstoned row) is not a refused re-point. Counting it here would inflate the
+  // ambient `put` rate and the `refused` ratio below with a write that is neither.
+  if (entry.ownerSync === true) {
+    const outcome = typeof parsed?.outcome === 'string' ? parsed.outcome : undefined;
+    return {
+      pointerAccepted,
+      ...(owner ? { owner } : {}),
+      ...(outcome ? { outcome } : {}),
+    };
+  }
 
   // The success path too, and deliberately: a counter that only fires on failure
   // cannot give you a RATE. `count` says where the owner fields came from — 1
@@ -299,7 +354,23 @@ export async function registerFamilyOrThrow(
     });
   }
 
-  return { pointerAccepted };
+  return owner ? { pointerAccepted, owner } : { pointerAccepted };
+}
+
+/**
+ * The `owner` block of a PUT response, or `undefined` when it is absent or not the
+ * expected shape (an older Lambda, a non-`ownerSync` write). A malformed block is
+ * treated as absent rather than compared against.
+ */
+function parseOwner(raw: unknown): RegistryWriteResult['owner'] {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const { memberId, email } = raw as { memberId?: unknown; email?: unknown };
+  const str = (v: unknown): string | null | undefined =>
+    typeof v === 'string' ? v : v === null || v === undefined ? null : undefined;
+  const id = str(memberId);
+  const mail = str(email);
+  if (id === undefined || mail === undefined) return undefined;
+  return { memberId: id, email: mail };
 }
 
 /**

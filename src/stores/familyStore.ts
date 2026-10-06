@@ -80,6 +80,20 @@ export const useFamilyStore = defineStore('family', () => {
 
   const owner = computed(() => members.value.find((m) => m.role === 'owner'));
 
+  /**
+   * The roster owner ONLY when exactly one member has `role: 'owner'`, else `null`.
+   *
+   * `owner` above picks the first match, which is right for the UI but not for a
+   * claim made on the family's behalf: a transient two-owner state (a transfer
+   * merged from another device before `normalizeRoles` settles it) would let
+   * whichever owner sorts first speak for the pod. The registry owner sync reads
+   * THIS, so a two-owner roster never sends an owner change.
+   */
+  const soleOwner = computed(() => {
+    const owners = members.value.filter((m) => m.role === 'owner');
+    return owners.length === 1 ? owners[0]! : null;
+  });
+
   const hasOwner = computed(() => !!owner.value);
 
   const isSetupComplete = computed(() => hasOwner.value || members.value.length > 0);
@@ -1138,6 +1152,21 @@ export const useFamilyStore = defineStore('family', () => {
         });
       }
 
+      // Tell the registry (save the transfer, then hand the registry row over). Not awaited:
+      // the transfer is the document's and already done; the registry catches up behind it,
+      // and `onOwnershipTransferred` logs its own outcome and never throws.
+      try {
+        const { useSyncStore } = await import('./syncStore');
+        void useSyncStore().onOwnershipTransferred(toMemberId);
+      } catch (e) {
+        reportError({
+          surface: 'familyStore.transferOwnership',
+          message: 'registry owner sync after transfer failed to start',
+          severity: 'warning',
+          error: e,
+        });
+      }
+
       return true;
     });
     return result ?? false;
@@ -1188,6 +1217,7 @@ export const useFamilyStore = defineStore('family', () => {
     // Getters
     currentMember,
     owner,
+    soleOwner,
     hasOwner,
     isSetupComplete,
     sortedMembers,

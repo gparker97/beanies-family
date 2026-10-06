@@ -14,6 +14,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - The email unsubscribe page now has a one-tap re-subscribe, and says so when you are already unsubscribed.
 
+### Fixed
+
+- The family's registered owner now stays in step with the pod's actual owner, including after an ownership transfer or the owner changing their email.
+
 ### Changed
 
 - The privacy policy now makes clear that owner emails are separate from the Substack newsletter, and that the only activity used to choose who gets a "we miss you" email is a count of app uses.

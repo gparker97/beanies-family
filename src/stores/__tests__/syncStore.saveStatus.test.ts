@@ -117,6 +117,8 @@ vi.mock('@/services/automerge/repositories/settingsRepository', () => ({
   saveSettings: vi.fn(async () => {}),
 }));
 vi.mock('@/services/registry/registryService', () => ({
+  // syncStore installs the registry owner-sync observer at setup.
+  addRegistryEntryObserver: () => () => {},
   registerCurrentFamily: vi.fn(async () => {}),
 }));
 vi.mock('@/services/automerge/docService', () => ({ replaceDoc: vi.fn(), mergeDoc: vi.fn() }));

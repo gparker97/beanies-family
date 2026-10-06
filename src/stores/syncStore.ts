@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import type { LineageBasis, CachePersistFailureDetail } from '@/services/automerge/worker/protocol';
 import { decodeBaselinePayload, decodeHeadsFingerprint } from '@/services/sync/remoteBaseline';
-import { ref, computed, shallowRef, nextTick, watch } from 'vue';
+import { ref, computed, shallowRef, nextTick, watch, onScopeDispose } from 'vue';
 
 // Import stores for auto-sync and reload
 import { useAccountsStore } from './accountsStore';
@@ -40,6 +40,8 @@ import type { RedirectMode } from '@/services/google/redirectState';
 import { markFamilyJustCreated } from '@/utils/newFamilyFlag';
 import { features } from '@/config/features';
 import * as registry from '@/services/registry/registryService';
+import { createRegistryOwnerSync } from '@/services/registry/registryOwnerSync';
+import { realEmail } from '@/utils/email';
 import type { RegistryEntry } from '@/types/models';
 import * as syncService from '@/services/sync/syncService';
 import { GoogleDriveProvider } from '@/services/sync/providers/googleDriveProvider';
@@ -366,6 +368,9 @@ export const BLOCKER_KINDS: ReadonlySet<NonNullable<BackgroundSyncErrorKind>> = 
 export const BANNERED_BLOCKER_KINDS: ReadonlySet<NonNullable<BackgroundSyncErrorKind>> = new Set([
   'decrypt',
 ]);
+
+/** The installed registry owner-sync observer's remover (one per app; see its install below). */
+let removeOwnerSyncObserver: (() => void) | null = null;
 
 export const useSyncStore = defineStore('sync', () => {
   // State
@@ -2110,6 +2115,12 @@ export const useSyncStore = defineStore('sync', () => {
     }
     setupAutoSync();
     useAuthStore().markPodCreated();
+    // LAST, once the open is fully set up. Not Drive-specific despite this function's
+    // name: it is the single successful-open terminus (merge, open-guard skip, join/kit,
+    // cached-key paths), so it is where the session's AUTHORITATIVE load of the pod is
+    // known. Registry owner sync waits for it.
+    const loadedFamilyId = useFamilyContextStore().activeFamilyId;
+    if (loadedFamilyId) ownerSync.onAuthoritativeLoad(loadedFamilyId);
   }
 
   /**
@@ -3107,6 +3118,11 @@ export const useSyncStore = defineStore('sync', () => {
       isSignupEvent?: boolean;
       attribution?: Attribution | null;
       heardVia?: HeardViaId | null;
+      /**
+       * Only `registryOwnerSync`'s write sets this: an owner-sync write, sent for this reason.
+       * See `ownerSync` / `ownerSyncReason` on the payload type.
+       */
+      ownerSync?: registry.RegistryOwnerSyncReason;
     } = {}
   ): registry.RegistryWritePayload {
     const ctx = useFamilyContextStore();
@@ -3115,7 +3131,16 @@ export const useSyncStore = defineStore('sync', () => {
     // The family's own answer to "who owns this pod", read from the shared
     // document. `useFamilyStore()` is already used below for `memberCount`, so
     // this adds no coupling the payload did not already have.
-    const rosterOwner = useFamilyStore().owner;
+    //
+    // An owner-sync write names `soleOwner` (null unless exactly one member is
+    // owner), the definition the owner sync judged by, so a two-owner merge
+    // state can never be sent as a handover target. Every other write keeps
+    // `owner` (the first owner): the Lambda keeps those fields write-once, so
+    // there it only stamps a row that has none.
+    const familyStoreForPayload = useFamilyStore();
+    const rosterOwner = opts.ownerSync
+      ? familyStoreForPayload.soleOwner
+      : familyStoreForPayload.owner;
     return {
       provider: overrides.provider ?? storageProviderType.value ?? 'local',
       fileId: overrides.fileId ?? provider?.getFileId() ?? null,
@@ -3131,20 +3156,27 @@ export const useSyncStore = defineStore('sync', () => {
       // computes from the shared document, so every device now sends the SAME
       // value and no device can nominate itself.
       //
-      // ⚠️ NULL WHEN THERE IS NO RESOLVABLE ROSTER OWNER — never a fallback to
-      // the session. The Lambda preserves both fields when they arrive null or
-      // absent (`existing.x ?? body.x ?? null`), so a device that cannot see the
+      // ⚠️ OWNERSHIP ONLY CHANGES ON AN `ownerSync` WRITE. On every other write
+      // the Lambda keeps both fields write-once; only `registryOwnerSync` (the
+      // registered owner's device, after the authoritative load) sends the flag
+      // that lets them move (a transfer, an owner email edit).
+      //
+      // ⚠️ NULL WHEN THERE IS NO RESOLVABLE ROSTER OWNER (none; on an
+      // owner-sync write, also more than one) — never a fallback to the
+      // session. The Lambda preserves both fields when they arrive null or
+      // absent (`existing.x || body.x || null`), so a device that cannot see the
       // roster (doc not loaded yet, a background write mid-boot) leaves the
       // stored values exactly as they were. Substituting the local session there
       // would reintroduce the whole defect on precisely the paths least able to
       // judge it.
-      // ⚠️ `||`, NOT `??`, AND THIS ONE IS THE DANGEROUS HALF. The server latches
-      // `ownerEmail` WRITE-ONCE (`existing.ownerEmail ?? body.ownerEmail`), and
-      // `''` is not nullish — so once an empty string lands from a roster owner
-      // whose email is not filled in yet, it is permanent. Its legacy pointer
-      // tier then reads `!existing.ownerEmail` as TRUE forever, falling open for
-      // every writer, with no route back.
-      ownerEmail: rosterOwner?.email || null,
+      // ⚠️ THROUGH `realEmail`, AND THIS ONE IS THE DANGEROUS HALF. The server
+      // latches `ownerEmail` write-once, so an empty string or a placeholder
+      // (`…@temp.beanies.family`, `…@setup.local`) from a roster owner whose
+      // email is not filled in yet would be permanent, and an empty one makes its
+      // legacy pointer tier read `!existing.ownerEmail` as TRUE forever, falling
+      // open for every writer. `realEmail` sends null for all of those (the
+      // Lambda's `owner.mjs` twin re-applies the same rule).
+      ownerEmail: realEmail(rosterOwner?.email),
       ownerMemberId: rosterOwner?.id || null,
       // WHO IS WRITING, and the only thing the server's pointer guard consults.
       // Distinct from the owner above from this release onward; identical to it
@@ -3166,7 +3198,10 @@ export const useSyncStore = defineStore('sync', () => {
       // paths set `email: ''` (passkey sign-in fills it only after the file
       // decrypts).
       writerEmail: authStore.currentUser?.email || null,
-      subscribeNewsletter: authStore.newsletterOptIn ?? null,
+      // Null on an `ownerSync` write, which the Lambda reads as "keep the stored
+      // value": that write is ownership-only and must not carry this device's
+      // session opt-in (a consent) onto the row as a side effect.
+      subscribeNewsletter: opts.ownerSync ? null : (authStore.newsletterOptIn ?? null),
       country: useSettingsStore().country ?? null,
       beanpodSizeKb: currentBeanpodSizeKb(),
       // Roster size from the decrypted doc — a bare count, never member data.
@@ -3188,6 +3223,9 @@ export const useSyncStore = defineStore('sync', () => {
       heardVia: opts.heardVia ?? null,
       isLoginEvent: opts.isLoginEvent === true,
       isSignupEvent: opts.isSignupEvent === true,
+      ownerSync: !!opts.ownerSync,
+      // Absent (dropped from the JSON) on every write but an owner sync.
+      ownerSyncReason: opts.ownerSync,
     };
   }
 
@@ -5219,6 +5257,7 @@ export const useSyncStore = defineStore('sync', () => {
     configHealInFlight = false;
     verifyInFlight = false;
     invalidateCanonicalCheck();
+    ownerSync.reset();
     podAccessError.value = null;
     configHealTotalFailureReported = false;
     reconnecting.value = false;
@@ -7338,6 +7377,64 @@ export const useSyncStore = defineStore('sync', () => {
     }
   );
 
+  // ─── Registry owner sync ─────────────────────────────────────────────────
+  // Keeps the registry row's owner in line with the pod's after an owner email
+  // edit or an ownership transfer. Decisions live in `registryOwnerSync`; these
+  // are its inputs. See `~/projects/beanies-ops/docs/plans/2026-10-06-registry-owner-sync.md`.
+  const familyStoreForOwner = useFamilyStore();
+
+  const ownerSync = createRegistryOwnerSync({
+    activeFamilyId: () => useFamilyContextStore().activeFamilyId,
+    podOwner: () => familyStoreForOwner.soleOwner,
+    me: () => useAuthStore().currentUser?.memberId ?? null,
+    // Bound to the family the module judged: a family switch in between writes nothing.
+    write: (familyId, reason) =>
+      familyId === useFamilyContextStore().activeFamilyId
+        ? registry.registerFamily(familyId, buildRegistryPayload({}, { ownerSync: reason }))
+        : Promise.resolve(null),
+    // Before a transfer's registry write, so the file names the new owner first. The
+    // transfer's own debounced save is left armed (like every other durable-save caller):
+    // a rare redundant upload is cheaper than a lost save if this one times out then fails.
+    save: () => syncNowBounded(CREDENTIAL_PUBLISH_TIMEOUT_MS),
+    log: (detail, level, extra) =>
+      logEvent({
+        level,
+        surface: 'registry',
+        message: `owner-sync ${detail}`,
+        context: { action: 'owner-sync', detail, ...(extra?.kind ? { kind: extra.kind } : {}) },
+        ...(extra?.error === undefined ? {} : { error: extra.error }),
+      }),
+  });
+  // ONE observer per app, as in `entitlementStore`: a re-created store (each
+  // Pinia in tests) replaces its predecessor's rather than stacking beside it,
+  // and a disposed store takes its observer with it.
+  removeOwnerSyncObserver?.();
+  const removeMyOwnerSyncObserver = ownerSync.install();
+  removeOwnerSyncObserver = removeMyOwnerSyncObserver;
+  onScopeDispose(() => {
+    removeMyOwnerSyncObserver();
+    if (removeOwnerSyncObserver === removeMyOwnerSyncObserver) removeOwnerSyncObserver = null;
+  });
+  // A primitive key, so a members recompute that leaves the owner unchanged does
+  // not re-fire: an owner email edit does, and so does a late sign-in.
+  watch(
+    () => {
+      const o = familyStoreForOwner.soleOwner;
+      return `${o?.id ?? ''}|${o?.email ?? ''}|${useAuthStore().currentUser?.memberId ?? ''}`;
+    },
+    () => ownerSync.onOwnerChange()
+  );
+
+  /**
+   * `familyStore.transferOwnership`, after its mutate: save the transfer, then
+   * hand the registry row to `toMemberId`. Never throws; logs its own outcome.
+   */
+  function onOwnershipTransferred(toMemberId: string): Promise<void> {
+    // No registry (a self-host): nothing to hand over, and no GET would ever clear a marker.
+    if (!features.registry) return Promise.resolve();
+    return ownerSync.onOwnershipTransferred(toMemberId);
+  }
+
   return {
     // State
     isInitialized,
@@ -7450,6 +7547,7 @@ export const useSyncStore = defineStore('sync', () => {
     resetState,
     clearError,
     ensureRegistered,
+    onOwnershipTransferred,
     // Passkey secrets
     passkeySecrets,
     effectivePasskeySecrets,

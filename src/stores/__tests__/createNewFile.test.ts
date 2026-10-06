@@ -318,6 +318,8 @@ vi.mock('@/utils/slackNotify', () => ({
 
 // Registry service
 vi.mock('@/services/registry/registryService', () => ({
+  // syncStore installs the registry owner-sync observer at setup.
+  addRegistryEntryObserver: () => () => {},
   registerFamily: vi.fn(async () => {}),
   registerFamilyOrThrow: vi.fn(async () => {}),
   lookupFamily: vi.fn(async () => null),

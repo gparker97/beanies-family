@@ -130,6 +130,8 @@ vi.mock('@/services/telemetry/loginFlowEvents', () => ({ emitCacheKept: emitCach
 // `deleteLocalFamily` no longer does it, because that row belongs to the whole
 // family. Unmocked, this would reach a real `fetch`.
 vi.mock('@/services/registry/registryService', () => ({
+  // syncStore installs the registry owner-sync observer at setup.
+  addRegistryEntryObserver: () => () => {},
   removeFamily: removeFamilyMock,
 }));
 

@@ -200,6 +200,8 @@ vi.mock('@/services/indexeddb/database', () => ({
 }));
 
 vi.mock('@/services/registry/registryService', () => ({
+  // syncStore installs the registry owner-sync observer at setup.
+  addRegistryEntryObserver: () => () => {},
   registerFamily: (...a: unknown[]) =>
     (mockRegisterFamily as (...x: unknown[]) => Promise<void>)(...a),
   removeFamily: vi.fn(async () => {}),
