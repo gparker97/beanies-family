@@ -167,7 +167,7 @@ The site sends `{ kind, platform?, fields, loc }` as a `text/plain` JSON string 
 5. truncates `loc` to 120 characters, or stores `/` when it is not a path (never a rejection);
 6. writes one item to the events table (dev origins write to the dev table) and answers `204`; a DynamoDB failure answers `500`.
 
-Every request logs exactly one structured line: `{ msg: 'marketing_event', kind, platform, tagged, outcome: 'stored' | 'rejected' | 'error', reason }`. `kind` and `platform` are logged only when they are allowlisted values.
+Every request logs exactly one structured line: `{ msg: 'marketing_event', kind, platform, tagged, outcome: 'stored' | 'rejected' | 'error', reason }`. `kind` and `platform` are logged only when they are allowlisted values. `rejected` lines also carry `origin` (the `Origin` header reduced by `reduceOrigin` to `scheme://host[:port]`, or `none` / `null` / `invalid`, at most 80 characters) and `device` (`reduceUserAgent`), so a rejection can be told apart as a bot, a non-browser client or a real origin missing from `CORS_ORIGIN`; stored and error lines omit both.
 
 The item (`events.mjs` `buildItem`):
 

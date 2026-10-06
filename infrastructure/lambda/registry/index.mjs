@@ -9,6 +9,7 @@ import {
   MAX_BODY_BYTES,
   PLATFORMS,
   buildItem,
+  reduceOrigin,
   reduceUserAgent,
   validateEvent,
 } from './events.mjs';
@@ -337,6 +338,11 @@ function entitlementFor(familyId, row, billingRead) {
  * One structured line per `POST /events` request, success path included, so the acceptance rate
  * per kind is a CloudWatch count. `kind` / `platform` are logged only when they are allowlisted
  * values: a rejected body's raw values are arbitrary client input and never reach the log.
+ *
+ * `origin` and `device` appear on `rejected` lines only, and only in reduced form (`reduceOrigin`
+ * / `reduceUserAgent`), so a rejection can be told apart as a bot, a non-browser client or a real
+ * origin missing from the allowlist. Stored and error calls never pass them, and `JSON.stringify`
+ * drops `undefined`, so those lines keep their exact shape (pinned by tests).
  */
 function logMarketingEvent({
   kind = null,
@@ -344,6 +350,8 @@ function logMarketingEvent({
   tagged = null,
   outcome,
   reason = null,
+  origin,
+  device,
 }) {
   // eslint-disable-next-line no-console -- structured outcome line, read by CloudWatch
   console.log(
@@ -354,6 +362,8 @@ function logMarketingEvent({
       tagged,
       outcome,
       reason,
+      origin,
+      device,
     })
   );
 }
@@ -372,10 +382,22 @@ function logMarketingEvent({
  */
 async function handleEvents(event) {
   const origin = event.headers?.origin;
-  if (!origin || !ALLOWED_ORIGINS.includes(origin)) {
-    logMarketingEvent({ outcome: 'rejected', reason: 'origin_not_allowed' });
-    return response(403, { error: 'origin_not_allowed' }, event);
-  }
+  const device = reduceUserAgent(event.headers?.['user-agent']);
+  /** Log one rejection with its diagnostic origin/device and answer `status { error: reason }`. */
+  const reject = (status, reason, parsed) => {
+    // Keep the `?.`: a JSON `null` body reaches validation, and destructuring null would throw.
+    logMarketingEvent({
+      kind: parsed?.kind,
+      platform: parsed?.platform,
+      outcome: 'rejected',
+      reason,
+      origin: reduceOrigin(origin),
+      device,
+    });
+    return response(status, { error: reason }, event);
+  };
+
+  if (!origin || !ALLOWED_ORIGINS.includes(origin)) return reject(403, 'origin_not_allowed');
 
   // API Gateway v2 may base64-encode a body (the billing Lambda's `rawBodyOf` idiom). The size
   // check runs on the decoded bytes, before any parsing.
@@ -385,35 +407,23 @@ async function handleEvents(event) {
       : event.isBase64Encoded
         ? Buffer.from(event.body, 'base64')
         : Buffer.from(event.body, 'utf8');
-  if (raw.length > MAX_BODY_BYTES) {
-    logMarketingEvent({ outcome: 'rejected', reason: 'body_too_large' });
-    return response(400, { error: 'body_too_large' }, event);
-  }
+  if (raw.length > MAX_BODY_BYTES) return reject(400, 'body_too_large');
 
   let body;
   try {
     body = JSON.parse(raw.toString('utf8'));
   } catch {
-    logMarketingEvent({ outcome: 'rejected', reason: 'bad_json' });
-    return response(400, { error: 'bad_json' }, event);
+    return reject(400, 'bad_json');
   }
 
   const verdict = validateEvent(body, (fields) => validAttribution(fields, null));
-  if (!verdict.ok) {
-    logMarketingEvent({
-      kind: body?.kind,
-      platform: body?.platform,
-      outcome: 'rejected',
-      reason: verdict.reason,
-    });
-    return response(400, { error: verdict.reason }, event);
-  }
+  if (!verdict.ok) return reject(400, verdict.reason, body);
 
   const { kind, platform, tagged } = verdict.event;
   const item = buildItem(verdict.event, {
     now: Date.now(),
     origin,
-    device: reduceUserAgent(event.headers?.['user-agent']),
+    device,
     eventId: randomUUID(),
   });
   const tableName = tableForOrigin(origin, EVENTS_TABLES);

@@ -32,6 +32,30 @@ export const LEDGER_TTL_MS = 390 * 24 * 60 * 60 * 1000;
  */
 export const eventsTableName = (env) => `beanies-family-marketing-events-${env}`;
 
+/** Longest origin string a `marketing_event` line will carry (a DNS name alone can be 253). */
+export const MAX_ORIGIN_LOG_LENGTH = 80;
+
+/**
+ * Reduce a request `Origin` header to `scheme://host[:port]`, lower-cased and capped at
+ * MAX_ORIGIN_LOG_LENGTH, for the rejected-line diagnostic. Returns 'none' when the header is absent
+ * or blank (a non-browser client), 'null' for the literal opaque origin `null` (sandboxed frames,
+ * some in-app browsers), and 'invalid' when it does not parse. Never a path, query, fragment or
+ * userinfo. Diagnostic only: NOT an allowlist check (that compares the raw header). Never throws.
+ *
+ * Deliberately not `url.origin`: WHATWG returns the string 'null' for non-special schemes, which
+ * would hide `capacitor://...` and similar origins, the very cases this exists to show.
+ */
+export function reduceOrigin(origin) {
+  if (typeof origin !== 'string' || !origin.trim()) return 'none';
+  if (origin.trim() === 'null') return 'null';
+  try {
+    const url = new URL(origin);
+    return `${url.protocol}//${url.host}`.toLowerCase().slice(0, MAX_ORIGIN_LOG_LENGTH);
+  } catch {
+    return 'invalid';
+  }
+}
+
 const isPlainObject = (v) => typeof v === 'object' && v !== null && !Array.isArray(v);
 
 /**

@@ -16,6 +16,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
+- Visits to www.beanies.family are now counted by the site's first-party visit ledger.
 - The family's registered owner now stays in step with the pod's actual owner, including after an ownership transfer or the owner changing their email.
 
 ### Changed

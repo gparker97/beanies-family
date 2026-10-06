@@ -3,7 +3,13 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { Buffer } from 'node:buffer';
 import { createHash } from 'node:crypto';
 import { marshall, unmarshall } from '@aws-sdk/util-dynamodb';
-import { LEDGER_TTL_MS, MAX_LOC_LENGTH, reduceUserAgent } from './events.mjs';
+import {
+  LEDGER_TTL_MS,
+  MAX_LOC_LENGTH,
+  MAX_ORIGIN_LOG_LENGTH,
+  reduceOrigin,
+  reduceUserAgent,
+} from './events.mjs';
 
 // --- Mock the DynamoDB client (keep util-dynamodb's marshall/unmarshall real) ---
 const sendMock = vi.fn();
@@ -48,9 +54,10 @@ beforeAll(async () => {
   process.env.DEV_TABLE_NAME = 'registry-dev';
   process.env.REGISTRY_API_KEY = API_KEY;
   // The app origin stays FIRST: `getHeaders` falls back to the first entry. The site and the dev
-  // origin are allowlisted so the keyless `POST /events` route (#121) can be driven from both.
+  // origin are allowlisted so the keyless `POST /events` route (#121) can be driven from both;
+  // www mirrors the terraform `cors_origins` entry (the site also serves on www).
   process.env.CORS_ORIGIN =
-    'https://app.beanies.family,https://beanies.family,http://localhost:5173';
+    'https://app.beanies.family,https://beanies.family,https://www.beanies.family,http://localhost:5173';
   process.env.DEV_ORIGINS = 'http://localhost:5173';
   process.env.EVENTS_TABLE_NAME = 'events-prod';
   process.env.EVENTS_DEV_TABLE_NAME = 'events-dev';
@@ -1844,6 +1851,26 @@ function linesFor(msg) {
 const marketingLines = () => linesFor('marketing_event');
 
 describe('registry POST /events — accepted events (#121)', () => {
+  it('accepts the site on www and stores to the prod table (www is not a dev origin)', async () => {
+    const { res, item, table } = await postEvent(
+      { kind: 'landing', loc: '/' },
+      { origin: 'https://www.beanies.family' }
+    );
+    expect(res.statusCode).toBe(204);
+    expect(table).toBe('events-prod');
+    expect(item.origin).toBe('https://www.beanies.family');
+    expect(marketingLines()).toEqual([
+      {
+        msg: 'marketing_event',
+        kind: 'landing',
+        platform: null,
+        tagged: false,
+        outcome: 'stored',
+        reason: null,
+      },
+    ]);
+  });
+
   it('stores a tagged store_tap, keyless, and logs one stored line', async () => {
     const { res, item, table } = await postEvent({
       kind: 'store_tap',
@@ -2063,6 +2090,9 @@ describe('registry POST /events — rejections', () => {
     const lines = marketingLines();
     expect(lines).toHaveLength(1);
     expect(lines[0]).toMatchObject({ msg: 'marketing_event', outcome: 'rejected', reason });
+    // Every rejection carries the reduced diagnostic origin and device.
+    expect(lines[0]).toHaveProperty('origin');
+    expect(lines[0]).toHaveProperty('device');
   }
 
   it('rejects a foreign origin with 403 before reading the body', async () => {
@@ -2071,11 +2101,28 @@ describe('registry POST /events — rejections', () => {
       { origin: 'https://evil.example', raw: 'not json at all' }
     );
     expectRejected(res, 403, 'origin_not_allowed');
+    expect(marketingLines()[0]).toMatchObject({
+      origin: 'https://evil.example',
+      device: { class: 'phone', os: 'ios' },
+    });
+  });
+
+  it('logs only the scheme and host of a hostile origin, never its userinfo, path or query', async () => {
+    const { res } = await postEvent(
+      { kind: 'landing', loc: '/' },
+      { origin: 'https://user:pw@Evil.Example/p?q=1#frag' }
+    );
+    expectRejected(res, 403, 'origin_not_allowed');
+    const line = marketingLines()[0];
+    expect(line.origin).toBe('https://evil.example');
+    const logged = JSON.stringify(line);
+    for (const leaked of ['user', 'pw', '/p', 'q=1', 'frag']) expect(logged).not.toContain(leaked);
   });
 
   it('rejects an absent origin with 403 (browsers always send one on POST)', async () => {
     const { res } = await postEvent({ kind: 'landing', loc: '/' }, { origin: null });
     expectRejected(res, 403, 'origin_not_allowed');
+    expect(marketingLines()[0].origin).toBe('none');
   });
 
   it('rejects an unknown kind, without logging the raw value', async () => {
@@ -2159,6 +2206,29 @@ describe('registry POST /events — rejections', () => {
     });
     expect(res.statusCode).toBe(401);
     expect(sendMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('reduceOrigin', () => {
+  it.each([
+    ['https://beanies.family', 'https://beanies.family'],
+    ['http://localhost:5173', 'http://localhost:5173'],
+    ['HTTPS://WWW.Beanies.Family', 'https://www.beanies.family'],
+    ['https://user:pw@evil.example/path?q=1#f', 'https://evil.example'],
+    ['capacitor://app.beanies.family', 'capacitor://app.beanies.family'],
+    [undefined, 'none'],
+    ['', 'none'],
+    ['   ', 'none'],
+    ['null', 'null'],
+    ['not a url', 'invalid'],
+  ])('%s -> %s', (input, expected) => {
+    expect(reduceOrigin(input)).toBe(expected);
+  });
+
+  it('caps an over-long origin at MAX_ORIGIN_LOG_LENGTH', () => {
+    const out = reduceOrigin(`https://${'a.'.repeat(60)}example`);
+    expect(out).toHaveLength(MAX_ORIGIN_LOG_LENGTH);
+    expect(out.startsWith('https://a.a.')).toBe(true);
   });
 });
 
