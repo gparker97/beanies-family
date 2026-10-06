@@ -106,6 +106,8 @@ const META_PREFIX = 'meta:';
 export type CacheMetaCounter = 'base-decrypt-failures' | 'fence-merges';
 /** Rows waiting on missing deps that were already reported (paged) once. */
 const META_REPORTED = `${META_PREFIX}replay-reported`;
+/** A report-marker entry for changes the base buffers itself: the prefix, then their missing deps. */
+const BASE_QUEUE_REPORT_PREFIX = 'base-deps:';
 
 /**
  * This realm's increment-key suffix (C5h). Two tabs of one device share one cache DB, each with
@@ -655,7 +657,8 @@ export async function loadCachedDoc(
     applied: Map<string, Uint8Array[]>,
     skipped: string[]
   ): Promise<{ doc: Doc } & CacheReplay> => {
-    const missingDeps = Automerge.getMissingDeps(doc, []).length;
+    const missing = Automerge.getMissingDeps(doc, []);
+    const missingDeps = missing.length;
     const contained = new Set<string>();
     const waiting: string[] = [];
     for (const [id, changes] of applied) {
@@ -674,7 +677,13 @@ export async function loadCachedDoc(
       containedRows = contained;
       pendingRows = waiting;
     }
-    const triage = await triageReplayRows(db, skipped, waiting);
+    // Changes buffered by the BASE itself (`Automerge.save` keeps them) wait in no row, so the
+    // report marker remembers their missing deps instead: one report, not one per open.
+    const reportable =
+      missingDeps > 0 && waiting.length === 0
+        ? [`${BASE_QUEUE_REPORT_PREFIX}${[...missing].sort().join('+')}`]
+        : waiting;
+    const triage = await triageReplayRows(db, skipped, reportable);
     return {
       doc,
       recovered: skipped.length > 0 || missingDeps > 0,
@@ -682,7 +691,7 @@ export async function loadCachedDoc(
       missingDeps,
       incrementCount: incEntries.length,
       ...(triage.quarantined ? { quarantined: triage.quarantined } : {}),
-      ...(skipped.length || waiting.length ? { newlyReported: triage.newlyReported } : {}),
+      ...(skipped.length || reportable.length ? { newlyReported: triage.newlyReported } : {}),
       ...(triage.bookkeepingFailed.length ? { bookkeepingFailed: triage.bookkeepingFailed } : {}),
     };
   };
@@ -761,6 +770,8 @@ export async function loadCachedDoc(
  *    re-reported. Each is reported exactly once, on the open that quarantined it.
  *  - rows WAITING on missing deps stay (the fence needs them); the ids already reported are
  *    remembered in a plaintext marker row, so only a row never seen before counts as new.
+ *  - changes the BASE buffers itself wait in no row: they ride in `waiting` as one
+ *    `base-deps:<hashes>` entry (change hashes only, no content), reported once the same way.
  * Best-effort: a failed bookkeeping write logs and degrades to "report again next open".
  */
 async function triageReplayRows(

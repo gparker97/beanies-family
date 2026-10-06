@@ -315,6 +315,44 @@ describe('round 3, item 6: damaged replay rows are reported once and leave repla
     expect(liveTodos()).toEqual(['a']);
   });
 
+  it('changes the BASE buffers itself are reported once, then given up like a waiting row', async () => {
+    // The field shape (2026-10-06): `Automerge.save` keeps buffered changes, so the base carries
+    // them and no increment row waits. The marker used to have nothing to remember, and every
+    // open paged as a first sighting.
+    ap.initDoc();
+    await ap.openCache(FAMILY);
+    setTodo('a');
+    await ap.flush();
+    const d0 = loadDoc(ap.exportSnapshot().binary);
+    const remote = await envelopeOf(d0);
+    const d1 = Automerge.change(d0, (d) => {
+      (d.todos as Record<string, unknown>).b = { id: 'b', title: 'b' };
+    });
+    const d2 = Automerge.change(d1, (d) => {
+      (d.todos as Record<string, unknown>).c = { id: 'c', title: 'c' };
+    });
+    const [queued] = Automerge.applyChanges(
+      loadDoc(ap.exportSnapshot().binary),
+      getChangesSince(d2, getHeads(d1))
+    );
+    await putRaw('base', bufferToBase64(await encryptPayload(key, saveDoc(queued))));
+
+    const seen: Array<Record<string, unknown> | undefined> = [];
+    for (let i = 0; i < 4; i++) {
+      await reload();
+      seen.push((await ap.initAndLoadCache(FAMILY)).replay as never);
+      if (i < 2) await ap.mergeRemoteEnvelope(remote, FAMILY, BASELINE);
+      await ap.flush();
+    }
+    expect(seen[0]).toMatchObject({ missingDeps: 1, droppedIncrements: 0, newlyReported: 1 });
+    expect(seen[1]).toMatchObject({ missingDeps: 1, newlyReported: 0 });
+    expect(seen[2]).toMatchObject({ missingDeps: 1, newlyReported: 0, fenceGaveUp: true });
+    expect(seen[3]).toMatchObject({ recovered: false, missingDeps: 0 });
+    expect(seen[3]?.newlyReported).toBeUndefined();
+    expect((await allKeys()).some((k) => k.endsWith('replay-reported'))).toBe(false);
+    expect(liveTodos()).toEqual(['a']);
+  });
+
   it('foreign rows a base write could not delete do not count toward re-compaction', async () => {
     ap.initDoc();
     await ap.openCache(FAMILY);
