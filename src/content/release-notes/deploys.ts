@@ -17,6 +17,101 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.10.07',
+    date: '2026-10-07',
+    month: '7 october 2026',
+    spotlight: true,
+    summary: {
+      en: 'Tidying up the edge cases on the way to v1: a round of robustness improvements to saving, syncing and the calendar.',
+      beanie:
+        'tidying up the edge cases on the way to v1: a round of robustness improvements to saving, syncing and the calendar.',
+    },
+    features: [
+      {
+        icon: '\u{1F4F6}',
+        title: {
+          en: 'Saving on a very slow connection',
+          beanie: 'saving on a very slow connection',
+        },
+        description: {
+          en: 'Fixed an edge case where a large family file on a weak mobile signal could run out of time mid-upload and show a "can\'t save" alarm. The save now waits and retries as "Waiting to Save", and bigger files get the time they need.',
+          beanie:
+            'fixed an edge case where a large family file on a weak mobile signal could run out of time mid-upload and show a "can\'t save" alarm. the save now waits and retries as "waiting to save", and bigger files get the time they need.',
+        },
+      },
+      {
+        icon: '\u{1F91D}',
+        title: {
+          en: 'The same item edited on two devices at once',
+          beanie: 'the same item edited on two devices at once',
+        },
+        description: {
+          en: 'Patched a longstanding edge case that applied when two people changed the same list, recipe, holiday vote, goal or loan between syncs: the later save could win over the earlier one. Both edits are now kept, and a form only writes the fields you changed.',
+          beanie:
+            'patched a longstanding edge case that applied when two people changed the same list, recipe, holiday vote, goal or loan between syncs: the later save could win over the earlier one. both edits are now kept, and a form only writes the fields you changed.',
+        },
+      },
+      {
+        icon: '\u{1F4B0}',
+        title: {
+          en: 'Balance adjustments from two devices',
+          beanie: 'balance adjustments from two devices',
+        },
+        description: {
+          en: 'In the rare case where two devices adjusted the same account, goal or loan before syncing, one adjustment could replace the other. They now add up.',
+          beanie:
+            'in the rare case where two devices adjusted the same account, goal or loan before syncing, one adjustment could replace the other. they now add up.',
+        },
+      },
+      {
+        icon: '\u{1F552}',
+        title: {
+          en: 'Calendar sync from a device abroad',
+          beanie: 'calendar sync from a device abroad',
+        },
+        description: {
+          en: "Fixed an edge case where a family member syncing from another time zone could shift Google Calendar events to their local time. Events are now written in the family's home time zone, which you can set in Settings, and any that were moved are put back.",
+          beanie:
+            "fixed an edge case where a family member syncing from another time zone could shift google calendar events to their local time. events are now written in the family's home time zone, which you can set in settings, and any that were moved are put back.",
+        },
+      },
+      {
+        icon: '\u{1F4C2}',
+        title: {
+          en: 'Small safeguards around the family file',
+          beanie: 'small safeguards around the family file',
+        },
+        description: {
+          en: 'A device on a much older version is now asked to update before it writes over a tidied-up family file, joining a family does one unhurried upload instead of two, and the "can\'t save locally" message now tells you why.',
+          beanie:
+            'a device on a much older version is now asked to update before it writes over a tidied-up family file, joining a family does one unhurried upload instead of two, and the "can\'t save locally" message now tells you why.',
+        },
+      },
+      {
+        icon: '\u{1F50E}',
+        title: { en: 'A sweep of the save paths', beanie: 'a sweep of the save paths' },
+        description: {
+          en: 'As part of getting ready for v1, we reviewed how beanies saves, switches between families, restores from your file and attaches photos, and tidied up a number of corner cases along the way.',
+          beanie:
+            'as part of getting ready for v1, we reviewed how beanies saves, switches between families, restores from your file and attaches photos, and tidied up a number of corner cases along the way.',
+        },
+      },
+      {
+        icon: '\u{1F4AC}',
+        title: { en: 'Join us on Discord', beanie: 'join us on discord' },
+        description: {
+          en: "Get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+          beanie:
+            "get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+        },
+        cta: {
+          label: { en: 'Join the Discord', beanie: 'join the discord' },
+          href: 'https://beanies.family/discord',
+        },
+      },
+    ],
+  },
+  {
     version: '2026.10.05',
     date: '2026-10-05',
     month: '5 october 2026',
