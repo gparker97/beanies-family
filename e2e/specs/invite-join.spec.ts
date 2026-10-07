@@ -1,7 +1,7 @@
 import { test, expect } from '../fixtures/test';
 import type { Route } from '@playwright/test';
 import { bypassLoginIfNeeded } from '../helpers/auth';
-import { gotoRoot } from '../helpers/navigation';
+import { gotoRoot, gotoRoute } from '../helpers/navigation';
 import { IndexedDBHelper } from '../helpers/indexeddb';
 test.describe('Magic Link Invite System', () => {
   test('Invite wizard: picker → add-bean → Step 1 → Step 2 with QR', async ({ page }) => {
@@ -12,8 +12,29 @@ test.describe('Magic Link Invite System', () => {
     await bypassLoginIfNeeded(page);
 
     // Navigate to The Pod (/family auto-redirects to /pod as of 2026-04).
-    await page.goto('/pod');
+    // A raw `page.goto` does not stage the worker doc snapshot, so the reloaded
+    // page had 0 members and the Invite button existed only through the
+    // session-role fallback that #85 removes. `gotoRoute` stages the snapshot
+    // (see e2e/helpers/navigation.ts), and the assertion below keeps this spec
+    // from ever running on a phantom pod again.
+    await gotoRoute(page, '/pod');
     await page.waitForURL(/\/pod(\/|$)/);
+    // Polled, not read once: the staged snapshot restores asynchronously after the
+    // navigation commits (same gate `IndexedDBHelper.seedData` uses).
+    await expect
+      .poll(
+        // `null` until the reloaded page has installed the data bridge; a throw here would
+        // abort the poll instead of retrying it.
+        async () =>
+          (await dbHelper.exportData().catch(() => null))?.familyMembers.some(
+            (m) => m.role === 'owner'
+          ) ?? false,
+        {
+          timeout: 30000,
+          message: 'owner never appeared after the staged reload: the spec is on a phantom pod',
+        }
+      )
+      .toBe(true);
 
     // --- Part 1: Open wizard from generic CTA — picker (Step 0) opens ---
 
