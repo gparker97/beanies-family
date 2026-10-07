@@ -29,6 +29,8 @@ const h = vi.hoisted(() => ({
   pulse: vi.fn(),
   recoveryKits: [] as unknown[],
   liveRecoveryKitCount: 1,
+  nudgePending: { value: false },
+  nudgeResolve: vi.fn(),
 }));
 
 vi.mock('@/composables/useConfirm', () => ({ confirm: h.confirm, alert: vi.fn() }));
@@ -62,6 +64,15 @@ vi.mock('@/stores/authStore', () => ({
   useAuthStore: () => ({
     invalidateRecoveryKit: h.invalidateRecoveryKit,
     setRecoveryPassphrase: vi.fn(),
+    checkFamilyPassphrase: vi.fn(async () => ({ ok: true, score: 4 })),
+  }),
+}));
+vi.mock('@/composables/usePassphraseNudge', () => ({
+  usePassphraseNudge: () => ({
+    // A real ref (read at mount), so the template unwraps it as the real computed is.
+    isPending: ref(h.nudgePending.value),
+    dismiss: vi.fn(),
+    resolve: h.nudgeResolve,
   }),
 }));
 vi.mock('@/stores/syncStore', () => ({
@@ -74,6 +85,9 @@ vi.mock('@/stores/syncStore', () => ({
       return h.liveRecoveryKitCount;
     },
   }),
+}));
+vi.mock('@/utils/passphraseStrength', () => ({
+  generatePassphrase: vi.fn(async () => 'one-two-three-four-five-six'),
 }));
 vi.mock('@/composables/useTranslation', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
@@ -113,6 +127,7 @@ beforeEach(() => {
   h.flowError.value = null;
   h.recoveryKits = [oldKit];
   h.liveRecoveryKitCount = 1;
+  h.nudgePending.value = false;
   h.approveReplace.mockResolvedValue(true);
   h.confirm.mockResolvedValue(true);
   h.confirmStored.mockResolvedValue(true);
@@ -280,5 +295,27 @@ describe('RecoverySettings — create confirm and the empty-state pulse', () => 
     vi.advanceTimersByTime(400);
     expect(h.pulse).not.toHaveBeenCalled();
     vi.useRealTimers();
+  });
+});
+
+describe('RecoverySettings — passphrase half', () => {
+  it('renders the extracted editor with no legacy nudge when none is pending', async () => {
+    const w = mountSettings();
+    const editor = w.findComponent({ name: 'RecoveryPassphraseEditor' });
+    expect(editor.exists()).toBe(true);
+    expect(editor.props()).toEqual({ hasPassphrase: false, legacyPending: false });
+  });
+
+  it('passes a pending legacy-passphrase nudge to the editor', async () => {
+    h.nudgePending.value = true;
+    const w = mountSettings();
+    expect(w.findComponent({ name: 'RecoveryPassphraseEditor' }).props('legacyPending')).toBe(true);
+  });
+
+  it('a saved passphrase resolves the nudge and shows the saved message', async () => {
+    const w = mountSettings();
+    await w.findComponent({ name: 'RecoveryPassphraseEditor' }).vm.$emit('saved');
+    expect(h.nudgeResolve).toHaveBeenCalledTimes(1);
+    expect(w.text()).toContain('recovery.passphraseSaved');
   });
 });

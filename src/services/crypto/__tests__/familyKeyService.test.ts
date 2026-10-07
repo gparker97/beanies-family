@@ -9,8 +9,13 @@ import {
   unwrapFamilyKey,
   encryptPayload,
   decryptPayload,
+  isWrongKeyUnwrap,
   SALT_LENGTH,
 } from '../familyKeyService';
+import { LEGACY_ITERATIONS, KdfParamsError, type KdfParams } from '../kdfParams';
+
+/** Legacy-count params: cheap enough for a unit test, and what every pre-ADR-041 wrap used. */
+const P: KdfParams = { profile: 'secret', iterations: LEGACY_ITERATIONS };
 
 describe('familyKeyService', () => {
   // ── Key generation ──────────────────────────────────────────────
@@ -67,8 +72,8 @@ describe('familyKeyService', () => {
   describe('deriveMemberKey', () => {
     it('produces deterministic keys for same password + salt', async () => {
       const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
-      const key1 = await deriveMemberKey('password123', salt);
-      const key2 = await deriveMemberKey('password123', salt);
+      const key1 = await deriveMemberKey('password123', salt, P);
+      const key2 = await deriveMemberKey('password123', salt, P);
       // Cannot compare CryptoKeys directly, but wrapping the same FK should produce
       // identical output
       const fk = await generateFamilyKey();
@@ -80,16 +85,28 @@ describe('familyKeyService', () => {
     it('produces different keys for different passwords', async () => {
       const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
       const fk = await generateFamilyKey();
-      const key1 = await deriveMemberKey('password-A', salt);
-      const key2 = await deriveMemberKey('password-B', salt);
+      const key1 = await deriveMemberKey('password-A', salt, P);
+      const key2 = await deriveMemberKey('password-B', salt, P);
       const wrapped1 = await wrapFamilyKey(fk, key1);
       const wrapped2 = await wrapFamilyKey(fk, key2);
       expect(wrapped1).not.toBe(wrapped2);
     });
 
+    it('honours the iteration count it is given (a different count is a different key)', async () => {
+      const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
+      const fk = await generateFamilyKey();
+      const legacy = await deriveMemberKey('same-password', salt, P);
+      const other = await deriveMemberKey('same-password', salt, {
+        profile: 'secret',
+        iterations: LEGACY_ITERATIONS + 1,
+      });
+      const wrapped = await wrapFamilyKey(fk, legacy);
+      await expect(unwrapFamilyKey(wrapped, other)).rejects.toThrow();
+    });
+
     it('produces an AES-KW key', async () => {
       const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
-      const key = await deriveMemberKey('test', salt);
+      const key = await deriveMemberKey('test', salt, P);
       expect(key.algorithm).toMatchObject({ name: 'AES-KW', length: 256 });
       expect(key.usages).toContain('wrapKey');
       expect(key.usages).toContain('unwrapKey');
@@ -102,7 +119,7 @@ describe('familyKeyService', () => {
     it('round-trips the family key', async () => {
       const fk = await generateFamilyKey();
       const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
-      const wrappingKey = await deriveMemberKey('my-password', salt);
+      const wrappingKey = await deriveMemberKey('my-password', salt, P);
 
       const wrapped = await wrapFamilyKey(fk, wrappingKey);
       expect(typeof wrapped).toBe('string');
@@ -120,12 +137,36 @@ describe('familyKeyService', () => {
     it('rejects wrong wrapping key', async () => {
       const fk = await generateFamilyKey();
       const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
-      const correctKey = await deriveMemberKey('correct-password', salt);
-      const wrongKey = await deriveMemberKey('wrong-password', salt);
+      const correctKey = await deriveMemberKey('correct-password', salt, P);
+      const wrongKey = await deriveMemberKey('wrong-password', salt, P);
 
       const wrapped = await wrapFamilyKey(fk, correctKey);
 
       await expect(unwrapFamilyKey(wrapped, wrongKey)).rejects.toThrow();
+    });
+  });
+
+  // ── isWrongKeyUnwrap ────────────────────────────────────────────
+
+  describe('isWrongKeyUnwrap', () => {
+    it('is true for the error a wrong-key AES-KW unwrap actually raises', async () => {
+      const fk = await generateFamilyKey();
+      const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
+      const wrapped = await wrapFamilyKey(fk, await deriveMemberKey('right', salt, P));
+      const err = await unwrapFamilyKey(wrapped, await deriveMemberKey('wrong', salt, P)).catch(
+        (e: unknown) => e
+      );
+      expect(isWrongKeyUnwrap(err)).toBe(true);
+    });
+
+    it('is false for every other failure, so a broken entry is never "wrong password"', () => {
+      expect(isWrongKeyUnwrap(new KdfParamsError('bad'))).toBe(false);
+      expect(isWrongKeyUnwrap(new TypeError('bad salt'))).toBe(false);
+      expect(isWrongKeyUnwrap(new DOMException('x', 'DataError'))).toBe(false);
+      expect(isWrongKeyUnwrap(null)).toBe(false);
+      expect(isWrongKeyUnwrap('OperationError')).toBe(false);
+      // Read by name, not instanceof, so it holds across realms / test DOMs.
+      expect(isWrongKeyUnwrap({ name: 'OperationError' })).toBe(true);
     });
   });
 

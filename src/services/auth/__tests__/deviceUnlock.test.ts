@@ -25,6 +25,13 @@ import {
   type DeviceUnlockRecordWithFp,
 } from '@/services/auth/deviceUnlock';
 import { generateFamilyKey, exportFamilyKey } from '@/services/crypto/familyKeyService';
+import { KDF_PROFILES } from '@/services/crypto/kdfParams';
+import { __resetDeviceSecretCacheForTests } from '@/services/auth/deviceSecret';
+import {
+  getDeviceSecret,
+  saveDeviceSecret,
+} from '@/services/indexeddb/repositories/deviceUnlockRepository';
+import { bufferToBase64 } from '@/utils/encoding';
 
 // happy-dom's crypto lacks subtle in some configs — pin to node's webcrypto.
 if (!globalThis.crypto?.subtle) {
@@ -198,5 +205,52 @@ describe('deviceUnlock pinHash fingerprint (pinVersion fence)', () => {
     expect(
       await pinWrapIsStale({ pinVersion: 2, pinHashFp: undefined }, { pinVersion: 2, pinHash: 'x' })
     ).toBe(false);
+  });
+  // The `hkdf+pbkdf2` fallback stretches the PIN through the ONE PBKDF2 primitive, at the
+  // `deviceFallback` count, unchanged from before kdfParams existed. Last in the suite: it
+  // swaps the device secret to the extractable-bytes mode and restores it afterwards.
+  it('the extractable-bytes fallback round-trips via the deviceFallback profile', async () => {
+    const previous = await getDeviceSecret();
+    try {
+      await saveDeviceSecret({
+        id: 'device_secret',
+        rawSecret: bufferToBase64(crypto.getRandomValues(new Uint8Array(32))),
+        kdf: 'hkdf+pbkdf2',
+        createdAt: new Date().toISOString(),
+      });
+      __resetDeviceSecretCacheForTests();
+      const fk = await generateFamilyKey();
+      await enrollPinUnlock({
+        familyId: 'fam-fb',
+        member,
+        pin: '246810',
+        familyKey: fk,
+        keyId: 'k',
+      });
+      expect((await getPinUnlockRecord('fam-fb', 'm-1'))?.kdf).toBe('hkdf+pbkdf2');
+
+      expect((await unlockWithPin({ familyId: 'fam-fb', memberId: 'm-1', pin: '000000' })).ok).toBe(
+        false
+      );
+      const result = await unlockWithPin({ familyId: 'fam-fb', memberId: 'm-1', pin: '246810' });
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(await exportFamilyKey(result.familyKey)).toEqual(await exportFamilyKey(fk));
+      }
+
+      const derives = logEvent.mock.calls
+        .map(([e]) => e as { message: string; context: Record<string, unknown> })
+        .filter((e) => e.message === 'kdf_derive');
+      expect(derives.length).toBe(3); // enrol + wrong PIN + right PIN
+      for (const e of derives) {
+        expect(e.context).toMatchObject({
+          kind: 'deviceFallback',
+          count: KDF_PROFILES.deviceFallback,
+        });
+      }
+    } finally {
+      if (previous) await saveDeviceSecret(previous);
+      __resetDeviceSecretCacheForTests();
+    }
   });
 });

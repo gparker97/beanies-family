@@ -9,11 +9,16 @@
  * parse/validate (`parseBeanpodV4`, `detectFileVersion`), and key unwrap
  * (`tryUnwrapFamilyKey`). Those are what this file exercises.
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+const logEvent = vi.hoisted(() => vi.fn());
+vi.mock('@/services/telemetry/logEvent', () => ({ logEvent }));
+
 import {
   createBeanpodV4,
   parseBeanpodV4,
   tryUnwrapFamilyKey,
+  unwrapWrappedKey,
   reEncryptEnvelope,
   beanpodVersionFor,
 } from './fileSync';
@@ -24,11 +29,13 @@ import {
 } from '@/types/sync';
 import {
   generateFamilyKey,
+  exportFamilyKey,
   deriveMemberKey,
   wrapFamilyKey,
 } from '@/services/crypto/familyKeyService';
+import { LEGACY_ITERATIONS } from '@/services/crypto/kdfParams';
 import { bufferToBase64 } from '@/utils/encoding';
-import type { BeanpodFileV4 } from '@/types/syncFileV4';
+import type { BeanpodFileV4, WrappedMemberKey } from '@/types/syncFileV4';
 
 describe('fileSync V4 format', () => {
   let familyKey: CryptoKey;
@@ -292,26 +299,115 @@ describe('fileSync V4 format', () => {
 
   // ── tryUnwrapFamilyKey password-collision behavior ─────────────────
 
-  describe('tryUnwrapFamilyKey detects same-password collisions', () => {
-    async function buildEnvelopeWithMembers(
-      members: Array<{ memberId: string; password: string }>
-    ): Promise<BeanpodFileV4> {
-      const wrappedKeys: Record<string, { wrapped: string; salt: string }> = {};
-      for (const m of members) {
-        const salt = crypto.getRandomValues(new Uint8Array(16));
-        const memberKey = await deriveMemberKey(m.password, salt);
-        const wrapped = await wrapFamilyKey(familyKey, memberKey);
-        wrappedKeys[m.memberId] = { wrapped, salt: bufferToBase64(salt) };
-      }
-      return {
-        version: '4.0',
-        familyId: 'fam-test',
-        familyName: 'Test',
-        encryptedPayload: '',
-        wrappedKeys,
-      } as BeanpodFileV4;
-    }
+  /**
+   * A member wrap. With no `iterations` it is written exactly as a pre-ADR-041 build did
+   * (legacy 100k, no field); with one it records the count it was made at.
+   */
+  async function makeWrap(password: string, iterations?: number): Promise<WrappedMemberKey> {
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const memberKey = await deriveMemberKey(password, salt, {
+      profile: 'secret',
+      iterations: iterations ?? LEGACY_ITERATIONS,
+    });
+    const wrapped = await wrapFamilyKey(familyKey, memberKey);
+    return {
+      wrapped,
+      salt: bufferToBase64(salt),
+      ...(iterations !== undefined ? { iterations } : {}),
+    };
+  }
 
+  async function buildEnvelopeWithMembers(
+    members: Array<{ memberId: string; password: string; iterations?: number }>,
+    extra: Partial<BeanpodFileV4> = {}
+  ): Promise<BeanpodFileV4> {
+    const wrappedKeys: Record<string, WrappedMemberKey> = {};
+    for (const m of members) {
+      wrappedKeys[m.memberId] = await makeWrap(m.password, m.iterations);
+    }
+    return {
+      version: '4.0',
+      familyId: 'fam-test',
+      familyName: 'Test',
+      encryptedPayload: '',
+      wrappedKeys,
+      ...extra,
+    } as BeanpodFileV4;
+  }
+
+  // ── unwrapWrappedKey: read-both + loud on a broken entry (ADR-041) ──
+
+  describe('unwrapWrappedKey reads the recorded count', () => {
+    beforeEach(() => logEvent.mockClear());
+
+    it('a legacy entry with no iterations still unwraps', async () => {
+      const entry = await makeWrap('pw');
+      expect(entry).not.toHaveProperty('iterations');
+      const fk = await unwrapWrappedKey(entry, 'pw');
+      expect(fk).not.toBeNull();
+      expect(await exportFamilyKey(fk!)).toEqual(await exportFamilyKey(familyKey));
+    });
+
+    it('an entry derives at the count it records, not a constant', async () => {
+      const entry = await makeWrap('pw', 2_000);
+      expect(await unwrapWrappedKey(entry, 'pw')).not.toBeNull();
+      // The same wrap read as legacy (field dropped) does not open: the count is honoured.
+      const { iterations: _dropped, ...asLegacy } = entry;
+      expect(await unwrapWrappedKey(asLegacy, 'pw')).toBeNull();
+    });
+
+    it('a wrong password is a quiet null (no telemetry: it is the expected miss)', async () => {
+      const entry = await makeWrap('pw');
+      expect(await unwrapWrappedKey(entry, 'nope')).toBeNull();
+      expect(logEvent).not.toHaveBeenCalled();
+    });
+
+    it('the passphrase wrap is attributed as kind passphrase, never member', async () => {
+      logEvent.mockClear();
+      const r = await unwrapWrappedKey(
+        {
+          wrapped: 'AAAA',
+          salt: 'AAAAAAAAAAAAAAAAAAAAAA==',
+          iterations: 'abc' as unknown as number,
+        },
+        'pw',
+        'passphrase'
+      );
+      expect(r).toBeNull();
+      expect(logEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          context: expect.objectContaining({ action: 'wrap_entry_unusable', kind: 'passphrase' }),
+        })
+      );
+    });
+
+    it('a corrupt iterations is null for the caller but logged wrap_entry_unusable', async () => {
+      const entry = { ...(await makeWrap('pw')), iterations: 'lots' as unknown as number };
+      expect(await unwrapWrappedKey(entry, 'pw')).toBeNull();
+      expect(logEvent).toHaveBeenCalledTimes(1);
+      expect(logEvent.mock.calls[0]![0]).toMatchObject({
+        level: 'warn',
+        surface: 'login-flow',
+        context: { action: 'wrap_entry_unusable', error_code: 'KdfParamsError', kind: 'member' },
+      });
+    });
+
+    it('a count over the DoS bound is refused before any derivation', async () => {
+      const entry = { ...(await makeWrap('pw')), iterations: 50_000_000 };
+      const spy = vi.spyOn(crypto.subtle, 'deriveKey');
+      try {
+        expect(await unwrapWrappedKey(entry, 'pw')).toBeNull();
+        expect(spy).not.toHaveBeenCalled();
+      } finally {
+        spy.mockRestore();
+      }
+      expect(logEvent.mock.calls[0]![0]).toMatchObject({
+        context: { action: 'wrap_entry_unusable', error_code: 'KdfParamsError' },
+      });
+    });
+  });
+
+  describe('tryUnwrapFamilyKey detects same-password collisions', () => {
     it('returns the single matching memberId when only one member uses this password', async () => {
       const envelope = await buildEnvelopeWithMembers([
         { memberId: 'alice', password: 'alice-pw' },
@@ -358,6 +454,86 @@ describe('fileSync V4 format', () => {
         name: 'UnlockFailedError',
         reason: 'no-candidates',
       });
+    });
+  });
+
+  // ── tryUnwrapFamilyKey runs member tries concurrently, semantics unchanged ──
+
+  describe('tryUnwrapFamilyKey tries member wraps in parallel', () => {
+    it('starts every member derivation before any finishes', async () => {
+      const envelope = await buildEnvelopeWithMembers([
+        { memberId: 'alice', password: 'a' },
+        { memberId: 'bob', password: 'b' },
+        { memberId: 'carol', password: 'c' },
+      ]);
+      const real = crypto.subtle.deriveKey.bind(crypto.subtle);
+      let inFlight = 0;
+      let peak = 0;
+      const spy = vi
+        .spyOn(crypto.subtle, 'deriveKey')
+        .mockImplementation(async (...args: Parameters<SubtleCrypto['deriveKey']>) => {
+          inFlight += 1;
+          peak = Math.max(peak, inFlight);
+          try {
+            return await real(...args);
+          } finally {
+            inFlight -= 1;
+          }
+        });
+      try {
+        const result = await tryUnwrapFamilyKey(envelope, 'b');
+        expect(result.memberIds).toEqual(['bob']);
+      } finally {
+        spy.mockRestore();
+      }
+      expect(peak).toBe(3);
+    });
+
+    it('reports collisions in envelope order (not completion order)', async () => {
+      const envelope = await buildEnvelopeWithMembers([
+        { memberId: 'zed', password: 'shared', iterations: 20_000 },
+        { memberId: 'amy', password: 'shared' },
+        { memberId: 'bob', password: 'other' },
+        { memberId: 'cat', password: 'shared', iterations: 1_000 },
+      ]);
+      const result = await tryUnwrapFamilyKey(envelope, 'shared');
+      expect(result.memberIds).toEqual(['zed', 'amy', 'cat']);
+      expect(result.viaRecoveryPassphrase).toBeUndefined();
+    });
+
+    it('opens a mix of legacy and recorded-count wraps', async () => {
+      const envelope = await buildEnvelopeWithMembers([
+        { memberId: 'old', password: 'old-pw' },
+        { memberId: 'new', password: 'new-pw', iterations: 3_000 },
+      ]);
+      expect((await tryUnwrapFamilyKey(envelope, 'old-pw')).memberIds).toEqual(['old']);
+      expect((await tryUnwrapFamilyKey(envelope, 'new-pw')).memberIds).toEqual(['new']);
+    });
+
+    it('one corrupt member entry does not block the others', async () => {
+      const envelope = await buildEnvelopeWithMembers([
+        { memberId: 'broken', password: 'pw' },
+        { memberId: 'fine', password: 'pw' },
+      ]);
+      envelope.wrappedKeys.broken!.iterations = -1;
+      expect((await tryUnwrapFamilyKey(envelope, 'pw')).memberIds).toEqual(['fine']);
+    });
+
+    it('a member wrap still shadows an identical recovery passphrase', async () => {
+      const envelope = await buildEnvelopeWithMembers([{ memberId: 'alice', password: 'same' }], {
+        recoveryPassphrase: await makeWrap('same', 2_000),
+      });
+      const result = await tryUnwrapFamilyKey(envelope, 'same');
+      expect(result).toMatchObject({ memberIds: ['alice'] });
+      expect(result.viaRecoveryPassphrase).toBeUndefined();
+    });
+
+    it('falls through to the passphrase (at its recorded count) when no member matches', async () => {
+      const envelope = await buildEnvelopeWithMembers([{ memberId: 'alice', password: 'a' }], {
+        recoveryPassphrase: await makeWrap('family-phrase', 2_000),
+      });
+      const result = await tryUnwrapFamilyKey(envelope, 'family-phrase');
+      expect(result).toMatchObject({ memberIds: [], viaRecoveryPassphrase: true });
     });
   });
 });

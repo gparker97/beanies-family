@@ -35,22 +35,55 @@ const dist = process.argv[2] || 'dist';
  * Both packages must be represented. They land in SEPARATE chunks, so markers from one say
  * nothing about the other.
  */
-const LIBRARY_MARKERS = [
-  // ── ehbp (the HPKE seal) ────────────────────────────────────────────────────────────────
-  'Ehbp-Encapsulated-Key', // PROTOCOL constant
-  'ehbp response', // EXPORT_LABEL
-  'X25519', // the cipher suite
+const LIBRARY_GROUPS = [
+  {
+    label: 'enclave crypto',
+    markers: [
+      // ── ehbp (the HPKE seal) ────────────────────────────────────────────────────────────────
+      'Ehbp-Encapsulated-Key', // PROTOCOL constant
+      'ehbp response', // EXPORT_LABEL
+      'X25519', // the cipher suite
 
-  // ── @tinfoilsh/verifier (the attestation) ───────────────────────────────────────────────
-  //
-  // ⚠️ ADDED AFTER THE FIRST VERSION COULD NOT SEE THIS PACKAGE AT ALL. All three ehbp markers
-  // live in one chunk and the verifier lands in a DIFFERENT one carrying none of them, so
-  // turning `await import('@tinfoilsh/verifier')` into a static import left this script
-  // printing `ok` while every family parsed 164KB of attestation crypto on first paint — half
-  // the guarantee the script exists to enforce, unenforced.
-  'sev-snp',
-  'tinfoil-attestation',
-  'sigstore',
+      // ── @tinfoilsh/verifier (the attestation) ───────────────────────────────────────────────
+      //
+      // ⚠️ ADDED AFTER THE FIRST VERSION COULD NOT SEE THIS PACKAGE AT ALL. All three ehbp markers
+      // live in one chunk and the verifier lands in a DIFFERENT one carrying none of them, so
+      // turning `await import('@tinfoilsh/verifier')` into a static import left this script
+      // printing `ok` while every family parsed 164KB of attestation crypto on first paint — half
+      // the guarantee the script exists to enforce, unenforced.
+      'sev-snp',
+      'tinfoil-attestation',
+      'sigstore',
+    ],
+    fixHint:
+      'Every family now downloads and parses the HPKE implementation on a cold load, whether or\n' +
+      'not they ever use a managed extraction. Usual causes, both of which have happened here:\n' +
+      '  · a VALUE import from `ehbp` or `@tinfoilsh/verifier` somewhere that should be\n' +
+      '    `import type` — one constant is enough to pull the whole package in;\n' +
+      '  · a `manualChunks` entry, which makes this worse rather than better (see 96bab28f).\n' +
+      'Fix the import, not the bundler config.',
+  },
+  {
+    // The zxcvbn dictionaries (~1 MB) are only for the Settings own-phrase check; the lazy
+    // `passphraseScorer` module is their only importer.
+    label: 'passphrase scorer',
+    markers: ['zxcvbn'],
+    fixHint:
+      'The strength scorer must only be reached through `await import("./passphraseScorer")` in\n' +
+      '`src/utils/passphraseStrength.ts`. A static import of `passphraseScorer` or `@zxcvbn-ts/*`\n' +
+      'anywhere puts ~1 MB of dictionaries on every cold load.',
+  },
+  {
+    // `id` is the marker: an unused exported string would be tree-shaken and this group would
+    // then report the list missing from every chunk.
+    label: 'EFF wordlist',
+    markers: ['EFF_LARGE_WORDLIST_V1'],
+    fixHint:
+      'The 7,776-word list must only be reached through `await import("@/constants/effWordlist")`\n' +
+      'in `generatePassphrase`. If the check reports it missing from every chunk instead, the `id`\n' +
+      'property must stay on the exported `EFF_WORDLIST` object (and be read, so it is not\n' +
+      'tree-shaken).',
+  },
 ];
 
 function entryChunk() {
@@ -108,53 +141,58 @@ function eagerClosure(entryFile) {
 }
 
 const eager = eagerClosure(entry);
-const inEntry = [];
-const missingEverywhere = [];
+const inEntry = []; // { group, text }
+const missingEverywhere = []; // { group, marker }
 
-for (const marker of LIBRARY_MARKERS) {
-  // Any EAGERLY reachable file, not just the entry.
-  const carrier = eager.find((f) => {
-    try {
-      return readFileSync(join(dist, 'assets', f), 'utf8').includes(marker);
-    } catch {
-      return false;
-    }
-  });
-  if (carrier) inEntry.push(`${marker} (in ${carrier})`);
+for (const group of LIBRARY_GROUPS) {
+  for (const marker of group.markers) {
+    // Any EAGERLY reachable file, not just the entry.
+    const carrier = eager.find((f) => {
+      try {
+        return readFileSync(join(dist, 'assets', f), 'utf8').includes(marker);
+      } catch {
+        return false;
+      }
+    });
+    if (carrier) inEntry.push({ group, text: `${marker} (in ${carrier})` });
 
-  // ⚠️ "Measured nothing" must be an explicit failure, not a silent pass. If a marker has
-  // vanished from EVERY chunk the library was renamed, tree-shaken away, or these strings
-  // changed — and this script would otherwise report success while checking for nothing.
-  const found = allChunks.some((f) =>
-    readFileSync(join(dist, 'assets', f), 'utf8').includes(marker)
-  );
-  if (!found) missingEverywhere.push(marker);
+    // ⚠️ "Measured nothing" must be an explicit failure, not a silent pass. If a marker has
+    // vanished from EVERY chunk the library was renamed, tree-shaken away, or these strings
+    // changed — and this script would otherwise report success while checking for nothing.
+    const found = allChunks.some((f) =>
+      readFileSync(join(dist, 'assets', f), 'utf8').includes(marker)
+    );
+    if (!found) missingEverywhere.push({ group, marker });
+  }
 }
 
 if (missingEverywhere.length) {
+  const names = [...new Set(missingEverywhere.map((m) => m.group.label))].join(', ');
   console.error(
-    `[crypto-chunk] FAILED — these markers are in NO chunk at all: ${missingEverywhere.join(', ')}\n` +
-      'That means this check is no longer checking anything. Either the enclave crypto is gone\n' +
-      'from the build, or the library changed these strings. Update LIBRARY_MARKERS in\n' +
-      'scripts/checkCryptoChunk.mjs against the current `ehbp` build before trusting a pass.'
+    `[crypto-chunk] FAILED — [${names}] markers are in NO chunk at all: ` +
+      `${missingEverywhere.map((m) => m.marker).join(', ')}\n` +
+      'That means this check is no longer checking anything. Either the code is gone from the\n' +
+      'build, or the library changed these strings. Update LIBRARY_GROUPS in\n' +
+      'scripts/checkCryptoChunk.mjs against the current build before trusting a pass.' +
+      [...new Set(missingEverywhere.map((m) => m.group))]
+        .filter((g) => g.label === 'EFF wordlist')
+        .map((g) => `\n(${g.label}) ${g.fixHint}`)
+        .join('')
   );
   process.exit(1);
 }
 
 if (inEntry.length) {
+  const groups = [...new Set(inEntry.map((m) => m.group))];
   console.error(
-    `[crypto-chunk] FAILED — enclave crypto is EAGERLY loaded (entry ${entry}): ${inEntry.join(', ')}\n` +
-      'Every family now downloads and parses the HPKE implementation on a cold load, whether or\n' +
-      'not they ever use a managed extraction. Usual causes, both of which have happened here:\n' +
-      '  · a VALUE import from `ehbp` or `@tinfoilsh/verifier` somewhere that should be\n' +
-      '    `import type` — one constant is enough to pull the whole package in;\n' +
-      '  · a `manualChunks` entry, which makes this worse rather than better (see 96bab28f).\n' +
-      'Fix the import, not the bundler config.'
+    `[crypto-chunk] FAILED — [${groups.map((g) => g.label).join(', ')}] EAGERLY loaded ` +
+      `(entry ${entry}): ${inEntry.map((m) => m.text).join(', ')}\n` +
+      groups.map((g) => `\n${g.label}: ${g.fixHint}`).join('\n')
   );
   process.exit(1);
 }
 
 console.log(
   `[crypto-chunk] ok — ${eager.length} eagerly-loaded chunk(s) from ${entry} carry none of: ` +
-    LIBRARY_MARKERS.join(', ')
+    LIBRARY_GROUPS.map((g) => `${g.label} [${g.markers.join(', ')}]`).join('; ')
 );

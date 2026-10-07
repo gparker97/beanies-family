@@ -493,3 +493,80 @@ describe('keyDictSize', () => {
     expect(keyDictSize(after)).toBe(keyDictSize(before));
   });
 });
+
+describe('KDF cost upgrade converges (#81, ADR-041)', () => {
+  // A current build re-wraps a member's legacy (100k) wrap at 600k through the SAME
+  // rotation path as a password change: value-pinned tombstone on the old wrap, then
+  // the new entry carrying `iterations`. The field is additive-optional, so it must ride
+  // every merge untouched.
+  const upgradedRemote = () =>
+    buildEnvelope({
+      wrappedKeys: { m1: { wrapped: 'W600', salt: 's2', iterations: 600_000 } },
+      revokedKeys: {
+        [revocationKey('wrappedKeys', 'm1', 'W100')]: {
+          revokedAt: '2026-10-07T00:00:00Z',
+          wrapped: 'W100',
+        },
+      },
+    });
+  const legacyPeer = () => buildEnvelope({ wrappedKeys: { m1: { wrapped: 'W100', salt: 's1' } } });
+
+  it('a peer still holding the legacy wrap adopts the 600k wrap, iterations intact', () => {
+    const { envelope } = mergeEnvelopes(upgradedRemote(), legacyPeer());
+    expect(envelope.wrappedKeys.m1).toEqual({ wrapped: 'W600', salt: 's2', iterations: 600_000 });
+    expect(envelope.revokedKeys).toHaveProperty(revocationKey('wrappedKeys', 'm1', 'W100'));
+  });
+
+  it('a legacy entry without `iterations` survives a merge exactly as written', () => {
+    const { envelope } = mergeEnvelopes(legacyPeer(), buildEnvelope());
+    expect(envelope.wrappedKeys.m1).toEqual({ wrapped: 'W100', salt: 's1' });
+    expect('iterations' in envelope.wrappedKeys.m1!).toBe(false);
+  });
+
+  it('the old-client ping-pong is a downgrade, never a lockout (recorded residual)', () => {
+    // A pre-KDF_READ_BOTH_SINCE client cannot open W600, heals at 100k (W100b) and pins a
+    // tombstone on W600. Merging that into a current client yields the 100k wrap: the
+    // member can still sign in, and the next current-build sign-in upgrades again.
+    const staleHeal = () =>
+      buildEnvelope({
+        wrappedKeys: { m1: { wrapped: 'W100b', salt: 's3' } },
+        revokedKeys: {
+          [revocationKey('wrappedKeys', 'm1', 'W600')]: {
+            revokedAt: '2026-10-08T00:00:00Z',
+            wrapped: 'W600',
+          },
+        },
+      });
+    const { envelope } = mergeEnvelopes(staleHeal(), upgradedRemote());
+    expect(envelope.wrappedKeys.m1?.wrapped).toBe('W100b');
+    // The second upgrade pins W100b and the strong wrap stands again.
+    const reUpgraded = buildEnvelope({
+      wrappedKeys: { m1: { wrapped: 'W600b', salt: 's4', iterations: 600_000 } },
+      revokedKeys: {
+        ...envelope.revokedKeys,
+        [revocationKey('wrappedKeys', 'm1', 'W100b')]: {
+          revokedAt: '2026-10-09T00:00:00Z',
+          wrapped: 'W100b',
+        },
+      },
+    });
+    expect(mergeEnvelopes(reUpgraded, envelope).envelope.wrappedKeys.m1?.wrapped).toBe('W600b');
+  });
+
+  it('a 600k recovery passphrase wrap wins over the legacy one by createdAt', () => {
+    const { envelope } = mergeEnvelopes(
+      buildEnvelope({
+        recoveryPassphrase: {
+          wrapped: 'P600',
+          salt: 'p2',
+          iterations: 600_000,
+          createdAt: '2026-10-07T00:00:00Z',
+        },
+      }),
+      buildEnvelope({
+        recoveryPassphrase: { wrapped: 'P100', salt: 'p1', createdAt: '2026-09-01T00:00:00Z' },
+      })
+    );
+    expect(envelope.recoveryPassphrase).toMatchObject({ wrapped: 'P600', iterations: 600_000 });
+  });
+});

@@ -41,3 +41,5 @@ Key implementation details:
 - Key rotation is needed on member removal to prevent evicted members from decrypting future data (deferred to #117)
 - Invite links expire in 24 hours — if not used in time, a new invite must be generated
 - The raw family key exists in memory during the active session, which is an accepted trade-off for a client-side SPA
+
+2026-10-07: iteration counts now live in `kdfParams.ts` and travel with each wrap; see ADR-041.

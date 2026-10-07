@@ -428,6 +428,36 @@ describe('envelope writers build from the authoritative envelope (audit C2)', ()
     expect(live().revokedKeys).toBeUndefined();
   });
 
+  // ADR-041: the setters pass the entry through whole. They used to rebuild it as exactly
+  // `{ wrapped, salt }`, which would silently drop the recorded `iterations` and make a
+  // 600k wrap read back as legacy 100k (a false "wrong password").
+  it('addInvitePackage stages the WHOLE package, iterations included', async () => {
+    const live = liveServiceEnvelope({ ...POLL_MERGED });
+    const store = useSyncStore();
+    await store.addInvitePackage('hash-1', {
+      salt: 'I-s',
+      wrapped: 'I-w',
+      expiresAt: '2026-10-08T00:00:00Z',
+      iterations: 100_000,
+    });
+    expect((live().inviteKeys as Record<string, unknown>)['hash-1']).toEqual({
+      salt: 'I-s',
+      wrapped: 'I-w',
+      expiresAt: '2026-10-08T00:00:00Z',
+      iterations: 100_000,
+    });
+  });
+
+  it('setMemberWrappedKey / addMemberWrappedKey preserve the recorded iterations', async () => {
+    const live = liveServiceEnvelope({ ...POLL_MERGED });
+    const store = useSyncStore();
+    await store.setMemberWrappedKey('m1', { wrapped: 'NEW-w', salt: 'NEW-s', iterations: 600_000 });
+    await store.addMemberWrappedKey('m2', { wrapped: 'M2-w', salt: 'M2-s', iterations: 100_000 });
+    const keys = live().wrappedKeys as Record<string, unknown>;
+    expect(keys.m1).toEqual({ wrapped: 'NEW-w', salt: 'NEW-s', iterations: 600_000 });
+    expect(keys.m2).toEqual({ wrapped: 'M2-w', salt: 'M2-s', iterations: 100_000 });
+  });
+
   it('persistFamilyName renames the authoritative envelope, keeping the merged peer passkey', async () => {
     const live = liveServiceEnvelope({ ...POLL_MERGED });
     vi.mocked(syncService.save).mockResolvedValue(true);

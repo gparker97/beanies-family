@@ -5539,13 +5539,51 @@ const STRING_DEFS = {
   'recovery.passphraseRegenerate': { en: 'Suggest Another', beanie: 'suggest another' },
   'recovery.passphraseUseOwn': { en: 'Use my own phrase', beanie: 'use my own phrase' },
   'recovery.passphraseRules': {
-    en: "At least 14 characters and 3 different words — spaces or dashes between words are fine, and any characters are allowed. Your family or member names are too easy to guess and won't be accepted.",
+    en: "At least 14 characters and hard to guess. We'll check it as you type. Spaces or dashes between words are fine, and any characters are allowed. Your family or member names are too easy to guess and won't be accepted.",
     beanie:
-      'at least 14 characters and 3 different words — spaces or dashes are fine, any characters allowed. family or member names are too easy to guess.',
+      "at least 14 characters and hard to guess. we'll check it as you type. spaces or dashes are fine, any characters allowed. family or member names are too easy to guess.",
   },
   'recovery.passphraseTooWeak': {
-    en: 'That phrase is too easy to guess — use at least 14 characters and 3 different words.',
-    beanie: 'that phrase is too easy to guess — use at least 14 characters and 3 different words.',
+    en: 'That phrase is too short. Use at least 14 characters.',
+    beanie: 'that phrase is too short. use at least 14 characters.',
+  },
+  'recovery.passphraseTooGuessable': {
+    en: 'That phrase is too easy to guess. Try more words, or use a suggested one.',
+    beanie: 'that phrase is too easy to guess. try more words, or use a suggested one.',
+  },
+  'recovery.passphraseCheckUnavailable': {
+    en: "We couldn't check that phrase right now. Use a suggested one or try again.",
+    beanie: "we couldn't check that phrase right now. use a suggested one or try again.",
+  },
+  'recovery.strengthLabel': { en: 'Passphrase strength', beanie: 'passphrase strength' },
+  'recovery.strengthWeak': { en: 'Weak', beanie: 'weak' },
+  'recovery.strengthFair': { en: 'Fair', beanie: 'fair' },
+  'recovery.strengthGood': { en: 'Good', beanie: 'good' },
+  'recovery.strengthStrong': { en: 'Strong', beanie: 'strong' },
+  'recovery.strengthHint.commonWord': {
+    en: 'Common words and phrases are the first things guessed.',
+    beanie: 'common words and phrases are the first things guessed.',
+  },
+  'recovery.strengthHint.repeats': {
+    en: 'Repeated letters or words add very little strength.',
+    beanie: 'repeated letters or words add very little strength.',
+  },
+  'recovery.strengthHint.sequences': {
+    en: 'Sequences and keyboard patterns are easy to guess.',
+    beanie: 'sequences and keyboard patterns are easy to guess.',
+  },
+  'recovery.strengthHint.dates': {
+    en: 'Dates and years are easy to guess.',
+    beanie: 'dates and years are easy to guess.',
+  },
+  'recovery.passphraseLegacyNudge': {
+    en: 'Your family passphrase came from an older, shorter list. Choose a new one when you have a minute.',
+    beanie:
+      'your family passphrase came from an older, shorter list. choose a new one when you have a minute.',
+  },
+  'recovery.passphraseLegacyNudgeAction': {
+    en: 'Change in Settings',
+    beanie: 'change in settings',
   },
   'recovery.passphraseMatchesName': {
     en: "Your family or a member's name is too easy to guess — pick something else.",

@@ -1,317 +1,174 @@
 /**
- * Recovery-passphrase generation + the one acceptance rule (login rethink Phase 3).
+ * Recovery-passphrase generation and the one acceptance check.
  *
- * NOT a strength meter — per the plan (Pass 2), no zxcvbn dependency, no scoring UI.
- * The default UX GENERATES a 4-word passphrase from the embedded wordlist via
- * `crypto.getRandomValues` (guaranteed ≥ 4 × log2(256) ≈ 32 bits… wordlist entropy —
- * see below — plus separator structure; the real defense is that user-chosen phrases are
- * the exception, not the rule). "Use my own" is allowed behind `isAcceptablePassphrase`.
+ * Suggestions are 6 words from the EFF large list (~77 bits), drawn with unbiased rejection
+ * sampling. Typed phrases are scored by zxcvbn (`passphraseScorer.ts`, lazy) and must clear
+ * `MIN_GUESSES_LOG10`; the verdict fails CLOSED if the scorer cannot load. The retired
+ * 256-word list is kept only as `LEGACY_WORDLIST`: it detects old suggestions for the
+ * settings nudge and is a zxcvbn dictionary so such phrases score as the weak things they are.
  */
+import { reportError } from '@/utils/errorReporter';
+import type { UIStringKey } from '@/services/translation/uiStrings';
 
 /**
- * 256 common, concrete, family-friendly English words (8 bits each → a generated
- * 4-word phrase carries 32 bits of wordlist entropy; combined with the requirement
- * that an attacker must ALSO hold the Drive file, this is the deliberate floor the
- * plan accepts for a memorable secret — families wanting more use the recovery kit).
+ * The retired 256-word list (8 bits a word, so a 4-word phrase carried only 32 bits).
+ * `generatePassphrase` never uses it again.
  */
-const WORDLIST = [
-  'apple',
-  'anchor',
-  'autumn',
-  'bacon',
-  'badge',
-  'bamboo',
-  'banana',
-  'basket',
-  'beach',
-  'beacon',
-  'bean',
-  'bear',
-  'berry',
-  'bicycle',
-  'birch',
-  'blanket',
-  'bloom',
-  'bluebird',
-  'boat',
-  'bonfire',
-  'book',
-  'boot',
-  'bottle',
-  'breeze',
-  'brick',
-  'bridge',
-  'brook',
-  'bubble',
-  'bucket',
-  'butter',
-  'button',
-  'cabin',
-  'cactus',
-  'camera',
-  'candle',
-  'canoe',
-  'canyon',
-  'carrot',
-  'castle',
-  'cedar',
-  'cellar',
-  'chair',
-  'cherry',
-  'chimney',
-  'cinnamon',
-  'circle',
-  'cloud',
-  'clover',
-  'cobweb',
-  'coconut',
-  'comet',
-  'compass',
-  'cookie',
-  'copper',
-  'coral',
-  'corn',
-  'cotton',
-  'cradle',
-  'crayon',
-  'cricket',
-  'crystal',
-  'daisy',
-  'dolphin',
-  'donkey',
-  'drawer',
-  'drum',
-  'duck',
-  'eagle',
-  'earth',
-  'echo',
-  'ember',
-  'engine',
-  'falcon',
-  'feather',
-  'fern',
-  'fiddle',
-  'field',
-  'firefly',
-  'flag',
-  'flame',
-  'flower',
-  'flute',
-  'fog',
-  'forest',
-  'fountain',
-  'fox',
-  'frost',
-  'garden',
-  'garlic',
-  'geyser',
-  'ginger',
-  'glacier',
-  'glove',
-  'goose',
-  'grape',
-  'grove',
-  'hammer',
-  'hammock',
-  'harbor',
-  'harvest',
-  'hazel',
-  'heron',
-  'hill',
-  'honey',
-  'horizon',
-  'horse',
-  'hunter',
-  'igloo',
-  'island',
-  'ivory',
-  'jacket',
-  'jaguar',
-  'jasmine',
-  'jelly',
-  'jungle',
-  'kayak',
-  'kettle',
-  'kitten',
-  'kiwi',
-  'ladder',
-  'lagoon',
-  'lantern',
-  'lemon',
-  'lighthouse',
-  'lily',
-  'lion',
-  'lizard',
-  'lobster',
-  'locket',
-  'lumber',
-  'mango',
-  'maple',
-  'marble',
-  'meadow',
-  'melon',
-  'mirror',
-  'mitten',
-  'monkey',
-  'moon',
-  'moss',
-  'mountain',
-  'mushroom',
-  'nest',
-  'noodle',
-  'north',
-  'oak',
-  'ocean',
-  'olive',
-  'onion',
-  'orange',
-  'orchard',
-  'otter',
-  'owl',
-  'oyster',
-  'paddle',
-  'pancake',
-  'panda',
-  'paper',
-  'parrot',
-  'peach',
-  'pearl',
-  'pebble',
-  'pelican',
-  'pencil',
-  'penguin',
-  'pepper',
-  'petal',
-  'piano',
-  'pickle',
-  'pigeon',
-  'pillow',
-  'pine',
-  'planet',
-  'plum',
-  'pocket',
-  'pond',
-  'pony',
-  'poppy',
-  'potato',
-  'prairie',
-  'pumpkin',
-  'puzzle',
-  'quill',
-  'rabbit',
-  'raccoon',
-  'radish',
-  'rainbow',
-  'raven',
-  'reef',
-  'ribbon',
-  'river',
-  'robin',
-  'rocket',
-  'rooster',
-  'rose',
-  'ruby',
-  'saddle',
-  'sailboat',
-  'salmon',
-  'sand',
-  'sapphire',
-  'seal',
-  'shell',
-  'silver',
-  'sky',
-  'sled',
-  'snail',
-  'snow',
-  'socks',
-  'sparrow',
-  'spider',
-  'spoon',
-  'spring',
-  'sprout',
-  'squirrel',
-  'stone',
-  'storm',
-  'stove',
-  'straw',
-  'stream',
-  'sugar',
-  'summer',
-  'sunset',
-  'swan',
-  'table',
-  'teapot',
-  'thunder',
-  'tiger',
-  'timber',
-  'toast',
-  'tomato',
-  'torch',
-  'trail',
-  'train',
-  'tulip',
-  'tunnel',
-  'turtle',
-  'valley',
-  'velvet',
-  'violet',
-  'wagon',
-  'walnut',
-  'water',
-  'whale',
-  'wheat',
-  'willow',
-  'window',
-  'winter',
-  'wolf',
-  'wonder',
-  'woodpecker',
-  'wren',
-  'yarn',
-  'yogurt',
-  'zebra',
-  'zephyr',
-] as const;
+import { LEGACY_WORDLIST } from '@/constants/legacyWordlist';
+import { canonPassphrase, splitPassphraseWords } from '@/utils/passphraseTokens';
+export { LEGACY_WORDLIST };
 
-export const PASSPHRASE_WORD_COUNT = 4;
+export const PASSPHRASE_WORD_COUNT = 6;
 export const PASSPHRASE_MIN_LENGTH = 14;
-export const PASSPHRASE_MIN_TOKENS = 3;
+const LEGACY_WORD_COUNT = 4;
+const LEGACY_SET: ReadonlySet<string> = new Set(LEGACY_WORDLIST);
 
-/** Generate a memorable 4-word passphrase (`word-word-word-word`). */
-export function generatePassphrase(): string {
-  const idx = crypto.getRandomValues(new Uint8Array(PASSPHRASE_WORD_COUNT));
-  return Array.from(idx, (i) => WORDLIST[i % WORDLIST.length]).join('-');
+/** True for exactly what the old generator produced: 4 hyphen-joined lowercase legacy words. */
+export function isLegacyGeneratedShape(phrase: string): boolean {
+  const tokens = phrase.trim().split('-');
+  return tokens.length === LEGACY_WORD_COUNT && tokens.every((w) => LEGACY_SET.has(w));
 }
 
+/** Draw `count` unbiased indices in [0, range) from 13-bit draws (range <= 8192). */
+export function drawIndices(count: number, range: number): number[] {
+  const BITS = 13;
+  const SPACE = 1 << BITS;
+  const limit = SPACE - (SPACE % range); // reject draws in the biased tail
+  const out: number[] = [];
+  while (out.length < count) {
+    const buf = crypto.getRandomValues(new Uint16Array(count * 2));
+    for (const raw of buf) {
+      const v = raw & (SPACE - 1);
+      if (v < limit) {
+        out.push(v % range);
+        if (out.length === count) break;
+      }
+    }
+  }
+  return out;
+}
+
+/** Generate a 6-word passphrase (`word-word-...`). Loads the EFF list on first use. */
+export async function generatePassphrase(): Promise<string> {
+  const { EFF_WORDLIST } = await import('@/constants/effWordlist');
+  const words = EFF_WORDLIST.words;
+  return drawIndices(PASSPHRASE_WORD_COUNT, words.length)
+    .map((i) => words[i])
+    .join('-');
+}
+
+type Score = 0 | 1 | 2 | 3 | 4;
+
+export type PassphraseRefusal =
+  'too-short' | 'matches-name' | 'too-guessable' | 'scorer-unavailable';
+
 export type PassphraseVerdict =
-  { ok: true } | { ok: false; reason: 'too-short' | 'too-few-words' | 'matches-name' };
+  | { ok: true; score: 4 }
+  | { ok: false; reason: PassphraseRefusal; score: Score; hintKey?: UIStringKey };
 
 /**
- * The ONE acceptance rule for a user-chosen passphrase: min 14 chars AND min 3 distinct
- * word tokens, and never equal to the family name or a member name (case-insensitive,
- * separators ignored). Deliberately not a meter.
+ * The ONE reason -> copy map, shared by `authStore.setRecoveryPassphrase` (the Save error)
+ * and `RecoveryPassphraseEditor` (the live message) so the two can never disagree.
  */
-export function checkPassphrase(
-  passphrase: string,
-  names: { familyName?: string; memberNames?: string[] } = {}
-): PassphraseVerdict {
-  const trimmed = passphrase.trim();
-  if (trimmed.length < PASSPHRASE_MIN_LENGTH) return { ok: false, reason: 'too-short' };
-  const tokens = new Set(
-    trimmed
-      .toLowerCase()
-      .split(/[\s\-_.]+/)
-      .filter(Boolean)
-  );
-  if (tokens.size < PASSPHRASE_MIN_TOKENS) return { ok: false, reason: 'too-few-words' };
+export const PASSPHRASE_REFUSAL_KEY: Record<PassphraseRefusal, UIStringKey> = {
+  'too-short': 'recovery.passphraseTooWeak',
+  'matches-name': 'recovery.passphraseMatchesName',
+  'too-guessable': 'recovery.passphraseTooGuessable',
+  'scorer-unavailable': 'recovery.passphraseCheckUnavailable',
+};
 
-  const canon = (v: string) => v.toLowerCase().replace(/[\s\-_.]+/g, '');
-  const canonPhrase = canon(trimmed);
-  const candidates = [names.familyName, ...(names.memberNames ?? [])].filter(
-    (n): n is string => !!n
+/**
+ * zxcvbn-ts warning keys (no translations are loaded, so `feedback.warning` is the key
+ * itself: straightRow, keyPattern, simpleRepeat, extendedRepeat, sequences, recentYears,
+ * dates, topTen, topHundred, common, similarToCommon, wordByItself, namesByThemselves,
+ * commonNames, userInputs, pwned) -> the four hints we translate.
+ */
+const HINT_SLUGS: ReadonlyArray<[RegExp, UIStringKey]> = [
+  [/repeat/i, 'recovery.strengthHint.repeats'],
+  [/sequence|straightRow|keyPattern/i, 'recovery.strengthHint.sequences'],
+  [/year|date/i, 'recovery.strengthHint.dates'],
+  [
+    /common|similar|topTen|topHundred|names|userInputs|wordByItself|pwned/i,
+    'recovery.strengthHint.commonWord',
+  ],
+];
+
+function hintKeyFor(warning: string | null): UIStringKey | undefined {
+  if (!warning) return undefined;
+  return HINT_SLUGS.find(([re]) => re.test(warning))?.[1];
+}
+
+let effSet: Promise<ReadonlySet<string>> | null = null;
+/** The EFF list as a Set, loaded once (it is a lazy chunk) and shared by every check. */
+function loadEffSet(): Promise<ReadonlySet<string>> {
+  effSet ??= import('@/constants/effWordlist').then(
+    ({ EFF_WORDLIST }) => new Set(EFF_WORDLIST.words)
   );
-  if (candidates.some((n) => canon(n) === canonPhrase)) {
-    return { ok: false, reason: 'matches-name' };
+  return effSet;
+}
+
+/**
+ * The FALLBACK when the scorer chunk cannot load: a phrase of six or more DISTINCT words,
+ * every one on the EFF long list and none of them a family or member name, is accepted at
+ * score 4 so a suggested phrase is never a dead end. It is only ever consulted after the
+ * scorer has failed to load; with the scorer available every phrase is scored for real
+ * (a typed six-word EFF phrase is not uniformly random). `false` when the EFF chunk itself
+ * cannot load; the caller then fails closed.
+ */
+async function isEffFallbackPhrase(trimmed: string, userInputs: string[]): Promise<boolean> {
+  const words = splitPassphraseWords(trimmed);
+  if (words.length < PASSPHRASE_WORD_COUNT || new Set(words).size !== words.length) return false;
+  const names = new Set(userInputs.flatMap((n) => splitPassphraseWords(n)));
+  if (words.some((w) => names.has(w))) return false;
+  try {
+    const eff = await loadEffSet();
+    return words.every((w) => eff.has(w));
+  } catch {
+    effSet = null; // let a later call retry the chunk
+    return false;
   }
-  return { ok: true };
+}
+
+/**
+ * The ONE acceptance rule for a passphrase: at least 14 characters, never equal to a name in
+ * `userInputs` (family, member names, aliases, email local-parts), and hard enough to guess.
+ * Async because the scorer is a lazy chunk; fails closed with `scorer-unavailable`.
+ */
+export async function checkPassphrase(
+  phrase: string,
+  userInputs: string[] = []
+): Promise<PassphraseVerdict> {
+  const trimmed = phrase.trim();
+  if (trimmed.length < PASSPHRASE_MIN_LENGTH) {
+    return { ok: false, reason: 'too-short', score: 0 };
+  }
+  const canonPhrase = canonPassphrase(trimmed);
+  if (userInputs.some((n) => !!n && canonPassphrase(n) === canonPhrase)) {
+    return { ok: false, reason: 'matches-name', score: 0 };
+  }
+  let scorer: typeof import('./passphraseScorer');
+  try {
+    scorer = await import('./passphraseScorer');
+  } catch (error) {
+    reportError({
+      surface: 'passphrase-strength',
+      message: 'the passphrase scorer could not be loaded',
+      severity: 'error',
+      error,
+      context: { action: 'scorer_load_failed' },
+    });
+    if (await isEffFallbackPhrase(trimmed, userInputs)) return { ok: true, score: 4 };
+    return { ok: false, reason: 'scorer-unavailable', score: 0 };
+  }
+  const r = scorer.scorePassphrase(trimmed, userInputs);
+  if (r.guessesLog10 < scorer.MIN_GUESSES_LOG10) {
+    const hintKey = hintKeyFor(r.warning);
+    return {
+      ok: false,
+      reason: 'too-guessable',
+      score: Math.min(r.score, 3) as Score,
+      ...(hintKey ? { hintKey } : {}),
+    };
+  }
+  return { ok: true, score: 4 };
 }

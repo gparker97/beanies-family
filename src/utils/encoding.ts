@@ -2,7 +2,7 @@
  * Shared binary ↔ string encoding utilities.
  *
  * These are used by the family-key and invite crypto services.
- * Existing files (encryption.ts, passkeyCrypto.ts) keep their private copies
+ * Existing files (passkeyCrypto.ts) keep their private copies
  * for now — consolidation is a separate cleanup task.
  */
 

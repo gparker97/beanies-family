@@ -97,9 +97,9 @@ async function verify(entered: string) {
   if (!props.candidates.length || inCooldown.value) return;
   isVerifying.value = true;
   try {
-    // Sequential, stopping at the first match. Each check is a 100k-iteration
-    // PBKDF2 derive (~100ms), so a household of three adults costs at most
-    // ~300ms on a wrong PIN — deliberate work the attempt limit already caps.
+    // Sequential, stopping at the first match. Each check is one PBKDF2 derive
+    // at the `docHash` count in kdfParams.ts (~100ms on desktop), so a household of three
+    // adults costs at most ~300ms on a wrong PIN — deliberate work the attempt limit already caps.
     let matched: FamilyMember | null = null;
     for (const candidate of props.candidates) {
       if (!candidate.pinHash) continue;

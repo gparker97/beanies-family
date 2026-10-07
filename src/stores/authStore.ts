@@ -7,6 +7,7 @@ import {
 import { PayloadLoadError, type RemoteBlocker } from '@/types/sync';
 import { ref, computed, watch } from 'vue';
 import { hashPassword, verifyPassword } from '@/services/auth/passwordService';
+import { isKdfUpgradeGateOpen, needsSecretRewrap } from '@/services/crypto/kdfWriteGate';
 import {
   registerPasskeyForMember,
   authenticateWithPasskey,
@@ -60,6 +61,7 @@ import { clearDriveConnectionForAccount } from '@/services/google/driveTokenReco
 import { clearLastGoogleAccount } from '@/services/sync/fileHandleStore';
 import { clearFolderCache } from '@/services/google/driveService';
 import { reportError } from '@/utils/errorReporter';
+import { PASSPHRASE_REFUSAL_KEY } from '@/utils/passphraseStrength';
 import { logEvent } from '@/services/telemetry/logEvent';
 import {
   emitDeviceTrustSet,
@@ -80,6 +82,7 @@ import {
   type SignOutStepName,
 } from '@/services/auth/signOutSteps';
 import type { WrappedMemberKey } from '@/types/syncFileV4';
+import type { PassphraseVerdict } from '@/utils/passphraseStrength';
 import { showToast } from '@/composables/useToast';
 import { sweepHandoffFiles } from '@/utils/shareOrDownloadFile';
 import { clearKeptRecipe } from '@/utils/recipeKeepStash';
@@ -201,7 +204,14 @@ export type KitInvalidateOutcome =
   | { invalidated: true; save: DurableSaveOutcome; liveRemaining: number }
   | { invalidated: false; refusal: 'last_kit' | 'no_envelope' | 'error' };
 
-export type RotateSurface = 'change-password' | 'reset-member-password' | 'signin-heal';
+/**
+ * Who is rotating a member's password wrap. `signin-heal` (a stale wrap repaired on sign-in)
+ * and `kdf-upgrade` (a legacy-cost wrap re-written at the current cost, ADR-041) re-wrap with
+ * the password just verified and are BEST-EFFORT: no offline gate, no rollback, a bounded
+ * save, never blocking sign-in. The other two are user-initiated and transactional.
+ */
+export type RotateSurface =
+  'change-password' | 'reset-member-password' | 'signin-heal' | 'kdf-upgrade';
 
 /**
  * Closed union of every reason `resetMemberPassword` can fail. Adding a
@@ -242,6 +252,10 @@ async function rotateMemberPassword(
   const syncStore = useSyncStore();
   const familyStore = useFamilyStore();
   const memberIdTail = memberId.slice(-8);
+  // Best-effort surfaces re-wrap with the CURRENT password, so there is no old/new
+  // split-brain to protect against: they skip the offline gate and the save-failure
+  // rollback (the wrap-only undo after a failed hash write still applies to all).
+  const bestEffort = surface === 'signin-heal' || surface === 'kdf-upgrade';
   if (!syncStore.familyKey) {
     reportError({
       surface,
@@ -256,8 +270,8 @@ async function rotateMemberPassword(
   // impossible (no write provider, or a cloud provider while the browser is
   // offline), block BEFORE mutating anything and tell the user plainly. This
   // avoids the scary rollback+critical-page+~24s-wait path for the common offline
-  // case. signin-heal is best-effort and never blocks — it skips this gate.
-  if (surface !== 'signin-heal' && !syncStore.canDurablySaveNow()) {
+  // case. Best-effort surfaces (signin-heal, kdf-upgrade) never block — they skip this gate.
+  if (!bestEffort && !syncStore.canDurablySaveNow()) {
     logEvent({
       level: 'info',
       surface,
@@ -359,16 +373,16 @@ async function rotateMemberPassword(
   }
 
   // ── Durable save vs best-effort, by surface ──────────────────────────────
-  // signin-heal re-wraps with the CURRENT password (no old/new split-brain) and
-  // must never block or fail sign-in — keep its best-effort resolve-and-proceed
-  // 5s bound. NO rollback, NO error surface (regressing this would re-introduce
-  // the 0.9.5R3/R4 spinner-freeze class). The caller discards the result.
-  if (surface === 'signin-heal') {
+  // signin-heal and kdf-upgrade re-wrap with the CURRENT password (no old/new
+  // split-brain) and must never block or fail sign-in — keep their best-effort
+  // resolve-and-proceed 5s bound. NO rollback, NO error surface (regressing this
+  // would re-introduce the 0.9.5R3/R4 spinner-freeze class).
+  if (bestEffort) {
     const synced = await syncStore.syncNowBounded();
     logEvent({
       level: 'info',
       surface,
-      message: 'signin-heal rotation save (best-effort)',
+      message: `${surface} rotation save (best-effort)`,
       context: {
         member_id_tail: memberIdTail,
         action: synced ? 'rotation-saved' : 'rotation-deferred',
@@ -443,6 +457,91 @@ async function rotateMemberPassword(
   return { success: false, error: 'saveFailed' };
 }
 
+type WrapUpgradeAction =
+  | 'upgraded'
+  | 'upgrade-deferred'
+  | 'skipped-gate-closed'
+  | 'skipped-current'
+  | 'skipped-changed'
+  | 'failed';
+
+/** The one `wrap_upgrade` row (ADR-041): exactly one per attempted lazy upgrade. */
+function logWrapUpgrade(
+  action: WrapUpgradeAction,
+  kind: 'member' | 'passphrase',
+  extra: { member_id_tail?: string; error_code?: string } = {}
+): void {
+  logEvent({
+    level: action === 'failed' ? 'warn' : 'info',
+    surface: 'kdf-upgrade',
+    message: 'wrap_upgrade',
+    context: { action, kind, ...extra },
+  });
+}
+
+/**
+ * Why a wrap is NOT being upgraded, for the telemetry row only; the decision itself is
+ * `needsSecretRewrap` (gate open AND recorded count below the `secret` profile), so once it
+ * said no, an open gate can only mean the wrap is already current.
+ */
+function wrapUpgradeSkipReason(): 'skipped-gate-closed' | 'skipped-current' {
+  return isKdfUpgradeGateOpen() ? 'skipped-current' : 'skipped-gate-closed';
+}
+
+/**
+ * Lazy KDF upgrade of a member's password wrap (ADR-041). Called only after `entry` has
+ * just unwrapped with `password`. Best-effort: one attempt per sign-in, through the same
+ * rotation path as the heal (`'kdf-upgrade'` is a best-effort surface), and NEVER throws
+ * into sign-in. Emits exactly one `wrap_upgrade` row.
+ */
+async function upgradeMemberWrap(
+  memberId: string,
+  password: string,
+  entry: WrappedMemberKey
+): Promise<void> {
+  const memberIdTail = memberId.slice(-8);
+  try {
+    if (!needsSecretRewrap(entry)) {
+      logWrapUpgrade(wrapUpgradeSkipReason(), 'member', {
+        member_id_tail: memberIdTail,
+      });
+      return;
+    }
+    const result = await rotateMemberPassword(memberId, password, 'kdf-upgrade');
+    if (result.success) {
+      logWrapUpgrade('upgraded', 'member', { member_id_tail: memberIdTail });
+      return;
+    }
+    // Every `success: false` arm of rotateMemberPassword has already reportError'd under
+    // the `kdf-upgrade` surface; this row carries the outcome code for the upgrade rate.
+    logWrapUpgrade('failed', 'member', {
+      member_id_tail: memberIdTail,
+      error_code: result.error,
+    });
+  } catch (e) {
+    logWrapUpgrade('failed', 'member', {
+      member_id_tail: memberIdTail,
+      error_code: e instanceof Error ? e.name : 'unknown',
+    });
+    reportError({
+      surface: 'kdf-upgrade',
+      message: 'member wrap KDF upgrade threw; sign-in continues on the old wrap',
+      error: e,
+      severity: 'warning',
+      context: { action: 'failed', kind: 'member', member_id_tail: memberIdTail },
+    });
+  }
+}
+
+/**
+ * The last `passphrase-strength` verdict reason logged by `checkFamilyPassphrase`, so the
+ * live meter emits one row per reason TRANSITION rather than one per keystroke. Reset by
+ * `setRecoveryPassphrase`.
+ */
+let lastLoggedPassphraseReason: PassphraseVerdictDetail | null = null;
+
+type PassphraseVerdictDetail = 'ok' | Extract<PassphraseVerdict, { ok: false }>['reason'];
+
 /**
  * Self-heal stale `envelope.wrappedKeys[memberId]` on successful password
  * sign-in. Fires whenever a member authenticates via password (PickBean or
@@ -468,7 +567,13 @@ async function healStaleWrappedKey(memberId: string, password: string): Promise<
     const env = syncStore.authoritativeEnvelope();
     if (!env || !syncStore.familyKey) return; // passkey / cache-only sign-in — no password-shaped repair possible
     const entry = env.wrappedKeys?.[memberId];
-    if (entry && (await unwrapWrappedKey(entry, password))) return; // fresh — no heal needed
+    if (entry && (await unwrapWrappedKey(entry, password))) {
+      // Fresh. A wrap made at the legacy cost is re-written at the current one once the
+      // fleet gate is open (ADR-041); awaited like the heal so the next cold sign-in
+      // already has it. Never throws.
+      await upgradeMemberWrap(memberId, password, entry);
+      return;
+    }
 
     console.warn(
       `[authStore.signIn] stale wrappedKey for ${memberId} — re-wrapping; symptom of envelope-merge corruption, verify replaceEnvelope/preserveLocalKeyDicts are deployed`
@@ -2121,9 +2226,76 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   /**
+   * The ONE place the recovery-passphrase wrap is written (ADR-041): the Settings save and
+   * the lazy KDF upgrade after a passphrase unlock are the same code. `wrapFamilyKeyWithSecret`
+   * picks the cost the write gate allows and records it; `setRecoveryPassphraseWrap` stamps
+   * newest-wins by `createdAt`; the bounded save may return `false` (offline, no provider
+   * yet), in which case the wrap rides the next save. Throws if no pod is open.
+   */
+  /**
+   * Wrap the family key under `phrase` and commit it as THE recovery passphrase.
+   * `expectPrevWrapped` makes it a compare-and-set for the lazy upgrade: the 600k
+   * derivation takes a second, and a peer may have changed the passphrase meanwhile
+   * (`setRecoveryPassphraseWrap` newest-wins-clamps `createdAt`, so a blind commit would
+   * revert that change with the OLD phrase). Settings' own save passes nothing: a
+   * deliberate change always wins. The outcome names whether the save landed.
+   */
+  async function writePassphraseWrap(
+    phrase: string,
+    opts: { expectPrevWrapped?: string } = {}
+  ): Promise<'saved' | 'deferred' | 'changed'> {
+    const { useSyncStore } = await import('./syncStore');
+    const syncStore = useSyncStore();
+    if (!syncStore.familyKey) throw new Error('No family key loaded');
+    const { wrapFamilyKeyWithSecret } = await import('@/services/crypto/secretWrap');
+    const pkg = await wrapFamilyKeyWithSecret(syncStore.familyKey, phrase);
+    if (
+      opts.expectPrevWrapped !== undefined &&
+      syncStore.authoritativeEnvelope()?.recoveryPassphrase?.wrapped !== opts.expectPrevWrapped
+    ) {
+      return 'changed';
+    }
+    syncStore.setRecoveryPassphraseWrap({ ...pkg, createdAt: toISODateString(new Date()) });
+    return (await syncStore.syncNowBounded()) ? 'saved' : 'deferred';
+  }
+
+  /**
+   * The ONE strength verdict for a family passphrase, used by BOTH the live meter
+   * (`RecoveryPassphraseEditor`) and `setRecoveryPassphrase`, so they can never disagree.
+   * Supplies what a passphrase must not lean on as zxcvbn `userInputs`: the family name,
+   * each member's name and aliases, and the local part of their emails.
+   *
+   * Logs a `verdict` row only when the reason changes (never per keystroke).
+   */
+  async function checkFamilyPassphrase(phrase: string): Promise<PassphraseVerdict> {
+    const familyStore = useFamilyStore();
+    const candidates: Array<string | null | undefined> = [useFamilyContextStore().activeFamilyName];
+    for (const m of familyStore.members) {
+      candidates.push(m.name, ...(m.aliases ?? []));
+      candidates.push(m.email?.split('@')[0], m.googleAccountEmail?.split('@')[0]);
+    }
+    const userInputs = [
+      ...new Set(candidates.map((v) => v?.trim()).filter((v): v is string => !!v)),
+    ];
+    const { checkPassphrase } = await import('@/utils/passphraseStrength');
+    const verdict = await checkPassphrase(phrase.trim(), userInputs);
+    const detail = verdict.ok ? 'ok' : verdict.reason;
+    if (detail !== lastLoggedPassphraseReason) {
+      lastLoggedPassphraseReason = detail;
+      logEvent({
+        level: 'info',
+        surface: 'passphrase-strength',
+        message: 'verdict',
+        context: { detail, count: verdict.score },
+      });
+    }
+    return verdict;
+  }
+
+  /**
    * Set (or replace) the family recovery passphrase: a strength-checked memorable
    * phrase wrapped into the envelope's own `recoveryPassphrase` field via the SAME
-   * password machinery members use (deriveMemberKey → AES-KW). Never a `wrappedKeys`
+   * password machinery members use (`wrapFamilyKeyWithSecret`). Never a `wrappedKeys`
    * entry — legacy clients would surface a phantom member (Pass-4 finding).
    */
   async function setRecoveryPassphrase(
@@ -2140,39 +2312,21 @@ export const useAuthStore = defineStore('auth', () => {
       // derived from the raw one, so a stray trailing space made the recovery credential
       // permanently un-redeemable as the user knows it.
       passphrase = passphrase.trim();
-      const { checkPassphrase } = await import('@/utils/passphraseStrength');
-      const familyStore = useFamilyStore();
-      const familyContextStore = useFamilyContextStore();
-      const verdict = checkPassphrase(passphrase, {
-        familyName: familyContextStore.activeFamilyName ?? undefined,
-        memberNames: familyStore.members.map((m) => m.name),
-      });
+      const verdict = await checkFamilyPassphrase(passphrase);
       if (!verdict.ok) {
-        const key =
-          verdict.reason === 'matches-name'
-            ? 'recovery.passphraseMatchesName'
-            : 'recovery.passphraseTooWeak';
-        return { success: false, error: translationStore.t(key) };
+        return {
+          success: false,
+          error: translationStore.t(PASSPHRASE_REFUSAL_KEY[verdict.reason]),
+        };
       }
 
-      const { deriveMemberKey, wrapFamilyKey, SALT_LENGTH } =
-        await import('@/services/crypto/familyKeyService');
-      const { bufferToBase64 } = await import('@/utils/encoding');
-      const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
-      const wrapKey = await deriveMemberKey(passphrase, salt);
-      const wrapped = await wrapFamilyKey(syncStore.familyKey, wrapKey);
-      syncStore.setRecoveryPassphraseWrap({
-        salt: bufferToBase64(salt),
-        wrapped,
-        createdAt: toISODateString(new Date()),
-      });
+      await writePassphraseWrap(passphrase);
       logEvent({
         level: 'info',
         surface: 'login-flow',
         message: 'recovery_passphrase_set',
         context: { action: 'passphrase_set' },
       });
-      await syncStore.syncNowBounded();
       return { success: true };
     } catch (e) {
       reportError({
@@ -2186,6 +2340,68 @@ export const useAuthStore = defineStore('auth', () => {
         success: false,
         error: e instanceof Error ? e.message : translationStore.t('auth.signInFailed'),
       };
+    } finally {
+      // A save closes the editing episode: the next one logs its first verdict afresh.
+      lastLoggedPassphraseReason = null;
+    }
+  }
+
+  /**
+   * Follow-ups after the pod was opened with the family recovery passphrase (ADR-041),
+   * wired at the two interactive unlock sites (`useLoginFlow`, `LoadPodView`). Both are
+   * best-effort and this NEVER throws into the unlock:
+   *  (a) a phrase in the old generator's shape arms the gentle Settings nudge, shown once a
+   *      member signs in (`usePassphraseNudge`);
+   *  (b) a wrap made at the legacy cost is re-written at the current one once the fleet
+   *      gate is open, through the same `writePassphraseWrap` the Settings save uses.
+   * Reads the AUTHORITATIVE envelope, never `syncStore.envelope` (a pre-merge snapshot).
+   */
+  async function afterPassphraseUnlock(phrase: string): Promise<void> {
+    try {
+      const { isLegacyGeneratedShape } = await import('@/utils/passphraseStrength');
+      if (isLegacyGeneratedShape(phrase)) {
+        const { armLegacyPassphraseSignal } =
+          await import('@/services/auth/legacyPassphraseSignal');
+        armLegacyPassphraseSignal();
+      }
+    } catch (e) {
+      reportError({
+        surface: 'passphrase-nudge',
+        message: 'legacy passphrase check failed after unlock; no nudge this time',
+        error: e,
+        severity: 'warning',
+        context: { action: 'arm_failed' },
+      });
+    }
+
+    try {
+      const { useSyncStore } = await import('./syncStore');
+      const rp = useSyncStore().authoritativeEnvelope()?.recoveryPassphrase;
+      if (!rp) return; // opened by passphrase, so unreachable short of a racing replace
+      if (!needsSecretRewrap(rp)) {
+        logWrapUpgrade(wrapUpgradeSkipReason(), 'passphrase');
+        return;
+      }
+      const outcome = await writePassphraseWrap(phrase, { expectPrevWrapped: rp.wrapped });
+      logWrapUpgrade(
+        outcome === 'saved'
+          ? 'upgraded'
+          : outcome === 'deferred'
+            ? 'upgrade-deferred'
+            : 'skipped-changed',
+        'passphrase'
+      );
+    } catch (e) {
+      logWrapUpgrade('failed', 'passphrase', {
+        error_code: e instanceof Error ? e.name : 'unknown',
+      });
+      reportError({
+        surface: 'kdf-upgrade',
+        message: 'recovery passphrase KDF upgrade failed; the unlock stands on the old wrap',
+        error: e,
+        severity: 'warning',
+        context: { action: 'failed', kind: 'passphrase' },
+      });
     }
   }
 
@@ -3881,6 +4097,8 @@ export const useAuthStore = defineStore('auth', () => {
     createRecoveryKit,
     invalidateRecoveryKit,
     setRecoveryPassphrase,
+    checkFamilyPassphrase,
+    afterPassphraseUnlock,
     signInWithPasskey,
     sessionRejected,
     sessionIsLegacy,

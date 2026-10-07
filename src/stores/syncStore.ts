@@ -130,13 +130,10 @@ import { summarizeRecoveryKits } from '@/services/auth/recoveryKit';
 import type { EnvelopeTombstone } from '@/types/syncFileV4';
 import { logRecoveryKitsExhausted, logRevokedEntriesFiltered } from '@/services/sync/revocationLog';
 import type { EnvelopeKeyDictField } from '@/services/sync/envelopeMerge';
-import {
-  generateFamilyKey,
-  deriveMemberKey,
-  wrapFamilyKey,
-} from '@/services/crypto/familyKeyService';
+import { generateFamilyKey } from '@/services/crypto/familyKeyService';
+import { wrapFamilyKeyWithSecret } from '@/services/crypto/secretWrap';
 import * as docClient from '@/services/automerge/worker/docClient';
-import type { BeanpodFileV4, WrappedMemberKey } from '@/types/syncFileV4';
+import type { BeanpodFileV4, InviteKeyPackage, WrappedMemberKey } from '@/types/syncFileV4';
 import type { StorageProvider, StorageProviderType } from '@/services/sync/storageProvider';
 import { toISODateString } from '@/utils/date';
 import { raceTimeout } from '@/utils/timing';
@@ -4152,19 +4149,13 @@ export const useSyncStore = defineStore('sync', () => {
   }
 
   /**
-   * Derive a wrapping key from a password and wrap the family key for a member.
-   * Adds the wrappedKey entry to the envelope so the member can decrypt from any browser/device.
+   * Wrap the family key for a member with their password and add the wrappedKey entry to
+   * the envelope so the member can decrypt from any browser/device. The wrap (salt, cost,
+   * recorded `iterations`) comes from the one helper, `wrapFamilyKeyWithSecret` (ADR-041).
    */
   async function wrapFamilyKeyForMember(memberId: string, password: string): Promise<void> {
     if (!familyKey.value) throw new Error('No family key loaded');
-    const salt = crypto.getRandomValues(new Uint8Array(16));
-    const memberKey = await deriveMemberKey(password, salt);
-    const wrapped = await wrapFamilyKey(familyKey.value, memberKey);
-    const { bufferToBase64 } = await import('@/utils/encoding');
-    await addMemberWrappedKey(memberId, {
-      wrapped,
-      salt: bufferToBase64(salt),
-    });
+    await addMemberWrappedKey(memberId, await wrapFamilyKeyWithSecret(familyKey.value, password));
   }
 
   /**
@@ -4178,7 +4169,7 @@ export const useSyncStore = defineStore('sync', () => {
    */
   async function setMemberWrappedKey(
     memberId: string,
-    entry: { wrapped: string; salt: string } | undefined
+    entry: WrappedMemberKey | undefined
   ): Promise<void> {
     // ⚠️ AUTHORITATIVE, and through the entry helper (audit C2). This used to spread
     // `envelope.value`, which a poll merge never updates — so a rotation written just after
@@ -4219,11 +4210,9 @@ export const useSyncStore = defineStore('sync', () => {
         });
       }
     }
-    setEnvelopeEntry(
-      'wrappedKeys',
-      memberId,
-      entry ? { wrapped: entry.wrapped, salt: entry.salt } : null
-    );
+    // The entry is passed through WHOLE (never rebuilt as `{ wrapped, salt }`), so every
+    // field it carries survives, `iterations` included (ADR-041).
+    setEnvelopeEntry('wrappedKeys', memberId, entry ?? null);
   }
 
   /**
@@ -4242,11 +4231,8 @@ export const useSyncStore = defineStore('sync', () => {
    * Add a wrapped key entry to the envelope for a new member (joinFamily flow).
    * Delegates to `setMemberWrappedKey` (one write path, DRY).
    */
-  async function addMemberWrappedKey(
-    memberId: string,
-    wrappedKey: { wrapped: string; salt: string }
-  ): Promise<void> {
-    await setMemberWrappedKey(memberId, wrappedKey);
+  async function addMemberWrappedKey(memberId: string, entry: WrappedMemberKey): Promise<void> {
+    await setMemberWrappedKey(memberId, entry);
   }
 
   /**
@@ -4259,10 +4245,7 @@ export const useSyncStore = defineStore('sync', () => {
    * the truth to warn instead of handing out a dead QR. (In-memory + cache always
    * updated; a false return means "rides the next save".)
    */
-  async function addInvitePackage(
-    tokenHash: string,
-    pkg: { salt: string; wrapped: string; expiresAt: string }
-  ): Promise<boolean> {
+  async function addInvitePackage(tokenHash: string, pkg: InviteKeyPackage): Promise<boolean> {
     // ⚠️ STAGING IS THE HELPER'S JOB TOO. This used to hand-roll the spread, assign
     // `envelope.value` and call `setEnvelope` itself, immediately before a raw publish —
     // which is `publishEnvelopeEntry`'s entire body, minus its rollback.
@@ -4277,7 +4260,8 @@ export const useSyncStore = defineStore('sync', () => {
     const outcome = await publishEnvelopeEntry({
       dict: 'inviteKeys',
       key: tokenHash,
-      value: { salt: pkg.salt, wrapped: pkg.wrapped, expiresAt: pkg.expiresAt },
+      // The WHOLE package, never a hand rebuild: `iterations` (ADR-041) must ride along.
+      value: pkg,
       /**
        * ⚠️ NEVER ROLL BACK AN INVITE KEY, and the DEFAULT here is wrong for one.
        *

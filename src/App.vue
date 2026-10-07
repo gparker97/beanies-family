@@ -11,6 +11,7 @@ import FatalErrorOverlay from '@/components/common/FatalErrorOverlay.vue';
 import InstallPrompt from '@/components/common/InstallPrompt.vue';
 import { usePwaUpdater, PWA_POST_UPDATE_ROUTE_KEY } from '@/composables/usePwaUpdater';
 import { useAppUpdate } from '@/composables/useAppUpdate';
+import { usePassphraseNudge } from '@/composables/usePassphraseNudge';
 import { installNativeAuthListener } from '@/services/google/googleAuth';
 import { installInboundLinkListener } from '@/services/share/inboundLinkBridge';
 import { isSameOriginReturnPath } from '@/services/google/redirectState';
@@ -1893,9 +1894,13 @@ watch(
 // sets PWA_POST_UPDATE_ROUTE_KEY; onMounted reads it into `pendingUpdateToast`.
 usePwaUpdater();
 // The native twin: `usePwaUpdater` self-updates the web, `useAppUpdate` asks
-// iOS and Android to update through the store. Each is inert on the other's
-// platform, so exactly one is live at a time.
+// iOS and Android to update through the store, so exactly one updater prompts
+// per platform. `useAppUpdate` still CHECKS the floor on web (no prompt) so it
+// is persisted for the KDF write gate (ADR-041).
 useAppUpdate();
+// A legacy-shaped passphrase unlock (ADR-041) arms a one-time toast; this is its trigger,
+// fired once a member signs in. Mounted once here; RecoverySettings reads the hint state.
+usePassphraseNudge();
 
 // Native (Capacitor) OAuth deep-link completion. On native, Google sign-in
 // returns via a verified App Link `appUrlOpen` event; the listener completes

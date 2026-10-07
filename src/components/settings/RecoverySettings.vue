@@ -12,11 +12,12 @@
 import { ref, computed, nextTick, onMounted } from 'vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
-import BaseInput from '@/components/ui/BaseInput.vue';
 import RecoveryKitDisplay from '@/components/auth/RecoveryKitDisplay.vue';
+import RecoveryPassphraseEditor from '@/components/settings/RecoveryPassphraseEditor.vue';
 import RecoveryKitsModal from '@/components/settings/RecoveryKitsModal.vue';
 import SettingsAdminOnlyNotice from '@/components/settings/SettingsAdminOnlyNotice.vue';
 import { useRecoveryKitFlow } from '@/composables/useRecoveryKitFlow';
+import { usePassphraseNudge } from '@/composables/usePassphraseNudge';
 import {
   approveReplace,
   invalidateKit,
@@ -30,7 +31,6 @@ import { useSyncStore } from '@/stores/syncStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { formatDate } from '@/utils/date';
-import { generatePassphrase } from '@/utils/passphraseStrength';
 import { emitKitInvalidateOutcome } from '@/services/telemetry/loginFlowEvents';
 import type { RecoveryKitSummary } from '@/services/auth/recoveryKit';
 
@@ -171,37 +171,16 @@ async function handleKitStored(via: 'saved' | 'acknowledged') {
   }
 }
 
-// ── Passphrase state ─────────────────────────────────────────────────────────
+// ── Passphrase ───────────────────────────────────────────────────────────────
 const hasPassphrase = computed(() => !!syncStore.envelope?.recoveryPassphrase);
-const isEditingPassphrase = ref(false);
-const suggested = ref('');
-const useOwn = ref(false);
-const ownPhrase = ref('');
-const isSavingPassphrase = ref(false);
+// The legacy-passphrase nudge (ADR-041): the editor shows the hint while it is pending, and
+// a saved passphrase resolves it.
+const passphraseNudge = usePassphraseNudge();
+const legacyPassphrasePending = passphraseNudge.isPending;
 
-function startPassphrase() {
-  statusMessage.value = null;
-  suggested.value = generatePassphrase();
-  useOwn.value = false;
-  ownPhrase.value = '';
-  isEditingPassphrase.value = true;
-}
-
-async function handleSavePassphrase() {
-  statusMessage.value = null;
-  const phrase = useOwn.value ? ownPhrase.value : suggested.value;
-  isSavingPassphrase.value = true;
-  try {
-    const result = await authStore.setRecoveryPassphrase(phrase);
-    if (result.success) {
-      statusMessage.value = { text: t('recovery.passphraseSaved'), type: 'success' };
-      isEditingPassphrase.value = false;
-    } else {
-      statusMessage.value = { text: result.error ?? t('auth.signInFailed'), type: 'error' };
-    }
-  } finally {
-    isSavingPassphrase.value = false;
-  }
+function handlePassphraseSaved() {
+  passphraseNudge.resolve();
+  statusMessage.value = { text: t('recovery.passphraseSaved'), type: 'success' };
 }
 </script>
 
@@ -262,66 +241,11 @@ async function handleSavePassphrase() {
     </div>
 
     <!-- Recovery passphrase -->
-    <div>
-      <h4 class="font-outfit dark:text-ink mb-1 text-base font-semibold text-gray-900">
-        {{ t('recovery.passphraseTitle') }}
-      </h4>
-      <p class="dark:text-ink-soft mb-3 text-sm text-gray-600">
-        {{ t('recovery.passphraseDescription') }}
-      </p>
-      <p class="mb-3 text-xs text-gray-500">
-        {{ hasPassphrase ? t('recovery.passphraseIsSet') : t('recovery.passphraseNotSet') }}
-      </p>
-
-      <BaseButton v-if="!isEditingPassphrase" variant="secondary" @click="startPassphrase">
-        {{ hasPassphrase ? t('recovery.passphraseChange') : t('recovery.passphraseSet') }}
-      </BaseButton>
-
-      <div v-else class="space-y-3">
-        <template v-if="!useOwn">
-          <p class="dark:text-ink-soft text-sm font-medium text-gray-700">
-            {{ t('recovery.passphraseSuggestion') }}
-          </p>
-          <p
-            class="font-outfit dark:bg-surface-overlay dark:text-ink rounded-xl bg-gray-50 p-3 text-center text-lg font-bold tracking-wide text-gray-900 select-all"
-          >
-            {{ suggested }}
-          </p>
-          <div class="flex gap-3">
-            <BaseButton variant="secondary" type="button" @click="suggested = generatePassphrase()">
-              {{ t('recovery.passphraseRegenerate') }}
-            </BaseButton>
-            <BaseButton variant="secondary" type="button" @click="useOwn = true">
-              {{ t('recovery.passphraseUseOwn') }}
-            </BaseButton>
-          </div>
-        </template>
-        <template v-else>
-          <BaseInput
-            v-model="ownPhrase"
-            :label="t('recovery.passphraseTitle')"
-            type="text"
-            autocomplete="off"
-          />
-          <p class="dark:text-ink-soft mt-2 text-xs text-gray-500">
-            {{ t('recovery.passphraseRules') }}
-          </p>
-        </template>
-        <div class="flex gap-3">
-          <BaseButton :disabled="isSavingPassphrase" @click="handleSavePassphrase">
-            {{ isSavingPassphrase ? t('common.saving') : t('action.save') }}
-          </BaseButton>
-          <BaseButton
-            variant="ghost"
-            type="button"
-            :disabled="isSavingPassphrase"
-            @click="isEditingPassphrase = false"
-          >
-            {{ t('action.cancel') }}
-          </BaseButton>
-        </div>
-      </div>
-    </div>
+    <RecoveryPassphraseEditor
+      :has-passphrase="hasPassphrase"
+      :legacy-pending="legacyPassphrasePending"
+      @saved="handlePassphraseSaved"
+    />
 
     <RecoveryKitsModal
       :open="showKits"

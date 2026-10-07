@@ -1141,6 +1141,14 @@ export function useLoginFlow(opts: {
                 fallbackDepth: pendingProveDepth,
               });
               dispatch({ type: 'OPEN_FAILED', reason: 'wrong-password' });
+              // ADR-041: arm the legacy-phrase nudge and lazily re-wrap a legacy-cost
+              // passphrase wrap. Best-effort, never throws, and DETACHED after the
+              // prove screen is dispatched: with the gate open the re-wrap is a 600k
+              // derivation plus a bounded save (same as LoadPodView). A member-password
+              // sign-in that follows runs its own best-effort upgrade; both commits
+              // build on the authoritative envelope, so the later one carries the
+              // earlier wrap and the worst case is one extra bounded save.
+              void authStore.afterPassphraseUnlock(password);
               return;
             }
             if (!dec.success) {

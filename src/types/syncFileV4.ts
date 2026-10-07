@@ -17,6 +17,12 @@ export interface WrappedMemberKey {
   salt: string;
   /** AES-KW wrapped family key (base64) */
   wrapped: string;
+  /**
+   * PBKDF2 iteration count this wrap was made with. ADDITIVE OPTIONAL: absent = 100,000
+   * (`LEGACY_ITERATIONS`), written before KDF_READ_BOTH_SINCE; see ADR-041. Readers derive
+   * with `recordedIterations(entry)`, never a constant.
+   */
+  iterations?: number;
 }
 
 /** A family key wrapped with a passkey's PRF-derived AES-KW key. */
@@ -47,6 +53,12 @@ export interface RecoveryKeyPackage {
    * permission check.
    */
   createdBy?: string;
+  /**
+   * PBKDF2 iteration count this wrap was made with. ADDITIVE OPTIONAL: absent = 100,000
+   * (`LEGACY_ITERATIONS`), written before KDF_READ_BOTH_SINCE; see ADR-041. Readers derive
+   * with `recordedIterations(entry)`, never a constant.
+   */
+  iterations?: number;
 }
 
 export interface InviteKeyPackage {
@@ -61,6 +73,12 @@ export interface InviteKeyPackage {
    * already minting 15-minute packages.)
    */
   expiresAt: ISODateString;
+  /**
+   * PBKDF2 iteration count this wrap was made with. ADDITIVE OPTIONAL: absent = 100,000
+   * (`LEGACY_ITERATIONS`), written before KDF_READ_BOTH_SINCE; see ADR-041. Readers derive
+   * with `recordedIterations(entry)`, never a constant.
+   */
+  iterations?: number;
 }
 
 /**

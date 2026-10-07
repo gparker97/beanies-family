@@ -14,7 +14,19 @@
 
 import type { BeanpodFileV4, RecoveryKeyPackage } from '@/types/syncFileV4';
 import type { ISODateString } from '@/types/models';
-import { unwrapFamilyKey, wrapFamilyKey, SALT_LENGTH } from '@/services/crypto/familyKeyService';
+import {
+  unwrapFamilyKey,
+  wrapFamilyKey,
+  isWrongKeyUnwrap,
+  SALT_LENGTH,
+} from '@/services/crypto/familyKeyService';
+import {
+  KDF_PROFILES,
+  derivePbkdf2Key,
+  recordedIterations,
+  type KdfParams,
+} from '@/services/crypto/kdfParams';
+import { bufferToBase64, base64ToBuffer } from '@/utils/encoding';
 import { slotTombstoneEntryKey } from '@/services/sync/envelopeMerge';
 import { toISODateString } from '@/utils/date';
 import { shareableOrigin } from '@/utils/shareableOrigin';
@@ -26,7 +38,6 @@ import { logEvent } from '@/services/telemetry/logEvent';
 const ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 const CODE_BYTES = 20; // 160 bits → 32 base32 chars → 8 groups of 4
 const GROUP = 4;
-const PBKDF2_ITERATIONS = 100_000; // parity with invite derivation; entropy carries the load
 
 export interface GeneratedKit {
   /** Non-secret id printed on the kit (8 hex chars). */
@@ -65,26 +76,9 @@ export function normalizeKitCode(input: string): string {
   return input.toUpperCase().replace(/[\s-]/g, '').replace(/O/g, '0').replace(/[IL]/g, '1');
 }
 
-async function deriveKitKey(code: string, salt: Uint8Array): Promise<CryptoKey> {
-  const material = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(code),
-    'PBKDF2',
-    false,
-    ['deriveKey']
-  );
-  return crypto.subtle.deriveKey(
-    {
-      name: 'PBKDF2',
-      salt: salt.buffer as ArrayBuffer,
-      iterations: PBKDF2_ITERATIONS,
-      hash: 'SHA-256',
-    },
-    material,
-    { name: 'AES-KW', length: 256 },
-    false,
-    ['wrapKey', 'unwrapKey']
-  );
+/** Profile `highEntropy`: parity with invite derivation; the code's entropy carries the load. */
+function deriveKitKey(code: string, salt: Uint8Array, params: KdfParams): Promise<CryptoKey> {
+  return derivePbkdf2Key(new TextEncoder().encode(code), salt, params);
 }
 
 /** Generate a kit and its envelope wrap for the given family key. */
@@ -93,16 +87,18 @@ export async function generateRecoveryKit(familyKey: CryptoKey): Promise<Generat
   const kitId = Array.from(crypto.getRandomValues(new Uint8Array(4)))
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
+  const iterations = KDF_PROFILES.highEntropy;
   const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
-  const wrapKey = await deriveKitKey(codeRaw, salt);
+  const wrapKey = await deriveKitKey(codeRaw, salt, { profile: 'highEntropy', iterations });
   const wrapped = await wrapFamilyKey(familyKey, wrapKey);
   return {
     kitId,
     code: formatCode(codeRaw),
     pkg: {
-      salt: btoa(String.fromCharCode(...salt)),
+      salt: bufferToBase64(salt),
       wrapped,
       createdAt: toISODateString(new Date()),
+      iterations,
     },
   };
 }
@@ -187,15 +183,6 @@ function stampOf(kit: RecoveryKitSummary): string {
 }
 
 /**
- * The ONE failure that means "this code does not open this entry": AES-KW's integrity
- * check refusing the unwrap, which WebCrypto raises as a DOMException named
- * `OperationError`. Read by name, not `instanceof`, so it holds across realms and test DOMs.
- */
-function isWrongKeyUnwrap(e: unknown): boolean {
-  return !!e && typeof e === 'object' && (e as { name?: unknown }).name === 'OperationError';
-}
-
-/**
  * Redeem a kit code against an envelope: tries every `recoveryKeys` entry. An entry
  * stays valid until a `recoveryKeys:<kitId>` slot tombstone retires it (tracker #99);
  * revoked wraps are filtered out of every envelope before this function is reached, so
@@ -219,8 +206,11 @@ export async function redeemRecoveryKit(
   let unusable = 0;
   for (const [kitId, pkg] of entries) {
     try {
-      const salt = Uint8Array.from(atob(pkg.salt), (c) => c.charCodeAt(0));
-      const wrapKey = await deriveKitKey(code, salt);
+      const salt = new Uint8Array(base64ToBuffer(pkg.salt));
+      const wrapKey = await deriveKitKey(code, salt, {
+        profile: 'highEntropy',
+        iterations: recordedIterations(pkg),
+      });
       const familyKey = await unwrapFamilyKey(pkg.wrapped, wrapKey);
       return { ok: true, familyKey, kitId };
     } catch (e) {

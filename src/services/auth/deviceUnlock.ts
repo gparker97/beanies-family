@@ -37,6 +37,7 @@ import {
   unwrapDEK,
 } from '@/services/crypto/keyWrap';
 import { getOrCreateDeviceSecret } from '@/services/auth/deviceSecret';
+import { KDF_PROFILES, derivePbkdf2Bits } from '@/services/crypto/kdfParams';
 import { bufferToBase64, base64ToBuffer } from '@/utils/encoding';
 import { toISODateString } from '@/utils/date';
 import { logEvent } from '@/services/telemetry/logEvent';
@@ -47,8 +48,6 @@ export const PIN_LENGTH = 6;
 
 /** Domain separation for the PIN wrap derivation. Immutable — changing it orphans every wrap. */
 const PIN_WRAP_INFO_PREFIX = 'beanies.family-pin-unlock-v1:';
-/** PBKDF2 stretch used ONLY on the extractable-bytes fallback path. */
-const FALLBACK_PBKDF2_ITERATIONS = 210_000;
 
 export type PinUnlockResult =
   | { ok: true; familyKey: CryptoKey; record: DeviceUnlockRecord }
@@ -116,21 +115,11 @@ async function deriveWrapKeyForPin(
 ): Promise<CryptoKey> {
   let pinComponent = pin;
   if (kdf === 'hkdf+pbkdf2') {
-    const pinKey = await crypto.subtle.importKey(
-      'raw',
+    // Profile `deviceFallback`, used ONLY on the extractable-bytes fallback path.
+    const stretched = await derivePbkdf2Bits(
       new TextEncoder().encode(pin),
-      'PBKDF2',
-      false,
-      ['deriveBits']
-    );
-    const stretched = await crypto.subtle.deriveBits(
-      {
-        name: 'PBKDF2',
-        salt: hkdfSalt.buffer as ArrayBuffer,
-        iterations: FALLBACK_PBKDF2_ITERATIONS,
-        hash: 'SHA-256',
-      },
-      pinKey,
+      hkdfSalt,
+      { profile: 'deviceFallback', iterations: KDF_PROFILES.deviceFallback },
       256
     );
     pinComponent = bufferToBase64(stretched);

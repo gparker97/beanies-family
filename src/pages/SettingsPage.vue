@@ -26,6 +26,7 @@ import {
   AI_SETTINGS_OPEN,
   CALENDAR_SYNC_OPEN,
   REMINDERS_OPEN,
+  SECURITY_OPEN,
 } from '@/constants/settingsDeepLinks';
 import TransferOwnershipModal from '@/components/family/TransferOwnershipModal.vue';
 import { BaseSelect, BaseButton, BaseInput } from '@/components/ui';
@@ -200,7 +201,7 @@ const cardOpenMap: Record<string, () => void> = {
   account: () => {
     showAccount.value = true;
   },
-  security: () => {
+  [SECURITY_OPEN]: () => {
     showSecurity.value = true;
   },
   'data-management': () => {

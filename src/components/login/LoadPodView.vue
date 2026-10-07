@@ -977,6 +977,8 @@ async function handleDecrypt() {
     const result = await syncStore.decryptPendingFile(decryptPassword.value);
     if (result.success) {
       showDecryptModal.value = false;
+      // Captured before any branch clears the field: the passphrase follow-ups need it.
+      const phrase = decryptPassword.value;
 
       // Auto-sign-in is safe ONLY when exactly one member's wrappedKey
       // unwrapped with this password. If more than one matched, multiple
@@ -1005,6 +1007,9 @@ async function handleDecrypt() {
 
       decryptPassword.value = '';
       await finishLoaded(result.viaRecoveryPassphrase ? 'passphrase' : null);
+      // ADR-041: after finishLoaded, so a provider exists for the bounded save. Fire and
+      // forget: it never throws and must not hold up the pod opening.
+      if (result.viaRecoveryPassphrase) void authStore.afterPassphraseUnlock(phrase);
     } else if (result.payloadError) {
       // NOT a credential failure: the payload could not be loaded however right
       // the password is, so re-prompting loops forever. Before this branch the

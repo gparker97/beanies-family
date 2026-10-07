@@ -27,4 +27,8 @@ export const STORAGE_KEYS = {
    *  so a boot before the registry answers uses it. Device-local, never in the pod; not read
    *  by the `index.html` bootstrap. */
   COUNTER_WRITES: 'beanies:counterWrites',
+  /** The last update floor (`promptBelowVersion` from `min-app-version.json`) fetched on any
+   *  platform, so the KDF write gate (`kdfWriteGate.ts`) can read it synchronously at boot.
+   *  Device-local, never in the pod; not read by the `index.html` bootstrap. */
+  UPDATE_FLOOR: 'beanies:updateFloor',
 } as const;

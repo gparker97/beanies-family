@@ -18,6 +18,7 @@ vi.mock('@capacitor/core', () => ({ CapacitorHttp: http }));
 vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: vi.fn() }));
 
 import { logEvent } from '@/services/telemetry/logEvent';
+import { STORAGE_KEYS } from '@/constants/storageKeys';
 import { fetchUpdateFloor, __resetVersionPolicyForTesting } from '../versionPolicy';
 
 function lastFailure(): string | undefined {
@@ -32,6 +33,7 @@ function lastFailure(): string | undefined {
 describe('fetchUpdateFloor', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear();
     __resetVersionPolicyForTesting();
   });
 
@@ -97,6 +99,29 @@ describe('fetchUpdateFloor', () => {
     http.get.mockRejectedValueOnce(new Error(message));
     await expect(fetchUpdateFloor()).resolves.toBeNull();
     expect(lastFailure()).toBe(expected);
+  });
+
+  it('persists a successfully read floor, so the KDF write gate can read it synchronously', async () => {
+    http.get.mockResolvedValueOnce({ status: 200, data: { promptBelowVersion: ' 0.17 ' } });
+    await fetchUpdateFloor();
+    // Trimmed, exactly the value returned.
+    expect(localStorage.getItem(STORAGE_KEYS.UPDATE_FLOOR)).toBe('"0.17"');
+  });
+
+  it.each([
+    ['a non-200', () => http.get.mockResolvedValueOnce({ status: 503, data: '' })],
+    [
+      'an unparseable version',
+      () => http.get.mockResolvedValueOnce({ status: 200, data: { promptBelowVersion: 'v1-x' } }),
+    ],
+    ['a thrown request', () => http.get.mockRejectedValueOnce(new Error('Network request failed'))],
+  ])('keeps the last persisted floor on %s, and never persists null', async (_label, arrange) => {
+    // A failure is "we could not tell", not "there is no floor": overwriting the
+    // last known value would close the KDF gate on a flaky network.
+    localStorage.setItem(STORAGE_KEYS.UPDATE_FLOOR, '"0.16"');
+    arrange();
+    await expect(fetchUpdateFloor()).resolves.toBeNull();
+    expect(localStorage.getItem(STORAGE_KEYS.UPDATE_FLOOR)).toBe('"0.16"');
   });
 
   it('never throws, whatever comes back', async () => {

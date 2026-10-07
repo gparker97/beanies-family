@@ -315,7 +315,7 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
     icon: '\u{1F510}',
     readTime: 5,
     popular: true,
-    updatedDate: '2026-08-28',
+    updatedDate: '2026-10-07',
     sections: [
       {
         type: 'heading',
@@ -339,7 +339,7 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
         content: '',
         items: [
           'When you create a pod, a random 256-bit <strong>family key</strong> is generated',
-          'A <strong>wrapping key</strong> is made from a secret only your family holds \u2014 the recovery kit code created with your family, an optional family passphrase, or (for members of older families) a password run through <strong>PBKDF2</strong> (100,000 rounds, SHA-256) with a random 16-byte salt',
+          'A <strong>wrapping key</strong> is made from a secret only your family holds \u2014 the recovery kit code created with your family, an optional family passphrase, or (for members of older families) a password run through <strong>PBKDF2</strong> (hundreds of thousands of rounds, SHA-256, recorded with the data so it can be raised again without anyone doing anything) with a random 16-byte salt',
           'The family key is wrapped (encrypted) with your wrapping key using <strong>AES-KW</strong>',
           'All your family data (Automerge binary) is encrypted with the family key using <strong>AES-GCM</strong> with a random 12-byte IV',
           'The encrypted payload, wrapped keys, and salts are stored in the <code>.beanpod</code> file',
@@ -356,10 +356,15 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
         content: '',
         items: [
           '<strong>Algorithm:</strong> AES-256-GCM (encryption) + AES-KW (key wrapping)',
-          '<strong>Key derivation:</strong> PBKDF2 with 100,000 iterations, SHA-256, 16-byte random salt (for passphrase and password wraps)',
+          '<strong>Key derivation:</strong> PBKDF2 with hundreds of thousands of iterations, SHA-256, 16-byte random salt (for passphrase and password wraps); the iteration count is recorded with the data so it can be raised again without anyone doing anything',
           '<strong>IV:</strong> 12 bytes, randomly generated for each save',
           '<strong>Implementation:</strong> Web Crypto API (native browser cryptography)',
         ],
+      },
+      {
+        type: 'paragraph',
+        content:
+          'If you set an optional family passphrase, the app suggests six words drawn from a large public list, and a phrase you type yourself is strength-checked as you type. An older, shorter suggestion is gently flagged in Settings so you can swap it when you have a minute. A strong passphrase makes guessing very expensive, but no passphrase is a promise of anything: keep it private, and keep your recovery kit too.',
       },
       {
         type: 'callout',
@@ -577,7 +582,7 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
       'Your recovery kit is what gets you back into your family\u2019s data. Learn how to store it, the family passphrase option, and every other way back in if a PIN or device is lost.',
     icon: '\u{1F5DD}\uFE0F',
     readTime: 5,
-    updatedDate: '2026-09-24',
+    updatedDate: '2026-10-07',
     sections: [
       {
         type: 'heading',
@@ -624,6 +629,11 @@ export const SECURITY_ARTICLES: HelpArticle[] = [
         type: 'paragraph',
         content:
           'If you\u2019d rather remember something than store something, you can also set a <strong>family passphrase</strong> in <strong>Settings \u2192 Security &amp; Recovery</strong> \u2014 a memorable phrase that can open your family\u2019s data on a fresh device, just like the kit. It\u2019s optional, and it works alongside the kit rather than replacing it.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'The suggested phrase is six words from a large public list, and a phrase you type yourself is checked for strength as you type. If your family passphrase came from the older, shorter suggestion, Settings will gently flag it so you can choose a new one when you have a minute. It stays optional, and it always sits alongside your recovery kit.',
       },
       {
         type: 'heading',

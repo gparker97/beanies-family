@@ -75,3 +75,5 @@ There is no "create account" option for members — accounts are created by the 
 
 - ADR-010: AWS Cognito Authentication
 - ADR-013: Admin API with Lambda + API Gateway
+
+2026-10-07: iteration counts now live in `kdfParams.ts` and travel with each wrap; see ADR-041.

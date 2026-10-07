@@ -55,3 +55,5 @@ When `encrypted` is `false`, the `data` field contains the plain JSON data objec
 - Password is user-managed — no recovery if forgotten
 - PBKDF2 with 100k iterations adds ~100ms to encrypt/decrypt operations
 - Entire data set is encrypted as one blob (no partial decryption)
+
+2026-10-07: iteration counts now live in `kdfParams.ts` and travel with each wrap; see ADR-041.

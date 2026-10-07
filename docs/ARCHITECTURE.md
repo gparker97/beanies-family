@@ -276,7 +276,7 @@ FamilyMember (0..1) ───▶ (N) Goal
 ### Authentication
 
 - **Family key model**: A random 256-bit AES-GCM family key encrypts the Automerge document. Each member's key is wrapped individually via AES-KW (see [ADR-019](adr/019-family-key-encryption.md)):
-  - **Password path**: PBKDF2 (100k iterations) derives an AES-KW wrapping key → unwraps the family key
+  - **Password path**: PBKDF2 (iteration count recorded with each wrap, see ADR-041) derives an AES-KW wrapping key → unwraps the family key
   - **Passkey PRF path**: Authenticator PRF output → HKDF → AES-KW key → unwraps family key directly (true passwordless)
   - **Invite token path**: PBKDF2 from one-time token → AES-KW key → unwraps family key for new members (24h expiry)
 - **Single password**: Member password both proves identity and unwraps the family key — no separate file decrypt step

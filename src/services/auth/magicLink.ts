@@ -128,7 +128,7 @@ export async function refuseMagicLink(
 
 /** Unwrap the family key from a package already cleared by `refuseMagicLink`. */
 export function unwrapMagicLink(pkg: MemberLinkKeyPackage, token: string): Promise<CryptoKey> {
-  return redeemInviteToken(pkg.wrapped, pkg.salt, token);
+  return redeemInviteToken(pkg, token);
 }
 
 /** Build the shareable URL. `memberId` + `ml=1` are what route it past the person picker. */

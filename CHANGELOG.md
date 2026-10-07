@@ -13,6 +13,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 ### Added
 
 - Sign-ups that stop after the first wizard step are now recorded, so a family that never finished creating its pod can be invited back.
+- Suggested family passphrases are now six words from a large public list, and a typed passphrase is checked for strength as you type and refused with a reason when it is too easy to guess. An older, shorter suggested passphrase is flagged gently in Settings.
+
+### Security
+
+- The password and passphrase wraps on the family file now record how they were made, so their cost can be raised over time without anyone doing anything; the raise itself switches on fleet-wide once every store build can read it.
 
 ### Changed
 

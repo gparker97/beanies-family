@@ -1,12 +1,18 @@
 /**
  * Ask people on iOS and Android to update the app.
  *
- * ⚠️ NATIVE ONLY, and the exact mirror of `usePwaUpdater`, which returns early
- * on native. Between them there is exactly one updater live per platform and
- * neither has to know about the other: the web self-updates through the service
- * worker, and native cannot, because no service worker is registered there
- * (ADR-029). If you are here wondering why the browser never sees this, that is
- * why, and `usePwaUpdater` is the file you want.
+ * ⚠️ THE PROMPT IS NATIVE ONLY, and the exact mirror of `usePwaUpdater`, which
+ * returns early on native. Between them there is exactly one updater live per
+ * platform and neither has to know about the other: the web self-updates
+ * through the service worker, and native cannot, because no service worker is
+ * registered there (ADR-029). If you are here wondering why the browser never
+ * sees the prompt, that is why, and `usePwaUpdater` is the file you want.
+ *
+ * ⚠️ THE CHECK RUNS ON EVERY PLATFORM. Web fetches the floor too (one `checked`
+ * row per process, `os: web`), because a successful read is persisted for the
+ * KDF write gate (`services/crypto/kdfWriteGate.ts`, ADR-041), which must know
+ * the fleet floor synchronously. Web never enters the prompt scope below, so
+ * `storeUrlFor('web') === null` (and its `no-store-url` report) is unreachable.
  *
  * ⚠️ THIS FILE CAN ONLY EVER PROMPT. The floor it reads is a static file we
  * deploy by hand, so the worst case of getting it wrong has to be a dismissible
@@ -150,8 +156,8 @@ async function maybePrompt(isOnline: boolean): Promise<void> {
     return;
   }
 
-  // Unreachable in practice: this composable is native-only and `storeUrlFor`
-  // answers `null` only for `'web'`. It is here because the TYPE says
+  // Unreachable in practice: only native enters the prompt scope that calls this,
+  // and `storeUrlFor` answers `null` only for `'web'`. It is here because the TYPE says
   // `string | null`, and it reports rather than returning quietly, because an
   // impossible branch that is also silent is how a wrong assumption survives.
   const url = storeUrlFor(getPlatform());
@@ -196,45 +202,52 @@ async function maybePrompt(isOnline: boolean): Promise<void> {
 }
 
 /**
- * Start the native update check. Call ONCE from `App.vue` setup, beside
- * `usePwaUpdater()`. Idempotent, and inert on web.
+ * Start the update check. Call ONCE from `App.vue` setup, beside
+ * `usePwaUpdater()`. Idempotent. Checks (and so persists the floor) on every
+ * platform; prompts on native only.
  */
 export function useAppUpdate(): { updateAvailable: Readonly<typeof updateAvailable> } {
-  if (isNative() && !initialized) {
+  if (!initialized) {
     initialized = true;
-    scope = effectScope(true);
-    scope.run(() => {
-      const { isOnline } = useOnline();
+    // ONE check per process on every platform. Web needs it only for the
+    // persisted floor the KDF write gate reads; native also chains the prompt
+    // off this same promise, so there is never a second fetch or `checked` row.
+    const checked = checkForUpdate();
+    if (isNative()) {
+      scope = effectScope(true);
+      scope.run(() => {
+        const { isOnline } = useOnline();
 
-      void checkForUpdate().then(() => maybePrompt(isOnline.value));
+        void checked.then(() => maybePrompt(isOnline.value));
 
-      // ⚠️ THE LAUNCH CHECK ALONE WOULD ALMOST NEVER PROMPT, and it took a
-      // review to see it. The floor resolves in a couple of hundred
-      // milliseconds while the family document is still loading, so `isLoaded()`
-      // is false, the prompt is deferred, and the only other trigger is a
-      // `resume` the person may never produce. A launch that is never
-      // backgrounded would have asked nobody.
-      //
-      // `docVersion` is the app's single reactivity source and is bumped by the
-      // same hook that flips `loaded` true, so the first bump IS "the document
-      // is here". Watching it costs one boolean read per document change and
-      // stops mattering the moment `dismissedThisSession` is set. `isOnline` is
-      // in the same watcher because coming back online is the other gate that
-      // opens on its own.
-      watch([docVersion, isOnline], () => void maybePrompt(isOnline.value));
+        // ⚠️ THE LAUNCH CHECK ALONE WOULD ALMOST NEVER PROMPT, and it took a
+        // review to see it. The floor resolves in a couple of hundred
+        // milliseconds while the family document is still loading, so `isLoaded()`
+        // is false, the prompt is deferred, and the only other trigger is a
+        // `resume` the person may never produce. A launch that is never
+        // backgrounded would have asked nobody.
+        //
+        // `docVersion` is the app's single reactivity source and is bumped by the
+        // same hook that flips `loaded` true, so the first bump IS "the document
+        // is here". Watching it costs one boolean read per document change and
+        // stops mattering the moment `dismissedThisSession` is set. `isOnline` is
+        // in the same watcher because coming back online is the other gate that
+        // opens on its own.
+        watch([docVersion, isOnline], () => void maybePrompt(isOnline.value));
 
-      // Resume re-evaluates the GATES, it does not re-fetch: the floor is
-      // memoised for the process, but the device may have come back online, the
-      // save may have finished, or the overlay may have closed while away.
-      const listener = App.addListener('resume', () => {
-        void maybePrompt(isOnline.value);
+        // Resume re-evaluates the GATES, it does not re-fetch: the floor is
+        // memoised for the process, but the device may have come back online, the
+        // save may have finished, or the overlay may have closed while away.
+        const listener = App.addListener('resume', () => {
+          void maybePrompt(isOnline.value);
+        });
+        onScopeDispose(() => {
+          // `addListener` resolves a handle rather than returning one; a leaked
+          // native listener is a silent failure with a long fuse.
+          void listener.then((l) => l.remove()).catch(() => undefined);
+        });
       });
-      onScopeDispose(() => {
-        // `addListener` resolves a handle rather than returning one; a leaked
-        // native listener is a silent failure with a long fuse.
-        void listener.then((l) => l.remove()).catch(() => undefined);
-      });
-    });
+    }
   }
 
   return { updateAvailable: readonly(updateAvailable) };

@@ -8,8 +8,16 @@ import {
   buildInviteLink,
   parseInviteLink,
   isInviteExpired,
+  deriveInviteKey,
 } from '../inviteService';
-import { generateFamilyKey, exportFamilyKey } from '../familyKeyService';
+import {
+  generateFamilyKey,
+  exportFamilyKey,
+  wrapFamilyKey,
+  SALT_LENGTH,
+} from '../familyKeyService';
+import { KDF_PROFILES, LEGACY_ITERATIONS, KdfParamsError } from '../kdfParams';
+import { bufferToBase64url } from '@/utils/encoding';
 
 describe('inviteService', () => {
   afterEach(() => {
@@ -48,8 +56,10 @@ describe('inviteService', () => {
       expect(pkg.salt).toBeTruthy();
       expect(pkg.wrapped).toBeTruthy();
       expect(pkg.expiresAt).toBeTruthy();
+      // ADR-041: every new package records the count it was made with.
+      expect(pkg.iterations).toBe(KDF_PROFILES.highEntropy);
 
-      const recovered = await redeemInviteToken(pkg.wrapped, pkg.salt, token);
+      const recovered = await redeemInviteToken(pkg, token);
       const rawOriginal = await exportFamilyKey(fk);
       const rawRecovered = await exportFamilyKey(recovered);
       expect(rawRecovered).toEqual(rawOriginal);
@@ -62,7 +72,50 @@ describe('inviteService', () => {
 
       const pkg = await createInvitePackage(fk, correctToken);
 
-      await expect(redeemInviteToken(pkg.wrapped, pkg.salt, wrongToken)).rejects.toThrow();
+      await expect(redeemInviteToken(pkg, wrongToken)).rejects.toThrow();
+    });
+
+    it('redeems a legacy package with no recorded iterations (written before ADR-041)', async () => {
+      const fk = await generateFamilyKey();
+      const token = generateInviteToken();
+      const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
+      const wrapped = await wrapFamilyKey(
+        fk,
+        await deriveInviteKey(token, salt, {
+          profile: 'highEntropy',
+          iterations: LEGACY_ITERATIONS,
+        })
+      );
+      const legacy = { salt: bufferToBase64url(salt), wrapped };
+
+      const recovered = await redeemInviteToken(legacy, token);
+      expect(await exportFamilyKey(recovered)).toEqual(await exportFamilyKey(fk));
+    });
+
+    it('derives with the RECORDED count, not a constant', async () => {
+      const fk = await generateFamilyKey();
+      const token = generateInviteToken();
+      const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
+      const iterations = 1_000;
+      const wrapped = await wrapFamilyKey(
+        fk,
+        await deriveInviteKey(token, salt, { profile: 'highEntropy', iterations })
+      );
+      const salt64 = bufferToBase64url(salt);
+
+      const recovered = await redeemInviteToken({ salt: salt64, wrapped, iterations }, token);
+      expect(await exportFamilyKey(recovered)).toEqual(await exportFamilyKey(fk));
+      // The same wrap read as legacy (count dropped) does not open.
+      await expect(redeemInviteToken({ salt: salt64, wrapped }, token)).rejects.toThrow();
+    });
+
+    it('refuses a corrupt recorded count rather than guessing legacy', async () => {
+      const fk = await generateFamilyKey();
+      const token = generateInviteToken();
+      const pkg = await createInvitePackage(fk, token);
+      await expect(redeemInviteToken({ ...pkg, iterations: -5 }, token)).rejects.toBeInstanceOf(
+        KdfParamsError
+      );
     });
 
     it('sets expiry 24h in the future', async () => {

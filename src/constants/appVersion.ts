@@ -41,3 +41,22 @@
 // when there is a reason everyone should move.
 // See `docs/runbooks/native-store-submission.md` § 7. Raising the update floor.
 export const APP_VERSION = '0.92';
+
+/**
+ * The first build that READS every recorded KDF iteration count (ADR-041, #81).
+ *
+ * Release-order pointer: this MUST equal the version this build ships as. Set it in the
+ * same commit that bumps `APP_VERSION` above (today it names the expected next release,
+ * one ahead of `APP_VERSION`, because the read-both code lands before that bump). Raising
+ * the update floor (`min-app-version.json`) to this version or above is what OPENS the
+ * KDF upgrade gate (`services/crypto/kdfWriteGate.ts`): from then on new member-password
+ * and recovery-passphrase wraps are written at 600,000 iterations and legacy wraps are
+ * upgraded on unlock. See ADR-041 and `docs/runbooks/native-store-submission.md` § 7.
+ *
+ * ⚠️ NEVER LOWER IT below 0.93, the first build that reads recorded counts: a floor at such
+ * a version would open the gate while builds that heal (or refuse) a 600k wrap still count
+ * as up to date. `__tests__/appVersion.test.ts` enforces exactly that lower bound. Nothing
+ * enforces the upper one: a value AHEAD of the shipped version only keeps the gate closed
+ * for longer, and the release step (runbook § 7) is where it is set equal to APP_VERSION.
+ */
+export const KDF_READ_BOTH_SINCE = '0.93';

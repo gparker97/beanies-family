@@ -10,15 +10,24 @@
  * named `promptBelowVersion` for the same reason: `minSupportedVersion` reads
  * like a kill switch, and sooner or later somebody wires one up.
  *
- * ⚠️ `CapacitorHttp`, NEVER `fetch`. The apex serves no CORS headers, and the
- * native WebView origin is `capacitor://app.beanies.family` on iOS and
- * `https://app.beanies.family` on Android, a different host either way. A
- * browser fetch from the app origin to the apex is refused on every device, the
- * fail-open below swallows the refusal, and the whole floor becomes dead code
- * that reports nothing. `CapacitorHttp` runs on the native layer and is not
- * subject to CORS. An eslint zone bans `fetch` in this directory; it catches a
- * bare `fetch`, not `window.fetch` or `globalThis.fetch`, so do not take the
- * rule as total.
+ * ⚠️ `CapacitorHttp`, NEVER `fetch`. The native WebView origin is
+ * `capacitor://app.beanies.family` on iOS and `https://app.beanies.family` on
+ * Android, a different host from the apex either way, and the platform's own
+ * networking is not subject to CORS. On web `CapacitorHttp` degrades to a plain
+ * `fetch` with no custom headers (no preflight). The apex now serves
+ * `min-app-version.json` with `access-control-allow-origin: *` (a CloudFront
+ * response headers policy, ADR-041), so the web fetch succeeds too. An eslint
+ * zone bans `fetch` in this directory; it catches a bare `fetch`, not
+ * `window.fetch` or `globalThis.fetch`, so do not take the rule as total.
+ *
+ * ⚠️ FETCHED ON EVERY PLATFORM, PROMPTED ONLY ON NATIVE. `useAppUpdate` runs the
+ * check on web too, for one reason: a successful read is persisted
+ * (`updateFloorStore.ts`) so the KDF write gate (`kdfWriteGate.ts`) can read the
+ * fleet floor synchronously. The update PROMPT stays native-only. If the CORS
+ * header ever regresses, the web fetch fails open to `null` exactly like any
+ * other failure (no user-visible effect; the gate keeps the last persisted
+ * floor, or stays closed if there is none) and the web `check-failed` rate is
+ * the signal.
  *
  * ⚠️ DO NOT enable the global `CapacitorHttp` patch in `capacitor.config.ts`.
  * Calling it directly is the whole of what this needs; the flag reroutes every
@@ -28,6 +37,7 @@ import { CapacitorHttp } from '@capacitor/core';
 import { MARKETING_URL } from '@/utils/marketing';
 import { isComparableVersion } from '@/utils/compareAppVersions';
 import { logEvent } from '@/services/telemetry/logEvent';
+import { persistUpdateFloor } from '@/services/appUpdate/updateFloorStore';
 
 /** Why the floor could not be read. Rides in `detail`, never the raw error. */
 export type FloorFailure =
@@ -132,9 +142,10 @@ export async function fetchUpdateFloor(): Promise<string | null> {
   let value: string | null = null;
   try {
     // The device's own HTTP cache is a separate problem from the CDN's: the web
-    // deploy sets no `Cache-Control` and the apex default TTL is a day, so a
-    // device can serve a day-old floor after the deploy's invalidation has
-    // already cleared the edge. An hour bucket gives it a fresh URL hourly.
+    // deploy sets no `Cache-Control`, so a device can serve a stale floor after
+    // the deploy's invalidation has already cleared the edge. An hour bucket
+    // gives it a fresh URL hourly. (The edge itself holds this path for at most
+    // an hour: its own CloudFront behaviour caps the TTL at 3600 s.)
     //
     // ⚠️ THIS DOES NOT BUST THE EDGE. The apex behaviour sets
     // `forwarded_values { query_string = false }`, so CloudFront does not vary
@@ -171,6 +182,9 @@ export async function fetchUpdateFloor(): Promise<string | null> {
     return (cached = { value: report(classify(e)) }).value;
   }
 
+  // Success only: a failure keeps whatever this device last persisted, and `null`
+  // is never written. `persistUpdateFloor` never throws (a refused write warns).
+  persistUpdateFloor(value);
   cached = { value };
   return value;
 }

@@ -6,7 +6,14 @@
  * that can unwrap the family key. This replaces the V3 single-password model.
  */
 
-import { deriveMemberKey, unwrapFamilyKey, SALT_LENGTH } from '@/services/crypto/familyKeyService';
+import {
+  deriveMemberKey,
+  unwrapFamilyKey,
+  isWrongKeyUnwrap,
+  SALT_LENGTH,
+} from '@/services/crypto/familyKeyService';
+import { recordedIterations } from '@/services/crypto/kdfParams';
+import { logEvent } from '@/services/telemetry/logEvent';
 import { base64ToBuffer } from '@/utils/encoding';
 import { generateUUID } from '@/utils/id';
 import { APP_VERSION } from '@/constants/appVersion';
@@ -181,22 +188,45 @@ export function parseBeanpodV4(jsonString: string): BeanpodFileV4 {
 /**
  * Try to unwrap a single wrappedKey entry with a password. Returns the family
  * key on success, or `null` on any failure (wrong password, malformed salt,
- * AES-KW unwrap error). Pure crypto — no I/O, no state mutation.
+ * unusable recorded `iterations`, AES-KW unwrap error). No I/O, no state mutation.
+ *
+ * Derives with the count the entry RECORDS (`recordedIterations`; absent = legacy
+ * 100k), so wraps written at any cost open on this build (ADR-041).
  *
  * Returning null is signal, not silence — every caller branches explicitly
  * on it. Used by `tryUnwrapFamilyKey` (iterates) and by the per-member
- * stale-wrappedKey check in `authStore.signIn`'s self-heal.
+ * stale-wrappedKey check in `authStore.signIn`'s self-heal. A failure that is NOT a
+ * wrong-key unwrap (a corrupt salt or `iterations`, a refused KDF) is still `null` for
+ * the caller but is logged (`wrap_entry_unusable`), so a broken entry never hides behind
+ * "wrong password" with nothing in CloudWatch.
  */
 export async function unwrapWrappedKey(
   wrappedKey: WrappedMemberKey,
-  password: string
+  password: string,
+  kind: 'member' | 'passphrase' = 'member'
 ): Promise<CryptoKey | null> {
   try {
     const salt = new Uint8Array(base64ToBuffer(wrappedKey.salt));
     if (salt.length !== SALT_LENGTH) return null;
-    const memberKey = await deriveMemberKey(password, salt);
+    const memberKey = await deriveMemberKey(password, salt, {
+      profile: 'secret',
+      iterations: recordedIterations(wrappedKey),
+    });
     return await unwrapFamilyKey(wrappedKey.wrapped, memberKey);
-  } catch {
+  } catch (e) {
+    if (!isWrongKeyUnwrap(e)) {
+      logEvent({
+        level: 'warn',
+        surface: 'login-flow',
+        message: 'a wrapped key entry could not be tried',
+        error: e,
+        context: {
+          action: 'wrap_entry_unusable',
+          error_code: (e as { name?: unknown } | null)?.name,
+          kind,
+        },
+      });
+    }
     return null;
   }
 }
@@ -215,8 +245,8 @@ export async function unwrapWrappedKey(
  * (a family has exactly one family key, just wrapped multiple ways
  * for different members), so we return the first one we recover.
  *
- * Cost: O(N) PBKDF2 + AES-KW operations where N = number of members.
- * For a typical family this is <1s; we accept the cost over the
+ * Cost: N PBKDF2 + AES-KW operations where N = number of members, run
+ * concurrently (latency ≈ one derivation); we accept the work over the
  * security risk of returning the first match without checking for
  * ambiguity.
  *
@@ -452,11 +482,18 @@ export async function tryUnwrapFamilyKey(
   let familyKey: CryptoKey | null = null;
   const memberIds: string[] = [];
 
-  for (const [memberId, wrappedKey] of entries) {
-    const fk = await unwrapWrappedKey(wrappedKey, password);
+  // Every member wrap is tried CONCURRENTLY: the loop always collected all matches (never
+  // first-match), and WebCrypto runs the derivations on its own thread pool, so a cold open
+  // costs about one derivation instead of N in series. Results are consumed in envelope
+  // order, so `memberIds` order and the chosen `familyKey` are exactly as before.
+  const results = await Promise.all(
+    entries.map(([, wrappedKey]) => unwrapWrappedKey(wrappedKey, password))
+  );
+  for (const [i, fk] of results.entries()) {
     if (!fk) continue;
     familyKey ??= fk;
-    memberIds.push(memberId);
+    // eslint-disable-next-line security/detect-object-injection -- index into our own array
+    memberIds.push(entries[i]![0]);
   }
 
   if (familyKey && memberIds.length > 0) {
@@ -464,7 +501,7 @@ export async function tryUnwrapFamilyKey(
   }
 
   if (envelope.recoveryPassphrase) {
-    const fk = await unwrapWrappedKey(envelope.recoveryPassphrase, password);
+    const fk = await unwrapWrappedKey(envelope.recoveryPassphrase, password, 'passphrase');
     if (fk) {
       return { familyKey: fk, memberIds: [], viaRecoveryPassphrase: true };
     }

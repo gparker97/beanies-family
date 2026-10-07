@@ -28,7 +28,7 @@ import {
   unwrapDEK,
 } from '@/services/crypto/keyWrap';
 import { bufferToBase64, base64ToBuffer } from '@/utils/encoding';
-import { importFamilyKey } from '@/services/crypto/familyKeyService';
+import { importFamilyKey, isWrongKeyUnwrap } from '@/services/crypto/familyKeyService';
 import { toISODateString } from '@/utils/date';
 import { reportError } from '@/utils/errorReporter';
 
@@ -104,7 +104,7 @@ export async function loadTrustedAutoOpenKey(familyId: string): Promise<string |
     // wrong key material — secret rotated, corrupt row). A transient failure
     // anywhere else (secret read, derivation IDB access) must NOT destroy a valid
     // credential; degrade to no-key and let the next open retry (review R2-F5).
-    const isUnwrapFailure = e instanceof DOMException && e.name === 'OperationError';
+    const isUnwrapFailure = isWrongKeyUnwrap(e);
     reportError({
       surface: 'login-flow',
       message: isUnwrapFailure

@@ -16,3 +16,6 @@ export const REMINDERS_OPEN = 'reminders';
 
 /** Opens Settings → AI & Privacy (a no-op unless the family can see the AI card). */
 export const AI_SETTINGS_OPEN = 'ai';
+
+/** Opens Settings → Security & Recovery. */
+export const SECURITY_OPEN = 'security';

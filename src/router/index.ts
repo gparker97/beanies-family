@@ -82,6 +82,13 @@ const routes: RouteRecordRaw[] = [
           component: () => import('@/pages/dev/MagicLinkCopyHarness.vue'),
           meta: { requiresAuth: false, noChrome: true, hideQuickAdd: true },
         } as RouteRecordRaw,
+        {
+          // #81 PBKDF2 timing harness: run on real phones over the LAN before the floor flip.
+          path: '/dev/kdf-benchmark',
+          name: 'DevKdfBenchmark',
+          component: () => import('@/pages/dev/KdfBenchmarkPage.vue'),
+          meta: { requiresAuth: false, noChrome: true, hideQuickAdd: true },
+        } as RouteRecordRaw,
       ]
     : []),
   {

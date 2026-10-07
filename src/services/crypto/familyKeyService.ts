@@ -9,18 +9,22 @@
  * - encryptPayload/decryptPayload work with raw Uint8Array (Automerge binary).
  * - importFamilyKey and unwrapFamilyKey return extractable keys so they can
  *   be re-wrapped for new members.
- * - deriveMemberKey outputs AES-KW (for wrapping), unlike encryption.ts
- *   deriveKey which outputs AES-GCM (for direct encryption).
- * - Wrong-password errors propagate as native DOMException.
+ * - deriveMemberKey outputs AES-KW (for wrapping) through the one PBKDF2 primitive in
+ *   `kdfParams.ts`; the caller supplies the `KdfParams` (a reader the RECORDED count,
+ *   a writer the policy count). This module stays policy-free: no gate read here.
+ * - Wrong-password errors propagate as native DOMException (see `isWrongKeyUnwrap`).
  */
 
-import { SALT_LENGTH, IV_LENGTH } from './encryption';
 import { bufferToBase64, base64ToBuffer } from '@/utils/encoding';
+import { derivePbkdf2Key, type KdfParams } from './kdfParams';
 
 const ALGORITHM = 'AES-GCM';
 const KEY_LENGTH = 256;
 const WRAPPING_ALGO = 'AES-KW';
-const PBKDF2_ITERATIONS = 100_000;
+/** PBKDF2 salt length in bytes, for every wrap and the doc-side hashes. */
+export const SALT_LENGTH = 16;
+/** AES-GCM IV length in bytes. */
+export const IV_LENGTH = 12;
 
 // ── Key generation & serialization ──────────────────────────────────
 
@@ -51,28 +55,17 @@ export async function importFamilyKey(raw: Uint8Array): Promise<CryptoKey> {
 
 // ── Member wrapping (password → AES-KW) ────────────────────────────
 
-/** Derive an AES-KW wrapping key from a member's password + salt. */
-export async function deriveMemberKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
-  const keyMaterial = await crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(password),
-    'PBKDF2',
-    false,
-    ['deriveBits', 'deriveKey']
-  );
-
-  return crypto.subtle.deriveKey(
-    {
-      name: 'PBKDF2',
-      salt: salt.buffer as ArrayBuffer,
-      iterations: PBKDF2_ITERATIONS,
-      hash: 'SHA-256',
-    },
-    keyMaterial,
-    { name: WRAPPING_ALGO, length: KEY_LENGTH },
-    false,
-    ['wrapKey', 'unwrapKey']
-  );
+/**
+ * Derive an AES-KW wrapping key from a member's password (or the family recovery
+ * passphrase) + salt, with the given parameters. Readers pass
+ * `{ profile: 'secret', iterations: recordedIterations(entry) }`.
+ */
+export function deriveMemberKey(
+  secret: string,
+  salt: Uint8Array,
+  params: KdfParams
+): Promise<CryptoKey> {
+  return derivePbkdf2Key(new TextEncoder().encode(secret), salt, params);
 }
 
 /** Wrap a family key with an AES-KW wrapping key. Returns base64. */
@@ -95,6 +88,17 @@ export async function unwrapFamilyKey(
     true, // extractable — so the FK can be re-wrapped for new members
     ['encrypt', 'decrypt']
   );
+}
+
+/**
+ * The ONE failure that means "this secret does not open this wrap": AES-KW's integrity
+ * check refusing the unwrap, which WebCrypto raises as a DOMException named
+ * `OperationError`. Read by name, not `instanceof`, so it holds across realms and test
+ * DOMs. Anything else (a malformed salt, a refused KDF, a `KdfParamsError`) is a broken
+ * entry, not a wrong secret, and callers must log it rather than report "wrong password".
+ */
+export function isWrongKeyUnwrap(e: unknown): boolean {
+  return !!e && typeof e === 'object' && (e as { name?: unknown }).name === 'OperationError';
 }
 
 // ── Payload encryption (AES-GCM) ───────────────────────────────────
@@ -151,6 +155,3 @@ export async function decryptPayload(
 
   return new Uint8Array(plaintext);
 }
-
-// Re-export for convenience
-export { SALT_LENGTH, IV_LENGTH };

@@ -49,6 +49,7 @@ import type { StructuredErrorEntry } from '@/utils/structuredError';
 import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry/logEvent';
 import type { FamilyMember, RegistryEntry } from '@/types/models';
+import type { InviteKeyPackage } from '@/types/syncFileV4';
 import { refuseMagicLink, type MagicLinkRefusal } from '@/services/auth/magicLink';
 import { emitLinkRedeemed } from '@/services/telemetry/loginFlowEvents';
 
@@ -1108,13 +1109,9 @@ export function useJoinFlow() {
    * magic-link resolver differ ONLY in how they find the wrap. Every error arm below is
    * unchanged from the invite-only version.
    */
-  async function decryptPendingWithWrap(
-    wrapped: string,
-    salt: string,
-    token: string
-  ): Promise<boolean> {
+  async function decryptPendingWithWrap(pkg: InviteKeyPackage, token: string): Promise<boolean> {
     const decrypted = await tryStep('FILE_DECRYPT_FAILED', async () => {
-      const fk = await redeemInviteToken(wrapped, salt, token);
+      const fk = await redeemInviteToken(pkg, token);
       const result = await syncStore.decryptPendingFileWithKey(fk);
       if (!result.success) throw asJoinDecryptError(result);
       return true;
@@ -1151,7 +1148,7 @@ export function useJoinFlow() {
     }
 
     // Non-null: `refuseMagicLink` returns 'no-entry' when the package is missing.
-    return decryptPendingWithWrap(pkg!.wrapped, pkg!.salt, inviteToken.value);
+    return decryptPendingWithWrap(pkg!, inviteToken.value);
   }
 
   async function tryInviteTokenDecrypt(): Promise<boolean> {
@@ -1178,7 +1175,7 @@ export function useJoinFlow() {
       return false;
     }
 
-    return decryptPendingWithWrap(pkg.wrapped, pkg.salt, inviteToken.value);
+    return decryptPendingWithWrap(pkg, inviteToken.value);
   }
 
   /**

@@ -460,13 +460,15 @@ export default [
   {
     // THE UPDATE FLOOR MUST NOT USE `fetch`, and the reason is not style.
     //
-    // The apex serves no CORS headers, and the native WebView origin is a
-    // different host either way (`capacitor://app.beanies.family` on iOS,
-    // `https://app.beanies.family` on Android). A browser fetch from the app
-    // origin to the apex is refused on every real device, the floor's
-    // fail-open swallows the refusal, and the whole feature becomes dead code
-    // that reports nothing while looking perfectly healthy. `CapacitorHttp`
-    // runs on the native layer and is not subject to CORS.
+    // The native WebView origin is a different host from the apex
+    // (`capacitor://app.beanies.family` on iOS, `https://app.beanies.family`
+    // on Android), so a WebView fetch depends on the apex's CORS header: the
+    // CloudFront policy on `/min-app-version.json` (#81) is the only thing
+    // making it work, and if it regresses the floor's fail-open swallows the
+    // refusal and the feature becomes dead code that looks perfectly healthy.
+    // `CapacitorHttp` runs on the native layer and is not subject to CORS on
+    // iOS/Android; on web it degrades to a plain `fetch`, which that header
+    // now allows (the web reads the floor for the KDF write gate).
     //
     // A lint zone rather than a comment, for the same reason as the two
     // `no-restricted-imports` zones above: this repo has been bitten by rules
@@ -478,7 +480,7 @@ export default [
         {
           name: 'fetch',
           message:
-            'Use CapacitorHttp.get() here, never fetch: the apex sends no CORS headers and a fetch from the native WebView origin is refused on every device, which the fail-open then hides. Known limit of this rule: it catches a bare `fetch` only, not `window.fetch` or `globalThis.fetch`.',
+            'Use CapacitorHttp.get() here, never fetch: on iOS/Android it bypasses CORS, so the native floor never depends on the apex CORS header (which only the web path, via the CapacitorHttp web fallback, needs), and a refused fetch would be hidden by the fail-open. Known limit of this rule: it catches a bare `fetch` only, not `window.fetch` or `globalThis.fetch`.',
         },
       ],
     },

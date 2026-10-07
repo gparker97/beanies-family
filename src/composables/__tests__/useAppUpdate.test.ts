@@ -5,7 +5,8 @@
  * raised before the app is past boot is a modal nobody can see or dismiss
  * (`ConfirmModal` is z-250 under a z-300 boot overlay) which then holds
  * `hasOpenOverlays()` true for the rest of the session. A prompt raised on web
- * would fight the service worker, which has already done the job. And a
+ * would fight the service worker, which has already done the job (web still
+ * CHECKS, once, so the floor is persisted for the KDF write gate). And a
  * `resume` listener that outlives its scope is a silent leak with a long fuse.
  *
  * Everything is driven through `useAppUpdate()` and the captured `resume`
@@ -141,13 +142,43 @@ describe('useAppUpdate', () => {
     confirmMock.mockResolvedValue(true);
   });
 
-  it('is completely inert on web, where the service worker already updates the app', async () => {
+  it('checks ONCE on web (for the persisted floor) and never enters the prompt path', async () => {
+    // Web fetches the floor only so `fetchUpdateFloor` persists it for the KDF
+    // write gate. The prompt stays native: the service worker already updates
+    // the web app, and `storeUrlFor('web')` is null, so reaching `maybePrompt`
+    // here would emit `no-store-url` on every behind web boot.
     platform.value = 'web';
+    floor.value = '0.17'; // behind, with every gate open: the worst case
     useAppUpdate();
+    useAppUpdate();
+    await vi.waitFor(() => expect(logEvent).toHaveBeenCalled());
+    docVersion.value++;
+    isOnline.ref!.value = false;
+    isOnline.ref!.value = true;
     await Promise.resolve();
-    expect(logEvent).not.toHaveBeenCalled();
+    await Promise.resolve();
+
+    const events = vi.mocked(logEvent).mock.calls.map((c) => c[0]);
+    const checked = events.filter((e) => e.context?.action === 'checked');
+    expect(checked).toHaveLength(1);
+    expect(checked[0]!.context).toMatchObject({ os: 'web', detail: 'floor=0.17,behind=true' });
+    // Nothing from `maybePrompt`: no deferral row, no impossible-branch report,
+    // no prompt, and no native resume listener.
+    expect(events.map((e) => e.context?.action)).not.toContain('prompt-deferred');
+    expect(events.map((e) => e.context?.detail)).not.toContain('no-store-url');
     expect(confirmMock).not.toHaveBeenCalled();
     expect(resume.handler).toBeNull();
+  });
+
+  it('checks once per process on native too, however often it is called', async () => {
+    useAppUpdate();
+    useAppUpdate();
+    await launch();
+    const checked = vi
+      .mocked(logEvent)
+      .mock.calls.map((c) => c[0])
+      .filter((e) => e.context?.action === 'checked');
+    expect(checked).toHaveLength(1);
   });
 
   it('has no store listing to offer on web, which is what keeps the block web-safe', () => {
