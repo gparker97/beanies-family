@@ -29,6 +29,8 @@ vi.mock('@aws-sdk/client-dynamodb', () => {
     GetItemCommand: class GetItemCommand extends Command {},
     PutItemCommand: class PutItemCommand extends Command {},
     DeleteItemCommand: class DeleteItemCommand extends Command {},
+    // The create-time inference Query (#125). Its handler cases live in index.signup.test.mjs.
+    QueryCommand: class QueryCommand extends Command {},
   };
 });
 
@@ -1773,6 +1775,23 @@ describe('registry GET: entitlement (#95)', () => {
     expect(body.entitlement.state).toBe('trial');
     expect(warnSpy.mock.calls[0][0]).toContain('entitlement_created_at_invalid');
     expect(JSON.stringify(warnSpy.mock.calls)).not.toContain(FAMILY_ID);
+  });
+
+  it('a never-finished step-1 row (#125) gets a full trial and NO warning; a pod row still warns', async () => {
+    process.env.V1_LAUNCH_AT = '2025-01-01T00:00:00.000Z';
+    // A step-1 item: no createdAt and no pointer at all.
+    const stepOne = {
+      ownerEmail: ROW.ownerEmail,
+      signupStartedAt: '2026-10-07T08:00:00.000Z',
+    };
+    const { body } = await get(stepOne);
+    expect(body.entitlement.state).toBe('trial');
+    expect(warnSpy).not.toHaveBeenCalled();
+
+    // The same row without the step-1 stamp is a pod with no createdAt: a hand-edited row.
+    const { createdAt: _drop, ...podNoCreatedAt } = ROW;
+    await get(podNoCreatedAt);
+    expect(warnSpy.mock.calls[0][0]).toContain('entitlement_created_at_invalid');
   });
 });
 

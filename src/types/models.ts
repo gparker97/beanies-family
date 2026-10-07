@@ -2316,7 +2316,12 @@ export interface SyncStatus {
 // Family registry — maps familyId to file location metadata
 export interface RegistryEntry {
   familyId: UUID;
-  provider: 'local' | 'google_drive';
+  /**
+   * Absent on a #125 step-1 row (sign-up started, no pod yet): the registry stores no pointer
+   * at all for it, and GET returns the row. Every reader must handle absence, never assume
+   * `'local'`.
+   */
+  provider?: 'local' | 'google_drive';
   fileId?: string | null; // Google Drive file ID (future)
   displayPath?: string | null;
   familyName?: string | null;
@@ -2358,6 +2363,19 @@ export interface RegistryEntry {
    * the DELETE tombstone. The free text of `other` is never sent. `null` when skipped.
    */
   heardVia?: HeardViaId | null;
+  /**
+   * #125: when the owner finished step 1 of the create wizard, server-stamped write-once by
+   * the step-1 write (`signupStart`). A row with this and no `createdAt` is a sign-up that
+   * never created its pod (`isNeverFinishedRow` in the registry Lambda's `entitlement.mjs`);
+   * absent on rows created before 2026-10-07 and on any create whose step-1 write was lost.
+   */
+  signupStartedAt?: ISODateString | null;
+  /**
+   * #125: the ISO 3166-1 alpha-2 country the registry Lambda derived from the device time
+   * zone on a signup write, server-stamped write-once. Separate from `country` (the wizard /
+   * Settings choice); the zone itself is never stored. Null when the zone mapped to none.
+   */
+  deviceCountry?: string | null;
   /**
    * #95: what the family is entitled to, computed server-side on every GET by
    * `infrastructure/lambda/registry/entitlement.mjs` (never stored in the row). `null` when the

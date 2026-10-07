@@ -15,8 +15,6 @@ import { connectDriveStorage, connectLocalStorage } from '@/services/sync/connec
 import { resolveDriveCollision } from '@/composables/useDriveCollisionRecovery';
 import { canUseLocalFiles } from '@/services/sync/capabilities';
 import { isUserCancellation } from '@/services/google/googleAuth';
-import { slackNotify } from '@/utils/slackNotify';
-import { getPlatformLabel, getDeviceLabel } from '@/utils/platformLabel';
 import { reportError } from '@/utils/errorReporter';
 
 const { t } = useTranslation();
@@ -125,10 +123,9 @@ async function handleStep1Next() {
   });
 
   if (result.success) {
-    slackNotify(
-      `🫘 *New family pod started!*\n*Family:* ${familyName.value}\n*Owner:* ${name.value}` +
-        `\n*Platform:* ${getPlatformLabel()}\n*Device:* ${getDeviceLabel()}`
-    );
+    // The step-1 registry row and the "pod started" Slack line (#125). Not awaited: the
+    // wizard never waits on the registry, and the action never throws.
+    void syncStore.registerSignupStart();
     if (subscribeNewsletter.value) {
       try {
         const form = document.createElement('form');

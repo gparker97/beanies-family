@@ -838,6 +838,10 @@ function handleSignedIn(destination: string) {
 
 /** "Start over instead" from the resume-setup screen — abandon the half-finished onboarding. */
 async function handleStartOver() {
+  // Tombstone this family's step-1 registry row first, while the session still names it
+  // (#125). The registry leaves a real pod untouched, and the action never throws, so a
+  // failure never blocks start over.
+  await syncStore.abandonSignupStart();
   // Cache outcome deliberately not read: an abandoned half-finished onboarding, and
   // `docClient.clearCache` has already logged a cache another tab kept (#100).
   await authStore.signOut();

@@ -5,6 +5,7 @@ import {
   SUBSCRIBED_STATUSES,
   TRIAL_DAYS,
   computeEntitlement,
+  isNeverFinishedRow,
   isValidInstant,
 } from './entitlement.mjs';
 
@@ -369,5 +370,26 @@ describe('isValidInstant', () => {
     for (const bad of [undefined, null, '', 'garbage', 12345, {}]) {
       expect(isValidInstant(bad)).toBe(false);
     }
+  });
+});
+
+describe('isNeverFinishedRow (#125: the one "pod exists" predicate)', () => {
+  const STARTED = '2026-10-07T08:00:00.000Z';
+  const CREATED = '2026-10-07T08:05:00.000Z';
+
+  it.each([
+    ['step 1 only (signupStartedAt, no createdAt)', { signupStartedAt: STARTED }, true],
+    ['finished (both stamps)', { signupStartedAt: STARTED, createdAt: CREATED }, false],
+    ['legacy pod (createdAt only)', { createdAt: CREATED }, false],
+    ['legacy row with neither field (still a pod)', { provider: 'local' }, false],
+  ])('%s', (_label, row, expected) => {
+    expect(isNeverFinishedRow(row)).toBe(expected);
+  });
+
+  it('a step-1 tombstone is still never-finished; null and undefined are not', () => {
+    expect(isNeverFinishedRow({ signupStartedAt: STARTED, deletedAt: CREATED })).toBe(true);
+    expect(isNeverFinishedRow(null)).toBe(false);
+    expect(isNeverFinishedRow(undefined)).toBe(false);
+    expect(isNeverFinishedRow({ signupStartedAt: STARTED, createdAt: null })).toBe(true);
   });
 });

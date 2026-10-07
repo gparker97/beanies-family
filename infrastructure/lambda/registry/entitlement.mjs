@@ -91,6 +91,17 @@ export function isValidInstant(value) {
   return toMs(value) !== null;
 }
 
+/**
+ * A #125 step-1 row: sign-up started, no pod ever created (its trial has not started). Every other
+ * live row is a pod, including legacy rows with neither field.
+ *
+ * THE ONE DEFINITION of "pod exists". It lives here because this module already says what
+ * `createdAt` means, and the registry handler, `scripts/billing-cohort.mjs` and the ops scripts
+ * (through `scripts/lib/registryRows.mjs`) all import it. Never key on `fileId` instead: a
+ * local-file pod has none.
+ */
+export const isNeverFinishedRow = (row) => !!row?.signupStartedAt && !row?.createdAt;
+
 /** ISO string for a valid instant, else null. Normalises the billing row's dates on the way out. */
 function toIso(value) {
   const ms = toMs(value);

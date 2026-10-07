@@ -710,6 +710,35 @@ describe('pod creation: full end-to-end flow', () => {
     expect(useAuthStore().podCreated).toBe(false);
   });
 
+  it('returns reason="register" with a RegistryPointerRefused error when the registry refuses the pointer (#125)', async () => {
+    // The write landed but the row does not point at the pod just written, so the recovery
+    // anchor is missing. It used to be ignored; it must fail the retryable register step,
+    // and the store must not report it itself (finalizePod's resumeSetup.register report
+    // pages once for it).
+    const { memberId } = await signUpAndConfigureStorage();
+    const syncStore = useSyncStore();
+    const registry = await import('@/services/registry/registryService');
+    const { slackNotify } = await import('@/utils/slackNotify');
+    vi.mocked(registry.registerFamilyOrThrow).mockResolvedValueOnce({ pointerAccepted: false });
+    const result = await syncStore.createNewFile(
+      'test.beanpod',
+      memberId,
+      'fam-test-1',
+      'Test Family'
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.reason).toBe('register');
+    expect(result.error.name).toBe('RegistryPointerRefused');
+    expect(result.error.message).toContain('pointerAccepted: false');
+    expect(syncStore.criticalWriteState.kind).toBe('idle');
+    expect(useAuthStore().podCreated).toBe(false);
+    expect(vi.mocked(slackNotify)).not.toHaveBeenCalled();
+    expect(vi.mocked(reportError)).not.toHaveBeenCalledWith(
+      expect.objectContaining({ message: expect.stringContaining('pointerAccepted') })
+    );
+  });
+
   it('returns reason="existing-pod" and writes nothing when the registry already has a fileId for this family', async () => {
     const { memberId } = await signUpAndConfigureStorage();
     const syncStore = useSyncStore();
@@ -1042,6 +1071,88 @@ describe('pod creation: full end-to-end flow', () => {
         expect(vi.mocked(registryService.registerFamilyOrThrow)).not.toHaveBeenCalled();
         expect(vi.mocked(slackNotify)).not.toHaveBeenCalled();
         expect(stashed()).toBe(before);
+      });
+    });
+
+    // #125: the pod-creation write's response feeds the Slack line (device country, and the
+    // create-time inference for a native pod with no campaign tag).
+    describe('pod-creation response in Slack (#125)', () => {
+      const lastSlack = async () => {
+        const { slackNotify } = await import('@/utils/slackNotify');
+        return vi.mocked(slackNotify).mock.calls.at(-1)![0] as string;
+      };
+
+      it('sends the device time zone on the signup write, never as a step-1 write', async () => {
+        const registryService = await import('@/services/registry/registryService');
+        const { knownDeviceTimeZone } = await import('@/utils/timeZone');
+
+        await createPod();
+
+        const [, entry] = vi.mocked(registryService.registerFamilyOrThrow).mock.calls.at(-1)!;
+        expect(entry.isSignupEvent).toBe(true);
+        expect(entry.signupStart).toBe(false);
+        expect(entry.deviceTimeZone).toBe(knownDeviceTimeZone());
+      });
+
+      it('shows the country before the platform lines when the registry returned one', async () => {
+        const registryService = await import('@/services/registry/registryService');
+        vi.mocked(registryService.registerFamilyOrThrow).mockResolvedValueOnce({
+          pointerAccepted: true,
+          deviceCountry: 'SG',
+        });
+
+        await createPod();
+
+        expect(await lastSlack()).toMatch(/\n\*Country:\* SG\n\*Platform:\* .+\n\*Device:\* .+$/);
+      });
+
+      it('leaves the country line out when the registry returned none', async () => {
+        const registryService = await import('@/services/registry/registryService');
+        vi.mocked(registryService.registerFamilyOrThrow).mockResolvedValueOnce({
+          pointerAccepted: true,
+          deviceCountry: null,
+        });
+
+        await createPod();
+
+        const text = await lastSlack();
+        expect(text).not.toContain('Country');
+        expect(text).toContain('\n*Platform:* ');
+      });
+
+      it.each(['high', 'medium'] as const)(
+        'adds the inferred "Came from" line for a %s band',
+        async (band) => {
+          const registryService = await import('@/services/registry/registryService');
+          vi.mocked(registryService.registerFamilyOrThrow).mockResolvedValueOnce({
+            pointerAccepted: true,
+            attributionInferred: {
+              band,
+              fields: { utm_source: 'chatgpt', utm_campaign: 'sg-pilot', utm_content: 'ad_1' },
+            },
+          });
+
+          const result = await createPod();
+
+          expect(result.ok).toBe(true);
+          const text = await lastSlack();
+          expect(text).toContain(
+            `\n*Came from (inferred, ${band}):* \`chatgpt / sg-pilot / ad_1\``
+          );
+          expect(text).not.toContain('\n*Came from:*');
+        }
+      );
+
+      it('does not post a low band', async () => {
+        const registryService = await import('@/services/registry/registryService');
+        vi.mocked(registryService.registerFamilyOrThrow).mockResolvedValueOnce({
+          pointerAccepted: true,
+          attributionInferred: { band: 'low', fields: { utm_source: 'chatgpt' } },
+        });
+
+        await createPod();
+
+        expect(await lastSlack()).not.toContain('Came from');
       });
     });
 

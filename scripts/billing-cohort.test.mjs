@@ -143,4 +143,20 @@ describe('billing-cohort: snapshot selection mirrors attribute_not_exists(cohort
       [id(4), 'first_ten'],
     ]);
   });
+
+  it('skips never-finished sign-up starts (#125) and lists them, so they get no cohort', () => {
+    const started = { familyId: id(6), signupStartedAt: '2026-10-07T00:00:00.000Z' };
+    const pod = {
+      familyId: id(7),
+      signupStartedAt: '2026-10-07T00:00:00.000Z',
+      createdAt: '2026-10-07T01:00:00.000Z',
+    };
+    const { toWrite, live, skippedNeverFinished } = selectPreV1Targets(
+      [...registry, started, pod],
+      billing
+    );
+    expect(skippedNeverFinished).toEqual([started]);
+    expect(live.map((r) => r.familyId)).not.toContain(id(6));
+    expect(toWrite.map((r) => r.familyId)).toEqual([id(1), id(2), id(7)]);
+  });
 });

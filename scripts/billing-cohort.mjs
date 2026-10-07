@@ -33,7 +33,10 @@
 import { pathToFileURL } from 'node:url';
 // The one parse rule for billing-row dates: whatever the registry's `computeEntitlement` accepts
 // as `trialEndsAt` is what this script may write. (The script runs from the repo checkout.)
-import { isValidInstant } from '../infrastructure/lambda/registry/entitlement.mjs';
+import {
+  isNeverFinishedRow,
+  isValidInstant,
+} from '../infrastructure/lambda/registry/entitlement.mjs';
 
 export const REGISTRY_TABLE = 'beanies-family-registry-prod';
 export const BILLING_TABLE = 'beanies-family-billing-prod';
@@ -99,11 +102,15 @@ export function trialEndsAtUpdate(familyId, iso) {
  * `attribute_not_exists(#cohort)` condition EXACTLY: a family qualifies only when its billing row
  * is missing or has no `cohort` attribute at all. A DynamoDB NULL attribute (`cohort: null` after
  * unmarshall) EXISTS, so the condition would refuse it; it is listed as untouched, not written.
- * Tombstoned registry rows (`deletedAt`) are skipped entirely.
+ * Tombstoned registry rows (`deletedAt`) are skipped entirely, and so are never-finished sign-up
+ * starts (#125: no pod exists, so there is no cohort to snapshot); those are listed under
+ * `skippedNeverFinished`.
  */
 export function selectPreV1Targets(registry, billing) {
   const billingOf = new Map(billing.map((b) => [b.familyId, b]));
-  const live = registry.filter((r) => !r.deletedAt);
+  const notDeleted = registry.filter((r) => !r.deletedAt);
+  const skippedNeverFinished = notDeleted.filter(isNeverFinishedRow);
+  const live = notDeleted.filter((r) => !isNeverFinishedRow(r));
   const toWrite = [];
   const already = [];
   for (const reg of live) {
@@ -111,7 +118,7 @@ export function selectPreV1Targets(registry, billing) {
     if (row && Object.hasOwn(row, 'cohort')) already.push({ reg, cohort: row.cohort });
     else toWrite.push(reg);
   }
-  return { live, toWrite, already };
+  return { live, toWrite, already, skippedNeverFinished };
 }
 
 // ── Argument parsing ──────────────────────────────────────────────────────────────────────
@@ -227,10 +234,11 @@ async function snapshotPreV1(sdk, apply) {
     scanAll(sdk, REGISTRY_TABLE),
     scanAll(sdk, BILLING_TABLE),
   ]);
-  const { live, toWrite, already } = selectPreV1Targets(registry, billing);
+  const { live, toWrite, already, skippedNeverFinished } = selectPreV1Targets(registry, billing);
 
   console.log(
-    `Registry rows: ${registry.length} (${registry.length - live.length} tombstoned, skipped)\n`
+    `Registry rows: ${registry.length} (${registry.filter((r) => r.deletedAt).length} tombstoned, ` +
+      `${skippedNeverFinished.length} never finished, skipped)\n`
   );
   console.log(`=== WILL SET cohort=pre_v1: no cohort attribute at all (${toWrite.length}) ===`);
   for (const r of toWrite) console.log(`  ${fmtFamily(r)}`);

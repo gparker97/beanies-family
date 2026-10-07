@@ -1,9 +1,14 @@
 /* global process */
 import { Buffer } from 'node:buffer';
 import { createHash, randomUUID } from 'node:crypto';
-import { DynamoDBClient, GetItemCommand, PutItemCommand } from '@aws-sdk/client-dynamodb';
+import {
+  DynamoDBClient,
+  GetItemCommand,
+  PutItemCommand,
+  QueryCommand,
+} from '@aws-sdk/client-dynamodb';
 import { marshall, unmarshall } from '@aws-sdk/util-dynamodb';
-import { computeEntitlement, isValidInstant } from './entitlement.mjs';
+import { computeEntitlement, isNeverFinishedRow, isValidInstant } from './entitlement.mjs';
 import {
   EVENT_KINDS,
   MAX_BODY_BYTES,
@@ -18,8 +23,11 @@ import {
   normEmail,
   onCanonicalPointer,
   ownerVersionCondition,
+  realEmail,
   resolveOwnerFields,
 } from './owner.mjs';
+import { SCORING, scoreFamily, wantsCreateInference } from './inference.mjs';
+import { countryForTimeZone } from './timeZoneCountry.mjs';
 
 const client = new DynamoDBClient({});
 // Each table pair falls back to prod when no dev table is configured (safe fallback).
@@ -214,6 +222,39 @@ function familyIdHash(familyId) {
 }
 
 /**
+ * The #125 step-1 item: who started signing up, before any pod exists. A pure build from the
+ * request, using the same validators as the ordinary item.
+ *
+ * ⚠️ NO POINTER AND NO `createdAt`, AND THE OMISSIONS ARE THE POINT. `provider` / `fileId` /
+ * `displayPath` are left out entirely, never `'local'`: every pointer reader (the canonical check,
+ * resume-from-registry, the join lookup) keys on their presence and falls through without them,
+ * whereas a stored `'local'` would warn `canonical-provider-mismatch` on a Drive family's first
+ * boot. `createdAt` starts the trial clock (entitlement.mjs) and is stamped only by the
+ * pod-creation write, so its absence is what makes this row never-finished (`isNeverFinishedRow`).
+ * No `lastLoginAt` (nobody has logged in to a pod) and no country, member count or size (no pod).
+ */
+function buildSignupStartItem({ familyId, body, now, deviceCountry }) {
+  return {
+    familyId,
+    familyName: body.familyName || null,
+    // `realEmail`, as the ordinary owner stamp does: a placeholder address never latches.
+    ownerEmail: realEmail(body.ownerEmail),
+    // The caller has already checked that the writer is this owner.
+    ownerMemberId: body.ownerMemberId,
+    subscribeNewsletter:
+      typeof body.subscribeNewsletter === 'boolean' ? body.subscribeNewsletter : null,
+    signupPlatform: validPlatform(body.signupPlatform),
+    attribution: validAttribution(body.attribution, familyId),
+    // The survey comes later (resume setup); the pod-creation write stamps it (`null ?? x`).
+    heardVia: null,
+    attributionInferred: null,
+    signupStartedAt: now,
+    deviceCountry,
+    updatedAt: now,
+  };
+}
+
+/**
  * The GET arm's billing read (#95), issued CONCURRENTLY with the registry read so the pointer
  * lookup pays no extra round trip. It NEVER rejects: the result is `{ configured, billing }` or
  * `{ configured, error }`, and `entitlementFor` decides what to log only once the registry row is
@@ -305,10 +346,14 @@ function entitlementFor(familyId, row, billingRead) {
   const createdAtUsed =
     (entitlement.reason === 'in_trial' || entitlement.reason === 'trial_ended') &&
     !isValidInstant(billingRead.billing?.trialEndsAt);
-  if (createdAtUsed && !isValidInstant(row.createdAt)) {
+  // A #125 step-1 row has no `createdAt` BY DESIGN (no pod yet, so a full trial from now is the
+  // right answer), and `createNewFile` / the entitlement store GET it before the pod exists. The
+  // warn means "a row edited by hand", so it skips those rows rather than crying wolf on every
+  // sign-up in progress.
+  if (createdAtUsed && !isValidInstant(row.createdAt) && !isNeverFinishedRow(row)) {
     // `computeEntitlement` treated the missing createdAt as now (a full trial, the generous
-    // failure). Every PUT stamps `createdAt` and tombstones keep it, so this means a row that
-    // was edited by hand: fix the row, or pin the trial with
+    // failure). Every pod-creation PUT stamps `createdAt` and tombstones keep it, so this means
+    // a row that was edited by hand: fix the row, or pin the trial with
     // `scripts/billing-cohort.mjs --trial-ends-at`.
     console.warn(
       '[registry] entitlement_created_at_invalid: trial computed from now. Fix createdAt on the ' +
@@ -492,17 +537,18 @@ async function handlePut(event, familyId, tableName) {
         },
       });
       if (!round.conflict) return round.res;
+      // A step-1 write (#125) conflicts only on `attribute_not_exists`, a create race, which is
+      // not the handover race this loop was written for; name it so a filter on the handover
+      // string does not count sign-up races.
+      const race =
+        body.signupStart === true ? 'signup-start create race' : 'owner-version conflict';
       if (retries === OWNER_VERSION_RETRIES) {
         exhausted = true;
-        console.error(
-          '[registry] owner-version conflict: giving up',
-          familyId,
-          `${retries + 1} attempts`
-        );
+        console.error(`[registry] ${race}: giving up`, familyId, `${retries + 1} attempts`);
         return response(500, { error: 'Internal server error' }, event);
       }
       retries += 1;
-      console.warn('[registry] owner-version conflict: retrying', familyId, `retry ${retries}`);
+      console.warn(`[registry] ${race}: retrying`, familyId, `retry ${retries}`);
     }
   } finally {
     if (sync) {
@@ -528,6 +574,13 @@ async function handlePut(event, familyId, tableName) {
  * `{ conflict: true }` when the conditional `PutItem` found the owner version moved since the read
  * (`handlePut` re-runs the round). Any other failure throws to the handler's catch, as before.
  * `noteSync` receives the owner-sync decision (null for an ordinary PUT) for `handlePut`'s log.
+ *
+ * THREE MUTUALLY EXCLUSIVE MODES, decided in this order (the README states the same order):
+ *   1. `signupStart: true` (#125): the create-only step-1 write, `signupStartRound`. Its
+ *      `isLoginEvent` / `isSignupEvent` / `ownerSync` flags are ignored.
+ *   2. `ownerSync: true`: ownership-only (owner.mjs); may return before any write.
+ *   3. Everything else: the ordinary whole-item merge below.
+ * A new flag on this endpoint takes a place in this order rather than a special case inside one.
  */
 async function putOnce({ event, familyId, tableName, body, now, today, noteSync }) {
   // Read existing row to preserve write-once fields (createdAt, ownerEmail,
@@ -545,6 +598,12 @@ async function putOnce({ event, familyId, tableName, body, now, today, noteSync 
     })
   );
   const existing = existingRaw ? unmarshall(existingRaw) : {};
+
+  // Mode 1, the #125 step-1 write: create-only, so it is judged before any writer/owner logic.
+  if (body.signupStart === true) {
+    noteSync(null);
+    return signupStartRound({ event, existingRaw, body, familyId, tableName, now });
+  }
 
   // ─── Canonical-pointer guard (2026-08-10) ────────────────────────────
   //
@@ -739,6 +798,12 @@ async function putOnce({ event, familyId, tableName, body, now, today, noteSync 
     );
   }
 
+  // This write stamps createdAt when the row has none, unless the row is a #125 step-1 row and
+  // this is not the pod-creation write (a watcher or background PUT must not start the trial).
+  // Read again by the inference gate below, so "this write creates the pod" is decided once.
+  const stampsCreatedAt =
+    !existing.createdAt && (!isNeverFinishedRow(existing) || body.isSignupEvent === true);
+
   const item = {
     familyId,
     provider: pointerAccepted ? body.provider || 'local' : existing.provider || 'local',
@@ -747,7 +812,11 @@ async function putOnce({ event, familyId, tableName, body, now, today, noteSync 
     // Preserve-on-omit (2026-08-10): an omitted name previously nulled a
     // stored one. Same semantics as country/subscribeNewsletter below.
     familyName: body.familyName || existing.familyName || null,
-    createdAt: existing.createdAt || now,
+    // `undefined` (no stamp) is dropped by `removeUndefinedValues`: a step-1 row stays podless.
+    createdAt: existing.createdAt || (stampsCreatedAt ? now : undefined),
+    // When step 1 of the create wizard ran (#125, stamped only by `signupStartRound`). Carried
+    // so this whole-item PutItem keeps it; legacy rows carry null.
+    signupStartedAt: existing.signupStartedAt ?? null,
     // Write-once. Previously `body.ownerEmail ?? existing.ownerEmail` let the
     // last writer win, so a member device could take over the row. This stays
     // an ops/contact field (see the guard above) but is also the LEGACY
@@ -878,11 +947,28 @@ async function putOnce({ event, familyId, tableName, body, now, today, noteSync 
     // `UpdateItem`. Never read from the body (a client cannot set or clear it); carried here
     // because this whole-item PutItem would otherwise erase it on the next login.
     attributionInferred: existing.attributionInferred ?? null,
+    // Country from the device time zone (#125): the same two conditions as `signupPlatform`
+    // (never move a stamped value; only a signup write may stamp). A null stored at step 1
+    // because the zone was unknown is re-evaluated here by the pod-creation write, since
+    // `null ?? x` is `x`. The zone itself is never stored. (A `signupStart` body never gets here.)
+    deviceCountry:
+      existing.deviceCountry ??
+      (body.isSignupEvent === true ? countryForTimeZone(body.deviceTimeZone) : null),
     // No `deletedAt` here, deliberately: `PutItem` replaces the whole item,
     // so reaching this point at all IS the revival. Only the owner reaches
     // it — every other writer returned above with the family still deleted.
     updatedAt: now,
   };
+  // Create-time inference (#125): only on the write that creates the pod, and only for a family
+  // `wantsCreateInference` says is scorable. `inferAtCreate` never rejects; null means "nothing".
+  if (body.isSignupEvent === true && stampsCreatedAt && wantsCreateInference(item)) {
+    item.attributionInferred = await inferAtCreate({
+      origin: event.headers?.origin,
+      familyId,
+      item,
+      now,
+    });
+  }
   // Conditioned on the owner version this round READ (see `handlePut`): a handover that landed
   // since then fails the write, and the round re-runs against the handed-over row instead of
   // writing the previous owner back.
@@ -906,8 +992,10 @@ async function putOnce({ event, familyId, tableName, body, now, today, noteSync 
   // pointer fields on every login because the payload is uniform). Clients
   // that predate this field treat its absence as accepted.
   // An `ownerSync` request also gets the stored `owner` after the write and the
-  // outcome, so the client can tell applied from refused; every other PUT's
-  // response is unchanged.
+  // outcome, so the client can tell applied from refused. A signup write (#125) also gets the
+  // stamped country and the inferred band + tag, for the creating client's Slack line only;
+  // every other PUT's response is unchanged.
+  const signupExtras = body.isSignupEvent === true ? signupResponseFields(item) : {};
   return {
     res: response(
       200,
@@ -917,17 +1005,198 @@ async function putOnce({ event, familyId, tableName, body, now, today, noteSync 
             pointerAccepted,
             owner: { memberId: item.ownerMemberId, email: item.ownerEmail },
             outcome: owner.sync.outcome,
+            ...signupExtras,
           }
-        : { success: true, pointerAccepted },
+        : { success: true, pointerAccepted, ...signupExtras },
       event
     ),
   };
 }
 
 /**
+ * The PUT arm's step-1 mode (#125, `signupStart: true`): create the row only when no row exists,
+ * and never touch an existing one. Resolves `{ res }`, or `{ conflict: true }` when a concurrent
+ * writer created the row between the read and the write (`handlePut` re-runs the round, which then
+ * answers `exists`). The flag itself is never stored, and this arm reads none of `isLoginEvent`,
+ * `isSignupEvent` or `ownerSync` (the step-1 item has no `lastLoginAt` and no pointer for them to
+ * decide).
+ */
+async function signupStartRound({ event, existingRaw, body, familyId, tableName, now }) {
+  // Validated before logging: the raw `signupPlatform` is client input and never reaches a log.
+  const platform = validPlatform(body.signupPlatform);
+  const answer = (outcome, extra = {}, deviceCountry = null) => {
+    // eslint-disable-next-line no-console -- structured step-1 outcome line, read by CloudWatch
+    console.log(
+      JSON.stringify({
+        msg: 'registry_signup_start',
+        family_id_hash: familyIdHash(familyId),
+        outcome,
+        platform,
+        has_country: deviceCountry !== null,
+      })
+    );
+    return { res: response(200, { success: true, signupStart: outcome, ...extra }, event) };
+  };
+
+  // A live row is a pod (or an earlier step 1) and a tombstone is a deleted family: a late or
+  // replayed step-1 write must not touch either, so both answer `exists` with nothing written.
+  if (existingRaw) return answer('exists');
+
+  // The row this creates stamps its owner, so the writer must BE that owner: otherwise a later
+  // pod-creation write from the real owner would fail the pointer guard (`isOwner`). Absent,
+  // null and empty writer ids are refused for the same reason.
+  if (!body.writerMemberId || body.writerMemberId !== body.ownerMemberId) {
+    return answer('refused');
+  }
+
+  const deviceCountry = countryForTimeZone(body.deviceTimeZone);
+  const item = buildSignupStartItem({ familyId, body, now, deviceCountry });
+  // `attribute_not_exists(familyId)`, the ordinary first write's condition: a row created since
+  // the read fails this write and `handlePut`'s existing retry re-reads it (no second mechanism).
+  const version = ownerVersionCondition(null);
+  try {
+    await client.send(
+      new PutItemCommand({
+        TableName: tableName,
+        Item: marshall(item, { removeUndefinedValues: true }),
+        ConditionExpression: version.expression,
+      })
+    );
+  } catch (err) {
+    if (err?.name === 'ConditionalCheckFailedException') return { conflict: true };
+    throw err;
+  }
+  return answer('created', { deviceCountry }, deviceCountry);
+}
+
+/**
+ * The response-only fields of a pod-creation write (#125): the stamped country and the inferred
+ * band + tag, for the creating client's Slack line. The full `attributionInferred` stays ops data
+ * (GET strips it), so only `band` and `fields` go back.
+ */
+function signupResponseFields(item) {
+  const inferred = item.attributionInferred;
+  return {
+    deviceCountry: item.deviceCountry ?? null,
+    attributionInferred: inferred ? { band: inferred.band, fields: inferred.fields } : null,
+  };
+}
+
+/** The sparse events-table index (#125 Terraform): store taps only, by platform and time. */
+const INFERENCE_INDEX = 'platform-tsEpoch-index';
+/** Ledger rows read per inference. Newest first, so the cut drops the oldest, never the nearest. */
+const INFERENCE_QUERY_LIMIT = 200;
+
+/**
+ * Create-time inference (#125): score a native pod against the store-tap ledger at its
+ * pod-creation write, with the same rules as the metrics run (`inference.mjs`). Returns the
+ * `attributionInferred` value to store, or null.
+ *
+ * NEVER REJECTS, the `readBilling` pattern. This is derived data: a Query or scoring failure must
+ * never fail a pod creation, so every failure logs and returns null and the PUT proceeds. It does
+ * not see other families' claims (that would need a scan); the metrics run reconciles, never
+ * overwrites, and reports a tap held by two rows.
+ *
+ * Logs exactly one `attribution_inference` line per call, so `putOnce` carries no inference
+ * logging.
+ */
+async function inferAtCreate({ origin, familyId, item, now }) {
+  const log = (fields) =>
+    // eslint-disable-next-line no-console -- structured inference outcome line, read by CloudWatch
+    console.log(
+      JSON.stringify({
+        msg: 'attribution_inference',
+        family_id_hash: familyIdHash(familyId),
+        platform: item.signupPlatform,
+        ...fields,
+      })
+    );
+
+  // A self-host with no ledger has nothing to score against; that is a configuration, not an error.
+  const tableName = tableForOrigin(origin, EVENTS_TABLES);
+  if (!tableName) {
+    log({ outcome: 'skipped', reason: 'no-events-table' });
+    return null;
+  }
+
+  let events;
+  try {
+    const toSec = Math.floor(Date.parse(now) / 1000);
+    const { Items } = await client.send(
+      new QueryCommand({
+        TableName: tableName,
+        IndexName: INFERENCE_INDEX,
+        KeyConditionExpression: '#p = :p AND tsEpoch BETWEEN :from AND :to',
+        ExpressionAttributeNames: { '#p': 'platform' },
+        ExpressionAttributeValues: marshall({
+          ':p': item.signupPlatform,
+          ':from': toSec - SCORING.windowHours * 3600,
+          ':to': toSec,
+        }),
+        // The scorer picks the nearest tap, so the Limit must cut the oldest, not the newest.
+        ScanIndexForward: false,
+        Limit: INFERENCE_QUERY_LIMIT,
+      })
+    );
+    events = (Items || []).map((i) => unmarshall(i));
+  } catch (err) {
+    console.error(
+      `[registry] attribution_inference query failed: check the ${INFERENCE_INDEX} index on the events table and dynamodb:Query on it (policy marketing-events-read)`,
+      err
+    );
+    log({ outcome: 'error', reason: 'ddb_query' });
+    return null;
+  }
+
+  let r;
+  try {
+    // `createdAt = now`, which is what the batch scorer uses for this row too, so the two paths
+    // score the same gap. `attribution: null`: `wantsCreateInference` already declined a tag.
+    r = scoreFamily(
+      {
+        createdAt: now,
+        signupPlatform: item.signupPlatform,
+        heardVia: item.heardVia,
+        attribution: null,
+      },
+      events,
+      { now: new Date(now) }
+    );
+  } catch (err) {
+    // Pure code on stored ledger rows; a throw here is a bug, and still must not fail the create.
+    console.error('[registry] attribution_inference scoring threw', err);
+    log({ outcome: 'error', reason: 'score' });
+    return null;
+  }
+
+  if (r.status === 'scored') {
+    log({
+      outcome: 'scored',
+      band: r.value.band,
+      candidates: r.value.candidates,
+      gap_minutes: r.value.gapMinutes,
+    });
+    return r.value;
+  }
+  if (r.status === 'no-candidates' || r.status === 'below-threshold') {
+    log({ outcome: r.status, candidates: r.candidates ?? 0 });
+    return null;
+  }
+  // `deterministic` / `ineligible`: unreachable behind `wantsCreateInference`, logged if not.
+  log({ outcome: 'skipped', reason: r.status });
+  return null;
+}
+
+/**
  * The DELETE arm: tombstone the row (see the comment inside). Moved out of `handler` as
  * `handlePut` already is, so `handler` stays a dispatcher. Throws to the handler's catch (500),
  * as before.
+ *
+ * `?neverFinishedOnly=1` (#125, "Start over" on the resume-setup screen) tombstones the row only
+ * when it is a step-1 row (`isNeverFinishedRow`), and answers `skipped: 'pod-exists'` for anything
+ * else. The decision is made HERE, from the stored row, never from client state: a device that
+ * thinks no pod exists may be wrong, and a tombstoned pod is a family gone missing. Without the
+ * flag the arm is unchanged.
  */
 async function handleDelete(event, familyId, tableName) {
   // ─── TOMBSTONE, NOT A DROP (2026-09-09) ──────────────────────────────
@@ -953,10 +1222,40 @@ async function handleDelete(event, familyId, tableName) {
   );
   const existing = existingRaw ? unmarshall(existingRaw) : null;
 
+  const neverFinishedOnly = event.queryStringParameters?.neverFinishedOnly === '1';
+  // One line per start-over request, so the decision is visible: the client does not parse it.
+  const logStartOver = (outcome) =>
+    neverFinishedOnly &&
+    // eslint-disable-next-line no-console -- structured start-over outcome line, read by CloudWatch
+    console.log(
+      JSON.stringify({
+        msg: 'registry_start_over',
+        family_id_hash: familyIdHash(familyId),
+        outcome,
+      })
+    );
+
   // Nothing to tombstone. Writing a bare `deletedAt` row for a family that
   // never registered would manufacture junk every reader then has to filter,
   // so report the same idempotent success the hard delete gave.
-  if (!existing) return response(200, { success: true }, event);
+  if (!existing) {
+    logStartOver('no-row');
+    return response(200, { success: true }, event);
+  }
+
+  // A DELETE on a tombstone (a second start-over, a teardown retry, a double tap) has nothing
+  // live to remove, and rewriting `deletedAt` would move the deletion forward in every ops
+  // scan. Idempotent for the whole arm, flag or no flag.
+  if (existing.deletedAt) {
+    logStartOver('already-tombstoned');
+    return response(200, { success: true, skipped: 'already-tombstoned' }, event);
+  }
+
+  // Start over must never delete a family that has a pod: only a step-1 row is abandoned.
+  if (neverFinishedOnly && !isNeverFinishedRow(existing)) {
+    logStartOver('skipped-pod-exists');
+    return response(200, { success: true, skipped: 'pod-exists' }, event);
+  }
 
   // ─── DELETE ladder, step 1 of 2: MEASURE, DO NOT ENFORCE ─────────────
   //
@@ -1010,6 +1309,10 @@ async function handleDelete(event, familyId, tableName) {
           // kind, so a restore keeps them too.
           heardVia: existing.heardVia ?? null,
           attributionInferred: existing.attributionInferred ?? null,
+          // When sign-up started and the zone-derived country (#125): provenance too, and
+          // `signupStartedAt` is what still marks a started-over row as never-finished.
+          signupStartedAt: existing.signupStartedAt ?? null,
+          deviceCountry: existing.deviceCountry ?? null,
           // Everything else is deliberately DROPPED, and the omissions are
           // decisions: the canonical pointer (a stale pointer is worse than
           // none), the activity signals and roster size (they would keep a
@@ -1025,6 +1328,7 @@ async function handleDelete(event, familyId, tableName) {
       ),
     })
   );
+  logStartOver('tombstoned');
   return response(200, { success: true }, event);
 }
 

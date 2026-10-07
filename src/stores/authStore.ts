@@ -1251,6 +1251,16 @@ export const useAuthStore = defineStore('auth', () => {
       typeof params.subscribeNewsletter === 'boolean' ? params.subscribeNewsletter : null;
 
     try {
+      // NO POD YET, SAID BEFORE THE FAMILY BECOMES ACTIVE (#125). `restorePodCreated` reads
+      // true on a fresh device and `signOut` never clears it, so until this line a device
+      // that ever opened a pod still says one exists. `createFamily` below sets the active
+      // family, which is the only thing an ambient registry write needs; the step-1 write is
+      // not awaited, so a write in the createFamily -> persistSession window would pass
+      // syncStore's pre-pod gate and land an ordinary row ahead of it. Reset synchronously
+      // here, with no await between this and the activation.
+      podCreated.value = false;
+      persistPodCreated(false);
+
       // Create the family
       const familyContextStore = useFamilyContextStore();
       const family = await familyContextStore.createFamily(params.familyName);
@@ -1309,9 +1319,7 @@ export const useAuthStore = defineStore('auth', () => {
       // The session now exists but no `.beanpod` file does yet — that's
       // written later by `syncStore.createNewFile` (step 2 of the wizard).
       // Until then, the routing guard treats this as "resume setup", not
-      // "ready for /nook".
-      podCreated.value = false;
-      persistPodCreated(false);
+      // "ready for /nook". (`podCreated` was reset above, before `createFamily`.)
       // The campaign tag (#118) rides the signup event as custom props. Peeked, not consumed:
       // this fires at the identity step, before the Drive redirect and `createNewFile`, which
       // still need it for the registry row and the Slack line.

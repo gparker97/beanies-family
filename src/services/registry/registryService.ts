@@ -27,6 +27,31 @@ export interface RegistryWriteResult {
    * from a Lambda that predates it.
    */
   outcome?: string;
+  /**
+   * #125: the step-1 write's outcome (`created`, `exists` when a row was already there,
+   * `refused` when the writer is not the owner it stamps). Returned only for a
+   * `signupStart` write; absent from a Lambda that predates it, which
+   * `signupStartDetail` reads as `unsupported`.
+   */
+  signupStart?: 'created' | 'exists' | 'refused';
+  /**
+   * #125: the ISO 3166-1 alpha-2 country the Lambda derived from `deviceTimeZone`, or
+   * null when the zone mapped to none. Returned on a signup write (`signupStart` or
+   * `isSignupEvent`) only; ops-facing (the Slack lines), never stored by the client.
+   */
+  deviceCountry?: string | null;
+  /**
+   * #125: the attribution the Lambda inferred from the store-tap ledger at pod creation
+   * (native pods with no campaign tag), or null when it scored nothing. Returned on the
+   * pod-creation write only; the client shows it in Slack and never stores it.
+   */
+  attributionInferred?: RegistryInferredAttribution | null;
+}
+
+/** The slice of the Lambda's create-time inference the client reads (#125). */
+export interface RegistryInferredAttribution {
+  band: 'high' | 'medium' | 'low';
+  fields: Record<string, string>;
 }
 
 /**
@@ -96,6 +121,20 @@ export type RegistryWritePayload = Omit<RegistryEntry, 'familyId' | 'updatedAt'>
    * sends it for an owner email sync, same owner id) never needs to.
    */
   ownerSyncReason?: RegistryOwnerSyncReason;
+  /**
+   * Transient, never stored (#125). Marks the step-1 write of the create wizard: a
+   * create-only row (no pointer, no `createdAt`) so a sign-up that never finishes is
+   * still reachable. The Lambda judges a body carrying it by the step-1 rules alone
+   * and ignores `isLoginEvent`, `isSignupEvent` and `ownerSync` on it, so the builder
+   * never sets two modes on one payload.
+   */
+  signupStart?: boolean;
+  /**
+   * Transient, never stored (#125). The device's IANA time zone, sent on a signup write
+   * only (`signupStart` or `isSignupEvent`), null otherwise. The Lambda maps it to a
+   * country (`deviceCountry`) and discards the zone itself.
+   */
+  deviceTimeZone?: string | null;
 };
 
 /** Why an owner-sync write was sent; see `ownerSyncReason` on the payload. */
@@ -302,30 +341,14 @@ export async function registerFamilyOrThrow(
       `Registry PUT failed: HTTP ${res.status}${res.statusText ? ' ' + res.statusText : ''}`
     );
   }
-  // ABSENT MEANS ACCEPTED. A self-hoster on an older Lambda — and the prod window
-  // between the server hotfix and the client shipping — must not generate false
-  // `critical` reports. Only an explicit `false` is a refusal.
-  const parsed = (await res.json().catch(() => ({}))) as {
-    pointerAccepted?: boolean;
-    owner?: unknown;
-    outcome?: unknown;
-  };
-  const pointerAccepted = parsed?.pointerAccepted !== false;
-  const owner = parseOwner(parsed?.owner);
+  const result = parseWriteResult(await res.json().catch(() => ({})));
 
   // ⚠️ NOT FOR AN `ownerSync` WRITE. `registryOwnerSync` logs that write's own
   // outcome, and it is ownership-only: it never
   // asks to move the pointer, so a no-op `pointerAccepted: false` on it (a
   // tombstoned row) is not a refused re-point. Counting it here would inflate the
   // ambient `put` rate and the `refused` ratio below with a write that is neither.
-  if (entry.ownerSync === true) {
-    const outcome = typeof parsed?.outcome === 'string' ? parsed.outcome : undefined;
-    return {
-      pointerAccepted,
-      ...(owner ? { owner } : {}),
-      ...(outcome ? { outcome } : {}),
-    };
-  }
+  if (entry.ownerSync === true) return result;
 
   // The success path too, and deliberately: a counter that only fires on failure
   // cannot give you a RATE. `count` says where the owner fields came from — 1
@@ -340,7 +363,7 @@ export async function registerFamilyOrThrow(
     context: { action: 'put', count: entry.ownerMemberId ? 1 : 0 },
   });
 
-  if (!pointerAccepted) {
+  if (!result.pointerAccepted) {
     // Boring for a member device — every one of them sends pointer fields on
     // every login because the payload is uniform — and DATA AT RISK when the
     // caller meant to re-point. The caller distinguishes those two; this counts
@@ -354,7 +377,66 @@ export async function registerFamilyOrThrow(
     });
   }
 
-  return owner ? { pointerAccepted, owner } : { pointerAccepted };
+  return result;
+}
+
+/**
+ * Parse a PUT response into a `RegistryWriteResult`. Every field but `pointerAccepted`
+ * is ADDITIVE: a value that is absent or not the expected shape is left out of the
+ * result rather than guessed at, so an older Lambda (or a write that does not return
+ * the field) produces exactly the result it always did.
+ */
+export function parseWriteResult(raw: unknown): RegistryWriteResult {
+  const r = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+  // ABSENT MEANS ACCEPTED. A self-hoster on an older Lambda — and the prod window
+  // between the server hotfix and the client shipping — must not generate false
+  // `critical` reports. Only an explicit `false` is a refusal.
+  const result: RegistryWriteResult = { pointerAccepted: r.pointerAccepted !== false };
+  const owner = parseOwner(r.owner);
+  if (owner) result.owner = owner;
+  if (typeof r.outcome === 'string' && r.outcome) result.outcome = r.outcome;
+  if (r.signupStart === 'created' || r.signupStart === 'exists' || r.signupStart === 'refused') {
+    result.signupStart = r.signupStart;
+  }
+  // A two-letter code or an explicit null (the zone mapped to no country). Anything else
+  // never reaches a Slack line.
+  if (r.deviceCountry === null) result.deviceCountry = null;
+  else if (typeof r.deviceCountry === 'string' && /^[A-Z]{2}$/.test(r.deviceCountry)) {
+    result.deviceCountry = r.deviceCountry;
+  }
+  const inferred = parseInferredAttribution(r.attributionInferred);
+  if (inferred !== undefined) result.attributionInferred = inferred;
+  return result;
+}
+
+/**
+ * The `attributionInferred` block of a PUT response: `null` when the Lambda scored
+ * nothing, `undefined` (absent) when the field is missing or malformed. Only the
+ * band and string-valued fields are kept; the rest of the stored value is ops data.
+ */
+function parseInferredAttribution(raw: unknown): RegistryInferredAttribution | null | undefined {
+  if (raw === null) return null;
+  if (!raw || typeof raw !== 'object') return undefined;
+  const { band, fields } = raw as { band?: unknown; fields?: unknown };
+  if (band !== 'high' && band !== 'medium' && band !== 'low') return undefined;
+  if (!fields || typeof fields !== 'object' || Array.isArray(fields)) return undefined;
+  const entries = Object.entries(fields as Record<string, unknown>);
+  if (!entries.every(([, v]) => typeof v === 'string')) return undefined;
+  return { band, fields: Object.fromEntries(entries) as Record<string, string> };
+}
+
+/** The `registry` `signup-start` log detail for a step-1 write (#125). */
+export type SignupStartDetail = 'created' | 'exists' | 'refused' | 'unsupported' | 'failed';
+
+/**
+ * Map a step-1 write's result to its log detail. `null` is a transport failure
+ * (`registerFamily` swallowed it and logged `put-failed`). A result without
+ * `signupStart` means the Lambda predates #125 and wrote an ordinary first row
+ * (pointer and `createdAt` at step 1): that is the deploy-order tripwire.
+ */
+export function signupStartDetail(result: RegistryWriteResult | null): SignupStartDetail {
+  if (!result) return 'failed';
+  return result.signupStart ?? 'unsupported';
 }
 
 /**
@@ -389,10 +471,15 @@ function parseOwner(raw: unknown): RegistryWriteResult['owner'] {
  * while the row sat there. It returns a boolean now and the caller must surface a
  * false. `features.registry` off returns true: there is no row to remove, so
  * nothing failed.
+ *
+ * `opts.neverFinishedOnly` (#125, "Start over" on the resume-setup screen): tombstone the
+ * row only if it is a step-1 row no pod was ever created for. The Lambda decides from the
+ * stored row and leaves a real pod untouched, so the client never has to judge it.
  */
 export async function removeFamily(
   familyId: string,
-  writerMemberId: string | null
+  writerMemberId: string | null,
+  opts: { neverFinishedOnly?: boolean } = {}
 ): Promise<boolean> {
   if (!features.registry) return true;
 
@@ -401,11 +488,14 @@ export async function removeFamily(
     // enough intermediaries to be a bad bet. The server validates it as a UUID,
     // logs a mismatch, and in this release still performs the delete — that warn
     // is the measurement that decides when it may start refusing.
+    const query: Record<string, string> = {};
+    if (writerMemberId) query.writerMemberId = writerMemberId;
+    if (opts.neverFinishedOnly) query.neverFinishedOnly = '1';
     const res = await request(
       'DELETE',
       familyId,
       undefined,
-      writerMemberId ? { writerMemberId } : undefined
+      Object.keys(query).length ? query : undefined
     );
     if (!res.ok) {
       console.warn(`[registry] removeFamily refused — HTTP ${res.status}`);

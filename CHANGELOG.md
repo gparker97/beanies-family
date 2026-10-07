@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-10-07
 
+### Added
+
+- Sign-ups that stop after the first wizard step are now recorded, so a family that never finished creating its pod can be invited back.
+
 ### Changed
 
 - Version 0.92 is out on the web, Google Play (production) and the App Store (on approval), with a spotlight note covering the recent round of edge-case robustness improvements to saving, syncing and the calendar.

@@ -25,6 +25,8 @@ import {
   registerFamily,
   registerFamilyOrThrow,
   addRegistryEntryObserver,
+  parseWriteResult,
+  signupStartDetail,
   type RegistryWritePayload,
 } from '../registryService';
 
@@ -343,6 +345,33 @@ describe('registry DELETE — the writer id rides the query string', () => {
     );
   });
 
+  it('sends neverFinishedOnly=1 only when asked (#125 start over), beside the writer id', async () => {
+    const f = okFetch();
+    global.fetch = f;
+    expect(await removeFamily(FAMILY, OWNER, { neverFinishedOnly: true })).toBe(true);
+    const url = new URL(lastUrl(f));
+    expect(url.searchParams.get('neverFinishedOnly')).toBe('1');
+    expect(url.searchParams.get('writerMemberId')).toBe(OWNER);
+
+    const g = okFetch();
+    global.fetch = g;
+    await removeFamily(FAMILY, OWNER);
+    expect(lastUrl(g)).not.toContain('neverFinishedOnly');
+
+    const h = okFetch();
+    global.fetch = h;
+    await removeFamily(FAMILY, null, { neverFinishedOnly: true });
+    expect(lastUrl(h)).toContain('?neverFinishedOnly=1');
+    expect(lastUrl(h)).not.toContain('writerMemberId');
+  });
+
+  it('keeps the boolean contract with the flag: a refusal is false, never a throw', async () => {
+    global.fetch = failFetch(500);
+    expect(await removeFamily(FAMILY, OWNER, { neverFinishedOnly: true })).toBe(false);
+    global.fetch = vi.fn().mockRejectedValue(new Error('offline'));
+    expect(await removeFamily(FAMILY, OWNER, { neverFinishedOnly: true })).toBe(false);
+  });
+
   it('reports success', async () => {
     global.fetch = okFetch();
 
@@ -350,6 +379,108 @@ describe('registry DELETE — the writer id rides the query string', () => {
     expect(logEvent).toHaveBeenCalledWith(
       expect.objectContaining({ context: { action: 'delete' } })
     );
+  });
+});
+
+describe('registry PUT: the #125 response fields', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('parses signupStart, deviceCountry and attributionInferred', () => {
+    expect(
+      parseWriteResult({
+        success: true,
+        signupStart: 'created',
+        deviceCountry: 'SG',
+        attributionInferred: { band: 'high', fields: { utm_source: 'chatgpt' }, eventId: 'e1' },
+      })
+    ).toEqual({
+      pointerAccepted: true,
+      signupStart: 'created',
+      deviceCountry: 'SG',
+      // Only the band and the fields: the rest of the stored value is ops data.
+      attributionInferred: { band: 'high', fields: { utm_source: 'chatgpt' } },
+    });
+  });
+
+  it('keeps an explicit null country and an explicit null inference', () => {
+    expect(parseWriteResult({ deviceCountry: null, attributionInferred: null })).toEqual({
+      pointerAccepted: true,
+      deviceCountry: null,
+      attributionInferred: null,
+    });
+  });
+
+  it('leaves every new field ABSENT for an older Lambda', () => {
+    const result = parseWriteResult({ success: true });
+    expect(result).toEqual({ pointerAccepted: true });
+    for (const key of ['signupStart', 'deviceCountry', 'attributionInferred']) {
+      expect(key in result).toBe(false);
+    }
+  });
+
+  it('treats a malformed value as absent, never guessing at it', () => {
+    for (const raw of [
+      { signupStart: 'maybe' },
+      { signupStart: true },
+      { deviceCountry: 'sg' },
+      { deviceCountry: 'SGP' },
+      { deviceCountry: 65 },
+      { attributionInferred: 'high' },
+      { attributionInferred: { band: 'certain', fields: {} } },
+      { attributionInferred: { band: 'high' } },
+      { attributionInferred: { band: 'high', fields: ['chatgpt'] } },
+      { attributionInferred: { band: 'high', fields: { utm_source: 42 } } },
+    ]) {
+      expect(parseWriteResult(raw)).toEqual({ pointerAccepted: true });
+    }
+  });
+
+  it('survives a non-object body', () => {
+    for (const raw of [null, undefined, 'x', 42, []]) {
+      expect(parseWriteResult(raw)).toEqual({ pointerAccepted: true });
+    }
+  });
+
+  it('carries the new fields through registerFamilyOrThrow and registerFamily', async () => {
+    const body = { success: true, signupStart: 'exists', deviceCountry: 'US' };
+    global.fetch = okFetch(body);
+    expect(await registerFamilyOrThrow(FAMILY, payload({ signupStart: true }))).toEqual({
+      pointerAccepted: true,
+      signupStart: 'exists',
+      deviceCountry: 'US',
+    });
+    global.fetch = okFetch(body);
+    expect(await registerFamily(FAMILY, payload({ signupStart: true }))).toEqual({
+      pointerAccepted: true,
+      signupStart: 'exists',
+      deviceCountry: 'US',
+    });
+  });
+
+  it('sends the transient signupStart and deviceTimeZone on the wire', async () => {
+    const f = okFetch({ success: true, signupStart: 'created' });
+    global.fetch = f;
+    await registerFamilyOrThrow(
+      FAMILY,
+      payload({ signupStart: true, deviceTimeZone: 'Asia/Singapore' })
+    );
+    expect(lastBody(f)).toEqual(
+      expect.objectContaining({ signupStart: true, deviceTimeZone: 'Asia/Singapore' })
+    );
+  });
+});
+
+describe('signupStartDetail: the step-1 write outcome for the log (#125)', () => {
+  it('maps a transport failure (null) to failed', () => {
+    expect(signupStartDetail(null)).toBe('failed');
+  });
+
+  it.each(['created', 'exists', 'refused'] as const)('passes %s through', (outcome) => {
+    expect(signupStartDetail({ pointerAccepted: true, signupStart: outcome })).toBe(outcome);
+  });
+
+  it('maps a result without the field to unsupported, the deploy-order tripwire', () => {
+    expect(signupStartDetail({ pointerAccepted: true })).toBe('unsupported');
   });
 });
 
