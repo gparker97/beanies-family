@@ -349,7 +349,9 @@ describe('registry DELETE — the writer id rides the query string', () => {
     const f = okFetch();
     global.fetch = f;
     expect(await removeFamily(FAMILY, OWNER, { neverFinishedOnly: true })).toBe(true);
-    const url = new URL(lastUrl(f));
+    // CI has no VITE_REGISTRY_API_URL, so the request URL is relative there; a base makes
+    // the parse work in both environments and the assertions only read the query string.
+    const url = new URL(lastUrl(f), 'https://registry.test');
     expect(url.searchParams.get('neverFinishedOnly')).toBe('1');
     expect(url.searchParams.get('writerMemberId')).toBe(OWNER);
 

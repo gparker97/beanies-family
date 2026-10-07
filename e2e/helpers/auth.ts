@@ -120,6 +120,22 @@ async function createUpToMembers(page: Page, familyName = E2E_FAMILY_NAME): Prom
 }
 
 /**
+ * Answer the PIN step-up (`ReauthChallenge`) if a sensitive action raises it. The E2E
+ * owner has the fixture PIN from the create flow, so a real owner is asked to verify
+ * before destructive actions (Clear Data, delete family); a spec on a phantom 0-member
+ * pod never was, which is how this was missed until #85 closed that fallback. Resolves
+ * quietly when no challenge appears within `timeout`.
+ */
+export async function answerReauthIfAsked(page: Page, timeout = 5000): Promise<void> {
+  const pinField = page.getByLabel(ui('pin.enterPin'));
+  const asked = await pinField
+    .waitFor({ state: 'visible', timeout })
+    .then(() => true)
+    .catch(() => false);
+  if (asked) await pinField.fill(E2E_PIN);
+}
+
+/**
  * Navigates through the create flow to the Add Family Members step.
  * Useful for tests that need to interact with the members step directly.
  * (Replaces the old `navigateToSetupStep3` — there is no "step 3" anymore;

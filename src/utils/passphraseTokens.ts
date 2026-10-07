@@ -9,7 +9,11 @@ export function splitPassphraseWords(phrase: string): string[] {
   return phrase.trim().toLowerCase().split(PASSPHRASE_SEPARATORS).filter(Boolean);
 }
 
-/** The phrase with every separator removed, lowercased: the name-equality form. */
+/**
+ * The phrase with every separator removed, lowercased: the name-equality form. Split + join
+ * rather than a global `replace`, so the one separator pattern above is reused as-is and no
+ * RegExp is built from a string (the SAST gate rejects a non-literal RegExp constructor).
+ */
 export function canonPassphrase(value: string): string {
-  return value.toLowerCase().replace(new RegExp(PASSPHRASE_SEPARATORS.source, 'g'), '');
+  return value.toLowerCase().split(PASSPHRASE_SEPARATORS).join('');
 }

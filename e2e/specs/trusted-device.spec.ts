@@ -1,6 +1,6 @@
 import { test, expect } from '../fixtures/test';
 import { IndexedDBHelper } from '../helpers/indexeddb';
-import { bypassLoginIfNeeded } from '../helpers/auth';
+import { answerReauthIfAsked, bypassLoginIfNeeded } from '../helpers/auth';
 import { gotoRoot, gotoRoute } from '../helpers/navigation';
 import { ui } from '../helpers/ui-strings';
 
@@ -200,8 +200,11 @@ test.describe('Trusted Device Password Cache', () => {
     let record = await getTrustedAutoOpenRecord(page, 'test-family');
     expect(record?.wrapped).toBe('opaque-wrapped-bytes');
 
-    // Reload page — IndexedDB persists
-    await page.reload();
+    // Reload page — IndexedDB persists. Through `gotoRoute`, not a raw `page.reload()`:
+    // the raw reload left this memory-provider pod with 0 members, and the Data
+    // Management card below was reachable only through the session-role owner fallback
+    // that #85 closes once a roster load settles empty (same fix as invite-join).
+    await gotoRoute(page, '/nook');
     await page.waitForURL('/nook');
 
     // Verify the wrapped record survived reload
@@ -224,6 +227,9 @@ test.describe('Trusted Device Password Cache', () => {
     const confirmBtn = page.getByRole('button', { name: /yes.*delete/i });
     await confirmBtn.waitFor({ state: 'visible', timeout: 3000 });
     await confirmBtn.click();
+
+    // A real owner is asked for their PIN before the clear runs (step-up re-auth).
+    await answerReauthIfAsked(page);
 
     // Clear Data asks before deleting unsaved work (audit C6, 2026-10-03). This pod has
     // no data file configured, so whether the probe reports the never-saved document as
