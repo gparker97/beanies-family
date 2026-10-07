@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-10-07
+
+### Changed
+
+- Version 0.92 is out on the web, Google Play (production) and the App Store (on approval), with a spotlight note covering the recent round of edge-case robustness improvements to saving, syncing and the calendar.
+
 ## 2026-10-06
 
 ### Added
