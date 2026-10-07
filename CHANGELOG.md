@@ -8,6 +8,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-10-08
+
+### Changed
+
+- Version 0.93 is out on the web, Google Play (production) and the App Store (on approval), with a spotlight note on the recent round of security tidy-ups around sign-in, permissions and the family file.
+- Devices still on a version before 0.92 are now asked to update, now that 0.92 is on both stores.
+
 ## 2026-10-07
 
 ### Added

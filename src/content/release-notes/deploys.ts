@@ -17,6 +17,95 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.10.08',
+    date: '2026-10-08',
+    month: '8 october 2026',
+    spotlight: true,
+    summary: {
+      en: 'Tidying up the security corners on the way to v1: a round of small, long-standing issues around sign-in, permissions and the family file have been closed.',
+      beanie:
+        'tidying up the security corners on the way to v1: a round of small, long-standing issues around sign-in, permissions and the family file have been closed.',
+    },
+    features: [
+      {
+        icon: '\u{1F510}',
+        title: {
+          en: 'Stronger passphrases, quietly',
+          beanie: 'stronger passphrases, quietly',
+        },
+        description: {
+          en: 'Suggested family passphrases are now six words from a large public list, and a typed passphrase is checked for strength as you type. The way your password and passphrase lock the family file now records how it was made, so that protection can be strengthened over time without anyone having to do anything.',
+          beanie:
+            'suggested family passphrases are now six words from a large public list, and a typed passphrase is checked for strength as you type. the way your password and passphrase lock the family file now records how it was made, so that protection can be strengthened over time without anyone having to do anything.',
+        },
+      },
+      {
+        icon: '\u{1F46A}',
+        title: {
+          en: 'Permissions come from the family file',
+          beanie: 'permissions come from the family file',
+        },
+        description: {
+          en: "Fixed an edge case where, on a device that could not open its family file, a grown-up's permissions were taken from the saved sign-in instead. They now always come from the file itself, and a device that cannot open its file is offered the reconnect options instead.",
+          beanie:
+            "fixed an edge case where, on a device that could not open its family file, a grown-up's permissions were taken from the saved sign-in instead. they now always come from the file itself, and a device that cannot open its file is offered the reconnect options instead.",
+        },
+      },
+      {
+        icon: '\u{1F511}',
+        title: { en: 'Your PIN, where it matters', beanie: 'your pin, where it matters' },
+        description: {
+          en: 'Deleting a family now always asks for your PIN, including when the family file is not loaded. Creating a magic link asks for it too, and only members who can manage the pod can create a link for someone else.',
+          beanie:
+            'deleting a family now always asks for your pin, including when the family file is not loaded. creating a magic link asks for it too, and only members who can manage the pod can create a link for someone else.',
+        },
+      },
+      {
+        icon: '\u{1F4C2}',
+        title: { en: 'Keeping family files apart', beanie: 'keeping family files apart' },
+        description: {
+          en: "Patched a long-standing edge case where creating a new family while the app was still connected to another family's storage could write into the wrong file. The app now stops and asks where to keep the new family's file.",
+          beanie:
+            "patched a long-standing edge case where creating a new family while the app was still connected to another family's storage could write into the wrong file. the app now stops and asks where to keep the new family's file.",
+        },
+      },
+      {
+        icon: '\u{1F517}',
+        title: { en: 'Safer links and quieter logs', beanie: 'safer links and quieter logs' },
+        description: {
+          en: 'A crafted sign-in link can no longer send you to another website, and invite codes are shortened before they reach the diagnostic logs, so a failed join never records the full code.',
+          beanie:
+            'a crafted sign-in link can no longer send you to another website, and invite codes are shortened before they reach the diagnostic logs, so a failed join never records the full code.',
+        },
+      },
+      {
+        icon: '\u{1F50E}',
+        title: {
+          en: 'A sweep of the security corners',
+          beanie: 'a sweep of the security corners',
+        },
+        description: {
+          en: 'As part of getting ready for v1, the sign-in, permission and recovery paths were reviewed and a number of small, pesky issues were tidied up along the way, including biometric unlock keys that could outlive the app on an iPhone. None of these changed how your family’s data is protected at its core; they close the small gaps around it, and none needed anything from you.',
+          beanie:
+            'as part of getting ready for v1, the sign-in, permission and recovery paths were reviewed and a number of small, pesky issues were tidied up along the way, including biometric unlock keys that could outlive the app on an iphone. none of these changed how your family’s data is protected at its core; they close the small gaps around it, and none needed anything from you.',
+        },
+      },
+      {
+        icon: '\u{1F4AC}',
+        title: { en: 'Join us on Discord', beanie: 'join us on discord' },
+        description: {
+          en: "Get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+          beanie:
+            "get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+        },
+        cta: {
+          label: { en: 'Join the Discord', beanie: 'join the discord' },
+          href: 'https://beanies.family/discord',
+        },
+      },
+    ],
+  },
+  {
     version: '2026.10.07',
     date: '2026-10-07',
     month: '7 october 2026',
