@@ -141,6 +141,39 @@ describe('familyStore — session member resolution', () => {
   });
 });
 
+describe('familyStore — rosterLoadSettled latch', () => {
+  it('latches when a load finds an empty roster', async () => {
+    vi.mocked(familyRepo.getAllFamilyMembers).mockResolvedValue([]);
+    const store = useFamilyStore();
+    expect(store.rosterLoadSettled).toBe(false);
+
+    await store.loadMembers();
+
+    expect(store.rosterLoadSettled).toBe(true);
+  });
+
+  it('latches when the load itself fails (a failed load is also a state the user stays in)', async () => {
+    vi.mocked(familyRepo.getAllFamilyMembers).mockRejectedValueOnce(new Error('boom'));
+    const store = useFamilyStore();
+
+    await store.loadMembers();
+
+    expect(store.error).not.toBeNull();
+    expect(store.rosterLoadSettled).toBe(true);
+  });
+
+  it('is cleared by resetState, so it cannot leak into the next family', async () => {
+    vi.mocked(familyRepo.getAllFamilyMembers).mockResolvedValue([OWNER]);
+    const store = useFamilyStore();
+    await store.loadMembers();
+    expect(store.rosterLoadSettled).toBe(true);
+
+    store.resetState();
+
+    expect(store.rosterLoadSettled).toBe(false);
+  });
+});
+
 describe('familyStore.deleteMember — self-removal (the no-devtools vector)', () => {
   it('signs a manager out when they delete their own bean, instead of promoting them', async () => {
     vi.mocked(familyRepo.getAllFamilyMembers).mockResolvedValue([OWNER, ME]);

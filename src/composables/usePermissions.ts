@@ -20,38 +20,41 @@ export function usePermissions() {
 
   // When currentMember is resolved, use its role and permission flags.
   /**
-   * A loaded pod ALWAYS contains its owner (`normalizeRoles` guarantees exactly one; the
-   * single exception, a pets-only pod, has no human to confer owner on anyway), so an
-   * empty roster means "not loaded yet" — never "a pod with no owner".
+   * INVARIANT (#80, #85): the forgeable session `role` may confer owner ONLY while no roster
+   * load has settled: the boot window, and the signup bootstrap before the owner's record
+   * exists. Once a load attempt settles (`familyStore.rosterLoadSettled`), owner comes from
+   * the pod's own member record and nowhere else, even when the roster is empty.
    *
-   * ⚠️ A STRONGER VERSION OF THIS WAS TRIED AND REVERTED (2026-09-02). The #80 review found
-   * a real hole: App.vue's path 3 renders an empty doc as a PERSISTENT recoverable state
-   * (cache unavailable, Drive permission lost), so "empty" is not always "still loading",
-   * and the fallback below then grants owner from the forgeable session `role` indefinitely.
-   * The fix added a sticky `familyStore.rosterResolved` and OR-ed it in here.
+   * Why an empty roster is not enough: App.vue's path 3 renders an empty doc as a
+   * PERSISTENT, recoverable state (cache unavailable, Drive permission lost, provider config
+   * lost), and path-1b failures load nothing at all. Gating on `members.length` alone let a
+   * hand-edited session sit on such a pod and read as owner for the whole session.
    *
-   * It broke pod creation. `rosterResolved` latches on the FIRST completed `loadMembers`,
-   * which during the create-pod wizard runs against a doc that legitimately has no members
-   * yet — so the fallback died before the owner's own record existed, and every
-   * `canManagePod` surface (the invite button among them) vanished for the rest of the
-   * session. Caught by `invite-join.spec.ts` on both chromium and webkit.
+   * History: a sticky latch was first tried on 2026-09-02 (commit d1ef1589) and reverted the
+   * same day (c3be5e29) when `invite-join.spec.ts` went red on chromium and webkit. That
+   * spec reloaded with a raw `page.goto`, which restores an empty, ownerless doc for the
+   * memory provider; the Invite button existed there ONLY through this fallback, so the
+   * test was exercising the hole. Pod creation never depended on it (the owner record is
+   * selected before `currentUser` is set). The spec now reloads through `gotoRoute`.
    *
-   * Closing the hole needs a signal that separates "this pod exists but did not load" from
-   * "this pod is being created" — most likely whether a sync file is configured, which is
-   * false only in the second case. Until that lands, this stays as it was: the hole is
-   * narrow (it needs a hand-edited session AND lost file access), the seal already makes
-   * hand-editing hard, and `useReauth`'s PIN step-up — not this — is the documented boundary
-   * on every irreversible action.
+   * When and where the latch is set: see `familyStore.settleRosterLoad()`.
+   *
+   * `rosterLoaded` itself stays "a roster exists" (`members.length > 0`); App.vue's
+   * home-time-zone watch consumes it with that meaning. `useReauth`'s PIN step-up remains
+   * the boundary on every irreversible action.
    */
   const rosterLoaded = computed(() => familyStore.members.length > 0);
 
   const isOwner = computed(
     () =>
       familyStore.currentMember?.role === 'owner' ||
-      // Pre-load ONLY. Once a roster exists, an absent currentMember is a REJECTION (see
-      // familyStore's session handling), not a fallback — otherwise forging just the
-      // `role` field in the stored session confers owner outright (#80).
-      (!rosterLoaded.value && authStore.currentUser?.role === 'owner')
+      // ONLY until a load attempt settles. After that, an absent currentMember is a
+      // REJECTION (see familyStore's session handling) or a pod that did not load, never a
+      // fallback; otherwise forging just the `role` field in the stored session confers
+      // owner outright (#80, #85).
+      (!rosterLoaded.value &&
+        !familyStore.rosterLoadSettled &&
+        authStore.currentUser?.role === 'owner')
   );
 
   const canManagePod = computed(() => isOwner.value || !!familyStore.currentMember?.canManagePod);

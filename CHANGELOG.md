@@ -18,6 +18,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 ### Security
 
 - The password and passphrase wraps on the family file now record how they were made, so their cost can be raised over time without anyone doing anything; the raise itself switches on fleet-wide once every store build can read it.
+- A grown-up's permissions are no longer granted from the saved sign-in alone when the family file cannot be opened.
 
 ### Changed
 

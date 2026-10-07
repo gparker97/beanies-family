@@ -74,6 +74,12 @@ export const useFamilyStore = defineStore('family', () => {
    * `members`, which a half-loaded roster would also produce.
    */
   const removedMemberIds = ref<ReadonlySet<string>>(new Set());
+  /**
+   * Whether a roster load attempt has SETTLED for this family (#85). Written only through
+   * `settleRosterLoad()`; read by `usePermissions` to decide when the session-role fallback
+   * stops applying. See the action for the mechanics.
+   */
+  const rosterLoadSettled = ref(false);
 
   // Getters
   const currentMember = computed(() => members.value.find((m) => m.id === currentMemberId.value));
@@ -373,6 +379,9 @@ export const useFamilyStore = defineStore('family', () => {
       // path-3 fallback deliberately renders an empty doc when the cache is unavailable or
       // Drive permission was lost, and the user recovers from Settings. Rejecting here
       // would sign them out mid-boot on a recoverable error.
+      //
+      // (The empty-roster population is logged from `settleRosterLoad`, which also covers
+      // the boot paths that never reach this function. #85)
       if (roster.length === 0) return { kind: 'none' };
       const vouched = roster.find((m) => m.id === sessionMemberId);
       if (vouched) {
@@ -491,78 +500,143 @@ export const useFamilyStore = defineStore('family', () => {
   }
 
   // Actions
-  async function loadMembers() {
-    await wrapAsync(isLoading, error, async () => {
-      // Captured BEFORE the read, so it names the family whose doc was actually read.
-      const readForFamilyId = getActiveFamilyId();
-      const removed = new Set((await getAllRemovedMembers()).map((r) => r.id));
-      const loadedRaw = await familyRepo.getAllFamilyMembers();
-      // A row whose id the pod records as REMOVED is a resurrection (a concurrent
-      // delete/patch race — automergeRepository.ts) and never a member. Filtered BEFORE
-      // `normalizeRoles`, so a removed row can never be promoted or patched.
-      const loaded = loadedRaw.filter((m) => !removed.has(m.id));
-      if (loaded.length !== loadedRaw.length) {
-        logEvent({
-          level: 'warn',
-          surface: 'family-roster',
-          message: 'removed_member_row_filtered',
-          context: {
-            action: 'removed_member_row_filtered',
-            count: loadedRaw.length - loaded.length,
-          },
-        });
-      }
-      const roster = await normalizeRoles(loaded);
-      // Resolve the session member BEFORE publishing the roster. Assigning members.value
-      // first left a tick where the roster existed but currentMemberId was still null,
-      // and usePermissions (which now refuses to read the session `role` once a roster
-      // exists) reported the owner as a non-owner for that tick — the Piggy Bank nav
-      // vanished and the canViewFinances true->false diagnostic fired on every boot.
-      const resolvedForRoster = currentMemberId.value
-        ? null
-        : await resolveSessionMember(roster, removed);
-      members.value = roster;
-      rosterFamilyId.value = readForFamilyId;
-      // With the roster and its family, never before: the removed-members watcher needs to
-      // know which family these removals belong to.
-      removedMemberIds.value = removed;
-      logDuplicateMembers(members.value);
+  /**
+   * Latch `rosterLoadSettled` (#85): a load attempt has finished, whatever it found.
+   *
+   * It latches on EVERY settled attempt: a successful read (even of an empty roster), a
+   * failed read, and a boot path on which no store load runs at all. Two call sites:
+   *  - `loadMembers`, in a `finally` around its one `wrapAsync` call. Every store load goes
+   *    through here, including a login-flow family switch, which loads via syncStore and
+   *    never reaches App.vue's `loadFamilyData`.
+   *  - App.vue `loadFamilyData`'s `finally`, for the path-1b failures that return without
+   *    any store load. That call is unconditional (it also runs on success and hand-off,
+   *    both harmless: success already latched here, and every hand-off re-enters a load
+   *    that latches).
+   *
+   * Why `finally`: a failed load is also a state the user stays in, so it must latch too.
+   * `wrapAsync` swallows throws today; the `finally` holds if it ever rethrows.
+   *
+   * Why neither existing signal can be the latch: `members.length` is 0 both before a load
+   * and after one that found an empty or unopenable doc, so it cannot tell "not loaded yet"
+   * from "loaded nothing". `rosterFamilyId` is written only on a successful read and only
+   * when `getActiveFamilyId()` is non-null, so a thrown load (and the E2E memory provider)
+   * would never latch it.
+   *
+   * Cleared only by `resetState()`, which every family switch and sign-out runs, so the
+   * latch cannot leak from one family to the next.
+   */
+  function settleRosterLoad() {
+    rosterLoadSettled.value = true;
+    if (members.value.length === 0) void reportEmptyRosterSettled();
+  }
 
-      // Restore currentMemberId: prefer authStore session, then previous value, then owner
-      if (!currentMemberId.value) {
-        const resolved = resolvedForRoster ?? (await resolveSessionMember(members.value, removed));
-        if (await applyResolution(resolved)) return;
-        // No session member at all: the legitimate signup / pre-login bootstrap.
-        // NOT reachable after a rejection — `sessionRejected` stays true until a real
-        // sign-in, so a rejected session cannot be handed the owner's row on the next
-        // reload and read as owner again.
-        if (owner.value && !(await sessionWasRejected())) {
-          currentMemberId.value = owner.value.id;
+  /**
+   * Diagnostic for #85: a signed-in session settled on an empty roster of an ESTABLISHED
+   * pod is exactly the population the closed owner fallback affects, and `kind` (the sync
+   * status) tells a lost Drive permission from a lost provider config. Emitted from the
+   * latch, not from `resolveSessionMember`, so the boot paths that load nothing at all
+   * (a lost Drive token, a missing file) are counted too. Gated on `podCreated` because
+   * the create wizard's bootstrap (`buildOwnerDoc`, and its resume-after-redirect re-run
+   * with a session already set) settles on an empty doc on purpose. Both stores are
+   * imported here only, so a healthy load pays nothing for it. Never throws: a diagnostic
+   * must not take the latch down with it.
+   */
+  async function reportEmptyRosterSettled(): Promise<void> {
+    try {
+      const [{ useAuthStore }, { useSyncStore }] = await Promise.all([
+        import('@/stores/authStore'),
+        import('./syncStore'),
+      ]);
+      const authStore = useAuthStore();
+      if (!authStore.currentUser || !authStore.podCreated) return;
+      logEvent({
+        level: 'warn',
+        surface: 'session-integrity',
+        message: 'empty_roster_with_session',
+        context: { action: 'empty_roster_with_session', kind: useSyncStore().syncStatus },
+      });
+    } catch (e) {
+      console.warn('[familyStore] empty_roster_with_session diagnostic could not run', e);
+    }
+  }
+
+  async function loadMembers() {
+    try {
+      await wrapAsync(isLoading, error, async () => {
+        // Captured BEFORE the read, so it names the family whose doc was actually read.
+        const readForFamilyId = getActiveFamilyId();
+        const removed = new Set((await getAllRemovedMembers()).map((r) => r.id));
+        const loadedRaw = await familyRepo.getAllFamilyMembers();
+        // A row whose id the pod records as REMOVED is a resurrection (a concurrent
+        // delete/patch race — automergeRepository.ts) and never a member. Filtered BEFORE
+        // `normalizeRoles`, so a removed row can never be promoted or patched.
+        const loaded = loadedRaw.filter((m) => !removed.has(m.id));
+        if (loaded.length !== loadedRaw.length) {
+          logEvent({
+            level: 'warn',
+            surface: 'family-roster',
+            message: 'removed_member_row_filtered',
+            context: {
+              action: 'removed_member_row_filtered',
+              count: loadedRaw.length - loaded.length,
+            },
+          });
         }
-      } else if (!members.value.some((m) => m.id === currentMemberId.value)) {
-        if (await applyResolution(await resolveSessionMember(members.value, removed))) return;
-        // An EMPTY roster is "the doc did not load", not "your member was removed" — the
-        // same reasoning `resolveSessionMember` uses to return `none` rather than reject.
-        // Nulling here anyway cost a signed-in non-owner `canEditActivities` and
-        // `canViewFinances` for the rest of the session on a recoverable error (#80
-        // review). Hold the id; the next successful load re-resolves it.
-        if (members.value.length === 0) return;
-        // Last resort. The old code fell back to the OWNER here, which silently promoted
-        // a member whose record had vanished (#80). This session now names nobody.
-        //
-        // There is deliberately no "reuse the previous id" fallback: `prevMemberId` is
-        // captured as `currentMemberId` and this branch is entered precisely BECAUSE that
-        // id is absent from the roster, so the check could only ever be false. The
-        // version that pretended otherwise read as a safety net and was dead code.
-        logEvent({
-          level: 'warn',
-          surface: 'session-integrity',
-          message: 'current_member_cleared',
-          context: { action: 'session_rejected', kind: 'member-vanished' },
-        });
-        currentMemberId.value = null;
-      }
-    });
+        const roster = await normalizeRoles(loaded);
+        // Resolve the session member BEFORE publishing the roster. Assigning members.value
+        // first left a tick where the roster existed but currentMemberId was still null,
+        // and usePermissions (which now refuses to read the session `role` once a roster
+        // exists) reported the owner as a non-owner for that tick — the Piggy Bank nav
+        // vanished and the canViewFinances true->false diagnostic fired on every boot.
+        const resolvedForRoster = currentMemberId.value
+          ? null
+          : await resolveSessionMember(roster, removed);
+        members.value = roster;
+        rosterFamilyId.value = readForFamilyId;
+        // With the roster and its family, never before: the removed-members watcher needs to
+        // know which family these removals belong to.
+        removedMemberIds.value = removed;
+        logDuplicateMembers(members.value);
+
+        // Restore currentMemberId: prefer authStore session, then previous value, then owner
+        if (!currentMemberId.value) {
+          const resolved =
+            resolvedForRoster ?? (await resolveSessionMember(members.value, removed));
+          if (await applyResolution(resolved)) return;
+          // No session member at all: the legitimate signup / pre-login bootstrap.
+          // NOT reachable after a rejection — `sessionRejected` stays true until a real
+          // sign-in, so a rejected session cannot be handed the owner's row on the next
+          // reload and read as owner again.
+          if (owner.value && !(await sessionWasRejected())) {
+            currentMemberId.value = owner.value.id;
+          }
+        } else if (!members.value.some((m) => m.id === currentMemberId.value)) {
+          if (await applyResolution(await resolveSessionMember(members.value, removed))) return;
+          // An EMPTY roster is "the doc did not load", not "your member was removed" — the
+          // same reasoning `resolveSessionMember` uses to return `none` rather than reject.
+          // Nulling here anyway cost a signed-in non-owner `canEditActivities` and
+          // `canViewFinances` for the rest of the session on a recoverable error (#80
+          // review). Hold the id; the next successful load re-resolves it.
+          if (members.value.length === 0) return;
+          // Last resort. The old code fell back to the OWNER here, which silently promoted
+          // a member whose record had vanished (#80). This session now names nobody.
+          //
+          // There is deliberately no "reuse the previous id" fallback: `prevMemberId` is
+          // captured as `currentMemberId` and this branch is entered precisely BECAUSE that
+          // id is absent from the roster, so the check could only ever be false. The
+          // version that pretended otherwise read as a safety net and was dead code.
+          logEvent({
+            level: 'warn',
+            surface: 'session-integrity',
+            message: 'current_member_cleared',
+            context: { action: 'session_rejected', kind: 'member-vanished' },
+          });
+          currentMemberId.value = null;
+        }
+      });
+    } finally {
+      settleRosterLoad();
+    }
   }
 
   /**
@@ -1202,6 +1276,7 @@ export const useFamilyStore = defineStore('family', () => {
     members.value = [];
     removedMemberIds.value = new Set();
     rosterFamilyId.value = null;
+    rosterLoadSettled.value = false;
     currentMemberId.value = null;
     isLoading.value = false;
     error.value = null;
@@ -1211,6 +1286,7 @@ export const useFamilyStore = defineStore('family', () => {
     // State
     members,
     rosterFamilyId,
+    rosterLoadSettled,
     currentMemberId,
     isLoading,
     error,
@@ -1226,6 +1302,7 @@ export const useFamilyStore = defineStore('family', () => {
     hasPets,
     initialsById,
     // Actions
+    settleRosterLoad,
     loadMembers,
     createMember,
     createMemberWithId,

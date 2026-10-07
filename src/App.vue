@@ -783,6 +783,10 @@ async function loadFamilyData() {
     throw e;
   } finally {
     if (!handedOff) endOpen(outcome, openToken);
+    // Path-1b failures return without any store load, so the boot settles the roster here
+    // (#85). Intentionally unconditional: it also runs on success and hand-off, both
+    // harmless. Do not guard it on `outcome`/`handedOff`; see `settleRosterLoad()`.
+    familyStore.settleRosterLoad();
   }
 }
 
