@@ -1784,6 +1784,8 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'saveStatus.reassuranceDegradedOwner': '你最近的更改已安全保存在此设备上，下次保存成功后会同步。',
   'saveStatus.reassuranceDegradedMember':
     '你的更改在此设备上是安全的。如果问题持续，请告诉家庭所有者。',
+  'saveStatus.reassuranceDegradedRecovery':
+    '你的更改在此设备上是安全的。请在"家庭数据"中重新连接，继续之前的工作。',
 
   // Transactions (additional)
   'transactions.showing': '显示：',
@@ -1924,6 +1926,8 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'settings.createOrLoadDataFile': '完成加密数据文件的设置，或加载已有文件。',
   'settings.resumeSetup': '继续设置',
   'settings.loadExistingDataFile': '加载已有的家庭数据文件',
+  'settings.reconnectNoFamily':
+    '此设备已不记得要重新连接哪个家庭。请改用"加载已有的家庭数据文件"。',
   'settings.reconnectAndReload': '重新连接并刷新我的数据',
   'settings.dataReconnecting': '正在重新连接你的数据…',
   'settings.dataReconnectingDesc': '正在重新连接你的家庭数据文件。你的数据很安全。',

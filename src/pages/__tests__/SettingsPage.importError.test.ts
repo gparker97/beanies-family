@@ -15,6 +15,7 @@
  * kind. A test against the configured state alone would pass over the half that
  * matters most.
  */
+import { ref } from 'vue';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount, flushPromises } from '@vue/test-utils';
 import { setActivePinia, createPinia } from 'pinia';
@@ -41,10 +42,12 @@ vi.mock('@/composables/useReauth', () => ({
 }));
 vi.mock('@/services/automerge/projection', () => ({ list: () => [], getSettings: () => ({}) }));
 vi.mock('@/services/analytics/plausible', () => ({ track: vi.fn() }));
-// The Family Data drawer is gated on `canManagePod`; without it nothing under
+// The Family Data drawer is gated on `familyDataReachable` (`useFamilyDataAccess` =
+// `canManagePod || recoveryNeeded`); the real `usePodRecovery` sees an unlatched store
+// here, so `recoveryNeeded` is false and the gate collapses to this mock. Without it nothing under
 // test renders at all.
 vi.mock('@/composables/usePermissions', () => ({
-  usePermissions: () => ({ canManagePod: true, isOwner: true }),
+  usePermissions: () => ({ canManagePod: ref(true), isOwner: ref(true) }),
 }));
 vi.mock('@/utils/errorReporter', () => ({ reportError: vi.fn() }));
 vi.mock('@/services/indexeddb/database', () => ({ deleteFamilyDatabase: vi.fn(async () => {}) }));

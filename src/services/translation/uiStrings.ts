@@ -3279,6 +3279,11 @@ const STRING_DEFS = {
     en: 'Your changes are safe on this device. If it keeps up, let your family owner know.',
     beanie: 'your changes are safe on this device. if it keeps up, let your family owner know.',
   },
+  'saveStatus.reassuranceDegradedRecovery': {
+    en: 'Your changes are safe on this device. Reconnect from Family Data to pick up where you left off.',
+    beanie:
+      'your changes are safe on this device. reconnect from family data to pick up where you left off.',
+  },
 
   // Transactions (additional)
   'transactions.showing': { en: 'Showing:', beanie: 'showing:' },
@@ -3541,6 +3546,11 @@ const STRING_DEFS = {
   'settings.loadExistingDataFile': {
     en: 'Load Existing Family Data File',
     beanie: 'load existing family data file',
+  },
+  'settings.reconnectNoFamily': {
+    en: 'This device no longer remembers which family to reconnect. Use Load Existing Family Data File instead.',
+    beanie:
+      'this device no longer remembers which family to reconnect. use load existing family data file instead.',
   },
   'settings.reconnectAndReload': {
     en: 'Reconnect and Reload My Data',

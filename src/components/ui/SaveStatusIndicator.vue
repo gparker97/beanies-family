@@ -6,7 +6,10 @@
  * (soft-green), "Saving…" (Sky-Silk pulse), or "Having trouble saving"
  * (Heritage Orange — never Alert Red). Tapping opens a small popover with the
  * connection + last-saved detail; a single recovery action deep-links to the
- * Family Data modal, shown ONLY to users who can manage the pod.
+ * Family Data modal, shown to users who can manage the pod, or to anyone when the
+ * pod is degraded and the roster is empty (recovery needs no role; see
+ * `usePodRecovery`). The reassurance copy follows the same gate, so the popover
+ * never pairs "member" copy with the owner-style recovery button.
  *
  * Presentation-only: it owns NO telemetry (the single save-status transition
  * log lives in syncStore, which is why two mounted instances — desktop +
@@ -16,7 +19,7 @@
 import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useEscapeClose } from '@/composables/useEscapeClose';
-import { usePermissions } from '@/composables/usePermissions';
+import { useFamilyDataAccess } from '@/composables/useFamilyDataAccess';
 import { useSyncStore } from '@/stores/syncStore';
 import { useRouter } from 'vue-router';
 import CloudProviderBadge from '@/components/ui/CloudProviderBadge.vue';
@@ -26,7 +29,7 @@ import { formatRelativeTime } from '@/utils/date';
 import { fillTemplate } from '@/utils/fillTemplate';
 
 const { t, currentLanguage } = useTranslation();
-const { canManagePod } = usePermissions();
+const { canManagePod, recoveryNeeded, familyDataReachable } = useFamilyDataAccess();
 const syncStore = useSyncStore();
 const router = useRouter();
 
@@ -72,9 +75,12 @@ const isQueued = computed(() => syncStore.saveStatus === 'queued');
 const reassuranceKey = computed(() => {
   if (isQueued.value) return 'saveStatus.reassuranceQueued';
   if (!isDegraded.value) return 'saveStatus.reassuranceOk';
-  return canManagePod.value
-    ? 'saveStatus.reassuranceDegradedOwner'
-    : 'saveStatus.reassuranceDegradedMember';
+  // Three populations: a manager can land the save; a device whose pod settled on an
+  // empty roster can only reconnect (role unknown, so neither the owner nor the member
+  // copy is honest); everyone else is told to involve the owner.
+  if (canManagePod.value) return 'saveStatus.reassuranceDegradedOwner';
+  if (recoveryNeeded.value) return 'saveStatus.reassuranceDegradedRecovery';
+  return 'saveStatus.reassuranceDegradedMember';
 });
 
 // ── Open / position (shared teleport + getBoundingClientRect + drop-up +
@@ -242,7 +248,7 @@ onUnmounted(() => {
         </p>
 
         <button
-          v-if="canManagePod"
+          v-if="familyDataReachable"
           type="button"
           class="font-outfit mt-2.5 w-full rounded-xl bg-[#F15D22] px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#D14D1A]"
           @click="openFamilyData"

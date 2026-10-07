@@ -58,7 +58,7 @@ import { logEvent } from '@/services/telemetry';
 import type { StorageProviderType } from '@/services/sync/storageProvider';
 import { useGoogleReconnect, reconnectSucceeded } from '@/composables/useGoogleReconnect';
 import { classifyDriveFailure } from '@/utils/podAccess';
-import { usePermissions } from '@/composables/usePermissions';
+import { useFamilyDataAccess } from '@/composables/useFamilyDataAccess';
 import { usePWA } from '@/composables/usePWA';
 import { useCurrencyOptions } from '@/composables/useCurrencyOptions';
 import { useCountryOptions } from '@/composables/useCountryOptions';
@@ -121,7 +121,9 @@ const { t } = useTranslation();
 const fullVersionLabel = getFullVersionLabel();
 const deploymentBadge = computed(() => getDeploymentBadge());
 const { canInstall, isInstalled, installApp } = usePWA();
-const { canManagePod, isOwner } = usePermissions();
+// `familyDataReachable` gates the Family Data card + modal: whoever can manage the pod,
+// plus anyone whose pod settled on an empty roster (recovery needs no role, #85).
+const { canManagePod, isOwner, familyDataReachable } = useFamilyDataAccess();
 
 // Dev-only Feature Flags card (issue #31). Loaded via a DEV-gated dynamic import
 // so the card AND its write transport are dead-code-eliminated from the prod
@@ -558,7 +560,23 @@ async function handleResumeSetup() {
  */
 async function handleDriveReconnect() {
   const familyId = useFamilyContextStore().activeFamilyId;
-  if (!familyId) return;
+  if (!familyId) {
+    console.warn(
+      '[SettingsPage] reconnect refused: no active family id (Family Data card shown by ' +
+        'recoveryNeeded while familyContextStore.activeFamilyId is null; check familyContext hydration)'
+    );
+    logEvent({
+      level: 'warn',
+      surface: 'settings-drive-reconnect',
+      message: 'reconnect refused: no active family',
+      context: { action: 'unconfigured-card', error_code: 'no-family-id' },
+    });
+    // A user action failed: say so, and point at the action that still works.
+    showToast('warning', t('settings.reconnectNoFamily'), undefined, {
+      surface: 'settings-drive-reconnect',
+    });
+    return;
+  }
   logEvent({
     level: 'info',
     surface: 'settings-drive-reconnect',
@@ -1186,9 +1204,11 @@ async function handleDecryptFile(password: string) {
  *
  * ⚠️ A TOAST, NOT ONLY `importError`, AND THAT IS THE WHOLE POINT OF THIS
  * FUNCTION. `importError`'s two render sites live inside the Family Data drawer,
- * which is `v-if="canManagePod"` — and `canManagePod` is FALSE in exactly the
- * case that brings us here: no member could be bound, so the roster load rejected
- * the session and the drawer unmounted underneath us. Writing only there would
+ * which is `v-if="familyDataReachable"` (`canManagePod || recoveryNeeded`) — and
+ * both are FALSE in exactly the case that brings us here: no member could be bound,
+ * so the roster load rejected the session (`canManagePod` false), and the decrypted
+ * file's roster IS loaded (`recoveryNeeded` false, it only covers an empty roster),
+ * so the drawer still unmounts underneath us. Writing only there would
  * have relocated the "refusal with no render site" defect this whole change set
  * exists to remove, rather than fixing it. `importError` is still set, because it
  * is the durable carrier on the paths where the section IS still mounted; the
@@ -1913,7 +1933,7 @@ async function handleDeleteFamilyClick() {
         @click="showDataManagement = true"
       />
       <SettingsCard
-        v-if="canManagePod"
+        v-if="familyDataReachable"
         icon="💾"
         :title="t('settings.card.familyData')"
         :description="t('settings.card.familyDataDesc')"
@@ -2482,7 +2502,7 @@ async function handleDeleteFamilyClick() {
 
     <!-- ── Family Data Modal ───────────────────────────────────────────── -->
     <BeanieFormModal
-      v-if="canManagePod"
+      v-if="familyDataReachable"
       variant="drawer"
       :open="showFamilyData"
       :title="t('settings.familyDataOptions')"
@@ -2555,7 +2575,10 @@ async function handleDeleteFamilyClick() {
             </BaseButton>
           </div>
 
-          <div v-else>
+          <!-- Management: never for a recovery-only viewer (#85). `familyDataReachable`
+               lets anyone in while the pod is degraded, so this branch re-checks the role
+               rather than trusting the status alone. -->
+          <div v-else-if="canManagePod">
             <!-- My Family's Data -->
             <div
               class="dark:border-line flex items-center justify-between border-b border-gray-200 py-3"
