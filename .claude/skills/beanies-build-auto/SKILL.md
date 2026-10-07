@@ -41,7 +41,7 @@ branch; shipping is a separate, deliberate act with its own decision gate.
 ## Run to completion
 
 Invoking this skill IS the approval. It authorises the whole sequence — implement, validate,
-infra, browser, review, fix, decide on a second review, report — so **do not stop between phases
+infra, browser, review, fix, decide on a second review, report, hand the tracker row to testing — so **do not stop between phases
 to ask whether to continue.** greg invoked it precisely so he does not have to sit there saying
 "yes, carry on" eight times.
 
@@ -363,6 +363,35 @@ actionable, "join from a second device in a private window; you should land on t
 prompt" is. And **report failures plainly.** If something does not work, say so with the output. A report
 that overstates what was verified is worse than no report, because it retires the question in greg's head.
 
+### Phase 9: Hand the tracker row to testing
+
+The report in Phase 8 is for greg; the tracker row is for the next session, the laptop, and the
+on-device test that closes the issue. Without this step the row stays at `In Progress` forever, because
+`beanies-pre-plan` only ever moves it there and nothing else in the chain touches it (found 2026-10-07,
+when #125 was built, reviewed and committed and the row still said In Progress).
+
+**Trigger:** the plan carries a Notion tracker id. The pre-plan prompt names it in its `Title:` line
+(`(Notion #125)`) and the plan header's `Related issues`. No id, no tracker row, skip this phase silently.
+
+**Action, on the `mcp__notion-beanies__*` integration** (the ids, the Status vocabulary and the
+`API-patch-page` / `API-patch-block-children` contract are in `beanies-pre-plan`'s binding block; do not
+restate them here):
+
+1. Resolve the row by its `ID` with `API-query-data-source` (the pre-plan way).
+2. `API-patch-page`: **Status -> `Ready for Testing`.** That is the ceiling. `Done` is greg's, after the
+   on-device test.
+3. `API-patch-block-children` on the page id: append ONE paragraph, the Phase 8 report compressed. It
+   carries: the plan path; infra applied or not (and what); commit SHAs, or "uncommitted on the working
+   tree" when nothing was committed; what was verified and how (browser, direct checks, tests); review
+   rounds with finding counts and what was deliberately not fixed; follow-ups recorded; and the
+   needs-your-hands list verbatim. Append a block, never a comment: `API-create-a-comment` fails on this
+   integration (`missing_version`).
+4. Say in one line that the row moved, with the ID. A failed patch is reported with the exact Status and
+   text so greg can set them by hand; it never blocks the report.
+
+If the build stopped short (a blocker, a showstopper, scope left out), the row does NOT move. It stays
+`In Progress` and the appended paragraph says what was built, what was not, and why.
+
 ---
 
 ## What this skill does not do
@@ -371,7 +400,9 @@ that overstates what was verified is worse than no report, because it retires th
   decision gate for release notes and version floors. Offer the handoff; never take it.
 - **It does not commit or push** unless asked. The deploy skills commit as part of their flow, and an
   auto-commit here would pre-empt their decision gate. Report the diff and leave it.
-- **It does not update the tracker or Notion.** `beanies-pre-plan` owns the row's state.
+- **It does not update the tracker or Notion, except the Phase 9 hand-off.** `beanies-pre-plan` owns the
+  row up to `In Progress`; this skill moves it to `Ready for Testing` with a build note once the build
+  is reviewed and verified, and never to `Done`.
 - **It does not write the plan itself.** `beanies-plan` does, with its four passes intact.
 
 ---
@@ -413,6 +444,8 @@ that overstates what was verified is worse than no report, because it retires th
   next action.
 - **When patches stop converging, go structural.** Three rounds in the same area means the decision belongs
   on the type or in the owning layer, not in more call sites.
+- **Close with the tracker hand-off.** A plan with a Notion id ends at `Ready for Testing` plus a build
+  note on the row (Phase 9). A build that stopped short leaves the row at `In Progress` and says why.
 - **Never deploy from this skill**, and never suggest it as the automatic next step. Reviewed code and shipped
   code are different states, and the gap between them is greg's to close.
 - **Report honestly, including what you skipped.** Scaling the work down is greg's call, not yours — so if
