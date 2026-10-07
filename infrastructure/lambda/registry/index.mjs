@@ -924,6 +924,110 @@ async function putOnce({ event, familyId, tableName, body, now, today, noteSync 
   };
 }
 
+/**
+ * The DELETE arm: tombstone the row (see the comment inside). Moved out of `handler` as
+ * `handlePut` already is, so `handler` stays a dispatcher. Throws to the handler's catch (500),
+ * as before.
+ */
+async function handleDelete(event, familyId, tableName) {
+  // ─── TOMBSTONE, NOT A DROP (2026-09-09) ──────────────────────────────
+  //
+  // A hard delete lost `createdAt`, `ownerMemberId`, `ownerEmail`, `country`
+  // and `signupPlatform` irrecoverably, and the next write from ANY member
+  // device recreated the row from scratch with that member stamped as the
+  // owner. That is how greg's pod reported an owner it never had. See
+  // docs/investigations/2026-09-08-compaction-fallout.md items 3 + 8.
+  //
+  // Keeping the identity attributes makes that loss structurally impossible:
+  // a re-registration restores the row the family had rather than inventing
+  // a new one. The client-side fix (a per-device action no longer issues a
+  // DELETE at all) closes the door that was actually used; this closes the
+  // room, because the investigation could not fully identify the trigger and
+  // defence in depth is the whole design here.
+  const { Item: existingRaw } = await client.send(
+    new GetItemCommand({
+      TableName: tableName,
+      Key: marshall({ familyId }),
+      ConsistentRead: true,
+    })
+  );
+  const existing = existingRaw ? unmarshall(existingRaw) : null;
+
+  // Nothing to tombstone. Writing a bare `deletedAt` row for a family that
+  // never registered would manufacture junk every reader then has to filter,
+  // so report the same idempotent success the hard delete gave.
+  if (!existing) return response(200, { success: true }, event);
+
+  // ─── DELETE ladder, step 1 of 2: MEASURE, DO NOT ENFORCE ─────────────
+  //
+  // NOT AUTHORIZATION, and it must not later be mistaken for it. The API key
+  // ships inside the client bundle, so a curl gets the same answer here that
+  // the app does — exactly as the pointer guard above already concedes. This
+  // defends a family against the APP'S OWN BUGS, which is the failure that
+  // actually happened, and against nothing else.
+  //
+  // The delete still proceeds. This warn IS the measurement that decides when
+  // the 403 can ship: every client deployed before the writer id goes on the
+  // wire sends none at all and would be refused on day one, including the
+  // Playwright teardown hook. Enforce only once this line is quiet for real
+  // families for a full release cycle.
+  const writerMemberId = event.queryStringParameters?.writerMemberId;
+  const writerValid = typeof writerMemberId === 'string' && UUID_RE.test(writerMemberId);
+  const deleteAuthorized =
+    writerValid && !!existing.ownerMemberId && writerMemberId === existing.ownerMemberId;
+
+  if (!deleteAuthorized) {
+    // Id TAILS only — never a full member id in CloudWatch, matching the
+    // masking the pointer-refusal warn above already uses.
+    console.warn(
+      '[registry] delete would be refused',
+      familyId,
+      writerValid ? String(writerMemberId).slice(-6) : 'no-writer-id',
+      String(existing.ownerMemberId ?? '').slice(-6) || 'no-owner'
+    );
+  }
+
+  const deletedNow = new Date().toISOString();
+  await client.send(
+    new PutItemCommand({
+      TableName: tableName,
+      Item: marshall(
+        {
+          familyId,
+          // Identity and provenance survive so a restore is a restore.
+          createdAt: existing.createdAt ?? null,
+          ownerMemberId: existing.ownerMemberId ?? null,
+          ownerEmail: existing.ownerEmail ?? null,
+          // The drift-handover lock (owner.mjs) survives a delete, so a restored family
+          // cannot have its ownership handed back by a stale roster either.
+          ownerHandoverAt: existing.ownerHandoverAt ?? null,
+          country: existing.country ?? null,
+          signupPlatform: existing.signupPlatform ?? null,
+          // Campaign provenance (#118): identifies the ad, not the family, and a
+          // restore must not lose which ad created the pod.
+          attribution: existing.attribution ?? null,
+          // The survey answer and the scorer's inferred ad (#121): provenance of the same
+          // kind, so a restore keeps them too.
+          heardVia: existing.heardVia ?? null,
+          attributionInferred: existing.attributionInferred ?? null,
+          // Everything else is deliberately DROPPED, and the omissions are
+          // decisions: the canonical pointer (a stale pointer is worse than
+          // none), the activity signals and roster size (they would keep a
+          // deleted family alive in the metrics), and `familyName` +
+          // `subscribeNewsletter` (family content and a marketing consent —
+          // the user asked for this family to be gone).
+          deletedAt: deletedNow,
+          // Ops hygiene: every other row carries one, and a tombstone with
+          // no `updatedAt` is invisible to a "what changed recently" scan.
+          updatedAt: deletedNow,
+        },
+        { removeUndefinedValues: true }
+      ),
+    })
+  );
+  return response(200, { success: true }, event);
+}
+
 export async function handler(event) {
   // The keyless marketing-events beacon (#121) has no API key and no familyId, so it branches
   // BEFORE both checks below. Every other route keeps the key + UUID gate.
@@ -984,104 +1088,7 @@ export async function handler(event) {
 
     if (method === 'PUT') return await handlePut(event, familyId, tableName);
 
-    if (method === 'DELETE') {
-      // ─── TOMBSTONE, NOT A DROP (2026-09-09) ──────────────────────────────
-      //
-      // A hard delete lost `createdAt`, `ownerMemberId`, `ownerEmail`, `country`
-      // and `signupPlatform` irrecoverably, and the next write from ANY member
-      // device recreated the row from scratch with that member stamped as the
-      // owner. That is how greg's pod reported an owner it never had. See
-      // docs/investigations/2026-09-08-compaction-fallout.md items 3 + 8.
-      //
-      // Keeping the identity attributes makes that loss structurally impossible:
-      // a re-registration restores the row the family had rather than inventing
-      // a new one. The client-side fix (a per-device action no longer issues a
-      // DELETE at all) closes the door that was actually used; this closes the
-      // room, because the investigation could not fully identify the trigger and
-      // defence in depth is the whole design here.
-      const { Item: existingRaw } = await client.send(
-        new GetItemCommand({
-          TableName: tableName,
-          Key: marshall({ familyId }),
-          ConsistentRead: true,
-        })
-      );
-      const existing = existingRaw ? unmarshall(existingRaw) : null;
-
-      // Nothing to tombstone. Writing a bare `deletedAt` row for a family that
-      // never registered would manufacture junk every reader then has to filter,
-      // so report the same idempotent success the hard delete gave.
-      if (!existing) return response(200, { success: true }, event);
-
-      // ─── DELETE ladder, step 1 of 2: MEASURE, DO NOT ENFORCE ─────────────
-      //
-      // NOT AUTHORIZATION, and it must not later be mistaken for it. The API key
-      // ships inside the client bundle, so a curl gets the same answer here that
-      // the app does — exactly as the pointer guard above already concedes. This
-      // defends a family against the APP'S OWN BUGS, which is the failure that
-      // actually happened, and against nothing else.
-      //
-      // The delete still proceeds. This warn IS the measurement that decides when
-      // the 403 can ship: every client deployed before the writer id goes on the
-      // wire sends none at all and would be refused on day one, including the
-      // Playwright teardown hook. Enforce only once this line is quiet for real
-      // families for a full release cycle.
-      const writerMemberId = event.queryStringParameters?.writerMemberId;
-      const writerValid = typeof writerMemberId === 'string' && UUID_RE.test(writerMemberId);
-      const deleteAuthorized =
-        writerValid && !!existing.ownerMemberId && writerMemberId === existing.ownerMemberId;
-
-      if (!deleteAuthorized) {
-        // Id TAILS only — never a full member id in CloudWatch, matching the
-        // masking the pointer-refusal warn above already uses.
-        console.warn(
-          '[registry] delete would be refused',
-          familyId,
-          writerValid ? String(writerMemberId).slice(-6) : 'no-writer-id',
-          String(existing.ownerMemberId ?? '').slice(-6) || 'no-owner'
-        );
-      }
-
-      const deletedNow = new Date().toISOString();
-      await client.send(
-        new PutItemCommand({
-          TableName: tableName,
-          Item: marshall(
-            {
-              familyId,
-              // Identity and provenance survive so a restore is a restore.
-              createdAt: existing.createdAt ?? null,
-              ownerMemberId: existing.ownerMemberId ?? null,
-              ownerEmail: existing.ownerEmail ?? null,
-              // The drift-handover lock (owner.mjs) survives a delete, so a restored family
-              // cannot have its ownership handed back by a stale roster either.
-              ownerHandoverAt: existing.ownerHandoverAt ?? null,
-              country: existing.country ?? null,
-              signupPlatform: existing.signupPlatform ?? null,
-              // Campaign provenance (#118): identifies the ad, not the family, and a
-              // restore must not lose which ad created the pod.
-              attribution: existing.attribution ?? null,
-              // The survey answer and the scorer's inferred ad (#121): provenance of the same
-              // kind, so a restore keeps them too.
-              heardVia: existing.heardVia ?? null,
-              attributionInferred: existing.attributionInferred ?? null,
-              // Everything else is deliberately DROPPED, and the omissions are
-              // decisions: the canonical pointer (a stale pointer is worse than
-              // none), the activity signals and roster size (they would keep a
-              // deleted family alive in the metrics), and `familyName` +
-              // `subscribeNewsletter` (family content and a marketing consent —
-              // the user asked for this family to be gone).
-              deletedAt: deletedNow,
-              // Ops hygiene: every other row carries one, and a tombstone with
-              // no `updatedAt` is invisible to a "what changed recently" scan.
-              updatedAt: deletedNow,
-            },
-            { removeUndefinedValues: true }
-          ),
-        })
-      );
-      return response(200, { success: true }, event);
-    }
+    if (method === 'DELETE') return await handleDelete(event, familyId, tableName);
 
     return response(405, { error: 'Method not allowed' }, event);
   } catch (err) {
