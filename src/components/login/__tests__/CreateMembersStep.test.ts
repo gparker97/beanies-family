@@ -45,6 +45,12 @@ vi.mock('@/stores/familyStore', () => ({
   }),
 }));
 
+// The heading names the family (#128). Mutable per test, reset in beforeEach.
+const familyContext: { activeFamilyName: string | null } = { activeFamilyName: null };
+vi.mock('@/stores/familyContextStore', () => ({
+  useFamilyContextStore: () => familyContext,
+}));
+
 /** Drive the real add-member form to add one member by name. */
 async function addMember(wrapper: VueWrapper, name: string): Promise<void> {
   const addAdult = wrapper.findAll('button').find((b) => b.text().includes('loginV6.addAnAdult'));
@@ -60,6 +66,13 @@ async function addMember(wrapper: VueWrapper, name: string): Promise<void> {
   await flushPromises();
 }
 
+/** The exit as a component, so its `variant` prop can be asserted. */
+function findExit(wrapper: VueWrapper) {
+  return wrapper
+    .findAllComponents({ name: 'BaseButton' })
+    .find((b) => b.attributes('data-testid') === 'members-exit');
+}
+
 describe('CreateMembersStep', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
@@ -68,6 +81,7 @@ describe('CreateMembersStep', () => {
     vi.resetAllMocks();
     mockDeleteMember.mockResolvedValue(true);
     owner.ageGroup = 'adult';
+    familyContext.activeFamilyName = null;
   });
 
   it('renders the owner card with the "you" badge', () => {
@@ -83,13 +97,49 @@ describe('CreateMembersStep', () => {
     expect(wrapper.text()).not.toContain('loginV6.parentBean');
   });
 
-  it("emits 'finish' when the Finish CTA is clicked", async () => {
+  it("emits 'finish' from the exit button, labelled \"I'll do this later\" with nobody added", async () => {
     const wrapper = mount(CreateMembersStep);
-    // Finish is the last BaseButton, visible while the add-member form is closed.
-    const buttons = wrapper.findAllComponents({ name: 'BaseButton' });
-    const finishBtn = buttons[buttons.length - 1];
-    await finishBtn!.trigger('click');
+    const exit = wrapper.find('[data-testid="members-exit"]');
+    expect(exit.text()).toBe('setup.addLater');
+    await exit.trigger('click');
     expect(wrapper.emitted('finish')).toHaveLength(1);
+  });
+
+  it('names the family in the heading, and falls back to the generic title without one', () => {
+    familyContext.activeFamilyName = 'The Parker family';
+    // The mocked t() returns the key, so the template's {family} token is what gets filled.
+    expect(mount(CreateMembersStep).find('h2').text()).toBe('setup.whoIsInFamily');
+    familyContext.activeFamilyName = null;
+    expect(mount(CreateMembersStep).find('h2').text()).toBe('loginV6.addBeansTitle');
+  });
+
+  it('offers the exit while the add form is open, as a ghost, and leaving discards the form', async () => {
+    const wrapper = mount(CreateMembersStep);
+    const addAdult = wrapper.findAll('button').find((b) => b.text().includes('loginV6.addAnAdult'));
+    await addAdult!.trigger('click');
+    await wrapper.find('input[type="text"], input:not([type])').setValue('Half Typed');
+
+    const exit = findExit(wrapper)!;
+    expect(exit.props('variant')).toBe('ghost');
+    expect(exit.text()).toBe('setup.addLater');
+    await exit.trigger('click');
+    expect(wrapper.emitted('finish')).toHaveLength(1);
+    expect(mockCreateMember).not.toHaveBeenCalled();
+  });
+
+  it('relabels the exit "Finish" once a member has been added', async () => {
+    mockCreateMember.mockResolvedValueOnce({
+      id: 'm-2',
+      name: 'Jane',
+      color: '#AED6F1',
+      ageGroup: 'adult',
+      role: 'member',
+    });
+    const wrapper = mount(CreateMembersStep);
+    await addMember(wrapper, 'Jane');
+    const exit = findExit(wrapper)!;
+    expect(exit.text()).toBe('loginV6.finish');
+    expect(exit.props('variant')).toBe('primary');
   });
 
   it('reports to telemetry (not just a toast) when createMember fails', async () => {

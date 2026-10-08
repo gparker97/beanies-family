@@ -26,7 +26,7 @@ import {
   realEmail,
   resolveOwnerFields,
 } from './owner.mjs';
-import { SCORING, scoreFamily, wantsCreateInference } from './inference.mjs';
+import { SCORING, applyHeardVia, scoreFamily, wantsCreateInference } from './inference.mjs';
 import { countryForTimeZone } from './timeZoneCountry.mjs';
 
 const client = new DynamoDBClient({});
@@ -61,7 +61,17 @@ const DEV_ORIGINS = new Set(
  * in practice only allowlisted origins ever reach the Lambda body.
  */
 function tableForOrigin(origin, { dev, prod }) {
-  return origin && DEV_ORIGINS.has(origin) ? dev : prod;
+  return tableLabel(origin) === 'dev' ? dev : prod;
+}
+
+/**
+ * Which table pair a request's Origin selects, as a log field (#128): `'dev'` for a localhost
+ * origin, `'prod'` otherwise. The one statement of the split, so a log line can never name a
+ * different table from the one `tableForOrigin` wrote to, and a CloudWatch filter on
+ * `table = "prod"` drops local test runs from the funnel.
+ */
+function tableLabel(origin) {
+  return origin && DEV_ORIGINS.has(origin) ? 'dev' : 'prod';
 }
 
 function getHeaders(event) {
@@ -212,6 +222,30 @@ function validHeardVia(value, familyId) {
 }
 
 /**
+ * The create-attempt id (#128): the random UUID the client mints when the person taps Create, so
+ * one attempt's firehose events join to its registry row. Client-supplied AND write-once
+ * (stamped by the step-1 write, or by the pod-creation write on a row without one), so it is
+ * validated here.
+ *
+ * Omitted / null is the normal case (every client older than #128, and a create with no open
+ * attempt) and logs nothing; anything else that is not a UUID logs one `create_attempt_id_dropped`
+ * line (hash only, never the rejected value) and stores null.
+ */
+function validAttemptId(value, familyId) {
+  if (value === undefined || value === null) return null;
+  if (typeof value === 'string' && UUID_RE.test(value)) return value;
+  // eslint-disable-next-line no-console -- structured drop line, read by CloudWatch
+  console.log(
+    JSON.stringify({
+      msg: 'create_attempt_id_dropped',
+      family_id_hash: familyIdHash(familyId),
+      reason: typeof value === 'string' ? 'not-uuid' : 'not-string',
+    })
+  );
+  return null;
+}
+
+/**
  * sha256 hex of a family id, for log lines. Deliberately the SAME function as
  * `ai-extract/ddb.mjs` `hash()`, so an `entitlement_computed` line joins against the usage table
  * and the metrics skill without a second derivation. (It cannot be imported: every Lambda here is
@@ -245,7 +279,10 @@ function buildSignupStartItem({ familyId, body, now, deviceCountry }) {
       typeof body.subscribeNewsletter === 'boolean' ? body.subscribeNewsletter : null,
     signupPlatform: validPlatform(body.signupPlatform),
     attribution: validAttribution(body.attribution, familyId),
-    // The survey comes later (resume setup); the pod-creation write stamps it (`null ?? x`).
+    // The attempt that started this signup (#128); the pod-creation write carries it forward.
+    createAttemptId: validAttemptId(body.createAttemptId, familyId),
+    // The survey comes later (after the pod is written, #128); the owner write that carries the
+    // answer stamps it (`null ?? x`).
     heardVia: null,
     attributionInferred: null,
     signupStartedAt: now,
@@ -937,15 +974,25 @@ async function putOnce({ event, familyId, tableName, body, now, today, noteSync 
     attribution:
       existing.attribution ??
       (body.isSignupEvent === true ? validAttribution(body.attribution, familyId) : null),
-    // Survey answer id (#121): the same two conditions as `attribution` above, for the same
-    // reasons. Validated only on a stampable write, so `heard_via_dropped` never fires for a
-    // login/background PUT.
-    heardVia:
-      existing.heardVia ??
-      (body.isSignupEvent === true ? validHeardVia(body.heardVia, familyId) : null),
-    // Inferred attribution (#121): written ONLY by the metrics skill's conditional
-    // `UpdateItem`. Never read from the body (a client cannot set or clear it); carried here
-    // because this whole-item PutItem would otherwise erase it on the next login.
+    // The create attempt (#128): the same two conditions as `attribution` above, for the same
+    // reasons (a member login PUT can never stamp it). A step-1 row already carries the id its
+    // own write stamped, and `existing.createAttemptId ??` keeps it; the pod-creation write
+    // stamps it only on a row that has none (an old step-1 row, or no step-1 row at all).
+    createAttemptId:
+      existing.createAttemptId ??
+      (body.isSignupEvent === true ? validAttemptId(body.createAttemptId, familyId) : null),
+    // Survey answer id (#121). Write-once like `attribution`, but stampable by ANY OWNER write,
+    // not only the signup one (#128): the survey now runs after the pod is written, so the answer
+    // arrives on the setup-completion write. An old client still sends it on the `isSignupEvent`
+    // write, which is an owner write, so that path stamps exactly as before. `isOwner`, not
+    // `pointerAccepted`: a member device echoing the pointer must never answer the owner's
+    // survey. `validHeardVia` logs nothing for an absent or null answer, so login PUTs stay
+    // quiet. A first stamp also rescales a stored inferred value (below the item).
+    heardVia: existing.heardVia ?? (isOwner ? validHeardVia(body.heardVia, familyId) : null),
+    // Inferred attribution (#121, #125). Never read from the body (a client cannot set or clear
+    // it); carried here because this whole-item PutItem would otherwise erase it on the next
+    // login. Three writers, none of them a client: `inferAtCreate` on the pod-creation write,
+    // the late `heardVia` rescale below (#128), and the metrics skill's batch reconcile.
     attributionInferred: existing.attributionInferred ?? null,
     // Country from the device time zone (#125): the same two conditions as `signupPlatform`
     // (never move a stamped value; only a signup write may stamp). A null stored at step 1
@@ -969,6 +1016,7 @@ async function putOnce({ event, familyId, tableName, body, now, today, noteSync 
       now,
     });
   }
+  const lateHeardViaStamped = stampHeardViaLate({ existing, item, body, familyId });
   // Conditioned on the owner version this round READ (see `handlePut`): a handover that landed
   // since then fails the write, and the round re-runs against the handed-over row instead of
   // writing the previous owner back.
@@ -993,9 +1041,16 @@ async function putOnce({ event, familyId, tableName, body, now, today, noteSync 
   // that predate this field treat its absence as accepted.
   // An `ownerSync` request also gets the stored `owner` after the write and the
   // outcome, so the client can tell applied from refused. A signup write (#125) also gets the
-  // stamped country and the inferred band + tag, for the creating client's Slack line only;
-  // every other PUT's response is unchanged.
-  const signupExtras = body.isSignupEvent === true ? signupResponseFields(item) : {};
+  // stamped country and the inferred band + tag, for the creating client's Slack line only.
+  // So does the setup-completion write (#128), which now posts the "created" Slack line: it says
+  // so with the transient `setupComplete` flag (never stored), honoured only from the OWNER so a
+  // member device cannot fish for ops data, and a late `heardVia` stamp counts too (a client that
+  // answers on any later owner write still gets the post-rescale band). The flag is what covers a
+  // skipped survey, where nothing is stamped. Every other PUT's response is unchanged.
+  const signupExtras =
+    body.isSignupEvent === true || lateHeardViaStamped || (isOwner && body.setupComplete === true)
+      ? signupResponseFields(item)
+      : {};
   return {
     res: response(
       200,
@@ -1033,6 +1088,7 @@ async function signupStartRound({ event, existingRaw, body, familyId, tableName,
         outcome,
         platform,
         has_country: deviceCountry !== null,
+        table: tableLabel(event.headers?.origin),
       })
     );
     return { res: response(200, { success: true, signupStart: outcome, ...extra }, event) };
@@ -1067,6 +1123,42 @@ async function signupStartRound({ event, existingRaw, body, familyId, tableName,
     throw err;
   }
   return answer('created', { deviceCountry }, deviceCountry);
+}
+
+/**
+ * The survey answer's first stamp (#128), applied to the item `putOnce` is about to write. When
+ * this write is the first to stamp `heardVia` and the row already holds an inferred attribution,
+ * that value was scored without the answer (the answer is write-once, so it was null then), and
+ * `applyHeardVia` rescales it with the scorer's own multiplier and bands (never an upgrade; null
+ * below the threshold, as the scorer stores nothing there).
+ *
+ * Returns true for a LATE stamp (a first stamp on a write that is not the pod-creation one),
+ * which `putOnce` answers with the signup response fields. An old client stamping on the
+ * `isSignupEvent` write gets false: its row has no inferred value yet (`inferAtCreate` scores it
+ * on that same write, with the answer already in the item), so nothing here changes for it.
+ *
+ * Logs one `heard_via_late_stamp` line per late stamp or rescale (hash and bands only, never the
+ * answer), so the rate of answers arriving after the pod is countable from the success path.
+ */
+function stampHeardViaLate({ existing, item, body, familyId }) {
+  if (existing.heardVia != null || item.heardVia == null) return false;
+  const late = body.isSignupEvent !== true;
+  const before = existing.attributionInferred ?? null;
+  if (before) {
+    item.attributionInferred = applyHeardVia(before, item.heardVia, before.fields?.utm_source);
+  }
+  if (late || before) {
+    // eslint-disable-next-line no-console -- structured late-stamp line, read by CloudWatch
+    console.log(
+      JSON.stringify({
+        msg: 'heard_via_late_stamp',
+        family_id_hash: familyIdHash(familyId),
+        band_before: before?.band ?? null,
+        band_after: item.attributionInferred?.band ?? null,
+      })
+    );
+  }
+  return late;
 }
 
 /**
@@ -1232,6 +1324,7 @@ async function handleDelete(event, familyId, tableName) {
         msg: 'registry_start_over',
         family_id_hash: familyIdHash(familyId),
         outcome,
+        table: tableLabel(event.headers?.origin),
       })
     );
 
@@ -1313,6 +1406,9 @@ async function handleDelete(event, familyId, tableName) {
           // `signupStartedAt` is what still marks a started-over row as never-finished.
           signupStartedAt: existing.signupStartedAt ?? null,
           deviceCountry: existing.deviceCountry ?? null,
+          // The create attempt (#128): a random id, not the family, and a started-over row is
+          // exactly the one whose firehose funnel needs joining back to it.
+          createAttemptId: existing.createAttemptId ?? null,
           // Everything else is deliberately DROPPED, and the omissions are
           // decisions: the canonical pointer (a stale pointer is worse than
           // none), the activity signals and roster size (they would keep a

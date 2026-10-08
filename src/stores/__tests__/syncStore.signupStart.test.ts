@@ -238,6 +238,20 @@ describe('registerSignupStart: the step-1 payload (one mode only)', () => {
     );
   });
 
+  it('carries the open create attempt id (#128), and none when no attempt is open', async () => {
+    const { setCreateAttempt } = await import('@/utils/createAttemptState');
+    setCreateAttempt({ id: 'attempt-uuid', startedAt: Date.now(), step: 'about-you' });
+    try {
+      await useSyncStore().registerSignupStart();
+      expect(registerFamily.mock.calls.at(-1)![1].createAttemptId).toBe('attempt-uuid');
+    } finally {
+      setCreateAttempt(null);
+    }
+
+    await useSyncStore().registerSignupStart();
+    expect(registerFamily.mock.calls.at(-1)![1].createAttemptId).toBeUndefined();
+  });
+
   it('an ordinary write sends signupStart false and no time zone', async () => {
     // A payload-shape test, not a gate test: the ambient PUT only goes out once a pod exists.
     auth.podCreated = true;

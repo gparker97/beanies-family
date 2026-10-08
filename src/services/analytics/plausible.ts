@@ -44,6 +44,9 @@ export const ANALYTICS_EVENTS = {
   member_joined: 'interactive',
   invite_request_click: 'interactive',
   create_pod_click: 'interactive',
+  // #128: once per pod, at setup completion (after the survey). `signup` stays the step-1
+  // event; this is the one that means "a pod exists".
+  pod_created: 'interactive',
   discord_join_click: 'interactive',
   family_deleted: 'interactive',
   install_nudge_dismissed: 'interactive',

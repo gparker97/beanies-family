@@ -13,10 +13,23 @@ import { REDIRECT_AUTH_CODE_KEY } from '@/services/google/googleAuth';
 import { CALENDAR_REDIRECT_CODE_KEY } from '@/services/calendar/calendarAuth';
 import { decodeRedirectState } from '@/services/google/redirectState';
 import { stashPickerSelection } from '@/services/google/pickerRedirect';
+import { classifyOAuthError } from '@/services/google/oauthError';
 import { reportError } from '@/utils/errorReporter';
 import { useTranslation } from '@/composables/useTranslation';
+import { setResumeReason } from '@/components/login/resumePaths';
+import { trackOnboardingStep } from '@/services/telemetry/onboardingAttempt';
 
 const { t } = useTranslation();
+
+/**
+ * Whether this callback closes the create flow's Drive-consent redirect (#128). Mode alone is
+ * not enough: the calendar connect redirect is also `mode: 'create'` (`calendarSyncStore`), and
+ * a calendar decline must neither stash the create flow's resume reason nor count as a Drive
+ * consent exit.
+ */
+function isCreateDriveGrant(d: ReturnType<typeof decodeRedirectState>): boolean {
+  return d?.mode === 'create' && d.grant === 'drive';
+}
 
 /** Stash the auth code under a grant-scoped key for the matching completion on the
  *  returnPath load (Drive → `completeRedirectAuth`, calendar → the calendar
@@ -35,7 +48,11 @@ function stashCode(code: string, key: string): boolean {
 onMounted(() => {
   const params = new URLSearchParams(window.location.search);
   const code = params.get('code');
-  const error = params.get('error');
+  // One rule with the native deep link (`classifyOAuthError`): only a BARE `access_denied` is a
+  // decline; a described one (a policy block) is forwarded as `access_denied: <description>`.
+  const classified = classifyOAuthError(params.get('error'), params.get('error_description'));
+  const error = classified?.message ?? null;
+  const bareDecline = classified?.kind === 'declined';
   const stateParam = params.get('state');
 
   if (window.opener) {
@@ -92,6 +109,10 @@ onMounted(() => {
     const codeKey =
       decoded.grant === 'calendar' ? CALENDAR_REDIRECT_CODE_KEY : REDIRECT_AUTH_CODE_KEY;
     if (stashCode(code, codeKey)) {
+      // The create funnel's web consent exit (#128): Google said yes. Recorded here because
+      // App.vue's settle returns a token, not a mode. The attempt was hydrated from localStorage
+      // at boot, and `logEvent` enqueues synchronously, so the event rides the unload beacon.
+      if (isCreateDriveGrant(decoded)) trackOnboardingStep('drive-consent', 'submitted');
       window.location.href = decoded.returnPath;
       return;
     }
@@ -146,7 +167,22 @@ onMounted(() => {
     }
     if (decoded?.returnPath) {
       // Every other mode: go back where they came from, without a parameter nobody reads.
-      // The decline itself is already recorded by the caller that started the redirect.
+      //
+      // ⚠️ THIS ARM IS THE RECORD of a declined web redirect (#128). The page that started the
+      // redirect has unloaded, so nobody else can log it or explain it. For the create flow's
+      // Drive grant: stash `drive-declined` so the resume screen names the decline instead of
+      // silently re-asking for everything, and close the funnel's `drive-consent` step. `error`
+      // is an attacker-controllable query parameter (and `redactContext` only truncates), so the
+      // firehose gets a closed set, never the raw value.
+      // ⚠️ ONLY A BARE `access_denied` IS A DECLINE (see `classifyOAuthError`). A policy block or
+      // any other OAuth error is not "Google needs a yes", so it stashes no reason: the declined
+      // screen's "try again" copy would tell the person to retry something they cannot fix.
+      if (isCreateDriveGrant(decoded)) {
+        if (bareDecline) setResumeReason('drive-declined');
+        trackOnboardingStep('drive-consent', 'back', {
+          error_code: bareDecline ? 'access_denied' : 'oauth-error',
+        });
+      }
       window.location.href = decoded.returnPath;
       return;
     }

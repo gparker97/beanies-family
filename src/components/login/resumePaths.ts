@@ -47,6 +47,16 @@ export const RESUME_SETUP = 'setup';
 export const RESUME_SETUP_PATH = `/welcome?resume=${RESUME_SETUP}`;
 
 /**
+ * Whether a raw `location.search` string is the create flow's resume-setup return
+ * (`?resume=setup`). For code that runs before the router has resolved the route — App.vue's
+ * boot catch uses it to attribute a failed redirect-auth exchange to the create funnel (#128),
+ * the create flow being the only owner of that return path.
+ */
+export function isResumeSetupSearch(search: string): boolean {
+  return new URLSearchParams(search).get('resume') === RESUME_SETUP;
+}
+
+/**
  * Whether a `route.query.resume` value puts LoginPage into a deliberate
  * podless recovery view — the resume-setup continuation OR the Drive-load
  * picker re-open (ADR-029). Used to exempt those surfaces from the
@@ -68,20 +78,35 @@ export function isPodlessRecoveryQuery(resume: unknown): boolean {
  * - `drive-consent` — the granular consent screen came back WITHOUT `drive.file`
  *   (the user unchecked file access). Without this, the user was silently routed
  *   with no explanation and retried blindly.
+ * - `drive-declined` — the person pressed Cancel/Back on Google's consent screen
+ *   (or Google returned another `error=`) during the create flow's WEB redirect.
+ *   Set by `OAuthCallbackPage`'s create-decline arm (#128).
+ *
+ * Both route `ResumePodSetup` to its `drive-declined` phase (an orange notice and
+ * one "Try again with Google" button), never to the red form-error box.
  *
  * sessionStorage-backed (survives the full-page OAuth redirect) rather than a
  * URL param, so it doesn't have to thread through the shared `RESUME_SETUP_PATH`
  * redirect. Best-effort: a storage failure just means no hint is shown.
  */
-export type ResumeSetupReason = 'drive-consent';
+export type ResumeSetupReason = 'drive-consent' | 'drive-declined';
+const RESUME_REASONS: ReadonlySet<string> = new Set<ResumeSetupReason>([
+  'drive-consent',
+  'drive-declined',
+]);
 const RESUME_REASON_KEY = 'beanies:resume-reason';
+
+function isResumeSetupReason(v: string | null): v is ResumeSetupReason {
+  return v !== null && RESUME_REASONS.has(v);
+}
 
 export function setResumeReason(reason: ResumeSetupReason): void {
   try {
     sessionStorage.setItem(RESUME_REASON_KEY, reason);
-  } catch {
+  } catch (e) {
     // sessionStorage unavailable (private mode / disabled) — the hint is
     // best-effort; the recovery screen still works without it.
+    console.warn('[resumePaths] sessionStorage write failed; resume reason not stashed', e);
   }
 }
 
@@ -108,8 +133,9 @@ export function consumeResumeReason(): ResumeSetupReason | null {
   try {
     const v = sessionStorage.getItem(RESUME_REASON_KEY);
     if (v) sessionStorage.removeItem(RESUME_REASON_KEY);
-    return v === 'drive-consent' ? 'drive-consent' : null;
-  } catch {
+    return isResumeSetupReason(v) ? v : null;
+  } catch (e) {
+    console.warn('[resumePaths] sessionStorage read failed; no resume reason', e);
     return null;
   }
 }

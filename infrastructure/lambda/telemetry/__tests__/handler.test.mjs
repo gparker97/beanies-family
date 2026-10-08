@@ -329,6 +329,7 @@ describe('Telemetry Lambda handler', () => {
         'consecutive_failures',
         'context_build_error',
         'count',
+        'create_attempt_id',
         'credential_source',
         'detail',
         'detail_field_count',

@@ -43,6 +43,7 @@ import {
   nativeOAuthTransport,
   nativeOAuthParams,
 } from '@/constants/nativeOAuth';
+import { classifyOAuthError } from '@/services/google/oauthError';
 
 /**
  * Exported because the system-browser Picker request must send THIS SCOPE ALONE. Google's onepick
@@ -444,11 +445,23 @@ export function isGoogleAuthConfigured(): boolean {
  *
  * Covers the `AbortError` shape (`showSaveFilePicker` cancellation) by name
  * and the GIS / popup-blocked message shapes by substring.
+ *
+ * `access_denied` is Google's OAuth error for Cancel/Back on the consent screen:
+ * a decision, not a fault (#128). Unmatched, it surfaced as the raw string
+ * "access_denied" and paged `#beanies-errors` as critical.
+ *
+ * ⚠️ ONLY THE BARE CODE IS A CANCEL, never a message that merely contains it. Google also
+ * answers `access_denied` for policy blocks (an admin-blocked third-party app, an unverified
+ * app's test-user restriction), and those carry an `error_description`. `OAuthCallbackPage`
+ * forwards that as `access_denied: <description>` (as `oauthProxy` does for token errors), so
+ * a substring match would file a block the person cannot fix by retrying as their own "never
+ * mind".
  */
 export function isUserCancellation(e: unknown): boolean {
   if ((e as { name?: string } | null)?.name === 'AbortError') return true;
   const msg = e instanceof Error ? e.message : String(e);
-  return /cancel|dismiss|popup_closed|user_cancel/i.test(msg);
+  if (/cancel|dismiss|popup_closed|user_cancel/i.test(msg)) return true;
+  return msg.trim().toLowerCase() === 'access_denied';
 }
 
 /**
@@ -3310,7 +3323,9 @@ async function completeNativeAuthRedirect(
   // custom scheme, so params must not be derived from it. Cannot throw.
   const params = nativeOAuthParams(url);
   const code = params.get('code');
-  const error = params.get('error');
+  // The bridge forwards Google's query string verbatim, so `error_description` arrives here as it
+  // does on the web callback page; the same rule classifies both (`classifyOAuthError`).
+  const oauthError = classifyOAuthError(params.get('error'), params.get('error_description'));
   const returnedState = params.get('state');
 
   logEvent({
@@ -3403,8 +3418,11 @@ async function completeNativeAuthRedirect(
     return { kind: 'completed', action: 'complete_picker' };
   }
 
-  // OAuth error on the redirect (most commonly access_denied = user declined
-  // consent): benign — clear pending state, no reportError.
+  // OAuth error on the redirect: clear pending state either way. A BARE access_denied (the person
+  // declined consent) is benign: an abandon, no reportError. Anything else (a DESCRIBED
+  // access_denied is a policy block, e.g. an admin-blocked app) is a real failure, NOT an abandon,
+  // so `connectStorage` does not record it as `cancelled` and the screen does not invite a retry
+  // that cannot work. Same rule as the web callback page (`classifyOAuthError`).
   //
   // ⚠️ MOVED BELOW THE CSRF CHECK (was above it). Two reasons. It let any installed app invoke
   // the custom scheme with `?error=x` during a live auth and force a session teardown without
@@ -3413,15 +3431,24 @@ async function completeNativeAuthRedirect(
   // stash before the state check. DELIBERATE DELTA: an error return that FAILS the check now
   // reports `native-oauth-state-mismatch` (severity 'error', which does not page) instead of
   // silently clearing. Genuine declines echo our `state` per OAuth 2.0 and are unaffected.
-  if (error) {
+  if (oauthError) {
     await clearGoogleSessionState();
+    if (oauthError.kind === 'declined') {
+      logEvent({
+        level: 'info',
+        surface: 'native-oauth',
+        message: `oauth declined on deep link: ${oauthError.message}`,
+        context: { action: 'declined' },
+      });
+      return abandoned('declined');
+    }
     logEvent({
-      level: 'info',
+      level: 'warn',
       surface: 'native-oauth',
-      message: `oauth declined/error on deep link: ${error}`,
-      context: { action: 'declined' },
+      message: `oauth error on deep link: ${oauthError.message}`,
+      context: { action: 'oauth-error' },
     });
-    return abandoned('declined');
+    return { kind: 'failed', error: new Error(oauthError.message) };
   }
 
   if (!code) {

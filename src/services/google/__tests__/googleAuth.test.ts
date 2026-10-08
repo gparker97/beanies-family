@@ -2206,6 +2206,21 @@ describe('isUserCancellation', () => {
     expect(isUserCancellation('user_cancel')).toBe(true);
   });
 
+  it("treats Google's BARE access_denied (Cancel/Back on the consent screen) as a cancellation (#128)", () => {
+    expect(isUserCancellation(new Error('access_denied'))).toBe(true);
+    expect(isUserCancellation('access_denied')).toBe(true);
+    expect(isUserCancellation(new Error(' ACCESS_DENIED '))).toBe(true);
+  });
+
+  it('does NOT treat a message that merely contains access_denied as a cancellation (policy blocks)', () => {
+    // An admin-blocked app / unverified-app test-user restriction: `OAuthCallbackPage` forwards
+    // Google's description, and a block the person cannot retry past is not their "never mind".
+    expect(
+      isUserCancellation(new Error('access_denied: Access blocked by your administrator'))
+    ).toBe(false);
+    expect(isUserCancellation(new Error('OAuth error: access_denied'))).toBe(false);
+  });
+
   it('does not treat genuine failures as cancellations', () => {
     expect(isUserCancellation(new Error('Network request failed'))).toBe(false);
     expect(isUserCancellation(new Error('403 Forbidden'))).toBe(false);

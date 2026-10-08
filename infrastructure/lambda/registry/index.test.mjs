@@ -2280,7 +2280,7 @@ describe('reduceUserAgent', () => {
   });
 });
 
-describe('registry PUT — heardVia (survey id, stamped at signup, never moved)', () => {
+describe('registry PUT — heardVia (survey id, stamped by an owner write, never moved)', () => {
   const FAMILY_HASH = createHash('sha256').update(FAMILY_ID).digest('hex');
 
   it('stamps an allowlisted id on a genuine signup write', async () => {
@@ -2294,9 +2294,29 @@ describe('registry PUT — heardVia (survey id, stamped at signup, never moved)'
     expect(linesFor('heard_via_dropped')).toEqual([]);
   });
 
-  it('does NOT stamp a write that is not a signup', async () => {
-    const { item } = await put({ provider: 'local', heardVia: 'reddit' });
-    expect(item.heardVia).toBeNull();
+  it('stamps on an owner write that is not a signup (#128: the survey runs after the pod)', async () => {
+    const { item } = await put(
+      { provider: 'local', ownerMemberId: M_A, writerMemberId: M_A, heardVia: 'reddit' },
+      { createdAt: '2026-01-01T00:00:00.000Z', ownerMemberId: M_A }
+    );
+    expect(item.heardVia).toBe('reddit');
+  });
+
+  it('does NOT stamp a member device write, signup flag or not', async () => {
+    for (const isSignupEvent of [false, true]) {
+      const { item } = await put(
+        {
+          provider: 'local',
+          ownerMemberId: M_A,
+          writerMemberId: M_B,
+          heardVia: 'reddit',
+          isSignupEvent,
+        },
+        { createdAt: '2026-01-01T00:00:00.000Z', ownerMemberId: M_A }
+      );
+      expect(item.heardVia).toBeNull();
+    }
+    expect(linesFor('heard_via_dropped')).toEqual([]);
   });
 
   it('is preserved by a later login PUT that omits it', async () => {

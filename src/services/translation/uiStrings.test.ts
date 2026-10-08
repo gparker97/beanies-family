@@ -72,6 +72,8 @@ describe('uiStrings', () => {
       'podTooLarge.',
       'podCredentialStale.',
       'resumeSetup.pod',
+      'resumeSetup.driveDeclined',
+      'storage.driveOnlyHere',
       'resumeSetup.subtitle',
       'sync.',
       'docWorker.',

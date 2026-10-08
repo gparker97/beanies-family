@@ -15,7 +15,7 @@
  * (the pod already exists at this point), and persisted by the host's
  * `SetupProgressModal` sync after `finish`.
  */
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BaseSelect from '@/components/ui/BaseSelect.vue';
@@ -24,6 +24,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { useCalendarSelectOptions } from '@/composables/useCalendarSelectOptions';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { useFamilyStore } from '@/stores/familyStore';
+import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { nextFreeMemberColor } from '@/constants/memberColors';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { reportError } from '@/utils/errorReporter';
@@ -34,6 +35,13 @@ const emit = defineEmits<{ finish: [] }>();
 
 const { t } = useTranslation();
 const familyStore = useFamilyStore();
+const familyContextStore = useFamilyContextStore();
+
+/** "Who's in The Parker family?" (#128); the generic title only if the name is not known. */
+const heading = computed(() => {
+  const family = familyContextStore.activeFamilyName?.trim();
+  return family ? fillTemplate(t('setup.whoIsInFamily'), { family }) : t('loginV6.addBeansTitle');
+});
 
 /** Set when a new bean has to share an existing bean's colour (all hues held). */
 const colorSharedWith = ref<string | null>(null);
@@ -124,6 +132,19 @@ async function handleRemoveMember(memberId: string) {
   if (addedMembers.value.length === 0) showMemberForm.value = true;
 }
 
+/**
+ * The step's single exit. "I'll do this later" until someone has been added, "Finish" after.
+ * Available while the add form is open too (#128): the form is local refs only, so leaving
+ * with it open discards nothing that was ever written.
+ */
+const exitLabel = computed(() =>
+  addedMembers.value.length > 0 ? t('loginV6.finish') : t('setup.addLater')
+);
+function handleExit() {
+  showMemberForm.value = false;
+  emit('finish');
+}
+
 function openAddMemberForm(role: 'parent' | 'child') {
   newMemberRole.value = role;
   newMemberName.value = '';
@@ -154,7 +175,7 @@ function getNextColor(): string {
 <template>
   <div>
     <h2 class="font-outfit dark:text-ink mb-6 text-center text-xl font-bold text-gray-900">
-      {{ t('loginV6.addBeansTitle') }}
+      {{ heading }}
     </h2>
 
     <div
@@ -291,7 +312,7 @@ function getNextColor(): string {
           :class="
             newMemberRole === 'parent'
               ? 'bg-secondary-500 text-white'
-              : 'dark:bg-surface-overlay dark:text-ink-soft bg-gray-100 text-gray-600 hover:bg-gray-200'
+              : 'dark:bg-surface-overlay dark:text-ink-soft dark:hover:bg-surface-hover bg-gray-100 text-gray-600 hover:bg-gray-200'
           "
           @click="newMemberRole = 'parent'"
         >
@@ -303,7 +324,7 @@ function getNextColor(): string {
           :class="
             newMemberRole === 'child'
               ? 'bg-secondary-500 text-white'
-              : 'dark:bg-surface-overlay dark:text-ink-soft bg-gray-100 text-gray-600 hover:bg-gray-200'
+              : 'dark:bg-surface-overlay dark:text-ink-soft dark:hover:bg-surface-hover bg-gray-100 text-gray-600 hover:bg-gray-200'
           "
           @click="newMemberRole = 'child'"
         >
@@ -354,10 +375,15 @@ function getNextColor(): string {
       </div>
     </div>
 
-    <!-- Finish CTA — only visible while the form is closed. Finish IS the skip
-         path when no members have been added. -->
-    <BaseButton v-if="!showMemberForm" class="mt-6 w-full" @click="emit('finish')">
-      {{ t('loginV6.finish') }}
+    <!-- The single exit, and the skip path when nobody has been added. Primary while the
+         form is closed; a ghost under an open form, so it never competes with "Add". -->
+    <BaseButton
+      class="mt-6 w-full"
+      :variant="showMemberForm ? 'ghost' : 'primary'"
+      data-testid="members-exit"
+      @click="handleExit"
+    >
+      {{ exitLabel }}
     </BaseButton>
   </div>
 </template>

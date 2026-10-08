@@ -1156,8 +1156,10 @@ export const useAuthStore = defineStore('auth', () => {
    * `id` is given, the member is created with that exact id (rehydrate must
    * keep `currentUser.memberId` — and the `.beanpod` envelope's `wrappedKeys`
    * keyed by it — pointing at the recreated member). `gender: 'male'` and
-   * `ageGroup: 'adult'` match `signUp`'s long-standing behavior (the role
-   * picker in the wizard is cosmetic; the owner is always stored as an adult).
+   * `ageGroup: 'adult'` match `signUp`'s long-standing behavior: the owner who
+   * creates a pod is always stored as an adult, and the wizard does not ask
+   * (`Gender` has no "unspecified" value; the owner can change it in Meet the
+   * Beans).
    */
   /**
    * Tear down ALL in-memory family state before building a fresh owner doc.

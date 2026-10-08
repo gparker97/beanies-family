@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   NATIVE_PLATFORMS,
   SCORING,
+  applyHeardVia,
   candidatesFor,
   contradicts,
   eventEpoch,
@@ -153,6 +154,73 @@ describe('the helpers the ops script imports', () => {
       new Set(['taken'])
     );
     expect(c.map((x) => x.event.eventId)).toEqual(['near', 'far']);
+  });
+});
+
+describe('applyHeardVia (the late survey answer, #128)', () => {
+  const scoredWithout = (taps) => scoreFamily(family(), taps, { now: NOW }).value;
+
+  // Gap tiers x competitor counts x every survey id (and none): a late answer applied to the
+  // value scored without it must give the band and confidence scoring with it gives.
+  const SHAPES = [
+    ['one near tap', [tap('e1', 5)]],
+    ['two ads in a tier', [tap('e1', 3), tap('e2', 8, { content: 'straight-one-app' })]],
+    ['a 20 minute gap', [tap('e1', 20)]],
+    ['a 90 minute gap', [tap('e1', 90)]],
+    ['a 5 hour gap', [tap('e1', 300)]],
+  ];
+  const ANSWERS = ['chatgpt_ad', 'ai', 'reddit', 'google', 'friend'];
+  for (const [shape, taps] of SHAPES) {
+    it.each(ANSWERS)(`matches scoring with the answer present: ${shape}, %s`, (heardVia) => {
+      const base = scoredWithout(taps);
+      const late = applyHeardVia(base, heardVia, base.fields.utm_source);
+      const upfront = scoreFamily(family({ heardVia }), taps, { now: NOW });
+      if (upfront.status === 'scored') {
+        expect(late).toEqual(upfront.value);
+      } else {
+        expect(upfront.status).toBe('below-threshold');
+        expect(late).toBeNull();
+      }
+    });
+  }
+
+  it('a contradiction multiplies by heardViaContradiction and re-bands (never an upgrade)', () => {
+    const base = scoredWithout([tap('e1', 5)]);
+    expect(applyHeardVia(base, 'reddit', 'chatgpt')).toEqual({
+      ...base,
+      confidence: SCORING.heardViaContradiction,
+      band: 'medium',
+    });
+  });
+
+  it('a consistent or channel-less answer leaves confidence and band as they were', () => {
+    const base = scoredWithout([tap('e1', 5)]);
+    expect(applyHeardVia(base, 'chatgpt_ad', 'chatgpt')).toEqual(base);
+    expect(applyHeardVia(base, 'app_store', 'chatgpt')).toEqual(base);
+  });
+
+  it('falling below the low band returns null, as the scorer stores nothing there', () => {
+    const low = { ...scoredWithout([tap('e1', 300)]) };
+    expect(low.band).toBe('low');
+    expect(applyHeardVia(low, 'reddit', 'chatgpt')).toBeNull();
+  });
+
+  it('an untagged inferred value has no source to contradict', () => {
+    const base = scoredWithout([tap('e1', 5, { content: null })]);
+    expect(applyHeardVia(base, 'reddit', base.fields.utm_source)).toEqual(base);
+  });
+
+  it('a value with no numeric confidence comes back unchanged; nothing comes back null', () => {
+    const odd = { band: 'medium', fields: {} };
+    expect(applyHeardVia(odd, 'reddit', 'chatgpt')).toBe(odd);
+    expect(applyHeardVia(null, 'reddit', 'chatgpt')).toBeNull();
+  });
+
+  it('does not mutate the value it is given', () => {
+    const base = scoredWithout([tap('e1', 5)]);
+    const copy = structuredClone(base);
+    applyHeardVia(base, 'reddit', 'chatgpt');
+    expect(base).toEqual(copy);
   });
 });
 

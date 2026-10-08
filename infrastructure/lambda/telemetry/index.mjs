@@ -234,6 +234,9 @@ export const ALLOWED_CONTEXT_KEYS = new Set([
   'entitlement_state',
   'plan',
   'dry_run',
+  // Pod-creation funnel (#128): the open create attempt's random UUID. Mirror of
+  // src/utils/diagnosticContext.ts.
+  'create_attempt_id',
 ]);
 
 function getHeaders(event) {

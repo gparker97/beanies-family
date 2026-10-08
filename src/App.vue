@@ -65,7 +65,12 @@ import {
   isExternalLandingRoute,
   isNavigationCancelled,
 } from '@/utils/appChrome';
-import { isPodlessRecoveryQuery, RESUME_SETUP_PATH } from '@/components/login/resumePaths';
+import {
+  isPodlessRecoveryQuery,
+  isResumeSetupSearch,
+  RESUME_SETUP_PATH,
+} from '@/components/login/resumePaths';
+import { trackOnboardingStep } from '@/services/telemetry/onboardingAttempt';
 import {
   hardReload,
   isChunkLoadError,
@@ -1397,8 +1402,22 @@ onMounted(async () => {
           message: `Redirect-auth code exchange failed during app init: ${msg}`,
           error: e,
           severity: isConsentDenied ? 'warning' : 'critical',
-          context: { route_path: route.path, consent_denied: isConsentDenied },
+          // `detail`, not a bespoke key: an unallowlisted key is stripped by `redactContext`
+          // (the old `consent_denied` never reached CloudWatch).
+          context: {
+            route_path: route.path,
+            detail: isConsentDenied ? 'consent-denied' : 'failed',
+          },
         });
+        // The create funnel's web consent exit (#128). The callback page already logged
+        // `submitted` for the code; a box left unticked or a failed exchange is the `back` that
+        // follows it. Only on the create flow's return path, which it alone owns; a reconnect or
+        // calendar return is not a funnel step (and with no attempt open this is a no-op anyway).
+        if (isResumeSetupSearch(window.location.search)) {
+          trackOnboardingStep('drive-consent', 'back', {
+            error_code: isConsentDenied ? 'consent-denied' : 'exchange-failed',
+          });
+        }
       }
 
     // If not authenticated, redirect to the welcome/login gate (unless already on an auth page).

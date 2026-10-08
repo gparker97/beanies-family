@@ -25,6 +25,10 @@
       capture path was used plus two small counts — never a URL, page text,
       transcript or recipe content. Declared here under Other Diagnostic Data; no new
       NSPrivacyCollectedDataType is required.
+    - Set-up attempt id (create_attempt_id, 2026-10-08, #128): a random UUID per attempt
+      to set up a pod, used to string one attempt's diagnostics together. Not linkable
+      to a person; declared here under Other Diagnostic Data, no new
+      NSPrivacyCollectedDataType is required.
     - User ID (family_id): a random per-family UUID used to correlate diagnostics.
     - Product Interaction, from TWO surfaces, both analytics, neither ever for ads
       or tracking:

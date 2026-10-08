@@ -368,6 +368,54 @@ describe('googleAuth — native (Capacitor) OAuth deep-link (ADR-029 A2)', () =>
       expect(reportError).not.toHaveBeenCalled();
     });
 
+    it('a DESCRIBED access_denied (a policy block) settles it FAILED, never abandoned', async () => {
+      // Same rule as the web callback page (`classifyOAuthError`): only a bare access_denied is
+      // a decline. A policy block is not a cancel, so `connectStorage` must not record one.
+      const { reportError } = await import('@/utils/errorReporter');
+      const { logEvent } = await import('@/services/telemetry');
+      await googleAuth.startRedirectAuth('/welcome?resume=setup', undefined, 'create');
+      const stored = JSON.parse(sessionStorage.getItem(STATE_KEY)!);
+      const trip = googleAuth.awaitNativeOAuthReturn();
+
+      await googleAuth.handleNativeAuthRedirect(
+        `${NATIVE_REDIRECT}?error=access_denied&error_description=${encodeURIComponent('Access blocked by your admin')}&state=${stored.state}`,
+        vi.fn()
+      );
+
+      const outcome = await trip;
+      expect(outcome.kind).toBe('failed');
+      if (outcome.kind !== 'failed') return;
+      expect(outcome.error).not.toBeInstanceOf((await syncTypes()).OAuthRoundTripAbandonedError);
+      expect(outcome.error.message).toBe('access_denied: Access blocked by your admin');
+      expect(logEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          level: 'warn',
+          surface: 'native-oauth',
+          context: { action: 'oauth-error' },
+        })
+      );
+      expect(reportError).not.toHaveBeenCalled();
+      // The pending auth is cleared either way.
+      expect(sessionStorage.getItem(STATE_KEY)).toBeNull();
+    });
+
+    it('a non-access_denied OAuth error settles it FAILED too', async () => {
+      await googleAuth.startRedirectAuth('/welcome?resume=setup', undefined, 'create');
+      const stored = JSON.parse(sessionStorage.getItem(STATE_KEY)!);
+      const trip = googleAuth.awaitNativeOAuthReturn();
+
+      await googleAuth.handleNativeAuthRedirect(
+        `${NATIVE_REDIRECT}?error=server_error&state=${stored.state}`,
+        vi.fn()
+      );
+
+      const outcome = await trip;
+      expect(outcome.kind).toBe('failed');
+      if (outcome.kind !== 'failed') return;
+      expect(outcome.error).not.toBeInstanceOf((await syncTypes()).OAuthRoundTripAbandonedError);
+      expect(outcome.error.message).toBe('server_error');
+    });
+
     it('a consent denial arrives as the DriveConsentDeniedError itself, and stashes nothing', async () => {
       // ⚠️ NO RESUME-REASON STASH ON NATIVE. The awaiting seam has the error in hand; a hint
       // written here could only be read by the wrong flow later (a declined Drive LOAD leaving

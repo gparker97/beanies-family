@@ -10,7 +10,7 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
     icon: '\u{1F331}',
     readTime: 3,
     popular: true,
-    updatedDate: '2026-06-26',
+    updatedDate: '2026-10-08',
     sections: [
       {
         type: 'heading',
@@ -34,11 +34,12 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
         content: '',
         items: [
           'Open <a href="https://app.beanies.family" target="_blank" rel="noopener">app.beanies.family</a> and click <strong>Create a New Family</strong>',
-          'Enter your family name, your name, and your email address',
-          'Connect where your pod lives \u2014 Google Drive (recommended) or a local file',
+          'Enter your name and your email address \u2014 your family name is suggested from your name, and you can change it',
+          'Choose where your family file is saved \u2014 Google Drive (recommended), or on desktop a local file if you only plan to use one device. If you cancel Google\u2019s permission screen, nothing is lost: tap <strong>Try again</strong>',
           'Choose a 6-digit PIN \u2014 this is how you sign in on devices where your family is already set up',
-          'Save your recovery kit when beanies shows it \u2014 this is what gets you in on a brand-new device',
-          'Add your family members so they\u2019re ready to assign to accounts and activities',
+          'Save your recovery kit when beanies shows it \u2014 this is what gets you in on a brand-new device. Tap <strong>Open my pod</strong> when it is safe',
+          'Add your family members so they\u2019re ready to assign to accounts and activities \u2014 or tap <strong>I\u2019ll do this later</strong> and add them any time',
+          'Answer the one-tap \u201Chow did you hear about us?\u201D question (or skip it)',
           "Your pod is created! You'll land in the Family Nook",
         ],
       },
@@ -59,6 +60,11 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
         type: 'paragraph',
         content:
           'After creating your pod, you can add family members, set up bank accounts, record transactions, and start tracking goals. Everything is stored locally on your device until you choose to save to Google Drive.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'On a computer you\u2019ll also see a small <strong>use beanies on your phone too</strong> link at the end of setup. You can find the same thing later in <strong>Settings</strong>.',
       },
     ],
   },

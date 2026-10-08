@@ -12,6 +12,12 @@ vi.mock('@/composables/useTranslation', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
+const onboarding = vi.hoisted(() => ({
+  beginCreateAttempt: vi.fn(() => 'attempt-id'),
+  trackOnboardingStep: vi.fn(),
+}));
+vi.mock('@/services/telemetry/onboardingAttempt', () => onboarding);
+
 describe('WelcomeGate', () => {
   describe('layout hierarchy', () => {
     it('renders the prompt header with eyebrow + title', () => {
@@ -80,6 +86,32 @@ describe('WelcomeGate', () => {
       } finally {
         vi.unstubAllGlobals();
       }
+    });
+
+    it('opens the create attempt, then logs welcome submitted, on the Create tap (#128)', async () => {
+      onboarding.beginCreateAttempt.mockClear();
+      onboarding.trackOnboardingStep.mockClear();
+      const wrapper = mount(WelcomeGate);
+      // Every visitor sees the gate: nothing is logged or opened on mount.
+      expect(onboarding.beginCreateAttempt).not.toHaveBeenCalled();
+      expect(onboarding.trackOnboardingStep).not.toHaveBeenCalled();
+
+      await wrapper.findAll('button')[0].trigger('click');
+      expect(onboarding.beginCreateAttempt).toHaveBeenCalledTimes(1);
+      expect(onboarding.trackOnboardingStep).toHaveBeenCalledTimes(1);
+      expect(onboarding.trackOnboardingStep).toHaveBeenCalledWith('welcome', 'submitted');
+      // The attempt is open before the step is logged, or the step would be a no-op.
+      expect(onboarding.beginCreateAttempt.mock.invocationCallOrder[0]).toBeLessThan(
+        onboarding.trackOnboardingStep.mock.invocationCallOrder[0]!
+      );
+    });
+
+    it('Sign In and Join open no create attempt', async () => {
+      onboarding.beginCreateAttempt.mockClear();
+      const wrapper = mount(WelcomeGate);
+      await wrapper.findAll('button')[1].trigger('click');
+      await wrapper.findAll('button')[2].trigger('click');
+      expect(onboarding.beginCreateAttempt).not.toHaveBeenCalled();
     });
 
     it("emits navigate('load-pod') when Sign In is clicked", async () => {

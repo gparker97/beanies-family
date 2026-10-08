@@ -2377,6 +2377,14 @@ export interface RegistryEntry {
    */
   deviceCountry?: string | null;
   /**
+   * #128: the random UUID of the create attempt that made this pod (`createAttemptState.ts`),
+   * the same `create_attempt_id` its firehose events carry, so a registry row joins to that
+   * attempt's funnel. Sent while an attempt is open; the registry Lambda stamps it write-once on
+   * the step-1 and signup writes. Null or absent on rows made before 2026-10-08 and on creates
+   * with no open attempt.
+   */
+  createAttemptId?: string | null;
+  /**
    * #95: what the family is entitled to, computed server-side on every GET by
    * `infrastructure/lambda/registry/entitlement.mjs` (never stored in the row). `null` when the
    * registry could not read the billing table; absent from a Lambda older than #95. The client

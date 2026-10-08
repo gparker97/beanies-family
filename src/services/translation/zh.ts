@@ -2273,13 +2273,21 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'loginV6.createNext': '下一步',
   'loginV6.createButton': '创建 Pod',
   'resumeSetup.title': '完成 Pod 设置',
-  'resumeSetup.subtitle':
-    '我们来完成 Pod 的设置吧。我们从不存储你的 PIN，所以你的数据始终端到端加密。',
+  // #128 resume-setup
+  'resumeSetup.subtitle': '我们来完成 Pod 的设置吧。',
+  'resumeSetup.subtitlePin': '快好了。你的 PIN 用于在这台设备上解锁你的 Pod。',
+  'resumeSetup.choosePinFor': '{name}，设置你的 PIN',
   'resumeSetup.subtitleRecovery':
     '你上次的设置没有完成。请重新输入密码来收尾；我们从不存储密码，所以你的数据始终端到端加密。',
   'resumeSetup.storagePrompt': '你的 Pod 要存放在哪里？',
   'resumeSetup.finishing': '正在完成 Pod 设置…',
   'resumeSetup.startOver': '改为重新开始',
+  // #128 drive-declined
+  'resumeSetup.driveDeclinedTitle': 'Google 需要你点头同意',
+  'resumeSetup.driveDeclinedBody':
+    '你的家庭文件还没有保存。Google 询问时，请勾选允许 beanies 在你的 Drive 中创建文件的选项。',
+  'resumeSetup.tryAgainWithGoogle': '用 Google 重试',
+  'storage.driveOnlyHere': '在这个浏览器上，Google Drive 是 beanies 唯一能保存你家庭文件的地方。',
   'resumeSetup.checking': '正在查找你的 Pod…',
   'resumeSetup.foundPod': '找到你家的 Pod 了，输入密码即可解锁。',
   'resumeSetup.lastSaved': '上次保存：',
@@ -2688,7 +2696,6 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'setup.choosePinLabel': '设置你的 PIN',
   'setup.choosePinHint':
     '在已设置好家庭的设备上，用 6 位 PIN 即可登录。在全新的设备上，则需要用恢复套件（下一步）进入。',
-  'setup.kitStepIntro': '你的家庭 Pod 已准备就绪！最后一步，把恢复套件保存在安全的地方。',
   'recovery.kitPromptTitle': '保存你的恢复套件',
   'recovery.kitPromptBody':
     '恢复套件能帮你重新进入家庭数据。如果所有设备和 PIN 都丢失了，它是唯一的途径。现在就创建一个，并妥善保管。',
@@ -4437,20 +4444,14 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'inviteGate.privacyNote':
     '你的邮箱只会发给 beanies 团队，用于发送邀请。不会公开，也不会存储在应用中。',
   'inviteGate.confirmedJoinDiscord': '加入 Discord',
-  'createWelcome.eyebrow': '欢迎回家',
-  'createWelcome.title': '一起打造你的家庭 Pod',
-  'createWelcome.subtitle': '只需三步，就能拥有你的私密家庭空间。先看看接下来要做什么。',
-  'createWelcome.step1Title': '关于你',
-  'createWelcome.step1Body': '填写你的名字和几项基本信息，用来设置你的空间。',
-  'createWelcome.step2Title': '你的家庭数据文件',
-  'createWelcome.step2Body': '我们会为你创建一个私密的加密文件，安心存放全家的数据。',
-  'createWelcome.step3Title': '你的家庭',
-  'createWelcome.step3Body': '准备好后，随时添加你的另一半或小豆豆。',
-  'createWelcome.safeText':
-    '你的数据在你的设备上加密，并保存在只有你能打开的文件中，我们永远看不到。',
-  'createWelcome.safeLink': '你的数据如何保持安全',
-  'createWelcome.cta': '种下我的家庭 Pod',
-  'createWelcome.ctaHint': '之后随时都可以修改。',
+  // #128 onboarding UX
+  'auth.familyNameDefault': '{name}一家',
+  'loginV6.createSubtitleStep1': '只需两项，马上就好。',
+  'recovery.kitModalTitleCreation': '你的 Pod 已准备好',
+  'recovery.kitOpenPod': '打开我的 Pod',
+  'setup.usePhoneToo': '在手机上也用 beanies',
+  'setup.whoIsInFamily': '{family}有哪些成员？',
+  'setup.addLater': '以后再说',
   'createSurvey.eyebrow': '最后一件事',
   'createSurvey.title': '你是怎么知道我们的？',
   'createSurvey.subtitle': '这能帮我们找到更多像你这样的家庭。完全自愿填写。',

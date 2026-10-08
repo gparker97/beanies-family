@@ -12,7 +12,7 @@ test.describe('Setup Flow', () => {
     await dbHelper.clearAllData();
     await gotoRoot(page);
 
-    // Walk through the create flow: homepage → welcome → identity → injected
+    // Walk through the create flow: homepage → welcome → step 1 → injected
     // storage → password → the add-members step on the finish surface.
     await navigateToAddMembers(page);
 

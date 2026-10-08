@@ -82,9 +82,9 @@ describe('openHelpArticle', () => {
   });
 
   it('carries the calling surface, which is how the two links are told apart', () => {
-    openHelpArticle(HELP_PATHS.zeroKnowledge, 'create-welcome');
+    openHelpArticle(HELP_PATHS.zeroKnowledge, 'who-owns-what-first-deal');
     expect(mockLogEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ surface: 'create-welcome' })
+      expect.objectContaining({ surface: 'who-owns-what-first-deal' })
     );
   });
 });

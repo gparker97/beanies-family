@@ -17,6 +17,7 @@ const h = vi.hoisted(() => ({
   rehydrateOwnerDoc: vi.fn(),
   signOutAndClearData: vi.fn(),
   createNewFile: vi.fn(),
+  completePodSetup: vi.fn(),
   reloadAllStores: vi.fn(),
   setOnboardingCompleted: vi.fn(),
   dismissKitPrompt: vi.fn(),
@@ -48,7 +49,11 @@ vi.mock('@/stores/authStore', () => ({
   }),
 }));
 vi.mock('@/stores/syncStore', () => ({
-  useSyncStore: () => ({ createNewFile: h.createNewFile, reloadAllStores: h.reloadAllStores }),
+  useSyncStore: () => ({
+    createNewFile: h.createNewFile,
+    completePodSetup: h.completePodSetup,
+    reloadAllStores: h.reloadAllStores,
+  }),
 }));
 vi.mock('@/stores/settingsStore', () => ({
   useSettingsStore: () => ({
@@ -216,9 +221,14 @@ describe('seedDemoFamily — happy path', () => {
 
   it('suppresses every remote side effect of the create', async () => {
     await seedDemoFamily();
-    const opts = h.createNewFile.mock.calls[0]![5];
+    // Five arguments since #128 dropped `heardVia`; the options bag is the last.
+    expect(h.createNewFile.mock.calls[0]).toHaveLength(5);
+    const opts = h.createNewFile.mock.calls[0]![4];
     expect(opts).toEqual({ suppressRemoteSideEffects: true });
     expect(h.slackNotify).not.toHaveBeenCalled();
+    // The "Family pod created!" Slack post lives in `completePodSetup` (#128); the demo seed
+    // must never reach it.
+    expect(h.completePodSetup).not.toHaveBeenCalled();
   });
 
   it('makes no network request at all', async () => {

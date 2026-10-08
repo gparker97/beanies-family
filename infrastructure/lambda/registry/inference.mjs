@@ -16,6 +16,12 @@
  * family differently. The rules were lifted from that script unchanged (#125); its tests and
  * `references/data-sources.md` still pin `SCORING`.
  *
+ * THE SURVEY CAN ARRIVE AFTER THE SCORE (#128)
+ * The survey now runs after the pod is written, so `heardVia` usually lands on a later write
+ * than the one that scored the pod. That write rescales the stored value with `applyHeardVia`,
+ * and `scoreFamily` applies the same multiplier and bands through the same `heardViaScore`, so
+ * a late answer and an answer present at scoring give the same band.
+ *
  * PURE, ON PURPOSE
  * No AWS imports, no `process.env`, no clock (the caller passes `now`), no logging. The Lambda
  * owns the ledger Query and the log lines; the batch script owns its file reads and its write.
@@ -118,6 +124,34 @@ function bandFor(confidence) {
 
 const round = (n, dp) => Math.round(n * 10 ** dp) / 10 ** dp;
 
+/**
+ * The ONE place the survey multiplier and the banding are applied: `scoreFamily` calls it with
+ * the tap's raw score, `applyHeardVia` with a stored value's confidence. `band` is null below
+ * the low band. Rounded once, after the multiplier, exactly as `scoreFamily` always did.
+ */
+function heardViaScore(confidence, heardVia, utmSource) {
+  const multiplier = contradicts(heardVia, utmSource) ? SCORING.heardViaContradiction : 1;
+  const scored = round(confidence * multiplier, 3);
+  return { confidence: scored, band: bandFor(scored) };
+}
+
+/**
+ * Rescale a stored `attributionInferred` value for a survey answer that arrived after it was
+ * scored (#128: the survey runs after the pod-creation write). Returns the value with its new
+ * `confidence` and `band`, or null when the band falls below the low threshold (nothing is
+ * stored, exactly as `scoreFamily` stores nothing there). The multiplier is <= 1, so this never
+ * upgrades a band.
+ *
+ * Call it ONLY when the answer is new to the row: a value scored with the answer already present
+ * has the multiplier in it, and applying it twice would double-count. A value with no numeric
+ * `confidence` (hand-edited ops data) has nothing to rescale and comes back unchanged.
+ */
+export function applyHeardVia(inferred, heardVia, utmSource) {
+  if (!inferred || !Number.isFinite(inferred.confidence)) return inferred ?? null;
+  const { confidence, band } = heardViaScore(inferred.confidence, heardVia, utmSource);
+  return band ? { ...inferred, confidence, band } : null;
+}
+
 /** Unclaimed same-platform taps in the window before the pod, nearest first. */
 export function candidatesFor(family, events, claimed) {
   const created = Date.parse(family.createdAt) / 1000;
@@ -159,12 +193,14 @@ export function scoreFamily(family, events, { claimed = new Set(), now = new Dat
   const sameTier = cands.filter((c) => tierIndex(c.gapMinutes) === tier);
   const competitors = new Set(sameTier.map((c) => c.event.fields?.utm_content ?? null)).size;
   const fields = hasFields(chosen.event.fields) ? { ...chosen.event.fields } : {};
-  const multiplier = contradicts(family.heardVia, fields.utm_source)
-    ? SCORING.heardViaContradiction
-    : 1;
-  // eslint-disable-next-line security/detect-object-injection -- `tier` is a findIndex result
-  const confidence = round((SCORING.gapTiers[tier].base / competitors) * multiplier, 3);
-  const band = bandFor(confidence);
+  // `heardViaScore`, not `applyHeardVia`: below the threshold the batch run still reports the
+  // confidence, which `applyHeardVia`'s null would discard. Same function underneath, same band.
+  const { confidence, band } = heardViaScore(
+    // eslint-disable-next-line security/detect-object-injection -- `tier` is a findIndex result
+    SCORING.gapTiers[tier].base / competitors,
+    family.heardVia,
+    fields.utm_source
+  );
   if (!band) return { status: 'below-threshold', candidates: cands.length, confidence };
 
   return {

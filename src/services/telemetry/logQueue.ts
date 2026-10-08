@@ -41,6 +41,7 @@ let intervalTimer: ReturnType<typeof setInterval> | null = null;
 let flushInFlight: Promise<void> | null = null;
 let droppedTotal = 0;
 let warnedNoUrl = false;
+let pageHideHooks: Array<() => void> = [];
 
 /**
  * Echo events to the console instead of dropping them, in dev only.
@@ -245,6 +246,41 @@ function beaconBatchUnderCap(): LogRecord[] {
   return [];
 }
 
+// ─── Pre-beacon hooks ────────────────────────────────────────────────────────
+
+/**
+ * Run `fn` on a real page unload, BEFORE the terminal beacon flush, so an event it logs
+ * rides that same beacon.
+ *
+ * ⚠️ THE ONLY PRE-BEACON SEAM. A `pagehide` listener registered anywhere else runs after
+ * this module's whenever it was attached later (listeners fire in registration order, and
+ * this one is attached by the first enqueue), so whatever it logs lands in the buffer after the beacon has gone and dies with
+ * the page. Register here instead. Hooks run only on a real unload (`persisted` false, same
+ * gate as the beacon), each in its own try/catch so one failing hook never costs the others
+ * or the flush. A hook should log through `logEvent` (synchronous through to
+ * `enqueueLogEvent`, and enriched by `enrichAndRedact`), never call `enqueueLogEvent`
+ * directly. Today's one registrant: `installOnboardingAttempt` (the `onboarding` `abandon`
+ * event).
+ *
+ * Registering also attaches the lifecycle listeners, so a page that has enqueued nothing yet
+ * still runs its hooks on unload (a listener attached by the hook's own enqueue, mid-dispatch,
+ * would never fire for that event).
+ */
+export function registerPageHideHook(fn: () => void): void {
+  pageHideHooks.push(fn);
+  startListening();
+}
+
+function runPageHideHooks(): void {
+  for (const hook of pageHideHooks) {
+    try {
+      hook();
+    } catch (e) {
+      console.warn('[telemetry] pagehide hook threw (skipped)', e);
+    }
+  }
+}
+
 // ─── Lifecycle listeners (idempotent) ────────────────────────────────────────
 
 function handleOnline(): void {
@@ -258,9 +294,12 @@ function handleVisibilityChange(): void {
 }
 
 function handlePageHide(event: PageTransitionEvent): void {
-  // Real unload → terminal beacon. bfcache freeze (`persisted: true`) will
-  // resume and flush normally, so don't beacon (would double-send).
-  if (!event.persisted) flushViaBeacon();
+  // Real unload → hooks, then the terminal beacon. bfcache freeze (`persisted: true`) will
+  // resume and flush normally, so don't beacon (would double-send) and don't run the hooks
+  // (the page is not gone).
+  if (event.persisted) return;
+  runPageHideHooks();
+  flushViaBeacon();
 }
 
 function startListening(): void {
@@ -301,6 +340,7 @@ export function __resetLogQueueForTesting(): void {
   flushInFlight = null;
   droppedTotal = 0;
   warnedNoUrl = false;
+  pageHideHooks = [];
 }
 
 /** Test-only — inspect the current buffer length. */

@@ -311,9 +311,9 @@ vi.mock('@/services/sync/offlineQueue', () => ({
   clearQueue: vi.fn(),
 }));
 
-// REVIEW-DEMO: the pod-created Slack ping fires from INSIDE createNewFile
-// (step 8), not from CreatePodView — mocked so the suppression tests below can
-// assert on it.
+// #128: the pod-created Slack ping moved OUT of createNewFile into
+// `completePodSetup` (completePodSetup.test.ts) — mocked so the tests below can
+// assert createNewFile never posts it.
 vi.mock('@/utils/slackNotify', () => ({
   slackNotify: vi.fn(),
 }));
@@ -352,7 +352,6 @@ import { resetDoc } from '@/services/automerge/docService';
 import { installInlineBackend } from '@/services/automerge/worker/__tests__/inlineHarness';
 import * as docClient from '@/services/automerge/worker/docClient';
 import { ATTRIBUTION_STORAGE_KEY, makeEnvelope } from '@beanies/brand/attribution';
-import type { HeardViaId } from '@beanies/brand/heardVia';
 
 // ---------------------------------------------------------------------------
 // Tests — full end-to-end pod creation flow
@@ -897,21 +896,19 @@ describe('pod creation: full end-to-end flow', () => {
   /**
    * REVIEW-DEMO: `createNewFile`'s remote-side-effect suppression.
    *
-   * Demo mode drives the real create path, so the three REMOTE things this
-   * function does — the pre-write existing-pod registry lookup, the registry
-   * registration, and the pod-created Slack ping — must all be skippable. One
-   * option controls all three, deliberately: three separate flags could be set
-   * inconsistently.
+   * Demo mode drives the real create path, so the REMOTE things this function
+   * does — the pre-write existing-pod registry lookup and the registry
+   * registration — must both be skippable. One option controls both,
+   * deliberately: separate flags could be set inconsistently. (The pod-created
+   * Slack ping left this function in #128; these tests also pin that it never
+   * comes back, suppressed or not.)
    *
    * The second test here is the one that matters most. It pins the DEFAULT, so a
    * flag that gets inverted or defaults wrong shows up as a failure rather than as
    * silently unregistered real families.
    */
   describe('createNewFile — REVIEW-DEMO remote side-effect suppression', () => {
-    async function createPod(
-      opts?: { suppressRemoteSideEffects?: boolean },
-      heardVia: { id: HeardViaId; label: string } | null = null
-    ) {
+    async function createPod(opts?: { suppressRemoteSideEffects?: boolean }) {
       const authStore = useAuthStore();
       const syncStore = useSyncStore();
 
@@ -943,12 +940,11 @@ describe('pod creation: full end-to-end flow', () => {
         // id; using anything else fails verify with a familyId mismatch.
         'fam-test-1',
         'Demo Family',
-        heardVia,
         opts
       );
     }
 
-    it('skips the registry lookup, the registration and the Slack ping when suppressed', async () => {
+    it('skips the registry lookup and the registration, and posts nothing, when suppressed', async () => {
       const registryService = await import('@/services/registry/registryService');
       const { slackNotify } = await import('@/utils/slackNotify');
 
@@ -960,32 +956,28 @@ describe('pod creation: full end-to-end flow', () => {
       expect(vi.mocked(slackNotify)).not.toHaveBeenCalled();
     });
 
-    it('still does all three by default — every real create must register', async () => {
+    it('still looks up and registers by default — every real create must register', async () => {
       const registryService = await import('@/services/registry/registryService');
-      const { slackNotify } = await import('@/utils/slackNotify');
 
       const result = await createPod();
 
       expect(result.ok).toBe(true);
       expect(vi.mocked(registryService.lookupFamilyResult)).toHaveBeenCalled();
       expect(vi.mocked(registryService.registerFamilyOrThrow)).toHaveBeenCalled();
-      expect(vi.mocked(slackNotify)).toHaveBeenCalled();
     });
 
-    it('persists the survey answer id on the signup write; the label stays Slack-only', async () => {
-      const registryService = await import('@/services/registry/registryService');
+    it('posts NO Slack line on a real create — that moved to completePodSetup (#128)', async () => {
       const { slackNotify } = await import('@/utils/slackNotify');
 
-      const result = await createPod(undefined, { id: 'chatgpt_ad', label: 'ChatGPT ad' });
+      const result = await createPod();
 
       expect(result.ok).toBe(true);
-      const [, entry] = vi.mocked(registryService.registerFamilyOrThrow).mock.calls.at(-1)!;
-      expect(entry.heardVia).toBe('chatgpt_ad');
-      expect(JSON.stringify(entry)).not.toContain('ChatGPT ad');
-      expect(vi.mocked(slackNotify).mock.calls.at(-1)![0]).toContain('\n*Heard via:* ChatGPT ad');
+      expect(vi.mocked(slackNotify)).not.toHaveBeenCalled();
     });
 
-    it('sends heardVia: null when the survey was skipped', async () => {
+    it('takes no survey answer: the signup write sends heardVia: null (#128)', async () => {
+      // The survey runs AFTER the write now; its answer rides `completePodSetup`'s write.
+      // (The signature itself, four positionals plus the options bag, is pinned by type-check.)
       const registryService = await import('@/services/registry/registryService');
 
       await createPod();
@@ -1018,7 +1010,9 @@ describe('pod creation: full end-to-end flow', () => {
         localStorage.removeItem(ATTRIBUTION_STORAGE_KEY);
       });
 
-      it('stamps the signup registry write, adds the Slack line, then clears the stash', async () => {
+      it('stamps the signup registry write and LEAVES the stash for completePodSetup', async () => {
+        // #128: the "Came from" Slack line is posted at setup completion, which still needs
+        // the tag, so createNewFile must not consume it.
         const registryService = await import('@/services/registry/registryService');
         const { slackNotify } = await import('@/utils/slackNotify');
 
@@ -1028,22 +1022,19 @@ describe('pod creation: full end-to-end flow', () => {
         const [, entry] = vi.mocked(registryService.registerFamilyOrThrow).mock.calls.at(-1)!;
         expect(entry.attribution).toEqual(TAG);
         expect(entry.isSignupEvent).toBe(true);
-        const text = vi.mocked(slackNotify).mock.calls.at(-1)![0] as string;
-        expect(text).toContain('\n*Came from:* `chatgpt / sg-pilot-oct26 / calm_ad~1`');
-        expect(stashed()).toBeNull();
+        expect(vi.mocked(slackNotify)).not.toHaveBeenCalled();
+        expect(stashed()).not.toBeNull();
       });
 
-      it('sends attribution: null and no Slack line when the device has no tag', async () => {
+      it('sends attribution: null when the device has no tag', async () => {
         localStorage.removeItem(ATTRIBUTION_STORAGE_KEY);
         const registryService = await import('@/services/registry/registryService');
-        const { slackNotify } = await import('@/utils/slackNotify');
 
         await createPod();
 
         const [, entry] = vi.mocked(registryService.registerFamilyOrThrow).mock.calls.at(-1)!;
         expect('attribution' in entry).toBe(true);
         expect(entry.attribution).toBeNull();
-        expect(vi.mocked(slackNotify).mock.calls.at(-1)![0]).not.toContain('Came from');
       });
 
       it('keeps the tag when the registry write fails, so a retry still carries it', async () => {
@@ -1074,14 +1065,10 @@ describe('pod creation: full end-to-end flow', () => {
       });
     });
 
-    // #125: the pod-creation write's response feeds the Slack line (device country, and the
-    // create-time inference for a native pod with no campaign tag).
-    describe('pod-creation response in Slack (#125)', () => {
-      const lastSlack = async () => {
-        const { slackNotify } = await import('@/utils/slackNotify');
-        return vi.mocked(slackNotify).mock.calls.at(-1)![0] as string;
-      };
-
+    // #125: the pod-creation (signup) write still carries the device time zone. Its response
+    // (country, inferred band) no longer feeds a Slack line here: #128 moved the post to
+    // `completePodSetup`, which reads the same fields from ITS write (completePodSetup.test.ts).
+    describe('pod-creation signup write (#125)', () => {
       it('sends the device time zone on the signup write, never as a step-1 write', async () => {
         const registryService = await import('@/services/registry/registryService');
         const { knownDeviceTimeZone } = await import('@/utils/timeZone');
@@ -1094,65 +1081,19 @@ describe('pod creation: full end-to-end flow', () => {
         expect(entry.deviceTimeZone).toBe(knownDeviceTimeZone());
       });
 
-      it('shows the country before the platform lines when the registry returned one', async () => {
+      it('posts nothing even when the registry returns a country and an inferred band', async () => {
         const registryService = await import('@/services/registry/registryService');
+        const { slackNotify } = await import('@/utils/slackNotify');
         vi.mocked(registryService.registerFamilyOrThrow).mockResolvedValueOnce({
           pointerAccepted: true,
           deviceCountry: 'SG',
+          attributionInferred: { band: 'high', fields: { utm_source: 'chatgpt' } },
         });
 
-        await createPod();
+        const result = await createPod();
 
-        expect(await lastSlack()).toMatch(/\n\*Country:\* SG\n\*Platform:\* .+\n\*Device:\* .+$/);
-      });
-
-      it('leaves the country line out when the registry returned none', async () => {
-        const registryService = await import('@/services/registry/registryService');
-        vi.mocked(registryService.registerFamilyOrThrow).mockResolvedValueOnce({
-          pointerAccepted: true,
-          deviceCountry: null,
-        });
-
-        await createPod();
-
-        const text = await lastSlack();
-        expect(text).not.toContain('Country');
-        expect(text).toContain('\n*Platform:* ');
-      });
-
-      it.each(['high', 'medium'] as const)(
-        'adds the inferred "Came from" line for a %s band',
-        async (band) => {
-          const registryService = await import('@/services/registry/registryService');
-          vi.mocked(registryService.registerFamilyOrThrow).mockResolvedValueOnce({
-            pointerAccepted: true,
-            attributionInferred: {
-              band,
-              fields: { utm_source: 'chatgpt', utm_campaign: 'sg-pilot', utm_content: 'ad_1' },
-            },
-          });
-
-          const result = await createPod();
-
-          expect(result.ok).toBe(true);
-          const text = await lastSlack();
-          expect(text).toContain(
-            `\n*Came from (inferred, ${band}):* \`chatgpt / sg-pilot / ad_1\``
-          );
-          expect(text).not.toContain('\n*Came from:*');
-        }
-      );
-
-      it('does not post a low band', async () => {
-        const registryService = await import('@/services/registry/registryService');
-        vi.mocked(registryService.registerFamilyOrThrow).mockResolvedValueOnce({
-          pointerAccepted: true,
-          attributionInferred: { band: 'low', fields: { utm_source: 'chatgpt' } },
-        });
-
-        await createPod();
-
-        expect(await lastSlack()).not.toContain('Came from');
+        expect(result.ok).toBe(true);
+        expect(vi.mocked(slackNotify)).not.toHaveBeenCalled();
       });
     });
 
@@ -1296,7 +1237,6 @@ describe('pod creation: full end-to-end flow', () => {
         authStore.currentUser!.memberId,
         'fam-test-1',
         'Trust Family',
-        null,
         opts
       );
     }

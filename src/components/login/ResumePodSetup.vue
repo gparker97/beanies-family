@@ -39,31 +39,36 @@
  * surface for a brand-new family (desktop hands off here after the step-2
  * popup; iPhone resumes here after the Drive redirect). The owner's 6-digit PIN
  * (Phase 4 — families are born password-free) is
- * collected ONCE in the `identity` phase, then the pod is written and the new
- * terminal `members` phase runs for every user before `/nook`.
+ * collected ONCE in the `identity` phase, then the pod is written and the
+ * post-write steps (kit, members, survey) run for every user before `/nook`.
  *
  * Phase reachability — the create and load sub-flows are disjoint:
  *
  *   create (genuinely-new family):
- *     no-registry-entry → identity → survey → (storage |        ) → finishing
- *                                              (already-connected) → finalizePod
- *       → finalizePod SUCCESS → members → SetupProgressModal → signed-in /nook
+ *     no-registry-entry → identity → (storage |        ) → finishing
+ *                                    (already-connected) → finalizePod
+ *       → finalizePod SUCCESS → recovery-kit → members → survey
+ *       → SetupProgressModal → syncStore.completePodSetup → signed-in /nook
  *
- *   The `survey` phase ("how did you hear about us?") sits between `identity`
- *   (the one universal pre-finalize node — the PIN is collected there) and the
- *   finalize dispatch, so its answer can ride the `createNewFile` Slack. It is
- *   optional/skippable and MUST never block finalize (see `proceedToFinalize`).
+ *   #128: back from a web Drive redirect that said no (a stashed resume reason):
+ *     no-registry-entry → drive-declined → (redirect to Google | token already valid → identity
+ *                                           | local file → identity)
+ *
+ *   #128: the `survey` phase ("how did you hear about us?") is the LAST tap before
+ *   the app, after the pod write, so it is off the critical path. Its answer rides
+ *   `completePodSetup` (the registry write + the "Family pod created!" Slack). It is
+ *   optional/skippable and MUST never block entry to the app (see `onErrorCaptured`).
  *
  *   load (existing pod — NEVER reaches `members`):
  *     auto-loadable → auto-load → completeAutoLoad success → signed-in /nook
  *     open-existing (adopt-confirm) → auto-load → … → signed-in /nook
  *     registry-error | load-failed → retry → (re-probe | start-new → identity)
  *
- * The `members` phase is entered ONLY from `finalizePod`'s create-success
- * branch — never from any existing-pod load (`handleAutoLoadSubmit`,
+ * The post-write phases (`recovery-kit` → `members` → `survey`) are entered ONLY
+ * from `finalizePod`'s create-success branch — never from any existing-pod load (`handleAutoLoadSubmit`,
  * `openExistingOnDrive`, `retry`), which emit `signed-in '/nook'` directly.
  */
-import { ref, computed, onMounted, onBeforeUnmount, onErrorCaptured } from 'vue';
+import { ref, computed, watch, onMounted, onBeforeUnmount, onErrorCaptured } from 'vue';
 import {
   type PayloadLoadError,
   DriveConsentDeniedError,
@@ -77,7 +82,9 @@ import LocalFileSyncWarning from '@/components/login/LocalFileSyncWarning.vue';
 import CreateMembersStep from '@/components/login/CreateMembersStep.vue';
 import PinInput from '@/components/ui/PinInput.vue';
 import RecoveryKitDisplay from '@/components/auth/RecoveryKitDisplay.vue';
-import MagicLinkFlow from '@/components/auth/MagicLinkFlow.vue';
+import PhoneHandoffLine from '@/components/auth/PhoneHandoffLine.vue';
+import { isDesktopBrowser } from '@/utils/platformLabel';
+import { fillTemplate } from '@/utils/fillTemplate';
 import { isValidPin } from '@/services/auth/deviceUnlock';
 import CreatePodSurvey from '@/components/login/CreatePodSurvey.vue';
 import SetupProgressModal from '@/components/login/SetupProgressModal.vue';
@@ -94,8 +101,9 @@ import { canUseLocalFiles } from '@/services/sync/capabilities';
 import { isTokenValid, isUserCancellation } from '@/services/google/googleAuth';
 import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry';
+import { trackOnboardingStep, type OnboardingStep } from '@/services/telemetry/onboardingAttempt';
 import { confirm } from '@/composables/useConfirm';
-import { consumeResumeReason } from '@/components/login/resumePaths';
+import { consumeResumeReason, type ResumeSetupReason } from '@/components/login/resumePaths';
 import type { HeardVia } from '@beanies/brand/heardVia';
 
 const { t } = useTranslation();
@@ -127,15 +135,19 @@ const emit = defineEmits<{
  * `auto-load` is the non-destructive happy path; `identity` + `storage` are
  * the create flow (genuinely-new families). `finishing` is the spinner shown
  * during a critical write — both auto-load decrypt and create-pod write.
- * `survey` is the optional create-only "how did you hear about us?" step shown
- * after `identity` and before finalize (its answer rides the create Slack).
- * `members` is the terminal create-only add-family-members step, reached ONLY
- * after a successful pod write (see the phase-reachability table above).
+ * `recovery-kit`, `members` and `survey` are the create-only post-write steps,
+ * reached ONLY after a successful pod write (see the phase-reachability table
+ * above); `survey` is the optional "how did you hear about us?" step, last.
+ * `drive-declined` is the web redirect's "Google needs a yes" return (#128): a stashed
+ * resume reason on a `no-registry-entry` probe. It sits BEFORE `identity`, so nothing on it
+ * may write a pod (no PIN yet): `finalizePod` routes to the PIN step until `ownerReady`, and
+ * every storage fallback returns here rather than to `storage` (`storageFallbackPhase`).
  */
 type Phase =
   | 'probing'
   | 'auto-load'
   | 'identity'
+  | 'drive-declined'
   | 'survey'
   | 'storage'
   | 'finishing'
@@ -143,6 +155,52 @@ type Phase =
   | 'members'
   | 'retry';
 const phase = ref<Phase>('probing');
+
+/**
+ * #128 funnel: the onboarding step each phase IS, for the `shown` events. Phases absent from
+ * the map (`auto-load`, `retry`, `finishing`) are not create-funnel steps and emit nothing;
+ * every create error fallback lands on `storage` or `drive-declined` (`storageFallbackPhase`),
+ * both mapped, so the recorded step never sticks on a screen the person has left. `submitted`
+ * is emitted explicitly on the success line of each step's handler, not here.
+ */
+const PHASE_STEP: Partial<Record<Phase, OnboardingStep>> = {
+  probing: 'resume-probe',
+  'drive-declined': 'drive-declined',
+  identity: 'pin',
+  storage: 'storage',
+  'recovery-kit': 'kit',
+  members: 'members',
+  survey: 'survey',
+};
+// `immediate`: the first phase (`probing`) is set before the watcher exists. A no-op when no
+// create attempt is open (a returning user's recovery visit emits nothing).
+watch(
+  phase,
+  (next) => {
+    const step = PHASE_STEP[next];
+    if (step) trackOnboardingStep(step, 'shown');
+  },
+  { immediate: true }
+);
+
+/**
+ * Has the PIN step run: the owner rebuilt with the chosen PIN (`handleIdentityNext`)? THE
+ * precondition of a pod write, enforced at the one place a write starts (`finalizePod`), so no
+ * route into it, however it got there, can write a pod with `pin === ''` and no rebuilt owner.
+ * Before it is set, the only screen that can start a storage connect is `drive-declined`
+ * (#128), which sits BEFORE the PIN step.
+ */
+const ownerReady = ref(false);
+
+/**
+ * Where a storage attempt that did not reach the write returns to: the storage step once the
+ * PIN is set, the `drive-declined` screen it started from before that. ONE rule for every
+ * fallback arm (Drive, local file, the catches and `finally`s), so no arm can drop someone who
+ * has not chosen a PIN onto a storage step whose buttons assume they have.
+ */
+function storageFallbackPhase(): Phase {
+  return ownerReady.value ? 'storage' : 'drive-declined';
+}
 
 const ownerName = ref('');
 // Phase 4: the create-flow credential is the owner's 6-digit PIN. `password`
@@ -153,16 +211,14 @@ const password = ref('');
 // One-time recovery kit from `createNewFile` — the mandatory `recovery-kit`
 // phase displays it; the code leaves memory on confirmation.
 const kitCode = ref('');
-/** The owner's magic link for the combined save step. One-time, like the kit code. */
-/** A `uiStrings` key when the mint failed — the step degrades, it never blocks. */
 const kitId = ref('');
 // "How did you hear about us?" answer (`{ id, label }`; null = skipped). Captured in the
-// `survey` phase, threaded into createNewFile.
+// `survey` phase, handed to `syncStore.completePodSetup` at the end.
 const heardVia = ref<HeardVia | null>(null);
 const formError = ref<string | null>(null);
 const busy = ref(false);
 const showLocalFileWarning = ref(false);
-// Drives the SetupProgressModal opened from the terminal `members` phase
+// Drives the SetupProgressModal opened from the terminal `survey` phase
 // (sync the just-added members + register), mirroring CreatePodView's old
 // handleFinish → SetupProgressModal → /nook tail.
 const showSetupModal = ref(false);
@@ -172,9 +228,62 @@ const navigatedAway = ref(false);
 
 // Auto-load phase metadata (populated when registry lookup says 'auto-loadable').
 const autoLoadFamilyName = ref<string>('');
+
+/**
+ * Why the `drive-declined` phase is showing (#128), for its notice copy: `drive-declined`
+ * (Cancel/Back at Google) or `drive-consent` (the file-access box left unticked).
+ */
+const declineReason = ref<ResumeSetupReason | null>(null);
 const autoLoadLastSaved = ref<string | null>(null);
 
 const familyName = computed(() => familyContextStore.activeFamilyName || 'your family');
+
+/**
+ * The name the session already knows (#128), from step 1's `signUp`. ⚠️ `currentUser.displayName`,
+ * NEVER the `authStore.displayName` getter: that falls back to the email, which must not be
+ * greeted as a name. Non-empty → the PIN step says it and does not ask for it again.
+ */
+const knownOwnerName = computed(() => authStore.currentUser?.displayName?.trim() ?? '');
+/** The greeting uses the first name only ("Choose your PIN, Greg"), per the approved mockup. */
+const knownOwnerFirstName = computed(() => knownOwnerName.value.split(/\s+/)[0] ?? '');
+
+/**
+ * The page header, one variant per phase (#128). `null` hides it: the survey and the members
+ * step carry their own heading. The subtitle says why the person is on this screen; the
+ * default is phase-neutral because it also renders on probing, retry, storage and kit.
+ */
+const header = computed<{ title: string; subtitle: string | null } | null>(() => {
+  switch (phase.value) {
+    case 'survey':
+    case 'members':
+      return null;
+    case 'identity':
+      return {
+        title: knownOwnerName.value
+          ? fillTemplate(t('resumeSetup.choosePinFor'), { name: knownOwnerFirstName.value })
+          : t('resumeSetup.title'),
+        subtitle: t('resumeSetup.subtitlePin'),
+      };
+    case 'auto-load':
+      return { title: t('resumeSetup.title'), subtitle: t('resumeSetup.subtitleRecovery') };
+    // No subtitle: the orange notice under the title is the explanation (mockup Focus 2).
+    case 'drive-declined':
+      return { title: t('resumeSetup.driveDeclinedTitle'), subtitle: null };
+    default:
+      return { title: t('resumeSetup.title'), subtitle: t('resumeSetup.subtitle') };
+  }
+});
+
+/** Phases with no "Start over": a critical write, and every post-write step. */
+const HIDE_START_OVER: ReadonlySet<Phase> = new Set<Phase>([
+  'finishing',
+  'recovery-kit',
+  'members',
+  'survey',
+]);
+
+/** Desktop browsers only (#128): the kit step's "Use beanies on your phone too" line. */
+const onDesktopBrowser = isDesktopBrowser();
 
 const lastSavedDisplay = computed(() => {
   if (!autoLoadLastSaved.value) return null;
@@ -208,8 +317,9 @@ onMounted(async () => {
   }
 
   // Pre-fill the name field. `authStore.displayName` resolves to the cached
-  // `currentUser.displayName` (set by signUp) when the doc isn't loaded yet.
-  ownerName.value = authStore.displayName;
+  // `currentUser.displayName` (set by signUp) when the doc isn't loaded yet. The known
+  // name backs it up: when it is set the field is hidden, so it must never stay empty.
+  ownerName.value = authStore.displayName || knownOwnerName.value;
 
   // No secret is stashed across the iOS Drive redirect (the round-2 stash was
   // removed 2026-06-20 — WebKit bounce-tracking cleared it anyway). The generic
@@ -218,23 +328,54 @@ onMounted(async () => {
   // `no-registry-entry` → the `identity` phase asks for the PIN ONCE →
   // `handleIdentityNext` finishes on Drive. See
   // docs/plans/2026-06-20-ios-oauth-bounce-state-param.md.
-  await runProbe();
-
-  // Surface a specific hint if we arrived here because Google file access was
-  // denied on the consent screen (2026-06-19, finding 3). Set after runProbe so
-  // it isn't cleared by the probe's `formError = null`. The reconnect CTA is the
-  // storage step's "Connect Google Drive" button.
-  // ⚠️ ONLY WHEN THE PROBE LEFT NOTHING TO SAY. `runProbe` now has two arms of its own that set
-  // `formError` (its catch, and `drive-auth-failed`), and a stashed hint is the older, vaguer
-  // fact — overwriting a live "you cancelled sign-in" with "allow file access" would describe a
-  // flow that did not happen. Consume it either way so it cannot resurface on a later mount.
-  const stashedReason = consumeResumeReason();
-  if (!formError.value && stashedReason === 'drive-consent') {
-    formError.value = t('resumeSetup.driveConsentDenied');
-  }
+  //
+  // #128: a web Drive redirect that came back with a "no" (declined at Google, or the file-access
+  // box unticked) stashed a reason. It is consumed here, once, either way, so it cannot resurface
+  // on a later mount, and handed to the probe, which honours it ONLY on its `no-registry-entry`
+  // arm (the genuinely-new family that was about to pick a PIN). Every other probe outcome keeps
+  // its own arm: a known pod, a retry or a redirect is a newer, more specific fact than the hint.
+  // ⚠️ Decided INSIDE the probe rather than by re-routing `identity` afterwards: the phase
+  // watcher would otherwise flush `identity` first and log a false `pin shown`.
+  await runProbe(consumeResumeReason());
 });
 
+/**
+ * Safari's swipe-back from Google restores this page from the back/forward cache (#128): the
+ * JS heap comes back exactly as it left, with `navigatedAway` still set by the redirect that
+ * left it, so no `finally` or probe arm will ever move the spinner. Two redirects can leave it:
+ *   - `finishOnDrive`'s (`phase` `finishing`, no Start over): back to the screen they left from
+ *     (`storageFallbackPhase`). The attempt's step leaves `drive-consent` with a `back`
+ *     (`returned`) and the restored screen logs its own `shown` through the phase watcher, so a
+ *     later tab close is an honest abandon at the screen they are actually on;
+ *   - the registry probe's (`phase` `probing`): to `retry`, whose Try again re-probes on the
+ *     person's own tap and whose Start over is the way out. No funnel step: the probe never
+ *     recorded `drive-consent`.
+ * Every redirect arm runs inside a `finally` that has already released `busy`; a restore with
+ * `busy` still raised is some other action in flight, which settles its own phase.
+ */
+function handlePageShow(e: PageTransitionEvent) {
+  if (!e.persisted || !navigatedAway.value || busy.value) return;
+  if (phase.value === 'finishing') {
+    navigatedAway.value = false;
+    trackOnboardingStep('drive-consent', 'back', { error_code: 'returned' });
+    phase.value = storageFallbackPhase();
+  } else if (phase.value === 'probing') {
+    navigatedAway.value = false;
+    phase.value = 'retry';
+  } else {
+    return;
+  }
+  logEvent({
+    level: 'info',
+    surface: 'resumeSetup',
+    message: 'restored from the back/forward cache mid-redirect',
+    context: { action: `bfcache-restore:${phase.value}` },
+  });
+}
+onMounted(() => window.addEventListener('pageshow', handlePageShow));
+
 onBeforeUnmount(() => {
+  window.removeEventListener('pageshow', handlePageShow);
   // Safety: never leave the members-step guard flag stranded if this surface is
   // torn down by any path other than handleSetupComplete (start-over, an error
   // route, a hard navigation). A stuck flag would suppress the ALREADY_AUTH
@@ -246,14 +387,16 @@ onBeforeUnmount(() => {
  * Registry probe + phase routing. Extracted from onMounted so the `retry`
  * screen's "Try again" can re-run it.
  *
- * `no-registry-entry` → `identity` (genuinely-new family — create is correct).
+ * `no-registry-entry` → `identity` (genuinely-new family — create is correct), or
+ * `drive-declined` when `stashedReason` says a web Drive redirect just came back with a "no"
+ * (#128; only the mount passes one, so a retry re-probe never re-shows the decline).
  * `registry-error` / `load-failed` → `retry` (a pod fileId is/was known but we
  * couldn't reach it). We deliberately do NOT fall through to the destructive
  * create path here — re-creating would orphan the real pod (the 2026-05-15
  * incident). The retry screen offers a non-destructive re-probe, and an
  * explicit confirm-gated "start a new pod" for the rare genuine give-up.
  */
-async function runProbe() {
+async function runProbe(stashedReason: ResumeSetupReason | null = null) {
   formError.value = null;
   phase.value = 'probing';
   let probeResult: Awaited<ReturnType<typeof syncStore.attemptResumeFromRegistry>>;
@@ -282,12 +425,21 @@ async function runProbe() {
       phase.value = 'auto-load';
       return;
     case 'no-registry-entry':
-      // Scenario (a) — genuinely new family; fall through to the create flow.
+      // Scenario (a) — genuinely new family; fall through to the create flow. Back from a
+      // declined web Drive redirect (#128): say so first, in orange, and offer the retry.
+      if (stashedReason) {
+        declineReason.value = stashedReason;
+        phase.value = 'drive-declined';
+        return;
+      }
       phase.value = 'identity';
       return;
     case 'redirecting':
       // WEB ONLY: the page is unloading; keep the probing spinner up. On native
       // `gateCreateDriveAuth` awaits the round trip, so this arm is never taken there.
+      // `navigatedAway` lets a back/forward-cache restore find its way off the spinner
+      // (`handlePageShow`).
+      navigatedAway.value = true;
       return;
     case 'drive-auth-failed': {
       // NATIVE (or a start failure on either transport): the gesture-less probe opened the sheet
@@ -512,6 +664,7 @@ async function handleIdentityNext() {
   if (busy.value) return;
   if (!validateIdentity()) return;
   busy.value = true;
+  let rehydrated = false;
   try {
     const r = await authStore.rehydrateOwnerDoc(ownerName.value, pin.value);
     if (!r.success) {
@@ -524,11 +677,8 @@ async function handleIdentityNext() {
       });
       return;
     }
-    // PIN is set + owner rehydrated. Show the optional "how did you hear
-    // about us?" survey before finalize — the `identity` phase is the one node
-    // every create path passes through, so the answer can ride createNewFile's
-    // Slack. The survey drives `proceedToFinalize()` on complete/skip.
-    phase.value = 'survey';
+    rehydrated = true;
+    ownerReady.value = true;
   } catch (e) {
     console.error('[ResumePodSetup] unexpected error resuming setup', e);
     reportError({
@@ -537,22 +687,21 @@ async function handleIdentityNext() {
       error: e,
       severity: 'error',
     });
+    // Stays on the PIN step, like the `!r.success` arm above: the owner was NOT rebuilt, so the
+    // storage step (which used to be set here) would lead straight to a write with no owner.
     formError.value = t('setup.fileCreateFailed');
-    phase.value = 'storage';
   } finally {
     busy.value = false;
-    if (!navigatedAway.value && phase.value === 'finishing') phase.value = 'storage';
+    if (!navigatedAway.value && phase.value === 'finishing') phase.value = storageFallbackPhase();
   }
+  if (!rehydrated) return;
+  // PIN is set + owner rehydrated: straight to the write. #128 moved the survey AFTER it
+  // (kit → members → survey), off the critical path. Called after the `finally` above has
+  // released `busy`, which `proceedToFinalize` re-arms for itself.
+  trackOnboardingStep('pin', 'submitted');
+  await proceedToFinalize();
 }
 
-/**
- * The finalize dispatch that writes the pod, extracted so BOTH the desktop
- * already-connected path (via the survey's @complete) and error-degradation
- * reach it with the SAME safety envelope — a peer of `handleConnectDrive` /
- * `handleConnectLocal`. The survey's callback fires on a LATER tick after an
- * indefinite user pause, so this MUST re-arm the busy latch + try/catch + finally
- * rather than run the point-of-no-return bare.
- */
 /**
  * Do we hold a usable Drive token, trying one silent recovery first?
  *
@@ -594,6 +743,12 @@ function driveAuthMessage(kind: 'consent-denied' | 'cancelled' | 'failed'): stri
   return t('googleDrive.authFailed');
 }
 
+/**
+ * The finalize dispatch that writes the pod, extracted so the PIN step and the storage
+ * fallbacks reach it with the SAME safety envelope — a peer of `handleConnectDrive` /
+ * `handleConnectLocal`. It re-arms the busy latch + try/catch + finally rather than run
+ * the point-of-no-return bare.
+ */
 async function proceedToFinalize() {
   if (busy.value) return;
   busy.value = true;
@@ -652,7 +807,7 @@ async function proceedToFinalize() {
       } else {
         // ⚠️ NO ERROR MESSAGE HERE, AND THAT IS NOT AN OVERSIGHT — a previous round added one and
         // it was wrong. This `else` is the ORDINARY route to the storage step for a brand-new
-        // family: the phase table above reads `no-registry-entry → identity → survey → storage`,
+        // family: the phase table above reads `no-registry-entry → identity → storage`,
         // and on that path there is no provider yet and no Google token (accounts are born from
         // email + PIN, not OAuth), so every first-time creator lands here. Saying "Google
         // sign-in failed" above "Where should we keep your family's file?" tells someone their
@@ -673,25 +828,40 @@ async function proceedToFinalize() {
       severity: 'error',
     });
     formError.value = t('setup.fileCreateFailed');
-    phase.value = 'storage';
+    phase.value = storageFallbackPhase();
   } finally {
     busy.value = false;
-    if (!navigatedAway.value && phase.value === 'finishing') phase.value = 'storage';
+    if (!navigatedAway.value && phase.value === 'finishing') phase.value = storageFallbackPhase();
   }
 }
 
 /**
- * Survey complete/skip — record the answer (may be null) and proceed to finalize.
- * A survey failure must NEVER block pod creation (see `onErrorCaptured` below).
+ * Survey complete/skip — the last step (#128): record the answer (may be null) and open
+ * SetupProgressModal, whose completion hands the answer to `syncStore.completePodSetup`.
+ * A survey failure must NEVER block entry to the app (see `onErrorCaptured` below).
  */
 function handleSurveyComplete(heard: HeardVia | null) {
   heardVia.value = heard;
-  void proceedToFinalize();
+  trackOnboardingStep('survey', 'submitted');
+  openSetupModal();
+}
+
+/**
+ * Leave the survey for the setup modal. ⚠️ `finishing` UNMOUNTS THE SURVEY, and that is the
+ * point: left mounted behind the modal, a survey that threw once could throw again, and with
+ * the modal open the error guard below no longer owned it, so the second throw escaped to the
+ * global handler and the completion never ran. `finishing` also keeps Start over hidden (the
+ * pod exists) and records no funnel step. `handleSetupBack` returns to `survey`.
+ */
+function openSetupModal() {
+  phase.value = 'finishing';
+  showSetupModal.value = true;
 }
 
 // Belt-and-braces: if the survey subtree throws, degrade to skip and still
-// create the pod (a cosmetic survey must never block family creation). Scoped to
-// the survey phase so non-survey errors keep propagating normally.
+// finish setup (a cosmetic survey must never block entry to the app). Scoped to
+// the survey phase, which `openSetupModal` leaves, so non-survey errors (the
+// modal's own included) keep propagating normally.
 onErrorCaptured((err) => {
   if (phase.value !== 'survey') return undefined;
   reportError({
@@ -701,12 +871,32 @@ onErrorCaptured((err) => {
     severity: 'warning',
   });
   heardVia.value = null;
-  void proceedToFinalize();
+  openSetupModal();
   return false; // handled — stop propagation
 });
 
 /** Step 2: write the pod file with the now-connected provider, then route to /nook. */
 async function finalizePod(): Promise<boolean> {
+  // ⚠️ NO WRITE BEFORE THE PIN STEP (see `ownerReady`). A storage connect started on the
+  // `drive-declined` screen (a local file, or a Drive connect that came back connected in place)
+  // reaches here with `pin === ''` and no rebuilt owner. The provider it installed stays live,
+  // so the PIN step's submit writes into it (`proceedToFinalize` → the live-provider arm).
+  if (!ownerReady.value) {
+    logEvent({
+      level: 'info',
+      surface: 'resumeSetup',
+      message: 'pod write deferred to the PIN step',
+      context: {
+        action: 'finalize-deferred:no-pin',
+        provider_type: syncStore.storageProviderType ?? null,
+      },
+    });
+    // The connect that got here succeeded: a message left from an earlier try on the declined
+    // screen (`handleConnectLocal` does not clear it) must not sit above the PIN form.
+    formError.value = null;
+    phase.value = 'identity';
+    return false;
+  }
   const user = authStore.currentUser;
   if (!user) {
     formError.value = t('setup.fileCreateFailed');
@@ -737,8 +927,7 @@ async function finalizePod(): Promise<boolean> {
       podFileName,
       user.memberId,
       familyId,
-      familyContextStore.activeFamilyName ?? 'My Family',
-      heardVia.value
+      familyContextStore.activeFamilyName ?? 'My Family'
     );
   let result = await createPod();
   let retriedWrite = false;
@@ -831,11 +1020,11 @@ async function finalizePod(): Promise<boolean> {
     return false;
   }
   // Pod written. Unlike the load paths, a create does NOT route to /nook yet:
-  // advance to the terminal `members` phase so every user (iPhone included)
-  // gets the add-family-members step before entering the app. `/nook` is
-  // emitted later, after SetupProgressModal completes (handleSetupComplete).
-  // Flag the members step so the router's ALREADY_AUTH guard does not bounce
-  // /welcome?resume=setup → /nook now that podCreated is true (iOS skip guard).
+  // advance to the post-write steps (kit → members → survey) so every user
+  // (iPhone included) gets them before entering the app. `/nook` is emitted
+  // later, after SetupProgressModal completes (handleSetupComplete). Flag them so
+  // the router's ALREADY_AUTH guard does not bounce /welcome?resume=setup → /nook
+  // now that podCreated is true (iOS skip guard).
   logEvent({
     level: 'info',
     surface: 'resumeSetup',
@@ -854,7 +1043,6 @@ async function finalizePod(): Promise<boolean> {
   // guard doesn't bounce /welcome → /nook out of the kit step.
   kitCode.value = result.kit.code;
   kitId.value = result.kit.kitId;
-  // Mint the owner's magic link for the SAME screen (Requirement 10). Best-effort by
   // ⚠️ NO MAGIC-LINK MINT HERE ANY MORE, AND THAT IS THE POINT.
   //
   // Setup used to hand the new owner a 7-day magic link alongside the recovery kit, as a second
@@ -864,8 +1052,9 @@ async function finalizePod(): Promise<boolean> {
   // by side said they were equally important and drained the urgency from the one that is.
   //
   // What the link was actually for at this moment ("I am on the desktop, I want the app on my
-  // phone") is now an OFFER below the kit, minting on demand at fifteen minutes. Nothing to
-  // save, nothing expiring in a week in someone's notes app.
+  // phone") is now a one-line OFFER under the kit's confirm button (`PhoneHandoffLine`, desktop
+  // browsers only, #128), minting on demand at fifteen minutes. Nothing to save, nothing
+  // expiring in a week in someone's notes app.
   //
   // ⚠️ AND IT CLOSES A HOLE: the 7-day link wrote `memberLinkKeys`, and the Settings card that
   // was the only UI able to read or replace that dict is gone. A link issued here would have
@@ -882,19 +1071,6 @@ async function finalizePod(): Promise<boolean> {
 }
 
 /**
- * Mint the owner's magic link for the combined save step.
- *
- * ⚠️ BEST-EFFORT, AND IT MUST STAY THAT WAY. This runs inside an UNCLOSABLE modal at the
- * end of a create flow that already loses 47% of its starters. `setMemberLinkWrap`
- * awaits a publish and returns false when offline, so on a flaky connection this WILL
- * fail — and if that could wedge the final screen, we would have traded a whole family's
- * signup for a convenience credential. The kit is the guaranteed artefact; the link
- * degrades to a Settings pointer and the confirm button stays enabled.
- *
- * Silent is still forbidden: the failure is shown on the card and reported by the store.
- */
-
-/**
  * The kit-step confirmation: stamp the doc-side signal (and HOW the kit was confirmed, which
  * the sign-out kit guard keys on), drop the code, advance. No sync here: SetupProgressModal's
  * sync carries the stamp, and the create tail must never block on a push.
@@ -902,24 +1078,29 @@ async function finalizePod(): Promise<boolean> {
  */
 async function handleKitStepStored(via: 'saved' | 'acknowledged') {
   kitCode.value = '';
-  // The magic link is no longer minted here, so there is nothing of its to clear: the offer
-  // below the kit mints on demand and `MagicLinkFlow` owns resetting its own state.
+  // The magic link is no longer minted here, so there is nothing of its to clear: the phone
+  // line under the kit mints on demand and owns its own state.
   await settingsStore.markRecoveryKitConfirmed(via);
+  trackOnboardingStep('kit', 'submitted');
   phase.value = 'members';
 }
 
 /**
- * `members` phase: the user is done adding family — open SetupProgressModal,
- * which syncs the just-added members + registers the pod, then routes to /nook.
+ * `members` phase: the user is done adding family (or chose "later") — on to the
+ * optional survey, the last step before the app (#128).
  */
 function handleMembersFinish() {
-  showSetupModal.value = true;
+  trackOnboardingStep('members', 'submitted');
+  phase.value = 'survey';
 }
 
 async function handleSetupComplete() {
-  // The "🎉 pod created" Slack ping already fired inside createNewFile when the
-  // pod was written; this just closes the wizard and enters the app.
   showSetupModal.value = false;
+  // #128: the completion write (registry heardVia + memberCount), the "🎉 Family pod
+  // created!" Slack post, Plausible `pod_created` and the end of the create attempt. Never
+  // throws and bounded, so entry to the app is never blocked by it; a second call for the
+  // same family is a logged no-op.
+  await syncStore.completePodSetup({ heardVia: heardVia.value });
   // Refresh the reactive settings projection from the just-written doc BEFORE
   // routing. `buildOwnerDoc` set `onboardingCompleted:false`, but the snapshot
   // in `settingsStore.settings` can lag the doc — and `/nook`'s onboarding
@@ -933,10 +1114,10 @@ async function handleSetupComplete() {
     // the next navigation (the prior behaviour). Don't block entry to the app.
     console.warn('[ResumePodSetup] settings refresh before /nook failed', e);
   }
-  // Members step is finished and we're leaving for /nook — release the guard
-  // flag. NOT cleared in handleSetupBack: that only closes SetupProgressModal
-  // and returns to the still-active members phase (CreateMembersStep re-renders),
-  // so clearing there would reopen the /welcome → /nook skip window.
+  // Setup is finished and we're leaving for /nook — release the guard flag. NOT
+  // cleared in handleSetupBack: that only closes SetupProgressModal and returns to
+  // the survey phase (CreatePodSurvey re-mounts), so clearing there would reopen
+  // the /welcome → /nook skip window.
   syncStore.membersStepActive = false;
   navigatedAway.value = true;
   emit('signed-in', '/nook');
@@ -944,6 +1125,9 @@ async function handleSetupComplete() {
 
 function handleSetupBack() {
   showSetupModal.value = false;
+  // The watcher then logs `survey shown` for the return, so the step pair reads back → shown.
+  trackOnboardingStep('survey', 'back');
+  phase.value = 'survey';
 }
 
 async function finishOnDrive() {
@@ -954,7 +1138,13 @@ async function finishOnDrive() {
   });
   // WEB ONLY: the page is unloading. On native `connectDriveStorage` awaited the round trip and
   // this arm is never taken — the arms below run in place, inside `handleConnectDrive`'s envelope.
-  if (r.status === 'redirecting') return;
+  // ⚠️ `navigatedAway` keeps the callers' `finally` from flipping `finishing` back to `storage`
+  // while Google loads (#128): that flashed the storage picker, and its `storage shown` made the
+  // unload log as an `abandon` at `storage`, the false abandon `drive-consent` exists to prevent.
+  if (r.status === 'redirecting') {
+    navigatedAway.value = true;
+    return;
+  }
   if (r.status === 'failed') {
     // Adopt-existing recovery — the fix for the iOS dead-end loop (2026-06-19).
     // This is exactly where the orphaned-pod collision lands on iPhone.
@@ -976,7 +1166,7 @@ async function finishOnDrive() {
           return;
         case 'declined':
           formError.value = t('createPod.duplicateFile');
-          phase.value = 'storage';
+          phase.value = storageFallbackPhase();
           return;
         case 'reject-different-account':
           formError.value = t('createPod.duplicateFile');
@@ -986,23 +1176,24 @@ async function finishOnDrive() {
             severity: 'warning',
             context: { provider_type: 'google_drive', collision_file_id: r.collision.fileId },
           });
-          phase.value = 'storage';
+          phase.value = storageFallbackPhase();
           return;
         case 'failed':
-          formError.value = action.error || t('googleDrive.authFailed');
+          // Translated copy only; the raw (English, possibly id-bearing) error goes to the report.
+          formError.value = t('googleDrive.authFailed');
           reportError({
             surface: 'resumeSetup.adoptExisting',
             message: action.error || 'adopt-existing recovery failed during resume',
             severity: 'critical',
             context: { provider_type: 'google_drive' },
           });
-          phase.value = 'storage';
+          phase.value = storageFallbackPhase();
           return;
       }
     }
     if (r.errorKind === 'collision-check-unavailable') {
       formError.value = t('createPod.driveCheckUnavailable');
-      phase.value = 'storage';
+      phase.value = storageFallbackPhase();
       return;
     }
     // A consent denial is a user DECISION, so it is classified with the aborts
@@ -1024,7 +1215,7 @@ async function finishOnDrive() {
     formError.value = driveAuthMessage(
       consentDenied ? 'consent-denied' : abandoned ? 'cancelled' : 'failed'
     );
-    phase.value = 'storage';
+    phase.value = storageFallbackPhase();
     return;
   }
   await finalizePod();
@@ -1051,7 +1242,7 @@ async function openExistingOnDrive(fileId: string): Promise<void> {
     context: { provider_type: 'google_drive' },
   });
   formError.value = t('setup.fileCreateFailed');
-  phase.value = 'storage';
+  phase.value = storageFallbackPhase();
 }
 
 async function handleConnectDrive() {
@@ -1066,6 +1257,9 @@ async function handleConnectDrive() {
   busy.value = true;
   phase.value = 'finishing';
   try {
+    // #128: Drive connect started. Recorded HERE so the redirect `finishOnDrive` may start is
+    // never logged as an abandon at `storage`; the consent outcome is `connectStorage`'s.
+    trackOnboardingStep('drive-consent', 'shown');
     await finishOnDrive();
   } catch (e) {
     console.error('[ResumePodSetup] unexpected error connecting Drive', e);
@@ -1076,11 +1270,38 @@ async function handleConnectDrive() {
       severity: 'error',
     });
     formError.value = t('googleDrive.authFailed');
-    phase.value = 'storage';
+    phase.value = storageFallbackPhase();
   } finally {
     busy.value = false;
-    if (!navigatedAway.value && phase.value === 'finishing') phase.value = 'storage';
+    if (!navigatedAway.value && phase.value === 'finishing') phase.value = storageFallbackPhase();
   }
+}
+
+/**
+ * "Try again with Google" on the `drive-declined` screen (#128).
+ *
+ * This screen comes BEFORE the PIN step, and `handleConnectDrive` → `finishOnDrive` only
+ * redirects when no valid token exists; with one it would connect in place and reach
+ * `finalizePod`, whose `ownerReady` guard would send it to the PIN step anyway. A token already
+ * in hand means Google said yes after all, so this goes to the PIN step directly, whose submit
+ * finishes on Drive as usual, without a Drive connect first.
+ * (`ensureDriveToken` only tries a silent reconnect and never redirects, so it is not the retry;
+ * `gateCreateDriveAuth` stays the one place the create redirect starts.)
+ */
+async function handleDriveDeclinedRetry() {
+  showLocalFileWarning.value = false;
+  trackOnboardingStep('drive-declined', 'submitted');
+  if (isTokenValid()) {
+    phase.value = 'identity';
+    return;
+  }
+  await handleConnectDrive();
+}
+
+/** The local-file warning's "use Google Drive instead": the declined screen keeps its guard. */
+function handleWarningUseDrive() {
+  if (phase.value === 'drive-declined') void handleDriveDeclinedRetry();
+  else void handleConnectDrive();
 }
 
 function handleLocalFileClick() {
@@ -1090,6 +1311,10 @@ function handleLocalFileClick() {
 async function handleConnectLocal() {
   showLocalFileWarning.value = false;
   if (busy.value) return;
+  // #128: from the `drive-declined` screen no PIN has been chosen yet, so a connected local file
+  // goes to the PIN step (`finalizePod`'s guard; the PIN submit writes into the live local
+  // provider), and a failure returns to the declined screen rather than to `storage`.
+  const fallbackPhase = storageFallbackPhase();
   busy.value = true;
   phase.value = 'finishing';
   try {
@@ -1110,7 +1335,7 @@ async function handleConnectLocal() {
         });
         formError.value = t('setup.fileCreateFailed');
       }
-      phase.value = 'storage';
+      phase.value = fallbackPhase;
       return;
     }
     await finalizePod();
@@ -1123,10 +1348,10 @@ async function handleConnectLocal() {
       severity: 'error',
     });
     formError.value = t('setup.fileCreateFailed');
-    phase.value = 'storage';
+    phase.value = fallbackPhase;
   } finally {
     busy.value = false;
-    if (!navigatedAway.value && phase.value === 'finishing') phase.value = 'storage';
+    if (!navigatedAway.value && phase.value === 'finishing') phase.value = fallbackPhase;
   }
 }
 </script>
@@ -1135,25 +1360,26 @@ async function handleConnectLocal() {
   <div
     class="dark:bg-surface-raised dark:from-surface-raised dark:to-surface-raised mx-auto max-w-[480px] rounded-3xl bg-gradient-to-b from-white to-[#fffaf3] p-8 shadow-xl"
   >
-    <!-- The survey phase carries its own hero (eyebrow/title/subtitle), so the
-         generic ResumeSetup header is hidden while it shows. -->
-    <div v-if="phase !== 'survey'" class="mb-2 text-center">
-      <img
-        src="/brand/beanies_impact_bullet_transparent_192x192.png"
-        alt=""
-        class="mx-auto h-[80px] w-[80px]"
-      />
-    </div>
-
-    <h2
-      v-if="phase !== 'survey'"
-      class="font-outfit dark:text-ink mb-1 text-center text-xl font-bold text-gray-900"
-    >
-      {{ t('resumeSetup.title') }}
-    </h2>
-    <p v-if="phase !== 'survey'" class="dark:text-ink-soft mb-6 text-center text-sm text-gray-500">
-      {{ phase === 'auto-load' ? t('resumeSetup.subtitleRecovery') : t('resumeSetup.subtitle') }}
-    </p>
+    <!-- One header, one variant per phase (`header`); null on the survey, which
+         carries its own hero (eyebrow/title/subtitle). -->
+    <template v-if="header">
+      <div class="mb-2 text-center">
+        <img
+          src="/brand/beanies_impact_bullet_transparent_192x192.png"
+          alt=""
+          class="mx-auto h-[80px] w-[80px]"
+        />
+      </div>
+      <h2
+        class="font-outfit dark:text-ink text-center text-xl font-bold text-gray-900"
+        :class="header.subtitle ? 'mb-1' : 'mb-5'"
+      >
+        {{ header.title }}
+      </h2>
+      <p v-if="header.subtitle" class="dark:text-ink-soft mb-6 text-center text-sm text-gray-500">
+        {{ header.subtitle }}
+      </p>
+    </template>
 
     <div
       v-if="formError"
@@ -1222,6 +1448,40 @@ async function handleConnectLocal() {
       </button>
     </div>
 
+    <!-- Drive declined (#128): back from a web Drive redirect that said no. A decision,
+         not a fault, so a Heritage Orange notice (never the red form-error box), one
+         primary retry, and the quiet local-file fallback only where it exists. -->
+    <div v-else-if="phase === 'drive-declined'" class="space-y-4">
+      <p
+        class="dark:border-accent-lift border-primary-500 dark:bg-surface-raised dark:text-ink-soft rounded-xl border-l-4 bg-[var(--tint-orange-8)] p-3 text-sm text-gray-700"
+      >
+        {{
+          declineReason === 'drive-consent'
+            ? t('resumeSetup.driveConsentDenied')
+            : t('resumeSetup.driveDeclinedBody')
+        }}
+      </p>
+      <BaseButton class="w-full" :disabled="busy" :loading="busy" @click="handleDriveDeclinedRetry">
+        {{ t('resumeSetup.tryAgainWithGoogle') }}
+      </BaseButton>
+      <div v-if="canUseLocalFiles()" class="text-center">
+        <button
+          type="button"
+          class="font-outfit text-secondary-500 hover:text-secondary-600 dark:text-ink-faint dark:hover:text-ink cursor-pointer text-sm underline decoration-1 underline-offset-4 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+          :disabled="busy"
+          @click="handleLocalFileClick"
+        >
+          {{ t('storage.useLocalInstead') }}
+        </button>
+        <p class="dark:text-ink-faint mt-1 text-xs text-gray-500">
+          {{ t('storage.localFileWarning') }}
+        </p>
+      </div>
+      <p v-else class="dark:text-ink-faint text-center text-xs text-gray-500">
+        {{ t('storage.driveOnlyHere') }}
+      </p>
+    </div>
+
     <!-- Identity (fallback for scenario (a)) -->
     <form v-else-if="phase === 'identity'" class="space-y-4" @submit.prevent="handleIdentityNext">
       <div
@@ -1229,7 +1489,10 @@ async function handleConnectLocal() {
       >
         🫘 {{ familyName }}
       </div>
+      <!-- Asked only when the session does not already know it (#128): the header
+           greets a known name instead. -->
       <BaseInput
+        v-if="!knownOwnerName"
         v-model="ownerName"
         :label="t('setup.yourName')"
         :placeholder="t('family.enterName')"
@@ -1266,35 +1529,26 @@ async function handleConnectLocal() {
     </form>
 
     <!-- Recovery kit (Phase 4): mandatory post-write step — the kit generated inside
-         createNewFile is the envelope's ONLY wrap; confirm-stored gates progress. -->
-    <div v-else-if="phase === 'recovery-kit'" class="space-y-4">
-      <p class="dark:text-ink-soft text-center text-sm text-gray-600">
-        {{ t('setup.kitStepIntro') }}
-      </p>
-      <RecoveryKitDisplay
-        :open="phase === 'recovery-kit'"
-        :kit-id="kitId"
-        :code="kitCode"
-        @stored="handleKitStepStored"
-      />
-
-      <!-- The offer, deliberately NOT a task: no "save this too", and it can be ignored. -->
-      <div class="dark:border-line mt-4 rounded-2xl border border-gray-200 p-4 text-left">
-        <p class="font-outfit dark:text-ink text-sm font-bold text-gray-900">
-          {{ t('setup.alsoOnPhone') }}
-        </p>
-        <p class="dark:text-ink-soft mt-1 mb-3 text-sm text-gray-600">
-          {{ t('setup.alsoOnPhoneBody') }}
-        </p>
-        <!-- ⚠️ `gate: 'not-applicable'`. The owner set their PIN seconds ago in this same
-             uninterruptible step; re-asking for it is friction for no security. -->
-        <MagicLinkFlow
-          origin="creation"
-          cta-label-key="setup.scanWithPhone"
-          gate="not-applicable"
+         createNewFile is the envelope's ONLY wrap; confirm-stored gates progress. The
+         modal is unclosable, so everything for this step lives INSIDE it (#128): the
+         "your pod is ready" title + "Open my pod" (`creation`), and, on desktop browsers
+         only, the one-tap phone hand-off under the confirm button. The slot sits in the
+         modal footer, outside the kit card, so it never lands in the exported PDF. -->
+    <RecoveryKitDisplay
+      v-else-if="phase === 'recovery-kit'"
+      open
+      :kit-id="kitId"
+      :code="kitCode"
+      creation
+      @stored="handleKitStepStored"
+    >
+      <template #after-confirm>
+        <PhoneHandoffLine
+          v-if="onDesktopBrowser && authStore.currentUser?.memberId"
+          :owner-member-id="authStore.currentUser.memberId"
         />
-      </div>
-    </div>
+      </template>
+    </RecoveryKitDisplay>
 
     <!-- Storage (fallback for scenario (a)) -->
     <div v-else-if="phase === 'storage'" class="space-y-3">
@@ -1331,10 +1585,10 @@ async function handleConnectLocal() {
       </p>
     </div>
 
-    <!-- Survey (create-only): "how did you hear about us?" before finalize. -->
+    <!-- Survey (create-only): "how did you hear about us?", the last step (#128). -->
     <CreatePodSurvey v-else-if="phase === 'survey'" @complete="handleSurveyComplete" />
 
-    <!-- Members (create-finish only): add family members after the pod write. -->
+    <!-- Members (create-finish only): add family members after the kit step. -->
     <CreateMembersStep v-else-if="phase === 'members'" @finish="handleMembersFinish" />
 
     <!-- Finishing (in-flight critical write — auto-load decrypt or create-pod) -->
@@ -1343,13 +1597,10 @@ async function handleConnectLocal() {
       <p class="dark:text-ink-soft text-sm text-gray-500">{{ t('resumeSetup.finishing') }}</p>
     </div>
 
-    <!-- Start over — hidden during a critical write, on the members step (the pod
-         already exists; the user should finish, not sign back out), and on the
-         survey (which has its own skip affordance). -->
-    <div
-      v-if="phase !== 'finishing' && phase !== 'members' && phase !== 'survey'"
-      class="mt-6 text-center"
-    >
+    <!-- Start over — hidden during a critical write and on every post-write step
+         (kit, members, survey): the pod already exists, so the user should finish,
+         not sign back out. -->
+    <div v-if="!HIDE_START_OVER.has(phase)" class="mt-6 text-center">
       <button
         type="button"
         class="dark:hover:text-ink-soft text-sm text-gray-400 hover:text-gray-600"
@@ -1365,10 +1616,10 @@ async function handleConnectLocal() {
       :google-drive-available="syncStore.isGoogleDriveAvailable"
       @close="showLocalFileWarning = false"
       @proceed="handleConnectLocal"
-      @use-google-drive="handleConnectDrive"
+      @use-google-drive="handleWarningUseDrive"
     />
 
-    <!-- Setup progress modal — opened from the members step; syncs the added
+    <!-- Setup progress modal — opened from the survey step; syncs the added
          members + registers the pod, then routes into the app. -->
     <SetupProgressModal
       :open="showSetupModal"

@@ -9,7 +9,7 @@ import { HEARD_VIA_IDS, type HeardVia, type HeardViaId } from '@beanies/brand/he
 
 /**
  * "How did you hear about us?" — a brief, skippable single-question step shown
- * after the password (identity) step and before finalize, so its answer can
+ * last in the create flow (after the members step, before the setup modal), so its answer can
  * ride the create-pod Slack notification (see ResumePodSetup). Purely
  * presentational; it NEVER blocks pod creation. See
  * docs/plans/2026-07-21-remove-invite-gate-create-welcome-modal.md.
@@ -133,7 +133,7 @@ onMounted(() => {
       context: { action: 'shown' },
     });
   } catch {
-    // Never let a telemetry hiccup strand the user before finalize.
+    // Never let a telemetry hiccup strand the user before the setup modal.
     emit('complete', null);
   }
 });

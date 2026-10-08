@@ -28,6 +28,8 @@ import * as syncService from '@/services/sync/syncService';
 import { supportsFileSystemAccess, isNative } from '@/services/sync/capabilities';
 import { withTimeout } from '@/utils/timing';
 import { logEvent } from '@/services/telemetry/logEvent';
+import { trackOnboardingStep } from '@/services/telemetry/onboardingAttempt';
+import { currentCreateAttempt } from '@/utils/createAttemptState';
 import {
   FileNameCollisionError,
   CollisionCheckUnavailableError,
@@ -256,6 +258,47 @@ export async function connectDriveStorage(
   podFileBaseName: string,
   opts: { googleEmail?: string; activeFamilyId?: string | null } = {}
 ): Promise<StorageConnectOutcome> {
+  const outcome = await connectDriveStorageOnce(podFileBaseName, opts);
+  recordDriveConsentOutcome(outcome);
+  return outcome;
+}
+
+/**
+ * Close the create funnel's open `drive-consent` step (#128) with this call's outcome, for the
+ * two transports that finish in place (desktop popup, native round trip). The web redirect
+ * returns `redirecting` here and its exit is recorded by `OAuthCallbackPage` / App.vue's boot
+ * catch instead.
+ *
+ * Only while the attempt's current step IS `drive-consent`: the resume screen's finalize runs
+ * this again after a redirect return with the token already in hand (no consent in this call,
+ * step already `pin`), and the callback page has recorded that consent once. Collision outcomes
+ * count as `submitted`: Google said yes; what failed was the file, not the consent.
+ */
+function recordDriveConsentOutcome(outcome: StorageConnectOutcome): void {
+  if (outcome.status === 'redirecting') return;
+  if (currentCreateAttempt()?.step !== 'drive-consent') return;
+  if (outcome.status === 'connected') {
+    trackOnboardingStep('drive-consent', 'submitted');
+    return;
+  }
+  switch (outcome.errorKind) {
+    case 'name-collision':
+    case 'collision-check-unavailable':
+      trackOnboardingStep('drive-consent', 'submitted');
+      return;
+    case 'cancelled':
+    case 'consent-denied':
+      trackOnboardingStep('drive-consent', 'back', { error_code: outcome.errorKind });
+      return;
+    default:
+      trackOnboardingStep('drive-consent', 'back', { error_code: 'failed' });
+  }
+}
+
+async function connectDriveStorageOnce(
+  podFileBaseName: string,
+  opts: { googleEmail?: string; activeFamilyId?: string | null }
+): Promise<StorageConnectOutcome> {
   try {
     // On a redirect surface with no valid token, bounce through the system browser / full-page
     // redirect. The gate is INSIDE this try so one catch classifies both transports: a native
@@ -311,8 +354,9 @@ export async function connectDriveStorage(
       // choice; the caller explains what to allow and offers a retry.
       //
       // ⚠️ Typed here rather than sniffed at the call sites. It used to be left
-      // to `isUserCancellation`, whose regex (/cancel|dismiss|popup_closed/)
-      // matches none of the words in this message — so the same decision was
+      // to `isUserCancellation`, whose matcher (the substrings cancel / dismiss /
+      // popup_closed / user_cancel, or a bare `access_denied`) matches
+      // none of the words in this message — so the same decision was
       // classified three different ways by three callers, and exactly one of
       // them paged Slack as `critical` for a user ticking a box differently.
       return { status: 'failed', error: e.message, errorKind: 'consent-denied' };

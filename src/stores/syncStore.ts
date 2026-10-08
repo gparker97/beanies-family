@@ -139,6 +139,9 @@ import { toISODateString } from '@/utils/date';
 import { raceTimeout } from '@/utils/timing';
 import { knownDeviceTimeZone } from '@/utils/timeZone';
 import { clearAttribution, peekAttribution } from '@/utils/attributionStash';
+import { currentCreateAttempt } from '@/utils/createAttemptState';
+import { endCreateAttempt, trackOnboardingStep } from '@/services/telemetry/onboardingAttempt';
+import { track } from '@/services/analytics/plausible';
 import { summariseAttribution, type Attribution } from '@beanies/brand/attribution';
 import type { HeardVia, HeardViaId } from '@beanies/brand/heardVia';
 import { measureAsync, record as recordPerf } from '@/utils/perfTiming';
@@ -389,6 +392,18 @@ export const CREDENTIAL_PUBLISH_TIMEOUT_MS = 20000;
 const SIGNUP_START_SLACK_WAIT_MS = 5000;
 /** How long "Start over" waits for its registry DELETE before signing out anyway (#125). */
 const START_OVER_WAIT_MS = 5000;
+/**
+ * How long setup completion (#128) waits for its registry write before posting the Slack line
+ * without the country / inferred band and entering the app. A bound, not a deadline: the write
+ * keeps going and its real outcome is logged when it settles.
+ */
+const COMPLETE_SETUP_WAIT_MS = 5000;
+/**
+ * The longest later registry writes queue behind an in-flight setup-completion write (#128, see
+ * `pendingRegistryWrite`). `registerFamily` has no fetch timeout of its own, so without this one
+ * hung completion PUT would starve every later registry write for the rest of the session.
+ */
+const PENDING_REGISTRY_WRITE_MAX_MS = 15_000;
 
 /**
  * One `registry` firehose line per outcome of a registry action (#125): `action` names the
@@ -941,13 +956,15 @@ export const useSyncStore = defineStore('sync', () => {
   // SetupProgressModal visibility gate. See `src/types/sync.ts` for shape.
   const criticalWriteState = ref<CriticalWriteState>({ kind: 'idle' });
 
-  // True while the create flow's terminal add-members step is on screen. The
-  // pod is already written (podCreated=true) at this point, so the router's
-  // ALREADY_AUTH guard would otherwise redirect /welcome?resume=setup → /nook
-  // and skip add-members on iOS. A dedicated flag (NOT a criticalWriteState
+  // True while the create flow's post-write steps are on screen: the recovery kit,
+  // add-members, the survey and the setup modal (#128 moved the survey after the
+  // write). The pod is already written (podCreated=true) at this point, so the
+  // router's ALREADY_AUTH guard would otherwise redirect /welcome?resume=setup →
+  // /nook and skip those steps on iOS. A dedicated flag (NOT a criticalWriteState
   // variant — that would block ALL navigation) checked only in that guard. Set
-  // when finalizePod advances to the members phase; cleared on completion and
-  // on unmount. See ResumePodSetup + router/index.ts.
+  // when finalizePod succeeds; cleared only in ResumePodSetup's handleSetupComplete
+  // and on its unmount. Not a completion latch (`completePodSetup` has its own).
+  // See ResumePodSetup + router/index.ts.
   const membersStepActive = ref(false);
 
   // Google Drive state
@@ -3285,12 +3302,14 @@ export const useSyncStore = defineStore('sync', () => {
       // function was deleted on 2026-09-08 and the Lambda tombstones a DELETE
       // rather than dropping the row, so a recreate preserves the stamp.)
       signupPlatform: registrySignupPlatform(),
-      // The campaign tag (#118). Same write-once contract as `signupPlatform`: the Lambda
-      // stamps it ONLY alongside `isSignupEvent` on a row that has none, so only
-      // `createNewFile` passes it and every other write sends `null`, which never clears it.
+      // The campaign tag (#118). Write-once like `signupPlatform`: the Lambda stamps it only
+      // on the step-1 and signup writes, on a row that has none, so only `registerSignupStart`
+      // and `createNewFile` pass it and every other write sends `null`, which never clears it.
       attribution: opts.attribution ?? null,
-      // The survey answer's stable id. Same write-once-at-signup contract as `attribution`:
-      // only `createNewFile` passes it, every other write sends `null`, which never clears it.
+      // The survey answer's stable id. #128 moved the survey after the pod write, so this
+      // rides the setup-completion write instead of the signup one: the Lambda stamps it
+      // write-once on any OWNER write that carries it. Only `completePodSetup` passes it;
+      // every other write sends `null`, which never clears it.
       heardVia: opts.heardVia ?? null,
       // ONE MODE PER PAYLOAD. The Lambda decides `signupStart`, then `ownerSync`, then an
       // ordinary write, and judges a step-1 body by the step-1 rules alone. Forcing the other
@@ -3305,6 +3324,11 @@ export const useSyncStore = defineStore('sync', () => {
       // Lambda derives `deviceCountry` write-once. Every other write sends null; the zone
       // itself is never stored.
       deviceTimeZone: signupStart || isSignupEvent ? knownDeviceTimeZone() : null,
+      // #128: the open create attempt's id, so the registry row joins to that attempt's
+      // firehose funnel. Sent on every write while an attempt is open (an in-memory read); the
+      // Lambda stamps it write-once and only on the step-1 and signup writes, so a later write
+      // can never move it. Absent from the JSON when no attempt is open.
+      createAttemptId: currentCreateAttempt()?.id,
     };
   }
 
@@ -3315,8 +3339,7 @@ export const useSyncStore = defineStore('sync', () => {
    * fire-and-forget contract for non-critical background syncs.
    */
   async function _registerCurrentFamilySync(
-    attribution: Attribution | null,
-    heardVia: HeardViaId | null
+    attribution: Attribution | null
   ): Promise<registry.RegistryWriteResult> {
     const ctx = useFamilyContextStore();
     if (!ctx.activeFamilyId) {
@@ -3328,9 +3351,10 @@ export const useSyncStore = defineStore('sync', () => {
     // anchor invariant holds: post-`markPodCreated`, the registry has fileId.
     const result = await registry.registerFamilyOrThrow(
       ctx.activeFamilyId,
-      // Pod creation is the family's first login — and the ONLY write allowed to
-      // stamp `signupPlatform`, `attribution` and `heardVia`.
-      buildRegistryPayload({}, { isLoginEvent: true, isSignupEvent: true, attribution, heardVia })
+      // Pod creation is the family's first login — and the write that stamps
+      // `signupPlatform` and `attribution` (`heardVia` arrives later, on
+      // `completePodSetup`'s write, #128).
+      buildRegistryPayload({}, { isLoginEvent: true, isSignupEvent: true, attribution })
     );
     // A REFUSED POINTER IS A FAILED REGISTER (#125). The write landed but the row does not
     // point at the pod just written, so the recovery anchor this step exists for is missing.
@@ -3444,6 +3468,146 @@ export const useSyncStore = defineStore('sync', () => {
   }
 
   /**
+   * The family whose setup `completePodSetup` has already completed in this session, or null.
+   * Its own latch, deliberately NOT `membersStepActive`: that is a router-guard flag with three
+   * writers, and overloading it as a completion latch would couple the two. Cleared by
+   * `resetState` (sign-out), so a second family created after a sign-out completes normally.
+   */
+  let completedSetupFamilyId: string | null = null;
+
+  /**
+   * #128: the setup-completion registry write while it is still in flight (settled either way,
+   * so it never rejects), or null.
+   *
+   * ⚠️ WHY REGISTRY WRITES QUEUE BEHIND IT. `completePodSetup` waits at most
+   * `COMPLETE_SETUP_WAIT_MS` for that write so the person is never held at the door, then routes
+   * into the app, where `handleSignedIn`'s login register fires at once. The Lambda's PUT is a
+   * read-merge-write with a whole-item `PutItem`, conditioned only on the owner version: a login
+   * PUT that READ the row before the completion write landed and WROTE after it would put back
+   * the row it read, with `heardVia` and the re-scored `attributionInferred` gone. So every later
+   * fire-and-forget write (`registerCurrentFamily`, the owner sync) waits for this one to settle
+   * and then builds its payload, and the Lambda reads the row the completion wrote. Settles
+   * after at most `PENDING_REGISTRY_WRITE_MAX_MS` even if the write hangs. Cleared on settle and
+   * on sign-out (`resetState`); a write already queued behind it is bound to its family by
+   * `afterPendingRegistryWrite`, so it never lands on another family's row.
+   */
+  let pendingRegistryWrite: Promise<void> | null = null;
+
+  /**
+   * #128: the create wizard's completion, run once after the kit, members and survey steps
+   * (`ResumePodSetup.handleSetupComplete`). The "Family pod created!" Slack post moved here
+   * from `createNewFile` so it can carry the survey answer and the member count.
+   *
+   *   1. One registry write with `heardVia` (the Lambda stamps it write-once on an owner write
+   *      and re-scores the inferred attribution against it) and the transient `setupComplete`,
+   *      which asks the Lambda for the device country and the inferred band even when the
+   *      survey was skipped. `memberCount` already rides every payload. `isLoginEvent: false`:
+   *      `handleSignedIn` stays the sole `lastLoginAt` site. Bounded by
+   *      `COMPLETE_SETUP_WAIT_MS` because `registerFamily` has no timeout of its own and the
+   *      person is waiting to enter the app; the write's real outcome is logged when it
+   *      settles either way.
+   *   2. The Slack post, built from live state plus THIS write's response.
+   *   3. `clearAttribution('consumed')`, now that the Slack line has the tag.
+   *   4. Plausible `pod_created`, the `done` funnel step, and the end of the create attempt.
+   *
+   * Never throws and never blocks entry to the app: a registry failure is a `warning`, and
+   * step 4 runs whatever happened before it (the pod already exists). Idempotent per family:
+   * a second call returns early with an `onboarding` `complete-setup` `skipped` line. The demo
+   * seed never reaches this (it stops at `createNewFile` with `suppressRemoteSideEffects`).
+   */
+  async function completePodSetup({ heardVia }: { heardVia: HeardVia | null }): Promise<void> {
+    const ctx = useFamilyContextStore();
+    const familyId = ctx.activeFamilyId;
+    if (familyId && completedSetupFamilyId === familyId) {
+      logEvent({
+        level: 'info',
+        surface: 'onboarding',
+        message: 'complete-setup',
+        context: { action: 'skipped' },
+      });
+      return;
+    }
+    // Latched BEFORE the first await, so a concurrent second call is skipped too.
+    completedSetupFamilyId = familyId;
+    const log = registryActionLog('complete-setup');
+    try {
+      const familyStoreInst = useFamilyStore();
+      const membersAdded = familyStoreInst.members.filter((m) => m.role !== 'owner').length;
+
+      let registered: registry.RegistryWriteResult | null | undefined;
+      if (familyId) {
+        // `setupComplete` is transient (never stored, client or server). This is the one write
+        // that sends it, so it is spread on here rather than added to the shared builder.
+        const write = registry.registerFamily(familyId, {
+          ...buildRegistryPayload({}, { isLoginEvent: false, heardVia: heardVia?.id ?? null }),
+          setupComplete: true,
+        });
+        // Every later registry write waits for this one (see `pendingRegistryWrite`), but for
+        // at most `PENDING_REGISTRY_WRITE_MAX_MS`: a hung PUT must not starve the queue. The
+        // clear is chained FIRST, so it runs before any write queued behind it.
+        const settled = raceTimeout(
+          write.then(
+            () => true,
+            () => true
+          ),
+          PENDING_REGISTRY_WRITE_MAX_MS
+        ).then((done) => {
+          if (!done) log('queue-released-timeout', 'warn');
+        });
+        pendingRegistryWrite = settled;
+        void settled.then(() => {
+          if (pendingRegistryWrite === settled) pendingRegistryWrite = null;
+        });
+        // `registerFamily` never rejects (a transport failure resolves null, logged there as
+        // `put-failed`), so this logs the real outcome even when the wait below gave up.
+        void write.then((r) => log(r ? 'ok' : 'failed', r ? 'info' : 'warn'));
+        registered = await raceTimeout(write, COMPLETE_SETUP_WAIT_MS);
+        if (registered === undefined) log('timeout', 'warn');
+      } else {
+        log('no-family', 'warn');
+      }
+
+      const providerType = syncService.getProviderType();
+      const storageLabel =
+        providerType === 'google_drive'
+          ? 'Google Drive'
+          : providerType === 'local'
+            ? 'Local File'
+            : '(unknown)';
+      const attribution = peekAttribution();
+      const cameFrom = attribution ? summariseAttribution(attribution) : '';
+      slackNotify(
+        `🎉 *Family pod created!*\n*Family:* ${ctx.activeFamilyName ?? ''}\n*Owner:* ${familyStoreInst.owner?.name ?? ''}\n*Storage:* ${storageLabel}` +
+          // Always present: "(skipped)" tells a skip apart from a missing line.
+          `\n*Heard via:* ${heardVia?.label || '(skipped)'}` +
+          // One code span: the value charset admits `_` `~` `:`, which Slack would render
+          // as italic / strike / emoji, and excludes the backtick, so nothing breaks out.
+          // Omitted when the tag has none of source / campaign / content (ad ids only).
+          (cameFrom ? `\n*Came from:* \`${cameFrom}\`` : '') +
+          // From THIS write's response: the band after the Lambda re-scored it against the
+          // survey answer.
+          inferredSlackLine(registered?.attributionInferred) +
+          `\n*Members added:* ${membersAdded}` +
+          podSlackFooter(registered?.deviceCountry)
+      );
+      // Consume once, now that the registry row (stamped at the signup write) and the Slack
+      // line both have it.
+      clearAttribution('consumed');
+    } catch (e) {
+      reportError({
+        surface: 'onboarding',
+        message: `complete-setup failed: ${e instanceof Error ? e.message : String(e)}`,
+        error: e,
+        severity: 'warning',
+        context: { action: 'complete-setup', detail: 'failed' },
+      });
+    }
+    track('pod_created');
+    trackOnboardingStep('done', 'submitted');
+    endCreateAttempt('done');
+  }
+
+  /**
    * Cleanup after a failed `createNewFile`. Best-effort, never throws — the
    * caller's catch already has the originating error; this helper exists to
    * reduce the blast radius of the failure (don't leave a corrupt file under
@@ -3525,21 +3689,24 @@ export const useSyncStore = defineStore('sync', () => {
    *   3. await persistDoc         (persist) ← previously fire-and-forget
    *   4. await persistEnvelope    (persist) ← previously fire-and-forget
    *   5. await _registerCurrentFamilySync  (register) ← previously fire-and-forget
-   *   6. markPodCreated + slack notify (success)
+   *   6. markPodCreated (success)
+   *
+   * #128: the "Family pod created!" Slack post is NOT here any more. It moved to
+   * `completePodSetup`, which runs after the kit, members and survey steps, so it can carry
+   * the survey answer and the member count. A create abandoned between this write and
+   * setup completion therefore posts nothing; the registry `createdAt` and the
+   * `resumeSetup` `create-ok` firehose line still record the pod.
    */
   async function createNewFile(
     _podFileName: string,
     memberId: string,
     familyId: string,
     familyName: string,
-    /** Optional "how did you hear about us?" answer. The `id` is persisted write-once on the
-     *  registry row at signup; the `label` (stable English label, or the free text of
-     *  `other`) goes to the pod-created Slack notification only and is never stored. */
-    heardVia?: HeardVia | null,
     /**
      * REVIEW-DEMO: demo/review seeding ONLY — skip every REMOTE interaction of
-     * this create: the existing-pod registry LOOKUP (pre-write), the registry
-     * REGISTRATION (step 6), and the pod-created Slack ping (step 8).
+     * this create: the existing-pod registry LOOKUP (pre-write) and the registry
+     * REGISTRATION (step 6). (The pod-created Slack ping lives in `completePodSetup`
+     * since #128, which the demo seed never calls.)
      *
      * Skipping the lookup is safe HERE AND ONLY HERE: `signUp` minted this
      * familyId seconds earlier, so it cannot already have a pod.
@@ -3556,11 +3723,11 @@ export const useSyncStore = defineStore('sync', () => {
      */
     opts?: { suppressRemoteSideEffects?: boolean }
   ): Promise<CreatePodResult> {
-    // REVIEW-DEMO: read once so the three call sites below can't diverge.
+    // REVIEW-DEMO: read once so the call sites below can't diverge.
     const suppressRemote = opts?.suppressRemoteSideEffects === true;
-    // The campaign tag (#118), read ONCE from the device stash so the registry row and the
-    // Slack line cannot disagree. Read here rather than passed in (no eighth positional
-    // parameter). Demo mode sends neither, so it reads nothing and leaves the stash alone.
+    // The campaign tag (#118), read from the device stash for the signup registry write.
+    // NOT consumed here: `completePodSetup` posts the Slack line that also needs it and
+    // clears it then (#128). Demo mode sends nothing, so it reads nothing.
     const attribution = suppressRemote ? null : peekAttribution();
     // Re-entrancy guard. The UI shouldn't be able to call this twice
     // concurrently (the storage step disables its CTA while in flight), but
@@ -3671,9 +3838,6 @@ export const useSyncStore = defineStore('sync', () => {
     // the offline queue belongs to someone else's save.
     let writeAttempted = false;
     let partialFileId: string | null = null;
-    // The pod-creation write's response: the device country and the create-time inference
-    // (#125) for the Slack line. Unset when the registration is suppressed (demo seed).
-    let registered: registry.RegistryWriteResult | undefined;
 
     try {
       // 1. Build the encrypted envelope (in-memory, no I/O). Phase 4: the
@@ -3792,7 +3956,7 @@ export const useSyncStore = defineStore('sync', () => {
       step = 'register';
       // REVIEW-DEMO: never plant a synthetic family in the real registry.
       if (!suppressRemote) {
-        registered = await _registerCurrentFamilySync(attribution, heardVia?.id ?? null);
+        await _registerCurrentFamilySync(attribution);
       }
 
       // 7. TRUST THE CREATING DEVICE — WITHOUT FAIL (2026-09-23, greg). The person
@@ -3844,30 +4008,8 @@ export const useSyncStore = defineStore('sync', () => {
       // who never not-had those features (2026-06-19). Decoupled one-shot flag
       // (no notificationsStore import here); consumed once in useNotifications.
       markFamilyJustCreated();
-      const providerType = syncService.getProviderType();
-      const storageLabel =
-        providerType === 'google_drive'
-          ? 'Google Drive'
-          : providerType === 'local'
-            ? 'Local File'
-            : '(unknown)';
-      // REVIEW-DEMO: a reviewer tapping the demo button must not ping #beanies.
-      if (!suppressRemote) {
-        const cameFrom = attribution ? summariseAttribution(attribution) : '';
-        slackNotify(
-          `🎉 *Family pod created!*\n*Family:* ${familyName}\n*Owner:* ${ownerMember.name}\n*Storage:* ${storageLabel}` +
-            (heardVia?.label ? `\n*Heard via:* ${heardVia.label}` : '') +
-            // One code span: the value charset admits `_` `~` `:`, which Slack would render
-            // as italic / strike / emoji, and excludes the backtick, so nothing breaks out.
-            // Omitted when the tag has none of source / campaign / content (ad ids only).
-            (cameFrom ? `\n*Came from:* \`${cameFrom}\`` : '') +
-            inferredSlackLine(registered?.attributionInferred) +
-            podSlackFooter(registered?.deviceCountry)
-        );
-        // Consume once, only now that the registry row (step 6, which throws into the catch
-        // below and so leaves the tag in place for a retry) and the Slack line both have it.
-        clearAttribution('consumed');
-      }
+      // #128: no Slack post and no `clearAttribution` here; both moved to `completePodSetup`
+      // (see the docblock above). The tag stays in the stash for that Slack line.
 
       return { ok: true, kit: { kitId: kit.kitId, code: kit.code } };
     } catch (e) {
@@ -5417,6 +5559,8 @@ export const useSyncStore = defineStore('sync', () => {
     // The service clears its own latch in `reset()`; the mirror has to follow or
     // it outlives a sign-out and a family switch.
     clearPodUnopenable();
+    completedSetupFamilyId = null;
+    pendingRegistryWrite = null;
     if (autoSyncStopHandle) {
       autoSyncStopHandle();
       autoSyncStopHandle = null;
@@ -7481,8 +7625,47 @@ export const useSyncStore = defineStore('sync', () => {
     overrides: Partial<Pick<RegistryEntry, 'provider' | 'fileId' | 'displayPath'>> = {},
     opts: { isLoginEvent?: boolean; pointerIntent?: boolean } = {}
   ): void {
-    const ctx = useFamilyContextStore();
-    if (!ctx.activeFamilyId) return;
+    const familyId = useFamilyContextStore().activeFamilyId;
+    if (!familyId) return;
+    // Everything, the payload included, is built when the write actually runs.
+    void afterPendingRegistryWrite(familyId, () =>
+      registerCurrentFamilyNow(familyId, overrides, opts)
+    ).catch((e: unknown) => registryActionLog('put')('deferred-failed', 'warn', e));
+  }
+
+  /**
+   * #128: run a registry write for `familyId` once no setup-completion write is in flight (see
+   * `pendingRegistryWrite`). With none, `run` goes at once, synchronously. Otherwise it waits
+   * for that write to settle, and stays bound to the family it was queued for: if the active
+   * family changed in between (a sign-out and a sign-in as another family), it is dropped
+   * rather than written onto the other family's row. Either way it never runs while
+   * `familyId` is not the active family. Resolves `run`'s result, or null when dropped.
+   * The ONE home for this rule: every fire-and-forget registry PUT goes through it.
+   */
+  function afterPendingRegistryWrite<T>(
+    familyId: string,
+    run: () => T | Promise<T>
+  ): Promise<T | null> {
+    const isActive = () => useFamilyContextStore().activeFamilyId === familyId;
+    const pending = pendingRegistryWrite;
+    if (!pending) return Promise.resolve(isActive() ? run() : null);
+    const log = registryActionLog('put');
+    log('deferred-behind-complete-setup', 'debug');
+    return pending.then(() => {
+      if (!isActive()) {
+        log('deferred-family-changed', 'warn');
+        return null;
+      }
+      return run();
+    });
+  }
+
+  /** `registerCurrentFamily`'s body, run by `afterPendingRegistryWrite` for `familyId`. */
+  function registerCurrentFamilyNow(
+    familyId: string,
+    overrides: Partial<Pick<RegistryEntry, 'provider' | 'fileId' | 'displayPath'>>,
+    opts: { isLoginEvent?: boolean; pointerIntent?: boolean }
+  ): void {
     // NO AMBIENT WRITE BEFORE THE POD EXISTS (#125). `signUp` sets the active family, so the
     // country watcher (the home-time-zone backfill) fires in the same tick as the un-awaited
     // step-1 write. If this PUT won that race the Lambda saw an empty key and an ordinary
@@ -7503,7 +7686,7 @@ export const useSyncStore = defineStore('sync', () => {
     }
     const payload = buildRegistryPayload(overrides, opts);
     registry
-      .registerFamily(ctx.activeFamilyId, payload)
+      .registerFamily(familyId, payload)
       .then((result) => {
         // The server refuses to move the canonical pointer for anyone but the
         // family's registered owner (see the guard in the registry Lambda). Two
@@ -7590,10 +7773,12 @@ export const useSyncStore = defineStore('sync', () => {
     podOwner: () => familyStoreForOwner.soleOwner,
     me: () => useAuthStore().currentUser?.memberId ?? null,
     // Bound to the family the module judged: a family switch in between writes nothing.
+    // Queued behind an in-flight setup-completion write, like `registerCurrentFamily` (see
+    // `pendingRegistryWrite`): this is a whole-item PUT too.
     write: (familyId, reason) =>
-      familyId === useFamilyContextStore().activeFamilyId
-        ? registry.registerFamily(familyId, buildRegistryPayload({}, { ownerSync: reason }))
-        : Promise.resolve(null),
+      afterPendingRegistryWrite(familyId, () =>
+        registry.registerFamily(familyId, buildRegistryPayload({}, { ownerSync: reason }))
+      ),
     // Before a transfer's registry write, so the file names the new owner first. The
     // transfer's own debounced save is left armed (like every other durable-save caller):
     // a rare redundant upload is cheaper than a lost save if this one times out then fails.
@@ -7717,6 +7902,7 @@ export const useSyncStore = defineStore('sync', () => {
     clearPendingEncryptedFile,
     createNewFile,
     registerSignupStart,
+    completePodSetup,
     abandonSignupStart,
     clearSessionPassword,
     getExportedFamilyKey,

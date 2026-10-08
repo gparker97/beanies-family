@@ -39,6 +39,17 @@ const mockPeekAttribution = vi.fn((): Record<string, string> | null => null);
 vi.mock('@/utils/attributionStash', () => ({
   peekAttribution: () => mockPeekAttribution(),
 }));
+// The create funnel (#128): `connectDriveStorage` closes an open `drive-consent` step.
+const mockTrackOnboardingStep = vi.fn();
+vi.mock('@/services/telemetry/onboardingAttempt', () => ({
+  trackOnboardingStep: (...args: unknown[]) => mockTrackOnboardingStep(...args),
+}));
+const mockCurrentCreateAttempt = vi.fn(
+  (): { id: string; startedAt: number; step: string } | null => null
+);
+vi.mock('@/utils/createAttemptState', () => ({
+  currentCreateAttempt: () => mockCurrentCreateAttempt(),
+}));
 vi.mock('@/services/sync/fileSync', async (importOriginal) => ({
   // The version DERIVATION is real even where the writers are mocked: a
   // test-local `'4.0'` here would hide the one regression the derivation
@@ -471,6 +482,22 @@ describe('connectDriveStorage on NATIVE — it awaits, and never reports `redire
     expect(GoogleDriveProvider.createNew).not.toHaveBeenCalled();
   });
 
+  it('a policy-blocked trip (described access_denied) is a generic failure, NOT a cancel', async () => {
+    // `googleAuth` settles a described access_denied as a plain failure (`classifyOAuthError`),
+    // so the funnel records `failed`, not `cancelled`, and the copy is the generic one.
+    const real = await vi.importActual<typeof import('@/services/google/googleAuth')>(
+      '@/services/google/googleAuth'
+    );
+    vi.mocked(isUserCancellation).mockImplementation(real.isUserCancellation);
+    vi.mocked(awaitNativeOAuthReturn).mockResolvedValue({
+      kind: 'failed',
+      error: new Error('access_denied: Access blocked by your admin'),
+    });
+    const r = await connectDriveStorage('the-smiths');
+    expect(r).toEqual({ status: 'failed', error: 'access_denied: Access blocked by your admin' });
+    expect(GoogleDriveProvider.createNew).not.toHaveBeenCalled();
+  });
+
   it('a consent denial from the trip classifies exactly as the popup arm does', async () => {
     vi.mocked(awaitNativeOAuthReturn).mockResolvedValue({
       kind: 'failed',
@@ -478,5 +505,110 @@ describe('connectDriveStorage on NATIVE — it awaits, and never reports `redire
     });
     const r = await connectDriveStorage('the-smiths');
     expect(r).toMatchObject({ status: 'failed', errorKind: 'consent-denied' });
+  });
+});
+
+describe("connectDriveStorage — Google's access_denied is a cancel (#128 B1)", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mockShouldRedirect.mockReturnValue(false);
+    mockIsTokenValid.mockReturnValue(false);
+  });
+
+  it('classifies a popup rejection carrying access_denied as `cancelled`, not a generic fault', async () => {
+    const real = await vi.importActual<typeof import('@/services/google/googleAuth')>(
+      '@/services/google/googleAuth'
+    );
+    vi.mocked(isUserCancellation).mockImplementation(real.isUserCancellation);
+    vi.mocked(GoogleDriveProvider.createNew).mockRejectedValue(new Error('access_denied'));
+    const r = await connectDriveStorage('my-family');
+    expect(r).toMatchObject({ status: 'failed', errorKind: 'cancelled', cancelled: true });
+  });
+
+  it('an access_denied WITH a description (a policy block) is a generic failure, not a cancel', async () => {
+    const real = await vi.importActual<typeof import('@/services/google/googleAuth')>(
+      '@/services/google/googleAuth'
+    );
+    vi.mocked(isUserCancellation).mockImplementation(real.isUserCancellation);
+    vi.mocked(GoogleDriveProvider.createNew).mockRejectedValue(
+      new Error('access_denied: Access blocked by your administrator')
+    );
+    const r = await connectDriveStorage('my-family');
+    expect(r).toEqual({
+      status: 'failed',
+      error: 'access_denied: Access blocked by your administrator',
+    });
+  });
+});
+
+describe('connectDriveStorage — closes the open drive-consent funnel step (#128)', () => {
+  const OPEN_AT_CONSENT = { id: 'a-1', startedAt: 0, step: 'drive-consent' };
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mockShouldRedirect.mockReturnValue(false);
+    mockIsTokenValid.mockReturnValue(true);
+    mockCurrentCreateAttempt.mockReturnValue(OPEN_AT_CONSENT);
+  });
+
+  it('emits `submitted` on a connect', async () => {
+    const provider = { persist: vi.fn(async () => {}) } as unknown as InstanceType<
+      typeof GoogleDriveProvider
+    >;
+    vi.mocked(GoogleDriveProvider.createNew).mockResolvedValue(provider);
+    await connectDriveStorage('my-family');
+    expect(mockTrackOnboardingStep).toHaveBeenCalledTimes(1);
+    expect(mockTrackOnboardingStep).toHaveBeenCalledWith('drive-consent', 'submitted');
+  });
+
+  it('emits `back` with the errorKind for a cancel and a consent denial', async () => {
+    vi.mocked(isUserCancellation).mockReturnValue(true);
+    vi.mocked(GoogleDriveProvider.createNew).mockRejectedValue(new Error('access_denied'));
+    await connectDriveStorage('my-family');
+    expect(mockTrackOnboardingStep).toHaveBeenLastCalledWith('drive-consent', 'back', {
+      error_code: 'cancelled',
+    });
+
+    vi.mocked(isUserCancellation).mockReturnValue(false);
+    vi.mocked(GoogleDriveProvider.createNew).mockRejectedValue(
+      new DriveConsentDeniedError('Google Drive file access was not granted.')
+    );
+    await connectDriveStorage('my-family');
+    expect(mockTrackOnboardingStep).toHaveBeenLastCalledWith('drive-consent', 'back', {
+      error_code: 'consent-denied',
+    });
+  });
+
+  it('emits `back` `failed` for an unclassified fault, and `submitted` for a collision', async () => {
+    vi.mocked(GoogleDriveProvider.createNew).mockRejectedValue(new Error('Drive 500'));
+    await connectDriveStorage('my-family');
+    expect(mockTrackOnboardingStep).toHaveBeenLastCalledWith('drive-consent', 'back', {
+      error_code: 'failed',
+    });
+
+    vi.mocked(GoogleDriveProvider.createNew).mockRejectedValue(
+      new FileNameCollisionError('exists', 'file-1', 'my-family.beanpod', true)
+    );
+    await connectDriveStorage('my-family');
+    expect(mockTrackOnboardingStep).toHaveBeenLastCalledWith('drive-consent', 'submitted');
+  });
+
+  it('emits nothing when the step is not drive-consent (finalize after a redirect return)', async () => {
+    mockCurrentCreateAttempt.mockReturnValue({ ...OPEN_AT_CONSENT, step: 'pin' });
+    vi.mocked(GoogleDriveProvider.createNew).mockRejectedValue(new Error('Drive 500'));
+    await connectDriveStorage('my-family');
+    mockCurrentCreateAttempt.mockReturnValue(null);
+    await connectDriveStorage('my-family');
+    expect(mockTrackOnboardingStep).not.toHaveBeenCalled();
+  });
+
+  it('emits nothing while redirecting (the callback page records that exit)', async () => {
+    mockShouldRedirect.mockReturnValue(true);
+    mockIsTokenValid.mockReturnValue(false);
+    mockIsNative.mockReturnValue(false);
+    vi.mocked(startRedirectAuth).mockResolvedValue(undefined as never);
+    const r = await connectDriveStorage('my-family');
+    expect(r).toEqual({ status: 'redirecting' });
+    expect(mockTrackOnboardingStep).not.toHaveBeenCalled();
   });
 });

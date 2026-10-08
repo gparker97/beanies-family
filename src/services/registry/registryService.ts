@@ -135,6 +135,14 @@ export type RegistryWritePayload = Omit<RegistryEntry, 'familyId' | 'updatedAt'>
    * country (`deviceCountry`) and discards the zone itself.
    */
   deviceTimeZone?: string | null;
+  /**
+   * Transient, never stored (#128). Set only on `syncStore.completePodSetup`'s write, the
+   * create wizard's completion (after the survey). It asks the Lambda to return the signup
+   * response fields (`deviceCountry`, `attributionInferred`) on that write even when the
+   * survey was skipped, so the "Family pod created!" Slack line has them. Honoured only from
+   * the owner.
+   */
+  setupComplete?: boolean;
 };
 
 /** Why an owner-sync write was sent; see `ownerSyncReason` on the payload. */

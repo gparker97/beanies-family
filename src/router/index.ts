@@ -473,11 +473,12 @@ router.beforeEach((to) => {
   if (!ALREADY_AUTH_REDIRECT_FROM.has(to.path)) return;
   const authStore = useAuthStore();
   if (!authStore.isAuthenticated) return;
-  // Mid-create: the add-members step renders at /welcome?resume=setup AFTER
-  // createNewFile flips podCreated=true (so needsPodSetup is already false).
-  // Without this, the redirect below would bounce the user to /nook and skip
-  // add-members on iOS. The flag is set only during the members phase and
-  // cleared on completion/unmount (see ResumePodSetup).
+  // Mid-create: the recovery-kit, add-members and survey steps (and the setup
+  // modal after them) render at /welcome?resume=setup AFTER createNewFile flips
+  // podCreated=true (so needsPodSetup is already false). Without this, the
+  // redirect below would bounce the user to /nook and skip them on iOS. The flag
+  // is set when the pod write succeeds, stays true through the survey and the
+  // setup modal, and is cleared on completion/unmount (see ResumePodSetup).
   const syncStore = useSyncStore();
   if (syncStore.membersStepActive) return;
   if (authStore.needsPodSetup) {

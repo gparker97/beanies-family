@@ -37,8 +37,8 @@ describe('RecoveryKitDisplay — the Continue gate', () => {
    * greg's reasoning for keeping the checkbox was that nobody can get stuck, because a
    * checkbox has no network and no platform dependency and is therefore always available.
    * That holds ONLY while the tick is unconditional. If it is ever "tidied" into something
-   * like `:disabled="!hasTriedSaving"`, this screen — an unclosable modal at the tail of a
-   * flow that already loses 47% of its starters — becomes one that CAN strand a new family.
+   * like `:disabled="!hasTriedSaving"`, this screen (an unclosable modal at the tail of the
+   * create flow) becomes one that CAN strand a new family.
    */
   it('the tick alone releases Continue, with no save attempted', async () => {
     const wrapper = mount(RecoveryKitDisplay, { props });
@@ -165,5 +165,43 @@ describe('RecoveryKitDisplay — the Continue gate', () => {
     const hidden = qrs.filter((img) => img.classes().includes('opacity-0'));
     expect(hidden).toHaveLength(1);
     expect(hidden[0]!.classes()).toContain('absolute');
+  });
+
+  // ── The creation host (#128): title, confirm label, and the footer slot ──
+
+  it('creation: titles the modal "your pod is ready" and the confirm "open my pod"', () => {
+    const wrapper = mount(RecoveryKitDisplay, { props: { ...props, creation: true } });
+    expect(wrapper.text()).toContain('recovery.kitModalTitleCreation');
+    expect(wrapper.find('[data-testid="kit-confirm"]').text()).toBe('recovery.kitOpenPod');
+  });
+
+  it('without creation (the other four hosts) keeps the original title and confirm', () => {
+    const wrapper = mount(RecoveryKitDisplay, { props });
+    expect(wrapper.text()).toContain('recovery.kitModalTitle');
+    expect(wrapper.text()).not.toContain('recovery.kitModalTitleCreation');
+    expect(wrapper.find('[data-testid="kit-confirm"]').text()).toBe('recovery.kitConfirmStored');
+  });
+
+  /**
+   * ⚠️ THE SLOT IS OUTSIDE THE EXPORTED CARD. The creation host slots the phone hand-off
+   * (and its magic-link QR) here; anything inside the card's element lands in the saved kit
+   * PDF, which must hold the kit and nothing else.
+   */
+  it('renders the after-confirm slot under the confirm, outside the exported card', () => {
+    const wrapper = mount(RecoveryKitDisplay, {
+      props: { ...props, creation: true },
+      slots: { 'after-confirm': '<p data-testid="slotted">phone line</p>' },
+    });
+    const slotted = wrapper.find('[data-testid="slotted"]');
+    expect(slotted.exists()).toBe(true);
+    // The card is the element holding the kit code (code <p> → its row → the card).
+    const kitCode = wrapper.findAll('p').find((p) => p.text() === props.code)!;
+    const cardEl = kitCode.element.parentElement!.parentElement!;
+    expect(cardEl.contains(slotted.element)).toBe(false);
+    // ...and it follows the confirm button in document order.
+    const confirm = wrapper.find('[data-testid="kit-confirm"]').element;
+    expect(
+      confirm.compareDocumentPosition(slotted.element) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
   });
 });

@@ -45,7 +45,21 @@ const props = defineProps<{
    * refused). The step degrades to kit-only and says so — it never blocks. See below.
    */
   magicLinkErrorKey?: string;
+  /**
+   * The create wizard's kit step (#128): the modal is the "your pod is ready" moment, so it
+   * is titled that way and the confirm reads "Open my pod". Off (the default) for the other
+   * four hosts (Settings regenerate, the kit prompt, the sign-out guard, the dev harness),
+   * which render exactly as before.
+   */
+  creation?: boolean;
 }>();
+
+/**
+ * `after-confirm`: an optional line under the confirm button, in the FOOTER. The creation
+ * host puts the desktop "Use beanies on your phone too" hand-off here. It is deliberately
+ * outside `kitCardEl`, so nothing a host slots in can ever land in the exported kit PDF.
+ */
+defineSlots<{ 'after-confirm'?: () => unknown }>();
 
 const emit = defineEmits<{
   /**
@@ -99,9 +113,16 @@ const kitCardEl = ref<HTMLElement | null>(null);
  * network and no platform dependency, so it is always available — which is the whole
  * reason this gate cannot strand anyone. If it is ever made conditional (`:disabled` on a
  * save having been attempted, say), this screen becomes one that CAN wedge, at the tail of
- * a create flow that already loses 47% of its starters. Pinned by a test.
+ * a create flow where every lost step costs a family. Pinned by a test.
  */
 const kitAcknowledged = ref(false);
+const modalTitle = computed(() =>
+  props.creation ? t('recovery.kitModalTitleCreation') : t('recovery.kitModalTitle')
+);
+const confirmLabel = computed(() => {
+  if (props.magicLink) return t('setup.saveBothConfirm');
+  return props.creation ? t('recovery.kitOpenPod') : t('recovery.kitConfirmStored');
+});
 const kitSaved = ref(false);
 const canConfirmKit = computed(() => kitSaved.value || kitAcknowledged.value);
 
@@ -226,7 +247,7 @@ async function exportKitPdf(preferDownload: boolean) {
 
 <template>
   <!-- One-time kit modal: not closable except via the explicit stored confirmation -->
-  <BaseModal :open="open" :title="t('recovery.kitModalTitle')" size="md" :closable="false">
+  <BaseModal :open="open" :title="modalTitle" size="md" :closable="false">
     <!-- ⚠️ ABOVE the card, not below it. This explains what the kit IS, and it used to sit
          underneath as a footnote — which put "save this now" ahead of "here is what this
          is" on the one screen where someone has to decide how carefully to treat an
@@ -310,7 +331,7 @@ async function exportKitPdf(preferDownload: boolean) {
           </p>
         </template>
         <!-- ⚠️ DEGRADED, NEVER BLOCKING. This step is an unclosable modal at the end of a
-             create flow that already loses 47% of its starters; a network dependency that
+             create flow where every lost step costs a family; a network dependency that
              can wedge the final screen is not an acceptable trade for a convenience
              credential. The kit below is the guaranteed artefact, the confirm stays
              reachable, and the person is told where to get a link later. -->
@@ -446,7 +467,7 @@ async function exportKitPdf(preferDownload: boolean) {
           data-testid="kit-confirm"
           @click="emit('stored', kitVia)"
         >
-          {{ magicLink ? t('setup.saveBothConfirm') : t('recovery.kitConfirmStored') }}
+          {{ confirmLabel }}
         </BaseButton>
         <p
           v-if="!canConfirmKit"
@@ -455,6 +476,7 @@ async function exportKitPdf(preferDownload: boolean) {
         >
           {{ t('recovery.kitGateHint') }}
         </p>
+        <slot name="after-confirm" />
       </div>
     </template>
   </BaseModal>

@@ -4490,10 +4490,19 @@ const STRING_DEFS = {
     en: 'Finish setting up your pod',
     beanie: 'finish setting up your pod',
   },
+  // #128 resume-setup: the header says why the person is here (phase-neutral by default, the
+  // PIN step's own line) and the PIN step greets a known name instead of re-asking it.
   'resumeSetup.subtitle': {
-    en: 'Let’s finish setting up your pod. We never store your PIN, so your data stays encrypted end-to-end.',
-    beanie:
-      'let’s finish setting up your pod. we never store your pin, so your data stays encrypted end-to-end.',
+    en: 'Let’s finish setting up your pod.',
+    beanie: 'let’s finish setting up your pod.',
+  },
+  'resumeSetup.subtitlePin': {
+    en: 'Almost there. Your PIN unlocks your pod on this device.',
+    beanie: 'almost there. your pin unlocks your pod on this device.',
+  },
+  'resumeSetup.choosePinFor': {
+    en: 'Choose your PIN, {name}',
+    beanie: 'choose your pin, {name}',
   },
   'resumeSetup.subtitleRecovery': {
     en: "Your last setup didn't quite finish. Re-enter your password to wrap things up — we never store it, so your data stays encrypted end-to-end.",
@@ -4511,6 +4520,25 @@ const STRING_DEFS = {
   'resumeSetup.startOver': {
     en: 'Start over instead',
     beanie: 'start over instead',
+  },
+  // #128 drive-declined: the web redirect's return after a "no" at Google. A decision, not a
+  // fault (orange notice, never red). Important surface: beanie keeps Google, Drive, family file.
+  'resumeSetup.driveDeclinedTitle': {
+    en: 'Google needs a yes from you',
+    beanie: 'google needs a yes from you',
+  },
+  'resumeSetup.driveDeclinedBody': {
+    en: "Your family file wasn't saved yet. When Google asks, tick the box that lets beanies create files in your Drive.",
+    beanie:
+      "your family file wasn't saved yet. when google asks, tick the box that lets beanies create files in your drive.",
+  },
+  'resumeSetup.tryAgainWithGoogle': {
+    en: 'Try again with Google',
+    beanie: 'try again with google',
+  },
+  'storage.driveOnlyHere': {
+    en: 'On this browser, Google Drive is the only place beanies can keep your family file.',
+    beanie: 'on this browser, google drive is the only place beanies can keep your family file.',
   },
 
   // Auto-load (non-destructive) recovery — shown when the family registry
@@ -5746,10 +5774,6 @@ const STRING_DEFS = {
     en: 'A 6-digit PIN signs you in on devices where your family is already set up. Your recovery kit (next step) is what gets you in on a brand-new one.',
     beanie:
       'a 6-digit pin signs you in on devices where your family is already set up. your recovery kit (next step) is what gets you in on a brand-new one.',
-  },
-  'setup.kitStepIntro': {
-    en: 'Your family pod is ready! One last thing — save your recovery kit somewhere safe.',
-    beanie: 'your family pod is ready! one last thing — save your recovery kit somewhere safe.',
   },
   'recovery.kitPromptTitle': { en: 'Save Your Recovery Kit', beanie: 'save your recovery kit' },
   'recovery.kitPromptBody': {
@@ -9892,45 +9916,23 @@ const STRING_DEFS = {
   },
   'inviteGate.confirmedJoinDiscord': { en: 'Join the Discord', beanie: 'join the discord' },
 
-  // Create-pod welcome modal (shown at the start of the Create path, replacing the invite gate).
-  // Rendered all-lowercase via CSS — these strings stay standard-cased for CI + screen readers.
-  'createWelcome.eyebrow': { en: 'Welcome home', beanie: 'welcome home' },
-  'createWelcome.title': {
-    en: "Let's grow your family pod",
-    beanie: "let's grow your family pod",
+  // #128 onboarding UX: step 1's family-name default and subtitle, the creation kit modal, the
+  // desktop phone hand-off line, and the members step's heading and exit.
+  'auth.familyNameDefault': { en: 'The {name} family', beanie: 'the {name} family' },
+  'loginV6.createSubtitleStep1': {
+    en: "Two things and you're in.",
+    beanie: "two things and you're in.",
   },
-  'createWelcome.subtitle': {
-    en: "Three quick steps to your private family space. Here's what's ahead.",
-    beanie: "three quick steps to your private family space. here's what's ahead.",
+  'recovery.kitModalTitleCreation': { en: 'Your pod is ready', beanie: 'your pod is ready' },
+  'recovery.kitOpenPod': { en: 'Open my pod', beanie: 'open my pod' },
+  'setup.usePhoneToo': {
+    en: 'Use beanies on your phone too',
+    beanie: 'use beanies on your phone too',
   },
-  'createWelcome.step1Title': { en: 'About you', beanie: 'about you' },
-  'createWelcome.step1Body': {
-    en: 'Your name and a couple of details to set up your space.',
-    beanie: 'your name and a couple of details to set up your space.',
-  },
-  'createWelcome.step2Title': { en: 'Your Family Data File', beanie: 'your family data file' },
-  'createWelcome.step2Body': {
-    en: "We create your private, encrypted file — the safe home for your family's data.",
-    beanie: "we create your private, encrypted file — the safe home for your family's data.",
-  },
-  'createWelcome.step3Title': { en: 'Your family', beanie: 'your family' },
-  'createWelcome.step3Body': {
-    en: "Add your partner or little beanies whenever you're ready.",
-    beanie: "add your partner or little beanies whenever you're ready.",
-  },
-  'createWelcome.safeText': {
-    en: 'Your data is encrypted on your device and stored in a file only you can open — we never see it.',
-    beanie:
-      'your data is encrypted on your device and stored in a file only you can open — we never see it.',
-  },
-  'createWelcome.safeLink': { en: 'How your data stays safe', beanie: 'how your data stays safe' },
-  'createWelcome.cta': { en: 'Plant my bean pod', beanie: 'plant my bean pod' },
-  'createWelcome.ctaHint': {
-    en: 'You can change anything later.',
-    beanie: 'you can change anything later.',
-  },
+  'setup.whoIsInFamily': { en: "Who's in {family}?", beanie: "who's in {family}?" },
+  'setup.addLater': { en: "I'll do this later", beanie: "i'll do this later" },
 
-  // Create-pod "how did you hear about us?" survey (shown after the password step, before finalize).
+  // Create-pod "how did you hear about us?" survey (#128: the last step, after members, before /nook).
   // Rendered all-lowercase via CSS. The Slack attribution label is a separate stable-English
   // constant in CreatePodSurvey.vue (HEARD_OPTIONS.slackLabel) — NOT these display strings.
   'createSurvey.eyebrow': { en: 'One last thing', beanie: 'one last thing' },

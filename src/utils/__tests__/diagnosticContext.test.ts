@@ -27,6 +27,7 @@ import {
   breadcrumbsForReport,
 } from '../diagnosticContext';
 import { APP_VERSION } from '@/constants/appVersion';
+import { setCreateAttempt, __resetCreateAttemptForTesting } from '@/utils/createAttemptState';
 
 describe('diagnosticContext', () => {
   let warnSpy: ReturnType<typeof vi.spyOn>;
@@ -217,6 +218,36 @@ describe('diagnosticContext', () => {
       const out = enrichAndRedact({ surface: 's' });
       expect(typeof out.web_storage).toBe('string');
       expect(out.web_storage).toMatch(/^ls=(true|false),ss=(true|false)$/);
+    });
+  });
+
+  describe('enrichAndRedact — create_attempt_id (#128)', () => {
+    afterEach(() => {
+      __resetCreateAttemptForTesting();
+      localStorage.clear();
+    });
+
+    it('stamps the open attempt id on both paths', () => {
+      setCreateAttempt({ id: 'attempt-uuid', startedAt: Date.now(), step: 'storage' });
+      expect(enrichAndRedact({ surface: 's' }, { includeEmail: false }).create_attempt_id).toBe(
+        'attempt-uuid'
+      );
+      expect(enrichAndRedact({ surface: 's' }, { includeEmail: true }).create_attempt_id).toBe(
+        'attempt-uuid'
+      );
+    });
+
+    it('stamps nothing when no attempt is open', () => {
+      expect(enrichAndRedact({ surface: 's' })).not.toHaveProperty('create_attempt_id');
+    });
+
+    it("keeps the caller's explicit id over the open attempt", () => {
+      setCreateAttempt({ id: 'open-attempt', startedAt: Date.now(), step: 'pin' });
+      const out = enrichAndRedact({
+        surface: 's',
+        context: { create_attempt_id: 'stale-attempt' },
+      });
+      expect(out.create_attempt_id).toBe('stale-attempt');
     });
   });
 

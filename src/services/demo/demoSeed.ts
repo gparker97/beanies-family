@@ -204,7 +204,6 @@ export async function seedDemoFamily(): Promise<DemoSeedResult> {
       memberId,
       familyId,
       DEMO_FAMILY_NAME,
-      null,
       { suppressRemoteSideEffects: true }
     );
     if (!createResult.ok) {

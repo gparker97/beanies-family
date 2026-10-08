@@ -176,6 +176,9 @@ import LegalLayout from '../layouts/LegalLayout.astro';
         state your family is in on this device (beta, trial, active or read-only), which plan it is
         on (basic or full), and whether the app acted on that state. it never records a price, a
         payment detail or anything you typed.
+        while a pod is being set up, these events also carry a random identifier for that one
+        set-up attempt, so we can see where an attempt stalled; it is not linked to your name or
+        email.
         this stream is PII-free: it carries dates, counts and yes/no answers, never the name or
         content of an activity, reminder, payment or recipe, no family content at all, and is
         correlated only by a random family id, not by your name or email

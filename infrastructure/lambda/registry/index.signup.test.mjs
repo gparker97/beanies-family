@@ -1,7 +1,8 @@
 /* global process */
 /**
  * #125 handler cases: the step-1 write (`signupStart`), the signup-gated `createdAt`, the
- * `deviceCountry` stamp, `DELETE ?neverFinishedOnly=1` and create-time inference.
+ * `deviceCountry` stamp, `DELETE ?neverFinishedOnly=1` and create-time inference. #128 cases:
+ * the `table` log field, `createAttemptId`, and the late `heardVia` stamp with its rescale.
  *
  * Its own copy of the client mock (index.test.mjs has the same scaffold): `vi.mock` is hoisted
  * per file, so a shared helper module would fight the hoisting rules, and duplicating twenty
@@ -234,6 +235,7 @@ describe('registry PUT signupStart: the create-only step-1 write (#125)', () => 
       subscribeNewsletter: true,
       signupPlatform: 'ios',
       attribution: null,
+      createAttemptId: null,
       heardVia: null,
       attributionInferred: null,
       signupStartedAt: NOW,
@@ -286,6 +288,7 @@ describe('registry PUT signupStart: the create-only step-1 write (#125)', () => 
         outcome: 'created',
         platform: 'ios',
         has_country: true,
+        table: 'prod',
       },
     ]);
     expect(allLogged()).not.toContain(FAMILY_ID);
@@ -490,7 +493,12 @@ describe('registry DELETE ?neverFinishedOnly=1: start over (#125)', () => {
     expect(item).not.toHaveProperty('familyName');
     expect(item).not.toHaveProperty('subscribeNewsletter');
     expect(lines('registry_start_over')).toEqual([
-      { msg: 'registry_start_over', family_id_hash: FAMILY_HASH, outcome: 'tombstoned' },
+      {
+        msg: 'registry_start_over',
+        family_id_hash: FAMILY_HASH,
+        outcome: 'tombstoned',
+        table: 'prod',
+      },
     ]);
   });
 
@@ -515,7 +523,12 @@ describe('registry DELETE ?neverFinishedOnly=1: start over (#125)', () => {
     expect(body).toEqual({ success: true, skipped: 'already-tombstoned' });
     expect(puts).toHaveLength(0);
     expect(lines('registry_start_over')).toEqual([
-      { msg: 'registry_start_over', family_id_hash: FAMILY_HASH, outcome: 'already-tombstoned' },
+      {
+        msg: 'registry_start_over',
+        family_id_hash: FAMILY_HASH,
+        outcome: 'already-tombstoned',
+        table: 'prod',
+      },
     ]);
   });
 
@@ -526,7 +539,7 @@ describe('registry DELETE ?neverFinishedOnly=1: start over (#125)', () => {
     expect(lines('registry_start_over')[0].outcome).toBe('no-row');
   });
 
-  it('without the flag, the tombstone is exactly the pre-#125 item plus the two kept fields', async () => {
+  it('without the flag, the tombstone is exactly the pre-#125 item plus the kept provenance fields', async () => {
     const pod = {
       familyId: FAMILY_ID,
       createdAt: '2025-03-01T00:00:00.000Z',
@@ -558,6 +571,7 @@ describe('registry DELETE ?neverFinishedOnly=1: start over (#125)', () => {
       attributionInferred: null,
       signupStartedAt: null,
       deviceCountry: null,
+      createAttemptId: null,
       deletedAt: NOW,
       updatedAt: NOW,
     });
@@ -731,5 +745,268 @@ describe('registry PUT: create-time inference with no events table configured (#
         reason: 'no-events-table',
       },
     ]);
+  });
+});
+
+// ─── #128: table label, create attempt id, late heardVia ────────────────────
+
+const ATTEMPT_ID = 'cccccccc-1111-4222-8333-444444444444';
+
+describe('registry log lines name the table the origin selects (#128)', () => {
+  it('a dev-origin step-1 write logs table dev', async () => {
+    await put(stepOneBody(), { origin: DEV_ORIGIN });
+    expect(lines('registry_signup_start')[0].table).toBe('dev');
+  });
+
+  it('a dev-origin start over logs table dev', async () => {
+    await call('DELETE', {
+      rows: [STEP_ONE_ROW],
+      queryStringParameters: { writerMemberId: M_OWNER, neverFinishedOnly: '1' },
+      origin: DEV_ORIGIN,
+    });
+    expect(lines('registry_start_over')[0]).toMatchObject({ outcome: 'tombstoned', table: 'dev' });
+  });
+});
+
+describe('registry: createAttemptId is write-once, stamped by signup writes only (#128)', () => {
+  const dropped = () => lines('create_attempt_id_dropped');
+
+  it('the step-1 write stores a valid id, with no drop line', async () => {
+    const { item } = await put(stepOneBody({ createAttemptId: ATTEMPT_ID }));
+    expect(item.createAttemptId).toBe(ATTEMPT_ID);
+    expect(dropped()).toEqual([]);
+  });
+
+  it('an absent or null id stores null with no log (every older client)', async () => {
+    for (const createAttemptId of [undefined, null]) {
+      const { item } = await put(stepOneBody({ createAttemptId }));
+      expect(item.createAttemptId).toBeNull();
+    }
+    expect(dropped()).toEqual([]);
+  });
+
+  it.each([
+    ['not a UUID', 'attempt-1; DROP TABLE', 'not-uuid'],
+    ['not a string', 42, 'not-string'],
+  ])(
+    'drops an id that is %s, with one hashed line that never carries the value',
+    async (_label, createAttemptId, reason) => {
+      const { item } = await put(stepOneBody({ createAttemptId }));
+      expect(item.createAttemptId).toBeNull();
+      expect(dropped()).toEqual([
+        { msg: 'create_attempt_id_dropped', family_id_hash: FAMILY_HASH, reason },
+      ]);
+      expect(allLogged()).not.toContain('DROP TABLE');
+    }
+  );
+
+  it('the pod-creation write keeps the step-1 id, never the body one', async () => {
+    const other = 'dddddddd-1111-4222-8333-444444444444';
+    const { item } = await put(podCreateBody({ createAttemptId: other }), {
+      rows: [{ ...STEP_ONE_ROW, createAttemptId: ATTEMPT_ID }],
+    });
+    expect(item.createAttemptId).toBe(ATTEMPT_ID);
+  });
+
+  it('the pod-creation write stamps it on a row without one', async () => {
+    const { item } = await put(podCreateBody({ createAttemptId: ATTEMPT_ID }), {
+      rows: [STEP_ONE_ROW],
+    });
+    expect(item.createAttemptId).toBe(ATTEMPT_ID);
+  });
+
+  it('a non-signup write never stamps it', async () => {
+    const { item } = await put(
+      {
+        provider: 'local',
+        ownerMemberId: M_OWNER,
+        writerMemberId: M_OWNER,
+        isLoginEvent: true,
+        createAttemptId: ATTEMPT_ID,
+      },
+      { rows: [{ ...STEP_ONE_ROW, createdAt: STARTED }] }
+    );
+    expect(item.createAttemptId).toBeNull();
+    expect(dropped()).toEqual([]);
+  });
+
+  it('survives the start-over tombstone', async () => {
+    const { item } = await call('DELETE', {
+      rows: [{ ...STEP_ONE_ROW, createAttemptId: ATTEMPT_ID }],
+      queryStringParameters: { writerMemberId: M_OWNER, neverFinishedOnly: '1' },
+    });
+    expect(item.deletedAt).toBe(NOW);
+    expect(item.createAttemptId).toBe(ATTEMPT_ID);
+  });
+});
+
+describe('registry PUT: heardVia stamped late by the setup-completion write (#128)', () => {
+  const lateLines = () => lines('heard_via_late_stamp');
+  /** A created pod, as the pod-creation write leaves it (no survey answer yet). */
+  const POD_ROW = {
+    ...STEP_ONE_ROW,
+    createdAt: STARTED,
+    provider: 'google_drive',
+    fileId: 'FILE-1',
+    displayPath: 'brambleworths.beanpod',
+    createAttemptId: ATTEMPT_ID,
+  };
+  /** Scored at the pod-creation write, with no answer to apply. */
+  const INFERRED = {
+    fields: TAG,
+    confidence: 1,
+    band: 'high',
+    method: 'store_tap_v1',
+    eventId: 'e1',
+    gapMinutes: 5,
+    candidates: 1,
+    scoredAt: STARTED,
+  };
+  /** The write `completePodSetup` sends: an owner PUT, not a login, not a signup. */
+  const completionBody = (over = {}) => ({
+    provider: 'google_drive',
+    fileId: 'FILE-1',
+    displayPath: 'brambleworths.beanpod',
+    familyName: 'The Brambleworths',
+    ownerEmail: 'owner@example.com',
+    ownerMemberId: M_OWNER,
+    writerMemberId: M_OWNER,
+    isLoginEvent: false,
+    isSignupEvent: false,
+    memberCount: 3,
+    heardVia: 'chatgpt_ad',
+    ...over,
+  });
+
+  it('stamps the answer, returns the signup fields and logs the late stamp (no inferred value)', async () => {
+    const { body, item, queries } = await put(completionBody(), { rows: [POD_ROW] });
+    expect(item.heardVia).toBe('chatgpt_ad');
+    expect(item.memberCount).toBe(3);
+    expect(item.createAttemptId).toBe(ATTEMPT_ID);
+    expect(queries).toHaveLength(0);
+    expect(body).toEqual({
+      success: true,
+      pointerAccepted: true,
+      deviceCountry: 'SG',
+      attributionInferred: null,
+    });
+    expect(lateLines()).toEqual([
+      {
+        msg: 'heard_via_late_stamp',
+        family_id_hash: FAMILY_HASH,
+        band_before: null,
+        band_after: null,
+      },
+    ]);
+    expect(allLogged()).not.toContain('chatgpt_ad');
+  });
+
+  it('a contradicting answer lowers the stored band with the scorer multiplier', async () => {
+    const { body, item } = await put(completionBody({ heardVia: 'reddit' }), {
+      rows: [{ ...POD_ROW, attributionInferred: INFERRED }],
+    });
+    expect(item.attributionInferred).toEqual({ ...INFERRED, confidence: 0.6, band: 'medium' });
+    expect(body.attributionInferred).toEqual({ band: 'medium', fields: TAG });
+    expect(lateLines()[0]).toMatchObject({ band_before: 'high', band_after: 'medium' });
+  });
+
+  it('a consistent answer leaves the stored value as it was', async () => {
+    const { body, item } = await put(completionBody(), {
+      rows: [{ ...POD_ROW, attributionInferred: INFERRED }],
+    });
+    expect(item.attributionInferred).toEqual(INFERRED);
+    expect(body.attributionInferred).toEqual({ band: 'high', fields: TAG });
+    expect(lateLines()[0]).toMatchObject({ band_before: 'high', band_after: 'high' });
+  });
+
+  it('a contradiction below the low band clears the stored value, as the scorer stores nothing', async () => {
+    const low = { ...INFERRED, confidence: 0.4, band: 'low' };
+    const { body, item } = await put(completionBody({ heardVia: 'reddit' }), {
+      rows: [{ ...POD_ROW, attributionInferred: low }],
+    });
+    expect(item.attributionInferred).toBeNull();
+    expect(body.attributionInferred).toBeNull();
+    expect(lateLines()[0]).toMatchObject({ band_before: 'low', band_after: null });
+  });
+
+  it('a skipped survey stamps nothing, logs nothing and answers like any PUT', async () => {
+    const { body, item } = await put(completionBody({ heardVia: null }), {
+      rows: [{ ...POD_ROW, attributionInferred: INFERRED }],
+    });
+    expect(item.heardVia).toBeNull();
+    expect(item.attributionInferred).toEqual(INFERRED);
+    expect(body).toEqual({ success: true, pointerAccepted: true });
+    expect(lateLines()).toEqual([]);
+  });
+
+  it('a member device can never answer the owner survey', async () => {
+    const { body, item } = await put(completionBody({ writerMemberId: M_OTHER }), {
+      rows: [{ ...POD_ROW, attributionInferred: INFERRED }],
+    });
+    expect(item.heardVia).toBeNull();
+    expect(item.attributionInferred).toEqual(INFERRED);
+    expect(body).toEqual({ success: true, pointerAccepted: true });
+    expect(lateLines()).toEqual([]);
+  });
+
+  it('an answer already stamped never moves and is never applied twice', async () => {
+    const answered = {
+      ...POD_ROW,
+      heardVia: 'reddit',
+      attributionInferred: { ...INFERRED, confidence: 0.6, band: 'medium' },
+    };
+    const { body, item } = await put(completionBody({ heardVia: 'google' }), {
+      rows: [answered],
+    });
+    expect(item.heardVia).toBe('reddit');
+    expect(item.attributionInferred).toEqual(answered.attributionInferred);
+    expect(body).toEqual({ success: true, pointerAccepted: true });
+    expect(lateLines()).toEqual([]);
+  });
+
+  it('setupComplete from the owner returns the signup fields with a skipped survey', async () => {
+    const { body, item } = await put(completionBody({ heardVia: null, setupComplete: true }), {
+      rows: [{ ...POD_ROW, attributionInferred: INFERRED }],
+    });
+    expect(item.heardVia).toBeNull();
+    expect(item).not.toHaveProperty('setupComplete');
+    expect(body).toEqual({
+      success: true,
+      pointerAccepted: true,
+      deviceCountry: 'SG',
+      attributionInferred: { band: 'high', fields: TAG },
+    });
+    expect(lateLines()).toEqual([]);
+  });
+
+  it('setupComplete with an answer returns the post-rescale band', async () => {
+    const { body, item } = await put(completionBody({ heardVia: 'reddit', setupComplete: true }), {
+      rows: [{ ...POD_ROW, attributionInferred: INFERRED }],
+    });
+    expect(item).not.toHaveProperty('setupComplete');
+    expect(item.attributionInferred.band).toBe('medium');
+    expect(body.attributionInferred).toEqual({ band: 'medium', fields: TAG });
+    expect(body.deviceCountry).toBe('SG');
+  });
+
+  it('a member write with setupComplete gets no signup fields', async () => {
+    const { body, item } = await put(
+      completionBody({ writerMemberId: M_OTHER, heardVia: null, setupComplete: true }),
+      { rows: [{ ...POD_ROW, attributionInferred: INFERRED }] }
+    );
+    expect(item).not.toHaveProperty('setupComplete');
+    expect(body).toEqual({ success: true, pointerAccepted: true });
+  });
+
+  it('an old client answering on the pod-creation write behaves exactly as before', async () => {
+    const { body, item } = await put(podCreateBody({ heardVia: 'reddit' }), {
+      rows: [STEP_ONE_ROW],
+      queryItems: [tap('e1', 5)],
+    });
+    expect(item.heardVia).toBe('reddit');
+    // Scored once, with the answer already in the item: the multiplier applied exactly once.
+    expect(item.attributionInferred).toMatchObject({ confidence: 0.6, band: 'medium' });
+    expect(body.attributionInferred).toEqual({ band: 'medium', fields: TAG });
+    expect(lateLines()).toEqual([]);
   });
 });

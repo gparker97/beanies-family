@@ -8,6 +8,12 @@
  * (`isNative` / `getPlatform` / `isStandalone` / `isIosOrIpadOs`) — the ONE
  * place native↔web detection lives (ADR-029). This module only adds a light
  * UA parse for browser/OS names, which no existing helper provides.
+ *
+ * ONE UI CONSUMER (#128): `isDesktopBrowser()` below gates the creation flow's
+ * "Use beanies on your phone too" line. It lives here, not in `capabilities.ts`,
+ * because this module already imports from there (exporting it from
+ * `capabilities.ts` would be a cycle), and because `formFactor` must stay the
+ * ONLY UA form-factor regex in the app.
  */
 
 import { getPlatform, isNative, isStandalone, isIosOrIpadOs } from '@/services/sync/capabilities';
@@ -70,6 +76,26 @@ function formFactor(ua: string): string {
   if (isIosOrIpadOs()) return 'ios';
   if (/Windows|Macintosh|Mac OS X|Linux|CrOS/.test(ua)) return 'desktop';
   return 'device';
+}
+
+/**
+ * True on an ordinary desktop browser (a tab or an installed desktop PWA), false in
+ * the native shell and on any phone or tablet browser (`formFactor` already buckets
+ * iPadOS as `ios`). Deliberately NOT viewport-width based: a narrow desktop window is
+ * still a desktop with no phone in hand, which is the question the caller asks.
+ * Never throws (a detection failure answers `false`, the safe "hide the extra" side).
+ *
+ * ⚠️ `console.warn`, NOT `logEvent`/`reportError`: telemetry imports this module
+ * (`logEvent` → `diagnosticContext` → `platformLabel`), so reaching back would be a cycle.
+ * Same pattern as `resumePaths.ts`.
+ */
+export function isDesktopBrowser(): boolean {
+  try {
+    return !isNative() && formFactor(userAgent()) === 'desktop';
+  } catch (e) {
+    console.warn('[platformLabel] desktop detection failed', e);
+    return false;
+  }
 }
 
 /**

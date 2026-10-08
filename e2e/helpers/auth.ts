@@ -38,7 +38,7 @@ async function waitForSettled(locator: Locator, frames = 8): Promise<void> {
 
 /**
  * Drive the create-a-family flow from WelcomeGate up to the add-members step,
- * leaving the Finish button visible (NOT yet clicked).
+ * leaving the members-step exit button ("I'll do this later") visible (NOT yet clicked).
  *
  * The unified flow finishes on the `ResumePodSetup` surface, which calls
  * `createNewFile` and so needs a real `StorageProvider`. The storage connect
@@ -87,21 +87,8 @@ async function createUpToMembers(page: Page, familyName = E2E_FAMILY_NAME): Prom
 
   // Recovery-kit phase (Phase 4, mandatory): the one-time kit modal — confirm stored.
   //
-  // ⚠️ TWO POSSIBLE LABELS, and the helper must accept either. The kit step now also
-  // shows the owner's magic link when one could be minted, and the confirm then reads
-  // "I've saved both" instead of "I've stored my kit somewhere safe". Which one appears
-  // depends on whether `setMemberLinkWrap` reached the durable file — i.e. on Drive, i.e.
-  // on the environment. Pinning the helper to one label made the whole E2E suite depend
-  // on a network outcome; this is how that was discovered, so keep it tolerant.
-  //
-  // ⚠️ `.or()`, NOT a built `new RegExp(...)`. The security lint forbids a non-literal
-  // RegExp argument (`security/detect-non-literal-regexp`) and it is right to: building a
-  // pattern out of interpolated strings is how an unescaped metacharacter becomes a silently
-  // wrong matcher. Playwright composes alternatives natively, which needs no escaping at all.
-  const kitStored = page
-    .getByRole('button', { name: ui('recovery.kitConfirmStored') })
-    .or(page.getByRole('button', { name: ui('setup.saveBothConfirm') }))
-    .first();
+  // The kit modal's single primary action is "Open my pod" (`recovery.kitOpenPod`).
+  const kitStored = page.getByRole('button', { name: ui('recovery.kitOpenPod') }).first();
   await kitStored.waitFor({ state: 'visible', timeout: 15000 });
 
   // ⚠️ The confirm is GATED now (#97): it releases on save, share, or this acknowledgement.
@@ -113,9 +100,10 @@ async function createUpToMembers(page: Page, familyName = E2E_FAMILY_NAME): Prom
 
   await kitStored.click();
 
-  // Members phase — the Finish button is the marker we leave visible.
+  // Members phase — no member is added here, so the exit button reads "I'll do this later"
+  // (`setup.addLater`); it only becomes "Finish" once a member exists. This is the marker.
   await page
-    .getByRole('button', { name: ui('loginV6.finish') })
+    .getByRole('button', { name: ui('setup.addLater') })
     .waitFor({ state: 'visible', timeout: 10000 });
 }
 
@@ -197,8 +185,8 @@ export async function bypassLoginIfNeeded(
     await createPodButton.click();
     await createUpToMembers(page, opts.familyName);
 
-    // Members step → finish (goes to /nook).
-    await page.getByRole('button', { name: ui('loginV6.finish') }).click();
+    // Members step → "I'll do this later" (no member added; goes to /nook).
+    await page.getByRole('button', { name: ui('setup.addLater') }).click();
   }
 
   await page.waitForURL('/nook', { timeout: 60000 });

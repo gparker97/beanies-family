@@ -74,17 +74,24 @@ The table schema is implicit — the Lambda writes whatever fields are in the PU
     oppref?: string
   } | null,
   heardVia: string | null,    // survey answer id (#121): one of reddit, product_hunt, substack,
-                              //   google, app_store, chatgpt_ad, ai, friend, other. Write-once
-                              //   exactly like `attribution` (signup write only, kept on the
-                              //   tombstone); anything else is dropped with a `heard_via_dropped`
-                              //   log line. The label and free text stay Slack-only. Twin of
-                              //   packages/brand/heardVia.ts.
+                              //   google, app_store, chatgpt_ad, ai, friend, other. Write-once,
+                              //   kept on the tombstone, but stamped by ANY OWNER write that
+                              //   carries it (#128: the survey runs after the pod is written, so
+                              //   it arrives on the setup-completion write); a member write
+                              //   never stamps it. Anything else is dropped with a
+                              //   `heard_via_dropped` log line. The label and free text stay
+                              //   Slack-only. Twin of packages/brand/heardVia.ts.
+  createAttemptId: string | null, // #128: the random UUID the client mints on the Create tap, so
+                              //   the firehose funnel joins to the row. Write-once, stamped by the
+                              //   `signupStart` write or the pod-creation write (isSignupEvent);
+                              //   a non-UUID is dropped with a `create_attempt_id_dropped` line.
+                              //   Kept on the DELETE tombstone.
   attributionInferred: {...} | null, // see below; never accepted from a client
   updatedAt: ISO timestamp,   // updated on every PUT
 }
 ```
 
-`attributionInferred` (#121) is derived ops data, never accepted from a client. It has two writers, both scoring with the same rules (`inference.mjs`): the Lambda itself, once, at a native pod's creation (see [Create-time inference](#create-time-inference)), and the metrics skill's batch run (`.claude/skills/beanies-metrics/scripts/infer_attribution.mjs --apply`), a single-attribute conditional `UpdateItem` that requires `attribution` to be absent or null, so it can never sit beside, or overwrite, a deterministic tag. The batch run is the reconciler: it never overwrites a stored value and reports a tap held by two rows. The Lambda carries it from the existing row on every PUT and on the DELETE tombstone, never reads it from a request body, and strips it from the GET response (only the creating client sees `{ band, fields }` in its pod-creation PUT response). Its shape:
+`attributionInferred` (#121) is derived ops data, never accepted from a client. It has two writers, both scoring with the same rules (`inference.mjs`): the Lambda itself, at a native pod's creation (see [Create-time inference](#create-time-inference)) and when a late survey answer rescales it (below), and the metrics skill's batch run (`.claude/skills/beanies-metrics/scripts/infer_attribution.mjs --apply`), a single-attribute conditional `UpdateItem` that requires `attribution` to be absent or null, so it can never sit beside, or overwrite, a deterministic tag. The batch run is the reconciler: it never overwrites a stored value and reports a tap held by two rows. The Lambda carries it from the existing row on every PUT and on the DELETE tombstone, never reads it from a request body, and strips it from the GET response (only the creating client sees `{ band, fields }` in its pod-creation and setup-completion PUT responses). When a later owner write is the first to stamp `heardVia` (#128), the Lambda rescales a stored value with `applyHeardVia` (the scorer's own contradiction multiplier and bands, never an upgrade; below the low band it is cleared) and logs one `heard_via_late_stamp` line (`family_id_hash`, `band_before`, `band_after`). Its shape:
 
 ```ts
 {
@@ -107,11 +114,11 @@ A row is **never-finished** when it has `signupStartedAt` and no `createdAt` (`i
 
 A PUT body is in exactly one of three modes, decided in this order (the order is the contract; a new flag takes a place in it rather than a special case inside one):
 
-1. **`signupStart: true`** (#125, the create wizard's step 1). Create-only: when any row exists for the family (live or tombstoned) it writes nothing and answers `{ success: true, signupStart: 'exists' }`; when `writerMemberId` is absent, null or differs from `ownerMemberId` it writes nothing and answers `'refused'`; otherwise it writes the step-1 row (`familyName`, `ownerEmail`, `ownerMemberId`, `subscribeNewsletter`, `signupPlatform`, `attribution`, `signupStartedAt`, `deviceCountry`, `updatedAt`, with **no** pointer, `createdAt` or `lastLoginAt`) on `attribute_not_exists(familyId)` and answers `{ success: true, signupStart: 'created', deviceCountry }`. Its `isLoginEvent`, `isSignupEvent` and `ownerSync` flags are ignored. Logs one `registry_signup_start` line (`family_id_hash`, `outcome`, `platform`, `has_country`).
+1. **`signupStart: true`** (#125, the create wizard's step 1). Create-only: when any row exists for the family (live or tombstoned) it writes nothing and answers `{ success: true, signupStart: 'exists' }`; when `writerMemberId` is absent, null or differs from `ownerMemberId` it writes nothing and answers `'refused'`; otherwise it writes the step-1 row (`familyName`, `ownerEmail`, `ownerMemberId`, `subscribeNewsletter`, `signupPlatform`, `attribution`, `signupStartedAt`, `deviceCountry`, `updatedAt`, with **no** pointer, `createdAt` or `lastLoginAt`) on `attribute_not_exists(familyId)` and answers `{ success: true, signupStart: 'created', deviceCountry }`. Its `isLoginEvent`, `isSignupEvent` and `ownerSync` flags are ignored. Logs one `registry_signup_start` line (`family_id_hash`, `outcome`, `platform`, `has_country`, `table`: `prod` / `dev` by Origin, #128).
 2. **`ownerSync: true`**: ownership-only (handover or email sync, `owner.mjs`); never creates a row or moves the pointer.
-3. **Everything else**: the ordinary read-merge-write. A pod-creation write (`isSignupEvent: true`) additionally answers `deviceCountry` and `attributionInferred: { band, fields } | null`.
+3. **Everything else**: the ordinary read-merge-write. A pod-creation write (`isSignupEvent: true`), an owner's setup-completion write (`setupComplete: true`, #128; ignored from a member) and a write that first stamps `heardVia` late additionally answer `deviceCountry` and `attributionInferred: { band, fields } | null`.
 
-`signupStart` and `deviceTimeZone` (the device's IANA zone, sent on signup writes) are transient: neither is ever stored.
+`signupStart`, `setupComplete` and `deviceTimeZone` (the device's IANA zone, sent on signup writes) are transient: none is ever stored.
 
 ### Create-time inference
 
@@ -119,7 +126,7 @@ On the pod-creation write (`isSignupEvent: true`, the write that stamps `created
 
 ### DELETE and start over
 
-`DELETE /family/{familyId}?writerMemberId=…` writes a tombstone: `createdAt`, the owner fields, `country`, `signupPlatform`, `attribution`, `heardVia`, `attributionInferred`, `signupStartedAt` and `deviceCountry` survive so a re-registration is a restore; the pointer, activity signals, `familyName` and `subscribeNewsletter` are dropped. With `&neverFinishedOnly=1` (the resume-setup screen's "Start over", #125) it tombstones only a never-finished row and answers `{ success: true, skipped: 'pod-exists' }` for any other row. The decision is made from the stored row, never from client state. It logs one `registry_start_over` line (`family_id_hash`, `outcome`: `tombstoned` / `skipped-pod-exists` / `no-row`).
+`DELETE /family/{familyId}?writerMemberId=…` writes a tombstone: `createdAt`, the owner fields, `country`, `signupPlatform`, `attribution`, `heardVia`, `attributionInferred`, `signupStartedAt`, `deviceCountry` and `createAttemptId` survive so a re-registration is a restore; the pointer, activity signals, `familyName` and `subscribeNewsletter` are dropped. With `&neverFinishedOnly=1` (the resume-setup screen's "Start over", #125) it tombstones only a never-finished row and answers `{ success: true, skipped: 'pod-exists' }` for any other row. The decision is made from the stored row, never from client state. It logs one `registry_start_over` line (`family_id_hash`, `outcome`: `tombstoned` / `skipped-pod-exists` / `no-row`, `table`: `prod` / `dev` by Origin, #128).
 
 ### 2. Bundle the Lambda
 
@@ -253,6 +260,6 @@ The Drive sign-in flow is unaffected — `VITE_OAUTH_PROXY_URL` (or `VITE_REGIST
 ## Security notes
 
 - The API key in `REGISTRY_API_KEY` is the only thing protecting the registry from arbitrary writes. Treat it like a credential — don't commit it, rotate if exposed.
-- DynamoDB rows are not encrypted at rest beyond the AWS-managed default. The data stored is: family ID, file location, family name, owner email, newsletter opt-in, when sign-up started (`signupStartedAt`), a country derived from the device's time zone (`deviceCountry`; the zone itself is never stored), the campaign tag from the link that first brought the family to beanies.family (`attribution`, if there was one; it identifies the ad, not the person), the survey answer id (`heardVia`, if answered) and, on the hosted service, the scorer's inferred ad (`attributionInferred`). No financial data, no member list, no transactions — none of which the registry sees.
+- DynamoDB rows are not encrypted at rest beyond the AWS-managed default. The data stored is: family ID, file location, family name, owner email, newsletter opt-in, when sign-up started (`signupStartedAt`), a country derived from the device's time zone (`deviceCountry`; the zone itself is never stored), the campaign tag from the link that first brought the family to beanies.family (`attribution`, if there was one; it identifies the ad, not the person), the survey answer id (`heardVia`, if answered), a random id for the sign-up attempt (`createAttemptId`; not linkable to a person) and, on the hosted service, the scorer's inferred ad (`attributionInferred`). No financial data, no member list, no transactions — none of which the registry sees.
 - `POST /events` has no API key. It is bounded by the `Origin` allowlist (forgeable by a non-browser client, so it is a filter, not a boundary), the 2 KB cap, strict validation and the per-route throttle; at 10 rps a flood is at most 864k small writes a day, and a polluted event can only ever attach to a pod that really was created. The worst outcome is a mis-scored dashboard, never data exposure: the route writes only, and reads nothing back.
 - CORS allowlisting + API-key gating means an attacker who finds the URL still needs the key. An attacker who finds both can DoS your registry but cannot read other users' families (different family IDs).

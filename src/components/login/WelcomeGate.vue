@@ -7,6 +7,7 @@ import { getBuildVersionLabel } from '@/utils/diagnosticContext';
 import { isReviewDemoAvailable } from '@/utils/reviewDemo';
 import LoginChoiceCard from './LoginChoiceCard.vue';
 import { track } from '@/services/analytics/plausible';
+import { beginCreateAttempt, trackOnboardingStep } from '@/services/telemetry/onboardingAttempt';
 
 const { t } = useTranslation();
 
@@ -53,9 +54,16 @@ const emit = defineEmits<{
  * many start the create flow but bail at the invite-only friction. Fired here
  * (the actual button) rather than in LoginPage's navigate handler, which is also
  * reached by non-button redirect paths.
+ *
+ * The same tap opens the firehose create attempt (#128): it mints the `create_attempt_id`
+ * every later event carries, and `welcome submitted` is the funnel's first step. Nothing is
+ * logged on mount: every visitor sees the gate, so a `shown` here would measure traffic,
+ * not the funnel.
  */
 function onCreatePod() {
   track('create_pod_click');
+  beginCreateAttempt();
+  trackOnboardingStep('welcome', 'submitted');
   emit('navigate', 'create');
 }
 

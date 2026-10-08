@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { getPlatformLabel, getDeviceLabel } from './platformLabel';
+import { getPlatformLabel, getDeviceLabel, isDesktopBrowser } from './platformLabel';
 import * as capabilities from '@/services/sync/capabilities';
 
 /**
@@ -92,6 +92,45 @@ describe('getDeviceLabel — installed PWA', () => {
   it('appends a pwa suffix', () => {
     stub({ standalone: true, ua: CHROME_ANDROID });
     expect(getDeviceLabel()).toBe('chrome android pwa');
+  });
+});
+
+describe('isDesktopBrowser (#128 phone hand-off gate)', () => {
+  it('is true for a desktop browser tab and a desktop PWA', () => {
+    stub({ ua: CHROME_DESKTOP });
+    expect(isDesktopBrowser()).toBe(true);
+    stub({ standalone: true, ua: EDGE_DESKTOP });
+    expect(isDesktopBrowser()).toBe(true);
+  });
+
+  it('is false on phone browsers, including iPadOS (desktop UA, touch Mac)', () => {
+    stub({ ua: CHROME_ANDROID });
+    expect(isDesktopBrowser()).toBe(false);
+    stub({ ios: true, ua: SAFARI_IOS });
+    expect(isDesktopBrowser()).toBe(false);
+    stub({
+      ios: true,
+      ua: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15',
+    });
+    expect(isDesktopBrowser()).toBe(false);
+  });
+
+  it('is false in the native shell even with a desktop-looking UA', () => {
+    stub({ native: true, platform: 'ios', ua: CHROME_DESKTOP });
+    expect(isDesktopBrowser()).toBe(false);
+  });
+
+  it('is false for an unrecognised UA and when detection throws', () => {
+    stub({ ua: 'SomeBot/1.0' });
+    expect(isDesktopBrowser()).toBe(false);
+    const failure = new Error('capabilities unavailable');
+    vi.spyOn(capabilities, 'isNative').mockImplementation(() => {
+      throw failure;
+    });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(isDesktopBrowser()).toBe(false);
+    // Classified, never silent: the failure is logged with the error (no telemetry import here).
+    expect(warn).toHaveBeenCalledWith('[platformLabel] desktop detection failed', failure);
   });
 });
 

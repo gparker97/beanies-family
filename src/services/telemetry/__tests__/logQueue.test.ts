@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   enqueueLogEvent,
+  registerPageHideHook,
   __resetLogQueueForTesting,
   __getLogQueueLengthForTesting,
 } from '../logQueue';
@@ -173,6 +174,66 @@ describe('logQueue', () => {
       window.dispatchEvent(e);
       await tick();
       expect(beaconSpy).not.toHaveBeenCalled();
+    });
+  });
+  describe('pre-beacon pagehide hooks', () => {
+    function realUnload() {
+      window.dispatchEvent(new Event('pagehide')); // persisted undefined → real unload
+    }
+
+    it('runs a hook BEFORE the beacon, so an event it enqueues rides that beacon', async () => {
+      enqueueN(1, 'earlier');
+      registerPageHideHook(() => enqueueLogEvent(rec('from-hook')));
+      realUnload();
+      await tick();
+      expect(beaconSpy).toHaveBeenCalledTimes(1);
+      const blob = beaconSpy.mock.calls[0]![1] as Blob;
+      const body = JSON.parse(await blob.text()) as { events: LogRecord[] };
+      expect(body.events.map((e) => e.message)).toEqual(['earlier', 'from-hook']);
+    });
+
+    it('attaches the listener on registration, so a page that enqueued nothing still runs it', async () => {
+      registerPageHideHook(() => enqueueLogEvent(rec('only-event')));
+      realUnload();
+      await tick();
+      expect(beaconSpy).toHaveBeenCalledTimes(1);
+      const blob = beaconSpy.mock.calls[0]![1] as Blob;
+      const body = JSON.parse(await blob.text()) as { events: LogRecord[] };
+      expect(body.events.map((e) => e.message)).toEqual(['only-event']);
+    });
+
+    it('a throwing hook is skipped with a warn; later hooks and the beacon still run', async () => {
+      const later = vi.fn();
+      registerPageHideHook(() => {
+        throw new Error('boom');
+      });
+      registerPageHideHook(later);
+      enqueueN(1);
+      realUnload();
+      await tick();
+      expect(later).toHaveBeenCalledTimes(1);
+      expect(beaconSpy).toHaveBeenCalledTimes(1);
+      expect(
+        warnSpy.mock.calls.some((c: unknown[]) => String(c[0]).includes('pagehide hook threw'))
+      ).toBe(true);
+    });
+
+    it('does NOT run hooks on a bfcache freeze (pagehide persisted=true)', () => {
+      const hook = vi.fn();
+      registerPageHideHook(hook);
+      const e = new Event('pagehide');
+      Object.defineProperty(e, 'persisted', { value: true });
+      window.dispatchEvent(e);
+      expect(hook).not.toHaveBeenCalled();
+    });
+
+    it('the test reset clears registered hooks', () => {
+      const hook = vi.fn();
+      registerPageHideHook(hook);
+      __resetLogQueueForTesting();
+      enqueueN(1); // re-attaches the listener without the hook
+      realUnload();
+      expect(hook).not.toHaveBeenCalled();
     });
   });
 });

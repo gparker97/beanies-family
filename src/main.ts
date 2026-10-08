@@ -5,6 +5,7 @@ import App from './App.vue';
 import router from './router';
 import { initAnalytics } from './services/analytics/plausible';
 import { captureAttributionFromUrl } from './utils/attributionStash';
+import { installOnboardingAttempt } from './services/telemetry/onboardingAttempt';
 import { readInstallReferrerOnce } from './utils/installReferrer';
 import { getPlatform } from '@/services/sync/capabilities';
 import { reportError } from './utils/errorReporter';
@@ -23,6 +24,12 @@ initAnalytics();
 // it is still the raw landing URL, is the only point that is guaranteed to see the tag. The same
 // read also restores it after the web OAuth hop (the return path carries it; see
 // `connectStorage.createReturnPath`). Synchronous and never throws; a no-op on native.
+//
+// The open pod-creation attempt (#128) is hydrated just before it, so every event from here on
+// (the attribution capture's included) carries its `create_attempt_id`. Synchronous and never
+// throws (localStorage via `storedJson`); it also drops a stale attempt and registers the
+// pre-beacon pagehide hook that records an abandon.
+installOnboardingAttempt();
 captureAttributionFromUrl();
 // Android only: the Play install referrer is the native install's campaign tag (one-shot).
 if (getPlatform() === 'android') void readInstallReferrerOnce();

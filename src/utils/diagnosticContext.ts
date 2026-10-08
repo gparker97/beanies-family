@@ -32,6 +32,10 @@ import { getDeviceInfo, tail } from '@/utils/diagnostics';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useSyncStore } from '@/stores/syncStore';
+// The state holder only (it imports nothing but `storedJson`). The orchestrator that logs,
+// `services/telemetry/onboardingAttempt.ts`, must never be imported here: see the
+// dependency-direction note above.
+import { currentCreateAttempt } from '@/utils/createAttemptState';
 
 // ─── Privacy: context allowlist ──────────────────────────────────────────────
 
@@ -359,6 +363,13 @@ export const ALLOWED_CONTEXT_KEYS = new Set<string>([
   'entitlement_state',
   'plan',
   'dry_run',
+  // Pod-creation funnel (#128): the random UUID of the open create attempt, minted on the
+  // Create tap (`createAttemptState.ts`) and stamped on every event by `enrichAndRedact` while
+  // the attempt is open, so one query grouped by it returns each attempt's steps. Not linkable
+  // to a person; ends at setup completion, Start over or another sign-in, expires after 24 h.
+  // MIRRORED in the telemetry Lambda + its pinned test; declared as "Diagnostics: a random
+  // identifier for one set-up attempt".
+  'create_attempt_id',
 ]);
 
 export const MAX_STRING_LEN = 200;
@@ -555,6 +566,15 @@ export function enrichAndRedact(
     if (opts.includeEmail && ctx.activeFamilyName) raw.family_name = ctx.activeFamilyName;
   } catch {
     /* pre-auth, no Pinia, or store error — context is just less rich */
+  }
+
+  // The open pod-creation attempt (#128). A random UUID, non-PII, so it ships on both paths,
+  // and it is what correlates the events BEFORE a pod exists, where `family_id` is absent. An
+  // in-memory read (never localStorage per event). The caller's value wins: a boot event about
+  // an expired attempt names that attempt's id explicitly after the cache has been cleared.
+  if (raw.create_attempt_id === undefined) {
+    const attemptId = currentCreateAttempt()?.id;
+    if (attemptId) raw.create_attempt_id = attemptId;
   }
 
   if (opts.includeEmail) {

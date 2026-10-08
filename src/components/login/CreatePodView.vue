@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BaseModal from '@/components/ui/BaseModal.vue';
-import BaseSelect from '@/components/ui/BaseSelect.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import CloudProviderBadge from '@/components/ui/CloudProviderBadge.vue';
 import LocalFileSyncWarning from '@/components/login/LocalFileSyncWarning.vue';
@@ -16,6 +15,8 @@ import { resolveDriveCollision } from '@/composables/useDriveCollisionRecovery';
 import { canUseLocalFiles } from '@/services/sync/capabilities';
 import { isUserCancellation } from '@/services/google/googleAuth';
 import { reportError } from '@/utils/errorReporter';
+import { deriveFamilyName } from '@/utils/familyName';
+import { trackOnboardingStep, trackStorageChoice } from '@/services/telemetry/onboardingAttempt';
 
 const { t } = useTranslation();
 const authStore = useAuthStore();
@@ -40,15 +41,24 @@ const emit = defineEmits<{
 const currentStep = ref(1);
 const formError = ref<string | null>(null);
 
-// Step 1 fields
-const familyName = ref('');
+// Step 1 fields: Your name, Email, Your family (#128). No Adult/Child question: the owner who
+// creates a pod is always stored as an adult, so it was a decision that changed nothing.
 const name = ref('');
 const email = ref('');
-const ownerRole = ref<'parent' | 'child'>('parent');
-const ownerRoleOptions = computed(() => [
-  { value: 'parent', label: t('loginV6.parentBean') },
-  { value: 'child', label: t('loginV6.littleBean') },
-]);
+/**
+ * "The Parker family" from "Greg Parker", until the person edits the field. A display default
+ * only: nothing is written before step 1 is submitted, and the submitted value is whatever the
+ * field shows then.
+ */
+const derivedFamilyName = computed(() => deriveFamilyName(name.value, t('auth.familyNameDefault')));
+/** Set by the first edit, raw (so the field can be cleared while typing); null = follow the name. */
+const familyNameOverride = ref<string | null>(null);
+const familyName = computed({
+  get: () => familyNameOverride.value ?? derivedFamilyName.value,
+  set: (v: string) => {
+    familyNameOverride.value = v;
+  },
+});
 const subscribeNewsletter = ref(true);
 
 // Step 2 state
@@ -93,6 +103,12 @@ if (import.meta.env.DEV) {
 
 const stepLabels = [() => t('loginV6.createStep1'), () => t('loginV6.createStep2')];
 
+// The onboarding funnel (#128): each step's `shown`, on mount and on every move between them
+// (Back from the storage step re-shows step 1).
+watch(currentStep, (step) => trackOnboardingStep(step === 1 ? 'about-you' : 'storage', 'shown'), {
+  immediate: true,
+});
+
 async function handleStep1Next() {
   formError.value = null;
 
@@ -102,11 +118,14 @@ async function handleStep1Next() {
   // Just advance to the storage step with the family we already created.
   // (Renaming the family after creation is out of scope — see the plan.)
   if (authStore.currentUser) {
+    trackOnboardingStep('about-you', 'submitted');
     currentStep.value = 2;
     return;
   }
 
-  if (!familyName.value || !name.value || !email.value) {
+  // A field cleared mid-edit falls back to the name-derived default rather than failing.
+  const resolvedFamilyName = familyName.value.trim() || derivedFamilyName.value;
+  if (!resolvedFamilyName || !name.value || !email.value) {
     formError.value = t('auth.fillAllFields');
     return;
   }
@@ -117,12 +136,15 @@ async function handleStep1Next() {
   const result = await authStore.signUp({
     deferPassword: true,
     email: email.value,
-    familyName: familyName.value,
+    familyName: resolvedFamilyName,
     memberName: name.value,
     subscribeNewsletter: subscribeNewsletter.value,
   });
 
   if (result.success) {
+    // The field now shows exactly what was written (the storage step names the file from it).
+    familyNameOverride.value = resolvedFamilyName;
+    trackOnboardingStep('about-you', 'submitted');
     // The step-1 registry row and the "pod started" Slack line (#125). Not awaited: the
     // wizard never waits on the registry, and the action never throws.
     void syncStore.registerSignupStart();
@@ -177,7 +199,14 @@ async function handleStep1Next() {
 }
 
 function handleLocalFileClick() {
+  trackStorageChoice('local');
   showLocalFileWarning.value = true;
+}
+
+/** The Drive card itself: a storage CHOICE, unlike the result modal's retry. */
+function handleDriveCardClick() {
+  trackStorageChoice('drive');
+  void handleChooseGoogleDriveStorage();
 }
 
 /**
@@ -196,7 +225,7 @@ function handleFieldFocus(e: FocusEvent) {
 /** "Use Google Drive instead" from the local-file warning modal. */
 function handleUseDriveFromWarning() {
   showLocalFileWarning.value = false;
-  void handleChooseGoogleDriveStorage();
+  handleDriveCardClick();
 }
 
 async function handleChooseLocalStorage() {
@@ -251,6 +280,8 @@ async function handleChooseGoogleDriveStorage() {
   isSavingStorage.value = true;
   formError.value = null;
   driveResultError.value = null;
+  // Drive connect started: the card tap, the warning modal's "use Drive", or the retry.
+  trackOnboardingStep('drive-consent', 'shown');
 
   // On a redirect surface (iOS / PWA / native) connecting Drive does a full-page
   // redirect that destroys this component's state. The routing rides through the
@@ -311,7 +342,8 @@ async function handleChooseGoogleDriveStorage() {
           showDriveResultModal.value = true;
           break;
         case 'failed':
-          driveResultError.value = action.error || t('googleDrive.authFailed');
+          // Translated copy only; the raw (English, possibly id-bearing) error goes to the report.
+          driveResultError.value = t('googleDrive.authFailed');
           console.error('[CreatePodView] adopt-existing recovery failed:', action.error);
           reportError({
             surface: 'createPod.adoptExisting',
@@ -359,7 +391,10 @@ async function handleChooseGoogleDriveStorage() {
       console.warn('[CreatePodView] Drive collision check unavailable:', r.error);
       showDriveResultModal.value = true;
     } else {
-      driveResultError.value = r.error || t('googleDrive.authFailed');
+      // ⚠️ TRANSLATED KEY, NEVER `r.error`, as in `ResumePodSetup`'s sibling arm
+      // (`driveAuthMessage`): `r.error` is English-only and may be Google-supplied text. The raw
+      // error rides the report's `message`; a classified kind that reaches here, its `error_code`.
+      driveResultError.value = t('googleDrive.authFailed');
       // A genuine cancellation (closed the chooser) is benign; anything else
       // — a 400, a timeout, a scope denial — is a real onboarding failure.
       const cancelled = r.cancelled || isUserCancellation(r.error);
@@ -369,10 +404,20 @@ async function handleChooseGoogleDriveStorage() {
         surface: 'createPod.connectDrive',
         message: r.error || 'Google Drive connect failed',
         severity: cancelled ? 'warning' : 'critical',
-        context: { provider_type: 'google_drive' },
+        context: {
+          provider_type: 'google_drive',
+          ...(r.errorKind ? { error_code: r.errorKind } : {}),
+        },
       });
       showDriveResultModal.value = true; // failure state — Try again / Use a local file
     }
+    // Every arm that opened the result modal, success AND failure, leaves the person back on the
+    // storage screen (behind the modal). Record that once, so the attempt's step leaves
+    // `drive-consent` (whose exit `connectStorage` already logged) and a pagehide from here counts
+    // as an abandon. ⚠️ The success state too: until its Next, the step would otherwise stay
+    // `drive-consent`, which the pagehide hook ignores, so closing the tab on "Drive connected"
+    // went unrecorded. (`redirecting` returned above; `open-existing` navigates away, no modal.)
+    if (showDriveResultModal.value) trackOnboardingStep('storage', 'shown');
   } finally {
     isSavingStorage.value = false;
   }
@@ -438,6 +483,8 @@ function handleStorageConnected() {
     });
     return;
   }
+  // On the success line only: every refusal above leaves the person on this step.
+  trackOnboardingStep('storage', 'submitted');
   emit('finish-storage');
 }
 
@@ -549,42 +596,33 @@ function handleBack() {
 
     <!-- Step 1: About You -->
     <div v-if="currentStep === 1">
-      <h2 class="font-outfit dark:text-ink mb-6 text-xl font-bold text-gray-900">
+      <h2 class="font-outfit dark:text-ink text-xl font-bold text-gray-900">
         {{ t('loginV6.growPodTitle') }}
       </h2>
+      <p class="dark:text-ink-soft mt-1 mb-6 text-sm text-gray-500">
+        {{ t('loginV6.createSubtitleStep1') }}
+      </p>
 
       <form @submit.prevent="handleStep1Next">
         <div class="space-y-4">
           <BaseInput
-            v-model="familyName"
-            :label="t('auth.familyName')"
-            :placeholder="t('auth.familyNamePlaceholder')"
+            v-model="name"
+            :label="t('setup.yourName')"
+            :placeholder="t('auth.yourNamePlaceholder')"
             required
           />
-          <div class="grid grid-cols-2 gap-3">
-            <BaseInput
-              v-model="name"
-              :label="t('setup.yourName')"
-              :placeholder="t('auth.yourNamePlaceholder')"
-              required
-            />
-            <!-- Role dropdown -->
-            <div>
-              <label
-                class="font-outfit dark:text-ink-soft mb-1 block text-xs font-semibold tracking-[0.1em] text-gray-700 uppercase"
-              >
-                {{ t('form.type') }}
-              </label>
-              <!-- BaseSelect (not a raw <select>): its control inherits the
-                   16px body size, so iOS Safari doesn't auto-zoom on focus. -->
-              <BaseSelect v-model="ownerRole" :options="ownerRoleOptions" />
-            </div>
-          </div>
           <BaseInput
             v-model="email"
             :label="t('form.email')"
             type="email"
             placeholder="you@example.com"
+            required
+          />
+          <!-- Pre-filled from the surname; editable, and stops following the name once edited. -->
+          <BaseInput
+            v-model="familyName"
+            :label="t('auth.familyName')"
+            :placeholder="t('auth.familyNamePlaceholder')"
             required
           />
         </div>
@@ -628,7 +666,7 @@ function handleBack() {
                   ? 'border-blue-300 bg-blue-50/50 dark:border-blue-600/50 dark:bg-blue-900/15'
                   : 'border-primary-500/40 bg-primary-500/[0.04] hover:border-primary-500 hover:bg-primary-500/[0.08] dark:border-primary-500/30 dark:bg-primary-500/[0.06] dark:hover:border-primary-500/50 hover:shadow-[0_4px_20px_rgba(241,93,34,0.08)]'
             "
-            @click="handleChooseGoogleDriveStorage"
+            @click="handleDriveCardClick"
           >
             <div
               class="flex h-[42px] w-[42px] flex-shrink-0 items-center justify-center rounded-[12px]"
@@ -729,7 +767,7 @@ function handleBack() {
             <button
               v-else-if="canUseLocalFiles()"
               type="button"
-              class="font-outfit text-secondary-500/60 hover:text-secondary-500 dark:text-ink-soft dark:hover:text-ink cursor-pointer text-sm underline decoration-1 underline-offset-4 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+              class="font-outfit text-secondary-500 hover:text-secondary-600 dark:text-ink-faint dark:hover:text-ink cursor-pointer text-sm underline decoration-1 underline-offset-4 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
               :disabled="isSavingStorage"
               @click="handleLocalFileClick"
             >

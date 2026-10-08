@@ -1,10 +1,12 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   RESUME_SETUP,
   RESUME_LOAD_DRIVE,
   isPodlessRecoveryQuery,
   stashResumeReasonFor,
   consumeResumeReason,
+  setResumeReason,
+  isResumeSetupSearch,
 } from '../resumePaths';
 import { DriveConsentDeniedError } from '@/types/sync';
 
@@ -49,5 +51,62 @@ describe('stashResumeReasonFor', () => {
     expect(stashResumeReasonFor(new Error('network'))).toBe(false);
     expect(stashResumeReasonFor(undefined)).toBe(false);
     expect(consumeResumeReason()).toBeNull();
+  });
+});
+
+describe('setResumeReason / consumeResumeReason (#128 reason union)', () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it('round-trips both reasons once', () => {
+    setResumeReason('drive-declined');
+    expect(consumeResumeReason()).toBe('drive-declined');
+    expect(consumeResumeReason()).toBeNull();
+    setResumeReason('drive-consent');
+    expect(consumeResumeReason()).toBe('drive-consent');
+    expect(consumeResumeReason()).toBeNull();
+  });
+
+  it('rejects (and clears) a value outside the union', () => {
+    sessionStorage.setItem('beanies:resume-reason', 'something-else');
+    expect(consumeResumeReason()).toBeNull();
+    expect(sessionStorage.getItem('beanies:resume-reason')).toBeNull();
+  });
+
+  it('warns instead of swallowing silently when sessionStorage throws', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.stubGlobal('sessionStorage', {
+      setItem: () => {
+        throw new Error('quota');
+      },
+      getItem: () => {
+        throw new Error('denied');
+      },
+      removeItem: () => {},
+    });
+    expect(() => setResumeReason('drive-declined')).not.toThrow();
+    expect(consumeResumeReason()).toBeNull();
+    expect(warn).toHaveBeenCalledTimes(2);
+    expect(warn.mock.calls.every((c) => String(c[0]).startsWith('[resumePaths]'))).toBe(true);
+  });
+});
+
+describe('isResumeSetupSearch (App.vue boot catch, #128)', () => {
+  it('is true only for the resume-setup return', () => {
+    expect(isResumeSetupSearch('?resume=setup')).toBe(true);
+    expect(isResumeSetupSearch('?resume=setup&utm_source=chatgpt')).toBe(true);
+    expect(isResumeSetupSearch('?utm_source=x&resume=setup')).toBe(true);
+  });
+
+  it('is false for every other return (load-drive, calendar, reconnect, none)', () => {
+    expect(isResumeSetupSearch('?resume=load-drive')).toBe(false);
+    expect(isResumeSetupSearch('?open=calendar-sync&calResume=connect')).toBe(false);
+    expect(isResumeSetupSearch('')).toBe(false);
+    expect(isResumeSetupSearch('?resume=setupx')).toBe(false);
   });
 });

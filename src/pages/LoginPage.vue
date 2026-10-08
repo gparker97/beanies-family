@@ -18,7 +18,6 @@ import CreatePodView from '@/components/login/CreatePodView.vue';
 import ResumePodSetup from '@/components/login/ResumePodSetup.vue';
 import JoinPodView from '@/components/login/JoinPodView.vue';
 import InviteGateOverlay from '@/components/login/InviteGateOverlay.vue';
-import CreatePodWelcome from '@/components/login/CreatePodWelcome.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { showToast } from '@/composables/useToast';
 import { isNavigationCancelled } from '@/utils/appChrome';
@@ -38,6 +37,7 @@ import {
   RESUME_SETUP_PATH,
 } from '@/components/login/resumePaths';
 import { reportError } from '@/utils/errorReporter';
+import { endCreateAttempt } from '@/services/telemetry/onboardingAttempt';
 import { hasPendingKeptRecipe, KEPT_RECIPE_DESTINATION } from '@/utils/recipeKeepStash';
 
 const router = useRouter();
@@ -125,13 +125,10 @@ const loadErrorProviderHint = ref<'local' | 'google_drive' | undefined>();
  */
 const reconnectDriveFile = ref<{ fileId: string; fileName: string; familyName?: string }>();
 const isSingleFamilyAutoSelect = ref(false);
-// Two mutually-exclusive create-path overlays over the always-mounted CreatePodView.
-// Precedence is encoded by v-if/v-else-if order in the 'create' block below: the
-// invite gate (only when flagged on) OUTRANKS the welcome intro. Two independent
-// once-per-mount latches:
+// The create path's one optional overlay over the always-mounted CreatePodView. The
+// Create tap opens step 1 directly (the "Plant my bean pod" interstitial was removed in
+// #128, docs/plans/2026-10-08-pod-creation-drop-off.md).
 //  - inviteGateLocked: starts features.inviteGate; latched false on unlock.
-//  - showCreateWelcome: starts true; latched false ONLY on proceed (✕/cancel leaves
-//    it true so the intro re-shows on re-entry, since they haven't seen the wizard).
 //
 // Invite gate intentionally retained but switched off in prod — see
 // docs/plans/2026-07-21-remove-invite-gate-create-welcome-modal.md. NOT dead code: set the
@@ -140,7 +137,6 @@ const isSingleFamilyAutoSelect = ref(false);
 // delete this + the create block's InviteGateOverlay + InviteGateOverlay/InviteDiscordButton/
 // inviteToken.ts + the inviteGate.* strings.
 const inviteGateLocked = ref(features.inviteGate);
-const showCreateWelcome = ref(true);
 
 // ── The login-flow machine (2026-08-28 rethink) ─────────────────────────────
 // LoginPage is a thin renderer over it for the returning-user path: 'flow' view
@@ -820,6 +816,10 @@ async function handleLinkReady(payload: {
 }
 
 function handleSignedIn(destination: string) {
+  // Any sign-in that lands here closes an open create attempt (#128): a no-op on the create
+  // path, which has already ended it in `completePodSetup`, but a create abandoned earlier in
+  // this browser must not tag a loaded or joined pod's events for up to 24 h.
+  endCreateAttempt('superseded');
   // Single canonical arm-and-register point for EVERY entry path — create,
   // load, join, reconnect. SetupProgressModal no longer calls these (it used to,
   // causing a duplicate registry write on every create); they live here so the
@@ -838,6 +838,8 @@ function handleSignedIn(destination: string) {
 
 /** "Start over instead" from the resume-setup screen — abandon the half-finished onboarding. */
 async function handleStartOver() {
+  // First, while the session still names the family, so the event carries `family_id` (#128).
+  endCreateAttempt('start-over');
   // Tombstone this family's step-1 registry row first, while the session still names it
   // (#125). The registry leaves a real pod untouched, and the action never throws, so a
   // failure never blocks start over.
@@ -972,16 +974,10 @@ async function handleStartOver() {
             @finish-storage="handleFinishStorage"
           />
         </div>
-        <!-- Optional invite gate: retained, flag-gated (off in prod). Outranks the welcome intro. -->
+        <!-- Optional invite gate: retained, flag-gated (off in prod). -->
         <InviteGateOverlay
           v-if="inviteGateLocked"
           @unlocked="inviteGateLocked = false"
-          @cancel="activeView = 'welcome'"
-        />
-        <!-- Welcome intro: shown once the gate (if any) is passed. -->
-        <CreatePodWelcome
-          v-else-if="showCreateWelcome"
-          @dismiss="showCreateWelcome = false"
           @cancel="activeView = 'welcome'"
         />
       </div>
