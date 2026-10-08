@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { URL_PLACEHOLDER } from '@/constants/inputPlaceholders';
 import { ref, computed, watch, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { useTranslation } from '@/composables/useTranslation';
@@ -1676,7 +1677,7 @@ async function confirmReschedule() {
                     ref="linkRef"
                     v-model="draftLink"
                     type="url"
-                    placeholder="https://..."
+                    :placeholder="URL_PLACEHOLDER"
                     class="rounded-[14px] ring-2 ring-orange-500/30"
                     @keydown="handleInputKeydown('link')($event)"
                   />

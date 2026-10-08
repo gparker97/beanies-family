@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { URL_PLACEHOLDER } from '@/constants/inputPlaceholders';
 /**
  * The optional account-details fields, rendered inside AccountModal's existing
  * "More Details" collapsible. Extracted so the modal stays thin.
@@ -71,7 +72,7 @@ function setNetwork(value: string | number) {
 
     <!-- Common -->
     <FormFieldGroup :label="t('accountDetails.field.onlineBankingUrl')">
-      <BaseInput v-model="details.onlineBankingUrl" type="url" placeholder="https://…" />
+      <BaseInput v-model="details.onlineBankingUrl" type="url" :placeholder="URL_PLACEHOLDER" />
     </FormFieldGroup>
     <FormFieldGroup :label="t('accountDetails.field.onlineBankingUserId')">
       <BaseInput v-model="details.onlineBankingUserId" type="text" />

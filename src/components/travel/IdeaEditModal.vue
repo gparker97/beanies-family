@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { URL_PLACEHOLDER } from '@/constants/inputPlaceholders';
 import { safeExternalHref, safeHttpsUrl } from '@/utils/url';
 import { ref, computed } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
@@ -305,7 +306,7 @@ function handleSave() {
           <BaseInput
             v-model="link"
             type="url"
-            placeholder="https://..."
+            :placeholder="URL_PLACEHOLDER"
             class="flex-1"
             @blur="handleLinkBlur"
           />

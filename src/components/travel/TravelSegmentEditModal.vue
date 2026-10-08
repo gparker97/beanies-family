@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { URL_PLACEHOLDER } from '@/constants/inputPlaceholders';
 import { ref, computed } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
@@ -1010,7 +1011,7 @@ async function handleSave() {
       <!-- Link (common) -->
       <FormFieldGroup :label="t('vacation.field.link')">
         <div class="flex items-center gap-2">
-          <BaseInput v-model="link" type="url" placeholder="https://..." class="flex-1" />
+          <BaseInput v-model="link" type="url" :placeholder="URL_PLACEHOLDER" class="flex-1" />
           <a
             v-if="linkHref"
             :href="linkHref"

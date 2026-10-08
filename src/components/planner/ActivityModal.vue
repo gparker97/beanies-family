@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { URL_PLACEHOLDER } from '@/constants/inputPlaceholders';
 import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue';
 import MagicBeansQuickCard from '@/components/ai/MagicBeansQuickCard.vue';
 import MagicMiscategorisedBanner from '@/components/ai/MagicMiscategorisedBanner.vue';
@@ -1449,7 +1450,7 @@ function handleSave() {
           <!-- Link -->
           <FormFieldGroup :label="t('planner.field.link')" optional>
             <div class="flex items-center gap-2">
-              <BaseInput v-model="link" type="url" placeholder="https://..." class="flex-1" />
+              <BaseInput v-model="link" type="url" :placeholder="URL_PLACEHOLDER" class="flex-1" />
               <a
                 v-if="linkHref"
                 :href="linkHref"
