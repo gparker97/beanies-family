@@ -145,6 +145,28 @@ export const MAGIC_BEANS = { trialPerDay: 1, basicPerMonth: 1 } as const;
  *  into a historical fact, an undated one ages into a false claim. */
 export const COZI = { adFreeYearly: '$39', aiYearly: '$79', checked: 'sep 2026' } as const;
 
+/**
+ * The Full plan's daily allowance is a live Terraform value (`planLimits.ts`), so FAQ copy never
+ * states it. An answer carries this token instead: the visible FAQ renders it as a live
+ * `data-bean-limit` span ("25 a day"), and the FAQPage JSON-LD, which runs no script, gets the
+ * wordless fallback. A hard-coded "ten a day" sat here after the limit moved to 25 (2026-10-08).
+ */
+export const FULL_BEANS_TOKEN = '{fullBeansPerDay}';
+export const FULL_BEANS_FALLBACK = 'plenty every day';
+export const FULL_BEANS_LIVE_TEMPLATE = '{count} a day';
+
+/** An answer split around the token, for the visible FAQ. `after` is null when there is none. */
+export function splitFaqAnswer(a: string): { before: string; after: string | null } {
+  const i = a.indexOf(FULL_BEANS_TOKEN);
+  return i === -1
+    ? { before: a, after: null }
+    : { before: a.slice(0, i), after: a.slice(i + FULL_BEANS_TOKEN.length) };
+}
+
+/** An answer as plain text, for structured data. */
+export const faqAnswerText = (a: string): string =>
+  a.replaceAll(FULL_BEANS_TOKEN, FULL_BEANS_FALLBACK);
+
 export interface PricingFaq {
   id: string;
   q: string;
@@ -176,7 +198,7 @@ export const PRICING_FAQS: PricingFaq[] = [
   {
     id: 'one-magic-bean',
     q: 'what counts as one magic bean?',
-    a: "one magic bean (which is one ai read) is one document, invitation, itinerary, recipe, etc. a bank statement is read page by page, so it's one bean per page, and beanies tells you how many before it reads. finding duplicates in a shopping list is free and never uses a bean. with the trial you get one per day, beanies + magic beans gives you ten a day, and with beanies basic you get one each month. bring your own key and there's no limit from me at all.",
+    a: "one magic bean (which is one ai read) is one document, invitation, itinerary, recipe, etc. a bank statement is read page by page, so it's one bean per page, and beanies tells you how many before it reads. finding duplicates in a shopping list is free and never uses a bean. with the trial you get one per day, beanies + magic beans gives you {fullBeansPerDay}, and with beanies basic you get one each month. bring your own key and there's no limit from me at all.",
   },
   {
     id: 'compare-to-cozi',

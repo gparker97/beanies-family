@@ -11,7 +11,16 @@
  */
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { APP_URL, SITE_URL } from '@beanies/brand/nav';
-import { DEFAULT_CURRENCY, PRICES, PRICING_FAQS, TRIAL_DAYS } from '../lib/pricing';
+import {
+  DEFAULT_CURRENCY,
+  FULL_BEANS_FALLBACK,
+  FULL_BEANS_LIVE_TEMPLATE,
+  PRICES,
+  PRICING_FAQS,
+  TRIAL_DAYS,
+  faqAnswerText,
+  splitFaqAnswer,
+} from '../lib/pricing';
 // Caveat: the CIG handwritten accent, for the tape label and the sign-off only.
 import '@fontsource-variable/caveat';
 import '../styles/switch-page.css';
@@ -27,7 +36,7 @@ const faqSchema = {
     '@type': 'Question',
     '@id': `${SITE_URL}${canonicalPath}#${f.id}`,
     name: f.q,
-    acceptedAnswer: { '@type': 'Answer', text: f.a },
+    acceptedAnswer: { '@type': 'Answer', text: faqAnswerText(f.a) },
   })),
 };
 ---
@@ -366,7 +375,9 @@ const faqSchema = {
               PRICING_FAQS.map((f, i) => (
                 <details id={f.id} open={i === 0}>
                   <summary>{f.q}</summary>
-                  <p>{f.a}</p>
+                  <p>
+                    {splitFaqAnswer(f.a).before}{splitFaqAnswer(f.a).after !== null && <span data-bean-limit="full" data-live={FULL_BEANS_LIVE_TEMPLATE}>{FULL_BEANS_FALLBACK}</span>}{splitFaqAnswer(f.a).after}
+                  </p>
                 </details>
               ))
             }
