@@ -15,6 +15,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - Creating a pod now asks for less: the family name is suggested from your name, there is no adult or child question, no extra welcome step, and your name is never typed twice.
 - The last screen of pod setup has one clear "Open my pod" button, and on desktop a small "use beanies on your phone too" link.
 - The quick "how did you hear about us" question now comes last, after adding family members.
+- Version 0.94 is out on the web, Google Play (production) and the App Store (on approval; it replaces the 0.93 submission that was still waiting for review), with a short note on the onboarding improvements.
 - Version 0.93 is out on the web, Google Play (production) and the App Store (on approval), with a spotlight note on the recent round of security tidy-ups around sign-in, permissions and the family file.
 - Devices still on a version before 0.92 are now asked to update, now that 0.92 is on both stores.
 
