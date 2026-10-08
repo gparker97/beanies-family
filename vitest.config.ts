@@ -23,6 +23,8 @@ export default defineConfig({
       // exemption must reach the .html rewrite, not 301 or 403). The test loads
       // the real source in a node:vm sandbox, so the shipped file gains nothing.
       'infrastructure/modules/web/functions/**/*.{test,spec}.mjs',
+      // The marketing site's beacon (lib/marketingEvents.ts): pure DOM code, no Astro runtime.
+      'web/src/lib/**/*.{test,spec}.ts',
     ],
   },
   resolve: {
