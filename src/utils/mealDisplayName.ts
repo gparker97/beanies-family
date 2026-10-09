@@ -15,6 +15,9 @@ export function mealDisplayName(
   if (meal.kind === 'recipe') {
     return recipes.find((r) => r.id === meal.recipeId)?.name ?? t('mealPlanner.card.recipeRemoved');
   }
+  // "Other" is a bucket, not a description: a named one is just its name ("Fish tacos",
+  // never "Other · Fish tacos"). The other kinds say something the name does not.
+  if (meal.kind === 'other' && meal.label) return meal.label;
   const label = t(`mealPlanner.kind.${meal.kind}` as 'mealPlanner.kind.other');
   return meal.label ? `${label} · ${meal.label}` : label;
 }

@@ -15,29 +15,20 @@ import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
-import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
-import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
-import BeanieTimeInput from '@/components/ui/BeanieTimeInput.vue';
-import SettingToggleRow from '@/components/settings/SettingToggleRow.vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import PinSettings from '@/components/settings/PinSettings.vue';
+import WallSettingsDrawer from '@/components/settings/WallSettingsDrawer.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useAuthStore } from '@/stores/authStore';
 import { getDevicePlatform, isWakeLockSupported } from '@/services/sync/capabilities';
 import { openHelpArticle, HELP_PATHS } from '@/utils/helpLinks';
 import { wallDeviceTipKeys } from '@/utils/wallDeviceTips';
-import { useSettingsStore } from '@/stores/settingsStore';
-import { logEvent } from '@/services/telemetry/logEvent';
-import { fillTemplate } from '@/utils/fillTemplate';
-import { WALL_SLEEP_IDLE_OPTIONS } from '@/utils/wallSleep';
-import type { WallSleepSettings } from '@/types/models';
 
 const router = useRouter();
 const { t } = useTranslation();
 const familyStore = useFamilyStore();
 const authStore = useAuthStore();
-const settingsStore = useSettingsStore();
 
 // ⚠️ THE SAME QUESTION `PinSettings` ASKS. It was `familyStore.currentMember`,
 // which falls back to the OWNER when nothing else resolves, while the PIN form
@@ -89,33 +80,8 @@ watch(canEnterWall, (ready) => {
   }
 });
 
-/**
- * Night mode on its own (this device only): when the wall dims to its night clock. The store
- * toasts a failed write and re-throws; the catch is only so the rejection does not go
- * unhandled. Success is logged so a confusing change ("the wall went dark at 8") can be traced.
- */
-const sleep = computed(() => settingsStore.wallSleep);
-const idleOptions = computed(() =>
-  WALL_SLEEP_IDLE_OPTIONS.map((n) => ({
-    value: String(n),
-    variant: 'orange' as const,
-    label: n === 60 ? t('wall.sleep.idle.hour') : fillTemplate(t('wall.sleep.idle.minutes'), { n }),
-  }))
-);
-
-async function updateSleep(field: keyof WallSleepSettings, patch: Partial<WallSleepSettings>) {
-  try {
-    await settingsStore.setWallSleep(patch);
-    logEvent({
-      level: 'info',
-      surface: 'wall-settings',
-      message: 'wall_sleep_change',
-      context: { action: 'settings', kind: field },
-    });
-  } catch {
-    // Already toasted and reported by `persistGlobalSetting`.
-  }
-}
+/** The wall's own settings for this device live in a drawer, so this card stays short. */
+const settingsOpen = ref(false);
 </script>
 
 <template>
@@ -151,6 +117,9 @@ async function updateSleep(field: keyof WallSleepSettings, patch: Partial<WallSl
       <BaseButton @click="start">
         {{ canEnterWall ? t('wall.setup.start') : t('wall.setup.setPinAndStart') }}
       </BaseButton>
+      <BaseButton variant="secondary" data-testid="wall-settings-open" @click="settingsOpen = true">
+        {{ t('wall.settings.title') }}
+      </BaseButton>
       <button
         type="button"
         data-testid="wall-setup-help"
@@ -161,42 +130,7 @@ async function updateSleep(field: keyof WallSleepSettings, patch: Partial<WallSl
       </button>
     </div>
 
-    <!-- Beanie-wall-only settings for this device live here, under the wall's own card. -->
-    <div class="dark:border-line mt-5 border-t border-[var(--tint-slate-10)] pt-2">
-      <SettingToggleRow
-        :model-value="sleep.enabled"
-        :title="t('wall.sleep.auto')"
-        :hint="t('wall.sleep.autoHint')"
-        testid="wall-sleep-toggle"
-        @update:model-value="updateSleep('enabled', { enabled: $event })"
-      />
-      <div v-if="sleep.enabled" class="space-y-4 pb-1">
-        <div class="grid gap-3 sm:grid-cols-2">
-          <FormFieldGroup :label="t('wall.sleep.starts')">
-            <BeanieTimeInput
-              :model-value="sleep.startTime"
-              @update:model-value="updateSleep('startTime', { startTime: $event })"
-            />
-          </FormFieldGroup>
-          <FormFieldGroup :label="t('wall.sleep.ends')">
-            <BeanieTimeInput
-              :model-value="sleep.endTime"
-              @update:model-value="updateSleep('endTime', { endTime: $event })"
-            />
-          </FormFieldGroup>
-        </div>
-        <FormFieldGroup :label="t('wall.sleep.idle')">
-          <TogglePillGroup
-            :model-value="String(sleep.idleMinutes)"
-            :options="idleOptions"
-            @update:model-value="updateSleep('idleMinutes', { idleMinutes: Number($event) })"
-          />
-        </FormFieldGroup>
-      </div>
-      <p class="text-secondary-400 dark:text-ink-soft mt-2 text-xs">
-        {{ t('wall.sleep.deviceOnly') }}
-      </p>
-    </div>
+    <WallSettingsDrawer :open="settingsOpen" @close="settingsOpen = false" />
 
     <BeanieFormModal
       :open="pinModalOpen"

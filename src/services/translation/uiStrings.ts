@@ -7908,6 +7908,8 @@ const STRING_DEFS = {
     en: 'How to set your device up for the wall',
     beanie: 'how to set your device up for the wall',
   },
+  'wall.settings.title': { en: 'Beanie Wall Settings', beanie: 'beanie wall settings' },
+  'wall.settings.nightSection': { en: 'Night Mode', beanie: 'night mode' },
   'wall.sleep.auto': { en: 'Night Mode on Its Own', beanie: 'night mode on its own' },
   'wall.sleep.autoHint': {
     en: 'During night hours, the wall dims to its night clock once nobody has touched it for a while, and wakes again when night hours end.',

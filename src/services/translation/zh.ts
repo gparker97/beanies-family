@@ -3510,6 +3510,8 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'wall.setup.tips.lockGeneric': '把设备锁定在这个应用里，以免误触跳到其他应用',
   'wall.setup.tips.power': '挂在插座够得着的地方',
   'wall.setup.help.link': '如何设置设备作为家庭看板',
+  'wall.settings.title': '家庭看板设置',
+  'wall.settings.nightSection': '夜间模式',
   'wall.sleep.auto': '自动进入夜间模式',
   'wall.sleep.autoHint':
     '在夜间时段内，看板一段时间无人触碰后会自动调暗为夜间时钟，夜间时段结束时再自动唤醒。',

@@ -1994,6 +1994,9 @@ async function handleDeleteFamilyClick() {
       </span>
     </div>
 
+    <!-- ── Beanie Wall: a feature with its own settings drawer, so it sits with the cards,
+         above the quick toggles. -->
+    <WallSetupCard v-if="showWallCard" />
     <!-- ── Quick Toggles ───────────────────────────────────────────────── -->
     <div>
       <p
@@ -2071,7 +2074,6 @@ async function handleDeleteFamilyClick() {
     <!-- ── Feature Flags (dev-only, owner/admin) ───────────────────────────
          DevFlagsCard is undefined in prod (DEV-gated dynamic import above), so
          this renders nothing and ships no flag-editing code to users. -->
-    <WallSetupCard v-if="showWallCard" />
 
     <component :is="DevFlagsCard" v-if="DevFlagsCard && (isOwner || canManagePod)" />
 

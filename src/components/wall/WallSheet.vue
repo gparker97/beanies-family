@@ -703,7 +703,11 @@ const { identityFor } = useActivityIdentity();
               />
             </p>
             <div v-if="tripDetail" class="mb-3 flex flex-wrap items-center gap-3">
-              <span class="font-inter wall-sheet-line text-[var(--muted-text,#4d5d6c)]">
+              <!-- Nothing added to book yet: no "0 of 0 booked". -->
+              <span
+                v-if="tripDetail.booking.total"
+                class="font-inter wall-sheet-line text-[var(--muted-text,#4d5d6c)]"
+              >
                 {{
                   fillTemplate(t('wall.trip.booked'), {
                     booked: tripDetail.booking.booked,
