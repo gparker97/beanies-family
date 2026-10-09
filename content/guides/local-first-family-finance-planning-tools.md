@@ -14,6 +14,7 @@ relatedPosts:
   - the-apps-are-here
   - have-your-cake-and-eat-it-too
   - passwords-are-so-two-thousand-and-late
+  - getting-ready-for-v1
 tags:
   - local-first
   - privacy
