@@ -2303,6 +2303,22 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'resumeSetup.startNewConfirmMessage':
     '现在就来设置你的家庭。如果你已经有同名的家庭文件，我们会找到并打开它，你的数据很安全。',
   'resumeSetup.startNewConfirmCta': '设置我的家庭',
+  'createPod.driveError.title': 'Google Drive 未能连接',
+  'createPod.driveError.timeout': 'Google Drive 响应太久了。请重试。',
+  'createPod.driveError.offline': '你似乎已离线。请检查网络连接后重试。',
+  'createPod.driveError.accessDenied':
+    'Google 没有允许 beanies 使用这个账号。请重试，或改用其他 Google 账号登录。',
+  'createPod.driveError.appBlocked':
+    '这个 Google 账号（工作或学校账号）的管理员不允许使用 beanies。请改用个人 Google 账号，或把家庭文件保存在这台设备上。',
+  'createPod.driveError.busy': 'Google Drive 现在有点忙。请稍后再试。',
+  'createPod.driveError.driveFull':
+    '你的 Google Drive 已满。请腾出一些空间，或改用其他 Google 账号。',
+  'createPod.driveError.apiDisabled':
+    '我们这边出了点问题，导致 Google Drive 无法连接。我们已收到通知。请稍后再试。',
+  'createPod.driveError.unknown':
+    '中途出了点状况。请重试；如果一直这样，帮助文章里介绍了常见原因。',
+  'createPod.driveError.getApp': '获取 beanies 应用',
+  'createPod.driveError.help': 'Google Drive 为什么没有连接？',
   'createPod.driveConsentDenied':
     'Google 需要权限才能创建你的家庭文件。请重试，并在 Google 询问时勾选文件访问权限。',
   'lists.fromRecipe.title': '生成购物清单',
@@ -2356,8 +2372,6 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'ingredients.split': '拆分',
   'ingredients.splitAria': '拆分 {item}',
   'ingredients.byMagic': '由魔法豆找到',
-  'resumeSetup.driveConsentDenied':
-    'Google 需要权限才能访问你的家庭文件。请重新连接 Google Drive，并在提示时允许文件访问。',
   'resumeSetup.podCorrupted':
     '你的 Pod 文件似乎已损坏，无法打开。请将下方的诊断详情发送至 support@beanies.family，我们也许能帮上忙。',
   'resumeSetup.podTooLarge':

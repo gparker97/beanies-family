@@ -14,6 +14,8 @@ import {
   POD_ACCESS_SEVERITY,
   classifyDriveFailure,
   evaluatePodMetadata,
+  isDriveStorageFull,
+  isTokenExpiredError,
   type PodAccessErrorCode,
 } from '../podAccess';
 import { DriveApiError, DriveFileNotFoundError } from '@/services/google/driveService';
@@ -57,6 +59,44 @@ describe('a Drive THROTTLE is not a permission problem', () => {
       'PERMISSION_DENIED'
     );
     expect(classifyDriveFailure({ status: 403 })).toBe('PERMISSION_DENIED');
+  });
+});
+
+describe('a FULL Drive is not a permission problem either', () => {
+  it('🔴 403 storageQuotaExceeded → VERIFY_UNAVAILABLE, not PERMISSION_DENIED', () => {
+    // PERMISSION_DENIED offers `pickFamilyFile`, which can fork the pod and
+    // cannot free a byte of space.
+    expect(classifyDriveFailure({ status: 403, reason: 'storageQuotaExceeded' })).toBe(
+      'VERIFY_UNAVAILABLE'
+    );
+    expect(
+      classifyDriveFailure(new DriveApiError('storage full', 403, 'storageQuotaExceeded'))
+    ).toBe('VERIFY_UNAVAILABLE');
+  });
+
+  it('isDriveStorageFull reads status AND reason, duck-typed', () => {
+    expect(isDriveStorageFull({ status: 403, reason: 'storageQuotaExceeded' })).toBe(true);
+    expect(isDriveStorageFull(new DriveApiError('full', 403, 'storageQuotaExceeded'))).toBe(true);
+  });
+
+  it.each([
+    ['a throttle', { status: 403, reason: 'quotaExceeded' }],
+    ['a refusal', { status: 403, reason: 'insufficientPermissions' }],
+    ['a 403 with no reason', { status: 403 }],
+    ['the reason on another status', { status: 400, reason: 'storageQuotaExceeded' }],
+    ['a plain Error', new Error('storageQuotaExceeded')],
+    ['null', null],
+  ])('🔴 isDriveStorageFull is false for %s', (_label, e) => {
+    expect(isDriveStorageFull(e)).toBe(false);
+  });
+});
+
+describe('isTokenExpiredError', () => {
+  it('reads the name or the message contract, never the class', () => {
+    expect(isTokenExpiredError({ name: 'TokenExpiredError' })).toBe(true);
+    expect(isTokenExpiredError(new Error('silent refresh failed: no grant'))).toBe(true);
+    expect(isTokenExpiredError(new Error('something else'))).toBe(false);
+    expect(isTokenExpiredError(undefined)).toBe(false);
   });
 });
 

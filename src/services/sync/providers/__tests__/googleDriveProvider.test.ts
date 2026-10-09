@@ -270,6 +270,18 @@ describe('GoogleDriveProvider', () => {
       expect(mockGetOrCreateAppFolder).toHaveBeenCalled();
       expect(mockCreateFile).toHaveBeenCalled();
     });
+
+    it("passes chooseAccount through to requestAccessToken (create's different-account recovery)", async () => {
+      const { requestAccessToken } = await import('@/services/google/googleAuth');
+      await GoogleDriveProvider.createNew('new-family.beanpod', {
+        forceConsent: false,
+        chooseAccount: true,
+      });
+      expect(requestAccessToken).toHaveBeenLastCalledWith({
+        forceConsent: false,
+        chooseAccount: true,
+      });
+    });
   });
 
   describe('write — 401 recovery (silent-only, no popups)', () => {

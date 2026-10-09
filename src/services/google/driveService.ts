@@ -6,7 +6,11 @@
  */
 
 import { getGoogleAccountEmail, fetchGoogleUserEmail, invalidateAccessToken } from './googleAuth';
-import { extractGoogleError, isGoogleThrottleReason } from '@/utils/googleApiError';
+import {
+  extractGoogleError,
+  isGoogleStorageQuotaReason,
+  isGoogleThrottleReason,
+} from '@/utils/googleApiError';
 import { sameAccount } from '@/utils/email';
 import { utf8ByteLength } from '@/utils/encoding';
 import { delay } from '@/utils/timing';
@@ -804,15 +808,21 @@ async function driveRequest(token: string, url: string, init?: RequestInit): Pro
     // One `photoStore` call site was already narrowed to `status === 404` for this
     // reason. That patched one symptom; classifying correctly here fixes the other
     // three without each having to know.
-    if (status === 403 && isGoogleThrottleReason(reason)) {
+    //
+    // A FULL DRIVE (`storageQuotaExceeded`) rides the same arm for the same
+    // reason: it is a 403 that says nothing about the file, so as a
+    // `DriveFileNotFoundError` it flipped photos to "missing" and told a family
+    // with no free space that they lacked permission. Consumers recognise it
+    // with `isDriveStorageFull` (`@/utils/podAccess`), duck-typed on `reason`.
+    if (status === 403 && (isGoogleThrottleReason(reason) || isGoogleStorageQuotaReason(reason))) {
       throw new DriveApiError(message, status, reason);
     }
 
     // 404 Not Found or a genuine 403 Forbidden both mean "the file isn't accessible
     // to this caller" — photoStore treats these identically (flags the photo as
-    // unresolved).
+    // unresolved). `reason` rides along so telemetry can still name the refusal.
     if (status === 404 || status === 403) {
-      throw new DriveFileNotFoundError(message, status);
+      throw new DriveFileNotFoundError(message, status, reason);
     }
     throw new DriveApiError(message, status);
   }
@@ -850,8 +860,8 @@ export class DriveApiError extends Error {
  * unresolved and show Replace/Remove UI).
  */
 export class DriveFileNotFoundError extends DriveApiError {
-  constructor(message: string, status: number) {
-    super(message, status);
+  constructor(message: string, status: number, reason?: string) {
+    super(message, status, reason);
     this.name = 'DriveFileNotFoundError';
   }
 }

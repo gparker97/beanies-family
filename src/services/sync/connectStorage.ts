@@ -18,7 +18,7 @@ import {
   isTokenValid,
   whenRedirectAuthSettled,
   awaitNativeOAuthReturn,
-  isUserCancellation,
+  preferRedirectAuth,
 } from '@/services/google/googleAuth';
 import type { RedirectMode } from '@/services/google/redirectState';
 import { currentLocationPath } from '@/services/google/redirectState';
@@ -28,14 +28,16 @@ import * as syncService from '@/services/sync/syncService';
 import { supportsFileSystemAccess, isNative } from '@/services/sync/capabilities';
 import { withTimeout } from '@/utils/timing';
 import { logEvent } from '@/services/telemetry/logEvent';
+import { reportError } from '@/utils/errorReporter';
 import { trackOnboardingStep } from '@/services/telemetry/onboardingAttempt';
 import { currentCreateAttempt } from '@/utils/createAttemptState';
+import { FileNameCollisionError } from '@/types/sync';
 import {
-  FileNameCollisionError,
-  CollisionCheckUnavailableError,
-  DriveConsentDeniedError,
-  OAuthRoundTripAbandonedError,
-} from '@/types/sync';
+  CREATE_DRIVE_ERRORS,
+  DRIVE_CONNECT_TIMEOUT_NAME,
+  classifyCreateDriveFailure,
+  type CreateDriveErrorCode,
+} from '@/services/sync/createDriveErrors';
 
 // The create flow's WEB return path. On native the trip is awaited in place and this is not used
 // (see `createReturnPath`). The old `export { RESUME_SETUP_PATH }` back-compat re-export is GONE —
@@ -65,8 +67,10 @@ import { peekAttribution } from '@/utils/attributionStash';
  *
  * `opts.forceReauth` redirects even when a valid token is held — the
  * switch-account case on a redirect surface, where the popup `forceConsent`
- * path can't run. `startRedirectAuth`'s `prompt=consent` re-prompts Google;
- * the create path never passes this (default false → unchanged).
+ * path can't run. It sends `prompt=select_account consent`: the default
+ * `consent` re-asks on the account already signed in and SUPPRESSES the
+ * chooser, so a switch would land on the same account. Used by LoadPodView's
+ * "different account" and create's "use a different Google account".
  */
 export async function beginDriveAuthRedirectIfNeeded(
   returnPath: string,
@@ -90,7 +94,11 @@ export async function beginDriveAuthRedirectIfNeeded(
     if (!opts.forceReauth && (await tryReconnectSilently(expectedEmail))) {
       return false; // connection restored silently; caller proceeds with the token
     }
-    await startRedirectAuth(returnPath, loginHint, mode);
+    if (opts.forceReauth) {
+      await startRedirectAuth(returnPath, loginHint, mode, { prompt: 'select_account consent' });
+    } else {
+      await startRedirectAuth(returnPath, loginHint, mode);
+    }
     return true;
   }
   return false;
@@ -101,44 +109,28 @@ export interface StorageConnected {
   status: 'connected';
   type: 'local' | 'google_drive';
 }
-/** Connect failed; `cancelled` ⇒ a benign user abort the caller should not report. */
+/** Connect failed. `errorKind` says why; callers render and report from it, never from `error`. */
 export interface StorageConnectFailed {
   status: 'failed';
+  /** English-only and may carry ids: for logs, NEVER rendered. */
   error: string;
-  cancelled?: boolean;
   /**
-   * Discriminator for failure classes the caller may want to surface with
-   * a focused message:
-   * - `name-collision` — Drive folder already has a `.beanpod` with this name.
-   * - `collision-check-unavailable` — could NOT verify whether a same-name file
-   *   exists (transient Drive list failure). Distinct from "no collision": we
-   *   refused to create blindly to avoid a second orphan. Retryable.
-   * - `unsupported-browser` — local files need the File System Access API
-   *   (Chromium-only); this browser (e.g. Firefox/Safari) can't do it, so a
-   *   retry is futile. Steer the user to Google Drive (works everywhere) or
-   *   Chrome/Edge instead of showing the generic "try again".
-   * - `consent-denied` — the user reached Google's consent screen and left the
-   *   file-access checkbox unticked. A DECISION, not a fault: callers must show
-   *   the "allow file access" guidance and must NOT report it as a code error.
-   *   Distinct from `cancelled` (which means nothing happened at all, so there
-   *   is nothing to explain); here there IS something specific to tell them.
-   * - `cancelled` — the person declined at Google, closed the sign-in sheet, or closed the
-   *   desktop popup. A DECISION too, on every transport.
-   *   ⚠️ IT EXISTS SO CALLERS NEVER RENDER `error` FOR THIS CASE. `error` carries an
-   *   English-only message (`OAuthRoundTripAbandonedError`'s, or the popup's "Authentication
-   *   cancelled"), and every caller's generic arm paints `error` verbatim — which put raw English
-   *   into a Chinese UI and told people who cancelled that their sign-in had FAILED. Pick a
-   *   `t()` key off this discriminant instead. Pairs with `cancelled: true`, which remains the
-   *   separate "do not report this as a fault" signal for severity.
-   * Other failures pass through with no `errorKind` set and the caller shows
-   * the generic error.
+   * The ONE discriminator, a `CREATE_DRIVE_ERRORS` code (`createDriveErrors.ts`). Every Drive
+   * connect failure carries one (`classifyCreateDriveFailure`); callers take the message,
+   * recoveries and severity from the registry. The local-file connect sets `unsupported-browser`
+   * (no File System Access API) and `cancelled` (a dismissed picker, a benign abort the caller
+   * does not report); its other failures leave it unset.
+   *
+   * ⚠️ THERE IS NO SEPARATE `cancelled` FLAG ANY MORE. It said the same thing as
+   * `errorKind === 'cancelled'`, and two fields saying one thing is how the two create surfaces
+   * drifted apart on what a cancel was.
    */
-  errorKind?:
-    | 'name-collision'
-    | 'collision-check-unavailable'
-    | 'unsupported-browser'
-    | 'consent-denied'
-    | 'cancelled';
+  errorKind?: CreateDriveErrorCode;
+  /**
+   * The raw failure behind a Drive `errorKind`, for `reportCreateDriveFailure` only: it carries
+   * the error name, stack and Google's `reason` that the `error` string drops. Never rendered.
+   */
+  cause?: unknown;
   /**
    * Present iff `errorKind === 'name-collision'`. Grouped into one object
    * (rather than loose `collision*` siblings) so the failure shape stays
@@ -196,9 +188,12 @@ function createReturnPath(): string {
  *
  * NOT used by the Drive-LOAD picker, whose return is the `load-drive` marker by design.
  */
-export async function gateCreateDriveAuth(loginHint: string | undefined): Promise<DriveAuthGate> {
+export async function gateCreateDriveAuth(
+  loginHint: string | undefined,
+  opts: { forceReauth?: boolean } = {}
+): Promise<DriveAuthGate> {
   try {
-    if (!(await beginDriveAuthRedirectIfNeeded(createReturnPath(), loginHint, 'create'))) {
+    if (!(await beginDriveAuthRedirectIfNeeded(createReturnPath(), loginHint, 'create', opts))) {
       return { kind: 'proceed' };
     }
     if (!isNative()) return { kind: 'redirecting' };
@@ -219,9 +214,10 @@ export async function gateCreateDriveAuth(loginHint: string | undefined): Promis
 }
 
 /**
- * Every unclassified failure out of this module reaches the firehose (audit C12). The
- * typed arms (cancel, collision, consent) are decisions the caller renders; THIS is the
- * remainder, which used to leave only a string in the caller's state.
+ * Stage markers and the local connects reach the firehose here (audit C12): the stub probe, the
+ * local-file failures, and the gate's `drive-auth-gate-threw` (the redirect could not START, a
+ * stage the classified report cannot carry). A Drive CONNECT failure is NOT logged here: it is
+ * reported exactly once, by `reportCreateDriveFailure` below, from the caller that renders it.
  */
 function logConnectFailure(action: string, e: unknown): void {
   logEvent({
@@ -230,6 +226,53 @@ function logConnectFailure(action: string, e: unknown): void {
     message: 'storage connect step failed',
     error: e instanceof Error ? e : undefined,
     context: { action, error_code: e instanceof Error ? e.name : 'unknown' },
+  });
+}
+
+/**
+ * The surfaces that report a create-flow Drive failure. `resumeSetup.write` is the pod write after
+ * a successful connect (a full Drive that passed the stub), kept apart so CloudWatch can tell a
+ * write-time failure from a connect-time one.
+ */
+export type CreateDriveSurface =
+  | 'createPod.connectDrive'
+  | 'resumeSetup.connectDrive'
+  | 'resumeSetup.probeDriveAuth'
+  | 'resumeSetup.write';
+
+/**
+ * THE one report for a create-flow Drive failure: `reportError` at the registry's severity (only
+ * `unknown` and `drive-api-disabled` page Slack) plus one console line. Lives beside
+ * `logConnectFailure` so "one report per failure" reads in one file, and here rather than in the
+ * leaf registry because it needs `reportError` and the transport.
+ *
+ * `detail` is a closed `transport=<popup|redirect|native>[;reason=<google reason>]`. The transport
+ * is derived HERE at report time, never passed, so the call sites cannot disagree. Pass the raw
+ * failure as `error` (a `StorageConnectFailed`'s `cause ?? error`) so the report keeps the error
+ * name, stack and Google's `reason`.
+ */
+export function reportCreateDriveFailure(
+  surface: CreateDriveSurface,
+  code: CreateDriveErrorCode,
+  error: unknown
+): void {
+  const { severity } = CREATE_DRIVE_ERRORS[code];
+  const transport = isNative() ? 'native' : shouldUseRedirectAuth() ? 'redirect' : 'popup';
+  const reason = (error as { reason?: unknown } | null | undefined)?.reason;
+  const detail =
+    typeof reason === 'string'
+      ? `transport=${transport};reason=${reason}`
+      : `transport=${transport}`;
+  const log = severity === 'critical' ? console.error : console.warn;
+  // `resumeSetup.write` failed AFTER a successful connect; saying "connect" there misleads triage.
+  const what = surface === 'resumeSetup.write' ? 'write' : 'connect';
+  log(`[${surface}] Google Drive ${what} failed (${code}):`, error);
+  reportError({
+    surface,
+    message: error instanceof Error ? error.message : String(error ?? code),
+    severity,
+    error,
+    context: { provider_type: 'google_drive', error_code: code, detail },
   });
 }
 
@@ -250,15 +293,29 @@ function logConnectFailure(action: string, e: unknown): void {
  *   one if we do), creates the `.beanpod` file in the user's Drive, and
  *   installs the provider on `syncService`.
  *
+ * - A BLOCKED POPUP is not handed back: this records the tab's redirect preference
+ *   (`preferRedirectAuth`) and re-runs ONCE, now through the redirect gate. This is the ONE place
+ *   the preference is recorded, because a connect always runs behind a person's tap, which the
+ *   popup opener cannot know. The re-run fails with its own classified code if it fails.
+ *
  * @param podFileBaseName Base name for the `.beanpod` file (family name).
  * @param opts.googleEmail Pre-fills Google's account chooser (`login_hint`).
  * @param opts.activeFamilyId If known, persists the provider→family mapping.
+ * @param opts.chooseAccount "Use a different Google account": forces Google's account chooser
+ *   and drops the login hint, on every transport.
  */
 export async function connectDriveStorage(
   podFileBaseName: string,
-  opts: { googleEmail?: string; activeFamilyId?: string | null } = {}
+  opts: { googleEmail?: string; activeFamilyId?: string | null; chooseAccount?: boolean } = {}
 ): Promise<StorageConnectOutcome> {
-  const outcome = await connectDriveStorageOnce(podFileBaseName, opts);
+  let outcome = await connectDriveStorageOnce(podFileBaseName, opts);
+  if (outcome.status === 'failed' && outcome.errorKind === 'popup-blocked') {
+    preferRedirectAuth();
+    // ⚠️ GUARDED ON THE PREFERENCE HAVING TAKEN. The in-memory flag makes the re-run a redirect
+    // even when sessionStorage throws; were it somehow still a popup surface, a re-run would only
+    // open a second popup into the same blocker. Exactly one retry, structurally: no loop.
+    if (shouldUseRedirectAuth()) outcome = await connectDriveStorageOnce(podFileBaseName, opts);
+  }
   recordDriveConsentOutcome(outcome);
   return outcome;
 }
@@ -281,40 +338,47 @@ function recordDriveConsentOutcome(outcome: StorageConnectOutcome): void {
     trackOnboardingStep('drive-consent', 'submitted');
     return;
   }
-  switch (outcome.errorKind) {
-    case 'name-collision':
-    case 'collision-check-unavailable':
-      trackOnboardingStep('drive-consent', 'submitted');
-      return;
-    case 'cancelled':
-    case 'consent-denied':
-      trackOnboardingStep('drive-consent', 'back', { error_code: outcome.errorKind });
-      return;
-    default:
-      trackOnboardingStep('drive-consent', 'back', { error_code: 'failed' });
+  if (
+    outcome.errorKind === 'name-collision' ||
+    outcome.errorKind === 'collision-check-unavailable'
+  ) {
+    trackOnboardingStep('drive-consent', 'submitted');
+    return;
   }
+  trackOnboardingStep('drive-consent', 'back', { error_code: outcome.errorKind ?? 'unknown' });
 }
 
 async function connectDriveStorageOnce(
   podFileBaseName: string,
-  opts: { googleEmail?: string; activeFamilyId?: string | null }
+  opts: { googleEmail?: string; activeFamilyId?: string | null; chooseAccount?: boolean }
 ): Promise<StorageConnectOutcome> {
+  const chooseAccount = Boolean(opts.chooseAccount);
   try {
     // On a redirect surface with no valid token, bounce through the system browser / full-page
     // redirect. The gate is INSIDE this try so one catch classifies both transports: a native
-    // trip that fails hands back the very error the popup path would have thrown.
-    const gate = await gateCreateDriveAuth(opts.googleEmail);
+    // trip that fails hands back the very error the popup path would have thrown. A switch of
+    // account sends no login hint (it would pre-select the account being left) and forces the
+    // redirect even with a valid token.
+    const gate = await gateCreateDriveAuth(chooseAccount ? undefined : opts.googleEmail, {
+      forceReauth: chooseAccount,
+    });
     if (gate.kind === 'redirecting') return { status: 'redirecting' };
     if (gate.kind === 'failed') throw gate.error;
 
     const fileName = `${podFileBaseName || 'my-family'}.beanpod`;
     // Force a fresh consent screen only when we have no token yet; if we just
     // returned from a redirect we already hold a valid one — reuse it (no
-    // popup, no second chooser).
+    // popup, no second chooser). The chooser rides the popup ONLY: on native
+    // `requestAccessToken({ chooseAccount })` throws, and on a redirect surface
+    // the gate above already switched accounts.
     const provider = await withTimeout(
-      GoogleDriveProvider.createNew(fileName, { forceConsent: !isTokenValid() }),
+      GoogleDriveProvider.createNew(fileName, {
+        forceConsent: !isTokenValid(),
+        chooseAccount: chooseAccount && !shouldUseRedirectAuth(),
+      }),
       150_000,
-      'Connecting to Google Drive is taking too long. Try again, or use a local file instead.'
+      'Connecting to Google Drive is taking too long. Try again, or use a local file instead.',
+      DRIVE_CONNECT_TIMEOUT_NAME
     );
     // Bind the provider to the family the caller will compare it against. An unbound provider
     // that survives a native round trip is exactly what reached a create write on 2026-09-21.
@@ -322,64 +386,33 @@ async function connectDriveStorageOnce(
     if (opts.activeFamilyId) await provider.persist(opts.activeFamilyId);
     return { status: 'connected', type: 'google_drive' };
   } catch (e) {
-    if (e instanceof OAuthRoundTripAbandonedError) {
-      // Declined at Google, or the sheet was closed. A benign abort, like a dismissed local
-      // picker — never reported as a fault. ⚠️ `errorKind` IS WHAT KEEPS THE COPY TRANSLATED:
-      // `e.message` is English-only and callers render `error` verbatim in their generic arm.
-      return { status: 'failed', error: e.message, errorKind: 'cancelled', cancelled: true };
-    }
+    // ONE classification for every transport and every failure (`createDriveErrors.ts` owns the
+    // ordered ladder: typed errors, deadlines, policy blocks, statuses, then the message
+    // predicates, with `isUserCancellation` below the typed arms so a real fault is never read as
+    // a cancel). ⚠️ `errorKind` IS WHAT KEEPS THE COPY TRANSLATED: `error` is English-only.
+    const errorKind = classifyCreateDriveFailure(e);
+    const error = e instanceof Error ? e.message : String(e);
     if (e instanceof FileNameCollisionError) {
       // Hand the caller the grouped collision metadata (no decrypt here — that
       // lives in `resolveExistingBeanpod`). The adopt-existing recovery reads
       // `collision.ownedByCurrentAccount` to decide adopt vs. reject.
       return {
         status: 'failed',
-        error: e.message,
-        errorKind: 'name-collision',
+        error,
+        errorKind,
+        cause: e,
         collision: { fileId: e.existingFileId, ownedByCurrentAccount: e.ownedByCurrentAccount },
       };
     }
-    if (e instanceof CollisionCheckUnavailableError) {
-      // We could not verify the user's Drive for existing files, so we refused
-      // to create blindly (avoiding a second orphan). Retryable, not fatal.
-      return {
-        status: 'failed',
-        error: e.message,
-        errorKind: 'collision-check-unavailable',
-        retryable: true,
-      };
-    }
-    if (e instanceof DriveConsentDeniedError) {
-      // Granular consent came back without `drive.file`. The user made a
-      // choice; the caller explains what to allow and offers a retry.
-      //
-      // ⚠️ Typed here rather than sniffed at the call sites. It used to be left
-      // to `isUserCancellation`, whose matcher (the substrings cancel / dismiss /
-      // popup_closed / user_cancel, or a bare `access_denied`) matches
-      // none of the words in this message — so the same decision was
-      // classified three different ways by three callers, and exactly one of
-      // them paged Slack as `critical` for a user ticking a box differently.
-      return { status: 'failed', error: e.message, errorKind: 'consent-denied' };
-    }
-    // ⚠️ THE POPUP TRANSPORT'S CANCELLATION, CLASSIFIED HERE RATHER THAN AT EACH CALLER — and it
-    // sits BELOW the typed arms so a real fault can never be read as a cancel by a regex.
-    //
-    // Closing the desktop popup rejects with a plain `Error('Authentication cancelled')`, not
-    // `OAuthRoundTripAbandonedError`, so without this it fell to the generic return below with no
-    // `errorKind` — and the callers' generic arms render `error` VERBATIM. That put the
-    // untranslated English "Authentication cancelled" into a Chinese UI, and made the resume
-    // screen say "Google sign-in failed" to someone who had just closed the chooser themselves.
-    // The native half was fixed first; leaving the desktop half is the asymmetry this closes.
-    if (isUserCancellation(e)) {
-      return {
-        status: 'failed',
-        error: e instanceof Error ? e.message : String(e),
-        errorKind: 'cancelled',
-        cancelled: true,
-      };
-    }
-    logConnectFailure('drive-connect-failed', e);
-    return { status: 'failed', error: e instanceof Error ? e.message : String(e) };
+    // `collision-check-unavailable`: we could not verify the Drive for an existing file, so we
+    // refused to create blindly (avoiding a second orphan). Retryable, not fatal.
+    return {
+      status: 'failed',
+      error,
+      errorKind,
+      cause: e,
+      ...(errorKind === 'collision-check-unavailable' ? { retryable: true } : {}),
+    };
   }
 }
 
@@ -470,7 +503,7 @@ export async function adoptDriveStub(
 
 /**
  * Connect a local file as the storage for a new pod (the OS save-file
- * picker). Returns `{ status: 'failed', cancelled: true }` when the user
+ * picker). Returns `{ status: 'failed', errorKind: 'cancelled' }` when the user
  * dismisses the picker — a normal abort the caller should not report — or
  * `{ status: 'failed', errorKind: 'unsupported-browser' }` when the browser
  * lacks the File System Access API (Firefox/Safari), where a retry can never
@@ -508,7 +541,7 @@ export async function connectLocalStorage(
   try {
     const ok = await syncService.selectSyncFile();
     if (ok) return { status: 'connected', type: 'local' };
-    return { status: 'failed', error: 'File picker cancelled', cancelled: true };
+    return { status: 'failed', error: 'File picker cancelled', errorKind: 'cancelled' };
   } catch (e) {
     logConnectFailure('local-connect-failed', e);
     return { status: 'failed', error: e instanceof Error ? e.message : String(e) };

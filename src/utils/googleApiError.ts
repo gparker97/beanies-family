@@ -57,6 +57,33 @@ export function isGoogleRetryableThrottleReason(reason: string | undefined): boo
   return reason !== undefined && GOOGLE_USER_RATE_LIMIT_REASONS.has(reason);
 }
 
+/**
+ * The family's own Drive is full. A 403 like the throttles, and like them NOT a
+ * refusal: the file is there and the person may write it, there is just no room.
+ *
+ * ⚠️ Not the project `quotaExceeded` above, despite the name. That one is the
+ * app's API allowance and heals on its own; this one is the person's storage and
+ * heals only when they free space or use another account. So it is deliberately
+ * kept OUT of the throttle sets: no backoff retry can clear it.
+ */
+export const GOOGLE_STORAGE_QUOTA_REASON = 'storageQuotaExceeded';
+
+export function isGoogleStorageQuotaReason(reason: string | undefined): boolean {
+  return reason === GOOGLE_STORAGE_QUOTA_REASON;
+}
+
+/**
+ * The Drive API is switched off for our Google Cloud project. Our configuration,
+ * not the family's, so the create flow reports it as a fault of ours.
+ */
+export const GOOGLE_API_DISABLED_REASON = 'accessNotConfigured';
+
+/**
+ * A Workspace admin's policy forbids this app (or this sharing) for the account.
+ * Nothing the person can retry; only another account or the admin can clear it.
+ */
+export const GOOGLE_DOMAIN_POLICY_REASON = 'domainPolicy';
+
 export interface GoogleErrorBody {
   /** e.g. `rateLimitExceeded`, `insufficientPermissions`. The load-bearing field. */
   reason?: string;

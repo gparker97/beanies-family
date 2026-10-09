@@ -11,6 +11,8 @@ import {
   extractGoogleError,
   isGoogleThrottleReason,
   isGoogleRetryableThrottleReason,
+  isGoogleStorageQuotaReason,
+  GOOGLE_STORAGE_QUOTA_REASON,
 } from '../googleApiError';
 
 describe('extractGoogleError', () => {
@@ -89,4 +91,24 @@ describe('which throttles are worth retrying', () => {
       expect(isGoogleRetryableThrottleReason(reason)).toBe(false);
     }
   );
+});
+
+describe('a full Drive is its own reason', () => {
+  it('recognises storageQuotaExceeded', () => {
+    expect(isGoogleStorageQuotaReason(GOOGLE_STORAGE_QUOTA_REASON)).toBe(true);
+    expect(isGoogleStorageQuotaReason('storageQuotaExceeded')).toBe(true);
+  });
+
+  it.each(['quotaExceeded', 'dailyLimitExceeded', 'insufficientPermissions', undefined])(
+    '🔴 %s is not a full Drive',
+    (reason) => {
+      // `quotaExceeded` is the app's API allowance, not the family's storage.
+      expect(isGoogleStorageQuotaReason(reason)).toBe(false);
+    }
+  );
+
+  it('🔴 a full Drive is NOT a throttle, so nothing backs off and retries it', () => {
+    expect(isGoogleThrottleReason(GOOGLE_STORAGE_QUOTA_REASON)).toBe(false);
+    expect(isGoogleRetryableThrottleReason(GOOGLE_STORAGE_QUOTA_REASON)).toBe(false);
+  });
 });

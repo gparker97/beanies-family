@@ -1,7 +1,4 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-// Pure helper — safe to import statically (no module state, unaffected by the
-// resetModules dance the suite below uses).
-import { isUserCancellation } from '../googleAuth';
 
 // Mock dependencies before importing the module
 vi.mock('../pkce', () => ({
@@ -2189,42 +2186,5 @@ describe('googleAuth (PKCE)', () => {
         expect.objectContaining({ surface: 'auth-epoch-leak', level: 'error' })
       );
     });
-  });
-});
-
-describe('isUserCancellation', () => {
-  it('treats an AbortError (file-picker cancel) as a cancellation', () => {
-    const e = new Error('The user aborted a request.');
-    e.name = 'AbortError';
-    expect(isUserCancellation(e)).toBe(true);
-  });
-
-  it('treats popup-closed / dismiss / user_cancel messages as cancellations', () => {
-    expect(isUserCancellation(new Error('popup_closed_by_user'))).toBe(true);
-    expect(isUserCancellation(new Error('User cancelled the flow'))).toBe(true);
-    expect(isUserCancellation(new Error('Account chooser dismissed'))).toBe(true);
-    expect(isUserCancellation('user_cancel')).toBe(true);
-  });
-
-  it("treats Google's BARE access_denied (Cancel/Back on the consent screen) as a cancellation (#128)", () => {
-    expect(isUserCancellation(new Error('access_denied'))).toBe(true);
-    expect(isUserCancellation('access_denied')).toBe(true);
-    expect(isUserCancellation(new Error(' ACCESS_DENIED '))).toBe(true);
-  });
-
-  it('does NOT treat a message that merely contains access_denied as a cancellation (policy blocks)', () => {
-    // An admin-blocked app / unverified-app test-user restriction: `OAuthCallbackPage` forwards
-    // Google's description, and a block the person cannot retry past is not their "never mind".
-    expect(
-      isUserCancellation(new Error('access_denied: Access blocked by your administrator'))
-    ).toBe(false);
-    expect(isUserCancellation(new Error('OAuth error: access_denied'))).toBe(false);
-  });
-
-  it('does not treat genuine failures as cancellations', () => {
-    expect(isUserCancellation(new Error('Network request failed'))).toBe(false);
-    expect(isUserCancellation(new Error('403 Forbidden'))).toBe(false);
-    expect(isUserCancellation(null)).toBe(false);
-    expect(isUserCancellation(undefined)).toBe(false);
   });
 });

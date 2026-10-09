@@ -28,6 +28,7 @@ import {
 import {
   startRedirectAuth,
   getRedirectUri,
+  openOAuthPopup,
   REDIRECT_AUTH_CODE_KEY_CALENDAR,
   REDIRECT_AUTH_KEY,
 } from '@/services/google/googleAuth';
@@ -116,19 +117,6 @@ function getClientId(): string {
 // googleAuth.startRedirectAuth) used `/oauth/native`, so every native calendar
 // token exchange 400'd (`redirect_uri_mismatch`). See ADR-029.
 
-/** Open a centered blank popup synchronously (must precede any await to keep the user-gesture). */
-function openBlankPopup(): Window | null {
-  const width = 500;
-  const height = 600;
-  const left = window.screenX + (window.outerWidth - width) / 2;
-  const top = window.screenY + (window.outerHeight - height) / 2;
-  return window.open(
-    'about:blank',
-    'beanies-calendar-oauth',
-    `width=${width},height=${height},left=${left},top=${top},scrollbars=yes,resizable=yes`
-  );
-}
-
 function buildCalendarAuthUrl(clientId: string, codeChallenge: string, loginHint?: string): string {
   const params = new URLSearchParams({
     client_id: clientId,
@@ -213,8 +201,9 @@ export async function connectGoogleCalendar(
     return fail('not_configured', 'Google Client ID not configured (VITE_GOOGLE_CLIENT_ID).');
   }
 
-  // Open the popup synchronously, before any await, so the browser keeps the gesture.
-  const popup = openBlankPopup();
+  // Open the popup synchronously, before any await, so the browser keeps the gesture. The shared
+  // opener logs a block (with the activation state) and records nothing; the failure shape is ours.
+  const popup = openOAuthPopup('beanies-calendar-oauth');
   if (!popup) {
     return fail('popup_blocked', 'The sign-in window was blocked. Allow pop-ups and try again.');
   }

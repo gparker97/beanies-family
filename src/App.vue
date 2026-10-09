@@ -1389,35 +1389,32 @@ onMounted(async () => {
         const msg = (e as Error).message;
         console.warn('[App] redirect-auth completion failed during init:', msg);
         initBreadcrumbs.push(`auth: redirect-auth completion failed: ${msg}`);
-        // Granular-consent denial (drive.file unchecked) is a SPECIFIC,
-        // user-fixable failure (2026-06-19, finding 3) — stash a reason so the
-        // resume-setup screen explains "you must allow file access" instead of
-        // a silent route the user retries blindly. Reported at warning (not
-        // critical): it's user action, not a code fault.
-        // ONE predicate, shared with the native deep-link handler (`googleAuth`'s exchange catch),
-        // which used to classify this differently and paged a developer for a user's decision.
-        const { stashResumeReasonFor } = await import('@/components/login/resumePaths');
-        const isConsentDenied = stashResumeReasonFor(e);
+        // Classified ONCE into the create registry's code, which also sets the severity: a
+        // decision or an environment problem (an unticked file-access box, a decline, offline)
+        // reports at `warning`, only `unknown` / `drive-api-disabled` page. On the create flow's
+        // return path the code is also stashed for the resume screen, which shows its message
+        // and recoveries instead of a silent route the person retries blindly (2026-06-19,
+        // finding 3; #128). No create-specific branch here: `stashResumeReasonFor` owns the
+        // path check, the registry owns the severity. (`error_code` is allowlisted; a bespoke key
+        // would be stripped by `redactContext`.)
+        const [{ stashResumeReasonFor }, { CREATE_DRIVE_ERRORS }] = await Promise.all([
+          import('@/components/login/resumePaths'),
+          import('@/services/sync/createDriveErrors'),
+        ]);
+        const code = stashResumeReasonFor(e);
         reportError({
           surface: 'app.redirectAuthCompletion',
           message: `Redirect-auth code exchange failed during app init: ${msg}`,
           error: e,
-          severity: isConsentDenied ? 'warning' : 'critical',
-          // `detail`, not a bespoke key: an unallowlisted key is stripped by `redactContext`
-          // (the old `consent_denied` never reached CloudWatch).
-          context: {
-            route_path: route.path,
-            detail: isConsentDenied ? 'consent-denied' : 'failed',
-          },
+          severity: CREATE_DRIVE_ERRORS[code].severity,
+          context: { route_path: route.path, error_code: code },
         });
         // The create funnel's web consent exit (#128). The callback page already logged
         // `submitted` for the code; a box left unticked or a failed exchange is the `back` that
         // follows it. Only on the create flow's return path, which it alone owns; a reconnect or
         // calendar return is not a funnel step (and with no attempt open this is a no-op anyway).
         if (isResumeSetupSearch(window.location.search)) {
-          trackOnboardingStep('drive-consent', 'back', {
-            error_code: isConsentDenied ? 'consent-denied' : 'exchange-failed',
-          });
+          trackOnboardingStep('drive-consent', 'back', { error_code: code });
         }
       }
 

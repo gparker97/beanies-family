@@ -18,7 +18,13 @@ vi.mock('@/services/google/googleAuth', () => ({
   startRedirectAuth: vi.fn(),
   isTokenValid: vi.fn(() => true),
   awaitNativeOAuthReturn: vi.fn(async () => ({ kind: 'completed' })),
-  isUserCancellation: vi.fn(() => false),
+  preferRedirectAuth: vi.fn(),
+}));
+// `reportCreateDriveFailure` is the one report per create-flow Drive failure.
+vi.mock('@/utils/errorReporter', () => ({ reportError: vi.fn() }));
+vi.mock('@/services/telemetry/logEvent', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/services/telemetry/logEvent')>()),
+  logEvent: vi.fn(),
 }));
 // Silent recovery is exercised in driveTokenRecovery's own tests; here it is a
 // deterministic no-op so the redirect-path assertions are unaffected.
@@ -65,7 +71,10 @@ import {
   gateCreateDriveAuth,
   resolveExistingBeanpod,
   adoptDriveStub,
+  reportCreateDriveFailure,
 } from '../connectStorage';
+import { POPUP_BLOCKED_MESSAGE } from '@/services/google/oauthError';
+import { reportError } from '@/utils/errorReporter';
 import { GoogleDriveProvider } from '@/services/sync/providers/googleDriveProvider';
 import {
   DriveConsentDeniedError,
@@ -78,7 +87,7 @@ import {
   startRedirectAuth,
   isTokenValid,
   awaitNativeOAuthReturn,
-  isUserCancellation,
+  preferRedirectAuth,
 } from '@/services/google/googleAuth';
 import * as syncService from '@/services/sync/syncService';
 
@@ -132,8 +141,9 @@ describe('connectLocalStorage', () => {
 
     const r = await connectLocalStorage();
 
-    expect(r).toMatchObject({ status: 'failed', cancelled: true });
-    expect(r).not.toHaveProperty('errorKind');
+    // `errorKind` is the ONE discriminator; there is no separate `cancelled` flag any more.
+    expect(r).toMatchObject({ status: 'failed', errorKind: 'cancelled' });
+    expect(r).not.toHaveProperty('cancelled');
   });
 
   it('surfaces a thrown picker error as a generic (reportable) failure', async () => {
@@ -191,7 +201,11 @@ describe('beginDriveAuthRedirectIfNeeded', () => {
     expect(
       await beginDriveAuthRedirectIfNeeded('/p', undefined, 'reconnect', { forceReauth: true })
     ).toBe(true);
-    expect(mockStartRedirect).toHaveBeenCalledWith('/p', undefined, 'reconnect');
+    // ⚠️ `select_account consent`, NOT the default `consent`, which SUPPRESSES the chooser: a
+    // switch of account would otherwise land straight back on the account being left.
+    expect(mockStartRedirect).toHaveBeenCalledWith('/p', undefined, 'reconnect', {
+      prompt: 'select_account consent',
+    });
   });
 
   it('forceReauth on a popup surface still does NOT redirect (transport decision wins)', async () => {
@@ -398,21 +412,12 @@ describe('connectDriveStorage — a declined consent is typed, not sniffed', () 
     expect(r).toMatchObject({ status: 'failed', errorKind: 'consent-denied' });
   });
 
-  it('does NOT mark it `cancelled` — there IS something to tell the user', async () => {
-    // `cancelled` means "nothing happened, say nothing". A consent denial needs
-    // the "tick the file access box" guidance, so the two must stay distinct.
-    vi.mocked(GoogleDriveProvider.createNew).mockRejectedValue(
-      new DriveConsentDeniedError('Google Drive file access was not granted.')
-    );
+  it('files an unrecognised failure as `unknown`, carrying the raw failure for the report', async () => {
+    const raw = new Error('Drive 500');
+    vi.mocked(GoogleDriveProvider.createNew).mockRejectedValue(raw);
     const r = await connectDriveStorage('my-family');
-    expect((r as { cancelled?: boolean }).cancelled).toBeUndefined();
-  });
-
-  it('leaves a genuine failure unclassified, so it still surfaces as an error', async () => {
-    vi.mocked(GoogleDriveProvider.createNew).mockRejectedValue(new Error('Drive 500'));
-    const r = await connectDriveStorage('my-family');
-    expect(r).toMatchObject({ status: 'failed', error: 'Drive 500' });
-    expect((r as { errorKind?: string }).errorKind).toBeUndefined();
+    expect(r).toMatchObject({ status: 'failed', error: 'Drive 500', errorKind: 'unknown' });
+    expect((r as { cause?: unknown }).cause).toBe(raw);
   });
 
   it('does not shadow the collision classification', async () => {
@@ -428,18 +433,17 @@ describe('connectDriveStorage — a declined consent is typed, not sniffed', () 
     // to fall through with no `errorKind` — and the callers' generic arms render `error`
     // verbatim. That painted the untranslated "Authentication cancelled" into a Chinese UI and
     // made the resume screen say "sign-in failed" to someone who closed the chooser themselves.
-    vi.mocked(isUserCancellation).mockReturnValue(true);
     vi.mocked(GoogleDriveProvider.createNew).mockRejectedValue(
       new Error('Authentication cancelled')
     );
     const r = await connectDriveStorage('my-family');
-    expect(r).toMatchObject({ status: 'failed', errorKind: 'cancelled', cancelled: true });
+    expect(r).toMatchObject({ status: 'failed', errorKind: 'cancelled' });
   });
 
-  it('a real fault is NEVER read as a cancel — the typed arms win', async () => {
-    vi.mocked(isUserCancellation).mockReturnValue(true); // the regex would say yes…
+  it('a real fault is NEVER read as a cancel, the typed arms win', async () => {
+    // The message alone would match `isUserCancellation`'s regex…
     vi.mocked(GoogleDriveProvider.createNew).mockRejectedValue(
-      new FileNameCollisionError('exists', 'file-1', 'my-family.beanpod', true)
+      new FileNameCollisionError('cancelled', 'file-1', 'my-family.beanpod', true)
     );
     const r = await connectDriveStorage('my-family');
     expect(r).toMatchObject({ status: 'failed', errorKind: 'name-collision' }); // …and is outranked
@@ -478,23 +482,31 @@ describe('connectDriveStorage on NATIVE — it awaits, and never reports `redire
       error: new OAuthRoundTripAbandonedError('dismissed'),
     });
     const r = await connectDriveStorage('the-smiths');
-    expect(r).toMatchObject({ status: 'failed', cancelled: true, errorKind: 'cancelled' });
+    expect(r).toMatchObject({ status: 'failed', errorKind: 'cancelled' });
     expect(GoogleDriveProvider.createNew).not.toHaveBeenCalled();
   });
 
-  it('a policy-blocked trip (described access_denied) is a generic failure, NOT a cancel', async () => {
-    // `googleAuth` settles a described access_denied as a plain failure (`classifyOAuthError`),
-    // so the funnel records `failed`, not `cancelled`, and the copy is the generic one.
-    const real = await vi.importActual<typeof import('@/services/google/googleAuth')>(
-      '@/services/google/googleAuth'
-    );
-    vi.mocked(isUserCancellation).mockImplementation(real.isUserCancellation);
+  it('a described access_denied from the trip is `access-denied`; a policy code is `app-blocked`', async () => {
+    // `googleAuth` settles a described access_denied as a plain failure (`classifyOAuthError`).
+    // A description does not prove a block (the #128 fixture is a localized plain decline), nor
+    // is it the person's own Cancel; only Google's explicit policy codes are a block.
     vi.mocked(awaitNativeOAuthReturn).mockResolvedValue({
       kind: 'failed',
       error: new Error('access_denied: Access blocked by your admin'),
     });
-    const r = await connectDriveStorage('the-smiths');
-    expect(r).toEqual({ status: 'failed', error: 'access_denied: Access blocked by your admin' });
+    expect(await connectDriveStorage('the-smiths')).toMatchObject({
+      status: 'failed',
+      error: 'access_denied: Access blocked by your admin',
+      errorKind: 'access-denied',
+    });
+    vi.mocked(awaitNativeOAuthReturn).mockResolvedValue({
+      kind: 'failed',
+      error: new Error('admin_policy_enforced'),
+    });
+    expect(await connectDriveStorage('the-smiths')).toMatchObject({
+      status: 'failed',
+      errorKind: 'app-blocked',
+    });
     expect(GoogleDriveProvider.createNew).not.toHaveBeenCalled();
   });
 
@@ -516,27 +528,20 @@ describe("connectDriveStorage — Google's access_denied is a cancel (#128 B1)",
   });
 
   it('classifies a popup rejection carrying access_denied as `cancelled`, not a generic fault', async () => {
-    const real = await vi.importActual<typeof import('@/services/google/googleAuth')>(
-      '@/services/google/googleAuth'
-    );
-    vi.mocked(isUserCancellation).mockImplementation(real.isUserCancellation);
     vi.mocked(GoogleDriveProvider.createNew).mockRejectedValue(new Error('access_denied'));
     const r = await connectDriveStorage('my-family');
-    expect(r).toMatchObject({ status: 'failed', errorKind: 'cancelled', cancelled: true });
+    expect(r).toMatchObject({ status: 'failed', errorKind: 'cancelled' });
   });
 
-  it('an access_denied WITH a description (a policy block) is a generic failure, not a cancel', async () => {
-    const real = await vi.importActual<typeof import('@/services/google/googleAuth')>(
-      '@/services/google/googleAuth'
-    );
-    vi.mocked(isUserCancellation).mockImplementation(real.isUserCancellation);
+  it('an access_denied WITH a description is `access-denied`: neither a Cancel nor a proven block', async () => {
     vi.mocked(GoogleDriveProvider.createNew).mockRejectedValue(
       new Error('access_denied: Access blocked by your administrator')
     );
     const r = await connectDriveStorage('my-family');
-    expect(r).toEqual({
+    expect(r).toMatchObject({
       status: 'failed',
       error: 'access_denied: Access blocked by your administrator',
+      errorKind: 'access-denied',
     });
   });
 });
@@ -562,14 +567,12 @@ describe('connectDriveStorage — closes the open drive-consent funnel step (#12
   });
 
   it('emits `back` with the errorKind for a cancel and a consent denial', async () => {
-    vi.mocked(isUserCancellation).mockReturnValue(true);
     vi.mocked(GoogleDriveProvider.createNew).mockRejectedValue(new Error('access_denied'));
     await connectDriveStorage('my-family');
     expect(mockTrackOnboardingStep).toHaveBeenLastCalledWith('drive-consent', 'back', {
       error_code: 'cancelled',
     });
 
-    vi.mocked(isUserCancellation).mockReturnValue(false);
     vi.mocked(GoogleDriveProvider.createNew).mockRejectedValue(
       new DriveConsentDeniedError('Google Drive file access was not granted.')
     );
@@ -579,11 +582,19 @@ describe('connectDriveStorage — closes the open drive-consent funnel step (#12
     });
   });
 
-  it('emits `back` `failed` for an unclassified fault, and `submitted` for a collision', async () => {
+  it('emits `back` with the REAL code for any other fault, and `submitted` for a collision', async () => {
     vi.mocked(GoogleDriveProvider.createNew).mockRejectedValue(new Error('Drive 500'));
     await connectDriveStorage('my-family');
     expect(mockTrackOnboardingStep).toHaveBeenLastCalledWith('drive-consent', 'back', {
-      error_code: 'failed',
+      error_code: 'unknown',
+    });
+
+    vi.mocked(GoogleDriveProvider.createNew).mockRejectedValue(
+      Object.assign(new Error('full'), { status: 403, reason: 'storageQuotaExceeded' })
+    );
+    await connectDriveStorage('my-family');
+    expect(mockTrackOnboardingStep).toHaveBeenLastCalledWith('drive-consent', 'back', {
+      error_code: 'drive-full',
     });
 
     vi.mocked(GoogleDriveProvider.createNew).mockRejectedValue(
@@ -610,5 +621,225 @@ describe('connectDriveStorage — closes the open drive-consent funnel step (#12
     const r = await connectDriveStorage('my-family');
     expect(r).toEqual({ status: 'redirecting' });
     expect(mockTrackOnboardingStep).not.toHaveBeenCalled();
+  });
+});
+
+describe('connectDriveStorage — a blocked popup falls back to the redirect, once', () => {
+  // The tab's transport, as `shouldUseRedirectAuth()` reports it: a popup surface until
+  // `preferRedirectAuth()` records the preference (the real module's in-memory flag).
+  let preferred = false;
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    preferred = false;
+    vi.mocked(preferRedirectAuth).mockImplementation(() => {
+      preferred = true;
+    });
+    mockShouldRedirect.mockImplementation(() => preferred);
+    mockIsTokenValid.mockReturnValue(false);
+    mockIsNative.mockReturnValue(false);
+    mockStartRedirect.mockResolvedValue(undefined);
+    vi.mocked(GoogleDriveProvider.createNew).mockRejectedValue(new Error(POPUP_BLOCKED_MESSAGE));
+  });
+
+  it('records the preference and re-runs ONCE through the create gate, which starts the redirect', async () => {
+    const r = await connectDriveStorage('my-family', { googleEmail: 'a@b.com' });
+
+    expect(r).toEqual({ status: 'redirecting' });
+    expect(preferRedirectAuth).toHaveBeenCalledTimes(1);
+    // The SAME gate every redirect surface uses: create's return path, the login hint, 'create'.
+    expect(mockStartRedirect).toHaveBeenCalledTimes(1);
+    expect(mockStartRedirect).toHaveBeenCalledWith('/welcome?resume=setup', 'a@b.com', 'create');
+    // No second popup: the re-run never reached `createNew`.
+    expect(GoogleDriveProvider.createNew).toHaveBeenCalledTimes(1);
+  });
+
+  it("a re-run that fails hands back THAT failure's classified code, never popup-blocked", async () => {
+    mockStartRedirect.mockRejectedValue(new Error('Google Client ID not configured'));
+    const r = await connectDriveStorage('my-family');
+    expect(r).toMatchObject({ status: 'failed', errorKind: 'unknown' });
+    expect(preferRedirectAuth).toHaveBeenCalledTimes(1);
+    expect(GoogleDriveProvider.createNew).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not re-run if the preference did not take (it would only open a second popup)', async () => {
+    vi.mocked(preferRedirectAuth).mockImplementation(() => {});
+    const r = await connectDriveStorage('my-family');
+    expect(r).toMatchObject({ status: 'failed', errorKind: 'popup-blocked' });
+    expect(GoogleDriveProvider.createNew).toHaveBeenCalledTimes(1);
+    expect(mockStartRedirect).not.toHaveBeenCalled();
+  });
+
+  it('no other failure records the preference', async () => {
+    vi.mocked(GoogleDriveProvider.createNew).mockRejectedValue(
+      new Error('Authentication cancelled')
+    );
+    const r = await connectDriveStorage('my-family');
+    expect(r).toMatchObject({ status: 'failed', errorKind: 'cancelled' });
+    expect(preferRedirectAuth).not.toHaveBeenCalled();
+  });
+});
+
+describe('connectDriveStorage — "use a different Google account" (chooseAccount)', () => {
+  const provider = { persist: vi.fn(async () => {}) } as unknown as InstanceType<
+    typeof GoogleDriveProvider
+  >;
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mockStartRedirect.mockResolvedValue(undefined);
+    vi.mocked(GoogleDriveProvider.createNew).mockResolvedValue(provider);
+  });
+
+  it('POPUP surface: the chooser rides createNew; no redirect', async () => {
+    mockShouldRedirect.mockReturnValue(false);
+    mockIsTokenValid.mockReturnValue(true);
+    await connectDriveStorage('my-family', { googleEmail: 'a@b.com', chooseAccount: true });
+    expect(GoogleDriveProvider.createNew).toHaveBeenCalledWith('my-family.beanpod', {
+      forceConsent: false,
+      chooseAccount: true,
+    });
+    expect(mockStartRedirect).not.toHaveBeenCalled();
+  });
+
+  it('WEB REDIRECT surface: redirects even with a valid token, with no hint and the chooser prompt', async () => {
+    mockShouldRedirect.mockReturnValue(true);
+    mockIsTokenValid.mockReturnValue(true);
+    mockIsNative.mockReturnValue(false);
+    const r = await connectDriveStorage('my-family', {
+      googleEmail: 'a@b.com',
+      chooseAccount: true,
+    });
+    expect(r).toEqual({ status: 'redirecting' });
+    // No login hint: it would pre-select the very account being left.
+    expect(mockStartRedirect).toHaveBeenCalledWith('/welcome?resume=setup', undefined, 'create', {
+      prompt: 'select_account consent',
+    });
+    expect(GoogleDriveProvider.createNew).not.toHaveBeenCalled();
+  });
+
+  it('NATIVE: the chooser rides the system-browser trip; createNew never gets chooseAccount (it would throw TokenExpiredError)', async () => {
+    mockShouldRedirect.mockReturnValue(true);
+    mockIsTokenValid.mockReturnValue(true);
+    mockIsNative.mockReturnValue(true);
+    vi.mocked(awaitNativeOAuthReturn).mockResolvedValue({ kind: 'completed' });
+    const r = await connectDriveStorage('my-family', { chooseAccount: true });
+    expect(r).toEqual({ status: 'connected', type: 'google_drive' });
+    expect(mockStartRedirect).toHaveBeenCalledWith(expect.any(String), undefined, 'create', {
+      prompt: 'select_account consent',
+    });
+    expect(GoogleDriveProvider.createNew).toHaveBeenCalledWith('my-family.beanpod', {
+      forceConsent: false,
+      chooseAccount: false,
+    });
+  });
+
+  it('without chooseAccount the hint is forwarded and the default prompt is kept', async () => {
+    mockShouldRedirect.mockReturnValue(true);
+    mockIsTokenValid.mockReturnValue(false);
+    mockIsNative.mockReturnValue(false);
+    await connectDriveStorage('my-family', { googleEmail: 'a@b.com' });
+    expect(mockStartRedirect).toHaveBeenCalledWith('/welcome?resume=setup', 'a@b.com', 'create');
+  });
+});
+
+describe('connectDriveStorage — the 150 s connect cap is named, so it classifies as timeout', () => {
+  it('a createNew that never settles comes back as `timeout`, not `unknown`', async () => {
+    vi.resetAllMocks();
+    vi.useFakeTimers();
+    try {
+      mockShouldRedirect.mockReturnValue(false);
+      mockIsTokenValid.mockReturnValue(true);
+      vi.mocked(GoogleDriveProvider.createNew).mockReturnValue(new Promise(() => {}));
+      const pending = connectDriveStorage('my-family');
+      await vi.advanceTimersByTimeAsync(150_000);
+      expect(await pending).toMatchObject({ status: 'failed', errorKind: 'timeout' });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('reportCreateDriveFailure — the one report per failure', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mockIsNative.mockReturnValue(false);
+    mockShouldRedirect.mockReturnValue(false);
+  });
+
+  it('reports at the registry severity with error_code and a transport + reason detail', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const error = Object.assign(new Error('Quota'), { status: 403, reason: 'quotaExceeded' });
+
+    reportCreateDriveFailure('createPod.connectDrive', 'drive-busy', error);
+
+    expect(reportError).toHaveBeenCalledTimes(1);
+    expect(reportError).toHaveBeenCalledWith({
+      surface: 'createPod.connectDrive',
+      message: 'Quota',
+      severity: 'warning',
+      error,
+      context: {
+        provider_type: 'google_drive',
+        error_code: 'drive-busy',
+        detail: 'transport=popup;reason=quotaExceeded',
+      },
+    });
+    expect(warn).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
+  });
+
+  it('pages only for the critical codes, logging to console.error', () => {
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockShouldRedirect.mockReturnValue(true);
+
+    reportCreateDriveFailure('resumeSetup.connectDrive', 'unknown', 'boom');
+
+    expect(reportError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        severity: 'critical',
+        message: 'boom',
+        context: expect.objectContaining({ error_code: 'unknown', detail: 'transport=redirect' }),
+      })
+    );
+    expect(errorLog).toHaveBeenCalledTimes(1);
+    errorLog.mockRestore();
+  });
+
+  it('derives the native transport itself (native also reads as a redirect surface)', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    mockIsNative.mockReturnValue(true);
+    mockShouldRedirect.mockReturnValue(true);
+    reportCreateDriveFailure('resumeSetup.probeDriveAuth', 'cancelled', new Error('closed'));
+    expect(reportError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        context: expect.objectContaining({ detail: 'transport=native' }),
+      })
+    );
+  });
+
+  it('the console line says "write" for the pod write and "connect" for every other surface', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const error = new Error('full');
+
+    reportCreateDriveFailure('resumeSetup.write', 'drive-full', error);
+    reportCreateDriveFailure('resumeSetup.connectDrive', 'drive-full', error);
+    reportCreateDriveFailure('createPod.connectDrive', 'drive-full', error);
+
+    expect(warn.mock.calls.map((c) => c[0])).toEqual([
+      '[resumeSetup.write] Google Drive write failed (drive-full):',
+      '[resumeSetup.connectDrive] Google Drive connect failed (drive-full):',
+      '[createPod.connectDrive] Google Drive connect failed (drive-full):',
+    ]);
+    warn.mockRestore();
+  });
+
+  it('a connect failure is NOT also logged by the module (no parallel connect-storage warn)', async () => {
+    const { logEvent } = await import('@/services/telemetry/logEvent');
+    vi.mocked(GoogleDriveProvider.createNew).mockRejectedValue(new Error('Drive 500'));
+    mockIsTokenValid.mockReturnValue(true);
+    await connectDriveStorage('my-family');
+    expect(vi.mocked(logEvent)).not.toHaveBeenCalled();
+    expect(reportError).not.toHaveBeenCalled();
   });
 });

@@ -32,7 +32,7 @@
 // 29 test mock factories do not provide — see `driveStatusOf` below.
 import { PayloadLoadError, payloadErrorKind, type PayloadErrorKind } from '@/types/sync';
 import type { StructuredErrorEntry } from '@/utils/structuredError';
-import { isGoogleThrottleReason } from '@/utils/googleApiError';
+import { isGoogleStorageQuotaReason, isGoogleThrottleReason } from '@/utils/googleApiError';
 
 export type PodAccessErrorCode =
   | 'OFFLINE'
@@ -215,12 +215,25 @@ export function isDriveThrottle(e: unknown): boolean {
   return typeof reason === 'string' && isGoogleThrottleReason(reason);
 }
 
+/**
+ * Was this Drive failure a FULL DRIVE (`storageQuotaExceeded`)?
+ *
+ * Duck-typed on `.status` + `.reason` like `isDriveThrottle`, for the same
+ * mock-factory reason. `driveService` raises it as a plain `DriveApiError`, never
+ * a `DriveFileNotFoundError`, so a full Drive is not read as a missing file.
+ */
+export function isDriveStorageFull(e: unknown): boolean {
+  if (driveStatusOf(e) !== 403) return false;
+  const reason = (e as { reason?: unknown } | null | undefined)?.reason;
+  return typeof reason === 'string' && isGoogleStorageQuotaReason(reason);
+}
+
 export function driveStatusOf(e: unknown): number | null {
   const status = (e as { status?: unknown } | null | undefined)?.status;
   return typeof status === 'number' ? status : null;
 }
 
-function isTokenExpiredError(e: unknown): boolean {
+export function isTokenExpiredError(e: unknown): boolean {
   const err = e as { name?: unknown; message?: unknown } | null | undefined;
   if (err?.name === 'TokenExpiredError') return true;
   // The MESSAGE contract, not a second rule: `TokenExpiredError`'s own
@@ -264,7 +277,10 @@ export function classifyDriveFailure(e: unknown): PodAccessErrorCode {
   // `critical` severity that they lacked permission to their own `.beanpod` and
   // offered them `pickFamilyFile`, which can fork the pod. `VERIFY_UNAVAILABLE`
   // is the retryable warning, which is what a self-healing condition deserves.
-  if (status === 403 && isDriveThrottle(e)) return 'VERIFY_UNAVAILABLE';
+  // A full Drive shares the arm: it is not a refusal either, and picking another
+  // file cannot fix it. It heals when the family frees space, so it is retryable
+  // too. (A dedicated pod-access "Drive full" code is a recorded follow-up.)
+  if (status === 403 && (isDriveThrottle(e) || isDriveStorageFull(e))) return 'VERIFY_UNAVAILABLE';
   if (status === 403) return 'PERMISSION_DENIED';
   if (status === 404) return 'FILE_NOT_FOUND';
 

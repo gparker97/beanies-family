@@ -663,15 +663,23 @@ export class GoogleDriveProvider implements StorageProvider {
    * unchanged and deliberately so — switching this to `chooseAccount` changes the create-a-pod
    * flow, which is outside the join-flow work that found the inversion. See
    * `docs/plans/2026-09-16-join-flow-consent-loop-and-picker-retirement.md`.
+   *
+   * `chooseAccount` is passed straight to `requestAccessToken` for create's "use a different
+   * Google account" recovery. POPUP SURFACES ONLY: on native `requestAccessToken({ chooseAccount })`
+   * throws `TokenExpiredError`, and on a redirect surface the create gate has already switched
+   * accounts, so `connectStorage` sends it only when `shouldUseRedirectAuth()` is false.
    */
   static async createNew(
     fileName: string,
-    opts: { forceConsent?: boolean } = {}
+    opts: { forceConsent?: boolean; chooseAccount?: boolean } = {}
   ): Promise<GoogleDriveProvider> {
     // Clear cached folder ID — prevents cross-account folder leak when switching Google accounts
     clearFolderCache();
 
-    const token = await requestAccessToken({ forceConsent: opts.forceConsent ?? true });
+    const token = await requestAccessToken({
+      forceConsent: opts.forceConsent ?? true,
+      chooseAccount: opts.chooseAccount,
+    });
 
     // Capture account email (best-effort, non-blocking for provider creation)
     const email = await fetchGoogleUserEmail(token);

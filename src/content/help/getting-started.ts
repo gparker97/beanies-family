@@ -190,7 +190,7 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
       'Save your encrypted pod file to Google Drive for cross-device access and automatic backups.',
     icon: '\u2601\uFE0F',
     readTime: 3,
-    updatedDate: '2026-05-12',
+    updatedDate: '2026-10-09',
     sections: [
       {
         type: 'heading',
@@ -242,6 +242,28 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
         type: 'paragraph',
         content:
           'On a new device, click <strong>Load Existing Family</strong> on the login page, connect your Google account, and select your pod file. Enter your recovery code to open it, then choose a PIN for that device.',
+      },
+      {
+        type: 'heading',
+        content: "If Google Drive won't connect",
+        level: 2,
+        id: 'drive-wont-connect',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          "<strong>Pop-ups are blocked</strong> \u2014 beanies switches to a full-page Google sign-in by itself, so you can usually just carry on. If it keeps happening, allow pop-ups for <strong>beanies.family</strong> in your browser. There's no need to turn your pop-up blocker off everywhere.",
+          '<strong>Your Google Drive is full</strong> \u2014 free up some space in Drive, or sign in with a different Google account that has room.',
+          '<strong>A work or school account is blocked</strong> \u2014 the administrator of that account may not allow apps like beanies. Use a personal Google account instead.',
+        ],
+      },
+      {
+        type: 'callout',
+        content:
+          'The beanies app can keep your family file on your device instead of Google Drive, so you can get started without connecting anything.',
+        title: 'Prefer to skip Google Drive?',
+        icon: '\u{1F4F1}',
       },
     ],
   },

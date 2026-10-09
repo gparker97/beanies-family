@@ -4596,6 +4596,56 @@ const STRING_DEFS = {
     en: 'Set up my family',
     beanie: 'set up my family',
   },
+  // Create-flow Google Drive failures. Important surface: beanie keeps the real nouns
+  // (Google Drive, Google account, pop-ups, app, device).
+  'createPod.driveError.title': {
+    en: "Google Drive didn't connect",
+    beanie: "google drive didn't connect",
+  },
+  'createPod.driveError.timeout': {
+    en: 'Google Drive took too long to answer. Try again.',
+    beanie: 'google drive took too long to answer. try again.',
+  },
+  'createPod.driveError.offline': {
+    en: 'You look to be offline. Check your connection and try again.',
+    beanie: 'you look to be offline. check your connection and try again.',
+  },
+  'createPod.driveError.accessDenied': {
+    en: "Google didn't allow beanies to use this account. Try again, or sign in with a different Google account.",
+    beanie:
+      "google didn't allow beanies to use this account. try again, or sign in with a different google account.",
+  },
+  'createPod.driveError.appBlocked': {
+    en: "The administrator of this Google account (work or school) doesn't allow beanies. Use a personal Google account, or keep your family file on this device instead.",
+    beanie:
+      "the administrator of this google account (work or school) doesn't allow beanies. use a personal google account, or keep your family file on this device instead.",
+  },
+  'createPod.driveError.busy': {
+    en: 'Google Drive is busy right now. Try again in a moment.',
+    beanie: 'google drive is busy right now. try again in a moment.',
+  },
+  'createPod.driveError.driveFull': {
+    en: 'Your Google Drive is full. Free up some space, or use a different Google account.',
+    beanie: 'your google drive is full. free up some space, or use a different google account.',
+  },
+  'createPod.driveError.apiDisabled': {
+    en: "Something on our side stopped Google Drive from connecting. We've been told. Try again in a little while.",
+    beanie:
+      "something on our side stopped google drive from connecting. we've been told. try again in a little while.",
+  },
+  'createPod.driveError.unknown': {
+    en: 'Something got in the way. Try again, and if it keeps happening, the help article explains the usual causes.',
+    beanie:
+      'something got in the way. try again, and if it keeps happening, the help article explains the usual causes.',
+  },
+  'createPod.driveError.getApp': {
+    en: 'Get the beanies App',
+    beanie: 'get the beanies app',
+  },
+  'createPod.driveError.help': {
+    en: "Why didn't Google Drive connect?",
+    beanie: "why didn't google drive connect?",
+  },
   'createPod.driveConsentDenied': {
     en: 'Google needs permission to create your family file. Try again and tick the file access box when Google asks.',
     beanie:
@@ -4735,11 +4785,6 @@ const STRING_DEFS = {
   'ingredients.splitAria': { en: 'Split {item}', beanie: 'split {item}' },
   // The ✨ on a line magic beans merged (the glyph is decorative; this is its name).
   'ingredients.byMagic': { en: 'Found by magic beans', beanie: 'found by magic beans' },
-  'resumeSetup.driveConsentDenied': {
-    en: 'Google needs permission to access your family file. Please reconnect Google Drive and allow file access when prompted.',
-    beanie:
-      'google needs permission to access your family file. please reconnect google drive and allow file access when prompted.',
-  },
   'resumeSetup.podCorrupted': {
     en: "Your pod file appears damaged and can't be opened. Please contact support@beanies.family with the diagnostic details below — we may be able to help.",
     beanie:

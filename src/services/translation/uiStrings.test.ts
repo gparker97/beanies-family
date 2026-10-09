@@ -73,6 +73,7 @@ describe('uiStrings', () => {
       'podCredentialStale.',
       'resumeSetup.pod',
       'resumeSetup.driveDeclined',
+      'createPod.driveError.',
       'storage.driveOnlyHere',
       'resumeSetup.subtitle',
       'sync.',

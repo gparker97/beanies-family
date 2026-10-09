@@ -22,6 +22,7 @@ const h = vi.hoisted(() => ({
     async () => ({ ok: true, kit: { code: 'KIT-CODE', kitId: 'kit-1' } }) as unknown
   ),
   reportError: vi.fn(),
+  reportCreateDriveFailure: vi.fn(),
   activeFamilyId: { value: 'fam-1' as string | null },
   // #128
   displayName: { value: 'Greg' as string | undefined },
@@ -31,7 +32,7 @@ const h = vi.hoisted(() => ({
   // #128 drive-declined
   reason: { value: null as string | null },
   localFiles: { value: false },
-  connectLocal: vi.fn(async () => ({ status: 'failed', cancelled: true }) as unknown),
+  connectLocal: vi.fn(async () => ({ status: 'failed', errorKind: 'cancelled' }) as unknown),
   rehydrateOwnerDoc: vi.fn(async () => ({ success: true }) as { success: boolean; error?: string }),
   markRecoveryKitConfirmed: vi.fn(async () => {}),
   sync: {
@@ -60,6 +61,7 @@ vi.mock('@/composables/useDriveCollisionRecovery', () => ({
 vi.mock('@/services/sync/connectStorage', () => ({
   connectDriveStorage: h.connectDrive,
   connectLocalStorage: h.connectLocal,
+  reportCreateDriveFailure: h.reportCreateDriveFailure,
 }));
 vi.mock('@/services/sync/syncService', () => ({
   getProvider: vi.fn(() => null),
@@ -71,7 +73,6 @@ vi.mock('@/services/google/driveTokenRecovery', () => ({
 }));
 vi.mock('@/services/google/googleAuth', () => ({
   isTokenValid: vi.fn(() => true),
-  isUserCancellation: vi.fn(() => false),
 }));
 vi.mock('@/services/sync/capabilities', () => ({ canUseLocalFiles: () => h.localFiles.value }));
 vi.mock('@/services/auth/deviceUnlock', () => ({ isValidPin: (p: string) => /^\d{6}$/.test(p) }));
@@ -241,7 +242,6 @@ describe('ResumePodSetup — the Drive seam continues in place', () => {
       status: 'failed',
       error: new OAuthRoundTripAbandonedError('dismissed').message,
       errorKind: 'cancelled',
-      cancelled: true,
     });
     const wrapper = await atStorage();
     (wrapper.vm as unknown as Record<string, () => Promise<void>>).handleConnectDrive();
@@ -254,8 +254,17 @@ describe('ResumePodSetup — the Drive seam continues in place', () => {
     // exactly what they asked.
     expect(shows(wrapper, 'googleDrive.authCancelled')).toBe(true);
     expect(shows(wrapper, 'googleDrive.authFailed')).toBe(false);
-    // A benign abort is reported at `warning`, never as a fault.
-    expect(h.reportError).toHaveBeenCalledWith(expect.objectContaining({ severity: 'warning' }));
+    // Reported once, through the shared create-flow report (the registry gives it `warning`).
+    expect(h.reportCreateDriveFailure).toHaveBeenCalledTimes(1);
+    expect(h.reportCreateDriveFailure).toHaveBeenCalledWith(
+      'resumeSetup.connectDrive',
+      'cancelled',
+      expect.anything()
+    );
+    expect(h.reportError).not.toHaveBeenCalled();
+    // In the orange notice, never the red form-error box.
+    expect(wrapper.find('p.border-l-4').text()).toBe('googleDrive.authCancelled');
+    expect(wrapper.find('.bg-red-50').exists()).toBe(false);
   });
 
   it('a CONSENT DENIAL shows the specific "allow file access" copy, not the generic failure', async () => {
@@ -269,7 +278,7 @@ describe('ResumePodSetup — the Drive seam continues in place', () => {
     await flushPromises();
 
     expect(shows(wrapper, 'resumeSetup.storagePrompt')).toBe(true);
-    expect(shows(wrapper, 'resumeSetup.driveConsentDenied')).toBe(true);
+    expect(shows(wrapper, 'createPod.driveConsentDenied')).toBe(true);
   });
 
   it('a probe that comes back WITHOUT a grant lands on retry, with a message', async () => {
@@ -282,22 +291,44 @@ describe('ResumePodSetup — the Drive seam continues in place', () => {
     const wrapper = await mountScreen();
 
     expect(shows(wrapper, 'resumeSetup.retryBody')).toBe(true);
-    expect(shows(wrapper, 'resumeSetup.driveConsentDenied')).toBe(true);
-    // A consent denial is a DECISION — reported, but never at `error`.
-    expect(h.reportError).toHaveBeenCalledWith(expect.objectContaining({ severity: 'warning' }));
+    expect(shows(wrapper, 'createPod.driveConsentDenied')).toBe(true);
+    // Through the shared report, whose registry severity for a decision is `warning`.
+    expect(h.reportCreateDriveFailure).toHaveBeenCalledWith(
+      'resumeSetup.probeDriveAuth',
+      'consent-denied',
+      expect.any(DriveConsentDeniedError)
+    );
   });
 
-  it('a probe that ABANDONED the sheet reports nothing at all — closing it is not a fault', async () => {
-    h.probe.mockResolvedValue({
-      kind: 'drive-auth-failed',
-      error: new OAuthRoundTripAbandonedError('dismissed'),
-    });
-    const wrapper = await mountScreen();
+  it.each([
+    [
+      'an abandoned sheet',
+      new OAuthRoundTripAbandonedError('dismissed'),
+      'googleDrive.authCancelled',
+    ],
+    [
+      'a full Drive',
+      Object.assign(new Error('quota'), { status: 403, reason: 'storageQuotaExceeded' }),
+      'createPod.driveError.driveFull',
+    ],
+    ['an unknown fault', new Error('boom'), 'createPod.driveError.unknown'],
+  ])(
+    'the probe arm takes the message ONLY for %s: no recoveries beside a known pod',
+    async (_n, error, messageKey) => {
+      // ⚠️ "Use a local file" / "use a different account" here would start a second pod beside
+      // the one the registry knows (the 2026-05-15 orphan incident).
+      h.localFiles.value = true;
+      h.probe.mockResolvedValue({ kind: 'drive-auth-failed', error });
+      const wrapper = await mountScreen();
 
-    expect(shows(wrapper, 'resumeSetup.retryBody')).toBe(true);
-    expect(shows(wrapper, 'googleDrive.authCancelled')).toBe(true);
-    expect(h.reportError).not.toHaveBeenCalled();
-  });
+      expect((wrapper.vm as unknown as Record<string, unknown>).phase).toBe('retry');
+      expect((wrapper.vm as unknown as Record<string, unknown>).driveFailure).toBeNull();
+      expect(shows(wrapper, messageKey)).toBe(true);
+      expect(wrapper.find('[data-recovery]').exists()).toBe(false);
+      expect(shows(wrapper, 'resumeSetup.retryCta')).toBe(true);
+      h.localFiles.value = false;
+    }
+  );
 
   it('a WEB `redirecting` probe keeps the spinner — the page is unloading', async () => {
     h.probe.mockResolvedValue({ kind: 'redirecting' });
@@ -340,6 +371,90 @@ describe('ResumePodSetup — the Drive seam continues in place', () => {
     expect(h.reportError).toHaveBeenCalledWith(
       expect.objectContaining({ surface: 'resumeSetup.finalize', severity: 'critical' })
     );
+  });
+
+  it('a full Drive at the pod WRITE skips the reconnect retry and shows drive-full on storage', async () => {
+    // A nearly full Drive passes the 2-byte stub and fails at the real write. A fresh token
+    // cannot free space, so the silent-reconnect retry would only fail the same way.
+    const quota = Object.assign(new Error('The user’s Drive storage quota has been exceeded.'), {
+      status: 403,
+      reason: 'storageQuotaExceeded',
+    });
+    h.createNewFile.mockResolvedValue({ ok: false, reason: 'write', error: quota });
+    const { reconnectForWriteRetry } = await import('@/services/google/driveTokenRecovery');
+    const wrapper = await atStorage();
+    const vm = wrapper.vm as unknown as Record<string, unknown> & {
+      handleConnectDrive: () => Promise<void>;
+    };
+
+    await vm.handleConnectDrive();
+    await flushPromises();
+
+    expect(reconnectForWriteRetry).not.toHaveBeenCalled();
+    expect(h.createNewFile).toHaveBeenCalledTimes(1);
+    expect(vm.phase).toBe('storage');
+    expect(vm.driveFailure).toBe('drive-full');
+    // The registry's message in the orange notice, not the write-failure copy in the red box.
+    expect(vm.formError).toBeNull();
+    expect(shows(wrapper, 'createPod.driveError.driveFull')).toBe(true);
+    expect(shows(wrapper, 'createPod.failedReasonWrite')).toBe(false);
+    expect(wrapper.find('[data-recovery="retry"]').exists()).toBe(true);
+    expect(wrapper.find('[data-recovery="chooseAccount"]').exists()).toBe(true);
+    // One report, at the registry severity, never the `critical` write-failure page. Its own
+    // surface, so CloudWatch tells a write-time full Drive from a connect-time one.
+    expect(h.reportCreateDriveFailure).toHaveBeenCalledWith(
+      'resumeSetup.write',
+      'drive-full',
+      quota
+    );
+    expect(h.reportError).not.toHaveBeenCalledWith(
+      expect.objectContaining({ surface: 'resumeSetup.write' })
+    );
+  });
+
+  it.each([
+    // `drive-busy` offers only Try again; the storage step still offers its local file.
+    ['drive-busy', ['retry', 'useLocal']],
+    // `cancelled` already offers it: one button, never two.
+    ['cancelled', ['retry', 'useLocal']],
+  ])(
+    'storage keeps "use a local file" beside a %s failure, exactly once',
+    async (errorKind, expected) => {
+      h.localFiles.value = true;
+      h.connectDrive.mockResolvedValue({ status: 'failed', error: 'x', errorKind });
+      const wrapper = await atStorage();
+      await (wrapper.vm as unknown as Vm).handleConnectDrive();
+      await flushPromises();
+
+      const recoveries = wrapper
+        .findAll('[data-recovery]')
+        .map((b) => b.attributes('data-recovery'))
+        .filter((a) => a !== 'help');
+      expect(recoveries).toEqual(expected);
+      expect(
+        wrapper.findAll('button').filter((b) => b.text() === 'storage.useLocalInstead')
+      ).toHaveLength(1);
+      h.localFiles.value = false;
+    }
+  );
+
+  it("a new attempt clears the last failure; storage's Try again is the Drive connect", async () => {
+    h.connectDrive.mockResolvedValue({ status: 'failed', error: 'x', errorKind: 'drive-busy' });
+    const wrapper = await atStorage();
+    const vm = wrapper.vm as unknown as Record<string, unknown> & {
+      handleConnectDrive: () => Promise<void>;
+    };
+    await vm.handleConnectDrive();
+    await flushPromises();
+    expect(vm.driveFailure).toBe('drive-busy');
+    expect(shows(wrapper, 'createPod.driveError.busy')).toBe(true);
+
+    h.connectDrive.mockResolvedValue({ status: 'redirecting' });
+    await wrapper.find('[data-recovery="retry"]').trigger('click');
+    await flushPromises();
+
+    expect(h.connectDrive).toHaveBeenCalledTimes(2);
+    expect(vm.driveFailure).toBeNull();
   });
 });
 
@@ -640,7 +755,7 @@ describe('ResumePodSetup — #128 drive-declined', () => {
     h.desktop.value = true;
     h.surveyThrows.value = false;
     h.sync.membersStepActive = false;
-    h.reason.value = 'drive-declined';
+    h.reason.value = 'cancelled';
     h.localFiles.value = false;
     h.rehydrateOwnerDoc.mockResolvedValue({ success: true });
     h.probe.mockResolvedValue({ kind: 'no-registry-entry' });
@@ -656,9 +771,10 @@ describe('ResumePodSetup — #128 drive-declined', () => {
     const vm = wrapper.vm as unknown as DeclinedVm;
 
     expect(vm.phase).toBe('drive-declined');
+    expect(vm.driveFailure).toBe('cancelled');
     expect(shows(wrapper, 'resumeSetup.driveDeclinedTitle')).toBe(true);
-    expect(shows(wrapper, 'resumeSetup.driveDeclinedBody')).toBe(true);
-    expect(shows(wrapper, 'resumeSetup.tryAgainWithGoogle')).toBe(true);
+    expect(shows(wrapper, 'googleDrive.authCancelled')).toBe(true);
+    expect(wrapper.find('[data-recovery="retry"]').exists()).toBe(true);
     expect(shows(wrapper, 'resumeSetup.startOver')).toBe(true);
     // The header's subtitle slot is empty here: the notice is the explanation.
     expect(shows(wrapper, 'resumeSetup.subtitle')).toBe(false);
@@ -668,37 +784,107 @@ describe('ResumePodSetup — #128 drive-declined', () => {
       expect.arrayContaining([
         'border-primary-500',
         'dark:border-accent-lift',
-        'dark:bg-surface-raised',
+        'dark:bg-surface-overlay',
       ])
     );
     expect(wrapper.find('.bg-red-50').exists()).toBe(false);
     // Nothing already given is asked again here: no PIN form, no name field.
     expect(shows(wrapper, 'setup.choosePinLabel')).toBe(false);
     expect(stepCalls('shown')).toEqual(['resume-probe', 'drive-declined']);
+    // The producer already reported it; the screen reports nothing new.
+    expect(h.reportCreateDriveFailure).not.toHaveBeenCalled();
   });
 
-  it('an unticked file-access box uses the consent copy on the same screen', async () => {
-    h.reason.value = 'drive-consent';
+  it('an unticked file-access box uses the consent copy under the same decision title', async () => {
+    h.reason.value = 'consent-denied';
     const wrapper = await mountScreen();
 
     expect((wrapper.vm as unknown as DeclinedVm).phase).toBe('drive-declined');
-    expect(shows(wrapper, 'resumeSetup.driveConsentDenied')).toBe(true);
-    expect(shows(wrapper, 'resumeSetup.driveDeclinedBody')).toBe(false);
+    expect(shows(wrapper, 'resumeSetup.driveDeclinedTitle')).toBe(true);
+    expect(shows(wrapper, 'createPod.driveConsentDenied')).toBe(true);
+    expect(shows(wrapper, 'googleDrive.authCancelled')).toBe(false);
     expect(wrapper.find('.bg-red-50').exists()).toBe(false);
   });
 
-  it('without local files: the Drive-only caption, no local link', async () => {
+  it.each(['app-blocked', 'access-denied', 'unknown', 'drive-full', 'offline'])(
+    'a stashed %s is NOT a decision: the neutral title, never "Google needs a yes"',
+    async (code) => {
+      h.reason.value = code;
+      const wrapper = await mountScreen();
+
+      expect((wrapper.vm as unknown as DeclinedVm).phase).toBe('drive-declined');
+      expect(shows(wrapper, 'createPod.driveError.title')).toBe(true);
+      expect(shows(wrapper, 'resumeSetup.driveDeclinedTitle')).toBe(false);
+      expect(wrapper.find('p.border-l-4').exists()).toBe(true);
+    }
+  );
+
+  it('an admin-blocked return offers a different account and the app, never a retry', async () => {
+    h.reason.value = 'app-blocked';
     const wrapper = await mountScreen();
-    expect(shows(wrapper, 'storage.driveOnlyHere')).toBe(true);
+
+    expect(shows(wrapper, 'createPod.driveError.appBlocked')).toBe(true);
+    expect(wrapper.find('[data-recovery="retry"]').exists()).toBe(false);
+    expect(wrapper.find('[data-recovery="chooseAccount"]').exists()).toBe(true);
+    // No local files in this browser: the app, not a dead-end local button.
+    expect(wrapper.find('[data-recovery="useLocal"]').exists()).toBe(false);
+    expect(wrapper.find('[data-recovery="getApp"]').exists()).toBe(true);
+  });
+
+  it('a described access_denied return: its own message, retry and a different account', async () => {
+    h.reason.value = 'access-denied';
+    h.localFiles.value = true;
+    const wrapper = await mountScreen();
+
+    expect(shows(wrapper, 'createPod.driveError.accessDenied')).toBe(true);
+    expect(shows(wrapper, 'googleDrive.authCancelled')).toBe(false);
+    expect(wrapper.findAll('[data-recovery]').map((b) => b.attributes('data-recovery'))).toEqual([
+      'retry',
+      'chooseAccount',
+      'useLocal',
+      'help',
+    ]);
+  });
+
+  it('without local files: no local-file recovery', async () => {
+    const wrapper = await mountScreen();
+    expect(wrapper.find('[data-recovery="useLocal"]').exists()).toBe(false);
     expect(shows(wrapper, 'storage.useLocalInstead')).toBe(false);
   });
 
-  it('with local files: the quiet local link and its single-device caveat, no caption', async () => {
+  it('with local files: the local-file recovery opens the single-device warning', async () => {
     h.localFiles.value = true;
     const wrapper = await mountScreen();
-    expect(shows(wrapper, 'storage.useLocalInstead')).toBe(true);
-    expect(shows(wrapper, 'storage.localFileWarning')).toBe(true);
-    expect(shows(wrapper, 'storage.driveOnlyHere')).toBe(false);
+    const local = wrapper.find('[data-recovery="useLocal"]');
+    expect(local.exists()).toBe(true);
+    await local.trigger('click');
+    expect((wrapper.vm as unknown as DeclinedVm).showLocalFileWarning).toBe(true);
+  });
+
+  it("the actions' Try again is the declined screen's own retry (it keeps the token shortcut)", async () => {
+    const { isTokenValid } = await import('@/services/google/googleAuth');
+    vi.mocked(isTokenValid).mockReturnValue(true);
+    const wrapper = await mountScreen();
+
+    await wrapper.find('[data-recovery="retry"]').trigger('click');
+    await flushPromises();
+
+    expect((wrapper.vm as unknown as DeclinedVm).phase).toBe('identity');
+    expect(h.connectDrive).not.toHaveBeenCalled();
+  });
+
+  it('"use a different Google account" runs the connect with the chooser forced', async () => {
+    h.reason.value = 'app-blocked';
+    const wrapper = await mountScreen();
+
+    await wrapper.find('[data-recovery="chooseAccount"]').trigger('click');
+    await flushPromises();
+
+    expect(h.connectDrive).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ chooseAccount: true })
+    );
+    expect(stepCalls('submitted')).toContain('drive-declined');
   });
 
   it('Try again with no token starts the Drive connect (the redirect), and keeps the spinner', async () => {
@@ -748,9 +934,88 @@ describe('ResumePodSetup — #128 drive-declined', () => {
     expect(vm.phase).toBe('identity');
   });
 
+  it('a local failure after a Drive failure: the red form error, the default notice, never the stale code', async () => {
+    h.localFiles.value = true;
+    h.connectLocal.mockResolvedValue({ status: 'failed', errorKind: 'unknown', error: 'disk' });
+    const wrapper = await mountScreen();
+    const vm = wrapper.vm as unknown as DeclinedVm;
+    expect(vm.driveFailure).toBe('cancelled');
+
+    await vm.handleConnectLocal();
+    await flushPromises();
+
+    expect(vm.phase).toBe('drive-declined');
+    expect(vm.driveFailure).toBeNull();
+    expect(vm.formError).toBe('setup.fileCreateFailed');
+    expect(wrapper.find('.bg-red-50').exists()).toBe(true);
+    expect(shows(wrapper, 'googleDrive.authCancelled')).toBe(false);
+    expect(wrapper.find('[data-recovery]').exists()).toBe(false);
+    expect(shows(wrapper, 'resumeSetup.driveDeclinedBody')).toBe(true);
+  });
+
+  it('with NO code (a dismissed local picker), the screen keeps its default title and notice', async () => {
+    h.localFiles.value = true;
+    h.reason.value = 'app-blocked';
+    h.connectLocal.mockResolvedValue({ status: 'failed', errorKind: 'cancelled' });
+    const wrapper = await mountScreen();
+    const vm = wrapper.vm as unknown as DeclinedVm;
+    expect(shows(wrapper, 'createPod.driveError.title')).toBe(true);
+
+    await vm.handleConnectLocal();
+    await flushPromises();
+
+    expect(vm.phase).toBe('drive-declined');
+    expect(vm.driveFailure).toBeNull();
+    // Never the neutral failure title with nothing under it to explain it.
+    expect(shows(wrapper, 'createPod.driveError.title')).toBe(false);
+    expect(shows(wrapper, 'resumeSetup.driveDeclinedTitle')).toBe(true);
+    const notice = wrapper.find('p.border-l-4');
+    expect(notice.exists()).toBe(true);
+    expect(notice.text()).toContain('resumeSetup.driveDeclinedBody');
+    expect(shows(wrapper, 'resumeSetup.tryAgainWithGoogle')).toBe(true);
+  });
+
+  it('the declined screen offers a local file even for a code that omits it (as storage does)', async () => {
+    h.localFiles.value = true;
+    h.reason.value = 'popup-blocked';
+    const wrapper = await mountScreen();
+    expect((wrapper.vm as unknown as DeclinedVm).phase).toBe('drive-declined');
+    expect(wrapper.find('[data-recovery="useLocal"]').exists()).toBe(true);
+  });
+
+  it('the valid-token shortcut to the PIN step clears the code: it never reappears on storage', async () => {
+    const { isTokenValid } = await import('@/services/google/googleAuth');
+    vi.mocked(isTokenValid).mockReturnValue(true);
+    h.reason.value = 'app-blocked';
+    const wrapper = await mountScreen();
+    const vm = wrapper.vm as unknown as DeclinedVm;
+    expect(vm.driveFailure).toBe('app-blocked');
+
+    await vm.handleDriveDeclinedRetry();
+    await flushPromises();
+    expect(vm.phase).toBe('identity');
+    expect(vm.driveFailure).toBeNull();
+
+    vm.phase = 'storage';
+    await flushPromises();
+    expect(wrapper.find('[data-recovery]').exists()).toBe(false);
+    expect(shows(wrapper, 'createPod.driveError.appBlocked')).toBe(false);
+  });
+
+  it('moving between the two failure phases keeps the code', async () => {
+    h.reason.value = 'drive-full';
+    const wrapper = await mountScreen();
+    const vm = wrapper.vm as unknown as DeclinedVm;
+
+    vm.phase = 'storage';
+    await flushPromises();
+    expect(vm.driveFailure).toBe('drive-full');
+    expect(shows(wrapper, 'createPod.driveError.driveFull')).toBe(true);
+  });
+
   it('a failed local file returns to the declined screen, not the storage step', async () => {
     h.localFiles.value = true;
-    h.connectLocal.mockResolvedValue({ status: 'failed', cancelled: true });
+    h.connectLocal.mockResolvedValue({ status: 'failed', errorKind: 'cancelled' });
     const wrapper = await mountScreen();
     const vm = wrapper.vm as unknown as DeclinedVm;
 
@@ -803,7 +1068,7 @@ describe('ResumePodSetup — no pod write before the PIN step, on any route', ()
     h.displayName.value = 'Greg';
     h.surveyThrows.value = false;
     h.sync.membersStepActive = false;
-    h.reason.value = 'drive-declined';
+    h.reason.value = 'cancelled';
     h.localFiles.value = true;
     h.rehydrateOwnerDoc.mockResolvedValue({ success: true });
     h.probe.mockResolvedValue({ kind: 'no-registry-entry' });
@@ -816,7 +1081,11 @@ describe('ResumePodSetup — no pod write before the PIN step, on any route', ()
   it('a Drive gate that FAILS before redirecting returns to drive-declined, not storage', async () => {
     // The finding: this used to land on `storage`, whose buttons assume the PIN step ran, so
     // its local-file link (or a later Drive connect) wrote a pod with pin === ''.
-    h.connectDrive.mockResolvedValue({ status: 'failed', error: 'redirect could not start' });
+    h.connectDrive.mockResolvedValue({
+      status: 'failed',
+      error: 'redirect could not start',
+      errorKind: 'unknown',
+    });
     const wrapper = await mountScreen();
     const vm = wrapper.vm as unknown as DeclinedVm;
 
@@ -824,7 +1093,9 @@ describe('ResumePodSetup — no pod write before the PIN step, on any route', ()
     await flushPromises();
 
     expect(vm.phase).toBe('drive-declined');
-    expect(shows(wrapper, 'googleDrive.authFailed')).toBe(true);
+    expect(vm.driveFailure).toBe('unknown');
+    expect(shows(wrapper, 'createPod.driveError.unknown')).toBe(true);
+    expect(shows(wrapper, 'createPod.driveError.title')).toBe(true);
     expect(stepCalls('shown')).not.toContain('storage');
 
     // …and the local-file link from here still goes to the PIN step first, no write…
@@ -832,9 +1103,10 @@ describe('ResumePodSetup — no pod write before the PIN step, on any route', ()
     await flushPromises();
     expect(vm.phase).toBe('identity');
     expect(h.createNewFile).not.toHaveBeenCalled();
-    // …without the declined screen's stale "Google sign-in failed" above the PIN form.
+    // …without the declined screen's stale Drive failure above the PIN form.
     expect(vm.formError).toBeNull();
-    expect(shows(wrapper, 'googleDrive.authFailed')).toBe(false);
+    expect(vm.driveFailure).toBeNull();
+    expect(shows(wrapper, 'createPod.driveError.unknown')).toBe(false);
   });
 
   it('a Drive connect that THROWS from drive-declined returns there too', async () => {
@@ -847,6 +1119,13 @@ describe('ResumePodSetup — no pod write before the PIN step, on any route', ()
 
     expect(vm.phase).toBe('drive-declined');
     expect(h.createNewFile).not.toHaveBeenCalled();
+    // The unexpected throw takes the shared pattern: classified, reported once, shown in orange.
+    expect(vm.driveFailure).toBe('unknown');
+    expect(h.reportCreateDriveFailure).toHaveBeenCalledWith(
+      'resumeSetup.connectDrive',
+      'unknown',
+      expect.any(Error)
+    );
   });
 
   it('a Drive connect that CONNECTS in place from drive-declined goes to the PIN step, then writes', async () => {
@@ -977,7 +1256,7 @@ describe('ResumePodSetup — Safari back/forward-cache return from Google', () =
   });
 
   it('a restored page from the drive-declined retry goes back to drive-declined', async () => {
-    h.reason.value = 'drive-declined';
+    h.reason.value = 'cancelled';
     const wrapper = await mountScreen();
     const vm = wrapper.vm as unknown as Vm & { handleDriveDeclinedRetry: () => Promise<void> };
     await vm.handleDriveDeclinedRetry();

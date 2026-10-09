@@ -39,22 +39,37 @@ describe('stashResumeReasonFor', () => {
       /* storage unavailable — the helper is best-effort by design */
     }
   });
-
-  it('stashes and reports true ONLY for a consent denial', () => {
-    expect(stashResumeReasonFor(new DriveConsentDeniedError('unticked'))).toBe(true);
-    expect(consumeResumeReason()).toBe('drive-consent');
+  afterEach(() => {
+    window.history.replaceState(null, '', '/');
   });
 
-  it('reports false and stashes nothing for any other failure', () => {
-    // `App.vue`'s web boot catch classifies its report on this boolean, so a false positive
-    // would downgrade a genuine code fault from `error` to `warning`.
-    expect(stashResumeReasonFor(new Error('network'))).toBe(false);
-    expect(stashResumeReasonFor(undefined)).toBe(false);
+  it('on the create return path, stashes the classified code and returns it', () => {
+    window.history.replaceState(null, '', '/welcome?resume=setup');
+    expect(stashResumeReasonFor(new DriveConsentDeniedError('unticked'))).toBe('consent-denied');
+    expect(consumeResumeReason()).toBe('consent-denied');
+    // Only Google's explicit policy codes are a block; a described access_denied is its own
+    // neutral `access-denied`, and only the bare code is the person's Cancel.
+    expect(stashResumeReasonFor(new Error('admin_policy_enforced'))).toBe('app-blocked');
+    expect(consumeResumeReason()).toBe('app-blocked');
+    expect(stashResumeReasonFor(new Error('access_denied: admin policy'))).toBe('access-denied');
+    expect(consumeResumeReason()).toBe('access-denied');
+    expect(stashResumeReasonFor(new Error('access_denied'))).toBe('cancelled');
+    expect(consumeResumeReason()).toBe('cancelled');
+  });
+
+  it('off the create return path, returns the code and stashes NOTHING (reconnect, load)', () => {
+    // App.vue's boot catch runs for every Drive grant; only the create return may leave a hint
+    // for the next create screen.
+    window.history.replaceState(null, '', '/welcome?resume=load-drive');
+    expect(stashResumeReasonFor(new DriveConsentDeniedError('unticked'))).toBe('consent-denied');
+    expect(consumeResumeReason()).toBeNull();
+    window.history.replaceState(null, '', '/settings');
+    expect(stashResumeReasonFor(new Error('boom'))).toBe('unknown');
     expect(consumeResumeReason()).toBeNull();
   });
 });
 
-describe('setResumeReason / consumeResumeReason (#128 reason union)', () => {
+describe('setResumeReason / consumeResumeReason (#128, the create registry code)', () => {
   beforeEach(() => {
     sessionStorage.clear();
   });
@@ -63,19 +78,30 @@ describe('setResumeReason / consumeResumeReason (#128 reason union)', () => {
     vi.unstubAllGlobals();
   });
 
-  it('round-trips both reasons once', () => {
-    setResumeReason('drive-declined');
-    expect(consumeResumeReason()).toBe('drive-declined');
+  it('round-trips a code once', () => {
+    setResumeReason('cancelled');
+    expect(consumeResumeReason()).toBe('cancelled');
     expect(consumeResumeReason()).toBeNull();
-    setResumeReason('drive-consent');
-    expect(consumeResumeReason()).toBe('drive-consent');
+    setResumeReason('drive-full');
+    expect(consumeResumeReason()).toBe('drive-full');
     expect(consumeResumeReason()).toBeNull();
   });
 
-  it('rejects (and clears) a value outside the union', () => {
+  it('drops (and clears) a legacy reason left mid-redirect across the deploy', () => {
+    for (const legacy of ['drive-declined', 'drive-consent']) {
+      sessionStorage.setItem('beanies:resume-reason', legacy);
+      expect(consumeResumeReason()).toBeNull();
+      expect(sessionStorage.getItem('beanies:resume-reason')).toBeNull();
+    }
+  });
+
+  it('rejects (and clears) a value that is not a registry code', () => {
     sessionStorage.setItem('beanies:resume-reason', 'something-else');
     expect(consumeResumeReason()).toBeNull();
     expect(sessionStorage.getItem('beanies:resume-reason')).toBeNull();
+    // An inherited property name is not a code either.
+    sessionStorage.setItem('beanies:resume-reason', 'toString');
+    expect(consumeResumeReason()).toBeNull();
   });
 
   it('warns instead of swallowing silently when sessionStorage throws', () => {
@@ -89,7 +115,7 @@ describe('setResumeReason / consumeResumeReason (#128 reason union)', () => {
       },
       removeItem: () => {},
     });
-    expect(() => setResumeReason('drive-declined')).not.toThrow();
+    expect(() => setResumeReason('cancelled')).not.toThrow();
     expect(consumeResumeReason()).toBeNull();
     expect(warn).toHaveBeenCalledTimes(2);
     expect(warn.mock.calls.every((c) => String(c[0]).startsWith('[resumePaths]'))).toBe(true);

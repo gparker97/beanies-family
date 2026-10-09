@@ -43,7 +43,11 @@ import {
   nativeOAuthTransport,
   nativeOAuthParams,
 } from '@/constants/nativeOAuth';
-import { classifyOAuthError } from '@/services/google/oauthError';
+import {
+  classifyOAuthError,
+  POPUP_AUTH_TIMEOUT_NAME,
+  POPUP_BLOCKED_MESSAGE,
+} from '@/services/google/oauthError';
 
 /**
  * Exported because the system-browser Picker request must send THIS SCOPE ALONE. Google's onepick
@@ -349,6 +353,27 @@ const permanentFailureCallbacks: PermanentFailureCallback[] = [];
 // unavailable (private mode, quota), we fall back to in-memory counting
 // and warn once per session — never silently skip the escalation path.
 const FAILURE_COUNTER_KEY = 'beanies_silent_refresh_failures';
+
+/**
+ * One tab-scoped value this module mirrors to sessionStorage, named for its warn-once report.
+ * In-memory state is always the primary source; sessionStorage only carries it across a reload.
+ */
+interface SessionStorageUse {
+  /** The `reportError` surface for a storage failure. */
+  surface: string;
+  /** What the failure costs, for the console line. */
+  consequence: string;
+  /** The report's message noun: `sessionStorage <op> failed; <subject> persistence unavailable`. */
+  subject: string;
+}
+const FAILURE_COUNTER_STORAGE: SessionStorageUse = {
+  surface: 'silent-refresh-counter-storage',
+  consequence:
+    'silent-refresh failure counter will not survive page reloads. Falls back to in-memory counting.',
+  subject: 'counter',
+};
+// ONE flag for every use, deliberately: a throwing sessionStorage is one fact about the tab (private
+// mode, quota), so it is reported once, by whichever use hits it first, not once per value.
 let storageWarnedThisSession = false;
 
 function loadFailureCounter(): number {
@@ -357,7 +382,7 @@ function loadFailureCounter(): number {
       typeof sessionStorage !== 'undefined' ? sessionStorage.getItem(FAILURE_COUNTER_KEY) : null;
     return v ? Math.max(0, parseInt(v, 10) || 0) : 0;
   } catch (e) {
-    warnStorageOnce('read', e);
+    warnStorageOnce(FAILURE_COUNTER_STORAGE, 'read', e);
     return 0;
   }
 }
@@ -367,21 +392,82 @@ function persistFailureCounter(n: number): void {
       sessionStorage.setItem(FAILURE_COUNTER_KEY, String(n));
     }
   } catch (e) {
-    warnStorageOnce('write', e);
+    warnStorageOnce(FAILURE_COUNTER_STORAGE, 'write', e);
   }
 }
-function warnStorageOnce(op: 'read' | 'write', err: unknown): void {
+function warnStorageOnce(use: SessionStorageUse, op: 'read' | 'write', err: unknown): void {
   if (storageWarnedThisSession) return;
   storageWarnedThisSession = true;
-  console.warn(
-    `[googleAuth] sessionStorage ${op} failed — silent-refresh failure counter ` +
-      `will not survive page reloads. Falls back to in-memory counting.`,
-    err
-  );
+  console.warn(`[googleAuth] sessionStorage ${op} failed — ${use.consequence}`, err);
   reportError({
-    surface: 'silent-refresh-counter-storage',
-    message: `sessionStorage ${op} failed; counter persistence unavailable`,
+    surface: use.surface,
+    message: `sessionStorage ${op} failed; ${use.subject} persistence unavailable`,
     error: err instanceof Error ? err : new Error(String(err)),
+  });
+}
+
+// ── Sticky redirect preference (create's popup-blocked fallback) ─────────────
+//
+// Once the create flow has seen its popup blocked behind a person's tap, this tab treats itself
+// as a redirect surface for every later Google sign-in, through `shouldUseRedirectAuth()`.
+//
+// ⚠️ THE ONE WRITER IS `preferRedirectAuth()`, AND ITS ONE CALLER IS `connectDriveStorage`'s
+// popup-blocked arm. The popup opener only OBSERVES a block: it cannot tell a tap from a
+// gesture-less background `requestAccessToken` (the photo sweep after a laptop sleep), and
+// recording there would silently flip a healthy desktop tab to redirect sign-in.
+//
+// The in-memory flag is the primary source, so the current page redirects next even when
+// sessionStorage throws. It is LOADED ONCE here at module init (like the counter above), so
+// `shouldUseRedirectAuth()` stays a synchronous read with no storage I/O. sessionStorage, never
+// localStorage: a new session tries the popup again, and a blocked desktop session does not
+// poison the device for good. Rollback is one line: drop the read in `shouldUseRedirectAuth()`.
+const REDIRECT_PREFERENCE_KEY = 'beanies_prefer_redirect_auth';
+const REDIRECT_PREFERENCE_STORAGE: SessionStorageUse = {
+  surface: 'redirect-preference-storage',
+  consequence:
+    'the redirect sign-in preference will not survive a page reload. Falls back to in-memory.',
+  subject: 'redirect preference',
+};
+
+function loadRedirectPreference(): boolean {
+  try {
+    return (
+      typeof sessionStorage !== 'undefined' &&
+      sessionStorage.getItem(REDIRECT_PREFERENCE_KEY) === '1'
+    );
+  } catch (e) {
+    warnStorageOnce(REDIRECT_PREFERENCE_STORAGE, 'read', e);
+    return false;
+  }
+}
+
+let redirectAuthPreferred = loadRedirectPreference();
+
+/** Whether this tab has recorded the redirect preference. Read inside `shouldUseRedirectAuth`. */
+export function isRedirectAuthPreferred(): boolean {
+  return redirectAuthPreferred;
+}
+
+/**
+ * Record that this tab must use full-page redirect sign-in from now on (see the block above).
+ * Call ONLY behind a person's tap whose popup the browser blocked. Idempotent; logs
+ * `redirect_preferred` once per tab.
+ */
+export function preferRedirectAuth(): void {
+  if (redirectAuthPreferred) return;
+  redirectAuthPreferred = true;
+  try {
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.setItem(REDIRECT_PREFERENCE_KEY, '1');
+    }
+  } catch (e) {
+    warnStorageOnce(REDIRECT_PREFERENCE_STORAGE, 'write', e);
+  }
+  logEvent({
+    level: 'info',
+    surface: 'google-auth',
+    message: 'this tab now prefers redirect sign-in',
+    context: { action: 'redirect_preferred' },
   });
 }
 
@@ -437,48 +523,10 @@ export function isGoogleAuthConfigured(): boolean {
   return !!getClientId();
 }
 
-/**
- * Whether a thrown error represents the user backing out of an auth/picker
- * flow (closing the Google account chooser, dismissing the OS file picker,
- * a blocked popup, etc.) rather than a real failure. Callers use this to
- * treat the situation as a quiet "never mind" instead of an error to report.
- *
- * Covers the `AbortError` shape (`showSaveFilePicker` cancellation) by name
- * and the GIS / popup-blocked message shapes by substring.
- *
- * `access_denied` is Google's OAuth error for Cancel/Back on the consent screen:
- * a decision, not a fault (#128). Unmatched, it surfaced as the raw string
- * "access_denied" and paged `#beanies-errors` as critical.
- *
- * ⚠️ ONLY THE BARE CODE IS A CANCEL, never a message that merely contains it. Google also
- * answers `access_denied` for policy blocks (an admin-blocked third-party app, an unverified
- * app's test-user restriction), and those carry an `error_description`. `OAuthCallbackPage`
- * forwards that as `access_denied: <description>` (as `oauthProxy` does for token errors), so
- * a substring match would file a block the person cannot fix by retrying as their own "never
- * mind".
- */
-export function isUserCancellation(e: unknown): boolean {
-  if ((e as { name?: string } | null)?.name === 'AbortError') return true;
-  const msg = e instanceof Error ? e.message : String(e);
-  if (/cancel|dismiss|popup_closed|user_cancel/i.test(msg)) return true;
-  return msg.trim().toLowerCase() === 'access_denied';
-}
-
-/**
- * Whether the browser REFUSED to open the popup — as opposed to the user closing it.
- *
- * ⚠️ A sibling of `isUserCancellation`, which deliberately does NOT match this shape: a browser
- * blocking the popup is not a "never mind", it is a condition the user can actually fix (allow
- * popups) and must therefore be told about. Collapsing the two is why `OAUTH_POPUP_BLOCKED`
- * existed in the join error registry and was emitted by precisely nothing.
- *
- * Matches the message `openBlankPopup` throws below; kept as a predicate beside it so the two
- * cannot drift apart in separate files.
- */
-export function isPopupBlocked(e: unknown): boolean {
-  const msg = e instanceof Error ? e.message : String(e);
-  return /popup blocked/i.test(msg);
-}
+// The two OAuth string predicates moved to `oauthError.ts`, beside `isOAuthPolicyBlock` and their
+// shared ordering contract, so the create-flow classifier can use them without importing this
+// module. Re-exported here so no existing importer changes.
+export { isUserCancellation, isPopupBlocked } from '@/services/google/oauthError';
 
 /**
  * Whether the current browser should skip popup-based OAuth and use full-page
@@ -510,6 +558,9 @@ export function isPopupBlocked(e: unknown): boolean {
  * are worse and more common. If the Picker concern resurfaces on iOS it's
  * handled at the picker, not by reverting this. See ADR — iOS redirect OAuth.
  *
+ * **3. A tab whose create popup was blocked**: `preferRedirectAuth()` records it, for this tab
+ * only (sessionStorage), so no later sign-in in the tab re-hits the blocker.
+ *
  * Safe to call at module/SSR time: returns false if `navigator`,
  * `window`, or `matchMedia` is missing.
  */
@@ -521,8 +572,9 @@ export function shouldUseRedirectAuth(): boolean {
   // is fragile. Installed/standalone PWA: the popup→postMessage bridge is broken.
   // This is the single source of truth for "use redirect auth"; callers must not
   // re-test these separately. Detection primitives live in capabilities.ts.
-  // See ADR-029.
-  return isNative() || isIosOrIpadOs() || isStandalone();
+  // See ADR-029. The last term is the tab's sticky preference, recorded only by create's
+  // popup-blocked fallback (`preferRedirectAuth`); an in-memory read, no storage I/O.
+  return isNative() || isIosOrIpadOs() || isStandalone() || isRedirectAuthPreferred();
 }
 
 /**
@@ -2446,23 +2498,53 @@ function buildAuthUrl(
 }
 
 /**
- * Open a blank centered popup synchronously. Must be called in the direct
- * call stack of a user gesture (click/tap) — before any `await` — so that
- * mobile browsers don't block it.
+ * Open a blank centered OAuth popup synchronously, or return `null` when the browser refuses.
+ * Must be called in the direct call stack of a user gesture (click/tap), before any `await`, so
+ * that mobile browsers don't block it.
+ *
+ * Contract: "return null and log", never throw. Each caller keeps its own failure shape.
+ *
+ * ⚠️ A BLOCK IS OBSERVED HERE, NEVER RECORDED. This logs `popup_blocked` with the user-activation
+ * state read at this instant (only the opener can read it then), and it fires for EVERY block,
+ * background token requests included. It must not call `preferRedirectAuth()`: it cannot tell a
+ * tap from a gesture-less `requestAccessToken`, see the sticky-preference block above.
  */
-function openBlankPopup(): Window {
+export function openOAuthPopup(windowName: string): Window | null {
   const width = 500;
   const height = 600;
   const left = window.screenX + (window.outerWidth - width) / 2;
   const top = window.screenY + (window.outerHeight - height) / 2;
   const features = `width=${width},height=${height},left=${left},top=${top},scrollbars=yes,resizable=yes`;
 
-  const popup = window.open('about:blank', 'beanies-oauth', features);
-
+  const popup = window.open('about:blank', windowName, features);
   if (!popup) {
-    throw new Error('Popup blocked — please allow popups for this site');
+    // `info`: a block is the person's browser setting, and the caller surfaces it; the event is
+    // for counting blocks and their activation state, not for paging.
+    logEvent({
+      level: 'info',
+      surface: 'google-auth',
+      message: 'oauth popup blocked',
+      context: { action: 'popup_blocked', detail: `activation=${userActivationState()}` },
+    });
   }
+  return popup;
+}
 
+/**
+ * Whether the page still held transient user activation, as a closed `detail` value. `unknown`
+ * where the browser has no `navigator.userActivation` (older Safari / Firefox).
+ */
+function userActivationState(): 'true' | 'false' | 'unknown' {
+  const activation = (navigator as Navigator & { userActivation?: { isActive?: boolean } })
+    .userActivation;
+  if (typeof activation?.isActive !== 'boolean') return 'unknown';
+  return activation.isActive ? 'true' : 'false';
+}
+
+/** The Drive popup: `openOAuthPopup`, throwing `POPUP_BLOCKED_MESSAGE` on a block. */
+function openBlankPopup(): Window {
+  const popup = openOAuthPopup('beanies-oauth');
+  if (!popup) throw new Error(POPUP_BLOCKED_MESSAGE);
   return popup;
 }
 
@@ -2517,11 +2599,12 @@ function waitForAuthCode(popup: Window, url: string): Promise<string> {
     // Hard timeout — never let a stuck/orphaned popup hang the flow.
     const timeoutTimer = setTimeout(() => {
       cleanup();
-      reject(
-        new Error(
-          `Google sign-in didn't return after ${POPUP_AUTH_TIMEOUT_MS / 1000}s — the sign-in window may have been closed or blocked. Try again, or use a local file instead.`
-        )
+      const err = new Error(
+        `Google sign-in didn't return after ${POPUP_AUTH_TIMEOUT_MS / 1000}s — the sign-in window may have been closed or blocked. Try again, or use a local file instead.`
       );
+      // Named so the create-flow classifier files this deadline as `timeout`, not `unknown`.
+      err.name = POPUP_AUTH_TIMEOUT_NAME;
+      reject(err);
     }, POPUP_AUTH_TIMEOUT_MS);
 
     function cleanup() {
@@ -3419,10 +3502,12 @@ async function completeNativeAuthRedirect(
   }
 
   // OAuth error on the redirect: clear pending state either way. A BARE access_denied (the person
-  // declined consent) is benign: an abandon, no reportError. Anything else (a DESCRIBED
-  // access_denied is a policy block, e.g. an admin-blocked app) is a real failure, NOT an abandon,
-  // so `connectStorage` does not record it as `cancelled` and the screen does not invite a retry
-  // that cannot work. Same rule as the web callback page (`classifyOAuthError`).
+  // declined consent) is benign: an abandon, no reportError. Anything else (including a DESCRIBED
+  // access_denied, which may be a localized decline or an unverified app's test-user restriction)
+  // is settled as a failure carrying Google's string, NOT an abandon, so each consumer classifies
+  // it: the create flow's `classifyCreateDriveFailure` files any access_denied as `cancelled` and
+  // only Google's explicit policy codes as `app-blocked`. Same rule as the web callback page
+  // (`classifyOAuthError`).
   //
   // ⚠️ MOVED BELOW THE CSRF CHECK (was above it). Two reasons. It let any installed app invoke
   // the custom scheme with `?error=x` during a live auth and force a session teardown without

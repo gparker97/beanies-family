@@ -50,10 +50,12 @@ vi.mock('@/services/automerge/worker/docClient', async (importOriginal) => {
 const driveMocks = vi.hoisted(() => {
   class DriveApiError extends Error {
     readonly status: number;
-    constructor(message: string, status: number) {
+    readonly reason?: string;
+    constructor(message: string, status: number, reason?: string) {
       super(message);
       this.name = 'DriveApiError';
       this.status = status;
+      this.reason = reason;
     }
   }
   class DriveFileNotFoundError extends DriveApiError {
@@ -409,6 +411,26 @@ describe('photoStore', () => {
     const url = await store.getImageUrl(photoId, 'thumb');
     expect(url).toBeNull();
     expect(store.isUnresolved(photoId)).toBe(true);
+  });
+
+  it('🔴 getImageUrl does NOT flag the photo unresolved when the Drive is full', async () => {
+    // `driveService` raises a full Drive as a plain `DriveApiError`, never a
+    // `DriveFileNotFoundError`, so a healthy photo is not flipped to "missing".
+    storeInternals.registerPhotoCollection('activities');
+    await ensureEntity('activities', 'act-1');
+    const store = usePhotoStore();
+    driveMocks.getFileMetadata
+      .mockResolvedValueOnce({ parents: ['folder-1'] })
+      .mockRejectedValueOnce(
+        new driveMocks.DriveApiError('storage full', 403, 'storageQuotaExceeded')
+      );
+
+    const { photoId } = await store.addPhoto(makeFile(), 'activities', 'act-1');
+    await expect(store.getImageUrl(photoId, 'thumb')).rejects.toMatchObject({
+      status: 403,
+      reason: 'storageQuotaExceeded',
+    });
+    expect(store.isUnresolved(photoId)).toBe(false);
   });
 
   it('getPublicUrl returns deterministic Drive CDN URLs and honors tombstone/unresolved guards', async () => {

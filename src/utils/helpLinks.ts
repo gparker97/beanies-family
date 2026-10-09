@@ -44,6 +44,7 @@ export const HELP_PATHS = {
   wallSetup: 'getting-started/set-up-the-beanie-wall',
   zeroKnowledge: 'security/zero-knowledge-architecture',
   whoOwnsWhat: 'features/who-owns-what',
+  connectingGoogleDrive: 'getting-started/connecting-google-drive',
 } as const;
 
 export type HelpPath = (typeof HELP_PATHS)[keyof typeof HELP_PATHS];
@@ -54,7 +55,7 @@ export type HelpPath = (typeof HELP_PATHS)[keyof typeof HELP_PATHS];
  * one-link-per-surface invariant above reviewable rather than aspirational:
  * adding a surface is a deliberate edit here, next to the rule it has to obey.
  */
-export type HelpSurface = 'wall-setup-card' | 'who-owns-what-first-deal';
+export type HelpSurface = 'wall-setup-card' | 'who-owns-what-first-deal' | 'create-drive-failure';
 
 /** The absolute, cross-origin url for a help article. */
 export function helpUrl(path: HelpPath): string {

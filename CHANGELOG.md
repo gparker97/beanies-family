@@ -30,6 +30,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - A to-do shared by two people now shows once in the beanie wall's to-do drawer and summary card, marked with each owner's face rather than a name that could be cut off.
 - The beanie wall's to-do drawer no longer cuts off the orange border around late and today's to-dos, and its scrollbar now matches the sidebar's.
 - A planned meal of kind Other now shows just its name (no "Other ·" in front), and the beanie wall's trip sheet no longer says "0 of 0 booked" before anything is added.
+- Creating a pod on Google Drive now carries on when the browser blocks the sign-in pop-up, switching to a full-page Google sign-in instead of stopping.
+- A full Google Drive is now explained as such, with the option to use another Google account, instead of a generic sign-in failure.
 
 ## 2026-10-08
 

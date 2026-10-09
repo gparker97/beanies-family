@@ -17,6 +17,7 @@ import { classifyOAuthError } from '@/services/google/oauthError';
 import { reportError } from '@/utils/errorReporter';
 import { useTranslation } from '@/composables/useTranslation';
 import { setResumeReason } from '@/components/login/resumePaths';
+import { classifyCreateDriveFailure } from '@/services/sync/createDriveErrors';
 import { trackOnboardingStep } from '@/services/telemetry/onboardingAttempt';
 
 const { t } = useTranslation();
@@ -49,10 +50,10 @@ onMounted(() => {
   const params = new URLSearchParams(window.location.search);
   const code = params.get('code');
   // One rule with the native deep link (`classifyOAuthError`): only a BARE `access_denied` is a
-  // decline; a described one (a policy block) is forwarded as `access_denied: <description>`.
+  // decline; a described one is forwarded as `access_denied: <description>` for each consumer to
+  // classify (the create flow reads it as a decline too).
   const classified = classifyOAuthError(params.get('error'), params.get('error_description'));
   const error = classified?.message ?? null;
-  const bareDecline = classified?.kind === 'declined';
   const stateParam = params.get('state');
 
   if (window.opener) {
@@ -168,20 +169,19 @@ onMounted(() => {
     if (decoded?.returnPath) {
       // Every other mode: go back where they came from, without a parameter nobody reads.
       //
-      // ⚠️ THIS ARM IS THE RECORD of a declined web redirect (#128). The page that started the
+      // ⚠️ THIS ARM IS THE RECORD of a failed web redirect (#128). The page that started the
       // redirect has unloaded, so nobody else can log it or explain it. For the create flow's
-      // Drive grant: stash `drive-declined` so the resume screen names the decline instead of
-      // silently re-asking for everything, and close the funnel's `drive-consent` step. `error`
-      // is an attacker-controllable query parameter (and `redactContext` only truncates), so the
-      // firehose gets a closed set, never the raw value.
-      // ⚠️ ONLY A BARE `access_denied` IS A DECLINE (see `classifyOAuthError`). A policy block or
-      // any other OAuth error is not "Google needs a yes", so it stashes no reason: the declined
-      // screen's "try again" copy would tell the person to retry something they cannot fix.
+      // Drive grant, EVERY error (a bare decline included): stash its create registry code so
+      // the resume screen says what happened (never a silent PIN step), and close the funnel's
+      // `drive-consent` step with the same code. The classifier reads the classified string as
+      // readily as an `Error`: a bare `access_denied` is `cancelled`, a described one
+      // `access-denied`, and only Google's explicit policy codes are `app-blocked`. `error` is an attacker-controllable query parameter (and
+      // `redactContext` only truncates), so the firehose gets the closed code set, never the
+      // raw value.
       if (isCreateDriveGrant(decoded)) {
-        if (bareDecline) setResumeReason('drive-declined');
-        trackOnboardingStep('drive-consent', 'back', {
-          error_code: bareDecline ? 'access_denied' : 'oauth-error',
-        });
+        const code = classifyCreateDriveFailure(error);
+        setResumeReason(code);
+        trackOnboardingStep('drive-consent', 'back', { error_code: code });
       }
       window.location.href = decoded.returnPath;
       return;

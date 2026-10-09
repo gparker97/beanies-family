@@ -50,7 +50,7 @@
  *       → finalizePod SUCCESS → recovery-kit → members → survey
  *       → SetupProgressModal → syncStore.completePodSetup → signed-in /nook
  *
- *   #128: back from a web Drive redirect that said no (a stashed resume reason):
+ *   #128: back from a web Drive redirect that failed (a stashed `CreateDriveErrorCode`):
  *     no-registry-entry → drive-declined → (redirect to Google | token already valid → identity
  *                                           | local file → identity)
  *
@@ -69,16 +69,13 @@
  * `openExistingOnDrive`, `retry`), which emit `signed-in '/nook'` directly.
  */
 import { ref, computed, watch, onMounted, onBeforeUnmount, onErrorCaptured } from 'vue';
-import {
-  type PayloadLoadError,
-  DriveConsentDeniedError,
-  OAuthRoundTripAbandonedError,
-} from '@/types/sync';
+import type { PayloadLoadError } from '@/types/sync';
 import { surfacePayloadFatal, surfaceBlockerFatal } from '@/utils/payloadFailureSurface';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import LocalFileSyncWarning from '@/components/login/LocalFileSyncWarning.vue';
+import CreateDriveFailureActions from '@/components/login/CreateDriveFailureActions.vue';
 import CreateMembersStep from '@/components/login/CreateMembersStep.vue';
 import PinInput from '@/components/ui/PinInput.vue';
 import RecoveryKitDisplay from '@/components/auth/RecoveryKitDisplay.vue';
@@ -93,17 +90,27 @@ import { useAuthStore } from '@/stores/authStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useSettingsStore } from '@/stores/settingsStore';
-import { connectDriveStorage, connectLocalStorage } from '@/services/sync/connectStorage';
+import {
+  connectDriveStorage,
+  connectLocalStorage,
+  reportCreateDriveFailure,
+} from '@/services/sync/connectStorage';
+import {
+  classifyCreateDriveFailure,
+  createDriveFailureMessage,
+  type CreateDriveErrorCode,
+} from '@/services/sync/createDriveErrors';
 import { getProvider, providerBelongsToAnotherFamily } from '@/services/sync/syncService';
 import { tryReconnectSilently, reconnectForWriteRetry } from '@/services/google/driveTokenRecovery';
 import { resolveDriveCollision } from '@/composables/useDriveCollisionRecovery';
 import { canUseLocalFiles } from '@/services/sync/capabilities';
-import { isTokenValid, isUserCancellation } from '@/services/google/googleAuth';
+import { isTokenValid } from '@/services/google/googleAuth';
 import { reportError } from '@/utils/errorReporter';
+import { isDriveStorageFull } from '@/utils/podAccess';
 import { logEvent } from '@/services/telemetry';
 import { trackOnboardingStep, type OnboardingStep } from '@/services/telemetry/onboardingAttempt';
 import { confirm } from '@/composables/useConfirm';
-import { consumeResumeReason, type ResumeSetupReason } from '@/components/login/resumePaths';
+import { consumeResumeReason } from '@/components/login/resumePaths';
 import type { HeardVia } from '@beanies/brand/heardVia';
 
 const { t } = useTranslation();
@@ -138,8 +145,8 @@ const emit = defineEmits<{
  * `recovery-kit`, `members` and `survey` are the create-only post-write steps,
  * reached ONLY after a successful pod write (see the phase-reachability table
  * above); `survey` is the optional "how did you hear about us?" step, last.
- * `drive-declined` is the web redirect's "Google needs a yes" return (#128): a stashed
- * resume reason on a `no-registry-entry` probe. It sits BEFORE `identity`, so nothing on it
+ * `drive-declined` is the web redirect's failed return (#128): a stashed `CreateDriveErrorCode`
+ * on a `no-registry-entry` probe. It sits BEFORE `identity`, so nothing on it
  * may write a pod (no PIN yet): `finalizePod` routes to the PIN step until `ownerReady`, and
  * every storage fallback returns here rather than to `storage` (`storageFallbackPhase`).
  */
@@ -230,10 +237,43 @@ const navigatedAway = ref(false);
 const autoLoadFamilyName = ref<string>('');
 
 /**
- * Why the `drive-declined` phase is showing (#128), for its notice copy: `drive-declined`
- * (Cancel/Back at Google) or `drive-consent` (the file-access box left unticked).
+ * Why Google Drive did not connect, as a `CREATE_DRIVE_ERRORS` code: the ONE source for it on this
+ * screen. Set by a failed connect (`finishOnDrive`, `handleConnectDrive`'s catch), a full Drive at
+ * the pod write (`finalizePod`), or a code stashed by the redirect return (`runProbe`). While it is
+ * set, the `storage` and `drive-declined` phases render its message in the orange notice and the
+ * registry's recoveries (`showDriveFailure`). Cleared at the start of every connect, probe and
+ * write, and on leaving those two phases (the `phase` watcher below), so a code never outlives
+ * the attempt that set it.
+ *
+ * ⚠️ NEVER SET BY THE PROBE'S `drive-auth-failed` ARM. That arm sits beside a pod the registry
+ * already knows; its `retry` phase takes the message alone (`formError`), never the recoveries.
  */
-const declineReason = ref<ResumeSetupReason | null>(null);
+const driveFailure = ref<CreateDriveErrorCode | null>(null);
+const driveFailureMessage = computed(() => createDriveFailureMessage(driveFailure.value, t));
+/** The two screens a Drive failure lands on (`storageFallbackPhase`) render it the same way. */
+const DRIVE_FAILURE_PHASES: ReadonlySet<Phase> = new Set<Phase>(['storage', 'drive-declined']);
+const showDriveFailure = computed(
+  () => driveFailure.value !== null && DRIVE_FAILURE_PHASES.has(phase.value)
+);
+// Leaving the two failure phases ends the failure: a code must not reappear on a later visit
+// (e.g. `handleDriveDeclinedRetry`'s valid-token shortcut to `identity`, then back to `storage`).
+// ⚠️ `flush: 'sync'`, so it clears AT the transition: a code set while `finishing` (a failed
+// connect, `finalizePod`'s full Drive) is set after the clear and survives the step back onto
+// `storage` / `drive-declined`. A batched watcher could run after that code was set and drop it.
+watch(
+  phase,
+  (next) => {
+    if (!DRIVE_FAILURE_PHASES.has(next)) driveFailure.value = null;
+  },
+  { flush: 'sync' }
+);
+/**
+ * A cancel or an unticked file-access box is the person's own DECISION, so "Google needs a yes
+ * from you" is true. Nothing else is: an admin-blocked app must not be told Google wants a yes.
+ */
+const driveFailureIsDecision = computed(
+  () => driveFailure.value === 'cancelled' || driveFailure.value === 'consent-denied'
+);
 const autoLoadLastSaved = ref<string | null>(null);
 
 const familyName = computed(() => familyContextStore.activeFamilyName || 'your family');
@@ -267,8 +307,15 @@ const header = computed<{ title: string; subtitle: string | null } | null>(() =>
     case 'auto-load':
       return { title: t('resumeSetup.title'), subtitle: t('resumeSetup.subtitleRecovery') };
     // No subtitle: the orange notice under the title is the explanation (mockup Focus 2).
+    // With no code (a later local-file attempt cleared it), the screen's own default title.
     case 'drive-declined':
-      return { title: t('resumeSetup.driveDeclinedTitle'), subtitle: null };
+      return {
+        title:
+          !driveFailure.value || driveFailureIsDecision.value
+            ? t('resumeSetup.driveDeclinedTitle')
+            : t('createPod.driveError.title'),
+        subtitle: null,
+      };
     default:
       return { title: t('resumeSetup.title'), subtitle: t('resumeSetup.subtitle') };
   }
@@ -329,11 +376,13 @@ onMounted(async () => {
   // `handleIdentityNext` finishes on Drive. See
   // docs/plans/2026-06-20-ios-oauth-bounce-state-param.md.
   //
-  // #128: a web Drive redirect that came back with a "no" (declined at Google, or the file-access
-  // box unticked) stashed a reason. It is consumed here, once, either way, so it cannot resurface
-  // on a later mount, and handed to the probe, which honours it ONLY on its `no-registry-entry`
-  // arm (the genuinely-new family that was about to pick a PIN). Every other probe outcome keeps
-  // its own arm: a known pod, a retry or a redirect is a newer, more specific fact than the hint.
+  // #128: a web Drive redirect that came back with a failure (a decline at Google, an unticked
+  // file-access box, a policy block, a failed exchange) stashed its `CreateDriveErrorCode`. It
+  // was already reported by whoever stashed it. It is consumed here, once, either way, so it
+  // cannot resurface on a later mount, and handed to the probe, which honours it ONLY on its
+  // `no-registry-entry` arm (the genuinely-new family that was about to pick a PIN). Every other
+  // probe outcome keeps its own arm: a known pod, a retry or a redirect is a newer, more specific
+  // fact than the hint.
   // ⚠️ Decided INSIDE the probe rather than by re-routing `identity` afterwards: the phase
   // watcher would otherwise flush `identity` first and log a false `pin shown`.
   await runProbe(consumeResumeReason());
@@ -387,17 +436,19 @@ onBeforeUnmount(() => {
  * Registry probe + phase routing. Extracted from onMounted so the `retry`
  * screen's "Try again" can re-run it.
  *
- * `no-registry-entry` → `identity` (genuinely-new family — create is correct), or
- * `drive-declined` when `stashedReason` says a web Drive redirect just came back with a "no"
- * (#128; only the mount passes one, so a retry re-probe never re-shows the decline).
+ * `no-registry-entry` → `identity` (genuinely-new family: create is correct), or the storage
+ * fallback (`drive-declined` before the PIN) showing `stashedCode` when a web Drive redirect just
+ * came back with a failure (#128; only the mount passes one, so a retry re-probe never re-shows
+ * it).
  * `registry-error` / `load-failed` → `retry` (a pod fileId is/was known but we
  * couldn't reach it). We deliberately do NOT fall through to the destructive
  * create path here — re-creating would orphan the real pod (the 2026-05-15
  * incident). The retry screen offers a non-destructive re-probe, and an
  * explicit confirm-gated "start a new pod" for the rare genuine give-up.
  */
-async function runProbe(stashedReason: ResumeSetupReason | null = null) {
+async function runProbe(stashedCode: CreateDriveErrorCode | null = null) {
   formError.value = null;
+  driveFailure.value = null;
   phase.value = 'probing';
   let probeResult: Awaited<ReturnType<typeof syncStore.attemptResumeFromRegistry>>;
   try {
@@ -426,10 +477,11 @@ async function runProbe(stashedReason: ResumeSetupReason | null = null) {
       return;
     case 'no-registry-entry':
       // Scenario (a) — genuinely new family; fall through to the create flow. Back from a
-      // declined web Drive redirect (#128): say so first, in orange, and offer the retry.
-      if (stashedReason) {
-        declineReason.value = stashedReason;
-        phase.value = 'drive-declined';
+      // failed web Drive redirect (#128): say why first, in orange, with the registry's
+      // recoveries. Nothing is reported here: the producer that stashed the code already did.
+      if (stashedCode) {
+        driveFailure.value = stashedCode;
+        phase.value = storageFallbackPhase();
         return;
       }
       phase.value = 'identity';
@@ -446,20 +498,13 @@ async function runProbe(stashedReason: ResumeSetupReason | null = null) {
       // and it came back without a grant. The pod IS known — the probe only redirects when the
       // registry holds a fileId — so `retry` copy is honest and its button re-runs the probe,
       // now behind a real tap.
-      const abandoned = probeResult.error instanceof OAuthRoundTripAbandonedError;
-      const consentDenied = probeResult.error instanceof DriveConsentDeniedError;
-      if (!abandoned) {
-        reportError({
-          surface: 'resumeSetup.probeDriveAuth',
-          message: `Drive sign-in failed during the registry probe: ${probeResult.error.message}`,
-          error: probeResult.error,
-          severity: consentDenied ? 'warning' : 'error',
-          context: { provider_type: 'google_drive' },
-        });
-      }
-      formError.value = driveAuthMessage(
-        abandoned ? 'cancelled' : consentDenied ? 'consent-denied' : 'failed'
-      );
+      //
+      // ⚠️ THE MESSAGE AND SEVERITY ONLY, NEVER `driveFailure`. The recovery stack ("use a local
+      // file", "use a different Google account") would start a second pod beside the known one;
+      // the `retry` phase's own re-probe is the only action here.
+      const code = classifyCreateDriveFailure(probeResult.error);
+      reportCreateDriveFailure('resumeSetup.probeDriveAuth', code, probeResult.error);
+      formError.value = createDriveFailureMessage(code, t) || null;
       phase.value = 'retry';
       return;
     }
@@ -728,22 +773,6 @@ async function ensureDriveToken(): Promise<boolean> {
 }
 
 /**
- * The one place the create flow's Drive-auth copy is chosen, shared by the probe arm and
- * `finishOnDrive`.
- *
- * ⚠️ THREE OUTCOMES, NOT TWO, AND THE THIRD IS THE ONE THAT WAS WRONG. A consent denial has
- * something specific to tell them ("allow file access"). A CANCELLATION — declined at Google, or
- * the sheet closed — must not say "sign-in failed": that frames the person's own decision as a
- * code error and tells them to retry something that did exactly what they asked. Only a genuine
- * fault gets the failure copy.
- */
-function driveAuthMessage(kind: 'consent-denied' | 'cancelled' | 'failed'): string {
-  if (kind === 'consent-denied') return t('resumeSetup.driveConsentDenied');
-  if (kind === 'cancelled') return t('googleDrive.authCancelled');
-  return t('googleDrive.authFailed');
-}
-
-/**
  * The finalize dispatch that writes the pod, extracted so the PIN step and the storage
  * fallbacks reach it with the SAME safety envelope — a peer of `handleConnectDrive` /
  * `handleConnectLocal`. It re-arms the busy latch + try/catch + finally rather than run
@@ -877,6 +906,8 @@ onErrorCaptured((err) => {
 
 /** Step 2: write the pod file with the now-connected provider, then route to /nook. */
 async function finalizePod(): Promise<boolean> {
+  // The connect that got here succeeded, so no earlier Drive failure is current any more.
+  driveFailure.value = null;
   // ⚠️ NO WRITE BEFORE THE PIN STEP (see `ownerReady`). A storage connect started on the
   // `drive-declined` screen (a local file, or a Drive connect that came back connected in place)
   // reaches here with `pin === ''` and no rebuilt owner. The provider it installed stays live,
@@ -947,7 +978,9 @@ async function finalizePod(): Promise<boolean> {
   // `<name>.corrupt-<ts>` and a retry would write a valid pod under that bad name)
   // — and createNewFile now clears the offline queue on any create failure, so the
   // discarded first-attempt envelope can never flush over the retried pod.
-  if (!result.ok && result.reason === 'write') {
+  // ⚠️ NOT FOR A FULL DRIVE: a fresh token cannot free space, so the retry would only fail the
+  // same way. A nearly full Drive passes the 2-byte stub and fails here, at the real write.
+  if (!result.ok && result.reason === 'write' && !isDriveStorageFull(result.error)) {
     const canRetry = await reconnectForWriteRetry(user.email);
     logEvent({
       level: 'info',
@@ -980,6 +1013,16 @@ async function finalizePod(): Promise<boolean> {
       });
       formError.value = t('resumeSetup.couldNotFindPod');
       phase.value = 'retry';
+      return false;
+    }
+    // A full Drive is the person's to fix, not a write fault: the create registry's `drive-full`
+    // message, recoveries and severity (`warning`), in the orange notice rather than the red box.
+    // `result.error` is the provider's original error, so its `reason` survives to here. The
+    // caller's `finally` lands on `storage`, whose "Try again" re-enters `finishOnDrive` (the
+    // owned stub is re-adopted by the collision path).
+    if (result.reason === 'write' && isDriveStorageFull(result.error)) {
+      reportCreateDriveFailure('resumeSetup.write', 'drive-full', result.error);
+      driveFailure.value = 'drive-full';
       return false;
     }
     // Map each failure reason to its specific, recovery-oriented message
@@ -1130,11 +1173,14 @@ function handleSetupBack() {
   phase.value = 'survey';
 }
 
-async function finishOnDrive() {
+/** @param opts.chooseAccount "Use a different Google account": Google's account chooser forced. */
+async function finishOnDrive(opts: { chooseAccount?: boolean } = {}) {
   formError.value = null;
+  driveFailure.value = null;
   const r = await connectDriveStorage(familyName.value, {
     googleEmail: authStore.currentUser?.email,
     activeFamilyId: createFamilyId.value,
+    chooseAccount: opts.chooseAccount,
   });
   // WEB ONLY: the page is unloading. On native `connectDriveStorage` awaited the round trip and
   // this arm is never taken — the arms below run in place, inside `handleConnectDrive`'s envelope.
@@ -1165,11 +1211,11 @@ async function finishOnDrive() {
           await openExistingOnDrive(action.fileId);
           return;
         case 'declined':
-          formError.value = t('createPod.duplicateFile');
+          driveFailure.value = 'name-collision';
           phase.value = storageFallbackPhase();
           return;
         case 'reject-different-account':
-          formError.value = t('createPod.duplicateFile');
+          driveFailure.value = 'name-collision';
           reportError({
             surface: 'resumeSetup.nameCollision',
             message: r.error,
@@ -1179,8 +1225,9 @@ async function finishOnDrive() {
           phase.value = storageFallbackPhase();
           return;
         case 'failed':
-          // Translated copy only; the raw (English, possibly id-bearing) error goes to the report.
-          formError.value = t('googleDrive.authFailed');
+          // Sign-in had SUCCEEDED here, so never "sign-in failed": the registry's `unknown`
+          // message. The raw (English, possibly id-bearing) error goes to the report.
+          driveFailure.value = 'unknown';
           reportError({
             surface: 'resumeSetup.adoptExisting',
             message: action.error || 'adopt-existing recovery failed during resume',
@@ -1191,30 +1238,12 @@ async function finishOnDrive() {
           return;
       }
     }
-    if (r.errorKind === 'collision-check-unavailable') {
-      formError.value = t('createPod.driveCheckUnavailable');
-      phase.value = storageFallbackPhase();
-      return;
-    }
-    // A consent denial is a user DECISION, so it is classified with the aborts
-    // rather than the faults — and it carries its own guidance, because unlike a
-    // plain cancel there is something specific to tell them to do.
-    const consentDenied = r.errorKind === 'consent-denied';
-    const abandoned = r.errorKind === 'cancelled';
-    const cancelled = consentDenied || r.cancelled || isUserCancellation(r.error);
-    if (cancelled) console.warn('[ResumePodSetup] Drive connect declined:', r.error);
-    else console.error('[ResumePodSetup] Drive connect failed:', r.error);
-    reportError({
-      surface: 'resumeSetup.connectDrive',
-      message: r.error || 'Google Drive connect failed during resume',
-      severity: cancelled ? 'warning' : 'error',
-      context: { provider_type: 'google_drive' },
-    });
-    // Translated copy only (finding 13): never assign the raw Drive message —
-    // it's English-only and a name-collision message leaks an internal fileId.
-    formError.value = driveAuthMessage(
-      consentDenied ? 'consent-denied' : abandoned ? 'cancelled' : 'failed'
-    );
+    // Every other failure, cancel included: one code, one report at the registry's severity (the
+    // same as CreatePodView's for the same code), one registry message. ⚠️ Translated copy only,
+    // never `r.error`: English-only, and a collision message carries an internal fileId.
+    const code = r.errorKind ?? 'unknown';
+    reportCreateDriveFailure('resumeSetup.connectDrive', code, r.cause ?? r.error);
+    driveFailure.value = code;
     phase.value = storageFallbackPhase();
     return;
   }
@@ -1245,7 +1274,8 @@ async function openExistingOnDrive(fileId: string): Promise<void> {
   phase.value = storageFallbackPhase();
 }
 
-async function handleConnectDrive() {
+/** @param opts.chooseAccount "Use a different Google account" (see `finishOnDrive`). */
+async function handleConnectDrive(opts: { chooseAccount?: boolean } = {}) {
   // ⚠️ CLOSE THE LOCAL-FILE WARNING FIRST — ABOVE the busy guard, exactly as `handleConnectLocal`
   // does. This handler is also the modal's own "use Google Drive instead" action and the modal
   // does not self-close, so returning early with it still open leaves a dead button on a modal
@@ -1260,16 +1290,12 @@ async function handleConnectDrive() {
     // #128: Drive connect started. Recorded HERE so the redirect `finishOnDrive` may start is
     // never logged as an abandon at `storage`; the consent outcome is `connectStorage`'s.
     trackOnboardingStep('drive-consent', 'shown');
-    await finishOnDrive();
+    await finishOnDrive(opts);
   } catch (e) {
-    console.error('[ResumePodSetup] unexpected error connecting Drive', e);
-    reportError({
-      surface: 'resumeSetup.connectDrive',
-      message: `Unexpected error connecting Drive during resume: ${e instanceof Error ? e.message : String(e)}`,
-      error: e,
-      severity: 'error',
-    });
-    formError.value = t('googleDrive.authFailed');
+    // An unexpected throw takes the same three lines as a returned failure, classified here.
+    const code = classifyCreateDriveFailure(e);
+    reportCreateDriveFailure('resumeSetup.connectDrive', code, e);
+    driveFailure.value = code;
     phase.value = storageFallbackPhase();
   } finally {
     busy.value = false;
@@ -1298,10 +1324,22 @@ async function handleDriveDeclinedRetry() {
   await handleConnectDrive();
 }
 
-/** The local-file warning's "use Google Drive instead": the declined screen keeps its guard. */
-function handleWarningUseDrive() {
+/**
+ * Google Drive again, from whichever screen asked: the local-file warning's "use Google Drive
+ * instead" and the failure notice's "Try again". The declined screen keeps its guard.
+ */
+function handleRetryDrive() {
   if (phase.value === 'drive-declined') void handleDriveDeclinedRetry();
   else void handleConnectDrive();
+}
+
+/**
+ * The failure notice's "use a different Google account": the same connect with Google's account
+ * chooser forced. From the declined screen it is that screen's answer, as its retry is.
+ */
+function handleChooseDifferentAccount() {
+  if (phase.value === 'drive-declined') trackOnboardingStep('drive-declined', 'submitted');
+  void handleConnectDrive({ chooseAccount: true });
 }
 
 function handleLocalFileClick() {
@@ -1311,6 +1349,9 @@ function handleLocalFileClick() {
 async function handleConnectLocal() {
   showLocalFileWarning.value = false;
   if (busy.value) return;
+  // A new storage attempt: an earlier Drive failure is no longer current (as `finishOnDrive` and
+  // `runProbe` clear it). A local failure below then shows alone, in the red form-error box.
+  driveFailure.value = null;
   // #128: from the `drive-declined` screen no PIN has been chosen yet, so a connected local file
   // goes to the PIN step (`finalizePod`'s guard; the PIN submit writes into the live local
   // provider), and a failure returns to the declined screen rather than to `storage`.
@@ -1325,7 +1366,7 @@ async function handleConnectLocal() {
         // Show an actionable message (use Drive, or Chrome/Edge); no report.
         console.warn('[ResumePodSetup] local file unsupported in this browser:', r.error);
         formError.value = t('setup.localFileUnsupported');
-      } else if (!r.cancelled) {
+      } else if (r.errorKind !== 'cancelled') {
         console.error('[ResumePodSetup] local file selection failed:', r.error);
         reportError({
           surface: 'resumeSetup.selectLocalFile',
@@ -1388,8 +1429,35 @@ async function handleConnectLocal() {
       {{ formError }}
     </div>
 
+    <!-- A Google Drive failure on the two screens it lands on (`storage`, and `drive-declined`
+         before the PIN). A decision or an environment problem, not a hard error, so a Heritage
+         Orange notice (never the red form-error box), then the registry's recoveries for this
+         code on this device in place of the phase's own buttons. The storage step keeps its
+         prompt, so the screen still says what it is for. -->
+    <div v-if="showDriveFailure && driveFailure" class="space-y-4">
+      <p
+        v-if="phase === 'storage'"
+        class="font-outfit dark:text-ink-soft text-center text-sm font-semibold text-gray-700"
+      >
+        {{ t('resumeSetup.storagePrompt') }}
+      </p>
+      <p
+        class="dark:border-accent-lift border-primary-500 dark:bg-surface-overlay dark:text-ink-soft rounded-xl border-l-4 bg-[var(--tint-orange-8)] p-3 text-sm text-gray-700"
+      >
+        {{ driveFailureMessage }}
+      </p>
+      <CreateDriveFailureActions
+        :code="driveFailure"
+        :disabled="busy"
+        :always-offer-local="showDriveFailure"
+        @retry="handleRetryDrive"
+        @choose-account="handleChooseDifferentAccount"
+        @use-local="handleLocalFileClick"
+      />
+    </div>
+
     <!-- Initial probe — short, only visible while the registry lookup runs. -->
-    <div v-if="phase === 'probing'" class="py-6 text-center">
+    <div v-else-if="phase === 'probing'" class="py-6 text-center">
       <BeanieSpinner size="md" class="mx-auto mb-3" />
       <p class="dark:text-ink-soft text-sm text-gray-500">{{ t('resumeSetup.checking') }}</p>
     </div>
@@ -1448,18 +1516,15 @@ async function handleConnectLocal() {
       </button>
     </div>
 
-    <!-- Drive declined (#128): back from a web Drive redirect that said no. A decision,
-         not a fault, so a Heritage Orange notice (never the red form-error box), one
-         primary retry, and the quiet local-file fallback only where it exists. -->
+    <!-- Drive declined (#128) with no current failure code (a later local-file attempt on this
+         screen cleared it, e.g. a dismissed picker): the screen's default notice, one primary
+         retry, and the quiet local-file fallback only where it exists. With a code, the block
+         above renders instead. -->
     <div v-else-if="phase === 'drive-declined'" class="space-y-4">
       <p
         class="dark:border-accent-lift border-primary-500 dark:bg-surface-raised dark:text-ink-soft rounded-xl border-l-4 bg-[var(--tint-orange-8)] p-3 text-sm text-gray-700"
       >
-        {{
-          declineReason === 'drive-consent'
-            ? t('resumeSetup.driveConsentDenied')
-            : t('resumeSetup.driveDeclinedBody')
-        }}
+        {{ t('resumeSetup.driveDeclinedBody') }}
       </p>
       <BaseButton class="w-full" :disabled="busy" :loading="busy" @click="handleDriveDeclinedRetry">
         {{ t('resumeSetup.tryAgainWithGoogle') }}
@@ -1559,7 +1624,7 @@ async function handleConnectLocal() {
         v-if="syncStore.isGoogleDriveAvailable"
         class="w-full"
         :disabled="busy"
-        @click="handleConnectDrive"
+        @click="handleConnectDrive()"
       >
         {{ t('storage.connectGoogleDrive') }}
       </BaseButton>
@@ -1616,7 +1681,7 @@ async function handleConnectLocal() {
       :google-drive-available="syncStore.isGoogleDriveAvailable"
       @close="showLocalFileWarning = false"
       @proceed="handleConnectLocal"
-      @use-google-drive="handleWarningUseDrive"
+      @use-google-drive="handleRetryDrive"
     />
 
     <!-- Setup progress modal — opened from the survey step; syncs the added

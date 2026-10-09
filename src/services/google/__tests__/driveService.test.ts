@@ -325,9 +325,34 @@ describe('driveService', () => {
         )
       );
 
-      await expect(getFileMetadata(mockToken, 'forbidden', 'parents')).rejects.toThrow(
-        DriveFileNotFoundError
+      const err = await getFileMetadata(mockToken, 'forbidden', 'parents').catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(DriveFileNotFoundError);
+      // The refusal keeps Google's reason, so telemetry can still name it.
+      expect((err as DriveFileNotFoundError).reason).toBe('insufficientPermissions');
+    });
+
+    it('🔴 a 403 storageQuotaExceeded (a FULL Drive) is NOT a missing file', async () => {
+      // A full Drive says nothing about the file. As a `DriveFileNotFoundError`
+      // it flipped photos to "missing" and read as "no permission" to the pod.
+      globalThis.fetch = vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            error: {
+              message: "The user's Drive storage quota has been exceeded.",
+              errors: [{ reason: 'storageQuotaExceeded' }],
+            },
+          }),
+          { status: 403, headers: { 'Content-Type': 'application/json' } }
+        )
       );
+
+      const err = await createFile(mockToken, 'folder-1', 'family.beanpod', '{}').catch(
+        (e: unknown) => e
+      );
+      expect(err).toBeInstanceOf(DriveApiError);
+      expect(err).not.toBeInstanceOf(DriveFileNotFoundError);
+      expect((err as DriveApiError).status).toBe(403);
+      expect((err as DriveApiError).reason).toBe('storageQuotaExceeded');
     });
 
     it.each(['rateLimitExceeded', 'userRateLimitExceeded', 'quotaExceeded', 'dailyLimitExceeded'])(
@@ -352,6 +377,7 @@ describe('driveService', () => {
         expect(err).toBeInstanceOf(DriveApiError);
         expect(err).not.toBeInstanceOf(DriveFileNotFoundError);
         expect((err as DriveApiError).status).toBe(403);
+        expect((err as DriveApiError).reason).toBe(reason);
       }
     );
 

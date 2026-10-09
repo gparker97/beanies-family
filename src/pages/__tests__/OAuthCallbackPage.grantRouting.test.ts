@@ -179,39 +179,48 @@ describe('OAuthCallbackPage — create-flow Drive consent (#128)', () => {
     expect(hrefTarget).toBe('/welcome?resume=setup');
   });
 
-  it('a create decline stashes `drive-declined`, emits `back` access_denied, and returns', () => {
+  it('a create decline stashes `cancelled`, emits `back` with the same code, and returns', () => {
     stubLocation(`?error=access_denied&state=${encodeURIComponent(createState())}`);
     mount(OAuthCallbackPage);
 
-    expect(sessionStorage.getItem(RESUME_REASON_KEY)).toBe('drive-declined');
+    expect(sessionStorage.getItem(RESUME_REASON_KEY)).toBe('cancelled');
     expect(mockTrackOnboardingStep).toHaveBeenCalledTimes(1);
     expect(mockTrackOnboardingStep).toHaveBeenCalledWith('drive-consent', 'back', {
-      error_code: 'access_denied',
+      error_code: 'cancelled',
     });
     expect(hrefTarget).toBe('/welcome?resume=setup');
   });
 
-  it('any other `error=` value is collapsed to the closed `oauth-error` code, never echoed', () => {
+  it('any other `error=` value is classified into the closed code set, never echoed', () => {
     stubLocation(`?error=%3Cscript%3Ecrafted&state=${encodeURIComponent(createState())}`);
     mount(OAuthCallbackPage);
 
     expect(mockTrackOnboardingStep).toHaveBeenCalledWith('drive-consent', 'back', {
-      error_code: 'oauth-error',
+      error_code: 'unknown',
     });
-    // Not a decline, so no "Google needs a yes" screen on return.
-    expect(sessionStorage.getItem(RESUME_REASON_KEY)).toBeNull();
+    // Never a silent PIN step: the resume screen shows the `unknown` message and recoveries.
+    expect(sessionStorage.getItem(RESUME_REASON_KEY)).toBe('unknown');
   });
 
-  it('an access_denied WITH a description (a policy block) is not a decline: no reason, oauth-error', () => {
+  it('an access_denied WITH a description stashes `access-denied`: neither a Cancel nor a proven block', () => {
     stubLocation(
       `?error=access_denied&error_description=${encodeURIComponent('Access blocked by your admin')}&state=${encodeURIComponent(createState())}`
     );
     mount(OAuthCallbackPage);
 
-    expect(sessionStorage.getItem(RESUME_REASON_KEY)).toBeNull();
+    // The #128 fixture is a localized plain decline that carries a description.
+    expect(sessionStorage.getItem(RESUME_REASON_KEY)).toBe('access-denied');
     expect(mockTrackOnboardingStep).toHaveBeenCalledWith('drive-consent', 'back', {
-      error_code: 'oauth-error',
+      error_code: 'access-denied',
     });
+    expect(hrefTarget).toBe('/welcome?resume=setup');
+  });
+
+  it('an admin_policy_enforced error on the create grant stashes `app-blocked`', () => {
+    stubLocation(`?error=admin_policy_enforced&state=${encodeURIComponent(createState())}`);
+    mount(OAuthCallbackPage);
+
+    expect(sessionStorage.getItem(RESUME_REASON_KEY)).toBe('app-blocked');
     expect(hrefTarget).toBe('/welcome?resume=setup');
   });
 

@@ -6,14 +6,22 @@ import BaseModal from '@/components/ui/BaseModal.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import CloudProviderBadge from '@/components/ui/CloudProviderBadge.vue';
 import LocalFileSyncWarning from '@/components/login/LocalFileSyncWarning.vue';
+import CreateDriveFailureActions from '@/components/login/CreateDriveFailureActions.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useAuthStore } from '@/stores/authStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useSyncStore } from '@/stores/syncStore';
-import { connectDriveStorage, connectLocalStorage } from '@/services/sync/connectStorage';
+import {
+  connectDriveStorage,
+  connectLocalStorage,
+  reportCreateDriveFailure,
+} from '@/services/sync/connectStorage';
+import {
+  createDriveFailureMessage,
+  type CreateDriveErrorCode,
+} from '@/services/sync/createDriveErrors';
 import { resolveDriveCollision } from '@/composables/useDriveCollisionRecovery';
 import { canUseLocalFiles } from '@/services/sync/capabilities';
-import { isUserCancellation } from '@/services/google/googleAuth';
 import { reportError } from '@/utils/errorReporter';
 import { deriveFamilyName } from '@/utils/familyName';
 import { trackOnboardingStep, trackStorageChoice } from '@/services/telemetry/onboardingAttempt';
@@ -66,7 +74,13 @@ const storageSaved = ref(false);
 const isSavingStorage = ref(false);
 const storageType = ref<'local' | 'google_drive' | null>(null);
 const showDriveResultModal = ref(false);
-const driveResultError = ref<string | null>(null);
+/**
+ * Why the last Drive attempt failed, as a `CREATE_DRIVE_ERRORS` code; null = no failure (the
+ * result modal then shows its success state). Cleared at the start of every attempt, so a code
+ * never outlives the attempt that set it. The modal's message comes from the registry.
+ */
+const driveFailure = ref<CreateDriveErrorCode | null>(null);
+const driveFailureMessage = computed(() => createDriveFailureMessage(driveFailure.value, t));
 const showLocalFileWarning = ref(false);
 
 /** Visual state of the Google Drive hero card in Step 2. */
@@ -233,6 +247,7 @@ async function handleChooseLocalStorage() {
   if (isSavingStorage.value) return;
   isSavingStorage.value = true;
   formError.value = null;
+  driveFailure.value = null;
 
   try {
     // Only selects the file + installs the provider — createNewFile() (on
@@ -247,7 +262,7 @@ async function handleChooseLocalStorage() {
       // to Chrome/Edge). Not a Slack-worthy error — it's a known browser gap.
       formError.value = t('setup.localFileUnsupported');
       console.warn('[CreatePodView] local file unsupported in this browser:', r.error);
-    } else if (r.cancelled) {
+    } else if (r.errorKind === 'cancelled') {
       // Normal abort (user dismissed the OS picker) — re-prompt, no report.
       formError.value = t('setup.fileCreateFailed');
     } else {
@@ -265,7 +280,11 @@ async function handleChooseLocalStorage() {
   }
 }
 
-async function handleChooseGoogleDriveStorage() {
+/**
+ * Connect Google Drive. `chooseAccount` is the failure modal's "use a different Google account":
+ * the same connect with Google's account chooser forced (`connectDriveStorage` owns how).
+ */
+async function handleChooseGoogleDriveStorage(opts: { chooseAccount?: boolean } = {}) {
   if (!syncStore.isGoogleDriveAvailable) {
     // Defense-in-depth: the card is hidden in this state. If this fires,
     // log so a dev can spot the regression.
@@ -279,7 +298,7 @@ async function handleChooseGoogleDriveStorage() {
 
   isSavingStorage.value = true;
   formError.value = null;
-  driveResultError.value = null;
+  driveFailure.value = null;
   // Drive connect started: the card tap, the warning modal's "use Drive", or the retry.
   trackOnboardingStep('drive-consent', 'shown');
 
@@ -293,6 +312,7 @@ async function handleChooseGoogleDriveStorage() {
     const r = await connectDriveStorage(familyName.value || 'my-family', {
       googleEmail: email.value || undefined,
       activeFamilyId: familyContextStore.activeFamilyId,
+      chooseAccount: opts.chooseAccount,
     });
     // ⚠️ WEB ONLY. On a web redirect surface this means the page is unloading and the work
     // resumes at `RESUME_SETUP_PATH` on the fresh load. On native `connectDriveStorage` AWAITS
@@ -329,7 +349,7 @@ async function handleChooseGoogleDriveStorage() {
           break;
         case 'reject-different-account':
         case 'declined':
-          driveResultError.value = t('createPod.duplicateFile');
+          driveFailure.value = 'name-collision';
           if (action.kind === 'reject-different-account') {
             console.error('[CreatePodView] Drive name collision (different account):', r.error);
             reportError({
@@ -342,8 +362,9 @@ async function handleChooseGoogleDriveStorage() {
           showDriveResultModal.value = true;
           break;
         case 'failed':
-          // Translated copy only; the raw (English, possibly id-bearing) error goes to the report.
-          driveResultError.value = t('googleDrive.authFailed');
+          // Sign-in had SUCCEEDED here, so never "sign-in failed": the registry's `unknown`
+          // message. The raw (English, possibly id-bearing) error goes to the report.
+          driveFailure.value = 'unknown';
           console.error('[CreatePodView] adopt-existing recovery failed:', action.error);
           reportError({
             surface: 'createPod.adoptExisting',
@@ -354,62 +375,14 @@ async function handleChooseGoogleDriveStorage() {
           showDriveResultModal.value = true;
           break;
       }
-    } else if (r.errorKind === 'consent-denied') {
-      // A DECISION, not a fault: the user left Google's file-access box unticked.
-      // Report at `warning` so it never pages Slack — matching `App.vue`'s
-      // redirect-auth path, which has classified this identically since
-      // 2026-06-19. This site used to fall through to `critical` below, because
-      // `isUserCancellation` looks for the word "cancel" and Google's message
-      // does not contain it.
-      driveResultError.value = t('createPod.driveConsentDenied');
-      console.warn('[CreatePodView] Drive file access not granted:', r.error);
-      reportError({
-        surface: 'createPod.connectDrive',
-        message: r.error || 'Google Drive file access was not granted',
-        severity: 'warning',
-        context: { provider_type: 'google_drive' },
-      });
-      showDriveResultModal.value = true; // Try again / Use a local file
-    } else if (r.errorKind === 'cancelled') {
-      // ⚠️ TRANSLATED KEY, NEVER `r.error`. The person declined at Google or closed the sign-in
-      // sheet; `r.error` there is `OAuthRoundTripAbandonedError`'s English-only message, which
-      // the generic arm below would paint verbatim into a Chinese UI. Reported at `warning`
-      // because it is a decision, not a fault.
-      driveResultError.value = t('googleDrive.authCancelled');
-      console.warn('[CreatePodView] Drive sign-in cancelled:', r.error);
-      reportError({
-        surface: 'createPod.connectDrive',
-        message: r.error || 'Google sign-in was cancelled',
-        severity: 'warning',
-        context: { provider_type: 'google_drive' },
-      });
-      showDriveResultModal.value = true; // Try again / Use a local file
-    } else if (r.errorKind === 'collision-check-unavailable') {
-      // Couldn't verify the user's Drive for existing files — we refused to
-      // create blindly (avoids a second orphan). Retryable.
-      driveResultError.value = t('createPod.driveCheckUnavailable');
-      console.warn('[CreatePodView] Drive collision check unavailable:', r.error);
-      showDriveResultModal.value = true;
     } else {
-      // ⚠️ TRANSLATED KEY, NEVER `r.error`, as in `ResumePodSetup`'s sibling arm
-      // (`driveAuthMessage`): `r.error` is English-only and may be Google-supplied text. The raw
-      // error rides the report's `message`; a classified kind that reaches here, its `error_code`.
-      driveResultError.value = t('googleDrive.authFailed');
-      // A genuine cancellation (closed the chooser) is benign; anything else
-      // — a 400, a timeout, a scope denial — is a real onboarding failure.
-      const cancelled = r.cancelled || isUserCancellation(r.error);
-      if (cancelled) console.warn('[CreatePodView] Drive connect cancelled:', r.error);
-      else console.error('[CreatePodView] Drive connect failed:', r.error);
-      reportError({
-        surface: 'createPod.connectDrive',
-        message: r.error || 'Google Drive connect failed',
-        severity: cancelled ? 'warning' : 'critical',
-        context: {
-          provider_type: 'google_drive',
-          ...(r.errorKind ? { error_code: r.errorKind } : {}),
-        },
-      });
-      showDriveResultModal.value = true; // failure state — Try again / Use a local file
+      // Every other failure, cancel included: one code, one report at the registry's severity,
+      // one registry message. ⚠️ TRANSLATED COPY ONLY, NEVER `r.error`: it is English-only and
+      // may be Google-supplied text; the raw failure (`cause`) rides the report.
+      const code = r.errorKind ?? 'unknown';
+      reportCreateDriveFailure('createPod.connectDrive', code, r.cause ?? r.error);
+      driveFailure.value = code;
+      showDriveResultModal.value = true; // failure state: the registry's recoveries
     }
     // Every arm that opened the result modal, success AND failure, leaves the person back on the
     // storage screen (behind the modal). Record that once, so the attempt's step leaves
@@ -423,7 +396,11 @@ async function handleChooseGoogleDriveStorage() {
   }
 }
 
-/** Drive-result-modal actions (success: Continue; failure: Try again / Use a local file). */
+/**
+ * Drive-result-modal actions. Success: Continue. Failure: the registry's recoveries, rendered by
+ * `CreateDriveFailureActions` (Try again / a different Google account / a local file; the app and
+ * the help link it opens itself).
+ */
 function handleDriveModalContinue() {
   showDriveResultModal.value = false;
   handleStorageConnected();
@@ -431,6 +408,10 @@ function handleDriveModalContinue() {
 function handleDriveModalRetry() {
   showDriveResultModal.value = false;
   void handleChooseGoogleDriveStorage();
+}
+function handleDriveModalChooseAccount() {
+  showDriveResultModal.value = false;
+  void handleChooseGoogleDriveStorage({ chooseAccount: true });
 }
 function handleDriveModalUseLocal() {
   showDriveResultModal.value = false;
@@ -956,7 +937,7 @@ function handleBack() {
     <!-- Google Drive result modal (success or failure) -->
     <BaseModal :open="showDriveResultModal" @close="showDriveResultModal = false">
       <!-- Success -->
-      <template v-if="!driveResultError">
+      <template v-if="!driveFailure">
         <div class="text-center">
           <div
             class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30"
@@ -1029,11 +1010,13 @@ function handleBack() {
       <!-- Failure -->
       <template v-else>
         <div class="text-center">
+          <!-- Heritage Orange, never Alert Red: this heads a cancel, a full Drive or a blocked
+               pop-up, none of them destructive. -->
           <div
-            class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30"
+            class="dark:bg-surface-overlay mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-[var(--tint-orange-8)]"
           >
             <svg
-              class="dark:text-danger-lift h-6 w-6 text-red-600"
+              class="text-primary-500 dark:text-accent-lift h-6 w-6"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -1046,23 +1029,24 @@ function handleBack() {
               />
             </svg>
           </div>
+          <!-- One neutral title for every failure, cancel included; the body says which. -->
           <h3 class="font-outfit dark:text-ink text-lg font-bold text-gray-900">
-            {{ t('googleDrive.authFailed') }}
+            {{ t('createPod.driveError.title') }}
           </h3>
           <p class="dark:text-ink-soft mt-2 text-sm text-gray-500">
-            {{ driveResultError }}
+            {{ driveFailureMessage }}
           </p>
         </div>
 
-        <!-- The diagnostic is already on its way to #beanies-errors via
-             reportError. Give the user two concrete ways forward — never
+        <!-- The registry's recoveries for this code on this device, plus the help link. Never
              leave them stuck (the × dismisses back to the picker). -->
-        <BaseButton class="mt-4 w-full" @click="handleDriveModalRetry">
-          {{ t('action.tryAgain') }}
-        </BaseButton>
-        <BaseButton variant="outline" class="mt-2 w-full" @click="handleDriveModalUseLocal">
-          {{ t('storage.useLocalInstead') }}
-        </BaseButton>
+        <CreateDriveFailureActions
+          class="mt-4"
+          :code="driveFailure"
+          @retry="handleDriveModalRetry"
+          @choose-account="handleDriveModalChooseAccount"
+          @use-local="handleDriveModalUseLocal"
+        />
       </template>
     </BaseModal>
   </div>

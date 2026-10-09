@@ -16,9 +16,14 @@
  * `LoginPage` (matches `RESUME_LOAD_DRIVE` to re-open the picker on return).
  */
 
-// `@/types/sync` imports only `@/constants/appVersion`, so this module stays dependency-light —
-// the property its docblock above promises.
-import { DriveConsentDeniedError } from '@/types/sync';
+// `createDriveErrors` is leaf-only by contract (it imports no auth, Drive service, capability or
+// reporter module), so this module stays dependency-light, the property its docblock above
+// promises.
+import {
+  classifyCreateDriveFailure,
+  isCreateDriveErrorCode,
+  type CreateDriveErrorCode,
+} from '@/services/sync/createDriveErrors';
 
 /** `route.query.resume` value that re-opens the Google Drive file picker. */
 export const RESUME_LOAD_DRIVE = 'load-drive';
@@ -71,38 +76,27 @@ export function isPodlessRecoveryQuery(resume: unknown): boolean {
 }
 
 /**
- * Why the resume-setup screen was reached, surfaced as an actionable hint
- * (2026-06-19, finding 3). Set just before App.vue routes a podless session to
- * resume-setup; read+cleared once by the screen on mount.
+ * Why a create-flow web Drive redirect came back without a grant, carried across the reload to
+ * the resume-setup screen (#128). The value is the create registry's own code
+ * (`CreateDriveErrorCode`), ONE vocabulary with the rest of the create flow: `ResumePodSetup` shows
+ * its registry message in the orange notice with its recoveries, under "Google needs a yes from
+ * you" only for the two decision codes (`cancelled`, `consent-denied`). (The old
+ * `drive-declined` / `drive-consent` reasons were those two codes under other names.)
  *
- * - `drive-consent` — the granular consent screen came back WITHOUT `drive.file`
- *   (the user unchecked file access). Without this, the user was silently routed
- *   with no explanation and retried blindly.
- * - `drive-declined` — the person pressed Cancel/Back on Google's consent screen
- *   (or Google returned another `error=`) during the create flow's WEB redirect.
- *   Set by `OAuthCallbackPage`'s create-decline arm (#128).
+ * Two producers write it, with no branches of their own: `OAuthCallbackPage` for every error on
+ * the create Drive grant, and App.vue's boot catch through `stashResumeReasonFor`. Read and
+ * cleared once by the screen on mount.
  *
- * Both route `ResumePodSetup` to its `drive-declined` phase (an orange notice and
- * one "Try again with Google" button), never to the red form-error box.
- *
- * sessionStorage-backed (survives the full-page OAuth redirect) rather than a
- * URL param, so it doesn't have to thread through the shared `RESUME_SETUP_PATH`
- * redirect. Best-effort: a storage failure just means no hint is shown.
+ * sessionStorage-backed (survives the full-page OAuth redirect) rather than a URL param, so it
+ * doesn't have to thread through the shared `RESUME_SETUP_PATH` redirect. Best-effort: a storage
+ * failure just means no hint is shown, and so does a value that is not a registry code (a legacy
+ * `drive-declined` / `drive-consent` left in a tab mid-redirect across a deploy is dropped).
  */
-export type ResumeSetupReason = 'drive-consent' | 'drive-declined';
-const RESUME_REASONS: ReadonlySet<string> = new Set<ResumeSetupReason>([
-  'drive-consent',
-  'drive-declined',
-]);
 const RESUME_REASON_KEY = 'beanies:resume-reason';
 
-function isResumeSetupReason(v: string | null): v is ResumeSetupReason {
-  return v !== null && RESUME_REASONS.has(v);
-}
-
-export function setResumeReason(reason: ResumeSetupReason): void {
+export function setResumeReason(code: CreateDriveErrorCode): void {
   try {
-    sessionStorage.setItem(RESUME_REASON_KEY, reason);
+    sessionStorage.setItem(RESUME_REASON_KEY, code);
   } catch (e) {
     // sessionStorage unavailable (private mode / disabled) — the hint is
     // best-effort; the recovery screen still works without it.
@@ -111,29 +105,30 @@ export function setResumeReason(reason: ResumeSetupReason): void {
 }
 
 /**
- * Stash the consent-denial hint IFF this redirect-auth failure was the user unticking file
- * access. Returns whether a reason was stashed, so the caller can set its own severity/context
- * without a second `instanceof`.
+ * Classify a failed redirect-auth completion and, ONLY on the create flow's return path
+ * (`?resume=setup`), stash the code for the resume screen. Always returns the code, so the caller
+ * takes its severity from `CREATE_DRIVE_ERRORS[code]` with no create-specific branch.
  *
  * ⚠️ WEB ONLY. The reload that follows is what needs a stash: the error itself does not survive
  * a page unload, so the hint has to. On NATIVE the awaiting seam receives the error in place and
  * classifies it there — `googleAuth`'s native completion no longer writes here at all, which is
  * what stopped a declined Drive LOAD leaving "allow file access" for the next create screen.
  *
- * Known gap, recorded in STATUS: the web boot catch calls this for every Drive grant, not only
- * the create one.
+ * ⚠️ THE PATH CHECK IS THE POINT. App.vue's boot catch runs for EVERY Drive grant (reconnect,
+ * load, create); stashing for all of them left a reconnect's failure waiting on the next create
+ * screen.
  */
-export function stashResumeReasonFor(e: unknown): boolean {
-  if (!(e instanceof DriveConsentDeniedError)) return false;
-  setResumeReason('drive-consent');
-  return true;
+export function stashResumeReasonFor(e: unknown): CreateDriveErrorCode {
+  const code = classifyCreateDriveFailure(e);
+  if (isResumeSetupSearch(window.location.search)) setResumeReason(code);
+  return code;
 }
 
-export function consumeResumeReason(): ResumeSetupReason | null {
+export function consumeResumeReason(): CreateDriveErrorCode | null {
   try {
     const v = sessionStorage.getItem(RESUME_REASON_KEY);
     if (v) sessionStorage.removeItem(RESUME_REASON_KEY);
-    return isResumeSetupReason(v) ? v : null;
+    return isCreateDriveErrorCode(v) ? v : null;
   } catch (e) {
     console.warn('[resumePaths] sessionStorage read failed; no resume reason', e);
     return null;
