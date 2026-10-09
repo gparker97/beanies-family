@@ -46,6 +46,19 @@ vi.mock('@/stores/authStore', () => ({
   useAuthStore: () => ({ currentUser: { memberId: 'm1' } }),
 }));
 
+const sleepState = {
+  enabled: true,
+  screen: 'night',
+  startTime: '21:00',
+  endTime: '07:00',
+  idleMinutes: 10,
+};
+const setWallSleepMock = vi.fn().mockResolvedValue(undefined);
+vi.mock('@/stores/settingsStore', () => ({
+  useSettingsStore: () => ({ wallSleep: sleepState, setWallSleep: setWallSleepMock }),
+}));
+vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: vi.fn() }));
+
 import WallSetupCard from '../WallSetupCard.vue';
 
 const stubs = {
@@ -53,6 +66,15 @@ const stubs = {
   BaseButton: { template: '<button><slot /></button>' },
   BeanieFormModal: { template: '<div><slot /></div>' },
   PinSettings: true,
+  SettingToggleRow: {
+    props: ['modelValue'],
+    emits: ['update:modelValue'],
+    template:
+      '<button data-test="sleep-toggle" @click="$emit(\'update:modelValue\', !modelValue)" />',
+  },
+  BeanieTimeInput: { template: '<input data-test="sleep-time" />' },
+  TogglePillGroup: { template: '<div data-test="sleep-idle" />' },
+  FormFieldGroup: { template: '<div><slot /></div>' },
 };
 
 const render = () => mount(WallSetupCard, { global: { stubs } });
@@ -129,5 +151,23 @@ describe('the card does not take a wake lock just to ask about one', () => {
     // The support predicate lives in `capabilities.ts` precisely to avoid this.
     expect(src).not.toContain('useWakeLock');
     expect(src).toContain('isWakeLockSupported');
+  });
+});
+
+describe('night mode on its own', () => {
+  it('shows the hours and the wait while it is on, and saves a toggle through the store', async () => {
+    sleepState.enabled = true;
+    const wrapper = render();
+    expect(wrapper.findAll('[data-test="sleep-time"]')).toHaveLength(2);
+    expect(wrapper.find('[data-test="sleep-idle"]').exists()).toBe(true);
+    await wrapper.get('[data-test="sleep-toggle"]').trigger('click');
+    expect(setWallSleepMock).toHaveBeenCalledWith({ enabled: false });
+  });
+
+  it('hides the hours while it is off', () => {
+    sleepState.enabled = false;
+    const wrapper = render();
+    expect(wrapper.find('[data-test="sleep-time"]').exists()).toBe(false);
+    sleepState.enabled = true;
   });
 });

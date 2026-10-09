@@ -13,13 +13,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 ### Added
 
 - To-dos can now repeat: one rolling to-do that moves to its next date, with a Reminders section on phones and a Family Reminders panel on desktop.
+- The beanie wall now dims to its night clock on its own during night hours (9 PM to 7 AM by default) once nobody has touched it for 10 minutes, and wakes again in the morning. The hours and the wait are in Settings, under Beanie Wall, for each device.
 - Who Owns What cards can now carry a reminder that follows whoever holds the card, becomes a repeating to-do and shows in the daily briefing.
 
 ### Changed
 
 - The to-do drawer's Mark Completed button is now a checkbox beside the title.
 - The beanie wall's to-do drawer now sets late to-dos apart from today's, with small animated icons, a "3 days late" label on late rows and the due time on today's.
-- The beanie wall's "things on today" line and trip countdown are now handwritten.
+- The beanie wall's "things on today" line, trip countdown and the night screen's look at tomorrow are now handwritten.
 
 ### Fixed
 

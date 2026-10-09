@@ -7908,6 +7908,21 @@ const STRING_DEFS = {
     en: 'How to set your device up for the wall',
     beanie: 'how to set your device up for the wall',
   },
+  'wall.sleep.auto': { en: 'Night Mode on Its Own', beanie: 'night mode on its own' },
+  'wall.sleep.autoHint': {
+    en: 'During night hours, the wall dims to its night clock once nobody has touched it for a while, and wakes again when night hours end.',
+    beanie:
+      'during night hours, the wall dims to its night clock once nobody has touched it for a while, and wakes again when night hours end.',
+  },
+  'wall.sleep.starts': { en: 'Night Starts', beanie: 'night starts' },
+  'wall.sleep.ends': { en: 'Night Ends', beanie: 'night ends' },
+  'wall.sleep.idle': { en: 'After Nobody Touches It For', beanie: 'after nobody touches it for' },
+  'wall.sleep.idle.minutes': { en: '{n} minutes', beanie: '{n} minutes' },
+  'wall.sleep.idle.hour': { en: '1 hour', beanie: '1 hour' },
+  'wall.sleep.deviceOnly': {
+    en: 'These wall settings apply to this device only.',
+    beanie: 'these wall settings apply to this device only.',
+  },
   'wall.setup.start': { en: 'Start the wall', beanie: 'start the wall' },
   'wall.setup.setPinAndStart': { en: 'Set a PIN and start', beanie: 'set a pin and start' },
   'wall.setup.needsPin.title': { en: 'Set a PIN first', beanie: 'set a PIN first' },

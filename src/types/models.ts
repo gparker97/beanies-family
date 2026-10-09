@@ -44,6 +44,28 @@ export interface UserFamilyMapping {
 }
 
 // GlobalSettings - Device-level settings (stored in registry DB, not per-family)
+/**
+ * What the beanie wall shows when it goes to sleep. Only the night clock today; a photo
+ * slideshow is the planned second screen, which is why this is a union of one.
+ */
+export type WallSleepScreen = 'night';
+
+/** When and how the beanie wall puts itself to sleep. Times are local "HH:mm". */
+export interface WallSleepSettings {
+  enabled: boolean;
+  screen: WallSleepScreen;
+  /** Night starts. May be later than `endTime`: 21:00 to 07:00 runs past midnight. */
+  startTime: string;
+  endTime: string;
+  /** Minutes with nobody touching the wall before it sleeps. */
+  idleMinutes: number;
+}
+
+/** Beanie-wall-only preferences for this device (the wall is a device, not the family). */
+export interface WallDeviceSettings {
+  sleep?: WallSleepSettings;
+}
+
 export interface GlobalSettings {
   id: 'global_settings';
   theme: 'light' | 'dark' | 'system';
@@ -76,6 +98,8 @@ export interface GlobalSettings {
   /** Phase 4 recovery-kit nag dismissal (device-level). */
   kitPromptDismissedAt?: string;
   country?: CountryCode; // device mirror of Settings.country (dual-persisted, like language) — drives public-holiday display
+  /** Beanie wall preferences; per device, never family-synced. Absent ⟹ defaults (see wallSleep.ts). */
+  wall?: WallDeviceSettings;
 }
 
 // PasskeyRegistration - Stored in registry DB (survives sign-out)

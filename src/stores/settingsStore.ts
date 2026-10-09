@@ -32,6 +32,7 @@ import type {
   SupportedTravelType,
   ReminderMinutes,
   HelpfulHintType,
+  WallSleepSettings,
 } from '@/types/models';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import {
@@ -41,6 +42,7 @@ import {
   toActivityLeadOption,
 } from '@/utils/reminderSchedule';
 import { HINT_LEAD_DAYS } from '@/utils/helpfulHints';
+import { resolveWallSleep } from '@/utils/wallSleep';
 
 export const useSettingsStore = defineStore('settings', () => {
   // State
@@ -115,6 +117,8 @@ export const useSettingsStore = defineStore('settings', () => {
   const beanieLabEnabled = computed(() => globalSettings.value.beanieLabEnabled ?? false);
   // ── OS reminder prefs (#55) — device-scoped, never family-synced (GlobalSettings). ──
   const remindersEnabled = computed(() => globalSettings.value.remindersEnabled ?? true);
+  /** When the beanie wall sleeps on this device; always complete (see `resolveWallSleep`). */
+  const wallSleep = computed(() => resolveWallSleep(globalSettings.value.wall?.sleep));
   const todoReminderLead = computed(
     () => globalSettings.value.todoReminderLead ?? DEFAULT_TODO_LEAD
   );
@@ -750,6 +754,12 @@ export const useSettingsStore = defineStore('settings', () => {
     persistGlobalSetting('settings.beanieLab.title', 'beanieLabEnabled', enabled);
 
   // ── OS reminder prefs (#55) actions — device-scoped via persistGlobalSetting. ──
+  /** Change some of the beanie wall's sleep settings; the rest keep their current values. */
+  const setWallSleep = (patch: Partial<WallSleepSettings>) =>
+    persistGlobalSetting('wall.setup.title', 'wall', {
+      ...globalSettings.value.wall,
+      sleep: { ...wallSleep.value, ...patch },
+    });
   const setRemindersEnabled = (enabled: boolean) =>
     persistGlobalSetting('reminders.title', 'remindersEnabled', enabled);
   const setTodoReminderLead = (minutes: number) =>
@@ -1228,6 +1238,7 @@ export const useSettingsStore = defineStore('settings', () => {
     soundEnabled,
     beanieLabEnabled,
     remindersEnabled,
+    wallSleep,
     todoReminderLead,
     activityReminderLead,
     activityReminderBackfilledAt,
@@ -1281,6 +1292,7 @@ export const useSettingsStore = defineStore('settings', () => {
     setSoundEnabled,
     setBeanieLabEnabled,
     setRemindersEnabled,
+    setWallSleep,
     setTodoReminderLead,
     setActivityReminderLead,
     setActivityReminderBackfilledAt,

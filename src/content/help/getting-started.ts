@@ -782,7 +782,7 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
       'Turn a spare tablet into the family wall display, and set the two device settings that keep it awake and keep small hands inside the app.',
     icon: '\u{1F9F1}',
     readTime: 6,
-    updatedDate: '2026-09-16',
+    updatedDate: '2026-10-09',
     sections: [
       {
         type: 'paragraph',
@@ -1012,7 +1012,7 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'Night mode is something you start yourself from that menu when you want it. There is no schedule to configure.',
+          'Night mode also starts on its own. Between 9 PM and 7 AM, once nobody has touched the wall for 10 minutes, it dims to its night clock, and it wakes again at 7 AM. A touch wakes it any time. To change the hours or the wait, or to turn this off, go to <strong>Settings</strong> → <strong>Beanie Wall</strong>. These settings belong to each device, so a kitchen tablet and a hallway screen can keep different hours.',
       },
       {
         type: 'heading',

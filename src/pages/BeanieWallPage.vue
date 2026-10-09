@@ -34,6 +34,8 @@ import { WALL_LOCK } from '@/components/wall/wallLockKey';
 import { WALL_EDIT } from '@/components/wall/wallEditKey';
 import { WALL_BURST } from '@/components/wall/wallBurstKey';
 import { useMediaQuery } from '@/composables/useMediaQuery';
+import { useWallAutoSleep } from '@/composables/useWallAutoSleep';
+import { useSettingsStore } from '@/stores/settingsStore';
 import { useWallRoomGate } from '@/composables/useWallRoomGate';
 import { wallChromeFor, wallTierFor } from '@/components/wall/wallRoom';
 import { useToday } from '@/composables/useToday';
@@ -68,6 +70,7 @@ const { t } = useTranslation();
 const { showToast } = useToast();
 const activityStore = useActivityStore();
 const familyStore = useFamilyStore();
+const settingsStore = useSettingsStore();
 
 const activeView = ref<WallViewId>(DEFAULT_WALL_VIEW);
 /** Where "back" from the jobs board returns to — never the jobs board itself. */
@@ -624,15 +627,16 @@ function onGoBack() {
 }
 
 /**
- * Into night mode, from either door.
+ * Into night mode, from any door: the face button, the lock menu, or on its own at night
+ * (`useWallAutoSleep`).
  *
- * ONE function for both because the two call sites were the same assignment written twice, and
- * because `source` is the only thing that answers the question this change was made to ask: the
- * face button exists because the lock menu hid night mode two taps deep, and "did anyone find
- * it" is unanswerable without it. Emitted on the SUCCESS path, so the rate is measurable rather
- * than just the absence of complaints.
+ * ONE function for all of them because the call sites were the same assignment written twice,
+ * and because `source` is the only thing that answers the question this change was made to ask:
+ * the face button exists because the lock menu hid night mode two taps deep, and "did anyone
+ * find it" is unanswerable without it. Emitted on the SUCCESS path, so the rate is measurable
+ * rather than just the absence of complaints.
  */
-function enterNight(source: 'face' | 'lock-menu') {
+function enterNight(source: 'face' | 'lock-menu' | 'auto') {
   logEvent({
     level: 'info',
     surface: SURFACE,
@@ -645,18 +649,34 @@ function enterNight(source: 'face' | 'lock-menu') {
 /**
  * Waking from the night screen returns the wall to everyone.
  *
- * ⚠️ Night mode is MANUAL — entered only from the lock menu or the face button, and nothing
- * schedules it. So this clears the filter when someone has actually put the wall to
- * bed; it is not a nightly reset, and must not be described as one.
- *
- * Deliberately NOT a timer: a parent standing at the wall reading one child's day must not have
- * it change under them. What keeps a half-filtered wall honest the rest of the time is that
- * every focused bean is a LIT chip — see `WallFooter`.
+ * Night mode starts by hand, or on its own during the device's night hours once nobody has
+ * touched the wall for a while (Settings → Beanie Wall). Either way the wall was left alone
+ * before it slept, so clearing the filter here never changes a view under someone reading it.
+ * What keeps a half-filtered wall honest the rest of the time is that every focused bean is a
+ * LIT chip — see `WallFooter`.
  */
 function onWake() {
   nightNow.value = false;
   clearFocus();
 }
+
+/** Night hours ended: wake a wall that went to sleep during them, without a touch. */
+function onMorningWake() {
+  logEvent({
+    level: 'info',
+    surface: SURFACE,
+    message: 'wall_night_wake',
+    context: { action: 'night', detail: 'auto' },
+  });
+  onWake();
+}
+
+useWallAutoSleep({
+  settings: () => settingsStore.wallSleep,
+  asleep: nightNow,
+  sleep: () => enterNight('auto'),
+  wake: onMorningWake,
+});
 
 function onFocusDay(ymd: string) {
   // ⚠️ `setAnchor` can refuse. A day header at the forward edge of the range can
@@ -1464,6 +1484,11 @@ watch(activeView, () => (sheet.value = null));
 
 .wall-root :deep(.wall-night-date) {
   font-size: 1.4rem;
+}
+
+.wall-root :deep(.wall-night-hand) {
+  font-size: 2.1rem;
+  line-height: 1.1;
 }
 
 .wall-root :deep(.wall-night-hint) {
