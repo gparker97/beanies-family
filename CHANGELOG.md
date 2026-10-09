@@ -18,10 +18,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 ### Changed
 
 - The to-do drawer's Mark Completed button is now a checkbox beside the title.
+- The beanie wall's to-do drawer now sets late to-dos apart from today's, with small animated icons, a "3 days late" label on late rows and the due time on today's.
+- The beanie wall's "things on today" line and trip countdown are now handwritten.
 
 ### Fixed
 
 - A to-do shared by two people now shows once in the beanie wall's to-do drawer and summary card, marked with each owner's face rather than a name that could be cut off.
+- The beanie wall's to-do drawer no longer cuts off the orange border around late and today's to-dos, and its scrollbar now matches the sidebar's.
 
 ## 2026-10-08
 

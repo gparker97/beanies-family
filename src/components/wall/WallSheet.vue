@@ -17,6 +17,8 @@ import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
 import WallTripTimeline from '@/components/wall/WallTripTimeline.vue';
 import WallJobList from '@/components/wall/WallJobList.vue';
+import WallBucketIcon from '@/components/wall/WallBucketIcon.vue';
+import HandwrittenLine from '@/components/ui/HandwrittenLine.vue';
 import { useWallPeripherals } from '@/composables/useWallPeripherals';
 import { useWallLock } from '@/components/wall/wallLockKey';
 import { WALL_EDIT } from '@/components/wall/wallEditKey';
@@ -35,7 +37,13 @@ import { bookingProgress, daysUntilTrip, tripCountdownKey, tripTypeEmoji } from 
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import type { FamilyList, FamilyMember, FamilyActivity } from '@/types/models';
 import { jobOwnerIds, uniqueTodoJobs } from '@/utils/wallJobs';
-import type { WallJob, WallListGroup, WallSheetTarget, WallTodoBucket } from '@/types/wall';
+import type {
+  WallJob,
+  WallJobNote,
+  WallListGroup,
+  WallSheetTarget,
+  WallTodoBucket,
+} from '@/types/wall';
 
 const props = defineProps<{
   target: WallSheetTarget;
@@ -224,6 +232,32 @@ function todoOwners(job: WallJob): FamilyMember[] {
     .filter((m): m is FamilyMember => Boolean(m));
 }
 
+/** The row's chip: how late an overdue to-do is, or the time a today one is due by. */
+function todoNote(job: WallJob): WallJobNote | null {
+  if (job.bucket === 'overdue' && job.daysLate) {
+    const text =
+      job.daysLate === 1
+        ? t('date.yesterday')
+        : fillTemplate(t('wall.todo.daysLate'), { n: job.daysLate });
+    return { text, tone: 'late' };
+  }
+  if (job.bucket === 'today' && job.dueTime) {
+    return { text: fillTemplate(t('wall.todo.byTime'), { time: job.dueTime }), tone: 'time' };
+  }
+  return null;
+}
+
+/**
+ * Each bucket's heading. Late is the one loud block (Heritage Orange band, white text);
+ * today is warm but calm (a sunrise tint behind ink); the rest stay quiet.
+ */
+const TODO_HEADING: Record<WallTodoBucket, string> = {
+  overdue: 'from-primary-500 to-terracotta-400 bg-gradient-to-r text-white',
+  today: 'wall-today-band text-secondary-500 dark:text-ink',
+  upcoming: 'text-[var(--muted-text,#4d5d6c)]',
+  undated: 'text-[var(--muted-text,#4d5d6c)]',
+};
+
 function dateLabel(ymd: string): string {
   return new Date(`${ymd}T00:00:00`).toLocaleDateString(undefined, {
     weekday: 'long',
@@ -305,8 +339,13 @@ const { identityFor } = useActivityIdentity();
         </button>
       </div>
 
+      <!--
+        Bleeds 8px into the panel's padding (`-mx-2 px-2`, plus `pt-1`) so a card's ring and
+        shadow are not cropped by the scroll box's edge, and the thumb sits in that gutter
+        rather than over the cards.
+      -->
       <div
-        class="wall-sheet-body relative min-h-0 flex-1 overflow-y-auto"
+        class="wall-sheet-body quiet-scroll quiet-scroll-ink relative -mx-2 min-h-0 flex-1 px-2 pt-1"
         :class="celebratingActivity ? 'is-celebration' : ''"
       >
         <!--
@@ -486,28 +525,32 @@ const { identityFor } = useActivityIdentity();
           <div
             v-for="group in todoGroups"
             :key="group.bucket"
-            class="mb-3 overflow-hidden rounded-[20px] shadow-[var(--card-shadow)]"
-            :class="
-              group.bucket === 'overdue' || group.bucket === 'today'
-                ? 'dark:bg-surface-raised bg-white ring-2 ring-[var(--heritage-orange)]'
-                : 'dark:bg-surface-raised bg-white'
-            "
+            class="dark:bg-surface-raised mb-3 overflow-hidden rounded-[20px] bg-white shadow-[var(--card-shadow)]"
+            :class="group.bucket === 'overdue' ? 'wall-late-card' : ''"
           >
             <!--
-              Late and today wear the Heritage Orange band the app's own to-do
-              screen uses for the same states. Everything else is present but
-              quiet — visible without competing.
+              Late and today must never look alike: late is the Heritage Orange band with a
+              ringing alarm clock; today is a sunrise tint with a turning sun. Everything
+              else is present but quiet. The icon is decorative; the label says it.
             -->
             <p
-              class="font-outfit wall-list-title flex items-center gap-2 px-4 py-2 font-bold tracking-[0.08em] uppercase"
-              :class="
-                group.bucket === 'overdue' || group.bucket === 'today'
-                  ? 'from-primary-500 to-terracotta-400 bg-gradient-to-r text-white'
-                  : 'text-[var(--muted-text,#4d5d6c)]'
-              "
+              class="font-outfit wall-list-title flex items-center gap-2.5 px-4 py-2 font-bold tracking-[0.08em] uppercase"
+              :class="TODO_HEADING[group.bucket]"
             >
+              <span
+                v-if="group.bucket === 'overdue'"
+                class="wall-bucket-disc grid shrink-0 place-items-center rounded-full bg-white text-[var(--heritage-orange,#F15D22)]"
+              >
+                <WallBucketIcon :bucket="group.bucket" />
+              </span>
+              <WallBucketIcon
+                v-else-if="group.bucket === 'today'"
+                :bucket="group.bucket"
+                class="text-terracotta-500 dark:text-terracotta-lift shrink-0"
+              />
+              <WallBucketIcon v-else :bucket="group.bucket" class="shrink-0" />
               {{ t(group.labelKey) }}
-              <span class="opacity-70">{{ group.jobs.length }}</span>
+              <span class="font-semibold">{{ group.jobs.length }}</span>
             </p>
             <!--
               ONE list per bucket, not one per row. A `TransitionGroup` around a
@@ -520,6 +563,7 @@ const { identityFor } = useActivityIdentity();
                 :jobs="group.jobs"
                 :is-pending="isPending"
                 :owners="todoOwners"
+                :note="todoNote"
                 @toggle="emit('toggle', $event)"
               />
             </div>
@@ -640,16 +684,23 @@ const { identityFor } = useActivityIdentity();
             -->
             <p
               v-if="tripDetail && tripDetail.daysAway !== null && tripDetail.daysAway > 0"
-              class="font-outfit wall-sheet-title text-primary-500 mb-3 font-extrabold"
+              class="wall-trip-countdown text-primary-500 dark:text-accent-lift mb-3 flex items-center gap-2"
             >
-              <span aria-hidden="true">{{ tripDetail.emoji }}</span>
+              <span class="font-outfit wall-sheet-title" aria-hidden="true">{{
+                tripDetail.emoji
+              }}</span>
               <!--
                 The `travel.countdown.*` strings are SUFFIXES ("days until
                 takeoff") with the number prepended by the caller — the same
                 shape `CalendarTripRibbon` uses. Running them through
                 `fillTemplate` found no token and silently dropped the count.
+                Handwritten, like the wall header's line: the one warm line a
+                child checks every morning. The number stays in Outfit.
               -->
-              {{ tripDetail.daysAway }} {{ t(tripDetail.countdownKey) }}
+              <HandwrittenLine
+                :template="`{days} ${t(tripDetail.countdownKey)}`"
+                :values="{ days: tripDetail.daysAway }"
+              />
             </p>
             <div v-if="tripDetail" class="mb-3 flex flex-wrap items-center gap-3">
               <span class="font-inter wall-sheet-line text-[var(--muted-text,#4d5d6c)]">
@@ -726,6 +777,39 @@ const { identityFor } = useActivityIdentity();
 </template>
 
 <style scoped>
+/* Late: a faint orange wash and an orange edge drawn INSIDE the card, so no scroll box can crop it. */
+.wall-late-card {
+  background: linear-gradient(var(--tint-orange-4), var(--tint-orange-4)), #fff;
+  box-shadow:
+    var(--card-shadow),
+    inset 0 0 0 2px var(--heritage-orange, #f15d22);
+}
+
+html.dark .wall-late-card {
+  background:
+    linear-gradient(var(--tint-orange-4), var(--tint-orange-4)), var(--color-surface-raised);
+}
+
+/* Today: a sunrise of Terracotta fading into the card. */
+.wall-today-band {
+  background: linear-gradient(180deg, rgb(230 126 34 / 14%), transparent);
+}
+
+html.dark .wall-today-band {
+  background: linear-gradient(180deg, rgb(230 126 34 / 20%), transparent);
+}
+
+.wall-bucket-disc {
+  height: 1.9em;
+  width: 1.9em;
+}
+
+/* Caveat runs small for its size; this keeps the countdown the trip sheet's headline. */
+.wall-trip-countdown :deep(.font-caveat) {
+  font-size: 2.1rem;
+  line-height: 1;
+}
+
 /*
  * The hero band. Deliberately echoes the travel segment's "when" band — same
  * caption/value/sub rhythm — so an activity and a flight read the same way on

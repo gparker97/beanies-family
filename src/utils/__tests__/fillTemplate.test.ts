@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { fillTemplate } from '../fillTemplate';
+import { fillTemplate, splitTemplate } from '../fillTemplate';
 
 describe('fillTemplate', () => {
   it('substitutes a single token', () => {
@@ -28,5 +28,31 @@ describe('fillTemplate', () => {
 
   it('leaves unmatched placeholders untouched', () => {
     expect(fillTemplate('{a}/{b}', { a: 'x' })).toBe('x/{b}');
+  });
+});
+
+describe('splitTemplate', () => {
+  it('splits filled values from the words around them', () => {
+    expect(splitTemplate('{count} things on today', { count: 3 })).toEqual([
+      { text: '3', value: true },
+      { text: ' things on today', value: false },
+    ]);
+  });
+
+  it('joins back to exactly what fillTemplate returns, unmatched tokens included', () => {
+    const template = 'only {n} of {total} left, {missing}';
+    const vars = { n: 2, total: 8 };
+    expect(
+      splitTemplate(template, vars)
+        .map((p) => p.text)
+        .join('')
+    ).toBe(fillTemplate(template, vars));
+  });
+
+  it('keeps a $ in a value literal', () => {
+    expect(splitTemplate('{a}!', { a: '$&' })).toEqual([
+      { text: '$&', value: true },
+      { text: '!', value: false },
+    ]);
   });
 });

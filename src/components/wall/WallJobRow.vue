@@ -30,7 +30,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { fillTemplate } from '@/utils/fillTemplate';
 import WallOwnerFaces from '@/components/wall/WallOwnerFaces.vue';
 import type { FamilyMember } from '@/types/models';
-import type { WallJob } from '@/types/wall';
+import type { WallJob, WallJobNote } from '@/types/wall';
 
 /** Long enough to cover the spring; short enough never to double-fire. */
 const POP_MS = 460;
@@ -43,6 +43,8 @@ const props = defineProps<{
    * face for an unclaimed to-do (an empty array). Omitted on a list that is one person's.
    */
   owners?: FamilyMember[];
+  /** A chip after the title (how late, or due by when). Hidden once the job is done. */
+  note?: WallJobNote | null;
 }>();
 const emit = defineEmits<{ toggle: [WallJob] }>();
 
@@ -280,6 +282,17 @@ watch(canEdit, (allowed) => {
           the text and across the column.
         -->
         <span class="wall-strike" :class="isDone ? 'is-done' : ''">{{ job.title }}</span>
+      </span>
+      <span
+        v-if="note && !isDone"
+        class="font-inter wall-job-done-at wall-job-note shrink-0 rounded-full px-2 py-0.5 font-semibold whitespace-nowrap"
+        :class="
+          note.tone === 'late'
+            ? 'text-primary-700 dark:text-accent-lift bg-[var(--tint-orange-15)]'
+            : 'text-secondary-500 dark:text-ink-soft bg-[var(--tint-slate-5)]'
+        "
+      >
+        {{ note.text }}
       </span>
       <WallOwnerFaces v-if="owners" :members="owners" class="wall-job-owner" />
       <span

@@ -44,6 +44,10 @@ export interface WallJob {
   completedAt?: string;
   /** Set on to-dos only. */
   bucket?: WallTodoBucket;
+  /** Whole days past the due date, on an overdue to-do only (1 = due yesterday). */
+  daysLate?: number;
+  /** The to-do's own due time ("17:00"), when it has one. */
+  dueTime?: string;
   /**
    * The row cannot be renamed or removed here (a card-made to-do is the card's, #123). The tick
    * still works: ticking a repeating to-do rolls it to its next date.
@@ -55,6 +59,12 @@ export interface WallJob {
    * the per-person lanes keep one row per owner and never carry it.
    */
   ownerIds?: string[];
+}
+
+/** A short chip on a drawer row: how late it is, or the time it is due by. */
+export interface WallJobNote {
+  text: string;
+  tone: 'late' | 'time';
 }
 
 /** One list and its items, ready to render as a titled block. */

@@ -23,3 +23,32 @@ export function fillTemplate(template: string, vars: Record<string, unknown>): s
   }
   return out;
 }
+
+/** One run of a template: literal text, or a filled-in `{token}` value. */
+export interface TemplatePart {
+  text: string;
+  value: boolean;
+}
+
+/**
+ * `fillTemplate`, split into runs so a view can style the filled-in values apart from the
+ * words around them (a handwritten line keeps its numbers in a legible face). Joining the
+ * parts' text gives exactly what `fillTemplate` returns; empty runs are dropped.
+ *
+ * @example splitTemplate('{count} things on today', { count: 3 })
+ *   // [{ text: '3', value: true }, { text: ' things on today', value: false }]
+ */
+export function splitTemplate(template: string, vars: Record<string, unknown>): TemplatePart[] {
+  const parts: TemplatePart[] = [];
+  const pattern = /\{(\w+)\}/g;
+  let last = 0;
+  for (const match of template.matchAll(pattern)) {
+    const key = match[1]!;
+    if (!Object.hasOwn(vars, key)) continue;
+    if (match.index > last) parts.push({ text: template.slice(last, match.index), value: false });
+    parts.push({ text: String(vars[key] ?? ''), value: true });
+    last = match.index + match[0].length;
+  }
+  if (last < template.length) parts.push({ text: template.slice(last), value: false });
+  return parts.filter((part) => part.text);
+}

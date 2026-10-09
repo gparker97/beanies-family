@@ -38,7 +38,7 @@ import type {
 } from '@/types/wall';
 import { normalizeAssignees } from '@/utils/assignees';
 import { isFiled, isRecurring } from '@/utils/listLifecycle';
-import { extractDatePart } from '@/utils/date';
+import { daysBetweenYmd, extractDatePart } from '@/utils/date';
 
 /**
  * Dedupe key. The same task legitimately exists as both a dated to-do and an
@@ -107,9 +107,18 @@ function todoBucket(todo: TodoItem, todayYmd: string): WallTodoBucket | null {
   return due < todayYmd ? 'overdue' : 'upcoming';
 }
 
-function todoJob(todo: TodoItem, ownerId: string, bucket: WallTodoBucket): WallJob {
+function todoJob(
+  todo: TodoItem,
+  ownerId: string,
+  bucket: WallTodoBucket,
+  todayYmd: string
+): WallJob {
   return {
     bucket,
+    ...(bucket === 'overdue' && todo.dueDate
+      ? { daysLate: daysBetweenYmd(todo.dueDate, todayYmd) }
+      : {}),
+    ...(todo.dueTime ? { dueTime: todo.dueTime } : {}),
     // The owner is part of the key: a to-do assigned to three beans becomes
     // three rows, and a bare `todo:${id}` made them ONE key — so the `pending`
     // guard disabled all three when any one was tapped.
@@ -199,12 +208,12 @@ export function buildWallJobs(input: WallJobsInput): WallJobsResult {
       // Unassigned work is still the family's work. Dropping it was why to-dos
       // nobody had claimed never reached the wall at all.
       if (actionable) suppress.add(dedupeKey(UNASSIGNED, todo.title));
-      built.push(todoJob(todo, UNASSIGNED, bucket));
+      built.push(todoJob(todo, UNASSIGNED, bucket, todayYmd));
       continue;
     }
     for (const ownerId of assignees) {
       if (actionable) suppress.add(dedupeKey(ownerId, todo.title));
-      built.push(todoJob(todo, ownerId, bucket));
+      built.push(todoJob(todo, ownerId, bucket, todayYmd));
     }
   }
 

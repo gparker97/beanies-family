@@ -343,7 +343,8 @@
 /*
  * Quiet scrollbar: thin, invisible until hover, with top/bottom edge fades while the content
  * overflows (add `can-scroll` from useScrollOverflow). Used on the Deep Slate sidebar and
- * hamburger drawer, which are Deep Slate in both themes, so no dark partner is needed.
+ * hamburger drawer, which are Deep Slate in both themes, so the default thumb is light. On a
+ * surface that is light in light mode, add `quiet-scroll-ink` for a slate thumb.
  */
 @utility quiet-scroll {
   overflow-y: auto;
@@ -351,7 +352,7 @@
   scrollbar-width: thin;
 
   &:hover {
-    scrollbar-color: rgb(255 255 255 / 22%) transparent;
+    scrollbar-color: var(--quiet-scroll-thumb, rgb(255 255 255 / 22%)) transparent;
   }
 
   &::-webkit-scrollbar {
@@ -364,7 +365,7 @@
   }
 
   &:hover::-webkit-scrollbar-thumb {
-    background: rgb(255 255 255 / 22%);
+    background: var(--quiet-scroll-thumb, rgb(255 255 255 / 22%));
   }
 
   &.can-scroll {
@@ -375,6 +376,15 @@
       #000 calc(100% - 18px),
       transparent
     );
+  }
+}
+
+/* The `quiet-scroll` thumb for a surface that follows the theme: slate on light, white on dark. */
+@utility quiet-scroll-ink {
+  --quiet-scroll-thumb: rgb(44 62 80 / 28%);
+
+  &:where(.dark, .dark *) {
+    --quiet-scroll-thumb: rgb(255 255 255 / 22%);
   }
 }
 

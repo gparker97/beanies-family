@@ -3479,6 +3479,8 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'wall.todo.upcoming': '即将到来',
   'wall.todo.undated': '无日期',
   'wall.todo.anyone': '任何人',
+  'wall.todo.daysLate': '逾期 {n} 天',
+  'wall.todo.byTime': '{time} 前',
   'wall.notes': '备注',
   'wall.card.choresAndLists': '家务和清单',
   'wall.meals.slot.breakfast': '早餐',

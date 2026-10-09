@@ -7827,6 +7827,9 @@ const STRING_DEFS = {
   'wall.todo.upcoming': { en: 'Coming up', beanie: 'coming up' },
   'wall.todo.undated': { en: 'No date', beanie: 'no date' },
   'wall.todo.anyone': { en: 'Anyone', beanie: 'anyone' },
+  // Chips on drawer rows. Two or more days only: one day late reads "Yesterday" (`date.yesterday`).
+  'wall.todo.daysLate': { en: '{n} days late', beanie: '{n} days late' },
+  'wall.todo.byTime': { en: 'By {time}', beanie: 'by {time}' },
   'wall.notes': { en: 'Notes', beanie: 'notes' },
   'wall.card.choresAndLists': { en: 'Chores & Lists', beanie: 'chores & lists' },
   'wall.meals.slot.breakfast': { en: 'Breakfast', beanie: 'breakfast' },

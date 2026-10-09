@@ -17,13 +17,15 @@
  */
 import WallJobRow from '@/components/wall/WallJobRow.vue';
 import type { FamilyMember } from '@/types/models';
-import type { WallJob } from '@/types/wall';
+import type { WallJob, WallJobNote } from '@/types/wall';
 
 defineProps<{
   jobs: WallJob[];
   isPending: (job: WallJob) => boolean;
   /** Optional per-row owners, for lists that mix people (see `WallJobRow.owners`). */
   owners?: (job: WallJob) => FamilyMember[];
+  /** Optional per-row chip (see `WallJobRow.note`). */
+  note?: (job: WallJob) => WallJobNote | null;
 }>();
 const emit = defineEmits<{ toggle: [WallJob] }>();
 </script>
@@ -36,6 +38,7 @@ const emit = defineEmits<{ toggle: [WallJob] }>();
       :job="job"
       :pending="isPending(job)"
       :owners="owners?.(job)"
+      :note="note?.(job)"
       @toggle="emit('toggle', $event)"
     />
   </TransitionGroup>

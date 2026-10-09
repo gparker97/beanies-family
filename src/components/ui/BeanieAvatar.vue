@@ -130,6 +130,19 @@ function relativeLuminance(hex: string): number {
   return 0.2126 * ch[0]! + 0.7152 * ch[1]! + 0.0722 * ch[2]!;
 }
 
+/**
+ * A fill too dark to stand out on the dark surfaces (luminance under ~0.12, below 2.4:1
+ * against `surface-raised`) gets a hairline edge in dark mode, so the face does not
+ * dissolve into the card. None of today's palette hues come close; it is for a colour
+ * from older or imported data.
+ */
+const darkFill = computed(
+  () =>
+    showInitials.value &&
+    /^#[0-9a-f]{3,8}$/i.test(resolvedColor.value) &&
+    relativeLuminance(resolvedColor.value) < 0.12
+);
+
 const initialsInk = computed(() =>
   /^#[0-9a-f]{3,8}$/i.test(resolvedColor.value) && relativeLuminance(resolvedColor.value) > 0.45
     ? '#2C3E50'
@@ -191,7 +204,11 @@ function onPhotoError() {
 
 <template>
   <div
-    :class="[sizeClass, 'relative flex-shrink-0 overflow-hidden rounded-full']"
+    :class="[
+      sizeClass,
+      'relative flex-shrink-0 overflow-hidden rounded-full',
+      { 'beanie-avatar-edge': darkFill },
+    ]"
     :style="
       showInitials
         ? { background: resolvedColor }
@@ -264,3 +281,15 @@ function onPhotoError() {
     </div>
   </div>
 </template>
+
+<style scoped>
+/* Dark mode only: see `darkFill`. An inset line, not a border, so the size never changes. */
+html.dark .beanie-avatar-edge::after {
+  border-radius: 9999px;
+  box-shadow: inset 0 0 0 1.5px var(--color-line-strong);
+  content: '';
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+}
+</style>

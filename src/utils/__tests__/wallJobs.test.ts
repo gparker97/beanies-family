@@ -321,6 +321,24 @@ describe('what a shared screen must never show', () => {
  * six seconds the undo is on screen, with an add row sitting under that very
  * list). Capturing one item and its index is what makes both impossible.
  */
+describe('to-do timing on wall rows', () => {
+  it('says how many days late an overdue to-do is, and carries a due time', () => {
+    const r = build(
+      [
+        todo({ id: 'late3', dueDate: '2026-08-28T00:00:00.000Z' }),
+        todo({ id: 'late1', dueDate: '2026-08-30T00:00:00.000Z' }),
+        todo({ id: 'now', dueTime: '17:00' }),
+      ],
+      []
+    );
+    const byId = Object.fromEntries(r.todos.map((j) => [j.todoId, j]));
+    expect(byId.late3?.daysLate).toBe(3);
+    expect(byId.late1?.daysLate).toBe(1);
+    expect(byId.now?.daysLate).toBeUndefined();
+    expect(byId.now?.dueTime).toBe('17:00');
+  });
+});
+
 describe('jobOwnerIds', () => {
   it('names every owner of a combined row, its own owner otherwise, and nobody for unclaimed', () => {
     const r = build(

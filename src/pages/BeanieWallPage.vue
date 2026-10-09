@@ -13,6 +13,7 @@
 import { computed, onScopeDispose, provide, ref, watch } from 'vue';
 import { isNavigationFailure, useRouter } from 'vue-router';
 import WallFooter from '@/components/wall/WallFooter.vue';
+import HandwrittenLine from '@/components/ui/HandwrittenLine.vue';
 import WallLockMenu from '@/components/wall/WallLockMenu.vue';
 import WallNightScreen from '@/components/wall/WallNightScreen.vue';
 import WallSheet from '@/components/wall/WallSheet.vue';
@@ -156,7 +157,9 @@ const todayCount = computed(() => activityStore.activitiesForDate(today.value).l
 const tomorrowCount = computed(() => activityStore.activitiesForDate(tomorrowYmd.value).length);
 
 /**
- * "Week of 31 August · 6 things on today" — the line the mockup puts under the date.
+ * "Week of 31 August · 6 things on today" — the line the mockup puts under the date. The
+ * count half is handwritten (`HandwrittenLine`): it is the wall's welcome line, the one warm
+ * accent the CIG allows a page, with the number kept in Outfit.
  *
  * ⚠️ The "week of" half is dropped while browsing. It is built from `today` and
  * cannot follow the anchor (the header's job is to say what day it actually is),
@@ -164,19 +167,17 @@ const tomorrowCount = computed(() => activityStore.activitiesForDate(tomorrowYmd
  * different week than the navigator's own label. One header, two contradicting
  * weeks. The count of what is on today stays either way — that is still true.
  */
-const subtitle = computed(() => {
-  const things = fillTemplate(
-    todayCount.value === 1 ? t('wall.header.things.one') : t('wall.header.things.other'),
-    { count: todayCount.value }
-  );
-  if (!isAnchoredToToday.value) return things;
-
+const weekLabel = computed(() => {
+  if (!isAnchoredToToday.value) return '';
   const week = new Date(`${today.value}T00:00:00`).toLocaleDateString(undefined, {
     day: 'numeric',
     month: 'long',
   });
-  return `${fillTemplate(t('wall.header.weekOf'), { date: week })} · ${things}`;
+  return fillTemplate(t('wall.header.weekOf'), { date: week });
 });
+const thingsTemplate = computed(() =>
+  todayCount.value === 1 ? t('wall.header.things.one') : t('wall.header.things.other')
+);
 /**
  * Reactive, because this is the ONE route that unlocks rotation — a snapshot
  * taken at setup meant rotating a mounted tablet kept the landscape layout
@@ -860,7 +861,12 @@ watch(activeView, () => (sheet.value = null));
           {{ dateLabel }}
         </h1>
         <p class="font-inter wall-subtitle mt-1.5 text-[var(--muted-text,#4d5d6c)]">
-          {{ subtitle }}
+          <template v-if="weekLabel">{{ weekLabel }} · </template>
+          <HandwrittenLine
+            :template="thingsTemplate"
+            :values="{ count: todayCount }"
+            class="wall-subtitle-hand text-primary-500 dark:text-accent-lift"
+          />
         </p>
       </div>
       <div class="wall-header-controls ml-auto flex items-center gap-3">
@@ -1175,6 +1181,12 @@ watch(activeView, () => (sheet.value = null));
 
 .wall-root :deep(.wall-stamp) {
   font-size: 0.8rem;
+}
+
+.wall-root :deep(.wall-subtitle-hand) {
+  /* Caveat runs small; 1.45x sits it level with the Inter beside it. */
+  font-size: calc(var(--wall-subtitle) * 1.45);
+  line-height: 1;
 }
 
 .wall-root :deep(.wall-subtitle) {
