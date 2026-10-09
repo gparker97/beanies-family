@@ -28,6 +28,8 @@ import { WALL_EDIT } from '@/components/wall/wallEditKey';
 import { WALL_BURST } from '@/components/wall/wallBurstKey';
 import { useTranslation } from '@/composables/useTranslation';
 import { fillTemplate } from '@/utils/fillTemplate';
+import WallOwnerFaces from '@/components/wall/WallOwnerFaces.vue';
+import type { FamilyMember } from '@/types/models';
 import type { WallJob } from '@/types/wall';
 
 /** Long enough to cover the spring; short enough never to double-fire. */
@@ -36,14 +38,11 @@ const POP_MS = 460;
 const props = defineProps<{
   job: WallJob;
   pending?: boolean;
-  /** Whose job this is, when the surrounding list mixes people. */
-  ownerLabel?: string;
   /**
-   * That person's colour. Renders the name as a tinted pill, the same way a bean's
-   * column header is washed in their colour — on a mixed list the owner is then
-   * readable at a glance instead of being decoded from a line of grey text.
+   * Whose job this is, when the surrounding list mixes people: their faces, or a "?"
+   * face for an unclaimed to-do (an empty array). Omitted on a list that is one person's.
    */
-  ownerColor?: string;
+  owners?: FamilyMember[];
 }>();
 const emit = defineEmits<{ toggle: [WallJob] }>();
 
@@ -128,7 +127,7 @@ function onTick() {
  * Tapping the row.
  *
  * LOCKED, this is byte-for-byte the old behaviour: a tap anywhere on the row
- * (tick, title, owner pill, done stamp or list emoji) ticks it. That is the
+ * (tick, title, owner faces, done stamp or list emoji) ticks it. That is the
  * whole point of the surface and edit mode must not make it smaller or riskier.
  *
  * UNLOCKED, the title area becomes the rename target. The tick keeps its own
@@ -259,7 +258,7 @@ watch(canEdit, (allowed) => {
     />
     <!--
       Everything a locked tap should hit lives INSIDE this button: the title,
-      the owner pill, the done stamp and the list emoji. Putting any of them
+      the owner faces, the done stamp and the list emoji. Putting any of them
       outside it would have quietly killed "tap anywhere to tick".
     -->
     <button
@@ -282,14 +281,7 @@ watch(canEdit, (allowed) => {
         -->
         <span class="wall-strike" :class="isDone ? 'is-done' : ''">{{ job.title }}</span>
       </span>
-      <span
-        v-if="ownerLabel"
-        class="font-inter wall-job-done-at text-secondary-500 dark:text-ink max-w-[7.5rem] shrink-0 truncate rounded-full px-2 py-0.5 font-semibold"
-        :class="ownerColor ? '' : 'bg-[var(--tint-slate-10)]'"
-        :style="ownerColor ? { background: `${ownerColor}2e` } : undefined"
-      >
-        {{ ownerLabel }}
-      </span>
+      <WallOwnerFaces v-if="owners" :members="owners" class="wall-job-owner" />
       <span
         v-if="doneAt"
         class="font-inter wall-job-done-at shrink-0 text-[var(--muted-text,#4d5d6c)] opacity-70"

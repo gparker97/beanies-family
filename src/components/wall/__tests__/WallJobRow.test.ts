@@ -44,7 +44,7 @@ function mountRow(
     ...opts.edit,
   };
   const wrapper = mount(WallJobRow, {
-    props: { job: opts.job ?? job, pending: false, ownerLabel: 'Leo' },
+    props: { job: opts.job ?? job, pending: false, owners: [] },
     global: {
       provide: {
         [WALL_LOCK as symbol]: { isLocked: ref(!opts.unlocked), noteActivity: vi.fn() },
@@ -77,9 +77,9 @@ describe('WallJobRow', () => {
       expect(wrapper.emitted('toggle')).toHaveLength(1);
     });
 
-    it('ticks when the owner pill is tapped, because it sits inside the title button', async () => {
+    it('ticks when the owner face is tapped, because it sits inside the title button', async () => {
       const { wrapper } = mountRow();
-      await wrapper.get('.wall-job-done-at').trigger('click');
+      await wrapper.get('.wall-job-owner').trigger('click');
       expect(wrapper.emitted('toggle')).toHaveLength(1);
     });
 

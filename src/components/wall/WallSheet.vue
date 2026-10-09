@@ -34,8 +34,7 @@ import { activityDetailRows } from '@/utils/activityDetails';
 import { bookingProgress, daysUntilTrip, tripCountdownKey, tripTypeEmoji } from '@/utils/vacation';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import type { FamilyList, FamilyMember, FamilyActivity } from '@/types/models';
-import { UNASSIGNED, uniqueTodoJobs } from '@/utils/wallJobs';
-import { formatNameList } from '@/utils/assignees';
+import { jobOwnerIds, uniqueTodoJobs } from '@/utils/wallJobs';
 import type { WallJob, WallListGroup, WallSheetTarget, WallTodoBucket } from '@/types/wall';
 
 const props = defineProps<{
@@ -218,18 +217,11 @@ const celebratingActivity = computed(() => {
   return identityFor(value).celebration.celebrating ? value.id : null;
 });
 
-/** Who owes this to-do ("Greg & Jill" when shared); "Anyone" when nobody has claimed it. */
-function todoOwnerName(job: WallJob): string {
-  const names = (job.ownerIds ?? [job.ownerId])
-    .filter((id) => id !== UNASSIGNED)
-    .map((id) => familyStore.members.find((m) => m.id === id)?.name ?? '');
-  return formatNameList(names) || t('wall.todo.anyone');
-}
-
-/** The owner's colour, so the name reads as a pill rather than grey text. */
-function todoOwnerColour(job: WallJob): string | undefined {
-  if (job.ownerId === UNASSIGNED) return undefined;
-  return familyStore.members.find((m) => m.id === job.ownerId)?.color;
+/** Who owes this to-do, as members; empty when nobody has claimed it (the row shows "?"). */
+function todoOwners(job: WallJob): FamilyMember[] {
+  return jobOwnerIds(job)
+    .map((id) => familyStore.members.find((m) => m.id === id))
+    .filter((m): m is FamilyMember => Boolean(m));
 }
 
 function dateLabel(ymd: string): string {
@@ -527,8 +519,7 @@ const { identityFor } = useActivityIdentity();
               <WallJobList
                 :jobs="group.jobs"
                 :is-pending="isPending"
-                :owner-label="todoOwnerName"
-                :owner-color="todoOwnerColour"
+                :owners="todoOwners"
                 @toggle="emit('toggle', $event)"
               />
             </div>

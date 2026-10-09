@@ -16,15 +16,14 @@
  * the drill-in sheet cannot drift into three different reorder feels.
  */
 import WallJobRow from '@/components/wall/WallJobRow.vue';
+import type { FamilyMember } from '@/types/models';
 import type { WallJob } from '@/types/wall';
 
 defineProps<{
   jobs: WallJob[];
   isPending: (job: WallJob) => boolean;
-  /** Optional per-row owner label, for lists that mix people. */
-  ownerLabel?: (job: WallJob) => string;
-  /** That owner's colour, for the pill on a mixed list. */
-  ownerColor?: (job: WallJob) => string | undefined;
+  /** Optional per-row owners, for lists that mix people (see `WallJobRow.owners`). */
+  owners?: (job: WallJob) => FamilyMember[];
 }>();
 const emit = defineEmits<{ toggle: [WallJob] }>();
 </script>
@@ -36,8 +35,7 @@ const emit = defineEmits<{ toggle: [WallJob] }>();
       :key="job.key"
       :job="job"
       :pending="isPending(job)"
-      :owner-label="ownerLabel?.(job)"
-      :owner-color="ownerColor?.(job)"
+      :owners="owners?.(job)"
       @toggle="emit('toggle', $event)"
     />
   </TransitionGroup>

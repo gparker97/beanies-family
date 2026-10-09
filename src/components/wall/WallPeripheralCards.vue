@@ -17,15 +17,14 @@
  * loudest complaint about the first cut of this screen.
  */
 import { computed } from 'vue';
-import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
-import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
 import WallCard from '@/components/wall/WallCard.vue';
 import { useWallPeripherals } from '@/composables/useWallPeripherals';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { isRecurring } from '@/utils/listLifecycle';
-import { jobsProgress, uniqueTodoJobs, UNASSIGNED } from '@/utils/wallJobs';
+import { jobOwnerIds, jobsProgress, uniqueTodoJobs, UNASSIGNED } from '@/utils/wallJobs';
+import WallOwnerFaces from '@/components/wall/WallOwnerFaces.vue';
 import { formatNameList } from '@/utils/assignees';
 import type { FamilyList, FamilyMember } from '@/types/models';
 import type { WallJob, WallPeripheralData, WallSheetTarget } from '@/types/wall';
@@ -101,11 +100,11 @@ const todoProgress = computed(() => jobsProgress(visibleTodos.value));
 const outstandingTodos = computed(() => {
   const groups = new Map<
     string,
-    { key: string; member: FamilyMember | null; label: string; jobs: WallJob[] }
+    { key: string; members: FamilyMember[]; label: string; jobs: WallJob[] }
   >();
   for (const job of visibleTodos.value) {
     if (job.done) continue;
-    const owners = (job.ownerIds ?? [job.ownerId]).filter((id) => id !== UNASSIGNED);
+    const owners = jobOwnerIds(job);
     const key = owners.length ? owners.join('+') : UNASSIGNED;
     let group = groups.get(key);
     if (!group) {
@@ -114,7 +113,7 @@ const outstandingTodos = computed(() => {
         .filter((m): m is FamilyMember => !!m);
       group = {
         key,
-        member: members[0] ?? null,
+        members,
         label: formatNameList(members.map((m) => m.name)) || t('wall.todo.anyone'),
         jobs: [],
       };
@@ -224,8 +223,6 @@ const stripHasContent = computed(
     visibleLists.value.length > 0 ||
     Boolean(trip.value)
 );
-
-const { memberAvatarBindings } = useMemberAvatarBindings();
 </script>
 
 <template>
@@ -367,18 +364,7 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
         :key="entry.key"
         class="dark:border-line flex items-center gap-2.5 border-b border-[rgba(44,62,80,0.06)] py-1.5 last:border-b-0"
       >
-        <BeanieAvatar
-          v-if="entry.member"
-          v-bind="memberAvatarBindings(entry.member)"
-          fallback="initials"
-          size="sm"
-        />
-        <span
-          v-else
-          class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#95a5a6] text-xs font-bold text-white"
-          aria-hidden="true"
-          >?</span
-        >
+        <WallOwnerFaces :members="entry.members" />
         <span class="min-w-0 flex-1">
           <span class="font-inter wall-card-line text-secondary-500 dark:text-ink block truncate">
             {{ entry.jobs[0].title }}

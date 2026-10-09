@@ -234,6 +234,14 @@ export function sortJobs(jobs: readonly WallJob[]): WallJob[] {
 }
 
 /**
+ * Who owes a row, without the unassigned sentinel: every owner on a combined row
+ * (`uniqueTodoJobs`), the row's own owner otherwise. Empty means nobody has claimed it.
+ */
+export function jobOwnerIds(job: WallJob): string[] {
+  return (job.ownerIds ?? [job.ownerId]).filter((id) => id !== UNASSIGNED);
+}
+
+/**
  * One row per to-do for a COMBINED view.
  *
  * `buildWallJobs` emits a to-do once per assignee on purpose, so a shared to-do

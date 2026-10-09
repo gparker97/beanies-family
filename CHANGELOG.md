@@ -21,7 +21,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
-- A to-do shared by two people now shows once in the beanie wall's to-do drawer and summary card.
+- A to-do shared by two people now shows once in the beanie wall's to-do drawer and summary card, marked with each owner's face rather than a name that could be cut off.
 
 ## 2026-10-08
 

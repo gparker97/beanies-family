@@ -3,6 +3,7 @@ import {
   UNASSIGNED,
   buildWallJobs,
   captureListRemoval,
+  jobOwnerIds,
   jobsProgress,
   sortJobs,
   uniqueTodoJobs,
@@ -320,6 +321,18 @@ describe('what a shared screen must never show', () => {
  * six seconds the undo is on screen, with an add row sitting under that very
  * list). Capturing one item and its index is what makes both impossible.
  */
+describe('jobOwnerIds', () => {
+  it('names every owner of a combined row, its own owner otherwise, and nobody for unclaimed', () => {
+    const r = build(
+      [todo({ assigneeIds: ['greg', 'leo'] }), todo({ id: 't2', assigneeIds: [] })],
+      []
+    );
+    const combined = uniqueTodoJobs(r.todos);
+    expect(combined.map(jobOwnerIds)).toEqual([['greg', 'leo'], []]);
+    expect(jobOwnerIds(r.todos[0])).toEqual(['greg']);
+  });
+});
+
 describe('uniqueTodoJobs (combined views)', () => {
   it('lists a to-do shared by two people once, with both owners', () => {
     const r = build([todo({ assigneeIds: ['greg', 'leo'] })], []);
