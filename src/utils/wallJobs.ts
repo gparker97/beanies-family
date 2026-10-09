@@ -26,6 +26,7 @@
  * Lists and to-dos are still deduped against each other: the same task written
  * in both places is one job, not two, and the dated to-do wins.
  */
+import { todoCapabilities } from '@/utils/todoRecurrence';
 import type { FamilyList, FamilyListItem, ListCategory, TodoItem } from '@/types/models';
 import { isKnownListCategory } from '@/constants/listCategories';
 import type {
@@ -119,7 +120,15 @@ function todoJob(todo: TodoItem, ownerId: string, bucket: WallTodoBucket): WallJ
     source: 'todo',
     todoId: todo.id,
     completedAt: todo.completedAt,
+    // The same capability table the to-do page and drawer read (#123).
+    ...(locked(todo) ? { locked: true } : {}),
   };
+}
+
+/** A to-do the wall must not rename or remove: one whose title or deletion belongs elsewhere. */
+function locked(todo: TodoItem): boolean {
+  const caps = todoCapabilities(todo);
+  return !(caps.editTitle && caps.delete);
 }
 
 function listJob(list: FamilyList, item: FamilyListItem): WallJob {

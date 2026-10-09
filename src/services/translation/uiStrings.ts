@@ -7125,6 +7125,29 @@ const STRING_DEFS = {
     en: 'No signed-in family member was found. Sign in and try again.',
     beanie: 'no signed-in family member was found. sign in and try again.',
   },
+  // #123: refusals from `todoStore` (the backstop behind `todoCapabilities`). Error copy under
+  // `todo.error.`, an important surface, so the beanie values keep the real nouns.
+  'todo.error.repeatCardManaged': {
+    en: 'This to-do is set by a card in Who Owns What. Change its repeat on the card.',
+    beanie: 'this to-do is set by a card in who owns what. change its repeat on the card.',
+  },
+  'todo.error.repeatNoSomeday': {
+    en: "A repeating to-do can't move to someday. Turn its repeat off first.",
+    beanie: "a repeating to-do can't move to someday. turn its repeat off first.",
+  },
+  'todo.error.repeatNotRepeating': {
+    en: "This to-do isn't repeating, so there's no occurrence to skip.",
+    beanie: "this to-do isn't repeating, so there's no occurrence to skip.",
+  },
+  'todo.error.notFound': {
+    en: 'This to-do no longer exists. It may have been deleted on another device.',
+    beanie: 'this to-do no longer exists. it may have been deleted on another device.',
+  },
+  'todo.error.cardTodoNoDelete': {
+    en: "This to-do comes from a card's reminder. To stop it, turn the reminder off on the card.",
+    beanie:
+      "this to-do comes from a card's reminder. to stop it, turn the reminder off on the card.",
+  },
   'todo.field.title': { en: 'To-do', beanie: 'to-do' },
   'todo.magicHint': {
     en: 'Snap a note, a list or a school email',
@@ -7177,6 +7200,128 @@ const STRING_DEFS = {
   'todo.hint.keep': { en: 'Keep', beanie: 'keep' },
   'todo.hint.dismiss': { en: 'Dismiss', beanie: 'dismiss' },
   'todo.hint.dismissedToast': { en: 'Hint dismissed', beanie: 'hint dismissed' },
+  'todo.repeat.skipped': { en: 'Skipped. Next: {date}', beanie: 'skipped. next: {date}' },
+  'todo.repeat.skippedLast': {
+    en: 'Skipped. That was the last one.',
+    beanie: 'skipped. that was the last one.',
+  },
+  // #123: repeating to-dos (form switch, the drawer's Repeats block, the reminders roster) and
+  // the card a card-made to-do links back to.
+  'todo.repeat.label': { en: 'Repeat', beanie: 'repeat' },
+  'todo.repeat.toggle': { en: 'Repeat This To-do', beanie: 'repeat this to-do' },
+  'todo.repeat.toggleHintOff': {
+    en: 'Off. Turn on to make it a family reminder.',
+    beanie: 'off. turn on to make it a family reminder.',
+  },
+  'todo.repeat.createTitle': {
+    en: 'Create a Repeating Family Reminder',
+    beanie: 'create a repeating family reminder',
+  },
+  'todo.repeat.createHint': {
+    en: "One to-do that rolls to its next date. It joins the family's reminders on To-Dos.",
+    beanie: "one to-do that rolls to its next date. it joins the family's reminders on to-dos.",
+  },
+  'todo.repeat.field': { en: 'Repeats', beanie: 'repeats' },
+  'todo.repeat.setOnCard': { en: 'Set on the {card} card', beanie: 'set on the {card} card' },
+  'todo.repeat.next': {
+    en: 'Done or skipped, it moves to {date}',
+    beanie: 'done or skipped, it moves to {date}',
+  },
+  'todo.repeat.lastOne': { en: 'This is the last one.', beanie: 'this is the last one.' },
+  'todo.repeat.skip': { en: 'Skip This Time', beanie: 'skip this time' },
+  'todo.repeat.skipAria': {
+    en: 'Skip this time and move to the next date',
+    beanie: 'skip this time and move to the next date',
+  },
+  'todo.repeat.recent': { en: 'Recent', beanie: 'recent' },
+  'todo.repeat.recentDone': { en: '{date}, {name}', beanie: '{date}, {name}' },
+  'todo.repeat.recentSkipped': { en: 'Skipped {date}', beanie: 'skipped {date}' },
+  'todo.repeat.recentMissed': { en: 'Skipped {date}, missed', beanie: 'skipped {date}, missed' },
+  'todo.repeat.turnOff': { en: 'Turn off repeat', beanie: 'turn off repeat' },
+  'todo.repeat.dateFollows': {
+    en: 'Moves with the repeat. Skip it, or change the repeat to move it.',
+    beanie: 'moves with the repeat. skip it, or change the repeat to move it.',
+  },
+  'todo.repeat.deleteOnCard': {
+    en: 'To stop this reminder, turn it off on the {card} card.',
+    beanie: 'to stop this reminder, turn it off on the {card} card.',
+  },
+  'todo.section.reminders': { en: 'Reminders', beanie: 'reminders' },
+  'todo.section.remindersHint': {
+    en: 'Everything that repeats in the family, by who it reminds.',
+    beanie: 'everything that repeats in the family, by who it reminds.',
+  },
+  'todo.reminders.panelTitle': { en: 'Family Reminders', beanie: 'family reminders' },
+  'todo.reminders.panelCount.one': {
+    en: '{count} repeating to-do across the family',
+    beanie: '{count} repeating to-do across the family',
+  },
+  'todo.reminders.panelCount.other': {
+    en: '{count} repeating to-dos across the family',
+    beanie: '{count} repeating to-dos across the family',
+  },
+  'todo.reminders.perPerson.one': { en: '{count} reminder', beanie: '{count} reminder' },
+  'todo.reminders.perPerson.other': { en: '{count} reminders', beanie: '{count} reminders' },
+  'todo.reminders.empty': {
+    en: 'No repeating to-dos yet. Turn one on from any to-do, or set a reminder on a card in Who Owns What.',
+    beanie:
+      'no repeating to-dos yet. turn one on from any to-do, or set a reminder on a card in who owns what.',
+  },
+  'todo.reminders.next': { en: 'Next', beanie: 'next' },
+  'todo.linkedCard': { en: 'Linked Card', beanie: 'linked card' },
+  'todo.linkedCard.heldBy': { en: 'Held by {name}', beanie: 'held by {name}' },
+  'todo.linkedCard.madeBy': { en: 'Made by the {card} card', beanie: 'made by the {card} card' },
+  'todo.linkedCard.open': { en: 'Open the card', beanie: 'open the card' },
+  'whoOwnsWhat.reminder.adultsSee': { en: 'Adults see it too.', beanie: 'adults see it too.' },
+  'whoOwnsWhat.reminder.field': { en: 'Reminder', beanie: 'reminder' },
+  'whoOwnsWhat.reminder.toggle': { en: 'Remind the Holder', beanie: 'remind the holder' },
+  'whoOwnsWhat.reminder.togglePart': { en: 'Remind {name}', beanie: 'remind {name}' },
+  'whoOwnsWhat.reminder.hintOff': {
+    en: 'Off. Turn it on and {name} gets a repeating to-do with a nudge at the time you pick.',
+    beanie: 'off. turn it on and {name} gets a repeating to-do with a nudge at the time you pick.',
+  },
+  'whoOwnsWhat.reminder.hintOn': {
+    en: "Today that's {name}. It follows the card if it is re-dealt.",
+    beanie: "today that's {name}. it follows the card if it is re-dealt.",
+  },
+  'whoOwnsWhat.reminder.hintNobody': {
+    en: 'Nobody holds this yet. It starts reminding when someone does.',
+    beanie: 'nobody holds this yet. it starts reminding when someone does.',
+  },
+  'whoOwnsWhat.reminder.none': {
+    en: 'No reminder on this card.',
+    beanie: 'no reminder on this card.',
+  },
+  'whoOwnsWhat.reminder.say': { en: 'What to Say', beanie: 'what to say' },
+  'whoOwnsWhat.reminder.howOften': { en: 'How Often', beanie: 'how often' },
+  'whoOwnsWhat.reminder.at': { en: 'At', beanie: 'at' },
+  'whoOwnsWhat.reminder.goesOn': {
+    en: '"{say}" goes on {name}\'s to-dos and nudges them at {time}.',
+    beanie: '"{say}" goes on {name}\'s to-dos and nudges them at {time}.',
+  },
+  'whoOwnsWhat.reminder.goesOnAllDay': {
+    en: '"{say}" goes on {name}\'s to-dos on the day.',
+    beanie: '"{say}" goes on {name}\'s to-dos on the day.',
+  },
+  'whoOwnsWhat.reminder.partNone': { en: 'No reminder', beanie: 'no reminder' },
+  'whoOwnsWhat.reminder.remindsHolder': {
+    en: 'Reminds {name}: {cadence}',
+    beanie: 'reminds {name}: {cadence}',
+  },
+  'whoOwnsWhat.reminder.perPartHint': {
+    en: 'Each part has its own reminder, and it follows whoever holds that part.',
+    beanie: 'each part has its own reminder, and it follows whoever holds that part.',
+  },
+  'whoOwnsWhat.reminder.editHint': {
+    en: 'Edit the card to add one.',
+    beanie: 'edit the card to add one.',
+  },
+  'whoOwnsWhat.reminder.change': { en: 'Change', beanie: 'change' },
+  'whoOwnsWhat.reminder.openTodo': { en: 'Open the to-do', beanie: 'open the to-do' },
+  'whoOwnsWhat.tile.reminderBadge': {
+    en: 'This card has a reminder',
+    beanie: 'this card has a reminder',
+  },
   'todo.hint.drawerPrompt': {
     en: 'A helpful hint. Keep it as a to-do, or dismiss it.',
     beanie: 'a helpful hint. keep it as a to-do, or dismiss it.',
@@ -8339,6 +8484,14 @@ const STRING_DEFS = {
   },
   // #40: a Helpful Hint in the briefing. One fixed framing — never the overdue /
   // today / no-due variants (a hint's dueDate is its nudge date, not a deadline).
+  'nook.reminderFor': {
+    en: 'Reminder for {name}: {task} at {time}!',
+    beanie: 'reminder for {name}: {task} at {time}!',
+  },
+  'nook.reminderForAllDay': {
+    en: 'Reminder for {name}: {task} today!',
+    beanie: 'reminder for {name}: {task} today!',
+  },
   'nook.criticalHint': {
     en: 'Helpful hint: {task}',
     beanie: 'helpful hint: {task}',
@@ -9316,6 +9469,7 @@ const STRING_DEFS = {
   'recurrence.desc.lastDay': { en: 'last day', beanie: 'last day' },
   'recurrence.desc.untilDate': { en: 'until {date}', beanie: 'until {date}' },
   'recurrence.desc.timesN': { en: '{n} times', beanie: '{n} times' },
+  'recurrence.desc.atTime': { en: '{cadence} at {time}', beanie: '{cadence} at {time}' },
 
   // Planner — Fee schedule labels
   'planner.fee.none': { en: 'No fees', beanie: 'no fees' },

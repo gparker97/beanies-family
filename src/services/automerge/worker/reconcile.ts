@@ -61,6 +61,7 @@ export const KEY_FIELDS: Readonly<Record<string, readonly string[]>> = {
   pickupCompletions: ['date'],
   exchangeRates: ['from', 'to'],
   categories: ['categoryId'],
+  repeatLog: ['date'],
 };
 
 /** Map-like nested objects patched per key. Every other nested object is a value. */

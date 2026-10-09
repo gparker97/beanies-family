@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { celebrate } from '@/composables/useCelebration';
 import { createMemberFiltered } from '@/composables/useMemberFiltered';
 import { wrapAsync } from '@/composables/useStoreActions';
@@ -16,14 +16,34 @@ import {
   type SessionItem,
 } from '@/utils/activityLinks';
 import { isHint, dedupeHintsByKey, type HintTodo } from '@/utils/helpfulHints';
+import {
+  advanceRepeat,
+  isCardTodo,
+  isRepeating,
+  repeatStartDate,
+  rollOverdue,
+  skipLastOccurrence,
+  startRepeat,
+  todoCapabilities,
+} from '@/utils/todoRecurrence';
+import { createReconcileLoop } from '@/utils/reconcileLoop';
+import { fillTemplate } from '@/utils/fillTemplate';
 import type {
   TodoItem,
   CreateTodoInput,
   UpdateTodoInput,
   FamilyMember,
   FamilyActivity,
+  RecurrenceRule,
+  TodoRepeatLogEntry,
 } from '@/types/models';
-import { toISODateString } from '@/utils/date';
+import type { UIStringKey } from '@/services/translation/uiStrings';
+import { formatNookDate, toISODateString } from '@/utils/date';
+import { isDocLoaded } from '@/services/automerge/docService';
+import { skipWhileReadOnly } from '@/services/automerge/worker/writeGate';
+import { resolveTodoRule } from '@/services/recurrence/adapters';
+import { ruleKey } from '@/services/recurrence/cadence';
+import { createChangeGate } from '@/services/telemetry/emitPolicy';
 import { trackFeature } from '@/services/analytics/plausible';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { useActivityStore } from '@/stores/activityStore';
@@ -58,6 +78,52 @@ function logHintCompleted(todo: TodoItem): void {
     },
   });
 }
+
+// #123: repeating to-dos. Every event on this surface (`rolled`, `repeat_set`, `reconcile`,
+// `refused`, the loop's failure report, `skipWhileReadOnly`) shares it, so one CloudWatch filter
+// isolates the feature. Context reuses the allowlisted `recur_*`, `action`, `detail`, `count`.
+const RECURRENCE_SURFACE = 'todo-recurrence';
+
+/** The rule's shape as telemetry: enums and a small int only, never dates or titles. */
+function ruleContext(rule: RecurrenceRule | undefined) {
+  return rule ? { recur_unit: rule.unit, recur_interval: rule.interval } : {};
+}
+
+/** One user roll (done / skipped / the series' last occurrence), on the success path. */
+function logRolled(
+  todo: TodoItem,
+  outcome: TodoRepeatLogEntry['outcome'] | 'series-ended',
+  trimmed: number
+): void {
+  logEvent({
+    level: 'info',
+    surface: RECURRENCE_SURFACE,
+    message: 'rolled',
+    context: {
+      recur_surface: 'todo',
+      recur_outcome: outcome,
+      ...ruleContext(resolveTodoRule(todo)?.rule),
+      count: trimmed,
+    },
+  });
+}
+
+/** A repeat turned on at creation, changed, or turned off. */
+function logRepeatSet(action: 'create' | 'change' | 'off', rule: RecurrenceRule | undefined): void {
+  logEvent({
+    level: 'info',
+    surface: RECURRENCE_SURFACE,
+    message: 'repeat_set',
+    context: {
+      recur_surface: 'todo',
+      action,
+      ...ruleContext(rule),
+      ...(rule ? { recur_end: rule.end.kind } : {}),
+    },
+  });
+}
+
+type RefusedAction = 'set-repeat' | 'someday' | 'skip' | 'delete';
 
 export const useTodoStore = defineStore('todos', () => {
   // State
@@ -161,6 +227,10 @@ export const useTodoStore = defineStore('todos', () => {
       },
       { action: 'todoStore:loadTodos' }
     );
+    // #123: only AFTER the to-dos are populated, and outside the load's `wrapAsync`, so a
+    // failed roll never reads as a failed load. Runs on first load and every post-merge reload.
+    rollTrigger = 'load';
+    await rollLoop.runNow();
   }
 
   async function createTodo(input: CreateTodoInput): Promise<TodoItem | null> {
@@ -175,6 +245,8 @@ export const useTodoStore = defineStore('todos', () => {
       },
       { action: 'todoStore:createTodo', surface: 'todos' }
     );
+    // #123: the one place a repeat set at creation is counted (every create path lands here).
+    if (result?.repeat) logRepeatSet('create', result.repeat.rule);
     return trackFeature(result ?? null, 'todo');
   }
 
@@ -195,7 +267,18 @@ export const useTodoStore = defineStore('todos', () => {
     return result ?? null;
   }
 
+  /**
+   * Remove one to-do. The single-id path every user surface reaches (`discardTodo` for the
+   * to-do page, its drawer and the briefing; the wall's remove), so a card-made to-do (#123) is
+   * refused here: the card's next reconcile would only recreate it. The card orchestrator
+   * removes through `deleteTodos`, which is not guarded.
+   */
   async function deleteTodo(id: string): Promise<boolean> {
+    const existing = todos.value.find((t) => t.id === id);
+    if (existing && !todoCapabilities(existing).delete) {
+      refuse('delete', 'card-made', 'todo.error.cardTodoNoDelete');
+      return false;
+    }
     const result = await wrapAsync(
       isLoading,
       error,
@@ -296,9 +379,14 @@ export const useTodoStore = defineStore('todos', () => {
    * The ids come from the magic beans review drafts, so a retry after a failure rewrites the
    * same records instead of duplicating them. Failures toast + report once through
    * `wrapAsync`; the caller keeps its drafts. `trackFeature` counts the batch as one use.
+   *
+   * `ifAbsent` (#123, deterministic ids such as a card's to-do) skips every id the document
+   * already holds, even one not yet loaded into this store, so another device's record is
+   * never overwritten. Only the to-dos actually created are returned and merged in.
    */
   async function createTodos(
-    inputs: readonly (CreateTodoInput & { id: string })[]
+    inputs: readonly (CreateTodoInput & { id: string })[],
+    opts?: { ifAbsent?: boolean }
   ): Promise<TodoItem[] | null> {
     if (!inputs.length) return [];
     const result = await wrapAsync(
@@ -306,7 +394,8 @@ export const useTodoStore = defineStore('todos', () => {
       error,
       async () => {
         const created = await todoRepo.createTodosWithIds(
-          inputs.map(({ id, ...input }) => ({ id, input }))
+          inputs.map(({ id, ...input }) => ({ id, input })),
+          { ifAbsent: opts?.ifAbsent === true }
         );
         const ids = new Set(created.map((t) => t.id));
         // Replace-by-id so a retried batch never leaves two copies in memory either.
@@ -341,6 +430,30 @@ export const useTodoStore = defineStore('todos', () => {
         return linked;
       },
       { action: 'todoStore:linkTodosToActivity', surface: 'todos' }
+    );
+    return result ?? null;
+  }
+
+  /**
+   * A different patch per to-do in ONE write (#123: the auto-roll, the card reminders). A
+   * to-do deleted meanwhile is skipped, never a failure. Returns the patched to-dos, or null
+   * when the write failed (already toasted + reported once by `wrapAsync`; the to-dos keep
+   * their old values and the caller retries on its next trigger).
+   */
+  async function patchTodosEach(
+    items: readonly { id: string; patch: UpdateTodoInput }[]
+  ): Promise<TodoItem[] | null> {
+    if (!items.length) return [];
+    const result = await wrapAsync(
+      isLoading,
+      error,
+      async () => {
+        const patched = await todoRepo.patchTodosEach(items, { onMissing: 'skip' });
+        const byId = new Map(patched.map((t) => [t.id, t]));
+        todos.value = todos.value.map((t) => byId.get(t.id) ?? t);
+        return patched;
+      },
+      { action: 'todoStore:patchTodosEach', surface: RECURRENCE_SURFACE }
     );
     return result ?? null;
   }
@@ -448,6 +561,13 @@ export const useTodoStore = defineStore('todos', () => {
 
     const now = toISODateString(new Date());
 
+    // #123: a repeating to-do rolls to its next occurrence instead of completing. Only when
+    // its rule has no next occurrence does it fall through and complete, leaving the series.
+    if (!existing.completed && isRepeating(existing)) {
+      const rolled = await rollOccurrence(existing, 'done', completedBy, now);
+      if (rolled !== 'series-ended') return rolled;
+    }
+
     if (existing.completed) {
       // Undo complete
       return updateTodo(id, {
@@ -464,6 +584,7 @@ export const useTodoStore = defineStore('todos', () => {
       });
       if (result) {
         logHintCompleted(existing);
+        if (isRepeating(existing)) logRolled(existing, 'series-ended', 0);
         celebrate('goal-reached', {
           onUndo: () => {
             updateTodo(id, {
@@ -485,10 +606,226 @@ export const useTodoStore = defineStore('todos', () => {
    * (toast + telemetry via `wrapAsync`); not a silent-failure path.
    */
   async function setSomeday(id: string, someday: boolean): Promise<TodoItem | null> {
+    const existing = todos.value.find((t) => t.id === id);
+    // #123: someday clears the due date, which only the roll may move on a repeating to-do.
+    if (someday && existing && !todoCapabilities(existing).someday) {
+      refuse(
+        'someday',
+        isCardTodo(existing) ? 'card-made' : 'repeating',
+        'todo.error.repeatNoSomeday'
+      );
+      return null;
+    }
     return someday
       ? updateTodo(id, { someday: true, dueDate: undefined, dueTime: undefined })
       : updateTodo(id, { someday: false });
   }
+
+  // ========== #123: REPEATING TO-DOS ==========
+
+  /**
+   * The store's backstop behind `todoCapabilities`: the UI hides each refused action from the
+   * same function, so reaching here means a stale screen or an old path. Never silent: one
+   * `refused` event (with the capability rule that refused, as `detail`) and an info toast.
+   */
+  function refuse(action: RefusedAction, detail: string, messageKey: UIStringKey): void {
+    logEvent({
+      level: 'warn',
+      surface: RECURRENCE_SURFACE,
+      message: 'refused',
+      context: { action, detail },
+    });
+    showToast('info', useTranslationStore().t(messageKey));
+  }
+
+  /**
+   * Handle a repeating to-do's current occurrence and move it to the next one (`advanceRepeat`).
+   * `'series-ended'` when the rule has no next occurrence: the caller decides how the series
+   * ends. A `done` roll celebrates, and its undo writes back the previous date and log.
+   */
+  async function rollOccurrence(
+    existing: TodoItem,
+    outcome: TodoRepeatLogEntry['outcome'],
+    by: string,
+    nowIso: string
+  ): Promise<TodoItem | null | 'series-ended'> {
+    const roll = advanceRepeat(existing, outcome, by || undefined, nowIso, today.value);
+    if (roll === 'series-ended') return 'series-ended';
+    if (!roll) return null; // unreachable: callers check `isRepeating` first
+    const result = await updateTodo(existing.id, roll.patch);
+    if (!result) return null; // `updateTodo` has toasted + reported
+    logRolled(existing, outcome, roll.trimmed);
+    if (outcome === 'done') {
+      celebrate('goal-reached', {
+        onUndo: () => {
+          void updateTodo(existing.id, rollUndoPatch(existing));
+        },
+      });
+    }
+    return result;
+  }
+
+  /** What a roll moves (the due date and the log), as it was before: an undo writes it back. */
+  function rollUndoPatch(existing: TodoItem): UpdateTodoInput {
+    return { dueDate: existing.dueDate, repeatLog: existing.repeatLog };
+  }
+
+  /**
+   * "Skip this time": record the current occurrence as skipped and move on, with no
+   * celebration and a toast naming the next date. Skipping the LAST occurrence of an ending
+   * rule ends the series: the to-do completes (no celebration; it was not done).
+   */
+  async function skipOccurrence(id: string, by: string): Promise<TodoItem | null> {
+    const existing = todos.value.find((t) => t.id === id);
+    if (!existing) {
+      refuse('skip', 'not-found', 'todo.error.notFound');
+      return null;
+    }
+    if (!todoCapabilities(existing).skip) {
+      refuse(
+        'skip',
+        existing.completed ? 'completed' : 'not-repeating',
+        'todo.error.repeatNotRepeating'
+      );
+      return null;
+    }
+    const now = toISODateString(new Date());
+    const t = useTranslationStore().t;
+    const rolled = await rollOccurrence(existing, 'skipped', by, now);
+    if (rolled === 'series-ended') {
+      const ended = await updateTodo(
+        id,
+        skipLastOccurrence(existing, by || undefined, now, today.value)
+      );
+      if (ended) {
+        logRolled(existing, 'series-ended', 0);
+        toastSkipUndo(t('todo.repeat.skippedLast'), id, {
+          ...rollUndoPatch(existing),
+          completed: existing.completed,
+          completedBy: existing.completedBy,
+          completedAt: existing.completedAt,
+        });
+      }
+      return ended;
+    }
+    if (rolled?.dueDate) {
+      toastSkipUndo(
+        fillTemplate(t('todo.repeat.skipped'), { date: formatNookDate(rolled.dueDate) }),
+        id,
+        rollUndoPatch(existing)
+      );
+    }
+    return rolled;
+  }
+
+  /**
+   * The house Undo toast (6s) for a skip. Undo writes `before` back through `updateTodo`,
+   * which toasts and reports a failed write like any other.
+   */
+  function toastSkipUndo(message: string, id: string, before: UpdateTodoInput): void {
+    showToast('info', message, undefined, {
+      actionLabel: useTranslationStore().t('action.undo'),
+      actionFn: () => {
+        void updateTodo(id, before);
+      },
+      durationMs: 6000,
+    });
+  }
+
+  /**
+   * Turn a to-do's repeat on, change it, or (with `null`) turn it off.
+   *
+   * On or changed: the series restarts from `repeatStartDate` (the date the drawer's picker
+   * showed), which becomes the anchor, so the saved rule means exactly what the picker showed;
+   * the log is kept. A rule whose `ruleKey` equals the current one is a no-op (never a write).
+   * Off: the to-do stays a normal dated to-do on its current due date.
+   */
+  async function setRepeat(id: string, rule: RecurrenceRule | null): Promise<TodoItem | null> {
+    const existing = todos.value.find((t) => t.id === id);
+    if (!existing) {
+      refuse('set-repeat', 'not-found', 'todo.error.notFound');
+      return null;
+    }
+    if (!todoCapabilities(existing).editRepeat) {
+      refuse('set-repeat', 'card-made', 'todo.error.repeatCardManaged');
+      return null;
+    }
+    const current = resolveTodoRule(existing);
+
+    if (rule === null) {
+      if (!existing.repeat) return existing;
+      const off = await updateTodo(id, { repeat: undefined, repeatLog: undefined });
+      if (off) logRepeatSet('off', current?.rule);
+      return off;
+    }
+
+    if (current && ruleKey(current.rule) === ruleKey(rule)) return existing;
+    const started = startRepeat(
+      rule,
+      repeatStartDate(existing, today.value),
+      today.value,
+      existing.repeatLog
+    );
+    if (!started) {
+      // `resolveTodoRule` has logged the unusable rule; nothing is written.
+      logEvent({
+        level: 'warn',
+        surface: RECURRENCE_SURFACE,
+        message: 'setRepeat: unusable rule',
+        context: { action: 'set-repeat', detail: 'invalid-rule' },
+      });
+      return null;
+    }
+    const result = await updateTodo(id, {
+      ...started,
+      // A repeating to-do is never someday (it always has a due date).
+      ...(existing.someday ? { someday: false } : {}),
+    });
+    if (result) logRepeatSet('change', rule);
+    return result;
+  }
+
+  /**
+   * The ONE write path for "the clock advanced" on repeating to-dos (mirrors
+   * `listStore.reconcileRecurringLists`). Rolls every open repeating to-do whose due date is
+   * past, missing, off-rule or already logged (`rollOverdue`) in ONE `patchTodosEach` write.
+   * Writes nothing when there is nothing to roll, before the document loads, or while the
+   * family is read-only (logged once per session; it runs again on the next writable load).
+   * A failed write is reported once by `wrapAsync` and retried on the next trigger.
+   */
+  async function reconcileRepeatingTodos(trigger: 'load' | 'today'): Promise<void> {
+    if (!isDocLoaded()) return;
+    if (skipWhileReadOnly(RECURRENCE_SURFACE)) return;
+    const todayYmd = today.value;
+    const items = todos.value
+      .filter((t) => !t.completed && !t.someday)
+      .flatMap((t) => {
+        const patch = rollOverdue(t, todayYmd);
+        return patch ? [{ id: t.id, patch }] : [];
+      });
+    const patched = await patchTodosEach(items);
+    if (!patched) return; // reported + toasted by `wrapAsync`
+    if (reconcileGate(`${trigger}:${patched.length}`)) {
+      logEvent({
+        level: 'info',
+        surface: RECURRENCE_SURFACE,
+        message: 'reconcile',
+        context: { action: 'auto-roll', count: patched.length, detail: trigger },
+      });
+    }
+  }
+
+  // Change + heartbeat, so a device that never rolls is still visible.
+  const reconcileGate = createChangeGate();
+  // Which trigger queued the next run, for the `reconcile` event only.
+  let rollTrigger: 'load' | 'today' = 'load';
+  // One run in flight, one coalesced rerun, a throw reported (never a dead watcher).
+  const rollLoop = createReconcileLoop({
+    debounceMs: 0,
+    run: () => reconcileRepeatingTodos(rollTrigger),
+    surface: RECURRENCE_SURFACE,
+    failureMessage: 'Repeating to-do roll failed',
+  });
 
   // #40: "keep" a hint — it becomes a permanent normal to-do (exempt from
   // auto-expiry + master-off cleanup) while retaining its subtle hint marker.
@@ -500,7 +837,16 @@ export const useTodoStore = defineStore('todos', () => {
     todos.value = [];
     isLoading.value = false;
     error.value = null;
+    rollLoop.reset();
   }
+
+  // #123: roll repeating to-dos when the local day advances (midnight, PWA wake). Needed as
+  // well as the `loadTodos` run: `today` is set at module load, so for a session that opens
+  // fresh each day this watcher never fires.
+  watch(today, () => {
+    rollTrigger = 'today';
+    rollLoop.queue();
+  });
 
   return {
     // State
@@ -532,6 +878,7 @@ export const useTodoStore = defineStore('todos', () => {
     loadTodos,
     createTodo,
     createTodos,
+    patchTodosEach,
     linkTodosToActivity,
     deleteTodos,
     openTodosForActivity,
@@ -542,6 +889,9 @@ export const useTodoStore = defineStore('todos', () => {
     restoreTodo,
     toggleComplete,
     setSomeday,
+    // #123: repeating to-dos
+    skipOccurrence,
+    setRepeat,
     acknowledgeHint,
     resetState,
   };

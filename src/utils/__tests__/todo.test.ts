@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { isTodoOverdue, isTodoDueToday, sortTodos, toCreateTodoInput } from '../todo';
-import type { TodoItem } from '@/types/models';
+import { isTodoOverdue, isTodoDueToday, sortTodos, toCreateTodoInput, dueDayLabel } from '../todo';
+import type { RecurrenceRule, TodoItem } from '@/types/models';
+import type { UIStringKey } from '@/services/translation/uiStrings';
 
 function todo(overrides: Partial<TodoItem> = {}): TodoItem {
   return {
@@ -230,5 +231,67 @@ describe('toCreateTodoInput', () => {
     const input = toCreateTodoInput({ title: 'x', assigneeIds: ids }, 'm-1');
     expect(input.assigneeIds).toEqual(ids);
     expect(input.assigneeIds).not.toBe(ids);
+  });
+
+  describe('with a repeat (#123)', () => {
+    const weeklyWed: RecurrenceRule = {
+      unit: 'week',
+      interval: 1,
+      weekdays: [3],
+      end: { kind: 'never' },
+    };
+
+    it('starts the series on the due date: anchor = the date, first occurrence, empty log', () => {
+      // 2026-10-09 is a Friday, so the first Wednesday on or after it is the 14th.
+      const input = toCreateTodoInput(
+        { title: 'Trash', dueDate: '2026-10-09', dueTime: '20:00', repeat: weeklyWed },
+        'm-1',
+        '2026-10-09'
+      );
+      expect(input).toEqual({
+        title: 'Trash',
+        dueDate: '2026-10-14',
+        dueTime: '20:00',
+        repeat: { rule: weeklyWed, anchor: '2026-10-09' },
+        repeatLog: [],
+        completed: false,
+        createdBy: 'm-1',
+      });
+    });
+
+    it('ignores a repeat without a due date', () => {
+      const input = toCreateTodoInput({ title: 'Trash', repeat: weeklyWed }, 'm-1', '2026-10-09');
+      expect(Object.keys(input).sort()).toEqual(['completed', 'createdBy', 'title']);
+    });
+
+    it('an unusable rule keeps the plain due date and writes no repeat', () => {
+      const bad = { ...weeklyWed, interval: 0 };
+      const input = toCreateTodoInput(
+        { title: 'Trash', dueDate: '2026-10-09', repeat: bad },
+        'm-1',
+        '2026-10-09'
+      );
+      expect(input.dueDate).toBe('2026-10-09');
+      expect(input).not.toHaveProperty('repeat');
+      expect(input).not.toHaveProperty('repeatLog');
+    });
+  });
+});
+
+describe('dueDayLabel', () => {
+  const t = (k: UIStringKey) => (k === 'date.today' ? 'Today' : String(k));
+
+  it('"Today" on the day itself', () => {
+    expect(dueDayLabel('2026-10-14', '2026-10-14', t)).toBe('Today');
+  });
+
+  it('the compact Nook date otherwise', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 9, 9, 12, 0, 0));
+    try {
+      expect(dueDayLabel('2026-10-14', '2026-10-09', t)).toBe('Wed, 14 Oct');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

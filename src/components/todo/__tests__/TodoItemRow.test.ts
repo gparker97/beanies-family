@@ -2,7 +2,10 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { setActivePinia, createPinia } from 'pinia';
 import TodoItemRow from '../TodoItemRow.vue';
-import type { TodoItem } from '@/types/models';
+import LinkedCardChip from '../LinkedCardChip.vue';
+import type { TodoItem, TodoRepeat } from '@/types/models';
+
+vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 
 function todo(overrides: Partial<TodoItem> = {}): TodoItem {
   return {
@@ -134,6 +137,53 @@ describe('TodoItemRow', () => {
       expect(w.text()).not.toContain('📅');
       box.trigger('click');
       expect(w.emitted('toggle')).toEqual([['t-1']]);
+    });
+  });
+
+  describe('repeating and card-made to-dos (#123)', () => {
+    // 2026-10-07 is a Wednesday.
+    const repeat: TodoRepeat = {
+      rule: { unit: 'week', interval: 1, weekdays: [3], end: { kind: 'never' } },
+      anchor: '2026-10-07',
+    };
+    const repeating = (o: Partial<TodoItem> = {}) =>
+      todo({ repeat, dueDate: '2026-10-14', dueTime: '20:00', repeatLog: [], ...o });
+    const badge = (w: ReturnType<typeof mount>) => w.find('[data-testid="todo-repeat-badge"]');
+    const deleteButton = (w: ReturnType<typeof mount>) =>
+      w.findAll('button').find((b) => b.text().includes('🗑️'));
+
+    it('shows the ↻ cadence badge with its time, in the full and the compact row', () => {
+      const full = mount(TodoItemRow, { props: { todo: repeating() } });
+      expect(badge(full).text()).toContain('↻');
+      expect(badge(full).text()).toMatch(/weekly on wed at 8pm/i);
+
+      const compact = mount(TodoItemRow, { props: { todo: repeating(), compact: true } });
+      expect(badge(compact).exists()).toBe(true);
+    });
+
+    it('shows no badge on a plain to-do', () => {
+      const w = mount(TodoItemRow, { props: { todo: todo({ dueDate: '2026-10-14' }) } });
+      expect(badge(w).exists()).toBe(false);
+      expect(w.findComponent(LinkedCardChip).exists()).toBe(false);
+    });
+
+    it('a repeating to-do offers no someday action (it would clear the date) but can be deleted', () => {
+      const w = mount(TodoItemRow, { props: { todo: repeating() } });
+      expect(hoverButton(w, 'someday')).toBeUndefined();
+      expect(deleteButton(w)).toBeDefined();
+    });
+
+    it('a card-made to-do hides delete and someday, and links its card (with the part)', () => {
+      const w = mount(TodoItemRow, {
+        props: { todo: repeating({ cardId: 'school-drop', cardPartKey: 'm-leo' }) },
+      });
+      expect(deleteButton(w)).toBeUndefined();
+      expect(hoverButton(w, 'someday')).toBeUndefined();
+      expect(w.findComponent(LinkedCardChip).props()).toMatchObject({
+        cardId: 'school-drop',
+        partKey: 'm-leo',
+        variant: 'chip',
+      });
     });
   });
 });

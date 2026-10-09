@@ -9,6 +9,9 @@
  * timestamp via the shared `formatCreatedAt`, so every drawer that adopts it
  * reads identically — this is the standard convention for showing when an
  * item was created. Renders nothing if it has neither piece of data.
+ *
+ * `label`, when given, replaces "Created by {name}" (the timestamp stays), for an item that
+ * a feature made rather than a person ("Made by the Trash Night card", #123).
  */
 import { computed } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
@@ -18,20 +21,26 @@ import { formatCreatedAt } from '@/utils/date';
 const props = defineProps<{
   createdAt?: string | null;
   createdBy?: string | null;
+  /** Replaces "Created by {name}" when present; the timestamp is unchanged. */
+  label?: string;
 }>();
 
 const { t } = useTranslation();
 const { getMemberName } = useMemberInfo();
 
 const creatorName = computed(() => (props.createdBy ? getMemberName(props.createdBy) : null));
+const byLine = computed(() => {
+  if (props.label) return props.label;
+  return creatorName.value ? `${t('common.createdBy')} ${creatorName.value}` : null;
+});
 const timestamp = computed(() => (props.createdAt ? formatCreatedAt(props.createdAt) : null));
 </script>
 
 <template>
-  <div v-if="creatorName || timestamp" class="dark:border-line border-t border-gray-100 pt-2.5">
+  <div v-if="byLine || timestamp" class="dark:border-line border-t border-gray-100 pt-2.5">
     <p class="font-inter text-xs text-[var(--color-text-muted)]">
-      <template v-if="creatorName">{{ t('common.createdBy') }} {{ creatorName }}</template>
-      <span v-if="creatorName && timestamp" class="px-1 opacity-50" aria-hidden="true">·</span>
+      <template v-if="byLine">{{ byLine }}</template>
+      <span v-if="byLine && timestamp" class="px-1 opacity-50" aria-hidden="true">·</span>
       <template v-if="timestamp">{{ timestamp }}</template>
     </p>
   </div>

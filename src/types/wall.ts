@@ -44,6 +44,11 @@ export interface WallJob {
   completedAt?: string;
   /** Set on to-dos only. */
   bucket?: WallTodoBucket;
+  /**
+   * The row cannot be renamed or removed here (a card-made to-do is the card's, #123). The tick
+   * still works: ticking a repeating to-do rolls it to its next date.
+   */
+  locked?: boolean;
 }
 
 /** One list and its items, ready to render as a titled block. */

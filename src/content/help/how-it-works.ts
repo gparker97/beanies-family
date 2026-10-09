@@ -431,6 +431,11 @@ export const HOW_IT_WORKS_ARTICLES: HelpArticle[] = [
         icon: '✨',
       },
       {
+        type: 'paragraph',
+        content:
+          'A <a href="/help/features/repeating-to-dos-and-card-reminders">card reminder</a> set on a Who Owns What card shows up on its day as a \u{1F514} row, <em>"Reminder for Leo: Trash Night at 8:00 PM!"</em>, in place of the usual "asked you" row. Ticking it off moves the repeating to-do to its next date.',
+      },
+      {
         type: 'heading',
         content: 'Who Owns What cards',
         level: 3,

@@ -1,9 +1,10 @@
 /**
  * DeckGrid (#109): `scrollToShelf`, which the page calls after an Overview "By Category" row
- * opens the Deck view filtered to that category.
+ * opens the Deck view filtered to that category. Plus the deck tile's reminder bell (#123).
  */
 import { describe, it, expect, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
+import { setActivePinia, createPinia } from 'pinia';
 import { getResponsibilityCard } from '@/constants/responsibilityCards';
 import type { ResolvedCard } from '@/utils/responsibilityDeck';
 import type { ListCategory } from '@/types/models';
@@ -14,6 +15,7 @@ vi.mock('@/composables/useTranslation', () => ({
 vi.mock('../useDealActions', () => ({ useDealActions: () => ({ bringBack: vi.fn() }) }));
 
 import DeckGrid from '../DeckGrid.vue';
+import ResponsibilityCardTile from '../ResponsibilityCardTile.vue';
 
 function card(id: string): ResolvedCard {
   const def = getResponsibilityCard(id)!;
@@ -93,5 +95,26 @@ describe('DeckGrid opening a card', () => {
     byBean.findComponent({ name: 'DeckByBean' }).vm.$emit('open', 'laundry', seq);
     expect(byBean.emitted('open')![0]).toEqual(['laundry', seq]);
     byBean.unmount();
+  });
+});
+
+describe('ResponsibilityCardTile reminder badge (#123)', () => {
+  const mountTile = (c: ResolvedCard) => {
+    setActivePinia(createPinia());
+    return mount(ResponsibilityCardTile, {
+      props: { card: c },
+      global: { stubs: { CardArt: true, MemberChip: true } },
+    });
+  };
+
+  it('shows the bell on the slab only when the card has a reminder', () => {
+    const plain = mountTile(card('dishes'));
+    expect(plain.find('[data-testid="card-reminder-badge-dishes"]').exists()).toBe(false);
+
+    const reminding = mountTile({ ...card('dishes'), hasReminder: true });
+    const badge = reminding.find('[data-testid="card-reminder-badge-dishes"]');
+    expect(badge.exists()).toBe(true);
+    expect(badge.attributes('aria-label')).toBe('whoOwnsWhat.tile.reminderBadge');
+    expect(badge.text()).toBe('🔔');
   });
 });

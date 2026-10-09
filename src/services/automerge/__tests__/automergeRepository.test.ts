@@ -499,6 +499,100 @@ describe('createAutomergeRepository', () => {
       ]);
     });
 
+    it('createManyWithIds({ ifAbsent }) never overwrites a projected id and returns only the created', async () => {
+      await todoRepo.createManyWithIds([{ id: 'td-1', input: input('Peer made this') }]);
+      await todoRepo.patchMany(['td-1'], { description: 'peer note' }, { onMissing: 'skip' });
+      const sent = recordMutations();
+
+      const created = await todoRepo.createManyWithIds(
+        [
+          { id: 'td-1', input: input('Mine') },
+          { id: 'td-2', input: input('Pay fee') },
+        ],
+        { ifAbsent: true }
+      );
+
+      expect(created.map((t) => t.id)).toEqual(['td-2']);
+      const kept = await todoRepo.getById('td-1');
+      expect(kept!.title).toBe('Peer made this');
+      expect(kept!.description).toBe('peer note');
+      // Only the absent id travelled in the write.
+      const batch = sent.find((op) => op.op === 'batch') as Extract<
+        (typeof sent)[number],
+        { op: 'batch' }
+      >;
+      expect(batch.ops.map((op) => (op as { id: string }).id)).toEqual(['td-2']);
+    });
+
+    it('createManyWithIds({ ifAbsent }) with every id present writes nothing', async () => {
+      await todoRepo.createManyWithIds([{ id: 'td-1', input: input('Sign slip') }]);
+      const sent = recordMutations();
+
+      expect(
+        await todoRepo.createManyWithIds([{ id: 'td-1', input: input('Mine') }], { ifAbsent: true })
+      ).toEqual([]);
+      expect(sent).toEqual([]);
+    });
+
+    it('patchEach writes a different patch per id in one change and skips a missing id', async () => {
+      await todoRepo.createManyWithIds([
+        { id: 'td-1', input: { ...input('Sign slip'), activityId: 'act-1' } },
+        { id: 'td-2', input: input('Pay fee') },
+      ]);
+      const sent = recordMutations();
+
+      const patched = await todoRepo.patchEach(
+        [
+          { id: 'td-1', patch: { dueDate: '2026-10-14', activityId: undefined } },
+          { id: 'gone', patch: { dueDate: '2026-10-15' } },
+          { id: 'td-2', patch: { title: 'Pay the fee' } },
+        ],
+        { onMissing: 'skip' }
+      );
+
+      // ONE batch, one op per item, each with its own patch, deleteKeys and base.
+      expect(sent.filter((op) => op.op === 'batch')).toHaveLength(1);
+      expect(patchOpsIn(sent).map((op) => [op.id, op.patch, op.deleteKeys, op.base])).toEqual([
+        ['td-1', { dueDate: '2026-10-14' }, ['activityId'], {}],
+        ['gone', { dueDate: '2026-10-15' }, [], {}],
+        ['td-2', { title: 'Pay the fee' }, [], { title: 'Pay fee' }],
+      ]);
+      expect(patched.map((t) => t.id)).toEqual(['td-1', 'td-2']);
+      const one = projGetById('todos', 'td-1') as unknown as Record<string, unknown>;
+      expect(one.dueDate).toBe('2026-10-14');
+      expect('activityId' in one).toBe(false); // cleared on td-1 only
+      expect(one.title).toBe('Sign slip');
+      expect((await todoRepo.getById('td-2'))!.title).toBe('Pay the fee');
+      expect(await todoRepo.getById('gone')).toBeUndefined();
+    });
+
+    it('patchEach with no items writes nothing', async () => {
+      const sent = recordMutations();
+      expect(await todoRepo.patchEach([], { onMissing: 'skip' })).toEqual([]);
+      expect(sent).toEqual([]);
+    });
+
+    it('patchEach keeps a concurrent change to another key, and to another item of the same array', async () => {
+      await todoRepo.createManyWithIds([
+        { id: 'td-1', input: { ...input('Trash night'), assigneeIds: ['m-1', 'm-2'] } },
+      ]);
+
+      // Both writes are built from the same state; the peer's lands first. patchEach's base is
+      // the pre-peer state, so the worker reconciles three-way instead of reverting the peer.
+      await Promise.all([
+        todoRepo.update('td-1', { title: 'Peer title', assigneeIds: ['m-1', 'm-2', 'm-3'] }),
+        todoRepo.patchEach(
+          [{ id: 'td-1', patch: { dueDate: '2026-10-14', assigneeIds: ['m-1'] } }],
+          { onMissing: 'skip' }
+        ),
+      ]);
+
+      const stored = projGetById('todos', 'td-1') as unknown as Record<string, unknown>;
+      expect(stored.title).toBe('Peer title'); // another key: untouched
+      expect(stored.dueDate).toBe('2026-10-14');
+      expect(stored.assigneeIds).toEqual(['m-1', 'm-3']); // peer's add kept, our removal applied
+    });
+
     it('removeMany deletes present ids and ignores a missing one', async () => {
       await todoRepo.createManyWithIds([
         { id: 'td-1', input: input('Sign slip') },

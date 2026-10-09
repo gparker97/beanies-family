@@ -99,6 +99,8 @@ export default [
             // Repeat marker on the calendar-import review row (#94). Decorative:
             // it sits beside the pattern text ("Weekly") and is aria-hidden.
             '↻',
+            // "Skip This Time" on a repeating to-do (#123). Decorative, aria-hidden.
+            '⏭',
             '○',
             // Archived-cycle tile: history is filed, not active (#cycle-history).
             '🗂',
@@ -258,6 +260,7 @@ export default [
             '⋯',
             '☀️',
             '🔔',
+            '🔕', // #123: the card edit drawer's "no reminder" box
             '💭',
             '🚪',
             '➕',

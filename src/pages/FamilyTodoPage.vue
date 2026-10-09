@@ -28,6 +28,9 @@ import QuickAddBar from '@/components/todo/QuickAddBar.vue';
 import TodoSection from '@/components/todo/TodoSection.vue';
 import SortMenu from '@/components/ui/SortMenu.vue';
 import TodoMemberFilter from '@/components/todo/TodoMemberFilter.vue';
+import TodoRemindersRoster from '@/components/todo/TodoRemindersRoster.vue';
+import { isRepeating } from '@/utils/todoRecurrence';
+import { fillTemplate } from '@/utils/fillTemplate';
 import type { TodoItem } from '@/types/models';
 import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useTodoSort, SORT_OPTIONS } from '@/composables/useTodoSort';
@@ -97,6 +100,8 @@ let revealGeneration = 0;
 const { sortBy } = useTodoSort();
 const memberFilter = ref('all');
 const completedCollapsed = ref(true);
+// #123: the phone's Reminders section starts open, like the mockup; page-local like Completed.
+const remindersCollapsed = ref(false);
 
 const { isDesktop } = useBreakpoint();
 
@@ -128,6 +133,18 @@ function withMemberFilterAndSort(items: TodoItem[]): TodoItem[] {
 }
 
 const displayedOpenTodos = computed(() => withMemberFilterAndSort(todoStore.filteredActiveTodos));
+// #123: every repeating to-do (open), through the same lenses and sort as the Open section. One
+// host shows them at a time: the Reminders section on a phone, the Family Reminders panel on
+// desktop.
+const displayedReminderTodos = computed(() =>
+  withMemberFilterAndSort(todoStore.filteredActiveTodos.filter(isRepeating))
+);
+const remindersPanelCount = computed(() => {
+  const count = displayedReminderTodos.value.length;
+  const key = count === 1 ? 'todo.reminders.panelCount.one' : 'todo.reminders.panelCount.other';
+  return fillTemplate(t(key), { count: String(count) });
+});
+
 const displayedSomedayTodos = computed(() =>
   withMemberFilterAndSort(todoStore.filteredSomedayTodos)
 );
@@ -295,8 +312,17 @@ async function handleAcknowledge(id: string) {
 </script>
 
 <template>
-  <div ref="pageRoot" class="space-y-6">
-    <!-- Page header: view controls (filter + sort, only with to-dos), then the page's ✨ magic
+  <div
+    ref="pageRoot"
+    class="grid grid-cols-1 gap-6"
+    :class="{ 'lg:grid-cols-[minmax(0,1fr)_320px]': hasAnyTodos }"
+  >
+    <!-- #123: two columns on desktop (the Meet the Beans precedent); the list column is unchanged
+         and the Family Reminders panel sits in the right rail. An empty family gets one column
+         and one empty state, as the phone Reminders section sits behind the same gate. (Inside
+         the root: a comment at the template root would make a fragment.) -->
+    <div class="min-w-0 space-y-6">
+      <!-- Page header: view controls (filter + sort, only with to-dos), then the page's ✨ magic
          beans and "+ Add To-do", the same pair as Activities (CalendarCommandBar).
 
          Two arrangements from one markup, split at `md` (the app's phone width, as
@@ -305,123 +331,155 @@ async function handleAcknowledge(id: string) {
              below. The page's actions sit at the top, as on Activities and Who Owns What.
            · md+: the two wrappers are `display: contents`, so the filter, sort, ✨ and + are
              flex items of ONE right-aligned group, beside the subtitle. -->
-    <div class="flex flex-wrap items-start justify-between gap-3 md:items-center">
-      <PageWelcomeSubtitle
-        :text="t('todo.subtitle')"
-        class="min-w-0 flex-1 md:min-w-auto md:flex-initial"
-      />
-      <div class="contents md:ml-auto md:flex md:flex-wrap md:items-center md:justify-end md:gap-2">
-        <!-- `order-last w-full`: its own row under the subtitle and actions on a phone. -->
+      <div class="flex flex-wrap items-start justify-between gap-3 md:items-center">
+        <PageWelcomeSubtitle
+          :text="t('todo.subtitle')"
+          class="min-w-0 flex-1 md:min-w-auto md:flex-initial"
+        />
         <div
-          v-if="hasAnyTodos"
-          class="order-last flex w-full items-center justify-end gap-2 md:contents"
+          class="contents md:ml-auto md:flex md:flex-wrap md:items-center md:justify-end md:gap-2"
         >
-          <!-- Member view-filter (desktop/tablet only): a lens, not an assignee control -->
-          <TodoMemberFilter
-            v-if="sortedMembers.length > 1"
-            v-model="memberFilter"
-            :members="sortedMembers"
-            class="hidden min-w-0 sm:flex"
-          />
-          <SortMenu v-model="sortBy" :options="SORT_OPTIONS" trigger-label-key="todo.sortLabel" />
-        </div>
+          <!-- `order-last w-full`: its own row under the subtitle and actions on a phone. -->
+          <div
+            v-if="hasAnyTodos"
+            class="order-last flex w-full items-center justify-end gap-2 md:contents"
+          >
+            <!-- Member view-filter (desktop/tablet only): a lens, not an assignee control -->
+            <TodoMemberFilter
+              v-if="sortedMembers.length > 1"
+              v-model="memberFilter"
+              :members="sortedMembers"
+              class="hidden min-w-0 sm:flex"
+            />
+            <SortMenu v-model="sortBy" :options="SORT_OPTIONS" trigger-label-key="todo.sortLabel" />
+          </div>
 
-        <div class="flex shrink-0 items-center gap-2 md:contents">
-          <!-- The door owns the sheet, consent and its own `canReadAny` gate. -->
-          <MagicBeansDoor hint="todo">
-            <template #trigger="{ open }">
-              <MagicReaderPill :label="t('ai.magic.perform')" @click="open" />
-            </template>
-          </MagicBeansDoor>
+          <div class="flex shrink-0 items-center gap-2 md:contents">
+            <!-- The door owns the sheet, consent and its own `canReadAny` gate. -->
+            <MagicBeansDoor hint="todo">
+              <template #trigger="{ open }">
+                <MagicReaderPill :label="t('ai.magic.perform')" @click="open" />
+              </template>
+            </MagicBeansDoor>
 
-          <AddEntityButton
-            v-if="canEditActivities"
-            :label="t('todo.addTodo')"
-            compact
-            @click="showCreate = true"
-          />
+            <AddEntityButton
+              v-if="canEditActivities"
+              :label="t('todo.addTodo')"
+              compact
+              @click="showCreate = true"
+            />
+          </div>
         </div>
       </div>
-    </div>
 
-    <!-- Quick add bar -->
-    <QuickAddBar
-      v-if="canEditActivities"
-      ref="quickAddBar"
-      source="quick_bar"
-      caller-tag="FamilyTodoPage"
-      @created="revealTodo($event.id)"
-    />
-
-    <!-- #40: Helpful Hints — gentle auto-suggested prep to-dos, shown above the
-         family's own tasks. One-tap Keep (acknowledge) or Dismiss on each row. -->
-    <TodoSection
-      v-if="displayedHintTodos.length > 0"
-      :label="t('todo.hint.section')"
-      emoji="💡"
-      label-class="text-[var(--color-primary-500)]"
-      :todos="displayedHintTodos"
-      @toggle="handleToggle"
-      @view="openModal"
-      @edit="openModal"
-      @delete="handleHintDismiss"
-      @acknowledge="handleAcknowledge"
-    >
-      <template #hint>{{ t('todo.hint.sectionHint') }}</template>
-    </TodoSection>
-
-    <!-- Empty state -->
-    <div v-if="!hasAnyTodos" class="py-12 text-center">
-      <EmptyStateIllustration variant="goals" class="mb-4" />
-      <p class="text-lg font-medium text-[var(--color-text)]">{{ t('todo.noTodos') }}</p>
-      <p class="mt-1 text-sm text-[var(--color-text-muted)]">{{ t('todo.getStarted') }}</p>
-    </div>
-
-    <!-- Sections (only show when there are todos) -->
-    <template v-if="hasAnyTodos">
-      <!-- Open to-dos -->
-      <TodoSection
-        :label="t('todo.section.open')"
-        label-class="text-purple-500 dark:text-purple-lift"
-        :todos="displayedOpenTodos"
-        :empty-text="t('todo.noTodos')"
-        @toggle="handleToggle"
-        @view="openModal"
-        @edit="openModal"
-        @delete="handleDelete"
-        @set-someday="handleSetSomeday"
+      <!-- Quick add bar -->
+      <QuickAddBar
+        v-if="canEditActivities"
+        ref="quickAddBar"
+        source="quick_bar"
+        caller-tag="FamilyTodoPage"
+        @created="revealTodo($event.id)"
       />
 
-      <!-- Someday · Maybe — always visible (these aren't completed), hidden only when empty -->
+      <!-- #40: Helpful Hints — gentle auto-suggested prep to-dos, shown above the
+         family's own tasks. One-tap Keep (acknowledge) or Dismiss on each row. -->
       <TodoSection
-        v-if="displayedSomedayTodos.length > 0"
-        :label="t('todo.someday')"
-        emoji="💭"
-        label-class="text-sky-600 dark:text-sky-400"
-        :todos="displayedSomedayTodos"
+        v-if="displayedHintTodos.length > 0"
+        :label="t('todo.hint.section')"
+        emoji="💡"
+        label-class="text-[var(--color-primary-500)]"
+        :todos="displayedHintTodos"
         @toggle="handleToggle"
         @view="openModal"
         @edit="openModal"
-        @delete="handleDelete"
-        @set-someday="handleSetSomeday"
+        @delete="handleHintDismiss"
+        @acknowledge="handleAcknowledge"
       >
-        <template #hint>{{ t('todo.somedayHint') }}</template>
+        <template #hint>{{ t('todo.hint.sectionHint') }}</template>
       </TodoSection>
 
-      <!-- Completed (collapsible) -->
-      <TodoSection
-        v-if="displayedCompletedTodos.length > 0"
-        v-model:collapsed="completedCollapsed"
-        :label="t('todo.section.completed')"
-        label-class="text-green-600 dark:text-success-lift"
-        :todos="displayedCompletedTodos"
-        collapsible
-        @toggle="handleToggle"
-        @view="openModal"
-        @edit="openModal"
-        @delete="handleDelete"
-      />
-    </template>
+      <!-- Empty state -->
+      <div v-if="!hasAnyTodos" class="py-12 text-center">
+        <EmptyStateIllustration variant="goals" class="mb-4" />
+        <p class="text-lg font-medium text-[var(--color-text)]">{{ t('todo.noTodos') }}</p>
+        <p class="mt-1 text-sm text-[var(--color-text-muted)]">{{ t('todo.getStarted') }}</p>
+      </div>
+
+      <!-- Sections (only show when there are todos) -->
+      <template v-if="hasAnyTodos">
+        <!-- Open to-dos -->
+        <TodoSection
+          :label="t('todo.section.open')"
+          label-class="text-purple-500 dark:text-purple-lift"
+          :todos="displayedOpenTodos"
+          :empty-text="t('todo.noTodos')"
+          @toggle="handleToggle"
+          @view="openModal"
+          @edit="openModal"
+          @delete="handleDelete"
+          @set-someday="handleSetSomeday"
+        />
+
+        <!-- #123: Reminders (phone): everything that repeats, by who it reminds -->
+        <TodoSection
+          v-if="!isDesktop"
+          v-model:collapsed="remindersCollapsed"
+          :label="t('todo.section.reminders')"
+          emoji="🔔"
+          label-class="text-[var(--color-primary-500)] dark:text-accent-lift"
+          :todos="displayedReminderTodos"
+          collapsible
+          data-testid="todo-reminders-section"
+        >
+          <template #hint>{{ t('todo.section.remindersHint') }}</template>
+          <TodoRemindersRoster :todos="displayedReminderTodos" @view="openModal" />
+        </TodoSection>
+
+        <!-- Someday · Maybe — always visible (these aren't completed), hidden only when empty -->
+        <TodoSection
+          v-if="displayedSomedayTodos.length > 0"
+          :label="t('todo.someday')"
+          emoji="💭"
+          label-class="text-sky-600 dark:text-sky-400"
+          :todos="displayedSomedayTodos"
+          @toggle="handleToggle"
+          @view="openModal"
+          @edit="openModal"
+          @delete="handleDelete"
+          @set-someday="handleSetSomeday"
+        >
+          <template #hint>{{ t('todo.somedayHint') }}</template>
+        </TodoSection>
+
+        <!-- Completed (collapsible) -->
+        <TodoSection
+          v-if="displayedCompletedTodos.length > 0"
+          v-model:collapsed="completedCollapsed"
+          :label="t('todo.section.completed')"
+          label-class="text-green-600 dark:text-success-lift"
+          :todos="displayedCompletedTodos"
+          collapsible
+          @toggle="handleToggle"
+          @view="openModal"
+          @edit="openModal"
+          @delete="handleDelete"
+        />
+      </template>
+    </div>
+
+    <!-- #123: Family Reminders (desktop right rail). No outer card: the roster's member cards sit
+         on the page ground, as a card on a card would be raised-on-raised in dark mode. -->
+    <aside v-if="isDesktop && hasAnyTodos" class="min-w-0" data-testid="todo-reminders-panel">
+      <h2
+        class="font-outfit dark:text-ink flex items-center gap-2 text-base font-bold text-[var(--color-text)]"
+      >
+        <span aria-hidden="true">🔔</span>{{ t('todo.reminders.panelTitle') }}
+      </h2>
+      <p class="dark:text-ink-faint mb-3 text-xs text-[var(--color-text-muted)]">
+        {{ remindersPanelCount }}
+      </p>
+      <TodoRemindersRoster :todos="displayedReminderTodos" @view="openModal" />
+    </aside>
 
     <TodoViewEditModal :todo="selectedTodo" @close="selectedTodoId = null" />
 

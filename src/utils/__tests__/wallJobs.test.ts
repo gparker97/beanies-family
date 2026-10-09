@@ -6,7 +6,7 @@ import {
   jobsProgress,
   sortJobs,
 } from '@/utils/wallJobs';
-import type { FamilyList, TodoItem } from '@/types/models';
+import type { FamilyList, TodoItem, TodoRepeat } from '@/types/models';
 
 const TODAY = '2026-08-31';
 
@@ -355,5 +355,23 @@ describe('captureListRemoval', () => {
     const l = list({ id: 'l1', items: threeItems } as never);
 
     expect(captureListRemoval(l, 'i2')).not.toHaveProperty('items');
+  });
+});
+
+describe('buildWallJobs: repeating and card-made to-dos (#123)', () => {
+  // 2026-08-31 is a Monday.
+  const repeat: TodoRepeat = {
+    rule: { unit: 'week', interval: 1, weekdays: [1], end: { kind: 'never' } },
+    anchor: TODAY,
+  };
+
+  it('locks a card-made to-do (no rename or remove on the wall)', () => {
+    const result = build([todo({ repeat, cardId: 'trash', cardPartKey: 'main' })], []);
+    expect(todosOf(result, 'leo')[0]).toMatchObject({ todoId: 't1', locked: true });
+  });
+
+  it('leaves a plain repeating to-do and a one-off to-do editable', () => {
+    const result = build([todo({ repeat }), todo({ id: 't2', title: 'sign the slip' })], []);
+    expect(todosOf(result, 'leo').every((j) => !j.locked)).toBe(true);
   });
 });

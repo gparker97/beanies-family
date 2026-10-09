@@ -484,6 +484,7 @@ describe('copies and helpers', () => {
       pickupCompletions: ['date'],
       exchangeRates: ['from', 'to'],
       categories: ['categoryId'],
+      repeatLog: ['date'],
     });
     expect([...MERGE_FIELDS].sort()).toEqual([
       'aiApiKeys',

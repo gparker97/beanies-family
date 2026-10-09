@@ -2,12 +2,15 @@ import type { RecurrenceRule } from '@/types/recurrence';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { logEvent } from '@/services/telemetry/logEvent';
+import { reportUnmappable, type RecurSurface } from '@/services/recurrence/adapters';
 import { getOrdinalSuffix } from '@/utils/format';
 import {
   parseLocalDate,
   getWeekdayOrdinalInMonth,
   formatDate,
   formatDateShort,
+  formatTime12,
+  isWallClockTime,
 } from '@/utils/date';
 
 /**
@@ -135,10 +138,46 @@ export function describeRule(rule: RecurrenceRule, anchorYmd: string, t: T): str
     }
   }
 
+  return core + endSuffix(rule, t);
+}
+
+/** The " · until {date}" / " · {n} times" tail of a summary; '' for a rule that never ends. */
+function endSuffix(rule: RecurrenceRule, t: T): string {
   if (rule.end.kind === 'onDate') {
-    core += ` · ${fillTemplate(t('recurrence.desc.untilDate'), { date: formatDate(rule.end.date) })}`;
-  } else if (rule.end.kind === 'afterCount') {
-    core += ` · ${fillTemplate(t('recurrence.desc.timesN'), { n: rule.end.count })}`;
+    return ` · ${fillTemplate(t('recurrence.desc.untilDate'), { date: formatDate(rule.end.date) })}`;
   }
-  return core;
+  if (rule.end.kind === 'afterCount') {
+    return ` · ${fillTemplate(t('recurrence.desc.timesN'), { n: rule.end.count })}`;
+  }
+  return '';
+}
+
+/**
+ * {@link describeRule} plus an optional time of day ("weekly on Wed at 8pm").
+ * It composes the one canonical summary rather than generating a second one:
+ * without a time it returns `describeRule` unchanged. With one, the time sits
+ * on the cadence and the end stays last ("weekly on Wed at 8pm · 2 times").
+ * `time` is `HH:mm`; `surface` names the caller's entity in the fallback report.
+ */
+export function describeRuleAt(
+  rule: RecurrenceRule,
+  anchorYmd: string,
+  time: string | undefined,
+  t: T,
+  surface: RecurSurface = 'unknown'
+): string {
+  if (!time) return describeRule(rule, anchorYmd, t);
+  // `formatTime12` renders any malformed input as "12pm", which would state a
+  // wrong time. A bad stored time drops back to the plain cadence, reported once
+  // per (surface, reason) for the session: this runs in render-time computeds,
+  // so a per-call log would repeat on every re-render and trip the rate limit.
+  if (!isWallClockTime(time)) {
+    reportUnmappable(surface, 'invalid-time');
+    return describeRule(rule, anchorYmd, t);
+  }
+  const cadence = describeRule({ ...rule, end: { kind: 'never' } }, anchorYmd, t);
+  return (
+    fillTemplate(t('recurrence.desc.atTime'), { cadence, time: formatTime12(time) }) +
+    endSuffix(rule, t)
+  );
 }

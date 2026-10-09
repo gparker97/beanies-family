@@ -15,6 +15,8 @@ import { HELPFUL_HINT_TYPES } from '@/utils/helpfulHints';
 import { UI_STRINGS, BEANIE_STRINGS } from '@/services/translation/uiStrings';
 import {
   buildCardBriefingRows,
+  cardRoute,
+  isValidCardReminder,
   MOVED_NOTE_DAYS,
   cardHistory,
   checkInCardIds,
@@ -43,6 +45,7 @@ import {
   type ResolvedCard,
 } from '@/utils/responsibilityDeck';
 import type {
+  CardReminder,
   FamilyMember,
   ListCategory,
   ResponsibilityCardState,
@@ -1060,5 +1063,101 @@ describe('check-in lists and the remaining rule', () => {
   it('remainingScope: never-sorted cards first, else the waiting ones', () => {
     expect(remainingScope({ unsorted: 3 })).toBe('unsorted');
     expect(remainingScope({ unsorted: 0 })).toBe('waiting');
+  });
+});
+
+// ── #123 card reminders ─────────────────────────────────────────────────────────
+
+describe('card reminders on the read side', () => {
+  const R: CardReminder = {
+    say: 'Put the trash out',
+    cadence: { unit: 'week', interval: 1, weekdays: [3] },
+    time: '20:00',
+    anchor: '2026-09-30',
+  };
+
+  it('isValidCardReminder accepts a well-formed reminder (time optional)', () => {
+    expect(isValidCardReminder(R)).toBe(true);
+    const { time: _time, ...allDay } = R;
+    expect(isValidCardReminder(allDay)).toBe(true);
+    expect(
+      isValidCardReminder({
+        ...R,
+        cadence: { unit: 'month', interval: 1, monthlyAnchor: 'weekday' },
+      })
+    ).toBe(true);
+  });
+
+  it.each([
+    ['not an object', null],
+    ['an array', [R]],
+    ['say not a string', { ...R, say: 3 }],
+    ['no cadence', { ...R, cadence: undefined }],
+    ['unknown unit', { ...R, cadence: { unit: 'fortnight', interval: 1 } }],
+    ['zero interval', { ...R, cadence: { unit: 'day', interval: 0 } }],
+    ['monthly without an anchor', { ...R, cadence: { unit: 'month', interval: 1 } }],
+    ['weekdays not numbers', { ...R, cadence: { unit: 'week', interval: 1, weekdays: ['wed'] } }],
+    ['anchor overflows', { ...R, anchor: '2026-02-31' }],
+    ['anchor not a ymd', { ...R, anchor: '2026-09-30T00:00:00Z' }],
+    ['time not HH:mm', { ...R, time: '8pm' }],
+    ['time out of range', { ...R, time: '24:00' }],
+  ])('isValidCardReminder rejects %s', (_label, value) => {
+    expect(isValidCardReminder(value)).toBe(false);
+  });
+
+  it('resolves each part its own reminder by part key; hasReminder follows', () => {
+    const { cards, invalidReminderIds } = resolve([
+      state('laundry', { parts: [{ key: 'main', holderId: 'greg' }], reminders: { main: R } }),
+      state('lunchboxes', {
+        splitMode: 'child',
+        parts: [{ key: 'leo', holderId: 'greg' }, { key: 'mia' }],
+        reminders: { mia: { ...R, say: 'Mia lunch' } },
+      }),
+      state('dishes'),
+    ]);
+    expect(card(cards, 'laundry').parts[0]!.reminder).toEqual(R);
+    expect(card(cards, 'laundry').hasReminder).toBe(true);
+    const lunch = card(cards, 'lunchboxes');
+    expect(lunch.parts.find((p) => p.key === 'leo')!.reminder).toBeUndefined();
+    expect(lunch.parts.find((p) => p.key === 'mia')!.reminder?.say).toBe('Mia lunch');
+    expect(lunch.hasReminder).toBe(true);
+    expect(card(cards, 'dishes').hasReminder).toBe(false);
+    expect(card(cards, 'bikes').hasReminder).toBe(false);
+    expect(invalidReminderIds).toEqual([]);
+  });
+
+  it('ignores orphan keys silently (a removed child, a deleted label part)', () => {
+    const { cards, invalidReminderIds } = resolve([
+      state('laundry', {
+        parts: [{ key: 'main', holderId: 'greg' }],
+        reminders: { 'label-gone': R, ghost: { broken: true } as unknown as CardReminder },
+      }),
+    ]);
+    const laundry = card(cards, 'laundry');
+    expect(laundry.parts[0]!.reminder).toBeUndefined();
+    expect(laundry.hasReminder).toBe(false);
+    expect(invalidReminderIds).toEqual([]);
+  });
+
+  it('a malformed entry hides only itself: the card stays valid and the entry is listed', () => {
+    const { cards, invalidIds, invalidReminderIds } = resolve([
+      state('laundry', {
+        parts: [{ key: 'main', holderId: 'greg' }],
+        reminders: { main: { ...R, anchor: 'soon' } },
+      }),
+      state('dishes', {
+        parts: [{ key: 'main', holderId: 'sofia' }],
+        reminders: 'nope' as unknown as Record<string, CardReminder>,
+      }),
+    ]);
+    expect(invalidIds).toEqual([]);
+    expect(card(cards, 'laundry').status).toBe('held');
+    expect(card(cards, 'laundry').parts[0]!.reminder).toBeUndefined();
+    expect(card(cards, 'dishes').status).toBe('held');
+    expect(invalidReminderIds).toEqual(['laundry:main', 'dishes']);
+  });
+
+  it('cardRoute is the card deep link on Who Owns What', () => {
+    expect(cardRoute('laundry')).toEqual({ path: '/who-owns-what', query: { card: 'laundry' } });
   });
 });

@@ -7,13 +7,16 @@
  *   - no author means no write,
  *   - the time field only exists alongside a date, and clearing the date clears the time,
  *   - a double tap while saving writes once,
- *   - a save still in flight from an earlier open never reports into (or locks) a new one.
+ *   - a save still in flight from an earlier open never reports into (or locks) a new one,
+ *   - the Repeat switch (#123): its copy swaps when on, it seeds a date when there is none,
+ *     clearing the date turns it off, a reopen resets it, and only an "on" switch sends a rule.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { flushPromises, mount } from '@vue/test-utils';
 import { defineComponent, h, ref } from 'vue';
 import TodoFormModal from '@/components/todo/TodoFormModal.vue';
 import { logEvent } from '@/services/telemetry/logEvent';
+import type { RecurrenceRule } from '@/types/models';
 
 vi.mock('@/composables/useTranslation', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
@@ -26,6 +29,7 @@ vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: vi.fn() }));
 vi.mock('@/composables/useBreakpoint', () => ({
   useBreakpoint: () => ({ isDesktop: ref(false) }),
 }));
+vi.mock('@/composables/useToday', () => ({ useToday: () => ({ today: ref('2030-10-10') }) }));
 
 const createTodo = vi.fn();
 vi.mock('@/stores/todoStore', () => ({ useTodoStore: () => ({ createTodo }) }));
@@ -61,6 +65,7 @@ const stubs = {
   FamilyChipPicker: true,
   BeanieDatePicker: true,
   TimePresetPicker: true,
+  RecurrencePicker: true,
 };
 
 async function mountOpen() {
@@ -217,5 +222,85 @@ describe('TodoFormModal', () => {
     finishOld({ id: 'todo-old' });
     await flushPromises();
     expect(w.emitted('created')).toEqual([['todo-new']]);
+  });
+});
+
+describe('TodoFormModal: Repeat (#123)', () => {
+  // 2030-10-13 is a Sunday.
+  const WEEKLY_SUN: RecurrenceRule = {
+    unit: 'week',
+    interval: 1,
+    weekdays: [0],
+    end: { kind: 'never' },
+  };
+  const toggle = (w: Awaited<ReturnType<typeof mountOpen>>) =>
+    w.find('[data-testid="todo-repeat-toggle"]');
+  const picker = (w: Awaited<ReturnType<typeof mountOpen>>) =>
+    w.findComponent({ name: 'RecurrencePicker' });
+
+  it('reads as a quiet row when off, and as "Create a Repeating Family Reminder" when on', async () => {
+    const w = await mountOpen();
+    expect(w.text()).toContain('todo.repeat.toggle');
+    expect(w.text()).toContain('todo.repeat.toggleHintOff');
+    expect(picker(w).exists()).toBe(false);
+
+    await toggle(w).trigger('click');
+    expect(w.text()).toContain('todo.repeat.createTitle');
+    expect(w.text()).toContain('todo.repeat.createHint');
+    expect(picker(w).exists()).toBe(true);
+    expect(picker(w).props()).toMatchObject({ accent: 'purple', defaultCadence: 'weekly' });
+  });
+
+  it('turning it on with no date starts today, and the picker anchors on the due date + time', async () => {
+    const w = await mountOpen();
+    await toggle(w).trigger('click');
+    expect(picker(w).props('startDate')).toBe('2030-10-10');
+    expect(w.findComponent({ name: 'BeanieDatePicker' }).props('modelValue')).toBe('2030-10-10');
+
+    await pick(w, 'BeanieDatePicker', '2030-10-13');
+    await pick(w, 'TimePresetPicker', '20:00');
+    expect(picker(w).props()).toMatchObject({ startDate: '2030-10-13', time: '20:00' });
+  });
+
+  it('clearing the date turns the repeat off', async () => {
+    const w = await mountOpen();
+    await pick(w, 'BeanieDatePicker', '2030-10-13');
+    await toggle(w).trigger('click');
+    expect(picker(w).exists()).toBe(true);
+
+    await pick(w, 'BeanieDatePicker', '');
+    expect(picker(w).exists()).toBe(false);
+    expect(w.text()).toContain('todo.repeat.toggle');
+  });
+
+  it('a reopened form starts with the repeat off', async () => {
+    const w = await mountOpen();
+    await toggle(w).trigger('click');
+    await w.setProps({ open: false });
+    await w.setProps({ open: true });
+    expect(picker(w).exists()).toBe(false);
+    expect(w.text()).toContain('todo.repeat.toggleHintOff');
+  });
+
+  it('creates a repeating to-do anchored on its due date when on, and a plain one when off', async () => {
+    const w = await mountOpen();
+    await w.find('input').setValue('Put the trash out');
+    await pick(w, 'BeanieDatePicker', '2030-10-13');
+    await toggle(w).trigger('click');
+    await picker(w).vm.$emit('update:modelValue', WEEKLY_SUN);
+
+    await save(w).trigger('click');
+    await flushPromises();
+    expect(createTodo.mock.calls[0]![0]).toMatchObject({
+      dueDate: '2030-10-13',
+      repeat: { rule: WEEKLY_SUN, anchor: '2030-10-13' },
+      repeatLog: [],
+    });
+
+    // Off again: the rule the picker emitted is not sent.
+    await toggle(w).trigger('click');
+    await save(w).trigger('click');
+    await flushPromises();
+    expect(createTodo.mock.calls[1]![0]).not.toHaveProperty('repeat');
   });
 });

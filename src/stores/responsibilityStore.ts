@@ -177,10 +177,12 @@ export const useResponsibilityStore = defineStore('responsibilities', () => {
   // Once per id per session. The ids come from the document, so they are never sent.
   const loggedBadIds = new Set<string>();
   function logBadRecords(): void {
-    const { unknownIds, invalidIds } = resolvedDeck.value;
+    const { unknownIds, invalidIds, invalidReminderIds } = resolvedDeck.value;
     for (const [message, ids] of [
       ['unknown_card', unknownIds],
       ['invalid_card_state', invalidIds],
+      // #123: a malformed reminder entry hides only itself, never its card.
+      ['invalid_card_reminder', invalidReminderIds],
     ] as const) {
       for (const id of ids) {
         const key = `${message}:${id}`;

@@ -5,6 +5,8 @@ import { useTranslation } from '@/composables/useTranslation';
 import { effectiveAssignees } from '@/utils/assignees';
 import { formatNookDate } from '@/utils/date';
 import { isTodoOverdue, isTodoDueToday } from '@/utils/todo';
+import { todoCapabilities } from '@/utils/todoRecurrence';
+import { useRecurrenceLabel } from '@/composables/useRecurrenceLabel';
 import {
   isHint,
   isFreshHint as isFreshHintTodo,
@@ -15,6 +17,8 @@ import { MARKETING_URL } from '@/utils/marketing';
 import ActivityOwnerStack from '@/components/ui/ActivityOwnerStack.vue';
 import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
 import LinkedActivityChip from '@/components/todo/LinkedActivityChip.vue';
+import LinkedCardChip from '@/components/todo/LinkedCardChip.vue';
+import TodoCompleteCheckbox from '@/components/todo/TodoCompleteCheckbox.vue';
 import EverySessionTag from '@/components/ui/EverySessionTag.vue';
 import type { SessionLinkScope } from '@/utils/activityLinks';
 import type { FamilyMember, TodoItem } from '@/types/models';
@@ -107,15 +111,11 @@ const containerClass = computed(() => {
   return `${pad} border-[var(--tint-slate-5)] bg-white hover:bg-[var(--tint-orange-8)] dark:bg-surface-raised`;
 });
 
-const checkboxClass = computed(() => {
-  // Filled controls keep the true brand colour with white ink in both themes.
-  if (isDone.value) return 'border-[#27ae60] bg-[#27ae60] text-white';
-  if (isSomeday.value)
-    return 'border-[var(--color-sky-silk-300)] hover:bg-[var(--tint-silk-20)] dark:border-sky-400/70';
-  if (!isHintRow.value && isOverdue.value)
-    return 'border-red-400 hover:bg-red-100 dark:border-red-500';
-  return 'border-[var(--color-primary-500)] hover:bg-[var(--tint-orange-8)]';
-});
+// #123: a repeating to-do shows its cadence; what the hover actions offer comes from the ONE
+// capability table (a repeating to-do cannot go someday, a card-made one cannot be deleted).
+const { describeTodo } = useRecurrenceLabel();
+const repeatLabel = computed(() => (isDone.value ? '' : describeTodo(props.todo)));
+const caps = computed(() => todoCapabilities(props.todo));
 
 // Hover-action pill background — picks up the Sky-Silk tint on a someday row so
 // the ✏️ / 🗑️ / 💭 buttons sit on a cohesive field rather than a grey patch.
@@ -164,15 +164,7 @@ function ownersOf(entity: { assigneeIds?: string[]; assigneeId?: string }) {
          the row itself, not a wrapper: the `attention-ring` is an inset shadow, which a child's
          background would hide. (Kept in here: a comment at the template root makes a fragment.) -->
     <!-- Checkbox -->
-    <button
-      type="button"
-      class="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border-[2.5px] transition-colors"
-      :class="[compact ? '' : 'md:h-7 md:w-7', checkboxClass]"
-      :aria-pressed="isDone"
-      @click.stop="emit('toggle', todo.id)"
-    >
-      <span v-if="isDone" class="text-xs font-bold" aria-hidden="true">✓</span>
-    </button>
+    <TodoCompleteCheckbox :todo="todo" :compact="compact" @toggle="emit('toggle', $event)" />
 
     <!-- Content -->
     <div class="min-w-0 flex-1" :class="compact ? '' : 'cursor-pointer'">
@@ -263,6 +255,18 @@ function ownersOf(entity: { assigneeIds?: string[]; assigneeId?: string }) {
           {{ t('todo.noDateSet') }}
         </span>
 
+        <!-- #123: the repeat badge ("↻ weekly on Wed at 8pm"), then the card it came from -->
+        <span
+          v-if="repeatLabel"
+          class="font-outfit dark:text-ink-soft inline-flex max-w-[14rem] min-w-0 items-center gap-1 rounded-full bg-[var(--tint-purple-12)] px-2 py-0.5 text-xs font-semibold text-purple-700"
+          :title="repeatLabel"
+          data-testid="todo-repeat-badge"
+        >
+          <span class="dark:text-purple-lift" aria-hidden="true">↻</span>
+          <span class="min-w-0 truncate">{{ repeatLabel }}</span>
+        </span>
+        <LinkedCardChip v-if="todo.cardId" :card-id="todo.cardId" :part-key="todo.cardPartKey" />
+
         <!-- Linked activity (renders nothing when the activity no longer resolves; its click
              never opens the row) -->
         <LinkedActivityChip
@@ -312,6 +316,7 @@ function ownersOf(entity: { assigneeIds?: string[]; assigneeId?: string }) {
       class="hidden shrink-0 gap-1.5 opacity-0 transition-opacity group-hover:opacity-100 md:flex"
     >
       <button
+        v-if="caps.someday"
         class="flex h-8 w-8 items-center justify-center rounded-[10px] text-sm opacity-40 transition-opacity hover:opacity-70"
         :style="actionPillStyle"
         :title="isSomeday ? t('todo.makeActive') : t('todo.moveToSomeday')"
@@ -327,6 +332,7 @@ function ownersOf(entity: { assigneeIds?: string[]; assigneeId?: string }) {
         ✏️
       </button>
       <button
+        v-if="caps.delete"
         class="flex h-8 w-8 items-center justify-center rounded-[10px] text-sm opacity-40 transition-opacity hover:opacity-70"
         :style="actionPillStyle"
         :aria-label="t('action.delete')"

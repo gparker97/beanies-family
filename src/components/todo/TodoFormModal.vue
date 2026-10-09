@@ -18,8 +18,14 @@
  *
  * The magic beans quick card at the top routes its result through the page's `todo` consumer,
  * which closes this drawer before the review drawer opens.
+ *
+ * Repeat (#123): a quiet switch row under the date and time. On, it reads "Create a Repeating
+ * Family Reminder" and reveals the `RecurrencePicker`, anchored on the due date. A repeat needs
+ * a date: turning it on with none sets today, and clearing the date turns it off (visibly, never
+ * a silent drop). The picker emits its default rule on mount; that is the initial value here,
+ * because this form saves explicitly.
  */
-import { nextTick, ref, watch } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
@@ -27,12 +33,18 @@ import BaseTextarea from '@/components/ui/BaseTextarea.vue';
 import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
 import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import TimePresetPicker from '@/components/ui/TimePresetPicker.vue';
+import ToggleRow from '@/components/ui/ToggleRow.vue';
+import ConditionalSection from '@/components/ui/ConditionalSection.vue';
+import RecurrencePicker from '@/components/ui/RecurrencePicker.vue';
+import RepeatGlyph from '@/components/todo/RepeatGlyph.vue';
 import MagicBeansQuickCard from '@/components/ai/MagicBeansQuickCard.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFormModal } from '@/composables/useFormModal';
 import { useFormValidation } from '@/composables/useFormValidation';
 import { useTodoCreate } from '@/composables/useTodoCreate';
 import { useBreakpoint } from '@/composables/useBreakpoint';
+import { useToday } from '@/composables/useToday';
+import type { RecurrenceRule } from '@/types/models';
 
 const props = defineProps<{
   open: boolean;
@@ -46,21 +58,41 @@ const emit = defineEmits<{
 const { t } = useTranslation();
 const { createTodoFrom } = useTodoCreate();
 const { isDesktop } = useBreakpoint();
+const { today } = useToday();
 
 const title = ref('');
 const description = ref('');
 const assigneeIds = ref<string[]>([]);
 const dueDate = ref('');
 const dueTime = ref('');
+const repeatOn = ref(false);
+const repeatRule = ref<RecurrenceRule | null>(null);
 const titleField = ref<InstanceType<typeof BaseInput> | null>(null);
 
 /** Bumped on every open, so a save from an earlier open never reports into this one. */
 let generation = 0;
 
-// A cleared date takes its time with it, so an old time never comes back with a new date.
+// A cleared date takes its time with it, so an old time never comes back with a new date. It
+// takes the repeat too: a series is anchored on its date, so the switch visibly turns off.
 watch(dueDate, (date) => {
-  if (!date) dueTime.value = '';
+  if (date) return;
+  dueTime.value = '';
+  repeatOn.value = false;
 });
+
+const repeatTitle = computed(() =>
+  repeatOn.value ? t('todo.repeat.createTitle') : t('todo.repeat.toggle')
+);
+const repeatHint = computed(() =>
+  repeatOn.value ? t('todo.repeat.createHint') : t('todo.repeat.toggleHintOff')
+);
+
+function onRepeatToggle(on: boolean): void {
+  // A repeat starts from a date; with none yet, it starts today.
+  if (on && !dueDate.value) dueDate.value = today.value;
+  repeatOn.value = on;
+  if (!on) repeatRule.value = null;
+}
 
 const { isSubmitting } = useFormModal(
   () => null,
@@ -81,6 +113,8 @@ function reset(): void {
   assigneeIds.value = [];
   dueDate.value = '';
   dueTime.value = '';
+  repeatOn.value = false;
+  repeatRule.value = null;
   // Desktop only: on a phone the keyboard would cover the drawer as it slides in.
   if (isDesktop.value) void focusTitle();
 }
@@ -106,6 +140,7 @@ async function handleSave(): Promise<void> {
         dueDate: dueDate.value,
         dueTime: dueTime.value,
         assigneeIds: assigneeIds.value,
+        ...(repeatOn.value && repeatRule.value ? { repeat: repeatRule.value } : {}),
       },
       'TodoFormModal',
       'sidebar'
@@ -162,5 +197,31 @@ async function handleSave(): Promise<void> {
         <TimePresetPicker v-model="dueTime" clearable />
       </FormFieldGroup>
     </div>
+
+    <FormFieldGroup :label="t('todo.repeat.label')" optional>
+      <div
+        class="dark:border-line dark:bg-surface-overlay flex items-center gap-3 rounded-[14px] border border-[var(--tint-slate-10)] bg-white px-3 py-2.5"
+      >
+        <RepeatGlyph />
+        <ToggleRow
+          class="min-w-0 flex-1"
+          :model-value="repeatOn"
+          :title="repeatTitle"
+          :hint="repeatHint"
+          testid="todo-repeat-toggle"
+          @update:model-value="onRepeatToggle"
+        />
+      </div>
+    </FormFieldGroup>
+    <ConditionalSection :show="repeatOn">
+      <RecurrencePicker
+        v-if="repeatOn"
+        v-model="repeatRule"
+        accent="purple"
+        default-cadence="weekly"
+        :start-date="dueDate"
+        :time="dueTime || undefined"
+      />
+    </ConditionalSection>
   </BeanieFormModal>
 </template>

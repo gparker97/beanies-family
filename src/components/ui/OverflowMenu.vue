@@ -87,7 +87,7 @@ function itemClass(item: OverflowMenuItem): string {
         :style="popoverStyle"
         role="menu"
         :aria-label="t(triggerLabelKey)"
-        class="dark:border-line-strong dark:bg-surface-raised z-50 min-w-[12rem] rounded-2xl border border-gray-200 bg-white p-1.5 shadow-[var(--soft-shadow)]"
+        class="dark:border-line-strong dark:bg-surface-raised min-w-[12rem] rounded-2xl border border-gray-200 bg-white p-1.5 shadow-[var(--soft-shadow)]"
         @click.stop
         @keydown="onMenuKeydown"
       >

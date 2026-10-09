@@ -17,9 +17,9 @@
  * emergencyContacts, notificationReads, calendarConnections, calendarEventLinks,
  * driveConnections, overlapAcknowledgments, listCycles, removedMembers,
  * responsibilityCards, responsibilityMoves, responsibilityCheckIns. The
- * supplement covers listCycles, responsibilityCards and the activity completions
- * only; the rest are NOT audited (their array-of-objects fields, if any, would
- * be missed). Extend the supplement when adding a collection with such a field.
+ * supplement covers listCycles, responsibilityCards, the activity completions and
+ * a repeating to-do's `repeatLog` only; the rest are NOT audited (their
+ * array-of-objects fields, if any, would be missed). Extend the supplement when adding a collection with such a field.
  */
 import { describe, it, expect } from 'vitest';
 import { materializeFixture } from '@/services/demo/demoFixture';
@@ -70,6 +70,19 @@ const SUPPLEMENT: Record<string, Json[]> = {
       ],
       pickupCompletions: [
         { date: '2026-10-01', completedBy: 'm1', completedAt: '2026-10-01T15:00:00Z' },
+      ],
+    },
+  ],
+  todos: [
+    {
+      id: 'todo-supp',
+      repeat: {
+        rule: { unit: 'week', interval: 1, weekdays: [3], end: { kind: 'never' } },
+        anchor: '2026-09-30',
+      },
+      repeatLog: [
+        { date: '2026-09-30', outcome: 'done', by: 'm1', at: '2026-09-30T20:05:00.000Z' },
+        { date: '2026-10-07', outcome: 'skipped', by: 'm1', at: '2026-10-07T19:00:00.000Z' },
       ],
     },
   ],

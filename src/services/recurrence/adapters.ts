@@ -7,10 +7,11 @@ import type {
   FamilyList,
   ListFrequency,
   Cadence,
+  TodoItem,
 } from '@/types/models';
 import { extractDatePart, toDateInputValue, parseLocalDate } from '@/utils/date';
 import { logEvent } from '@/services/telemetry/logEvent';
-import { firstDueOnOrAfter } from '@/services/recurrence/recurrenceEngine';
+import { firstDueOnOrAfter, isRuleComplete } from '@/services/recurrence/recurrenceEngine';
 
 /**
  * One place to record a stored recurrence shape that fell outside the model.
@@ -23,7 +24,11 @@ import { firstDueOnOrAfter } from '@/services/recurrence/recurrenceEngine';
  * screen. One event carries the same information.
  */
 const reportedFallbacks = new Set<string>();
-function reportUnmappable(surface: 'transaction' | 'activity' | 'list', reason: string): null {
+
+/** The `recur_surface` a recurrence fallback is reported against. */
+export type RecurSurface = 'transaction' | 'activity' | 'list' | 'todo' | 'card' | 'unknown';
+
+export function reportUnmappable(surface: RecurSurface, reason: string): null {
   const key = `${surface}:${reason}`;
   if (!reportedFallbacks.has(key)) {
     reportedFallbacks.add(key);
@@ -345,6 +350,27 @@ export function resolveListRule(list: ListCadenceFields): ResolvedRule | null {
     default:
       return reportUnmappable('list', 'unknown-frequency');
   }
+}
+
+// ── To-dos (#123) ───────────────────────────────────────────────────────────
+
+/**
+ * Resolve a to-do to its repeat rule + anchor. Returns `null` for a to-do that
+ * does not repeat. A to-do has no legacy recurrence shape, so `repeat` is the
+ * only source; a stored `repeat` whose rule is not structurally complete or
+ * whose anchor does not parse is reported once and treated as not repeating,
+ * so a corrupt record never drives the engine.
+ */
+export function resolveTodoRule(todo: Pick<TodoItem, 'repeat'>): ResolvedRule | null {
+  const repeat = todo.repeat;
+  if (!repeat) return null;
+  if (!isRuleComplete(repeat.rule)) return reportUnmappable('todo', 'invalid-rule');
+  const anchor = typeof repeat.anchor === 'string' ? extractDatePart(repeat.anchor) : '';
+  // Round-trip check: rejects '' and NaN as well as an overflowing "2026-02-31".
+  if (!anchor || toDateInputValue(parseLocalDate(anchor)) !== anchor) {
+    return reportUnmappable('todo', 'invalid-rule');
+  }
+  return { rule: repeat.rule, anchor };
 }
 
 /**

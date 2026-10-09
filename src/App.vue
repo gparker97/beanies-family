@@ -18,6 +18,7 @@ import { isSameOriginReturnPath } from '@/services/google/redirectState';
 import { isNative } from '@/services/sync/capabilities';
 import { useLocalNotifications } from '@/composables/useLocalNotifications';
 import { useHelpfulHints } from '@/composables/useHelpfulHints';
+import { useCardReminders } from '@/composables/useCardReminders';
 import { useNotifications } from '@/composables/useNotifications';
 import { useCalendarRedirectResume } from '@/composables/useCalendarRedirectResume';
 import { useUnifiedRedirectResume } from '@/composables/useUnifiedRedirectResume';
@@ -1961,6 +1962,11 @@ useLocalNotifications();
 // birthdays, parties, and trips (each carrying a #55 notification). Gated behind
 // the `helpfulHints` dev flag; no-op when off. Runs on all platforms.
 useHelpfulHints();
+
+// Card reminders (#123): keep each Who Owns What card reminder's rolling to-do in step with
+// its card (holder, wording, cadence, time). Adult sessions in a writable family only; writes
+// nothing for a family without card reminders. No flag: exposure is opt-in per card.
+useCardReminders();
 
 // In-app notifications: poll tick, app-badge sync, What's-New migration,
 // auto-open on login. Owns no business state — see useNotifications.

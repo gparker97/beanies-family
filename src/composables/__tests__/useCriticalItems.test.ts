@@ -911,6 +911,80 @@ describe('useCriticalItems', () => {
     expect(criticalItems.value[0]!.completed).toBe(false);
   });
 
+  // ── Card reminders (#123) ─────────────────────────────────────────
+
+  describe('card reminder rows', () => {
+    const cardTodo = (overrides?: Partial<TodoItem>) =>
+      makeTodo({
+        id: 'card-trash-main',
+        title: 'Put the trash out',
+        assigneeIds: ['parent-1'],
+        dueDate: TODAY,
+        dueTime: '20:00',
+        createdBy: 'parent-2',
+        cardId: 'trash',
+        cardPartKey: 'main',
+        repeat: {
+          rule: { unit: 'week', interval: 1, weekdays: [2], end: { kind: 'never' } },
+          anchor: '2026-03-03',
+        },
+        repeatLog: [],
+        ...overrides,
+      });
+
+    it('on its due day reads "Reminder for {name}: {task} at {time}!" with a bell, completable', () => {
+      familyStore.setCurrentMember('parent-1');
+      todoStore.todos.push(cardTodo());
+      const items = useCriticalItems().criticalItems.value;
+      expect(items).toHaveLength(1);
+      expect(items[0]).toMatchObject({
+        id: 'card-trash-main',
+        type: 'todo',
+        icon: '🔔',
+        completable: true,
+        completed: false,
+        time: '20:00',
+      });
+      // Case-free: the test store renders in beanie mode (lowercase first word).
+      expect(items[0]!.message).toMatch(/^reminder for Dad: put the trash out at 8pm!$/i);
+    });
+
+    it('an untimed reminder says "today"', () => {
+      familyStore.setCurrentMember('parent-1');
+      todoStore.todos.push(cardTodo({ dueTime: undefined }));
+      expect(useCriticalItems().criticalItems.value[0]!.message).toMatch(
+        /^reminder for Dad: put the trash out today!$/i
+      );
+    });
+
+    it("an adult sees a child's reminder framed by the child's name; another child does not", () => {
+      const childTodo = cardTodo({ assigneeIds: ['child-1'], title: 'Water the plants' });
+      familyStore.setCurrentMember('parent-2');
+      todoStore.todos.push(childTodo);
+      const items = useCriticalItems().criticalItems.value;
+      expect(items).toHaveLength(1);
+      expect(items[0]!.message).toMatch(/^reminder for Emma: water the plants at 8pm!$/i);
+      expect(items[0]!.icon).toBe('🔔');
+
+      familyStore.setCurrentMember('child-2');
+      expect(useCriticalItems().criticalItems.value).toHaveLength(0);
+    });
+
+    it('not on its day, or a plain repeating to-do: the generic rows are unchanged', () => {
+      familyStore.setCurrentMember('parent-1');
+      todoStore.todos.push(
+        cardTodo({ dueDate: '2026-03-12' }),
+        cardTodo({ id: 'plain', cardId: undefined, cardPartKey: undefined, title: 'Pay rent' })
+      );
+      const items = useCriticalItems().criticalItems.value;
+      expect(items).toHaveLength(1);
+      expect(items[0]!.id).toBe('plain');
+      expect(items[0]!.icon).toBe('📋');
+      expect(items[0]!.message).toContain('Mom');
+      expect(items[0]!.message).not.toMatch(/reminder for/i);
+    });
+  });
+
   // ── Medication dose reminders ─────────────────────────────────────
 
   it('shows a medication reminder when no doses logged today (plural)', () => {

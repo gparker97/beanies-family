@@ -18,15 +18,22 @@ import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import TimePresetPicker from '@/components/ui/TimePresetPicker.vue';
 import LinkList from '@/components/ui/LinkList.vue';
 import LinkedActivityChip from '@/components/todo/LinkedActivityChip.vue';
+import LinkedCardChip from '@/components/todo/LinkedCardChip.vue';
+import TodoCompleteCheckbox from '@/components/todo/TodoCompleteCheckbox.vue';
+import TodoRepeatField from '@/components/todo/TodoRepeatField.vue';
+import { useTodoCardLink } from '@/composables/useTodoCardLink';
+import { isAdultMember } from '@/composables/useMemberInfo';
+import { isCardTodo, isRepeating, todoCapabilities } from '@/utils/todoRecurrence';
+import { fillTemplate } from '@/utils/fillTemplate';
 import { todoLink } from '@/utils/activityLinks';
 import { extractUrls } from '@/utils/url';
 import { formatDateWithDay } from '@/utils/date';
 import { normalizeAssignees, toAssigneePayload } from '@/utils/assignees';
 import { isTodoOverdue, isTodoDueToday } from '@/utils/todo';
 import { isFreshHint as isFreshHintTodo } from '@/utils/helpfulHints';
-import type { TodoItem } from '@/types/models';
+import type { RecurrenceRule, TodoItem } from '@/types/models';
 
-type EditableField = 'title' | 'dueDate' | 'dueTime' | 'assignee' | 'description';
+type EditableField = 'title' | 'dueDate' | 'dueTime' | 'assignee' | 'description' | 'repeat';
 
 const props = defineProps<{
   todo: TodoItem | null;
@@ -57,6 +64,7 @@ const draftDueDate = ref('');
 const draftDueTime = ref('');
 const draftAssigneeIds = ref<string[]>([]);
 const draftDescription = ref('');
+const draftRule = ref<RecurrenceRule | null>(null);
 
 // Template refs for auto-focus
 const titleInputRef = ref<HTMLInputElement | null>(null);
@@ -82,6 +90,10 @@ const { editingField, startEdit, saveField, cancelEdit, saveAndClose } =
         case 'description':
           draftDescription.value = todo.value.description ?? '';
           break;
+        case 'repeat':
+          // null on a to-do that does not repeat yet: the picker then emits its default.
+          draftRule.value = todo.value.repeat?.rule ?? null;
+          break;
       }
       nextTick(() => {
         if (field === 'title') titleInputRef.value?.focus();
@@ -90,6 +102,12 @@ const { editingField, startEdit, saveField, cancelEdit, saveAndClose } =
     },
     async saveDraft(field) {
       if (!todo.value) return;
+      // A repeat is saved through the store, which starts the series on the date the picker
+      // showed and no-ops an unchanged rule (#123).
+      if (field === 'repeat') {
+        if (draftRule.value) await todoStore.setRepeat(todo.value.id, draftRule.value);
+        return;
+      }
       const update: Record<string, string | boolean | null> = {};
       let changed = false;
 
@@ -158,8 +176,43 @@ watch(
   }
 );
 
+// #123: what this to-do allows (card-made, repeating) comes from the ONE capability table.
+const caps = computed(() => (todo.value ? todoCapabilities(todo.value) : null));
+const repeating = computed(() => !!todo.value && isRepeating(todo.value));
+// Offered on an open, dated-or-datable to-do; always shown once it repeats or is being set.
+const repeatFieldShown = computed(() => {
+  const item = todo.value;
+  if (!item) return false;
+  if (repeating.value || editingField.value === 'repeat') return true;
+  return !!caps.value?.editRepeat && !item.completed && !item.someday;
+});
+
+const { resolveCardLink } = useTodoCardLink();
+const cardLink = computed(() => (todo.value ? resolveCardLink(todo.value) : null));
+const madeByLabel = computed(() =>
+  cardLink.value
+    ? fillTemplate(t('todo.linkedCard.madeBy'), { card: cardLink.value.name })
+    : undefined
+);
+const deleteOnCardCaption = computed(() =>
+  cardLink.value && !caps.value?.delete
+    ? fillTemplate(t('todo.repeat.deleteOnCard'), { card: cardLink.value.name })
+    : ''
+);
+
 // Computed display values
 const viewAssigneeIds = computed(() => (todo.value ? normalizeAssignees(todo.value) : []));
+
+/** A card-made to-do held by a child is the child's, and every adult sees it too. */
+const showAdultsSee = computed(
+  () =>
+    !!todo.value &&
+    isCardTodo(todo.value) &&
+    viewAssigneeIds.value.some((id) => {
+      const member = familyStore.members.find((m) => m.id === id);
+      return !!member && !member.isPet && !isAdultMember(member);
+    })
+);
 
 const viewCompletedBy = computed(() => {
   if (!todo.value?.completedBy) return null;
@@ -230,7 +283,21 @@ function handleKindChange(value: string) {
   if (todo.value) void todoStore.setSomeday(todo.value.id, value === 'someday');
 }
 
-// Toggle complete/reopen
+// Skip This Time (the title row's pill) / Turn off repeat (#123). The store refuses, toasts and logs anything the
+// capability table does not allow; these never reject.
+async function handleSkip() {
+  if (!todo.value) return;
+  await todoStore.skipOccurrence(todo.value.id, familyStore.currentMember?.id ?? '');
+}
+
+async function handleTurnOffRepeat() {
+  if (!todo.value) return;
+  cancelEdit();
+  await todoStore.setRepeat(todo.value.id, null);
+}
+
+// The title checkbox: completes a to-do, or rolls a repeating one to its next date (the store
+// celebrates either, with undo); on a done to-do it reopens it.
 async function handleToggleComplete() {
   if (!todo.value) return;
   const wasOpen = !todo.value.completed;
@@ -305,55 +372,72 @@ async function handleDelete() {
     size="narrow"
     :save-label="t('action.close')"
     save-gradient="purple"
-    :show-delete="true"
+    :show-delete="!!caps?.delete"
     @close="handleClose"
     @save="handleDone"
     @delete="handleDelete"
   >
     <div class="space-y-3">
-      <!-- Task title — inline editable -->
-      <InlineEditField
-        :editing="editingField === 'title'"
-        tint-color="purple"
-        @start-edit="startEdit('title')"
-      >
-        <template #view>
-          <span
-            class="font-outfit dark:text-ink text-xl font-bold text-[var(--color-text)]"
-            :class="[
-              todo.completed ? 'line-through opacity-50' : '',
-              'border-b border-dotted border-transparent group-hover/field:border-[var(--color-text-muted)]',
-            ]"
-          >
-            {{ todo.title }}
-          </span>
-        </template>
-        <template #edit>
-          <div class="flex items-center gap-2">
-            <input
-              ref="titleInputRef"
-              v-model="draftTitle"
-              type="text"
-              class="font-outfit dark:text-ink w-full rounded-md border-none bg-transparent px-1 text-xl font-bold text-[var(--color-text)] ring-2 ring-purple-500/30 outline-none"
-              @keydown="handleTitleKeydown"
-            />
-            <button
-              class="dark:text-purple-lift flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-purple-600 transition-colors hover:bg-purple-100 dark:hover:bg-purple-900/30"
-              @click.stop="saveField('title')"
+      <!-- Task title, inline editable, with the list row's completion checkbox beside it and,
+           on an open repeating to-do, Skip This Time beside the title (#123). The title keeps
+           at least 12rem, so on a phone the pill drops to its own line, right-aligned. -->
+      <div class="flex flex-wrap items-start gap-x-3 gap-y-1">
+        <TodoCompleteCheckbox :todo="todo" class="mt-1" @toggle="handleToggleComplete" />
+        <InlineEditField
+          class="min-w-0 flex-1 basis-48"
+          :editing="editingField === 'title'"
+          :disabled="!caps?.editTitle"
+          tint-color="purple"
+          @start-edit="startEdit('title')"
+        >
+          <template #view>
+            <span
+              class="font-outfit dark:text-ink text-xl font-bold text-[var(--color-text)]"
+              :class="[
+                todo.completed ? 'line-through opacity-50' : '',
+                'border-b border-dotted border-transparent group-hover/field:border-[var(--color-text-muted)]',
+              ]"
             >
-              <svg
-                class="h-4 w-4"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2.5"
-                viewBox="0 0 24 24"
+              {{ todo.title }}
+            </span>
+          </template>
+          <template #edit>
+            <div class="flex items-center gap-2">
+              <input
+                ref="titleInputRef"
+                v-model="draftTitle"
+                type="text"
+                class="font-outfit dark:text-ink w-full rounded-md border-none bg-transparent px-1 text-xl font-bold text-[var(--color-text)] ring-2 ring-purple-500/30 outline-none"
+                @keydown="handleTitleKeydown"
+              />
+              <button
+                class="dark:text-purple-lift flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-purple-600 transition-colors hover:bg-purple-100 dark:hover:bg-purple-900/30"
+                @click.stop="saveField('title')"
               >
-                <path d="M5 13l4 4L19 7" />
-              </svg>
-            </button>
-          </div>
-        </template>
-      </InlineEditField>
+                <svg
+                  class="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M5 13l4 4L19 7" />
+                </svg>
+              </button>
+            </div>
+          </template>
+        </InlineEditField>
+        <button
+          v-if="caps?.skip"
+          type="button"
+          class="font-outfit dark:border-line dark:text-ink-soft dark:hover:bg-surface-hover dark:hover:text-ink mt-0.5 ml-auto inline-flex shrink-0 items-center gap-1 rounded-full border border-[var(--tint-slate-10)] px-3 py-1 text-xs font-semibold whitespace-nowrap text-[var(--color-text-muted)] transition-colors hover:bg-[var(--tint-purple-8)] hover:text-[var(--color-text)]"
+          :aria-label="t('todo.repeat.skipAria')"
+          data-testid="todo-repeat-skip"
+          @click="handleSkip"
+        >
+          <span aria-hidden="true">⏭</span> {{ t('todo.repeat.skip') }}
+        </button>
+      </div>
 
       <!-- #40: Keep or Dismiss a fresh Helpful Hint without leaving the drawer -->
       <div
@@ -385,7 +469,7 @@ async function handleDelete() {
       </div>
 
       <!-- Track as: To-do vs. Someday · Maybe (hidden once completed) -->
-      <FormFieldGroup v-if="!todo.completed" :label="t('todo.kind')">
+      <FormFieldGroup v-if="!todo.completed && caps?.someday" :label="t('todo.kind')">
         <FrequencyChips
           :model-value="todo.someday ? 'someday' : 'todo'"
           :options="kindOptions"
@@ -423,6 +507,7 @@ async function handleDelete() {
       <FormFieldGroup v-if="!todo.someday" :label="t('todo.dueDate')">
         <InlineEditField
           :editing="editingField === 'dueDate'"
+          :disabled="!caps?.editDueDate"
           tint-color="purple"
           @start-edit="startEdit('dueDate')"
         >
@@ -477,6 +562,14 @@ async function handleDelete() {
             </div>
           </template>
         </InlineEditField>
+        <!-- #123: only the repeat moves a repeating to-do's date -->
+        <p
+          v-if="repeating && !caps?.editDueDate"
+          class="dark:text-ink-faint mt-1 px-1 text-xs text-[var(--color-text-muted)]"
+          data-testid="todo-date-follows"
+        >
+          {{ t('todo.repeat.dateFollows') }}
+        </p>
       </FormFieldGroup>
 
       <!-- Due time — only shown when a date exists (never for someday · maybe), inline editable -->
@@ -486,6 +579,7 @@ async function handleDelete() {
       >
         <InlineEditField
           :editing="editingField === 'dueTime'"
+          :disabled="!caps?.editDueTime"
           tint-color="purple"
           @start-edit="(todo.dueDate || draftDueDate) && startEdit('dueTime')"
         >
@@ -506,10 +600,57 @@ async function handleDelete() {
         </InlineEditField>
       </FormFieldGroup>
 
+      <!-- #123: Repeats (the block's markup lives in TodoRepeatField; this keeps the wiring) -->
+      <FormFieldGroup
+        v-if="repeatFieldShown"
+        :label="repeating ? t('todo.repeat.field') : t('todo.repeat.label')"
+      >
+        <InlineEditField
+          :editing="editingField === 'repeat'"
+          :disabled="!caps?.editRepeat || todo.completed"
+          tint-color="purple"
+          align-items="start"
+          @start-edit="startEdit('repeat')"
+        >
+          <template #view>
+            <TodoRepeatField
+              :todo="todo"
+              :editing="false"
+              :draft-rule="null"
+              @open-card="handleClose"
+            />
+          </template>
+          <template #edit>
+            <TodoRepeatField
+              v-model:draft-rule="draftRule"
+              :todo="todo"
+              :editing="true"
+              @turn-off="handleTurnOffRepeat"
+            />
+            <div class="mt-2 flex gap-1.5">
+              <button
+                class="rounded-lg bg-[var(--color-primary-500)] px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-[var(--color-primary-600)]"
+                data-testid="todo-repeat-save"
+                @click="saveField('repeat')"
+              >
+                ✓
+              </button>
+              <button
+                class="dark:bg-surface-hover dark:text-ink-soft dark:hover:bg-surface-hover rounded-lg bg-gray-200 px-3 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-300"
+                @click="cancelEdit"
+              >
+                ✕
+              </button>
+            </div>
+          </template>
+        </InlineEditField>
+      </FormFieldGroup>
+
       <!-- Assignee — inline editable -->
       <FormFieldGroup :label="t('todo.assignTo')">
         <InlineEditField
           :editing="editingField === 'assignee'"
+          :disabled="!caps?.editAssignee"
           tint-color="purple"
           @start-edit="startEdit('assignee')"
         >
@@ -544,6 +685,13 @@ async function handleDelete() {
             </div>
           </template>
         </InlineEditField>
+        <p
+          v-if="showAdultsSee"
+          class="dark:text-ink-faint mt-1 px-1 text-xs text-[var(--color-text-muted)]"
+          data-testid="todo-adults-see"
+        >
+          {{ t('whoOwnsWhat.reminder.adultsSee') }}
+        </p>
       </FormFieldGroup>
 
       <!-- Description — inline editable -->
@@ -622,30 +770,28 @@ async function handleDelete() {
         </span>
       </FormFieldGroup>
 
-      <!-- Created by + when — shared subtle footer (standard convention) -->
-      <CreatedMeta :created-by="todo.createdBy" :created-at="todo.createdAt" />
-    </div>
+      <!-- #123: the card this to-do was made by. Last, above the created line; it renders only
+           when the card still resolves, so the field hides with it. -->
+      <FormFieldGroup v-if="cardLink && todo.cardId" :label="t('todo.linkedCard')">
+        <LinkedCardChip
+          :card-id="todo.cardId"
+          :part-key="todo.cardPartKey"
+          variant="row"
+          @open="handleClose"
+        />
+      </FormFieldGroup>
 
-    <!-- Complete / Reopen button in the footer, next to close -->
-    <template #footer-start>
-      <button
-        v-if="!todo.completed"
-        type="button"
-        class="font-outfit flex flex-1 items-center justify-center gap-2 rounded-[16px] py-3.5 text-sm font-bold text-white shadow-sm transition-all duration-200 hover:shadow-md active:scale-[0.98]"
-        style="background: linear-gradient(135deg, #27ae60, #2ecc71)"
-        @click="handleToggleComplete"
+      <!-- Created by + when — shared subtle footer (standard convention) -->
+      <CreatedMeta :created-by="todo.createdBy" :created-at="todo.createdAt" :label="madeByLabel" />
+
+      <!-- A card-made to-do has no Delete: it stops on the card -->
+      <p
+        v-if="deleteOnCardCaption"
+        class="dark:text-ink-faint text-xs text-[var(--color-text-muted)]"
+        data-testid="todo-delete-on-card"
       >
-        <span>✓</span>
-        {{ t('action.markCompleted') }}
-      </button>
-      <button
-        v-else
-        type="button"
-        class="font-outfit dark:text-purple-lift flex flex-1 items-center justify-center gap-2 rounded-[16px] py-3.5 text-sm font-semibold text-purple-600 transition-colors hover:bg-purple-50 active:bg-purple-100 dark:hover:bg-purple-900/20"
-        @click="handleToggleComplete"
-      >
-        {{ t('todo.reopenTask') }}
-      </button>
-    </template>
+        {{ deleteOnCardCaption }}
+      </p>
+    </div>
   </BeanieFormModal>
 </template>

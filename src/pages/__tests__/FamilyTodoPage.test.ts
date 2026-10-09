@@ -10,7 +10,10 @@
  *   - overlapping reveals never fight: only the latest one scrolls and pulses,
  *   - a to-do the quick-add bar created is revealed (the bar's own create rules are pinned in
  *     `QuickAddBar.test.ts` / `useTodoDraft.test.ts`),
- *   - desktop focuses the quick-add bar, unless the page was opened to add a to-do.
+ *   - desktop focuses the quick-add bar, unless the page was opened to add a to-do,
+ *   - the family's reminders (#123): a phone mounts the Reminders section and not the panel,
+ *     desktop the reverse; both list only repeating to-dos, honour the member lens, and a tap
+ *     on a roster row opens the drawer.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { flushPromises, shallowMount } from '@vue/test-utils';
@@ -20,7 +23,8 @@ import FamilyTodoPage from '@/pages/FamilyTodoPage.vue';
 import type { QuickAddIntentHandler } from '@/composables/useQuickAddIntent';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { useTodoStore } from '@/stores/todoStore';
-import type { TodoItem } from '@/types/models';
+import { useFamilyStore } from '@/stores/familyStore';
+import type { TodoItem, TodoRepeat } from '@/types/models';
 
 /** The query the page mounts with (the quick-add sheet's intent arrives here). */
 let routeQuery: Record<string, string> = {};
@@ -73,8 +77,9 @@ vi.mock('@/composables/useMagicReader', async (orig) => ({
   },
 }));
 
+const isDesktop = ref(true);
 vi.mock('@/composables/useBreakpoint', () => ({
-  useBreakpoint: () => ({ isDesktop: ref(true) }),
+  useBreakpoint: () => ({ isDesktop }),
 }));
 
 /** The bar exposes `focus`, which the page calls on a desktop mount. */
@@ -126,6 +131,7 @@ beforeEach(() => {
   setActivePinia(createPinia());
   vi.clearAllMocks();
   canEditActivities.value = true;
+  isDesktop.value = true;
   routeQuery = {};
 });
 
@@ -267,5 +273,81 @@ describe('FamilyTodoPage: add affordances', () => {
     mountPage();
     await settle();
     expect(focusBar).not.toHaveBeenCalled();
+  });
+});
+
+describe('FamilyTodoPage: the family reminders (#123)', () => {
+  const repeat: TodoRepeat = {
+    rule: { unit: 'week', interval: 1, weekdays: [3], end: { kind: 'never' } },
+    anchor: '2030-10-16',
+  };
+  function seed(): void {
+    useTodoStore().todos = [
+      { ...openTodo('plain', '2030-10-13'), assigneeIds: ['m-dan'] },
+      { ...openTodo('trash', '2030-10-16'), repeat, repeatLog: [], assigneeIds: ['m-sofia'] },
+      { ...openTodo('sitter', '2030-10-16'), repeat, repeatLog: [], assigneeIds: ['m-dan'] },
+    ];
+  }
+  const mountWithSlots = () =>
+    shallowMount(FamilyTodoPage, {
+      global: { stubs: { QuickAddBar: QuickAddBarStub }, renderStubDefaultSlot: true },
+    });
+  const rosterIds = (w: ReturnType<typeof mountWithSlots>) =>
+    (w.findComponent({ name: 'TodoRemindersRoster' }).props('todos') as TodoItem[]).map(
+      (t) => t.id
+    );
+  const section = (w: ReturnType<typeof mountWithSlots>) =>
+    w.find('[data-testid="todo-reminders-section"]');
+  const panel = (w: ReturnType<typeof mountWithSlots>) =>
+    w.find('[data-testid="todo-reminders-panel"]');
+
+  it('desktop: the Family Reminders panel lists only repeating to-dos; no phone section', () => {
+    seed();
+    const w = mountWithSlots();
+    expect(panel(w).exists()).toBe(true);
+    expect(section(w).exists()).toBe(false);
+    expect(panel(w).text()).toContain('todo.reminders.panelTitle');
+    expect(rosterIds(w).sort()).toEqual(['sitter', 'trash']);
+  });
+
+  it('phone: the Reminders section carries the roster; no panel', () => {
+    isDesktop.value = false;
+    seed();
+    const w = mountWithSlots();
+    expect(panel(w).exists()).toBe(false);
+    expect(section(w).exists()).toBe(true);
+    expect(w.findAllComponents({ name: 'TodoRemindersRoster' })).toHaveLength(1);
+    expect(rosterIds(w).sort()).toEqual(['sitter', 'trash']);
+  });
+
+  it('an empty family sees one empty state: no reminders panel beside it', () => {
+    useTodoStore().todos = [];
+    const w = mountWithSlots();
+    expect(panel(w).exists()).toBe(false);
+    expect(section(w).exists()).toBe(false);
+    expect(w.text()).toContain('todo.getStarted');
+  });
+
+  it('honours the page member lens', async () => {
+    seed();
+    useFamilyStore().members = [
+      { id: 'm-sofia', name: 'Sofia', role: 'owner', ageGroup: 'adult' },
+      { id: 'm-dan', name: 'Dan', role: 'admin', ageGroup: 'adult' },
+    ] as never;
+    const w = mountWithSlots();
+    w.findComponent({ name: 'TodoMemberFilter' }).vm.$emit('update:modelValue', 'm-dan');
+    await nextTick();
+    expect(rosterIds(w)).toEqual(['sitter']);
+  });
+
+  it('a tap on a roster row opens the to-do drawer', async () => {
+    seed();
+    const w = mountWithSlots();
+    const trash = useTodoStore().todos.find((t) => t.id === 'trash')!;
+    w.findComponent({ name: 'TodoRemindersRoster' }).vm.$emit('view', trash);
+    await nextTick();
+    expect(w.findComponent({ name: 'TodoViewEditModal' }).props('todo')).toMatchObject({
+      id: 'trash',
+    });
   });
 });

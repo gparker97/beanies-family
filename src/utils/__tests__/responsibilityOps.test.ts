@@ -13,11 +13,17 @@ import {
   buildSkip,
   buildUndo,
   draftPartsForMode,
+  draftRemindersForMode,
   moveId,
   withCycleStart,
   type DeckOp,
 } from '@/utils/responsibilityOps';
-import type { FamilyMember, ResponsibilityCardState, ResponsibilityMove } from '@/types/models';
+import type {
+  CardReminder,
+  FamilyMember,
+  ResponsibilityCardState,
+  ResponsibilityMove,
+} from '@/types/models';
 
 function member(id: string, over: Partial<FamilyMember> = {}): FamilyMember {
   return { id, name: id, ageGroup: 'adult', role: 'member', ...over } as FamilyMember;
@@ -554,5 +560,212 @@ describe('withCycleStart', () => {
     );
     if (withOther.stale) throw new Error('unexpected');
     expect(withOther.ops.some((o) => o.op === 'deleteCheckIn')).toBe(false);
+  });
+});
+
+// ── #123 card reminders ─────────────────────────────────────────────────────────
+
+describe('card reminders on the write side', () => {
+  const WEEKLY_WED: CardReminder = {
+    say: 'Put the trash out',
+    cadence: { unit: 'week', interval: 1, weekdays: [3] },
+    time: '20:00',
+    anchor: '2026-09-30',
+  };
+  const MONTHLY: CardReminder = {
+    say: 'Swap the sheets',
+    cadence: { unit: 'month', interval: 1, monthlyAnchor: 'weekday' },
+    anchor: '2026-10-04',
+  };
+  const single = (over: Partial<ResponsibilityCardState> = {}) =>
+    state('laundry', { parts: [{ key: 'main', holderId: 'greg' }], ...over });
+  const singleDraft = {
+    splitMode: 'single' as const,
+    parts: [{ key: 'main', holderId: 'greg' }],
+    skipped: false,
+  };
+  const saved = (ops: DeckOp[]) => setStates(ops)[0]!.state;
+
+  it('writes a single card reminder under main and logs reminder_saved set', () => {
+    const c = card(resolved([single()]), 'laundry');
+    const r = buildSaveCard(c, { ...singleDraft, reminders: { main: WEEKLY_WED } }, 'greg', NOW);
+    expect(saved(r.ops).reminders).toEqual({ main: WEEKLY_WED });
+    expect(r.telemetry).toContainEqual({
+      message: 'reminder_saved',
+      context: { kind: 'set', count: 1 },
+    });
+  });
+
+  it('re-keys a single card entry to main like its part', () => {
+    const c = card(resolved([single()]), 'laundry');
+    const r = buildSaveCard(
+      c,
+      {
+        splitMode: 'single',
+        parts: [{ key: 'leo', holderId: 'greg' }],
+        skipped: false,
+        reminders: { leo: WEEKLY_WED },
+      },
+      'greg',
+      NOW
+    );
+    expect(saved(r.ops).reminders).toEqual({ main: WEEKLY_WED });
+  });
+
+  it('writes one reminder per part on a split card and drops orphan keys', () => {
+    const prior = state('laundry', {
+      splitMode: 'child',
+      parts: [
+        { key: 'leo', holderId: 'greg' },
+        { key: 'mia', holderId: 'sofia' },
+      ],
+      reminders: { gone: WEEKLY_WED },
+    });
+    const c = card(resolved([prior]), 'laundry');
+    const r = buildSaveCard(
+      c,
+      {
+        splitMode: 'child',
+        parts: [
+          { key: 'leo', holderId: 'greg' },
+          { key: 'mia', holderId: 'sofia' },
+        ],
+        skipped: false,
+        reminders: { leo: WEEKLY_WED, mia: MONTHLY, stale: MONTHLY },
+      },
+      'greg',
+      NOW
+    );
+    expect(saved(r.ops).reminders).toEqual({ leo: WEEKLY_WED, mia: MONTHLY });
+    expect(r.telemetry).toContainEqual({
+      message: 'reminder_saved',
+      context: { kind: 'set', count: 2 },
+    });
+  });
+
+  it('an empty map deletes the field and logs reminder_saved cleared', () => {
+    const c = card(resolved([single({ reminders: { main: WEEKLY_WED } })]), 'laundry');
+    const r = buildSaveCard(c, { ...singleDraft, reminders: {} }, 'greg', NOW);
+    expect(saved(r.ops)).not.toHaveProperty('reminders');
+    expect(r.telemetry).toContainEqual({
+      message: 'reminder_saved',
+      context: { kind: 'cleared', count: 0 },
+    });
+  });
+
+  it('leaves the stored map alone when the draft carries none', () => {
+    const c = card(resolved([single({ reminders: { main: WEEKLY_WED } })]), 'laundry');
+    const r = buildSaveCard(c, { ...singleDraft, doneOverride: 'Folded' }, 'greg', NOW);
+    expect(saved(r.ops).reminders).toEqual({ main: WEEKLY_WED });
+    expect(r.telemetry.some((e) => e.message === 'reminder_saved')).toBe(false);
+  });
+
+  it('is unchanged for the same reminders (key order and weekday order ignored)', () => {
+    const c = card(resolved([single({ reminders: { main: WEEKLY_WED } })]), 'laundry');
+    const same: CardReminder = {
+      anchor: WEEKLY_WED.anchor,
+      time: WEEKLY_WED.time,
+      cadence: { weekdays: [3], interval: 1, unit: 'week' },
+      say: WEEKLY_WED.say,
+    };
+    expect(
+      buildSaveCard(c, { ...singleDraft, reminders: { main: same } }, 'greg', NOW).ops
+    ).toEqual([]);
+    for (const changed of [
+      { ...WEEKLY_WED, say: 'Bins out' },
+      { ...WEEKLY_WED, time: '19:00' },
+      { ...WEEKLY_WED, anchor: '2026-10-07' },
+      { ...WEEKLY_WED, cadence: { unit: 'week' as const, interval: 2, weekdays: [3] } },
+    ]) {
+      const r = buildSaveCard(c, { ...singleDraft, reminders: { main: changed } }, 'greg', NOW);
+      expect(saved(r.ops).reminders).toEqual({ main: changed });
+    }
+  });
+
+  it('rewrites a malformed stored entry on save, and refuses a malformed draft', () => {
+    const bad = { main: { say: 1 } } as unknown as Record<string, CardReminder>;
+    const c = card(resolved([single({ reminders: bad })]), 'laundry');
+    const r = buildSaveCard(c, { ...singleDraft, reminders: { main: WEEKLY_WED } }, 'greg', NOW);
+    expect(saved(r.ops).reminders).toEqual({ main: WEEKLY_WED });
+    expect(() => buildSaveCard(c, { ...singleDraft, reminders: bad }, 'greg', NOW)).toThrow(
+      /malformed reminder/
+    );
+  });
+
+  it('deal, skip, bring back and keep preserve reminders', () => {
+    const reminders = { main: WEEKLY_WED };
+    const kept = card(resolved([single({ reminders })]), 'laundry');
+    expect(saved(buildDeal(kept, 'main', 'sofia', 'greg', NOW).ops).reminders).toEqual(reminders);
+    expect(saved(buildSkip([kept], 'greg', NOW).ops).reminders).toEqual(reminders);
+    const skipped = card(resolved([single({ status: 'skipped', reminders })]), 'laundry');
+    expect(saved(buildBringBack(skipped, 'greg', NOW).ops).reminders).toEqual(reminders);
+    expect(saved(buildKeep(skipped, 'greg', NOW).ops).reminders).toEqual(reminders);
+  });
+
+  it('a record whose parts an old client rebuilt (key/label/holder only) keeps its reminders', () => {
+    // An old client's deal rebuilds `parts` from key/label/holderId and clones the rest of
+    // the record, so the card-level map rides along untouched.
+    const rebuiltByOldClient = state('laundry', {
+      splitMode: 'child',
+      parts: [{ key: 'leo', holderId: 'sofia' }, { key: 'mia' }],
+      reminders: { leo: WEEKLY_WED },
+    });
+    const c = card(resolved([rebuiltByOldClient]), 'laundry');
+    expect(c.parts[0]!.reminder).toEqual(WEEKLY_WED);
+    expect(saved(buildDeal(c, 'mia', 'greg', 'greg', NOW).ops).reminders).toEqual({
+      leo: WEEKLY_WED,
+    });
+  });
+
+  it('restore defaults drops reminders from the custom cards it keeps', () => {
+    const custom = state('custom-9', {
+      custom: { name: 'Hens', emoji: '🐔', category: 'home' },
+      parts: [{ key: 'main', holderId: 'greg' }],
+      reminders: { main: WEEKLY_WED },
+    });
+    const r = buildRestoreDefaults([custom], [], true, NOW);
+    expect(saved(r.ops)).not.toHaveProperty('reminders');
+    expect(saved(r.ops).custom).toEqual(custom.custom);
+  });
+});
+
+describe('draftRemindersForMode', () => {
+  const R: CardReminder = {
+    say: 'Drop-off',
+    cadence: { unit: 'week', interval: 1, weekdays: [1] },
+    anchor: '2026-10-05',
+  };
+
+  it('single -> split puts the reminder on the first part (child and label)', () => {
+    const current = [{ key: 'main', holderId: 'greg' }];
+    expect(
+      draftRemindersForMode({ main: R }, current, [{ key: 'leo' }, { key: 'mia' }], 'child')
+    ).toEqual({ leo: R });
+    expect(
+      draftRemindersForMode({ main: R }, current, [{ key: 'label-x', label: '' }], 'label')
+    ).toEqual({ 'label-x': R });
+  });
+
+  it('split -> single carries the first part to main; others are dropped', () => {
+    const current = [{ key: 'leo' }, { key: 'mia' }];
+    expect(
+      draftRemindersForMode(
+        { leo: R, mia: { ...R, say: 'Mia' } },
+        current,
+        [{ key: 'main' }],
+        'single'
+      )
+    ).toEqual({ main: R });
+    expect(draftRemindersForMode({ mia: R }, current, [{ key: 'main' }], 'single')).toEqual({});
+  });
+
+  it('a part that survives the switch keeps its own reminder only', () => {
+    const current = [
+      { key: 'label-a', label: 'up' },
+      { key: 'label-b', label: 'down' },
+    ];
+    expect(draftRemindersForMode({ 'label-b': R }, current, current, 'label')).toEqual({
+      'label-b': R,
+    });
   });
 });

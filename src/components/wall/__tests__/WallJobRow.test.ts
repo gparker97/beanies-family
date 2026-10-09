@@ -127,6 +127,27 @@ describe('WallJobRow', () => {
     });
   });
 
+  describe('a locked job (a card-made to-do, #123) while the wall is unlocked', () => {
+    const cardJob: WallJob = {
+      key: 'todo:t1:m1',
+      title: 'Put the trash out',
+      done: false,
+      ownerId: 'm1',
+      source: 'todo',
+      todoId: 't1',
+      locked: true,
+    };
+
+    it('offers no trash and no rename, and a title tap ticks it', async () => {
+      const { wrapper, writers } = mountRow({ unlocked: true, job: cardJob });
+      expect(wrapper.findComponent(ActionButtons).exists()).toBe(false);
+      await wrapper.get('button:not([aria-pressed])').trigger('click');
+      expect(wrapper.find('input').exists()).toBe(false);
+      expect(wrapper.emitted('toggle')).toHaveLength(1);
+      expect(writers.renameJob).not.toHaveBeenCalled();
+    });
+  });
+
   describe('unlocked: rename', () => {
     it('opens the input when the title is tapped, and does NOT tick', async () => {
       const { wrapper } = mountRow({ unlocked: true });

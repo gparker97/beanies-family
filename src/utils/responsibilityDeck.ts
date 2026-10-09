@@ -12,14 +12,21 @@
  *     "since", "previous holder", the briefing and the check-in agenda.
  *   - **Holders resolve against the CURRENT family.** A removed member or a pet is
  *     nobody, and a child split is rebuilt from the current children every time.
+ *
+ * Card reminders (#123) resolve here too, per part (`ResolvedPart.reminder`). This module
+ * imports only the recurrence helpers for them, NEVER to-do code: the to-do side
+ * (`utils/cardReminders.ts`) depends on the deck, not the reverse.
  */
 import type { ResponsibilityCardDef, CardDefaultTarget } from '@/constants/responsibilityCards';
 import { cardIdForTarget } from '@/constants/responsibilityCards';
 import { LIST_CATEGORIES } from '@/constants/listCategories';
 import { isAdultMember } from '@/composables/useMemberInfo';
 import { CARD_CHECKIN_PREFIX, CARD_MOVE_PREFIX } from '@/utils/notifications';
-import { addDaysYmd, toDateInputValue } from '@/utils/date';
+import { addDaysYmd, isWallClockTime, parseLocalDate, toDateInputValue } from '@/utils/date';
+import { cadenceToRule } from '@/services/recurrence/cadence';
+import { isRuleComplete } from '@/services/recurrence/recurrenceEngine';
 import type {
+  CardReminder,
   CardSplitMode,
   FamilyMember,
   ListCategory,
@@ -44,6 +51,8 @@ export interface ResolvedPart {
   since?: string;
   /** Who held it before the current holder, when that member is still in the family. */
   previousHolderId?: string;
+  /** #123: this part's reminder (`state.reminders[key]`), only when it is well-formed. */
+  reminder?: CardReminder;
 }
 
 export interface ResolvedCard {
@@ -62,6 +71,11 @@ export interface ResolvedCard {
   splitMode: CardSplitMode;
   parts: ResolvedPart[];
   doneOverride?: string;
+  /**
+   * #123: at least one resolved part carries a reminder. Always set by `resolveDeck`;
+   * optional only so hand-built test cards need not spell it out (absent reads as false).
+   */
+  hasReminder?: boolean;
   /** The validated stored record, or null while the card is unsorted. */
   state: ResponsibilityCardState | null;
 }
@@ -72,6 +86,12 @@ export interface ResolvedDeck {
   unknownIds: string[];
   /** Malformed records; the card (when known) is treated as unsorted. */
   invalidIds: string[];
+  /**
+   * #123: malformed reminder entries on resolved parts, as `${cardId}:${partKey}` (or the
+   * bare card id when the whole `reminders` value is not a map). Only that reminder is
+   * ignored; the card itself resolves as normal. Orphan keys are not resolved, so not listed.
+   */
+  invalidReminderIds: string[];
 }
 
 const STATUSES = new Set(['kept', 'skipped']);
@@ -96,6 +116,41 @@ export function isValidCardState(s: unknown): s is ResponsibilityCardState {
     if (typeof c.category !== 'string') return false;
   }
   return true;
+}
+
+const YMD = /^\d{4}-\d{2}-\d{2}$/;
+
+function isPlainRecord(v: unknown): v is Record<string, unknown> {
+  return !!v && typeof v === 'object' && !Array.isArray(v);
+}
+
+/**
+ * Shape check for one stored card reminder (#123; any client may have written it): an
+ * object with a string `say`, a cadence the engine can expand, a real `YYYY-MM-DD` anchor,
+ * and a `time` that is absent or `HH:mm`.
+ */
+export function isValidCardReminder(r: unknown): r is CardReminder {
+  if (!isPlainRecord(r)) return false;
+  if (typeof r.say !== 'string') return false;
+  const cadence = r.cadence;
+  if (!isPlainRecord(cadence)) return false;
+  const weekdays = cadence.weekdays;
+  if (
+    weekdays !== undefined &&
+    !(Array.isArray(weekdays) && weekdays.every((d) => Number.isInteger(d) && d >= 0 && d <= 6))
+  )
+    return false;
+  if (!isRuleComplete(cadenceToRule(cadence as unknown as CardReminder['cadence']))) return false;
+  const anchor = r.anchor;
+  if (typeof anchor !== 'string' || !YMD.test(anchor)) return false;
+  // Round-trip: rejects an overflowing "2026-02-31".
+  if (toDateInputValue(parseLocalDate(anchor)) !== anchor) return false;
+  return r.time === undefined || (typeof r.time === 'string' && isWallClockTime(r.time));
+}
+
+/** The card's own route, opened by the to-do side's links (#123). Never a deep-link entry. */
+export function cardRoute(cardId: string): { path: string; query: { card: string } } {
+  return { path: '/who-owns-what', query: { card: cardId } };
 }
 
 /** Local `YYYY-MM-DD` of an ISO timestamp (a ymd passes through). */
@@ -145,6 +200,7 @@ export function resolveDeck(
   const valid = new Map<string, ResponsibilityCardState>();
   const invalidIds: string[] = [];
   const unknownIds: string[] = [];
+  const invalidReminderIds: string[] = [];
   for (const s of states) {
     if (!isValidCardState(s)) {
       const id = (s as { id?: unknown } | null)?.id;
@@ -183,10 +239,13 @@ export function resolveDeck(
       raw = [state.parts[0] ?? { key: MAIN_PART_KEY }];
     }
 
+    const reminders = remindersOf(cardId, state);
     const parts = raw.map((p): ResolvedPart => {
       const holderId = p.holderId && eligible.has(p.holderId) ? p.holderId : undefined;
       const part: ResolvedPart = { key: p.key };
       if (typeof p.label === 'string') part.label = p.label;
+      const reminder = reminderFor(cardId, reminders, p.key);
+      if (reminder) part.reminder = reminder;
       if (holderId) {
         part.holderId = holderId;
         // Superseded moves are skipped: only a move TO the current holder counts.
@@ -200,6 +259,31 @@ export function resolveDeck(
       return part;
     });
     return { splitMode, parts };
+  }
+
+  /** The stored reminder map, or null (a value that is not a map is logged and ignored). */
+  function remindersOf(
+    cardId: string,
+    state: ResponsibilityCardState | null
+  ): Record<string, unknown> | null {
+    const map: unknown = state?.reminders;
+    if (map === undefined) return null;
+    if (isPlainRecord(map)) return map;
+    invalidReminderIds.push(cardId);
+    return null;
+  }
+
+  /** One part's reminder when well-formed; a malformed entry is listed and ignored. */
+  function reminderFor(
+    cardId: string,
+    reminders: Record<string, unknown> | null,
+    key: string
+  ): CardReminder | undefined {
+    if (!reminders || !Object.prototype.hasOwnProperty.call(reminders, key)) return undefined;
+    const r = reminders[key];
+    if (isValidCardReminder(r)) return r;
+    invalidReminderIds.push(`${cardId}:${key}`);
+    return undefined;
   }
 
   function statusOf(state: ResponsibilityCardState | null, parts: ResolvedPart[]): CardStatus {
@@ -225,6 +309,7 @@ export function resolveDeck(
       splitMode,
       parts,
       doneOverride: state?.doneOverride,
+      hasReminder: parts.some((p) => !!p.reminder),
       state,
     });
   }
@@ -241,10 +326,11 @@ export function resolveDeck(
       splitMode,
       parts,
       doneOverride: state.doneOverride,
+      hasReminder: parts.some((p) => !!p.reminder),
       state,
     });
   }
-  return { cards, unknownIds, invalidIds };
+  return { cards, unknownIds, invalidIds, invalidReminderIds };
 }
 
 export interface DeckStats {

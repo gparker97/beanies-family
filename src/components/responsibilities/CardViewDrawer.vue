@@ -19,6 +19,12 @@
  * (i) reason (built-in cards, which are skipped rather than deleted), an outlined Edit,
  * and Close. Children get Close only: the drawer is view-only for them.
  *
+ * A card reminder (#123) shows as a tear-off stub on the card face ("🔔 weekly on Wed at
+ * 8pm"; per held part on a split card, "No reminder" for a part without one; nothing when
+ * the card has none). Below the card, a single card gets a Reminder field (the summary, what
+ * it says and to whom, and the live to-do through `LinkedTodoRow`, the card side's one to-do
+ * resolver, so this drawer never reads `todoStore`); a split card says it in each part's row.
+ *
  * If the card disappears while open (deleted or restored on another device) the drawer
  * says so and closes, rather than rendering an empty shell. A delete from this drawer's
  * own tile is not a surprise: it has its own success toast, so the notice is skipped.
@@ -31,10 +37,14 @@ import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import MemberChip from '@/components/ui/MemberChip.vue';
 import CardBack from '@/components/responsibilities/CardBack.vue';
 import DealPileStage from '@/components/responsibilities/DealPileStage.vue';
+import LinkedTodoRow from '@/components/todo/LinkedTodoRow.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useResponsibilityCardLabel } from '@/composables/useResponsibilityCardLabel';
-import { useMemberInfo } from '@/composables/useMemberInfo';
-import { formatNookDate } from '@/utils/date';
+import { useRecurrenceLabel } from '@/composables/useRecurrenceLabel';
+import { isAdultMember, useMemberInfo } from '@/composables/useMemberInfo';
+import { formatNookDate, formatTime12 } from '@/utils/date';
+import { cadenceToRule } from '@/services/recurrence/cadence';
+import { cardTodoId } from '@/utils/cardReminders';
 import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
 import { useKeyboardShortcuts } from '@/composables/useKeyboardShortcuts';
 import { useResponsibilityStore } from '@/stores/responsibilityStore';
@@ -54,6 +64,7 @@ import {
   type CardSequence,
 } from '@/utils/responsibilityDeck';
 import type { UIStringKey } from '@/services/translation/uiStrings';
+import type { CardReminder } from '@/types/models';
 import { useCardDrawerEnd } from './useCardDeletion';
 
 const props = withDefaults(
@@ -72,6 +83,7 @@ const emit = defineEmits<{ close: []; edit: [cardId: string]; navigate: [cardId:
 const { t, currentLanguage } = useTranslation();
 const store = useResponsibilityStore();
 const { holderLines } = useResponsibilityCardLabel();
+const { describeWithTime } = useRecurrenceLabel();
 const { getMemberById, getMemberName } = useMemberInfo();
 const { memberAvatarBindings } = useMemberAvatarBindings();
 
@@ -123,6 +135,76 @@ const splitTitle = computed(() =>
     ? t('whoOwnsWhat.card.splitChild')
     : t('whoOwnsWhat.card.splitLabel')
 );
+
+// ── Reminders (#123) ─────────────────────────────────────────────────────────
+/** A part's reminder (only well-formed ones resolve), by part key. */
+function partReminder(key: string): CardReminder | undefined {
+  return card.value?.parts.find((p) => p.key === key)?.reminder;
+}
+/** The shared cadence wording plus its time: "weekly on Wed at 8pm". */
+function reminderSummary(r: CardReminder): string {
+  return describeWithTime(cadenceToRule(r.cadence), r.anchor, r.time, 'card');
+}
+
+/**
+ * The stub on the card face: the single card's reminder, or one line per HELD part of a
+ * split card (its own reminder, or "No reminder"). Empty (no stub) when no part reminds.
+ */
+const stubLines = computed(() => {
+  if (!parts.value.some((p) => partReminder(p.key))) return [];
+  const split = card.value?.splitMode !== 'single';
+  return parts.value
+    .filter((p) => !split || p.memberId)
+    .map((p) => {
+      const r = partReminder(p.key);
+      return { key: p.key, caption: p.caption, summary: r ? reminderSummary(r) : '' };
+    });
+});
+
+/** The single card's Reminder field below the card; null on a split or un-kept card. */
+const singleReminder = computed(() => {
+  const c = card.value;
+  const part = parts.value[0];
+  if (!c || c.splitMode !== 'single' || !part) return null;
+  const r = partReminder(part.key);
+  const holder = part.member;
+  let hint = '';
+  if (r && holder) {
+    hint = r.time
+      ? fillTemplate(t('whoOwnsWhat.reminder.goesOn'), {
+          say: r.say,
+          name: holder.name,
+          time: formatTime12(r.time),
+        })
+      : fillTemplate(t('whoOwnsWhat.reminder.goesOnAllDay'), { say: r.say, name: holder.name });
+  } else if (r) {
+    hint = t('whoOwnsWhat.reminder.hintNobody');
+  }
+  return {
+    reminder: r ?? null,
+    summary: r ? reminderSummary(r) : '',
+    hint,
+    adultsSee: !!r && !!holder && !isAdultMember(holder),
+    todoId: cardTodoId(c.id, part.key),
+  };
+});
+/** Children see the field only when there is a reminder to read (no "edit it" hint). */
+const showReminderField = computed(
+  () => !!singleReminder.value && (!!singleReminder.value.reminder || props.canEdit)
+);
+
+/** A split row's reminder line: "🔔 Reminds Dan: weekly on Wed at 8pm", or the summary alone. */
+function splitReminderText(line: { key: string; memberId: string | null }): string {
+  const r = partReminder(line.key);
+  if (!r) return '';
+  const cadence = reminderSummary(r);
+  return line.memberId
+    ? fillTemplate(t('whoOwnsWhat.reminder.remindsHolder'), {
+        name: getMemberName(line.memberId, ''),
+        cadence,
+      })
+    : cadence;
+}
 
 // ── History: everything that happened to the card, newest first ─────────────
 const HISTORY_KEYS: Record<CardHistoryKind, UIStringKey> = {
@@ -306,8 +388,76 @@ const { onDelete } = useCardDrawerEnd({
             >
             <span v-else class="nobody-chip">{{ t('whoOwnsWhat.deck.nobody') }}</span>
           </div>
+          <!-- #123: the reminder, printed on the card as a tear-off stub. -->
+          <div
+            v-if="stubLines.length"
+            class="reminder-stub font-outfit flex flex-col gap-1"
+            data-testid="card-view-stub"
+          >
+            <p
+              v-for="line in stubLines"
+              :key="line.key"
+              class="flex min-w-0 flex-wrap items-baseline gap-x-1.5 leading-snug"
+              :class="line.caption ? 'text-xs' : 'text-sm'"
+            >
+              <span
+                v-if="line.caption"
+                class="dark:text-ink-soft font-semibold text-[var(--color-text)]"
+                >{{ line.caption }}</span
+              >
+              <span v-if="line.summary" class="dark:text-ink font-semibold text-[var(--color-text)]"
+                ><span class="text-primary-500 dark:text-accent-lift" aria-hidden="true">🔔</span>
+                {{ line.summary }}</span
+              >
+              <span v-else class="dark:text-ink-faint font-medium text-[var(--color-text-muted)]">{{
+                t('whoOwnsWhat.reminder.partNone')
+              }}</span>
+            </p>
+          </div>
         </DealPileStage>
       </div>
+
+      <FormFieldGroup
+        v-if="showReminderField && singleReminder"
+        :label="t('whoOwnsWhat.reminder.field')"
+      >
+        <div v-if="singleReminder.reminder" class="space-y-2.5" data-testid="card-view-reminder">
+          <div class="flex items-start gap-2.5">
+            <span
+              class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--tint-orange-8)] text-base"
+              aria-hidden="true"
+              >🔔</span
+            >
+            <div class="min-w-0">
+              <p class="font-outfit dark:text-ink text-base font-semibold text-[var(--color-text)]">
+                {{ singleReminder.summary }}
+              </p>
+              <p
+                v-if="singleReminder.hint"
+                class="dark:text-ink-soft text-sm text-[var(--color-text-muted)]"
+              >
+                {{ singleReminder.hint }}
+              </p>
+              <p
+                v-if="singleReminder.adultsSee"
+                class="dark:text-ink-faint text-xs text-[var(--color-text-muted)]"
+                data-testid="card-view-reminder-adults"
+              >
+                {{ t('whoOwnsWhat.reminder.adultsSee') }}
+              </p>
+            </div>
+          </div>
+          <LinkedTodoRow :todo-id="singleReminder.todoId" @open="emit('close')" />
+        </div>
+        <div v-else data-testid="card-view-reminder-none">
+          <p class="dark:text-ink-soft text-sm text-[var(--color-text-muted)]">
+            {{ t('whoOwnsWhat.reminder.none') }}
+          </p>
+          <p class="dark:text-ink-faint text-xs text-[var(--color-text-muted)]">
+            {{ t('whoOwnsWhat.reminder.editHint') }}
+          </p>
+        </div>
+      </FormFieldGroup>
 
       <FormFieldGroup v-if="splitLines.length" :label="splitTitle">
         <ul class="space-y-2" data-testid="card-view-split">
@@ -324,6 +474,19 @@ const { onDelete } = useCardDrawerEnd({
               <MemberChip v-if="line.memberId" :member-id="line.memberId" size="sm" />
               <span v-else class="nobody-chip">{{ t('whoOwnsWhat.deck.nobody') }}</span>
             </span>
+            <span
+              v-if="splitReminderText(line)"
+              class="dark:text-ink-soft w-full text-sm text-[var(--color-text)]"
+              data-testid="card-view-split-reminder"
+              ><span class="text-primary-500 dark:text-accent-lift" aria-hidden="true">🔔</span>
+              {{ splitReminderText(line) }}</span
+            >
+            <span
+              v-else
+              class="dark:text-ink-faint w-full text-sm text-[var(--color-text-muted)]"
+              data-testid="card-view-split-reminder-none"
+              >{{ t('whoOwnsWhat.reminder.partNone') }}</span
+            >
           </li>
         </ul>
       </FormFieldGroup>
@@ -400,5 +563,19 @@ const { onDelete } = useCardDrawerEnd({
 
 html.dark .nobody-chip {
   color: var(--color-accent-lift);
+}
+
+/* #123: the reminder stub, torn along a dashed line at the foot of the card in hand. It
+   bleeds to the card's edges (the hand card body is padded 0.75rem; the card clips it). */
+.reminder-stub {
+  background: var(--tint-orange-8);
+  border-top: 2px dashed var(--color-border);
+  margin: 0.25rem -0.75rem -0.75rem;
+  padding: 0.5rem 0.75rem 0.5625rem;
+}
+
+html.dark .reminder-stub {
+  background: var(--color-surface-overlay);
+  border-top-color: var(--color-line-strong);
 }
 </style>

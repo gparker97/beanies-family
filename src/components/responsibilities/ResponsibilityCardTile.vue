@@ -4,7 +4,7 @@
  * the card art (hero illustration, else emoji), then the name, the done line and
  * who holds it: one row per part, "Nobody Yet" for an open part, "since" and the
  * previous holder for an unsplit card. Skipped cards (the skipped filter) carry
- * "Bring Back" for grown-ups.
+ * "Bring Back" for grown-ups. A card with a reminder (#123) wears a small bell on its slab.
  *
  * The whole tile opens the card (a stretched button, last in the DOM so a missing z-index
  * degrades loudly); "Bring Back" sits above it. Purely presentational: writes are the
@@ -85,6 +85,15 @@ const splitCaption = computed(() => {
         class="pointer-events-none absolute -right-1.5 -bottom-3 text-5xl leading-none opacity-[0.07]"
         aria-hidden="true"
         >{{ card.emoji }}</span
+      >
+      <span
+        v-if="card.hasReminder"
+        class="text-primary-500 dark:bg-surface-overlay dark:text-accent-lift absolute top-2 right-2 rounded-full bg-white px-1.5 py-0.5 text-xs leading-none shadow-sm"
+        role="img"
+        :aria-label="t('whoOwnsWhat.tile.reminderBadge')"
+        :title="t('whoOwnsWhat.tile.reminderBadge')"
+        :data-testid="`card-reminder-badge-${card.id}`"
+        >🔔</span
       >
     </div>
 

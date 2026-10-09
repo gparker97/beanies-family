@@ -8,6 +8,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-10-09
+
+### Added
+
+- To-dos can now repeat: one rolling to-do that moves to its next date, with a Reminders section on phones and a Family Reminders panel on desktop.
+- Who Owns What cards can now carry a reminder that follows whoever holds the card, becomes a repeating to-do and shows in the daily briefing.
+
+### Changed
+
+- The to-do drawer's Mark Completed button is now a checkbox beside the title.
+
 ## 2026-10-08
 
 ### Changed

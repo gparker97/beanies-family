@@ -28,6 +28,7 @@ import { useToday } from '@/composables/useToday';
 import { normalizeAssignees, formatNameList } from '@/utils/assignees';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { isTodoOverdue } from '@/utils/todo';
+import { isCardTodo } from '@/utils/todoRecurrence';
 import {
   classifyAudience,
   classifyOwnerAudience,
@@ -340,7 +341,21 @@ export function useCriticalItems() {
       const dateLabel = isOverdue ? formatDateShort(dueDate) : '';
 
       let message: string;
-      if (audience.kind === 'assignee') {
+      let icon = isOverdue ? '⏰' : '📋';
+      if (isCardTodo(todo) && todo.repeat && isDueToday) {
+        // #123: a card reminder on its due day reads as the reminder itself, for every
+        // audience the loop admits ("Reminder for Sofia: put the trash out at 8:00 PM!").
+        const sole = normalizeAssignees(todo)[0];
+        const name = getMemberName(sole, t('family.unknownMemberInline'));
+        message = todo.dueTime
+          ? buildMessage('nook.reminderFor', {
+              name,
+              task: taskTitle,
+              time: formatTime12(todo.dueTime),
+            })
+          : buildMessage('nook.reminderForAllDay', { name, task: taskTitle });
+        icon = '🔔';
+      } else if (audience.kind === 'assignee') {
         const fromOther = !!todo.createdBy && todo.createdBy !== memberId;
         const key = TODO_ASSIGNEE_KEYS[dateState][fromOther ? 'other' : 'self'];
         message = buildMessage(key, {
@@ -365,7 +380,7 @@ export function useCriticalItems() {
         id: todo.id,
         type: 'todo',
         message,
-        icon: isOverdue ? '⏰' : '📋',
+        icon,
         time: isDueToday ? (todo.dueTime ?? '') : '',
         completable: true,
         completed: false, // open todos are never completed (completed ones are filtered out)

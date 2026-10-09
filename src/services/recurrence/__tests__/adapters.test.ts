@@ -2,15 +2,17 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   resolveTransactionRule,
   resolveActivityRule,
+  resolveTodoRule,
   legacyShadowFromRule,
   activityShadowFromRule,
+  __resetFallbackDedupeForTests,
 } from '../adapters';
 import { logEvent } from '@/services/telemetry/logEvent';
 import type { Cadence } from '@/types/recurrence';
 import { monthlyFactor } from '../recurrenceEngine';
 
 vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: vi.fn() }));
-import { describeRule } from '../describe';
+import { describeRule, describeRuleAt } from '../describe';
 import type { RecurringItem } from '@/types/models';
 import type { RecurrenceRule } from '@/types/recurrence';
 import type { UIStringKey } from '@/services/translation/uiStrings';
@@ -29,6 +31,7 @@ const EN: Partial<Record<string, string>> = {
   'recurrence.desc.lastDay': 'last day',
   'recurrence.desc.untilDate': 'until {date}',
   'recurrence.desc.timesN': '{n} times',
+  'recurrence.desc.atTime': '{cadence} at {time}',
   'planner.weekday.short.sun': 'Sun',
   'planner.weekday.short.mon': 'Mon',
   'planner.weekday.short.tue': 'Tue',
@@ -369,5 +372,118 @@ describe('shadow regressions caught in review (#70)', () => {
     expect(resolved!.rule.interval).toBe(3);
     // And the monthly-equivalent normalization follows the rule, not the shadow.
     expect(monthlyFactor(resolved!.rule)).toBeCloseTo(1 / 3, 5);
+  });
+});
+
+describe('describeRuleAt: describeRule plus an optional time', () => {
+  // 2026-10-07 is a Wednesday.
+  const weeklyWed: RecurrenceRule = {
+    unit: 'week',
+    interval: 1,
+    weekdays: [3],
+    end: { kind: 'never' },
+  };
+  beforeEach(() => vi.mocked(logEvent).mockClear());
+
+  it('without a time is exactly describeRule', () => {
+    expect(describeRuleAt(weeklyWed, '2026-10-07', undefined, t)).toBe(
+      describeRule(weeklyWed, '2026-10-07', t)
+    );
+    expect(describeRuleAt(weeklyWed, '2026-10-07', '', t)).toBe('weekly on Wed');
+  });
+
+  it('appends the 12-hour time through the atTime template', () => {
+    expect(describeRuleAt(weeklyWed, '2026-10-07', '20:00', t)).toBe('weekly on Wed at 8pm');
+    expect(describeRuleAt(weeklyWed, '2026-10-07', '07:30', t)).toBe('weekly on Wed at 7:30am');
+  });
+
+  it('puts the time on the cadence and keeps the end last', () => {
+    const twice: RecurrenceRule = { ...weeklyWed, end: { kind: 'afterCount', count: 2 } };
+    expect(describeRuleAt(twice, '2026-10-07', '20:00', t)).toBe('weekly on Wed at 8pm · 2 times');
+    expect(describeRuleAt(twice, '2026-10-07', undefined, t)).toBe('weekly on Wed · 2 times');
+  });
+
+  it('drops a malformed time back to the plain cadence and logs it', () => {
+    __resetFallbackDedupeForTests();
+    expect(describeRuleAt(weeklyWed, '2026-10-07', 'soon', t)).toBe('weekly on Wed');
+    expect(describeRuleAt(weeklyWed, '2026-10-07', '25:00', t)).toBe('weekly on Wed');
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'warn',
+        message: 'rule-adapter-fallback',
+        context: { recur_surface: 'unknown', recur_reason: 'invalid-time' },
+      })
+    );
+  });
+});
+
+describe('describeRuleAt: a malformed time is reported once per surface', () => {
+  const weeklyWed: RecurrenceRule = {
+    unit: 'week',
+    interval: 1,
+    weekdays: [3],
+    end: { kind: 'never' },
+  };
+  beforeEach(() => {
+    vi.mocked(logEvent).mockClear();
+    __resetFallbackDedupeForTests();
+  });
+
+  it('two renders of the same bad time log once, tagged with the caller surface', () => {
+    // A render-time computed calls this on every re-render.
+    describeRuleAt(weeklyWed, '2026-10-07', '99:99', t, 'card');
+    describeRuleAt(weeklyWed, '2026-10-07', '99:99', t, 'card');
+    expect(logEvent).toHaveBeenCalledTimes(1);
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        surface: 'recurrence',
+        context: { recur_surface: 'card', recur_reason: 'invalid-time' },
+      })
+    );
+    // Another surface is its own report.
+    describeRuleAt(weeklyWed, '2026-10-07', '99:99', t, 'todo');
+    expect(logEvent).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('resolveTodoRule (#123)', () => {
+  const rule: RecurrenceRule = { unit: 'week', interval: 1, weekdays: [3], end: { kind: 'never' } };
+  beforeEach(() => {
+    vi.mocked(logEvent).mockClear();
+    __resetFallbackDedupeForTests();
+  });
+
+  it('returns null, without logging, for a to-do that does not repeat', () => {
+    expect(resolveTodoRule({})).toBeNull();
+    expect(logEvent).not.toHaveBeenCalled();
+  });
+
+  it('returns the stored rule and anchor', () => {
+    expect(resolveTodoRule({ repeat: { rule, anchor: '2026-10-07' } })).toEqual({
+      rule,
+      anchor: '2026-10-07',
+    });
+  });
+
+  it('reports an incomplete rule once and treats it as not repeating', () => {
+    const bad = { repeat: { rule: { ...rule, interval: 0 }, anchor: '2026-10-07' } };
+    expect(resolveTodoRule(bad)).toBeNull();
+    expect(resolveTodoRule(bad)).toBeNull();
+    expect(logEvent).toHaveBeenCalledTimes(1);
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'rule-adapter-fallback',
+        context: { recur_surface: 'todo', recur_reason: 'invalid-rule' },
+      })
+    );
+  });
+
+  it.each(['', 'not-a-date', '2026-02-31'])('rejects the unparseable anchor %j', (anchor) => {
+    expect(resolveTodoRule({ repeat: { rule, anchor } })).toBeNull();
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        context: { recur_surface: 'todo', recur_reason: 'invalid-rule' },
+      })
+    );
   });
 });

@@ -702,6 +702,32 @@ export interface Budget {
   updatedAt: ISODateString;
 }
 
+/**
+ * A repeating to-do's schedule. Structurally a `ResolvedRule`
+ * (services/recurrence/adapters): the anchor rides with the rule, and both are
+ * always written together.
+ */
+export interface TodoRepeat {
+  rule: RecurrenceRule;
+  /** YYYY-MM-DD: the picker's start date when the rule was set. */
+  anchor: ISODateString;
+}
+
+/**
+ * One handled occurrence of a repeating to-do. Keyed by `date` (`KEY_FIELDS.repeatLog`), so a
+ * concurrent append on two devices merges. Only `done` and `skipped` are stored: a "missed"
+ * occurrence is derived on read (`recentOccurrences`), never written.
+ */
+export interface TodoRepeatLogEntry {
+  /** YYYY-MM-DD: the occurrence's due date (the identity key). */
+  date: ISODateString;
+  outcome: 'done' | 'skipped';
+  /** The member who completed or skipped it. */
+  by?: UUID;
+  /** When it was handled (full ISO timestamp). */
+  at: ISODateString;
+}
+
 // Todo item - Family task management
 export interface TodoItem {
   id: UUID;
@@ -738,6 +764,21 @@ export interface TodoItem {
    * the id (see `utils/activityLinks.ts`).
    */
   activityDate?: ISODateString; // YYYY-MM-DD
+  /** Present only on a repeating to-do: one rolling record whose `dueDate` follows the rule. */
+  repeat?: TodoRepeat;
+  /**
+   * A repeating to-do's handled occurrences: the newest `REPEAT_LOG_KEEP`
+   * (`utils/todoRecurrence`), keyed by `date`. "Missed" is derived, never stored. Seeded as
+   * `[]` whenever a series starts, so a concurrent first append merges.
+   */
+  repeatLog?: TodoRepeatLogEntry[];
+  /**
+   * #123 Phase B: a SOFT reference to the responsibility card whose reminder made this to-do.
+   * Written once at creation and never changed (a different card means a different to-do).
+   */
+  cardId?: string;
+  /** #123 Phase B: the card part this to-do belongs to (`'main'` for a single card). Immutable. */
+  cardPartKey?: string;
 }
 
 /** Helpful Hints (#40) — the closed set of rule-based hint triggers. */
@@ -890,9 +931,32 @@ export interface ResponsibilityCardState {
   doneOverride?: string;
   /** Custom cards only. Built-in cards keep their static name, emoji and category. */
   custom?: { name: string; emoji: string; category: ListCategory };
+  /**
+   * #123: the card's reminders, keyed by part key (`'main'` | child id | `label-<uuid>`).
+   * Card-level on purpose, never on `CardPart`: every deal/skip/save (an old client's too)
+   * rebuilds `parts` from key/label/holder only and would drop a field stored there. Read
+   * only through `resolveDeck` (`ResolvedPart.reminder`), which ignores malformed and orphan
+   * entries. Absent = no reminder on any part.
+   */
+  reminders?: Record<string, CardReminder>;
   createdBy?: UUID;
   createdAt: ISODateString;
   updatedAt: ISODateString;
+}
+
+/**
+ * #123: a reminder on one card part. It becomes ONE rolling to-do assigned to the part's
+ * holder (`utils/cardReminders.ts`). No end, like a list reset.
+ */
+export interface CardReminder {
+  /** The to-do title and the Nook line. Always stored (filled with the card name when left
+   *  blank) so no device ever translates it. */
+  say: string;
+  cadence: Cadence;
+  /** HH:mm; absent = all-day. */
+  time?: string;
+  /** YYYY-MM-DD: the picker's start date when the cadence was set. Fixed, never moved by a roll. */
+  anchor: ISODateString;
 }
 
 /**

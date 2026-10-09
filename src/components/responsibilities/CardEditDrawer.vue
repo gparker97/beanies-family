@@ -14,6 +14,12 @@
  * built-ins show the disabled tile with its reason. A card that disappears while open says
  * so and closes (shared with the view drawer via `useCardDrawerEnd`).
  *
+ * Card reminders (#123, existing cards only): the draft carries the whole `reminders` map,
+ * keyed like the parts, and `saveCard` receives it in the same one draft. A single card gets
+ * one Reminder field after the done line; a split card gets one control per part through the
+ * split editor's `#part` slot, only one open at a time (`expandedReminderKey`). A mode switch
+ * carries the reminders by the same rule as the holders (`draftRemindersForMode`).
+ *
  * Mounted unconditionally by the page (never `v-if`-gated) so `useFormModal` seeds it.
  */
 import { computed, ref } from 'vue';
@@ -21,21 +27,22 @@ import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import EmojiPicker from '@/components/ui/EmojiPicker.vue';
-import ToggleSwitch from '@/components/ui/ToggleSwitch.vue';
+import ToggleRow from '@/components/ui/ToggleRow.vue';
 import ListCategoryPills from '@/components/lists/ListCategoryPills.vue';
 import CardArt from '@/components/responsibilities/CardArt.vue';
+import CardReminderField from '@/components/responsibilities/CardReminderField.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFormModal } from '@/composables/useFormModal';
 import { useFormValidation } from '@/composables/useFormValidation';
-import { useMemberInfo } from '@/composables/useMemberInfo';
+import { isAdultMember, useMemberInfo } from '@/composables/useMemberInfo';
 import { useResponsibilityCardLabel } from '@/composables/useResponsibilityCardLabel';
 import { showToast } from '@/composables/useToast';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useResponsibilityStore } from '@/stores/responsibilityStore';
 import { MAIN_PART_KEY, type ResolvedCard } from '@/utils/responsibilityDeck';
 import { fillTemplate } from '@/utils/fillTemplate';
-import type { CardDraft } from '@/utils/responsibilityOps';
-import type { ListCategory } from '@/types/models';
+import { draftRemindersForMode, type CardDraft } from '@/utils/responsibilityOps';
+import type { CardPart, CardReminder, ListCategory } from '@/types/models';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import CardSplitEditor, { type SplitDraft } from './CardSplitEditor.vue';
 import { useCardDrawerEnd } from './useCardDeletion';
@@ -50,8 +57,8 @@ const emit = defineEmits<{ close: []; saved: [cardId: string] }>();
 const { t } = useTranslation();
 const store = useResponsibilityStore();
 const familyStore = useFamilyStore();
-const { getMemberName } = useMemberInfo();
-const { cardName, cardEmoji } = useResponsibilityCardLabel();
+const { getMemberName, getMemberById } = useMemberInfo();
+const { cardName, cardEmoji, partCaption } = useResponsibilityCardLabel();
 
 /** The curated emoji for a family-made card. Labels are translation keys. */
 const EMOJI_CHOICES: { emoji: string; labelKey: UIStringKey }[] = [
@@ -90,6 +97,10 @@ const category = ref<ListCategory>('home');
 const split = ref<SplitDraft>({ splitMode: 'single', parts: [{ key: MAIN_PART_KEY }] });
 const done = ref('');
 const skipped = ref(false);
+/** #123: the card's reminders, keyed like `split.parts` (the whole map goes in the draft). */
+const reminders = ref<Record<string, CardReminder>>({});
+/** The one reminder control that is open (a split card opens one part at a time). */
+const expandedReminderKey = ref<string | null>(null);
 /** The holder the card had when the drawer opened (for the re-deal note). */
 const openedHolderId = ref<string | undefined>();
 /** The header icon: the live-picked emoji while editing a custom card's identity, else the card's art. */
@@ -115,6 +126,10 @@ const { isSubmitting } = useFormModal(
       done.value = c.doneOverride ?? '';
       skipped.value = c.status === 'skipped';
       openedHolderId.value = c.splitMode === 'single' ? c.parts[0]?.holderId : undefined;
+      reminders.value = Object.fromEntries(
+        c.parts.flatMap((p) => (p.reminder ? [[p.key, { ...p.reminder }]] : []))
+      );
+      expandedReminderKey.value = c.splitMode === 'single' ? MAIN_PART_KEY : null;
     },
     onNew: () => {
       name.value = '';
@@ -124,6 +139,8 @@ const { isSubmitting } = useFormModal(
       done.value = '';
       skipped.value = false;
       openedHolderId.value = undefined;
+      reminders.value = {};
+      expandedReminderKey.value = null;
     },
     // Retargeted while open (Edit on another card, or New): refill for the new target.
     entityKey: () => props.cardId,
@@ -149,6 +166,43 @@ const v = useFormValidation(
 );
 
 const holders = computed(() => familyStore.sortedHumans);
+
+/** The split editor's update: a mode switch carries the reminders like it carries holders. */
+function onSplit(next: SplitDraft): void {
+  if (next.splitMode !== split.value.splitMode) {
+    reminders.value = draftRemindersForMode(
+      reminders.value,
+      split.value.parts,
+      next.parts,
+      next.splitMode
+    );
+    expandedReminderKey.value = next.splitMode === 'single' ? MAIN_PART_KEY : null;
+  }
+  split.value = next;
+}
+
+// ── Reminders (#123) ─────────────────────────────────────────────────────────
+/** What a blank What to Say saves: the card's name (a custom card's draft name, if typed). */
+const reminderFallbackSay = computed(() => {
+  const typed = editsIdentity.value ? name.value.trim() : '';
+  return typed || (card.value ? cardName(card.value) : '');
+});
+
+/** Who a part's reminder goes to today, for the control's copy. */
+function reminderHolder(part: CardPart): { name: string | null; child: boolean } {
+  const member = getMemberById(part.holderId);
+  return { name: member ? member.name : null, child: !!member && !isAdultMember(member) };
+}
+
+function setReminder(key: string, value: CardReminder | null): void {
+  const { [key]: _drop, ...rest } = reminders.value;
+  reminders.value = value ? { ...rest, [key]: value } : rest;
+}
+
+function setReminderExpanded(key: string, open: boolean): void {
+  if (open) expandedReminderKey.value = key;
+  else if (expandedReminderKey.value === key) expandedReminderKey.value = null;
+}
 
 /** "greg holds this card now…": shown when the drawer is about to move an unsplit card. */
 const redealNote = computed(() => {
@@ -177,6 +231,7 @@ function buildDraft(): CardDraft {
     parts: split.value.parts.map((p) => ({ ...p })),
     doneOverride: done.value.trim() || undefined,
     skipped: skipped.value,
+    reminders: { ...reminders.value },
   };
   if (card.value?.isCustom) {
     draft.custom = { name: name.value.trim(), emoji: emoji.value, category: category.value };
@@ -274,13 +329,38 @@ const { onDelete } = useCardDrawerEnd({
     </template>
 
     <CardSplitEditor
-      v-model="split"
+      :model-value="split"
       :members="familyStore.members"
       :holders="holders"
       :allow-split="!isNew"
       :holder-optional="isNew"
       :parts-bind="v.bind('parts', t('whoOwnsWhat.edit.partNames'))"
-    />
+      @update:model-value="onSplit"
+    >
+      <template v-if="!isNew" #parts-intro>
+        <p
+          class="dark:text-ink-faint mb-2.5 text-xs text-[var(--color-text-muted)]"
+          data-testid="card-reminder-per-part-hint"
+        >
+          {{ t('whoOwnsWhat.reminder.perPartHint') }}
+        </p>
+      </template>
+      <template v-if="!isNew" #part="{ part }">
+        <div class="dark:border-line border-t border-[var(--tint-slate-10)] pt-2.5">
+          <CardReminderField
+            :key="`${cardId}:${part.key}`"
+            :model-value="reminders[part.key] ?? null"
+            :holder-name="reminderHolder(part).name"
+            :child-holder="reminderHolder(part).child"
+            :card-name="reminderFallbackSay"
+            :part-label="partCaption(split, part)"
+            :expanded="expandedReminderKey === part.key"
+            @update:model-value="setReminder(part.key, $event)"
+            @update:expanded="setReminderExpanded(part.key, $event)"
+          />
+        </div>
+      </template>
+    </CardSplitEditor>
     <p
       v-if="redealNote"
       class="dark:text-ink-soft -mt-3 text-xs text-[var(--color-text-muted)]"
@@ -306,20 +386,28 @@ const { onDelete } = useCardDrawerEnd({
       </p>
     </FormFieldGroup>
 
-    <div v-if="!isNew" class="flex items-center justify-between gap-4">
-      <div class="min-w-0">
-        <p class="font-outfit dark:text-ink text-sm font-semibold text-[var(--color-text)]">
-          {{ t('whoOwnsWhat.edit.skip') }}
-        </p>
-        <p class="dark:text-ink-faint text-xs text-[var(--color-text-muted)]">
-          {{ t('whoOwnsWhat.edit.skipHint') }}
-        </p>
-      </div>
-      <ToggleSwitch
-        v-model="skipped"
-        :aria-label="t('whoOwnsWhat.edit.skip')"
-        data-testid="card-edit-skip"
+    <FormFieldGroup
+      v-if="!isNew && split.splitMode === 'single' && split.parts[0]"
+      :label="t('whoOwnsWhat.reminder.field')"
+    >
+      <CardReminderField
+        :key="`${cardId}:${MAIN_PART_KEY}`"
+        :model-value="reminders[MAIN_PART_KEY] ?? null"
+        :holder-name="reminderHolder(split.parts[0]).name"
+        :child-holder="reminderHolder(split.parts[0]).child"
+        :card-name="reminderFallbackSay"
+        :expanded="expandedReminderKey === MAIN_PART_KEY"
+        @update:model-value="setReminder(MAIN_PART_KEY, $event)"
+        @update:expanded="setReminderExpanded(MAIN_PART_KEY, $event)"
       />
-    </div>
+    </FormFieldGroup>
+
+    <ToggleRow
+      v-if="!isNew"
+      v-model="skipped"
+      :title="t('whoOwnsWhat.edit.skip')"
+      :hint="t('whoOwnsWhat.edit.skipHint')"
+      testid="card-edit-skip"
+    />
   </BeanieFormModal>
 </template>

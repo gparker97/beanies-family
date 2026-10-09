@@ -16,20 +16,27 @@
  *   - The check-in cycle starts with a stored `'start'` record, appended by `withCycleStart`
  *     to the write that first puts something in an empty deck. The due date is derived
  *     from records only (`nextCheckInDate`), never from cards or moves.
+ *   - Card reminders (#123) are card-level, keyed by part key (`state.reminders`). Only
+ *     `buildSaveCard` writes them (filtered to the draft's parts) and `buildRestoreDefaults`
+ *     clears them; every other builder carries them through `baseState`'s clone. This module
+ *     never imports to-do code.
  */
 import { generateUUID } from '@/utils/id';
+import { cadenceKey } from '@/services/recurrence/cadence';
 import {
   CUSTOM_CARD_PREFIX,
   MAIN_PART_KEY,
   childMembers,
   countsTowardCycle,
   isUndealtDeck,
+  isValidCardReminder,
   isValidCardState,
   type ResolvedCard,
   type ResolvedPart,
 } from '@/utils/responsibilityDeck';
 import type {
   CardPart,
+  CardReminder,
   CardSplitMode,
   FamilyMember,
   ListCategory,
@@ -268,6 +275,11 @@ export interface CardDraft {
   skipped: boolean;
   /** Custom cards only; ignored for built-ins (they keep their name, emoji and category). */
   custom?: { name: string; emoji: string; category: ListCategory };
+  /**
+   * #123: the FULL desired reminder map, keyed like `parts` (see `draftRemindersForMode`).
+   * Absent = leave the stored map exactly as it is.
+   */
+  reminders?: Record<string, CardReminder>;
 }
 
 /**
@@ -298,6 +310,79 @@ export function draftPartsForMode(
   return [withHolder({ key: newLabelPartKey(), label: '' }, first)];
 }
 
+/**
+ * The reminders a draft carries when the editor switches split mode, by the same rule as
+ * `draftPartsForMode`'s holders: a part that survives the switch (same key) keeps its own
+ * reminder, and a new first part takes the first current part's, so single ↔ split moves a
+ * reminder between `main` and the first part instead of dropping it unseen. Every other new
+ * part starts without one.
+ */
+export function draftRemindersForMode(
+  reminders: Readonly<Record<string, CardReminder>>,
+  currentParts: readonly CardPart[],
+  nextParts: readonly CardPart[],
+  mode: CardSplitMode
+): Record<string, CardReminder> {
+  const currentKeys = new Set(currentParts.map((p) => p.key));
+  const firstCurrent = currentParts[0] ? reminders[currentParts[0].key] : undefined;
+  const out: Record<string, CardReminder> = {};
+  nextParts.forEach((p, i) => {
+    const key = mode === 'single' ? MAIN_PART_KEY : p.key;
+    const carried = currentKeys.has(p.key) ? reminders[p.key] : i === 0 ? firstCurrent : undefined;
+    if (carried) out[key] = carried;
+  });
+  return out;
+}
+
+function sameReminder(a: CardReminder, b: CardReminder): boolean {
+  return (
+    a.say === b.say &&
+    (a.time ?? '') === (b.time ?? '') &&
+    a.anchor === b.anchor &&
+    cadenceKey(a.cadence) === cadenceKey(b.cadence)
+  );
+}
+
+/**
+ * Is the stored reminder value (raw: any client may have written it) the same as `next`?
+ * A malformed stored entry never compares equal, so saving a card rewrites it cleanly.
+ */
+function sameReminders(stored: unknown, next: Readonly<Record<string, CardReminder>>): boolean {
+  const raw = stored ?? {};
+  if (typeof raw !== 'object' || Array.isArray(raw)) return false;
+  const prev = raw as Record<string, unknown>;
+  const keys = Object.keys(prev);
+  if (keys.length !== Object.keys(next).length) return false;
+  return keys.every((k) => {
+    const a = prev[k];
+    const b = next[k];
+    return !!b && isValidCardReminder(a) && sameReminder(a, b);
+  });
+}
+
+/** A reminder as written: only its own fields, `time` only when set. */
+function storedReminder(r: CardReminder): CardReminder {
+  const out: CardReminder = { say: r.say, cadence: clone(r.cadence), anchor: r.anchor };
+  if (r.time) out.time = r.time;
+  return out;
+}
+
+/**
+ * The draft's reminders filtered to its parts (orphans pruned), with a single card's entry
+ * re-keyed to `main` like its part. Null when the draft carries no map (keep the stored one).
+ */
+function draftReminders(draft: CardDraft): Record<string, CardReminder> | null {
+  const src = draft.reminders;
+  if (!src) return null;
+  const single = draft.splitMode === 'single';
+  const out: Record<string, CardReminder> = {};
+  for (const p of draft.parts) {
+    const r = src[p.key] ?? (single ? src[MAIN_PART_KEY] : undefined);
+    if (r) out[single ? MAIN_PART_KEY : p.key] = storedReminder(r);
+  }
+  return out;
+}
+
 function sameParts(a: readonly CardPart[], b: readonly CardPart[]): boolean {
   return (
     a.length === b.length &&
@@ -321,6 +406,8 @@ function validateDraft(card: ResolvedCard, draft: CardDraft): void {
     throw new Error('buildSaveCard: every label part needs a label');
   if (card.isCustom && draft.custom && !draft.custom.name.trim())
     throw new Error('buildSaveCard: a custom card needs a name');
+  if (Object.values(draft.reminders ?? {}).some((r) => !isValidCardReminder(r)))
+    throw new Error('buildSaveCard: a malformed reminder');
 }
 
 /**
@@ -350,13 +437,17 @@ export function buildSaveCard(
         : card.custom
       : undefined;
 
+  const reminders = draftReminders(draft);
+  const remindersSame = !reminders || sameReminders(card.state?.reminders, reminders);
+
   const unchanged =
     card.state !== null &&
     card.state.status === status &&
     card.splitMode === draft.splitMode &&
     sameParts(storedParts(card.parts), parts) &&
     (card.doneOverride?.trim() || undefined) === doneOverride &&
-    JSON.stringify(card.custom ?? null) === JSON.stringify(custom ?? null);
+    JSON.stringify(card.custom ?? null) === JSON.stringify(custom ?? null) &&
+    remindersSame;
   if (unchanged) return NOOP;
 
   const state = baseState(card, actorId, nowIso);
@@ -366,6 +457,9 @@ export function buildSaveCard(
   if (doneOverride) state.doneOverride = doneOverride;
   else delete state.doneOverride;
   if (custom) state.custom = custom;
+  // Absent draft map: `baseState`'s clone already carries the stored one through.
+  if (reminders && Object.keys(reminders).length) state.reminders = reminders;
+  else if (reminders) delete state.reminders;
 
   const ops: DeckOp[] = [{ op: 'setState', state }];
   let moved = 0;
@@ -385,6 +479,13 @@ export function buildSaveCard(
     telemetry.push({ message: 'card_skipped', context: { count: 1, detail: 'single' } });
   if (card.status === 'skipped' && status === 'kept')
     telemetry.push({ message: 'bring_back', context: { kind: card.category } });
+  if (reminders && !remindersSame) {
+    const count = Object.keys(reminders).length;
+    telemetry.push({
+      message: 'reminder_saved',
+      context: { kind: count ? 'set' : 'cleared', count },
+    });
+  }
   return { ops, telemetry };
 }
 
@@ -460,8 +561,8 @@ export function buildDeleteCustom(
  * Restore the default cards and start the deal over (Requirement 15). Takes the RAW
  * stored records so ids this build doesn't recognise are deleted too.
  *   - every non-custom record is deleted (every built-in card is unsorted again);
- *   - custom cards are deleted, or with `keepCustom` kept as waiting: holders and split
- *     cleared, `custom` and `doneOverride` preserved;
+ *   - custom cards are deleted, or with `keepCustom` kept as waiting: holders, split and
+ *     reminders (#123) cleared, `custom` and `doneOverride` preserved;
  *   - every move is deleted; check-in records are kept. The deck is then empty (see
  *     `countsTowardCycle`), so the next write that puts a card in it writes a new cycle
  *     start (`withCycleStart`) and the check-in clock restarts from there.
@@ -485,6 +586,8 @@ export function buildRestoreDefaults(
         parts: [{ key: MAIN_PART_KEY }],
         updatedAt: nowIso,
       };
+      // Restore is a fresh start: a kept card's reminders go with its holders.
+      delete state.reminders;
       ops.push({ op: 'setState', state });
       kept += 1;
     } else {

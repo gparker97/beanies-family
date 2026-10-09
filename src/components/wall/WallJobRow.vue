@@ -49,6 +49,8 @@ const emit = defineEmits<{ toggle: [WallJob] }>();
 
 const { t } = useTranslation();
 const { canEdit, noteActivity } = useWallLock();
+/** Edit mode applies to this row: unlocked, and not a row whose edits belong elsewhere (#123). */
+const rowEditable = computed(() => canEdit.value && !props.job.locked);
 const edit = inject(WALL_EDIT, undefined);
 const burst = inject(WALL_BURST, undefined);
 const tickEl = ref<HTMLElement | null>(null);
@@ -141,7 +143,7 @@ const {
 function onTitleTap() {
   // A row mid-write is not a row to start editing.
   if (props.pending) return;
-  if (!canEdit.value || !edit) {
+  if (!rowEditable.value || !edit) {
     onTick();
     return;
   }
@@ -300,7 +302,7 @@ watch(canEdit, (allowed) => {
     </button>
 
     <ActionButtons
-      v-if="canEdit && edit && !renaming"
+      v-if="rowEditable && edit && !renaming"
       size="xl"
       :show-edit="false"
       @delete="onRemove"

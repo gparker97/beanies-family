@@ -16,6 +16,7 @@ import {
   weekStartOffset,
   startOfWeekYmd,
   defaultDueBeforeEvent,
+  isWallClockTime,
 } from '../date';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 
@@ -113,6 +114,16 @@ describe('isDateBetween', () => {
     expect(isDateBetween('2026-03-15', '2026-03-15', '2026-03-15')).toBe(true);
     expect(isDateBetween('2026-03-14', '2026-03-15', '2026-03-15')).toBe(false);
     expect(isDateBetween('2026-03-16', '2026-03-15', '2026-03-15')).toBe(false);
+  });
+});
+
+describe('isWallClockTime', () => {
+  it('accepts the stored shape: zero-padded 24-hour HH:mm', () => {
+    for (const ok of ['00:00', '09:05', '12:30', '23:59']) expect(isWallClockTime(ok)).toBe(true);
+  });
+  it('rejects other shapes and out-of-range values', () => {
+    for (const bad of ['9:00', '24:00', '09:60', '9:5', '09:00:00', ' 09:00', '', 'ab:cd'])
+      expect(isWallClockTime(bad)).toBe(false);
   });
 });
 

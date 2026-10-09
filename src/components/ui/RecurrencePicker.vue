@@ -3,7 +3,8 @@ import { computed, onMounted, reactive, watch } from 'vue';
 import FrequencyChips, { type ChipOption } from '@/components/ui/FrequencyChips.vue';
 import DayOfWeekSelector from '@/components/ui/DayOfWeekSelector.vue';
 import { useTranslation } from '@/composables/useTranslation';
-import { describeRule, WEEKDAY_SHORT } from '@/services/recurrence/describe';
+import { ruleKey } from '@/services/recurrence/cadence';
+import { describeRuleAt, WEEKDAY_SHORT } from '@/services/recurrence/describe';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { getOrdinalSuffix } from '@/utils/format';
 import {
@@ -39,8 +40,21 @@ const props = withDefaults(
      * keeps those defaults intact instead of silently imposing one on both.
      */
     defaultCadence?: SimpleCadence;
+    /**
+     * Hide the "Ends" row while keeping the "Repeats" wording (a card reminder has no end,
+     * #123). `mode="reset"` hides it too, but also relabels the control.
+     */
+    hideEnd?: boolean;
+    /** An `HH:mm` time the host pairs with the rule: the live summary adds " at {time}". */
+    time?: string;
   }>(),
-  { mode: 'repeat', accent: 'orange', defaultCadence: 'monthly' }
+  {
+    mode: 'repeat',
+    accent: 'orange',
+    defaultCadence: 'monthly',
+    hideEnd: false,
+    time: undefined,
+  }
 );
 const emit = defineEmits<{ 'update:modelValue': [value: RecurrenceRule] }>();
 
@@ -165,9 +179,13 @@ const builtRule = computed<RecurrenceRule>(() => {
 
 // ── Model <-> state sync (echo-guarded to prevent an infinite v-model loop) ──
 // `watch(builtRule)` flushes async, so a synchronous flag can't suppress the
-// emit's echo — instead we compare against the JSON we last emitted/applied and
-// skip both the re-emit and the re-sync when they match.
-let lastJson = '';
+// emit's echo — instead we compare against the rule we last emitted/applied and
+// skip both the re-emit and the re-sync when they match. The comparison is by
+// `ruleKey` (order-independent), not JSON: a host that stores the rule and hands
+// it back rebuilt (key order changed, e.g. via `cadenceOf`/`cadenceToRule`) is
+// still our own echo. Re-syncing from it would snap a Custom pick that matches a
+// preset (Custom opens on every 2 weeks) back to Simple.
+let lastKey = '';
 function syncFromModel(rule: RecurrenceRule | null): void {
   const anchorDow = anchorDate.value.getDay();
   if (!rule) {
@@ -199,7 +217,7 @@ function syncFromModel(rule: RecurrenceRule | null): void {
       s.customUnit = (Object.keys(UNIT_OF) as CustomUnit[]).find((k) => UNIT_OF[k] === rule.unit)!;
     }
   }
-  lastJson = JSON.stringify(builtRule.value);
+  lastKey = ruleKey(builtRule.value);
 }
 syncFromModel(props.modelValue);
 
@@ -214,14 +232,14 @@ syncFromModel(props.modelValue);
 // before the parent has finished initializing.
 onMounted(() => {
   if (props.modelValue) return;
-  lastJson = JSON.stringify(builtRule.value);
+  lastKey = ruleKey(builtRule.value);
   emit('update:modelValue', builtRule.value);
 });
 
 watch(
   () => props.modelValue,
   (v) => {
-    if (JSON.stringify(v) === lastJson) return; // our own echo — ignore
+    if (v && ruleKey(v) === lastKey) return; // our own echo — ignore
     syncFromModel(v);
   }
 );
@@ -249,9 +267,9 @@ watch(anchorYmd, (newYmd, oldYmd) => {
 watch(
   builtRule,
   (rule) => {
-    const json = JSON.stringify(rule);
-    if (json === lastJson) return; // no real change (or an apply we already recorded)
-    lastJson = json;
+    const key = ruleKey(rule);
+    if (key === lastKey) return; // no real change (or an apply we already recorded)
+    lastKey = key;
     emit('update:modelValue', rule);
   },
   { deep: true }
@@ -286,7 +304,7 @@ const monthlyHint = computed(() => {
     ? `${base} ${fillTemplate(t('recurrence.monthly.clampHint'), { date: getOrdinalSuffix(s.monthlyDay) })}`
     : base;
 });
-const summary = computed(() => describeRule(builtRule.value, anchorYmd.value, t));
+const summary = computed(() => describeRuleAt(builtRule.value, anchorYmd.value, props.time, t));
 
 // ── Handlers ────────────────────────────────────────────────────────────────
 function setMode(m: 'simple' | 'custom') {
@@ -449,9 +467,9 @@ function stepN(delta: number) {
       </div>
     </div>
 
-    <!-- Ends (repeat mode only) -->
+    <!-- Ends (repeat mode only, unless the host has no end to offer) -->
     <div
-      v-if="!isReset"
+      v-if="!isReset && !hideEnd"
       class="flex flex-wrap items-center gap-2 text-sm text-[var(--color-text-muted)]"
     >
       {{ t('recurrence.ends') }}

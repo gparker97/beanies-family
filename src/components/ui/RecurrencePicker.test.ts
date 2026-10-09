@@ -4,10 +4,12 @@ import { nextTick } from 'vue';
 import RecurrencePicker from './RecurrencePicker.vue';
 import FrequencyChips from './FrequencyChips.vue';
 import type { RecurrenceRule } from '@/types/recurrence';
+import { cadenceOf, cadenceToRule } from '@/services/recurrence/cadence';
 
 vi.mock('@/composables/useTranslation', () => ({
   useTranslation: () => ({
-    t: (k: string) => k,
+    // The one template the `time` summary needs; every other key renders as itself.
+    t: (k: string) => (k === 'recurrence.desc.atTime' ? '{cadence} at {time}' : k),
     isEnglish: { value: true },
     isBeanieMode: { value: false },
   }),
@@ -72,6 +74,50 @@ describe('RecurrencePicker', () => {
     // picker re-derived monthlyDay from the start date (5th), builtRule would
     // differ from the loaded rule (15th) and emit. It stays silent → 15 preserved.
     expect(wrapper.emitted('update:modelValue')).toBeUndefined();
+  });
+});
+
+describe('RecurrencePicker — own echo by ruleKey (#123)', () => {
+  it('a host that hands the rule back rebuilt (another key order) does not snap Custom to Simple', async () => {
+    // The card reminder round trip: the host stores the cadence and hands back
+    // `cadenceToRule(cadenceOf(rule))`, an equal rule with `end` moved last. Custom opens on
+    // every 2 weeks, which matches the Biweekly preset; re-syncing from the rebuilt rule
+    // would flip the control back to Simple and leave Custom unreachable.
+    const weekly: RecurrenceRule = {
+      unit: 'week',
+      interval: 1,
+      weekdays: [0],
+      end: { kind: 'never' },
+    };
+    const held: { wrapper?: ReturnType<typeof mount<typeof RecurrencePicker>> } = {};
+    held.wrapper = mount(RecurrencePicker, {
+      props: {
+        modelValue: weekly,
+        startDate: ANCHOR,
+        'onUpdate:modelValue': (v: RecurrenceRule) => {
+          void held.wrapper?.setProps({ modelValue: cadenceToRule(cadenceOf(v)) });
+        },
+      },
+    });
+    const wrapper = held.wrapper;
+
+    const custom = wrapper.findAll('button').find((b) => b.text() === 'recurrence.mode.custom')!;
+    await custom.trigger('click');
+    await nextTick();
+    await nextTick();
+
+    const emitted = wrapper.emitted('update:modelValue')!;
+    expect(JSON.stringify(wrapper.props('modelValue'))).not.toBe(
+      JSON.stringify(emitted.at(-1)![0])
+    );
+    expect(emitted.at(-1)![0]).toEqual({
+      unit: 'week',
+      interval: 2,
+      weekdays: [0],
+      end: { kind: 'never' },
+    });
+    expect(wrapper.findComponent(FrequencyChips).exists()).toBe(false);
+    expect(emitted.length).toBe(1);
   });
 });
 
@@ -164,5 +210,31 @@ describe('RecurrencePicker — defaultCadence (#70)', () => {
       },
     });
     expect(model).toMatchObject({ unit: 'month', interval: 1 });
+  });
+});
+
+describe('RecurrencePicker: hideEnd + time (#123)', () => {
+  it('hideEnd hides the Ends row and keeps the "Repeats" wording', () => {
+    const shown = mount(RecurrencePicker, { props: { modelValue: null, startDate: ANCHOR } });
+    expect(shown.find('select[aria-label="recurrence.ends"]').exists()).toBe(true);
+
+    const hidden = mount(RecurrencePicker, {
+      props: { modelValue: null, startDate: ANCHOR, hideEnd: true },
+    });
+    expect(hidden.find('select[aria-label="recurrence.ends"]').exists()).toBe(false);
+    expect(hidden.text()).toContain('recurrence.repeats');
+    expect(hidden.text()).not.toContain('recurrence.resets');
+  });
+
+  it('adds " at {time}" to the live summary only when a time is given', () => {
+    const plain = mount(RecurrencePicker, {
+      props: { modelValue: null, startDate: ANCHOR, defaultCadence: 'weekly' },
+    });
+    expect(plain.text()).not.toContain(' at ');
+
+    const timed = mount(RecurrencePicker, {
+      props: { modelValue: null, startDate: ANCHOR, defaultCadence: 'weekly', time: '20:00' },
+    });
+    expect(timed.text()).toMatch(/ at 8(:00)?\s?pm/i);
   });
 });

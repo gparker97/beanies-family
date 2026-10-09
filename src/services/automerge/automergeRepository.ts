@@ -186,13 +186,22 @@ export function createAutomergeRepository<
    * Each is stamped exactly like `createWithId`. Because the ids come from the caller, a retry
    * with the same ids rewrites the same entities rather than adding duplicates, so there is no
    * post-write projection check (unlike `commitStatementAdds`, whose fresh ids forbid a retry).
+   *
+   * `ifAbsent` drops every item whose id is already in the projection (the document's truth,
+   * not a store array that may not have loaded it yet), so a deterministic id another device
+   * already created is never overwritten by a whole-entity `set`. Returns only the entities
+   * this call created; with nothing left to create it writes nothing.
    */
   async function createManyWithIds(
-    items: readonly { id: string; input: CreateInput }[]
+    items: readonly { id: string; input: CreateInput }[],
+    opts?: { ifAbsent?: boolean }
   ): Promise<Entity[]> {
-    if (!items.length) return [];
+    const toCreate = opts?.ifAbsent
+      ? items.filter(({ id }) => !projectionGetById(collectionName, id))
+      : items;
+    if (!toCreate.length) return [];
     const now = toISODateString(new Date());
-    const entities = items.map(({ id, input }) => stampNew(id, input, now));
+    const entities = toCreate.map(({ id, input }) => stampNew(id, input, now));
     const ops: MutationOp[] = entities.map((entity) => ({
       op: 'set',
       collection: collectionName,
@@ -207,8 +216,8 @@ export function createAutomergeRepository<
    * Split an update input into the keys to write and the keys to delete. A key explicitly
    * set to `undefined` is DELETED from the stored entity (e.g. clearing `goalId` to unlink
    * a goal); a key absent from the input is left untouched. Automerge rejects `undefined`,
-   * so it can never travel in the patch itself. Shared by `update` and `patchMany` so a
-   * batched clear behaves exactly like a single one.
+   * so it can never travel in the patch itself. Shared by `update`, `patchMany` and
+   * `patchEach` so a batched clear behaves exactly like a single one.
    */
   function splitPatch(input: UpdateInput): {
     patch: Record<string, unknown>;
@@ -244,6 +253,36 @@ export function createAutomergeRepository<
     await mutate({ op: 'batch', ops });
     return ids
       .map((id) => projectionGetById(collectionName, id) as Entity | undefined)
+      .filter((e): e is Entity => e !== undefined)
+      .map(transform);
+  }
+
+  /**
+   * Apply a DIFFERENT patch to each of several entities in ONE Automerge change. Each item
+   * becomes its own `patchOp`, with its own `splitPatch` (a key set to `undefined` is deleted
+   * on that entity only) and its own base read from the projection at call time, so the
+   * worker reconciles each three-way and a peer's concurrent edit is kept (ADR-039). An id
+   * that is absent is skipped, never a failure. Returns the entities that were patched, read
+   * back from the projection.
+   */
+  async function patchEach(
+    items: readonly { id: string; patch: UpdateInput }[],
+    options: { onMissing: 'skip' }
+  ): Promise<Entity[]> {
+    if (!items.length) return [];
+    const now = toISODateString(new Date());
+    // Every base is read here, synchronously, before the write is sent.
+    const ops: MutationOp[] = items.map(({ id, patch }) => {
+      const { patch: cleanPatch, deleteKeys } = splitPatch(patch);
+      return patchOp(collectionName, id, cleanPatch, {
+        deleteKeys,
+        updatedAt: now,
+        onMissing: options.onMissing,
+      });
+    });
+    await mutate({ op: 'batch', ops });
+    return items
+      .map(({ id }) => projectionGetById(collectionName, id) as Entity | undefined)
       .filter((e): e is Entity => e !== undefined)
       .map(transform);
   }
@@ -312,6 +351,7 @@ export function createAutomergeRepository<
     createManyWithIds,
     update,
     patchMany,
+    patchEach,
     remove,
     removeMany,
   };

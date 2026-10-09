@@ -6,6 +6,10 @@
  *  - Built-in cards show the DISABLED delete tile with its reason; family-made cards the
  *    real one.
  *  - Children see everything read-only: no Edit, no delete, no Add, no write menu items.
+ *  - Card reminders (#123): the edit drawer seeds, edits and carries the `reminders` map in the
+ *    same one draft (one control per part, one open at a time; a mode switch keeps it); the
+ *    view drawer prints the stub, the single card's Reminder field with its live to-do, and
+ *    each split part's line.
  */
 import { setActivePinia, createPinia } from 'pinia';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -13,7 +17,7 @@ import { mount, flushPromises, enableAutoUnmount } from '@vue/test-utils';
 import { defineComponent, reactive } from 'vue';
 import { getResponsibilityCard } from '@/constants/responsibilityCards';
 import type { ResolvedCard } from '@/utils/responsibilityDeck';
-import type { FamilyMember } from '@/types/models';
+import type { CardReminder, FamilyMember } from '@/types/models';
 
 vi.mock('@/composables/useTranslation', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
@@ -124,7 +128,24 @@ const SplitEditorStub = defineComponent({
   name: 'CardSplitEditor',
   props: ['modelValue'],
   emits: ['update:modelValue'],
-  template: '<div data-testid="split-editor" />',
+  template: `<div data-testid="split-editor">
+    <template v-if="modelValue.splitMode !== 'single'">
+      <slot name="parts-intro" />
+      <div v-for="part in modelValue.parts" :key="part.key"><slot name="part" :part="part" /></div>
+    </template>
+  </div>`,
+});
+const ReminderFieldStub = defineComponent({
+  name: 'CardReminderField',
+  props: ['modelValue', 'holderName', 'cardName', 'childHolder', 'partLabel', 'expanded'],
+  emits: ['update:modelValue', 'update:expanded'],
+  template: '<div data-testid="reminder-field" />',
+});
+const LinkedTodoStub = defineComponent({
+  name: 'LinkedTodoRow',
+  props: ['todoId'],
+  emits: ['open'],
+  template: '<div data-testid="linked-todo" />',
 });
 const stubs = {
   BeanieFormModal: FormModalStub,
@@ -140,6 +161,39 @@ const stubs = {
   ListCategoryPills: true,
   ToggleSwitch: true,
   MemberChip: true,
+  CardReminderField: ReminderFieldStub,
+  LinkedTodoRow: LinkedTodoStub,
+};
+
+/** Every Monday at 8pm (#123). */
+const REMINDER: CardReminder = {
+  say: 'Laundry day',
+  cadence: { unit: 'week', interval: 1, weekdays: [1] },
+  time: '20:00',
+  anchor: '2026-09-07',
+};
+/** Laundry with a reminder on its one part, or a child split of it; restored after each test. */
+function withCard(card: ResolvedCard): void {
+  store.cards[card.id] = card;
+}
+const LAUNDRY_REMINDING: ResolvedCard = {
+  ...LAUNDRY,
+  parts: [{ key: 'main', holderId: 'greg', reminder: REMINDER }],
+  hasReminder: true,
+};
+const SPLIT_REMINDING: ResolvedCard = {
+  ...LAUNDRY,
+  id: 'school-drop-off',
+  def: getResponsibilityCard('school-drop-off'),
+  category: 'kids',
+  emoji: '🎒',
+  splitMode: 'label',
+  parts: [
+    { key: 'label-a', label: 'Mornings', holderId: 'greg', reminder: REMINDER },
+    { key: 'label-b', label: 'Afternoons', holderId: 'sofia' },
+    { key: 'label-c', label: 'Weekends' },
+  ],
+  hasReminder: true,
 };
 
 async function openEdit(cardId: string | null) {
@@ -177,6 +231,7 @@ describe('CardEditDrawer', () => {
       parts: [{ key: 'main', holderId: 'sofia' }],
       doneOverride: undefined,
       skipped: false,
+      reminders: {},
     });
     for (const other of [store.deal, store.keep, store.skip, store.bringBack, store.createCustom])
       expect(other).not.toHaveBeenCalled();
@@ -286,6 +341,109 @@ describe('CardEditDrawer', () => {
     const custom = await openEdit('custom-swim');
     expect(custom.find('[data-testid="delete"]').exists()).toBe(true);
     expect(custom.find('[data-testid="delete-reason"]').exists()).toBe(false);
+  });
+});
+
+describe('CardEditDrawer reminders (#123)', () => {
+  afterEach(() => {
+    store.cards.laundry = LAUNDRY;
+    delete store.cards['school-drop-off'];
+  });
+  const fields = (w: Awaited<ReturnType<typeof openEdit>>) =>
+    w.findAllComponents(ReminderFieldStub);
+
+  it('a new card has no Reminder field', async () => {
+    const w = await openEdit(null);
+    expect(fields(w)).toHaveLength(0);
+  });
+
+  it('a single card seeds one open field from the card and saves the edit in the one draft', async () => {
+    withCard(LAUNDRY_REMINDING);
+    const w = await openEdit('laundry');
+    const [field] = fields(w);
+    expect(fields(w)).toHaveLength(1);
+    expect(field!.props()).toMatchObject({
+      modelValue: REMINDER,
+      holderName: 'greg',
+      childHolder: false,
+      expanded: true,
+      partLabel: undefined,
+    });
+    // The name a blank What to Say saves.
+    expect(field!.props('cardName')).toBeTruthy();
+
+    const next = { ...REMINDER, time: '19:00' };
+    field!.vm.$emit('update:modelValue', next);
+    await w.find('[data-testid="save"]').trigger('click');
+    await flushPromises();
+    expect(store.saveCard).toHaveBeenCalledTimes(1);
+    expect(store.saveCard.mock.calls[0]![1].reminders).toEqual({ main: next });
+  });
+
+  it('turned off, the draft carries an empty map (the store clears it)', async () => {
+    withCard(LAUNDRY_REMINDING);
+    const w = await openEdit('laundry');
+    fields(w)[0]!.vm.$emit('update:modelValue', null);
+    await w.find('[data-testid="save"]').trigger('click');
+    await flushPromises();
+    expect(store.saveCard.mock.calls[0]![1].reminders).toEqual({});
+  });
+
+  it('a split card: one control per part, the hint once, and one open at a time', async () => {
+    withCard(SPLIT_REMINDING);
+    const w = await openEdit('school-drop-off');
+    expect(w.findAll('[data-testid="card-reminder-per-part-hint"]')).toHaveLength(1);
+    const parts = fields(w);
+    expect(parts.map((f) => f.props('holderName'))).toEqual(['greg', 'Sofia', null]);
+    expect(parts.map((f) => f.props('partLabel'))).toEqual(['Mornings', 'Afternoons', 'Weekends']);
+    expect(parts.map((f) => f.props('modelValue'))).toEqual([REMINDER, null, null]);
+    expect(parts.every((f) => f.props('expanded') === false)).toBe(true);
+
+    parts[0]!.vm.$emit('update:expanded', true);
+    await flushPromises();
+    expect(fields(w).map((f) => f.props('expanded'))).toEqual([true, false, false]);
+    fields(w)[1]!.vm.$emit('update:expanded', true);
+    await flushPromises();
+    expect(fields(w).map((f) => f.props('expanded'))).toEqual([false, true, false]);
+
+    const second = { ...REMINDER, say: 'Pick up' };
+    fields(w)[1]!.vm.$emit('update:modelValue', second);
+    await w.find('[data-testid="save"]').trigger('click');
+    await flushPromises();
+    expect(store.saveCard.mock.calls[0]![1].reminders).toEqual({
+      'label-a': REMINDER,
+      'label-b': second,
+    });
+  });
+
+  it('switching split to single keeps the first part reminder, on the card', async () => {
+    withCard(SPLIT_REMINDING);
+    const w = await openEdit('school-drop-off');
+    w.findComponent(SplitEditorStub).vm.$emit('update:modelValue', {
+      splitMode: 'single',
+      parts: [{ key: 'main', holderId: 'greg' }],
+    });
+    await flushPromises();
+    expect(fields(w)).toHaveLength(1);
+    expect(fields(w)[0]!.props('modelValue')).toEqual(REMINDER);
+    expect(w.find('[data-testid="card-reminder-per-part-hint"]').exists()).toBe(false);
+    await w.find('[data-testid="save"]').trigger('click');
+    await flushPromises();
+    expect(store.saveCard.mock.calls[0]![1].reminders).toEqual({ main: REMINDER });
+  });
+
+  it('switching single to split carries the reminder to the first part', async () => {
+    withCard(LAUNDRY_REMINDING);
+    const w = await openEdit('laundry');
+    w.findComponent(SplitEditorStub).vm.$emit('update:modelValue', {
+      splitMode: 'label',
+      parts: [
+        { key: 'label-x', label: '', holderId: 'greg' },
+        { key: 'label-y', label: '' },
+      ],
+    });
+    await flushPromises();
+    expect(fields(w).map((f) => f.props('modelValue'))).toEqual([REMINDER, null]);
   });
 });
 
@@ -496,6 +654,79 @@ describe('CardViewDrawer', () => {
     expect(split.findAll('li')).toHaveLength(2);
     expect(split.text()).toContain('whoOwnsWhat.deck.nobody');
     delete store.cards['school-drop-off'];
+  });
+
+  describe('reminders (#123)', () => {
+    afterEach(() => {
+      store.cards.laundry = LAUNDRY;
+      delete store.cards['school-drop-off'];
+      family.members = family.members.filter((m) => m.id !== 'leo');
+    });
+
+    it('a single card: the stub on the card, then the Reminder field and its live to-do', () => {
+      withCard(LAUNDRY_REMINDING);
+      const w = mountView(true);
+      const stub = w.find('[data-testid="card-view-stub"]');
+      expect(stub.exists()).toBe(true);
+      expect(stub.text()).toContain('🔔');
+      expect(stub.text()).not.toContain('whoOwnsWhat.reminder.partNone');
+      const field = w.find('[data-testid="card-view-reminder"]');
+      expect(field.text()).toContain('whoOwnsWhat.reminder.goesOn');
+      expect(field.text()).not.toContain('whoOwnsWhat.reminder.adultsSee');
+      expect(w.findComponent(LinkedTodoStub).props('todoId')).toBe('card-laundry-main');
+    });
+
+    it('opening the linked to-do closes the drawer', () => {
+      withCard(LAUNDRY_REMINDING);
+      const w = mountView(true);
+      w.findComponent(LinkedTodoStub).vm.$emit('open', 'card-laundry-main');
+      expect(w.emitted('close')).toHaveLength(1);
+    });
+
+    it('a child holder: adults see it too', () => {
+      family.members = [
+        ...family.members,
+        { id: 'leo', name: 'Leo', role: 'member', ageGroup: 'child' },
+      ];
+      withCard({
+        ...LAUNDRY_REMINDING,
+        parts: [{ key: 'main', holderId: 'leo', reminder: REMINDER }],
+      });
+      const w = mountView(false);
+      expect(w.find('[data-testid="card-view-reminder-adults"]').exists()).toBe(true);
+    });
+
+    it('a split card: a stub line per held part, and each split row says its reminder', () => {
+      withCard(SPLIT_REMINDING);
+      const w = mountView(true, 'school-drop-off');
+      const stubLines = w.findAll('[data-testid="card-view-stub"] p').map((p) => p.text());
+      // The part nobody holds is left off the card.
+      expect(stubLines).toHaveLength(2);
+      expect(stubLines[0]).toContain('Mornings');
+      expect(stubLines[0]).toContain('🔔');
+      expect(stubLines[1]).toContain('whoOwnsWhat.reminder.partNone');
+      // No separate Reminder field: the rows carry it.
+      expect(w.find('[data-testid="card-view-reminder"]').exists()).toBe(false);
+      expect(w.findComponent(LinkedTodoStub).exists()).toBe(false);
+      const rows = w.findAll('[data-testid="card-view-split"] li');
+      expect(rows[0]!.find('[data-testid="card-view-split-reminder"]').text()).toContain(
+        'whoOwnsWhat.reminder.remindsHolder'
+      );
+      expect(rows[1]!.find('[data-testid="card-view-split-reminder-none"]').exists()).toBe(true);
+    });
+
+    it('no reminder: no stub; a grown-up gets "No reminder" and how to add one, a child nothing', () => {
+      const adult = mountView(true);
+      expect(adult.find('[data-testid="card-view-stub"]').exists()).toBe(false);
+      const none = adult.find('[data-testid="card-view-reminder-none"]');
+      expect(none.text()).toContain('whoOwnsWhat.reminder.none');
+      expect(none.text()).toContain('whoOwnsWhat.reminder.editHint');
+
+      const child = mountView(false);
+      expect(child.find('[data-testid="card-view-reminder-none"]').exists()).toBe(false);
+      expect(child.text()).not.toContain('whoOwnsWhat.reminder.editHint');
+      expect(child.findComponent(LinkedTodoStub).exists()).toBe(false);
+    });
   });
 
   it('a child sees the card read-only: no Edit, no delete of any kind', () => {

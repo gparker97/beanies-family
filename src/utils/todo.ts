@@ -1,8 +1,10 @@
-import type { CreateTodoInput, TodoItem, TodoSort } from '@/types/models';
+import type { CreateTodoInput, RecurrenceRule, TodoItem, TodoSort } from '@/types/models';
+import type { UIStringKey } from '@/services/translation/uiStrings';
 import { toAssigneePayload } from './assignees';
-import { localToday } from './date';
+import { formatNookDate, localToday } from './date';
 import { parseIsoDateSafely } from './safeDate';
 import { todoLink, todoLinkPatch } from './activityLinks';
+import { startRepeat } from './todoRecurrence';
 
 /**
  * Check whether a todo item is overdue (past its due date/time).
@@ -76,6 +78,8 @@ export interface TodoCreateFields {
   activityId?: string;
   /** With `activityId`: the session of a repeating activity it belongs to (`YYYY-MM-DD`). */
   activityDate?: string;
+  /** Make it a repeating to-do (#123). Ignored without a due date, which anchors the series. */
+  repeat?: RecurrenceRule;
 }
 
 /**
@@ -87,21 +91,32 @@ export interface TodoCreateFields {
  *     (`stripUndefined` drops only `undefined`, and a cleared picker yields `''`);
  *   - a time is kept only alongside a date (reminders and "overdue" assume both);
  *   - assignees are written only when there are some;
- *   - an activity link is written only with an id, through `todoLinkPatch`.
+ *   - an activity link is written only with an id, through `todoLinkPatch`;
+ *   - a repeat is written only with a due date, through `startRepeat` (the due date is the
+ *     anchor, and `dueDate` becomes the series' first occurrence on or after today).
  *
  * Built FIELD BY FIELD and never by spreading `fields`: the review drawer passes whole drafts,
  * which carry keys that must never be persisted (`matchDate`, `timeDropped`, `dueDerived`,
  * `duplicateOf`). Pure: no id, no store, no logging.
  */
-export function toCreateTodoInput(fields: TodoCreateFields, createdBy: string): CreateTodoInput {
+export function toCreateTodoInput(
+  fields: TodoCreateFields,
+  createdBy: string,
+  todayYmd: string = localToday()
+): CreateTodoInput {
   const description = fields.description?.trim() || undefined;
   const dueDate = fields.dueDate?.trim() || undefined;
   const dueTime = dueDate ? fields.dueTime?.trim() || undefined : undefined;
   const assigneeIds = fields.assigneeIds ?? [];
+  const started = dueDate && fields.repeat ? startRepeat(fields.repeat, dueDate, todayYmd) : null;
   return {
     title: fields.title.trim(),
     ...(description ? { description } : {}),
-    ...(dueDate ? { dueDate } : {}),
+    ...(started
+      ? { dueDate: started.dueDate, repeat: started.repeat, repeatLog: started.repeatLog }
+      : dueDate
+        ? { dueDate }
+        : {}),
     ...(dueTime ? { dueTime } : {}),
     ...(assigneeIds.length ? toAssigneePayload([...assigneeIds]) : {}),
     // Through the link writer, so the id and session date are always written together.
@@ -109,4 +124,16 @@ export function toCreateTodoInput(fields: TodoCreateFields, createdBy: string): 
     completed: false,
     createdBy,
   };
+}
+
+/**
+ * A short label for a due day: "Today", else the compact Nook date ("Wed, 6 Mar"). Used where
+ * a repeating to-do's next date is shown (the reminders roster, the card's linked to-do row).
+ */
+export function dueDayLabel(
+  ymd: string,
+  todayYmd: string,
+  t: (key: UIStringKey) => string
+): string {
+  return ymd === todayYmd ? t('date.today') : formatNookDate(ymd);
 }

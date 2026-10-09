@@ -924,6 +924,17 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       },
       {
         type: 'heading',
+        content: 'Repeating to-dos',
+        level: 2,
+        id: 'repeating',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'A to-do can repeat. Turn on <strong>Repeat This To-do</strong> when you add one, pick how often, and it stays a single to-do that moves to its next date each time it is done or skipped. Every repeating to-do in the family is listed in the <strong>Reminders</strong> section on a phone, or the <strong>Family Reminders</strong> panel on desktop. See <a href="/help/features/repeating-to-dos-and-card-reminders">Repeating to-dos and card reminders</a> for the details.',
+      },
+      {
+        type: 'heading',
         content: 'To-dos linked to an activity',
         level: 2,
         id: 'linked-activity',
@@ -2651,6 +2662,17 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       },
       {
         type: 'heading',
+        content: 'Reminders on cards',
+        level: 2,
+        id: 'reminders',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'A grown-up can attach a repeating reminder to a card, such as a Tuesday night nudge on Trash Night. It follows whoever holds the card and shows up in their to-dos and daily briefing. Open the card, tap <strong>Edit</strong> and turn on <strong>Remind the Holder</strong>. The full steps are in <a href="/help/features/repeating-to-dos-and-card-reminders">Repeating to-dos and card reminders</a>.',
+      },
+      {
+        type: 'heading',
         content: 'What’s next?',
         level: 2,
         id: 'whats-next',
@@ -2659,6 +2681,137 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         type: 'paragraph',
         content:
           'Learn exactly how <a href="/help/features/family-check-in">the family check-in</a> works, see how card changes show up each morning in <a href="/help/how-it-works/your-daily-briefing">Your Daily Briefing</a>, and learn more about <a href="/help/features/helpful-hints">helpful hints</a>.',
+      },
+    ],
+  },
+  {
+    slug: 'repeating-to-dos-and-card-reminders',
+    category: 'features',
+    title: 'Repeating to-dos and card reminders',
+    excerpt:
+      'Make a to-do repeat on its own, see every repeating reminder in the family, and attach a reminder to a Who Owns What card so it follows whoever holds the card.',
+    icon: '\u{1F501}',
+    readTime: 6,
+    updatedDate: '2026-10-09',
+    sections: [
+      {
+        type: 'heading',
+        content: 'Why repeating to-dos?',
+        level: 2,
+        id: 'why',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Some jobs come back every week: trash night, a Sunday-night schedule check, a monthly bill. Instead of adding the same to-do again and again, you can make one to-do repeat. It stays a single to-do that moves to its next date each time it is dealt with, so your list never fills up with copies.',
+      },
+      {
+        type: 'heading',
+        content: 'Make a to-do repeat',
+        level: 2,
+        id: 'repeat',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'On the <strong>To-Dos</strong> page, tap <strong>+ Add To-do</strong> and fill in the title, who it is for and a due date. If you turn on the repeat without a due date, today is used.',
+          'Turn on <strong>Repeat This To-do</strong>. The row changes to <strong>Create a Repeating Family Reminder</strong> and a picker opens.',
+          'Choose how often it repeats (for example weekly on Wednesday) and, if you like, when it stops. A summary under the picker reads back what you chose, such as <em>Repeats weekly on Wed at 8:00 PM</em>.',
+          'Optionally set a due time, then save.',
+        ],
+      },
+      {
+        type: 'paragraph',
+        content:
+          'You can also turn on a repeat for an existing to-do. Open it and look for the <strong>Repeats</strong> field in the drawer. Repeating to-dos show a small repeat badge on their row.',
+      },
+      {
+        type: 'heading',
+        content: 'What happens when you complete, skip or miss it',
+        level: 2,
+        id: 'what-happens',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>Complete it:</strong> the to-do does not move to the Completed list. It is recorded as done for that date and jumps to its next date. If the repeat has an end and that was the last one, the to-do completes normally.',
+          '<strong>Skip it:</strong> open the to-do and tap <strong>Skip This Time</strong>. The date is recorded as skipped and the to-do moves on to its next date.',
+          '<strong>Miss it:</strong> if a date passes without being done or skipped, the to-do rolls forward to the next date on its own once that day is over. The missed date appears in the <strong>Recent</strong> strip.',
+        ],
+      },
+      {
+        type: 'paragraph',
+        content:
+          'The <strong>Recent</strong> strip in the drawer lists the last few dates with who did them, or <em>Skipped</em> and <em>missed</em> for the ones that were not done.',
+      },
+      {
+        type: 'callout',
+        title: 'The due date follows the schedule',
+        icon: '\u{1F4C5}',
+        content:
+          'On a repeating to-do the due date is not edited by hand, because it always matches the schedule. To move it, tap <strong>Skip This Time</strong> or change the repeat. The due time can still be changed, and it applies to every date. To stop repeating, open the to-do and tap <strong>Turn off repeat</strong>; it stays as an ordinary to-do on its current date.',
+      },
+      {
+        type: 'heading',
+        content: 'See every repeating reminder in the family',
+        level: 2,
+        id: 'reminders-list',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'On a phone, open the <strong>Reminders</strong> section below your open to-dos. On desktop, the <strong>Family Reminders</strong> panel sits on the right of the To-Dos page. Both list everything that repeats, grouped by the person it reminds, with how often it repeats and when it is <strong>Next</strong> due. Tap a row to open the to-do. A child’s group also notes that adults see it too, and the member filter at the top of the page applies here as well.',
+      },
+      {
+        type: 'heading',
+        content: 'Set a reminder on a Who Owns What card',
+        level: 2,
+        id: 'card-reminders',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'A <a href="/help/features/who-owns-what">Who Owns What</a> card can carry its own reminder, so the nudge stays with the job rather than with one person. Only grown-ups can set it.',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'Open the card and tap <strong>Edit</strong>. (A brand-new custom card gets its reminder the first time you edit it after saving.)',
+          'Turn on <strong>Remind the Holder</strong>.',
+          'Under <strong>What to Say</strong>, type the words for the reminder. Leave it blank to use the card’s name.',
+          'Under <strong>How Often</strong>, choose how the reminder repeats.',
+          'Under <strong>At</strong>, pick the time of day.',
+          'Save the card.',
+        ],
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>It follows the holder.</strong> The reminder lands on whoever holds the card today. When the card is re-dealt, it moves to the new holder. If nobody holds it yet, it starts as soon as someone does.',
+          '<strong>Split cards:</strong> each part can have its own reminder, going to that part’s holder.',
+          '<strong>Kids:</strong> a reminder for a child holder belongs to the child, and adults see it too.',
+          '<strong>Turning it off:</strong> edit the card and turn off <strong>Remind the Holder</strong>. Skipping the card also stops it.',
+        ],
+      },
+      {
+        type: 'paragraph',
+        content:
+          'The reminder becomes a repeating to-do in the holder’s list. Because the card owns it, that to-do cannot be renamed, re-dated or deleted from To-Dos or the wall; it says <em>Set on the card</em> and points you back to the card. Its description stays editable. A small card chip on the row and the <strong>Linked Card</strong> row in the drawer both open the card. In the Nook’s daily briefing, the holder sees it on the day as <em>Reminder for Leo: Trash Night at 8:00 PM!</em>',
+      },
+      {
+        type: 'heading',
+        content: 'What’s next?',
+        level: 2,
+        id: 'whats-next',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'See the basics in <a href="/help/features/family-todo-lists">Family To-Do Lists</a>, learn how the deck works in <a href="/help/features/who-owns-what">Who Owns What</a>, and see how reminders appear each morning in <a href="/help/how-it-works/your-daily-briefing">Your Daily Briefing</a>.',
       },
     ],
   },

@@ -10,6 +10,8 @@ import type { NotificationOccurrence } from '@/utils/notifications';
 import type { TravelSegmentOccurrence } from '@/utils/vacation';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import { allDayFireTime, DEFAULT_TRAVEL_LEADS } from '@/utils/reminderSchedule';
+import { todoDueId } from '@/utils/notifications';
+import { advanceRepeat } from '@/utils/todoRecurrence';
 
 const NOW = new Date('2026-05-22T10:00:00'); // local 10am
 
@@ -518,6 +520,30 @@ describe('buildReminderSchedule — todos', () => {
       PREFS
     );
     expect(reminders).toHaveLength(0);
+  });
+});
+
+describe('buildReminderSchedule: a rolled repeating to-do (#123)', () => {
+  it('arms the next occurrence under a NEW id (the date is part of it)', () => {
+    // Weekly on Saturdays, current occurrence 2026-05-23.
+    const repeating = todo({
+      id: 't-rep' as UUID,
+      repeat: {
+        rule: { unit: 'week', interval: 1, weekdays: [6], end: { kind: 'never' } },
+        anchor: '2026-05-23',
+      },
+      repeatLog: [],
+    });
+    const before = buildReminderSchedule(input({ todos: [repeating] }), NOW, PREFS).reminders;
+    const roll = advanceRepeat(repeating, 'done', 'me', NOW.toISOString(), '2026-05-22');
+    if (!roll || roll === 'series-ended') throw new Error('expected a roll');
+    const rolled = { ...repeating, ...roll.patch } as TodoItem;
+    const after = buildReminderSchedule(input({ todos: [rolled] }), NOW, PREFS).reminders;
+
+    expect(rolled.dueDate).toBe('2026-05-30');
+    expect(before.map((r) => r.id)).toEqual([todoDueId('t-rep', '2026-05-23')]);
+    expect(after.map((r) => r.id)).toEqual([todoDueId('t-rep', '2026-05-30')]);
+    expect(after[0].fireAt).toEqual(new Date('2026-05-30T17:30:00'));
   });
 });
 

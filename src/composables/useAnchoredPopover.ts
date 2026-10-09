@@ -1,6 +1,27 @@
 import { ref, nextTick, onMounted, onUnmounted, type Ref } from 'vue';
 import { useEscapeClose } from '@/composables/useEscapeClose';
 
+/**
+ * The z-index every anchored popover paints at: above every modal and drawer layer
+ * (BaseModal `top` z-[250] and `gate` z-[260], BaseSidePanel up to z-[255], the onboarding
+ * overlay at 200), below toasts (z-[270]) and the fatal / splash overlays (z-[300]). A
+ * popover is transient and must show over whatever surface opened it: at a page-level tier
+ * (z-50 / z-[70]) a picker opened inside the onboarding overlay rendered invisibly behind it.
+ * It rides `popoverStyle`, so a consumer that binds the style cannot pick a different tier.
+ */
+export const ANCHORED_POPOVER_Z_INDEX = 265;
+
+/** Typing targets: arrow keys there step the field (a time input's hours), never rove the menu. */
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return (
+    target instanceof HTMLInputElement ||
+    target instanceof HTMLTextAreaElement ||
+    target instanceof HTMLSelectElement ||
+    target.isContentEditable
+  );
+}
+
 export interface AnchoredPopoverOptions {
   /** The component root. Its rect anchors the menu; clicks inside it don't close it. */
   anchorRef: Ref<HTMLElement | undefined>;
@@ -10,26 +31,35 @@ export interface AnchoredPopoverOptions {
   popoverRef: Ref<HTMLElement | null>;
   /** Selector for the focusable menu rows, used for roving arrow-key focus. */
   itemSelector: string;
-  /** Row index to focus on open (e.g. the active option). Default: the first row. */
+  /**
+   * Row index to focus on open (e.g. the active option). Default: the first row; a negative
+   * index also lands on the first row, so a caller with no match should name a row itself.
+   */
   initialFocusIndex?: () => number;
   /** Used until the menu has rendered and can be measured. */
   widthEstimate?: number;
   heightEstimate?: number;
+  /**
+   * Which trigger edge the menu lines up with: `'end'` (default) right-aligns it, the menu
+   * idiom; `'start'` left-aligns it, for a picker that drops down from its pill.
+   */
+  align?: 'start' | 'end';
 }
 
 /**
  * A menu popover anchored to a trigger: teleported + fixed-position so a
  * clipping/scrolling ancestor can't cut it off (the overflow-safe idiom proven
- * on AssigneePickerButton 2026-05-21), right-aligned to the trigger, flipped up
+ * on AssigneePickerButton 2026-05-21), right-aligned to the trigger (`align`), flipped up
  * when there's no room below, clamped to the viewport, re-positioned on
  * scroll/resize, closed on Escape (`useEscapeClose`) and on a click outside
  * both the anchor and the teleported menu, with ArrowUp/ArrowDown roving focus.
  *
  * The caller owns the three template refs and renders the trigger and the
- * `<Teleport to="body">` menu itself, binding `popoverStyle` and
- * `onMenuKeydown` onto the menu element.
+ * `<Teleport to="body">` menu itself, binding `popoverStyle` (which carries the
+ * position AND the z tier, `ANCHORED_POPOVER_Z_INDEX`) and `onMenuKeydown` onto
+ * the menu element. Arrow keys typed into a field inside the menu are left alone.
  *
- * TODO(consolidation): consumers are SortMenu and OverflowMenu. BeanHero's add
+ * TODO(consolidation): consumers are SortMenu, OverflowMenu and TimePresetPicker. BeanHero's add
  * menu is the next one to migrate. AssigneePickerButton, BaseCombobox,
  * BeanieDatePicker, BeanieTimeInput and InfoHintBadge still carry their own copy
  * of this idiom (their anchoring differs: pickers/inputs, not menus); fold each
@@ -44,6 +74,7 @@ export function useAnchoredPopover(options: AnchoredPopoverOptions) {
     initialFocusIndex,
     widthEstimate = 208,
     heightEstimate = 156,
+    align = 'end',
   } = options;
 
   const show = ref(false);
@@ -61,9 +92,9 @@ export function useAnchoredPopover(options: AnchoredPopoverOptions) {
     const dropUp = spaceBelow < height + 16 && rect.top > height + 16;
     const top = dropUp ? rect.top - height - 6 : rect.bottom + 6;
 
-    // Anchor the menu's right edge to the trigger's right edge, then clamp to the
-    // viewport so a trigger near the edge can't push the menu off-screen.
-    let left = rect.right - width;
+    // Anchor the menu to the trigger's `align` edge, then clamp to the viewport so a
+    // trigger near the edge can't push the menu off-screen.
+    let left = align === 'start' ? rect.left : rect.right - width;
     if (left + width > window.innerWidth - MARGIN) left = window.innerWidth - width - MARGIN;
     if (left < MARGIN) left = MARGIN;
 
@@ -71,6 +102,7 @@ export function useAnchoredPopover(options: AnchoredPopoverOptions) {
       position: 'fixed',
       top: `${Math.max(MARGIN, top)}px`,
       left: `${left}px`,
+      zIndex: String(ANCHORED_POPOVER_Z_INDEX),
     };
   }
 
@@ -101,6 +133,8 @@ export function useAnchoredPopover(options: AnchoredPopoverOptions) {
   }
 
   function onMenuKeydown(e: KeyboardEvent) {
+    // A field inside the menu (TimePresetPicker's custom time) keeps its own arrow keys.
+    if (isEditableTarget(e.target)) return;
     const items = menuItems();
     if (items.length === 0) return;
     const currentIdx = items.indexOf(document.activeElement as HTMLElement);

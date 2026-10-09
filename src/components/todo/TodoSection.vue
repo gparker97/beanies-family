@@ -6,6 +6,9 @@
  * "Completed" section opts into `collapsible` (the header becomes a toggle);
  * the others are always visible. The parent passes an already-filtered/sorted
  * `todos` list and handles the to-do events (it's the orchestrator).
+ *
+ * A default slot, when given, replaces the flat list (the Reminders section renders the roster
+ * there, #123); the header, its count from `todos`, collapsing and `emptyText` are unchanged.
  */
 import { useSyncHighlight } from '@/composables/useSyncHighlight';
 import TodoItemCard from '@/components/todo/TodoItemCard.vue';
@@ -53,11 +56,13 @@ const { syncHighlightClass } = useSyncHighlight();
     >
       <span class="text-xs opacity-50">{{ collapsed ? '▼' : '▲' }}</span>
       <span class="nook-section-label" :class="labelClass">
-        <span v-if="emoji" aria-hidden="true">{{ emoji }} </span>{{ label }} ({{ todos.length }})
+        <span v-if="emoji" class="mr-1" aria-hidden="true">{{ emoji }}</span
+        >{{ label }} ({{ todos.length }})
       </span>
     </button>
     <p v-else class="nook-section-label mb-2" :class="labelClass">
-      <span v-if="emoji" aria-hidden="true">{{ emoji }} </span>{{ label }} ({{ todos.length }})
+      <span v-if="emoji" class="mr-1" aria-hidden="true">{{ emoji }}</span
+      >{{ label }} ({{ todos.length }})
     </p>
 
     <!-- Optional hint line under the header -->
@@ -72,7 +77,10 @@ const { syncHighlightClass } = useSyncHighlight();
       <div v-if="todos.length === 0 && emptyText" class="py-6 text-center">
         <p class="text-sm text-[var(--color-text-muted)]">{{ emptyText }}</p>
       </div>
-      <div :class="collapsible ? 'mt-2 space-y-2' : 'space-y-2'">
+      <div v-if="$slots.default" :class="collapsible ? 'mt-2' : ''">
+        <slot />
+      </div>
+      <div v-else :class="collapsible ? 'mt-2 space-y-2' : 'space-y-2'">
         <div v-for="todo in todos" :key="todo.id" :class="syncHighlightClass(todo.id)">
           <TodoItemCard
             :todo="todo"

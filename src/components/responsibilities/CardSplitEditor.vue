@@ -13,6 +13,10 @@
  * Switching mode goes through `draftPartsForMode`, the ONE owner of the part-key rules
  * (child ids, label uuids, `'main'`); this component never invents a key itself except
  * through `newLabelPartKey`.
+ *
+ * Two slots let the host add to a split without this editor knowing what it adds (#123, the
+ * per-part card reminder): `#part="{ part, index }"` at the foot of each part's block, and
+ * `#parts-intro` once above the parts.
  */
 import { computed } from 'vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
@@ -138,6 +142,8 @@ const singleHolder = computed(() => props.modelValue.parts[0]?.holderId ?? '');
       >
         {{ t('whoOwnsWhat.edit.noChildren') }}
       </p>
+      <!-- Host content said once above the parts (the drawer's per-part reminder hint). -->
+      <slot v-if="modelValue.parts.length" name="parts-intro" />
       <ul class="space-y-2.5">
         <li
           v-for="(part, index) in modelValue.parts"
@@ -192,6 +198,9 @@ const singleHolder = computed(() => props.modelValue.parts[0]?.holderId ?? '');
             :members="holders"
             @update:model-value="setHolder(index, $event)"
           />
+          <!-- Host content per part (the drawer's reminder control); this editor never
+               knows what it is. -->
+          <slot name="part" :part="part" :index="index" />
         </li>
       </ul>
       <button
