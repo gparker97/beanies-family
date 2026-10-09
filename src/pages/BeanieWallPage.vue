@@ -1487,11 +1487,6 @@ watch(activeView, () => (sheet.value = null));
   font-size: 1.4rem;
 }
 
-.wall-root :deep(.wall-night-hand) {
-  font-size: 2.1rem;
-  line-height: 1.1;
-}
-
 .wall-root :deep(.wall-night-hint) {
   font-size: 0.9rem;
 }
