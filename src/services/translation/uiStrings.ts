@@ -7961,7 +7961,7 @@ const STRING_DEFS = {
       'everything is included until {date}. start a plan now and billing begins today; wait and nothing is charged until day {day}.',
   },
   'plan.name.basic': { en: 'beanies basic', beanie: 'beanies basic' },
-  'plan.name.full': { en: 'beanies + magic beans', beanie: 'beanies + magic beans' },
+  'plan.name.full': { en: 'magic beans', beanie: 'magic beans' },
   'plan.active.renews': { en: 'Renews {date}.', beanie: 'renews {date}.' },
   // A cancelled plan keeps everything until the paid period ends; a failed renewal keeps the
   // plan while Stripe retries. Both are "active" to the server; the words and the CTA differ.

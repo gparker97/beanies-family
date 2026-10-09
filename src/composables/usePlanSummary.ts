@@ -2,10 +2,10 @@
  * The ACTIVE plan in words (#95): one source for the Settings card and the Plan page, so the
  * two can never describe a cancelled or past-due plan differently.
  *
- *   renewing   "beanies + magic beans" · Active · "Renews 1 Oct 2027."        CTA Manage Plan
- *   ending     "beanies + magic beans" · Ending · "Cancelled. Everything stays included until
+ *   renewing   "magic beans" · Active · "Renews 1 Oct 2027."        CTA Manage Plan
+ *   ending     "magic beans" · Ending · "Cancelled. Everything stays included until
  *              1 Oct 2027, then beanies.family goes read-only."               CTA Restart Plan
- *   pastDue    "beanies + magic beans" · Payment Issue · "Your last payment didn't go through…"
+ *   pastDue    "magic beans" · Payment Issue · "Your last payment didn't go through…"
  *                                                                              CTA Update Card
  *
  * Every CTA opens the Stripe Customer Portal (`usePlanPortal`), which is where a cancelled plan

@@ -3542,7 +3542,7 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'plan.trial.endsWeb':
     '{date}前可使用全部功能。现在开通套餐，今天就开始计费；如果再等等，第{day}天之前不会收取任何费用。',
   'plan.name.basic': 'beanies 基础版',
-  'plan.name.full': 'beanies + 魔法豆',
+  'plan.name.full': '魔法豆',
   'plan.active.renews': '{date}自动续费。',
   'plan.pill.ending': '即将到期',
   'plan.pill.paymentIssue': '付款异常',

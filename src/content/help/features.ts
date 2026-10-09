@@ -2962,7 +2962,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       'What the 90-day trial includes, what changes when it ends, how to choose a plan from the website, and what happens to your family’s data if you stop paying (nothing).',
     icon: '\u{1F331}',
     readTime: 5,
-    updatedDate: '2026-10-01',
+    updatedDate: '2026-10-09',
     sections: [
       {
         type: 'paragraph',
@@ -3025,7 +3025,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         content: '',
         items: [
           '<strong>beanies basic</strong>: the whole app for the whole family, sold by the year. Includes one magic bean a month, so the paperwork reader is there when you need it.',
-          '<strong>beanies + magic beans</strong>: everything in basic, plus <span data-bean-limit="full" data-live="{count} magic beans a day">a daily allowance of magic beans</span>, so statements, invitations, recipes and itineraries can be read straight into the app. Monthly or yearly.',
+          '<strong>the magic beans plan</strong>: everything in basic, plus <span data-bean-limit="full" data-live="{count} magic beans a day">a daily allowance of magic beans</span>, so statements, invitations, recipes and itineraries can be read straight into the app. Monthly or yearly.',
         ],
       },
       {
@@ -3056,7 +3056,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         items: [
           'Open <strong>app.beanies.family</strong> in a web browser and sign in.',
           'Go to <strong>Settings → Your beanies Plan</strong> and tap <strong>See Plans</strong>.',
-          'Pick your currency, then a plan. On beanies + magic beans you can also pick <strong>Yearly</strong> or <strong>Monthly</strong>.',
+          'Pick your currency, then a plan. On the magic beans plan you can also pick <strong>Yearly</strong> or <strong>Monthly</strong>.',
           'Pay in the box on the same page. It is Stripe’s secure checkout; beanies.family never sees your card.',
           'That’s it. The page switches to your active plan, and every device in the family picks it up the next time it checks in.',
         ],
@@ -3082,7 +3082,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'Switching plans takes effect straight away. Moving up (basic to beanies + magic beans) charges the difference today, with the unused part of your old plan taken off; moving down credits the unused part against your next bill. The confirmation screen shows what is due today and what each renewal will cost from then on. If you have already cancelled and want a different plan, choose <strong>Renew</strong> in the portal first, then <strong>Update plan</strong>.',
+          'Switching plans takes effect straight away. Moving up (basic to the magic beans plan) charges the difference today, with the unused part of your old plan taken off; moving down credits the unused part against your next bill. The confirmation screen shows what is due today and what each renewal will cost from then on. If you have already cancelled and want a different plan, choose <strong>Renew</strong> in the portal first, then <strong>Update plan</strong>.',
       },
       {
         type: 'paragraph',

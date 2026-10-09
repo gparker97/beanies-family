@@ -59,7 +59,7 @@ So for full disclosure: the above is actually a genuine question from me, becaus
 
 The main reason for the _magic beans_ cap is to prevent abuse - I never wanted to restrict how many _magic beans_ (which, for those who [missed the blog](https://beanies.family/blog/getting-down-to-brass-tacks?utm_source=blog&utm_medium=post&utm_campaign=getting-ready-for-v1&utm_content=pricing-post), or just plum forgot, is our cutesy term for AI) could be used by families who genuinely need it. After analyzing the data for how magic beans are actually used (and hitting the limit myself), I concluded that a limit of 10 could actually impact families on particularly busy days, so it’s been raised. At no extra cost. Because I don’t want anybody reaching the limit when they need it most - I know how frustrating that would be.
 
-![The beanies + magic beans plan card: $9.99 a month or $84.99 a year, with "up to 25 magic beans every day" circled in orange](/blog/getting-ready-for-v1-magic-beans-plan-card.webp)
+![The magic beans plan card on the pricing page: $9.99 a month or $84.99 a year, with "up to 25 magic beans every day" circled in orange](/blog/getting-ready-for-v1-magic-beans-plan-card.webp)
 
 _in case you missed it_
 

@@ -22,6 +22,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - The beanie wall's to-do drawer now sets late to-dos apart from today's, with small animated icons, a "3 days late" label on late rows and the due time on today's.
 - The beanie wall's "things on today" line (now "Nothing on today" on a free day) and trip countdown are now handwritten.
 - The summary box at the top of beanstalk posts is now called **the beanie breakdown**.
+- The beanie wall setup guide now says the wall works either way up, landscape or portrait, including in the Android app.
+- The beanies + magic beans plan is now called simply **magic beans**, on the pricing page, in Settings and in the Help Center.
 
 ### Fixed
 

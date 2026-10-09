@@ -40,7 +40,7 @@ export interface PriceTable {
   basicYearly: string;
   /** basicYearly / 12, for the "works out to" line. */
   basicPerMonth: string;
-  /** beanies + magic beans. */
+  /** The magic beans plan (`full` in code and Stripe lookup keys). */
   fullYearly: string;
   fullMonthly: string;
   /** fullYearly / 12, ROUNDED - it is only ever rendered behind a "~". The
@@ -198,17 +198,17 @@ export const PRICING_FAQS: PricingFaq[] = [
   {
     id: 'one-magic-bean',
     q: 'what counts as one magic bean?',
-    a: "one magic bean (which is one ai read) is one document, invitation, itinerary, recipe, etc. a bank statement is read page by page, so it's one bean per page, and beanies tells you how many before it reads. finding duplicates in a shopping list is free and never uses a bean. with the trial you get one per day, beanies + magic beans gives you {fullBeansPerDay}, and with beanies basic you get one each month. bring your own key and there's no limit from me at all.",
+    a: "one magic bean (which is one ai read) is one document, invitation, itinerary, recipe, etc. a bank statement is read page by page, so it's one bean per page, and beanies tells you how many before it reads. finding duplicates in a shopping list is free and never uses a bean. with the trial you get one per day, the magic beans plan gives you {fullBeansPerDay}, and with beanies basic you get one each month. bring your own key and there's no limit from me at all.",
   },
   {
     id: 'compare-to-cozi',
     q: 'how does this compare to cozi?',
-    a: `as of this writing (in ${COZI.checked}), cozi's ad-free plan is ${COZI.adFreeYearly} a year and beanies basic is ${PRICES.USD.basicYearly}. their ai plan is ${COZI.aiYearly} and beanies + magic beans is ${PRICES.USD.fullYearly}. we're about five dollars more, which is roughly due to beanies providing privacy rather than advertising. cozi has a free tier which runs on ads, while we have a ${TRIAL_DAYS} day trial period (and we'll never have ads).`,
+    a: `as of this writing (in ${COZI.checked}), cozi's ad-free plan is ${COZI.adFreeYearly} a year and beanies basic is ${PRICES.USD.basicYearly}. their ai plan is ${COZI.aiYearly} and the magic beans plan is ${PRICES.USD.fullYearly}. we're about five dollars more, which is roughly due to beanies providing privacy rather than advertising. cozi has a free tier which runs on ads, while we have a ${TRIAL_DAYS} day trial period (and we'll never have ads).`,
   },
   {
     id: 'here-now',
     q: "i'm an early adopter beanie. what does that get me?",
-    a: `half price on either plan, forever, for joining before v1. that's ${PRICES.USD.halfBasicYearly} a year for beanies basic, or ${PRICES.USD.halfFullYearly} for beanies + magic beans. no code, no expiry, and no renewal to miss.`,
+    a: `half price on either plan, forever, for joining before v1. that's ${PRICES.USD.halfBasicYearly} a year for beanies basic, or ${PRICES.USD.halfFullYearly} for the magic beans plan. no code, no expiry, and no renewal to miss.`,
   },
   {
     id: 'prove-early',
