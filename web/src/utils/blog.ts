@@ -108,8 +108,11 @@ export function padIssue(n: number): string {
   return n.toString().padStart(2, '0');
 }
 
-/** The three bullets of a post's "the long and short of it" summary box. */
+/** A post's "the beanie breakdown" summary box: three bullets plus an optional intro line. */
 export type LongAndShort = NonNullable<CollectionEntry<'blog'>['data']['longAndShort']>;
+
+/** The bullet keys of the summary box (everything but the optional intro). */
+type LongAndShortBullet = Exclude<keyof LongAndShort, 'intro'>;
 
 /**
  * Role label for each summary bullet. Key order is render order. `satisfies`
@@ -119,11 +122,11 @@ export const LONG_AND_SHORT_ROLES = {
   built: 'what we built',
   helps: 'how it helps you',
   where: 'where to find it',
-} satisfies Record<keyof LongAndShort, string>;
+} satisfies Record<LongAndShortBullet, string>;
 
 /** `[role label, bullet text]` in render order. Used by the post page and llms-full.txt. */
 export function longAndShortEntries(summary: LongAndShort): [string, string][] {
-  return (Object.keys(LONG_AND_SHORT_ROLES) as (keyof LongAndShort)[]).map((key) => [
+  return (Object.keys(LONG_AND_SHORT_ROLES) as LongAndShortBullet[]).map((key) => [
     LONG_AND_SHORT_ROLES[key],
     summary[key],
   ]);

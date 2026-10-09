@@ -6,7 +6,7 @@ category: stories
 coverEmoji: 🎉
 coverImage: /blog/getting-ready-for-v1-bear-steals-database.webp
 excerpt: 'v1 is nearly here. a look at the under-the-hood work getting beanies.family ready, and some good news: magic beans go from 10 to 25 a day, at no extra cost.'
-subtitle: 'as our release day approaches, i come bearing good news'
+subtitle: 'as release day approaches, i come bearing good news'
 featured: false
 author: greg
 draft: false
@@ -14,6 +14,7 @@ longAndShort:
   built: 'a massive stability overhaul ahead of v1, plus a daily magic beans allowance raised from 10 to 25.'
   helps: 'changes save more reliably, security is improved, and busy days are less likely to hit the magic beans limit.'
   where: 'the stability work is automatic; your magic beans count is in `Settings › Your beanies Plan`.'
+  intro: 'A new feature - we know our families are busy, so if you just want to know what changed, and not sit through a whole long story about why (how boring is that, right?), here’s the breakdown:'
 ---
 
 The day is nearly upon us, my friends (and beans).
@@ -64,10 +65,12 @@ _in case you missed it_
 
 So that’s it - we’re coming down to the wire, and I’m using just about every hour god gave me for final testing and tweaking. I’m thrilled and invigorated by all the positive feedback from families who enjoy the app, and happy to see more people signing on every day. I’m seeing (through [Plausible](https://plausible.io/privacy-focused-web-analytics), our fully anonymized and privacy-preserving analytics provider) more and more people visiting the site and using the app, and a wider variety of features being used.
 
-I encourage more families to [explore what’s available](https://beanies.family/?utm_source=blog&utm_medium=post&utm_campaign=getting-ready-for-v1&utm_content=explore-features) in beanies.family, and I hope everybody here takes this opportunity to look around and see what’s out there - there may even be something new that quietly appeared since you last checked. Believe it or not, it actually takes time to write these, so there are usually some “quietly released” features that have gone out before I’ve had a chance to actually announce them properly (a soft bean-launch, if you will).
+I encourage more families to [explore what’s available](https://beanies.family/?utm_source=blog&utm_medium=post&utm_campaign=getting-ready-for-v1&utm_content=explore-features) in beanies.family, and I hope everybody here takes this opportunity to look around and see what’s out there.
+
+Believe it or not, it actually takes time to write these, so there may even be some “quietly released” surprise features that have gone out before I’ve had a chance to actually announce them properly (a soft bean-launch, if you will).
 
 I’m also seeing more and more early beanies [joining us on discord](https://beanies.family/discord?utm_source=blog&utm_medium=post&utm_campaign=getting-ready-for-v1&utm_content=discord-cta), and it’s been great getting a chance to speak directly to some of you.
 
-Thanks again for being on the journey with me, and I hope you stick with us for the next stage. It’s gonna be an awesome ride.
+Thanks again for being on the journey with me, and I hope you stick with us for the next stage. It’ll be an awesome ride.
 
 -greg

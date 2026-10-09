@@ -21,6 +21,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - The to-do drawer's Mark Completed button is now a checkbox beside the title.
 - The beanie wall's to-do drawer now sets late to-dos apart from today's, with small animated icons, a "3 days late" label on late rows and the due time on today's.
 - The beanie wall's "things on today" line (now "Nothing on today" on a free day) and trip countdown are now handwritten.
+- The summary box at the top of beanstalk posts is now called **the beanie breakdown**.
 
 ### Fixed
 

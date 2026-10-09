@@ -1,9 +1,16 @@
 ---
 /**
- * "the long and short of it" — the three-bullet summary box at the top of a
+ * "the beanie breakdown" — the three-bullet summary box at the top of a
  * feature-style beanstalk post (what we built / how it helps you / where to
  * find it). Rendered by `pages/blog/[...slug].astro` between the header and
- * the "the post" divider, only when the post sets `longAndShort`.
+ * the "the post" divider, only when the post sets `longAndShort`. The box was
+ * called "the long and short of it" until 2026-10-09; the component, the
+ * frontmatter key and the CSS classes keep that name because they are data
+ * format (the beanies-blog skill reads `section.long-and-short` for Substack).
+ *
+ * The intro line under the heading is optional and normally absent: a post
+ * sets `longAndShort.intro` only for a one-off note (the first post to carry
+ * the new name used one to introduce the box).
  *
  * Takes its colour from the issue tint the post page sets on `.post-page`.
  * Text in backticks becomes an app-path chip; nothing else is interpreted.
@@ -30,8 +37,8 @@ const items = longAndShortEntries(summary).map(([role, text]) => ({
 ---
 
 <section class="long-and-short" aria-labelledby="long-and-short-heading">
-  <h2 class="las-title" id="long-and-short-heading">the long and short of it</h2>
-  <p class="las-intro">we know our families are busy, so here's the beanie breakdown</p>
+  <h2 class="las-title" id="long-and-short-heading">the beanie breakdown</h2>
+  {summary.intro && <p class="las-intro">{summary.intro}</p>}
   <ul class="las-list" role="list">
     {
       items.map(({ role, segments }) => (
@@ -73,6 +80,11 @@ const items = longAndShortEntries(summary).map(([role, text]) => ({
     font-style: italic;
     line-height: 1.45;
     margin: 0 0 16px;
+  }
+
+  /* No intro line: the title's 4px is too tight above the first bullet. */
+  .las-title + .las-list {
+    margin-top: 14px;
   }
 
   .las-list {
