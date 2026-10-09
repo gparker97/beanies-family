@@ -34,7 +34,8 @@ import { activityDetailRows } from '@/utils/activityDetails';
 import { bookingProgress, daysUntilTrip, tripCountdownKey, tripTypeEmoji } from '@/utils/vacation';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import type { FamilyList, FamilyMember, FamilyActivity } from '@/types/models';
-import { UNASSIGNED } from '@/utils/wallJobs';
+import { UNASSIGNED, uniqueTodoJobs } from '@/utils/wallJobs';
+import { formatNameList } from '@/utils/assignees';
 import type { WallJob, WallListGroup, WallSheetTarget, WallTodoBucket } from '@/types/wall';
 
 const props = defineProps<{
@@ -195,9 +196,8 @@ const TODO_LABEL: Record<WallTodoBucket, UIStringKey> = {
 
 const todoGroups = computed(() => {
   const allowed = props.visibleMemberIds ? new Set(props.visibleMemberIds) : null;
-  const visible = props.allTodos.filter(
-    (job) => !allowed || job.ownerId === UNASSIGNED || allowed.has(job.ownerId)
-  );
+  // One row per to-do: a to-do shared by two people is one job, not two.
+  const visible = uniqueTodoJobs(props.allTodos, allowed);
   return TODO_ORDER.map((bucket) => ({
     bucket,
     labelKey: TODO_LABEL[bucket],
@@ -218,10 +218,12 @@ const celebratingActivity = computed(() => {
   return identityFor(value).celebration.celebrating ? value.id : null;
 });
 
-/** Who owes this to-do — "Anyone" when nobody has claimed it. */
+/** Who owes this to-do ("Greg & Jill" when shared); "Anyone" when nobody has claimed it. */
 function todoOwnerName(job: WallJob): string {
-  if (job.ownerId === UNASSIGNED) return t('wall.todo.anyone');
-  return familyStore.members.find((m) => m.id === job.ownerId)?.name ?? t('wall.todo.anyone');
+  const names = (job.ownerIds ?? [job.ownerId])
+    .filter((id) => id !== UNASSIGNED)
+    .map((id) => familyStore.members.find((m) => m.id === id)?.name ?? '');
+  return formatNameList(names) || t('wall.todo.anyone');
 }
 
 /** The owner's colour, so the name reads as a pill rather than grey text. */

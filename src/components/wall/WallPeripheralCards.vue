@@ -25,7 +25,8 @@ import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { isRecurring } from '@/utils/listLifecycle';
-import { jobsProgress } from '@/utils/wallJobs';
+import { jobsProgress, uniqueTodoJobs, UNASSIGNED } from '@/utils/wallJobs';
+import { formatNameList } from '@/utils/assignees';
 import type { FamilyList, FamilyMember } from '@/types/models';
 import type { WallJob, WallPeripheralData, WallSheetTarget } from '@/types/wall';
 
@@ -78,33 +79,53 @@ const beans = computed(() => {
  * than taken from the page so the card cannot contradict the board it links to
  * once a person filter is applied.
  */
-const todoProgress = computed(() =>
-  jobsProgress([
+/**
+ * Today's to-dos across the visible beans, one row per to-do: a to-do shared by
+ * two people is one job here (each lane still shows it), so it is neither
+ * listed twice nor counted twice.
+ */
+const visibleTodos = computed(() =>
+  uniqueTodoJobs([
     ...beans.value.flatMap((m) => props.peripherals.todosFor(m.id)),
     ...props.peripherals.unassignedTodos,
   ])
 );
+const todoProgress = computed(() => jobsProgress(visibleTodos.value));
 
-/** Only beans who still owe something — a finished bean is not news. */
-function outstandingFor(source: (id: string) => WallJob[]) {
-  return beans.value
-    .map((member) => ({
-      member: member as FamilyMember | null,
-      jobs: source(member.id).filter((j) => !j.done),
-    }))
-    .filter((entry) => entry.jobs.length)
-    .slice(0, rows.value);
-}
+/**
+ * Outstanding to-dos grouped by who owes them. A shared to-do forms its own
+ * group ("Greg & Jill") rather than appearing under each person. Unclaimed work
+ * keeps a group too: the card is what opens the drawer, and a family whose only
+ * to-do was added at the wall (which creates them unassigned) needs a way back.
+ */
 const outstandingTodos = computed(() => {
-  // Named `entries`, not `rows`: a local `rows` shadowed the `rows` computed
-  // above, so the cap that limits this list silently became `slice(0, its own
-  // length)` — a no-op.
-  const entries = outstandingFor(props.peripherals.todosFor);
-  const loose = props.peripherals.unassignedTodos.filter((j) => !j.done);
-  // Unclaimed work still needs a way in: the card is what opens the drawer, and
-  // gating it on assigned counts alone left a family whose only to-do was added
-  // at the wall (which creates them unassigned) with no route back to it.
-  if (loose.length) entries.push({ member: null, jobs: loose });
+  const groups = new Map<
+    string,
+    { key: string; member: FamilyMember | null; label: string; jobs: WallJob[] }
+  >();
+  for (const job of visibleTodos.value) {
+    if (job.done) continue;
+    const owners = (job.ownerIds ?? [job.ownerId]).filter((id) => id !== UNASSIGNED);
+    const key = owners.length ? owners.join('+') : UNASSIGNED;
+    let group = groups.get(key);
+    if (!group) {
+      const members = owners
+        .map((id) => beans.value.find((m) => m.id === id))
+        .filter((m): m is FamilyMember => !!m);
+      group = {
+        key,
+        member: members[0] ?? null,
+        label: formatNameList(members.map((m) => m.name)) || t('wall.todo.anyone'),
+        jobs: [],
+      };
+      groups.set(key, group);
+    }
+    group.jobs.push(job);
+  }
+  // Unclaimed work last, as before.
+  const entries = [...groups.values()].sort(
+    (a, b) => Number(a.key === UNASSIGNED) - Number(b.key === UNASSIGNED)
+  );
   return entries.slice(0, rows.value);
 });
 
@@ -343,7 +364,7 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
     >
       <span
         v-for="entry in outstandingTodos"
-        :key="entry.member?.id ?? 'unassigned'"
+        :key="entry.key"
         class="dark:border-line flex items-center gap-2.5 border-b border-[rgba(44,62,80,0.06)] py-1.5 last:border-b-0"
       >
         <BeanieAvatar
@@ -363,7 +384,7 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
             {{ entry.jobs[0].title }}
           </span>
           <span class="font-inter wall-card-sub block text-[var(--muted-text,#4d5d6c)]">
-            {{ entry.member?.name ?? t('wall.todo.anyone')
+            {{ entry.label
             }}<template v-if="entry.jobs.length > 1">
               ·
               {{ fillTemplate(t('wall.card.more'), { count: entry.jobs.length - 1 }) }}

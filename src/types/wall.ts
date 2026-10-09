@@ -49,6 +49,12 @@ export interface WallJob {
    * still works: ticking a repeating to-do rolls it to its next date.
    */
   locked?: boolean;
+  /**
+   * Every owner of a to-do row that stands for several assignees. Set only by
+   * `uniqueTodoJobs`, for the combined views (the drawer and the summary card);
+   * the per-person lanes keep one row per owner and never carry it.
+   */
+  ownerIds?: string[];
 }
 
 /** One list and its items, ready to render as a titled block. */

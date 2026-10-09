@@ -19,6 +19,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - The to-do drawer's Mark Completed button is now a checkbox beside the title.
 
+### Fixed
+
+- A to-do shared by two people now shows once in the beanie wall's to-do drawer and summary card.
+
 ## 2026-10-08
 
 ### Changed

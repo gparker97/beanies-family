@@ -233,6 +233,45 @@ export function sortJobs(jobs: readonly WallJob[]): WallJob[] {
   return [...jobs].sort((a, b) => Number(a.done) - Number(b.done));
 }
 
+/**
+ * One row per to-do for a COMBINED view.
+ *
+ * `buildWallJobs` emits a to-do once per assignee on purpose, so a shared to-do
+ * shows in each person's lane. A view that lists everyone together (the drawer,
+ * the summary card) must not inherit that, or a to-do shared by two people is
+ * listed and counted twice. Rows collapse by `todoId`, keeping the first row's
+ * position and collecting every owner in `ownerIds`. When `allowed` is given
+ * (the wall's person filter), owners outside it are dropped and a to-do none of
+ * whose owners is visible disappears; unassigned work is always visible.
+ * Non-to-do rows pass through untouched.
+ */
+export function uniqueTodoJobs(
+  jobs: readonly WallJob[],
+  allowed: ReadonlySet<string> | null = null
+): WallJob[] {
+  const visible = (ownerId: string) => !allowed || ownerId === UNASSIGNED || allowed.has(ownerId);
+  const out: WallJob[] = [];
+  const byTodo = new Map<string, WallJob>();
+  for (const job of jobs) {
+    if (!visible(job.ownerId)) continue;
+    if (job.source !== 'todo' || !job.todoId) {
+      out.push(job);
+      continue;
+    }
+    const seen = byTodo.get(job.todoId);
+    if (seen) {
+      if (!seen.ownerIds?.includes(job.ownerId)) {
+        seen.ownerIds = [...(seen.ownerIds ?? []), job.ownerId];
+      }
+      continue;
+    }
+    const first: WallJob = { ...job, ownerIds: [job.ownerId] };
+    byTodo.set(job.todoId, first);
+    out.push(first);
+  }
+  return out;
+}
+
 export function jobsProgress(jobs: readonly WallJob[]): { done: number; total: number } {
   return { done: jobs.filter((j) => j.done).length, total: jobs.length };
 }

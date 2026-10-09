@@ -5,6 +5,7 @@ import {
   captureListRemoval,
   jobsProgress,
   sortJobs,
+  uniqueTodoJobs,
 } from '@/utils/wallJobs';
 import type { FamilyList, TodoItem, TodoRepeat } from '@/types/models';
 
@@ -319,6 +320,48 @@ describe('what a shared screen must never show', () => {
  * six seconds the undo is on screen, with an add row sitting under that very
  * list). Capturing one item and its index is what makes both impossible.
  */
+describe('uniqueTodoJobs (combined views)', () => {
+  it('lists a to-do shared by two people once, with both owners', () => {
+    const r = build([todo({ assigneeIds: ['greg', 'leo'] })], []);
+    // The lanes keep one row per person, by design.
+    expect(r.todos).toHaveLength(2);
+    const combined = uniqueTodoJobs(r.todos);
+    expect(combined).toHaveLength(1);
+    expect(combined[0].ownerIds).toEqual(['greg', 'leo']);
+    expect(jobsProgress(combined).total).toBe(1);
+  });
+
+  it('keeps separate to-dos separate and leaves single-owner rows alone', () => {
+    const r = build([todo(), todo({ id: 't2', title: 'feed the cat', assigneeIds: ['milo'] })], []);
+    const combined = uniqueTodoJobs(r.todos);
+    expect(combined.map((j) => j.todoId)).toEqual(['t1', 't2']);
+    expect(combined.map((j) => j.ownerIds)).toEqual([['leo'], ['milo']]);
+  });
+
+  it('drops owners outside the person filter and hides a to-do with none visible', () => {
+    const r = build(
+      [todo({ assigneeIds: ['greg', 'leo'] }), todo({ id: 't2', assigneeIds: ['milo'] })],
+      []
+    );
+    const combined = uniqueTodoJobs(r.todos, new Set(['leo']));
+    expect(combined).toHaveLength(1);
+    expect(combined[0].ownerIds).toEqual(['leo']);
+  });
+
+  it('always shows unassigned work, even under a person filter', () => {
+    const r = build([todo({ assigneeIds: [] })], []);
+    const combined = uniqueTodoJobs(r.todos, new Set(['leo']));
+    expect(combined).toHaveLength(1);
+    expect(combined[0].ownerId).toBe(UNASSIGNED);
+  });
+
+  it('does not mutate the per-person rows it was given', () => {
+    const r = build([todo({ assigneeIds: ['greg', 'leo'] })], []);
+    uniqueTodoJobs(r.todos);
+    expect(r.todos.every((j) => j.ownerIds === undefined)).toBe(true);
+  });
+});
+
 describe('captureListRemoval', () => {
   const threeItems = [
     { id: 'i1', title: 'goggles', completed: false },
