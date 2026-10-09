@@ -178,9 +178,10 @@ const weekLabel = computed(() => {
   });
   return fillTemplate(t('wall.header.weekOf'), { date: week });
 });
-const thingsTemplate = computed(() =>
-  todayCount.value === 1 ? t('wall.header.things.one') : t('wall.header.things.other')
-);
+const thingsTemplate = computed(() => {
+  if (todayCount.value === 0) return t('wall.header.things.none');
+  return todayCount.value === 1 ? t('wall.header.things.one') : t('wall.header.things.other');
+});
 /**
  * Reactive, because this is the ONE route that unlocks rotation — a snapshot
  * taken at setup meant rotating a mounted tablet kept the landscape layout

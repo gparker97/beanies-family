@@ -7714,6 +7714,7 @@ const STRING_DEFS = {
     beanie: '{count} things on tomorrow',
   },
   'wall.header.weekOf': { en: 'Week of {date}', beanie: 'week of {date}' },
+  'wall.header.things.none': { en: 'Nothing on today', beanie: 'nothing on today' },
   'wall.header.things.one': { en: '{count} thing on today', beanie: '{count} thing on today' },
   'wall.header.things.other': { en: '{count} things on today', beanie: '{count} things on today' },
   'wall.card.chores': { en: 'Chores', beanie: 'chores' },

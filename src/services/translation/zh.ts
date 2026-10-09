@@ -3417,6 +3417,7 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'wall.night.tomorrow.one': '明天有{count}件事',
   'wall.night.tomorrow.other': '明天有{count}件事',
   'wall.header.weekOf': '{date}这一周',
+  'wall.header.things.none': '今天没有安排',
   'wall.header.things.one': '今天有{count}件事',
   'wall.header.things.other': '今天有{count}件事',
   'wall.card.chores': '家务',
