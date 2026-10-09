@@ -768,12 +768,11 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
       },
     ],
   },
-  // \u26a0\ufe0f The "Which way up" section below describes the orientation matrix as it
-  // stands BEFORE the beanie wall's phase 8 (native Android landscape). When
-  // `@capacitor/screen-orientation` lands and `useWallOrientation` grows its
-  // native branch, revisit that paragraph: the installed Android PWA and the
-  // Android app stop being portrait-only. See
-  // docs/plans/2026-08-31-beanie-wall.md.
+  // \u26a0\ufe0f The "Which way up" section below mirrors the orientation policy: tablets
+  // rotate freely (MainActivity's sw600dp `allow_rotation` on Android, the iPad
+  // Info.plist, `applyOrientationPolicy()` in a browser), phones stay portrait, and
+  // an installed Android PWA keeps the manifest's `portrait`. Revisit it if any of
+  // those change (`useWallOrientation.ts`, `vite.config.ts` manifest `orientation`).
   {
     slug: 'set-up-the-beanie-wall',
     category: 'getting-started',
@@ -945,12 +944,19 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'The wall is built for a landscape tablet, and that works today in a browser tab on any tablet, and in the beanies app on iPad. If you installed beanies to your Android home screen, or you are using the Android app, the wall stays portrait for now; landscape there is coming in a later release. It still works, it is just taller than it is wide. Any tablet will do, including the small 8-inch ones, and the wall makes itself a little more compact on those so it still reads from across the kitchen. A phone is genuinely too small, so beanies says so rather than showing you something unreadable.',
+          'Either way works. Hang the tablet sideways (landscape) or upright (portrait), and turn it whenever you like: the wall rearranges itself to fit. Sideways shows the whole week across the screen; upright fits fewer days across, and everything else is the same. This works in the beanies app on an iPad or an Android tablet, and in a browser tab on any tablet.',
       },
       {
         type: 'paragraph',
         content:
-          'If you want landscape on an Android tablet today, open beanies in a browser tab rather than the installed app.',
+          'Any tablet will do, including the small 8-inch ones, and the wall makes itself a little more compact on those so it still reads from across the kitchen. A phone is genuinely too small, so beanies says so rather than showing you something unreadable.',
+      },
+      {
+        type: 'callout',
+        content:
+          'The wall follows the tablet’s own rotation lock. If it will not turn, switch rotation lock off, or turn the tablet the way you plan to hang it first and then lock it there. One exception: if you added beanies to an Android tablet’s home screen from Chrome, rather than installing the app from Google Play, it stays upright. For sideways there, use the Android app or a browser tab.',
+        title: 'If the wall will not turn',
+        icon: '\u{1F504}',
       },
       {
         type: 'heading',
