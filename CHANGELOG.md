@@ -17,6 +17,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Changed
 
+- The iOS and Android apps now ask anyone on a version older than 0.94 to update.
 - Helpful hints now show on the beanie wall with the rest of the family's to-dos, except birthday-present and anniversary hints, which stay off the shared screen so a surprise is not spoiled.
 
 ## 2026-10-09
