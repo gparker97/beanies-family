@@ -110,6 +110,11 @@ export interface WallPeripheralData {
   todosFor: (memberId: string) => WallJob[];
   /** Due-now work nobody has claimed — counted and shown like anyone else's. */
   unassignedTodos: WallJob[];
+  /**
+   * Every to-do on the wall, in every bucket. The to-do card counts due-now work, but it
+   * is also the drawer's only door, so it shows whenever anything here is still open.
+   */
+  allTodos: WallJob[];
   listsFor: (memberId: string) => WallListGroup[];
   orphanLists: WallListGroup[];
   /** The wall's person filter, so a card agrees with the view above it. */

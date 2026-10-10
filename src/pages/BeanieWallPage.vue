@@ -407,6 +407,7 @@ function emitRailMode(view: 'days' | 'lanes', rail: boolean, room: boolean, colu
 const peripherals = computed<WallPeripheralData>(() => ({
   todosFor: jobs.todosFor,
   unassignedTodos: jobs.unassignedTodos.value,
+  allTodos: jobs.allTodos.value,
   listsFor: jobs.listsFor,
   orphanLists: jobs.orphanLists.value,
   visibleMemberIds: visibleMemberIds.value,

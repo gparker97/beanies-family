@@ -23,7 +23,13 @@ import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { isRecurring } from '@/utils/listLifecycle';
-import { jobOwnerIds, jobsProgress, uniqueTodoJobs, UNASSIGNED } from '@/utils/wallJobs';
+import {
+  jobOwnerIds,
+  jobsProgress,
+  openLaterTodoJobs,
+  uniqueTodoJobs,
+  UNASSIGNED,
+} from '@/utils/wallJobs';
 import WallOwnerFaces from '@/components/wall/WallOwnerFaces.vue';
 import { formatNameList } from '@/utils/assignees';
 import type { FamilyList, FamilyMember } from '@/types/models';
@@ -92,6 +98,17 @@ const visibleTodos = computed(() =>
 const todoProgress = computed(() => jobsProgress(visibleTodos.value));
 
 /**
+ * Open to-dos not due yet (coming up or undated) for the beans on show. The card
+ * counts due-now work, but it is the drawer's only door, so it shows whenever
+ * ANY to-do is open; with nothing due today it says how many are open instead.
+ */
+const laterTodoCount = computed(() => {
+  const ids = props.peripherals.visibleMemberIds;
+  return openLaterTodoJobs(props.peripherals.allTodos, ids ? new Set(ids) : null).length;
+});
+const showTodos = computed(() => todoProgress.value.total > 0 || laterTodoCount.value > 0);
+
+/**
  * Outstanding to-dos grouped by who owes them. A shared to-do forms its own
  * group ("Greg & Jill") rather than appearing under each person. Unclaimed work
  * keeps a group too: the card is what opens the drawer, and a family whose only
@@ -151,7 +168,7 @@ const CARD_WEIGHTS: Record<string, number> = {
 const visibleCards = computed(() => {
   const on: string[] = [];
   if (visibleLists.value.length) on.push('lists');
-  if (todoProgress.value.total) on.push('todos');
+  if (showTodos.value) on.push('todos');
   if (tonight.value) on.push('meals');
   if (trip.value) on.push('trip');
   return on;
@@ -219,7 +236,7 @@ const tripDates = computed(() => {
 const stripHasContent = computed(
   () =>
     Boolean(tonight.value) ||
-    todoProgress.value.total > 0 ||
+    showTodos.value ||
     visibleLists.value.length > 0 ||
     Boolean(trip.value)
 );
@@ -254,14 +271,15 @@ const stripHasContent = computed(
       <span class="truncate">{{ tonight.name }}</span>
     </button>
     <button
-      v-if="todoProgress.total"
+      v-if="showTodos"
       type="button"
       class="wall-card-line font-outfit dark:border-line flex flex-1 items-center justify-center gap-2 border-r border-[rgba(44,62,80,0.08)] font-semibold last:border-r-0"
       :aria-label="t('wall.card.todos')"
       @click="emit('open', { kind: 'todos' })"
     >
       <span aria-hidden="true">✅</span>
-      <span>{{ todoProgress.done }} / {{ todoProgress.total }}</span>
+      <span v-if="todoProgress.total">{{ todoProgress.done }} / {{ todoProgress.total }}</span>
+      <span v-else>{{ fillTemplate(t('wall.card.todosOpen'), { count: laterTodoCount }) }}</span>
     </button>
     <button
       v-if="visibleLists.length"
@@ -354,7 +372,7 @@ const stripHasContent = computed(
     </WallCard>
     <!-- to-dos: a smaller card, and a drawer rather than a board -->
     <WallCard
-      v-if="todoProgress.total"
+      v-if="showTodos"
       :title="t('wall.card.todos')"
       tone="todos"
       @open="emit('open', { kind: 'todos' })"
@@ -380,10 +398,12 @@ const stripHasContent = computed(
       </span>
       <span class="font-inter wall-card-sub mt-2 block text-[var(--muted-text,#4d5d6c)]">
         {{
-          fillTemplate(t('wall.card.todosProgress'), {
-            done: todoProgress.done,
-            total: todoProgress.total,
-          })
+          todoProgress.total
+            ? fillTemplate(t('wall.card.todosProgress'), {
+                done: todoProgress.done,
+                total: todoProgress.total,
+              })
+            : fillTemplate(t('wall.card.todosNoneDue'), { count: laterTodoCount })
         }}
       </span>
     </WallCard>

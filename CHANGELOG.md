@@ -8,6 +8,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-10-10
+
+### Fixed
+
+- The beanie wall's Family To-Dos card now shows whenever any to-do is open, not only when one is due today, so to-dos with no date or a later date can always be reached from the wall. With nothing due today it reads "Nothing due today · N open".
+
+### Changed
+
+- Helpful hints now show on the beanie wall with the rest of the family's to-dos, except birthday-present and anniversary hints, which stay off the shared screen so a surprise is not spoiled.
+
 ## 2026-10-09
 
 ### Added

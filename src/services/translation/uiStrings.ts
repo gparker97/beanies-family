@@ -7773,6 +7773,12 @@ const STRING_DEFS = {
     beanie: '{done} of {total} done today',
   },
   'wall.card.more': { en: '+{count} more', beanie: '+{count} more' },
+  // The to-do card with nothing due today but open to-dos coming up or undated.
+  'wall.card.todosNoneDue': {
+    en: 'Nothing due today · {count} open',
+    beanie: 'nothing due today · {count} open',
+  },
+  'wall.card.todosOpen': { en: '{count} open', beanie: '{count} open' },
   'wall.card.cooking': { en: '{name} is cooking', beanie: '{name} is cooking' },
   'wall.list.repeats': { en: 'Repeats', beanie: 'repeats' },
   'wall.list.ownerList': { en: "{name}'s list", beanie: "{name}'s list" },

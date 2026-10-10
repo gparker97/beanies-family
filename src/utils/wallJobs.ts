@@ -12,8 +12,8 @@
  *   a bean's LISTS = every wall-safe list they own, repeating or one-off,
  *                    each rendered whole under their name
  *   orphan lists   = lists whose owner is not a member we know about
- *   to-dos         = every to-do bar `someday` and hints, tagged by when it is
- *                    due, assigned or not
+ *   to-dos         = every to-do bar `someday` and surprise hints, tagged by
+ *                    when it is due, assigned or not
  *
  * Lists are NOT split by lifecycle any more. A recurring "leo's jobs" and a
  * one-off "swim bag" are both Leo's list; parking one under his name and the
@@ -28,6 +28,7 @@
  */
 import { todoCapabilities } from '@/utils/todoRecurrence';
 import type { FamilyList, FamilyListItem, ListCategory, TodoItem } from '@/types/models';
+import { isSurpriseHint } from '@/constants/helpfulHints';
 import { isKnownListCategory } from '@/constants/listCategories';
 import type {
   WallJob,
@@ -188,11 +189,12 @@ export function buildWallJobs(input: WallJobsInput): WallJobsResult {
   // 1. To-dos first, so they win any dedupe collision with a list item: they
   //    are the dated, explicitly assigned form of the same task.
   for (const todo of todos) {
+    // "Someday / maybe" stays off the wall: a deliberately unscheduled idea, not
+    // work the family owes. Everything else reaches it (greg, 2026-10-10),
+    // helpful hints and repeating reminders included, except the surprise hints.
     if (todo.someday) continue;
-    // Auto-generated hints are excluded at the manual/hint boundary everywhere
-    // else in the app; some carry audience rules precisely so a surprise stays
-    // hidden from the person it concerns. A shared wall must respect that.
-    if (todo.hintType) continue;
+    // A surprise hint stays off a shared screen (`SURPRISE_HINT_TYPES`).
+    if (isSurpriseHint(todo.hintType)) continue;
 
     const bucket = todoBucket(todo, todayYmd);
     if (!bucket) continue;
@@ -287,6 +289,28 @@ export function uniqueTodoJobs(
     out.push(first);
   }
   return out;
+}
+
+/**
+ * Open to-dos that are not due yet (coming up, or with no date), one row per to-do.
+ *
+ * The wall's to-do card counts what is due NOW, but it is also the only way into the
+ * to-do drawer, which lists everything. Gating the card on due-now work alone meant a
+ * family whose to-dos were all undated or due later saw no card and could not reach
+ * them from the wall at all. This is the rest of the open work, so the card can show
+ * whenever anything is open. `allowed` is the wall's person filter, as in
+ * `uniqueTodoJobs`.
+ */
+export function openLaterTodoJobs(
+  jobs: readonly WallJob[],
+  allowed: ReadonlySet<string> | null = null
+): WallJob[] {
+  return uniqueTodoJobs(
+    jobs.filter(
+      (j) => j.source === 'todo' && !j.done && (j.bucket === 'upcoming' || j.bucket === 'undated')
+    ),
+    allowed
+  );
 }
 
 export function jobsProgress(jobs: readonly WallJob[]): { done: number; total: number } {

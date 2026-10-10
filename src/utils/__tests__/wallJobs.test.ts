@@ -5,6 +5,7 @@ import {
   captureListRemoval,
   jobOwnerIds,
   jobsProgress,
+  openLaterTodoJobs,
   sortJobs,
   uniqueTodoJobs,
 } from '@/utils/wallJobs';
@@ -278,9 +279,28 @@ describe('sortJobs / jobsProgress', () => {
 });
 
 describe('what a shared screen must never show', () => {
-  it('hides auto-generated hint to-dos, including surprise-sensitive ones', () => {
-    const hint = todo({ title: 'Plan a birthday present for Leo', hintType: 'birthday' } as never);
-    expect(build([hint], []).todos).toEqual([]);
+  // greg, 2026-10-10: helpful hints reach the wall, except the surprise ones.
+  it('shows helpful hint to-dos like any other to-do', () => {
+    const hint = todo({ title: 'Pack for the trip', hintType: 'trip-packing' });
+    expect(build([hint], []).todos.map((j) => j.todoId)).toEqual(['t1']);
+  });
+
+  it('keeps surprise hints off the wall: birthday presents and anniversary plans', () => {
+    const present = todo({
+      title: 'Plan a birthday present for Leo',
+      hintType: 'birthday-present',
+    });
+    const anniversary = todo({
+      id: 't2',
+      title: 'Plan the anniversary',
+      hintType: 'anniversary-plan',
+    });
+    const partyGift = todo({
+      id: 't3',
+      title: "Gift for Sam's party",
+      hintType: 'birthday-party-gift',
+    });
+    expect(build([present, anniversary, partyGift], []).todos.map((j) => j.todoId)).toEqual(['t3']);
   });
 
   it('keeps a health list off the wall entirely', () => {
@@ -447,5 +467,43 @@ describe('buildWallJobs: repeating and card-made to-dos (#123)', () => {
   it('leaves a plain repeating to-do and a one-off to-do editable', () => {
     const result = build([todo({ repeat }), todo({ id: 't2', title: 'sign the slip' })], []);
     expect(todosOf(result, 'leo').every((j) => !j.locked)).toBe(true);
+  });
+});
+
+describe('openLaterTodoJobs (keeps the to-do card reachable)', () => {
+  it('counts open to-dos coming up or undated, never due-now, finished or someday ones', () => {
+    const r = build(
+      [
+        todo({ id: 'today' }),
+        todo({ id: 'late', dueDate: '2026-08-30T00:00:00.000Z' }),
+        todo({ id: 'later', dueDate: '2026-09-05T00:00:00.000Z' }),
+        todo({ id: 'undated', dueDate: undefined }),
+        todo({
+          id: 'later-done',
+          dueDate: '2026-09-05T00:00:00.000Z',
+          completed: true,
+          completedAt: `${TODAY}T09:00:00.000Z`,
+        }),
+        todo({ id: 'someday', dueDate: undefined, someday: true }),
+      ],
+      []
+    );
+    expect(openLaterTodoJobs(r.todos).map((j) => j.todoId)).toEqual(['later', 'undated']);
+  });
+
+  it('counts a shared to-do once and respects the person filter, keeping unassigned work', () => {
+    const r = build(
+      [
+        todo({ id: 'shared', assigneeIds: ['greg', 'leo'], dueDate: undefined }),
+        todo({ id: 'milo', assigneeIds: ['milo'], dueDate: undefined }),
+        todo({ id: 'nobody', assigneeIds: [], dueDate: undefined }),
+      ],
+      []
+    );
+    expect(openLaterTodoJobs(r.todos)).toHaveLength(3);
+    expect(openLaterTodoJobs(r.todos, new Set(['leo'])).map((j) => j.todoId)).toEqual([
+      'shared',
+      'nobody',
+    ]);
   });
 });

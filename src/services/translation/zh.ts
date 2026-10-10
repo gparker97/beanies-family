@@ -3439,6 +3439,8 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'wall.card.todos': '家庭待办',
   'wall.card.todosProgress': '今天已完成{done}/{total}',
   'wall.card.more': '还有{count}项',
+  'wall.card.todosNoneDue': '今天没有到期的待办 · {count}项未完成',
+  'wall.card.todosOpen': '{count}项未完成',
   'wall.card.cooking': '{name}掌勺',
   'wall.list.repeats': '重复',
   'wall.list.ownerList': '{name}的清单',
