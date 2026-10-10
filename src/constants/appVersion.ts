@@ -40,7 +40,7 @@
 // deliberately lags this constant: a normal release does not raise it. Raise it only
 // when there is a reason everyone should move.
 // See `docs/runbooks/native-store-submission.md` § 7. Raising the update floor.
-export const APP_VERSION = '0.94.1';
+export const APP_VERSION = '0.94.2';
 
 /**
  * The first build that READS every recorded KDF iteration count (ADR-041, #81).
