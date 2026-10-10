@@ -11,7 +11,7 @@ featured: false
 author: greg
 draft: false
 longAndShort:
-  built: 'a massive stability overhaul ahead of v1, plus a daily magic beans allowance raised from 10 to 25.'
+  built: 'a massive stability overhaul ahead of v1, plus your daily magic beans allowance raised from 10 to 25.'
   helps: 'changes save more reliably, security is improved, and busy days are less likely to hit the magic beans limit.'
   where: 'the stability work is automatic; your magic beans count is in `Settings › Your beanies Plan`.'
   intro: 'A new feature - we know our families are busy, so if you just want to know what changed, and not sit through a whole long story about why (how boring is that, right?), here’s the breakdown:'
