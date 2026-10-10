@@ -27,7 +27,7 @@ Provided everything goes to plan, v1 should be here around the middle of October
 
 My glorious _claude-bot_ and I are in the final stages of a multi-week overhaul of lots of “under the hood” stuff. Our focus is around data storage, security, general stability, and other things that you may not see, but would definitely feel if they were broken.
 
-In IT, this is known as “non-functional testing”, which is a term I hate, because it sounds like you’re testing stuff that doesn’t work. What it actually means is, rather than building stuff your users could actually, well, use, you’re working on stuff that is foundational to the platform. The benefits are less immediate, but manifest over the long term.
+In IT, this is known as “non-functional testing”, which is a term I hate, because it sounds like the testing itself is broken (I also have a non-functional toaster gathering rust in my kitchen). What “non-functional testing” actually means is, rather than building stuff your users could actually, well, use, you’re working on stuff that is foundational to the platform. The benefits are less immediate, but they help stabilize our site over the long term.
 
 One of the hardest things to get right with [beanies.family](https://beanies.family/?utm_source=blog&utm_medium=post&utm_campaign=getting-ready-for-v1&utm_content=homepage-mention) (and, presumably, [local-first software](https://beanies.family/guides/local-first-family-finance-planning-tools?utm_source=blog&utm_medium=post&utm_campaign=getting-ready-for-v1&utm_content=pillar-local-first) in general) is how data is stored. Not having a database is really a thing to bear.
 
