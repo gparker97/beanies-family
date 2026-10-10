@@ -35,7 +35,7 @@ One of the hardest things to get right with [beanies.family](https://beanies.fam
 
 _no, claude, i didn’t mean our database got stolen by a bear_
 
-Centralized cloud databases are amazing, and they make everything simple - they just _work_. That’s why people love them (and apparently, bears steal them in the woods). Every bit of data is in one central, lovely (and hackable) place. But when it comes to my beanies, local-first is the way to go to [keep your (and our) data safe](https://beanies.family/blog/have-your-cake-and-eat-it-too?utm_source=blog&utm_medium=post&utm_campaign=getting-ready-for-v1&utm_content=privacy-explainer). The benefit of being able to nearly guarantee (as much as one could) that your data is safe is worth the challenge of making it work. And anyway, having that challenge is part of the fun, isn’t it?
+Centralized cloud databases are amazing, and they make everything simple - they just _work_. That’s why people love them (and apparently, bears steal them in the woods). Every bit of data is in one central, lovely (and hackable) place. But when it comes to my beanies, local-first is the way to go to [keep your (and my) data safe](https://beanies.family/blog/have-your-cake-and-eat-it-too?utm_source=blog&utm_medium=post&utm_campaign=getting-ready-for-v1&utm_content=privacy-explainer). The benefit of being able to guarantee (as much as one possibly could) that your data is safe is worth the pain of making it work. And anyway, having that challenge is part of the fun, isn’t it?
 
 In the meantime, I’ve been doing my best to respond to user feedback, but I’ve had to put some suggestions on the back burner while the focus is on prepping the platform for v1.
 
