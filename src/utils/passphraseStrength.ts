@@ -15,7 +15,11 @@ import type { UIStringKey } from '@/services/translation/uiStrings';
  * `generatePassphrase` never uses it again.
  */
 import { LEGACY_WORDLIST } from '@/constants/legacyWordlist';
-import { canonPassphrase, splitPassphraseWords } from '@/utils/passphraseTokens';
+import {
+  canonPassphrase,
+  PASSPHRASE_SEPARATORS,
+  splitPassphraseWords,
+} from '@/utils/passphraseTokens';
 export { LEGACY_WORDLIST };
 
 export const PASSPHRASE_WORD_COUNT = 6;
@@ -48,13 +52,28 @@ export function drawIndices(count: number, range: number): number[] {
   return out;
 }
 
-/** Generate a 6-word passphrase (`word-word-...`). Loads the EFF list on first use. */
+let generatorPool: readonly string[] | null = null;
+
+/**
+ * Generate a 6-word passphrase (`word-word-...`) of six DISTINCT single words. Loads the
+ * EFF list on first use.
+ *
+ * Two kinds of draw used to slip through about once in 200 phrases, and both broke the
+ * scorer-unavailable fallback (`isEffFallbackPhrase`), which only accepts six distinct EFF
+ * words: a repeated word, and one of the list's four hyphenated words ("t-shirt", "yo-yo"),
+ * which the hyphen joiner splits into pieces that are not on the list. So the pool drops
+ * any word containing a separator, and repeats are redrawn. The pool is 7,772 words, so
+ * the phrase keeps its entropy.
+ */
 export async function generatePassphrase(): Promise<string> {
   const { EFF_WORDLIST } = await import('@/constants/effWordlist');
-  const words = EFF_WORDLIST.words;
-  return drawIndices(PASSPHRASE_WORD_COUNT, words.length)
-    .map((i) => words[i])
-    .join('-');
+  generatorPool ??= EFF_WORDLIST.words.filter((w) => !PASSPHRASE_SEPARATORS.test(w));
+  const pool = generatorPool;
+  const picked = new Set<number>();
+  while (picked.size < PASSPHRASE_WORD_COUNT) {
+    for (const i of drawIndices(PASSPHRASE_WORD_COUNT - picked.size, pool.length)) picked.add(i);
+  }
+  return [...picked].map((i) => pool[i]).join('-');
 }
 
 type Score = 0 | 1 | 2 | 3 | 4;

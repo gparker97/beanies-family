@@ -169,6 +169,31 @@ describe('passphraseStrength', () => {
     expect(await checkPassphrase(p)).toEqual({ ok: true, score: 4 });
   });
 
+  it('never suggests a repeated or hyphenated word, even when the dice repeat', async () => {
+    // Force every draw to the same value: the generator must redraw rather than repeat.
+    // Index 0 first, then 1, 2, ... so six distinct words do eventually come out.
+    let next = 0;
+    const spy = vi.spyOn(crypto, 'getRandomValues').mockImplementation(((arr: Uint16Array) => {
+      arr.fill(Math.floor(next++ / 3));
+      return arr;
+    }) as typeof crypto.getRandomValues);
+    try {
+      const words = (await generatePassphrase()).split('-');
+      expect(words).toHaveLength(PASSPHRASE_WORD_COUNT);
+      expect(new Set(words).size).toBe(PASSPHRASE_WORD_COUNT);
+    } finally {
+      spy.mockRestore();
+    }
+    const { EFF_WORDLIST } = await import('@/constants/effWordlist');
+    const hyphenated = EFF_WORDLIST.words.filter((w) => w.includes('-'));
+    expect(hyphenated.length).toBeGreaterThan(0); // the case this guards still exists
+    for (let n = 0; n < 200; n++) {
+      const words = (await generatePassphrase()).split('-');
+      expect(words).toHaveLength(PASSPHRASE_WORD_COUNT);
+      expect(new Set(words).size).toBe(PASSPHRASE_WORD_COUNT);
+    }
+  });
+
   it('rejects short phrases before scoring anything', async () => {
     expect(await checkPassphrase('short-one')).toMatchObject({ ok: false, reason: 'too-short' });
   });

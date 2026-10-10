@@ -12,6 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
+- Fixed a rare case where a suggested family passphrase could be refused.
 - The beanie wall's Family To-Dos card now shows whenever any to-do is open, not only when one is due today, so to-dos with no date or a later date can always be reached from the wall. With nothing due today it reads "Nothing due today · N open".
 
 ### Changed
