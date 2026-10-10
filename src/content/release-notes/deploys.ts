@@ -17,6 +17,16 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.10.10',
+    date: '2026-10-10',
+    month: '10 october 2026',
+    summary: {
+      en: 'To-dos can now repeat, Who Owns What cards can now carry reminders, and the Beanie Wall now switches to night mode on its own. The full plan is now called magic beans, plus other minor fixes and improvements.',
+      beanie:
+        'to-dos can now repeat, who owns what cards can now carry reminders, and the beanie wall now switches to night mode on its own. the full plan is now called magic beans, plus other minor fixes and improvements.',
+    },
+  },
+  {
     version: '2026.10.08.1',
     date: '2026-10-08',
     month: '8 october 2026',
