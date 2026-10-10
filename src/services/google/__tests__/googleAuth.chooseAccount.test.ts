@@ -118,11 +118,22 @@ describe('the account chooser is reachable at all', () => {
     // the test below proves nothing.
     await expect(googleAuth.requestAccessToken()).resolves.toBe('cached-token');
 
-    // With it, the request must leave the cache behind and go interactive. jsdom has no popup,
-    // so the interactive attempt fails — and THAT is the proof: the only way to reach a popup
-    // failure is to have declined the cached token first. Before the fix this line resolved to
-    // 'cached-token' and the chooser was never reached on any platform.
-    await expect(googleAuth.requestAccessToken({ chooseAccount: true })).rejects.toThrow();
+    // With it, the request must leave the cache behind and go interactive. The popup is
+    // BLOCKED here, so the interactive attempt fails — and THAT is the proof: the only way to
+    // reach a popup failure is to have declined the cached token first. Before the fix this line
+    // resolved to 'cached-token' and the chooser was never reached on any platform.
+    //
+    // ⚠️ The block is explicit, not assumed. happy-dom DOES implement window.open: the popup it
+    // returned was then pointed at accounts.google.com and fetched over the real network, and in
+    // CI that fetch failed after the test had finished, surfacing as an unhandled rejection that
+    // failed the whole run (2026-10-10, two of four main runs).
+    const open = vi.spyOn(window, 'open').mockReturnValue(null);
+    try {
+      await expect(googleAuth.requestAccessToken({ chooseAccount: true })).rejects.toThrow();
+      expect(open).toHaveBeenCalled();
+    } finally {
+      open.mockRestore();
+    }
   });
 
   it('offlineAccess KEEPS the cached token — it is a prompt change, not a fresh grant', async () => {
