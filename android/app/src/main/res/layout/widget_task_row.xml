@@ -2,8 +2,9 @@
 <!--
   One row of the fixed to-dos section (#130, round 9 row key), added into `tasks_rows` as a nested
   RemoteViews so each row owns its dot views. The lead column is as wide as the calendar's time
-  column (API 31+) and holds the glyph: a to-do's purple ring (filled when timed), a hint's bean,
-  a list's checklist mark. Then the title, the tag ("overdue" in the accent, "Thu 16" in quieter
+  column (API 31+) and holds the glyph: a to-do's checkbox, a hint's bean, a list's checklist
+  mark. Then the title in regular weight (event titles are medium: the second cue that this is a
+  task under the day, not an event in it), the tag ("overdue" in the accent, "Thu 16" in quieter
   ink; a word, never colour alone) and whose it is.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
@@ -20,7 +21,7 @@
         android:layout_height="wrap_content"
         android:layout_marginEnd="6dp">
 
-        <!-- centerInside: the 9dp rings stay 9dp, the 12dp glyphs and the bean fit the box. -->
+        <!-- centerInside: the 10dp checkbox stays 10dp, the 12dp glyphs and the bean fit the box. -->
         <ImageView
             android:id="@+id/task_glyph"
             android:layout_width="12dp"
@@ -36,7 +37,7 @@
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:ellipsize="end"
-        android:fontFamily="sans-serif-medium"
+        android:fontFamily="sans-serif"
         android:singleLine="true"
         android:textColor="@color/widget_ink"
         android:textSize="11sp" />

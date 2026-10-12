@@ -19,6 +19,24 @@
         }
       }
     },
+    "Background": {
+      "comment": "Widget setting: how solid the widget card is (100% / 70% / 40%).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Background"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "背景"
+          }
+        }
+      }
+    },
     "Helpful hint": {
       "comment": "Widget setting toggle: show helpful hints and reminders in the to-dos section.",
       "extractionState": "manual",

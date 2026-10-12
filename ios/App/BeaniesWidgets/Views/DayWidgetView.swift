@@ -10,8 +10,9 @@ struct DayWidgetView: View {
 
     var body: some View {
         content
+            // The card at the picker's opacity (100 / 70 / 40); the panel inside is untouched.
             .containerBackground(for: .widget) {
-                Color.wRaised
+                Color.wRaised.opacity(entry.blocks.background.opacity)
             }
     }
 

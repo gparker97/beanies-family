@@ -75,10 +75,12 @@ struct TaskRowView: View {
     var body: some View {
         Link(destination: WidgetLinks.url(task.link.isEmpty ? fallbackLink : task.link, size)) {
             HStack(spacing: 6) {
-                TaskGlyphView(kind: task.kind, timed: task.timed, m: m)
+                TaskGlyphView(kind: task.kind, m: m)
                     .frame(width: leadWidth, alignment: .leading)
+                // Regular, not medium: the second cue (after the checkbox) that this is a task
+                // under the day and not an event in it. Event titles stay medium.
                 Text(task.title)
-                    .font(.sys(size: m.s(11), weight: .medium))
+                    .font(.sys(size: m.s(11), weight: .regular))
                     .foregroundStyle(Color.wInk)
                     .lineLimit(1)
                     .truncationMode(.tail)
@@ -112,17 +114,17 @@ struct TaskRowView: View {
     }
 }
 
-/// What a task is, at a glance (mockup 9c): a to-do's purple ring (filled when it has a
-/// time), a hint's bean, a list's checklist mark.
+/// What a task is, at a glance: a to-do's checkbox (the purple outline of a rounded square,
+/// the universal "this is a task" mark, unmistakable beside a time even on the small widget),
+/// a hint's bean, a list's checklist mark. A to-do's time lives in its tag, not the glyph.
 struct TaskGlyphView: View {
     let kind: WSTaskKind
-    let timed: Bool
     let m: WidgetMetrics
 
     var body: some View {
         switch kind {
         case .todo:
-            ring
+            checkbox
         case .hint:
             bean
         case .list:
@@ -132,16 +134,11 @@ struct TaskGlyphView: View {
         }
     }
 
-    private var ring: some View {
-        ZStack {
-            if timed {
-                Circle().fill(Color.wDuePurple)
-            } else {
-                Circle().strokeBorder(Color.wDuePurple, lineWidth: 1.6)
-            }
-        }
-        .frame(width: m.s(9), height: m.s(9))
-        .padding(.leading, 2)
+    private var checkbox: some View {
+        RoundedRectangle(cornerRadius: m.s(2.5), style: .continuous)
+            .strokeBorder(Color.wDuePurple, lineWidth: 1.6)
+            .frame(width: m.s(10), height: m.s(10))
+            .padding(.leading, 2)
     }
 
     /// The full-colour bean: the asset is template-rendered for the lock screen, so the

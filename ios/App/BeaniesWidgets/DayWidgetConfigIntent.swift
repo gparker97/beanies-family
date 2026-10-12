@@ -14,6 +14,31 @@ enum WidgetAudienceOption: String, AppEnum {
     ]
 }
 
+/// How solid the widget's card is, in percent. The same three choices as Android's
+/// configuration screen (`WidgetPrefs.OPACITIES`). Only the card thins; the agenda panel and
+/// every readable string stay as they are, so ink contrast holds over any wallpaper. Moot in
+/// the system's tinted / clear appearance, which strips the card entirely.
+enum WidgetBackgroundOption: String, AppEnum {
+    case solid
+    case lighter
+    case light
+
+    static var typeDisplayRepresentation: TypeDisplayRepresentation = "Background"
+    static var caseDisplayRepresentations: [WidgetBackgroundOption: DisplayRepresentation] = [
+        .solid: "100%",
+        .lighter: "70%",
+        .light: "40%",
+    ]
+
+    var opacity: Double {
+        switch self {
+        case .solid: return 1.0
+        case .lighter: return 0.7
+        case .light: return 0.4
+        }
+    }
+}
+
 /// The per-widget picker ("Edit Widget"). Titles are keys in Localizable.xcstrings
 /// (en + zh-Hans): they render before any snapshot exists, so they cannot come from one.
 /// Defaults: everything on (`WIDGET_DEFAULT_BLOCKS` in src/types/widgetSnapshot.ts). Each
@@ -50,6 +75,9 @@ struct DayWidgetConfigIntent: WidgetConfigurationIntent {
 
     @Parameter(title: "Helpful hint", default: true)
     var hint: Bool
+
+    @Parameter(title: "Background", default: .solid)
+    var background: WidgetBackgroundOption
 }
 
 /// The picker's choices as a plain value, so the views and the fill logic never touch the
@@ -62,6 +90,8 @@ struct WidgetBlocks: Equatable {
     var due: Bool
     var comingUp: Bool
     var hint: Bool
+    /// The card's opacity choice; not a block, but it rides with the picker's other values.
+    var background: WidgetBackgroundOption = .solid
 
     static let defaults = WidgetBlocks(
         audience: .my, events: true, whosWhere: true, meals: true, due: true, comingUp: true, hint: true
@@ -88,7 +118,8 @@ extension WidgetBlocks {
             meals: configuration.meals,
             due: configuration.due,
             comingUp: configuration.tripsAndBirthdays,
-            hint: configuration.hint
+            hint: configuration.hint,
+            background: configuration.background
         )
     }
 }

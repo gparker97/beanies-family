@@ -176,11 +176,11 @@ final class DayWidgetRenderer {
         }
     }
 
-    /** A to-do's purple ring (filled when timed), a hint's bean, a list's checklist mark. */
+    /** A to-do's checkbox, a hint's bean, a list's checklist mark (the time is in the tag). */
     private static int taskGlyph(WidgetSnapshot.Task task) {
         if (task.isHint()) return R.drawable.widget_bean;
         if ("list".equals(task.kind)) return R.drawable.widget_glyph_checklist;
-        return task.timed ? R.drawable.widget_due_dot : R.drawable.widget_due_ring;
+        return R.drawable.widget_task_box;
     }
 
     // ---- small ---------------------------------------------------------------------------
