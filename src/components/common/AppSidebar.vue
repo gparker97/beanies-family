@@ -10,13 +10,13 @@ import { useNavSelect } from '@/composables/useNavSelect';
 import { useScrollOverflow } from '@/composables/useScrollOverflow';
 import { useTranslation } from '@/composables/useTranslation';
 import { navItemsInSection } from '@/constants/navigation';
-import { getProductVersionLabel } from '@/utils/diagnosticContext';
+import { useProductVersionLabel } from '@/composables/useProductVersionLabel';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useSyncStore } from '@/stores/syncStore';
 
 const { t } = useTranslation();
-/** Friendly product version (e.g. "v0.9"); bumped per release in constants/appVersion.ts. */
-const productVersionLabel = getProductVersionLabel();
+/** Friendly product version ("v0.95"; "v0.95 (92)" on native, with the store build number). */
+const productVersionLabel = useProductVersionLabel();
 const familyStore = useFamilyStore();
 const syncStore = useSyncStore();
 

@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-10-13
+
+### Changed
+
+- On iPhone and Android, the version shown at the bottom of the sidebar and menu now includes the store build number, so test builds of the same version can be told apart.
+
 ## 2026-10-12
 
 ### Added

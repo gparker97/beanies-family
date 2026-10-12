@@ -12,7 +12,7 @@ import { usePrivacyMode } from '@/composables/usePrivacyMode';
 import { useSounds } from '@/composables/useSounds';
 import { useTranslation } from '@/composables/useTranslation';
 import { useSignOut } from '@/composables/useSignOut';
-import { getProductVersionLabel } from '@/utils/diagnosticContext';
+import { useProductVersionLabel } from '@/composables/useProductVersionLabel';
 import { getCurrencyInfo } from '@/constants/currencies';
 import { LANGUAGES } from '@/constants/languages';
 import { useAuthStore } from '@/stores/authStore';
@@ -33,7 +33,7 @@ const route = useRoute();
 const router = useRouter();
 const { t } = useTranslation();
 /** Friendly product version (e.g. "v0.9"); bumped per release in constants/appVersion.ts. */
-const productVersionLabel = getProductVersionLabel();
+const productVersionLabel = useProductVersionLabel();
 const authStore = useAuthStore();
 const familyStore = useFamilyStore();
 const settingsStore = useSettingsStore();
