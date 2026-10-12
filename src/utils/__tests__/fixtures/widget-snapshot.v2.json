@@ -1,0 +1,2056 @@
+{
+  "version": 2,
+  "generatedAt": "2026-10-11T00:40:00.000Z",
+  "familyIdTail": "4f2a9c",
+  "viewer": {
+    "memberId": "sam",
+    "firstName": "Sam",
+    "avatar": "father",
+    "isChild": false
+  },
+  "settings": {
+    "lockScreenTitles": true
+  },
+  "labels": {
+    "asOf": "as of {time}",
+    "later": "later ›",
+    "next": "next",
+    "tomorrow": "tomorrow",
+    "more": "{n} more",
+    "nothingToday": "nothing on today",
+    "myDay": "my day",
+    "ourDay": "our day",
+    "childsDay": "Sam's day",
+    "nothingOnToday": "nothing on today,",
+    "enjoy": "enjoy"
+  },
+  "links": {
+    "nook": "https://app.beanies.family/nook?src=widget",
+    "todo": "https://app.beanies.family/todo?src=widget"
+  },
+  "days": [
+    {
+      "ymd": "2026-10-11",
+      "numeral": "11",
+      "weekday": "Sunday",
+      "month": "October",
+      "weekdayShort": "Sun",
+      "dividerDate": "Sun 11",
+      "my": {
+        "rows": [
+          {
+            "id": "party:2026-10-11",
+            "kind": "event",
+            "todayOnly": false,
+            "time": "10:15am",
+            "startsAt": 1791713700000,
+            "endsAt": 1791721800000,
+            "title": "Carter's party",
+            "who": "Max",
+            "dot": {
+              "kind": "member",
+              "initial": "M",
+              "color": "#22c55e",
+              "ink": "#FFFFFF"
+            },
+            "isDone": false,
+            "handoff": {
+              "line": "Sam drops off, Jo picks up 12:30pm",
+              "avatars": ["father", "mother"]
+            },
+            "link": "https://app.beanies.family/activities?date=2026-10-11&activity=party&src=widget"
+          },
+          {
+            "id": "swim:2026-10-11",
+            "kind": "event",
+            "todayOnly": false,
+            "time": "1pm",
+            "startsAt": 1791723600000,
+            "endsAt": 1791726300000,
+            "title": "swimming lesson at Tampines pool",
+            "who": "Max",
+            "dot": {
+              "kind": "member",
+              "initial": "M",
+              "color": "#22c55e",
+              "ink": "#FFFFFF"
+            },
+            "isDone": false,
+            "handoff": null,
+            "link": "https://app.beanies.family/activities?date=2026-10-11&activity=swim&src=widget"
+          },
+          {
+            "id": "piano:2026-10-11",
+            "kind": "event",
+            "todayOnly": false,
+            "time": "4:30pm",
+            "startsAt": 1791736200000,
+            "endsAt": 1791738900000,
+            "title": "piano",
+            "who": "Ava",
+            "dot": {
+              "kind": "member",
+              "initial": "A",
+              "color": "#8b5cf6",
+              "ink": "#FFFFFF"
+            },
+            "isDone": false,
+            "handoff": {
+              "inlineTitle": "piano, Jo drives",
+              "avatars": []
+            },
+            "link": "https://app.beanies.family/activities?date=2026-10-11&activity=piano&src=widget"
+          },
+          {
+            "id": "soccer:2026-10-11",
+            "kind": "event",
+            "todayOnly": false,
+            "time": "5:15pm",
+            "startsAt": 1791738900000,
+            "endsAt": 1791743400000,
+            "title": "soccer practice",
+            "who": "Max",
+            "dot": {
+              "kind": "member",
+              "initial": "M",
+              "color": "#22c55e",
+              "ink": "#FFFFFF"
+            },
+            "isDone": false,
+            "handoff": {
+              "line": "Sam picks up 6:30pm",
+              "avatars": ["father"]
+            },
+            "link": "https://app.beanies.family/activities?date=2026-10-11&activity=soccer&src=widget"
+          },
+          {
+            "id": "bedtime:2026-10-11",
+            "kind": "event",
+            "todayOnly": false,
+            "time": "7:30pm",
+            "startsAt": 1791747000000,
+            "endsAt": 1791748800000,
+            "title": "bedtime story",
+            "who": "Sam",
+            "dot": {
+              "kind": "member",
+              "initial": "S",
+              "color": "#3b82f6",
+              "ink": "#FFFFFF"
+            },
+            "isDone": false,
+            "handoff": null,
+            "link": "https://app.beanies.family/activities?date=2026-10-11&activity=bedtime&src=widget"
+          }
+        ],
+        "tonight": {
+          "text": "tonight: tacos, you cook",
+          "emphasis": "tacos",
+          "link": "https://app.beanies.family/meal-planner?src=widget"
+        },
+        "tasks": {
+          "items": [
+            {
+              "id": "todo:candles",
+              "kind": "todo",
+              "bucket": "overdue",
+              "title": "buy birthday candles",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": null,
+              "link": "https://app.beanies.family/todo?view=candles&src=widget"
+            },
+            {
+              "id": "todo:swim-bag",
+              "kind": "todo",
+              "bucket": "today",
+              "title": "pack swim bag",
+              "tag": "by 5pm",
+              "tagTone": "accent",
+              "timed": true,
+              "dot": {
+                "kind": "member",
+                "initial": "M",
+                "color": "#22c55e",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/todo?view=swim-bag&src=widget"
+            },
+            {
+              "id": "todo:library",
+              "kind": "todo",
+              "bucket": "today",
+              "title": "return library book",
+              "tag": "today",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": {
+                "kind": "member",
+                "initial": "A",
+                "color": "#8b5cf6",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/todo?view=library&src=widget"
+            },
+            {
+              "id": "todo:gift-hint",
+              "kind": "hint",
+              "bucket": "today",
+              "title": "wrap a gift for Carter's party",
+              "tag": "today",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": null,
+              "link": "https://app.beanies.family/todo?view=gift-hint&src=widget"
+            },
+            {
+              "id": "list:groceries",
+              "kind": "list",
+              "bucket": "later",
+              "title": "groceries, 2 left",
+              "tag": "Mon 12",
+              "tagTone": "soft",
+              "timed": false,
+              "dot": null,
+              "link": "https://app.beanies.family/lists?view=groceries&src=widget"
+            },
+            {
+              "id": "todo:plumber",
+              "kind": "todo",
+              "bucket": "later",
+              "title": "call the plumber",
+              "tag": "Thu 15",
+              "tagTone": "soft",
+              "timed": false,
+              "dot": null,
+              "link": "https://app.beanies.family/todo?view=plumber&src=widget"
+            }
+          ],
+          "overflow": {
+            "due": 0,
+            "hint": 0
+          },
+          "heading": "to-dos and lists",
+          "count": 3,
+          "countText": {
+            "text": "3 for you today",
+            "emphasis": "3"
+          },
+          "link": "https://app.beanies.family/todo?src=widget"
+        },
+        "thingsText": "5 things on today",
+        "pickups": [
+          {
+            "at": 1791743400000,
+            "text": "pick-up 6:30pm, Max"
+          }
+        ]
+      },
+      "our": {
+        "rows": [
+          {
+            "id": "pancakes:2026-10-11",
+            "kind": "event",
+            "todayOnly": false,
+            "time": "8:30am",
+            "startsAt": 1791707400000,
+            "endsAt": 1791711000000,
+            "title": "pancakes with grandpa",
+            "who": "",
+            "dot": {
+              "kind": "family"
+            },
+            "isDone": false,
+            "handoff": null,
+            "link": "https://app.beanies.family/activities?date=2026-10-11&activity=pancakes&src=widget"
+          },
+          {
+            "id": "party:2026-10-11",
+            "kind": "event",
+            "todayOnly": false,
+            "time": "10:15am",
+            "startsAt": 1791713700000,
+            "endsAt": 1791721800000,
+            "title": "Carter's party",
+            "who": "Max",
+            "dot": {
+              "kind": "member",
+              "initial": "M",
+              "color": "#22c55e",
+              "ink": "#FFFFFF"
+            },
+            "isDone": false,
+            "handoff": {
+              "line": "Sam drops off, Jo picks up 12:30pm",
+              "avatars": ["father", "mother"]
+            },
+            "link": "https://app.beanies.family/activities?date=2026-10-11&activity=party&src=widget"
+          },
+          {
+            "id": "swim:2026-10-11",
+            "kind": "event",
+            "todayOnly": false,
+            "time": "1pm",
+            "startsAt": 1791723600000,
+            "endsAt": 1791726300000,
+            "title": "swimming lesson at Tampines pool",
+            "who": "Max",
+            "dot": {
+              "kind": "member",
+              "initial": "M",
+              "color": "#22c55e",
+              "ink": "#FFFFFF"
+            },
+            "isDone": false,
+            "handoff": null,
+            "link": "https://app.beanies.family/activities?date=2026-10-11&activity=swim&src=widget"
+          },
+          {
+            "id": "vet:2026-10-11",
+            "kind": "event",
+            "todayOnly": false,
+            "time": "2:30pm",
+            "startsAt": 1791729000000,
+            "endsAt": 1791731700000,
+            "title": "Biscuit to the vet",
+            "who": "Jo",
+            "dot": {
+              "kind": "member",
+              "initial": "J",
+              "color": "#ec4899",
+              "ink": "#FFFFFF"
+            },
+            "isDone": false,
+            "handoff": null,
+            "link": "https://app.beanies.family/activities?date=2026-10-11&activity=vet&src=widget"
+          },
+          {
+            "id": "piano:2026-10-11",
+            "kind": "event",
+            "todayOnly": false,
+            "time": "4:30pm",
+            "startsAt": 1791736200000,
+            "endsAt": 1791738900000,
+            "title": "piano",
+            "who": "Ava",
+            "dot": {
+              "kind": "member",
+              "initial": "A",
+              "color": "#8b5cf6",
+              "ink": "#FFFFFF"
+            },
+            "isDone": false,
+            "handoff": {
+              "inlineTitle": "piano, Jo drives",
+              "avatars": []
+            },
+            "link": "https://app.beanies.family/activities?date=2026-10-11&activity=piano&src=widget"
+          },
+          {
+            "id": "soccer:2026-10-11",
+            "kind": "event",
+            "todayOnly": false,
+            "time": "5:15pm",
+            "startsAt": 1791738900000,
+            "endsAt": 1791743400000,
+            "title": "soccer practice",
+            "who": "Max",
+            "dot": {
+              "kind": "member",
+              "initial": "M",
+              "color": "#22c55e",
+              "ink": "#FFFFFF"
+            },
+            "isDone": false,
+            "handoff": {
+              "line": "Sam picks up 6:30pm",
+              "avatars": ["father"]
+            },
+            "link": "https://app.beanies.family/activities?date=2026-10-11&activity=soccer&src=widget"
+          },
+          {
+            "id": "bedtime:2026-10-11",
+            "kind": "event",
+            "todayOnly": false,
+            "time": "7:30pm",
+            "startsAt": 1791747000000,
+            "endsAt": 1791748800000,
+            "title": "bedtime story",
+            "who": "Sam",
+            "dot": {
+              "kind": "member",
+              "initial": "S",
+              "color": "#3b82f6",
+              "ink": "#FFFFFF"
+            },
+            "isDone": false,
+            "handoff": null,
+            "link": "https://app.beanies.family/activities?date=2026-10-11&activity=bedtime&src=widget"
+          }
+        ],
+        "tonight": {
+          "text": "tonight: tacos, Sam cooks",
+          "emphasis": "tacos",
+          "link": "https://app.beanies.family/meal-planner?src=widget"
+        },
+        "tasks": {
+          "items": [
+            {
+              "id": "todo:candles",
+              "kind": "todo",
+              "bucket": "overdue",
+              "title": "buy birthday candles",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": {
+                "kind": "member",
+                "initial": "S",
+                "color": "#3b82f6",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/todo?view=candles&src=widget"
+            },
+            {
+              "id": "todo:swim-bag",
+              "kind": "todo",
+              "bucket": "today",
+              "title": "pack swim bag",
+              "tag": "by 5pm",
+              "tagTone": "accent",
+              "timed": true,
+              "dot": {
+                "kind": "member",
+                "initial": "M",
+                "color": "#22c55e",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/todo?view=swim-bag&src=widget"
+            },
+            {
+              "id": "todo:passports",
+              "kind": "todo",
+              "bucket": "today",
+              "title": "passports for the lake trip",
+              "tag": "today",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": {
+                "kind": "member",
+                "initial": "J",
+                "color": "#ec4899",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/todo?view=passports&src=widget"
+            },
+            {
+              "id": "todo:library",
+              "kind": "todo",
+              "bucket": "today",
+              "title": "return library book",
+              "tag": "today",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": {
+                "kind": "member",
+                "initial": "A",
+                "color": "#8b5cf6",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/todo?view=library&src=widget"
+            },
+            {
+              "id": "todo:gift-hint",
+              "kind": "hint",
+              "bucket": "today",
+              "title": "wrap a gift for Carter's party",
+              "tag": "today",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": null,
+              "link": "https://app.beanies.family/todo?view=gift-hint&src=widget"
+            },
+            {
+              "id": "list:groceries",
+              "kind": "list",
+              "bucket": "later",
+              "title": "groceries, 2 left",
+              "tag": "Mon 12",
+              "tagTone": "soft",
+              "timed": false,
+              "dot": {
+                "kind": "member",
+                "initial": "S",
+                "color": "#3b82f6",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/lists?view=groceries&src=widget"
+            },
+            {
+              "id": "todo:plumber",
+              "kind": "todo",
+              "bucket": "later",
+              "title": "call the plumber",
+              "tag": "Thu 15",
+              "tagTone": "soft",
+              "timed": false,
+              "dot": {
+                "kind": "member",
+                "initial": "S",
+                "color": "#3b82f6",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/todo?view=plumber&src=widget"
+            }
+          ],
+          "overflow": {
+            "due": 0,
+            "hint": 0
+          },
+          "heading": "to-dos and lists",
+          "count": 4,
+          "countText": {
+            "text": "4 due today",
+            "emphasis": "4"
+          },
+          "link": "https://app.beanies.family/todo?src=widget"
+        },
+        "thingsText": "7 things on today",
+        "pickups": []
+      }
+    },
+    {
+      "ymd": "2026-10-12",
+      "numeral": "12",
+      "weekday": "Monday",
+      "month": "October",
+      "weekdayShort": "Mon",
+      "dividerDate": "Mon 12",
+      "my": {
+        "rows": [
+          {
+            "id": "playdate:2026-10-12",
+            "kind": "event",
+            "todayOnly": false,
+            "time": "3pm",
+            "startsAt": 1791817200000,
+            "endsAt": 1791824400000,
+            "title": "playdate",
+            "who": "Ava",
+            "dot": {
+              "kind": "member",
+              "initial": "A",
+              "color": "#8b5cf6",
+              "ink": "#FFFFFF"
+            },
+            "isDone": false,
+            "handoff": {
+              "inlineTitle": "playdate, Jo drives",
+              "avatars": []
+            },
+            "link": "https://app.beanies.family/activities?date=2026-10-12&activity=playdate&src=widget"
+          }
+        ],
+        "tonight": null,
+        "tasks": {
+          "items": [
+            {
+              "id": "todo:candles",
+              "kind": "todo",
+              "bucket": "overdue",
+              "title": "buy birthday candles",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": null,
+              "link": "https://app.beanies.family/todo?view=candles&src=widget"
+            },
+            {
+              "id": "todo:swim-bag",
+              "kind": "todo",
+              "bucket": "overdue",
+              "title": "pack swim bag",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": true,
+              "dot": {
+                "kind": "member",
+                "initial": "M",
+                "color": "#22c55e",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/todo?view=swim-bag&src=widget"
+            },
+            {
+              "id": "todo:library",
+              "kind": "todo",
+              "bucket": "overdue",
+              "title": "return library book",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": {
+                "kind": "member",
+                "initial": "A",
+                "color": "#8b5cf6",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/todo?view=library&src=widget"
+            },
+            {
+              "id": "list:groceries",
+              "kind": "list",
+              "bucket": "today",
+              "title": "groceries, 2 left",
+              "tag": "today",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": null,
+              "link": "https://app.beanies.family/lists?view=groceries&src=widget"
+            },
+            {
+              "id": "todo:plumber",
+              "kind": "todo",
+              "bucket": "later",
+              "title": "call the plumber",
+              "tag": "Thu 15",
+              "tagTone": "soft",
+              "timed": false,
+              "dot": null,
+              "link": "https://app.beanies.family/todo?view=plumber&src=widget"
+            }
+          ],
+          "overflow": {
+            "due": 0,
+            "hint": 0
+          },
+          "heading": "to-dos and lists",
+          "count": 4,
+          "countText": {
+            "text": "4 for you today",
+            "emphasis": "4"
+          },
+          "link": "https://app.beanies.family/todo?src=widget"
+        },
+        "thingsText": "1 thing on today",
+        "pickups": []
+      },
+      "our": {
+        "rows": [
+          {
+            "id": "grandma:2026-10-12",
+            "kind": "event",
+            "todayOnly": false,
+            "time": "12pm",
+            "startsAt": 1791806400000,
+            "endsAt": 1791813600000,
+            "title": "lunch at grandma's",
+            "who": "",
+            "dot": {
+              "kind": "family"
+            },
+            "isDone": false,
+            "handoff": null,
+            "link": "https://app.beanies.family/activities?date=2026-10-12&activity=grandma&src=widget"
+          },
+          {
+            "id": "playdate:2026-10-12",
+            "kind": "event",
+            "todayOnly": false,
+            "time": "3pm",
+            "startsAt": 1791817200000,
+            "endsAt": 1791824400000,
+            "title": "playdate",
+            "who": "Ava",
+            "dot": {
+              "kind": "member",
+              "initial": "A",
+              "color": "#8b5cf6",
+              "ink": "#FFFFFF"
+            },
+            "isDone": false,
+            "handoff": {
+              "inlineTitle": "playdate, Jo drives",
+              "avatars": []
+            },
+            "link": "https://app.beanies.family/activities?date=2026-10-12&activity=playdate&src=widget"
+          }
+        ],
+        "tonight": null,
+        "tasks": {
+          "items": [
+            {
+              "id": "todo:candles",
+              "kind": "todo",
+              "bucket": "overdue",
+              "title": "buy birthday candles",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": {
+                "kind": "member",
+                "initial": "S",
+                "color": "#3b82f6",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/todo?view=candles&src=widget"
+            },
+            {
+              "id": "todo:swim-bag",
+              "kind": "todo",
+              "bucket": "overdue",
+              "title": "pack swim bag",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": true,
+              "dot": {
+                "kind": "member",
+                "initial": "M",
+                "color": "#22c55e",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/todo?view=swim-bag&src=widget"
+            },
+            {
+              "id": "todo:passports",
+              "kind": "todo",
+              "bucket": "overdue",
+              "title": "passports for the lake trip",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": {
+                "kind": "member",
+                "initial": "J",
+                "color": "#ec4899",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/todo?view=passports&src=widget"
+            },
+            {
+              "id": "todo:library",
+              "kind": "todo",
+              "bucket": "overdue",
+              "title": "return library book",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": {
+                "kind": "member",
+                "initial": "A",
+                "color": "#8b5cf6",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/todo?view=library&src=widget"
+            },
+            {
+              "id": "list:groceries",
+              "kind": "list",
+              "bucket": "today",
+              "title": "groceries, 2 left",
+              "tag": "today",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": {
+                "kind": "member",
+                "initial": "S",
+                "color": "#3b82f6",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/lists?view=groceries&src=widget"
+            },
+            {
+              "id": "todo:plumber",
+              "kind": "todo",
+              "bucket": "later",
+              "title": "call the plumber",
+              "tag": "Thu 15",
+              "tagTone": "soft",
+              "timed": false,
+              "dot": {
+                "kind": "member",
+                "initial": "S",
+                "color": "#3b82f6",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/todo?view=plumber&src=widget"
+            }
+          ],
+          "overflow": {
+            "due": 0,
+            "hint": 0
+          },
+          "heading": "to-dos and lists",
+          "count": 5,
+          "countText": {
+            "text": "5 due today",
+            "emphasis": "5"
+          },
+          "link": "https://app.beanies.family/todo?src=widget"
+        },
+        "thingsText": "2 things on today",
+        "pickups": []
+      }
+    },
+    {
+      "ymd": "2026-10-13",
+      "numeral": "13",
+      "weekday": "Tuesday",
+      "month": "October",
+      "weekdayShort": "Tue",
+      "dividerDate": "Tue 13",
+      "my": {
+        "rows": [],
+        "tonight": null,
+        "tasks": {
+          "items": [
+            {
+              "id": "todo:candles",
+              "kind": "todo",
+              "bucket": "overdue",
+              "title": "buy birthday candles",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": null,
+              "link": "https://app.beanies.family/todo?view=candles&src=widget"
+            },
+            {
+              "id": "todo:swim-bag",
+              "kind": "todo",
+              "bucket": "overdue",
+              "title": "pack swim bag",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": true,
+              "dot": {
+                "kind": "member",
+                "initial": "M",
+                "color": "#22c55e",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/todo?view=swim-bag&src=widget"
+            },
+            {
+              "id": "todo:library",
+              "kind": "todo",
+              "bucket": "overdue",
+              "title": "return library book",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": {
+                "kind": "member",
+                "initial": "A",
+                "color": "#8b5cf6",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/todo?view=library&src=widget"
+            },
+            {
+              "id": "list:groceries",
+              "kind": "list",
+              "bucket": "overdue",
+              "title": "groceries, 2 left",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": null,
+              "link": "https://app.beanies.family/lists?view=groceries&src=widget"
+            },
+            {
+              "id": "todo:plumber",
+              "kind": "todo",
+              "bucket": "later",
+              "title": "call the plumber",
+              "tag": "Thu 15",
+              "tagTone": "soft",
+              "timed": false,
+              "dot": null,
+              "link": "https://app.beanies.family/todo?view=plumber&src=widget"
+            }
+          ],
+          "overflow": {
+            "due": 0,
+            "hint": 0
+          },
+          "heading": "to-dos and lists",
+          "count": 4,
+          "countText": {
+            "text": "4 for you today",
+            "emphasis": "4"
+          },
+          "link": "https://app.beanies.family/todo?src=widget"
+        },
+        "thingsText": "nothing on today",
+        "pickups": []
+      },
+      "our": {
+        "rows": [],
+        "tonight": null,
+        "tasks": {
+          "items": [
+            {
+              "id": "todo:candles",
+              "kind": "todo",
+              "bucket": "overdue",
+              "title": "buy birthday candles",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": {
+                "kind": "member",
+                "initial": "S",
+                "color": "#3b82f6",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/todo?view=candles&src=widget"
+            },
+            {
+              "id": "todo:swim-bag",
+              "kind": "todo",
+              "bucket": "overdue",
+              "title": "pack swim bag",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": true,
+              "dot": {
+                "kind": "member",
+                "initial": "M",
+                "color": "#22c55e",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/todo?view=swim-bag&src=widget"
+            },
+            {
+              "id": "todo:passports",
+              "kind": "todo",
+              "bucket": "overdue",
+              "title": "passports for the lake trip",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": {
+                "kind": "member",
+                "initial": "J",
+                "color": "#ec4899",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/todo?view=passports&src=widget"
+            },
+            {
+              "id": "todo:library",
+              "kind": "todo",
+              "bucket": "overdue",
+              "title": "return library book",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": {
+                "kind": "member",
+                "initial": "A",
+                "color": "#8b5cf6",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/todo?view=library&src=widget"
+            },
+            {
+              "id": "list:groceries",
+              "kind": "list",
+              "bucket": "overdue",
+              "title": "groceries, 2 left",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": {
+                "kind": "member",
+                "initial": "S",
+                "color": "#3b82f6",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/lists?view=groceries&src=widget"
+            },
+            {
+              "id": "todo:plumber",
+              "kind": "todo",
+              "bucket": "later",
+              "title": "call the plumber",
+              "tag": "Thu 15",
+              "tagTone": "soft",
+              "timed": false,
+              "dot": {
+                "kind": "member",
+                "initial": "S",
+                "color": "#3b82f6",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/todo?view=plumber&src=widget"
+            }
+          ],
+          "overflow": {
+            "due": 0,
+            "hint": 0
+          },
+          "heading": "to-dos and lists",
+          "count": 5,
+          "countText": {
+            "text": "5 due today",
+            "emphasis": "5"
+          },
+          "link": "https://app.beanies.family/todo?src=widget"
+        },
+        "thingsText": "nothing on today",
+        "pickups": []
+      }
+    },
+    {
+      "ymd": "2026-10-14",
+      "numeral": "14",
+      "weekday": "Wednesday",
+      "month": "October",
+      "weekdayShort": "Wed",
+      "dividerDate": "Wed 14",
+      "my": {
+        "rows": [
+          {
+            "id": "parents-evening:2026-10-14",
+            "kind": "event",
+            "todayOnly": false,
+            "time": "6pm",
+            "startsAt": 1792000800000,
+            "endsAt": 1792004400000,
+            "title": "parents' evening",
+            "who": "Sam",
+            "dot": {
+              "kind": "member",
+              "initial": "S",
+              "color": "#3b82f6",
+              "ink": "#FFFFFF"
+            },
+            "isDone": false,
+            "handoff": null,
+            "link": "https://app.beanies.family/activities?date=2026-10-14&activity=parents-evening&src=widget"
+          }
+        ],
+        "tonight": null,
+        "tasks": {
+          "items": [
+            {
+              "id": "todo:candles",
+              "kind": "todo",
+              "bucket": "overdue",
+              "title": "buy birthday candles",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": null,
+              "link": "https://app.beanies.family/todo?view=candles&src=widget"
+            },
+            {
+              "id": "todo:swim-bag",
+              "kind": "todo",
+              "bucket": "overdue",
+              "title": "pack swim bag",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": true,
+              "dot": {
+                "kind": "member",
+                "initial": "M",
+                "color": "#22c55e",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/todo?view=swim-bag&src=widget"
+            },
+            {
+              "id": "todo:library",
+              "kind": "todo",
+              "bucket": "overdue",
+              "title": "return library book",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": {
+                "kind": "member",
+                "initial": "A",
+                "color": "#8b5cf6",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/todo?view=library&src=widget"
+            },
+            {
+              "id": "list:groceries",
+              "kind": "list",
+              "bucket": "overdue",
+              "title": "groceries, 2 left",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": null,
+              "link": "https://app.beanies.family/lists?view=groceries&src=widget"
+            },
+            {
+              "id": "todo:plumber",
+              "kind": "todo",
+              "bucket": "later",
+              "title": "call the plumber",
+              "tag": "Thu 15",
+              "tagTone": "soft",
+              "timed": false,
+              "dot": null,
+              "link": "https://app.beanies.family/todo?view=plumber&src=widget"
+            }
+          ],
+          "overflow": {
+            "due": 0,
+            "hint": 0
+          },
+          "heading": "to-dos and lists",
+          "count": 4,
+          "countText": {
+            "text": "4 for you today",
+            "emphasis": "4"
+          },
+          "link": "https://app.beanies.family/todo?src=widget"
+        },
+        "thingsText": "1 thing on today",
+        "pickups": []
+      },
+      "our": {
+        "rows": [
+          {
+            "id": "parents-evening:2026-10-14",
+            "kind": "event",
+            "todayOnly": false,
+            "time": "6pm",
+            "startsAt": 1792000800000,
+            "endsAt": 1792004400000,
+            "title": "parents' evening",
+            "who": "Sam",
+            "dot": {
+              "kind": "member",
+              "initial": "S",
+              "color": "#3b82f6",
+              "ink": "#FFFFFF"
+            },
+            "isDone": false,
+            "handoff": null,
+            "link": "https://app.beanies.family/activities?date=2026-10-14&activity=parents-evening&src=widget"
+          }
+        ],
+        "tonight": null,
+        "tasks": {
+          "items": [
+            {
+              "id": "todo:candles",
+              "kind": "todo",
+              "bucket": "overdue",
+              "title": "buy birthday candles",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": {
+                "kind": "member",
+                "initial": "S",
+                "color": "#3b82f6",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/todo?view=candles&src=widget"
+            },
+            {
+              "id": "todo:swim-bag",
+              "kind": "todo",
+              "bucket": "overdue",
+              "title": "pack swim bag",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": true,
+              "dot": {
+                "kind": "member",
+                "initial": "M",
+                "color": "#22c55e",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/todo?view=swim-bag&src=widget"
+            },
+            {
+              "id": "todo:passports",
+              "kind": "todo",
+              "bucket": "overdue",
+              "title": "passports for the lake trip",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": {
+                "kind": "member",
+                "initial": "J",
+                "color": "#ec4899",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/todo?view=passports&src=widget"
+            },
+            {
+              "id": "todo:library",
+              "kind": "todo",
+              "bucket": "overdue",
+              "title": "return library book",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": {
+                "kind": "member",
+                "initial": "A",
+                "color": "#8b5cf6",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/todo?view=library&src=widget"
+            },
+            {
+              "id": "list:groceries",
+              "kind": "list",
+              "bucket": "overdue",
+              "title": "groceries, 2 left",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": {
+                "kind": "member",
+                "initial": "S",
+                "color": "#3b82f6",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/lists?view=groceries&src=widget"
+            },
+            {
+              "id": "todo:plumber",
+              "kind": "todo",
+              "bucket": "later",
+              "title": "call the plumber",
+              "tag": "Thu 15",
+              "tagTone": "soft",
+              "timed": false,
+              "dot": {
+                "kind": "member",
+                "initial": "S",
+                "color": "#3b82f6",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/todo?view=plumber&src=widget"
+            }
+          ],
+          "overflow": {
+            "due": 0,
+            "hint": 0
+          },
+          "heading": "to-dos and lists",
+          "count": 5,
+          "countText": {
+            "text": "5 due today",
+            "emphasis": "5"
+          },
+          "link": "https://app.beanies.family/todo?src=widget"
+        },
+        "thingsText": "1 thing on today",
+        "pickups": []
+      }
+    },
+    {
+      "ymd": "2026-10-15",
+      "numeral": "15",
+      "weekday": "Thursday",
+      "month": "October",
+      "weekdayShort": "Thu",
+      "dividerDate": "Thu 15",
+      "my": {
+        "rows": [
+          {
+            "id": "trip:lake:2026-10-15",
+            "kind": "trip",
+            "todayOnly": false,
+            "time": "",
+            "startsAt": null,
+            "endsAt": null,
+            "title": "lake trip · starts",
+            "titleEmphasis": "starts",
+            "who": "Sam, Jo, Ava & Max",
+            "dot": {
+              "kind": "member",
+              "initial": "S",
+              "color": "#3b82f6",
+              "ink": "#FFFFFF"
+            },
+            "isDone": false,
+            "handoff": null,
+            "link": "https://app.beanies.family/travel?vacation=lake&src=widget"
+          }
+        ],
+        "tonight": null,
+        "tasks": {
+          "items": [
+            {
+              "id": "todo:candles",
+              "kind": "todo",
+              "bucket": "overdue",
+              "title": "buy birthday candles",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": null,
+              "link": "https://app.beanies.family/todo?view=candles&src=widget"
+            },
+            {
+              "id": "todo:swim-bag",
+              "kind": "todo",
+              "bucket": "overdue",
+              "title": "pack swim bag",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": true,
+              "dot": {
+                "kind": "member",
+                "initial": "M",
+                "color": "#22c55e",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/todo?view=swim-bag&src=widget"
+            },
+            {
+              "id": "todo:library",
+              "kind": "todo",
+              "bucket": "overdue",
+              "title": "return library book",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": {
+                "kind": "member",
+                "initial": "A",
+                "color": "#8b5cf6",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/todo?view=library&src=widget"
+            },
+            {
+              "id": "list:groceries",
+              "kind": "list",
+              "bucket": "overdue",
+              "title": "groceries, 2 left",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": null,
+              "link": "https://app.beanies.family/lists?view=groceries&src=widget"
+            },
+            {
+              "id": "todo:plumber",
+              "kind": "todo",
+              "bucket": "today",
+              "title": "call the plumber",
+              "tag": "today",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": null,
+              "link": "https://app.beanies.family/todo?view=plumber&src=widget"
+            }
+          ],
+          "overflow": {
+            "due": 0,
+            "hint": 0
+          },
+          "heading": "to-dos and lists",
+          "count": 5,
+          "countText": {
+            "text": "5 for you today",
+            "emphasis": "5"
+          },
+          "link": "https://app.beanies.family/todo?src=widget"
+        },
+        "thingsText": "1 thing on today",
+        "pickups": []
+      },
+      "our": {
+        "rows": [
+          {
+            "id": "trip:lake:2026-10-15",
+            "kind": "trip",
+            "todayOnly": false,
+            "time": "",
+            "startsAt": null,
+            "endsAt": null,
+            "title": "lake trip · starts",
+            "titleEmphasis": "starts",
+            "who": "Sam, Jo, Ava & Max",
+            "dot": {
+              "kind": "member",
+              "initial": "S",
+              "color": "#3b82f6",
+              "ink": "#FFFFFF"
+            },
+            "isDone": false,
+            "handoff": null,
+            "link": "https://app.beanies.family/travel?vacation=lake&src=widget"
+          }
+        ],
+        "tonight": null,
+        "tasks": {
+          "items": [
+            {
+              "id": "todo:candles",
+              "kind": "todo",
+              "bucket": "overdue",
+              "title": "buy birthday candles",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": {
+                "kind": "member",
+                "initial": "S",
+                "color": "#3b82f6",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/todo?view=candles&src=widget"
+            },
+            {
+              "id": "todo:swim-bag",
+              "kind": "todo",
+              "bucket": "overdue",
+              "title": "pack swim bag",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": true,
+              "dot": {
+                "kind": "member",
+                "initial": "M",
+                "color": "#22c55e",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/todo?view=swim-bag&src=widget"
+            },
+            {
+              "id": "todo:passports",
+              "kind": "todo",
+              "bucket": "overdue",
+              "title": "passports for the lake trip",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": {
+                "kind": "member",
+                "initial": "J",
+                "color": "#ec4899",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/todo?view=passports&src=widget"
+            },
+            {
+              "id": "todo:library",
+              "kind": "todo",
+              "bucket": "overdue",
+              "title": "return library book",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": {
+                "kind": "member",
+                "initial": "A",
+                "color": "#8b5cf6",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/todo?view=library&src=widget"
+            },
+            {
+              "id": "list:groceries",
+              "kind": "list",
+              "bucket": "overdue",
+              "title": "groceries, 2 left",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": {
+                "kind": "member",
+                "initial": "S",
+                "color": "#3b82f6",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/lists?view=groceries&src=widget"
+            },
+            {
+              "id": "todo:plumber",
+              "kind": "todo",
+              "bucket": "today",
+              "title": "call the plumber",
+              "tag": "today",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": {
+                "kind": "member",
+                "initial": "S",
+                "color": "#3b82f6",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/todo?view=plumber&src=widget"
+            }
+          ],
+          "overflow": {
+            "due": 0,
+            "hint": 0
+          },
+          "heading": "to-dos and lists",
+          "count": 6,
+          "countText": {
+            "text": "6 due today",
+            "emphasis": "6"
+          },
+          "link": "https://app.beanies.family/todo?src=widget"
+        },
+        "thingsText": "1 thing on today",
+        "pickups": []
+      }
+    },
+    {
+      "ymd": "2026-10-16",
+      "numeral": "16",
+      "weekday": "Friday",
+      "month": "October",
+      "weekdayShort": "Fri",
+      "dividerDate": "Fri 16",
+      "my": {
+        "rows": [
+          {
+            "id": "trip:lake:2026-10-16",
+            "kind": "trip",
+            "todayOnly": true,
+            "time": "",
+            "startsAt": null,
+            "endsAt": null,
+            "title": "lake trip · day 2 of 4",
+            "titleEmphasis": "day 2 of 4",
+            "who": "Sam, Jo, Ava & Max",
+            "dot": {
+              "kind": "member",
+              "initial": "S",
+              "color": "#3b82f6",
+              "ink": "#FFFFFF"
+            },
+            "isDone": false,
+            "handoff": null,
+            "link": "https://app.beanies.family/travel?vacation=lake&src=widget"
+          },
+          {
+            "id": "birthday:jo:2026-10-16",
+            "kind": "birthday",
+            "todayOnly": false,
+            "time": "",
+            "startsAt": null,
+            "endsAt": null,
+            "title": "Jo's birthday",
+            "who": "Jo",
+            "dot": {
+              "kind": "member",
+              "initial": "J",
+              "color": "#ec4899",
+              "ink": "#FFFFFF"
+            },
+            "isDone": false,
+            "handoff": null,
+            "link": "https://app.beanies.family/family?edit=jo&src=widget"
+          }
+        ],
+        "tonight": null,
+        "tasks": {
+          "items": [
+            {
+              "id": "todo:candles",
+              "kind": "todo",
+              "bucket": "overdue",
+              "title": "buy birthday candles",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": null,
+              "link": "https://app.beanies.family/todo?view=candles&src=widget"
+            },
+            {
+              "id": "todo:swim-bag",
+              "kind": "todo",
+              "bucket": "overdue",
+              "title": "pack swim bag",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": true,
+              "dot": {
+                "kind": "member",
+                "initial": "M",
+                "color": "#22c55e",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/todo?view=swim-bag&src=widget"
+            },
+            {
+              "id": "todo:library",
+              "kind": "todo",
+              "bucket": "overdue",
+              "title": "return library book",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": {
+                "kind": "member",
+                "initial": "A",
+                "color": "#8b5cf6",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/todo?view=library&src=widget"
+            },
+            {
+              "id": "list:groceries",
+              "kind": "list",
+              "bucket": "overdue",
+              "title": "groceries, 2 left",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": null,
+              "link": "https://app.beanies.family/lists?view=groceries&src=widget"
+            },
+            {
+              "id": "todo:plumber",
+              "kind": "todo",
+              "bucket": "overdue",
+              "title": "call the plumber",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": null,
+              "link": "https://app.beanies.family/todo?view=plumber&src=widget"
+            }
+          ],
+          "overflow": {
+            "due": 0,
+            "hint": 0
+          },
+          "heading": "to-dos and lists",
+          "count": 5,
+          "countText": {
+            "text": "5 for you today",
+            "emphasis": "5"
+          },
+          "link": "https://app.beanies.family/todo?src=widget"
+        },
+        "thingsText": "2 things on today",
+        "pickups": []
+      },
+      "our": {
+        "rows": [
+          {
+            "id": "trip:lake:2026-10-16",
+            "kind": "trip",
+            "todayOnly": true,
+            "time": "",
+            "startsAt": null,
+            "endsAt": null,
+            "title": "lake trip · day 2 of 4",
+            "titleEmphasis": "day 2 of 4",
+            "who": "Sam, Jo, Ava & Max",
+            "dot": {
+              "kind": "member",
+              "initial": "S",
+              "color": "#3b82f6",
+              "ink": "#FFFFFF"
+            },
+            "isDone": false,
+            "handoff": null,
+            "link": "https://app.beanies.family/travel?vacation=lake&src=widget"
+          },
+          {
+            "id": "birthday:jo:2026-10-16",
+            "kind": "birthday",
+            "todayOnly": false,
+            "time": "",
+            "startsAt": null,
+            "endsAt": null,
+            "title": "Jo's birthday",
+            "who": "Jo",
+            "dot": {
+              "kind": "member",
+              "initial": "J",
+              "color": "#ec4899",
+              "ink": "#FFFFFF"
+            },
+            "isDone": false,
+            "handoff": null,
+            "link": "https://app.beanies.family/family?edit=jo&src=widget"
+          }
+        ],
+        "tonight": null,
+        "tasks": {
+          "items": [
+            {
+              "id": "todo:candles",
+              "kind": "todo",
+              "bucket": "overdue",
+              "title": "buy birthday candles",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": {
+                "kind": "member",
+                "initial": "S",
+                "color": "#3b82f6",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/todo?view=candles&src=widget"
+            },
+            {
+              "id": "todo:swim-bag",
+              "kind": "todo",
+              "bucket": "overdue",
+              "title": "pack swim bag",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": true,
+              "dot": {
+                "kind": "member",
+                "initial": "M",
+                "color": "#22c55e",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/todo?view=swim-bag&src=widget"
+            },
+            {
+              "id": "todo:passports",
+              "kind": "todo",
+              "bucket": "overdue",
+              "title": "passports for the lake trip",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": {
+                "kind": "member",
+                "initial": "J",
+                "color": "#ec4899",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/todo?view=passports&src=widget"
+            },
+            {
+              "id": "todo:library",
+              "kind": "todo",
+              "bucket": "overdue",
+              "title": "return library book",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": {
+                "kind": "member",
+                "initial": "A",
+                "color": "#8b5cf6",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/todo?view=library&src=widget"
+            },
+            {
+              "id": "list:groceries",
+              "kind": "list",
+              "bucket": "overdue",
+              "title": "groceries, 2 left",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": {
+                "kind": "member",
+                "initial": "S",
+                "color": "#3b82f6",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/lists?view=groceries&src=widget"
+            },
+            {
+              "id": "todo:plumber",
+              "kind": "todo",
+              "bucket": "overdue",
+              "title": "call the plumber",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": {
+                "kind": "member",
+                "initial": "S",
+                "color": "#3b82f6",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/todo?view=plumber&src=widget"
+            }
+          ],
+          "overflow": {
+            "due": 0,
+            "hint": 0
+          },
+          "heading": "to-dos and lists",
+          "count": 6,
+          "countText": {
+            "text": "6 due today",
+            "emphasis": "6"
+          },
+          "link": "https://app.beanies.family/todo?src=widget"
+        },
+        "thingsText": "2 things on today",
+        "pickups": []
+      }
+    },
+    {
+      "ymd": "2026-10-17",
+      "numeral": "17",
+      "weekday": "Saturday",
+      "month": "October",
+      "weekdayShort": "Sat",
+      "dividerDate": "Sat 17",
+      "my": {
+        "rows": [
+          {
+            "id": "trip:lake:2026-10-17",
+            "kind": "trip",
+            "todayOnly": true,
+            "time": "",
+            "startsAt": null,
+            "endsAt": null,
+            "title": "lake trip · day 3 of 4",
+            "titleEmphasis": "day 3 of 4",
+            "who": "Sam, Jo, Ava & Max",
+            "dot": {
+              "kind": "member",
+              "initial": "S",
+              "color": "#3b82f6",
+              "ink": "#FFFFFF"
+            },
+            "isDone": false,
+            "handoff": null,
+            "link": "https://app.beanies.family/travel?vacation=lake&src=widget"
+          }
+        ],
+        "tonight": null,
+        "tasks": {
+          "items": [
+            {
+              "id": "todo:candles",
+              "kind": "todo",
+              "bucket": "overdue",
+              "title": "buy birthday candles",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": null,
+              "link": "https://app.beanies.family/todo?view=candles&src=widget"
+            },
+            {
+              "id": "todo:swim-bag",
+              "kind": "todo",
+              "bucket": "overdue",
+              "title": "pack swim bag",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": true,
+              "dot": {
+                "kind": "member",
+                "initial": "M",
+                "color": "#22c55e",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/todo?view=swim-bag&src=widget"
+            },
+            {
+              "id": "todo:library",
+              "kind": "todo",
+              "bucket": "overdue",
+              "title": "return library book",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": {
+                "kind": "member",
+                "initial": "A",
+                "color": "#8b5cf6",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/todo?view=library&src=widget"
+            },
+            {
+              "id": "list:groceries",
+              "kind": "list",
+              "bucket": "overdue",
+              "title": "groceries, 2 left",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": null,
+              "link": "https://app.beanies.family/lists?view=groceries&src=widget"
+            },
+            {
+              "id": "todo:plumber",
+              "kind": "todo",
+              "bucket": "overdue",
+              "title": "call the plumber",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": null,
+              "link": "https://app.beanies.family/todo?view=plumber&src=widget"
+            }
+          ],
+          "overflow": {
+            "due": 0,
+            "hint": 0
+          },
+          "heading": "to-dos and lists",
+          "count": 5,
+          "countText": {
+            "text": "5 for you today",
+            "emphasis": "5"
+          },
+          "link": "https://app.beanies.family/todo?src=widget"
+        },
+        "thingsText": "1 thing on today",
+        "pickups": []
+      },
+      "our": {
+        "rows": [
+          {
+            "id": "trip:lake:2026-10-17",
+            "kind": "trip",
+            "todayOnly": true,
+            "time": "",
+            "startsAt": null,
+            "endsAt": null,
+            "title": "lake trip · day 3 of 4",
+            "titleEmphasis": "day 3 of 4",
+            "who": "Sam, Jo, Ava & Max",
+            "dot": {
+              "kind": "member",
+              "initial": "S",
+              "color": "#3b82f6",
+              "ink": "#FFFFFF"
+            },
+            "isDone": false,
+            "handoff": null,
+            "link": "https://app.beanies.family/travel?vacation=lake&src=widget"
+          }
+        ],
+        "tonight": null,
+        "tasks": {
+          "items": [
+            {
+              "id": "todo:candles",
+              "kind": "todo",
+              "bucket": "overdue",
+              "title": "buy birthday candles",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": {
+                "kind": "member",
+                "initial": "S",
+                "color": "#3b82f6",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/todo?view=candles&src=widget"
+            },
+            {
+              "id": "todo:swim-bag",
+              "kind": "todo",
+              "bucket": "overdue",
+              "title": "pack swim bag",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": true,
+              "dot": {
+                "kind": "member",
+                "initial": "M",
+                "color": "#22c55e",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/todo?view=swim-bag&src=widget"
+            },
+            {
+              "id": "todo:passports",
+              "kind": "todo",
+              "bucket": "overdue",
+              "title": "passports for the lake trip",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": {
+                "kind": "member",
+                "initial": "J",
+                "color": "#ec4899",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/todo?view=passports&src=widget"
+            },
+            {
+              "id": "todo:library",
+              "kind": "todo",
+              "bucket": "overdue",
+              "title": "return library book",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": {
+                "kind": "member",
+                "initial": "A",
+                "color": "#8b5cf6",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/todo?view=library&src=widget"
+            },
+            {
+              "id": "list:groceries",
+              "kind": "list",
+              "bucket": "overdue",
+              "title": "groceries, 2 left",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": {
+                "kind": "member",
+                "initial": "S",
+                "color": "#3b82f6",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/lists?view=groceries&src=widget"
+            },
+            {
+              "id": "todo:plumber",
+              "kind": "todo",
+              "bucket": "overdue",
+              "title": "call the plumber",
+              "tag": "overdue",
+              "tagTone": "accent",
+              "timed": false,
+              "dot": {
+                "kind": "member",
+                "initial": "S",
+                "color": "#3b82f6",
+                "ink": "#FFFFFF"
+              },
+              "link": "https://app.beanies.family/todo?view=plumber&src=widget"
+            }
+          ],
+          "overflow": {
+            "due": 0,
+            "hint": 0
+          },
+          "heading": "to-dos and lists",
+          "count": 6,
+          "countText": {
+            "text": "6 due today",
+            "emphasis": "6"
+          },
+          "link": "https://app.beanies.family/todo?src=widget"
+        },
+        "thingsText": "1 thing on today",
+        "pickups": []
+      }
+    }
+  ]
+}

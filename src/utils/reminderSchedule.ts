@@ -12,7 +12,7 @@ import type { FamilyActivity, FamilyMember, ReminderMinutes } from '@/types/mode
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { normalizeAssignees } from '@/utils/assignees';
-import { classifyAudience } from '@/utils/audience';
+import { classifyAudience, type BriefingAudience } from '@/utils/audience';
 
 /**
  * Parse a local `YYYY-MM-DD` (+ optional `HH:mm`) into a LOCAL-time Date —
@@ -62,6 +62,12 @@ export interface ActivityReminderContext {
   /** The viewer's primary duty — `dutyRoles[0]`. Drives the single-role bell
    *  chip, which has no way to show two. */
   dutyRole?: 'dropoff' | 'pickup';
+  /**
+   * `classifyAudience` over the activity's assignees for this viewer, already computed for
+   * `relevant`. Exposed so the home-screen widget (#130) applies the Nook briefing's rule
+   * (`dutyRoles.length > 0 || ownerItemSurfaces(audience)`) without classifying twice.
+   */
+  audience: BriefingAudience;
 }
 
 export function activityReminderContext(
@@ -90,6 +96,7 @@ export function activityReminderContext(
     who,
     dutyRoles,
     dutyRole: dutyRoles[0],
+    audience,
   };
 }
 

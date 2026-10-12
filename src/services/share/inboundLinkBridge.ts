@@ -26,6 +26,8 @@ import { readHashMarker, APPROVAL_LINK_HASH } from '@/services/auth/deepLinks';
 import { emitApprovalKeyDropped, type DeliveryKind } from '@/services/telemetry/deepLinkEvents';
 import { reportError } from '@/utils/errorReporter';
 import { nativeOAuthTransport } from '@/constants/nativeOAuth';
+import { emitWidgetOpened, emitWidgetOpenInvalid } from '@/services/telemetry/homeWidgetEvents';
+import { isWidgetSize } from '@/types/widgetSnapshot';
 
 /**
  * Paths we are willing to route from an external link. Anything else is ignored.
@@ -259,6 +261,14 @@ export function installInboundLinkListener(
       // which changes the injected contract and App.vue's wiring. Do not read this
       // counter as "landed on the item" until that exists.
       emitInboundLinkRouted({ routePath: parsed.pathname });
+      // #130: a tap on a home-screen widget. `w` is untrusted query text (any app can send
+      // an Intent), so it is logged only once matched against the fixed size set; otherwise
+      // only the fact of an invalid value is.
+      if (parsed.searchParams.get('src') === 'widget') {
+        const size = parsed.searchParams.get('w');
+        if (isWidgetSize(size)) emitWidgetOpened({ size, routePath: parsed.pathname });
+        else emitWidgetOpenInvalid();
+      }
       // ⚠️ STRIP ONLY THE APPROVAL MARKER, AND FORWARD THE REST.
       //
       // Dropping the whole fragment here broke the printed recovery kit: its QR is

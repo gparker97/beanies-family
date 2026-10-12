@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Home-screen widget palette, light mode (#130). Dark partners in values-night/widget_colors.xml.
+  Values are the CIG ladder (docs/brand/beanies-cig-v2.html slides 8-9, packages/brand/theme.css),
+  listed in the plan's Dark Mode Coverage. The widget never computes a colour: member dot fills and
+  initials come from the snapshot (`dot.color` / `dot.ink`), everything else resolves from here at
+  inflation time, so the launcher re-resolves it when the system switches light/dark.
+-->
+<resources>
+    <color name="widget_container">#FFFFFF</color>
+    <!-- The inner surface inset 10dp inside the frame: the container at 95%, whatever the
+         background-opacity choice, so the wallpaper never sits behind readable text. -->
+    <color name="widget_container_inner">#F2FFFFFF</color>
+    <!-- The panel stays ~95% opaque whatever the background-opacity choice (alpha 0xF2). -->
+    <color name="widget_panel">#F2EEF6FC</color>
+    <color name="widget_ink">#2C3E50</color>
+    <color name="widget_ink_soft">#506B7A</color>
+    <color name="widget_ink_faint">#506B7A</color>
+    <!-- Hairline beside the look-ahead dividers and the to-dos heading: decoration only, never text. -->
+    <color name="widget_hairline">#D5E1EA</color>
+    <color name="widget_accent_text">#D14D1A</color>
+    <color name="widget_due_purple">#9B59B6</color>
+    <color name="widget_tick_green">#27AE60</color>
+    <color name="widget_family_chip">#DAEEF9</color>
+    <!-- The member-dot ring is a dark-mode-only affordance (the slate dot must not vanish). -->
+    <color name="widget_dot_ring">#00000000</color>
+</resources>

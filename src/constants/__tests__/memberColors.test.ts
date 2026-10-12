@@ -9,6 +9,8 @@ import {
   isBlankMemberColor,
   takenColors,
   nextFreeMemberColor,
+  inkOnMemberColor,
+  relativeLuminance,
 } from '../memberColors';
 
 const m = (id: string, color?: string) => ({ id, color });
@@ -124,5 +126,21 @@ describe('nextFreeMemberColor', () => {
     const { color, reused } = nextFreeMemberColor(members);
     expect(color).not.toBe(ASSIGNABLE_MEMBER_COLORS[0]);
     expect(reused?.id).not.toBe('owner');
+  });
+});
+
+describe('inkOnMemberColor (#130: BeanieAvatar and the widget snapshot share it)', () => {
+  it('draws Deep Slate on a light fill, either side of the 0.45 threshold', () => {
+    // light amber #fbbf24 sits above 0.45; blue #3b82f6 sits below it.
+    expect(relativeLuminance('#fbbf24')).toBeGreaterThan(0.45);
+    expect(inkOnMemberColor('#fbbf24')).toBe('#2C3E50');
+    expect(relativeLuminance('#3b82f6')).toBeLessThan(0.45);
+    expect(inkOnMemberColor('#3b82f6')).toBe('#FFFFFF');
+  });
+
+  it('reads a 3-digit hex and falls back to white for anything unreadable', () => {
+    expect(inkOnMemberColor('#fff')).toBe('#2C3E50');
+    expect(inkOnMemberColor('rebeccapurple')).toBe('#FFFFFF');
+    expect(inkOnMemberColor('')).toBe('#FFFFFF');
   });
 });

@@ -1,0 +1,276 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "Events": {
+      "comment": "Widget setting toggle: show the day's activities.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Events"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "活动"
+          }
+        }
+      }
+    },
+    "Helpful hint": {
+      "comment": "Widget setting toggle: show helpful hints and reminders in the to-dos section.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Helpful hint"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "贴心提示"
+          }
+        }
+      }
+    },
+    "Meals": {
+      "comment": "Widget setting toggle: show tonight's dinner.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Meals"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "餐食"
+          }
+        }
+      }
+    },
+    "My day": {
+      "comment": "Widget setting option: the signed-in member's own day.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "My day"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "我的一天"
+          }
+        }
+      }
+    },
+    "Next up": {
+      "comment": "Lock-screen widget name in the widget gallery.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next up"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "接下来"
+          }
+        }
+      }
+    },
+    "Our day": {
+      "comment": "Widget setting option: the whole family's day.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Our day"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "我们的一天"
+          }
+        }
+      }
+    },
+    "To-dos and lists": {
+      "comment": "Widget setting toggle: show to-dos and lists (the to-dos section).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "To-dos and lists"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "待办和清单"
+          }
+        }
+      }
+    },
+    "Today's plans, handoffs and dinner at a glance.": {
+      "comment": "Widget description in the widget gallery.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Today's plans, handoffs and dinner at a glance."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今天的安排、接送和晚餐，一目了然。"
+          }
+        }
+      }
+    },
+    "Trips and birthdays": {
+      "comment": "Widget setting toggle: show trips and birthdays on the calendar.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trips and birthdays"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "旅行和生日"
+          }
+        }
+      }
+    },
+    "Who's where": {
+      "comment": "Widget setting toggle: show drop-off and pick-up handoffs.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Who's where"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "谁在哪儿"
+          }
+        }
+      }
+    },
+    "Whose day": {
+      "comment": "Widget setting: whose day the widget shows.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Whose day"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "谁的一天"
+          }
+        }
+      }
+    },
+    "Your day": {
+      "comment": "Home-screen widget name in the widget gallery and the edit sheet.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your day"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "你的一天"
+          }
+        }
+      }
+    },
+    "widget_open_beanies": {
+      "comment": "Signed-out widget title (no snapshot on the device).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "open beanies"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开 beanies"
+          }
+        }
+      }
+    },
+    "widget_refresh": {
+      "comment": "Widget title when the saved day cannot be read; opening the app rewrites it.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "open beanies to refresh"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开 beanies 以刷新"
+          }
+        }
+      }
+    },
+    "widget_sign_in_to_see": {
+      "comment": "Signed-out widget line under the title.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "sign in to see your day"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "登录后查看你的一天"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

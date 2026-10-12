@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The widget's inner surface (#130, mockup 2e): inset 10dp inside the outer frame, 95% opaque
+     in both modes. Only the ~10dp rim thins with the background-opacity choice; at 100% the two
+     read as one surface. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="@color/widget_container_inner" />
+    <corners android:radius="18dp" />
+</shape>

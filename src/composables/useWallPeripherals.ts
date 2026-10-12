@@ -24,7 +24,7 @@ import type { UIStringKey } from '@/services/translation/uiStrings';
 import { isWallSafeList } from '@/utils/wallJobs';
 import { isFiled } from '@/utils/listLifecycle';
 import { tripDayProgress, tripPhase } from '@/utils/vacation';
-import { SLOT_EMOJI, SLOT_INDEX } from '@/constants/mealSlots';
+import { SLOT_EMOJI, SLOT_INDEX, pickTonight } from '@/constants/mealSlots';
 import type { FamilyList, FamilyMember, MealPlanEntry, MealSlot } from '@/types/models';
 
 export interface WallMeal {
@@ -77,15 +77,8 @@ export function useWallPeripherals() {
       .map(toWallMeal);
   });
 
-  /**
-   * "Tonight" means dinner when there is one. Falling back to the last meal of
-   * the day rather than the first keeps the card forward-looking on a family
-   * that only plans lunches.
-   */
-  const tonight = computed<WallMeal | null>(() => {
-    const meals = mealsToday.value;
-    return meals.find((m) => m.slot === 'dinner') ?? meals[meals.length - 1] ?? null;
-  });
+  /** "Tonight": dinner, else the last meal of the day (`pickTonight`, shared with the widget). */
+  const tonight = computed<WallMeal | null>(() => pickTonight(mealsToday.value));
 
   /**
    * The raw vacation behind the wall's trip, exposed so the sheet does not

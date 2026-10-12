@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The 4x3 widget uses the 4x2's layout (#130, round 9b): the two differ only in how many task rows
+  the fixed to-dos section has and in the "my day" / "our day" label, both set in code. An alias
+  keeps a distinct layout id per size (WidgetSizes), so a resize between them re-inflates.
+-->
+<resources>
+    <item name="widget_day_large" type="layout">@layout/widget_day_medium</item>
+</resources>

@@ -68,6 +68,7 @@
  * from `finalizePod`'s create-success branch — never from any existing-pod load (`handleAutoLoadSubmit`,
  * `openExistingOnDrive`, `retry`), which emit `signed-in '/nook'` directly.
  */
+import { firstName } from '@/utils/assignees';
 import { ref, computed, watch, onMounted, onBeforeUnmount, onErrorCaptured } from 'vue';
 import type { PayloadLoadError } from '@/types/sync';
 import { surfacePayloadFatal, surfaceBlockerFatal } from '@/utils/payloadFailureSurface';
@@ -285,7 +286,7 @@ const familyName = computed(() => familyContextStore.activeFamilyName || 'your f
  */
 const knownOwnerName = computed(() => authStore.currentUser?.displayName?.trim() ?? '');
 /** The greeting uses the first name only ("Choose your PIN, Greg"), per the approved mockup. */
-const knownOwnerFirstName = computed(() => knownOwnerName.value.split(/\s+/)[0] ?? '');
+const knownOwnerFirstName = computed(() => firstName(knownOwnerName.value));
 
 /**
  * The page header, one variant per phase (#128). `null` hides it: the survey and the members

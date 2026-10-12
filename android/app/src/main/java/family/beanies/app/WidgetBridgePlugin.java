@@ -1,0 +1,125 @@
+package family.beanies.app;
+
+import android.appwidget.AppWidgetManager;
+import android.content.ComponentName;
+import android.content.Context;
+import com.getcapacitor.JSObject;
+import com.getcapacitor.Plugin;
+import com.getcapacitor.PluginCall;
+import com.getcapacitor.PluginMethod;
+import com.getcapacitor.annotation.CapacitorPlugin;
+import family.beanies.app.widget.DayWidgetProvider;
+import family.beanies.app.widget.WidgetPrefs;
+import family.beanies.app.widget.WidgetSizes;
+import family.beanies.app.widget.WidgetSnapshotStore;
+import java.io.IOException;
+
+/**
+ * The app's side of the home-screen widget (#130, ADR-042; JS: src/services/native/widgetBridgePlugin.ts).
+ *
+ * `publish({ json })` writes the snapshot the app built (WidgetSnapshotStore owns the path and
+ * the atomic write), re-renders every placed widget, and answers with the placements by size and
+ * the widget's last read failure, which is the only route from the widget to the firehose.
+ * `clear()` deletes the snapshot at sign-out so every placed widget shows "open beanies".
+ *
+ * Reject codes (documented on the TS interface): `write_failed`; and from `clear()` only,
+ * `reload_failed` (the file is gone but the re-render failed, so the launcher still shows the
+ * last views). In `publish` a render failure after a good write does NOT reject (the snapshot is
+ * on disk and the next render picks it up); it is relayed as a `reload_failed;<Exception>` token.
+ *
+ * Capacitor runs plugin methods on its background handler thread, so the file I/O and the render
+ * stay off the UI thread.
+ */
+@CapacitorPlugin(name = "WidgetBridge")
+public class WidgetBridgePlugin extends Plugin {
+
+    @PluginMethod
+    public void publish(PluginCall call) {
+        String json = call.getString("json");
+        if (json == null) {
+            call.reject("missing json", "write_failed");
+            return;
+        }
+        Context context = getContext();
+        try {
+            WidgetSnapshotStore.write(context, json);
+        } catch (IOException | RuntimeException e) {
+            call.reject("widget snapshot write failed: " + e.getClass().getSimpleName(), "write_failed", toException(e));
+            return;
+        }
+        String reloadFailure = render(context);
+
+        JSObject ret = new JSObject();
+        JSObject counts = new JSObject();
+        String placementsFailure = placements(context, counts);
+        ret.put("placements", counts);
+        // Tokens are joined with '|', the separator the web side splits on (homeWidgetEvents).
+        StringBuilder outcome = new StringBuilder();
+        for (String token : new String[] {reloadFailure, placementsFailure, WidgetPrefs.takeReadOutcome(context)}) {
+            if (token == null || token.isEmpty()) continue;
+            if (outcome.length() > 0) outcome.append('|');
+            outcome.append(token);
+        }
+        if (outcome.length() > 0) ret.put("readOutcome", outcome.toString());
+        call.resolve(ret);
+    }
+
+    @PluginMethod
+    public void clear(PluginCall call) {
+        Context context = getContext();
+        try {
+            WidgetSnapshotStore.delete(context);
+        } catch (IOException | RuntimeException e) {
+            call.reject(
+                    "widget snapshot delete failed; family content may remain on the home screen",
+                    "write_failed",
+                    toException(e));
+            return;
+        }
+        // The file is gone, but the launcher keeps the last views until we re-render: a failed
+        // re-render leaves the family's day on the home screen, so sign-out must hear about it.
+        String reloadFailure = render(context);
+        if (reloadFailure != null) {
+            call.reject(
+                    "widget re-render after delete failed; family content may remain on the home screen ("
+                            + reloadFailure + ")",
+                    "reload_failed");
+            return;
+        }
+        call.resolve();
+    }
+
+    /** Re-render every placed widget; returns a `reload_failed;<token>` line on failure. */
+    private static String render(Context context) {
+        try {
+            DayWidgetProvider.renderAll(context);
+            return null;
+        } catch (RuntimeException e) {
+            android.util.Log.w("beanies-widget", "widget render after publish failed", e);
+            return "reload_failed;" + e.getClass().getSimpleName();
+        }
+    }
+
+    /**
+     * Count placed widgets of our provider into {@code counts} by size key (`android-2x2` /
+     * `-4x2` / `-4x3`). Returns a `placements_failed;<Exception>` token on failure, else null.
+     */
+    private static String placements(Context context, JSObject counts) {
+        try {
+            AppWidgetManager manager = AppWidgetManager.getInstance(context);
+            int[] ids = manager.getAppWidgetIds(new ComponentName(context, DayWidgetProvider.class));
+            for (int id : ids) {
+                String key = WidgetSizes.sizeFor(manager.getAppWidgetOptions(id)).key;
+                counts.put(key, counts.optInt(key, 0) + 1);
+            }
+        } catch (RuntimeException e) {
+            android.util.Log.w("beanies-widget", "could not count widget placements", e);
+            return "placements_failed;" + e.getClass().getSimpleName();
+        }
+        return null;
+    }
+
+    private static Exception toException(Throwable t) {
+        return t instanceof Exception ? (Exception) t : new Exception(t);
+    }
+}

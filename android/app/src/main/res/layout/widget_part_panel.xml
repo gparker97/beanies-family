@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The agenda panel of the medium and large widgets (#130, round 9b): the scrolling calendar
+  (a ListView backed by DayWidgetService, or the relaxed block in its place on a clear week), the
+  fixed to-dos section under it (never part of the scroll), the "tonight" footer with "later ›",
+  and the peek over the panel's top-right edge. Geometry (root padding top 5dp): the peek's top is 5dp below the widget's top, the panel's
+  top 20dp below that (= 13dp below the 12dp content top), so the 22dp peek ends 2dp inside the
+  panel, 6dp in from its right edge. The 13dp right padding leaves room for the scrollbar.
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="0dp"
+    android:layout_height="match_parent"
+    android:layout_weight="1"
+    tools:ignore="MergeRootFrame">
+
+    <LinearLayout
+        android:id="@+id/panel"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_marginTop="20dp"
+        android:background="@drawable/widget_panel_bg"
+        android:orientation="vertical"
+        android:paddingStart="6dp"
+        android:paddingTop="4dp"
+        android:paddingEnd="13dp"
+        android:paddingBottom="3dp">
+
+        <ListView
+            android:id="@+id/agenda_list"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:divider="@null"
+            android:dividerHeight="0dp"
+            android:listSelector="@android:color/transparent"
+            android:scrollbarStyle="outsideOverlay"
+            android:scrollbars="vertical" />
+
+        <include
+            layout="@layout/widget_part_relaxed"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+        <!-- The to-dos section: heading row, then up to 2 (medium) or 4 (large) task rows added
+             as nested RemoteViews (widget_task_row.xml). GONE when no task shows. -->
+        <LinearLayout
+            android:id="@+id/tasks"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:id="@+id/tasks_heading_row"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:minHeight="15dp"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/tasks_heading"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-medium"
+                    android:singleLine="true"
+                    android:textColor="@color/widget_ink_soft"
+                    android:textSize="11sp" />
+
+                <FrameLayout
+                    android:layout_width="0dp"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="5dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/widget_hairline" />
+
+                <TextView
+                    android:id="@+id/tasks_more"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="5dp"
+                    android:singleLine="true"
+                    android:textColor="@color/widget_ink_soft"
+                    android:textSize="11sp"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/tasks_rows"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/panel_footer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:minHeight="17dp"
+            android:orientation="horizontal"
+            android:paddingTop="1dp">
+
+            <TextView
+                android:id="@+id/footer_tonight"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:singleLine="true"
+                android:textColor="@color/widget_ink_soft"
+                android:textSize="11sp"
+                android:visibility="invisible" />
+
+            <TextView
+                android:id="@+id/footer_later"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:singleLine="true"
+                android:textColor="@color/widget_ink_faint"
+                android:textSize="11sp"
+                android:visibility="gone" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <ImageView
+        android:id="@+id/peek_family"
+        android:layout_width="48dp"
+        android:layout_height="22dp"
+        android:layout_gravity="top|end"
+        android:layout_marginEnd="6dp"
+        android:importantForAccessibility="no"
+        android:scaleType="fitCenter"
+        android:src="@drawable/peek_family" />
+
+    <ImageView
+        android:id="@+id/peek_avatar"
+        android:layout_width="30dp"
+        android:layout_height="22dp"
+        android:layout_gravity="top|end"
+        android:layout_marginEnd="6dp"
+        android:importantForAccessibility="no"
+        android:scaleType="centerCrop"
+        android:visibility="gone" />
+</FrameLayout>

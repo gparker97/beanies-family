@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { firstName } from '@/utils/assignees';
 import { ref, onMounted } from 'vue';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useToday } from '@/composables/useToday';
@@ -68,10 +69,10 @@ onMounted(() => {
     console.warn('[birthday-overlay] localStorage gate unavailable — firing once:', e);
   }
 
-  const firstName = (member.name ?? '').trim().split(/\s+/)[0] ?? '';
+  const first = firstName(member.name);
   const template = t('nook.birthday.overlay');
-  greeting.value = firstName
-    ? template.replace('{name}', firstName)
+  greeting.value = first
+    ? template.replace('{name}', first)
     : template.replace(', {name}', '').replace('{name}', '');
 
   visible.value = true;

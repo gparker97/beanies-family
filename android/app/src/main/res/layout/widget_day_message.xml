@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The full-widget message layout for every size (#130), used ONLY when there is no readable
+  snapshot: signed out (covering eyes + "open beanies" + "sign in to see your day") and unreadable
+  (covering eyes + "open beanies to refresh"). The whole widget is the tap target. "Nothing on
+  today" is not here: it draws inside the panel (widget_part_relaxed.xml).
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <ImageView
+        android:id="@+id/widget_frame"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:importantForAccessibility="no"
+        android:scaleType="fitXY"
+        android:src="@drawable/widget_container_bg" />
+
+    <!-- The near-solid inner surface (95%), inset 10dp: only the rim above thins. -->
+    <ImageView
+        android:id="@+id/widget_inner"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_margin="10dp"
+        android:importantForAccessibility="no"
+        android:scaleType="fitXY"
+        android:src="@drawable/widget_inner_bg" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="14dp">
+
+        <ImageView
+            android:id="@+id/message_image"
+            android:layout_width="wrap_content"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:adjustViewBounds="true"
+            android:importantForAccessibility="no"
+            android:maxHeight="96dp"
+            android:scaleType="fitCenter" />
+
+        <!-- "open beanies" / "open beanies to refresh": Outfit Bold 16sp accent, centred, up to
+             two lines, drawn as a tinted bitmap (WidgetTextBitmaps). -->
+        <ImageView
+            android:id="@+id/message_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:scaleType="fitCenter"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/message_line"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:maxLines="2"
+            android:textColor="@color/widget_ink_soft"
+            android:textSize="11sp"
+            android:visibility="gone" />
+    </LinearLayout>
+</FrameLayout>

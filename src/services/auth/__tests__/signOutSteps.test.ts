@@ -189,3 +189,27 @@ describe('clearAttribution (#118): tier 3 only', () => {
     expect(KEY_MATERIAL_STEPS.has('clearAttribution')).toBe(false);
   });
 });
+
+describe('clearWidgetSnapshot (#130): right after cancelReminders, on every tier that runs it', () => {
+  // Both put family content outside the app (the lock screen, the home screen), so a tier
+  // that cancels reminders and keeps the widget snapshot would leave the family's day on a
+  // signed-out device.
+  const TIERS: Array<[string, readonly SignOutStepName[]]> = [
+    ['trusted', SIGN_OUT_TRUSTED_STEPS],
+    ['untrusted', SIGN_OUT_UNTRUSTED_STEPS],
+    ['clear', SIGN_OUT_CLEAR_STEPS],
+    ['clear (active)', SIGN_OUT_CLEAR_ACTIVE_STEPS],
+    ['cleared elsewhere', SIGN_OUT_CLEARED_ELSEWHERE_STEPS],
+    ['eviction lock', SIGN_OUT_EVICTION_LOCK_STEPS],
+    ['evicted', SIGN_OUT_EVICTED_STEPS],
+  ];
+
+  it.each(TIERS)('%s', (_name, steps) => {
+    expect(steps).toContain('cancelReminders');
+    expect(steps.indexOf('clearWidgetSnapshot')).toBe(steps.indexOf('cancelReminders') + 1);
+  });
+
+  it('is not key material: it never trips the sign-out kit guard', () => {
+    expect(KEY_MATERIAL_STEPS.has('clearWidgetSnapshot')).toBe(false);
+  });
+});

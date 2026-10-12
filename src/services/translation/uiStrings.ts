@@ -10535,6 +10535,20 @@ const STRING_DEFS = {
       'turn on notifications in your device settings to get these. your in-app briefing still shows everything either way.',
   },
   'reminders.openDeviceSettings': { en: 'Open device settings', beanie: 'open device settings' },
+  // Home-screen widgets (#130) - per-device lock-screen privacy
+  'settings.widgets.heading': { en: 'Home-Screen Widgets', beanie: 'home-screen widgets' },
+  'settings.widgets.lockScreenTitles': {
+    en: 'Show event titles on the lock screen',
+    beanie: 'show event titles on the lock screen',
+  },
+  'settings.widgets.lockScreenTitlesHint': {
+    en: 'Turn off to show only times and first names on lock-screen widgets.',
+    beanie: 'turn off to show only times and first names on lock-screen widgets.',
+  },
+  'settings.widgets.learnHow': {
+    en: 'Learn how to add a widget',
+    beanie: 'learn how to add a widget',
+  },
   // Lead-time option labels
   'reminders.lead.atTime': { en: 'At the time', beanie: 'at the time' },
   'reminders.lead.dayBefore': { en: 'The day before', beanie: 'the day before' },
@@ -14696,6 +14710,68 @@ const STRING_DEFS = {
   'cards.seeingMyFriends.done': {
     en: 'A catch-up with friends at least once a month',
     beanie: 'a catch-up with friends at least once a month',
+  },
+  // ── Home-screen widgets (#130, ADR-042). Pre-rendered into the widget snapshot by
+  //    `utils/widgetSnapshot.ts`; native only paints them. Sentence fragments, so lowercase
+  //    `en` as in the mockup. `widget.asOf` and `widget.publishFailed*` are on the
+  //    important-surface floor (uiStrings.test.ts): real nouns in beanie mode. ──
+  'widget.asOf': { en: 'as of {time}', beanie: 'as of {time}' },
+  'widget.later': { en: 'later ›', beanie: 'later ›' },
+  'widget.next': { en: 'next', beanie: 'next' },
+  'widget.myDay': { en: 'my day', beanie: 'my day' },
+  'widget.ourDay': { en: 'our day', beanie: 'our day' },
+  'widget.childsDay': { en: "{name}'s day", beanie: "{name}'s day" },
+  'widget.nothingOnToday': { en: 'nothing on today,', beanie: 'nothing on today,' },
+  'widget.enjoy': { en: 'enjoy', beanie: 'enjoy' },
+  'widget.thingsOnToday.none': { en: 'nothing on today', beanie: 'nothing on today' },
+  'widget.thingsOnToday.one': { en: '{n} thing on today', beanie: '{n} thing on today' },
+  'widget.thingsOnToday.other': { en: '{n} things on today', beanie: '{n} things on today' },
+  'widget.dueToday.one': { en: '{n} due today', beanie: '{n} due today' },
+  'widget.dueToday.other': { en: '{n} due today', beanie: '{n} due today' },
+  'widget.forYouToday.one': { en: '{n} for you today', beanie: '{n} for you today' },
+  'widget.forYouToday.other': { en: '{n} for you today', beanie: '{n} for you today' },
+  'widget.tonight': {
+    en: 'tonight: {meal}, {name} cooks',
+    beanie: 'tonight: {meal}, {name} cooks',
+  },
+  'widget.tonightYouCook': { en: 'tonight: {meal}, you cook', beanie: 'tonight: {meal}, you cook' },
+  'widget.tonightNoCook': { en: 'tonight: {meal}', beanie: 'tonight: {meal}' },
+  'widget.handoff.drives': { en: '{title}, {name} drives', beanie: '{title}, {name} drives' },
+  'widget.handoff.dropoffPickup': {
+    en: '{dropoff} drops off, {pickup} picks up {time}',
+    beanie: '{dropoff} drops off, {pickup} picks up {time}',
+  },
+  'widget.handoff.dropoffPickupNoTime': {
+    en: '{dropoff} drops off, {pickup} picks up',
+    beanie: '{dropoff} drops off, {pickup} picks up',
+  },
+  'widget.handoff.dropoffOnly': { en: '{name} drops off', beanie: '{name} drops off' },
+  'widget.handoff.pickupOnly': { en: '{name} picks up {time}', beanie: '{name} picks up {time}' },
+  'widget.handoff.pickupOnlyNoTime': { en: '{name} picks up', beanie: '{name} picks up' },
+  'widget.pickup': { en: 'pick-up {time}, {name}', beanie: 'pick-up {time}, {name}' },
+  'widget.pickupNoName': { en: 'pick-up {time}', beanie: 'pick-up {time}' },
+  'widget.dueBy': { en: 'by {time}', beanie: 'by {time}' },
+  'widget.tomorrow': { en: 'tomorrow', beanie: 'tomorrow' },
+  'widget.more': { en: '{n} more', beanie: '{n} more' },
+  'widget.tasks': { en: 'to-dos', beanie: 'to-dos' },
+  'widget.tasksAndLists': { en: 'to-dos and lists', beanie: 'to-dos and lists' },
+  'widget.taskOverdue': { en: 'overdue', beanie: 'overdue' },
+  'widget.taskToday': { en: 'today', beanie: 'today' },
+  'widget.listRemaining': { en: '{list}, {n} left', beanie: '{list}, {n} left' },
+  'widget.tripRow': { en: '{name} · {status}', beanie: '{name} · {status}' },
+  'widget.tripStarts': { en: 'starts', beanie: 'starts' },
+  'widget.tripDay': { en: 'day {n} of {total}', beanie: 'day {n} of {total}' },
+  'widget.tripOnNow': { en: 'on now', beanie: 'on now' },
+  'widget.birthdayTurns': { en: '{name} turns {age}', beanie: '{name} turns {age}' },
+  'widget.birthdayOf': { en: "{name}'s birthday", beanie: "{name}'s birthday" },
+  'widget.publishFailed': {
+    en: "Home-screen widget didn't update",
+    beanie: "home-screen widget didn't update",
+  },
+  'widget.publishFailedHelp': {
+    en: 'Your widget may show old plans. Open beanies again later, and if it keeps happening, remove and re-add the widget.',
+    beanie:
+      'your widget may show old plans. open beanies again later, and if it keeps happening, remove and re-add the widget.',
   },
 } satisfies Record<string, StringEntry>;
 

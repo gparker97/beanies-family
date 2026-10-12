@@ -64,15 +64,17 @@ if [ ${#missing[@]} -gt 0 ]; then
 ✖ ${#missing[@]} shipped binary/binaries do NOT carry $REQUIRED_GROUP:
 $(printf '    %s\n' "${missing[@]}")
 
-Sharing to beanies CANNOT work in this build: the app group is the only channel between
-the Share Extension and the app, and without the entitlement the container is nil on both
-sides. It fails silently on device — the share sheet accepts the item and nothing happens.
+Sharing to beanies and the home-screen widgets CANNOT work in this build: the app group
+is the only channel between each extension and the app, and without the entitlement the
+container is nil. It fails silently on device — the share sheet accepts the item and
+nothing happens, and the widgets never show the day.
 
 Read the two dumps above to tell the causes apart:
   - profile GRANTS the group but the binary lacks it  → a signing/export problem here.
   - profile does NOT grant it                          → the App ID in the Developer portal
-    needs App Groups enabled with $REQUIRED_GROUP assigned, for BOTH
-    family.beanies.app and family.beanies.app.ShareExtension.
+    needs App Groups enabled with $REQUIRED_GROUP assigned, for ALL THREE of
+    family.beanies.app, family.beanies.app.ShareExtension and
+    family.beanies.app.BeaniesWidgets.
 MSG
   exit 1
 fi

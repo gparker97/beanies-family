@@ -43,6 +43,7 @@ import { LEAD_OPTIONS, ACTIVITY_LEAD_OPTIONS, formatLeadLabel } from '@/utils/re
 import { HELPFUL_HINT_TYPES, HINT_TYPE_META, HINT_LEAD_OPTIONS } from '@/utils/helpfulHints';
 import { isFlagEnabled } from '@/config/flags';
 import { fillTemplate } from '@/utils/fillTemplate';
+import { HELP_PATHS, openHelpArticle } from '@/utils/helpLinks';
 import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue';
 import type { SupportedTravelType, HelpfulHintType } from '@/types/models';
@@ -178,6 +179,18 @@ async function onActivityLead(value: string | number): Promise<void> {
   }
 }
 
+// Home-screen widgets (#130) - per-device lock-screen privacy. Native only,
+// like the master toggle: widgets do not exist on web.
+const widgetLockScreenTitles = computed(() => settingsStore.widgetLockScreenTitles);
+
+async function onToggleWidgetTitles(enabled: boolean): Promise<void> {
+  try {
+    await settingsStore.setWidgetLockScreenTitles(enabled);
+  } catch {
+    // Setter toasts + re-throws; the toggle reads the persisted value and reverts.
+  }
+}
+
 // OS-permission nudge — native only, and ONLY once a denial has actually been
 // observed. Never on 'prompt' or 'unknown': telling a user notifications are off
 // before we have ever asked is a pre-emptive block warning (CLAUDE.md § Cloud
@@ -227,7 +240,7 @@ async function onOpenExactAlarmSettings(): Promise<void> {
     @save="$emit('close')"
   >
     <template #icon><BeanieBellIcon :size="26" /></template>
-    <p class="dark:text-ink-faint -mt-1 text-sm text-[var(--deep-slate)]/45">
+    <p class="dark:text-ink-faint -mt-1 text-sm text-[var(--color-text-muted)]">
       {{ t('reminders.description') }}
     </p>
 
@@ -242,7 +255,7 @@ async function onOpenExactAlarmSettings(): Promise<void> {
 
     <!-- Lead-time controls -->
     <p
-      class="font-outfit dark:text-ink-faint mt-5 mb-1 text-xs font-semibold tracking-[0.08em] text-[var(--deep-slate)]/40 uppercase"
+      class="font-outfit dark:text-ink-faint mt-5 mb-1 text-xs font-semibold tracking-[0.08em] text-[var(--color-text-muted)] uppercase"
     >
       {{ t('reminders.howMuchNotice') }}
     </p>
@@ -258,7 +271,7 @@ async function onOpenExactAlarmSettings(): Promise<void> {
           <p class="font-outfit dark:text-ink text-sm font-semibold text-[var(--deep-slate)]">
             {{ t('reminders.activities') }}
           </p>
-          <p class="dark:text-ink-faint text-xs text-[var(--deep-slate)]/40">
+          <p class="dark:text-ink-faint text-xs text-[var(--color-text-muted)]">
             {{ t('reminders.activitiesHint') }}
           </p>
         </div>
@@ -301,7 +314,7 @@ async function onOpenExactAlarmSettings(): Promise<void> {
           <p class="font-outfit dark:text-ink text-sm font-semibold text-[var(--deep-slate)]">
             {{ t('reminders.timedTodos') }}
           </p>
-          <p class="dark:text-ink-faint text-xs text-[var(--deep-slate)]/40">
+          <p class="dark:text-ink-faint text-xs text-[var(--color-text-muted)]">
             {{ t('reminders.timedTodosHint') }}
           </p>
         </div>
@@ -318,7 +331,7 @@ async function onOpenExactAlarmSettings(): Promise<void> {
     <!-- #40: Helpful Hints — master (family-synced) + per-device per-type mutes -->
     <template v-if="helpfulHintsFlagOn">
       <p
-        class="font-outfit dark:text-ink-faint mt-5 mb-1 flex items-center gap-1.5 text-xs font-semibold tracking-[0.08em] text-[var(--deep-slate)]/40 uppercase"
+        class="font-outfit dark:text-ink-faint mt-5 mb-1 flex items-center gap-1.5 text-xs font-semibold tracking-[0.08em] text-[var(--color-text-muted)] uppercase"
       >
         {{ t('settings.helpfulHints.title') }}
         <InfoHintBadge :text="t('settings.helpfulHints.perDeviceHint')" />
@@ -342,14 +355,14 @@ async function onOpenExactAlarmSettings(): Promise<void> {
               <p class="font-outfit dark:text-ink text-sm font-semibold text-[var(--deep-slate)]">
                 {{ t(row.labelKey) }}
               </p>
-              <p class="dark:text-ink-faint text-xs text-[var(--deep-slate)]/45">
+              <p class="dark:text-ink-faint text-xs text-[var(--color-text-muted)]">
                 {{ t(row.descKey) }}
               </p>
             </div>
           </div>
           <!-- How far ahead (family-synced) -->
           <div class="mt-2.5 flex items-center justify-between gap-4 pl-[2.1rem]">
-            <span class="dark:text-ink-soft text-xs font-medium text-[var(--deep-slate)]/60">
+            <span class="dark:text-ink-soft text-secondary-400 text-xs font-medium">
               {{ t('settings.helpfulHints.howFarAhead') }}
             </span>
             <BaseSelect
@@ -362,7 +375,7 @@ async function onOpenExactAlarmSettings(): Promise<void> {
           </div>
           <!-- Notify me on this device (per-device) -->
           <div class="mt-2 flex items-center justify-between gap-4 pl-[2.1rem]">
-            <span class="dark:text-ink-soft text-xs font-medium text-[var(--deep-slate)]/60">
+            <span class="dark:text-ink-soft text-secondary-400 text-xs font-medium">
               {{ t('settings.helpfulHints.notifyOnDevice') }}
             </span>
             <ToggleSwitch
@@ -372,6 +385,30 @@ async function onOpenExactAlarmSettings(): Promise<void> {
           </div>
         </div>
       </template>
+    </template>
+
+    <!-- Home-screen widgets (#130) - native only -->
+    <template v-if="isNative()">
+      <p
+        class="font-outfit dark:text-ink-faint mt-5 mb-1 text-xs font-semibold tracking-[0.08em] text-[var(--color-text-muted)] uppercase"
+      >
+        {{ t('settings.widgets.heading') }}
+      </p>
+      <SettingToggleRow
+        testid="widget-lock-screen-titles"
+        :title="t('settings.widgets.lockScreenTitles')"
+        :hint="t('settings.widgets.lockScreenTitlesHint')"
+        :model-value="widgetLockScreenTitles"
+        @update:model-value="onToggleWidgetTitles"
+      />
+      <button
+        type="button"
+        class="dark:text-accent-lift mt-2 cursor-pointer text-xs font-semibold text-[var(--heritage-orange)] underline"
+        data-testid="widget-learn-how"
+        @click="openHelpArticle(HELP_PATHS.homeScreenWidgets, 'widget-settings')"
+      >
+        {{ t('settings.widgets.learnHow') }}
+      </button>
     </template>
 
     <!-- OS-permission nudge (Heritage Orange — never red) -->

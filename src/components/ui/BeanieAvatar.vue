@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
 import { getAvatarImagePath } from '@/constants/avatars';
-import { NEUTRAL_MEMBER_COLOR, resolveMemberColor } from '@/constants/memberColors';
+import {
+  NEUTRAL_MEMBER_COLOR,
+  inkOnMemberColor,
+  isHexColor,
+  relativeLuminance,
+  resolveMemberColor,
+} from '@/constants/memberColors';
 import type { AvatarVariant } from '@/constants/avatars';
 
 /**
@@ -111,26 +117,6 @@ const showInitials = computed(() => props.fallback === 'initials');
 const resolvedColor = computed(() => resolveMemberColor(props.color));
 
 /**
- * Initials are drawn in whichever of white/near-black actually reads on the member's
- * colour, rather than always white.
- *
- * Not one of the six palette hues clears WCAG AA (4.5:1) against white — teal 2.49:1,
- * green 2.28:1, amber 2.15:1, pink 3.53:1, blue 3.68:1, violet 4.23:1 — and three
- * miss even the 3:1 large-text floor. Against Deep Slate they all clear it
- * comfortably. Computed rather than hard-coded so a future palette change cannot
- * quietly reintroduce unreadable initials.
- */
-function relativeLuminance(hex: string): number {
-  const h = hex.replace('#', '');
-  const full = h.length === 3 ? [...h].map((c) => c + c).join('') : h;
-  const ch = [0, 2, 4].map((i) => {
-    const v = parseInt(full.slice(i, i + 2), 16) / 255;
-    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
-  });
-  return 0.2126 * ch[0]! + 0.7152 * ch[1]! + 0.0722 * ch[2]!;
-}
-
-/**
  * A fill too dark to stand out on the dark surfaces (luminance under ~0.12, below 2.4:1
  * against `surface-raised`) gets a hairline edge in dark mode, so the face does not
  * dissolve into the card. None of today's palette hues come close; it is for a colour
@@ -139,15 +125,15 @@ function relativeLuminance(hex: string): number {
 const darkFill = computed(
   () =>
     showInitials.value &&
-    /^#[0-9a-f]{3,8}$/i.test(resolvedColor.value) &&
+    isHexColor(resolvedColor.value) &&
     relativeLuminance(resolvedColor.value) < 0.12
 );
 
-const initialsInk = computed(() =>
-  /^#[0-9a-f]{3,8}$/i.test(resolvedColor.value) && relativeLuminance(resolvedColor.value) > 0.45
-    ? '#2C3E50'
-    : '#ffffff'
-);
+/**
+ * Initials are drawn in whichever of white/Deep Slate actually reads on the member's
+ * colour (`inkOnMemberColor`, shared with the home-screen widget snapshot).
+ */
+const initialsInk = computed(() => inkOnMemberColor(resolvedColor.value));
 
 /**
  * Never an anonymous coloured disc. `initials` defaults to `''` and

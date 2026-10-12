@@ -59,6 +59,7 @@ import * as docClient from '@/services/automerge/worker/docClient';
 import { clearGoogleSessionState, getGoogleAccountEmail } from '@/services/google/googleAuth';
 import { clearDriveConnectionForAccount } from '@/services/google/driveTokenRecovery';
 import { clearLastGoogleAccount } from '@/services/sync/fileHandleStore';
+import { isNative } from '@/services/sync/capabilities';
 import { clearFolderCache } from '@/services/google/driveService';
 import { reportError } from '@/utils/errorReporter';
 import { PASSPHRASE_REFUSAL_KEY } from '@/utils/passphraseStrength';
@@ -3350,6 +3351,18 @@ export const useAuthStore = defineStore('auth', () => {
       },
       beginQuietTeardown: () => docClient.beginQuietTeardown(),
       cancelReminders: () => cancelRemindersForSignOut(),
+      // #130: delete the home-screen widget snapshot so a placed widget shows "open beanies"
+      // rather than the family's day. No step-local catch: `runSignOutSteps` reports a
+      // rejected `clear()` once, under `auth-signout` with `kind: 'clearWidgetSnapshot'`.
+      // Dynamic import, like the reminders step, so the plugin stays out of authStore's graph.
+      clearWidgetSnapshot: async () => {
+        if (!isNative()) return;
+        // Halt first: a publish already in flight must land BEFORE the delete, never after.
+        const { haltWidgetPublishingForSignOut } = await import('@/composables/useWidgetSnapshot');
+        await haltWidgetPublishingForSignOut();
+        const { WidgetBridge } = await import('@/services/native/widgetBridgePlugin');
+        await WidgetBridge.clear();
+      },
       captureDepartingAccount: () => {
         // MUST run before the Google clear nulls the cached email (#62).
         ctx.departedEmail = getGoogleAccountEmail();

@@ -56,6 +56,18 @@ export const SLOT_LABEL_KEYS: Record<MealSlot, UIStringKey> = {
   snack: 'mealPlanner.slot.snack',
 };
 
+/**
+ * "Tonight" from one day's meals, already in slot order: dinner when there is one, else
+ * the LAST meal of the day, so a family that only plans lunches still sees something
+ * forward-looking. `null` for an empty day.
+ *
+ * The one rule, shared by the beanie wall's meal card (`useWallPeripherals`) and the
+ * home-screen widget's "tonight" line (#130), so the kitchen and the phone agree.
+ */
+export function pickTonight<T extends { slot: MealSlot }>(meals: readonly T[]): T | null {
+  return meals.find((m) => m.slot === 'dinner') ?? meals[meals.length - 1] ?? null;
+}
+
 /** Narrows an unknown (a stored value, a model response) to a real slot. */
 export function isMealSlot(value: unknown): value is MealSlot {
   return typeof value === 'string' && (MEAL_SLOTS as readonly string[]).includes(value);

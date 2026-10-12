@@ -124,6 +124,14 @@ export function toAssigneePayload(ids: string[]): {
 }
 
 /**
+ * The first word of a member's name ("Jo" from "Jo Parker"), for the tight surfaces that
+ * only have room for one (the home-screen widget, #130). Total: '' for a blank name.
+ */
+export function firstName(name: string | undefined): string {
+  return (name ?? '').trim().split(/\s+/)[0] ?? '';
+}
+
+/**
  * Human-friendly conjunction list of names:
  *   []                     → ""
  *   ["Ansel"]               → "Ansel"

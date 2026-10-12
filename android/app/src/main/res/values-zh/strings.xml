@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Home-screen widget strings, Simplified Chinese (#130). Glossary: docs/TRANSLATION.md. -->
+<resources>
+    <string name="widget_name">你的一天</string>
+    <string name="widget_description">今天的安排、接送和晚餐，一眼看清。</string>
+    <string name="widget_open_beanies">打开 beanies</string>
+    <string name="widget_sign_in_to_see">登录后查看你的一天</string>
+    <string name="widget_refresh">打开 beanies 以刷新</string>
+    <string name="widget_config_title">“你的一天”小组件</string>
+    <string name="widget_config_whose_day">显示谁的一天</string>
+    <string name="widget_config_my_day">我的一天</string>
+    <string name="widget_config_our_day">我们的一天</string>
+    <string name="widget_config_show">显示内容</string>
+    <string name="widget_config_events">活动</string>
+    <string name="widget_config_whos_where">谁在哪里</string>
+    <string name="widget_config_meals">餐食</string>
+    <string name="widget_config_due">待办和清单</string>
+    <string name="widget_config_coming_up">旅行和生日</string>
+    <string name="widget_config_hint">贴心提示</string>
+    <string name="widget_config_background">背景</string>
+    <string name="widget_config_done">完成</string>
+</resources>

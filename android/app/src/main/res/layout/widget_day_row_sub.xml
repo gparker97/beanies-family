@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The handoff sub-line under a row (#130): drop-off and pick-up avatars in the time column, then
+  "Sam drops off, Jo picks up 12:30". sub_time_ghost is an INVISIBLE copy of the row's time so the
+  column is exactly as wide as the row above it on every API level (API 31+ also sets it).
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/sub_root"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:minHeight="15dp"
+    android:orientation="horizontal">
+
+    <FrameLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="6dp">
+
+        <TextView
+            android:id="@+id/sub_time_ghost"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:includeFontPadding="false"
+            android:minWidth="30dp"
+            android:singleLine="true"
+            android:textSize="11sp"
+            android:visibility="invisible" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:id="@+id/sub_avatar_1"
+                android:layout_width="13dp"
+                android:layout_height="13dp"
+                android:importantForAccessibility="no"
+                android:scaleType="fitCenter"
+                android:visibility="gone" />
+
+            <ImageView
+                android:id="@+id/sub_avatar_2"
+                android:layout_width="13dp"
+                android:layout_height="13dp"
+                android:layout_marginStart="1dp"
+                android:importantForAccessibility="no"
+                android:scaleType="fitCenter"
+                android:visibility="gone" />
+        </LinearLayout>
+    </FrameLayout>
+
+    <TextView
+        android:id="@+id/sub_text"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:ellipsize="end"
+        android:singleLine="true"
+        android:textColor="@color/widget_ink_soft"
+        android:textSize="11sp" />
+</LinearLayout>

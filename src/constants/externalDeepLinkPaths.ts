@@ -37,6 +37,20 @@ const REDIRECT_TARGETS = ['/pod'];
 /** Pre-auth paths. NOT entity links — they carry their own marker semantics. */
 const AUTH_PATHS = ['/join', '/welcome'];
 
+/**
+ * Page links the home-screen widgets open (#130): the date column and "later ›" open the
+ * Nook, the "tonight" line opens the meal planner. PAGE paths, not entities, so they are
+ * not in `ENTITY_DEEP_LINKS` (which is keyed by an id param). `/meal-planner` is
+ * flag-gated; the router guard redirects it when `mealPlanner` is off, and the widget only
+ * mints it when the flag is on.
+ */
+export const WIDGET_PAGE_PATHS = { nook: '/nook', mealPlanner: '/meal-planner' } as const;
+
 export const EXTERNAL_DEEP_LINK_PATHS: readonly string[] = [
-  ...new Set([...ENTITY_PATHS, ...REDIRECT_TARGETS, ...AUTH_PATHS]),
+  ...new Set([
+    ...ENTITY_PATHS,
+    ...REDIRECT_TARGETS,
+    ...AUTH_PATHS,
+    ...Object.values(WIDGET_PAGE_PATHS),
+  ]),
 ].sort();

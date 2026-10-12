@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-10-12
+
+### Added
+
+- Home-screen widgets on iPhone (iOS 17 and later) and Android: your family's day at a glance, with the date, your calendar (and the rest of the week when today is quiet), who drops off and picks up, tonight's dinner, and your to-dos and lists underneath. Each widget can show "my day" or "our day" and which parts to include; every tap opens beanies on the right screen. iPhone also gets lock-screen widgets, and a new setting in Settings, Reminders hides event titles there. The widget's copy of the day stays on the phone and is removed at sign-out.
+
 ## 2026-10-10
 
 ### Fixed

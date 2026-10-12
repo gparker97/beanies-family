@@ -27,5 +27,6 @@ class MainViewController: CAPBridgeViewController {
         // Order is irrelevant; keep it matching MainActivity.java so the two read as a pair.
         bridge?.registerPluginInstance(BiometricKeystorePlugin())
         bridge?.registerPluginInstance(ShareIntentPlugin())
+        bridge?.registerPluginInstance(WidgetBridgePlugin())
     }
 }

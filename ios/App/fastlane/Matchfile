@@ -1,6 +1,6 @@
 # match storage configuration (#64 signing).
 #
-# The certificate and both App Store profiles live ENCRYPTED in a private git repo,
+# The certificate and the App Store profiles (app + extensions) live ENCRYPTED in a private git repo,
 # separate from this one. `MATCH_PASSWORD` is the encryption passphrase and is the only
 # thing standing between that repo and a usable signing identity - it is a GitHub secret
 # and is not recoverable if lost (match cannot decrypt without it; the recovery is to

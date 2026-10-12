@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The relaxed state (#130): the whole look-ahead is clear and no task shows. Drawn INSIDE the agenda
+  panel where the calendar would be, matching iOS: the date column, peek and footer all stay. Included by the medium /
+  large panel (widget_part_panel.xml) and the small panel; GONE until the renderer shows it in
+  place of the list (RemoteViews cannot add or remove views, so both are always present).
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/relaxed"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:visibility="gone"
+    tools:ignore="MergeRootFrame">
+
+    <ImageView
+        android:id="@+id/relaxed_hug"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:layout_gravity="bottom|end"
+        android:importantForAccessibility="no"
+        android:scaleType="fitCenter"
+        android:src="@drawable/widget_family_hug" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|start"
+        android:orientation="vertical"
+        android:paddingTop="2dp">
+
+        <!-- Caveat Bold 20sp accent, drawn as a tinted bitmap (WidgetTextBitmaps). -->
+        <ImageView
+            android:id="@+id/relaxed_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:scaleType="fitStart" />
+
+        <TextView
+            android:id="@+id/relaxed_enjoy"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fontFamily="sans-serif-medium"
+            android:singleLine="true"
+            android:textColor="@color/widget_ink"
+            android:textSize="13sp" />
+    </LinearLayout>
+</FrameLayout>

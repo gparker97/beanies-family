@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  One row of the fixed to-dos section (#130, round 9 row key), added into `tasks_rows` as a nested
+  RemoteViews so each row owns its dot views. The lead column is as wide as the calendar's time
+  column (API 31+) and holds the glyph: a to-do's purple ring (filled when timed), a hint's bean,
+  a list's checklist mark. Then the title, the tag ("overdue" in the accent, "Thu 16" in quieter
+  ink; a word, never colour alone) and whose it is.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/task_root"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:minHeight="19dp"
+    android:orientation="horizontal">
+
+    <FrameLayout
+        android:id="@+id/task_lead"
+        android:layout_width="30dp"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="6dp">
+
+        <!-- centerInside: the 9dp rings stay 9dp, the 12dp glyphs and the bean fit the box. -->
+        <ImageView
+            android:id="@+id/task_glyph"
+            android:layout_width="12dp"
+            android:layout_height="12dp"
+            android:layout_gravity="start|center_vertical"
+            android:importantForAccessibility="no"
+            android:scaleType="centerInside" />
+    </FrameLayout>
+
+    <TextView
+        android:id="@+id/task_title"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:ellipsize="end"
+        android:fontFamily="sans-serif-medium"
+        android:singleLine="true"
+        android:textColor="@color/widget_ink"
+        android:textSize="11sp" />
+
+    <TextView
+        android:id="@+id/task_tag"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="4dp"
+        android:singleLine="true"
+        android:textColor="@color/widget_accent_text"
+        android:textSize="11sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <include
+        layout="@layout/widget_part_dot"
+        android:layout_width="14dp"
+        android:layout_height="14dp"
+        android:layout_marginStart="4dp" />
+</LinearLayout>

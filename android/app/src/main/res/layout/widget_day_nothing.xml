@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The calendar's first line when today has no rows (#130, round 9 `.cav9`): "nothing on today"
+     (tasks are waiting) or "nothing on today, enjoy", Caveat Bold in the accent, drawn as a tinted
+     bitmap (WidgetTextBitmaps): fontFamily is ignored in launcher-hosted RemoteViews. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:minHeight="19dp"
+    tools:ignore="MergeRootFrame">
+
+    <ImageView
+        android:id="@+id/nothing_line"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="start|center_vertical"
+        android:scaleType="fitStart" />
+</FrameLayout>

@@ -73,6 +73,8 @@
                 <data android:scheme="https" android:host="app.beanies.family" android:path="/goals" />
                 <data android:scheme="https" android:host="app.beanies.family" android:path="/join" />
                 <data android:scheme="https" android:host="app.beanies.family" android:path="/lists" />
+                <data android:scheme="https" android:host="app.beanies.family" android:path="/meal-planner" />
+                <data android:scheme="https" android:host="app.beanies.family" android:path="/nook" />
                 <data android:scheme="https" android:host="app.beanies.family" android:path="/pod" />
                 <data android:scheme="https" android:host="app.beanies.family" android:path="/todo" />
                 <data android:scheme="https" android:host="app.beanies.family" android:path="/transactions" />
@@ -137,6 +139,53 @@
             android:grantUriPermissions="true">
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
         </provider>
+
+        <!-- #130 "Your day" home-screen widget (ADR-042). NOT exported: the widget broadcasts
+             (APPWIDGET_UPDATE, options changed, deleted, disabled) are sent by the system, which
+             reaches a non-exported receiver, as do the time-zone / clock / locale broadcasts, and
+             RERENDER comes only from the provider's own AlarmManager PendingIntent. So no other
+             app can drive a render. -->
+        <receiver
+            android:name=".widget.DayWidgetProvider"
+            android:exported="false"
+            android:label="@string/widget_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="family.beanies.app.widget.RERENDER" />
+            </intent-filter>
+            <!-- "Today" is the device-local day: a zone or clock change moves midnight, and a
+                 locale change re-reads the native strings. System broadcasts, manifest-exempt. -->
+            <intent-filter>
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.LOCALE_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_day_info" />
+        </receiver>
+
+        <!-- The widget's scrolling agenda list. Bound only by the system (BIND_REMOTEVIEWS). -->
+        <service
+            android:name=".widget.DayWidgetService"
+            android:exported="false"
+            android:permission="android.permission.BIND_REMOTEVIEWS" />
+
+        <!-- The widget's configuration screen. EXPORTED because the launcher starts it, so it
+             treats EXTRA_APPWIDGET_ID as untrusted: the id must name a widget bound to our
+             provider before anything is written (DayWidgetConfigActivity). -->
+        <activity
+            android:name=".widget.DayWidgetConfigActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:label="@string/widget_config_title"
+            android:theme="@style/WidgetConfigTheme">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
     </application>
 
     <!-- Permissions -->

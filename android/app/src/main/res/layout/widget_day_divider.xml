@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A later day's divider in the calendar look-ahead (#130, round 9 `.dv9`): "Wed 15" in the
+     accent, "tomorrow" in quieter ink when it is the device's tomorrow, then a hairline. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:minHeight="19dp"
+    android:orientation="horizontal"
+    android:paddingTop="2dp">
+
+    <TextView
+        android:id="@+id/divider_date"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:singleLine="true"
+        android:textColor="@color/widget_accent_text"
+        android:textSize="11sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/divider_tomorrow"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="5dp"
+        android:fontFamily="sans-serif-medium"
+        android:singleLine="true"
+        android:textColor="@color/widget_ink_soft"
+        android:textSize="11sp"
+        android:visibility="gone" />
+
+    <FrameLayout
+        android:layout_width="0dp"
+        android:layout_height="1dp"
+        android:layout_marginStart="6dp"
+        android:layout_weight="1"
+        android:background="@drawable/widget_hairline" />
+</LinearLayout>

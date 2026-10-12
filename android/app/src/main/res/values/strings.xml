@@ -1,7 +1,36 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">beanies.family</string>
-    <string name="title_activity_main">beanies.family</string>
-    <string name="package_name">family.beanies.app</string>
-    <string name="custom_url_scheme">family.beanies.app</string>
+    <!-- Identifiers and the brand name are never translated (values-zh carries only the widget strings). -->
+    <string name="app_name" translatable="false">beanies.family</string>
+    <string name="title_activity_main" translatable="false">beanies.family</string>
+    <string name="package_name" translatable="false">family.beanies.app</string>
+    <string name="custom_url_scheme" translatable="false">family.beanies.app</string>
+
+    <!--
+      Home-screen widget (#130). Only the strings that cannot come from the JS-built snapshot live
+      here: the widget picker entry, the states shown when there is NO readable snapshot, and the
+      configuration screen (it must work before any snapshot exists). Everything else the widget
+      shows is pre-rendered through t() in src/utils/widgetSnapshot.ts. zh in values-zh/strings.xml.
+    -->
+    <string name="widget_name">Your day</string>
+    <string name="widget_description">Today\'s plans, handoffs and dinner at a glance.</string>
+    <string name="widget_open_beanies">open beanies</string>
+    <string name="widget_sign_in_to_see">sign in to see your day</string>
+    <string name="widget_refresh">open beanies to refresh</string>
+    <string name="widget_config_title">Your day widget</string>
+    <string name="widget_config_whose_day">Whose day</string>
+    <string name="widget_config_my_day">My day</string>
+    <string name="widget_config_our_day">Our day</string>
+    <string name="widget_config_show">Show</string>
+    <string name="widget_config_events">Events</string>
+    <string name="widget_config_whos_where">Who\'s where</string>
+    <string name="widget_config_meals">Meals</string>
+    <string name="widget_config_due">To-dos and lists</string>
+    <string name="widget_config_coming_up">Trips and birthdays</string>
+    <string name="widget_config_hint">Helpful hint</string>
+    <string name="widget_config_background">Background</string>
+    <string name="widget_config_opacity_100" translatable="false">100%</string>
+    <string name="widget_config_opacity_70" translatable="false">70%</string>
+    <string name="widget_config_opacity_40" translatable="false">40%</string>
+    <string name="widget_config_done">Done</string>
 </resources>

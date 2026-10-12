@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  "Your day" home-screen widget (#130). Default placement 4x2; resizable from 2x2 to 4x3 and
+  beyond (WidgetSizes classifies the placed size into the three layouts). updatePeriodMillis is 0:
+  the app's publish and the provider's own midnight / row-end alarm drive every refresh.
+  targetCell*, previewLayout and widgetFeatures are Android 12+ and ignored below it.
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:configure="family.beanies.app.widget.DayWidgetConfigActivity"
+    android:description="@string/widget_description"
+    android:initialLayout="@layout/widget_day_medium"
+    android:minWidth="250dp"
+    android:minHeight="110dp"
+    android:minResizeWidth="110dp"
+    android:minResizeHeight="110dp"
+    android:previewImage="@drawable/peek_family"
+    android:previewLayout="@layout/widget_day_preview"
+    android:resizeMode="horizontal|vertical"
+    android:targetCellWidth="4"
+    android:targetCellHeight="2"
+    android:updatePeriodMillis="0"
+    android:widgetCategory="home_screen"
+    android:widgetFeatures="reconfigurable|configuration_optional"
+    tools:ignore="UnusedAttribute" />

@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The 14dp member dot beside an agenda row (#130), shared by the list rows and the small widget's
+  "next" row. A member paints dot_fill tinted with the snapshot's `dot.color` and the initial in
+  `dot.ink`; a family-wide event shows the hug icon on the family-chip circle; a child's done row
+  shows the green tick. dot_ring is the dark-mode line-strong ring (transparent in light).
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/dot_frame"
+    android:layout_width="14dp"
+    android:layout_height="14dp"
+    tools:ignore="MergeRootFrame">
+
+    <ImageView
+        android:id="@+id/dot_fill"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:importantForAccessibility="no"
+        android:src="@drawable/widget_dot" />
+
+    <ImageView
+        android:id="@+id/dot_family"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/widget_family_chip"
+        android:importantForAccessibility="no"
+        android:padding="1.5dp"
+        android:scaleType="fitCenter"
+        android:src="@drawable/widget_family_hug"
+        android:visibility="gone" />
+
+    <!-- The initial must fit a 14dp circle, so it sits below the 11sp text floor: it is a
+         glyph inside an icon, always paired with the member colour and never the only cue. -->
+    <TextView
+        android:id="@+id/dot_initial"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:importantForAccessibility="no"
+        android:includeFontPadding="false"
+        android:maxLines="1"
+        android:textSize="8sp"
+        android:textStyle="bold"
+        tools:ignore="SmallSp" />
+
+    <ImageView
+        android:id="@+id/dot_ring"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:importantForAccessibility="no"
+        android:src="@drawable/widget_dot_ring" />
+
+    <ImageView
+        android:id="@+id/dot_tick"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:importantForAccessibility="no"
+        android:src="@drawable/widget_tick"
+        android:visibility="gone" />
+</FrameLayout>

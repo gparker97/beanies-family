@@ -17,6 +17,7 @@ import { installInboundLinkListener } from '@/services/share/inboundLinkBridge';
 import { isSameOriginReturnPath } from '@/services/google/redirectState';
 import { isNative } from '@/services/sync/capabilities';
 import { useLocalNotifications } from '@/composables/useLocalNotifications';
+import { useWidgetSnapshot } from '@/composables/useWidgetSnapshot';
 import { useHelpfulHints } from '@/composables/useHelpfulHints';
 import { useCardReminders } from '@/composables/useCardReminders';
 import { useNotifications } from '@/composables/useNotifications';
@@ -1954,6 +1955,10 @@ installInboundLinkListener(
 // generated on-device from already-decrypted data (no server sees the schedule).
 // No-op on web. See ADR-029.
 useLocalNotifications();
+
+// Home-screen widgets (#130): publish today's and tomorrow's family day to the native
+// widgets on data change and foreground (debounced). Native only; no-op on web.
+useWidgetSnapshot();
 
 // Helpful Hints (#40): auto-generate gentle prep to-dos before upcoming
 // birthdays, parties, and trips (each carrying a #55 notification). Gated behind

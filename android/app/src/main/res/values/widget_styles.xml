@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The widget configuration screen (#130). DayNight follows the system light/dark setting;
+         controls take the brand accent (accent-lift in dark through values-night). -->
+    <style name="WidgetConfigTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/widget_accent_text</item>
+        <item name="colorPrimaryDark">@color/widget_container</item>
+        <item name="colorAccent">@color/widget_accent_text</item>
+        <item name="android:windowBackground">@color/widget_container</item>
+        <item name="android:textColorPrimary">@color/widget_ink</item>
+        <item name="android:textColorSecondary">@color/widget_ink_soft</item>
+    </style>
+
+    <style name="WidgetConfigHeading">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">20dp</item>
+        <item name="android:layout_marginBottom">4dp</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:textColor">@color/widget_ink_soft</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="WidgetConfigOption">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:minHeight">48dp</item>
+        <item name="android:textColor">@color/widget_ink</item>
+        <item name="android:textSize">16sp</item>
+    </style>
+</resources>

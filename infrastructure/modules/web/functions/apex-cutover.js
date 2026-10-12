@@ -44,6 +44,8 @@ var APP_PATHS = [
   // in src/constants/externalDeepLinkPaths.ts.
   '/pod',
   '/lists',
+  // #130: the home-screen widget's page link for "tonight" (`/nook` is already above).
+  '/meal-planner',
 ];
 
 function isAppPath(path) {

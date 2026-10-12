@@ -22,6 +22,39 @@
 		BE1A0000000000000000AA02 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = BE1A0000000000000000AA01 /* PrivacyInfo.xcprivacy */; };
 		BE1A0000000000000000DD04 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE1A0000000000000000DD03 /* ShareViewController.swift */; };
 		BE1A0000000000000000DD02 /* ShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = BE1A0000000000000000DD01 /* ShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		BE2B00000000000000000023 /* BeaniesWidgetsBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2B00000000000000000001 /* BeaniesWidgetsBundle.swift */; };
+		BE2B00000000000000000024 /* DayWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2B00000000000000000002 /* DayWidget.swift */; };
+		BE2B00000000000000000025 /* DayWidgetConfigIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2B00000000000000000003 /* DayWidgetConfigIntent.swift */; };
+		BE2B00000000000000000026 /* DayAccessoryWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2B00000000000000000004 /* DayAccessoryWidget.swift */; };
+		BE2B00000000000000000027 /* WidgetSnapshotStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2B00000000000000000005 /* WidgetSnapshotStore.swift */; };
+		BE2B00000000000000000028 /* WidgetFill.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2B00000000000000000006 /* WidgetFill.swift */; };
+		BE2B00000000000000000029 /* WidgetFonts.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2B00000000000000000007 /* WidgetFonts.swift */; };
+		BE2B0000000000000000002A /* WidgetLinks.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2B00000000000000000008 /* WidgetLinks.swift */; };
+		BE2B0000000000000000002B /* WidgetStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2B00000000000000000009 /* WidgetStyle.swift */; };
+		BE2B0000000000000000002C /* WidgetTimeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2B0000000000000000000A /* WidgetTimeline.swift */; };
+		BE2B0000000000000000002D /* SampleSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2B0000000000000000000B /* SampleSnapshot.swift */; };
+		BE2B0000000000000000002E /* DayWidgetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2B0000000000000000000C /* DayWidgetView.swift */; };
+		BE2B0000000000000000002F /* DayColumnView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2B0000000000000000000D /* DayColumnView.swift */; };
+		BE2B00000000000000000030 /* AgendaPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2B0000000000000000000E /* AgendaPanelView.swift */; };
+		BE2B00000000000000000031 /* AgendaRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2B0000000000000000000F /* AgendaRowView.swift */; };
+		BE2B00000000000000000032 /* PeekView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2B00000000000000000010 /* PeekView.swift */; };
+		BE2B00000000000000000033 /* TaskSectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2B00000000000000000011 /* TaskSectionView.swift */; };
+		BE2B00000000000000000034 /* SmallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2B00000000000000000012 /* SmallView.swift */; };
+		BE2B00000000000000000035 /* MessageStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2B00000000000000000013 /* MessageStateView.swift */; };
+		BE2B00000000000000000036 /* WidgetTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2B00000000000000000014 /* WidgetTextView.swift */; };
+		BE2B00000000000000000037 /* BeaniesBrand.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2B0000000000000000001E /* BeaniesBrand.swift */; };
+		BE2B00000000000000000038 /* BeaniesBrand.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2B0000000000000000001E /* BeaniesBrand.swift */; };
+		BE2B00000000000000000039 /* BeaniesBrand.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2B0000000000000000001E /* BeaniesBrand.swift */; };
+		BE2B0000000000000000003A /* WidgetBridgePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2B0000000000000000001F /* WidgetBridgePlugin.swift */; };
+		BE2B0000000000000000003B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BE2B00000000000000000015 /* Assets.xcassets */; };
+		BE2B0000000000000000003C /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = BE2B00000000000000000016 /* Localizable.xcstrings */; };
+		BE2B0000000000000000003D /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = BE2B00000000000000000017 /* PrivacyInfo.xcprivacy */; };
+		BE2B0000000000000000003E /* Outfit-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = BE2B00000000000000000018 /* Outfit-Bold.ttf */; };
+		BE2B0000000000000000003F /* Outfit-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = BE2B00000000000000000019 /* Outfit-SemiBold.ttf */; };
+		BE2B00000000000000000040 /* Caveat-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = BE2B0000000000000000001A /* Caveat-Bold.ttf */; };
+		BE2B00000000000000000041 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BE2B00000000000000000020 /* WidgetKit.framework */; };
+		BE2B00000000000000000042 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BE2B00000000000000000021 /* SwiftUI.framework */; };
+		BE2B00000000000000000043 /* BeaniesWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = BE2B00000000000000000022 /* BeaniesWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -31,6 +64,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = BE1A0000000000000000DD08;
 			remoteInfo = ShareExtension;
+		};
+		BE2B00000000000000000051 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = BE2B00000000000000000049;
+			remoteInfo = BeaniesWidgets;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -42,6 +82,7 @@
 			dstSubfolderSpec = 13;
 			files = (
 				BE1A0000000000000000DD02 /* ShareExtension.appex in Embed Foundation Extensions */,
+				BE2B00000000000000000043 /* BeaniesWidgets.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -69,6 +110,40 @@
 		BE1A0000000000000000DD03 /* ShareViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
 		BE1A0000000000000000DD05 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		BE1A0000000000000000DD06 /* ShareExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ShareExtension.entitlements; sourceTree = "<group>"; };
+		BE2B00000000000000000001 /* BeaniesWidgetsBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeaniesWidgetsBundle.swift; sourceTree = "<group>"; };
+		BE2B00000000000000000002 /* DayWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayWidget.swift; sourceTree = "<group>"; };
+		BE2B00000000000000000003 /* DayWidgetConfigIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayWidgetConfigIntent.swift; sourceTree = "<group>"; };
+		BE2B00000000000000000004 /* DayAccessoryWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayAccessoryWidget.swift; sourceTree = "<group>"; };
+		BE2B00000000000000000005 /* WidgetSnapshotStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetSnapshotStore.swift; sourceTree = "<group>"; };
+		BE2B00000000000000000006 /* WidgetFill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetFill.swift; sourceTree = "<group>"; };
+		BE2B00000000000000000007 /* WidgetFonts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetFonts.swift; sourceTree = "<group>"; };
+		BE2B00000000000000000008 /* WidgetLinks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetLinks.swift; sourceTree = "<group>"; };
+		BE2B00000000000000000009 /* WidgetStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetStyle.swift; sourceTree = "<group>"; };
+		BE2B0000000000000000000A /* WidgetTimeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetTimeline.swift; sourceTree = "<group>"; };
+		BE2B0000000000000000000B /* SampleSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleSnapshot.swift; sourceTree = "<group>"; };
+		BE2B0000000000000000000C /* DayWidgetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayWidgetView.swift; sourceTree = "<group>"; };
+		BE2B0000000000000000000D /* DayColumnView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayColumnView.swift; sourceTree = "<group>"; };
+		BE2B0000000000000000000E /* AgendaPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgendaPanelView.swift; sourceTree = "<group>"; };
+		BE2B0000000000000000000F /* AgendaRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgendaRowView.swift; sourceTree = "<group>"; };
+		BE2B00000000000000000010 /* PeekView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PeekView.swift; sourceTree = "<group>"; };
+		BE2B00000000000000000011 /* TaskSectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskSectionView.swift; sourceTree = "<group>"; };
+		BE2B00000000000000000012 /* SmallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmallView.swift; sourceTree = "<group>"; };
+		BE2B00000000000000000013 /* MessageStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageStateView.swift; sourceTree = "<group>"; };
+		BE2B00000000000000000014 /* WidgetTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetTextView.swift; sourceTree = "<group>"; };
+		BE2B00000000000000000015 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		BE2B00000000000000000016 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
+		BE2B00000000000000000017 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		BE2B00000000000000000018 /* Outfit-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Outfit-Bold.ttf"; sourceTree = "<group>"; };
+		BE2B00000000000000000019 /* Outfit-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Outfit-SemiBold.ttf"; sourceTree = "<group>"; };
+		BE2B0000000000000000001A /* Caveat-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Caveat-Bold.ttf"; sourceTree = "<group>"; };
+		BE2B0000000000000000001B /* OFL.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = OFL.txt; sourceTree = "<group>"; };
+		BE2B0000000000000000001C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		BE2B0000000000000000001D /* BeaniesWidgets.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = BeaniesWidgets.entitlements; sourceTree = "<group>"; };
+		BE2B0000000000000000001E /* BeaniesBrand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeaniesBrand.swift; sourceTree = "<group>"; };
+		BE2B0000000000000000001F /* WidgetBridgePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetBridgePlugin.swift; sourceTree = "<group>"; };
+		BE2B00000000000000000020 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		BE2B00000000000000000021 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		BE2B00000000000000000022 /* BeaniesWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = BeaniesWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -87,6 +162,15 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		BE2B0000000000000000004B /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BE2B00000000000000000041 /* WidgetKit.framework in Frameworks */,
+				BE2B00000000000000000042 /* SwiftUI.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -96,6 +180,9 @@
 				958DCC722DB07C7200EA8C5F /* debug.xcconfig */,
 				504EC3061FED79650016851F /* App */,
 				BE1A0000000000000000DD07 /* ShareExtension */,
+				BE2B00000000000000000044 /* BeaniesWidgets */,
+				BE2B00000000000000000047 /* Shared */,
+				BE2B00000000000000000048 /* Frameworks */,
 				504EC3051FED79650016851F /* Products */,
 			);
 			sourceTree = "<group>";
@@ -116,6 +203,7 @@
 			children = (
 				504EC3041FED79650016851F /* App.app */,
 				BE1A0000000000000000DD01 /* ShareExtension.appex */,
+				BE2B00000000000000000022 /* BeaniesWidgets.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -126,6 +214,7 @@
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				BE1A0000000000000000CC03 /* ShareIntentPlugin.swift */,
+				BE2B0000000000000000001F /* WidgetBridgePlugin.swift */,
 				BE1A0000000000000000CC05 /* MainViewController.swift */,
 				BE1A0000000000000000CC01 /* BiometricKeystorePlugin.swift */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
@@ -138,6 +227,75 @@
 				50B271D01FEDC1A000F3C39B /* public */,
 			);
 			path = App;
+			sourceTree = "<group>";
+		};
+		BE2B00000000000000000047 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				BE2B0000000000000000001E /* BeaniesBrand.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		BE2B00000000000000000044 /* BeaniesWidgets */ = {
+			isa = PBXGroup;
+			children = (
+				BE2B00000000000000000001 /* BeaniesWidgetsBundle.swift */,
+				BE2B00000000000000000002 /* DayWidget.swift */,
+				BE2B00000000000000000003 /* DayWidgetConfigIntent.swift */,
+				BE2B00000000000000000004 /* DayAccessoryWidget.swift */,
+				BE2B00000000000000000005 /* WidgetSnapshotStore.swift */,
+				BE2B00000000000000000006 /* WidgetFill.swift */,
+				BE2B00000000000000000007 /* WidgetFonts.swift */,
+				BE2B00000000000000000008 /* WidgetLinks.swift */,
+				BE2B00000000000000000009 /* WidgetStyle.swift */,
+				BE2B0000000000000000000A /* WidgetTimeline.swift */,
+				BE2B0000000000000000000B /* SampleSnapshot.swift */,
+				BE2B00000000000000000045 /* Views */,
+				BE2B00000000000000000046 /* Fonts */,
+				BE2B00000000000000000015 /* Assets.xcassets */,
+				BE2B00000000000000000016 /* Localizable.xcstrings */,
+				BE2B00000000000000000017 /* PrivacyInfo.xcprivacy */,
+				BE2B0000000000000000001C /* Info.plist */,
+				BE2B0000000000000000001D /* BeaniesWidgets.entitlements */,
+			);
+			path = BeaniesWidgets;
+			sourceTree = "<group>";
+		};
+		BE2B00000000000000000045 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				BE2B0000000000000000000C /* DayWidgetView.swift */,
+				BE2B0000000000000000000D /* DayColumnView.swift */,
+				BE2B0000000000000000000E /* AgendaPanelView.swift */,
+				BE2B0000000000000000000F /* AgendaRowView.swift */,
+				BE2B00000000000000000010 /* PeekView.swift */,
+				BE2B00000000000000000011 /* TaskSectionView.swift */,
+				BE2B00000000000000000012 /* SmallView.swift */,
+				BE2B00000000000000000013 /* MessageStateView.swift */,
+				BE2B00000000000000000014 /* WidgetTextView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		BE2B00000000000000000046 /* Fonts */ = {
+			isa = PBXGroup;
+			children = (
+				BE2B00000000000000000018 /* Outfit-Bold.ttf */,
+				BE2B00000000000000000019 /* Outfit-SemiBold.ttf */,
+				BE2B0000000000000000001A /* Caveat-Bold.ttf */,
+				BE2B0000000000000000001B /* OFL.txt */,
+			);
+			path = Fonts;
+			sourceTree = "<group>";
+		};
+		BE2B00000000000000000048 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				BE2B00000000000000000020 /* WidgetKit.framework */,
+				BE2B00000000000000000021 /* SwiftUI.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -156,6 +314,7 @@
 			);
 			dependencies = (
 				BE1A0000000000000000DD10 /* PBXTargetDependency */,
+				BE2B00000000000000000050 /* PBXTargetDependency */,
 			);
 			name = App;
 			packageProductDependencies = (
@@ -182,6 +341,23 @@
 			productReference = BE1A0000000000000000DD01 /* ShareExtension.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		BE2B00000000000000000049 /* BeaniesWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BE2B0000000000000000004D /* Build configuration list for PBXNativeTarget "BeaniesWidgets" */;
+			buildPhases = (
+				BE2B0000000000000000004A /* Sources */,
+				BE2B0000000000000000004B /* Frameworks */,
+				BE2B0000000000000000004C /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = BeaniesWidgets;
+			productName = BeaniesWidgets;
+			productReference = BE2B00000000000000000022 /* BeaniesWidgets.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -200,6 +376,10 @@
 						CreatedOnToolsVersion = 16.0;
 						ProvisioningStyle = Automatic;
 					};
+					BE2B00000000000000000049 = {
+						CreatedOnToolsVersion = 16.0;
+						ProvisioningStyle = Automatic;
+					};
 				};
 			};
 			buildConfigurationList = 504EC2FF1FED79650016851F /* Build configuration list for PBXProject "App" */;
@@ -209,6 +389,7 @@
 			knownRegions = (
 				en,
 				Base,
+				"zh-Hans",
 			);
 			mainGroup = 504EC2FB1FED79650016851F;
 			packageReferences = (
@@ -220,6 +401,7 @@
 			targets = (
 				504EC3031FED79650016851F /* App */,
 				BE1A0000000000000000DD08 /* ShareExtension */,
+				BE2B00000000000000000049 /* BeaniesWidgets */,
 			);
 		};
 /* End PBXProject section */
@@ -247,6 +429,19 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		BE2B0000000000000000004C /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BE2B0000000000000000003B /* Assets.xcassets in Resources */,
+				BE2B0000000000000000003C /* Localizable.xcstrings in Resources */,
+				BE2B0000000000000000003D /* PrivacyInfo.xcprivacy in Resources */,
+				BE2B0000000000000000003E /* Outfit-Bold.ttf in Resources */,
+				BE2B0000000000000000003F /* Outfit-SemiBold.ttf in Resources */,
+				BE2B00000000000000000040 /* Caveat-Bold.ttf in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -258,6 +453,8 @@
 				BE1A0000000000000000CC04 /* ShareIntentPlugin.swift in Sources */,
 				BE1A0000000000000000CC06 /* MainViewController.swift in Sources */,
 				BE1A0000000000000000CC02 /* BiometricKeystorePlugin.swift in Sources */,
+				BE2B0000000000000000003A /* WidgetBridgePlugin.swift in Sources */,
+				BE2B00000000000000000038 /* BeaniesBrand.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -266,6 +463,35 @@
 			buildActionMask = 2147483647;
 			files = (
 				BE1A0000000000000000DD04 /* ShareViewController.swift in Sources */,
+				BE2B00000000000000000039 /* BeaniesBrand.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BE2B0000000000000000004A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BE2B00000000000000000023 /* BeaniesWidgetsBundle.swift in Sources */,
+				BE2B00000000000000000024 /* DayWidget.swift in Sources */,
+				BE2B00000000000000000025 /* DayWidgetConfigIntent.swift in Sources */,
+				BE2B00000000000000000026 /* DayAccessoryWidget.swift in Sources */,
+				BE2B00000000000000000027 /* WidgetSnapshotStore.swift in Sources */,
+				BE2B00000000000000000028 /* WidgetFill.swift in Sources */,
+				BE2B00000000000000000029 /* WidgetFonts.swift in Sources */,
+				BE2B0000000000000000002A /* WidgetLinks.swift in Sources */,
+				BE2B0000000000000000002B /* WidgetStyle.swift in Sources */,
+				BE2B0000000000000000002C /* WidgetTimeline.swift in Sources */,
+				BE2B0000000000000000002D /* SampleSnapshot.swift in Sources */,
+				BE2B0000000000000000002E /* DayWidgetView.swift in Sources */,
+				BE2B0000000000000000002F /* DayColumnView.swift in Sources */,
+				BE2B00000000000000000030 /* AgendaPanelView.swift in Sources */,
+				BE2B00000000000000000031 /* AgendaRowView.swift in Sources */,
+				BE2B00000000000000000032 /* PeekView.swift in Sources */,
+				BE2B00000000000000000033 /* TaskSectionView.swift in Sources */,
+				BE2B00000000000000000034 /* SmallView.swift in Sources */,
+				BE2B00000000000000000035 /* MessageStateView.swift in Sources */,
+				BE2B00000000000000000036 /* WidgetTextView.swift in Sources */,
+				BE2B00000000000000000037 /* BeaniesBrand.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -276,6 +502,11 @@
 			isa = PBXTargetDependency;
 			target = BE1A0000000000000000DD08 /* ShareExtension */;
 			targetProxy = BE1A0000000000000000DD11 /* PBXContainerItemProxy */;
+		};
+		BE2B00000000000000000050 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = BE2B00000000000000000049 /* BeaniesWidgets */;
+			targetProxy = BE2B00000000000000000051 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -500,6 +731,54 @@
 			};
 			name = Release;
 		};
+		BE2B0000000000000000004E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = BeaniesWidgets/BeaniesWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = BeaniesWidgets/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = family.beanies.app.BeaniesWidgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		BE2B0000000000000000004F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = BeaniesWidgets/BeaniesWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = BeaniesWidgets/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = family.beanies.app.BeaniesWidgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -526,6 +805,15 @@
 			buildConfigurations = (
 				BE1A0000000000000000DD0E /* Debug */,
 				BE1A0000000000000000DD0F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		BE2B0000000000000000004D /* Build configuration list for PBXNativeTarget "BeaniesWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BE2B0000000000000000004E /* Debug */,
+				BE2B0000000000000000004F /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

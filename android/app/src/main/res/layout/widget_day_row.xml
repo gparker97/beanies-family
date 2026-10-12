@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  One calendar row in the scrolling list (#130): the lead column (the time, or a trip's plane /
+  a birthday's cake in the accent over an empty time view that keeps the column's width), the
+  title, the member dot. row_title_accent is the accent layer of a title emphasis ("day 3 of 6"),
+  stacked on row_title with the same text (WidgetText.accentLayer); GONE otherwise.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/row_root"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:baselineAligned="false"
+    android:gravity="center_vertical"
+    android:minHeight="19dp"
+    android:orientation="horizontal">
+
+    <FrameLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="6dp">
+
+        <TextView
+            android:id="@+id/row_time"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:includeFontPadding="false"
+            android:minWidth="30dp"
+            android:singleLine="true"
+            android:textColor="@color/widget_ink"
+            android:textSize="11sp" />
+
+        <ImageView
+            android:id="@+id/row_glyph"
+            android:layout_width="12dp"
+            android:layout_height="12dp"
+            android:layout_gravity="start|center_vertical"
+            android:importantForAccessibility="no"
+            android:scaleType="fitCenter"
+            android:visibility="gone" />
+    </FrameLayout>
+
+    <FrameLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1">
+
+        <TextView
+            android:id="@+id/row_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:fontFamily="sans-serif-medium"
+            android:singleLine="true"
+            android:textColor="@color/widget_ink"
+            android:textSize="11sp" />
+
+        <TextView
+            android:id="@+id/row_title_accent"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:fontFamily="sans-serif-medium"
+            android:importantForAccessibility="no"
+            android:singleLine="true"
+            android:textColor="@color/widget_accent_text"
+            android:textSize="11sp"
+            android:visibility="gone" />
+    </FrameLayout>
+
+    <include
+        layout="@layout/widget_part_dot"
+        android:layout_width="14dp"
+        android:layout_height="14dp"
+        android:layout_marginStart="4dp" />
+</LinearLayout>

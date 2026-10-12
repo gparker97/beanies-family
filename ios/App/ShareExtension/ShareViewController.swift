@@ -44,26 +44,8 @@ class ShareViewController: UIViewController {
     /// Matches the plugin's cap and the JS `AI_PICKER_MAX_BYTES`.
     private static let maxBytes = 25 * 1024 * 1024
 
-    // ── Brand tokens ──────────────────────────────────────────────────────────────
-    //
-    // Hand-written because an extension is a separate process and cannot reach the app's
-    // theme. Kept to the CIG palette exactly; see docs/brand/beanies-cig-v2.html.
-    private enum Brand {
-        static let orange = UIColor(red: 0.945, green: 0.365, blue: 0.133, alpha: 1) // #F15D22
-        static let terracotta = UIColor(red: 0.902, green: 0.494, blue: 0.133, alpha: 1) // #E67E22
-        static let slate = UIColor(red: 0.173, green: 0.243, blue: 0.314, alpha: 1) // #2C3E50
-        static let silk = UIColor(red: 0.682, green: 0.839, blue: 0.945, alpha: 1) // #AED6F1
-        static let cloud = UIColor(red: 0.973, green: 0.976, blue: 0.980, alpha: 1) // #F8F9FA
-
-        /// Outfit is not in the extension bundle. SF Rounded is the closest system face —
-        /// geometric and friendly where the default SF is neutral — so the sheet reads as
-        /// beanies rather than as a system dialog. Falls back gracefully if unavailable.
-        static func font(_ size: CGFloat, _ weight: UIFont.Weight) -> UIFont {
-            let base = UIFont.systemFont(ofSize: size, weight: weight)
-            guard let rounded = base.fontDescriptor.withDesign(.rounded) else { return base }
-            return UIFont(descriptor: rounded, size: size)
-        }
-    }
+    // Brand tokens (`Brand.orange`, `Brand.font`, ...) live in ios/App/Shared/BeaniesBrand.swift,
+    // compiled into this target, the app and the widgets, so the palette is written once.
 
     /// What was captured, as the sheet needs to show it. Assembled from the share itself —
     /// no network, no AI, nothing that could make the user wait.

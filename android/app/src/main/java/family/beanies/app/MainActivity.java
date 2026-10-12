@@ -26,6 +26,8 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(ShareIntentPlugin.class);
         // Play install referrer (campaign attribution for native installs); read once by JS.
         registerPlugin(InstallReferrerPlugin.class);
+        // #130 home-screen widget: the app publishes its day snapshot and clears it at sign-out.
+        registerPlugin(WidgetBridgePlugin.class);
         super.onCreate(savedInstanceState);
         // Portrait on phones, free rotation on tablets. The manifest used to carry a
         // blanket android:screenOrientation="portrait", which locked tablets too — but a

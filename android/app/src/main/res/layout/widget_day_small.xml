@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  "Your day", 2x2 (#130): "Sat" + numeral, the handwritten count line, and the next item that has
+  not ended yet (from a later day, named, when today has none), or the relaxed block on a clear week. The 28dp peek sits on the panel: its top is 8dp below the 14dp padding and the
+  panel starts 34dp below it, so the peek ends 2dp inside the panel.
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <ImageView
+        android:id="@+id/widget_frame"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:importantForAccessibility="no"
+        android:scaleType="fitXY"
+        android:src="@drawable/widget_container_bg" />
+
+    <!-- The near-solid inner surface (95%), inset 10dp: only the rim above thins. -->
+    <ImageView
+        android:id="@+id/widget_inner"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_margin="10dp"
+        android:importantForAccessibility="no"
+        android:scaleType="fitXY"
+        android:src="@drawable/widget_inner_bg" />
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:padding="14dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:id="@+id/date_column"
+                android:layout_width="wrap_content"
+                android:layout_height="30dp"
+                android:gravity="bottom"
+                android:orientation="horizontal">
+
+                <!-- "Sat" (Outfit Bold 14sp, accent) and the numeral (Outfit Bold 28sp, ink) are
+                     tinted bitmaps (WidgetTextBitmaps): fontFamily is ignored in RemoteViews. -->
+                <ImageView
+                    android:id="@+id/date_weekday"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="3dp"
+                    android:scaleType="fitStart" />
+
+                <ImageView
+                    android:id="@+id/date_numeral"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="5dp"
+                    android:scaleType="fitStart" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/panel"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_marginTop="4dp"
+                android:layout_weight="1"
+                android:background="@drawable/widget_panel_bg"
+                android:orientation="vertical"
+                android:paddingStart="8dp"
+                android:paddingTop="5dp"
+                android:paddingEnd="8dp"
+                android:paddingBottom="5dp">
+
+                <!-- Caveat Bold 20sp count line (bitmap; shrinks to 15sp before ellipsizing). -->
+                <ImageView
+                    android:id="@+id/small_things"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:scaleType="fitStart" />
+
+                <LinearLayout
+                    android:id="@+id/small_next"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                    <!-- "next", or "next · Wed 15" for a later day: its own line (mockup 9 (d)),
+                         so a day name never pushes the time and dot out of a 2x2. -->
+                    <TextView
+                        android:id="@+id/small_next_label"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:ellipsize="end"
+                        android:singleLine="true"
+                        android:textColor="@color/widget_ink_soft"
+                        android:textSize="11sp" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/small_next_time"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginEnd="6dp"
+                            android:includeFontPadding="false"
+                            android:singleLine="true"
+                            android:textColor="@color/widget_ink"
+                            android:textSize="20sp"
+                            android:textStyle="bold" />
+
+                        <include
+                            layout="@layout/widget_part_dot"
+                            android:layout_width="14dp"
+                            android:layout_height="14dp" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/small_next_title"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:fontFamily="sans-serif-medium"
+                        android:singleLine="true"
+                        android:textColor="@color/widget_ink"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <include
+                    layout="@layout/widget_part_relaxed"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1" />
+
+                <TextView
+                    android:id="@+id/date_as_of"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:singleLine="true"
+                    android:textColor="@color/widget_ink_faint"
+                    android:textSize="11sp"
+                    android:visibility="gone" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <ImageView
+            android:id="@+id/peek_family"
+            android:layout_width="60dp"
+            android:layout_height="28dp"
+            android:layout_gravity="top|end"
+            android:layout_marginTop="8dp"
+            android:layout_marginEnd="6dp"
+            android:importantForAccessibility="no"
+            android:scaleType="fitCenter"
+            android:src="@drawable/peek_family" />
+
+        <ImageView
+            android:id="@+id/peek_avatar"
+            android:layout_width="38dp"
+            android:layout_height="28dp"
+            android:layout_gravity="top|end"
+            android:layout_marginTop="8dp"
+            android:layout_marginEnd="6dp"
+            android:importantForAccessibility="no"
+            android:scaleType="centerCrop"
+            android:visibility="gone" />
+    </FrameLayout>
+</FrameLayout>

@@ -13,7 +13,8 @@
  * and schedule. See `docs/plans/2026-07-23-notifications-end-to-end-native.md`.
  */
 import { isContinuationDay } from '@/utils/calendar/occurrence';
-import { computed, type ComputedRef } from 'vue';
+import { computed, effectScope, type ComputedRef } from 'vue';
+import { getActivePinia } from 'pinia';
 import type {
   FamilyMember,
   TodoItem,
@@ -543,10 +544,31 @@ export function buildReminderSchedule(
   return { reminders: truncated ? all.slice(0, MAX_SCHEDULED) : all, truncated, skipped, gated };
 }
 
-export function useScheduledReminders(): {
+export interface ScheduledReminderSources {
   reminderInput: ComputedRef<ReminderInput | null>;
   prefs: ComputedRef<ReminderPrefs>;
-} {
+}
+
+/**
+ * One shared instance per Pinia. Two consumers read this input on native (the OS reminder
+ * scheduler and the home-screen widget publisher, #130), and each fresh call would build its
+ * own computed and repeat the 14-day occurrence + travel expansion on every data change. The
+ * instance lives in a detached effect scope so it outlives whichever caller created it; a new
+ * Pinia (a test, or a fresh app) gets a fresh instance. No active Pinia: not cached.
+ */
+const sharedSources = new WeakMap<object, ScheduledReminderSources>();
+
+export function useScheduledReminders(): ScheduledReminderSources {
+  const pinia = getActivePinia();
+  if (!pinia) return createScheduledReminderSources();
+  const cached = sharedSources.get(pinia);
+  if (cached) return cached;
+  const sources = effectScope(true).run(createScheduledReminderSources)!;
+  sharedSources.set(pinia, sources);
+  return sources;
+}
+
+function createScheduledReminderSources(): ScheduledReminderSources {
   const settingsStore = useSettingsStore();
   const familyStore = useFamilyStore();
   const activityStore = useActivityStore();

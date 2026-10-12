@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { firstName } from '@/utils/assignees';
 import { computed } from 'vue';
 import { useHolidayStore } from '@/stores/holidayStore';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -39,12 +40,12 @@ const surface = computed<DisplaySurface | null>(() => {
     const todayMonth = Number(monthStr);
     const todayDay = Number(dayStr);
     if (dob.month === todayMonth && dob.day === todayDay) {
-      const firstName = (member.name ?? '').trim().split(/\s+/)[0] ?? '';
+      const first = firstName(member.name);
       const greetingTemplate = t('nook.holiday.greeting.birthday');
       return {
         theme: 'birthday',
-        greeting: firstName
-          ? greetingTemplate.replace('{name}', firstName)
+        greeting: first
+          ? greetingTemplate.replace('{name}', first)
           : greetingTemplate.replace(', {name}', '').replace('{name}', ''),
         emoji: '🎂',
         caption: t('nook.holiday.birthday.caption'),

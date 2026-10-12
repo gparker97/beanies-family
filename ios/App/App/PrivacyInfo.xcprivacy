@@ -154,6 +154,9 @@
 			<key>NSPrivacyAccessedAPITypeReasons</key>
 			<array>
 				<string>CA92.1</string>
+				<!-- 1C8F.1 (#130): App Group defaults shared with the widget extension
+				     (WidgetBridgePlugin reads and clears the widget's read-outcome token). -->
+				<string>1C8F.1</string>
 			</array>
 		</dict>
 		<dict>

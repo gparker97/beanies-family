@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Home-screen widgets (#130). A WidgetKit extension: the app writes the day as a JSON
+  snapshot into the App Group (WidgetBridgePlugin.swift) and these widgets only paint it.
+
+  UIAppFonts is load-bearing: without it Font.custom("Outfit-Bold") silently falls back to
+  SF and nothing reports it. The three faces are OFL (see Fonts/OFL.txt, not bundled).
+
+  The extension's deployment target is iOS 17 (AppIntentConfiguration for the picker); the
+  app stays at 15, so on iOS 15/16 the widget is simply not offered.
+-->
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleDisplayName</key>
+	<string>beanies.family</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>XPC!</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>NSExtension</key>
+	<dict>
+		<key>NSExtensionPointIdentifier</key>
+		<string>com.apple.widgetkit-extension</string>
+	</dict>
+	<key>UIAppFonts</key>
+	<array>
+		<string>Outfit-Bold.ttf</string>
+		<string>Outfit-SemiBold.ttf</string>
+		<string>Caveat-Bold.ttf</string>
+	</array>
+</dict>
+</plist>

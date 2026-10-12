@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The widget's outer frame. Painted by an ImageView so the background-opacity choice can thin it
+     with setImageAlpha while the colour still resolves light/dark at inflation (#130). -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="@color/widget_container" />
+    <corners android:radius="28dp" />
+</shape>

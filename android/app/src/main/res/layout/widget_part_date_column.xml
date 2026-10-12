@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The 52dp date column of the medium and large widgets (#130): numeral, weekday (accent), month,
+  and at the foot the "as of" stale line, the audience label and the due count. Taps open the
+  Nook. Starts 7dp below the 5dp root padding = 12dp below the widget's top edge.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/date_column"
+    android:layout_width="52dp"
+    android:layout_height="match_parent"
+    android:layout_marginTop="7dp"
+    android:layout_marginEnd="8dp"
+    android:orientation="vertical">
+
+    <!-- Outfit Bold 32sp numeral, drawn as a tinted bitmap (WidgetTextBitmaps): fontFamily is
+         ignored in launcher-hosted RemoteViews. -->
+    <ImageView
+        android:id="@+id/date_numeral"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:scaleType="fitStart" />
+
+    <!-- A long weekday ("Wednesday") shrinks to fit the column rather than ellipsizing
+         (API 26+; API 24/25 clip). -->
+    <TextView
+        android:id="@+id/date_weekday"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:autoSizeMaxTextSize="11sp"
+        android:autoSizeMinTextSize="10sp"
+        android:autoSizeStepGranularity="0.5sp"
+        android:autoSizeTextType="uniform"
+        android:fontFamily="sans-serif-medium"
+        android:maxLines="1"
+        android:textColor="@color/widget_accent_text"
+        android:textSize="11sp"
+        tools:ignore="UnusedAttribute" />
+
+    <TextView
+        android:id="@+id/date_month"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:ellipsize="end"
+        android:singleLine="true"
+        android:textColor="@color/widget_ink_soft"
+        android:textSize="11sp" />
+
+    <!-- Spacer: a plain View is not a RemoteViews class, so it is an empty FrameLayout. -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        tools:ignore="UselessLeaf" />
+
+    <TextView
+        android:id="@+id/date_as_of"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:maxLines="2"
+        android:textColor="@color/widget_ink_faint"
+        android:textSize="11sp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/date_audience"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:maxLines="2"
+        android:textColor="@color/widget_ink_soft"
+        android:textSize="11sp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/date_due"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:maxLines="2"
+        android:textColor="@color/widget_ink_soft"
+        android:textSize="11sp"
+        android:visibility="gone" />
+</LinearLayout>

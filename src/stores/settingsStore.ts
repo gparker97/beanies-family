@@ -117,6 +117,10 @@ export const useSettingsStore = defineStore('settings', () => {
   const beanieLabEnabled = computed(() => globalSettings.value.beanieLabEnabled ?? false);
   // ── OS reminder prefs (#55) — device-scoped, never family-synced (GlobalSettings). ──
   const remindersEnabled = computed(() => globalSettings.value.remindersEnabled ?? true);
+  /** #130: "Show event titles on the lock screen" for the home-screen widgets; on by default. */
+  const widgetLockScreenTitles = computed(
+    () => globalSettings.value.widgetLockScreenTitles ?? true
+  );
   /** When the beanie wall sleeps on this device; always complete (see `resolveWallSleep`). */
   const wallSleep = computed(() => resolveWallSleep(globalSettings.value.wall?.sleep));
   const todoReminderLead = computed(
@@ -762,6 +766,8 @@ export const useSettingsStore = defineStore('settings', () => {
     });
   const setRemindersEnabled = (enabled: boolean) =>
     persistGlobalSetting('reminders.title', 'remindersEnabled', enabled);
+  const setWidgetLockScreenTitles = (enabled: boolean) =>
+    persistGlobalSetting('reminders.title', 'widgetLockScreenTitles', enabled);
   const setTodoReminderLead = (minutes: number) =>
     persistGlobalSetting('reminders.title', 'todoReminderLead', minutes);
   const setActivityReminderLead = (minutes: number) =>
@@ -1238,6 +1244,7 @@ export const useSettingsStore = defineStore('settings', () => {
     soundEnabled,
     beanieLabEnabled,
     remindersEnabled,
+    widgetLockScreenTitles,
     wallSleep,
     todoReminderLead,
     activityReminderLead,
@@ -1292,6 +1299,7 @@ export const useSettingsStore = defineStore('settings', () => {
     setSoundEnabled,
     setBeanieLabEnabled,
     setRemindersEnabled,
+    setWidgetLockScreenTitles,
     setWallSleep,
     setTodoReminderLead,
     setActivityReminderLead,

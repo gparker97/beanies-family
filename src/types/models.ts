@@ -81,6 +81,7 @@ export interface GlobalSettings {
   // ── OS reminder preferences (#55) — device-scoped; local notifications live
   //    per-device, so these are never family-synced. See reminderSchedule.ts. ──
   remindersEnabled?: boolean; // master on/off for OS local notifications; on by default
+  widgetLockScreenTitles?: boolean; // #130: show event titles on the lock-screen widgets (default on); off → times and first names only. Device-scoped, never family-synced
   todoReminderLead?: number; // minutes before a timed to-do's due time (default DEFAULT_TODO_LEAD)
   activityReminderLead?: number; // DEFAULT lead for NEW activities + duty reminders (default DEFAULT_ACTIVITY_LEAD); each activity can still override it
   travelReminderLeads?: Partial<Record<SupportedTravelType, number>>; // per-travel-type override; missing type → DEFAULT_TRAVEL_LEADS

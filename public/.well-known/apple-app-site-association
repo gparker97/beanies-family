@@ -16,6 +16,8 @@
           { "/": "/goals" },
           { "/": "/join" },
           { "/": "/lists" },
+          { "/": "/meal-planner" },
+          { "/": "/nook" },
           { "/": "/pod" },
           { "/": "/todo" },
           { "/": "/transactions" },

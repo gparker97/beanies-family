@@ -332,3 +332,50 @@ describe('inboundLinkBridge — entity deep links and gate telemetry', () => {
     expect(navigate).toHaveBeenCalledWith('/activities');
   });
 });
+
+describe('inboundLinkBridge: opens from a home-screen widget (#130)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getLaunchUrl.mockResolvedValue(null);
+    try {
+      sessionStorage.clear();
+    } catch {
+      /* happy-dom without storage: the bridge tolerates this too */
+    }
+  });
+
+  function widgetEvents(): Record<string, unknown>[] {
+    return logEvent.mock.calls
+      .map((c) => c[0] as { surface: string; context: Record<string, unknown> })
+      .filter((e) => e.surface === 'home-widget')
+      .map((e) => e.context);
+  }
+
+  it('logs a known size as `kind`, and still routes the link with its query', async () => {
+    const { navigate } = install();
+
+    await fireWarm('https://app.beanies.family/nook?src=widget&w=ios-medium');
+
+    expect(navigate).toHaveBeenCalledWith('/nook?src=widget&w=ios-medium');
+    expect(widgetEvents()).toEqual([{ kind: 'ios-medium', route_path: '/nook' }]);
+  });
+
+  it('logs `widget_param_invalid` for an unknown size, and NEVER the value', async () => {
+    const { navigate } = install();
+
+    await fireWarm('https://app.beanies.family/todo?src=widget&w=attacker-text-here');
+
+    expect(navigate).toHaveBeenCalled();
+    const events = widgetEvents();
+    expect(events).toEqual([{ error_code: 'widget_param_invalid' }]);
+    expect(JSON.stringify(logEvent.mock.calls)).not.toContain('attacker-text-here');
+  });
+
+  it('logs nothing widget-shaped for an ordinary deep link', async () => {
+    install();
+
+    await fireWarm('https://app.beanies.family/activities?activity=abc');
+
+    expect(widgetEvents()).toEqual([]);
+  });
+});

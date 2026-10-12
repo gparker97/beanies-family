@@ -310,6 +310,162 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
     ],
   },
   {
+    slug: 'home-screen-widgets',
+    category: 'features',
+    title: "Put your family's day on your home screen",
+    excerpt:
+      "A beanies widget shows today's plan right on your phone's Home Screen, so you can see what's on without opening the app, and one tap takes you to the right screen.",
+    icon: '\u{1F4F1}',
+    readTime: 4,
+    updatedDate: '2026-10-12',
+    sections: [
+      {
+        type: 'paragraph',
+        content:
+          "Most days you only need a quick look: what's on, who is dropping off, what's for dinner. A beanies widget puts that on your Home Screen, so you can glance at your phone and know. Tap any part of it and beanies opens on the right screen.",
+      },
+      {
+        type: 'heading',
+        content: 'Add the widget on iPhone',
+        level: 2,
+        id: 'add-on-iphone',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'Touch and hold an empty spot on your Home Screen until the icons start to wiggle.',
+          'Tap the <strong>+</strong> in the corner.',
+          'Search for <strong>beanies</strong>.',
+          'Swipe to choose a size, then tap <strong>Add Widget</strong>.',
+        ],
+      },
+      {
+        type: 'heading',
+        content: 'Add the widget on Android',
+        level: 2,
+        id: 'add-on-android',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'Touch and hold an empty spot on your Home screen.',
+          'Tap <strong>Widgets</strong>.',
+          'Find <strong>beanies</strong> and drag the widget onto your screen.',
+          'Choose what it shows on the setup screen, then save.',
+        ],
+      },
+      {
+        type: 'infoBox',
+        content:
+          'Widgets are per-device: adding one to your phone does not add one to anyone else’s. Each device shows its own, from your family plan. On iPhone, widgets need iOS 17 or later.',
+        title: 'Set per device',
+        icon: '\u{1F4F1}',
+      },
+      {
+        type: 'heading',
+        content: 'Three sizes',
+        level: 2,
+        id: 'sizes',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>Small</strong> shows the date, how many things are on today, and the next thing coming up, even when that is later in the week.',
+          "<strong>Medium</strong> shows your calendar, with drop-offs and pick-ups, tonight's dinner, and your to-dos underneath.",
+          '<strong>Large</strong> shows the same, with room for more of the week and more to-dos.',
+        ],
+      },
+      {
+        type: 'heading',
+        content: 'Your calendar first, your to-dos underneath',
+        level: 2,
+        id: 'calendar-and-to-dos',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'The widget is always laid out the same way. <strong>The calendar is at the top:</strong> today’s activities, a trip you are on ("day 3 of 6") and birthdays. When today is quiet, the rest of the week fills the space, each day under its own date, with <strong>tomorrow</strong> marked, so you always know when you are looking ahead.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          '<strong>To-dos and lists sit underneath</strong>, in the same place every time. To-dos, helpful hints, reminders and lists share one order: overdue first, then what is due today, then anything without a date, then what is due later this week. When there are to-dos, they always keep a little room, and "2 more" tells you how many did not fit.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'On Android the calendar scrolls through the week while the to-dos stay put. On iPhone, widgets cannot scroll, so the widget shows as much as fits and <strong>later ›</strong> opens beanies for the rest. Nothing is ever squeezed in: if it does not fit, it is left out, so the text stays easy to read.',
+      },
+      {
+        type: 'heading',
+        content: 'My day or our day',
+        level: 2,
+        id: 'my-day-or-our-day',
+      },
+      {
+        type: 'paragraph',
+        content:
+          '<strong>My day</strong> shows what is yours today, the same as your daily briefing on the Nook. <strong>Our day</strong> shows the whole family’s day, like the beanie wall. You can also pick which parts show: the plan, who is where, dinner, to-dos and lists, trips and birthdays, and helpful hints.',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          '<strong>iPhone:</strong> touch and hold the widget, then tap <strong>Edit Widget</strong>.',
+          '<strong>Android:</strong> you choose when you add it. To change it later, touch and hold the widget, then tap its settings or reconfigure option.',
+        ],
+      },
+      {
+        type: 'heading',
+        content: 'Lock-screen widgets on iPhone',
+        level: 2,
+        id: 'lock-screen',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'On iPhone you can also add a small beanies widget to your Lock Screen, showing your next pick-up, the next thing on, or a count for the day. If you would rather keep event titles private when the phone is locked, open <strong>Settings → Reminders</strong> and turn off <strong>Show event titles on the lock screen</strong>. The widget then shows only times and first names.',
+      },
+      {
+        type: 'heading',
+        content: 'What a child sees',
+        level: 2,
+        id: 'children',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'When a child is signed in, the widget shows only their own day, in bigger type. It does not show other family members, to-dos or hints.',
+      },
+      {
+        type: 'heading',
+        content: 'Taps and the occasional hiccup',
+        level: 2,
+        id: 'taps-and-hiccups',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          'Tap an event to open it, dinner to open the meal planner, or what is due to open your to-dos.',
+          'Tap <strong>later ›</strong> to open beanies on the Nook.',
+          'If the widget says <strong>open beanies to refresh</strong>, it could not read its information. Opening beanies fixes it.',
+          'If it says <strong>sign in to see your day</strong>, you are signed out. Open beanies and sign in.',
+        ],
+      },
+      {
+        type: 'callout',
+        icon: '\u{1F512}',
+        title: 'Private to your phone',
+        content:
+          'The widget’s copy of the day stays on your phone. It never includes money information, and it is removed when you sign out.',
+      },
+    ],
+  },
+  {
     slug: 'helpful-hints',
     category: 'features',
     title: 'Helpful Hints — gentle reminders before the things that matter',

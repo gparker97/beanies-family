@@ -80,44 +80,65 @@ if (missing.length > 0) {
 console.log(`✓ all ${swiftFiles.length} Swift file(s) under ios/App/ are in Compile Sources`);
 
 /**
- * GUARD 2 — the app group + marker names must MATCH across the two targets.
+ * GUARD 2 — names shared across targets must MATCH in every file that uses them.
  *
- * The Share Extension and the app are separate processes that share nothing but the app
- * group container, so these strings are necessarily duplicated: there is no shared module
- * to hold them and no compiler check that they agree. A typo in either one does not fail
- * the build, does not throw at runtime, and does not log — the extension writes into one
- * container while the app reads another, and every share silently vanishes.
+ * An extension and the app are separate processes that share nothing but the app group
+ * container, so these strings are necessarily duplicated: there is no shared module to
+ * hold them (the App Group string is deliberately NOT in ios/App/Shared/BeaniesBrand.swift,
+ * because then this guard would pass on "absent everywhere" and check nothing) and no
+ * compiler check that they agree. A typo in one copy does not fail the build, does not
+ * throw at runtime, and does not log — one side writes into one container while the other
+ * reads another, and the feature silently vanishes.
+ *
+ * Two pairs today:
+ *  - the Share Extension and ShareIntentPlugin (#64): every share vanishes on drift;
+ *  - the widget extension's reader and WidgetBridgePlugin (#130): every widget shows
+ *    "open beanies" (or "open beanies to refresh") on drift, and the read-failure relay
+ *    goes quiet.
+ * `appGroup` must agree across all four files.
  *
  * That is precisely the failure mode this file already exists to catch for Compile Sources.
  */
-const CROSS_TARGET_CONSTANTS = [
-  { name: 'appGroup', pattern: /private static let appGroup = "([^"]+)"/ },
-  { name: 'inboxName', pattern: /private static let inboxName = "([^"]+)"/ },
-  { name: 'traceName', pattern: /private static let traceName = "([^"]+)"/ },
-];
-
-const PAIRED_FILES = {
-  extension: 'ios/App/ShareExtension/ShareViewController.swift',
-  app: 'ios/App/App/ShareIntentPlugin.swift',
+const SHARE_PAIR = {
+  'share extension': 'ios/App/ShareExtension/ShareViewController.swift',
+  'share plugin': 'ios/App/App/ShareIntentPlugin.swift',
+};
+const WIDGET_PAIR = {
+  'widget reader': 'ios/App/BeaniesWidgets/WidgetSnapshotStore.swift',
+  'widget plugin': 'ios/App/App/WidgetBridgePlugin.swift',
 };
 
-const sources = Object.fromEntries(
-  Object.entries(PAIRED_FILES).map(([role, rel]) => [role, readFileSync(join(ROOT, rel), 'utf8')])
-);
+const constant = (name) => new RegExp(`private static let ${name} = "([^"]+)"`);
+
+const CROSS_TARGET_CONSTANTS = [
+  { name: 'appGroup', pattern: constant('appGroup'), files: { ...SHARE_PAIR, ...WIDGET_PAIR } },
+  { name: 'inboxName', pattern: constant('inboxName'), files: SHARE_PAIR },
+  { name: 'traceName', pattern: constant('traceName'), files: SHARE_PAIR },
+  { name: 'snapshotPath', pattern: constant('snapshotPath'), files: WIDGET_PAIR },
+  { name: 'readOutcomeKey', pattern: constant('readOutcomeKey'), files: WIDGET_PAIR },
+];
+
+const sourceCache = new Map();
+const sourceOf = (rel) => {
+  if (!sourceCache.has(rel)) sourceCache.set(rel, readFileSync(join(ROOT, rel), 'utf8'));
+  return sourceCache.get(rel);
+};
 
 const mismatches = [];
-for (const { name, pattern } of CROSS_TARGET_CONSTANTS) {
-  const found = Object.fromEntries(
-    Object.entries(sources).map(([role, text]) => [role, pattern.exec(text)?.[1]])
-  );
-  // A constant absent from BOTH is fine (it may not exist yet); absent from one, or present
-  // in both with different values, is the drift this guard is for.
-  const values = Object.values(found);
+for (const { name, pattern, files } of CROSS_TARGET_CONSTANTS) {
+  const found = Object.entries(files).map(([role, rel]) => [
+    role,
+    pattern.exec(sourceOf(rel))?.[1],
+  ]);
+  // A constant absent from EVERY file of its group is fine (it may not exist yet); absent
+  // from one but present in another, or present with different values, is the drift this
+  // guard is for.
+  const values = found.map(([, v]) => v);
   if (values.every((v) => v === undefined)) continue;
   if (values.some((v) => v === undefined) || new Set(values).size > 1) {
     mismatches.push(
       `    ${name}: ` +
-        Object.entries(found)
+        found
           .map(([role, v]) => `${role}=${v === undefined ? '(not found)' : `"${v}"`}`)
           .join('  vs  ')
     );
@@ -125,19 +146,24 @@ for (const { name, pattern } of CROSS_TARGET_CONSTANTS) {
 }
 
 if (mismatches.length > 0) {
+  const allFiles = [
+    ...new Set(CROSS_TARGET_CONSTANTS.flatMap(({ files }) => Object.values(files))),
+  ];
   console.error(
-    `\n\u2716 the Share Extension and the app disagree on ${mismatches.length} shared constant(s):\n` +
+    `\n\u2716 the extensions and the app disagree on ${mismatches.length} shared constant(s):\n` +
       mismatches.join('\n') +
-      '\n\nThese name the SAME app-group container from two separate targets. When they differ,\n' +
-      'the extension writes where the app never reads: every share vanishes with no error,\n' +
-      'on device and in the logs. Make them identical in both files:\n' +
-      `    ${PAIRED_FILES.extension}\n    ${PAIRED_FILES.app}\n`
+      '\n\nThese name the SAME app-group container (and the files and keys inside it) from\n' +
+      'separate targets. When they differ, one side writes where the other never reads:\n' +
+      'shares vanish and widgets go blank with no error, on device and in the logs. Make\n' +
+      'them identical in every file:\n' +
+      allFiles.map((f) => `    ${f}`).join('\n') +
+      '\n'
   );
   process.exit(1);
 }
 
 console.log(
-  `\u2713 the Share Extension and the app agree on all ${CROSS_TARGET_CONSTANTS.length} shared constants`
+  `\u2713 the extensions and the app agree on all ${CROSS_TARGET_CONSTANTS.length} shared constants`
 );
 
 /**
@@ -240,5 +266,78 @@ if (unbundled.length > 0) {
 if (EXTENSION_ASSETS.length > 0) {
   console.log(
     `\u2713 all ${EXTENSION_ASSETS.length} ShareExtension asset(s) are in a Resources build phase`
+  );
+}
+
+/**
+ * GUARD 4b — the widget extension's runtime resources must be in ITS Resources phase.
+ *
+ * The same failure class as above, with worse symptoms: a font missing from the bundle makes
+ * `Font.custom` fall back to SF without a word, a missing string catalog shows raw keys
+ * ("widget_open_beanies") on the signed-out widget, a missing asset catalog paints holes
+ * where the beanies peek, and a missing privacy manifest fails App Store review. All with a
+ * green build.
+ *
+ * Scoped to the BeaniesWidgets TARGET's phase, not any Resources phase: the app also ships
+ * an `Assets.xcassets` and a `PrivacyInfo.xcprivacy`, so a project-wide search would pass
+ * with the widget's copies missing. The target is found by name, then its buildPhases.
+ */
+const WIDGET_TARGET = 'BeaniesWidgets';
+const WIDGET_DIR = join(ROOT, 'ios/App', WIDGET_TARGET);
+const WIDGET_RESOURCE = /\.(ttf|xcstrings|xcprivacy|xcassets)$/;
+
+let widgetResources = [];
+try {
+  widgetResources = [
+    ...readdirSync(WIDGET_DIR),
+    ...readdirSync(join(WIDGET_DIR, 'Fonts')).filter((name) => name.endsWith('.ttf')),
+  ].filter((name) => WIDGET_RESOURCE.test(name));
+} catch {
+  widgetResources = []; // no widget extension in this tree
+}
+
+if (widgetResources.length > 0) {
+  // One block per target (each ends at its own closing brace), so a match can never span
+  // from one target's build phases into another target's name.
+  const target = [...project.matchAll(/= \{\s*isa = PBXNativeTarget;([\s\S]*?)\n\t\t\};/g)].find(
+    (m) => m[1].includes(`name = ${WIDGET_TARGET};`)
+  );
+  const phasesList = target ? /buildPhases = \(([\s\S]*?)\);/.exec(target[1]) : null;
+  const phaseIds = phasesList
+    ? [...phasesList[1].matchAll(/([0-9A-F]{24})/g)].map((m) => m[1])
+    : [];
+  const widgetPhase = phaseIds
+    .map((id) =>
+      new RegExp(
+        `\\t${id} /\\* [^*]+ \\*/ = \\{\\s*isa = PBXResourcesBuildPhase;[\\s\\S]*?files = \\(([\\s\\S]*?)\\);`
+      ).exec(project)
+    )
+    .find(Boolean);
+
+  if (!widgetPhase) {
+    console.error(
+      `\n\u2716 ios/App/${WIDGET_TARGET}/ has ${widgetResources.length} resource(s) but no ${WIDGET_TARGET}\n` +
+        '  target with a Resources build phase was found in project.pbxproj, so none of them\n' +
+        '  would ship. See docs/runbooks/native-store-submission.md § 6c.\n'
+    );
+    process.exit(1);
+  }
+
+  const unshipped = widgetResources.filter(
+    (name) => !widgetPhase[1].includes(`${name} in Resources`)
+  );
+  if (unshipped.length > 0) {
+    console.error(
+      `\n\u2716 ${unshipped.length} ${WIDGET_TARGET} resource(s) are committed but NOT in that target's Resources phase:\n` +
+        unshipped.map((a) => `    ${a}`).join('\n') +
+        '\n\nThey will not be inside the widget .appex: fonts fall back to SF, the string catalog\n' +
+        'shows raw keys, the asset catalog paints holes and a missing privacy manifest fails\n' +
+        'review. Nothing else reports this - the build stays green.\n'
+    );
+    process.exit(1);
+  }
+
+  console.log(
+    `\u2713 all ${widgetResources.length} ${WIDGET_TARGET} resource(s) are in its Resources build phase`
   );
 }

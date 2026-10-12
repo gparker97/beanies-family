@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  "Your day", 4x2 and 4x3 (#130, mockup placement E, round 9b; the 4x3 is an alias in
+  values/widget_layouts.xml): the date column beside the agenda panel (calendar, to-dos, footer).
+  widget_frame paints the outer frame so the background-opacity choice can thin it (setImageAlpha)
+  while its colour still follows light/dark; widget_inner, inset 10dp, stays 95% opaque so only
+  the rim thins and no readable text ever sits on the wallpaper. The panel keeps its own fill.
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <ImageView
+        android:id="@+id/widget_frame"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:importantForAccessibility="no"
+        android:scaleType="fitXY"
+        android:src="@drawable/widget_container_bg" />
+
+    <!-- The near-solid inner surface (95%), inset 10dp: only the rim above thins. -->
+    <ImageView
+        android:id="@+id/widget_inner"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_margin="10dp"
+        android:importantForAccessibility="no"
+        android:scaleType="fitXY"
+        android:src="@drawable/widget_inner_bg" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="horizontal"
+        android:paddingStart="14dp"
+        android:paddingTop="5dp"
+        android:paddingEnd="12dp"
+        android:paddingBottom="12dp">
+
+        <include layout="@layout/widget_part_date_column" />
+
+        <include layout="@layout/widget_part_panel" />
+    </LinearLayout>
+</FrameLayout>

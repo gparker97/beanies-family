@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Home-screen widget palette, dark mode (#130). See values/widget_colors.xml. -->
+<resources>
+    <color name="widget_container">#1E2A36</color>
+    <color name="widget_container_inner">#F21E2A36</color>
+    <color name="widget_panel">#F226343F</color>
+    <color name="widget_ink">#F2F5F7</color>
+    <color name="widget_ink_soft">#C3CED6</color>
+    <color name="widget_ink_faint">#9AA9B4</color>
+    <color name="widget_hairline">#4A5B69</color>
+    <color name="widget_accent_text">#FF8B5E</color>
+    <color name="widget_due_purple">#CB95DD</color>
+    <color name="widget_tick_green">#5FD08A</color>
+    <color name="widget_family_chip">#2F3E4B</color>
+    <color name="widget_dot_ring">#7A8A97</color>
+</resources>

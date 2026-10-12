@@ -123,6 +123,45 @@ export function resolveMemberColor(color?: string | null): string {
   return color && color.trim() ? color : NEUTRAL_MEMBER_COLOR;
 }
 
+/** A `#RGB` / `#RRGGBB` (alpha tolerated) hex: the only shape the luminance rule can read. */
+const HEX_COLOR = /^#[0-9a-f]{3,8}$/i;
+
+/**
+ * WCAG relative luminance (0 = black, 1 = white) of a `#RGB` / `#RRGGBB` colour.
+ *
+ * The one implementation: `BeanieAvatar` uses it for its initials ink and its dark-mode
+ * edge, and the home-screen widget snapshot (#130) ships the same ink to native so a widget
+ * never computes a colour. Callers check `HEX_COLOR` first (via `inkOnMemberColor`); a
+ * non-hex string yields NaN.
+ */
+export function relativeLuminance(hex: string): number {
+  const h = hex.replace('#', '');
+  const full = h.length === 3 ? [...h].map((c) => c + c).join('') : h;
+  const ch = [0, 2, 4].map((i) => {
+    const v = parseInt(full.slice(i, i + 2), 16) / 255;
+    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * ch[0]! + 0.7152 * ch[1]! + 0.0722 * ch[2]!;
+}
+
+/** Whether `color` is a hex the luminance rule can read (`relativeLuminance`). */
+export function isHexColor(color: string): boolean {
+  return HEX_COLOR.test(color);
+}
+
+/**
+ * The ink an initial is drawn in on a member's fill: Deep Slate on a light fill, white
+ * otherwise (and for anything that is not a readable hex).
+ *
+ * Not one of the six palette hues clears WCAG AA (4.5:1) against white (teal 2.49:1,
+ * green 2.28:1, amber 2.15:1, pink 3.53:1, blue 3.68:1, violet 4.23:1) and three miss even
+ * the 3:1 large-text floor; against Deep Slate they all clear it. Computed rather than
+ * hard-coded so a future palette change cannot quietly reintroduce unreadable initials.
+ */
+export function inkOnMemberColor(hex: string): '#2C3E50' | '#FFFFFF' {
+  return isHexColor(hex) && relativeLuminance(hex) > 0.45 ? '#2C3E50' : '#FFFFFF';
+}
+
 /** Whether a member's stored colour is unusable and needs the neutral fallback. */
 export function isBlankMemberColor(color?: string | null): boolean {
   return !color || !color.trim();

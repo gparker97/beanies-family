@@ -226,6 +226,10 @@ describe('uiStrings', () => {
       // stand in for the plan, the family data or the device here.
       'plan.',
       'readOnly.',
+      // Home-screen widgets (#130): a stale widget ("as of 7:40") and a failed publish tell a
+      // parent their home screen may be showing old plans. Real nouns only.
+      'widget.asOf',
+      'widget.publishFailed',
     ];
     const KEY_SUFFIXES =
       /(deleteConfirm|DeleteConfirm|ConfirmMessage|confirmMessage|Failed|Error)$/;

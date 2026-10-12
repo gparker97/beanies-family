@@ -29,6 +29,12 @@ import { reportError } from '@/utils/errorReporter';
 export type SignOutStepName =
   | 'quietTeardownAndForceSave'
   | 'cancelReminders'
+  /**
+   * Delete the home-screen widget snapshot (#130, ADR-042) and reload the widgets, so a
+   * placed widget shows "open beanies" instead of the family's day. Beside
+   * `cancelReminders` on every tier that runs it: both put family content outside the app.
+   */
+  | 'clearWidgetSnapshot'
   | 'captureDepartingAccount'
   | 'clearGoogleSessionKeepTokens'
   | 'clearGoogleSessionDropTokens'
@@ -105,6 +111,7 @@ export type SignOutStepName =
 export const SIGN_OUT_TRUSTED_STEPS: readonly SignOutStepName[] = [
   'quietTeardownAndForceSave',
   'cancelReminders',
+  'clearWidgetSnapshot',
   'clearGoogleSessionKeepTokens',
   'resetSyncState',
   'resetDocClient',
@@ -128,6 +135,7 @@ export const SIGN_OUT_CLEARED_ELSEWHERE_STEPS: readonly SignOutStepName[] = SIGN
 export const SIGN_OUT_UNTRUSTED_STEPS: readonly SignOutStepName[] = [
   'quietTeardownAndForceSave',
   'cancelReminders',
+  'clearWidgetSnapshot',
   'captureDepartingAccount',
   'clearGoogleSessionDropTokens',
   'resetSyncState',
@@ -148,6 +156,7 @@ export const SIGN_OUT_UNTRUSTED_STEPS: readonly SignOutStepName[] = [
 export const SIGN_OUT_CLEAR_STEPS: readonly SignOutStepName[] = [
   'quietTeardownAndForceSave',
   'cancelReminders',
+  'clearWidgetSnapshot',
   'captureDepartingAccount',
   'clearGoogleSessionDropTokens',
   'clearAllRefreshTokens',
@@ -222,6 +231,7 @@ export type ClearScope = 'active' | 'all';
 export const SIGN_OUT_EVICTION_LOCK_STEPS: readonly SignOutStepName[] = [
   'beginQuietTeardown',
   'cancelReminders',
+  'clearWidgetSnapshot',
   'resetSyncState',
   'resetDocClient',
   // NO `announceSessionEnded` (round 3): the channel is per FAMILY, and the people still in

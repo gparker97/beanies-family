@@ -13,6 +13,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
+  pickTonight,
   MEAL_SLOTS,
   SLOT_EMOJI,
   SLOT_INDEX,
@@ -88,5 +89,25 @@ describe('meal slot constants', () => {
     it('handles empty', () => {
       expect(sortSlots([])).toEqual([]);
     });
+  });
+});
+
+describe('pickTonight (#130: the wall card and the widget share it)', () => {
+  it('picks dinner when there is one', () => {
+    const meals = [
+      { slot: 'lunch' as const },
+      { slot: 'dinner' as const },
+      { slot: 'snack' as const },
+    ];
+    expect(pickTonight(meals)).toBe(meals[1]);
+  });
+
+  it('falls back to the last meal of the day', () => {
+    const meals = [{ slot: 'breakfast' as const }, { slot: 'lunch' as const }];
+    expect(pickTonight(meals)).toBe(meals[1]);
+  });
+
+  it('is null for an empty day', () => {
+    expect(pickTonight([])).toBeNull();
   });
 });

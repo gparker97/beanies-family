@@ -286,6 +286,7 @@ For reference, the current help center contains these articles:
 - Beanie Lists *(categorized family checklists — one-off & recurring; `popular`)*
 - Who Owns What *(the responsibility deck: first deal, splitting, re-dealing, the board, Card Details and history, the Good to Know panel, the fridge sheet, card-holder defaults; marked beta)*
 - The Family Check-in: How It Works *(slug `family-check-in`: when it's due, which cards come up and why, No Issues / We've Talked / Save for Next Time / Re-deal, Still to Deal, where results show; the support reference)*
+- Put your family's day on your home screen *(slug `home-screen-widgets`: adding the widget on iPhone and Android, the three sizes, my day vs our day and the block picker, lock-screen widgets and the lock-screen titles setting, child view, "later", "open beanies to refresh", privacy; linked from Settings, Reminders)*
 - Travel Plans & Vacations
 - The Family Nook — Your Home Base
 - Family Planner & Activities
