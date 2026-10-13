@@ -61,10 +61,10 @@ final class WidgetFill {
     static final float TASKS_HEADING_DP = 15f;
     /**
      * Frame and panel padding, the peek's drop, the tasks' top margin and the footer, around
-     * the list and the tasks (root 5+12, panel drop 20, panel padding 4+3, tasks margin 2,
+     * the list and the tasks (root 5+7, panel drop 20, panel padding 4+3, tasks margin 2,
      * footer 17+1). Over-estimating is the safe side: one task row fewer, never a squeezed list.
      */
-    static final float PANEL_CHROME_DP = 64f;
+    static final float PANEL_CHROME_DP = 59f;
     /** The most task rows any widget draws (each one needs its own tap slot, `WidgetViews`). */
     static final int MAX_TASK_ROWS = 16;
 

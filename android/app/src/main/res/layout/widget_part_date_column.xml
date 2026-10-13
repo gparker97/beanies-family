@@ -4,8 +4,8 @@
   and at the foot the "as of" stale line, the audience label and the due count. Taps open the
   Nook. The foot's three lines hold "2 for you today" / "as of 12:40 am" at the Larger text
   size (two cut the last word silently); at Standard and Large they take two. The view is 62dp with 6dp/4dp side padding so a see-through card can give it a tile
-  (widget_tile_bg) without moving the text: content still starts 14dp in and 12dp below the top
-  (5dp root + 1dp margin + 6dp padding), and the panel still starts 74dp in (8 + 62 + 4).
+  (widget_tile_bg) without moving the text: content starts 10dp in and 12dp below the top
+  (5dp root + 1dp margin + 6dp padding), and the panel starts 70dp in (4 + 62 + 4).
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"

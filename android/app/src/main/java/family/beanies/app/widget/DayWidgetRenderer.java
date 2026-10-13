@@ -57,17 +57,17 @@ final class DayWidgetRenderer {
      * (a 5-column launcher grid) "10:15am" at 20sp already pushes the member dot out of the panel.
      */
     private static final float SMALL_NEXT_TIME_MIN_SP = 16f;
-    /** The small widget's content padding, both sides (widget_day_small.xml: 14 + 14). */
-    private static final float SMALL_CONTENT_INSET_DP = 28f;
+    /** The small widget's content padding, both sides (widget_day_small.xml: 10 + 9). */
+    private static final float SMALL_CONTENT_INSET_DP = 19f;
     /** In the small header row: the tile's 6dp end padding and the numeral's 5dp start margin. */
     private static final float SMALL_HEADER_TRAIL_DP = 6f + 5f;
     /** The small header never shrinks below this, however narrow the widget. */
     private static final float SMALL_HEADER_MIN_SCALE = 0.7f;
     private static final Typeface WEEKDAY_FACE = Typeface.create("sans-serif-medium", Typeface.NORMAL);
-    /** Root padding 14 + 12, date column 52 + 8, panel padding 6 + 13. */
-    static final float AGENDA_PANEL_INSET_DP = 105f;
-    /** Root padding 14 + 14, panel padding 8 + 8. */
-    private static final float SMALL_PANEL_INSET_DP = 44f;
+    /** Root padding to the content 10 + 9, date column 52 + 8, panel padding 6 + 13. */
+    static final float AGENDA_PANEL_INSET_DP = 98f;
+    /** Root padding 10 + 9, panel padding 8 + 8. */
+    private static final float SMALL_PANEL_INSET_DP = 35f;
     /** Message padding 14 + 14. */
     private static final float MESSAGE_INSET_DP = 28f;
 

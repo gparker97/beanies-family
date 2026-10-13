@@ -12,6 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Changed
 
+- Home-screen widget on Android: the margin around the panel is thinner, matching iPhone, so titles get a little more room before they are cut short.
 - On iPhone and Android, the version shown at the bottom of the sidebar and menu now includes the store build number, so test builds of the same version can be told apart.
 - Home-screen widget: to-dos now carry a small checkbox and a lighter title, so they read as tasks under the day rather than more calendar entries; iPhone widgets gain the same Background choice (100%, 70%, 40%) that Android already had, for people who want a little wallpaper to show through.
 - Home-screen widget: the Background choice now visibly lets the wallpaper through on Android (before, only a thin rim changed), with the date kept on its own solid tile so it stays readable. New widgets start at 70%, so a little wallpaper shows through by default.

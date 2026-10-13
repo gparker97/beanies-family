@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- The agenda panel (and the small panel): 18dp corners, concentric with the 28dp card at the
+     ~9dp margins (28 - 9 ~ 18), so the band around it is even along the sides and at the corners. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
     <solid android:color="@color/widget_panel" />
-    <corners android:radius="14dp" />
+    <corners android:radius="18dp" />
 </shape>

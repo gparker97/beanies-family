@@ -5,7 +5,8 @@
   widget_frame and widget_inner paint the card at 100%; below it the frame alone paints it at the
   background-opacity choice (setImageAlpha; the inner is hidden so the card is one even surface)
   while its colour still follows light/dark. No readable text sits on it then: the panel keeps its own 95% fill and the date column gets a 95% tile (widget_tile_bg,
-  set only below 100%). The root's 8dp start padding plus the column's 6dp keep the text at 14dp.
+  set only below 100%). Margins match iOS placement E (text 10dp in, panel 9dp from the right, 7dp from the bottom): the
+  root's 4dp start padding plus the column's 6dp put the date text 10dp in.
 -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
@@ -34,10 +35,10 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="horizontal"
-        android:paddingStart="8dp"
+        android:paddingStart="4dp"
         android:paddingTop="5dp"
-        android:paddingEnd="12dp"
-        android:paddingBottom="12dp">
+        android:paddingEnd="9dp"
+        android:paddingBottom="7dp">
 
         <include layout="@layout/widget_part_date_column" />
 
