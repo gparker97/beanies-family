@@ -17,7 +17,9 @@
         android:scaleType="fitXY"
         android:src="@drawable/widget_container_bg" />
 
-    <!-- The near-solid inner surface (95%), inset 10dp: only the rim above thins. -->
+    <!-- The inner surface (95%), inset 10dp; thins with the rim. The header gets its own 95% tile
+         (widget_tile_bg, only below 100%): 6dp side padding offset by a -6dp start margin, and 2dp
+         top/bottom inside a 34dp row raised 2dp, so the text and the panel stay where they were. -->
     <ImageView
         android:id="@+id/widget_inner"
         android:layout_width="match_parent"
@@ -40,9 +42,15 @@
             <LinearLayout
                 android:id="@+id/date_column"
                 android:layout_width="wrap_content"
-                android:layout_height="30dp"
+                android:layout_height="34dp"
+                android:layout_marginStart="-6dp"
+                android:layout_marginTop="-2dp"
                 android:gravity="bottom"
-                android:orientation="horizontal">
+                android:orientation="horizontal"
+                android:paddingStart="6dp"
+                android:paddingTop="2dp"
+                android:paddingEnd="6dp"
+                android:paddingBottom="2dp">
 
                 <!-- "Sat" (Outfit Bold 14sp, accent) and the numeral (Outfit Bold 28sp, ink) are
                      tinted bitmaps (WidgetTextBitmaps): fontFamily is ignored in RemoteViews. -->
@@ -65,7 +73,7 @@
                 android:id="@+id/panel"
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
-                android:layout_marginTop="4dp"
+                android:layout_marginTop="2dp"
                 android:layout_weight="1"
                 android:background="@drawable/widget_panel_bg"
                 android:orientation="vertical"

@@ -140,7 +140,7 @@ interface AudienceRules {
   hints: 'viewer' | 'noSurprise' | 'none';
   /** Whether the viewer's pick-ups are listed (the lock-screen inline slot). */
   pickups: boolean;
-  /** Whether a trip must concern the viewer (`classifyAudience`) to be counted down. */
+  /** Whether a trip must concern the viewer (`classifyAudience`) to be counted down (child only). */
   tripsForViewerOnly: boolean;
   /**
    * Whether copy may address the viewer as "you" ("tonight: tacos, you cook"). Off on the
@@ -162,7 +162,9 @@ const AUDIENCE_RULES: Readonly<Record<AudienceKey, AudienceRules>> = Object.free
     dueNamesViewer: false,
     hints: 'viewer',
     pickups: true,
-    tripsForViewerOnly: true,
+    // Every family trip, whoever is going: a partner away is the most relevant fact about the
+    // parent at home's day, unlike another adult's to-do. The row names who is going.
+    tripsForViewerOnly: false,
     addressesViewer: true,
     birthdaysForViewerOnly: false,
   },

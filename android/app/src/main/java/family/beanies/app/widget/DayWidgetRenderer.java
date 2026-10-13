@@ -79,7 +79,8 @@ final class DayWidgetRenderer {
         WidgetSnapshot s = plan.snapshot;
         WidgetSnapshot.Day day = plan.day;
         RemoteViews v = new RemoteViews(context.getPackageName(), size.layout);
-        frame(v, context, id, size, prefs, s.links.nook);
+        frame(v, context, id, size, prefs.opacity, s.links.nook);
+        dateTile(v, prefs.opacity);
 
         // Date column.
         WidgetTextBitmaps.bind(v, context, R.id.date_numeral, plan.entry.numeral, COLUMN_NUMERAL,
@@ -190,7 +191,8 @@ final class DayWidgetRenderer {
         WidgetSizes.Size size = WidgetSizes.Size.SMALL;
         WidgetSnapshot s = plan.snapshot;
         RemoteViews v = new RemoteViews(context.getPackageName(), size.layout);
-        frame(v, context, id, size, prefs, s.links.nook);
+        frame(v, context, id, size, prefs.opacity, s.links.nook);
+        dateTile(v, prefs.opacity);
 
         WidgetTextBitmaps.bind(v, context, R.id.date_weekday, plan.entry.weekdayShort, SMALL_WEEKDAY,
                 0, R.color.widget_accent_text);
@@ -270,7 +272,8 @@ final class DayWidgetRenderer {
     private static RemoteViews message(Context context, int id, WidgetSizes.Size size, float widthDp,
             WidgetPrefs prefs, String link, String title, String line) {
         RemoteViews v = new RemoteViews(context.getPackageName(), R.layout.widget_day_message);
-        frame(v, context, id, size, prefs, link);
+        // A message's text sits on the card itself, so a message is always drawn solid.
+        frame(v, context, id, size, 100, link);
         v.setImageViewResource(R.id.message_image, R.drawable.widget_covering_eyes);
         WidgetTextBitmaps.bind(v, context, R.id.message_title, title, MESSAGE_TITLE,
                 widthDp - MESSAGE_INSET_DP, R.color.widget_accent_text);
@@ -280,12 +283,28 @@ final class DayWidgetRenderer {
 
     // ---- shared --------------------------------------------------------------------------
 
-    /** The outer frame's opacity and the whole-widget tap. */
+    /**
+     * The card's opacity and the whole-widget tap. The rim (widget_frame) and the inner surface
+     * (widget_inner) both thin to the Background choice; readable text never sits on them: the
+     * agenda panel keeps its own 95% fill, and the date column (the small header) gets
+     * {@link #dateTile}.
+     */
     private static void frame(
-            RemoteViews v, Context context, int id, WidgetSizes.Size size, WidgetPrefs prefs, String link) {
-        v.setInt(R.id.widget_frame, "setImageAlpha", Math.round(prefs.opacity * 255f / 100f));
+            RemoteViews v, Context context, int id, WidgetSizes.Size size, int opacity, String link) {
+        int alpha = Math.round(opacity * 255f / 100f);
+        v.setInt(R.id.widget_frame, "setImageAlpha", alpha);
+        v.setInt(R.id.widget_inner, "setImageAlpha", alpha);
         WidgetViews.onClick(v, R.id.widget_root, context, id, WidgetViews.SLOT_ROOT,
                 WidgetViews.or(link, WidgetViews.FALLBACK_NOOK), size);
+    }
+
+    /**
+     * The date column's (the small header's) 95% tile, drawn only when the card is see-through,
+     * so a solid widget looks exactly as before. Day layouts only: the message layout has no
+     * date column and keeps its card solid.
+     */
+    private static void dateTile(RemoteViews v, int opacity) {
+        v.setInt(R.id.date_column, "setBackgroundResource", opacity < 100 ? R.drawable.widget_tile_bg : 0);
     }
 
     /** "as of 08:30" (device time format) when the plan is stale; "" otherwise. */

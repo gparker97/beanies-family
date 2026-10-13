@@ -2,9 +2,10 @@
 <!--
   "Your day", 4x2 and 4x3 (#130, mockup placement E, round 9b; the 4x3 is an alias in
   values/widget_layouts.xml): the date column beside the agenda panel (calendar, to-dos, footer).
-  widget_frame paints the outer frame so the background-opacity choice can thin it (setImageAlpha)
-  while its colour still follows light/dark; widget_inner, inset 10dp, stays 95% opaque so only
-  the rim thins and no readable text ever sits on the wallpaper. The panel keeps its own fill.
+  widget_frame and widget_inner paint the card; both thin with the background-opacity choice
+  (setImageAlpha) while their colour still follows light/dark. No readable text sits on them when
+  they do: the panel keeps its own 95% fill and the date column gets a 95% tile (widget_tile_bg,
+  set only below 100%). The root's 8dp start padding plus the column's 6dp keep the text at 14dp.
 -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
@@ -19,7 +20,7 @@
         android:scaleType="fitXY"
         android:src="@drawable/widget_container_bg" />
 
-    <!-- The near-solid inner surface (95%), inset 10dp: only the rim above thins. -->
+    <!-- The inner surface (95%), inset 10dp; thins with the rim. -->
     <ImageView
         android:id="@+id/widget_inner"
         android:layout_width="match_parent"
@@ -33,7 +34,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="horizontal"
-        android:paddingStart="14dp"
+        android:paddingStart="8dp"
         android:paddingTop="5dp"
         android:paddingEnd="12dp"
         android:paddingBottom="12dp">

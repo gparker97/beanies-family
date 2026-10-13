@@ -10,10 +10,19 @@ struct DayWidgetView: View {
 
     var body: some View {
         content
-            // The card at the picker's opacity (100 / 70 / 40); the panel inside is untouched.
+            // The card at the picker's opacity (100 / 70 / 40) on a ready day, where every string
+            // sits on the panel or a `cardTile`. A message's text sits on the card, so it stays solid.
             .containerBackground(for: .widget) {
-                Color.wRaised.opacity(entry.blocks.background.opacity)
+                Color.wRaised.opacity(cardOpacity)
             }
+    }
+
+    private var cardOpacity: Double {
+        if case .ready(let snapshot) = entry.state,
+           DayResolver.resolve(snapshot, at: entry.date, audience: entry.blocks.audience) != nil {
+            return entry.blocks.background.opacity
+        }
+        return 1
     }
 
     @ViewBuilder private var content: some View {
@@ -125,6 +134,7 @@ struct DayLayoutView: View {
                     m: m
                 )
                 .frame(height: headerHeight)
+                .cardTile(blocks.background, outset: EdgeInsets(top: 2, leading: 6, bottom: 2, trailing: 6))
             }
             HStack(alignment: .top, spacing: 8) {
                 if !child {
@@ -139,6 +149,8 @@ struct DayLayoutView: View {
                     )
                     .frame(width: 52)
                     .frame(maxHeight: .infinity, alignment: .top)
+                    // Gap to the panel is the 8pt spacing; the tile takes 4 of it.
+                    .cardTile(blocks.background, outset: EdgeInsets(top: 6, leading: 6, bottom: 0, trailing: 4))
                 }
                 VStack(alignment: .leading, spacing: 0) {
                     AgendaPanelView(

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The date column's tile when the card is see-through (Background 70% / 40%, #130): the card's
+     own colour at 95%, so readable text never sits on the wallpaper. Set by DayWidgetRenderer only
+     below 100%, so a solid widget is unchanged. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="@color/widget_container_inner" />
+    <corners android:radius="14dp" />
+</shape>

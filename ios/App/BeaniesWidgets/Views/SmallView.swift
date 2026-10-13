@@ -24,15 +24,18 @@ struct SmallView: View {
 
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .firstTextBaseline, spacing: 5) {
-                Text(entry.weekdayShort)
-                    .font(.outfit(size: m.s(14), weight: .bold))
-                    .foregroundStyle(Color.wAccent)
-                    .lineLimit(1)
-                Text(entry.numeral)
-                    .font(.outfit(size: m.s(28), weight: .bold))
-                    .monospacedDigit()
-                    .foregroundStyle(Color.wInk)
-                    .lineLimit(1)
+                HStack(alignment: .firstTextBaseline, spacing: 5) {
+                    Text(entry.weekdayShort)
+                        .font(.outfit(size: m.s(14), weight: .bold))
+                        .foregroundStyle(Color.wAccent)
+                        .lineLimit(1)
+                    Text(entry.numeral)
+                        .font(.outfit(size: m.s(28), weight: .bold))
+                        .monospacedDigit()
+                        .foregroundStyle(Color.wInk)
+                        .lineLimit(1)
+                }
+                .cardTile(blocks.background, outset: EdgeInsets(top: 0, leading: 6, bottom: 2, trailing: 6))
                 // Keep the header clear of the peek.
                 Spacer(minLength: PeekView.width(peek, height: Self.peekHeight) + peek.rightInset)
             }
@@ -49,6 +52,7 @@ struct SmallView: View {
                     .font(.sys(size: m.s(11), weight: .medium))
                     .foregroundStyle(Color.wInkFaint)
                     .lineLimit(1)
+                    .cardTile(blocks.background, outset: EdgeInsets(top: 1, leading: 6, bottom: 1, trailing: 6))
                     .padding(.top, 3)
             }
         }

@@ -469,7 +469,7 @@ describe('buildWidgetSnapshot: the calendar section', () => {
     expect(trip('2026-10-16')).toMatchObject({ title: 'lake trip · day 2 of 4', todayOnly: true });
   });
 
-  it("keeps another adult's trip off my day", () => {
+  it("shows another adult's trip on my day too, but not on a child's", () => {
     const solo = {
       ...LAKE_TRIP,
       id: 'solo',
@@ -477,8 +477,10 @@ describe('buildWidgetSnapshot: the calendar section', () => {
       assigneeIds: ['jo'],
     } as FamilyVacation;
     const days = build({ vacations: [solo] }).snapshot.days;
-    expect(days.some((d) => d.my!.rows.some((r) => r.kind === 'trip'))).toBe(false);
+    expect(days.some((d) => d.my!.rows.some((r) => r.kind === 'trip'))).toBe(true);
     expect(days.some((d) => d.our!.rows.some((r) => r.kind === 'trip'))).toBe(true);
+    const child = build({ vacations: [solo], currentMember: AVA }).snapshot.days;
+    expect(child.some((d) => d.my!.rows.some((r) => r.kind === 'trip'))).toBe(false);
   });
 
   it('orders timed rows first, and an all-day row has no instants and no time', () => {

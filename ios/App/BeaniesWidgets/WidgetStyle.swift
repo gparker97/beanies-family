@@ -25,6 +25,37 @@ extension Color {
     }
 }
 
+/// A see-through card (Background 70% / 40%) never carries readable text: the text that sits
+/// outside the agenda panel (the date column, the small header, the child header) gets its own
+/// near-solid tile in the card colour, drawn just outside its frame so the layout does not move.
+/// At 100% nothing is drawn, so the solid widget is exactly as before; in the system's tinted or
+/// clear appearance the card is stripped anyway, so the tile is skipped there too.
+struct CardTile: ViewModifier {
+    let background: WidgetBackgroundOption
+    let outset: EdgeInsets
+
+    @Environment(\.widgetRenderingMode) private var renderingMode
+
+    func body(content: Content) -> some View {
+        content.background {
+            if background != .solid && renderingMode == .fullColor {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color.wRaised.opacity(0.95))
+                    .padding(EdgeInsets(
+                        top: -outset.top, leading: -outset.leading,
+                        bottom: -outset.bottom, trailing: -outset.trailing
+                    ))
+            }
+        }
+    }
+}
+
+extension View {
+    func cardTile(_ background: WidgetBackgroundOption, outset: EdgeInsets) -> some View {
+        modifier(CardTile(background: background, outset: outset))
+    }
+}
+
 /// One scale factor for the whole widget, from the Dynamic Type setting. Text sizes, row
 /// heights and the fill budget all multiply by it, so bigger text means FEWER rows rather
 /// than clipped rows. Never below 1: 11pt is the floor at the default size.

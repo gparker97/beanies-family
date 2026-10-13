@@ -2,16 +2,22 @@
 <!--
   The 52dp date column of the medium and large widgets (#130): numeral, weekday (accent), month,
   and at the foot the "as of" stale line, the audience label and the due count. Taps open the
-  Nook. Starts 7dp below the 5dp root padding = 12dp below the widget's top edge.
+  Nook. The view is 62dp with 6dp/4dp side padding so a see-through card can give it a tile
+  (widget_tile_bg) without moving the text: content still starts 14dp in and 12dp below the top
+  (5dp root + 1dp margin + 6dp padding), and the panel still starts 74dp in (8 + 62 + 4).
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/date_column"
-    android:layout_width="52dp"
+    android:layout_width="62dp"
     android:layout_height="match_parent"
-    android:layout_marginTop="7dp"
-    android:layout_marginEnd="8dp"
-    android:orientation="vertical">
+    android:layout_marginTop="1dp"
+    android:layout_marginEnd="4dp"
+    android:orientation="vertical"
+    android:paddingStart="6dp"
+    android:paddingTop="6dp"
+    android:paddingEnd="4dp"
+    android:paddingBottom="4dp">
 
     <!-- Outfit Bold 32sp numeral, drawn as a tinted bitmap (WidgetTextBitmaps): fontFamily is
          ignored in launcher-hosted RemoteViews. -->
