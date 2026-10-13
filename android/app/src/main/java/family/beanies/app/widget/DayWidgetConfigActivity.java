@@ -133,13 +133,18 @@ public class DayWidgetConfigActivity extends AppCompatActivity {
         ((RadioGroup) findViewById(R.id.config_text_size)).check(TEXT_SIZE_IDS[prefs.textSize.ordinal()]);
     }
 
-    /** The index of the checked radio in `ids`; 0 (each group's default) when none matches. */
-    private int checkedIndex(int groupId, int[] ids) {
+    private static int indexOf(int[] values, int value) {
+        for (int i = 0; i < values.length; i++) if (values[i] == value) return i;
+        return 0;
+    }
+
+    /** The index of the checked radio in `ids`; `fallback` when none matches. */
+    private int checkedIndex(int groupId, int[] ids, int fallback) {
         int checked = ((RadioGroup) findViewById(groupId)).getCheckedRadioButtonId();
         for (int i = 0; i < ids.length; i++) {
             if (ids[i] == checked) return i;
         }
-        return 0;
+        return fallback;
     }
 
     private void save() {
@@ -154,9 +159,10 @@ public class DayWidgetConfigActivity extends AppCompatActivity {
         for (int i = 0; i < BLOCK_IDS.length; i++) {
             blocks[i] = ((CheckBox) findViewById(BLOCK_IDS[i])).isChecked();
         }
-        int opacity = WidgetPrefs.OPACITIES[checkedIndex(R.id.config_opacity, OPACITY_IDS)];
+        int opacity = WidgetPrefs.OPACITIES[
+                checkedIndex(R.id.config_opacity, OPACITY_IDS, indexOf(WidgetPrefs.OPACITIES, WidgetPrefs.DEFAULT_OPACITY))];
         WidgetPrefs.TextSize textSize =
-                WidgetPrefs.TextSize.values()[checkedIndex(R.id.config_text_size, TEXT_SIZE_IDS)];
+                WidgetPrefs.TextSize.values()[checkedIndex(R.id.config_text_size, TEXT_SIZE_IDS, 0)];
         new WidgetPrefs(our ? WidgetPrefs.AUDIENCE_OUR : WidgetPrefs.AUDIENCE_MY, blocks, opacity, textSize)
                 .save(this, appWidgetId);
 

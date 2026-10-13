@@ -11,7 +11,8 @@ import android.content.SharedPreferences;
  *
  * A widget the launcher placed without running the configuration activity (Android 12+
  * `configuration_optional`) has no keys and reads the defaults: my day, every block on
- * (WIDGET_DEFAULT_BLOCKS in src/types/widgetSnapshot.ts), 100% background, Standard text.
+ * (WIDGET_DEFAULT_BLOCKS in src/types/widgetSnapshot.ts), a 70% background ({@link #DEFAULT_OPACITY}),
+ * Standard text.
  */
 public final class WidgetPrefs {
 
@@ -23,6 +24,11 @@ public final class WidgetPrefs {
 
     /** The three background-opacity choices, in percent. */
     static final int[] OPACITIES = {100, 70, 40};
+    /**
+     * The background a widget starts with: a little wallpaper shows through, the text stays on
+     * solid tiles. Same default as the iOS picker (`WidgetBackgroundOption.lighter`).
+     */
+    static final int DEFAULT_OPACITY = 70;
 
     /**
      * The text-size choice: the stored key and the factor on the system text size. The rule that
@@ -58,7 +64,7 @@ public final class WidgetPrefs {
     WidgetPrefs(String audience, boolean[] blocks, int opacity, TextSize textSize) {
         this.audience = AUDIENCE_OUR.equals(audience) ? AUDIENCE_OUR : AUDIENCE_MY;
         this.blocks = blocks.clone();
-        this.opacity = isKnownOpacity(opacity) ? opacity : 100;
+        this.opacity = isKnownOpacity(opacity) ? opacity : DEFAULT_OPACITY;
         this.textSize = textSize == null ? TextSize.STANDARD : textSize;
     }
 
@@ -77,7 +83,7 @@ public final class WidgetPrefs {
         return new WidgetPrefs(
                 p.getString(prefix + "audience", AUDIENCE_MY),
                 blocks,
-                p.getInt(prefix + "opacity", 100),
+                p.getInt(prefix + "opacity", DEFAULT_OPACITY),
                 TextSize.fromKey(p.getString(prefix + "textSize", TextSize.STANDARD.key)));
     }
 

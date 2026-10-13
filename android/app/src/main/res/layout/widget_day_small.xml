@@ -17,7 +17,7 @@
         android:scaleType="fitXY"
         android:src="@drawable/widget_container_bg" />
 
-    <!-- The inner surface (95%), inset 10dp; thins with the rim. The header gets its own 95% tile
+    <!-- The inner surface (95%), inset 10dp; hidden when the card is see-through. The header gets its own 95% tile
          (widget_tile_bg, only below 100%): 6dp side padding offset by a -6dp start margin, and 2dp
          top/bottom inside a 34dp row raised 2dp, so the text and the panel stay where they were. -->
     <ImageView

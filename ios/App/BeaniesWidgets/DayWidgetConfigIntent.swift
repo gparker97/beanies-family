@@ -101,7 +101,9 @@ struct DayWidgetConfigIntent: WidgetConfigurationIntent {
     @Parameter(title: "Helpful hint", default: true)
     var hint: Bool
 
-    @Parameter(title: "Background", default: .solid)
+    /// 70% by default: a little wallpaper shows through, the text stays on solid tiles. Same
+    /// default as Android (`WidgetPrefs.DEFAULT_OPACITY`).
+    @Parameter(title: "Background", default: .lighter)
     var background: WidgetBackgroundOption
 
     @Parameter(title: "Text size", default: .standard)
@@ -119,7 +121,7 @@ struct WidgetBlocks: Equatable {
     var comingUp: Bool
     var hint: Bool
     /// The card's opacity choice; not a block, but it rides with the picker's other values.
-    var background: WidgetBackgroundOption = .solid
+    var background: WidgetBackgroundOption = .lighter
     /// The text-size choice; the lock-screen widget (no picker) keeps Standard.
     var textSize: WidgetTextSizeOption = .standard
 

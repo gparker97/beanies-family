@@ -398,16 +398,19 @@ final class DayWidgetRenderer {
     // ---- shared --------------------------------------------------------------------------
 
     /**
-     * The card's opacity and the whole-widget tap. The rim (widget_frame) and the inner surface
-     * (widget_inner) both thin to the Background choice; readable text never sits on them: the
-     * agenda panel keeps its own 95% fill, and the date column (the small header) gets
-     * {@link #dateTile}.
+     * The card's opacity and the whole-widget tap. Below 100% the frame (widget_frame) alone
+     * paints the card, at the Background choice, so it is one even surface; readable text never
+     * sits on it: the agenda panel keeps its own 95% fill, and the date column (the small header)
+     * gets {@link #dateTile}.
      */
     private static void frame(
             RemoteViews v, Context context, int id, WidgetSizes.Size size, int opacity, String link) {
         int alpha = Math.round(opacity * 255f / 100f);
         v.setInt(R.id.widget_frame, "setImageAlpha", alpha);
-        v.setInt(R.id.widget_inner, "setImageAlpha", alpha);
+        // See-through: the frame alone paints the card. Thinning both layers left the inner one
+        // stacked on the frame, so the card's middle came out more solid than its 10dp edge and
+        // the edge read as a separate ring. Solid: the inner surface stays, as before.
+        v.setInt(R.id.widget_inner, "setImageAlpha", opacity < 100 ? 0 : 255);
         WidgetViews.onClick(v, R.id.widget_root, context, id, WidgetViews.SLOT_ROOT,
                 WidgetViews.or(link, WidgetViews.FALLBACK_NOOK), size);
     }
