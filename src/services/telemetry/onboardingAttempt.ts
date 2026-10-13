@@ -23,6 +23,9 @@
  *   - `abandon`        `{ action: 'pagehide', detail: <step> }`, enqueued before the unload
  *                      beacon; never at `drive-consent` (the Drive redirect unloads the page by
  *                      design; that step's exits are its own `submitted`/`back`) or `done`.
+ *                      At `drive-consent` with a web consent popup still open (the
+ *                      `popup-abandoned` pre-stash, #131) the pagehide logs that step's `back`
+ *                      with `error_code: popup-abandoned` instead.
  *   - `attempt-ended`  `{ action: done|start-over|superseded, detail: <last shown step> }`
  *   - `attempt-expired` / `attempt-corrupt` at boot, `{ detail: <step> }` when known; the
  *                      expired one names the stale id explicitly (the cache is already clear).
@@ -34,6 +37,9 @@ import { logEvent } from '@/services/telemetry/logEvent';
 import { registerPageHideHook } from '@/services/telemetry/logQueue';
 import { reportError } from '@/utils/errorReporter';
 import { generateUUID } from '@/utils/id';
+// `resumePaths` is dependency-light by contract (its one import is the leaf `createDriveErrors`),
+// so this pulls in no auth, Drive or telemetry module and closes no import cycle.
+import { clearResumeReason, peekResumeReason } from '@/components/login/resumePaths';
 import {
   currentCreateAttempt,
   hydrateCreateAttempt,
@@ -71,11 +77,23 @@ function persist(attempt: CreateAttempt | null, stage: 'begin' | 'step' | 'end')
 /**
  * The pre-beacon `pagehide` hook. Logs through `logEvent` (synchronous through to the
  * enqueue, and enriched with `create_attempt_id`) so the event rides the unload beacon.
+ *
+ * At `drive-consent` it logs no `abandon`: the redirect transport unloads the page by design.
+ * The one exit it does record there is a web consent POPUP still open as the page goes
+ * (`connectDriveStorage` pre-stashes `popup-abandoned` just before the popup opens and settles
+ * the key when it closes; the redirect transport never pre-stashes). That is the person leaving
+ * the consent, so it is the step's `back`, with the code the resume screen will show.
  */
 function logAbandonOnPageHide(): void {
   const attempt = currentCreateAttempt();
   if (!attempt) return;
-  if (attempt.step === 'done' || attempt.step === 'drive-consent') return;
+  if (attempt.step === 'drive-consent') {
+    if (peekResumeReason() === 'popup-abandoned') {
+      trackOnboardingStep('drive-consent', 'back', { error_code: 'popup-abandoned' });
+    }
+    return;
+  }
+  if (attempt.step === 'done') return;
   logEvent({
     level: 'info',
     surface: SURFACE,
@@ -114,6 +132,10 @@ export function installOnboardingAttempt(): void {
  */
 export function beginCreateAttempt(): string {
   if (currentCreateAttempt()) endCreateAttempt('superseded');
+  // The start of an attempt is a scope boundary for the resume-reason stash as much as the end
+  // is: a code stashed while no attempt was open (expired or corrupt record) must not greet the
+  // next create.
+  clearResumeReason();
   const attempt: CreateAttempt = { id: generateUUID(), startedAt: Date.now(), step: 'welcome' };
   persist(attempt, 'begin');
   return attempt.id;
@@ -156,8 +178,14 @@ export function trackStorageChoice(choice: 'drive' | 'local'): void {
 /**
  * End the open attempt (a no-op when none is open). Logged BEFORE the state is cleared, so the
  * event still carries the attempt's id.
+ *
+ * The create flow's resume stash (`resumePaths`) is cleared FIRST, open attempt or not: a stashed
+ * Drive reason never outlives its attempt, so a sign-out plus a new signup in the same tab cannot
+ * show an old Drive notice. The redirect producers stash after the attempt opens and before any
+ * end, so they are unaffected.
  */
 export function endCreateAttempt(reason: CreateAttemptEndReason): void {
+  clearResumeReason();
   const attempt = currentCreateAttempt();
   if (!attempt) return;
   logEvent({

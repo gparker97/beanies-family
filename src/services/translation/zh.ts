@@ -2282,12 +2282,8 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'resumeSetup.storagePrompt': '你的 Pod 要存放在哪里？',
   'resumeSetup.finishing': '正在完成 Pod 设置…',
   'resumeSetup.startOver': '改为重新开始',
-  // #128 drive-declined
+  // #128 drive-declined: title of the storage-step notice shown for a stashed CreateDriveErrorCode
   'resumeSetup.driveDeclinedTitle': 'Google 需要你点头同意',
-  'resumeSetup.driveDeclinedBody':
-    '你的家庭文件还没有保存。Google 询问时，请勾选允许 beanies 在你的 Drive 中创建文件的选项。',
-  'resumeSetup.tryAgainWithGoogle': '用 Google 重试',
-  'storage.driveOnlyHere': '在这个浏览器上，Google Drive 是 beanies 唯一能保存你家庭文件的地方。',
   'resumeSetup.checking': '正在查找你的 Pod…',
   'resumeSetup.foundPod': '找到你家的 Pod 了，输入密码即可解锁。',
   'resumeSetup.lastSaved': '上次保存：',
@@ -2305,6 +2301,8 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'resumeSetup.startNewConfirmCta': '设置我的家庭',
   'createPod.driveError.title': 'Google Drive 未能连接',
   'createPod.driveError.timeout': 'Google Drive 响应太久了。请重试。',
+  'createPod.driveError.popupAbandoned':
+    'Google 登录窗口没有完成。请重试，并保持该窗口打开，直到它自行关闭。',
   'createPod.driveError.offline': '你似乎已离线。请检查网络连接后重试。',
   'createPod.driveError.accessDenied':
     'Google 没有允许 beanies 使用这个账号。请重试，或改用其他 Google 账号登录。',

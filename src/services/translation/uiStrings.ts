@@ -4491,7 +4491,8 @@ const STRING_DEFS = {
     beanie: 'finish setting up your pod',
   },
   // #128 resume-setup: the header says why the person is here (phase-neutral by default, the
-  // PIN step's own line) and the PIN step greets a known name instead of re-asking it.
+  // storage step's own line) and the PIN step (now last, just before the write) greets a known
+  // name instead of re-asking it.
   'resumeSetup.subtitle': {
     en: 'Let’s finish setting up your pod.',
     beanie: 'let’s finish setting up your pod.',
@@ -4521,24 +4522,12 @@ const STRING_DEFS = {
     en: 'Start over instead',
     beanie: 'start over instead',
   },
-  // #128 drive-declined: the web redirect's return after a "no" at Google. A decision, not a
-  // fault (orange notice, never red). Important surface: beanie keeps Google, Drive, family file.
+  // #128 drive-declined: the title of the notice the storage step shows when a Drive attempt
+  // (popup or web redirect) stashed a `CreateDriveErrorCode`, e.g. a "no" at Google. The body
+  // comes from `createPod.driveError.*`. A decision, not a fault (orange notice, never red). Important surface: beanie keeps Google, Drive, family file.
   'resumeSetup.driveDeclinedTitle': {
     en: 'Google needs a yes from you',
     beanie: 'google needs a yes from you',
-  },
-  'resumeSetup.driveDeclinedBody': {
-    en: "Your family file wasn't saved yet. When Google asks, tick the box that lets beanies create files in your Drive.",
-    beanie:
-      "your family file wasn't saved yet. when google asks, tick the box that lets beanies create files in your drive.",
-  },
-  'resumeSetup.tryAgainWithGoogle': {
-    en: 'Try again with Google',
-    beanie: 'try again with google',
-  },
-  'storage.driveOnlyHere': {
-    en: 'On this browser, Google Drive is the only place beanies can keep your family file.',
-    beanie: 'on this browser, google drive is the only place beanies can keep your family file.',
   },
 
   // Auto-load (non-destructive) recovery — shown when the family registry
@@ -4605,6 +4594,11 @@ const STRING_DEFS = {
   'createPod.driveError.timeout': {
     en: 'Google Drive took too long to answer. Try again.',
     beanie: 'google drive took too long to answer. try again.',
+  },
+  'createPod.driveError.popupAbandoned': {
+    en: "The Google sign-in window didn't finish. Try again, and keep that window open until it closes on its own.",
+    beanie:
+      "the google sign-in window didn't finish. try again, and keep that window open until it closes on its own.",
   },
   'createPod.driveError.offline': {
     en: 'You look to be offline. Check your connection and try again.',

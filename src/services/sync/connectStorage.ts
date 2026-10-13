@@ -19,6 +19,7 @@ import {
   whenRedirectAuthSettled,
   awaitNativeOAuthReturn,
   preferRedirectAuth,
+  willOpenConsentPopup,
 } from '@/services/google/googleAuth';
 import type { RedirectMode } from '@/services/google/redirectState';
 import { currentLocationPath } from '@/services/google/redirectState';
@@ -42,7 +43,11 @@ import {
 // The create flow's WEB return path. On native the trip is awaited in place and this is not used
 // (see `createReturnPath`). The old `export { RESUME_SETUP_PATH }` back-compat re-export is GONE —
 // every importer takes it from `resumePaths` directly, which is where it lives.
-import { RESUME_SETUP_PATH } from '@/components/login/resumePaths';
+import {
+  RESUME_SETUP_PATH,
+  clearResumeReason,
+  setResumeReason,
+} from '@/components/login/resumePaths';
 import { toSearchParams } from '@beanies/brand/attribution';
 import { peekAttribution } from '@/utils/attributionStash';
 
@@ -241,6 +246,16 @@ export type CreateDriveSurface =
   | 'resumeSetup.write';
 
 /**
+ * How a create-flow Drive consent travels on this device: the native system-browser trip, a
+ * full-page web redirect, or the desktop web popup. The ONE derivation, read by the report below
+ * and by `connectDriveStorage`'s pre-stash.
+ */
+export function createDriveTransport(): 'native' | 'redirect' | 'popup' {
+  if (isNative()) return 'native';
+  return shouldUseRedirectAuth() ? 'redirect' : 'popup';
+}
+
+/**
  * THE one report for a create-flow Drive failure: `reportError` at the registry's severity (only
  * `unknown` and `drive-api-disabled` page Slack) plus one console line. Lives beside
  * `logConnectFailure` so "one report per failure" reads in one file, and here rather than in the
@@ -257,7 +272,7 @@ export function reportCreateDriveFailure(
   error: unknown
 ): void {
   const { severity } = CREATE_DRIVE_ERRORS[code];
-  const transport = isNative() ? 'native' : shouldUseRedirectAuth() ? 'redirect' : 'popup';
+  const transport = createDriveTransport();
   const reason = (error as { reason?: unknown } | null | undefined)?.reason;
   const detail =
     typeof reason === 'string'
@@ -297,6 +312,9 @@ export function reportCreateDriveFailure(
  *   (`preferRedirectAuth`) and re-runs ONCE, now through the redirect gate. This is the ONE place
  *   the preference is recorded, because a connect always runs behind a person's tap, which the
  *   popup opener cannot know. The re-run fails with its own classified code if it fails.
+ * - WEB: the outcome is stashed for the resume screen (`resumePaths`, #131). Just before a consent
+ *   popup opens, `popup-abandoned` is pre-stashed, so a page that reloads or closes while the popup
+ *   is up leaves that reason behind; `settleDriveConsent` then replaces it with this call's verdict.
  *
  * @param podFileBaseName Base name for the `.beanpod` file (family name).
  * @param opts.googleEmail Pre-fills Google's account chooser (`login_hint`).
@@ -308,44 +326,61 @@ export async function connectDriveStorage(
   podFileBaseName: string,
   opts: { googleEmail?: string; activeFamilyId?: string | null; chooseAccount?: boolean } = {}
 ): Promise<StorageConnectOutcome> {
+  // A popup opens only on the popup transport, and only when there is no token to reuse or the
+  // account chooser is forced (`createNew`'s `forceConsent` / `chooseAccount`). With a valid token
+  // and no chooser nothing opens, so a slow Drive call outliving a reload is not misreported.
+  const popupOpens = createDriveTransport() === 'popup' && willOpenConsentPopup(opts);
+  if (popupOpens) setResumeReason('popup-abandoned');
   let outcome = await connectDriveStorageOnce(podFileBaseName, opts);
   if (outcome.status === 'failed' && outcome.errorKind === 'popup-blocked') {
+    // That popup never opened, and `preferRedirectAuth()` flips the transport: drop the pre-stash
+    // here rather than rely on the settle step, so an unload during the redirect start can never
+    // leave `popup-abandoned` behind.
+    clearResumeReason();
     preferRedirectAuth();
     // ⚠️ GUARDED ON THE PREFERENCE HAVING TAKEN. The in-memory flag makes the re-run a redirect
     // even when sessionStorage throws; were it somehow still a popup surface, a re-run would only
     // open a second popup into the same blocker. Exactly one retry, structurally: no loop.
     if (shouldUseRedirectAuth()) outcome = await connectDriveStorageOnce(podFileBaseName, opts);
   }
-  recordDriveConsentOutcome(outcome);
+  settleDriveConsent(outcome);
   return outcome;
 }
 
 /**
- * Close the create funnel's open `drive-consent` step (#128) with this call's outcome, for the
- * two transports that finish in place (desktop popup, native round trip). The web redirect
- * returns `redirecting` here and its exit is recorded by `OAuthCallbackPage` / App.vue's boot
- * catch instead.
+ * Settle one Drive connect: the resume stash (web) and the create funnel's `drive-consent` step.
  *
- * Only while the attempt's current step IS `drive-consent`: the resume screen's finalize runs
- * this again after a redirect return with the token already in hand (no consent in this call,
- * step already `pin`), and the callback page has recorded that consent once. Collision outcomes
- * count as `submitted`: Google said yes; what failed was the file, not the consent.
+ * STASH, WEB ONLY (`!isNative()`: nothing unloads on native, the seam handles the outcome in
+ * place). The verdict never re-reads the transport (a blocked popup flips it mid-call):
+ *  - `redirecting` → cleared: the redirect return writes its own reason (`OAuthCallbackPage`,
+ *    App.vue's boot catch);
+ *  - a failure other than a collision → the real code, for the resume screen after a reload;
+ *  - anything else (connected, or a collision, which both callers adopt automatically) → cleared.
+ * It does not depend on the attempt (which expires after 24 h); only the funnel event does.
+ *
+ * FUNNEL (#128), unchanged: only while the attempt's current step IS `drive-consent`, the step
+ * both create surfaces show when the person taps the Drive card. Any other connect is not a
+ * consent the funnel counts: the resume screen's dispatch (`proceedToFinalize`) reconnects from
+ * `resume-probe` with a token already in hand (a redirect return, or a silent reconnect), and a
+ * redirect's consent is recorded once by `OAuthCallbackPage` / App.vue's boot catch on the return.
+ * Collision outcomes count as `submitted`: Google said yes; what failed was the file, not the
+ * consent.
  */
-function recordDriveConsentOutcome(outcome: StorageConnectOutcome): void {
+function settleDriveConsent(outcome: StorageConnectOutcome): void {
+  const backCode: CreateDriveErrorCode | null =
+    outcome.status === 'failed' &&
+    outcome.errorKind !== 'name-collision' &&
+    outcome.errorKind !== 'collision-check-unavailable'
+      ? (outcome.errorKind ?? 'unknown')
+      : null;
+  if (!isNative()) {
+    if (backCode) setResumeReason(backCode);
+    else clearResumeReason();
+  }
   if (outcome.status === 'redirecting') return;
   if (currentCreateAttempt()?.step !== 'drive-consent') return;
-  if (outcome.status === 'connected') {
-    trackOnboardingStep('drive-consent', 'submitted');
-    return;
-  }
-  if (
-    outcome.errorKind === 'name-collision' ||
-    outcome.errorKind === 'collision-check-unavailable'
-  ) {
-    trackOnboardingStep('drive-consent', 'submitted');
-    return;
-  }
-  trackOnboardingStep('drive-consent', 'back', { error_code: outcome.errorKind ?? 'unknown' });
+  if (backCode) trackOnboardingStep('drive-consent', 'back', { error_code: backCode });
+  else trackOnboardingStep('drive-consent', 'submitted');
 }
 
 async function connectDriveStorageOnce(
@@ -515,12 +550,14 @@ export async function connectLocalStorage(
   // Native (Capacitor): no File System Access API and no save picker — the pod
   // is written to an app-private file via @capacitor/filesystem (app-managed
   // location, persisted for cold-boot restore). See ADR-029.
+  // A local attempt supersedes any stashed Drive reason, chosen file or not: the person has moved
+  // past that notice, so a reload must not show it again.
+  clearResumeReason();
   if (isNative()) {
     try {
       const ok = await syncService.selectNativeLocalFile(baseName);
-      return ok
-        ? { status: 'connected', type: 'local' }
-        : { status: 'failed', error: 'Could not set up local file storage' };
+      if (!ok) return { status: 'failed', error: 'Could not set up local file storage' };
+      return { status: 'connected', type: 'local' };
     } catch (e) {
       logConnectFailure('native-local-connect-failed', e);
       return { status: 'failed', error: e instanceof Error ? e.message : String(e) };

@@ -5,6 +5,8 @@ import {
   isPodlessRecoveryQuery,
   stashResumeReasonFor,
   consumeResumeReason,
+  peekResumeReason,
+  clearResumeReason,
   setResumeReason,
   isResumeSetupSearch,
 } from '../resumePaths';
@@ -118,6 +120,61 @@ describe('setResumeReason / consumeResumeReason (#128, the create registry code)
     expect(() => setResumeReason('cancelled')).not.toThrow();
     expect(consumeResumeReason()).toBeNull();
     expect(warn).toHaveBeenCalledTimes(2);
+    expect(warn.mock.calls.every((c) => String(c[0]).startsWith('[resumePaths]'))).toBe(true);
+  });
+});
+
+describe('peekResumeReason / clearResumeReason (#131)', () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it('peek reads the validated code and does NOT remove it', () => {
+    setResumeReason('popup-abandoned');
+    expect(peekResumeReason()).toBe('popup-abandoned');
+    expect(peekResumeReason()).toBe('popup-abandoned');
+    expect(sessionStorage.getItem('beanies:resume-reason')).toBe('popup-abandoned');
+  });
+
+  it('peek rejects a value that is not a registry code, and leaves it for consume to clear', () => {
+    sessionStorage.setItem('beanies:resume-reason', 'drive-declined');
+    expect(peekResumeReason()).toBeNull();
+    expect(sessionStorage.getItem('beanies:resume-reason')).toBe('drive-declined');
+  });
+
+  it('clear removes whatever is stashed, and is safe when nothing is', () => {
+    setResumeReason('cancelled');
+    clearResumeReason();
+    expect(peekResumeReason()).toBeNull();
+    expect(() => clearResumeReason()).not.toThrow();
+  });
+
+  it('consume is peek then clear', () => {
+    setResumeReason('consent-denied');
+    expect(consumeResumeReason()).toBe('consent-denied');
+    expect(peekResumeReason()).toBeNull();
+    expect(sessionStorage.getItem('beanies:resume-reason')).toBeNull();
+  });
+
+  it('a refused read or removal only warns, never throws', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.stubGlobal('sessionStorage', {
+      setItem: () => {},
+      getItem: () => {
+        throw new Error('denied');
+      },
+      removeItem: () => {
+        throw new Error('denied');
+      },
+    });
+    expect(peekResumeReason()).toBeNull();
+    expect(() => clearResumeReason()).not.toThrow();
+    expect(consumeResumeReason()).toBeNull();
+    expect(warn).toHaveBeenCalledTimes(4);
     expect(warn.mock.calls.every((c) => String(c[0]).startsWith('[resumePaths]'))).toBe(true);
   });
 });

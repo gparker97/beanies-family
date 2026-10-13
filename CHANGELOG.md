@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-10-13
 
+### Fixed
+
+- Creating a pod on the web: if the page reloads during the Google Drive step (a stuck or declined sign-in window), it now comes back to the storage step with an explanation instead of asking for your PIN again; the PIN is now the last step before your pod is created.
+
 ### Changed
 
 - Home-screen widget on Android: the margin around the panel is thinner, matching iPhone, so titles get a little more room before they are cut short.

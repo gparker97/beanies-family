@@ -46,6 +46,7 @@ const ALL_CODES: readonly CreateDriveErrorCode[] = [
   'offline',
   'consent-denied',
   'cancelled',
+  'popup-abandoned',
   'access-denied',
   'app-blocked',
   'auth-expired',
@@ -342,6 +343,24 @@ describe('createDriveFailureMessage', () => {
     for (const code of ALL_CODES) {
       expect(createDriveFailureMessage(code, t)).toBe(`t:${CREATE_DRIVE_ERRORS[code].messageKey}`);
     }
+  });
+});
+
+describe('popup-abandoned (#131): a stuck web consent popup', () => {
+  it('is a registry code with the stuck-popup copy, the same recoveries as a Cancel, at warning', () => {
+    expect(isCreateDriveErrorCode('popup-abandoned')).toBe(true);
+    expect(CREATE_DRIVE_ERRORS['popup-abandoned']).toEqual({
+      messageKey: 'createPod.driveError.popupAbandoned',
+      recoveries: CREATE_DRIVE_ERRORS.cancelled.recoveries,
+      severity: 'warning',
+    });
+    expect(createDriveRecoveries('popup-abandoned', true)).toEqual(['retry', 'useLocal']);
+    expect(createDriveRecoveries('popup-abandoned', false)).toEqual(['retry']);
+  });
+
+  it('is never produced by the classifier (only the connect seam stashes it)', () => {
+    expect(classifyCreateDriveFailure(new Error('popup-abandoned'))).not.toBe('popup-abandoned');
+    expect(classifyCreateDriveFailure('popup-abandoned')).not.toBe('popup-abandoned');
   });
 });
 

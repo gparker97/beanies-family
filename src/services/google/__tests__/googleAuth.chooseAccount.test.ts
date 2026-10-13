@@ -159,3 +159,41 @@ describe('the account chooser is reachable at all', () => {
     );
   });
 });
+
+/**
+ * #131: `willOpenConsentPopup` is the ONE predicate for "this call opens a window". The create
+ * flow's connect seam pre-stashes a resume reason on it, so it must answer exactly as
+ * `requestAccessToken` behaves, and this test is what keeps the two from drifting (the seam's own
+ * suite mocks googleAuth and hand-mirrors the rule).
+ */
+describe('willOpenConsentPopup mirrors requestAccessToken', () => {
+  beforeEach(async () => {
+    vi.resetModules();
+    vi.clearAllMocks();
+    sessionStorage.clear();
+    vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id');
+    googleAuth = await import('../googleAuth');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('a valid cached token and no fresh-grant flag: no popup, and the cached token is returned', async () => {
+    googleAuth.__setTokenForTesting?.('cached-token', Date.now() + 3_600_000);
+    expect(googleAuth.willOpenConsentPopup()).toBe(false);
+    expect(googleAuth.willOpenConsentPopup({})).toBe(false);
+    await expect(googleAuth.requestAccessToken()).resolves.toBe('cached-token');
+  });
+
+  it('an expired token opens a popup', () => {
+    googleAuth.__setTokenForTesting?.('stale', Date.now() - 1);
+    expect(googleAuth.willOpenConsentPopup()).toBe(true);
+  });
+
+  it('chooseAccount or forceConsent opens a popup even with a valid token (the fresh-grant clear)', () => {
+    googleAuth.__setTokenForTesting?.('cached-token', Date.now() + 3_600_000);
+    expect(googleAuth.willOpenConsentPopup({ chooseAccount: true })).toBe(true);
+    expect(googleAuth.willOpenConsentPopup({ forceConsent: true })).toBe(true);
+  });
+});

@@ -49,6 +49,7 @@ export type CreateDriveErrorCode =
   | 'offline'
   | 'consent-denied'
   | 'cancelled'
+  | 'popup-abandoned'
   | 'access-denied'
   | 'app-blocked'
   | 'auth-expired'
@@ -106,6 +107,15 @@ export const CREATE_DRIVE_ERRORS = {
   },
   cancelled: {
     messageKey: 'googleDrive.authCancelled',
+    recoveries: ['retry', 'useLocal'],
+    severity: 'warning',
+  },
+  // A web consent popup that opened and never settled: the page reloaded or closed while it was
+  // up. Never classified from an error; `connectDriveStorage` pre-stashes it before the popup
+  // opens and the settle step replaces it, so only a page that died mid-popup leaves it for the
+  // resume screen (#131). A person's action, measured by the funnel: nothing reports this code.
+  'popup-abandoned': {
+    messageKey: 'createPod.driveError.popupAbandoned',
     recoveries: ['retry', 'useLocal'],
     severity: 'warning',
   },

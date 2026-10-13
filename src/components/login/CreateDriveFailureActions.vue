@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * The recovery stack for a create-flow Google Drive failure: the ONE place it renders, shared by
- * CreatePodView's result modal and ResumePodSetup's `storage` / `drive-declined` notice.
+ * CreatePodView's result modal and ResumePodSetup's storage-step notice (a stashed `CreateDriveErrorCode`).
  *
  * Presentational. The host owns the message (`createDriveFailureMessage`) and the
  * three handlers that change its own state (`retry`, `chooseAccount`, `useLocal`); the registry

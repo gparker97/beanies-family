@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   CREATE_ATTEMPT_MAX_AGE_MS,
+  ONBOARDING_STEPS,
   currentCreateAttempt,
   hydrateCreateAttempt,
   setCreateAttempt,
@@ -77,6 +78,14 @@ describe('createAttemptState', () => {
       localStorage.setItem(KEY, JSON.stringify(attempt({ startedAt: NOW + 60_000 })));
       expect(hydrateCreateAttempt(NOW).kind).toBe('expired');
       expect(currentCreateAttempt()).toBeNull();
+    });
+
+    it('a stored legacy `drive-declined` step (pre-#131) hydrates as `storage`, the same screen now', () => {
+      localStorage.setItem(KEY, JSON.stringify({ ...attempt(), step: 'drive-declined' }));
+      const res = hydrateCreateAttempt(NOW);
+      expect(res).toEqual({ kind: 'ok', attempt: attempt({ step: 'storage' }) });
+      expect(currentCreateAttempt()?.step).toBe('storage');
+      expect(ONBOARDING_STEPS).not.toContain('drive-declined');
     });
 
     it('corrupt: unparseable JSON is cleared', () => {

@@ -76,21 +76,31 @@ export function isPodlessRecoveryQuery(resume: unknown): boolean {
 }
 
 /**
- * Why a create-flow web Drive redirect came back without a grant, carried across the reload to
- * the resume-setup screen (#128). The value is the create registry's own code
- * (`CreateDriveErrorCode`), ONE vocabulary with the rest of the create flow: `ResumePodSetup` shows
- * its registry message in the orange notice with its recoveries, under "Google needs a yes from
- * you" only for the two decision codes (`cancelled`, `consent-denied`). (The old
- * `drive-declined` / `drive-consent` reasons were those two codes under other names.)
+ * Why a create-flow web Drive connect did not finish, carried across a reload to the resume-setup
+ * screen (#128, #131). The value is the create registry's own code (`CreateDriveErrorCode`), ONE
+ * vocabulary with the rest of the create flow: `ResumePodSetup` shows its registry message in the
+ * orange notice with its recoveries on the storage step, under "Google needs a yes from you" only
+ * for the two decision codes (`cancelled`, `consent-denied`).
  *
- * Two producers write it, with no branches of their own: `OAuthCallbackPage` for every error on
- * the create Drive grant, and App.vue's boot catch through `stashResumeReasonFor`. Read and
- * cleared once by the screen on mount.
+ * Writers, all web-only:
+ *  - the redirect return: `OAuthCallbackPage` for every error on the create Drive grant, and
+ *    App.vue's boot catch through `stashResumeReasonFor`;
+ *  - the popup connect, in `connectStorage.connectDriveStorage`: it pre-stashes `popup-abandoned`
+ *    just before a consent popup opens, then settles the key with the outcome (the real code on a
+ *    decline or failure, cleared on a connect, a collision or a redirect). `connectLocalStorage`
+ *    clears it on a local connect, and `endCreateAttempt` clears it when the attempt ends.
  *
- * sessionStorage-backed (survives the full-page OAuth redirect) rather than a URL param, so it
- * doesn't have to thread through the shared `RESUME_SETUP_PATH` redirect. Best-effort: a storage
- * failure just means no hint is shown, and so does a value that is not a registry code (a legacy
- * `drive-declined` / `drive-consent` left in a tab mid-redirect across a deploy is dropped).
+ * ⚠️ INVARIANT: the key holds `popup-abandoned` ONLY while a popup connect is in flight, or after
+ * the page died during one. The funnel's pagehide hook (`onboardingAttempt.logAbandonOnPageHide`)
+ * reads it through `peekResumeReason` to count a stuck popup, and depends on exactly that.
+ *
+ * The resume screen's probe reads and clears it once (`consumeResumeReason`), and shows it only
+ * where nothing is connected.
+ *
+ * sessionStorage-backed (survives the full-page OAuth redirect and a reload) rather than a URL
+ * param, so it doesn't have to thread through the shared `RESUME_SETUP_PATH` redirect. Best-effort:
+ * a storage failure just means no hint is shown, and so does a value that is not a registry code
+ * (a legacy `drive-declined` / `drive-consent` left in a tab across a deploy is dropped).
  */
 const RESUME_REASON_KEY = 'beanies:resume-reason';
 
@@ -124,15 +134,31 @@ export function stashResumeReasonFor(e: unknown): CreateDriveErrorCode {
   return code;
 }
 
-export function consumeResumeReason(): CreateDriveErrorCode | null {
+/** The stashed code, validated, WITHOUT removing it. Null when absent, invalid or unreadable. */
+export function peekResumeReason(): CreateDriveErrorCode | null {
   try {
     const v = sessionStorage.getItem(RESUME_REASON_KEY);
-    if (v) sessionStorage.removeItem(RESUME_REASON_KEY);
     return isCreateDriveErrorCode(v) ? v : null;
   } catch (e) {
     console.warn('[resumePaths] sessionStorage read failed; no resume reason', e);
     return null;
   }
+}
+
+/** Remove the stashed code, whatever it holds. */
+export function clearResumeReason(): void {
+  try {
+    sessionStorage.removeItem(RESUME_REASON_KEY);
+  } catch (e) {
+    console.warn('[resumePaths] sessionStorage remove failed; resume reason not cleared', e);
+  }
+}
+
+/** Read once: `peekResumeReason` then `clearResumeReason` (an invalid value is cleared too). */
+export function consumeResumeReason(): CreateDriveErrorCode | null {
+  const v = peekResumeReason();
+  clearResumeReason();
+  return v;
 }
 
 // NOTE: the `PendingCreate` password-stash (2026-06-19, round 2) was REMOVED on

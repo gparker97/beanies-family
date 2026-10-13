@@ -1,6 +1,6 @@
 /**
  * The create-resume screen's Drive seam, after the native round trip started being AWAITED
- * (2026-09-22).
+ * (2026-09-22), and its create order since #131: storage connects BEFORE the PIN is asked.
  *
  * ⚠️ WHAT CHANGED, AND WHY THESE CASES ARE THE ONES WORTH HAVING. This screen used to carry a
  * five-part resume machine — a `'redirecting'` phase, a `redirectInFlight` marker, a
@@ -10,37 +10,62 @@
  * as the desktop popup path always did, and the whole machine is gone. What must not regress is
  * the property greg stated as the rule: never land the person back on the screen they came from
  * with nothing said.
+ *
+ * #131: the PIN lives only in page memory, so it is asked LAST, once, right before the write. The
+ * probe's `no-registry-entry` arm goes through `proceedToFinalize`, which connects in place when
+ * it can and otherwise lands on `storage`, showing a stashed Drive outcome there and only there.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mount, flushPromises, enableAutoUnmount } from '@vue/test-utils';
 import { setActivePinia, createPinia } from 'pinia';
 
-const h = vi.hoisted(() => ({
-  probe: vi.fn(async () => ({ kind: 'no-registry-entry' }) as Record<string, unknown>),
-  connectDrive: vi.fn(async () => ({ status: 'connected', type: 'google_drive' }) as unknown),
-  createNewFile: vi.fn(
-    async () => ({ ok: true, kit: { code: 'KIT-CODE', kitId: 'kit-1' } }) as unknown
-  ),
-  reportError: vi.fn(),
-  reportCreateDriveFailure: vi.fn(),
-  activeFamilyId: { value: 'fam-1' as string | null },
-  // #128
-  displayName: { value: 'Greg' as string | undefined },
-  desktop: { value: true },
-  surveyThrows: { value: false },
-  trackOnboardingStep: vi.fn(),
-  // #128 drive-declined
-  reason: { value: null as string | null },
-  localFiles: { value: false },
-  connectLocal: vi.fn(async () => ({ status: 'failed', errorKind: 'cancelled' }) as unknown),
-  rehydrateOwnerDoc: vi.fn(async () => ({ success: true }) as { success: boolean; error?: string }),
-  markRecoveryKitConfirmed: vi.fn(async () => {}),
-  sync: {
-    isGoogleDriveAvailable: true,
-    membersStepActive: false,
-    completePodSetup: vi.fn(async () => {}),
-  },
-}));
+const h = vi.hoisted(() => {
+  /** The live storage provider, as `getProvider()` sees it. */
+  const provider = { value: null as { type: string } | null };
+  /** A Drive connect that succeeds installs a Drive provider, as the real seam does. */
+  const driveConnects = async () => {
+    provider.value = { type: 'google_drive' };
+    return { status: 'connected', type: 'google_drive' } as unknown;
+  };
+  /** A local-file connect that succeeds installs a local provider, as the real seam does. */
+  const localConnects = async () => {
+    provider.value = { type: 'local' };
+    return { status: 'connected', type: 'local' } as unknown;
+  };
+  return {
+    provider,
+    driveConnects,
+    localConnects,
+    foreign: { value: false },
+    probe: vi.fn(async () => ({ kind: 'no-registry-entry' }) as Record<string, unknown>),
+    connectDrive: vi.fn(driveConnects),
+    createNewFile: vi.fn(
+      async () => ({ ok: true, kit: { code: 'KIT-CODE', kitId: 'kit-1' } }) as unknown
+    ),
+    reportError: vi.fn(),
+    reportCreateDriveFailure: vi.fn(),
+    logEvent: vi.fn(),
+    activeFamilyId: { value: 'fam-1' as string | null },
+    // #128
+    displayName: { value: 'Greg' as string | undefined },
+    desktop: { value: true },
+    surveyThrows: { value: false },
+    trackOnboardingStep: vi.fn(),
+    // A stashed Drive outcome from before the reload (#128 redirect, #131 popup)
+    reason: { value: null as string | null },
+    localFiles: { value: false },
+    connectLocal: vi.fn(async () => ({ status: 'failed', errorKind: 'cancelled' }) as unknown),
+    rehydrateOwnerDoc: vi.fn(
+      async () => ({ success: true }) as { success: boolean; error?: string }
+    ),
+    markRecoveryKitConfirmed: vi.fn(async () => {}),
+    sync: {
+      isGoogleDriveAvailable: true,
+      membersStepActive: false,
+      completePodSetup: vi.fn(async () => {}),
+    },
+  };
+});
 
 vi.mock('@/composables/useTranslation', () => ({
   // One template key resolves to a real template so the greeting's interpolation is visible.
@@ -53,7 +78,7 @@ vi.mock('@/services/telemetry/onboardingAttempt', () => ({
 }));
 vi.mock('@/utils/platformLabel', () => ({ isDesktopBrowser: () => h.desktop.value }));
 vi.mock('@/utils/errorReporter', () => ({ reportError: h.reportError }));
-vi.mock('@/services/telemetry', () => ({ logEvent: vi.fn() }));
+vi.mock('@/services/telemetry', () => ({ logEvent: h.logEvent }));
 vi.mock('@/composables/useConfirm', () => ({ confirm: vi.fn(async () => false) }));
 vi.mock('@/composables/useDriveCollisionRecovery', () => ({
   resolveDriveCollision: vi.fn(async () => ({ kind: 'declined' })),
@@ -64,8 +89,8 @@ vi.mock('@/services/sync/connectStorage', () => ({
   reportCreateDriveFailure: h.reportCreateDriveFailure,
 }));
 vi.mock('@/services/sync/syncService', () => ({
-  getProvider: vi.fn(() => null),
-  providerBelongsToAnotherFamily: vi.fn(() => false),
+  getProvider: vi.fn(() => h.provider.value),
+  providerBelongsToAnotherFamily: vi.fn(() => h.foreign.value),
 }));
 vi.mock('@/services/google/driveTokenRecovery', () => ({
   tryReconnectSilently: vi.fn(async () => false),
@@ -162,11 +187,29 @@ vi.mock('@/components/login/CreatePodSurvey.vue', () => ({
 vi.mock('@/components/login/SetupProgressModal.vue', () => ({ default: { template: '<div />' } }));
 
 import ResumePodSetup from '../ResumePodSetup.vue';
+import { isTokenValid } from '@/services/google/googleAuth';
+import { tryReconnectSilently, reconnectForWriteRetry } from '@/services/google/driveTokenRecovery';
+import { resolveDriveCollision } from '@/composables/useDriveCollisionRecovery';
+import { confirm } from '@/composables/useConfirm';
 
 // Each mount adds a window `pageshow` listener; unmount after every case so a later case's
 // dispatched event reaches only its own screen.
 enableAutoUnmount(afterEach);
 import { DriveConsentDeniedError, OAuthRoundTripAbandonedError } from '@/types/sync';
+
+// `clearAllMocks` (in each describe) clears calls, not implementations: put back every default a
+// case may flip, so nothing leaks into the next one. Runs before each describe's own `beforeEach`.
+beforeEach(() => {
+  h.provider.value = null;
+  h.foreign.value = false;
+  h.reason.value = null;
+  h.localFiles.value = false;
+  h.connectDrive.mockImplementation(h.driveConnects);
+  h.connectLocal.mockResolvedValue({ status: 'failed', errorKind: 'cancelled' });
+  vi.mocked(isTokenValid).mockReturnValue(true);
+  vi.mocked(tryReconnectSilently).mockResolvedValue(false);
+  vi.mocked(confirm).mockResolvedValue(false);
+});
 
 /** Mount past `onMounted → runProbe()` and return the wrapper. */
 async function mountScreen() {
@@ -176,27 +219,28 @@ async function mountScreen() {
 }
 
 /**
- * Mount and walk the ordinary first-time route to the storage step: the PIN step with no
- * provider and no Google token lands there (`proceedToFinalize`'s last arm). The token mock is
- * restored to valid afterwards, so a Drive connect from here connects in place. ⚠️ THE PIN STEP
- * IS NOT OPTIONAL: `finalizePod` refuses to write before it (`ownerReady`), so a case that
- * starts a storage connect straight from the mount is testing the drive-declined route.
+ * Mount and land on the storage step the way a fresh reload does (#131): the probe's dispatch
+ * finds no provider, no Google token and no refresh token to recover. The token mock is restored
+ * to valid afterwards, so a Drive connect from here connects in place. ⚠️ NO PIN HAS BEEN CHOSEN
+ * YET: a connect from here reaches `finalizePod`, which defers to the PIN step (`ownerReady`);
+ * the PIN submit (`submitPin`) is what writes.
  */
 async function atStorage() {
-  const { isTokenValid } = await import('@/services/google/googleAuth');
   vi.mocked(isTokenValid).mockReturnValue(false);
   const wrapper = await mountScreen();
-  const vm = wrapper.vm as unknown as Record<string, unknown> & {
-    handleIdentityNext: () => Promise<void>;
-  };
-  vm.pin = '123456';
-  vm.confirmPin = '123456';
-  await vm.handleIdentityNext();
-  await flushPromises();
-  expect(vm.phase).toBe('storage');
+  expect((wrapper.vm as unknown as Record<string, unknown>).phase).toBe('storage');
   vi.mocked(isTokenValid).mockReturnValue(true);
   h.trackOnboardingStep.mockClear();
+  h.logEvent.mockClear();
   return wrapper;
+}
+
+/** Choose a valid PIN on the PIN step and submit it, settling whatever it starts. */
+async function submitPin(vm: Record<string, unknown>) {
+  vm.pin = '123456';
+  vm.confirmPin = '123456';
+  await (vm.handleIdentityNext as () => Promise<void>)();
+  await flushPromises();
 }
 
 /** The screen renders one phase at a time; read it off the rendered text/markup. */
@@ -204,8 +248,25 @@ function shows(wrapper: Awaited<ReturnType<typeof mountScreen>>, key: string): b
   return wrapper.text().includes(key);
 }
 
+/**
+ * The `resumeSetup` info events, in order, as `action` or `action:detail` (`finalize-dispatch:<route>`
+ * carries the route in `detail`, the queryable field; `finalize-deferred:no-pin` is a bare action).
+ */
+function resumeActions(): string[] {
+  return h.logEvent.mock.calls
+    .map(([e]) => e as { surface: string; context?: { action?: string; detail?: string } })
+    .filter((e) => e.surface === 'resumeSetup')
+    .map((e) =>
+      e.context?.detail ? `${e.context.action}:${e.context.detail}` : (e.context?.action ?? '')
+    );
+}
+
+function dispatches(): string[] {
+  return resumeActions().filter((a) => a.startsWith('finalize-dispatch:'));
+}
+
 describe('ResumePodSetup — the Drive seam continues in place', () => {
-  beforeEach(async () => {
+  beforeEach(() => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
     h.activeFamilyId.value = 'fam-1';
@@ -215,22 +276,27 @@ describe('ResumePodSetup — the Drive seam continues in place', () => {
     h.sync.membersStepActive = false;
     h.rehydrateOwnerDoc.mockResolvedValue({ success: true });
     h.probe.mockResolvedValue({ kind: 'no-registry-entry' });
-    h.connectDrive.mockResolvedValue({ status: 'connected', type: 'google_drive' });
     h.createNewFile.mockResolvedValue({ ok: true, kit: { code: 'KIT-CODE', kitId: 'kit-1' } });
-    // `clearAllMocks` clears calls, not return values — restore the default so a case that
-    // flips it cannot leak into the next one.
-    const { isTokenValid } = await import('@/services/google/googleAuth');
-    vi.mocked(isTokenValid).mockReturnValue(true);
   });
 
-  it('a CONNECTED Drive result writes the pod and leaves the storage step', async () => {
+  it('a CONNECTED Drive result goes to the PIN step, whose submit writes into it', async () => {
     const wrapper = await atStorage();
-    (wrapper.vm as unknown as Record<string, () => Promise<void>>).handleConnectDrive();
+    const vm = wrapper.vm as unknown as Vm;
+    await vm.handleConnectDrive();
     await flushPromises();
 
+    // Storage first, PIN last (#131): nothing is written until the PIN is chosen.
+    expect(h.connectDrive).toHaveBeenCalledTimes(1);
+    expect(h.createNewFile).not.toHaveBeenCalled();
+    expect(vm.phase).toBe('identity');
+    expect(resumeActions()).toContain('finalize-deferred:no-pin');
+
+    await submitPin(vm);
+    // Into the provider that connect installed: no second connect, one write, the kit.
     expect(h.connectDrive).toHaveBeenCalledTimes(1);
     expect(h.createNewFile).toHaveBeenCalledTimes(1);
-    // The write succeeded, so the screen must NOT be back on the storage picker.
+    expect(dispatches()).toEqual(['finalize-dispatch:live-provider']);
+    expect(vm.phase).toBe('recovery-kit');
     expect(shows(wrapper, 'resumeSetup.storagePrompt')).toBe(false);
   });
 
@@ -326,7 +392,6 @@ describe('ResumePodSetup — the Drive seam continues in place', () => {
       expect(shows(wrapper, messageKey)).toBe(true);
       expect(wrapper.find('[data-recovery]').exists()).toBe(false);
       expect(shows(wrapper, 'resumeSetup.retryCta')).toBe(true);
-      h.localFiles.value = false;
     }
   );
 
@@ -341,22 +406,23 @@ describe('ResumePodSetup — the Drive seam continues in place', () => {
   it('the ORDINARY arrival at the storage step says nothing about a failure', async () => {
     // ⚠️ THE REGRESSION THIS EXISTS TO STOP, and it was introduced by a fix for an earlier
     // review finding. For a brand-new family the route is
-    // `no-registry-entry → identity → proceedToFinalize → storage`, and on that path
-    // there is no provider and no Google token — so the `else` that lands on 'storage' is the
-    // NORMAL way in, not an error arm. A round-1 fix put "Google sign-in failed" there, which
-    // told every first-time creator their sign-in had failed before they attempted one.
+    // `no-registry-entry → proceedToFinalize → storage` (#131), and on that path there is no
+    // provider and no Google token — so the dispatch's `storage` route is the NORMAL way in, not
+    // an error arm. A round-1 fix put "Google sign-in failed" there, which told every first-time
+    // creator their sign-in had failed before they attempted one.
     // The shape a first-time creator is actually in at this point: nothing installed, no Google
     // token (the account was born from email + PIN), and no refresh token to recover silently.
-    const { isTokenValid } = await import('@/services/google/googleAuth');
     vi.mocked(isTokenValid).mockReturnValue(false);
-
     const wrapper = await mountScreen();
-    (wrapper.vm as unknown as Record<string, () => Promise<void>>).proceedToFinalize();
-    await flushPromises();
 
     expect(shows(wrapper, 'resumeSetup.storagePrompt')).toBe(true);
     expect(shows(wrapper, 'googleDrive.authFailed')).toBe(false);
     expect(shows(wrapper, 'googleDrive.authCancelled')).toBe(false);
+    expect(wrapper.find('p.border-l-4').exists()).toBe(false);
+    // The screen's own neutral header, never a failure title.
+    expect(shows(wrapper, 'resumeSetup.title')).toBe(true);
+    expect(shows(wrapper, 'createPod.driveError.title')).toBe(false);
+    expect(shows(wrapper, 'resumeSetup.driveDeclinedTitle')).toBe(false);
   });
 
   it('REFUSES to write with no resolvable family id, rather than passing "" to the guard', async () => {
@@ -364,8 +430,10 @@ describe('ResumePodSetup — the Drive seam continues in place', () => {
     // message about the wrong thing; the honest answer is to stop here and page.
     h.activeFamilyId.value = null;
     const wrapper = await atStorage();
-    (wrapper.vm as unknown as Record<string, () => Promise<void>>).handleConnectDrive();
+    const vm = wrapper.vm as unknown as Vm;
+    await vm.handleConnectDrive();
     await flushPromises();
+    await submitPin(vm);
 
     expect(h.createNewFile).not.toHaveBeenCalled();
     expect(h.reportError).toHaveBeenCalledWith(
@@ -381,14 +449,12 @@ describe('ResumePodSetup — the Drive seam continues in place', () => {
       reason: 'storageQuotaExceeded',
     });
     h.createNewFile.mockResolvedValue({ ok: false, reason: 'write', error: quota });
-    const { reconnectForWriteRetry } = await import('@/services/google/driveTokenRecovery');
     const wrapper = await atStorage();
-    const vm = wrapper.vm as unknown as Record<string, unknown> & {
-      handleConnectDrive: () => Promise<void>;
-    };
+    const vm = wrapper.vm as unknown as Vm;
 
     await vm.handleConnectDrive();
     await flushPromises();
+    await submitPin(vm);
 
     expect(reconnectForWriteRetry).not.toHaveBeenCalled();
     expect(h.createNewFile).toHaveBeenCalledTimes(1);
@@ -434,7 +500,6 @@ describe('ResumePodSetup — the Drive seam continues in place', () => {
       expect(
         wrapper.findAll('button').filter((b) => b.text() === 'storage.useLocalInstead')
       ).toHaveLength(1);
-      h.localFiles.value = false;
     }
   );
 
@@ -454,6 +519,11 @@ describe('ResumePodSetup — the Drive seam continues in place', () => {
     await flushPromises();
 
     expect(h.connectDrive).toHaveBeenCalledTimes(2);
+    // The emitted payload never reaches `opts`: a plain retry, not the account chooser.
+    expect(h.connectDrive.mock.calls[1]).toEqual([
+      expect.any(String),
+      expect.objectContaining({ chooseAccount: undefined }),
+    ]);
     expect(vm.driveFailure).toBeNull();
   });
 });
@@ -469,14 +539,15 @@ type Vm = Record<string, unknown> & {
   handleConnectDrive: () => Promise<void>;
 };
 
-/** Mount, set a valid PIN, submit the PIN step and settle the write. */
+/**
+ * Mount with a valid Drive token (a redirect that just returned with a grant): the probe's
+ * dispatch connects in place and lands on the PIN step. Then submit a valid PIN and settle the
+ * write, which goes into the provider that connect installed.
+ */
 async function throughPin() {
   const wrapper = await mountScreen();
   const vm = wrapper.vm as unknown as Vm;
-  vm.pin = '123456';
-  vm.confirmPin = '123456';
-  await vm.handleIdentityNext();
-  await flushPromises();
+  await submitPin(vm);
   return { wrapper, vm };
 }
 
@@ -485,7 +556,7 @@ function stepCalls(action: string): string[] {
 }
 
 describe('ResumePodSetup — #128 order: write → kit → members → survey → Nook', () => {
-  beforeEach(async () => {
+  beforeEach(() => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
     h.activeFamilyId.value = 'fam-1';
@@ -495,10 +566,7 @@ describe('ResumePodSetup — #128 order: write → kit → members → survey �
     h.sync.membersStepActive = false;
     h.rehydrateOwnerDoc.mockResolvedValue({ success: true });
     h.probe.mockResolvedValue({ kind: 'no-registry-entry' });
-    h.connectDrive.mockResolvedValue({ status: 'connected', type: 'google_drive' });
     h.createNewFile.mockResolvedValue({ ok: true, kit: { code: 'KIT-CODE', kitId: 'kit-1' } });
-    const { isTokenValid } = await import('@/services/google/googleAuth');
-    vi.mocked(isTokenValid).mockReturnValue(true);
   });
 
   it('the PIN step goes straight to the write (no survey) and lands on the kit', async () => {
@@ -565,9 +633,13 @@ describe('ResumePodSetup — #128 order: write → kit → members → survey �
     expect(h.sync.completePodSetup).toHaveBeenCalledWith({ heardVia: null });
   });
 
-  it('hides "Start over" on every post-write step, and shows it on the PIN step', async () => {
-    const wrapper = await mountScreen();
+  it('hides "Start over" on every post-write step, and shows it on storage and the PIN step', async () => {
+    const wrapper = await atStorage();
     const vm = wrapper.vm as unknown as Vm;
+    expect(shows(wrapper, 'resumeSetup.startOver')).toBe(true);
+
+    vm.phase = 'identity';
+    await flushPromises();
     expect(shows(wrapper, 'resumeSetup.startOver')).toBe(true);
 
     for (const phase of ['recovery-kit', 'members', 'survey']) {
@@ -579,7 +651,7 @@ describe('ResumePodSetup — #128 order: write → kit → members → survey �
 });
 
 describe('ResumePodSetup — #128 kit step', () => {
-  beforeEach(async () => {
+  beforeEach(() => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
     h.activeFamilyId.value = 'fam-1';
@@ -587,10 +659,7 @@ describe('ResumePodSetup — #128 kit step', () => {
     h.surveyThrows.value = false;
     h.rehydrateOwnerDoc.mockResolvedValue({ success: true });
     h.probe.mockResolvedValue({ kind: 'no-registry-entry' });
-    h.connectDrive.mockResolvedValue({ status: 'connected', type: 'google_drive' });
     h.createNewFile.mockResolvedValue({ ok: true, kit: { code: 'KIT-CODE', kitId: 'kit-1' } });
-    const { isTokenValid } = await import('@/services/google/googleAuth');
-    vi.mocked(isTokenValid).mockReturnValue(true);
   });
 
   it('on a desktop browser the phone line sits in the kit modal, for the owner', async () => {
@@ -669,16 +738,36 @@ describe('ResumePodSetup — #128 PIN greeting and header', () => {
     expect(shows(wrapper, 'resumeSetup.title')).toBe(true);
     expect(shows(wrapper, 'resumeSetup.subtitle')).toBe(true);
     expect(shows(wrapper, 'resumeSetup.subtitlePin')).toBe(false);
+    // The prompt is the body's, said once, never repeated in the header.
+    expect(wrapper.text().split('resumeSetup.storagePrompt')).toHaveLength(2);
 
     vm.phase = 'survey';
     await flushPromises();
     expect(shows(wrapper, 'resumeSetup.title')).toBe(false);
     expect(wrapper.find('img').exists()).toBe(false);
   });
+
+  it.each([
+    ['cancelled', 'resumeSetup.driveDeclinedTitle', 'createPod.driveError.title'],
+    ['consent-denied', 'resumeSetup.driveDeclinedTitle', 'createPod.driveError.title'],
+    ['app-blocked', 'createPod.driveError.title', 'resumeSetup.driveDeclinedTitle'],
+  ])('storage with a %s failure: its own title, no subtitle', async (code, title, notTitle) => {
+    h.displayName.value = 'Greg';
+    h.reason.value = code;
+    vi.mocked(isTokenValid).mockReturnValue(false);
+    const wrapper = await mountScreen();
+
+    expect(shows(wrapper, title)).toBe(true);
+    expect(shows(wrapper, notTitle)).toBe(false);
+    expect(shows(wrapper, 'resumeSetup.subtitle')).toBe(false);
+    expect(shows(wrapper, 'resumeSetup.title')).toBe(false);
+    // The storage prompt still says what the screen is for, once.
+    expect(wrapper.text().split('resumeSetup.storagePrompt')).toHaveLength(2);
+  });
 });
 
 describe('ResumePodSetup — #128 funnel steps', () => {
-  beforeEach(async () => {
+  beforeEach(() => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
     h.activeFamilyId.value = 'fam-1';
@@ -687,10 +776,7 @@ describe('ResumePodSetup — #128 funnel steps', () => {
     h.surveyThrows.value = false;
     h.rehydrateOwnerDoc.mockResolvedValue({ success: true });
     h.probe.mockResolvedValue({ kind: 'no-registry-entry' });
-    h.connectDrive.mockResolvedValue({ status: 'connected', type: 'google_drive' });
     h.createNewFile.mockResolvedValue({ ok: true, kit: { code: 'KIT-CODE', kitId: 'kit-1' } });
-    const { isTokenValid } = await import('@/services/google/googleAuth');
-    vi.mocked(isTokenValid).mockReturnValue(true);
   });
 
   it("emits shown once per mapped phase, and submitted on each step's success line", async () => {
@@ -707,6 +793,20 @@ describe('ResumePodSetup — #128 funnel steps', () => {
     expect(stepCalls('submitted')).toEqual(['pin', 'kit', 'members', 'survey']);
   });
 
+  it('a fresh reload walks storage → PIN → write, with storage shown before the PIN', async () => {
+    vi.mocked(isTokenValid).mockReturnValue(false);
+    const wrapper = await mountScreen();
+    const vm = wrapper.vm as unknown as Vm;
+    vi.mocked(isTokenValid).mockReturnValue(true);
+    await vm.handleConnectDrive();
+    await flushPromises();
+    await submitPin(vm);
+
+    expect(stepCalls('shown')).toEqual(['resume-probe', 'storage', 'drive-consent', 'pin', 'kit']);
+    expect(stepCalls('submitted')).toEqual(['pin']);
+    expect(vm.phase).toBe('recovery-kit');
+  });
+
   it('no submitted for a PIN step whose owner rebuild failed', async () => {
     h.rehydrateOwnerDoc.mockResolvedValue({ success: false, error: 'nope' });
     await throughPin();
@@ -716,11 +816,8 @@ describe('ResumePodSetup — #128 funnel steps', () => {
   });
 
   it('the storage step is shown, and the Drive connect records drive-consent shown first', async () => {
-    const wrapper = await mountScreen();
+    const wrapper = await atStorage();
     const vm = wrapper.vm as unknown as Vm;
-    vm.phase = 'storage';
-    await flushPromises();
-    h.trackOnboardingStep.mockClear();
 
     await vm.handleConnectDrive();
     await flushPromises();
@@ -731,23 +828,68 @@ describe('ResumePodSetup — #128 funnel steps', () => {
     );
   });
 
-  it('with no stashed reason the probe goes to the PIN step, never drive-declined', async () => {
+  it('a fresh reload (nothing connected) lands on storage, never on the PIN step', async () => {
+    vi.mocked(isTokenValid).mockReturnValue(false);
     const wrapper = await mountScreen();
-    expect(stepCalls('shown')).not.toContain('drive-declined');
-    expect(shows(wrapper, 'resumeSetup.subtitlePin')).toBe(true);
+    const vm = wrapper.vm as unknown as Vm;
+
+    expect(vm.phase).toBe('storage');
+    expect(stepCalls('shown')).toEqual(['resume-probe', 'storage']);
+    // No failure on screen, so no `error_code` on the step.
+    expect(h.trackOnboardingStep).toHaveBeenCalledWith('storage', 'shown');
+    expect(shows(wrapper, 'setup.choosePinLabel')).toBe(false);
+    expect(dispatches()).toEqual(['finalize-dispatch:storage']);
+    expect(h.connectDrive).not.toHaveBeenCalled();
+  });
+
+  it('a valid token at the probe connects in place: no consent counted, the PIN step via no-pin', async () => {
+    const wrapper = await mountScreen();
+    const vm = wrapper.vm as unknown as Vm;
+
+    expect(h.connectDrive).toHaveBeenCalledTimes(1);
+    expect(h.createNewFile).not.toHaveBeenCalled();
+    expect(vm.phase).toBe('identity');
+    expect(resumeActions()).toEqual(['finalize-dispatch:valid-token', 'finalize-deferred:no-pin']);
+    expect(stepCalls('shown')).toEqual(['resume-probe', 'pin']);
+    // The consent is the connect seam's to count, from the storage step only.
+    expect(h.trackOnboardingStep.mock.calls.map(([s]) => s)).not.toContain('drive-consent');
+  });
+
+  it('storage shown carries the error_code of the failure it displays', async () => {
+    h.reason.value = 'consent-denied';
+    vi.mocked(isTokenValid).mockReturnValue(false);
+    await mountScreen();
+
+    expect(h.trackOnboardingStep).toHaveBeenCalledWith('storage', 'shown', {
+      error_code: 'consent-denied',
+    });
+    // `drive-declined` is no longer a step.
+    expect(stepCalls('shown')).toEqual(['resume-probe', 'storage']);
+  });
+
+  it('a failed connect back on storage logs storage shown with its error_code', async () => {
+    h.connectDrive.mockResolvedValue({ status: 'failed', error: 'x', errorKind: 'drive-busy' });
+    const wrapper = await atStorage();
+    await (wrapper.vm as unknown as Vm).handleConnectDrive();
+    await flushPromises();
+
+    expect(h.trackOnboardingStep.mock.calls).toEqual([
+      ['drive-consent', 'shown'],
+      ['storage', 'shown', { error_code: 'drive-busy' }],
+    ]);
   });
 });
 
-// ─── #128 B2: the web redirect's "Google needs a yes" return ──────────────────
+// ─── #128 / #131: a Drive outcome stashed before the reload, shown on storage ─────────────────
 
-describe('ResumePodSetup — #128 drive-declined', () => {
-  type DeclinedVm = Vm & {
-    handleDriveDeclinedRetry: () => Promise<void>;
+describe('ResumePodSetup — a stashed Drive outcome lands on storage', () => {
+  type StorageVm = Vm & {
     handleConnectLocal: () => Promise<void>;
     handleLocalFileClick: () => void;
+    handleRetry: () => Promise<void>;
   };
 
-  beforeEach(async () => {
+  beforeEach(() => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
     h.activeFamilyId.value = 'fam-1';
@@ -756,28 +898,30 @@ describe('ResumePodSetup — #128 drive-declined', () => {
     h.surveyThrows.value = false;
     h.sync.membersStepActive = false;
     h.reason.value = 'cancelled';
-    h.localFiles.value = false;
     h.rehydrateOwnerDoc.mockResolvedValue({ success: true });
     h.probe.mockResolvedValue({ kind: 'no-registry-entry' });
     h.connectDrive.mockResolvedValue({ status: 'redirecting' });
-    h.connectLocal.mockResolvedValue({ status: 'connected', type: 'local' });
+    h.connectLocal.mockImplementation(h.localConnects);
     h.createNewFile.mockResolvedValue({ ok: true, kit: { code: 'KIT-CODE', kitId: 'kit-1' } });
-    const { isTokenValid } = await import('@/services/google/googleAuth');
+    // Nothing connected and nothing to recover: the dispatch lands on `storage`.
     vi.mocked(isTokenValid).mockReturnValue(false);
   });
 
-  it('a decline lands on the screen: title, orange notice, retry, Start over; no red box', async () => {
+  it('a decline lands on storage: title, prompt, orange notice, retry, Start over; no red box', async () => {
     const wrapper = await mountScreen();
-    const vm = wrapper.vm as unknown as DeclinedVm;
+    const vm = wrapper.vm as unknown as StorageVm;
 
-    expect(vm.phase).toBe('drive-declined');
+    expect(vm.phase).toBe('storage');
     expect(vm.driveFailure).toBe('cancelled');
     expect(shows(wrapper, 'resumeSetup.driveDeclinedTitle')).toBe(true);
+    expect(shows(wrapper, 'resumeSetup.storagePrompt')).toBe(true);
     expect(shows(wrapper, 'googleDrive.authCancelled')).toBe(true);
     expect(wrapper.find('[data-recovery="retry"]').exists()).toBe(true);
     expect(shows(wrapper, 'resumeSetup.startOver')).toBe(true);
     // The header's subtitle slot is empty here: the notice is the explanation.
     expect(shows(wrapper, 'resumeSetup.subtitle')).toBe(false);
+    // The recoveries replace the default buttons, never sit beside them.
+    expect(shows(wrapper, 'storage.connectGoogleDrive')).toBe(false);
     // A decision, not a fault: Heritage Orange with a dark partner, never the red form-error box.
     const notice = wrapper.find('p.border-l-4');
     expect(notice.classes()).toEqual(
@@ -790,20 +934,47 @@ describe('ResumePodSetup — #128 drive-declined', () => {
     expect(wrapper.find('.bg-red-50').exists()).toBe(false);
     // Nothing already given is asked again here: no PIN form, no name field.
     expect(shows(wrapper, 'setup.choosePinLabel')).toBe(false);
-    expect(stepCalls('shown')).toEqual(['resume-probe', 'drive-declined']);
+    expect(stepCalls('shown')).toEqual(['resume-probe', 'storage']);
+    expect(dispatches()).toEqual(['finalize-dispatch:storage']);
     // The producer already reported it; the screen reports nothing new.
     expect(h.reportCreateDriveFailure).not.toHaveBeenCalled();
+    expect(h.reportError).not.toHaveBeenCalled();
   });
 
   it('an unticked file-access box uses the consent copy under the same decision title', async () => {
     h.reason.value = 'consent-denied';
     const wrapper = await mountScreen();
 
-    expect((wrapper.vm as unknown as DeclinedVm).phase).toBe('drive-declined');
+    expect((wrapper.vm as unknown as StorageVm).phase).toBe('storage');
     expect(shows(wrapper, 'resumeSetup.driveDeclinedTitle')).toBe(true);
     expect(shows(wrapper, 'createPod.driveConsentDenied')).toBe(true);
     expect(shows(wrapper, 'googleDrive.authCancelled')).toBe(false);
     expect(wrapper.find('.bg-red-50').exists()).toBe(false);
+  });
+
+  it('a stuck popup from before the reload: storage with its notice, retry and a local file; nothing reported', async () => {
+    h.reason.value = 'popup-abandoned';
+    h.localFiles.value = true;
+    const wrapper = await mountScreen();
+    const vm = wrapper.vm as unknown as StorageVm;
+
+    expect(vm.phase).toBe('storage');
+    expect(vm.driveFailure).toBe('popup-abandoned');
+    expect(shows(wrapper, 'createPod.driveError.popupAbandoned')).toBe(true);
+    // Not a decision: the neutral failure title.
+    expect(shows(wrapper, 'createPod.driveError.title')).toBe(true);
+    expect(
+      wrapper
+        .findAll('[data-recovery]')
+        .map((b) => b.attributes('data-recovery'))
+        .filter((a) => a !== 'help')
+    ).toEqual(['retry', 'useLocal']);
+    expect(h.trackOnboardingStep).toHaveBeenCalledWith('storage', 'shown', {
+      error_code: 'popup-abandoned',
+    });
+    // A person's action, measured by the funnel: never a report.
+    expect(h.reportCreateDriveFailure).not.toHaveBeenCalled();
+    expect(h.reportError).not.toHaveBeenCalled();
   });
 
   it.each(['app-blocked', 'access-denied', 'unknown', 'drive-full', 'offline'])(
@@ -812,7 +983,7 @@ describe('ResumePodSetup — #128 drive-declined', () => {
       h.reason.value = code;
       const wrapper = await mountScreen();
 
-      expect((wrapper.vm as unknown as DeclinedVm).phase).toBe('drive-declined');
+      expect((wrapper.vm as unknown as StorageVm).phase).toBe('storage');
       expect(shows(wrapper, 'createPod.driveError.title')).toBe(true);
       expect(shows(wrapper, 'resumeSetup.driveDeclinedTitle')).toBe(false);
       expect(wrapper.find('p.border-l-4').exists()).toBe(true);
@@ -858,19 +1029,48 @@ describe('ResumePodSetup — #128 drive-declined', () => {
     const local = wrapper.find('[data-recovery="useLocal"]');
     expect(local.exists()).toBe(true);
     await local.trigger('click');
-    expect((wrapper.vm as unknown as DeclinedVm).showLocalFileWarning).toBe(true);
+    expect((wrapper.vm as unknown as StorageVm).showLocalFileWarning).toBe(true);
   });
 
-  it("the actions' Try again is the declined screen's own retry (it keeps the token shortcut)", async () => {
-    const { isTokenValid } = await import('@/services/google/googleAuth');
-    vi.mocked(isTokenValid).mockReturnValue(true);
+  it('storage offers a local file even for a code that omits it', async () => {
+    h.localFiles.value = true;
+    h.reason.value = 'popup-blocked';
     const wrapper = await mountScreen();
+    expect((wrapper.vm as unknown as StorageVm).phase).toBe('storage');
+    expect(wrapper.find('[data-recovery="useLocal"]').exists()).toBe(true);
+  });
+
+  it('Try again with no token starts the Drive connect (the redirect), and keeps the spinner', async () => {
+    const wrapper = await mountScreen();
+    const vm = wrapper.vm as unknown as StorageVm;
+    h.trackOnboardingStep.mockClear();
 
     await wrapper.find('[data-recovery="retry"]').trigger('click');
     await flushPromises();
 
-    expect((wrapper.vm as unknown as DeclinedVm).phase).toBe('identity');
-    expect(h.connectDrive).not.toHaveBeenCalled();
+    expect(h.connectDrive).toHaveBeenCalledTimes(1);
+    expect(h.createNewFile).not.toHaveBeenCalled();
+    expect(h.trackOnboardingStep.mock.calls[0]).toEqual(['drive-consent', 'shown']);
+    // The page is unloading to Google: no flash of the storage picker, no `storage shown`
+    // (which would log the unload as an abandon at `storage`).
+    expect(vm.phase).toBe('finishing');
+    expect(stepCalls('shown')).not.toContain('storage');
+  });
+
+  it('Try again with a token connects in place and goes to the PIN step, never writing', async () => {
+    const wrapper = await mountScreen();
+    const vm = wrapper.vm as unknown as StorageVm;
+    vi.mocked(isTokenValid).mockReturnValue(true);
+    h.connectDrive.mockImplementation(h.driveConnects);
+
+    await wrapper.find('[data-recovery="retry"]').trigger('click');
+    await flushPromises();
+
+    expect(h.connectDrive).toHaveBeenCalledTimes(1);
+    expect(h.createNewFile).not.toHaveBeenCalled();
+    expect(vm.phase).toBe('identity');
+    expect(vm.driveFailure).toBeNull();
+    expect(stepCalls('submitted')).toEqual([]);
   });
 
   it('"use a different Google account" runs the connect with the chooser forced', async () => {
@@ -884,116 +1084,75 @@ describe('ResumePodSetup — #128 drive-declined', () => {
       expect.any(String),
       expect.objectContaining({ chooseAccount: true })
     );
-    expect(stepCalls('submitted')).toContain('drive-declined');
-  });
-
-  it('Try again with no token starts the Drive connect (the redirect), and keeps the spinner', async () => {
-    const wrapper = await mountScreen();
-    const vm = wrapper.vm as unknown as DeclinedVm;
-    h.trackOnboardingStep.mockClear();
-
-    await vm.handleDriveDeclinedRetry();
-    await flushPromises();
-
-    expect(h.connectDrive).toHaveBeenCalledTimes(1);
-    expect(h.createNewFile).not.toHaveBeenCalled();
-    expect(h.trackOnboardingStep.mock.calls.slice(0, 2)).toEqual([
-      ['drive-declined', 'submitted'],
-      ['drive-consent', 'shown'],
-    ]);
-    // The page is unloading to Google: no flash of the storage picker, no `storage shown`
-    // (which would log the unload as an abandon at `storage`).
-    expect(vm.phase).toBe('finishing');
-    expect(stepCalls('shown')).not.toContain('storage');
-  });
-
-  it('Try again with a VALID token routes to the PIN step and never writes a pod without a PIN', async () => {
-    const { isTokenValid } = await import('@/services/google/googleAuth');
-    vi.mocked(isTokenValid).mockReturnValue(true);
-    const wrapper = await mountScreen();
-    const vm = wrapper.vm as unknown as DeclinedVm;
-
-    await vm.handleDriveDeclinedRetry();
-    await flushPromises();
-
-    expect(vm.phase).toBe('identity');
-    expect(h.connectDrive).not.toHaveBeenCalled();
-    expect(h.createNewFile).not.toHaveBeenCalled();
-    expect(stepCalls('submitted')).toEqual(['drive-declined']);
+    expect(stepCalls('submitted')).toEqual([]);
   });
 
   it('a local file chosen here goes to the PIN step first, then writes into it', async () => {
     h.localFiles.value = true;
     const wrapper = await mountScreen();
-    const vm = wrapper.vm as unknown as DeclinedVm;
+    const vm = wrapper.vm as unknown as StorageVm;
 
     await vm.handleConnectLocal();
     await flushPromises();
     expect(h.connectLocal).toHaveBeenCalledTimes(1);
     expect(h.createNewFile).not.toHaveBeenCalled();
     expect(vm.phase).toBe('identity');
+
+    await submitPin(vm);
+    expect(h.createNewFile).toHaveBeenCalledTimes(1);
+    expect(h.connectDrive).not.toHaveBeenCalled();
+    expect(vm.phase).toBe('recovery-kit');
   });
 
-  it('a local failure after a Drive failure: the red form error, the default notice, never the stale code', async () => {
+  it('a local failure after a Drive failure: the red form error, the default storage screen, never the stale code', async () => {
     h.localFiles.value = true;
     h.connectLocal.mockResolvedValue({ status: 'failed', errorKind: 'unknown', error: 'disk' });
     const wrapper = await mountScreen();
-    const vm = wrapper.vm as unknown as DeclinedVm;
+    const vm = wrapper.vm as unknown as StorageVm;
     expect(vm.driveFailure).toBe('cancelled');
 
     await vm.handleConnectLocal();
     await flushPromises();
 
-    expect(vm.phase).toBe('drive-declined');
+    expect(vm.phase).toBe('storage');
     expect(vm.driveFailure).toBeNull();
     expect(vm.formError).toBe('setup.fileCreateFailed');
     expect(wrapper.find('.bg-red-50').exists()).toBe(true);
     expect(shows(wrapper, 'googleDrive.authCancelled')).toBe(false);
     expect(wrapper.find('[data-recovery]').exists()).toBe(false);
-    expect(shows(wrapper, 'resumeSetup.driveDeclinedBody')).toBe(true);
+    expect(shows(wrapper, 'storage.connectGoogleDrive')).toBe(true);
   });
 
-  it('with NO code (a dismissed local picker), the screen keeps its default title and notice', async () => {
+  it('with NO code (a dismissed local picker), the default storage screen and header', async () => {
     h.localFiles.value = true;
     h.reason.value = 'app-blocked';
     h.connectLocal.mockResolvedValue({ status: 'failed', errorKind: 'cancelled' });
     const wrapper = await mountScreen();
-    const vm = wrapper.vm as unknown as DeclinedVm;
+    const vm = wrapper.vm as unknown as StorageVm;
     expect(shows(wrapper, 'createPod.driveError.title')).toBe(true);
 
     await vm.handleConnectLocal();
     await flushPromises();
 
-    expect(vm.phase).toBe('drive-declined');
+    expect(vm.phase).toBe('storage');
     expect(vm.driveFailure).toBeNull();
-    // Never the neutral failure title with nothing under it to explain it.
+    expect(h.createNewFile).not.toHaveBeenCalled();
+    // Never a failure title with nothing under it to explain it.
     expect(shows(wrapper, 'createPod.driveError.title')).toBe(false);
-    expect(shows(wrapper, 'resumeSetup.driveDeclinedTitle')).toBe(true);
-    const notice = wrapper.find('p.border-l-4');
-    expect(notice.exists()).toBe(true);
-    expect(notice.text()).toContain('resumeSetup.driveDeclinedBody');
-    expect(shows(wrapper, 'resumeSetup.tryAgainWithGoogle')).toBe(true);
+    expect(shows(wrapper, 'resumeSetup.driveDeclinedTitle')).toBe(false);
+    expect(shows(wrapper, 'resumeSetup.title')).toBe(true);
+    expect(wrapper.find('p.border-l-4').exists()).toBe(false);
+    expect(shows(wrapper, 'storage.connectGoogleDrive')).toBe(true);
   });
 
-  it('the declined screen offers a local file even for a code that omits it (as storage does)', async () => {
-    h.localFiles.value = true;
-    h.reason.value = 'popup-blocked';
-    const wrapper = await mountScreen();
-    expect((wrapper.vm as unknown as DeclinedVm).phase).toBe('drive-declined');
-    expect(wrapper.find('[data-recovery="useLocal"]').exists()).toBe(true);
-  });
-
-  it('the valid-token shortcut to the PIN step clears the code: it never reappears on storage', async () => {
-    const { isTokenValid } = await import('@/services/google/googleAuth');
-    vi.mocked(isTokenValid).mockReturnValue(true);
+  it('leaving storage clears the code: it never reappears on a later visit', async () => {
     h.reason.value = 'app-blocked';
     const wrapper = await mountScreen();
-    const vm = wrapper.vm as unknown as DeclinedVm;
+    const vm = wrapper.vm as unknown as StorageVm;
     expect(vm.driveFailure).toBe('app-blocked');
 
-    await vm.handleDriveDeclinedRetry();
+    vm.phase = 'identity';
     await flushPromises();
-    expect(vm.phase).toBe('identity');
     expect(vm.driveFailure).toBeNull();
 
     vm.phase = 'storage';
@@ -1002,26 +1161,47 @@ describe('ResumePodSetup — #128 drive-declined', () => {
     expect(shows(wrapper, 'createPod.driveError.appBlocked')).toBe(false);
   });
 
-  it('moving between the two failure phases keeps the code', async () => {
-    h.reason.value = 'drive-full';
+  it.each([
+    ['a live same-family provider', 'live-provider'],
+    ['a valid token', 'valid-token'],
+    ['a silent reconnect', 'silent-reconnect'],
+  ])(
+    'a stash is dropped when the dispatch finds %s: the PIN step, no notice',
+    async (_n, route) => {
+      let token = route === 'valid-token';
+      vi.mocked(isTokenValid).mockImplementation(() => token);
+      if (route === 'live-provider') h.provider.value = { type: 'google_drive' };
+      if (route === 'silent-reconnect') {
+        vi.mocked(tryReconnectSilently).mockImplementation(async () => {
+          token = true;
+          return true;
+        });
+      }
+      h.connectDrive.mockImplementation(h.driveConnects);
+      const wrapper = await mountScreen();
+      const vm = wrapper.vm as unknown as StorageVm;
+
+      expect(dispatches()).toEqual([`finalize-dispatch:${route}`]);
+      expect(vm.phase).toBe('identity');
+      expect(vm.driveFailure).toBeNull();
+      expect(h.reason.value).toBeNull(); // consumed either way
+      expect(wrapper.find('p.border-l-4').exists()).toBe(false);
+      expect(stepCalls('shown')).toEqual(['resume-probe', 'pin']);
+      expect(h.createNewFile).not.toHaveBeenCalled();
+    }
+  );
+
+  it('a FOREIGN Drive provider is not "connected": the stash still lands on storage', async () => {
+    // A provider bound to another family is never written into (the 2026-09-21 near data loss).
+    // With no token to replace it, nothing is connected, so the stashed reason is the news.
+    h.provider.value = { type: 'google_drive' };
+    h.foreign.value = true;
     const wrapper = await mountScreen();
-    const vm = wrapper.vm as unknown as DeclinedVm;
+    const vm = wrapper.vm as unknown as StorageVm;
 
-    vm.phase = 'storage';
-    await flushPromises();
-    expect(vm.driveFailure).toBe('drive-full');
-    expect(shows(wrapper, 'createPod.driveError.driveFull')).toBe(true);
-  });
-
-  it('a failed local file returns to the declined screen, not the storage step', async () => {
-    h.localFiles.value = true;
-    h.connectLocal.mockResolvedValue({ status: 'failed', errorKind: 'cancelled' });
-    const wrapper = await mountScreen();
-    const vm = wrapper.vm as unknown as DeclinedVm;
-
-    await vm.handleConnectLocal();
-    await flushPromises();
-    expect(vm.phase).toBe('drive-declined');
+    expect(dispatches()).toEqual(['finalize-dispatch:storage']);
+    expect(vm.phase).toBe('storage');
+    expect(vm.driveFailure).toBe('cancelled');
     expect(h.createNewFile).not.toHaveBeenCalled();
   });
 
@@ -1035,91 +1215,87 @@ describe('ResumePodSetup — #128 drive-declined', () => {
     async (_n, result, expected) => {
       h.probe.mockResolvedValue(result);
       const wrapper = await mountScreen();
-      expect((wrapper.vm as unknown as DeclinedVm).phase).toBe(expected);
+      expect((wrapper.vm as unknown as StorageVm).phase).toBe(expected);
       expect(h.reason.value).toBeNull();
-      expect(stepCalls('shown')).not.toContain('drive-declined');
+      expect(stepCalls('shown')).not.toContain('storage');
+      expect(dispatches()).toEqual([]);
     }
   );
 
-  it('a retry re-probe never re-shows the decline (the reason is mount-only)', async () => {
+  it('a retry re-probe never re-shows the stash (the reason is mount-only)', async () => {
     h.probe.mockResolvedValueOnce({ kind: 'registry-error', error: new Error('down') });
     const wrapper = await mountScreen();
-    const vm = wrapper.vm as unknown as DeclinedVm & { handleRetry: () => Promise<void> };
+    const vm = wrapper.vm as unknown as StorageVm;
     expect(vm.phase).toBe('retry');
 
     await vm.handleRetry();
     await flushPromises();
-    expect(vm.phase).toBe('identity');
+    expect(vm.phase).toBe('storage');
+    expect(vm.driveFailure).toBeNull();
+    expect(wrapper.find('p.border-l-4').exists()).toBe(false);
   });
 });
 
-// ─── #128 review fix-ups: no write before the PIN, bfcache return, survey re-throw ───────────
+// ─── #131: the PIN is the last step before the write, on every route ─────────────────────────
 
 describe('ResumePodSetup — no pod write before the PIN step, on any route', () => {
-  type DeclinedVm = Vm & {
-    handleDriveDeclinedRetry: () => Promise<void>;
+  type StorageVm = Vm & {
     handleConnectLocal: () => Promise<void>;
+    handleStartNewPodFromRetry: () => Promise<void>;
   };
 
-  beforeEach(async () => {
+  beforeEach(() => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
     h.activeFamilyId.value = 'fam-1';
     h.displayName.value = 'Greg';
     h.surveyThrows.value = false;
     h.sync.membersStepActive = false;
-    h.reason.value = 'cancelled';
     h.localFiles.value = true;
     h.rehydrateOwnerDoc.mockResolvedValue({ success: true });
     h.probe.mockResolvedValue({ kind: 'no-registry-entry' });
-    h.connectLocal.mockResolvedValue({ status: 'connected', type: 'local' });
+    h.connectLocal.mockImplementation(h.localConnects);
     h.createNewFile.mockResolvedValue({ ok: true, kit: { code: 'KIT-CODE', kitId: 'kit-1' } });
-    const { isTokenValid } = await import('@/services/google/googleAuth');
-    vi.mocked(isTokenValid).mockReturnValue(false);
   });
 
-  it('a Drive gate that FAILS before redirecting returns to drive-declined, not storage', async () => {
-    // The finding: this used to land on `storage`, whose buttons assume the PIN step ran, so
-    // its local-file link (or a later Drive connect) wrote a pod with pin === ''.
+  it('a Drive gate that FAILS before redirecting returns to storage with its code', async () => {
     h.connectDrive.mockResolvedValue({
       status: 'failed',
       error: 'redirect could not start',
       errorKind: 'unknown',
     });
-    const wrapper = await mountScreen();
-    const vm = wrapper.vm as unknown as DeclinedVm;
+    const wrapper = await atStorage();
+    const vm = wrapper.vm as unknown as StorageVm;
 
-    await vm.handleDriveDeclinedRetry();
+    await vm.handleConnectDrive();
     await flushPromises();
 
-    expect(vm.phase).toBe('drive-declined');
+    expect(vm.phase).toBe('storage');
     expect(vm.driveFailure).toBe('unknown');
     expect(shows(wrapper, 'createPod.driveError.unknown')).toBe(true);
     expect(shows(wrapper, 'createPod.driveError.title')).toBe(true);
-    expect(stepCalls('shown')).not.toContain('storage');
 
     // …and the local-file link from here still goes to the PIN step first, no write…
     await vm.handleConnectLocal();
     await flushPromises();
     expect(vm.phase).toBe('identity');
     expect(h.createNewFile).not.toHaveBeenCalled();
-    // …without the declined screen's stale Drive failure above the PIN form.
+    // …without the storage step's stale Drive failure above the PIN form.
     expect(vm.formError).toBeNull();
     expect(vm.driveFailure).toBeNull();
     expect(shows(wrapper, 'createPod.driveError.unknown')).toBe(false);
   });
 
-  it('a Drive connect that THROWS from drive-declined returns there too', async () => {
+  it('a Drive connect that THROWS returns to storage, classified and reported once', async () => {
     h.connectDrive.mockRejectedValue(new Error('boom'));
-    const wrapper = await mountScreen();
-    const vm = wrapper.vm as unknown as DeclinedVm;
+    const wrapper = await atStorage();
+    const vm = wrapper.vm as unknown as StorageVm;
 
-    await vm.handleDriveDeclinedRetry();
+    await vm.handleConnectDrive();
     await flushPromises();
 
-    expect(vm.phase).toBe('drive-declined');
+    expect(vm.phase).toBe('storage');
     expect(h.createNewFile).not.toHaveBeenCalled();
-    // The unexpected throw takes the shared pattern: classified, reported once, shown in orange.
     expect(vm.driveFailure).toBe('unknown');
     expect(h.reportCreateDriveFailure).toHaveBeenCalledWith(
       'resumeSetup.connectDrive',
@@ -1128,37 +1304,134 @@ describe('ResumePodSetup — no pod write before the PIN step, on any route', ()
     );
   });
 
-  it('a Drive connect that CONNECTS in place from drive-declined goes to the PIN step, then writes', async () => {
-    h.connectDrive.mockResolvedValue({ status: 'connected', type: 'google_drive' });
-    const wrapper = await mountScreen();
-    const vm = wrapper.vm as unknown as DeclinedVm;
-
-    await vm.handleDriveDeclinedRetry();
+  it('a provider lost between storage and the PIN sends the submit back to storage, then writes', async () => {
+    const wrapper = await atStorage();
+    const vm = wrapper.vm as unknown as StorageVm;
+    await vm.handleConnectDrive();
     await flushPromises();
     expect(vm.phase).toBe('identity');
+
+    // The provider and the token are gone by the time the PIN is submitted.
+    h.provider.value = null;
+    vi.mocked(isTokenValid).mockReturnValue(false);
+    await submitPin(vm);
+
+    expect(h.createNewFile).not.toHaveBeenCalled();
+    expect(vm.phase).toBe('storage');
+    expect(vm.driveFailure).toBeNull();
+    expect(dispatches()).toEqual(['finalize-dispatch:storage']);
+
+    // The PIN is already chosen: the next connect writes, and the PIN is not asked again.
+    vi.mocked(isTokenValid).mockReturnValue(true);
+    await vm.handleConnectDrive();
+    await flushPromises();
+    expect(h.createNewFile).toHaveBeenCalledTimes(1);
+    expect(h.rehydrateOwnerDoc).toHaveBeenCalledTimes(1);
+    expect(vm.phase).toBe('recovery-kit');
+  });
+
+  it('a failed local file returns to the storage step, no write', async () => {
+    h.connectLocal.mockResolvedValue({ status: 'failed', errorKind: 'cancelled' });
+    const wrapper = await atStorage();
+    const vm = wrapper.vm as unknown as StorageVm;
+
+    await vm.handleConnectLocal();
+    await flushPromises();
+    expect(vm.phase).toBe('storage');
+    expect(h.createNewFile).not.toHaveBeenCalled();
+  });
+
+  it('the retry screen\'s "set up my family" goes to storage, not the PIN step', async () => {
+    h.probe.mockResolvedValue({ kind: 'registry-error', error: new Error('down') });
+    vi.mocked(confirm).mockResolvedValue(true);
+    const wrapper = await mountScreen();
+    const vm = wrapper.vm as unknown as StorageVm;
+    expect(vm.phase).toBe('retry');
+
+    await vm.handleStartNewPodFromRetry();
+    await flushPromises();
+    expect(vm.phase).toBe('storage');
+    expect(stepCalls('shown')).toContain('storage');
+    expect(stepCalls('shown')).not.toContain('pin');
+  });
+
+  it('a silent reconnect at the probe connects in place, adopts its own stub, and lands on the PIN step', async () => {
+    // A reload after a popup grant: no provider and no access token, but the family's refresh
+    // token restores one. The stub the popup connect wrote comes back as a name collision and is
+    // adopted; no consent is shown or counted.
+    let token = false;
+    vi.mocked(isTokenValid).mockImplementation(() => token);
+    vi.mocked(tryReconnectSilently).mockImplementation(async () => {
+      token = true;
+      return true;
+    });
+    let tokenAtConnect: boolean | null = null;
+    h.connectDrive.mockImplementation(async () => {
+      tokenAtConnect = isTokenValid();
+      return {
+        status: 'failed',
+        error: 'a pod with this name exists',
+        errorKind: 'name-collision',
+        collision: { fileId: 'stub-1' },
+      };
+    });
+    vi.mocked(resolveDriveCollision).mockImplementationOnce(async () => {
+      h.provider.value = { type: 'google_drive' };
+      return { kind: 'adopted-stub' } as Awaited<ReturnType<typeof resolveDriveCollision>>;
+    });
+    const wrapper = await mountScreen();
+    const vm = wrapper.vm as unknown as StorageVm;
+
+    expect(dispatches()).toEqual(['finalize-dispatch:silent-reconnect']);
+    expect(h.connectDrive).toHaveBeenCalledTimes(1);
+    expect(tokenAtConnect).toBe(true);
+    expect(resolveDriveCollision).toHaveBeenCalledTimes(1);
+    expect(vm.phase).toBe('identity');
+    expect(resumeActions()).toContain('finalize-deferred:no-pin');
+    expect(h.trackOnboardingStep.mock.calls.map(([s]) => s)).not.toContain('drive-consent');
+    expect(h.reportCreateDriveFailure).not.toHaveBeenCalled();
     expect(h.createNewFile).not.toHaveBeenCalled();
 
-    const { isTokenValid } = await import('@/services/google/googleAuth');
-    vi.mocked(isTokenValid).mockReturnValue(true);
-    vm.pin = '123456';
-    vm.confirmPin = '123456';
-    await vm.handleIdentityNext();
-    await flushPromises();
-    expect(h.rehydrateOwnerDoc).toHaveBeenCalledWith('Greg', '123456');
+    // The PIN submit writes into the adopted stub: no second connect.
+    await submitPin(vm);
+    expect(h.connectDrive).toHaveBeenCalledTimes(1);
     expect(h.createNewFile).toHaveBeenCalledTimes(1);
     expect(vm.phase).toBe('recovery-kit');
   });
 
+  it.each([
+    ['live-provider', 'live-provider'],
+    ['valid-token', 'valid-token'],
+    ['silent-reconnect', 'silent-reconnect'],
+    ['storage', 'storage'],
+  ])('finalize-dispatch is logged exactly once per call: %s', async (_n, route) => {
+    let token = route === 'valid-token';
+    vi.mocked(isTokenValid).mockImplementation(() => token);
+    if (route === 'live-provider') h.provider.value = { type: 'local' };
+    if (route === 'silent-reconnect') {
+      vi.mocked(tryReconnectSilently).mockImplementation(async () => {
+        token = true;
+        return true;
+      });
+    }
+    await mountScreen();
+
+    expect(dispatches()).toEqual([`finalize-dispatch:${route}`]);
+    expect(h.logEvent).toHaveBeenCalledWith({
+      level: 'info',
+      surface: 'resumeSetup',
+      message: 'finalize dispatch',
+      context: { action: 'finalize-dispatch', detail: route },
+    });
+  });
+
   it('an owner rebuild that THROWS stays on the PIN step (never the storage step)', async () => {
-    h.reason.value = null;
     h.rehydrateOwnerDoc.mockRejectedValue(new Error('doc gone'));
     const wrapper = await mountScreen();
-    const vm = wrapper.vm as unknown as DeclinedVm;
-    vm.pin = '123456';
-    vm.confirmPin = '123456';
+    const vm = wrapper.vm as unknown as StorageVm;
+    expect(vm.phase).toBe('identity');
 
-    await vm.handleIdentityNext();
-    await flushPromises();
+    await submitPin(vm);
 
     expect(vm.phase).toBe('identity');
     expect(shows(wrapper, 'setup.fileCreateFailed')).toBe(true);
@@ -1173,25 +1446,21 @@ describe('ResumePodSetup — Safari back/forward-cache return from Google', () =
     window.dispatchEvent(ev);
   }
 
-  beforeEach(async () => {
+  beforeEach(() => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
     h.activeFamilyId.value = 'fam-1';
     h.displayName.value = 'Greg';
     h.surveyThrows.value = false;
-    h.reason.value = null;
-    h.localFiles.value = false;
     h.rehydrateOwnerDoc.mockResolvedValue({ success: true });
     h.probe.mockResolvedValue({ kind: 'no-registry-entry' });
     h.connectDrive.mockResolvedValue({ status: 'redirecting' });
-    const { isTokenValid } = await import('@/services/google/googleAuth');
     vi.mocked(isTokenValid).mockReturnValue(false);
   });
 
   it('a restored page leaves the spinner for the storage step, stepping back from drive-consent', async () => {
     const wrapper = await atStorage();
     const vm = wrapper.vm as unknown as Vm;
-    const { isTokenValid } = await import('@/services/google/googleAuth');
     vi.mocked(isTokenValid).mockReturnValue(false);
 
     await vm.handleConnectDrive();
@@ -1236,13 +1505,12 @@ describe('ResumePodSetup — Safari back/forward-cache return from Google', () =
     await vm.handleRetry();
     await flushPromises();
     expect(h.probe).toHaveBeenCalledTimes(2);
-    expect(vm.phase).toBe('identity');
+    expect(vm.phase).toBe('storage');
   });
 
   it('a restore while an action is still busy changes nothing', async () => {
     const wrapper = await atStorage();
     const vm = wrapper.vm as unknown as Vm;
-    const { isTokenValid } = await import('@/services/google/googleAuth');
     vi.mocked(isTokenValid).mockReturnValue(false);
     await vm.handleConnectDrive();
     await flushPromises();
@@ -1255,24 +1523,24 @@ describe('ResumePodSetup — Safari back/forward-cache return from Google', () =
     expect(vm.navigatedAway).toBe(true);
   });
 
-  it('a restored page from the drive-declined retry goes back to drive-declined', async () => {
+  it('a restored page from a stashed-failure retry goes back to storage', async () => {
     h.reason.value = 'cancelled';
     const wrapper = await mountScreen();
-    const vm = wrapper.vm as unknown as Vm & { handleDriveDeclinedRetry: () => Promise<void> };
-    await vm.handleDriveDeclinedRetry();
+    const vm = wrapper.vm as unknown as Vm;
+    expect(vm.phase).toBe('storage');
+    await wrapper.find('[data-recovery="retry"]').trigger('click');
     await flushPromises();
     expect(vm.phase).toBe('finishing');
 
     pageshow(true);
     await flushPromises();
 
-    expect(vm.phase).toBe('drive-declined');
+    expect(vm.phase).toBe('storage');
   });
 
   it('an ordinary (non-persisted) pageshow, or one after unmount, changes nothing', async () => {
     const wrapper = await atStorage();
     const vm = wrapper.vm as unknown as Vm;
-    const { isTokenValid } = await import('@/services/google/googleAuth');
     vi.mocked(isTokenValid).mockReturnValue(false);
     await vm.handleConnectDrive();
     await flushPromises();
@@ -1287,21 +1555,16 @@ describe('ResumePodSetup — Safari back/forward-cache return from Google', () =
 });
 
 describe('ResumePodSetup — a survey that throws can never block completion', () => {
-  beforeEach(async () => {
+  beforeEach(() => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
     h.activeFamilyId.value = 'fam-1';
     h.displayName.value = 'Greg';
-    h.reason.value = null;
     h.surveyThrows.value = true;
     h.rehydrateOwnerDoc.mockResolvedValue({ success: true });
     h.probe.mockResolvedValue({ kind: 'no-registry-entry' });
-    h.connectDrive.mockResolvedValue({ status: 'connected', type: 'google_drive' });
     h.createNewFile.mockResolvedValue({ ok: true, kit: { code: 'KIT-CODE', kitId: 'kit-1' } });
-    const { isTokenValid } = await import('@/services/google/googleAuth');
-    vi.mocked(isTokenValid).mockReturnValue(true);
   });
-
   it('throws twice: the setup modal opens both times, nothing escapes, and completion runs', async () => {
     const escaped = vi.fn();
     const wrapper = mount(ResumePodSetup, { global: { config: { errorHandler: escaped } } });
@@ -1357,6 +1620,7 @@ describe('ResumePodSetup — a survey that throws can never block completion', (
     expect(vm.phase).toBe('survey');
     expect(h.trackOnboardingStep.mock.calls).toEqual([
       ['survey', 'back'],
+      // No Drive failure on screen: the watcher's `extra` is `undefined`.
       ['survey', 'shown'],
     ]);
   });

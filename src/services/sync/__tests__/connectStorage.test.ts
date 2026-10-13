@@ -12,14 +12,21 @@ vi.mock('@/services/sync/syncService', () => ({
   setProvider: vi.fn(),
   getProvider: vi.fn(() => null),
 }));
-vi.mock('@/services/google/googleAuth', () => ({
-  whenRedirectAuthSettled: vi.fn(async () => {}),
-  shouldUseRedirectAuth: vi.fn(() => false),
-  startRedirectAuth: vi.fn(),
-  isTokenValid: vi.fn(() => true),
-  awaitNativeOAuthReturn: vi.fn(async () => ({ kind: 'completed' })),
-  preferRedirectAuth: vi.fn(),
-}));
+vi.mock('@/services/google/googleAuth', () => {
+  const isTokenValid = vi.fn(() => true);
+  return {
+    whenRedirectAuthSettled: vi.fn(async () => {}),
+    shouldUseRedirectAuth: vi.fn(() => false),
+    startRedirectAuth: vi.fn(),
+    isTokenValid,
+    awaitNativeOAuthReturn: vi.fn(async () => ({ kind: 'completed' })),
+    preferRedirectAuth: vi.fn(),
+    // Mirrors the real predicate so the pre-stash tests exercise the same rule as production.
+    willOpenConsentPopup: vi.fn(
+      (opts?: { chooseAccount?: boolean }) => Boolean(opts?.chooseAccount) || !isTokenValid()
+    ),
+  };
+});
 // `reportCreateDriveFailure` is the one report per create-flow Drive failure.
 vi.mock('@/utils/errorReporter', () => ({ reportError: vi.fn() }));
 vi.mock('@/services/telemetry/logEvent', async (importOriginal) => ({
@@ -72,7 +79,9 @@ import {
   resolveExistingBeanpod,
   adoptDriveStub,
   reportCreateDriveFailure,
+  createDriveTransport,
 } from '../connectStorage';
+import { peekResumeReason, setResumeReason } from '@/components/login/resumePaths';
 import { POPUP_BLOCKED_MESSAGE } from '@/services/google/oauthError';
 import { reportError } from '@/utils/errorReporter';
 import { GoogleDriveProvider } from '@/services/sync/providers/googleDriveProvider';
@@ -757,6 +766,188 @@ describe('connectDriveStorage — the 150 s connect cap is named, so it classifi
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('connectDriveStorage — the create resume stash (#131)', () => {
+  const provider = { persist: vi.fn(async () => {}) } as unknown as InstanceType<
+    typeof GoogleDriveProvider
+  >;
+  /** What the stash held at the moment `createNew` (the popup) ran. */
+  let stashDuringPopup: string | null | undefined;
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    sessionStorage.clear();
+    stashDuringPopup = undefined;
+    mockIsNative.mockReturnValue(false);
+    mockShouldRedirect.mockReturnValue(false);
+    mockIsTokenValid.mockReturnValue(false);
+    mockStartRedirect.mockResolvedValue(undefined);
+    mockCurrentCreateAttempt.mockReturnValue({ id: 'a-1', startedAt: 0, step: 'drive-consent' });
+    vi.mocked(GoogleDriveProvider.createNew).mockImplementation(async () => {
+      stashDuringPopup = peekResumeReason();
+      return provider;
+    });
+  });
+
+  function failPopupWith(e: unknown): void {
+    vi.mocked(GoogleDriveProvider.createNew).mockImplementation(async () => {
+      stashDuringPopup = peekResumeReason();
+      throw e;
+    });
+  }
+
+  it('pre-stashes popup-abandoned while a popup with no token is open, and clears it on connect', async () => {
+    const r = await connectDriveStorage('my-family');
+    expect(r).toEqual({ status: 'connected', type: 'google_drive' });
+    expect(stashDuringPopup).toBe('popup-abandoned');
+    expect(peekResumeReason()).toBeNull();
+  });
+
+  it('a valid token and no chooser opens no popup, so nothing is pre-stashed', async () => {
+    mockIsTokenValid.mockReturnValue(true);
+    await connectDriveStorage('my-family');
+    expect(stashDuringPopup).toBeNull();
+  });
+
+  it('the account chooser opens a popup even with a valid token, so it pre-stashes', async () => {
+    mockIsTokenValid.mockReturnValue(true);
+    await connectDriveStorage('my-family', { chooseAccount: true });
+    expect(stashDuringPopup).toBe('popup-abandoned');
+    expect(peekResumeReason()).toBeNull();
+  });
+
+  it.each([
+    ['a Cancel', new Error('access_denied'), 'cancelled'],
+    ['a consent denial', new DriveConsentDeniedError('unticked'), 'consent-denied'],
+    ['a fault', new Error('Drive 500'), 'unknown'],
+  ] as const)('%s replaces the pre-stash with the real code', async (_label, e, code) => {
+    failPopupWith(e);
+    await connectDriveStorage('my-family');
+    expect(stashDuringPopup).toBe('popup-abandoned');
+    expect(peekResumeReason()).toBe(code);
+  });
+
+  it('a collision clears it: both callers adopt it automatically', async () => {
+    failPopupWith(new FileNameCollisionError('exists', 'file-1', 'my-family.beanpod', true));
+    const r = await connectDriveStorage('my-family');
+    expect(r).toMatchObject({ status: 'failed', errorKind: 'name-collision' });
+    expect(peekResumeReason()).toBeNull();
+  });
+
+  it('the stash is written with no open attempt (only the funnel event needs one)', async () => {
+    mockCurrentCreateAttempt.mockReturnValue(null);
+    failPopupWith(new Error('access_denied'));
+    await connectDriveStorage('my-family');
+    expect(peekResumeReason()).toBe('cancelled');
+    expect(mockTrackOnboardingStep).not.toHaveBeenCalled();
+  });
+
+  it('REDIRECT: no pre-stash, and `redirecting` clears a stale reason (the return writes its own)', async () => {
+    mockShouldRedirect.mockReturnValue(true);
+    setResumeReason('cancelled');
+    let stashAtRedirect: string | null | undefined;
+    mockStartRedirect.mockImplementation(async () => {
+      stashAtRedirect = peekResumeReason();
+    });
+    const r = await connectDriveStorage('my-family');
+    expect(r).toEqual({ status: 'redirecting' });
+    expect(stashAtRedirect).toBe('cancelled'); // untouched until the settle: no pre-stash
+    expect(peekResumeReason()).toBeNull();
+  });
+
+  it('NATIVE: never touches the stash (nothing unloads; the seam handles it in place)', async () => {
+    mockIsNative.mockReturnValue(true);
+    mockShouldRedirect.mockReturnValue(true);
+    vi.mocked(awaitNativeOAuthReturn).mockResolvedValue({
+      kind: 'failed',
+      error: new OAuthRoundTripAbandonedError('dismissed'),
+    });
+    const r = await connectDriveStorage('my-family');
+    expect(r).toMatchObject({ status: 'failed', errorKind: 'cancelled' });
+    expect(peekResumeReason()).toBeNull();
+
+    setResumeReason('consent-denied');
+    vi.mocked(awaitNativeOAuthReturn).mockResolvedValue({ kind: 'completed' });
+    expect(await connectDriveStorage('my-family')).toMatchObject({ status: 'connected' });
+    expect(peekResumeReason()).toBe('consent-denied');
+  });
+
+  describe('a blocked popup', () => {
+    let preferred = false;
+    beforeEach(() => {
+      preferred = false;
+      vi.mocked(preferRedirectAuth).mockImplementation(() => {
+        preferred = true;
+      });
+      mockShouldRedirect.mockImplementation(() => preferred);
+      failPopupWith(new Error(POPUP_BLOCKED_MESSAGE));
+    });
+
+    it('clears the pre-stash BEFORE the redirect re-run starts', async () => {
+      let stashAtRedirect: string | null | undefined;
+      mockStartRedirect.mockImplementation(async () => {
+        stashAtRedirect = peekResumeReason();
+      });
+      const r = await connectDriveStorage('my-family');
+      expect(r).toEqual({ status: 'redirecting' });
+      expect(stashDuringPopup).toBe('popup-abandoned');
+      expect(stashAtRedirect).toBeNull();
+      expect(peekResumeReason()).toBeNull();
+    });
+
+    it('a re-run that fails at the gate leaves the REAL code, never popup-abandoned', async () => {
+      mockStartRedirect.mockRejectedValue(new Error('Google Client ID not configured'));
+      const r = await connectDriveStorage('my-family');
+      expect(r).toMatchObject({ status: 'failed', errorKind: 'unknown' });
+      expect(peekResumeReason()).toBe('unknown');
+    });
+  });
+});
+
+describe('connectLocalStorage — a local connect clears the create resume stash (#131)', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    sessionStorage.clear();
+  });
+
+  it('web: a picked file clears a stale Drive reason', async () => {
+    mockSupports.mockReturnValue(true);
+    mockSelect.mockResolvedValue(true);
+    setResumeReason('consent-denied');
+    expect(await connectLocalStorage()).toEqual({ status: 'connected', type: 'local' });
+    expect(peekResumeReason()).toBeNull();
+  });
+
+  it('native: a local connect clears it too', async () => {
+    mockIsNative.mockReturnValue(true);
+    mockSelectNative.mockResolvedValue(true);
+    setResumeReason('cancelled');
+    await connectLocalStorage('the-smiths');
+    expect(peekResumeReason()).toBeNull();
+  });
+
+  it('a dismissed picker clears it too: a local attempt supersedes the Drive reason', async () => {
+    mockSupports.mockReturnValue(true);
+    mockSelect.mockResolvedValue(false);
+    setResumeReason('consent-denied');
+    await connectLocalStorage();
+    expect(peekResumeReason()).toBeNull();
+  });
+});
+
+describe('createDriveTransport — the one transport derivation', () => {
+  beforeEach(() => vi.resetAllMocks());
+
+  it('native wins over the redirect surface it also is; otherwise redirect or popup', () => {
+    mockIsNative.mockReturnValue(true);
+    mockShouldRedirect.mockReturnValue(true);
+    expect(createDriveTransport()).toBe('native');
+    mockIsNative.mockReturnValue(false);
+    expect(createDriveTransport()).toBe('redirect');
+    mockShouldRedirect.mockReturnValue(false);
+    expect(createDriveTransport()).toBe('popup');
   });
 });
 

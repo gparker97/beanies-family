@@ -42,7 +42,10 @@ import {
   __resetCreateAttemptForTesting,
 } from '@/utils/createAttemptState';
 
+import { peekResumeReason, setResumeReason } from '@/components/login/resumePaths';
+
 const KEY = 'beanies:create-attempt';
+const RESUME_REASON_KEY = 'beanies:resume-reason';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 type Logged = {
@@ -85,6 +88,7 @@ async function beaconEvents(): Promise<LogRecord[]> {
 
 beforeEach(() => {
   localStorage.clear();
+  sessionStorage.clear();
   __resetCreateAttemptForTesting();
   __resetOnboardingAttemptForTesting();
   __resetLogQueueForTesting();
@@ -255,6 +259,38 @@ describe('endCreateAttempt', () => {
     endCreateAttempt('superseded');
     expect(onboarding()).toEqual([]);
   });
+
+  // #131: a stashed Drive reason never outlives its attempt (a sign-out plus a new signup in the
+  // same tab must not show an old Drive notice).
+  it.each(['done', 'start-over', 'superseded'] as const)(
+    '%s: clears the create resume stash',
+    (reason) => {
+      beginCreateAttempt();
+      setResumeReason('consent-denied');
+      endCreateAttempt(reason);
+      expect(sessionStorage.getItem(RESUME_REASON_KEY)).toBeNull();
+    }
+  );
+
+  it('clears the stash even with no open attempt', () => {
+    setResumeReason('popup-abandoned');
+    endCreateAttempt('start-over');
+    expect(peekResumeReason()).toBeNull();
+  });
+
+  it("a second Create tap clears the previous attempt's stash (the supersede)", () => {
+    beginCreateAttempt();
+    setResumeReason('cancelled');
+    beginCreateAttempt();
+    expect(peekResumeReason()).toBeNull();
+  });
+
+  it('a Create tap with NO open attempt clears a code stashed outside any attempt', () => {
+    // An expired or corrupt attempt record leaves the popup seam stashing with nothing to end.
+    setResumeReason('cancelled');
+    beginCreateAttempt();
+    expect(peekResumeReason()).toBeNull();
+  });
 });
 
 describe('the pagehide abandon', () => {
@@ -293,6 +329,53 @@ describe('the pagehide abandon', () => {
       expect(onboarding('abandon')).toEqual([]);
     }
   );
+
+  it('at drive-consent with a popup still open (the pre-stash) logs back popup-abandoned on the beacon, no abandon (#131)', async () => {
+    installOnboardingAttempt();
+    const id = beginCreateAttempt();
+    trackOnboardingStep('drive-consent', 'shown');
+    setResumeReason('popup-abandoned');
+    realUnload();
+    expect(onboarding('abandon')).toEqual([]);
+    expect(onboarding('step').at(-1)?.context).toEqual({
+      action: 'back',
+      detail: 'drive-consent',
+      error_code: 'popup-abandoned',
+    });
+    const last = (await beaconEvents()).at(-1)!;
+    expect(last).toMatchObject({
+      message: 'step',
+      action: 'back',
+      detail: 'drive-consent',
+      error_code: 'popup-abandoned',
+      create_attempt_id: id,
+    });
+    // Peeked, not consumed: the resume screen reads it after the reload.
+    expect(peekResumeReason()).toBe('popup-abandoned');
+  });
+
+  it.each([
+    ['no stash (the redirect transport never pre-stashes)', null],
+    ['a settled popup outcome', 'cancelled'],
+  ] as const)('at drive-consent with %s logs nothing', (_label, code) => {
+    installOnboardingAttempt();
+    beginCreateAttempt();
+    trackOnboardingStep('drive-consent', 'shown');
+    if (code) setResumeReason(code);
+    vi.mocked(logEvent).mockClear();
+    realUnload();
+    expect(onboarding()).toEqual([]);
+  });
+
+  it('a pre-stash at any other step changes nothing: the ordinary abandon is logged', () => {
+    installOnboardingAttempt();
+    beginCreateAttempt();
+    trackOnboardingStep('storage', 'shown');
+    setResumeReason('popup-abandoned');
+    vi.mocked(logEvent).mockClear();
+    realUnload();
+    expect(onboarding().map((e) => e.message)).toEqual(['abandon']);
+  });
 
   it('logs nothing on a bfcache freeze', () => {
     installOnboardingAttempt();

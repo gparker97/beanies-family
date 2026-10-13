@@ -39,20 +39,21 @@
  * surface for a brand-new family (desktop hands off here after the step-2
  * popup; iPhone resumes here after the Drive redirect). The owner's 6-digit PIN
  * (Phase 4 — families are born password-free) is
- * collected ONCE in the `identity` phase, then the pod is written and the
- * post-write steps (kit, members, survey) run for every user before `/nook`.
+ * collected ONCE in the `identity` phase, the last step before the write (#131: storage
+ * connects first, so a reload during the Drive step never asks for the PIN twice), then the
+ * pod is written and the post-write steps (kit, members, survey) run for every user before `/nook`.
  *
  * Phase reachability — the create and load sub-flows are disjoint:
  *
- *   create (genuinely-new family):
- *     no-registry-entry → identity → (storage |        ) → finishing
- *                                    (already-connected) → finalizePod
- *       → finalizePod SUCCESS → recovery-kit → members → survey
- *       → SetupProgressModal → syncStore.completePodSetup → signed-in /nook
+ *   create (genuinely-new family), web reload or redirect return:
+ *     no-registry-entry → proceedToFinalize → storage → (Drive | local) → finishing → finalizePod (no PIN yet)
+ *                                                      → identity → proceedToFinalize → finalizePod → recovery-kit → …
+ *   in-page hand-off (live provider for this family): no-registry-entry → proceedToFinalize → finalizePod → identity → …
+ *   redirect return with a grant: no-registry-entry → proceedToFinalize → finishOnDrive → finalizePod → identity → …
+ *   stashed CreateDriveErrorCode (redirect OR popup), nothing connected: no-registry-entry → storage (notice + recoveries)
  *
- *   #128: back from a web Drive redirect that failed (a stashed `CreateDriveErrorCode`):
- *     no-registry-entry → drive-declined → (redirect to Google | token already valid → identity
- *                                           | local file → identity)
+ *   after the write: recovery-kit → members → survey
+ *       → SetupProgressModal → syncStore.completePodSetup → signed-in /nook
  *
  *   #128: the `survey` phase ("how did you hear about us?") is the LAST tap before
  *   the app, after the pod write, so it is off the critical path. Its answer rides
@@ -62,7 +63,7 @@
  *   load (existing pod — NEVER reaches `members`):
  *     auto-loadable → auto-load → completeAutoLoad success → signed-in /nook
  *     open-existing (adopt-confirm) → auto-load → … → signed-in /nook
- *     registry-error | load-failed → retry → (re-probe | start-new → identity)
+ *     registry-error | load-failed → retry → (re-probe | start-new → storage)
  *
  * The post-write phases (`recovery-kit` → `members` → `survey`) are entered ONLY
  * from `finalizePod`'s create-success branch — never from any existing-pod load (`handleAutoLoadSubmit`,
@@ -140,22 +141,23 @@ const emit = defineEmits<{
 
 /**
  * Discriminated UI phases. `probing` is the initial registry-check;
- * `auto-load` is the non-destructive happy path; `identity` + `storage` are
- * the create flow (genuinely-new families). `finishing` is the spinner shown
- * during a critical write — both auto-load decrypt and create-pod write.
+ * `auto-load` is the non-destructive happy path; `storage` then `identity` are
+ * the create flow (genuinely-new families), in that order since #131: storage connects first
+ * and the PIN step is the last one before the write. `storage` is also the ONE screen a Drive
+ * failure lands on, whatever produced it (a connect on this page, or a redirect or popup outcome
+ * stashed before a reload): its header and notice follow `driveFailure`. It sits BEFORE
+ * `identity`, so a connect started there reaches `finalizePod` with no PIN, which defers to the
+ * PIN step (`ownerReady`); the PIN submit then writes into the provider that connect installed.
+ * `finishing` is the spinner shown during a critical write — both auto-load decrypt and
+ * create-pod write — and during the finalize dispatch.
  * `recovery-kit`, `members` and `survey` are the create-only post-write steps,
  * reached ONLY after a successful pod write (see the phase-reachability table
  * above); `survey` is the optional "how did you hear about us?" step, last.
- * `drive-declined` is the web redirect's failed return (#128): a stashed `CreateDriveErrorCode`
- * on a `no-registry-entry` probe. It sits BEFORE `identity`, so nothing on it
- * may write a pod (no PIN yet): `finalizePod` routes to the PIN step until `ownerReady`, and
- * every storage fallback returns here rather than to `storage` (`storageFallbackPhase`).
  */
 type Phase =
   | 'probing'
   | 'auto-load'
   | 'identity'
-  | 'drive-declined'
   | 'survey'
   | 'storage'
   | 'finishing'
@@ -165,50 +167,15 @@ type Phase =
 const phase = ref<Phase>('probing');
 
 /**
- * #128 funnel: the onboarding step each phase IS, for the `shown` events. Phases absent from
- * the map (`auto-load`, `retry`, `finishing`) are not create-funnel steps and emit nothing;
- * every create error fallback lands on `storage` or `drive-declined` (`storageFallbackPhase`),
- * both mapped, so the recorded step never sticks on a screen the person has left. `submitted`
- * is emitted explicitly on the success line of each step's handler, not here.
- */
-const PHASE_STEP: Partial<Record<Phase, OnboardingStep>> = {
-  probing: 'resume-probe',
-  'drive-declined': 'drive-declined',
-  identity: 'pin',
-  storage: 'storage',
-  'recovery-kit': 'kit',
-  members: 'members',
-  survey: 'survey',
-};
-// `immediate`: the first phase (`probing`) is set before the watcher exists. A no-op when no
-// create attempt is open (a returning user's recovery visit emits nothing).
-watch(
-  phase,
-  (next) => {
-    const step = PHASE_STEP[next];
-    if (step) trackOnboardingStep(step, 'shown');
-  },
-  { immediate: true }
-);
-
-/**
  * Has the PIN step run: the owner rebuilt with the chosen PIN (`handleIdentityNext`)? THE
  * precondition of a pod write, enforced at the one place a write starts (`finalizePod`), so no
  * route into it, however it got there, can write a pod with `pin === ''` and no rebuilt owner.
- * Before it is set, the only screen that can start a storage connect is `drive-declined`
- * (#128), which sits BEFORE the PIN step.
+ * Since #131 the storage step comes BEFORE the PIN step, so a storage connect ordinarily reaches
+ * `finalizePod` with this unset: the write is deferred to the PIN step (`finalize-deferred:no-pin`)
+ * and the PIN submit writes into the provider the connect installed. Set only after
+ * `rehydrateOwnerDoc` succeeds.
  */
 const ownerReady = ref(false);
-
-/**
- * Where a storage attempt that did not reach the write returns to: the storage step once the
- * PIN is set, the `drive-declined` screen it started from before that. ONE rule for every
- * fallback arm (Drive, local file, the catches and `finally`s), so no arm can drop someone who
- * has not chosen a PIN onto a storage step whose buttons assume they have.
- */
-function storageFallbackPhase(): Phase {
-  return ownerReady.value ? 'storage' : 'drive-declined';
-}
 
 const ownerName = ref('');
 // Phase 4: the create-flow credential is the owner's 6-digit PIN. `password`
@@ -240,34 +207,69 @@ const autoLoadFamilyName = ref<string>('');
 /**
  * Why Google Drive did not connect, as a `CREATE_DRIVE_ERRORS` code: the ONE source for it on this
  * screen. Set by a failed connect (`finishOnDrive`, `handleConnectDrive`'s catch), a full Drive at
- * the pod write (`finalizePod`), or a code stashed by the redirect return (`runProbe`). While it is
- * set, the `storage` and `drive-declined` phases render its message in the orange notice and the
- * registry's recoveries (`showDriveFailure`). Cleared at the start of every connect, probe and
- * write, and on leaving those two phases (the `phase` watcher below), so a code never outlives
- * the attempt that set it.
+ * the pod write (`finalizePod`), or a code a redirect or popup connect stashed before a reload
+ * (`runProbe` hands it to `proceedToFinalize` as `storageNotice`, applied only when nothing is
+ * connected). While it is set, the `storage` phase renders its message in the orange notice and
+ * the registry's recoveries (`showDriveFailure`), and its header follows it. Cleared at the start
+ * of every connect, probe and write, and on leaving `storage` (the `phase` watcher below), so a
+ * code never outlives the attempt that set it.
  *
  * ⚠️ NEVER SET BY THE PROBE'S `drive-auth-failed` ARM. That arm sits beside a pod the registry
  * already knows; its `retry` phase takes the message alone (`formError`), never the recoveries.
  */
 const driveFailure = ref<CreateDriveErrorCode | null>(null);
 const driveFailureMessage = computed(() => createDriveFailureMessage(driveFailure.value, t));
-/** The two screens a Drive failure lands on (`storageFallbackPhase`) render it the same way. */
-const DRIVE_FAILURE_PHASES: ReadonlySet<Phase> = new Set<Phase>(['storage', 'drive-declined']);
-const showDriveFailure = computed(
-  () => driveFailure.value !== null && DRIVE_FAILURE_PHASES.has(phase.value)
-);
-// Leaving the two failure phases ends the failure: a code must not reappear on a later visit
-// (e.g. `handleDriveDeclinedRetry`'s valid-token shortcut to `identity`, then back to `storage`).
+/** Still checks the phase: a code is set while `finishing`, before the step onto `storage`. */
+const showDriveFailure = computed(() => phase.value === 'storage' && driveFailure.value !== null);
+// Leaving `storage` ends the failure: a code must not reappear on a later visit (e.g. a connect
+// that then succeeds in place and goes on to the PIN step, whose provider is lost before the write
+// and sends the person back to `storage`).
 // ⚠️ `flush: 'sync'`, so it clears AT the transition: a code set while `finishing` (a failed
-// connect, `finalizePod`'s full Drive) is set after the clear and survives the step back onto
-// `storage` / `drive-declined`. A batched watcher could run after that code was set and drop it.
+// connect, `finalizePod`'s full Drive, `proceedToFinalize`'s `storageNotice`) is set after the
+// clear and survives the step onto `storage`. A batched watcher could run after that code was set
+// and drop it.
 watch(
   phase,
   (next) => {
-    if (!DRIVE_FAILURE_PHASES.has(next)) driveFailure.value = null;
+    if (next !== 'storage') driveFailure.value = null;
   },
   { flush: 'sync' }
 );
+
+/**
+ * #128 funnel: the onboarding step each phase IS, for the `shown` events. Phases absent from
+ * the map (`auto-load`, `retry`, `finishing`) are not create-funnel steps and emit nothing;
+ * every create error fallback lands on `storage`, which is mapped, so the recorded step never
+ * sticks on a screen the person has left. Whenever the storage step is shown WITH a Drive failure
+ * (a stashed code on arrival, or an in-place failure that just fell back here), the `shown` event
+ * carries it as `error_code`: it counts displays, while `drive-consent back` counts the failures
+ * themselves, so the two are filtered by `action`, never summed (`driveFailure` never survives
+ * leaving `storage`, see its watcher).
+ * `submitted` is emitted explicitly on the success line of each step's handler, not here.
+ */
+const PHASE_STEP: Partial<Record<Phase, OnboardingStep>> = {
+  probing: 'resume-probe',
+  identity: 'pin',
+  storage: 'storage',
+  'recovery-kit': 'kit',
+  members: 'members',
+  survey: 'survey',
+};
+// Declared after `driveFailure`, which it reads (an `immediate` watcher runs at once, so an
+// earlier declaration is a TDZ error). `immediate`: the first phase (`probing`) is set before the
+// watcher exists. A no-op when no create attempt is open (a returning user's recovery visit emits
+// nothing).
+watch(
+  phase,
+  (next) => {
+    const step = PHASE_STEP[next];
+    if (!step) return;
+    if (driveFailure.value) trackOnboardingStep(step, 'shown', { error_code: driveFailure.value });
+    else trackOnboardingStep(step, 'shown');
+  },
+  { immediate: true }
+);
+
 /**
  * A cancel or an unticked file-access box is the person's own DECISION, so "Google needs a yes
  * from you" is true. Nothing else is: an admin-blocked app must not be told Google wants a yes.
@@ -291,7 +293,9 @@ const knownOwnerFirstName = computed(() => firstName(knownOwnerName.value));
 /**
  * The page header, one variant per phase (#128). `null` hides it: the survey and the members
  * step carry their own heading. The subtitle says why the person is on this screen; the
- * default is phase-neutral because it also renders on probing, retry, storage and kit.
+ * default is phase-neutral because it also renders on probing, retry, storage and kit. A Drive
+ * failure on `storage` takes its own title and no subtitle: the orange notice under the storage
+ * prompt is the explanation (mockup Focus 2). The prompt itself is in the body, not repeated here.
  */
 const header = computed<{ title: string; subtitle: string | null } | null>(() => {
   switch (phase.value) {
@@ -307,19 +311,20 @@ const header = computed<{ title: string; subtitle: string | null } | null>(() =>
       };
     case 'auto-load':
       return { title: t('resumeSetup.title'), subtitle: t('resumeSetup.subtitleRecovery') };
-    // No subtitle: the orange notice under the title is the explanation (mockup Focus 2).
-    // With no code (a later local-file attempt cleared it), the screen's own default title.
-    case 'drive-declined':
-      return {
-        title:
-          !driveFailure.value || driveFailureIsDecision.value
+    // With no code (the ordinary first arrival, or a later local-file attempt cleared it), the
+    // default below: nothing on the header may say a sign-in failed before one was tried.
+    case 'storage':
+      if (driveFailure.value) {
+        return {
+          title: driveFailureIsDecision.value
             ? t('resumeSetup.driveDeclinedTitle')
             : t('createPod.driveError.title'),
-        subtitle: null,
-      };
-    default:
-      return { title: t('resumeSetup.title'), subtitle: t('resumeSetup.subtitle') };
+          subtitle: null,
+        };
+      }
+      break;
   }
+  return { title: t('resumeSetup.title'), subtitle: t('resumeSetup.subtitle') };
 });
 
 /** Phases with no "Start over": a critical write, and every post-write step. */
@@ -369,23 +374,24 @@ onMounted(async () => {
   // name backs it up: when it is set the field is hidden, so it must never stay empty.
   ownerName.value = authStore.displayName || knownOwnerName.value;
 
-  // No secret is stashed across the iOS Drive redirect (the round-2 stash was
-  // removed 2026-06-20 — WebKit bounce-tracking cleared it anyway). The generic
-  // `runProbe()` flow IS the clean single-credential resume: on a fresh-token
-  // return for a genuinely-new family, the registry probe yields
-  // `no-registry-entry` → the `identity` phase asks for the PIN ONCE →
-  // `handleIdentityNext` finishes on Drive. See
-  // docs/plans/2026-06-20-ios-oauth-bounce-state-param.md.
+  // No secret is stashed across a reload (ADR-034; the iOS redirect's round-2 stash was removed
+  // 2026-06-20, see docs/plans/2026-06-20-ios-oauth-bounce-state-param.md): the chosen PIN lives
+  // only in page memory, which is why the PIN step comes LAST (#131). Any podless reload during
+  // creation (a web Drive redirect return, a reload while the consent popup was open, a plain
+  // refresh) re-runs the generic `runProbe()`. For a genuinely-new family its `no-registry-entry`
+  // arm goes through `proceedToFinalize`, which connects in place when it can (a live provider, a
+  // valid token, a silent reconnect) and otherwise lands on the storage step; the PIN is then
+  // asked ONCE, right before the write.
   //
-  // #128: a web Drive redirect that came back with a failure (a decline at Google, an unticked
-  // file-access box, a policy block, a failed exchange) stashed its `CreateDriveErrorCode`. It
-  // was already reported by whoever stashed it. It is consumed here, once, either way, so it
-  // cannot resurface on a later mount, and handed to the probe, which honours it ONLY on its
-  // `no-registry-entry` arm (the genuinely-new family that was about to pick a PIN). Every other
-  // probe outcome keeps its own arm: a known pod, a retry or a redirect is a newer, more specific
-  // fact than the hint.
-  // ⚠️ Decided INSIDE the probe rather than by re-routing `identity` afterwards: the phase
-  // watcher would otherwise flush `identity` first and log a false `pin shown`.
+  // A web Drive connect that did not finish before the reload (a decline at Google, an unticked
+  // file-access box, a policy block, a failed exchange, a popup the page died under) stashed its
+  // `CreateDriveErrorCode`. Whoever stashed it already reported it (a stuck popup is counted by
+  // the funnel instead). It is consumed here, once, either way, so it cannot resurface on a later
+  // mount, and handed to the probe, which honours it ONLY on its `no-registry-entry` arm and only
+  // when the dispatch lands on `storage`. Every other probe outcome keeps its own arm: a known
+  // pod, a retry or a redirect is a newer, more specific fact than the hint.
+  // ⚠️ Decided INSIDE the dispatch rather than by re-routing afterwards: the phase watcher would
+  // otherwise log `storage shown` without the code it is about to display.
   await runProbe(consumeResumeReason());
 });
 
@@ -393,8 +399,8 @@ onMounted(async () => {
  * Safari's swipe-back from Google restores this page from the back/forward cache (#128): the
  * JS heap comes back exactly as it left, with `navigatedAway` still set by the redirect that
  * left it, so no `finally` or probe arm will ever move the spinner. Two redirects can leave it:
- *   - `finishOnDrive`'s (`phase` `finishing`, no Start over): back to the screen they left from
- *     (`storageFallbackPhase`). The attempt's step leaves `drive-consent` with a `back`
+ *   - `finishOnDrive`'s (`phase` `finishing`, no Start over): back to the storage step, the one
+ *     screen a create Drive connect starts from (#131). The attempt's step leaves `drive-consent` with a `back`
  *     (`returned`) and the restored screen logs its own `shown` through the phase watcher, so a
  *     later tab close is an honest abandon at the screen they are actually on;
  *   - the registry probe's (`phase` `probing`): to `retry`, whose Try again re-probes on the
@@ -408,7 +414,7 @@ function handlePageShow(e: PageTransitionEvent) {
   if (phase.value === 'finishing') {
     navigatedAway.value = false;
     trackOnboardingStep('drive-consent', 'back', { error_code: 'returned' });
-    phase.value = storageFallbackPhase();
+    phase.value = 'storage';
   } else if (phase.value === 'probing') {
     navigatedAway.value = false;
     phase.value = 'retry';
@@ -437,10 +443,10 @@ onBeforeUnmount(() => {
  * Registry probe + phase routing. Extracted from onMounted so the `retry`
  * screen's "Try again" can re-run it.
  *
- * `no-registry-entry` → `identity` (genuinely-new family: create is correct), or the storage
- * fallback (`drive-declined` before the PIN) showing `stashedCode` when a web Drive redirect just
- * came back with a failure (#128; only the mount passes one, so a retry re-probe never re-shows
- * it).
+ * `no-registry-entry` → `proceedToFinalize` (genuinely-new family: create is correct, #131): it
+ * connects in place when storage is already connected or a Drive token is in hand or recoverable,
+ * and otherwise lands on `storage`, showing `stashedCode` there when a web Drive connect failed
+ * before the reload (only the mount passes one, so a retry re-probe never re-shows it).
  * `registry-error` / `load-failed` → `retry` (a pod fileId is/was known but we
  * couldn't reach it). We deliberately do NOT fall through to the destructive
  * create path here — re-creating would orphan the real pod (the 2026-05-15
@@ -477,15 +483,10 @@ async function runProbe(stashedCode: CreateDriveErrorCode | null = null) {
       phase.value = 'auto-load';
       return;
     case 'no-registry-entry':
-      // Scenario (a) — genuinely new family; fall through to the create flow. Back from a
-      // failed web Drive redirect (#128): say why first, in orange, with the registry's
-      // recoveries. Nothing is reported here: the producer that stashed the code already did.
-      if (stashedCode) {
-        driveFailure.value = stashedCode;
-        phase.value = storageFallbackPhase();
-        return;
-      }
-      phase.value = 'identity';
+      // Scenario (a) — genuinely new family. The dispatch decides "connected" (live same-family
+      // provider, valid token, silent reconnect); a stashed code is shown only if it lands on
+      // `storage`. Nothing is reported here: the producer that stashed the code already did.
+      await proceedToFinalize({ storageNotice: stashedCode });
       return;
     case 'redirecting':
       // WEB ONLY: the page is unloading; keep the probing spinner up. On native
@@ -553,8 +554,8 @@ async function handleRetry() {
  * only proceed through a scary destructive confirm. It is now SAFE because the
  * adopt-existing recovery protects the create path — if a real same-name pod
  * exists on Drive, `finishOnDrive` adopts/opens it instead of overwriting. So
- * this routes to the identity/create flow behind a reassuring INFO confirm
- * rather than a destructive one.
+ * this routes to the create flow's first step, `storage` (#131: storage before the PIN),
+ * behind a reassuring INFO confirm rather than a destructive one.
  */
 async function handleStartNewPodFromRetry() {
   const ok = await confirm({
@@ -565,7 +566,7 @@ async function handleStartNewPodFromRetry() {
   });
   if (!ok) return;
   formError.value = null;
-  phase.value = 'identity';
+  phase.value = 'storage';
 }
 
 // ─── Non-destructive auto-load path ─────────────────────────────────────────
@@ -738,7 +739,6 @@ async function handleIdentityNext() {
     formError.value = t('setup.fileCreateFailed');
   } finally {
     busy.value = false;
-    if (!navigatedAway.value && phase.value === 'finishing') phase.value = storageFallbackPhase();
   }
   if (!rehydrated) return;
   // PIN is set + owner rehydrated: straight to the write. #128 moved the survey AFTER it
@@ -751,8 +751,8 @@ async function handleIdentityNext() {
 /**
  * Do we hold a usable Drive token, trying one silent recovery first?
  *
- * Extracted from `proceedToFinalize`'s else-branch rather than re-written, so the create path and
- * the redirect-resume path cannot drift on what "connected" means. Before forcing a SECOND Drive
+ * `proceedToFinalize`'s `silent-reconnect` route, kept as its own function rather than inlined, so
+ * the create path and the redirect-resume path cannot drift on what "connected" means. Before forcing a SECOND Drive
  * redirect (which on web reloads the app and makes the person start over), try the
  * beanpod-mirrored refresh token.
  *
@@ -773,43 +773,63 @@ async function ensureDriveToken(): Promise<boolean> {
   return recovered && isTokenValid();
 }
 
+/** `proceedToFinalize`'s routes, in the order it tries them; logged as `finalize-dispatch:<route>`. */
+type FinalizeRoute = 'live-provider' | 'valid-token' | 'silent-reconnect' | 'storage';
+
 /**
- * The finalize dispatch that writes the pod, extracted so the PIN step and the storage
- * fallbacks reach it with the SAME safety envelope — a peer of `handleConnectDrive` /
- * `handleConnectLocal`. It re-arms the busy latch + try/catch + finally rather than run
- * the point-of-no-return bare.
+ * The finalize dispatch: the ONE judge of "is storage connected?" on this screen. The probe's
+ * `no-registry-entry` arm (#131) and the PIN submit both reach it, with the SAME safety envelope
+ * (busy latch + try/catch + finally) rather than run the point-of-no-return bare — a peer of
+ * `handleConnectDrive` / `handleConnectLocal`. Route first, then act, with one `finalize-dispatch`
+ * event per call naming the route:
+ *
+ *   - `live-provider`: storage is ALREADY connected on this page (CreatePodView's step-2 popup or
+ *     local picker, native, the E2E memory provider, or an earlier connect here) AND belongs to
+ *     THIS family: `finalizePod` writes straight into it, or defers to the PIN step when there is
+ *     no PIN yet. Never re-run `connectDriveStorage`, which would call `createNew` a second time
+ *     and collide with the stub (and re-prompt for a local file).
+ *   - `valid-token`: a fresh Drive token but no usable provider (a redirect that just returned
+ *     with a grant): connect in place, exactly once (`finishOnDrive`). No consent is shown or
+ *     counted, and an own stub is adopted through `name-collision`.
+ *   - `silent-reconnect`: no token, but the family's refresh token restores one (a reload after
+ *     a popup grant; the iOS edge where the token lapsed on the way here). Connect in place the
+ *     same way, never a SECOND full-page redirect, which would reload the app again.
+ *   - `storage`: nothing connected. The fresh-reload route (a brand-new family has no provider and
+ *     no Google token: accounts are born from email + PIN, not OAuth) and the recovery for a
+ *     provider lost between storage and PIN. `opts.storageNotice`, a Drive outcome stashed before
+ *     a reload, is shown here and ONLY here: any connected route above is a newer fact.
+ *
+ * ⚠️ THE FAMILY CHECK IS THE POINT, AND ITS ABSENCE WAS A NEAR DATA LOSS. The old docblock said
+ * "iOS never takes this branch: its full-page Drive redirect reloads the app, so the in-memory
+ * provider is gone on return." That is true on iOS WEB/PWA and FALSE on native Capacitor, where
+ * OAuth is `Browser.open()` + a deep link resolving to a router navigation — the WebView never
+ * unloads and the provider survives. On 2026-09-21 a provider bound to a previous family reached
+ * the live-provider route on a production iPhone and `createNewFile` wrote into that family's
+ * Drive file; only a `drive.file` 404 (different Google account) stopped it overwriting their pod
+ * with a new envelope under a new family key. A foreign provider now takes a reconnect route,
+ * where `connectDriveStorage` REPLACES it with one bound to this family, so in the common case
+ * nothing is refused and the person sees no error at all. `createNewFile` carries the same check
+ * as a backstop.
+ * ⚠️ ONLY A DRIVE PROVIDER MAY BE REFUSED HERE, because the reconnect routes are Drive-only. A
+ * foreign LOCAL provider would otherwise be silently replaced by a `.beanpod` created in Google
+ * Drive — the person explicitly chose a local file and would never be asked or told.
+ * `createNewFile` still refuses a cross-family write for EVERY provider type, so the data-loss
+ * guard is intact either way; this only decides whether we can recover automatically.
+ * ⚠️ AND ONLY WHEN THE FAMILY IS ACTUALLY KNOWN. `?? ''` would hand an empty id to a predicate
+ * whose contract makes every bound provider foreign, so a momentarily-null family would reject a
+ * perfectly good provider and re-run `connectDriveStorage` against the stub it already wrote —
+ * the collision the live-provider route exists to avoid.
+ * ⚠️ NO ERROR MESSAGE ON `storage` WITHOUT A NOTICE, AND THAT IS NOT AN OVERSIGHT — a previous
+ * round added one and it was wrong. It is the ORDINARY first arrival for a brand-new family, so
+ * "Google sign-in failed" above "Where should we keep your family's file?" would tell someone
+ * their sign-in failed before they had attempted one. The "never bounce back with no message"
+ * rule is about returning someone to a screen they just ACTED on; the genuine failures set
+ * `driveFailure` / `formError` at the point they occur.
  */
-async function proceedToFinalize() {
+async function proceedToFinalize(opts: { storageNotice?: CreateDriveErrorCode | null } = {}) {
   if (busy.value) return;
   busy.value = true;
   try {
-    // Storage was ALREADY connected on this same page (CreatePodView's step-2 popup / local
-    // picker installed the provider and, for Drive, wrote the stub `.beanpod`) AND it belongs to
-    // THIS family: write straight into it — do NOT re-run `connectDriveStorage`, which would call
-    // `createNew` a second time and collide with that stub (and re-prompt for a local file).
-    //
-    // ⚠️ THE FAMILY CHECK IS THE POINT, AND ITS ABSENCE WAS A NEAR DATA LOSS. The old docblock
-    // said "iOS never takes this branch: its full-page Drive redirect reloads the app, so the
-    // in-memory provider is gone on return." That is true on iOS WEB/PWA and FALSE on native
-    // Capacitor, where OAuth is `Browser.open()` + a deep link resolving to a router navigation —
-    // the WebView never unloads and the provider survives. On 2026-09-21 a provider bound to a
-    // previous family reached this branch on a production iPhone and `createNewFile` wrote into
-    // that family's Drive file; only a `drive.file` 404 (different Google account) stopped it
-    // overwriting their pod with a new envelope under a new family key.
-    //
-    // A foreign provider now falls through to the reconnect branch, where `connectDriveStorage`
-    // REPLACES it with one bound to this family — so in the common case nothing is refused and the
-    // person sees no error at all. `createNewFile` carries the same check as a backstop.
-    // ⚠️ THE FALL-THROUGH IS DRIVE-ONLY, so only a DRIVE provider may be refused here. A foreign
-    // LOCAL provider would otherwise be silently replaced by a `.beanpod` created in Google Drive
-    // — the person explicitly chose a local file and would never be asked or told. `createNewFile`
-    // still refuses a cross-family write for EVERY provider type, so the data-loss guard is intact
-    // either way; this branch only decides whether we can recover automatically.
-    //
-    // ⚠️ AND ONLY WHEN THE FAMILY IS ACTUALLY KNOWN. `?? ''` would hand an empty id to a predicate
-    // whose contract makes every bound provider foreign, so a momentarily-null family would reject
-    // a perfectly good provider and re-run `connectDriveStorage` against the stub it already wrote
-    // — the collision this branch exists to avoid.
     const activeProvider = getProvider();
     const foreignDriveProvider =
       !!activeProvider &&
@@ -818,36 +838,32 @@ async function proceedToFinalize() {
       providerBelongsToAnotherFamily(createFamilyId.value);
 
     phase.value = 'finishing'; // before ANY await: the silent reconnect below can take seconds
-    if (activeProvider && !foreignDriveProvider) {
-      await finalizePod();
-    } else if (isTokenValid()) {
-      // Returned from the Drive redirect with a fresh token but no usable provider — connect
-      // Drive here, exactly once.
-      await finishOnDrive();
-    } else {
-      // iOS edge: no live provider AND no valid token at the finish surface
-      // (e.g. the token lapsed while the user was on the password form). Before
-      // forcing a SECOND full-page Drive redirect — which reloads the app and
-      // makes the user re-enter the password — try a silent reconnect via the
-      // beanpod-mirrored refresh token. If it restores a token, finish on Drive
-      // with no redirect; only fall back to the storage step when it genuinely
-      // can't recover.
-      if (await ensureDriveToken()) {
-        await finishOnDrive();
-      } else {
-        // ⚠️ NO ERROR MESSAGE HERE, AND THAT IS NOT AN OVERSIGHT — a previous round added one and
-        // it was wrong. This `else` is the ORDINARY route to the storage step for a brand-new
-        // family: the phase table above reads `no-registry-entry → identity → storage`,
-        // and on that path there is no provider yet and no Google token (accounts are born from
-        // email + PIN, not OAuth), so every first-time creator lands here. Saying "Google
-        // sign-in failed" above "Where should we keep your family's file?" tells someone their
-        // sign-in failed before they have attempted one.
-        //
-        // The "never bounce back with no message" rule is about returning someone to a screen
-        // they just ACTED on. Nobody has acted yet; the storage screen's own prompt is the
-        // message. The genuine failures all set `formError` at the point they occur.
+    const route: FinalizeRoute =
+      activeProvider && !foreignDriveProvider
+        ? 'live-provider'
+        : isTokenValid()
+          ? 'valid-token'
+          : (await ensureDriveToken())
+            ? 'silent-reconnect'
+            : 'storage';
+    logEvent({
+      level: 'info',
+      surface: 'resumeSetup',
+      message: 'finalize dispatch',
+      context: { action: 'finalize-dispatch', detail: route },
+    });
+    switch (route) {
+      case 'live-provider':
+        await finalizePod(); // no PIN yet → finalize-deferred:no-pin → identity
+        return;
+      case 'valid-token':
+      case 'silent-reconnect':
+        await finishOnDrive(); // connect in place, no consent → finalizePod → identity
+        return;
+      case 'storage':
+        driveFailure.value = opts.storageNotice ?? null; // before the phase, for the sync watcher
         phase.value = 'storage';
-      }
+        return;
     }
   } catch (e) {
     console.error('[ResumePodSetup] unexpected error finalizing pod', e);
@@ -858,10 +874,10 @@ async function proceedToFinalize() {
       severity: 'error',
     });
     formError.value = t('setup.fileCreateFailed');
-    phase.value = storageFallbackPhase();
+    phase.value = 'storage';
   } finally {
     busy.value = false;
-    if (!navigatedAway.value && phase.value === 'finishing') phase.value = storageFallbackPhase();
+    if (!navigatedAway.value && phase.value === 'finishing') phase.value = 'storage';
   }
 }
 
@@ -909,10 +925,11 @@ onErrorCaptured((err) => {
 async function finalizePod(): Promise<boolean> {
   // The connect that got here succeeded, so no earlier Drive failure is current any more.
   driveFailure.value = null;
-  // ⚠️ NO WRITE BEFORE THE PIN STEP (see `ownerReady`). A storage connect started on the
-  // `drive-declined` screen (a local file, or a Drive connect that came back connected in place)
-  // reaches here with `pin === ''` and no rebuilt owner. The provider it installed stays live,
-  // so the PIN step's submit writes into it (`proceedToFinalize` → the live-provider arm).
+  // ⚠️ NO WRITE BEFORE THE PIN STEP (see `ownerReady`). Since #131 this is the ordinary route:
+  // every storage connect (the storage step's Drive or local file, the probe's in-place connect,
+  // the in-page hand-off) reaches here with `pin === ''` and no rebuilt owner. The provider it
+  // installed stays live, so the PIN step's submit writes into it (`proceedToFinalize` →
+  // `live-provider`).
   if (!ownerReady.value) {
     logEvent({
       level: 'info',
@@ -923,8 +940,8 @@ async function finalizePod(): Promise<boolean> {
         provider_type: syncStore.storageProviderType ?? null,
       },
     });
-    // The connect that got here succeeded: a message left from an earlier try on the declined
-    // screen (`handleConnectLocal` does not clear it) must not sit above the PIN form.
+    // The connect that got here succeeded: a message left from an earlier try on the storage
+    // step (`handleConnectLocal` does not clear `formError`) must not sit above the PIN form.
     formError.value = null;
     phase.value = 'identity';
     return false;
@@ -1213,7 +1230,7 @@ async function finishOnDrive(opts: { chooseAccount?: boolean } = {}) {
           return;
         case 'declined':
           driveFailure.value = 'name-collision';
-          phase.value = storageFallbackPhase();
+          phase.value = 'storage';
           return;
         case 'reject-different-account':
           driveFailure.value = 'name-collision';
@@ -1223,7 +1240,7 @@ async function finishOnDrive(opts: { chooseAccount?: boolean } = {}) {
             severity: 'warning',
             context: { provider_type: 'google_drive', collision_file_id: r.collision.fileId },
           });
-          phase.value = storageFallbackPhase();
+          phase.value = 'storage';
           return;
         case 'failed':
           // Sign-in had SUCCEEDED here, so never "sign-in failed": the registry's `unknown`
@@ -1235,7 +1252,7 @@ async function finishOnDrive(opts: { chooseAccount?: boolean } = {}) {
             severity: 'critical',
             context: { provider_type: 'google_drive' },
           });
-          phase.value = storageFallbackPhase();
+          phase.value = 'storage';
           return;
       }
     }
@@ -1245,7 +1262,7 @@ async function finishOnDrive(opts: { chooseAccount?: boolean } = {}) {
     const code = r.errorKind ?? 'unknown';
     reportCreateDriveFailure('resumeSetup.connectDrive', code, r.cause ?? r.error);
     driveFailure.value = code;
-    phase.value = storageFallbackPhase();
+    phase.value = 'storage';
     return;
   }
   await finalizePod();
@@ -1272,7 +1289,7 @@ async function openExistingOnDrive(fileId: string): Promise<void> {
     context: { provider_type: 'google_drive' },
   });
   formError.value = t('setup.fileCreateFailed');
-  phase.value = storageFallbackPhase();
+  phase.value = 'storage';
 }
 
 /** @param opts.chooseAccount "Use a different Google account" (see `finishOnDrive`). */
@@ -1297,49 +1314,18 @@ async function handleConnectDrive(opts: { chooseAccount?: boolean } = {}) {
     const code = classifyCreateDriveFailure(e);
     reportCreateDriveFailure('resumeSetup.connectDrive', code, e);
     driveFailure.value = code;
-    phase.value = storageFallbackPhase();
+    phase.value = 'storage';
   } finally {
     busy.value = false;
-    if (!navigatedAway.value && phase.value === 'finishing') phase.value = storageFallbackPhase();
+    if (!navigatedAway.value && phase.value === 'finishing') phase.value = 'storage';
   }
-}
-
-/**
- * "Try again with Google" on the `drive-declined` screen (#128).
- *
- * This screen comes BEFORE the PIN step, and `handleConnectDrive` → `finishOnDrive` only
- * redirects when no valid token exists; with one it would connect in place and reach
- * `finalizePod`, whose `ownerReady` guard would send it to the PIN step anyway. A token already
- * in hand means Google said yes after all, so this goes to the PIN step directly, whose submit
- * finishes on Drive as usual, without a Drive connect first.
- * (`ensureDriveToken` only tries a silent reconnect and never redirects, so it is not the retry;
- * `gateCreateDriveAuth` stays the one place the create redirect starts.)
- */
-async function handleDriveDeclinedRetry() {
-  showLocalFileWarning.value = false;
-  trackOnboardingStep('drive-declined', 'submitted');
-  if (isTokenValid()) {
-    phase.value = 'identity';
-    return;
-  }
-  await handleConnectDrive();
-}
-
-/**
- * Google Drive again, from whichever screen asked: the local-file warning's "use Google Drive
- * instead" and the failure notice's "Try again". The declined screen keeps its guard.
- */
-function handleRetryDrive() {
-  if (phase.value === 'drive-declined') void handleDriveDeclinedRetry();
-  else void handleConnectDrive();
 }
 
 /**
  * The failure notice's "use a different Google account": the same connect with Google's account
- * chooser forced. From the declined screen it is that screen's answer, as its retry is.
+ * chooser forced.
  */
 function handleChooseDifferentAccount() {
-  if (phase.value === 'drive-declined') trackOnboardingStep('drive-declined', 'submitted');
   void handleConnectDrive({ chooseAccount: true });
 }
 
@@ -1353,10 +1339,8 @@ async function handleConnectLocal() {
   // A new storage attempt: an earlier Drive failure is no longer current (as `finishOnDrive` and
   // `runProbe` clear it). A local failure below then shows alone, in the red form-error box.
   driveFailure.value = null;
-  // #128: from the `drive-declined` screen no PIN has been chosen yet, so a connected local file
-  // goes to the PIN step (`finalizePod`'s guard; the PIN submit writes into the live local
-  // provider), and a failure returns to the declined screen rather than to `storage`.
-  const fallbackPhase = storageFallbackPhase();
+  // No PIN yet on the storage step (#131): a connected local file reaches `finalizePod`, which
+  // defers to the PIN step, and the PIN submit writes into the live local provider.
   busy.value = true;
   phase.value = 'finishing';
   try {
@@ -1377,7 +1361,7 @@ async function handleConnectLocal() {
         });
         formError.value = t('setup.fileCreateFailed');
       }
-      phase.value = fallbackPhase;
+      phase.value = 'storage';
       return;
     }
     await finalizePod();
@@ -1390,10 +1374,10 @@ async function handleConnectLocal() {
       severity: 'error',
     });
     formError.value = t('setup.fileCreateFailed');
-    phase.value = fallbackPhase;
+    phase.value = 'storage';
   } finally {
     busy.value = false;
-    if (!navigatedAway.value && phase.value === 'finishing') phase.value = fallbackPhase;
+    if (!navigatedAway.value && phase.value === 'finishing') phase.value = 'storage';
   }
 }
 </script>
@@ -1430,35 +1414,8 @@ async function handleConnectLocal() {
       {{ formError }}
     </div>
 
-    <!-- A Google Drive failure on the two screens it lands on (`storage`, and `drive-declined`
-         before the PIN). A decision or an environment problem, not a hard error, so a Heritage
-         Orange notice (never the red form-error box), then the registry's recoveries for this
-         code on this device in place of the phase's own buttons. The storage step keeps its
-         prompt, so the screen still says what it is for. -->
-    <div v-if="showDriveFailure && driveFailure" class="space-y-4">
-      <p
-        v-if="phase === 'storage'"
-        class="font-outfit dark:text-ink-soft text-center text-sm font-semibold text-gray-700"
-      >
-        {{ t('resumeSetup.storagePrompt') }}
-      </p>
-      <p
-        class="dark:border-accent-lift border-primary-500 dark:bg-surface-overlay dark:text-ink-soft rounded-xl border-l-4 bg-[var(--tint-orange-8)] p-3 text-sm text-gray-700"
-      >
-        {{ driveFailureMessage }}
-      </p>
-      <CreateDriveFailureActions
-        :code="driveFailure"
-        :disabled="busy"
-        :always-offer-local="showDriveFailure"
-        @retry="handleRetryDrive"
-        @choose-account="handleChooseDifferentAccount"
-        @use-local="handleLocalFileClick"
-      />
-    </div>
-
     <!-- Initial probe — short, only visible while the registry lookup runs. -->
-    <div v-else-if="phase === 'probing'" class="py-6 text-center">
+    <div v-if="phase === 'probing'" class="py-6 text-center">
       <BeanieSpinner size="md" class="mx-auto mb-3" />
       <p class="dark:text-ink-soft text-sm text-gray-500">{{ t('resumeSetup.checking') }}</p>
     </div>
@@ -1517,38 +1474,7 @@ async function handleConnectLocal() {
       </button>
     </div>
 
-    <!-- Drive declined (#128) with no current failure code (a later local-file attempt on this
-         screen cleared it, e.g. a dismissed picker): the screen's default notice, one primary
-         retry, and the quiet local-file fallback only where it exists. With a code, the block
-         above renders instead. -->
-    <div v-else-if="phase === 'drive-declined'" class="space-y-4">
-      <p
-        class="dark:border-accent-lift border-primary-500 dark:bg-surface-raised dark:text-ink-soft rounded-xl border-l-4 bg-[var(--tint-orange-8)] p-3 text-sm text-gray-700"
-      >
-        {{ t('resumeSetup.driveDeclinedBody') }}
-      </p>
-      <BaseButton class="w-full" :disabled="busy" :loading="busy" @click="handleDriveDeclinedRetry">
-        {{ t('resumeSetup.tryAgainWithGoogle') }}
-      </BaseButton>
-      <div v-if="canUseLocalFiles()" class="text-center">
-        <button
-          type="button"
-          class="font-outfit text-secondary-500 hover:text-secondary-600 dark:text-ink-faint dark:hover:text-ink cursor-pointer text-sm underline decoration-1 underline-offset-4 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
-          :disabled="busy"
-          @click="handleLocalFileClick"
-        >
-          {{ t('storage.useLocalInstead') }}
-        </button>
-        <p class="dark:text-ink-faint mt-1 text-xs text-gray-500">
-          {{ t('storage.localFileWarning') }}
-        </p>
-      </div>
-      <p v-else class="dark:text-ink-faint text-center text-xs text-gray-500">
-        {{ t('storage.driveOnlyHere') }}
-      </p>
-    </div>
-
-    <!-- Identity (fallback for scenario (a)) -->
+    <!-- PIN: the last step before the write (#131), after storage has connected. -->
     <form v-else-if="phase === 'identity'" class="space-y-4" @submit.prevent="handleIdentityNext">
       <div
         class="dark:bg-surface-overlay/50 dark:text-ink-soft rounded-xl bg-gray-50 p-3 text-sm text-gray-600"
@@ -1616,39 +1542,60 @@ async function handleConnectLocal() {
       </template>
     </RecoveryKitDisplay>
 
-    <!-- Storage (fallback for scenario (a)) -->
+    <!-- Storage: the create flow's first step on this screen (#131), and the ONE screen a Google
+         Drive failure lands on, whatever produced it. The prompt always shows, so the screen
+         still says what it is for. With a failure: a decision or an environment problem, not a
+         hard error, so a Heritage Orange notice (never the red form-error box), then the
+         registry's recoveries for this code on this device in place of the default buttons. -->
     <div v-else-if="phase === 'storage'" class="space-y-3">
       <p class="font-outfit dark:text-ink-soft text-center text-sm font-semibold text-gray-700">
         {{ t('resumeSetup.storagePrompt') }}
       </p>
-      <BaseButton
-        v-if="syncStore.isGoogleDriveAvailable"
-        class="w-full"
-        :disabled="busy"
-        @click="handleConnectDrive()"
-      >
-        {{ t('storage.connectGoogleDrive') }}
-      </BaseButton>
-      <!-- Local file only where the File System Access API exists (Chromium
-           desktop / native). On iOS WebKit + Firefox it dead-ends; hide it when
-           Drive is available, or show a clear message in the self-host case. -->
-      <BaseButton
-        v-if="canUseLocalFiles()"
-        variant="outline"
-        class="w-full"
-        :disabled="busy"
-        @click="handleLocalFileClick"
-      >
-        {{
-          syncStore.isGoogleDriveAvailable ? t('storage.useLocalInstead') : t('storage.localFile')
-        }}
-      </BaseButton>
-      <p
-        v-else-if="!syncStore.isGoogleDriveAvailable"
-        class="dark:text-ink-soft text-center text-xs text-gray-500"
-      >
-        {{ t('selfHost.localUnsupported') }}
-      </p>
+      <template v-if="showDriveFailure && driveFailure">
+        <p
+          class="dark:border-accent-lift border-primary-500 dark:bg-surface-overlay dark:text-ink-soft rounded-xl border-l-4 bg-[var(--tint-orange-8)] p-3 text-sm text-gray-700"
+        >
+          {{ driveFailureMessage }}
+        </p>
+        <CreateDriveFailureActions
+          :code="driveFailure"
+          :disabled="busy"
+          always-offer-local
+          @retry="() => handleConnectDrive()"
+          @choose-account="handleChooseDifferentAccount"
+          @use-local="handleLocalFileClick"
+        />
+      </template>
+      <template v-else>
+        <BaseButton
+          v-if="syncStore.isGoogleDriveAvailable"
+          class="w-full"
+          :disabled="busy"
+          @click="handleConnectDrive()"
+        >
+          {{ t('storage.connectGoogleDrive') }}
+        </BaseButton>
+        <!-- Local file only where the File System Access API exists (Chromium
+             desktop / native). On iOS WebKit + Firefox it dead-ends; hide it when
+             Drive is available, or show a clear message in the self-host case. -->
+        <BaseButton
+          v-if="canUseLocalFiles()"
+          variant="outline"
+          class="w-full"
+          :disabled="busy"
+          @click="handleLocalFileClick"
+        >
+          {{
+            syncStore.isGoogleDriveAvailable ? t('storage.useLocalInstead') : t('storage.localFile')
+          }}
+        </BaseButton>
+        <p
+          v-else-if="!syncStore.isGoogleDriveAvailable"
+          class="dark:text-ink-soft text-center text-xs text-gray-500"
+        >
+          {{ t('selfHost.localUnsupported') }}
+        </p>
+      </template>
     </div>
 
     <!-- Survey (create-only): "how did you hear about us?", the last step (#128). -->
@@ -1682,7 +1629,7 @@ async function handleConnectLocal() {
       :google-drive-available="syncStore.isGoogleDriveAvailable"
       @close="showLocalFileWarning = false"
       @proceed="handleConnectLocal"
-      @use-google-drive="handleRetryDrive"
+      @use-google-drive="() => handleConnectDrive()"
     />
 
     <!-- Setup progress modal — opened from the survey step; syncs the added

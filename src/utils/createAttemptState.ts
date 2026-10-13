@@ -39,8 +39,10 @@ const LABEL = 'createAttempt';
 export const CREATE_ATTEMPT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 /**
- * Every step the onboarding funnel names, in the order a person meets them. The firehose
- * `detail` of every `onboarding` event is one of these, so the set is closed by construction.
+ * Every step the onboarding funnel names, in the order a person meets them: welcome, about-you,
+ * storage, drive-consent, resume-probe, pin, kit, members, survey, done (storage connects before
+ * the PIN is asked, #131). The firehose `detail` of every `onboarding` event is one of these, so
+ * the set is closed by construction.
  */
 export const ONBOARDING_STEPS = [
   'welcome',
@@ -48,7 +50,6 @@ export const ONBOARDING_STEPS = [
   'storage',
   'drive-consent',
   'resume-probe',
-  'drive-declined',
   'pin',
   'kit',
   'members',
@@ -90,8 +91,12 @@ function parseAttempt(value: unknown): CreateAttempt | null {
   const v = value as Record<string, unknown>;
   if (typeof v.id !== 'string' || v.id.length === 0 || v.id.length > 64) return null;
   if (typeof v.startedAt !== 'number' || !Number.isFinite(v.startedAt)) return null;
-  if (typeof v.step !== 'string' || !STEP_SET.has(v.step)) return null;
-  return { id: v.id, startedAt: v.startedAt, step: v.step as OnboardingStep };
+  // Legacy alias, remove after 2026-10-15 (CREATE_ATTEMPT_MAX_AGE_MS): `drive-declined` left the
+  // step set when it merged into the storage screen (#131), and an attempt opened across the
+  // deploy may still carry it. It is the same screen now, so it reads as `storage`.
+  const step = v.step === 'drive-declined' ? 'storage' : v.step;
+  if (typeof step !== 'string' || !STEP_SET.has(step)) return null;
+  return { id: v.id, startedAt: v.startedAt, step: step as OnboardingStep };
 }
 
 /**

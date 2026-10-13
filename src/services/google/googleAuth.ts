@@ -957,6 +957,20 @@ function noteNativeRefusal(
 }
 
 /**
+ * Whether an interactive `requestAccessToken(options)` call will open the OAuth popup (web popup
+ * transport): with a valid cached token and no account chooser it returns the token silently and
+ * nothing opens. The one source for that decision; the create flow's connect seam reads it before
+ * the call to pre-stash a "popup in flight" resume reason, so a reload mid-popup can be explained.
+ */
+export function willOpenConsentPopup(options?: {
+  forceConsent?: boolean;
+  chooseAccount?: boolean;
+}): boolean {
+  // Mirrors `requestAccessToken`'s `wantsFreshGrant`: either flag clears the cached token first.
+  return Boolean(options?.forceConsent || options?.chooseAccount) || !isTokenValid();
+}
+
+/**
  * Request an OAuth access token via PKCE popup flow.
  *
  * If a valid token exists, returns it immediately.
@@ -1063,13 +1077,16 @@ export async function requestAccessToken(options?: {
   // dead as the bug it exists to escape.
   const wantsFreshGrant = Boolean(options?.forceConsent || options?.chooseAccount);
 
-  // If forcing consent, clear existing token so we don't short-circuit
+  // If forcing consent, clear existing token so we don't short-circuit (`willOpenConsentPopup`
+  // folds the same two flags in, so its answer below matches this clear).
   if (wantsFreshGrant) {
     clearTokenState();
   }
 
-  // Return cached token if still valid
-  if (!options?.chooseAccount && isTokenValid()) {
+  // Return cached token if still valid. `willOpenConsentPopup` is THE predicate for "this call
+  // opens a window": the create flow's connect seam pre-stashes a resume reason on it, so the two
+  // sites must never drift.
+  if (!willOpenConsentPopup(options)) {
     return accessToken!;
   }
 
