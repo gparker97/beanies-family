@@ -32,5 +32,9 @@
     <string name="widget_config_opacity_100" translatable="false">100%</string>
     <string name="widget_config_opacity_70" translatable="false">70%</string>
     <string name="widget_config_opacity_40" translatable="false">40%</string>
+    <string name="widget_config_text_size">Text size</string>
+    <string name="widget_config_text_standard">Standard</string>
+    <string name="widget_config_text_large">Large</string>
+    <string name="widget_config_text_larger">Larger</string>
     <string name="widget_config_done">Done</string>
 </resources>

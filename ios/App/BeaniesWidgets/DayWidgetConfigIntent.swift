@@ -39,6 +39,31 @@ enum WidgetBackgroundOption: String, AppEnum {
     }
 }
 
+/// How big the widget's text is, on top of the phone's own text size: Standard (today's look),
+/// Large, Larger. Never smaller than Standard, and never past `WidgetMetrics.maxScale` overall
+/// (the rule is `WidgetMetrics.init`). Bigger text shows fewer rows, never clipped ones. Android's
+/// configuration screen has the same three (`WidgetPrefs.TextSize`).
+enum WidgetTextSizeOption: String, AppEnum {
+    case standard
+    case large
+    case larger
+
+    static var typeDisplayRepresentation: TypeDisplayRepresentation = "Text size"
+    static var caseDisplayRepresentations: [WidgetTextSizeOption: DisplayRepresentation] = [
+        .standard: "Standard",
+        .large: "Large",
+        .larger: "Larger",
+    ]
+
+    var factor: CGFloat {
+        switch self {
+        case .standard: return 1.0
+        case .large: return 1.15
+        case .larger: return 1.3
+        }
+    }
+}
+
 /// The per-widget picker ("Edit Widget"). Titles are keys in Localizable.xcstrings
 /// (en + zh-Hans): they render before any snapshot exists, so they cannot come from one.
 /// Defaults: everything on (`WIDGET_DEFAULT_BLOCKS` in src/types/widgetSnapshot.ts). Each
@@ -78,6 +103,9 @@ struct DayWidgetConfigIntent: WidgetConfigurationIntent {
 
     @Parameter(title: "Background", default: .solid)
     var background: WidgetBackgroundOption
+
+    @Parameter(title: "Text size", default: .standard)
+    var textSize: WidgetTextSizeOption
 }
 
 /// The picker's choices as a plain value, so the views and the fill logic never touch the
@@ -92,6 +120,8 @@ struct WidgetBlocks: Equatable {
     var hint: Bool
     /// The card's opacity choice; not a block, but it rides with the picker's other values.
     var background: WidgetBackgroundOption = .solid
+    /// The text-size choice; the lock-screen widget (no picker) keeps Standard.
+    var textSize: WidgetTextSizeOption = .standard
 
     static let defaults = WidgetBlocks(
         audience: .my, events: true, whosWhere: true, meals: true, due: true, comingUp: true, hint: true
@@ -119,7 +149,8 @@ extension WidgetBlocks {
             due: configuration.due,
             comingUp: configuration.tripsAndBirthdays,
             hint: configuration.hint,
-            background: configuration.background
+            background: configuration.background,
+            textSize: configuration.textSize
         )
     }
 }

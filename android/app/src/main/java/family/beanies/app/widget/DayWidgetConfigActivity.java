@@ -20,8 +20,9 @@ import androidx.core.view.WindowInsetsControllerCompat;
 import family.beanies.app.R;
 
 /**
- * The widget's configuration screen (#130): whose day, the six blocks, background opacity. Shown
- * by the launcher when a widget is placed (optional on Android 12+) and from "reconfigure".
+ * The widget's configuration screen (#130): whose day, the six blocks, background opacity and
+ * text size. Shown by the launcher when a widget is placed (optional on Android 12+) and from
+ * "reconfigure".
  *
  * EXPORTED, SO THE ID IS UNTRUSTED. The launcher must be able to start this activity, which means
  * any app can too, with any EXTRA_APPWIDGET_ID. Before anything is written, the id must name a
@@ -45,6 +46,11 @@ public class DayWidgetConfigActivity extends AppCompatActivity {
     /** Radio ids in {@link WidgetPrefs#OPACITIES} order. */
     private static final int[] OPACITY_IDS = {
         R.id.config_opacity_100, R.id.config_opacity_70, R.id.config_opacity_40,
+    };
+
+    /** Radio ids in {@link WidgetPrefs.TextSize} declaration order. */
+    private static final int[] TEXT_SIZE_IDS = {
+        R.id.config_text_standard, R.id.config_text_large, R.id.config_text_larger,
     };
 
     private int appWidgetId = AppWidgetManager.INVALID_APPWIDGET_ID;
@@ -124,6 +130,16 @@ public class DayWidgetConfigActivity extends AppCompatActivity {
             ((RadioButton) findViewById(OPACITY_IDS[i]))
                     .setChecked(WidgetPrefs.OPACITIES[i] == prefs.opacity);
         }
+        ((RadioGroup) findViewById(R.id.config_text_size)).check(TEXT_SIZE_IDS[prefs.textSize.ordinal()]);
+    }
+
+    /** The index of the checked radio in `ids`; 0 (each group's default) when none matches. */
+    private int checkedIndex(int groupId, int[] ids) {
+        int checked = ((RadioGroup) findViewById(groupId)).getCheckedRadioButtonId();
+        for (int i = 0; i < ids.length; i++) {
+            if (ids[i] == checked) return i;
+        }
+        return 0;
     }
 
     private void save() {
@@ -138,15 +154,19 @@ public class DayWidgetConfigActivity extends AppCompatActivity {
         for (int i = 0; i < BLOCK_IDS.length; i++) {
             blocks[i] = ((CheckBox) findViewById(BLOCK_IDS[i])).isChecked();
         }
-        int opacity = 100;
-        int checked = ((RadioGroup) findViewById(R.id.config_opacity)).getCheckedRadioButtonId();
-        for (int i = 0; i < OPACITY_IDS.length; i++) {
-            if (OPACITY_IDS[i] == checked) opacity = WidgetPrefs.OPACITIES[i];
-        }
-        new WidgetPrefs(our ? WidgetPrefs.AUDIENCE_OUR : WidgetPrefs.AUDIENCE_MY, blocks, opacity)
+        int opacity = WidgetPrefs.OPACITIES[checkedIndex(R.id.config_opacity, OPACITY_IDS)];
+        WidgetPrefs.TextSize textSize =
+                WidgetPrefs.TextSize.values()[checkedIndex(R.id.config_text_size, TEXT_SIZE_IDS)];
+        new WidgetPrefs(our ? WidgetPrefs.AUDIENCE_OUR : WidgetPrefs.AUDIENCE_MY, blocks, opacity, textSize)
                 .save(this, appWidgetId);
 
-        DayWidgetProvider.renderAll(this);
+        try {
+            DayWidgetProvider.renderAll(this);
+        } catch (RuntimeException e) {
+            // The choices are saved; the widget redraws on its next update. Never crash the screen.
+            Log.e(TAG, "render after configure failed; prefs are saved and the widget redraws on its next update", e);
+            WidgetPrefs.recordReadOutcome(this, "reload_failed;" + e.getClass().getSimpleName());
+        }
         setResult(RESULT_OK, new Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId));
         finish();
     }

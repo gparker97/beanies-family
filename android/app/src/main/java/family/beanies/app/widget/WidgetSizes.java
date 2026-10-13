@@ -64,16 +64,45 @@ public final class WidgetSizes {
     /**
      * The placed widget's portrait height (`MAX_HEIGHT`, else `MIN_HEIGHT`) divided by the text
      * scale, for giving the to-dos section the rows the calendar leaves free: rows grow with
-     * the system font size, so a larger font leaves fewer of them. 0 when the host reports
-     * nothing.
+     * the system font size and the widget's Text size choice ({@link #textScale}), so bigger
+     * text leaves fewer of them. 0 when the host reports nothing.
      */
-    static float layoutHeightDp(Context context, Bundle options) {
+    static float layoutHeightDp(Context context, Bundle options, float textScale) {
         if (options == null) return 0f;
         int height = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 0);
         if (height <= 0) height = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0);
         if (height <= 0) return 0f;
-        float fontScale = context.getResources().getConfiguration().fontScale;
-        return height / Math.max(1f, fontScale);
+        // height / max(1, effective scale): not max(1, fontScale) × textScale, which is wrong
+        // when the system scale is below 1.
+        return height / Math.max(1f, fontScale(context) * textScale);
+    }
+
+    /**
+     * The ceiling on the widget's effective text scale (system × the Text size choice). Mirrors
+     * iOS `WidgetMetrics.maxScale` (ios/App/BeaniesWidgets/WidgetStyle.swift); change both.
+     */
+    static final float TEXT_SCALE_MAX = 1.3f;
+
+    /**
+     * The multiplier on a base sp for this widget's Text size choice: the effective scale
+     * `max(fs, min(fs × factor, TEXT_SCALE_MAX))` divided by the system font scale `fs`, because
+     * the launcher applies `fs` itself to every SP size. 1 at Standard. The choice makes text
+     * bigger up to the ceiling, never smaller, and never past what the system alone already does.
+     * Worked values (Standard / Large / Larger): fs 1.0 → 1 / 1.15 / 1.3; fs 1.3 → 1 / 1 / 1;
+     * fs 0.85 → 1 / 1.15 / 1.3 (capped at 1.105 / 0.85).
+     *
+     * Deliberately not called "scale": iOS `WidgetMetrics.scale` is the absolute effective scale.
+     * This class is the only reader of `Configuration.fontScale`.
+     */
+    static float textScale(Context context, WidgetPrefs.TextSize size) {
+        float fs = fontScale(context);
+        float effective = Math.max(fs, Math.min(fs * size.factor, TEXT_SCALE_MAX));
+        return effective / fs;
+    }
+
+    private static float fontScale(Context context) {
+        float fs = context.getResources().getConfiguration().fontScale;
+        return fs > 0 ? fs : 1f;
     }
 
     public static Size sizeFor(Bundle options) {

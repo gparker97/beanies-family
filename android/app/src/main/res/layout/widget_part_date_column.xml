@@ -2,7 +2,8 @@
 <!--
   The 52dp date column of the medium and large widgets (#130): numeral, weekday (accent), month,
   and at the foot the "as of" stale line, the audience label and the due count. Taps open the
-  Nook. The view is 62dp with 6dp/4dp side padding so a see-through card can give it a tile
+  Nook. The foot's three lines hold "2 for you today" / "as of 12:40 am" at the Larger text
+  size (two cut the last word silently); at Standard and Large they take two. The view is 62dp with 6dp/4dp side padding so a see-through card can give it a tile
   (widget_tile_bg) without moving the text: content still starts 14dp in and 12dp below the top
   (5dp root + 1dp margin + 6dp padding), and the panel still starts 74dp in (8 + 62 + 4).
 -->
@@ -27,22 +28,20 @@
         android:layout_height="wrap_content"
         android:scaleType="fitStart" />
 
-    <!-- A long weekday ("Wednesday") shrinks to fit the column rather than ellipsizing
-         (API 26+; API 24/25 clip). -->
+    <!-- A long weekday ("Wednesday") or month ("September") shrinks to fit the column: the size is
+         picked in Java (WidgetViews.fitSp, down to DayWidgetRenderer.DATE_COLUMN_MIN_SP), not by
+         XML autosize, which ignores any size the app sets and so could never follow the widget's
+         Text size choice. -->
     <TextView
         android:id="@+id/date_weekday"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="2dp"
-        android:autoSizeMaxTextSize="11sp"
-        android:autoSizeMinTextSize="10sp"
-        android:autoSizeStepGranularity="0.5sp"
-        android:autoSizeTextType="uniform"
+        android:ellipsize="end"
         android:fontFamily="sans-serif-medium"
-        android:maxLines="1"
+        android:singleLine="true"
         android:textColor="@color/widget_accent_text"
-        android:textSize="11sp"
-        tools:ignore="UnusedAttribute" />
+        android:textSize="@dimen/widget_text_body" />
 
     <TextView
         android:id="@+id/date_month"
@@ -51,7 +50,7 @@
         android:ellipsize="end"
         android:singleLine="true"
         android:textColor="@color/widget_ink_soft"
-        android:textSize="11sp" />
+        android:textSize="@dimen/widget_text_body" />
 
     <!-- Spacer: a plain View is not a RemoteViews class, so it is an empty FrameLayout. -->
     <FrameLayout
@@ -64,9 +63,10 @@
         android:id="@+id/date_as_of"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:maxLines="2"
+        android:ellipsize="end"
+        android:maxLines="3"
         android:textColor="@color/widget_ink_faint"
-        android:textSize="11sp"
+        android:textSize="@dimen/widget_text_body"
         android:visibility="gone" />
 
     <TextView
@@ -74,9 +74,10 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="2dp"
-        android:maxLines="2"
+        android:ellipsize="end"
+        android:maxLines="3"
         android:textColor="@color/widget_ink_soft"
-        android:textSize="11sp"
+        android:textSize="@dimen/widget_text_body"
         android:visibility="gone" />
 
     <TextView
@@ -84,8 +85,9 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="2dp"
-        android:maxLines="2"
+        android:ellipsize="end"
+        android:maxLines="3"
         android:textColor="@color/widget_ink_soft"
-        android:textSize="11sp"
+        android:textSize="@dimen/widget_text_body"
         android:visibility="gone" />
 </LinearLayout>

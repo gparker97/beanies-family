@@ -8,23 +8,27 @@ import android.graphics.Paint;
 import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Build;
+import android.util.Log;
 import android.util.TypedValue;
 import android.view.View;
 import android.widget.RemoteViews;
+import androidx.annotation.DimenRes;
+import androidx.annotation.IdRes;
 import family.beanies.app.MainActivity;
 import family.beanies.app.R;
 
 /**
  * RemoteViews helpers shared by {@link DayWidgetRenderer} and {@link DayWidgetFactory} (#130):
- * taps, member dots, avatars, mode-safe text colours and the lead (time) column width.
+ * taps, member dots, avatars, mode-safe text colours, text sizes and the lead (time) column width.
+ *
+ * TEXT SIZES: base sp × `textScale` ({@link WidgetSizes#textScale}), set as SP so the launcher
+ * still applies the live system font scale on top. The base sizes live in
+ * `res/values/widget_dimens.xml`, which the layouts reference too: one source of truth.
  */
 final class WidgetViews {
 
     /** The narrowest lead column (dp): a row with no time, or a glyph, still lines up. */
     static final float LEAD_MIN_DP = 30f;
-    /** Calendar and task row text; the child view's rows are bigger and bold. */
-    static final float ROW_TEXT_SP = 11f;
-    static final float CHILD_ROW_TEXT_SP = 19f;
 
     /** The origin every widget link lives on (`shareableOrigin()` on the JS side). */
     static final String ORIGIN = "https://app.beanies.family";
@@ -144,10 +148,28 @@ final class WidgetViews {
      * for a child). An unknown avatar falls back to the family.
      */
     static void bindPeek(RemoteViews views, WidgetFill.Plan plan) {
-        int avatar = plan.isOurDay ? 0 : avatarRes(plan.snapshot.viewer.avatar);
+        int avatar = peekAvatar(plan);
         views.setViewVisibility(R.id.peek_family, avatar == 0 ? View.VISIBLE : View.GONE);
         views.setViewVisibility(R.id.peek_avatar, avatar == 0 ? View.GONE : View.VISIBLE);
         if (avatar != 0) views.setImageViewResource(R.id.peek_avatar, avatar);
+    }
+
+    /** The viewer's avatar drawable for the peek, or 0 when the family peek shows. */
+    static int peekAvatar(WidgetFill.Plan plan) {
+        return plan.isOurDay ? 0 : avatarRes(plan.snapshot.viewer.avatar);
+    }
+
+    /** The width (dp) of the peek {@link #bindPeek} shows, from the same dimens as the layout. */
+    static float peekWidthDp(Context context, WidgetFill.Plan plan) {
+        return dp(context, peekAvatar(plan) == 0
+                ? R.dimen.widget_peek_family_width
+                : R.dimen.widget_peek_avatar_width);
+    }
+
+    /** A dp dimen, in dp. */
+    static float dp(Context context, @DimenRes int dimenRes) {
+        return context.getResources().getDimension(dimenRes)
+                / context.getResources().getDisplayMetrics().density;
     }
 
     /**
@@ -202,9 +224,19 @@ final class WidgetViews {
      * glyph and a to-do ring all line up: the widest calendar time, never under
      * {@link #LEAD_MIN_DP}. The list factory and the renderer both call this with the same plan.
      */
-    static float leadColumnDp(Context context, WidgetFill.Plan plan) {
-        float sp = plan.isChild ? CHILD_ROW_TEXT_SP : ROW_TEXT_SP;
-        return Math.max(LEAD_MIN_DP, timeColumnDp(context, plan.calendarTimes(), sp, plan.isChild));
+    static float leadColumnDp(Context context, WidgetFill.Plan plan, float textScale) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return LEAD_MIN_DP;
+        float sp = sp(context, rowDimen(plan.isChild)) * textScale;
+        Typeface face = plan.isChild ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT;
+        float widest = widestDp(context, plan.calendarTimes(), sp, face);
+        // +2dp: sub-pixel rounding between this Paint and the host's TextView must never ellipsize.
+        return Math.max(LEAD_MIN_DP, widest == 0 ? 0 : widest + 2f);
+    }
+
+    /** The calendar row text size: the child view's rows are bigger and bold. */
+    @DimenRes
+    static int rowDimen(boolean isChild) {
+        return isChild ? R.dimen.widget_text_child_row : R.dimen.widget_text_body;
     }
 
     /** API 31+: set a lead-column view's width (below 31 its 30dp minWidth holds the column). */
@@ -215,24 +247,74 @@ final class WidgetViews {
     }
 
     /**
-     * The widest of `times` in dp, measured in the typeface the HOST actually draws the row time
-     * in (system sans: `row_time` has no fontFamily, since `@font` is ignored in launcher-hosted
-     * RemoteViews; bold only for the child view's bold span), at `sp` through the device font
-     * scale, so every row's time column (and the handoff sub-line's avatar column) lines up and
-     * "10:15am" is never cut. API 31+ only (setViewLayoutWidth); 0 when there is nothing to measure.
+     * The widest of `texts` in dp, measured in the typeface the HOST actually draws it in (system
+     * sans: `@font` is ignored in launcher-hosted RemoteViews), at `sp` through the device font
+     * scale. 0 when there is nothing to measure. Shared by the lead column and {@link #fitSp}.
      */
-    private static float timeColumnDp(Context context, Iterable<String> times, float sp, boolean bold) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return 0;
+    static float widestDp(Context context, Iterable<String> texts, float sp, Typeface face) {
+        return widestDp(context, texts, sp, paint(face));
+    }
+
+    private static Paint paint(Typeface face) {
         Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        paint.setTypeface(bold ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT);
+        paint.setTypeface(face);
+        return paint;
+    }
+
+    private static float widestDp(Context context, Iterable<String> texts, float sp, Paint paint) {
         android.util.DisplayMetrics metrics = context.getResources().getDisplayMetrics();
         paint.setTextSize(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, sp, metrics));
         float widest = 0;
-        for (String t : times) {
+        for (String t : texts) {
             if (t != null && !t.isEmpty()) widest = Math.max(widest, paint.measureText(t));
         }
-        if (widest == 0) return 0;
-        // +2dp: sub-pixel rounding between this Paint and the host's TextView must never ellipsize.
-        return (float) Math.ceil(widest / metrics.density) + 2f;
+        return widest == 0 ? 0 : (float) Math.ceil(widest / metrics.density);
+    }
+
+    /**
+     * The largest sp, from `sp` down in 0.5sp steps to `minSp`, at which `text` fits `maxWidthDp`
+     * on one line (`minSp` when even that does not fit; the view's ellipsize is the last resort).
+     * Replaces XML autosize, which ignores any size set by the app (`TextView.setTextSize` does
+     * nothing while autosize is on), so a Text size choice could never reach it.
+     */
+    static float fitSp(Context context, String text, Typeface face, float sp, float minSp, float maxWidthDp) {
+        java.util.List<String> one = java.util.Collections.singletonList(text);
+        Paint paint = paint(face);
+        for (float s = sp; s > minSp; s -= 0.5f) {
+            // +2dp, as the lead column: this Paint and the host's TextView round differently, and
+            // a fit that is exact here can ellipsize there.
+            if (widestDp(context, one, s, paint) + 2f <= maxWidthDp) return s;
+        }
+        return minSp;
+    }
+
+    /**
+     * A base size from `widget_dimens.xml`, in sp. Never throws: a throw here would also fail the
+     * refresh-state fallback in {@link DayWidgetProvider#renderAll}, and the provider's update
+     * callbacks have no catch. A dimen in another unit is logged and its number used as sp; the
+     * build-time grep in the plan's testing steps keeps that from shipping. The unit is read with
+     * the shift-and-mask form because `TypedValue.getComplexUnit()` is API 30 (minSdk is 24).
+     */
+    static float sp(Context context, @DimenRes int dimenRes) {
+        TypedValue tv = new TypedValue();
+        context.getResources().getValue(dimenRes, tv, true);
+        int unit = (tv.data >> TypedValue.COMPLEX_UNIT_SHIFT) & TypedValue.COMPLEX_UNIT_MASK;
+        if (tv.type != TypedValue.TYPE_DIMENSION || unit != TypedValue.COMPLEX_UNIT_SP) {
+            Log.e("beanies-widget", "widget text dimen "
+                    + context.getResources().getResourceEntryName(dimenRes)
+                    + " must be declared in sp (res/values/widget_dimens.xml); using its number as sp");
+        }
+        return TypedValue.complexToFloat(tv.data);
+    }
+
+    /**
+     * Size `ids` at the base `dimenRes` × `textScale`, as SP. Called on EVERY render, Standard
+     * included: the launcher re-applies a RemoteViews onto the views it already inflated, so a
+     * size set by an earlier render would otherwise persist.
+     */
+    static void textSize(RemoteViews views, Context context, float textScale, @DimenRes int dimenRes,
+            @IdRes int... ids) {
+        float sp = sp(context, dimenRes) * textScale;
+        for (int id : ids) views.setTextViewTextSize(id, TypedValue.COMPLEX_UNIT_SP, sp);
     }
 }

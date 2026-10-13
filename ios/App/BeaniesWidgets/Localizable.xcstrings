@@ -1,24 +1,6 @@
 {
   "sourceLanguage": "en",
   "strings": {
-    "Events": {
-      "comment": "Widget setting toggle: show the day's activities.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Events"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "活动"
-          }
-        }
-      }
-    },
     "Background": {
       "comment": "Widget setting: how solid the widget card is (100% / 70% / 40%).",
       "extractionState": "manual",
@@ -37,6 +19,24 @@
         }
       }
     },
+    "Events": {
+      "comment": "Widget setting toggle: show the day's activities.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Events"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "活动"
+          }
+        }
+      }
+    },
     "Helpful hint": {
       "comment": "Widget setting toggle: show helpful hints and reminders in the to-dos section.",
       "extractionState": "manual",
@@ -51,6 +51,42 @@
           "stringUnit": {
             "state": "translated",
             "value": "贴心提示"
+          }
+        }
+      }
+    },
+    "Large": {
+      "comment": "Widget Text size option: a little bigger.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Large"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "大"
+          }
+        }
+      }
+    },
+    "Larger": {
+      "comment": "Widget Text size option: bigger still.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Larger"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更大"
           }
         }
       }
@@ -123,6 +159,42 @@
           "stringUnit": {
             "state": "translated",
             "value": "我们的一天"
+          }
+        }
+      }
+    },
+    "Standard": {
+      "comment": "Widget Text size option: today's size.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Standard"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "标准"
+          }
+        }
+      }
+    },
+    "Text size": {
+      "comment": "Widget setting: how big the widget's text is (Standard / Large / Larger).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Text size"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文字大小"
           }
         }
       }

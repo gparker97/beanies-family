@@ -29,20 +29,27 @@
         android:scaleType="fitXY"
         android:src="@drawable/widget_inner_bg" />
 
+    <!-- clipToPadding / clipChildren off: the header's tile reaches 6dp left of (and 2dp above) the
+         content box, and would otherwise be cut square on that side. The peeks therefore clip
+         themselves (cropToPadding): their centre-cropped art would otherwise spill past their box. -->
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:clipChildren="false"
+        android:clipToPadding="false"
         android:padding="14dp">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:clipChildren="false"
+            android:clipToPadding="false"
             android:orientation="vertical">
 
             <LinearLayout
                 android:id="@+id/date_column"
                 android:layout_width="wrap_content"
-                android:layout_height="34dp"
+                android:layout_height="@dimen/widget_small_header_height"
                 android:layout_marginStart="-6dp"
                 android:layout_marginTop="-2dp"
                 android:gravity="bottom"
@@ -106,7 +113,7 @@
                         android:ellipsize="end"
                         android:singleLine="true"
                         android:textColor="@color/widget_ink_soft"
-                        android:textSize="11sp" />
+                        android:textSize="@dimen/widget_text_body" />
 
                     <LinearLayout
                         android:layout_width="match_parent"
@@ -122,7 +129,7 @@
                             android:includeFontPadding="false"
                             android:singleLine="true"
                             android:textColor="@color/widget_ink"
-                            android:textSize="20sp"
+                            android:textSize="@dimen/widget_text_small_time"
                             android:textStyle="bold" />
 
                         <include
@@ -139,7 +146,7 @@
                         android:fontFamily="sans-serif-medium"
                         android:singleLine="true"
                         android:textColor="@color/widget_ink"
-                        android:textSize="12sp" />
+                        android:textSize="@dimen/widget_text_small_title" />
                 </LinearLayout>
 
                 <include
@@ -154,29 +161,31 @@
                     android:layout_height="wrap_content"
                     android:singleLine="true"
                     android:textColor="@color/widget_ink_faint"
-                    android:textSize="11sp"
+                    android:textSize="@dimen/widget_text_body"
                     android:visibility="gone" />
             </LinearLayout>
         </LinearLayout>
 
         <ImageView
             android:id="@+id/peek_family"
-            android:layout_width="60dp"
+            android:layout_width="@dimen/widget_peek_family_width"
             android:layout_height="28dp"
             android:layout_gravity="top|end"
-            android:layout_marginTop="8dp"
-            android:layout_marginEnd="6dp"
+            android:layout_marginTop="@dimen/widget_small_peek_top"
+            android:layout_marginEnd="@dimen/widget_small_peek_end"
+            android:cropToPadding="true"
             android:importantForAccessibility="no"
             android:scaleType="fitCenter"
             android:src="@drawable/peek_family" />
 
         <ImageView
             android:id="@+id/peek_avatar"
-            android:layout_width="38dp"
+            android:layout_width="@dimen/widget_peek_avatar_width"
             android:layout_height="28dp"
             android:layout_gravity="top|end"
-            android:layout_marginTop="8dp"
-            android:layout_marginEnd="6dp"
+            android:layout_marginTop="@dimen/widget_small_peek_top"
+            android:layout_marginEnd="@dimen/widget_small_peek_end"
+            android:cropToPadding="true"
             android:importantForAccessibility="no"
             android:scaleType="centerCrop"
             android:visibility="gone" />

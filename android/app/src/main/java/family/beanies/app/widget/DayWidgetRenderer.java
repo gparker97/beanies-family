@@ -3,8 +3,11 @@ package family.beanies.app.widget;
 import android.appwidget.AppWidgetManager;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Typeface;
 import android.net.Uri;
+import android.os.Build;
 import android.text.format.DateFormat;
+import android.util.TypedValue;
 import android.view.View;
 import android.widget.RemoteViews;
 import family.beanies.app.R;
@@ -23,6 +26,11 @@ import java.util.List;
  * and the next render does not mention keeps its old text (signed out → unreadable once kept
  * "sign in to see your day"). Each view a path may change is therefore set or hidden on every
  * path through the same layout, or lives inside a container whose visibility is always set.
+ *
+ * TEXT SIZES FOLLOW THE SAME RULE, BY STRUCTURE. Each layout's text is sized by one helper
+ * (`sizeAgendaText`, `sizeSmallText`, `sizeMessageText`, and the task row's line) called on the line
+ * straight after `new RemoteViews(...)`, before any branch, so every size is set on every render at
+ * base × `textScale` ({@link WidgetSizes#textScale}). A new TextView is one added line there.
  */
 final class DayWidgetRenderer {
 
@@ -40,6 +48,22 @@ final class DayWidgetRenderer {
 
     /** Layout insets (dp) between the widget's width and the line a bitmap may fill. */
     private static final float DATE_COLUMN_DP = 52f;
+    /** The date column's weekday and month never shrink below this (the old XML autosize floor). */
+    private static final float DATE_COLUMN_MIN_SP = 10f;
+    /** The small next time's trailing room: its 6dp end margin and the 14dp member dot. */
+    private static final float SMALL_NEXT_TIME_TRAIL_DP = 20f;
+    /**
+     * The small next time's floor. Below its 20sp Standard size on purpose: on the narrowest 2x2
+     * (a 5-column launcher grid) "10:15am" at 20sp already pushes the member dot out of the panel.
+     */
+    private static final float SMALL_NEXT_TIME_MIN_SP = 16f;
+    /** The small widget's content padding, both sides (widget_day_small.xml: 14 + 14). */
+    private static final float SMALL_CONTENT_INSET_DP = 28f;
+    /** In the small header row: the tile's 6dp end padding and the numeral's 5dp start margin. */
+    private static final float SMALL_HEADER_TRAIL_DP = 6f + 5f;
+    /** The small header never shrinks below this, however narrow the widget. */
+    private static final float SMALL_HEADER_MIN_SCALE = 0.7f;
+    private static final Typeface WEEKDAY_FACE = Typeface.create("sans-serif-medium", Typeface.NORMAL);
     /** Root padding 14 + 12, date column 52 + 8, panel padding 6 + 13. */
     static final float AGENDA_PANEL_INSET_DP = 105f;
     /** Root padding 14 + 14, panel padding 8 + 8. */
@@ -56,35 +80,39 @@ final class DayWidgetRenderer {
             float widthDp,
             float heightDp,
             WidgetPrefs prefs,
+            float textScale,
             WidgetSnapshotStore.Result result,
             long now) {
         if (result.state == WidgetSnapshotStore.State.SIGNED_OUT) {
-            return signedOut(context, appWidgetId, size, widthDp, prefs);
+            return signedOut(context, appWidgetId, size, widthDp, prefs, textScale);
         }
         WidgetFill.Plan plan =
                 result.state == WidgetSnapshotStore.State.READY
                         ? WidgetFill.plan(result.snapshot, prefs, size, heightDp, now)
                         : null;
-        if (plan == null) return refresh(context, appWidgetId, size, widthDp, prefs);
+        if (plan == null) return refresh(context, appWidgetId, size, widthDp, prefs, textScale);
 
-        if (size == WidgetSizes.Size.SMALL) return small(context, appWidgetId, widthDp, prefs, plan, now);
-        return agenda(context, appWidgetId, size, widthDp, prefs, plan);
+        if (size == WidgetSizes.Size.SMALL) {
+            return small(context, appWidgetId, widthDp, prefs, textScale, plan, now);
+        }
+        return agenda(context, appWidgetId, size, widthDp, prefs, textScale, plan);
     }
 
     // ---- medium + large ------------------------------------------------------------------
 
     private static RemoteViews agenda(
             Context context, int id, WidgetSizes.Size size, float widthDp, WidgetPrefs prefs,
-            WidgetFill.Plan plan) {
+            float textScale, WidgetFill.Plan plan) {
         WidgetSnapshot s = plan.snapshot;
         WidgetSnapshot.Day day = plan.day;
         RemoteViews v = new RemoteViews(context.getPackageName(), size.layout);
+        sizeAgendaText(v, context, textScale, plan.entry);
         frame(v, context, id, size, prefs.opacity, s.links.nook);
         dateTile(v, prefs.opacity);
 
         // Date column.
         WidgetTextBitmaps.bind(v, context, R.id.date_numeral, plan.entry.numeral, COLUMN_NUMERAL,
-                DATE_COLUMN_DP, R.color.widget_ink);
+                textScale, DATE_COLUMN_DP, R.color.widget_ink);
         v.setTextViewText(R.id.date_weekday, plan.entry.weekday);
         v.setTextViewText(R.id.date_month, plan.entry.month);
         WidgetViews.onClick(v, R.id.date_column, context, id, WidgetViews.SLOT_DATE, s.links.nook, size);
@@ -117,10 +145,10 @@ final class DayWidgetRenderer {
         v.setPendingIntentTemplate(R.id.agenda_list, WidgetViews.listTemplate(context, id));
         // A clear week with no tasks: the relaxed block takes the list's place inside the panel;
         // the date column, peek and footer stay (the same state as iOS).
-        boolean relaxed = bindRelaxed(v, context, plan, widthDp - AGENDA_PANEL_INSET_DP);
+        boolean relaxed = bindRelaxed(v, context, plan, textScale, widthDp - AGENDA_PANEL_INSET_DP);
         v.setViewVisibility(R.id.agenda_list, relaxed ? View.GONE : View.VISIBLE);
 
-        bindTasks(v, context, id, size, plan);
+        bindTasks(v, context, id, size, textScale, plan);
 
         // Footer: tonight (meals block) and "later ›" (always, to the Nook).
         boolean tonight = plan.shows(WidgetFill.MEALS) && day != null && day.tonight != null
@@ -145,8 +173,8 @@ final class DayWidgetRenderer {
      * each a nested RemoteViews (`widget_task_row.xml`) so every row has its own dot views. GONE
      * when no task shows; the row container is emptied on every render so no old row survives.
      */
-    private static void bindTasks(
-            RemoteViews v, Context context, int id, WidgetSizes.Size size, WidgetFill.Plan plan) {
+    private static void bindTasks(RemoteViews v, Context context, int id, WidgetSizes.Size size,
+            float textScale, WidgetFill.Plan plan) {
         WidgetSnapshot s = plan.snapshot;
         List<WidgetSnapshot.Task> tasks = plan.visibleTasks;
         v.removeAllViews(R.id.tasks_rows);
@@ -159,10 +187,12 @@ final class DayWidgetRenderer {
         WidgetViews.onClick(v, R.id.tasks_heading_row, context, id, WidgetViews.SLOT_TASKS_HEADING,
                 sectionLink, size);
 
-        float leadDp = WidgetViews.leadColumnDp(context, plan);
+        float leadDp = WidgetViews.leadColumnDp(context, plan, textScale);
         for (int i = 0; i < tasks.size(); i++) {
             WidgetSnapshot.Task task = tasks.get(i);
             RemoteViews row = new RemoteViews(context.getPackageName(), R.layout.widget_task_row);
+            WidgetViews.textSize(row, context, textScale, R.dimen.widget_text_body,
+                    R.id.task_title, R.id.task_tag);
             row.setImageViewResource(R.id.task_glyph, taskGlyph(task));
             WidgetViews.leadWidth(row, R.id.task_lead, leadDp);
             row.setTextViewText(R.id.task_title, task.title);
@@ -187,17 +217,20 @@ final class DayWidgetRenderer {
     // ---- small ---------------------------------------------------------------------------
 
     private static RemoteViews small(
-            Context context, int id, float widthDp, WidgetPrefs prefs, WidgetFill.Plan plan, long now) {
+            Context context, int id, float widthDp, WidgetPrefs prefs, float textScale,
+            WidgetFill.Plan plan, long now) {
         WidgetSizes.Size size = WidgetSizes.Size.SMALL;
         WidgetSnapshot s = plan.snapshot;
         RemoteViews v = new RemoteViews(context.getPackageName(), size.layout);
+        float headerScale = smallHeaderScale(context, widthDp, textScale, plan);
+        sizeSmallText(v, context, textScale, headerScale);
         frame(v, context, id, size, prefs.opacity, s.links.nook);
         dateTile(v, prefs.opacity);
 
         WidgetTextBitmaps.bind(v, context, R.id.date_weekday, plan.entry.weekdayShort, SMALL_WEEKDAY,
-                0, R.color.widget_accent_text);
+                headerScale, 0, R.color.widget_accent_text);
         WidgetTextBitmaps.bind(v, context, R.id.date_numeral, plan.entry.numeral, SMALL_NUMERAL,
-                0, R.color.widget_ink);
+                headerScale, 0, R.color.widget_ink);
         WidgetViews.onClick(v, R.id.date_column, context, id, WidgetViews.SLOT_DATE, s.links.nook, size);
         WidgetViews.bindPeek(v, plan);
         WidgetViews.textOrGone(v, R.id.date_as_of, asOf(context, plan));
@@ -206,10 +239,10 @@ final class DayWidgetRenderer {
         // A clear week: the relaxed block replaces only the panel's content (the small has no
         // to-dos section, so tasks never hold it back: its visibleTasks is always empty).
         float panelDp = widthDp - SMALL_PANEL_INSET_DP;
-        boolean relaxed = bindRelaxed(v, context, plan, panelDp);
+        boolean relaxed = bindRelaxed(v, context, plan, textScale, panelDp);
         boolean events = !relaxed && plan.shows(WidgetFill.EVENTS) && day != null;
         WidgetTextBitmaps.bind(v, context, R.id.small_things, events ? day.thingsText : "",
-                CAVEAT_LINE, panelDp, R.color.widget_accent_text);
+                CAVEAT_LINE, textScale, panelDp, R.color.widget_accent_text);
 
         // Next: the shared search (WidgetFill.Plan#next, the same rule as iOS), named with its
         // day when it falls on a later one ("next · Wed 15").
@@ -224,6 +257,12 @@ final class DayWidgetRenderer {
         if (next != null) {
             WidgetViews.textOrGone(v, R.id.small_next_label, label);
             WidgetViews.textOrGone(v, R.id.small_next_time, next.time);
+            // The time is the line that matters: it shrinks to fit beside the member dot on a
+            // narrow 2x2 rather than ellipsizing or pushing the dot out.
+            float timeSp = WidgetViews.sp(context, R.dimen.widget_text_small_time) * textScale;
+            v.setTextViewTextSize(R.id.small_next_time, TypedValue.COMPLEX_UNIT_SP, WidgetViews.fitSp(
+                    context, next.time, Typeface.DEFAULT_BOLD, timeSp, SMALL_NEXT_TIME_MIN_SP,
+                    panelDp - SMALL_NEXT_TIME_TRAIL_DP));
             v.setTextViewText(R.id.small_next_title, WidgetText.styled(
                     rowTitle(next, plan.shows(WidgetFill.WHOS_WHERE)), plan.isChild, false));
             // Same rule as the list (DayWidgetFactory.row): a child view names no one, so no
@@ -240,45 +279,120 @@ final class DayWidgetRenderer {
     /**
      * Show the relaxed block ("nothing on today," in Caveat over "enjoy", the hug at the panel's
      * bottom right; `widget_part_relaxed.xml`) when {@link WidgetFill.Plan#isRelaxed}. Returns
-     * whether it is shown; the caller hides the panel content it replaces.
+     * whether it is shown; the caller hides the panel content it replaces. Its "enjoy" line is
+     * sized by the caller's sizing helper.
      */
     private static boolean bindRelaxed(
-            RemoteViews v, Context context, WidgetFill.Plan plan, float panelDp) {
+            RemoteViews v, Context context, WidgetFill.Plan plan, float textScale, float panelDp) {
         boolean relaxed = plan.isRelaxed();
         v.setViewVisibility(R.id.relaxed, relaxed ? View.VISIBLE : View.GONE);
         if (relaxed) {
             WidgetTextBitmaps.bind(v, context, R.id.relaxed_title, plan.snapshot.labels.nothingOnToday,
-                    CAVEAT_LINE, panelDp, R.color.widget_accent_text);
+                    CAVEAT_LINE, textScale, panelDp, R.color.widget_accent_text);
             WidgetViews.textOrGone(v, R.id.relaxed_enjoy, plan.snapshot.labels.enjoy);
         }
         return relaxed;
     }
 
-    private static RemoteViews signedOut(
-            Context context, int id, WidgetSizes.Size size, float widthDp, WidgetPrefs prefs) {
-        return message(context, id, size, widthDp, prefs, WidgetViews.SIGNED_OUT_LINK,
+    private static RemoteViews signedOut(Context context, int id, WidgetSizes.Size size, float widthDp,
+            WidgetPrefs prefs, float textScale) {
+        return message(context, id, size, widthDp, prefs, textScale, WidgetViews.SIGNED_OUT_LINK,
                 context.getString(R.string.widget_open_beanies),
                 context.getString(R.string.widget_sign_in_to_see));
     }
 
     /** File present but unreadable / an unknown version: never shown as signed out. */
-    private static RemoteViews refresh(
-            Context context, int id, WidgetSizes.Size size, float widthDp, WidgetPrefs prefs) {
-        return message(context, id, size, widthDp, prefs, WidgetViews.FALLBACK_NOOK,
+    private static RemoteViews refresh(Context context, int id, WidgetSizes.Size size, float widthDp,
+            WidgetPrefs prefs, float textScale) {
+        return message(context, id, size, widthDp, prefs, textScale, WidgetViews.FALLBACK_NOOK,
                 context.getString(R.string.widget_refresh), "");
     }
 
     /** Sets EVERY message view (title, line, image), so no state's text survives into another. */
     private static RemoteViews message(Context context, int id, WidgetSizes.Size size, float widthDp,
-            WidgetPrefs prefs, String link, String title, String line) {
+            WidgetPrefs prefs, float textScale, String link, String title, String line) {
         RemoteViews v = new RemoteViews(context.getPackageName(), R.layout.widget_day_message);
+        sizeMessageText(v, context, textScale);
         // A message's text sits on the card itself, so a message is always drawn solid.
         frame(v, context, id, size, 100, link);
         v.setImageViewResource(R.id.message_image, R.drawable.widget_covering_eyes);
         WidgetTextBitmaps.bind(v, context, R.id.message_title, title, MESSAGE_TITLE,
-                widthDp - MESSAGE_INSET_DP, R.color.widget_accent_text);
+                textScale, widthDp - MESSAGE_INSET_DP, R.color.widget_accent_text);
         WidgetViews.textOrGone(v, R.id.message_line, line);
         return v;
+    }
+
+    // ---- text sizes (one helper per layout, called first) -----------------------------------
+
+    /** Medium + large: the date column, the to-dos heading, the footer and the relaxed line. */
+    private static void sizeAgendaText(
+            RemoteViews v, Context context, float textScale, WidgetSnapshot.DayEntry entry) {
+        WidgetViews.textSize(v, context, textScale, R.dimen.widget_text_body,
+                R.id.date_as_of, R.id.date_audience, R.id.date_due, R.id.tasks_heading,
+                R.id.tasks_more, R.id.footer_tonight, R.id.footer_later);
+        WidgetViews.textSize(v, context, textScale, R.dimen.widget_text_relaxed, R.id.relaxed_enjoy);
+        // The weekday and month fill the fixed 52dp column: a short name grows with the choice, a
+        // long one ("Wednesday", "September") shrinks to fit, never below DATE_COLUMN_MIN_SP.
+        float body = WidgetViews.sp(context, R.dimen.widget_text_body) * textScale;
+        v.setTextViewTextSize(R.id.date_weekday, TypedValue.COMPLEX_UNIT_SP, WidgetViews.fitSp(
+                context, entry.weekday, WEEKDAY_FACE, body, DATE_COLUMN_MIN_SP, DATE_COLUMN_DP));
+        v.setTextViewTextSize(R.id.date_month, TypedValue.COMPLEX_UNIT_SP, WidgetViews.fitSp(
+                context, entry.month, Typeface.DEFAULT, body, DATE_COLUMN_MIN_SP, DATE_COLUMN_DP));
+    }
+
+    /**
+     * The scale the small header's weekday and numeral bitmaps draw at: the Text size multiplier,
+     * but no wider than the room beside the peek. On a wide enough widget a Standard header is
+     * unchanged (1). On the narrowest one (a 5-column launcher grid, the 60dp family peek) even
+     * Standard runs under the peek, so the header shrinks to fit, down to
+     * {@link #SMALL_HEADER_MIN_SCALE}. Below API 31 the header row cannot grow
+     * (setViewLayoutHeight is 31+), so the header never draws bigger than Standard there.
+     */
+    private static float smallHeaderScale(
+            Context context, float widthDp, float textScale, WidgetFill.Plan plan) {
+        float upper = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ? textScale : 1f;
+        float standard = WidgetTextBitmaps.naturalWidthDp(context, plan.entry.weekdayShort, SMALL_WEEKDAY, 1f)
+                + WidgetTextBitmaps.naturalWidthDp(context, plan.entry.numeral, SMALL_NUMERAL, 1f);
+        if (standard <= 0f) return upper;
+        float room = widthDp - SMALL_CONTENT_INSET_DP - WidgetViews.peekWidthDp(context, plan)
+                - WidgetViews.dp(context, R.dimen.widget_small_peek_end) - SMALL_HEADER_TRAIL_DP;
+        return Math.max(SMALL_HEADER_MIN_SCALE, Math.min(upper, room / standard));
+    }
+
+    /**
+     * Small: the next item, the stale line, the relaxed line, and (API 31+) the header row, which
+     * holds the weekday and numeral bitmaps at a fixed height, so it grows with them (`headerScale`
+     * × the system font scale, which the bitmaps are drawn through); the peeks move down by the
+     * same amount so they still end 2dp inside the panel. Never `date_weekday`: on the 2x2 it is
+     * an ImageView (a bitmap), and a text-size action on it fails in the launcher.
+     */
+    private static void sizeSmallText(RemoteViews v, Context context, float textScale, float headerScale) {
+        WidgetViews.textSize(v, context, textScale, R.dimen.widget_text_body,
+                R.id.small_next_label, R.id.date_as_of);
+        WidgetViews.textSize(v, context, textScale, R.dimen.widget_text_small_title, R.id.small_next_title);
+        WidgetViews.textSize(v, context, textScale, R.dimen.widget_text_small_time, R.id.small_next_time);
+        WidgetViews.textSize(v, context, textScale, R.dimen.widget_text_relaxed, R.id.relaxed_enjoy);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            // The row grows as much as its numeral bitmap actually does: through applyDimension, so
+            // Android 14's non-linear font scaling is honoured, and never past TEXT_SCALE_MAX, so a
+            // very large system font cannot take the panel's room (beyond it the bitmaps fit the
+            // row, as they always have).
+            android.util.DisplayMetrics metrics = context.getResources().getDisplayMetrics();
+            float numeralGrowth = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP,
+                    SMALL_NUMERAL.sp * headerScale, metrics)
+                    / TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, SMALL_NUMERAL.sp, metrics);
+            float header = WidgetViews.dp(context, R.dimen.widget_small_header_height);
+            float grown = header * Math.max(1f, Math.min(numeralGrowth, WidgetSizes.TEXT_SCALE_MAX));
+            v.setViewLayoutHeight(R.id.date_column, grown, TypedValue.COMPLEX_UNIT_DIP);
+            float peekTop = WidgetViews.dp(context, R.dimen.widget_small_peek_top) + grown - header;
+            v.setViewLayoutMargin(R.id.peek_family, RemoteViews.MARGIN_TOP, peekTop, TypedValue.COMPLEX_UNIT_DIP);
+            v.setViewLayoutMargin(R.id.peek_avatar, RemoteViews.MARGIN_TOP, peekTop, TypedValue.COMPLEX_UNIT_DIP);
+        }
+    }
+
+    /** Signed out / refresh / the render fallback. */
+    private static void sizeMessageText(RemoteViews v, Context context, float textScale) {
+        WidgetViews.textSize(v, context, textScale, R.dimen.widget_text_body, R.id.message_line);
     }
 
     // ---- shared --------------------------------------------------------------------------

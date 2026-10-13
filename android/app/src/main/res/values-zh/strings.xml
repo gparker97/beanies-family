@@ -18,5 +18,9 @@
     <string name="widget_config_coming_up">旅行和生日</string>
     <string name="widget_config_hint">贴心提示</string>
     <string name="widget_config_background">背景</string>
+    <string name="widget_config_text_size">文字大小</string>
+    <string name="widget_config_text_standard">标准</string>
+    <string name="widget_config_text_large">大</string>
+    <string name="widget_config_text_larger">更大</string>
     <string name="widget_config_done">完成</string>
 </resources>

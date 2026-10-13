@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The home-screen widget's base text sizes (#130), the ONE source of truth: the layouts reference
+  these, and WidgetViews.textSize multiplies the same values by the widget's Text size choice
+  (WidgetSizes.textScale) on every render. Every value MUST be in sp: WidgetViews.sp reads the
+  number as sp and the launcher applies the system font scale on top. The member dot's initials
+  (widget_part_dot.xml) are deliberately not here: they size to the fixed 14dp dot.
+-->
+<resources>
+    <!-- Rows, tags, headings, the date column, the footer, message lines. -->
+    <dimen name="widget_text_body">11sp</dimen>
+    <!-- The small widget's next-item title. -->
+    <dimen name="widget_text_small_title">12sp</dimen>
+    <!-- The relaxed block's "enjoy" line. -->
+    <dimen name="widget_text_relaxed">13sp</dimen>
+    <!-- The small widget's next-item time. -->
+    <dimen name="widget_text_small_time">20sp</dimen>
+    <!-- The child view's calendar rows. -->
+    <dimen name="widget_text_child_row">19sp</dimen>
+
+    <!-- Small-widget geometry that DayWidgetRenderer also sets from code (API 31+), so the layout
+         and the code read one value: the header row's height, and the peeks' top margin, end
+         margin and widths. -->
+    <dimen name="widget_small_header_height">34dp</dimen>
+    <dimen name="widget_small_peek_top">8dp</dimen>
+    <dimen name="widget_small_peek_end">6dp</dimen>
+    <dimen name="widget_peek_family_width">60dp</dimen>
+    <dimen name="widget_peek_avatar_width">38dp</dimen>
+</resources>

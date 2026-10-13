@@ -15,7 +15,7 @@
         android:layout_height="wrap_content"
         android:singleLine="true"
         android:textColor="@color/widget_accent_text"
-        android:textSize="11sp"
+        android:textSize="@dimen/widget_text_body"
         android:textStyle="bold" />
 
     <TextView
@@ -26,7 +26,7 @@
         android:fontFamily="sans-serif-medium"
         android:singleLine="true"
         android:textColor="@color/widget_ink_soft"
-        android:textSize="11sp"
+        android:textSize="@dimen/widget_text_body"
         android:visibility="gone" />
 
     <FrameLayout

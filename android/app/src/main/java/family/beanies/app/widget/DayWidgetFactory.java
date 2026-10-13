@@ -3,7 +3,6 @@ package family.beanies.app.widget;
 import android.appwidget.AppWidgetManager;
 import android.content.Context;
 import android.content.Intent;
-import android.util.TypedValue;
 import android.view.View;
 import android.widget.RemoteViews;
 import android.widget.RemoteViewsService;
@@ -59,6 +58,8 @@ final class DayWidgetFactory implements RemoteViewsService.RemoteViewsFactory {
     private String nookLink = "";
     private String tomorrowLabel = "";
     private float leadDp = WidgetViews.LEAD_MIN_DP;
+    /** The widget's Text size multiplier ({@link WidgetSizes#textScale}), set in {@link #build}. */
+    private float textScale = 1f;
     private float panelDp;
 
     DayWidgetFactory(Context context, Intent intent) {
@@ -94,9 +95,10 @@ final class DayWidgetFactory implements RemoteViewsService.RemoteViewsFactory {
         android.os.Bundle options = manager.getAppWidgetOptions(appWidgetId);
         size = WidgetSizes.sizeFor(options);
         long now = System.currentTimeMillis();
-        WidgetFill.Plan plan = WidgetFill.plan(
-                result.snapshot, WidgetPrefs.load(context, appWidgetId), size,
-                WidgetSizes.layoutHeightDp(context, options), now);
+        WidgetPrefs prefs = WidgetPrefs.load(context, appWidgetId);
+        textScale = WidgetSizes.textScale(context, prefs.textSize);
+        WidgetFill.Plan plan = WidgetFill.plan(result.snapshot, prefs, size,
+                WidgetSizes.layoutHeightDp(context, options, textScale), now);
         if (plan == null || plan.isRelaxed()) return out;
 
         whosWhere = plan.shows(WidgetFill.WHOS_WHERE);
@@ -112,7 +114,7 @@ final class DayWidgetFactory implements RemoteViewsService.RemoteViewsFactory {
             out.add(new Item(TYPE_DIVIDER, null, later.entry.dividerDate, later.isTomorrow));
             addRows(out, later.rows, now);
         }
-        leadDp = WidgetViews.leadColumnDp(context, plan);
+        leadDp = WidgetViews.leadColumnDp(context, plan, textScale);
         return out;
     }
 
@@ -158,6 +160,7 @@ final class DayWidgetFactory implements RemoteViewsService.RemoteViewsFactory {
         WidgetSnapshot.Row row = item.row;
         boolean past = item.flag;
         RemoteViews v = new RemoteViews(context.getPackageName(), R.layout.widget_day_row);
+        textSize(v, R.id.row_time, R.id.row_title, R.id.row_title_accent);
         String title = DayWidgetRenderer.rowTitle(row, whosWhere);
         // Same rules as iOS AgendaRowView. A child's row reads as done once it is over or is
         // ticked (mockup 2g): soft ink, no strikethrough, the green tick, and no member dot
@@ -184,11 +187,9 @@ final class DayWidgetFactory implements RemoteViewsService.RemoteViewsFactory {
         if (inkLayer != null) {
             v.setTextViewText(R.id.row_title_accent,
                     WidgetText.accentLayer(title, row.titleEmphasis, isChild, true));
-            textSize(v, R.id.row_title_accent);
         }
         WidgetViews.textColorRes(v, context, R.id.row_time, ink);
         WidgetViews.textColorRes(v, context, R.id.row_title, ink);
-        textSize(v, R.id.row_time, R.id.row_title);
         WidgetViews.leadWidth(v, R.id.row_time, leadDp);
         WidgetViews.bindDot(v, isChild ? null : row.dot, childDone);
         v.setOnClickFillInIntent(R.id.row_root, fillIn(row.link));
@@ -205,8 +206,9 @@ final class DayWidgetFactory implements RemoteViewsService.RemoteViewsFactory {
     private RemoteViews sub(Item item) {
         WidgetSnapshot.Row row = item.row;
         RemoteViews v = new RemoteViews(context.getPackageName(), R.layout.widget_day_row_sub);
-        v.setTextViewText(R.id.sub_time_ghost, WidgetText.styled(row.time, isChild, false));
         textSize(v, R.id.sub_time_ghost);
+        WidgetViews.textSize(v, context, textScale, R.dimen.widget_text_body, R.id.sub_text);
+        v.setTextViewText(R.id.sub_time_ghost, WidgetText.styled(row.time, isChild, false));
         WidgetViews.leadWidth(v, R.id.sub_time_ghost, leadDp);
         // The row's own rule: a child's past row is never struck through (it gets the tick).
         v.setTextViewText(R.id.sub_text, WidgetText.styled(item.label, false, !isChild && item.flag));
@@ -224,6 +226,8 @@ final class DayWidgetFactory implements RemoteViewsService.RemoteViewsFactory {
     /** "Wed 15" in the accent, "tomorrow" beside it when it is the device's tomorrow, a hairline. */
     private RemoteViews divider(Item item) {
         RemoteViews v = new RemoteViews(context.getPackageName(), R.layout.widget_day_divider);
+        WidgetViews.textSize(v, context, textScale, R.dimen.widget_text_body,
+                R.id.divider_date, R.id.divider_tomorrow);
         v.setTextViewText(R.id.divider_date, item.label);
         WidgetViews.textOrGone(v, R.id.divider_tomorrow, item.flag ? tomorrowLabel : "");
         return v;
@@ -231,15 +235,17 @@ final class DayWidgetFactory implements RemoteViewsService.RemoteViewsFactory {
 
     private RemoteViews nothing(Item item) {
         RemoteViews v = new RemoteViews(context.getPackageName(), R.layout.widget_day_nothing);
-        WidgetTextBitmaps.bind(v, context, R.id.nothing_line, item.label, NOTHING_LINE, panelDp,
-                R.color.widget_accent_text);
+        WidgetTextBitmaps.bind(v, context, R.id.nothing_line, item.label, NOTHING_LINE, textScale,
+                panelDp, R.color.widget_accent_text);
         return v;
     }
 
-    /** Always set (never only for a child): a recycled row view keeps its last size otherwise. */
+    /**
+     * A calendar row's text at the row size (child or adult) × the Text size choice. Always set,
+     * first, on every bind: a recycled row view keeps its last size otherwise.
+     */
     private void textSize(RemoteViews v, int... ids) {
-        float sp = isChild ? WidgetViews.CHILD_ROW_TEXT_SP : WidgetViews.ROW_TEXT_SP;
-        for (int id : ids) v.setTextViewTextSize(id, TypedValue.COMPLEX_UNIT_SP, sp);
+        WidgetViews.textSize(v, context, textScale, WidgetViews.rowDimen(isChild), ids);
     }
 
     /** The row's link + `w=<size>`, merged into the list's click template. */

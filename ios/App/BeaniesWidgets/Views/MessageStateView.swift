@@ -18,7 +18,7 @@ struct MessageStateView: View {
     let image: String
     /// The whole-widget tap target, when this view IS the widget (signed out, unreadable).
     var link: URL? = nil
-    var m = WidgetMetrics(scale: 1)
+    let m: WidgetMetrics
 
     var body: some View {
         if let link {

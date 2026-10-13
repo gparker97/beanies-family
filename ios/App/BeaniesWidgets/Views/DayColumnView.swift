@@ -30,13 +30,13 @@ struct DayColumnView: View {
                         .font(.outfit(size: m.s(11), weight: .semibold))
                         .foregroundStyle(Color.wAccent)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.85)
+                        .minimumScaleFactor(m.standardFloor(0.85))
                         .padding(.top, 5)
                     Text(entry.month)
                         .font(.sys(size: m.s(11)))
                         .foregroundStyle(Color.wInkSoft)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.85)
+                        .minimumScaleFactor(m.standardFloor(0.85))
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -50,7 +50,7 @@ struct DayColumnView: View {
                         .font(.sys(size: m.s(11), weight: .medium))
                         .foregroundStyle(Color.wInkSoft)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.85)
+                        .minimumScaleFactor(m.standardFloor(0.85))
                 }
                 if let tasks = taskCount {
                     Link(destination: WidgetLinks.url(tasks.link.isEmpty ? links.todo : tasks.link, size)) {

@@ -27,7 +27,7 @@ struct DayWidgetView: View {
 
     @ViewBuilder private var content: some View {
         let size = WidgetSizeKey(family: family)
-        let m = WidgetMetrics(dynamicTypeSize)
+        let m = WidgetMetrics(dynamicTypeSize, textSize: entry.blocks.textSize)
         switch entry.state {
         case .signedOut:
             MessageStateView(

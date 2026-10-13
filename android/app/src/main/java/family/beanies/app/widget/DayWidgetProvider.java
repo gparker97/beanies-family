@@ -91,17 +91,20 @@ public class DayWidgetProvider extends AppWidgetProvider {
                 Bundle options = manager.getAppWidgetOptions(id);
                 WidgetSizes.Size size = WidgetSizes.sizeFor(options);
                 float widthDp = WidgetSizes.widthDp(options, size);
-                float heightDp = WidgetSizes.layoutHeightDp(app, options);
                 WidgetPrefs prefs = WidgetPrefs.load(app, id);
+                float textScale = WidgetSizes.textScale(app, prefs.textSize);
+                float heightDp = WidgetSizes.layoutHeightDp(app, options, textScale);
                 RemoteViews views;
                 try {
-                    views = DayWidgetRenderer.build(app, id, size, widthDp, heightDp, prefs, result, now);
+                    views = DayWidgetRenderer.build(
+                            app, id, size, widthDp, heightDp, prefs, textScale, result, now);
                 } catch (RuntimeException e) {
                     // A malformed snapshot must not leave the widget on "Can't load widget".
                     Log.w(TAG, "widget render failed; showing the refresh state", e);
                     WidgetPrefs.recordReadOutcome(app, "render_failed");
                     views = DayWidgetRenderer.build(
-                            app, id, size, widthDp, heightDp, prefs, WidgetSnapshotStore.Result.unreadableForRender(), now);
+                            app, id, size, widthDp, heightDp, prefs, textScale,
+                            WidgetSnapshotStore.Result.unreadableForRender(), now);
                 }
                 manager.updateAppWidget(id, views);
                 if (size != WidgetSizes.Size.SMALL) {

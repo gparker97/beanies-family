@@ -58,24 +58,38 @@ extension View {
 
 /// One scale factor for the whole widget, from the Dynamic Type setting. Text sizes, row
 /// heights and the fill budget all multiply by it, so bigger text means FEWER rows rather
-/// than clipped rows. Never below 1: 11pt is the floor at the default size.
+/// than clipped rows. Never below 1: 11pt is the floor at the default size. The widget's Text
+/// size choice multiplies the Dynamic Type scale, within `maxScale`.
 struct WidgetMetrics {
+    /// The ceiling on the effective scale (Dynamic Type × the Text size choice): the accessibility
+    /// cap, so a row still fits the widget. Mirrors Android `WidgetSizes.TEXT_SCALE_MAX`
+    /// (android/.../widget/WidgetSizes.java); change both.
+    static let maxScale: CGFloat = 1.3
+
+    /// The absolute effective scale every design size multiplies by.
     let scale: CGFloat
 
-    init(_ size: DynamicTypeSize) {
+    /// No default for `textSize`, so the compiler finds every place that builds metrics.
+    init(_ size: DynamicTypeSize, textSize: WidgetTextSizeOption) {
+        let system: CGFloat
         switch size {
-        case .xSmall, .small, .medium, .large: scale = 1.0
-        case .xLarge: scale = 1.08
-        case .xxLarge: scale = 1.16
-        case .xxxLarge: scale = 1.24
-        default: scale = 1.3 // accessibility sizes; capped so a row still fits the widget
+        case .xSmall, .small, .medium, .large: system = 1.0
+        case .xLarge: system = 1.08
+        case .xxLarge: system = 1.16
+        case .xxxLarge: system = 1.24
+        default: system = Self.maxScale // accessibility sizes
         }
+        // Bigger up to the ceiling, never smaller, never past what Dynamic Type alone does.
+        scale = max(system, min(system * textSize.factor, Self.maxScale))
     }
-
-    init(scale: CGFloat) { self.scale = scale }
 
     /// A design size in points, scaled.
     func s(_ points: CGFloat) -> CGFloat { points * scale }
+
+    /// A `minimumScaleFactor` that keeps the Standard floor at any scale: text in a fixed-width
+    /// column may shrink back to `factor` of its Standard size, so "Wednesday" fits the 52pt date
+    /// column at Larger exactly as it does at Standard. (Not `floor`, which would shadow Foundation's.)
+    func standardFloor(_ factor: CGFloat) -> CGFloat { factor / scale }
 }
 
 /// The beanie art for a person; unknown names fall back to `neutral`.

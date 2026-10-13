@@ -39,7 +39,7 @@ struct SmallView: View {
                 // Keep the header clear of the peek.
                 Spacer(minLength: PeekView.width(peek, height: Self.peekHeight) + peek.rightInset)
             }
-            .frame(height: 38, alignment: .leading)
+            .frame(height: m.s(38), alignment: .leading)
 
             panel(day: day, next: next)
                 .overlay(alignment: .topTrailing) {
@@ -72,31 +72,15 @@ struct SmallView: View {
                     m: m
                 )
             } else {
-                // The count line speaks for the events, so it is only said with them on (Android
-                // blanks it the same way): hidden events are neither "nothing" nor counted.
-                if blocks.events {
-                    Text(day.thingsText)
-                        .font(.caveat(size: m.s(19)))
-                        .foregroundStyle(Color.wAccent)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
-                }
-                Spacer(minLength: 0)
-                if let next {
-                    Text(nextLabel(next))
-                        .font(.sys(size: m.s(11)))
-                        .foregroundStyle(Color.wInkSoft)
-                        .lineLimit(1)
-                    HStack(spacing: 6) {
-                        nextLead(next.row)
-                        if let dot = next.row.dot {
-                            MemberDotView(dot: dot, diameter: m.s(14), m: m)
-                        }
-                    }
-                    Text(title(of: next.row))
-                        .font(.sys(size: m.s(12), weight: .medium))
-                        .foregroundStyle(Color.wInk)
-                        .lineLimit(1)
+                // The small widget has no fill budget (a fixed set of lines), so a bigger Text size
+                // drops lines in order of least value before anything would clip: the "next" label,
+                // then the count line. `ViewThatFits` falls back to the last, most compact candidate.
+                // At Standard with a default Dynamic Type size the first fits, so that look is
+                // unchanged; at an accessibility size the label may now drop where it used to clip.
+                ViewThatFits(in: .vertical) {
+                    panelContent(day: day, next: next, showNextLabel: true, showCount: true)
+                    panelContent(day: day, next: next, showNextLabel: false, showCount: true)
+                    panelContent(day: day, next: next, showNextLabel: false, showCount: false)
                 }
             }
         }
@@ -105,6 +89,43 @@ struct SmallView: View {
         .background {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(renderingMode == .fullColor ? Color.wPanel : Color.primary.opacity(0.08))
+        }
+    }
+
+    /// The panel's lines below the header: the count line, then the next item (label, time, title).
+    /// Either of the first two can be left out so `ViewThatFits` can pick what fits.
+    @ViewBuilder private func panelContent(
+        day: WSDay, next: NextRow?, showNextLabel: Bool, showCount: Bool
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // The count line speaks for the events, so it is only said with them on (Android
+            // blanks it the same way): hidden events are neither "nothing" nor counted.
+            if showCount && blocks.events {
+                Text(day.thingsText)
+                    .font(.caveat(size: m.s(19)))
+                    .foregroundStyle(Color.wAccent)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+            Spacer(minLength: 0)
+            if let next {
+                if showNextLabel {
+                    Text(nextLabel(next))
+                        .font(.sys(size: m.s(11)))
+                        .foregroundStyle(Color.wInkSoft)
+                        .lineLimit(1)
+                }
+                HStack(spacing: 6) {
+                    nextLead(next.row)
+                    if let dot = next.row.dot {
+                        MemberDotView(dot: dot, diameter: m.s(14), m: m)
+                    }
+                }
+                Text(title(of: next.row))
+                    .font(.sys(size: m.s(12), weight: .medium))
+                    .foregroundStyle(Color.wInk)
+                    .lineLimit(1)
+            }
         }
     }
 

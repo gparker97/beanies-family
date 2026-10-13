@@ -317,7 +317,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       "A beanies widget shows today's plan right on your phone's Home Screen, so you can see what's on without opening the app, and one tap takes you to the right screen.",
     icon: '\u{1F4F1}',
     readTime: 4,
-    updatedDate: '2026-10-12',
+    updatedDate: '2026-10-13',
     sections: [
       {
         type: 'paragraph',
@@ -387,7 +387,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'The widget is always laid out the same way. <strong>The calendar is at the top:</strong> today’s activities, a trip you are on ("day 3 of 6") and birthdays. When today is quiet, the rest of the week fills the space, each day under its own date, with <strong>tomorrow</strong> marked, so you always know when you are looking ahead.',
+          'The widget is always laid out the same way. <strong>The calendar is at the top:</strong> today’s activities, family trips ("day 3 of 6"), including ones you are not on, and birthdays. When today is quiet, the rest of the week fills the space, each day under its own date, with <strong>tomorrow</strong> marked, so you always know when you are looking ahead.',
       },
       {
         type: 'paragraph',
@@ -408,7 +408,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          '<strong>My day</strong> shows what is yours today, the same as your daily briefing on the Nook. <strong>Our day</strong> shows the whole family’s day, like the beanie wall. You can also pick which parts show: the plan, who is where, dinner, to-dos and lists, trips and birthdays, and helpful hints.',
+          '<strong>My day</strong> shows what is yours today, the same as your daily briefing on the Nook. <strong>Our day</strong> shows the whole family’s day, like the beanie wall. You can also pick which parts show: the plan, who is where, dinner, to-dos and lists, trips and birthdays, and helpful hints. To make the text bigger, choose a <strong>Text size</strong>: Standard, Large or Larger. Bigger text means fewer rows fit, never squashed ones, and the widget also follows your phone’s own text size. Set the <strong>Background</strong> to 70% or 40% to let your wallpaper show through (100% is solid).',
       },
       {
         type: 'steps',

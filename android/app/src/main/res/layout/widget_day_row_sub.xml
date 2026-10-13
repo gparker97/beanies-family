@@ -24,7 +24,7 @@
             android:includeFontPadding="false"
             android:minWidth="30dp"
             android:singleLine="true"
-            android:textSize="11sp"
+            android:textSize="@dimen/widget_text_body"
             android:visibility="invisible" />
 
         <LinearLayout
@@ -60,5 +60,5 @@
         android:ellipsize="end"
         android:singleLine="true"
         android:textColor="@color/widget_ink_soft"
-        android:textSize="11sp" />
+        android:textSize="@dimen/widget_text_body" />
 </LinearLayout>

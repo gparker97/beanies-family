@@ -109,6 +109,34 @@
                 android:text="@string/widget_config_opacity_40" />
         </RadioGroup>
 
+        <TextView
+            style="@style/WidgetConfigHeading"
+            android:text="@string/widget_config_text_size" />
+
+        <!-- Vertical: three word labels overflow a narrow screen at a large system font. Order is
+             WidgetPrefs.TextSize's declaration order (DayWidgetConfigActivity.TEXT_SIZE_IDS). -->
+        <RadioGroup
+            android:id="@+id/config_text_size"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <RadioButton
+                android:id="@+id/config_text_standard"
+                style="@style/WidgetConfigOption"
+                android:text="@string/widget_config_text_standard" />
+
+            <RadioButton
+                android:id="@+id/config_text_large"
+                style="@style/WidgetConfigOption"
+                android:text="@string/widget_config_text_large" />
+
+            <RadioButton
+                android:id="@+id/config_text_larger"
+                style="@style/WidgetConfigOption"
+                android:text="@string/widget_config_text_larger" />
+        </RadioGroup>
+
         <Button
             android:id="@+id/config_done"
             android:layout_width="match_parent"

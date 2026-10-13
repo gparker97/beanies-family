@@ -27,7 +27,7 @@
             android:minWidth="30dp"
             android:singleLine="true"
             android:textColor="@color/widget_ink"
-            android:textSize="11sp" />
+            android:textSize="@dimen/widget_text_body" />
 
         <ImageView
             android:id="@+id/row_glyph"
@@ -52,7 +52,7 @@
             android:fontFamily="sans-serif-medium"
             android:singleLine="true"
             android:textColor="@color/widget_ink"
-            android:textSize="11sp" />
+            android:textSize="@dimen/widget_text_body" />
 
         <TextView
             android:id="@+id/row_title_accent"
@@ -63,7 +63,7 @@
             android:importantForAccessibility="no"
             android:singleLine="true"
             android:textColor="@color/widget_accent_text"
-            android:textSize="11sp"
+            android:textSize="@dimen/widget_text_body"
             android:visibility="gone" />
     </FrameLayout>
 

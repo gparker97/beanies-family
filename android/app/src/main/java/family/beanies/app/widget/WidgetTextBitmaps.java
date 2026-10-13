@@ -29,7 +29,8 @@ import family.beanies.app.R;
  * repaints it without asking the app. Below 31 the colour is resolved now and holds until the
  * next render (the midnight / row-end alarm or the next app publish).
  *
- * Sizing follows the device: sp through the current font scale, pixels at the display density,
+ * Sizing follows the device: sp × the widget's Text size multiplier (`textScale`,
+ * {@link WidgetSizes#textScale}) through the current font scale, pixels at the display density,
  * so the bitmap is as sharp as system text. Every bitmap ImageView gets the text as its content
  * description, so TalkBack reads it.
  */
@@ -57,11 +58,16 @@ final class WidgetTextBitmaps {
 
     /**
      * Draw `text` into `viewId` (an ImageView) tinted with `colorRes`, or hide the view when the
-     * text is empty. `maxWidthDp` bounds the line (0 = unbounded, single line).
+     * text is empty. `textScale` multiplies the style's size; the shrink floor stays the Standard
+     * one, so a line that fits at Standard is never ellipsized at a bigger Text size (it shrinks
+     * back toward Standard instead; iOS `WidgetMetrics.standardFloor`). `maxWidthDp` bounds the
+     * line (0 = unbounded, single line).
      */
     static void bind(RemoteViews views, Context context, int viewId, String text, Style style,
-            float maxWidthDp, int colorRes) {
-        Bitmap bitmap = text == null || text.isEmpty() ? null : render(context, text, style, maxWidthDp);
+            float textScale, float maxWidthDp, int colorRes) {
+        Bitmap bitmap = text == null || text.isEmpty()
+                ? null
+                : render(context, text, style, textScale, maxWidthDp);
         if (bitmap == null) {
             views.setViewVisibility(viewId, View.GONE);
             return;
@@ -76,18 +82,44 @@ final class WidgetTextBitmaps {
         }
     }
 
-    /** The white text mask, or null when the font cannot load or the text is empty. */
-    static Bitmap render(Context context, String text, Style style, float maxWidthDp) {
+    /**
+     * The width (dp) `text` draws at in `style` × `textScale`, on one line and unshrunk: what a
+     * caller budgets a row of bitmaps with before binding them.
+     */
+    static float naturalWidthDp(Context context, String text, Style style, float textScale) {
+        if (text == null || text.isEmpty()) return 0f;
+        DisplayMetrics metrics = context.getResources().getDisplayMetrics();
+        TextPaint paint = paint(context, style);
+        paint.setTextSize(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, style.sp * textScale, metrics));
+        return (Layout.getDesiredWidth(text, paint) + overhangPx(paint)) / metrics.density;
+    }
+
+    /**
+     * Script and slanted faces (Caveat) draw strokes past the advance width the layout reports, so
+     * every bitmap leaves this much room after the text; budgets must count it too.
+     */
+    private static int overhangPx(TextPaint paint) {
+        return (int) Math.ceil(paint.getTextSize() * 0.15f);
+    }
+
+    /** A white anti-aliased paint in the style's font (bold system sans when it cannot load). */
+    private static TextPaint paint(Context context, Style style) {
         Typeface face;
         try {
             face = ResourcesCompat.getFont(context, style.font);
         } catch (RuntimeException e) {
             face = null;
         }
-        DisplayMetrics metrics = context.getResources().getDisplayMetrics();
         TextPaint paint = new TextPaint(TextPaint.ANTI_ALIAS_FLAG);
         paint.setColor(Color.WHITE);
         paint.setTypeface(face != null ? face : Typeface.DEFAULT_BOLD);
+        return paint;
+    }
+
+    /** The white text mask, or null when the font cannot load or the text is empty. */
+    static Bitmap render(Context context, String text, Style style, float textScale, float maxWidthDp) {
+        DisplayMetrics metrics = context.getResources().getDisplayMetrics();
+        TextPaint paint = paint(context, style);
 
         int maxWidthPx = maxWidthDp > 0
                 ? Math.max(1, Math.round(maxWidthDp * metrics.density))
@@ -95,7 +127,11 @@ final class WidgetTextBitmaps {
         // Shrink in 0.5sp steps until the text fits its line budget, down to the floor; past the
         // floor, the layout ellipsizes the last line.
         StaticLayout layout = null;
-        for (float sp = style.sp; sp >= style.minSp - 0.01f; sp -= 0.5f) {
+        float startSp = style.sp * textScale;
+        // The Standard floor, or the start itself when a caller scales below Standard (the small
+        // header on a too-narrow widget), so the loop always runs at least once.
+        float minSp = Math.min(style.minSp, startSp);
+        for (float sp = startSp; sp >= minSp - 0.01f; sp -= 0.5f) {
             paint.setTextSize(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, sp, metrics));
             layout = layout(text, paint, maxWidthPx, style, false);
             if (fits(layout, paint, text, maxWidthPx, style)) break;
@@ -107,9 +143,8 @@ final class WidgetTextBitmaps {
         for (int i = 0; i < layout.getLineCount(); i++) {
             width = Math.max(width, (int) Math.ceil(layout.getLineWidth(i)));
         }
-        // Script and slanted faces (Caveat) draw strokes past the advance width the layout
-        // reports, so the last letter's tail would be cut flat; leave room for the overhang.
-        width += (int) Math.ceil(paint.getTextSize() * 0.15f);
+        // Room for the overhang, so the last letter's tail is not cut flat.
+        width += overhangPx(paint);
         int height = layout.getHeight();
         if (width <= 0 || height <= 0) return null;
         Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);

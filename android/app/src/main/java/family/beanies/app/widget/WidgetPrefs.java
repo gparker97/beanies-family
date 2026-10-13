@@ -7,11 +7,11 @@ import android.content.SharedPreferences;
 /**
  * Per-widget choices from {@link DayWidgetConfigActivity}, plus the read-outcome relay slot, in
  * `SharedPreferences("beanies_widgets")` (#130). The ONE place that knows the key format:
- * `<id>.audience`, `<id>.block.<kind>`, `<id>.opacity`, and `read_outcome`.
+ * `<id>.audience`, `<id>.block.<kind>`, `<id>.opacity`, `<id>.textSize`, and `read_outcome`.
  *
  * A widget the launcher placed without running the configuration activity (Android 12+
  * `configuration_optional`) has no keys and reads the defaults: my day, every block on
- * (WIDGET_DEFAULT_BLOCKS in src/types/widgetSnapshot.ts), 100% background.
+ * (WIDGET_DEFAULT_BLOCKS in src/types/widgetSnapshot.ts), 100% background, Standard text.
  */
 public final class WidgetPrefs {
 
@@ -24,15 +24,42 @@ public final class WidgetPrefs {
     /** The three background-opacity choices, in percent. */
     static final int[] OPACITIES = {100, 70, 40};
 
+    /**
+     * The text-size choice: the stored key and the factor on the system text size. The rule that
+     * turns it into a multiplier (with the ceiling) is {@link WidgetSizes#textScale}; this enum is
+     * only what is stored. Declaration order is the configuration screen's radio order.
+     */
+    enum TextSize {
+        STANDARD("standard", 1f),
+        LARGE("large", 1.15f),
+        LARGER("larger", 1.3f);
+
+        final String key;
+        final float factor;
+
+        TextSize(String key, float factor) {
+            this.key = key;
+            this.factor = factor;
+        }
+
+        /** The stored choice; absent or unknown reads as Standard (the same rule as opacity). */
+        static TextSize fromKey(String key) {
+            for (TextSize t : values()) if (t.key.equals(key)) return t;
+            return STANDARD;
+        }
+    }
+
     final String audience;
     /** Indexed like {@link WidgetFill#FILL_ORDER}. */
     final boolean[] blocks;
     final int opacity;
+    final TextSize textSize;
 
-    WidgetPrefs(String audience, boolean[] blocks, int opacity) {
+    WidgetPrefs(String audience, boolean[] blocks, int opacity, TextSize textSize) {
         this.audience = AUDIENCE_OUR.equals(audience) ? AUDIENCE_OUR : AUDIENCE_MY;
         this.blocks = blocks.clone();
         this.opacity = isKnownOpacity(opacity) ? opacity : 100;
+        this.textSize = textSize == null ? TextSize.STANDARD : textSize;
     }
 
     private static SharedPreferences prefs(Context context) {
@@ -50,7 +77,8 @@ public final class WidgetPrefs {
         return new WidgetPrefs(
                 p.getString(prefix + "audience", AUDIENCE_MY),
                 blocks,
-                p.getInt(prefix + "opacity", 100));
+                p.getInt(prefix + "opacity", 100),
+                TextSize.fromKey(p.getString(prefix + "textSize", TextSize.STANDARD.key)));
     }
 
     @SuppressLint("ApplySharedPref") // see the commit() note below
@@ -62,6 +90,7 @@ public final class WidgetPrefs {
             e.putBoolean(prefix + blockKey(WidgetFill.FILL_ORDER[i]), blocks[i]);
         }
         e.putInt(prefix + "opacity", opacity);
+        e.putString(prefix + "textSize", textSize.key);
         // commit, not apply: the activity renders straight after and must read these values.
         e.commit();
     }
