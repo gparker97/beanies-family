@@ -17,6 +17,51 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.10.13',
+    date: '2026-10-13',
+    month: '13 october 2026',
+    spotlight: true,
+    summary: {
+      en: "Home-screen widgets are here on iPhone and Android: your family's day at a glance, plus other minor fixes and improvements.",
+      beanie:
+        "home-screen widgets are here on iphone and android: your family's day at a glance, plus other minor fixes and improvements.",
+    },
+    features: [
+      {
+        title: { en: 'Your day on your home screen', beanie: 'your day on your home screen' },
+        description: {
+          en: "A beanies widget can now be added to your phone's home screen, showing today's calendar with your to-dos and lists underneath, and one tap opens the right screen. Each widget can show my day or our day, which parts to include, a text size, and how much of your wallpaper shows through.",
+          beanie:
+            "a beanies widget can now be added to your phone's home screen, showing today's calendar with your to-dos and lists underneath, and one tap opens the right screen. each widget can show my day or our day, which parts to include, a text size, and how much of your wallpaper shows through.",
+        },
+      },
+      {
+        title: {
+          en: 'Next up on the iPhone lock screen',
+          beanie: 'next up on the iphone lock screen',
+        },
+        description: {
+          en: 'On iPhone, a small widget can also sit on the lock screen, showing your next pick-up or the next thing on. Event titles can be hidden there in Settings, Reminders.',
+          beanie:
+            'on iphone, a small widget can also sit on the lock screen, showing your next pick-up or the next thing on. event titles can be hidden there in settings, reminders.',
+        },
+      },
+      {
+        icon: '💬',
+        title: { en: 'Join us on Discord', beanie: 'join us on discord' },
+        description: {
+          en: "Get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+          beanie:
+            "get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+        },
+        cta: {
+          label: { en: 'Join the Discord', beanie: 'join the discord' },
+          href: 'https://beanies.family/discord',
+        },
+      },
+    ],
+  },
+  {
     version: '2026.10.10',
     date: '2026-10-10',
     month: '10 october 2026',
