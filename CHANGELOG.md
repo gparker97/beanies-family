@@ -8,11 +8,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
-## 2026-10-13
+## 2026-10-14
 
 ### Fixed
 
 - Creating a pod on the web: if the page reloads during the Google Drive step (a stuck or declined sign-in window), it now comes back to the storage step with an explanation instead of asking for your PIN again; the PIN is now the last step before your pod is created.
+
+## 2026-10-13
 
 ### Changed
 
