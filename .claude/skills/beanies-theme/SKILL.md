@@ -366,7 +366,7 @@ Every string has three values: `en` and `beanie` in `src/services/translation/ui
 - **Wordmark:** "beanies.family" in Outfit 700 — "beanies" in white/Deep Slate, ".family" in Heritage Orange
 - **Tagline lockup:** "every bean counts" in italic below the wordmark (0.5rem, 25% opacity, tracking 0.06em). No period — see Identity above. Outfit ships no italic cut, so the oblique is synthesised (browser `italic`, or a shear when rendering to a raster asset).
 - **Symbol:** A parent bean in Deep Slate blue wearing a Heritage Orange beanie hat, holding hands with a smaller child bean in Heritage Orange wearing a Sky Silk hat. An upward-trending Heritage Orange arrow rises behind them.
-- **The Golden Rule:** The beanies hold hands to show they are together as a family. **Never separate them. Never rotate the arrow.**
+- **The Golden Rule (logo):** The beanies hold hands to show they are together as a family. **Never separate them in the logo. Never rotate the arrow.** Illustrations are looser, see § Drawing images and illustrations.
 - **Clear space:** 2× hat height on all sides
 - **Min size:** 48px height (digital)
 - **Format:** SVG preferred, PNG at 2×
@@ -868,7 +868,8 @@ Security is foundational but should feel safe, never scary. Security UI communic
 
 - **The beanies characters** are round, simple, friendly bean shapes with hands
 - The **parent bean** is blue/Deep Slate; the **child bean** is orange/Terracotta
-- They always hold hands — never depicted separately
+- Preferably holding hands; close together is also fine. A beanie may appear alone when the page or image calls for it (e.g. one user giving a testimonial). Relaxed 2026-10-14; before that they were never drawn apart.
+- What never changes: a beanie never looks sad, lonely, or unhappy, together or alone. Happy and unconcerned, always.
 - Expressions are warm and celebratory — never stressed, never alarmed
 - Background: warm whites (`#F8F9FA`), soft gradients in the brand palette
 - **Never** depict the beanies with sharp angles, dark surroundings, or anxious expressions
@@ -882,7 +883,7 @@ Security is foundational but should feel safe, never scary. Security UI communic
 - Use Heritage Orange for routine alerts — Alert Red is reserved for destructive confirmations (delete/leave) and hard validation errors only
 - Maintain squircle corners (24px+) on all containers
 - Use soft, diffused shadows only
-- Keep the beanies together — parent and child always hold hands
+- Keep the beanies happy — preferably holding hands or close together; a beanie alone is fine when the context calls for it, never lonely or sad
 - Use visual icons in the header (flags, avatars, badges) not text
 - Show upcoming transactions, not just recent history
 - Include security indicators (save file + encryption) in every sidebar

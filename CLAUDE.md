@@ -74,7 +74,7 @@ beanies.family is the focal point of your family. It is a local-first, PWA-enabl
 - **Accent colors:** Sky Silk `#AED6F1` (calm, safety, backgrounds), Terracotta `#E67E22` (warmth, milestones, gradient partner)
 - **Background color:** Cloud White `#F8F9FA` (space, clarity, page backgrounds, cards)
 - **Voice:** Simple, friendly, comforting, secure, familiar. Say "counting beans..." not "Loading..."
-- **Golden rule:** The beanies hold hands and are never separated; never rotate the arrow.
+- **Golden rule:** In the logo the beanies hold hands and are never separated; never rotate the arrow. In illustrations a lone beanie is fine when the context calls for it, as long as it looks happy (theme skill § Drawing images).
 - **Full guidelines:** `docs/brand/beanies-cig-v2.html`
 - **Theme skill:** `.claude/skills/beanies-theme/SKILL.md` — consult for all UI copy and component design
 - **Typography standard:** Six-level scale from Display (`text-3xl`/`text-4xl`) to Caption (`text-xs`). Minimum 12px. Standard Tailwind classes only — no custom `text-[X.Xrem]`. See theme skill for full spec.
