@@ -258,7 +258,7 @@ function handleBirthdayClick(birthday: BirthdayOccurrence) {
 }
 function openBeanProfile(memberId: string) {
   selectedBirthday.value = null;
-  void router.push({ name: 'BeanDetail', params: { id: memberId } });
+  void router.push(`/pod/${memberId}/overview`);
 }
 
 // Activity created confirmation modal. `lastCreatedDate` holds the date the

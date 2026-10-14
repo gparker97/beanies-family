@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-10-15
+
+### Fixed
+
+- Planner: "Open their profile" in the birthday drawer now opens that member's profile instead of doing nothing.
+
 ## 2026-10-14
 
 ### Added
