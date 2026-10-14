@@ -2,9 +2,25 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import WorldsBeanstalk from '../components/WorldsBeanstalk.astro';
 import HeroShowcase from '../components/HeroShowcase.astro';
+import ProofNote from '../components/ProofNote.astro';
+import ProofCounter from '../components/ProofCounter.astro';
 import { SOFTWARE_APPLICATION } from '@beanies/brand/schema';
 import { APP_URL, SITE_URL } from '@beanies/brand/nav';
 import { PRICES, numericPrice } from '../lib/pricing';
+import { proofQuote } from '../lib/proof';
+import { parseStoreProof, fiveStarTotal } from '../lib/storeProof';
+import storeProof from '../data/store-proof.json';
+
+/**
+ * Real-user proof (#135). ONE number under ONE gate: the hero counter and the
+ * JSON-LD aggregateRating both read `total`, and both exist only while `hasProof`,
+ * so the page and its markup cannot disagree. `parseStoreProof` fails the build,
+ * naming the field, if the committed file is malformed; `fiveStarTotal` is 0 (and
+ * both disappear) if the App Store average is no longer exactly 5.0. The number is
+ * refreshed by `node web/scripts/store-proof.mjs`, never typed by hand.
+ */
+const total = fiveStarTotal(parseStoreProof(storeProof));
+const hasProof = total > 0;
 
 // The LCP element. Single source of truth: this same path feeds BOTH the
 // `<link rel="preload" as="image">` (via BaseLayout's `lcpImage`) and the
@@ -37,6 +53,10 @@ const appSchema = {
     highPrice: numericPrice(PRICES.USD.fullYearly),
     offerCount: 2,
   },
+  // Omitted entirely at zero: an aggregateRating with ratingCount 0 is a Rich Results error.
+  ...(hasProof
+    ? { aggregateRating: { '@type': 'AggregateRating', ratingValue: 5, bestRating: 5, ratingCount: total } }
+    : {}),
 };
 
 const HERO_MASCOT = '/brand/beanies_family_hugging_transparent_512x512.webp';
@@ -113,13 +133,22 @@ const HERO_MASCOT = '/brand/beanies_family_hugging_transparent_512x512.webp';
 
       <div class="hero__stores">
         <span class="hero__stores-label">or get the app</span>
-        <div class="hero__stores-badges">
-          <a href="/ios" data-cta="CTA: App Store (iOS)" data-cta-loc="homepage-hero" aria-label="Download beanies.family on the App Store">
-            <img src="/badges/app-store.svg" alt="Download on the App Store" width="120" height="40" loading="lazy" decoding="async" />
-          </a>
-          <a href="/android" data-cta="CTA: App Store (Android)" data-cta-loc="homepage-hero" aria-label="Get beanies.family on Google Play">
-            <img src="/badges/google-play.svg" alt="Get it on Google Play" width="239" height="71" loading="lazy" decoding="async" />
-          </a>
+        <!-- the proof strip (#135): the five-star counter | the badges | one note, its tendril on the Play badge -->
+        <div class="hero__stores-row">
+          {hasProof && (
+            <div class="hero__proof-count"><ProofCounter total={total} loc="homepage-hero" /></div>
+          )}
+          <div class="hero__stores-badges">
+            <a href="/ios" data-cta="CTA: App Store (iOS)" data-cta-loc="homepage-hero" aria-label="Download beanies.family on the App Store">
+              <img src="/badges/app-store.svg" alt="Download on the App Store" width="120" height="40" loading="lazy" decoding="async" />
+            </a>
+            <a href="/android" data-cta="CTA: App Store (Android)" data-cta-loc="homepage-hero" aria-label="Get beanies.family on Google Play">
+              <img src="/badges/google-play.svg" alt="Get it on Google Play" width="239" height="71" loading="lazy" decoding="async" />
+            </a>
+          </div>
+          <div class="hero__proof-note">
+            <ProofNote quote={proofQuote('aashyqii-life-saver')} stem="left" tilt={0.8} variant="strip" loc="homepage-hero" />
+          </div>
         </div>
       </div>
 
@@ -144,7 +173,9 @@ const HERO_MASCOT = '/brand/beanies_family_hugging_transparent_512x512.webp';
     <div class="section-fade section-fade--hero-out"></div>
 
     <!-- WHAT'S INSIDE — three-worlds scroll-grown beanstalk (Notion #56) -->
-    <WorldsBeanstalk />
+    <WorldsBeanstalk
+      notes={[proofQuote('dana-large-screen'), proofQuote('kemi-coordinate'), proofQuote('lcstryder-struck-gold')]}
+    />
 
     <div class="section-fade section-fade--to-dark"></div>
 
@@ -412,6 +443,15 @@ const HERO_MASCOT = '/brand/beanies_family_hugging_transparent_512x512.webp';
       <img src="/brand/beanies_neutral_icon_transparent_350x350.webp" alt="" width="350" height="350" loading="lazy" decoding="async" class="final-cta__deco-accent" />
       <div class="container">
         <h2 class="final-cta__title reveal">so... ready to count some beans? <em>🫘</em></h2>
+        <!-- real-user proof (#135). The phone shows Ummu's note only: Aashyqii is already in the hero strip. -->
+        <div class="proof-pair reveal">
+          <div class="proof-pair__desktop">
+            <ProofNote quote={proofQuote('aashyqii-best-app')} stem="left" tilt={1} loc="homepage-final" />
+          </div>
+          <div class="proof-pair__last">
+            <ProofNote quote={proofQuote('ummu-plan-ahead')} stem="right" tilt={-0.8} mascot loc="homepage-final" />
+          </div>
+        </div>
         <p class="final-cta__sub reveal">
           it's free. run it locally or login below. yes, it's really free.
           <a href="/pricing" class="final-cta__pricing">probably not forever.</a>
@@ -852,6 +892,39 @@ const HERO_MASCOT = '/brand/beanies_family_hugging_transparent_512x512.webp';
   align-items: center;
   gap: 9px;
   margin-top: 16px;
+  width: 100%;
+}
+/* The proof strip (#135): counter | badges | note. Explicit columns, so without the
+   counter (hasProof false) the badges still sit in the centre column. Only these
+   wrappers are styled here; ProofCounter / ProofNote own everything inside them. */
+.hero__stores-row {
+  align-items: center;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  max-width: 1120px;
+  min-height: 52px;
+  width: 100%;
+}
+.hero__stores-row .hero__stores-badges { grid-column: 2; grid-row: 1; }
+.hero__proof-count {
+  border-right: 1px solid rgb(44 62 80 / 14%);
+  grid-column: 1;
+  grid-row: 1;
+  justify-self: end;
+  margin-right: 26px;
+  min-width: 0;
+  padding-right: 26px;
+  text-align: right;
+}
+/* margin-left lets the note's tendril (84px past its body) reach the Google Play badge */
+.hero__proof-note {
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: start;
+  margin-left: 100px;
+  max-width: 300px;
+  min-width: 0;
+  text-align: left;
 }
 .hero__stores-label {
   font-size: 0.78rem;
@@ -1080,6 +1153,13 @@ const HERO_MASCOT = '/brand/beanies_family_hugging_transparent_512x512.webp';
 .back-to-top[hidden] { display: none; }
 .back-to-top:hover { background: white; box-shadow: 0 4px 16px rgb(44 62 80 / 12%); transform: translateY(-2px); }
 
+/* FINAL CTA proof pair (#135): page-owned cells; the 84px padding is the calyx reserve on each note's stem side,
+   so the cells are border-box and their basis counts it (340px note + 84px reserve) */
+.proof-pair { align-items: flex-start; display: flex; flex-wrap: wrap; gap: 40px 48px; justify-content: center; margin: 44px auto 30px; max-width: 980px; text-align: left; }
+.proof-pair > div { box-sizing: border-box; flex: 1 1 calc(340px + 84px); }
+.proof-pair__desktop { max-width: calc(400px + 84px); padding-left: 84px; }
+.proof-pair__last { max-width: calc(420px + 84px); padding-right: 84px; }
+
 /* SCROLL REVEAL */
 .reveal { opacity: 0; transform: translateY(24px); transition: opacity 600ms ease, transform 600ms ease; }
 .reveal.visible { opacity: 1; transform: translateY(0); }
@@ -1095,6 +1175,19 @@ const HERO_MASCOT = '/brand/beanies_family_hugging_transparent_512x512.webp';
 }
 
 /* RESPONSIVE */
+/* The proof strip stacks: badges, then the counter, then the note (#135). */
+@media (max-width: 1000px) {
+  .hero__stores-row { grid-template-columns: 1fr; justify-items: center; row-gap: 12px; }
+  .hero__stores-row .hero__stores-badges { grid-column: auto; grid-row: auto; order: 1; }
+  .hero__proof-count { border-right: 0; grid-column: auto; grid-row: auto; justify-self: center; margin-right: 0; order: 2; padding-right: 0; text-align: center; }
+  .hero__proof-note { grid-column: auto; grid-row: auto; justify-self: center; margin: 10px 0 0 84px; order: 3; }
+}
+/* phone: one note before the CTA buttons, its calyx (stem right) hanging into the space on the right */
+@media (max-width: 760px) {
+  .proof-pair { align-items: flex-start; flex-direction: column; }
+  .proof-pair__desktop { display: none; }
+  .proof-pair > .proof-pair__last { flex: none; padding-right: 0; width: min(100% - 84px, 300px); }
+}
 @media (max-width: 640px) {
   .hero { padding: 120px 20px 24px; }
   .security-grid { grid-template-columns: 1fr; }
@@ -1110,5 +1203,3 @@ const HERO_MASCOT = '/brand/beanies_family_hugging_transparent_512x512.webp';
   .security-section__deco-accent { display: none; }
 }
 </style>
-</content>
-</invoke>

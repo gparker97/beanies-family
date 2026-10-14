@@ -8,6 +8,8 @@ import { APP_URL } from '@beanies/brand/nav';
 import '@fontsource-variable/caveat';
 import '../../styles/switch-page.css';
 import TrustBetaFree from '../../components/TrustBetaFree.astro';
+import ProofNote from '../../components/ProofNote.astro';
+import { proofQuote } from '../../lib/proof';
 
 const MASCOT = '/brand/beanies_family_hugging_transparent_512x512.webp';
 ---
@@ -69,6 +71,8 @@ const MASCOT = '/brand/beanies_family_hugging_transparent_512x512.webp';
             <span class="bean b3"></span><span class="bean b4"></span>
           </div>
         </div>
+
+        <div class="hero-proof"><ProofNote quote={proofQuote('brendan-found-it')} stem="left" tilt={-1.4} mascot loc="welcome-maple-hero" /></div>
       </div>
     </header>
 

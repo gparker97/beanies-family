@@ -18,14 +18,46 @@
  * :root brand tokens are inherited from .landing-page (only --vine-green(-light) are
  * declared here), the grass is pre-rendered deterministically at build time (Astro can't
  * scope styles onto JS-created nodes), and decorative emoji get aria-hidden.
+ *
+ * One later, fenced addition (#135, 2026-10-14): a real-user proof note per world
+ * card, from the approved mockup
+ *   ~/projects/beanies-ops/docs/mockups/homepage-proof-d-notes-and-strip-2026-10-14.html
+ * Plan: ~/projects/beanies-ops/docs/plans/2026-10-14-real-user-proof-135.md § 5.
+ * Above 1000px each note sits beside its card. At <=1000px the vine leaves own the
+ * gaps between cards, so only world 3's note shows in its scene (stacked under the
+ * card, in the leaf-free band above the root family, with .stage made taller to fit),
+ * and worlds 1 + 2's notes render a second time as a pair in the payoff, between
+ * the tag-line and the CTA (`.worlds-notes`). See the "#135 proof notes" style block. The vine path, braid,
+ * leaf fracs, docking (`data-center`, `dockOffset`) and script are untouched; the only
+ * geometry change is the <=1000px stage height, which the vine stretches to fill.
  */
 
-// Caveat — the CIG handwritten accent face, used by `.root-note` below and by
-// nothing else on the site. Imported HERE rather than in BaseLayout so the other
-// 90 pages don't carry its @font-face rules; colocating it with its only consumer
-// also means it cannot be orphaned if this section is ever removed. Mirrors the
-// existing per-page Fraunces pattern.
+// Caveat — the CIG handwritten accent face, used here by `.root-note` below. It is
+// imported per consumer rather than in BaseLayout, so pages that never show it don't
+// carry its @font-face rules: the shared consumer is `ProofNote.astro` (the proof
+// notes on this section, the hero and /pricing, /from/*), which imports it itself,
+// and `pricing.astro` and `from/*.astro` import it for their own handwritten bits.
+// Vite deduplicates the import, so a page with several consumers still ships one
+// @font-face block. Mirrors the existing per-page Fraunces pattern.
 import '@fontsource-variable/caveat';
+import ProofNote from './ProofNote.astro';
+import type { ProofQuote } from '../lib/proof';
+
+interface Props {
+  /** One proof note per world, in order (#135). Required, so a page cannot drop one silently. */
+  notes: readonly [ProofQuote, ProofQuote, ProofQuote];
+}
+const { notes } = Astro.props;
+
+/**
+ * Where each world's note sits (#135): the stem faces the card, and the tilt is the
+ * approved mockup's value for that placement. A placement decision, like `data-center`.
+ */
+const WORLD_NOTES = [
+  { stem: 'left', tilt: 1.6 },
+  { stem: 'right', tilt: -1.6 },
+  { stem: 'left', tilt: -1.2 },
+] as const;
 
 // --- Deterministic grass generator (build-time; reproduces the mockup's buildGrass()
 //     distribution with a fixed seed so builds are reproducible). Call order matches
@@ -151,6 +183,7 @@ const gbeans = ([['🌱', -118, 8, 1.5], ['🫘', -34, 2, 1.9], ['🌱', 80, 10,
           <div class="drow"><span class="who">✈️ tokyo family trip</span><span class="tag" style="background:rgba(39,174,96,0.12);color:var(--soft-green)">12 sleeps</span></div>
         </div>
       </div>
+      <div class="scene__note"><ProofNote quote={notes[0]} stem={WORLD_NOTES[0].stem} tilt={WORLD_NOTES[0].tilt} loc="beanstalk-world-1" /></div>
     </div>
 
     <div class="scene" data-i="1" data-center="0.48">
@@ -175,6 +208,7 @@ const gbeans = ([['🌱', -118, 8, 1.5], ['🫘', -34, 2, 1.9], ['🌱', 80, 10,
           </div>
         </div>
       </div>
+      <div class="scene__note"><ProofNote quote={notes[1]} stem={WORLD_NOTES[1].stem} tilt={WORLD_NOTES[1].tilt} loc="beanstalk-world-2" /></div>
     </div>
 
     <div class="scene" data-i="2" data-center="0.78">
@@ -195,6 +229,7 @@ const gbeans = ([['🌱', -118, 8, 1.5], ['🫘', -34, 2, 1.9], ['🌱', 80, 10,
           <div class="drow"><span class="who">🔒 all of it</span><span class="lock">encrypted &amp; yours</span></div>
         </div>
       </div>
+      <div class="scene__note"><ProofNote quote={notes[2]} stem={WORLD_NOTES[2].stem} tilt={WORLD_NOTES[2].tilt} loc="beanstalk-world-3" /></div>
     </div>
 
     <div class="root" id="root">
@@ -218,6 +253,11 @@ const gbeans = ([['🌱', -118, 8, 1.5], ['🫘', -34, 2, 1.9], ['🌱', 80, 10,
 
   <div class="payoff">
     <p class="tag-line">three worlds. one family. <em>zero chaos.</em></p>
+    <!-- #135: worlds 1 + 2's notes again, between the tag-line and the CTA, for <=1000px only (see the fenced style block) -->
+    <div class="worlds-notes">
+      <div class="worlds-notes__cell" data-stem={WORLD_NOTES[0].stem}><ProofNote quote={notes[0]} stem={WORLD_NOTES[0].stem} tilt={WORLD_NOTES[0].tilt} loc="beanstalk-footer-1" /></div>
+      <div class="worlds-notes__cell" data-stem={WORLD_NOTES[1].stem}><ProofNote quote={notes[1]} stem={WORLD_NOTES[1].stem} tilt={WORLD_NOTES[1].tilt} loc="beanstalk-footer-2" /></div>
+    </div>
     <a class="cta" data-cta="CTA: Create Pod" data-cta-loc="beanstalk-footer" href="https://app.beanies.family">plant a beanstalk of your own →</a>
   </div>
 </section>
@@ -241,8 +281,12 @@ const gbeans = ([['🌱', -118, 8, 1.5], ['🫘', -34, 2, 1.9], ['🌱', 80, 10,
        The `auto` keyword makes the browser remember the section's REAL rendered size
        after first render, so the literal below is only a first-paint placeholder.
        It is derived, not measured by eye: .stage has a fixed height of 2400px
-       (2550px at <=780px) plus the intro/payoff blocks and padding. DO NOT treat
-       3000px as a measurement and do not maintain it by hand.
+       above 1000px plus the intro/payoff blocks and padding. DO NOT treat 3000px
+       as a measurement and do not maintain it by hand. Above 1000px the #135 proof
+       notes sit beside the cards and add no height. At <=1000px the section is
+       taller than the placeholder (the stage grows to 3020px / 3180px at <=780px
+       for world 3's stacked note, and the two payoff notes add ~0.5k inside the
+       payoff); `auto` corrects it after the first render, so the literal stays.
 
        NOTE: this is why dockOffset() guards against degenerate rects — while the
        section is skipped its descendants are unlaid-out. Removing that guard
@@ -416,11 +460,79 @@ const gbeans = ([['🌱', -118, 8, 1.5], ['🫘', -34, 2, 1.9], ['🌱', 80, 10,
   .cta { display: inline-block; background: linear-gradient(135deg, var(--heritage-orange), var(--terracotta)); color: #fff; font-family: 'Outfit Variable', Outfit, sans-serif; font-weight: 700; font-size: 1rem; text-decoration: none; padding: 0.85rem 1.7rem; border-radius: 16px; box-shadow: 0 8px 22px rgba(241,93,34,0.28); transition: transform 0.2s ease, box-shadow 0.2s ease; }
   .cta:hover { transform: translateY(-2px); box-shadow: 0 12px 30px rgba(241,93,34,0.36); }
 
+  /* ==== #135 proof notes (fenced) ==========================================
+     A real-user proof note per world card. The scenes stay docked absolutely
+     at their `top` % of .stage; only the inside of each changes.
+     Wide (>1000px): a three-column grid, card in the middle, the note in the
+     side column its stem faces (worlds 1 + 3 right, world 2 left). The note
+     wrapper sits at z-index -1 INSIDE the .scene stacking context, so the
+     note's calyx tucks behind the card edge. Never give .card a z-index: it
+     would become a stacking context and trap its own .card__vine (z-index -1)
+     tendrils above its background, changing the vine art.
+     <=1000px: the side columns would fall under 250px ((stage - 392 card - 2x40
+     gap) / 2), and the gaps between cards 1/2 and 2/3 belong to the vine
+     leaves. Only the band between card 3 and the root family is leaf-free, so
+     world 3's note stacks under its card there (the scene becomes a column);
+     worlds 1 + 2's beside-card notes are hidden, and the SAME two quotes render
+     again as a pair inside .payoff, between the tag-line and the CTA button
+     (.worlds-notes). That duplication of
+     two notes in the DOM is deliberate: each copy is display:none at the other
+     breakpoint, so exactly one of each shows at any width. The footer pair is
+     static (no .scene.in fade; it is outside every .scene).
+     ======================================================================== */
+  @media (width > 1000px) {
+    .scene { display: grid; grid-template-columns: 1fr minmax(0, 392px) 1fr; align-items: center; gap: 40px; }
+    .scene .card { grid-column: 2; grid-row: 1; width: 100%; }
+    .scene__note { grid-row: 1; max-width: 312px; }
+    .scene[data-i="0"] .scene__note, .scene[data-i="2"] .scene__note { grid-column: 3; justify-self: start; }
+    .scene[data-i="1"] .scene__note { grid-column: 1; justify-self: end; }
+    .worlds-notes { display: none; }
+  }
+  .scene__note { position: relative; z-index: -1; opacity: 0; transition: opacity 500ms ease 200ms; }
+  .scene.in .scene__note { opacity: 1; }
+  @media (width <= 1000px) {
+    /* The stacked note needs the stage taller, so card 3 (top: 72%) and the root family
+       (bottom-anchored) part. Every px added to the stage moves card 3 + note down
+       0.72px and the family down 1px, so the band grows only 0.28px per px. Derived,
+       not eyeballed: at 2400px (900 wide) the note's rect (body + calyx + credit tag)
+       ended 146px BELOW the family image's top, so (146 + 24 spare) / 0.28 = 608 ->
+       2400 + 620 = 3020px (12 over, as the family's resting top measures +-2px run to
+       run). The <=780px query below repeats this for phones (3180px). */
+    .stage { height: 3020px; }
+    .scene[data-i="0"] .scene__note, .scene[data-i="1"] .scene__note { display: none; }
+    .scene[data-i="2"] { flex-direction: column; align-items: center; }
+    /* stem left, so the 84px calyx reserve is on the left and the note hugs the right */
+    .scene[data-i="2"] .scene__note { width: min(100% - 84px, 300px); align-self: flex-end; margin-top: 26px; z-index: auto; }
+    /* no side padding of its own: .payoff already supplies the 16px gutter, and a second
+       one narrowed the cells to 210px at 390 wide, where the nowrap credit tag overran the screen */
+    .worlds-notes { display: flex; flex-direction: column; gap: 40px; max-width: 420px; margin: 28px auto 32px; }
+    .worlds-notes__cell { width: min(100% - 84px, 300px); }
+    .worlds-notes__cell[data-stem="left"] { align-self: flex-end; }
+    .worlds-notes__cell[data-stem="right"] { align-self: flex-start; }
+  }
+  @media (max-width: 400px) {
+    /* narrow phones (360 is common on Android): the credit tags are wider than the cells, so
+       the notes sit centred and the tags overflow evenly into the gutters instead of off the
+       right edge (.worlds is overflow: hidden); the stage gets the room 360 needs (see the
+       780px query's derivation). 320-wide screens still clip a few px of the longest tags. */
+    .scene[data-i="2"] .scene__note { align-self: center; }
+    .worlds-notes__cell[data-stem="left"], .worlds-notes__cell[data-stem="right"] { align-self: center; }
+  }
+  /* ==== end #135 proof notes ============================================== */
+
   @media (max-width: 780px) {
-    .stage { height: 2550px; }
+    /* 2550px before #135. The stacked world-3 note (see the fenced #135 block for the
+       0.28px-per-px derivation): at 390 wide it ended 149px below the family image's
+       top, so (149 + 24) / 0.28 = 618 -> 2550 + 630 = 3180px (12 over, as above).
+       Narrower phones have a taller card + note: 360 wide needs ~3290px, 320 wide ~3700px. */
+    .stage { height: 3180px; }
     .card { width: min(92%, 360px); }
     .vine-leaf { width: 134px; height: 54px; }
     .vine-leaf .t { font-size: 0.78rem; }
+  }
+  @media (max-width: 400px) {
+    /* #135: the room 360-wide phones need under world 3 (must follow the 780px rule to win) */
+    .stage { height: 3300px; }
   }
   @media (prefers-reduced-motion: reduce) {
     .grow-hint { display: none; }
@@ -429,6 +541,7 @@ const gbeans = ([['🌱', -118, 8, 1.5], ['🫘', -34, 2, 1.9], ['🌱', 80, 10,
     .card__vine--top, .card__vine--bottom { transform: translateX(-50%) scaleY(1) !important; }
     .card__vine--left, .card__vine--right { transform: scaleX(1) !important; }
     .card__head, .card__lead, .mini > * { opacity: 1 !important; transform: none !important; }
+    .scene__note { opacity: 1 !important; }
     .vine-leaf { opacity: 1 !important; }
     .vine-leaf.r { transform: translateY(-50%) scale(1) rotate(var(--r)) !important; }
     .vine-leaf.l { transform: translate(-100%,-50%) scale(1) rotate(var(--r)) !important; }

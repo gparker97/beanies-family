@@ -24,6 +24,8 @@ import {
 // Caveat: the CIG handwritten accent, for the tape label and the sign-off only.
 import '@fontsource-variable/caveat';
 import '../styles/switch-page.css';
+import ProofNote from '../components/ProofNote.astro';
+import { proofQuote } from '../lib/proof';
 
 const canonicalPath = '/pricing';
 const p = PRICES[DEFAULT_CURRENCY];
@@ -151,8 +153,8 @@ const faqSchema = {
               </div>
             </div>
 
-            <div class="plans plans--two">
-              <div class="plan plan--basic">
+            <div class="plans plans--two plans--proof">
+              <div class="plan plan-free">
                 <h3>beanies basic</h3>
                 <p class="who">the whole app, except ai</p>
                 <p class="price">
@@ -182,7 +184,7 @@ const faqSchema = {
                 >
               </div>
 
-              <div class="plan plan--paid">
+              <div class="plan plan-paid">
                 <span class="tape">where most families land</span>
                 <h3>magic beans</h3>
                 <p class="who">
@@ -213,6 +215,11 @@ const faqSchema = {
                   data-cta="CTA: Create Pod"
                   data-cta-loc="pricing-plan-full">start counting beans 🫘</a
                 >
+              </div>
+
+              <div class="plan-proof">
+                <div><ProofNote quote={proofQuote('aherndon-replaced-apps')} stem="left" tilt={1.4} mascot loc="pricing-plan-basic" /></div>
+                <div><ProofNote quote={proofQuote('miss-cowboy-everything')} stem="left" tilt={-1.2} loc="pricing-plan-full" /></div>
               </div>
             </div>
 
@@ -970,6 +977,76 @@ const faqSchema = {
   /* Two plans, so cap the row rather than letting two cards sprawl across
      the full width the three-card grid was built for. */
   .pricing-page .plans--two { max-width: 700px; }
+
+  /* #135: a third column of real-user notes beside the plans. Each note sits in its own
+     cell (a page rule cannot reach the component root); the 84px padding-left is the calyx reserve, so the column is 300px + 84px.
+     .wrap is only 992px inside its gutters, which would squeeze the two plan cards to
+     ~270px, so at desktop the row breaks out of .wrap: up to 1144px wide (two ~346px
+     cards + the 384px column + gaps), centred on the page with at least 80px each side,
+     because the first note's mascot hangs 52px past its right edge and .welcome-page
+     clips overflow-x. Below 1260px (where that would squeeze the cards) the notes
+     return to normal flow under the plans. */
+  .pricing-page .plans--proof {
+    gap: 22px 34px;
+    grid-template-columns: 1fr 1fr 384px;
+    margin-left: 50%;
+    max-width: none;
+    position: relative;
+    transform: translateX(-50%);
+    width: min(1144px, 100vw - 160px);
+  }
+
+  .pricing-page .plan-proof {
+    align-self: center;
+    display: flex;
+    flex-direction: column;
+    gap: 34px;
+  }
+
+  .pricing-page .plan-proof > div {
+    padding-left: 84px;
+  }
+
+  @media (max-width: 1260px) {
+    .pricing-page .plans--proof {
+      grid-template-columns: 1fr 1fr;
+      margin-left: auto;
+      max-width: 700px;
+      transform: none;
+      width: auto;
+    }
+
+    .pricing-page .plan-proof {
+      flex-direction: row;
+      gap: 34px 60px;
+      grid-column: 1 / -1;
+      justify-content: center;
+      padding-top: 14px;
+    }
+
+    .pricing-page .plan-proof > div {
+      flex: 1 1 0;
+    }
+  }
+
+  @media (max-width: 760px) {
+    .pricing-page .plans--proof {
+      grid-template-columns: 1fr;
+    }
+
+    .pricing-page .plan-proof {
+      align-items: flex-end;
+      flex-direction: column;
+      gap: 40px;
+      padding-top: 30px; /* the phone mascot hangs 44px above the note: clear the paid card */
+    }
+
+    .pricing-page .plan-proof > div {
+      flex: none;
+      padding-left: 0;
+      width: min(100% - 84px, 300px);
+    }
+  }
 
   /* ── what are magic beans ───────────────────────────────────────────── */
   .pricing-page .aibox {

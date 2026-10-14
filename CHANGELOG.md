@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-10-14
 
+### Added
+
+- Real reviews now appear on the homepage, pricing page and the switch pages: short notes from App Store and Google Play reviewers and one early adopter, plus a live count of five-star ratings beside the store badges.
+
 ### Fixed
 
 - Home-screen widget on Android: a widget that kept showing yesterday's date after the phone's launcher dropped an update now rights itself within half an hour, and one widget the system refuses no longer stops the others from updating. The app also records which day the widgets painted, so a stuck widget can be told apart from a stuck launcher.

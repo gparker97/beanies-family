@@ -1,0 +1,223 @@
+---
+/**
+ * ProofCounter: the hero's flip-clock count of five-star ratings (#135).
+ *
+ * Reference implementation: the approved mockup's `.counter` / `.counter__d` and its
+ * roll script (~/projects/beanies-ops/docs/mockups/homepage-proof-d-notes-and-strip-2026-10-14.html).
+ *
+ * `total` is `fiveStarTotal(parseStoreProof(store-proof.json))`, computed once by the
+ * page at build time. The page renders this component only when `total > 0` (its
+ * `hasProof` constant, which also gates the JSON-LD aggregateRating), so this never
+ * shows a zero and never makes a claim the data does not support.
+ *
+ * The digits are in the HTML. The roll is an enhancement: one tile per digit ticks
+ * 0 -> N once when the counter first scrolls into view, never under reduced motion.
+ * Fixed tile size + tabular numerals reserve the width, so the roll causes no layout
+ * shift. Each tile's `data-digit` is the source of truth; `textContent` is only ever
+ * derived from it, and every exit path (finish, error) writes it back.
+ *
+ * Alignment follows the wrapper's `text-align` (the page owns the wrapper): right
+ * beside the badges on desktop, centred when the strip stacks.
+ */
+import { PROOF_LISTING_URL } from '../lib/proof';
+
+interface Props {
+  /** The combined five-star count. Positive: the page's `hasProof` is the one guard. */
+  total: number;
+  /** `data-cta-loc` for both store links (Plausible "Proof: Store listing"). */
+  loc: string;
+}
+
+const { total, loc } = Astro.props;
+const digits = String(total).split('');
+---
+
+<div class="proof-count">
+  <p class="proof-count-head">
+    <span class="proof-count-tiles" role="img" aria-label={String(total)}
+      >{digits.map((d) => <b class="proof-count-tile" data-digit={d}>{d}</b>)}</span
+    > five-star ratings
+  </p>
+  <span class="proof-count-stars" role="img" aria-label="rated five stars">★★★★★</span>
+  <p class="proof-count-links">
+    <a href={PROOF_LISTING_URL['app-store']} target="_blank" rel="noopener" data-cta="Proof: Store listing" data-cta-loc={loc}
+      >App Store<span class="proof-count-ext" aria-hidden="true">↗</span></a
+    >
+    <span aria-hidden="true">·</span>
+    <a href={PROOF_LISTING_URL['google-play']} target="_blank" rel="noopener" data-cta="Proof: Store listing" data-cta-loc={loc}
+      >Google Play<span class="proof-count-ext" aria-hidden="true">↗</span></a
+    >
+  </p>
+</div>
+
+<style>
+  .proof-count {
+    min-width: 0;
+  }
+
+  .proof-count-head {
+    color: var(--deep-slate, #2c3e50);
+    font-family: 'Outfit Variable', Outfit, 'Outfit Fallback', sans-serif;
+    font-size: 1.125rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    line-height: 1.1;
+    margin: 0;
+    padding-bottom: 2px;
+    white-space: nowrap;
+  }
+
+  .proof-count-tiles {
+    display: inline-flex;
+    gap: 3px;
+    margin-right: 8px;
+    vertical-align: bottom;
+  }
+
+  /* flip-clock tile: one per digit, a hairline seam across the middle */
+  .proof-count-tile {
+    background: #fff;
+    border: 1px solid rgb(44 62 80 / 14%);
+    border-radius: 6px;
+    box-shadow: 0 2px 4px rgb(44 62 80 / 10%), inset 0 -1px 0 rgb(44 62 80 / 6%);
+    color: var(--heritage-orange, #f15d22);
+    display: inline-grid;
+    font-family: 'Outfit Variable', Outfit, 'Outfit Fallback', sans-serif;
+    font-size: 1.625rem;
+    font-variant-numeric: tabular-nums;
+    font-weight: 800;
+    height: 2.1rem;
+    line-height: 1;
+    overflow: hidden;
+    place-items: center;
+    position: relative;
+    width: 1.45rem;
+  }
+  .proof-count-tile::after {
+    background: rgb(44 62 80 / 16%);
+    content: "";
+    height: 1px;
+    left: 0;
+    position: absolute;
+    right: 0;
+    top: 50%;
+  }
+
+  .proof-count-stars {
+    color: var(--heritage-orange, #f15d22);
+    display: block;
+    font-size: 1.375rem;
+    letter-spacing: 3px;
+    line-height: 1;
+    margin: 5px -3px 6px 0; /* -3px: the last star's trailing letter-spacing */
+  }
+
+  .proof-count-links {
+    color: var(--muted-text, #4d5d6c);
+    font-family: 'Outfit Variable', Outfit, 'Outfit Fallback', sans-serif;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    line-height: 1.4;
+    margin: 0;
+    white-space: nowrap;
+  }
+  .proof-count-links a {
+    color: var(--deep-slate, #2c3e50);
+    text-decoration: none;
+  }
+  .proof-count-links a:hover,
+  .proof-count-links a:focus-visible {
+    text-decoration: underline;
+    text-decoration-color: var(--heritage-orange, #f15d22);
+    text-underline-offset: 3px;
+  }
+  .proof-count-ext {
+    color: var(--heritage-orange, #f15d22);
+    font-weight: 700;
+    margin-left: 2px;
+  }
+</style>
+
+<script>
+  // Roll every counter once, on first reveal. Bail out (the digits are already in the
+  // HTML) under reduced motion or without IntersectionObserver. Any failure restores
+  // every tile from data-digit, so a wrong digit can never be left on screen.
+  const TICK_MS = 70;
+  const groups = Array.from(document.querySelectorAll<HTMLElement>('.proof-count-tiles'));
+  const tilesOf = (group: HTMLElement) => Array.from(group.querySelectorAll<HTMLElement>('.proof-count-tile'));
+
+  function restore(only: HTMLElement[] = groups): void {
+    for (const group of only) {
+      for (const tile of tilesOf(group)) {
+        if (tile.dataset.digit !== undefined) tile.textContent = tile.dataset.digit;
+      }
+    }
+  }
+
+  function fail(err: unknown): void {
+    restore();
+    console.error(
+      '[ProofCounter] roll failed; digits restored from data-digit. Check the tile markup in ProofCounter.astro.',
+      err,
+    );
+  }
+
+  function guarded(fn: () => void): void {
+    try {
+      fn();
+    } catch (err) {
+      fail(err);
+    }
+  }
+
+  function roll(group: HTMLElement): void {
+    const tiles = tilesOf(group);
+    const targets = tiles.map((tile) => Number(tile.dataset.digit));
+    if (targets.some((d) => !Number.isInteger(d) || d < 0 || d > 9)) {
+      throw new Error(`bad data-digit in [${targets.join(',')}]`);
+    }
+    // Tile i ticks through (digit + 10 * i) steps, so later tiles spin longer, like a flip clock.
+    const remaining = targets.map((d, i) => d + 10 * i);
+    const shown = tiles.map(() => 0);
+    tiles.forEach((tile, i) => {
+      if (remaining[i] > 0) tile.textContent = '0';
+    });
+    // One interval per group, not per tile.
+    const timer = window.setInterval(() => {
+      try {
+        let rolling = false;
+        tiles.forEach((tile, i) => {
+          if (remaining[i] <= 0) return;
+          shown[i] = (shown[i] + 1) % 10;
+          remaining[i] -= 1;
+          tile.textContent = String(shown[i]);
+          if (remaining[i] > 0) rolling = true;
+        });
+        if (!rolling) {
+          window.clearInterval(timer);
+          restore([group]); // the unconditional final write: data-digit is the truth, whatever the ticks did
+        }
+      } catch (err) {
+        window.clearInterval(timer);
+        fail(err);
+      }
+    }, TICK_MS);
+  }
+
+  guarded(() => {
+    const still =
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches || !('IntersectionObserver' in window);
+    if (still) return;
+    for (const group of groups) {
+      const observer = new IntersectionObserver(
+        (entries) => {
+          if (!entries.some((entry) => entry.isIntersecting)) return;
+          observer.disconnect();
+          guarded(() => roll(group));
+        },
+        { threshold: 0.5 },
+      );
+      observer.observe(group);
+    }
+  });
+</script>

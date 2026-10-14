@@ -1,0 +1,321 @@
+---
+/**
+ * ProofNote: the ONE testimonial style on the marketing site (#135).
+ *
+ * Reference implementation: the approved mockup (direction D),
+ *   ~/projects/beanies-ops/docs/mockups/homepage-proof-d-notes-and-strip-2026-10-14.html
+ *   (`figure.pn`, `#podCalyx`). Plan: ~/projects/beanies-ops/docs/plans/2026-10-14-real-user-proof-135.md
+ *
+ * A pale green squircle with a thin beanstalk-green line, a handwritten open-quote,
+ * a slight tilt, and the beanstalk's own stem + calyx + tendril on the end that faces
+ * whatever the note vouches for. Inside: the hook (words copied from the quote) in
+ * Caveat, then the quote. Below, hung on a thread, the credit tag.
+ *
+ * Every quote comes from `lib/proof.ts` by id; this component never takes free text.
+ *
+ * PAGES STYLE ONLY THE WRAPPER THEY OWN. Astro scopes styles at the component
+ * boundary, so all note CSS lives here and the note is `width: 100%` of its wrapper.
+ * The wrapper's obligations are exactly two numbers:
+ *   - RESERVE 84px on the stem side at every width (the calyx hangs 84px outside the
+ *     body; 63px under 760px), e.g. `width: min(100% - 84px, 300px)` or `padding-left: 84px`.
+ *   - ALLOW the mascot (when `mascot` is set) to hang 52px past the far bottom corner
+ *     and 34px below. Under 760px it peeks over the TOP-RIGHT corner instead (16px out,
+ *     44px up), whichever side the stem is on. It reserves nothing; the placement must
+ *     land it in page padding, a gap or a section's padding.
+ *
+ * Light only, like every marketing surface (the site has no dark theme; the mockup
+ * keeps the dark tokens for the day it does). Colours read the page's brand variables
+ * with CIG fallbacks, so the note renders correctly on any page.
+ */
+import '@fontsource-variable/caveat';
+import { PROOF_LISTING_URL, type ProofQuote } from '../lib/proof';
+
+interface Props {
+  quote: ProofQuote;
+  /** Which end carries the calyx: the side facing what the note vouches for. `right` mirrors it. */
+  stem: 'left' | 'right';
+  /** Degrees, the mockup's value for this placement (within ±2). A placement decision, like position. */
+  tilt: number;
+  /** `data-cta-loc` for the credit-tag link (Plausible "Proof: Store listing"). */
+  loc: string;
+  /** `strip`: the hero's smaller note beside the store badges. */
+  variant?: 'default' | 'strip';
+  /** The megaphone beanie outside the far bottom corner. Once per page. */
+  mascot?: boolean;
+}
+
+const { quote, stem, tilt, loc, variant = 'default', mascot = false } = Astro.props;
+
+// A committed master in packages/brand/assets/marketing/, served at /brand/ by the
+// prebuild sync like every other marketing mascot. No existence check by design:
+// the Playwright walk asserts it rendered (plan #135, Context fact 9).
+const MASCOT = '/brand/beanies-megaphone.webp';
+const listing = quote.source === 'email' ? null : PROOF_LISTING_URL[quote.source];
+---
+
+<figure class="proof-note" data-stem={stem} data-variant={variant} style={`--tilt:${tilt}deg`}>
+  <div class="proof-note-body">
+    <svg class="proof-note-calyx" viewBox="0 0 120 100" aria-hidden="true" focusable="false">
+      <path
+        fill="none"
+        style="stroke: var(--proof-green)"
+        stroke-width="4.5"
+        stroke-linecap="round"
+        d="M80 50 C 66 50, 57 45, 51 37 C 45 28, 46 17, 36 13 C 26 9, 16 15, 18 25 C 20 33, 31 33, 31 26 C 31 21, 26 20, 25 23"
+      ></path>
+      <path
+        fill="none"
+        style="stroke: var(--proof-curl)"
+        stroke-width="3.5"
+        stroke-linecap="round"
+        d="M58 46 C 48 53, 38 59, 28 59 C 18 59, 14 69, 20 75 C 26 80, 34 75, 30 69"
+      ></path>
+      <path
+        style="fill: var(--proof-leaf); stroke: var(--proof-green-deep)"
+        stroke-width="1"
+        d="M62 45 C 59 33, 67 25, 76 28 C 76 39, 70 45, 62 45 Z"
+      ></path>
+      <path
+        style="fill: var(--proof-green); stroke: var(--proof-green-deep)"
+        stroke-width="1"
+        stroke-linejoin="round"
+        d="M79 44 C 87 33, 99 28, 112 28 C 104 37, 95 43, 84 48 Z M81 48 C 93 44, 106 45, 118 50 C 106 55, 93 56, 81 52 Z M79 56 C 87 67, 99 72, 112 72 C 104 63, 95 57, 84 52 Z"
+      ></path>
+      <ellipse cx="80" cy="50" rx="4.5" ry="9" style="fill: var(--proof-green); stroke: var(--proof-green-deep)" stroke-width="1"></ellipse>
+    </svg>
+    <div class="proof-note-inner">
+      <p class="proof-note-hook" aria-hidden="true">{quote.hook}</p>
+      <blockquote class="proof-note-quote">“{quote.text}”</blockquote>
+    </div>
+    {mascot && <img class="proof-note-mascot" src={MASCOT} width="78" height="78" loading="lazy" decoding="async" alt="" />}
+  </div>
+  <figcaption class="proof-note-by">
+    {quote.stars && (
+      <>
+        <span class="proof-note-stars" role="img" aria-label="five stars">★★★★★</span>{' · '}
+      </>
+    )}
+    {listing ? (
+      <a href={listing} target="_blank" rel="noopener" data-cta="Proof: Store listing" data-cta-loc={loc}><b>{quote.name}</b></a>
+    ) : (
+      <b>{quote.name}</b>
+    )}{' · '}{quote.where}
+  </figcaption>
+</figure>
+
+<style>
+  .proof-note {
+    /* the beanstalk's palette (WorldsBeanstalk.astro), scoped to the note */
+    --proof-green: #3e8e52;
+    --proof-green-deep: #2d7742;
+    --proof-curl: #347f49;
+    --proof-leaf: #57a56a;
+    --proof-tint: #eef7f0;
+
+    margin: 0;
+    position: relative;
+    width: 100%;
+  }
+
+  .proof-note-body {
+    background: var(--proof-tint);
+    border: 1.5px solid var(--proof-green);
+    border-radius: 24px;
+    filter: drop-shadow(0 8px 14px rgb(44 62 80 / 13%)) drop-shadow(0 2px 3px rgb(31 87 48 / 12%));
+    position: relative;
+    transform: rotate(var(--tilt));
+  }
+
+  /* the handwritten open-quote in the top-left corner */
+  .proof-note-body::before {
+    color: var(--proof-green);
+    content: "\201C";
+    font-family: 'Caveat Variable', Caveat, cursive;
+    font-size: 2.75rem;
+    font-weight: 700;
+    left: 13px;
+    line-height: 1;
+    pointer-events: none;
+    position: absolute;
+    top: 2px;
+    z-index: 2;
+  }
+
+  /* stem + calyx + tendril, drawn at a fixed size so the stem never distorts */
+  .proof-note-calyx {
+    height: 100px;
+    left: -84px;
+    overflow: visible;
+    position: absolute;
+    top: calc(50% - 50px);
+    width: 120px;
+    z-index: 3;
+  }
+  .proof-note[data-stem='right'] .proof-note-calyx {
+    left: auto;
+    right: -84px;
+    transform: scaleX(-1);
+  }
+
+  .proof-note-inner {
+    padding: 18px 22px 16px 40px;
+    position: relative;
+    text-align: center;
+    z-index: 2;
+  }
+  .proof-note[data-stem='right'] .proof-note-inner {
+    padding: 18px 40px 16px 22px;
+  }
+
+  /* An explicit line-height, so the Caveat swap can change glyph widths but never the note's height. */
+  .proof-note-hook {
+    color: var(--heritage-orange, #f15d22);
+    font-family: 'Caveat Variable', Caveat, cursive;
+    font-size: 1.25rem;
+    font-weight: 700;
+    line-height: 1.1;
+    margin: 0 0 3px;
+  }
+  .proof-note-quote {
+    color: var(--deep-slate, #2c3e50);
+    font-family: 'Inter Variable', Inter, sans-serif;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    margin: 0;
+  }
+
+  /* the credit hangs under the note on a thread, like a seed tag */
+  .proof-note-by {
+    white-space: nowrap;
+    background: #fff;
+    border: 1px solid rgb(62 142 82 / 55%);
+    border-radius: 12px;
+    box-shadow: 0 3px 8px rgb(44 62 80 / 8%);
+    color: var(--muted-text, #4d5d6c);
+    display: block;
+    font-family: 'Inter Variable', Inter, sans-serif;
+    font-size: 0.75rem;
+    line-height: 1.4;
+    margin: 22px auto 0;
+    max-width: none;
+    padding: 7px 13px 4px;
+    position: relative;
+    text-align: center;
+    transform: rotate(calc(var(--tilt) * -1.4));
+    width: max-content;
+    z-index: 2;
+  }
+  /* the knot */
+  .proof-note-by::before {
+    background: var(--proof-green);
+    border-radius: 50%;
+    content: "";
+    height: 5px;
+    left: 50%;
+    margin-left: -2.5px;
+    position: absolute;
+    top: 3px;
+    width: 5px;
+  }
+  /* the thread */
+  .proof-note-by::after {
+    background: var(--proof-green);
+    border-radius: 1px;
+    bottom: calc(100% - 5px);
+    content: "";
+    height: 38px;
+    left: 50%;
+    margin-left: -0.75px;
+    position: absolute;
+    width: 1.5px;
+  }
+  .proof-note-by b {
+    color: var(--color-primary-700, #b33e15); /* brand primary-700: 12px text needs AA (5.81:1 on white); Heritage Orange is ~3.4:1 */
+    font-weight: 600;
+  }
+  .proof-note-by a {
+    color: inherit;
+    text-decoration: none;
+  }
+  .proof-note-by a:hover,
+  .proof-note-by a:focus-visible {
+    text-decoration: underline;
+    text-decoration-color: var(--heritage-orange, #f15d22);
+    text-underline-offset: 3px;
+  }
+  .proof-note-stars {
+    color: var(--heritage-orange, #f15d22);
+    font-size: 0.75rem;
+    letter-spacing: 0.5px;
+    margin-right: 1px;
+  }
+
+  /* the megaphone beanie, outside the far bottom corner, pointing into the note */
+  .proof-note-mascot {
+    bottom: -34px;
+    filter: drop-shadow(0 3px 4px rgb(44 62 80 / 18%));
+    height: 78px;
+    object-fit: contain;
+    position: absolute;
+    right: -52px;
+    width: 78px;
+    z-index: 4;
+  }
+  .proof-note[data-stem='right'] .proof-note-mascot {
+    left: -52px;
+    right: auto;
+    transform: scaleX(-1);
+  }
+
+  /* strip: the hero's smaller note (the mockup's .pn--mini; the hero wrapper owns its width) */
+  .proof-note[data-variant='strip'] .proof-note-inner {
+    padding: 12px 16px 10px 34px;
+  }
+  .proof-note[data-variant='strip'][data-stem='right'] .proof-note-inner {
+    padding: 12px 34px 10px 16px;
+  }
+  .proof-note[data-variant='strip'] .proof-note-hook {
+    font-size: 1.1rem;
+  }
+  .proof-note[data-variant='strip'] .proof-note-quote {
+    font-size: 0.8125rem;
+  }
+  .proof-note[data-variant='strip'] .proof-note-body::before {
+    font-size: 2.2rem;
+    left: 11px;
+    top: 0;
+  }
+  .proof-note[data-variant='strip'] .proof-note-by {
+    margin-top: 14px;
+  }
+  .proof-note[data-variant='strip'] .proof-note-by::after {
+    height: 24px;
+  }
+
+  @media (max-width: 760px) {
+    .proof-note-calyx {
+      height: 75px;
+      left: -63px;
+      top: calc(50% - 37px);
+      width: 90px;
+    }
+    .proof-note[data-stem='right'] .proof-note-calyx {
+      left: auto;
+      right: -63px;
+    }
+    /* phone: the credit tag is nearly as wide as the note, so the bottom corners are taken;
+       the beanie peeks over the top-right corner instead, facing into the note (never
+       mirrored: the art faces left). Clear of the calyx on a right stem (which sits at
+       mid-height) and of the open-quote mark (top-left). */
+    .proof-note-mascot,
+    .proof-note[data-stem='right'] .proof-note-mascot {
+      bottom: auto;
+      height: 60px;
+      left: auto;
+      right: -16px;
+      top: -44px;
+      transform: none;
+      width: 60px;
+    }
+  }
+</style>

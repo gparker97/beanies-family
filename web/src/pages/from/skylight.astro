@@ -11,6 +11,8 @@ import '../../styles/switch-page.css';
 // layer on top of the furniture rather than fighting it.
 import '../../styles/skylight-wall.css';
 import TrustBetaFree from '../../components/TrustBetaFree.astro';
+import ProofNote from '../../components/ProofNote.astro';
+import { proofQuote } from '../../lib/proof';
 
 /**
  * /from/skylight - the switching page for people who own, or are pricing, a
@@ -555,6 +557,8 @@ const PLUS_YEAR = '$79';
             <div class="mat"><span>oh hi, skylight friends 👋</span></div>
           </div>
         </div>
+
+        <div class="wall-proof"><div><ProofNote quote={proofQuote('aherndon-skylight')} stem="right" tilt={-2} mascot loc="welcome-skylight-hero" /></div></div>
 
         <div class="wall-switcher" role="group" aria-label="wall views">
           <button type="button" data-go="days" aria-pressed="true">

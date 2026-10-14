@@ -716,6 +716,15 @@
   color: var(--heritage-orange);
 }
 
+/* #135: a real-user note under the mat (second column, as the scene); padding-left is the calyx reserve */
+.welcome-page .hero-proof {
+  grid-column: 2;
+  justify-self: center;
+  margin-top: 34px;
+  max-width: 396px;
+  padding-left: 84px;
+}
+
 @media (width <= 860px) {
   .welcome-page .hero {
     padding-top: 88px;
@@ -739,6 +748,15 @@
 
   .welcome-page .scene {
     order: 2;
+  }
+
+  .welcome-page .hero-proof {
+    grid-column: auto;
+    justify-self: center;
+    margin-top: 12px; /* with the 38px grid gap, the 44px phone mascot clears the scene */
+    order: 3;
+    padding-left: 0;
+    width: min(100% - 84px, 300px);
   }
 }
 

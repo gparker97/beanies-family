@@ -941,6 +941,20 @@
 
 /* ── responsive ───────────────────────────────────────────────────────── */
 
+/* #135: a real-user note overlapping the room's floor; margin-left is the mascot's overhang, padding-right the calyx reserve */
+.welcome-page .wall-proof {
+  margin: -40px auto 0;
+  max-width: 940px;
+  position: relative;
+  z-index: 3;
+}
+
+.welcome-page .wall-proof > div {
+  margin-left: 52px;
+  max-width: 396px;
+  padding-right: 84px;
+}
+
 @media (width <= 980px) {
   .welcome-page .wall-shelf,
   .welcome-page .wall-cord,
@@ -972,6 +986,17 @@
 }
 
 @media (width <= 740px) {
+  .welcome-page .wall-proof {
+    margin-inline: -24px;
+    margin-top: 22px;
+  }
+
+  .welcome-page .wall-proof > div {
+    margin-left: 16px;
+    padding-right: 0;
+    width: min(100% - 100px, 300px);
+  }
+
   .welcome-page .wall-pair {
     gap: 12px;
     grid-template-columns: 1fr;
