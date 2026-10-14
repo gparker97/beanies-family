@@ -12,6 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
+- Home-screen widget on Android: a widget that kept showing yesterday's date after the phone's launcher dropped an update now rights itself within half an hour, and one widget the system refuses no longer stops the others from updating. The app also records which day the widgets painted, so a stuck widget can be told apart from a stuck launcher.
 - Creating a pod on the web: if the page reloads during the Google Drive step (a stuck or declined sign-in window), it now comes back to the storage step with an explanation instead of asking for your PIN again; the PIN is now the last step before your pod is created.
 
 ## 2026-10-13

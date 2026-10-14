@@ -28,7 +28,9 @@ function emit(level: LogLevel, message: string, context: Record<string, unknown>
 /**
  * A snapshot reached the native side. Emitted on EVERY success so the publish rate is
  * measurable. `detail` is always `tasks=<n>;ahead=<n>;kb=<n>`, plus `;skipped=<n>` only when
- * a part was dropped by a malformed record: filter on `skipped=`, never on `detail` existing.
+ * a part was dropped by a malformed record, plus `;day=<n>` only when the native side said
+ * which day it painted (Android): `day=0` is today, `day=-1` a widget still on yesterday.
+ * Filter on `skipped=` / `day=`, never on `detail` existing.
  */
 export function emitSnapshotPublished(payload: {
   reason: WidgetRefreshReason;
@@ -41,6 +43,8 @@ export function emitSnapshotPublished(payload: {
   /** The snapshot JSON's size, in whole kilobytes (rounded up). */
   kb: number;
   skipped: number;
+  /** Days from the app's today to the day the widgets painted (Android); absent on iOS. */
+  renderedDayOffset?: number;
 }): void {
   // Fixed `key=<int>` tokens only, so `detail` never carries free text. Enough to tell "the
   // widget is empty" apart: no rows today, no tasks, nothing ahead, or a part that threw.
@@ -49,6 +53,7 @@ export function emitSnapshotPublished(payload: {
     `ahead=${payload.aheadRows}`,
     `kb=${payload.kb}`,
     ...(payload.skipped > 0 ? [`skipped=${payload.skipped}`] : []),
+    ...(payload.renderedDayOffset !== undefined ? [`day=${payload.renderedDayOffset}`] : []),
   ].join(';');
   emit('info', 'snapshot published', {
     kind: payload.reason,

@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   "Your day" home-screen widget (#130). Default placement 4x2; resizable from 2x2 to 4x3 and
-  beyond (WidgetSizes classifies the placed size into the three layouts). updatePeriodMillis is 0:
-  the app's publish and the provider's own midnight / row-end alarm drive every refresh.
+  beyond (WidgetSizes classifies the placed size into the three layouts). The app's publish and
+  the provider's own midnight / row-end alarm drive every refresh; updatePeriodMillis (30 minutes,
+  the system minimum) only re-sends the current picture, so a launcher that dropped one update
+  heals on its own (DayWidgetProvider, THE BACKSTOP).
   targetCell*, previewLayout and widgetFeatures are Android 12+ and ignored below it.
 -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
@@ -19,7 +21,7 @@
     android:resizeMode="horizontal|vertical"
     android:targetCellWidth="4"
     android:targetCellHeight="2"
-    android:updatePeriodMillis="0"
+    android:updatePeriodMillis="1800000"
     android:widgetCategory="home_screen"
     android:widgetFeatures="reconfigurable|configuration_optional"
     tools:ignore="UnusedAttribute" />

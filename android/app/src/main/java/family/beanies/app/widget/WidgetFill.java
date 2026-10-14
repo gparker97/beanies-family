@@ -237,28 +237,11 @@ final class WidgetFill {
     static Plan plan(
             WidgetSnapshot s, WidgetPrefs prefs, WidgetSizes.Size size, float heightDp, long now) {
         if (s.days.isEmpty()) return null;
-        String todayYmd = ymd(now, 0);
-
-        int index = -1;
-        for (int i = 0; i < s.days.size(); i++) {
-            if (todayYmd.equals(s.days.get(i).ymd)) {
-                index = i;
-                break;
-            }
-        }
-        boolean stale = false;
-        if (index < 0) {
-            // No entry for today: keep the latest day before today and flag it stale. A snapshot
-            // entirely in the future (the clock moved back) shows its first day, unflagged.
-            for (int i = 0; i < s.days.size(); i++) {
-                if (s.days.get(i).ymd.compareTo(todayYmd) < 0) index = i;
-            }
-            if (index >= 0) {
-                stale = true;
-            } else {
-                index = 0;
-            }
-        }
+        int index = todayIndex(s, now);
+        // A negative index means no entry for today: the latest day before today is shown and
+        // flagged stale (the index is encoded as -(i + 1)).
+        boolean stale = index < 0;
+        if (stale) index = -index - 1;
         long generated = parseIso(s.generatedAt);
         if (generated > 0 && now - generated > STALE_AFTER_MS) stale = true;
 
@@ -300,6 +283,38 @@ final class WidgetFill {
         return new Plan(s, entry, day, isChild, isOur, stale, shown,
                 Collections.unmodifiableList(todayRows), Collections.unmodifiableList(later),
                 Collections.unmodifiableList(tasks), taskRows(size, heightDp, calendarDp));
+    }
+
+    /**
+     * The index of the entry every widget shows for `now`: today's entry when the snapshot has
+     * it; otherwise the latest day before today, returned as {@code -(index + 1)} so the caller
+     * can flag it stale; a snapshot entirely in the future (the clock moved back) shows its first
+     * day, unflagged. The snapshot must carry at least one day.
+     */
+    static int todayIndex(WidgetSnapshot s, long now) {
+        String todayYmd = ymd(now, 0);
+        for (int i = 0; i < s.days.size(); i++) {
+            if (todayYmd.equals(s.days.get(i).ymd)) return i;
+        }
+        int latestBefore = -1;
+        for (int i = 0; i < s.days.size(); i++) {
+            if (s.days.get(i).ymd.compareTo(todayYmd) < 0) latestBefore = i;
+        }
+        return latestBefore >= 0 ? -(latestBefore + 1) : 0;
+    }
+
+    /**
+     * The `ymd` the widgets painted from this read, or null when nothing dated was painted
+     * (signed out, unreadable, or a snapshot with no days). The plugin relays it so the firehose
+     * can tell "painted yesterday" from "painted today" without a device in hand.
+     */
+    static String renderedYmd(WidgetSnapshotStore.Result result, long now) {
+        if (result.state != WidgetSnapshotStore.State.READY || result.snapshot.days.isEmpty()) {
+            return null;
+        }
+        int index = todayIndex(result.snapshot, now);
+        if (index < 0) index = -index - 1;
+        return result.snapshot.days.get(index).ymd;
     }
 
     /** The calendar list's height: the nothing line or today's rows, then each later day. */

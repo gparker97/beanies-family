@@ -27,6 +27,12 @@ import family.beanies.app.R;
  * failure heals without the app). No exact alarm: a widget a few minutes late is fine. Alarms do
  * not survive a reboot; the host calls onUpdate after boot, which re-arms it.
  *
+ * THE BACKSTOP. `updatePeriodMillis` (widget_day_info.xml) also has the system call onUpdate about
+ * every 30 minutes. It is not what moves the date: it re-sends the current picture, so a launcher
+ * that dropped one update (seen on a Pixel 10 Pro, Android 17: the app published and painted the
+ * new day, the launcher kept showing the old one on a single instance until it was re-added)
+ * shows the right day within half an hour instead of until the next alarm or app open.
+ *
  * Not exported: the launcher's APPWIDGET_UPDATE / OPTIONS_CHANGED / DELETED / DISABLED come from
  * the system (which reaches a non-exported receiver), and RERENDER only from our own
  * PendingIntent, so no other app can drive a render.
@@ -78,9 +84,10 @@ public class DayWidgetProvider extends AppWidgetProvider {
     /**
      * Render every placed widget from one snapshot read and re-arm the alarm. Safe from any
      * thread (the plugin calls it from Capacitor's background thread); serialised so a publish
-     * and an alarm cannot interleave their updates.
+     * and an alarm cannot interleave their updates. Returns the `ymd` the widgets painted
+     * ({@link WidgetFill#renderedYmd}), or null when nothing dated was painted.
      */
-    public static void renderAll(Context context) {
+    public static String renderAll(Context context) {
         Context app = context.getApplicationContext();
         synchronized (LOCK) {
             AppWidgetManager manager = AppWidgetManager.getInstance(app);
@@ -106,12 +113,21 @@ public class DayWidgetProvider extends AppWidgetProvider {
                             app, id, size, widthDp, heightDp, prefs, textScale,
                             WidgetSnapshotStore.Result.unreadableForRender(), now);
                 }
-                manager.updateAppWidget(id, views);
-                if (size != WidgetSizes.Size.SMALL) {
-                    manager.notifyAppWidgetViewDataChanged(id, R.id.agenda_list);
+                try {
+                    manager.updateAppWidget(id, views);
+                    if (size != WidgetSizes.Size.SMALL) {
+                        manager.notifyAppWidgetViewDataChanged(id, R.id.agenda_list);
+                    }
+                } catch (RuntimeException e) {
+                    // One instance the system refuses must not stop the others from updating or
+                    // the alarm from re-arming (that left every widget on yesterday until the app
+                    // was opened). Relayed on the next publish as `reload_failed;<Exception>`.
+                    Log.w(TAG, "widget " + id + " update refused", e);
+                    WidgetPrefs.recordReadOutcome(app, "reload_failed;" + e.getClass().getSimpleName());
                 }
             }
             schedule(app, result, now, ids.length > 0);
+            return WidgetFill.renderedYmd(result, now);
         }
     }
 

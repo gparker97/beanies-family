@@ -47,12 +47,14 @@ public class WidgetBridgePlugin extends Plugin {
             call.reject("widget snapshot write failed: " + e.getClass().getSimpleName(), "write_failed", toException(e));
             return;
         }
-        String reloadFailure = render(context);
+        Render render = render(context);
 
         JSObject ret = new JSObject();
         JSObject counts = new JSObject();
         String placementsFailure = placements(context, counts);
         ret.put("placements", counts);
+        if (render.ymd != null) ret.put("renderedYmd", render.ymd);
+        String reloadFailure = render.failure;
         // Tokens are joined with '|', the separator the web side splits on (homeWidgetEvents).
         StringBuilder outcome = new StringBuilder();
         for (String token : new String[] {reloadFailure, placementsFailure, WidgetPrefs.takeReadOutcome(context)}) {
@@ -78,7 +80,7 @@ public class WidgetBridgePlugin extends Plugin {
         }
         // The file is gone, but the launcher keeps the last views until we re-render: a failed
         // re-render leaves the family's day on the home screen, so sign-out must hear about it.
-        String reloadFailure = render(context);
+        String reloadFailure = render(context).failure;
         if (reloadFailure != null) {
             call.reject(
                     "widget re-render after delete failed; family content may remain on the home screen ("
@@ -89,14 +91,25 @@ public class WidgetBridgePlugin extends Plugin {
         call.resolve();
     }
 
-    /** Re-render every placed widget; returns a `reload_failed;<token>` line on failure. */
-    private static String render(Context context) {
+    /** One re-render's outcome: the `ymd` painted (null if nothing dated), or the failure token. */
+    private static final class Render {
+        final String ymd;
+        /** A `reload_failed;<token>` line, or null on success. */
+        final String failure;
+
+        Render(String ymd, String failure) {
+            this.ymd = ymd;
+            this.failure = failure;
+        }
+    }
+
+    /** Re-render every placed widget. */
+    private static Render render(Context context) {
         try {
-            DayWidgetProvider.renderAll(context);
-            return null;
+            return new Render(DayWidgetProvider.renderAll(context), null);
         } catch (RuntimeException e) {
             android.util.Log.w("beanies-widget", "widget render after publish failed", e);
-            return "reload_failed;" + e.getClass().getSimpleName();
+            return new Render(null, "reload_failed;" + e.getClass().getSimpleName());
         }
     }
 

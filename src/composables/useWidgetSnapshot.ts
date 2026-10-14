@@ -12,7 +12,7 @@ import { useTodoStore } from '@/stores/todoStore';
 import { useTranslationStore } from '@/stores/translationStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { isFlagEnabled } from '@/config/flags';
-import { addDaysYmd } from '@/utils/date';
+import { addDaysYmd, daysBetweenYmd } from '@/utils/date';
 import { WIDGET_DAYS } from '@/types/widgetSnapshot';
 import { measureSync } from '@/utils/perfTiming';
 import { reportError } from '@/utils/errorReporter';
@@ -129,6 +129,16 @@ function logPlacementsOnChange(placements: WidgetPublishResult['placements']): v
 }
 
 /**
+ * Whole days from the app's `today` to the day the native widgets painted (`0` = today,
+ * `-1` = still on yesterday), or undefined when the native side reported none (iOS) or
+ * something that is not a `YYYY-MM-DD` day (never trusted into the firehose).
+ */
+function renderedDayOffset(today: string, renderedYmd: unknown): number | undefined {
+  if (typeof renderedYmd !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(renderedYmd)) return undefined;
+  return daysBetweenYmd(today, renderedYmd);
+}
+
+/**
  * Build, publish and log one snapshot. Never throws: every failure is reported here.
  * Exported so the not-ready guard and the failure paths are testable with a plain input.
  */
@@ -177,6 +187,7 @@ export async function publishWidgetSnapshot(
     aheadRows,
     kb: Math.ceil(new TextEncoder().encode(json).length / 1024),
     skipped,
+    renderedDayOffset: renderedDayOffset(input.today, result?.renderedYmd),
   });
   if (result?.readOutcome) emitReadOutcome(result.readOutcome);
   logPlacementsOnChange(result?.placements ?? {});

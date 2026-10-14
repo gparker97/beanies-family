@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { nextTick, ref } from 'vue';
 import { createPinia, setActivePinia } from 'pinia';
+import { addDaysYmd } from '@/utils/date';
 
 // `vi.mock` factories are hoisted above the module body, so everything they
 // close over must come from `vi.hoisted`.
@@ -332,6 +333,24 @@ describe('publishWidgetSnapshot: failures and relayed native state', () => {
     expect(events('widget read failed')).toEqual([
       { error_code: 'snapshot_unreadable', detail: 'decode_failed;v=2' },
       { error_code: 'snapshot_unreadable', detail: 'unrecognised' },
+    ]);
+  });
+
+  it('logs the day the Android widgets painted as an offset from today, and nothing for iOS', async () => {
+    plugin.publish.mockResolvedValueOnce({ placements: {}, renderedYmd: TODAY });
+    await publishWidgetSnapshot(widgetInput(), 'foreground', now);
+    plugin.publish.mockResolvedValueOnce({ placements: {}, renderedYmd: addDaysYmd(TODAY, -1) });
+    await publishWidgetSnapshot(widgetInput(), 'foreground', now);
+    plugin.publish.mockResolvedValueOnce({ placements: {} });
+    await publishWidgetSnapshot(widgetInput(), 'foreground', now);
+    plugin.publish.mockResolvedValueOnce({ placements: {}, renderedYmd: 'not a day' });
+    await publishWidgetSnapshot(widgetInput(), 'foreground', now);
+
+    expect(events('snapshot published').map((c) => c.detail)).toEqual([
+      expect.stringMatching(/;day=0$/),
+      expect.stringMatching(/;day=-1$/),
+      expect.not.stringMatching(/day=/),
+      expect.not.stringMatching(/day=/),
     ]);
   });
 

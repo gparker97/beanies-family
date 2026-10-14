@@ -17,6 +17,14 @@ export interface WidgetPublishResult {
    * `homeWidgetEvents.emitReadOutcome` re-validates it before logging.
    */
   readOutcome?: string;
+  /**
+   * Android only: the `YYYY-MM-DD` day the placed widgets painted from this publish (the
+   * provider's own pick of "today" from the snapshot), or absent when nothing dated was
+   * painted. iOS paints from a timeline on its own clock and never reports one. The
+   * publisher logs it as a day offset from the app's `today`, so a widget stuck on
+   * yesterday is visible in the firehose without a device in hand.
+   */
+  renderedYmd?: string;
 }
 
 export interface WidgetBridgePlugin {
