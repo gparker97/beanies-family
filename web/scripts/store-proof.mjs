@@ -246,6 +246,9 @@ async function main() {
   const { dryRun, playOverride, deadlineSeconds } = readFlags();
 
   // The previous file first: a corrupt one is reported, never silently overwritten.
+  // Developer/deploy-run script. DATA_FILE is the one constant URL above, resolved from this
+  // module's own location; no user or network input reaches these paths.
+  // eslint-disable-next-line security/detect-non-literal-fs-filename
   const previous = parseStoreProof(JSON.parse(await readFile(DATA_FILE, 'utf8')));
 
   const deadline = Date.now() + deadlineSeconds * 1000;
@@ -339,11 +342,13 @@ async function main() {
     process.stdout.write(body);
     return;
   }
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- DATA_FILE constant, see above
   const current = await readFile(DATA_FILE, 'utf8');
   if (current === body) {
     console.log(`${fileURLToPath(DATA_FILE)} unchanged`);
     return;
   }
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- DATA_FILE constant, see above
   await writeFile(DATA_FILE, body);
   console.log(`Wrote ${fileURLToPath(DATA_FILE)}`);
 }

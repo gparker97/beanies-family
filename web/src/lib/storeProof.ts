@@ -63,7 +63,10 @@ function isCount(v: unknown): v is number {
 /** YYYY-MM-DD (optionally followed by an ISO time) that names a real day. */
 function isIsoDate(v: unknown): v is string {
   return (
-    typeof v === 'string' && /^\d{4}-\d{2}-\d{2}(T.*)?$/.test(v) && !Number.isNaN(Date.parse(v))
+    typeof v === 'string' &&
+    /^\d{4}-\d{2}-\d{2}/.test(v) &&
+    (v.length === 10 || v[10] === 'T') &&
+    !Number.isNaN(Date.parse(v))
   );
 }
 
