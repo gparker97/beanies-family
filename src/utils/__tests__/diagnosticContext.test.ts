@@ -3,9 +3,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 // Stores are mocked so `enrichAndRedact`'s top-level store imports resolve.
 // Each store read is independently try/caught, so missing/throwing stores
 // just produce a less-rich (but still valid) context.
-vi.mock('@/stores/familyStore', () => ({
-  useFamilyStore: vi.fn(() => ({ members: [] })),
-}));
 vi.mock('@/stores/familyContextStore', () => ({
   useFamilyContextStore: vi.fn(() => ({ activeFamilyId: null, activeFamilyName: null })),
 }));
@@ -106,14 +103,12 @@ describe('diagnosticContext', () => {
       expect(warnSpy).not.toHaveBeenCalled();
     });
 
-    it('preserves email as the only PII', () => {
+    it('keeps the family name and id', () => {
       const result = redactContext({
-        family_email: 'greg@example.com',
         family_name: 'Robinsons',
         family_id: 'fam_123',
       });
       expect(result).toEqual({
-        family_email: 'greg@example.com',
         family_name: 'Robinsons',
         family_id: 'fam_123',
       });
@@ -161,21 +156,8 @@ describe('diagnosticContext', () => {
     });
   });
 
-  describe('enrichAndRedact — includeEmail gating', () => {
-    it('includes family_email only when includeEmail is true', async () => {
-      const famMod = await import('@/stores/familyStore');
-      vi.mocked(famMod.useFamilyStore).mockReturnValue({
-        members: [{ role: 'owner', email: 'owner@example.com' }],
-      } as never);
-
-      const withEmail = enrichAndRedact({ surface: 's' }, { includeEmail: true });
-      expect(withEmail.family_email).toBe('owner@example.com');
-
-      const withoutEmail = enrichAndRedact({ surface: 's' }, { includeEmail: false });
-      expect(withoutEmail.family_email).toBeUndefined();
-    });
-
-    it('includes family_name only when includeEmail is true (PII stays off the firehose)', async () => {
+  describe('enrichAndRedact — includeFamilyName gating', () => {
+    it('includes family_name only when includeFamilyName is true (critical reports only)', async () => {
       const ctxMod = await import('@/stores/familyContextStore');
       // mockReturnValueOnce ×2 — self-cleaning, one read per enrichAndRedact call
       vi.mocked(ctxMod.useFamilyContextStore)
@@ -185,13 +167,13 @@ describe('diagnosticContext', () => {
           activeFamilyName: 'Robinsons',
         } as never);
 
-      // Slack error path: user-typed family name (PII) is included alongside email
-      const slackPath = enrichAndRedact({ surface: 's' }, { includeEmail: true });
-      expect(slackPath.family_name).toBe('Robinsons');
-      expect(slackPath.family_id).toBe('fam-uuid');
+      // Critical report: the user-typed family name (PII) is included so the page names it
+      const critical = enrichAndRedact({ surface: 's' }, { includeFamilyName: true });
+      expect(critical.family_name).toBe('Robinsons');
+      expect(critical.family_id).toBe('fam-uuid');
 
-      // Telemetry firehose: family_name must NOT ship; only the random family_id correlates
-      const firehose = enrichAndRedact({ surface: 's' }, { includeEmail: false });
+      // Everything else: family_name must NOT ship; only the random family_id correlates
+      const firehose = enrichAndRedact({ surface: 's' }, { includeFamilyName: false });
       expect(firehose.family_name).toBeUndefined();
       expect(firehose.family_id).toBe('fam-uuid');
     });
@@ -229,10 +211,10 @@ describe('diagnosticContext', () => {
 
     it('stamps the open attempt id on both paths', () => {
       setCreateAttempt({ id: 'attempt-uuid', startedAt: Date.now(), step: 'storage' });
-      expect(enrichAndRedact({ surface: 's' }, { includeEmail: false }).create_attempt_id).toBe(
-        'attempt-uuid'
-      );
-      expect(enrichAndRedact({ surface: 's' }, { includeEmail: true }).create_attempt_id).toBe(
+      expect(
+        enrichAndRedact({ surface: 's' }, { includeFamilyName: false }).create_attempt_id
+      ).toBe('attempt-uuid');
+      expect(enrichAndRedact({ surface: 's' }, { includeFamilyName: true }).create_attempt_id).toBe(
         'attempt-uuid'
       );
     });

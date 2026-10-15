@@ -55,6 +55,7 @@ import {
   onTokenAcquired,
   fetchGoogleUserEmail,
   isSilentRefreshPending,
+  isInteractiveOAuthPending,
   isTokenValid,
   isUserCancellation,
   whenRedirectAuthSettled,
@@ -70,6 +71,7 @@ import {
 import { logTokenLifecycle } from '@/services/google/googleRevoke';
 import { buildSilentRefreshAlertContext } from '@/services/google/silentRefreshAlertContext';
 import { reportError } from '@/utils/errorReporter';
+import { severityFor } from '@/utils/pagingPolicy';
 import { cacheFailureCause } from '@/utils/cacheFailureCause';
 import { useTranslationStore } from '@/stores/translationStore';
 import { logEvent } from '@/services/telemetry/logEvent';
@@ -92,7 +94,7 @@ import {
   DriveApiError,
 } from '@/services/google/driveService';
 import {
-  POD_ACCESS_SEVERITY,
+  POD_ACCESS_ERRORS,
   classifyDriveFailure,
   driveStatusOf,
   evaluatePodMetadata,
@@ -1140,31 +1142,95 @@ export const useSyncStore = defineStore('sync', () => {
   let configHealTotalFailureReported = false;
   let configHealTokenUnsub: (() => void) | null = null;
 
-  function showBannerWithTelemetry(deferred: boolean): void {
-    showSaveFailureBanner.value = true;
+  // ─── Save-failure handling ───────────────────────────────────────────────
+  //
+  // `handleSaveFailureChange` runs only on LEVEL TRANSITIONS, so anything that
+  // needs the failure current at a later moment reads `syncService.getLastSaveCause()`
+  // then, rather than trusting the cause that crossed the threshold.
+
+  // When the banner was last actually SHOWN (not suppressed); null otherwise. Drives
+  // the `recovered` event, so time-to-recover and the recovery rate are measurable.
+  let saveBannerShownAt: number | null = null;
+
+  function currentSaveErrorCode(): string {
+    return syncService.saveErrorCode(syncService.getLastSaveCause());
+  }
+
+  /** critical -> none: log `recovered` if the banner had been shown. */
+  function noteBannerRecovered(prev: SaveFailureLevel, level: SaveFailureLevel): void {
+    if (prev === 'critical' && level === 'none' && saveBannerShownAt !== null) {
+      logEvent({
+        level: 'info',
+        surface: 'save-failure-banner',
+        message: 'recovered',
+        context: { perf_duration_ms: Date.now() - saveBannerShownAt },
+      });
+    }
+    if (level !== 'critical') saveBannerShownAt = null;
+  }
+
+  // A banner raised while outranked (`showBannerWithTelemetry`'s suppressed path) has no
+  // `saveBannerShownAt`, so when the toast or pod-access banner later clears and it
+  // appears, stamp it here; otherwise that reveal logs no `shown` and no `recovered`.
+  watch(shouldShowSaveFailureBanner, (visible, wasVisible) => {
+    if (!visible || wasVisible) return;
+    if (saveFailureLevel.value !== 'critical' || saveBannerShownAt !== null) return;
+    saveBannerShownAt = Date.now();
     reportError({
       surface: 'save-failure-banner',
-      // The save-failure banner is surfaced to the user — their data isn't
-      // saving (data at risk). Already debounced/escalated, so paging here is signal.
-      severity: 'critical',
+      severity: 'error',
+      message: 'banner revealed after the surface outranking it cleared',
+      context: { action: 'shown-revealed', error_code: currentSaveErrorCode() },
+    });
+  });
+
+  function showBannerWithTelemetry(deferred: boolean): void {
+    showSaveFailureBanner.value = true;
+    if (!shouldShowSaveFailureBanner.value) {
+      // Raised but outranked (banner precedence above): the toast or the pod-access
+      // banner already owns this problem, so this is a decision, not an alarm.
+      logEvent({
+        level: 'warn',
+        surface: 'save-failure-banner',
+        message: 'banner suppressed',
+        context: {
+          action: showGoogleReconnect.value ? 'suppressed-reconnect' : 'suppressed-pod-access',
+          error_code: currentSaveErrorCode(),
+        },
+      });
+      return;
+    }
+    saveBannerShownAt = Date.now();
+    // `error`, not `critical`: the banner is the user's own signal and carries its recovery.
+    reportError({
+      surface: 'save-failure-banner',
+      severity: 'error',
       message: deferred
         ? 'banner shown after deferred recovery window'
         : 'banner shown immediately (no recovery in flight)',
-      context: { lastSaveError: lastSaveError.value, deferred },
+      context: {
+        action: deferred ? 'shown-deferred' : 'shown',
+        error_code: currentSaveErrorCode(),
+      },
     });
   }
 
   function handleSaveFailureChange(level: SaveFailureLevel, failError: string | null): void {
+    const prev = saveFailureLevel.value;
     saveFailureBannerDefer.cancel();
     saveFailureLevel.value = level;
     lastSaveError.value = failError;
+
+    noteBannerRecovered(prev, level);
 
     if (level !== 'critical') {
       showSaveFailureBanner.value = false;
       return;
     }
 
-    if (!isSilentRefreshPending()) {
+    // A silent refresh, a native browser-sheet trip or the web consent popup can
+    // each clear the failure on their own; alarming mid-consent is noise.
+    if (!isSilentRefreshPending() && !isInteractiveOAuthPending()) {
       showBannerWithTelemetry(false);
       return;
     }
@@ -1397,6 +1463,8 @@ export const useSyncStore = defineStore('sync', () => {
     // App.vue's load pipeline runs; a transient failure re-arms silently (Layer 2).
     const ctx = useFamilyContextStore();
     const familyId = ctx.activeFamilyId;
+    // No `isAuthenticated` gate: a registry miss (the discarded family) only warns now, and the gate
+    // dropped a real heal once a sealed session expired (same-family sign-in skips `initialize()`).
     if (familyId && useAuthStore().podCreated) {
       // boot=true: App.vue's path-1b load runs right after this returns and owns the
       // load + resume-setup navigation, so the heal must not also load (double-fetch).
@@ -4800,9 +4868,9 @@ export const useSyncStore = defineStore('sync', () => {
 
       reportError({
         surface: 'cold-start-reconnect-escalation',
-        // Cold-start data load is stuck and the user must reconnect — they can't
-        // reach their data. Already deferred past the recovery window, so fatal.
-        severity: 'critical',
+        // The user is shown the reconnect prompt and recovers with one tap, so it
+        // does not page (2026-10-15 paging policy); the rate stays in CloudWatch.
+        severity: 'error',
         message:
           'Cold-start data load stuck on auth-transient (silent refresh failed); ' +
           `banner surfaced after ${COLD_START_RECONNECT_DEFER_MS}ms defer window. ` +
@@ -5567,12 +5635,13 @@ export const useSyncStore = defineStore('sync', () => {
     }
     stopFilePolling();
     saveFailureBannerDefer.cancel();
+    saveBannerShownAt = null;
     coldStartReconnectDefer.cancel();
     reconnectEscalationPending.value = false;
     needsResumeSetupNav.value = false;
     // Silent-config-heal teardown — cancel the retry timer, drop its dedicated
     // token subscriber, reset the budget/flags + the once-per-family total-failure
-    // guard so a different family can heal (and page) cleanly on next sign-in.
+    // guard so a different family can heal cleanly on next sign-in.
     configHealDefer.cancel();
     if (configHealTokenUnsub) {
       configHealTokenUnsub();
@@ -5900,9 +5969,9 @@ export const useSyncStore = defineStore('sync', () => {
   }
 
   /**
-   * The ONE logging call site for pod access. Level/severity comes from
-   * `POD_ACCESS_SEVERITY`, so "which codes page Slack" is data in one table
-   * rather than a policy scattered across fifteen `reportError` calls.
+   * The ONE logging call site for pod access. Level/severity comes from the
+   * registry's `impact` through `severityFor`, so "which codes page Slack" is data
+   * in one table rather than a policy scattered across fifteen `reportError` calls.
    *
    * The success path logs too — deliberately. A failure-only event cannot tell you
    * a failure RATE, and not being able to measure the rate is why this bug went a
@@ -5924,10 +5993,10 @@ export const useSyncStore = defineStore('sync', () => {
       provider_type,
       file_id_tail: tail(syncService.getProvider()?.getFileId() ?? null),
     };
-    if (POD_ACCESS_SEVERITY[result.code] === 'critical') {
+    const pair = severityFor('pod-access', POD_ACCESS_ERRORS[result.code].impact);
+    if (pair.severity === 'critical') {
       reportError({
-        surface: 'pod-access',
-        severity: 'critical',
+        ...pair,
         message: `pod access failed: ${result.code}`,
         error: thrown ?? result.error,
         context,
@@ -6007,9 +6076,20 @@ export const useSyncStore = defineStore('sync', () => {
     }
   }
 
-  /** Non-retryable / budget-exhausted terminal: surface the reconnect affordance
-   *  (Layer 3) and page ONCE (mirrors the `zombieStateReported` once-guard). */
-  function configHealTotalFailure(registryProvider: string | null, hadFileId: boolean): void {
+  /**
+   * Terminal heal failure: surface the reconnect affordance (Layer 3). Two causes, told apart
+   * because only one is a failure worth an `error` record:
+   *  - `no-registry-home`: the registry has no Drive home to heal from (not found, a local pod,
+   *    or a Drive entry with no fileId). Usually the family the person just discarded with
+   *    Start over, or one that never finished onboarding. A `warn`, countable by rate.
+   *  - `budget-exhausted`: a Drive home exists but could not be reinstalled within the retry
+   *    budget. Reported ONCE at `error` (mirrors the `zombieStateReported` once-guard).
+   */
+  function configHealTotalFailure(
+    registryProvider: string | null,
+    hadFileId: boolean,
+    cause: 'no-registry-home' | 'budget-exhausted'
+  ): void {
     reconnecting.value = false;
     // A review-demo session runs entirely in memory: it never installs a durable
     // storage provider and never registers, so the config-heal has nothing to
@@ -6029,11 +6109,25 @@ export const useSyncStore = defineStore('sync', () => {
       return;
     }
     configHealFailed.value = true;
+    if (cause === 'no-registry-home') {
+      logEvent({
+        level: 'warn',
+        // Same surface as the budget-exhausted report, so one filter holds every terminal outcome.
+        surface: 'sync-config-total-failure',
+        message: 'no registry home to heal from',
+        context: {
+          action: 'no-registry-home',
+          registry_had_file_id: hadFileId,
+          provider_type: registryProvider ?? undefined,
+        },
+      });
+      return;
+    }
     if (!configHealTotalFailureReported) {
       configHealTotalFailureReported = true;
       reportError({
         surface: 'sync-config-total-failure',
-        severity: 'critical',
+        severity: 'error',
         message: 'could not re-establish the data connection — user must reconnect',
         context: {
           provider_type: registryProvider ?? undefined,
@@ -6047,7 +6141,7 @@ export const useSyncStore = defineStore('sync', () => {
   /** Re-arm the heal while the budget is unspent; otherwise it's a total failure. */
   function scheduleConfigHealRetry(familyId: string, errorCode: string): void {
     if (configHealAttempts >= CONFIG_HEAL_RETRY_BUDGET) {
-      configHealTotalFailure('google_drive', true);
+      configHealTotalFailure('google_drive', true, 'budget-exhausted');
       return;
     }
     configHealAttempts += 1;
@@ -6118,7 +6212,7 @@ export const useSyncStore = defineStore('sync', () => {
         // Registry has no Drive home for this family (unknown, or a local pod we
         // can't re-derive remotely) → non-retryable. The user reconnects/loads
         // manually via the Layer-3 affordance.
-        configHealTotalFailure(entry?.provider ?? null, !!entry?.fileId);
+        configHealTotalFailure(entry?.provider ?? null, !!entry?.fileId, 'no-registry-home');
         return false;
       }
 
@@ -6151,7 +6245,7 @@ export const useSyncStore = defineStore('sync', () => {
       // family's pod as this family's storage, and the next save would overwrite it
       // (a multi-family user's other pod). Surface reconnect/total-failure and let the
       // user re-establish it explicitly — never auto-adopt an unverified file.
-      configHealTotalFailure('google_drive', false);
+      configHealTotalFailure('google_drive', false, 'no-registry-home');
       return false;
     } finally {
       configHealInFlight = false;
@@ -6771,12 +6865,11 @@ export const useSyncStore = defineStore('sync', () => {
     } catch (e) {
       const code = classifyDriveFailure(e);
       console.warn('[syncStore] rebindPodFile failed:', (e as Error).message);
-      // A failed rebind is a user action that failed with data at risk — the
-      // family is loaded and visible but still not saving anywhere it should.
+      // A failed rebind is reported through the registry impact; degraded codes warn, since
+      // the picker can be retried.
       reportError({
-        surface: 'pod-access',
-        // From the table, not hardcoded: "please update beanies" must not page.
-        severity: POD_ACCESS_SEVERITY[code],
+        // From the registry's impact, not hardcoded: "please update beanies" must not page.
+        ...severityFor('pod-access', POD_ACCESS_ERRORS[code].impact),
         message: 'rebind to the family pod file failed',
         error: e,
         context: {

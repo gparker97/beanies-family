@@ -726,6 +726,9 @@ const saveAttemptCallbacks: SaveAttemptCallback[] = [];
 
 let consecutiveFailures = 0;
 let lastSaveError: string | null = null;
+// The thrown value behind `lastSaveError`, kept so a subscriber can classify the failure that is
+// current when it asks (the transition callback only names the one that crossed the threshold).
+let lastSaveCause: unknown = null;
 let saveFailureLevel: SaveFailureLevel = 'none';
 
 function updateSaveFailureLevel(): void {
@@ -760,13 +763,15 @@ function notifySaveAttempt(): void {
 function recordSaveSuccess(): void {
   consecutiveFailures = 0;
   lastSaveError = null;
+  lastSaveCause = null;
   updateSaveFailureLevel();
   notifySaveAttempt();
 }
 
-function recordSaveFailure(error: string): void {
+function recordSaveFailure(error: string, cause?: unknown): void {
   consecutiveFailures++;
   lastSaveError = error;
+  lastSaveCause = cause ?? null;
   updateSaveFailureLevel();
   notifySaveAttempt();
 }
@@ -781,10 +786,24 @@ export function getLastSaveError(): string | null {
   return lastSaveError;
 }
 
+/** Get the thrown value behind the last save failure (null after a success or reset). */
+export function getLastSaveCause(): unknown {
+  return lastSaveCause;
+}
+
+/**
+ * The `error_code` a failed save is classified by: the remote blocker's code, else the error's
+ * class name. Shared by the `sync-save` event and the store's banner telemetry.
+ */
+export function saveErrorCode(e: unknown): string {
+  return isRemoteBlocker(e) ? e.blockCode : e instanceof Error ? e.name : 'unknown';
+}
+
 /** Reset save failure state (call after successful reconnect). */
 export function resetSaveFailures(): void {
   consecutiveFailures = 0;
   lastSaveError = null;
+  lastSaveCause = null;
   updateSaveFailureLevel();
   notifySaveAttempt();
 }
@@ -2699,7 +2718,7 @@ async function doSave(opts: SaveOptions = {}): Promise<boolean> {
   } catch (e) {
     const errorMsg = (e as Error).message;
     updateState({ isSyncing: false, lastError: errorMsg });
-    recordSaveFailure(errorMsg);
+    recordSaveFailure(errorMsg, e);
     // ONE event per failed save, classified by phase, so a single `sync-save` filter
     // gives the refusal and failure rates (audit C4/C12).
     const httpStatus = e instanceof DriveApiError ? e.status : undefined;
@@ -2720,7 +2739,7 @@ async function doSave(opts: SaveOptions = {}): Promise<boolean> {
       error: e instanceof Error ? e : undefined,
       context: {
         action,
-        error_code: isRemoteBlocker(e) ? e.blockCode : e instanceof Error ? e.name : 'unknown',
+        error_code: saveErrorCode(e),
         ...(httpStatus !== undefined ? { http_status: httpStatus } : {}),
         provider_type: provider.type,
         ...writePerf(),
@@ -3244,7 +3263,7 @@ export function triggerDebouncedSave(): void {
     }
     save().catch((err) => {
       console.warn('[syncService] Auto-save failed:', err);
-      recordSaveFailure((err as Error).message ?? 'Auto-save failed');
+      recordSaveFailure((err as Error).message ?? 'Auto-save failed', err);
     });
   }, DEBOUNCE_MS);
 }

@@ -11,6 +11,7 @@ import FatalErrorOverlay from '@/components/common/FatalErrorOverlay.vue';
 import InstallPrompt from '@/components/common/InstallPrompt.vue';
 import { usePwaUpdater, PWA_POST_UPDATE_ROUTE_KEY } from '@/composables/usePwaUpdater';
 import { useAppUpdate } from '@/composables/useAppUpdate';
+import { useInitWatchdog } from '@/composables/useInitWatchdog';
 import { usePassphraseNudge } from '@/composables/usePassphraseNudge';
 import { installNativeAuthListener } from '@/services/google/googleAuth';
 import { installInboundLinkListener } from '@/services/share/inboundLinkBridge';
@@ -59,6 +60,7 @@ import { useEnsurePhotosPublic } from '@/composables/useEnsurePhotosPublic';
 import { usePhotoStore } from '@/stores/photoStore';
 import { formatDeviceInfo } from '@/utils/diagnostics';
 import { reportError } from '@/utils/errorReporter';
+import { severityFor } from '@/utils/pagingPolicy';
 import { beginOpen, setOpenPath, endOpen } from '@/services/telemetry/openCycle';
 import type { OpenToken } from '@/services/telemetry/openCycle';
 import {
@@ -1156,6 +1158,7 @@ const INIT_TIMEOUTS = {
   // (redirect-auth completion is now bounded inside googleAuth.ensureRedirectAuthSettled)
   dataLoad: 30_000, // dismiss the data skeleton; loading continues in the background
   watchdog: 35_000, // last resort: flip isInitializing false + show the recovery overlay
+  watchdogFollowUp: 60_000, // after a firing: page only if init is still unsettled and visible
 } as const;
 
 onMounted(async () => {
@@ -1191,24 +1194,36 @@ onMounted(async () => {
     });
   }
 
-  // Watchdog: if init never settles (a downstream await hangs before the
-  // data-load timeout can fire), flip out of "counting beans" into the EXISTING
-  // recovery overlay rather than freezing forever. Cleared in the finally on any
-  // resolution; only fires when the body genuinely never completes.
-  const initWatchdog = setTimeout(() => {
-    if (isChunkRecoveryInProgress()) return; // a hardReload is already swapping the page
-    if (!isInitializing.value && !isLoadingData.value) return; // already settled
-    console.error('[App] init watchdog fired — setup stalled; surfacing recovery overlay');
-    setGenericInitError(t('app.initError.stalled'), initBreadcrumbs.join('\n'));
-    isInitializing.value = false;
-    isLoadingData.value = false;
-    reportError({
-      surface: 'app.onboardingStallTimeout',
-      message: `App init stalled — watchdog fired after ${INIT_TIMEOUTS.watchdog}ms`,
-      severity: 'critical',
-      context: { route_path: route.path },
-    });
-  }, INIT_TIMEOUTS.watchdog);
+  // Watchdog: if the shell never becomes visible (a downstream await hangs before
+  // the data-load timeout is even armed), flip out of "counting beans" into the
+  // EXISTING recovery overlay rather than freezing forever. Cleared where the
+  // shell becomes visible (the data-load timeout owns the rest) and in the
+  // finally. The first firing reports at `error`; only a stall that is still
+  // unsettled `watchdogFollowUp` later, with the page visible throughout, pages.
+  // `initWatchdog.settle()` clears the overlay if init completes after a firing.
+  const initWatchdog = useInitWatchdog({
+    firstMs: INIT_TIMEOUTS.watchdog,
+    followUpMs: INIT_TIMEOUTS.watchdogFollowUp,
+    breadcrumbs: () => initBreadcrumbs,
+    routePath: () => route.path,
+    isStandingDown: isChunkRecoveryInProgress, // a hardReload is already swapping the page
+    onFire: () => {
+      setGenericInitError(t('app.initError.stalled'), initBreadcrumbs.join('\n'));
+      isInitializing.value = false;
+      isLoadingData.value = false;
+    },
+    // Only these two. A payload failure that landed after the firing has been
+    // mirrored into `initError` by the fatal-store watcher, so it is the overlay
+    // now, not the stall message: leave it painted.
+    onLateSettle: () => {
+      if (fatalErrorStore.message) return;
+      initError.value = null;
+      initErrorDetail.value = null;
+    },
+  });
+  // Set by the catch. Every OTHER exit (completion or an early return) settles the
+  // watchdog from the finally, so a stall overlay never outlives a working page.
+  let initThrew = false;
   try {
     // Ensure initial route is resolved before checking route names
     await router.isReady();
@@ -1404,10 +1419,9 @@ onMounted(async () => {
         ]);
         const code = stashResumeReasonFor(e);
         reportError({
-          surface: 'app.redirectAuthCompletion',
+          ...severityFor('app.redirectAuthCompletion', CREATE_DRIVE_ERRORS[code].impact),
           message: `Redirect-auth code exchange failed during app init: ${msg}`,
           error: e,
-          severity: CREATE_DRIVE_ERRORS[code].severity,
           context: { route_path: route.path, error_code: code },
         });
         // The create funnel's web consent exit (#128). The callback page already logged
@@ -1469,7 +1483,7 @@ onMounted(async () => {
           surface: 'app.onboardingZombieState',
           message:
             'App boot found an authenticated session with no pod file — routing to resume-setup',
-          severity: 'critical',
+          severity: 'error',
           // ⚠️ `path`, NEVER `fullPath`. `fullPath` is path + query + HASH, and a shared
           // recipe carries the ENTIRE RECIPE in its hash (#92) — shipping it would put
           // private recipe content in the firehose for 90 days and break the guarantee
@@ -1547,6 +1561,7 @@ onMounted(async () => {
     // Step 4: Dismiss full-screen spinner — app shell can now render.
     // Data loading continues with skeleton/progress bar in the content area.
     isInitializing.value = false;
+    initWatchdog.clear(); // the shell is up; the data-load timeout owns the rest
     initBreadcrumbs.push('shell: app shell visible, loading data...');
 
     // Step 5: Load family data from the active per-family DB
@@ -1581,6 +1596,11 @@ onMounted(async () => {
         console.warn('[App] loadFamilyData completed after timeout — data is now available');
       }
     }
+    // Init has landed. Settled HERE, before the health check rather than at the
+    // end of the try body: the health check may paint its own (true) `noData`
+    // overlay, which a later clear would wipe, and its suppressed branches
+    // return early, which would leave a stale stall overlay over visible data.
+    initWatchdog.settle();
 
     // Post-init health check: verify the Automerge doc is loaded
     let docLoaded = false;
@@ -1727,6 +1747,7 @@ onMounted(async () => {
 
     refreshExchangeRatesIfNeeded();
   } catch (err) {
+    initThrew = true;
     // Stale-chunk symptom — a dynamic `await import()` during init either
     // rejected with one of the standard chunk-load shapes OR resolved to
     // `null`, which then made the destructure throw a TypeError. Both are
@@ -1803,7 +1824,10 @@ onMounted(async () => {
     // Init resolved (success, early return, or error) — the watchdog is no
     // longer needed. (If the body instead WEDGED forever, this finally never
     // runs and the watchdog fires — exactly the freeze it exists to break.)
-    clearTimeout(initWatchdog);
+    // An early return (`/welcome`, resume-setup) is a completion too; a no-op
+    // when the data-load path already settled.
+    if (!initThrew) initWatchdog.settle();
+    initWatchdog.clear();
     // Always dismiss loading states, even on early return or error —
     // EXCEPT when a chunk-load `hardReload()` is in flight. Keep the
     // initial spinner visible until `location.replace()` swaps the page,

@@ -1,8 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-vi.mock('@/stores/familyStore', () => ({
-  useFamilyStore: vi.fn(() => ({ members: [{ role: 'owner', email: 'owner@example.com' }] })),
-}));
 vi.mock('@/stores/familyContextStore', () => ({
   useFamilyContextStore: vi.fn(() => ({
     activeFamilyId: 'fam-uuid',
@@ -54,14 +51,19 @@ describe('logEvent', () => {
     expect(record.build_sha).toBe('test-sha');
   });
 
-  it('never includes family_email or family_name (PII-free firehose) even though both exist', () => {
+  it('omits family_name by default', () => {
     logEvent({ level: 'info', surface: 's', message: 'm' });
     const record = enqueueSpy.mock.calls[0][0];
-    // Both PII fields are gated behind includeEmail (the Slack path); the
-    // firehose passes includeEmail:false and correlates by the random family_id.
-    expect(record.family_email).toBeUndefined();
+    // family_name is gated behind includeFamilyName (critical reports only); the
+    // rest of the stream correlates by the random family_id.
     expect(record.family_name).toBeUndefined();
     expect(record.family_id).toBe('fam-uuid');
+  });
+
+  it('adds family_name only when includeFamilyName is set', () => {
+    logEvent({ level: 'error', surface: 's', message: 'm', includeFamilyName: true });
+    const record = enqueueSpy.mock.calls[0][0];
+    expect(record.family_name).toBe('Robinsons');
   });
 
   it('drops non-allowlisted context keys', () => {

@@ -112,12 +112,12 @@ describe('submitFeedback — delivery telemetry', () => {
     expect(arg.context).toEqual({ action: 'dropped_no_webhook' });
   });
 
-  it('pages critical when the POST fails at the network layer', async () => {
+  it('reports at error (no page) when the POST fails at the network layer', async () => {
     slackPostMock.mockResolvedValue({ outcome: 'network_error', error: new Error('offline') });
     submitFeedback({ score: 4 });
     await settle();
     const [arg] = reportErrorMock.mock.calls[0];
-    expect(arg.severity).toBe('critical');
+    expect(arg.severity).toBe('error');
     expect(arg.context).toEqual({ action: 'network_error' });
   });
 
@@ -129,7 +129,7 @@ describe('submitFeedback — delivery telemetry', () => {
     await settle();
     expect(reportErrorMock).toHaveBeenCalledTimes(1);
     const [arg] = reportErrorMock.mock.calls[0];
-    expect(arg.severity).toBe('critical');
+    expect(arg.severity).toBe('error');
     expect(arg.surface).toBe('feedback-submit');
     expect(arg.context).toEqual({ action: 'build_error' });
     // The raw feedback text must never reach the error/telemetry pipeline.

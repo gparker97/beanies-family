@@ -11,7 +11,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import {
   POD_ACCESS_ERRORS,
-  POD_ACCESS_SEVERITY,
   classifyDriveFailure,
   evaluatePodMetadata,
   isDriveStorageFull,
@@ -219,28 +218,25 @@ describe('POD_ACCESS_ERRORS registry', () => {
     // ⚠️ A loop over a hand-written list is not an exhaustiveness test. A code
     // added to the registry but not to this array was checked by nothing.
     expect([...ALL_CODES].sort()).toEqual(Object.keys(POD_ACCESS_ERRORS).sort());
-    expect([...ALL_CODES].sort()).toEqual(Object.keys(POD_ACCESS_SEVERITY).sort());
   });
 
-  it('has an entry and a severity for every code', () => {
+  it('has an entry, a banner tint and an impact for every code', () => {
     for (const code of ALL_CODES) {
       expect(POD_ACCESS_ERRORS[code], code).toBeDefined();
-      expect(POD_ACCESS_SEVERITY[code], code).toMatch(/^(warning|critical)$/);
+      expect(POD_ACCESS_ERRORS[code].severity, code).toMatch(/^(warning|critical)$/);
+      expect(POD_ACCESS_ERRORS[code].impact, code).toMatch(
+        /^(data-at-risk|journey-blocked|security|degraded)$/
+      );
     }
   });
 
-  it('agrees with itself about severity', () => {
-    for (const code of ALL_CODES) {
-      expect(POD_ACCESS_ERRORS[code].severity, code).toBe(POD_ACCESS_SEVERITY[code]);
-    }
-  });
-
-  it('treats transient failures as warnings and data-at-risk as critical', () => {
-    expect(POD_ACCESS_SEVERITY.OFFLINE).toBe('warning');
-    expect(POD_ACCESS_SEVERITY.VERIFY_UNAVAILABLE).toBe('warning');
-    // A member writing to a non-canonical pod is live data divergence.
-    expect(POD_ACCESS_SEVERITY.CANONICAL_MISMATCH).toBe('critical');
-    expect(POD_ACCESS_SEVERITY.NO_HOME).toBe('critical');
+  it('pages only for data divergence (the 2026-10-15 paging policy)', () => {
+    // A member writing to a non-canonical pod is live data divergence; every other code is
+    // shown to the person with a recovery and does not page.
+    const paging = ALL_CODES.filter((c) => POD_ACCESS_ERRORS[c].impact !== 'degraded');
+    expect(paging).toEqual(['CANONICAL_MISMATCH']);
+    // The banner tint is unchanged: NO_HOME still renders red.
+    expect(POD_ACCESS_ERRORS.NO_HOME.severity).toBe('critical');
   });
 
   it('NEVER offers a recovery that creates a new file', () => {
@@ -276,7 +272,7 @@ describe('classifyDriveFailure and a file from a newer beanies', () => {
     );
   });
   it('does not page for it, and offers no recovery button', () => {
-    expect(POD_ACCESS_SEVERITY.FILE_NEWER_VERSION).toBe('warning');
+    expect(POD_ACCESS_ERRORS.FILE_NEWER_VERSION.impact).toBe('degraded');
     expect(POD_ACCESS_ERRORS.FILE_NEWER_VERSION.recoveries).toEqual([]);
   });
   it('still reads a plain offline failure as OFFLINE', () => {

@@ -24,6 +24,7 @@ import * as docOps from '../docOps';
 import * as cache from '../cache';
 import * as ap from '../applyAndProject';
 import { foldDoc } from '../counterFields';
+import { FENCE_GIVE_UP_MERGES } from '../protocol';
 import { seeded, apply } from './twoDevices';
 
 const FAMILY = 'r3-family';
@@ -269,6 +270,76 @@ async function seedOrphanRow(): Promise<{
   );
   return { remote, orphan };
 }
+
+describe('2026-10-15: the merge says whether the remote supplied the missing deps', () => {
+  it("'missing' when the remote lacks them too, once per open; absent when unfenced", async () => {
+    const { remote } = await seedOrphanRow();
+    await reload();
+    await ap.initAndLoadCache(FAMILY);
+    const first = await ap.mergeRemoteEnvelope(remote, FAMILY, BASELINE);
+    expect(first).toMatchObject({
+      action: 'merged',
+      fenceDepsAfterMerge: 'missing',
+      fenceMerges: 1,
+    });
+    // Already answered this open: a 10s poll must not report it again.
+    const second = await ap.mergeRemoteEnvelope(remote, FAMILY, BASELINE);
+    expect(second.fenceDepsAfterMerge).toBeUndefined();
+  });
+
+  it("'delivered' when the remote holds the deps the waiting row needs", async () => {
+    ap.initDoc();
+    await ap.openCache(FAMILY);
+    setTodo('a');
+    await ap.flush();
+    const d0 = loadDoc(ap.exportSnapshot().binary);
+    const d1 = Automerge.change(d0, (d) => {
+      (d.todos as Record<string, unknown>).b = { id: 'b', title: 'b' };
+    });
+    const d2 = Automerge.change(d1, (d) => {
+      (d.todos as Record<string, unknown>).c = { id: 'c', title: 'c' };
+    });
+    await putRaw(
+      'inc:000000000900:othertab',
+      bufferToBase64(await encryptPayload(key, frameChanges(getChangesSince(d2, getHeads(d1)))))
+    );
+    await reload();
+    expect((await ap.initAndLoadCache(FAMILY)).replay).toMatchObject({ missingDeps: 1 });
+    const res = await ap.mergeRemoteEnvelope(await envelopeOf(d1), FAMILY, BASELINE);
+    expect(res).toMatchObject({
+      action: 'merged',
+      fenceDepsAfterMerge: 'delivered',
+      fenceMerges: 0,
+    });
+    expect(liveTodos()).toEqual(['a', 'b', 'c']);
+  });
+
+  it('a clean open never carries the field', async () => {
+    ap.initDoc();
+    await ap.openCache(FAMILY);
+    setTodo('a');
+    await ap.flush();
+    const remote = await envelopeOf(loadDoc(ap.exportSnapshot().binary));
+    await reload();
+    await ap.initAndLoadCache(FAMILY);
+    const res = await ap.mergeRemoteEnvelope(remote, FAMILY, BASELINE);
+    expect(res.fenceDepsAfterMerge).toBeUndefined();
+    expect(res.fenceMerges).toBeUndefined();
+  });
+
+  it('the second fenced session that still misses carries fenceMerges = FENCE_GIVE_UP_MERGES', async () => {
+    const { remote } = await seedOrphanRow();
+    const counts: Array<number | undefined> = [];
+    for (let i = 0; i < FENCE_GIVE_UP_MERGES; i++) {
+      await reload();
+      await ap.initAndLoadCache(FAMILY);
+      counts.push((await ap.mergeRemoteEnvelope(remote, FAMILY, BASELINE)).fenceMerges);
+      await ap.flush();
+    }
+    // First session warns (the remote may only be behind); the second is the one main pages.
+    expect(counts).toEqual([1, FENCE_GIVE_UP_MERGES]);
+  });
+});
 
 describe('round 3, item 6: damaged replay rows are reported once and leave replay', () => {
   it('a skipped row is quarantined and reported only on the open that found it', async () => {

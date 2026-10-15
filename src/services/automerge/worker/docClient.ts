@@ -27,7 +27,7 @@ import { exportFamilyKey } from '@/services/crypto/familyKeyService';
 import { withTimeout } from '@/utils/timing';
 import { deviceActorId } from '@/services/automerge/deviceActor';
 import { acquireActorLease, releaseActorLease } from '@/services/automerge/actorLease';
-import { wasHiddenSince } from '@/utils/visibilityTracker';
+import { ensureVisibilityTracking, wasHiddenSince } from '@/utils/visibilityTracker';
 import { record as recordPerf } from '@/utils/perfTiming';
 import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry/logEvent';
@@ -54,6 +54,7 @@ import {
   reconstructError,
   DocWorkerError,
   WorkerCrashError,
+  FENCE_GIVE_UP_MERGES,
   type RpcRequest,
   type RpcResponse,
   type WorkerSignal,
@@ -1167,9 +1168,8 @@ async function awaitWithSuspensionAwareDeadline<T>(
   extendWhile?: () => boolean
 ): Promise<T> {
   const TIMED_OUT = Symbol('timed-out');
-  // Register the lazy visibility listener BEFORE any hidden transition during
-  // this wait (wasHiddenSince registers it on first call).
-  wasHiddenSince(Date.now());
+  // Register the lazy visibility listener BEFORE any hidden transition during this wait.
+  ensureVisibilityTracking();
   const firstArmedAt = Date.now();
   let cappedExtensions = 0;
   let totalExtensions = 0;
@@ -1788,10 +1788,12 @@ export async function initAndLoadCache(familyId: string): Promise<InitAndLoadRes
  * Report what a cache replay did (C5c, data-layer audit 2026-10-03). ON THE SUCCESS PATH TOO,
  * so the rate of damaged replays is measurable.
  *
- * Round 3: `critical` (Slack) only on the FIRST sighting of a damaged row (`newlyReported`,
+ * Round 3: `critical` (Slack) only on the FIRST sighting of a DROPPED row (`newlyReported`,
  * which the worker keeps in a marker row; a skipped row is quarantined and never comes back).
- * A row already reported, a replaced base (`corruptBaseReplaced`: the live document became the
- * cache, nothing was lost) and a stale-lineage cache are logged at `warn`, never paged.
+ * Rows waiting on missing deps alone are `warn` (2026-10-15): the merge decides whether they
+ * page. A row already reported, a replaced base (`corruptBaseReplaced`: the live document
+ * became the cache, nothing was lost) and a stale-lineage cache are logged at `warn`, never
+ * paged.
  */
 function logCacheReplay(replay: CacheReplay, familyId: string): void {
   const detail =
@@ -1857,9 +1859,13 @@ function logCacheReplay(replay: CacheReplay, familyId: string): void {
         : replay.baseReseeded
           ? 'base-reseeded'
           : 'corrupt-base-replaced';
-  // An older worker that does not report `newlyReported` keeps today's paging.
-  const firstSighting = damaged && (replay.newlyReported ?? 1) > 0;
-  if (firstSighting) {
+  // An older worker that does not report `newlyReported` is treated as a first sighting.
+  const newSighting = (replay.newlyReported ?? 1) > 0;
+  // Pages only for a DROPPED row: an edit this cache held and could not apply may exist
+  // nowhere else. Rows waiting on missing deps are kept and usually heal from the remote;
+  // whether the remote actually has those deps is answered after the merge
+  // (`fenceDepsAfterMerge`, `deps-missing-after-merge`), and that is where it pages.
+  if (replay.droppedIncrements > 0 && newSighting) {
     reportError({
       surface: 'cache-replay',
       message: 'cache replay could not apply every increment',
@@ -1872,9 +1878,12 @@ function logCacheReplay(replay: CacheReplay, familyId: string): void {
     logEvent({
       level: 'warn',
       surface: 'cache-replay',
-      message: damaged
-        ? 'cache replay still holds rows already reported'
-        : 'cache base replaced from the live document',
+      message:
+        errorCode === 'missing-deps' && newSighting
+          ? 'cache replay waiting on missing deps'
+          : damaged
+            ? 'cache replay still holds rows already reported'
+            : 'cache base replaced from the live document',
       context: { ...context, error_code: errorCode },
     });
     return;
@@ -2093,6 +2102,7 @@ export async function mergeRemoteEnvelope(
       if (res.rebaseUnavailable)
         noteRebaseUnavailable(familyId, res.action, res.rebaseConflictKind);
       noteRemovedMembersCarried(res, familyId);
+      noteFenceDepsAfterMerge(res, familyId);
       noteDocInstalled();
       bumpOpenCycle('reconstruction');
       return res;
@@ -2101,6 +2111,7 @@ export async function mergeRemoteEnvelope(
   }
   if (res.rebaseUnavailable) noteRebaseUnavailable(familyId, res.action, res.rebaseConflictKind);
   noteRemovedMembersCarried(res, familyId);
+  noteFenceDepsAfterMerge(res, familyId);
   // The worker installed a document for this family, so whatever we knew about
   // an empty cache is stale. (`kept-local` too: it kept a document it holds.) A plain merge or
   // a kept-local leaves every acknowledged write in the document, so the anchor stays.
@@ -2261,6 +2272,39 @@ function noteRemovedMembersCarried(res: MergeOutcome, familyId: string | null): 
       detail: `rows_deleted=${res.removedMembers.rowsDeleted}`,
       ...(familyId ? { family_id: familyId } : {}),
     },
+  });
+}
+
+/**
+ * The second half of a missing-deps cache replay (2026-10-15). `logCacheReplay` only warns for
+ * rows waiting on missing deps, because the remote usually has them; the first merge of the
+ * session answers whether it did. Still missing after it means the waiting edits rest on
+ * changes neither this cache nor the family file holds YET: on the first such session the
+ * remote may simply be behind another device that holds the deps and has not pushed, so that
+ * warns. It pages only once FENCE_GIVE_UP_MERGES sessions in a row have missed, the point at
+ * which the next open gives the fence up. Delivered is the success-path counter that makes
+ * the rate measurable.
+ */
+function noteFenceDepsAfterMerge(res: MergeOutcome, familyId: string | null): void {
+  if (!res.fenceDepsAfterMerge) return;
+  const familyCtx = familyId ? { family_id: familyId } : {};
+  const merges = res.fenceMerges ?? 0;
+  const detail = `deps=${res.fenceDepsAfterMerge},merges=${merges}`;
+  if (res.fenceDepsAfterMerge === 'missing') {
+    const context = { action: 'deps-missing-after-merge', detail, ...familyCtx };
+    const message = 'cache replay deps still missing after remote merge';
+    if (merges >= FENCE_GIVE_UP_MERGES) {
+      reportError({ surface: 'cache-replay', severity: 'critical', message, context });
+    } else {
+      logEvent({ level: 'warn', surface: 'cache-replay', message, context });
+    }
+    return;
+  }
+  logEvent({
+    level: 'info',
+    surface: 'cache-replay',
+    message: 'cache replay deps delivered by remote merge',
+    context: { action: 'deps-delivered-by-merge', detail, ...familyCtx },
   });
 }
 

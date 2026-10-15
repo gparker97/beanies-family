@@ -33,7 +33,11 @@ import {
 import { getActiveFamilyId } from '@/services/indexeddb/database';
 import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry';
-import { DriveConsentDeniedError, OAuthRoundTripAbandonedError } from '@/types/sync';
+import {
+  DriveConsentDeniedError,
+  OAuthRoundTripAbandonedError,
+  type OAuthAbandonReason,
+} from '@/types/sync';
 import { withTimeout } from '@/utils/timing';
 import { Browser } from '@capacitor/browser';
 import { App as CapacitorApp, type URLOpenListenerEvent } from '@capacitor/app';
@@ -113,6 +117,10 @@ let currentFamilyId: string | null = null;
 // but generate different PKCE verifiers — the first listener catches the code
 // meant for the second verifier, causing "Invalid code verifier" errors.
 let pendingAuthPromise: Promise<string> | null = null;
+/** True from the moment `requestAccessToken` opens the consent popup until it closes or hands off.
+ *  `pendingAuthPromise` is only assigned after the silent attempts, while the popup is already
+ *  on screen, so `isInteractiveOAuthPending` reads this too. */
+let interactivePopupOpen = false;
 
 // Cached Google account email. `cachedEmailToken` records the ACCESS TOKEN the
 // email was verified against via userinfo — so a primed guess (from persisted
@@ -1112,38 +1120,45 @@ export async function requestAccessToken(options?: {
   // Only open when there's no cached token (checked above) and we may need
   // interactive auth. Throws synchronously if popup is blocked.
   const popup = openBlankPopup();
-
-  // Try silent refresh first (if we have a refresh token)
-  if (currentRefreshToken && !options?.chooseAccount) {
-    const silentToken = await attemptSilentRefresh();
-    if (silentToken) {
-      // Don't need the popup after all — close it
-      if (!popup.closed) popup.close();
-      return silentToken;
-    }
-  }
-
-  // Try silent auth-code (handles the Marketplace-installed case where
-  // scopes are pre-granted at install time). forceConsent skips this —
-  // the caller is explicitly asking for a fresh consent flow.
-  if (!wantsFreshGrant) {
-    const silentToken = await attemptSilentAuthCode(clientId);
-    if (silentToken) {
-      if (!popup.closed) popup.close();
-      return silentToken;
-    }
-  }
-
-  const promise = performPopupAuth(clientId, popup, options);
-  pendingAuthPromise = promise;
+  interactivePopupOpen = true;
 
   try {
-    return await promise;
-  } finally {
-    // Only clear if this is still the active promise
-    if (pendingAuthPromise === promise) {
-      pendingAuthPromise = null;
+    // Try silent refresh first (if we have a refresh token)
+    if (currentRefreshToken && !options?.chooseAccount) {
+      const silentToken = await attemptSilentRefresh();
+      if (silentToken) {
+        // Don't need the popup after all — close it
+        if (!popup.closed) popup.close();
+        return silentToken;
+      }
     }
+
+    // Try silent auth-code (handles the Marketplace-installed case where
+    // scopes are pre-granted at install time). forceConsent skips this —
+    // the caller is explicitly asking for a fresh consent flow.
+    if (!wantsFreshGrant) {
+      const silentToken = await attemptSilentAuthCode(clientId);
+      if (silentToken) {
+        if (!popup.closed) popup.close();
+        return silentToken;
+      }
+    }
+
+    const promise = performPopupAuth(clientId, popup, options);
+    pendingAuthPromise = promise;
+
+    try {
+      return await promise;
+    } finally {
+      // Only clear if this is still the active promise
+      if (pendingAuthPromise === promise) {
+        pendingAuthPromise = null;
+      }
+    }
+  } finally {
+    // Every exit: a silent success closed the popup, and `waitForAuthCode` closes it on its own
+    // settle, so the consent window is no longer this call's to wait on.
+    interactivePopupOpen = false;
   }
 }
 
@@ -1576,6 +1591,17 @@ function classifySilentRefreshError(e: unknown): SilentRefreshAttemptDiagnostic[
  */
 export function isSilentRefreshPending(): boolean {
   return pendingSilentRefresh !== null;
+}
+
+/**
+ * Whether an interactive OAuth round trip is in flight: a native browser-sheet trip that has not
+ * settled, or the web consent popup (open from `openBlankPopup` onwards, before the single-flight
+ * promise exists). Read beside `isSilentRefreshPending` so the
+ * save-failure banner does not alarm while the user is mid-consent. A full-page redirect leaves
+ * the document, so it needs no flag.
+ */
+export function isInteractiveOAuthPending(): boolean {
+  return liveTrip() !== null || pendingAuthPromise !== null || interactivePopupOpen;
 }
 
 /**
@@ -3212,7 +3238,7 @@ function liveTrip(): NativeTrip | null {
   return nativeTrip && !nativeTrip.settled ? nativeTrip : null;
 }
 
-function abandoned(reason: 'declined' | 'dismissed'): NativeOAuthOutcome {
+function abandoned(reason: OAuthAbandonReason): NativeOAuthOutcome {
   return { kind: 'failed', error: new OAuthRoundTripAbandonedError(reason) };
 }
 
@@ -3391,6 +3417,25 @@ export async function handleNativeAuthRedirect(
   const transport = nativeOAuthTransport(url);
   if (!transport) return;
 
+  // A SECOND delivery of a return the live trip already has. Android delivers `appUrlOpen` twice
+  // ~330 ms apart; the first delivery has already handed the code to the exchange, which removed
+  // the pending-auth stash, so letting this one through would read "nothing pending" and settle a
+  // trip that is about to succeed as failed. Ignore it: the first delivery owns the settle.
+  //
+  // ⚠️ READ THE RETAINED TRIP, NOT `liveTrip()`. The picker and calendar arms settle synchronously
+  // after `Browser.close()`, well inside Android's ~330 ms re-delivery, so by the time the
+  // duplicate lands the trip is settled and `liveTrip()` is null. A settled trip stays in
+  // `nativeTrip` until the next arm, and its `returned` flag still says "this return was taken".
+  if (nativeTrip?.returned) {
+    logEvent({
+      level: 'info',
+      surface: 'native-oauth',
+      message: 'duplicate return ignored',
+      context: { action: 'duplicate_return' },
+    });
+    return;
+  }
+
   // ⚠️ BEFORE THE BODY, which closes the sheet: our own `Browser.close()` must never be read as a
   // dismissal by the closed-sheet listeners.
   markNativeReturn();
@@ -3450,10 +3495,7 @@ async function completeNativeAuthRedirect(
       message: 'deep link with no pending auth — ignored',
       context: { action: 'no_pending' },
     });
-    return {
-      kind: 'failed',
-      error: new Error('No Google sign-in was pending when the return arrived'),
-    };
+    return abandoned('no-pending');
   }
 
   // The stash is attacker-reachable state now that a custom scheme can invoke
@@ -3471,10 +3513,7 @@ async function completeNativeAuthRedirect(
       message: 'pending-auth stash was unparseable — cleared, no exchange attempted',
       context: { action: 'stash_unparseable' },
     });
-    return {
-      kind: 'failed',
-      error: new Error('No Google sign-in was pending when the return arrived'),
-    };
+    return abandoned('no-pending');
   }
 
   // CSRF: the echoed state must match what we stored. Mismatch ⇒ discard.

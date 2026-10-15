@@ -15,7 +15,6 @@ const ALL_ENV_KEYS = [
   'VITE_INVITE_BEAN_HASHES',
   'VITE_INVITE_WEBHOOK_URL',
   'VITE_SLACK_WEBHOOK_URL',
-  'VITE_BEANIES_ERROR_WEBHOOK_URL',
   'VITE_FEEDBACK_WEBHOOK_URL',
   'VITE_MARKETING_URL',
   'VITE_PLAUSIBLE_DOMAIN',
@@ -110,9 +109,8 @@ describe('config/features', () => {
     });
 
     it('single-var features derive directly from their env vars', async () => {
-      const cases: Array<[string, 'slackPodCreate' | 'errorReporter' | 'analytics']> = [
+      const cases: Array<[string, 'slackPodCreate' | 'analytics']> = [
         ['VITE_SLACK_WEBHOOK_URL', 'slackPodCreate'],
-        ['VITE_BEANIES_ERROR_WEBHOOK_URL', 'errorReporter'],
         ['VITE_PLAUSIBLE_DOMAIN', 'analytics'],
       ];
 

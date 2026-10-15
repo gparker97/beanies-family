@@ -18,6 +18,7 @@ vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: vi.fn() }));
 // suspension-aware deadline behaves exactly like a plain timeout unless a test
 // overrides the implementation (see the suspension-aware describe below).
 vi.mock('@/utils/visibilityTracker', () => ({
+  ensureVisibilityTracking: vi.fn(),
   wasHiddenSince: vi.fn(() => false),
   getHiddenDurationMs: vi.fn(() => null),
 }));

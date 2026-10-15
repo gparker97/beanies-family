@@ -19,6 +19,7 @@ vi.mock('../../projection', () => ({
 vi.mock('@/utils/errorReporter', () => ({ reportError: vi.fn() }));
 vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: vi.fn() }));
 vi.mock('@/utils/visibilityTracker', () => ({
+  ensureVisibilityTracking: vi.fn(),
   wasHiddenSince: vi.fn(() => false),
   getHiddenDurationMs: vi.fn(() => null),
 }));
@@ -431,6 +432,164 @@ describe('round 3, item 6: the cache-replay event pages only on a first sighting
         family_id: 'fam',
       },
     });
+  });
+});
+
+describe('2026-10-15: cache-replay pages only for dropped rows; the merge pages missing deps', () => {
+  const replayWith = (replay: Record<string, unknown>) =>
+    useWorkers([
+      (req) =>
+        req.method === 'initAndLoadCache'
+          ? ok(req, { loaded: true, remoteBaseline: null, replay })
+          : null,
+    ]);
+  const critical = () =>
+    vi.mocked(reportError).mock.calls.filter(([e]) => e.severity === 'critical');
+
+  it('dropped>0, new>0: critical dropped-increments', async () => {
+    replayWith({
+      recovered: true,
+      droppedIncrements: 1,
+      missingDeps: 1,
+      incrementCount: 3,
+      newlyReported: 1,
+    });
+    await initAndLoadCache('fam');
+    expect(critical()).toHaveLength(1);
+    expect(critical()[0]![0]).toMatchObject({
+      surface: 'cache-replay',
+      message: 'cache replay could not apply every increment',
+      context: { action: 'cache-replay', error_code: 'dropped-increments' },
+    });
+    expect(eventsWith('cache-replay')).toHaveLength(0);
+  });
+
+  it('missing_deps>0, dropped=0, new>0: warn "waiting on missing deps", never a page', async () => {
+    replayWith({
+      recovered: true,
+      droppedIncrements: 0,
+      missingDeps: 1,
+      incrementCount: 3,
+      newlyReported: 3,
+    });
+    await initAndLoadCache('fam');
+    expect(critical()).toHaveLength(0);
+    expect(eventsWith('cache-replay')).toEqual([
+      expect.objectContaining({
+        level: 'warn',
+        message: 'cache replay waiting on missing deps',
+        context: expect.objectContaining({
+          error_code: 'missing-deps',
+          detail: 'recovered=true,dropped=0,missing_deps=1,increments=3,new=3',
+        }),
+      }),
+    ]);
+  });
+
+  it('missing_deps>0, dropped=0, new=0: warn "already reported"', async () => {
+    replayWith({
+      recovered: true,
+      droppedIncrements: 0,
+      missingDeps: 1,
+      incrementCount: 3,
+      newlyReported: 0,
+    });
+    await initAndLoadCache('fam');
+    expect(critical()).toHaveLength(0);
+    expect(eventsWith('cache-replay')).toEqual([
+      expect.objectContaining({
+        level: 'warn',
+        message: 'cache replay still holds rows already reported',
+        context: expect.objectContaining({ error_code: 'missing-deps' }),
+      }),
+    ]);
+  });
+
+  const mergeWith = (extra: Record<string, unknown>) =>
+    useWorkers([
+      (req) =>
+        req.method === 'mergeRemoteEnvelope'
+          ? ok(req, {
+              action: 'merged',
+              heads: ['m'],
+              dirty: false,
+              changed: true,
+              remoteHeads: ['m'],
+              ...extra,
+            })
+          : null,
+    ]);
+
+  it("fenceDepsAfterMerge 'missing' on the first fenced merge: warn, never a page", async () => {
+    // The remote may only be behind a device that holds the deps and has not pushed yet.
+    mergeWith({ fenceDepsAfterMerge: 'missing', fenceMerges: 1 });
+    await mergeRemoteEnvelope(ENVELOPE, 'fam', { kind: 'baseline', heads: ['h'] });
+    expect(reportError).not.toHaveBeenCalled();
+    expect(eventsWith('deps-missing-after-merge')).toEqual([
+      {
+        level: 'warn',
+        surface: 'cache-replay',
+        message: 'cache replay deps still missing after remote merge',
+        context: {
+          action: 'deps-missing-after-merge',
+          detail: 'deps=missing,merges=1',
+          family_id: 'fam',
+        },
+      },
+    ]);
+  });
+
+  it("fenceDepsAfterMerge 'missing' at FENCE_GIVE_UP_MERGES: critical deps-missing-after-merge", async () => {
+    mergeWith({ fenceDepsAfterMerge: 'missing', fenceMerges: 2 });
+    await mergeRemoteEnvelope(ENVELOPE, 'fam', { kind: 'baseline', heads: ['h'] });
+    expect(critical()).toEqual([
+      [
+        {
+          surface: 'cache-replay',
+          severity: 'critical',
+          message: 'cache replay deps still missing after remote merge',
+          context: {
+            action: 'deps-missing-after-merge',
+            detail: 'deps=missing,merges=2',
+            family_id: 'fam',
+          },
+        },
+      ],
+    ]);
+    expect(eventsWith('deps-missing-after-merge')).toHaveLength(0);
+    expect(eventsWith('deps-delivered-by-merge')).toHaveLength(0);
+  });
+
+  it("fenceDepsAfterMerge 'missing' with no fenceMerges (an older worker): warn, merges=0", async () => {
+    mergeWith({ fenceDepsAfterMerge: 'missing' });
+    await mergeRemoteEnvelope(ENVELOPE, 'fam', { kind: 'baseline', heads: ['h'] });
+    expect(reportError).not.toHaveBeenCalled();
+    expect(eventsWith('deps-missing-after-merge')).toEqual([
+      expect.objectContaining({
+        level: 'warn',
+        context: expect.objectContaining({ detail: 'deps=missing,merges=0' }),
+      }),
+    ]);
+  });
+
+  it("fenceDepsAfterMerge 'delivered': info deps=delivered, no page", async () => {
+    mergeWith({ fenceDepsAfterMerge: 'delivered', fenceMerges: 0 });
+    await mergeRemoteEnvelope(ENVELOPE, 'fam', { kind: 'baseline', heads: ['h'] });
+    expect(reportError).not.toHaveBeenCalled();
+    expect(eventsWith('deps-delivered-by-merge')).toEqual([
+      expect.objectContaining({
+        level: 'info',
+        surface: 'cache-replay',
+        context: expect.objectContaining({ detail: 'deps=delivered,merges=0', family_id: 'fam' }),
+      }),
+    ]);
+  });
+
+  it('no fenceDepsAfterMerge: neither', async () => {
+    mergeWith({});
+    await mergeRemoteEnvelope(ENVELOPE, 'fam', { kind: 'baseline', heads: ['h'] });
+    expect(reportError).not.toHaveBeenCalled();
+    expect(eventsWith('deps-delivered-by-merge')).toHaveLength(0);
   });
 });
 

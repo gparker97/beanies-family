@@ -9,6 +9,7 @@ import { installOnboardingAttempt } from './services/telemetry/onboardingAttempt
 import { readInstallReferrerOnce } from './utils/installReferrer';
 import { getPlatform } from '@/services/sync/capabilities';
 import { reportError } from './utils/errorReporter';
+import { vueErrorSeverity } from './utils/vueErrorSeverity';
 import { isChunkLoadError, startChunkRecovery } from './utils/hardReload';
 import { isIdbTransientError } from './utils/idbTransient';
 import { isBenignBrowserError } from './utils/benignBrowserError';
@@ -67,15 +68,18 @@ app.use(router);
 // ─── Global error reporting (Layers B + C from the plan) ─────────────────────
 // Layer A — error toasts auto-report via the `useToast` wrapper. These two
 // layers cover everything else: Vue render exceptions and unhandled JS errors.
-// All three layers route through the same `reportError` utility, which owns
-// dedup, allowlist enforcement, and the Slack POST.
+// All three layers route through the same `reportError` utility, the typed
+// severity gate in front of the telemetry firehose (the Lambda decides paging).
 
 // Vue render / lifecycle errors
 app.config.errorHandler = (err, instance, info) => {
   reportError({
     surface: 'vue-render',
-    // A Vue render/lifecycle throw breaks the UI (blank/broken component) — fatal.
-    severity: 'critical',
+    // A throw in setup, render, update or a lifecycle hook breaks the component (blank or
+    // half-built), so it pages; a throw in an event handler or watcher leaves the component
+    // working and one interaction failed, so it does not. `vueErrorSeverity` reads Vue's `info`,
+    // and never pages a stale-chunk load (it self-heals through the chunk recovery below).
+    severity: vueErrorSeverity(info, err),
     message: err instanceof Error ? err.message : String(err),
     error: err,
     context: {
@@ -100,8 +104,10 @@ window.addEventListener('error', (event) => {
   }
   reportError({
     surface: 'unhandled-error',
-    // An uncaught synchronous error escaped every call-site catch — fatal.
-    severity: 'critical',
+    // An uncaught synchronous error escaped every call-site catch. It does not page: with no
+    // call site it says nothing about user impact, and a fatal failure is reported `critical`
+    // where it is caught. The firehose rate (and the client_error alarm) still sees it.
+    severity: 'error',
     message: event.message || 'Uncaught error',
     error: event.error,
   });

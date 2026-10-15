@@ -2,7 +2,8 @@
  * Structured-error view derivation — the shared half of the ADR-024 pattern.
  *
  * The pattern is: a frozen registry maps every error *code* to one i18n message
- * key, an ordered list of recovery actions, and a severity. A view then derives
+ * key, an ordered list of recovery actions, a severity (the banner tint) and an
+ * impact (the paging policy, read by `severityFor` in `utils/pagingPolicy.ts`). A view then derives
  * "what do I render right now" from (registry, current error, translator).
  *
  * That derivation is identical everywhere the pattern is used; the *markup* is
@@ -27,6 +28,7 @@
 
 import { fillTemplate } from '@/utils/fillTemplate';
 import type { UIStringKey } from '@/services/translation/uiStrings';
+import type { Impact } from '@/utils/pagingPolicy';
 
 export interface StructuredErrorEntry {
   /**
@@ -38,7 +40,17 @@ export interface StructuredErrorEntry {
   messageKey: UIStringKey;
   /** Ordered recovery action ids — the first is rendered as the primary action. */
   recoveries: readonly string[];
+  /**
+   * The banner tint only (`'critical'` renders red, `'warning'` the orange notice). It does NOT
+   * decide whether a report pages; `impact` does.
+   */
   severity: 'warning' | 'critical';
+  /**
+   * The paging policy for this code. A report site spreads `severityFor(surface, impact)` into
+   * `reportError`: `'degraded'` reports at warning, anything else pages, provided the report
+   * surface is on the allowlist (`pagingPolicy.test.ts` checks every registry).
+   */
+  impact: Impact;
 }
 
 export interface StructuredError {

@@ -195,12 +195,13 @@ async function ensureChannel(): Promise<boolean> {
     }
     return true;
   } catch (e) {
-    // Only reachable on Android now (the guard above returns early elsewhere),
-    // so always critical: without the channel EVERY reminder is silently dropped
-    // by the OS — the same user impact as a failed schedule.
+    // Only reachable on Android now (the guard above returns early elsewhere).
+    // Without the channel EVERY reminder is silently dropped by the OS, the same
+    // user impact as a failed schedule: a device condition, reported at `error`
+    // (not paged; the rate is the signal).
     reportError({
       surface: 'local-notifications-schedule',
-      severity: 'critical',
+      severity: 'error',
       message: 'createChannel(reminders) failed; reminders will not post on Android O+',
       error: e,
       context: { notif_error_stage: 'channel' },
@@ -248,7 +249,7 @@ export async function reconcileScheduled(
     // Inside the `if`, not hoisted above it: ensureChannel never throws (it
     // catches and reports internally) and does NOT latch `channelReady` on
     // failure, so calling it on runs with nothing to schedule would emit a fresh
-    // `critical` on every debounced reschedule for a broken-channel device.
+    // `error` report on every debounced reschedule for a broken-channel device.
     const channelOk = await ensureChannel();
     if (channelOk) {
       try {
@@ -258,7 +259,7 @@ export async function reconcileScheduled(
       } catch (e) {
         reportError({
           surface: 'local-notifications-schedule',
-          severity: 'critical',
+          severity: 'error',
           message: 'failed to arm device reminders',
           error: e,
           // NOTE: on THIS event `notif_count` is the count ATTEMPTED, not armed.

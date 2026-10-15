@@ -45,6 +45,8 @@ export const registerDocPersistCallback = vi.fn();
 // Save failure tracking
 export const getSaveFailureLevel = vi.fn(() => 'none');
 export const getLastSaveError = vi.fn(() => null);
+export const getLastSaveCause = vi.fn<() => unknown>(() => null);
+export const saveErrorCode = vi.fn<(e: unknown) => string>(() => 'unknown');
 export const resetSaveFailures = vi.fn();
 export const getConsecutiveSaveFailures = vi.fn(() => 0);
 export const onSaveAttempt = vi.fn(() => () => {});

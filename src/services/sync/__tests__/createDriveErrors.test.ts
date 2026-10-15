@@ -71,6 +71,11 @@ afterEach(() => {
 describe('classifyCreateDriveFailure: one input per code', () => {
   const rows: Array<[string, unknown, CreateDriveErrorCode]> = [
     ['an abandoned native round trip', new OAuthRoundTripAbandonedError('dismissed'), 'cancelled'],
+    [
+      'a native return matched to no pending request',
+      new OAuthRoundTripAbandonedError('no-pending'),
+      'cancelled',
+    ],
     ['a denied file-access scope', new DriveConsentDeniedError('not granted'), 'consent-denied'],
     [
       'a same-name file',
@@ -353,6 +358,7 @@ describe('popup-abandoned (#131): a stuck web consent popup', () => {
       messageKey: 'createPod.driveError.popupAbandoned',
       recoveries: CREATE_DRIVE_ERRORS.cancelled.recoveries,
       severity: 'warning',
+      impact: 'degraded',
     });
     expect(createDriveRecoveries('popup-abandoned', true)).toEqual(['retry', 'useLocal']);
     expect(createDriveRecoveries('popup-abandoned', false)).toEqual(['retry']);

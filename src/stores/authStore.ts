@@ -1611,7 +1611,7 @@ export const useAuthStore = defineStore('auth', () => {
     if (!updated) {
       reportError({
         surface: 'join-flow',
-        severity: 'critical',
+        severity: 'error',
         message: 'unclaim failed: the member doc write did not land',
         context: { action: 'unclaim_failed', member_id_tail: targetMemberId.slice(-8) },
       });
@@ -1866,7 +1866,7 @@ export const useAuthStore = defineStore('auth', () => {
     if (!written) {
       reportError({
         surface: 'login-flow',
-        severity: 'critical',
+        severity: 'error',
         message: 'PIN write did not land; nothing was changed',
         context: { action: 'pin_write_failed', kind, member_id_tail: memberId.slice(-8) },
       });
@@ -3910,8 +3910,9 @@ export const useAuthStore = defineStore('auth', () => {
         surface: 'login-flow',
         message: 'device trust write failed',
         error: e,
-        // A user action failed (the trust answer, toggle or sign-out tick did not apply).
-        severity: 'critical',
+        // A user action failed (the trust answer, toggle or sign-out tick did not apply), and the
+        // silent toast below tells them: an `error`, not a page.
+        severity: 'error',
         context: { action: 'device_trust_set_failed', kind: source },
       });
       showToast('error', useTranslationStore().t('auth.trustSetFailed'), undefined, {

@@ -58,3 +58,18 @@ describe('visibilityTracker — getHiddenDurationMs', () => {
     }
   });
 });
+
+describe('visibilityTracker: ensureVisibilityTracking', () => {
+  it('registers the visibilitychange listener exactly once, without a query', async () => {
+    vi.resetModules();
+    const add = vi.spyOn(document, 'addEventListener');
+    try {
+      const { ensureVisibilityTracking } = await import('@/utils/visibilityTracker');
+      ensureVisibilityTracking();
+      ensureVisibilityTracking();
+      expect(add.mock.calls.filter(([type]) => type === 'visibilitychange')).toHaveLength(1);
+    } finally {
+      add.mockRestore();
+    }
+  });
+});

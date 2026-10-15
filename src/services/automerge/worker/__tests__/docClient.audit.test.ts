@@ -18,6 +18,7 @@ vi.mock('../../projection', () => ({
 vi.mock('@/utils/errorReporter', () => ({ reportError: vi.fn() }));
 vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: vi.fn() }));
 vi.mock('@/utils/visibilityTracker', () => ({
+  ensureVisibilityTracking: vi.fn(),
   wasHiddenSince: vi.fn(() => false),
   getHiddenDurationMs: vi.fn(() => null),
 }));
@@ -135,7 +136,7 @@ describe('C5c: the cache-replay event', () => {
     expect(reportError).not.toHaveBeenCalled();
   });
 
-  it('a dropped increment or a missing dep is CRITICAL', async () => {
+  it('a dropped increment is CRITICAL', async () => {
     replayWith({ recovered: true, droppedIncrements: 1, missingDeps: 0, incrementCount: 3 });
     await initAndLoadCache('fam');
     expect(reportError).toHaveBeenCalledWith(

@@ -47,6 +47,7 @@ import { getDeviceInfo, tail } from '@/utils/diagnostics';
 import { platformContext } from '@/utils/platformLabel';
 import type { StructuredErrorEntry } from '@/utils/structuredError';
 import { reportError } from '@/utils/errorReporter';
+import { severityFor } from '@/utils/pagingPolicy';
 import { logEvent } from '@/services/telemetry/logEvent';
 import type { FamilyMember, RegistryEntry } from '@/types/models';
 import type { InviteKeyPackage } from '@/types/syncFileV4';
@@ -226,6 +227,7 @@ export const JOIN_ERRORS = {
     messageKey: 'join.error.oauthRedirect',
     recoveries: ['retry', 'tryAnotherDevice'],
     severity: 'critical',
+    impact: 'degraded',
   },
   /**
    * ⚠️ `severity: 'warning'`, NOT critical, and for the same reason `PICKER_UNAVAILABLE` is.
@@ -238,6 +240,7 @@ export const JOIN_ERRORS = {
     messageKey: 'join.error.scopeDenied',
     recoveries: ['retry'],
     severity: 'warning',
+    impact: 'degraded',
   },
   /**
    * ⚠️ `severity: 'warning'` for the same reason: a browser's popup blocker firing is a
@@ -248,16 +251,19 @@ export const JOIN_ERRORS = {
     messageKey: 'join.error.popupBlocked',
     recoveries: ['retry', 'tryAnotherDevice'],
     severity: 'warning',
+    impact: 'degraded',
   },
   PICKER_SCRIPT_LOAD_FAILED: {
     messageKey: 'join.error.pickerScript',
     recoveries: ['retry', 'tryAnotherDevice'],
     severity: 'critical',
+    impact: 'degraded',
   },
   PICKER_FAILED: {
     messageKey: 'join.error.pickerFailed',
     recoveries: ['retry', 'signInDifferentAccount', 'tryAnotherDevice'],
     severity: 'critical',
+    impact: 'degraded',
   },
   /**
    * The Picker iframe was built and shown, and then never called back at all — no `'loaded'`,
@@ -280,6 +286,7 @@ export const JOIN_ERRORS = {
     messageKey: 'join.error.pickerFailed',
     recoveries: ['retry', 'signInDifferentAccount', 'tryAnotherDevice'],
     severity: 'warning',
+    impact: 'degraded',
   },
   /**
    * The Picker cannot run because THIS BUILD is misconfigured — `VITE_GOOGLE_API_KEY` is unset,
@@ -297,6 +304,7 @@ export const JOIN_ERRORS = {
     messageKey: 'settings.drivePickerUnavailable',
     recoveries: ['tryAnotherDevice'],
     severity: 'warning',
+    impact: 'degraded',
   },
   /**
    * Google auth failed BEFORE the Picker could open. Previously collapsed into `PICKER_FAILED`,
@@ -306,9 +314,13 @@ export const JOIN_ERRORS = {
     messageKey: 'settings.drivePickerAuth',
     recoveries: ['signInDifferentAccount', 'retry', 'tryAnotherDevice'],
     severity: 'warning',
+    impact: 'degraded',
   },
   /**
    * The Picker iframe loaded and then went quiet for the rest of the 30s window.
+   *
+   * `impact: 'degraded'` (2026-10-15 paging policy): it no longer pages; `severity` below is
+   * the banner tint only.
    *
    * ⚠️ NARROWER THAN IT WAS, AND THAT IS WHY IT STAYS 'critical'. Before the 8s bootstrap probe
    * this code absorbed the common iOS case (a frame that never called back at all), which is a
@@ -326,16 +338,19 @@ export const JOIN_ERRORS = {
     messageKey: 'join.error.pickerTimeout',
     recoveries: ['retry', 'tryAnotherDevice'],
     severity: 'critical',
+    impact: 'degraded',
   },
   FILE_READ_FAILED: {
     messageKey: 'join.error.fileRead',
     recoveries: ['signInDifferentAccount', 'retry', 'tryAnotherDevice'],
     severity: 'critical',
+    impact: 'data-at-risk',
   },
   FILE_DECRYPT_FAILED: {
     messageKey: 'join.error.fileDecrypt',
     recoveries: [],
     severity: 'critical',
+    impact: 'data-at-risk',
   },
   /**
    * The invite and the key are FINE — this device ran out of memory inflating
@@ -348,6 +363,7 @@ export const JOIN_ERRORS = {
     messageKey: 'join.error.fileTooLarge',
     recoveries: ['tryAnotherDevice'],
     severity: 'critical',
+    impact: 'data-at-risk',
   },
   /**
    * The family's pod itself is damaged. Also distinct from
@@ -360,28 +376,33 @@ export const JOIN_ERRORS = {
     messageKey: 'join.error.fileCorrupt',
     recoveries: [],
     severity: 'critical',
+    impact: 'data-at-risk',
   },
   /** The family file was saved by a newer beanies. Update, then reopen the link. */
   FILE_NEWER_VERSION: {
     messageKey: 'join.error.newerVersion',
     recoveries: [],
     severity: 'warning',
+    impact: 'degraded',
   },
   /** The family file predates the oldest format this build reads. */
   FILE_OLDER_VERSION: {
     messageKey: 'podOlderVersion.inline',
     recoveries: [],
     severity: 'warning',
+    impact: 'degraded',
   },
   FILE_FAMILY_MISMATCH: {
     messageKey: 'join.error.familyMismatch',
     recoveries: ['signInDifferentAccount'],
     severity: 'critical',
+    impact: 'degraded',
   },
   INVITE_TOKEN_EXPIRED: {
     messageKey: 'join.error.tokenExpired',
     recoveries: ['retry'],
     severity: 'critical',
+    impact: 'degraded',
   },
   // ── Magic link ──────────────────────────────────────────────────────────────
   // Three codes rather than one shared "link didn't work", because the way OUT differs
@@ -393,21 +414,25 @@ export const JOIN_ERRORS = {
     messageKey: 'join.error.magicLinkNotFound',
     recoveries: [],
     severity: 'warning',
+    impact: 'degraded',
   },
   MAGIC_LINK_EXPIRED: {
     messageKey: 'join.error.magicLinkExpired',
     recoveries: [],
     severity: 'warning',
+    impact: 'degraded',
   },
   MAGIC_LINK_REVOKED: {
     messageKey: 'join.error.magicLinkRevoked',
     recoveries: [],
     severity: 'warning',
+    impact: 'degraded',
   },
   MAGIC_LINK_KEY_ROTATED: {
     messageKey: 'join.error.magicLinkKeyRotated',
     recoveries: [],
     severity: 'warning',
+    impact: 'degraded',
   },
   INVITE_LINK_UNPARSEABLE: {
     // The URL carried invite-shaped params but `parseInviteLink` rejected it outright.
@@ -420,6 +445,7 @@ export const JOIN_ERRORS = {
     messageKey: 'join.error.linkUnparseable',
     recoveries: [],
     severity: 'warning',
+    impact: 'degraded',
   },
   MAGIC_LINK_INCOMPLETE: {
     // `ml=1` with no `m=`. Expected input, not an edge case: chat apps wrap and truncate
@@ -427,6 +453,7 @@ export const JOIN_ERRORS = {
     messageKey: 'join.error.magicLinkIncomplete',
     recoveries: [],
     severity: 'warning',
+    impact: 'degraded',
   },
   INVITE_TOKEN_INVALID: {
     // Most common cause is a stale Drive read — the inviter just generated
@@ -439,6 +466,7 @@ export const JOIN_ERRORS = {
     messageKey: 'join.error.tokenInvalid',
     recoveries: ['retry'],
     severity: 'critical',
+    impact: 'degraded',
   },
   NO_UNCLAIMED_MEMBERS: {
     // No in-app recovery — the user must contact a family admin out-of-band.
@@ -446,6 +474,7 @@ export const JOIN_ERRORS = {
     messageKey: 'join.error.noUnclaimed',
     recoveries: [],
     severity: 'warning',
+    impact: 'degraded',
   },
   MEMBER_ALREADY_CLAIMED: {
     // No button: the member grid is back on screen (minus the claimed bean), and the copy
@@ -453,6 +482,7 @@ export const JOIN_ERRORS = {
     messageKey: 'join.error.memberClaimed',
     recoveries: [],
     severity: 'warning',
+    impact: 'degraded',
   },
 } as const satisfies Record<JoinErrorCode, JoinErrorEntry>;
 
@@ -560,16 +590,16 @@ export function useJoinFlow() {
 
   /**
    * Single source of truth for join-flow error reporting. Sets
-   * `currentError.value` AND fires a Slack alert via `reportError` with
-   * the underlying detail in the message body. Used by `tryStep` for
+   * `currentError.value` AND reports via `reportError` (paging per the
+   * registry's `impact`) with the underlying detail in the message body. Used by `tryStep` for
    * caught errors and by every direct caller that knows synchronously
    * an error has occurred (file mismatch, invite token mismatch, etc.).
    *
    * **Allowlist routing — read before adding new context fields:**
    * fields passed in `context` land in the user-copied diagnostic blob
-   * (read by `buildDiagnosticReport`) but only land in the Slack
-   * `*Context:*` block if they're listed in `ALLOWED_CONTEXT_KEYS` in
-   * `errorReporter.ts`. Anything else is silently dropped (with a
+   * (read by `buildDiagnosticReport`) but only reach CloudWatch (and the
+   * Lambda's Slack page) if they're listed in `ALLOWED_CONTEXT_KEYS` in
+   * `diagnosticContext.ts`. Anything else is silently dropped (with a
    * console.warn). The `message` field below is the escape hatch — it's
    * free text. We embed the disambiguating detail there so future
    * maintainers don't have to chase the allowlist for every new field.
@@ -588,13 +618,11 @@ export function useJoinFlow() {
       '';
 
     reportError({
-      surface: `join-flow:${code}`,
+      // The registry's `impact` decides paging, paired with the per-code surface: only the
+      // data-at-risk file codes page; every other code reports at warning.
+      ...severityFor(`join-flow:${code}`, JOIN_ERRORS[code].impact),
       message: detail ? `${code}: ${detail}` : code,
       error: err,
-      // Forward the per-code severity already declared on the registry so the
-      // genuinely-fatal join failures page Slack under the critical-only gate;
-      // recoverable codes (e.g. NO_UNCLAIMED_MEMBERS, 'warning') stay log-only.
-      severity: JOIN_ERRORS[code].severity,
       context: {
         error_code: code,
         // ⚠️ WHICH PLATFORM THIS CAME FROM. Every join error code is reported from here, so

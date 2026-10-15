@@ -1,5 +1,9 @@
 /**
- * Telemetry context-allowlist drift guard — client vs the ingest Lambda.
+ * Client vs Lambda drift (context keys and paging surfaces).
+ *
+ * Every client/Lambda mirror is compared here, through the one `.mjs` import below: the
+ * context-key allowlist (`ALLOWED_CONTEXT_KEYS`) and the Slack paging allowlist
+ * (`PAGING_SURFACES` vs the Lambda's `SLACK_ESCALATE_SURFACES`).
  *
  * THE GUARD THAT WAS CLAIMED BUT DID NOT EXIST. The Lambda's own test asserts its
  * `ALLOWED_CONTEXT_KEYS` against a hardcoded array inside that same test file, and its
@@ -20,22 +24,14 @@
  */
 import { describe, it, expect } from 'vitest';
 import { ALLOWED_CONTEXT_KEYS } from '../diagnosticContext';
+import { PAGING_SURFACES } from '../pagingPolicy';
 // The telemetry Lambda's mirrored copy. Plain JS with no .d.ts — imported for its runtime
 // value only, exactly as the prompt drift guard imports the ai-extract copy.
 // @ts-expect-error — no type declarations for the Lambda source.
 import * as telemetryLambda from '../../../infrastructure/lambda/telemetry/index.mjs';
 
 const lambdaKeys = telemetryLambda.ALLOWED_CONTEXT_KEYS as Set<string>;
-
-/**
- * The ONE key that is deliberately client-only.
- *
- * `family_email` rides the low-volume Slack error path (gated by `includeEmail`), never the
- * telemetry firehose, which is PII-free by contract. The Lambda strips it on purpose and its
- * own test pins that. Listing it here rather than relaxing the assertion keeps the exclusion
- * explicit — a SECOND client-only key would still fail.
- */
-const DELIBERATELY_CLIENT_ONLY = new Set(['family_email']);
+const lambdaPagingSurfaces = telemetryLambda.SLACK_ESCALATE_SURFACES as Set<string> | undefined;
 
 describe('telemetry context allowlist: client vs Lambda', () => {
   it('the Lambda exports its allowlist for comparison', () => {
@@ -48,16 +44,15 @@ describe('telemetry context allowlist: client vs Lambda', () => {
   it('every client key is accepted by the Lambda', () => {
     // A key only on the client is the DANGEROUS direction: the field ships, is stripped on
     // ingest, and is absent from CloudWatch with nothing reporting a problem.
-    const clientOnly = [...ALLOWED_CONTEXT_KEYS]
-      .filter((k) => !lambdaKeys.has(k) && !DELIBERATELY_CLIENT_ONLY.has(k))
-      .sort();
+    const clientOnly = [...ALLOWED_CONTEXT_KEYS].filter((k) => !lambdaKeys.has(k)).sort();
     expect(clientOnly).toEqual([]);
   });
 
-  it('the PII-free firehose still refuses the email key', () => {
-    // The exclusion above is a contract, not a convenience: assert it rather than assume it.
+  it('neither copy carries the email key', () => {
+    // The client never reads or sends an email (the client Slack path that carried one is
+    // gone); the Lambda's own test still pins its refusal as defense in depth.
     expect(lambdaKeys.has('family_email')).toBe(false);
-    expect(ALLOWED_CONTEXT_KEYS.has('family_email')).toBe(true);
+    expect(ALLOWED_CONTEXT_KEYS.has('family_email')).toBe(false);
   });
 
   it('the Lambda accepts nothing the client does not send', () => {
@@ -73,5 +68,20 @@ describe('telemetry context allowlist: client vs Lambda', () => {
       expect(ALLOWED_CONTEXT_KEYS.has(key)).toBe(true);
       expect(lambdaKeys.has(key)).toBe(true);
     }
+  });
+});
+
+describe('Slack paging surfaces: client vs Lambda', () => {
+  // The Lambda pages only for `severity: 'critical'` on a surface in its set; the client's type
+  // only allows `critical` on a surface in `PAGING_SURFACES`. If the two drift, a surface the
+  // client may page on never pages (client-only), or the server would page on a surface the
+  // client can no longer mark critical (Lambda-only, dead policy).
+  it('the Lambda exports its paging allowlist for comparison', () => {
+    expect(lambdaPagingSurfaces).toBeInstanceOf(Set);
+    expect(lambdaPagingSurfaces?.has('boot-integrity')).toBe(true);
+  });
+
+  it('PAGING_SURFACES and SLACK_ESCALATE_SURFACES are the same set', () => {
+    expect([...(lambdaPagingSurfaces ?? [])].sort()).toEqual(Object.keys(PAGING_SURFACES).sort());
   });
 });

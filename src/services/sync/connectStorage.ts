@@ -30,6 +30,7 @@ import { supportsFileSystemAccess, isNative } from '@/services/sync/capabilities
 import { withTimeout } from '@/utils/timing';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { reportError } from '@/utils/errorReporter';
+import { severityFor } from '@/utils/pagingPolicy';
 import { trackOnboardingStep } from '@/services/telemetry/onboardingAttempt';
 import { currentCreateAttempt } from '@/utils/createAttemptState';
 import { FileNameCollisionError } from '@/types/sync';
@@ -256,9 +257,9 @@ export function createDriveTransport(): 'native' | 'redirect' | 'popup' {
 }
 
 /**
- * THE one report for a create-flow Drive failure: `reportError` at the registry's severity (only
- * `unknown` and `drive-api-disabled` page Slack) plus one console line. Lives beside
- * `logConnectFailure` so "one report per failure" reads in one file, and here rather than in the
+ * THE one report for a create-flow Drive failure: `reportError` at the severity the registry's
+ * `impact` earns (only `unknown` and `drive-api-disabled` page Slack) plus one console line.
+ * Lives beside `logConnectFailure` so "one report per failure" reads in one file, and here rather than in the
  * leaf registry because it needs `reportError` and the transport.
  *
  * `detail` is a closed `transport=<popup|redirect|native>[;reason=<google reason>]`. The transport
@@ -271,21 +272,20 @@ export function reportCreateDriveFailure(
   code: CreateDriveErrorCode,
   error: unknown
 ): void {
-  const { severity } = CREATE_DRIVE_ERRORS[code];
+  const pair = severityFor(surface, CREATE_DRIVE_ERRORS[code].impact);
   const transport = createDriveTransport();
   const reason = (error as { reason?: unknown } | null | undefined)?.reason;
   const detail =
     typeof reason === 'string'
       ? `transport=${transport};reason=${reason}`
       : `transport=${transport}`;
-  const log = severity === 'critical' ? console.error : console.warn;
+  const log = pair.severity === 'critical' ? console.error : console.warn;
   // `resumeSetup.write` failed AFTER a successful connect; saying "connect" there misleads triage.
   const what = surface === 'resumeSetup.write' ? 'write' : 'connect';
   log(`[${surface}] Google Drive ${what} failed (${code}):`, error);
   reportError({
-    surface,
+    ...pair,
     message: error instanceof Error ? error.message : String(error ?? code),
-    severity,
     error,
     context: { provider_type: 'google_drive', error_code: code, detail },
   });

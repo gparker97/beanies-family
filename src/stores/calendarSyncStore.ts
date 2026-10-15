@@ -24,6 +24,7 @@ import { list as projectionList } from '@/services/automerge/projection';
 import { toISODateString, localToday, addDaysYmd } from '@/utils/date';
 import { getDeviceId } from '@/utils/deviceId';
 import { reportError } from '@/utils/errorReporter';
+import { isTokenExpiredError } from '@/utils/podAccess';
 import { isFlagEnabled } from '@/config/flags';
 import { useToday } from '@/composables/useToday';
 import { useActivityStore } from '@/stores/activityStore';
@@ -1167,6 +1168,10 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
         n += 1;
         reconcileErrorCounters.set(connection.id, n);
       }
+      // An auth-class failure (a lapsed token, or a token refresh that failed and was filed as
+      // transient) is the reconnect path's to fix, so even when sustained it reports at
+      // `error` rather than paging (2026-10-15 paging policy).
+      const authClass = isTokenExpiredError(worst) || /token refresh failed/i.test(worst.message);
       reportError({
         surface: 'calendar-sync',
         message: `[calendarSync] reconcile error (${worst.kind}) on connection ${connection.id}: ${worst.message}${
@@ -1175,7 +1180,9 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
         error: worst,
         severity:
           n === RECONCILE_ERROR_THRESHOLD && !throttled
-            ? 'critical'
+            ? authClass
+              ? 'error'
+              : 'critical'
             : CALENDAR_SYNC_ERRORS[worst.kind],
         // `consecutive_failures` is the allowlisted spelling — the camelCase one
         // was silently dropped by `redactContext` and never once reached Slack.

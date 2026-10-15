@@ -33,7 +33,6 @@ function assertOfficialBuildEnv() {
       if (!process.env.VITE_BUILD_SHA) return; // not the official CI build
       const required = [
         'VITE_SLACK_WEBHOOK_URL',
-        'VITE_BEANIES_ERROR_WEBHOOK_URL',
         // #45 feedback. Added 2026-08-10: the mobile release lanes set
         // VITE_BUILD_SHA but never set this, so every Android/iOS build from
         // 2026-07-09 shipped `slackPost(undefined, …)` — a silent no-op behind

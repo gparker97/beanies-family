@@ -486,6 +486,113 @@ describe('googleAuth — native (Capacitor) OAuth deep-link (ADR-029 A2)', () =>
       }
     });
 
+    it('ANDROID double delivery: two returns 300 ms apart settle the trip once, successfully', async () => {
+      // Android delivers `appUrlOpen` twice ~330 ms apart. The first delivery's exchange removes
+      // the pending-auth stash before it awaits the proxy, so an unguarded second delivery read
+      // "nothing pending" and settled the still-live trip as failed.
+      vi.useFakeTimers();
+      try {
+        const { logEvent } = await import('@/services/telemetry');
+        const { exchangeCodeForTokens } = await import('../oauthProxy');
+        let releaseExchange!: () => void;
+        (exchangeCodeForTokens as ReturnType<typeof vi.fn>).mockImplementationOnce(
+          () =>
+            new Promise((resolve) => {
+              releaseExchange = () =>
+                resolve({
+                  access_token: 'tok',
+                  refresh_token: 'rt',
+                  expires_in: 3600,
+                  token_type: 'Bearer',
+                  scope: 'drive.file userinfo.email',
+                });
+            })
+        );
+        await googleAuth.startRedirectAuth('/welcome?resume=setup', undefined, 'create');
+        const stored = JSON.parse(sessionStorage.getItem(STATE_KEY)!);
+        const trip = googleAuth.awaitNativeOAuthReturn();
+        const url = `${NATIVE_REDIRECT}?code=THE_CODE&state=${stored.state}`;
+        const onComplete = vi.fn();
+
+        const first = googleAuth.handleNativeAuthRedirect(url, onComplete);
+        await vi.advanceTimersByTimeAsync(300);
+        await googleAuth.handleNativeAuthRedirect(url, onComplete);
+        releaseExchange();
+        await first;
+
+        await expect(trip).resolves.toEqual({ kind: 'completed' });
+        expect(exchangeCodeForTokens).toHaveBeenCalledTimes(1);
+        expect(onComplete).toHaveBeenCalledTimes(1);
+        const duplicates = (logEvent as ReturnType<typeof vi.fn>).mock.calls.filter(
+          ([e]) => e?.context?.action === 'duplicate_return'
+        );
+        expect(duplicates).toHaveLength(1);
+        const noPending = (logEvent as ReturnType<typeof vi.fn>).mock.calls.filter(
+          ([e]) => e?.context?.action === 'no_pending'
+        );
+        expect(noPending).toHaveLength(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('ANDROID double delivery, calendar arm: a second return after the synchronous settle is ignored', async () => {
+      // The calendar arm settles the trip right after `Browser.close()`, inside the ~330 ms
+      // re-delivery window, so `liveTrip()` is already null when the duplicate lands. It keeps the
+      // stash (the calendar resume needs its PKCE verifier), so an unguarded duplicate re-ran the
+      // whole arm: a second `return_*` event, `onComplete` twice, and the code key re-planted.
+      vi.useFakeTimers();
+      try {
+        const { logEvent } = await import('@/services/telemetry');
+        await googleAuth.startRedirectAuth('/planner?resume=calendar', undefined, 'create');
+        const stored = JSON.parse(sessionStorage.getItem(STATE_KEY)!);
+        sessionStorage.setItem(STATE_KEY, JSON.stringify({ ...stored, grant: 'calendar' }));
+        const trip = googleAuth.awaitNativeOAuthReturn();
+        const url = `${NATIVE_REDIRECT}?code=CAL_CODE&state=${stored.state}`;
+        const onComplete = vi.fn();
+
+        await googleAuth.handleNativeAuthRedirect(url, onComplete);
+        await expect(trip).resolves.toMatchObject({ kind: 'completed' });
+        // The calendar resume redeems (and removes) the code before the duplicate arrives.
+        sessionStorage.removeItem(googleAuth.REDIRECT_AUTH_CODE_KEY_CALENDAR);
+
+        await vi.advanceTimersByTimeAsync(300);
+        await googleAuth.handleNativeAuthRedirect(url, onComplete);
+
+        expect(onComplete).toHaveBeenCalledTimes(1);
+        expect(sessionStorage.getItem(googleAuth.REDIRECT_AUTH_CODE_KEY_CALENDAR)).toBeNull();
+        const calls = (logEvent as ReturnType<typeof vi.fn>).mock.calls;
+        expect(calls.filter(([e]) => e?.context?.action === 'duplicate_return')).toHaveLength(1);
+        expect(calls.filter(([e]) => e?.message === 'native oauth return received')).toHaveLength(
+          1
+        );
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('a live trip whose stash is gone settles ABANDONED/no-pending, never a plain Error', async () => {
+      const { OAuthRoundTripAbandonedError } = await syncTypes();
+      await googleAuth.startRedirectAuth('/welcome?resume=setup', undefined, 'create');
+      const stored = JSON.parse(sessionStorage.getItem(STATE_KEY)!);
+      const trip = googleAuth.awaitNativeOAuthReturn();
+      sessionStorage.removeItem(STATE_KEY);
+
+      await googleAuth.handleNativeAuthRedirect(
+        `${NATIVE_REDIRECT}?code=THE_CODE&state=${stored.state}`,
+        vi.fn()
+      );
+
+      const outcome = await trip;
+      expect(outcome.kind).toBe('failed');
+      const error = (outcome as { error: Error }).error;
+      expect(error).toBeInstanceOf(OAuthRoundTripAbandonedError);
+      expect((error as OAuthRoundTripAbandonedError).reason).toBe('no-pending');
+      expect(error.message).toBe(
+        'Google sign-in could not be matched to a request on this device.'
+      );
+    });
+
     it('settles even when the trip ENDED before anyone awaited it', async () => {
       // The window between `Browser.open` resolving and the gate reaching its await is real; a
       // settled trip must stay readable until the next arm or the seam hangs forever.

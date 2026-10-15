@@ -21,7 +21,11 @@ const visibilityTracker = {
   listenerRegistered: false,
 };
 
-function ensureVisibilityListener(): void {
+/**
+ * Register the visibilitychange listener now (it is otherwise lazy), so a hide that starts
+ * AND ends inside a caller's window is still recorded for a later `wasHiddenSince`.
+ */
+export function ensureVisibilityTracking(): void {
   if (visibilityTracker.listenerRegistered) return;
   if (typeof document === 'undefined') return;
   document.addEventListener('visibilitychange', () => {
@@ -43,7 +47,7 @@ function ensureVisibilityListener(): void {
  * Used by the doc-worker's suspension-aware RPC deadlines: time spent hidden
  * must not count toward declaring the worker dead. */
 export function wasHiddenSince(sinceTs: number): boolean {
-  ensureVisibilityListener();
+  ensureVisibilityTracking();
   if (typeof document !== 'undefined' && document.hidden) return true;
   const { lastHiddenAt, lastVisibleAt } = visibilityTracker;
   if (lastHiddenAt !== null && lastHiddenAt >= sinceTs) return true;
@@ -56,7 +60,7 @@ export function wasHiddenSince(sinceTs: number): boolean {
 /** ms the page was last hidden before becoming visible, or null if never
  *  hidden this session. Used as a wake-time diagnostic on auth/sync failures. */
 export function getHiddenDurationMs(): number | null {
-  ensureVisibilityListener();
+  ensureVisibilityTracking();
   const { lastHiddenAt, lastVisibleAt } = visibilityTracker;
   if (lastHiddenAt === null || lastVisibleAt === null) return null;
   if (lastVisibleAt < lastHiddenAt) return null; // page is still hidden — n/a

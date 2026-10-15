@@ -20,7 +20,6 @@ interface ImportMetaEnv {
   readonly VITE_REVIEW_DEMO_CODE_HASH: string | undefined;
   readonly VITE_REVIEW_DEMO_EXPIRES: string | undefined;
   readonly VITE_SLACK_WEBHOOK_URL: string | undefined;
-  readonly VITE_BEANIES_ERROR_WEBHOOK_URL: string | undefined;
   readonly VITE_FEEDBACK_WEBHOOK_URL: string | undefined;
   readonly VITE_MARKETING_URL: string | undefined;
   readonly VITE_PLAUSIBLE_DOMAIN: string | undefined;

@@ -94,7 +94,7 @@ import type {
   CacheReplay,
   InitAndLoadResult,
 } from './protocol';
-import { NoDocumentLoadedError } from './protocol';
+import { NoDocumentLoadedError, FENCE_GIVE_UP_MERGES } from './protocol';
 import { canonicalEqual, type ReconcileNote } from './reconcile';
 
 type Doc = Automerge.Doc<FamilyDocument>;
@@ -1197,12 +1197,6 @@ function withoutQueuedChanges(doc: Doc): Doc {
     .doc;
 }
 
-/**
- * Sessions that merged a remote and STILL missed the deps before the next open gives the
- * missing-deps fence up (round 3): fenced twice, given up on the third open. An offline or cold
- * open (no merge) never counts, so a device that simply has not reached Drive keeps its rows.
- */
-const FENCE_GIVE_UP_MERGES = 2;
 /** Consecutive unproven BASE decrypt failures before the cache is re-seeded (round 3, C5a). */
 const BASE_DECRYPT_RESEED_OPENS = 3;
 
@@ -1241,16 +1235,26 @@ async function quarantineFencedRows(failed: string[]): Promise<boolean> {
  * Round 3: after a remote merge into a fenced document, count this session toward the give-up
  * when the deps are STILL missing (once per open), or clear the run when the merge delivered
  * them. Only against this document's own open cache. Best-effort.
+ *
+ * Returns the verdict so main can report it (2026-10-15): `'missing'` means the remote did not
+ * have the deps either, `'delivered'` means the merge supplied them, and `merges` is the run
+ * length after this session (0 when delivered, or when the counter write failed). Main pages
+ * only once `merges` reaches FENCE_GIVE_UP_MERGES: a first miss may just be a remote that is
+ * behind. `null` when not fenced or already counted.
  */
-async function noteFenceAfterMerge(): Promise<void> {
-  if (!baseFence || fenceMergeCounted || !currentDoc) return;
-  if (docFamilyId === null || docFamilyId !== cache.cacheFamilyId()) return;
+async function noteFenceAfterMerge(): Promise<{
+  deps: 'missing' | 'delivered';
+  merges: number;
+} | null> {
+  if (!baseFence || fenceMergeCounted || !currentDoc) return null;
+  if (docFamilyId === null || docFamilyId !== cache.cacheFamilyId()) return null;
   fenceMergeCounted = true;
   if (Automerge.getMissingDeps(currentDoc, []).length > 0) {
-    await cache.bumpMetaCounter('fence-merges').catch(() => 0);
-  } else {
-    await cache.clearMetaCounter('fence-merges').catch(() => {});
+    const merges = await cache.bumpMetaCounter('fence-merges').catch(() => 0);
+    return { deps: 'missing', merges };
   }
+  await cache.clearMetaCounter('fence-merges').catch(() => {});
+  return { deps: 'delivered', merges: 0 };
 }
 
 /** Same compaction generation: both never-compacted, or the same lineage id at the same seq. */
@@ -2008,7 +2012,7 @@ export async function mergeRemoteEnvelope(
   const merged = time('automerge.merge', () => mergeDocs(local, remote));
   currentDoc = merged.doc;
   if (id) docFamilyId = id;
-  await noteFenceAfterMerge();
+  const fence = await noteFenceAfterMerge();
   schedulePersist();
   scheduleSnapshotPersist();
   const health = mergeHealth(conflictsBefore, currentDoc);
@@ -2036,6 +2040,7 @@ export async function mergeRemoteEnvelope(
     changed: !headsEqual(localHeads, merged.heads),
     remoteHeads,
     ...health,
+    ...(fence ? { fenceDepsAfterMerge: fence.deps, fenceMerges: fence.merges } : {}),
   };
 }
 

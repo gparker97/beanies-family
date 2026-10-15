@@ -483,7 +483,7 @@ async function ensureDurableHome() {
     console.error('[LoadPodView] verifyPodAccess failed:', e);
     reportError({
       surface: 'pod-access',
-      severity: 'critical',
+      severity: 'error',
       message: 'pod access verification threw at the load boundary',
       error: e,
       context: { action: 'VERIFY_UNAVAILABLE' },

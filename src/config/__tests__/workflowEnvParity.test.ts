@@ -52,7 +52,6 @@ describe('CI client-env parity', () => {
     // Guards against the regex silently matching nothing and the suite passing vacuously.
     expect(web.has('VITE_FEEDBACK_WEBHOOK_URL')).toBe(true);
     expect(web.has('VITE_SLACK_WEBHOOK_URL')).toBe(true);
-    expect(web.has('VITE_BEANIES_ERROR_WEBHOOK_URL')).toBe(true);
   });
 
   for (const lane of ['mobile-android-release.yml', 'mobile-ios-release.yml']) {

@@ -607,6 +607,30 @@ export async function clearRemoteBaseline(): Promise<void> {
   await withIdbRetry('clearRemoteBaseline', () => cacheDb!.delete(STORE_NAME, REMOTE_BASELINE_KEY));
 }
 
+type CacheRow = CacheDB['doc']['value'];
+
+/**
+ * Read the base (or the pre-B1 legacy row as its fallback) and every increment in ONE
+ * readonly transaction, so a `persistDocBinary` from another realm (which replaces the
+ * base and deletes the rows it folds in, in its own single transaction) lands entirely
+ * before or entirely after this read, never between its halves. Nothing is decrypted
+ * here: the transaction must not span an await on anything but its own requests, or
+ * IndexedDB auto-commits it.
+ */
+async function readCacheRows(
+  db: IDBPDatabase<CacheDB>
+): Promise<{ baseEntry: CacheRow | undefined; incEntries: CacheRow[] }> {
+  const tx = db.transaction(STORE_NAME, 'readonly');
+  const store = tx.objectStore(STORE_NAME);
+  const [base, legacy, incEntries] = await Promise.all([
+    store.get(BASE_KEY),
+    store.get(LEGACY_DOC_KEY),
+    store.getAll(IDBKeyRange.bound(INC_PREFIX, INC_UPPER, false, true)),
+    tx.done,
+  ]);
+  return { baseEntry: base ?? legacy, incEntries };
+}
+
 /**
  * Reconstruct the cached doc: load the base (`loadAndVerify`) then apply the
  * increments in seq order. Returns `null` if no base/legacy row exists.
@@ -630,9 +654,11 @@ export async function loadCachedDoc(
 ): Promise<({ doc: Doc } & CacheReplay) | null> {
   const db = requireHandle();
 
-  const baseEntry =
-    (await withIdbRetry('loadBase', () => db.get(STORE_NAME, BASE_KEY))) ??
-    (await withIdbRetry('loadLegacyDoc', () => db.get(STORE_NAME, LEGACY_DOC_KEY)));
+  // ONE transaction for base + increments (2026-10-15 torn-read fix): decrypt and
+  // verify take seconds on a slow device, and a compaction by another realm landing
+  // between two separate reads left this realm holding the OLD base with only the
+  // rows written on top of the NEW one (a torn view that reported missing deps).
+  const { baseEntry, incEntries } = await withIdbRetry('loadCachedDoc', () => readCacheRows(db));
   if (!baseEntry) return null;
 
   // Classified because an unclassified throw here reaches `initAndLoadCache`
@@ -649,9 +675,6 @@ export async function loadCachedDoc(
   await clearMetaCounter('base-decrypt-failures').catch(() => {});
   const baseDoc = loadAndVerify(baseBinary, familyId); // throws CorruptPayloadError on a bad base
 
-  const incEntries = (await withIdbRetry('loadIncrements', () =>
-    db.getAll(STORE_NAME, IDBKeyRange.bound(INC_PREFIX, INC_UPPER, false, true))
-  )) as Array<{ id: string; payload: string }>;
   const finish = async (
     doc: Doc,
     applied: Map<string, Uint8Array[]>,

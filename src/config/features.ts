@@ -86,7 +86,6 @@ export const features = {
   // docs/runbooks/native-store-submission.md.
   reviewDemo: flagOn(env.VITE_REVIEW_DEMO) && ok(env.VITE_REVIEW_DEMO_CODE_HASH),
   slackPodCreate: ok(env.VITE_SLACK_WEBHOOK_URL),
-  errorReporter: ok(env.VITE_BEANIES_ERROR_WEBHOOK_URL),
   // #45 in-app feedback/NPS. Gated here (rather than read only at the call site)
   // purely so the boot warning below can see it: feedback is fire-and-forget over
   // `no-cors`, is stored NOWHERE else, and the user sees a thank-you screen either
@@ -111,7 +110,6 @@ export type FeatureKey = keyof typeof features;
 // Production builds only — dev/test/self-host omit these and that's fine.
 if (env.PROD && (features.drive || features.registry)) {
   const operationalWebhooks: ReadonlyArray<readonly [FeatureKey, string, string]> = [
-    ['errorReporter', 'VITE_BEANIES_ERROR_WEBHOOK_URL', 'Errors will NOT reach #beanies-errors'],
     [
       'slackPodCreate',
       'VITE_SLACK_WEBHOOK_URL',
@@ -150,23 +148,12 @@ if (env.PROD && (features.drive || features.registry)) {
   // "Deploy beanies PROD" workflow — which recurred on 2026-08-10. Fix: redeploy
   // via the workflow.
   //
-  // ⚠️ THE REPORTING PATH HERE IS DELIBERATE AND COUNTER-INTUITIVE.
-  //
   // Until 2026-08-10 this only `console.error`d, so the 2026-08-10 recurrence ran
-  // undetected for hours until a user-facing symptom surfaced. The obvious fix —
-  // `reportError({ severity: 'critical' })` — DOES NOT WORK here: a dev build has
-  // no `VITE_BEANIES_ERROR_WEBHOOK_URL`, so the Slack path silently no-ops. The
-  // missing webhook IS the condition being reported.
-  //
-  // The telemetry firehose is the reliable channel, because its ingest endpoint is
-  // reachable independently of the Slack webhooks. `logEvent` with `flush: true`
-  // ships immediately, and the telemetry Lambda forwards `boot-integrity` events
-  // to Slack SERVER-SIDE (see infrastructure/lambda/telemetry/index.mjs) where the
-  // webhook is an environment variable this bundle can't be missing.
-  //
-  // `reportError` is still called as belt-and-braces: it costs nothing and does
-  // reach Slack in the partial-misconfiguration case (error webhook present but,
-  // say, the build SHA missing).
+  // undetected for hours until a user-facing symptom surfaced. One `reportError`
+  // at `critical` is the whole report: it is a single firehose write with
+  // `flush: true`, and the telemetry Lambda pages `boot-integrity` SERVER-SIDE
+  // (see infrastructure/lambda/telemetry/index.mjs), where the Slack webhook is an
+  // environment variable this bundle cannot be missing.
   const buildSha = (env.VITE_BUILD_SHA as string | undefined) ?? 'dev';
   if (
     typeof window !== 'undefined' &&
@@ -181,17 +168,6 @@ if (env.PROD && (features.drive || features.registry)) {
     // Imported lazily so this module stays importable by the Vite config graph
     // (vite.config.ts pulls in src/config/* at build time; a static import of the
     // telemetry stack here would drag Pinia/Vue into that graph).
-    void import('@/services/telemetry')
-      .then(({ logEvent }) => {
-        logEvent({
-          level: 'error',
-          surface: 'boot-integrity',
-          message,
-          context: { action: 'dev-build-on-cloud-host' },
-          flush: true,
-        });
-      })
-      .catch((e) => console.warn('[features] could not report build-integrity failure', e));
     void import('@/utils/errorReporter')
       .then(({ reportError }) => {
         reportError({
@@ -201,9 +177,7 @@ if (env.PROD && (features.drive || features.registry)) {
           context: { action: 'dev-build-on-cloud-host' },
         });
       })
-      .catch(() => {
-        /* logEvent above is the reliable path; this is belt-and-braces only */
-      });
+      .catch((e) => console.warn('[features] could not report build-integrity failure', e));
   }
 }
 

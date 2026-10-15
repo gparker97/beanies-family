@@ -26,6 +26,7 @@ vi.mock('../../projection', () => ({ applyDelta: vi.fn(), markAuthoritative: vi.
 vi.mock('@/utils/errorReporter', () => ({ reportError: vi.fn() }));
 vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: vi.fn() }));
 vi.mock('@/utils/visibilityTracker', () => ({
+  ensureVisibilityTracking: vi.fn(),
   wasHiddenSince: vi.fn(() => false),
   getHiddenDurationMs: vi.fn(() => null),
 }));

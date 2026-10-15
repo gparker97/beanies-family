@@ -1,10 +1,11 @@
 import { ref } from 'vue';
 import { reportError } from '@/utils/errorReporter';
+import type { PagingSurface } from '@/utils/pagingPolicy';
 import { useTranslationStore } from '@/stores/translationStore';
 
 export type ToastType = 'success' | 'error' | 'warning' | 'info';
 
-export interface ToastActionOptions {
+interface ToastActionBase {
   /** Label rendered on the action button (e.g. "Undo"). */
   actionLabel?: string;
   /**
@@ -35,21 +36,6 @@ export interface ToastActionOptions {
    */
   silent?: boolean;
   /**
-   * Page #beanies-errors for this toast (`severity: 'critical'`). Set ONLY for
-   * genuinely fatal / user-blocking errors that must reach a human (e.g. a save
-   * that failed and lost the user's work, a pod that couldn't be created).
-   * Default: the error is captured in telemetry + console but does NOT page —
-   * and the toast omits the "Support has been notified" line. No-op for
-   * non-error toasts and when `silent` is set.
-   */
-  critical?: boolean;
-  /**
-   * Override the auto-detected surface name for the error report.
-   * If unset, the reporter falls back to a generic 'app' surface.
-   * Use kebab-case: 'create-activity', 'drive-sync-write', etc.
-   */
-  surface?: string;
-  /**
    * Extra structured context for the error report. Filtered through the
    * reporter's allowlist before send — anything not on the allowlist is
    * dropped with a console.warn.
@@ -61,6 +47,20 @@ export interface ToastActionOptions {
    */
   error?: unknown;
 }
+
+/**
+ * Toast options. `critical: true` pages #beanies-errors (`severity: 'critical'`) and so, exactly
+ * as on `reportError`, requires a `surface` on the paging allowlist (`utils/pagingPolicy.ts`).
+ * Set it ONLY for genuinely fatal / user-blocking errors that must reach a human (e.g. a save
+ * that failed and lost the user's work). Default: the error is captured in telemetry + console
+ * but does NOT page, and the toast omits the "Support has been notified" line. No-op for
+ * non-error toasts and when `silent` is set.
+ *
+ * `surface` overrides the report surface; unset falls back to a generic 'app'. Kebab-case:
+ * 'create-activity', 'drive-sync-write', etc.
+ */
+export type ToastActionOptions = ToastActionBase &
+  ({ critical: true; surface: PagingSurface } | { critical?: false; surface?: string });
 
 export interface Toast {
   id: number;
@@ -126,24 +126,28 @@ export function showToast(
 
   // Auto-report system errors. Wrapped in try/catch — a reporter failure
   // must NEVER prevent the toast from rendering. The user always sees
-  // their error, even if Slack is down or the reporter itself bugs out.
+  // their error, even if the reporter itself bugs out.
   let reported = false;
   if (type === 'error' && !options?.silent) {
     try {
       // The toast's `title` is the error class name (e.g. "Couldn't save");
       // `message` is the user-facing detail, included as the reporter's
-      // `message` so support sees the full toast text in Slack. If the
+      // `message` so support sees the full toast text in the report. If the
       // caller passed an Error, its stack is attached separately.
       const reportMessage = message ? `${title} — ${message}` : title;
+      // Toasts are user-visible but not automatically fatal: page only when the caller marks
+      // this critical (which the option type allows only on a paging surface). Otherwise
+      // telemetry + console capture it without paging support.
+      // Only the surface/severity pair differs; the union keeps `critical` tied to a
+      // paging surface without a cast.
+      const report = options?.critical
+        ? { severity: 'critical' as const, surface: options.surface }
+        : { surface: options?.surface ?? 'app' };
       reportError({
-        surface: options?.surface ?? 'app',
+        ...report,
         message: reportMessage,
         error: options?.error,
         context: options?.context,
-        // Toasts are user-visible but not automatically fatal — page only when
-        // the caller marks this critical. Otherwise telemetry + console capture
-        // it without paging support.
-        severity: options?.critical ? 'critical' : undefined,
       });
       // `reported` drives the "Support has been notified" line — keep it
       // truthful: a human is paged only when this toast was critical.

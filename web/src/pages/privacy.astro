@@ -152,8 +152,9 @@ import LegalLayout from '../layouts/LegalLayout.astro';
     <ul>
       <li>
         <strong>error reports:</strong> when something breaks in a way that could affect your data,
-        the app sends an error report to our maintainer alerting channel. because we may need to
-        contact you about a serious problem, that report includes the account owner's email address
+        the app sends an error report to our error log on AWS, from which a page can be sent to
+        the team's Slack channel. because we may need to find your family's report, it includes
+        the family's display name and an anonymous family id, never an email address
       </li>
       <li>
         <strong>diagnostic logs:</strong> a stream of technical events (error messages, the screen

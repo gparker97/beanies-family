@@ -95,7 +95,7 @@ onMounted(() => {
     if (!stashPickerSelection(params.get('picked_file_ids'), 'web')) {
       reportError({
         surface: 'oauth.redirectStateLost',
-        severity: 'critical',
+        severity: 'error',
         message: 'picker redirect returned but the selection could not be stashed',
       });
     }
@@ -127,10 +127,10 @@ onMounted(() => {
       surface: 'oauth.redirectStateLost',
       message:
         'OAuth redirect returned with a code but no usable routing state (malformed/absent `state` param, or storage write failed)',
-      // Critical: a code-in-hand-but-routing-lost HARD-BLOCKS onboarding — it
-      // must page Slack. The device's `web_storage` context distinguishes a
-      // genuine storage fault from this (now-rare) malformed-callback case.
-      severity: 'critical',
+      // Not paged (2026-10-15 paging policy): the person retries sign-in, and the
+      // rate stays visible in CloudWatch. The device's `web_storage` context
+      // distinguishes a genuine storage fault from a malformed callback.
+      severity: 'error',
     });
     window.location.href = '/welcome?authError=storage';
     return;

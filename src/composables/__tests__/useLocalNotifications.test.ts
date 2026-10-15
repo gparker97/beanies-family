@@ -221,13 +221,13 @@ describe('reconcileScheduled — the ordering that stops a failure wiping remind
     expect(plugin.cancel).toHaveBeenCalledWith({ notifications: [{ id: 999_111 }] });
   });
 
-  it('a rejecting schedule() leaves pending alarms untouched, pages, and toasts once', async () => {
+  it('a rejecting schedule() leaves pending alarms untouched, reports at error, and toasts once', async () => {
     plugin.schedule.mockRejectedValue(new Error('bridge down'));
     await reconcileScheduled(payload, true, META);
     expect(plugin.cancel).not.toHaveBeenCalled(); // the user keeps what they had
     expect(reportError).toHaveBeenCalledWith(
       expect.objectContaining({
-        severity: 'critical',
+        severity: 'error',
         context: expect.objectContaining({ notif_error_stage: 'schedule' }),
       })
     );
@@ -268,12 +268,12 @@ describe('reconcileScheduled — the ordering that stops a failure wiping remind
     );
   });
 
-  it('a failing createChannel is CRITICAL on Android — every reminder would vanish', async () => {
+  it('a failing createChannel is reported at error on Android (every reminder would vanish)', async () => {
     plugin.createChannel.mockRejectedValue(new Error('no channel'));
     await reconcileScheduled(payload, true, META);
     expect(reportError).toHaveBeenCalledWith(
       expect.objectContaining({
-        severity: 'critical',
+        severity: 'error',
         context: expect.objectContaining({ notif_error_stage: 'channel' }),
       })
     );

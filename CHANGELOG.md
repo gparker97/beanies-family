@@ -13,6 +13,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 ### Fixed
 
 - Planner: "Open their profile" in the birthday drawer now opens that member's profile instead of doing nothing.
+- A slow first load no longer leaves a "Setup is taking longer than expected" screen over a working app.
+- On Android, a Google sign-in that reported "no sign-in was pending" during pod creation now completes on the first try.
+- After Start over, the app no longer reports a lost data connection for the discarded family.
+- Opening the app in two tabs at once no longer reports a cache replay gap.
+
+### Changed
+
+- Error alerts to the team channel are now sent server-side and only for data-at-risk or blocked-journey failures; everything else stays in diagnostics.
 
 ## 2026-10-14
 

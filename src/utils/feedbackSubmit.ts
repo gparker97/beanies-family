@@ -93,12 +93,14 @@ type FeedbackOutcome = 'dispatched' | 'dropped_no_webhook' | 'network_error' | '
 /**
  * Record the outcome of one submission. Every path lands here exactly once.
  *
- * Any outcome other than `dispatched` is UNRECOVERABLE DATA LOSS — feedback is
- * stored nowhere else and the user has already been shown a thank-you — so it
- * pages `#beanies-errors` via `reportError({ severity: 'critical' })`. That path
- * uses a DIFFERENT webhook (`VITE_BEANIES_ERROR_WEBHOOK_URL`), which is what
- * makes it able to report a missing/broken feedback webhook at all. `reportError`
- * does not toast, so the user's thank-you screen is unaffected.
+ * Any outcome other than `dispatched` is UNRECOVERABLE DATA LOSS: feedback is
+ * stored nowhere else and the user has already been shown a thank-you. A build
+ * with no feedback webhook (`dropped_no_webhook`) loses EVERY submission, so it
+ * pages `#beanies-errors` (`severity: 'critical'`, paged server-side by the
+ * telemetry Lambda, which is what makes it able to report a missing feedback
+ * webhook at all). A network or build failure loses one submission and reports
+ * at `error`: the rate is the signal. `reportError` does not toast, so the
+ * user's thank-you screen is unaffected.
  */
 function recordOutcome(outcome: FeedbackOutcome, error?: unknown): void {
   if (outcome === 'dispatched') {
@@ -123,7 +125,7 @@ function recordOutcome(outcome: FeedbackOutcome, error?: unknown): void {
 
   reportError({
     surface: SURFACE,
-    severity: 'critical',
+    severity: outcome === 'dropped_no_webhook' ? 'critical' : 'error',
     message,
     error,
     context: { action: outcome },

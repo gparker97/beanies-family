@@ -3,20 +3,20 @@
  * allowlist, context redaction, message normalization, identity/environment
  * enrichment, and stack extraction.
  *
- * Used by BOTH telemetry surfaces:
- *   - `src/utils/errorReporter.ts` (critical errors → Slack)
- *   - `src/services/telemetry/*` (the full diagnostic firehose → AWS)
+ * Used by the telemetry firehose (`src/services/telemetry/*`, which ships to
+ * AWS), and through it by `src/utils/errorReporter.ts` (the typed severity gate
+ * in front of the firehose; paging is the telemetry Lambda's decision).
  *
  * Dependency direction is one-way: errorReporter and telemetry import FROM
  * here; this module imports nothing from either, so there is no import cycle.
  * (The `APP_VERSION` constant it reads imports nothing, so no cycle there either.)
  *
  * Privacy contract:
- *   - Strict allowlist for context fields (NOT a blocklist). Email is the only
- *     PII allowed, and only on the low-volume Slack error path
- *     (`enrichAndRedact(..., { includeEmail: true })`). The high-volume
- *     telemetry firehose passes `includeEmail: false` and correlates by
- *     `family_id` (a random UUID, non-PII) instead.
+ *   - Strict allowlist for context fields (NOT a blocklist). No email ever
+ *     leaves the client. The family name is the only PII allowed, and only on
+ *     critical reports (`enrichAndRedact(..., { includeFamilyName: true })`, set
+ *     by `reportError` so the Lambda's Slack page can name the family). Every
+ *     other event correlates by `family_id` (a random UUID, non-PII) instead.
  *   - Stack traces ship as-is (Error.stack contains function@file:line, no
  *     local variable values).
  *
@@ -29,7 +29,6 @@
 
 import { APP_VERSION } from '@/constants/appVersion';
 import { getDeviceInfo, tail } from '@/utils/diagnostics';
-import { useFamilyStore } from '@/stores/familyStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useSyncStore } from '@/stores/syncStore';
 // The state holder only (it imports nothing but `storedJson`). The orchestrator that logs,
@@ -45,11 +44,11 @@ import { currentCreateAttempt } from '@/utils/createAttemptState';
  * adding a new context field requires explicit opt-in here AND the test
  * continues to pass.
  *
- * Email and family name are the only PII allowed, and BOTH ship only on the
- * low-volume Slack error path (gated by `includeEmail` in `enrichAndRedact` —
- * `family_email` and `family_name` are added to the payload only when
- * `includeEmail: true`). The high-volume telemetry firehose omits them and
- * correlates by `family_id` (a random UUID) instead, so it stays PII-free.
+ * The family name is the only PII allowed, and it ships only on critical
+ * reports (gated by `includeFamilyName` in `enrichAndRedact`, which only
+ * `reportError` sets, for `severity: 'critical'`). No email key exists here:
+ * the client never reads or sends one. Everything else correlates by
+ * `family_id` (a random UUID).
  * Add new fields only after confirming they cannot carry user-typed content
  * (transaction descriptions, activity titles, member names, etc.).
  *
@@ -65,7 +64,6 @@ import { currentCreateAttempt } from '@/utils/createAttemptState';
 export const ALLOWED_CONTEXT_KEYS = new Set<string>([
   'family_id',
   'family_name',
-  'family_email',
   'route_path',
   'route_name',
   'from_path',
@@ -139,8 +137,8 @@ export const ALLOWED_CONTEXT_KEYS = new Set<string>([
   'vue_info',
   'component',
   // The report's real severity ('warning' | 'error' | 'critical'), injected by
-  // `errorReporter.handleReport` so the firehose stays filterable ("which events
-  // actually paged Slack?" = severity === 'critical'). `LogLevel` has no
+  // `reportError` so the firehose stays filterable and the telemetry Lambda can
+  // gate its Slack page on `severity === 'critical'`. `LogLevel` has no
   // 'critical', so it cannot ride on `level`.
   //
   // This was NOT allowlisted until 2026-07-10 — the key was stripped (with a
@@ -435,8 +433,8 @@ export function normalizeMessage(message: string): string {
  * trail. Two guarantees, both load-bearing:
  *
  *   1. PII-free. The `auth:` breadcrumb embeds `user=<email>`, but the telemetry
- *      firehose is PII-free by contract (the Lambda allowlist omits
- *      `family_email`). Every email-shaped token is replaced with `<email>`. The
+ *      firehose carries no email by contract (neither allowlist has an email
+ *      key). Every email-shaped token is replaced with `<email>`. The
  *      pattern mirrors the repo's own email shape (`src/utils/email.ts`:
  *      `[^\s@]+@[^\s@]+\.[^\s@]+`); the extra `|` exclusion stops a match from
  *      spanning the ` | ` crumb separator, and the `@` exclusion stops it
@@ -475,9 +473,9 @@ export function getBuildTime(): string | null {
 /**
  * A subtle, human-readable "which version am I on?" marker for the welcome gate
  * (2026-06-19). Format: `<short-sha> · <DD Mon YYYY>` (e.g. `41f5353 · 19 Jun 2026`).
- * The short SHA is the first 7 chars of `VITE_BUILD_SHA` — the SAME value the
- * error reporter ships in the `Build:` field of #beanies-errors, so a Slack
- * alert can be matched directly against the running build. A local/dev build
+ * The short SHA is the first 7 chars of `VITE_BUILD_SHA`, the SAME `build_sha`
+ * every telemetry event carries (and the Lambda's #beanies-errors page shows),
+ * so an alert can be matched directly against the running build. A local/dev build
  * (no injected SHA) returns `dev`. Increments on every deploy (new commit +
  * new build time).
  */
@@ -539,15 +537,15 @@ export interface EnrichInput {
  * a Pinia pre-init race (boot-time event) doesn't lose ALL context — the
  * result still ships with the bits that worked.
  *
- * `includeEmail` gates the owner email: the critical Slack error path passes
- * `true` (precedent — operators may need to contact the family); the
- * high-volume telemetry firehose passes `false` and correlates by `family_id`.
+ * `includeFamilyName` gates the family name: `reportError` passes `true` for
+ * critical reports so the Lambda's Slack page can name the family; every other
+ * event passes `false` and correlates by `family_id`.
  *
  * Never touches Pinia at module-import time — only when actually called.
  */
 export function enrichAndRedact(
   input: EnrichInput,
-  opts: { includeEmail?: boolean } = {}
+  opts: { includeFamilyName?: boolean } = {}
 ): Record<string, unknown> {
   const raw: Record<string, unknown> = {
     build_sha: getBuildSha(),
@@ -556,35 +554,25 @@ export function enrichAndRedact(
 
   // Family identity (read once; tolerant of pre-auth state). `family_id` is a
   // random UUID (generateUUID → crypto.randomUUID; familyContext.ts) — non-PII,
-  // so it ships on BOTH paths as the correlation key. `family_name` is user-typed
-  // (commonly a surname) → PII, so it ships ONLY with `includeEmail` (the
-  // low-volume Slack error path, which already carries the owner email), NEVER on
-  // the high-volume telemetry firehose. This is what keeps the firehose PII-free.
+  // so it ships on every event as the correlation key. `family_name` is user-typed
+  // (commonly a surname) → PII, so it ships ONLY with `includeFamilyName` (critical
+  // reports, low volume, so the page can name the family), never on the rest of
+  // the stream.
   try {
     const ctx = useFamilyContextStore();
     if (ctx.activeFamilyId) raw.family_id = ctx.activeFamilyId;
-    if (opts.includeEmail && ctx.activeFamilyName) raw.family_name = ctx.activeFamilyName;
+    if (opts.includeFamilyName && ctx.activeFamilyName) raw.family_name = ctx.activeFamilyName;
   } catch {
     /* pre-auth, no Pinia, or store error — context is just less rich */
   }
 
-  // The open pod-creation attempt (#128). A random UUID, non-PII, so it ships on both paths,
+  // The open pod-creation attempt (#128). A random UUID, non-PII, so it ships on every event,
   // and it is what correlates the events BEFORE a pod exists, where `family_id` is absent. An
   // in-memory read (never localStorage per event). The caller's value wins: a boot event about
   // an expired attempt names that attempt's id explicitly after the cache has been cleared.
   if (raw.create_attempt_id === undefined) {
     const attemptId = currentCreateAttempt()?.id;
     if (attemptId) raw.create_attempt_id = attemptId;
-  }
-
-  if (opts.includeEmail) {
-    try {
-      const fam = useFamilyStore();
-      const owner = fam.members?.find?.((m) => m.role === 'owner');
-      if (owner?.email) raw.family_email = owner.email;
-    } catch {
-      /* same as above — independent so partial context still ships */
-    }
   }
 
   // Sync state

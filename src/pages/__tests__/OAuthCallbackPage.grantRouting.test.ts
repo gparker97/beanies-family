@@ -144,7 +144,7 @@ describe('OAuthCallbackPage — the picker grant (#98)', () => {
 
     const { reportError } = await import('@/utils/errorReporter');
     expect(reportError).toHaveBeenCalledWith(
-      expect.objectContaining({ severity: 'critical', surface: 'oauth.redirectStateLost' })
+      expect.objectContaining({ severity: 'error', surface: 'oauth.redirectStateLost' })
     );
     // The user is still put back where they came from rather than dumped on '/'.
     expect(hrefTarget).toBe(RETURN);

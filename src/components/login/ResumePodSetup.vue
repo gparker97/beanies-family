@@ -108,6 +108,7 @@ import { resolveDriveCollision } from '@/composables/useDriveCollisionRecovery';
 import { canUseLocalFiles } from '@/services/sync/capabilities';
 import { isTokenValid } from '@/services/google/googleAuth';
 import { reportError } from '@/utils/errorReporter';
+import { severityFor } from '@/utils/pagingPolicy';
 import { isDriveStorageFull } from '@/utils/podAccess';
 import { logEvent } from '@/services/telemetry';
 import { trackOnboardingStep, type OnboardingStep } from '@/services/telemetry/onboardingAttempt';
@@ -1066,7 +1067,10 @@ async function finalizePod(): Promise<boolean> {
     formError.value = t(reasonKey[result.reason] ?? 'setup.fileCreateFailed');
     console.error(`[ResumePodSetup] createNewFile failed (reason=${result.reason}):`, result.error);
     reportError({
-      surface: `resumeSetup.${result.reason}`,
+      ...severityFor(
+        `resumeSetup.${result.reason}`,
+        result.reason === 'provider-mismatch' ? 'degraded' : 'journey-blocked'
+      ),
       message: `createNewFile failed during resume at step '${result.reason}': ${result.error.message}`,
       error: result.error,
       // ⚠️ `provider-mismatch` IS NOT CRITICAL, for the same reason `existing-pod` above is not:
@@ -1074,8 +1078,8 @@ async function finalizePod(): Promise<boolean> {
       // one tap on the storage step. `critical` pages #beanies-errors and force-flushes; reserving
       // it for "a user action failed or data is at risk" (CLAUDE.md) keeps that channel worth
       // reading. The keep-data-sign-out-then-create-another-family path is common enough that
-      // paging on it would bury real create failures in the same bucket.
-      severity: result.reason === 'provider-mismatch' ? 'warning' : 'critical',
+      // paging on it would bury real create failures in the same bucket. Every other reason
+      // pages: each `resumeSetup.<reason>` surface is on the paging allowlist.
       context: { provider_type: syncStore.storageProviderType ?? null },
     });
     return false;

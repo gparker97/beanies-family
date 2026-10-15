@@ -672,6 +672,42 @@ describe('googleAuth (PKCE)', () => {
     });
   });
 
+  describe('isInteractiveOAuthPending', () => {
+    it('is true from the moment the consent popup opens, before the single-flight promise exists', async () => {
+      // `requestAccessToken` opens the popup first (user-gesture), then awaits the silent
+      // attempts; `pendingAuthPromise` only exists after them. The popup is on screen the whole
+      // time, so the save-failure banner must already read "mid-consent".
+      vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'test-client-id');
+      try {
+        googleAuth.primeRefreshToken('family-123', { token: 'rt', issuedAt: null });
+        const { refreshAccessToken } = await import('../oauthProxy');
+        let releaseRefresh!: () => void;
+        (refreshAccessToken as ReturnType<typeof vi.fn>).mockImplementationOnce(
+          () =>
+            new Promise((resolve) => {
+              releaseRefresh = () =>
+                resolve({ access_token: 'silent-token', expires_in: 3600, token_type: 'Bearer' });
+            })
+        );
+        const popup = { closed: false, close: vi.fn(), location: { href: '' } };
+        const open = vi.spyOn(window, 'open').mockReturnValue(popup as unknown as Window);
+
+        expect(googleAuth.isInteractiveOAuthPending()).toBe(false);
+        const request = googleAuth.requestAccessToken();
+        expect(open).toHaveBeenCalledTimes(1);
+        // Popup open, silent refresh still in flight, no single-flight promise yet.
+        expect(googleAuth.isInteractiveOAuthPending()).toBe(true);
+
+        releaseRefresh();
+        await expect(request).resolves.toBe('silent-token');
+        expect(popup.close).toHaveBeenCalled();
+        expect(googleAuth.isInteractiveOAuthPending()).toBe(false);
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    });
+  });
+
   describe('hasRefreshToken', () => {
     it('returns false when no refresh token loaded', () => {
       expect(googleAuth.hasRefreshToken()).toBe(false);
@@ -1973,6 +2009,22 @@ describe('googleAuth (PKCE)', () => {
       // getGoogleRefreshToken returns null by default, so no migration
       expect(storeGoogleRefreshToken).not.toHaveBeenCalled();
       expect(clearGoogleRefreshToken).not.toHaveBeenCalled();
+    });
+
+    it('a pending token is MOVED: stored under the family key, pending key cleared', async () => {
+      const fhs = await import('@/services/sync/fileHandleStore');
+      (fhs.getGoogleRefreshToken as ReturnType<typeof vi.fn>).mockImplementation(
+        async (key: string) =>
+          key === '__pending__' ? { token: 'pending-tok', issuedAt: 7 } : null
+      );
+
+      const migrated = await googleAuth.migratePendingRefreshToken('fam-new');
+
+      expect(migrated).toBe(true);
+      expect(fhs.storeGoogleRefreshToken).toHaveBeenCalledWith('fam-new', 'pending-tok', {
+        issuedAt: 7,
+      });
+      expect(fhs.clearGoogleRefreshToken).toHaveBeenCalledWith('__pending__');
     });
 
     it('enables silent refresh after migration', async () => {

@@ -80,7 +80,14 @@ export interface PodAccessEntry extends StructuredErrorEntry {
 
 /**
  * Single source of truth. `as const satisfies` makes a missing entry a build
- * error, so adding a code forces a message, a recovery, and a severity.
+ * error, so adding a code forces a message, a recovery, a severity (the banner
+ * tint) and an impact (whether its `pod-access` report pages, through
+ * `severityFor('pod-access', impact)`).
+ *
+ * `impact` is `'degraded'` for every code but `CANONICAL_MISMATCH`: a member
+ * writing to a non-canonical pod is live data divergence; the rest (a revoked
+ * share, an expired consent, a missing file, an old or new format) are shown to
+ * the person with a recovery and do not need a human woken up.
  *
  * NOTE there is deliberately no "create a new file" recovery, and there must
  * never be one. If a future code has no usable recovery, give it `recoveries: []`
@@ -93,69 +100,57 @@ export const POD_ACCESS_ERRORS = {
     messageKey: 'podAccess.error.offline',
     recoveries: ['retry'],
     severity: 'warning',
+    impact: 'degraded',
   },
   PERMISSION_DENIED: {
     messageKey: 'podAccess.error.permissionDenied',
     recoveries: ['retry', 'pickFamilyFile', 'pickFamilyFileOtherAccount'],
     severity: 'critical',
+    impact: 'degraded',
   },
   CONSENT_EXPIRED: {
     messageKey: 'podAccess.error.consentExpired',
     recoveries: ['reconnectAccount'],
     severity: 'critical',
+    impact: 'degraded',
   },
   FILE_NOT_FOUND: {
     messageKey: 'podAccess.error.fileNotFound',
     recoveries: ['retry', 'pickFamilyFile', 'pickFamilyFileOtherAccount'],
     severity: 'critical',
+    impact: 'degraded',
   },
   VERIFY_UNAVAILABLE: {
     messageKey: 'podAccess.error.verifyUnavailable',
     recoveries: ['retry'],
     severity: 'warning',
+    impact: 'degraded',
   },
   CANONICAL_MISMATCH: {
     messageKey: 'podAccess.error.canonicalMismatch',
     recoveries: ['switchToCanonical', 'pickFamilyFile', 'pickFamilyFileOtherAccount'],
     severity: 'critical',
+    impact: 'data-at-risk',
   },
   NO_HOME: {
     messageKey: 'podAccess.error.noHome',
     recoveries: ['pickFamilyFile', 'pickFamilyFileOtherAccount'],
     severity: 'critical',
+    impact: 'degraded',
   },
   FILE_NEWER_VERSION: {
     messageKey: 'podAccess.error.newerVersion',
     recoveries: [],
     severity: 'warning',
+    impact: 'degraded',
   },
   FILE_OLDER_VERSION: {
     messageKey: 'podOlderVersion.inline',
     recoveries: [],
     severity: 'warning',
+    impact: 'degraded',
   },
 } as const satisfies Record<PodAccessErrorCode, PodAccessEntry>;
-
-/**
- * Which codes page Slack. Data, not fifteen scattered `reportError` calls — so
- * "is this critical?" is answerable by reading one table.
- *
- * `critical` is reserved for "a user action failed or data is at risk". A member
- * writing to a non-canonical pod is live data divergence, so `CANONICAL_MISMATCH`
- * qualifies; a flaky Drive response does not.
- */
-export const POD_ACCESS_SEVERITY: Record<PodAccessErrorCode, 'warning' | 'critical'> = {
-  OFFLINE: 'warning',
-  PERMISSION_DENIED: 'critical',
-  CONSENT_EXPIRED: 'critical',
-  FILE_NOT_FOUND: 'critical',
-  VERIFY_UNAVAILABLE: 'warning',
-  CANONICAL_MISMATCH: 'critical',
-  NO_HOME: 'critical',
-  // "Please update beanies" is not an incident and must not page.
-  FILE_NEWER_VERSION: 'warning',
-  FILE_OLDER_VERSION: 'warning',
-};
 
 /**
  * Which payload kinds this classifier answers for itself, and which fall through

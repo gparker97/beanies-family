@@ -196,8 +196,9 @@ describe('useToast — auto-report on error', () => {
   });
 
   it('a critical error toast pages (severity: critical) and is marked reported', () => {
-    showToast('error', 'Boom', undefined, { critical: true });
+    showToast('error', 'Boom', undefined, { critical: true, surface: 'delete-family' });
     expect(reportErrorMock.mock.calls[0]![0].severity).toBe('critical');
+    expect(reportErrorMock.mock.calls[0]![0].surface).toBe('delete-family');
     expect(toasts.value.at(-1)?.reported).toBe(true);
   });
 

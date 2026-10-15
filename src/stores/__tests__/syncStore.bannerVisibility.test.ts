@@ -26,6 +26,10 @@ const {
   tokenPermanentlyExpiredCallbackHolder,
   stateChangeCallbackHolder,
   isSilentRefreshPendingMock,
+  isInteractiveOAuthPendingMock,
+  getLastSaveCauseMock,
+  saveErrorCodeMock,
+  logEventMock,
   isTokenValidMock,
   saveNowMock,
   loadMock,
@@ -54,6 +58,10 @@ const {
       | null,
   },
   isSilentRefreshPendingMock: vi.fn(() => false),
+  isInteractiveOAuthPendingMock: vi.fn(() => false),
+  getLastSaveCauseMock: vi.fn<() => unknown>(() => null),
+  saveErrorCodeMock: vi.fn<(e: unknown) => string>(() => 'unknown'),
+  logEventMock: vi.fn(),
   isTokenValidMock: vi.fn(() => false),
   saveNowMock: vi.fn(async () => true),
   loadMock: vi.fn(async () => null as string | null),
@@ -97,8 +105,15 @@ vi.mock('@/services/sync/syncService', async () => {
     initialize: vi.fn(async () => true),
     getProviderType: vi.fn(() => 'google_drive'),
     hasPermission: vi.fn(async () => true),
+    getLastSaveCause: getLastSaveCauseMock,
+    saveErrorCode: saveErrorCodeMock,
   };
 });
+
+vi.mock('@/services/telemetry/logEvent', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/services/telemetry/logEvent')>()),
+  logEvent: logEventMock,
+}));
 
 vi.mock('@/services/google/googleAuth', () => ({
   whenRedirectAuthSettled: vi.fn(async () => {}),
@@ -116,6 +131,7 @@ vi.mock('@/services/google/googleAuth', () => ({
   fetchGoogleUserEmail: vi.fn(async () => null),
   getVerifiedGoogleAccountEmail: vi.fn(() => null),
   isSilentRefreshPending: isSilentRefreshPendingMock,
+  isInteractiveOAuthPending: isInteractiveOAuthPendingMock,
   isTokenValid: isTokenValidMock,
   getLastSilentRefreshDiagnostics: getLastSilentRefreshDiagnosticsMock,
 }));
@@ -237,6 +253,11 @@ describe('syncStore — save-failure banner visibility', () => {
     tokenPermanentlyExpiredCallbackHolder.cb = null;
     stateChangeCallbackHolder.cb = null;
     isSilentRefreshPendingMock.mockReturnValue(false);
+    isInteractiveOAuthPendingMock.mockReturnValue(false);
+    getLastSaveCauseMock.mockReturnValue(null);
+    // Stands in for the real classifier (unit-tested in saveFailureTracking.test.ts):
+    // what matters here is that the store passes the CURRENT cause through it.
+    saveErrorCodeMock.mockImplementation((e) => (e instanceof Error ? e.name : 'unknown'));
     isTokenValidMock.mockReturnValue(false);
     saveNowMock.mockResolvedValue(true);
     loadMock.mockResolvedValue(null);
@@ -327,6 +348,125 @@ describe('syncStore — save-failure banner visibility', () => {
 
       saveFailureCallbackHolder.cb!('warning', 'err');
       expect(store.showSaveFailureBanner).toBe(false);
+    });
+  });
+
+  // Plan 2026-10-15 (error-review paging policy), requirements 18-22.
+  describe('banner telemetry', () => {
+    /** Three failed saves, as syncService reports them: two level transitions. */
+    function failThreeSaves(error = 'Server error'): void {
+      saveFailureCallbackHolder.cb!('warning', error);
+      saveFailureCallbackHolder.cb!('critical', error);
+    }
+    const reportsOn = (surface: string) =>
+      reportErrorMock.mock.calls
+        .map(
+          (c) => c[0] as { surface: string; severity: string; context?: Record<string, unknown> }
+        )
+        .filter((a) => a.surface === surface);
+    const eventsOn = (surface: string) =>
+      logEventMock.mock.calls
+        .map((c) => c[0] as { level: string; message: string; context?: Record<string, unknown> })
+        .filter((e) => (e as unknown as { surface: string }).surface === surface);
+
+    it('three failed saves while a native trip or web popup is live defer the banner', () => {
+      const store = useSyncStore();
+      isInteractiveOAuthPendingMock.mockReturnValue(true);
+
+      failThreeSaves();
+
+      expect(store.showSaveFailureBanner).toBe(false);
+      expect(reportsOn('save-failure-banner')).toHaveLength(0);
+
+      vi.advanceTimersByTime(5001);
+      expect(store.showSaveFailureBanner).toBe(true);
+      expect(reportsOn('save-failure-banner')[0]).toMatchObject({
+        severity: 'error',
+        context: { action: 'shown-deferred' },
+      });
+    });
+
+    it('a shown banner reports at error with action "shown" and the current error_code', () => {
+      useSyncStore();
+      getLastSaveCauseMock.mockReturnValue(new TypeError('Failed to fetch'));
+
+      failThreeSaves();
+
+      const reports = reportsOn('save-failure-banner');
+      expect(reports).toHaveLength(1);
+      expect(reports[0]).toMatchObject({
+        severity: 'error',
+        context: { action: 'shown', error_code: 'TypeError' },
+      });
+      // The two keys the allowlist used to strip silently are gone.
+      expect(reports[0].context).not.toHaveProperty('lastSaveError');
+      expect(reports[0].context).not.toHaveProperty('deferred');
+    });
+
+    it('a banner suppressed behind the reconnect toast logs a warn instead of reporting', () => {
+      const store = useSyncStore();
+      store.showGoogleReconnect = true;
+
+      failThreeSaves();
+
+      expect(store.shouldShowSaveFailureBanner).toBe(false);
+      expect(reportsOn('save-failure-banner')).toHaveLength(0);
+      expect(eventsOn('save-failure-banner')).toContainEqual(
+        expect.objectContaining({
+          level: 'warn',
+          message: 'banner suppressed',
+          context: expect.objectContaining({ action: 'suppressed-reconnect' }),
+        })
+      );
+    });
+
+    it('recovery after a shown banner logs "recovered" with perf_duration_ms', () => {
+      useSyncStore();
+      failThreeSaves();
+
+      vi.advanceTimersByTime(30_000);
+      saveFailureCallbackHolder.cb!('none', null);
+
+      expect(eventsOn('save-failure-banner')).toContainEqual(
+        expect.objectContaining({
+          level: 'info',
+          message: 'recovered',
+          context: { perf_duration_ms: 30_000 },
+        })
+      );
+    });
+
+    it('recovery after a SUPPRESSED banner logs no "recovered" (the user never saw it)', () => {
+      const store = useSyncStore();
+      store.showGoogleReconnect = true;
+      failThreeSaves();
+
+      saveFailureCallbackHolder.cb!('none', null);
+
+      expect(eventsOn('save-failure-banner').map((e) => e.message)).not.toContain('recovered');
+    });
+
+    it('a banner suppressed behind the toast logs "shown-revealed" when the toast clears, then "recovered"', async () => {
+      const { nextTick } = await import('vue');
+      const store = useSyncStore();
+      store.showGoogleReconnect = true;
+      failThreeSaves();
+      expect(reportsOn('save-failure-banner')).toHaveLength(0);
+
+      store.showGoogleReconnect = false;
+      await nextTick();
+      const reports = reportsOn('save-failure-banner');
+      expect(reports).toHaveLength(1);
+      expect(reports[0]).toMatchObject({
+        severity: 'error',
+        context: { action: 'shown-revealed', error_code: 'unknown' },
+      });
+
+      vi.advanceTimersByTime(30_000);
+      saveFailureCallbackHolder.cb!('none', null);
+      expect(eventsOn('save-failure-banner')).toContainEqual(
+        expect.objectContaining({ message: 'recovered', context: { perf_duration_ms: 30_000 } })
+      );
     });
   });
 

@@ -102,6 +102,94 @@ describe('syncService — save failure tracking', () => {
     });
   });
 
+  describe('saveErrorCode (the one failure-class expression)', () => {
+    it('names a remote blocker by its block code', () => {
+      const e = new UnsupportedBeanpodVersionError('6.0', 'test-family');
+      expect(syncService.saveErrorCode(e)).toBe(e.blockCode);
+    });
+
+    it('names any other Error by its class name', () => {
+      class DriveTimeoutError extends Error {
+        override name = 'DriveTimeoutError';
+      }
+      expect(syncService.saveErrorCode(new DriveTimeoutError('slow'))).toBe('DriveTimeoutError');
+      expect(syncService.saveErrorCode(new TypeError('Failed to fetch'))).toBe('TypeError');
+    });
+
+    it('is "unknown" for a non-Error throw or no cause at all', () => {
+      expect(syncService.saveErrorCode('boom')).toBe('unknown');
+      expect(syncService.saveErrorCode(null)).toBe('unknown');
+      expect(syncService.saveErrorCode(undefined)).toBe('unknown');
+    });
+  });
+
+  describe('getLastSaveCause', () => {
+    const failingProvider = (error: unknown) => ({
+      type: 'google_drive' as const,
+      write: vi.fn().mockRejectedValue(error),
+      read: vi.fn(),
+      getLastModified: vi.fn(),
+      isReady: vi.fn().mockResolvedValue(true),
+      requestAccess: vi.fn(),
+      persist: vi.fn(),
+      clearPersisted: vi.fn(),
+      disconnect: vi.fn(),
+      getDisplayName: vi.fn(() => 'test.beanpod'),
+      getFileId: vi.fn(() => 'file-123'),
+      getAccountEmail: vi.fn(() => null),
+    });
+
+    it('starts as null', () => {
+      expect(syncService.getLastSaveCause()).toBeNull();
+    });
+
+    it('holds the thrown value of the latest failed save, and a success clears it', async () => {
+      const first = new Error('first');
+      const second = new TypeError('second');
+      const provider = failingProvider(first);
+      syncService.setProvider(provider);
+
+      await syncService.save();
+      expect(syncService.getLastSaveCause()).toBe(first);
+
+      provider.write.mockRejectedValue(second);
+      await syncService.save();
+      expect(syncService.getLastSaveCause()).toBe(second);
+
+      provider.write.mockResolvedValue(undefined);
+      await expect(syncService.save()).resolves.toBe(true);
+      expect(syncService.getLastSaveCause()).toBeNull();
+    });
+
+    it('is cleared by resetSaveFailures and reset()', async () => {
+      syncService.setProvider(failingProvider(new Error('x')));
+      await syncService.save();
+      expect(syncService.getLastSaveCause()).not.toBeNull();
+      syncService.resetSaveFailures();
+      expect(syncService.getLastSaveCause()).toBeNull();
+
+      await syncService.save();
+      expect(syncService.getLastSaveCause()).not.toBeNull();
+      syncService.reset();
+      expect(syncService.getLastSaveCause()).toBeNull();
+    });
+
+    it('the sync-save event classifies through saveErrorCode', async () => {
+      const { logEvent } = await import('@/services/telemetry');
+      syncService.setProvider(failingProvider(new TypeError('Failed to fetch')));
+
+      await syncService.save();
+
+      expect(logEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          surface: 'sync-save',
+          message: 'save failed',
+          context: expect.objectContaining({ error_code: 'TypeError' }),
+        })
+      );
+    });
+  });
+
   describe('onSaveFailureChange', () => {
     it('returns an unsubscribe function', () => {
       const unsub = syncService.onSaveFailureChange(vi.fn());

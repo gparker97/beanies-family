@@ -89,26 +89,31 @@ export const CREATE_DRIVE_ERRORS = {
     messageKey: 'join.error.popupBlocked',
     recoveries: ['retry'],
     severity: 'warning',
+    impact: 'degraded',
   },
   timeout: {
     messageKey: 'createPod.driveError.timeout',
     recoveries: ['retry', 'useLocal'],
     severity: 'warning',
+    impact: 'degraded',
   },
   offline: {
     messageKey: 'createPod.driveError.offline',
     recoveries: ['retry'],
     severity: 'warning',
+    impact: 'degraded',
   },
   'consent-denied': {
     messageKey: 'createPod.driveConsentDenied',
     recoveries: ['retry', 'useLocal'],
     severity: 'warning',
+    impact: 'degraded',
   },
   cancelled: {
     messageKey: 'googleDrive.authCancelled',
     recoveries: ['retry', 'useLocal'],
     severity: 'warning',
+    impact: 'degraded',
   },
   // A web consent popup that opened and never settled: the page reloaded or closed while it was
   // up. Never classified from an error; `connectDriveStorage` pre-stashes it before the popup
@@ -118,6 +123,7 @@ export const CREATE_DRIVE_ERRORS = {
     messageKey: 'createPod.driveError.popupAbandoned',
     recoveries: ['retry', 'useLocal'],
     severity: 'warning',
+    impact: 'degraded',
   },
   // A described `access_denied`: Google said no without saying why we can trust (free text).
   // Not "Google needs a yes from you" (that is `cancelled`), and not proof of a policy block.
@@ -125,17 +131,20 @@ export const CREATE_DRIVE_ERRORS = {
     messageKey: 'createPod.driveError.accessDenied',
     recoveries: ['retry', 'chooseAccount', 'useLocal'],
     severity: 'warning',
+    impact: 'degraded',
   },
   // No `retry`: a policy block does not clear by asking again.
   'app-blocked': {
     messageKey: 'createPod.driveError.appBlocked',
     recoveries: ['chooseAccount', 'useLocal', 'getApp'],
     severity: 'warning',
+    impact: 'degraded',
   },
   'auth-expired': {
     messageKey: 'join.error.oauthRedirect',
     recoveries: ['retry'],
     severity: 'warning',
+    impact: 'degraded',
   },
   // Also the PROJECT quota reasons (`quotaExceeded` / `dailyLimitExceeded`), which are ours; the
   // report's `detail` carries Google's reason so an alarm can single them out.
@@ -143,36 +152,43 @@ export const CREATE_DRIVE_ERRORS = {
     messageKey: 'createPod.driveError.busy',
     recoveries: ['retry'],
     severity: 'warning',
+    impact: 'degraded',
   },
   'drive-full': {
     messageKey: 'createPod.driveError.driveFull',
     recoveries: ['retry', 'chooseAccount', 'useLocal'],
     severity: 'warning',
+    impact: 'degraded',
   },
   'drive-api-disabled': {
     messageKey: 'createPod.driveError.apiDisabled',
     recoveries: ['retry', 'useLocal', 'getApp'],
     severity: 'critical',
+    impact: 'journey-blocked',
   },
   'name-collision': {
     messageKey: 'createPod.duplicateFile',
     recoveries: ['retry', 'useLocal'],
     severity: 'warning',
+    impact: 'degraded',
   },
   'collision-check-unavailable': {
     messageKey: 'createPod.driveCheckUnavailable',
     recoveries: ['retry'],
     severity: 'warning',
+    impact: 'degraded',
   },
   'unsupported-browser': {
     messageKey: 'setup.localFileUnsupported',
     recoveries: [],
     severity: 'warning',
+    impact: 'degraded',
   },
   unknown: {
     messageKey: 'createPod.driveError.unknown',
     recoveries: ['retry', 'useLocal', 'getApp'],
     severity: 'critical',
+    impact: 'journey-blocked',
   },
 } as const satisfies Record<CreateDriveErrorCode, CreateDriveErrorEntry>;
 

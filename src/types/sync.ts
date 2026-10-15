@@ -659,10 +659,16 @@ export class DriveConsentDeniedError extends Error {
   }
 }
 
+/** Why a round trip ended with no grant. See `OAuthRoundTripAbandonedError`. */
+export type OAuthAbandonReason = 'declined' | 'dismissed' | 'no-pending';
+
 /**
  * A redirect / system-browser OAuth trip that ended with NO grant because the person said no
  * (`declined`: Google echoed `error=access_denied`) or closed the sheet (`dismissed`: no deep link
- * arrived within the grace). A DECISION, never a fault: `connectDriveStorage` maps it to
+ * arrived within the grace), or because the return could not be matched to this device's request
+ * (`no-pending`: a live native trip whose pending-auth stash was missing or unparseable; a
+ * duplicate delivery of a return already being exchanged is ignored before it gets here). A
+ * DECISION or a lost match, never a fault worth paging: `connectDriveStorage` maps it to
  * `cancelled`, and reconnect surfaces show the message verbatim, as they do every popup failure.
  *
  * ⚠️ Classified by `instanceof` at every seam, NEVER by message. The messages are user-facing
@@ -672,12 +678,14 @@ export class DriveConsentDeniedError extends Error {
 export class OAuthRoundTripAbandonedError extends Error {
   // ⚠️ A PLAIN FIELD, NOT A PARAMETER PROPERTY. `erasableSyntaxOnly` is on, so
   // `constructor(readonly reason: …)` does not compile.
-  readonly reason: 'declined' | 'dismissed';
-  constructor(reason: 'declined' | 'dismissed') {
+  readonly reason: OAuthAbandonReason;
+  constructor(reason: OAuthAbandonReason) {
     super(
       reason === 'declined'
         ? 'Google sign-in was declined.'
-        : 'Google sign-in was closed before it finished.'
+        : reason === 'no-pending'
+          ? 'Google sign-in could not be matched to a request on this device.'
+          : 'Google sign-in was closed before it finished.'
     );
     this.name = 'OAuthRoundTripAbandonedError';
     this.reason = reason;

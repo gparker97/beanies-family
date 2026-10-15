@@ -692,7 +692,7 @@ describe('useJoinFlow', () => {
       expect(flow.currentError.value?.code).toBe('PICKER_IFRAME_BLOCKED');
       const { JOIN_ERRORS } = await import('../useJoinFlow');
       expect(JOIN_ERRORS.PICKER_IFRAME_BLOCKED.severity).toBe('warning');
-      // The genuine-fault sibling must stay critical.
+      // The genuine-fault sibling keeps the critical banner tint (it no longer pages).
       expect(JOIN_ERRORS.PICKER_FAILED.severity).toBe('critical');
     });
 
@@ -841,9 +841,9 @@ describe('useJoinFlow', () => {
       };
       expect(call.surface).toBe('join-flow:PICKER_FAILED');
       expect(call.message).toContain('google.picker is undefined');
-      // The registry marks PICKER_FAILED 'critical' — confirm recordError now
-      // forwards that severity so the join-fatal codes page under the gate.
-      expect(call.severity).toBe('critical');
+      // PICKER_FAILED keeps its red banner tint but its impact is `degraded`
+      // (2026-10-15 paging policy), so recordError reports it at warning.
+      expect(call.severity).toBe('warning');
       expect(call.context).toMatchObject({ error_code: 'PICKER_FAILED' });
     });
 

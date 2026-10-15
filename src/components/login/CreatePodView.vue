@@ -201,13 +201,12 @@ async function handleStep1Next() {
     const msg = result.error ?? t('auth.signUpFailed');
     formError.value = msg;
     // Severity 'warning': some signup failures are expected (email already
-    // in a pod) — but a failed signup is still a dropped onboarding, and we
-    // want them visible. The reporter's 60s dedup keeps duplicates quiet.
+    // in a pod), but a failed signup is still a dropped onboarding, and we
+    // want them visible. No email in the context: none leaves the client.
     reportError({
       surface: 'createPod.signUp',
       message: msg,
       severity: 'warning',
-      context: { family_email: email.value },
     });
   }
 }
@@ -271,7 +270,7 @@ async function handleChooseLocalStorage() {
       reportError({
         surface: 'createPod.selectLocalFile',
         message: r.error || 'Local file selection failed',
-        severity: 'critical',
+        severity: 'error',
         context: { provider_type: 'local' },
       });
     }

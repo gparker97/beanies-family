@@ -1080,7 +1080,7 @@ export function useLoginFlow(opts: {
     } catch (e) {
       reportError({
         surface: 'pod-access',
-        severity: 'critical',
+        severity: 'error',
         message: 'pod access verification threw at the login-flow open boundary',
         error: e,
         context: { action: 'VERIFY_UNAVAILABLE' },

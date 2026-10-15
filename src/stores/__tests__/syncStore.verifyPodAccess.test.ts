@@ -773,7 +773,17 @@ describe('syncStore.verifyPodAccess', () => {
       (c) => (c[0] as { surface?: string })?.surface === 'sync-config-total-failure'
     );
 
-  it('pages sync-config-total-failure when a NON-demo family cannot re-establish its config', async () => {
+  const noRegistryHomeWarns = () =>
+    mockLogEvent.mock.calls.filter(
+      (c) =>
+        (c[0] as { surface?: string; context?: { action?: string } })?.surface ===
+          'sync-config-total-failure' &&
+        (c[0] as { context?: { action?: string } }).context?.action === 'no-registry-home'
+    );
+
+  // ── 2026-10-15: a registry with no Drive home (the family discarded by Start over, or one
+  //    that never finished) is a countable warn, not a reconnect failure report.
+  it('a registry miss logs a no-registry-home warn, keeps the reconnect affordance, reports nothing', async () => {
     demoRef.value = false;
     mockGetProviderType.mockReturnValue(null); // no provider installed → heal proceeds
     mockLookupFamilyResult.mockResolvedValue({ status: 'absent' }); // nothing to rebuild from
@@ -781,7 +791,79 @@ describe('syncStore.verifyPodAccess', () => {
 
     await store.attemptSilentConfigHeal('family-123');
 
-    expect(pagedTotalFailure()).toBe(true);
+    expect(pagedTotalFailure()).toBe(false);
+    expect(noRegistryHomeWarns()).toHaveLength(1);
+    expect(noRegistryHomeWarns()[0]![0]).toMatchObject({
+      level: 'warn',
+      message: 'no registry home to heal from',
+      context: { action: 'no-registry-home', registry_had_file_id: false },
+    });
+    expect(store.configHealFailed).toBe(true);
+  });
+
+  it('a Drive registry entry with no fileId is also no-registry-home, never a report', async () => {
+    demoRef.value = false;
+    mockGetProviderType.mockReturnValue(null);
+    mockLookupFamilyResult.mockResolvedValue({
+      status: 'found',
+      entry: { familyId: 'family-123', provider: 'google_drive', fileId: null },
+    });
+    const store = useSyncStore();
+
+    await store.attemptSilentConfigHeal('family-123');
+
+    expect(pagedTotalFailure()).toBe(false);
+    expect(noRegistryHomeWarns()[0]![0]).toMatchObject({
+      context: { registry_had_file_id: false, provider_type: 'google_drive' },
+    });
+    expect(store.configHealFailed).toBe(true);
+  });
+
+  it('reports sync-config-total-failure at error, once, when a Drive home cannot be reinstalled', async () => {
+    demoRef.value = false;
+    mockGetProviderType.mockReturnValue(null);
+    mockLookupFamilyResult.mockResolvedValue({
+      status: 'found',
+      entry: { familyId: 'family-123', provider: 'google_drive', fileId: 'drive-file-id' },
+    });
+    mockFromExisting.mockImplementation(() => {
+      throw new Error('install failed');
+    });
+    const store = useSyncStore();
+
+    // Burn the retry budget: each failed install re-arms until the budget is spent.
+    try {
+      for (let i = 0; i < 10; i++) await store.attemptSilentConfigHeal('family-123');
+    } finally {
+      mockFromExisting.mockReset();
+    }
+
+    const reports = mockReportError.mock.calls.filter(
+      (c) => (c[0] as { surface?: string })?.surface === 'sync-config-total-failure'
+    );
+    expect(reports).toHaveLength(1);
+    expect(reports[0]![0]).toMatchObject({ severity: 'error' });
+    expect(noRegistryHomeWarns()).toHaveLength(0);
+  });
+
+  // A signed-out boot still heals: the discarded-family registry miss only warns, and a sealed
+  // session that expired must not lose its heal (same-family sign-in never re-runs `initialize()`).
+  it.each([
+    ['signed-out boot still heals', false],
+    ['signed-in boot heals a lost provider config', true],
+  ])('%s', async (_label, isAuthenticated) => {
+    demoRef.value = false;
+    mockGetProviderType.mockReturnValue(null);
+    const { useAuthStore } = await import('@/stores/authStore');
+    const auth = useAuthStore();
+    auth.podCreated = true; // `restorePodCreated` reads an absent flag as true
+    auth.isAuthenticated = isAuthenticated;
+    const store = useSyncStore();
+
+    await store.initialize();
+
+    expect(mockLookupFamilyResult).toHaveBeenCalledWith('family-123');
+    expect(pagedTotalFailure()).toBe(false);
   });
 
   it('does NOT page sync-config-total-failure for a review-demo session', async () => {
@@ -826,7 +908,7 @@ describe('syncStore.rebindPodFile — the compaction safety copy', () => {
   });
 
   it('reports a NEWER-version file at warning with its own code, never critical', async () => {
-    // The report's severity comes from `POD_ACCESS_SEVERITY`, not a literal:
+    // The report's severity comes from the registry's `impact`, not a literal:
     // "please update beanies" must not page Slack. `classifyDriveFailure`
     // reads the typed error through the base-class member, first.
     const store = useSyncStore();

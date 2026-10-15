@@ -134,7 +134,7 @@ describe('setMemberPin (C10)', () => {
     expect(h.syncNowBounded).not.toHaveBeenCalled();
     expect(h.reportError).toHaveBeenCalledWith(
       expect.objectContaining({
-        severity: 'critical',
+        severity: 'error',
         context: expect.objectContaining({ action: 'pin_write_failed', kind: 'change' }),
       })
     );

@@ -78,6 +78,7 @@ vi.mock('@/services/google/googleAuth', () => ({
   onTokenAcquired: vi.fn(() => () => {}),
   fetchGoogleUserEmail: vi.fn(async () => null),
   isSilentRefreshPending: vi.fn(() => false),
+  isInteractiveOAuthPending: vi.fn(() => false),
   isTokenValid: vi.fn(() => false),
   getLastSilentRefreshDiagnostics: vi.fn(() => null),
   getVerifiedGoogleAccountEmail: vi.fn(() => null),

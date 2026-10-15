@@ -10,14 +10,14 @@
   Data-Safety/App-Privacy answers AND web/src/pages/privacy.astro together.
 
   What beanies collects (nothing for ads or tracking):
-    - Email + Name: ONLY on the low-volume critical-error path to the maintainer's
-      alerting channel (so we can contact the family about a data-at-risk failure).
-      Email is also held in the family registry and used for occasional owner emails
+    - Name: ONLY on critical error reports (family display name, so we can find the
+      family's report; the Slack page is composed server-side). The client never sends email.
+      Email is held in the family registry and used for occasional owner emails
       (#115, 2026-10), hence the DeveloperAdvertising (marketing) purpose on email.
     - Crash + Other Diagnostic Data: crash/error reports + a diagnostic firehose
       used solely to keep the app working. The firehose itself is PII-free
-      (correlated by a random family_id); the critical-error path additionally
-      carries the owner email, so these types are marked Linked.
+      (correlated by a random family_id); critical error reports additionally
+      carry the family display name (no email), so these types are marked Linked.
       Includes (2026-08) recurring-series occurrence dates: the calendar date of
       a repeating session being edited, the date it resolved to, the chosen edit
       scope, and counts — dates and closed enums only, never a title, member

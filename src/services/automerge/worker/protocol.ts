@@ -158,7 +158,29 @@ export interface MergeOutcome {
   counterStats?: CounterStats;
   /** What the rebase's Counter pass did (#117 writer flip). `rebased` only. */
   counterRebase?: CounterRebase;
+  /**
+   * The cache replay left rows waiting on missing deps (the base fence is up), and this was the
+   * session's first remote merge into that document: did the remote supply them (`delivered`)
+   * or are they still missing (`missing`, logged as `deps-missing-after-merge`)? `merged`
+   * only, and absent when unfenced or already answered this open (2026-10-15).
+   */
+  fenceDepsAfterMerge?: 'missing' | 'delivered';
+  /**
+   * Beside `fenceDepsAfterMerge`: the consecutive sessions that merged a remote and still
+   * missed the deps, this one included (0 after `delivered`). A first `missing` may only mean
+   * the remote is behind a device that has not pushed yet, so main pages only once this
+   * reaches `FENCE_GIVE_UP_MERGES`, the point where the next open gives the fence up.
+   */
+  fenceMerges?: number;
 }
+
+/**
+ * Sessions that merged a remote and STILL missed the deps before the next open gives the
+ * missing-deps fence up (round 3): fenced twice, given up on the third open. An offline or cold
+ * open (no merge) never counts, so a device that simply has not reached Drive keeps its rows.
+ * Here, not in the worker, so main's paging threshold and the worker's give-up cannot drift.
+ */
+export const FENCE_GIVE_UP_MERGES = 2;
 
 /**
  * Why the rebase composer refused to replay at all; the merge then takes the rebase-unavailable

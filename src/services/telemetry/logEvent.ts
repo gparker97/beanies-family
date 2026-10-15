@@ -1,9 +1,9 @@
 /**
  * Diagnostic logging tier — the firehose companion to `reportError`.
  *
- * Where `reportError` (errorReporter.ts) escalates CRITICAL errors to Slack,
- * `logEvent` captures the full diagnostic stream (`debug | info | warn | error`)
- * that today dies in the browser console. Every event is enriched + redacted
+ * `reportError` (errorReporter.ts) is the typed severity gate for failures and
+ * writes through here; `logEvent` captures the full diagnostic stream
+ * (`debug | info | warn | error`) that would otherwise die in the browser console. Every event is enriched + redacted
  * through the shared `diagnosticContext` core, then handed to a batched,
  * offline-aware queue (`logQueue.ts`) that ships to the AWS ingest endpoint.
  *
@@ -11,15 +11,17 @@
  *   - Fire-and-forget. Returns synchronously. NEVER throws, never blocks.
  *   - Re-entry guarded so a logEvent emitted from within enrichment/queue code
  *     can't recurse.
- *   - Privacy: enriches with `includeEmail: false` — the firehose correlates by
- *     `family_id` (random UUID), never email. Email stays on the Slack path.
+ *   - Privacy: the firehose correlates by `family_id` (random UUID) and never
+ *     carries an email. `family_name` is added only when the caller passes
+ *     `includeFamilyName` (reportError does, for critical reports only, so the
+ *     Lambda's page can name the family).
  *   - No silent failures: every internal failure → `[telemetry] <reason>`
  *     console.warn (never a bare catch).
  *
  * `level`, `surface`, `message`, `timestamp`, and `stack` are system-generated
  * fields written on top of the redacted context — they are NOT subject to the
  * context allowlist (they carry no user-typed content; `message` is
- * developer-authored, exactly as on the Slack path).
+ * developer-authored).
  */
 
 import { enrichAndRedact, extractStack, normalizeMessage } from '@/utils/diagnosticContext';
@@ -42,6 +44,12 @@ export interface LogEventInput {
    * coalesces concurrent flushes.
    */
   flush?: boolean;
+  /**
+   * Add the family name to the redacted context. Set by `reportError` for critical reports
+   * only, so the Slack page the Lambda sends can name the family. Default false: the
+   * high-volume stream stays name-free.
+   */
+  includeFamilyName?: boolean;
 }
 
 /**
@@ -67,8 +75,7 @@ let reentryGuard = false;
 // ─── Client-side rate limit (runaway-loop guard) ─────────────────────────────
 //
 // Collapse identical (surface, normalized-message) events within a window so a
-// hot loop can't flood the buffer. Count-only — no Slack summary (that's the
-// errorReporter's job). Reuses `normalizeMessage` so "nearly identical" events
+// hot loop can't flood the buffer. Count-only. Reuses `normalizeMessage` so "nearly identical" events
 // (differing only by UUID/timestamp/id) share a bucket.
 
 const RATE_WINDOW_MS = 60_000;
@@ -116,7 +123,7 @@ export function logEvent(input: LogEventInput): void {
 
     const context = enrichAndRedact(
       { surface: input.surface, context: input.context },
-      { includeEmail: false }
+      { includeFamilyName: input.includeFamilyName === true }
     );
     const stack = extractStack(input.error);
 

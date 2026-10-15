@@ -131,7 +131,7 @@ async function handleUnclaim(): Promise<void> {
     // Never silent: the family tapped a button and must be told it did not work.
     reportError({
       surface: 'join-flow',
-      severity: 'critical',
+      severity: 'error',
       message: 'unclaim threw',
       error: e,
       context: { action: 'unclaim_threw' },
