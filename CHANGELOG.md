@@ -22,6 +22,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - Error alerts to the team channel are now sent server-side and only for data-at-risk or blocked-journey failures; everything else stays in diagnostics.
 
+### Security
+
+- Routine dependency updates, including a fix for two critical advisories in a build tool.
+
 ## 2026-10-14
 
 ### Added
