@@ -24,7 +24,7 @@ import WeatherOutlook from '@/components/weather/WeatherOutlook.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { REGION_HOLIDAYS_OPEN } from '@/constants/settingsDeepLinks';
 import type { WeatherAtom } from '@/types/weather';
-import { fillTemplate, splitTemplate } from '@/utils/fillTemplate';
+import { splitTemplate } from '@/utils/fillTemplate';
 
 const props = defineProps<{ atom: WeatherAtom }>();
 
@@ -36,13 +36,7 @@ const reading = computed(() => (props.atom.state === 'reading' ? props.atom : nu
 const subLine = computed(() => {
   const r = reading.value;
   if (!r) return '';
-  return r.ageText ?? fillTemplate(t('weather.highLow'), { high: r.high, low: r.low });
-});
-
-/** An old reading has no current temperature: "Today H 57° L 49°" leads instead. */
-const todayHighLow = computed(() => {
-  const r = reading.value;
-  return r ? fillTemplate(t('weather.todayHighLow'), { high: r.high, low: r.low }) : '';
+  return r.ageText ?? r.highLow;
 });
 
 const nudgeParts = computed(() =>
@@ -75,7 +69,7 @@ const settingsLink = { path: '/settings', query: { open: REGION_HOLIDAYS_OPEN } 
         <span class="flex flex-col gap-0.5">
           <span
             class="font-outfit text-secondary-500 dark:text-ink text-sm leading-tight font-semibold"
-            >{{ reading.temp !== null ? reading.condition : todayHighLow }}</span
+            >{{ reading.temp !== null ? reading.condition : reading.todayHighLow }}</span
           >
           <span
             class="text-xs leading-tight"

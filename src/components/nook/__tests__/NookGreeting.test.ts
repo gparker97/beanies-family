@@ -49,6 +49,8 @@ function reading(overrides: Partial<WeatherAtomReading> = {}): WeatherAtomReadin
     condition: 'Rain',
     high: '57°',
     low: '49°',
+    highLow: 'H 57° L 49°',
+    todayHighLow: 'Today H 57° L 49°',
     ageText: null,
     ageShort: null,
     soft: false,

@@ -150,14 +150,18 @@ export function buildWeatherAtom(input: WeatherAtomInput): WeatherAtom | null {
     const days = outlook(reading.daily, todayYmd, 3);
     const tonight = days[0]?.minC ?? today.minC;
     const age = ageLines(freshness, reading.fetchedAt, now, input.online, lang, t);
+    const high = formatTemp(today.maxC, unit);
+    const low = formatTemp(today.minC, unit);
     return {
       state: 'reading',
       freshness,
       glyph,
       temp: freshness === 'old' ? null : formatTemp(reading.current.tempC, unit),
       condition: t(conditionKey(glyph)),
-      high: formatTemp(today.maxC, unit),
-      low: formatTemp(today.minC, unit),
+      high,
+      low,
+      highLow: fillTemplate(t('weather.highLow'), { high, low }),
+      todayHighLow: fillTemplate(t('weather.todayHighLow'), { high, low }),
       ageText: age.text,
       ageShort: age.short,
       soft: freshness === 'aged',

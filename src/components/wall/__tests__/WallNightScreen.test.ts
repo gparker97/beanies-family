@@ -48,10 +48,12 @@ describe('WallNightScreen weather', () => {
     expect(weather).toBeLessThan(hint);
   });
 
-  it('shows the age when stale, and no "now" once the reading is old', () => {
+  it('shows the age when stale, and today\'s high/low in place of "now" once the reading is old', () => {
     expect(mountNight(ATOMS.aged).text()).toContain('As of 3 hours ago');
     const old = mountNight(ATOMS.old);
     expect(old.find('.wall-night-wx-temp').exists()).toBe(false);
+    expect(old.get('.wall-night-wx-cond').text()).toBe('Today H 68° L 51°');
+    expect(old.text()).not.toContain('weather.night.nowLine');
     expect(old.text()).toContain('As of yesterday, 6:10 PM');
     expect(old.find('.weather-outlook').exists()).toBe(true);
   });

@@ -242,6 +242,8 @@ describe('buildWeatherAtom: states', () => {
       condition: 'Clear',
       high: '23°',
       low: '11°',
+      highLow: 'H 23° L 11°',
+      todayHighLow: 'Today H 23° L 11°',
       ageText: null,
       ageShort: null,
       soft: false,
@@ -262,6 +264,7 @@ describe('buildWeatherAtom: states', () => {
       buildWeatherAtom(input({ reading: r, now: r.fetchedAt + MIN, unit: 'F' }))
     );
     expect([atom.temp, atom.high, atom.low]).toEqual(['62°', '73°', '51°']);
+    expect([atom.highLow, atom.todayHighLow]).toEqual(['H 73° L 51°', 'Today H 73° L 51°']);
   });
 
   it('is unavailable offline with no cache and no attempt yet (never a silent blank)', () => {

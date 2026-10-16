@@ -78,6 +78,10 @@ export interface WeatherAtomReading {
   /** Today's (home-zone) high and low. */
   high: string;
   low: string;
+  /** "H 57° L 49°" (`weather.highLow`), formatted once here so no surface rebuilds it. */
+  highLow: string;
+  /** "Today H 57° L 49°" (`weather.todayHighLow`): an `old` reading's line in place of the temperature. */
+  todayHighLow: string;
   /** The full age line (wall card, night screen, desktop pill), or null under 1h. */
   ageText: string | null;
   /** The clipped age (one-line card, strip cell), or null under 1h. */

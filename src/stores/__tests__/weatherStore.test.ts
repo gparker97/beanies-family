@@ -9,7 +9,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
-import { reactive, ref } from 'vue';
+import { reactive, ref, watch } from 'vue';
 import type { WeatherPlace } from '@/types/models';
 import type { WeatherObservation } from '@/types/weather';
 import { UI_STRINGS, type UIStringKey } from '@/services/translation/uiStrings';
@@ -430,6 +430,94 @@ describe('late answers are dropped, never applied to the new question', () => {
     expect(events('weather_fetch_dropped')).toHaveLength(1);
     expect(store.reading).toBeNull();
     expect(localStorage.getItem(STORAGE_KEYS.WEATHER)).toBeNull();
+  });
+});
+
+describe('a question change mid-fetch hands over without a gap', () => {
+  it('never shows (or logs) unavailable between the aborted run and the trailing one', async () => {
+    // The first fetch rejects the way a real one does when its signal aborts.
+    h.fetchForecast.mockImplementationOnce(
+      (_place: WeatherPlace, _zone: string, signal: AbortSignal) =>
+        new Promise((_resolve, reject) => {
+          signal.addEventListener('abort', () =>
+            reject(new WeatherFetchError('aborted', 'caller moved on'))
+          );
+        })
+    );
+    const next = deferred<WeatherObservation>();
+    h.fetchForecast.mockImplementationOnce(() => next.promise);
+    const store = await createStore();
+    expect(store.fetching).toBe(true);
+
+    const states: Array<string | null> = [];
+    const stop = watch(
+      () => store.atom?.state ?? null,
+      (state) => states.push(state),
+      { flush: 'sync' }
+    );
+    const fetchingSeen: boolean[] = [];
+    const stopFetching = watch(
+      () => store.fetching,
+      (f) => fetchingSeen.push(f),
+      { flush: 'sync' }
+    );
+    settings.weatherPlace = BANGOR;
+    await settle();
+    expect(h.fetchForecast).toHaveBeenCalledTimes(2);
+    expect(store.fetching).toBe(true);
+    expect(fetchingSeen).not.toContain(false);
+    expect(states).not.toContain('unavailable');
+
+    next.resolve(obs(-5));
+    await settle();
+    stop();
+    stopFetching();
+    expect(store.fetching).toBe(false);
+    expect(store.atom?.state).toBe('reading');
+    expect(events('weather_staleness').map((e) => e.context.stage)).not.toContain('unavailable');
+  });
+
+  it('a trailing run that skips (offline) clears fetching, so the card says unavailable', async () => {
+    h.fetchForecast.mockImplementationOnce(
+      (_place: WeatherPlace, _zone: string, signal: AbortSignal) =>
+        new Promise((_resolve, reject) => {
+          signal.addEventListener('abort', () =>
+            reject(new WeatherFetchError('aborted', 'caller moved on'))
+          );
+        })
+    );
+    const store = await createStore();
+    online.value = false;
+    settings.weatherPlace = BANGOR;
+    await settle();
+    expect(store.fetching).toBe(false);
+    expect(store.atom).toMatchObject({ state: 'unavailable' });
+  });
+});
+
+describe('Show Weather switched off mid-fetch', () => {
+  it('aborts the request, and an answer that lands anyway is dropped, never cached', async () => {
+    const inFlight = deferred<WeatherObservation>();
+    let signal: AbortSignal | undefined;
+    // Ignores its signal, so the answer lands after the switch (the abort lost the race).
+    h.fetchForecast.mockImplementationOnce((_p: WeatherPlace, _z: string, s: AbortSignal) => {
+      signal = s;
+      return inFlight.promise;
+    });
+    const store = await createStore();
+    expect(store.fetching).toBe(true);
+
+    settings.weatherEnabled = false;
+    await settle();
+    expect(signal?.aborted).toBe(true);
+
+    inFlight.resolve(obs(30));
+    await settle();
+    expect(events('weather_fetch_dropped')[0]!.context).toMatchObject({ detail: 'disabled' });
+    expect(events('weather_fetch')).toHaveLength(0);
+    expect(localStorage.getItem(STORAGE_KEYS.WEATHER)).toBeNull();
+    expect(store.reading).toBeNull();
+    expect(store.fetching).toBe(false);
   });
 });
 

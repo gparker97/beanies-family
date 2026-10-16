@@ -137,6 +137,11 @@ describe('WallPeripheralCards weather', () => {
   it('strip cell: the clipped age when stale, the short nudge, the short unavailable', () => {
     atom = ATOMS.aged;
     expect(mountCards('strip', 'now').get('.wall-weather-strip').text()).toContain('3 hours ago');
+    // An old reading says "Today H L" like every other surface, never a bare "H L".
+    atom = ATOMS.old;
+    expect(mountCards('strip', 'now').get('.wall-weather-strip').text()).toContain(
+      'Today H 68° L 51°'
+    );
     atom = ATOMS.nudge;
     expect(mountCards('strip', 'now').get('.wall-weather-strip').text()).toContain(
       'weather.nudgeStrip'

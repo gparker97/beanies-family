@@ -62,7 +62,7 @@ describe('WallWeatherCard', () => {
     it("old: no temperature, today's high and low, and the age", () => {
       const wrapper = mountCard('old', layout);
       expect(wrapper.find('.wall-weather-temp').exists()).toBe(false);
-      expect(wrapper.text()).toContain('weather.todayHighLow');
+      expect(wrapper.text()).toContain('Today H 68° L 51°');
       expect(wrapper.text()).toContain(
         layout === 'line' ? 'yesterday' : 'As of yesterday, 6:10 PM'
       );
@@ -88,11 +88,11 @@ describe('WallWeatherCard', () => {
   it('only the full card carries the three days and the high and low', () => {
     const full = mountCard('fresh', 'full');
     expect(full.find('.weather-outlook[data-variant="inline"]').exists()).toBe(true);
-    expect(full.text()).toContain('weather.highLow');
+    expect(full.text()).toContain('H 68° L 51°');
     for (const layout of ['now', 'line'] as const) {
       const wrapper = mountCard('fresh', layout);
       expect(wrapper.find('.weather-outlook').exists()).toBe(false);
-      expect(wrapper.text()).not.toContain('weather.highLow');
+      expect(wrapper.text()).not.toContain('H 68° L 51°');
     }
   });
 });

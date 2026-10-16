@@ -31,6 +31,7 @@ const settings = reactive({
 });
 const weather = reactive({
   atom: null as WeatherAtom | null,
+  searchMinChars: 2,
   searchPlaces: vi.fn<(q: string, s?: AbortSignal) => Promise<WeatherSearchResult>>(),
 });
 const logEventMock = vi.fn();
@@ -208,6 +209,43 @@ describe('HomeTownField', () => {
     expect(wrapper.get('[data-testid="home-town-place"]').text()).toContain('Portland, Maine');
   });
 
+  it('keeps the last suggestions listed while the next query is searched', async () => {
+    const wrapper = render();
+    await type(wrapper, 'Portl');
+    await settle();
+    expect(wrapper.findAll('[role="option"]')).toHaveLength(2);
+    weather.searchPlaces.mockResolvedValue({ ok: true, places: [PORTLAND_ME] });
+    await type(wrapper, 'Portla');
+    // Mid-debounce: the spinner shows and the previous list stays open.
+    expect(wrapper.find('[data-test="spinner"]').exists()).toBe(true);
+    expect(wrapper.findAll('[role="option"]')).toHaveLength(2);
+    expect(wrapper.get('[data-testid="home-town-input"]').attributes('aria-expanded')).toBe('true');
+    await settle();
+    expect(wrapper.findAll('[role="option"]')).toHaveLength(1);
+  });
+
+  it('Enter with nothing highlighted picks the first suggestion, never a stale one', async () => {
+    const wrapper = render();
+    await type(wrapper, 'Portl');
+    await settle();
+    const input = wrapper.get('[data-testid="home-town-input"]');
+    // A newer query is still searching: Enter must not commit the list on screen.
+    await type(wrapper, 'Portla');
+    await input.trigger('keydown', { key: 'Enter' });
+    await flushPromises();
+    expect(settings.setWeatherPlace).not.toHaveBeenCalled();
+    await settle();
+    await input.trigger('keydown', { key: 'Enter' });
+    await flushPromises();
+    expect(settings.setWeatherPlace).toHaveBeenCalledWith(PORTLAND_OR);
+  });
+
+  it('names the combobox for assistive tech', () => {
+    const input = render().get('[data-testid="home-town-input"]');
+    expect(input.attributes('role')).toBe('combobox');
+    expect(input.attributes('aria-label')).toBe('settings.weather.homeTown');
+  });
+
   it('Escape closes the list without reaching the drawer', async () => {
     const wrapper = render();
     const outer = vi.fn();
@@ -257,6 +295,8 @@ describe('HomeTownField', () => {
       condition: 'Partly cloudy',
       high: '70°',
       low: '52°',
+      highLow: 'H 70° L 52°',
+      todayHighLow: 'Today H 70° L 52°',
       ageText: null,
       ageShort: null,
       soft: false,

@@ -41,10 +41,9 @@ const props = withDefaults(
 
 /** Long enough to skip the keystrokes in a word, short enough to feel live. */
 const SEARCH_DEBOUNCE_MS = 300;
-/** Mirrors the service's floor (`SEARCH_MIN_CHARS`): a 1-letter query is never sent. */
-const MIN_QUERY = 2;
 
-type SearchStatus = 'idle' | 'searching' | 'results' | 'not-found' | 'failed';
+/** What the last answered query found. A search in flight is `searching`, not a status. */
+type SearchStatus = 'idle' | 'results' | 'not-found' | 'failed';
 
 const { t } = useTranslation();
 const settingsStore = useSettingsStore();
@@ -53,6 +52,11 @@ const weatherStore = useWeatherStore();
 const query = ref('');
 const places = ref<WeatherPlace[]>([]);
 const status = ref<SearchStatus>('idle');
+/**
+ * A newer query is waiting on the debounce or the request. The previous suggestions stay
+ * listed (with the spinner) until its answer replaces them, so typing never collapses the list.
+ */
+const searching = ref(false);
 /** The query the shown results (or the not-found line) answer. */
 const answeredQuery = ref('');
 /** True while a stored place is being replaced ("Change"). */
@@ -70,6 +74,8 @@ const visibleCount = computed(() => (status.value === 'results' ? places.value.l
 const nav = useListboxNav(visibleCount, () => [query.value, places.value]);
 
 const message = computed(() => {
+  // A newer query is on its way: the last one's "not found" or "failed" no longer applies.
+  if (searching.value) return '';
   if (status.value === 'not-found')
     return fillTemplate(t('settings.weather.notFound'), { query: answeredQuery.value });
   if (status.value === 'failed') return t('weather.search.failed');
@@ -103,6 +109,7 @@ async function runSearch(q: string): Promise<void> {
   // A newer keystroke (or unmount) superseded this request: its answer is not wanted.
   if (controller !== mine) return;
   controller = null;
+  searching.value = false;
   if (!result.ok) {
     if (result.code === 'aborted') return;
     // The store already logged it and printed the `[weather]` devHint.
@@ -119,12 +126,14 @@ async function runSearch(q: string): Promise<void> {
 watch(query, (raw) => {
   cancelPending();
   const q = raw.trim();
-  if (q.length < MIN_QUERY) {
+  // The service's floor (a 1-letter query is never sent), read through the store.
+  if (q.length < weatherStore.searchMinChars) {
     places.value = [];
     status.value = 'idle';
+    searching.value = false;
     return;
   }
-  status.value = 'searching';
+  searching.value = true;
   timer = setTimeout(() => {
     timer = null;
     void runSearch(q);
@@ -153,15 +162,20 @@ async function pick(place: WeatherPlace): Promise<void> {
   query.value = '';
   places.value = [];
   status.value = 'idle';
+  searching.value = false;
   nav.reset();
 }
 
 function onKeydown(e: KeyboardEvent): void {
   if (nav.onNavKey(e)) return;
   if (e.key !== 'Enter') return;
-  // Enter never submits the drawer around the field; it picks the highlighted town.
+  // Enter never submits the drawer around the field. It picks the highlighted town, or with
+  // nothing highlighted the first one, but only once the list answers what is typed now (a
+  // stale list on screen during a search could otherwise commit the wrong town).
   e.preventDefault();
-  const chosen = nav.open.value && nav.active.value >= 0 ? places.value[nav.active.value] : null;
+  if (!nav.open.value) return;
+  const index = nav.active.value >= 0 ? nav.active.value : searching.value ? -1 : 0;
+  const chosen = index >= 0 ? places.value[index] : undefined;
   if (chosen) void pick(chosen);
 }
 
@@ -196,7 +210,7 @@ function onBlur(): void {
         <button
           v-if="!disabled"
           type="button"
-          class="font-outfit text-primary-500 dark:text-accent-lift shrink-0 text-sm font-semibold"
+          class="font-outfit text-primary-700 dark:text-accent-lift shrink-0 text-sm font-semibold"
           data-testid="home-town-change"
           @click="startChange"
         >
@@ -210,7 +224,7 @@ function onBlur(): void {
       >
         <WeatherGlyph :kind="atom.glyph" :size="22" />
         <span class="font-outfit dark:text-ink text-secondary-500 font-bold">{{
-          atom.temp ?? fillTemplate(t('weather.todayHighLow'), { high: atom.high, low: atom.low })
+          atom.temp ?? atom.todayHighLow
         }}</span>
         <span>{{
           fillTemplate(t('settings.weather.preview'), { condition: atom.condition })
@@ -231,6 +245,7 @@ function onBlur(): void {
           v-model="query"
           :placeholder="placeholder"
           :disabled="disabled"
+          :aria-label="t('settings.weather.homeTown')"
           role="combobox"
           autocomplete="off"
           aria-autocomplete="list"
@@ -247,7 +262,7 @@ function onBlur(): void {
         </BaseInput>
       </div>
 
-      <div v-if="status === 'searching'" class="mt-2 flex justify-start px-1">
+      <div v-if="searching" class="mt-2 flex justify-start px-1">
         <BeanieSpinner size="sm" label :halo="false" />
       </div>
 
@@ -293,7 +308,7 @@ function onBlur(): void {
            together with its content is not announced. Heritage Orange, never red: this is
            guidance, not a hard validation error. -->
       <p
-        class="text-primary-600 dark:text-accent-lift mt-1.5 text-xs font-semibold empty:mt-0"
+        class="text-primary-700 dark:text-accent-lift mt-1.5 text-xs font-semibold empty:mt-0"
         role="status"
         aria-live="polite"
         data-testid="home-town-message"

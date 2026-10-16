@@ -328,7 +328,7 @@ const STRIP_CELL =
           >
         </template>
         <span v-else class="text-secondary-400 dark:text-ink-soft min-w-0 truncate">{{
-          fillTemplate(t('weather.highLow'), { high: weather.high, low: weather.low })
+          weather.todayHighLow
         }}</span>
       </template>
       <template v-else-if="weather.state === 'nudge'">

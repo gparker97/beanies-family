@@ -13,8 +13,8 @@
  * Not interactive (`WallCard displayOnly`): there is no drill-in for weather, and a card that
  * looks tappable but is not was the wall's loudest complaint.
  *
- * Every value arrives formatted in the atom, so this card formats only its two whole-sentence
- * templates (`weather.highLow`, `weather.todayHighLow`) and splices no translated fragments.
+ * Every value arrives formatted in the atom (`highLow`, `todayHighLow` included), so this card
+ * formats nothing and splices no translated fragments.
  * Dark mode: the `WallCard` shell carries `dark:bg-surface-raised`; every string here resolves
  * to `ink` / `ink-soft` / `ink-faint`, and the card paints no background of its own.
  */
@@ -24,7 +24,6 @@ import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import WeatherGlyph from '@/components/weather/WeatherGlyph.vue';
 import WeatherOutlook from '@/components/weather/WeatherOutlook.vue';
 import { useTranslation } from '@/composables/useTranslation';
-import { fillTemplate } from '@/utils/fillTemplate';
 import type { WeatherAtom } from '@/types/weather';
 
 export type WallWeatherCardLayout = 'line' | 'now' | 'full';
@@ -38,18 +37,6 @@ const { t } = useTranslation();
 
 const isLine = computed(() => props.layout === 'line');
 
-/** "H 57° L 49°" under the condition (full only). */
-const highLow = computed(() =>
-  props.atom.state === 'reading'
-    ? fillTemplate(t('weather.highLow'), { high: props.atom.high, low: props.atom.low })
-    : ''
-);
-/** An `old` reading hides the temperature and keeps today's high and low. */
-const todayHighLow = computed(() =>
-  props.atom.state === 'reading'
-    ? fillTemplate(t('weather.todayHighLow'), { high: props.atom.high, low: props.atom.low })
-    : ''
-);
 /** An `aged` reading draws the temperature in the softer ink. */
 const tempClass = computed(() =>
   props.atom.state === 'reading' && props.atom.soft
@@ -92,7 +79,7 @@ const tempClass = computed(() =>
         <span
           v-else
           class="font-outfit wall-weather-cond text-secondary-500 dark:text-ink min-w-0 truncate font-semibold"
-          >{{ todayHighLow }}</span
+          >{{ atom.todayHighLow }}</span
         >
         <span
           v-if="atom.ageShort"
@@ -118,14 +105,14 @@ const tempClass = computed(() =>
               <span
                 v-if="layout === 'full'"
                 class="font-inter wall-weather-hl text-secondary-400 dark:text-ink-soft block whitespace-nowrap"
-                >{{ highLow }}</span
+                >{{ atom.highLow }}</span
               >
             </span>
           </template>
           <span
             v-else
             class="font-outfit wall-weather-cond text-secondary-500 dark:text-ink min-w-0 font-semibold"
-            >{{ todayHighLow }}</span
+            >{{ atom.todayHighLow }}</span
           >
         </span>
         <WeatherOutlook v-if="layout === 'full'" :days="atom.outlook" variant="inline" />

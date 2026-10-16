@@ -57,17 +57,22 @@ const { t } = useTranslation();
       :data-state="weather.state"
     >
       <template v-if="weather.state === 'reading'">
-        <!-- An `old` reading has no "now": only its age and the days ahead. -->
-        <p v-if="weather.temp !== null" class="flex items-center gap-3">
+        <p class="flex items-center gap-3">
           <WeatherGlyph :kind="weather.glyph" :size="34" mono />
-          <span class="font-outfit wall-night-wx-temp leading-none font-bold tabular-nums">{{
-            weather.temp
-          }}</span>
-          <span class="font-inter wall-night-wx-cond font-medium">{{
-            fillTemplate(t('weather.night.nowLine'), {
-              condition: weather.condition,
-              temp: weather.tonightLow,
-            })
+          <template v-if="weather.temp !== null">
+            <span class="font-outfit wall-night-wx-temp leading-none font-bold tabular-nums">{{
+              weather.temp
+            }}</span>
+            <span class="font-inter wall-night-wx-cond font-medium">{{
+              fillTemplate(t('weather.night.nowLine'), {
+                condition: weather.condition,
+                temp: weather.tonightLow,
+              })
+            }}</span>
+          </template>
+          <!-- An `old` reading has no "now": today's high and low stand in for it. -->
+          <span v-else class="font-inter wall-night-wx-cond font-medium">{{
+            weather.todayHighLow
           }}</span>
         </p>
         <p v-if="weather.ageText" class="font-inter wall-night-wx-age">{{ weather.ageText }}</p>

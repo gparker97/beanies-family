@@ -20,9 +20,10 @@
  *
  * A LATE ANSWER IS DROPPED, NEVER APPLIED TO THE NEW QUESTION. Every run captures what it
  * asked (`familyId`, `placeKey`); an answer that lands after the town, the home zone or the
- * family changed, or after sign-out began, is discarded (`weather_fetch_dropped`) and the
- * trailing run asks the new question. The watch also aborts the stale request, which makes
- * the common case fast; the comparison makes it correct when the abort loses the race.
+ * family changed, after Show Weather was switched off, or after sign-out began, is discarded
+ * (`weather_fetch_dropped`) and the trailing run asks the new question. The watch also aborts
+ * the stale request, which makes the common case fast; the comparison makes it correct when
+ * the abort loses the race.
  *
  * SIGN-OUT HALTS FIRST, THEN DELETES (`haltForSignOut`, the `clearWidgetSnapshot` precedent):
  * a forecast that resolved between the removal and the reset would otherwise write the
@@ -91,6 +92,9 @@ interface Asked {
   familyId: string;
   placeKey: string;
 }
+
+/** Why a late answer was dropped (`weather_fetch_dropped`'s `detail`). */
+type DropReason = 'superseded' | 'halted' | 'disabled';
 
 export const useWeatherStore = defineStore('weather', () => {
   const settingsStore = useSettingsStore();
@@ -173,7 +177,7 @@ export const useWeatherStore = defineStore('weather', () => {
     });
   }
 
-  function logDropped(kind: WeatherRefreshKind, detail: 'superseded' | 'halted'): void {
+  function logDropped(kind: WeatherRefreshKind, detail: DropReason): void {
     logEvent({
       level: 'debug',
       surface: SURFACE,
@@ -198,8 +202,10 @@ export const useWeatherStore = defineStore('weather', () => {
 
   // ── Fetching ───────────────────────────────────────────────────────────────
   /** Why an answer for `asked` no longer applies, or null when it still does. */
-  function supersededBy(asked: Asked): 'superseded' | 'halted' | null {
+  function supersededBy(asked: Asked): DropReason | null {
     if (halted) return 'halted';
+    // Show Weather went off mid-flight: the answer is neither cached nor shown.
+    if (!settingsStore.weatherEnabled) return 'disabled';
     if (asked.familyId !== familyContextStore.activeFamilyId) return 'superseded';
     if (asked.placeKey !== placeKey.value) return 'superseded';
     return null;
@@ -280,6 +286,15 @@ export const useWeatherStore = defineStore('weather', () => {
     });
   }
 
+  /**
+   * Abandon the running forecast: its answer is no longer wanted. The caller must queue a
+   * `request` straight after (the trailing run takes over `fetching`).
+   */
+  function abortInflight(): void {
+    inflight?.abort();
+    inflight = null;
+  }
+
   /** One refresh attempt: decide, then ask, then apply or drop. Never calls `request`. */
   async function run(kind: WeatherRefreshKind): Promise<void> {
     const now = Date.now();
@@ -299,6 +314,8 @@ export const useWeatherStore = defineStore('weather', () => {
       backoffUntil: failure.value?.until ?? 0,
     });
     if (decision.action === 'skip' || !familyId || !key || !place) {
+      // Nothing in flight now; this also ends a hand-off from an aborted run (below).
+      fetching.value = false;
       logSkip(decision.action === 'skip' ? decision.reason : 'pre-hydration');
       return;
     }
@@ -313,8 +330,14 @@ export const useWeatherStore = defineStore('weather', () => {
     } catch (e) {
       onFetchFailure(asked, e, kind);
     } finally {
-      fetching.value = false;
-      if (inflight === controller) inflight = null;
+      // A run the watch abandoned (`abortInflight`) leaves `fetching` set: the watch queued the
+      // trailing run in the same breath, and that run either fetches or clears the flag when it
+      // skips. Clearing it here would show `unavailable` (and log the stage) for the microtasks
+      // between this run settling and the trailing run starting.
+      if (inflight === controller) {
+        inflight = null;
+        fetching.value = false;
+      }
     }
   }
 
@@ -413,7 +436,7 @@ export const useWeatherStore = defineStore('weather', () => {
       placeKey,
       () => familyContextStore.activeFamilyId,
     ],
-    ([ready, , key, familyId], previous) => {
+    ([ready, enabled, key, familyId], previous) => {
       const [, , prevKey, prevFamilyId] = previous ?? [];
       // A session boundary lifts the sign-out latch: the session going away, or one starting.
       const present = ready && familyId !== null;
@@ -422,9 +445,10 @@ export const useWeatherStore = defineStore('weather', () => {
 
       const questionChanged =
         previous === undefined || key !== prevKey || familyId !== prevFamilyId;
+      // The old question's answer is no longer wanted, nor any answer once weather is off.
+      if (questionChanged || !enabled) abortInflight();
       if (questionChanged) {
-        // The old question's answer is no longer wanted; a new one gets a fresh backoff.
-        inflight?.abort();
+        // A new question gets a fresh backoff.
         failure.value = null;
         reading.value = hydrate(familyId, key);
       }
@@ -474,6 +498,8 @@ export const useWeatherStore = defineStore('weather', () => {
     placeKey,
     isActive,
     atom,
+    /** The shortest query `searchPlaces` sends (the service's floor), for the home-town field. */
+    searchMinChars: SEARCH_MIN_CHARS,
     searchPlaces,
     haltForSignOut,
   };
