@@ -107,6 +107,10 @@ Once deployed, copy the proxy's URL (API Gateway URL for AWS, your Dokploy domai
 | `VITE_GOOGLE_API_KEY`        | Picker only        | Google Cloud Console (API key)      |
 | `VITE_GOOGLE_PROJECT_NUMBER` | Picker only        | Google Cloud Console (dashboard)    |
 
+### Weather (optional)
+
+The weather on the beanie wall and the Nook comes straight from the browser to [Open-Meteo](https://open-meteo.com). With nothing configured it uses Open-Meteo's **free endpoints, which are for non-commercial use only**. A personal, family self-host fits that. If you run a commercial service, buy an Open-Meteo plan and set `VITE_OPEN_METEO_API_KEY` at build time: the app then switches to the customer endpoints with no code change. Leave it unset and nothing else is needed. The key is compiled into the client, so treat it as a quota key, not a secret. See ADR-043.
+
 ---
 
 ## Settings footer badge

@@ -706,7 +706,7 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
       'Tell beanies.family where your family lives and the Family Planner will mark your country\u2019s public holidays \u2014 the days when school is usually out.',
     icon: '\u{1F30D}',
     readTime: 2,
-    updatedDate: '2026-05-12',
+    updatedDate: '2026-10-16',
     sections: [
       {
         type: 'heading',
@@ -765,7 +765,7 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
       {
         type: 'infoBox',
         content:
-          'The country list and holiday data are bundled with the app \u2014 nothing about where your family lives ever leaves your device.',
+          'The country list and holiday data are bundled with the app, so looking up holidays sends nothing anywhere. If you set a home town for the weather, see <a href="/help/features/weather-on-the-wall-and-nook">Show the weather on the beanie wall and in the Nook</a>.',
         title: 'Private, like everything else',
         icon: '\u{1F512}',
       },
@@ -803,7 +803,7 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
       'Turn a spare tablet into the family wall display, and set the two device settings that keep it awake and keep small hands inside the app.',
     icon: '\u{1F9F1}',
     readTime: 6,
-    updatedDate: '2026-10-09',
+    updatedDate: '2026-10-16',
     sections: [
       {
         type: 'paragraph',
@@ -1025,6 +1025,22 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
           "No financial information is ever shown on the wall. No accounts, no balances, no transactions, no goals, no net worth. This is not a setting you have to remember to turn off, and it does not depend on who is signed in: none of the wall's screens will render any of it. A tablet on the kitchen wall is the last place your family's money should be readable from.",
         title: 'Never any money on the wall',
         icon: '\u{1F512}',
+      },
+      {
+        type: 'heading',
+        content: 'Weather on the wall',
+        level: 2,
+        id: 'weather-on-the-wall',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Once your family has set a home town, the wall shows a weather card with the conditions right now, today\u2019s high and low, and the next three days. On a shorter wall it shrinks to a single line so everything else still fits. The night screen shows the three days too, in the same soft colours as the clock.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'To choose how much weather this tablet shows, open the wall\u2019s settings and look for <strong>Size on This Wall</strong>: <strong>Large</strong> (now, plus the next 3 days, the default), <strong>Small</strong> (just right now) or <strong>Off</strong>. It is a setting for this tablet only, so a phone or another wall can differ. Setting the home town itself is covered in <a href="/help/features/weather-on-the-wall-and-nook">Show the weather on the beanie wall and in the Nook</a>.',
       },
       {
         type: 'heading',

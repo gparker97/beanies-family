@@ -6,7 +6,7 @@ import LegalLayout from '../layouts/LegalLayout.astro';
   title="privacy policy — beanies.family"
   description="beanies.family is local-first. your family's data lives on your device. we don't collect it, we don't store it, and we don't sell it. ever."
   canonicalPath="/privacy"
-  lastUpdated="5 October 2026"
+  lastUpdated="16 October 2026"
   breadcrumbLabel="privacy policy"
 >
   <section>
@@ -81,7 +81,6 @@ import LegalLayout from '../layouts/LegalLayout.astro';
       <li>your family members' names, relationships, or activities</li>
       <li>your goals, to-do items, or travel plans</li>
       <li>your passwords or encryption keys</li>
-      <li>your location data</li>
       <li>your contacts or address book</li>
       <li>your personal information beyond the family registry entry above and the limited technical diagnostics described below</li>
     </ul>
@@ -142,6 +141,18 @@ import LegalLayout from '../layouts/LegalLayout.astro';
     </p>
   </section>
 
+  <section id="weather">
+    <h2>weather</h2>
+    <p>
+      the weather is the one place the app uses a location, and only with your consent: it is collected only when a
+      pod manager in your family explicitly types a home town for the weather. what is sent is the typed town (to
+      find it) and its rounded coordinates (about a kilometre), from your device to
+      <a href="https://open-meteo.com" rel="noopener noreferrer">Open-Meteo</a> only, never through our servers. your
+      device's location services and GPS are never used. turning <strong>Show Weather</strong> off stops every lookup,
+      and weather readings are cached on your device only.
+    </p>
+  </section>
+
   <section id="diagnostics">
     <h2>diagnostics &amp; error reporting</h2>
     <p>
@@ -173,6 +184,7 @@ import LegalLayout from '../layouts/LegalLayout.astro';
         and lines were read, and how many lines were added, merged, skipped or looked like ones
         already in beanies &mdash; so we can tell how well the matching works. it never records an
         amount, a date, a payee, an account number or anything else from the statement. when you share something to beanies from another app, it records how it arrived and what KIND of item it was &mdash; the technical type, such as a png image or plain text &mdash; along with how many items came through and, on iPhone, whether the app was able to open or notify you, so we can tell when sharing quietly fails. it never records the link you shared, the file's name, or anything inside it. if you use the beanie wall, it records the size of the screen you opened it on, so we can tell which tablets it fits and which it turns away &mdash; four numbers describing the screen, nothing about what is on your wall.
+        when the weather is on, it records whether a weather lookup worked and how many minutes old the reading on screen is (a whole number), so we can tell when a wall is showing stale weather. it never records the town you typed, its coordinates or the forecast.
         so we can tell when a trial ends or a plan lapses as it should, it also records which plan
         state your family is in on this device (beta, trial, active or read-only), which plan it is
         on (basic or full), and whether the app acted on that state. it never records a price, a
@@ -295,6 +307,13 @@ import LegalLayout from '../layouts/LegalLayout.astro';
         sees your card, and stores only which plan your family is on
       </li>
       <li><strong>ExchangeRate API:</strong> to fetch currency exchange rates — no personal data is sent</li>
+      <li>
+        <strong>Open-Meteo:</strong> only if a pod manager in your family chooses to type a home town for the weather.
+        The town you type (to find it) and its rounded coordinates (about a kilometre) go from your device to
+        Open-Meteo, and nowhere else, to fetch the forecast. Your device's location services and GPS are never used.
+        Nothing else about your family is sent, turning Show Weather off stops every lookup, and Open-Meteo deletes
+        its request logs after 90 days
+      </li>
     </ul>
   </section>
 

@@ -10,6 +10,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-10-16
 
+### Added
+
+- Weather on the beanie wall, its night screen and the Nook, driven by a family home town set once in Settings > Region & Holidays.
+
+### Changed
+
+- The Region & Holidays country hint no longer claims that nothing about your location leaves your device.
+
 ### Fixed
 
 - Home-screen widget on Android: the medium and large sizes no longer get stuck on yesterday's date while the small one updates.

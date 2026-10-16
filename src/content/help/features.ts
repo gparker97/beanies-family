@@ -1400,7 +1400,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
     icon: '\u{1F3E1}',
     readTime: 5,
     popular: true,
-    updatedDate: '2026-03-27',
+    updatedDate: '2026-10-16',
     sections: [
       {
         type: 'heading',
@@ -1544,6 +1544,17 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         type: 'paragraph',
         content:
           'The last section shows recent happenings \u2014 completed tasks from the past week and your latest transactions. Tap any item to view its details. A <strong>See All \u2192</strong> link takes you to the full Transactions page.',
+      },
+      {
+        type: 'heading',
+        content: 'Weather',
+        level: 2,
+        id: 'weather',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Once your family has set a home town, the Nook shows the weather too. On a phone it joins the date line at the top. On a desktop it appears as a small weather card with today\u2019s high and low and the next three days. If no home town is set yet, a gentle link takes you to Settings to add one. See <a href="/help/features/weather-on-the-wall-and-nook">Show the weather on the beanie wall and in the Nook</a>.',
       },
       {
         type: 'heading',
@@ -3254,6 +3265,109 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         type: 'paragraph',
         content:
           'Related: <a href="/help/features/sharing-feedback">Sharing feedback</a> if anything about your plan looks wrong, and <a href="/help/security/how-your-data-is-encrypted">How your data is encrypted</a> for what is stored where.',
+      },
+    ],
+  },
+  {
+    slug: 'weather-on-the-wall-and-nook',
+    category: 'features',
+    title: 'Show the weather on the beanie wall and in the Nook',
+    excerpt:
+      'Set your family\u2019s home town once and see today\u2019s weather and the next three days on the beanie wall, its night screen and the Nook.',
+    icon: '\u{1F324}\u{FE0F}',
+    readTime: 3,
+    updatedDate: '2026-10-16',
+    sections: [
+      {
+        type: 'paragraph',
+        content:
+          'Is it a coat day or a sandals day? The weather sits right beside the plan for the day, so the family can see it at a glance without picking up a phone. You set a home town once, and the beanie wall, its night screen and the Nook all use it.',
+      },
+      {
+        type: 'heading',
+        content: 'Set your home town',
+        level: 2,
+        id: 'set-home-town',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'Open <strong>Settings</strong> and go to <strong>Region &amp; Holidays</strong>.',
+          'Make sure <strong>Show Weather</strong> is switched on.',
+          'In <strong>Home Town</strong>, type a city or a ZIP code and pick your town from the list that appears.',
+          'Under <strong>Temperature</strong>, choose \u00b0F or \u00b0C. The default is \u00b0F for the United States and \u00b0C everywhere else.',
+        ],
+      },
+      {
+        type: 'paragraph',
+        content:
+          'The home town is shared by the whole family and is set by a pod manager. Everyone then sees the same weather on their own device.',
+      },
+      {
+        type: 'heading',
+        content: 'Where the weather shows up',
+        level: 2,
+        id: 'where-it-shows',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>The beanie wall:</strong> a weather card with the conditions now, today\u2019s high and low, and the next three days. Each wall has its own <strong>Size on This Wall</strong> setting: <strong>Large</strong> (now, plus the next 3 days, the default), <strong>Small</strong> (just right now) or <strong>Off</strong>.',
+          '<strong>The wall\u2019s night screen:</strong> a quiet weather line under the clock. It shows the three days unless the wall is set to <strong>Off</strong>.',
+          '<strong>The Nook:</strong> on a phone, the weather joins the date line at the top; on a desktop, it is a small weather card.',
+        ],
+      },
+      {
+        type: 'heading',
+        content: 'When the weather is out of date',
+        level: 2,
+        id: 'out-of-date',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'beanies.family refreshes the weather while the app is open. If the device is offline or the weather service is busy, the last reading stays on screen with a note such as <strong>As of 3h ago</strong>, so you always know how fresh it is. A reading older than 12 hours stops showing the current temperature, because it would be misleading.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'If there is no reading at all, you will see <strong>Weather is unavailable right now. We\u2019ll keep trying.</strong> You do not need to do anything: it tries again on its own, and the weather comes back as soon as it can reach the service.',
+      },
+      {
+        type: 'callout',
+        content:
+          'A parent who is travelling still sees the weather for your home town, not for where they are. That is on purpose: it is the family\u2019s weather.',
+        title: 'Home weather, wherever you are',
+        icon: '\u{1F9F3}',
+      },
+      {
+        type: 'heading',
+        content: 'Your privacy',
+        level: 2,
+        id: 'privacy',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Your location is only used with your consent, when a pod manager types a home town. beanies.family <strong>never reads your device\u2019s location</strong>, and no GPS is involved. The weather comes from Open-Meteo, and the only things sent are the town you type (to find it) and its rough location, about a kilometre. Nothing else about your family is shared. The readings are kept on your device only.',
+      },
+      {
+        type: 'heading',
+        content: 'Turning weather off',
+        level: 2,
+        id: 'turning-off',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Switch <strong>Show Weather</strong> off in <strong>Settings \u2192 Region &amp; Holidays</strong> and every weather lookup stops for the whole family. Your home town is kept, so switching it back on picks up where you left off. To hide the weather on just one wall, set that wall\u2019s <strong>Size on This Wall</strong> to <strong>Off</strong>.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Related: <a href="/help/getting-started/set-up-the-beanie-wall">Set up the beanie wall on a tablet</a> and <a href="/help/features/the-family-nook">The Family Nook</a>.',
       },
     ],
   },
