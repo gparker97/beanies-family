@@ -368,6 +368,14 @@ export const ALLOWED_CONTEXT_KEYS = new Set<string>([
   // MIRRORED in the telemetry Lambda + its pinned test; declared as "Diagnostics: a random
   // identifier for one set-up attempt".
   'create_attempt_id',
+  // Weather (#134, surface 'weather'). ONE new key: `weather_age_min`, the age in whole
+  // minutes of the reading on screen (or of the previous one, on a successful fetch), capped
+  // at 10080 (a week), or -1 when there is none. A bounded integer, never a place name, a
+  // coordinate, the request URL or the provider key. Outcomes ride `action`, triggers `kind`,
+  // stages `stage`, failures `error_code` + `http_status`, the backoff `detail`, all reused.
+  // MIRRORED in infrastructure/lambda/telemetry/index.mjs (pinned by a Lambda test) and
+  // declared in docs/runbooks/native-store-submission.md + web/src/pages/privacy.astro.
+  'weather_age_min',
 ]);
 
 export const MAX_STRING_LEN = 200;

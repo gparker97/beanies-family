@@ -369,6 +369,9 @@ export const ALLOWED_CONTEXT_KEYS = new Set([
   // Pod-creation funnel (#128): the open create attempt's random UUID. Mirror of
   // src/utils/diagnosticContext.ts.
   'create_attempt_id',
+  // Weather (#134, surface 'weather'): the reading's age in whole minutes, capped at 10080,
+  // or -1 when there is none. A bounded integer. Mirror of src/utils/diagnosticContext.ts.
+  'weather_age_min',
 ]);
 
 function getHeaders(event) {

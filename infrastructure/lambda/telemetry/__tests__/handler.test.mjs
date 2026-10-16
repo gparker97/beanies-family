@@ -813,6 +813,7 @@ describe('Telemetry Lambda handler', () => {
         'visibility_state',
         'vue_info',
         'wallet_count',
+        'weather_age_min',
         'web_storage',
       ];
       assert.deepEqual([...ALLOWED_CONTEXT_KEYS].sort(), expected);

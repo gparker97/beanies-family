@@ -23,3 +23,10 @@ export function formatUiDate(
 ): string {
   return new Intl.DateTimeFormat(uiLocale(lang), options).format(new Date(`${dateISO}T00:00:00`));
 }
+
+/** A wall-clock time ("4:40 AM", "上午4:40") for an epoch-ms instant, in the UI language. */
+export function formatUiTime(ms: number, lang: LanguageCode | undefined): string {
+  return new Intl.DateTimeFormat(uiLocale(lang), { hour: 'numeric', minute: '2-digit' }).format(
+    new Date(ms)
+  );
+}

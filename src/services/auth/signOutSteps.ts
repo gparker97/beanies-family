@@ -35,6 +35,13 @@ export type SignOutStepName =
    * `cancelReminders` on every tier that runs it: both put family content outside the app.
    */
   | 'clearWidgetSnapshot'
+  /**
+   * Delete this device's weather reading (#134, ADR-043). It is derived from the family's
+   * home town, so it leaves with the session on every tier that runs `clearWidgetSnapshot`.
+   * One device key, so the same step is right for every tier, tier 3's "every family"
+   * included. Halts the weather store first (an answer in flight must land before the delete).
+   */
+  | 'clearWeatherCache'
   | 'captureDepartingAccount'
   | 'clearGoogleSessionKeepTokens'
   | 'clearGoogleSessionDropTokens'
@@ -112,6 +119,7 @@ export const SIGN_OUT_TRUSTED_STEPS: readonly SignOutStepName[] = [
   'quietTeardownAndForceSave',
   'cancelReminders',
   'clearWidgetSnapshot',
+  'clearWeatherCache',
   'clearGoogleSessionKeepTokens',
   'resetSyncState',
   'resetDocClient',
@@ -136,6 +144,7 @@ export const SIGN_OUT_UNTRUSTED_STEPS: readonly SignOutStepName[] = [
   'quietTeardownAndForceSave',
   'cancelReminders',
   'clearWidgetSnapshot',
+  'clearWeatherCache',
   'captureDepartingAccount',
   'clearGoogleSessionDropTokens',
   'resetSyncState',
@@ -157,6 +166,7 @@ export const SIGN_OUT_CLEAR_STEPS: readonly SignOutStepName[] = [
   'quietTeardownAndForceSave',
   'cancelReminders',
   'clearWidgetSnapshot',
+  'clearWeatherCache',
   'captureDepartingAccount',
   'clearGoogleSessionDropTokens',
   'clearAllRefreshTokens',
@@ -232,6 +242,7 @@ export const SIGN_OUT_EVICTION_LOCK_STEPS: readonly SignOutStepName[] = [
   'beginQuietTeardown',
   'cancelReminders',
   'clearWidgetSnapshot',
+  'clearWeatherCache',
   'resetSyncState',
   'resetDocClient',
   // NO `announceSessionEnded` (round 3): the channel is per FAMILY, and the people still in

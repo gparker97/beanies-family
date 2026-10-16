@@ -229,6 +229,11 @@ describe('uiStrings', () => {
       // parent their home screen may be showing old plans. Real nouns only.
       'widget.asOf',
       'widget.publishFailed',
+      // Weather (#134): a failed home-town search and "weather is unavailable" tell a parent
+      // what is wrong and that it retries. Real nouns only. The rest of `weather.` (conditions,
+      // captions, the nudge) is cosmetic and deliberately NOT covered.
+      'weather.search.failed',
+      'weather.unavailable',
     ];
     const KEY_SUFFIXES =
       /(deleteConfirm|DeleteConfirm|ConfirmMessage|confirmMessage|Failed|Error)$/;

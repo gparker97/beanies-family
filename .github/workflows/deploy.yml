@@ -184,6 +184,10 @@ jobs:
           # The marketing site (beanies.family) has its own ID hardcoded in
           # web/src/layouts/BaseLayout.astro — that's a separate Plausible site.
           VITE_PLAUSIBLE_DOMAIN: jvjpzIr6FM9tDKaS1gZaK
+          # Open-Meteo "API Standard" key (#134, ADR-043). Unset today, so the build uses the
+          # keyless free endpoints; adding the secret moves weather to the customer endpoints
+          # with no code change. Ships in the bundle (quota exposure only).
+          VITE_OPEN_METEO_API_KEY: ${{ secrets.OPEN_METEO_API_KEY }}
           # Build SHA — every error report includes this so we can correlate
           # bugs to specific deploys. Falls back to 'dev' for local builds.
           VITE_BUILD_SHA: ${{ github.sha }}

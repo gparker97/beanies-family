@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from 'vitest';
-import { delay, withTimeout, raceTimeout } from '@/utils/timing';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { delay, withTimeout, raceTimeout, timeoutSignal } from '@/utils/timing';
 
 describe('utils/timing', () => {
   describe('delay', () => {
@@ -104,5 +104,98 @@ describe('utils/timing', () => {
       expect(err.name).toBe('Error');
       vi.useRealTimers();
     });
+  });
+});
+
+describe('timeoutSignal', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  /** Old WebKit: an `AbortSignal` with neither `timeout` nor `any`. */
+  function stubOldWebKit(): void {
+    const Native = globalThis.AbortSignal;
+    class OldAbortSignal {}
+    Object.setPrototypeOf(OldAbortSignal.prototype, Native.prototype);
+    vi.stubGlobal('AbortSignal', OldAbortSignal);
+  }
+
+  it('uses AbortSignal.timeout and AbortSignal.any when both exist', () => {
+    const timeoutSpy = vi.spyOn(AbortSignal, 'timeout');
+    const anySpy = vi.spyOn(AbortSignal, 'any');
+    const caller = new AbortController();
+    timeoutSignal(1000, caller.signal);
+    expect(timeoutSpy).toHaveBeenCalledWith(1000);
+    expect(anySpy).toHaveBeenCalledTimes(1);
+    timeoutSpy.mockRestore();
+    anySpy.mockRestore();
+  });
+
+  describe.each([
+    ['without AbortSignal.timeout or AbortSignal.any', stubOldWebKit],
+    [
+      'with AbortSignal.timeout but without AbortSignal.any (iOS 16)',
+      () => {
+        const Native = globalThis.AbortSignal;
+        class Ios16AbortSignal {
+          static timeout = Native.timeout.bind(Native);
+        }
+        vi.stubGlobal('AbortSignal', Ios16AbortSignal);
+      },
+    ],
+  ])('%s', (_name, stub) => {
+    it('aborts after the deadline with a TimeoutError reason', async () => {
+      vi.useFakeTimers();
+      stub();
+      const caller = new AbortController();
+      const signal = timeoutSignal(1000, caller.signal);
+      expect(signal.aborted).toBe(false);
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(signal.aborted).toBe(true);
+      expect((signal.reason as Error).name).toBe('TimeoutError');
+    });
+
+    it("forwards the caller's abort, with the caller's reason, and cancels the timer", async () => {
+      vi.useFakeTimers();
+      stub();
+      const caller = new AbortController();
+      const signal = timeoutSignal(1000, caller.signal);
+      caller.abort(new DOMException('moved on', 'AbortError'));
+      expect(signal.aborted).toBe(true);
+      expect((signal.reason as Error).name).toBe('AbortError');
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('an already-aborted caller signal aborts the result at once', () => {
+      stub();
+      const caller = new AbortController();
+      caller.abort(new DOMException('gone', 'AbortError'));
+      const signal = timeoutSignal(1000, caller.signal);
+      expect(signal.aborted).toBe(true);
+      expect((signal.reason as Error).message).toBe('gone');
+    });
+
+    it("removes its listener from the caller's signal when the deadline fires", async () => {
+      vi.useFakeTimers();
+      stub();
+      const caller = new AbortController();
+      const add = vi.spyOn(caller.signal, 'addEventListener');
+      const remove = vi.spyOn(caller.signal, 'removeEventListener');
+      timeoutSignal(1000, caller.signal);
+      expect(add).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(remove).toHaveBeenCalledWith('abort', add.mock.calls[0]![1]);
+    });
+  });
+
+  it('without a caller signal and without AbortSignal.timeout, still times out', async () => {
+    vi.useFakeTimers();
+    stubOldWebKit();
+    const signal = timeoutSignal(500);
+    await vi.advanceTimersByTimeAsync(499);
+    expect(signal.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    expect((signal.reason as Error).name).toBe('TimeoutError');
   });
 });

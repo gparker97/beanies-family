@@ -3363,6 +3363,13 @@ export const useAuthStore = defineStore('auth', () => {
         const { WidgetBridge } = await import('@/services/native/widgetBridgePlugin');
         await WidgetBridge.clear();
       },
+      // #134: the weather reading is town-derived device data. Every platform (it is
+      // localStorage), halt-then-delete inside the store. Dynamic import keeps the weather
+      // service out of authStore's graph; a rejection is reported once by `runSignOutSteps`.
+      clearWeatherCache: async () => {
+        const { useWeatherStore } = await import('@/stores/weatherStore');
+        await useWeatherStore().haltForSignOut();
+      },
       captureDepartingAccount: () => {
         // MUST run before the Google clear nulls the cached email (#62).
         ctx.departedEmail = getGoogleAccountEmail();

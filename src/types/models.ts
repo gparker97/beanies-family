@@ -61,9 +61,14 @@ export interface WallSleepSettings {
   idleMinutes: number;
 }
 
+/** How big the weather card is on this wall (#134). `off` also hides the night screen's weather. */
+export type WallWeatherStyle = 'large' | 'small' | 'off';
+
 /** Beanie-wall-only preferences for this device (the wall is a device, not the family). */
 export interface WallDeviceSettings {
   sleep?: WallSleepSettings;
+  /** Absent = `'large'`. Read through `settingsStore.wallWeatherStyle`. */
+  weather?: WallWeatherStyle;
 }
 
 export interface GlobalSettings {
@@ -2180,6 +2185,29 @@ export interface AIApiKeys {
 export type AiTier = 'managed' | 'byok' | 'on-device';
 
 // Settings - App configuration
+/** #134: a temperature unit. Celsius is always fetched; Fahrenheit is a display conversion. */
+export type TemperatureUnit = 'F' | 'C';
+
+/**
+ * #134: the family's home town for the weather, as the geocoder returned it in the picking
+ * user's language and shown as-is to everyone (never re-geocoded on read). Persisted in the
+ * family doc, so it lives here rather than in `types/weather.ts`.
+ */
+export interface WeatherPlace {
+  /** The provider's GeoNames id. */
+  id: number;
+  name: string;
+  /** State, province or region. Optional in the provider's results (absent for some territories). */
+  admin1?: string;
+  /** The country's display name, or the provider's country code when it returned no name. */
+  country: string;
+  /** The provider's ISO country code; may fall outside our `CountryCode` list. */
+  countryCode: string;
+  /** Rounded to 2 decimals (about 1.1km): coarse location. */
+  lat: number;
+  lon: number;
+}
+
 export interface Settings {
   id: 'app_settings';
   baseCurrency: CurrencyCode;
@@ -2246,6 +2274,14 @@ export interface Settings {
    *  `settingsStore.resolveHomeTimeZoneNow()`, never raw. See
    *  `~/projects/beanies-ops/docs/plans/2026-10-06-calendar-home-time-zone.md`. */
   homeTimeZone?: string;
+  /** #134: the family's "Show Weather" switch. Absent = true. Off means no lookups at all
+   *  (forecast and geocoding) and weather leaves every surface; the stored town is kept. */
+  weatherEnabled?: boolean;
+  /** #134: the family's home town for the weather, typed and picked by a pod manager (never
+   *  from device location). Coordinates are rounded to 2 decimals before storage. */
+  weatherPlace?: WeatherPlace | null;
+  /** #134: °F or °C. Absent = `defaultUnitFor(family country)` (US = F, everywhere else C). */
+  temperatureUnit?: TemperatureUnit;
   skipDocumentConsentPrompt?: boolean; // #133: when true, the photo→activity AI consent modal is auto-confirmed (default: ask). Family-scoped.
   aiStatementConsentAcknowledgedAt?: ISODateString; // #107: when the family first confirmed the bank-statement consent (its merchant-list disclosure is new, so a family that skips the generic prompt still sees it once). Family-scoped.
   aiIngredientsConsentAcknowledgedAt?: ISODateString; // #116: when the family ticked "don't ask again" on the shopping-list ingredients consent. Its own skip: the family-wide document skip neither covers nor is set by it (a list is not a document). Family-scoped.

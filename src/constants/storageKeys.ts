@@ -31,4 +31,9 @@ export const STORAGE_KEYS = {
    *  platform, so the KDF write gate (`kdfWriteGate.ts`) can read it synchronously at boot.
    *  Device-local, never in the pod; not read by the `index.html` bootstrap. */
   UPDATE_FLOOR: 'beanies:updateFloor',
+  /** #134: the device's last weather reading for the active family's home town
+   *  (`services/weather/weatherCache.ts`). ONE key holding the reading plus the `familyId`
+   *  and `placeKey` it belongs to, so sign-out is a single removal. Device-local, never in
+   *  the pod; not read by the `index.html` bootstrap. */
+  WEATHER: 'beanies:weather',
 } as const;

@@ -33,6 +33,10 @@ import type {
   ReminderMinutes,
   HelpfulHintType,
   WallSleepSettings,
+  WallDeviceSettings,
+  WallWeatherStyle,
+  WeatherPlace,
+  TemperatureUnit,
 } from '@/types/models';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import {
@@ -43,6 +47,7 @@ import {
 } from '@/utils/reminderSchedule';
 import { HINT_LEAD_DAYS } from '@/utils/helpfulHints';
 import { resolveWallSleep } from '@/utils/wallSleep';
+import { defaultUnitFor } from '@/utils/weather/weatherReading';
 
 export const useSettingsStore = defineStore('settings', () => {
   // State
@@ -123,6 +128,10 @@ export const useSettingsStore = defineStore('settings', () => {
   );
   /** When the beanie wall sleeps on this device; always complete (see `resolveWallSleep`). */
   const wallSleep = computed(() => resolveWallSleep(globalSettings.value.wall?.sleep));
+  /** #134: this wall's weather card size (device-only). Absent = large. */
+  const wallWeatherStyle = computed<WallWeatherStyle>(
+    () => globalSettings.value.wall?.weather ?? 'large'
+  );
   const todoReminderLead = computed(
     () => globalSettings.value.todoReminderLead ?? DEFAULT_TODO_LEAD
   );
@@ -169,6 +178,15 @@ export const useSettingsStore = defineStore('settings', () => {
   // The FAMILY-scoped country (CRDT projection), never the device mirror `country` above.
   // Zone decisions (picker options, backfill, resolution) read this one.
   const familyCountry = computed<CountryCode | null>(() => getProjectedSettings()?.country ?? null);
+  // #134 weather: three FLAT family fields (ADR-039 fine-grained patches), so two devices
+  // changing the unit and the town at once do not clobber each other. Show Weather defaults
+  // on; nothing is fetched until a home town is set.
+  const weatherEnabled = computed<boolean>(() => settings.value.weatherEnabled ?? true);
+  const weatherPlace = computed<WeatherPlace | null>(() => settings.value.weatherPlace ?? null);
+  // Absent = the family country's default (US = F, every other or unset country = C).
+  const temperatureUnit = computed<TemperatureUnit>(
+    () => settings.value.temperatureUnit ?? defaultUnitFor(familyCountry.value)
+  );
   // #133: when true, the photo→activity AI consent modal is skipped (auto-consented).
   // Family-scoped (synced); default false so the first use always prompts.
   const skipDocumentConsentPrompt = computed<boolean>(
@@ -758,12 +776,14 @@ export const useSettingsStore = defineStore('settings', () => {
     persistGlobalSetting('settings.beanieLab.title', 'beanieLabEnabled', enabled);
 
   // ── OS reminder prefs (#55) actions — device-scoped via persistGlobalSetting. ──
+  /** The one writer of the wall's device object: the spread of `wall` lives only here. */
+  const patchWall = (patch: Partial<WallDeviceSettings>) =>
+    persistGlobalSetting('wall.setup.title', 'wall', { ...globalSettings.value.wall, ...patch });
   /** Change some of the beanie wall's sleep settings; the rest keep their current values. */
   const setWallSleep = (patch: Partial<WallSleepSettings>) =>
-    persistGlobalSetting('wall.setup.title', 'wall', {
-      ...globalSettings.value.wall,
-      sleep: { ...wallSleep.value, ...patch },
-    });
+    patchWall({ sleep: { ...wallSleep.value, ...patch } });
+  /** #134: this wall's weather card size; its sleep settings are untouched. */
+  const setWallWeather = (style: WallWeatherStyle) => patchWall({ weather: style });
   const setRemindersEnabled = (enabled: boolean) =>
     persistGlobalSetting('reminders.title', 'remindersEnabled', enabled);
   const setWidgetLockScreenTitles = (enabled: boolean) =>
@@ -978,6 +998,22 @@ export const useSettingsStore = defineStore('settings', () => {
   const setShowPublicHolidays = (show: boolean) =>
     persistAiSetting('settings.showPublicHolidays', 'showPublicHolidays', () =>
       settingsRepo.setShowPublicHolidays(show)
+    );
+
+  // #134 weather: family-only, flat fields, the `setHomeTimeZone` shape (toast + rethrow, so
+  // the control reverts on a failed write). `weatherStore` watches the derived place key and
+  // fetches on its own; nothing here calls the provider.
+  const setWeatherEnabled = (enabled: boolean) =>
+    persistAiSetting('settings.weather.show', 'weatherEnabled', () =>
+      settingsRepo.saveSettings({ weatherEnabled: enabled })
+    );
+  const setWeatherPlace = (place: WeatherPlace | null) =>
+    persistAiSetting('settings.weather.homeTown', 'weatherPlace', () =>
+      settingsRepo.saveSettings({ weatherPlace: place })
+    );
+  const setTemperatureUnit = (unit: TemperatureUnit) =>
+    persistAiSetting('settings.weather.unit', 'temperatureUnit', () =>
+      settingsRepo.saveSettings({ temperatureUnit: unit })
     );
 
   // #133: family-scoped consent skip for the photo→activity AI flow. Throws on failure
@@ -1246,6 +1282,7 @@ export const useSettingsStore = defineStore('settings', () => {
     remindersEnabled,
     widgetLockScreenTitles,
     wallSleep,
+    wallWeatherStyle,
     todoReminderLead,
     activityReminderLead,
     activityReminderBackfilledAt,
@@ -1301,6 +1338,7 @@ export const useSettingsStore = defineStore('settings', () => {
     setRemindersEnabled,
     setWidgetLockScreenTitles,
     setWallSleep,
+    setWallWeather,
     setTodoReminderLead,
     setActivityReminderLead,
     setActivityReminderBackfilledAt,
@@ -1312,6 +1350,12 @@ export const useSettingsStore = defineStore('settings', () => {
     setWeekStartDay,
     setCountry,
     familyCountry,
+    weatherEnabled,
+    weatherPlace,
+    temperatureUnit,
+    setWeatherEnabled,
+    setWeatherPlace,
+    setTemperatureUnit,
     resolveHomeTimeZoneNow,
     setHomeTimeZone,
     ensureHomeTimeZone,

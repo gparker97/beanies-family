@@ -213,3 +213,33 @@ describe('clearWidgetSnapshot (#130): right after cancelReminders, on every tier
     expect(KEY_MATERIAL_STEPS.has('clearWidgetSnapshot')).toBe(false);
   });
 });
+
+describe('clearWeatherCache (#134): on every tier that has clearWidgetSnapshot', () => {
+  // The weather reading is derived from the family's home town, so it leaves the device with
+  // the session exactly where the widget snapshot does. One device key: the same step serves
+  // every tier, tier 3's "every family" included.
+  const TIERS: Array<[string, readonly SignOutStepName[]]> = [
+    ['trusted', SIGN_OUT_TRUSTED_STEPS],
+    ['untrusted', SIGN_OUT_UNTRUSTED_STEPS],
+    ['clear', SIGN_OUT_CLEAR_STEPS],
+    ['clear (active)', SIGN_OUT_CLEAR_ACTIVE_STEPS],
+    ['cleared elsewhere', SIGN_OUT_CLEARED_ELSEWHERE_STEPS],
+    ['eviction lock', SIGN_OUT_EVICTION_LOCK_STEPS],
+    ['evicted', SIGN_OUT_EVICTED_STEPS],
+  ];
+
+  it.each(TIERS)('%s', (_name, steps) => {
+    expect(steps).toContain('clearWidgetSnapshot');
+    expect(steps).toContain('clearWeatherCache');
+  });
+
+  it('every tier list with clearWidgetSnapshot also has clearWeatherCache', () => {
+    for (const [, steps] of TIERS) {
+      expect(steps.includes('clearWeatherCache')).toBe(steps.includes('clearWidgetSnapshot'));
+    }
+  });
+
+  it('is not key material: it never trips the sign-out kit guard', () => {
+    expect(KEY_MATERIAL_STEPS.has('clearWeatherCache')).toBe(false);
+  });
+});

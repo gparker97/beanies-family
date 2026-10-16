@@ -178,6 +178,10 @@ jobs:
           VITE_CONTENT_FETCH_URL: ${{ vars.CONTENT_FETCH_URL }}
           VITE_CONTENT_FETCH_API_KEY: ${{ secrets.CONTENT_FETCH_API_KEY }}
           VITE_PLAUSIBLE_DOMAIN: jvjpzIr6FM9tDKaS1gZaK
+          # Open-Meteo "API Standard" key (#134, ADR-043). Unset today, so the build uses the
+          # keyless free endpoints; adding the secret moves weather to the customer endpoints
+          # with no code change. Ships in the bundle (quota exposure only).
+          VITE_OPEN_METEO_API_KEY: ${{ secrets.OPEN_METEO_API_KEY }}
           VITE_BUILD_SHA: ${{ github.sha }}
 
       # A .swift file in ios/App/App/ is NOT compiled just because it is committed — the

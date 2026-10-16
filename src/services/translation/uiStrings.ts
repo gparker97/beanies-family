@@ -2674,8 +2674,8 @@ const STRING_DEFS = {
   'settings.card.dataManagementDesc': { en: 'Export & clear data', beanie: 'export & clear data' },
   'settings.card.countryHolidays': { en: 'Region & Holidays', beanie: 'region & holidays' },
   'settings.card.countryHolidaysDesc': {
-    en: 'Your country, home time zone and public holidays',
-    beanie: 'your country, home time zone and public holidays',
+    en: 'Your country, home time zone, home town for the weather, and public holidays',
+    beanie: 'your country, home time zone, home town for the weather, and public holidays',
   },
   'settings.quickToggles': { en: 'Quick Settings', beanie: 'quick settings' },
   'settings.darkMode': { en: 'Dark Mode', beanie: 'dark mode' },
@@ -2719,9 +2719,9 @@ const STRING_DEFS = {
   'settings.country': { en: 'Country', beanie: 'country' },
   'settings.countryNotSet': { en: 'Not set', beanie: 'not set' },
   'settings.countryHelp': {
-    en: "We'll show your country's public holidays on the Family Planner. Nothing about your location ever leaves your device.",
+    en: "We'll show your country's public holidays on the Family Planner. Your country and time zone stay in your family file.",
     beanie:
-      "we'll show your country's public holidays on the family planner. nothing about your location ever leaves your device.",
+      "we'll show your country's public holidays on the family planner. your country and time zone stay in your family file.",
   },
   'settings.homeTimeZone': { en: 'Home Time Zone', beanie: 'home time zone' },
   'settings.homeTimeZoneHelp': {
@@ -14767,6 +14767,138 @@ const STRING_DEFS = {
     beanie:
       'your widget may show old plans. open beanies again later, and if it keeps happening, remove and re-add the widget.',
   },
+  // ── Weather (#134, ADR-043): the Region & Holidays Weather group, the beanie wall card and
+  //    night screen, the Nook caption and desktop pill. `weather.unavailable*` and
+  //    `weather.search.failed` are on the important-surface floor (uiStrings.test.ts). Age and
+  //    caption lines are whole sentences per case, never spliced from fragments. ──
+  'weather.title': { en: 'Weather', beanie: 'weather' },
+  'settings.weather.show': { en: 'Show Weather', beanie: 'show weather' },
+  'settings.weather.showHintOn': {
+    en: 'On the beanie wall, the Nook and phone widgets, for the whole family.',
+    beanie: 'on the beanie wall, the nook and phone widgets, for the whole family.',
+  },
+  'settings.weather.showHintOff': {
+    en: 'Off for the whole family. No weather is looked up.',
+    beanie: 'off for the whole family. no weather is looked up.',
+  },
+  'settings.weather.homeTown': { en: 'Home Town', beanie: 'home town' },
+  'settings.weather.homeTownPlaceholder': { en: 'City or ZIP code', beanie: 'city or zip code' },
+  'settings.weather.homeTownHint': {
+    en: "Your home town is only used to look up the weather for the wall, the Nook and your widgets. beanies.family never reads your device's location.",
+    beanie:
+      "your home town is only used to look up the weather for the wall, the nook and your widgets. beanies.family never reads your device's location.",
+  },
+  'settings.weather.notFound': {
+    en: 'No town called "{query}". Check the spelling, or try a ZIP code or a bigger town nearby.',
+    beanie:
+      'no town called "{query}". check the spelling, or try a zip code or a bigger town nearby.',
+  },
+  'settings.weather.preview': { en: '{condition} right now', beanie: '{condition} right now' },
+  'settings.weather.unit': { en: 'Temperature', beanie: 'temperature' },
+  'settings.weather.unitHint': {
+    en: '°F is the default for the United States, °C everywhere else.',
+    beanie: '°F is the default for the united states, °C everywhere else.',
+  },
+  'weather.search.failed': {
+    en: "We couldn't look that up just now. Check your connection and try again.",
+    beanie: "we couldn't look that up just now. check your connection and try again.",
+  },
+  'weather.unavailable': {
+    en: "Weather is unavailable right now. We'll keep trying.",
+    beanie: "weather is unavailable right now. we'll keep trying.",
+  },
+  'weather.unavailableShort': { en: 'Weather unavailable', beanie: 'weather unavailable' },
+  'wall.weather.size': { en: 'Size on This Wall', beanie: 'size on this wall' },
+  'wall.weather.large': { en: 'Large', beanie: 'large' },
+  'wall.weather.largeHint': {
+    en: 'Now, plus the next 3 days. The default.',
+    beanie: 'now, plus the next 3 days. the default.',
+  },
+  'wall.weather.small': { en: 'Small', beanie: 'small' },
+  'wall.weather.smallHint': { en: 'The weather right now.', beanie: 'the weather right now.' },
+  'wall.weather.off': { en: 'Off', beanie: 'off' },
+  'wall.weather.offHint': {
+    en: 'No weather on this wall or its night screen.',
+    beanie: 'no weather on this wall or its night screen.',
+  },
+  'wall.weather.sizeHint': {
+    en: 'The night screen always shows the three days unless this is Off. The home town and °F or °C are set for the whole family in Region & Holidays.',
+    beanie:
+      'the night screen always shows the three days unless this is off. the home town and °F or °C are set for the whole family in region & holidays.',
+  },
+  'weather.nudge': {
+    en: 'Set your home town in Settings to see the weather here',
+    beanie: 'set your home town in settings to see the weather here',
+  },
+  'weather.nudgeShort': {
+    en: 'Set your home town in Settings',
+    beanie: 'set your home town in settings',
+  },
+  'weather.nudgeStrip': { en: 'Set your home town', beanie: 'set your home town' },
+  'weather.nudgeNook': { en: 'Weather: {link}', beanie: 'weather: {link}' },
+  'weather.nudgeNookLink': { en: 'set your home town', beanie: 'set your home town' },
+  'weather.highLow': { en: 'H {high} L {low}', beanie: 'h {high} l {low}' },
+  'weather.todayHighLow': { en: 'Today H {high} L {low}', beanie: 'today h {high} l {low}' },
+  'weather.night.nowLine': {
+    en: '{condition}, low {temp} tonight',
+    beanie: '{condition}, low {temp} tonight',
+  },
+  'weather.asOf': { en: 'As of {ago}', beanie: 'as of {ago}' },
+  'weather.asOfShort': { en: '{ago}', beanie: '{ago}' },
+  'weather.asOfTime': { en: 'As of {time}', beanie: 'as of {time}' },
+  'weather.asOfYesterday': { en: 'As of yesterday, {time}', beanie: 'as of yesterday, {time}' },
+  'weather.asOfDayTime': { en: 'As of {day}, {time}', beanie: 'as of {day}, {time}' },
+  'weather.offlineAsOf': { en: 'Offline, as of {time}', beanie: 'offline, as of {time}' },
+  'weather.offlineShort': { en: 'offline', beanie: 'offline' },
+  'weather.condition.sunny': { en: 'Sunny', beanie: 'sunny' },
+  'weather.condition.partly': { en: 'Partly cloudy', beanie: 'partly cloudy' },
+  'weather.condition.cloudy': { en: 'Cloudy', beanie: 'cloudy' },
+  'weather.condition.rain': { en: 'Rain', beanie: 'rain' },
+  'weather.condition.thunder': { en: 'Thunderstorms', beanie: 'thunderstorms' },
+  'weather.condition.snow': { en: 'Snow', beanie: 'snow' },
+  'weather.condition.fog': { en: 'Fog', beanie: 'fog' },
+  'weather.condition.night': { en: 'Clear', beanie: 'clear' },
+  'weather.condition.nightPartly': { en: 'Partly cloudy', beanie: 'partly cloudy' },
+  // The Nook phone caption: one whole sentence per glyph (`nook.weatherCaption.<glyph>`), so a
+  // translation can place {temp} and {date} in its own order. {date} is `formatUiDate` output
+  // and keeps its capitals in beanie mode.
+  'nook.weatherCaption.sunny': {
+    en: "It's a sunny {temp} {date}",
+    beanie: "it's a sunny {temp} {date}",
+  },
+  'nook.weatherCaption.partly': {
+    en: "It's a partly cloudy {temp} {date}",
+    beanie: "it's a partly cloudy {temp} {date}",
+  },
+  'nook.weatherCaption.cloudy': {
+    en: "It's a cloudy {temp} {date}",
+    beanie: "it's a cloudy {temp} {date}",
+  },
+  'nook.weatherCaption.rain': {
+    en: "It's a rainy {temp} {date}",
+    beanie: "it's a rainy {temp} {date}",
+  },
+  'nook.weatherCaption.thunder': {
+    en: "It's a stormy {temp} {date}",
+    beanie: "it's a stormy {temp} {date}",
+  },
+  'nook.weatherCaption.snow': {
+    en: "It's a snowy {temp} {date}",
+    beanie: "it's a snowy {temp} {date}",
+  },
+  'nook.weatherCaption.fog': {
+    en: "It's a foggy {temp} {date}",
+    beanie: "it's a foggy {temp} {date}",
+  },
+  'nook.weatherCaption.night': {
+    en: "It's a clear {temp} night on {date}",
+    beanie: "it's a clear {temp} night on {date}",
+  },
+  'nook.weatherCaption.nightPartly': {
+    en: "It's a partly cloudy {temp} night on {date}",
+    beanie: "it's a partly cloudy {temp} night on {date}",
+  },
+  'nook.todayCaptionPlain': { en: "It's {date}", beanie: "it's {date}" },
 } satisfies Record<string, StringEntry>;
 
 /**

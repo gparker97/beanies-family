@@ -23,6 +23,10 @@ interface ImportMetaEnv {
   readonly VITE_FEEDBACK_WEBHOOK_URL: string | undefined;
   readonly VITE_MARKETING_URL: string | undefined;
   readonly VITE_PLAUSIBLE_DOMAIN: string | undefined;
+  /** Open-Meteo "API Standard" key (#134, ADR-043). Set = the customer endpoints with
+   *  `&apikey=`; unset or empty = the keyless free endpoints (non-commercial use only). Ships
+   *  in the client bundle, so never log it or a URL that carries it. */
+  readonly VITE_OPEN_METEO_API_KEY: string | undefined;
   /** Managed-tier AI extraction proxy endpoint (#133). Unset until the Phase-2 backend is deployed. */
   readonly VITE_AI_EXTRACT_URL: string | undefined;
   /** Soft API key sent to the AI extraction proxy (#133). Mirrors VITE_REGISTRY_API_KEY. */
