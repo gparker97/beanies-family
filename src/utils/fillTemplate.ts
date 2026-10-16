@@ -28,15 +28,18 @@ export function fillTemplate(template: string, vars: Record<string, unknown>): s
 export interface TemplatePart {
   text: string;
   value: boolean;
+  /** The token a value run filled (`'date'` for `{date}`); absent on literal runs. */
+  key?: string;
 }
 
 /**
  * `fillTemplate`, split into runs so a view can style the filled-in values apart from the
  * words around them (a handwritten line keeps its numbers in a legible face). Joining the
- * parts' text gives exactly what `fillTemplate` returns; empty runs are dropped.
+ * parts' text gives exactly what `fillTemplate` returns; empty runs are dropped. A value run
+ * carries its token name as `key`, so a view filling two tokens can style each its own way.
  *
  * @example splitTemplate('{count} things on today', { count: 3 })
- *   // [{ text: '3', value: true }, { text: ' things on today', value: false }]
+ *   // [{ text: '3', value: true, key: 'count' }, { text: ' things on today', value: false }]
  */
 export function splitTemplate(template: string, vars: Record<string, unknown>): TemplatePart[] {
   const parts: TemplatePart[] = [];
@@ -46,7 +49,7 @@ export function splitTemplate(template: string, vars: Record<string, unknown>): 
     const key = match[1]!;
     if (!Object.hasOwn(vars, key)) continue;
     if (match.index > last) parts.push({ text: template.slice(last, match.index), value: false });
-    parts.push({ text: String(vars[key] ?? ''), value: true });
+    parts.push({ text: String(vars[key] ?? ''), value: true, key });
     last = match.index + match[0].length;
   }
   if (last < template.length) parts.push({ text: template.slice(last), value: false });

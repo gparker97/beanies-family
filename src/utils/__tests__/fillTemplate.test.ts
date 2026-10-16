@@ -34,7 +34,7 @@ describe('fillTemplate', () => {
 describe('splitTemplate', () => {
   it('splits filled values from the words around them', () => {
     expect(splitTemplate('{count} things on today', { count: 3 })).toEqual([
-      { text: '3', value: true },
+      { text: '3', value: true, key: 'count' },
       { text: ' things on today', value: false },
     ]);
   });
@@ -51,8 +51,20 @@ describe('splitTemplate', () => {
 
   it('keeps a $ in a value literal', () => {
     expect(splitTemplate('{a}!', { a: '$&' })).toEqual([
-      { text: '$&', value: true },
+      { text: '$&', value: true, key: 'a' },
       { text: '!', value: false },
     ]);
+  });
+
+  it('names the token on each value run, so two tokens can be told apart', () => {
+    const parts = splitTemplate("It's a rainy {temp} {date}", { temp: '55°', date: 'Fri, Oct 16' });
+    expect(parts).toEqual([
+      { text: "It's a rainy ", value: false },
+      { text: '55°', value: true, key: 'temp' },
+      { text: ' ', value: false },
+      { text: 'Fri, Oct 16', value: true, key: 'date' },
+    ]);
+    expect(parts.filter((p) => !p.value).every((p) => p.key === undefined)).toBe(true);
+    expect(parts.map((p) => p.text).join('')).toBe("It's a rainy 55° Fri, Oct 16");
   });
 });
