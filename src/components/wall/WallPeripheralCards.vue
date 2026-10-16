@@ -1,7 +1,8 @@
 <script setup lang="ts">
 /**
- * The peripheral cards, in priority order: CHORES first and widest, then
- * to-dos, then tonight's meal and the trip.
+ * The peripheral cards, in priority order: the WEATHER glance (#134) ahead of
+ * everything when this wall shows it, then CHORES widest, then to-dos, then
+ * tonight's meal and the trip.
  *
  * That order is the argument the whole surface makes. A family hangs a screen
  * in the kitchen for the chore board; the meal and the trip are things you
@@ -14,10 +15,17 @@
  * and the rail would have drifted.
  *
  * Every card is a button. A card that looks tappable and isn't was the single
- * loudest complaint about the first cut of this screen.
+ * loudest complaint about the first cut of this screen. The one exception is the
+ * WEATHER card (#134), which leads every container and has no drill-in, so it is
+ * drawn `displayOnly`: no chevron, no press, a `div` rather than a button.
  */
-import { computed } from 'vue';
+import { computed, inject } from 'vue';
 import WallCard from '@/components/wall/WallCard.vue';
+import WallWeatherCard from '@/components/wall/WallWeatherCard.vue';
+import BeanieIcon from '@/components/ui/BeanieIcon.vue';
+import WeatherGlyph from '@/components/weather/WeatherGlyph.vue';
+import { WALL_WEATHER } from '@/components/wall/wallWeatherKey';
+import { useWeatherStore } from '@/stores/weatherStore';
 import { useWallPeripherals } from '@/composables/useWallPeripherals';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
@@ -61,6 +69,21 @@ const emit = defineEmits<{ open: [WallSheetTarget]; openChores: [] }>();
 const { t } = useTranslation();
 const familyStore = useFamilyStore();
 const { tonight, trip, timelineItems } = useWallPeripherals();
+const weatherStore = useWeatherStore();
+
+/**
+ * The weather card's size on this wall, decided by the page (`wallWeatherSize`) and
+ * provided rather than threaded through the views. No provider means no weather.
+ */
+const weatherSizeRef = inject(WALL_WEATHER, undefined);
+const weatherSize = computed(() => weatherSizeRef?.value ?? 'off');
+/**
+ * The atom, or null when there is nothing to draw: this wall's style is Off, or the store
+ * says so (the family switch is off, the doc is not ready, or the first fetch is in flight).
+ */
+const weather = computed(() => (weatherSize.value === 'off' ? null : weatherStore.atom));
+/** The card's layout: every size but `off` is one. */
+const weatherLayout = computed(() => (weatherSize.value === 'off' ? 'now' : weatherSize.value));
 
 /**
  * The card's teaser. `item.title` is `buildTravelSegmentTitle`, which already
@@ -159,6 +182,7 @@ const outstandingTodos = computed(() => {
  * silently mis-sized everything the day they had five cards.
  */
 const CARD_WEIGHTS: Record<string, number> = {
+  weather: 1.1,
   lists: 1.55,
   todos: 1,
   meals: 0.95,
@@ -167,6 +191,7 @@ const CARD_WEIGHTS: Record<string, number> = {
 
 const visibleCards = computed(() => {
   const on: string[] = [];
+  if (weather.value) on.push('weather');
   if (visibleLists.value.length) on.push('lists');
   if (showTodos.value) on.push('todos');
   if (tonight.value) on.push('meals');
@@ -228,23 +253,32 @@ const tripDates = computed(() => {
 /**
  * Does the strip have anything to show?
  *
- * Mirrors the four `v-if`s inside it, so the container cannot outlive its own
+ * Mirrors the five `v-if`s inside it, so the container cannot outlive its own
  * contents. The band gets this for free — each of its cards owns its own guard
  * and an empty band collapses to zero height — and the strip's single row had to
  * state it once.
  */
 const stripHasContent = computed(
   () =>
+    Boolean(weather.value) ||
     Boolean(tonight.value) ||
     showTodos.value ||
     visibleLists.value.length > 0 ||
     Boolean(trip.value)
 );
+
+/**
+ * The class string every strip cell shares. It was written out by hand four times, and the
+ * weather cell would have been the fifth. The trip cell used to omit the border classes,
+ * which `last:border-r-0` cancels anyway, so one string serves all five.
+ */
+const STRIP_CELL =
+  'wall-card-line font-outfit dark:border-line flex flex-1 items-center justify-center gap-2 border-r border-[rgba(44,62,80,0.08)] font-semibold last:border-r-0';
 </script>
 
 <template>
   <!--
-    The slim strip. Same four things, one row — shown when the grid needs the
+    The slim strip. Same things, one row, shown when the grid needs the
     height. Deliberately a separate branch rather than four more ternaries
     through the card markup below: the cards only ever see 'band' or 'rail',
     so no read site can be missed.
@@ -261,10 +295,63 @@ const stripHasContent = computed(
     v-if="variant === 'strip' && stripHasContent"
     class="dark:bg-surface-raised flex shrink-0 items-center rounded-[18px] bg-white p-1.5 shadow-[var(--card-shadow)]"
   >
+    <!--
+      Weather first, as everywhere. A span, not a button: weather has no drill-in.
+      One cell: glyph, temperature, then the condition, or the clipped age when stale.
+    -->
+    <span
+      v-if="weather"
+      :class="STRIP_CELL"
+      class="wall-weather-strip min-w-0"
+      :data-state="weather.state"
+    >
+      <template v-if="weather.state === 'reading'">
+        <WeatherGlyph :kind="weather.glyph" :size="22" class="shrink-0" />
+        <template v-if="weather.temp !== null">
+          <span
+            class="tabular-nums"
+            :class="
+              weather.soft
+                ? 'text-secondary-400 dark:text-ink-soft'
+                : 'text-secondary-500 dark:text-ink'
+            "
+            >{{ weather.temp }}</span
+          >
+          <span
+            class="font-inter min-w-0 truncate font-medium"
+            :class="
+              weather.ageShort
+                ? 'text-secondary-400 dark:text-ink-faint'
+                : 'text-secondary-500 dark:text-ink'
+            "
+            >{{ weather.ageShort ?? weather.condition }}</span
+          >
+        </template>
+        <span v-else class="text-secondary-400 dark:text-ink-soft min-w-0 truncate">{{
+          fillTemplate(t('weather.highLow'), { high: weather.high, low: weather.low })
+        }}</span>
+      </template>
+      <template v-else-if="weather.state === 'nudge'">
+        <BeanieIcon
+          name="map-pin"
+          size="sm"
+          class="text-secondary-400 dark:text-ink-soft shrink-0"
+        />
+        <span
+          class="font-inter text-secondary-400 dark:text-ink-soft min-w-0 truncate font-medium"
+          >{{ t('weather.nudgeStrip') }}</span
+        >
+      </template>
+      <span
+        v-else
+        class="font-inter text-secondary-400 dark:text-ink-soft min-w-0 truncate font-medium"
+        >{{ t('weather.unavailableShort') }}</span
+      >
+    </span>
     <button
       v-if="tonight"
       type="button"
-      class="wall-card-line font-outfit dark:border-line flex flex-1 items-center justify-center gap-2 border-r border-[rgba(44,62,80,0.08)] font-semibold last:border-r-0"
+      :class="STRIP_CELL"
       @click="emit('open', { kind: 'meals', ymd: mealsYmd })"
     >
       <span aria-hidden="true">{{ tonight.emoji }}</span>
@@ -273,7 +360,7 @@ const stripHasContent = computed(
     <button
       v-if="showTodos"
       type="button"
-      class="wall-card-line font-outfit dark:border-line flex flex-1 items-center justify-center gap-2 border-r border-[rgba(44,62,80,0.08)] font-semibold last:border-r-0"
+      :class="STRIP_CELL"
       :aria-label="t('wall.card.todos')"
       @click="emit('open', { kind: 'todos' })"
     >
@@ -284,18 +371,13 @@ const stripHasContent = computed(
     <button
       v-if="visibleLists.length"
       type="button"
-      class="wall-card-line font-outfit dark:border-line flex flex-1 items-center justify-center gap-2 border-r border-[rgba(44,62,80,0.08)] font-semibold last:border-r-0"
+      :class="STRIP_CELL"
       @click="emit('openChores')"
     >
       <span aria-hidden="true">📝</span>
       <span class="truncate">{{ visibleLists[0]?.list.title }}</span>
     </button>
-    <button
-      v-if="trip"
-      type="button"
-      class="wall-card-line font-outfit flex flex-1 items-center justify-center gap-2 font-semibold"
-      @click="emit('open', { kind: 'trip' })"
-    >
+    <button v-if="trip" type="button" :class="STRIP_CELL" @click="emit('open', { kind: 'trip' })">
       <span aria-hidden="true">✈️</span>
       <span class="truncate">{{ trip.name }}</span>
     </button>
@@ -314,7 +396,12 @@ const stripHasContent = computed(
     :style="variant === 'band' && !portrait ? { gridTemplateColumns: bandColumns } : undefined"
   >
     <!--
-      CHORES AND LISTS lead: widest cell, its own Sky Silk identity so the
+      WEATHER leads every container (#134): rail top, first band cell, first of the
+      portrait band's two columns. Not interactive, so it emits nothing.
+    -->
+    <WallWeatherCard v-if="weather" :atom="weather" :layout="weatherLayout" />
+    <!--
+      CHORES AND LISTS: widest cell, its own Sky Silk identity so the
       anchor of the band is not one white card among five.
       This replaced a separate "Chores" card that showed one or two rows and
       earned none of the space it took. Every active list is here instead —

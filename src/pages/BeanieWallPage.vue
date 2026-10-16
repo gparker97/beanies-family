@@ -33,6 +33,8 @@ import {
 import { WALL_LOCK } from '@/components/wall/wallLockKey';
 import { WALL_EDIT } from '@/components/wall/wallEditKey';
 import { WALL_BURST } from '@/components/wall/wallBurstKey';
+import { WALL_WEATHER } from '@/components/wall/wallWeatherKey';
+import { useWeatherStore } from '@/stores/weatherStore';
 import { useMediaQuery } from '@/composables/useMediaQuery';
 import { useWallAutoSleep } from '@/composables/useWallAutoSleep';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -57,7 +59,12 @@ import { useToast } from '@/composables/useToast';
 import { addDaysYmd, formatDayLong, parseLocalDate } from '@/utils/date';
 import { formatWeekRange } from '@/composables/useCalendarNavigation';
 import { anchorOffsetDays, stepDaysFor } from '@/utils/wallAnchor';
-import { bandFitsHeight, daysLayoutFor, railFits } from '@/components/wall/wallLayout';
+import {
+  bandFitsHeight,
+  daysLayoutFor,
+  railFits,
+  wallWeatherSize,
+} from '@/components/wall/wallLayout';
 import type { WallJob, WallPeripheralData, WallSheetTarget, WallViewId } from '@/types/wall';
 
 const SURFACE = 'beanie-wall';
@@ -281,6 +288,25 @@ const daysLayout = computed(() =>
 );
 /** Whether a stacked band still leaves the grid a real day — see `bandFitsHeight`. */
 const roomForBand = computed(() => bandFitsHeight(viewportHeight.value));
+
+/**
+ * The weather card's size on this wall (#134): this device's style against the window
+ * height, decided here because the page owns the one viewport mechanism. Provided (the
+ * `WALL_LOCK` precedent) rather than threaded through the three views and the shell, which
+ * only pass the peripheral cards through.
+ */
+provide(
+  WALL_WEATHER,
+  computed(() => wallWeatherSize(settingsStore.wallWeatherStyle, viewportHeight.value))
+);
+const weatherStore = useWeatherStore();
+/**
+ * The night screen ignores Large / Small (it always shows now plus three days) and
+ * honours only this wall's Off; the family switch already makes the atom null.
+ */
+const nightWeather = computed(() =>
+  settingsStore.wallWeatherStyle === 'off' ? null : weatherStore.atom
+);
 const lanesRail = computed(
   () =>
     !isPortrait.value &&
@@ -1083,6 +1109,7 @@ watch(activeView, () => (sheet.value = null));
       :time="clockNow.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })"
       :date="dateLabel"
       :tomorrow-count="tomorrowCount"
+      :weather="nightWeather"
       @wake="onWake"
     />
   </div>
@@ -1126,6 +1153,8 @@ watch(activeView, () => (sheet.value = null));
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
     env(safe-area-inset-left);
 
+  --wx-glyph: 2.4rem;
+  --wx-temp: 2.2rem;
   --wall-date: 2.6rem;
   --wall-subtitle: 0.95rem;
   --wall-clock: 2.3rem;
@@ -1136,6 +1165,8 @@ watch(activeView, () => (sheet.value = null));
 }
 
 .wall-root[data-tier='mid'] {
+  --wx-glyph: 2.25rem;
+  --wx-temp: 2rem;
   --wall-date: 1.85rem;
   --wall-subtitle: 0.85rem;
   --wall-clock: 1.7rem;
@@ -1146,6 +1177,8 @@ watch(activeView, () => (sheet.value = null));
 }
 
 .wall-root[data-tier='compact'] {
+  --wx-glyph: 2rem;
+  --wx-temp: 1.8rem;
   --wall-date: 1.45rem;
   --wall-subtitle: 0.8rem;
   --wall-clock: 1.35rem;
@@ -1253,6 +1286,41 @@ watch(activeView, () => (sheet.value = null));
 }
 
 .wall-root :deep(.wall-card-sub) {
+  font-size: 0.75rem;
+}
+
+/*
+ * The weather card (#134). The glyph and the temperature step with the tier through
+ * `--wx-glyph` / `--wx-temp`; the one-line card (walls under 700px tall) has its own
+ * smaller pair, because its job is to give the height back to Tonight.
+ */
+.wall-root :deep(.wall-weather-glyph) {
+  height: var(--wx-glyph);
+  width: var(--wx-glyph);
+}
+
+.wall-root :deep(.wall-weather-temp) {
+  font-size: var(--wx-temp);
+}
+
+.wall-root :deep(.wall-weather-card[data-layout='line'] .wall-weather-glyph) {
+  height: 1.625rem;
+  width: 1.625rem;
+}
+
+.wall-root :deep(.wall-weather-card[data-layout='line'] .wall-weather-temp) {
+  font-size: 1.4rem;
+}
+
+.wall-root :deep(.wall-weather-cond) {
+  font-size: 0.95rem;
+}
+
+.wall-root :deep(.wall-weather-hl) {
+  font-size: 0.78rem;
+}
+
+.wall-root :deep(.wall-weather-where) {
   font-size: 0.75rem;
 }
 
@@ -1490,6 +1558,22 @@ watch(activeView, () => (sheet.value = null));
 
 .wall-root :deep(.wall-night-hint) {
   font-size: 0.9rem;
+}
+
+.wall-root :deep(.wall-night-wx-temp) {
+  font-size: 1.85rem;
+}
+
+.wall-root :deep(.wall-night-wx-cond) {
+  font-size: 1.05rem;
+}
+
+.wall-root :deep(.wall-night-wx-age) {
+  font-size: 0.85rem;
+}
+
+.wall-root :deep(.wall-night-wx-line) {
+  font-size: 0.95rem;
 }
 
 .wall-root :deep(.wall-night-brand) {

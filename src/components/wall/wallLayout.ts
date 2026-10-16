@@ -1,5 +1,6 @@
 import { AXIS_WIDTH_PX } from '@/utils/wallTimeGrid';
 import { wallChromeFor, type WallChrome } from '@/components/wall/wallRoom';
+import type { WallWeatherStyle } from '@/types/models';
 
 /**
  * Page-layout facts about the wall's chrome.
@@ -207,4 +208,42 @@ export const BAND_MIN_VIEWPORT_HEIGHT_PX = 1000;
 export function bandFitsHeight(viewportHeightPx: number): boolean {
   if (!Number.isFinite(viewportHeightPx)) return true;
   return viewportHeightPx >= BAND_MIN_VIEWPORT_HEIGHT_PX;
+}
+
+/**
+ * The shortest wall that gets the full weather card (#134): now plus the next three days.
+ *
+ * Below it the card collapses to ONE line whatever this wall's style, so the Tonight card
+ * stays in view (the compact 853x533 wall still ends Tonight below the rail fold, which the
+ * rail's own scroll absorbs; accepted in the plan).
+ *
+ * A height rule read from the VIEWPORT, for the reason `bandFitsHeight` gives: the card's
+ * own size cannot move the window, so the choice cannot oscillate. Large reading mode does
+ * not move `innerHeight`, so a 720px wall in Large mode is still "tall"; the rail scrolls
+ * and the band clips, the existing accepted policy.
+ */
+export const WALL_WEATHER_FULL_MIN_HEIGHT_PX = 700;
+
+/**
+ * How the weather card is drawn on this wall: `off` (no card), `line` (one line),
+ * `now` (conditions now) or `full` (now plus the next three days).
+ */
+export type WallWeatherSize = 'off' | 'line' | 'now' | 'full';
+
+/**
+ * The wall's weather card size, from this device's style and the window height.
+ *
+ * Off wins; then a short wall is one line whatever the style; then Large is the full card
+ * and Small the conditions now. Total: a non-finite height counts as tall (the
+ * `bandFitsHeight` convention), so an unmeasured window never hides the three days.
+ */
+export function wallWeatherSize(
+  style: WallWeatherStyle,
+  viewportHeightPx: number
+): WallWeatherSize {
+  if (style === 'off') return 'off';
+  if (Number.isFinite(viewportHeightPx) && viewportHeightPx < WALL_WEATHER_FULL_MIN_HEIGHT_PX) {
+    return 'line';
+  }
+  return style === 'large' ? 'full' : 'now';
 }

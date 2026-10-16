@@ -18,9 +18,11 @@ import {
   BLOCK_SLIVER_PX,
   MAX_DAY_COLUMNS,
   MIN_DAY_COLUMNS,
+  WALL_WEATHER_FULL_MIN_HEIGHT_PX,
   bandFitsHeight,
   daysLayoutFor,
   railFits,
+  wallWeatherSize,
 } from '../wallLayout';
 
 describe('railFits — the LANES rule', () => {
@@ -166,5 +168,33 @@ describe("bandFitsHeight — the band's HEIGHT rule", () => {
     // the other way would flash a strip onto every wall on mount.
     expect(bandFitsHeight(NaN)).toBe(true);
     expect(bandFitsHeight(Infinity)).toBe(true);
+  });
+});
+
+describe('wallWeatherSize, the weather card (#134)', () => {
+  it('pins the threshold at 700px', () => {
+    expect(WALL_WEATHER_FULL_MIN_HEIGHT_PX).toBe(700);
+  });
+
+  it('Large is the full card at 700 and one line at 699', () => {
+    expect(wallWeatherSize('large', 700)).toBe('full');
+    expect(wallWeatherSize('large', 699)).toBe('line');
+  });
+
+  it('Small is the conditions now when tall, and one line when short', () => {
+    expect(wallWeatherSize('small', 700)).toBe('now');
+    expect(wallWeatherSize('small', 1180)).toBe('now');
+    expect(wallWeatherSize('small', 699)).toBe('line');
+  });
+
+  it('Off wins at every height', () => {
+    for (const h of [0, 533, 699, 700, 1180, NaN]) {
+      expect(wallWeatherSize('off', h)).toBe('off');
+    }
+  });
+
+  it('counts an unmeasured window as tall, never hiding the three days', () => {
+    expect(wallWeatherSize('large', NaN)).toBe('full');
+    expect(wallWeatherSize('small', Infinity)).toBe('now');
   });
 });
