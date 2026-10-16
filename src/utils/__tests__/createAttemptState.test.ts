@@ -80,11 +80,11 @@ describe('createAttemptState', () => {
       expect(currentCreateAttempt()).toBeNull();
     });
 
-    it('a stored legacy `drive-declined` step (pre-#131) hydrates as `storage`, the same screen now', () => {
+    it('corrupt: a step outside the set (e.g. the pre-#131 `drive-declined`) is cleared', () => {
       localStorage.setItem(KEY, JSON.stringify({ ...attempt(), step: 'drive-declined' }));
-      const res = hydrateCreateAttempt(NOW);
-      expect(res).toEqual({ kind: 'ok', attempt: attempt({ step: 'storage' }) });
-      expect(currentCreateAttempt()?.step).toBe('storage');
+      expect(hydrateCreateAttempt(NOW)).toEqual({ kind: 'corrupt', attempt: null });
+      expect(stored()).toBeNull();
+      expect(currentCreateAttempt()).toBeNull();
       expect(ONBOARDING_STEPS).not.toContain('drive-declined');
     });
 

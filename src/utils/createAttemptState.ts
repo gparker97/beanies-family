@@ -91,12 +91,8 @@ function parseAttempt(value: unknown): CreateAttempt | null {
   const v = value as Record<string, unknown>;
   if (typeof v.id !== 'string' || v.id.length === 0 || v.id.length > 64) return null;
   if (typeof v.startedAt !== 'number' || !Number.isFinite(v.startedAt)) return null;
-  // Legacy alias, remove after 2026-10-15 (CREATE_ATTEMPT_MAX_AGE_MS): `drive-declined` left the
-  // step set when it merged into the storage screen (#131), and an attempt opened across the
-  // deploy may still carry it. It is the same screen now, so it reads as `storage`.
-  const step = v.step === 'drive-declined' ? 'storage' : v.step;
-  if (typeof step !== 'string' || !STEP_SET.has(step)) return null;
-  return { id: v.id, startedAt: v.startedAt, step: step as OnboardingStep };
+  if (typeof v.step !== 'string' || !STEP_SET.has(v.step)) return null;
+  return { id: v.id, startedAt: v.startedAt, step: v.step as OnboardingStep };
 }
 
 /**
