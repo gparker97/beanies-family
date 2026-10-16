@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-10-16
+
+### Fixed
+
+- Home-screen widget on Android: the medium and large sizes no longer get stuck on yesterday's date while the small one updates.
+
 ## 2026-10-15
 
 ### Fixed

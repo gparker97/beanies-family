@@ -55,14 +55,13 @@ public class WidgetBridgePlugin extends Plugin {
         ret.put("placements", counts);
         if (render.ymd != null) ret.put("renderedYmd", render.ymd);
         String reloadFailure = render.failure;
-        // Tokens are joined with '|', the separator the web side splits on (homeWidgetEvents).
-        StringBuilder outcome = new StringBuilder();
-        for (String token : new String[] {reloadFailure, placementsFailure, WidgetPrefs.takeReadOutcome(context)}) {
-            if (token == null || token.isEmpty()) continue;
-            if (outcome.length() > 0) outcome.append('|');
-            outcome.append(token);
+        // The stored failures, then this publish's own (newest), joined by the same rule as the
+        // store (distinct, at most four), so one failure seen twice is relayed once.
+        String outcome = WidgetPrefs.takeReadOutcome(context);
+        for (String token : new String[] {reloadFailure, placementsFailure}) {
+            outcome = WidgetPrefs.mergeOutcome(outcome, token);
         }
-        if (outcome.length() > 0) ret.put("readOutcome", outcome.toString());
+        if (!outcome.isEmpty()) ret.put("readOutcome", outcome);
         call.resolve(ret);
     }
 
@@ -108,8 +107,8 @@ public class WidgetBridgePlugin extends Plugin {
         try {
             return new Render(DayWidgetProvider.renderAll(context), null);
         } catch (RuntimeException e) {
-            android.util.Log.w("beanies-widget", "widget render after publish failed", e);
-            return new Render(null, "reload_failed;" + e.getClass().getSimpleName());
+            android.util.Log.w(DayWidgetProvider.TAG, "widget render after publish failed", e);
+            return new Render(null, WidgetPrefs.failureToken("reload_failed", e));
         }
     }
 
@@ -126,8 +125,8 @@ public class WidgetBridgePlugin extends Plugin {
                 counts.put(key, counts.optInt(key, 0) + 1);
             }
         } catch (RuntimeException e) {
-            android.util.Log.w("beanies-widget", "could not count widget placements", e);
-            return "placements_failed;" + e.getClass().getSimpleName();
+            android.util.Log.w(DayWidgetProvider.TAG, "could not count widget placements", e);
+            return WidgetPrefs.failureToken("placements_failed", e);
         }
         return null;
     }

@@ -31,7 +31,7 @@ import org.json.JSONObject;
  */
 public final class WidgetSnapshotStore {
 
-    private static final String TAG = "beanies-widget";
+    private static final String TAG = DayWidgetProvider.TAG;
     private static final String DIR = "widgets";
     private static final String FILE = "snapshot.json";
     /** Bounds a read: the real snapshot is a few KB. A runaway file is treated as unreadable. */

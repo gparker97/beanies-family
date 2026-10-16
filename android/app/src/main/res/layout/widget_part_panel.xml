@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   The agenda panel of the medium and large widgets (#130, round 9b): the scrolling calendar
-  (a ListView backed by DayWidgetService, or the relaxed block in its place on a clear week), the
+  (a ListView whose rows DayWidgetList builds: inline in the update on API 31+, through
+  DayWidgetService on API 24-30; or the relaxed block in its place on a clear week), the
   fixed to-dos section under it (never part of the scroll), the "tonight" footer with "later ›",
   and the peek over the panel's top-right edge. Geometry (root padding top 5dp): the peek's top is 5dp below the widget's top, the panel's
   top 20dp below that (= 13dp below the 12dp content top), so the 22dp peek ends 2dp inside the

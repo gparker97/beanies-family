@@ -10,6 +10,7 @@ import android.text.format.DateFormat;
 import android.util.TypedValue;
 import android.view.View;
 import android.widget.RemoteViews;
+import androidx.annotation.RequiresApi;
 import family.beanies.app.R;
 import java.util.Date;
 import java.util.List;
@@ -17,7 +18,9 @@ import java.util.List;
 /**
  * Builds one placed widget's RemoteViews from the snapshot read (#130). Called only from
  * {@link DayWidgetProvider#renderAll}; the calendar rows inside the list come from
- * {@link DayWidgetFactory}, which resolves the same {@link WidgetFill.Plan}. The medium and large
+ * {@link DayWidgetList}, built from the same {@link WidgetFill.Plan}: inline in this update on API
+ * 31+ (so a row-end re-render re-sends the whole widget), through {@link DayWidgetFactory} on API
+ * 24-30. The medium and large
  * share one layout (round 9b) and differ only in how many task rows the fixed to-dos section has
  * and in the "my day" / "our day" label at the foot of the date column (large only).
  *
@@ -65,7 +68,7 @@ final class DayWidgetRenderer {
     private static final float SMALL_HEADER_MIN_SCALE = 0.7f;
     private static final Typeface WEEKDAY_FACE = Typeface.create("sans-serif-medium", Typeface.NORMAL);
     /** Root padding to the content 10 + 9, date column 52 + 8, panel padding 6 + 13. */
-    static final float AGENDA_PANEL_INSET_DP = 98f;
+    private static final float AGENDA_PANEL_INSET_DP = 98f;
     /** Root padding 10 + 9, panel padding 8 + 8. */
     private static final float SMALL_PANEL_INSET_DP = 35f;
     /** Message padding 14 + 14. */
@@ -95,14 +98,14 @@ final class DayWidgetRenderer {
         if (size == WidgetSizes.Size.SMALL) {
             return small(context, appWidgetId, widthDp, prefs, textScale, plan, now);
         }
-        return agenda(context, appWidgetId, size, widthDp, prefs, textScale, plan);
+        return agenda(context, appWidgetId, size, widthDp, prefs, textScale, plan, now);
     }
 
     // ---- medium + large ------------------------------------------------------------------
 
     private static RemoteViews agenda(
             Context context, int id, WidgetSizes.Size size, float widthDp, WidgetPrefs prefs,
-            float textScale, WidgetFill.Plan plan) {
+            float textScale, WidgetFill.Plan plan, long now) {
         WidgetSnapshot s = plan.snapshot;
         WidgetSnapshot.Day day = plan.day;
         RemoteViews v = new RemoteViews(context.getPackageName(), size.layout);
@@ -136,16 +139,17 @@ final class DayWidgetRenderer {
 
         WidgetViews.bindPeek(v, plan);
 
-        // The scrolling calendar. A unique data Uri per widget id stops the system from sharing
-        // one factory between two placed widgets (Intent equality ignores extras).
-        Intent service = new Intent(context, DayWidgetService.class);
-        service.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id);
-        service.setData(Uri.parse(service.toUri(Intent.URI_INTENT_SCHEME)));
-        v.setRemoteAdapter(R.id.agenda_list, service);
+        float panelDp = agendaPanelDp(widthDp);
+        // The scrolling calendar, set on every render (relaxed included, where it is empty).
+        if (DayWidgetList.INLINE) {
+            setInlineList(v, context, plan, size, panelDp, textScale, now);
+        } else {
+            setServiceList(v, context, id);
+        }
         v.setPendingIntentTemplate(R.id.agenda_list, WidgetViews.listTemplate(context, id));
         // A clear week with no tasks: the relaxed block takes the list's place inside the panel;
         // the date column, peek and footer stay (the same state as iOS).
-        boolean relaxed = bindRelaxed(v, context, plan, textScale, widthDp - AGENDA_PANEL_INSET_DP);
+        boolean relaxed = bindRelaxed(v, context, plan, textScale, panelDp);
         v.setViewVisibility(R.id.agenda_list, relaxed ? View.GONE : View.VISIBLE);
 
         bindTasks(v, context, id, size, textScale, plan);
@@ -165,6 +169,43 @@ final class DayWidgetRenderer {
         v.setViewVisibility(
                 R.id.panel_footer, tonight || !s.labels.later.isEmpty() ? View.VISIBLE : View.GONE);
         return v;
+    }
+
+    /** The agenda panel's inner width (dp) for a medium/large widget {@code widthDp} wide. */
+    static float agendaPanelDp(float widthDp) {
+        return widthDp - AGENDA_PANEL_INSET_DP;
+    }
+
+    /**
+     * API 31+: the list's item views travel inside this update, so the launcher gets the date
+     * column and the list as one parcel. No try here: a data failure is already absorbed by
+     * {@link DayWidgetList#viewsOrEmpty}, and a {@code build()} throw (more item layouts than
+     * {@link DayWidgetList#VIEW_TYPE_COUNT}) is a programming error that should surface as
+     * `render_failed`. The type count is fixed so the host's recycler sees the same count on every
+     * update, with or without dividers.
+     */
+    @RequiresApi(Build.VERSION_CODES.S)
+    private static void setInlineList(RemoteViews v, Context context, WidgetFill.Plan plan,
+            WidgetSizes.Size size, float panelDp, float textScale, long now) {
+        RemoteViews.RemoteCollectionItems.Builder items = new RemoteViews.RemoteCollectionItems.Builder()
+                .setHasStableIds(false)
+                .setViewTypeCount(DayWidgetList.VIEW_TYPE_COUNT);
+        List<RemoteViews> views = DayWidgetList.viewsOrEmpty(context, plan, size, panelDp, textScale, now);
+        for (int i = 0; i < views.size(); i++) items.addItem(i, views.get(i));
+        v.setRemoteAdapter(R.id.agenda_list, items.build());
+    }
+
+    /**
+     * API 24-30: the list is served by {@link DayWidgetService}. A unique data Uri per widget id
+     * stops the system from sharing one factory between two placed widgets (Intent equality
+     * ignores extras). TODO(minSdk 31): delete.
+     */
+    @SuppressWarnings("deprecation")
+    private static void setServiceList(RemoteViews v, Context context, int id) {
+        Intent service = new Intent(context, DayWidgetService.class);
+        service.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id);
+        service.setData(Uri.parse(service.toUri(Intent.URI_INTENT_SCHEME)));
+        v.setRemoteAdapter(R.id.agenda_list, service);
     }
 
     /**

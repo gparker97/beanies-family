@@ -3,6 +3,9 @@ package family.beanies.app.widget;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.util.Log;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Per-widget choices from {@link DayWidgetConfigActivity}, plus the read-outcome relay slot, in
@@ -113,17 +116,84 @@ public final class WidgetPrefs {
         e.apply();
     }
 
-    /** The widget's last read failure, for the plugin to relay. The later token wins. */
-    static void recordReadOutcome(Context context, String token) {
-        prefs(context).edit().putString(KEY_READ_OUTCOME, token).apply();
+    /** The most distinct failures held for one relay; the oldest is dropped once full. */
+    private static final int MAX_OUTCOME_TOKENS = 4;
+    /** The longest exception name a token carries (the app's token grammar, homeWidgetEvents.ts). */
+    private static final int MAX_TOKEN_NAME = 40;
+
+    /**
+     * Records a failure for the next publish to relay ({@link #mergeOutcome}: the four most recent
+     * distinct failures). Synchronised: callers run on the provider, the list factory's binder
+     * thread, the plugin thread and the config activity. An evicted token is logged, so a drop is
+     * never silent.
+     */
+    static synchronized void recordReadOutcome(Context context, String token) {
+        SharedPreferences p = prefs(context);
+        String stored = p.getString(KEY_READ_OUTCOME, "");
+        String merged = mergeOutcome(stored, token);
+        String oldest = stored == null || stored.isEmpty() ? "" : stored.split("\\|")[0];
+        if (!oldest.isEmpty() && !hasToken(merged, oldest)) {
+            Log.w(DayWidgetProvider.TAG, "widget failure dropped from the relay (four newer ones held): " + oldest);
+        }
+        p.edit().putString(KEY_READ_OUTCOME, merged).apply();
+    }
+
+    /**
+     * Pure: {@code outcome} with {@code token} added as the newest, '|'-joined (the separator the
+     * app splits on), distinct (re-adding a token moves it to newest) and at most four, the oldest
+     * dropped first, so one pass that fails two ways keeps both and a new failure is never crowded
+     * out by stale ones while the app stays closed. A null or empty token leaves it unchanged.
+     * Used for the stored relay and by WidgetBridgePlugin to join its own tokens onto it.
+     */
+    public static String mergeOutcome(String outcome, String token) {
+        String base = outcome == null ? "" : outcome;
+        if (token == null || token.isEmpty()) return base;
+        List<String> parts = new ArrayList<>();
+        if (!base.isEmpty()) {
+            for (String part : base.split("\\|")) {
+                if (!part.isEmpty() && !part.equals(token)) parts.add(part);
+            }
+        }
+        parts.add(token);
+        while (parts.size() > MAX_OUTCOME_TOKENS) parts.remove(0);
+        StringBuilder joined = new StringBuilder();
+        for (String part : parts) {
+            if (joined.length() > 0) joined.append('|');
+            joined.append(part);
+        }
+        return joined.toString();
+    }
+
+    private static boolean hasToken(String outcome, String token) {
+        for (String part : outcome.split("\\|")) {
+            if (part.equals(token)) return true;
+        }
+        return false;
     }
 
     /** Read and clear the relayed read outcome; "" when there is none. */
-    public static String takeReadOutcome(Context context) {
+    public static synchronized String takeReadOutcome(Context context) {
         SharedPreferences p = prefs(context);
         String value = p.getString(KEY_READ_OUTCOME, "");
         if (value != null && !value.isEmpty()) p.edit().remove(KEY_READ_OUTCOME).apply();
         return value == null ? "" : value;
+    }
+
+    /**
+     * `<prefix>;<root cause>`: the simple name of the innermost cause, not the wrapper.
+     * AppWidgetManager rethrows a binder failure (TransactionTooLargeException and the like) as a
+     * plain RuntimeException, so the outer class alone says nothing. The name is reduced to the
+     * app's token grammar ([A-Za-z_], at most 40) so it is never logged as "unrecognised";
+     * "Unknown" for an anonymous class.
+     */
+    public static String failureToken(String prefix, Throwable e) {
+        Throwable root = e;
+        for (int hops = 0; hops < 10 && root.getCause() != null && root.getCause() != root; hops++) {
+            root = root.getCause();
+        }
+        String name = root.getClass().getSimpleName().replaceAll("[^A-Za-z_]", "");
+        if (name.length() > MAX_TOKEN_NAME) name = name.substring(0, MAX_TOKEN_NAME);
+        return prefix + ";" + (name.isEmpty() ? "Unknown" : name);
     }
 
     /**

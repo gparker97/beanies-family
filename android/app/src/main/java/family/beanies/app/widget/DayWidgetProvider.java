@@ -19,7 +19,9 @@ import family.beanies.app.R;
  * ONE RENDER PATH. {@link #renderAll(Context)} is the only way a widget is drawn: onUpdate,
  * onAppWidgetOptionsChanged (a resize), the RERENDER alarm, the configuration activity's Done and
  * the WidgetBridge plugin's publish/clear all call it. It reads the snapshot once, renders every
- * placed id with that id's own size and prefs, then re-arms the single re-render alarm.
+ * placed id with that id's own size and prefs, then re-arms the single re-render alarm. On API
+ * 31+ the medium/large calendar list travels inside that one update ({@link DayWidgetList#INLINE});
+ * only API 24-30 serves it through DayWidgetService and needs notifyAppWidgetViewDataChanged.
  *
  * THE ALARM. One inexact {@code setAndAllowWhileIdle(RTC)} for the earliest of: the next local
  * midnight (tomorrow becomes today), the next row end today (the row greys out), the instant the
@@ -28,10 +30,10 @@ import family.beanies.app.R;
  * not survive a reboot; the host calls onUpdate after boot, which re-arms it.
  *
  * THE BACKSTOP. `updatePeriodMillis` (widget_day_info.xml) also has the system call onUpdate about
- * every 30 minutes. It is not what moves the date: it re-sends the current picture, so a launcher
- * that dropped one update (seen on a Pixel 10 Pro, Android 17: the app published and painted the
- * new day, the launcher kept showing the old one on a single instance until it was re-added)
- * shows the right day within half an hour instead of until the next alarm or app open.
+ * every 30 minutes. It is not what moves the date: it re-sends the current picture on the same
+ * path, so it covers a missed alarm, not a launcher that drops updates. That case (a Pixel 10 Pro
+ * on Android 17 kept yesterday on the two list-bearing sizes while the 2x2 updated from the same
+ * pass, 2026-10-14 and 10-16; the re-send did not heal it) is what the inline list addresses.
  *
  * Not exported: the launcher's APPWIDGET_UPDATE / OPTIONS_CHANGED / DELETED / DISABLED come from
  * the system (which reaches a non-exported receiver), and RERENDER only from our own
@@ -39,7 +41,8 @@ import family.beanies.app.R;
  */
 public class DayWidgetProvider extends AppWidgetProvider {
 
-    private static final String TAG = "beanies-widget";
+    /** The widget's one logcat tag, shared by every widget class and WidgetBridgePlugin. */
+    public static final String TAG = "beanies-widget";
     static final String ACTION_RERENDER = "family.beanies.app.widget.RERENDER";
     private static final long UNREADABLE_RETRY_MS = 15L * 60L * 1000L;
     private static final Object LOCK = new Object();
@@ -115,15 +118,15 @@ public class DayWidgetProvider extends AppWidgetProvider {
                 }
                 try {
                     manager.updateAppWidget(id, views);
-                    if (size != WidgetSizes.Size.SMALL) {
+                    if (size != WidgetSizes.Size.SMALL && !DayWidgetList.INLINE) {
                         manager.notifyAppWidgetViewDataChanged(id, R.id.agenda_list);
                     }
                 } catch (RuntimeException e) {
                     // One instance the system refuses must not stop the others from updating or
                     // the alarm from re-arming (that left every widget on yesterday until the app
-                    // was opened). Relayed on the next publish as `reload_failed;<Exception>`.
+                    // was opened). Relayed on the next publish as `reload_failed;<root cause>`.
                     Log.w(TAG, "widget " + id + " update refused", e);
-                    WidgetPrefs.recordReadOutcome(app, "reload_failed;" + e.getClass().getSimpleName());
+                    WidgetPrefs.recordReadOutcome(app, WidgetPrefs.failureToken("reload_failed", e));
                 }
             }
             schedule(app, result, now, ids.length > 0);

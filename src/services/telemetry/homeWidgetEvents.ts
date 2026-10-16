@@ -84,7 +84,22 @@ const READ_OUTCOME_TOKENS: readonly RegExp[] = [
   /^placements_failed;[A-Za-z_]{1,40}$/,
   /^placements_failed;code=-?\d{1,9}$/,
   /^reload_failed;[A-Za-z_]{1,40}$/,
+  /^list_failed;[A-Za-z_]{1,40}$/,
 ];
+
+/**
+ * Failure families that get their own message and error_code, matched on the token's name (the
+ * part before ';'). Any other valid token is a snapshot read failure (`snapshot_unreadable`).
+ */
+const OUTCOME_ROUTES = [
+  { name: 'reload_failed', message: 'widget re-render failed', code: 'widget_reload_failed' },
+  {
+    name: 'placements_failed',
+    message: 'widget placements unavailable',
+    code: 'placements_failed',
+  },
+  { name: 'list_failed', message: 'widget list failed', code: 'widget_list_failed' },
+] as const;
 
 /** Whether a relayed native read outcome matches the fixed token grammar. */
 export function isReadOutcomeToken(outcome: string): boolean {
@@ -92,9 +107,12 @@ export function isReadOutcomeToken(outcome: string): boolean {
 }
 
 /**
- * The widget could not read the snapshot (relayed by the next publish). Native may join
- * several tokens with `|` (iOS relays a read failure and a placements failure together);
- * each part is checked on its own and an unknown part is replaced, never echoed.
+ * The native widget's failures since the last publish (relayed by that publish). A refused
+ * `updateAppWidget` (`reload_failed`), an unavailable placements count and a list that could
+ * not be built each get their own error_code (OUTCOME_ROUTES); everything else, a snapshot
+ * read or decode failure and a renderer throw (`render_failed`), stays `snapshot_unreadable`.
+ * Native joins several tokens with `|`; each part is checked on its own and an unknown part is
+ * replaced, never echoed.
  */
 export function emitReadOutcome(outcome: string): void {
   for (const part of outcome.split('|')) {
@@ -105,18 +123,14 @@ export function emitReadOutcome(outcome: string): void {
       });
       continue;
     }
-    // Three different failures share this relay; each gets its own error_code so an alert
-    // on "the widget could not read its data" is not inflated by render or count failures.
-    if (part.startsWith('reload_failed')) {
-      emit('warn', 'widget re-render failed', { error_code: 'widget_reload_failed', detail: part });
-    } else if (part.startsWith('placements_failed')) {
-      emit('warn', 'widget placements unavailable', {
-        error_code: 'placements_failed',
-        detail: part,
-      });
-    } else {
-      emit('warn', 'widget read failed', { error_code: 'snapshot_unreadable', detail: part });
-    }
+    // Each failure family gets its own error_code (OUTCOME_ROUTES), so an alert on "the widget
+    // could not read its data" is not inflated by re-render, count or list failures.
+    const name = part.split(';')[0];
+    const route = OUTCOME_ROUTES.find((r) => r.name === name);
+    emit('warn', route?.message ?? 'widget read failed', {
+      error_code: route?.code ?? 'snapshot_unreadable',
+      detail: part,
+    });
   }
 }
 

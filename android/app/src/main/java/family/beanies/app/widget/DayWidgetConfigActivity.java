@@ -31,7 +31,7 @@ import family.beanies.app.R;
  */
 public class DayWidgetConfigActivity extends AppCompatActivity {
 
-    private static final String TAG = "beanies-widget";
+    private static final String TAG = DayWidgetProvider.TAG;
 
     /** Checkbox ids in {@link WidgetFill#FILL_ORDER} order. */
     private static final int[] BLOCK_IDS = {
@@ -171,7 +171,7 @@ public class DayWidgetConfigActivity extends AppCompatActivity {
         } catch (RuntimeException e) {
             // The choices are saved; the widget redraws on its next update. Never crash the screen.
             Log.e(TAG, "render after configure failed; prefs are saved and the widget redraws on its next update", e);
-            WidgetPrefs.recordReadOutcome(this, "reload_failed;" + e.getClass().getSimpleName());
+            WidgetPrefs.recordReadOutcome(this, WidgetPrefs.failureToken("reload_failed", e));
         }
         setResult(RESULT_OK, new Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId));
         finish();

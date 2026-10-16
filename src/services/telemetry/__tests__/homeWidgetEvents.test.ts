@@ -24,6 +24,9 @@ describe('homeWidgetEvents: read outcome grammar', () => {
     'placements_failed;RuntimeException',
     'placements_failed;timeout',
     'reload_failed;IllegalStateException',
+    'reload_failed;TransactionTooLargeException',
+    'list_failed;IllegalArgumentException',
+    'list_failed;Unknown',
   ])('accepts the native token %s', (token) => {
     expect(isReadOutcomeToken(token)).toBe(true);
   });
@@ -32,6 +35,9 @@ describe('homeWidgetEvents: read outcome grammar', () => {
     'decode_failed;v=1 Sam',
     'read_failed\nSam',
     "reload_failed;Carter's party",
+    "list_failed;Sam's",
+    'list_failed;',
+    'list_failed;' + 'A'.repeat(41),
     'decode_failed;v=',
     '',
   ])('rejects free text %j', (token) => {
@@ -50,6 +56,30 @@ describe('homeWidgetEvents: read outcome grammar', () => {
       ['placements_failed', 'placements_failed;code=-1'],
       ['widget_reload_failed', 'reload_failed;NullPointerException'],
       ['snapshot_unreadable', 'unrecognised'],
+    ]);
+  });
+
+  it('routes a list failure and a reload failure from one relay to their own codes', () => {
+    emitReadOutcome(
+      'list_failed;IllegalArgumentException|reload_failed;TransactionTooLargeException|render_failed'
+    );
+    const events = logEvent.mock.calls.map(([e]) => {
+      const ev = e as {
+        message: string;
+        level: string;
+        context: { error_code: string; detail: string };
+      };
+      return [ev.level, ev.message, ev.context.error_code, ev.context.detail];
+    });
+    expect(events).toEqual([
+      ['warn', 'widget list failed', 'widget_list_failed', 'list_failed;IllegalArgumentException'],
+      [
+        'warn',
+        'widget re-render failed',
+        'widget_reload_failed',
+        'reload_failed;TransactionTooLargeException',
+      ],
+      ['warn', 'widget read failed', 'snapshot_unreadable', 'render_failed'],
     ]);
   });
 });

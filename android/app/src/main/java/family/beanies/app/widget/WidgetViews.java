@@ -300,7 +300,7 @@ final class WidgetViews {
         context.getResources().getValue(dimenRes, tv, true);
         int unit = (tv.data >> TypedValue.COMPLEX_UNIT_SHIFT) & TypedValue.COMPLEX_UNIT_MASK;
         if (tv.type != TypedValue.TYPE_DIMENSION || unit != TypedValue.COMPLEX_UNIT_SP) {
-            Log.e("beanies-widget", "widget text dimen "
+            Log.e(DayWidgetProvider.TAG, "widget text dimen "
                     + context.getResources().getResourceEntryName(dimenRes)
                     + " must be declared in sp (res/values/widget_dimens.xml); using its number as sp");
         }
