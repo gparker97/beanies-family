@@ -17,6 +17,39 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.10.16',
+    date: '2026-10-16',
+    month: '16 october 2026',
+    summary: {
+      en: 'Weather is now on the beanie wall, its night screen and the Nook, plus other minor fixes and improvements.',
+      beanie:
+        'weather is now on the beanie wall, its night screen and the nook, plus other minor fixes and improvements.',
+    },
+    features: [
+      {
+        title: { en: 'Weather on the beanie wall', beanie: 'weather on the beanie wall' },
+        description: {
+          en: "Set your family's home town once in Settings, Region & Holidays, and today's weather with the next three days is shown on the beanie wall, its night screen and the Nook, so coats and umbrellas get decided at a glance. Only the town you type is used; your device's location is never read.",
+          beanie:
+            "set your family's home town once in settings, region & holidays, and today's weather with the next three days is shown on the beanie wall, its night screen and the nook, so coats and umbrellas get decided at a glance. only the town you type is used; your device's location is never read.",
+        },
+      },
+      {
+        icon: '💬',
+        title: { en: 'Join us on Discord', beanie: 'join us on discord' },
+        description: {
+          en: "Get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+          beanie:
+            "get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+        },
+        cta: {
+          label: { en: 'Join the Discord', beanie: 'join the discord' },
+          href: 'https://beanies.family/discord',
+        },
+      },
+    ],
+  },
+  {
     version: '2026.10.14',
     date: '2026-10-14',
     month: '14 october 2026',
