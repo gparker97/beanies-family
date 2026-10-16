@@ -240,6 +240,23 @@ describe('HomeTownField', () => {
     expect(settings.setWeatherPlace).toHaveBeenCalledWith(PORTLAND_OR);
   });
 
+  it('Enter on a highlighted suggestion does nothing while a search runs; a click still picks', async () => {
+    const wrapper = render();
+    await type(wrapper, 'Portl');
+    await settle();
+    const input = wrapper.get('[data-testid="home-town-input"]');
+    await type(wrapper, 'Portla');
+    await input.trigger('keydown', { key: 'ArrowDown' });
+    await input.trigger('keydown', { key: 'ArrowDown' });
+    await input.trigger('keydown', { key: 'Enter' });
+    await flushPromises();
+    expect(settings.setWeatherPlace).not.toHaveBeenCalled();
+    // A click on a visible suggestion is an explicit choice, searching or not.
+    await wrapper.findAll('[role="option"]')[1]!.trigger('mousedown');
+    await flushPromises();
+    expect(settings.setWeatherPlace).toHaveBeenCalledWith(PORTLAND_ME);
+  });
+
   it('names the combobox for assistive tech', () => {
     const input = render().get('[data-testid="home-town-input"]');
     expect(input.attributes('role')).toBe('combobox');

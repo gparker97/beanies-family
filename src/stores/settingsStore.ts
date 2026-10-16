@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, toRaw } from 'vue';
 import { showToast } from '@/composables/useToast';
 import { useTranslation } from '@/composables/useTranslation';
 import { STORAGE_KEYS } from '@/constants/storageKeys';
@@ -1007,9 +1007,12 @@ export const useSettingsStore = defineStore('settings', () => {
     persistAiSetting('settings.weather.show', 'weatherEnabled', () =>
       settingsRepo.saveSettings({ weatherEnabled: enabled })
     );
+  // The place usually comes out of a component's reactive suggestion list, and the repository's
+  // `structuredClone` throws `DataCloneError` on a Vue proxy, so it is unwrapped to a plain copy
+  // here (every field is a primitive, so a shallow spread suffices).
   const setWeatherPlace = (place: WeatherPlace | null) =>
     persistAiSetting('settings.weather.homeTown', 'weatherPlace', () =>
-      settingsRepo.saveSettings({ weatherPlace: place })
+      settingsRepo.saveSettings({ weatherPlace: place ? { ...toRaw(place) } : null })
     );
   const setTemperatureUnit = (unit: TemperatureUnit) =>
     persistAiSetting('settings.weather.unit', 'temperatureUnit', () =>

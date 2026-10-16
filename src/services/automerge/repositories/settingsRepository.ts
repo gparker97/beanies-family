@@ -1,6 +1,6 @@
 import { getSettings as projectionGetSettings } from '../projection';
 import { mutate } from '../worker/docClient';
-import { pickBase, toPlain } from '../automergeRepository';
+import { pickBase } from '../automergeRepository';
 import type { PatchSettingsArgs } from '../worker/protocol';
 import { DEFAULT_CURRENCY } from '@/constants/currencies';
 import { DEFAULT_LANGUAGE } from '@/constants/languages';
@@ -90,10 +90,7 @@ export async function saveSettings(
   settings: Partial<Settings>,
   options?: { preserveTimestamp?: boolean }
 ): Promise<Settings> {
-  // `toPlain`, not `structuredClone`: a caller may pass a value straight from reactive state (a
-  // picked home town from a `ref` list), and `structuredClone` throws `DataCloneError` on a Vue
-  // proxy. The JSON round trip is the same plainify the worker RPC applies before posting.
-  const patch = toPlain(settings) as Partial<Settings>;
+  const patch = structuredClone(settings) as Partial<Settings>;
   patch.id = SETTINGS_ID;
   delete patch.updatedAt;
   const args: PatchSettingsArgs = {

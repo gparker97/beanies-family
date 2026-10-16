@@ -25,6 +25,8 @@ const h = vi.hoisted(() => ({
   docLoaded: true,
   zone: 'America/Los_Angeles',
   poll: null as (() => unknown) | null,
+  /** Makes the next refresh decision throw (a bug in the decision step). */
+  decisionThrows: false,
 }));
 
 vi.mock('@/services/telemetry', () => ({ logEvent: h.logEvent }));
@@ -34,6 +36,19 @@ vi.mock('@/services/weather/openMeteo', async (importOriginal) => ({
   fetchForecast: h.fetchForecast,
   searchPlaces: h.searchPlaces,
 }));
+vi.mock('@/utils/weather/weatherRefresh', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@/utils/weather/weatherRefresh')>();
+  return {
+    ...real,
+    pickWeatherRefresh: (input: Parameters<typeof real.pickWeatherRefresh>[0]) => {
+      if (h.decisionThrows) {
+        h.decisionThrows = false;
+        throw new Error('decision step blew up');
+      }
+      return real.pickWeatherRefresh(input);
+    },
+  };
+});
 vi.mock('@/services/automerge/docService', async () => {
   const { ref: vueRef } = await import('vue');
   return { docVersion: vueRef(0), isDocLoaded: () => h.docLoaded };
@@ -158,6 +173,7 @@ beforeEach(() => {
   h.docLoaded = true;
   h.zone = LA;
   h.poll = null;
+  h.decisionThrows = false;
   online.value = true;
   familyContext.activeFamilyId = 'fam-1';
   settings.weatherEnabled = true;
@@ -490,6 +506,25 @@ describe('a question change mid-fetch hands over without a gap', () => {
     online.value = false;
     settings.weatherPlace = BANGOR;
     await settle();
+    expect(store.fetching).toBe(false);
+    expect(store.atom).toMatchObject({ state: 'unavailable' });
+  });
+
+  it('a trailing run that throws in its decision step still clears fetching (no permanent blank)', async () => {
+    h.fetchForecast.mockImplementationOnce(
+      (_place: WeatherPlace, _zone: string, signal: AbortSignal) =>
+        new Promise((_resolve, reject) => {
+          signal.addEventListener('abort', () =>
+            reject(new WeatherFetchError('aborted', 'caller moved on'))
+          );
+        })
+    );
+    const store = await createStore();
+    expect(store.fetching).toBe(true);
+    h.decisionThrows = true;
+    settings.weatherPlace = BANGOR;
+    await settle();
+    expect(reports('weather refresh run threw')).toHaveLength(1);
     expect(store.fetching).toBe(false);
     expect(store.atom).toMatchObject({ state: 'unavailable' });
   });

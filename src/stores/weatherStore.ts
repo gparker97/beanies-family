@@ -114,6 +114,11 @@ export const useWeatherStore = defineStore('weather', () => {
   const nowMs = ref(Date.now());
   /** The running forecast's controller (not reactive). */
   let inflight: AbortController | null = null;
+  /**
+   * Set by `abortInflight(true)`: the aborted run leaves `fetching` set for the trailing run its
+   * caller queued. Every run clears it on entry, because from then on that run owns `fetching`.
+   */
+  let handOffPending = false;
   /** Set by `haltForSignOut`; lifted at the next session boundary the watch sees. */
   let halted = false;
   /** Whether the watch last saw a session (doc ready + an active family). */
@@ -287,57 +292,61 @@ export const useWeatherStore = defineStore('weather', () => {
   }
 
   /**
-   * Abandon the running forecast: its answer is no longer wanted. The caller must queue a
-   * `request` straight after (the trailing run takes over `fetching`).
+   * Abandon the running forecast: its answer is no longer wanted. `handOff` is true only when
+   * the caller queues a `request` straight after: the aborted run then leaves `fetching` set for
+   * the trailing run, so the atom shows no `unavailable` flash between the two. Without it the
+   * aborted run clears `fetching` itself as it settles.
    */
-  function abortInflight(): void {
-    inflight?.abort();
+  function abortInflight(handOff: boolean): void {
+    if (!inflight) return;
+    inflight.abort();
     inflight = null;
+    if (handOff) handOffPending = true;
   }
 
   /** One refresh attempt: decide, then ask, then apply or drop. Never calls `request`. */
   async function run(kind: WeatherRefreshKind): Promise<void> {
-    const now = Date.now();
-    nowMs.value = now;
-    const familyId = familyContextStore.activeFamilyId;
-    const key = placeKey.value;
-    const place: WeatherPlace | null = settingsStore.weatherPlace;
-    const decision = pickWeatherRefresh({
-      halted,
-      docReady: docReady.value,
-      hasFamily: familyId !== null,
-      enabled: settingsStore.weatherEnabled,
-      hasPlace: key !== null && place !== null,
-      online: isOnline.value,
-      ageMs: reading.value ? now - reading.value.fetchedAt : null,
-      now,
-      backoffUntil: failure.value?.until ?? 0,
-    });
-    if (decision.action === 'skip' || !familyId || !key || !place) {
-      // Nothing in flight now; this also ends a hand-off from an aborted run (below).
-      fetching.value = false;
-      logSkip(decision.action === 'skip' ? decision.reason : 'pre-hydration');
-      return;
-    }
-    const asked: Asked = { familyId, placeKey: key };
-    const previousAgeMin = weatherAgeMin(reading.value?.fetchedAt, now);
-    const controller = new AbortController();
-    inflight = controller;
-    fetching.value = true;
+    // This run owns `fetching` now, whatever a handed-off run left set.
+    handOffPending = false;
+    let controller: AbortController | null = null;
     try {
-      const observation = await fetchForecast(place, homeZone.value, controller.signal);
-      onFetchSuccess(asked, observation, kind, previousAgeMin, Date.now() - now);
-    } catch (e) {
-      onFetchFailure(asked, e, kind);
-    } finally {
-      // A run the watch abandoned (`abortInflight`) leaves `fetching` set: the watch queued the
-      // trailing run in the same breath, and that run either fetches or clears the flag when it
-      // skips. Clearing it here would show `unavailable` (and log the stage) for the microtasks
-      // between this run settling and the trailing run starting.
-      if (inflight === controller) {
-        inflight = null;
-        fetching.value = false;
+      const now = Date.now();
+      nowMs.value = now;
+      const familyId = familyContextStore.activeFamilyId;
+      const key = placeKey.value;
+      const place: WeatherPlace | null = settingsStore.weatherPlace;
+      const decision = pickWeatherRefresh({
+        halted,
+        docReady: docReady.value,
+        hasFamily: familyId !== null,
+        enabled: settingsStore.weatherEnabled,
+        hasPlace: key !== null && place !== null,
+        online: isOnline.value,
+        ageMs: reading.value ? now - reading.value.fetchedAt : null,
+        now,
+        backoffUntil: failure.value?.until ?? 0,
+      });
+      if (decision.action === 'skip' || !familyId || !key || !place) {
+        logSkip(decision.action === 'skip' ? decision.reason : 'pre-hydration');
+        return;
       }
+      const asked: Asked = { familyId, placeKey: key };
+      const previousAgeMin = weatherAgeMin(reading.value?.fetchedAt, now);
+      controller = new AbortController();
+      inflight = controller;
+      fetching.value = true;
+      try {
+        const observation = await fetchForecast(place, homeZone.value, controller.signal);
+        onFetchSuccess(asked, observation, kind, previousAgeMin, Date.now() - now);
+      } catch (e) {
+        onFetchFailure(asked, e, kind);
+      }
+    } finally {
+      // Every exit clears `fetching` (a skip, an answer, or a throw in the decision step, which
+      // would otherwise leave the atom blank for good), except a run handed off by
+      // `abortInflight(true)`: its trailing run is already queued and takes the flag over.
+      if (inflight === controller) inflight = null;
+      if (!handOffPending) fetching.value = false;
     }
   }
 
@@ -420,7 +429,7 @@ export const useWeatherStore = defineStore('weather', () => {
    */
   async function haltForSignOut(): Promise<void> {
     halted = true;
-    inflight?.abort();
+    abortInflight(false);
     const pending = flight.pending();
     if (pending) await pending.catch(() => undefined);
     reading.value = null;
@@ -446,7 +455,7 @@ export const useWeatherStore = defineStore('weather', () => {
       const questionChanged =
         previous === undefined || key !== prevKey || familyId !== prevFamilyId;
       // The old question's answer is no longer wanted, nor any answer once weather is off.
-      if (questionChanged || !enabled) abortInflight();
+      if (questionChanged || !enabled) abortInflight(true);
       if (questionChanged) {
         // A new question gets a fresh backoff.
         failure.value = null;

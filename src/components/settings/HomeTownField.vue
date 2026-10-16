@@ -159,10 +159,8 @@ async function pick(place: WeatherPlace): Promise<void> {
     context: { action: 'place-set', kind },
   });
   editing.value = false;
+  // Clearing the query lets its watch reset the list, status and searching flag.
   query.value = '';
-  places.value = [];
-  status.value = 'idle';
-  searching.value = false;
   nav.reset();
 }
 
@@ -170,12 +168,12 @@ function onKeydown(e: KeyboardEvent): void {
   if (nav.onNavKey(e)) return;
   if (e.key !== 'Enter') return;
   // Enter never submits the drawer around the field. It picks the highlighted town, or with
-  // nothing highlighted the first one, but only once the list answers what is typed now (a
-  // stale list on screen during a search could otherwise commit the wrong town).
+  // nothing highlighted the first one, but only once the list answers what is typed now: while
+  // a search runs the list on screen is stale, highlighted or not, so Enter does nothing (a
+  // click on a visible suggestion is still an explicit choice).
   e.preventDefault();
-  if (!nav.open.value) return;
-  const index = nav.active.value >= 0 ? nav.active.value : searching.value ? -1 : 0;
-  const chosen = index >= 0 ? places.value[index] : undefined;
+  if (!nav.open.value || searching.value) return;
+  const chosen = places.value[nav.active.value >= 0 ? nav.active.value : 0];
   if (chosen) void pick(chosen);
 }
 

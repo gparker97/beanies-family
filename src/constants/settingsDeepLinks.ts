@@ -21,4 +21,5 @@ export const AI_SETTINGS_OPEN = 'ai';
 export const SECURITY_OPEN = 'security';
 
 /** Opens Settings → Region & Holidays (country, time zone, holidays and the weather home town). */
+// 'country-holidays' is a public URL contract (native bundles and help links ship it): never rename the value.
 export const REGION_HOLIDAYS_OPEN = 'country-holidays';
