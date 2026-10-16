@@ -19,12 +19,14 @@ import AiSettings from '@/components/settings/AiSettings.vue';
 import CalendarSyncSettings from '@/components/settings/CalendarSyncSettings.vue';
 import BeanieLabSection from '@/components/settings/BeanieLabSection.vue';
 import RemindersSettings from '@/components/settings/RemindersSettings.vue';
+import RegionHolidaysDrawer from '@/components/settings/RegionHolidaysDrawer.vue';
 import BeanieBellIcon from '@/components/ui/BeanieBellIcon.vue';
 import { useBeanieLab } from '@/composables/useBeanieLab';
 import { isFlagEnabled } from '@/config/flags';
 import {
   AI_SETTINGS_OPEN,
   CALENDAR_SYNC_OPEN,
+  REGION_HOLIDAYS_OPEN,
   REMINDERS_OPEN,
   SECURITY_OPEN,
 } from '@/constants/settingsDeepLinks';
@@ -35,7 +37,6 @@ import * as syncService from '@/services/sync/syncService';
 import { getAuxStore } from '@/services/sync/storageProvider';
 import { safetyCopyName } from '@/constants/compaction';
 import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
-import BaseCombobox from '@/components/ui/BaseCombobox.vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import CloudProviderBadge from '@/components/ui/CloudProviderBadge.vue';
@@ -61,9 +62,6 @@ import { classifyDriveFailure } from '@/utils/podAccess';
 import { useFamilyDataAccess } from '@/composables/useFamilyDataAccess';
 import { usePWA } from '@/composables/usePWA';
 import { useCurrencyOptions } from '@/composables/useCurrencyOptions';
-import { useCountryOptions } from '@/composables/useCountryOptions';
-import { useTimeZoneOptions } from '@/composables/useTimeZoneOptions';
-import { useToday } from '@/composables/useToday';
 import { CURRENCIES, getCurrencyInfo } from '@/constants/currencies';
 import {
   list as projectionList,
@@ -94,10 +92,8 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { useSyncStore } from '@/stores/syncStore';
 import { envelopeCapabilities, secretFieldFor } from '@/services/sync/fileSync';
 import { useTranslationStore } from '@/stores/translationStore';
-import { useHolidayStore } from '@/stores/holidayStore';
 import { useBeanTips } from '@/composables/useBeanTips';
 import { resetAllAppStores } from '@/utils/resetStores';
-import type { CountryCode } from '@/types/models';
 import { track } from '@/services/analytics/plausible';
 
 const router = useRouter();
@@ -115,7 +111,6 @@ const CACHE_WARNING_BY_CAUSE: Record<CacheFailureCause, UIStringKey> = {
 const translationStore = useTranslationStore();
 const beanTips = useBeanTips();
 const familyStore = useFamilyStore();
-const holidayStore = useHolidayStore();
 const { t } = useTranslation();
 /** Product version + build marker (e.g. "v0.9 · 41f5353 · 19 Jun 2026") for the about footer. */
 const fullVersionLabel = getFullVersionLabel();
@@ -197,7 +192,7 @@ const cardOpenMap: Record<string, () => void> = {
   currency: () => {
     showCurrency.value = true;
   },
-  'country-holidays': () => {
+  [REGION_HOLIDAYS_OPEN]: () => {
     showCountryHolidays.value = true;
   },
   account: () => {
@@ -314,55 +309,6 @@ const deleteConfirmText = ref('');
 const wantExport = ref(false);
 const wantDeleteDrive = ref(false);
 const isDeleting = ref(false);
-
-// ── Region & holidays (country, home time zone, public holidays) ─────────────
-const { countryOptions } = useCountryOptions();
-const { lastVisibleAt } = useToday();
-// The Home Time Zone picker shows the RESOLVED zone, but nothing when it is only the
-// device fallback (the placeholder says so). Re-evaluated on foreground: the device
-// zone is not reactive, and a device may have crossed zones while backgrounded.
-const homeTimeZoneModel = computed(() => {
-  void lastVisibleAt.value;
-  const resolved = settingsStore.resolveHomeTimeZoneNow();
-  return resolved.source === 'device-fallback' ? '' : resolved.zone;
-});
-const { timeZoneOptions } = useTimeZoneOptions(
-  computed(() => settingsStore.familyCountry),
-  computed(() => homeTimeZoneModel.value || undefined),
-  showCountryHolidays
-);
-// Shown inside the Region & Holidays drawer when a holiday fetch has failed
-// (transient network error with no cached fallback) — informative, with
-// recovery direction. The store's online watcher retries automatically.
-const showHolidayRetryHint = computed(() => !!settingsStore.country && holidayStore.loadFailed);
-
-async function onPickCountry(value: string) {
-  try {
-    await settingsStore.setCountry((value || null) as CountryCode | null);
-  } catch {
-    // persistDualSetting already surfaced this (toast + console.error) and
-    // re-threw so the picker can revert its visual state — nothing more to do.
-  }
-}
-
-async function onPickHomeTimeZone(value: string) {
-  if (!value) return;
-  try {
-    await settingsStore.setHomeTimeZone(value);
-  } catch {
-    // persistAiSetting already surfaced this (toast + console.error) and re-threw so
-    // the picker can revert its visual state — nothing more to do.
-  }
-}
-
-async function onToggleShowPublicHolidays(show: boolean) {
-  try {
-    await settingsStore.setShowPublicHolidays(show);
-  } catch {
-    // persistAiSetting already surfaced this (toast + console.error); the toggle
-    // reads the store value, so it reverts on its own.
-  }
-}
 
 // ── Currency ─────────────────────────────────────────────────────────────────
 const { currencyOptions } = useCurrencyOptions();
@@ -2380,64 +2326,7 @@ async function handleDeleteFamilyClick() {
     </BeanieFormModal>
 
     <!-- ── Region & Holidays Modal ─────────────────────────────────────── -->
-    <BeanieFormModal
-      variant="drawer"
-      :open="showCountryHolidays"
-      :title="t('settings.card.countryHolidays')"
-      icon="🌍"
-      icon-bg="var(--tint-silk-20)"
-      :save-label="t('action.close')"
-      @close="showCountryHolidays = false"
-      @save="showCountryHolidays = false"
-    >
-      <SettingsAdminOnlyNotice v-if="!canManagePod" class="mb-1" />
-
-      <BaseCombobox
-        :model-value="settingsStore.country ?? ''"
-        :options="countryOptions"
-        :label="t('settings.country')"
-        :hint="t('settings.countryHelp')"
-        :placeholder="t('settings.countryNotSet')"
-        :search-placeholder="t('settings.country')"
-        :disabled="!canManagePod"
-        @update:model-value="onPickCountry"
-      />
-
-      <BaseCombobox
-        :model-value="homeTimeZoneModel"
-        :options="timeZoneOptions"
-        :label="t('settings.homeTimeZone')"
-        :hint="t('settings.homeTimeZoneHelp')"
-        :placeholder="t('settings.homeTimeZoneNotSet')"
-        :search-placeholder="t('settings.homeTimeZone')"
-        :disabled="!canManagePod"
-        :clearable="false"
-        @update:model-value="onPickHomeTimeZone"
-      />
-
-      <p v-if="showHolidayRetryHint" class="dark:text-ink-soft text-secondary-500 text-xs">
-        {{ t('holiday.loadFailedRetryHint') }}
-      </p>
-
-      <!-- Show / hide public holidays on the planner -->
-      <div
-        class="dark:border-line flex items-center justify-between rounded-lg border border-gray-200 p-4"
-      >
-        <div>
-          <p class="dark:text-ink font-medium text-gray-900">
-            {{ t('settings.showPublicHolidays') }}
-          </p>
-          <p v-if="!settingsStore.country" class="dark:text-ink-soft text-sm text-gray-500">
-            {{ t('settings.showPublicHolidaysNeedsCountry') }}
-          </p>
-        </div>
-        <ToggleSwitch
-          :model-value="settingsStore.showPublicHolidays"
-          :disabled="!settingsStore.country || !canManagePod"
-          @update:model-value="onToggleShowPublicHolidays"
-        />
-      </div>
-    </BeanieFormModal>
+    <RegionHolidaysDrawer :open="showCountryHolidays" @close="showCountryHolidays = false" />
 
     <!-- ── Your Account Modal ─────────────────────────────────────────────
          The "this is me" surface: password, passkeys, sign-out lives.

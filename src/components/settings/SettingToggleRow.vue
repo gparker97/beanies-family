@@ -33,10 +33,7 @@ defineEmits<{ 'update:modelValue': [boolean] }>();
       <p class="dark:text-ink text-[0.8rem] font-semibold text-[var(--deep-slate)]">
         {{ title }}
       </p>
-      <p
-        v-if="hint"
-        class="dark:text-ink-faint text-[0.65rem] leading-snug text-[var(--deep-slate)]/40"
-      >
+      <p v-if="hint" class="dark:text-ink-faint text-secondary-400 text-[0.65rem] leading-snug">
         {{ hint }}
       </p>
       <slot />

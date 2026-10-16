@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, useSlots } from 'vue';
 
 /**
  * Forward every extra attribute (`aria-*`, `data-*`, `autocomplete`,
@@ -34,6 +34,13 @@ const emit = defineEmits<{
   blur: [event: FocusEvent];
 }>();
 
+/**
+ * Optional `leading` slot: a decorative icon inside the field's left edge (the home-town
+ * field's map pin). Additive: the extra left padding applies only when the slot is filled.
+ */
+const slots = useSlots();
+const hasLeading = computed(() => !!slots.leading);
+
 const inputId = computed(() => props.id || `input-${Math.random().toString(36).slice(2, 9)}`);
 
 const inputClasses = computed(() => {
@@ -43,7 +50,7 @@ const inputClasses = computed(() => {
   // force-quit clears). Pinning 1rem keeps every BaseInput above that threshold;
   // it's rem-based so Large reading mode still scales it.
   const base =
-    'block w-full rounded-xl border px-3 py-2 text-base text-gray-900 dark:text-ink bg-white dark:bg-surface-raised placeholder-gray-400 dark:placeholder-ink-faint focus:outline-none focus:ring-2 transition-colors';
+    'block w-full rounded-xl border pr-3 py-2 text-base text-gray-900 dark:text-ink bg-white dark:bg-surface-raised placeholder-gray-400 dark:placeholder-ink-faint focus:outline-none focus:ring-2 transition-colors';
 
   const states = props.error
     ? 'border-red-500 focus:border-red-500 focus:ring-red-200 dark:focus:ring-red-900'
@@ -53,7 +60,7 @@ const inputClasses = computed(() => {
     ? 'opacity-50 cursor-not-allowed bg-gray-50 dark:bg-surface-ground'
     : '';
 
-  return [base, states, disabled];
+  return [base, hasLeading.value ? 'pl-10' : 'pl-3', states, disabled];
 });
 
 function handleInput(event: Event) {
@@ -74,18 +81,27 @@ function handleInput(event: Event) {
       <span v-if="required" class="text-primary-500">*</span>
     </label>
 
-    <input
-      :id="inputId"
-      :type="type"
-      :value="modelValue"
-      :placeholder="placeholder"
-      :disabled="disabled"
-      :required="required"
-      :class="inputClasses"
-      v-bind="$attrs"
-      @input="handleInput"
-      @blur="emit('blur', $event)"
-    />
+    <div class="relative">
+      <span
+        v-if="hasLeading"
+        class="text-secondary-400 dark:text-ink-soft pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3"
+        aria-hidden="true"
+      >
+        <slot name="leading" />
+      </span>
+      <input
+        :id="inputId"
+        :type="type"
+        :value="modelValue"
+        :placeholder="placeholder"
+        :disabled="disabled"
+        :required="required"
+        :class="inputClasses"
+        v-bind="$attrs"
+        @input="handleInput"
+        @blur="emit('blur', $event)"
+      />
+    </div>
 
     <p v-if="error" class="dark:text-danger-lift text-sm text-red-600">
       {{ error }}
