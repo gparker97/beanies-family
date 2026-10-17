@@ -25,6 +25,7 @@
 		BE2B00000000000000000023 /* BeaniesWidgetsBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2B00000000000000000001 /* BeaniesWidgetsBundle.swift */; };
 		BE2B00000000000000000024 /* DayWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2B00000000000000000002 /* DayWidget.swift */; };
 		BE2B00000000000000000025 /* DayWidgetConfigIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2B00000000000000000003 /* DayWidgetConfigIntent.swift */; };
+		BE2B00000000000000000053 /* AccessoryConfigIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2B00000000000000000052 /* AccessoryConfigIntent.swift */; };
 		BE2B00000000000000000026 /* DayAccessoryWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2B00000000000000000004 /* DayAccessoryWidget.swift */; };
 		BE2B00000000000000000027 /* WidgetSnapshotStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2B00000000000000000005 /* WidgetSnapshotStore.swift */; };
 		BE2B00000000000000000028 /* WidgetFill.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2B00000000000000000006 /* WidgetFill.swift */; };
@@ -113,6 +114,7 @@
 		BE2B00000000000000000001 /* BeaniesWidgetsBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BeaniesWidgetsBundle.swift; sourceTree = "<group>"; };
 		BE2B00000000000000000002 /* DayWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayWidget.swift; sourceTree = "<group>"; };
 		BE2B00000000000000000003 /* DayWidgetConfigIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayWidgetConfigIntent.swift; sourceTree = "<group>"; };
+		BE2B00000000000000000052 /* AccessoryConfigIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessoryConfigIntent.swift; sourceTree = "<group>"; };
 		BE2B00000000000000000004 /* DayAccessoryWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayAccessoryWidget.swift; sourceTree = "<group>"; };
 		BE2B00000000000000000005 /* WidgetSnapshotStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetSnapshotStore.swift; sourceTree = "<group>"; };
 		BE2B00000000000000000006 /* WidgetFill.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetFill.swift; sourceTree = "<group>"; };
@@ -243,6 +245,7 @@
 				BE2B00000000000000000001 /* BeaniesWidgetsBundle.swift */,
 				BE2B00000000000000000002 /* DayWidget.swift */,
 				BE2B00000000000000000003 /* DayWidgetConfigIntent.swift */,
+				BE2B00000000000000000052 /* AccessoryConfigIntent.swift */,
 				BE2B00000000000000000004 /* DayAccessoryWidget.swift */,
 				BE2B00000000000000000005 /* WidgetSnapshotStore.swift */,
 				BE2B00000000000000000006 /* WidgetFill.swift */,
@@ -474,6 +477,7 @@
 				BE2B00000000000000000023 /* BeaniesWidgetsBundle.swift in Sources */,
 				BE2B00000000000000000024 /* DayWidget.swift in Sources */,
 				BE2B00000000000000000025 /* DayWidgetConfigIntent.swift in Sources */,
+				BE2B00000000000000000053 /* AccessoryConfigIntent.swift in Sources */,
 				BE2B00000000000000000026 /* DayAccessoryWidget.swift in Sources */,
 				BE2B00000000000000000027 /* WidgetSnapshotStore.swift in Sources */,
 				BE2B00000000000000000028 /* WidgetFill.swift in Sources */,

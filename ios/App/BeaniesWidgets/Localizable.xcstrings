@@ -55,6 +55,42 @@
         }
       }
     },
+    "How many are due today": {
+      "comment": "Subtitle of the To-dos left circle option.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "How many are due today"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今天还有几项待办"
+          }
+        }
+      }
+    },
+    "How much of today is still to come": {
+      "comment": "Subtitle of the Things left circle option.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "How much of today is still to come"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今天还剩多少安排"
+          }
+        }
+      }
+    },
     "Large": {
       "comment": "Widget Text size option: a little bigger.",
       "extractionState": "manual",
@@ -127,8 +163,26 @@
         }
       }
     },
+    "Next handoff": {
+      "comment": "Lock-screen circle option: the viewer's next drop-off or pick-up.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next handoff"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下次接送"
+          }
+        }
+      }
+    },
     "Next up": {
-      "comment": "Lock-screen widget name in the widget gallery.",
+      "comment": "Lock-screen widget name in the widget gallery, and the circle option that shows the next thing's time.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -159,6 +213,24 @@
           "stringUnit": {
             "state": "translated",
             "value": "我们的一天"
+          }
+        }
+      }
+    },
+    "Show": {
+      "comment": "Lock-screen circle setting: what the circle shows.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示"
           }
         }
       }
@@ -199,6 +271,24 @@
         }
       }
     },
+    "Things left": {
+      "comment": "Lock-screen circle option: how much of today is still to come.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Things left"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "剩余安排"
+          }
+        }
+      }
+    },
     "To-dos and lists": {
       "comment": "Widget setting toggle: show to-dos and lists (the to-dos section).",
       "extractionState": "manual",
@@ -213,6 +303,24 @@
           "stringUnit": {
             "state": "translated",
             "value": "待办和清单"
+          }
+        }
+      }
+    },
+    "To-dos left": {
+      "comment": "Lock-screen circle option: how many to-dos are still due today.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "To-dos left"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "剩余待办"
           }
         }
       }
@@ -249,6 +357,42 @@
           "stringUnit": {
             "state": "translated",
             "value": "旅行和生日"
+          }
+        }
+      }
+    },
+    "When you next drop off or pick up": {
+      "comment": "Subtitle of the Next handoff circle option.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When you next drop off or pick up"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "你下次送或接的时间"
+          }
+        }
+      }
+    },
+    "When your next thing starts": {
+      "comment": "Subtitle of the Next up circle option.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When your next thing starts"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下一件事何时开始"
           }
         }
       }
@@ -303,6 +447,24 @@
           "stringUnit": {
             "state": "translated",
             "value": "你的一天"
+          }
+        }
+      }
+    },
+    "widget_all_clear": {
+      "comment": "Lock-screen circle when nothing is coming up this week. Lowercase, a few characters.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "all clear"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "全部搞定"
           }
         }
       }

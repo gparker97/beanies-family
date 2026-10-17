@@ -111,7 +111,8 @@ struct DayWidgetConfigIntent: WidgetConfigurationIntent {
 }
 
 /// The picker's choices as a plain value, so the views and the fill logic never touch the
-/// App Intent type (and the lock-screen widget, which has no picker, can use the defaults).
+/// App Intent type (and the lock-screen widget, whose only choice is the circle's, can use
+/// the defaults).
 struct WidgetBlocks: Equatable {
     var audience: WidgetAudienceOption
     var events: Bool
@@ -122,8 +123,11 @@ struct WidgetBlocks: Equatable {
     var hint: Bool
     /// The card's opacity choice; not a block, but it rides with the picker's other values.
     var background: WidgetBackgroundOption = .lighter
-    /// The text-size choice; the lock-screen widget (no picker) keeps Standard.
+    /// The text-size choice; the lock-screen widget (no text-size picker) keeps Standard.
     var textSize: WidgetTextSizeOption = .standard
+    /// The lock-screen circle's choice (`AccessoryConfigIntent`); the home-screen widget
+    /// never reads it.
+    var circleShow: CircleShowOption = .nextUp
 
     static let defaults = WidgetBlocks(
         audience: .my, events: true, whosWhere: true, meals: true, due: true, comingUp: true, hint: true
