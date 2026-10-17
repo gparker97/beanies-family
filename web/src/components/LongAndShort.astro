@@ -13,7 +13,8 @@
  * the new name used one to introduce the box).
  *
  * Takes its colour from the issue tint the post page sets on `.post-page`.
- * Text in backticks becomes an app-path chip; nothing else is interpreted.
+ * Text in backticks becomes an app-path chip and `[text](url)` becomes a link;
+ * nothing else is interpreted.
  * The bullet markers are CSS backgrounds, so the section's HTML (which the
  * beanies-blog skill copies to Substack) carries no images. Role labels and
  * chips are <strong>, so they stay distinct where the styles don't travel
@@ -29,10 +30,26 @@ interface Props {
 }
 
 const { summary } = Astro.props;
+type Segment = string | { path: string } | { text: string; href: string };
+
+// An app path in backticks, or a markdown link. Everything else stays plain text.
+const TOKEN = /`([^`]+)`|\[([^\]]+)\]\(([^)\s]+)\)/g;
+
+function toSegments(text: string): Segment[] {
+  const segments: Segment[] = [];
+  let last = 0;
+  for (const m of text.matchAll(TOKEN)) {
+    if (m.index > last) segments.push(text.slice(last, m.index));
+    segments.push(m[1] !== undefined ? { path: m[1] } : { text: m[2], href: m[3] });
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) segments.push(text.slice(last));
+  return segments;
+}
+
 const items = longAndShortEntries(summary).map(([role, text]) => ({
   role,
-  // Odd segments sat between backticks: those are app paths.
-  segments: text.split(/`([^`]+)`/),
+  segments: toSegments(text),
 }));
 ---
 
@@ -45,8 +62,14 @@ const items = longAndShortEntries(summary).map(([role, text]) => ({
         <li class="las-item">
           <strong class="las-role">{role}</strong>
           <p class="las-text">
-            {segments.map((segment, i) =>
-              i % 2 === 1 ? <strong class="las-path">{segment}</strong> : segment
+            {segments.map((segment) =>
+              typeof segment === 'string' ? (
+                segment
+              ) : 'path' in segment ? (
+                <strong class="las-path">{segment.path}</strong>
+              ) : (
+                <a href={segment.href}>{segment.text}</a>
+              )
             )}
           </p>
         </li>
@@ -129,6 +152,15 @@ const items = longAndShortEntries(summary).map(([role, text]) => ({
     font-size: 1rem;
     line-height: 1.55;
     margin: 0;
+  }
+
+  /* Matches the post's links, but in the darker tint ink: the box's tinted
+     ground is a step darker than the page, so the bright tint loses contrast. */
+  .las-text a {
+    color: var(--tint-ink, #a83a11);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
   }
 
   /* The app path is the line people act on, so it reads as a breadcrumb chip.

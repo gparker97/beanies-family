@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-10-17
+
+### Changed
+
+- The summary box at the top of a blog post can now include links.
+
 ## 2026-10-16
 
 ### Added
