@@ -2,12 +2,15 @@
  * The home-screen widget snapshot builder (#130). Local factories, no Pinia (the
  * `wallJobs.test.ts` shape).
  *
- * The fixture test is the cross-platform contract: `fixtures/widget-snapshot.v2.json` is the
+ * The fixture test is the cross-platform contract: `fixtures/widget-snapshot.v3.json` is the
  * builder's output for the mockup's family, and the Swift and Java readers use it as their
  * sample. Regenerate it ONLY on a deliberate schema or copy change, and review the diff:
  *
  *   UPDATE_WIDGET_FIXTURE=1 npx vitest run src/utils/__tests__/widgetSnapshot.test.ts
- *   npx prettier --write src/utils/__tests__/fixtures/widget-snapshot.v2.json
+ *   npx prettier --write src/utils/__tests__/fixtures/widget-snapshot.v3.json
+ *
+ * `fixtures/widget-snapshot.v2.json` is frozen: the older shape the readers still accept
+ * (readers take 2 and 3). A test below proves v3 only ADDED optional fields to it.
  *
  * (The comparison is on the parsed JSON, so Prettier's layout never fails the test.)
  *
@@ -40,10 +43,19 @@ import type {
   Recipe,
   TodoItem,
 } from '@/types/models';
-import { WIDGET_DAYS, type WidgetDay, type WidgetSnapshot } from '@/types/widgetSnapshot';
+import {
+  WIDGET_DAYS,
+  WIDGET_SNAPSHOT_READABLE_VERSIONS,
+  WIDGET_SNAPSHOT_VERSION,
+  type WidgetDay,
+  type WidgetSnapshot,
+} from '@/types/widgetSnapshot';
+import type { WeatherReading } from '@/types/weather';
 import { addDaysYmd } from '@/utils/date';
+import { AGE_SHOW_MS, CURRENT_MAX_MS } from '@/utils/weather/weatherReading';
 
-const FIXTURE = resolve(__dirname, 'fixtures/widget-snapshot.v2.json');
+const FIXTURE = resolve(__dirname, 'fixtures/widget-snapshot.v3.json');
+const FIXTURE_V2 = resolve(__dirname, 'fixtures/widget-snapshot.v2.json');
 const ORIGIN = 'https://app.beanies.family';
 // The mockup's "Saturday 11" is a Sunday in 2026; the date (and its numeral) is kept.
 const TODAY = '2026-10-11';
@@ -291,6 +303,28 @@ const GROCERIES = {
   updatedAt: '',
 } as unknown as FamilyList;
 
+/**
+ * The Singapore family's reading, 20 minutes old at NOW (08:40 on the 11th in Singapore).
+ * The 10th is yesterday there, so it is never one of the widget's days.
+ */
+const READING: WeatherReading = {
+  v: 1,
+  familyId: 'family-0000-4f2a9c',
+  placeKey: '1.35,103.94|Asia/Singapore',
+  fetchedAt: NOW.getTime() - 20 * 60_000,
+  current: { tempC: 27.4, code: 2, isDay: true },
+  daily: [
+    { ymd: '2026-10-10', code: 3, maxC: 31, minC: 25 },
+    { ymd: '2026-10-11', code: 95, maxC: 32.2, minC: 25.6 },
+    { ymd: '2026-10-12', code: 61, maxC: 30, minC: 25 },
+    { ymd: '2026-10-13', code: 2, maxC: 31, minC: 26 },
+    { ymd: '2026-10-14', code: 0, maxC: 33, minC: 26 },
+    { ymd: '2026-10-15', code: 80, maxC: 29, minC: 24 },
+    { ymd: '2026-10-16', code: 1, maxC: 31, minC: 25 },
+  ],
+};
+const WEATHER = { reading: READING, unit: 'C' as const, zone: 'Asia/Singapore' };
+
 function familyInput(over: Partial<WidgetSnapshotInput> = {}): WidgetSnapshotInput {
   const todos = [SWIM_BAG, PASSPORTS, CANDLES, LIBRARY, PLUMBER, GIFT_HINT];
   return {
@@ -316,6 +350,7 @@ function familyInput(over: Partial<WidgetSnapshotInput> = {}): WidgetSnapshotInp
     lockScreenTitles: true,
     language: 'en',
     familyId: 'family-0000-4f2a9c',
+    weather: WEATHER,
     ...over,
   };
 }
@@ -337,6 +372,7 @@ function normaliseEpochs(snapshot: WidgetSnapshot): WidgetSnapshot {
         endsAt: r.endsAt === null ? null : shift(r.endsAt),
       })),
       pickups: d.pickups.map((p) => ({ ...p, at: shift(p.at) })),
+      handoffs: d.handoffs?.map((h) => ({ ...h, at: shift(h.at) })),
     };
   return {
     ...snapshot,
@@ -366,8 +402,24 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('buildWidgetSnapshot: the v1 fixture (cross-platform contract)', () => {
-  it('equals fixtures/widget-snapshot.v2.json for the mockup family', () => {
+/**
+ * Every key path in a JSON value, array indices collapsed to `[]` ("days[].my.rows[].title"),
+ * so two snapshots of the same family compare by SHAPE.
+ */
+function keyPaths(value: unknown, prefix = '', out = new Set<string>()): Set<string> {
+  if (Array.isArray(value)) value.forEach((v) => keyPaths(v, `${prefix}[]`, out));
+  else if (value && typeof value === 'object') {
+    for (const [k, v] of Object.entries(value)) {
+      const path = prefix ? `${prefix}.${k}` : k;
+      out.add(path);
+      keyPaths(v, path, out);
+    }
+  }
+  return out;
+}
+
+describe('buildWidgetSnapshot: the v3 fixture (cross-platform contract)', () => {
+  it('equals fixtures/widget-snapshot.v3.json for the mockup family', () => {
     const { snapshot, skipped } = build();
     expect(skipped).toBe(0);
     const actual = normaliseEpochs(snapshot);
@@ -375,6 +427,44 @@ describe('buildWidgetSnapshot: the v1 fixture (cross-platform contract)', () => 
       writeFileSync(FIXTURE, `${JSON.stringify(actual, null, 2)}\n`);
     }
     expect(actual).toEqual(JSON.parse(readFileSync(FIXTURE, 'utf8')));
+    expect(actual.version).toBe(3);
+  });
+
+  it('is the v2 shape plus optional fields only, so a v3 reader still reads the v2 fixture', () => {
+    const v2 = JSON.parse(readFileSync(FIXTURE_V2, 'utf8')) as { version: number };
+    const v3 = JSON.parse(readFileSync(FIXTURE, 'utf8')) as WidgetSnapshot;
+    expect(v2.version).toBe(2);
+    expect(v3.version).toBe(WIDGET_SNAPSHOT_VERSION);
+    expect([...WIDGET_SNAPSHOT_READABLE_VERSIONS]).toEqual([2, 3]);
+
+    const v2Paths = keyPaths(v2);
+    const v3Paths = keyPaths(v3);
+    // Nothing v2 carried was renamed or removed...
+    expect([...v2Paths].filter((p) => !v3Paths.has(p))).toEqual([]);
+    // ...and everything new is one of the optional v3 additions (or inside one).
+    const V3_ADDITIONS = [
+      'weather',
+      'labels.weatherAsOf',
+      'labels.circleLeft',
+      'labels.circleAllDone',
+      'labels.circleAllClear',
+      'labels.circleToDo',
+      'days[].my.handoffs',
+      'days[].our.handoffs',
+      'days[].my.tasks.doneToday',
+      'days[].our.tasks.doneToday',
+      'days[].my.rows[].shortTitle',
+      'days[].my.rows[].whoFirst',
+      'days[].our.rows[].shortTitle',
+      'days[].our.rows[].whoFirst',
+    ];
+    const added = [...v3Paths].filter((p) => !v2Paths.has(p));
+    expect(
+      added.filter(
+        (p) => !V3_ADDITIONS.some((a) => p === a || p.startsWith(`${a}.`) || p.startsWith(`${a}[]`))
+      )
+    ).toEqual([]);
+    expect(added).toEqual(expect.arrayContaining(V3_ADDITIONS));
   });
 });
 
@@ -732,5 +822,199 @@ describe('buildWidgetSnapshot: failure isolation and links', () => {
     const off = build({ flags: { mealPlanner: false, helpfulHints: true } }).snapshot;
     expect(today(off).my!.tonight).toBeNull();
     expect(JSON.stringify(off)).not.toContain('/meal-planner');
+  });
+});
+
+describe('buildWidgetSnapshot: v3 weather', () => {
+  it('is null when weather is off or has no town, when there is no reading, and with no entry for today', () => {
+    expect(build({ weather: null }).snapshot.weather).toBeNull();
+    expect(build({ weather: { ...WEATHER, reading: null } }).snapshot.weather).toBeNull();
+    const stale = { ...READING, daily: READING.daily.filter((d) => d.ymd < '2026-10-11') };
+    expect(build({ weather: { ...WEATHER, reading: stale } }).snapshot.weather).toBeNull();
+  });
+
+  it('carries the staleness thresholds as instants from fetchedAt', () => {
+    const w = build().snapshot.weather!;
+    expect(w.fetchedAt).toBe(READING.fetchedAt);
+    expect(w.ageFrom).toBe(READING.fetchedAt + AGE_SHOW_MS);
+    expect(w.currentUntil).toBe(READING.fetchedAt + CURRENT_MAX_MS);
+  });
+
+  it('formats the current reading with the web atom’s helpers, in the family’s unit', () => {
+    expect(build().snapshot.weather!.current).toEqual({
+      glyph: 'partly',
+      temp: '27°',
+      condition: 'Partly cloudy',
+    });
+    const night = { ...READING, current: { tempC: 12.6, code: 0, isDay: false } };
+    expect(
+      build({ weather: { ...WEATHER, unit: 'F', reading: night } }).snapshot.weather!.current
+    ).toEqual({ glyph: 'night', temp: '55°', condition: 'Clear' });
+  });
+
+  it('picks five days from the HOME-ZONE today, by date, with day glyphs and the range', () => {
+    // NOW is 08:40 on the 11th in Singapore and 17:40 on the 10th in Los Angeles.
+    const sg = build().snapshot.weather!.days;
+    expect(sg.map((d) => d.ymd)).toEqual([
+      '2026-10-11',
+      '2026-10-12',
+      '2026-10-13',
+      '2026-10-14',
+      '2026-10-15',
+    ]);
+    expect(sg[0]).toEqual({
+      ymd: '2026-10-11',
+      glyph: 'thunder',
+      high: '32°',
+      low: '26°',
+      range: '32° / 26°',
+    });
+    const shuffled = { ...READING, daily: [...READING.daily].reverse() };
+    const la = build({ weather: { ...WEATHER, zone: 'America/Los_Angeles', reading: shuffled } })
+      .snapshot.weather!.days;
+    expect(la.map((d) => d.ymd)).toEqual([
+      '2026-10-10',
+      '2026-10-11',
+      '2026-10-12',
+      '2026-10-13',
+      '2026-10-14',
+    ]);
+  });
+
+  it('drops only the weather when the reading is malformed', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const broken = { ...READING, daily: null } as unknown as WeatherReading;
+    const { snapshot, skipped } = build({ weather: { ...WEATHER, reading: broken } });
+    expect(snapshot.weather).toBeNull();
+    expect(skipped).toBe(1);
+    expect(titles(today(snapshot).my).length).toBeGreaterThan(0);
+  });
+});
+
+describe('buildWidgetSnapshot: v3 handoffs', () => {
+  const at = (h: number, m: number) => new Date(2026, 9, 11, h, m).getTime();
+
+  it("lists the viewer's own drop-offs and pick-ups, both kinds, on my day only", () => {
+    const s = build().snapshot;
+    const partyLink = today(s).my!.rows.find((r) => r.title === "Carter's party")!.link;
+    expect(today(s).my!.handoffs).toEqual([
+      { at: at(10, 15), kind: 'dropoff', name: 'Max', link: partyLink },
+      {
+        at: at(18, 30),
+        kind: 'pickup',
+        name: 'Max',
+        link: today(s).my!.rows.find((r) => r.title === 'soccer practice')!.link,
+      },
+    ]);
+    expect(today(s).our!.handoffs).toEqual([]);
+  });
+
+  it("never lists another adult's duties", () => {
+    const jo = build({ currentMember: JO }).snapshot;
+    expect(today(jo).my!.handoffs!.map((h) => [h.kind, h.at, h.name])).toEqual([
+      ['pickup', at(12, 30), 'Max'],
+      ['dropoff', at(16, 30), 'Ava'],
+      ['pickup', at(17, 15), 'Ava'],
+    ]);
+  });
+});
+
+describe('buildWidgetSnapshot: v3 doneToday', () => {
+  const doneAt = (h: number) => new Date(2026, 9, 11, h, 0).toISOString();
+
+  it('counts to-dos completed today that would count open, and never adds them as rows', () => {
+    const doneToday = todo({
+      id: 'done-today',
+      title: 'sign the form',
+      assigneeIds: ['sam'],
+      dueDate: TODAY,
+      completed: true,
+      completedAt: doneAt(7),
+    });
+    const doneOverdue = todo({
+      id: 'done-overdue',
+      title: 'renew the permit',
+      assigneeIds: ['sam'],
+      dueDate: '2026-10-09',
+      completed: true,
+      completedAt: doneAt(7),
+    });
+    const doneYesterday = todo({
+      id: 'done-yesterday',
+      title: 'old one',
+      assigneeIds: ['sam'],
+      dueDate: '2026-10-10',
+      completed: true,
+      completedAt: new Date(2026, 9, 10, 19, 0).toISOString(),
+    });
+    const doneLater = todo({
+      id: 'done-later',
+      title: 'early bird',
+      assigneeIds: ['sam'],
+      dueDate: '2026-10-14',
+      completed: true,
+      completedAt: doneAt(7),
+    });
+    const before = today(build().snapshot);
+    const s = build({
+      todos: [
+        SWIM_BAG,
+        PASSPORTS,
+        CANDLES,
+        LIBRARY,
+        PLUMBER,
+        GIFT_HINT,
+        doneToday,
+        doneOverdue,
+        doneYesterday,
+        doneLater,
+      ],
+    }).snapshot;
+    for (const view of ['my', 'our'] as const) {
+      const tasks = today(s)[view]!.tasks;
+      expect(tasks.doneToday).toBe(2);
+      expect(tasks.count).toBe(before[view]!.tasks.count);
+      expect(tasks.items.map((i) => i.title)).toEqual(
+        before[view]!.tasks.items.map((i) => i.title)
+      );
+    }
+    expect(build().snapshot.days[0]!.my!.tasks.doneToday).toBe(0);
+  });
+});
+
+describe('buildWidgetSnapshot: v3 row words', () => {
+  it('gives each row its first word, in English and in Chinese', () => {
+    const rows = today(build().snapshot).my!.rows;
+    expect(rows.find((r) => r.title.startsWith('swimming'))?.shortTitle).toBe('swimming');
+    expect(rows.find((r) => r.title === "Carter's party")?.shortTitle).toBe("Carter's");
+
+    const title = '游泳课在淡马锡';
+    const swim = activity({ ...SWIM, title });
+    const zh = today(
+      build({ language: 'zh', occurrencesByDate: { [TODAY]: [occ(swim)], [TOMORROW]: [] } })
+        .snapshot
+    ).our!.rows[0]!;
+    expect(zh.shortTitle!.length).toBeGreaterThan(0);
+    expect(zh.shortTitle!.length).toBeLessThan(title.length);
+    expect(title.startsWith(zh.shortTitle!)).toBe(true);
+  });
+
+  it('names the first assignee who still resolves, and nobody when none does', () => {
+    const duo = activity({
+      id: 'duo',
+      title: 'duet practice',
+      startTime: '11:00',
+      endTime: '12:00',
+      assigneeIds: ['gone', 'ava', 'max'],
+    });
+    const family = activity({ id: 'family', title: 'family walk', startTime: '09:00' });
+    const rows = today(
+      build({ occurrencesByDate: { [TODAY]: [occ(duo), occ(family)], [TOMORROW]: [] } }).snapshot
+    ).our!.rows;
+    expect(rows.find((r) => r.id.startsWith('duo'))).toMatchObject({
+      who: 'Ava & Max',
+      whoFirst: 'Ava',
+    });
+    expect(rows.find((r) => r.id.startsWith('family'))?.whoFirst).toBe('');
   });
 });

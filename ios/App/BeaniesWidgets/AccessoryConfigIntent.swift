@@ -1,10 +1,17 @@
 import AppIntents
 import WidgetKit
 
+// Compiled into BOTH the widget extension and the app: the app's `WidgetBridgePlugin`
+// reads each placed circle's choice through `widgetConfigurationIntent(of:)`, which needs
+// the type. So this file depends on nothing else in the extension, and carries
+// `@available(iOS 17.0, *)` for the app target's older deployment target.
+
 /// What the lock-screen circle shows (#134). The raw values are the stored keys: relabel
 /// freely, and add a case rather than reusing one when a meaning changes, so a placed circle
 /// never carries an old choice over to a new meaning. Titles and subtitles are keys in
-/// Localizable.xcstrings (en + zh-Hans).
+/// Localizable.xcstrings (en + zh-Hans). The raw values are also the `placements.circle` keys
+/// the app relays (`CIRCLE_SHOW_OPTIONS`, src/types/widgetSnapshot.ts); never rename one.
+@available(iOS 17.0, *)
 enum CircleShowOption: String, AppEnum {
     case nextUp
     case nextHandoff
@@ -24,6 +31,7 @@ enum CircleShowOption: String, AppEnum {
 /// rectangular and circular, and only the circle has a choice to make, so the summary lists
 /// `show` for `.accessoryCircular` alone. A circle placed while this widget was still a
 /// `StaticConfiguration` (same `kind`) is handed the default, Next up.
+@available(iOS 17.0, *)
 struct AccessoryConfigIntent: WidgetConfigurationIntent {
     static var title: LocalizedStringResource = "Next up"
     static var description: IntentDescription? = IntentDescription("Today's plans, handoffs and dinner at a glance.")
@@ -41,14 +49,5 @@ struct AccessoryConfigIntent: WidgetConfigurationIntent {
         } otherwise: {
             Summary("Next up")
         }
-    }
-}
-
-extension WidgetBlocks {
-    /// The lock-screen widget's blocks: every switch on (it has no block picker), plus the
-    /// circle's choice.
-    init(_ configuration: AccessoryConfigIntent) {
-        self = .defaults
-        circleShow = configuration.show
     }
 }

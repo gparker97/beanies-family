@@ -17,7 +17,8 @@ import WidgetKit
  * cannot read the file it leaves a short token in the App Group UserDefaults
  * (`WidgetSnapshotStore.swift`); `publish` reads it, clears it, and returns it as
  * `readOutcome` so the JS side can send it to the `home-widget` firehose. The same goes for
- * the placements (which sizes are on the home screen): only the app can ask WidgetCenter.
+ * the placements (which sizes are on the home screen, and on iOS 17+ what each lock-screen
+ * circle shows): only the app can ask WidgetCenter.
  */
 @objc(WidgetBridgePlugin)
 public class WidgetBridgePlugin: CAPPlugin, CAPBridgedPlugin {
@@ -38,6 +39,9 @@ public class WidgetBridgePlugin: CAPPlugin, CAPBridgedPlugin {
     /// App Group UserDefaults key the extension leaves a read failure in (Guard 2 pair).
     private static let readOutcomeKey = "widget-read-outcome"
 
+    /// The lock-screen widget's `kind` (`DayAccessoryWidget.swift`); it never changes.
+    private static let accessoryKind = "DayAccessoryWidget"
+
     private static func snapshotURL() -> URL? {
         FileManager.default
             .containerURL(forSecurityApplicationGroupIdentifier: appGroup)?
@@ -48,7 +52,8 @@ public class WidgetBridgePlugin: CAPPlugin, CAPBridgedPlugin {
      * Write the snapshot atomically, reload every widget, and report placements plus any
      * read failure the extension recorded since the last publish.
      *
-     * Resolves `{ placements: { "ios-medium": 1, ... }, readOutcome?: "read_failed|..." }`.
+     * Resolves `{ placements: { "ios-medium": 1, ..., circle?: { nextUp: 1, ... } },
+     * readOutcome?: "read_failed|..." }`.
      * A failure to LIST placements resolves (with empty placements and a
      * `placements_failed;` token) rather than rejecting: the snapshot is already on disk and
      * the widgets have it.
@@ -97,7 +102,11 @@ public class WidgetBridgePlugin: CAPPlugin, CAPBridgedPlugin {
                         counts[key, default: 0] += 1
                     }
                 }
-                payload["placements"] = counts
+                var placements: [String: Any] = counts
+                if #available(iOS 17.0, *) {
+                    placements["circle"] = Self.circleCounts(widgets)
+                }
+                payload["placements"] = placements
             case .failure(let error):
                 payload["placements"] = [String: Int]()
                 tokens.append("placements_failed;code=\((error as NSError).code)")
@@ -142,6 +151,22 @@ public class WidgetBridgePlugin: CAPPlugin, CAPBridgedPlugin {
         defaults.removeObject(forKey: readOutcomeKey)
         guard let value, !value.isEmpty else { return nil }
         return value
+    }
+
+    /// How many lock-screen circles are placed per "Show" option (#134), every option present
+    /// (0 = none), keyed by `CircleShowOption`'s raw values (`CIRCLE_SHOW_OPTIONS` in
+    /// src/types/widgetSnapshot.ts; the JS side folds them into the `circle=` detail token).
+    /// A circle with no readable choice (placed before the picker existed) counts as Next up,
+    /// the default WidgetKit hands it.
+    @available(iOS 17.0, *)
+    private static func circleCounts(_ widgets: [WidgetInfo]) -> [String: Int] {
+        let options: [CircleShowOption] = [.nextUp, .nextHandoff, .todosLeft, .thingsLeft]
+        var counts = Dictionary(uniqueKeysWithValues: options.map { ($0.rawValue, 0) })
+        for widget in widgets where widget.kind == accessoryKind && widget.family == .accessoryCircular {
+            let show = widget.widgetConfigurationIntent(of: AccessoryConfigIntent.self)?.show ?? .nextUp
+            counts[show.rawValue, default: 0] += 1
+        }
+        return counts
     }
 
     /// The `WIDGET_SIZES` key for a placed widget (src/types/widgetSnapshot.ts).

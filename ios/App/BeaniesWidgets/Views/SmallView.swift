@@ -5,10 +5,16 @@ import WidgetKit
 /// the handwritten count line and the next item. On a quiet day the next item comes from a
 /// later day, and the day is named ("next · Wed 15"). One tap target (`widgetURL`, set by
 /// the caller): small widgets cannot hold `Link`s.
+///
+/// Weather (#134): while there is a current temperature, the header's right side shows the
+/// glyph and the temperature in the peek's place, and the panel has no peek. The peek comes
+/// back with no reading, or once the reading is past `currentUntil` (the small widget has no
+/// room for a range).
 struct SmallView: View {
     let snapshot: WSSnapshot
     let resolved: ResolvedDay
     let blocks: WidgetBlocks
+    let weather: WeatherGlance?
     let date: Date
     let m: WidgetMetrics
 
@@ -21,6 +27,8 @@ struct SmallView: View {
         let day = resolved.day
         let peek = PeekKind.forDay(resolved, viewer: snapshot.viewer)
         let next = WidgetFill.nextRow(resolved, blocks: blocks, at: date)
+        // Only a reading with a current temperature takes the peek's place.
+        let current = weather?.temp == nil ? nil : weather
 
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .firstTextBaseline, spacing: 5) {
@@ -36,15 +44,33 @@ struct SmallView: View {
                         .lineLimit(1)
                 }
                 .cardTile(blocks.background, outset: EdgeInsets(top: 0, leading: 6, bottom: 2, trailing: 6))
-                // Keep the header clear of the peek.
-                Spacer(minLength: PeekView.width(peek, height: Self.peekHeight) + peek.rightInset)
+                if let current, let temp = current.temp {
+                    Spacer(minLength: 4)
+                    HStack(alignment: .firstTextBaseline, spacing: 3) {
+                        WeatherGlyphView(glyph: current.glyph, size: m.s(16))
+                            // Sit the glyph on the temperature's baseline, a touch below its middle.
+                            .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + m.s(5) }
+                        Text(temp)
+                            .font(.outfit(size: m.s(15), weight: .bold))
+                            .monospacedDigit()
+                            .foregroundStyle(current.aged ? Color.wInkSoft : Color.wInk)
+                            .lineLimit(1)
+                    }
+                    .fixedSize()
+                    .cardTile(blocks.background, outset: EdgeInsets(top: 0, leading: 4, bottom: 2, trailing: 4))
+                } else {
+                    // Keep the header clear of the peek.
+                    Spacer(minLength: PeekView.width(peek, height: Self.peekHeight) + peek.rightInset)
+                }
             }
             .frame(height: m.s(38), alignment: .leading)
 
             panel(day: day, next: next)
                 .overlay(alignment: .topTrailing) {
-                    PeekView(kind: peek, height: Self.peekHeight)
-                        .offset(x: -peek.rightInset, y: -(Self.peekHeight - PeekView.overlap))
+                    if current == nil {
+                        PeekView(kind: peek, height: Self.peekHeight)
+                            .offset(x: -peek.rightInset, y: -(Self.peekHeight - PeekView.overlap))
+                    }
                 }
 
             if resolved.stale, let asOf = StaleLabel.text(snapshot) {

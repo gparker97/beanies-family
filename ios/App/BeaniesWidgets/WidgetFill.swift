@@ -80,6 +80,19 @@ struct NextRow {
     let laterDay: WSDayEntry?
 }
 
+/// What the lock-screen circle shows, decided once (`WidgetFill.circle`) so its face and its
+/// tap target always agree. Every option that has nothing of its own lands on `nextUp`.
+enum CirclePick {
+    /// The next calendar item; nil = nothing in the rest of the week ("all clear").
+    case nextUp(NextRow?)
+    /// The viewer's next drop-off or pick-up today.
+    case nextHandoff(WSDayHandoff)
+    /// To-dos due now (`tasks.count`) and done today (`tasks.doneToday`).
+    case todosLeft(count: Int, done: Int)
+    /// Today's calendar items still to come, of all of today's.
+    case thingsLeft(left: Int, total: Int)
+}
+
 /// Who gets the room, for every size, in one place. iOS cannot scroll, so the calendar and
 /// the to-dos share ONE budget:
 ///   (a) today's calendar rows (or the "nothing on today" line) and their handoff sub-lines;
@@ -250,6 +263,61 @@ enum WidgetFill {
             return NextRow(row: row, laterDay: first.0)
         }
         return nil
+    }
+
+    // MARK: the lock-screen circle
+
+    /// The viewer's next drop-off or pick-up today (the first `handoffs.at` after now). nil
+    /// when there is none left, or the snapshot is v2 (no `handoffs`).
+    static func nextHandoff(_ resolved: ResolvedDay, at date: Date) -> WSDayHandoff? {
+        let nowMs = date.timeIntervalSince1970 * 1000
+        return (resolved.day.handoffs ?? [])
+            .filter { $0.at > nowMs }
+            .min { $0.at < $1.at }
+    }
+
+    /// Today's shown calendar rows, and how many are still to come: not past and not done.
+    /// The complement is the old circle's progress ring ("how much of today is behind me",
+    /// the child-view rule that a ticked or finished row is done).
+    static func thingsLeft(_ resolved: ResolvedDay, blocks: WidgetBlocks, at date: Date) -> (left: Int, total: Int) {
+        let rows = shownRows(resolved.day.rows, blocks: blocks, today: true)
+        let left = rows.filter { !$0.isDone && !$0.isPast(at: date) }.count
+        return (left, rows.count)
+    }
+
+    /// The circle's choice, with the one fallback path: an option shows Next up when it has
+    /// nothing of its own, when the viewer is a child (To-dos left: a child has no to-dos), or
+    /// when the snapshot is v2 (the option's field or label is absent, and an English default
+    /// would be wrong in zh).
+    static func circle(
+        _ resolved: ResolvedDay, labels: WSLabels, show: CircleShowOption, blocks: WidgetBlocks, at date: Date
+    ) -> CirclePick {
+        switch show {
+        case .nextUp:
+            break
+        case .nextHandoff:
+            if let handoff = nextHandoff(resolved, at: date) { return .nextHandoff(handoff) }
+        case .todosLeft:
+            let tasks = resolved.day.tasks
+            if !resolved.isChild, labels.circleToDo != nil, let done = tasks.doneToday, tasks.count + done > 0 {
+                return .todosLeft(count: tasks.count, done: done)
+            }
+        case .thingsLeft:
+            let things = thingsLeft(resolved, blocks: blocks, at: date)
+            if things.total > 0, labels.circleLeft != nil, labels.circleAllDone != nil {
+                return .thingsLeft(left: things.left, total: things.total)
+            }
+        }
+        return .nextUp(nextRow(resolved, blocks: blocks, at: date))
+    }
+
+    /// The circle's word under a Next up time: the title's first word (`shortTitle`), falling
+    /// back to the first name (`whoFirst`). With lock-screen titles off it is the first name
+    /// only, never a title word: the setting exists to keep titles off the lock screen. nil
+    /// when there is no word (a v2 snapshot has neither field): the time or glyph stands alone.
+    static func circleWord(_ row: WSRow, titles: Bool) -> String? {
+        let candidates = titles ? [row.shortTitle, row.whoFirst] : [row.whoFirst]
+        return candidates.compactMap { $0 }.first { !$0.isEmpty }
     }
 
     /// A child sees no to-dos and no hints (the snapshot omits them too; this is the

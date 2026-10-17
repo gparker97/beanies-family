@@ -145,13 +145,67 @@ final class WidgetViews {
 
     /**
      * The peek over the panel: the family on "our day", the viewer's own beanie on "my day" (and
-     * for a child). An unknown avatar falls back to the family.
+     * for a child). An unknown avatar falls back to the family. On the small widget the weather
+     * (#134) takes the peek's slot while a current temperature exists ({@code weatherInSlot}, the
+     * caller binds `small_weather`): both peeks hide, and return on the first render without one.
+     * The medium and large always pass false (their weather lives in the date column).
      */
-    static void bindPeek(RemoteViews views, WidgetFill.Plan plan) {
-        int avatar = peekAvatar(plan);
-        views.setViewVisibility(R.id.peek_family, avatar == 0 ? View.VISIBLE : View.GONE);
+    static void bindPeek(RemoteViews views, WidgetFill.Plan plan, boolean weatherInSlot) {
+        int avatar = weatherInSlot ? 0 : peekAvatar(plan);
+        views.setViewVisibility(R.id.peek_family, !weatherInSlot && avatar == 0 ? View.VISIBLE : View.GONE);
         views.setViewVisibility(R.id.peek_avatar, avatar == 0 ? View.GONE : View.VISIBLE);
         if (avatar != 0) views.setImageViewResource(R.id.peek_avatar, avatar);
+    }
+
+    /**
+     * The full-colour drawable for a WeatherGlyph kind (`wx_<kind>`, generated from
+     * src/constants/weatherGlyphs.json; the `_mono` variants are for surfaces that tint), or 0
+     * when the kind is unknown (a newer app's glyph): the caller hides the glyph, never guesses.
+     */
+    static int weatherGlyphRes(String kind) {
+        if (kind == null) return 0;
+        switch (kind) {
+            case "sunny":
+                return R.drawable.wx_sunny;
+            case "partly":
+                return R.drawable.wx_partly;
+            case "cloudy":
+                return R.drawable.wx_cloudy;
+            case "rain":
+                return R.drawable.wx_rain;
+            case "thunder":
+                return R.drawable.wx_thunder;
+            case "snow":
+                return R.drawable.wx_snow;
+            case "fog":
+                return R.drawable.wx_fog;
+            case "night":
+                return R.drawable.wx_night;
+            case "nightPartly":
+                return R.drawable.wx_night_partly;
+            default:
+                return 0;
+        }
+    }
+
+    /**
+     * Paint a weather glyph into {@code viewId}, {@code dp} square on API 31+ (below 31 the
+     * layout's size holds), with the condition word as its description. Returns the width it
+     * takes in the row (0 when hidden for an unknown kind), for budgeting the temperature beside it.
+     */
+    static float bindWeatherGlyph(RemoteViews views, @IdRes int viewId, WidgetWeather.Shown weather,
+            float dp, float layoutDp) {
+        int res = weatherGlyphRes(weather.glyph);
+        views.setViewVisibility(viewId, res == 0 ? View.GONE : View.VISIBLE);
+        if (res == 0) return 0f;
+        views.setImageViewResource(viewId, res);
+        views.setContentDescription(viewId, weather.condition.isEmpty() ? null : weather.condition);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            views.setViewLayoutWidth(viewId, dp, TypedValue.COMPLEX_UNIT_DIP);
+            views.setViewLayoutHeight(viewId, dp, TypedValue.COMPLEX_UNIT_DIP);
+            return dp;
+        }
+        return layoutDp;
     }
 
     /** The viewer's avatar drawable for the peek, or 0 when the family peek shows. */

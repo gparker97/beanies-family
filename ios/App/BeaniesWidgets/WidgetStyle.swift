@@ -101,3 +101,28 @@ enum WidgetAvatarAsset {
         return raw
     }
 }
+
+/// A weather glyph at a fixed size: the full-colour image (its own light and dark
+/// appearances) in the full-colour rendering, the template one in the system's tinted and
+/// clear renderings, where a colour image would be flattened into a blob.
+struct WeatherGlyphView: View {
+    let glyph: WSWeatherGlyph
+    let size: CGFloat
+
+    @Environment(\.widgetRenderingMode) private var renderingMode
+
+    var body: some View {
+        if renderingMode == .fullColor {
+            Image(glyph.asset)
+                .resizable()
+                .scaledToFit()
+                .frame(width: size, height: size)
+        } else {
+            Image(glyph.monoAsset)
+                .renderingMode(.template)
+                .resizable()
+                .scaledToFit()
+                .frame(width: size, height: size)
+        }
+    }
+}

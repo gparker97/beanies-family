@@ -26,6 +26,7 @@
 		BE2B00000000000000000024 /* DayWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2B00000000000000000002 /* DayWidget.swift */; };
 		BE2B00000000000000000025 /* DayWidgetConfigIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2B00000000000000000003 /* DayWidgetConfigIntent.swift */; };
 		BE2B00000000000000000053 /* AccessoryConfigIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2B00000000000000000052 /* AccessoryConfigIntent.swift */; };
+		BE2B00000000000000000056 /* AccessoryConfigIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2B00000000000000000052 /* AccessoryConfigIntent.swift */; };
 		BE2B00000000000000000026 /* DayAccessoryWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2B00000000000000000004 /* DayAccessoryWidget.swift */; };
 		BE2B00000000000000000027 /* WidgetSnapshotStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2B00000000000000000005 /* WidgetSnapshotStore.swift */; };
 		BE2B00000000000000000028 /* WidgetFill.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2B00000000000000000006 /* WidgetFill.swift */; };
@@ -33,6 +34,7 @@
 		BE2B0000000000000000002A /* WidgetLinks.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2B00000000000000000008 /* WidgetLinks.swift */; };
 		BE2B0000000000000000002B /* WidgetStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2B00000000000000000009 /* WidgetStyle.swift */; };
 		BE2B0000000000000000002C /* WidgetTimeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2B0000000000000000000A /* WidgetTimeline.swift */; };
+		BE2B00000000000000000055 /* WidgetWeather.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2B00000000000000000054 /* WidgetWeather.swift */; };
 		BE2B0000000000000000002D /* SampleSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2B0000000000000000000B /* SampleSnapshot.swift */; };
 		BE2B0000000000000000002E /* DayWidgetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2B0000000000000000000C /* DayWidgetView.swift */; };
 		BE2B0000000000000000002F /* DayColumnView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE2B0000000000000000000D /* DayColumnView.swift */; };
@@ -122,6 +124,7 @@
 		BE2B00000000000000000008 /* WidgetLinks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetLinks.swift; sourceTree = "<group>"; };
 		BE2B00000000000000000009 /* WidgetStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetStyle.swift; sourceTree = "<group>"; };
 		BE2B0000000000000000000A /* WidgetTimeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetTimeline.swift; sourceTree = "<group>"; };
+		BE2B00000000000000000054 /* WidgetWeather.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetWeather.swift; sourceTree = "<group>"; };
 		BE2B0000000000000000000B /* SampleSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleSnapshot.swift; sourceTree = "<group>"; };
 		BE2B0000000000000000000C /* DayWidgetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayWidgetView.swift; sourceTree = "<group>"; };
 		BE2B0000000000000000000D /* DayColumnView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DayColumnView.swift; sourceTree = "<group>"; };
@@ -253,6 +256,7 @@
 				BE2B00000000000000000008 /* WidgetLinks.swift */,
 				BE2B00000000000000000009 /* WidgetStyle.swift */,
 				BE2B0000000000000000000A /* WidgetTimeline.swift */,
+				BE2B00000000000000000054 /* WidgetWeather.swift */,
 				BE2B0000000000000000000B /* SampleSnapshot.swift */,
 				BE2B00000000000000000045 /* Views */,
 				BE2B00000000000000000046 /* Fonts */,
@@ -457,6 +461,7 @@
 				BE1A0000000000000000CC06 /* MainViewController.swift in Sources */,
 				BE1A0000000000000000CC02 /* BiometricKeystorePlugin.swift in Sources */,
 				BE2B0000000000000000003A /* WidgetBridgePlugin.swift in Sources */,
+				BE2B00000000000000000056 /* AccessoryConfigIntent.swift in Sources */,
 				BE2B00000000000000000038 /* BeaniesBrand.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -485,6 +490,7 @@
 				BE2B0000000000000000002A /* WidgetLinks.swift in Sources */,
 				BE2B0000000000000000002B /* WidgetStyle.swift in Sources */,
 				BE2B0000000000000000002C /* WidgetTimeline.swift in Sources */,
+				BE2B00000000000000000055 /* WidgetWeather.swift in Sources */,
 				BE2B0000000000000000002D /* SampleSnapshot.swift in Sources */,
 				BE2B0000000000000000002E /* DayWidgetView.swift in Sources */,
 				BE2B0000000000000000002F /* DayColumnView.swift in Sources */,

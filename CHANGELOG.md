@@ -8,6 +8,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-10-18
+
+### Added
+
+- Weather is now shown on the home-screen widgets, and as the temperature on the iPhone lock-screen inline and rectangular widgets.
+- The iPhone lock-screen circle widget can now be set to show Next up, Next handoff, To-dos left or Things left.
+
 ## 2026-10-17
 
 ### Changed

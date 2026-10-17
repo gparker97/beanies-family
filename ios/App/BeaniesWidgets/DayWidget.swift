@@ -29,11 +29,11 @@ struct DayProvider: AppIntentTimelineProvider {
         if context.isPreview {
             return DayEntry(date: now, state: .ready(SampleSnapshot.make(now: now)), blocks: blocks)
         }
-        return WidgetTimeline.build(blocks: blocks, now: now, includePickups: false).entries.first
+        return WidgetTimeline.build(blocks: blocks, now: now, lockScreen: false).entries.first
             ?? DayEntry(date: now, state: .signedOut, blocks: blocks)
     }
 
     func timeline(for configuration: DayWidgetConfigIntent, in context: Context) async -> Timeline<DayEntry> {
-        WidgetTimeline.build(blocks: WidgetBlocks(configuration), now: Date(), includePickups: false)
+        WidgetTimeline.build(blocks: WidgetBlocks(configuration), now: Date(), lockScreen: false)
     }
 }

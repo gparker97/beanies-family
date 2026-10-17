@@ -11,6 +11,7 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { useTodoStore } from '@/stores/todoStore';
 import { useTranslationStore } from '@/stores/translationStore';
 import { useVacationStore } from '@/stores/vacationStore';
+import { useWeatherStore } from '@/stores/weatherStore';
 import { isFlagEnabled } from '@/config/flags';
 import { addDaysYmd, daysBetweenYmd } from '@/utils/date';
 import { WIDGET_DAYS } from '@/types/widgetSnapshot';
@@ -23,6 +24,7 @@ import {
 import { buildWidgetSnapshot, type WidgetSnapshotInput } from '@/utils/widgetSnapshot';
 import { WidgetBridge, type WidgetPublishResult } from '@/services/native/widgetBridgePlugin';
 import {
+  circleOptionsToken,
   emitPlacements,
   emitReadOutcome,
   emitSignOutHaltIncomplete,
@@ -51,6 +53,12 @@ import {
  *
  * Every failure is reported (`reportError`, surface `home-widget`, severity `error`: the app
  * still works), the console names the fix, and the person is told once per session.
+ *
+ * Weather (#134) enters the input as its TIME-INDEPENDENT parts only (the reading, the unit,
+ * the home zone, and whether weather is on with a town), never `weatherStore.atom`: the atom's
+ * age text changes on every 5-minute tick, this publisher has no identical-JSON dedupe, and
+ * every publish reloads every widget, so an atom input would spend WidgetKit's reload budget
+ * every 5 minutes. The age is drawn natively from `weather.ageFrom` / `currentUntil` instead.
  */
 
 const PUBLISH_DEBOUNCE_MS = 1000;
@@ -116,13 +124,16 @@ function reportPublishFailure(stage: PublishStage, errorCode: string, error: unk
   showToast('warning', t('widget.publishFailed'), t('widget.publishFailedHelp'), { silent: true });
 }
 
-/** Log placements once per session, and again only when the set changes. */
+/** Log placements once per session, and again only when the set (or a circle's option) changes. */
 function logPlacementsOnChange(placements: WidgetPublishResult['placements']): void {
-  const key = Object.entries(placements ?? {})
-    .filter(([, n]) => (n ?? 0) > 0)
-    .map(([size, n]) => `${size}:${n}`)
-    .sort()
-    .join(',');
+  const { circle, ...sizes } = placements ?? {};
+  const key = [
+    ...Object.entries(sizes)
+      .filter(([, n]) => (n ?? 0) > 0)
+      .map(([size, n]) => `${size}:${n}`)
+      .sort(),
+    circle ? circleOptionsToken(circle) : '',
+  ].join(',');
   if (key === lastPlacementsKey) return;
   lastPlacementsKey = key;
   emitPlacements(placements ?? {});
@@ -154,6 +165,7 @@ export async function publishWidgetSnapshot(
   let tasksToday: number;
   let aheadRows: number;
   let skipped: number;
+  let hasWeather: boolean;
   try {
     const built = measureSync('widget-snapshot-build', () => buildWidgetSnapshot(input, now), {
       perf_entity_count: input.occurrencesByDate[input.today]?.length ?? 0,
@@ -165,6 +177,7 @@ export async function publishWidgetSnapshot(
     tasksToday = tasks ? tasks.items.length + tasks.overflow.due + tasks.overflow.hint : 0;
     aheadRows = ahead.reduce((n, d) => n + (d.my?.rows.length ?? 0), 0);
     skipped = built.skipped;
+    hasWeather = !!built.snapshot.weather;
   } catch (e) {
     reportPublishFailure('build', 'build_failed', e);
     return;
@@ -187,6 +200,7 @@ export async function publishWidgetSnapshot(
     aheadRows,
     kb: Math.ceil(new TextEncoder().encode(json).length / 1024),
     skipped,
+    weather: hasWeather,
     renderedDayOffset: renderedDayOffset(input.today, result?.renderedYmd),
   });
   if (result?.readOutcome) emitReadOutcome(result.readOutcome);
@@ -208,6 +222,7 @@ export function useWidgetSnapshot(): void {
   const todoStore = useTodoStore();
   const translationStore = useTranslationStore();
   const vacationStore = useVacationStore();
+  const weatherStore = useWeatherStore();
 
   const lockScreenTitles = computed(() => settingsStore.widgetLockScreenTitles);
 
@@ -250,6 +265,14 @@ export function useWidgetSnapshot(): void {
       lockScreenTitles: lockScreenTitles.value,
       language: translationStore.currentLanguage,
       familyId: familyContextStore.activeFamilyId ?? '',
+      // Never `weatherStore.atom` (see the module docblock): a tick must not republish.
+      weather: weatherStore.isActive
+        ? {
+            reading: weatherStore.reading,
+            unit: settingsStore.temperatureUnit,
+            zone: weatherStore.homeZone,
+          }
+        : null,
     };
   });
 

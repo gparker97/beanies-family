@@ -1,14 +1,20 @@
 import Foundation
 
 // ═══════════════════════════════════════════════════════════════════════════════════
-// The widget snapshot: a Codable mirror of `src/types/widgetSnapshot.ts` (v2) and the one
-// reader of the file the app writes (`WidgetBridgePlugin.swift`).
+// The widget snapshot: a Codable mirror of `src/types/widgetSnapshot.ts` (v2 and v3) and
+// the one reader of the file the app writes (`WidgetBridgePlugin.swift`).
 //
 // ⚠️ CROSS-PLATFORM CONTRACT. The TS file is the source of truth; the committed example is
-// `src/utils/__tests__/fixtures/widget-snapshot.v2.json`. Every key below must match the TS
-// field name exactly. Adding an OPTIONAL field there is safe (unknown keys are ignored
-// here). Renaming/removing/retyping a field bumps `WIDGET_SNAPSHOT_VERSION` there and
-// `supportedVersion` here in the same change.
+// `src/utils/__tests__/fixtures/widget-snapshot.v3.json` (`widget-snapshot.v2.json` is the
+// older shape this reader still accepts). Every key below must match the TS field name
+// exactly. Adding an OPTIONAL field there is safe (unknown keys are ignored here).
+// Renaming/removing/retyping a field bumps `WIDGET_SNAPSHOT_VERSION` there and
+// `supportedVersions` here in the same change.
+//
+// v3 (#134) is v2 plus optional fields only: `weather`, the `labels.weatherAsOf` and
+// `labels.circle*` strings, `days[].my.handoffs`, `tasks.doneToday`, `rows[].shortTitle` and
+// `rows[].whoFirst`. Each is an optional here, and nil means "a v2 file": every renderer that
+// reads one has a v2 path (no weather, the circle falls back to Next up).
 //
 // TOLERANT BY DESIGN. Only `version`, `generatedAt` and `days` are required; every other
 // field decodes leniently with a sensible default, and one malformed array element (a row,
@@ -66,6 +72,8 @@ struct WSTasks {
     /// Due now (overdue or today, plus undated on "my day"): the date column's count.
     var count = 0
     var countText = WSText()
+    /// v3: to-dos completed today among those `count` would count; nil in a v2 file.
+    var doneToday: Int? = nil
     var link: String = ""
 }
 
@@ -108,6 +116,10 @@ struct WSRow {
     /// A substring of `title` to bold in the accent ("day 3 of 6"); absent or not found = plain.
     var titleEmphasis: String? = nil
     var who: String = ""
+    /// v3: the title's first word ("swimming"), the circle's word with titles on.
+    var shortTitle: String? = nil
+    /// v3: the first assignee's first name ("Max"), the circle's word with titles off.
+    var whoFirst: String? = nil
     var dot: WSDot? = nil
     var isDone = false
     var handoff: WSHandoff? = nil
@@ -127,6 +139,23 @@ struct WSDay {
     var tasks = WSTasks()
     var thingsText: String = ""
     var pickups: [WSPickup] = []
+    /// v3: the viewer's own drop-offs and pick-ups, ascending (my day only). nil in a v2
+    /// file, which the circle's Next handoff treats like an empty list.
+    var handoffs: [WSDayHandoff]? = nil
+}
+
+/// v3: one of the viewer's own drop-offs or pick-ups, for the circle's Next handoff.
+struct WSDayHandoff {
+    /// Epoch ms: the activity's start for a drop-off, its end for a pick-up.
+    var at: Double = 0
+    var kind: WSDayHandoffKind = .dropoff
+    /// The first name of the person dropped off or collected; '' when nobody else is on it.
+    var name: String = ""
+    var link: String = ""
+}
+
+enum WSDayHandoffKind: String {
+    case dropoff, pickup
 }
 
 struct WSDayEntry {
@@ -158,6 +187,15 @@ struct WSLabels {
     var childsDay: String = ""
     var nothingOnToday: String = "nothing on today,"
     var enjoy: String = "enjoy"
+    // v3, no English default: nil means a v2 file, and each reader has its own v2 path (no
+    // age line; the circle falls back to Next up, whose "all clear" has a native key).
+    /// "as of {time}" beside a weather reading old enough to show its age.
+    var weatherAsOf: String? = nil
+    /// The circle: "left" (Things left), "all done", "all clear" (Next up), "to do".
+    var circleLeft: String? = nil
+    var circleAllDone: String? = nil
+    var circleAllClear: String? = nil
+    var circleToDo: String? = nil
 }
 
 struct WSLinks {
@@ -176,6 +214,39 @@ struct WSSettings {
     var lockScreenTitles = true
 }
 
+/// The nine weather glyphs (`WeatherGlyph`, src/types/weather.ts). Each has two bundled
+/// images: `wx-<kind>` in full colour (with a dark appearance) and `wx-<kind>-mono`, a
+/// template for the tinted, clear and lock-screen renderings.
+enum WSWeatherGlyph: String {
+    case sunny, partly, cloudy, rain, thunder, snow, fog, night, nightPartly
+}
+
+/// v3: one home-zone day of the forecast, already in the family's unit.
+struct WSWeatherDay {
+    var ymd: String = ""
+    var glyph: WSWeatherGlyph = .cloudy
+    var high: String = ""
+    var low: String = ""
+    /// "57° / 49°"
+    var range: String = ""
+}
+
+/// v3: the home town's weather. The staleness thresholds travel as instants (epoch ms), so
+/// this side holds no copy of them; `WidgetWeather` only compares the device clock.
+struct WSWeather {
+    var fetchedAt: Double = 0
+    /// From here the age is shown ("as of 7:40am") and the temperature softens.
+    var ageFrom: Double = 0
+    /// From here the current temperature is hidden and only the day's range stays.
+    var currentUntil: Double = 0
+    var currentGlyph: WSWeatherGlyph = .cloudy
+    /// "55°"
+    var currentTemp: String = ""
+    var currentCondition: String = ""
+    /// The home-zone today and the days after it, ascending.
+    var days: [WSWeatherDay] = []
+}
+
 struct WSSnapshot {
     var version: Int = 2
     var generatedAt: String = ""
@@ -186,6 +257,8 @@ struct WSSnapshot {
     var links = WSLinks()
     /// Today and the next six days, ascending.
     var days: [WSDayEntry] = []
+    /// v3: nil when Show Weather is off, no town is set, there is no reading, or the file is v2.
+    var weather: WSWeather? = nil
 
     var generatedDate: Date? { WSDates.parse(generatedAt) }
 }
@@ -269,7 +342,7 @@ extension WSTask: Decodable {
 }
 
 extension WSTasks: Decodable {
-    private enum CodingKeys: String, CodingKey { case items, overflow, heading, count, countText, link }
+    private enum CodingKeys: String, CodingKey { case items, overflow, heading, count, countText, doneToday, link }
     private enum OverflowKeys: String, CodingKey { case due, hint }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -281,6 +354,7 @@ extension WSTasks: Decodable {
         heading = c.lenient(String.self, .heading, "")
         count = c.lenient(Int.self, .count, 0)
         countText = c.lenient(WSText.self, .countText, WSText())
+        doneToday = c.opt(Int.self, .doneToday).map { Swift.max(0, $0) }
         link = c.lenient(String.self, .link, "")
     }
 }
@@ -329,7 +403,8 @@ extension WSHandoff: Decodable {
 
 extension WSRow: Decodable {
     private enum CodingKeys: String, CodingKey {
-        case id, kind, todayOnly, time, startsAt, endsAt, title, titleEmphasis, who, dot, isDone, handoff, link
+        case id, kind, todayOnly, time, startsAt, endsAt, title, titleEmphasis, who, shortTitle, whoFirst
+        case dot, isDone, handoff, link
     }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -342,6 +417,8 @@ extension WSRow: Decodable {
         title = c.lenient(String.self, .title, "")
         titleEmphasis = c.opt(String.self, .titleEmphasis)
         who = c.lenient(String.self, .who, "")
+        shortTitle = c.opt(String.self, .shortTitle)
+        whoFirst = c.opt(String.self, .whoFirst)
         dot = c.opt(WSDot.self, .dot)
         isDone = c.lenient(Bool.self, .isDone, false)
         handoff = c.opt(WSHandoff.self, .handoff)
@@ -351,7 +428,7 @@ extension WSRow: Decodable {
 
 extension WSDay: Decodable {
     private enum CodingKeys: String, CodingKey {
-        case rows, tonight, tasks, thingsText, pickups
+        case rows, tonight, tasks, thingsText, pickups, handoffs
     }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -360,6 +437,61 @@ extension WSDay: Decodable {
         tasks = c.lenient(WSTasks.self, .tasks, WSTasks())
         thingsText = c.lenient(String.self, .thingsText, "")
         pickups = c.list(WSPickup.self, .pickups)
+        // Present (even empty) = a v3 file; absent stays nil.
+        handoffs = c.contains(.handoffs) ? c.list(WSDayHandoff.self, .handoffs) : nil
+    }
+}
+
+extension WSDayHandoff: Decodable {
+    private enum CodingKeys: String, CodingKey { case at, kind, name, link }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        // Required: a handoff with no instant or an unknown kind is dropped on its own.
+        at = try c.decode(Double.self, forKey: .at)
+        guard let parsed = WSDayHandoffKind(rawValue: c.lenient(String.self, .kind, "")) else {
+            throw DecodingError.dataCorruptedError(forKey: .kind, in: c, debugDescription: "unknown handoff kind")
+        }
+        kind = parsed
+        name = c.lenient(String.self, .name, "")
+        link = c.lenient(String.self, .link, "")
+    }
+}
+
+extension WSWeatherGlyph {
+    /// An unknown glyph (a newer app) paints as cloudy, the web's fallback for an unknown code.
+    init(lenient raw: String?) {
+        self = raw.flatMap(WSWeatherGlyph.init(rawValue:)) ?? .cloudy
+    }
+}
+
+extension WSWeatherDay: Decodable {
+    private enum CodingKeys: String, CodingKey { case ymd, glyph, high, low, range }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        // Required: the day is picked by `ymd`, so one without it can never be shown.
+        ymd = try c.decode(String.self, forKey: .ymd)
+        glyph = WSWeatherGlyph(lenient: c.opt(String.self, .glyph))
+        high = c.lenient(String.self, .high, "")
+        low = c.lenient(String.self, .low, "")
+        range = c.lenient(String.self, .range, "")
+    }
+}
+
+extension WSWeather: Decodable {
+    private enum CodingKeys: String, CodingKey { case fetchedAt, ageFrom, currentUntil, current, days }
+    private enum CurrentKeys: String, CodingKey { case glyph, temp, condition }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        // Required: without the instants the staleness rules cannot be applied, and a
+        // reading that cannot be judged is not shown (`weather` becomes nil, nothing else).
+        fetchedAt = try c.decode(Double.self, forKey: .fetchedAt)
+        ageFrom = try c.decode(Double.self, forKey: .ageFrom)
+        currentUntil = try c.decode(Double.self, forKey: .currentUntil)
+        let current = try c.nestedContainer(keyedBy: CurrentKeys.self, forKey: .current)
+        currentGlyph = WSWeatherGlyph(lenient: current.opt(String.self, .glyph))
+        currentTemp = current.lenient(String.self, .temp, "")
+        currentCondition = current.lenient(String.self, .condition, "")
+        days = c.list(WSWeatherDay.self, .days)
     }
 }
 
@@ -384,7 +516,7 @@ extension WSDayEntry: Decodable {
 extension WSLabels: Decodable {
     private enum CodingKeys: String, CodingKey {
         case asOf, later, next, tomorrow, more, nothingToday, myDay, ourDay, childsDay
-        case nothingOnToday, enjoy
+        case nothingOnToday, enjoy, weatherAsOf, circleLeft, circleAllDone, circleAllClear, circleToDo
     }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -400,6 +532,11 @@ extension WSLabels: Decodable {
         childsDay = c.lenient(String.self, .childsDay, d.childsDay)
         nothingOnToday = c.lenient(String.self, .nothingOnToday, d.nothingOnToday)
         enjoy = c.lenient(String.self, .enjoy, d.enjoy)
+        weatherAsOf = c.opt(String.self, .weatherAsOf)
+        circleLeft = c.opt(String.self, .circleLeft)
+        circleAllDone = c.opt(String.self, .circleAllDone)
+        circleAllClear = c.opt(String.self, .circleAllClear)
+        circleToDo = c.opt(String.self, .circleToDo)
     }
 }
 
@@ -434,7 +571,7 @@ extension WSSettings: Decodable {
 
 extension WSSnapshot: Decodable {
     private enum CodingKeys: String, CodingKey {
-        case version, generatedAt, familyIdTail, viewer, settings, labels, links, days
+        case version, generatedAt, familyIdTail, viewer, settings, labels, links, days, weather
     }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -448,6 +585,7 @@ extension WSSnapshot: Decodable {
         settings = c.lenient(WSSettings.self, .settings, WSSettings())
         labels = c.lenient(WSLabels.self, .labels, WSLabels())
         links = c.lenient(WSLinks.self, .links, WSLinks())
+        weather = c.opt(WSWeather.self, .weather)
     }
 }
 
@@ -474,8 +612,9 @@ enum WidgetSnapshotStore {
     /// App Group UserDefaults key the plugin reads and clears on the next publish (Guard 2 pair).
     private static let readOutcomeKey = "widget-read-outcome"
 
-    /// The only schema version this build understands (`WIDGET_SNAPSHOT_VERSION`).
-    static let supportedVersion = 2
+    /// The schema versions this build understands (`WIDGET_SNAPSHOT_READABLE_VERSIONS`); the
+    /// upper bound is the one the app writes (`WIDGET_SNAPSHOT_VERSION`).
+    static let supportedVersions = 2...3
 
     /// Read the snapshot. Never throws, never crashes.
     static func read() -> SnapshotReadOutcome {
@@ -507,8 +646,9 @@ enum WidgetSnapshotStore {
         guard let probe = try? decoder.decode(VersionProbe.self, from: data) else {
             return record("decode_failed;v=0")
         }
-        guard probe.version == supportedVersion else {
-            // A newer app wrote a shape this extension does not know. Do not guess.
+        guard supportedVersions.contains(probe.version) else {
+            // A newer (or a much older) app wrote a shape this extension does not know. Do not
+            // guess; the token names the version it saw, so the firehose shows the mismatch.
             return record("decode_failed;v=\(probe.version)")
         }
         guard let snapshot = try? decoder.decode(WSSnapshot.self, from: data) else {

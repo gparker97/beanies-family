@@ -100,6 +100,15 @@ public final class WidgetSizes {
         return effective / fs;
     }
 
+    /**
+     * The absolute scale text draws at for a widget whose multiplier is {@code textScale} (the
+     * system font scale × it, which {@link #textScale} keeps within {@link #TEXT_SCALE_MAX} unless
+     * the system alone is bigger): what a fixed-width column wraps by ({@link WidgetFill#dateColumnLines}).
+     */
+    static float effectiveScale(Context context, float textScale) {
+        return fontScale(context) * textScale;
+    }
+
     private static float fontScale(Context context) {
         float fs = context.getResources().getConfiguration().fontScale;
         return fs > 0 ? fs : 1f;

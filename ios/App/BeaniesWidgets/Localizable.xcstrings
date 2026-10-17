@@ -452,7 +452,7 @@
       }
     },
     "widget_all_clear": {
-      "comment": "Lock-screen circle when nothing is coming up this week. Lowercase, a few characters.",
+      "comment": "Lock-screen circle when nothing is coming up this week, used only when the saved day is from an older app version (newer ones carry the app's own wording). Lowercase, a few characters.",
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -464,7 +464,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "全部搞定"
+            "value": "无安排"
           }
         }
       }
@@ -501,6 +501,24 @@
           "stringUnit": {
             "state": "translated",
             "value": "打开 beanies 以刷新"
+          }
+        }
+      }
+    },
+    "widget_sign_in": {
+      "comment": "Lock-screen circle when signed out, under the bean. Lowercase, a few characters.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "sign in"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "登录"
           }
         }
       }

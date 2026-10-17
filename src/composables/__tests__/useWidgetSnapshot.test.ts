@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { nextTick, ref } from 'vue';
+import { computed, nextTick, reactive, ref } from 'vue';
 import { createPinia, setActivePinia } from 'pinia';
 import { addDaysYmd } from '@/utils/date';
 
 // `vi.mock` factories are hoisted above the module body, so everything they
 // close over must come from `vi.hoisted`.
-const { plugin, reportError, logEvent, showToast, reminderInput, today, isVisible } = vi.hoisted(
-  () => ({
+const { plugin, reportError, logEvent, showToast, reminderInput, today, isVisible, weather } =
+  vi.hoisted(() => ({
     plugin: { publish: vi.fn(), clear: vi.fn() },
     reportError: vi.fn(),
     logEvent: vi.fn(),
@@ -15,8 +15,9 @@ const { plugin, reportError, logEvent, showToast, reminderInput, today, isVisibl
     reminderInput: { current: null as unknown as { value: unknown } },
     today: { current: null as unknown as { value: string } },
     isVisible: { current: null as unknown as { value: boolean } },
-  })
-);
+    // A fake weather store (`fakeWeatherStore`), rebuilt in `beforeEach`.
+    weather: { current: null as unknown as FakeWeatherStore },
+  }));
 
 vi.mock('@/services/sync/capabilities', () => ({ isNative: () => true }));
 vi.mock('@/services/native/widgetBridgePlugin', () => ({ WidgetBridge: plugin }));
@@ -32,6 +33,7 @@ vi.mock('@/composables/useScheduledReminders', () => ({
 vi.mock('@/composables/useToday', () => ({
   useToday: () => ({ today: today.current, isVisible: isVisible.current }),
 }));
+vi.mock('@/stores/weatherStore', () => ({ useWeatherStore: () => weather.current }));
 
 import {
   haltWidgetPublishingForSignOut,
@@ -43,11 +45,52 @@ import { UI_STRINGS, type UIStringKey } from '@/services/translation/uiStrings';
 import type { WidgetSnapshotInput } from '@/utils/widgetSnapshot';
 import type { FamilyMember } from '@/types/models';
 import type { ReminderInput } from '@/composables/useScheduledReminders';
+import type { WeatherReading } from '@/types/weather';
 
 const TODAY = '2026-10-11';
 const t = (key: UIStringKey): string => UI_STRINGS[key];
 const SAM = { id: 'sam', name: 'Sam', role: 'owner', ageGroup: 'adult' } as FamilyMember;
 const JO = { id: 'jo', name: 'Jo', role: 'member', ageGroup: 'adult' } as FamilyMember;
+
+/**
+ * The weather store's surface the publisher may read, plus the two it must NOT: `nowMs`
+ * (bumped by every 5-minute tick) and `atom` (whose age text follows it).
+ */
+interface FakeWeatherStore {
+  isActive: boolean;
+  reading: WeatherReading | null;
+  homeZone: string;
+  nowMs: number;
+  readonly atom: { ageText: string };
+}
+
+function fakeWeatherStore(): FakeWeatherStore {
+  const nowMs = ref(0);
+  return reactive({
+    isActive: false,
+    reading: null as WeatherReading | null,
+    homeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    nowMs,
+    atom: computed(() => ({ ageText: `as of ${nowMs.value}` })),
+  });
+}
+
+/** A reading with an entry for every day around TODAY, so any test machine's zone finds one. */
+function weatherReading(fetchedAt: number): WeatherReading {
+  return {
+    v: 1,
+    familyId: 'fam-123456',
+    placeKey: '1.30,103.80|zone',
+    fetchedAt,
+    current: { tempC: 12.6, code: 2, isDay: true },
+    daily: [-1, 0, 1, 2, 3, 4, 5].map((n) => ({
+      ymd: addDaysYmd(TODAY, n),
+      code: 61,
+      maxC: 14,
+      minC: 9,
+    })),
+  };
+}
 
 /** The reminders' input, as `useScheduledReminders` would expose it. */
 function reminders(member: FamilyMember = SAM): ReminderInput {
@@ -80,6 +123,7 @@ function widgetInput(over: Partial<WidgetSnapshotInput> = {}): WidgetSnapshotInp
     lockScreenTitles: true,
     language: 'en',
     familyId: 'fam-123456',
+    weather: null,
     ...over,
   };
 }
@@ -105,6 +149,7 @@ beforeEach(() => {
   reminderInput.current = ref<ReminderInput | null>(null);
   today.current = ref(TODAY);
   isVisible.current = ref(true);
+  weather.current = fakeWeatherStore();
   plugin.publish.mockResolvedValue({ placements: {} });
   vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
@@ -144,7 +189,7 @@ describe('useWidgetSnapshot: the watcher', () => {
         kind: 'data-change',
         count: 0,
         action: 'publish',
-        detail: expect.stringMatching(/^tasks=0;ahead=0;kb=\d+$/),
+        detail: expect.stringMatching(/^tasks=0;ahead=0;kb=\d+;wx=0$/),
       },
     ]);
   });
@@ -160,6 +205,33 @@ describe('useWidgetSnapshot: the watcher', () => {
     await settle();
     expect(plugin.publish).toHaveBeenCalledTimes(2);
     expect(events('snapshot published').map((c) => c.kind)).toEqual(['data-change', 'foreground']);
+  });
+
+  it('never republishes on a 5-minute weather tick with an unchanged reading', async () => {
+    vi.setSystemTime(new Date(2026, 9, 11, 8, 0));
+    weather.current.isActive = true;
+    weather.current.reading = weatherReading(Date.now());
+    reminderInput.current.value = reminders();
+    useWidgetSnapshot();
+    await settle();
+    expect(plugin.publish).toHaveBeenCalledTimes(1);
+    const json = (plugin.publish.mock.calls[0]![0] as { json: string }).json;
+    expect(JSON.parse(json).weather.current.temp).toBe('13°');
+    expect(events('snapshot published')[0]!.detail).toMatch(/;wx=1$/);
+
+    // The weather store's tick: its clock moves and the atom's age text with it.
+    const ageBefore = weather.current.atom.ageText;
+    weather.current.nowMs += 5 * 60_000;
+    expect(weather.current.atom.ageText).not.toBe(ageBefore);
+    await vi.advanceTimersByTimeAsync(5 * 60_000);
+    await nextTick();
+    expect(plugin.publish).toHaveBeenCalledTimes(1);
+
+    // A new reading is a data change, and does publish.
+    weather.current.reading = weatherReading(Date.now());
+    await nextTick();
+    await settle();
+    expect(plugin.publish).toHaveBeenCalledTimes(2);
   });
 
   it('republishes for the new viewer on a member switch', async () => {
@@ -351,6 +423,23 @@ describe('publishWidgetSnapshot: failures and relayed native state', () => {
       expect.stringMatching(/;day=-1$/),
       expect.not.stringMatching(/day=/),
       expect.not.stringMatching(/day=/),
+    ]);
+  });
+
+  it('logs placements again when only a circle option changes', async () => {
+    plugin.publish.mockResolvedValue({
+      placements: { 'ios-accessory': 1, circle: { nextUp: 1 } },
+    });
+    await publishWidgetSnapshot(widgetInput(), 'data-change', now);
+    await publishWidgetSnapshot(widgetInput(), 'data-change', now);
+    plugin.publish.mockResolvedValue({
+      placements: { 'ios-accessory': 1, circle: { thingsLeft: 1 } },
+    });
+    await publishWidgetSnapshot(widgetInput(), 'data-change', now);
+
+    expect(events('placements')).toEqual([
+      { kind: 'ios-accessory', count: 1, detail: 'circle=nextUp:1,handoff:0,todos:0,left:0' },
+      { kind: 'ios-accessory', count: 1, detail: 'circle=nextUp:0,handoff:0,todos:0,left:1' },
     ]);
   });
 

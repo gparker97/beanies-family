@@ -20,7 +20,8 @@ import org.json.JSONObject;
  *
  * Three read outcomes, never conflated:
  *  - file absent → {@link State#SIGNED_OUT} ("open beanies" / "sign in to see your day");
- *  - present but unreadable (I/O) or undecodable / an unknown version → {@link State#UNREADABLE}
+ *  - present but unreadable (I/O) or undecodable / a version outside
+ *    {@link WidgetSnapshot#MIN_VERSION}..{@link WidgetSnapshot#MAX_VERSION} → {@link State#UNREADABLE}
  *    ("open beanies to refresh"), and a fixed token is left in prefs for the plugin to relay to
  *    the firehose on the next publish (`read_failed` | `decode_failed;v=<n>`);
  *  - decoded → {@link State#READY}.
@@ -88,7 +89,9 @@ public final class WidgetSnapshotStore {
         try {
             JSONObject root = new JSONObject(json);
             int version = root.optInt("version", -1);
-            if (version != WidgetSnapshot.VERSION) {
+            // Any version this reader knows (v2 and v3); outside the range the detail names the
+            // version it saw, so the firehose can tell an old reader from a damaged file.
+            if (!WidgetSnapshot.isReadable(version)) {
                 return unreadable(context, "decode_failed;v=" + version, null);
             }
             return new Result(State.READY, WidgetSnapshot.from(root));

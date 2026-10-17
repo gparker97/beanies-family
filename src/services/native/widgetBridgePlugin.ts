@@ -5,11 +5,20 @@
 // gates on `isNative()` (`useWidgetSnapshot`, the `clearWidgetSnapshot` sign-out step).
 
 import { registerPlugin } from '@capacitor/core';
-import type { WidgetSize } from '@/types/widgetSnapshot';
+import type { CircleShowOption, WidgetSize } from '@/types/widgetSnapshot';
+
+/** How many widgets of each size are placed right now. Absent size = none placed. */
+export type WidgetPlacements = Partial<Record<WidgetSize, number>> & {
+  /**
+   * iOS, from v3 (#134): how many lock-screen circles are placed per "Show" option (read
+   * natively through `widgetConfigurationIntent(of:)`). Absent on Android and on older
+   * builds; an absent option = none placed.
+   */
+  circle?: Partial<Record<CircleShowOption, number>>;
+};
 
 export interface WidgetPublishResult {
-  /** How many widgets of each size are placed right now. Absent size = none placed. */
-  placements: Partial<Record<WidgetSize, number>>;
+  placements: WidgetPlacements;
   /**
    * The widget's last recorded read failure, consumed (and cleared natively) by this call,
    * or absent when there was none. A fixed token grammar, never free text:

@@ -160,3 +160,13 @@ extension WidgetBlocks {
         )
     }
 }
+
+extension WidgetBlocks {
+    /// The lock-screen widget's blocks: every switch on (it has no block picker), plus the
+    /// circle's choice. Here rather than beside the intent, because `AccessoryConfigIntent.swift`
+    /// is also compiled into the app, which has no `WidgetBlocks`.
+    init(_ configuration: AccessoryConfigIntent) {
+        self = .defaults
+        circleShow = configuration.show
+    }
+}

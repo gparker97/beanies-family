@@ -19,18 +19,27 @@
  * and warns with the part and the record it was on (the `buildReminderSchedule` pattern).
  * One malformed record never empties the whole widget. The picker switches are applied
  * natively; every part is always built.
+ *
+ * v3 (#134) adds the home town's weather (`buildWidgetWeather`, from the same reading and
+ * formatters as the web atom, so there is no second formatter), the viewer's handoffs, the
+ * to-dos done today, and each row's one-word forms (`shortTitle`, `whoFirst`) for the
+ * lock-screen circle.
  */
 import type {
+  FamilyActivity,
   FamilyMember,
   FamilyVacation,
   LanguageCode,
   MealPlanEntry,
   Recipe,
+  TemperatureUnit,
   TodoItem,
 } from '@/types/models';
+import type { WeatherReading } from '@/types/weather';
 import {
   WIDGET_DAYS,
   WIDGET_SNAPSHOT_VERSION,
+  WIDGET_WEATHER_DAYS,
   type WidgetAvatar,
   type WidgetDay,
   type WidgetDayEntry,
@@ -41,6 +50,7 @@ import {
   type WidgetTaskBucket,
   type WidgetTasks,
   type WidgetText,
+  type WidgetWeather,
 } from '@/types/widgetSnapshot';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import type { ReminderInput } from '@/composables/useScheduledReminders';
@@ -74,9 +84,20 @@ import { birthdaysInRange, MAX_AGE_SHOWN_ON_CALENDAR } from '@/utils/birthdays';
 import { ENTITY_DEEP_LINKS, entityDeepLink, type DeepLink } from '@/utils/entityDeepLink';
 import { shareableOrigin } from '@/utils/shareableOrigin';
 import { formatUiDate } from '@/utils/uiLocale';
-import { addDaysYmd, formatTime12 } from '@/utils/date';
+import { addDaysYmd, extractDatePart, formatTime12 } from '@/utils/date';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { firstName, formatNameList, normalizeAssignees } from '@/utils/assignees';
+import { firstWord } from '@/utils/firstWord';
+import { glyphFor } from '@/utils/weather/weatherCodes';
+import {
+  AGE_SHOW_MS,
+  CURRENT_MAX_MS,
+  conditionKey,
+  formatTemp,
+  homeYmdAt,
+  outlook,
+  todayEntry,
+} from '@/utils/weather/weatherReading';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { isAdultMember } from '@/composables/useMemberInfo';
 
@@ -107,6 +128,22 @@ export interface WidgetSnapshotInput extends Pick<
   lockScreenTitles: boolean;
   language: LanguageCode;
   familyId: string;
+  /**
+   * The home town's weather (#134): the store's reading plus the family's unit and home zone,
+   * or null when Show Weather is off or no town is set (`weatherStore.isActive`). Only
+   * time-independent inputs, never the store's `atom`: its age text changes on every 5-minute
+   * tick, and every publish reloads every widget (WidgetKit's reload budget).
+   */
+  weather: WidgetWeatherInput | null;
+}
+
+export interface WidgetWeatherInput {
+  /** `weatherStore.reading`: null before the first answer (or after a cache miss). */
+  reading: WeatherReading | null;
+  /** `settingsStore.temperatureUnit`. */
+  unit: TemperatureUnit;
+  /** The family home time zone (`weatherStore.homeZone`), which names the forecast's days. */
+  zone: string;
 }
 
 export interface WidgetSnapshotResult {
@@ -138,7 +175,10 @@ interface AudienceRules {
   dueNamesViewer: boolean;
   /** Which hints may show. */
   hints: 'viewer' | 'noSurprise' | 'none';
-  /** Whether the viewer's pick-ups are listed (the lock-screen inline slot). */
+  /**
+   * Whether the viewer's own duties are listed: `pickups` (the lock-screen inline slot) and,
+   * from v3, `handoffs` (drop-offs and pick-ups, the circle's "Next handoff").
+   */
   pickups: boolean;
   /** Whether a trip must concern the viewer (`classifyAudience`) to be counted down (child only). */
   tripsForViewerOnly: boolean;
@@ -292,9 +332,30 @@ function firstNames(ctx: DayContext, ids: readonly string[]): string {
   );
 }
 
+/** The first of `ids` that still resolves to a member. */
+function firstMember(ctx: DayContext, ids: readonly string[]): FamilyMember | undefined {
+  return ids.map((id) => member(ctx, id)).find((m) => m !== undefined);
+}
+
+/**
+ * A row's one-word forms for the lock-screen circle (v3): the title's first word, and the
+ * first assignee's first name ('' when nobody resolves).
+ */
+function rowWords(
+  ctx: DayContext,
+  title: string,
+  assigneeIds: readonly string[]
+): Pick<WidgetRow, 'shortTitle' | 'whoFirst'> {
+  const first = firstMember(ctx, assigneeIds);
+  return {
+    shortTitle: firstWord(title, ctx.input.language),
+    whoFirst: first ? firstName(first.name) : '',
+  };
+}
+
 /** The coloured initial beside a row: the first resolvable assignee, else the family icon. */
 function rowDot(ctx: DayContext, assigneeIds: readonly string[]): WidgetDot {
-  const owner = assigneeIds.map((id) => member(ctx, id)).find((m) => m !== undefined);
+  const owner = firstMember(ctx, assigneeIds);
   if (!owner) return { kind: 'family' };
   const color = resolveMemberColor(owner.color);
   return {
@@ -356,6 +417,7 @@ const eventsPart: DayPart = {
         ...rowInstants(occ),
         title: a.title,
         who: firstNames(ctx, assignees),
+        ...rowWords(ctx, a.title, assignees),
         dot: rowDot(ctx, assignees),
         // The viewer's duty is done when every duty they hold here is ticked for this date.
         isDone:
@@ -374,11 +436,29 @@ const eventsPart: DayPart = {
   },
 };
 
-/** "who's where": drop-off / pick-up handoffs on the rows, and the viewer's pick-ups. */
+/**
+ * The first name of the person a duty is for: an assignee other than the viewer (the child
+ * being dropped off or collected), the first one that still resolves; '' when none. Never the
+ * activity: the pick-up line and the handoffs show on the lock screen whatever "Show event
+ * titles" says, so they must never carry a title.
+ */
+function dutyName(ctx: DayContext, a: FamilyActivity): string {
+  const other = firstMember(
+    ctx,
+    normalizeAssignees(a).filter((id) => id !== ctx.viewer.id)
+  );
+  return other ? firstName(other.name) : '';
+}
+
+/**
+ * "who's where": drop-off / pick-up handoffs on the rows, the viewer's pick-ups, and (v3) the
+ * viewer's own timed drop-offs and pick-ups (`handoffs`), all from the same handoff data.
+ */
 const whosWherePart: DayPart = {
   build(day, ctx) {
     const { t } = ctx.input;
     const pickups: WidgetDay['pickups'] = [];
+    const handoffs: NonNullable<WidgetDay['handoffs']> = [];
     for (const { occ, row } of ctx.entries) {
       const a = occ.activity;
       ctx.cursor = a.id;
@@ -416,30 +496,35 @@ const whosWherePart: DayPart = {
           avatars: [avatar(pickup)],
         };
       }
-      if (ctx.rules.pickups && pickup?.id === ctx.viewer.id && a.endTime) {
-        const at = localDateTime(occ.date, a.endTime);
-        if (at) {
-          // Name the child being collected, never the activity: this text is shown on the
-          // lock screen whatever "Show event titles" says, so it must never carry a title.
-          // The child is an assignee other than the driver; the first one that still resolves.
-          const child = normalizeAssignees(a)
-            .filter((id) => id !== ctx.viewer.id)
-            .find((id) => ctx.input.resolveMember(id) !== undefined);
-          const who = child ? firstNames(ctx, [child]) : '';
-          pickups.push({
-            at: at.getTime(),
-            text: who
-              ? fillTemplate(t('widget.pickup'), { time, name: who })
-              : fillTemplate(t('widget.pickupNoName'), { time }),
-          });
-        }
+      if (!ctx.rules.pickups) continue;
+      // A drop-off is at the start (null for an all-day row); a pick-up at the end time.
+      if (dropoff?.id === ctx.viewer.id && row.startsAt !== null) {
+        handoffs.push({
+          at: row.startsAt,
+          kind: 'dropoff',
+          name: dutyName(ctx, a),
+          link: row.link,
+        });
+      }
+      const pickupAt = a.endTime ? localDateTime(occ.date, a.endTime) : null;
+      if (pickup?.id === ctx.viewer.id && pickupAt) {
+        const who = dutyName(ctx, a);
+        pickups.push({
+          at: pickupAt.getTime(),
+          text: who
+            ? fillTemplate(t('widget.pickup'), { time, name: who })
+            : fillTemplate(t('widget.pickupNoName'), { time }),
+        });
+        handoffs.push({ at: pickupAt.getTime(), kind: 'pickup', name: who, link: row.link });
       }
     }
     day.pickups = pickups.sort((x, y) => x.at - y.at);
+    day.handoffs = handoffs.sort((x, y) => x.at - y.at);
   },
   clear(day, ctx) {
     for (const entry of ctx.entries) entry.row.handoff = null;
     day.pickups = [];
+    day.handoffs = [];
   },
 };
 
@@ -504,6 +589,7 @@ function tripRows(ctx: DayContext): WidgetRow[] {
     } else {
       continue;
     }
+    const title = fillTemplate(t('widget.tripRow'), { name: v.name, status });
     out.push({
       start: v.startDate ?? '',
       row: {
@@ -513,9 +599,10 @@ function tripRows(ctx: DayContext): WidgetRow[] {
         time: '',
         startsAt: null,
         endsAt: null,
-        title: fillTemplate(t('widget.tripRow'), { name: v.name, status }),
+        title,
         titleEmphasis: status,
         who: firstNames(ctx, assignees),
+        ...rowWords(ctx, title, assignees),
         dot: rowDot(ctx, assignees),
         isDone: false,
         handoff: null,
@@ -538,6 +625,9 @@ function birthdayRows(ctx: DayContext): WidgetRow[] {
     // The age is named only where the calendar names it (`birthdayLabel`'s rule).
     const age =
       b.age !== undefined && b.age <= MAX_AGE_SHOWN_ON_CALENDAR ? String(b.age) : undefined;
+    const title = age
+      ? fillTemplate(t('widget.birthdayTurns'), { name, age })
+      : fillTemplate(t('widget.birthdayOf'), { name });
     return {
       id: `birthday:${b.memberId}:${ctx.ymd}`,
       kind: 'birthday',
@@ -545,10 +635,9 @@ function birthdayRows(ctx: DayContext): WidgetRow[] {
       time: '',
       startsAt: null,
       endsAt: null,
-      title: age
-        ? fillTemplate(t('widget.birthdayTurns'), { name, age })
-        : fillTemplate(t('widget.birthdayOf'), { name }),
+      title,
       who: name,
+      ...rowWords(ctx, title, [b.memberId]),
       dot: rowDot(ctx, [b.memberId]),
       isDone: false,
       handoff: null,
@@ -587,6 +676,11 @@ interface TaskDraft {
   dueTime?: string;
   ownerIds: string[];
   link: string;
+  /**
+   * A to-do completed on the day (v3): never a row, only counted in `doneToday`. Open drafts
+   * (every hint and list) are false.
+   */
+  done: boolean;
 }
 
 /** The most to-dos and lists (and, separately, hints) one day carries; `overflow` counts the rest. */
@@ -604,14 +698,24 @@ function taskBucket(ctx: DayContext, due: string): WidgetTaskBucket | null {
 }
 
 /**
+ * A completed to-do's completion falls on `ymd` (local date). `extractDatePart`, never a
+ * slice: `completedAt` is a UTC timestamp (the wall's `todoBucket` rule).
+ */
+function completedOn(todo: TodoItem, ymd: string): boolean {
+  return todo.completed && extractDatePart(todo.completedAt ?? '') === ymd;
+}
+
+/**
  * "My day": the briefing's to-do rule (`useCriticalItems`): not hidden from the viewer by
- * `classifyAudience`. Hints come through `hintTodos` instead, so they are skipped here.
+ * `classifyAudience`. Hints come through `hintTodos` instead, so they are skipped here. Open
+ * to-dos, plus (marked `done`) those completed on the day, for `doneToday`.
  */
 function myTodoDrafts(ctx: DayContext): TaskDraft[] {
   const out: TaskDraft[] = [];
   for (const todo of ctx.input.todos) {
     ctx.cursor = todo.id;
-    if (isHint(todo) || todo.completed || todo.someday) continue;
+    if (isHint(todo) || todo.someday) continue;
+    if (todo.completed && !completedOn(todo, ctx.ymd)) continue;
     const owners = normalizeAssignees(todo);
     if (classifyAudience(owners, ctx.viewer, ctx.input.resolveMember).kind === 'hidden') continue;
     out.push(todoDraft(ctx, todo, owners, 'todo'));
@@ -620,8 +724,10 @@ function myTodoDrafts(ctx: DayContext): TaskDraft[] {
 }
 
 /**
- * "Our day": the wall's to-do card (`buildWallJobs` + `uniqueTodoJobs`), open jobs only, one
- * row per to-do. Hints come through `hintTodos`, so wall jobs for a hint are skipped.
+ * "Our day": the wall's to-do card (`buildWallJobs` + `uniqueTodoJobs`), one row per to-do.
+ * The wall keeps a job completed on the day (struck through) and drops older completions, so
+ * its done jobs are exactly the drafts `todoDraft` marks `done`. Hints come through `hintTodos`, so
+ * wall jobs for a hint are skipped.
  */
 function ourTodoDrafts(ctx: DayContext): TaskDraft[] {
   const byId = new Map(ctx.input.todos.map((todo) => [todo.id, todo]));
@@ -632,7 +738,7 @@ function ourTodoDrafts(ctx: DayContext): TaskDraft[] {
     todayYmd: ctx.ymd,
   });
   const out: TaskDraft[] = [];
-  for (const job of uniqueTodoJobs(todos.filter((j) => !j.done))) {
+  for (const job of uniqueTodoJobs(todos)) {
     const todo = job.todoId ? byId.get(job.todoId) : undefined;
     if (!todo || isHint(todo)) continue;
     ctx.cursor = todo.id;
@@ -655,6 +761,7 @@ function todoDraft(
     dueTime: todo.dueTime,
     ownerIds,
     link: widgetLink(ctx.origin, entityDeepLink('todo', todo.id)),
+    done: completedOn(todo, ctx.ymd),
   };
 }
 
@@ -718,6 +825,7 @@ function listDrafts(ctx: DayContext): TaskDraft[] {
       due,
       ownerIds: list.ownerId ? [list.ownerId] : [],
       link: widgetLink(ctx.origin, entityDeepLink('list', list.id)),
+      done: false,
     });
   }
   return out;
@@ -780,9 +888,13 @@ const tasksPart: DayPart = {
       ...(rules.due === 'none' ? [] : listDrafts(ctx)),
     ];
     const ranked: { draft: TaskDraft; bucket: WidgetTaskBucket }[] = [];
+    let doneToday = 0;
     for (const draft of drafts) {
       const bucket = taskBucket(ctx, draft.due);
-      if (bucket) ranked.push({ draft, bucket });
+      if (!bucket) continue;
+      // A to-do done on the day is never a row; it counts when it would have counted open.
+      if (draft.done) doneToday += Number(countsNow(rules, draft.kind, bucket));
+      else ranked.push({ draft, bucket });
     }
     // Stable: bucket, then due date, then timed before untimed by time; source order last.
     ranked.sort((a, b) => {
@@ -800,13 +912,7 @@ const tasksPart: DayPart = {
     });
     // The count covers what the `due` switch shows (to-dos and lists), never hints, so the
     // date column never counts a row the hint switch hides.
-    const count = all.filter(
-      (i) =>
-        i.kind !== 'hint' &&
-        (i.bucket === 'overdue' ||
-          i.bucket === 'today' ||
-          (i.bucket === 'undated' && rules.countUndated))
-    ).length;
+    const count = all.filter((i) => countsNow(rules, i.kind, i.bucket)).length;
     // Capped per switch (no widget draws more, and the list is carried for 14 day-views), so a
     // long to-do list never crowds out the hints, in display order.
     const isHintTask = (i: WidgetTask) => i.kind === 'hint';
@@ -828,6 +934,7 @@ const tasksPart: DayPart = {
       ),
       count,
       countText: taskCountText(ctx, count),
+      doneToday,
       link: todoPageLink(ctx.origin),
     };
   },
@@ -835,6 +942,22 @@ const tasksPart: DayPart = {
     day.tasks = emptyTasks(ctx);
   },
 };
+
+/**
+ * Whether a task counts toward the date column's "due now" count: to-dos and lists (never
+ * hints) that are overdue or due today, plus undated ones on "my day". The same rule picks
+ * which completed to-dos count in `doneToday`, so the circle's ring and the count agree.
+ */
+function countsNow(
+  rules: AudienceRules,
+  kind: WidgetTask['kind'],
+  bucket: WidgetTaskBucket
+): boolean {
+  return (
+    kind !== 'hint' &&
+    (bucket === 'overdue' || bucket === 'today' || (bucket === 'undated' && rules.countUndated))
+  );
+}
 
 /** One part of a day, in `DAY_PARTS` order; each is isolated by the build loop. */
 interface DayPart {
@@ -881,6 +1004,7 @@ function emptyTasks(ctx: DayContext): WidgetTasks {
     heading: ctx.input.t('widget.tasks'),
     count: 0,
     countText: taskCountText(ctx, 0),
+    doneToday: 0,
     link: todoPageLink(ctx.origin),
   };
 }
@@ -910,6 +1034,7 @@ function buildWidgetDay(
     tasks: emptyTasks(ctx),
     thingsText: '',
     pickups: [],
+    handoffs: [],
   };
   let skipped = 0;
   for (const [name, part] of DAY_PARTS) {
@@ -951,9 +1076,54 @@ function dayEntry(ymd: string, input: WidgetSnapshotInput): Omit<WidgetDayEntry,
   };
 }
 
+// ── Weather (v3, #134) ──────────────────────────────────────────────────────
+
 /**
- * Build the whole snapshot. `now` stamps `generatedAt` only; "today" is `input.days[0]`
- * (the device-local day), matching every store getter.
+ * The home town's weather for the native widgets, from the same reading, glyph mapping and
+ * `formatTemp` as the web atom (`buildWeatherAtom`), so there is no second formatter. null
+ * when weather is off or has no town (`input.weather` null), when there is no reading yet, or
+ * when the reading has no entry for the home-zone today (the web's `unavailable`). `days` are
+ * the home-zone today and the days after it, by `ymd`, never by position. The staleness
+ * thresholds travel as instants (`ageFrom`, `currentUntil`), so native holds no copy.
+ */
+export function buildWidgetWeather(
+  input: Pick<WidgetSnapshotInput, 'weather' | 't'>,
+  now: Date
+): WidgetWeather | null {
+  const reading = input.weather?.reading;
+  if (!input.weather || !reading) return null;
+  const { unit, zone } = input.weather;
+  const todayYmd = homeYmdAt(now.getTime(), zone);
+  const today = todayEntry(reading.daily, todayYmd);
+  if (!today) return null;
+  const glyph = glyphFor(reading.current.code, reading.current.isDay).glyph;
+  return {
+    fetchedAt: reading.fetchedAt,
+    ageFrom: reading.fetchedAt + AGE_SHOW_MS,
+    currentUntil: reading.fetchedAt + CURRENT_MAX_MS,
+    current: {
+      glyph,
+      temp: formatTemp(reading.current.tempC, unit),
+      condition: input.t(conditionKey(glyph)),
+    },
+    days: [today, ...outlook(reading.daily, todayYmd, WIDGET_WEATHER_DAYS - 1)].map((d) => {
+      const high = formatTemp(d.maxC, unit);
+      const low = formatTemp(d.minC, unit);
+      return {
+        ymd: d.ymd,
+        glyph: glyphFor(d.code, true).glyph,
+        high,
+        low,
+        range: fillTemplate(input.t('widget.weatherRange'), { high, low }),
+      };
+    }),
+  };
+}
+
+/**
+ * Build the whole snapshot. `now` stamps `generatedAt` and picks the weather's home-zone
+ * today; "today" for the calendar is `input.days[0]` (the device-local day), matching every
+ * store getter.
  */
 export function buildWidgetSnapshot(
   rawInput: WidgetSnapshotInput,
@@ -988,6 +1158,15 @@ export function buildWidgetSnapshot(
     our: audiences.our ? view(ymd, audiences.our) : null,
   }));
 
+  // Isolated like a day part: a malformed reading drops the weather, never the widget.
+  let weather: WidgetWeather | null = null;
+  try {
+    weather = buildWidgetWeather(input, now);
+  } catch (err) {
+    skipped++;
+    console.warn('[buildWidgetSnapshot] dropped weather (malformed reading):', err);
+  }
+
   const viewerFirstName = firstName(viewer.name);
   const snapshot: WidgetSnapshot = {
     version: WIDGET_SNAPSHOT_VERSION,
@@ -1012,12 +1191,18 @@ export function buildWidgetSnapshot(
       childsDay: fillTemplate(t('widget.childsDay'), { name: viewerFirstName }),
       nothingOnToday: t('widget.nothingOnToday'),
       enjoy: t('widget.enjoy'),
+      weatherAsOf: t('widget.weatherAsOf'),
+      circleLeft: t('widget.circleLeft'),
+      circleAllDone: t('widget.circleAllDone'),
+      circleAllClear: t('widget.circleAllClear'),
+      circleToDo: t('widget.circleToDo'),
     },
     links: {
       nook: widgetLink(origin, { path: WIDGET_PAGE_PATHS.nook, query: {} }),
       todo: todoPageLink(origin),
     },
     days,
+    weather,
   };
   return { snapshot, skipped };
 }

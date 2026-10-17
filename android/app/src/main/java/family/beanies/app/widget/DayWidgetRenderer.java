@@ -48,6 +48,17 @@ final class DayWidgetRenderer {
             new WidgetTextBitmaps.Style(R.font.caveat_bold, 20f, 15f, 1, false);
     private static final WidgetTextBitmaps.Style MESSAGE_TITLE =
             new WidgetTextBitmaps.Style(R.font.outfit_bold, 16f, 13f, 2, true);
+    /** The date column's temperature (#134): Outfit Bold 13sp, as iOS DayColumnView. */
+    private static final WidgetTextBitmaps.Style COLUMN_TEMP =
+            new WidgetTextBitmaps.Style(R.font.outfit_bold, 13f, 11f, 1, false);
+    /** The small header's temperature: Outfit Bold 15sp, scaled with the header like the numeral. */
+    private static final WidgetTextBitmaps.Style SMALL_TEMP =
+            new WidgetTextBitmaps.Style(R.font.outfit_bold, 15f, 15f, 1, false);
+
+    /** The weather glyphs' Standard sizes (the layouts' 14dp / 16dp) and the gap to the temperature. */
+    private static final float COLUMN_GLYPH_DP = 14f;
+    private static final float SMALL_GLYPH_DP = 16f;
+    private static final float WEATHER_GAP_DP = 3f;
 
     /** Layout insets (dp) between the widget's width and the line a bitmap may fill. */
     private static final float DATE_COLUMN_DP = 52f;
@@ -98,14 +109,14 @@ final class DayWidgetRenderer {
         if (size == WidgetSizes.Size.SMALL) {
             return small(context, appWidgetId, widthDp, prefs, textScale, plan, now);
         }
-        return agenda(context, appWidgetId, size, widthDp, prefs, textScale, plan, now);
+        return agenda(context, appWidgetId, size, widthDp, heightDp, prefs, textScale, plan, now);
     }
 
     // ---- medium + large ------------------------------------------------------------------
 
     private static RemoteViews agenda(
-            Context context, int id, WidgetSizes.Size size, float widthDp, WidgetPrefs prefs,
-            float textScale, WidgetFill.Plan plan, long now) {
+            Context context, int id, WidgetSizes.Size size, float widthDp, float heightDp,
+            WidgetPrefs prefs, float textScale, WidgetFill.Plan plan, long now) {
         WidgetSnapshot s = plan.snapshot;
         WidgetSnapshot.Day day = plan.day;
         RemoteViews v = new RemoteViews(context.getPackageName(), size.layout);
@@ -119,25 +130,48 @@ final class DayWidgetRenderer {
         v.setTextViewText(R.id.date_weekday, plan.entry.weekday);
         v.setTextViewText(R.id.date_month, plan.entry.month);
         WidgetViews.onClick(v, R.id.date_column, context, id, WidgetViews.SLOT_DATE, s.links.nook, size);
-        WidgetViews.textOrGone(v, R.id.date_as_of, asOf(context, plan));
+        String asOf = asOf(context, plan);
         String audience = "";
         if (plan.isChild) {
             audience = s.labels.childsDay;
         } else if (size == WidgetSizes.Size.LARGE) {
             audience = plan.isOurDay ? s.labels.ourDay : s.labels.myDay;
         }
-        WidgetViews.textOrGone(v, R.id.date_audience, audience);
         // countText.text is '' when nothing is due; an empty WidgetText is never drawn.
         boolean dueCount = plan.shows(WidgetFill.DUE) && day != null && day.tasks.count > 0
                 && !day.tasks.countText.text.isEmpty();
+        // The weather (#134) under the month: the row always (glyph + temperature, or + today's
+        // high once the temperature is gone), then the range, or the age once the reading is old
+        // enough (WidgetWeather; no thresholds here).
+        WidgetWeather.Shown weather = WidgetWeather.at(s.weather, now);
+        String age = weather != null && weather.showsAge()
+                ? asOfText(context, s.labels.weatherAsOf, weather.fetchedAt) : "";
+        // An aged reading with no age label falls back to the range; past currentUntil the line
+        // is the age or nothing.
+        String weatherSub = weather == null || !age.isEmpty() || !weather.hasCurrent() ? age : weather.range;
+        // Which optional lines fit the placed height, dropped in the plan's order (range/age, then
+        // the audience, then the count): RemoteViews has no ViewThatFits.
+        int lines = WidgetFill.dateColumnLines(heightDp, WidgetSizes.effectiveScale(context, textScale),
+                (weather != null ? WidgetFill.COLUMN_WEATHER : 0)
+                        | (!weatherSub.isEmpty() ? WidgetFill.COLUMN_WEATHER_SUB : 0)
+                        | (!age.isEmpty() ? WidgetFill.COLUMN_AGE : 0)
+                        | (!asOf.isEmpty() ? WidgetFill.COLUMN_STALE : 0)
+                        | (!audience.isEmpty() ? WidgetFill.COLUMN_AUDIENCE : 0)
+                        | (dueCount ? WidgetFill.COLUMN_DUE : 0));
+        bindColumnWeather(v, context, textScale, weather,
+                (lines & WidgetFill.COLUMN_WEATHER_SUB) != 0 ? weatherSub : "", age.isEmpty());
+        WidgetViews.textOrGone(v, R.id.date_as_of, asOf);
+        WidgetViews.textOrGone(v, R.id.date_audience,
+                (lines & WidgetFill.COLUMN_AUDIENCE) != 0 ? audience : "");
+        boolean showDue = (lines & WidgetFill.COLUMN_DUE) != 0;
         WidgetViews.textOrGone(
-                v, R.id.date_due, dueCount ? WidgetText.emphasised(day.tasks.countText) : "");
-        if (dueCount) {
+                v, R.id.date_due, showDue ? WidgetText.emphasised(day.tasks.countText) : "");
+        if (showDue) {
             WidgetViews.onClick(v, R.id.date_due, context, id, WidgetViews.SLOT_DUE_COUNT,
                     WidgetViews.or(day.tasks.link, s.links.todo), size);
         }
 
-        WidgetViews.bindPeek(v, plan);
+        WidgetViews.bindPeek(v, plan, false);
 
         float panelDp = agendaPanelDp(widthDp);
         // The scrolling calendar, set on every render (relaxed included, where it is empty).
@@ -169,6 +203,34 @@ final class DayWidgetRenderer {
         v.setViewVisibility(
                 R.id.panel_footer, tonight || !s.labels.later.isEmpty() ? View.VISIBLE : View.GONE);
         return v;
+    }
+
+    /**
+     * The date column's weather: the row when there is weather, and the line under it ({@code sub}:
+     * the range or the age; "" when there is none or the fill dropped it). The row is the glyph and
+     * an Outfit bitmap like the numeral: the temperature (softer ink while the reading shows its
+     * age), or, past `currentUntil`, today's glyph and high in the softer ink and the same style,
+     * so the row that is never dropped is never a lone glyph. A range line shrinks to one line like the month; an age
+     * wraps. Sets every weather view on every path.
+     */
+    private static void bindColumnWeather(RemoteViews v, Context context, float textScale,
+            WidgetWeather.Shown weather, String sub, boolean subIsRange) {
+        v.setViewVisibility(R.id.date_weather, weather == null ? View.GONE : View.VISIBLE);
+        if (weather == null) {
+            v.setViewVisibility(R.id.date_weather_sub, View.GONE);
+            return;
+        }
+        float scale = Math.min(WidgetSizes.effectiveScale(context, textScale), WidgetSizes.TEXT_SCALE_MAX);
+        float glyphDp = WidgetViews.bindWeatherGlyph(
+                v, R.id.date_weather_glyph, weather, COLUMN_GLYPH_DP * scale, COLUMN_GLYPH_DP);
+        WidgetTextBitmaps.bind(v, context, R.id.date_weather_temp, weather.rowText(), COLUMN_TEMP, textScale,
+                DATE_COLUMN_DP - glyphDp - WEATHER_GAP_DP,
+                weather.soft() ? R.color.widget_ink_soft : R.color.widget_ink);
+        if (WidgetViews.textOrGone(v, R.id.date_weather_sub, sub) && subIsRange) {
+            float body = WidgetViews.sp(context, R.dimen.widget_text_body) * textScale;
+            v.setTextViewTextSize(R.id.date_weather_sub, TypedValue.COMPLEX_UNIT_SP, WidgetViews.fitSp(
+                    context, sub, Typeface.DEFAULT, body, DATE_COLUMN_MIN_SP, DATE_COLUMN_DP));
+        }
     }
 
     /** The agenda panel's inner width (dp) for a medium/large widget {@code widthDp} wide. */
@@ -263,7 +325,10 @@ final class DayWidgetRenderer {
         WidgetSizes.Size size = WidgetSizes.Size.SMALL;
         WidgetSnapshot s = plan.snapshot;
         RemoteViews v = new RemoteViews(context.getPackageName(), size.layout);
-        float headerScale = smallHeaderScale(context, widthDp, textScale, plan);
+        // The weather takes the peek's slot only while a current temperature exists (#134).
+        WidgetWeather.Shown weather = WidgetWeather.at(s.weather, now);
+        WidgetWeather.Shown slot = weather != null && weather.hasCurrent() ? weather : null;
+        float headerScale = smallHeaderScale(context, widthDp, textScale, plan, slot);
         sizeSmallText(v, context, textScale, headerScale);
         frame(v, context, id, size, prefs.opacity, s.links.nook);
         dateTile(v, prefs.opacity);
@@ -273,7 +338,8 @@ final class DayWidgetRenderer {
         WidgetTextBitmaps.bind(v, context, R.id.date_numeral, plan.entry.numeral, SMALL_NUMERAL,
                 headerScale, 0, R.color.widget_ink);
         WidgetViews.onClick(v, R.id.date_column, context, id, WidgetViews.SLOT_DATE, s.links.nook, size);
-        WidgetViews.bindPeek(v, plan);
+        WidgetViews.bindPeek(v, plan, slot != null);
+        bindSmallWeather(v, context, headerScale, slot);
         WidgetViews.textOrGone(v, R.id.date_as_of, asOf(context, plan));
 
         WidgetSnapshot.Day day = plan.day;
@@ -313,6 +379,22 @@ final class DayWidgetRenderer {
                     WidgetViews.or(next.link, s.links.nook), size);
         }
         return v;
+    }
+
+    /**
+     * The small header's weather in the peek's slot: glyph + temperature at the header's scale
+     * (so a narrow 2x2 shrinks them together), soft ink while the reading shows its age; GONE
+     * when {@code slot} is null and the peek is back. No range or age line: the 2x2 has no room.
+     */
+    private static void bindSmallWeather(
+            RemoteViews v, Context context, float headerScale, WidgetWeather.Shown slot) {
+        v.setViewVisibility(R.id.small_weather, slot == null ? View.GONE : View.VISIBLE);
+        if (slot == null) return;
+        float scale = Math.min(WidgetSizes.effectiveScale(context, headerScale), WidgetSizes.TEXT_SCALE_MAX);
+        WidgetViews.bindWeatherGlyph(
+                v, R.id.small_weather_glyph, slot, SMALL_GLYPH_DP * scale, SMALL_GLYPH_DP);
+        WidgetTextBitmaps.bind(v, context, R.id.small_weather_temp, slot.temp, SMALL_TEMP, headerScale, 0,
+                slot.aged ? R.color.widget_ink_soft : R.color.widget_ink);
     }
 
     // ---- message states ------------------------------------------------------------------
@@ -369,8 +451,8 @@ final class DayWidgetRenderer {
     private static void sizeAgendaText(
             RemoteViews v, Context context, float textScale, WidgetSnapshot.DayEntry entry) {
         WidgetViews.textSize(v, context, textScale, R.dimen.widget_text_body,
-                R.id.date_as_of, R.id.date_audience, R.id.date_due, R.id.tasks_heading,
-                R.id.tasks_more, R.id.footer_tonight, R.id.footer_later);
+                R.id.date_weather_sub, R.id.date_as_of, R.id.date_audience, R.id.date_due,
+                R.id.tasks_heading, R.id.tasks_more, R.id.footer_tonight, R.id.footer_later);
         WidgetViews.textSize(v, context, textScale, R.dimen.widget_text_relaxed, R.id.relaxed_enjoy);
         // The weekday and month fill the fixed 52dp column: a short name grows with the choice, a
         // long one ("Wednesday", "September") shrinks to fit, never below DATE_COLUMN_MIN_SP.
@@ -388,14 +470,23 @@ final class DayWidgetRenderer {
      * Standard runs under the peek, so the header shrinks to fit, down to
      * {@link #SMALL_HEADER_MIN_SCALE}. Below API 31 the header row cannot grow
      * (setViewLayoutHeight is 31+), so the header never draws bigger than Standard there.
+     *
+     * When the weather holds the peek's slot ({@code slot}, #134) its glyph and temperature
+     * scale with the header, so they share the budget: the slot's fixed part is only the gap.
      */
-    private static float smallHeaderScale(
-            Context context, float widthDp, float textScale, WidgetFill.Plan plan) {
+    private static float smallHeaderScale(Context context, float widthDp, float textScale,
+            WidgetFill.Plan plan, WidgetWeather.Shown slot) {
         float upper = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ? textScale : 1f;
         float standard = WidgetTextBitmaps.naturalWidthDp(context, plan.entry.weekdayShort, SMALL_WEEKDAY, 1f)
                 + WidgetTextBitmaps.naturalWidthDp(context, plan.entry.numeral, SMALL_NUMERAL, 1f);
         if (standard <= 0f) return upper;
-        float room = widthDp - SMALL_CONTENT_INSET_DP - WidgetViews.peekWidthDp(context, plan)
+        float slotFixed = WidgetViews.peekWidthDp(context, plan);
+        if (slot != null) {
+            slotFixed = WEATHER_GAP_DP;
+            standard += SMALL_GLYPH_DP * WidgetSizes.effectiveScale(context, 1f)
+                    + WidgetTextBitmaps.naturalWidthDp(context, slot.temp, SMALL_TEMP, 1f);
+        }
+        float room = widthDp - SMALL_CONTENT_INSET_DP - slotFixed
                 - WidgetViews.dp(context, R.dimen.widget_small_peek_end) - SMALL_HEADER_TRAIL_DP;
         return Math.max(SMALL_HEADER_MIN_SCALE, Math.min(upper, room / standard));
     }
@@ -425,6 +516,8 @@ final class DayWidgetRenderer {
             float header = WidgetViews.dp(context, R.dimen.widget_small_header_height);
             float grown = header * Math.max(1f, Math.min(numeralGrowth, WidgetSizes.TEXT_SCALE_MAX));
             v.setViewLayoutHeight(R.id.date_column, grown, TypedValue.COMPLEX_UNIT_DIP);
+            // The weather in the peek's slot is the header row's height, so it stays level with it.
+            v.setViewLayoutHeight(R.id.small_weather, grown, TypedValue.COMPLEX_UNIT_DIP);
             float peekTop = WidgetViews.dp(context, R.dimen.widget_small_peek_top) + grown - header;
             v.setViewLayoutMargin(R.id.peek_family, RemoteViews.MARGIN_TOP, peekTop, TypedValue.COMPLEX_UNIT_DIP);
             v.setViewLayoutMargin(R.id.peek_avatar, RemoteViews.MARGIN_TOP, peekTop, TypedValue.COMPLEX_UNIT_DIP);
@@ -467,18 +560,25 @@ final class DayWidgetRenderer {
 
     /** "as of 08:30" (device time format) when the plan is stale; "" otherwise. */
     private static String asOf(Context context, WidgetFill.Plan plan) {
-        if (!plan.stale || plan.snapshot.labels.asOf.isEmpty()) return "";
-        long generated = WidgetFill.parseIso(plan.snapshot.generatedAt);
-        if (generated <= 0) return "";
-        // A time alone reads as "this morning"; a snapshot from another day names the day (same
-        // rule as iOS StaleLabel). Lowercased so "3:31 AM" matches the rows' "10:15am" style.
-        String when = android.text.format.DateUtils.isToday(generated)
-                ? DateFormat.getTimeFormat(context).format(new Date(generated)).toLowerCase(java.util.Locale.ROOT)
-                : android.text.format.DateUtils.formatDateTime(context, generated,
+        if (!plan.stale) return "";
+        return asOfText(context, plan.snapshot.labels.asOf, WidgetFill.parseIso(plan.snapshot.generatedAt));
+    }
+
+    /**
+     * {@code template} ("as of {time}": `labels.asOf`, or `labels.weatherAsOf` for a reading's
+     * age) filled with {@code epochMs}; "" when the template is empty or the instant unknown.
+     */
+    private static String asOfText(Context context, String template, long epochMs) {
+        if (template.isEmpty() || epochMs <= 0) return "";
+        // A time alone reads as "this morning"; another day names the day (same rule as iOS
+        // StaleLabel). Lowercased so "3:31 AM" matches the rows' "10:15am" style.
+        String when = android.text.format.DateUtils.isToday(epochMs)
+                ? DateFormat.getTimeFormat(context).format(new Date(epochMs)).toLowerCase(java.util.Locale.ROOT)
+                : android.text.format.DateUtils.formatDateTime(context, epochMs,
                         android.text.format.DateUtils.FORMAT_SHOW_DATE
                                 | android.text.format.DateUtils.FORMAT_ABBREV_MONTH
                                 | android.text.format.DateUtils.FORMAT_NO_YEAR);
-        return plan.snapshot.labels.asOf.replace("{time}", when);
+        return template.replace("{time}", when);
     }
 
     /** The row's title, or the handoff's inline title when "who's where" is on. */

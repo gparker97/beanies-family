@@ -6749,6 +6749,12 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'widget.tripOnNow': '进行中',
   'widget.birthdayTurns': '{name} 满 {age} 岁',
   'widget.birthdayOf': '{name} 的生日',
+  'widget.weatherAsOf': '截至 {time}',
+  'widget.weatherRange': '{high} / {low}',
+  'widget.circleLeft': '剩余',
+  'widget.circleAllDone': '全部完成',
+  'widget.circleAllClear': '无安排',
+  'widget.circleToDo': '待办',
   'widget.publishFailed': '主屏幕小组件未能更新',
   'widget.publishFailedHelp':
     '小组件可能显示的是旧安排。请稍后再打开 beanies；如果一直这样，请移除小组件后重新添加。',

@@ -92,6 +92,9 @@ dependencies {
     implementation "com.android.installreferrer:installreferrer:$installReferrerVersion"
     implementation project(':capacitor-android')
     testImplementation "junit:junit:$junitVersion"
+    // The real org.json for JVM unit tests: android.jar's copy is a stub that throws, and the
+    // widget snapshot reader (WidgetSnapshotTest) is tested against the committed v2/v3 fixtures.
+    testImplementation "org.json:json:20250517"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
     implementation project(':capacitor-cordova-android-plugins')

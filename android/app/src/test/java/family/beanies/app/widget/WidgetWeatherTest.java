@@ -1,0 +1,134 @@
+package family.beanies.app.widget;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+
+import java.util.Arrays;
+import java.util.Calendar;
+import java.util.Collections;
+import java.util.TimeZone;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+
+/**
+ * The widget's weather reader (#134). The thresholds live in TypeScript and arrive as two instants;
+ * these pin the comparisons at their edges (just before and exactly at `ageFrom` and
+ * `currentUntil`) and the device-ymd day pick across midnight.
+ */
+public class WidgetWeatherTest {
+
+    private static final long HOUR = 60L * 60L * 1000L;
+    private static final long FETCHED = 1_791_678_000_000L;
+    private static final long AGE_FROM = FETCHED + HOUR;
+    private static final long CURRENT_UNTIL = FETCHED + 12 * HOUR;
+
+    private TimeZone savedZone;
+
+    @Before
+    public void pinZone() {
+        savedZone = TimeZone.getDefault();
+        // No daylight saving, so local midnight is a fixed offset from UTC.
+        TimeZone.setDefault(TimeZone.getTimeZone("Asia/Singapore"));
+    }
+
+    @After
+    public void restoreZone() {
+        TimeZone.setDefault(savedZone);
+    }
+
+    private static WidgetSnapshot.Weather weather() {
+        return new WidgetSnapshot.Weather(FETCHED, AGE_FROM, CURRENT_UNTIL, "partly", "27°", "Partly cloudy",
+                Arrays.asList(
+                        new WidgetSnapshot.WeatherDay("2026-10-11", "thunder", "32°", "32° / 26°"),
+                        new WidgetSnapshot.WeatherDay("2026-10-12", "rain", "30°", "30° / 25°")));
+    }
+
+    @Test
+    public void justBeforeAgeFromShowsTheTemperatureWithNoAge() {
+        WidgetWeather.Shown shown = WidgetWeather.at(weather(), "2026-10-11", AGE_FROM - 1);
+        assertEquals("27°", shown.temp);
+        assertFalse(shown.aged);
+        assertEquals("partly", shown.glyph);
+        assertEquals("Partly cloudy", shown.condition);
+        assertEquals("32° / 26°", shown.range);
+        assertTrue(shown.hasCurrent());
+        assertEquals("27°", shown.rowText());
+        assertFalse(shown.soft());
+        assertFalse(shown.showsAge());
+    }
+
+    @Test
+    public void atAgeFromTheAgeShows() {
+        WidgetWeather.Shown shown = WidgetWeather.at(weather(), "2026-10-11", AGE_FROM);
+        assertEquals("27°", shown.temp);
+        assertTrue(shown.aged);
+        assertEquals(FETCHED, shown.fetchedAt);
+        assertEquals("27°", shown.rowText());
+        assertTrue(shown.soft());
+        assertTrue(shown.showsAge());
+    }
+
+    @Test
+    public void justBeforeCurrentUntilTheTemperatureStaysAged() {
+        WidgetWeather.Shown shown = WidgetWeather.at(weather(), "2026-10-11", CURRENT_UNTIL - 1);
+        assertEquals("27°", shown.temp);
+        assertTrue(shown.aged);
+        assertTrue(shown.hasCurrent());
+    }
+
+    @Test
+    public void atCurrentUntilTheTemperatureGoesAndTheRangeStays() {
+        WidgetWeather.Shown shown = WidgetWeather.at(weather(), "2026-10-11", CURRENT_UNTIL);
+        assertEquals("", shown.temp);
+        assertFalse(shown.aged);
+        assertFalse(shown.hasCurrent());
+        // The stale "now" glyph gives way to today's, as the web atom does for an old reading.
+        assertEquals("thunder", shown.glyph);
+        assertEquals("", shown.condition);
+        assertEquals("32° / 26°", shown.range);
+        // The kept row is never a lone glyph: today's high takes the temperature's place, in the
+        // softer ink, and the line under it carries the age.
+        assertEquals("32°", shown.rowText());
+        assertTrue(shown.soft());
+        assertTrue(shown.showsAge());
+        assertEquals(FETCHED, shown.fetchedAt);
+    }
+
+    @Test
+    public void noEntryForTodayIsNoWeather() {
+        assertNull(WidgetWeather.at(weather(), "2026-10-13", AGE_FROM - 1));
+        assertNull(WidgetWeather.at(null, "2026-10-11", AGE_FROM - 1));
+        WidgetSnapshot.Weather noDays = new WidgetSnapshot.Weather(FETCHED, AGE_FROM, CURRENT_UNTIL,
+                "partly", "27°", "Partly cloudy", Collections.<WidgetSnapshot.WeatherDay>emptyList());
+        assertNull(WidgetWeather.at(noDays, "2026-10-11", AGE_FROM - 1));
+    }
+
+    @Test
+    public void theDayIsPickedByTheDeviceYmdAcrossMidnight() {
+        long midnight = localMidnight(2026, Calendar.OCTOBER, 12);
+        WidgetWeather.Shown before = WidgetWeather.at(weather(), midnight - 1);
+        WidgetWeather.Shown after = WidgetWeather.at(weather(), midnight);
+        assertEquals("32° / 26°", before.range);
+        assertEquals("30° / 25°", after.range);
+        // Past the last day the reading carries, there is no weather at all (the peek returns).
+        assertNull(WidgetWeather.at(weather(), localMidnight(2026, Calendar.OCTOBER, 13)));
+    }
+
+    @Test
+    public void nextChangeIsTheNextInstantAhead() {
+        assertEquals(AGE_FROM, WidgetWeather.nextChange(weather(), FETCHED));
+        assertEquals(CURRENT_UNTIL, WidgetWeather.nextChange(weather(), AGE_FROM));
+        assertEquals(Long.MAX_VALUE, WidgetWeather.nextChange(weather(), CURRENT_UNTIL));
+        assertEquals(Long.MAX_VALUE, WidgetWeather.nextChange(null, FETCHED));
+    }
+
+    private static long localMidnight(int year, int month, int day) {
+        Calendar c = Calendar.getInstance();
+        c.clear();
+        c.set(year, month, day, 0, 0, 0);
+        return c.getTimeInMillis();
+    }
+}

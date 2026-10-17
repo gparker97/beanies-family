@@ -14,7 +14,12 @@
  */
 
 import { logEvent, type LogLevel } from '@/services/telemetry/logEvent';
-import type { WidgetSize } from '@/types/widgetSnapshot';
+import {
+  CIRCLE_SHOW_OPTIONS,
+  type CircleShowOption,
+  type WidgetSize,
+} from '@/types/widgetSnapshot';
+import type { WidgetPlacements } from '@/services/native/widgetBridgePlugin';
 
 const SURFACE = 'home-widget';
 
@@ -27,10 +32,11 @@ function emit(level: LogLevel, message: string, context: Record<string, unknown>
 
 /**
  * A snapshot reached the native side. Emitted on EVERY success so the publish rate is
- * measurable. `detail` is always `tasks=<n>;ahead=<n>;kb=<n>`, plus `;skipped=<n>` only when
- * a part was dropped by a malformed record, plus `;day=<n>` only when the native side said
- * which day it painted (Android): `day=0` is today, `day=-1` a widget still on yesterday.
- * Filter on `skipped=` / `day=`, never on `detail` existing.
+ * measurable. `detail` is always `tasks=<n>;ahead=<n>;kb=<n>;wx=<0|1>` (`wx=1`: the snapshot
+ * carried a weather reading, #134), plus `;skipped=<n>` only when a part was dropped by a
+ * malformed record, plus `;day=<n>` only when the native side said which day it painted
+ * (Android): `day=0` is today, `day=-1` a widget still on yesterday. Filter on `skipped=` /
+ * `day=` / `wx=`, never on `detail` existing.
  */
 export function emitSnapshotPublished(payload: {
   reason: WidgetRefreshReason;
@@ -43,6 +49,8 @@ export function emitSnapshotPublished(payload: {
   /** The snapshot JSON's size, in whole kilobytes (rounded up). */
   kb: number;
   skipped: number;
+  /** The snapshot carried weather (`snapshot.weather` non-null). */
+  weather: boolean;
   /** Days from the app's today to the day the widgets painted (Android); absent on iOS. */
   renderedDayOffset?: number;
 }): void {
@@ -52,6 +60,7 @@ export function emitSnapshotPublished(payload: {
     `tasks=${payload.tasksToday}`,
     `ahead=${payload.aheadRows}`,
     `kb=${payload.kb}`,
+    `wx=${payload.weather ? 1 : 0}`,
     ...(payload.skipped > 0 ? [`skipped=${payload.skipped}`] : []),
     ...(payload.renderedDayOffset !== undefined ? [`day=${payload.renderedDayOffset}`] : []),
   ].join(';');
@@ -63,11 +72,41 @@ export function emitSnapshotPublished(payload: {
   });
 }
 
-/** Placed widgets, one event per size with at least one placement. */
-export function emitPlacements(placements: Partial<Record<WidgetSize, number>>): void {
-  for (const [size, count] of Object.entries(placements)) {
+/** Short names in the `circle=` token, in `CIRCLE_SHOW_OPTIONS` order. Never rename one. */
+const CIRCLE_TOKEN_NAMES: Readonly<Record<CircleShowOption, string>> = {
+  nextUp: 'nextUp',
+  nextHandoff: 'handoff',
+  todosLeft: 'todos',
+  thingsLeft: 'left',
+};
+
+/** A relayed native count as a small non-negative integer (anything else reads as 0). */
+function safeCount(n: unknown): number {
+  return typeof n === 'number' && Number.isFinite(n) && n > 0 ? Math.min(Math.floor(n), 999) : 0;
+}
+
+/**
+ * `circle=nextUp:1,handoff:0,todos:0,left:0`: every option, always in the same order, so a
+ * CloudWatch filter can match one option's count. Fixed tokens and integers only.
+ */
+export function circleOptionsToken(circle: Partial<Record<CircleShowOption, number>>): string {
+  return `circle=${CIRCLE_SHOW_OPTIONS.map((o) => `${CIRCLE_TOKEN_NAMES[o]}:${safeCount(circle[o])}`).join(',')}`;
+}
+
+/**
+ * Placed widgets, one event per size with at least one placement. The circle option counts
+ * (iOS, #134) ride the `ios-accessory` event as its `detail` token, since circles are
+ * accessories.
+ */
+export function emitPlacements(placements: WidgetPlacements): void {
+  const { circle, ...sizes } = placements;
+  for (const [size, count] of Object.entries(sizes) as [WidgetSize, number | undefined][]) {
     if (!count || count <= 0) continue;
-    emit('info', 'placements', { kind: size, count });
+    emit('info', 'placements', {
+      kind: size,
+      count,
+      ...(size === 'ios-accessory' && circle ? { detail: circleOptionsToken(circle) } : {}),
+    });
   }
 }
 

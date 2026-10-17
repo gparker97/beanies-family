@@ -14758,6 +14758,13 @@ const STRING_DEFS = {
   'widget.tripOnNow': { en: 'on now', beanie: 'on now' },
   'widget.birthdayTurns': { en: '{name} turns {age}', beanie: '{name} turns {age}' },
   'widget.birthdayOf': { en: "{name}'s birthday", beanie: "{name}'s birthday" },
+  // v3 (#134): the weather line and the lock-screen circle's words.
+  'widget.weatherAsOf': { en: 'as of {time}', beanie: 'as of {time}' },
+  'widget.weatherRange': { en: '{high} / {low}', beanie: '{high} / {low}' },
+  'widget.circleLeft': { en: 'left', beanie: 'left' },
+  'widget.circleAllDone': { en: 'all done', beanie: 'all done' },
+  'widget.circleAllClear': { en: 'all clear', beanie: 'all clear' },
+  'widget.circleToDo': { en: 'to do', beanie: 'to do' },
   'widget.publishFailed': {
     en: "Home-screen widget didn't update",
     beanie: "home-screen widget didn't update",

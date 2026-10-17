@@ -5,7 +5,9 @@ import WidgetKit
 /// (`my`). Respects the per-device "Show event titles on the lock screen" setting
 /// (`settings.lockScreenTitles`): off → times and first names only. Inline and rectangular
 /// show the next calendar item even when it falls on a later day, and then name the day
-/// ("Wed 4:30pm piano"). The circle's picker (`AccessoryConfigIntent`) chooses what it shows.
+/// ("Wed 4:30pm piano"). Inline and rectangular also carry the current temperature when
+/// there is one (#134); the circle never does. The circle's picker (`AccessoryConfigIntent`)
+/// chooses what it shows (`WidgetFill.circle`).
 ///
 /// The `kind` predates the picker (it was a `StaticConfiguration`) and must never change:
 /// WidgetKit keeps placed accessories across the switch by `kind` and hands them the intent's
@@ -34,15 +36,15 @@ struct AccessoryProvider: AppIntentTimelineProvider {
         if context.isPreview {
             return DayEntry(date: now, state: .ready(SampleSnapshot.make(now: now)), blocks: blocks)
         }
-        return WidgetTimeline.build(blocks: blocks, now: now, includePickups: true).entries.first
+        return WidgetTimeline.build(blocks: blocks, now: now, lockScreen: true).entries.first
             ?? DayEntry(date: now, state: .signedOut, blocks: blocks)
     }
 
-    // P2.0 spike step 3: no entries are added for the circle's countdown hour, on purpose.
-    // The ring must animate from `ProgressView(timerInterval:)` alone; P2.2 adds each row's
-    // `startsAt - 3600` and `startsAt` instants for the time and word swap.
+    // The countdown ring animates from `ProgressView(timerInterval:)` alone; the timeline adds
+    // each item's and handoff's start minus an hour and the start itself, so the face is
+    // redrawn as each countdown begins and ends (`WidgetTimeline.entryDates`).
     func timeline(for configuration: AccessoryConfigIntent, in context: Context) async -> Timeline<DayEntry> {
-        WidgetTimeline.build(blocks: WidgetBlocks(configuration), now: Date(), includePickups: true)
+        WidgetTimeline.build(blocks: WidgetBlocks(configuration), now: Date(), lockScreen: true)
     }
 }
 
@@ -80,6 +82,9 @@ struct DayAccessoryView: View {
 
     private var link: URL {
         if let pair = resolved {
+            if family == .accessoryCircular {
+                return WidgetLinks.url(circleLink(circlePick(pair.0, pair.1), pair.0), .accessory)
+            }
             if let next = nextRow(pair.1) { return WidgetLinks.url(next.row.link, .accessory) }
             return WidgetLinks.url(pair.0.links.nook, .accessory)
         }
@@ -108,7 +113,16 @@ struct DayAccessoryView: View {
         case .accessoryCircular:
             ZStack {
                 AccessoryWidgetBackground()
-                BeanMark(size: 22)
+                if isSignedOut {
+                    // Signed out: the bean and "sign in" (native: no snapshot exists).
+                    VStack(spacing: 2) {
+                        BeanMark(size: 18)
+                        circleWordText(String(localized: "widget_sign_in"))
+                    }
+                    .padding(7)
+                } else {
+                    BeanMark(size: 22)
+                }
             }
         default:
             VStack(alignment: .leading, spacing: 1) {
@@ -128,15 +142,26 @@ struct DayAccessoryView: View {
     @ViewBuilder private func ready(_ snapshot: WSSnapshot, _ day: ResolvedDay) -> some View {
         switch family {
         case .accessoryInline:
-            Text(inlineText(snapshot, day))
+            inlineText(snapshot, day)
         case .accessoryCircular:
             circular(snapshot, day)
         default:
             let lines = rectangularLines(snapshot, day)
             VStack(alignment: .leading, spacing: 1) {
-                Text(lines.first)
-                    .font(.system(size: 15, weight: .semibold))
-                    .lineLimit(1)
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    Text(lines.first)
+                        .font(.system(size: 15, weight: .semibold))
+                        .lineLimit(1)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    // The current temperature at line one's trailing edge; never the range.
+                    if let temp = currentWeather(snapshot)?.temp {
+                        Text(temp)
+                            .font(.system(size: 15, weight: .semibold))
+                            .monospacedDigit()
+                            .lineLimit(1)
+                            .fixedSize()
+                    }
+                }
                 if !lines.second.isEmpty {
                     Text(lines.second)
                         .font(.system(size: 13))
@@ -147,9 +172,23 @@ struct DayAccessoryView: View {
         }
     }
 
+    /// The reading as of this entry, or nil (`WidgetWeather`: off, no town, none for today, v2).
+    private func currentWeather(_ snapshot: WSSnapshot) -> WeatherGlance? {
+        WidgetWeather.glance(snapshot.weather, labels: snapshot.labels, at: entry.date)
+    }
+
+    /// The inline line, led by the weather glyph and the current temperature when there is
+    /// one ("☁ 27° · 4:30pm piano"). Concatenated `Text`, the only way an inline accessory
+    /// draws an image beside its words; the glyph is the template image, in the system tint.
+    private func inlineText(_ snapshot: WSSnapshot, _ day: ResolvedDay) -> Text {
+        let line = Text(inlineLine(snapshot, day))
+        guard let weather = currentWeather(snapshot), let temp = weather.temp else { return line }
+        return Text(Image(weather.glyph.monoAsset)) + Text(" \(temp) · ") + line
+    }
+
     /// The next pick-up the viewer does today, else the next calendar item ("4:30pm piano",
     /// "Wed 4:30pm piano"; titles off: "4:30pm Max"), else "Sat 11 · 6 things on today".
-    private func inlineText(_ snapshot: WSSnapshot, _ day: ResolvedDay) -> String {
+    private func inlineLine(_ snapshot: WSSnapshot, _ day: ResolvedDay) -> String {
         let nowMs = entry.date.timeIntervalSince1970 * 1000
         if let pickup = day.day.pickups.first(where: { $0.at > nowMs }), !pickup.text.isEmpty {
             return pickup.text
@@ -186,93 +225,195 @@ struct DayAccessoryView: View {
         return [day, next.row.time].filter { !$0.isEmpty }.joined(separator: " ")
     }
 
-    /// The circle, by the picker's choice. Every option falls back to Next up when it has
-    /// nothing of its own to show.
+    // MARK: the circle
+
+    /// What the circle shows (`WidgetFill.circle`): the picker's choice, or Next up when the
+    /// choice has nothing of its own. Read by both the face and the tap target.
+    private func circlePick(_ snapshot: WSSnapshot, _ day: ResolvedDay) -> CirclePick {
+        WidgetFill.circle(day, labels: snapshot.labels, show: entry.blocks.circleShow, blocks: entry.blocks, at: entry.date)
+    }
+
+    /// The circle's tap target: the item or the handoff's activity, the to-dos page, or the Nook.
+    private func circleLink(_ pick: CirclePick, _ snapshot: WSSnapshot) -> String {
+        switch pick {
+        case .nextUp(let next): return next?.row.link ?? snapshot.links.nook
+        case .nextHandoff(let handoff): return handoff.link
+        case .todosLeft: return snapshot.links.todo
+        case .thingsLeft: return snapshot.links.nook
+        }
+    }
+
+    /// The circle, by `circlePick`. The four faces share one layout (`circleFace`: the ring,
+    /// then an optional line above, the lead, and a word under it).
     @ViewBuilder private func circular(_ snapshot: WSSnapshot, _ day: ResolvedDay) -> some View {
-        switch entry.blocks.circleShow {
-        case .nextUp:
-            nextUpCircle(snapshot, day)
-        case .nextHandoff, .todosLeft, .thingsLeft:
-            // P2.2: Next handoff (car + time + name), To-dos left (count + done ring) and
-            // Things left (count + the day's progress ring) need the v3 snapshot fields
-            // (`handoffs`, `doneToday`, the circle labels). The spike shows Next up for all.
-            nextUpCircle(snapshot, day)
-        }
-    }
-
-    /// Next up: the next item's time, big, with one word under it (the title's first word,
-    /// or who, when titles are off) and a ring that fills over the hour before it starts. A
-    /// later day's item names the day above. Untimed (trips, birthdays, all-day): the glyph
-    /// in place of the time, and no ring. Nothing left this week: a tick and "all clear".
-    private func nextUpCircle(_ snapshot: WSSnapshot, _ day: ResolvedDay) -> some View {
-        let next = nextRow(day)
-        let start = next.flatMap { next -> Date? in
-            guard let startsAt = next.row.startsAt, !next.row.time.isEmpty else { return nil }
-            return Date(timeIntervalSince1970: startsAt / 1000)
-        }
-        return ZStack {
-            AccessoryWidgetBackground()
-            if let start {
-                // Empty before the hour starts, full from the start on. The system animates
-                // it on its own, with no timeline entries (spike step 3 proves this).
-                ProgressView(
-                    timerInterval: start.addingTimeInterval(-3600)...start,
-                    countsDown: false,
-                    label: { EmptyView() },
-                    currentValueLabel: { EmptyView() }
-                )
-                .progressViewStyle(.circular)
-                .widgetAccentable()
-            }
-            if let next {
+        switch circlePick(snapshot, day) {
+        case .nextUp(let next):
+            nextUpCircle(snapshot, next)
+        case .nextHandoff(let handoff):
+            // Car + time + the child's name, counting down over the hour before it.
+            let at = Date(timeIntervalSince1970: handoff.at / 1000)
+            circleFace(ring: .countdown(to: at), above: nil, word: handoff.name) {
                 VStack(spacing: 0) {
-                    if let later = next.laterDay, !later.weekdayShort.isEmpty {
-                        Text(later.weekdayShort)
-                            .font(.system(size: 10, weight: .semibold))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
-                    }
-                    if start != nil {
-                        Text(next.row.time)
-                            .font(.outfit(size: 17, weight: .bold))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.5)
-                    } else {
-                        circleGlyph(next.row.kind)
-                    }
-                    let word = circleWord(next.row, titles: snapshot.settings.lockScreenTitles)
-                    if !word.isEmpty {
-                        Text(word)
-                            .font(.system(size: 11, weight: .medium))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.6)
-                    }
+                    circleSymbol("car.fill")
+                    circleBig(WidgetClock.time(at))
                 }
-                .padding(7)
+            }
+        case .todosLeft(let count, let done):
+            // Checkbox + how many are due now + "to do"; the ring is done today of the total.
+            circleFace(
+                ring: .progress(Double(done) / Double(count + done)),
+                above: nil,
+                word: snapshot.labels.circleToDo
+            ) {
+                VStack(spacing: 0) {
+                    circleSymbol("checkmark.square")
+                    circleBig(String(count))
+                }
+            }
+        case .thingsLeft(let left, let total):
+            // Calendar + how many are still to come + "left"; the ring is how much of today is
+            // behind (the old circle's ring). None left: a tick and "all done".
+            let progress = Double(total - left) / Double(total)
+            if left == 0 {
+                circleFace(ring: .progress(progress), above: nil, word: snapshot.labels.circleAllDone) {
+                    circleTick()
+                }
             } else {
-                VStack(spacing: 1) {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 17, weight: .bold))
-                        .widgetAccentable()
-                    // P2.2: `labels.circleAllClear` from the snapshot replaces this native key.
-                    Text(String(localized: "widget_all_clear"))
-                        .font(.system(size: 11, weight: .medium))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.6)
+                circleFace(ring: .progress(progress), above: nil, word: snapshot.labels.circleLeft) {
+                    VStack(spacing: 0) {
+                        circleSymbol("calendar")
+                        circleBig(String(left))
+                    }
                 }
-                .padding(7)
             }
         }
     }
 
-    /// One word under the circle's time: the title's first word, or who when titles are off,
-    /// each falling back to the other.
-    private func circleWord(_ row: WSRow, titles: Bool) -> String {
-        // P2.2: the v3 snapshot's `row.shortTitle` (an `Intl.Segmenter` first word, right
-        // for CJK) and `row.whoFirst` replace these two; v2 snapshots keep this fallback.
-        let title = row.title.split(whereSeparator: { $0.isWhitespace }).first.map(String.init) ?? ""
-        let who = row.who
-        return titles ? (title.isEmpty ? who : title) : (who.isEmpty ? title : who)
+    /// Next up: the next item's time, big, with one word under it (`WidgetFill.circleWord`) and
+    /// a ring that fills over the hour before it starts. A later day's item names the day
+    /// above. Untimed (trips, birthdays, all-day): the glyph in place of the time, and no ring.
+    /// Nothing left this week: a tick and "all clear" (the native key only for a v2 snapshot).
+    @ViewBuilder private func nextUpCircle(_ snapshot: WSSnapshot, _ next: NextRow?) -> some View {
+        if let next {
+            let start: Date? = {
+                guard let startsAt = next.row.startsAt, !next.row.time.isEmpty else { return nil }
+                return Date(timeIntervalSince1970: startsAt / 1000)
+            }()
+            let ring: CircleRing = start.map { CircleRing.countdown(to: $0) } ?? .absent
+            circleFace(
+                ring: ring,
+                above: next.laterDay?.weekdayShort,
+                word: WidgetFill.circleWord(next.row, titles: snapshot.settings.lockScreenTitles)
+            ) {
+                if start != nil {
+                    circleBig(next.row.time)
+                } else {
+                    circleGlyph(next.row.kind)
+                }
+            }
+        } else {
+            circleFace(
+                ring: .absent,
+                above: nil,
+                word: snapshot.labels.circleAllClear ?? String(localized: "widget_all_clear")
+            ) {
+                circleTick()
+            }
+        }
+    }
+
+    /// The ring behind a face.
+    private enum CircleRing {
+        /// No ring (an untimed item, "all clear").
+        case absent
+        /// Empty before the final hour, full at the instant (`ProgressView(timerInterval:)`).
+        case countdown(to: Date)
+        /// A fixed share, 0...1.
+        case progress(Double)
+    }
+
+    /// The one circle layout: the background, the ring, then (top to bottom) the optional
+    /// short line above, the lead (a time, a count, a glyph or a tick) and the word under it.
+    private func circleFace<Lead: View>(
+        ring: CircleRing, above: String?, word: String?, @ViewBuilder lead: () -> Lead
+    ) -> some View {
+        ZStack {
+            AccessoryWidgetBackground()
+            circleRing(ring)
+            VStack(spacing: 0) {
+                if let above, !above.isEmpty {
+                    Text(above)
+                        .font(.system(size: 10, weight: .semibold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                }
+                lead()
+                if let word, !word.isEmpty {
+                    circleWordText(word)
+                }
+            }
+            .padding(7)
+        }
+    }
+
+    @ViewBuilder private func circleRing(_ ring: CircleRing) -> some View {
+        switch ring {
+        case .absent:
+            EmptyView()
+        case .countdown(let start):
+            // Empty before the hour starts, full from the start on. The system animates it on
+            // its own between timeline entries.
+            ProgressView(
+                timerInterval: start.addingTimeInterval(-3600)...start,
+                countsDown: false,
+                label: { EmptyView() },
+                currentValueLabel: { EmptyView() }
+            )
+            .progressViewStyle(.circular)
+            .widgetAccentable()
+        case .progress(let value):
+            // The old circle's hand-drawn ring: a faint track and the share in the accent.
+            ZStack {
+                Circle()
+                    .stroke(Color.white.opacity(0.28), lineWidth: 4)
+                Circle()
+                    .trim(from: 0, to: CGFloat(Swift.min(1, Swift.max(0, value))))
+                    .stroke(Color.white, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                    .widgetAccentable()
+            }
+            .padding(2)
+        }
+    }
+
+    /// The big line: a time or a count.
+    private func circleBig(_ text: String) -> some View {
+        Text(text)
+            .font(.outfit(size: 17, weight: .bold))
+            .monospacedDigit()
+            .lineLimit(1)
+            .minimumScaleFactor(0.5)
+    }
+
+    /// The small word under the lead.
+    private func circleWordText(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 11, weight: .medium))
+            .lineLimit(1)
+            .minimumScaleFactor(0.6)
+    }
+
+    /// The option's small symbol above a time or a count (car, checkbox, calendar).
+    private func circleSymbol(_ name: String) -> some View {
+        Image(systemName: name)
+            .font(.system(size: 10, weight: .semibold))
+    }
+
+    /// The "nothing left" tick, in the accent.
+    private func circleTick() -> some View {
+        Image(systemName: "checkmark")
+            .font(.system(size: 17, weight: .bold))
+            .widgetAccentable()
     }
 
     /// An untimed item's glyph in the time's place: the rows' plane and cake (in the

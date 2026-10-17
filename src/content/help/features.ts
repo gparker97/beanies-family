@@ -316,8 +316,8 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
     excerpt:
       "A beanies widget shows today's plan right on your phone's Home Screen, so you can see what's on without opening the app, and one tap takes you to the right screen.",
     icon: '\u{1F4F1}',
-    readTime: 4,
-    updatedDate: '2026-10-13',
+    readTime: 5,
+    updatedDate: '2026-10-18',
     sections: [
       {
         type: 'paragraph',
@@ -373,7 +373,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         type: 'list',
         content: '',
         items: [
-          '<strong>Small</strong> shows the date, how many things are on today, and the next thing coming up, even when that is later in the week.',
+          '<strong>Small</strong> shows the date, the weather, how many things are on today, and the next thing coming up, even when that is later in the week.',
           "<strong>Medium</strong> shows your calendar, with drop-offs and pick-ups, tonight's dinner, and your to-dos underneath.",
           '<strong>Large</strong> shows the same, with room for more of the week and more to-dos.',
         ],
@@ -420,6 +420,22 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       },
       {
         type: 'heading',
+        content: 'Weather on your widget',
+        level: 2,
+        id: 'weather',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'The weather shows beside the date on the medium and large widgets, and on the small widget in the spot where a peek at what is coming used to be. The peek returns whenever there is no weather to show. It comes from your family’s home town, which is set once for everyone in <strong>Settings → Region &amp; Holidays</strong>. Until a home town is set, no weather is shown.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'When a reading gets old, the widget shows how old it is. After a longer while the current temperature is hidden, and today’s high and low stay.',
+      },
+      {
+        type: 'heading',
         content: 'Lock-screen widgets on iPhone',
         level: 2,
         id: 'lock-screen',
@@ -427,7 +443,30 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'On iPhone you can also add a small beanies widget to your Lock Screen, showing your next pick-up, the next thing on, or a count for the day. If you would rather keep event titles private when the phone is locked, open <strong>Settings → Reminders</strong> and turn off <strong>Show event titles on the lock screen</strong>. The widget then shows only times and first names.',
+          'On iPhone you can also add a small beanies widget to your Lock Screen. The inline and rectangular ones show the current temperature along with your next pick-up or the next thing on. The circle shows one thing at a glance, and you choose which.',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'Touch and hold the circle widget, then tap <strong>Edit Widget</strong>.',
+          'Tap <strong>Show</strong> and choose an option.',
+        ],
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>Next up</strong> shows when your next thing starts.',
+          '<strong>Next handoff</strong> shows when you next drop off or pick up.',
+          '<strong>To-dos left</strong> shows how many are due today.',
+          '<strong>Things left</strong> shows how much of today is still to come.',
+        ],
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Android has no lock-screen widget, so the circle and the lock-screen temperature are iPhone only. If you would rather keep event titles private when the phone is locked, open <strong>Settings → Reminders</strong> and turn off <strong>Show event titles on the lock screen</strong>. The widget then shows only times and first names.',
       },
       {
         type: 'heading',

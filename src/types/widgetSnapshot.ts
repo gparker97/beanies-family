@@ -9,8 +9,9 @@
  *
  * ⚠️ THIS FILE IS A CROSS-PLATFORM CONTRACT. The Swift `Codable` mirror
  * (`WidgetSnapshotStore.swift`) and the Java reader (`WidgetSnapshot.java`) parse the
- * same shape. `src/utils/__tests__/fixtures/widget-snapshot.v2.json` is the committed
- * example the builder test asserts against, so a change here shows up as a diff there.
+ * same shape. `src/utils/__tests__/fixtures/widget-snapshot.v3.json` is the committed
+ * example the builder test asserts against, so a change here shows up as a diff there
+ * (`widget-snapshot.v2.json` is kept as the older shape the readers must still accept).
  * Adding an OPTIONAL field is safe (both readers ignore unknown keys). Renaming, removing
  * or retyping a field needs `WIDGET_SNAPSHOT_VERSION` bumped and both readers updated in
  * the same change; a reader that meets a version it does not know shows "open beanies to
@@ -20,8 +21,21 @@
  * `clearWidgetSnapshot`). It never carries finance data, private lists, surprise hints,
  * or an item `classifyAudience` hides from the viewer.
  */
+import type { WeatherGlyph } from './weather';
 
-export const WIDGET_SNAPSHOT_VERSION = 2 as const;
+/**
+ * The version the app WRITES. Readers ACCEPT 2 and 3 (`WIDGET_SNAPSHOT_READABLE_VERSIONS`):
+ * v3 (#134, 2026-10) is v2 plus optional fields only (`weather`, the `labels.weather*` /
+ * `labels.circle*` strings, `WidgetDay.handoffs`, `WidgetTasks.doneToday`,
+ * `WidgetRow.shortTitle` / `whoFirst`), so a v3 reader paints a v2 file with those absent,
+ * and the bump exists so an OLD (v2-only) reader shows "open beanies to refresh" instead of
+ * a widget missing its weather. Swift `supportedVersions = 2...3`, Java `MIN_VERSION = 2`,
+ * `MAX_VERSION = 3`.
+ */
+export const WIDGET_SNAPSHOT_VERSION = 3 as const;
+
+/** Every version the native readers accept, oldest first; the last is the one written. */
+export const WIDGET_SNAPSHOT_READABLE_VERSIONS = [2, WIDGET_SNAPSHOT_VERSION] as const;
 
 /**
  * Every placement size a widget can report or be opened from. The native side appends
@@ -42,6 +56,14 @@ export type WidgetSize = (typeof WIDGET_SIZES)[number];
 export function isWidgetSize(value: string | null | undefined): value is WidgetSize {
   return !!value && (WIDGET_SIZES as readonly string[]).includes(value);
 }
+
+/**
+ * The lock-screen circle's "Show" options (#134), in picker order. Mirrored by the Swift
+ * `CircleShowOption` (`AccessoryConfigIntent.swift`); the native side relays how many circles
+ * are placed per option in the publish result's `placements.circle`.
+ */
+export const CIRCLE_SHOW_OPTIONS = ['nextUp', 'nextHandoff', 'todosLeft', 'thingsLeft'] as const;
+export type CircleShowOption = (typeof CIRCLE_SHOW_OPTIONS)[number];
 
 /**
  * The six picker switches. Each one shows or hides a KIND of row; it never decides where a
@@ -164,6 +186,17 @@ export interface WidgetRow {
    * `settings.lockScreenTitles` is off. '' when nobody is assigned.
    */
   who: string;
+  /**
+   * v3: the title's first word (`utils/firstWord.ts`: "swimming" from "swimming lesson"),
+   * the lock-screen circle's word when `settings.lockScreenTitles` is on. '' for a blank
+   * title. Absent in a v2 snapshot.
+   */
+  shortTitle?: string;
+  /**
+   * v3: the first assignee's first name ("Max"), the circle's word when titles are off.
+   * '' when nobody is assigned. Absent in a v2 snapshot.
+   */
+  whoFirst?: string;
   dot: WidgetDot | null;
   /**
    * The viewer's drop-off/pick-up duty on this row is ticked. In a child view the renderers
@@ -232,6 +265,12 @@ export interface WidgetTasks {
   count: number;
   /** "**4** for you today" / "**4** due today"; `text` is '' when `count` is 0. */
   countText: WidgetText;
+  /**
+   * v3: to-dos completed on this day (`completedAt`'s local date) among those that would
+   * count in `count` were they open. The circle's "To-dos left" ring is
+   * `doneToday / (doneToday + count)`. Absent in a v2 snapshot.
+   */
+  doneToday?: number;
   /** The to-do page, for the count and the section heading. */
   link: string;
 }
@@ -242,6 +281,21 @@ export interface WidgetPickup {
   at: number;
   /** "pick-up 12:30pm, Max" (the child being picked up). */
   text: string;
+}
+
+/** v3: one of the viewer's own drop-offs or pick-ups, for the circle's "Next handoff". */
+export interface WidgetDayHandoff {
+  /** Epoch ms: the activity's start for a drop-off, its end for a pick-up. */
+  at: number;
+  kind: 'dropoff' | 'pickup';
+  /**
+   * The first name of the person being dropped off or collected (an assignee other than the
+   * viewer), never the activity: it shows whatever `lockScreenTitles` says. '' when nobody
+   * else is assigned.
+   */
+  name: string;
+  /** The activity's link (as on its row). */
+  link: string;
 }
 
 /** One audience's view of one day. */
@@ -262,6 +316,11 @@ export interface WidgetDay {
   thingsText: string;
   /** Pick-ups the viewer does on this day, ascending (my day only; empty on our day). */
   pickups: WidgetPickup[];
+  /**
+   * v3: the viewer's own timed drop-offs and pick-ups on this day, ascending by `at` (my day
+   * only; empty on our day). Absent in a v2 snapshot. `pickups` stays for the inline slot.
+   */
+  handoffs?: WidgetDayHandoff[];
 }
 
 export interface WidgetDayEntry {
@@ -316,6 +375,61 @@ export interface WidgetLabels {
    */
   nothingOnToday: string;
   enjoy: string;
+  /**
+   * v3: "as of {time}" beside a weather reading old enough to show its age; native fills
+   * {time} from `weather.fetchedAt` in the device's format. Absent in a v2 snapshot.
+   */
+  weatherAsOf?: string;
+  /** v3, the lock-screen circle: "left" ("3 left", Things left). */
+  circleLeft?: string;
+  /** v3, the circle: "all done" (Things left, nothing still to come today). */
+  circleAllDone?: string;
+  /** v3, the circle: "all clear" (Next up, nothing on the rest of the week). */
+  circleAllClear?: string;
+  /** v3, the circle: "to do" ("4 to do", To-dos left). */
+  circleToDo?: string;
+}
+
+/** How many home-zone days `WidgetWeather.days` carries: today and the four after it. */
+export const WIDGET_WEATHER_DAYS = 5;
+
+/** v3: one home-zone day of the forecast, already formatted in the family's unit. */
+export interface WidgetWeatherDay {
+  /** `YYYY-MM-DD` in the family's home time zone. Native picks the entry for its own ymd. */
+  ymd: string;
+  glyph: WeatherGlyph;
+  /** "57°" */
+  high: string;
+  /** "49°" */
+  low: string;
+  /** "57° / 49°" */
+  range: string;
+}
+
+/**
+ * v3: the home town's weather (#134, ADR-043), built from the same reading and helpers as
+ * the web atom (`utils/weather/weatherReading.ts`). The staleness thresholds travel as
+ * instants, so native holds no copy of them: `now < ageFrom` shows no age;
+ * `ageFrom <= now < currentUntil` shows the age (`labels.weatherAsOf`) and the softer ink;
+ * `now >= currentUntil` hides `current.temp` and keeps the day's range. A reading with no
+ * entry for the device's today is treated as no reading.
+ */
+export interface WidgetWeather {
+  /** Epoch ms the reading arrived (device clock). */
+  fetchedAt: number;
+  /** `fetchedAt + AGE_SHOW_MS`: from here the age is shown. */
+  ageFrom: number;
+  /** `fetchedAt + CURRENT_MAX_MS`: from here the current temperature is hidden. */
+  currentUntil: number;
+  current: {
+    glyph: WeatherGlyph;
+    /** "55°" */
+    temp: string;
+    /** The translated condition word ("Partly cloudy"). */
+    condition: string;
+  };
+  /** The home-zone today and the days after it, at most `WIDGET_WEATHER_DAYS`, ascending. */
+  days: WidgetWeatherDay[];
 }
 
 /** Absolute https links (with `src=widget`) for surfaces that are not an item. */
@@ -346,4 +460,9 @@ export interface WidgetSnapshot {
   links: WidgetLinks;
   /** Today and the next six days (`WIDGET_DAYS`), ascending. */
   days: WidgetDayEntry[];
+  /**
+   * v3: the home town's weather, or null when Show Weather is off, no town is set, or there
+   * is no reading with an entry for the home-zone today. Absent in a v2 snapshot.
+   */
+  weather?: WidgetWeather | null;
 }

@@ -2,7 +2,8 @@
 <!--
   "Your day", 2x2 (#130): "Sat" + numeral, the handwritten count line, and the next item that has
   not ended yet (from a later day, named, when today has none), or the relaxed block on a clear week. The 28dp peek sits on the panel: its top is 8dp below the 14dp padding and the
-  panel starts 34dp below it, so the peek ends 2dp inside the panel.
+  panel starts 34dp below it, so the peek ends 2dp inside the panel. While a current temperature
+  exists the weather (#134) takes the peek's slot instead.
 -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
@@ -192,5 +193,34 @@
             android:importantForAccessibility="no"
             android:scaleType="centerCrop"
             android:visibility="gone" />
+
+        <!-- The home town's weather (#134) in the peek's slot: the header row's right side, the
+             same height and end margin, so it lines up with "Sat 11". Shown only while a current
+             temperature exists; the peek returns otherwise (WidgetViews.bindPeek). The glyph is a
+             full-colour wx_* drawable, the temperature an Outfit Bold 15sp bitmap. -->
+        <LinearLayout
+            android:id="@+id/small_weather"
+            android:layout_width="wrap_content"
+            android:layout_height="@dimen/widget_small_header_height"
+            android:layout_gravity="top|end"
+            android:layout_marginTop="-2dp"
+            android:layout_marginEnd="@dimen/widget_small_peek_end"
+            android:gravity="center_vertical|end"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <ImageView
+                android:id="@+id/small_weather_glyph"
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:scaleType="fitCenter" />
+
+            <ImageView
+                android:id="@+id/small_weather_temp"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="3dp"
+                android:scaleType="fitStart" />
+        </LinearLayout>
     </FrameLayout>
 </FrameLayout>

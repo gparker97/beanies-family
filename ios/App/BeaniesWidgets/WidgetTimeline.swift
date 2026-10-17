@@ -35,6 +35,21 @@ struct ResolvedDay {
     let stale: Bool
 }
 
+/// Instants as the widgets print them.
+enum WidgetClock {
+    /// The device's short time, lowercased so "6:30 PM" sits with the rows' "10:15am" style
+    /// (a no-op for zh): the stale label, the weather's age and the circle's handoff time.
+    static func time(_ date: Date) -> String {
+        DateFormatter.localizedString(from: date, dateStyle: .none, timeStyle: .short).lowercased()
+    }
+
+    /// "as of" stamps: the time alone reads as "today", so an instant from another day names
+    /// the day instead ("Oct 15"). The stale label and the weather's age.
+    static func stamp(_ date: Date) -> String {
+        Calendar.current.isDateInToday(date) ? time(date) : date.formatted(.dateTime.month(.abbreviated).day())
+    }
+}
+
 enum DayResolver {
     /// Local calendar date in the snapshot's `ymd` form ("2026-10-11").
     static func ymd(_ date: Date) -> String {
@@ -98,10 +113,15 @@ enum DayResolver {
 
 /// One timeline policy for every widget kind.
 enum WidgetTimeline {
-    /// Row-end entries per timeline (the past styling flips at each without a refresh).
+    /// Instants per timeline (row ends, the circle's countdown hours, the weather's two
+    /// thresholds). When a busy day has more, the timeline ends at the last one kept and
+    /// `.atEnd` asks for the next batch, so the afternoon is never left to midnight.
     static let maxRowEntries = 12
 
-    static func build(blocks: WidgetBlocks, now: Date, includePickups: Bool) -> Timeline<DayEntry> {
+    /// `lockScreen`: the accessory's extra instants (its pick-up line, and the circle's
+    /// countdown hour before each item and handoff). The home-screen widget changes at none
+    /// of them, so it does not spend entries on them.
+    static func build(blocks: WidgetBlocks, now: Date, lockScreen: Bool) -> Timeline<DayEntry> {
         switch WidgetSnapshotStore.read() {
         case .unreadable:
             // Usually transient (a read before first unlock): retry without waiting for the app.
@@ -117,38 +137,62 @@ enum WidgetTimeline {
             return Timeline(entries: entries, policy: .atEnd)
 
         case .ready(let snapshot):
-            let dates = entryDates(snapshot, audience: blocks.audience, now: now, includePickups: includePickups)
+            let dates = entryDates(snapshot, audience: blocks.audience, now: now, lockScreen: lockScreen)
             let entries = dates.map { DayEntry(date: $0, state: .ready(snapshot), blocks: blocks) }
             return Timeline(entries: entries, policy: .atEnd)
         }
     }
 
-    /// now, each remaining row end today (capped), the 24h staleness instant, and the next
-    /// local midnight. Midnight is what rolls the look-ahead without the app: that entry
+    /// now, each remaining row end today, the 24h staleness instant, the weather's `ageFrom`
+    /// and `currentUntil`, on the lock screen the circle's countdown instants (each upcoming
+    /// row's and handoff's start minus an hour, and the start itself), all capped, and the
+    /// next local midnight. Midnight is what rolls the look-ahead without the app: that entry
     /// resolves the snapshot's next day as today, so its divider leaves the look-ahead, the
     /// following day becomes "tomorrow", and its to-dos (built as if it were today) take
     /// over. `.atEnd` then asks for a fresh timeline just after midnight.
-    static func entryDates(_ snapshot: WSSnapshot, audience: WidgetAudienceOption, now: Date, includePickups: Bool) -> [Date] {
+    static func entryDates(_ snapshot: WSSnapshot, audience: WidgetAudienceOption, now: Date, lockScreen: Bool) -> [Date] {
         let midnight = nextMidnight(after: now)
         var instants: [Date] = []
+        func ms(_ value: Double, plus seconds: TimeInterval = 0) -> Date {
+            Date(timeIntervalSince1970: value / 1000 + seconds)
+        }
         if let resolved = DayResolver.resolve(snapshot, at: now, audience: audience) {
             // +1s: a row is past when `endsAt < now`, so the entry lands just after the end.
             for row in resolved.day.rows {
-                if let endsAt = row.endsAt { instants.append(Date(timeIntervalSince1970: endsAt / 1000 + 1)) }
+                if let endsAt = row.endsAt { instants.append(ms(endsAt, plus: 1)) }
             }
-            if includePickups {
+            if lockScreen {
                 for pickup in resolved.day.pickups where pickup.at > 0 {
-                    instants.append(Date(timeIntervalSince1970: pickup.at / 1000 + 1))
+                    instants.append(ms(pickup.at, plus: 1))
+                }
+                // The circle's countdown hour: the ring animates on its own, but the face
+                // (the time, the word, the next handoff) is redrawn as each hour starts and ends.
+                for row in resolved.day.rows {
+                    if let startsAt = row.startsAt {
+                        instants.append(ms(startsAt, plus: -3600))
+                        instants.append(ms(startsAt))
+                    }
+                }
+                for handoff in resolved.day.handoffs ?? [] where handoff.at > 0 {
+                    instants.append(ms(handoff.at, plus: -3600))
+                    instants.append(ms(handoff.at, plus: 1))
                 }
             }
         }
         if let generated = snapshot.generatedDate {
             instants.append(generated.addingTimeInterval(24 * 3600 + 1))
         }
-        let upcoming = Set(instants.filter { $0 > now && $0 < midnight }).sorted().prefix(maxRowEntries)
+        if let weather = snapshot.weather {
+            // `WidgetWeather` switches AT these instants (`now >= ageFrom`), so no +1s.
+            instants.append(ms(weather.ageFrom))
+            instants.append(ms(weather.currentUntil))
+        }
+        let upcoming = Set(instants.filter { $0 > now && $0 < midnight }).sorted()
         var dates: [Date] = [now]
-        dates.append(contentsOf: upcoming)
-        dates.append(midnight)
+        dates.append(contentsOf: upcoming.prefix(maxRowEntries))
+        // Over the cap, end at the last instant kept (`.atEnd` rebuilds from there) rather
+        // than at midnight, which would freeze the rest of the day.
+        if upcoming.count <= maxRowEntries { dates.append(midnight) }
         return dates
     }
 

@@ -25,7 +25,8 @@ import family.beanies.app.R;
  *
  * THE ALARM. One inexact {@code setAndAllowWhileIdle(RTC)} for the earliest of: the next local
  * midnight (tomorrow becomes today), the next row end today (the row greys out), the instant the
- * snapshot turns 24 hours old ("as of"), or, for an unreadable file, 15 minutes (a transient read
+ * snapshot turns 24 hours old ("as of"), the weather's `ageFrom` / `currentUntil` (its age shows,
+ * its temperature goes; {@link WidgetWeather#nextChange}), or, for an unreadable file, 15 minutes (a transient read
  * failure heals without the app). No exact alarm: a widget a few minutes late is fine. Alarms do
  * not survive a reboot; the host calls onUpdate after boot, which re-arms it.
  *
@@ -168,6 +169,8 @@ public class DayWidgetProvider extends AppWidgetProvider {
             at = Math.min(at, earliestEnd(entry.my, now));
             at = Math.min(at, earliestEnd(entry.our, now));
         }
+        // The weather's age line appears or its temperature goes: instants the snapshot carries.
+        at = Math.min(at, WidgetWeather.nextChange(result.snapshot.weather, now));
         return at;
     }
 

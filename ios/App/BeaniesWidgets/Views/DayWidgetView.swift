@@ -42,14 +42,24 @@ struct DayWidgetView: View {
             refreshState(size: size, m: m)
         case .ready(let snapshot):
             if let resolved = DayResolver.resolve(snapshot, at: entry.date, audience: entry.blocks.audience) {
+                // Judged once per entry against the entry's own date (#134); nil = no weather.
+                let weather = WidgetWeather.glance(snapshot.weather, labels: snapshot.labels, at: entry.date)
                 Group {
                     if family == .systemSmall {
-                        SmallView(snapshot: snapshot, resolved: resolved, blocks: entry.blocks, date: entry.date, m: m)
+                        SmallView(
+                            snapshot: snapshot,
+                            resolved: resolved,
+                            blocks: entry.blocks,
+                            weather: weather,
+                            date: entry.date,
+                            m: m
+                        )
                     } else {
                         DayLayoutView(
                             snapshot: snapshot,
                             resolved: resolved,
                             blocks: entry.blocks,
+                            weather: weather,
                             date: entry.date,
                             size: size,
                             m: m
@@ -85,6 +95,8 @@ struct DayLayoutView: View {
     let snapshot: WSSnapshot
     let resolved: ResolvedDay
     let blocks: WidgetBlocks
+    /// Drawn in the date column; the child view has no column, so no weather.
+    let weather: WeatherGlance?
     let date: Date
     let size: WidgetSizeKey
     let m: WidgetMetrics
@@ -143,6 +155,7 @@ struct DayLayoutView: View {
                         labels: snapshot.labels,
                         links: snapshot.links,
                         taskCount: plan.taskCount,
+                        weather: weather,
                         showAudienceLabel: isLarge && resolved.audience == .my,
                         size: size,
                         m: m
@@ -214,11 +227,6 @@ struct ChildHeaderView: View {
 enum StaleLabel {
     static func text(_ snapshot: WSSnapshot) -> String? {
         guard let generated = snapshot.generatedDate else { return nil }
-        // A time alone reads as "this morning"; a snapshot from another day names the day.
-        // Lowercased so "12:40 AM" matches the rows' "10:15am" style (no-op for zh).
-        let when = Calendar.current.isDateInToday(generated)
-            ? DateFormatter.localizedString(from: generated, dateStyle: .none, timeStyle: .short).lowercased()
-            : generated.formatted(.dateTime.month(.abbreviated).day())
-        return snapshot.labels.asOf.replacingOccurrences(of: "{time}", with: when)
+        return snapshot.labels.asOf.replacingOccurrences(of: "{time}", with: WidgetClock.stamp(generated))
     }
 }

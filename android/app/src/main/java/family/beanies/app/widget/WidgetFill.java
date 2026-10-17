@@ -92,6 +92,105 @@ final class WidgetFill {
         }
     }
 
+    /*
+     * The date column (#134). RemoteViews has no ViewThatFits, so which of its optional lines show
+     * is decided here, from the placed height, before binding. Flags name the lines a render
+     * WANTS; dateColumnLines returns the ones that fit.
+     */
+    /**
+     * The weather row under the month: glyph + temperature, or glyph + today's high once the
+     * temperature is gone (WidgetWeather.Shown#rowText). Counted, never dropped.
+     */
+    static final int COLUMN_WEATHER = 1;
+    /**
+     * The line under it: today's range, or the reading's age when {@link #COLUMN_AGE} is set (an
+     * aged reading, and every reading past `currentUntil`, whose row then shows today's high).
+     */
+    static final int COLUMN_WEATHER_SUB = 1 << 1;
+    /** The sub line is the age ("as of 3:40 pm", wraps) rather than the one-line range. */
+    static final int COLUMN_AGE = 1 << 2;
+    /** The snapshot's own "as of" line (a stale snapshot). Counted, never dropped. */
+    static final int COLUMN_STALE = 1 << 3;
+    /** "my day" / "our day" / "Ava's day". */
+    static final int COLUMN_AUDIENCE = 1 << 4;
+    /** "2 for you today". */
+    static final int COLUMN_DUE = 1 << 5;
+
+    /*
+     * The column's heights in dp at an effective text scale of 1, from widget_part_date_column.xml
+     * and the bundled fonts' metrics: Outfit draws 1.26em (ascent 1.0 + descent 0.26), the host's
+     * Roboto 11sp body line 14.6dp with font padding and 12.9dp per extra wrapped line.
+     */
+    /** Root padding 5 + 7, the column's 1dp top margin and its 6 + 4 padding: never scales. */
+    static final float COLUMN_CHROME_DP = 23f;
+    /** The Outfit Bold 32sp numeral bitmap. */
+    static final float COLUMN_NUMERAL_DP = 40.3f;
+    /** One body line (11sp) and each further wrapped line. */
+    static final float COLUMN_LINE_DP = 14.6f;
+    static final float COLUMN_WRAP_DP = 12.9f;
+    /** The 2dp top margin of the weekday, the weather sub line, the audience and the due count. */
+    static final float COLUMN_GAP_DP = 2f;
+    /** The weather row: a 3dp top margin, then the taller of the 14dp glyph and 13sp Outfit temp. */
+    static final float COLUMN_WEATHER_GAP_DP = 3f;
+    static final float COLUMN_WEATHER_GLYPH_DP = 14f;
+    static final float COLUMN_WEATHER_TEMP_DP = 16.4f;
+    /**
+     * Above this effective scale the 52dp column wraps a phrase ("2 for you today", "as of 12:40
+     * am") onto three lines instead of two, and a child's "Ava's day" onto two (the layout's
+     * measured note: three lines at Larger, two at Standard and Large).
+     */
+    static final float COLUMN_WRAP_SCALE = 1.2f;
+
+    /**
+     * Which of the date column's wanted lines fit a widget {@code heightDp} tall (the TEXT-scaled
+     * height the renderer already has, `WidgetSizes.layoutHeightDp`) at the effective text scale
+     * {@code textScale} (system font scale × the Text size choice, `WidgetSizes.effectiveScale`).
+     *
+     * The weather row and a stale snapshot's "as of" always stay. When the rest does not fit the
+     * lines go in the plan's order (#134 requirement 12, the same order as iOS's ViewThatFits
+     * candidates): the weather's range/age line first, then the audience, then the due count. A
+     * host that reports no height (0) keeps everything, as before weather.
+     */
+    static int dateColumnLines(float heightDp, float textScale, int flags) {
+        if (heightDp <= 0) return flags;
+        float scale = Math.max(textScale, 0.5f);
+        // Back to real dp: layoutHeightDp divided the reported height by max(1, scale), and the
+        // fixed parts (padding, glyph) do not grow with text, so the estimate runs in real dp.
+        float room = heightDp * Math.max(1f, scale);
+        int wrapped = scale > COLUMN_WRAP_SCALE ? 3 : 2;
+        float body = COLUMN_LINE_DP * scale;
+
+        float need = COLUMN_CHROME_DP + COLUMN_NUMERAL_DP * scale
+                + COLUMN_GAP_DP + body          // weekday
+                + body;                         // month
+        if ((flags & COLUMN_WEATHER) != 0) {
+            need += COLUMN_WEATHER_GAP_DP
+                    + Math.max(COLUMN_WEATHER_GLYPH_DP * scale, COLUMN_WEATHER_TEMP_DP * scale);
+        }
+        if ((flags & COLUMN_STALE) != 0) need += lines(wrapped, scale);
+
+        float sub = (flags & COLUMN_AGE) != 0 ? lines(wrapped, scale) : body;
+        float audience = lines(wrapped - 1, scale);
+        float due = lines(wrapped, scale);
+        int[] dropOrder = {COLUMN_WEATHER_SUB, COLUMN_AUDIENCE, COLUMN_DUE};
+        float[] cost = {COLUMN_GAP_DP + sub, COLUMN_GAP_DP + audience, COLUMN_GAP_DP + due};
+        for (int i = 0; i < dropOrder.length; i++) {
+            if ((flags & dropOrder[i]) != 0) need += cost[i];
+        }
+        int kept = flags;
+        for (int i = 0; i < dropOrder.length && need > room; i++) {
+            if ((kept & dropOrder[i]) == 0) continue;
+            kept &= ~dropOrder[i];
+            need -= cost[i];
+        }
+        return kept;
+    }
+
+    /** The height of a phrase that wraps onto {@code count} body lines. */
+    private static float lines(int count, float scale) {
+        return (COLUMN_LINE_DP + COLUMN_WRAP_DP * Math.max(0, count - 1)) * scale;
+    }
+
     /** One later day in the calendar look-ahead: its divider and the rows that show under it. */
     static final class LaterDay {
         final WidgetSnapshot.DayEntry entry;

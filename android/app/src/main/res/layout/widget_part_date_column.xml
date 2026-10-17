@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   The 52dp date column of the medium and large widgets (#130): numeral, weekday (accent), month,
-  and at the foot the "as of" stale line, the audience label and the due count. Taps open the
+  the weather row and its range/age line (#134), and at the foot the "as of" stale line, the
+  audience label and the due count. Which optional lines show is decided from the placed height
+  (WidgetFill.dateColumnLines; RemoteViews has no ViewThatFits). Taps open the
   Nook. The foot's three lines hold "2 for you today" / "as of 12:40 am" at the Larger text
   size (two cut the last word silently); at Standard and Large they take two. The view is 62dp with 6dp/4dp side padding so a see-through card can give it a tile
   (widget_tile_bg) without moving the text: content starts 10dp in and 12dp below the top
@@ -51,6 +53,49 @@
         android:singleLine="true"
         android:textColor="@color/widget_ink_soft"
         android:textSize="@dimen/widget_text_body" />
+
+    <!-- The home town's weather (#134): the glyph (a full-colour wx_* drawable) and the
+         temperature (or today's high once it is gone), Outfit Bold 13sp drawn as a tinted
+         bitmap like the numeral. When it shows,
+         this row always stays; the lines under the spacer and the sub line below give way first
+         (WidgetFill.dateColumnLines). GONE when there is no weather. -->
+    <LinearLayout
+        android:id="@+id/date_weather"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="3dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:visibility="gone">
+
+        <ImageView
+            android:id="@+id/date_weather_glyph"
+            android:layout_width="14dp"
+            android:layout_height="14dp"
+            android:scaleType="fitCenter" />
+
+        <ImageView
+            android:id="@+id/date_weather_temp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="3dp"
+            android:scaleType="fitStart" />
+    </LinearLayout>
+
+    <!-- Today's range ("57° / 49°", one line, shrinks to fit like the month) or, once the
+         reading is old enough, its age ("as of 3:40 pm"). Past the reading's currentUntil today's
+         high takes the temperature's place in the row, and this line is the age. Soft
+         ink in both. -->
+    <TextView
+        android:id="@+id/date_weather_sub"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:ellipsize="end"
+        android:maxLines="3"
+        android:textColor="@color/widget_ink_soft"
+        android:textSize="@dimen/widget_text_body"
+        android:visibility="gone" />
 
     <!-- Spacer: a plain View is not a RemoteViews class, so it is an empty FrameLayout. -->
     <FrameLayout
