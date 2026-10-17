@@ -53,7 +53,19 @@ enum WidgetClock {
 enum DayResolver {
     /// Local calendar date in the snapshot's `ymd` form ("2026-10-11").
     static func ymd(_ date: Date) -> String {
-        let parts = Calendar.current.dateComponents([.year, .month, .day], from: date)
+        ymd(date, calendar: Calendar.current)
+    }
+
+    /// The calendar date in `zone`, same form. For the weather, whose days are the home
+    /// zone's (`WidgetWeather`), not the device's.
+    static func ymd(_ date: Date, in zone: TimeZone) -> String {
+        var calendar = Calendar.current
+        calendar.timeZone = zone
+        return ymd(date, calendar: calendar)
+    }
+
+    private static func ymd(_ date: Date, calendar: Calendar) -> String {
+        let parts = calendar.dateComponents([.year, .month, .day], from: date)
         return String(format: "%04ld-%02ld-%02ld", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
     }
 
@@ -144,7 +156,7 @@ enum WidgetTimeline {
     }
 
     /// now, each remaining row end today, the 24h staleness instant, the weather's `ageFrom`
-    /// and `currentUntil`, on the lock screen the circle's countdown instants (each upcoming
+    /// and `currentUntil` and the home zone's next midnight, on the lock screen the circle's countdown instants (each upcoming
     /// row's and handoff's start minus an hour, and the start itself), all capped, and the
     /// next local midnight. Midnight is what rolls the look-ahead without the app: that entry
     /// resolves the snapshot's next day as today, so its divider leaves the look-ahead, the
@@ -186,6 +198,12 @@ enum WidgetTimeline {
             // `WidgetWeather` switches AT these instants (`now >= ageFrom`), so no +1s.
             instants.append(ms(weather.ageFrom))
             instants.append(ms(weather.currentUntil))
+            // The home zone's next midnight: `WidgetWeather` picks today by the home zone's
+            // date, so a home zone that rolls over before the device does repaints that day's
+            // weather then, not at the device's midnight. Mirrors Android.
+            if let homeZone = weather.homeZone {
+                instants.append(nextMidnight(after: now, in: homeZone))
+            }
         }
         let upcoming = Set(instants.filter { $0 > now && $0 < midnight }).sorted()
         var dates: [Date] = [now]
@@ -196,8 +214,10 @@ enum WidgetTimeline {
         return dates
     }
 
-    static func nextMidnight(after date: Date) -> Date {
-        let calendar = Calendar.current
+    /// The start of the next day in `zone` (the device's when nil).
+    static func nextMidnight(after date: Date, in zone: TimeZone? = nil) -> Date {
+        var calendar = Calendar.current
+        if let zone { calendar.timeZone = zone }
         let startOfToday = calendar.startOfDay(for: date)
         return calendar.date(byAdding: .day, value: 1, to: startOfToday) ?? date.addingTimeInterval(24 * 3600)
     }

@@ -8,6 +8,7 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.TimeZone;
 
 /**
  * What one placed widget shows, decided once and shared by the provider (date column, to-dos
@@ -107,7 +108,11 @@ final class WidgetFill {
      * aged reading, and every reading past `currentUntil`, whose row then shows today's high).
      */
     static final int COLUMN_WEATHER_SUB = 1 << 1;
-    /** The sub line is the age ("as of 3:40 pm", wraps) rather than the one-line range. */
+    /**
+     * The sub line is the age ("as of 3:40 pm", two lines) rather than the one-line range. With
+     * {@link #COLUMN_STALE} it never shows: the snapshot's own "as of" already says how old
+     * everything in the column is, so the two would read the same date twice.
+     */
     static final int COLUMN_AGE = 1 << 2;
     /** The snapshot's own "as of" line (a stale snapshot). Counted, never dropped. */
     static final int COLUMN_STALE = 1 << 3;
@@ -135,23 +140,30 @@ final class WidgetFill {
     static final float COLUMN_WEATHER_GLYPH_DP = 14f;
     static final float COLUMN_WEATHER_TEMP_DP = 16.4f;
     /**
-     * Above this effective scale the 52dp column wraps a phrase ("2 for you today", "as of 12:40
-     * am") onto three lines instead of two, and a child's "Ava's day" onto two (the layout's
-     * measured note: three lines at Larger, two at Standard and Large).
+     * Above this effective scale the 52dp column wraps the due count ("2 for you today") onto
+     * three lines instead of two, and a child's "Ava's day" onto two (the layout's measured note:
+     * three lines at Larger, two at Standard and Large). The "as of" phrases ("as of Oct 17",
+     * "as of 4:08 am") stay on two lines at every scale (emulator, 2026-10-18).
      */
     static final float COLUMN_WRAP_SCALE = 1.2f;
+    /** The "as of" lines (the stale snapshot's and the weather's age): two lines at every scale. */
+    static final int COLUMN_AS_OF_LINES = 2;
 
     /**
      * Which of the date column's wanted lines fit a widget {@code heightDp} tall (the TEXT-scaled
      * height the renderer already has, `WidgetSizes.layoutHeightDp`) at the effective text scale
      * {@code textScale} (system font scale × the Text size choice, `WidgetSizes.effectiveScale`).
      *
-     * The weather row and a stale snapshot's "as of" always stay. When the rest does not fit the
+     * The weather row and a stale snapshot's "as of" always stay; a stale snapshot never shows the
+     * weather's age line (its own "as of" covers it). When the rest does not fit the
      * lines go in the plan's order (#134 requirement 12, the same order as iOS's ViewThatFits
      * candidates): the weather's range/age line first, then the audience, then the due count. A
      * host that reports no height (0) keeps everything, as before weather.
      */
     static int dateColumnLines(float heightDp, float textScale, int flags) {
+        if ((flags & (COLUMN_STALE | COLUMN_AGE)) == (COLUMN_STALE | COLUMN_AGE)) {
+            flags &= ~(COLUMN_WEATHER_SUB | COLUMN_AGE);
+        }
         if (heightDp <= 0) return flags;
         float scale = Math.max(textScale, 0.5f);
         // Back to real dp: layoutHeightDp divided the reported height by max(1, scale), and the
@@ -167,9 +179,10 @@ final class WidgetFill {
             need += COLUMN_WEATHER_GAP_DP
                     + Math.max(COLUMN_WEATHER_GLYPH_DP * scale, COLUMN_WEATHER_TEMP_DP * scale);
         }
-        if ((flags & COLUMN_STALE) != 0) need += lines(wrapped, scale);
+        float asOf = lines(COLUMN_AS_OF_LINES, scale);
+        if ((flags & COLUMN_STALE) != 0) need += asOf;
 
-        float sub = (flags & COLUMN_AGE) != 0 ? lines(wrapped, scale) : body;
+        float sub = (flags & COLUMN_AGE) != 0 ? asOf : body;
         float audience = lines(wrapped - 1, scale);
         float due = lines(wrapped, scale);
         int[] dropOrder = {COLUMN_WEATHER_SUB, COLUMN_AUDIENCE, COLUMN_DUE};
@@ -458,7 +471,12 @@ final class WidgetFill {
 
     /** The device-local calendar date `offsetDays` after `now`, as "yyyy-MM-dd". */
     static String ymd(long now, int offsetDays) {
-        Calendar c = Calendar.getInstance();
+        return ymd(now, offsetDays, TimeZone.getDefault());
+    }
+
+    /** The calendar date in `zone` `offsetDays` after `now`, as "yyyy-MM-dd". */
+    static String ymd(long now, int offsetDays, TimeZone zone) {
+        Calendar c = Calendar.getInstance(zone);
         c.setTimeInMillis(now);
         if (offsetDays != 0) c.add(Calendar.DAY_OF_MONTH, offsetDays);
         return String.format(
@@ -471,7 +489,12 @@ final class WidgetFill {
 
     /** The next device-local midnight after `now`, in epoch ms. */
     static long nextMidnight(long now) {
-        Calendar c = Calendar.getInstance();
+        return nextMidnight(now, TimeZone.getDefault());
+    }
+
+    /** The next midnight in `zone` after `now`, in epoch ms. */
+    static long nextMidnight(long now, TimeZone zone) {
+        Calendar c = Calendar.getInstance(zone);
         c.setTimeInMillis(now);
         c.add(Calendar.DAY_OF_MONTH, 1);
         c.set(Calendar.HOUR_OF_DAY, 0);

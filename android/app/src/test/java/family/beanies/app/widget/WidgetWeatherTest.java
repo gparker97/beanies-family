@@ -40,10 +40,15 @@ public class WidgetWeatherTest {
     }
 
     private static WidgetSnapshot.Weather weather() {
+        return weather(null);
+    }
+
+    private static WidgetSnapshot.Weather weather(String zone) {
         return new WidgetSnapshot.Weather(FETCHED, AGE_FROM, CURRENT_UNTIL, "partly", "27°", "Partly cloudy",
                 Arrays.asList(
                         new WidgetSnapshot.WeatherDay("2026-10-11", "thunder", "32°", "32° / 26°"),
-                        new WidgetSnapshot.WeatherDay("2026-10-12", "rain", "30°", "30° / 25°")));
+                        new WidgetSnapshot.WeatherDay("2026-10-12", "rain", "30°", "30° / 25°")),
+                zone);
     }
 
     @Test
@@ -102,8 +107,46 @@ public class WidgetWeatherTest {
         assertNull(WidgetWeather.at(weather(), "2026-10-13", AGE_FROM - 1));
         assertNull(WidgetWeather.at(null, "2026-10-11", AGE_FROM - 1));
         WidgetSnapshot.Weather noDays = new WidgetSnapshot.Weather(FETCHED, AGE_FROM, CURRENT_UNTIL,
-                "partly", "27°", "Partly cloudy", Collections.<WidgetSnapshot.WeatherDay>emptyList());
+                "partly", "27°", "Partly cloudy", Collections.<WidgetSnapshot.WeatherDay>emptyList(), null);
         assertNull(WidgetWeather.at(noDays, "2026-10-11", AGE_FROM - 1));
+    }
+
+    @Test
+    public void aMalformedTodayIsNoWeatherOnceTheTemperatureGoes() {
+        // A lenient decode can leave today's range or high empty. While the temperature shows it
+        // carries the row; past `currentUntil` the row would be a lone glyph, so it is no weather.
+        for (String[] hr : new String[][] {{"", "32° / 26°"}, {"32°", ""}}) {
+            WidgetSnapshot.Weather w = new WidgetSnapshot.Weather(FETCHED, AGE_FROM, CURRENT_UNTIL,
+                    "partly", "27°", "Partly cloudy",
+                    Collections.singletonList(
+                            new WidgetSnapshot.WeatherDay("2026-10-11", "thunder", hr[0], hr[1])),
+                    null);
+            WidgetWeather.Shown shown = WidgetWeather.at(w, "2026-10-11", CURRENT_UNTIL - 1);
+            assertEquals("27°", shown.rowText());
+            assertNull(WidgetWeather.at(w, "2026-10-11", CURRENT_UNTIL));
+        }
+    }
+
+    @Test
+    public void theDayIsTheHomeZonesToday() {
+        TimeZone.setDefault(TimeZone.getTimeZone("America/Los_Angeles"));
+        // 15:00 on the 11th in Los Angeles is 06:00 on the 12th in Singapore.
+        Calendar la = Calendar.getInstance();
+        la.clear();
+        la.set(2026, Calendar.OCTOBER, 11, 15, 0, 0);
+        long now = la.getTimeInMillis();
+        assertEquals("30° / 25°", WidgetWeather.at(weather("Asia/Singapore"), now).range);
+        // An unknown id (TimeZone answers GMT for it) or none falls back to the device's day.
+        assertEquals("32° / 26°", WidgetWeather.at(weather("Mars/Olympus_Mons"), now).range);
+        assertEquals("32° / 26°", WidgetWeather.at(weather(null), now).range);
+        assertEquals("America/Los_Angeles",
+                WidgetWeather.homeZone(weather("Mars/Olympus_Mons")).getID());
+        // The re-render alarm includes the home zone's midnight, not just the device's.
+        Calendar sg = Calendar.getInstance(TimeZone.getTimeZone("Asia/Singapore"));
+        sg.clear();
+        sg.set(2026, Calendar.OCTOBER, 13, 0, 0, 0);
+        WidgetSnapshot.Weather old = weather("Asia/Singapore");
+        assertEquals(sg.getTimeInMillis(), WidgetWeather.nextChange(old, Math.max(now, CURRENT_UNTIL)));
     }
 
     @Test
@@ -121,7 +164,9 @@ public class WidgetWeatherTest {
     public void nextChangeIsTheNextInstantAhead() {
         assertEquals(AGE_FROM, WidgetWeather.nextChange(weather(), FETCHED));
         assertEquals(CURRENT_UNTIL, WidgetWeather.nextChange(weather(), AGE_FROM));
-        assertEquals(Long.MAX_VALUE, WidgetWeather.nextChange(weather(), CURRENT_UNTIL));
+        // Past both instants the next change is the (home, here the device's) day turning over.
+        assertEquals(localMidnight(2026, Calendar.OCTOBER, 12),
+                WidgetWeather.nextChange(weather(), CURRENT_UNTIL));
         assertEquals(Long.MAX_VALUE, WidgetWeather.nextChange(null, FETCHED));
     }
 

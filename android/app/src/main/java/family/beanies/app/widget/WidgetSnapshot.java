@@ -431,11 +431,16 @@ final class WidgetSnapshot {
         final String currentTemp;
         /** The translated condition word ("Partly cloudy"). */
         final String currentCondition;
-        /** The home-zone days, ascending; picked by the device's own ymd, never by position. */
+        /**
+         * The home-zone days, ascending; picked by today's ymd in {@link #zone} (the device's own
+         * zone when that is absent or unknown), never by position.
+         */
         final List<WeatherDay> days;
+        /** The family's home zone (IANA id, "Asia/Singapore"), or null when the snapshot has none. */
+        final String zone;
 
         Weather(long fetchedAt, long ageFrom, long currentUntil, String currentGlyph,
-                String currentTemp, String currentCondition, List<WeatherDay> days) {
+                String currentTemp, String currentCondition, List<WeatherDay> days, String zone) {
             this.fetchedAt = fetchedAt;
             this.ageFrom = ageFrom;
             this.currentUntil = currentUntil;
@@ -443,14 +448,18 @@ final class WidgetSnapshot {
             this.currentTemp = currentTemp;
             this.currentCondition = currentCondition;
             this.days = Collections.unmodifiableList(new ArrayList<>(days));
+            this.zone = zone;
         }
 
         /**
-         * Null when an instant is missing: without them no rule can be applied, and a reading
-         * that cannot say how old it is must not be drawn as current.
+         * Null when an instant is missing or null: without them no rule can be applied, and a
+         * reading that cannot say how old it is must not be drawn as current.
          */
         static Weather from(JSONObject o) {
-            if (!o.has("fetchedAt") || !o.has("ageFrom") || !o.has("currentUntil")) return null;
+            if (!hasInstant(o, "fetchedAt") || !hasInstant(o, "ageFrom")
+                    || !hasInstant(o, "currentUntil")) {
+                return null;
+            }
             JSONObject current = obj(o, "current");
             List<WeatherDay> parsed = new ArrayList<>();
             JSONArray arr = o.optJSONArray("days");
@@ -463,9 +472,15 @@ final class WidgetSnapshot {
                     }
                 }
             }
+            String zone = str(o, "zone");
             return new Weather(o.optLong("fetchedAt", 0L), o.optLong("ageFrom", 0L),
                     o.optLong("currentUntil", 0L), str(current, "glyph"), str(current, "temp"),
-                    str(current, "condition"), parsed);
+                    str(current, "condition"), parsed, zone.isEmpty() ? null : zone);
+        }
+
+        /** Present and not JSON null, the same guard {@link DayHandoff}'s `at` gets. */
+        private static boolean hasInstant(JSONObject o, String key) {
+            return o.has(key) && !o.isNull(key);
         }
     }
 

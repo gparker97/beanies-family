@@ -245,6 +245,9 @@ struct WSWeather {
     var currentCondition: String = ""
     /// The home-zone today and the days after it, ascending.
     var days: [WSWeatherDay] = []
+    /// The home zone's IANA id ("Asia/Singapore"), the zone `days[].ymd` are dated in; nil
+    /// in a file from before the field (`WidgetWeather` then falls back to the device zone).
+    var zone: String? = nil
 }
 
 struct WSSnapshot {
@@ -478,7 +481,7 @@ extension WSWeatherDay: Decodable {
 }
 
 extension WSWeather: Decodable {
-    private enum CodingKeys: String, CodingKey { case fetchedAt, ageFrom, currentUntil, current, days }
+    private enum CodingKeys: String, CodingKey { case fetchedAt, ageFrom, currentUntil, current, days, zone }
     private enum CurrentKeys: String, CodingKey { case glyph, temp, condition }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -492,6 +495,7 @@ extension WSWeather: Decodable {
         currentTemp = current.lenient(String.self, .temp, "")
         currentCondition = current.lenient(String.self, .condition, "")
         days = c.list(WSWeatherDay.self, .days)
+        zone = c.opt(String.self, .zone)
     }
 }
 

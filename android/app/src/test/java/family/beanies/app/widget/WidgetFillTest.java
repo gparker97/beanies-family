@@ -43,18 +43,36 @@ public class WidgetFillTest {
     }
 
     @Test
-    public void largeDropsTheTwoLineAgeBeforeTheCount() {
+    public void aStaleSnapshotNeverShowsTheWeatherAge() {
+        // The snapshot's own "as of" covers the reading's age, so the column never says the same
+        // date twice; the weather row stays. Applies with no height too.
         int flags = MEDIUM_WEATHER | COLUMN_AGE | COLUMN_STALE;
-        assertEquals(flags & ~COLUMN_WEATHER_SUB, lines(MEDIUM_DP, LARGE, flags));
+        int expected = COLUMN_WEATHER | COLUMN_STALE | COLUMN_DUE;
+        assertEquals(expected, lines(MEDIUM_DP, STANDARD, flags));
+        assertEquals(expected, lines(MEDIUM_DP, LARGE, flags));
+        assertEquals(expected, WidgetFill.dateColumnLines(0f, LARGER, flags));
+        // A stale snapshot whose reading still shows its range keeps the range.
+        int range = MEDIUM_WEATHER | COLUMN_STALE;
+        assertEquals(range, lines(MEDIUM_DP, LARGE, range));
+    }
+
+    @Test
+    public void largeKeepsTheTwoLineAgeAndTheCount() {
+        // "as of 4:08 am" is two lines at every scale, so a two-row widget at Large holds it.
+        int flags = MEDIUM_WEATHER | COLUMN_AGE;
+        assertEquals(flags, lines(MEDIUM_DP, LARGE, flags));
     }
 
     @Test
     public void largerKeepsTheRangeAndCountUntilTheSnapshotIsStale() {
         assertEquals(MEDIUM_WEATHER, lines(MEDIUM_DP, LARGER, MEDIUM_WEATHER));
-        // Stale: the "as of" line is never dropped, so the range goes, then the count. The
-        // weather row stays whatever happens.
+        // Stale: the "as of" line (two lines) is never dropped, so the range goes, then the
+        // count: the weather row, the as-of and a three-line count need 229.9dp of the 224
+        // (checked against the emulator's p1-stale-larger render, 2026-10-18), and keeping the
+        // count would clip the as-of. The weather row stays whatever happens.
         int stale = MEDIUM_WEATHER | COLUMN_STALE;
         assertEquals(COLUMN_WEATHER | COLUMN_STALE, lines(MEDIUM_DP, LARGER, stale));
+        assertEquals(COLUMN_WEATHER | COLUMN_STALE, lines(MEDIUM_DP, LARGER, stale | COLUMN_AGE));
     }
 
     @Test
@@ -67,18 +85,19 @@ public class WidgetFillTest {
 
     @Test
     public void withoutWeatherTheColumnHoldsWhatItHeldBefore() {
-        // The pre-#134 column at Larger: a stale line and the count, three lines each (the
-        // layout's note), still fit a two-row widget, so a v2 snapshot loses nothing.
+        // The pre-#134 column at Larger: a two-line stale "as of" and a three-line count still
+        // fit a two-row widget, so a v2 snapshot loses nothing.
         int flags = COLUMN_STALE | COLUMN_DUE;
         assertEquals(flags, lines(MEDIUM_DP, LARGER, flags));
     }
 
     @Test
     public void aThreeRowWidgetKeepsEverythingAtLarger() {
-        int all = COLUMN_WEATHER | COLUMN_WEATHER_SUB | COLUMN_AGE | COLUMN_STALE | COLUMN_AUDIENCE
-                | COLUMN_DUE;
+        int all = COLUMN_WEATHER | COLUMN_WEATHER_SUB | COLUMN_AGE | COLUMN_AUDIENCE | COLUMN_DUE;
         assertEquals(all, lines(LARGE_DP, LARGER, all));
         assertEquals(all, lines(LARGE_DP, STANDARD, all));
+        int stale = COLUMN_WEATHER | COLUMN_WEATHER_SUB | COLUMN_STALE | COLUMN_AUDIENCE | COLUMN_DUE;
+        assertEquals(stale, lines(LARGE_DP, LARGER, stale));
     }
 
     @Test

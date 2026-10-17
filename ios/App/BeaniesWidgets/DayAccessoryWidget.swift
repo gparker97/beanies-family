@@ -179,11 +179,13 @@ struct DayAccessoryView: View {
 
     /// The inline line, led by the weather glyph and the current temperature when there is
     /// one ("☁ 27° · 4:30pm piano"). Concatenated `Text`, the only way an inline accessory
-    /// draws an image beside its words; the glyph is the template image, in the system tint.
+    /// draws an image beside its words. The glyph is an SF Symbol, not the wx asset: an image
+    /// inside `Text` cannot be resized (no `.resizable()`/`.frame`), so the 24x24 asset would
+    /// draw at its intrinsic size in the ~15pt line, while a symbol scales with the font.
     private func inlineText(_ snapshot: WSSnapshot, _ day: ResolvedDay) -> Text {
         let line = Text(inlineLine(snapshot, day))
         guard let weather = currentWeather(snapshot), let temp = weather.temp else { return line }
-        return Text(Image(weather.glyph.monoAsset)) + Text(" \(temp) · ") + line
+        return Text(Image(systemName: weather.glyph.symbolName)) + Text(" \(temp) · ") + line
     }
 
     /// The next pick-up the viewer does today, else the next calendar item ("4:30pm piano",

@@ -1,5 +1,7 @@
 package family.beanies.app.widget;
 
+import java.util.TimeZone;
+
 /**
  * What a widget draws of the home town's weather at a given instant (#134, ADR-043). A pure
  * reader of the snapshot's {@link WidgetSnapshot.Weather}, mirrored by iOS `WidgetWeather.swift`.
@@ -13,10 +15,14 @@ package family.beanies.app.widget;
  *  - {@code now >= currentUntil}: no temperature; today's glyph (not the stale "now" one) and
  *    today's high (a temperature-width token, so it fits where the temperature did) take its
  *    place in the row, softer, and the age moves to the line under it. The kept row is never a
- *    lone glyph.
- * The day is the snapshot entry for the DEVICE's local ymd (the same "today" every widget uses,
- * {@link WidgetFill#ymd}); a reading with no entry for it is no weather at all, so the small
- * widget's peek returns, the native form of the web atom's `unavailable`.
+ *    lone glyph: a today entry with no range or high (a lenient decode) is no weather once the
+ *    temperature is gone, as on iOS.
+ * The day is the snapshot entry for today's ymd in the family's HOME zone ({@code weather.zone}),
+ * because the weather's days are the home zone's days (the provider's forecast for the town).
+ * The calendar's {@code days[].ymd} stay device-local ({@link WidgetFill#ymd}), deliberately: a
+ * traveller's agenda follows them, the town's weather follows the town. An absent or unknown
+ * zone falls back to the device zone. A reading with no entry for today is no weather at all, so
+ * the small widget's peek returns, the native form of the web atom's `unavailable`.
  *
  * Pure Java (no android.*), JVM-tested in WidgetWeatherTest.
  */
@@ -62,9 +68,13 @@ final class WidgetWeather {
             return hasCurrent() ? temp : high;
         }
 
-        /** The row's text is in the softer ink: an aged temperature, or the high standing in for one. */
+        /**
+         * The row's text is in the softer ink: an aged temperature, or the high standing in for
+         * one. Exactly the cases where the age shows, by design: the softer ink is the cue that
+         * the age line beside it explains.
+         */
         boolean soft() {
-            return aged || !hasCurrent();
+            return showsAge();
         }
 
         /**
@@ -76,9 +86,24 @@ final class WidgetWeather {
         }
     }
 
-    /** {@link #at(WidgetSnapshot.Weather, String, long)} for the device's own today. */
+    /** {@link #at(WidgetSnapshot.Weather, String, long)} for today in the home zone. */
     static Shown at(WidgetSnapshot.Weather weather, long now) {
-        return at(weather, WidgetFill.ymd(now, 0), now);
+        if (weather == null) return null;
+        return at(weather, WidgetFill.ymd(now, 0, homeZone(weather)), now);
+    }
+
+    /**
+     * The zone whose today picks the weather day: {@code weather.zone} when it is a known id,
+     * else the device's. {@link TimeZone#getTimeZone(String)} answers GMT for an unknown id
+     * rather than failing, so the id it resolves to must be the one asked for.
+     */
+    static TimeZone homeZone(WidgetSnapshot.Weather weather) {
+        String id = weather == null ? null : weather.zone;
+        if (id != null && !id.isEmpty()) {
+            TimeZone zone = TimeZone.getTimeZone(id);
+            if (id.equals(zone.getID())) return zone;
+        }
+        return TimeZone.getDefault();
     }
 
     /**
@@ -96,6 +121,9 @@ final class WidgetWeather {
         }
         if (today == null) return null;
         boolean current = now < weather.currentUntil && !weather.currentTemp.isEmpty();
+        // Past the temperature the row is today's high and the line under it the age; with no
+        // range or high it would be a lone glyph, so it is no weather (iOS returns nil here too).
+        if (!current && (today.range.isEmpty() || today.high.isEmpty())) return null;
         boolean aged = current && now >= weather.ageFrom;
         String glyph = current && !weather.currentGlyph.isEmpty() ? weather.currentGlyph : today.glyph;
         return new Shown(glyph, current ? weather.currentTemp : "", aged, today.range, today.high,
@@ -104,12 +132,13 @@ final class WidgetWeather {
 
     /**
      * The next instant after {@code now} at which {@link #at} changes on its own (the age appears,
-     * or the temperature goes), or {@link Long#MAX_VALUE} when neither is ahead. The provider's
-     * re-render alarm takes the earliest of this, midnight (the day pick) and its other instants.
+     * the temperature goes, or the home zone's day turns over), or {@link Long#MAX_VALUE} when
+     * there is no weather. The provider's re-render alarm takes the earliest of this, the device's
+     * midnight (the calendar's day pick) and its other instants.
      */
     static long nextChange(WidgetSnapshot.Weather weather, long now) {
         if (weather == null) return Long.MAX_VALUE;
-        long at = Long.MAX_VALUE;
+        long at = WidgetFill.nextMidnight(now, homeZone(weather));
         if (weather.ageFrom > now) at = weather.ageFrom;
         if (weather.currentUntil > now) at = Math.min(at, weather.currentUntil);
         return at;

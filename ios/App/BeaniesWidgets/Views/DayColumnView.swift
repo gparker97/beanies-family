@@ -16,6 +16,9 @@ struct DayColumnView: View {
     let taskCount: WSTasks?
     /// nil = no weather (off, no town, no reading for today, or a v2 snapshot).
     let weather: WeatherGlance?
+    /// The footer's stale "as of …" is showing: the weather's age would say the same thing
+    /// twice ("as of Oct 17"), so it is not drawn. Mirrors Android.
+    let staleLabelShown: Bool
     let showAudienceLabel: Bool
     let size: WidgetSizeKey
     let m: WidgetMetrics
@@ -94,11 +97,16 @@ struct DayColumnView: View {
             .lineLimit(1)
     }
 
+    /// The weather's age, unless the stale label already says "as of".
+    private var shownAge: String? {
+        staleLabelShown ? nil : weather?.age
+    }
+
     /// The droppable line under it: today's range while the reading is fresh; the age from
     /// `ageFrom` on (the range is in the row once past `currentUntil`).
     private var weatherDetail: String? {
         guard let weather else { return nil }
-        if let age = weather.age { return age }
+        if let age = shownAge { return age }
         guard weather.temp != nil, !weather.range.isEmpty else { return nil }
         return weather.range
     }
@@ -113,7 +121,7 @@ struct DayColumnView: View {
                     .font(.sys(size: m.s(11)))
                     .foregroundStyle(Color.wInkSoft)
                     // The age may take two lines ("as of / 7:40am"); the range keeps to one.
-                    .lineLimit(weather?.age != nil ? 2 : 1)
+                    .lineLimit(shownAge != nil ? 2 : 1)
                     .minimumScaleFactor(m.standardFloor(0.85))
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 1)

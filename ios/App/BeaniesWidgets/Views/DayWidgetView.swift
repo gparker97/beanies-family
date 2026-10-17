@@ -137,6 +137,7 @@ struct DayLayoutView: View {
 
     private func layout(_ plan: FillPlan) -> some View {
         let peek = PeekKind.forDay(resolved, viewer: snapshot.viewer)
+        let asOf = resolved.stale ? StaleLabel.text(snapshot) : nil
         return VStack(alignment: .leading, spacing: 0) {
             if child {
                 ChildHeaderView(
@@ -156,6 +157,7 @@ struct DayLayoutView: View {
                         links: snapshot.links,
                         taskCount: plan.taskCount,
                         weather: weather,
+                        staleLabelShown: asOf != nil,
                         showAudienceLabel: isLarge && resolved.audience == .my,
                         size: size,
                         m: m
@@ -180,7 +182,7 @@ struct DayLayoutView: View {
                     .padding(.top, child ? 0 : headerHeight)
                     FooterView(
                         tonight: plan.tonight,
-                        asOf: resolved.stale ? StaleLabel.text(snapshot) : nil,
+                        asOf: asOf,
                         later: snapshot.labels.later,
                         nook: snapshot.links.nook,
                         size: size,

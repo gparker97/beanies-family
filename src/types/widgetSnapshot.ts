@@ -411,10 +411,15 @@ export interface WidgetWeatherDay {
  * the web atom (`utils/weather/weatherReading.ts`). The staleness thresholds travel as
  * instants, so native holds no copy of them: `now < ageFrom` shows no age;
  * `ageFrom <= now < currentUntil` shows the age (`labels.weatherAsOf`) and the softer ink;
- * `now >= currentUntil` hides `current.temp` and keeps the day's range. A reading with no
- * entry for the device's today is treated as no reading.
+ * `now >= currentUntil` hides `current.temp` and keeps the day's range. `days` are the HOME
+ * zone's days (the provider's), so a reader picks today by the ymd in `zone`, never by the
+ * device's date (the calendar `days[].ymd` stay device-local: a travelling parent's device
+ * and home can sit on different dates for most of a day). A reading with no entry for the
+ * home-zone today is treated as no reading.
  */
 export interface WidgetWeather {
+  /** IANA id of the home zone the `days` are keyed in ("Asia/Singapore"). */
+  zone: string;
   /** Epoch ms the reading arrived (device clock). */
   fetchedAt: number;
   /** `fetchedAt + AGE_SHOW_MS`: from here the age is shown. */

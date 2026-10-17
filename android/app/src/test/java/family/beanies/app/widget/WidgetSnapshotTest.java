@@ -102,6 +102,24 @@ public class WidgetSnapshotTest {
         assertNull(WidgetSnapshot.from(root).weather);
     }
 
+    @Test
+    public void weatherWithANullInstantIsNoWeather() throws Exception {
+        for (String key : new String[] {"fetchedAt", "ageFrom", "currentUntil"}) {
+            JSONObject root = fixture("widget-snapshot.v3.json");
+            root.getJSONObject("weather").put(key, JSONObject.NULL);
+            assertNull(key, WidgetSnapshot.from(root).weather);
+        }
+    }
+
+    @Test
+    public void weatherCarriesItsHomeZone() throws Exception {
+        JSONObject root = fixture("widget-snapshot.v3.json");
+        root.getJSONObject("weather").put("zone", "Asia/Singapore");
+        assertEquals("Asia/Singapore", WidgetSnapshot.from(root).weather.zone);
+        root.getJSONObject("weather").remove("zone");
+        assertNull(WidgetSnapshot.from(root).weather.zone);
+    }
+
     /** Remove every optional v3 field, leaving the v2 shape. */
     private static void stripV3(JSONObject root) throws Exception {
         root.remove("weather");

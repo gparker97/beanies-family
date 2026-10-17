@@ -1098,6 +1098,7 @@ export function buildWidgetWeather(
   if (!today) return null;
   const glyph = glyphFor(reading.current.code, reading.current.isDay).glyph;
   return {
+    zone,
     fetchedAt: reading.fetchedAt,
     ageFrom: reading.fetchedAt + AGE_SHOW_MS,
     currentUntil: reading.fetchedAt + CURRENT_MAX_MS,

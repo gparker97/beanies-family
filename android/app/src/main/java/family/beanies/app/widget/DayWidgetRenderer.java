@@ -48,9 +48,13 @@ final class DayWidgetRenderer {
             new WidgetTextBitmaps.Style(R.font.caveat_bold, 20f, 15f, 1, false);
     private static final WidgetTextBitmaps.Style MESSAGE_TITLE =
             new WidgetTextBitmaps.Style(R.font.outfit_bold, 16f, 13f, 2, true);
-    /** The date column's temperature (#134): Outfit Bold 13sp, as iOS DayColumnView. */
+    /**
+     * The date column's temperature (#134): Outfit Bold 13sp, as iOS DayColumnView. It shrinks to
+     * fit the room beside the glyph down to 9sp before it would ellipsize: at a 200% system font
+     * the 11sp floor still overran and drew "2…".
+     */
     private static final WidgetTextBitmaps.Style COLUMN_TEMP =
-            new WidgetTextBitmaps.Style(R.font.outfit_bold, 13f, 11f, 1, false);
+            new WidgetTextBitmaps.Style(R.font.outfit_bold, 13f, 9f, 1, false);
     /** The small header's temperature: Outfit Bold 15sp, scaled with the header like the numeral. */
     private static final WidgetTextBitmaps.Style SMALL_TEMP =
             new WidgetTextBitmaps.Style(R.font.outfit_bold, 15f, 15f, 1, false);

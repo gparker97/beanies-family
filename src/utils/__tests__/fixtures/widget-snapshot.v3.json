@@ -2150,6 +2150,7 @@
     }
   ],
   "weather": {
+    "zone": "Asia/Singapore",
     "fetchedAt": 1791678000000,
     "ageFrom": 1791681600000,
     "currentUntil": 1791721200000,
