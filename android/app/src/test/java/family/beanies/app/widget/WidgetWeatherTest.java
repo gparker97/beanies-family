@@ -170,6 +170,27 @@ public class WidgetWeatherTest {
         assertEquals(Long.MAX_VALUE, WidgetWeather.nextChange(null, FETCHED));
     }
 
+    @Test
+    public void aHomeMidnightBeforeTheAgeIsTheNextChange() {
+        TimeZone.setDefault(TimeZone.getTimeZone("America/Los_Angeles"));
+        TimeZone home = TimeZone.getTimeZone("Asia/Singapore");
+        Calendar c = Calendar.getInstance(home);
+        c.clear();
+        c.set(2026, Calendar.OCTOBER, 11, 23, 30, 0);
+        long fetched = c.getTimeInMillis();
+        c.set(2026, Calendar.OCTOBER, 12, 0, 0, 0);
+        long homeMidnight = c.getTimeInMillis();
+        // Fetched at 23:30 in Singapore: the home day turns over before the age line is due.
+        WidgetSnapshot.Weather w = new WidgetSnapshot.Weather(fetched, fetched + HOUR,
+                fetched + 12 * HOUR, "partly", "27°", "Partly cloudy",
+                Arrays.asList(
+                        new WidgetSnapshot.WeatherDay("2026-10-11", "thunder", "32°", "32° / 26°"),
+                        new WidgetSnapshot.WeatherDay("2026-10-12", "rain", "30°", "30° / 25°")),
+                "Asia/Singapore");
+        assertEquals(homeMidnight, WidgetWeather.nextChange(w, fetched));
+        assertEquals(fetched + HOUR, WidgetWeather.nextChange(w, homeMidnight));
+    }
+
     private static long localMidnight(int year, int month, int day) {
         Calendar c = Calendar.getInstance();
         c.clear();

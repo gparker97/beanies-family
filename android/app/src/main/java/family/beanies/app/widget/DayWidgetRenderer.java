@@ -148,7 +148,9 @@ final class DayWidgetRenderer {
         // high once the temperature is gone), then the range, or the age once the reading is old
         // enough (WidgetWeather; no thresholds here).
         WidgetWeather.Shown weather = WidgetWeather.at(s.weather, now);
-        String age = weather != null && weather.showsAge()
+        // A stale snapshot's own "as of" (asOf) already dates the whole column, the weather
+        // included, so the reading's age would repeat it: the age is left out and the row stays.
+        String age = weather != null && weather.showsAge() && asOf.isEmpty()
                 ? asOfText(context, s.labels.weatherAsOf, weather.fetchedAt) : "";
         // An aged reading with no age label falls back to the range; past currentUntil the line
         // is the age or nothing.

@@ -47,7 +47,9 @@ enum WidgetWeather {
         if nowMs >= weather.currentUntil || weather.currentTemp.isEmpty {
             // Too old for "now" (or nothing to say about now): today's day glyph and range
             // carry it, never the stale current glyph.
-            guard !day.range.isEmpty else { return nil }
+            // Both texts the row may fall back to must exist, or the row would be a lone glyph
+            // (the Java mirror applies the same guard).
+            guard !day.range.isEmpty, !day.high.isEmpty else { return nil }
             return WeatherGlance(
                 glyph: day.glyph, temp: nil, range: day.range, high: day.high, aged: false, age: age
             )

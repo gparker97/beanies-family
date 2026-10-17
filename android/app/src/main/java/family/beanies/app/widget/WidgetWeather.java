@@ -70,16 +70,19 @@ final class WidgetWeather {
 
         /**
          * The row's text is in the softer ink: an aged temperature, or the high standing in for
-         * one. Exactly the cases where the age shows, by design: the softer ink is the cue that
-         * the age line beside it explains.
+         * one. The same cases as {@link #showsAge()}, by design: the softer ink is the cue that an
+         * "as of" in the column explains (the reading's age, or a stale snapshot's own "as of",
+         * which the renderer shows in its place).
          */
         boolean soft() {
             return showsAge();
         }
 
         /**
-         * The line under the row carries the age rather than the range: while the reading is
-         * aged, and once the temperature is gone (the row then shows today's high).
+         * The reading wants its age on the line under the row rather than the range: while it is
+         * aged, and once the temperature is gone (the row then shows today's high). The renderer
+         * leaves the age out when a stale snapshot's own "as of" already shows, so this is a want,
+         * not a promise.
          */
         boolean showsAge() {
             return aged || !hasCurrent();
@@ -139,7 +142,7 @@ final class WidgetWeather {
     static long nextChange(WidgetSnapshot.Weather weather, long now) {
         if (weather == null) return Long.MAX_VALUE;
         long at = WidgetFill.nextMidnight(now, homeZone(weather));
-        if (weather.ageFrom > now) at = weather.ageFrom;
+        if (weather.ageFrom > now) at = Math.min(at, weather.ageFrom);
         if (weather.currentUntil > now) at = Math.min(at, weather.currentUntil);
         return at;
     }

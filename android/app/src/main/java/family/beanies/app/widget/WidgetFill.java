@@ -109,9 +109,9 @@ final class WidgetFill {
      */
     static final int COLUMN_WEATHER_SUB = 1 << 1;
     /**
-     * The sub line is the age ("as of 3:40 pm", two lines) rather than the one-line range. With
-     * {@link #COLUMN_STALE} it never shows: the snapshot's own "as of" already says how old
-     * everything in the column is, so the two would read the same date twice.
+     * The sub line is the age ("as of 3:40 pm", two lines) rather than the one-line range. The
+     * renderer never wants it alongside {@link #COLUMN_STALE} (the snapshot's own "as of" says
+     * the same date), so a stale snapshot's flags carry no age.
      */
     static final int COLUMN_AGE = 1 << 2;
     /** The snapshot's own "as of" line (a stale snapshot). Counted, never dropped. */
@@ -154,16 +154,12 @@ final class WidgetFill {
      * height the renderer already has, `WidgetSizes.layoutHeightDp`) at the effective text scale
      * {@code textScale} (system font scale × the Text size choice, `WidgetSizes.effectiveScale`).
      *
-     * The weather row and a stale snapshot's "as of" always stay; a stale snapshot never shows the
-     * weather's age line (its own "as of" covers it). When the rest does not fit the
-     * lines go in the plan's order (#134 requirement 12, the same order as iOS's ViewThatFits
+     * The weather row and a stale snapshot's "as of" always stay. Only the wanted lines are
+     * weighed; none is added or rewritten here. When the rest does not fit the lines go in the plan's order (#134 requirement 12, the same order as iOS's ViewThatFits
      * candidates): the weather's range/age line first, then the audience, then the due count. A
      * host that reports no height (0) keeps everything, as before weather.
      */
     static int dateColumnLines(float heightDp, float textScale, int flags) {
-        if ((flags & (COLUMN_STALE | COLUMN_AGE)) == (COLUMN_STALE | COLUMN_AGE)) {
-            flags &= ~(COLUMN_WEATHER_SUB | COLUMN_AGE);
-        }
         if (heightDp <= 0) return flags;
         float scale = Math.max(textScale, 0.5f);
         // Back to real dp: layoutHeightDp divided the reported height by max(1, scale), and the

@@ -43,15 +43,14 @@ public class WidgetFillTest {
     }
 
     @Test
-    public void aStaleSnapshotNeverShowsTheWeatherAge() {
-        // The snapshot's own "as of" covers the reading's age, so the column never says the same
-        // date twice; the weather row stays. Applies with no height too.
+    public void theCalculatorOnlyWeighsTheWantedLines() {
+        // Leaving the weather's age out under a stale snapshot's own "as of" is the renderer's
+        // call (DayWidgetRenderer, where asOf is in hand); this calculator never rewrites wants.
+        // Given both, it keeps both when they fit, and with no height it returns them unchanged.
         int flags = MEDIUM_WEATHER | COLUMN_AGE | COLUMN_STALE;
-        int expected = COLUMN_WEATHER | COLUMN_STALE | COLUMN_DUE;
-        assertEquals(expected, lines(MEDIUM_DP, STANDARD, flags));
-        assertEquals(expected, lines(MEDIUM_DP, LARGE, flags));
-        assertEquals(expected, WidgetFill.dateColumnLines(0f, LARGER, flags));
-        // A stale snapshot whose reading still shows its range keeps the range.
+        assertEquals(flags, lines(MEDIUM_DP, STANDARD, flags));
+        assertEquals(flags, WidgetFill.dateColumnLines(0f, LARGER, flags));
+        // What the renderer sends for a stale snapshot whose reading still shows its range.
         int range = MEDIUM_WEATHER | COLUMN_STALE;
         assertEquals(range, lines(MEDIUM_DP, LARGE, range));
     }
@@ -72,7 +71,6 @@ public class WidgetFillTest {
         // count would clip the as-of. The weather row stays whatever happens.
         int stale = MEDIUM_WEATHER | COLUMN_STALE;
         assertEquals(COLUMN_WEATHER | COLUMN_STALE, lines(MEDIUM_DP, LARGER, stale));
-        assertEquals(COLUMN_WEATHER | COLUMN_STALE, lines(MEDIUM_DP, LARGER, stale | COLUMN_AGE));
     }
 
     @Test
