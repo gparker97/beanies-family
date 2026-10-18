@@ -262,6 +262,18 @@ describe('native (iOS / Android)', () => {
     expect(text).not.toContain('plan.trial.endsWeb');
   });
 
+  it('trial, beta and active say the plan is viewed and managed on the website; read-only has its own line', () => {
+    for (const s of [TRIAL, { state: 'beta', reason: 'no_launch' }, ACTIVE]) {
+      setState(s);
+      expect(render().text()).toContain('plan.native.manageOnWeb');
+    }
+    setState(TRIAL_ENDED);
+    expect(render().text()).not.toContain('plan.native.manageOnWeb');
+    h.native = false;
+    setState(ACTIVE);
+    expect(render().text()).not.toContain('plan.native.manageOnWeb');
+  });
+
   it("read-only uses greg's final copy: both paragraphs", () => {
     setState(TRIAL_ENDED);
     const text = render().text();

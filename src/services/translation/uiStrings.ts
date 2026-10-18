@@ -8000,6 +8000,12 @@ const STRING_DEFS = {
     beanie:
       'everything is included until {date}, then beanies.family goes read-only until a plan is chosen.',
   },
+  // Native only (trial, beta and active cards): where the plan can be seen and changed. No
+  // link, no price, no purchase verb (App Review); the read-only state has its own line.
+  'plan.native.manageOnWeb': {
+    en: 'Your plan can be viewed and managed on the beanies.family website.',
+    beanie: 'your plan can be viewed and managed on the beanies.family website.',
+  },
   'plan.trial.endsWeb': {
     en: 'Everything is included until {date}. Start a plan now and billing begins today; wait and nothing is charged until day {day}.',
     beanie:

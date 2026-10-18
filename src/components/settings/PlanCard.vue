@@ -86,6 +86,7 @@ const copy = computed<{ lead: string | null; body: string | null; extra: string[
       ? fillTemplate(t('plan.trial.endsNative'), { date })
       : fillTemplate(t('plan.trial.endsWeb'), { date, day: TRIAL_DAYS + 1 });
     if (cohortLine.value) extra.push(cohortLine.value);
+    if (native) extra.push(t('plan.native.manageOnWeb'));
     return {
       lead: fillTemplate(t('plan.trial.day'), { day: trialDay.value, total: TRIAL_DAYS }),
       body,
@@ -96,11 +97,15 @@ const copy = computed<{ lead: string | null; body: string | null; extra: string[
   if (s === 'beta' || s === 'trial') {
     // A trial with no end date cannot happen from the server; read it as beta, not blank.
     if (cohortLine.value) extra.push(cohortLine.value);
+    if (native) extra.push(t('plan.native.manageOnWeb'));
     return { lead: null, body: t('plan.beta.body'), extra };
   }
 
   if (s === 'active') {
     if (cohortLine.value) extra.push(cohortLine.value);
+    // Native carries no action, so say where the plan lives (the read-only state has its own
+    // line for this, `readOnly.native.plansElsewhere`). Plain text: no link, price or verb.
+    if (native) extra.push(t('plan.native.manageOnWeb'));
     return { lead: planSummary.name.value, body: planSummary.body.value, extra };
   }
 

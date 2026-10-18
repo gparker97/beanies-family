@@ -3633,6 +3633,7 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'header.plan': '你的 beanies 套餐',
   'readOnly.native.trialEnded':
     '你的试用期已结束，beanies.family 现在为只读。所有数据仍然属于你，随时都能导出。',
+  'plan.native.manageOnWeb': '你的套餐可以在 beanies.family 网站查看和管理。',
   'readOnly.native.plansElsewhere': '这里无法选择套餐，请前往 beanies.family 网站管理。',
   'readOnly.web.trialEnded':
     '你的试用期已结束，选择套餐之前无法添加新内容。所有数据仍然属于你，随时都能导出。',

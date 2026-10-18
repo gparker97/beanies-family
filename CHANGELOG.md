@@ -14,6 +14,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - Choosing a plan works again for families who joined before v1; checkout had refused them at launch.
 - The Plan page now says when the 50% early-adopter discount is applied.
+- On the iPhone and Android apps the plan card now says your plan is viewed and managed on the beanies.family website.
 
 ### Added
 
