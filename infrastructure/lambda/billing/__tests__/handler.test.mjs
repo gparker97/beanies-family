@@ -360,7 +360,7 @@ describe('billing Lambda handler', () => {
       assert.equal(d.cohort, null);
       assert.equal(d.theme, 'dark');
     });
-    it('pre_v1 adds the coupon; first_ten uses its own lookup key; an existing customer is reused', async () => {
+    it('pre_v1 buys the list price and adds the coupon; first_ten uses its own lookup key; an existing customer is reused', async () => {
       const t = fakeDdb({
         registry: {
           [FAMILY]: { familyId: FAMILY, ownerEmail: 'o@x.test' },
@@ -396,7 +396,7 @@ describe('billing Lambda handler', () => {
       assert.equal(p.get('allow_promotion_codes'), null);
       assert.equal(p.get('customer'), 'cus_9');
       assert.equal(p.get('customer_email'), null);
-      assert.equal(keys[0], 'pre_v1.basic.year.usd');
+      assert.equal(keys[0], 'list.basic.year.usd', 'the coupon cohort buys the list price');
 
       const r2 = await handler(
         evt({

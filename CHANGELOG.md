@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-10-18
 
+### Fixed
+
+- Choosing a plan works again for families who joined before v1; checkout had refused them at launch.
+
 ### Added
 
 - Weather is now shown on the home-screen widgets, and as the temperature on the iPhone lock-screen inline and rectangular widgets.

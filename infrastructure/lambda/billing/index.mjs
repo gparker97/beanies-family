@@ -307,7 +307,10 @@ async function handleCheckout(body, event, cfg, ddb) {
   }
 
   const cohort = billing && COHORTS.has(billing.cohort) ? billing.cohort : null;
-  const lookupKey = lookupKeyFor({ cohort, plan, interval, currency });
+  // The coupon cohort buys the LIST price and gets its discount below; only `first_ten` has
+  // Prices of its own. Asking Stripe for `pre_v1.*` refused every pre-v1 family at launch.
+  const priceCohort = cohort === COUPON_COHORT ? null : cohort;
+  const lookupKey = lookupKeyFor({ cohort: priceCohort, plan, interval, currency });
   const price = await findPriceByLookupKey(lookupKey);
   if (!price) {
     console.error(
