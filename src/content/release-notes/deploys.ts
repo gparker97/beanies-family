@@ -17,6 +17,65 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.10.18',
+    date: '2026-10-18',
+    month: '18 october 2026',
+    spotlight: true,
+    summary: {
+      en: 'beanies.family v1 is here! Plans are now available from the website, and the weather has reached your home-screen widgets.',
+      beanie:
+        'beanies.family v1 is here! plans are now available from the website, and the weather has reached your home-screen widgets.',
+    },
+    features: [
+      {
+        icon: '🎉',
+        title: { en: 'beanies.family v1 is here', beanie: 'beanies.family v1 is here' },
+        description: {
+          en: "Plans are now available from the website. Every family gets 90 days free, no card needed, and your family's data stays yours whatever you decide.",
+          beanie:
+            "plans are now available from the website. every family gets 90 days free, no card needed, and your family's data stays yours whatever you decide.",
+        },
+        tryItRoute: '/settings/plan',
+        cta: {
+          label: { en: 'Read the post', beanie: 'read the post' },
+          href: 'https://beanies.family/blog/v1-is-here',
+        },
+      },
+      {
+        title: { en: 'Weather on your widgets', beanie: 'weather on your widgets' },
+        description: {
+          en: "Today's weather sits beside the date on your home-screen widgets, and the temperature on the iPhone lock screen, from the home town you set in Settings.",
+          beanie:
+            "today's weather sits beside the date on your home-screen widgets, and the temperature on the iphone lock screen, from the home town you set in settings.",
+        },
+      },
+      {
+        title: {
+          en: 'Choose what the lock-screen circle shows',
+          beanie: 'choose what the lock-screen circle shows',
+        },
+        description: {
+          en: "The iPhone circle now shows what's next up, with a countdown through the last hour. Long-press it, Edit Widget, Show, to switch to your next handoff, to-dos left or things left.",
+          beanie:
+            "the iphone circle now shows what's next up, with a countdown through the last hour. long-press it, edit widget, show, to switch to your next handoff, to-dos left or things left.",
+        },
+      },
+      {
+        icon: '💬',
+        title: { en: 'Join us on Discord', beanie: 'join us on discord' },
+        description: {
+          en: "Get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+          beanie:
+            "get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+        },
+        cta: {
+          label: { en: 'Join the Discord', beanie: 'join the discord' },
+          href: 'https://beanies.family/discord',
+        },
+      },
+    ],
+  },
+  {
     version: '2026.10.16',
     date: '2026-10-16',
     month: '16 october 2026',
