@@ -9,7 +9,7 @@ The one place beanies.family talks to Stripe. Zero-dependency Node on `nodejs20.
 | `/billing/portal-session`   | `x-api-key` + plan token in the body | Creates a Customer Portal session |
 | `/billing/webhook`          | `Stripe-Signature` only | Re-reads the subscription and writes its current state |
 
-Files: `index.mjs` (routing, handlers), `stripeApi.mjs` (REST client, pinned `STRIPE_API_VERSION`), `webhookSignature.mjs` (HMAC + `safeEqual`), `ddb.mjs` (`UpdateItem SET` discipline), `alarms.mjs` (prefixes pinned to the Terraform by test).
+Files: `index.mjs` (routing, handlers), `stripeApi.mjs` (REST client, pinned `STRIPE_API_VERSION`), `webhookSignature.mjs` (HMAC + `safeEqual`), `ddb.mjs` (`UpdateItem SET` discipline), `alarms.mjs` (prefixes pinned to the Terraform by test), `slack.mjs` (the #beanies-joiners subscription lines: `formatSubscriptionMessage`, `postToSlack`).
 
 ```bash
 npm run test:lambda      # node:test, mocked fetch + DynamoDB

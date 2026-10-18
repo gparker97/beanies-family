@@ -46,6 +46,7 @@ import {
   createPortalSession,
 } from './stripeApi.mjs';
 import { WEBHOOK_APPLY_FAILED_PREFIX, UPSTREAM_ERROR_PREFIX } from './alarms.mjs';
+import { SLACK_SUBSCRIPTION_EXPAND, formatSubscriptionMessage, postToSlack } from './slack.mjs';
 import { randomBytes } from 'node:crypto';
 
 // ── Vocabulary ───────────────────────────────────────────────────────────────
@@ -119,6 +120,9 @@ const env = () => ({
   // `sk_live_` or a restricted `rk_live_` (Stripe's recommended key shape for a narrow server).
   liveKey: /^(sk|rk)_live_/.test(process.env.STRIPE_SECRET_KEY || ''),
   coupon: process.env.STRIPE_PRE_V1_COUPON || '',
+  // #beanies-joiners (the client's new-family channel). Empty: the Slack line is skipped and
+  // logged (`slack_post_skipped`); the webhook is unaffected either way.
+  slackJoinersWebhookUrl: process.env.SLACK_JOINERS_WEBHOOK_URL || '',
   allowedOrigins: (process.env.CORS_ORIGINS || 'https://app.beanies.family')
     .split(',')
     .map((o) => o.trim())
@@ -257,6 +261,88 @@ async function applySubscription(familyId, subscriptionId, ddb) {
   );
   await send(new commands.UpdateItemCommand(input));
   return attrs;
+}
+
+// ── Slack (#beanies-joiners) ─────────────────────────────────────────────────
+
+/**
+ * Which Slack line, if any, an applied webhook earns. `previous` is the row read BEFORE the
+ * apply: a cancellation posts only when `cancelAt` flips on for the SAME subscription (so a
+ * redelivered event, or a changed end date, stays quiet), and not once it has already ended
+ * (the `deleted` event says that). Renewals and payment-method changes post nothing.
+ */
+export function slackKindFor(type, attrs, previous) {
+  if (type === 'customer.subscription.created') return 'created';
+  if (type === 'customer.subscription.deleted') return 'ended';
+  if (type !== 'customer.subscription.updated' || !attrs?.cancelAt) return null;
+  if (TERMINAL_STATUSES.has(attrs.status)) return null;
+  const sameSub = previous?.stripeSubscriptionId === attrs.stripeSubscriptionId;
+  return sameSub && previous?.cancelAt ? null : 'cancel_scheduled';
+}
+
+/** The registry row (name, owner email); a localhost family lives in the DEV table. */
+async function registryRowFor(familyId, cfg, ddb) {
+  const row = cfg.registryTable ? await getRow(cfg.registryTable, familyId, ddb) : null;
+  if (row || !cfg.registryDevTable) return row;
+  return getRow(cfg.registryDevTable, familyId, ddb);
+}
+
+/**
+ * Post the subscription event to Slack. NEVER throws and never fails the webhook: every miss is
+ * a `slack_post_*` / `slack_detail_failed` decision line plus a console.warn. A detail read that
+ * fails (registry, expanded retrieve) still posts, with less detail.
+ */
+async function notifySubscriptionSlack(kind, familyId, attrs, previous, cfg, ddb) {
+  try {
+    if (!cfg.slackJoinersWebhookUrl) {
+      logLine('slack_post_skipped', familyId, { kind, reason: 'no_url' });
+      return;
+    }
+    const detail = async (what, read) => {
+      try {
+        return await read();
+      } catch (err) {
+        console.warn(`[billing] slack_detail_failed what=${what}`, err?.message ?? err);
+        logLine('slack_detail_failed', familyId, {
+          kind,
+          detail: what,
+          action: err instanceof BillingUpstreamError ? err.action : 'ddb_get',
+          http_status: err instanceof BillingUpstreamError ? err.httpStatus : null,
+        });
+        return null;
+      }
+    };
+    const [registry, sub] = await Promise.all([
+      detail('registry', () => registryRowFor(familyId, cfg, ddb)),
+      detail('subscription', () =>
+        retrieveSubscription(attrs.stripeSubscriptionId, { expand: SLACK_SUBSCRIPTION_EXPAND })
+      ),
+    ]);
+    const text = formatSubscriptionMessage(kind, attrs, {
+      familyId,
+      familyName: registry?.familyName ?? null,
+      ownerEmail: registry?.ownerEmail ?? null,
+      cohort: COHORTS.has(previous?.cohort) ? previous.cohort : null,
+      sub,
+    });
+    const r = await postToSlack(cfg.slackJoinersWebhookUrl, text);
+    if (r.ok) {
+      logLine('slack_posted', familyId, { kind });
+      return;
+    }
+    console.warn(
+      `[billing] slack_post_failed kind=${kind} reason=${r.reason} http_status=${r.httpStatus ?? '-'}\n` +
+        'Check SLACK_JOINERS_WEBHOOK_URL (TF_VAR_slack_joiners_webhook_url, the SLACK_WEBHOOK_URL GitHub secret).'
+    );
+    logLine('slack_post_failed', familyId, {
+      kind,
+      reason: r.reason,
+      http_status: r.httpStatus ?? null,
+    });
+  } catch (err) {
+    console.warn('[billing] slack_post_failed reason=exception', err);
+    logLine('slack_post_failed', familyId, { kind, reason: 'exception' });
+  }
 }
 
 // ── Route handlers ───────────────────────────────────────────────────────────
@@ -534,11 +620,13 @@ async function handleWebhook(event, cfg, ddb) {
     logLine('webhook_ignored', null, { reason: 'no_family_id', kind: type });
     return { status: 200, body: { ignored: 'no_family_id' } };
   }
+  let attrs;
+  let current;
   try {
     // "Retrieve-then-upsert converges" holds PER SUBSCRIPTION. A retried event for an OLD
     // subscription (cancelled, then the family re-subscribed) must not overwrite the current
     // one's row with `canceled`; it is acknowledged and ignored.
-    const current = await getRow(cfg.billingTable, familyId, ddb);
+    current = await getRow(cfg.billingTable, familyId, ddb);
     if (current?.stripeSubscriptionId && current.stripeSubscriptionId !== object.id) {
       const old = await retrieveSubscription(object.id);
       if (TERMINAL_STATUSES.has(old?.status)) {
@@ -547,9 +635,8 @@ async function handleWebhook(event, cfg, ddb) {
       }
     }
     // The event's snapshot is deliberately ignored: applySubscription re-reads the subscription.
-    const attrs = await applySubscription(familyId, object.id, ddb);
+    attrs = await applySubscription(familyId, object.id, ddb);
     logLine('webhook_applied', familyId, { kind: type, status: attrs.status, plan: attrs.plan });
-    return { status: 200, body: { ok: true } };
   } catch (err) {
     // 500 so Stripe retries (up to three days live). The alarmed prefix pages once.
     console.error(`${WEBHOOK_APPLY_FAILED_PREFIX} kind=${type}\n${WEBHOOK_APPLY_REMEDIATION}`, err);
@@ -559,6 +646,11 @@ async function handleWebhook(event, cfg, ddb) {
     });
     return { status: 500, body: { error: 'Could not apply event', code: 'apply_failed' } };
   }
+  // AFTER the apply's try: the row is written, and nothing on the Slack path can turn that into a
+  // 500 (Stripe would retry, and the retry would post again).
+  const slackKind = slackKindFor(type, attrs, current);
+  if (slackKind) await notifySubscriptionSlack(slackKind, familyId, attrs, current, cfg, ddb);
+  return { status: 200, body: { ok: true } };
 }
 
 // ── Entry ────────────────────────────────────────────────────────────────────

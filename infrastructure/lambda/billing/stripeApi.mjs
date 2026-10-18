@@ -177,10 +177,12 @@ export function retrieveCheckoutSession(sessionId, opts = {}) {
   });
 }
 
+/** `opts.expand` (array of paths) is sent as `expand[i]=`; the row write never passes one. */
 export function retrieveSubscription(subscriptionId, opts = {}) {
   return stripeRequest({
     method: 'GET',
     path: `/v1/subscriptions/${encodeURIComponent(subscriptionId)}`,
+    params: opts.expand?.length ? { expand: [...opts.expand] } : undefined,
     action: 'retrieve_subscription',
     fetchImpl: opts.fetchImpl,
   });

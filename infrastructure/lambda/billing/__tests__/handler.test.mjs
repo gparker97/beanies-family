@@ -26,6 +26,7 @@ const sha = (s) => createHash('sha256').update(s, 'utf8').digest('hex');
 const originalFetch = globalThis.fetch;
 const originalLog = console.log;
 const originalError = console.error;
+const originalWarn = console.warn;
 
 // ── A tiny DynamoDB double: two tables of unmarshalled rows, UpdateItem SET applied ───────────
 class GetItemCommand {
@@ -193,6 +194,7 @@ describe('billing Lambda handler', () => {
     globalThis.fetch = originalFetch;
     console.log = originalLog;
     console.error = originalError;
+    console.warn = originalWarn;
     for (const k of [
       'BILLING_API_KEY',
       'BILLING_TABLE_NAME',
@@ -203,6 +205,7 @@ describe('billing Lambda handler', () => {
       'STRIPE_PRE_V1_COUPON',
       'CORS_ORIGINS',
       'DEV_ORIGINS',
+      'SLACK_JOINERS_WEBHOOK_URL',
     ])
       delete process.env[k];
   });
@@ -856,6 +859,175 @@ describe('billing Lambda handler', () => {
       r = await handler(signed(event('customer.subscription.updated', SUB())), t.ddb);
       assert.equal(r.statusCode, 500);
       assert.equal(decisions('webhook_apply_failed')[1].action, 'ddb_update');
+    });
+
+    describe('Slack (#beanies-joiners)', () => {
+      const HOOK = 'https://hooks.slack.com/services/T0/B0/secret';
+      let warns;
+      beforeEach(() => {
+        process.env.SLACK_JOINERS_WEBHOOK_URL = HOOK;
+        warns = [];
+        console.warn = (...a) => warns.push(a.map(String).join(' '));
+      });
+      const EXPANDED = (over = {}) =>
+        SUB({
+          latest_invoice: { id: 'in_1', amount_paid: 2499, total: 2499, currency: 'usd' },
+          discounts: [
+            {
+              id: 'di_1',
+              source: {
+                type: 'coupon',
+                coupon: { id: 'PRE_V1_50', percent_off: 50, duration: 'forever' },
+              },
+              promotion_code: null,
+            },
+          ],
+          ...over,
+        });
+      // The row write reads the plain subscription; the Slack path asks for the expanded one.
+      const stripeWith = (plain, { slack = { status: 200, body: {} }, expanded } = {}) =>
+        fakeStripe({
+          'GET /v1/subscriptions/': ({ url }) =>
+            url.search.includes('expand') ? (expanded ?? EXPANDED()) : plain,
+          'POST /services/': slack,
+        });
+      const slackPosts = (calls) => calls.filter((c) => c.path.startsWith('/services/'));
+      const registry = { [FAMILY]: { familyId: FAMILY, familyName: 'The Parkers' } };
+
+      it('posts once on created, with the family, the expanded retrieve, and never expands the row read', async () => {
+        const t = fakeDdb({
+          registry,
+          billing: { [FAMILY]: { familyId: FAMILY, cohort: 'pre_v1' } },
+        });
+        const calls = stripeWith(SUB());
+        const r = await handler(signed(event('customer.subscription.created', SUB())), t.ddb);
+        assert.equal(r.statusCode, 200, r.body);
+        const posts = slackPosts(calls);
+        assert.equal(posts.length, 1);
+        const { text } = JSON.parse(posts[0].body);
+        assert.match(text, /^:tada: \*New subscription\*/);
+        assert.match(text, /\*Family:\* The Parkers · id …55555555/);
+        assert.match(text, /\*Charged:\* USD 24\.99/);
+        assert.match(text, /\*Cohort:\* pre_v1/);
+        const subReads = calls.filter((c) => c.path.startsWith('/v1/subscriptions/'));
+        assert.equal(subReads.length, 2);
+        assert.equal(subReads[0].query, '', 'the row write retrieve is unexpanded');
+        const expand = new URLSearchParams(subReads[1].query);
+        assert.deepEqual(
+          [expand.get('expand[0]'), expand.get('expand[1]'), expand.get('expand[2]')],
+          ['latest_invoice', 'discounts.source.coupon', 'discounts.promotion_code']
+        );
+        assert.equal(decisions('slack_posted')[0].kind, 'created');
+        assert.equal(t.tables[BILLING][FAMILY].status, 'active');
+      });
+
+      it('falls back to the DEV registry and the owner email domain when there is no name', async () => {
+        const t = fakeDdb({
+          registryDev: { [FAMILY]: { familyId: FAMILY, ownerEmail: 'greg@example.com' } },
+        });
+        const calls = stripeWith(SUB());
+        await handler(signed(event('customer.subscription.created', SUB())), t.ddb);
+        const { text } = JSON.parse(slackPosts(calls)[0].body);
+        assert.match(text, /\*Family:\* owner @example\.com · id …55555555/);
+        assert.doesNotMatch(text, /greg@/);
+      });
+
+      it('posts on the cancel flip only: not on its redelivery, not on a plain update', async () => {
+        const t = fakeDdb({
+          registry,
+          billing: {
+            [FAMILY]: { familyId: FAMILY, stripeSubscriptionId: 'sub_1', status: 'active' },
+          },
+        });
+        let calls = stripeWith(SUB());
+        await handler(signed(event('customer.subscription.updated', SUB())), t.ddb);
+        assert.equal(slackPosts(calls).length, 0, 'a renewal / payment-method change is quiet');
+
+        calls = stripeWith(SUB({ cancel_at: 1_900_000_000 }));
+        await handler(signed(event('customer.subscription.updated', SUB())), t.ddb);
+        const posts = slackPosts(calls);
+        assert.equal(posts.length, 1);
+        assert.match(
+          JSON.parse(posts[0].body).text,
+          /^:wave: \*Subscription cancelled, ends 2030-03-17\*/
+        );
+
+        calls = stripeWith(SUB({ cancel_at: 1_900_000_000 }));
+        await handler(signed(event('customer.subscription.updated', SUB())), t.ddb);
+        assert.equal(slackPosts(calls).length, 0, 'the redelivered cancel does not post twice');
+      });
+
+      it('posts on deleted', async () => {
+        const t = fakeDdb({ registry });
+        const calls = stripeWith(SUB({ status: 'canceled', ended_at: 1_900_000_000 }), {
+          expanded: EXPANDED({ status: 'canceled', ended_at: 1_900_000_000 }),
+        });
+        const r = await handler(
+          signed(event('customer.subscription.deleted', SUB({ status: 'canceled' }))),
+          t.ddb
+        );
+        assert.equal(r.statusCode, 200);
+        const posts = slackPosts(calls);
+        assert.equal(posts.length, 1);
+        assert.match(
+          JSON.parse(posts[0].body).text,
+          /^:no_entry: \*Subscription ended\*[^]*\*Ended:\* 2030-03-17/
+        );
+      });
+
+      it('never fails the webhook when Slack returns 500 or times out', async () => {
+        let t = fakeDdb({ registry });
+        let calls = stripeWith(SUB(), { slack: { status: 500, body: {} } });
+        let r = await handler(signed(event('customer.subscription.created', SUB())), t.ddb);
+        assert.equal(r.statusCode, 200, r.body);
+        assert.equal(slackPosts(calls).length, 1);
+        let failed = decisions('slack_post_failed');
+        assert.equal(failed[0].reason, 'http_error');
+        assert.equal(failed[0].http_status, 500);
+        assert.ok(warns.some((w) => w.startsWith('[billing] slack_post_failed')));
+
+        t = fakeDdb({ registry });
+        let signal;
+        calls = stripeWith(SUB(), {
+          slack: ({ init }) => {
+            signal = init.signal;
+            return Object.assign(new Error('The operation was aborted due to timeout'), {
+              name: 'TimeoutError',
+            });
+          },
+        });
+        r = await handler(signed(event('customer.subscription.created', SUB())), t.ddb);
+        assert.equal(r.statusCode, 200, r.body);
+        assert.ok(signal instanceof AbortSignal, 'the Slack post carries a timeout signal');
+        failed = decisions('slack_post_failed');
+        assert.equal(failed[1].reason, 'timeout');
+        assert.equal(t.tables[BILLING][FAMILY].status, 'active', 'the row write stands');
+      });
+
+      it('still posts, with less detail, when the expanded retrieve fails', async () => {
+        const t = fakeDdb({ registry });
+        const calls = stripeWith(SUB(), {
+          expanded: { status: 400, body: { error: { message: 'bad expand' } } },
+        });
+        const r = await handler(signed(event('customer.subscription.created', SUB())), t.ddb);
+        assert.equal(r.statusCode, 200);
+        const { text } = JSON.parse(slackPosts(calls)[0].body);
+        assert.match(text, /\*Charged:\* unknown/);
+        const d = decisions('slack_detail_failed')[0];
+        assert.equal(d.detail, 'subscription');
+        assert.equal(d.http_status, 400);
+      });
+
+      it('reads SLACK_JOINERS_WEBHOOK_URL at call time: unset skips the post and says so', async () => {
+        delete process.env.SLACK_JOINERS_WEBHOOK_URL;
+        const t = fakeDdb({ registry });
+        const calls = stripeWith(SUB());
+        const r = await handler(signed(event('customer.subscription.created', SUB())), t.ddb);
+        assert.equal(r.statusCode, 200);
+        assert.equal(slackPosts(calls).length, 0);
+        assert.equal(calls.filter((c) => c.path.startsWith('/v1/subscriptions/')).length, 1);
+        assert.equal(decisions('slack_post_skipped')[0].reason, 'no_url');
+      });
     });
   });
 
