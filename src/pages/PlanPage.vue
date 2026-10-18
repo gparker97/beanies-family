@@ -490,6 +490,16 @@ watch(
         {{ cohortLine.tail }}
       </p>
 
+      <!-- The one Caveat accent on this page: the half price shown in the cards is already
+           applied, so say so warmly right above them. Real information, so not aria-hidden. -->
+      <p
+        v-if="cohort === 'pre_v1'"
+        data-testid="plan-early-note"
+        class="font-caveat text-primary-500 dark:text-accent-lift -mb-3 text-center text-xl leading-tight"
+      >
+        {{ t('plan.cohort.page.preV1.note') }}
+      </p>
+
       <div role="radiogroup" :aria-label="t('plan.select.aria')" class="grid gap-4 md:grid-cols-2">
         <PlanChoiceCard
           plan="basic"
