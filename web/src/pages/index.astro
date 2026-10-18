@@ -6,7 +6,7 @@ import ProofNote from '../components/ProofNote.astro';
 import ProofCounter from '../components/ProofCounter.astro';
 import { SOFTWARE_APPLICATION } from '@beanies/brand/schema';
 import { APP_URL, SITE_URL } from '@beanies/brand/nav';
-import { PRICES, numericPrice } from '../lib/pricing';
+import { PRICES, TRIAL_DAYS, numericPrice } from '../lib/pricing';
 import { proofQuote } from '../lib/proof';
 import { parseStoreProof, fiveStarTotal } from '../lib/storeProof';
 import storeProof from '../data/store-proof.json';
@@ -453,8 +453,8 @@ const HERO_MASCOT = '/brand/beanies_family_hugging_transparent_512x512.webp';
           </div>
         </div>
         <p class="final-cta__sub reveal">
-          it's free. run it locally or login below. yes, it's really free.
-          <a href="/pricing" class="final-cta__pricing">probably not forever.</a>
+          free and open source if you run it yourself, or log in below for {TRIAL_DAYS} days of
+          everything, on me. <a href="/pricing" class="final-cta__pricing">here's the deal after that.</a>
         </p>
         <div style="display: flex; flex-wrap: wrap; gap: 14px; justify-content: center" class="reveal">
           <a

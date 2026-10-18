@@ -14,6 +14,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - Weather is now shown on the home-screen widgets, and as the temperature on the iPhone lock-screen inline and rectangular widgets.
 - The iPhone lock-screen circle widget can now be set to show Next up, Next handoff, To-dos left or Things left.
+- A v1 launch coupon: the first 100 families can enter `beaniev1` at checkout for 20% off their first three months on the monthly magic beans plan.
+
+### Changed
+
+- The pricing page, the switching pages, the help center and the terms now describe beanies.family v1: 90 days of everything free, then a plan, and free and open source if you host it yourself.
 
 ## 2026-10-17
 

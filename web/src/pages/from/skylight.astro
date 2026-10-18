@@ -2,6 +2,7 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import Breadcrumbs from '../../components/Breadcrumbs.astro';
 import { APP_URL } from '@beanies/brand/nav';
+import { PRICES, TRIAL_DAYS } from '../../lib/pricing';
 // Caveat - the CIG handwritten accent face. Imported per-page rather than in
 // BaseLayout, matching /from/maple and WorldsBeanstalk.astro: only the pages that
 // actually use the accent should pay for the font.
@@ -10,7 +11,7 @@ import '../../styles/switch-page.css';
 // The kitchen-wall scene. Imported AFTER the shared sheet so its `wall-` classes
 // layer on top of the furniture rather than fighting it.
 import '../../styles/skylight-wall.css';
-import TrustBetaFree from '../../components/TrustBetaFree.astro';
+import TrustFreeTrial from '../../components/TrustFreeTrial.astro';
 import ProofNote from '../../components/ProofNote.astro';
 import { proofQuote } from '../../lib/proof';
 
@@ -593,7 +594,7 @@ const PLUS_YEAR = '$79';
           <li>🔒 end-to-end encrypted</li>
           <li>📂 your file, your storage</li>
           <li>🚫 no ads, ever</li>
-          <TrustBetaFree />
+          <TrustFreeTrial />
         </ul>
       </div>
     </header>
@@ -624,7 +625,7 @@ const PLUS_YEAR = '$79';
               <tr
                 ><th scope="row">subscription</th><td class="warn"
                   >{PLUS_YEAR}/yr for meal planning, chore rewards and more</td
-                ><td class="good"><a href="/pricing">free while beanies is in beta</a></td></tr
+                ><td class="good"><a href="/pricing">{PRICES.USD.basicYearly}/yr for the whole app</a>, after {TRIAL_DAYS} days free</td></tr
               >
               <tr
                 ><th scope="row">wall-mounted family calendar</th><td class="good"
@@ -749,7 +750,7 @@ const PLUS_YEAR = '$79';
               <h3>the wall is for your week</h3>
               <p>
                 One owner in that thread counted one a day for a week, and noted they are "almost
-                all for the plus subscription". beanies has one paid thing and it's the ai helper
+                all for the plus subscription". beanies has one upgrade and it's the ai helper
                 (<a href="/pricing">the plan's here</a>), and there's nothing to announce at you about
                 it inside the app. If that ever changes it'll be quiet, and there
                 will be a switch in settings to turn it off, because being asked is the whole point
@@ -944,8 +945,8 @@ const PLUS_YEAR = '$79';
         <details open>
           <summary>do i need to buy anything?</summary>
           <p>
-            No. Nothing at all beyond beanies itself, and beanies is <a href="/pricing">free while we're
-            in beta</a>. If you
+            No. Nothing at all beyond beanies itself, which is free for {TRIAL_DAYS} days and then
+            <a href="/pricing">{PRICES.USD.basicYearly} a year</a>. If you
             want the tablet to look tidy on the wall you could pick up a simple wall mount, but
             that's optional and it's the whole shopping list. Any tablet with a browser works: iPad,
             Android, Fire, the one with the cracked corner.

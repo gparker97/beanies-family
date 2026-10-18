@@ -2,12 +2,13 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import Breadcrumbs from '../../components/Breadcrumbs.astro';
 import { APP_URL } from '@beanies/brand/nav';
+import { PRICES, TRIAL_DAYS } from '../../lib/pricing';
 // Caveat — the CIG handwritten accent face. Imported per-page rather than in
 // BaseLayout for the same reason WorldsBeanstalk.astro imports it: only the
 // pages that actually use the accent should pay for the font.
 import '@fontsource-variable/caveat';
 import '../../styles/switch-page.css';
-import TrustBetaFree from '../../components/TrustBetaFree.astro';
+import TrustFreeTrial from '../../components/TrustFreeTrial.astro';
 import ProofNote from '../../components/ProofNote.astro';
 import { proofQuote } from '../../lib/proof';
 
@@ -53,7 +54,7 @@ const MASCOT = '/brand/beanies_family_hugging_transparent_512x512.webp';
             <li>🔒 end-to-end encrypted</li>
             <li>📂 your file, your storage</li>
             <li>🚫 no ads, ever</li>
-            <TrustBetaFree />
+            <TrustFreeTrial />
           </ul>
         </div>
 
@@ -96,8 +97,9 @@ const MASCOT = '/brand/beanies_family_hugging_transparent_512x512.webp';
               or local). Not on my servers. I don't have servers with your data on them.
             </p>
             <p class="fact">
-              <b>what it costs</b>Free while we're in beta. <a href="/pricing">Here's the plan after
-              that</a>, and no ads for life is the beanies guarantee. That one I mean.
+              <b>what it costs</b>{TRIAL_DAYS} days of everything, free. Then it's
+              {PRICES.USD.basicYearly} a year for the whole app. <a href="/pricing">Here's the whole
+              plan</a>, and no ads for life is the beanies guarantee. That one I mean.
             </p>
           </div>
         </div>
@@ -251,12 +253,12 @@ const MASCOT = '/brand/beanies_family_hugging_transparent_512x512.webp';
           </p>
         </details>
         <details>
-          <summary>why is it free right now?</summary>
+          <summary>what does it cost?</summary>
           <p>
-            Right now, I cover the costs myself. At v1 there'll be a fair price, starting at three
-            dollars a month, and every family gets 90 days of everything first;
-            <a href="/pricing">the whole plan is here</a>, and I promise it won't burn a hole in your
-            wallet. What there won't be, ever: ads. Or
+            Every family gets {TRIAL_DAYS} days of everything first, free, no card needed. After
+            that it's {PRICES.USD.basicYearly} a year for beanies basic, and if you'd rather host it
+            yourself, it's free and open source, forever. <a href="/pricing">The whole plan is
+            here</a>, and I promise it won't burn a hole in your wallet. What there won't be, ever: ads. Or
             popups. Or anybody reading your family's data besides you, and your family. Which is the way it
             should be for your precious beans.
           </p>

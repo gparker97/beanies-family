@@ -1,0 +1,14 @@
+---
+/**
+ * The free-trial trust badge on the switching pages.
+ *
+ * One component rather than the same string hand-copied into four pages, so the
+ * day the offer changes it changes once. The number comes from `lib/pricing.ts`.
+ */
+import { TRIAL_DAYS } from '../lib/pricing';
+---
+
+<li>
+  🆓{' '}
+  <a href="/pricing">{TRIAL_DAYS} days free, no card needed</a>
+</li>

@@ -350,6 +350,13 @@ async function handleCheckout(body, event, cfg, ddb) {
       };
     }
     params.discounts = [{ coupon: cfg.coupon }];
+  } else if (cohort === null && interval === 'month') {
+    // The v1 coupon on /pricing (`V1_COUPON` in packages/brand/pricing.ts) is monthly-only: its
+    // live coupon is 20% for 3 months, which on a yearly invoice would take 20% off the whole
+    // year. So only a list-price monthly checkout shows Stripe's promotion-code field. Never
+    // beside a cohort price: Stripe refuses `discounts` with it, and `first_ten` is already the
+    // founding price.
+    params.allow_promotion_codes = true;
   }
 
   const session = await createCheckoutSession(params);
@@ -368,6 +375,7 @@ async function handleCheckout(body, event, cfg, ddb) {
     interval,
     currency,
     cohort,
+    promo_codes: params.allow_promotion_codes === true,
     theme: theme === 'dark' ? 'dark' : 'light',
   });
   return { status: 200, body: { sessionId: session.id, clientSecret: session.client_secret } };

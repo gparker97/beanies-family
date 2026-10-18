@@ -2,15 +2,15 @@
 /**
  * /pricing
  *
- * A pricing page whose job is to defuse the "free for now" hedge that appears
- * on nine pages and four posts. It follows the switching-page kit
+ * A pricing page for v1: the cloud plans, the v1 coupon, and a quiet note that
+ * self-hosting stays free and open source. It follows the switching-page kit
  * (`switch-page.css` + `.welcome-page`) so it looks like it already lived here.
  *
  * Every number on this page comes from `lib/pricing.ts`. Do not type a price
  * into this file.
  */
 import BaseLayout from '../layouts/BaseLayout.astro';
-import { APP_URL, SITE_URL } from '@beanies/brand/nav';
+import { APP_URL, GITHUB_URL, SITE_URL } from '@beanies/brand/nav';
 import {
   DEFAULT_CURRENCY,
   FULL_BEANS_FALLBACK,
@@ -18,6 +18,7 @@ import {
   PRICES,
   PRICING_FAQS,
   TRIAL_DAYS,
+  V1_COUPON,
   faqAnswerText,
   splitFaqAnswer,
 } from '../lib/pricing';
@@ -44,7 +45,7 @@ const faqSchema = {
 ---
     <BaseLayout
       title="pricing - beanies.family"
-      description="beanies.family is free while it's in beta. at v1: 90 days of the whole app, then beanies basic from $30 a year, or the magic beans plan with the ai included. no ads, and your data stays in your own encrypted file."
+      description="beanies.family v1 is here: 90 days of the whole app free, then beanies basic from $30 a year, or the magic beans plan with the ai included. free and open source if you host it yourself. no ads, and your data stays in your own encrypted file."
       canonicalPath={canonicalPath}
   jsonLd={faqSchema}
 >
@@ -58,9 +59,10 @@ const faqSchema = {
                    `.kicker-pill` style stays — those pages still use it. -->
               <h1>no ads. no data. <em>no surprises.</em></h1>
               <p class="hero-sub">
-                free for now, while we're in beta. v1 won't be, but i promise it won't burn a
-                hole in your wallet. your doggie may even find a couple bucks in the corner
-                of the sofa to cover the first month.
+                beanies.family is free and open source if you're a nerd like me (no offense) and
+                host it yourself. the cloud version costs money, but i promise it won't burn a hole
+                in your wallet. your doggie may even find a couple bucks in the corner of the sofa
+                to cover the first month.
               </p>
               <div class="hero-cta">
                 <a
@@ -250,6 +252,22 @@ const faqSchema = {
                 <li class="soon"><span>🌱</span><span>lots more on the way</span></li>
               </ul>
             </div>
+
+            <!-- Deliberately quiet: one line under the plans, never a third plan card. -->
+            <div class="foss">
+              <p>
+                <b>free and open source, always.</b> rather run beanies.family yourself? the code
+                is all on github, and self-hosting will never cost you a bean.
+              </p>
+              <a
+                class="foss-link"
+                href={GITHUB_URL}
+                target="_blank"
+                rel="noopener"
+                data-cta="CTA: GitHub"
+                data-cta-loc="pricing-foss">host it yourself ↗</a
+              >
+            </div>
           </div>
         </section>
 
@@ -263,20 +281,18 @@ const faqSchema = {
                 of hearing my thoughts, well... too bad.
               </p>
               <p>
-                First things first: The app is <span class="highlight">
-                  still free, and will remain free while it's in beta</span
-                >. The 90-day trial clock will only start when v1 lands.
+                First things first: beanies.family will <span class="highlight">always be FOSS
+                (free and open source)</span> for those techie self-hosters out there - we (well,
+                I - I can't speak for my <em>claude-bot</em>) love you. For the rest of us, the
+                hosting, tokens, and lots of other stuff costs real money (yes, MY real money).
               </p>
               <p>
-                I won't charge users for software that's not up to my standards for a live app.
-                We're still working out the kinks, together, and I'm grateful for each and every
-                one of my early adopter beanies who've been helping (even passively) to unearth
-                those fiddly little bugs, issues, and snafus.
-              </p>
-              <p>
-                That said, I'm still footing the bill. And as I may have mentioned (once or
-                twice), we don't harvest user data, run ads, or do any other revenue-generating
-                things, so, like all good things, at some point the free ride has to come to an end.
+                As I may have mentioned (once or twice), we don't generate revenue with your
+                private data or ads, so, like all good things, at some point the free ride has to
+                come to an end. One thing I can promise, though - it'll be worth
+                it (meaning beanies.family - I won't actually give your kid a free ride. I'm pretty
+                sure I made that clear in <a href="/blog/welcome-to-the-beanstalk">my first
+                blog</a>).
               </p>
               <p>
                 My plans for pricing are listed right here on this page. If they change, you'll be
@@ -289,10 +305,11 @@ const faqSchema = {
                 basic tier at a low price.
               </p>
               <p>
-                For those who've helped make beanies better just by being here, know that I
-                appreciate everything you do, and your contributions will not go unrewarded (in
-                fact, <a href="#early">see down below</a> for some interesting prizes for early
-                adopter beanies).
+                For all my wonderful beanie families who've made beanies better just by being
+                here, know that I appreciate everything you do, and your contributions are what
+                make beanies.family awesome. Please keep the feedback coming through all the
+                feedback channels. You have my eternal gratitude (and
+                don't miss <a href="#early">the section below</a> for some special rewards).
               </p>
               <p>
                 Together, we can make <a href="/">beanies.family</a> the best software it can
@@ -313,62 +330,17 @@ const faqSchema = {
           <div class="wrap">
             <p class="section-label">while you're early</p>
             <h2 class="section-title">a little something for being an early bean</h2>
-            <p class="section-subtitle">a special surprise for my early adopter beanies</p>
+            <p class="section-subtitle">a special surprise for my v1 beanies</p>
             <div class="offers">
-              <div class="offer offer--rest">
-                <p class="who">everyone who joins before v1</p>
-                <p class="deal"><em>half price</em>, forever</p>
+              <div class="offer offer-v1">
+                <p class="who">for the first {V1_COUPON.families} v1 beanie families</p>
+                <p class="deal"><em>{V1_COUPON.pctOff}% off</em> your first {V1_COUPON.months} months</p>
                 <p>
-                  when your trial period is up, it's 50% off for as long as you stay. forever. no
-                  code needed.
+                  when your trial period is up, use coupon code
+                  <code class="coupon">{V1_COUPON.code}</code> for {V1_COUPON.pctOff}% off your
+                  first {V1_COUPON.months} months on the monthly magic beans plan. just for being
+                  here and being awesome.
                 </p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section class="section section-tight">
-          <div class="wrap">
-            <p class="section-label">the rollout</p>
-            <h2 class="section-title">here's what to expect</h2>
-            <div class="steps">
-              <div class="step step--now">
-                <div class="step-rail"><span class="step-dot">1</span></div>
-                <div class="step-body">
-                  <span class="when">you are here</span>
-                  <h3>beta. everything free, no clock.</h3>
-                  <p>no charge while we're still testing. but that won't last forever.</p>
-                </div>
-              </div>
-              <div class="step">
-                <div class="step-rail"><span class="step-dot">2</span></div>
-                <div class="step-body">
-                  <span class="when">before anything changes</span>
-                  <h3>i'll update you here and by email</h3>
-                  <p>
-                    you'll have time to decide, and the prices above will only take effect after
-                    your trial period.
-                  </p>
-                </div>
-              </div>
-              <div class="step">
-                <div class="step-rail"><span class="step-dot">3</span></div>
-                <div class="step-body">
-                  <span class="when">v1</span>
-                  <h3>beta ends, subscriptions open</h3>
-                  <p>
-                    after the {TRIAL_DAYS} days trial period, pick one of the plans. if you sign
-                    up now, you'll keep your special price forever.
-                  </p>
-                </div>
-              </div>
-              <div class="step">
-                <div class="step-rail"><span class="step-dot">4</span></div>
-                <div class="step-body">
-                  <span class="when">after v1</span>
-                  <h3>new families pay the full price</h3>
-                  <p>which is why i'm telling you this now.</p>
-                </div>
               </div>
             </div>
           </div>
@@ -394,8 +366,8 @@ const faqSchema = {
         <section class="final">
           <h2 class="final-title">so... ready to count some beans? 🫘</h2>
           <p class="hero-sub">
-            free while in beta, and <a href="#early">special rewards for those who sign up now</a>,
-            so <em>get in while the gettin's good.</em>
+            don't forget your <a href="#early">v1 coupon</a>, and <em>get in while the gettin's
+            good.</em>
           </p>
           <div class="hero-cta">
             <a
@@ -413,7 +385,10 @@ const faqSchema = {
             height="140"
             loading="lazy"
           />
-          <p class="ps">the beanie doggie says hello. and <em>every bean counts</em></p>
+          <p class="ps">
+            the beanie dog says <em>every bean counts</em> (wait a minute. dogs can't talk. he just
+            says bark.)
+          </p>
         </section>
   </div>
 </BaseLayout>
@@ -771,12 +746,8 @@ const faqSchema = {
     text-align: center;
   }
 
-  .pricing-page .offer-ten {
+  .pricing-page .offer-v1 {
     border-top: 6px solid var(--heritage-orange);
-  }
-
-  .pricing-page .offer-rest {
-    border-top: 6px solid var(--sky-silk);
   }
 
   .pricing-page .offer .who {
@@ -804,95 +775,17 @@ const faqSchema = {
     margin: 0;
   }
 
-  .pricing-page .offer .works {
-    color: var(--muted-text);
-    font-size: 0.84rem;
-  }
-
-  /* the rollout: a real sequence, so the numbers are earned */
-  .pricing-page .steps {
-    list-style: none;
-    margin: 0 auto;
-    max-width: 720px;
-    padding: 0;
-  }
-
-  .pricing-page .step {
-    display: grid;
-    gap: 0 1.2rem;
-    grid-template-columns: 2.6rem 1fr;
-    position: relative;
-  }
-
-  .pricing-page .step-rail {
-    display: flex;
-    justify-content: center;
-    position: relative;
-  }
-
-  .pricing-page .step-rail::before {
-    background: rgb(241 93 34 / 22%);
-    bottom: 0;
-    content: '';
-    left: 50%;
-    position: absolute;
-    top: 0;
-    transform: translateX(-50%);
-    width: 2px;
-  }
-
-  .pricing-page .step:last-child .step-rail::before {
-    bottom: auto;
-    height: 1.6rem;
-  }
-
-  .pricing-page .step-dot {
-    align-items: center;
-    background: #fff;
-    border: 2px solid rgb(241 93 34 / 30%);
-    border-radius: 999px;
+  /* The code a family types at checkout: a dashed "clip me" chip in house orange. */
+  .pricing-page .coupon {
+    background: rgb(241 93 34 / 8%);
+    border: 1.5px dashed var(--heritage-orange);
+    border-radius: 6px;
     color: var(--heritage-orange);
-    display: flex;
-    font-family: 'Outfit Variable', Outfit, sans-serif;
-    font-size: 0.85rem;
+    font-family: var(--font-display);
     font-weight: 800;
-    height: 2.2rem;
-    justify-content: center;
-    position: relative;
-    width: 2.2rem;
-    z-index: 1;
-  }
-
-  .pricing-page .step-now .step-dot {
-    background: linear-gradient(135deg, var(--heritage-orange), var(--terracotta));
-    border-color: transparent;
-    color: #fff;
-  }
-
-  .pricing-page .step-body {
-    padding-bottom: 1.8rem;
-  }
-
-  .pricing-page .step h3 {
-    color: var(--deep-slate);
-    font-family: 'Outfit Variable', Outfit, sans-serif;
-    font-size: 1.05rem;
-    font-weight: 800;
-    margin: 0.15rem 0 0.3rem;
-  }
-
-  .pricing-page .step p {
-    font-size: 0.95rem;
-    margin: 0;
-  }
-
-  .pricing-page .step .when {
-    color: var(--heritage-orange);
-    font-family: 'Outfit Variable', Outfit, sans-serif;
-    font-size: 0.74rem;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 1px 8px;
+    white-space: nowrap;
   }
 
   .pricing-page .final .hero-sub em {
@@ -1088,6 +981,45 @@ const faqSchema = {
     padding: 2px 7px;
     text-transform: uppercase;
     white-space: nowrap;
+  }
+
+  /* ── free and open source ─────────────────────────────────────────────
+     A thin, quiet strip under the magic beans box: no card, no shadow, muted
+     text, so it reads as a footnote to the plans rather than a third option. */
+  .pricing-page .foss {
+    align-items: center;
+    border: 1px dashed rgb(44 62 80 / 22%);
+    border-radius: var(--sq);
+    color: var(--muted-text);
+    display: flex;
+    font-size: 0.88rem;
+    gap: 0.6rem 1.2rem;
+    justify-content: space-between;
+    margin: 18px auto 0;
+    max-width: 700px;
+    padding: 12px 20px;
+  }
+  .pricing-page .foss p { margin: 0; }
+  .pricing-page .foss b { color: var(--deep-slate); }
+  .pricing-page .foss-link {
+    border: 1.5px solid rgb(44 62 80 / 25%);
+    border-radius: 999px;
+    color: var(--deep-slate);
+    flex-shrink: 0;
+    font-family: var(--font-display);
+    font-size: 0.82rem;
+    font-weight: 700;
+    padding: 5px 14px;
+    text-decoration: none;
+    transition: border-color 0.15s ease, color 0.15s ease;
+  }
+  .pricing-page .foss-link:hover { border-color: var(--heritage-orange); color: var(--heritage-orange); }
+  .pricing-page .foss-link:focus-visible {
+    outline: 3px solid var(--heritage-orange);
+    outline-offset: 2px;
+  }
+  @media (max-width: 640px) {
+    .pricing-page .foss { flex-direction: column; text-align: center; }
   }
 
   /* The full note runs long, so it gets a reading measure and more air

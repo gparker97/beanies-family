@@ -3168,7 +3168,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       'What the 90-day trial includes, what changes when it ends, how to choose a plan from the website, and what happens to your family’s data if you stop paying (nothing).',
     icon: '\u{1F331}',
     readTime: 5,
-    updatedDate: '2026-10-09',
+    updatedDate: '2026-10-18',
     sections: [
       {
         type: 'paragraph',
@@ -3238,17 +3238,6 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         type: 'paragraph',
         content:
           'Magic beans are counted per family, not per person, and reset on a UTC day; the app shows the reset in your local time. If you use your <strong>own AI key</strong> (Settings → AI) there is no limit at all, on any plan, because the reading happens with your key rather than ours.',
-      },
-      {
-        type: 'heading',
-        content: 'Early families',
-        level: 2,
-        id: 'early-families',
-      },
-      {
-        type: 'paragraph',
-        content:
-          'Families who joined before version 1 pay <strong>half price for life</strong> on either plan. There is no code to type and nothing to claim: the discount is already on your plan page and on every invoice. A handful of founding families have their own price, shown the same way.',
       },
       {
         type: 'heading',

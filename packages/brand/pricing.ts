@@ -133,6 +133,15 @@ export function familyPrice(
  *  PRICES rather than retyped, so the JSON-LD cannot drift from the page. */
 export const numericPrice = (price: string): string => price.replace(/[^0-9.]/g, '');
 
+/**
+ * The v1 launch offer on /pricing: a Stripe promotion code a family types at checkout, for the
+ * first `families` who redeem it, on the MONTHLY magic beans plan only (live coupon
+ * `V1_LAUNCH_20_3MO`, limited to that product; the billing Lambda shows the code field on
+ * list-price monthly checkouts only). The page states these figures, so they live here and not
+ * in the markup; the live coupon and promotion code must match them.
+ */
+export const V1_COUPON = { code: 'beaniev1', pctOff: 20, months: 3, families: 100 } as const;
+
 /** Length of the everything-included trial that starts at v1. */
 export const TRIAL_DAYS = 90;
 
@@ -206,19 +215,9 @@ export const PRICING_FAQS: PricingFaq[] = [
     a: `as of this writing (in ${COZI.checked}), cozi's ad-free plan is ${COZI.adFreeYearly} a year and beanies basic is ${PRICES.USD.basicYearly}. their ai plan is ${COZI.aiYearly} and the magic beans plan is ${PRICES.USD.fullYearly}. we're about five dollars more, which is roughly due to beanies providing privacy rather than advertising. cozi has a free tier which runs on ads, while we have a ${TRIAL_DAYS} day trial period (and we'll never have ads).`,
   },
   {
-    id: 'here-now',
-    q: "i'm an early adopter beanie. what does that get me?",
-    a: `half price on either plan, forever, for joining before v1. that's ${PRICES.USD.halfBasicYearly} a year for beanies basic, or ${PRICES.USD.halfFullYearly} for the magic beans plan. no code, no expiry, and no renewal to miss.`,
-  },
-  {
-    id: 'prove-early',
-    q: 'how do you know i was here before v1?',
-    a: "your pod has a creation date, and that's the whole test. no code, no coupon, no screenshot. you don't need to do anything today except be here.",
-  },
-  {
     id: 'when-is-v1',
     q: 'when is v1 coming?',
-    a: "v1 will be released once i've muscled my way through our outstanding bugs and issues list. we're getting closer to an acceptable (in my view) level of production stability every day. as of this writing (which is Sep 2026), i'd say we're a month or 2 away. i'll post updates here as we get closer.",
+    a: 'v1 is here, you lucky devil! after months on end of early mornings and late nights spent troubleshooting, fixing bugs, implementing user feedback, and writing silly songs (more on this later), beanies.family v1 is officially available for everyone!',
   },
   {
     id: 'data-if-i-leave',

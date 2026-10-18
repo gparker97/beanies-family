@@ -17,11 +17,14 @@ export const PUBLIC_NAV: NavLink[] = [
   { label: 'help', href: '/help' },
 ];
 
+/** The public source repository: beanies.family is free and open source to self-host. */
+export const GITHUB_URL = 'https://github.com/gparker97/beanies-family';
+
 /** Footer links */
 export const FOOTER_NAV: NavLink[] = [
   { label: 'privacy', href: '/privacy' },
   { label: 'terms', href: '/terms' },
-  { label: 'github', href: 'https://github.com/gparker97/beanies-family', external: true },
+  { label: 'github', href: GITHUB_URL, external: true },
 ];
 
 /**

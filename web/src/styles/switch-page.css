@@ -781,7 +781,7 @@
 }
 
 /*
-  A badge may link (the beta one points at /pricing); it must still read as a
+  A badge may link (the free-trial one points at /pricing); it must still read as a
   pill. Sits last because `li a` outranks the `.pull a` / `.ps a` link rules
   above and stylelint wants specificity ascending.
 */

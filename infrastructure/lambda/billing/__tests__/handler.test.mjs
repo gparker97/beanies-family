@@ -351,6 +351,7 @@ describe('billing Lambda handler', () => {
       assert.equal(p.get('customer_email'), 'o@x.test');
       assert.equal(p.get('customer'), null);
       assert.equal(p.get('discounts[0][coupon]'), null);
+      assert.equal(p.get('allow_promotion_codes'), null, 'the v1 code is monthly-only');
       assert.equal(p.get('branding_settings[background_color]'), '#1e2a36');
       assert.equal(p.get('return_url'), null);
       assert.equal(create.headers['Stripe-Version'], STRIPE_API_VERSION);
@@ -392,6 +393,7 @@ describe('billing Lambda handler', () => {
         calls.filter((c) => c.path === '/v1/checkout/sessions').at(-1).body
       );
       assert.equal(p.get('discounts[0][coupon]'), 'PRE_V1_50');
+      assert.equal(p.get('allow_promotion_codes'), null);
       assert.equal(p.get('customer'), 'cus_9');
       assert.equal(p.get('customer_email'), null);
       assert.equal(keys[0], 'pre_v1.basic.year.usd');
@@ -407,7 +409,26 @@ describe('billing Lambda handler', () => {
       assert.equal(r2.statusCode, 200, r2.body);
       p = new URLSearchParams(calls.filter((c) => c.path === '/v1/checkout/sessions').at(-1).body);
       assert.equal(p.get('discounts[0][coupon]'), null);
+      assert.equal(p.get('allow_promotion_codes'), null, 'first_ten is already the founding price');
       assert.equal(keys[1], 'first_ten.full.month.sgd');
+    });
+    it('a list-price monthly checkout offers the promotion-code field (the v1 coupon)', async () => {
+      const t = fakeDdb({ registry: { [FAMILY]: { familyId: FAMILY, ownerEmail: 'o@x.test' } } });
+      const calls = fakeStripe({
+        'GET /v1/prices': { data: [{ id: 'price_month' }] },
+        'POST /v1/checkout/sessions': { id: 'cs_3', client_secret: 's3' },
+      });
+      const r = await handler(
+        evt({ path: ROUTES.checkout, headers: keyed, body: { ...good, interval: 'month' } }),
+        t.ddb
+      );
+      assert.equal(r.statusCode, 200, r.body);
+      const p = new URLSearchParams(
+        calls.filter((c) => c.path === '/v1/checkout/sessions').at(-1).body
+      );
+      assert.equal(p.get('allow_promotion_codes'), 'true');
+      assert.equal(p.get('discounts[0][coupon]'), null);
+      assert.equal(decisions('checkout_session_created').at(-1).promo_codes, true);
     });
     it('a missing Price is 502 price_missing with the key in the log; a missing coupon is 502 coupon_unset', async () => {
       const t = fakeDdb({
