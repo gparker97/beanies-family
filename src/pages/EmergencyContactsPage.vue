@@ -6,8 +6,7 @@
  * sitter affordance (ships its own composable in a follow-up).
  */
 import { computed, ref } from 'vue';
-import { useRouter } from 'vue-router';
-import BeanieIcon from '@/components/ui/BeanieIcon.vue';
+import BackLink from '@/components/common/BackLink.vue';
 import AddEntityButton from '@/components/ui/AddEntityButton.vue';
 import EmptyState from '@/components/pod/shared/EmptyState.vue';
 import EmergencyContactFormModal from '@/components/pod/EmergencyContactFormModal.vue';
@@ -18,7 +17,6 @@ import { usePermissions } from '@/composables/usePermissions';
 import { CATEGORY_EMOJI, CATEGORY_ORDER } from '@/constants/emergencyContacts';
 import type { EmergencyContact, EmergencyContactCategory } from '@/types/models';
 
-const router = useRouter();
 const { t } = useTranslation();
 const store = useEmergencyContactsStore();
 const { canEditActivities } = usePermissions();
@@ -114,14 +112,7 @@ function emailFor(c: EmergencyContact, e: Event): void {
         🏥
       </div>
       <div class="min-w-0 flex-1">
-        <button
-          type="button"
-          class="font-outfit text-secondary-500/60 hover:text-primary-500 dark:text-ink-soft mb-1 flex items-center gap-1 text-xs font-semibold transition-colors"
-          @click="router.push('/pod')"
-        >
-          <BeanieIcon name="chevron-left" size="xs" />
-          <span>{{ t('bean.backToPod') }}</span>
-        </button>
+        <BackLink :fallback="'/pod'" :label="t('bean.backToPod')" class="mb-1" />
         <h1
           class="font-outfit text-secondary-500 dark:text-ink text-xl leading-tight font-extrabold sm:text-2xl"
         >

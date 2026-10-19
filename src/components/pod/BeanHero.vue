@@ -15,6 +15,7 @@ import { computed, ref, onBeforeUnmount } from 'vue';
 import { useRouter } from 'vue-router';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
+import BackLink from '@/components/common/BackLink.vue';
 import PhotoViewer from '@/components/media/PhotoViewer.vue';
 import { getMemberAvatarVariant } from '@/composables/useMemberAvatar';
 import { useAvatarPhotoUrl } from '@/composables/useAvatarPhotoUrl';
@@ -175,14 +176,7 @@ function onAddButtonClick(): void {
     class="mb-6 flex flex-col gap-3 rounded-[var(--sq)] bg-gradient-to-br from-[rgba(174,214,241,0.35)] to-[rgba(241,93,34,0.08)] px-4 py-5 sm:px-8 sm:py-7"
   >
     <!-- Top-left back link (breadcrumb-style; sits above the avatar + name row) -->
-    <button
-      type="button"
-      class="font-outfit text-secondary-500/60 hover:text-primary-500 dark:text-ink-soft dark:hover:text-accent-lift -ml-1 inline-flex w-fit items-center gap-1 text-xs font-semibold transition-colors"
-      @click="router.push('/pod')"
-    >
-      <BeanieIcon name="chevron-left" size="xs" />
-      <span>{{ t('bean.backToPod') }}</span>
-    </button>
+    <BackLink :fallback="'/pod'" :label="t('bean.backToPod')" class="-ml-1 w-fit" />
 
     <div class="flex flex-wrap items-center gap-4 sm:gap-6">
       <button

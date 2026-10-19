@@ -3,7 +3,12 @@ import { ref, computed, nextTick, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import CalendarCommandBar from '@/components/planner/CalendarCommandBar.vue';
 import { useMemberFilterChips } from '@/composables/useMemberFilterChips';
-import { usePlannerNavigation, type PlannerView } from '@/composables/usePlannerNavigation';
+import {
+  usePlannerNavigation,
+  isPlannerView,
+  type PlannerView,
+} from '@/composables/usePlannerNavigation';
+import { usePlannerUrlState } from '@/composables/usePlannerUrlState';
 import { useBreakpoint } from '@/composables/useBreakpoint';
 import CalendarGrid from '@/components/planner/CalendarGrid.vue';
 import CalendarMonthStream, {
@@ -134,6 +139,9 @@ const activeView = ref<PlannerView>('month');
 // Single source of truth for the calendar's period — the views are controlled
 // off this (props down); navigation intents flow back up (events).
 const { referenceDate, label, goPrev, goNext, goToday } = usePlannerNavigation(activeView);
+// The view and date ride the URL (`?view=&d=`) so Back from a day returns to the
+// month on that date; a drill-in is the only writer that adds a history entry.
+const { drillToDay } = usePlannerUrlState({ activeView, referenceDate });
 const showInactive = ref(false);
 
 // ── External-calendar clash nudge (#34) ──────────────────────────────────────
@@ -759,9 +767,8 @@ useQuickAddIntent((action) => {
 
 function handleCalendarDateClick(date: string) {
   // Clicking a day in the monthly/weekly grid drills into that day's
-  // timeline. Sets the shared reference date so the Day view opens on it.
-  referenceDate.value = parseLocalDate(date);
-  activeView.value = 'day';
+  // timeline, as a history entry so Back returns to the grid on that date.
+  drillToDay(date);
 }
 
 // Mobile week-strip day pick: move the reference date but STAY in week view.
@@ -819,7 +826,14 @@ function handleMonthInView(firstOfMonth: Date) {
 // incl. the already-on-this-page case where router.push is a no-op.
 usePlannerTodayConsumer(handleToday);
 function setView(view: string) {
-  activeView.value = view as PlannerView;
+  if (isPlannerView(view)) activeView.value = view;
+  else
+    logEvent({
+      level: 'warn',
+      surface: 'planner-view',
+      message: 'invalid_view',
+      context: { action: 'invalid_view', detail: 'view' },
+    });
 }
 
 function handleOpenAgenda() {

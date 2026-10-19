@@ -10,7 +10,7 @@
  * the RIGHT NUMBER of times. That is precisely the class of mistake template surgery makes,
  * and it is the class unit tests on extracted components cannot catch.
  */
-import { mount } from '@vue/test-utils';
+import { enableAutoUnmount, mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { FamilyVacation } from '@/types/models';
@@ -20,7 +20,9 @@ vi.mock('@/composables/useTranslation', () => ({
 }));
 vi.mock('@/composables/useToast', () => ({
   useToast: () => ({ showToast: vi.fn() }),
+  showToast: vi.fn(),
 }));
+vi.mock('@/utils/errorReporter', () => ({ reportError: vi.fn() }));
 vi.mock('@/composables/useConfirm', () => ({ confirm: vi.fn().mockResolvedValue(true) }));
 vi.mock('@/composables/usePermissions', () => ({
   usePermissions: () => ({ canEditActivities: { value: true } }),
@@ -32,23 +34,26 @@ vi.mock('@/composables/useMagicReader', () => ({
   useMagicReader: () => ({ canReadTravelDoc: { value: false } }),
   useMagicReaderConsumer: vi.fn(),
 }));
-vi.mock('vue-router', () => ({
-  useRoute: () => ({ params: {}, query: {} }),
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+vi.mock('@/services/telemetry', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/services/telemetry')>()),
+  logEvent: vi.fn(),
 }));
 
-// Selection is driven through the deep-link composable — the page's real entry point for
-// "open this trip". Triggering the card's event is not an option: `shallow` leaves child
-// components unresolved, so there is no component there to emit.
-let deepLinkId: string | null = null;
-vi.mock('@/composables/useDeepLinkParam', () => ({
-  useDeepLinkParam: (opts: { open: (id: string) => boolean }) => {
-    if (deepLinkId) {
-      const id = deepLinkId;
-      // Next tick, so the page's own reactive state is set up before selection lands.
-      void Promise.resolve().then(() => opts.open(id));
-    }
-  },
+// Selection is driven through the route query, the page's real entry point for "open this
+// trip" (`?vacation=<id>`, pushed by a card tap and by the planner). Triggering the card's
+// event is not an option: `shallow` leaves child components unresolved, so there is no
+// component there to emit. One shared reactive route, so a test sets the query it needs.
+const { routeState, routerMock } = await vi.hoisted(async () => {
+  const { reactive } = await import('vue');
+  const { vi: hoistedVi } = await import('vitest');
+  return {
+    routeState: reactive({ params: {}, query: {} as Record<string, string> }),
+    routerMock: { push: hoistedVi.fn(), replace: hoistedVi.fn(), back: hoistedVi.fn() },
+  };
+});
+vi.mock('vue-router', () => ({
+  useRoute: () => routeState,
+  useRouter: () => routerMock,
 }));
 
 function trip(over?: Partial<FamilyVacation>): FamilyVacation {
@@ -74,6 +79,9 @@ function trip(over?: Partial<FamilyVacation>): FamilyVacation {
 }
 
 describe('TravelPlansPage — smoke', () => {
+  // Every page watches the one shared route; a page left mounted would react to the next test's query.
+  enableAutoUnmount(afterEach);
+
   beforeEach(() => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
@@ -81,7 +89,7 @@ describe('TravelPlansPage — smoke', () => {
     // which happy-dom leaves hanging until the 5s timeout — and only when the whole suite
     // runs, so it passed in isolation and failed together. A test that depends on run order
     // is not a safety net.
-    deepLinkId = null;
+    routeState.query = {};
     vi.stubGlobal(
       'fetch',
       vi
@@ -92,6 +100,7 @@ describe('TravelPlansPage — smoke', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it('mounts without throwing', async () => {
@@ -127,13 +136,146 @@ describe('TravelPlansPage — smoke', () => {
     expect(w.findAll('tripcard').length).toBe(0);
   }, 20_000);
 
-  // NOT COVERED, deliberately, and this is a limitation worth naming rather than papering
-  // over: the DETAIL view (timeline + ideas panel) has no smoke coverage. Selecting a trip
-  // needs a child component to emit, and `shallow` leaves children unresolved; driving it
-  // through the deep-link composable did not land either. Several attempts produced only a
-  // test that asserted 0 === 0, which is worse than no test.
-  //
-  // Consequence for whoever continues the decomposition: extracting TripTimeline (~330
-  // lines, the largest remaining unit) has NO structural safety net. Either solve this
-  // harness problem first, or verify that extraction in a browser.
+  it('renders the DETAIL view for the trip named in `?vacation=`', async () => {
+    const { useVacationStore } = await import('@/stores/vacationStore');
+    const store = useVacationStore();
+    store.vacations = [trip(), trip({ id: 'vac-2', name: 'Ski Trip' })];
+    routeState.query = { vacation: 'vac-2' };
+
+    const { default: Page } = await import('../TravelPlansPage.vue');
+    const w = mount(Page, { global: { stubs: { teleport: true } }, shallow: true });
+    await w.vm.$nextTick();
+
+    expect(w.text()).toContain('Ski Trip');
+    expect(w.text()).not.toContain('Japan Trip');
+    expect(w.findAll('trip-card-stub').length).toBe(0);
+    expect(w.text()).not.toContain('travel.notFound.title');
+  }, 20_000);
+
+  it('shows not-found, with a way back, for a `?vacation=` no trip matches, and logs it once', async () => {
+    const { logEvent } = await import('@/services/telemetry');
+    const { useVacationStore } = await import('@/stores/vacationStore');
+    const store = useVacationStore();
+    store.vacations = [trip()];
+    routeState.query = { vacation: 'gone' };
+
+    const { default: Page } = await import('../TravelPlansPage.vue');
+    const w = mount(Page, { global: { stubs: { teleport: true } }, shallow: true });
+    await w.vm.$nextTick();
+
+    expect(w.text()).toContain('travel.notFound.title');
+    expect(w.find('back-link-stub').exists()).toBe(true);
+    expect(w.findAll('trip-card-stub').length).toBe(0);
+    store.vacations = [trip(), trip({ id: 'vac-3' })]; // an unrelated change re-renders
+    await w.vm.$nextTick();
+    const notFound = vi
+      .mocked(logEvent)
+      .mock.calls.filter(([e]) => e.surface === 'travel' && e.message === 'vacation_not_found');
+    expect(notFound).toHaveLength(1);
+  }, 20_000);
+
+  it('deleting the open trip goes back to the list with no not-found flash and no warning', async () => {
+    const { logEvent } = await import('@/services/telemetry');
+    const { useVacationStore } = await import('@/stores/vacationStore');
+    const store = useVacationStore();
+    store.vacations = [trip(), trip({ id: 'vac-2', name: 'Ski Trip' })];
+    routeState.query = { vacation: 'vac-2' };
+    // The real delete drops the trip, then keeps awaiting (list-link cleanup) before it returns.
+    vi.spyOn(store, 'deleteVacation').mockImplementation(async (id: string) => {
+      store.vacations = store.vacations.filter((v) => v.id !== id);
+      await new Promise((r) => setTimeout(r, 0));
+      return true;
+    });
+
+    const { default: Page } = await import('../TravelPlansPage.vue');
+    const w = mount(Page, { global: { stubs: { teleport: true } }, shallow: true });
+    await w.vm.$nextTick();
+    await w.find('button[title="vacation.deleteTitle"]').trigger('click');
+    await new Promise((r) => setTimeout(r, 10));
+    await w.vm.$nextTick();
+
+    expect(store.deleteVacation).toHaveBeenCalledWith('vac-2');
+    // The mocked router never moves the route, so the trip stays gone under `?vacation=` here:
+    // the window a real Back takes to land. happy-dom has no history state: goBack falls back.
+    expect(routerMock.push).toHaveBeenCalledWith({ path: '/travel' });
+    expect(w.text()).not.toContain('travel.notFound.title');
+    const notFound = vi
+      .mocked(logEvent)
+      .mock.calls.filter(([e]) => e.message === 'vacation_not_found');
+    expect(notFound).toHaveLength(0);
+
+    // The route leaves the trip, then Forward returns to it: now it is genuinely missing.
+    routeState.query = {};
+    await w.vm.$nextTick();
+    routeState.query = { vacation: 'vac-2' };
+    await w.vm.$nextTick();
+    expect(w.text()).toContain('travel.notFound.title');
+  }, 20_000);
+
+  it('deleting goes back in history when the previous entry is the plain trips list', async () => {
+    vi.spyOn(window.history, 'state', 'get').mockReturnValue({ back: '/travel' });
+    const { useVacationStore } = await import('@/stores/vacationStore');
+    const store = useVacationStore();
+    store.vacations = [trip(), trip({ id: 'vac-2', name: 'Ski Trip' })];
+    routeState.query = { vacation: 'vac-2' };
+    vi.spyOn(store, 'deleteVacation').mockImplementation(async (id: string) => {
+      store.vacations = store.vacations.filter((v) => v.id !== id);
+      return true;
+    });
+
+    const { default: Page } = await import('../TravelPlansPage.vue');
+    const w = mount(Page, { global: { stubs: { teleport: true } }, shallow: true });
+    await w.vm.$nextTick();
+    await w.find('button[title="vacation.deleteTitle"]').trigger('click');
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(routerMock.back).toHaveBeenCalledOnce();
+    expect(routerMock.push).not.toHaveBeenCalled();
+  }, 20_000);
+
+  it('a failed delete stays on the trip, says so, and reports it', async () => {
+    const { showToast } = await import('@/composables/useToast');
+    const { reportError } = await import('@/utils/errorReporter');
+    const { useVacationStore } = await import('@/stores/vacationStore');
+    const store = useVacationStore();
+    store.vacations = [trip(), trip({ id: 'vac-2', name: 'Ski Trip' })];
+    routeState.query = { vacation: 'vac-2' };
+    vi.spyOn(store, 'deleteVacation').mockResolvedValue(false);
+
+    const { default: Page } = await import('../TravelPlansPage.vue');
+    const w = mount(Page, { global: { stubs: { teleport: true } }, shallow: true });
+    await w.vm.$nextTick();
+    await w.find('button[title="vacation.deleteTitle"]').trigger('click');
+    await new Promise((r) => setTimeout(r, 10));
+    await w.vm.$nextTick();
+
+    expect(routerMock.back).not.toHaveBeenCalled();
+    expect(routerMock.push).not.toHaveBeenCalled();
+    expect(w.text()).toContain('Ski Trip');
+    expect(showToast).toHaveBeenCalledWith('error', 'error.deleteFailed');
+    expect(reportError).toHaveBeenCalledWith(
+      expect.objectContaining({ surface: 'travel', severity: 'warning' })
+    );
+  }, 20_000);
+
+  it('a cold-start deep link waits for the trips instead of reporting the trip missing', async () => {
+    const { logEvent } = await import('@/services/telemetry');
+    const { useVacationStore } = await import('@/stores/vacationStore');
+    const store = useVacationStore();
+    store.vacations = [];
+    routeState.query = { vacation: 'vac-2' };
+
+    const { default: Page } = await import('../TravelPlansPage.vue');
+    const w = mount(Page, { global: { stubs: { teleport: true } }, shallow: true });
+    await w.vm.$nextTick();
+    expect(w.text()).not.toContain('travel.notFound.title');
+
+    store.vacations = [trip(), trip({ id: 'vac-2', name: 'Ski Trip' })];
+    await w.vm.$nextTick();
+    expect(w.text()).toContain('Ski Trip');
+    const notFound = vi
+      .mocked(logEvent)
+      .mock.calls.filter(([e]) => e.message === 'vacation_not_found');
+    expect(notFound).toHaveLength(0);
+  }, 20_000);
 });

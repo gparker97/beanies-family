@@ -116,6 +116,7 @@ import { useMemberFilterStore } from '@/stores/memberFilterStore';
 import { useEntitlementStore } from '@/stores/entitlementStore';
 import { useWeatherStore } from '@/stores/weatherStore';
 import { installCounterWritesPolicy } from '@/services/registry/counterWritesPolicy';
+import { installMainScrollRestoration } from '@/composables/useMainScrollRestoration';
 import { useRecurringStore } from '@/stores/recurringStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTodoStore } from '@/stores/todoStore';
@@ -223,6 +224,9 @@ useWeatherStore();
 // #117: the served Counter-write policy. Installed beside the entitlement observer, before any
 // unlock can reach `setFamilyKey`, so the worker gets the persisted value with the key.
 installCounterWritesPolicy();
+// `<main>` is the app's real scroller: Back returns to where you were on it, forward opens at the top.
+const mainEl = ref<HTMLElement | null>(null);
+installMainScrollRestoration(router, mainEl);
 
 const authStore = useAuthStore();
 const notificationsStore = useNotificationsStore();
@@ -2574,6 +2578,7 @@ watch(
         <AppHeader v-if="!headerReclaimed" />
 
         <main
+          ref="mainEl"
           class="flex-1 overflow-auto overscroll-y-contain"
           :class="[
             isPlannerRoute ? 'px-4 pb-4 md:px-6 md:pb-6' : 'p-4 md:p-6',

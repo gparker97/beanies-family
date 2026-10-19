@@ -20,6 +20,7 @@
 import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
+import BackLink from '@/components/common/BackLink.vue';
 import PhotoViewer from '@/components/media/PhotoViewer.vue';
 import ScrapbookSpine from '@/components/scrapbook/ScrapbookSpine.vue';
 import EveryoneSpread from '@/components/scrapbook/EveryoneSpread.vue';
@@ -161,14 +162,7 @@ function onEntryClick(entry: ScrapbookEntry): void {
       >
         📖
       </span>
-      <button
-        type="button"
-        class="font-outfit text-secondary-500/60 hover:text-primary-500 dark:text-ink-soft mb-1 flex items-center gap-1 text-xs font-semibold transition-colors"
-        @click="router.push('/pod')"
-      >
-        <BeanieIcon name="chevron-left" size="xs" />
-        <span>{{ t('bean.backToPod') }}</span>
-      </button>
+      <BackLink :fallback="'/pod'" :label="t('bean.backToPod')" class="mb-1" />
       <div class="flex items-start justify-between gap-3">
         <div class="min-w-0 flex-1">
           <h1

@@ -15,6 +15,7 @@
 import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
+import BackLink from '@/components/common/BackLink.vue';
 import { isFlagEnabled } from '@/config/flags';
 import { hasShoppableIngredients } from '@/utils/mealShoppingList';
 import PolaroidImage from '@/components/pod/shared/PolaroidImage.vue';
@@ -28,6 +29,7 @@ import RecipeShareModal from '@/components/pod/RecipeShareModal.vue';
 import RecipeRefetchAction from '@/components/pod/RecipeRefetchAction.vue';
 import CookLogFormModal from '@/components/pod/CookLogFormModal.vue';
 import { useTranslation } from '@/composables/useTranslation';
+import { useAppBack } from '@/composables/useAppBack';
 import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
 import { useRecipesStore } from '@/stores/recipesStore';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -41,6 +43,7 @@ import { getUrlDomain, safeExternalHref } from '@/utils/url';
 
 const route = useRoute();
 const router = useRouter();
+const { goBack } = useAppBack();
 const { t } = useTranslation();
 const recipesStore = useRecipesStore();
 const familyStore = useFamilyStore();
@@ -189,14 +192,11 @@ watch(recipe, (now, before) => {
 <template>
   <div class="space-y-6">
     <template v-if="recipe">
-      <button
-        type="button"
-        class="font-outfit text-secondary-500/60 hover:text-primary-500 dark:text-ink-soft mb-3 flex items-center gap-1 text-xs font-semibold transition-colors"
-        @click="router.push('/pod/cookbook')"
-      >
-        <BeanieIcon name="chevron-left" size="xs" />
-        <span>{{ t('recipes.detail.backToCookbook') }}</span>
-      </button>
+      <BackLink
+        :fallback="'/pod/cookbook'"
+        :label="t('recipes.detail.backToCookbook')"
+        class="mb-3"
+      />
 
       <!-- Hero -->
       <section
@@ -540,7 +540,7 @@ watch(recipe, (now, before) => {
       <button
         type="button"
         class="font-outfit text-primary-500 dark:text-accent-lift text-sm font-semibold hover:underline"
-        @click="router.push('/pod/cookbook')"
+        @click="goBack('/pod/cookbook')"
       >
         {{ t('recipes.detail.backToCookbook') }}
       </button>

@@ -10,7 +10,15 @@ import { useToday } from '@/composables/useToday';
 import { useWeekNavigation } from '@/composables/useCalendarNavigation';
 import { useBreakpoint } from '@/composables/useBreakpoint';
 
-export type PlannerView = 'month' | 'week' | 'day';
+/** Every planner view, in switcher order. The one source for the type and its guard. */
+export const PLANNER_VIEWS = ['month', 'week', 'day'] as const;
+
+export type PlannerView = (typeof PLANNER_VIEWS)[number];
+
+/** Narrow an untrusted string (an emitted value, a URL param) to a `PlannerView`. */
+export function isPlannerView(value: unknown): value is PlannerView {
+  return typeof value === 'string' && (PLANNER_VIEWS as readonly string[]).includes(value);
+}
 
 /**
  * Single source of truth for the calendar's current period.

@@ -37,7 +37,7 @@ import PlanPortalActions from '@/components/billing/PlanPortalActions.vue';
 import PlanChoiceCard from '@/components/billing/PlanChoiceCard.vue';
 import AllowanceMeter from '@/components/billing/AllowanceMeter.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
-import { useRouter } from 'vue-router';
+import { useAppBack } from '@/composables/useAppBack';
 import { usePlanLimits } from '@/composables/usePlanLimits';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import { usePlanSummary } from '@/composables/usePlanSummary';
@@ -56,7 +56,7 @@ const entitlementStore = useEntitlementStore();
 const settingsStore = useSettingsStore();
 const familyContextStore = useFamilyContextStore();
 const planSummary = usePlanSummary();
-const router = useRouter();
+const { goBack } = useAppBack();
 
 const familyId = computed(() => familyContextStore.activeFamilyId);
 
@@ -357,7 +357,7 @@ watch(
       type="button"
       class="font-outfit text-primary-500 dark:text-accent-lift inline-flex items-center gap-1 text-sm font-semibold hover:underline"
       data-testid="plan-back"
-      @click="router.push('/settings')"
+      @click="goBack('/settings')"
     >
       <BeanieIcon name="chevron-left" size="xs" />
       {{ t('plan.backToSettings') }}

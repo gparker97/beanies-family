@@ -38,11 +38,13 @@ import { useInviteFlow } from '@/composables/useInviteFlow';
 import { useSyncStore } from '@/stores/syncStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
 import { useTranslation } from '@/composables/useTranslation';
+import { useAppBack } from '@/composables/useAppBack';
 import { removeMember } from '@/composables/useMemberRemoval';
 import type { CreateFamilyMemberInput, UpdateFamilyMemberInput } from '@/types/models';
 
 const route = useRoute();
 const router = useRouter();
+const { goBack } = useAppBack();
 const { t } = useTranslation();
 
 const familyStore = useFamilyStore();
@@ -173,7 +175,7 @@ function selectTab(tab: BeanTabId): void {
       <button
         type="button"
         class="font-outfit text-primary-500 dark:text-accent-lift inline-flex items-center gap-1 text-sm font-semibold hover:underline"
-        @click="router.push('/pod')"
+        @click="goBack('/pod')"
       >
         <BeanieIcon name="chevron-left" size="xs" />
         {{ t('bean.backToPod') }}

@@ -20,7 +20,7 @@ import { fillTemplate } from '@/utils/fillTemplate';
 import { formatServes, servingsOf } from '@/utils/recipeServings';
 import PolaroidImage from '@/components/pod/shared/PolaroidImage.vue';
 import RecipeFormModal from '@/components/pod/RecipeFormModal.vue';
-import BeanieIcon from '@/components/ui/BeanieIcon.vue';
+import BackLink from '@/components/common/BackLink.vue';
 import { useRecipePhotoPending } from '@/composables/useRecipePhotoPending';
 import AddEntityButton from '@/components/ui/AddEntityButton.vue';
 import MagicBeansDoor from '@/components/ai/MagicBeansDoor.vue';
@@ -299,14 +299,7 @@ async function handleSaved(id: string): Promise<void> {
       >
         🍳
       </span>
-      <button
-        type="button"
-        class="font-outfit text-secondary-500/60 hover:text-primary-500 dark:text-ink-soft mb-1 flex items-center gap-1 text-xs font-semibold transition-colors"
-        @click="router.push('/pod')"
-      >
-        <BeanieIcon name="chevron-left" size="xs" />
-        <span>{{ t('bean.backToPod') }}</span>
-      </button>
+      <BackLink :fallback="'/pod'" :label="t('bean.backToPod')" class="mb-1" />
       <h1
         class="font-outfit text-secondary-500 dark:text-ink text-2xl leading-tight font-extrabold break-words sm:text-3xl sm:leading-none"
       >

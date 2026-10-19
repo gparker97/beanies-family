@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import PageWelcomeSubtitle from '@/components/ui/PageWelcomeSubtitle.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
 import ErrorBanner from '@/components/common/ErrorBanner.vue';
@@ -24,7 +25,10 @@ import { useClipboard } from '@/composables/useClipboard';
 import { confirm } from '@/composables/useConfirm';
 import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
 import { usePermissions } from '@/composables/usePermissions';
-import { useDeepLinkParam } from '@/composables/useDeepLinkParam';
+import { useAppBack } from '@/composables/useAppBack';
+import { logEvent } from '@/services/telemetry';
+import { reportError } from '@/utils/errorReporter';
+import BackLink from '@/components/common/BackLink.vue';
 import { showToast } from '@/composables/useToast';
 import { useDocumentToTravel, type TravelReady } from '@/composables/useDocumentToTravel';
 import { useMagicReader, useMagicReaderConsumer } from '@/composables/useMagicReader';
@@ -53,6 +57,9 @@ import PhotoViewer from '@/components/media/PhotoViewer.vue';
 import type { FamilyVacation, VacationIdea } from '@/types/models';
 
 const { t } = useTranslation();
+const route = useRoute();
+const router = useRouter();
+const { goBack } = useAppBack();
 const { canEditActivities } = usePermissions();
 const vacationStore = useVacationStore();
 const familyStore = useFamilyStore();
@@ -255,7 +262,7 @@ async function onReviewSubmit(payload: {
     }
 
     reviewReady.value = null;
-    selectedVacationId.value = vacationId;
+    selectTrip(vacationId);
     showToast('success', t('travelExtract.added.title'), t('travelExtract.added.message'));
   } finally {
     reviewSubmitting.value = false;
@@ -264,7 +271,11 @@ async function onReviewSubmit(payload: {
 
 // ── State ────────────────────────────────────────────────────────────────────
 
-const selectedVacationId = ref<string | null>(null);
+// The open trip rides the URL (`?vacation=<id>`, also the planner's deep link), so a trip is a
+// history entry: "All trips" and the hardware back go back, and the list keeps its scroll place.
+const selectedVacationId = computed(() =>
+  typeof route.query.vacation === 'string' ? route.query.vacation : null
+);
 const showPastTrips = ref(false);
 const showVacationWizard = ref(false);
 const editingVacation = ref<FamilyVacation | null>(null);
@@ -326,24 +337,50 @@ function scrollToIdeas() {
   ideasPanelRef.value?.$el?.scrollIntoView({ behavior: 'smooth' });
 }
 
-// ── Query param: auto-select vacation from ?vacation=ID ──────────────────────
-
-// Auto-select a trip from a deep link (?vacation=<id>). Robust to cold-start:
-// only clears the param once the trip exists, and retries when trips hydrate.
-useDeepLinkParam({
-  param: 'vacation',
-  open: (id) => {
-    if (!vacationStore.getVacationById(id)) return false;
-    selectedVacationId.value = id;
-    return true;
-  },
-  ready: () => vacationStore.vacations.length,
-});
-
 // ── Computed ─────────────────────────────────────────────────────────────────
 
 const selectedVacation = computed(() =>
   selectedVacationId.value ? vacationStore.getVacationById(selectedVacationId.value) : undefined
+);
+
+// The trip this page is deleting. The store drops it before the route leaves `?vacation=<id>`;
+// that gap shows the list, not a missing trip. Forgotten once the route moves off it, so a later
+// Forward to the deleted trip does show not-found.
+const deletingVacationId = ref<string | null>(null);
+watch(selectedVacationId, (id) => {
+  if (id !== deletingVacationId.value) deletingVacationId.value = null;
+});
+
+/**
+ * Which branch the page shows, decided in one place so the cases cannot overlap or leave a gap:
+ * - `list`: no `?vacation=`; the trip this page just deleted while the route is still leaving it;
+ *   or no trips loaded yet (the page mounts under App's `v-show` before the trips hydrate, so a
+ *   cold-start deep link must not read as missing; a family with no trips gets the empty list).
+ * - `detail`: the trip exists.
+ * - `missing`: the id names no trip (deleted elsewhere, or a bad link).
+ */
+const tripView = computed<'list' | 'detail' | 'missing'>(() => {
+  const id = selectedVacationId.value;
+  if (!id) return 'list';
+  if (selectedVacation.value) return 'detail';
+  if (id === deletingVacationId.value || vacationStore.vacations.length === 0) return 'list';
+  return 'missing';
+});
+// A missing trip is logged once per id.
+let loggedMissingId: string | null = null;
+watch(
+  () => (tripView.value === 'missing' ? selectedVacationId.value : null),
+  (missingId) => {
+    if (!missingId || missingId === loggedMissingId) return;
+    loggedMissingId = missingId;
+    logEvent({
+      level: 'warn',
+      surface: 'travel',
+      message: 'vacation_not_found',
+      context: { action: 'vacation_not_found' },
+    });
+  },
+  { immediate: true }
 );
 
 const { today: todayISO } = useToday();
@@ -533,12 +570,15 @@ function vacationAssignees(v: FamilyVacation) {
 // ── Navigation ───────────────────────────────────────────────────────────────
 
 function selectTrip(id: string) {
-  selectedVacationId.value = id;
   collapsedCards.value = {};
+  void router.push({ query: { ...route.query, vacation: id } });
 }
 
+// "All trips" names a place, so it goes back only to the plain trips list entry; arriving from
+// the planner's trip chip, or from another trip, it opens the list instead.
+const TRIPS_LIST = '/travel';
 function backToList() {
-  selectedVacationId.value = null;
+  goBack({ path: TRIPS_LIST }, { onlyTo: TRIPS_LIST });
 }
 
 async function deleteTrip() {
@@ -549,10 +589,28 @@ async function deleteTrip() {
     message: 'vacation.deleteMessage',
     variant: 'danger',
   });
-  if (confirmed) {
-    await vacationStore.deleteVacation(selectedVacation.value.id);
-    selectedVacationId.value = null;
+  if (!confirmed) return;
+  const id = selectedVacation.value.id;
+  deletingVacationId.value = id;
+  await vacationStore.deleteVacation(id);
+  // Judged by the store, not the returned boolean: a failure after the trip was removed (the
+  // list-link cleanup) still leaves it gone, and the page must then leave it too.
+  if (!vacationStore.getVacationById(id)) {
+    // Back, not a replace to `/travel`: a same-path replace keeps the trip's scroll offset, while
+    // going back restores the list where it was.
+    backToList();
+    return;
   }
+  deletingVacationId.value = null;
+  // A thrown failure was already toasted by the store's `wrapAsync` (it records `error`); a
+  // refusal that set no error would otherwise pass without a word.
+  if (!vacationStore.error) showToast('error', t('error.deleteFailed'));
+  reportError({
+    surface: 'travel',
+    severity: 'warning',
+    message: 'trip delete left the trip in place',
+    context: { action: 'delete_trip_failed' },
+  });
 }
 
 function startWizard() {
@@ -770,7 +828,7 @@ async function addQuickIdea() {
     <!-- ═══════════════════════════════════════════════════════════════════════
          LIST VIEW — when no trip is selected
          ═══════════════════════════════════════════════════════════════════════ -->
-    <template v-if="!selectedVacationId">
+    <template v-if="tripView === 'list'">
       <!-- Page welcome subtitle convention (#33): handwritten orange Caveat line,
            matching Beanie Lists / To-Dos (no bold title bar). -->
       <div class="flex flex-wrap items-start justify-between gap-3">
@@ -896,7 +954,7 @@ async function addQuickIdea() {
     <!-- ═══════════════════════════════════════════════════════════════════════
          EXPANDED VIEW — when a trip is selected
          ═══════════════════════════════════════════════════════════════════════ -->
-    <template v-else-if="selectedVacation">
+    <template v-else-if="tripView === 'detail' && selectedVacation">
       <!-- Back to all trips -->
       <button
         type="button"
@@ -1344,6 +1402,23 @@ async function addQuickIdea() {
         />
       </div>
     </template>
+
+    <!-- NOT FOUND: `?vacation=` names no trip (deleted, or a bad link) -->
+    <div
+      v-else-if="tripView === 'missing'"
+      class="dark:bg-surface-raised flex flex-col items-center justify-center gap-3 rounded-[var(--sq)] bg-white py-16 text-center"
+    >
+      <span class="text-5xl" aria-hidden="true">🧳</span>
+      <h1 class="font-outfit text-secondary-500 dark:text-ink text-xl font-bold">
+        {{ t('travel.notFound.title') }}
+      </h1>
+      <p class="text-secondary-500 dark:text-ink-soft text-sm">{{ t('travel.notFound.body') }}</p>
+      <BackLink
+        :fallback="{ path: TRIPS_LIST }"
+        :only-to="TRIPS_LIST"
+        :label="t('travel.allTrips')"
+      />
+    </div>
 
     <!-- ═══════════════════════════════════════════════════════════════════════
          MODALS

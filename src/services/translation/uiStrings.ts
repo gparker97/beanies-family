@@ -11028,6 +11028,11 @@ const STRING_DEFS = {
   'travel.daysAgo': { en: 'Days Ago', beanie: 'days ago' },
   'travel.completed': { en: 'Completed', beanie: 'completed' },
   'travel.allTrips': { en: 'All Trips', beanie: 'all trips' },
+  'travel.notFound.title': { en: "We can't find this trip", beanie: "can't find this trip" },
+  'travel.notFound.body': {
+    en: 'It may have been deleted, or the link is out of date.',
+    beanie: 'it may have been deleted, or the link is out of date',
+  },
   'travel.bookingProgress': { en: 'Booking Progress', beanie: 'booking progress' },
   'travel.needsBooking': { en: 'Needs Booking', beanie: 'needs booking' },
   'travel.openIdeas': { en: 'open ideas', beanie: 'open ideas' },

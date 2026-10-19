@@ -38,6 +38,11 @@ declare module 'vue-router' {
      * deep link; a self-host has nothing to buy.
      */
     webOnly?: boolean;
+    /**
+     * False when the page positions its own scroller, so `useMainScrollRestoration` opens it at
+     * the top instead of restoring a saved offset (the planner's month stream anchors to its date).
+     */
+    scrollRestore?: boolean;
   }
 }
 
@@ -258,11 +263,13 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/pages/FamilyNookPage.vue'),
     meta: { titleKey: 'nav.nook', requiresAuth: true },
   },
+  // The planner. Its view and reference date ride the query (`?view=day|week|month&d=YYYY-MM-DD`)
+  // so Back from a day returns to the month on that date; it owns its scroller (`scrollRestore`).
   {
     path: '/activities',
     name: 'Activities',
     component: () => import('@/pages/FamilyPlannerPage.vue'),
-    meta: { titleKey: 'nav.activities', requiresAuth: true },
+    meta: { titleKey: 'nav.activities', requiresAuth: true, scrollRestore: false },
   },
   {
     path: '/travel',
@@ -428,9 +435,7 @@ const routes: RouteRecordRaw[] = [
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes,
-  scrollBehavior(_to, _from, savedPosition) {
-    return savedPosition ?? { top: 0 };
-  },
+  // No `scrollBehavior`: the window never scrolls; `<main>` is restored by useMainScrollRestoration.
 });
 
 // Already-authenticated guard: redirect away from pre-auth landing pages

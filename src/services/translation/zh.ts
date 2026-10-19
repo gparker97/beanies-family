@@ -5076,6 +5076,8 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'travel.daysAgo': '天前',
   'travel.completed': '已完成',
   'travel.allTrips': '全部行程',
+  'travel.notFound.title': '找不到这个行程',
+  'travel.notFound.body': '它可能已被删除，或者链接已过期。',
   'travel.bookingProgress': '预订进度',
   'travel.needsBooking': '待预订',
   'travel.openIdeas': '个待定想法',

@@ -22,6 +22,7 @@
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
+import BackLink from '@/components/common/BackLink.vue';
 import EmptyState from '@/components/pod/shared/EmptyState.vue';
 import MilestoneFormModal from '@/components/pod/MilestoneFormModal.vue';
 import MilestoneThumb from '@/components/pod/MilestoneThumb.vue';
@@ -133,14 +134,7 @@ function openMilestone(m: Milestone): void {
       </span>
       <div class="flex items-start justify-between gap-3">
         <div class="min-w-0 flex-1">
-          <button
-            type="button"
-            class="font-outfit text-secondary-500/60 hover:text-primary-500 dark:text-ink-soft mb-1 flex items-center gap-1 text-xs font-semibold transition-colors"
-            @click="router.push('/pod')"
-          >
-            <BeanieIcon name="chevron-left" size="xs" />
-            <span>{{ t('bean.backToPod') }}</span>
-          </button>
+          <BackLink :fallback="'/pod'" :label="t('bean.backToPod')" class="mb-1" />
           <h1
             class="font-outfit text-secondary-500 dark:text-ink text-2xl leading-tight font-extrabold break-words sm:text-3xl sm:leading-none"
           >
