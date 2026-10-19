@@ -166,6 +166,42 @@ function isDuplicatePage(key, now) {
 }
 
 /**
+ * An event this much older than its request is a replay (the client spools undelivered events
+ * while offline and sends them at the next launch): its line is stamped `late_s` and it never
+ * pages, because a page about something that happened hours ago is noise, not an alert.
+ */
+export const LATE_EVENT_MS = 5 * 60_000;
+
+/**
+ * Seconds an event waited on the device before this request, or null when it is not late or
+ * cannot be measured. Both inputs are DEVICE time (the event's own `timestamp` and the request's
+ * `sentAt`), so a device whose clock is off does not look late. Takes the RAW client timestamp:
+ * `sanitizeEvent` back-fills a missing one with server time, which would mix the two clocks.
+ * A request without a usable `sentAt` (older clients) is never late, which is today's behaviour.
+ */
+export function lateSeconds(rawTimestamp, sentAtMs) {
+  if (typeof rawTimestamp !== 'string' || !Number.isFinite(sentAtMs)) return null;
+  const ts = Date.parse(rawTimestamp);
+  if (Number.isNaN(ts)) return null;
+  const lag = sentAtMs - ts;
+  return lag > LATE_EVENT_MS ? Math.round(lag / 1000) : null;
+}
+
+/**
+ * Whether one sanitized event pages Slack: null (not a pageable event), `late`, `duplicate`, or
+ * `page` with its dedup key. Pure apart from reading the dedup map.
+ */
+export function pageDecision(sanitized, late, now, batchKeys) {
+  if (sanitized.severity !== 'critical' || !SLACK_ESCALATE_SURFACES.has(sanitized.surface)) {
+    return null;
+  }
+  if (late !== null) return { kind: 'late' };
+  const key = pageKey(sanitized);
+  if (batchKeys.has(key) || isDuplicatePage(key, now)) return { kind: 'duplicate' };
+  return { kind: 'page', key };
+}
+
+/**
  * Records a delivered page (re-inserted so Map order stays oldest-first) and
  * evicts the oldest entries past the cap. Called only after Slack accepted the
  * post, so an overflow or a failed POST never suppresses a later real page.
@@ -447,6 +483,8 @@ export async function handler(event) {
   }
 
   const events = parsed?.events;
+  // Device clock at send time (transport metadata beside the events, never stored).
+  const sentAtMs = typeof parsed?.sentAt === 'string' ? Date.parse(parsed.sentAt) : NaN;
   if (!Array.isArray(events)) {
     return response(400, { error: 'Body must be { events: [...] }' }, event);
   }
@@ -470,6 +508,9 @@ export async function handler(event) {
         dropped++;
         continue;
       }
+      // Server-derived after sanitizing, so a client-sent `late_s` (not allowlisted) never lands.
+      const late = lateSeconds(evt.timestamp, sentAtMs);
+      if (late !== null) sanitized.late_s = late;
       // `t` first, `v` stamped server-side. Client-sent t/v were dropped above.
       const line = JSON.stringify({ t: 'beanlog', v: SCHEMA_VERSION, ...sanitized });
       if (line.length > MAX_EVENT_BYTES) {
@@ -485,16 +526,18 @@ export async function handler(event) {
         console.log(`${ALARMING_PREFIXES.clientCritical} ${sanitized.surface}`);
       }
       written++;
-      if (sanitized.severity === 'critical' && SLACK_ESCALATE_SURFACES.has(sanitized.surface)) {
-        const key = pageKey(sanitized);
-        if (batchKeys.has(key) || isDuplicatePage(key, now)) {
-          console.log(
-            `[telemetry-lambda] Slack page suppressed (duplicate within 5 min): ${sanitized.surface}`
-          );
-        } else {
-          batchKeys.add(key);
-          escalations.push({ event: sanitized, key });
-        }
+      const decision = pageDecision(sanitized, late, now, batchKeys);
+      if (decision?.kind === 'late') {
+        console.log(
+          `[telemetry-lambda] Slack page suppressed (late event, ${late}s): ${sanitized.surface}`
+        );
+      } else if (decision?.kind === 'duplicate') {
+        console.log(
+          `[telemetry-lambda] Slack page suppressed (duplicate within 5 min): ${sanitized.surface}`
+        );
+      } else if (decision?.kind === 'page') {
+        batchKeys.add(decision.key);
+        escalations.push({ event: sanitized, key: decision.key });
       }
     }
   } catch (err) {

@@ -6,6 +6,7 @@ import router from './router';
 import { initAnalytics } from './services/analytics/plausible';
 import { captureAttributionFromUrl } from './utils/attributionStash';
 import { installOnboardingAttempt } from './services/telemetry/onboardingAttempt';
+import { installTelemetrySpool } from './services/telemetry/telemetrySpool';
 import { readInstallReferrerOnce } from './utils/installReferrer';
 import { getPlatform } from '@/services/sync/capabilities';
 import { reportError } from './utils/errorReporter';
@@ -31,6 +32,10 @@ initAnalytics();
 // throws (localStorage via `storedJson`); it also drops a stale attempt and registers the
 // pre-beacon pagehide hook that records an abandon.
 installOnboardingAttempt();
+// Diagnostics an earlier session could not deliver (offline, or killed first) go back in the
+// queue. After the attempt hydrate, so the `telemetry-spool` line carries the attempt id.
+// Synchronous and never throws (localStorage via `storedJson`).
+installTelemetrySpool();
 captureAttributionFromUrl();
 // Android only: the Play install referrer is the native install's campaign tag (one-shot).
 if (getPlatform() === 'android') void readInstallReferrerOnce();

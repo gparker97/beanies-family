@@ -577,6 +577,80 @@ describe('Telemetry Lambda handler', () => {
       await send([critical]);
       assert.equal(calls.length, 1);
     });
+
+    describe('late events (offline replays)', () => {
+      const sendAt = (events, sentAt) =>
+        mod.handler(makeEvent({ headers: keyHeader, body: { sentAt, events } }));
+      const minutes = (iso, m) => new Date(Date.parse(iso) + m * 60_000).toISOString();
+      const lines = () => logs.filter((l) => l.startsWith('{')).map((l) => JSON.parse(l));
+
+      it('stamps late_s and does not page a critical that waited on the device', async () => {
+        await sendAt([critical], minutes(critical.timestamp, 90));
+        assert.equal(calls.length, 0);
+        const line = lines().find((l) => l.surface === 'pod-merge');
+        assert.equal(line.late_s, 5400);
+        assert.ok(
+          logs.includes('[telemetry-lambda] Slack page suppressed (late event, 5400s): pod-merge')
+        );
+      });
+
+      it('an event sent within 5 minutes is not late and still pages', async () => {
+        await sendAt([critical], minutes(critical.timestamp, 4));
+        assert.equal(calls.length, 1);
+        assert.equal(lines()[0].late_s, undefined);
+      });
+
+      it('a device clock that is off does not make events late (both sides are device time)', async () => {
+        // Device 10 minutes slow: timestamp and sentAt are both 10 min behind the server, 1 s apart.
+        const slow = new Date(Date.now() - 10 * 60_000).toISOString();
+        await sendAt([{ ...critical, timestamp: slow }], minutes(slow, 1 / 60));
+        assert.equal(calls.length, 1);
+      });
+
+      it('a missing, unparseable or non-string sentAt is never late (older clients)', async () => {
+        await send([critical]);
+        await sendAt([{ ...critical, message: 'b' }], 'not a date');
+        await sendAt([{ ...critical, message: 'c' }], Date.parse(critical.timestamp) + 3_600_000);
+        assert.equal(calls.length, 3);
+        assert.ok(lines().every((l) => l.late_s === undefined));
+      });
+
+      it('an event with no client timestamp is never late (no server-time back-fill)', async () => {
+        const { timestamp, ...noTs } = critical;
+        void timestamp;
+        await sendAt([noTs], new Date(Date.now() + 60 * 60_000).toISOString());
+        assert.equal(calls.length, 1);
+      });
+
+      it('lateSeconds: null for future, unparseable or within the threshold', () => {
+        const t = '2026-10-19T00:00:00.000Z';
+        const at = (m) => Date.parse(t) + m * 60_000;
+        assert.equal(mod.lateSeconds(t, at(-1)), null);
+        assert.equal(mod.lateSeconds(t, at(5)), null);
+        assert.equal(mod.lateSeconds(t, at(6)), 360);
+        assert.equal(mod.lateSeconds('nope', at(60)), null);
+        assert.equal(mod.lateSeconds(t, NaN), null);
+        assert.equal(mod.lateSeconds(undefined, at(60)), null);
+      });
+
+      it('pageDecision orders late before duplicate', () => {
+        const keys = new Set();
+        assert.equal(mod.pageDecision({ ...critical, severity: 'error' }, null, 0, keys), null);
+        assert.deepEqual(mod.pageDecision(critical, 99, 0, keys), { kind: 'late' });
+        const first = mod.pageDecision(critical, null, 0, keys);
+        assert.equal(first.kind, 'page');
+        keys.add(first.key);
+        assert.deepEqual(mod.pageDecision(critical, 99, 0, keys), { kind: 'late' });
+        assert.deepEqual(mod.pageDecision(critical, null, 0, keys), { kind: 'duplicate' });
+      });
+
+      it('late_s and sentAt are server-side only: a client-sent late_s is dropped', async () => {
+        assert.equal(mod.ALLOWED_CONTEXT_KEYS.has('late_s'), false);
+        assert.equal(mod.ALLOWED_CONTEXT_KEYS.has('sentAt'), false);
+        await send([{ ...sampleEvent, late_s: 1 }]);
+        assert.equal(lines()[0].late_s, undefined);
+      });
+    });
   });
 
   describe('insightsLink', () => {

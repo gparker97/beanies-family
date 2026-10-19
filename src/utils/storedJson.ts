@@ -5,7 +5,8 @@
  * caller knows whether a lost write matters.
  *
  * Shared by `perMemberStore` (install/community nudges, bean tips),
- * `useSidebarAccordion` and the entitlement cache (#95).
+ * `useSidebarAccordion`, the entitlement cache (#95) and the telemetry spool
+ * (`services/telemetry/logSpool.ts`).
  */
 
 export type StoredJsonRead =
@@ -63,5 +64,25 @@ export function removeStoredJson(key: string, label: string): StoredJsonWrite {
   } catch (error) {
     console.warn(`[${label}] localStorage remove failed for "${key}"`, error);
     return { ok: false, error };
+  }
+}
+
+/**
+ * Every stored key that starts with `prefix`. Collected into an array before returning, so the
+ * caller may remove keys while iterating the result (removing during a `localStorage.key(i)` walk
+ * would shift the indices). Same contract as the helpers above: never throws; an unreadable
+ * storage warns with the prefix and returns `[]`.
+ */
+export function storedKeysWithPrefix(prefix: string, label: string): string[] {
+  try {
+    const keys: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key !== null && key.startsWith(prefix)) keys.push(key);
+    }
+    return keys;
+  } catch (err) {
+    console.warn(`[${label}] localStorage key scan failed for prefix "${prefix}"`, err);
+    return [];
   }
 }

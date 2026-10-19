@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { readStoredJson, removeStoredJson, writeStoredJson } from '../storedJson';
+import {
+  readStoredJson,
+  removeStoredJson,
+  storedKeysWithPrefix,
+  writeStoredJson,
+} from '../storedJson';
 
 describe('storedJson', () => {
   let warn: ReturnType<typeof vi.spyOn>;
@@ -70,5 +75,28 @@ describe('storedJson', () => {
     expect(removeStoredJson('k', 'test')).toEqual({ ok: false, error: blocked });
     expect(String(warn.mock.calls[0]?.[0])).toContain('"k"');
     removeSpy.mockRestore();
+  });
+
+  it('lists only the keys with the prefix', () => {
+    localStorage.setItem('p.a', '1');
+    localStorage.setItem('p.b', '2');
+    localStorage.setItem('other', '3');
+    expect(storedKeysWithPrefix('p.', 'test').sort()).toEqual(['p.a', 'p.b']);
+  });
+
+  it('returns a snapshot, so removing while iterating visits every key', () => {
+    for (const k of ['p.1', 'p.2', 'p.3']) localStorage.setItem(k, '1');
+    for (const k of storedKeysWithPrefix('p.', 'test')) localStorage.removeItem(k);
+    expect(storedKeysWithPrefix('p.', 'test')).toEqual([]);
+  });
+
+  it('treats a throwing key scan as empty and warns with the prefix', () => {
+    const keySpy = vi.spyOn(localStorage, 'key').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+    localStorage.setItem('p.a', '1');
+    expect(storedKeysWithPrefix('p.', 'test')).toEqual([]);
+    expect(String(warn.mock.calls[0]?.[0])).toContain('"p."');
+    keySpy.mockRestore();
   });
 });

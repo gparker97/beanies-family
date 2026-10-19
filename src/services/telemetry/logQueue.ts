@@ -5,6 +5,8 @@
  * endpoint on any of: a periodic interval, a batch-size threshold, the network
  * coming back (`online`), or the page being hidden / unloaded.
  *
+ * Main thread only (the doc worker relays its telemetry to main).
+ *
  * Design mirrors `services/sync/offlineQueue.ts`: an `isListening` idempotency
  * flag, a `flushInFlight` coalescing guard, and lifecycle-event triggers.
  *
@@ -17,6 +19,23 @@
  *   - buffer overflow → drop oldest + counted warn
  *   - `sendBeacon` returns false on unload → accepted terminal loss (the page
  *     is gone; no retry is possible)
+ *   - spool write/remove refused (quota, storage disabled) → `storedJson` warns;
+ *     the in-memory buffer is unaffected
+ *
+ * Offline spool (`logSpool.ts`): while delivery is FAILING (a flush failed, or
+ * the browser reports offline) the unsent buffer is also kept in localStorage,
+ * written on that failure, on hide and on unload, and the next launch replays
+ * it (`restoreSpooledEvents`, called once at boot by `telemetrySpool.ts`). Not
+ * on every hide: on iOS the hide-time flush is sent but JS is suspended before
+ * its response runs, so a spool written then would never be cleared and would
+ * re-send delivered events. No localStorage write happens while online and
+ * delivering. The spool deliberately survives sign-out (the last moments of a
+ * session are what triage needs); a future sign-out step that sweeps keys by
+ * prefix must exclude `beanies.telemetrySpool.`.
+ *
+ * Sent events leave the buffer by IDENTITY (`removeSent`), never by count from
+ * the front: the overflow trim and the restore prepend can change the front
+ * while a flush is in flight.
  *
  * Transport split (CORS reality):
  *   - interval/online/visibility flush → `fetch` with `keepalive` + the
@@ -28,6 +47,7 @@
  */
 
 import type { LogRecord } from './logEvent';
+import { claimSpools, newSpoolKey, removeSpool, writeSpool } from './logSpool';
 
 const FLUSH_INTERVAL_MS = 10_000;
 const BATCH_THRESHOLD = 25;
@@ -42,6 +62,18 @@ let flushInFlight: Promise<void> | null = null;
 let droppedTotal = 0;
 let warnedNoUrl = false;
 let pageHideHooks: Array<() => void> = [];
+/** This page instance's spool key (see `logSpool.ts`). */
+let spoolKey = newSpoolKey();
+/** True while a spool for this instance is in storage. */
+let spoolWritten = false;
+/**
+ * The last flush hit a network error or a 5xx. Cleared by any answer from the server, so one
+ * blip does not leave an online, delivering session acting as if delivery were failing.
+ */
+let lastFlushFailed = false;
+/** What the spool last held, so an unchanged buffer is never re-serialised. */
+let spooled: { length: number; first: LogRecord | undefined; last: LogRecord | undefined } | null =
+  null;
 
 /**
  * Echo events to the console instead of dropping them, in dev only.
@@ -52,10 +84,10 @@ let pageHideHooks: Array<() => void> = [];
  * because Vitest sets it and it cannot be confused with a production build run
  * under `--mode test`; without it, 6773 tests each print their own telemetry.
  *
- * The `typeof import.meta` guard is kept: this module is imported by the worker
- * as well as the main bundle, and the file already guards it twice for the
- * ingest config. Removing a defence to save a branch is not a trade worth making
- * for a dev-only console line.
+ * The `typeof import.meta` guard is kept as a defence: this module runs on the
+ * main thread today, and the file already guards it twice for the ingest config.
+ * Removing a defence to save a branch is not a trade worth making for a dev-only
+ * console line.
  */
 const ECHO_TO_CONSOLE =
   typeof import.meta !== 'undefined' && !!import.meta.env?.DEV && !import.meta.env?.VITEST;
@@ -116,13 +148,7 @@ export function enqueueLogEvent(record: LogRecord, flush = false): void {
   }
 
   buffer.push(record);
-
-  if (buffer.length > MAX_BUFFER) {
-    const overflow = buffer.length - MAX_BUFFER;
-    buffer.splice(0, overflow); // drop oldest
-    droppedTotal += overflow;
-    console.warn(`[telemetry] buffer overflow — dropped ${droppedTotal} oldest event(s) total`);
-  }
+  trimBufferToCap();
 
   startListening();
 
@@ -135,6 +161,25 @@ export function enqueueLogEvent(record: LogRecord, flush = false): void {
   if (flush || buffer.length >= BATCH_THRESHOLD) {
     void tryFlush();
   }
+}
+
+/** Drop the oldest events beyond `MAX_BUFFER`; returns how many were dropped. */
+function trimBufferToCap(): number {
+  const overflow = buffer.length - MAX_BUFFER;
+  if (overflow <= 0) return 0;
+  buffer.splice(0, overflow); // drop oldest
+  droppedTotal += overflow;
+  console.warn(`[telemetry] buffer overflow — dropped ${droppedTotal} oldest event(s) total`);
+  return overflow;
+}
+
+/**
+ * The request body for both transports. `sentAt` is the device clock at send time, beside (never
+ * inside) the events: the Lambda measures lateness as `sentAt − timestamp`, both device time, so
+ * a device whose clock is off does not look late.
+ */
+function requestBody(batch: LogRecord[]): string {
+  return JSON.stringify({ sentAt: new Date().toISOString(), events: batch });
 }
 
 // ─── Flush ───────────────────────────────────────────────────────────────────
@@ -162,7 +207,7 @@ async function flush(): Promise<void> {
   if (!url || buffer.length === 0) return;
 
   const batch = buffer.slice(0, MAX_EVENTS_PER_REQUEST);
-  const body = JSON.stringify({ events: batch });
+  const body = requestBody(batch);
 
   let res: Response;
   try {
@@ -173,34 +218,135 @@ async function flush(): Promise<void> {
       body,
     });
   } catch (e) {
-    // Network / timeout — retryable. Keep the batch for the next trigger.
+    // Network / timeout — retryable. Keep the batch for the next trigger, and keep it on the
+    // device too in case the page dies first.
     console.warn('[telemetry] flush network error (will retry on next trigger)', e);
+    lastFlushFailed = true;
+    persistSpool();
     return;
   }
 
   if (res.ok) {
-    removeFromFront(batch.length);
-    // More queued than one request holds — drain on the next tick.
-    if (buffer.length > 0) void Promise.resolve().then(() => void tryFlush());
+    lastFlushFailed = false;
+    removeSent(batch);
+    // More queued than one request holds — drain on the next tick. A macrotask, not a microtask:
+    // a microtask runs before `tryFlush`'s `finally` clears `flushInFlight`, so it got this
+    // finished flush back and the backlog waited for the next 10 s interval.
+    if (buffer.length > 0) setTimeout(() => void tryFlush(), 0);
     return;
   }
 
   if (res.status >= 400 && res.status < 500) {
+    lastFlushFailed = false; // the server answered: delivery works, this batch is just refused
     // Terminal: bad key / malformed body. The server will always reject this —
     // drop it rather than retry-loop forever.
     console.warn(
       `[telemetry] flush rejected ${res.status} (terminal — dropping ${batch.length} event(s))`
     );
-    removeFromFront(batch.length);
+    removeSent(batch);
     return;
   }
 
-  // 5xx — server-side transient. Keep the batch, retry next trigger.
+  // 5xx — server-side transient. Keep the batch, retry next trigger (and on the device).
   console.warn(`[telemetry] flush failed ${res.status} (will retry on next trigger)`);
+  lastFlushFailed = true;
+  persistSpool();
 }
 
-function removeFromFront(n: number): void {
-  buffer.splice(0, n);
+/**
+ * Remove the events of a sent (or terminally rejected) batch, by identity: the front of the
+ * buffer may have moved since the batch was taken (overflow trim, restore prepend). A spool is
+ * kept in step only while delivery is still failing; once it works again the spool is dropped,
+ * so a recovered session goes back to writing nothing (what is left is in memory, as for any
+ * online session).
+ */
+function removeSent(batch: LogRecord[]): void {
+  const sent = new Set(batch);
+  buffer = buffer.filter((r) => !sent.has(r));
+  if (!spoolWritten) return;
+  if (deliveryFailing()) persistSpool();
+  else clearSpool();
+}
+
+// ─── Offline spool ───────────────────────────────────────────────────────────
+
+/** The last send failed, or the browser reports no network. */
+function deliveryFailing(): boolean {
+  return lastFlushFailed || (typeof navigator !== 'undefined' && navigator.onLine === false);
+}
+
+function clearSpool(): void {
+  if (spoolWritten && removeSpool(spoolKey)) {
+    spoolWritten = false;
+    spooled = null;
+  }
+}
+
+/**
+ * Bring this instance's spool in line with the buffer: remove it when the buffer is empty,
+ * otherwise write it unless it already holds exactly this buffer (every buffer change moves its
+ * length or an end reference, so those three identify it). Returns false only when the buffer is
+ * NOT safely on the device (the write was refused).
+ */
+function persistSpool(): boolean {
+  if (buffer.length === 0) {
+    clearSpool();
+    return true;
+  }
+  const first = buffer[0];
+  const last = buffer[buffer.length - 1];
+  const unchanged =
+    spooled?.length === buffer.length && spooled.first === first && spooled.last === last;
+  if (unchanged) return true;
+  if (!writeSpool(spoolKey, buffer)) return false;
+  spoolWritten = true;
+  spooled = { length: buffer.length, first, last };
+  return true;
+}
+
+export interface SpoolRestore {
+  /** Spool keys found from earlier page instances. */
+  keys: number;
+  /** Events put back in the queue. */
+  restored: number;
+  /** Events older than 7 days, dropped. */
+  stale: number;
+  /** Unreadable keys plus events with no parseable timestamp, dropped. */
+  malformed: number;
+  /** Keys that could not be removed, so were left unrestored. */
+  unremovable: number;
+  /** Fresh events dropped by the 500-event cap. */
+  capped: number;
+}
+
+/**
+ * Put events spooled by earlier page instances back at the front of the queue. Called once at
+ * boot by `installTelemetrySpool`, which logs the returned counts (this module never logs about
+ * itself). Restored events are re-spooled under THIS instance's key at once, so a launch that dies
+ * before the first flush does not lose what it claimed, then a flush starts. The first send that
+ * succeeds drops that spool (see `removeSent`).
+ */
+export function restoreSpooledEvents(): SpoolRestore {
+  const empty: SpoolRestore = {
+    keys: 0,
+    restored: 0,
+    stale: 0,
+    malformed: 0,
+    unremovable: 0,
+    capped: 0,
+  };
+  if (!ingestUrl()) return empty;
+  const { records, keys, stale, malformed, unremovable } = claimSpools(spoolKey, Date.now());
+  if (records.length === 0) return { ...empty, keys, stale, malformed, unremovable };
+
+  buffer = [...records, ...buffer];
+  const dropped = trimBufferToCap();
+  // The trim drops oldest first, and restored events are the oldest, so it only costs them.
+  const capped = Math.min(dropped, records.length);
+  persistSpool();
+  startListening();
+  void tryFlush();
+  return { keys, restored: records.length - capped, stale, malformed, unremovable, capped };
 }
 
 // ─── Unload flush (terminal, beacon) ─────────────────────────────────────────
@@ -218,7 +364,7 @@ function flushViaBeacon(): void {
   try {
     const batch = beaconBatchUnderCap();
     if (batch.length === 0) return;
-    const body = JSON.stringify({ events: batch });
+    const body = requestBody(batch);
     // Beacons can't set headers → key travels as a query param. text/plain is a
     // CORS-safelisted content type → no preflight (beacons can't preflight).
     const key = ingestApiKey();
@@ -226,7 +372,7 @@ function flushViaBeacon(): void {
     const blob = new Blob([body], { type: 'text/plain' });
     const ok = navigator.sendBeacon(beaconUrl, blob);
     if (ok) {
-      removeFromFront(batch.length);
+      removeSent(batch);
     } else {
       console.warn('[telemetry] sendBeacon returned false on unload (events lost — no retry)');
     }
@@ -240,7 +386,7 @@ function beaconBatchUnderCap(): LogRecord[] {
   let count = Math.min(buffer.length, MAX_EVENTS_PER_REQUEST);
   while (count > 0) {
     const candidate = buffer.slice(0, count);
-    if (JSON.stringify({ events: candidate }).length <= BEACON_MAX_BYTES) return candidate;
+    if (requestBody(candidate).length <= BEACON_MAX_BYTES) return candidate;
     count = Math.floor(count / 2);
   }
   return [];
@@ -290,15 +436,23 @@ function handleOnline(): void {
 function handleVisibilityChange(): void {
   // Tab hidden (mobile background / tab switch): flush via keepalive fetch so a
   // successful flush clears the buffer (avoids re-sending if the tab returns).
-  if (typeof document !== 'undefined' && document.hidden) void tryFlush();
+  // While delivery is failing, keep the buffer on the device first: iOS may kill
+  // a backgrounded app without another event.
+  if (typeof document === 'undefined' || !document.hidden) return;
+  if (deliveryFailing()) persistSpool();
+  void tryFlush();
 }
 
 function handlePageHide(event: PageTransitionEvent): void {
   // Real unload → hooks, then the terminal beacon. bfcache freeze (`persisted: true`) will
   // resume and flush normally, so don't beacon (would double-send) and don't run the hooks
   // (the page is not gone).
+  // While delivery is failing, spool instead: an offline `sendBeacon` returns true because it only
+  // queues, and the batch would be dropped as delivered.
   if (event.persisted) return;
   runPageHideHooks();
+  // A refused spool write falls back to the beacon: an attempt beats a certain loss.
+  if (deliveryFailing() && persistSpool()) return;
   flushViaBeacon();
 }
 
@@ -341,6 +495,10 @@ export function __resetLogQueueForTesting(): void {
   droppedTotal = 0;
   warnedNoUrl = false;
   pageHideHooks = [];
+  spoolKey = newSpoolKey();
+  spoolWritten = false;
+  lastFlushFailed = false;
+  spooled = null;
 }
 
 /** Test-only — inspect the current buffer length. */
