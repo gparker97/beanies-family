@@ -15,7 +15,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - Back now returns you to where you were in the cookbook, scrapbook, trips and other lists instead of the top, and in the planner it steps from a day back to the month you came from.
 - The weather pill on the desktop Nook is now as short as the greeting beside it, so the daily briefing starts sooner.
 - Diagnostics recorded while a device is offline are now kept on the device and sent the next time the app opens.
-
+- Phone apps older than 1.0.1 are now asked to update.
 - Creating a pod now tells you about the one checkbox Google will show, and if it was left unticked the retry shows you exactly which box to tick.
 - The local-file warning on the storage step is one short paragraph.
 - Step 1 says what your email is used for.
