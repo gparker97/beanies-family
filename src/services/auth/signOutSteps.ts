@@ -62,10 +62,11 @@ export type SignOutStepName =
   | 'deleteAllLocalFamilies'
   /**
    * Tell this family's other tabs the session ended here (C10), WHETHER OR NOT the cache
-   * delete ran: a kept cache must not leave the person signed in next door. The untrusted
-   * and clear tiers run it; the trusted, cleared-elsewhere and eviction tiers never do (a
-   * trusted sign-out keeps the device's sessions by design, an echo would ping-pong, and an
-   * eviction must not sign out the family's remaining members in other tabs).
+   * delete ran: a kept cache must not leave the person signed in next door. The untrusted,
+   * clear and Start over tiers run it; the trusted, cleared-elsewhere and eviction tiers
+   * never do (a trusted sign-out keeps the device's sessions by design, an echo would
+   * ping-pong, and an eviction must not sign out the family's remaining members in other
+   * tabs).
    */
   | 'announceSessionEnded'
   | 'clearKeyCacheFamily'
@@ -106,11 +107,12 @@ export type SignOutStepName =
    * The campaign tag from the link that brought this device here (#118). ON TIER 3 ONLY, the
    * opposite of `clearKeptRecipe`, and on purpose. A kept recipe is CONTENT that would leak
    * into the next person's pod; the tag names an ad, not a person, and its 30-day TTL plus
-   * consume-once at pod creation already bound it. The deciding fact is that tier 2 runs
-   * INSIDE the create flow: LoginPage's "Start over" calls `authStore.signOut()` (tier 2)
+   * consume-once at pod creation already bound it. The deciding fact is that a sign-out can
+   * run INSIDE the create flow: LoginPage's "Start over" runs `SIGN_OUT_START_OVER_STEPS`
    * and then routes back to `/welcome`, so a tagged visitor who hits a Drive hiccup, starts
-   * over and then creates would lose the attribution at exactly the moment it matters. The
-   * eviction tiers skip it for the same reason. Tier 3 keeps the clean-device promise.
+   * over and then creates would lose the attribution at exactly the moment it matters. That
+   * list skips it for this reason, and tier 2 and the eviction tiers skip it too. Tier 3
+   * keeps the clean-device promise.
    */
   | 'clearAttribution';
 
@@ -272,6 +274,54 @@ export const SIGN_OUT_EVICTED_STEPS: readonly SignOutStepName[] = [
 ];
 
 /**
+ * Start over (2026-10-19): the person abandons a pod they never finished creating, from the
+ * resume-setup screen, and goes back to `/welcome` to create again. Not a menu tier and not
+ * trust-dependent: a never-finished pod has nothing a trusted device would keep. Before this
+ * list existed Start over ran tier 2, which never forgets the family, so the family context
+ * kept the tombstoned family active: every later event carried its `family_id`, and the next
+ * boot restored it as last active.
+ *   - `beginQuietTeardown`, not the force-save, for the eviction lists' reason: a pod being
+ *     discarded has nothing legitimate to push, the save's only readers are
+ *     `deleteFamilyDb`'s guards (never run here), and a dirty answer would set an unpushed
+ *     marker for a family about to be forgotten.
+ *   - `forgetLocalFamily` in place of `deleteFamilyDb` + `removePinWrapsFamily` +
+ *     `removeRosterFamily`: `deleteLocalFamily` already covers the database, roster, PIN
+ *     wraps, passkeys, file handle, provider config and `lastActiveFamilyId`, and it nulls
+ *     the active family. After `clearKeyCacheFamily`, as on the eviction list, and after
+ *     `resolveFamilyId`, because the step throws without `ctx.familyId`.
+ *   - Tokens DROPPED (`clearGoogleSessionDropTokens`, then `clearFamilyRefreshToken`, which
+ *     resolves its own id): the refresh token is stored per family id, `deleteLocalFamily`
+ *     never deletes it, and once the family leaves the registry no later sweep
+ *     (`clearAllRefreshTokens` walks the registry) can reach it, so keeping it would leave
+ *     a live bearer secret nobody can use or clear. Keeping it buys the retry nothing: the
+ *     next create mints a new family id. The two steps overlap on purpose: the session drop
+ *     clears the token of the family googleAuth is BOUND to, and `clearFamilyRefreshToken`
+ *     is the backstop for a resume reached with googleAuth unbound (a reload before Drive
+ *     connected). On the common path the second delete finds nothing.
+ *   - NO `captureDepartingAccount` / `clearDepartedArtifacts`: Start over is not an account
+ *     change, so the last-account breadcrumb stays, as on the trusted tier.
+ *   - NO `clearAttribution`: the person is about to create again, and the campaign tag must
+ *     survive to that create (see the step's note).
+ *   - `announceSessionEnded` after the forget (C10): this tier deletes the family's cache.
+ */
+export const SIGN_OUT_START_OVER_STEPS: readonly SignOutStepName[] = [
+  'beginQuietTeardown',
+  'cancelReminders',
+  'clearWidgetSnapshot',
+  'clearWeatherCache',
+  'clearGoogleSessionDropTokens',
+  'clearFamilyRefreshToken',
+  'resetSyncState',
+  'resetDocClient',
+  'resolveFamilyId',
+  'clearKeyCacheFamily',
+  'forgetLocalFamily',
+  'announceSessionEnded',
+  'sweepHandoffFiles',
+  'clearKeptRecipe',
+];
+
+/**
  * Every step that removes this device's ability to open a pod unattended (2026-09-23).
  * The sign-out kit guard asks `dropsKeyMaterial` rather than re-deriving "is this the
  * untrusted tier", so the guard and the teardown can never disagree. A new step that
@@ -297,7 +347,9 @@ export type SignOutTier = 'sign-out' | 'clear';
 
 /**
  * The ONE place a user-facing sign-out picks its step list. `authStore.signOut` /
- * `signOutAndClearData` and the kit guard (`useSignOut`) all select through it.
+ * `signOutAndClearData` and the kit guard (`useSignOut`) all select through it. Start over
+ * is not a menu tier and has no kit guard, so `authStore.signOut({ startOver: true })`
+ * selects `SIGN_OUT_START_OVER_STEPS` directly.
  */
 export function signOutStepsFor(
   tier: SignOutTier,

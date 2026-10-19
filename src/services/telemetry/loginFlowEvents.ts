@@ -266,9 +266,9 @@ export function emitRosterFallbackUsed(): void {
   emit('warn', 'roster_fallback_used', { action: 'fallback' });
 }
 
-/** One sign-out ran. Confirms no tier ever revokes; local token deletion only on 2-untrusted/3. */
+/** One sign-out ran. Confirms no tier ever revokes; local token deletion only on 2-untrusted/3/start-over. */
 export function emitSignoutTier(payload: {
-  tier: 'switch-person' | 'sign-out' | 'sign-out-clear' | 'cleared-elsewhere';
+  tier: 'switch-person' | 'sign-out' | 'sign-out-clear' | 'cleared-elsewhere' | 'start-over';
   trusted: boolean;
   tokensKept: boolean;
 }): void {
@@ -286,7 +286,14 @@ export function emitSignoutTier(payload: {
  * toast type is `warning`, which never auto-reports.
  */
 export function emitCacheKept(
-  kind: 'sign-out' | 'sign-out-clear' | 'clear-data' | 'forget-family' | 'delete-family' | 'evicted'
+  kind:
+    | 'sign-out'
+    | 'sign-out-clear'
+    | 'clear-data'
+    | 'forget-family'
+    | 'delete-family'
+    | 'evicted'
+    | 'start-over'
 ): void {
   emit('warn', 'cache_kept', { action: 'cache_kept', kind });
 }

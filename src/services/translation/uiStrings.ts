@@ -4641,9 +4641,29 @@ const STRING_DEFS = {
     beanie: "why didn't google drive connect?",
   },
   'createPod.driveConsentDenied': {
-    en: 'Google needs permission to create your family file. Try again and tick the file access box when Google asks.',
+    en: "The file box wasn't ticked. Try again and tick this one:",
+    beanie: "the file box wasn't ticked. try again and tick this one:",
+  },
+  // Google's consent screen for Drive file access: the storage-step hint, the drawn copy of
+  // Google's row (label is Google's own wording) and the step-1 email caption. Important surface:
+  // beanie values keep the real nouns.
+  'createPod.consent.hint': {
+    en: 'Google will show one checkbox. Tick it so beanies.family can create your family file.',
+    beanie: 'google will show one checkbox. tick it so beanies.family can create your family file.',
+  },
+  'createPod.consent.label': {
+    en: 'See, edit, create, and delete only the specific Google Drive files you use with this app',
     beanie:
-      'google needs permission to create your family file. try again and tick the file access box when google asks.',
+      'see, edit, create, and delete only the specific google drive files you use with this app',
+  },
+  'createPod.consent.tick': { en: 'Tick', beanie: 'tick' },
+  'createPod.consent.rowAlt': {
+    en: "Google's file access checkbox",
+    beanie: "google's file access checkbox",
+  },
+  'createPod.consent.emailPurpose': {
+    en: 'Only for mail from beanies.family. Never shared or sold.',
+    beanie: 'only for mail from beanies.family. never shared or sold.',
   },
   // Shopping list from a recipe (#88). Ordinary product copy, so playful beanie
   // values are fine — EXCEPT `noMemberError`, whose `Error` suffix makes
@@ -9088,18 +9108,13 @@ const STRING_DEFS = {
   'storage.dropbox': { en: 'Dropbox', beanie: 'dropbox' },
   'storage.iCloud': { en: 'iCloud', beanie: 'icloud' },
   'storage.localFileWarningTitle': {
-    en: "Heads up — local files don't sync",
-    beanie: "heads up — local files don't sync",
+    en: 'A local file stays on this device',
+    beanie: 'a local file stays on this device',
   },
   'storage.localFileWarning': {
-    en: 'Your data stays on this device. To share with other family members, you will need to manually share the data file.',
+    en: 'Only this device can open your pod unless you share the file yourself. Google Drive keeps everyone in sync.',
     beanie:
-      'your data stays on this device. to share with other family members, you will need to manually share the data file.',
-  },
-  'storage.localFileWarningEncryption': {
-    en: 'Your data is encrypted either way — only the people you share the file with can open it.',
-    beanie:
-      'your data is encrypted either way — only the people you share the file with can open it.',
+      'only this device can open your pod unless you share the file yourself. google drive keeps everyone in sync.',
   },
   'storage.localFileContinue': {
     en: 'Use a local file',
@@ -9152,11 +9167,6 @@ const STRING_DEFS = {
     en: 'This file looks like a conflict copy from your cloud-storage provider. Beanies will merge it on load — you can delete the duplicate after.',
     beanie:
       'this file looks like a conflict copy from your cloud-storage provider. beanies will merge it on load — you can delete the duplicate after.',
-  },
-  'storage.localFileBestOnDesktop': {
-    en: 'Local files only work in Chrome or Edge on a computer. On a phone, or in Safari or Firefox, choose Google Drive instead.',
-    beanie:
-      'local files only work in chrome or edge on a computer. on a phone, or in safari or firefox, choose google drive instead.',
   },
   'storage.comingSoon': { en: 'Coming Soon', beanie: 'coming soon' },
   'storage.recommended': { en: 'Recommended', beanie: 'recommended' },

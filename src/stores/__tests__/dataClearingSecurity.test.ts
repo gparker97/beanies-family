@@ -312,12 +312,43 @@ vi.mock('@/services/familyContext', () => ({
   deleteLocalFamily: (id: string) => mockDeleteLocalFamily(id),
 }));
 
+// `deleteLocalFamily` mirrors the real store's contract (forget through the service, then
+// null the active family when it was the one forgotten) so the Start over tier's wiring is
+// observable; `familyContextStore.deleteLocalFamily.test.ts` pins that contract on the
+// real store.
+const fcs = vi.hoisted(() => ({ activeFamilyId: 'family-123' as string | null }));
 vi.mock('@/stores/familyContextStore', () => ({
   useFamilyContextStore: () => ({
-    activeFamilyId: 'family-123',
+    get activeFamilyId() {
+      return fcs.activeFamilyId;
+    },
     activeFamilyName: 'Test Family',
+    deleteLocalFamily: async (id: string) => {
+      // As the real store: a throwing service yields `null` and leaves the active family
+      // alone; only a completed forget nulls it.
+      try {
+        const result = await mockDeleteLocalFamily(id);
+        if (fcs.activeFamilyId === id) fcs.activeFamilyId = null;
+        return result;
+      } catch {
+        return null;
+      }
+    },
   }),
 }));
+
+// Spy the per-family refresh-token delete, still calling through to the real store.
+const mockClearGoogleRefreshToken = vi.fn();
+vi.mock('@/services/sync/fileHandleStore', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@/services/sync/fileHandleStore')>();
+  return {
+    ...real,
+    clearGoogleRefreshToken: (id: string) => {
+      mockClearGoogleRefreshToken(id);
+      return real.clearGoogleRefreshToken(id);
+    },
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Store imports — after mocks
@@ -570,6 +601,7 @@ describe('Sensitive Data Clearing Security', () => {
     c6.markers.clear();
     c6.sweptIds = [];
     c6.registryFamilies = [];
+    fcs.activeFamilyId = 'family-123';
   });
 
   // =========================================================================
@@ -1739,6 +1771,36 @@ describe('Sensitive Data Clearing Security', () => {
       sync.resetState();
       sync.resetState();
       expect(sync.hasSessionPassword).toBe(false);
+    });
+  });
+
+  // =========================================================================
+  // Start over (2026-10-19): the never-finished family is forgotten locally
+  // =========================================================================
+  describe('signOut({ startOver: true })', () => {
+    it('forgets the family, drops its refresh token, and reports the delete', async () => {
+      const { auth, settings } = populateAllStores();
+      await settings.setTrustedDevice(true);
+
+      await expect(auth.signOut({ startOver: true })).resolves.toEqual({ cacheDeleted: true });
+
+      expect(mockDeleteLocalFamily).toHaveBeenCalledWith('family-123');
+      expect(fcs.activeFamilyId).toBeNull();
+      expect(mockClearGoogleRefreshToken).toHaveBeenCalledWith('family-123');
+      // Trust-independent: a trusted device runs the same list, and says tokens were dropped.
+      expect(mockEmitSignoutTier).toHaveBeenCalledWith({
+        tier: 'start-over',
+        trusted: true,
+        tokensKept: false,
+      });
+    });
+
+    it('a cache another tab kept is reported as kept, under its own kind', async () => {
+      const { auth } = populateAllStores();
+      mockDeleteLocalFamily.mockResolvedValueOnce({ deleted: false });
+
+      await expect(auth.signOut({ startOver: true })).resolves.toEqual({ cacheDeleted: false });
+      expect(mockEmitCacheKept).toHaveBeenCalledWith('start-over');
     });
   });
 });

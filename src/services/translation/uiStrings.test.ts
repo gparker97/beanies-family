@@ -74,6 +74,8 @@ describe('uiStrings', () => {
       'resumeSetup.pod',
       'resumeSetup.driveDeclined',
       'createPod.driveError.',
+      'createPod.consent.',
+      'createPod.driveConsentDenied',
       'resumeSetup.subtitle',
       'sync.',
       'docWorker.',

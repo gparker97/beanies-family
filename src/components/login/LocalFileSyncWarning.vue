@@ -42,14 +42,8 @@ const { t } = useTranslation();
           {{ t('storage.localFileWarningTitle') }}
         </h3>
       </div>
-      <p class="dark:text-ink-soft mb-2.5 text-sm leading-relaxed text-gray-600">
+      <p class="dark:text-ink-soft mb-4 text-sm leading-relaxed text-gray-600">
         {{ t('storage.localFileWarning') }}
-      </p>
-      <p class="dark:text-ink-soft mb-2.5 text-sm leading-relaxed text-gray-500">
-        <span aria-hidden="true">{{ '💻' }}</span> {{ t('storage.localFileBestOnDesktop') }}
-      </p>
-      <p class="dark:text-ink-soft mb-4 text-sm leading-relaxed text-gray-500">
-        🔒 {{ t('storage.localFileWarningEncryption') }}
       </p>
       <div class="space-y-2">
         <BaseButton v-if="googleDriveAvailable" class="w-full" @click="emit('use-google-drive')">

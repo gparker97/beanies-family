@@ -8,6 +8,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-10-19
+
+### Changed
+
+- Creating a pod now tells you about the one checkbox Google will show, and if it was left unticked the retry shows you exactly which box to tick.
+- The local-file warning on the storage step is one short paragraph.
+- Step 1 says what your email is used for.
+
+### Fixed
+
+- Starting over on a half-finished pod now forgets it on this device properly.
+
 ## 2026-10-18
 
 ### Fixed

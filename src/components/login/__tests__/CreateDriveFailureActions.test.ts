@@ -59,6 +59,13 @@ describe('CreateDriveFailureActions', () => {
     expect(rendered(factory(code))).toEqual(expected);
   });
 
+  it("draws Google's consent row for consent-denied only", () => {
+    expect(factory('consent-denied').find('[data-testid="google-consent-row"]').exists()).toBe(
+      true
+    );
+    expect(factory('drive-full').find('[data-testid="google-consent-row"]').exists()).toBe(false);
+  });
+
   // The append-and-dedup rule itself is table-tested in `createDriveErrors.test.ts`; this proves
   // only that the prop reaches it.
   it('passes alwaysOfferLocal through to the registry', () => {

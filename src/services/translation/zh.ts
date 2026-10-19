@@ -2317,8 +2317,13 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
     '中途出了点状况。请重试；如果一直这样，帮助文章里介绍了常见原因。',
   'createPod.driveError.getApp': '获取 beanies 应用',
   'createPod.driveError.help': 'Google Drive 为什么没有连接？',
-  'createPod.driveConsentDenied':
-    'Google 需要权限才能创建你的家庭文件。请重试，并在 Google 询问时勾选文件访问权限。',
+  'createPod.driveConsentDenied': '文件框没有勾选。请重试，并勾选这一项：',
+  'createPod.consent.hint':
+    'Google 会显示一个复选框。请勾选它，beanies.family 才能创建你的家庭文件。',
+  'createPod.consent.label': '查看、编辑、创建和删除您通过此应用使用的特定 Google 云端硬盘文件',
+  'createPod.consent.tick': '勾选',
+  'createPod.consent.rowAlt': 'Google 的文件访问复选框',
+  'createPod.consent.emailPurpose': '仅用于接收来自 beanies.family 的邮件，绝不分享或出售。',
   'lists.fromRecipe.title': '生成购物清单',
   'lists.fromRecipe.body': '取消勾选已有的食材，可以编辑任意一行，也可以添加你自己的。',
   'lists.fromRecipe.listTitle': '{recipe} 购物清单',
@@ -3933,11 +3938,9 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'storage.localFile': '本地文件',
   'storage.dropbox': 'Dropbox',
   'storage.iCloud': 'iCloud',
-  'storage.localFileWarningTitle': '注意：本地文件不会同步',
+  'storage.localFileWarningTitle': '本地文件只保存在这台设备上',
   'storage.localFileWarning':
-    '你的数据只保存在这台设备上。如需与其他家人共享，需要手动分享数据文件。',
-  'storage.localFileWarningEncryption':
-    '无论选哪种方式，你的数据都会加密；只有你分享了文件的人才能打开。',
+    '除非你自己分享文件，否则只有这台设备能打开你的家庭空间。Google Drive 能让全家保持同步。',
   'storage.localFileContinue': '使用本地文件',
   'storage.useGoogleDriveInstead': '改用 Google Drive',
   'storage.driveSyncsWithFamily': '与全家自动同步，每台设备都能用。加密方式与本地文件相同。',
@@ -3951,8 +3954,6 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'storage.localFileWriteFailed': '无法保存你的数据文件。请重试，或查看浏览器控制台了解详情。',
   'storage.localFileConflictDetected':
     '这个文件看起来是云存储服务生成的冲突副本。beanies 会在加载时自动合并，之后你可以删除重复的文件。',
-  'storage.localFileBestOnDesktop':
-    '本地文件仅支持电脑上的 Chrome 或 Edge。在手机上，或使用 Safari、Firefox 时，请改选 Google Drive。',
   'storage.comingSoon': '即将推出',
   'storage.recommended': '推荐',
 

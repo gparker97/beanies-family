@@ -78,6 +78,7 @@ import BaseInput from '@/components/ui/BaseInput.vue';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import LocalFileSyncWarning from '@/components/login/LocalFileSyncWarning.vue';
 import CreateDriveFailureActions from '@/components/login/CreateDriveFailureActions.vue';
+import DriveConsentHint from '@/components/login/DriveConsentHint.vue';
 import CreateMembersStep from '@/components/login/CreateMembersStep.vue';
 import PinInput from '@/components/ui/PinInput.vue';
 import RecoveryKitDisplay from '@/components/auth/RecoveryKitDisplay.vue';
@@ -1579,6 +1580,7 @@ async function handleConnectLocal() {
         >
           {{ t('storage.connectGoogleDrive') }}
         </BaseButton>
+        <DriveConsentHint v-if="syncStore.isGoogleDriveAvailable" />
         <!-- Local file only where the File System Access API exists (Chromium
              desktop / native). On iOS WebKit + Firefox it dead-ends; hide it when
              Drive is available, or show a clear message in the self-host case. -->

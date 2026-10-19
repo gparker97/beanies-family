@@ -79,6 +79,7 @@ import {
   SIGN_OUT_CLEARED_ELSEWHERE_STEPS,
   SIGN_OUT_EVICTED_STEPS,
   SIGN_OUT_EVICTION_LOCK_STEPS,
+  SIGN_OUT_START_OVER_STEPS,
   type SignOutStepImpls,
   type SignOutStepName,
 } from '@/services/auth/signOutSteps';
@@ -3301,6 +3302,11 @@ export const useAuthStore = defineStore('auth', () => {
     /** Every family `deleteAllLocalFamilies` forgot (tier 3), for the cross-tab announce. */
     clearedFamilyIds?: string[];
     /**
+     * Which tier `forgetLocalFamily` runs under, for its `cache_kept` kind: the #77
+     * eviction (the default) or Start over, so the two stay apart in CloudWatch.
+     */
+    forgetKind?: 'evicted' | 'start-over';
+    /**
      * The person chose to DISCARD the queued photos on an untrusted keep-data sign-out
      * (round 3, `useSignOut`). A queued photo is plaintext, so on that device it is never
      * kept silently: either this is set, or the sign-out did not run.
@@ -3609,12 +3615,16 @@ export const useAuthStore = defineStore('auth', () => {
       },
       forgetLocalFamily: async () => {
         if (!ctx.familyId) throw new Error('forgetLocalFamily: no familyId');
+        // Attempted and not yet known to be gone, as `deleteFamilyDb` records it: a throw
+        // below leaves `false`, never the "no delete attempted" `null`.
+        ctx.cacheDeleted = false;
         const result = await useFamilyContextStore().deleteLocalFamily(ctx.familyId);
         if (result === null) throw new Error('deleteLocalFamily returned null');
+        ctx.cacheDeleted = result.deleted;
         // The family is forgotten either way; a cache another tab would not release
-        // is still counted (#100). No UI: the login page already explains the
-        // removal, and this device no longer holds the key.
-        if (!result.deleted) emitCacheKept('evicted');
+        // is still counted (#100), under the tier that forgot it. No UI: the login page
+        // already explains the removal, and this device no longer holds the key.
+        if (!result.deleted) emitCacheKept(ctx.forgetKind ?? 'evicted');
       },
       untrustDevice: () => settingsStore.setTrustedDevice(false),
       reArmTrustPrompt: () => settingsStore.resetTrustedDevicePrompt(),
@@ -3629,8 +3639,9 @@ export const useAuthStore = defineStore('auth', () => {
       // earlier cut put this on tier 3 alone, arguing the TTL and single-consume already
       // bounded it; they bound duration and repetition, not IDENTITY.)
       clearKeptRecipe: () => clearKeptRecipe(),
-      // TIER 3 ONLY — see the reasoning on `SignOutStepName` in `signOutSteps.ts` (tier 2
-      // runs inside the create flow via "Start over", where the tag must survive).
+      // TIER 3 ONLY — see the reasoning on `SignOutStepName` in `signOutSteps.ts` ("Start
+      // over" runs `SIGN_OUT_START_OVER_STEPS` inside the create flow, where the tag must
+      // survive, so that list skips it).
       clearAttribution: () => clearAttribution('sign-out'),
     };
   }
@@ -3640,19 +3651,27 @@ export const useAuthStore = defineStore('auth', () => {
    * pod, clear the member session. NO tier revokes at Google. Trusted devices keep
    * tokens + caches + wraps (silent reconnect); untrusted devices get the full
    * family-scoped local teardown. The step ORDER is data in `signOutSteps.ts`.
+   *
+   * `startOver` (LoginPage's "Start over", 2026-10-19) runs `SIGN_OUT_START_OVER_STEPS`
+   * instead, on any device: it forgets the never-finished family locally so no later
+   * event carries its `family_id` and the next boot does not restore it.
+   *
+   * `cacheDeleted`: whether the family's cache left this browser (`false` when another
+   * tab kept it), on an untrusted sign-out and on Start over; `null` when no delete ran
+   * (a trusted keep-data sign-out).
    */
   async function signOut(
-    opts: { dropPhotoQueue?: boolean } = {}
+    opts: { dropPhotoQueue?: boolean; startOver?: boolean } = {}
   ): Promise<{ cacheDeleted: boolean | null }> {
     const trusted = useSettingsStore().isTrustedDevice;
     const ctx = await runSignOutTier({
-      tier: 'sign-out',
-      steps: signOutStepsFor('sign-out', trusted),
+      tier: opts.startOver ? 'start-over' : 'sign-out',
+      steps: opts.startOver ? SIGN_OUT_START_OVER_STEPS : signOutStepsFor('sign-out', trusted),
       userAskedToClear: false,
       trusted,
       dropPhotoQueue: opts.dropPhotoQueue === true,
     });
-    // Untrusted devices delete the cache too; `null` on a trusted one (#100).
+    // Untrusted devices and Start over delete the cache; `null` on a trusted one (#100).
     return { cacheDeleted: ctx.cacheDeleted };
   }
 
@@ -3677,6 +3696,7 @@ export const useAuthStore = defineStore('auth', () => {
       cacheDeleted: null as boolean | null,
       clearedFamilyIds: undefined as string[] | undefined,
       dropPhotoQueue: false,
+      forgetKind: undefined as 'evicted' | 'start-over' | undefined,
     };
   }
 
@@ -3708,7 +3728,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   /** Run one sign-out tier's steps, record it, and end the session. */
   async function runSignOutTier(opts: {
-    tier: 'sign-out' | 'sign-out-clear' | 'cleared-elsewhere';
+    tier: 'sign-out' | 'sign-out-clear' | 'cleared-elsewhere' | 'start-over';
     steps: readonly SignOutStepName[];
     userAskedToClear: boolean;
     trusted: boolean;
@@ -3716,6 +3736,7 @@ export const useAuthStore = defineStore('auth', () => {
   }): Promise<ReturnType<typeof buildSignOutCtx>> {
     const ctx = buildSignOutCtx(opts.userAskedToClear);
     ctx.dropPhotoQueue = opts.dropPhotoQueue === true;
+    if (opts.tier === 'start-over') ctx.forgetKind = 'start-over';
     await runSignOutSteps(opts.steps, buildSignOutStepImpls(ctx));
     emitSignoutTier({
       tier: opts.tier,

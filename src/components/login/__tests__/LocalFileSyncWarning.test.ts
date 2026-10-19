@@ -21,14 +21,15 @@ describe('LocalFileSyncWarning', () => {
     setActivePinia(createPinia());
   });
 
-  it('shows the title and the three body lines when open', async () => {
+  it('shows the title and one body paragraph when open', async () => {
     const wrapper = factory();
     await nextTick();
     const text = wrapper.text();
     expect(text).toContain('storage.localFileWarningTitle');
     expect(text).toContain('storage.localFileWarning');
-    expect(text).toContain('storage.localFileBestOnDesktop');
-    expect(text).toContain('storage.localFileWarningEncryption');
+    expect(text).not.toContain('storage.localFileBestOnDesktop');
+    expect(text).not.toContain('storage.localFileWarningEncryption');
+    expect(wrapper.findAll('p')).toHaveLength(1);
   });
 
   it('emits "use-google-drive" from the primary button when Drive is available', async () => {

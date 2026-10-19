@@ -7,7 +7,8 @@
  * three handlers that change its own state (`retry`, `chooseAccount`, `useLocal`); the registry
  * (`createDriveRecoveries`) decides which recoveries apply on this device; this component owns
  * their labels, the two that need no host state (`getApp`, the help link), and the one tap event
- * per recovery.
+ * per recovery. It also owns the per-code illustration, and `consent-denied` is the only code
+ * that has one: a drawn copy of Google's file-access checkbox row (`GoogleConsentRow`).
  *
  * ⚠️ NEVER ON THE RESUME PROBE'S `retry` PHASE. That phase sits beside a pod the registry already
  * knows; "use a local file" or "use a different account" there would start a second pod beside it
@@ -15,6 +16,7 @@
  */
 import { computed } from 'vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
+import GoogleConsentRow from '@/components/login/GoogleConsentRow.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { canUseLocalFiles } from '@/services/sync/capabilities';
 import {
@@ -91,6 +93,7 @@ function handleHelp() {
 
 <template>
   <div class="space-y-2">
+    <GoogleConsentRow v-if="code === 'consent-denied'" data-testid="google-consent-row" />
     <BaseButton
       v-for="action in recoveries"
       :key="action"

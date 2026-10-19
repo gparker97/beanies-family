@@ -845,8 +845,9 @@ async function handleStartOver() {
   // failure never blocks start over.
   await syncStore.abandonSignupStart();
   // Cache outcome deliberately not read: an abandoned half-finished onboarding, and
-  // `docClient.clearCache` has already logged a cache another tab kept (#100).
-  await authStore.signOut();
+  // `docClient.clearCache` has already logged a cache another tab kept (#100). The Start over
+  // tier forgets the family locally, so later events stop carrying its `family_id`.
+  await authStore.signOut({ startOver: true });
   activeView.value = 'welcome';
   await router.replace('/welcome');
 }

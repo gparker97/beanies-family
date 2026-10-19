@@ -155,7 +155,8 @@ export const useFamilyContextStore = defineStore('familyContext', () => {
 
   /**
    * Delete all local data for a family and remove it from the registry.
-   * Cannot delete the currently active family.
+   * Deleting the currently active family is allowed: it nulls `activeFamily` (the
+   * service clears `lastActiveFamilyId`), which the Start over sign-out relies on.
    *
    * Returns the cache-delete outcome, or `null` if the delete threw (the message
    * is in `error`). The family is forgotten whenever this is non-null, even when

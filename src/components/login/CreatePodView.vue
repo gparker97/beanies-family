@@ -7,6 +7,7 @@ import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import CloudProviderBadge from '@/components/ui/CloudProviderBadge.vue';
 import LocalFileSyncWarning from '@/components/login/LocalFileSyncWarning.vue';
 import CreateDriveFailureActions from '@/components/login/CreateDriveFailureActions.vue';
+import DriveConsentHint from '@/components/login/DriveConsentHint.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useAuthStore } from '@/stores/authStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
@@ -596,6 +597,7 @@ function handleBack() {
             :label="t('form.email')"
             type="email"
             placeholder="you@example.com"
+            :hint="t('createPod.consent.emailPurpose')"
             required
           />
           <!-- Pre-filled from the surname; editable, and stops following the name once edited. -->
@@ -699,7 +701,7 @@ function handleBack() {
               <p class="font-outfit dark:text-success-lift text-base font-semibold text-green-700">
                 {{ t('googleDrive.fileCreated') }}
               </p>
-              <p class="text-secondary-500/70 dark:text-ink-soft mt-0.5 text-sm leading-snug">
+              <p class="text-secondary-500 dark:text-ink-soft mt-0.5 text-sm leading-snug">
                 {{ t('googleDrive.fileCreatedSubtitle') }}
               </p>
             </div>
@@ -716,7 +718,7 @@ function handleBack() {
                   >{{ t('storage.recommended') }}</span
                 >
               </p>
-              <p class="text-secondary-500/70 dark:text-ink-soft mt-0.5 text-sm leading-snug">
+              <p class="text-secondary-500 dark:text-ink-soft mt-0.5 text-sm leading-snug">
                 {{ t('storage.driveSyncsWithFamily') }}
               </p>
               <p class="text-primary-500 font-outfit mt-1.5 text-xs font-semibold">
@@ -724,6 +726,8 @@ function handleBack() {
               </p>
             </div>
           </button>
+          <!-- Only while no storage is chosen yet: a local pick makes the Google line a non-sequitur. -->
+          <DriveConsentHint v-if="!storageType" />
 
           <div class="mt-3 text-center">
             <p
@@ -859,7 +863,7 @@ function handleBack() {
             >
             <span>{{ t('loginV6.howThisWorks.toggle') }}</span>
           </summary>
-          <div class="text-secondary-500/70 dark:text-ink-soft pb-2 pl-4 text-sm leading-relaxed">
+          <div class="text-secondary-500 dark:text-ink-soft pb-2 pl-4 text-sm leading-relaxed">
             <p class="mb-2">
               <strong class="text-secondary-500 dark:text-ink">{{
                 t('loginV6.howThisWorks.leadStrong')

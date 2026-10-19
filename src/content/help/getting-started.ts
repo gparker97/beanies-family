@@ -190,7 +190,7 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
       'Save your encrypted pod file to Google Drive for cross-device access and automatic backups.',
     icon: '\u2601\uFE0F',
     readTime: 3,
-    updatedDate: '2026-10-09',
+    updatedDate: '2026-10-19',
     sections: [
       {
         type: 'heading',
@@ -253,10 +253,18 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
         type: 'list',
         content: '',
         items: [
+          '<strong>The file box wasn\u2019t ticked</strong> \u2014 Google shows one checkbox for file access. Tap <strong>Try again</strong> and tick it so beanies.family can create your family file.',
           "<strong>Pop-ups are blocked</strong> \u2014 beanies switches to a full-page Google sign-in by itself, so you can usually just carry on. If it keeps happening, allow pop-ups for <strong>beanies.family</strong> in your browser. There's no need to turn your pop-up blocker off everywhere.",
           '<strong>Your Google Drive is full</strong> \u2014 free up some space in Drive, or sign in with a different Google account that has room.',
           '<strong>A work or school account is blocked</strong> \u2014 the administrator of that account may not allow apps like beanies. Use a personal Google account instead.',
         ],
+      },
+      {
+        type: 'callout',
+        content:
+          '\u201CSee, edit, create, and delete only the specific Google Drive files you use with this app\u201D',
+        title: 'What the box says',
+        icon: '\u2611\uFE0F',
       },
       {
         type: 'callout',

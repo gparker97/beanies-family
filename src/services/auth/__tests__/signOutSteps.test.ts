@@ -15,6 +15,7 @@ import {
   SIGN_OUT_CLEARED_ELSEWHERE_STEPS,
   SIGN_OUT_EVICTED_STEPS,
   SIGN_OUT_EVICTION_LOCK_STEPS,
+  SIGN_OUT_START_OVER_STEPS,
   SIGN_OUT_TRUSTED_STEPS,
   SIGN_OUT_UNTRUSTED_STEPS,
   dropsKeyMaterial,
@@ -140,11 +141,12 @@ describe('C6: tier 3 forgets EVERY family, not only the active one', () => {
 });
 
 describe('C10: every non-trusted tier tells the other tabs the session ended', () => {
-  it('untrusted and both clear tiers announce, AFTER any delete attempt', () => {
+  it('untrusted, both clear tiers and Start over announce, AFTER any delete attempt', () => {
     for (const steps of [
       SIGN_OUT_UNTRUSTED_STEPS,
       SIGN_OUT_CLEAR_STEPS,
       SIGN_OUT_CLEAR_ACTIVE_STEPS,
+      SIGN_OUT_START_OVER_STEPS,
     ]) {
       expect(steps).toContain('announceSessionEnded');
     }
@@ -153,6 +155,9 @@ describe('C10: every non-trusted tier tells the other tabs the session ended', (
     );
     expect(SIGN_OUT_CLEAR_STEPS.indexOf('deleteAllLocalFamilies')).toBeLessThan(
       SIGN_OUT_CLEAR_STEPS.indexOf('announceSessionEnded')
+    );
+    expect(SIGN_OUT_START_OVER_STEPS.indexOf('forgetLocalFamily')).toBeLessThan(
+      SIGN_OUT_START_OVER_STEPS.indexOf('announceSessionEnded')
     );
   });
 
@@ -167,8 +172,8 @@ describe('C10: every non-trusted tier tells the other tabs the session ended', (
 });
 
 describe('clearAttribution (#118): tier 3 only', () => {
-  // Tier 2 runs inside the create flow (LoginPage "Start over"), so the campaign tag must
-  // survive it; only the clean-device "Clear data" tier drops it.
+  // Start over runs inside the create flow (LoginPage), so the campaign tag must survive
+  // it; only the clean-device "Clear data" tier drops it.
   it('runs on the clear tier', () => {
     expect(SIGN_OUT_CLEAR_STEPS).toContain('clearAttribution');
   });
@@ -202,6 +207,7 @@ describe('clearWidgetSnapshot (#130): right after cancelReminders, on every tier
     ['cleared elsewhere', SIGN_OUT_CLEARED_ELSEWHERE_STEPS],
     ['eviction lock', SIGN_OUT_EVICTION_LOCK_STEPS],
     ['evicted', SIGN_OUT_EVICTED_STEPS],
+    ['start over', SIGN_OUT_START_OVER_STEPS],
   ];
 
   it.each(TIERS)('%s', (_name, steps) => {
@@ -226,6 +232,7 @@ describe('clearWeatherCache (#134): on every tier that has clearWidgetSnapshot',
     ['cleared elsewhere', SIGN_OUT_CLEARED_ELSEWHERE_STEPS],
     ['eviction lock', SIGN_OUT_EVICTION_LOCK_STEPS],
     ['evicted', SIGN_OUT_EVICTED_STEPS],
+    ['start over', SIGN_OUT_START_OVER_STEPS],
   ];
 
   it.each(TIERS)('%s', (_name, steps) => {
@@ -241,5 +248,48 @@ describe('clearWeatherCache (#134): on every tier that has clearWidgetSnapshot',
 
   it('is not key material: it never trips the sign-out kit guard', () => {
     expect(KEY_MATERIAL_STEPS.has('clearWeatherCache')).toBe(false);
+  });
+});
+
+describe('Start over (2026-10-19): forgets the never-finished family', () => {
+  const steps = SIGN_OUT_START_OVER_STEPS;
+
+  it('resolves the family, drops its key, forgets it, then announces (C10)', () => {
+    const at = (step: SignOutStepName) => steps.indexOf(step);
+    expect(at('resolveFamilyId')).toBeGreaterThanOrEqual(0);
+    expect(at('resolveFamilyId')).toBeLessThan(at('clearKeyCacheFamily'));
+    expect(at('clearKeyCacheFamily')).toBeLessThan(at('forgetLocalFamily'));
+    expect(at('forgetLocalFamily')).toBeLessThan(at('announceSessionEnded'));
+  });
+
+  it("drops this family's tokens: forgetting it would orphan its refresh token", () => {
+    expect(steps).toContain('clearGoogleSessionDropTokens');
+    expect(steps).toContain('clearFamilyRefreshToken');
+    expect(steps).not.toContain('clearGoogleSessionKeepTokens');
+    // Family-scoped only: another family's token on this device is not this tier's.
+    expect(steps).not.toContain('clearAllRefreshTokens');
+    // The token step must run while the family is still known to the registry.
+    expect(steps.indexOf('clearFamilyRefreshToken')).toBeLessThan(
+      steps.indexOf('forgetLocalFamily')
+    );
+  });
+
+  it('starts with the quiet teardown, never the force-save', () => {
+    expect(steps[0]).toBe('beginQuietTeardown');
+    expect(steps).not.toContain('quietTeardownAndForceSave');
+  });
+
+  it('never runs deleteFamilyDb, clearDepartedArtifacts or clearAttribution', () => {
+    for (const step of [
+      'deleteFamilyDb',
+      'clearDepartedArtifacts',
+      'clearAttribution',
+    ] as SignOutStepName[]) {
+      expect(steps).not.toContain(step);
+    }
+  });
+
+  it('drops key material', () => {
+    expect(dropsKeyMaterial(steps)).toBe(true);
   });
 });
