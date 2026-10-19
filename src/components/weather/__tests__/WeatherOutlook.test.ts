@@ -51,6 +51,20 @@ describe('WeatherOutlook', () => {
     expect(cols[2]!.classes()).toContain('border-l');
   });
 
+  it('tiles is one line per day with no painted tile', () => {
+    const wrapper = mount(WeatherOutlook, { props: { days: DAYS, variant: 'tiles' } });
+    const rows = wrapper.findAll('.weather-outlook > div');
+    expect(rows).toHaveLength(3);
+    for (const r of rows) {
+      expect(r.classes()).toEqual(expect.arrayContaining(['flex', 'items-center']));
+      expect(r.classes()).not.toContain('flex-col');
+      expect(r.classes().some((c) => c.startsWith('bg-') || c.includes(':bg-'))).toBe(false);
+    }
+    for (const svg of wrapper.findAll('svg.weather-glyph')) {
+      expect(svg.classes()).not.toContain('weather-glyph-mono');
+    }
+  });
+
   it('renders nothing for an empty outlook', () => {
     const wrapper = mount(WeatherOutlook, { props: { days: [], variant: 'tiles' } });
     expect(wrapper.find('.weather-outlook').exists()).toBe(false);

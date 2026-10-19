@@ -1,9 +1,10 @@
 <script setup lang="ts">
 /**
- * The next few days of the forecast (#134, ADR-043), one shared row in three dresses:
+ * The next few days of the forecast (#134, ADR-043), one shared row in three dresses (`tiles` and
+ * `night` share one template branch driven by `ROW`; `inline` keeps its own):
  *
- * - `tiles`: the Nook desktop pill. One small tile per day on the raised pill, so the tiles
- *   step up to `surface-overlay` on dark.
+ * - `tiles`: the Nook desktop pill. One compact line per day (weekday, glyph, high, low) with
+ *   no painted background, so the raised pill needs no surface step on dark.
  * - `inline`: the wall weather card (Large). Three equal columns under a hairline, divided by
  *   hairlines, glyph + high + low on one line under the day.
  * - `night`: the wall night screen. One dim row, every glyph `mono`, the first day labelled
@@ -28,6 +29,32 @@ const props = defineProps<{
 
 const { t } = useTranslation();
 
+/**
+ * The two one-line-per-day dresses, as complete class strings so Tailwind's scanner sees every
+ * utility. `tiles` carries the dark partners; `night` has none on purpose (see the doc above).
+ */
+const ROW = {
+  tiles: {
+    root: 'weather-outlook flex items-center gap-3.5',
+    day: 'flex items-center gap-1.5',
+    label: 'font-outfit text-secondary-400 dark:text-ink-soft text-xs leading-none font-bold',
+    high: 'font-outfit text-secondary-500 dark:text-ink text-sm leading-none font-bold tabular-nums',
+    low: 'font-inter text-secondary-400 dark:text-ink-faint text-xs leading-none font-medium tabular-nums',
+    glyph: 18,
+  },
+  night: {
+    root: 'weather-outlook flex gap-7 border-t border-[rgb(142_163_184/22%)] pt-3 text-[#8ea3b8]',
+    day: 'flex items-center gap-2 text-base',
+    label: 'font-outfit leading-none font-bold',
+    high: 'font-outfit leading-none font-bold tabular-nums',
+    low: 'font-inter leading-none font-medium tabular-nums',
+    glyph: 22,
+  },
+} as const;
+
+/** Index through a computed: inside the `!== 'inline'` branch the prop is still all three. */
+const row = computed(() => ROW[props.variant === 'night' ? 'night' : 'tiles']);
+
 /** The night row names its first day "Tomorrow"; the others keep their weekday. */
 const labels = computed(() =>
   props.days.map((day, i) =>
@@ -37,29 +64,12 @@ const labels = computed(() =>
 </script>
 
 <template>
-  <div
-    v-if="days.length && variant === 'tiles'"
-    class="weather-outlook flex gap-1.5"
-    data-variant="tiles"
-  >
-    <div
-      v-for="(day, i) in days"
-      :key="day.ymd"
-      class="bg-secondary-50 dark:bg-surface-overlay flex min-w-12 flex-col items-center gap-1 rounded-2xl px-1.5 py-1"
-    >
-      <span
-        class="font-outfit text-secondary-400 dark:text-ink-soft text-xs leading-none font-bold"
-        >{{ labels[i] }}</span
-      >
-      <WeatherGlyph :kind="day.glyph" :size="22" />
-      <span
-        class="font-outfit text-secondary-500 dark:text-ink text-sm leading-none font-bold tabular-nums"
-        >{{ day.high }}</span
-      >
-      <span
-        class="font-inter text-secondary-400 dark:text-ink-faint text-xs leading-none font-medium tabular-nums"
-        >{{ day.low }}</span
-      >
+  <div v-if="days.length && variant !== 'inline'" :class="row.root" :data-variant="variant">
+    <div v-for="(day, i) in days" :key="day.ymd" :class="row.day">
+      <span :class="row.label">{{ labels[i] }}</span>
+      <WeatherGlyph :kind="day.glyph" :size="row.glyph" :mono="variant === 'night'" />
+      <span :class="row.high">{{ day.high }}</span>
+      <span :class="row.low">{{ day.low }}</span>
     </div>
   </div>
 
@@ -88,19 +98,6 @@ const labels = computed(() =>
           >{{ day.low }}</span
         >
       </span>
-    </div>
-  </div>
-
-  <div
-    v-else-if="days.length && variant === 'night'"
-    class="weather-outlook flex gap-7 border-t border-[rgb(142_163_184/22%)] pt-3 text-[#8ea3b8]"
-    data-variant="night"
-  >
-    <div v-for="(day, i) in days" :key="day.ymd" class="flex items-center gap-2 text-base">
-      <span class="font-outfit leading-none font-bold">{{ labels[i] }}</span>
-      <WeatherGlyph :kind="day.glyph" :size="22" mono />
-      <span class="font-outfit leading-none font-bold tabular-nums">{{ day.high }}</span>
-      <span class="font-inter leading-none font-medium tabular-nums">{{ day.low }}</span>
     </div>
   </div>
 </template>

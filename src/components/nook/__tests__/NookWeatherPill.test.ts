@@ -53,6 +53,10 @@ describe('NookWeatherPill', () => {
     expect(wrapper.get('[data-testid="nook-weather-sub"]').text()).toBe('H 68° L 51°');
     expect(wrapper.findAll('.weather-outlook > div')).toHaveLength(3);
     expect(wrapper.text()).toContain('Sat');
+    const row = wrapper.get('.weather-outlook > div');
+    expect(row.classes()).toContain('items-center');
+    expect(row.classes()).not.toContain('flex-col');
+    expect(wrapper.get('.weather-outlook').html()).not.toContain('surface-overlay');
   });
 
   it('draws an aged temperature in the soft ink with its age under the condition', () => {

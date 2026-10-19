@@ -13,9 +13,8 @@
  * greeting row's `@3xl` container width (about a 1072px desktop window, and scaled with Large
  * reading mode since container queries resolve rem against the root) the outlook hides first.
  *
- * Dark: a raised card on the page, so the outlook tiles step up to `surface-overlay` (in
- * `WeatherOutlook`); every readable string is `ink` / `ink-soft` / `ink-faint`, and the nudge
- * link takes `accent-lift`.
+ * Dark: a raised card on the page; every readable string is `ink` / `ink-soft` / `ink-faint`,
+ * and the nudge link takes `accent-lift`.
  */
 import { computed } from 'vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
