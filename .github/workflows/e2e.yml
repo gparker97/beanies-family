@@ -52,7 +52,11 @@ jobs:
   e2e:
     name: E2E — ${{ matrix.browser }}
     needs: [browsers]
-    runs-on: ubuntu-latest
+    # Pinned, not ubuntu-latest: Playwright downloads a browser build per OS release, and when
+    # ubuntu-latest moved to 26.04 (2026-10-19) the cached WebKit (built for 24.04) could not
+    # load libicudata.so.74, failing every WebKit test at launch. Move this deliberately, with a
+    # Playwright version that supports the new image.
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -80,7 +84,9 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ matrix.browser }}-${{ steps.pw-version.outputs.version }}
+          # ImageOS (e.g. ubuntu24) in the key: a browser cached on one OS release must never be
+          # restored onto another, whose system libraries it was not built against.
+          key: playwright-${{ env.ImageOS }}-${{ matrix.browser }}-${{ steps.pw-version.outputs.version }}
 
       - name: Install Playwright browser
         run: npx playwright install --with-deps ${{ matrix.browser }}
