@@ -8103,8 +8103,8 @@ const STRING_DEFS = {
     beanie: 'every plan is half price, forever.',
   },
   'plan.cohort.page.preV1.note': {
-    en: '50% off applied, thanks for being an early beanie!',
-    beanie: '50% off applied, thanks for being an early beanie!',
+    en: 'Thanks for being an early beanie!',
+    beanie: 'thanks for being an early beanie!',
   },
   'plan.cohort.page.firstTen.lead': {
     en: "You're one of the first ten families, so it's",

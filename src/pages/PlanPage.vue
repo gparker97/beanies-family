@@ -71,6 +71,10 @@ const cohort = computed(() => entitlementStore.cohort);
 const basicPrice = computed(() => familyPrice(table.value, 'basic', 'year', cohort.value));
 const fullPrice = computed(() => familyPrice(table.value, 'full', interval.value, cohort.value));
 const fullMonthly = computed(() => familyPrice(table.value, 'full', 'month', cohort.value).price);
+// The handwritten thank-you beside each half price (the silk cohort line explains the discount).
+const priceNoteKey = computed(() =>
+  cohort.value === 'pre_v1' ? ('plan.cohort.page.preV1.note' as const) : undefined
+);
 
 const INTERVALS: PlanInterval[] = ['year', 'month'];
 const BASIC_BULLETS = [
@@ -490,16 +494,6 @@ watch(
         {{ cohortLine.tail }}
       </p>
 
-      <!-- The one Caveat accent on this page: the half price shown in the cards is already
-           applied, so say so warmly right above them. Real information, so not aria-hidden. -->
-      <p
-        v-if="cohort === 'pre_v1'"
-        data-testid="plan-early-note"
-        class="font-caveat text-primary-500 dark:text-accent-lift -mb-3 text-center text-xl leading-tight"
-      >
-        {{ t('plan.cohort.page.preV1.note') }}
-      </p>
-
       <div role="radiogroup" :aria-label="t('plan.select.aria')" class="grid gap-4 md:grid-cols-2">
         <PlanChoiceCard
           plan="basic"
@@ -509,6 +503,7 @@ watch(
           :price="basicPrice.price"
           :list="basicPrice.list"
           per-key="plan.per.year"
+          :note-key="priceNoteKey"
           :bullets="BASIC_BULLETS"
           @choose="choose"
         />
@@ -520,6 +515,7 @@ watch(
           :price="fullPrice.price"
           :list="fullPrice.list"
           :per-key="interval === 'month' ? 'plan.per.month' : 'plan.per.year'"
+          :note-key="priceNoteKey"
           :bullets="FULL_BULLETS"
           :vars="{ count: fullPerDay }"
           @choose="choose"

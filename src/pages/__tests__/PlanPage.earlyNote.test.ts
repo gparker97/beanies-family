@@ -1,6 +1,7 @@
 /**
- * PlanPage (#95): the handwritten "50% off applied" note shows only for the pre_v1 cohort,
- * whose half price the cards already show. List-price and first_ten families see nothing.
+ * PlanPage (#95): the handwritten early-adopter thank-you goes beside the price in both plan
+ * cards only for the pre_v1 cohort, whose half price the cards already show. List-price and
+ * first_ten families see nothing.
  *
  * `t` returns the key, so assertions name the copy that was chosen rather than its wording.
  */
@@ -78,23 +79,22 @@ describe('PlanPage early-adopter note', () => {
     store.cohort = null;
   });
 
-  it('shows the handwritten note for a pre_v1 family', () => {
+  const noteKeys = () =>
+    render()
+      .findAllComponents({ name: 'PlanChoiceCard' })
+      .map((c) => c.props('noteKey'));
+
+  it('passes the thank-you to both cards for a pre_v1 family', () => {
     store.cohort = 'pre_v1';
-    const note = render().find('[data-testid="plan-early-note"]');
-    expect(note.exists()).toBe(true);
-    expect(note.text()).toBe('plan.cohort.page.preV1.note');
-    expect(note.classes()).toEqual(
-      expect.arrayContaining(['font-caveat', 'text-primary-500', 'dark:text-accent-lift'])
-    );
-    expect(note.attributes('aria-hidden')).toBeUndefined();
+    expect(noteKeys()).toEqual(['plan.cohort.page.preV1.note', 'plan.cohort.page.preV1.note']);
   });
 
   it('shows nothing at list price', () => {
-    expect(render().find('[data-testid="plan-early-note"]').exists()).toBe(false);
+    expect(noteKeys()).toEqual([undefined, undefined]);
   });
 
   it('shows nothing for a first_ten family', () => {
     store.cohort = 'first_ten';
-    expect(render().find('[data-testid="plan-early-note"]').exists()).toBe(false);
+    expect(noteKeys()).toEqual([undefined, undefined]);
   });
 });

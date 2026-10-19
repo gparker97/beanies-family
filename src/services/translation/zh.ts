@@ -3588,7 +3588,7 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'plan.select.aria': '选择套餐',
   'plan.cohort.page.preV1.lead': '你的 Pod 在 v1 之前就加入了，所以',
   'plan.cohort.page.preV1.bold': '所有套餐永久半价。',
-  'plan.cohort.page.preV1.note': '已享五折优惠，感谢你成为早期的小豆豆！',
+  'plan.cohort.page.preV1.note': '感谢你成为早期的小豆豆！',
   'plan.cohort.page.firstTen.lead': '你是首批十个家庭之一，所以',
   'plan.cohort.page.firstTen.bold': '每月{price}，永久不变。',
   'plan.cohort.page.noCode': '无需优惠码，什么都不用做。',

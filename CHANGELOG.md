@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-10-20
+
+### Fixed
+
+- The early-adopter thank-you on the Plan page now sits beside the price in each plan card instead of hiding behind them.
+
 ## 2026-10-19
 
 ### Changed

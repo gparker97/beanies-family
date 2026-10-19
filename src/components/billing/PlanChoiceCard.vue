@@ -18,6 +18,9 @@ const props = defineProps<{
   price: string;
   list: string;
   perKey: UIStringKey;
+  /** A handwritten aside beside the price (the early-adopter thank-you); wraps under it when
+   *  the row is too narrow. Real information, so not aria-hidden. */
+  noteKey?: UIStringKey;
   bullets: readonly UIStringKey[];
   /** Placeholder values for the bullets (e.g. the live Full allowance `{count}`). */
   vars?: Record<string, unknown>;
@@ -61,7 +64,7 @@ function onKey(e: KeyboardEvent): void {
       {{ t(nameKey) }}
     </h2>
     <p class="text-secondary-400 dark:text-ink-soft mt-1 text-sm">{{ t(forKey) }}</p>
-    <p class="mt-4 flex items-baseline gap-2">
+    <p class="mt-4 flex flex-wrap items-baseline gap-x-2">
       <span
         class="font-outfit text-secondary-500 dark:text-ink text-4xl font-extrabold"
         :data-testid="`plan-${plan}-price`"
@@ -74,6 +77,13 @@ function onKey(e: KeyboardEvent): void {
         class="font-outfit text-secondary-300 dark:text-ink-faint text-base line-through"
       >
         {{ list }}
+      </span>
+      <span
+        v-if="noteKey"
+        :data-testid="`plan-${plan}-note`"
+        class="font-caveat text-primary-500 dark:text-accent-lift text-lg leading-tight"
+      >
+        {{ t(noteKey) }}
       </span>
     </p>
     <slot />
