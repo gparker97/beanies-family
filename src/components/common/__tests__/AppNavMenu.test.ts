@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { enableAutoUnmount, mount } from '@vue/test-utils';
 import { nextTick, reactive, ref } from 'vue';
 
 const mockRoute = reactive({ path: '/nook' });
@@ -31,6 +31,11 @@ import {
   useSidebarAccordion,
   __resetSidebarAccordionForTesting,
 } from '@/composables/useSidebarAccordion';
+
+// Every menu owns a route watcher that reveals the current section. A menu left mounted by an
+// earlier test would still react to `mockRoute.path` and re-open a section a later test just
+// collapsed (Vue 3.5.44's scheduler made that leak visible), so each test starts with none.
+enableAutoUnmount(afterEach);
 
 function mountMenu(hidePinned?: string[], groups?: 'all' | 'sections' | 'pinned') {
   return mount(AppNavMenu, { props: { density: 'sidebar', hidePinned, groups } });
