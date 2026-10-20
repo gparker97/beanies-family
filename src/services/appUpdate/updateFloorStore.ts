@@ -12,11 +12,11 @@
  *
  * ⚠️ CAPACITOR-FREE ON PURPOSE. The crypto layer imports this module through the gate,
  * so it must not drag `@capacitor/core` (or `versionPolicy.ts`) into that graph.
- * Mirrors `counterWritesPolicy.readPersisted/persist`.
+ * Mirrors `registry/dataPolicy.readPersisted/persist`.
  */
 import { STORAGE_KEYS } from '@/constants/storageKeys';
 import { logEvent } from '@/services/telemetry/logEvent';
-import { isComparableVersion } from '@/utils/compareAppVersions';
+import { compareAppVersions, isComparableVersion } from '@/utils/compareAppVersions';
 import { readStoredJson, removeStoredJson, writeStoredJson } from '@/utils/storedJson';
 
 const SURFACE = 'app-update';
@@ -63,4 +63,20 @@ export function persistUpdateFloor(v: string): void {
       error: written.error,
     });
   }
+}
+
+/**
+ * Is the persisted update floor at or above `since`? The one answer both the KDF write gate and
+ * the scalar-strings policy (`registry/dataPolicy.ts`) act on.
+ *
+ * ⚠️ FAIL CLOSED: no persisted floor, or a pair that cannot be compared (an unparseable `since`),
+ * is `'unknown'`. Callers treat anything but `'open'` as closed. Recomputed on every call and never
+ * persisted, so a stale floor only ever lags upward ("closed longer").
+ */
+export function floorVerdict(since: string): 'open' | 'closed' | 'unknown' {
+  const floor = readPersistedUpdateFloor();
+  if (floor === null) return 'unknown';
+  const order = compareAppVersions(floor, since);
+  if (order === null) return 'unknown';
+  return order >= 0 ? 'open' : 'closed';
 }

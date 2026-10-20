@@ -327,6 +327,8 @@ export const ALLOWED_CONTEXT_KEYS = new Set([
   'perf_op',
   'perf_duration_ms',
   'perf_doc_bytes',
+  'perf_doc_ops',
+  'perf_doc_changes',
   'perf_entity_count',
   // Native hardware-Keystore biometric backing enum (added 2026-07-14, #52 pivot).
   'key_backing',

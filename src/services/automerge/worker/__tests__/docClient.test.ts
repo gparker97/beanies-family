@@ -49,7 +49,7 @@ import {
   setCachePersistFailedHandler,
   receiveSignal,
   setFamilyKey,
-  applyCounterWritesPolicy,
+  applyDataPolicy,
   type DocWorkerLike,
 } from '../docClient';
 
@@ -1551,7 +1551,7 @@ describe('#100: cache release + the delete outcome', () => {
   });
 });
 
-describe('docClient — the served Counter-write policy (#117 writer flip)', () => {
+describe('docClient — the served data policy (#117 Counter writes, #124 scalar strings)', () => {
   beforeEach(() => {
     __resetDocClientForTesting();
     vi.clearAllMocks();
@@ -1561,29 +1561,72 @@ describe('docClient — the served Counter-write policy (#117 writer flip)', () 
   const acceptAll: Responder = (req) => ({ cid: req.cid, ok: true, result: null });
   const methods = (fw: FakeWorker | undefined) => fw?.posted.map((m) => m.method) ?? [];
   const policyPosts = (fw: FakeWorker | undefined) =>
-    fw?.posted.filter((m) => m.method === 'setCounterWrites').map((m) => m.args) ?? [];
+    fw?.posted.filter((m) => m.method === 'setDataPolicy').map((m) => m.args) ?? [];
   const policyFailures = () =>
-    vi.mocked(reportError).mock.calls.filter(([e]) => e.surface === 'counter-policy');
+    vi.mocked(reportError).mock.calls.filter(([e]) => e.surface === 'data-policy');
+
+  describe('doc-load (R8)', () => {
+    const stats = { ops: 1234, changes: 56, bytes: 7890, durationMs: 42.4 };
+    const docLoads = () =>
+      vi
+        .mocked(logEvent)
+        .mock.calls.map(([e]) => e)
+        .filter((e) => e.surface === 'doc-load');
+    const loadWith = async (docStats: unknown) => {
+      useWorkers([
+        (req) =>
+          req.method === 'initAndLoadCache'
+            ? { cid: req.cid, ok: true, result: { loaded: true, remoteBaseline: null, docStats } }
+            : acceptAll(req),
+      ]);
+      await initAndLoadCache('fam-1');
+    };
+
+    it('logs one unconditional event with the four perf keys, scalar=off by default', async () => {
+      await loadWith(stats);
+      expect(docLoads()).toEqual([
+        expect.objectContaining({
+          level: 'info',
+          message: 'doc loaded',
+          context: {
+            action: 'loaded',
+            perf_duration_ms: 42,
+            perf_doc_bytes: 7890,
+            perf_doc_ops: 1234,
+            perf_doc_changes: 56,
+            detail: 'scalar=off',
+            family_id: 'fam-1',
+          },
+        }),
+      ]);
+    });
+
+    it('reports scalar=on once the retained policy serves it', async () => {
+      await applyDataPolicy({ counterWrites: null, scalarWrites: true });
+      await loadWith(stats);
+      expect(docLoads()[0]!.context).toMatchObject({ detail: 'scalar=on' });
+    });
+
+    it('logs nothing when the open read no cache (no docStats)', async () => {
+      await loadWith(undefined);
+      expect(docLoads()).toHaveLength(0);
+    });
+  });
 
   it('retains the value and logs it, but never spawns a worker before a family key', async () => {
     const spawn = vi.fn(() => new FakeWorker());
     setWorkerFactory(spawn);
 
-    await applyCounterWritesPolicy(true, 'persisted');
+    await applyDataPolicy({ counterWrites: true, scalarWrites: null });
 
     expect(spawn).not.toHaveBeenCalled();
-    expect(logEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        level: 'info',
-        surface: 'counter-policy',
-        context: { action: 'applied', detail: 'on=true,source=persisted' },
-      })
-    );
+    // The per-flag `applied` log lives in registry/dataPolicy.ts, not here.
+    expect(logEvent).not.toHaveBeenCalled();
   });
 
   it('posts the retained value in setFamilyKey, after setActor and before setKey', async () => {
     const { created } = useWorkers([acceptAll]);
-    await applyCounterWritesPolicy(true, 'registry');
+    await applyDataPolicy({ counterWrites: true, scalarWrites: null });
 
     await setFamilyKey(await generateFamilyKey(), 'fam-1');
 
@@ -1592,9 +1635,9 @@ describe('docClient — the served Counter-write policy (#117 writer flip)', () 
     const order = methods(created[0]);
     const posts = policyPosts(created[0]);
     expect(posts.length).toBeGreaterThan(0);
-    expect(posts.every((a) => (a as { on: boolean }).on === true)).toBe(true);
+    expect(posts.every((a) => (a as { counterWrites: boolean }).counterWrites === true)).toBe(true);
     const actorAt = order.indexOf('setActor');
-    const policyAt = order.lastIndexOf('setCounterWrites');
+    const policyAt = order.lastIndexOf('setDataPolicy');
     expect(actorAt).toBeGreaterThan(-1);
     expect(actorAt).toBeLessThan(policyAt);
     expect(policyAt).toBeLessThan(order.lastIndexOf('setKey'));
@@ -1603,29 +1646,32 @@ describe('docClient — the served Counter-write policy (#117 writer flip)', () 
   it('posts null (the worker default) in setFamilyKey when no policy was ever served', async () => {
     const { created } = useWorkers([acceptAll]);
     await setFamilyKey(await generateFamilyKey(), 'fam-1');
-    expect(policyPosts(created[0])).toEqual([{ on: null }]);
+    expect(policyPosts(created[0])).toEqual([{ counterWrites: null, scalarWrites: null }]);
   });
 
   it('posts a change made while the session is live', async () => {
     const { created } = useWorkers([acceptAll]);
     await setFamilyKey(await generateFamilyKey(), 'fam-1');
 
-    await applyCounterWritesPolicy(true, 'registry');
+    await applyDataPolicy({ counterWrites: true, scalarWrites: null });
 
-    expect(policyPosts(created[0])).toEqual([{ on: null }, { on: true }]);
+    expect(policyPosts(created[0])).toEqual([
+      { counterWrites: null, scalarWrites: null },
+      { counterWrites: true, scalarWrites: null },
+    ]);
   });
 
   it('re-drives the retained value on a respawned worker, before its setKey', async () => {
     const { created } = useWorkers([acceptAll, acceptAll]);
-    await applyCounterWritesPolicy(false, 'persisted');
+    await applyDataPolicy({ counterWrites: false, scalarWrites: null });
     await setFamilyKey(await generateFamilyKey(), 'fam-1');
 
     created[0]!.onerror?.(new Error('reaped'));
     await getHeads();
 
     const order = methods(created[1]);
-    expect(policyPosts(created[1])).toEqual([{ on: false }]);
-    expect(order.indexOf('setCounterWrites')).toBeLessThan(order.indexOf('setKey'));
+    expect(policyPosts(created[1])).toEqual([{ counterWrites: false, scalarWrites: null }]);
+    expect(order.indexOf('setDataPolicy')).toBeLessThan(order.indexOf('setKey'));
   });
 
   it('re-drives the retained value on the inline fallback, before the key', async () => {
@@ -1638,22 +1684,25 @@ describe('docClient — the served Counter-write policy (#117 writer flip)', () 
       throw new Error('no workers here');
     });
     vi.spyOn(console, 'error').mockImplementation(() => {});
-    await applyCounterWritesPolicy(true, 'persisted');
+    await applyDataPolicy({ counterWrites: true, scalarWrites: null });
 
     await setFamilyKey(await generateFamilyKey(), 'fam-1');
 
     const order = calls.map((c) => c.method);
-    const first = order.indexOf('setCounterWrites');
+    const first = order.indexOf('setDataPolicy');
     expect(first).toBeGreaterThan(-1);
-    expect(calls.find((c) => c.method === 'setCounterWrites')?.args).toEqual({ on: true });
+    expect(calls.find((c) => c.method === 'setDataPolicy')?.args).toEqual({
+      counterWrites: true,
+      scalarWrites: null,
+    });
     expect(first).toBeLessThan(order.indexOf('setKey'));
     setInlineExecutor(null);
   });
 
-  it('a failed post is reported as a counter-policy warning and never rejects', async () => {
+  it('a failed post is reported as a data-policy warning and never rejects', async () => {
     useWorkers([
       (req) =>
-        req.method === 'setCounterWrites'
+        req.method === 'setDataPolicy'
           ? { cid: req.cid, ok: false, error: serializeError(new Error('worker said no')) }
           : acceptAll(req),
     ]);
@@ -1661,7 +1710,9 @@ describe('docClient — the served Counter-write policy (#117 writer flip)', () 
 
     // The pod still opens: the key reaches the worker even though the policy post failed.
     await expect(setFamilyKey(await generateFamilyKey(), 'fam-1')).resolves.toBeUndefined();
-    await expect(applyCounterWritesPolicy(true, 'registry')).resolves.toBeUndefined();
+    await expect(
+      applyDataPolicy({ counterWrites: true, scalarWrites: null })
+    ).resolves.toBeUndefined();
 
     const failures = policyFailures();
     expect(failures).toHaveLength(2);
@@ -1675,14 +1726,14 @@ describe('docClient — the served Counter-write policy (#117 writer flip)', () 
 
   it('a failed inline re-drive is reported, not swallowed', async () => {
     setInlineExecutor(async (method) => {
-      if (method === 'setCounterWrites') throw new Error('inline realm refused');
+      if (method === 'setDataPolicy') throw new Error('inline realm refused');
       return {};
     });
     setWorkerFactory(() => {
       throw new Error('no workers here');
     });
     vi.spyOn(console, 'error').mockImplementation(() => {});
-    await applyCounterWritesPolicy(true, 'persisted');
+    await applyDataPolicy({ counterWrites: true, scalarWrites: null });
 
     await setFamilyKey(await generateFamilyKey(), 'fam-1');
 
@@ -1692,7 +1743,16 @@ describe('docClient — the served Counter-write policy (#117 writer flip)', () 
     setInlineExecutor(null);
   });
 
+  it('posts both flags together in one setDataPolicy', async () => {
+    const { created } = useWorkers([acceptAll]);
+    await setFamilyKey(await generateFamilyKey(), 'fam-1');
+
+    await applyDataPolicy({ counterWrites: false, scalarWrites: true });
+
+    expect(policyPosts(created[0]).at(-1)).toEqual({ counterWrites: false, scalarWrites: true });
+  });
+
   it('is an idempotent state post, safe to replay after a respawn', () => {
-    expect(__RETRYABLE_METHODS_FOR_TESTING.has('setCounterWrites')).toBe(true);
+    expect(__RETRYABLE_METHODS_FOR_TESTING.has('setDataPolicy')).toBe(true);
   });
 });

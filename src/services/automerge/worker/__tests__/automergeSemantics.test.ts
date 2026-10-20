@@ -53,11 +53,23 @@
  *      the fold (`counterValue`), `toJS` and `save`/`load` unchanged; two concurrent puts at one
  *      key converge to ONE visible value with `getConflicts` listing both; and `.increment` on
  *      it throws, which is why a carry register is a plain integer and never a `Counter`.
+ *
+ * Structural strings as scalars (#124, plan `docs/plans/2026-10-20-scalar-strings-124.md`,
+ * Phase 1 spike; engine 3.5.0):
+ *  (q) a change proxy writes `new ImmutableString(s)` as ONE `str` op (a plain string is
+ *      `1 + length` ops) and reads it back as an `ImmutableString`, for a key write, a whole
+ *      entity assignment and `push`/`splice`; `from(toJS)` keeps `str` and text apart, a JSON
+ *      round trip does not; `str` vs text on one key is ordinary LWW; `structuredClone` makes a
+ *      bare `{ val }` the engine no longer recognises (the marker is the own symbol
+ *      `Symbol.for('_am_immutableString')`); `firstJsonDifference` is type-strict; and today's
+ *      `keyOf` could not match `str` ids (the old-client proof, an `it.fails` until Phase 2 R3).
  */
 import { createHash } from 'node:crypto';
 import { describe, it, expect } from 'vitest';
 import * as Automerge from '@automerge/automerge';
 import { foldIndex } from '../counterFields';
+import { reconcileInto, type ReconcileContext } from '../reconcile';
+import { firstJsonDifference } from '@/utils/firstJsonDifference';
 
 type AnyRecord = Record<string, unknown>;
 type Item = { id: string; name: string; done?: boolean };
@@ -520,4 +532,179 @@ describe('automerge semantics (p): a plain-integer carry register (writer flip g
     ).toThrow(TypeError);
     expect((doc.counterDeltas as unknown as AnyRecord)[REG]).toBe(5);
   });
+});
+
+// ─── #124: structural strings as ImmutableString scalars ────────────────────────
+
+describe('automerge semantics (q): ImmutableString (#124)', () => {
+  const Imm = Automerge.ImmutableString;
+  const isImm = Automerge.isImmutableString;
+  type ListItem = { id: unknown; title: string; done: boolean };
+  type ScalarDoc = {
+    m: AnyRecord;
+    tags: unknown[];
+    lists: Record<string, { id: unknown; title: string; items: ListItem[] }>;
+  };
+  const ops = (doc: Automerge.Doc<unknown>) => Automerge.stats(doc).numOps;
+  const scalarOrigin = () => Automerge.from<ScalarDoc>({ m: {}, tags: ['p'], lists: {} });
+  /** Apply `fn` in one change; return the doc and how many ops it wrote. The count is taken
+   *  BEFORE the change: `stats` on the superseded handle reads the shared, updated state. */
+  function write(doc: Automerge.Doc<ScalarDoc>, fn: (d: ScalarDoc) => void) {
+    const before = ops(doc);
+    const after = Automerge.change(doc, fn);
+    return { doc: after, delta: ops(after) - before };
+  }
+
+  it('a key write is ONE op and reads back as an ImmutableString; a plain string is 1 + n', () => {
+    const s = write(scalarOrigin(), (d) => {
+      d.m.k = new Imm('2026-10-20');
+    });
+    expect(s.delta).toBe(1);
+    expect(isImm(s.doc.m.k)).toBe(true);
+    expect(String(s.doc.m.k)).toBe('2026-10-20');
+    const t = write(scalarOrigin(), (d) => {
+      d.m.k = '2026-10-20';
+    });
+    expect(t.delta).toBe(1 + '2026-10-20'.length); // makeText + one op per character
+    expect(t.doc.m.k).toBe('2026-10-20');
+  });
+
+  it('a whole nested entity assigned under a collection key keeps every str field', () => {
+    // makeMap, id, title 'x' (makeText + 1), makeList, item makeMap, item id, item title ''
+    // (makeText alone), done = 9. Each str is ONE op whatever its length.
+    const { doc, delta } = write(scalarOrigin(), (d) => {
+      d.lists.L1 = {
+        id: new Imm('L1'),
+        title: 'x',
+        items: [{ id: new Imm('a'), title: '', done: false }],
+      };
+    });
+    expect(delta).toBe(9);
+    expect(isImm(doc.lists.L1!.id)).toBe(true);
+    expect(isImm(doc.lists.L1!.items[0]!.id)).toBe(true);
+    expect(doc.lists.L1!.title).toBe('x');
+  });
+
+  it('push and splice into an existing list write ONE op per str element', () => {
+    const pushed = write(scalarOrigin(), (d) => {
+      d.tags.push(new Imm('q'));
+    });
+    expect(pushed.delta).toBe(1);
+    const spliced = write(pushed.doc, (d) => {
+      d.tags.splice(1, 0, new Imm('r'));
+    });
+    expect(spliced.delta).toBe(1);
+    expect(spliced.doc.tags.map((v) => isImm(v))).toEqual([false, true, true]);
+    expect(spliced.doc.tags.map(String)).toEqual(['p', 'r', 'q']);
+  });
+
+  it('from(toJS) preserves str and text exactly; a JSON round trip turns str into text', () => {
+    const { doc } = write(scalarOrigin(), (d) => {
+      d.m.s = new Imm('abc');
+      d.m.t = 'abc';
+    });
+    const js = Automerge.toJS(doc) as ScalarDoc;
+    expect(isImm(js.m.s)).toBe(true);
+    const kept = Automerge.from(js);
+    expect(isImm(kept.m.s)).toBe(true);
+    expect(kept.m.t).toBe('abc');
+    const json = Automerge.from(plain(js));
+    expect(json.m.s).toBe('abc');
+    expect(isImm(json.m.s)).toBe(false);
+    expect(ops(json) - ops(kept)).toBe('abc'.length); // str 1 op became text 1 + 3
+  });
+
+  it('a text write and a str write to one key converge to ONE value, the other in getConflicts', () => {
+    const { a, b } = fork(scalarOrigin());
+    const text = Automerge.change(a, (d) => {
+      d.m.k = 'from-text';
+    });
+    const scalar = Automerge.change(b, (d) => {
+      d.m.k = new Imm('from-str');
+    });
+    const merged = converge(text, scalar);
+    const shown = merged.m.k;
+    expect(['from-text', 'from-str']).toContain(String(shown));
+    // The visible value keeps its own form (the str winner reads back as an ImmutableString).
+    expect(isImm(shown)).toBe(String(shown) === 'from-str');
+    // `getConflicts` lists both, but as PLAIN strings: it erases the str form (3.5.0).
+    const all = Object.values(Automerge.getConflicts(merged.m, 'k') ?? {});
+    expect(all.sort()).toEqual(['from-str', 'from-text']);
+  });
+
+  it('structuredClone drops the marker; the marker is the own symbol _am_immutableString', () => {
+    const v = new Imm('x');
+    const cloned: unknown = structuredClone(v);
+    expect(cloned).toEqual({ val: 'x' });
+    expect(isImm(cloned)).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(v, Symbol.for('_am_immutableString'))).toBe(true);
+    expect(Object.keys(v)).toEqual(['val']);
+  });
+
+  it('firstJsonDifference: two equal ImmutableStrings match; a string vs an ImmutableString does not', () => {
+    expect(firstJsonDifference(new Imm('a'), new Imm('a'))).toBeNull();
+    expect(firstJsonDifference('a', new Imm('a'))).not.toBeNull();
+  });
+
+  // The old-client proof. A doc whose `items[].id` are `str`, patched the way main patches it
+  // (`base`/`next` are projections, so their ids are plain strings). The assertions are the
+  // CORRECT outcome; the text row proves they hold for text, the str row proved the pre-R3
+  // `keyOf` (`typeof item.id === 'string'`) broke them. Observed on 3.5.0 before Phase 2: the tick
+  // falls back to a whole-array write with `reconcile_verify_failed`, and the additive write
+  // inserts every item again (2 -> 5). Phase 2 R3 flipped both from `it.fails` to `it`.
+  type IdForm = 'text' | 'str';
+  function listDoc(form: IdForm) {
+    const id = (s: string): unknown => (form === 'str' ? new Imm(s) : s);
+    return Automerge.from<ScalarDoc>({
+      m: {},
+      tags: [],
+      lists: {
+        L1: {
+          id: id('L1'),
+          title: 'groceries',
+          items: [
+            { id: id('a'), title: 'milk', done: false },
+            { id: id('b'), title: 'eggs', done: false },
+          ],
+        },
+      },
+    });
+  }
+  /** Reconcile `items` towards `next` from `base`, exactly as a `patch` op does per key. */
+  function patchItems(
+    doc: Automerge.Doc<ScalarDoc>,
+    next: ListItem[],
+    base: ListItem[] | undefined
+  ) {
+    const ctx: ReconcileContext = { writes: 0, notes: [] };
+    const { doc: after, delta } = write(doc, (d) => {
+      reconcileInto(d.lists.L1 as unknown as AnyRecord, 'items', next, base, ctx);
+    });
+    return { items: after.lists.L1!.items, delta, ctx };
+  }
+  const baseOf = (doc: Automerge.Doc<ScalarDoc>) => plain(Automerge.toJS(doc).lists.L1!.items);
+
+  function expectTickMatched(form: IdForm) {
+    const doc = listDoc(form);
+    const base = baseOf(doc);
+    const next = base.map((it, i) => (i === 0 ? { ...it, done: true } : it));
+    const { items, delta, ctx } = patchItems(doc, next, base);
+    expect(ctx.notes).toEqual([]);
+    expect(delta).toBe(1); // one fine-grained `done` write, no whole-array fallback
+    expect(items.map((it) => it.done)).toEqual([true, false]);
+    expect(items.every((it) => isImm(it.id))).toBe(form === 'str'); // ids untouched
+  }
+  function expectAdditiveMatched(form: IdForm) {
+    const doc = listDoc(form);
+    const next = [...baseOf(doc), { id: 'c', title: 'bread', done: false }];
+    const { items } = patchItems(doc, next, undefined);
+    expect(items.map((it) => String(it.id))).toEqual(['a', 'b', 'c']);
+  }
+
+  it('control: text ids, a tick patch matches the keyed items', () => expectTickMatched('text'));
+  it('control: text ids, an additive patch inserts only the new item', () =>
+    expectAdditiveMatched('text'));
+  // Failed before Phase 2 R3 (`keyOf` read `typeof item.id`); passes now it compares `str(item.id)`.
+  it('str ids: a tick patch matches the keyed items', () => expectTickMatched('str'));
+  it('str ids: an additive patch inserts only the new item', () => expectAdditiveMatched('str'));
 });

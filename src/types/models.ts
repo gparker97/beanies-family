@@ -2519,10 +2519,12 @@ export interface RegistryEntry {
   /**
    * #117: the served data-layer policy, set by Terraform `counter_writes_enabled` through the
    * registry Lambda's env (never stored in the row). `counterWrites` turns Counter adjustments
-   * on for every device. Absent from a Lambda older than the writer flip; the client then keeps
-   * its last persisted value (`counterWritesPolicy.ts`).
+   * on for every device; `scalarWrites` (#124, `scalar_writes_enabled`) lets the worker write
+   * structural strings as scalars once the update floor allows it. Absent from a Lambda older
+   * than the flag (`scalarWrites` is optional for that reason); the client then keeps its last
+   * persisted value (`registry/dataPolicy.ts`).
    */
-  dataPolicy?: { counterWrites: boolean };
+  dataPolicy?: { counterWrites: boolean; scalarWrites?: boolean };
   updatedAt: ISODateString;
 }
 

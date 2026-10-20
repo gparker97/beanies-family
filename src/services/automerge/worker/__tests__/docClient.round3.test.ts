@@ -597,7 +597,7 @@ describe("round 3, item 1: setKey carries the key's family", () => {
   it('posts familyId with the key', async () => {
     const workers = useWorkers([
       (req) =>
-        req.method === 'setKey' || req.method === 'setActor' || req.method === 'setCounterWrites'
+        req.method === 'setKey' || req.method === 'setActor' || req.method === 'setDataPolicy'
           ? ok(req, null)
           : null,
     ]);

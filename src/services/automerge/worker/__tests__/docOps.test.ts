@@ -12,6 +12,7 @@ import {
   saveDoc,
   mergeDocs,
   applyMutation,
+  applyMutation as applyMutationTo,
   materializeCollection,
   buildFullProjection,
   projectionDeltasBetween,
@@ -40,6 +41,7 @@ import {
 import type { MutationOp, ProjectionDelta } from '../protocol';
 import { calculateExtraPayment } from '@/utils/loanPayment';
 import { apply, converge, fork, seeded } from './twoDevices';
+import { FORMS } from './strForms';
 
 type Doc = Automerge.Doc<FamilyDocument>;
 const base = (): Doc => migrateDoc(Automerge.init<FamilyDocument>());
@@ -621,147 +623,156 @@ describe('docOps — projection + named ops', () => {
   });
 });
 
-describe('docOps — core domain named ops (financial atomic RMW)', () => {
-  const goal = (extra: Record<string, unknown> = {}) => ({
-    id: 'g',
-    currentAmount: 50,
-    targetAmount: 100,
-    isCompleted: false,
-    updatedAt: '2026-01-01',
-    ...extra,
-  });
-
-  it('applyGoalContribution adds, and a top-level named op returns the echoed entity', () => {
-    const d = applyMutation(base(), {
-      op: 'set',
-      collection: 'goals',
+// #124 R3: both string forms. Every mutation first turns its input doc into `form`, so each op
+// reads the scalar values a scalar writer would have left (the loan lookup's id/type compares).
+describe.each(FORMS)(
+  'docOps — core domain named ops (financial atomic RMW) (%s)',
+  (_form, form) => {
+    const applyMutation = (doc: Doc, op: MutationOp) => applyMutationTo(form(doc), op);
+    const goal = (extra: Record<string, unknown> = {}) => ({
       id: 'g',
-      entity: goal(),
-    }).doc;
-    const { doc, result, delta } = applyMutation(d, {
-      op: 'named',
-      name: 'applyGoalContribution',
-      args: { id: 'g', delta: 30 },
+      currentAmount: 50,
+      targetAmount: 100,
+      isCompleted: false,
+      updatedAt: '2026-01-01',
+      ...extra,
     });
-    expect((result as { currentAmount: number }).currentAmount).toBe(80);
-    expect((result as { isCompleted: boolean }).isCompleted).toBe(false);
-    expect(delta).toMatchObject({ kind: 'upsert', collection: 'goals', id: 'g' });
-    expect(
-      (materializeCollection(doc, 'goals', foldIndex(doc))[0]![1] as { currentAmount: number })
-        .currentAmount
-    ).toBe(80);
-  });
 
-  it('applyGoalContribution auto-completes at target and floors at 0', () => {
-    // Auto-complete: 50 → 110 ≥ target 100.
-    const d0 = applyMutation(base(), {
-      op: 'set',
-      collection: 'goals',
-      id: 'g',
-      entity: goal(),
-    }).doc;
-    const completed = applyMutation(d0, {
-      op: 'named',
-      name: 'applyGoalContribution',
-      args: { id: 'g', delta: 60 },
+    it('applyGoalContribution adds, and a top-level named op returns the echoed entity', () => {
+      const d = applyMutation(base(), {
+        op: 'set',
+        collection: 'goals',
+        id: 'g',
+        entity: goal(),
+      }).doc;
+      const { doc, result, delta } = applyMutation(d, {
+        op: 'named',
+        name: 'applyGoalContribution',
+        args: { id: 'g', delta: 30 },
+      });
+      expect((result as { currentAmount: number }).currentAmount).toBe(80);
+      expect((result as { isCompleted: boolean }).isCompleted).toBe(false);
+      expect(delta).toMatchObject({ kind: 'upsert', collection: 'goals', id: 'g' });
+      expect(
+        (materializeCollection(doc, 'goals', foldIndex(doc))[0]![1] as { currentAmount: number })
+          .currentAmount
+      ).toBe(80);
     });
-    expect(completed.result as { currentAmount: number; isCompleted: boolean }).toMatchObject({
-      currentAmount: 110,
-      isCompleted: true,
-    });
-    // Floor (fresh doc — Automerge freezes a doc once changed): a big reversal
-    // cannot drive the amount negative.
-    const d1 = applyMutation(base(), {
-      op: 'set',
-      collection: 'goals',
-      id: 'g',
-      entity: goal(),
-    }).doc;
-    const floored = applyMutation(d1, {
-      op: 'named',
-      name: 'applyGoalContribution',
-      args: { id: 'g', delta: -500 },
-    }).doc;
-    expect(
-      (
-        materializeCollection(floored, 'goals', foldIndex(floored))[0]![1] as {
-          currentAmount: number;
-        }
-      ).currentAmount
-    ).toBe(0);
-  });
 
-  it('applyLoanPayment amortizes an account-backed loan and reverse restores it', () => {
-    const acct = { id: 'acc', type: 'loan', balance: 1000, interestRate: 12, currency: 'USD' };
-    let d = applyMutation(base(), {
-      op: 'set',
-      collection: 'accounts',
-      id: 'acc',
-      entity: acct,
-    }).doc;
-    const pay = applyMutation(d, {
-      op: 'named',
-      name: 'applyLoanPayment',
-      args: { loanId: 'acc', paymentAmount: 100, isRecurring: true },
+    it('applyGoalContribution auto-completes at target and floors at 0', () => {
+      // Auto-complete: 50 → 110 ≥ target 100.
+      const d0 = applyMutation(base(), {
+        op: 'set',
+        collection: 'goals',
+        id: 'g',
+        entity: goal(),
+      }).doc;
+      const completed = applyMutation(d0, {
+        op: 'named',
+        name: 'applyGoalContribution',
+        args: { id: 'g', delta: 60 },
+      });
+      expect(completed.result as { currentAmount: number; isCompleted: boolean }).toMatchObject({
+        currentAmount: 110,
+        isCompleted: true,
+      });
+      // Floor (fresh doc — Automerge freezes a doc once changed): a big reversal
+      // cannot drive the amount negative.
+      const d1 = applyMutation(base(), {
+        op: 'set',
+        collection: 'goals',
+        id: 'g',
+        entity: goal(),
+      }).doc;
+      const floored = applyMutation(d1, {
+        op: 'named',
+        name: 'applyGoalContribution',
+        args: { id: 'g', delta: -500 },
+      }).doc;
+      expect(
+        (
+          materializeCollection(floored, 'goals', foldIndex(floored))[0]![1] as {
+            currentAmount: number;
+          }
+        ).currentAmount
+      ).toBe(0);
     });
-    // monthlyRate 0.01 → interest 10, principal 90, newBalance 910
-    expect(pay.result).toMatchObject({
-      applied: true,
-      hostCollection: 'accounts',
-      interestPortion: 10,
-      principalPortion: 90,
-    });
-    d = pay.doc;
-    expect(
-      (materializeCollection(d, 'accounts', foldIndex(d))[0]![1] as { balance: number }).balance
-    ).toBe(910);
 
-    const rev = applyMutation(d, {
-      op: 'named',
-      name: 'reverseLoanPayment',
-      args: { loanId: 'acc', principalToRestore: 90 },
-    });
-    expect(
-      (materializeCollection(rev.doc, 'accounts', foldIndex(rev.doc))[0]![1] as { balance: number })
-        .balance
-    ).toBe(1000);
-  });
+    it('applyLoanPayment amortizes an account-backed loan and reverse restores it', () => {
+      const acct = { id: 'acc', type: 'loan', balance: 1000, interestRate: 12, currency: 'USD' };
+      let d = applyMutation(base(), {
+        op: 'set',
+        collection: 'accounts',
+        id: 'acc',
+        entity: acct,
+      }).doc;
+      const pay = applyMutation(d, {
+        op: 'named',
+        name: 'applyLoanPayment',
+        args: { loanId: 'acc', paymentAmount: 100, isRecurring: true },
+      });
+      // monthlyRate 0.01 → interest 10, principal 90, newBalance 910
+      expect(pay.result).toMatchObject({
+        applied: true,
+        hostCollection: 'accounts',
+        interestPortion: 10,
+        principalPortion: 90,
+      });
+      d = pay.doc;
+      expect(
+        (materializeCollection(d, 'accounts', foldIndex(d))[0]![1] as { balance: number }).balance
+      ).toBe(910);
 
-  it('applyLoanPayment writes the NESTED asset-loan balance (extra payment)', () => {
-    const asset = {
-      id: 'ast',
-      name: 'Car',
-      currency: 'USD',
-      loan: { hasLoan: true, outstandingBalance: 5000, interestRate: 6, monthlyPayment: 200 },
-    };
-    const d = applyMutation(base(), {
-      op: 'set',
-      collection: 'assets',
-      id: 'ast',
-      entity: asset,
-    }).doc;
-    const { doc, result } = applyMutation(d, {
-      op: 'named',
-      name: 'applyLoanPayment',
-      args: { loanId: 'ast', paymentAmount: 200, isRecurring: false },
+      const rev = applyMutation(d, {
+        op: 'named',
+        name: 'reverseLoanPayment',
+        args: { loanId: 'acc', principalToRestore: 90 },
+      });
+      expect(
+        (
+          materializeCollection(rev.doc, 'accounts', foldIndex(rev.doc))[0]![1] as {
+            balance: number;
+          }
+        ).balance
+      ).toBe(1000);
     });
-    expect((result as { principalPortion: number }).principalPortion).toBe(200);
-    const host = materializeCollection(doc, 'assets', foldIndex(doc))[0]![1] as {
-      loan: { outstandingBalance: number };
-    };
-    expect(host.loan.outstandingBalance).toBe(4800);
-  });
 
-  it('applyLoanPayment on an unknown/paid-off loan is a no-op (applied:false)', () => {
-    const { result, delta } = applyMutation(base(), {
-      op: 'named',
-      name: 'applyLoanPayment',
-      args: { loanId: 'missing', paymentAmount: 100, isRecurring: true },
+    it('applyLoanPayment writes the NESTED asset-loan balance (extra payment)', () => {
+      const asset = {
+        id: 'ast',
+        name: 'Car',
+        currency: 'USD',
+        loan: { hasLoan: true, outstandingBalance: 5000, interestRate: 6, monthlyPayment: 200 },
+      };
+      const d = applyMutation(base(), {
+        op: 'set',
+        collection: 'assets',
+        id: 'ast',
+        entity: asset,
+      }).doc;
+      const { doc, result } = applyMutation(d, {
+        op: 'named',
+        name: 'applyLoanPayment',
+        args: { loanId: 'ast', paymentAmount: 200, isRecurring: false },
+      });
+      expect((result as { principalPortion: number }).principalPortion).toBe(200);
+      const host = materializeCollection(doc, 'assets', foldIndex(doc))[0]![1] as {
+        loan: { outstandingBalance: number };
+      };
+      expect(host.loan.outstandingBalance).toBe(4800);
     });
-    expect(result).toEqual({ applied: false });
-    expect(delta).toEqual({ kind: 'multi', deltas: [] });
-  });
-});
+
+    it('applyLoanPayment on an unknown/paid-off loan is a no-op (applied:false)', () => {
+      const { result, delta } = applyMutation(base(), {
+        op: 'named',
+        name: 'applyLoanPayment',
+        args: { loanId: 'missing', paymentAmount: 100, isRecurring: true },
+      });
+      expect(result).toEqual({ applied: false });
+      expect(delta).toEqual({ kind: 'multi', deltas: [] });
+    });
+  }
+);
 
 // ─── #117 Phase 2: the relative writes behind `adjustField` ──────────────────
 //
@@ -780,7 +791,7 @@ describe('docOps — relative writes through adjustField (#117 Phase 2)', () => 
     updatedBy: 'member-1',
     ...(note ? { note } : {}),
   });
-  const goalDoc = (extra: Record<string, unknown> = {}): Doc =>
+  const textGoalDoc = (extra: Record<string, unknown> = {}): Doc =>
     seeded([
       {
         op: 'set',
@@ -789,7 +800,7 @@ describe('docOps — relative writes through adjustField (#117 Phase 2)', () => 
         entity: { id: 'g', currentAmount: 50, targetAmount: 100, isCompleted: false, ...extra },
       },
     ]);
-  const contribute = (doc: Doc, args: Record<string, unknown>) =>
+  const contributeTo = (doc: Doc, args: Record<string, unknown>) =>
     applyMutation(doc, { op: 'named', name: 'applyGoalContribution', args: { id: 'g', ...args } });
   const goalOf = (doc: Doc) =>
     materializeCollection(doc, 'goals', foldIndex(doc))[0]![1] as {
@@ -798,7 +809,14 @@ describe('docOps — relative writes through adjustField (#117 Phase 2)', () => 
       manualContributions?: Array<Record<string, unknown>>;
     };
 
-  describe('applyGoalContribution history args', () => {
+  // #124 R3: both string forms. The doc a contribution reads, and the one it returns, are in
+  // `form`, so the retry and undo id compares meet `str` entry ids in the str row.
+  describe.each(FORMS)('applyGoalContribution history args (%s)', (_form, form) => {
+    const goalDoc = (extra: Record<string, unknown> = {}): Doc => form(textGoalDoc(extra));
+    const contribute = (doc: Doc, args: Record<string, unknown>) => {
+      const r = contributeTo(doc, args);
+      return { ...r, doc: form(r.doc) };
+    };
     it('appends the entry in the same change, creating the array when absent', () => {
       const r = contribute(goalDoc(), { delta: 30, contribution: entry('c1', 30, 'birthday') });
       expect(r.result).toMatchObject({

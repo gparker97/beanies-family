@@ -180,6 +180,8 @@ export const ALLOWED_CONTEXT_KEYS = new Set<string>([
   'perf_op',
   'perf_duration_ms',
   'perf_doc_bytes',
+  'perf_doc_ops',
+  'perf_doc_changes',
   'perf_entity_count',
   // Local-durability cache-persist failure (surface `cache-persist`, see
   // services/sync/syncService.ts). PII-free: which cache operation failed

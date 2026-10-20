@@ -185,7 +185,7 @@ export type RegistryLookup =
 
 /**
  * The observers of every successful registry GET. `entitlementStore` (#95)
- * reads the entitlement block and `counterWritesPolicy` (#117) reads
+ * reads the entitlement block and `dataPolicy.ts` (#117, #124) reads
  * `dataPolicy`, so both ride the lookups `syncStore` already makes (four call
  * sites, all funnelled through `lookupFamilyResult`) without `syncStore`
  * knowing either exists. The same inversion as `setLocalChangeHandler` in

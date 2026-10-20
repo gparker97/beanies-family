@@ -49,8 +49,12 @@
  *
  * INVARIANTS. Never `delete arr[i]` (on a plain array it leaves a hole, on the
  * proxy it removes: the two would diverge), only `splice`. Every value written
- * is a plain JSON copy, never a reference into `next` or the target.
+ * is `docValue(...)`: a plain JSON copy, never a reference into `next` or the
+ * target, with its structural strings minted as scalars when the #124 writer is on.
  */
+
+// Automerge-free (this module must stay pure), so importable here.
+import { docValue, isMapValue, str } from './scalarStrings';
 
 type AnyRecord = Record<string, unknown>;
 
@@ -94,6 +98,12 @@ export interface ReconcileContext {
 interface Scope {
   /** The field name used for `KEY_FIELDS` / `MERGE_FIELDS` lookups. */
   field: string;
+  /**
+   * The name of the map or array holding `parent[key]` (#124 `docValue`'s `container`): the
+   * entity's collection at the root, the parent field for a map key, the array's own field for
+   * an element. It classifies a string whose own key does not (`dismissedHintKeys.<hintKey>`).
+   */
+  container: string | undefined;
   /** May an object-vs-object pair recurse per key here? */
   mergeable: boolean;
   /** The top-level field, for notes. */
@@ -112,7 +122,7 @@ type Reconcile = (
 // ─── Equality and copies ─────────────────────────────────────────────────────
 
 function sortKeys(_key: string, value: unknown): unknown {
-  if (!isMap(value)) return value;
+  if (!isMapValue(value)) return value;
   const sorted: AnyRecord = {};
   for (const k of Object.keys(value).sort()) sorted[k] = value[k];
   return sorted;
@@ -128,15 +138,6 @@ export function canonicalEqual(a: unknown, b: unknown): boolean {
   return canonicalJson(a) === canonicalJson(b);
 }
 
-/** A plain JSON copy. JSON, not `structuredClone`: an Automerge proxy cannot be cloned. */
-function copy<T>(value: T): T {
-  return value === undefined ? value : (JSON.parse(JSON.stringify(value)) as T);
-}
-
-function isMap(value: unknown): value is AnyRecord {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-
 // ─── Identity ────────────────────────────────────────────────────────────────
 
 /**
@@ -146,10 +147,13 @@ function isMap(value: unknown): value is AnyRecord {
  * repeated primitives such as `['salt', 'salt']` are two distinct items.
  */
 function keyOf(field: string, item: unknown, occurrences: Map<string, number>): string {
-  if (isMap(item)) {
-    if (typeof item.id === 'string') return `id:${item.id}`;
-    const parts = KEY_FIELDS[field]?.map((f) => item[f]);
-    if (parts && parts.every((p) => typeof p === 'string')) return `k:${JSON.stringify(parts)}`;
+  if (isMapValue(item)) {
+    // `str`, never `typeof`: a doc written by the scalar writer holds `ImmutableString` ids,
+    // and `next`/`base` (projections) hold the same ids as plain strings (#124 R3).
+    const id = str(item.id);
+    if (id !== undefined) return `id:${id}`;
+    const parts = KEY_FIELDS[field]?.map((f) => str(item[f]));
+    if (parts && parts.every((p) => p !== undefined)) return `k:${JSON.stringify(parts)}`;
   }
   const value = `v:${canonicalJson(item)}`;
   const seen = occurrences.get(value) ?? 0;
@@ -186,7 +190,12 @@ function note(scope: Scope, action: ReconcileNote['action'], count: number): voi
 }
 
 function childScope(scope: Scope, field: string): Scope {
-  return { ...scope, field, mergeable: MERGE_FIELDS.has(field) };
+  return { ...scope, field, container: scope.field, mergeable: MERGE_FIELDS.has(field) };
+}
+
+/** The scope of an array's elements: same field, the array itself as the container. */
+function elementScopeOf(scope: Scope): Scope {
+  return { ...scope, container: scope.field, mergeable: true };
 }
 
 // ─── Normalising `next` ──────────────────────────────────────────────────────
@@ -202,8 +211,8 @@ function childScope(scope: Scope, field: string): Scope {
 function normalise(next: unknown, base: unknown, scope: Scope): unknown {
   if (Array.isArray(next))
     return normaliseList(next, Array.isArray(base) ? base : undefined, scope);
-  if (!scope.mergeable || !isMap(next)) return next;
-  const baseMap = isMap(base) ? base : undefined;
+  if (!scope.mergeable || !isMapValue(next)) return next;
+  const baseMap = isMapValue(base) ? base : undefined;
   const out: AnyRecord = {};
   for (const [k, v] of Object.entries(next))
     out[k] = normalise(v, baseMap?.[k], childScope(scope, k));
@@ -215,7 +224,7 @@ function normaliseList(next: unknown[], base: unknown[] | undefined, scope: Scop
   const baseKeys = base ? keysOf(scope.field, base) : [];
   const baseIndex = firstIndex(baseKeys);
   const baseRepeats = duplicated(baseKeys);
-  const elementScope = { ...scope, mergeable: true };
+  const elementScope = elementScopeOf(scope);
   const seen = new Set<string>();
   const out: unknown[] = [];
   let dropped = 0;
@@ -241,11 +250,11 @@ const reconcileValue: Reconcile = (parent, key, next, base, scope) => {
   if (Array.isArray(next) && Array.isArray(target)) {
     return reconcileList(target, next, Array.isArray(base) ? base : undefined, scope);
   }
-  if (scope.mergeable && isMap(next) && isMap(target)) {
-    return reconcileMap(target, next, isMap(base) ? base : undefined, scope);
+  if (scope.mergeable && isMapValue(next) && isMapValue(target)) {
+    return reconcileMap(target, next, isMapValue(base) ? base : undefined, scope);
   }
   if (canonicalEqual(next, target)) return;
-  parent[key] = copy(next);
+  parent[key] = docValue(key, next, scope.container);
   scope.ctx.writes++;
 };
 
@@ -296,17 +305,17 @@ function reconcileList(
   const baseIndex = base ? firstIndex(keysOf(scope.field, base)) : undefined;
   if (baseIndex) removeDropped(target, tKeys, baseIndex, new Set(nKeys), scope.ctx);
   const moves = plannedMoves(nKeys, baseIndex, new Set(tKeys));
-  const elementScope = { ...scope, mergeable: true };
+  const elementScope = elementScopeOf(scope);
   const slots = target as unknown as AnyRecord;
   let cursor = -1;
   nKeys.forEach((k, i) => {
     const at = tKeys.indexOf(k);
     if (at === -1 && baseIndex?.has(k)) return; // removed concurrently: not resurrected
     if (at === -1) {
-      cursor = insertAt(target, tKeys, cursor + 1, k, next[i], scope.ctx);
+      cursor = insertAt(target, tKeys, cursor + 1, k, next[i], scope);
       return;
     }
-    cursor = moves.has(k) ? moveAfter(target, tKeys, at, cursor, scope.ctx) : at;
+    cursor = moves.has(k) ? moveAfter(target, tKeys, at, cursor, scope) : at;
     reconcileValue(slots, cursor, next[i], base?.[baseIndex?.get(k) ?? -1], elementScope);
   });
 }
@@ -381,34 +390,40 @@ function lisMembers(seq: readonly number[]): Set<number> {
   return keep;
 }
 
+/** `scope` is the ARRAY's scope: an element is written under the array's field name. */
 function insertAt(
   target: unknown[],
   tKeys: string[],
   at: number,
   key: string,
   value: unknown,
-  ctx: ReconcileContext
+  scope: Scope
 ): number {
-  target.splice(at, 0, copy(value));
+  target.splice(at, 0, docValue(scope.field, value));
   tKeys.splice(at, 0, key);
-  ctx.writes++;
+  scope.ctx.writes++;
   return at;
 }
 
-/** Move the item at `from` to just after `cursor` (a copy, then splice). Returns its index. */
+/**
+ * Move the item at `from` to just after `cursor` (a copy, then splice). Returns its index.
+ * `insertAt` copies (and re-wraps, under the writer) again, so the form here does not matter.
+ * With the writer OFF a moved element's `str` fields (written by a peer whose writer is on)
+ * land as text again: the same thing any pre-#124 build does, and what the readers tolerate.
+ */
 function moveAfter(
   target: unknown[],
   tKeys: string[],
   from: number,
   cursor: number,
-  ctx: ReconcileContext
+  scope: Scope
 ): number {
   if (from === cursor + 1) return from;
-  const item = copy(target[from]);
+  const item: unknown = docValue(scope.field, target[from]);
   const [key] = tKeys.splice(from, 1);
   target.splice(from, 1);
   const to = from < cursor ? cursor : cursor + 1;
-  return insertAt(target, tKeys, to, key!, item, ctx);
+  return insertAt(target, tKeys, to, key!, item, scope);
 }
 
 // ─── Entry points ────────────────────────────────────────────────────────────
@@ -419,16 +434,23 @@ function reconcileWith(
   key: string,
   next: unknown,
   base: unknown,
-  ctx: ReconcileContext
+  ctx: ReconcileContext,
+  container: string | undefined
 ): void {
-  const scope: Scope = { field: key, mergeable: MERGE_FIELDS.has(key), kind: key, ctx };
+  const scope: Scope = {
+    field: key,
+    container,
+    mergeable: MERGE_FIELDS.has(key),
+    kind: key,
+    ctx,
+  };
   const targetWasBase = canonicalEqual(parent[key], base);
   const clean = normalise(next, base, scope);
   inner(parent, key, clean, base, scope);
   if (!targetWasBase || canonicalEqual(parent[key], clean)) return;
   // Law 1 failed: fall back to today's whole write, visibly.
   if (clean === undefined) delete parent[key];
-  else parent[key] = copy(clean);
+  else parent[key] = docValue(key, clean, container);
   ctx.writes++;
   note(scope, 'reconcile_verify_failed', 1);
 }
@@ -437,15 +459,18 @@ function reconcileWith(
  * Reconcile `parent[key]` towards `next`, given the `base` the caller built
  * `next` from (`undefined` = additive). Called once per top-level key of a
  * `patch` / `patchSettings`. Counts writes and pushes notes into `ctx`.
+ * `container` is the name `parent` sits under (the collection, or `'settings'`), the same
+ * name a whole-entity `docValue` write passes, so a `patch` and a `set` classify alike.
  */
 export function reconcileInto(
   parent: AnyRecord,
   key: string,
   next: unknown,
   base: unknown,
-  ctx: ReconcileContext
+  ctx: ReconcileContext,
+  container?: string
 ): void {
-  reconcileWith(reconcileValue, parent, key, next, base, ctx);
+  reconcileWith(reconcileValue, parent, key, next, base, ctx, container);
 }
 
 /**
@@ -457,11 +482,11 @@ export function reconcileInto(
 export function appendUnique(entity: AnyRecord, field: string, value: unknown): boolean {
   const list = entity[field];
   if (!Array.isArray(list)) {
-    entity[field] = [copy(value)];
+    entity[field] = [docValue(field, value)];
     return true;
   }
   if (list.some((item) => canonicalEqual(item, value))) return false;
-  list.push(copy(value));
+  list.push(docValue(field, value));
   return true;
 }
 
@@ -472,5 +497,6 @@ export function appendUnique(entity: AnyRecord, field: string, value: unknown): 
 export function __reconcileIntoWithForTesting(
   inner: (parent: AnyRecord, key: string | number, next: unknown, base: unknown) => void
 ): typeof reconcileInto {
-  return (parent, key, next, base, ctx) => reconcileWith(inner, parent, key, next, base, ctx);
+  return (parent, key, next, base, ctx, container) =>
+    reconcileWith(inner, parent, key, next, base, ctx, container);
 }

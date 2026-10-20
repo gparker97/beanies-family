@@ -26,6 +26,10 @@ import type { NamedOpHandler } from './docOps';
 import type { ProjectionDelta } from './protocol';
 // Pure (no Automerge import), so this file stays free of Automerge for `photoStore`.
 import { appendUnique } from './reconcile';
+// Pure too: the scalar-string read helper (#124 R3). `collect` yields RAW doc values, which may
+// be `ImmutableString`s; `str` unwraps them so `collectReferencedPhotoIds` returns plain strings
+// (a `{ val }` object would never match a photo id, and `gcOrphans` would delete every photo).
+import { str } from './scalarStrings';
 
 /** JSON round-trip to a plain, structured-clone-safe object (no Automerge dep). */
 function toPlain<T>(value: T): T {
@@ -77,7 +81,10 @@ export function flatHooks(collection: string): PhotoCollectionHooks {
       const entities = (doc as unknown as Record<string, FlatEntities>)[collection];
       if (!entities) return;
       for (const entity of Object.values(entities)) {
-        for (const pid of entity?.photoIds ?? []) yield pid;
+        for (const pid of entity?.photoIds ?? []) {
+          const id = str(pid);
+          if (id !== undefined) yield id;
+        }
       }
     },
   };
@@ -140,7 +147,7 @@ export const vacationPhotoHooks: PhotoCollectionHooks = {
     const vac = (doc.vacations ?? {})[vacationId];
     if (!vac) return; // vacation not in the doc yet (mid-wizard) — expected no-op
     for (const arr of vacationSegmentArrays(vac)) {
-      const seg = arr.find((s) => s.id === segmentId);
+      const seg = arr.find((s) => str(s.id) === segmentId);
       if (seg) {
         attachTo(seg, photoId);
         return;
@@ -153,7 +160,10 @@ export const vacationPhotoHooks: PhotoCollectionHooks = {
   *collect(doc) {
     const ids: UUID[] = [];
     forEachBookingSegment(doc, (seg) => {
-      for (const pid of seg.photoIds ?? []) ids.push(pid);
+      for (const pid of seg.photoIds ?? []) {
+        const id = str(pid);
+        if (id !== undefined) ids.push(id);
+      }
     });
     yield* ids;
   },
@@ -167,7 +177,8 @@ export const avatarPhotoHooks: PhotoCollectionHooks = {
   },
   *collect(doc) {
     for (const member of Object.values(doc.familyMembers ?? {})) {
-      if (member.avatarPhotoId) yield member.avatarPhotoId;
+      const id = str(member.avatarPhotoId);
+      if (id) yield id;
     }
   },
 };

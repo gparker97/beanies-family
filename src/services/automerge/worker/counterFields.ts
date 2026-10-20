@@ -78,6 +78,7 @@ import type { CollectionName, FamilyDocument, COUNTER_COLLECTION_NAMES } from '@
 import { StaleBuildCounterError } from '@/types/sync';
 // Type-only (a cycle with `protocol.ts`'s type-only `CounterStats` import, erased both ways).
 import type { MutationOp } from './protocol';
+import { isMapValue, str } from './scalarStrings';
 
 type AnyRecord = Record<string, unknown>;
 type Doc = Automerge.Doc<FamilyDocument>;
@@ -199,7 +200,10 @@ const CURRENCY_DECIMALS: ReadonlyMap<string, number> = new Map(
  * carries, never at this.
  */
 export function decimalsFor(code: unknown): number {
-  const d = typeof code === 'string' ? CURRENCY_DECIMALS.get(code) : undefined;
+  // `str`: a currency written by the scalar writer is an `ImmutableString` (#124 R3). It reaches
+  // here from the live draft AND from the compaction source (`foldDoc`'s `toJS`).
+  const c = str(code);
+  const d = c === undefined ? undefined : CURRENCY_DECIMALS.get(c);
   return Math.min(MAX_COUNTER_DECIMALS, Math.max(MIN_COUNTER_DECIMALS, d ?? MIN_COUNTER_DECIMALS));
 }
 
@@ -211,8 +215,8 @@ export function decimalsFor(code: unknown): number {
 export function fieldDecimals(spec: CounterField, ...sources: unknown[]): number {
   for (const source of sources) {
     if (source === null || typeof source !== 'object') continue;
-    const code = (source as AnyRecord)[spec.currency[0]];
-    if (typeof code === 'string') return decimalsFor(code);
+    const code = str((source as AnyRecord)[spec.currency[0]]);
+    if (code !== undefined) return decimalsFor(code);
   }
   return decimalsFor(undefined);
 }
@@ -594,7 +598,7 @@ export function sigma(index: FoldIndex, collection: string, id: string, field: s
 function parentOf(obj: AnyRecord, abs: CounterField['abs']): AnyRecord | null {
   if (abs.length === 1) return obj;
   const p = obj[abs[0]];
-  return p !== null && typeof p === 'object' && !Array.isArray(p) ? (p as AnyRecord) : null;
+  return isMapValue(p) ? p : null;
 }
 
 const leafOf = (abs: CounterField['abs']): string => abs[abs.length - 1]!;

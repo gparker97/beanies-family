@@ -651,7 +651,7 @@ async function readCacheRows(
 export async function loadCachedDoc(
   familyKey: CryptoKey,
   familyId: string | null
-): Promise<({ doc: Doc } & CacheReplay) | null> {
+): Promise<({ doc: Doc; baseBytes: number } & CacheReplay) | null> {
   const db = requireHandle();
 
   // ONE transaction for base + increments (2026-10-15 torn-read fix): decrypt and
@@ -679,7 +679,7 @@ export async function loadCachedDoc(
     doc: Doc,
     applied: Map<string, Uint8Array[]>,
     skipped: string[]
-  ): Promise<{ doc: Doc } & CacheReplay> => {
+  ): Promise<{ doc: Doc; baseBytes: number } & CacheReplay> => {
     const missing = Automerge.getMissingDeps(doc, []);
     const missingDeps = missing.length;
     const contained = new Set<string>();
@@ -709,6 +709,8 @@ export async function loadCachedDoc(
     const triage = await triageReplayRows(db, skipped, reportable);
     return {
       doc,
+      // DECRYPTED base length (never the base64 length): rides into `doc-load`'s perf_doc_bytes.
+      baseBytes: baseBinary.byteLength,
       recovered: skipped.length > 0 || missingDeps > 0,
       droppedIncrements: skipped.length,
       missingDeps,

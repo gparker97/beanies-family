@@ -56,6 +56,7 @@ import {
   getChangesSince as changesSince,
   applyChanges as applyChangesOp,
   decryptToDoc,
+  decodedSizeOf,
   materializeCollection,
   encryptDocPayload,
   buildFullProjection,
@@ -78,6 +79,7 @@ import {
   type CounterStats,
   type LedgerFigures,
 } from './counterFields';
+import { docValue, setScalarMint, type ScalarMint } from './scalarStrings';
 import * as cache from './cache';
 import type { RemoteBaselineRow } from '@/services/sync/remoteBaseline';
 import type {
@@ -93,6 +95,7 @@ import type {
   DispatchReply,
   CacheReplay,
   InitAndLoadResult,
+  DocStats,
 } from './protocol';
 import { NoDocumentLoadedError, FENCE_GIVE_UP_MERGES } from './protocol';
 import { canonicalEqual, type ReconcileNote } from './reconcile';
@@ -1003,7 +1006,9 @@ export async function initAndLoadCache(id: string): Promise<InitAndLoadResult> {
     throw new CacheInitError('open', openStageLoss(), name);
   }
   const key = requireKey('initAndLoadCache');
-  let loaded: ({ doc: Doc } & CacheReplay) | null;
+  let loaded: ({ doc: Doc; baseBytes: number } & CacheReplay) | null;
+  let loadStart = 0;
+  let loadMs = 0;
   const bookkeepingFailed: string[] = [];
   // Round 3: the missing-deps fence is not forever. Rows still waiting after
   // FENCE_GIVE_UP_MERGES sessions that merged a remote and still missed their deps will not get
@@ -1011,7 +1016,9 @@ export async function initAndLoadCache(id: string): Promise<InitAndLoadResult> {
   // rewritten. Main logs the decision.
   let fenceGaveUp = false;
   try {
+    loadStart = performance.now();
     loaded = await time2('automerge.cacheLoad', () => cache.loadCachedDoc(key, id));
+    loadMs = performance.now() - loadStart;
     if (loaded && (await fenceShouldGiveUp(loaded.missingDeps))) {
       // `Automerge.save` KEEPS a buffered change, so a base written from this document would
       // carry the missing deps into every later open. Rebuild it from its applied history only,
@@ -1050,6 +1057,9 @@ export async function initAndLoadCache(id: string): Promise<InitAndLoadResult> {
     }
     return { loaded: false, remoteBaseline: null };
   }
+  // R8: sampled on every open (`stats` measured < 0.01 ms). Before `migrateDoc`, which consumes
+  // the handle.
+  const docStats = docStatsOf(loaded.doc, loaded.baseBytes, loadMs);
   const replay: CacheReplay = {
     recovered: loaded.recovered,
     droppedIncrements: loaded.droppedIncrements,
@@ -1109,6 +1119,7 @@ export async function initAndLoadCache(id: string): Promise<InitAndLoadResult> {
     return {
       loaded: true,
       remoteBaseline: null,
+      docStats,
       replay: {
         ...replay,
         lineageStale: true,
@@ -1140,7 +1151,7 @@ export async function initAndLoadCache(id: string): Promise<InitAndLoadResult> {
     pushDeltas(projectionDeltasBetween(doc, localHeads, merged.heads) ?? buildFullProjection(doc));
     schedulePersist();
     scheduleSnapshotPersist();
-    return { loaded: true, remoteBaseline: await baselineFor(), replay };
+    return { loaded: true, remoteBaseline: await baselineFor(), replay, docStats };
   }
 
   // Capture the reconstructed heads BEFORE migrate (which consumes the handle). A
@@ -1188,7 +1199,7 @@ export async function initAndLoadCache(id: string): Promise<InitAndLoadResult> {
     perf_entity_count: countEntities(doc),
   });
   scheduleSnapshotPersist(); // refresh the fast-paint snapshot from the authoritative load
-  return { loaded: true, remoteBaseline: await baselineFor(), replay };
+  return { loaded: true, remoteBaseline: await baselineFor(), replay, docStats };
 }
 
 /** `doc` without the changes it buffered for missing deps: its applied history, re-applied. */
@@ -1614,7 +1625,7 @@ function carryRemovedMembers(
   let carried = 0;
   for (const [id, rec] of Object.entries(prior)) {
     if (tombstones[id] === undefined) {
-      tombstones[id] = rec;
+      tombstones[id] = docValue('removedMembers', rec);
       carried++;
     }
   }
@@ -1651,9 +1662,17 @@ export async function mergeRemoteEnvelope(
   // dropped by a consumer's stale annotation.
 ): Promise<MergeOutcome> {
   const key = requireKey('mergeRemoteEnvelope');
+  const remoteStart = performance.now();
   const remote = await time2('automerge.remoteLoad', () => decryptToDoc(envelope, key), {
     perf_doc_bytes: envelope.encryptedPayload.length,
   });
+  // R8: the installed remote's size, sampled before any migrate consumes the handle. Reported
+  // only on `adopted`/`rebased`; `decodedSizeOf` is the decrypted length to within two bytes.
+  const remoteDocStats = docStatsOf(
+    remote,
+    decodedSizeOf(envelope.encryptedPayload) ?? 0,
+    performance.now() - remoteStart
+  );
   // ⚠️ THE LINEAGE GUARD. THIS IS THE ONLY PLACE IT RUNS, AND IT RUNS HERE
   // BECAUSE THIS IS THE ONLY PLACE BOTH DOCUMENTS EXIST.
   //
@@ -1876,6 +1895,7 @@ export async function mergeRemoteEnvelope(
         });
         return {
           action: 'rebased',
+          docStats: remoteDocStats,
           heads,
           // The replay moved us past the bytes Drive holds, so the caller's
           // existing `if (dirty)` publishes the peer's work onto the new lineage.
@@ -1985,6 +2005,7 @@ export async function mergeRemoteEnvelope(
     // is exactly as before.
     return {
       action: 'adopted',
+      docStats: remoteDocStats,
       heads,
       dirty: !headsEqual(remoteHeads, heads),
       changed: true,
@@ -2462,6 +2483,17 @@ export function exportSnapshot(): { binary: Uint8Array } {
 
 // ─── Dispatch (single method→handler map; shared by worker loop + inline) ────
 
+/** The one Automerge-bound line of the scalar writer (#124): installed at `setDataPolicy` dispatch. */
+const mintImmutableString: ScalarMint = (s) => new Automerge.ImmutableString(s);
+
+/** A `setDataPolicy` flag: only `boolean | null` is valid; anything else is treated as `null`. */
+function policyFlag(name: string, v: unknown): boolean | null {
+  if (v === null || v === undefined) return null;
+  if (typeof v === 'boolean') return v;
+  console.warn(`[worker] setDataPolicy.${name} is not boolean|null; treating as null`, v);
+  return null;
+}
+
 /** Route one RPC method to its handler. Returns the `{result, delta}` envelope
  * (delta only for `mutate`). Used by BOTH `docWorker` (over the async-FIFO) and
  * the inline fallback executor — one dispatch table, no drift. */
@@ -2481,8 +2513,9 @@ export async function dispatch(method: string, args: unknown): Promise<DispatchR
     case 'setActor':
       setActor((a.actor as string | null) ?? null);
       return {};
-    case 'setCounterWrites':
-      setCounterWrites((a.on as boolean | null) ?? null);
+    case 'setDataPolicy':
+      setCounterWrites(policyFlag('counterWrites', a.counterWrites));
+      setScalarMint(policyFlag('scalarWrites', a.scalarWrites) ? mintImmutableString : null);
       return {};
     case 'initDoc':
       return { result: initDoc() };
@@ -2553,6 +2586,12 @@ export async function dispatch(method: string, args: unknown): Promise<DispatchR
 }
 
 // ─── Async timing helper (kept below the sync `time` for readability) ────────
+
+/** R8: the facts `doc-load` and the `pod-lineage` outcome report; one `Automerge.stats` call. */
+function docStatsOf(doc: Doc, bytes: number, durationMs: number): DocStats {
+  const st = Automerge.stats(doc);
+  return { ops: st.numOps, changes: st.numChanges, bytes, durationMs };
+}
 
 async function time2<T>(label: string, fn: () => Promise<T>, ctx?: PerfCtx): Promise<T> {
   const start = performance.now();

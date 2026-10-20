@@ -81,6 +81,7 @@ import {
   type ReconcileContext,
   type ReconcileNote,
 } from './reconcile';
+import { docValue, isMapValue, stampUpdatedAt, str } from './scalarStrings';
 
 type Doc = Automerge.Doc<FamilyDocument>;
 type AnyRecord = Record<string, unknown>;
@@ -724,17 +725,20 @@ function baseFor(opBase: AnyRecord | undefined, target: AnyRecord, k: string): u
 /**
  * The one per-key loop behind `patch` and `patchSettings`: reconcile every key of `patch`
  * into `target`, then clear `deleteKeys`. A clear counts as a write only when the key is
- * there (Automerge stores no `undefined`, so `=== undefined` is "absent").
+ * there (Automerge stores no `undefined`, so `=== undefined` is "absent"). `container` is the
+ * name `target` sits under (the collection, or `'settings'`): the same name the whole-value
+ * `docValue` write of that target passes, so a patch and a set classify strings alike (#124).
  */
 function reconcileFields(
   target: AnyRecord,
   patch: AnyRecord,
   opBase: AnyRecord | undefined,
   deleteKeys: readonly string[],
-  ctx: ReconcileContext
+  ctx: ReconcileContext,
+  container: string
 ): void {
   for (const [k, v] of Object.entries(patch)) {
-    reconcileInto(target, k, v, baseFor(opBase, target, k), ctx);
+    reconcileInto(target, k, v, baseFor(opBase, target, k), ctx, container);
   }
   for (const k of deleteKeys) {
     if (target[k] === undefined) continue;
@@ -779,7 +783,7 @@ interface GoalContributionArgs {
 const isNonEmptyString = (v: unknown): v is string => typeof v === 'string' && v !== '';
 
 function isContributionEntry(v: unknown): v is GoalManualContribution {
-  if (!isPlainObject(v)) return false;
+  if (!isMapValue(v)) return false;
   return (
     isNonEmptyString(v.id) &&
     typeof v.amount === 'number' &&
@@ -853,13 +857,14 @@ const applyGoalContributionOp: NamedOpHandler = (draft, rawArgs, { writerId }) =
     const d = entityDelta(draft, 'goals', id, index);
     return { result: d.kind === 'upsert' ? d.entity : undefined, deltas: [d] };
   };
-  if (contribution && goal.manualContributions?.some((c) => c.id === contribution.id)) {
+  // `str(c.id)`: the stored entry's id may be an `ImmutableString` (#124 R3); the args are plain.
+  if (contribution && goal.manualContributions?.some((c) => str(c.id) === contribution.id)) {
     return echo();
   }
   const undoAt =
     undoContributionId === undefined
       ? -1
-      : (goal.manualContributions?.findIndex((c) => c.id === undoContributionId) ?? -1);
+      : (goal.manualContributions?.findIndex((c) => str(c.id) === undoContributionId) ?? -1);
   if (undoContributionId !== undefined && undoAt < 0) return echo();
 
   const decimals = fieldDecimals(resolveField('goals', 'currentAmount'), goal);
@@ -893,15 +898,16 @@ const applyGoalContributionOp: NamedOpHandler = (draft, rawArgs, { writerId }) =
       // mistake has no business in the document.
       ...(contribution.note !== undefined ? { note: contribution.note } : {}),
     };
-    if (goal.manualContributions) goal.manualContributions.push(entry);
-    else goal.manualContributions = [entry];
+    if (goal.manualContributions) {
+      goal.manualContributions.push(docValue('manualContributions', entry));
+    } else goal.manualContributions = docValue('manualContributions', [entry]);
     changed = true;
   } else if (undoAt >= 0) {
     goal.manualContributions!.splice(undoAt, 1);
     changed = true;
   }
 
-  if (changed) goal.updatedAt = nowIso();
+  if (changed) stampUpdatedAt(goal, nowIso());
   return echo();
 };
 
@@ -935,7 +941,10 @@ function adjustLoanBalance(
   // C9c: `null` when nothing was written, so the handler reports `applied: false` and stamps
   // nothing, instead of moving the heads for a payment that changed no balance.
   if (!adjustField(draft, collection, loan.entityId, field, delta, writerId, index)) return null;
-  (draft[collection] as unknown as Record<string, AnyRecord>)[loan.entityId]!.updatedAt = nowIso();
+  stampUpdatedAt(
+    (draft[collection] as unknown as Record<string, AnyRecord>)[loan.entityId]!,
+    nowIso()
+  );
   const echo = entityDelta(draft, collection, loan.entityId, index);
   return { collection, entity: echo.kind === 'upsert' ? echo.entity : undefined, delta: echo };
 }
@@ -1017,7 +1026,7 @@ const reverseLoanPaymentOp: NamedOpHandler = (draft, args, { writerId }) => {
 /** Replace the settings singleton (`doc.settings` is `Settings | null`, not a
  * collection map — so `set`/`patch` don't fit). Emits a `settings` delta. */
 const setSettingsOp: NamedOpHandler = (draft, args) => {
-  (draft as unknown as AnyRecord).settings = args.settings;
+  (draft as unknown as AnyRecord).settings = docValue('settings', args.settings);
   const settings = toPlain(draft.settings ?? null);
   return { result: settings, deltas: [{ kind: 'settings', settings }] };
 };
@@ -1049,14 +1058,14 @@ const patchSettingsOp: NamedOpHandler = (draft, rawArgs) => {
   // existing object: that would reset real values. Defaults come in as an argument because this
   // runs in the worker, which must not import main-thread modules.
   if (!d.settings || typeof d.settings !== 'object') {
-    d.settings = { ...(args.defaults ?? {}) };
+    d.settings = docValue('settings', { ...(args.defaults ?? {}) });
     ctx.writes++;
   }
   const target = d.settings as AnyRecord; // re-read: the doc holds the proxy, not the literal
-  reconcileFields(target, args.patch ?? {}, args.base, args.deleteKeys ?? [], ctx);
+  reconcileFields(target, args.patch ?? {}, args.base, args.deleteKeys ?? [], ctx, 'settings');
   // Only on a write, matching `patch`: an all-unchanged save leaves the heads alone, so it
   // schedules no persist and no Drive save.
-  if (args.updatedAt && ctx.writes > 0) target.updatedAt = args.updatedAt;
+  if (args.updatedAt && ctx.writes > 0) stampUpdatedAt(target, args.updatedAt);
   const settings = toPlain(draft.settings ?? null);
   return {
     result: settings,
@@ -1109,7 +1118,7 @@ interface MutationSink {
  * fold of the stored raw value reads back as.
  */
 function unfoldSetEntity(draft: FamilyDocument, op: Extract<MutationOp, { op: 'set' }>): unknown {
-  if (!isCounterCollection(op.collection) || !isPlainObject(op.entity)) return op.entity;
+  if (!isCounterCollection(op.collection) || !isMapValue(op.entity)) return op.entity;
   const stored = (draft[op.collection] as AnyRecord | undefined)?.[op.id];
   return unfoldPatch(op.collection, op.id, op.entity, undefined, foldIndex(draft), stored).patch;
 }
@@ -1120,7 +1129,11 @@ function unfoldSetEntity(draft: FamilyDocument, op: Extract<MutationOp, { op: 's
 function mutateDraft(draft: FamilyDocument, op: MutationOp, sink: MutationSink): void {
   switch (op.op) {
     case 'set':
-      (draft[op.collection] as AnyRecord)[op.id] = unfoldSetEntity(draft, op);
+      // `docValue` copies: `deltaFor` echoes `op.entity`, which inline mode shares with main.
+      (draft[op.collection] as AnyRecord)[op.id] = docValue(
+        op.collection,
+        unfoldSetEntity(draft, op)
+      );
       break;
     case 'patch': {
       const col = draft[op.collection] as Record<string, AnyRecord>;
@@ -1141,7 +1154,7 @@ function mutateDraft(draft: FamilyDocument, op: MutationOp, sink: MutationSink):
       }
       // A programming error, never data to reconcile into: throw, so the worker's error path
       // surfaces it (toast + report on main) rather than the edit vanishing quietly.
-      if (!isPlainObject(entity)) {
+      if (!isMapValue(entity)) {
         throw new Error(`patch: ${op.collection}/${op.id} is not an object`);
       }
       // Fine-grained, three-way (#117, ADR-039): only what the caller changed relative to
@@ -1154,10 +1167,10 @@ function mutateDraft(draft: FamilyDocument, op: MutationOp, sink: MutationSink):
         op.base && isCounterCollection(op.collection)
           ? unfoldPatch(op.collection, op.id, op.patch, op.base, foldIndex(draft), entity)
           : op;
-      reconcileFields(entity, patch, base, op.deleteKeys ?? [], ctx);
+      reconcileFields(entity, patch, base, op.deleteKeys ?? [], ctx, op.collection);
       // Only on a write: an all-unchanged patch must leave the heads untouched so `mutate`
       // reports `changed: false` (no persist, no Drive save).
-      if (op.updatedAt && ctx.writes > 0) entity.updatedAt = op.updatedAt;
+      if (op.updatedAt && ctx.writes > 0) stampUpdatedAt(entity, op.updatedAt);
       sink.notes.push(...scopeNotes(op.collection, ctx.notes));
       break;
     }
@@ -1177,7 +1190,7 @@ function mutateDraft(draft: FamilyDocument, op: MutationOp, sink: MutationSink):
       // read-modify-write of the absolute with writes off; both in integer minor units.
       // C9c: stamp only on a real write, so a zero-delta adjustment leaves the heads alone.
       const wrote = adjustField(draft, op.collection, op.id, op.field, op.delta, sink.writerId);
-      if (wrote && op.updatedAt) entity.updatedAt = op.updatedAt;
+      if (wrote && op.updatedAt) stampUpdatedAt(entity, op.updatedAt);
       break;
     }
     case 'carry': {
@@ -1675,7 +1688,7 @@ function isKeyedArray(field: string, ...arrays: unknown[]): boolean {
       Array.isArray(arr) &&
       arr.every(
         (item) =>
-          isPlainObject(item) &&
+          isMapValue(item) &&
           (typeof item.id === 'string' ||
             (keys !== undefined && keys.every((f) => typeof item[f] === 'string')))
       )
@@ -1756,12 +1769,7 @@ function threeWayFields(
     // low-memory device this tier exists to spare is not what it asked for, and
     // a pathologically nested value should degrade to a conflict rather than a
     // deep walk.
-    if (
-      depth < MAX_MERGE_DEPTH &&
-      isPlainObject(a[key]) &&
-      isPlainObject(b[key]) &&
-      isPlainObject(t[key])
-    ) {
+    if (depth < MAX_MERGE_DEPTH && isMapValue(a[key]) && isMapValue(b[key]) && isMapValue(t[key])) {
       const inner = threeWayFields(a[key], b[key], t[key], depth + 1, subShift(shift, key));
       if (inner) {
         conflicts += inner.conflicts;
@@ -1887,10 +1895,6 @@ const MAX_MERGE_DEPTH = 2;
  * document model is pure JSON, so this is exact. */
 function same(x: unknown, y: unknown): boolean {
   return canonicalEqual(x, y);
-}
-
-function isPlainObject(v: unknown): v is AnyRecord {
-  return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
 /** Test-only: clear plugin ops but keep the core domain ops registered. */

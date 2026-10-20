@@ -5814,7 +5814,7 @@ export const useSyncStore = defineStore('sync', () => {
    *
    * ⚠️ THIS IS THE PER-SESSION REGISTRY READ, NOT ONLY A CANONICAL CHECK. Every
    * observer on `registryService` is fed by its lookup: `entitlementStore` (the
-   * plan) and `counterWritesPolicy` (the #117 Counter-write switch) rely on it for
+   * plan) and `dataPolicy` (the #117 Counter-write switch) rely on it for
    * EVERY provider, local included. Narrowing it to Drive families would silently
    * stop plan and Counter-policy delivery everywhere else.
    *

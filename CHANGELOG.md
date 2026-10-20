@@ -17,6 +17,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Changed
 
+- The family file now grows more slowly from each day's list ticks and edits, so it keeps opening quickly over the years.
 - The homepage's closing line is simpler: three months of everything free, then a link to what it costs after that.
 
 ## 2026-10-19

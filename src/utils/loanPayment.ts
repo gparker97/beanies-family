@@ -4,6 +4,8 @@
  */
 
 import type { Asset, Account, CurrencyCode } from '@/types/models';
+// Automerge-free (the worker's scalar-string read helper), so safe on main too.
+import { str } from '@/services/automerge/worker/scalarStrings';
 
 // ── Amortization ──────────────────────────────────────────────────────────────
 
@@ -90,33 +92,38 @@ export function findLoanDetails(
   assets: Asset[],
   accounts: Account[]
 ): LoanDetails | null {
+  // `str` on every compared and returned id/code (#124 R3): the worker hands this RAW draft rows,
+  // whose structural strings may be `ImmutableString`s. The result is always plain strings, in
+  // both realms (main passes store projections, where `str` is the identity).
   // Check assets first
-  const asset = assets.find((a) => a.id === loanId && a.loan?.hasLoan);
+  const asset = assets.find((a) => str(a.id) === loanId && a.loan?.hasLoan);
   if (asset && asset.loan) {
-    const linkedAccount = accounts.find((a) => a.linkedAssetId === loanId);
+    const linkedAccount = accounts.find((a) => str(a.linkedAssetId) === loanId);
     return {
       type: 'asset',
-      entityId: asset.id,
+      entityId: loanId,
       name: asset.name,
       outstandingBalance: asset.loan.outstandingBalance ?? 0,
       interestRate: asset.loan.interestRate ?? 0,
       monthlyPayment: asset.loan.monthlyPayment ?? 0,
-      currency: asset.currency as CurrencyCode,
-      linkedAccountId: linkedAccount?.id,
+      currency: str(asset.currency) as CurrencyCode,
+      linkedAccountId: str(linkedAccount?.id),
     };
   }
 
   // Check standalone loan accounts (exclude auto-linked accounts)
-  const account = accounts.find((a) => a.id === loanId && a.type === 'loan' && !a.linkedAssetId);
+  const account = accounts.find(
+    (a) => str(a.id) === loanId && str(a.type) === 'loan' && !str(a.linkedAssetId)
+  );
   if (account) {
     return {
       type: 'account',
-      entityId: account.id,
+      entityId: loanId,
       name: account.name,
       outstandingBalance: account.balance,
       interestRate: account.interestRate ?? 0,
       monthlyPayment: account.monthlyPayment ?? 0,
-      currency: account.currency as CurrencyCode,
+      currency: str(account.currency) as CurrencyCode,
     };
   }
 

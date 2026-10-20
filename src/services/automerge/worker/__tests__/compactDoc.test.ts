@@ -64,6 +64,7 @@ const {
   loadSnapshot,
 } = await import('../applyAndProject');
 const { migrateDoc } = await import('../docOps');
+const { asStrForm } = await import('./strForms');
 
 /** A document with real history: many changes, one entity per change. */
 function seedHistory(n: number) {
@@ -315,6 +316,54 @@ describe('compactDoc folds the Counters (#117 Phase 2)', () => {
       [firstKey!]: { v: -2025, s: 1 },
       [secondKey!]: { v: -500, s: 2 },
     });
+  });
+
+  // #124 R3: a pod some of whose structural strings are `str` (written after the flip) and some
+  // still text. The source keeps each value's form (`from(toJS)`), the REAL verify compares two
+  // `ImmutableString`s as equal, and the fold reads the `str` currency at its own scale.
+  it('a doc holding BOTH string forms compacts, keeps each form, and folds a str currency at its scale', () => {
+    initDoc();
+    mutate({
+      op: 'set',
+      collection: 'accounts',
+      id: 'A',
+      entity: { id: 'A', type: 'crypto', currency: 'BTC', balance: 0.5 },
+    });
+    mutate({
+      op: 'set',
+      collection: 'accounts',
+      id: 'B',
+      entity: { id: 'B', type: 'savings', currency: 'USD', balance: 10 },
+    });
+    mutate({ op: 'increment', collection: 'accounts', id: 'A', field: 'balance', delta: 0.00004 });
+    // Every scalar string as `str`, then B's back to text: one account in each form.
+    type Acct = { id: unknown; type: unknown; currency: unknown; balance: number };
+    const mixed = Automerge.change(
+      asStrForm(Automerge.load<{ accounts: Record<string, Acct> }>(exportSnapshot().binary)),
+      (d) => {
+        Object.assign(d.accounts.B!, { id: 'B', type: 'savings', currency: 'USD' });
+      }
+    );
+    loadSnapshot(Automerge.save(mixed));
+
+    // No hook path: the real verify runs on the mixed source.
+    expect(compactDoc().changesAfter).toBe(1);
+    const after = Automerge.load<{ accounts: Record<string, Acct> }>(exportSnapshot().binary);
+    const isStr = Automerge.isImmutableString;
+    expect(
+      [after.accounts.A!.id, after.accounts.A!.type, after.accounts.A!.currency].map(isStr)
+    ).toEqual([true, true, true]);
+    expect(
+      [after.accounts.B!.id, after.accounts.B!.type, after.accounts.B!.currency].map(isStr)
+    ).toEqual([false, false, false]);
+    expect(after.accounts.B!.currency).toBe('USD');
+    const doc = snapshot();
+    // Folded at eight decimals: at the two a missed `str` read gives, 0.50004 would be 0.5.
+    expect(doc.accounts.A!.balance).toBe(0.50004);
+    expect(doc.accounts.B!.balance).toBe(10);
+    expect(Object.keys(doc.foldedCounters ?? {})).toEqual([
+      expect.stringMatching(/^accounts\/A\/balance@8\//),
+    ]);
   });
 
   it("REFUSES a newer build's Counter field, keeping the old document, with its own class", () => {

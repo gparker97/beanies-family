@@ -21,8 +21,7 @@
  * Pure and synchronous: imports no store and no Capacitor.
  */
 import { KDF_PROFILES, LEGACY_ITERATIONS, recordedIterations } from './kdfParams';
-import { readPersistedUpdateFloor } from '@/services/appUpdate/updateFloorStore';
-import { compareAppVersions } from '@/utils/compareAppVersions';
+import { floorVerdict } from '@/services/appUpdate/updateFloorStore';
 import { KDF_READ_BOTH_SINCE } from '@/constants/appVersion';
 import { logEvent } from '@/services/telemetry/logEvent';
 
@@ -37,13 +36,7 @@ export function __resetKdfWriteGateForTesting(): void {
 }
 
 function evaluate(): GateDetail {
-  const floor = readPersistedUpdateFloor();
-  if (floor === null) return 'unknown';
-  // `null` (undecidable) is closed. `readPersistedUpdateFloor` already screens the
-  // floor, so reaching `null` here means the constant itself does not parse.
-  const order = compareAppVersions(floor, KDF_READ_BOTH_SINCE);
-  if (order === null) return 'unknown';
-  return order >= 0 ? 'open' : 'closed';
+  return floorVerdict(KDF_READ_BOTH_SINCE);
 }
 
 /**

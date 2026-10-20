@@ -53,6 +53,8 @@ import { parseBeanpodV4, tryUnwrapFamilyKey, reEncryptEnvelope } from '@/service
 import { decryptPayload, encryptPayload } from '@/services/crypto/familyKeyService';
 import { base64ToBuffer, bufferToBase64 } from '@/utils/encoding';
 import { loadAndVerify, nextLineage } from '@/services/automerge/worker/docOps';
+import { docValue, setScalarMint } from '@/services/automerge/worker/scalarStrings';
+import { COLLECTION_NAMES } from '@/types/automerge';
 import { PayloadTooLargeError } from '@/types/sync';
 
 const FILE = process.env.BEANPOD_FILE;
@@ -97,6 +99,31 @@ async function step<T>(name: string, hint: string, fn: () => T | Promise<T>): Pr
 }
 
 const mb = (bytes: number) => `${(bytes / 1_048_576).toFixed(2)}MB`;
+
+/**
+ * #124 R7: the op count of a history-free copy of `plain` with every structural string written
+ * the way the scalar writer writes it: each entity through `docValue(collection, entity)` and
+ * `settings` through `docValue('settings', …)`, exactly the calls the worker's choke points make,
+ * with the mint installed for the duration. The lineage stamp and the Counter maps are left as
+ * they are, as the writer leaves them.
+ */
+function scalarFormOps(plain: Record<string, unknown>): number {
+  setScalarMint((s) => new Automerge.ImmutableString(s));
+  try {
+    const wrapped: Record<string, unknown> = { ...plain };
+    for (const name of COLLECTION_NAMES) {
+      const col = plain[name] as Record<string, unknown> | undefined;
+      if (!col) continue;
+      wrapped[name] = Object.fromEntries(
+        Object.entries(col).map(([id, entity]) => [id, docValue(name, entity)])
+      );
+    }
+    if (plain.settings) wrapped.settings = docValue('settings', plain.settings);
+    return Automerge.stats(Automerge.from(wrapped)).numOps;
+  } finally {
+    setScalarMint(null);
+  }
+}
 
 describe.skipIf(!FILE || !PASSWORD)('beanpod profile — history vs data', () => {
   it('reports op count, full vs compacted size, load time and peak RSS', async () => {
@@ -219,6 +246,9 @@ describe.skipIf(!FILE || !PASSWORD)('beanpod profile — history vs data', () =>
     // the cast is to the shape `from` wants, not a claim about the data.
     const plain = Automerge.toJS(doc) as unknown as Record<string, unknown>;
     const compactedBytes = Automerge.save(Automerge.from(plain)).byteLength;
+    // #124: the same history-free copy, as text (today) and as the scalar writer would write it.
+    const compactedOps = Automerge.stats(Automerge.from(plain)).numOps;
+    const scalarOps = scalarFormOps(plain);
 
     // `process.stdout.write`, not `console.log`: under the happy-dom test
     // environment the DOM Console replaces the global and the report never
@@ -238,6 +268,10 @@ describe.skipIf(!FILE || !PASSWORD)('beanpod profile — history vs data', () =>
         `  save() full         ${mb(fullBytes)}`,
         `  save() compacted    ${mb(compactedBytes)}`,
         `  history multiple    ${(fullBytes / Math.max(compactedBytes, 1)).toFixed(1)}x`,
+        '',
+        `  ops from(plain)     ${compactedOps.toLocaleString()} (text, as written today)`,
+        `  ↳ scalar writer     ${scalarOps.toLocaleString()} ` +
+          `(${((scalarOps / Math.max(compactedOps, 1)) * 100).toFixed(0)}%, #124 docValue)`,
         '',
         `  load time           ${loadMs}ms`,
         `  RSS before load     ${mb(baselineRss)}`,

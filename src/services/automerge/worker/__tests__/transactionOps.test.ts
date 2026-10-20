@@ -8,6 +8,7 @@
  *  - two devices' cascades both land after a merge (writes on).
  */
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
+import * as Automerge from '@automerge/automerge';
 import type { CollectionName } from '@/types/automerge';
 import { applyMutation, materializeCollection, getHeads, getChangesSince } from '../docOps';
 import { foldIndex, setCounterWrites } from '../counterFields';
@@ -18,6 +19,7 @@ import {
 } from '../transactionOps';
 import type { MutationOp } from '../protocol';
 import { apply, converge, fork, seeded, type Doc } from './twoDevices';
+import { FORMS, asStrForm, type DocForm } from './strForms';
 
 type AnyRec = Record<string, unknown>;
 
@@ -70,7 +72,7 @@ const CAR_LOAN = {
   interestRate: 12,
 };
 
-const world = (): Doc =>
+const seedWorld = (): Doc =>
   seeded([
     set('accounts', CHECKING),
     set('accounts', SAVINGS),
@@ -102,12 +104,25 @@ const cascade = (args: TransactionCascadeArgs): MutationOp => ({
   args: args as unknown as Record<string, unknown>,
 });
 
-function run(
+function runCascade(
   doc: Doc,
   args: TransactionCascadeArgs
 ): { doc: Doc; result: TransactionCascadeResult } {
   const { doc: next, result } = applyMutation(doc, cascade(args));
   return { doc: next, result: result as TransactionCascadeResult };
+}
+
+const world = seedWorld;
+const run = runCascade;
+
+/**
+ * #124 R3: `world` and `run` in a string form. The world is seeded in `form`, and every cascade
+ * first turns its input doc into `form`, so each op reads what a scalar writer would have left
+ * (account `type`s, loan ids, rows' `balanceEffect`/`date`/`recurringItemId`). A doc already in
+ * the form comes back unchanged, so heads assertions hold in both rows.
+ */
+function inForm(form: DocForm): { world: () => Doc; run: typeof runCascade } {
+  return { world: () => form(seedWorld()), run: (doc, args) => runCascade(form(doc), args) };
 }
 
 /** What main would show for one entity: the folded projection. */
@@ -123,7 +138,8 @@ const tx = (doc: Doc, id = 't1'): AnyRec | undefined => shown(doc, 'transactions
 
 // ─── Create ──────────────────────────────────────────────────────────────────
 
-describe('create', () => {
+describe.each(FORMS)('create (%s)', (_form, form) => {
+  const { world, run } = inForm(form);
   it('a sub-minor-unit delta writes no adjustment and does not stamp the account', () => {
     const before = world();
     const stamp = shown(before, 'accounts', 'chk')!.updatedAt;
@@ -206,9 +222,11 @@ describe('create', () => {
 
   it('a retry of a committed create applies nothing twice', () => {
     const first = run(world(), { mode: 'create', transaction: row() as never });
-    const again = run(first.doc, { mode: 'create', transaction: row() as never });
+    // Settled into the row's form first, so the retry's own conversion is not a change.
+    const settled = form(first.doc);
+    const again = run(settled, { mode: 'create', transaction: row() as never });
     expect(balance(again.doc, 'chk')).toBe(900);
-    expect(getHeads(again.doc)).toEqual(getHeads(first.doc));
+    expect(getHeads(again.doc)).toEqual(getHeads(settled));
     expect(again.result.found).toBe(true);
   });
 
@@ -427,7 +445,8 @@ describe('update', () => {
 
 // ─── Delete ──────────────────────────────────────────────────────────────────
 
-describe('delete', () => {
+describe.each(FORMS)('delete (%s)', (_form, form) => {
+  const { world, run } = inForm(form);
   it('reverses the balance, the goal and the loan from the STORED portions, then deletes the row', () => {
     const created = run(world(), {
       mode: 'create',
@@ -574,7 +593,8 @@ describe('delete', () => {
   });
 
   it('a malformed dedup throws and commits nothing', () => {
-    const before = run(world(), { mode: 'create', transaction: row() as never }).doc;
+    // Settled into the form: an Automerge doc can be changed once, and `before` is reused.
+    const before = form(run(world(), { mode: 'create', transaction: row() as never }).doc);
     const del = (dedup: unknown) => () => run(before, { mode: 'delete', id: 't1', dedup } as never);
     expect(del(true)).toThrow(/survivorId/);
     expect(del({ survivorId: '' })).toThrow(/survivorId/);
@@ -590,9 +610,56 @@ describe('delete', () => {
   });
 });
 
+// #124 R3: one dedup group holding BOTH forms of a date-only `date`. `extractDatePart`'s
+// date-only short-circuit reads `.length`, which an `ImmutableString` lacks, so an unwrapped
+// `str` date fell through to `new Date(...)` and, west of UTC, to the previous local day: the
+// twins' instance keys disagreed and the first absolute twin's delete reversed the shared
+// movement (the second then reversed it again).
+describe('a mixed-form dedup group (#124 R3)', () => {
+  const tz = process.env.TZ;
+  beforeEach(() => {
+    process.env.TZ = 'America/Los_Angeles';
+  });
+  afterEach(() => {
+    process.env.TZ = tz;
+  });
+
+  it('keys a str twin and a text twin to the same instance, west of UTC', () => {
+    const { a: forkA, b: rest } = fork(world());
+    const { a: forkB, b: forkC } = fork(rest);
+    setCounterWrites(true);
+    const onA = run(forkA, {
+      mode: 'create',
+      transaction: row({ id: 'dup-a', recurringItemId: 'r1' }) as never,
+    }).doc;
+    setCounterWrites(false);
+    const onB = run(forkB, {
+      mode: 'create',
+      transaction: row({ id: 'dup-b', recurringItemId: 'r1' }) as never,
+    }).doc;
+    const onC = run(forkC, {
+      mode: 'create',
+      transaction: row({ id: 'dup-c', recurringItemId: 'r1' }) as never,
+    }).doc;
+    // Everything scalar as `str`, except dup-c's date, which an old build left as text.
+    const mixed = Automerge.change(asStrForm(converge(converge(onA, onB).a, onC).a), (d) => {
+      (d.transactions['dup-c'] as unknown as AnyRec).date = '2026-10-03';
+    });
+    expect(Automerge.isImmutableString(mixed.transactions['dup-b']!.date)).toBe(true);
+    expect(Automerge.isImmutableString(mixed.transactions['dup-c']!.date)).toBe(false);
+    const first = run(mixed, { mode: 'delete', id: 'dup-b', dedup: { survivorId: 'dup-a' } });
+    expect(first.result.reversed).toBe(false);
+    expect(balance(first.doc, 'chk')).toBe(800);
+    const last = run(first.doc, { mode: 'delete', id: 'dup-c', dedup: { survivorId: 'dup-a' } });
+    expect(last.result.reversed).toBe(true);
+    expect(balance(last.doc, 'chk')).toBe(900);
+  });
+});
+
 // ─── balanceEffect ───────────────────────────────────────────────────────────
 
-describe('balanceEffect (the per-pair dedup stamp)', () => {
+describe.each(FORMS)('balanceEffect (the per-pair dedup stamp) (%s)', (_form, form) => {
+  const { world, run } = inForm(form);
   const create = (extra: AnyRec = {}): Doc =>
     run(world(), { mode: 'create', transaction: row(extra) as never }).doc;
   const update = (doc: Doc, patch: AnyRec, deleteKeys?: string[]): Doc =>
@@ -658,7 +725,8 @@ describe('balanceEffect (the per-pair dedup stamp)', () => {
 
 // ─── Loan mirror ─────────────────────────────────────────────────────────────
 
-describe('asset loan mirror', () => {
+describe.each(FORMS)('asset loan mirror (%s)', (_form, form) => {
+  const { world, run } = inForm(form);
   const payment = (): TransactionCascadeArgs => ({
     mode: 'create',
     transaction: row({ amount: 500, loanId: 'house', recurringItemId: 'r1' }) as never,

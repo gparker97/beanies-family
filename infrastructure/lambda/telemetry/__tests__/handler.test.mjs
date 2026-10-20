@@ -838,6 +838,8 @@ describe('Telemetry Lambda handler', () => {
         'overwrote',
         'page_hidden_for_ms',
         'perf_doc_bytes',
+        'perf_doc_changes',
+        'perf_doc_ops',
         'perf_duration_ms',
         'perf_entity_count',
         'perf_op',

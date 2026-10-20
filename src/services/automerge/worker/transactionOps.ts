@@ -47,6 +47,7 @@ import {
 } from './counterFields';
 import { registerNamedOp, type NamedOpHandler } from './docOps';
 import { canonicalEqual } from './reconcile';
+import { docValue, isMapValue, stampUpdatedAt, str } from './scalarStrings';
 import type { ProjectionDelta } from './protocol';
 import { recurringInstanceKey } from '@/utils/recurringInstance';
 
@@ -144,14 +145,27 @@ function otherAbsoluteTwinRemains(
   survivorId: string,
   live: AnyRecord
 ): boolean {
-  const key = recurringInstanceKey(live as unknown as Transaction);
+  const key = instanceKeyOf(live);
   if (key === null) return false;
   for (const [id, row] of Object.entries(rows)) {
     if (id === liveId || id === survivorId) continue;
-    if (row.balanceEffect === 'counter') continue;
-    if (recurringInstanceKey(row as unknown as Transaction) === key) return true;
+    if (str(row.balanceEffect) === 'counter') continue;
+    if (instanceKeyOf(row) === key) return true;
   }
   return false;
+}
+
+/**
+ * `recurringInstanceKey` of a RAW draft row, its inputs unwrapped (#124 R3). An `ImmutableString`
+ * date has no `.length`, so `extractDatePart`'s date-only short-circuit would miss and the
+ * local-date branch could shift the day: the key would silently disagree with a plain row's.
+ */
+function instanceKeyOf(row: AnyRecord): string | null {
+  return recurringInstanceKey({
+    date: str(row.date) ?? '',
+    recurringDueDate: str(row.recurringDueDate),
+    recurringItemId: str(row.recurringItemId),
+  });
 }
 
 /** Owned by the cascade: computed here, never accepted from a patch. */
@@ -180,8 +194,6 @@ function toPlain<T>(value: T): T {
 
 const isNonEmptyString = (v: unknown): v is string => typeof v === 'string' && v !== '';
 const isFiniteNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
-const isPlainObject = (v: unknown): v is AnyRecord =>
-  typeof v === 'object' && v !== null && !Array.isArray(v);
 
 const TRANSACTION_TYPES = new Set(['income', 'expense', 'transfer', 'balance_adjustment']);
 
@@ -192,7 +204,7 @@ function parseArgs(args: Record<string, unknown>): TransactionCascadeArgs {
   const { mode } = args;
   if (mode === 'create') {
     const tx = args.transaction;
-    if (!isPlainObject(tx)) throw fail('`transaction` must be an object.');
+    if (!isMapValue(tx)) throw fail('`transaction` must be an object.');
     if (!isNonEmptyString(tx.id)) throw fail('`transaction.id` must be a non-empty string.');
     if (!isNonEmptyString(tx.accountId)) throw fail('`transaction.accountId` must be set.');
     if (!TRANSACTION_TYPES.has(tx.type as string)) throw fail('`transaction.type` is unknown.');
@@ -202,7 +214,7 @@ function parseArgs(args: Record<string, unknown>): TransactionCascadeArgs {
   if (mode === 'update') {
     const { id, patch, deleteKeys, updatedAt } = args;
     if (!isNonEmptyString(id)) throw fail('`id` must be a non-empty string.');
-    if (!isPlainObject(patch)) throw fail('`patch` must be an object.');
+    if (!isMapValue(patch)) throw fail('`patch` must be an object.');
     if (deleteKeys !== undefined && !Array.isArray(deleteKeys)) {
       throw fail('`deleteKeys` must be an array.');
     }
@@ -216,7 +228,7 @@ function parseArgs(args: Record<string, unknown>): TransactionCascadeArgs {
     const { id, dedup } = args;
     if (!isNonEmptyString(id)) throw fail('`id` must be a non-empty string.');
     if (dedup === undefined) return { mode, id };
-    if (!isPlainObject(dedup) || !isNonEmptyString(dedup.survivorId)) {
+    if (!isMapValue(dedup) || !isNonEmptyString(dedup.survivorId)) {
       throw fail('`dedup.survivorId` must be a non-empty string.');
     }
     if (dedup.survivorId === id) throw fail('`dedup.survivorId` must name the OTHER twin.');
@@ -281,7 +293,7 @@ class Cascade {
       return;
     }
     if (delta !== 0 && this.adjust('accounts', id, 'balance', delta)) {
-      account.updatedAt = this.now;
+      stampUpdatedAt(account, this.now);
     }
     this.touch('accounts', id);
   }
@@ -296,7 +308,9 @@ class Cascade {
     if (source) {
       this.adjustAccount(
         tx.accountId,
-        signedAccountDelta(tx.type, tx.amount, source.type, true) * direction
+        // `str`: the account row is RAW draft; its `type` may be an `ImmutableString` (#124 R3).
+        signedAccountDelta(tx.type, tx.amount, str(source.type) as Account['type'], true) *
+          direction
       );
     } else {
       this.skipped.push({ kind: 'account', id: tx.accountId });
@@ -307,7 +321,8 @@ class Cascade {
         const magnitude = tx.toAmount ?? tx.amount;
         this.adjustAccount(
           tx.toAccountId,
-          signedAccountDelta('transfer', magnitude, dest.type, false) * direction
+          signedAccountDelta('transfer', magnitude, str(dest.type) as Account['type'], false) *
+            direction
         );
       } else {
         this.skipped.push({ kind: 'account', id: tx.toAccountId });
@@ -345,7 +360,7 @@ class Cascade {
         goal.isCompleted = true;
         changed = true;
       }
-      if (changed) goal.updatedAt = this.now;
+      if (changed) stampUpdatedAt(goal, this.now);
     }
     this.touch('goals', goalId);
     return applied;
@@ -400,7 +415,7 @@ class Cascade {
       return;
     }
     if (delta !== 0 && this.adjust('assets', loan.entityId, 'loan.outstandingBalance', delta)) {
-      this.collection<AnyRecord>('assets')[loan.entityId]!.updatedAt = this.now;
+      stampUpdatedAt(this.collection<AnyRecord>('assets')[loan.entityId]!, this.now);
     }
     this.touch('assets', loan.entityId);
     if (loan.linkedAccountId) this.adjustAccount(loan.linkedAccountId, delta);
@@ -496,7 +511,7 @@ class Cascade {
 function writeDerived(target: AnyRecord, derived: Derived): void {
   for (const key of DERIVED_FIELDS) {
     const value = derived[key];
-    if (value !== undefined) target[key] = value;
+    if (value !== undefined) target[key] = docValue(key, value, 'transactions');
     else delete target[key];
   }
 }
@@ -508,7 +523,7 @@ function writePatch(live: AnyRecord, patch: AnyRecord, deleteKeys: readonly stri
   for (const [k, v] of Object.entries(patch)) {
     if (v === undefined) continue; // Automerge rejects `undefined`; clears travel in `deleteKeys`
     if (canonicalEqual(toPlain(live[k]), v)) continue;
-    live[k] = v;
+    live[k] = docValue(k, v, 'transactions');
     writes++;
   }
   for (const k of deleteKeys) {
@@ -554,7 +569,7 @@ const commitTransactionCascadeOp: NamedOpHandler = (draft, rawArgs, { writerId }
       const tx = { ...(args.transaction as unknown as AnyRecord) };
       for (const key of DERIVED_FIELDS) delete tx[key];
       writeDerived(tx, cascade.applyEffects(tx as unknown as Transaction));
-      rows[id] = tx;
+      rows[id] = docValue('transactions', tx);
       return finish(true, id);
     }
     case 'delete': {
@@ -576,8 +591,8 @@ const commitTransactionCascadeOp: NamedOpHandler = (draft, rawArgs, { writerId }
       // once however many absolute twins there were (review round 1: three twins over-reversed).
       const reverse =
         !args.dedup ||
-        live.balanceEffect === 'counter' ||
-        (survivor?.balanceEffect === 'counter' &&
+        str(live.balanceEffect) === 'counter' ||
+        (str(survivor?.balanceEffect) === 'counter' &&
           !otherAbsoluteTwinRemains(rows, args.id, args.dedup.survivorId, live));
       if (reverse) cascade.reverseEffects(toPlain(live) as unknown as Transaction);
       delete rows[args.id];
@@ -604,9 +619,9 @@ const commitTransactionCascadeOp: NamedOpHandler = (draft, rawArgs, { writerId }
         writePatch(live, patch, deleteKeys);
         const next = toPlain(live) as unknown as Transaction;
         writeDerived(live, cascade.applyEffects(next));
-        live.updatedAt = args.updatedAt;
+        stampUpdatedAt(live, args.updatedAt);
       } else if (writePatch(live, patch, deleteKeys) > 0) {
-        live.updatedAt = args.updatedAt;
+        stampUpdatedAt(live, args.updatedAt);
       }
       return finish(true, args.id);
     }

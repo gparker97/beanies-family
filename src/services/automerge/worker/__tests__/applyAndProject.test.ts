@@ -158,6 +158,33 @@ describe('worker/applyAndProject', () => {
     });
   });
 
+  it('a cache open returns docStats with positive ops/changes/bytes (R8)', async () => {
+    setKey(key);
+    await initAndLoadCache(FAMILY_ID);
+    initDoc();
+    mutate({ op: 'set', collection: 'accounts', id: 'a1', entity: { id: 'a1', balance: 7 } });
+    await flush();
+    await reset();
+    configure({
+      pushChunk: (delta, final) => chunks.push({ delta, final }),
+      perf: (label) => perf.push(label),
+      cachePersistFailed: () => {},
+      cacheReleased: () => {},
+    });
+    setKey(key);
+    const res = await initAndLoadCache(FAMILY_ID);
+    expect(res.loaded).toBe(true);
+    expect(res.docStats).toEqual({
+      ops: expect.any(Number),
+      changes: expect.any(Number),
+      bytes: expect.any(Number),
+      durationMs: expect.any(Number),
+    });
+    expect(res.docStats!.ops).toBeGreaterThan(0);
+    expect(res.docStats!.changes).toBeGreaterThan(0);
+    expect(res.docStats!.bytes).toBeGreaterThan(0);
+  });
+
   it('mutate returns { result, delta } and a flush persists the doc to cache', async () => {
     setKey(key);
     await initAndLoadCache(FAMILY_ID); // opens the DB; empty → loaded:false

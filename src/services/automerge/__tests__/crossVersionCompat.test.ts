@@ -159,4 +159,19 @@ describe('cross-version .beanpod compatibility (current engine <-> automerge-leg
     const headsOld = new Set(AmNew.getHeads(AmNew.load<FamilyDocument>(mergedOnOldBytes)));
     expect(headsOld).toEqual(headsNew);
   });
+
+  it('a str (ImmutableString) value written on new loads and reads on old (#124)', () => {
+    const doc = AmNew.change(seed(), (d) => {
+      (d.todos as unknown as Record<string, Record<string, unknown>>)['t1']!.status =
+        new AmNew.ImmutableString('open');
+    });
+    const onOld = AmOld.load<FamilyDocument>(saveDoc(doc));
+    const v = (onOld.todos as unknown as Record<string, Record<string, unknown>>)['t1']!.status;
+    // The legacy engine's own predicate recognises it, and it reads as the plain string.
+    expect(AmOld.isImmutableString(v)).toBe(true);
+    expect(String(v)).toBe('open');
+    expect((v as AmOld.ImmutableString).toJSON()).toBe('open');
+    // Back through the bytes, the projection (a JSON copy) is the plain string on both sides.
+    expect(projectBytes(AmOld.save(onOld))).toEqual(projectDoc(doc));
+  });
 });

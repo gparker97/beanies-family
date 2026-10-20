@@ -52,6 +52,7 @@ import {
   type GrowthKnowledge,
 } from '../counterFields';
 import { migrateDoc } from '../docOps';
+import { FORMS } from './strForms';
 
 type Doc = Automerge.Doc<FamilyDocument>;
 type AnyRec = Record<string, unknown>;
@@ -161,6 +162,62 @@ describe('decimalsFor / fieldDecimals: the scale is the currency minor unit', ()
     expect(fieldDecimals(spec, { balance: 1 }, { currency: 'BTC' })).toBe(8);
     expect(fieldDecimals(spec, { currency: 'XRP' }, { currency: 'BTC' })).toBe(6);
     expect(fieldDecimals(spec, undefined, null)).toBe(2);
+  });
+
+  // #124 R3: a currency the scalar writer wrote reads back as an `ImmutableString`, on the live
+  // draft and on the compaction source (`toJS`). A miss would key and fold at two decimals.
+  // (There is no 3-decimal currency in `CURRENCIES`; XRP's six is the non-crypto-8 case.)
+  it.each([
+    ['BTC', 8],
+    ['XRP', 6],
+    ['JPY', 2],
+    ['USD', 2],
+  ] as const)('a str currency %s reads at %i decimals, exactly as text', (code, d) => {
+    const spec = resolveField('accounts', 'balance');
+    const scalar = new Automerge.ImmutableString(code);
+    expect(decimalsFor(scalar)).toBe(d);
+    expect(decimalsFor(code)).toBe(d);
+    expect(fieldDecimals(spec, { currency: scalar })).toBe(d);
+    expect(fieldDecimals(spec, { balance: 1 }, { currency: scalar })).toBe(d);
+  });
+});
+
+describe.each(FORMS)('the currency scale on a doc in the %s form (#124 R3)', (_form, form) => {
+  /** `docWith`, turned into `form` BEFORE `edit` runs, so the edit reads the form's values. */
+  const formed = (edit: (d: FamilyDocument) => void): Doc =>
+    Automerge.change(form(docWith()), edit);
+  const xrp = (d: FamilyDocument) => {
+    (d.accounts as unknown as AnyRec).XRP = { id: 'XRP', balance: 2, currency: 'XRP' };
+  };
+
+  it('writes on: the key carries the entity currency scale', () => {
+    setCounterWrites(true);
+    const doc = Automerge.change(form(docWith(xrp)), (d) => {
+      adjustField(d, 'accounts', 'BTC', 'balance', 0.00004, W1);
+      adjustField(d, 'accounts', 'XRP', 'balance', 0.000001, W1);
+      adjustField(d, 'assets', 'L', 'loan.outstandingBalance', -10, W1);
+    });
+    expect(Object.keys(doc.counterDeltas).sort()).toEqual([
+      'accounts/BTC/balance@8/w1',
+      'accounts/XRP/balance@6/w1',
+      'assets/L/loan.outstandingBalance@2/w1',
+    ]);
+  });
+
+  it('writes off: a sub-cent BTC delta lands at eight decimals (two would round it to nothing)', () => {
+    setCounterWrites(false);
+    const doc = formed((d) => {
+      expect(adjustField(d, 'accounts', 'BTC', 'balance', 0.00004, W1)).toBe(true);
+    });
+    expect((doc.accounts.BTC as Account).balance).toBe(0.50004);
+  });
+
+  it('the compaction fold reads the str currency from the toJS source', () => {
+    setCounterWrites(true);
+    const written = docWith((d) => adjustField(d, 'accounts', 'BTC', 'balance', 0.00004, W1));
+    const source = foldDoc(form(written), 1);
+    expect((source.accounts.BTC as Account).balance).toBe(0.50004);
+    expect(source.foldedCounters).toEqual({ 'accounts/BTC/balance@8/w1': { v: 4000, s: 1 } });
   });
 });
 

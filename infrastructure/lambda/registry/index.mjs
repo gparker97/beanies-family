@@ -41,9 +41,12 @@ const EVENTS_TABLES = {
   dev: process.env.EVENTS_DEV_TABLE_NAME || process.env.EVENTS_TABLE_NAME,
 };
 const API_KEY = process.env.REGISTRY_API_KEY;
-// The served Counter-write policy (#117 writer flip). Terraform `counter_writes_enabled` sets it;
-// only the exact string "true" turns writes on, so an unset or mistyped value stays off.
-const COUNTER_WRITES = process.env.COUNTER_WRITES_ENABLED === 'true';
+// The served data policy (#117 Counter writes, #124 scalar strings). Terraform
+// `counter_writes_enabled` / `scalar_writes_enabled` set the env; only the exact string "true"
+// turns a flag on, so an unset or mistyped value stays off.
+const envFlag = (name) => process.env[name] === 'true';
+const COUNTER_WRITES = envFlag('COUNTER_WRITES_ENABLED');
+const SCALAR_WRITES = envFlag('SCALAR_WRITES_ENABLED');
 const ALLOWED_ORIGINS = (process.env.CORS_ORIGIN || 'https://beanies.family')
   .split(',')
   .map((o) => o.trim());
@@ -1502,7 +1505,11 @@ export async function handler(event) {
       // device-locally and hands it to the doc worker; it is never a row attribute.
       return response(
         200,
-        { ...publicRow, entitlement, dataPolicy: { counterWrites: COUNTER_WRITES } },
+        {
+          ...publicRow,
+          entitlement,
+          dataPolicy: { counterWrites: COUNTER_WRITES, scalarWrites: SCALAR_WRITES },
+        },
         event
       );
     }

@@ -116,8 +116,22 @@ export type LineageBasis =
  * consumer testing `replayed !== undefined` is asking "did a rebase happen?" —
  * which is why they are not defaulted to 0.
  */
+/**
+ * Size of a document as the worker found it on open or on a remote install (R8, `doc-load`).
+ * `bytes` is the DECRYPTED length (never base64), `ops`/`changes` come from `Automerge.stats`,
+ * `durationMs` is the decrypt + load time. Main logs it; the worker cannot telemeter.
+ */
+export interface DocStats {
+  ops: number;
+  changes: number;
+  bytes: number;
+  durationMs: number;
+}
+
 export interface MergeOutcome {
   action: 'merged' | 'adopted' | 'kept-local' | 'rebased';
+  /** Present on `adopted` and `rebased`: the installed remote's size (R8). */
+  docStats?: DocStats;
   heads: Heads;
   dirty: boolean;
   changed: boolean;
@@ -268,6 +282,8 @@ export interface InitAndLoadResult {
   loaded: boolean;
   remoteBaseline: RemoteBaselineRow | null;
   replay?: CacheReplay;
+  /** Present whenever a cache was read (not on a miss or the empty-cache reseed). */
+  docStats?: DocStats;
 }
 
 // ─── Mutation ops (main → worker; the `changeDoc` closures, made declarative) ─
@@ -362,11 +378,11 @@ export type PatchSettingsArgs = {
 // ─── Envelope ────────────────────────────────────────────────────────────────
 
 /**
- * `setCounterWrites` (#117 writer flip): the served Counter-write policy, retained by `docClient`
- * and re-posted with `setActor` at the same three sites. `null` means no policy has ever reached
- * this device, and the worker falls back to `COUNTER_WRITES_DEFAULT`.
+ * `setDataPolicy` (#117 Counter writes, #124 scalar strings): the served data policy, retained by
+ * `docClient` and re-posted with `setActor` at the same three sites. A `null` flag means no policy
+ * has ever reached this device for it; the worker falls back to `COUNTER_WRITES_DEFAULT` / no mint.
  */
-export type SetCounterWritesArgs = { on: boolean | null };
+export type SetDataPolicyArgs = { counterWrites: boolean | null; scalarWrites: boolean | null };
 
 /** A request from main → worker. `method` names the handler; `args` is its input. */
 export interface RpcRequest {

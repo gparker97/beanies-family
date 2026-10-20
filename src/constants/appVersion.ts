@@ -40,7 +40,7 @@
 // deliberately lags this constant: a normal release does not raise it. Raise it only
 // when there is a reason everyone should move.
 // See `docs/runbooks/native-store-submission.md` § 7. Raising the update floor.
-export const APP_VERSION = '1.0.2';
+export const APP_VERSION = '1.0.3';
 
 /**
  * The first build that READS every recorded KDF iteration count (ADR-041, #81).
@@ -60,3 +60,16 @@ export const APP_VERSION = '1.0.2';
  * for longer, and the release step (runbook § 7) is where it is set equal to APP_VERSION.
  */
 export const KDF_READ_BOTH_SINCE = '0.93';
+
+/**
+ * The first build whose worker reads scalar (`ImmutableString`) structural strings (#124).
+ *
+ * The scalar writer (`dataPolicy.scalarWrites`) opens on a device only once the update floor
+ * (`promptBelowVersion`) is at or above this version (`registry/dataPolicy.ts`, via
+ * `floorVerdict`). 1.0.3 is the #124 readers build; bump if the release ships under a
+ * different version.
+ *
+ * ⚠️ NEVER LOWER IT below the readers build: older clients mis-handle a doc holding scalar
+ * strings. `__tests__/appVersion.test.ts` pins the lower bound.
+ */
+export const SCALAR_READ_SINCE = '1.0.3';

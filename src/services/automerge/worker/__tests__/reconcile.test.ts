@@ -8,8 +8,13 @@
  * Everything runs on plain objects: the reconciler has no Automerge import, and
  * it removes with `splice` only, so plain arrays behave exactly like the proxy.
  * Merges through Automerge itself are covered by `docOps.test.ts`.
+ *
+ * #124 R3: the law and identity tables also run through an Automerge draft in both string
+ * forms (`text`, and `str` via `asStrForm`, where ids and `KEY_FIELDS` parts are
+ * `ImmutableString`s), asserting the same outcome as on plain objects (`RUNNERS`).
  */
 import { describe, it, expect } from 'vitest';
+import * as Automerge from '@automerge/automerge';
 import {
   reconcileInto,
   appendUnique,
@@ -19,6 +24,7 @@ import {
   __reconcileIntoWithForTesting,
   type ReconcileContext,
 } from '../reconcile';
+import { FORMS, type DocForm } from './strForms';
 
 type AnyRecord = Record<string, unknown>;
 
@@ -36,6 +42,32 @@ function run(field: string, target: unknown, next: unknown, base: unknown) {
   return { value: parent[field], has: field in parent, parent, ctx };
 }
 
+type Run = typeof run;
+
+/**
+ * `run` through an Automerge draft: the target lives in a document turned into `form` first,
+ * so the reconciler reads the doc's raw values (`ImmutableString` ids in the `str` row) while
+ * `next`/`base` stay plain, exactly as a projection-built patch arrives (#124 R3).
+ */
+function runInDraft(form: DocForm): Run {
+  return (field, target, next, base) => {
+    const seed = { e: target === undefined ? {} : { [field]: clone(target) } };
+    const doc = form(Automerge.from<{ e: AnyRecord }>(seed));
+    const ctx = freshCtx();
+    const after = Automerge.change(doc, (d) =>
+      reconcileInto(d.e, field, clone(next), clone(base), ctx)
+    );
+    const parent = clone(Automerge.toJS(after).e);
+    return { value: parent[field], has: field in parent, parent, ctx };
+  };
+}
+
+/** Every row a law/identity table runs under: plain objects, then the two doc forms. */
+const RUNNERS: Array<[string, Run]> = [
+  ['plain', run],
+  ...FORMS.map(([name, form]): [string, Run] => [name, runInDraft(form)]),
+];
+
 /** The `docOps` loop: every key of `next`, plus deletes for base keys it dropped. */
 function runEntity(target: AnyRecord, next: AnyRecord, base: AnyRecord | undefined) {
   const parent = clone(target);
@@ -51,164 +83,179 @@ const verifyFailures = (ctx: ReconcileContext) =>
 
 // ─── Law 1: target equals base → result equals next ──────────────────────────
 
-describe('Law 1: if target equals base, the result equals next', () => {
-  const a = { id: 'a', name: 'milk', done: false };
-  const b = { id: 'b', name: 'eggs', done: false };
-  const c = { id: 'c', name: 'bread', done: false };
-  const d = { id: 'd', name: 'jam', done: false };
+describe.each(RUNNERS)(
+  'Law 1: if target equals base, the result equals next (%s)',
+  (_form, run) => {
+    const a = { id: 'a', name: 'milk', done: false };
+    const b = { id: 'b', name: 'eggs', done: false };
+    const c = { id: 'c', name: 'bread', done: false };
+    const d = { id: 'd', name: 'jam', done: false };
 
-  const cases: Array<[string, string, unknown, unknown]> = [
-    ['scalar change', 'title', 'Old', 'New'],
-    ['scalar set where absent', 'title', undefined, 'New'],
-    ['type change: string to array', 'title', 'x', ['x']],
-    ['type change: array to object', 'tags', ['x'], { x: true }],
-    ['type change: object to null', 'rule', { freq: 'weekly' }, null],
-    ['list: tick one item', 'items', [a, b, c], [a, { ...b, done: true }, c]],
-    ['list: insert at the front', 'items', [a, b], [d, a, b]],
-    ['list: insert in the middle', 'items', [a, b], [a, d, b]],
-    ['list: append', 'items', [a, b], [a, b, d]],
-    ['list: remove', 'items', [a, b, c], [a, c]],
-    ['list: clear to empty', 'items', [a, b], []],
-    ['list: reverse', 'items', [a, b, c, d], [d, c, b, a]],
-    ['list: rotate', 'items', [a, b, c, d], [b, c, d, a]],
-    [
-      'list: move, edit, add and remove together',
-      'items',
-      [a, b, c],
-      [c, { ...a, name: 'oat' }, d],
-    ],
-    ['list: clear an element field', 'items', [{ ...a, memo: 'x' }], [a]],
-    [
-      'primitives: remove one of two duplicates',
-      'ingredients',
-      ['salt', 'pepper', 'salt'],
-      ['pepper', 'salt'],
-    ],
-    ['primitives: add a duplicate', 'ingredients', ['salt'], ['salt', 'salt']],
-    ['primitives: reorder duplicates', 'ingredients', ['a', 'b', 'a', 'b'], ['b', 'b', 'a', 'a']],
-    [
-      'keyless objects: edit one step',
-      'steps',
-      [{ text: 'boil' }, { text: 'stir' }],
-      [{ text: 'boil' }, { text: 'whisk' }],
-    ],
-    [
-      'votes keyed by memberId',
-      'votes',
-      [{ memberId: 'm1' }],
-      [{ memberId: 'm2' }, { memberId: 'm1' }],
-    ],
-    [
-      'exchangeRates keyed by from|to',
-      'exchangeRates',
-      [{ from: 'USD', to: 'GBP', rate: 0.8 }],
+    const cases: Array<[string, string, unknown, unknown]> = [
+      ['scalar change', 'title', 'Old', 'New'],
+      ['scalar set where absent', 'title', undefined, 'New'],
+      ['type change: string to array', 'title', 'x', ['x']],
+      ['type change: array to object', 'tags', ['x'], { x: true }],
+      ['type change: object to null', 'rule', { freq: 'weekly' }, null],
+      ['list: tick one item', 'items', [a, b, c], [a, { ...b, done: true }, c]],
+      ['list: insert at the front', 'items', [a, b], [d, a, b]],
+      ['list: insert in the middle', 'items', [a, b], [a, d, b]],
+      ['list: append', 'items', [a, b], [a, b, d]],
+      ['list: remove', 'items', [a, b, c], [a, c]],
+      ['list: clear to empty', 'items', [a, b], []],
+      ['list: reverse', 'items', [a, b, c, d], [d, c, b, a]],
+      ['list: rotate', 'items', [a, b, c, d], [b, c, d, a]],
       [
-        { from: 'USD', to: 'GBP', rate: 0.79 },
-        { from: 'EUR', to: 'GBP', rate: 0.85 },
+        'list: move, edit, add and remove together',
+        'items',
+        [a, b, c],
+        [c, { ...a, name: 'oat' }, d],
       ],
-    ],
-    [
-      'categories keyed by categoryId',
-      'categories',
-      [{ categoryId: 'food', amount: 1 }],
-      [{ categoryId: 'food', amount: 2 }],
-    ],
-    [
-      'completions keyed by date',
-      'dropoffCompletions',
-      [{ date: '2026-10-01', by: 'm1' }],
+      ['list: clear an element field', 'items', [{ ...a, memo: 'x' }], [a]],
       [
-        { date: '2026-10-01', by: 'm2' },
-        { date: '2026-10-02', by: 'm1' },
+        'primitives: remove one of two duplicates',
+        'ingredients',
+        ['salt', 'pepper', 'salt'],
+        ['pepper', 'salt'],
       ],
-    ],
-    [
-      'merge field: loan per key, with a key cleared',
-      'loan',
-      { rate: 4, term: 30, lender: 'x' },
-      { rate: 5, term: 30 },
-    ],
-    [
-      'value object: rule',
-      'rule',
-      { freq: 'weekly', interval: 1 },
-      { freq: 'weekly', interval: 2 },
-    ],
-    [
-      'nested list inside an element',
-      'ideas',
-      [{ id: 'i1', votes: [{ memberId: 'm1' }] }],
-      [{ id: 'i1', votes: [{ memberId: 'm1' }, { memberId: 'm2' }] }],
-    ],
-  ];
+      ['primitives: add a duplicate', 'ingredients', ['salt'], ['salt', 'salt']],
+      ['primitives: reorder duplicates', 'ingredients', ['a', 'b', 'a', 'b'], ['b', 'b', 'a', 'a']],
+      [
+        'keyless objects: edit one step',
+        'steps',
+        [{ text: 'boil' }, { text: 'stir' }],
+        [{ text: 'boil' }, { text: 'whisk' }],
+      ],
+      [
+        'votes keyed by memberId',
+        'votes',
+        [{ memberId: 'm1' }],
+        [{ memberId: 'm2' }, { memberId: 'm1' }],
+      ],
+      [
+        'exchangeRates keyed by from|to',
+        'exchangeRates',
+        [{ from: 'USD', to: 'GBP', rate: 0.8 }],
+        [
+          { from: 'USD', to: 'GBP', rate: 0.79 },
+          { from: 'EUR', to: 'GBP', rate: 0.85 },
+        ],
+      ],
+      [
+        'categories keyed by categoryId',
+        'categories',
+        [{ categoryId: 'food', amount: 1 }],
+        [{ categoryId: 'food', amount: 2 }],
+      ],
+      [
+        'completions keyed by date',
+        'dropoffCompletions',
+        [{ date: '2026-10-01', by: 'm1' }],
+        [
+          { date: '2026-10-01', by: 'm2' },
+          { date: '2026-10-02', by: 'm1' },
+        ],
+      ],
+      [
+        'merge field: loan per key, with a key cleared',
+        'loan',
+        { rate: 4, term: 30, lender: 'x' },
+        { rate: 5, term: 30 },
+      ],
+      [
+        'value object: rule',
+        'rule',
+        { freq: 'weekly', interval: 1 },
+        { freq: 'weekly', interval: 2 },
+      ],
+      [
+        'nested list inside an element',
+        'ideas',
+        [{ id: 'i1', votes: [{ memberId: 'm1' }] }],
+        [{ id: 'i1', votes: [{ memberId: 'm1' }, { memberId: 'm2' }] }],
+      ],
+    ];
 
-  it.each(cases)('%s', (_name, field, base, next) => {
-    const { value, ctx } = run(field, base, next, base);
-    expect(value).toEqual(next);
-    expect(verifyFailures(ctx)).toEqual([]);
-  });
+    it.each(cases)('%s', (_name, field, base, next) => {
+      const { value, ctx } = run(field, base, next, base);
+      expect(value).toEqual(next);
+      expect(verifyFailures(ctx)).toEqual([]);
+    });
 
-  it('a clear (next undefined) deletes a key that was in base', () => {
-    const { has, ctx } = run('memo', 'x', undefined, 'x');
-    expect(has).toBe(false);
-    expect(ctx.writes).toBe(1);
-  });
+    it('a clear (next undefined) deletes a key that was in base', () => {
+      const { has, ctx } = run('memo', 'x', undefined, 'x');
+      expect(has).toBe(false);
+      expect(ctx.writes).toBe(1);
+    });
 
-  it('base and target both undefined: next is written whole', () => {
-    const { value, ctx } = run('items', undefined, [a], undefined);
-    expect(value).toEqual([a]);
-    expect(ctx.writes).toBe(1);
-  });
-});
+    it('base and target both undefined: next is written whole', () => {
+      const { value, ctx } = run('items', undefined, [a], undefined);
+      expect(value).toEqual([a]);
+      expect(ctx.writes).toBe(1);
+    });
+  }
+);
 
 // ─── Law 2: the caller's changes land, despite concurrent target edits ───────
 
-describe('Law 2: every change in next relative to base is in the result', () => {
-  const base = [
-    { id: 'a', name: 'milk', done: false },
-    { id: 'b', name: 'eggs', done: false },
-  ];
+describe.each(RUNNERS)(
+  'Law 2: every change in next relative to base is in the result (%s)',
+  (_form, run) => {
+    const base = [
+      { id: 'a', name: 'milk', done: false },
+      { id: 'b', name: 'eggs', done: false },
+    ];
 
-  it('a tick lands next to a concurrently added item', () => {
-    const target = [...base, { id: 'c', name: 'jam', done: false }];
-    const next = [base[0], { ...base[1], done: true }];
-    const { value } = run('items', target, next, base);
-    expect(value).toEqual([base[0], { ...base[1], done: true }, target[2]]);
-  });
+    it('a tick lands next to a concurrently added item', () => {
+      const target = [...base, { id: 'c', name: 'jam', done: false }];
+      const next = [base[0], { ...base[1], done: true }];
+      const { value } = run('items', target, next, base);
+      expect(value).toEqual([base[0], { ...base[1], done: true }, target[2]]);
+    });
 
-  it('an add lands next to a concurrent tick', () => {
-    const target = [{ ...base[0], done: true }, base[1]];
-    const next = [...base, { id: 'c', name: 'jam', done: false }];
-    const { value } = run('items', target, next, base);
-    expect(value).toEqual([target[0], base[1], next[2]]);
-  });
+    it('an add lands next to a concurrent tick', () => {
+      const target = [{ ...base[0], done: true }, base[1]];
+      const next = [...base, { id: 'c', name: 'jam', done: false }];
+      const { value } = run('items', target, next, base);
+      expect(value).toEqual([target[0], base[1], next[2]]);
+    });
 
-  it('a removal lands even when the item was concurrently edited (update vs remove)', () => {
-    const target = [{ ...base[0], name: 'oat milk' }, base[1]];
-    const { value } = run('items', target, [base[1]], base);
-    expect(ids(value)).toEqual(['b']);
-  });
+    it('a removal lands even when the item was concurrently edited (update vs remove)', () => {
+      const target = [{ ...base[0], name: 'oat milk' }, base[1]];
+      const { value } = run('items', target, [base[1]], base);
+      expect(ids(value)).toEqual(['b']);
+    });
 
-  it('a field edit is not applied to an item removed concurrently (no resurrection)', () => {
-    const target = [base[1]];
-    const next = [{ ...base[0], done: true }, base[1]];
-    const { value } = run('items', target, next, base);
-    expect(ids(value)).toEqual(['b']);
-  });
+    it('a field edit is not applied to an item removed concurrently (no resurrection)', () => {
+      const target = [base[1]];
+      const next = [{ ...base[0], done: true }, base[1]];
+      const { value } = run('items', target, next, base);
+      expect(ids(value)).toEqual(['b']);
+    });
 
-  it('a scalar the caller changed overwrites a concurrent change (same-scalar LWW)', () => {
-    const { value } = run('title', 'Theirs', 'Mine', 'Old');
-    expect(value).toBe('Mine');
-  });
+    it('a scalar the caller changed overwrites a concurrent change (same-scalar LWW)', () => {
+      const { value } = run('title', 'Theirs', 'Mine', 'Old');
+      expect(value).toBe('Mine');
+    });
 
-  it('a value object is written whole: a concurrent sub-field change is not merged', () => {
-    const baseRule = { freq: 'weekly', interval: 1 };
-    const target = { freq: 'weekly', interval: 3 };
-    const next = { freq: 'monthly', interval: 1 };
-    const { value } = run('rule', target, next, baseRule);
-    expect(value).toEqual(next);
-  });
+    it('a value object is written whole: a concurrent sub-field change is not merged', () => {
+      const baseRule = { freq: 'weekly', interval: 1 };
+      const target = { freq: 'weekly', interval: 3 };
+      const next = { freq: 'monthly', interval: 1 };
+      const { value } = run('rule', target, next, baseRule);
+      expect(value).toEqual(next);
+    });
 
+    it('a primitive set change on both sides merges as a set union', () => {
+      const { value } = run('assigneeIds', ['m1', 'm3'], ['m1', 'm2'], ['m1']);
+      expect(value).toEqual(['m1', 'm2', 'm3']);
+    });
+  }
+);
+
+// Plain objects only: these pin OBJECT IDENTITY (which object the reconciler kept), which a
+// draft's fresh proxies cannot show.
+describe('Law 2: value vs merge objects and minimal moves (object identity)', () => {
   it('a value object (dateOfBirth) is replaced, not patched per key', () => {
     const dob = { year: 2018, month: 4, day: 2 };
     const parent: AnyRecord = { dateOfBirth: clone(dob) };
@@ -239,69 +286,67 @@ describe('Law 2: every change in next relative to base is in the result', () => 
     // Every item off the moved one is the same object: only `b` was touched.
     for (const item of kept) expect((parent.items as AnyRecord[]).includes(item)).toBe(true);
   });
-
-  it('a primitive set change on both sides merges as a set union', () => {
-    const { value } = run('assigneeIds', ['m1', 'm3'], ['m1', 'm2'], ['m1']);
-    expect(value).toEqual(['m1', 'm2', 'm3']);
-  });
 });
 
 // ─── Law 3: concurrent target changes the caller did not touch survive ───────
 
-describe('Law 3: target values the caller left equal to base are untouched', () => {
-  const a = { id: 'a', name: 'milk' };
-  const b = { id: 'b', name: 'eggs' };
-  const c = { id: 'c', name: 'bread' };
+describe.each(RUNNERS)(
+  'Law 3: target values the caller left equal to base are untouched (%s)',
+  (_form, run) => {
+    const a = { id: 'a', name: 'milk' };
+    const b = { id: 'b', name: 'eggs' };
+    const c = { id: 'c', name: 'bread' };
 
-  it('a concurrent insert keeps its place', () => {
-    const target = [a, { id: 'x', name: 'new' }, b, c];
-    const { value } = run('items', target, [a, b, { ...c, name: 'rye' }], [a, b, c]);
-    expect(ids(value)).toEqual(['a', 'x', 'b', 'c']);
-  });
+    it('a concurrent insert keeps its place', () => {
+      const target = [a, { id: 'x', name: 'new' }, b, c];
+      const { value } = run('items', target, [a, b, { ...c, name: 'rye' }], [a, b, c]);
+      expect(ids(value)).toEqual(['a', 'x', 'b', 'c']);
+    });
 
-  it('a concurrent field edit on another item survives', () => {
-    const target = [{ ...a, name: 'oat milk' }, b];
-    const { value } = run('items', target, [a, { ...b, name: 'duck eggs' }], [a, b]);
-    expect(value).toEqual([
-      { ...a, name: 'oat milk' },
-      { ...b, name: 'duck eggs' },
-    ]);
-  });
+    it('a concurrent field edit on another item survives', () => {
+      const target = [{ ...a, name: 'oat milk' }, b];
+      const { value } = run('items', target, [a, { ...b, name: 'duck eggs' }], [a, b]);
+      expect(value).toEqual([
+        { ...a, name: 'oat milk' },
+        { ...b, name: 'duck eggs' },
+      ]);
+    });
 
-  it('a concurrent field edit on the same item, different field, survives', () => {
-    const base = [{ id: 'a', name: 'milk', done: false }];
-    const target = [{ id: 'a', name: 'oat milk', done: false }];
-    const { value } = run('items', target, [{ id: 'a', name: 'milk', done: true }], base);
-    expect(value).toEqual([{ id: 'a', name: 'oat milk', done: true }]);
-  });
+    it('a concurrent field edit on the same item, different field, survives', () => {
+      const base = [{ id: 'a', name: 'milk', done: false }];
+      const target = [{ id: 'a', name: 'oat milk', done: false }];
+      const { value } = run('items', target, [{ id: 'a', name: 'milk', done: true }], base);
+      expect(value).toEqual([{ id: 'a', name: 'oat milk', done: true }]);
+    });
 
-  it('a concurrent reorder is kept when the caller did not move anything', () => {
-    const target = [c, a, b];
-    const { value } = run('items', target, [a, { ...b, name: 'x' }, c], [a, b, c]);
-    expect(ids(value)).toEqual(['c', 'a', 'b']);
-  });
+    it('a concurrent reorder is kept when the caller did not move anything', () => {
+      const target = [c, a, b];
+      const { value } = run('items', target, [a, { ...b, name: 'x' }, c], [a, b, c]);
+      expect(ids(value)).toEqual(['c', 'a', 'b']);
+    });
 
-  it('a concurrent loan key survives a caller edit to another key', () => {
-    const base = { rate: 4, term: 30 };
-    const { value } = run('loan', { rate: 4, term: 25 }, { rate: 5, term: 30 }, base);
-    expect(value).toEqual({ rate: 5, term: 25 });
-  });
+    it('a concurrent loan key survives a caller edit to another key', () => {
+      const base = { rate: 4, term: 30 };
+      const { value } = run('loan', { rate: 4, term: 25 }, { rate: 5, term: 30 }, base);
+      expect(value).toEqual({ rate: 5, term: 25 });
+    });
 
-  it('a concurrent aiApiKeys provider survives the caller adding another', () => {
-    const { value } = run('aiApiKeys', { claude: 'k1' }, { openai: 'k2' }, {});
-    expect(value).toEqual({ claude: 'k1', openai: 'k2' });
-  });
+    it('a concurrent aiApiKeys provider survives the caller adding another', () => {
+      const { value } = run('aiApiKeys', { claude: 'k1' }, { openai: 'k2' }, {});
+      expect(value).toEqual({ claude: 'k1', openai: 'k2' });
+    });
 
-  it('a concurrent scalar change survives a caller who sent it unchanged', () => {
-    const { value, ctx } = run('title', 'Theirs', 'Old', 'Old');
-    expect(value).toBe('Theirs');
-    expect(ctx.writes).toBe(0);
-  });
-});
+    it('a concurrent scalar change survives a caller who sent it unchanged', () => {
+      const { value, ctx } = run('title', 'Theirs', 'Old', 'Old');
+      expect(value).toBe('Theirs');
+      expect(ctx.writes).toBe(0);
+    });
+  }
+);
 
 // ─── Law 4: next equals base → nothing is written ────────────────────────────
 
-describe('Law 4: if next equals base, nothing is written', () => {
+describe.each(RUNNERS)('Law 4: if next equals base, nothing is written (%s)', (_form, run) => {
   const cases: Array<[string, string, unknown, unknown]> = [
     ['scalar, target changed', 'title', 'Theirs', 'Old'],
     [
@@ -336,7 +381,7 @@ describe('Law 4: if next equals base, nothing is written', () => {
 
 // ─── Clears and the additive (base undefined) mode ───────────────────────────
 
-describe('clears and base === undefined (additive)', () => {
+describe.each(RUNNERS)('clears and base === undefined (additive) (%s)', (_form, run) => {
   it('a key in base missing from next is deleted, inside an element and a merge field', () => {
     const items = run('items', [{ id: 'a', memo: 'x' }], [{ id: 'a' }], [{ id: 'a', memo: 'x' }]);
     expect(items.value).toEqual([{ id: 'a' }]);
@@ -371,7 +416,7 @@ describe('clears and base === undefined (additive)', () => {
 
 // ─── Duplicates and identity ─────────────────────────────────────────────────
 
-describe('duplicates and identity', () => {
+describe.each(RUNNERS)('duplicates and identity (%s)', (_form, run) => {
   it('a duplicate key in the target is healed (first occurrence wins) with an info note', () => {
     const target = [{ memberId: 'm1', w: 1 }, { memberId: 'm2' }, { memberId: 'm1', w: 2 }];
     const base = [{ memberId: 'm1', w: 1 }, { memberId: 'm2' }];

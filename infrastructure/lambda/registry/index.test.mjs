@@ -1443,11 +1443,14 @@ describe('registry GET: dataPolicy (#117 served Counter-write policy)', () => {
   afterEach(() => {
     handler = fileHandler;
     delete process.env.COUNTER_WRITES_ENABLED;
+    delete process.env.SCALAR_WRITES_ENABLED;
   });
 
-  async function loadWith(value) {
+  async function loadWith(value, scalar) {
     if (value === undefined) delete process.env.COUNTER_WRITES_ENABLED;
     else process.env.COUNTER_WRITES_ENABLED = value;
+    if (scalar === undefined) delete process.env.SCALAR_WRITES_ENABLED;
+    else process.env.SCALAR_WRITES_ENABLED = scalar;
     vi.resetModules();
     ({ handler } = await import('./index.mjs'));
   }
@@ -1456,19 +1459,31 @@ describe('registry GET: dataPolicy (#117 served Counter-write policy)', () => {
     await loadWith('true');
     const { res, body } = await get(ROW);
     expect(res.statusCode).toBe(200);
-    expect(body.dataPolicy).toEqual({ counterWrites: true });
+    expect(body.dataPolicy).toEqual({ counterWrites: true, scalarWrites: false });
   });
 
   it('serves counterWrites: false when COUNTER_WRITES_ENABLED is "false"', async () => {
     await loadWith('false');
     const { res, body } = await get(ROW);
     expect(res.statusCode).toBe(200);
-    expect(body.dataPolicy).toEqual({ counterWrites: false });
+    expect(body.dataPolicy).toEqual({ counterWrites: false, scalarWrites: false });
   });
 
   it('serves counterWrites: false when COUNTER_WRITES_ENABLED is unset', async () => {
     await loadWith(undefined);
-    expect((await get(ROW)).body.dataPolicy).toEqual({ counterWrites: false });
+    expect((await get(ROW)).body.dataPolicy).toEqual({ counterWrites: false, scalarWrites: false });
+  });
+
+  it('serves scalarWrites: true when SCALAR_WRITES_ENABLED is "true", independent of counterWrites', async () => {
+    await loadWith(undefined, 'true');
+    expect((await get(ROW)).body.dataPolicy).toEqual({ counterWrites: false, scalarWrites: true });
+  });
+
+  it('serves scalarWrites: false when SCALAR_WRITES_ENABLED is "false" or mistyped', async () => {
+    await loadWith('true', 'false');
+    expect((await get(ROW)).body.dataPolicy).toEqual({ counterWrites: true, scalarWrites: false });
+    await loadWith('true', 'TRUE');
+    expect((await get(ROW)).body.dataPolicy.scalarWrites).toBe(false);
   });
 
   it('carries no dataPolicy on a 404 (no row to observe)', async () => {
