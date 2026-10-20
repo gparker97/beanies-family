@@ -15,6 +15,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - The early-adopter thank-you on the Plan page now sits beside the price in each plan card instead of hiding behind them.
 - Test and dev sign-ups no longer subscribe to the newsletter.
 
+### Changed
+
+- The homepage's closing line is simpler: three months of everything free, then a link to what it costs after that.
+
 ## 2026-10-19
 
 ### Changed
