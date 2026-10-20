@@ -15,23 +15,43 @@ Files: `index.mjs` (routing, handlers), `stripeApi.mjs` (REST client, pinned `ST
 npm run test:lambda      # node:test, mocked fetch + DynamoDB
 ```
 
-## Testing before launch: `npm run dev` straight to the sandbox
+## Sandbox testing: the deployed sandbox lane (default)
 
-While prod holds the sandbox key (`sk_test_`), the deployed Lambda lets a dev origin (`localhost:5173` / `:4173`) check out and looks the family up in the DEV registry table, where localhost families register. So the whole flow runs from `npm run dev` with `VITE_STRIPE_PUBLISHABLE_KEY=pk_test_...` in `.env` and the `pricing` flag override on; no harness needed. The `dev_origin` refusal arms itself the moment the Lambda's key starts with `sk_live_`.
+Prod holds the LIVE key pair and refuses localhost origins (`dev_origin`). Sandbox testing goes to
+a second instance of this Lambda, `module.billing_sandbox` (added 2026-10-20):
 
-## Sandbox repro after launch (the local harness)
+- routes `POST /sandbox/billing/{checkout-session,claim,portal-session,webhook}` on the same API
+  (`ROUTE_PREFIX=/sandbox`; `routePathOf` strips it, so routing is identical);
+- the SANDBOX key pair only, with `STRIPE_MODE=sandbox`. Terraform's precondition refuses a live key
+  for it, and the handler's `mode_mismatch` guard refuses every request if one slips through;
+- localhost origins only (`sandbox_origin` refuses any other, `app.beanies.family` included);
+- localhost-created families only (`live_family` refuses a family that exists in the PROD
+  registry, so a real pod opened on `npm run dev` can never pick up a sandbox plan token);
+- its own billing table, `beanies-family-billing-sandbox`. The registry reads it for dev-origin
+  GETs, so a sandbox purchase shows as `active` on dev;
+- the Stripe sandbox webhook endpoint points at `/sandbox/billing/webhook`;
+- its metrics go to `beanies-family/billing-sandbox` and it has no alarms, so sandbox noise never
+  pages.
 
-Prod holds exactly one Stripe key pair. Once that is live, sandbox testing happens here, with the deployed code unchanged:
+`npm run dev` needs `VITE_BILLING_BASE_URL=https://api.beanies.family/sandbox` and a `pk_test_`
+publishable key in `.env`; a dev build refuses checkout otherwise (`src/config/features.ts`).
+Removal path: the plan, `~/projects/beanies-ops/docs/plans/2026-10-20-sandbox-billing-lane-and-test-isolation.md`.
+
+## Iterating on the handler before a deploy (the local harness)
 
 ```bash
 source ~/.beanies-tf.env                                   # the SANDBOX pair by name + AWS profile
-# once: a sandbox billing table, so sandbox subscriptions never land in live families' rows
-aws dynamodb create-table --table-name beanies-family-billing-sandbox \
-  --attribute-definitions AttributeName=familyId,AttributeType=S \
-  --key-schema AttributeName=familyId,KeyType=HASH --billing-mode PAY_PER_REQUEST
-BILLING_TABLE_NAME=beanies-family-billing-sandbox npm run billing:local   # http://localhost:8787
-stripe listen --forward-to localhost:8787/billing/webhook   # prints a whsec_; export STRIPE_WEBHOOK_SECRET=... and restart
-VITE_BILLING_BASE_URL=http://localhost:8787 npm run dev     # the Plan page now talks to the harness
+npm run billing:local                                      # http://localhost:8787, the lane's sandbox table
+stripe listen --forward-to localhost:8787/billing/webhook  # optional; prints a whsec_ to export as STRIPE_WEBHOOK_SECRET
+VITE_BILLING_BASE_URL=http://localhost:8787 npm run dev    # the Plan page now talks to the harness
 ```
 
-`local.mjs` wraps `handler` in a synthetic HTTP API v2 event, reads the sandbox billing table you name (it refuses a `-prod` table) and the DEV registry (where localhost families register), read-only, with your AWS profile, and, because it reads the sandbox pair by name (and refuses a live key outright), is never refused for a localhost origin. It is never packaged (the archive excludes it). `stripe trigger customer.subscription.updated --add subscription:metadata.familyId=<uuid>` exercises the webhook path.
+`local.mjs` wraps `handler` in a synthetic HTTP API v2 event and runs it with the lane's guards
+(`STRIPE_MODE=sandbox`: `mode_mismatch`, `sandbox_origin`, `live_family`). It reads the sandbox
+billing table (default `beanies-family-billing-sandbox`; it refuses a `-prod` table), looks
+localhost families up in the DEV registry, and reads the PROD registry only for the `live_family`
+existence check, all with your AWS profile. It reads the sandbox pair by name and refuses a live
+key outright. It is never packaged (the archive excludes it). Without `stripe listen`, sandbox
+webhooks still reach the deployed lane, which writes the same table.
+`stripe trigger customer.subscription.updated --add subscription:metadata.familyId=<uuid>`
+exercises the webhook path.

@@ -80,6 +80,17 @@ describe('CI client-env parity', () => {
     expect(demoVars).toEqual([]);
   });
 
+  /**
+   * The newsletter opt-in URL belongs to the cloud RELEASE lanes only. The debug lanes are test
+   * builds and must never subscribe test addresses to the real newsletter; the release-superset
+   * loop above cannot see them (it only checks release lanes), so pin the exclusion here.
+   */
+  it('the debug build lanes never carry the newsletter subscribe URL', () => {
+    for (const lane of ['mobile-android-build.yml', 'mobile-ios-build.yml']) {
+      expect(viteVars(lane).has('VITE_NEWSLETTER_SUBSCRIBE_URL'), lane).toBe(false);
+    }
+  });
+
   it('the shipped store builds wire the feedback webhook', () => {
     // Called out separately from the parity loop: feedback is fire-and-forget over
     // `no-cors` and persisted nowhere, so a missing URL is invisible at both ends.

@@ -302,18 +302,29 @@ function buildSignupStartItem({ familyId, body, now, deviceCountry }) {
  * that only decides plan state must not take the family's file location down with it, so a
  * billing read failure degrades to `entitlement: null` and the row still goes back with a 200.
  *
- * ONE BILLING TABLE, WHATEVER THE ORIGIN. The registry picks its own table by Origin
- * (`tableForOrigin`), and that split is deliberately NOT extended here. Billing rows are written
- * only by the prod billing Lambda (a Stripe webhook carries no Origin, and checkout refuses
- * DEV_ORIGINS), so a localhost family simply has no billing row and computes `trial`/`beta`,
- * which is the right answer for a dev family.
+ * THE BILLING TABLE FOLLOWS THE ORIGIN, like the registry's own (`tableForOrigin`). Prod billing
+ * rows are written by the prod billing Lambda (live Stripe); localhost families check out on the
+ * sandbox lane (`module.billing_sandbox`, test Stripe), which writes `BILLING_DEV_TABLE_NAME`. So
+ * a dev family that buys a sandbox plan reads `active` on dev, and a prod family never reads a
+ * sandbox row. An unset dev table falls back to prod, where a localhost family has no row and
+ * computes `trial`/`beta` (the behaviour before 2026-10-20).
  *
  * Env is read at CALL time, not module load, so one test process can exercise launch set/unset
  * and enforce on/off without module-cache games (the `countUsage.mjs` convention).
  */
-async function readBilling(familyId) {
-  const billingTable = process.env.BILLING_TABLE_NAME;
-  if (!billingTable) return { configured: false, billing: null };
+function billingTables() {
+  return {
+    prod: process.env.BILLING_TABLE_NAME,
+    dev: process.env.BILLING_DEV_TABLE_NAME || process.env.BILLING_TABLE_NAME,
+  };
+}
+
+async function readBilling(familyId, origin) {
+  const tables = billingTables();
+  const billingTable = tableForOrigin(origin, tables);
+  // The table actually read: a localhost GET with no dev table configured reads prod (fallback).
+  const table = billingTable === tables.prod ? 'prod' : 'dev';
+  if (!billingTable) return { configured: false, billing: null, table };
   try {
     const { Item } = await client.send(
       new GetItemCommand({
@@ -325,9 +336,9 @@ async function readBilling(familyId) {
         ConsistentRead: true,
       })
     );
-    return { configured: true, billing: Item ? unmarshall(Item) : null };
+    return { configured: true, billing: Item ? unmarshall(Item) : null, table };
   } catch (error) {
-    return { configured: true, error };
+    return { configured: true, error, table };
   }
 }
 
@@ -352,8 +363,17 @@ function entitlementFor(familyId, row, billingRead) {
 
   if (billingRead.error) {
     console.error(
-      '[registry] entitlement_unavailable: check BILLING_TABLE_NAME and dynamodb:GetItem on the billing table',
+      '[registry] entitlement_unavailable: check BILLING_TABLE_NAME (prod origins) / BILLING_DEV_TABLE_NAME (localhost origins) and dynamodb:GetItem on that billing table',
       billingRead.error
+    );
+    // Which table failed, as a field (the message above stays one static string).
+    // eslint-disable-next-line no-console -- structured decision line, read by CloudWatch
+    console.log(
+      JSON.stringify({
+        msg: 'entitlement_unavailable',
+        family_id_hash: familyIdHash(familyId),
+        table: billingRead.table,
+      })
     );
     return null;
   }
@@ -410,6 +430,7 @@ function entitlementFor(familyId, row, billingRead) {
       reason: entitlement.reason,
       enforced: entitlement.enforced,
       launch_set: launchSet,
+      table: billingRead.table,
     })
   );
 
@@ -1462,7 +1483,7 @@ export async function handler(event) {
             ConsistentRead: true,
           })
         ),
-        readBilling(familyId),
+        readBilling(familyId, event.headers?.origin),
       ]);
       if (!Item) return response(404, { error: 'Family not found' }, event);
       const row = unmarshall(Item);

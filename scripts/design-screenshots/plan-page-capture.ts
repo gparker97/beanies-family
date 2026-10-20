@@ -2,6 +2,7 @@ import { test, expect } from '../../e2e/fixtures/test';
 import { bypassLoginIfNeeded } from '../../e2e/helpers/auth';
 import { gotoRoot } from '../../e2e/helpers/navigation';
 import type { Page } from '@playwright/test';
+import { sandboxStripeKey, stripeHeaders } from './sandboxStripe';
 
 /**
  * NOT a test — the browser walk for #95 Phase 5 (the Plan page + Embedded Checkout).
@@ -11,15 +12,17 @@ import type { Page } from '@playwright/test';
  * What it drives:
  *   1. the registry GET is answered with a chosen entitlement (trial / pre_v1, first_ten, read-only,
  *      active), so every page state renders without a real Stripe row;
- *   2. the live Lambda's `dev_origin` refusal is observed from localhost (the honest error state);
- *   3. a REAL sandbox Checkout Session (created here in Node with the sandbox key, so no prod row
- *      is written) is served to the page, and the Stripe iframe mounts inside it;
+ *   2. the checkout error state, from a fulfilled 403 `sandbox_origin` (deterministic, and no
+ *      Stripe object is created; the real lane's refusals are pinned by the Lambda's tests);
+ *   3. a REAL sandbox Checkout Session (created here in Node with the SANDBOX key, so no billing
+ *      row is written) is served to the page, and the Stripe iframe mounts inside it;
  *   4. light + dark, 1280 + 390.
- * The paid claim + webhook path is verified against the Lambda separately (see the plan Outcome).
+ * The paid claim + webhook path is `plan-flow-capture.ts`. Sandbox-only by construction:
+ * `sandboxStripeKey()` reads the SANDBOX key by name and throws on a live one.
  */
 
 const SHOTS = 'scratch-shots/plan-page';
-const STRIPE_KEY = process.env.TF_VAR_stripe_secret_key ?? '';
+const STRIPE_KEY = sandboxStripeKey();
 
 type Ent = {
   cancelAt?: string | null;
@@ -187,10 +190,7 @@ async function createSandboxSession(familyId: string, theme: 'light' | 'dark') {
   const prices = await fetch(
     'https://api.stripe.com/v1/prices?lookup_keys[0]=list.full.year.usd&active=true',
     {
-      headers: {
-        Authorization: `Basic ${Buffer.from(`${STRIPE_KEY}:`).toString('base64')}`,
-        'Stripe-Version': '2026-08-26.dahlia',
-      },
+      headers: stripeHeaders(STRIPE_KEY),
     }
   ).then((r) => r.json() as Promise<{ data: { id: string }[] }>);
   params.set('line_items[0][price]', prices.data[0]!.id);
@@ -198,11 +198,7 @@ async function createSandboxSession(familyId: string, theme: 'light' | 'dark') {
   params.set('discounts[0][coupon]', 'PRE_V1_50');
   const res = await fetch('https://api.stripe.com/v1/checkout/sessions', {
     method: 'POST',
-    headers: {
-      Authorization: `Basic ${Buffer.from(`${STRIPE_KEY}:`).toString('base64')}`,
-      'Stripe-Version': '2026-08-26.dahlia',
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
+    headers: { ...stripeHeaders(STRIPE_KEY), 'Content-Type': 'application/x-www-form-urlencoded' },
     body: params.toString(),
   });
   const json = (await res.json()) as {
@@ -214,8 +210,8 @@ async function createSandboxSession(familyId: string, theme: 'light' | 'dark') {
   return { sessionId: json.id, clientSecret: json.client_secret };
 }
 
-test('plan page: states, dev-origin refusal, real sandbox checkout', async ({ page }) => {
-  test.skip(!STRIPE_KEY, 'source ~/.beanies-tf.env first');
+test('plan page: states, checkout error, real sandbox checkout', async ({ page }) => {
+  test.skip(!STRIPE_KEY, 'source ~/.beanies-tf.env first (BEANIES_STRIPE_SANDBOX_SECRET_KEY)');
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => {
@@ -227,6 +223,17 @@ test('plan page: states, dev-origin refusal, real sandbox checkout', async ({ pa
   await gotoRoot(page);
   await bypassLoginIfNeeded(page);
   await page.evaluate(() => localStorage.setItem('beanies:flag:pricing', 'true'));
+  // Step 2's error state, answered here: the refusal a non-localhost origin gets from the lane.
+  await page.route('**/billing/checkout-session', (route) =>
+    route.fulfill({
+      status: 403,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        error: 'The sandbox billing lane serves only localhost dev origins',
+        code: 'sandbox_origin',
+      }),
+    })
+  );
 
   // ── 1. Settings card + See plans ──────────────────────────────────────────
   await page.goto('/settings');
@@ -238,13 +245,13 @@ test('plan page: states, dev-origin refusal, real sandbox checkout', async ({ pa
   await page.getByTestId('plan-see-plans').click();
   await page.waitForURL('**/settings/plan');
 
-  // ── 2. Plan page, trial + pre_v1: the live Lambda refuses localhost (dev_origin) ─
+  // ── 2. Plan page, trial + pre_v1: the checkout error state (sandbox_origin) ──
   await expect(page.getByTestId('plan-subtitle')).toBeVisible();
   await expect(page.getByTestId('plan-cohort-line')).toContainText('half price');
   await expect(page.getByTestId('plan-full-price')).toHaveText('$42.49');
   await expect(page.getByTestId('plan-basic-price')).toHaveText('$15');
   await expect(page.getByTestId('checkout-retry')).toBeVisible({ timeout: 30_000 });
-  await shot(page, '02-plan-trial-prev1-devorigin-light');
+  await shot(page, '02-plan-trial-prev1-checkout-error-light');
   await page.getByTestId('plan-currency-SGD').click();
   await expect(page.getByTestId('plan-full-price')).toHaveText('S$55');
   await page.getByTestId('plan-cycle-month').click();
@@ -256,6 +263,7 @@ test('plan page: states, dev-origin refusal, real sandbox checkout', async ({ pa
   await setDark(page, false);
 
   // ── 3. A real sandbox session served to the page: the Stripe iframe mounts ──
+  await page.unroute('**/billing/checkout-session');
   const familyId = await page.evaluate(() => localStorage.getItem('beanies:activeFamilyId') ?? '');
   await page.route('**/billing/checkout-session', async (route) => {
     const body = route.request().postDataJSON() as { theme: 'light' | 'dark' };

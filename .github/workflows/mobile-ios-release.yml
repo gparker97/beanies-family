@@ -178,6 +178,7 @@ jobs:
           VITE_CONTENT_FETCH_URL: ${{ vars.CONTENT_FETCH_URL }}
           VITE_CONTENT_FETCH_API_KEY: ${{ secrets.CONTENT_FETCH_API_KEY }}
           VITE_PLAUSIBLE_DOMAIN: jvjpzIr6FM9tDKaS1gZaK
+          VITE_NEWSLETTER_SUBSCRIBE_URL: https://everybeancounts.substack.com/api/v1/free
           # Open-Meteo "API Standard" key (#134, ADR-043). Unset today, so the build uses the
           # keyless free endpoints; adding the secret moves weather to the customer endpoints
           # with no code change. Ships in the bundle (quota exposure only).

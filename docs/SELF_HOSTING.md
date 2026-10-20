@@ -127,6 +127,12 @@ The Settings page footer shows which build you're on:
 
 A vanilla self-hosted beanies.family has no plan card, no Plan page and never goes read-only: plan state comes from the family registry (`features.entitlement`), and choosing a plan needs a Stripe publishable key (`VITE_STRIPE_PUBLISHABLE_KEY`, `features.checkout`), which only the hosted service at app.beanies.family has. Leave both unset and everything about plans is simply absent. If you run your own registry Lambda, the card shows your families as on the beta (your own `V1_LAUNCH_AT`, unset); still no Plan page. Self-hosting stays free by construction.
 
+If you do run checkout against your own billing Lambda, `VITE_BILLING_BASE_URL` sets where the `/billing/*` calls go. A production build falls back to `VITE_REGISTRY_API_URL` when it is unset; a **development build never falls back** (it would otherwise reach whatever live-keyed billing sits on the registry URL) and also requires a `pk_test_` publishable key, so `npm run dev` can only ever use Stripe test mode. The hosted service's dev value is the sandbox lane, `https://api.beanies.family/sandbox`.
+
+### Sign-up newsletter opt-in is a hosted-only feature
+
+The "subscribe to the newsletter" checkbox on the create-pod form appears only when `VITE_NEWSLETTER_SUBSCRIBE_URL` is set (`features.newsletter`); it is the Substack free-subscribe endpoint that the hosted service's release builds set. Leave it unset, as every dev build, test run and self-host should, and the checkbox is hidden and nothing ever contacts Substack. Do not put it in a local `.env`.
+
 ---
 
 ## Optional features (independent of Path A vs B)

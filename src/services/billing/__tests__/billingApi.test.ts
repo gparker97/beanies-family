@@ -9,7 +9,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 vi.hoisted(() => {
   vi.stubEnv('VITE_REGISTRY_API_URL', 'https://api.test');
   vi.stubEnv('VITE_REGISTRY_API_KEY', 'reg-key');
-  vi.stubEnv('VITE_BILLING_BASE_URL', '');
+  vi.stubEnv('VITE_BILLING_BASE_URL', 'https://api.test');
 });
 
 import { createCheckoutSession, claim, createPortalSession, BillingApiError } from '../billingApi';
@@ -93,5 +93,37 @@ describe('billingApi', () => {
     await expect(
       claim({ familyId: 'f', sessionId: 'cs', clientSecret: 's' })
     ).rejects.toMatchObject({ code: 'unknown', httpStatus: 502 });
+  });
+
+  it.each(['mode_mismatch', 'sandbox_origin', 'live_family', 'table_unset'])(
+    'maps the sandbox-lane guard code %s',
+    async (code) => {
+      fetchMock.mockResolvedValueOnce(fail(403, { code }));
+      await expect(
+        claim({ familyId: 'f', sessionId: 'cs', clientSecret: 's' })
+      ).rejects.toMatchObject({ code });
+    }
+  );
+
+  it('strips trailing slashes from the base URL', async () => {
+    vi.resetModules();
+    vi.stubEnv('VITE_BILLING_BASE_URL', 'https://api.test/sandbox//');
+    const mod = await import('../billingApi');
+    fetchMock.mockResolvedValue(ok({}));
+    await mod.claim({ familyId: 'f', sessionId: 'cs', clientSecret: 's' });
+    expect(fetchMock.mock.calls[0][0]).toBe('https://api.test/sandbox/billing/claim');
+    vi.stubEnv('VITE_BILLING_BASE_URL', 'https://api.test');
+  });
+
+  it('in a dev build with VITE_BILLING_BASE_URL unset, throws not_configured and never fetches (no registry-URL fallback)', async () => {
+    vi.resetModules();
+    vi.stubEnv('DEV', true);
+    vi.stubEnv('VITE_BILLING_BASE_URL', '');
+    const mod = await import('../billingApi');
+    await expect(
+      mod.claim({ familyId: 'f', sessionId: 'cs', clientSecret: 's' })
+    ).rejects.toMatchObject({ code: 'not_configured' });
+    expect(fetchMock).not.toHaveBeenCalled();
+    vi.stubEnv('VITE_BILLING_BASE_URL', 'https://api.test');
   });
 });

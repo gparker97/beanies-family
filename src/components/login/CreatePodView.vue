@@ -23,7 +23,9 @@ import {
 } from '@/services/sync/createDriveErrors';
 import { resolveDriveCollision } from '@/composables/useDriveCollisionRecovery';
 import { canUseLocalFiles } from '@/services/sync/capabilities';
+import { features } from '@/config/features';
 import { reportError } from '@/utils/errorReporter';
+import { submitNewsletterSignup } from '@/utils/newsletterSubscribe';
 import { deriveFamilyName } from '@/utils/familyName';
 import { trackOnboardingStep, trackStorageChoice } from '@/services/telemetry/onboardingAttempt';
 
@@ -153,7 +155,8 @@ async function handleStep1Next() {
     email: email.value,
     familyName: resolvedFamilyName,
     memberName: name.value,
-    subscribeNewsletter: subscribeNewsletter.value,
+    // Undefined when the feature is off: recorded as "not asked" (null), never an opt-out.
+    subscribeNewsletter: features.newsletter ? subscribeNewsletter.value : undefined,
   });
 
   if (result.success) {
@@ -163,39 +166,8 @@ async function handleStep1Next() {
     // The step-1 registry row and the "pod started" Slack line (#125). Not awaited: the
     // wizard never waits on the registry, and the action never throws.
     void syncStore.registerSignupStart();
-    if (subscribeNewsletter.value) {
-      try {
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = 'https://everybeancounts.substack.com/api/v1/free';
-        form.target = 'substack-subscribe-frame';
-        form.style.display = 'none';
-
-        const emailInput = document.createElement('input');
-        emailInput.name = 'email';
-        emailInput.value = email.value;
-        form.appendChild(emailInput);
-
-        const sourceInput = document.createElement('input');
-        sourceInput.name = 'first_url';
-        sourceInput.value = 'https://beanies.family/signup';
-        form.appendChild(sourceInput);
-
-        const iframe = document.createElement('iframe');
-        iframe.name = 'substack-subscribe-frame';
-        iframe.style.display = 'none';
-        document.body.appendChild(iframe);
-        document.body.appendChild(form);
-        form.submit();
-
-        setTimeout(() => {
-          form.remove();
-          iframe.remove();
-        }, 5000);
-      } catch {
-        // Newsletter subscription is best-effort
-      }
-    }
+    // Self-gated on features.newsletter (a dev/test/self-host build never contacts Substack).
+    if (subscribeNewsletter.value) submitNewsletterSignup(email.value);
     currentStep.value = 2;
     formError.value = null;
   } else {
@@ -609,7 +581,7 @@ function handleBack() {
           />
         </div>
 
-        <label class="mt-4 flex cursor-pointer items-start gap-3">
+        <label v-if="features.newsletter" class="mt-4 flex cursor-pointer items-start gap-3">
           <input
             v-model="subscribeNewsletter"
             type="checkbox"

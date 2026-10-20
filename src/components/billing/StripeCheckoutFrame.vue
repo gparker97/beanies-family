@@ -33,6 +33,15 @@ import { logEvent } from '@/services/telemetry';
 import { reportError } from '@/utils/errorReporter';
 import BaseButton from '@/components/ui/BaseButton.vue';
 
+// Developer-facing remediation for the sandbox lane's guard codes (console/firehose only; the
+// user sees the generic checkoutUnavailable copy).
+const CHECKOUT_CODE_HINTS: Record<string, string> = {
+  sandbox_origin:
+    'The sandbox lane serves only http://localhost:5173 / :4173; restart the dev server on one of those.',
+  mode_mismatch: "The lane's STRIPE_MODE and key disagree (modules/billing stripe_mode).",
+  live_family: 'Sandbox checkout is for localhost-created families only; this family is live.',
+};
+
 const props = defineProps<{
   familyId: string;
   plan: PlanId;
@@ -195,7 +204,7 @@ function fail(
     message:
       action === 'stripe_js_load_failed'
         ? '[billing] Stripe.js could not load: a content blocker or CSP is refusing js.stripe.com, or VITE_STRIPE_PUBLISHABLE_KEY is unset in the build. The page offers a retry.'
-        : `[billing] checkout could not start (${code}). price_missing / coupon_unset are Dashboard objects (docs/runbooks/pricing-launch.md); billing_upstream is Stripe or STRIPE_SECRET_KEY.`,
+        : `[billing] checkout could not start (${code}). price_missing / coupon_unset are Dashboard objects (docs/runbooks/pricing-launch.md); billing_upstream is Stripe or STRIPE_SECRET_KEY. ${CHECKOUT_CODE_HINTS[code] ?? ''}`.trim(),
     error: err,
     severity: 'error',
     context: { action, error_code: code, http_status: httpStatus, plan: props.plan },

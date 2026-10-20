@@ -2,7 +2,8 @@
 /**
  * Billing Lambda (#95 Phase 5): the one place beanies.family talks to Stripe.
  *
- * Four routes on the shared HTTP API (`api.beanies.family`):
+ * Four routes on the shared HTTP API (`api.beanies.family`), under an optional `ROUTE_PREFIX`
+ * (empty for prod; `/sandbox` for the sandbox lane, so its routes are `/sandbox/billing/...`):
  *
  *   POST /billing/checkout-session  { familyId, plan, interval, currency, theme? }
  *                                   -> { sessionId, clientSecret }     (x-api-key)
@@ -114,11 +115,18 @@ const env = () => ({
   // The registry keeps localhost families in a separate DEV table (`tableForOrigin` in the
   // registry Lambda); checkout must look a family up where it registered.
   registryDevTable: process.env.REGISTRY_DEV_TABLE_NAME || '',
-  // The `dev_origin` refusal protects MONEY: it fires only when this Lambda holds a LIVE key.
-  // Before the live flip prod runs sandbox keys, and a localhost checkout against the sandbox is
-  // exactly how the pricing flow is tested.
+  // The `dev_origin` refusal protects MONEY: it fires only when this Lambda holds a LIVE key, so
+  // a localhost checkout can never take real money from the prod instance. Localhost checkouts
+  // belong to the sandbox lane (STRIPE_MODE=sandbox below).
   // `sk_live_` or a restricted `rk_live_` (Stripe's recommended key shape for a narrow server).
   liveKey: /^(sk|rk)_live_/.test(process.env.STRIPE_SECRET_KEY || ''),
+  // Which Stripe account this instance is FOR: `live` (prod) or `sandbox` (the localhost lane,
+  // modules/billing `stripe_mode`). Unset means no mode guard (a self-host, or an older deploy).
+  // Terraform's precondition ties the mode to the key prefix; `modeMismatch` in the handler is
+  // the runtime twin, so a mixed-up key refuses every request instead of reaching a customer.
+  stripeMode: process.env.STRIPE_MODE || '',
+  // Path prefix the routes sit under (`/sandbox` for the sandbox lane). `routePathOf` strips it.
+  routePrefix: process.env.ROUTE_PREFIX || '',
   coupon: process.env.STRIPE_PRE_V1_COUPON || '',
   // #beanies-joiners (the client's new-family channel). Empty: the Slack line is skipped and
   // logged (`slack_post_skipped`); the webhook is unaffected either way.
@@ -345,6 +353,51 @@ async function notifySubscriptionSlack(kind, familyId, attrs, previous, cfg, ddb
   }
 }
 
+// ── Sandbox lane guards ──────────────────────────────────────────────────────
+
+/**
+ * The request path with this instance's `ROUTE_PREFIX` removed, so routing compares against the
+ * one frozen `ROUTES` table. A path WITHOUT the prefix on a prefixed instance becomes '' and falls
+ * through to the 404: the sandbox lane never answers a prod path, and vice versa.
+ */
+export function routePathOf(event, prefix) {
+  const raw = event?.requestContext?.http?.path ?? event?.rawPath ?? '';
+  if (!prefix) return raw;
+  return raw.startsWith(prefix + '/') ? raw.slice(prefix.length) : '';
+}
+
+/**
+ * True when STRIPE_MODE and the key disagree. Unset mode: no guard (a self-host). Any OTHER
+ * value ('Sandbox', 'test', a typo) also counts as a mismatch: an unrecognised mode would
+ * otherwise silently disable every sandbox guard, so it fails closed instead.
+ */
+function modeMismatch(cfg) {
+  if (!cfg.stripeMode) return false;
+  if (cfg.stripeMode === 'sandbox') return cfg.liveKey;
+  if (cfg.stripeMode === 'live') return !cfg.liveKey;
+  return true;
+}
+
+/**
+ * The sandbox lane serves localhost only. A browser on any other origin (app.beanies.family
+ * included) is refused, so a production page can never open a TEST MODE checkout or portal here.
+ * Not an abuse control (a script can send any Origin): the test key and the throttles bound that.
+ * Returns the refusal, or null to proceed. `route` names the decision line (checkout | portal).
+ */
+function sandboxOriginRefusal(route, familyId, event, cfg) {
+  if (cfg.stripeMode !== 'sandbox') return null;
+  const origin = event?.headers?.origin;
+  if (origin && cfg.devOrigins.has(origin)) return null;
+  logLine(`${route}_refused`, familyId, { reason: 'sandbox_origin' });
+  return {
+    status: 403,
+    body: {
+      error: 'The sandbox billing lane serves only localhost dev origins',
+      code: 'sandbox_origin',
+    },
+  };
+}
+
 // ── Route handlers ───────────────────────────────────────────────────────────
 
 async function handleCheckout(body, event, cfg, ddb) {
@@ -361,12 +414,14 @@ async function handleCheckout(body, event, cfg, ddb) {
   if (plan === 'basic' && interval !== 'year') {
     return { status: 400, body: { error: 'basic is yearly only', code: 'invalid_request' } };
   }
+  const sandboxRefusal = sandboxOriginRefusal('checkout', familyId, event, cfg);
+  if (sandboxRefusal) return sandboxRefusal;
   const origin = event?.headers?.origin;
   const isDevOrigin = Boolean(origin && cfg.devOrigins.has(origin));
   if (isDevOrigin && cfg.liveKey) {
-    // This module holds ONE key pair. A localhost checkout against LIVE keys would take real
-    // money; after the live flip the local harness (local.mjs, sandbox keys) is the only place a
-    // dev origin may check out. With a sandbox key there is no money to protect.
+    // A localhost checkout against LIVE keys would take real money. Dev origins check out on the
+    // sandbox lane (`/sandbox/billing/*`, STRIPE_MODE=sandbox) or the local harness (local.mjs);
+    // with a sandbox key there is no money to protect.
     logLine('checkout_refused', familyId, { reason: 'dev_origin' });
     return {
       status: 403,
@@ -376,10 +431,26 @@ async function handleCheckout(body, event, cfg, ddb) {
   const registryTable =
     isDevOrigin && cfg.registryDevTable ? cfg.registryDevTable : cfg.registryTable;
 
-  const [registry, billing] = await Promise.all([
+  // One parallel batch. On the sandbox lane the third read is the PROD registry, for live_family.
+  const [registry, billing, liveRow] = await Promise.all([
     getRow(registryTable, familyId, ddb),
     getRow(cfg.billingTable, familyId, ddb),
+    cfg.stripeMode === 'sandbox' ? getRow(cfg.registryTable, familyId, ddb) : null,
   ]);
+  if (liveRow) {
+    // A REAL family opened on `npm run dev`. A sandbox checkout would end in a claim that writes a
+    // sandbox plan token into its Drive-synced doc, and in prod the live family would then fail
+    // the portal (`bad_token`) and drop to the free AI tier. Billing tests use localhost-created
+    // families, which exist only in the dev registry table.
+    logLine('checkout_refused', familyId, { reason: 'live_family' });
+    return {
+      status: 403,
+      body: {
+        error: 'Sandbox checkout is for localhost-created families only',
+        code: 'live_family',
+      },
+    };
+  }
   if (!registry || registry.deletedAt) {
     logLine('checkout_refused', familyId, { reason: 'unknown_family' });
     return { status: 404, body: { error: 'Family not found', code: 'unknown_family' } };
@@ -571,6 +642,8 @@ async function handlePortal(body, event, cfg, ddb) {
   ) {
     return { status: 400, body: { error: 'Invalid request', code: 'invalid_request' } };
   }
+  const sandboxRefusal = sandboxOriginRefusal('portal', familyId, event, cfg);
+  if (sandboxRefusal) return sandboxRefusal;
   const billing = await getRow(cfg.billingTable, familyId, ddb);
   const tokenOk =
     typeof billing?.planTokenHash === 'string' && safeEqual(hash(planToken), billing.planTokenHash);
@@ -666,9 +739,20 @@ export async function handler(event) {
   const cfg = env();
   const respond = (status, body) => response(status, body, event, cfg.allowedOrigins);
   const method = event?.requestContext?.http?.method;
-  const path = event?.requestContext?.http?.path ?? event?.rawPath ?? '';
+  const path = routePathOf(event, cfg.routePrefix);
   if (method === 'OPTIONS') return respond(204, null);
   if (method !== 'POST') return respond(405, { error: 'Method not allowed' });
+
+  if (modeMismatch(cfg)) {
+    // Every route, the webhook included: a 500 makes Stripe retry, so no event is lost while the
+    // key is put right. Terraform's precondition should make this unreachable through a deploy.
+    console.error(
+      `[billing] mode_mismatch: STRIPE_MODE=${cfg.stripeMode} but STRIPE_SECRET_KEY is a ${cfg.liveKey ? 'live' : 'test'} key.\n` +
+        'STRIPE_MODE must be "live" or "sandbox" and match the key: set modules/billing `stripe_mode` (sandbox lane: the SANDBOX pair; prod: the LIVE pair) and re-apply.'
+    );
+    logLine('mode_mismatch', null, { kind: cfg.stripeMode });
+    return respond(500, { error: 'Billing is misconfigured', code: 'mode_mismatch' });
+  }
 
   if (path === ROUTES.webhook) {
     const r = await handleWebhook(event, cfg, ddb);

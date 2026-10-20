@@ -27,6 +27,28 @@ const flagOn = (v: unknown): boolean => typeof v === 'string' && v.trim().toLowe
 // The canonical cloud host. Update this set if it ever changes.
 const CLOUD_HOSTS = new Set(['app.beanies.family']);
 
+const publishableKey = String(env.VITE_STRIPE_PUBLISHABLE_KEY ?? '');
+const onCloudHost = CLOUD_HOSTS.has(globalThis.location?.hostname ?? '');
+
+/**
+ * Where the billing routes are called. The ONE place the endpoint is decided (billingApi.ts
+ * reads it at call time). A dev build (npm run dev, vitest, every Playwright config that serves
+ * the dev server) takes ONLY an explicit VITE_BILLING_BASE_URL, never the prod registry URL: the
+ * prod billing Lambda holds the live Stripe key, and dev must never reach it. The deployed
+ * sandbox lane is `https://api.beanies.family/sandbox`. A production build keeps the original
+ * `VITE_BILLING_BASE_URL || VITE_REGISTRY_API_URL`.
+ */
+export const billingBaseUrl: string = env.DEV
+  ? String(env.VITE_BILLING_BASE_URL ?? '')
+  : String(env.VITE_BILLING_BASE_URL || env.VITE_REGISTRY_API_URL || '');
+
+// Cloud host: the key must be LIVE (a family must never be offered Stripe's TEST MODE checkout
+// at app.beanies.family). Anywhere else, a dev build must hold a TEST key so no dev or test run
+// can move real money; a non-dev, non-cloud build (a preview, a self-host) is unconstrained.
+const keyModeOk = onCloudHost
+  ? publishableKey.startsWith('pk_live_')
+  : !env.DEV || publishableKey.startsWith('pk_test_');
+
 export const features = {
   // Drive sync only requires VITE_GOOGLE_CLIENT_ID — that's what gates OAuth
   // and the Drive REST API. VITE_GOOGLE_API_KEY + VITE_GOOGLE_PROJECT_NUMBER
@@ -50,15 +72,14 @@ export const features = {
   // The `pricing` dev flag gates the ROLLOUT; `isPricingAvailable` / `isPlanPageReachable` in
   // src/services/billing/pricingGate.ts combine the two.
   entitlement: ok(env.VITE_REGISTRY_API_URL) && ok(env.VITE_REGISTRY_API_KEY),
-  // On the cloud host the key must be LIVE: until the pricing launch flips the keys, prod holds
-  // the sandbox pair, and a family must never be offered Stripe's TEST MODE checkout at
-  // app.beanies.family. Everywhere else (greg's dev build, a preview) a test key is the point.
+  // Needs the registry, the billing endpoint (explicit in dev, see `billingBaseUrl`), the
+  // publishable key, and a key whose mode fits the build (see `keyModeOk`).
   checkout:
     ok(env.VITE_REGISTRY_API_URL) &&
+    ok(billingBaseUrl) &&
     ok(env.VITE_REGISTRY_API_KEY) &&
-    ok(env.VITE_STRIPE_PUBLISHABLE_KEY) &&
-    (!CLOUD_HOSTS.has(globalThis.location?.hostname ?? '') ||
-      String(env.VITE_STRIPE_PUBLISHABLE_KEY).startsWith('pk_live_')),
+    ok(publishableKey) &&
+    keyModeOk,
   // Invite gate: retained but switched OFF in prod as of 2026-07-21, superseded by the
   // Create-pod welcome modal. NOT dead code — flip the INVITE_GATE repo variable to
   // "true" to re-gate (e.g. a future closed cohort or paid beta). See
@@ -92,9 +113,29 @@ export const features = {
   // way — so an unset webhook is undetectable from both ends without this.
   feedbackReporter: ok(env.VITE_FEEDBACK_WEBHOOK_URL),
   analytics: ok(env.VITE_PLAUSIBLE_DOMAIN),
+  // Sign-up newsletter opt-in (Substack free-subscribe form post). Set ONLY on the cloud release
+  // lanes (deploy.yml, mobile-*-release.yml), so a dev build, every test and a self-host never
+  // contact Substack and show no checkbox. See src/utils/newsletterSubscribe.ts.
+  newsletter: ok(env.VITE_NEWSLETTER_SUBSCRIBE_URL),
 } as const;
 
 export type FeatureKey = keyof typeof features;
+
+// Dev guard rail: a publishable key is set but checkout is off for a billing-endpoint or
+// key-mode reason. Say exactly what to set instead of leaving a silent "checkout unavailable".
+if (
+  env.DEV &&
+  ok(publishableKey) &&
+  ok(env.VITE_REGISTRY_API_URL) &&
+  ok(env.VITE_REGISTRY_API_KEY) &&
+  !features.checkout
+) {
+  console.warn(
+    '[features] checkout is OFF in this dev build. Dev must use Stripe test mode: set ' +
+      'VITE_BILLING_BASE_URL=https://api.beanies.family/sandbox and a pk_test_ publishable key ' +
+      '(BEANIES_STRIPE_SANDBOX_PUBLISHABLE_KEY) in .env.'
+  );
+}
 
 // A cloud-ish build (Drive and/or the family registry wired) is the official
 // app, so it MUST also have the operational webhooks wired — otherwise the
@@ -130,6 +171,11 @@ if (env.PROD && (features.drive || features.registry)) {
       'analytics',
       'VITE_PLAUSIBLE_DOMAIN',
       'No usage analytics will be reported (signups, logins, feature adoption)',
+    ],
+    [
+      'newsletter',
+      'VITE_NEWSLETTER_SUBSCRIBE_URL',
+      'Sign-up newsletter opt-ins will NOT reach Substack (the checkbox is hidden)',
     ],
   ];
   for (const [key, envVar, impact] of operationalWebhooks) {

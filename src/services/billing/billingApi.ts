@@ -1,11 +1,12 @@
 /**
  * The client's three calls to the billing Lambda (#95 Phase 5), over one `post()` helper.
  *
- * The routes sit on the shared registry API (`VITE_REGISTRY_API_URL`) and take the registry's
- * soft key, so no new bundle key. `VITE_BILLING_BASE_URL` is an OPTIONAL override read only
- * here: it exists so `npm run dev` can point at the local harness
- * (`infrastructure/lambda/billing/local.mjs`, `http://localhost:8787`) after the live-key
- * flip, when the prod Lambda can no longer be used for sandbox testing.
+ * The routes sit on the shared registry API and take the registry's soft key, so no new bundle
+ * key. The base URL is decided in one place, `billingBaseUrl` (src/config/features.ts): production
+ * builds use `VITE_BILLING_BASE_URL || VITE_REGISTRY_API_URL`; dev builds use ONLY an explicit
+ * `VITE_BILLING_BASE_URL` (the deployed sandbox lane, `https://api.beanies.family/sandbox`, or the
+ * local harness), so dev can never reach the live-keyed prod Lambda. It is read per call, not at
+ * module load, so tests that partially mock `@/config/features` still import this module.
  *
  * Every failure, HTTP or network, becomes a `BillingApiError { code, httpStatus }` so the UI
  * maps one error shape to copy. The plan token travels in the BODY, never a header: the shared
@@ -13,26 +14,36 @@
  */
 
 import type { PlanId, PlanInterval } from '@beanies/brand/pricing';
+import { billingBaseUrl } from '@/config/features';
 import { logEvent } from '@/services/telemetry';
 
-const BASE_URL = import.meta.env.VITE_BILLING_BASE_URL || import.meta.env.VITE_REGISTRY_API_URL;
 const API_KEY = import.meta.env.VITE_REGISTRY_API_KEY;
 
-/** Lambda `code` values the UI distinguishes, plus the two client-side ones. */
+/** Lambda `code` values the UI distinguishes (the single source for the type and the KNOWN set). */
+const LAMBDA_CODES = [
+  'invalid_request',
+  'dev_origin',
+  'unknown_family',
+  'already_subscribed',
+  'price_missing',
+  'coupon_unset',
+  'billing_upstream',
+  'billing_store',
+  'mismatch',
+  'not_complete',
+  'no_subscription',
+  'bad_token',
+  'no_customer',
+  // The sandbox lane's guards (infrastructure/lambda/billing): all show the generic copy.
+  'mode_mismatch',
+  'sandbox_origin',
+  'live_family',
+  'table_unset',
+] as const;
+
+/** Lambda codes plus the client-side ones. */
 export type BillingErrorCode =
-  | 'invalid_request'
-  | 'dev_origin'
-  | 'unknown_family'
-  | 'already_subscribed'
-  | 'price_missing'
-  | 'coupon_unset'
-  | 'billing_upstream'
-  | 'billing_store'
-  | 'mismatch'
-  | 'not_complete'
-  | 'no_subscription'
-  | 'bad_token'
-  | 'no_customer'
+  | (typeof LAMBDA_CODES)[number]
   | 'unauthorized'
   | 'rate_limited'
   | 'network'
@@ -65,28 +76,15 @@ export interface CheckoutSession {
   clientSecret: string;
 }
 
-const KNOWN: ReadonlySet<string> = new Set<BillingErrorCode>([
-  'invalid_request',
-  'dev_origin',
-  'unknown_family',
-  'already_subscribed',
-  'price_missing',
-  'coupon_unset',
-  'billing_upstream',
-  'billing_store',
-  'mismatch',
-  'not_complete',
-  'no_subscription',
-  'bad_token',
-  'no_customer',
-]);
+const KNOWN: ReadonlySet<string> = new Set<string>(LAMBDA_CODES);
 
 async function post<T>(path: string, body: object, signal?: AbortSignal): Promise<T> {
-  if (!BASE_URL || !API_KEY)
+  const baseUrl = billingBaseUrl.replace(/\/+$/, '');
+  if (!baseUrl || !API_KEY)
     throw new BillingApiError('not_configured', 0, 'billing endpoint unset');
   let res: Response;
   try {
-    res = await fetch(`${BASE_URL}${path}`, {
+    res = await fetch(`${baseUrl}${path}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
       body: JSON.stringify(body),

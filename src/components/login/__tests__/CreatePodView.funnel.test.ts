@@ -22,6 +22,12 @@ const h = vi.hoisted(() => ({
   resolveDriveCollision: vi.fn(),
   connectLocal: vi.fn(),
   connectDrive: vi.fn(async () => ({ status: 'connected', type: 'google_drive' }) as unknown),
+  features: { newsletter: false },
+  submitNewsletterSignup: vi.fn(),
+  auth: {
+    currentUser: { memberId: 'mem-1', familyId: 'fam-1' } as unknown,
+    signUp: vi.fn(async (_req: Record<string, unknown>) => ({ success: true }) as unknown),
+  },
   sync: { isGoogleDriveAvailable: true, isConfigured: true, registerSignupStart: vi.fn() },
 }));
 
@@ -33,7 +39,7 @@ vi.mock('@/services/telemetry/onboardingAttempt', () => ({
   trackStorageChoice: vi.fn(),
 }));
 vi.mock('@/stores/authStore', () => ({
-  useAuthStore: () => ({ currentUser: { memberId: 'mem-1', familyId: 'fam-1' } }),
+  useAuthStore: () => h.auth,
 }));
 vi.mock('@/stores/familyContextStore', () => ({
   useFamilyContextStore: () => ({ activeFamilyId: 'fam-1' }),
@@ -49,6 +55,10 @@ vi.mock('@/composables/useDriveCollisionRecovery', () => ({
 }));
 vi.mock('@/services/sync/capabilities', () => ({ canUseLocalFiles: () => false }));
 vi.mock('@/utils/errorReporter', () => ({ reportError: h.reportError }));
+vi.mock('@/config/features', () => ({ features: h.features }));
+vi.mock('@/utils/newsletterSubscribe', () => ({
+  submitNewsletterSignup: h.submitNewsletterSignup,
+}));
 
 import CreatePodView from '../CreatePodView.vue';
 
@@ -273,5 +283,60 @@ describe('CreatePodView — #128 storage-step funnel', () => {
     expect(wrapper.emitted('finish-storage')).toBeUndefined();
     expect(vm.formError).toBe('setup.fileCreateFailed');
     expect(h.trackOnboardingStep).not.toHaveBeenCalledWith('storage', 'submitted');
+  });
+});
+
+describe('CreatePodView — newsletter checkbox is an env-gated integration', () => {
+  const checkbox = (w: ReturnType<typeof shallowMount>) =>
+    w.find('input[type="checkbox"]').exists();
+
+  it('is absent when the newsletter feature is off (dev, tests, self-host)', () => {
+    h.features.newsletter = false;
+    const wrapper = shallowMount(CreatePodView, { global: { renderStubDefaultSlot: true } });
+    expect(checkbox(wrapper)).toBe(false);
+  });
+
+  it('is present when the newsletter feature is on', () => {
+    h.features.newsletter = true;
+    const wrapper = shallowMount(CreatePodView, { global: { renderStubDefaultSlot: true } });
+    expect(checkbox(wrapper)).toBe(true);
+    h.features.newsletter = false;
+  });
+
+  describe('the about-you submit', () => {
+    async function submitAboutYou(subscribe: boolean) {
+      h.auth.currentUser = null;
+      h.auth.signUp.mockClear();
+      h.submitNewsletterSignup.mockClear();
+      const wrapper = shallowMount(CreatePodView, { global: { renderStubDefaultSlot: true } });
+      const vm = wrapper.vm as unknown as Vm & { handleStep1Next: () => Promise<void> };
+      vm.name = 'Ada';
+      vm.email = 'ada@example.test';
+      vm.subscribeNewsletter = subscribe;
+      await vm.handleStep1Next();
+      h.auth.currentUser = { memberId: 'mem-1', familyId: 'fam-1' };
+    }
+
+    it('feature on + ticked: records the opt-in and submits the newsletter form post', async () => {
+      h.features.newsletter = true;
+      await submitAboutYou(true);
+      h.features.newsletter = false;
+      expect(h.auth.signUp.mock.calls[0]![0]).toMatchObject({ subscribeNewsletter: true });
+      expect(h.submitNewsletterSignup).toHaveBeenCalledWith('ada@example.test');
+    });
+
+    it('feature on + unticked: records the opt-out and posts nothing', async () => {
+      h.features.newsletter = true;
+      await submitAboutYou(false);
+      h.features.newsletter = false;
+      expect(h.auth.signUp.mock.calls[0]![0]).toMatchObject({ subscribeNewsletter: false });
+      expect(h.submitNewsletterSignup).not.toHaveBeenCalled();
+    });
+
+    it('feature off: records "not asked" (undefined -> null in the store), never an opt-out', async () => {
+      h.features.newsletter = false;
+      await submitAboutYou(true);
+      expect(h.auth.signUp.mock.calls[0]![0].subscribeNewsletter).toBeUndefined();
+    });
   });
 });

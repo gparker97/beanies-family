@@ -2,7 +2,13 @@
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { handler as rawHandler, parseLookupKey, subscriptionAttrs, ROUTES } from '../index.mjs';
+import {
+  handler as rawHandler,
+  parseLookupKey,
+  subscriptionAttrs,
+  routePathOf,
+  ROUTES,
+} from '../index.mjs';
 import { __setDdbClientForTests } from '../ddb.mjs';
 
 // The handler takes ONE argument (the runtime passes `context` second); DynamoDB is injected
@@ -206,6 +212,8 @@ describe('billing Lambda handler', () => {
       'CORS_ORIGINS',
       'DEV_ORIGINS',
       'SLACK_JOINERS_WEBHOOK_URL',
+      'STRIPE_MODE',
+      'ROUTE_PREFIX',
     ])
       delete process.env[k];
   });
@@ -708,6 +716,167 @@ describe('billing Lambda handler', () => {
       assert.equal(p.get('customer'), 'cus_1');
       assert.equal(p.get('return_url'), 'https://beanies.family/settings/plan');
       assert.equal(decisions('portal_session_created').length, 1);
+    });
+  });
+
+  describe('sandbox lane (ROUTE_PREFIX + STRIPE_MODE)', () => {
+    const good = { familyId: FAMILY, plan: 'full', interval: 'year', currency: 'usd' };
+    const LOCAL = 'http://localhost:5173';
+    const sandbox = () => {
+      process.env.STRIPE_MODE = 'sandbox';
+      process.env.ROUTE_PREFIX = '/sandbox';
+    };
+    const sessionStripe = () =>
+      fakeStripe({
+        'GET /v1/prices': { data: [{ id: 'price_1' }] },
+        'POST /v1/checkout/sessions': { id: 'cs_1', client_secret: 'cs_1_secret_abc' },
+      });
+
+    it('routePathOf strips the prefix, and blanks a path that lacks it', () => {
+      const e = (path) => ({ requestContext: { http: { path } } });
+      assert.equal(routePathOf(e('/billing/claim'), ''), '/billing/claim');
+      assert.equal(routePathOf(e('/sandbox/billing/claim'), '/sandbox'), '/billing/claim');
+      assert.equal(routePathOf(e('/billing/claim'), '/sandbox'), '');
+      assert.equal(routePathOf(e('/sandboxed/billing/claim'), '/sandbox'), '');
+      assert.equal(
+        routePathOf({ rawPath: '/sandbox/billing/webhook' }, '/sandbox'),
+        '/billing/webhook'
+      );
+    });
+
+    it('a prefixed instance routes its own paths and 404s the unprefixed prod paths', async () => {
+      sandbox();
+      const t = fakeDdb({ registryDev: { [FAMILY]: { familyId: FAMILY } } });
+      sessionStripe();
+      const ok = await handler(
+        evt({ path: `/sandbox${ROUTES.checkout}`, headers: keyed, body: good, origin: LOCAL }),
+        t.ddb
+      );
+      assert.equal(ok.statusCode, 200, ok.body);
+      // Valid key and body, so the 404 is the router's answer, not an earlier 401/400.
+      const prodPath = await handler(
+        evt({ path: ROUTES.checkout, headers: keyed, body: good, origin: LOCAL }),
+        t.ddb
+      );
+      assert.equal(prodPath.statusCode, 404);
+    });
+
+    it('an unprefixed (prod) instance does not answer a /sandbox path', async () => {
+      const t = fakeDdb();
+      const r = await handler(
+        evt({ path: `/sandbox${ROUTES.claim}`, headers: keyed, body: {} }),
+        t.ddb
+      );
+      assert.equal(r.statusCode, 404);
+    });
+
+    it('mode_mismatch refuses every route, the webhook included, in both directions', async () => {
+      process.env.STRIPE_MODE = 'sandbox';
+      process.env.STRIPE_SECRET_KEY = 'sk_live_1';
+      for (const path of [ROUTES.checkout, ROUTES.webhook]) {
+        const r = await handler(evt({ path, headers: keyed, body: good }), fakeDdb().ddb);
+        assert.equal(r.statusCode, 500, path);
+        assert.equal(json(r).code, 'mode_mismatch');
+      }
+      process.env.STRIPE_MODE = 'live';
+      process.env.STRIPE_SECRET_KEY = 'sk_test_1';
+      const r = await handler(evt({ path: ROUTES.claim, headers: keyed, body: {} }), fakeDdb().ddb);
+      assert.equal(json(r).code, 'mode_mismatch');
+      assert.equal(decisions('mode_mismatch').length, 3);
+      // A matching pair, and an unset mode, are both left alone.
+      process.env.STRIPE_SECRET_KEY = 'rk_live_1';
+      const live = await handler(
+        evt({ path: ROUTES.claim, headers: keyed, body: {} }),
+        fakeDdb().ddb
+      );
+      assert.notEqual(json(live).code, 'mode_mismatch');
+      // An unrecognised mode fails closed instead of silently disabling the sandbox guards.
+      process.env.STRIPE_MODE = 'Sandbox';
+      const typo = await handler(
+        evt({ path: ROUTES.claim, headers: keyed, body: {} }),
+        fakeDdb().ddb
+      );
+      assert.equal(json(typo).code, 'mode_mismatch');
+      delete process.env.STRIPE_MODE;
+      const unset = await handler(
+        evt({ path: ROUTES.claim, headers: keyed, body: {} }),
+        fakeDdb().ddb
+      );
+      assert.notEqual(json(unset).code, 'mode_mismatch');
+    });
+
+    it('checkout and portal refuse any non-dev origin, a missing Origin included', async () => {
+      sandbox();
+      const t = fakeDdb({
+        registryDev: { [FAMILY]: { familyId: FAMILY } },
+        billing: {
+          [FAMILY]: {
+            familyId: FAMILY,
+            planTokenHash: sha('x'.repeat(43)),
+            stripeCustomerId: 'cus_1',
+          },
+        },
+      });
+      const stripeCalls = sessionStripe();
+      for (const origin of ['https://app.beanies.family', undefined]) {
+        const c = await handler(
+          evt({ path: `/sandbox${ROUTES.checkout}`, headers: keyed, body: good, origin }),
+          t.ddb
+        );
+        assert.equal(c.statusCode, 403, String(origin));
+        assert.equal(json(c).code, 'sandbox_origin');
+        const p = await handler(
+          evt({
+            path: `/sandbox${ROUTES.portal}`,
+            headers: keyed,
+            body: { familyId: FAMILY, planToken: 'x'.repeat(43) },
+            origin,
+          }),
+          t.ddb
+        );
+        assert.equal(p.statusCode, 403, String(origin));
+        assert.equal(json(p).code, 'sandbox_origin');
+      }
+      assert.equal(stripeCalls.length, 0, 'a refused origin never reaches Stripe');
+      assert.equal(decisions('checkout_refused')[0].reason, 'sandbox_origin');
+      assert.equal(decisions('portal_refused')[0].reason, 'sandbox_origin');
+    });
+
+    it('checkout refuses a family that exists in the PROD registry (live_family); a dev-only family proceeds', async () => {
+      sandbox();
+      const t = fakeDdb({
+        registry: { [FAMILY]: { familyId: FAMILY } },
+        registryDev: { [FAMILY]: { familyId: FAMILY }, [OTHER]: { familyId: OTHER } },
+      });
+      const stripeCalls = sessionStripe();
+      const live = await handler(
+        evt({ path: `/sandbox${ROUTES.checkout}`, headers: keyed, body: good, origin: LOCAL }),
+        t.ddb
+      );
+      assert.equal(live.statusCode, 403);
+      assert.equal(json(live).code, 'live_family');
+      assert.equal(decisions('checkout_refused')[0].reason, 'live_family');
+      assert.equal(stripeCalls.length, 0);
+      const dev = await handler(
+        evt({
+          path: `/sandbox${ROUTES.checkout}`,
+          headers: keyed,
+          body: { ...good, familyId: OTHER },
+          origin: LOCAL,
+        }),
+        t.ddb
+      );
+      assert.equal(dev.statusCode, 200, dev.body);
+    });
+
+    it('the live_family check is sandbox-only: prod never reads the registry twice for it', async () => {
+      process.env.STRIPE_MODE = 'live';
+      process.env.STRIPE_SECRET_KEY = 'sk_live_1';
+      const t = fakeDdb({ registry: { [FAMILY]: { familyId: FAMILY } } });
+      sessionStripe();
+      const r = await handler(evt({ path: ROUTES.checkout, headers: keyed, body: good }), t.ddb);
+      assert.equal(r.statusCode, 200, r.body);
+      assert.equal(t.calls.filter((c) => c.input.TableName === REGISTRY).length, 1);
     });
   });
 

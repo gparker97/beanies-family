@@ -1,4 +1,5 @@
 import { expect, type Locator, type Page } from '@playwright/test';
+import { assertNoSubstack, guardSubstack } from './substack-guard';
 import { ui } from './ui-strings';
 
 const E2E_PIN = '123456';
@@ -130,6 +131,9 @@ export async function answerReauthIfAsked(page: Page, timeout = 5000): Promise<v
  * members live on the finish surface.)
  */
 export async function navigateToAddMembers(page: Page): Promise<void> {
+  // Tripwire for fixture-less callers (store-screenshot / promo captures); idempotent when the
+  // E2E fixture already installed it.
+  await guardSubstack(page);
   const createPodButton = page.getByTestId('create-pod-button');
   await createPodButton.waitFor({ state: 'visible', timeout: 5000 });
 
@@ -162,6 +166,9 @@ export async function bypassLoginIfNeeded(
   page: Page,
   opts: { familyName?: string } = {}
 ): Promise<void> {
+  // Tripwire for fixture-less callers (store-screenshot / promo captures); idempotent when the
+  // E2E fixture already installed it. assertNoSubstack runs before this helper returns.
+  await guardSubstack(page);
   const createPodButton = page.getByTestId('create-pod-button');
 
   // Wait for whichever screen the app settles on: the welcome gate (fresh context) or
@@ -211,4 +218,5 @@ export async function bypassLoginIfNeeded(
   await page.evaluate(() => {
     sessionStorage.setItem('e2e_auto_auth', 'true');
   });
+  assertNoSubstack(page);
 }

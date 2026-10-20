@@ -5,14 +5,15 @@
  * Local harness for the billing Lambda (#95 Phase 5). DEV TOOLING, never packaged: the
  * module's `archive_file` excludes this file, and nothing in `index.mjs` imports it.
  *
- * WHY IT EXISTS: after the live-key flip, prod holds exactly one Stripe key pair. Sandbox
- * testing then happens here, on the dev machine, with the deployed handler running unchanged
- * against the sandbox keys from `~/.beanies-tf.env`. There is no second key set in prod or in
- * GitHub, on purpose (greg, 2026-10-01).
+ * WHY IT EXISTS: day-to-day sandbox testing uses the DEPLOYED sandbox lane
+ * (`https://api.beanies.family/sandbox`, `module.billing_sandbox`, decided 2026-10-20), which
+ * `.env` points `npm run dev` at. This harness is for iterating on `index.mjs` itself before a
+ * deploy: the handler runs unchanged on the dev machine against the sandbox keys from
+ * `~/.beanies-tf.env` and the same sandbox billing table the lane uses.
  *
  *   source ~/.beanies-tf.env
  *   npm run billing:local                          # http://localhost:8787
- *   stripe listen --forward-to localhost:8787/billing/webhook
+ *   stripe listen --forward-to localhost:8787/billing/webhook   # optional: webhooks to the harness
  *   VITE_BILLING_BASE_URL=http://localhost:8787 npm run dev
  *
  * It wraps `handler` in a synthetic API Gateway HTTP API v2 event, so what runs is the same
@@ -21,10 +22,15 @@
  *   STRIPE_WEBHOOK_SECRET  <- BEANIES_STRIPE_SANDBOX_WEBHOOK_SECRET, or the `whsec_` `stripe listen` prints
  *   STRIPE_PRE_V1_COUPON   <- TF_VAR_stripe_pre_v1_coupon (default PRE_V1_50)
  *   BILLING_API_KEY        <- TF_VAR_registry_api_key (the dev client sends the registry key)
- *   BILLING_TABLE_NAME     <- REQUIRED, and never the prod table (see README: a sandbox table)
- *   REGISTRY_TABLE_NAME    <- beanies-family-registry-dev (localhost families live there)
- *   (DEV_ORIGINS keeps its default: the refusal only fires with a LIVE key, and the harness
- *    always runs with the sandbox key, so localhost checks out and reads the dev registry.)
+ *   BILLING_TABLE_NAME     <- beanies-family-billing-sandbox (the lane's table); never a -prod table
+ *   STRIPE_MODE            <- sandbox (the deployed lane's guards: mode_mismatch, sandbox_origin,
+ *                             live_family), on top of the harness's own live-key refusal below
+ *   REGISTRY_DEV_TABLE_NAME<- beanies-family-registry-dev (localhost families live there; a
+ *                             localhost checkout looks the family up here, as on the lane)
+ *   REGISTRY_TABLE_NAME    <- beanies-family-registry-prod, READ ONLY, for one thing: the
+ *                             `live_family` existence check, so a real pod opened on
+ *                             `npm run dev` can never pick up a sandbox plan token here either
+ *   (DEV_ORIGINS keeps its default: localhost checks out; any other origin is `sandbox_origin`.)
  */
 
 import { createServer } from 'node:http';
@@ -76,14 +82,17 @@ export function applyLocalEnv(env = process.env) {
   env.STRIPE_WEBHOOK_SECRET ||= env.BEANIES_STRIPE_SANDBOX_WEBHOOK_SECRET || '';
   env.STRIPE_PRE_V1_COUPON ||= env.TF_VAR_stripe_pre_v1_coupon || 'PRE_V1_50';
   env.BILLING_API_KEY ||= env.TF_VAR_registry_api_key || '';
-  // NEVER the prod billing table by default: after the live-key flip, a sandbox claim or a
-  // forwarded sandbox webhook would write `status=active` and `cus_test_` ids into a LIVE
-  // family's row. The harness needs its own table (README: one `create-table` line), named
-  // explicitly. The registry default is the dev table for the same reason.
-  env.BILLING_TABLE_NAME ||= '';
-  // The DEV registry table (the one localhost origins already write to), never prod: a checkout
-  // here would otherwise send a live family's ownerEmail to the sandbox as `customer_email`.
-  env.REGISTRY_TABLE_NAME ||= 'beanies-family-registry-dev';
+  // NEVER the prod billing table: a sandbox claim or a forwarded sandbox webhook would write
+  // `status=active` and `cus_test_` ids into a LIVE family's row. The default is the sandbox
+  // lane's table (Terraform `module.billing_sandbox`), so the registry's dev-origin entitlement
+  // read sees what the harness writes. The registry default is the dev table for the same reason.
+  env.BILLING_TABLE_NAME ||= 'beanies-family-billing-sandbox';
+  // Same guards and tables as the deployed sandbox lane (module.billing_sandbox). A localhost
+  // checkout reads the DEV registry (registryDevTable), so a live family's ownerEmail never
+  // reaches the sandbox as `customer_email`; the PROD registry is read only for `live_family`.
+  env.STRIPE_MODE ||= 'sandbox';
+  env.REGISTRY_DEV_TABLE_NAME ||= 'beanies-family-registry-dev';
+  env.REGISTRY_TABLE_NAME ||= 'beanies-family-registry-prod';
   env.CORS_ORIGINS ||= 'http://localhost:5173,http://localhost:4173';
   env.BILLING_LOCAL = '1';
   return env;
@@ -123,7 +132,7 @@ if (invokedDirectly) {
   );
   if (missing.length) {
     console.error(
-      `[billing-local] missing ${missing.join(', ')}. Run: source ~/.beanies-tf.env, then BILLING_TABLE_NAME=beanies-family-billing-sandbox npm run billing:local (see infrastructure/lambda/billing/README.md).`
+      `[billing-local] missing ${missing.join(', ')}. Run: source ~/.beanies-tf.env, then npm run billing:local (see infrastructure/lambda/billing/README.md).`
     );
     process.exit(1);
   }
@@ -139,6 +148,12 @@ if (invokedDirectly) {
   ) {
     console.error(
       `[billing-local] refusing to run against ${process.env.BILLING_TABLE_NAME}: sandbox subscriptions would land in live families' rows. Use the sandbox table, or set BILLING_LOCAL_ALLOW_PROD=1 if you really mean it.`
+    );
+    process.exit(1);
+  }
+  if (process.env.REGISTRY_TABLE_NAME === process.env.REGISTRY_DEV_TABLE_NAME) {
+    console.error(
+      `[billing-local] REGISTRY_TABLE_NAME and REGISTRY_DEV_TABLE_NAME are both ${process.env.REGISTRY_TABLE_NAME}: the live_family check would read the dev table and refuse every family. Unset REGISTRY_TABLE_NAME (default: beanies-family-registry-prod, read only).`
     );
     process.exit(1);
   }

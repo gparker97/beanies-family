@@ -11,6 +11,9 @@ const ALL_ENV_KEYS = [
   'VITE_OAUTH_PROXY_URL',
   'VITE_REGISTRY_API_URL',
   'VITE_REGISTRY_API_KEY',
+  'VITE_STRIPE_PUBLISHABLE_KEY',
+  'VITE_BILLING_BASE_URL',
+  'VITE_NEWSLETTER_SUBSCRIBE_URL',
   'VITE_INVITE_GATE',
   'VITE_INVITE_BEAN_HASHES',
   'VITE_INVITE_WEBHOOK_URL',
@@ -71,6 +74,7 @@ describe('config/features', () => {
     it('entitlement needs the registry (every platform); checkout also needs the Stripe key (web)', async () => {
       // greg's local .env carries the sandbox key; the test must not inherit it.
       vi.stubEnv('VITE_STRIPE_PUBLISHABLE_KEY', '');
+      vi.stubEnv('VITE_BILLING_BASE_URL', 'https://api.example.com/sandbox');
       vi.stubEnv('VITE_REGISTRY_API_URL', 'https://api.example.com');
       vi.stubEnv('VITE_REGISTRY_API_KEY', 'secret');
       let mod = await importFeatures();
@@ -89,6 +93,8 @@ describe('config/features', () => {
     });
 
     it('checkout on the cloud host needs a LIVE key: a sandbox key never offers test-mode checkout at app.beanies.family', async () => {
+      // vitest is a DEV build, where the billing endpoint must be explicit (no registry fallback).
+      vi.stubEnv('VITE_BILLING_BASE_URL', 'https://api.example.com');
       vi.stubEnv('VITE_REGISTRY_API_URL', 'https://api.example.com');
       vi.stubEnv('VITE_REGISTRY_API_KEY', 'secret');
       vi.stubEnv('VITE_STRIPE_PUBLISHABLE_KEY', 'pk_test_x');
@@ -104,14 +110,64 @@ describe('config/features', () => {
       // A dev build with the sandbox key keeps the full flow.
       vi.stubEnv('VITE_STRIPE_PUBLISHABLE_KEY', 'pk_test_x');
       setHostname('localhost');
+      vi.stubEnv('VITE_BILLING_BASE_URL', 'https://api.example.com/sandbox');
       mod = await importFeatures();
       expect(mod.features.checkout).toBe(true);
     });
 
+    describe('dev builds never reach live Stripe', () => {
+      beforeEach(() => {
+        vi.stubEnv('DEV', true);
+        vi.stubEnv('VITE_REGISTRY_API_URL', 'https://api.example.com');
+        vi.stubEnv('VITE_REGISTRY_API_KEY', 'secret');
+      });
+
+      it('DEV + pk_live_ key: checkout off, with a fix-it warning', async () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        vi.stubEnv('VITE_STRIPE_PUBLISHABLE_KEY', 'pk_live_x');
+        vi.stubEnv('VITE_BILLING_BASE_URL', 'https://api.example.com/sandbox');
+        const mod = await importFeatures();
+        expect(mod.features.checkout).toBe(false);
+        expect(warn.mock.calls.flat().join(' ')).toMatch(
+          /VITE_BILLING_BASE_URL=.*\/sandbox.*pk_test_/
+        );
+        warn.mockRestore();
+      });
+
+      it('DEV + no VITE_BILLING_BASE_URL: checkout off and no fallback to the registry URL', async () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        vi.stubEnv('VITE_STRIPE_PUBLISHABLE_KEY', 'pk_test_x');
+        const mod = await importFeatures();
+        expect(mod.billingBaseUrl).toBe('');
+        expect(mod.features.checkout).toBe(false);
+        expect(warn).toHaveBeenCalledTimes(1);
+        warn.mockRestore();
+      });
+
+      it('DEV + pk_test_ key + base URL: checkout on, no warning', async () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        vi.stubEnv('VITE_STRIPE_PUBLISHABLE_KEY', 'pk_test_x');
+        vi.stubEnv('VITE_BILLING_BASE_URL', 'https://api.example.com/sandbox');
+        const mod = await importFeatures();
+        expect(mod.billingBaseUrl).toBe('https://api.example.com/sandbox');
+        expect(mod.features.checkout).toBe(true);
+        expect(warn).not.toHaveBeenCalled();
+        warn.mockRestore();
+      });
+    });
+
+    it('a production build with no override falls back to the registry URL', async () => {
+      vi.stubEnv('DEV', false);
+      vi.stubEnv('VITE_REGISTRY_API_URL', 'https://api.example.com');
+      const mod = await importFeatures();
+      expect(mod.billingBaseUrl).toBe('https://api.example.com');
+    });
+
     it('single-var features derive directly from their env vars', async () => {
-      const cases: Array<[string, 'slackPodCreate' | 'analytics']> = [
+      const cases: Array<[string, 'slackPodCreate' | 'analytics' | 'newsletter']> = [
         ['VITE_SLACK_WEBHOOK_URL', 'slackPodCreate'],
         ['VITE_PLAUSIBLE_DOMAIN', 'analytics'],
+        ['VITE_NEWSLETTER_SUBSCRIBE_URL', 'newsletter'],
       ];
 
       for (const [envKey, featureKey] of cases) {

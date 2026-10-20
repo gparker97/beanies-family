@@ -1,8 +1,8 @@
 /**
  * Log prefixes that have a CloudWatch metric filter + alarm in `modules/billing/main.tf`.
  *
- * Declared in one place and IMPORTED by the handler, so a test (`__tests__/alarms.test.mjs`)
- * can read the Terraform and assert every prefix appears there verbatim. A drifted prefix then
+ * Declared in one place and IMPORTED by the handler, so a test (the ops repo's
+ * `infrastructure/__tests__/alarm-prefixes.test.mjs`) can read the Terraform and assert every prefix appears there verbatim. A drifted prefix then
  * fails CI instead of silently disarming an alarm (the ai-extract `meter.mjs` pattern).
  */
 export const WEBHOOK_APPLY_FAILED_PREFIX = '[billing] webhook_apply_failed';

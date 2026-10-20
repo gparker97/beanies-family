@@ -3,26 +3,30 @@ import { bypassLoginIfNeeded } from '../../e2e/helpers/auth';
 import { gotoRoot } from '../../e2e/helpers/navigation';
 import type { Page } from '@playwright/test';
 
+import { sandboxStripeKey, stripeHeaders } from './sandboxStripe';
+
 /**
- * NOT a test — the whole #95 pricing flow as a family experiences it, from `npm run dev`
- * against the LIVE billing Lambda and the Stripe SANDBOX, with nothing stubbed on the money
- * path. Lives OUTSIDE `e2e/specs/` on purpose (see capture.ts). Run it deliberately, on a dev
- * server on port 4173 (a `DEV_ORIGINS` port, so the Lambda uses the dev registry table):
- *   source ~/.beanies-tf.env && VITE_STRIPE_PUBLISHABLE_KEY=$BEANIES_STRIPE_PUBLISHABLE_KEY \
- *     npm run dev -- --port 4173 --strictPort &
- *   npx playwright test -c playwright.design.config.ts --grep "plan flow"
+ * NOT a test — the whole #95 pricing flow as a family experiences it, from `npm run dev` against
+ * the SANDBOX billing lane (`/sandbox/billing/*`, `module.billing_sandbox`) and the Stripe
+ * sandbox, with nothing stubbed. Lives OUTSIDE `e2e/specs/` on purpose (see capture.ts). Run it
+ * deliberately; the design config starts (or reuses) `npm run dev` on :5173 with `.env`, which
+ * must carry `VITE_BILLING_BASE_URL=https://api.beanies.family/sandbox` and a `pk_test_` key:
+ *   source ~/.beanies-tf.env && npx playwright test -c playwright.design.config.ts --grep "plan flow"
  *
- * What is real: the family's registry row (the create flow's PUT reaches the dev registry), the
- * checkout session (our Lambda), the Stripe iframe and the test-card payment, the claim and the
- * token, the webhook into the prod billing table, the portal session. What is faked: only the
- * registry GET's `entitlement` block (the dev registry Lambda answers `beta` for every family;
- * this script answers `trial` and, after the claim, `active` so the page swaps as it would at
- * v1). Cleanup: the fixture removes the registry row; this script removes the billing row and
- * the sandbox customer.
+ * Sandbox-only by construction: `sandboxStripeKey()` reads the SANDBOX key by name and throws on
+ * a live one, so the cleanup's DELETEs can never reach the live account.
+ *
+ * What is real: the family's registry row (the create flow's PUT reaches the dev registry), its
+ * entitlement (the registry reads the sandbox billing table for localhost origins), the checkout
+ * session, the Stripe iframe and the test-card payment, the claim and the token, the webhook into
+ * the sandbox billing table, the portal session. Stripe's invisible hCaptcha may refuse a
+ * headless submit (seen 2026-10-20); if step 3 times out with the form still filled, that is the
+ * cause, and the payment step is greg's to do by hand. Cleanup: the fixture removes the registry
+ * row; this script removes the sandbox subscription and customer and prints the billing-row delete.
  */
 
 const SHOTS = 'scratch-shots/plan-flow';
-const STRIPE_KEY = process.env.TF_VAR_stripe_secret_key ?? '';
+const STRIPE_KEY = sandboxStripeKey();
 
 async function shot(page: Page, name: string) {
   await page.waitForTimeout(600);
@@ -30,77 +34,28 @@ async function shot(page: Page, name: string) {
 }
 
 test('plan flow: pay in the page, claim, portal, lapse', async ({ page }) => {
-  test.skip(!STRIPE_KEY, 'source ~/.beanies-tf.env first');
-  const now = new Date();
-  const inDays = (d: number) => new Date(now.getTime() + d * 86_400_000).toISOString();
-  let phase: 'trial' | 'active' = 'trial';
-  const registered = new Map<string, Record<string, unknown>>();
+  test.skip(!STRIPE_KEY, 'source ~/.beanies-tf.env first (BEANIES_STRIPE_SANDBOX_SECRET_KEY)');
+  const registered = new Set<string>();
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => {
     if (/billing|claim/.test(m.text())) console.log(`[page:${m.type()}] ${m.text()}`);
   });
 
-  // The create flow's PUT goes to the REAL (dev) registry; the GET is answered here with the
-  // registered row plus an entitlement block.
+  // Everything goes to the REAL registry; this only notes which family the create flow registered.
   await page.route('**/family/**', async (route) => {
     const req = route.request();
     if (req.resourceType() !== 'fetch' && req.resourceType() !== 'xhr') return route.fallback();
-    const familyId = decodeURIComponent(new URL(req.url()).pathname.split('/family/')[1] ?? '');
     if (req.method() === 'PUT' || req.method() === 'POST') {
-      try {
-        registered.set(familyId, {
-          ...(registered.get(familyId) ?? {}),
-          ...(req.postDataJSON() as object),
-        });
-      } catch {
-        /* not JSON */
-      }
-      return route.continue();
+      registered.add(decodeURIComponent(new URL(req.url()).pathname.split('/family/')[1] ?? ''));
     }
-    if (req.method() !== 'GET') return route.continue();
-    const entry = registered.get(familyId);
-    if (!entry) return route.continue();
-    const entitlement =
-      phase === 'active'
-        ? {
-            state: 'active',
-            reason: 'subscribed',
-            plan: 'full',
-            cohort: null,
-            trialEndsAt: null,
-            currentPeriodEnd: inDays(30),
-            enforced: false,
-            serverTime: now.toISOString(),
-          }
-        : {
-            state: 'trial',
-            reason: 'in_trial',
-            plan: null,
-            cohort: null,
-            trialEndsAt: inDays(59),
-            currentPeriodEnd: null,
-            enforced: false,
-            serverTime: now.toISOString(),
-          };
-    return route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        ...entry,
-        familyId,
-        createdAt: inDays(-31),
-        updatedAt: now.toISOString(),
-        entitlement,
-      }),
-    });
+    return route.continue();
   });
   // Watch the real claim go by.
   let claimStatus = 0;
   page.on('response', (res) => {
     if (res.url().endsWith('/billing/claim')) {
       claimStatus = res.status();
-      if (res.status() === 200) phase = 'active';
     }
   });
 
@@ -167,8 +122,7 @@ test('plan flow: pay in the page, claim, portal, lapse', async ({ page }) => {
   await expect(page.getByTestId('plan-active')).toBeVisible();
 
   // 5. The billing row and the sandbox objects, then cleanup.
-  const auth = `Basic ${Buffer.from(`${STRIPE_KEY}:`).toString('base64')}`;
-  const H = { Authorization: auth, 'Stripe-Version': '2026-08-26.dahlia' };
+  const H = stripeHeaders(STRIPE_KEY);
   const subs = (await fetch('https://api.stripe.com/v1/subscriptions?limit=20', {
     headers: H,
   }).then((r) => r.json())) as {
@@ -187,7 +141,7 @@ test('plan flow: pay in the page, claim, portal, lapse', async ({ page }) => {
   });
   // The billing row for this throwaway family (the fixture removes the registry row).
   process.stdout.write(
-    `FLOW_FAMILY_ID=${familyId}  (now: aws dynamodb delete-item --table-name beanies-family-billing-prod --key '{"familyId":{"S":"${familyId}"}}')\n`
+    `FLOW_FAMILY_ID=${familyId}  (now: aws dynamodb delete-item --table-name beanies-family-billing-sandbox --key '{"familyId":{"S":"${familyId}"}}')\n`
   );
   expect(errors, `page errors: ${errors.join(' | ')}`).toEqual([]);
 });

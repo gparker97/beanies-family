@@ -37,6 +37,7 @@ vi.mock('@aws-sdk/client-dynamodb', () => {
 const API_KEY = 'test-key';
 const FAMILY_ID = '11111111-2222-4333-8444-555555555555';
 const BILLING_TABLE = 'billing-prod';
+const BILLING_DEV_TABLE = 'billing-sandbox';
 
 let handler;
 
@@ -782,7 +783,7 @@ async function get(
 ) {
   sendMock.mockReset();
   sendMock.mockImplementation((command) => {
-    if (command.input.TableName === BILLING_TABLE) {
+    if ([BILLING_TABLE, BILLING_DEV_TABLE].includes(command.input.TableName)) {
       if (billing instanceof Error) return Promise.reject(billing);
       return Promise.resolve({ Item: billing ? marshall(billing) : undefined });
     }
@@ -1634,6 +1635,13 @@ describe('registry GET: entitlement (#95)', () => {
     );
     expect(errorSpy.mock.calls[0][0]).toContain('dynamodb:GetItem');
     expect(computedLines()).toHaveLength(0);
+    const unavailable = logSpy.mock.calls
+      .map((c) => c[0])
+      .filter((l) => typeof l === 'string' && l.includes('"entitlement_unavailable"'))
+      .map((l) => JSON.parse(l));
+    expect(unavailable).toEqual([
+      { msg: 'entitlement_unavailable', family_id_hash: expect.any(String), table: 'prod' },
+    ]);
   });
 
   it('reflects BILLING_ENFORCE in `enforced`, and only the exact string "true" enforces', async () => {
@@ -1647,10 +1655,42 @@ describe('registry GET: entitlement (#95)', () => {
     expect((await get(ROW)).body.entitlement.enforced).toBe(false);
   });
 
-  it('reads the ONE billing table even for a dev-origin request', async () => {
+  it('a dev-origin request reads the sandbox billing table, so a sandbox purchase reads `active` on dev', async () => {
+    process.env.BILLING_DEV_TABLE_NAME = BILLING_DEV_TABLE;
+    process.env.V1_LAUNCH_AT = LAUNCH;
+    try {
+      const { body } = await get(ROW, {
+        origin: 'http://localhost:5173',
+        billing: { familyId: FAMILY_ID, status: 'active', plan: 'full' },
+      });
+      expect(getCommands().map((c) => c.input.TableName)).toEqual([
+        'registry-dev',
+        BILLING_DEV_TABLE,
+      ]);
+      expect(body.entitlement.state).toBe('active');
+      expect(computedLines()[0].table).toBe('dev');
+    } finally {
+      delete process.env.BILLING_DEV_TABLE_NAME;
+    }
+  });
+
+  it('a prod-origin request reads the prod billing table even when a dev table is configured', async () => {
+    process.env.BILLING_DEV_TABLE_NAME = BILLING_DEV_TABLE;
+    try {
+      await get(ROW);
+      expect(getCommands().map((c) => c.input.TableName)).toEqual(['registry-prod', BILLING_TABLE]);
+      expect(computedLines()[0].table).toBe('prod');
+    } finally {
+      delete process.env.BILLING_DEV_TABLE_NAME;
+    }
+  });
+
+  it('an unset BILLING_DEV_TABLE_NAME falls back to the prod billing table for a dev origin', async () => {
     await get(ROW, { origin: 'http://localhost:5173' });
     const tables = getCommands().map((c) => c.input.TableName);
     expect(tables).toEqual(['registry-dev', BILLING_TABLE]);
+    // The label names the table actually read (prod, via the fallback), not the origin's side.
+    expect(computedLines()[0].table).toBe('prod');
   });
 
   it('logs one structured `entitlement_computed` line per GET, hashed id only', async () => {
@@ -1666,6 +1706,7 @@ describe('registry GET: entitlement (#95)', () => {
       reason: 'in_trial',
       enforced: true,
       launch_set: true,
+      table: 'prod',
     });
     const everything = JSON.stringify([logSpy.mock.calls, warnSpy.mock.calls]);
     expect(everything).not.toContain(FAMILY_ID);

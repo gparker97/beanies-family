@@ -64,7 +64,18 @@ describe('local harness', () => {
     assert.equal(env.STRIPE_WEBHOOK_SECRET, 'whsec_1');
     assert.equal(env.BILLING_API_KEY, 'k');
     assert.equal(env.STRIPE_PRE_V1_COUPON, 'PRE_V1_50');
-    assert.equal(env.BILLING_TABLE_NAME, '', 'never the prod billing table by default');
+    assert.equal(
+      env.BILLING_TABLE_NAME,
+      'beanies-family-billing-sandbox',
+      "the sandbox lane's table by default, never the prod billing table"
+    );
+    assert.equal(env.STRIPE_MODE, 'sandbox', "the deployed lane's guards");
+    assert.equal(env.REGISTRY_DEV_TABLE_NAME, 'beanies-family-registry-dev');
+    assert.equal(
+      env.REGISTRY_TABLE_NAME,
+      'beanies-family-registry-prod',
+      'read only, for the live_family check'
+    );
     assert.equal(env.BILLING_LOCAL, '1');
   });
 
