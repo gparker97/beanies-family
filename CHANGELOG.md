@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-10-22
+
+### Changed
+
+- Phones still on a build older than 1.0.3 are now asked to update, since 1.0.3 is live on both stores.
+
 ## 2026-10-20
 
 ### Fixed
