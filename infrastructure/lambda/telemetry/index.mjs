@@ -72,7 +72,7 @@ export const SLACK_ESCALATE_SURFACES = new Set([
   'login-flow', // pod-creation owner rehydrate or sign-out failed: the person is stuck
   'offline-queue-flush', // queued offline edits failed past the flush threshold
   'photo-upload', // a photo failed to save
-  'pod-access', // canonical mismatch, pointer-write refusal, deletion residue
+  'pod-access', // canonical mismatch, pointer-write refusal, deletion residue (degraded codes below never page)
   'pod-compaction', // compaction failed, or a safety copy survived a deletion
   'pod-lineage', // pod lineage break: merge would lose history
   'pod-load-failure', // the pod payload is corrupt (device cannot open it)
@@ -188,6 +188,34 @@ export function lateSeconds(rawTimestamp, sentAtMs) {
 }
 
 /**
+ * `pod-access` codes whose registry entry is `impact: 'degraded'` (`POD_ACCESS_ERRORS` in
+ * `src/utils/podAccess.ts`; the drift test pins this set against it). A current client already
+ * sends these at `warning` through `severityFor`, but a native build from before 2026-10-15
+ * (0.96 / 0.97) still ships every pod-access code as `critical`, and `pod-access` is on the
+ * allowlist for the data-at-risk codes. Without this gate one of those builds pages Slack for
+ * "no home for this family" after the person disconnected Google themselves (2026-10-22).
+ * The code arrives as `action` (verify, `logPodAccessResult`) or as `error_code`
+ * (`rebind-failed`); both are checked.
+ */
+export const POD_ACCESS_DEGRADED_CODES = new Set([
+  'CONSENT_EXPIRED',
+  'FILE_NEWER_VERSION',
+  'FILE_NOT_FOUND',
+  'FILE_OLDER_VERSION',
+  'NO_HOME',
+  'OFFLINE',
+  'PERMISSION_DENIED',
+  'VERIFY_UNAVAILABLE',
+]);
+
+function isDegradedPodAccess(e) {
+  return (
+    e.surface === 'pod-access' &&
+    (POD_ACCESS_DEGRADED_CODES.has(e.action) || POD_ACCESS_DEGRADED_CODES.has(e.error_code))
+  );
+}
+
+/**
  * Whether one sanitized event pages Slack: null (not a pageable event), `late`, `duplicate`, or
  * `page` with its dedup key. Pure apart from reading the dedup map.
  */
@@ -195,6 +223,7 @@ export function pageDecision(sanitized, late, now, batchKeys) {
   if (sanitized.severity !== 'critical' || !SLACK_ESCALATE_SURFACES.has(sanitized.surface)) {
     return null;
   }
+  if (isDegradedPodAccess(sanitized)) return null;
   if (late !== null) return { kind: 'late' };
   const key = pageKey(sanitized);
   if (batchKeys.has(key) || isDuplicatePage(key, now)) return { kind: 'duplicate' };

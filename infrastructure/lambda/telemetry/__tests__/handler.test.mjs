@@ -644,6 +644,43 @@ describe('Telemetry Lambda handler', () => {
         assert.deepEqual(mod.pageDecision(critical, null, 0, keys), { kind: 'duplicate' });
       });
 
+      it('a degraded pod-access code never pages, whichever field carries it', () => {
+        // Pre-2026-10-15 native builds send every pod-access code as critical; the server
+        // mirrors the registry's `impact: 'degraded'` so NO_HOME after a self-inflicted
+        // Google disconnect stays in CloudWatch.
+        const podAccess = {
+          ...critical,
+          surface: 'pod-access',
+          message: 'pod access failed: NO_HOME',
+        };
+        assert.equal(
+          mod.pageDecision({ ...podAccess, action: 'NO_HOME' }, null, 0, new Set()),
+          null
+        );
+        assert.equal(
+          mod.pageDecision(
+            { ...podAccess, action: 'rebind-failed', error_code: 'CONSENT_EXPIRED' },
+            null,
+            0,
+            new Set()
+          ),
+          null
+        );
+        // The data-at-risk code and the other genuine actions still page.
+        for (const action of [
+          'CANONICAL_MISMATCH',
+          'registry-pointer-write-refused',
+          'delete-family',
+        ]) {
+          const d = mod.pageDecision({ ...podAccess, action }, null, 0, new Set());
+          assert.equal(d?.kind, 'page', action);
+        }
+        assert.deepEqual(
+          [...mod.POD_ACCESS_DEGRADED_CODES],
+          [...mod.POD_ACCESS_DEGRADED_CODES].sort()
+        );
+      });
+
       it('late_s and sentAt are server-side only: a client-sent late_s is dropped', async () => {
         assert.equal(mod.ALLOWED_CONTEXT_KEYS.has('late_s'), false);
         assert.equal(mod.ALLOWED_CONTEXT_KEYS.has('sentAt'), false);

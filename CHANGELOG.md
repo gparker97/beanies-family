@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-10-23
+
+### Fixed
+
+- Older app builds reporting a recoverable "no home for this family" pod-access condition no longer page the error channel; the server now applies the same severity rule the current app does.
+
 ## 2026-10-22
 
 ### Changed

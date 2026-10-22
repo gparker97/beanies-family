@@ -25,6 +25,7 @@
 import { describe, it, expect } from 'vitest';
 import { ALLOWED_CONTEXT_KEYS } from '../diagnosticContext';
 import { PAGING_SURFACES } from '../pagingPolicy';
+import { POD_ACCESS_ERRORS } from '../podAccess';
 // The telemetry Lambda's mirrored copy. Plain JS with no .d.ts — imported for its runtime
 // value only, exactly as the prompt drift guard imports the ai-extract copy.
 // @ts-expect-error — no type declarations for the Lambda source.
@@ -83,5 +84,16 @@ describe('Slack paging surfaces: client vs Lambda', () => {
 
   it('PAGING_SURFACES and SLACK_ESCALATE_SURFACES are the same set', () => {
     expect([...(lambdaPagingSurfaces ?? [])].sort()).toEqual(Object.keys(PAGING_SURFACES).sort());
+  });
+
+  it("the Lambda's degraded pod-access codes mirror the registry's `impact: 'degraded'` entries", () => {
+    // `pod-access` is allowlisted for its data-at-risk codes, so the server has to know which
+    // codes a pre-policy native build may still send as `critical` without meaning it.
+    const lambdaDegraded = telemetryLambda.POD_ACCESS_DEGRADED_CODES as Set<string>;
+    const registryDegraded = Object.entries(POD_ACCESS_ERRORS)
+      .filter(([, entry]) => entry.impact === 'degraded')
+      .map(([code]) => code)
+      .sort();
+    expect([...lambdaDegraded].sort()).toEqual(registryDegraded);
   });
 });
