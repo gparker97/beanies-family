@@ -133,7 +133,7 @@ const DEBOUNCE_MS = 2000;
 // would join the trailing slot, which waits for the very run awaiting it (a deadlock).
 // Fire-and-forget paths (`triggerDebouncedSave`, `tryFlush`) are safe because they are not
 // awaited inside `doSave`.
-const saveFlight = createTrailingSingleFlight<SaveOptions, boolean>(
+const saveFlight = createTrailingSingleFlight<SaveOptions, SaveResult>(
   (opts) => doSave(opts),
   (queued, incoming) => ({
     repairCorruptLocal: queued.repairCorruptLocal || incoming.repairCorruptLocal,
@@ -729,6 +729,29 @@ let lastSaveError: string | null = null;
 // The thrown value behind `lastSaveError`, kept so a subscriber can classify the failure that is
 // current when it asks (the transition callback only names the one that crossed the threshold).
 let lastSaveCause: unknown = null;
+/**
+ * Why a `doSave` did not land, in the classes a person can act on: `auth` (Google disconnected
+ * or consent expired, in the read OR the write phase), `transient` (offline, slow or a Google
+ * blip; the intent was queued), `no-provider` (no storage provider installed, e.g. Drive could
+ * not restore after a disconnect), `deferred` (a save hold, or the provider/family changed
+ * under the save; the intent is re-armed, nothing was lost) and `error` (anything else).
+ *
+ * ⚠️ NOT `lastSaveCause`. A queued save returns `false` WITHOUT `recordSaveFailure`, so the
+ * twin is null or stale exactly when the save did not land for a transient reason.
+ *
+ * ⚠️ RETURNED WITH THE RESULT (`SaveResult`), NEVER READ FROM MODULE STATE. `save()` is a
+ * trailing single flight, so a follower starts the moment the awaited save settles; a module
+ * variable published "at the end" was one microtask from being blanked before the awaiter read
+ * it. `pendingOutcome` below is written by `doSaveRun`'s terminals during ONE run (runs never
+ * overlap) and read by `doSave` into that run's own result before it returns.
+ */
+export type SaveOutcome = 'auth' | 'transient' | 'error' | 'no-provider' | 'deferred';
+export interface SaveResult {
+  saved: boolean;
+  /** Null when saved, or when there was simply nothing to save (no key / envelope). */
+  outcome: SaveOutcome | null;
+}
+let pendingOutcome: SaveOutcome | null = null;
 let saveFailureLevel: SaveFailureLevel = 'none';
 
 function updateSaveFailureLevel(): void {
@@ -1883,6 +1906,21 @@ export interface SaveOptions {
  * folded. Never await `save()` from inside `doSave` (see `saveFlight`).
  */
 export function save(opts: SaveOptions = {}): Promise<boolean> {
+  // One boolean promise PER flight promise: concurrent callers coalesced onto the same run
+  // must still receive the identical promise (`savePathGuards` pins `second === third`), so
+  // the mapping is memoised on the flight's promise rather than created per call.
+  const run = saveDetailed(opts);
+  let mapped = savedOf.get(run);
+  if (!mapped) {
+    mapped = run.then((r) => r.saved);
+    savedOf.set(run, mapped);
+  }
+  return mapped;
+}
+const savedOf = new WeakMap<Promise<SaveResult>, Promise<boolean>>();
+
+/** `save()` with the reason it did not land (see `SaveOutcome`). Same single flight. */
+export function saveDetailed(opts: SaveOptions = {}): Promise<SaveResult> {
   return saveFlight.call(opts);
 }
 
@@ -2236,7 +2274,13 @@ function classifyReadFailure(e: unknown): ReadFailureClass {
   return { kind: 'error', errorCode: e instanceof Error ? e.name : 'unknown', httpStatus };
 }
 
-async function doSave(opts: SaveOptions = {}): Promise<boolean> {
+async function doSave(opts: SaveOptions = {}): Promise<SaveResult> {
+  pendingOutcome = null;
+  const saved = await doSaveRun(opts);
+  return { saved, outcome: saved ? null : pendingOutcome };
+}
+
+async function doSaveRun(opts: SaveOptions = {}): Promise<boolean> {
   // Snapshot the offline-queue tick BEFORE any await: a landed save satisfies every marker
   // queued before it started, and `noteSaveLanded` clears the marker only if the tick is
   // unchanged (a marker queued DURING this save is newer work, or this save's own read
@@ -2248,6 +2292,9 @@ async function doSave(opts: SaveOptions = {}): Promise<boolean> {
   // count — rather than writing one family's bytes through another family's provider.
   const provider = currentProvider;
   if (!provider) {
+    // The Unshaken state (2026-10-22): the Drive provider could not restore after a revoke, so
+    // nothing can save. A cause of its own, so the unsaved-work confirm can say so.
+    pendingOutcome = 'no-provider';
     updateState({ lastError: 'No file configured' });
     return false;
   }
@@ -2263,6 +2310,7 @@ async function doSave(opts: SaveOptions = {}): Promise<boolean> {
   if (saveHolds.size > 0) {
     // Not a failure and not dropped: remembered, and re-armed when the hold releases.
     heldSaveIntent = true;
+    pendingOutcome = 'deferred';
     logEvent({
       level: 'info',
       surface: 'sync-save',
@@ -2278,6 +2326,7 @@ async function doSave(opts: SaveOptions = {}): Promise<boolean> {
     console.warn(
       `[syncService] save() blocked: provider belongs to family ${currentProviderFamilyId} but active family is ${activeFamilyId}`
     );
+    pendingOutcome = 'deferred';
     return false;
   }
 
@@ -2288,6 +2337,7 @@ async function doSave(opts: SaveOptions = {}): Promise<boolean> {
     currentEnvelope?.familyId === familyId &&
     holdEpoch === epochAtEntry;
   const abort = (stage: string): false => {
+    pendingOutcome = 'deferred';
     updateState({ isSyncing: false });
     // A key swap under a hold is not a lost save: the intent is remembered, and `release`
     // re-arms it once provider and envelope agree again (round 3).
@@ -2447,6 +2497,7 @@ async function doSave(opts: SaveOptions = {}): Promise<boolean> {
         // this save, read first. A `timeout` marker still escalates through the flush
         // streak (`offlineQueue` `'timeout-requeued'`).
         enqueueOfflineSave(cls.reason);
+        pendingOutcome = 'transient';
         updateState({ isSyncing: false, saveQueued: true });
         logEvent({
           level: 'info',
@@ -2560,6 +2611,8 @@ async function doSave(opts: SaveOptions = {}): Promise<boolean> {
     // holds the intent, the reconnect re-runs this save through the normal path,
     // and there is nothing here for a person to act on yet.
     if (ack?.queued === true) {
+      // The provider queues only on a transient failure (`queuedReason: TransientFailure`).
+      pendingOutcome = 'transient';
       updateState({ isSyncing: false, saveQueued: true });
       logEvent({
         level: 'info',
@@ -2719,6 +2772,13 @@ async function doSave(opts: SaveOptions = {}): Promise<boolean> {
     const errorMsg = (e as Error).message;
     updateState({ isSyncing: false, lastError: errorMsg });
     recordSaveFailure(errorMsg, e);
+    // `auth` by ERROR CLASS in either phase: the Drive provider throws `TokenExpiredError` from
+    // the WRITE phase too (`writeWithAuthRetry`, a 401 whose silent refresh failed), and that is
+    // the auth case the confirm's "reconnect Google" sentence exists for. `transient` only from a
+    // read (a transient read returned above, so here it means the classifier saw a network-shaped
+    // error); a thrown write failure of any other class is `error`, never "offline".
+    const cls = classifyReadFailure(e);
+    pendingOutcome = cls.kind === 'auth' ? 'auth' : at.phase === 'read' ? cls.kind : 'error';
     // ONE event per failed save, classified by phase, so a single `sync-save` filter
     // gives the refusal and failure rates (audit C4/C12).
     const httpStatus = e instanceof DriveApiError ? e.status : undefined;
@@ -3272,6 +3332,11 @@ export function triggerDebouncedSave(): void {
  * Cancel any pending debounced save and perform an immediate save.
  */
 export async function saveNow(): Promise<boolean> {
+  return (await saveNowDetailed()).saved;
+}
+
+/** `saveNow()` with the reason it did not land; the unsaved-work probe's entry point. */
+export async function saveNowDetailed(): Promise<SaveResult> {
   cancelPendingSave();
   if (!currentFamilyKey || !currentEnvelope) {
     if (!noKeyWarnedOnce) {
@@ -3279,9 +3344,9 @@ export async function saveNow(): Promise<boolean> {
       noKeyWarnedOnce = true;
     }
     noteSaveDeferredNoKey('save-now');
-    return false;
+    return { saved: false, outcome: null };
   }
-  return save();
+  return saveDetailed();
 }
 
 /**

@@ -1,7 +1,11 @@
 import { setActivePinia, createPinia } from 'pinia';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { GlobalSettings } from '@/types/models';
-import { saveNow, cancelPendingSave, triggerDebouncedSave } from '@/services/sync/syncService';
+import {
+  saveNowDetailed,
+  cancelPendingSave,
+  triggerDebouncedSave,
+} from '@/services/sync/syncService';
 import * as docClient from '@/services/automerge/worker/docClient';
 
 // ---------------------------------------------------------------------------
@@ -751,7 +755,7 @@ describe('Sensitive Data Clearing Security', () => {
 
       const report = await auth.measureUnsavedWork({ save: true, scope: 'all' });
 
-      expect(vi.mocked(saveNow)).toHaveBeenCalled();
+      expect(vi.mocked(saveNowDetailed)).toHaveBeenCalled();
       expect(report.unsavedFamilies).toBe(2);
       // The session is still live: the person may yet cancel.
       expect(auth.isAuthenticated).toBe(true);
@@ -762,7 +766,7 @@ describe('Sensitive Data Clearing Security', () => {
       const { auth } = populateAllStores();
       // A debounced save was pending, and the probe's save did not land.
       vi.mocked(cancelPendingSave).mockReturnValueOnce(true);
-      vi.mocked(saveNow).mockResolvedValueOnce(false);
+      vi.mocked(saveNowDetailed).mockResolvedValueOnce({ saved: false, outcome: null });
 
       await auth.measureUnsavedWork({ save: true, scope: 'active' });
 
@@ -780,17 +784,17 @@ describe('Sensitive Data Clearing Security', () => {
           .map((e) => e.context!.detail);
 
       mockLogEvent.mockClear();
-      vi.mocked(saveNow).mockResolvedValueOnce(false);
+      vi.mocked(saveNowDetailed).mockResolvedValueOnce({ saved: false, outcome: null });
       await auth.measureUnsavedWork({ save: true, scope: 'active' });
-      vi.mocked(saveNow).mockRejectedValueOnce(new Error('Drive 500'));
+      vi.mocked(saveNowDetailed).mockRejectedValueOnce(new Error('Drive 500'));
       await auth.measureUnsavedWork({ save: true, scope: 'active' });
-      vi.mocked(saveNow).mockResolvedValueOnce(true);
+      vi.mocked(saveNowDetailed).mockResolvedValueOnce({ saved: true, outcome: null });
       await auth.measureUnsavedWork({ save: true, scope: 'active' });
       expect(probeDetails()).toEqual(['nothing', 'failed']);
 
       vi.useFakeTimers();
       try {
-        vi.mocked(saveNow).mockReturnValueOnce(new Promise<boolean>(() => {}));
+        vi.mocked(saveNowDetailed).mockReturnValueOnce(new Promise<never>(() => {}));
         const probe = auth.measureUnsavedWork({ save: true, scope: 'active' });
         await vi.runAllTimersAsync();
         await probe;
@@ -800,10 +804,115 @@ describe('Sensitive Data Clearing Security', () => {
       expect(probeDetails()).toEqual(['nothing', 'failed', 'timeout']);
     });
 
+    describe('saveFailure: why the probe save did not land (2026-10-23)', () => {
+      const probeEvents = (action: string) =>
+        mockLogEvent.mock.calls
+          .map((c) => c[0] as { level: string; surface: string; context?: Record<string, unknown> })
+          .filter((e) => e.surface === 'sign-out' && e.context?.action === action);
+
+      it("a save that returned false carries syncService's own outcome (auth)", async () => {
+        const { auth } = populateAllStores();
+        mockLogEvent.mockClear();
+        vi.mocked(saveNowDetailed).mockResolvedValueOnce({ saved: false, outcome: 'auth' });
+
+        const report = await auth.measureUnsavedWork({ save: true, scope: 'active' });
+
+        expect(report.saveFailure).toBe('auth');
+        expect(probeEvents('unsaved_probe_save')[0]?.context).toMatchObject({
+          detail: 'failed',
+          error_code: 'auth',
+        });
+        expect(probeEvents('unsaved_probe')[0]?.context).toMatchObject({ error_code: 'auth' });
+      });
+
+      it("no storage provider installed reads as 'no-home' (its own sentence, not 'auth')", async () => {
+        const { auth } = populateAllStores();
+        mockLogEvent.mockClear();
+        vi.mocked(saveNowDetailed).mockResolvedValueOnce({ saved: false, outcome: 'no-provider' });
+
+        const report = await auth.measureUnsavedWork({ save: true, scope: 'active' });
+
+        expect(report.saveFailure).toBe('no-home');
+        expect(probeEvents('unsaved_probe_save')[0]?.context).toMatchObject({
+          detail: 'failed',
+          error_code: 'no-home',
+        });
+      });
+
+      it("a queued save is 'queued' at warn, never 'nothing' at info", async () => {
+        const { auth } = populateAllStores();
+        mockLogEvent.mockClear();
+        vi.mocked(saveNowDetailed).mockResolvedValueOnce({ saved: false, outcome: 'transient' });
+
+        const report = await auth.measureUnsavedWork({ save: true, scope: 'active' });
+
+        expect(report.saveFailure).toBe('transient');
+        const [save] = probeEvents('unsaved_probe_save');
+        expect(save?.level).toBe('warn');
+        expect(save?.context).toMatchObject({ detail: 'queued', error_code: 'transient' });
+      });
+
+      it("a held or aborted save is 'deferred' at warn: re-armed, not lost, not saved", async () => {
+        const { auth } = populateAllStores();
+        mockLogEvent.mockClear();
+        vi.mocked(saveNowDetailed).mockResolvedValueOnce({ saved: false, outcome: 'deferred' });
+
+        const report = await auth.measureUnsavedWork({ save: true, scope: 'active' });
+
+        expect(report.saveFailure).toBe('deferred');
+        const [save] = probeEvents('unsaved_probe_save');
+        expect(save?.level).toBe('warn');
+        expect(save?.context).toMatchObject({ detail: 'deferred', error_code: 'deferred' });
+      });
+
+      it("the probe's own race giving up is 'timeout'", async () => {
+        const { auth } = populateAllStores();
+        vi.useFakeTimers();
+        try {
+          vi.mocked(saveNowDetailed).mockReturnValueOnce(new Promise<never>(() => {}));
+          const probe = auth.measureUnsavedWork({ save: true, scope: 'active' });
+          await vi.runAllTimersAsync();
+          expect((await probe).saveFailure).toBe('timeout');
+        } finally {
+          vi.useRealTimers();
+        }
+      });
+
+      it("a rejected saveNow with no outcome recorded is 'error'", async () => {
+        const { auth } = populateAllStores();
+        vi.mocked(saveNowDetailed).mockRejectedValueOnce(new Error('Drive 500'));
+        const report = await auth.measureUnsavedWork({ save: true, scope: 'active' });
+        expect(report.saveFailure).toBe('error');
+      });
+
+      it('a save that landed, or no save at all, carries no cause', async () => {
+        const { auth } = populateAllStores();
+        vi.mocked(saveNowDetailed).mockResolvedValueOnce({ saved: true, outcome: null });
+        expect((await auth.measureUnsavedWork({ save: true, scope: 'active' })).saveFailure).toBe(
+          null
+        );
+        expect(
+          (await auth.measureUnsavedWork({ save: false, scope: 'active' })).saveFailure
+        ).toBeNull();
+      });
+
+      it('the photo-only probe (untrusted keep-data sign-out) never carries a cause', async () => {
+        const { auth } = populateAllStores();
+        vi.mocked(saveNowDetailed).mockResolvedValue({ saved: false, outcome: 'auth' });
+        try {
+          const report = await auth.measureQueuedPhotoUploads();
+          expect(report.saveFailure).toBeNull();
+          expect(vi.mocked(saveNowDetailed)).not.toHaveBeenCalled();
+        } finally {
+          vi.mocked(saveNowDetailed).mockResolvedValue({ saved: true, outcome: null });
+        }
+      });
+    });
+
     it('round 3: a probe save that landed does not re-arm', async () => {
       const { auth } = populateAllStores();
       vi.mocked(cancelPendingSave).mockReturnValueOnce(true);
-      vi.mocked(saveNow).mockResolvedValueOnce(true);
+      vi.mocked(saveNowDetailed).mockResolvedValueOnce({ saved: true, outcome: null });
 
       await auth.measureUnsavedWork({ save: true, scope: 'active' });
 
@@ -1044,10 +1153,10 @@ describe('Sensitive Data Clearing Security', () => {
 
       await auth.signOutAndClearData();
 
-      expect(vi.mocked(saveNow)).toHaveBeenCalled();
+      expect(vi.mocked(saveNowDetailed)).toHaveBeenCalled();
       // The force-save must run before deleteFamilyDatabase, so the freshest edit
       // reaches Drive before the local cache is deleted.
-      const saveOrder = vi.mocked(saveNow).mock.invocationCallOrder[0]!;
+      const saveOrder = vi.mocked(saveNowDetailed).mock.invocationCallOrder[0]!;
       const deleteOrder = mockDeleteFamilyDatabase.mock.invocationCallOrder[0]!;
       expect(saveOrder).toBeLessThan(deleteOrder);
     });
@@ -1144,12 +1253,12 @@ describe('Sensitive Data Clearing Security', () => {
 
       await auth.signOut();
 
-      expect(vi.mocked(saveNow)).toHaveBeenCalled();
+      expect(vi.mocked(saveNowDetailed)).toHaveBeenCalled();
     });
 
     it('completes sign-out even when the force-save REJECTS (never traps the user)', async () => {
       const { auth } = populateAllStores();
-      vi.mocked(saveNow).mockRejectedValueOnce(new Error('Drive 500'));
+      vi.mocked(saveNowDetailed).mockRejectedValueOnce(new Error('Drive 500'));
 
       // Completes: resolves with the delete outcome (#100) rather than throwing.
       await expect(auth.signOut()).resolves.toEqual({ cacheDeleted: true });
@@ -1161,7 +1270,7 @@ describe('Sensitive Data Clearing Security', () => {
 
     it('completes sign-out when the force-save saves nothing (returns false)', async () => {
       const { auth } = populateAllStores();
-      vi.mocked(saveNow).mockResolvedValueOnce(false);
+      vi.mocked(saveNowDetailed).mockResolvedValueOnce({ saved: false, outcome: null });
 
       // Completes: resolves with the delete outcome (#100) rather than throwing.
       await expect(auth.signOut()).resolves.toEqual({ cacheDeleted: true });

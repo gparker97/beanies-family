@@ -2882,3 +2882,260 @@ describe('registry PUT — owner sync (opt-in ownerSync, ownership-only)', () =>
     });
   });
 });
+
+describe('registry PUT — an omitted pointer keeps the stored one (2026-10-23)', () => {
+  const DRIVE_ROW = {
+    createdAt: '2026-10-02T00:00:00.000Z',
+    ownerMemberId: M_A,
+    ownerEmail: 'owner@example.com',
+    provider: 'google_drive',
+    fileId: 'DRIVE-FILE',
+    displayPath: 'The Unshaken.beanpod',
+  };
+
+  it('an owner login PUT with no pointer fields keeps provider / fileId / displayPath', async () => {
+    const { res, item } = await put(
+      { writerMemberId: M_A, ownerMemberId: M_A, isLoginEvent: true, memberCount: 3 },
+      DRIVE_ROW
+    );
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body).pointerAccepted).toBe(true);
+    expect(item.provider).toBe('google_drive');
+    expect(item.fileId).toBe('DRIVE-FILE');
+    expect(item.displayPath).toBe('The Unshaken.beanpod');
+    // The rest of the write still lands.
+    expect(item.lastLoginAt).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(item.memberCount).toBe(3);
+    const line = logSpy.mock.calls.find(
+      (c) => c[0] === '[registry] pointer omitted; existing pointer kept'
+    );
+    expect(line).toBeTruthy();
+    expect(line[1]).toBe(createHash('sha256').update(FAMILY_ID).digest('hex'));
+    expect(line[2]).toBe('prod');
+    expect(line.join(' ')).not.toContain(FAMILY_ID);
+  });
+
+  it("an owner PUT with an explicit provider: 'local' still moves the pointer", async () => {
+    const { res, item } = await put(
+      { writerMemberId: M_A, provider: 'local', fileId: null, displayPath: null },
+      DRIVE_ROW
+    );
+    expect(JSON.parse(res.body).pointerAccepted).toBe(true);
+    expect(item.provider).toBe('local');
+    expect(item.fileId).toBeNull();
+    expect(
+      logSpy.mock.calls.some((c) => c[0] === '[registry] pointer omitted; existing pointer kept')
+    ).toBe(false);
+  });
+
+  it('a member PUT with a different pointer is still refused', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const { res, item } = await put(
+        { writerMemberId: M_B, provider: 'local', fileId: null },
+        DRIVE_ROW
+      );
+      expect(JSON.parse(res.body).pointerAccepted).toBe(false);
+      expect(item.provider).toBe('google_drive');
+      expect(item.fileId).toBe('DRIVE-FILE');
+      expect(warn.mock.calls.some((c) => c[0] === '[registry] pointer write refused')).toBe(true);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+});
+
+describe('registry DELETE — #beanies-leavers posts (2026-10-23)', () => {
+  const HOOK = 'https://hooks.slack.com/services/T0/B9/leavers';
+  const POD = {
+    familyId: FAMILY_ID,
+    createdAt: '2026-10-02T08:00:00.000Z',
+    ownerMemberId: M_A,
+    ownerEmail: 'owner@example.com',
+    familyName: 'The Parkers',
+    signupPlatform: 'ios',
+    memberCount: 3,
+    provider: 'google_drive',
+    fileId: 'FILE-1',
+    displayPath: 'The Parkers.beanpod',
+  };
+  const STEP1 = {
+    familyId: FAMILY_ID,
+    signupStartedAt: '2026-10-02T08:00:00.000Z',
+    ownerMemberId: M_A,
+    ownerEmail: 'owner@example.com',
+  };
+  let fetchMock;
+  let warnSpy;
+
+  beforeEach(() => {
+    process.env.SLACK_LEAVERS_WEBHOOK_URL = HOOK;
+    process.env.BILLING_TABLE_NAME = BILLING_TABLE;
+    fetchMock = vi.fn(async () => ({ ok: true, status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    delete process.env.SLACK_LEAVERS_WEBHOOK_URL;
+    delete process.env.BILLING_TABLE_NAME;
+    vi.unstubAllGlobals();
+    warnSpy.mockRestore();
+  });
+
+  /**
+   * A DELETE with the billing read dispatched on TableName (the `get` helper's pattern). Pass an
+   * Error as `billing` to make the billing read throw.
+   */
+  async function delWith(
+    existing,
+    { query, billing = null, origin = 'https://app.beanies.family' } = {}
+  ) {
+    sendMock.mockReset();
+    sendMock.mockImplementation((command) => {
+      if (command.constructor.name === 'GetItemCommand') {
+        if ([BILLING_TABLE, BILLING_DEV_TABLE].includes(command.input.TableName)) {
+          if (billing instanceof Error) return Promise.reject(billing);
+          return Promise.resolve({ Item: billing ? marshall(billing) : undefined });
+        }
+        return Promise.resolve({ Item: existing ? marshall(existing) : undefined });
+      }
+      return Promise.resolve({});
+    });
+    const res = await handler({
+      headers: { 'x-api-key': API_KEY, origin },
+      pathParameters: { familyId: FAMILY_ID },
+      requestContext: { http: { method: 'DELETE' } },
+      ...(query ? { queryStringParameters: query } : {}),
+    });
+    const puts = sendMock.mock.calls.filter((c) => c[0].constructor.name === 'PutItemCommand');
+    return { res, body: JSON.parse(res.body), puts };
+  }
+
+  const posted = () =>
+    fetchMock.mock.calls.map(([url, init]) => ({ url, ...JSON.parse(init.body) }));
+  const lines = (msg) =>
+    logSpy.mock.calls
+      .map((c) => c[0])
+      .filter((l) => typeof l === 'string' && l.startsWith('{'))
+      .map((l) => JSON.parse(l))
+      .filter((l) => l.msg === msg);
+
+  it('a pod-row DELETE tombstones, then posts family_deleted with the plan', async () => {
+    const { res, puts } = await delWith(POD, {
+      query: { writerMemberId: M_A },
+      billing: { familyId: FAMILY_ID, plan: 'full', status: 'active' },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(puts).toHaveLength(1);
+    expect(posted()).toHaveLength(1);
+    const { url, text } = posted()[0];
+    expect(url).toBe(HOOK);
+    expect(text).toBe(
+      ':wave: *Family deleted* · The Parkers · id …55555555 · ios · 3 members · since 2026-10-02 · google_drive · plan: magic beans (active)'
+    );
+    expect(text).not.toContain('owner@example.com');
+    expect(text).not.toContain(FAMILY_ID);
+    const line = lines('slack_posted')[0];
+    expect(line).toMatchObject({ kind: 'family_deleted', channel: 'leavers', table: 'prod' });
+    expect(line.family_id_hash).toBe(createHash('sha256').update(FAMILY_ID).digest('hex'));
+  });
+
+  it('a billing read failure never fails the delete: the line posts without a plan', async () => {
+    const { res, puts } = await delWith(POD, {
+      query: { writerMemberId: M_A },
+      billing: new Error('ddb'),
+    });
+    expect(res.statusCode).toBe(200);
+    expect(puts).toHaveLength(1);
+    expect(posted()[0].text).not.toContain('plan:');
+  });
+
+  it('?keepFile=1 writes nothing, posts family_left_device and answers kept: file', async () => {
+    const { res, body, puts } = await delWith(POD, {
+      query: { keepFile: '1', writerMemberId: M_A },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(body).toEqual({ success: true, kept: 'file' });
+    expect(puts).toHaveLength(0);
+    expect(posted()).toHaveLength(1);
+    expect(posted()[0].text).toMatch(
+      /^:door: \*Family left a device \(file kept\)\* · The Parkers · id …55555555 · ios/
+    );
+    expect(lines('registry_left_device')[0]).toMatchObject({ outcome: 'notified', table: 'prod' });
+    expect(lines('slack_posted')[0].kind).toBe('family_left_device');
+    // Not a delete, so it is not measured as one.
+    expect(warnSpy.mock.calls.some((c) => c[0] === '[registry] delete would be refused')).toBe(
+      false
+    );
+  });
+
+  it('?keepFile=1 from a non-owner, or with no writer id, posts nothing (owner-gated)', async () => {
+    // The API key ships in the bundle: without this gate anyone could make the Lambda post a
+    // family's name, size and plan for any id. A member leaving their own device is also not
+    // the family leaving.
+    const member = await delWith(POD, { query: { keepFile: '1', writerMemberId: M_B } });
+    const anonymous = await delWith(POD, { query: { keepFile: '1' } });
+    expect(member.body).toEqual({ success: true });
+    expect(anonymous.body).toEqual({ success: true });
+    expect(member.puts).toHaveLength(0);
+    expect(anonymous.puts).toHaveLength(0);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(lines('registry_left_device').map((l) => l.outcome)).toEqual(['not-owner', 'not-owner']);
+  });
+
+  it('?keepFile=1 on a step-1 row posts nothing (not a pod)', async () => {
+    const { body, puts } = await delWith(STEP1, { query: { keepFile: '1' } });
+    expect(body).toEqual({ success: true });
+    expect(puts).toHaveLength(0);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(lines('registry_left_device')[0].outcome).toBe('not-pod');
+  });
+
+  it('?keepFile=1 with no row or a tombstone posts nothing and says which', async () => {
+    await delWith(null, { query: { keepFile: '1' } });
+    await delWith({ ...POD, deletedAt: '2026-10-20T00:00:00.000Z' }, { query: { keepFile: '1' } });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(lines('registry_left_device').map((l) => l.outcome)).toEqual(['no-row', 'tombstoned']);
+  });
+
+  it('?neverFinishedOnly=1 (start over) tombstones a step-1 row and posts nothing', async () => {
+    const { puts } = await delWith(STEP1, { query: { neverFinishedOnly: '1' } });
+    expect(puts).toHaveLength(1);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('a dev-origin DELETE tombstones but posts nothing, and logs dev_table', async () => {
+    const { puts } = await delWith(POD, {
+      query: { writerMemberId: M_A },
+      origin: 'http://localhost:5173',
+    });
+    expect(puts).toHaveLength(1);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(lines('slack_post_skipped')[0]).toMatchObject({
+      kind: 'family_deleted',
+      reason: 'dev_table',
+      channel: 'leavers',
+      table: 'dev',
+    });
+  });
+
+  it('a Slack failure never fails the DELETE', async () => {
+    fetchMock.mockImplementation(async () => ({ ok: false, status: 500 }));
+    const { res, puts } = await delWith(POD, { query: { writerMemberId: M_A } });
+    expect(res.statusCode).toBe(200);
+    expect(puts).toHaveLength(1);
+    expect(lines('slack_post_failed')[0]).toMatchObject({
+      kind: 'family_deleted',
+      reason: 'http_error',
+      http_status: 500,
+    });
+  });
+
+  it('an unset webhook URL skips with no_url and no fetch', async () => {
+    delete process.env.SLACK_LEAVERS_WEBHOOK_URL;
+    await delWith(POD, { query: { writerMemberId: M_A } });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(lines('slack_post_skipped')[0].reason).toBe('no_url');
+  });
+});

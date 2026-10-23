@@ -1,7 +1,11 @@
 /**
- * Slack lines for subscription events (#95): a new subscription, a cancellation being scheduled,
- * and a subscription ending, posted to #beanies-joiners beside the client's "Family pod created!"
- * line. The family is identified the way the other Slack surfaces already do it: the family name
+ * Slack lines for subscription events (#95): a new subscription (#beanies-joiners, beside the
+ * client's "Family pod created!" line), and a cancellation being scheduled or a subscription
+ * ending (#beanies-leavers, since 2026-10-23). The routing by kind is `index.mjs` `webhookFor`.
+ *
+ * ⚠️ `SLACK_TIMEOUT_MS`, `PLAN_LABELS`, `slackEscape`, `familyIdentity` and `postToSlack` have a
+ * verbatim TWIN in `../registry/slack.mjs` (every Lambda is its own zip), pinned by
+ * `../registry/slackTwinDrift.test.mjs`. Change them together. The family is identified the way the other Slack surfaces already do it: the family name
  * (as the join post shows it) or, without one, the owner's email DOMAIN only, plus the last 8
  * characters of the family id (the `id …tail` the telemetry error pages use). Never a full email.
  *
@@ -25,7 +29,7 @@ export const SLACK_SUBSCRIPTION_EXPAND = Object.freeze([
 
 export const SLACK_KINDS = new Set(['created', 'cancel_scheduled', 'ended']);
 
-const PLAN_LABELS = { basic: 'beanies basic', full: 'magic beans' };
+export const PLAN_LABELS = { basic: 'beanies basic', full: 'magic beans' };
 const INTERVAL_LABELS = { month: 'monthly', year: 'yearly' };
 
 /** Slack mrkdwn control characters (the telemetry Lambda's escape). */

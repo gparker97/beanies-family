@@ -338,7 +338,28 @@ describe('SettingsPage — delete family export gate', () => {
     // THAT member as owner, permanently. A surviving row is merely an ops
     // nuisance. The asymmetry is why the gate proves deletion rather than
     // inferring it from intent or from session state.
-    expect(removeFamilyMock).not.toHaveBeenCalled();
+    //
+    // The ONE registry call on this path is the keep-file notice (`?keepFile=1`), which the
+    // Lambda answers without writing: no tombstone, row and pointer untouched. A call without
+    // `keepFile` here would be the removal this gate exists to prevent.
+    expect(removeFamilyMock).toHaveBeenCalledTimes(1);
+    expect(removeFamilyMock.mock.calls[0]).toEqual(['fam-1', null, { keepFile: true }]);
+  });
+
+  it('a refused keep-file notice changes nothing the person is told', async () => {
+    // The notice only announces the departure server-side; `removeFamily` already logs a
+    // refusal (warn, `detail: 'keep-file'`). It must not turn the default path into a failure.
+    removeFamilyMock.mockResolvedValueOnce(false);
+    const wrapper = await mountPage();
+    await runDeleteWithExport(wrapper);
+
+    expect(removeFamilyMock).toHaveBeenCalledWith('fam-1', null, { keepFile: true });
+    expect(alertMock).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'settings.deleteFamilyFarewellKeptFileMsg' })
+    );
+    expect(reportErrorMock).not.toHaveBeenCalledWith(
+      expect.objectContaining({ surface: 'registry' })
+    );
   });
 
   it('does NOT cry failure on the default path, where nothing failed', async () => {

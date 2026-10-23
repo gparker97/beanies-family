@@ -46,6 +46,12 @@ export const registerDocPersistCallback = vi.fn();
 export const getSaveFailureLevel = vi.fn(() => 'none');
 export const getLastSaveError = vi.fn(() => null);
 export const getLastSaveCause = vi.fn<() => unknown>(() => null);
+export const saveNowDetailed = vi.fn<
+  () => Promise<{
+    saved: boolean;
+    outcome: 'auth' | 'transient' | 'error' | 'no-provider' | 'deferred' | null;
+  }>
+>(async () => ({ saved: true, outcome: null }));
 export const saveErrorCode = vi.fn<(e: unknown) => string>(() => 'unknown');
 export const resetSaveFailures = vi.fn();
 export const getConsecutiveSaveFailures = vi.fn(() => 0);

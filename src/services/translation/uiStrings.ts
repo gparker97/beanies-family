@@ -3949,6 +3949,37 @@ const STRING_DEFS = {
     en: 'We couldn\u2019t check whether everything on this device was saved.',
     beanie: 'we couldn\u2019t check whether everything on this device was saved.',
   },
+  // Disconnect Google (2026-10-23): the revoke leaves this device unable to save, so it asks
+  // first, the same way a delete does. Important surface: real nouns in beanie mode.
+  'auth.unsavedDisconnectMessage': {
+    en: 'Disconnecting Google means this device can no longer save to your family data file. Some changes on this device haven\u2019t reached it yet, and if you go ahead they are deleted for good. Keep them, wait for the save to finish, then disconnect.',
+    beanie:
+      'disconnecting google means this device can no longer save to your family data file. some changes on this device haven\u2019t reached it yet, and if you go ahead they are deleted for good. keep them, wait for the save to finish, then disconnect.',
+  },
+  // Why the save run before the delete did not land (one sentence, by `saveFailure`).
+  'auth.unsavedCauseAuth': {
+    en: 'The last save failed because Google is disconnected on this device. Reconnect Google, let it save, then try again.',
+    beanie:
+      'the last save failed because google is disconnected on this device. reconnect google, let it save, then try again.',
+  },
+  'auth.unsavedCauseOffline': {
+    en: 'The last save failed because Google couldn\u2019t be reached. Check your connection, let it save, then try again.',
+    beanie:
+      'the last save failed because google couldn\u2019t be reached. check your connection, let it save, then try again.',
+  },
+  'auth.unsavedCauseTimeout': {
+    en: 'The last save was still running when we checked. Give it a moment, then try again.',
+    beanie: 'the last save was still running when we checked. give it a moment, then try again.',
+  },
+  'auth.unsavedCauseNoHome': {
+    en: 'This device isn\u2019t connected to your family data file right now, so the last save couldn\u2019t run. Reconnect Google or open the family file in Settings, let it save, then try again.',
+    beanie:
+      'this device isn\u2019t connected to your family data file right now, so the last save couldn\u2019t run. reconnect google or open the family file in settings, let it save, then try again.',
+  },
+  'auth.unsavedCauseError': {
+    en: 'The last save failed. Export a backup from Settings before going ahead.',
+    beanie: 'the last save failed. export a backup from settings before going ahead.',
+  },
   'auth.unsavedDiscard': {
     en: 'Discard Unsaved Changes',
     beanie: 'discard unsaved changes',

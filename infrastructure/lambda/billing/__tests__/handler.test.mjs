@@ -212,6 +212,7 @@ describe('billing Lambda handler', () => {
       'CORS_ORIGINS',
       'DEV_ORIGINS',
       'SLACK_JOINERS_WEBHOOK_URL',
+      'SLACK_LEAVERS_WEBHOOK_URL',
       'STRIPE_MODE',
       'ROUTE_PREFIX',
     ])
@@ -1030,11 +1031,13 @@ describe('billing Lambda handler', () => {
       assert.equal(decisions('webhook_apply_failed')[1].action, 'ddb_update');
     });
 
-    describe('Slack (#beanies-joiners)', () => {
+    describe('Slack (#beanies-joiners, #beanies-leavers)', () => {
       const HOOK = 'https://hooks.slack.com/services/T0/B0/secret';
+      const LEAVERS_HOOK = 'https://hooks.slack.com/services/T0/B1/leavers';
       let warns;
       beforeEach(() => {
         process.env.SLACK_JOINERS_WEBHOOK_URL = HOOK;
+        process.env.SLACK_LEAVERS_WEBHOOK_URL = LEAVERS_HOOK;
         warns = [];
         console.warn = (...a) => warns.push(a.map(String).join(' '));
       });
@@ -1073,6 +1076,7 @@ describe('billing Lambda handler', () => {
         assert.equal(r.statusCode, 200, r.body);
         const posts = slackPosts(calls);
         assert.equal(posts.length, 1);
+        assert.equal(posts[0].path, new URL(HOOK).pathname, 'created goes to #beanies-joiners');
         const { text } = JSON.parse(posts[0].body);
         assert.match(text, /^:tada: \*New subscription\*/);
         assert.match(text, /\*Family:\* The Parkers · id …55555555/);
@@ -1087,6 +1091,7 @@ describe('billing Lambda handler', () => {
           ['latest_invoice', 'discounts.source.coupon', 'discounts.promotion_code']
         );
         assert.equal(decisions('slack_posted')[0].kind, 'created');
+        assert.equal(decisions('slack_posted')[0].channel, 'joiners');
         assert.equal(t.tables[BILLING][FAMILY].status, 'active');
       });
 
@@ -1116,10 +1121,12 @@ describe('billing Lambda handler', () => {
         await handler(signed(event('customer.subscription.updated', SUB())), t.ddb);
         const posts = slackPosts(calls);
         assert.equal(posts.length, 1);
+        assert.equal(posts[0].path, new URL(LEAVERS_HOOK).pathname, 'a cancel goes to leavers');
         assert.match(
           JSON.parse(posts[0].body).text,
           /^:wave: \*Subscription cancelled, ends 2030-03-17\*/
         );
+        assert.equal(decisions('slack_posted')[0].channel, 'leavers');
 
         calls = stripeWith(SUB({ cancel_at: 1_900_000_000 }));
         await handler(signed(event('customer.subscription.updated', SUB())), t.ddb);
@@ -1138,10 +1145,29 @@ describe('billing Lambda handler', () => {
         assert.equal(r.statusCode, 200);
         const posts = slackPosts(calls);
         assert.equal(posts.length, 1);
+        assert.equal(posts[0].path, new URL(LEAVERS_HOOK).pathname, 'an end goes to leavers');
         assert.match(
           JSON.parse(posts[0].body).text,
           /^:no_entry: \*Subscription ended\*[^]*\*Ended:\* 2030-03-17/
         );
+        assert.equal(decisions('slack_posted')[0].kind, 'ended');
+        assert.equal(decisions('slack_posted')[0].channel, 'leavers');
+      });
+
+      it('an unset leavers URL skips with channel=leavers and never falls back to joiners', async () => {
+        delete process.env.SLACK_LEAVERS_WEBHOOK_URL;
+        const t = fakeDdb({ registry });
+        const calls = stripeWith(SUB({ status: 'canceled', ended_at: 1_900_000_000 }));
+        const r = await handler(
+          signed(event('customer.subscription.deleted', SUB({ status: 'canceled' }))),
+          t.ddb
+        );
+        assert.equal(r.statusCode, 200);
+        assert.equal(slackPosts(calls).length, 0, 'nothing reaches the joiners hook');
+        const skipped = decisions('slack_post_skipped')[0];
+        assert.equal(skipped.kind, 'ended');
+        assert.equal(skipped.channel, 'leavers');
+        assert.equal(skipped.reason, 'no_url');
       });
 
       it('never fails the webhook when Slack returns 500 or times out', async () => {
@@ -1153,6 +1179,7 @@ describe('billing Lambda handler', () => {
         let failed = decisions('slack_post_failed');
         assert.equal(failed[0].reason, 'http_error');
         assert.equal(failed[0].http_status, 500);
+        assert.equal(failed[0].channel, 'joiners');
         assert.ok(warns.some((w) => w.startsWith('[billing] slack_post_failed')));
 
         t = fakeDdb({ registry });
@@ -1196,6 +1223,7 @@ describe('billing Lambda handler', () => {
         assert.equal(slackPosts(calls).length, 0);
         assert.equal(calls.filter((c) => c.path.startsWith('/v1/subscriptions/')).length, 1);
         assert.equal(decisions('slack_post_skipped')[0].reason, 'no_url');
+        assert.equal(decisions('slack_post_skipped')[0].channel, 'joiners');
       });
     });
   });

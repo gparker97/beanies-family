@@ -382,6 +382,54 @@ describe('registry DELETE — the writer id rides the query string', () => {
       expect.objectContaining({ context: { action: 'delete' } })
     );
   });
+
+  it('sends keepFile=1 only when asked (a family leaving the device with its file kept)', async () => {
+    const f = okFetch({ success: true, kept: 'file' });
+    global.fetch = f;
+    expect(await removeFamily(FAMILY, OWNER, { keepFile: true })).toBe(true);
+    const url = new URL(lastUrl(f), 'https://registry.test');
+    expect(url.searchParams.get('keepFile')).toBe('1');
+    expect(url.searchParams.get('writerMemberId')).toBe(OWNER);
+    expect(url.searchParams.get('neverFinishedOnly')).toBeNull();
+    expect((f.mock.calls[0]![1] as RequestInit).method).toBe('DELETE');
+
+    const g = okFetch();
+    global.fetch = g;
+    await removeFamily(FAMILY, OWNER);
+    expect(lastUrl(g)).not.toContain('keepFile');
+  });
+
+  it('tags every keep-file log line with detail keep-file, and never says the row was removed', async () => {
+    global.fetch = okFetch({ success: true, kept: 'file' });
+    await removeFamily(FAMILY, OWNER, { keepFile: true });
+    expect(logEvent).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        level: 'info',
+        message: expect.not.stringContaining('removed'),
+        context: { action: 'delete', detail: 'keep-file' },
+      })
+    );
+
+    global.fetch = failFetch(403);
+    expect(await removeFamily(FAMILY, OWNER, { keepFile: true })).toBe(false);
+    expect(logEvent).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        level: 'warn',
+        context: { action: 'delete-failed', http_status: 403, detail: 'keep-file' },
+      })
+    );
+
+    const boom = new Error('offline');
+    global.fetch = vi.fn().mockRejectedValue(boom);
+    expect(await removeFamily(FAMILY, OWNER, { keepFile: true })).toBe(false);
+    expect(logEvent).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        level: 'warn',
+        context: { action: 'delete-failed', detail: 'keep-file' },
+        error: boom,
+      })
+    );
+  });
 });
 
 describe('registry PUT: the #125 response fields', () => {

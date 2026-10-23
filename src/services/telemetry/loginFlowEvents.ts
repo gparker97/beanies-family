@@ -298,9 +298,19 @@ export function emitCacheKept(
   emit('warn', 'cache_kept', { action: 'cache_kept', kind });
 }
 
-/** The Settings "Disconnect Google everywhere" action ran — the ONLY revoke site left. */
-export function emitExplicitRevokeUsed(): void {
-  emit('warn', 'explicit_revoke_used', { action: 'explicit_revoke' });
+/**
+ * The Settings "Disconnect Google everywhere" action ran — the ONLY revoke site left.
+ * Emitted once, just before the revoke, after the save-first probe: `detail` says whether the
+ * device was clean or the person chose to discard unsaved work, and `errorCode` carries the
+ * probe's save-failure cause when there was one. Keep is the confirm's own
+ * `unsaved_discard_declined kind=disconnect-google`, never this event.
+ */
+export function emitExplicitRevokeUsed(detail: 'clean' | 'discarded', errorCode?: string): void {
+  emit('warn', 'explicit_revoke_used', {
+    action: 'explicit_revoke',
+    detail,
+    ...(errorCode ? { error_code: errorCode } : {}),
+  });
 }
 
 /** The roster-cache refresh failed (non-fatal; picker degrades to credential records). */

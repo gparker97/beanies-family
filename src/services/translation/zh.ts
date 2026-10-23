@@ -2053,6 +2053,16 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'auth.unsavedPhotos.other': '{count} 张照片正在等待上传，目前只保存在此设备上。',
   'auth.unsavedBlocked': '你的家庭数据文件目前无法读取，因此无法向其中保存任何内容。',
   'auth.unsavedUnknown': '我们无法确认此设备上的所有内容是否都已保存。',
+  'auth.unsavedDisconnectMessage':
+    '断开 Google 后，此设备将无法再保存到你的家庭数据文件。此设备上的部分更改还没有保存到该文件中，如果继续，这些更改将被永久删除。请先保留它们，等保存完成后再断开连接。',
+  'auth.unsavedCauseAuth':
+    '上次保存失败，因为此设备上的 Google 已断开连接。请重新连接 Google，等它完成保存后再试。',
+  'auth.unsavedCauseOffline':
+    '上次保存失败，因为无法连接到 Google。请检查网络连接，等它完成保存后再试。',
+  'auth.unsavedCauseTimeout': '我们检查时，上次保存仍在进行中。请稍等片刻后再试。',
+  'auth.unsavedCauseNoHome':
+    '此设备目前未连接到您的家庭数据文件，因此上次保存无法进行。请在设置中重新连接 Google 或打开家庭文件，等待保存完成后再试。',
+  'auth.unsavedCauseError': '上次保存失败。继续之前，请先在设置中导出备份。',
   'auth.unsavedDiscard': '放弃未保存的更改',
   'auth.unsavedKeep': '保留我的更改',
   'settings.familyData.signedInAs': '登录账户',

@@ -12,7 +12,7 @@ Three family endpoints (all `JSON`, all gated on an API key header):
 
 - `GET /family/{familyId}` — fetch a family's stored file location
 - `PUT /family/{familyId}` — register or update a family's location (called after pod creation / sync changes), or record a sign-up start (see [PUT modes](#put-modes))
-- `DELETE /family/{familyId}` — tombstone a family in the registry (identity and provenance kept, everything else dropped); `?neverFinishedOnly=1` limits it to a sign-up that never created a pod
+- `DELETE /family/{familyId}` — tombstone a family in the registry (identity and provenance kept, everything else dropped); `?neverFinishedOnly=1` limits it to a sign-up that never created a pod; `?keepFile=1` writes nothing and only announces that the family left a device with its file kept (see [DELETE and start over](#delete-and-start-over))
 
 State lives in DynamoDB, one row per family, keyed by `familyId` (UUID).
 
@@ -120,6 +120,8 @@ A PUT body is in exactly one of three modes, decided in this order (the order is
 
 `signupStart`, `setupComplete` and `deviceTimeZone` (the device's IANA zone, sent on signup writes) are transient: none is ever stored.
 
+**The pointer moves only when the body carries one** (2026-10-23, owner.mjs `resolvePointer`). A body with none of `provider` / `fileId` / `displayPath` (key presence, not truthiness: `fileId: null` is present) keeps the stored pointer, from any writer, and answers `pointerAccepted: true`; it logs `[registry] pointer omitted; existing pointer kept` with the family id hash and the table. A present pointer is stored when the writer is the owner (so an owner's explicit `provider: 'local'` still moves it) or when it equals the stored one; otherwise it is refused and the stored one kept (`[registry] pointer write refused`). A first write with no pointer stores `'local'` / `null`, as before. For an `ownerSync` request an omitted pointer counts as on the canonical pointer.
+
 ### Create-time inference
 
 On the pod-creation write (`isSignupEvent: true`, the write that stamps `createdAt`) of a native row (`signupPlatform` `ios` / `android`) with no deterministic `attribution` and no stored `attributionInferred` (`wantsCreateInference` in `inference.mjs`), the Lambda queries the events table's sparse `platform-tsEpoch-index` for same-platform taps in the 72 hours before now (newest first, at most 200) and scores them with `scoreFamily`. A `scored` result is stored write-once as `attributionInferred`. It never fails the PUT: a missing events table, a failed Query or a scoring error stores nothing and the pod is created as usual. Every call logs one `attribution_inference` line (`family_id_hash`, `platform`, `outcome`: `scored` / `no-candidates` / `below-threshold` / `skipped` / `error`, plus `band`, `candidates`, `gap_minutes` or `reason`).
@@ -127,6 +129,10 @@ On the pod-creation write (`isSignupEvent: true`, the write that stamps `created
 ### DELETE and start over
 
 `DELETE /family/{familyId}?writerMemberId=…` writes a tombstone: `createdAt`, the owner fields, `country`, `signupPlatform`, `attribution`, `heardVia`, `attributionInferred`, `signupStartedAt`, `deviceCountry` and `createAttemptId` survive so a re-registration is a restore; the pointer, activity signals, `familyName` and `subscribeNewsletter` are dropped. With `&neverFinishedOnly=1` (the resume-setup screen's "Start over", #125) it tombstones only a never-finished row and answers `{ success: true, skipped: 'pod-exists' }` for any other row. The decision is made from the stored row, never from client state. It logs one `registry_start_over` line (`family_id_hash`, `outcome`: `tombstoned` / `skipped-pod-exists` / `no-row`, `table`: `prod` / `dev` by Origin, #128).
+
+`DELETE /family/{familyId}?keepFile=1` (2026-10-23) is not a delete: the client's delete-family path left the pod file in place. It reads the row, posts `family_left_device` to #beanies-leavers when the row has a pod, and answers `{ success: true, kept: 'file' }` with **no write at all** (the row and its pointer survive). It branches before the start-over check and the writer-id measurement. It logs one `registry_left_device` line (`family_id_hash`, `outcome`: `no-row` / `tombstoned` / `not-pod` / `notified`, `table`).
+
+**#beanies-leavers** (`slack.mjs`): a plain DELETE that tombstones a row with a pod (`createdAt` set, not a never-finished row) posts `family_deleted`; the keep-file call posts `family_left_device`. A start-over never posts. The line carries the family name (or owner email domain), the id tail, platform, member count, created day, provider and the billing plan/status (one `readBilling` GetItem; a failed read posts without the plan). A dev-table origin never posts (`slack_post_skipped reason=dev_table`: e2e teardowns DELETE there). Each post logs `slack_posted` / `slack_post_failed` / `slack_post_skipped` with `kind` and `channel: 'leavers'`, and neither the billing read nor the post can fail the DELETE (3 s Slack timeout). `slack.mjs` shares `slackEscape`, `familyIdentity` and `postToSlack` verbatim with `../billing/slack.mjs`, pinned by `slackTwinDrift.test.mjs`.
 
 ### 2. Bundle the Lambda
 
@@ -138,7 +144,7 @@ cd infrastructure/lambda/registry
 # Every non-test .mjs here is imported by index.mjs (directly or through
 # timeZoneCountry.mjs); leaving any out fails every request with
 # ERR_MODULE_NOT_FOUND.
-zip -j lambda.zip index.mjs entitlement.mjs events.mjs owner.mjs inference.mjs \
+zip -j lambda.zip index.mjs entitlement.mjs events.mjs owner.mjs inference.mjs slack.mjs \
   timeZoneCountry.mjs timeZoneCountryData.mjs
 ```
 
@@ -147,7 +153,7 @@ If you need to bundle deps:
 ```bash
 npm init -y
 npm install @aws-sdk/client-dynamodb @aws-sdk/util-dynamodb
-zip -r lambda.zip index.mjs entitlement.mjs events.mjs owner.mjs inference.mjs \
+zip -r lambda.zip index.mjs entitlement.mjs events.mjs owner.mjs inference.mjs slack.mjs \
   timeZoneCountry.mjs timeZoneCountryData.mjs node_modules
 ```
 
@@ -167,6 +173,7 @@ zip -r lambda.zip index.mjs entitlement.mjs events.mjs owner.mjs inference.mjs \
   - `DEV_ORIGINS` (optional) — comma-separated dev origins; defaults to `http://localhost:5173,http://localhost:4173,http://localhost:4321`
   - `EVENTS_TABLE_NAME`, `EVENTS_DEV_TABLE_NAME` (optional) — the marketing-events ledger tables for `POST /events` and create-time inference; the dev one falls back to the prod one. Leave unset if you do not route `POST /events` (create-time inference is then skipped and logged `no-events-table`).
   - `BILLING_TABLE_NAME`, `V1_LAUNCH_AT`, `BILLING_ENFORCE`: the hosted service's plan state. The hosted deployment always provisions a billing DynamoDB table and grants this Lambda `dynamodb:GetItem` on it. A self-host deployment may leave `BILLING_TABLE_NAME` unset, and then only while `V1_LAUNCH_AT` is also unset: every GET returns `entitlement.state: 'beta'` and nothing is ever read-only. (Setting `V1_LAUNCH_AT` without a billing table makes the GET return `entitlement: null`. A subscription or a `trialEndsAt` override in the billing table counts even before `V1_LAUNCH_AT` is set; only the launch-based 90-day clock waits for it.)
+  - `SLACK_LEAVERS_WEBHOOK_URL` (optional): Slack incoming webhook for #beanies-leavers (`TF_VAR_slack_leavers_webhook_url` in the hosted deployment). Read at call time; unset means every leaver line is skipped and logged `no_url`.
 - **IAM permissions:** the Lambda's execution role needs `dynamodb:GetItem`, `dynamodb:PutItem`, `dynamodb:DeleteItem` on your table's ARN, plus `dynamodb:GetItem` on the billing table's ARN when `BILLING_TABLE_NAME` is set, plus `dynamodb:PutItem` on the events tables when `POST /events` is routed, plus `dynamodb:Query` on each events table's `platform-tsEpoch-index` for create-time inference.
 
 Upload `lambda.zip`.

@@ -20,6 +20,15 @@
  *    drift handover is `refused-handover-locked`, so a device on a stale roster can never hand
  *    ownership back. Email sync is never locked: it cannot move authority.
  *
+ * THE POINTER IS MOVED BY PRESENCE, NEVER BY TRUTHINESS (`pointerPresent`, `resolvePointer`)
+ * A PUT that carries none of `provider` / `fileId` / `displayPath` asks for NO pointer move, and
+ * the stored pointer stays, whoever sends it. That is how a device that opened the pod without
+ * its storage provider restored (a cold boot, a revoked Google grant) avoids rewriting a Drive
+ * family's canonical pointer to `'local'`. The test is key PRESENCE, not truthiness, because a
+ * genuine local family's `fileId: null` is a real pointer: `{ provider: 'local', fileId: null }`
+ * is present and moves the pointer (from the owner). Precedent: `'writerEmail' in body` in
+ * `index.mjs`. See `~/projects/beanies-ops/docs/plans/2026-10-23-disconnect-save-first-registry-pointer-leavers-channel.md`.
+ *
  * PURE, ON PURPOSE (the `entitlement.mjs` pattern)
  * No AWS imports, no `process.env`, no clock (the caller passes `now`), no logging. `index.mjs`
  * owns the I/O: it logs the `registry_owner_sync` line from `sync`, and skips the PutItem when
@@ -53,14 +62,64 @@ export function realEmail(s) {
 }
 
 /**
+ * Does the body carry a pointer at all? Key PRESENCE, never truthiness: a local family's
+ * `fileId: null` is a pointer (see the header). Absent means "no move asked for".
+ */
+export function pointerPresent(body) {
+  return 'provider' in body || 'fileId' in body || 'displayPath' in body;
+}
+
+/**
  * Does the body's pointer name the row's stored canonical pod? Provider and fileId only, with the
- * PUT arm's own normalisation (`samePointer` in `index.mjs`); `displayPath` is cosmetic and ignored.
+ * PUT arm's own normalisation (`resolvePointer` below); `displayPath` is cosmetic and ignored
+ * (adding it would make an `ownerSync` transfer `refused-off-canonical` after a mere file rename).
+ * A body with no pointer (`!pointerPresent`) asks for no move, so it is on the canonical pointer.
  */
 export function onCanonicalPointer(body, existing) {
   return (
     (body.provider || 'local') === (existing.provider || 'local') &&
     (body.fileId || null) === (existing.fileId ?? null)
   );
+}
+
+/**
+ * The pointer the PUT arm stores, and whether the write's pointer was accepted.
+ *
+ * `accepted` is true for the owner, for a body with no pointer (nothing was asked for), and for a
+ * body whose three fields equal the stored ones (a no-op echo, `displayPath` included, so a member
+ * renaming the file is still a refused move). A refused or absent pointer keeps the stored one.
+ *
+ * @param {object} body the parsed PUT body
+ * @param {object} existing the stored row (`{}` when there is none)
+ * @param {boolean} isOwner the PUT arm's pointer-authority answer for this writer
+ * @returns {{ provider: string, fileId: string|null, displayPath: string|null,
+ *   present: boolean, accepted: boolean }}
+ */
+export function resolvePointer(body, existing, isOwner) {
+  const present = pointerPresent(body);
+  // ONE normalisation for provider + fileId (`onCanonicalPointer`); only the `displayPath`
+  // term is this arm's own, the ownerSync arm deliberately ignores it.
+  const samePointer =
+    present &&
+    onCanonicalPointer(body, existing) &&
+    (body.displayPath || null) === (existing.displayPath ?? null);
+  const accepted = isOwner || !present || samePointer;
+  if (!present || !accepted) {
+    return {
+      provider: existing.provider || 'local',
+      fileId: existing.fileId ?? null,
+      displayPath: existing.displayPath ?? null,
+      present,
+      accepted,
+    };
+  }
+  return {
+    provider: body.provider || 'local',
+    fileId: body.fileId || null,
+    displayPath: body.displayPath || null,
+    present,
+    accepted,
+  };
 }
 
 const tail = (id) => (typeof id === 'string' && id ? id.slice(-6) : null);
@@ -146,7 +205,11 @@ export function resolveOwnerFields({ existing, body, isOwner, now }) {
   if (!storedId) return keep('refused-no-owner-id');
   // Only the registered owner can hand ownership on or edit the contact address.
   if (!isOwner) return keep('refused-not-owner');
-  // A device on a copy of the pod must not undo a transfer made on the canonical one.
+  // A device on a copy of the pod must not undo a transfer made on the canonical one. A device
+  // that cannot even name where the pod lives (no pointer: its provider did not restore) is not
+  // provably on it either, so it fails CLOSED with its own outcome, not the misleading
+  // off-canonical one a fallback `'local'` used to earn it (2026-10-23).
+  if (!pointerPresent(body)) return keep('refused-no-pointer');
   if (!onCanonicalPointer(body, existing)) return keep('refused-off-canonical');
   if (!UUID_RE.test(body.ownerMemberId ?? '')) return keep('refused-invalid-target');
 

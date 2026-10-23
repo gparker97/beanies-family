@@ -3297,10 +3297,34 @@ export const useSyncStore = defineStore('sync', () => {
     const rosterOwner = opts.ownerSync
       ? familyStoreForPayload.soleOwner
       : familyStoreForPayload.owner;
+    // ─── NO POINTER WITHOUT A PROVIDER: OMIT, NEVER A FALLBACK ───────────
+    //
+    // With no installed provider and no deliberate re-point, this device does not know where
+    // the pod lives, so the payload says NOTHING about it: the three pointer keys are left out
+    // and the Lambda keeps the stored pointer. Sending the old `'local'` / `null` fallback is
+    // how a Drive family's login register on a device whose Drive provider had not restored
+    // rewrote the canonical pointer to local (accepted, because the owner was writing).
+    //
+    // Keyed on the PROVIDER OBJECT, not `storageProviderType`: the staged-pending-password
+    // path sets the type to `'google_drive'` with no provider installed, and would otherwise
+    // send `google_drive` with a null `fileId`, nulling the canonical file id. A genuine local
+    // family has a provider installed (type `'local'`) and still sends `'local'`.
+    const pointerOverridden =
+      overrides.provider !== undefined ||
+      overrides.fileId !== undefined ||
+      overrides.displayPath !== undefined;
+    let pointer: Partial<Pick<RegistryEntry, 'provider' | 'fileId' | 'displayPath'>> = {};
+    if (!pointerOverridden && !provider) {
+      registryActionLog('put')('pointer-omitted', 'info');
+    } else {
+      pointer = {
+        provider: overrides.provider ?? provider?.type ?? storageProviderType.value ?? 'local',
+        fileId: overrides.fileId ?? provider?.getFileId() ?? null,
+        displayPath: overrides.displayPath ?? provider?.getDisplayName() ?? fileName.value ?? null,
+      };
+    }
     return {
-      provider: overrides.provider ?? storageProviderType.value ?? 'local',
-      fileId: overrides.fileId ?? provider?.getFileId() ?? null,
-      displayPath: overrides.displayPath ?? provider?.getDisplayName() ?? fileName.value ?? null,
+      ...pointer,
       familyName: ctx.activeFamilyName ?? null,
       // ─── THE OWNER COMES FROM THE POD ROSTER, NOT FROM THIS SESSION ────
       //

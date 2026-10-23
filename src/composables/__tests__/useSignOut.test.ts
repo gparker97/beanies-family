@@ -36,12 +36,14 @@ const h = vi.hoisted(() => ({
     photoUploads: 0,
     remoteBlocked: false,
     unknown: false,
+    saveFailure: null,
   })),
   measureQueuedPhotoUploads: vi.fn(async () => ({
     unsavedFamilies: 0,
     photoUploads: 0,
     remoteBlocked: false,
     unknown: false,
+    saveFailure: null,
   })),
   confirm: vi.fn(async () => true),
 }));
@@ -124,19 +126,27 @@ beforeEach(() => {
     photoUploads: 0,
     remoteBlocked: false,
     unknown: false,
+    saveFailure: null,
   });
   h.measureQueuedPhotoUploads.mockResolvedValue({
     unsavedFamilies: 0,
     photoUploads: 0,
     remoteBlocked: false,
     unknown: false,
+    saveFailure: null,
   });
   h.confirm.mockResolvedValue(true);
 });
 
 // C6: the clear tier never deletes unsaved work without the person's explicit "discard".
 describe('useSignOut clear tier: unsaved work (C6)', () => {
-  const atRisk = { unsavedFamilies: 1, photoUploads: 2, remoteBlocked: false, unknown: false };
+  const atRisk = {
+    unsavedFamilies: 1,
+    photoUploads: 2,
+    remoteBlocked: false,
+    unknown: false,
+    saveFailure: null,
+  };
   // The clear tier drops key material, so the kit guard opens first; get it out of the way.
   const clearPastGuard = () => {
     const pending = useSignOut().signOut('clear', { trust: false });
@@ -196,7 +206,13 @@ describe('useSignOut clear tier: unsaved work (C6)', () => {
 
 // Round 3: an untrusted keep-data sign-out never keeps queued (plaintext) photos silently.
 describe('useSignOut untrusted sign-out: queued photos', () => {
-  const photos = { unsavedFamilies: 0, photoUploads: 2, remoteBlocked: false, unknown: false };
+  const photos = {
+    unsavedFamilies: 0,
+    photoUploads: 2,
+    remoteBlocked: false,
+    unknown: false,
+    saveFailure: null,
+  };
   // An untrusted sign-out drops key material, so the kit guard opens first.
   const signOutUntrusted = () => {
     const pending = useSignOut().signOut('sign-out', { trust: false });
@@ -224,7 +240,18 @@ describe('useSignOut untrusted sign-out: queued photos', () => {
     expect(h.confirm).toHaveBeenCalledWith(
       expect.objectContaining({
         message: 'auth.unsavedPhotosSignOutMessage',
+        // Exactly the photo line: the photo-only probe runs no save, so it never names a
+        // save-failure cause (2026-10-23).
         detail: 'auth.unsavedPhotos.other',
+      })
+    );
+    expect(h.logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        context: expect.objectContaining({
+          action: 'unsaved_discard_confirmed',
+          kind: 'sign-out',
+          error_code: undefined,
+        }),
       })
     );
     expect(h.signOut).toHaveBeenCalledWith({ dropPhotoQueue: true });
@@ -252,13 +279,25 @@ describe('useSignOut untrusted sign-out: queued photos', () => {
 
 describe('confirmDiscardUnsavedWork (C6)', () => {
   it('resolves true without asking when nothing is at risk', async () => {
-    const clean = { unsavedFamilies: 0, photoUploads: 0, remoteBlocked: false, unknown: false };
+    const clean = {
+      unsavedFamilies: 0,
+      photoUploads: 0,
+      remoteBlocked: false,
+      unknown: false,
+      saveFailure: null,
+    };
     expect(await confirmDiscardUnsavedWork(clean, 'clear-data')).toBe(true);
     expect(h.confirm).not.toHaveBeenCalled();
   });
 
   it('forget family uses its own copy; "could not check" is at risk too', async () => {
-    const unknown = { unsavedFamilies: 0, photoUploads: 0, remoteBlocked: false, unknown: true };
+    const unknown = {
+      unsavedFamilies: 0,
+      photoUploads: 0,
+      remoteBlocked: false,
+      unknown: true,
+      saveFailure: null,
+    };
     await confirmDiscardUnsavedWork(unknown, 'forget-family');
     expect(h.confirm).toHaveBeenCalledWith(
       expect.objectContaining({

@@ -19,9 +19,28 @@ import {
   docPushedAgainst,
   getRemoteBaselineHeadsFp,
   isRemoteBlocked,
+  type SaveOutcome,
 } from '@/services/sync/syncService';
 import { countQueuedPhotoUploads, hasUnpushedAtSignOutMarker } from '@/services/indexeddb/database';
 import { logEvent } from '@/services/telemetry/logEvent';
+
+/**
+ * Why the save this measurement ran first did not land: the `syncService` save outcomes
+ * (`SaveResult.outcome`, with `no-provider` renamed `no-home` for the copy) plus `timeout`,
+ * the probe's own race giving up on a save that was still running. Carried as data so the ONE
+ * confirm can name the cause.
+ */
+export type SaveProbeCause = 'auth' | 'transient' | 'timeout' | 'error' | 'no-home' | 'deferred';
+
+/**
+ * The probe's cause from the sync layer's classification. `no-provider` (no storage provider
+ * installed, e.g. Drive could not restore after a Google disconnect) reads as `no-home`: the
+ * device is not connected to the family data file at all, which is a different sentence from
+ * "the token was rejected".
+ */
+export function probeCauseFromOutcome(outcome: SaveOutcome | null): SaveProbeCause | null {
+  return outcome === 'no-provider' ? 'no-home' : outcome;
+}
 
 export interface UnsavedWorkReport {
   /** Families whose document holds work the family file has not got. */
@@ -32,6 +51,13 @@ export interface UnsavedWorkReport {
   remoteBlocked: boolean;
   /** Something could not be measured. Reads as at-risk. */
   unknown: boolean;
+  /**
+   * Why the pre-delete save did not land, or `null` when it landed or no save ran. Stamped
+   * by the store that ran the save (`authStore.measureUnsavedWork`); the measurements here
+   * never run a save, so they always return `null`. Not a risk on its own: a failed save
+   * with nothing dirty still reads clean (`hasUnsavedWork` ignores it).
+   */
+  saveFailure: SaveProbeCause | null;
 }
 
 export const NOTHING_UNSAVED: Readonly<UnsavedWorkReport> = Object.freeze({
@@ -39,6 +65,7 @@ export const NOTHING_UNSAVED: Readonly<UnsavedWorkReport> = Object.freeze({
   photoUploads: 0,
   remoteBlocked: false,
   unknown: false,
+  saveFailure: null,
 });
 
 /** Would a delete now lose anything (or can we not tell)? */
@@ -52,6 +79,7 @@ export function combineUnsavedWork(a: UnsavedWorkReport, b: UnsavedWorkReport): 
     photoUploads: a.photoUploads + b.photoUploads,
     remoteBlocked: a.remoteBlocked || b.remoteBlocked,
     unknown: a.unknown || b.unknown,
+    saveFailure: a.saveFailure ?? b.saveFailure,
   };
 }
 
@@ -92,6 +120,7 @@ export async function measureLiveFamily(familyId: string | null): Promise<Unsave
     photoUploads: photos.count,
     remoteBlocked: isRemoteBlocked() !== null,
     unknown: unknown || photos.unknown,
+    saveFailure: null,
   };
 }
 
@@ -113,5 +142,6 @@ export async function measureFamilyAtRest(familyId: string): Promise<UnsavedWork
     photoUploads: photos.count,
     remoteBlocked: false,
     unknown: photos.unknown,
+    saveFailure: null,
   };
 }

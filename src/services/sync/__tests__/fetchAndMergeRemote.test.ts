@@ -768,6 +768,137 @@ describe('a merge that refuses AFTER the remote was read', () => {
   });
 });
 
+// The ONE save-outcome classification the unsaved-work confirm names its cause from
+// (2026-10-23). `doSave` swallows every failure and returns false, and a queued save never
+// reaches `recordSaveFailure`, so neither a catch nor `getLastSaveCause` can tell these apart.
+// The outcome rides on the RESULT (`saveDetailed`), never on module state: the trailing single
+// flight starts the next save the moment this one settles.
+describe('SaveResult.outcome (why the save did not land)', () => {
+  const fakeKey = {} as CryptoKey;
+  const provider = () =>
+    makeProvider({ remoteText: '', remoteTimestamp: '2026-05-16T10:00:00Z', onWrite: () => {} });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    syncService.reset();
+    parseMock.mockImplementation((text) => JSON.parse(text) as BeanpodFileV4);
+  });
+
+  it('is "auth" when the pre-save read fails with a TokenExpiredError', async () => {
+    const { TokenExpiredError } = await import('@/services/google/googleAuth');
+    const p = provider();
+    p.read.mockRejectedValueOnce(new TokenExpiredError());
+    syncService.setProvider(p as never);
+    syncService.setFamilyKey(fakeKey, buildEnvelope());
+
+    await expect(syncService.saveDetailed()).resolves.toEqual({ saved: false, outcome: 'auth' });
+  });
+
+  it('is "auth" for a Drive 401 on the pre-save read', async () => {
+    const { DriveApiError } = await import('@/services/google/driveService');
+    const p = provider();
+    p.read.mockRejectedValueOnce(new DriveApiError('unauthorized', 401));
+    syncService.setProvider(p as never);
+    syncService.setFamilyKey(fakeKey, buildEnvelope());
+
+    expect((await syncService.saveDetailed()).outcome).toBe('auth');
+  });
+
+  it('is "transient" for a queued pre-save read (NOT recorded as a failure)', async () => {
+    const p = provider();
+    p.read.mockRejectedValueOnce(new Error('network down'));
+    syncService.setProvider(p as never);
+    syncService.setFamilyKey(fakeKey, buildEnvelope());
+
+    await expect(syncService.saveDetailed()).resolves.toEqual({
+      saved: false,
+      outcome: 'transient',
+    });
+    // The twin it must not be read from: a queued save never reaches recordSaveFailure.
+    expect(syncService.getLastSaveCause()).toBeNull();
+  });
+
+  it('is "transient" for a write the provider queued', async () => {
+    const p = provider();
+    p.read.mockResolvedValueOnce(JSON.stringify(buildEnvelope()));
+    p.write.mockResolvedValueOnce({
+      revision: null,
+      queued: true,
+      queuedReason: 'network',
+    } as never);
+    syncService.setProvider(p as never);
+    syncService.setFamilyKey(fakeKey, buildEnvelope());
+
+    await expect(syncService.saveDetailed()).resolves.toEqual({
+      saved: false,
+      outcome: 'transient',
+    });
+  });
+
+  it('is "error" for a non-transport read failure and for a merge refusal', async () => {
+    const p = provider();
+    p.read.mockRejectedValueOnce(new Error('disk exploded'));
+    syncService.setProvider(p as never);
+    syncService.setFamilyKey(fakeKey, buildEnvelope());
+    expect((await syncService.saveDetailed()).outcome).toBe('error');
+
+    syncService.reset();
+    vi.mocked(docClient.mergeRemoteEnvelope).mockRejectedValueOnce(new Error('worker gone'));
+    const q = provider();
+    q.read.mockResolvedValueOnce(JSON.stringify(buildEnvelope()));
+    syncService.setProvider(q as never);
+    syncService.setFamilyKey(fakeKey, buildEnvelope());
+    expect((await syncService.saveDetailed()).outcome).toBe('error');
+  });
+
+  it('is null after a save that landed; a later failed write is classified on its own result', async () => {
+    const p = provider();
+    p.read.mockRejectedValueOnce(new Error('network down'));
+    p.read.mockResolvedValueOnce(JSON.stringify(buildEnvelope()));
+    syncService.setProvider(p as never);
+    syncService.setFamilyKey(fakeKey, buildEnvelope());
+
+    expect((await syncService.saveDetailed()).outcome).toBe('transient');
+    await expect(syncService.saveDetailed()).resolves.toEqual({ saved: true, outcome: null });
+
+    // A failed WRITE (the read may now be skipped against the fresh baseline) is `error`.
+    p.write.mockRejectedValueOnce(new Error('upload failed'));
+    expect((await syncService.saveDetailed()).outcome).toBe('error');
+  });
+
+  it('is "auth" for a TokenExpiredError thrown from the WRITE phase (401, refresh failed)', async () => {
+    // `writeWithAuthRetry` throws this when the upload gets 401 and the silent refresh fails:
+    // the reconnect-Google case, which a phase-based rule would have called `error`.
+    const { TokenExpiredError } = await import('@/services/google/googleAuth');
+    const p = provider();
+    p.read.mockResolvedValueOnce(JSON.stringify(buildEnvelope()));
+    p.write.mockRejectedValueOnce(new TokenExpiredError());
+    syncService.setProvider(p as never);
+    syncService.setFamilyKey(fakeKey, buildEnvelope());
+
+    await expect(syncService.saveDetailed()).resolves.toEqual({ saved: false, outcome: 'auth' });
+  });
+
+  it('is "no-provider" when no storage provider is installed (Drive did not restore)', async () => {
+    syncService.setFamilyKey(fakeKey, buildEnvelope());
+    await expect(syncService.saveDetailed()).resolves.toEqual({
+      saved: false,
+      outcome: 'no-provider',
+    });
+  });
+
+  it("is null after saveNow's no-key return (never the previous run's failure)", async () => {
+    const p = provider();
+    p.read.mockRejectedValueOnce(new Error('disk exploded'));
+    syncService.setProvider(p as never);
+    syncService.setFamilyKey(fakeKey, buildEnvelope());
+    expect((await syncService.saveDetailed()).outcome).toBe('error');
+
+    syncService.clearFamilyKey();
+    await expect(syncService.saveNowDetailed()).resolves.toEqual({ saved: false, outcome: null });
+  });
+});
+
 describe('a LINEAGE block must refuse the save, not fall through to it', () => {
   const fakeKey = {} as CryptoKey;
 

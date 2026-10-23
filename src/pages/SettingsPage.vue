@@ -1700,6 +1700,13 @@ async function handleDeleteFamilyClick() {
         message: 'registry row kept during a family deletion — the pod file survives',
         context: { action: 'delete-family', error_code: 'registry-kept-file-survives' },
       });
+      // Tell the registry the family left this device with its file kept, so the departure
+      // is announced server-side. The Lambda writes NOTHING in this mode (no tombstone, row
+      // and pointer untouched). Its result changes neither `kept` nor `keptByChoice`: nothing
+      // the person asked for depends on it, and a refused or failed notice is already logged
+      // by `removeFamily` (warn, `detail: 'keep-file'`; it never throws, and it is bounded
+      // inside, so a stalled connection cannot hold the deletion on a notice nothing depends on).
+      await removeFamily(familyId, authStore.currentUser?.memberId ?? null, { keepFile: true });
     }
 
     // 4. Delete local family (IndexedDB, passkeys, file handles, local registry).

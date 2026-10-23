@@ -25,9 +25,11 @@ import {
   ownerVersionCondition,
   realEmail,
   resolveOwnerFields,
+  resolvePointer,
 } from './owner.mjs';
 import { SCORING, applyHeardVia, scoreFamily, wantsCreateInference } from './inference.mjs';
 import { countryForTimeZone } from './timeZoneCountry.mjs';
+import { notifyLeaverSlack } from './slack.mjs';
 
 const client = new DynamoDBClient({});
 // Each table pair falls back to prod when no dev table is configured (safe fallback).
@@ -840,12 +842,27 @@ async function putOnce({ event, familyId, tableName, body, now, today, noteSync 
   // those as refused would page the team every time a member recovers normally,
   // and would drown the one signal that means something — a device actually
   // trying to MOVE the family's pointer somewhere it shouldn't.
-  const samePointer =
-    (body.provider || 'local') === (existing.provider || 'local') &&
-    (body.fileId || null) === (existing.fileId ?? null) &&
-    (body.displayPath || null) === (existing.displayPath ?? null);
+  //
+  // A write with NO pointer fields asks for no move at all, from anyone, the
+  // owner included (2026-10-23): a device that opened the pod without its
+  // storage provider restored omits the pointer rather than sending a fallback
+  // `'local'`, and the stored Drive pointer stays. Key PRESENCE, not
+  // truthiness; the rule and its reasons live in owner.mjs `resolvePointer`.
+  const pointer = resolvePointer(body, existing, isOwner);
+  const pointerAccepted = pointer.accepted;
 
-  const pointerAccepted = isOwner || samePointer;
+  if (!pointer.present) {
+    // Say what was actually stored: a first write (or a tombstone) has no pointer to keep and
+    // lands as local/null. One line per read-merge-write round (a conflict retry logs twice).
+    // eslint-disable-next-line no-console -- pointer-omission decision line, read by CloudWatch
+    console.log(
+      existing.provider || existing.fileId
+        ? '[registry] pointer omitted; existing pointer kept'
+        : '[registry] pointer omitted; no stored pointer, local/null stored',
+      familyIdHash(familyId),
+      tableLabel(event.headers?.origin)
+    );
+  }
 
   if (!pointerAccepted) {
     // Domains + id tails only — never full member emails or ids in CloudWatch.
@@ -867,9 +884,9 @@ async function putOnce({ event, familyId, tableName, body, now, today, noteSync 
 
   const item = {
     familyId,
-    provider: pointerAccepted ? body.provider || 'local' : existing.provider || 'local',
-    fileId: pointerAccepted ? body.fileId || null : (existing.fileId ?? null),
-    displayPath: pointerAccepted ? body.displayPath || null : (existing.displayPath ?? null),
+    provider: pointer.provider,
+    fileId: pointer.fileId,
+    displayPath: pointer.displayPath,
     // Preserve-on-omit (2026-08-10): an omitted name previously nulled a
     // stored one. Same semantics as country/subscribeNewsletter below.
     familyName: body.familyName || existing.familyName || null,
@@ -1304,6 +1321,19 @@ async function inferAtCreate({ origin, familyId, item, now }) {
 }
 
 /**
+ * Does the row have a pod? `createdAt` is stamped only by the pod-creation write, and a #125
+ * step-1 row never has it. The ONE predicate for both #beanies-leavers kinds, so an abandoned
+ * sign-up never reads as a leaver.
+ */
+const isPodRow = (row) => !!row?.createdAt && !isNeverFinishedRow(row);
+
+/** The billing row for a leaver line, or null. `readBilling` never rejects; an error reads null. */
+async function billingForLeaver(familyId, origin) {
+  const read = await readBilling(familyId, origin);
+  return read.billing ?? null;
+}
+
+/**
  * The DELETE arm: tombstone the row (see the comment inside). Moved out of `handler` as
  * `handlePut` already is, so `handler` stays a dispatcher. Throws to the handler's catch (500),
  * as before.
@@ -1313,6 +1343,16 @@ async function inferAtCreate({ origin, familyId, item, now }) {
  * else. The decision is made HERE, from the stored row, never from client state: a device that
  * thinks no pod exists may be wrong, and a tombstoned pod is a family gone missing. Without the
  * flag the arm is unchanged.
+ *
+ * `?keepFile=1` (2026-10-23) is NOT a delete: the client's delete-family path left the pod file in
+ * place, and this call only announces that to #beanies-leavers (`family_left_device`). It is
+ * read-only (no tombstone, no row write), branches before the writer-id measurement (a call that
+ * deletes nothing must not inflate it), and answers `{ success: true, kept: 'file' }`.
+ *
+ * #beanies-leavers posts (`slack.mjs`): `family_deleted` after the tombstone of a pod row,
+ * `family_left_device` from the keep-file branch, both gated on ONE predicate (`isPodRow`), so a
+ * step-1 row and a start-over never post. The billing row is read for the plan segment
+ * (`readBilling`, which never rejects). Neither the read nor the post can fail the DELETE.
  */
 async function handleDelete(event, familyId, tableName) {
   // ─── TOMBSTONE, NOT A DROP (2026-09-09) ──────────────────────────────
@@ -1351,12 +1391,29 @@ async function handleDelete(event, familyId, tableName) {
         table: tableLabel(event.headers?.origin),
       })
     );
+  const origin = event.headers?.origin;
+  const keepFile = event.queryStringParameters?.keepFile === '1';
+  // One line per keep-file request: `no-row` | `tombstoned` | `not-pod` | `no-owner-id` |
+  // `not-owner` | `notified` (the notifier was called; the post's own result is its `slack_*`
+  // line, not repeated here).
+  const logLeftDevice = (outcome) =>
+    keepFile &&
+    // eslint-disable-next-line no-console -- structured keep-file outcome line, read by CloudWatch
+    console.log(
+      JSON.stringify({
+        msg: 'registry_left_device',
+        family_id_hash: familyIdHash(familyId),
+        outcome,
+        table: tableLabel(origin),
+      })
+    );
 
   // Nothing to tombstone. Writing a bare `deletedAt` row for a family that
   // never registered would manufacture junk every reader then has to filter,
   // so report the same idempotent success the hard delete gave.
   if (!existing) {
     logStartOver('no-row');
+    logLeftDevice('no-row');
     return response(200, { success: true }, event);
   }
 
@@ -1365,7 +1422,43 @@ async function handleDelete(event, familyId, tableName) {
   // scan. Idempotent for the whole arm, flag or no flag.
   if (existing.deletedAt) {
     logStartOver('already-tombstoned');
+    logLeftDevice('tombstoned');
     return response(200, { success: true, skipped: 'already-tombstoned' }, event);
+  }
+
+  // The writer id, read once for both arms below. On the delete arm it is MEASURED, not
+  // enforced (see there); on the keep-file arm it IS the gate, see next.
+  const writerMemberId = event.queryStringParameters?.writerMemberId;
+  const writerValid = typeof writerMemberId === 'string' && UUID_RE.test(writerMemberId);
+  const writerIsOwner =
+    writerValid && !!existing.ownerMemberId && writerMemberId === existing.ownerMemberId;
+
+  // Keep-file: announce, write nothing. Before the start-over check and the writer-id
+  // measurement below, both of which are about deleting.
+  //
+  // ⚠️ OWNER-GATED, unlike the delete itself. The API key ships in the bundle, so without this
+  // anyone could make the Lambda read a billing row and post a family's name, size and plan to
+  // Slack for any id, as often as they liked. Every client that sends `keepFile` also sends its
+  // writer id, so the gate costs no legacy client anything; and a MEMBER removing the family
+  // from their own device is not the family leaving, so it is right not to announce it.
+  if (keepFile) {
+    if (!isPodRow(existing)) {
+      logLeftDevice('not-pod');
+      return response(200, { success: true }, event);
+    }
+    if (!writerIsOwner) {
+      // Fails closed either way; `no-owner-id` names the legacy rows (no stored owner id) so
+      // their silence is attributable to the row, not to the writer.
+      logLeftDevice(existing.ownerMemberId ? 'not-owner' : 'no-owner-id');
+      return response(200, { success: true }, event);
+    }
+    await notifyLeaverSlack(
+      'family_left_device',
+      { ...existing, familyId },
+      { table: tableLabel(origin), billing: () => billingForLeaver(familyId, origin) }
+    );
+    logLeftDevice('notified');
+    return response(200, { success: true, kept: 'file' }, event);
   }
 
   // Start over must never delete a family that has a pod: only a step-1 row is abandoned.
@@ -1387,10 +1480,7 @@ async function handleDelete(event, familyId, tableName) {
   // wire sends none at all and would be refused on day one, including the
   // Playwright teardown hook. Enforce only once this line is quiet for real
   // families for a full release cycle.
-  const writerMemberId = event.queryStringParameters?.writerMemberId;
-  const writerValid = typeof writerMemberId === 'string' && UUID_RE.test(writerMemberId);
-  const deleteAuthorized =
-    writerValid && !!existing.ownerMemberId && writerMemberId === existing.ownerMemberId;
+  const deleteAuthorized = writerIsOwner;
 
   if (!deleteAuthorized) {
     // Id TAILS only — never a full member id in CloudWatch, matching the
@@ -1449,6 +1539,15 @@ async function handleDelete(event, familyId, tableName) {
     })
   );
   logStartOver('tombstoned');
+  // A start-over (`neverFinishedOnly`) only ever tombstones a step-1 row, which `isPodRow` refuses,
+  // so an abandoned sign-up never reads as a leaver. `existing` still has the pointer and name.
+  if (isPodRow(existing)) {
+    await notifyLeaverSlack(
+      'family_deleted',
+      { ...existing, familyId },
+      { table: tableLabel(origin), billing: () => billingForLeaver(familyId, origin) }
+    );
+  }
   return response(200, { success: true }, event);
 }
 

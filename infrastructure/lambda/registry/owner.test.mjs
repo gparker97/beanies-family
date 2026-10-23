@@ -3,8 +3,10 @@ import {
   normEmail,
   onCanonicalPointer,
   ownerVersionCondition,
+  pointerPresent,
   realEmail,
   resolveOwnerFields,
+  resolvePointer,
 } from './owner.mjs';
 
 const FAMILY_ID = '11111111-2222-4333-8444-555555555555';
@@ -73,6 +75,104 @@ describe('normEmail / onCanonicalPointer', () => {
     expect(onCanonicalPointer({ provider: 'local', fileId: 'CANON' }, ROW)).toBe(false);
     expect(onCanonicalPointer({}, {})).toBe(true); // local/null on both sides
     expect(onCanonicalPointer({ fileId: '' }, { provider: 'local' })).toBe(true);
+  });
+
+  it("a body with no pointer fields is NOT on the canonical pointer (presence is the caller's question)", () => {
+    // `onCanonicalPointer` compares values only. Whether an omitted pointer means "no move
+    // asked for" (handlePut, via `resolvePointer`) or "cannot prove where it is" (ownerSync,
+    // `refused-no-pointer`) is decided by the arm, not here.
+    expect(onCanonicalPointer({ writerMemberId: OWNER_ID }, ROW)).toBe(false);
+    // Present-but-null is a pointer, and it is not the stored Drive one.
+    expect(onCanonicalPointer({ fileId: null }, ROW)).toBe(false);
+  });
+});
+
+describe('pointerPresent (key presence, never truthiness)', () => {
+  it('is false only when none of the three keys is in the body', () => {
+    expect(pointerPresent({})).toBe(false);
+    expect(pointerPresent({ isLoginEvent: true, ownerEmail: 'owner@example.com' })).toBe(false);
+    expect(pointerPresent({ provider: 'local' })).toBe(true);
+    expect(pointerPresent({ fileId: null })).toBe(true);
+    expect(pointerPresent({ displayPath: undefined })).toBe(true);
+  });
+});
+
+describe('resolvePointer', () => {
+  const DRIVE = Object.freeze({
+    provider: 'google_drive',
+    fileId: 'CANON',
+    displayPath: 'Family.beanpod',
+  });
+  const kept = { provider: 'google_drive', fileId: 'CANON', displayPath: 'Family.beanpod' };
+
+  it('an owner write with no pointer keeps the stored one and is accepted', () => {
+    expect(resolvePointer({ isLoginEvent: true }, DRIVE, true)).toEqual({
+      ...kept,
+      present: false,
+      accepted: true,
+    });
+  });
+
+  it('a member write with no pointer keeps the stored one and is accepted (nothing asked)', () => {
+    expect(resolvePointer({}, DRIVE, false)).toEqual({ ...kept, present: false, accepted: true });
+  });
+
+  it("an owner write with an explicit provider: 'local' moves the pointer", () => {
+    expect(resolvePointer({ provider: 'local', fileId: null }, DRIVE, true)).toEqual({
+      provider: 'local',
+      fileId: null,
+      displayPath: null,
+      present: true,
+      accepted: true,
+    });
+  });
+
+  it('a member write with a different pointer is refused and keeps the stored one', () => {
+    expect(
+      resolvePointer({ provider: 'google_drive', fileId: 'COPY', displayPath: 'x' }, DRIVE, false)
+    ).toEqual({ ...kept, present: true, accepted: false });
+  });
+
+  it('a member write echoing the stored pointer (displayPath included) is accepted', () => {
+    expect(resolvePointer({ ...DRIVE }, DRIVE, false)).toEqual({
+      ...kept,
+      present: true,
+      accepted: true,
+    });
+    // A rename alone is still a move for a member.
+    expect(
+      resolvePointer({ ...DRIVE, displayPath: 'Renamed.beanpod' }, DRIVE, false).accepted
+    ).toBe(false);
+  });
+
+  it('fileId: null alone counts as present (a local family), refused from a member', () => {
+    expect(resolvePointer({ fileId: null }, DRIVE, false)).toEqual({
+      ...kept,
+      present: true,
+      accepted: false,
+    });
+  });
+
+  it('an ownerSync write with the pointer omitted fails CLOSED as refused-no-pointer', () => {
+    // A device whose provider did not restore cannot prove it is on the canonical pod; it must
+    // not hand ownership on. Distinct from off-canonical so the rate of each is visible.
+    const body = syncBody({ ownerMemberId: NEW_OWNER_ID, ownerSyncReason: 'transfer' });
+    delete body.provider;
+    delete body.fileId;
+    delete body.displayPath;
+    const r = resolveOwnerFields({ existing: ROW, body, isOwner: true, now: NOW });
+    expect(r.sync.outcome).toBe('refused-no-pointer');
+    expect(r.write).toBe(false);
+  });
+
+  it("a first write with no pointer and no row stores 'local' / null, as before", () => {
+    expect(resolvePointer({}, {}, true)).toEqual({
+      provider: 'local',
+      fileId: null,
+      displayPath: null,
+      present: false,
+      accepted: true,
+    });
   });
 });
 

@@ -9,7 +9,9 @@ The one place beanies.family talks to Stripe. Zero-dependency Node on `nodejs20.
 | `/billing/portal-session`   | `x-api-key` + plan token in the body | Creates a Customer Portal session |
 | `/billing/webhook`          | `Stripe-Signature` only | Re-reads the subscription and writes its current state |
 
-Files: `index.mjs` (routing, handlers), `stripeApi.mjs` (REST client, pinned `STRIPE_API_VERSION`), `webhookSignature.mjs` (HMAC + `safeEqual`), `ddb.mjs` (`UpdateItem SET` discipline), `alarms.mjs` (prefixes pinned to the Terraform by test), `slack.mjs` (the #beanies-joiners subscription lines: `formatSubscriptionMessage`, `postToSlack`).
+Files: `index.mjs` (routing, handlers), `stripeApi.mjs` (REST client, pinned `STRIPE_API_VERSION`), `webhookSignature.mjs` (HMAC + `safeEqual`), `ddb.mjs` (`UpdateItem SET` discipline), `alarms.mjs` (prefixes pinned to the Terraform by test), `slack.mjs` (the subscription Slack lines: `formatSubscriptionMessage`, `postToSlack`).
+
+Slack routing is by kind (`index.mjs` `webhookFor`): `created` posts to #beanies-joiners (`SLACK_JOINERS_WEBHOOK_URL`); `cancel_scheduled` and `ended` post to #beanies-leavers (`SLACK_LEAVERS_WEBHOOK_URL`). An unset URL skips that kind's line (`slack_post_skipped reason=no_url`) and never falls back to the other channel; `slack_posted` / `slack_post_failed` / `slack_post_skipped` carry `channel: 'joiners' | 'leavers'`. `slackEscape`, `familyIdentity`, `postToSlack`, `PLAN_LABELS` and `SLACK_TIMEOUT_MS` have a verbatim twin in `../registry/slack.mjs`, pinned by `../registry/slackTwinDrift.test.mjs`; change both together.
 
 ```bash
 npm run test:lambda      # node:test, mocked fetch + DynamoDB

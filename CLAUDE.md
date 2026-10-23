@@ -365,6 +365,7 @@ Observability is a **first-class deliverable**, not an afterthought. Every featu
 - **`logEvent({ level, surface, message, context?, error?, flush? })`** (`src/services/telemetry/logEvent.ts`) — the diagnostic **firehose**. Offline-aware queue (`logQueue.ts`) → AWS ingest endpoint → CloudWatch. Every level (`debug`/`info`/`warn`/`error`) is recorded (client-side rate-limited to 50/surface/min). Use for lifecycle, decision, fallback, and outcome events — not just errors.
 - **`reportError({ surface, message, severity, error?, context? })`** (`src/utils/errorReporter.ts`) — for failures. **All** severities land in the CloudWatch firehose; **only `severity: 'critical'` also pages Slack `#beanies-errors`** (+ immediate flush) and must be reserved for "a user action failed or data is at risk." Use `'error'`/`'warning'` for caught-and-handled failures (firehose + console, no page).
 - **`perfTiming.record(label, ms, ctx?)`** (`src/utils/perfTiming.ts`) — durations, correlated by `family_id` in CloudWatch. Note the `TELEMETRY_FLOOR_MS = 250` floor: sub-floor events are dropped unless you count them explicitly.
+- **Slack channels and what posts where:** `~/projects/beanies-ops/docs/runbooks/slack-channels.md` (errors → `#beanies-errors`, growth → `#beanies-joiners`, negative non-error events → `#beanies-leavers`).
 
 **Rules:**
 

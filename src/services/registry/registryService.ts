@@ -148,6 +148,11 @@ export type RegistryWritePayload = Omit<RegistryEntry, 'familyId' | 'updatedAt'>
 /** Why an owner-sync write was sent; see `ownerSyncReason` on the payload. */
 export type RegistryOwnerSyncReason = 'transfer' | 'drift';
 
+import { raceTimeout } from '@/utils/timing';
+
+/** How long a registry DELETE may take before the caller moves on (every caller, one bound). */
+const REGISTRY_DELETE_WAIT_MS = 5_000;
+
 const API_URL = import.meta.env.VITE_REGISTRY_API_URL;
 const API_KEY = import.meta.env.VITE_REGISTRY_API_KEY;
 
@@ -483,13 +488,20 @@ function parseOwner(raw: unknown): RegistryWriteResult['owner'] {
  * `opts.neverFinishedOnly` (#125, "Start over" on the resume-setup screen): tombstone the
  * row only if it is a step-1 row no pod was ever created for. The Lambda decides from the
  * stored row and leaves a real pod untouched, so the client never has to judge it.
+ *
+ * `opts.keepFile` (the same owner-gated deletion, when the pod file is kept): the family left
+ * this device but its file survives, so the Lambda tombstones NOTHING and writes nothing; it
+ * only reads the row to announce the departure. The return value is then "the server took the
+ * notice", not "the row is gone" (the row deliberately stays). Every log line of this mode
+ * carries `detail: 'keep-file'` so the firehose separates it from a real removal.
  */
 export async function removeFamily(
   familyId: string,
   writerMemberId: string | null,
-  opts: { neverFinishedOnly?: boolean } = {}
+  opts: { neverFinishedOnly?: boolean; keepFile?: boolean } = {}
 ): Promise<boolean> {
   if (!features.registry) return true;
+  const modeContext = opts.keepFile ? { detail: 'keep-file' } : {};
 
   try {
     // A QUERY PARAMETER, not a body. A body on DELETE is legal and is dropped by
@@ -499,27 +511,56 @@ export async function removeFamily(
     const query: Record<string, string> = {};
     if (writerMemberId) query.writerMemberId = writerMemberId;
     if (opts.neverFinishedOnly) query.neverFinishedOnly = '1';
-    const res = await request(
-      'DELETE',
-      familyId,
-      undefined,
-      Object.keys(query).length ? query : undefined
+    if (opts.keepFile) query.keepFile = '1';
+    // Bounded for EVERY caller: `request()` has no fetch timeout, and a stalled connection must
+    // not wedge a deletion on this call (it used to, on the Drive-delete arm).
+    const res = await raceTimeout(
+      request('DELETE', familyId, undefined, Object.keys(query).length ? query : undefined),
+      REGISTRY_DELETE_WAIT_MS
     );
+    if (res === undefined) {
+      console.warn('[registry] removeFamily timed out');
+      logEvent({
+        level: 'warn',
+        surface: 'registry',
+        message: 'family delete timed out',
+        context: { action: 'delete-failed', error_code: 'timeout', ...modeContext },
+      });
+      return false;
+    }
     if (!res.ok) {
       console.warn(`[registry] removeFamily refused — HTTP ${res.status}`);
       logEvent({
         level: 'warn',
         surface: 'registry',
         message: 'family delete refused',
-        context: { action: 'delete-failed', http_status: res.status },
+        context: { action: 'delete-failed', http_status: res.status, ...modeContext },
       });
       return false;
+    }
+    if (opts.keepFile) {
+      // The Lambda answers `kept: 'file'` only when it announced the departure; a bare 200 means
+      // it declined (not the owner, not a pod, no row) and nothing was posted. Say which.
+      const announced = (await res.json().catch(() => null))?.kept === 'file';
+      logEvent({
+        level: 'info',
+        surface: 'registry',
+        message: announced
+          ? 'family left device, registry notified'
+          : 'family left device; registry did not announce it',
+        context: {
+          action: 'delete',
+          ...modeContext,
+          ...(announced ? {} : { error_code: 'declined' }),
+        },
+      });
+      return announced;
     }
     logEvent({
       level: 'info',
       surface: 'registry',
       message: 'family removed from registry',
-      context: { action: 'delete' },
+      context: { action: 'delete', ...modeContext },
     });
     return true;
   } catch (err) {
@@ -528,7 +569,7 @@ export async function removeFamily(
       level: 'warn',
       surface: 'registry',
       message: 'family delete threw',
-      context: { action: 'delete-failed' },
+      context: { action: 'delete-failed', ...modeContext },
       error: err,
     });
     return false;

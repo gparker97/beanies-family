@@ -13,6 +13,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 ### Fixed
 
 - Older app builds reporting a recoverable "no home for this family" pod-access condition no longer page the error channel; the server now applies the same severity rule the current app does.
+- Disconnecting Google now saves any last changes first, and the unsaved-changes notice says why a save could not finish.
+- A family's storage pointer is no longer changed by a device that opens the pod without its Google connection.
+
+### Changed
+
+- Subscription cancellations and family deletions are now announced in their own channel.
 
 ## 2026-10-22
 

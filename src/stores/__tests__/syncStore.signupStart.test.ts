@@ -538,6 +538,89 @@ describe('registerCurrentFamily: no ambient PUT before the pod exists (#125)', (
     const [familyId, body] = registerFamily.mock.calls[0]!;
     expect(familyId).toBe('fam-1');
     expect(body).toEqual(expect.objectContaining({ isLoginEvent: true, signupStart: false }));
+    // No provider is installed in this harness, so the only `put` line is the pointer omission
+    // (below), never a skip.
+    expect(putLogs().filter((e) => String(e.context.detail).startsWith('skipped'))).toEqual([]);
+  });
+});
+
+describe('buildRegistryPayload: no pointer without an installed provider', () => {
+  const putLogs = () =>
+    logEvent.mock.calls
+      .map(([e]) => e as { level: string; surface: string; context: Record<string, unknown> })
+      .filter((e) => e.surface === 'registry' && e.context?.action === 'put');
+
+  /** The syncService double the store under test imported (fresh per `resetModules`). */
+  async function syncServiceDouble() {
+    return vi.mocked(await import('@/services/sync/syncService'));
+  }
+
+  beforeEach(() => {
+    auth.podCreated = true;
+  });
+
+  it('omits provider, fileId and displayPath entirely and logs pointer-omitted', async () => {
+    // A Drive family's login register on a device whose Drive provider did not restore. The old
+    // fallback sent `provider: 'local', fileId: null`, which the Lambda accepted from the owner
+    // and wrote over the canonical Drive pointer.
+    (await syncServiceDouble()).getProvider.mockReturnValue(null);
+
+    useSyncStore().ensureRegistered(true);
+    await Promise.resolve();
+
+    expect(registerFamily).toHaveBeenCalledTimes(1);
+    const [, body] = registerFamily.mock.calls[0]!;
+    expect(body).not.toHaveProperty('provider');
+    expect(body).not.toHaveProperty('fileId');
+    expect(body).not.toHaveProperty('displayPath');
+    // The keys are absent on the wire too, not sent as null.
+    const wire = JSON.parse(JSON.stringify(body)) as Record<string, unknown>;
+    expect(
+      Object.keys(wire).filter((k) => ['provider', 'fileId', 'displayPath'].includes(k))
+    ).toEqual([]);
+    expect(putLogs()).toEqual([
+      expect.objectContaining({
+        level: 'info',
+        context: { action: 'put', detail: 'pointer-omitted' },
+      }),
+    ]);
+  });
+
+  it('still sends local for a genuine local family (a local provider is installed)', async () => {
+    (await syncServiceDouble()).getProvider.mockReturnValue({
+      type: 'local',
+      getFileId: () => null,
+      getDisplayName: () => 'family.beanpod',
+    } as unknown as import('@/services/sync/storageProvider').StorageProvider);
+
+    useSyncStore().ensureRegistered(true);
+    await Promise.resolve();
+
+    const [, body] = registerFamily.mock.calls.at(-1)!;
+    expect(body).toEqual(
+      expect.objectContaining({ provider: 'local', fileId: null, displayPath: 'family.beanpod' })
+    );
+    expect(putLogs()).toEqual([]);
+  });
+
+  it('sends the installed Drive provider pointer as before', async () => {
+    (await syncServiceDouble()).getProvider.mockReturnValue({
+      type: 'google_drive',
+      getFileId: () => 'drive-file-1',
+      getDisplayName: () => 'The Brambleworths.beanpod',
+    } as unknown as import('@/services/sync/storageProvider').StorageProvider);
+
+    useSyncStore().ensureRegistered(true);
+    await Promise.resolve();
+
+    const [, body] = registerFamily.mock.calls.at(-1)!;
+    expect(body).toEqual(
+      expect.objectContaining({
+        provider: 'google_drive',
+        fileId: 'drive-file-1',
+        displayPath: 'The Brambleworths.beanpod',
+      })
+    );
     expect(putLogs()).toEqual([]);
   });
 });

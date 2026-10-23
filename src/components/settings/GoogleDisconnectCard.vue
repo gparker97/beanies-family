@@ -7,6 +7,11 @@
  * gates it; afterwards this device signs out (its connection is dead anyway) through the
  * plain sign-out, whose tier follows the device's trust: a trusted device (now every
  * created or joined one, 2026-09-23) keeps its local cache; an untrusted one is wiped.
+ *
+ * ⚠️ SAVE FIRST, THEN REVOKE (2026-10-23). Revoking first left the sign-out's own final save
+ * running against a dead grant, so a pending change became permanently unsaveable on this
+ * device. The order is: measure with a bounded save → the C6 confirm when anything is still
+ * at risk (Keep cancels with no side effects) → revoke → sign out.
  */
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
@@ -17,6 +22,8 @@ import { useTranslation } from '@/composables/useTranslation';
 import { confirm as showConfirm } from '@/composables/useConfirm';
 import { disconnectGoogleEverywhere } from '@/services/google/googleAuth';
 import { emitExplicitRevokeUsed } from '@/services/telemetry/loginFlowEvents';
+import { confirmDiscardUnsavedWork } from '@/composables/useDiscardUnsavedWork';
+import { hasUnsavedWork } from '@/services/auth/unsavedWork';
 import { showToast } from '@/composables/useToast';
 import { reportError } from '@/utils/errorReporter';
 
@@ -35,7 +42,14 @@ async function handleDisconnect() {
 
   isDisconnecting.value = true;
   try {
-    emitExplicitRevokeUsed();
+    // Only THIS device's unsaved work can be measured; the revoke kills every device.
+    const report = await authStore.measureUnsavedWork({ save: true, scope: 'active' });
+    // Keep is logged by the confirm itself (`unsaved_discard_declined kind=disconnect-google`).
+    if (!(await confirmDiscardUnsavedWork(report, 'disconnect-google'))) return;
+    emitExplicitRevokeUsed(
+      hasUnsavedWork(report) ? 'discarded' : 'clean',
+      report.saveFailure ?? undefined
+    );
     await disconnectGoogleEverywhere();
     // This device's connection is gone — complete the sign-out so the user lands on a
     // truthful surface instead of an app that can no longer reach its file. The cache

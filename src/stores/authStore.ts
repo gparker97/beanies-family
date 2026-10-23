@@ -52,9 +52,16 @@ import {
   measureLiveFamily,
   measurePhotoQueue,
   NOTHING_UNSAVED,
+  type SaveProbeCause,
   type UnsavedWorkReport,
+  probeCauseFromOutcome,
 } from '@/services/auth/unsavedWork';
-import { saveNow, cancelPendingSave, triggerDebouncedSave } from '@/services/sync/syncService';
+import {
+  cancelPendingSave,
+  triggerDebouncedSave,
+  saveNowDetailed,
+  type SaveResult,
+} from '@/services/sync/syncService';
 import * as docClient from '@/services/automerge/worker/docClient';
 import { clearGoogleSessionState, getGoogleAccountEmail } from '@/services/google/googleAuth';
 import { clearDriveConnectionForAccount } from '@/services/google/driveTokenRecovery';
@@ -3811,51 +3818,83 @@ export const useAuthStore = defineStore('auth', () => {
    * when a save was pending and this one did not land, it re-arms it so the autosave intent
    * survives. A flow that does proceed to teardown cancels it there (`forceSaveWithTimeout`).
    */
-  async function probeSaveWithTimeout(timeoutMs: number): Promise<void> {
+  async function probeSaveWithTimeout(timeoutMs: number): Promise<SaveProbeCause | null> {
     // `saveNow` cancels the pending timer itself; ask first, so the intent can be restored.
     const hadPending = cancelPendingSave();
-    const saved = await boundedSaveNow(timeoutMs);
+    const { saved, cause } = await boundedSaveNow(timeoutMs);
     if (hadPending && !saved) triggerDebouncedSave();
+    return cause;
   }
 
-  /** One bounded `saveNow`; resolves whether it saved. Never throws. */
-  async function boundedSaveNow(timeoutMs: number): Promise<boolean> {
+  /**
+   * One bounded `saveNow`; resolves whether it saved and, when it did not, why (`null` when
+   * it saved or there was nothing it could try). Never throws. The cause is `syncService`'s
+   * own classification (`SaveResult.outcome` from `saveNowDetailed`): `doSave` swallows every failure and returns
+   * `false`, so nothing here can learn it from a catch.
+   */
+  async function boundedSaveNow(
+    timeoutMs: number
+  ): Promise<{ saved: boolean; cause: SaveProbeCause | null }> {
     // Every non-saving outcome reaches the firehose, so a lost-last-edit report can tell a
-    // hung save from a failed one from one with nothing to write.
-    const logUnsaved = (detail: 'timeout' | 'failed' | 'nothing', error?: unknown) =>
+    // hung save from a failed one from a queued one from one with nothing to write.
+    const logUnsaved = (
+      detail: 'timeout' | 'failed' | 'queued' | 'deferred' | 'nothing',
+      cause: SaveProbeCause | null,
+      error?: unknown
+    ) =>
       logEvent({
         level: detail === 'nothing' ? 'info' : 'warn',
         surface: 'sign-out',
         message: 'save before sign-out did not land',
         error,
-        context: { action: 'unsaved_probe_save', detail },
+        context: { action: 'unsaved_probe_save', detail, error_code: cause ?? undefined },
       });
     let timer: ReturnType<typeof setTimeout> | undefined;
     let timedOut = false;
     try {
-      const saved = await Promise.race([
-        saveNow(),
-        new Promise<boolean>((resolve) => {
+      // The outcome travels WITH the result (`SaveResult`): a module-level "last outcome" was
+      // one microtask from being blanked by the save queued behind this one.
+      const result = await Promise.race([
+        saveNowDetailed(),
+        new Promise<SaveResult>((resolve) => {
           timer = setTimeout(() => {
             timedOut = true;
             console.warn('[authStore] force-save timed out — proceeding with sign-out');
-            resolve(false);
+            resolve({ saved: false, outcome: null });
           }, timeoutMs);
         }),
       ]);
+      const saved = result.saved;
+      const cause: SaveProbeCause | null = timedOut
+        ? 'timeout'
+        : saved
+          ? null
+          : probeCauseFromOutcome(result.outcome);
       if (timedOut) {
-        logUnsaved('timeout');
+        logUnsaved('timeout', cause);
+      } else if (cause === 'transient') {
+        // Offline or Google unreachable: the intent is queued, not lost, but it is NOT saved.
+        // This used to read as 'nothing' at info, a silent misreport.
+        logUnsaved('queued', cause);
+      } else if (cause === 'deferred') {
+        // A save hold or a provider/family change under the save: re-armed, not lost, not saved.
+        logUnsaved('deferred', cause);
+      } else if (cause) {
+        // `doSave` caught an auth or other failure and returned false (its own `sync-save`
+        // event carries the detail).
+        logUnsaved('failed', cause);
       } else if (!saved) {
         // Not an error — no key/envelope yet (mid-create) or nothing dirty. Logged (never
         // silent) so a lost-last-edit repro can confirm whether the final save reached Drive.
         console.warn('[authStore] force-save on sign-out saved nothing (no durable state to save)');
-        logUnsaved('nothing');
+        logUnsaved('nothing', null);
       }
-      return saved;
+      return { saved, cause };
     } catch (e) {
       console.warn('[authStore] force-save failed — proceeding with sign-out', e);
-      logUnsaved('failed', e);
-      return false;
+      const cause: SaveProbeCause = 'error';
+      logUnsaved('failed', cause, e);
+      return { saved: false, cause };
     } finally {
       clearTimeout(timer);
     }
@@ -3993,7 +4032,8 @@ export const useAuthStore = defineStore('auth', () => {
     scope: 'active' | 'all';
   }): Promise<UnsavedWorkReport> {
     const activeId = resolveSignOutFamilyId() ?? null;
-    if (opts.save && activeId) await probeSaveWithTimeout(UNSAVED_PROBE_SAVE_TIMEOUT_MS);
+    const saveFailure =
+      opts.save && activeId ? await probeSaveWithTimeout(UNSAVED_PROBE_SAVE_TIMEOUT_MS) : null;
     let report = activeId ? await measureLiveFamily(activeId) : { ...NOTHING_UNSAVED };
     if (opts.scope === 'all') {
       const ids = new Set<string>();
@@ -4014,6 +4054,9 @@ export const useAuthStore = defineStore('auth', () => {
       if (activeId) ids.delete(activeId);
       for (const id of ids) report = combineUnsavedWork(report, await measureFamilyAtRest(id));
     }
+    // Unconditional: the confirm returns early on a clean report, so gating it here would be
+    // a second copy of that rule, and "save failed, nothing dirty" is itself a useful signal.
+    report = { ...report, saveFailure };
     logEvent({
       level: hasUnsavedWork(report) ? 'warn' : 'info',
       surface: 'sign-out',
@@ -4023,6 +4066,7 @@ export const useAuthStore = defineStore('auth', () => {
         detail: describeUnsaved(report),
         kind: opts.scope,
         file_count: report.photoUploads,
+        error_code: saveFailure ?? undefined,
       },
     });
     return report;

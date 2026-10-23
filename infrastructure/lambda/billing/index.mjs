@@ -128,9 +128,12 @@ const env = () => ({
   // Path prefix the routes sit under (`/sandbox` for the sandbox lane). `routePathOf` strips it.
   routePrefix: process.env.ROUTE_PREFIX || '',
   coupon: process.env.STRIPE_PRE_V1_COUPON || '',
-  // #beanies-joiners (the client's new-family channel). Empty: the Slack line is skipped and
-  // logged (`slack_post_skipped`); the webhook is unaffected either way.
+  // Two channels, routed by kind (`webhookFor`): #beanies-joiners (the client's new-family
+  // channel) for a new subscription, #beanies-leavers for a cancellation or an end. Empty: that
+  // kind's Slack line is skipped and logged (`slack_post_skipped`); never a fallback to the other
+  // channel. The webhook is unaffected either way.
   slackJoinersWebhookUrl: process.env.SLACK_JOINERS_WEBHOOK_URL || '',
+  slackLeaversWebhookUrl: process.env.SLACK_LEAVERS_WEBHOOK_URL || '',
   allowedOrigins: (process.env.CORS_ORIGINS || 'https://app.beanies.family')
     .split(',')
     .map((o) => o.trim())
@@ -271,7 +274,7 @@ async function applySubscription(familyId, subscriptionId, ddb) {
   return attrs;
 }
 
-// ── Slack (#beanies-joiners) ─────────────────────────────────────────────────
+// ── Slack (#beanies-joiners, #beanies-leavers) ───────────────────────────────
 
 /**
  * Which Slack line, if any, an applied webhook earns. `previous` is the row read BEFORE the
@@ -288,6 +291,24 @@ export function slackKindFor(type, attrs, previous) {
   return sameSub && previous?.cancelAt ? null : 'cancel_scheduled';
 }
 
+/**
+ * Which channel a Slack kind posts to, and its webhook. Positive growth (`created`) goes to
+ * #beanies-joiners; a cancellation or an end is a negative non-error event, #beanies-leavers
+ * (`~/projects/beanies-ops/docs/runbooks/slack-channels.md`). An unset URL is returned as `''`
+ * for that channel: it never falls back to the other one.
+ */
+export function webhookFor(kind, cfg) {
+  return kind === 'created'
+    ? { channel: 'joiners', url: cfg.slackJoinersWebhookUrl }
+    : { channel: 'leavers', url: cfg.slackLeaversWebhookUrl };
+}
+
+const WEBHOOK_VARIABLES = {
+  joiners:
+    'SLACK_JOINERS_WEBHOOK_URL (TF_VAR_slack_joiners_webhook_url, the SLACK_WEBHOOK_URL GitHub secret)',
+  leavers: 'SLACK_LEAVERS_WEBHOOK_URL (TF_VAR_slack_leavers_webhook_url)',
+};
+
 /** The registry row (name, owner email); a localhost family lives in the DEV table. */
 async function registryRowFor(familyId, cfg, ddb) {
   const row = cfg.registryTable ? await getRow(cfg.registryTable, familyId, ddb) : null;
@@ -301,9 +322,10 @@ async function registryRowFor(familyId, cfg, ddb) {
  * fails (registry, expanded retrieve) still posts, with less detail.
  */
 async function notifySubscriptionSlack(kind, familyId, attrs, previous, cfg, ddb) {
+  const { channel, url } = webhookFor(kind, cfg);
   try {
-    if (!cfg.slackJoinersWebhookUrl) {
-      logLine('slack_post_skipped', familyId, { kind, reason: 'no_url' });
+    if (!url) {
+      logLine('slack_post_skipped', familyId, { kind, channel, reason: 'no_url' });
       return;
     }
     const detail = async (what, read) => {
@@ -333,23 +355,24 @@ async function notifySubscriptionSlack(kind, familyId, attrs, previous, cfg, ddb
       cohort: COHORTS.has(previous?.cohort) ? previous.cohort : null,
       sub,
     });
-    const r = await postToSlack(cfg.slackJoinersWebhookUrl, text);
+    const r = await postToSlack(url, text);
     if (r.ok) {
-      logLine('slack_posted', familyId, { kind });
+      logLine('slack_posted', familyId, { kind, channel });
       return;
     }
     console.warn(
-      `[billing] slack_post_failed kind=${kind} reason=${r.reason} http_status=${r.httpStatus ?? '-'}\n` +
-        'Check SLACK_JOINERS_WEBHOOK_URL (TF_VAR_slack_joiners_webhook_url, the SLACK_WEBHOOK_URL GitHub secret).'
+      `[billing] slack_post_failed kind=${kind} channel=${channel} reason=${r.reason} http_status=${r.httpStatus ?? '-'}\n` +
+        `Check ${WEBHOOK_VARIABLES[channel]}. Joiners and leavers are separate webhooks: SLACK_JOINERS_WEBHOOK_URL for created, SLACK_LEAVERS_WEBHOOK_URL for cancel_scheduled / ended.`
     );
     logLine('slack_post_failed', familyId, {
       kind,
+      channel,
       reason: r.reason,
       http_status: r.httpStatus ?? null,
     });
   } catch (err) {
     console.warn('[billing] slack_post_failed reason=exception', err);
-    logLine('slack_post_failed', familyId, { kind, reason: 'exception' });
+    logLine('slack_post_failed', familyId, { kind, channel, reason: 'exception' });
   }
 }
 
