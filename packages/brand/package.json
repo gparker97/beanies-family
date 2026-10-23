@@ -12,7 +12,8 @@
     "./attribution": "./attribution.ts",
     "./heardVia": "./heardVia.ts",
     "./schema": "./schema.ts",
-    "./assets/*": "./assets/*"
+    "./assets/*": "./assets/*",
+    "./exitReason": "./exitReason.ts"
   },
   "files": [
     "theme.css",
@@ -21,6 +22,7 @@
     "planLimits.ts",
     "attribution.ts",
     "heardVia.ts",
+    "exitReason.ts",
     "schema.ts",
     "assets",
     "fonts"

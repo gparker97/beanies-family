@@ -66,7 +66,7 @@ enum WidgetTextSizeOption: String, AppEnum {
 
 /// The per-widget picker ("Edit Widget"). Titles are keys in Localizable.xcstrings
 /// (en + zh-Hans): they render before any snapshot exists, so they cannot come from one.
-/// Defaults: everything on (`WIDGET_DEFAULT_BLOCKS` in src/types/widgetSnapshot.ts). Each
+/// Defaults: our day, everything on (`WIDGET_DEFAULT_BLOCKS` in src/types/widgetSnapshot.ts). Each
 /// switch shows or hides a kind of row and only ever fills room that would otherwise be
 /// empty, so nothing competes for space by being on. The property names are the stored
 /// keys: relabel freely, and give a switch a new key only when its meaning changes (see
@@ -75,7 +75,7 @@ struct DayWidgetConfigIntent: WidgetConfigurationIntent {
     static var title: LocalizedStringResource = "Your day"
     static var description: IntentDescription? = IntentDescription("Today's plans, handoffs and dinner at a glance.")
 
-    @Parameter(title: "Whose day", default: .my)
+    @Parameter(title: "Whose day", default: .our)
     var audience: WidgetAudienceOption
 
     @Parameter(title: "Events", default: true)

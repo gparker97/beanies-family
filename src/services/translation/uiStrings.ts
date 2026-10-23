@@ -7159,6 +7159,51 @@ const STRING_DEFS = {
     en: 'This cannot be undone, and it affects every member of your pod.',
     beanie: 'this cannot be undone, and it affects every member of your pod.',
   },
+  // The delete drawer's required "why are you leaving?" survey (ExitReasonSurvey). A deletion
+  // surface, so the `beanie` values keep the real nouns (feature, design, google drive, app).
+  // The Slack line reads the stable English labels in `@beanies/brand/exitReason`, never these.
+  'settings.deleteFamilyReasonTitle': {
+    en: 'Before you go, why are you leaving?',
+    beanie: 'before you go, why are you leaving?',
+  },
+  'settings.deleteFamilyReason.missing_feature': {
+    en: "It doesn't have a feature I want",
+    beanie: "it doesn't have a feature i want",
+  },
+  'settings.deleteFamilyReason.design_layout': {
+    en: 'Not a fan of the design or layout',
+    beanie: 'not a fan of the design or layout',
+  },
+  'settings.deleteFamilyReason.too_slow': { en: 'Too slow', beanie: 'too slow' },
+  'settings.deleteFamilyReason.no_google_drive': {
+    en: "I don't have Google Drive",
+    beanie: "i don't have google drive",
+  },
+  'settings.deleteFamilyReason.too_complicated': {
+    en: 'Too complicated to set up',
+    beanie: 'too complicated to set up',
+  },
+  'settings.deleteFamilyReason.privacy_concerns': {
+    en: 'Privacy concerns',
+    beanie: 'privacy concerns',
+  },
+  'settings.deleteFamilyReason.switched_app': {
+    en: 'Switched to another app',
+    beanie: 'switched to another app',
+  },
+  'settings.deleteFamilyReason.just_trying': {
+    en: 'I was just trying it',
+    beanie: 'i was just trying it',
+  },
+  'settings.deleteFamilyReason.other': { en: 'Something else', beanie: 'something else' },
+  'settings.deleteFamilyReasonFeaturePlaceholder': {
+    en: 'Which feature were you hoping for?',
+    beanie: 'which feature were you hoping for?',
+  },
+  'settings.deleteFamilyReasonOtherPlaceholder': {
+    en: 'Tell us more…',
+    beanie: 'tell us more…',
+  },
   'settings.deleteFamilyFarewellTitle': { en: 'Goodbye', beanie: 'goodbye' },
   'settings.deleteFamilyFarewellMsg': {
     en: "Your family data has been deleted from all systems. We're sorry to see you go — every bean counts.",

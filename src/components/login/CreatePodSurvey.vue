@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import PageWelcomeSubtitle from '@/components/ui/PageWelcomeSubtitle.vue';
+import OptionSurvey, {
+  type OptionSurveyAnswer,
+  type OptionSurveyOption,
+} from '@/components/ui/OptionSurvey.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { logEvent } from '@/services/telemetry';
 import { reportError } from '@/utils/errorReporter';
@@ -13,6 +17,9 @@ import { HEARD_VIA_IDS, type HeardVia, type HeardViaId } from '@beanies/brand/he
  * ride the create-pod Slack notification (see ResumePodSetup). Purely
  * presentational; it NEVER blocks pod creation. See
  * docs/plans/2026-07-21-remove-invite-gate-create-welcome-modal.md.
+ *
+ * The option grid and its free-text field are the shared `OptionSurvey`; this host owns the
+ * copy, the finish/skip buttons, the telemetry and the mapping of `{ id, text }` to `HeardVia`.
  */
 const emit = defineEmits<{
   /** Resolved answer: the stable id (registry) + its Slack label or free text, or null (skip). */
@@ -59,29 +66,31 @@ const HEARD_OPTIONS = HEARD_VIA_IDS.map((id) => {
   return def;
 });
 
-const selectedId = ref<HeardViaId | null>(null);
-const otherText = ref('');
-const showOther = computed(() => selectedId.value === 'other');
+/** Translated at the render site; `other` asks for free text. */
+const options = computed<OptionSurveyOption[]>(() =>
+  HEARD_OPTIONS.map((def) => ({
+    id: def.id,
+    label: t(def.labelKey),
+    icon: def.icon,
+    requiresText: def.id === 'other',
+    textPlaceholder: def.id === 'other' ? t('createSurvey.otherPlaceholder') : undefined,
+  }))
+);
 
-function select(id: HeardViaId) {
-  // Single-select; tapping the selected tile clears it.
-  selectedId.value = selectedId.value === id ? null : id;
-}
+const answer = ref<OptionSurveyAnswer | null>(null);
 
 /**
- * Resolve the selection to `{ id, label }` (or null = skipped). `label` is the Slack string:
+ * Resolve the answer to `{ id, label }` (or null = skipped). `label` is the Slack string:
  * the stable English label, or for `other` the trimmed free text. `other` with no text typed is
- * a skip (null), as before.
+ * a skip (null): `OptionSurvey` reports it as no answer at all.
  */
 function resolve(): HeardVia | null {
-  if (!selectedId.value) return null;
-  const opt = HEARD_OPTIONS.find((o) => o.id === selectedId.value);
+  const picked = answer.value;
+  if (!picked) return null;
+  const opt = HEARD_OPTIONS.find((o) => o.id === picked.id);
   if (!opt) return null;
-  if (opt.id === 'other') {
-    const txt = otherText.value.trim();
-    return txt.length ? { id: opt.id, label: txt } : null;
-  }
-  return opt.slackLabel ? { id: opt.id, label: opt.slackLabel } : null;
+  const label = opt.slackLabel ?? picked.text;
+  return label ? { id: opt.id, label } : null;
 }
 
 function complete(payload: HeardVia | null) {
@@ -155,40 +164,8 @@ onMounted(() => {
       </p>
     </div>
 
-    <!-- Options -->
-    <div class="grid grid-cols-2 gap-2.5">
-      <button
-        v-for="opt in HEARD_OPTIONS"
-        :key="opt.id"
-        type="button"
-        :aria-pressed="selectedId === opt.id"
-        :data-testid="`survey-opt-${opt.id}`"
-        class="font-outfit flex items-center gap-2.5 rounded-[14px] border-[1.5px] p-3 text-left text-sm font-semibold transition-colors"
-        :class="
-          selectedId === opt.id
-            ? 'border-primary-500 dark:text-ink bg-[var(--tint-orange-8)] text-gray-900'
-            : 'dark:border-line-strong dark:text-ink border-[var(--tint-slate-5)] text-gray-700 hover:border-[var(--silk)]'
-        "
-        @click="select(opt.id)"
-      >
-        <span
-          class="dark:bg-surface-overlay grid h-7 w-7 shrink-0 place-items-center rounded-[10px] bg-[var(--tint-slate-5)] text-base"
-          aria-hidden="true"
-          >{{ opt.icon }}</span
-        >
-        {{ t(opt.labelKey) }}
-      </button>
-    </div>
-
-    <!-- Free text for "somewhere else" -->
-    <input
-      v-if="showOther"
-      v-model="otherText"
-      type="text"
-      :placeholder="t('createSurvey.otherPlaceholder')"
-      data-testid="survey-other-input"
-      class="dark:bg-surface-overlay dark:text-ink mt-2.5 w-full rounded-xl border-[1.5px] border-[var(--silk)] p-3 text-base text-gray-900 normal-case focus:ring-2 focus:ring-[var(--silk)] focus:outline-none"
-    />
+    <!-- Options + free text for "somewhere else" -->
+    <OptionSurvey v-model="answer" :options="options" testid-prefix="survey" />
 
     <!-- Finish + skip (both complete the flow; the survey never blocks) -->
     <button
@@ -212,8 +189,8 @@ onMounted(() => {
 
 <style scoped>
 /* All display copy renders lowercase (warm brand voice); underlying t() strings
-   stay standard-cased for CI + screen readers. The free-text input opts back out
-   (normal-case) so the user's own typing isn't visually lower-cased. */
+   stay standard-cased for CI + screen readers. It inherits into `OptionSurvey`, whose
+   free-text input opts back out (normal-case) so the user's own typing isn't lower-cased. */
 .survey {
   text-transform: lowercase;
 }

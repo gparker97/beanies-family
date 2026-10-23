@@ -29,7 +29,17 @@ const {
   requireReauthMock,
   measureUnsavedWorkMock,
   confirmDiscardMock,
+  logEventMock,
+  getProviderConfigMock,
+  canManagePodOverride,
 } = vi.hoisted(() => ({
+  // Only the exit-survey `shown` test needs the pod-management drawer (and its Delete Family
+  // opener) rendered; every other test keeps the real permission.
+  canManagePodOverride: { value: false },
+  logEventMock: vi.fn(),
+  getProviderConfigMock: vi.fn(
+    async (_familyId: string): Promise<{ type: string; driveFileId?: string } | null> => null
+  ),
   measureUnsavedWorkMock: vi.fn(async () => ({
     unsavedFamilies: 0,
     photoUploads: 0,
@@ -110,7 +120,24 @@ vi.mock('@/services/sync/fileSync', async (importOriginal) => {
   };
 });
 vi.mock('@/services/indexeddb/database', () => ({ deleteFamilyDatabase: vi.fn(async () => {}) }));
-vi.mock('@/services/sync/fileHandleStore', () => ({ getProviderConfig: vi.fn(async () => null) }));
+vi.mock('@/services/sync/fileHandleStore', () => ({ getProviderConfig: getProviderConfigMock }));
+vi.mock('@/composables/useFamilyDataAccess', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/composables/useFamilyDataAccess')>();
+  const { computed } = await import('vue');
+  return {
+    useFamilyDataAccess: () => {
+      const access = actual.useFamilyDataAccess();
+      return {
+        ...access,
+        canManagePod: computed(() => canManagePodOverride.value || access.canManagePod.value),
+      };
+    },
+  };
+});
+vi.mock('@/services/telemetry', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/services/telemetry')>()),
+  logEvent: logEventMock,
+}));
 vi.mock('@/services/automerge/projection', () => ({
   list: () => [],
   getSettings: () => ({}),
@@ -155,6 +182,7 @@ vi.mock('@/composables/useDiscardUnsavedWork', () => ({
 // Import AFTER the mocks
 import SettingsPage from '@/pages/SettingsPage.vue';
 import { COLLECTION_NAMES } from '@/types/automerge';
+import { useSyncStore } from '@/stores/syncStore';
 
 /** Renders the default slot so the modal's own form controls are reachable. */
 const SlotStub = { template: '<div><slot /></div>' };
@@ -200,23 +228,46 @@ async function runDeleteWithExport(wrapper: Awaited<ReturnType<typeof mountPage>
  * makes the gate itself the selector, so a change that dropped the typed confirmation
  * would fail here rather than silently select a different button.
  */
-async function typeConfirmationAndPressDelete(wrapper: Awaited<ReturnType<typeof mountPage>>) {
+function findDeleteButton(wrapper: Awaited<ReturnType<typeof mountPage>>) {
   const button = wrapper
     .findAllComponents({ name: 'BaseButton' })
     .find((b) => b.props('variant') === 'danger' && b.props('disabled') === true);
   expect(button, 'delete button (disabled until confirmed) not found').toBeTruthy();
+  return button!;
+}
 
+async function typeConfirmation(wrapper: Awaited<ReturnType<typeof mountPage>>) {
   const input = wrapper
     .findAllComponents({ name: 'BaseInput' })
     .find((c) => c.props('label') === 'settings.deleteFamilyTypeConfirm');
   expect(input, 'delete confirmation field not found').toBeTruthy();
   input!.vm.$emit('update:modelValue', 'delete');
   await flushPromises();
+}
 
-  // Typing the word is what arms it. If this ever reads `true`, the intent gate is gone.
-  expect(button!.props('disabled')).toBe(false);
+/** Answer the (stubbed, the page mounts shallow) "why are you leaving?" survey. */
+async function answerExitSurvey(
+  wrapper: Awaited<ReturnType<typeof mountPage>>,
+  reason: { id: string; text?: string } = { id: 'just_trying' }
+) {
+  const survey = wrapper.findComponent({ name: 'ExitReasonSurvey' });
+  expect(survey.exists(), 'exit reason survey not found in the delete drawer').toBe(true);
+  survey.vm.$emit('update:modelValue', reason);
+  await flushPromises();
+}
 
-  button!.vm.$emit('click');
+async function typeConfirmationAndPressDelete(
+  wrapper: Awaited<ReturnType<typeof mountPage>>,
+  reason?: { id: string; text?: string }
+) {
+  const button = findDeleteButton(wrapper);
+  await answerExitSurvey(wrapper, reason);
+  await typeConfirmation(wrapper);
+
+  // The typed word plus a reason is what arms it. If this ever reads `true`, a gate is gone.
+  expect(button.props('disabled')).toBe(false);
+
+  button.vm.$emit('click');
   await flushPromises();
 }
 
@@ -229,6 +280,7 @@ describe('SettingsPage — delete family export gate', () => {
     requireReauthMock.mockResolvedValue(true);
     confirmDiscardMock.mockResolvedValue(true);
     deleteLocalFamilyMock.mockResolvedValue({ deleted: true });
+    getProviderConfigMock.mockResolvedValue(null);
     setActivePinia(createPinia());
   });
 
@@ -343,7 +395,11 @@ describe('SettingsPage — delete family export gate', () => {
     // Lambda answers without writing: no tombstone, row and pointer untouched. A call without
     // `keepFile` here would be the removal this gate exists to prevent.
     expect(removeFamilyMock).toHaveBeenCalledTimes(1);
-    expect(removeFamilyMock.mock.calls[0]).toEqual(['fam-1', null, { keepFile: true }]);
+    expect(removeFamilyMock.mock.calls[0]).toEqual([
+      'fam-1',
+      null,
+      { keepFile: true, reason: { id: 'just_trying' } },
+    ]);
   });
 
   it('a refused keep-file notice changes nothing the person is told', async () => {
@@ -353,7 +409,10 @@ describe('SettingsPage — delete family export gate', () => {
     const wrapper = await mountPage();
     await runDeleteWithExport(wrapper);
 
-    expect(removeFamilyMock).toHaveBeenCalledWith('fam-1', null, { keepFile: true });
+    expect(removeFamilyMock).toHaveBeenCalledWith('fam-1', null, {
+      keepFile: true,
+      reason: { id: 'just_trying' },
+    });
     expect(alertMock).toHaveBeenCalledWith(
       expect.objectContaining({ message: 'settings.deleteFamilyFarewellKeptFileMsg' })
     );
@@ -521,5 +580,105 @@ describe('SettingsPage — delete family export gate', () => {
     const json = JSON.parse(await deliverFileMock.mock.calls[0][0].blob.text());
     for (const name of COLLECTION_NAMES) expect(json).toHaveProperty(name);
     expect(json).toHaveProperty('settings');
+  });
+});
+
+describe('SettingsPage — delete family exit reason', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    deliverFileMock.mockResolvedValue({ outcome: 'downloaded', delivered: true });
+    confirmMock.mockResolvedValue(true);
+    isNativeMock.mockReturnValue(false);
+    requireReauthMock.mockResolvedValue(true);
+    confirmDiscardMock.mockResolvedValue(true);
+    deleteLocalFamilyMock.mockResolvedValue({ deleted: true });
+    removeFamilyMock.mockResolvedValue(true);
+    getProviderConfigMock.mockResolvedValue(null);
+    canManagePodOverride.value = false;
+    setActivePinia(createPinia());
+  });
+
+  const exitSurveyEvents = () =>
+    logEventMock.mock.calls
+      .map((c) => c[0] as { surface: string; context?: Record<string, unknown> })
+      .filter((e) => e.surface === 'exit-survey');
+
+  it('keeps Delete disabled until a reason is picked, even with "delete" typed', async () => {
+    const wrapper = await mountPage();
+    const button = findDeleteButton(wrapper);
+    await typeConfirmation(wrapper);
+    expect(button.props('disabled')).toBe(true);
+
+    await answerExitSurvey(wrapper);
+    expect(button.props('disabled')).toBe(false);
+
+    // The survey reporting "no valid answer" (a text option emptied) disarms it again.
+    wrapper.findComponent({ name: 'ExitReasonSurvey' }).vm.$emit('update:modelValue', null);
+    await flushPromises();
+    expect(button.props('disabled')).toBe(true);
+  });
+
+  it('sends the reason on the Drive-delete arm too', async () => {
+    useSyncStore().storageProviderType = 'google_drive';
+    getProviderConfigMock.mockResolvedValue({ type: 'google_drive', driveFileId: 'file-1' });
+    const wrapper = await mountPage();
+    const label = wrapper
+      .findAll('label')
+      .find((l) => l.text().includes('settings.deleteFamilyDriveDelete'));
+    expect(label, 'drive-delete checkbox not found').toBeTruthy();
+    await label!.find('input[type="checkbox"]').setValue(true);
+
+    await typeConfirmationAndPressDelete(wrapper, { id: 'other', text: 'moving abroad' });
+
+    expect(deleteDriveFileMock).toHaveBeenCalledWith('tok', 'file-1');
+    expect(removeFamilyMock).toHaveBeenCalledTimes(1);
+    expect(removeFamilyMock.mock.calls[0]).toEqual([
+      'fam-1',
+      null,
+      { reason: { id: 'other', text: 'moving abroad' } },
+    ]);
+  });
+
+  it('logs shown on the explicit open and answered once, with the id only, at the send', async () => {
+    canManagePodOverride.value = true;
+    const wrapper = await mountPage();
+    // The opener sits beside the Danger Zone's description; it is the explicit open that logs.
+    const opener = wrapper
+      .findAllComponents({ name: 'BaseButton' })
+      .find((b) => b.element.parentElement?.textContent?.includes('settings.deleteFamilyDesc'));
+    expect(opener, 'delete-family opener not found').toBeTruthy();
+    opener!.vm.$emit('click');
+    await flushPromises();
+    expect(exitSurveyEvents()).toEqual([expect.objectContaining({ context: { action: 'shown' } })]);
+
+    await typeConfirmationAndPressDelete(wrapper, { id: 'missing_feature', text: 'meal plans' });
+
+    const events = exitSurveyEvents();
+    expect(events).toHaveLength(2);
+    expect(events[1]).toEqual(
+      expect.objectContaining({
+        message: 'answered',
+        context: { action: 'answered', detail: 'missing_feature', kind: 'with-text' },
+      })
+    );
+    // The free text never reaches the firehose.
+    expect(JSON.stringify(logEventMock.mock.calls)).not.toContain('meal plans');
+  });
+
+  it('logs no answered when the deletion is cancelled before anything is sent', async () => {
+    requireReauthMock.mockResolvedValue(false);
+    const wrapper = await mountPage();
+    await typeConfirmationAndPressDelete(wrapper);
+    expect(exitSurveyEvents().filter((e) => e.context?.action === 'answered')).toHaveLength(0);
+  });
+
+  it('keeps the reason across an export-failure reopen', async () => {
+    deliverFileMock.mockResolvedValue({ outcome: 'failed', delivered: false, stage: 'share' });
+    const wrapper = await mountPage();
+    await runDeleteWithExport(wrapper);
+    expect(removeFamilyMock).not.toHaveBeenCalled();
+    expect(wrapper.findComponent({ name: 'ExitReasonSurvey' }).props('modelValue')).toEqual({
+      id: 'just_trying',
+    });
   });
 });

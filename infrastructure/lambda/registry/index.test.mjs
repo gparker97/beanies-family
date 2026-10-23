@@ -10,6 +10,7 @@ import {
   reduceOrigin,
   reduceUserAgent,
 } from './events.mjs';
+import { formatLeaverMessage } from './slack.mjs';
 
 // --- Mock the DynamoDB client (keep util-dynamodb's marshall/unmarshall real) ---
 const sendMock = vi.fn();
@@ -3137,5 +3138,159 @@ describe('registry DELETE — #beanies-leavers posts (2026-10-23)', () => {
     await delWith(POD, { query: { writerMemberId: M_A } });
     expect(fetchMock).not.toHaveBeenCalled();
     expect(lines('slack_post_skipped')[0].reason).toBe('no_url');
+  });
+
+  // ── The exit survey's reason (2026-10-23) ──────────────────────────────────
+
+  /** Every console.log line as one string, to prove the free text never reaches CloudWatch. */
+  const allLogText = () => logSpy.mock.calls.map((c) => String(c[0])).join('\n');
+
+  it('a tombstone DELETE carries the reason and its text on the post, the id on the line', async () => {
+    const { res, puts } = await delWith(POD, {
+      query: { writerMemberId: M_A, reason: 'other', reasonText: 'the text' },
+      billing: { familyId: FAMILY_ID, plan: 'full', status: 'active' },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(puts).toHaveLength(1);
+    expect(posted()[0].text).toBe(
+      ':wave: *Family deleted* · The Parkers · id …55555555 · ios · 3 members · since 2026-10-02 · google_drive · plan: magic beans (active) · reason: Something else "the text"'
+    );
+    expect(lines('slack_posted')[0]).toMatchObject({
+      kind: 'family_deleted',
+      exit_reason: 'other',
+    });
+    expect(lines('exit_reason_dropped')).toHaveLength(0);
+    // The free text is Slack-only: never on a log line.
+    expect(allLogText()).not.toContain('the text');
+  });
+
+  it('?keepFile=1 from the owner carries the reason on family_left_device', async () => {
+    const { body } = await delWith(POD, {
+      query: { keepFile: '1', writerMemberId: M_A, reason: 'too_slow' },
+    });
+    expect(body).toEqual({ success: true, kept: 'file' });
+    expect(posted()[0].text).toBe(
+      ':door: *Family left a device (file kept)* · The Parkers · id …55555555 · ios · 3 members · since 2026-10-02 · google_drive · reason: Too slow'
+    );
+    expect(lines('slack_posted')[0]).toMatchObject({
+      kind: 'family_left_device',
+      exit_reason: 'too_slow',
+    });
+  });
+
+  it('a dev-origin DELETE logs the reason id on its dev_table skip line', async () => {
+    await delWith(POD, {
+      query: { writerMemberId: M_A, reason: 'just_trying' },
+      origin: 'http://localhost:5173',
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(lines('slack_post_skipped')[0]).toMatchObject({
+      kind: 'family_deleted',
+      reason: 'dev_table',
+      table: 'dev',
+      exit_reason: 'just_trying',
+    });
+  });
+
+  it('no reason (every legacy client) logs nothing and puts exit_reason null on the line', async () => {
+    await delWith(POD, { query: { writerMemberId: M_A } });
+    expect(lines('exit_reason_dropped')).toHaveLength(0);
+    expect(lines('slack_posted')[0].exit_reason).toBeNull();
+    expect(posted()[0].text).not.toContain('reason:');
+  });
+
+  it('an unknown id is dropped with one exit_reason_dropped line; the delete still answers 200', async () => {
+    const { res, puts } = await delWith(POD, {
+      query: { writerMemberId: M_A, reason: 'bogus_reason', reasonText: 'secret words' },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(puts).toHaveLength(1);
+    expect(lines('exit_reason_dropped')).toEqual([
+      {
+        msg: 'exit_reason_dropped',
+        family_id_hash: createHash('sha256').update(FAMILY_ID).digest('hex'),
+        reason: 'unknown-id',
+      },
+    ]);
+    expect(posted()[0].text).not.toContain('reason:');
+    expect(lines('slack_posted')[0].exit_reason).toBeNull();
+    // Never the rejected value, never the text.
+    expect(allLogText()).not.toContain('bogus_reason');
+    expect(allLogText()).not.toContain('secret words');
+  });
+
+  it('a non-string reason is dropped as not-string', async () => {
+    const { res } = await delWith(POD, {
+      query: { writerMemberId: M_A, reason: ['too_slow'] },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(lines('exit_reason_dropped').map((l) => l.reason)).toEqual(['not-string']);
+    expect(posted()[0].text).not.toContain('reason:');
+  });
+
+  it('text on an id that does not allow it keeps the id and drops only the text', async () => {
+    await delWith(POD, {
+      query: { writerMemberId: M_A, reason: 'too_slow', reasonText: 'tampered' },
+    });
+    expect(lines('exit_reason_dropped').map((l) => l.reason)).toEqual(['text-not-allowed']);
+    expect(posted()[0].text).toMatch(/ · reason: Too slow$/);
+    expect(posted()[0].text).not.toContain('tampered');
+    expect(lines('slack_posted')[0].exit_reason).toBe('too_slow');
+  });
+
+  it('the text is stripped of control and bidi characters, and capped at 200 code points', async () => {
+    await delWith(POD, {
+      query: { writerMemberId: M_A, reason: 'other', reasonText: '\u0000 calen\u202Edar\u2066 \n' },
+    });
+    expect(posted()[0].text).toMatch(/ · reason: Something else "calendar"$/);
+
+    // 199 + an astral emoji + 1 = 201 code points: the cap keeps the emoji whole.
+    const long = 'a'.repeat(199) + '\u{1F600}' + 'b';
+    await delWith(POD, {
+      query: { writerMemberId: M_A, reason: 'missing_feature', reasonText: long },
+    });
+    expect(posted()).toHaveLength(2);
+    expect(
+      posted()[1].text.endsWith(` · reason: Missing a feature "${'a'.repeat(199)}\u{1F600}"`)
+    ).toBe(true);
+  });
+
+  it('a no-row or tombstoned DELETE never logs a drop for its reason (it cannot post)', async () => {
+    await delWith(null, { query: { writerMemberId: M_A, reason: 'bogus' } });
+    await delWith(
+      { ...POD, deletedAt: '2026-10-20T00:00:00.000Z' },
+      { query: { keepFile: '1', writerMemberId: M_A, reason: 'bogus' } }
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(lines('exit_reason_dropped')).toHaveLength(0);
+  });
+});
+
+describe('formatLeaverMessage — the exit reason segment (2026-10-23)', () => {
+  const ROW = { familyId: FAMILY_ID, familyName: 'The Parkers' };
+
+  it('appends the label alone for an option without text', () => {
+    expect(
+      formatLeaverMessage('family_deleted', ROW, null, { id: 'too_slow', label: 'Too slow' })
+    ).toBe(':wave: *Family deleted* · The Parkers · id …55555555 · reason: Too slow');
+  });
+
+  it('appends the label and the quoted, escaped text for a text option', () => {
+    expect(
+      formatLeaverMessage(
+        'family_left_device',
+        ROW,
+        { plan: 'basic', status: 'trialing' },
+        { id: 'other', label: 'Something else', text: '<!channel> & co' }
+      )
+    ).toBe(
+      ':door: *Family left a device (file kept)* · The Parkers · id …55555555 · plan: beanies basic (trialing) · reason: Something else "&lt;!channel&gt; &amp; co"'
+    );
+  });
+
+  it('leaves the segment out with no reason (the default)', () => {
+    expect(formatLeaverMessage('family_deleted', ROW, null)).toBe(
+      ':wave: *Family deleted* · The Parkers · id …55555555'
+    );
   });
 });

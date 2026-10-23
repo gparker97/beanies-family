@@ -11,6 +11,13 @@ import { resolve } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { ATTRIBUTION_KEYS, ATTRIBUTION_VALUE_RE } from '@beanies/brand/attribution';
 import { HEARD_VIA_IDS } from '@beanies/brand/heardVia';
+import {
+  EXIT_REASON_IDS,
+  EXIT_REASON_LABELS,
+  EXIT_REASON_TEXT_IDS,
+  EXIT_REASON_TEXT_MAX,
+  sanitiseExitReasonText,
+} from '@beanies/brand/exitReason';
 // @ts-expect-error — no type declarations for the Lambda source.
 import * as registryLambda from '../../../infrastructure/lambda/registry/index.mjs';
 // @ts-expect-error — no type declarations for the Lambda source.
@@ -75,5 +82,70 @@ describe('registry owner email twin', () => {
 
   it.each(table)('client and Lambda agree on %s', (_name, input) => {
     expect((lambdaRealEmail as (s: unknown) => string | null)(input)).toBe(realEmail(input));
+  });
+});
+
+/**
+ * The exit-survey twin (2026-10-23): the delete drawer's reason ids, the ids that carry free
+ * text, the stable Slack labels and the text cap, by import (the `ATTRIBUTION_KEYS` pattern), and
+ * the text sanitiser by one table run through both functions (the `realEmail` pattern). The
+ * client sanitises before sending and the Lambda again on arrival; if they drift, the Slack line
+ * and the firehose disagree about what was said.
+ */
+describe('registry exit reason twin', () => {
+  it('the Lambda allowlists exactly the shared reason ids, in the same order', () => {
+    expect(registryLambda.EXIT_REASON_IDS).toEqual([...EXIT_REASON_IDS]);
+  });
+
+  it('the Lambda accepts free text for exactly the same ids', () => {
+    expect(registryLambda.EXIT_REASON_TEXT_IDS).toEqual([...EXIT_REASON_TEXT_IDS]);
+  });
+
+  it('the Lambda prints exactly the shared Slack labels', () => {
+    expect(registryLambda.EXIT_REASON_LABELS).toEqual({ ...EXIT_REASON_LABELS });
+  });
+
+  it('the Lambda caps the text at the same length', () => {
+    expect(registryLambda.EXIT_REASON_TEXT_MAX).toBe(EXIT_REASON_TEXT_MAX);
+  });
+
+  const LONG = 'a'.repeat(199) + '\u{1F600}' + 'b';
+  const table: Array<[string, unknown, string]> = [
+    ['valid', 'calendar sync', 'calendar sync'],
+    ['padded', '   calendar sync  ', 'calendar sync'],
+    ['control chars', '\u0000cal\u0007en\u009Fdar\n\t', 'calendar'],
+    ['a bidi override and isolate', 'abc\u202Edef\u2066ghi\u2069', 'abcdefghi'],
+    // The LOWER bounds of both ranges, so a one-sided narrowing of either twin's class is caught.
+    ['bidi range lower bounds', 'a\u202Ab\u202Bc\u2067d\u2068e', 'abcde'],
+    [
+      'a ZWJ family emoji',
+      'for \u{1F468}\u200D\u{1F469}\u200D\u{1F467}',
+      'for \u{1F468}\u200D\u{1F469}\u200D\u{1F467}',
+    ],
+    ['201 code points with an astral char', LONG, 'a'.repeat(199) + '\u{1F600}'],
+    ['empty', '', ''],
+    ['only controls', '\u0000\u202E \n', ''],
+    ['null', null, ''],
+    ['non-string', 42, ''],
+  ];
+
+  it('the 201-code-point row really is 201 code points (and 202 UTF-16 units)', () => {
+    expect(Array.from(LONG)).toHaveLength(201);
+    expect(LONG).toHaveLength(202);
+  });
+
+  it.each(table)('client and Lambda agree on %s', (_name, input, expected) => {
+    const lambda = (registryLambda.sanitiseExitReasonText as (v: unknown) => string)(input);
+    expect(sanitiseExitReasonText(input)).toBe(expected);
+    expect(lambda).toBe(sanitiseExitReasonText(input));
+  });
+
+  it('the cap never leaves a lone surrogate', () => {
+    const capped = sanitiseExitReasonText(LONG);
+    // A high surrogate not followed by a low one, or a low one not preceded by a high one.
+    expect(capped).not.toMatch(
+      /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/
+    );
+    expect((registryLambda.sanitiseExitReasonText as (v: unknown) => string)(LONG)).toBe(capped);
   });
 });

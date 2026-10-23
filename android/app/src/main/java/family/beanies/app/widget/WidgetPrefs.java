@@ -13,7 +13,7 @@ import java.util.List;
  * `<id>.audience`, `<id>.block.<kind>`, `<id>.opacity`, `<id>.textSize`, and `read_outcome`.
  *
  * A widget the launcher placed without running the configuration activity (Android 12+
- * `configuration_optional`) has no keys and reads the defaults: my day, every block on
+ * `configuration_optional`) has no keys and reads the defaults: our day, every block on
  * (WIDGET_DEFAULT_BLOCKS in src/types/widgetSnapshot.ts), a 70% background ({@link #DEFAULT_OPACITY}),
  * Standard text.
  */
@@ -24,6 +24,8 @@ public final class WidgetPrefs {
 
     static final String AUDIENCE_MY = "my";
     static final String AUDIENCE_OUR = "our";
+    /** The audience a widget starts with (and an unknown stored value reads as): the whole family. */
+    static final String DEFAULT_AUDIENCE = AUDIENCE_OUR;
 
     /** The three background-opacity choices, in percent. */
     static final int[] OPACITIES = {100, 70, 40};
@@ -65,7 +67,7 @@ public final class WidgetPrefs {
     final TextSize textSize;
 
     WidgetPrefs(String audience, boolean[] blocks, int opacity, TextSize textSize) {
-        this.audience = AUDIENCE_OUR.equals(audience) ? AUDIENCE_OUR : AUDIENCE_MY;
+        this.audience = AUDIENCE_MY.equals(audience) ? AUDIENCE_MY : DEFAULT_AUDIENCE;
         this.blocks = blocks.clone();
         this.opacity = isKnownOpacity(opacity) ? opacity : DEFAULT_OPACITY;
         this.textSize = textSize == null ? TextSize.STANDARD : textSize;
@@ -84,7 +86,7 @@ public final class WidgetPrefs {
             blocks[i] = p.getBoolean(prefix + blockKey(kind), WidgetFill.isDefaultOn(kind));
         }
         return new WidgetPrefs(
-                p.getString(prefix + "audience", AUDIENCE_MY),
+                p.getString(prefix + "audience", DEFAULT_AUDIENCE),
                 blocks,
                 p.getInt(prefix + "opacity", DEFAULT_OPACITY),
                 TextSize.fromKey(p.getString(prefix + "textSize", TextSize.STANDARD.key)));

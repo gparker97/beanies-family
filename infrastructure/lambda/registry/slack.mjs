@@ -86,13 +86,18 @@ const isoDay = (iso) => (typeof iso === 'string' && iso.length >= 10 ? iso.slice
 /**
  * One Slack mrkdwn line for a leaver event, e.g.
  * `:wave: *Family deleted* · The Parkers · id …55555555 · ios · 3 members · since 2026-10-02 ·
- * google_drive · plan: magic beans (active)`. A segment whose data is missing is left out.
+ * google_drive · plan: magic beans (active) · reason: Something else "the text"`. A segment whose
+ * data is missing is left out.
  *
  * @param {'family_deleted'|'family_left_device'} kind
  * @param {object} row the registry row as read BEFORE any tombstone (it still has the pointer)
  * @param {object|null} billing the billing row (`plan`, `status`), or null
+ * @param {{ id: string, label: string, text?: string }|null} exitReason the exit survey's answer,
+ *   already validated and labelled by `index.mjs` `validExitReason` (this file never sees the id
+ *   list), or null. The free text is user-authored: escaped, and quoted so it never reads as part
+ *   of the label.
  */
-export function formatLeaverMessage(kind, row, billing) {
+export function formatLeaverMessage(kind, row, billing, exitReason = null) {
   const r = row ?? {};
   const members =
     typeof r.memberCount === 'number' && r.memberCount >= 1
@@ -104,6 +109,9 @@ export function formatLeaverMessage(kind, row, billing) {
     planLabel || billing?.status
       ? `plan: ${slackEscape(planLabel ?? 'unknown')}${billing?.status ? ` (${slackEscape(billing.status)})` : ''}`
       : null;
+  const reason = exitReason?.label
+    ? `reason: ${slackEscape(exitReason.label)}${exitReason.text ? ` "${slackEscape(exitReason.text)}"` : ''}`
+    : null;
   return [
     LEAVER_HEADLINES[kind] ?? `*${slackEscape(kind)}*`,
     familyIdentity(r),
@@ -112,6 +120,7 @@ export function formatLeaverMessage(kind, row, billing) {
     since ? `since ${since}` : null,
     r.provider ? slackEscape(r.provider) : null,
     plan,
+    reason,
   ]
     .filter(Boolean)
     .join(' · ');
@@ -131,43 +140,53 @@ function logLine(msg, familyId, fields) {
 
 /**
  * Post a leaver line to #beanies-leavers. NEVER throws and never fails the DELETE: every outcome
- * is one `slack_posted` / `slack_post_failed` / `slack_post_skipped` line.
+ * is one `slack_posted` / `slack_post_failed` / `slack_post_skipped` line, and every one of them
+ * carries `exit_reason` (the survey id or null; NOT `reason`, which is the post outcome). The
+ * free text never reaches a log line.
  *
  * @param {'family_deleted'|'family_left_device'} kind
  * @param {object} row the registry row (read before any write)
- * @param {{ table: 'dev'|'prod', billing?: object|null, fetchImpl?: Function }} opts
+ * @param {{ table: 'dev'|'prod', billing?: object|null, exitReason?: { id: string, label: string, text?: string }|null, fetchImpl?: Function }} opts
  *   `table` is `index.mjs` `tableLabel(origin)`: `'dev'` skips (localhost and e2e teardowns).
  * @returns {Promise<{ ok: boolean, reason?: string }>}
  */
-export async function notifyLeaverSlack(kind, row, { table, billing = null, fetchImpl } = {}) {
+export async function notifyLeaverSlack(
+  kind,
+  row,
+  { table, billing = null, exitReason = null, fetchImpl } = {}
+) {
   const familyId = row?.familyId ?? null;
+  const log = (msg, fields) =>
+    logLine(msg, familyId, { ...fields, exit_reason: exitReason?.id ?? null });
   try {
     if (!(kind in LEAVER_HEADLINES)) {
-      logLine('slack_post_skipped', familyId, { kind, reason: 'unknown_kind', table });
+      log('slack_post_skipped', { kind, reason: 'unknown_kind', table });
       return { ok: false, reason: 'unknown_kind' };
     }
     if (table === 'dev') {
-      logLine('slack_post_skipped', familyId, { kind, reason: 'dev_table', table });
+      log('slack_post_skipped', { kind, reason: 'dev_table', table });
       return { ok: false, reason: 'dev_table' };
     }
     const url = process.env.SLACK_LEAVERS_WEBHOOK_URL || '';
     if (!url) {
-      logLine('slack_post_skipped', familyId, { kind, reason: 'no_url', table });
+      log('slack_post_skipped', { kind, reason: 'no_url', table });
       return { ok: false, reason: 'no_url' };
     }
     // The billing row is fetched only past the gates above: a dev-table or no-URL call must
     // not pay a DynamoDB read for a line it will never post. A thunk or a row are both accepted.
     const billingRow = typeof billing === 'function' ? await billing().catch(() => null) : billing;
-    const r = await postToSlack(url, formatLeaverMessage(kind, row, billingRow), { fetchImpl });
+    const r = await postToSlack(url, formatLeaverMessage(kind, row, billingRow, exitReason), {
+      fetchImpl,
+    });
     if (r.ok) {
-      logLine('slack_posted', familyId, { kind, table });
+      log('slack_posted', { kind, table });
       return r;
     }
     console.warn(
       `[registry] slack_post_failed kind=${kind} reason=${r.reason} http_status=${r.httpStatus ?? '-'}\n` +
         'Check SLACK_LEAVERS_WEBHOOK_URL (TF_VAR_slack_leavers_webhook_url) on the registry Lambda.'
     );
-    logLine('slack_post_failed', familyId, {
+    log('slack_post_failed', {
       kind,
       reason: r.reason,
       http_status: r.httpStatus ?? null,
@@ -176,7 +195,7 @@ export async function notifyLeaverSlack(kind, row, { table, billing = null, fetc
     return r;
   } catch (err) {
     console.warn('[registry] slack_post_failed reason=exception', err);
-    logLine('slack_post_failed', familyId, { kind, reason: 'exception', table });
+    log('slack_post_failed', { kind, reason: 'exception', table });
     return { ok: false, reason: 'exception' };
   }
 }

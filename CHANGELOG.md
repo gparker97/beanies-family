@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-10-23
 
+### Added
+
+- Deleting a family now asks why, so the reason can be learned from.
+
 ### Fixed
 
 - Older app builds reporting a recoverable "no home for this family" pod-access condition no longer page the error channel; the server now applies the same severity rule the current app does.
@@ -19,6 +23,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 ### Changed
 
 - Subscription cancellations and family deletions are now announced in their own channel.
+- Home-screen widgets now show the whole family's day by default; "my day" is still a tap away in the widget's settings.
 
 ## 2026-10-22
 

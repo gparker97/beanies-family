@@ -432,6 +432,80 @@ describe('registry DELETE — the writer id rides the query string', () => {
   });
 });
 
+describe('registry DELETE: the exit reason rides the query string', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  function sentQuery(f: ReturnType<typeof okFetch>): URLSearchParams {
+    return new URL(lastUrl(f), 'https://registry.test').searchParams;
+  }
+
+  it('sends the id alone for an option without free text, on both arms', async () => {
+    const f = okFetch();
+    global.fetch = f;
+    await removeFamily(FAMILY, OWNER, { reason: { id: 'too_slow' } });
+    expect(sentQuery(f).get('reason')).toBe('too_slow');
+    expect(sentQuery(f).has('reasonText')).toBe(false);
+
+    const g = okFetch({ success: true, kept: 'file' });
+    global.fetch = g;
+    await removeFamily(FAMILY, OWNER, { keepFile: true, reason: { id: 'just_trying' } });
+    expect(sentQuery(g).get('keepFile')).toBe('1');
+    expect(sentQuery(g).get('reason')).toBe('just_trying');
+    expect(sentQuery(g).has('reasonText')).toBe(false);
+  });
+
+  it('sends the sanitised free text for missing_feature and other', async () => {
+    const f = okFetch();
+    global.fetch = f;
+    await removeFamily(FAMILY, OWNER, {
+      reason: { id: 'missing_feature', text: '  meal plans & <shopping>\u0007  ' },
+    });
+    expect(sentQuery(f).get('reason')).toBe('missing_feature');
+    // Encoding is URLSearchParams' job; the control character is stripped and the ends trimmed.
+    expect(sentQuery(f).get('reasonText')).toBe('meal plans & <shopping>');
+
+    const g = okFetch();
+    global.fetch = g;
+    await removeFamily(FAMILY, OWNER, { reason: { id: 'other', text: 'moved abroad' } });
+    expect(sentQuery(g).get('reasonText')).toBe('moved abroad');
+  });
+
+  it('caps the free text at 200 code points', async () => {
+    const f = okFetch();
+    global.fetch = f;
+    await removeFamily(FAMILY, OWNER, { reason: { id: 'other', text: 'x'.repeat(250) } });
+    expect(sentQuery(f).get('reasonText')).toBe('x'.repeat(200));
+  });
+
+  it('never sends text for an id that does not allow it, nor an empty text', async () => {
+    const f = okFetch();
+    global.fetch = f;
+    await removeFamily(FAMILY, OWNER, { reason: { id: 'too_slow', text: 'smuggled' } });
+    expect(sentQuery(f).get('reason')).toBe('too_slow');
+    expect(sentQuery(f).has('reasonText')).toBe(false);
+
+    const g = okFetch();
+    global.fetch = g;
+    await removeFamily(FAMILY, OWNER, { reason: { id: 'other', text: '   ' } });
+    expect(sentQuery(g).get('reason')).toBe('other');
+    expect(sentQuery(g).has('reasonText')).toBe(false);
+  });
+
+  it('sends neither parameter when there is no reason (every legacy caller)', async () => {
+    const f = okFetch();
+    global.fetch = f;
+    await removeFamily(FAMILY, OWNER);
+    expect(sentQuery(f).has('reason')).toBe(false);
+    expect(sentQuery(f).has('reasonText')).toBe(false);
+  });
+
+  it('keeps the reason out of every log line', async () => {
+    global.fetch = okFetch();
+    await removeFamily(FAMILY, OWNER, { reason: { id: 'other', text: 'private words' } });
+    expect(JSON.stringify(logEvent.mock.calls)).not.toMatch(/private words|other/);
+  });
+});
+
 describe('registry PUT: the #125 response fields', () => {
   beforeEach(() => vi.clearAllMocks());
 

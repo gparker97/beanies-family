@@ -13,6 +13,20 @@ import org.junit.Test;
 public class WidgetPrefsTest {
 
     @Test
+    public void audienceDefaultsToOurDay() {
+        assertEquals(WidgetPrefs.AUDIENCE_OUR, WidgetPrefs.DEFAULT_AUDIENCE);
+        boolean[] blocks = new boolean[WidgetFill.FILL_ORDER.length];
+        assertEquals("our", new WidgetPrefs(null, blocks, WidgetPrefs.DEFAULT_OPACITY, null).audience);
+        assertEquals("our", new WidgetPrefs("bogus", blocks, WidgetPrefs.DEFAULT_OPACITY, null).audience);
+    }
+
+    @Test
+    public void aStoredMyDayIsKept() {
+        boolean[] blocks = new boolean[WidgetFill.FILL_ORDER.length];
+        assertEquals("my", new WidgetPrefs("my", blocks, WidgetPrefs.DEFAULT_OPACITY, null).audience);
+    }
+
+    @Test
     public void mergeStartsFromNothing() {
         assertEquals("list_failed;X", WidgetPrefs.mergeOutcome("", "list_failed;X"));
         assertEquals("list_failed;X", WidgetPrefs.mergeOutcome(null, "list_failed;X"));

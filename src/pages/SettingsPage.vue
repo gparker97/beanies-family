@@ -20,6 +20,8 @@ import CalendarSyncSettings from '@/components/settings/CalendarSyncSettings.vue
 import BeanieLabSection from '@/components/settings/BeanieLabSection.vue';
 import RemindersSettings from '@/components/settings/RemindersSettings.vue';
 import RegionHolidaysDrawer from '@/components/settings/RegionHolidaysDrawer.vue';
+import ExitReasonSurvey from '@/components/settings/ExitReasonSurvey.vue';
+import type { ExitReason } from '@beanies/brand/exitReason';
 import BeanieBellIcon from '@/components/ui/BeanieBellIcon.vue';
 import { useBeanieLab } from '@/composables/useBeanieLab';
 import { isFlagEnabled } from '@/config/flags';
@@ -309,6 +311,13 @@ const deleteConfirmText = ref('');
 const wantExport = ref(false);
 const wantDeleteDrive = ref(false);
 const isDeleting = ref(false);
+/**
+ * The drawer's required "why are you leaving?" answer (`ExitReasonSurvey`). It rides the registry
+ * DELETE to the #beanies-leavers line. Cleared only by `resetDeleteFamilyState()`: it SURVIVES the
+ * export-failure reopens for the same cause `wantExport` does (see the note there), because the
+ * person is sent back to retry, and re-asking why they are leaving on a retry is a punishment.
+ */
+const exitReason = ref<ExitReason | null>(null);
 
 // ── Currency ─────────────────────────────────────────────────────────────────
 const { currencyOptions } = useCurrencyOptions();
@@ -1402,6 +1411,51 @@ function resetDeleteFamilyState() {
   wantExport.value = false;
   wantDeleteDrive.value = false;
   isDeleting.value = false;
+  exitReason.value = null;
+}
+
+/**
+ * Open the delete drawer and count it: `exit-survey shown` here and `answered` just before the
+ * reason is sent give the drawer's abandonment rate. Only this explicit open logs; the
+ * export-failure reopens set `showDeleteFamilyConfirm` directly (one `shown` per intent).
+ */
+function openDeleteFamilyConfirm() {
+  showDeleteFamilyConfirm.value = true;
+  logEvent({
+    level: 'info',
+    surface: 'exit-survey',
+    message: 'shown',
+    context: { action: 'shown' },
+  });
+}
+
+/**
+ * The registry options carrying the exit reason, logging `exit-survey answered` as it goes.
+ * Called exactly once per deletion, at whichever `removeFamily` call runs (the two arms are
+ * exclusive), so `answered` means the reason was actually sent: every cancel and the
+ * export-failure reopens return before any arm, and the retry taps again. Only the id reaches
+ * the firehose; the free text goes to Slack alone.
+ *
+ * A null reason here is unreachable through the UI (the Delete button is gated on it). If it
+ * happens anyway the deletion proceeds with no reason, which the Lambda tolerates: a survey
+ * never blocks a deletion, and a reason is never invented for the Slack line.
+ */
+function exitReasonOpts(reason: ExitReason | null): { reason?: ExitReason } {
+  if (!reason) {
+    reportError({
+      surface: 'exit-survey',
+      severity: 'warning',
+      message: 'delete tapped with no exit reason; sending none',
+    });
+    return {};
+  }
+  logEvent({
+    level: 'info',
+    surface: 'exit-survey',
+    message: 'answered',
+    context: { action: 'answered', detail: reason.id, kind: reason.text ? 'with-text' : 'no-text' },
+  });
+  return { reason };
 }
 
 function handleDeleteFamilyConfirmClose() {
@@ -1467,6 +1521,9 @@ async function handleDeleteFamilyClick() {
     return;
   }
 
+  // Snapshot past the gates: the drawer closes below, and the reason sent must be the one the
+  // person confirmed with, whatever happens to the ref while the deletion runs.
+  const reason = exitReason.value;
   showDeleteFamilyConfirm.value = false;
 
   try {
@@ -1491,7 +1548,8 @@ async function handleDeleteFamilyClick() {
         // data first", and the toast above tells the user to retry the export
         // or untick it themselves. Someone following that advice would have
         // found the box already cleared, confirmed again, and lost everything
-        // with no gate and no backup. Only the typed confirmation is cleared.
+        // with no gate and no backup. Only the typed confirmation is cleared
+        // (`exitReason` survives too, for the same cause).
         deleteConfirmText.value = '';
         isDeleting.value = false;
         showDeleteFamilyConfirm.value = true;
@@ -1666,7 +1724,11 @@ async function handleDeleteFamilyClick() {
       // The signed-in member, so the server can tell an owner-initiated deletion
       // from any other. It only warns today; the rate of that warn is what
       // decides when it may start refusing.
-      const registryRemoved = await removeFamily(familyId, authStore.currentUser?.memberId ?? null);
+      const registryRemoved = await removeFamily(
+        familyId,
+        authStore.currentUser?.memberId ?? null,
+        exitReasonOpts(reason)
+      );
       if (!registryRemoved) {
         kept.push('registry-row');
         reportError({
@@ -1706,7 +1768,10 @@ async function handleDeleteFamilyClick() {
       // the person asked for depends on it, and a refused or failed notice is already logged
       // by `removeFamily` (warn, `detail: 'keep-file'`; it never throws, and it is bounded
       // inside, so a stalled connection cannot hold the deletion on a notice nothing depends on).
-      await removeFamily(familyId, authStore.currentUser?.memberId ?? null, { keepFile: true });
+      await removeFamily(familyId, authStore.currentUser?.memberId ?? null, {
+        keepFile: true,
+        ...exitReasonOpts(reason),
+      });
     }
 
     // 4. Delete local family (IndexedDB, passkeys, file handles, local registry).
@@ -3065,7 +3130,7 @@ async function handleDeleteFamilyClick() {
               {{ t('settings.deleteFamilyDesc') }}
             </p>
           </div>
-          <BaseButton variant="danger" size="sm" @click="showDeleteFamilyConfirm = true">
+          <BaseButton variant="danger" size="sm" @click="openDeleteFamilyConfirm">
             {{ t('settings.deleteFamily') }}
           </BaseButton>
         </div>
@@ -3090,11 +3155,13 @@ async function handleDeleteFamilyClick() {
           </p>
         </div>
 
+        <ExitReasonSurvey v-model="exitReason" />
+
         <label class="flex cursor-pointer items-start gap-3">
           <input
             v-model="wantExport"
             type="checkbox"
-            class="mt-0.5 h-4 w-4 rounded border-gray-300 text-[#F15D22] focus:ring-[#F15D22]"
+            class="dark:text-accent-lift dark:border-line-strong mt-0.5 h-4 w-4 rounded border-gray-300 text-[#F15D22] focus:ring-[#F15D22]"
           />
           <span class="dark:text-ink-soft text-sm text-gray-700">
             {{ t('settings.deleteFamilyExport') }}
@@ -3108,7 +3175,7 @@ async function handleDeleteFamilyClick() {
           <input
             v-model="wantDeleteDrive"
             type="checkbox"
-            class="mt-0.5 h-4 w-4 rounded border-gray-300 text-[#F15D22] focus:ring-[#F15D22]"
+            class="dark:text-accent-lift dark:border-line-strong mt-0.5 h-4 w-4 rounded border-gray-300 text-[#F15D22] focus:ring-[#F15D22]"
           />
           <span class="dark:text-ink-soft text-sm text-gray-700">
             {{ t('settings.deleteFamilyDriveDelete') }}
@@ -3127,7 +3194,7 @@ async function handleDeleteFamilyClick() {
         <BaseButton
           variant="danger"
           class="w-full"
-          :disabled="deleteConfirmText.toLowerCase() !== 'delete' || isDeleting"
+          :disabled="deleteConfirmText.toLowerCase() !== 'delete' || !exitReason || isDeleting"
           @click="handleDeleteFamilyClick"
         >
           {{ t('settings.deleteFamily') }}

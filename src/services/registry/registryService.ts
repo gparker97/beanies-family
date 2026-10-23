@@ -1,6 +1,11 @@
 import type { RegistryEntry } from '@/types/models';
 import { features } from '@/config/features';
 import { logEvent } from '@/services/telemetry';
+import {
+  allowsExitReasonText,
+  sanitiseExitReasonText,
+  type ExitReason,
+} from '@beanies/brand/exitReason';
 
 /**
  * Result of a registry write.
@@ -494,11 +499,17 @@ function parseOwner(raw: unknown): RegistryWriteResult['owner'] {
  * only reads the row to announce the departure. The return value is then "the server took the
  * notice", not "the row is gone" (the row deliberately stays). Every log line of this mode
  * carries `detail: 'keep-file'` so the firehose separates it from a real removal.
+ *
+ * `opts.reason` (the delete drawer's "why are you leaving?" answer, both arms): rides the query
+ * as `reason=<id>` and, only for an id that allows free text, `reasonText=<sanitised text>`
+ * (controls and bidi marks stripped, trimmed, capped at `EXIT_REASON_TEXT_MAX` code points; the
+ * Lambda re-validates both). The text goes to the #beanies-leavers line only: no log line here
+ * carries the reason, and the firehose sees the id on the page's `exit-survey` event alone.
  */
 export async function removeFamily(
   familyId: string,
   writerMemberId: string | null,
-  opts: { neverFinishedOnly?: boolean; keepFile?: boolean } = {}
+  opts: { neverFinishedOnly?: boolean; keepFile?: boolean; reason?: ExitReason } = {}
 ): Promise<boolean> {
   if (!features.registry) return true;
   const modeContext = opts.keepFile ? { detail: 'keep-file' } : {};
@@ -512,6 +523,13 @@ export async function removeFamily(
     if (writerMemberId) query.writerMemberId = writerMemberId;
     if (opts.neverFinishedOnly) query.neverFinishedOnly = '1';
     if (opts.keepFile) query.keepFile = '1';
+    if (opts.reason) {
+      query.reason = opts.reason.id;
+      const text = allowsExitReasonText(opts.reason.id)
+        ? sanitiseExitReasonText(opts.reason.text)
+        : '';
+      if (text) query.reasonText = text;
+    }
     // Bounded for EVERY caller: `request()` has no fetch timeout, and a stalled connection must
     // not wedge a deletion on this call (it used to, on the Drive-delete arm).
     const res = await raceTimeout(

@@ -225,6 +225,109 @@ function validHeardVia(value, familyId) {
   );
   return null;
 }
+/**
+ * The "why are you leaving?" survey a family answers before deleting itself (2026-10-23). The id
+ * rides the DELETE as `?reason=<id>`, plus `&reasonText=` for the ids in `EXIT_REASON_TEXT_IDS`.
+ * Only the id reaches CloudWatch (as `exit_reason` on the leavers `slack_*` lines); the label and
+ * the free text go to the #beanies-leavers post and nowhere else. Never stored on the row.
+ *
+ * ⚠️ TWIN of `packages/brand/exitReason.ts` (`EXIT_REASON_IDS`, `EXIT_REASON_TEXT_IDS`,
+ * `EXIT_REASON_LABELS`, `EXIT_REASON_TEXT_MAX`, `sanitiseExitReasonText`). It cannot be imported:
+ * every Lambda here is its own zip. Change a value there AND here, in the same order;
+ * `src/utils/__tests__/attributionTwinDrift.test.ts` fails if they drift (the data by value, the
+ * sanitiser by a shared table).
+ */
+export const EXIT_REASON_IDS = [
+  'missing_feature',
+  'design_layout',
+  'too_slow',
+  'no_google_drive',
+  'too_complicated',
+  'privacy_concerns',
+  'switched_app',
+  'just_trying',
+  'other',
+];
+
+/** The ids whose free text is accepted. Text on any other id is dropped (the id is kept). */
+export const EXIT_REASON_TEXT_IDS = ['missing_feature', 'other'];
+
+/** Stable English Slack labels: what the #beanies-leavers line prints, never the UI copy. */
+export const EXIT_REASON_LABELS = Object.freeze({
+  missing_feature: 'Missing a feature',
+  design_layout: 'Design or layout',
+  too_slow: 'Too slow',
+  no_google_drive: 'No Google Drive',
+  too_complicated: 'Too complicated',
+  privacy_concerns: 'Privacy concerns',
+  switched_app: 'Switched to another app',
+  just_trying: 'Was just trying it',
+  other: 'Something else',
+});
+
+/** Free-text cap, in CODE POINTS (so the cap never splits a surrogate pair). */
+export const EXIT_REASON_TEXT_MAX = 200;
+
+/**
+ * C0/C1 control characters plus the bidi overrides and isolates (U+202A–U+202E, U+2066–U+2069).
+ * Deliberately NOT all of `\p{Cf}`: that would strip U+200D and break a ZWJ family emoji.
+ */
+const EXIT_REASON_TEXT_STRIP_RE = /[\p{Cc}\u202A-\u202E\u2066-\u2069]/gu;
+
+/**
+ * Strip controls and bidi marks, trim, cap by code point. `''` for anything that is not a string
+ * or is empty afterwards. Twin of the client's `sanitiseExitReasonText`; the client already
+ * applied it, and the Lambda applies it again regardless of what arrived.
+ */
+export function sanitiseExitReasonText(value) {
+  if (typeof value !== 'string') return '';
+  const cleaned = value.replace(EXIT_REASON_TEXT_STRIP_RE, '').trim();
+  return Array.from(cleaned).slice(0, EXIT_REASON_TEXT_MAX).join('');
+}
+
+/** One `exit_reason_dropped` line: the hash and the class of problem, never the rejected value. */
+function logExitReasonDropped(familyId, reason) {
+  // eslint-disable-next-line no-console -- structured drop line, read by CloudWatch
+  console.log(
+    JSON.stringify({
+      msg: 'exit_reason_dropped',
+      family_id_hash: familyIdHash(familyId),
+      reason,
+    })
+  );
+}
+
+/**
+ * The DELETE's exit reason as `{ id, label, text? }`, or null. The label is resolved HERE so
+ * `slack.mjs` stays ignorant of the list (it must never import this file).
+ *
+ * An absent reason is the normal case (every legacy client, start-over, forget-family) and logs
+ * nothing. A present value that is not an allowlisted id logs one `exit_reason_dropped` line
+ * (`unknown-id` / `not-string`) and returns null. Free text on an id that does not allow it (only
+ * a tampered client sends that) keeps the id, drops the text and logs `text-not-allowed`. Never
+ * throws and never changes the response: a delete is not refused over its survey.
+ *
+ * @param {Record<string, unknown>|null|undefined} query `event.queryStringParameters`
+ * @param {string} familyId
+ * @returns {{ id: string, label: string, text?: string } | null}
+ */
+export function validExitReason(query, familyId) {
+  const value = query?.reason;
+  if (value === undefined || value === null) return null;
+  if (typeof value !== 'string' || !EXIT_REASON_IDS.includes(value)) {
+    logExitReasonDropped(familyId, typeof value === 'string' ? 'unknown-id' : 'not-string');
+    return null;
+  }
+  // eslint-disable-next-line security/detect-object-injection -- `value` is allowlisted above
+  const out = { id: value, label: EXIT_REASON_LABELS[value] };
+  const text = sanitiseExitReasonText(query.reasonText);
+  if (!text) return out;
+  if (!EXIT_REASON_TEXT_IDS.includes(value)) {
+    logExitReasonDropped(familyId, 'text-not-allowed');
+    return out;
+  }
+  return { ...out, text };
+}
 
 /**
  * The create-attempt id (#128): the random UUID the client mints when the person taps Create, so
@@ -1426,6 +1529,10 @@ async function handleDelete(event, familyId, tableName) {
     return response(200, { success: true, skipped: 'already-tombstoned' }, event);
   }
 
+  // The exit survey's answer (2026-10-23), read once for both leaver posts below. Read only past
+  // the no-row / tombstone returns, so a request that can never post never logs a drop for it.
+  const exitReason = validExitReason(event.queryStringParameters, familyId);
+
   // The writer id, read once for both arms below. On the delete arm it is MEASURED, not
   // enforced (see there); on the keep-file arm it IS the gate, see next.
   const writerMemberId = event.queryStringParameters?.writerMemberId;
@@ -1455,7 +1562,11 @@ async function handleDelete(event, familyId, tableName) {
     await notifyLeaverSlack(
       'family_left_device',
       { ...existing, familyId },
-      { table: tableLabel(origin), billing: () => billingForLeaver(familyId, origin) }
+      {
+        table: tableLabel(origin),
+        billing: () => billingForLeaver(familyId, origin),
+        exitReason,
+      }
     );
     logLeftDevice('notified');
     return response(200, { success: true, kept: 'file' }, event);
@@ -1545,7 +1656,11 @@ async function handleDelete(event, familyId, tableName) {
     await notifyLeaverSlack(
       'family_deleted',
       { ...existing, familyId },
-      { table: tableLabel(origin), billing: () => billingForLeaver(familyId, origin) }
+      {
+        table: tableLabel(origin),
+        billing: () => billingForLeaver(familyId, origin),
+        exitReason,
+      }
     );
   }
   return response(200, { success: true }, event);

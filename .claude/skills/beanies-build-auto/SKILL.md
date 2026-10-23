@@ -118,7 +118,10 @@ out early means he can start thinking about it while you work, rather than being
 
 - **Packages assigned to Sonnet or Opus run as subagents on that model** (`Agent` with `model: "sonnet"` /
   `"opus"`), one self-contained brief per package: the files, the plan requirements it satisfies, the tests it
-  must add or keep green, and what NOT to touch. Independent packages launch in parallel in one message;
+  must add or keep green, and what NOT to touch. **Every brief also says: the working tree is shared with other
+  packages; never `git stash`, `git reset`, `git checkout -- <file>`, `git clean` or anything that rewrites the
+  tree; compare against `git show HEAD:<path>` instead** (2026-10-23: a stash/pop reverted the other packages'
+  edits for two seconds mid-build; see `~/projects/beanies-ops/docs/lessons.md`). Independent packages launch in parallel in one message;
   dependent ones in sequence. The session reviews every returned diff against the plan before moving on —
   delegation is not abdication.
 - **The session keeps sequencing, integration, Phase 2 validate (once), the browser pass, review and fix-up.**
