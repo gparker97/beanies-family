@@ -13,6 +13,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 ### Added
 
 - Deleting a family now asks why, so the reason can be learned from.
+- A blog post on the new home-screen widgets is staged as a draft (not live yet).
 
 ### Fixed
 
