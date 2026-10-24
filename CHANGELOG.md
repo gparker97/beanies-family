@@ -10,8 +10,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-10-24
 
+### Added
+
+- A new blog post, "a widget for your fidget", introduces the home-screen widgets.
+
 ### Changed
 
+- App 1.0.4 is live on the web and on its way to both app stores, with minor improvements and bug fixes.
 - Reader quotes on the blog now appear as a note card, signed with the reader's name.
 - Detailed blog images, like the new widgets showcase, can now display wider than the text so they are readable.
 
