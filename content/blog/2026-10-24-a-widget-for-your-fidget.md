@@ -16,7 +16,7 @@ longAndShort:
 draft: false
 ---
 
-Good morning, my beans. Yes, this is still me writing. AI would write this many random bean references, of that I’m sure.
+Good morning, my beans. Yes, this is still me writing. AI would never write this many random bean references, of that I’m sure.
 
 Just a quick post this week as I’ve been busy (even more so than usual) with a super-special surprise project (hint: it relates to musicals, which is my other passion - I know, I’m a nerd in every universe), but I just wanted to say how wonderful it was to wake up a few days ago to the feedback below from one of our amazing early beanies (edited for length and clarity):
 
