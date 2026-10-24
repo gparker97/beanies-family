@@ -399,22 +399,47 @@ const jsonLd = post.data.author === 'greg' ? [blogPosting, AUTHOR] : [blogPostin
 .blog-prose ul li::marker { color: var(--tint-hex, #f15d22); }
 .blog-prose ol li::marker { color: var(--tint-ink, #a83a11); font-weight: 600; }
 
-/* Blockquote — the only piece of serif body copy on the page. Reads as
-   "quoted from the page". Tint-colored rule + a soft tint wash. */
+/* Blockquote: a note from a reader (feedback, an email, a request). The
+   quote stays the page's only serif body copy; the white note card says
+   "a real person wrote this". An optional last line `<cite>name</cite>`
+   signs it, led by a short tint rule. No decorative quote mark: the quotes
+   themselves carry their own quotation marks. */
 .blog-prose blockquote {
-  background: linear-gradient(90deg, var(--tint-accent, rgb(241 93 34 / 18%)), transparent 65%);
-  border-left: 3px solid var(--tint-hex, #f15d22);
-  border-radius: 0 10px 10px 0;
-  color: rgb(44 62 80 / 78%);
+  background: white;
+  border: 1.5px solid var(--tint-accent, rgb(241 93 34 / 18%));
+  border-radius: 20px;
+  box-shadow: 0 8px 24px rgb(44 62 80 / 6%);
+  color: rgb(44 62 80 / 84%);
   font-family: 'Fraunces Variable', Fraunces, 'Source Serif 4', Georgia, serif;
   font-feature-settings: 'ss01';
   font-size: 1.08rem;
   font-style: italic;
   line-height: 1.55;
-  margin: 1.5rem 0;
-  padding: 0.6rem 1rem 0.6rem 1.2rem;
+  margin: 1.75rem 0;
+  padding: 1.1rem 1.4rem;
 }
-.blog-prose blockquote p { margin: 0; color: inherit; font-family: inherit; font-size: inherit; line-height: inherit; }
+.blog-prose blockquote p { margin: 0 0 0.75rem; color: inherit; font-family: inherit; font-size: inherit; line-height: inherit; }
+.blog-prose blockquote p:last-child { margin-bottom: 0; }
+.blog-prose blockquote cite {
+  align-items: center;
+  color: rgb(44 62 80 / 72%);
+  display: flex;
+  font-family: 'Outfit Variable', Outfit, system-ui, sans-serif;
+  font-size: 0.875rem;
+  font-style: normal;
+  font-weight: 500;
+  gap: 0.5rem;
+}
+.blog-prose blockquote cite::before {
+  background: var(--tint-hex, #f15d22);
+  content: '';
+  flex: none;
+  height: 2px;
+  width: 1.25rem;
+}
+@media (width <= 520px) {
+  .blog-prose blockquote { padding: 1rem 1.1rem; }
+}
 
 /* Alert callout — for time-sensitive notices bolted onto an existing post
    (a competitor shutting down, a deadline, a correction). Deliberately uses
@@ -578,6 +603,14 @@ const jsonLd = post.data.author === 'greg' ? [blogPosting, AUTHOR] : [blogPostin
   .blog-prose img {
     max-width: 100%;
   }
+}
+/* A wide image (markdown title "wide", see lib/rehype-wide-images.mjs)
+   breaks out of the 592px text column to up to 880px, centred on it, so a
+   detailed showcase can be read. `.post-page` clips horizontal overflow. */
+.blog-prose img.is-wide {
+  margin-left: calc(50% - min(440px, 50vw - 16px));
+  max-width: none;
+  width: min(880px, 100vw - 32px);
 }
 /* A linked image is a button. It must not wear the illustration chrome
    above -- the framed card, the drop shadow and above all `cursor: zoom-in`,

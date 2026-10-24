@@ -42,6 +42,16 @@ No real users ever see drafts. Drafts support all the normal post features — i
 
 Blog markdown references images via absolute URLs like `![alt](/blog/screenshot.jpg)`. Those paths resolve to `web/public/blog/<file>`. If an image exists in the repo-root `public/blog/` but not in `web/public/blog/`, it'll render broken on the Astro site — copy it over.
 
+A detailed landscape image (phone screens, a widget showcase) can opt out of the narrow illustration cap with the title `"wide"`: `![alt](/blog/showcase.webp "wide")`. It then breaks out of the text column to up to 880px (`web/src/lib/rehype-wide-images.mjs`). Export it at about 1760px wide so it stays sharp on retina screens.
+
+## Quoting a reader
+
+A markdown blockquote renders as a white note card, for feedback, emails and requests from real people. Sign it with a last line holding only a `<cite>`; it renders after a short tint rule:
+
+    > _“the reader's words”_
+    >
+    > <cite>early beanie Ummu</cite>
+
 ## Connecting a post to a pillar
 
 If the post is a spoke for an existing guide (or one you're drafting), add the post's slug to that guide's `relatedPosts:` list in `content/guides/<pillar>.md`. The guide auto-renders a "further reading" section with the linked posts. Inside the blog post body, link back to the guide with a normal markdown link for the hub-and-spoke SEO loop.

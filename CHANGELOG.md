@@ -8,6 +8,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-10-24
+
+### Changed
+
+- Reader quotes on the blog now appear as a note card, signed with the reader's name.
+- Detailed blog images, like the new widgets showcase, can now display wider than the text so they are readable.
+
 ## 2026-10-23
 
 ### Added

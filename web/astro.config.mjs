@@ -8,6 +8,7 @@ import rehypeGuideAnnotations from './src/lib/rehype-guide-annotations.mjs';
 import rehypeExternalLinks from './src/lib/rehype-external-links.mjs';
 import rehypeImageDims from './src/lib/rehype-image-dims.mjs';
 import rehypeTableWrap from './src/lib/rehype-table-wrap.mjs';
+import rehypeWideImages from './src/lib/rehype-wide-images.mjs';
 import assertCtaTagged from './src/lib/assert-cta-tagged.mjs';
 
 export default defineConfig({
@@ -43,7 +44,13 @@ export default defineConfig({
     inlineStylesheets: 'always',
   },
   markdown: {
-    rehypePlugins: [rehypeGuideAnnotations, rehypeExternalLinks, rehypeImageDims, rehypeTableWrap],
+    rehypePlugins: [
+      rehypeGuideAnnotations,
+      rehypeExternalLinks,
+      rehypeImageDims,
+      rehypeTableWrap,
+      rehypeWideImages,
+    ],
   },
   // Canonical homepage is the apex (beanies.family). Anyone hitting /home
   // gets sent there. /welcome is an app-surface URL — kick it to the PWA so

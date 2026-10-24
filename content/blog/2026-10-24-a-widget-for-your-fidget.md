@@ -20,11 +20,11 @@ Good morning, my beans. Yes, this is still me writing. AI would never write this
 
 Just a quick post this week as I’ve been busy (even more so than usual) with a super-special surprise project (hint: it relates to musicals, which is my other passion - I know, I’m a nerd in every universe), but I just wanted to say how wonderful it was to wake up a few days ago to the feedback below from one of our amazing early beanies (edited for length and clarity):
 
-_“Hi, i love this app tbh and i created for my whole family. Now i could plan the days ahead without the need to text everyone one by one. They can check it in their own app. But i would love more if i can add a widget of huge calendar on my home screen or any widget will do. Other than that all is perfect! Tqsm again for this app.”_
+> _“Hi, i love this app tbh and i created for my whole family. Now i could plan the days ahead without the need to text everyone one by one. They can check it in their own app. But i would love more if i can add a widget of huge calendar on my home screen or any widget will do. Other than that all is perfect! Tqsm again for this app.”_
+>
+> <cite>early beanie Ummu</cite>
 
-_-early beanie Ummu_
-
-It’s great hearing from my beans, and it’s even better when they ask for stuff that I can build!
+It’s great hearing from my beans, and it’s even better when they ask for stuff that we can actually build!
 
 I’m a huge fan of home screen widgets (when they work), and I’ve had a beanies home screen widget sitting idly on my to-do list for what seems like an eternity. I kept putting it off, as I couldn’t justify spending time building a widget when we still had high-priority data and security issues on top, but now that I’ve legitimately burned through most of that backlog, Ummu’s feedback was the perfect excuse to get my lonely widget issue off the bench, and into beanies.family!
 
@@ -32,7 +32,7 @@ Great home screen widgets allow you to glean information without even lifting a 
 
 So, without further ado, I give you: **_the [beanies.family](https://beanies.family/help/features/home-screen-widgets?utm_source=blog&utm_medium=post&utm_campaign=a-widget-for-your-fidget&utm_content=widgets-reveal) widgets_**!
 
-![An iPhone lock screen, an iPhone home screen and an Android home screen, each showing beanies.family widgets with the day’s activities, to-dos and dinner.](/blog/a-widget-for-your-fidget-widgets.webp)
+![An iPhone lock screen, an iPhone home screen and an Android home screen, each showing beanies.family widgets with the day’s activities, to-dos and dinner.](/blog/a-widget-for-your-fidget-widgets.webp 'wide')
 
 _i love fidgeting with widgets_
 
