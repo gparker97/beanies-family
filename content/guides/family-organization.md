@@ -16,6 +16,7 @@ relatedPosts:
   - my-life-could-use-some-helpful-hints
   - mommy-whats-for-dinner-tonight
   - beanie-wall-for-your-whole-family
+  - a-widget-for-your-fidget
 tags:
   - family-organization
   - routines
