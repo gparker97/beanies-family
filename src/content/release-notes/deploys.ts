@@ -17,6 +17,15 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.10.28',
+    date: '2026-10-28',
+    month: '28 october 2026',
+    summary: {
+      en: 'Repeating lists now show up on your Nook as due today on the day they reset.',
+      beanie: 'repeating lists now show up on your nook as due today on the day they reset.',
+    },
+  },
+  {
     version: '2026.10.24',
     date: '2026-10-24',
     month: '24 october 2026',
