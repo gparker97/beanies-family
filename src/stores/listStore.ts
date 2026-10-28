@@ -180,8 +180,8 @@ export const useListStore = defineStore('lists', () => {
   /**
    * Count of lists overdue or due today, across ALL members — drives the nav
    * attention badge. Unfiltered (like the todo/goal/travel badges, which show
-   * the whole family); recurring + future-dated lists are excluded by
-   * `isDueSoon`, filed lists by `isFiled`. Reaches 0 when nothing's due.
+   * the whole family); future-dated lists and repeating lists between
+   * resets are excluded by `isDueSoon`, filed lists by `isFiled`. Reaches 0 when nothing's due.
    */
   const dueListsCount = computed(
     () => lists.value.filter((l) => !isFiled(l) && isDueSoon(l, today.value)).length

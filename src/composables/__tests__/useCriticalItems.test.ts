@@ -7,8 +7,10 @@ import { useTodoStore } from '@/stores/todoStore';
 import { useMedicationsStore } from '@/stores/medicationsStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useResponsibilityStore } from '@/stores/responsibilityStore';
+import { useListStore } from '@/stores/listStore';
 import type {
   FamilyActivity,
+  FamilyList,
   FamilyMember,
   Medication,
   MedicationLogEntry,
@@ -1466,6 +1468,63 @@ describe('useCriticalItems', () => {
       const { criticalItems, dismissItem } = useCriticalItems();
       await expect(dismissItem(criticalItems.value[0]!)).resolves.toBe(true);
       expect(markRead).toHaveBeenCalledWith(`briefing-hide:activity:activity-1:${TODAY}`);
+    });
+  });
+
+  // A repeating list is "due today" on the day it reset (isListDue), never otherwise.
+  describe('repeating lists', () => {
+    const repeating = (over: Partial<FamilyList> = {}): FamilyList =>
+      ({
+        id: 'list-rec',
+        title: 'Morning routine',
+        emoji: '🧾',
+        category: 'home',
+        ownerId: 'parent-1',
+        items: [
+          { id: 'i1', title: 'teeth', completed: false },
+          { id: 'i2', title: 'shoes', completed: false },
+        ],
+        lifecycle: 'recurring',
+        frequency: 'daily',
+        lastResetDate: TODAY,
+        completed: false,
+        createdBy: 'parent-1',
+        createdAt: '2026-03-01',
+        updatedAt: '2026-03-01',
+        ...over,
+      }) as FamilyList;
+
+    it('shows a list that reset today as due today, with the list icon', () => {
+      familyStore.setCurrentMember('parent-1');
+      useListStore().lists = [repeating()];
+      const { criticalItems } = useCriticalItems();
+      expect(criticalItems.value).toHaveLength(1);
+      expect(criticalItems.value[0]!.message.toLowerCase()).toBe(
+        'your list “morning routine” is due today'
+      );
+      expect(criticalItems.value[0]!.icon).toBe('🧾');
+    });
+
+    it('stays off the briefing when the list reset yesterday', () => {
+      familyStore.setCurrentMember('parent-1');
+      useListStore().lists = [repeating({ lastResetDate: '2026-03-09' })];
+      expect(useCriticalItems().criticalItems.value).toEqual([]);
+    });
+
+    it('stays off the briefing when every item is already ticked', () => {
+      familyStore.setCurrentMember('parent-1');
+      useListStore().lists = [
+        repeating({ items: [{ id: 'i1', title: 'teeth', completed: true }] }),
+      ];
+      expect(useCriticalItems().criticalItems.value).toEqual([]);
+    });
+
+    it('frames a child-owned list by the child for a grown-up', () => {
+      familyStore.setCurrentMember('parent-1');
+      useListStore().lists = [repeating({ ownerId: 'child-1' })];
+      const { criticalItems } = useCriticalItems();
+      expect(criticalItems.value).toHaveLength(1);
+      expect(criticalItems.value[0]!.message).toBe('Emma’s list “Morning routine” is due today');
     });
   });
 });

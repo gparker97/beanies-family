@@ -35,7 +35,7 @@ import {
   isDutyDone,
   ownerItemSurfaces,
 } from '@/utils/audience';
-import { isListDue } from '@/utils/listLifecycle';
+import { isListDue, listProgress } from '@/utils/listLifecycle';
 import { isFlagEnabled } from '@/config/flags';
 import { getActivityFallbackEmoji } from '@/constants/activityCategories';
 import { hintEmoji, isFreshHint } from '@/utils/helpfulHints';
@@ -401,9 +401,9 @@ export function useCriticalItems() {
         // and no reminder for anyone: three surfaces, two answers.
         if (!ownerItemSurfaces(audience)) continue;
         const due = isListDue(list, todayStr.value); // 'overdue' | 'today' | 'noDue' | null
-        if (due === null) continue; // future-dated or recurring → not on the plate
+        if (due === null) continue; // future-dated, or a repeating list between resets
 
-        const remaining = list.items.filter((i) => !i.completed).length;
+        const remaining = listProgress(list).open;
         // Don't surface empty / fully-checked lists ("0 left"): an undated list
         // only belongs on the plate while it still has open items.
         if (remaining === 0) continue;

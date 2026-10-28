@@ -156,13 +156,27 @@ describe('useNavBadges', () => {
     });
   });
 
-  it('lists count: overdue + due-today only, and gated to 0 (no Planning leak) when familyLists is off', () => {
+  it('lists count: overdue + due-today (incl. a repeating list that reset today) only, and gated to 0 (no Planning leak) when familyLists is off', () => {
     const listStore = useListStore();
     listStore.lists = [
       makeList({ id: 'o', dueDate: '2026-05-10' }), // overdue
       makeList({ id: 't', dueDate: '2026-05-16' }), // today (FAKE_TODAY)
       makeList({ id: 'fut', dueDate: '2026-06-01' }), // future → excluded
-      makeList({ id: 'rec', lifecycle: 'recurring', frequency: 'daily' }), // recurring → excluded
+      makeList({ id: 'rec', lifecycle: 'recurring', frequency: 'daily' }), // recurring, never stamped → excluded
+      makeList({
+        id: 'recToday',
+        lifecycle: 'recurring',
+        frequency: 'daily',
+        lastResetDate: '2026-05-16',
+        items: [{ id: 'i1', title: 'a', completed: false }],
+      }), // recurring, reset today with an open item → counted
+      makeList({
+        id: 'recDone',
+        lifecycle: 'recurring',
+        frequency: 'daily',
+        lastResetDate: '2026-05-16',
+        items: [{ id: 'i1', title: 'a', completed: true }],
+      }), // recurring, reset today but the round is finished → excluded
       makeList({ id: 'filed', dueDate: '2026-05-10', completed: true }), // filed → excluded
     ];
 
@@ -174,7 +188,7 @@ describe('useNavBadges', () => {
     // Flag ON: counts overdue + due-today only, and escalates Planning.
     flagState.familyLists = true;
     const { badges, categoryAttention } = useNavBadges();
-    expect(badges.value.dueLists).toEqual({ kind: 'count', count: 2 });
+    expect(badges.value.dueLists).toEqual({ kind: 'count', count: 3 });
     expect(categoryAttention.value.planning).toBe(true);
   });
 

@@ -733,6 +733,92 @@ describe('buildWidgetSnapshot: the to-dos section', () => {
     ]);
   });
 
+  describe('repeating lists', () => {
+    // Anchored on TODAY, so every-2-days resets on entries 0, 2, 4, 6 (the 11th, 13th, 15th, 17th).
+    const repeating = (over: Partial<FamilyList> = {}): FamilyList =>
+      ({
+        ...MEDS_LIST,
+        id: 'rep',
+        title: 'rounds',
+        ownerId: 'sam',
+        category: 'home',
+        cadence: { unit: 'day', interval: 2 },
+        createdAt: TODAY,
+        lastResetDate: TODAY,
+        items: [
+          { id: 'r1', title: 'a', completed: true },
+          { id: 'r2', title: 'b', completed: false },
+          { id: 'r3', title: 'c', completed: false },
+        ],
+        ...over,
+      }) as FamilyList;
+    const listRow = (s: WidgetSnapshot, i: number) =>
+      s.days[i]!.my!.tasks.items.find((r) => r.kind === 'list');
+
+    it('is a today row with the open count on the day it reset, then predicts every entry', () => {
+      const s = build({ lists: [repeating()], todos: [], hintTodos: [] }).snapshot;
+      expect(listRow(s, 0)).toMatchObject({ title: 'rounds, 2 left', bucket: 'today' });
+      for (const i of [1, 3, 5]) {
+        expect(listRow(s, i)).toMatchObject({ title: 'rounds, 3 left', bucket: 'later' });
+      }
+      for (const i of [2, 4, 6]) {
+        expect(listRow(s, i)).toMatchObject({ title: 'rounds, 3 left', bucket: 'today' });
+      }
+    });
+
+    it('shows a daily list as today on every entry', () => {
+      const daily = repeating({ cadence: undefined, frequency: 'daily' });
+      const s = build({ lists: [daily], todos: [], hintTodos: [] }).snapshot;
+      expect(listRow(s, 0)).toMatchObject({ title: 'rounds, 2 left', bucket: 'today' });
+      for (let i = 1; i < WIDGET_DAYS; i++) {
+        expect(listRow(s, i)).toMatchObject({ title: 'rounds, 3 left', bucket: 'today' });
+      }
+    });
+
+    it('a finished round is off today and predicts the NEXT reset, not today again', () => {
+      const done = repeating({
+        cadence: undefined,
+        frequency: 'daily',
+        items: [{ id: 'r1', title: 'a', completed: true }],
+      });
+      const s = build({ lists: [done], todos: [], hintTodos: [] }).snapshot;
+      // Today's round is done, so today's entry only carries tomorrow's reset as "later".
+      expect(listRow(s, 0)).toMatchObject({ title: 'rounds, 1 left', bucket: 'later' });
+      expect(listRow(s, 1)).toMatchObject({ title: 'rounds, 1 left', bucket: 'today' });
+    });
+
+    it('is later, not today, on the day after its reset', () => {
+      const s = build({
+        lists: [repeating({ createdAt: '2026-10-10', lastResetDate: '2026-10-10' })],
+        todos: [],
+        hintTodos: [],
+      }).snapshot;
+      expect(today(s).my!.tasks.items.filter((r) => r.bucket === 'today')).toEqual([]);
+      expect(listRow(s, 0)).toMatchObject({ bucket: 'later' });
+    });
+
+    it('is never overdue or undated on any entry', () => {
+      const lists = [repeating(), repeating({ id: 'rep2', lastResetDate: '2026-10-10' })];
+      const s = build({ lists, todos: [], hintTodos: [] }).snapshot;
+      for (const day of s.days) {
+        for (const view of [day.my, day.our]) {
+          const buckets = (view?.tasks.items ?? []).map((r) => r.bucket);
+          expect(buckets).not.toContain('overdue');
+          expect(buckets).not.toContain('undated');
+        }
+      }
+    });
+
+    it('honours isWallSafeList on our day', () => {
+      const s = build({
+        lists: [repeating({ ownerId: 'jo' }), repeating({ id: 'priv', category: 'health' })],
+        todos: [],
+        hintTodos: [],
+      }).snapshot;
+      expect(s.days[0]!.our!.tasks.items.filter((r) => r.kind === 'list')).toHaveLength(1);
+    });
+  });
+
   it("leaves out a task due past the look-ahead, an emptied list and another adult's list", () => {
     const far = todo({ id: 'far', title: 'far off', assigneeIds: ['sam'], dueDate: '2026-10-30' });
     const empty = { ...GROCERIES, id: 'empty', title: 'empty', items: [] } as FamilyList;

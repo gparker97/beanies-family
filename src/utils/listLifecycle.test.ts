@@ -3,6 +3,8 @@ import {
   isRecurring,
   isFiled,
   isListDue,
+  isDueSoon,
+  nextListResetOnOrAfter,
   computeRecurringReset,
   listProgress,
 } from './listLifecycle';
@@ -39,7 +41,7 @@ describe('listLifecycle predicates', () => {
   });
 
   it('listProgress counts done/total/pct and never returns NaN for an empty list', () => {
-    expect(listProgress(list({ items: [] }))).toEqual({ total: 0, done: 0, pct: 0 });
+    expect(listProgress(list({ items: [] }))).toEqual({ total: 0, done: 0, open: 0, pct: 0 });
     expect(
       listProgress(
         list({
@@ -51,7 +53,7 @@ describe('listLifecycle predicates', () => {
           ],
         })
       )
-    ).toEqual({ total: 4, done: 2, pct: 50 });
+    ).toEqual({ total: 4, done: 2, open: 2, pct: 50 });
   });
 
   describe('isListDue', () => {
@@ -62,8 +64,87 @@ describe('listLifecycle predicates', () => {
       expect(isListDue(list({ dueDate: '2026-06-25' }), today)).toBeNull(); // future
       expect(isListDue(list({ dueDate: undefined }), today)).toBe('noDue');
     });
-    it('returns null for any recurring list (schedule-driven, not due-date-driven)', () => {
-      expect(isListDue(list({ lifecycle: 'recurring', frequency: 'weekly' }), today)).toBeNull();
+    const open = [{ id: 'i1', title: 'a', completed: false }];
+    it('is due today on the day a repeating list reset, otherwise null (never overdue or noDue)', () => {
+      const rec = (lastResetDate?: string) =>
+        list({ lifecycle: 'recurring', frequency: 'daily', lastResetDate, items: open });
+      expect(isListDue(rec(today), today)).toBe('today');
+      expect(isListDue(rec('2026-06-16'), today)).toBeNull();
+      expect(isListDue(rec(undefined), today)).toBeNull();
+      expect(isDueSoon(rec(today), today)).toBe(true);
+      expect(isDueSoon(rec('2026-06-16'), today)).toBe(false);
+    });
+    it('a finished round is off the plate: reset today but every item ticked (or no items) is null', () => {
+      const rec = (items: FamilyList['items']) =>
+        list({ lifecycle: 'recurring', frequency: 'daily', lastResetDate: today, items });
+      expect(isListDue(rec([{ id: 'i1', title: 'a', completed: true }]), today)).toBeNull();
+      expect(isListDue(rec([]), today)).toBeNull();
+      expect(isDueSoon(rec([]), today)).toBe(false);
+    });
+    it('slices a full ISO lastResetDate to its date part', () => {
+      const l = list({
+        lifecycle: 'recurring',
+        frequency: 'daily',
+        lastResetDate: '2026-06-17T08:30:00.000Z',
+        items: open,
+      });
+      expect(isListDue(l, today)).toBe('today');
+    });
+  });
+
+  describe('listProgress.open', () => {
+    it('is total minus done, and 0 for an empty list', () => {
+      const items = [
+        { id: 'a', title: 'a', completed: true },
+        { id: 'b', title: 'b', completed: false },
+        { id: 'c', title: 'c', completed: false },
+      ];
+      expect(listProgress(list({ items })).open).toBe(2);
+      expect(listProgress(list({ items: [] })).open).toBe(0);
+    });
+  });
+
+  describe('nextListResetOnOrAfter', () => {
+    // 2026-06-01 is a Monday; every-2-days resets fall on the 1st, 3rd, 5th ...
+    const rec = (over: Partial<FamilyList> = {}) =>
+      list({
+        lifecycle: 'recurring',
+        createdAt: '2026-06-01',
+        lastResetDate: '2026-06-01',
+        ...over,
+      });
+    const every2 = { unit: 'day', interval: 2 } as const;
+
+    it('every-2-days: the asked day when it is a scheduled day, else the next one', () => {
+      expect(nextListResetOnOrAfter(rec({ cadence: every2 }), '2026-06-05')).toBe('2026-06-05');
+      expect(nextListResetOnOrAfter(rec({ cadence: every2 }), '2026-06-06')).toBe('2026-06-07');
+    });
+    it('never answers the current cycle start again: asked on (or before) the reset day, the NEXT reset', () => {
+      const daily = rec({ cadence: { unit: 'day', interval: 1 }, lastResetDate: '2026-06-05' });
+      expect(nextListResetOnOrAfter(daily, '2026-06-05')).toBe('2026-06-06');
+      expect(nextListResetOnOrAfter(daily, '2026-06-03')).toBe('2026-06-06');
+    });
+    it('legacy weekly resets on Mondays', () => {
+      const weekly = rec({ frequency: 'weekly' });
+      expect(nextListResetOnOrAfter(weekly, '2026-06-16')).toBe('2026-06-22'); // Tuesday
+      expect(nextListResetOnOrAfter(weekly, '2026-06-15')).toBe('2026-06-15'); // Monday
+    });
+    it('legacy monthly resets on the 1st', () => {
+      const monthly = rec({ frequency: 'monthly' });
+      expect(nextListResetOnOrAfter(monthly, '2026-06-17')).toBe('2026-07-01');
+      expect(nextListResetOnOrAfter(monthly, '2026-07-01')).toBe('2026-07-01');
+    });
+    it('is null for a one-off, no cadence, no baseline, or an unparseable anchor', () => {
+      expect(
+        nextListResetOnOrAfter(list({ lastResetDate: '2026-06-01' }), '2026-06-05')
+      ).toBeNull();
+      expect(nextListResetOnOrAfter(rec(), '2026-06-05')).toBeNull();
+      expect(
+        nextListResetOnOrAfter(rec({ cadence: every2, lastResetDate: undefined }), '2026-06-05')
+      ).toBeNull();
+      expect(
+        nextListResetOnOrAfter(rec({ cadence: every2, createdAt: '' }), '2026-06-05')
+      ).toBeNull();
     });
   });
 

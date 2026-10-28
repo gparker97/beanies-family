@@ -19,7 +19,7 @@ import type { BeanTip } from '@/content/tips';
 import type { AppNotification } from '@/types/notifications';
 import { normalizeAssignees } from '@/utils/assignees';
 import { classifyAudience, classifyOwnerAudience, ownerItemSurfaces } from '@/utils/audience';
-import { isFiled, isRecurring } from '@/utils/listLifecycle';
+import { isFiled, isRecurring, listProgress } from '@/utils/listLifecycle';
 import { entityDeepLink } from '@/utils/entityDeepLink';
 import { CALENDAR_SYNC_OPEN } from '@/constants/settingsDeepLinks';
 import {
@@ -291,9 +291,9 @@ export function deriveNotifications(input: DeriveInput, now: Date): AppNotificat
     try {
       if (!list?.id || !list.dueDate) continue;
       if (isRecurring(list) || isFiled(list)) continue; // recurring never files; a done one has nothing to say
-      // Every item ticked but not yet filed → nothing left to shop for. Same rule
-      // the briefing and the OS builder apply, so the three cannot disagree.
-      if (list.items.filter((i) => !i.completed).length === 0) continue;
+      // Every item ticked but not yet filed → nothing left to shop for. Same
+      // `listProgress(...).open` the briefing and the OS builder read, so the three cannot disagree.
+      if (listProgress(list).open === 0) continue;
       const audience = classifyOwnerAudience(list.ownerId, currentMember, resolveMember);
       if (!ownerItemSurfaces(audience)) continue;
 

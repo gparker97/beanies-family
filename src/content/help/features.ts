@@ -1830,13 +1830,13 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         content: '',
         items: [
           '<strong>One-off</strong> — a list you finish once, like packing for a trip or party prep. Give it a <strong>Due date</strong> if timing matters. When every item is ticked, it moves to the <strong>Completed</strong> area.',
-          '<strong>Repeats</strong> — a routine that comes back: <strong>Daily</strong>, <strong>Weekly</strong>, or <strong>Monthly</strong>. A repeating list never “finishes” — instead it unchecks itself at the start of each new period so you start fresh (your grocery list clears every week; before-school clears every morning).',
+          '<strong>Repeats</strong> — a routine that comes back: <strong>Daily</strong>, <strong>Weekly</strong>, or <strong>Monthly</strong>. A repeating list never “finishes” — instead it unchecks itself at the start of each new period so you start fresh (your grocery list clears every week; before-school clears every morning). On the day it resets, it shows up in your Daily Briefing as due today, so the fresh round lands on your plate.',
         ],
       },
       {
         type: 'callout',
         content:
-          'A repeating list clearing its checkmarks isn’t a glitch — it’s the point: it “unchecks itself each cycle so you start fresh, no due date needed.” Your items stay put; only the ticks reset.',
+          'A repeating list clearing its checkmarks isn’t a glitch — it’s the point: it “unchecks itself each cycle so you start fresh.” It shows up on the Nook as due today on the day it resets (and on the day you first set it up), then stays quiet until the next round. Your items stay put; only the ticks reset.',
         title: 'Repeating lists reset themselves',
         icon: '\u{1F504}',
       },
@@ -1943,7 +1943,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         content: '',
         items: [
           '<strong>The Beanie Lists page</strong> — a <strong>Due soon</strong> shelf at the top, your lists grouped by category below, and a <strong>Completed</strong> area at the bottom. The filter chips (<strong>All</strong>, Home, Kids…) narrow the view.',
-          '<strong>Your Daily Briefing</strong> — a one-off list that’s due today, overdue, or simply still has items to do gets a gentle nudge. Repeating lists don’t nag; they just reset.',
+          '<strong>Your Daily Briefing</strong> — a one-off list that’s due today, overdue, or simply still has items to do gets a gentle nudge. A repeating list nudges you once per round, on the day it resets.',
           '<strong>The menu badge</strong> — the little orange number beside Beanie Lists counts lists that are overdue or due today, so you know at a glance when something needs you.',
           '<strong>A linked trip or activity</strong> — any list you’ve linked appears there under Checklists.',
         ],

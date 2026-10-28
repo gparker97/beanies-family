@@ -669,6 +669,17 @@ describe('list due-date reminders', () => {
 
   it('schedules nothing for a recurring list', () => {
     expect(listsOf(list({ lifecycle: 'recurring', frequency: 'weekly' }))).toEqual([]);
+    // Even on the day it reset (due today in the briefing), the OS stays quiet.
+    expect(
+      listsOf(
+        list({
+          lifecycle: 'recurring',
+          frequency: 'daily',
+          dueDate: undefined,
+          lastResetDate: '2026-05-22',
+        })
+      )
+    ).toEqual([]);
   });
 
   it('schedules nothing for a list already ticked off', () => {

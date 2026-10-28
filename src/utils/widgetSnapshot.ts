@@ -27,6 +27,7 @@
  */
 import type {
   FamilyActivity,
+  FamilyList,
   FamilyMember,
   FamilyVacation,
   LanguageCode,
@@ -70,7 +71,13 @@ import {
   ownerItemSurfaces,
 } from '@/utils/audience';
 import { buildWallJobs, isWallSafeList, jobOwnerIds, uniqueTodoJobs } from '@/utils/wallJobs';
-import { isFiled, isListDue, isRecurring } from '@/utils/listLifecycle';
+import {
+  isFiled,
+  isListDue,
+  isRecurring,
+  listProgress,
+  nextListResetOnOrAfter,
+} from '@/utils/listLifecycle';
 import { sortByTime } from '@/utils/wallActivities';
 import { isTimedContinuation } from '@/utils/calendar/occurrence';
 import { isAllDayActivity } from '@/utils/calendar/activityDays';
@@ -794,9 +801,32 @@ function hintDrafts(ctx: DayContext): TaskDraft[] {
 }
 
 /**
+ * When a list is on the plate for the day being built, and how many items that is. A one-off
+ * passes its own due date through (`taskBucket` sorts overdue/today/later/undated from it; an
+ * undated list is `''`). A repeating list is due on the day its round began (`isListDue`); on
+ * any other day the engine's first scheduled reset on/after the day, which will untick every
+ * item, so all of them count. The on-or-after date is never before the day, so a repeating
+ * list never reaches `overdue`; `null` when it has no schedule or no baseline (silent, as today).
+ */
+function listDraftDue(
+  ctx: DayContext,
+  list: FamilyList
+): { due: string; remaining: number } | null {
+  if (!isRecurring(list)) {
+    return { due: list.dueDate?.slice(0, 10) ?? '', remaining: listProgress(list).open };
+  }
+  if (isListDue(list, ctx.ymd) === 'today') {
+    return { due: ctx.ymd, remaining: listProgress(list).open };
+  }
+  const next = nextListResetOnOrAfter(list, ctx.ymd);
+  return next ? { due: next, remaining: list.items.length } : null;
+}
+
+/**
  * Lists with open items that are due: overdue, today, undated (the briefing's `isListDue`
- * rule) or later this week. Recurring and filed lists never are. "My day" uses the
- * single-owner audience the briefing and the OS reminders share; "our day" uses the wall's
+ * rule) or later this week. A repeating list is due on the day it resets (and `later` ahead
+ * of its next scheduled reset); filed lists never are. "My day" uses the single-owner
+ * audience the briefing and the OS reminders share; "our day" uses the wall's
  * `isWallSafeList`, so a private list never reaches a shared view.
  */
 function listDrafts(ctx: DayContext): TaskDraft[] {
@@ -804,7 +834,7 @@ function listDrafts(ctx: DayContext): TaskDraft[] {
   const out: TaskDraft[] = [];
   for (const list of ctx.input.lists) {
     ctx.cursor = list.id;
-    if (isRecurring(list) || isFiled(list)) continue;
+    if (isFiled(list)) continue;
     const visible =
       ctx.rules.lists === 'owner'
         ? ownerItemSurfaces(
@@ -812,17 +842,16 @@ function listDrafts(ctx: DayContext): TaskDraft[] {
           )
         : isWallSafeList(list);
     if (!visible) continue;
-    const remaining = list.items.filter((i) => !i.completed).length;
-    if (remaining === 0) continue;
-    const state = isListDue(list, ctx.ymd);
-    // `isListDue` says null for a future-dated list; `taskBucket` keeps it when it falls
-    // inside the look-ahead.
-    const due = state === 'noDue' ? '' : (list.dueDate?.slice(0, 10) ?? '');
+    const plate = listDraftDue(ctx, list);
+    if (!plate || plate.remaining === 0) continue;
     out.push({
       id: `list:${list.id}`,
       kind: 'list',
-      title: fillTemplate(t('widget.listRemaining'), { list: list.title, n: String(remaining) }),
-      due,
+      title: fillTemplate(t('widget.listRemaining'), {
+        list: list.title,
+        n: String(plate.remaining),
+      }),
+      due: plate.due,
       ownerIds: list.ownerId ? [list.ownerId] : [],
       link: widgetLink(ctx.origin, entityDeepLink('list', list.id)),
       done: false,

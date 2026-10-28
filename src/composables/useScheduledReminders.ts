@@ -58,7 +58,7 @@ import {
 } from '@/utils/audience';
 import { normalizeAssignees } from '@/utils/assignees';
 import { resolveSegmentTravellers } from '@/utils/segmentTravellers';
-import { isFiled, isRecurring } from '@/utils/listLifecycle';
+import { isFiled, isRecurring, listProgress } from '@/utils/listLifecycle';
 import { isFlagEnabled } from '@/config/flags';
 
 /** How far ahead we arm reminders. Kept < the OS pending-notification ceiling via MAX_SCHEDULED. */
@@ -466,10 +466,10 @@ export function buildListReminders(
         gated++;
         continue; // not this viewer's to act on — never surface it
       }
-      // Mirrors the briefing's `remaining === 0` rule (`useCriticalItems.ts`):
+      // Same `listProgress(...).open` the briefing and widget read (`remaining === 0` rule):
       // an empty or fully-ticked-but-unfiled list has nothing to shop for, and
       // "0 items left" is a worse notification than none.
-      const remaining = list.items.filter((i) => !i.completed).length;
+      const remaining = listProgress(list).open;
       if (remaining === 0) {
         gated++;
         continue;
