@@ -14,6 +14,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - A repeating Beanie List now shows on the Nook as due today on the day it resets, counts on the Lists badge and appears in the home-screen widgets; it stays quiet between rounds and drops off once every item is ticked.
 
+### Changed
+
+- App 1.0.5 is live on the web and on its way to both app stores.
+
 ## 2026-10-24
 
 ### Added
