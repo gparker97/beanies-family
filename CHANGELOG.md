@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-11-01
+
+### Added
+
+- A new blog post, "daddy come look at my bed!", tells the story of the day after the beanie wall went up.
+
 ## 2026-10-28
 
 ### Fixed
