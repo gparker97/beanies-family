@@ -17,6 +17,7 @@ relatedPosts:
   - mommy-whats-for-dinner-tonight
   - beanie-wall-for-your-whole-family
   - a-widget-for-your-fidget
+  - daddy-come-look-at-my-bed
 tags:
   - family-organization
   - routines
