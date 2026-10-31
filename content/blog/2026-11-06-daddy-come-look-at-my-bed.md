@@ -14,7 +14,7 @@ draft: false
 
 “Wha-?” I muttered, my eyes groggy.
 
-“Come quickly daddy! I wanna show you something!” my son shouted, while simultaneously pulling on both of my arms.
+“Come quickly daddy! I wanna show you something!” my son shouted, while simultaneously grabbing both of my arms.
 
 My body jerked forward, pulled by the maximum amount of force that can be exerted by a 30kg, 7-year-old boy devoting all of his available body weight to the singular task of getting me out of bed. He led me down the wooden staircase of our house, hands over my eyes, directly into his room. He removed his hands to reveal a clean and tidy bed, blankets folded, pillows fluffed, and stuffed toys arranged neatly around the edges, like little soldiers. He stood tall, puffing out his chest like a gladiator.
 
@@ -42,13 +42,13 @@ There’s no silver bullet solution, but I’m appreciative of just about anythi
 
 ![A boy in striped pajamas taps a chore on the beanie wall's chore board, on a tablet mounted on the kitchen wall, with a half-eaten bowl of cereal in the foreground.](/blog/daddy-come-look-at-my-bed-beanie-wall.webp)
 
-_spoiler, this is not actually my kid, but this is my idea of a well-placed beanie wall. And my real kids were actually excited to do their chores this week (well maybe not to DO them, but at least to check them off)._
+_spoiler, this is not actually my kid, but my REAL kids were actually excited to do their chores this week (well maybe not to DO them, but at least to check them off)_
 
 Building [beanies.family](https://beanies.family/?utm_source=blog&utm_medium=post&utm_campaign=daddy-come-look-at-my-bed&utm_content=homepage-mention) has been a wild journey, and creating [the beanie wall](https://beanies.family/blog/beanie-wall-for-your-whole-family?utm_source=blog&utm_medium=post&utm_campaign=daddy-come-look-at-my-bed&utm_content=beanie-wall-post) as a [Skylight-esque](https://beanies.family/from/skylight?utm_source=blog&utm_medium=post&utm_campaign=daddy-come-look-at-my-bed&utm_content=from-skylight) alternative for a digital calendar and family wall, with to-dos, chores, grocery lists, travel plans, meal plans, and more on my own hardware has been fun. It may not solve all of our family’s organizational and behavioral problems (if it did, I might have to charge more), but as a tool to help keep us on track, it’s been awesome. My goal was for it to help families (starting with mine) get through the day, and maybe get more organized while we’re at it.
 
-Our house rule: Earn a star for chores you complete. Use your stars to earn prizes and allowance. Lose stars for bad behavior. The star reports are in development as we speak, and will be the first thing I use once it’s ready to determine allowance-worthiness each week for the boys.
+Our house rule: Earn a star for chores you complete. Use your stars to earn prizes and allowance. Lose stars for bad behavior. I’m working as we speak to get some super cool “star reports” into the [beanies.family](https://beanies.family/?utm_source=blog&utm_medium=post&utm_campaign=daddy-come-look-at-my-bed&utm_content=star-reports-mention) app itself, and it’ll be the first thing I use once it’s ready to determine allowance-worthiness each week for the boys.
 
-Your calendar is always there, on the wall, on a tablet you already owned (or picked up at a pawn shop) that never sleeps. Your family can see what’s for dinner that night. Your next big trip is highlighted in a big square, along with the number of sleeps until it starts, so nobody has to ask when you’re leaving, or what terminal to go to when the day arrives.
+Our calendar is always there, on the wall, on a tablet we already own, that never sleeps. We can see the weather, our dinner plans, our grocery lists, and more. Our next big trip is highlighted in a big square, along with the number of sleeps until it starts, so nobody has to ask when we’re leaving, or what time we have to start getting ready to leave for the airport.
 
 The beanie wall helps us get through one day to the next. The kids enjoy it, and my wife and I appreciate having one place to agree on everything that’s going on in our family life, and also the ability to add that one additional item to the grocery list that slipped our mind the day before.
 
