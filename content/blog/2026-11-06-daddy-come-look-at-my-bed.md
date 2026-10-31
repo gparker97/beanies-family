@@ -4,7 +4,7 @@ slug: daddy-come-look-at-my-bed
 date: 2026-11-06
 category: stories
 coverEmoji: 🛏️
-coverImage: /blog/daddy-come-look-at-my-bed-made-bed.webp
+coverImage: /blog/daddy-come-look-at-my-bed-beanie-wall.webp
 excerpt: "my 7-year-old dragged me out of bed to show me something i never expected: a made bed. here's what happened the day after we put up the beanie wall."
 subtitle: 'i never thought it would work this well'
 featured: false
