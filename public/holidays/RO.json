@@ -2,12 +2,12 @@
   "meta": {
     "country": "RO",
     "name": "Romania",
-    "generatedAt": "2026-05-12",
+    "generatedAt": "2026-11-01",
     "yearRange": [
       2025,
       2029
     ],
-    "source": "date-holidays@3.35.0",
+    "source": "date-holidays@3.37.0",
     "primaryLanguage": "ro",
     "types": [
       "public"
@@ -30,7 +30,7 @@
       "date": "2025-01-07",
       "name": "Saint John the Baptist",
       "type": "public",
-      "name_local": "Sfântul Ion"
+      "name_local": "Sfântul Ioan Botezătorul"
     },
     {
       "date": "2025-01-24",
@@ -54,7 +54,7 @@
       "date": "2025-04-21",
       "name": "Easter Monday",
       "type": "public",
-      "name_local": "A doua zi de Pasti"
+      "name_local": "A doua zi de Paști"
     },
     {
       "date": "2025-05-01",
@@ -126,7 +126,7 @@
       "date": "2026-01-07",
       "name": "Saint John the Baptist",
       "type": "public",
-      "name_local": "Sfântul Ion"
+      "name_local": "Sfântul Ioan Botezătorul"
     },
     {
       "date": "2026-01-24",
@@ -150,7 +150,7 @@
       "date": "2026-04-13",
       "name": "Easter Monday",
       "type": "public",
-      "name_local": "A doua zi de Pasti"
+      "name_local": "A doua zi de Paști"
     },
     {
       "date": "2026-05-01",
@@ -222,7 +222,7 @@
       "date": "2027-01-07",
       "name": "Saint John the Baptist",
       "type": "public",
-      "name_local": "Sfântul Ion"
+      "name_local": "Sfântul Ioan Botezătorul"
     },
     {
       "date": "2027-01-24",
@@ -252,7 +252,7 @@
       "date": "2027-05-03",
       "name": "Easter Monday",
       "type": "public",
-      "name_local": "A doua zi de Pasti"
+      "name_local": "A doua zi de Paști"
     },
     {
       "date": "2027-06-01",
@@ -318,7 +318,7 @@
       "date": "2028-01-07",
       "name": "Saint John the Baptist",
       "type": "public",
-      "name_local": "Sfântul Ion"
+      "name_local": "Sfântul Ioan Botezătorul"
     },
     {
       "date": "2028-01-24",
@@ -342,7 +342,7 @@
       "date": "2028-04-17",
       "name": "Easter Monday",
       "type": "public",
-      "name_local": "A doua zi de Pasti"
+      "name_local": "A doua zi de Paști"
     },
     {
       "date": "2028-05-01",
@@ -414,7 +414,7 @@
       "date": "2029-01-07",
       "name": "Saint John the Baptist",
       "type": "public",
-      "name_local": "Sfântul Ion"
+      "name_local": "Sfântul Ioan Botezătorul"
     },
     {
       "date": "2029-01-24",
@@ -438,7 +438,7 @@
       "date": "2029-04-09",
       "name": "Easter Monday",
       "type": "public",
-      "name_local": "A doua zi de Pasti"
+      "name_local": "A doua zi de Paști"
     },
     {
       "date": "2029-05-01",
