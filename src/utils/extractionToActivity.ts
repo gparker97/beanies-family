@@ -9,12 +9,15 @@
 // auto-created — the prefill opens the form for the user to review, edit, and confirm.
 //
 // Pure + total apart from ONE deliberate diagnostic: a present-but-unknown model category id is
-// logged via console.warn (matching the [travel-extract] convention) rather than silently
-// dropped, then keyword inference takes over. No throws, no other side effects.
+// logged via console.warn (matching the [travel-extract] convention) and a `logEvent` warning
+// to the diagnostics firehose rather than silently dropped, then keyword inference takes over.
+// No throws, no other side effects.
 
 import type { ExtractionResult } from '@/services/ai/types';
 import type { ActivityCategory, CreateFamilyActivityInput, ISODateString } from '@/types/models';
 import { getActivityCategoryById } from '@/constants/activityCategories';
+import { logEvent } from '@/services/telemetry/logEvent';
+import { matchOccasionCategory } from '@/utils/occasions';
 
 /**
  * Keyword → activity-category inference. The extraction model returns at most a short
@@ -63,6 +66,9 @@ export const CATEGORY_KEYWORDS: ReadonlyArray<readonly [RegExp, ActivityCategory
 ];
 
 function matchCategory(text: string): ActivityCategory | undefined {
+  // Occasion keywords first: "Anniversary dinner" is an anniversary, not dining out.
+  const occasion = matchOccasionCategory(text);
+  if (occasion) return occasion;
   for (const [pattern, id] of CATEGORY_KEYWORDS) {
     if (pattern.test(text)) return id;
   }
@@ -82,6 +88,12 @@ function validatedModelCategory(result: ExtractionResult): ActivityCategory | un
     '[activity-extract] model category id not recognized; falling back to keyword inference',
     { got: id, hint: result.categoryHint }
   );
+  logEvent({
+    level: 'warn',
+    surface: 'ai-extract',
+    message: 'unknown model category',
+    context: { action: 'category-fallback' },
+  });
   return undefined;
 }
 
@@ -92,11 +104,12 @@ function validatedModelCategory(result: ExtractionResult): ActivityCategory | un
  * model id/hint is present (older proxy, BYOK, on-device) it relies on the title/description pass.
  */
 export function inferActivityCategory(result: ExtractionResult): ActivityCategory | undefined {
-  return (
+  const category =
     validatedModelCategory(result) ??
     matchCategory(result.categoryHint ?? '') ??
-    matchCategory(`${result.title} ${result.description}`)
-  );
+    matchCategory(`${result.title} ${result.description}`);
+  // An imported invitation is almost always a party, never a yearly "remember this" entry.
+  return category === 'occasion_birthday' ? 'birthday' : category;
 }
 
 export function extractionToActivityPrefill(

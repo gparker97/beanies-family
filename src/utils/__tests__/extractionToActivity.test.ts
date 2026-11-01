@@ -5,6 +5,7 @@ import {
   CATEGORY_KEYWORDS,
 } from '../extractionToActivity';
 import type { ExtractionResult } from '@/services/ai/types';
+import { logEvent } from '@/services/telemetry/logEvent';
 import { ACTIVITY_CATEGORIES } from '@/constants/activityCategories';
 
 function result(overrides: Partial<ExtractionResult> = {}): ExtractionResult {
@@ -21,6 +22,8 @@ function result(overrides: Partial<ExtractionResult> = {}): ExtractionResult {
     ...overrides,
   };
 }
+
+vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: vi.fn() }));
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -143,5 +146,43 @@ describe('CATEGORY_KEYWORDS integrity', () => {
     for (const [, id] of CATEGORY_KEYWORDS) {
       expect(valid.has(id)).toBe(true);
     }
+  });
+});
+
+describe('inferActivityCategory — occasions', () => {
+  it('files "Anniversary dinner" as an anniversary, not dining out', () => {
+    expect(inferActivityCategory(result({ title: 'Anniversary dinner' }))).toBe('anniversary');
+  });
+
+  it('maps birthday text to the birthday party category, never occasion_birthday', () => {
+    expect(inferActivityCategory(result({ title: "Mia's birthday" }))).toBe('birthday');
+  });
+
+  it('maps a model-picked occasion_birthday to birthday', () => {
+    expect(inferActivityCategory(result({ category: 'occasion_birthday' }))).toBe('birthday');
+  });
+
+  it('maps a hint-only occasion_birthday match to birthday', () => {
+    expect(inferActivityCategory(result({ categoryHint: 'birthday' }))).toBe('birthday');
+  });
+
+  it('files "In memory of Grandpa" as remembrance', () => {
+    expect(inferActivityCategory(result({ title: 'In memory of Grandpa' }))).toBe('remembrance');
+  });
+
+  it('does not treat "Memorial Day BBQ" as remembrance', () => {
+    expect(inferActivityCategory(result({ title: 'Memorial Day BBQ' }))).not.toBe('remembrance');
+  });
+
+  it('logs a category-fallback warning for an unknown model id', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    inferActivityCategory(result({ category: 'not_a_real_id', title: 'Soccer game' }));
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'warn',
+        surface: 'ai-extract',
+        context: { action: 'category-fallback' },
+      })
+    );
   });
 });

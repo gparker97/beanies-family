@@ -167,7 +167,8 @@ export function useFormValidation<Field extends string>(
       });
     }
 
-    useAttentionPulse().reveal(found[0]);
+    // The halo sits outside the field group, so it never overdraws the control it points at.
+    useAttentionPulse().reveal(found[0], 'attention-halo');
     // The field the person was actually sent to (DOM order); rule order only when none was hooked.
     const firstShown = found[0]?.getAttribute(FORM_FIELD_ATTR)?.slice(prefix.length);
 

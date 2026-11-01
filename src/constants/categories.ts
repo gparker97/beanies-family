@@ -816,8 +816,13 @@ export function activityCategoryToExpenseCategory(activityCategory: string): str
     bar_mitzvah: 'entertainment',
     graduation: 'entertainment',
     baby_shower: 'entertainment',
-    anniversary: 'entertainment',
     other_celebration: 'entertainment',
+    // Occasions → Gifts Given (a card or a present for someone else's day). Anniversary
+    // keeps its pre-Occasions mapping.
+    anniversary: 'entertainment',
+    occasion_birthday: 'gifts_given',
+    remembrance: 'gifts_given',
+    other_occasion: 'gifts_given',
     // Food → Food (expense)
     dining_out: 'dining_out',
     brunch: 'dining_out',

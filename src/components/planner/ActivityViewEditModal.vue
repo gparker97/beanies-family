@@ -89,7 +89,7 @@ const emit = defineEmits<{
 const { t } = useTranslation();
 const { describeActivity } = useRecurrenceLabel();
 const { categoryLabel } = useActivityCategoryLabel();
-const { identityFor } = useActivityIdentity();
+const { identityFor, displayTitle } = useActivityIdentity();
 const isCelebration = computed(
   () => !!props.activity && identityFor(props.activity).celebration.celebrating
 );
@@ -966,7 +966,7 @@ async function confirmReschedule() {
       >
         <template #view>
           <span class="font-outfit dark:text-ink text-xl font-bold text-[var(--color-text)]">
-            {{ activity.title }}
+            {{ occurrenceDate ? displayTitle(activity, occurrenceDate) : activity.title }}
           </span>
         </template>
         <template #edit>

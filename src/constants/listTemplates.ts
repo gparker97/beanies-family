@@ -6,6 +6,7 @@
 import type { ActivityCategory, ListCategory, ListLifecycle, ListFrequency } from '@/types/models';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import { getActivityCategoryById } from '@/constants/activityCategories';
+import { CELEBRATORY_OCCASIONS } from '@/utils/occasions';
 
 export interface ListTemplate {
   key: string;
@@ -94,7 +95,8 @@ export const LIST_TEMPLATES: ListTemplate[] = [
     category: 'celebrations',
     lifecycle: 'oneoff',
     starterItems: ['Guest list', 'Send invites', 'Order cake', 'Decorations', 'Party bags'],
-    suggestFor: { groups: ['Party'], categories: ['work_party'] },
+    // Occasions that celebrate (never remembrance) can be a party too.
+    suggestFor: { groups: ['Party'], categories: ['work_party', ...CELEBRATORY_OCCASIONS] },
   },
 ];
 

@@ -14,6 +14,8 @@ import type { HelpfulHintType } from '@/types/models';
 export const SURPRISE_HINT_TYPES: readonly HelpfulHintType[] = [
   'birthday-present',
   'anniversary-plan',
+  // "Plan something for the big one" can be a surprise party for whoever it concerns.
+  'occasion-milestone',
 ];
 
 const SURPRISE_SET: ReadonlySet<HelpfulHintType> = new Set(SURPRISE_HINT_TYPES);

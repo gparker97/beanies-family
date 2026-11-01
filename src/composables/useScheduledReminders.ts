@@ -37,6 +37,7 @@ import { useToday } from '@/composables/useToday';
 import { assembleOccurrencesByDate } from '@/utils/occurrenceAssembly';
 import { addDaysYmd, formatTime12 } from '@/utils/date';
 import { fillTemplate } from '@/utils/fillTemplate';
+import { activityDisplayTitle } from '@/utils/occasions';
 import type { ActivityReminderContext } from '@/utils/reminderSchedule';
 import {
   activityReminderContext,
@@ -173,6 +174,9 @@ export function remindersForActivityOccurrence(
   const out: ScheduledReminder[] = [];
   let gated = 0;
   const who = ctx.who.join(' · ');
+  // An occasion names its milestone for this year ("... (turns 60)"); `ctx.title` stays the
+  // plain title for every other caller of `activityReminderContext`.
+  const title = activityDisplayTitle(a, date, t);
 
   // Two leads: the duty exemption applies ONLY to duty reminders. `ownLead ===
   // null` is the chip's "None" and must still suppress the generic reminder —
@@ -212,7 +216,7 @@ export function remindersForActivityOccurrence(
     out.push({
       id: activityReminderId(a.id, date, role),
       fireAt,
-      title: ctx.title,
+      title,
       body: fillTemplate(
         t(role === 'dropoff' ? 'reminders.activityBodyDropoff' : 'reminders.activityBodyPickup'),
         { who }
@@ -234,7 +238,7 @@ export function remindersForActivityOccurrence(
   out.push({
     id: activityReminderId(a.id, date),
     fireAt,
-    title: ctx.title,
+    title,
     body: ctx.who.length
       ? fillTemplate(t('reminders.activityBodyWho'), { who })
       : t('reminders.activityBody'),

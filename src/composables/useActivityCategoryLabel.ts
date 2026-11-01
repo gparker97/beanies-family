@@ -5,8 +5,9 @@
  * (`src/constants/activityCategories.ts`) as English. This composable resolves
  * a category id or group name to the language-appropriate label:
  *
- *   - **beanie mode** (English only): the English name, lowercased — exactly the
- *     prior behavior, so the cosmetic beanie overlay is unchanged.
+ *   - **beanie mode** (English only): categories use the English name, lowercased;
+ *     groups use their `planner.group.<slug>` beanie value (the lowercased name for
+ *     every group except Occasions, "special days").
  *   - **English**: the constant name (via the `planner.category.<id>` /
  *     `planner.group.<slug>` key, whose `en` value mirrors the constant — a sync
  *     test in `activityCategories.test.ts` enforces that).
@@ -39,10 +40,16 @@ export function useActivityCategoryLabel() {
    * the always-`t()` path (unlike `categoryLabel`'s English shortcut above) — there
    * are only a handful of groups, so the micro-optimization isn't worth diverging the
    * two functions' shapes.
+   *
+   * Beanie mode reads the key's `beanie` value too (`t()` already resolves it), rather
+   * than lowercasing the English name: a group may carry its own beanie label
+   * ("Occasions" is "special days"). The lowercased name is only the fallback.
    */
   function groupLabel(group: string): string {
-    if (isBeanieMode.value) return group.toLowerCase();
-    return t(`planner.group.${group.toLowerCase()}` as UIStringKey) || group;
+    return (
+      t(`planner.group.${group.toLowerCase()}` as UIStringKey) ||
+      (isBeanieMode.value ? group.toLowerCase() : group)
+    );
   }
 
   return { categoryLabel, groupLabel };

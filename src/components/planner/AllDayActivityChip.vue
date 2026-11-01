@@ -3,9 +3,9 @@
  * Activity adapter over the generic `AllDayChip` — resolves the activity's
  * colour (with a defensive neutral-slate fallback that warns rather than
  * rendering broken CSS) and fills the chip's content slot with the activity
- * title plus a photo indicator. Public API (`activity` / `isStart` / `isEnd`
- * props, `click` event, `data-testid="all-day-activity-chip"`) is unchanged so
- * its callers (`WeeklyCalendarView`, `CalendarGrid`) need no changes.
+ * title plus a photo indicator. Public API: `activity` / `date` / `isStart` /
+ * `isEnd` props, `click` event, `data-testid="all-day-activity-chip"`; callers are
+ * `WeeklyCalendarView` and `MonthDayCard`.
  */
 import { computed } from 'vue';
 import type { FamilyActivity } from '@/types/models';
@@ -16,12 +16,14 @@ import PhotoIndicator from '@/components/media/PhotoIndicator.vue';
 
 interface Props {
   activity: FamilyActivity;
+  /** The occurrence date (`YYYY-MM-DD`), so an occasion can name its milestone. */
+  date: string;
   /** First cell of the run. true for single-day; true on day 1 of multi-day. */
   isStart: boolean;
   /** Last cell of the run. true for single-day; true on the last day of multi-day. */
   isEnd: boolean;
 }
-const { identityFor } = useActivityIdentity();
+const { identityFor, displayTitle } = useActivityIdentity();
 
 const props = defineProps<Props>();
 defineEmits<{ click: [event: MouseEvent] }>();
@@ -45,11 +47,12 @@ const color = computed(() => identity.value.color);
  * "Shared" is still carried here by the dashed edge and the face stack.
  */
 const bgColor = computed(() => `${identity.value.color}22`);
+const title = computed(() => displayTitle(props.activity, props.date));
 </script>
 
 <template>
   <AllDayChip
-    :title="activity.title"
+    :title="title"
     :color="color"
     :bg-color="bgColor"
     :leading-emoji="identity.emoji"
@@ -64,6 +67,6 @@ const bgColor = computed(() => `${identity.value.color}22`);
       :activity-id="activity.id"
       density="month"
     />
-    <span>{{ activity.title }}<PhotoIndicator :photo-ids="activity.photoIds" /></span>
+    <span>{{ title }}<PhotoIndicator :photo-ids="activity.photoIds" /></span>
   </AllDayChip>
 </template>

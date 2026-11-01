@@ -17,10 +17,19 @@
 import { isContinuationDay } from '@/utils/calendar/occurrence';
 import type { FamilyMember, HelpfulHintType, TodoItem } from '@/types/models';
 import type { NotificationOccurrence } from '@/utils/notifications';
+import type { UIStringKey } from '@/services/translation/uiStrings';
 import { ACTIVITY_GROUP_MAP } from '@/constants/activityCategories';
 import { isAdultMember } from '@/composables/useMemberInfo';
 import { normalizeAssignees } from '@/utils/assignees';
 import { daysBetween, extractDatePart } from '@/utils/date';
+import {
+  activityDisplayTitle,
+  isOccasionCategory,
+  occasionCount,
+  OCCASION_TYPES,
+  type OccasionCategory,
+} from '@/utils/occasions';
+import { containsPhrase } from '@/utils/textSimilarity';
 // The ONE annual-date implementation. This file used to carry its own copy.
 import { nextAnnualDate } from '@/utils/birthdays';
 
@@ -33,6 +42,8 @@ export const HINT_LEAD_DAYS: Record<HelpfulHintType, number> = {
   'anniversary-plan': 14,
   'trip-packing': 2,
   'trip-documents': 7,
+  'occasion-heads-up': 7,
+  'occasion-milestone': 30,
 };
 
 /** Selectable lead-time options (days before the event) for the Settings picker. */
@@ -80,6 +91,18 @@ export const HINT_TYPE_META: Record<
     titleKey: 'todo.hint.title.tripDocuments',
     descKey: 'settings.helpfulHints.desc.tripDocuments',
   },
+  'occasion-heads-up': {
+    emoji: '💌',
+    labelKey: 'settings.helpfulHints.type.occasionHeadsUp',
+    titleKey: 'todo.hint.title.occasionHeadsUp',
+    descKey: 'settings.helpfulHints.desc.occasionHeadsUp',
+  },
+  'occasion-milestone': {
+    emoji: '🎉',
+    labelKey: 'settings.helpfulHints.type.occasionMilestone',
+    titleKey: 'todo.hint.title.occasionMilestone',
+    descKey: 'settings.helpfulHints.desc.occasionMilestone',
+  },
 };
 
 /** All hint types, in a stable display order (Settings toggle order). */
@@ -93,9 +116,9 @@ export const UNKNOWN_HINT_EMOJI = '💡';
  *  malformed record) can carry a `hintType` outside `HINT_TYPE_META`. A bare
  *  index would throw inside a render computed and blank the whole surface
  *  (the briefing, the to-do list) for one bad record; this degrades to a
- *  generic icon instead. An un-kept record is pruned by reconcile on its next
- *  tick; a kept or completed one is the family's own to-do and keeps the
- *  generic icon on this build. */
+ *  generic icon instead. Reconcile never prunes a hint whose type this build
+ *  does not know (the newer client that made it owns its lifecycle), so such a
+ *  record keeps the generic icon here until it expires or is handled. */
 export function hintEmoji(hintType: HelpfulHintType | undefined): string {
   if (!hintType) return '';
   return HINT_TYPE_META[hintType]?.emoji ?? UNKNOWN_HINT_EMOJI;
@@ -147,7 +170,9 @@ export type HintSkipReason =
   | 'no-dob'
   | 'no-start-date'
   | 'no-attendees'
-  | 'malformed-record';
+  | 'malformed-record'
+  /** An occasion birthday that duplicates a pod member's own (derived) birthday. */
+  | 'duplicate-member-birthday';
 
 /** A to-do that IS a hint: `hintType` is present, not merely optional. The
  *  narrowed type `isHint` produces, named so consumers (the store's hint feed,
@@ -189,24 +214,29 @@ export function pastDismissedHintKeys(
 /** What happened to a mapped card holder on a generated hint (#109). */
 export type CardHolderOutcome = 'used' | 'ineligible';
 
-/** Callbacks the source functions use to tally why a candidate was skipped, and what
- *  happened to its card holder. */
+/** Callbacks the source functions use to tally why a candidate was skipped, what
+ *  happened to its card holder, and when an occasion fell back to all adults. */
 interface Recorder {
   skip: (reason: HintSkipReason) => void;
   holder: (outcome: CardHolderOutcome) => void;
+  fallback: () => void;
+}
+
+/** One candidate hint: its type, the stable per-source id, the event date, the name in
+ *  its title, and its default audience. `titleKey` overrides the type's title. */
+interface HintSpec {
+  hintType: HelpfulHintType;
+  scopeId: string;
+  eventDate: string;
+  name: string;
+  assigneeIds: string[];
+  titleKey?: UIStringKey;
 }
 
 /** Build a DesiredHint for an in-window event, or null if outside its window /
- *  no audience (recording the reason). `scopeId` = the stable per-source id. */
-function buildDesired(
-  input: HelpfulHintsInput,
-  hintType: HelpfulHintType,
-  scopeId: string,
-  eventDate: string,
-  name: string,
-  assigneeIds: string[],
-  rec: Recorder
-): DesiredHint | null {
+ *  no audience (recording the reason). */
+function buildDesired(input: HelpfulHintsInput, rec: Recorder, spec: HintSpec): DesiredHint | null {
+  const { hintType, scopeId, eventDate, name, assigneeIds } = spec;
   if (!assigneeIds.length) {
     rec.skip('no-audience');
     return null;
@@ -234,7 +264,7 @@ function buildDesired(
       rec.holder('ineligible');
     }
   }
-  const title = input.translate(HINT_TYPE_META[hintType].titleKey, {
+  const title = input.translate(spec.titleKey ?? HINT_TYPE_META[hintType].titleKey, {
     name,
     date: input.formatDate(eventDate),
   });
@@ -247,14 +277,34 @@ function buildDesired(
   };
 }
 
-/** Which hint type (if any) an activity category maps to. `birthday`/`anniversary`
- *  are handled specially before the generic Party-group fallback. */
+/** Which hint type (if any) a Party-group activity category maps to. `birthday` is
+ *  handled specially before the generic Party-group fallback. Occasions (anniversary
+ *  included) are a separate trigger, `occasionHints`. */
 function activityTypeFor(category: string): HelpfulHintType | null {
   if (category === 'birthday') return 'birthday-party-gift';
-  if (category === 'anniversary') return 'anniversary-plan';
   if (ACTIVITY_GROUP_MAP[category] === 'Party') return 'celebration-gift';
   return null;
 }
+
+/**
+ * The heads-up each occasion type gets, and its title when it is not the type's own.
+ * Exhaustive, so a new occasion type fails to compile until it is wired here.
+ *
+ * Anniversary keeps its 14-day `anniversary-plan` as its only heads-up (greg, 2026-11-01);
+ * remembrance gets a gentler title than "card, gift or a call?".
+ */
+const OCCASION_HINTS: Record<
+  OccasionCategory,
+  { headsUp: HelpfulHintType; titleKey?: UIStringKey }
+> = {
+  anniversary: { headsUp: 'anniversary-plan' },
+  remembrance: {
+    headsUp: 'occasion-heads-up',
+    titleKey: 'todo.hint.title.occasionHeadsUpRemembrance',
+  },
+  occasion_birthday: { headsUp: 'occasion-heads-up' },
+  other_occasion: { headsUp: 'occasion-heads-up' },
+};
 
 export interface ComputeResult {
   hints: DesiredHint[];
@@ -267,13 +317,18 @@ export interface ComputeResult {
   /** Who Owns What (#109): desired hints assigned to their card holder, and hints whose
    *  card holder was outside the audience (so the default audience was kept). */
   cardHolder: { used: number; ineligible: number };
+  /** Occasion occurrences with nobody remembering, whose hints went to all adults. */
+  audienceFallback: number;
 }
 
 /** Trigger 1 — member birthday −14d → present/party (adults excl. the birthday
  *  person & pets). */
-function birthdayHints(input: HelpfulHintsInput, rec: Recorder): DesiredHint[] {
+function birthdayHints(
+  input: HelpfulHintsInput,
+  adultIds: readonly string[],
+  rec: Recorder
+): DesiredHint[] {
   const out: DesiredHint[] = [];
-  const adults = input.members.filter((m) => isAdultMember(m) && !m.isPet);
   for (const member of input.members) {
     try {
       if (member.isPet) continue;
@@ -283,16 +338,14 @@ function birthdayHints(input: HelpfulHintsInput, rec: Recorder): DesiredHint[] {
       }
       const { month, day } = member.dateOfBirth;
       const eventDate = nextAnnualDate(input.today, month, day);
-      const audience = adults.filter((a) => a.id !== member.id).map((a) => a.id);
-      const hint = buildDesired(
-        input,
-        'birthday-present',
-        member.id,
+      const audience = adultIds.filter((id) => id !== member.id);
+      const hint = buildDesired(input, rec, {
+        hintType: 'birthday-present',
+        scopeId: member.id,
         eventDate,
-        member.name,
-        audience,
-        rec
-      );
+        name: member.name,
+        assigneeIds: audience,
+      });
       if (hint) out.push(hint);
     } catch {
       rec.skip('malformed-record');
@@ -301,31 +354,104 @@ function birthdayHints(input: HelpfulHintsInput, rec: Recorder): DesiredHint[] {
   return out;
 }
 
-/** Triggers 2–4 — Party-group activity occurrences → gift/plan hints (attendees). */
-function activityHints(input: HelpfulHintsInput, rec: Recorder): DesiredHint[] {
-  const out: DesiredHint[] = [];
+/** Every activity occurrence once per event (a multi-day party's later days are not
+ *  events of their own), each visited inside its own try/catch so one malformed record
+ *  counts as `malformed-record` and never aborts the run. Shared by the activity
+ *  triggers. */
+function forEachEventOccurrence(
+  input: HelpfulHintsInput,
+  rec: Recorder,
+  visit: (occ: NotificationOccurrence) => void
+): void {
   for (const occ of Object.values(input.occurrences).flat()) {
     try {
-      // One hint per event, not one per day a multi-day party covers.
       if (isContinuationDay(occ)) continue;
-      const { activity, date } = occ;
-      const hintType = activityTypeFor(activity.category);
-      if (!hintType) continue; // not a hint-worthy category — not a "skip"
-      const audience = normalizeAssignees(activity);
-      const hint = buildDesired(
-        input,
-        hintType,
-        activity.id,
-        extractDatePart(date),
-        activity.title,
-        audience,
-        rec
-      );
-      if (hint) out.push(hint);
+      visit(occ);
     } catch {
       rec.skip('malformed-record');
     }
   }
+}
+
+/** Triggers 2–3 — Party-group activity occurrences → gift hints (attendees). */
+function activityHints(input: HelpfulHintsInput, rec: Recorder): DesiredHint[] {
+  const out: DesiredHint[] = [];
+  forEachEventOccurrence(input, rec, ({ activity, date }) => {
+    const hintType = activityTypeFor(activity.category);
+    if (!hintType) return; // not a hint-worthy category — not a "skip"
+    const hint = buildDesired(input, rec, {
+      hintType,
+      scopeId: activity.id,
+      eventDate: extractDatePart(date),
+      name: activity.title,
+      assigneeIds: normalizeAssignees(activity),
+    });
+    if (hint) out.push(hint);
+  });
+  return out;
+}
+
+/** An occasion birthday that is really a pod member's own birthday (same month/day as
+ *  their date of birth, and their name in the title), which `birthday-present` covers. */
+function duplicatesMemberBirthday(
+  activity: { date: string; title: string },
+  members: FamilyMember[]
+): boolean {
+  const anchor = extractDatePart(activity.date);
+  const month = Number(anchor.slice(5, 7));
+  const day = Number(anchor.slice(8, 10));
+  return members.some(
+    (m) =>
+      !m.isPet &&
+      m.dateOfBirth?.month === month &&
+      m.dateOfBirth?.day === day &&
+      !!m.name?.trim() &&
+      containsPhrase(activity.title ?? '', m.name)
+  );
+}
+
+/** Triggers 4 + 7–8 — Occasions occurrences → the type's heads-up (anniversary-plan for
+ *  anniversaries) and, for a round count with a year, the big-occasion hint. Audience is
+ *  whoever is remembering; nobody (or only removed members / pets) → all adults. */
+function occasionHints(
+  input: HelpfulHintsInput,
+  adultIds: readonly string[],
+  rec: Recorder
+): DesiredHint[] {
+  const out: DesiredHint[] = [];
+  const humanIds = new Set(input.members.filter((m) => !m.isPet).map((m) => m.id));
+  forEachEventOccurrence(input, rec, ({ activity, date }) => {
+    const category = activity.category;
+    if (!isOccasionCategory(category)) return; // not an occasion — not a "skip"
+
+    if (category === 'occasion_birthday' && duplicatesMemberBirthday(activity, input.members)) {
+      rec.skip('duplicate-member-birthday');
+      return;
+    }
+
+    let audience = normalizeAssignees(activity).filter((id) => humanIds.has(id));
+    const fellBack = !audience.length;
+    if (fellBack) audience = [...adultIds];
+
+    const eventDate = extractDatePart(date);
+    const name = activityDisplayTitle(activity, eventDate, (k) => input.translate(k));
+    const { headsUp, titleKey } = OCCASION_HINTS[category];
+    const base = { scopeId: activity.id, eventDate, name, assigneeIds: audience };
+
+    const hint = buildDesired(input, rec, { ...base, hintType: headsUp, titleKey });
+    if (hint) out.push(hint);
+    let generated = !!hint;
+
+    const count = occasionCount(activity, eventDate);
+    if (count !== undefined && OCCASION_TYPES[category].isRound(count)) {
+      const big = buildDesired(input, rec, { ...base, hintType: 'occasion-milestone' });
+      if (big) out.push(big);
+      generated ||= !!big;
+    }
+    // Count the fallback only when it actually produced a hint, so the rate means
+    // "adults were nudged because nobody was remembering", not "an occasion is in the window".
+    if (fellBack && generated) rec.fallback();
+  });
   return out;
 }
 
@@ -344,15 +470,13 @@ function tripHints(input: HelpfulHintsInput, rec: Recorder): DesiredHint[] {
       }
       const eventDate = extractDatePart(trip.startDate);
       for (const hintType of ['trip-packing', 'trip-documents'] as const) {
-        const hint = buildDesired(
-          input,
+        const hint = buildDesired(input, rec, {
           hintType,
-          trip.id,
+          scopeId: trip.id,
           eventDate,
-          trip.name,
-          trip.assigneeIds,
-          rec
-        );
+          name: trip.name,
+          assigneeIds: trip.assigneeIds,
+        });
         if (hint) out.push(hint);
       }
     } catch {
@@ -366,6 +490,7 @@ function tripHints(input: HelpfulHintsInput, rec: Recorder): DesiredHint[] {
 export function computeDesiredHints(input: HelpfulHintsInput): ComputeResult {
   const reasons: Partial<Record<HintSkipReason, number>> = {};
   const cardHolder = { used: 0, ineligible: 0 };
+  let audienceFallback = 0;
   const rec: Recorder = {
     skip: (reason) => {
       reasons[reason] = (reasons[reason] ?? 0) + 1;
@@ -373,13 +498,25 @@ export function computeDesiredHints(input: HelpfulHintsInput): ComputeResult {
     holder: (outcome) => {
       cardHolder[outcome] += 1;
     },
+    fallback: () => {
+      audienceFallback += 1;
+    },
   };
+  // `isAdultMember` already excludes pets.
+  const adultIds = input.members.filter(isAdultMember).map((m) => m.id);
   const hints = [
-    ...birthdayHints(input, rec),
+    ...birthdayHints(input, adultIds, rec),
     ...activityHints(input, rec),
+    ...occasionHints(input, adultIds, rec),
     ...tripHints(input, rec),
   ];
-  return { hints, skipped: reasons['malformed-record'] ?? 0, reasons, cardHolder };
+  return {
+    hints,
+    skipped: reasons['malformed-record'] ?? 0,
+    reasons,
+    cardHolder,
+    audienceFallback,
+  };
 }
 
 /** Diff desired hints against the family's existing hint to-dos.
@@ -397,7 +534,9 @@ export function computeDesiredHints(input: HelpfulHintsInput): ComputeResult {
  *      primary (an acknowledged/completed copy if any, else the earliest-created)
  *      and remove the safe extras — otherwise buildTodoReminders double-notifies.
  *    - EXPIRED: the event has passed (`hintEventDate < today`).
- *    - STALE: no longer desired (source deleted / moved out of window).
+ *    - STALE: no longer desired (source deleted / moved out of window). Only for a
+ *      `hintType` this build knows (`HINT_TYPE_META`): a type added by a newer client
+ *      is never desired here, so pruning it would ping-pong with that client.
  *    - DISMISSED: its key is dismissed (a copy an older build regenerated). */
 export function reconcileHints(
   desired: DesiredHint[],
@@ -434,6 +573,10 @@ export function reconcileHints(
     if (t.hintKey && dismissed.has(t.hintKey)) return true; // dismissed elsewhere
     if (t.hintKey && winnerByKey.get(t.hintKey) !== t) return true; // duplicate copy
     if (t.hintEventDate && t.hintEventDate < today) return true; // expired
+    // Stale, but only for a type this build can generate (see the doc comment). An unknown
+    // type is kept only while it carries an event date, so expiry still removes it later.
+    const unknownType = !t.hintType || !Object.hasOwn(HINT_TYPE_META, t.hintType);
+    if (unknownType && t.hintEventDate) return false;
     if (!t.hintKey || !desiredKeys.has(t.hintKey)) return true; // stale
     return false;
   });

@@ -82,7 +82,7 @@ const { t } = useTranslation();
 const clashFor = useClashLookup();
 const { isMobile } = useBreakpoint();
 const activityStore = useActivityStore();
-const { identityFor } = useActivityIdentity();
+const { identityFor, displayTitle } = useActivityIdentity();
 const familyStore = useFamilyStore();
 const memberFilterStore = useMemberFilterStore();
 
@@ -778,6 +778,7 @@ function onStripDayClick(dateStr: string) {
         >
           <AllDayActivityChip
             :activity="span.activity"
+            :date="span.startYmd"
             :is-start="true"
             :is-end="true"
             :data-activity-id="span.activity.id"
@@ -825,6 +826,7 @@ function onStripDayClick(dateStr: string) {
               v-for="occ in getUntimedForDay(day.dateStr)"
               :key="occ.activity.id"
               :activity="occ.activity"
+              :date="day.dateStr"
               :is-start="true"
               :is-end="true"
               :data-activity-id="occ.activity.id"
@@ -932,7 +934,7 @@ function onStripDayClick(dateStr: string) {
                   style="color: var(--color-text)"
                 >
                   <span aria-hidden="true">{{ identityFor(activity).emoji }}</span>
-                  <span class="truncate">{{ activity.title }}</span>
+                  <span class="truncate">{{ displayTitle(activity, eventDate) }}</span>
                   <PhotoIndicator :photo-ids="activity.photoIds" />
                   <ClashIndicator :clash="clashFor(activity.id, eventDate)" class="ml-1" />
                 </div>

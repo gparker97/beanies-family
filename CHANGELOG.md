@@ -13,6 +13,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 ### Added
 
 - A new blog post, "daddy come look at my bed!", tells the story of the day after the beanie wall went up.
+- Occasions: add birthdays, anniversaries and days to remember for people outside your pod, with yearly reminders and a heads-up hint.
+
+### Changed
+
+- The orange flash that points you to a form field now sits just outside the field instead of on top of it.
 
 ### Fixed
 

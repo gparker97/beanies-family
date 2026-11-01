@@ -5,6 +5,8 @@ import {
   CELEBRATION_KEYWORDS,
 } from '@/constants/celebrationKeywords';
 import type { FamilyActivity } from '@/types/models';
+import { isOccasionCategory, OCCASION_TYPES } from '@/utils/occasions';
+import { containsPhrase, isWordBoundedScript, wordTokenList } from '@/utils/textSimilarity';
 
 /**
  * Whether an activity is a genuine celebration — a birthday, an anniversary, a
@@ -40,9 +42,6 @@ const NOT_CELEBRATING: CelebrationVerdict = {
   rule: 'none',
   suppressed: null,
 };
-
-/** Latin-ish scripts, where word boundaries exist and matter. */
-const WORD_BOUNDED_SCRIPT = /^[ -ɏ\s]+$/;
 
 /**
  * Every form a base verb may legitimately wear: book/books/booked/booking.
@@ -117,40 +116,9 @@ function formsFor(base: string): Set<string> {
   return hit;
 }
 
-/**
- * Word tokens, lowercased. A LITERAL split, deliberately.
- *
- * This used to build a `new RegExp` per keyword per title, which the security lint
- * flags (`detect-non-literal-regexp`) — rightly, even though the inputs are our own
- * curated constants today: nothing structurally stops a future caller passing a title
- * or a user-supplied list, and a crafted pattern is a ReDoS. Tokenising is safe by
- * construction rather than by convention, and it is what "whole word" actually means.
- */
-function tokens(text: string): string[] {
-  return text
-    .toLowerCase()
-    .split(/[^\p{L}\p{N}]+/u)
-    .filter(Boolean);
-}
-
-/**
- * Whole-word (or whole-phrase) match. A substring match lights up "partygoer",
- * "Anniversary Road" and half the words containing "bday", so the boundary is the
- * point rather than a refinement.
- *
- * CJK has no word boundaries, so those locales fall back to a substring test —
- * correct for a script where a term cannot hide inside an unrelated word.
- */
-function matchesWord(haystack: string, needle: string): boolean {
-  if (!WORD_BOUNDED_SCRIPT.test(needle)) return haystack.includes(needle);
-  const hay = tokens(haystack);
-  const want = tokens(needle);
-  if (!want.length) return false;
-  for (let i = 0; i + want.length <= hay.length; i++) {
-    if (want.every((w, k) => hay[i + k] === w)) return true;
-  }
-  return false;
-}
+// The whole-word matcher (`wordTokenList`, `containsPhrase`) lives in `textSimilarity.ts`,
+// shared with the occasion keyword table. It is a literal token split, never a regex built
+// from a keyword, so `detect-non-literal-regexp` has nothing to flag.
 
 /**
  * Does the title OPEN with an errand verb?
@@ -163,13 +131,13 @@ function matchesWord(haystack: string, needle: string): boolean {
  */
 function startsWithErrandVerb(title: string, locale: string): boolean {
   const verbs = CELEBRATION_ERRAND_VERBS[locale] ?? CELEBRATION_ERRAND_VERBS.en ?? [];
-  const hay = tokens(title);
+  const hay = wordTokenList(title);
   const lowered = title.trim().toLowerCase();
 
   return verbs.some((verb) => {
     const v = verb.toLowerCase();
-    if (!WORD_BOUNDED_SCRIPT.test(v)) return lowered.startsWith(v);
-    const want = tokens(v);
+    if (!isWordBoundedScript(v)) return lowered.startsWith(v);
+    const want = wordTokenList(v);
     if (!want.length || hay.length < want.length) return false;
     // Only the FIRST word inflects; "pick up" must still be followed by "up".
     const head = want[0]!;
@@ -199,6 +167,17 @@ export function isCelebrationActivity(
     return { celebrating: true, rule: 'category-group', suppressed: null };
   }
 
+  // Occasions decide by their own table, before the emoji and keyword rules: a birthday or
+  // an anniversary celebrates, a remembrance NEVER does, even when its title says
+  // "birthday" ("Grandma's birthday memorial" must not throw confetti). Guarded by
+  // `isOccasionCategory` rather than a bare index, because synced data could carry a
+  // prototype key as its category.
+  if (isOccasionCategory(activity.category)) {
+    return OCCASION_TYPES[activity.category].celebrates
+      ? { celebrating: true, rule: 'category-group', suppressed: null }
+      : NOT_CELEBRATING;
+  }
+
   const title = activity.title ?? '';
   if (!title.trim()) return NOT_CELEBRATING;
 
@@ -208,12 +187,11 @@ export function isCelebrationActivity(
     return { celebrating: true, rule: 'emoji', suppressed: null };
   }
 
-  // `.toLowerCase()`, NOT `.toLocaleLowerCase()`: the latter follows the host OS, and a
-  // Turkish device maps 'I' to 'ı', so 'BIRTHDAY' stopped matching 'birthday' entirely
-  // — and the regex `i` flag cannot help once the haystack is destructively lowercased.
-  const lower = title.toLowerCase();
+  // `containsPhrase` lowercases both sides with `.toLowerCase()`, NOT
+  // `.toLocaleLowerCase()`: the latter follows the host OS, and a Turkish device maps 'I'
+  // to 'ı', so 'BIRTHDAY' stopped matching 'birthday' entirely.
   const keywords = CELEBRATION_KEYWORDS[locale] ?? CELEBRATION_KEYWORDS.en ?? [];
-  const hit = keywords.some((k) => matchesWord(lower, k.toLowerCase()));
+  const hit = keywords.some((k) => containsPhrase(title, k));
   if (!hit) return NOT_CELEBRATING;
 
   // An errand ABOUT a celebration is not one. Checked only once a keyword matched, so
@@ -232,7 +210,7 @@ export function isCelebrationActivity(
  * birthday category gives 🎂), so the sticker echoes the card rather than contradicting
  * it; 🎉 otherwise.
  */
-const CELEBRATORY_GLYPHS = new Set(['🎂', '🎉', '🎈', '🥳', '🍰', '💍', '🎓', '💒', '🍼']);
+const CELEBRATORY_GLYPHS = new Set(['🎂', '🧁', '🎉', '🎈', '🥳', '🍰', '💍', '🎓', '💒', '🍼']);
 
 export function celebrationSticker(emoji: string): string {
   return CELEBRATORY_GLYPHS.has(emoji) ? emoji : '🎉';

@@ -38,7 +38,7 @@ import type {
   TravelSegmentDraft,
 } from './types';
 
-export const PROMPT_VERSION = '2026-09-30.1';
+export const PROMPT_VERSION = '2026-11-01.1';
 
 /**
  * The activity-category taxonomy rendered for the model to pick `category` from.
@@ -58,7 +58,8 @@ export const CATEGORY_OPTIONS_TEXT = [
   'Food: brunch (Brunch), coffee (Coffee), dining_out (Dining Out), drinks (Drinks), picnic (Picnic), other_food (Other Food)',
   'Fun: arcade (Arcade), beach (Beach), bowling (Bowling), concert (Concert), festival (Festival / Fair), movie (Movie), museum (Museum), playground (Playground / Park), pool (Pool / Swim), show (Show / Musical), sporting_event (Sporting Event), theme_park (Theme Park), zoo (Zoo / Aquarium), other_entertainment (Other Fun Thing)',
   'Lessons: art (Art), chess (Chess), coding (Coding / Robotics), dance (Dance / Ballet), drama (Drama / Acting), drum (Drum), guitar (Guitar), music (Music), piano (Piano), voice (Singing / Voice), swimming (Swimming), trumpet (Trumpet), other_lesson (Other Lesson)',
-  'Party: anniversary (Anniversary), baby_shower (Baby Shower), bar_mitzvah (Bar Mitzvah), birthday (Birthday Party), graduation (Graduation), wedding (Wedding), other_celebration (Other Celebration)',
+  'Occasions: anniversary (Anniversary), occasion_birthday (Birthday), remembrance (Remembrance), other_occasion (Other Occasion)',
+  'Party: baby_shower (Baby Shower), bar_mitzvah (Bar Mitzvah), birthday (Birthday Party), graduation (Graduation), wedding (Wedding), other_celebration (Other Celebration)',
   'Pets: pet_grooming (Grooming), vet (Vet), other_pet (Other Pet)',
   'Religious: religious_class (Religious Class), worship (Worship / Service), other_religious (Other Religious)',
   'School: after_school (After School Activity), field_trip (Field Trip), school_recital (School Recital / Presentation), other_school (Other School Activity)',

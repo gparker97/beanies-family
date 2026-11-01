@@ -47,6 +47,8 @@ interface ActivePulse {
  */
 const activePulses = new WeakMap<HTMLElement, Map<string, ActivePulse>>();
 
+type RevealTarget = HTMLElement | null | undefined;
+
 export function useAttentionPulse() {
   function pulse(el: HTMLElement | null | undefined, className = 'attention-pulse') {
     if (!el) return;
@@ -91,14 +93,19 @@ export function useAttentionPulse() {
    * scroll is instant and the pulse starts at once (the pulse class itself is suppressed by
    * the reduced-motion block in `style.css`). A null element is a no-op, like `pulse`.
    * `className` picks the pulse, as for `pulse` (`attention-ring` for an element that paints
-   * its own background, e.g. a calendar chip).
+   * its own background, e.g. a calendar chip; `attention-halo` for a form field group).
+   * Given several elements, it scrolls to the first and pulses them all at once.
    */
-  function reveal(el: HTMLElement | null | undefined, className = 'attention-pulse') {
-    if (!el) return;
+  function reveal(target: RevealTarget | readonly RevealTarget[], className = 'attention-pulse') {
+    // A group scrolls to its first element and pulses every one together, so nothing below the
+    // fold flashes while the scroll is still travelling (the occasion defaults, #137).
+    const els = (Array.isArray(target) ? target : [target]).filter((e): e is HTMLElement => !!e);
+    if (els.length === 0) return;
     const reduced = prefersReducedMotion();
-    el.scrollIntoView({ block: 'center', behavior: reduced ? 'auto' : 'smooth' });
-    if (reduced) pulse(el, className);
-    else setTimeout(() => pulse(el, className), REVEAL_PULSE_DELAY_MS);
+    els[0].scrollIntoView({ block: 'center', behavior: reduced ? 'auto' : 'smooth' });
+    const pulseAll = () => els.forEach((e) => pulse(e, className));
+    if (reduced) pulseAll();
+    else setTimeout(pulseAll, REVEAL_PULSE_DELAY_MS);
   }
 
   return { pulse, reveal };

@@ -27,7 +27,8 @@
  * group's label, which the "still needed" toast prints verbatim) and receives
  * `data-form-field` by attribute fallthrough from `v-bind="v.bind('x')"`, which is the element
  * the composable scrolls to and pulses. `errorMessage` is the one-line reason under the control.
- * The root is `rounded-2xl` so the attention pulse follows the same shape as the error ring.
+ * The root is `rounded-2xl` so the attention halo (`attention-halo`, drawn outside the root)
+ * follows the same shape as the error ring.
  */
 import { onMounted, onUpdated, ref, useId } from 'vue';
 

@@ -169,7 +169,7 @@ export function useHelpfulHints(): void {
       end
     );
 
-    const { hints, skipped, reasons, cardHolder } = computeDesiredHints({
+    const { hints, skipped, reasons, cardHolder, audienceFallback } = computeDesiredHints({
       today: todayStr,
       members: familyStore.humans,
       occurrences,
@@ -252,7 +252,7 @@ export function useHelpfulHints(): void {
     )
       .sort()
       .map(([r, c]) => `${r}:${c}`)
-      .join(',')}|card:${cardHolder.used}:${cardHolder.ineligible}`;
+      .join(',')}|card:${cardHolder.used}:${cardHolder.ineligible}|fallback:${audienceFallback}`;
 
     if (emitGate(signature)) {
       logEvent({
@@ -298,6 +298,17 @@ export function useHelpfulHints(): void {
           surface: SURFACE,
           message: 'card_holder_ineligible',
           context: { count: cardHolder.ineligible },
+        });
+      }
+
+      // Occasions (#137): occurrences with nobody remembering, whose hints went to all
+      // adults. Explains "why did everyone get Uncle Bob's heads-up?".
+      if (audienceFallback) {
+        logEvent({
+          level: 'info',
+          surface: SURFACE,
+          message: 'occasion_adults_fallback',
+          context: { count: audienceFallback },
         });
       }
     }

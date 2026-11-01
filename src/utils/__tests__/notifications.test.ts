@@ -17,6 +17,7 @@ import type { FamilyMember, TodoItem, FamilyActivity, FamilyList } from '@/types
 import type { ReleaseNote } from '@/content/release-notes';
 import type { Announcement } from '@/content/announcements';
 import type { BeanTip } from '@/content/tips';
+import { UI_STRINGS } from '@/services/translation/uiStrings';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 function member(
@@ -91,6 +92,7 @@ function derive(overrides: Partial<DeriveInput>, now: Date = NOW) {
     readState: {},
     windowDays: 30,
     occurrencesByDate: {},
+    t: (key) => (UI_STRINGS as Record<string, string>)[key] ?? key,
   };
   return deriveNotifications({ ...base, ...overrides }, now);
 }
@@ -251,6 +253,28 @@ describe('deriveNotifications — todo-assigned', () => {
 });
 
 describe('deriveNotifications — activity-reminder', () => {
+  it('an occasion with a year names its milestone in the title', () => {
+    const out = derive({
+      occurrencesByDate: {
+        '2026-05-27': [
+          {
+            activity: activity({
+              title: "Uncle Bob's birthday",
+              category: 'occasion_birthday',
+              occasionYear: 1966,
+              assigneeIds: ['v'],
+              startTime: undefined,
+            }),
+            date: '2026-05-27',
+          },
+        ],
+      },
+    });
+    expect(byId(out, activityReminderId('a1', '2026-05-27'))?.title).toBe(
+      "Uncle Bob's birthday (turns 60)"
+    );
+  });
+
   it('timed → fires at start − reminderMinutes', () => {
     const out = derive({
       occurrencesByDate: {

@@ -38,6 +38,21 @@ describe('useAttentionPulse.reveal', () => {
   it('does nothing for a missing element', () => {
     expect(() => useAttentionPulse().reveal(null)).not.toThrow();
   });
+
+  it('scrolls a group to its first element, then pulses every one together', () => {
+    const [a, b] = [el(), el()];
+    useAttentionPulse().reveal([null, a, undefined, b], 'attention-halo');
+    expect(a.scrollIntoView).toHaveBeenCalledWith({ block: 'center', behavior: 'smooth' });
+    expect(b.scrollIntoView).not.toHaveBeenCalled();
+    expect(b.classList.contains('attention-halo')).toBe(false);
+    vi.advanceTimersByTime(400);
+    expect(a.classList.contains('attention-halo')).toBe(true);
+    expect(b.classList.contains('attention-halo')).toBe(true);
+  });
+
+  it('does nothing for an empty group', () => {
+    expect(() => useAttentionPulse().reveal([null, undefined])).not.toThrow();
+  });
 });
 
 describe('useAttentionPulse.pulse', () => {

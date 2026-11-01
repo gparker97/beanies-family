@@ -278,6 +278,7 @@ function onMoreClick(event: MouseEvent) {
           v-for="(item, i) in visibleAllDayItems"
           :key="item.activity.id + ':' + i"
           :activity="item.activity"
+          :date="cell.date"
           :is-start="item.isStart"
           :is-end="item.isEnd"
           :data-activity-id="item.activity.id"

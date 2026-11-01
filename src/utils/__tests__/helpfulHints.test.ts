@@ -15,6 +15,8 @@ import {
   pastDismissedHintKeys,
   isFreshHint,
 } from '@/utils/helpfulHints';
+import { UI_STRINGS } from '@/services/translation/uiStrings';
+import { fillTemplate } from '@/utils/fillTemplate';
 
 const TODAY = '2026-07-24';
 
@@ -466,5 +468,247 @@ describe('isFreshHint', () => {
       false
     );
     expect(isFreshHint(base as TodoItem)).toBe(false);
+  });
+});
+
+describe('computeDesiredHints — Occasions (#137)', () => {
+  // A real translator, so the asserted titles read as a family would see them.
+  const realTranslate = (key: string, params?: Record<string, string>) => {
+    const text = (UI_STRINGS as Record<string, string>)[key] ?? key;
+    return params ? fillTemplate(text, params) : text;
+  };
+  const dad = member({ id: 'dad', name: 'Dad', ageGroup: 'adult' });
+  const mum = member({ id: 'mum', name: 'Mum', ageGroup: 'adult' });
+  const kid = member({ id: 'kid', name: 'Kid', ageGroup: 'child' });
+  const pet = member({ id: 'pet', name: 'Rex', isPet: true });
+  const members = [dad, mum, kid, pet];
+  const SEVEN_OUT = '2026-07-31';
+  const MONTH_OUT = '2026-08-20'; // 27 days
+
+  function occasionHints(
+    a: FamilyActivity,
+    date = SEVEN_OUT,
+    over: Partial<HelpfulHintsInput> = {}
+  ) {
+    return computeDesiredHints(
+      baseInput({ members, occurrences: occ(date, a), translate: realTranslate, ...over })
+    );
+  }
+
+  it.each(['occasion_birthday', 'remembrance', 'other_occasion'] as const)(
+    '%s → occasion-heads-up at −7d for the rememberers',
+    (category) => {
+      const a = activity({ id: 'o', title: 'Uncle Bob', category, assigneeIds: ['mum'] });
+      const { hints } = occasionHints(a);
+      expect(hints.map((h) => h.hintType)).toEqual(['occasion-heads-up']);
+      expect(hints[0]!.assigneeIds).toEqual(['mum']);
+      // 8 days out: outside the 7-day default.
+      expect(occasionHints(a, '2026-08-01').hints).toHaveLength(0);
+    }
+  );
+
+  it('uses the gentle title for a remembrance and the card/gift/call title otherwise', () => {
+    const r = activity({ id: 'r', title: "Grandpa's day", category: 'remembrance' });
+    const b = activity({ id: 'b', title: "Uncle Bob's birthday", category: 'occasion_birthday' });
+    expect(occasionHints(r).hints[0]!.title).toBe(
+      "Grandpa's day is on 2026-07-31. A good day to reach out."
+    );
+    expect(occasionHints(b).hints[0]!.title).toBe(
+      "Uncle Bob's birthday is on 2026-07-31. Card, gift or a call?"
+    );
+  });
+
+  it('names the milestone in the hint title when a year is set', () => {
+    const b = activity({
+      id: 'b',
+      title: "Uncle Bob's birthday",
+      category: 'occasion_birthday',
+      occasionYear: 1966,
+      assigneeIds: ['dad'],
+    });
+    expect(occasionHints(b).hints.map((h) => h.title)).toEqual([
+      "Uncle Bob's birthday (turns 60) is on 2026-07-31. Card, gift or a call?",
+      "Uncle Bob's birthday (turns 60) is on 2026-07-31. A big one: plan something?",
+    ]);
+  });
+
+  it('adds the big-occasion hint (−30d) only for a round count with a year', () => {
+    const base = { id: 'b', category: 'occasion_birthday' as const, assigneeIds: ['dad'] };
+    const round = activity({ ...base, occasionYear: 1986 }); // turns 40
+    const notRound = activity({ ...base, occasionYear: 1985 }); // turns 41
+    const noYear = activity(base);
+    expect(occasionHints(round, MONTH_OUT).hints.map((h) => h.hintType)).toEqual([
+      'occasion-milestone',
+    ]);
+    expect(occasionHints(notRound, MONTH_OUT).hints).toHaveLength(0);
+    expect(occasionHints(noYear, MONTH_OUT).hints).toHaveLength(0);
+  });
+
+  it('never gives a remembrance or other occasion the big-occasion hint', () => {
+    for (const category of ['remembrance', 'other_occasion'] as const) {
+      const a = activity({ id: 'x', category, occasionYear: 1976, assigneeIds: ['dad'] });
+      expect(occasionHints(a).hints.map((h) => h.hintType)).toEqual(['occasion-heads-up']);
+    }
+  });
+
+  it('anniversary: anniversary-plan only, plus big-occasion when round', () => {
+    const a = activity({ id: 'an', category: 'anniversary', assigneeIds: ['dad'] });
+    expect(occasionHints(a).hints.map((h) => h.hintType)).toEqual(['anniversary-plan']);
+    const ruby = activity({ ...a, occasionYear: 1986 }); // 40th
+    expect(occasionHints(ruby).hints.map((h) => h.hintType)).toEqual([
+      'anniversary-plan',
+      'occasion-milestone',
+    ]);
+    const plain = activity({ ...a, occasionYear: 1990 }); // 36th
+    expect(occasionHints(plain).hints.map((h) => h.hintType)).toEqual(['anniversary-plan']);
+  });
+
+  it('never fires the Party gift hints for an occasion', () => {
+    for (const category of ['occasion_birthday', 'anniversary', 'other_occasion'] as const) {
+      const a = activity({ id: 'x', category, assigneeIds: ['dad'] });
+      const types = occasionHints(a, '2026-07-26').hints.map((h) => h.hintType);
+      expect(types).not.toContain('birthday-party-gift');
+      expect(types).not.toContain('celebration-gift');
+    }
+  });
+
+  it.each([
+    ['nobody', []],
+    ['only removed members', ['gone']],
+    ['only a pet', ['pet']],
+  ])('falls back to all adults when %s is remembering, and counts it', (_label, ids) => {
+    const a = activity({ id: 'o', category: 'occasion_birthday', assigneeIds: ids });
+    const result = occasionHints(a);
+    expect(result.hints[0]!.assigneeIds.sort()).toEqual(['dad', 'mum']);
+    expect(result.audienceFallback).toBe(1);
+  });
+
+  it('does not count a fallback for an occasion still outside its hint window', () => {
+    const a = activity({ id: 'o', category: 'occasion_birthday', assigneeIds: [] });
+    const result = occasionHints(a, '2026-08-20');
+    expect(result.hints).toEqual([]);
+    expect(result.audienceFallback).toBe(0);
+  });
+
+  it('does not count a fallback when someone is remembering', () => {
+    const a = activity({ id: 'o', category: 'occasion_birthday', assigneeIds: ['kid'] });
+    const result = occasionHints(a);
+    expect(result.hints[0]!.assigneeIds).toEqual(['kid']);
+    expect(result.audienceFallback).toBe(0);
+  });
+
+  it("skips an occasion birthday that duplicates a member's own birthday", () => {
+    const mia = member({
+      id: 'mia',
+      name: 'Mia',
+      ageGroup: 'child',
+      dateOfBirth: { month: 7, day: 31 },
+    });
+    const dup = activity({
+      id: 'dup',
+      title: "Mia's birthday",
+      category: 'occasion_birthday',
+      date: '2025-07-31',
+      assigneeIds: ['dad'],
+    });
+    const result = computeDesiredHints(
+      baseInput({ members: [dad, mum, mia], occurrences: occ(SEVEN_OUT, dup) })
+    );
+    expect(result.hints.filter((h) => h.hintType.startsWith('occasion'))).toEqual([]);
+    expect(result.reasons['duplicate-member-birthday']).toBe(1);
+  });
+
+  it('keeps an occasion birthday on the same day whose title names someone else', () => {
+    const mia = member({
+      id: 'mia',
+      name: 'Mia',
+      ageGroup: 'child',
+      dateOfBirth: { month: 7, day: 31 },
+    });
+    const other = activity({
+      id: 'o',
+      title: "Amelia's birthday", // "Mia" inside a word is not Mia
+      category: 'occasion_birthday',
+      date: '2025-07-31',
+      assigneeIds: ['dad'],
+    });
+    const result = computeDesiredHints(
+      baseInput({ members: [dad, mia], occurrences: occ(SEVEN_OUT, other) })
+    );
+    // Mia's own birthday-present hint fires too; the occasion is not swallowed by it.
+    expect(result.hints.map((h) => h.hintType).sort()).toEqual([
+      'birthday-present',
+      'occasion-heads-up',
+    ]);
+  });
+
+  it('narrows to the gifts card holder only from within the rememberers', () => {
+    const a = activity({ id: 'o', category: 'occasion_birthday', assigneeIds: ['dad', 'mum'] });
+    const inside = occasionHints(a, SEVEN_OUT, { cardHolders: { 'occasion-heads-up': 'mum' } });
+    expect(inside.hints[0]!.assigneeIds).toEqual(['mum']);
+    expect(inside.cardHolder).toEqual({ used: 1, ineligible: 0 });
+
+    const solo = activity({ ...a, assigneeIds: ['dad'] });
+    const outside = occasionHints(solo, SEVEN_OUT, { cardHolders: { 'occasion-heads-up': 'mum' } });
+    expect(outside.hints[0]!.assigneeIds).toEqual(['dad']);
+    expect(outside.cardHolder).toEqual({ used: 0, ineligible: 1 });
+  });
+
+  it('counts a malformed occasion as skipped without stopping the run', () => {
+    const bad = activity({ id: 'bad', category: 'occasion_birthday' });
+    Object.defineProperty(bad, 'assigneeIds', {
+      get() {
+        throw new Error('corrupt');
+      },
+    });
+    const good = activity({ id: 'good', category: 'occasion_birthday', assigneeIds: ['dad'] });
+    const result = computeDesiredHints(
+      baseInput({
+        members,
+        occurrences: {
+          [SEVEN_OUT]: [
+            { activity: bad, date: SEVEN_OUT },
+            { activity: good, date: SEVEN_OUT },
+          ],
+        },
+      })
+    );
+    expect(result.skipped).toBe(1);
+    expect(result.hints.map((h) => h.hintKey)).toEqual([
+      buildHintKey('occasion-heads-up', 'good', SEVEN_OUT),
+    ]);
+  });
+});
+
+describe('reconcileHints — a hint type this build does not know', () => {
+  it('is never pruned as stale (a newer client owns it), but still expires', () => {
+    const future = {
+      id: 'f',
+      title: 't',
+      completed: false,
+      createdBy: 'a',
+      createdAt: '2026-07-20',
+      updatedAt: '2026-07-20',
+      hintType: 'from-the-future',
+      hintKey: 'from-the-future:x:2026-07-30',
+      hintEventDate: '2026-07-30',
+    } as unknown as TodoItem;
+    expect(reconcileHints([], [future], TODAY).toRemove).toEqual([]);
+    const expired = { ...future, id: 'e', hintEventDate: '2026-07-01' } as TodoItem;
+    expect(reconcileHints([], [expired], TODAY).toRemove).toEqual([expired]);
+  });
+
+  it('still prunes one with no event date, which expiry could never remove', () => {
+    const undated = {
+      id: 'u',
+      title: 't',
+      completed: false,
+      createdBy: 'a',
+      createdAt: '2026-07-20',
+      updatedAt: '2026-07-20',
+      hintType: 'from-the-future',
+      hintKey: 'from-the-future:x',
+    } as unknown as TodoItem;
+    expect(reconcileHints([], [undated], TODAY).toRemove).toEqual([undated]);
   });
 });

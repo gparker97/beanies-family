@@ -13,6 +13,17 @@ describe('suggestedListTemplateFor', () => {
     for (const c of party) expect(suggestedListTemplateFor(c.id)?.key).toBe('party-prep');
   });
 
+  it.each(['occasion_birthday', 'anniversary', 'other_occasion'])(
+    'suggests party prep for the %s occasion',
+    (id) => {
+      expect(suggestedListTemplateFor(id)?.key).toBe('party-prep');
+    }
+  );
+
+  it('never suggests party prep for a remembrance', () => {
+    expect(suggestedListTemplateFor('remembrance')).toBeUndefined();
+  });
+
   it('suggests party prep for an office party (a Work-group category matched by id)', () => {
     expect(suggestedListTemplateFor('work_party')?.key).toBe('party-prep');
   });

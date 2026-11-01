@@ -233,7 +233,7 @@ function handleSlotClick(hour: number): void {
   emit('add-activity', props.dateStr, `${String(hour).padStart(2, '0')}:00`);
 }
 
-const { identityFor } = useActivityIdentity();
+const { identityFor, displayTitle } = useActivityIdentity();
 </script>
 
 <template>
@@ -294,7 +294,8 @@ const { identityFor } = useActivityIdentity();
       >
         <span class="min-w-0 flex-1 truncate">
           <span aria-hidden="true">{{ identityFor(occ.activity).emoji }}</span>
-          {{ occ.activity.title }}<PhotoIndicator :photo-ids="occ.activity.photoIds" /><span
+          {{ displayTitle(occ.activity, occ.date)
+          }}<PhotoIndicator :photo-ids="occ.activity.photoIds" /><span
             v-if="occ.activity.location"
             class="opacity-70"
           >
@@ -399,7 +400,9 @@ const { identityFor } = useActivityIdentity();
                 class="font-outfit dark:text-ink flex items-center truncate text-xs font-semibold text-gray-900"
               >
                 <span aria-hidden="true">{{ identityFor(ev.card.activity).emoji }}</span>
-                <span class="truncate">{{ ev.card.activity.title }}</span>
+                <span class="truncate">{{
+                  displayTitle(ev.card.activity, ev.card.eventDate)
+                }}</span>
                 <PhotoIndicator :photo-ids="ev.card.activity.photoIds" />
                 <ClashIndicator
                   :clash="clashFor(ev.card.activity.id, ev.card.eventDate)"

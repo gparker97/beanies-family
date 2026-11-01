@@ -13,17 +13,27 @@ const a = (title: string, category = 'other_activity' as ActivityCategory) => ({
 describe('isCelebrationActivity', () => {
   it('celebrates every Party-group category regardless of title', () => {
     // Group, not a hand-maintained id list — a future Party category is covered free.
-    const partyIds = [
-      'birthday',
-      'anniversary',
-      'wedding',
-      'graduation',
-      'baby_shower',
-    ] as ActivityCategory[];
+    const partyIds = ['birthday', 'wedding', 'graduation', 'baby_shower'] as ActivityCategory[];
     for (const id of partyIds) {
       expect(isCelebrationActivity(a('Tuesday', id)).celebrating).toBe(true);
       expect(isCelebrationActivity(a('Tuesday', id)).rule).toBe('category-group');
     }
+  });
+
+  it('celebrates the Occasions birthday, anniversary and other occasion', () => {
+    for (const id of ['occasion_birthday', 'anniversary', 'other_occasion'] as const) {
+      const v = isCelebrationActivity(a('Tuesday', id));
+      expect(v.celebrating).toBe(true);
+      expect(v.rule).toBe('category-group');
+    }
+  });
+
+  it('never celebrates a remembrance automatically, even with a celebration word or emoji', () => {
+    for (const title of ["Grandma's birthday memorial", 'Remembering Grandpa 🎂', 'Tuesday']) {
+      expect(isCelebrationActivity(a(title, 'remembrance')).celebrating).toBe(false);
+    }
+    // An explicit user choice still wins, as for every category.
+    expect(isCelebrationActivity(a('Tuesday', 'remembrance'), 'en', true).celebrating).toBe(true);
   });
 
   it('does NOT celebrate work_party, which sits in the Work group', () => {

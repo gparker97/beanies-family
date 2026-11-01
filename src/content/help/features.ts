@@ -512,7 +512,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       'Ahead of birthdays, parties, and trips, beanies can drop a gentle, clearly-marked suggestion into your family to-do list — buy a present, start packing, check passports — so the obvious prep never slips.',
     icon: '\u{1F4A1}',
     readTime: 3,
-    updatedDate: '2026-09-24',
+    updatedDate: '2026-11-01',
     sections: [
       {
         type: 'paragraph',
@@ -555,9 +555,11 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         type: 'list',
         content: '',
         items: [
-          "<strong>Birthdays</strong> — a couple of weeks before a family member's birthday, the grown-ups get a nudge to plan a present or party.",
-          '<strong>Parties &amp; celebrations</strong> — a couple of days before a birthday party, wedding, or other celebration on the calendar, the people going get a gift reminder.',
-          '<strong>Anniversaries</strong> — a couple of weeks ahead, a nudge to plan something.',
+          "<strong>Birthdays</strong>: a couple of weeks before a family member's birthday, the grown-ups get a nudge to plan a present or party.",
+          '<strong>Parties &amp; celebrations</strong>: a couple of days before a birthday party, wedding, or other celebration on the calendar, the people going get a gift reminder.',
+          '<strong>Anniversaries</strong>: a couple of weeks ahead, a nudge to plan something. Anniversaries now live under <strong>Occasions</strong> in the activity form and keep this two-week hint.',
+          '<strong>Occasion heads-up</strong>: a week before a birthday, a day to remember or another occasion for someone outside your family, a nudge goes to whoever is remembering it, or to all the grown-ups if nobody is.',
+          '<strong>Big occasions</strong>: a month before a round birthday (30, 40, 50 and so on) or a big anniversary (10, 25, 40, 50, 60, 70 or 75 years), you get an earlier nudge so there is time to plan. Like other surprise hints, it stays off the family wall.',
           '<strong>Trips</strong> — a week before you travel, a reminder to check passports, visas and travel insurance; a couple of days before, a nudge to start packing.',
         ],
       },
@@ -582,6 +584,13 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
           'The birthday person never sees their own present hint — so a surprise stays a surprise. It shows up only for the grown-ups planning it.',
         title: 'Surprises stay secret',
         icon: '\u{1F381}',
+      },
+      {
+        type: 'infoBox',
+        content:
+          'A hint\u2019s title is fixed on the day it appears. If you add a year to an occasion later (so it can say \u201cturns 60\u201d), the new wording shows from next year\u2019s hint.',
+        title: 'Adding a year later',
+        icon: '\u{1F4C5}',
       },
       {
         type: 'infoBox',
@@ -1616,7 +1625,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       'Schedule lessons, appointments, and recurring activities for your family with calendar views and smart recurrence.',
     icon: '\u{1F4C5}',
     readTime: 4,
-    updatedDate: '2026-08-29',
+    updatedDate: '2026-11-01',
     sections: [
       {
         type: 'heading',
@@ -1638,12 +1647,33 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'Click <strong>+ Add Activity</strong> to open the activity form. Give it a title, pick a category (lesson, sport, appointment, social, pickup, or other), and set a date. You can assign the activity to a specific family member and add a start/end time.',
+          'Click <strong>+ Add Activity</strong> to open the activity form. Give it a title, pick a category from the grouped list (appointments, lessons, sports, school, food, fun, occasions, parties, pets, work and more), and set a date. You can assign the activity to a specific family member and add a start/end time.',
       },
       {
         type: 'paragraph',
         content:
           'Activities can be <strong>one-off</strong> (a single date) or <strong>recurring</strong> (repeating on a schedule). Toggle between these modes at the top of the form.',
+      },
+      {
+        type: 'heading',
+        content: 'Occasions',
+        level: 2,
+        id: 'occasions',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Use <strong>Occasions</strong> for birthdays, anniversaries and days to remember for people outside your pod, like friends, aunts and uncles. Pick Birthday, Anniversary, Remembrance or Other Occasion and the form fills in the rest: the activity is all-day, repeats every year, and reminds you at 9 AM on the day.',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>Who\u2019s remembering?</strong> starts as you. Change it if someone else in the family keeps track of this one.',
+          '<strong>Year (optional).</strong> Add the year and the calendar can say \u201cturns 60\u201d, \u201c40th anniversary\u201d or \u201c10 years\u201d.',
+          '<strong>Your own family\u2019s birthdays</strong> come from member profiles, so there is nothing to add here for them.',
+          '<strong>Google Calendar</strong> shows the plain title without the age.',
+        ],
       },
       {
         type: 'heading',
@@ -2619,7 +2649,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       'A deck of household jobs your family keeps or skips, then hands out, so who owns what is never a debate. Split cards by child, re-deal when life changes, check in together and print the deck for the fridge.',
     icon: '\u{1F64B}',
     readTime: 9,
-    updatedDate: '2026-09-28',
+    updatedDate: '2026-11-01',
     sections: [
       { type: 'heading', content: 'What is Who Owns What?', level: 2, id: 'what' },
       {
@@ -2838,7 +2868,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         items: [
           '<strong>Meals:</strong> a new dinner in the Meal Planner starts with the holder of <em>Cooking Dinner</em> as the cook, and a new breakfast starts with the holder of <em>Breakfast</em>. The meal shows a small note such as <em>"Sofia holds Cooking Dinner in Who Owns What."</em> Eating out, leftovers and skipped meals never get a cook.',
           '<strong>Lists:</strong> a new list from the grocery template is owned by the holder of <em>Grocery Shopping</em>, and a vacation packing list by the holder of <em>Trip Packing</em>. The template shows who it will go to before you pick it.',
-          '<strong>Helpful hints:</strong> gift reminders go to the holder of <em>Gifts for Others</em>, anniversary plans to the holder of <em>Date Nights</em>, and trip reminders to the holders of <em>Trip Packing</em> and <em>Passports and Documents</em>. The hint says <em>Assigned from Who Owns What</em>. A birthday-present hint still never goes to the person whose birthday it is.',
+          '<strong>Helpful hints:</strong> gift reminders, occasion heads-ups and big-occasion reminders go to the holder of <em>Gifts for Others</em> (for an occasion, only when that person is one of the people remembering it), anniversary plans to the holder of <em>Date Nights</em>, and trip reminders to the holders of <em>Trip Packing</em> and <em>Passports and Documents</em>. The hint says <em>Assigned from Who Owns What</em>. A birthday-present hint still never goes to the person whose birthday it is.',
         ],
       },
       {

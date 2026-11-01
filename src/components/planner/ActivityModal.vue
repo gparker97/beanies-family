@@ -18,6 +18,7 @@ import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue';
 import RecurringPaymentPrompt from '@/components/ui/RecurringPaymentPrompt.vue';
 import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
+import InferredHint from '@/components/ui/InferredHint.vue';
 import PhotoAttachments from '@/components/media/PhotoAttachments.vue';
 import TripShortcutCard from '@/components/planner/TripShortcutCard.vue';
 import { formatCurrencyWithCode } from '@/composables/useCurrencyDisplay';
@@ -35,6 +36,8 @@ import { useFormModal } from '@/composables/useFormModal';
 import { useEagerEntityCreate } from '@/composables/useEagerEntityCreate';
 import { useFormValidation } from '@/composables/useFormValidation';
 import { usePhotoEntityBinding } from '@/composables/usePhotoEntityBinding';
+import { useAttentionPulse } from '@/composables/useAttentionPulse';
+import { useOccasionForm, type OccasionAutoField } from '@/composables/useOccasionForm';
 import { getActivityCategoryColor, getActivityFallbackEmoji } from '@/constants/activityCategories';
 import {
   addHourToTime,
@@ -200,6 +203,14 @@ const link = ref('');
 const isActive = ref(true);
 const color = ref('');
 const showMoreDetails = ref(false);
+/**
+ * The optional year of an occasion (#137): born in, married in, year of passing, since.
+ * An emptied field is `undefined` (see the input's binding), and only a valid year in
+ * occasion mode ever reaches the payload (`useOccasionForm.payloadYear`).
+ */
+const occasionYear = ref<number | undefined>(undefined);
+/** The member creating or editing this activity: `createdBy`, and the default rememberer. */
+const authorId = computed(() => (familyStore.currentMember ?? familyStore.owner)?.id);
 
 // --- Document-extraction prefill (#133) ---
 // Below this per-field confidence we visually flag the field for the user to double-check.
@@ -428,6 +439,10 @@ const { isEditing, isSubmitting } = useFormModal(
       isActive.value = activity.isActive;
       color.value = activity.color ?? getActivityCategoryColor(activity.category);
       showMoreDetails.value = hasDetailData(activity);
+      // The stored year, so the edit baseline carries it and an untouched edit emits nothing.
+      occasionYear.value = activity.occasionYear;
+      // A create session's occasion defaults, notes and date caption never leak into an edit.
+      occasion.reset();
       wasPrefilled.value = false; // editing an existing activity is never a prefill
       // Usually null, but the AI "update existing" flow opens an existing activity in edit mode
       // WITH a source document to attach — stage it symmetrically with onNew so it binds to this
@@ -470,8 +485,12 @@ const { isEditing, isSubmitting } = useFormModal(
       isActive.value = true;
       color.value = '';
       showMoreDetails.value = false;
+      occasionYear.value = undefined;
       // Apply an extraction prefill, if any, over the defaults just set above.
       applyPrefill();
+      // After the prefill, so the date the form opened on (a calendar click, an extracted
+      // date) is never mistaken for a birth year.
+      occasion.reset(date.value);
       // Stage the source document; maybeAttachSourcePhoto() attaches it once the gate clears.
       // Show it as a local preview immediately so the user sees it on the fresh AI draft.
       pendingSourcePhoto.value = props.sourcePhoto ?? null;
@@ -611,6 +630,69 @@ watch(date, (newDate, oldDate) => {
   seriesAnchor.value = addDaysYmd(seriesAnchor.value, deltaDays);
 });
 
+// --- Occasions (#137) ---
+// The field groups an occasion default can fill, for their one-shot pulse.
+type FieldGroupRef = { $el?: HTMLElement } | null;
+const scheduleGroupRef = ref<FieldGroupRef>(null);
+const allDayGroupRef = ref<FieldGroupRef>(null);
+const peopleGroupRef = ref<FieldGroupRef>(null);
+const reminderGroupRef = ref<FieldGroupRef>(null);
+const locationGroupRef = ref<FieldGroupRef>(null);
+const OCCASION_FIELD_REFS: Record<OccasionAutoField, typeof scheduleGroupRef> = {
+  schedule: scheduleGroupRef,
+  allDay: allDayGroupRef,
+  people: peopleGroupRef,
+  reminder: reminderGroupRef,
+};
+
+const occasion = useOccasionForm({
+  category,
+  title,
+  date,
+  mode,
+  rule,
+  isAllDay,
+  reminderMinutes,
+  assigneeIds,
+  occasionYear,
+  seriesAnchorReady,
+  isCreate: () => !props.activity,
+  authorId: () => authorId.value,
+  fieldEl: (field) => OCCASION_FIELD_REFS[field].value?.$el,
+});
+const {
+  occasionMode,
+  onCategoryPicked,
+  onTitleCommit,
+  autoSetHint,
+  yearIssue,
+  yearLabel,
+  yearErrorMessage,
+  yearErrorNow,
+  yearPreview,
+  bigOneNote,
+  dateMovedCaption,
+} = occasion;
+
+/** Logistics already on the form (an edit, an AI prefill): never hidden behind the toggle. */
+const hasLogisticsData = computed(
+  () => !!(location.value.trim() || dropoffMemberId.value || pickupMemberId.value || hasCost.value)
+);
+/** Location, drop-off/pick-up and cost wait behind "Add more details" for an empty occasion. */
+const showLogistics = computed(
+  () => !occasionMode.value || showMoreDetails.value || hasLogisticsData.value
+);
+
+const { reveal } = useAttentionPulse();
+async function toggleMoreDetails(): Promise<void> {
+  showMoreDetails.value = !showMoreDetails.value;
+  // In occasion mode opening the section also brings the logistics back, in their usual place
+  // above it, so take the eye there.
+  if (!showMoreDetails.value || !occasionMode.value || hasLogisticsData.value) return;
+  await nextTick();
+  reveal(locationGroupRef.value?.$el);
+}
+
 /**
  * "All sessions" pricing needs a finite session count, which exists only when
  * the series actually ends — by date OR after a set number of times (#70; the
@@ -699,7 +781,11 @@ const v = useFormValidation(
   () => ({
     title: () => title.value.trim().length > 0,
     date: () => !!date.value,
-    assignees: () => assigneeIds.value.length > 0,
+    // Optional for an occasion: nobody remembering means all adults get the heads-up.
+    ...(occasionMode.value ? {} : { assignees: () => assigneeIds.value.length > 0 }),
+    ...(occasionMode.value
+      ? { occasionYear: () => !occasionYear.value || yearIssue.value === 'ok' }
+      : {}),
     ...(isRecurring.value && isAllDay.value
       ? {
           lasts: () =>
@@ -709,6 +795,7 @@ const v = useFormValidation(
               lastsDays.value <= maxLastsDays.value),
         }
       : {}),
+    // A cost counts as logistics data, so these fields are always rendered when they apply.
     ...(isRecurring.value && hasCost.value
       ? {
           feeSchedule: () => feeSchedule.value !== 'none',
@@ -773,7 +860,6 @@ function payloadEndDate(): string | undefined {
  * composable so eager-uploaded photos persist on first save.
  */
 function buildPayload(): CreateFamilyActivityInput {
-  const currentMember = familyStore.currentMember ?? familyStore.owner;
   const assigneePayload = toAssigneePayload(assigneeIds.value);
 
   return {
@@ -793,6 +879,10 @@ function buildPayload(): CreateFamilyActivityInput {
       ? activityShadowFromRule(rule.value)
       : { recurrence: 'none' as const, daysOfWeek: undefined, recurrenceEndDate: undefined }),
     category: category.value,
+    // ALWAYS present, never a conditional spread: `diffPayload` deletes a field only when its
+    // key is present as `undefined`, so leaving it out would keep an old year after it was
+    // cleared or the category left Occasions. Valid years only (the eager photo path too).
+    occasionYear: occasion.payloadYear.value,
     ...assigneePayload,
     dropoffMemberId: dropoffMemberId.value || undefined,
     pickupMemberId: pickupMemberId.value || undefined,
@@ -814,7 +904,7 @@ function buildPayload(): CreateFamilyActivityInput {
     ...(binding.photoIds.value.length ? { photoIds: [...binding.photoIds.value] } : {}),
     isActive: isActive.value,
     color: color.value || undefined,
-    createdBy: currentMember?.id ?? '',
+    createdBy: authorId.value ?? '',
   };
 }
 
@@ -1110,6 +1200,7 @@ function handleSave() {
             type="text"
             class="font-outfit dark:text-ink w-full border-none bg-transparent text-xl font-bold text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] placeholder:opacity-30"
             :placeholder="t('modal.whatsTheActivity')"
+            @change="onTitleCommit"
           />
         </div>
         <!-- Heritage Orange (never Alert Red) review hint for a low-confidence extracted value -->
@@ -1124,13 +1215,14 @@ function handleSave() {
            (never / on a date / after N times). Anchored on the SERIES start
            date, never the opened occurrence. -->
       <template v-if="isRecurring">
-        <FormFieldGroup :label="t('modal.schedule')">
+        <FormFieldGroup ref="scheduleGroupRef" :label="t('modal.schedule')">
           <RecurrencePicker v-model="rule" :start-date="seriesAnchor" default-cadence="weekly" />
+          <InferredHint :text="autoSetHint('schedule')" />
         </FormFieldGroup>
       </template>
 
       <!-- 4. All-day toggle -->
-      <FormFieldGroup :label="t('planner.allDay')">
+      <FormFieldGroup ref="allDayGroupRef" :label="t('planner.allDay')">
         <label class="inline-flex cursor-pointer items-center gap-2.5">
           <input
             v-model="isAllDay"
@@ -1141,6 +1233,7 @@ function handleSave() {
             {{ t('planner.allDayHint') }}
           </span>
         </label>
+        <InferredHint :text="autoSetHint('allDay')" />
       </FormFieldGroup>
 
       <!-- 5. Date + Times -->
@@ -1151,6 +1244,13 @@ function handleSave() {
              a half-empty two-column grid. -->
         <FormFieldGroup :label="t('planner.field.date')" v-bind="v.bind('date')">
           <BeanieDatePicker v-model="date" required />
+          <!-- A past-year date picked for a yearly occasion moved into the year field (#137). -->
+          <p
+            v-if="dateMovedCaption"
+            class="font-outfit dark:text-ink-faint mt-1.5 text-xs text-[var(--color-text-muted)]"
+          >
+            {{ dateMovedCaption }}
+          </p>
         </FormFieldGroup>
         <!-- A repeating all-day activity can last several days (a weekly
              Fri-Sun weekend). Optional: it defaults to one day. -->
@@ -1213,139 +1313,203 @@ function handleSave() {
         </div>
       </template>
 
-      <!-- 6. Who? -->
-      <FormFieldGroup :label="t('modal.whosGoing')" v-bind="v.bind('assignees')">
-        <FamilyChipPicker v-model="assigneeIds" mode="multi" include-pets />
-      </FormFieldGroup>
-
-      <!-- 7. Category picker -->
-      <FormFieldGroup :label="t('modal.selectCategory')">
-        <ActivityCategoryPicker v-model="category" />
-      </FormFieldGroup>
-
-      <!-- 8. Location -->
-      <FormFieldGroup :label="t('planner.field.location')" optional>
-        <BaseInput v-model="location" :placeholder="t('planner.field.location')" />
-      </FormFieldGroup>
-
-      <!-- 8. Drop Off Duty / Pick Up Duty -->
-      <div class="grid grid-cols-2 gap-4">
-        <FormFieldGroup :label="t('planner.field.dropoff')" optional>
-          <AssigneePickerButton v-model="dropoffMemberId" mode="single" size="sm" align="left" />
-        </FormFieldGroup>
-        <FormFieldGroup :label="t('planner.field.pickup')" optional>
-          <AssigneePickerButton v-model="pickupMemberId" mode="single" size="sm" align="right" />
-        </FormFieldGroup>
-      </div>
-
-      <!-- 9. Cost + Fee Schedule -->
+      <!-- Occasions (#137): the optional year, with its live milestone preview. -->
       <FormFieldGroup
-        :label="
-          !isRecurring
-            ? t('planner.fee.totalCost')
-            : isAllSchedule
-              ? t('planner.fee.totalCost')
-              : t('modal.costPerSession')
-        "
+        v-if="occasionMode"
+        :label="yearLabel"
+        v-bind="v.bind('occasionYear')"
+        :required="false"
+        :error="v.bind('occasionYear').error || yearErrorNow"
+        :error-message="yearErrorMessage"
+        optional
       >
-        <CurrencyAmountInput
-          v-model:amount="feeAmount"
-          v-model:currency="feeCurrency"
-          font-size="1.1rem"
-        />
-      </FormFieldGroup>
-      <!-- Fee schedule chips (recurring only — one-off activities just have a flat cost) -->
-      <template v-if="isRecurring">
-        <FormFieldGroup :label="t('planner.field.feeSchedule')" v-bind="v.bind('feeSchedule')">
-          <template #label-extra>
-            <InfoHintBadge
-              :text="t('planner.fee.scheduleHintIntro')"
-              :items="[
-                t('planner.fee.scheduleHintPerSession'),
-                t('planner.fee.scheduleHintAll'),
-                t('planner.fee.scheduleHintWeekly'),
-                t('planner.fee.scheduleHintMonthly'),
-                t('planner.fee.scheduleHintYearly'),
-                t('planner.fee.scheduleHintCustom'),
-              ]"
-            />
-          </template>
-          <FrequencyChips v-model="feeSchedule" :options="feeScheduleChipOptions" />
-        </FormFieldGroup>
-
-        <!-- Custom period inputs -->
-        <FormFieldGroup
-          v-if="feeSchedule === 'custom'"
-          :label="t('planner.fee.customPeriodLabel')"
-          v-bind="v.bind('customPeriod')"
-        >
-          <div class="flex items-center gap-2">
-            <span class="font-outfit text-xs font-semibold text-[var(--color-text)]">{{
-              t('planner.fee.customPeriod')
-            }}</span>
-            <BaseInput v-model.number="feeCustomPeriod" type="number" min="1" class="w-20" />
-            <TogglePillGroup
-              v-model="feeCustomPeriodUnit"
-              :options="[
-                { value: 'weeks', label: t('planner.fee.weeks') },
-                { value: 'months', label: t('planner.fee.months') },
-              ]"
+        <div class="flex flex-wrap items-center gap-2">
+          <!-- Not v-model: BaseInput reports an emptied number field as 0, which would then
+               render as "0". Zero is stored as no year, so clearing it stays clear. -->
+          <!-- BaseInput is full-width; the wrapper sizes it to a four-digit year. -->
+          <div class="w-28 shrink-0">
+            <BaseInput
+              :model-value="occasionYear || undefined"
+              type="number"
+              inputmode="numeric"
+              min="1900"
+              @update:model-value="occasionYear = Number($event) || undefined"
             />
           </div>
+          <span
+            v-if="yearPreview"
+            class="font-outfit text-primary-500 dark:text-accent-lift text-sm font-semibold"
+          >
+            {{ yearPreview }}
+          </span>
+        </div>
+        <p
+          v-if="bigOneNote"
+          class="font-outfit dark:bg-surface-overlay dark:text-ink-soft mt-2 rounded-xl bg-[var(--tint-silk-20)] px-3 py-1.5 text-xs text-[var(--color-text)]"
+        >
+          {{ bigOneNote }}
+        </p>
+        <p
+          v-else-if="!occasionYear"
+          class="font-outfit dark:text-ink-faint mt-1.5 text-xs text-[var(--color-text-muted)]"
+        >
+          {{ t('planner.occasion.yearHelp') }}
+        </p>
+      </FormFieldGroup>
+
+      <!-- 6. Who? In occasion mode: who's remembering (optional; empty means all adults). -->
+      <FormFieldGroup
+        ref="peopleGroupRef"
+        :label="occasionMode ? t('planner.occasion.whoRemembering') : t('modal.whosGoing')"
+        v-bind="v.bind('assignees')"
+      >
+        <FamilyChipPicker v-model="assigneeIds" mode="multi" include-pets />
+        <InferredHint :text="autoSetHint('people')" />
+        <p
+          v-if="occasionMode"
+          class="font-outfit dark:text-ink-faint mt-1.5 text-xs text-[var(--color-text-muted)]"
+        >
+          {{
+            assigneeIds.length
+              ? t('planner.occasion.whoRememberingHelp')
+              : t('planner.occasion.whoRememberingEmpty')
+          }}
+        </p>
+      </FormFieldGroup>
+
+      <!-- 7. Category picker. Picking an occasion applies its defaults (a user-intent path,
+           never the category watch, which also fires when an edit populates the form). -->
+      <FormFieldGroup :label="t('modal.selectCategory')">
+        <ActivityCategoryPicker :model-value="category" @update:model-value="onCategoryPicked" />
+      </FormFieldGroup>
+
+      <!-- 8-9. Logistics. An empty occasion keeps them behind "Add more details" (#137); a
+           record or prefill that already carries any of them always shows them. -->
+      <template v-if="showLogistics">
+        <!-- 8. Location -->
+        <FormFieldGroup ref="locationGroupRef" :label="t('planner.field.location')" optional>
+          <BaseInput v-model="location" :placeholder="t('planner.field.location')" />
         </FormFieldGroup>
 
-        <!-- Per-session breakdown for 'all' schedule -->
-        <div v-if="isAllSchedule && hasCost && totalSessions > 0" class="flex items-center gap-2">
-          <span
-            class="font-outfit text-xs font-semibold tracking-[0.1em] text-[var(--color-text)] uppercase opacity-35"
-          >
-            {{ t('planner.fee.perSessionBreakdown') }}
-          </span>
-          <span class="font-outfit text-sm font-bold text-[var(--color-text)]">
-            {{ formatCurrencyWithCode(perSessionCost, (feeCurrency || 'USD') as any) }}
-            <span class="font-normal opacity-50">
-              {{ t('planner.fee.sessionsCount').replace('{count}', String(totalSessions)) }}
-            </span>
-          </span>
+        <!-- 8. Drop Off Duty / Pick Up Duty -->
+        <div class="grid grid-cols-2 gap-4">
+          <FormFieldGroup :label="t('planner.field.dropoff')" optional>
+            <AssigneePickerButton v-model="dropoffMemberId" mode="single" size="sm" align="left" />
+          </FormFieldGroup>
+          <FormFieldGroup :label="t('planner.field.pickup')" optional>
+            <AssigneePickerButton v-model="pickupMemberId" mode="single" size="sm" align="right" />
+          </FormFieldGroup>
         </div>
 
-        <!-- Calculated monthly display (non-all schedules) -->
-        <div
-          v-if="
-            !isAllSchedule &&
-            hasCost &&
-            feeSchedule !== 'none' &&
-            feeSchedule !== 'monthly' &&
-            calculatedMonthly > 0
+        <!-- 9. Cost + Fee Schedule -->
+        <FormFieldGroup
+          :label="
+            !isRecurring
+              ? t('planner.fee.totalCost')
+              : isAllSchedule
+                ? t('planner.fee.totalCost')
+                : t('modal.costPerSession')
           "
-          class="flex items-center gap-2"
         >
-          <span
-            class="font-outfit text-xs font-semibold tracking-[0.1em] text-[var(--color-text)] uppercase opacity-35"
-          >
-            {{ t('planner.fee.calculatedMonthly') }}
-          </span>
-          <span class="font-outfit text-sm font-bold text-[var(--color-text)]">
-            {{ formatCurrencyWithCode(calculatedMonthly, (feeCurrency || 'USD') as any)
-            }}{{ t('planner.unit.perMonthAbbrev') }}
-          </span>
-          <InfoHintBadge :text="t('planner.fee.monthlyCalcHint')" />
-        </div>
-      </template>
+          <CurrencyAmountInput
+            v-model:amount="feeAmount"
+            v-model:currency="feeCurrency"
+            font-size="1.1rem"
+          />
+        </FormFieldGroup>
+        <!-- Fee schedule chips (recurring only — one-off activities just have a flat cost) -->
+        <template v-if="isRecurring">
+          <FormFieldGroup :label="t('planner.field.feeSchedule')" v-bind="v.bind('feeSchedule')">
+            <template #label-extra>
+              <InfoHintBadge
+                :text="t('planner.fee.scheduleHintIntro')"
+                :items="[
+                  t('planner.fee.scheduleHintPerSession'),
+                  t('planner.fee.scheduleHintAll'),
+                  t('planner.fee.scheduleHintWeekly'),
+                  t('planner.fee.scheduleHintMonthly'),
+                  t('planner.fee.scheduleHintYearly'),
+                  t('planner.fee.scheduleHintCustom'),
+                ]"
+              />
+            </template>
+            <FrequencyChips v-model="feeSchedule" :options="feeScheduleChipOptions" />
+          </FormFieldGroup>
 
-      <!-- Linked payment prompt -->
-      <RecurringPaymentPrompt
-        v-if="hasCost && (isRecurring ? feeSchedule !== 'none' : true)"
-        v-model="createRecurringPayment"
-        :pay-from-account-id="feePayFromAccountId"
-        :payment-amount="
-          !isRecurring ? (feeAmount ?? 0) : isAllSchedule ? (feeAmount ?? 0) : calculatedMonthly
-        "
-        :currency="feeCurrency || 'USD'"
-        :start-date="date"
-        :frequency="!isRecurring || isAllSchedule ? 'one-time' : 'monthly'"
-        @update:pay-from-account-id="feePayFromAccountId = $event"
-      />
+          <!-- Custom period inputs -->
+          <FormFieldGroup
+            v-if="feeSchedule === 'custom'"
+            :label="t('planner.fee.customPeriodLabel')"
+            v-bind="v.bind('customPeriod')"
+          >
+            <div class="flex items-center gap-2">
+              <span class="font-outfit text-xs font-semibold text-[var(--color-text)]">{{
+                t('planner.fee.customPeriod')
+              }}</span>
+              <BaseInput v-model.number="feeCustomPeriod" type="number" min="1" class="w-20" />
+              <TogglePillGroup
+                v-model="feeCustomPeriodUnit"
+                :options="[
+                  { value: 'weeks', label: t('planner.fee.weeks') },
+                  { value: 'months', label: t('planner.fee.months') },
+                ]"
+              />
+            </div>
+          </FormFieldGroup>
+
+          <!-- Per-session breakdown for 'all' schedule -->
+          <div v-if="isAllSchedule && hasCost && totalSessions > 0" class="flex items-center gap-2">
+            <span
+              class="font-outfit text-xs font-semibold tracking-[0.1em] text-[var(--color-text)] uppercase opacity-35"
+            >
+              {{ t('planner.fee.perSessionBreakdown') }}
+            </span>
+            <span class="font-outfit text-sm font-bold text-[var(--color-text)]">
+              {{ formatCurrencyWithCode(perSessionCost, (feeCurrency || 'USD') as any) }}
+              <span class="font-normal opacity-50">
+                {{ t('planner.fee.sessionsCount').replace('{count}', String(totalSessions)) }}
+              </span>
+            </span>
+          </div>
+
+          <!-- Calculated monthly display (non-all schedules) -->
+          <div
+            v-if="
+              !isAllSchedule &&
+              hasCost &&
+              feeSchedule !== 'none' &&
+              feeSchedule !== 'monthly' &&
+              calculatedMonthly > 0
+            "
+            class="flex items-center gap-2"
+          >
+            <span
+              class="font-outfit text-xs font-semibold tracking-[0.1em] text-[var(--color-text)] uppercase opacity-35"
+            >
+              {{ t('planner.fee.calculatedMonthly') }}
+            </span>
+            <span class="font-outfit text-sm font-bold text-[var(--color-text)]">
+              {{ formatCurrencyWithCode(calculatedMonthly, (feeCurrency || 'USD') as any)
+              }}{{ t('planner.unit.perMonthAbbrev') }}
+            </span>
+            <InfoHintBadge :text="t('planner.fee.monthlyCalcHint')" />
+          </div>
+        </template>
+
+        <!-- Linked payment prompt -->
+        <RecurringPaymentPrompt
+          v-if="hasCost && (isRecurring ? feeSchedule !== 'none' : true)"
+          v-model="createRecurringPayment"
+          :pay-from-account-id="feePayFromAccountId"
+          :payment-amount="
+            !isRecurring ? (feeAmount ?? 0) : isAllSchedule ? (feeAmount ?? 0) : calculatedMonthly
+          "
+          :currency="feeCurrency || 'USD'"
+          :start-date="date"
+          :frequency="!isRecurring || isAllSchedule ? 'one-time' : 'monthly'"
+          @update:pay-from-account-id="feePayFromAccountId = $event"
+        />
+      </template>
 
       <!-- Photos — birthday invites, items-to-bring screenshots, location maps,
            anything visual the user wants pinned to this activity. Eager-creates
@@ -1400,12 +1564,19 @@ function handleSave() {
            now the control that decides whether the user's phone actually buzzes
            before this activity, so burying it behind a disclosure would hide
            the feature from most people. Sits directly above "more details". -->
-      <FormFieldGroup :label="t('planner.field.reminder')">
+      <FormFieldGroup ref="reminderGroupRef" :label="t('planner.field.reminder')">
         <FrequencyChips
           :model-value="String(reminderMinutes)"
           :options="reminderChipOptions"
           @update:model-value="reminderMinutes = toActivityLeadOption(Number($event))"
         />
+        <InferredHint :text="autoSetHint('reminder')" />
+        <p
+          v-if="occasionMode && isAllDay"
+          class="font-outfit dark:text-ink-faint mt-1.5 text-xs text-[var(--color-text-muted)]"
+        >
+          {{ t('planner.occasion.reminderCaption') }}
+        </p>
       </FormFieldGroup>
 
       <!-- 11. "Add more details" collapsible -->
@@ -1413,7 +1584,7 @@ function handleSave() {
         <button
           type="button"
           class="font-outfit text-primary-500 text-sm font-semibold transition-colors hover:underline"
-          @click="showMoreDetails = !showMoreDetails"
+          @click="toggleMoreDetails"
         >
           {{ t('planner.field.moreDetails') }}
           <span

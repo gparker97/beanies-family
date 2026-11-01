@@ -17,6 +17,8 @@ import type { ReleaseNote } from '@/content/release-notes';
 import type { Announcement } from '@/content/announcements';
 import type { BeanTip } from '@/content/tips';
 import type { AppNotification } from '@/types/notifications';
+import type { TranslateFn } from '@/utils/format';
+import { activityDisplayTitle } from '@/utils/occasions';
 import { normalizeAssignees } from '@/utils/assignees';
 import { classifyAudience, classifyOwnerAudience, ownerItemSurfaces } from '@/utils/audience';
 import { isFiled, isRecurring, listProgress } from '@/utils/listLifecycle';
@@ -111,6 +113,9 @@ export interface DeriveInput {
    * occurrences survive and the same month isn't re-expanded per day).
    */
   occurrencesByDate: Record<string, NotificationOccurrence[]>;
+  /** The app's translator (`notificationsStore` supplies `useTranslationStore().t`), for
+   *  the occasion milestone in an activity reminder's title. Injected to stay pure. */
+  t: TranslateFn;
 }
 
 // ── Stable id builders (one per logical event; escalation reuses the id) ──────
@@ -374,7 +379,7 @@ export function deriveNotifications(input: DeriveInput, now: Date): AppNotificat
         out.push({
           id,
           kind: 'activity-reminder',
-          title: ctx.title,
+          title: activityDisplayTitle(a, date, input.t),
           subtitle: ctx.who.length ? ctx.who.join(' · ') : undefined,
           occurredAt: trigger.toISOString(),
           eventDate: date,

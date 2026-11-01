@@ -526,6 +526,7 @@
   .animate-beanie-shimmer,
   .attention-pulse,
   .attention-pulse-twice,
+  .attention-halo,
   .attention-ring,
   .bell-ring,
   .card-bounce,
@@ -740,6 +741,62 @@
 
 .attention-pulse {
   animation: attention-pulse 1.5s ease-out;
+}
+
+/* Halo pulse for a form field group. `attention-pulse` paints its ring INSIDE the element's edge,
+   and a FormFieldGroup's controls run edge to edge, so the ring lands on the input borders. This
+   one draws the ring 6px OUTSIDE the group (outline + offset, which follows the rounded corners)
+   and tints the gap to match the inside, so the field reads as lifted rather than overdrawn.
+   Needs ~8px of free space round the target: the drawer body's px-6 and the groups' space-y-5
+   give it that. Accents get lighter on dark (CIG slide 9), so the dark ring is accent-lift. */
+@keyframes attention-halo {
+  0% {
+    background-color: rgb(241 93 34 / 6%);
+    box-shadow: 0 0 0 6px rgb(241 93 34 / 6%);
+    outline-color: rgb(241 93 34 / 55%);
+  }
+
+  60% {
+    background-color: rgb(241 93 34 / 3%);
+    box-shadow: 0 0 0 6px rgb(241 93 34 / 3%);
+    outline-color: rgb(241 93 34 / 20%);
+  }
+
+  100% {
+    background-color: transparent;
+    box-shadow: 0 0 0 6px rgb(241 93 34 / 0%);
+    outline-color: rgb(241 93 34 / 0%);
+  }
+}
+
+@keyframes attention-halo-dark {
+  0% {
+    background-color: rgb(255 139 94 / 8%);
+    box-shadow: 0 0 0 6px rgb(255 139 94 / 8%);
+    outline-color: rgb(255 139 94 / 70%);
+  }
+
+  60% {
+    background-color: rgb(255 139 94 / 4%);
+    box-shadow: 0 0 0 6px rgb(255 139 94 / 4%);
+    outline-color: rgb(255 139 94 / 25%);
+  }
+
+  100% {
+    background-color: transparent;
+    box-shadow: 0 0 0 6px rgb(255 139 94 / 0%);
+    outline-color: rgb(255 139 94 / 0%);
+  }
+}
+
+.attention-halo {
+  animation: attention-halo 1.5s ease-out;
+  outline: 2px solid transparent;
+  outline-offset: 6px;
+}
+
+.dark .attention-halo {
+  animation-name: attention-halo-dark;
 }
 
 /* Two quick beats for a control the person has not acted on yet (e.g. the empty

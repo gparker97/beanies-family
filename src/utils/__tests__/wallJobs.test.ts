@@ -303,6 +303,19 @@ describe('what a shared screen must never show', () => {
     expect(build([present, anniversary, partyGift], []).todos.map((j) => j.todoId)).toEqual(['t3']);
   });
 
+  it('keeps the big-occasion hint off the wall, but not the occasion heads-up', () => {
+    const big = todo({
+      title: "Uncle Bob's birthday (turns 60) is on Sat, 7 Nov. A big one: plan something?",
+      hintType: 'occasion-milestone',
+    });
+    const headsUp = todo({
+      id: 't2',
+      title: "Uncle Bob's birthday (turns 60) is on Sat, 7 Nov. Card, gift or a call?",
+      hintType: 'occasion-heads-up',
+    });
+    expect(build([big, headsUp], []).todos.map((j) => j.todoId)).toEqual(['t2']);
+  });
+
   it('keeps a health list off the wall entirely', () => {
     const meds = list({
       id: 'lh',

@@ -39,7 +39,7 @@ const emit = defineEmits<{
 }>();
 
 const { getMemberName } = useMemberInfo();
-const { identityFor } = useActivityIdentity();
+const { identityFor, displayTitle } = useActivityIdentity();
 const { categoryLabel: resolveCategoryLabel } = useActivityCategoryLabel();
 
 /** Whose, which faces, which glyph, celebration, wash — one call, one rule. */
@@ -51,7 +51,7 @@ const time = computed(() => {
   return t ? formatTime12(t) : '';
 });
 
-const title = computed(() => props.occurrence.activity.title);
+const title = computed(() => displayTitle(props.occurrence.activity, props.occurrence.date));
 
 // External-calendar clash (#34) — resolved through the single `useClash` seam.
 // The clash is signalled solely by the OverlapMark glyph (see ClashIndicator in

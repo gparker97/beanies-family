@@ -337,8 +337,14 @@ describe('ZH_STRINGS', () => {
     // and the value (a name, a count, a date) silently disappears. An added one
     // renders as a raw `{token}`.
     const tokens = (v: string) => [...new Set(v.match(PLACEHOLDER_RE) ?? [])].sort().join(' ');
+    // Keys whose caller fills two forms of ONE value and each language picks the form it
+    // needs, so nothing is lost: the occasion anniversary passes `{n}` (40) and `{ordinal}`
+    // (40th); English reads "40th anniversary", Chinese "40周年". Key → the zh token set.
+    const ALTERNATIVE_TOKENS: Record<string, string> = {
+      'planner.occasion.milestone.anniversary': '{n}',
+    };
     const offenders = keys
-      .filter((k) => tokens(zh[k]!) !== tokens(en[k]!))
+      .filter((k) => tokens(zh[k]!) !== tokens(en[k]!) && tokens(zh[k]!) !== ALTERNATIVE_TOKENS[k])
       .map((k) => `${k}: en [${tokens(en[k]!)}] zh [${tokens(zh[k]!)}] -> ${zh[k]}`);
     expect(offenders, report('placeholder mismatches', offenders)).toEqual([]);
   });

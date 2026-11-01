@@ -19,6 +19,7 @@ vi.mock('@/composables/useTranslation', () => ({
 }));
 vi.mock('@/composables/useActivityIdentity', () => ({
   useActivityIdentity: () => ({
+    displayTitle: (a: { title: string }) => a.title,
     identityFor: () => ({
       color: '#F15D22',
       emoji: '📌',

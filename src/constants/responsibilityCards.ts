@@ -660,6 +660,8 @@ export const CARD_DEFAULTS = {
     'anniversary-plan': 'date-nights',
     'trip-packing': 'trip-packing',
     'trip-documents': 'passports-and-documents',
+    'occasion-heads-up': 'gifts-for-others',
+    'occasion-milestone': 'gifts-for-others',
   },
 } as const satisfies {
   mealSlot: Partial<Record<MealSlot, string>>;

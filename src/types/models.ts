@@ -818,7 +818,9 @@ export type HelpfulHintType =
   | 'celebration-gift' // other Party-group −2d, attendees
   | 'anniversary-plan' // 'anniversary' −14d
   | 'trip-packing' // trip −2d, travellers
-  | 'trip-documents'; // trip −7d, travellers
+  | 'trip-documents' // trip −7d, travellers
+  | 'occasion-heads-up' // Occasions (not anniversary) −7d, rememberers
+  | 'occasion-milestone'; // round birthday/anniversary with a year −30d, rememberers
 
 export type CreateTodoInput = Omit<TodoItem, 'id' | 'createdAt' | 'updatedAt'>;
 export type UpdateTodoInput = Partial<Omit<TodoItem, 'id' | 'createdAt' | 'updatedAt'>>;
@@ -1191,8 +1193,12 @@ export type ActivityCategory =
   | 'bar_mitzvah'
   | 'graduation'
   | 'baby_shower'
-  | 'anniversary'
   | 'other_celebration'
+  // Occasions: yearly days to remember (rules live in src/utils/occasions.ts)
+  | 'anniversary'
+  | 'occasion_birthday'
+  | 'remembrance'
+  | 'other_occasion'
   // Appointments
   | 'doctor'
   | 'dentist'
@@ -1295,6 +1301,17 @@ export interface FamilyActivity {
   // Category
   category: ActivityCategory;
   color?: string; // Per-activity highlight color override (falls back to category color)
+  /**
+   * The year an occasion started (born in, married in, year of passing, since), used to
+   * label an occurrence "turns 60" / "40th anniversary" / "10 years". Separate from the
+   * series anchor `date`, which stays near today so a yearly series never expands decades
+   * of past occurrences.
+   *
+   * Meaningful ONLY for an Occasions-group category (`isOccasionCategory` in
+   * `src/utils/occasions.ts`). A stale value left on another category is inert: every
+   * reader gates on the category, and the drawer removes it on save.
+   */
+  occasionYear?: number;
 
   // People
   /** @deprecated Use assigneeIds instead */

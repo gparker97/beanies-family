@@ -837,7 +837,7 @@ describe('deck drift guards', () => {
       { kind: 'listTemplate', key: 'vacation-packing' },
       { kind: 'hint', hintType: 'trip-packing' },
     ]);
-    expect(cardUsesFor('gifts-for-others')).toHaveLength(3);
+    expect(cardUsesFor('gifts-for-others')).toHaveLength(5);
     expect(cardUsesFor('dishes')).toEqual([]);
     // A card target names its card directly; it is never a "beanies uses this card for" line.
     expect(cardUsesFor('school-forms')).toEqual([]);

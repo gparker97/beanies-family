@@ -43,7 +43,7 @@ function formatDisplayDate(dateStr: string): string {
   return formatNookDate(dateStr);
 }
 
-const { identityFor } = useActivityIdentity();
+const { identityFor, displayTitle } = useActivityIdentity();
 
 /** One classification per card, not one per binding. */
 const identity = computed(() => identityFor(props.activity));
@@ -87,7 +87,7 @@ const identity = computed(() => identityFor(props.activity));
         <h4
           class="font-outfit text-secondary-500 dark:text-ink flex min-w-0 items-center truncate text-sm font-semibold"
         >
-          <span class="truncate">{{ activity.title }}</span>
+          <span class="truncate">{{ displayTitle(activity, date) }}</span>
           <PhotoIndicator :photo-ids="activity.photoIds" />
           <ClashIndicator :clash="clash" class="ml-1.5" />
         </h4>

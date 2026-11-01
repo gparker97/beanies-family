@@ -7,7 +7,16 @@ vi.mock('@/composables/useActivityChipClass', () => ({
   useActivityChipClass: () => ({ classify }),
 }));
 vi.mock('@/stores/translationStore', () => ({
-  useTranslationStore: () => ({ currentLanguage: 'en' }),
+  useTranslationStore: () => ({
+    currentLanguage: 'en',
+    t: (k: string) =>
+      (
+        ({
+          'planner.occasion.displayTitle': '{title} ({milestone})',
+          'planner.occasion.milestone.anniversary': '{ordinal} anniversary',
+        }) as Record<string, string>
+      )[k] ?? k,
+  }),
 }));
 
 import { useActivityIdentity } from '../useActivityIdentity';
@@ -29,6 +38,14 @@ beforeEach(() => {
 });
 
 describe('useActivityIdentity', () => {
+  it("displayTitle names an occasion's milestone for the occurrence, else the plain title", () => {
+    const { displayTitle } = useActivityIdentity();
+    const ruby = activity({ title: 'Mum & Dad', category: 'anniversary', occasionYear: 1986 });
+    expect(displayTitle(ruby, '2026-06-01')).toBe('Mum & Dad (40th anniversary)');
+    expect(displayTitle(ruby, '2027-06-01')).toBe('Mum & Dad (41st anniversary)');
+    expect(displayTitle(activity(), '2026-06-01')).toBe('Swim run');
+  });
+
   it('hides the owner inside their own lane, because the lane header already names them', () => {
     classify.mockReturnValue({ kind: 'solo', color: '#111', members: [member('max', '#111')] });
     const { identityFor } = useActivityIdentity();

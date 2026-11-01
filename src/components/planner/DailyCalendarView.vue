@@ -66,7 +66,7 @@ const emit = defineEmits<{
 const { t } = useTranslation();
 const { isMobile } = useBreakpoint();
 const activityStore = useActivityStore();
-const { identityFor } = useActivityIdentity();
+const { identityFor, displayTitle } = useActivityIdentity();
 
 /**
  * The lane's own background: the bean's hue, flat, for the full height of the day.
@@ -492,7 +492,7 @@ const familyRowSpan = computed(() => Math.max(1, visibleMembers.value.length));
                 :activity-id="occ.activity.id"
                 density="month"
               />
-              {{ occ.activity.title }}
+              {{ displayTitle(occ.activity, currentDay.dateStr) }}
             </div>
             <!-- Todos (show in first member column) -->
             <div
@@ -624,7 +624,7 @@ const familyRowSpan = computed(() => Math.max(1, visibleMembers.value.length));
                   style="color: var(--color-text)"
                 >
                   <span aria-hidden="true">{{ identityFor(activity).emoji }}</span>
-                  <span class="truncate">{{ activity.title }}</span>
+                  <span class="truncate">{{ displayTitle(activity, eventDate) }}</span>
                   <ClashIndicator :clash="clashFor(activity.id, eventDate)" class="ml-1" />
                 </div>
                 <div class="flex min-w-0 items-center gap-1">

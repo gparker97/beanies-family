@@ -7485,6 +7485,19 @@ const STRING_DEFS = {
     en: 'Check passports and documents for {name} ({date})',
     beanie: 'check passports and documents for {name} ({date})',
   },
+  // Occasions (#137): `{name}` is the occasion's display title, milestone included.
+  'todo.hint.title.occasionHeadsUp': {
+    en: '{name} is on {date}. Card, gift or a call?',
+    beanie: '{name} is on {date}. card, gift or a call?',
+  },
+  'todo.hint.title.occasionHeadsUpRemembrance': {
+    en: '{name} is on {date}. A good day to reach out.',
+    beanie: '{name} is on {date}. a good day to reach out.',
+  },
+  'todo.hint.title.occasionMilestone': {
+    en: '{name} is on {date}. A big one: plan something?',
+    beanie: '{name} is on {date}. a big one: plan something?',
+  },
   'todo.kind': { en: 'Track as', beanie: 'track as' },
   'todo.kind.todo': { en: 'To-do', beanie: 'to-do' },
   'todo.moveToSomeday': { en: 'Move to Someday', beanie: 'move to someday' },
@@ -8803,6 +8816,76 @@ const STRING_DEFS = {
   'planner.birthday.tomorrow': { en: 'Tomorrow', beanie: 'tomorrow' },
   'planner.birthday.sleeps': { en: '{count} sleeps away', beanie: '{count} sleeps away' },
   'planner.birthday.turns': { en: 'Turns {age}', beanie: 'turns {age}' },
+  // Occasions (#137): the milestone appended to an occasion's title on the planner, in its
+  // reminder and in its hint ("Uncle Bob's birthday (turns 60)"). `{n}` is the plain count,
+  // `{ordinal}` the English ordinal ("40th"); a language picks whichever it needs. The title
+  // itself is the family's own text and is never reworded.
+  'planner.occasion.displayTitle': { en: '{title} ({milestone})', beanie: '{title} ({milestone})' },
+  'planner.occasion.milestone.turns': { en: 'turns {n}', beanie: 'turns {n}' },
+  'planner.occasion.milestone.anniversary': {
+    en: '{ordinal} anniversary',
+    beanie: '{ordinal} anniversary',
+  },
+  'planner.occasion.milestone.years.one': { en: '{n} year', beanie: '{n} year' },
+  'planner.occasion.milestone.years.other': { en: '{n} years', beanie: '{n} years' },
+  // The optional year field's label, per occasion type.
+  'planner.occasion.year.bornIn': { en: 'Born in', beanie: 'born in' },
+  'planner.occasion.year.marriedIn': { en: 'Married in', beanie: 'married in' },
+  'planner.occasion.year.yearOfPassing': { en: 'Year of passing', beanie: 'year of passing' },
+  'planner.occasion.year.since': { en: 'Since', beanie: 'since' },
+  // The activity drawer in occasion mode (`useOccasionForm`). `setFor` marks a field the
+  // drawer filled in when an Occasions category was chosen.
+  'planner.occasion.setFor': { en: 'Set for Occasions', beanie: 'set for special days' },
+  'planner.occasion.whoRemembering': { en: "Who's Remembering?", beanie: "who's remembering?" },
+  'planner.occasion.whoRememberingHelp': {
+    en: 'They get the heads-up and the reminder.',
+    beanie: 'they get the heads-up and the reminder.',
+  },
+  'planner.occasion.whoRememberingEmpty': {
+    en: 'No one picked, so all adults get the heads-up.',
+    beanie: 'no one picked, so all adults get the heads-up.',
+  },
+  'planner.occasion.reminderCaption': {
+    en: 'All-day reminders arrive at 9 AM on the day.',
+    beanie: 'all-day reminders arrive at 9 am on the day.',
+  },
+  'planner.occasion.yearHelp': {
+    en: 'Add the year to show the milestone on the calendar and in reminders.',
+    beanie: 'add the year to show the milestone on the calendar and in reminders.',
+  },
+  // "turns 60 on Sat, 7 Nov": `{milestone}` is one of the `milestone.*` values above.
+  'planner.occasion.yearPreview': { en: '{milestone} on {date}', beanie: '{milestone} on {date}' },
+  'planner.occasion.bigOne.one': {
+    en: "A big one. You'll also get a heads-up 1 day ahead.",
+    beanie: "a big one. you'll also get a heads-up 1 day ahead.",
+  },
+  'planner.occasion.bigOne.other': {
+    en: "A big one. You'll also get a heads-up {days} days ahead.",
+    beanie: "a big one. you'll also get a heads-up {days} days ahead.",
+  },
+  // A past-year date picked for a yearly occasion (7 Nov 1966) becomes the year, and the
+  // series starts on the next occurrence instead.
+  'planner.occasion.dateMoved.withYear': {
+    en: 'Moved {year} into the year field. The calendar starts from the next one.',
+    beanie: 'moved {year} into the year field. the calendar starts from the next one.',
+  },
+  'planner.occasion.dateMoved.dateOnly': {
+    en: 'The calendar starts from the next one.',
+    beanie: 'the calendar starts from the next one.',
+  },
+  // Hard validation on the year field: real nouns in beanie mode too.
+  'planner.occasion.yearError.future': {
+    en: "That year hasn't happened yet.",
+    beanie: "that year hasn't happened yet.",
+  },
+  'planner.occasion.yearError.tooEarly': {
+    en: 'That looks too early. Check the year.',
+    beanie: 'that looks too early. check the year.',
+  },
+  'planner.occasion.yearError.format': {
+    en: 'Enter a four-digit year, like 1966.',
+    beanie: 'enter a four-digit year, like 1966.',
+  },
   'planner.birthday.source': {
     en: 'beanies works this out from the birthday on their profile, so there is nothing here to edit.',
     beanie:
@@ -9394,6 +9477,7 @@ const STRING_DEFS = {
   'planner.group.food': { en: 'Food', beanie: 'food' },
   'planner.group.fun': { en: 'Fun', beanie: 'fun' },
   'planner.group.lessons': { en: 'Lessons', beanie: 'lessons' },
+  'planner.group.occasions': { en: 'Occasions', beanie: 'special days' },
   'planner.group.party': { en: 'Party', beanie: 'party' },
   'planner.group.pets': { en: 'Pets', beanie: 'pets' },
   'planner.group.religious': { en: 'Religious', beanie: 'religious' },
@@ -9468,6 +9552,9 @@ const STRING_DEFS = {
   'planner.category.graduation': { en: 'Graduation', beanie: 'graduation' },
   'planner.category.wedding': { en: 'Wedding', beanie: 'wedding' },
   'planner.category.other_celebration': { en: 'Other Celebration', beanie: 'other celebration' },
+  'planner.category.occasion_birthday': { en: 'Birthday', beanie: 'birthday' },
+  'planner.category.remembrance': { en: 'Remembrance', beanie: 'remembrance' },
+  'planner.category.other_occasion': { en: 'Other Occasion', beanie: 'other occasion' },
   'planner.category.pet_grooming': { en: 'Grooming', beanie: 'grooming' },
   'planner.category.vet': { en: 'Vet', beanie: 'vet' },
   'planner.category.other_pet': { en: 'Other Pet', beanie: 'other pet' },
@@ -10565,6 +10652,11 @@ const STRING_DEFS = {
     en: 'Travel documents',
     beanie: 'travel documents',
   },
+  'settings.helpfulHints.type.occasionHeadsUp': {
+    en: 'Occasion heads-up',
+    beanie: 'occasion heads-up',
+  },
+  'settings.helpfulHints.type.occasionMilestone': { en: 'Big occasions', beanie: 'big occasions' },
   // #40: per-type descriptions (shown under each hint in Settings).
   'settings.helpfulHints.desc.birthdayPresent': {
     en: 'Plan a present or party before someone in your own family has a birthday.',
@@ -10590,6 +10682,14 @@ const STRING_DEFS = {
   'settings.helpfulHints.desc.tripDocuments': {
     en: 'A reminder to check passports, visas, and travel insurance before a trip.',
     beanie: 'a reminder to check passports, visas, and travel insurance before a trip.',
+  },
+  'settings.helpfulHints.desc.occasionHeadsUp': {
+    en: 'Birthdays and days to remember, for whoever is remembering',
+    beanie: 'birthdays and days to remember, for whoever is remembering',
+  },
+  'settings.helpfulHints.desc.occasionMilestone': {
+    en: 'Round birthdays and anniversaries, a month ahead',
+    beanie: 'round birthdays and anniversaries, a month ahead',
   },
   // #40: per-type lead-time control labels.
   'settings.helpfulHints.howFarAhead': { en: 'How far ahead', beanie: 'how far ahead' },

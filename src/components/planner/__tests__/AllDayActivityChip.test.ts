@@ -35,7 +35,12 @@ describe('AllDayActivityChip', () => {
 
   it('renders the title for a single-day chip (isStart && isEnd)', () => {
     const wrapper = mount(AllDayActivityChip, {
-      props: { activity: activity({ title: 'Birthday' }), isStart: true, isEnd: true },
+      props: {
+        activity: activity({ title: 'Birthday' }),
+        date: '2026-05-13',
+        isStart: true,
+        isEnd: true,
+      },
     });
     expect(wrapper.text()).toContain('Birthday');
     expect(wrapper.classes()).toContain('rounded-l-md');
@@ -44,7 +49,12 @@ describe('AllDayActivityChip', () => {
 
   it('renders the title and rounds left only for a multi-day start', () => {
     const wrapper = mount(AllDayActivityChip, {
-      props: { activity: activity({ title: 'Tournament' }), isStart: true, isEnd: false },
+      props: {
+        activity: activity({ title: 'Tournament' }),
+        date: '2026-05-13',
+        isStart: true,
+        isEnd: false,
+      },
     });
     expect(wrapper.text()).toContain('Tournament');
     expect(wrapper.classes()).toContain('rounded-l-md');
@@ -53,7 +63,12 @@ describe('AllDayActivityChip', () => {
 
   it('hides the title and renders square corners for a multi-day middle cell', () => {
     const wrapper = mount(AllDayActivityChip, {
-      props: { activity: activity({ title: 'Tournament' }), isStart: false, isEnd: false },
+      props: {
+        activity: activity({ title: 'Tournament' }),
+        date: '2026-05-13',
+        isStart: false,
+        isEnd: false,
+      },
     });
     expect(wrapper.text()).not.toContain('Tournament');
     expect(wrapper.classes()).not.toContain('rounded-l-md');
@@ -62,7 +77,12 @@ describe('AllDayActivityChip', () => {
 
   it('hides the title and rounds right only for a multi-day end cell', () => {
     const wrapper = mount(AllDayActivityChip, {
-      props: { activity: activity({ title: 'Tournament' }), isStart: false, isEnd: true },
+      props: {
+        activity: activity({ title: 'Tournament' }),
+        date: '2026-05-13',
+        isStart: false,
+        isEnd: true,
+      },
     });
     expect(wrapper.text()).not.toContain('Tournament');
     expect(wrapper.classes()).not.toContain('rounded-l-md');
@@ -71,7 +91,7 @@ describe('AllDayActivityChip', () => {
 
   it('emits click when the button is clicked', async () => {
     const wrapper = mount(AllDayActivityChip, {
-      props: { activity: activity(), isStart: true, isEnd: true },
+      props: { activity: activity(), date: '2026-05-13', isStart: true, isEnd: true },
     });
     await wrapper.trigger('click');
     expect(wrapper.emitted('click')).toHaveLength(1);
@@ -88,7 +108,7 @@ describe('AllDayActivityChip', () => {
       category: '__missing_category__' as FamilyActivity['category'],
     });
     const wrapper = mount(AllDayActivityChip, {
-      props: { activity: bogus, isStart: true, isEnd: true },
+      props: { activity: bogus, date: '2026-05-13', isStart: true, isEnd: true },
     });
     const chip = wrapper.find('[data-testid="all-day-activity-chip"]');
     expect(chip.exists()).toBe(true);
@@ -100,6 +120,7 @@ describe('AllDayActivityChip', () => {
     const wrapper = mount(AllDayActivityChip, {
       props: {
         activity: activity({ title: 'Trip', photoIds: ['p-1', 'p-2'] }),
+        date: '2026-05-13',
         isStart: true,
         isEnd: false,
       },
@@ -111,6 +132,7 @@ describe('AllDayActivityChip', () => {
     const wrapper = mount(AllDayActivityChip, {
       props: {
         activity: activity({ title: 'No-photos', photoIds: [] }),
+        date: '2026-05-13',
         isStart: true,
         isEnd: true,
       },
@@ -122,6 +144,7 @@ describe('AllDayActivityChip', () => {
     const wrapper = mount(AllDayActivityChip, {
       props: {
         activity: activity({ title: 'Spans', photoIds: ['p-1'] }),
+        date: '2026-05-13',
         isStart: false,
         isEnd: true,
       },
@@ -133,8 +156,30 @@ describe('AllDayActivityChip', () => {
   it('keeps the chip clickable on the title attribute (full title even when truncated)', () => {
     const longTitle = 'A very long activity title that will definitely truncate in a calendar cell';
     const wrapper = mount(AllDayActivityChip, {
-      props: { activity: activity({ title: longTitle }), isStart: true, isEnd: true },
+      props: {
+        activity: activity({ title: longTitle }),
+        date: '2026-05-13',
+        isStart: true,
+        isEnd: true,
+      },
     });
     expect(wrapper.attributes('title')).toBe(longTitle);
+  });
+
+  it("names an occasion's milestone for the chip's own date", () => {
+    const wrapper = mount(AllDayActivityChip, {
+      props: {
+        activity: activity({
+          title: "Uncle Bob's birthday",
+          category: 'occasion_birthday',
+          occasionYear: 1966,
+        }),
+        date: '2026-05-13',
+        isStart: true,
+        isEnd: true,
+      },
+    });
+    expect(wrapper.text()).toContain("Uncle Bob's birthday (turns 60)");
+    expect(wrapper.attributes('title')).toBe("Uncle Bob's birthday (turns 60)");
   });
 });

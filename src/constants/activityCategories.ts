@@ -127,8 +127,30 @@ export const ACTIVITY_CATEGORIES: ActivityCategoryDef[] = [
   { id: 'picnic', name: 'Picnic', emoji: '🧺', color: '#0D9488', group: 'Food' },
   { id: 'other_food', name: 'Other Food', emoji: '🍴', color: '#155E75', group: 'Food' },
 
+  // Occasions: yearly days to remember (people outside the pod; members' own birthdays are
+  // derived from their profiles). Per-type rules live in `src/utils/occasions.ts`, whose
+  // table must list exactly this group's ids. `anniversary` moved here from Party with its id
+  // unchanged, so saved anniversaries carry over with no migration.
+  { id: 'anniversary', name: 'Anniversary', emoji: '💍', color: '#FB923C', group: 'Occasions' },
+  {
+    id: 'occasion_birthday',
+    name: 'Birthday',
+    emoji: '🧁',
+    color: '#EC4899',
+    group: 'Occasions',
+  },
+  // Calm blue-grey (3:1+ as a border/dot on both the light page and dark surface-raised): a
+  // remembrance is not a party, so it never wears a warm celebratory hue.
+  { id: 'remembrance', name: 'Remembrance', emoji: '🕯️', color: '#6F8BA4', group: 'Occasions' },
+  {
+    id: 'other_occasion',
+    name: 'Other Occasion',
+    emoji: '⭐',
+    color: '#A855F7',
+    group: 'Occasions',
+  },
+
   // Party
-  { id: 'anniversary', name: 'Anniversary', emoji: '💍', color: '#FB923C', group: 'Party' },
   { id: 'baby_shower', name: 'Baby Shower', emoji: '🍼', color: '#FCD34D', group: 'Party' },
   { id: 'bar_mitzvah', name: 'Bar Mitzvah', emoji: '✡️', color: '#D97706', group: 'Party' },
   { id: 'birthday', name: 'Birthday Party', emoji: '🎂', color: '#F15D22', group: 'Party' },
@@ -282,6 +304,7 @@ export const ACTIVITY_GROUP_EMOJI_MAP: Record<string, string> = {
   Fun: '🎈',
   Food: '🍽️',
   Lessons: '🎵',
+  Occasions: '💌',
   Party: '🎉',
   Pets: '🐾',
   Religious: '⛪',

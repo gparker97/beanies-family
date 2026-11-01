@@ -9,6 +9,7 @@ import {
   type CelebrationVerdict,
 } from '@/utils/activityCelebration';
 import { resolveMemberColor } from '@/constants/memberColors';
+import { activityDisplayTitle } from '@/utils/occasions';
 import { isDarkNow } from '@/composables/useDarkMode';
 import type { FamilyActivity, FamilyMember } from '@/types/models';
 
@@ -233,5 +234,15 @@ export function useActivityIdentity() {
     };
   }
 
-  return { identityFor, WASH_ALPHA, WASH_ALPHA_DARK };
+  /**
+   * The title a planner surface shows for one occurrence: the occasion milestone appended
+   * ("Uncle Bob's birthday (turns 60)") when there is one, the plain title otherwise. The
+   * single binding point for every calendar render site, so none of them wires `t` or
+   * imports the occasion rules itself. Not cached: it is a table lookup and a template fill.
+   */
+  function displayTitle(activity: FamilyActivity, ymd: string): string {
+    return activityDisplayTitle(activity, ymd, translation.t);
+  }
+
+  return { identityFor, displayTitle, WASH_ALPHA, WASH_ALPHA_DARK };
 }

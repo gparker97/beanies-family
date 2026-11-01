@@ -34,6 +34,8 @@ const T: Partial<Record<string, string>> = {
   'reminders.travelBody': 'Departs at {time}',
   'reminders.listBody': 'Due today — {n} left',
   'reminders.listBodyForChild': '{who}’s list — {n} left',
+  'planner.occasion.displayTitle': '{title} ({milestone})',
+  'planner.occasion.milestone.turns': 'turns {n}',
 };
 const t = (k: UIStringKey): string => T[k] ?? String(k);
 
@@ -116,6 +118,23 @@ describe('buildReminderSchedule — activities', () => {
       PREFS
     );
     expect(reminders.map((r) => r.fireAt.toISOString().slice(0, 10))).toEqual(['2026-05-22']);
+  });
+
+  it("an occasion's reminder title names its milestone; other activities keep their title", () => {
+    const bob = activity({
+      id: 'bob' as UUID,
+      title: "Uncle Bob's birthday",
+      category: 'occasion_birthday',
+      occasionYear: 1966,
+      startTime: '15:00',
+      reminderMinutes: 30,
+    });
+    const { reminders } = buildReminderSchedule(
+      input({ occurrencesByDate: { '2026-05-22': [occ('2026-05-22', bob)] } }),
+      NOW,
+      PREFS
+    );
+    expect(reminders.map((r) => r.title)).toEqual(["Uncle Bob's birthday (turns 60)"]);
   });
 
   it('fires at (startTime − reminderMinutes), not at the event', () => {
