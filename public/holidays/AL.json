@@ -2,12 +2,12 @@
   "meta": {
     "country": "AL",
     "name": "Albania",
-    "generatedAt": "2026-05-12",
+    "generatedAt": "2026-11-01",
     "yearRange": [
       2025,
       2029
     ],
-    "source": "date-holidays@3.35.0",
+    "source": "date-holidays@3.37.0",
     "primaryLanguage": "sq",
     "types": [
       "public"
@@ -35,6 +35,12 @@
     {
       "date": "2025-03-22",
       "name": "Sultan Nevruz's Day",
+      "type": "public",
+      "name_local": "Dita e Sulltan Nevruzit"
+    },
+    {
+      "date": "2025-03-24",
+      "name": "Sultan Nevruz's Day (substitute day)",
       "type": "public",
       "name_local": "Dita e Sulltan Nevruzit"
     },
@@ -105,6 +111,12 @@
       "name_local": "Dita e Çlirimit"
     },
     {
+      "date": "2025-12-01",
+      "name": "Liberation Day (substitute day)",
+      "type": "public",
+      "name_local": "Dita e Çlirimit"
+    },
+    {
       "date": "2025-12-08",
       "name": "Youth Day",
       "type": "public",
@@ -131,6 +143,12 @@
     {
       "date": "2026-03-14",
       "name": "Summer Day",
+      "type": "public",
+      "name_local": "Dita e Verës"
+    },
+    {
+      "date": "2026-03-16",
+      "name": "Summer Day (substitute day)",
       "type": "public",
       "name_local": "Dita e Verës"
     },
@@ -208,6 +226,12 @@
     },
     {
       "date": "2026-11-30",
+      "name": "Independence Day (substitute day)",
+      "type": "public",
+      "name_local": "Dita e Pavarësisë"
+    },
+    {
+      "date": "2026-11-30",
       "name": "Liberation Day (substitute day)",
       "type": "public",
       "name_local": "Dita e Çlirimit"
@@ -233,6 +257,12 @@
     {
       "date": "2027-01-02",
       "name": "New Year Holiday",
+      "type": "public",
+      "name_local": "Festa e Vitit të Ri"
+    },
+    {
+      "date": "2027-01-04",
+      "name": "New Year Holiday (substitute day)",
       "type": "public",
       "name_local": "Festa e Vitit të Ri"
     },
@@ -286,6 +316,12 @@
     },
     {
       "date": "2027-05-03",
+      "name": "Labour Day (substitute day)",
+      "type": "public",
+      "name_local": "Dita Ndërkombëtare e Punonjësve"
+    },
+    {
+      "date": "2027-05-03",
       "name": "Orthodox Easter",
       "type": "public",
       "name_local": "Pashkët Ortodokse"
@@ -333,6 +369,12 @@
       "name_local": "Krishtlindja"
     },
     {
+      "date": "2027-12-27",
+      "name": "Christmas Day (substitute day)",
+      "type": "public",
+      "name_local": "Krishtlindja"
+    },
+    {
       "date": "2028-01-01",
       "name": "New Year's Day",
       "type": "public",
@@ -346,6 +388,12 @@
     },
     {
       "date": "2028-01-03",
+      "name": "New Year's Day (substitute day)",
+      "type": "public",
+      "name_local": "Viti i Ri"
+    },
+    {
+      "date": "2028-01-04",
       "name": "New Year Holiday (substitute day)",
       "type": "public",
       "name_local": "Festa e Vitit të Ri"
@@ -521,6 +569,12 @@
     {
       "date": "2029-12-08",
       "name": "Youth Day",
+      "type": "public",
+      "name_local": "Dita Kombëtare e Rinisë"
+    },
+    {
+      "date": "2029-12-10",
+      "name": "Youth Day (substitute day)",
       "type": "public",
       "name_local": "Dita Kombëtare e Rinisë"
     },
