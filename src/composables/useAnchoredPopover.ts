@@ -11,6 +11,17 @@ import { useEscapeClose } from '@/composables/useEscapeClose';
  */
 export const ANCHORED_POPOVER_Z_INDEX = 265;
 
+/**
+ * Run a document-level outside-click check in the CAPTURE phase, before the clicked element's
+ * own handler. In a real browser Vue's re-render runs as a microtask between one listener and the
+ * next, so a bubble-phase document listener can see a target that has already left the DOM:
+ * TimePresetPicker's "+ Custom time" row swaps itself for the time input, `contains()` on the
+ * detached row is false, and the list closed the moment it opened (2026-11-01). In the capture
+ * phase nothing has reacted to the click yet, so the target is still where the person tapped.
+ * A scripted `el.click()` does not flush Vue between listeners, which is why tests missed it.
+ */
+export const OUTSIDE_CLICK_CAPTURE = true;
+
 /** Typing targets: arrow keys there step the field (a time input's hours), never rove the menu. */
 function isEditableTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -163,12 +174,12 @@ export function useAnchoredPopover(options: AnchoredPopoverOptions) {
   }
 
   onMounted(() => {
-    document.addEventListener('click', onDocClick);
+    document.addEventListener('click', onDocClick, OUTSIDE_CLICK_CAPTURE);
     window.addEventListener('scroll', handleViewportChange, true);
     window.addEventListener('resize', handleViewportChange);
   });
   onUnmounted(() => {
-    document.removeEventListener('click', onDocClick);
+    document.removeEventListener('click', onDocClick, OUTSIDE_CLICK_CAPTURE);
     window.removeEventListener('scroll', handleViewportChange, true);
     window.removeEventListener('resize', handleViewportChange);
   });

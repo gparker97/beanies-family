@@ -19,6 +19,7 @@
 import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useEscapeClose } from '@/composables/useEscapeClose';
+import { OUTSIDE_CLICK_CAPTURE } from '@/composables/useAnchoredPopover';
 import { useFamilyDataAccess } from '@/composables/useFamilyDataAccess';
 import { useSyncStore } from '@/stores/syncStore';
 import { useRouter } from 'vue-router';
@@ -142,12 +143,12 @@ function handleViewportChange() {
 }
 
 onMounted(() => {
-  document.addEventListener('click', onDocClick);
+  document.addEventListener('click', onDocClick, OUTSIDE_CLICK_CAPTURE);
   window.addEventListener('scroll', handleViewportChange, true);
   window.addEventListener('resize', handleViewportChange);
 });
 onUnmounted(() => {
-  document.removeEventListener('click', onDocClick);
+  document.removeEventListener('click', onDocClick, OUTSIDE_CLICK_CAPTURE);
   window.removeEventListener('scroll', handleViewportChange, true);
   window.removeEventListener('resize', handleViewportChange);
 });

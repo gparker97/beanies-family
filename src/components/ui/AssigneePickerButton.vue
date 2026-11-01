@@ -2,6 +2,7 @@
 import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
+import { OUTSIDE_CLICK_CAPTURE } from '@/composables/useAnchoredPopover';
 import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
 
 const props = withDefaults(
@@ -123,13 +124,13 @@ function onDocClick(e: MouseEvent) {
 }
 
 onMounted(() => {
-  document.addEventListener('click', onDocClick);
+  document.addEventListener('click', onDocClick, OUTSIDE_CLICK_CAPTURE);
   document.addEventListener(CLOSE_EVENT, onOtherPickerOpen);
   window.addEventListener('scroll', handleViewportChange, true);
   window.addEventListener('resize', handleViewportChange);
 });
 onUnmounted(() => {
-  document.removeEventListener('click', onDocClick);
+  document.removeEventListener('click', onDocClick, OUTSIDE_CLICK_CAPTURE);
   document.removeEventListener(CLOSE_EVENT, onOtherPickerOpen);
   window.removeEventListener('scroll', handleViewportChange, true);
   window.removeEventListener('resize', handleViewportChange);

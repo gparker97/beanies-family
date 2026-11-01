@@ -117,6 +117,24 @@ describe('TimePresetPicker list: layer and keyboard', () => {
     w.unmount();
   });
 
+  it('stays open when the Custom row re-renders away before the outside-click check', async () => {
+    // A real browser runs Vue's re-render (the row swapping for the input) as a microtask
+    // between the row's click listener and the document's, so the document listener sees a
+    // DETACHED target. A scripted `.click()` does not flush in between; a body-level listener
+    // that detaches the target stands in for that flush.
+    const w = await openPicker('');
+    const custom = document.querySelector<HTMLButtonElement>('[data-time-custom]')!;
+    const detach = (e: Event) => (e.target as Element).remove();
+    document.body.addEventListener('click', detach);
+    custom.click();
+    document.body.removeEventListener('click', detach);
+    await w.vm.$nextTick();
+    await w.vm.$nextTick();
+    expect(document.querySelector('[data-testid="time-preset-picker-list"]')).not.toBeNull();
+    expect(list().querySelector('input[type="time"]')).not.toBeNull();
+    w.unmount();
+  });
+
   it('still roves the preset rows with the arrow keys', async () => {
     const w = await openPicker('10:00');
     const e = new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true });

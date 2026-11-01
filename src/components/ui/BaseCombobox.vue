@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
+import { OUTSIDE_CLICK_CAPTURE } from '@/composables/useAnchoredPopover';
 
 export interface ComboboxOption {
   value: string;
@@ -217,7 +218,7 @@ watch(
 
 onMounted(() => {
   checkBackwardCompat();
-  document.addEventListener('click', handleClickOutside);
+  document.addEventListener('click', handleClickOutside, OUTSIDE_CLICK_CAPTURE);
   document.addEventListener('keydown', handleKeydown);
   // Reposition popover when the trigger moves (window resize) or the page
   // scrolls. Listeners are passive — no perf cost when popover is closed
@@ -231,7 +232,7 @@ onUnmounted(() => {
   // hooks fire when a Vue test wrapper is unmounted via teleport. Guard so the
   // teardown doesn't throw an unhandled rejection that fails CI.
   if (typeof document !== 'undefined') {
-    document.removeEventListener('click', handleClickOutside);
+    document.removeEventListener('click', handleClickOutside, OUTSIDE_CLICK_CAPTURE);
     document.removeEventListener('keydown', handleKeydown);
   }
   if (typeof window !== 'undefined') {

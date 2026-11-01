@@ -2,6 +2,7 @@
 import { ref, nextTick, onMounted, onUnmounted } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { openExternal } from '@/utils/openExternal';
+import { OUTSIDE_CLICK_CAPTURE } from '@/composables/useAnchoredPopover';
 
 const props = defineProps<{
   /** Hint text to display in the popover (plain text or array of bullet items) */
@@ -84,8 +85,8 @@ function openLink() {
 function onDocClick(e: MouseEvent) {
   if (el.value && !el.value.contains(e.target as Node)) show.value = false;
 }
-onMounted(() => document.addEventListener('click', onDocClick));
-onUnmounted(() => document.removeEventListener('click', onDocClick));
+onMounted(() => document.addEventListener('click', onDocClick, OUTSIDE_CLICK_CAPTURE));
+onUnmounted(() => document.removeEventListener('click', onDocClick, OUTSIDE_CLICK_CAPTURE));
 </script>
 
 <template>
