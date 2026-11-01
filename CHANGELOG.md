@@ -18,6 +18,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 ### Changed
 
 - The orange flash that points you to a form field now sits just outside the field instead of on top of it.
+- App 1.0.6 is live on the web and on its way to both app stores.
 
 ### Fixed
 

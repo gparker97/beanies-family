@@ -17,6 +17,40 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.11.01',
+    date: '2026-11-01',
+    month: '1 november 2026',
+    summary: {
+      en: 'Special days have been added, thanks to beanie feedback.',
+      beanie: 'special days have been added, thanks to beanie feedback.',
+    },
+    features: [
+      {
+        icon: '💌',
+        title: { en: 'Special days', beanie: 'special days' },
+        description: {
+          en: "Birthdays, anniversaries and days to remember for family and friends outside your pod now live under Occasions. Each one repeats every year, with a reminder on the day and a heads-up a week before. Add the year to see who's turning 60.",
+          beanie:
+            "birthdays, anniversaries and days to remember for family and friends outside your pod now live under special days. each one repeats every year, with a reminder on the day and a heads-up a week before. add the year to see who's turning 60.",
+        },
+        tryItRoute: '/activities',
+      },
+      {
+        icon: '💬',
+        title: { en: 'Join us on Discord', beanie: 'join us on discord' },
+        description: {
+          en: "Get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+          beanie:
+            "get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+        },
+        cta: {
+          label: { en: 'Join the Discord', beanie: 'join the discord' },
+          href: 'https://beanies.family/discord',
+        },
+      },
+    ],
+  },
+  {
     version: '2026.10.28',
     date: '2026-10-28',
     month: '28 october 2026',
