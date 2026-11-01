@@ -14,6 +14,15 @@ import {
 
 const base = (): StoreProof => parseStoreProof(structuredClone(committed));
 
+// The committed counts change on every deploy's refresh (deploy-prod-auto step 4b), so the
+// expectations are summed from the raw JSON here rather than pinned: a refresh must never
+// fail the pre-push test run.
+const committedAppStore = Object.values(committed.appStore.storefronts).reduce(
+  (sum: number, n) => sum + Number(n),
+  0
+);
+const committedTotal = committedAppStore + committed.googlePlay.ratingCount;
+
 const withPatch = (patch: (p: Record<string, any>) => void) => {
   const p: Record<string, any> = structuredClone(committed);
   patch(p);
@@ -23,7 +32,7 @@ const withPatch = (patch: (p: Record<string, any>) => void) => {
 describe('parseStoreProof: shape only', () => {
   it('accepts the committed file', () => {
     expect(() => parseStoreProof(committed)).not.toThrow();
-    expect(appStoreCount(base())).toBe(10);
+    expect(appStoreCount(base())).toBe(committedAppStore);
   });
 
   it('throws naming the field, with the refresh command', () => {
@@ -59,8 +68,8 @@ describe('parseStoreProof: shape only', () => {
 });
 
 describe('fiveStarTotal: the claim', () => {
-  it('is 15 for the committed file', () => {
-    expect(fiveStarTotal(base())).toBe(15);
+  it('sums both stores for the committed file', () => {
+    expect(fiveStarTotal(base())).toBe(committedTotal);
   });
 
   it('is 0 when the App Store average is below 5 with ratings present', () => {
