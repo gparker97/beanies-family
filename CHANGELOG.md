@@ -14,6 +14,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - A new blog post, "daddy come look at my bed!", tells the story of the day after the beanie wall went up.
 - Occasions: add birthdays, anniversaries and days to remember for people outside your pod, with yearly reminders and a heads-up hint.
+- Importing a document can now file anniversaries and days to remember under Occasions.
 
 ### Changed
 
