@@ -4,7 +4,7 @@
 // Entries marked `retired: true` have left the upstream dataset (closed, or the
 // code reassigned) and are kept ONLY so an already-saved trip still resolves —
 // they are excluded from the picker. See scripts/updateAirports.mjs.
-// Last regenerated: 2026-09-15.
+// Last regenerated: 2026-11-01.
 // Re-run via `npm run update-airports`.
 
 export interface AirportInfo {
@@ -513,6 +513,7 @@ export const AIRPORTS: AirportInfo[] = [
   { code: 'BSC', name: 'José Celestino Mutis', city: 'Bahía Solano', country: 'CO' },
   { code: 'BSD', name: 'Baoshan Yunrui', city: 'Baoshan', country: 'CN' },
   { code: 'BSG', name: 'Bata International', city: 'Bata', country: 'GQ' },
+  { code: 'BSI', name: 'Balesin Island', city: 'Balesin', country: 'PH' },
   { code: 'BSK', name: 'Biskra - Mohamed Khider', city: 'Biskra', country: 'DZ' },
   {
     code: 'BSL',
@@ -1090,7 +1091,12 @@ export const AIRPORTS: AirportInfo[] = [
   { code: 'EDO', name: 'Balıkesir Koca Seyit', city: 'Edremit', country: 'TR' },
   { code: 'EDR', name: 'Pormpuraaw Airport', city: 'Pormpuraaw', country: 'AU' },
   { code: 'EEK', name: 'Eek Airport', city: 'Eek', country: 'US' },
-  { code: 'EFL', name: 'Kefallinia', city: 'Kefallinia Island', country: 'GR' },
+  {
+    code: 'EFL',
+    name: 'Kefalonia International Airport "Anna Pollatou"',
+    city: 'Kefallinia Island',
+    country: 'GR',
+  },
   { code: 'EGC', name: 'Bergerac Dordogne-Périgord', city: 'Bergerac', country: 'FR' },
   { code: 'EGE', name: 'Eagle County', city: 'Eagle', country: 'US' },
   { code: 'EGO', name: 'Belgorod International', city: 'Belgorod', country: 'RU', retired: true },
@@ -1739,10 +1745,10 @@ export const AIRPORTS: AirportInfo[] = [
   { code: 'INO', name: 'Inongo Airport', city: 'Inongo', country: 'CD' },
   { code: 'INQ', name: 'Inisheer Aerodrome', city: 'Inis Oírr', country: 'IE' },
   { code: 'INU', name: 'Nauru', city: 'Yaren', country: 'NR' },
-  { code: 'INV', name: 'Inverness Airport', city: 'Inverness', country: 'GB' },
+  { code: 'INV', name: 'Inverness', city: 'Inverness, Highland', country: 'GB' },
   { code: 'INZ', name: 'In Salah Airport', city: 'In Salah', country: 'DZ' },
   { code: 'IOA', name: 'Ioannina King Pyrrhus National', city: 'Ioannina', country: 'GR' },
-  { code: 'IOM', name: 'Isle of Man', city: 'Castletown', country: 'IM' },
+  { code: 'IOM', name: 'Isle of Man', city: 'Castletown, Rushen', country: 'IM' },
   { code: 'IOQ', name: 'Isortoq Heliport', city: 'Isortoq', country: 'GL' },
   { code: 'IOR', name: 'Inishmore Aerodrome', city: 'Inis Mór', country: 'IE' },
   { code: 'IOS', name: 'Bahia - Jorge Amado', city: 'Ilhéus', country: 'BR' },
@@ -2476,7 +2482,7 @@ export const AIRPORTS: AirportInfo[] = [
   { code: 'MAU', name: 'Maupiti', city: 'Maupiti Airport', country: 'PF' },
   { code: 'MAZ', name: 'Eugenio Maria De Hostos', city: 'Mayaguez', country: 'PR' },
   { code: 'MBA', name: 'Moi', city: 'Mombasa', country: 'KE' },
-  { code: 'MBD', name: 'Mmabatho', city: 'Mafeking', country: 'ZA' },
+  { code: 'MBD', name: 'George Dick Montshioa', city: 'Mafeking', country: 'ZA' },
   { code: 'MBE', name: 'Monbetsu Airport', city: 'Monbetsu', country: 'JP' },
   { code: 'MBI', name: 'Songwe', city: 'Mbeya', country: 'TZ' },
   { code: 'MBJ', name: 'Sangster', city: 'Montego Bay', country: 'JM' },
@@ -4446,6 +4452,12 @@ export const AIRPORTS: AirportInfo[] = [
   { code: 'WRG', name: 'Wrangell Airport', city: 'Wrangell', country: 'US' },
   { code: 'WRO', name: 'Copernicus Wrocław', city: 'Wrocław', country: 'PL' },
   { code: 'WRY', name: 'Westray', city: 'Westray, Orkney Islands', country: 'GB' },
+  {
+    code: 'WSI',
+    name: 'Western Sydney International (Nancy-Bird Walton)',
+    city: 'Sydney',
+    country: 'AU',
+  },
   { code: 'WSK', name: 'Chongqing Wushan', city: 'Wushan', country: 'CN' },
   { code: 'WSN', name: 'South Naknek Number 2', city: 'South Naknek', country: 'US' },
   { code: 'WST', name: 'Westerly State', city: 'Westerly', country: 'US' },
@@ -4885,7 +4897,7 @@ export const AIRPORTS: AirportInfo[] = [
   { code: 'ZTB', name: 'Tête-à-la-Baleine Airport', city: 'Tête-à-la-Baleine', country: 'CA' },
   {
     code: 'ZTH',
-    name: 'Zakynthos International Airport Dionysios Solomos',
+    name: 'Zakynthos International Airport "Dionysios Solomos"',
     city: 'Zakynthos',
     country: 'GR',
   },
