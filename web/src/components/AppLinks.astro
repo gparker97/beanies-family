@@ -28,11 +28,10 @@
   import { APP_URL } from '@beanies/brand/nav';
   import { isEntryPageview, sendMarketingEvent } from '../lib/marketingEvents';
   import { readStoredAttribution } from '../lib/storedAttribution';
+  import { track } from '../lib/plausible';
 
   /** The site's own store redirect pages: decorated with the tag so they can record it. */
   const STORE_PATHS = new Set(['/ios', '/android']);
-
-  type PlausibleFn = (name: string, opts?: { props?: Record<string, string> }) => void;
 
   // 1. Capture (first touch wins) and the entry-pageview event. Computed once, so a tag
   //    captured on this very page decorates its links and reports `attributed: yes`.
@@ -91,12 +90,9 @@
       const el = target.closest('[data-cta]');
       const name = el?.getAttribute('data-cta');
       if (!el || !name) return;
-      const plausible = (window as unknown as { plausible?: PlausibleFn }).plausible;
-      plausible?.(name, {
-        props: {
-          location: el.getAttribute('data-cta-loc') || 'unknown',
-          attributed: fields ? 'yes' : 'no',
-        },
+      track(name, {
+        location: el.getAttribute('data-cta-loc') || 'unknown',
+        attributed: fields ? 'yes' : 'no',
       });
     },
     // Capture phase: these anchors navigate away, and a bubble-phase listener can lose the

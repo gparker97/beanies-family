@@ -1,0 +1,558 @@
+---
+/**
+ * FilmCard: a muted looping teaser card that opens the full film, with sound, in a
+ * native <dialog>. The musical is its first record (`lib/films.ts`); any film reuses it.
+ *
+ * Plan: ~/projects/beanies-ops/docs/plans/2026-11-03-musical-homepage-and-media-hosting.md
+ * Mockup (option B3, greg's final copy):
+ *   ~/projects/beanies-ops/docs/mockups/homepage-film-section-2026-11-03.html
+ *
+ * STRUCTURE. `[data-film-card]` is the script's root and carries the media URLs. It holds
+ * two siblings: the card, one <button> whose children are all phrasing content (spans, a
+ * <video> without controls, an svg), and the <dialog>. The dialog must stay OUTSIDE the
+ * button: nesting it is invalid HTML, and every click inside it (controls, close) would
+ * reach AppLinks' `closest('[data-cta]')`, re-sending Play and re-opening the dialog.
+ *
+ * LOADING. Nothing from /media/ is requested before `window` `load` unless the visitor
+ * opens the film: the teaser has no `src` and no `poster` in the markup (a `poster`
+ * attribute is fetched at parse time). After `load`, a near-viewport observer applies the
+ * poster and then, unless reduced motion or Save-Data is on, the teaser `src`. A 0.5
+ * observer sends Seen once and plays the teaser only while half the card is visible.
+ * The film gets its `src` only when the dialog opens.
+ *
+ * EVENTS (Plausible, `location: <loc>`): `<prefix>: Play` comes from the card's
+ * `data-cta` via AppLinks' listener; Seen, Progress and Error are sent here via track().
+ *
+ * Light only, like every marketing surface: the card paints its own surfaces (Deep Slate
+ * behind the video, a white stub, white text on a slate gradient), so it reads on any
+ * ground. Colours read the page's brand variables with CIG fallbacks.
+ */
+import '@fontsource-variable/caveat';
+import { durationClock, durationSpoken, type Film } from '../lib/films';
+
+interface Props {
+  film: Film;
+  /** `location` prop on every event and the card's `data-cta-loc`. */
+  loc: string;
+}
+
+const { film, loc } = Astro.props;
+---
+
+<div
+  class="film-card"
+  data-film-card
+  data-film720={film.urls.film720}
+  data-film1080={film.urls.film1080}
+  data-loop640={film.urls.loop640}
+  data-loop960={film.urls.loop960}
+  data-poster={film.urls.poster}
+  data-prefix={film.eventPrefix}
+  data-loc={loc}
+>
+  <button
+    type="button"
+    class="film-card-button"
+    aria-label={`Play ${film.title}, ${durationSpoken(film)}, with sound`}
+    data-cta={`${film.eventPrefix}: Play`}
+    data-cta-loc={loc}
+  >
+    <video class="film-card-teaser" muted loop playsinline></video>
+    <span class="film-card-stub">
+      <span class="film-card-stub-title">{film.title}</span>
+      <span class="film-card-stub-dur">{durationClock(film)}</span>
+    </span>
+    <span class="film-card-play"><span class="film-card-play-tri"></span></span>
+    <span class="film-card-cap">
+      <span class="film-card-cap-text">a beanies original production</span>
+      <svg
+        class="film-card-sound"
+        viewBox="0 0 24 24"
+        width="22"
+        height="22"
+        fill="none"
+        stroke="#fff"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+        focusable="false"
+      >
+        <path d="M11 5 6 9H3v6h3l5 4z" fill="#fff"></path>
+        <path d="M15.5 8.5a5 5 0 0 1 0 7"></path>
+        <path d="M18.5 5.5a9 9 0 0 1 0 13"></path>
+      </svg>
+    </span>
+  </button>
+
+  <dialog class="film-dialog" aria-label={film.title}>
+    <div class="film-dialog-box">
+      <form method="dialog" class="film-dialog-close-form">
+        <button type="submit" class="film-dialog-close" aria-label="close the film">
+          <span aria-hidden="true">×</span>
+        </button>
+      </form>
+      <video class="film-dialog-video" controls playsinline preload="none"></video>
+      <p class="film-dialog-fail" role="status" hidden>
+        sorry, the film wouldn't load. please try again in a moment.
+      </p>
+    </div>
+  </dialog>
+</div>
+
+<style>
+  .film-card {
+    margin: 26px auto 0;
+    position: relative;
+    width: min(100%, 35rem);
+  }
+
+  .film-card-button {
+    appearance: none;
+    aspect-ratio: 16 / 9;
+    background: var(--deep-slate, #2c3e50);
+    border: 0;
+    border-radius: var(--sq, 24px);
+    box-shadow: var(--card-shadow, 0 4px 20px rgb(44 62 80 / 5%));
+    color: #fff;
+    cursor: pointer;
+    display: block;
+    font: inherit;
+    overflow: hidden;
+    padding: 0;
+    position: relative;
+    text-align: left;
+    transition: box-shadow 200ms ease, transform 200ms ease;
+    width: 100%;
+  }
+  .film-card-button:hover {
+    box-shadow: var(--card-hover-shadow, 0 8px 32px rgb(44 62 80 / 10%));
+    transform: translateY(-2px);
+  }
+  .film-card-button:focus-visible {
+    outline: 3px solid var(--heritage-orange, #f15d22);
+    outline-offset: 3px;
+  }
+
+  .film-card-teaser {
+    display: block;
+    height: 100%;
+    object-fit: cover;
+    width: 100%;
+  }
+
+  /* the ticket stub: the name in the review notes' handwriting, the running time behind a tear line */
+  .film-card-stub {
+    align-items: center;
+    background: rgb(255 255 255 / 94%);
+    border-radius: 20px;
+    box-shadow: 0 4px 14px rgb(44 62 80 / 18%);
+    display: inline-flex;
+    gap: 8px;
+    left: 14px;
+    padding: 5px 12px;
+    position: absolute;
+    top: 12px;
+  }
+  /* 1.25rem Caveat 700 is the floor: Heritage Orange on white is 3.37:1, large text only. */
+  .film-card-stub-title {
+    color: var(--heritage-orange, #f15d22);
+    font-family: 'Caveat Variable', Caveat, cursive;
+    font-size: 1.25rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .film-card-stub-dur {
+    border-left: 1px dashed rgb(44 62 80 / 30%);
+    color: var(--deep-slate, #2c3e50);
+    font-family: var(--font-outfit, 'Outfit Variable', Outfit, sans-serif);
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    line-height: 1.2;
+    padding-left: 8px;
+  }
+
+  /* the round play button: a white ring around the orange-to-terracotta disc */
+  .film-card-play {
+    align-items: center;
+    background: rgb(255 255 255 / 92%);
+    border-radius: 50%;
+    box-shadow: 0 10px 30px rgb(44 62 80 / 25%);
+    display: inline-flex;
+    height: 60px;
+    justify-content: center;
+    left: 50%;
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    transition: transform 200ms ease;
+    width: 60px;
+  }
+  .film-card-button:hover .film-card-play {
+    transform: translate(-50%, -50%) scale(1.06);
+  }
+  .film-card-play-tri {
+    background: linear-gradient(135deg, var(--heritage-orange, #f15d22), var(--terracotta, #e67e22));
+    border-radius: 50%;
+    height: 48px;
+    position: relative;
+    width: 48px;
+  }
+  .film-card-play-tri::after {
+    border-bottom: 10px solid transparent;
+    border-left: 16px solid #fff;
+    border-top: 10px solid transparent;
+    content: "";
+    left: 19px;
+    position: absolute;
+    top: 14px;
+  }
+
+  .film-card-cap {
+    align-items: flex-end;
+    background: linear-gradient(180deg, transparent, rgb(44 62 80 / 72%));
+    bottom: 0;
+    color: #fff;
+    display: flex;
+    font-family: var(--font-outfit, 'Outfit Variable', Outfit, sans-serif);
+    font-size: 0.875rem;
+    font-weight: 600;
+    gap: 12px;
+    justify-content: space-between;
+    left: 0;
+    line-height: 1.3;
+    padding: 30px 16px 11px;
+    position: absolute;
+    right: 0;
+  }
+  .film-card-cap-text {
+    min-width: 0;
+    text-wrap: balance;
+  }
+  .film-card-sound {
+    filter: drop-shadow(0 1px 3px rgb(0 0 0 / 40%));
+    flex: none;
+  }
+
+  /* the lightbox. padding 0 with the content in .film-dialog-box, so a click that lands
+     on the dialog element itself can only be a backdrop click */
+  .film-dialog {
+    background: transparent;
+    border: 0;
+    /* Tailwind's preflight (global.css) zeroes the user-agent `margin: auto` that centres a modal dialog;
+       restated here with the fixed inset so the box sits in the middle of the viewport */
+    inset: 0;
+    margin: auto;
+    max-height: none;
+    max-width: none;
+    overflow: visible;
+    padding: 0;
+    position: fixed;
+    width: min(calc(100vw - 32px), 1100px, calc((100vh - 32px) * 16 / 9));
+  }
+  .film-dialog::backdrop {
+    background: rgb(21 30 39 / 88%);
+  }
+  .film-dialog-box {
+    aspect-ratio: 16 / 9;
+    background: #000;
+    border-radius: 20px;
+    box-shadow: 0 30px 80px rgb(0 0 0 / 50%);
+    overflow: hidden;
+    position: relative;
+  }
+  .film-dialog-video {
+    display: block;
+    height: 100%;
+    width: 100%;
+  }
+  .film-dialog-close-form {
+    margin: 0;
+    position: absolute;
+    right: 12px;
+    top: 12px;
+    z-index: 2;
+  }
+  .film-dialog-close {
+    background: rgb(255 255 255 / 90%);
+    border: 0;
+    border-radius: 50%;
+    color: var(--deep-slate, #2c3e50);
+    cursor: pointer;
+    font-family: var(--font-outfit, 'Outfit Variable', Outfit, sans-serif);
+    font-size: 1.125rem;
+    font-weight: 700;
+    height: 40px;
+    line-height: 1;
+    padding: 0;
+    width: 40px;
+  }
+  .film-dialog-close:focus-visible {
+    outline: 3px solid var(--heritage-orange, #f15d22);
+    outline-offset: 2px;
+  }
+  /* white on Deep Slate, centred over the empty player */
+  .film-dialog-fail {
+    background: var(--deep-slate, #2c3e50);
+    border-radius: 16px;
+    color: #fff;
+    font-family: var(--font-inter, 'Inter Variable', Inter, sans-serif);
+    font-size: 0.875rem;
+    left: 50%;
+    line-height: 1.5;
+    margin: 0;
+    max-width: calc(100% - 32px);
+    padding: 10px 16px;
+    position: absolute;
+    text-align: center;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: max-content;
+    z-index: 1;
+  }
+
+  /* showModal() does not lock the page's scroll; this does, with no script */
+  :global(body:has(dialog[open])) {
+    overflow: hidden;
+  }
+
+  @media (max-width: 640px) {
+    .film-card {
+      margin-top: 22px;
+    }
+    .film-card-cap {
+      font-size: 0.8125rem;
+      padding: 26px 12px 9px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .film-card-button,
+    .film-card-play {
+      transition: none;
+    }
+    .film-card-button:hover {
+      transform: none;
+    }
+    .film-card-button:hover .film-card-play {
+      transform: translate(-50%, -50%);
+    }
+  }
+</style>
+
+<script>
+  import { NARROW_MQ, errorReason, newMilestones } from '../lib/films';
+  import { track } from '../lib/plausible';
+
+  type Stage = 'teaser' | 'film';
+
+  /** One card's elements, URLs and state. Every handler below takes it as its first argument. */
+  interface Card {
+    card: HTMLButtonElement;
+    teaser: HTMLVideoElement;
+    dialog: HTMLDialogElement;
+    film: HTMLVideoElement;
+    fail: HTMLElement;
+    urls: { film720: string; film1080: string; loop640: string; loop960: string; poster: string };
+    prefix: string;
+    loc: string;
+    /** At least half the card is on screen (the 0.5 observer). */
+    visible: boolean;
+    /** `Seen` already sent this page view. */
+    seen: boolean;
+    /** One `Error` per stage: the teaser's per page view, the film's per opening. */
+    reported: Record<Stage, boolean>;
+    /** Progress milestones sent this opening. */
+    fired: Set<number>;
+  }
+
+  const UPLOAD_HINT =
+    "Check the file with the ops repo's scripts/media/upload-media.sh verify <film>/<version>; a missing key returns the 404 page as HTML, so the video reports MEDIA_ERR_SRC_NOT_SUPPORTED.";
+
+  function readCard(root: HTMLElement): Card | null {
+    const teaser = root.querySelector<HTMLVideoElement>('.film-card-teaser');
+    const card = root.querySelector<HTMLButtonElement>('.film-card-button');
+    const dialog = root.querySelector<HTMLDialogElement>('.film-dialog');
+    const film = root.querySelector<HTMLVideoElement>('.film-dialog-video');
+    const fail = root.querySelector<HTMLElement>('.film-dialog-fail');
+    const { film720, film1080, loop640, loop960, poster, prefix, loc } = root.dataset;
+    if (!teaser || !card || !dialog || !film || !fail || !film720 || !film1080 || !loop640 || !loop960 || !poster || !prefix || !loc) {
+      console.warn('[FilmCard] incomplete markup or data attributes; the card stays inert. Check FilmCard.astro.', root);
+      return null;
+    }
+    return {
+      card,
+      teaser,
+      dialog,
+      film,
+      fail,
+      urls: { film720, film1080, loop640, loop960, poster },
+      prefix,
+      loc,
+      visible: false,
+      seen: false,
+      reported: { teaser: false, film: false },
+      fired: new Set(),
+    };
+  }
+
+  function send(c: Card, action: string, props: Record<string, string> = {}): void {
+    track(`${c.prefix}: ${action}`, { location: c.loc, ...props });
+  }
+
+  function narrow(): boolean {
+    return window.matchMedia(NARROW_MQ).matches;
+  }
+
+  function filmUrl(c: Card): string {
+    return narrow() ? c.urls.film720 : c.urls.film1080;
+  }
+
+  function reportError(c: Card, stage: Stage, reason: string): void {
+    if (c.reported[stage]) return;
+    c.reported[stage] = true;
+    send(c, 'Error', { stage, reason });
+    const url = (stage === 'teaser' ? c.teaser : c.film).currentSrc || '(no src)';
+    console.warn(`[FilmCard] ${stage} failed (${reason}) for ${url}. ${UPLOAD_HINT}`);
+  }
+
+  function onPlayRejected(c: Card, stage: Stage, err: unknown): void {
+    // The media `error` event and the play() rejection race for the once-per-stage slot;
+    // when the element already holds a MediaError, report that, so one outage has one reason.
+    const el = stage === 'teaser' ? c.teaser : c.film;
+    const reason = el.error ? errorReason(el.error) : errorReason(err);
+    // AbortError: our own pause() or src change interrupted a pending play(); expected.
+    if (reason === 'AbortError') return;
+    // A teaser NotAllowedError is a device setting (iOS Low Power Mode, an autoplay policy),
+    // not a defect: the poster stays up and Error stays a defect signal.
+    if (stage === 'teaser' && reason === 'NotAllowedError') return;
+    // Anything else: the teaser keeps its poster, the film its native controls.
+    reportError(c, stage, reason);
+  }
+
+  /** The only way the teaser starts: never without a src, off screen, or behind the open dialog. */
+  function playTeaser(c: Card): void {
+    if (!c.teaser.getAttribute('src') || !c.visible || c.dialog.open) return;
+    c.teaser.play().catch((err: unknown) => onPlayRejected(c, 'teaser', err));
+  }
+
+  function pauseTeaser(c: Card): void {
+    c.teaser.pause();
+  }
+
+  /** Poster, then (motion and data allowing) the teaser. Runs once, when the card nears the viewport. */
+  function reveal(c: Card): void {
+    c.teaser.poster = c.urls.poster;
+    const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const saveData = (navigator as unknown as { connection?: { saveData?: boolean } }).connection?.saveData === true;
+    if (still || saveData) return; // poster only, by choice: not an error
+    c.teaser.src = narrow() ? c.urls.loop640 : c.urls.loop960;
+    playTeaser(c);
+  }
+
+  function onNear(c: Card, entries: IntersectionObserverEntry[], observer: IntersectionObserver): void {
+    if (!entries.some((entry) => entry.isIntersecting)) return;
+    observer.disconnect();
+    reveal(c);
+  }
+
+  function onVisibility(c: Card, entries: IntersectionObserverEntry[]): void {
+    // intersectionRatio, not isIntersecting: the latter is true at any overlap and would inflate Seen.
+    c.visible = entries[entries.length - 1].intersectionRatio >= 0.5;
+    if (c.visible && !c.seen) {
+      c.seen = true;
+      send(c, 'Seen');
+    }
+    if (c.visible) playTeaser(c);
+    else pauseTeaser(c);
+  }
+
+  /** Armed after `load`, so no media request competes with the page's own. */
+  function arm(c: Card): void {
+    if (!('IntersectionObserver' in window)) {
+      c.teaser.poster = c.urls.poster; // no observer: the poster at once, no teaser
+      return;
+    }
+    const near: IntersectionObserver = new IntersectionObserver((entries) => onNear(c, entries, near), {
+      rootMargin: '300px',
+    });
+    const half = new IntersectionObserver((entries) => onVisibility(c, entries), { threshold: 0.5 });
+    near.observe(c.card);
+    half.observe(c.card);
+  }
+
+  function onCardClick(c: Card): void {
+    const url = filmUrl(c);
+    if (typeof c.dialog.showModal !== 'function') {
+      location.href = url; // no <dialog> support: the browser's own player
+      return;
+    }
+    pauseTeaser(c);
+    // Every Play needs its Seen (the play-rate denominator): keyboard activation or a click
+    // on a sliver of the card can arrive before the 0.5 observer has reported.
+    if (!c.seen) {
+      c.seen = true;
+      send(c, 'Seen');
+    }
+    c.fail.hidden = true;
+    c.reported.film = false;
+    c.fired.clear();
+    try {
+      c.dialog.showModal();
+    } catch (err) {
+      console.warn('[FilmCard] showModal() failed; opening the film URL instead.', err);
+      location.href = url;
+      return;
+    }
+    // Reassigning src (even the same value) restarts the load: after a media error the
+    // element stays in its error state and play() would reject without ever retrying.
+    if (c.film.error || c.film.getAttribute('src') !== url) c.film.src = url;
+    c.film.play().catch((err: unknown) => onPlayRejected(c, 'film', err));
+  }
+
+  /** Esc, the close button and a backdrop click all end here. */
+  function onDialogClose(c: Card): void {
+    c.film.pause();
+    c.film.currentTime = 0;
+    playTeaser(c);
+  }
+
+  function onDialogClick(c: Card, e: MouseEvent): void {
+    // Native <dialog> does not close on a backdrop click (and `closedby` is not in Safari).
+    if (e.target === c.dialog) c.dialog.close();
+  }
+
+  function onProgress(c: Card, currentTime: number): void {
+    for (const percent of newMilestones(currentTime, c.film.duration, c.fired)) {
+      c.fired.add(percent);
+      send(c, 'Progress', { percent: String(percent) });
+    }
+  }
+
+  function onTeaserError(c: Card): void {
+    reportError(c, 'teaser', errorReason(c.teaser.error));
+  }
+
+  function onFilmError(c: Card): void {
+    c.fail.hidden = false;
+    reportError(c, 'film', errorReason(c.film.error));
+  }
+
+  function setupFilmCard(root: HTMLElement): void {
+    const c = readCard(root);
+    if (!c) return;
+    c.card.addEventListener('click', () => onCardClick(c));
+    c.dialog.addEventListener('click', (e) => onDialogClick(c, e));
+    c.dialog.addEventListener('close', () => onDialogClose(c));
+    c.teaser.addEventListener('error', () => onTeaserError(c));
+    c.film.addEventListener('error', () => onFilmError(c));
+    c.film.addEventListener('timeupdate', () => onProgress(c, c.film.currentTime));
+    // `ended` counts as the full duration: some engines stop currentTime a frame short.
+    c.film.addEventListener('ended', () => onProgress(c, c.film.duration));
+    if (document.readyState === 'complete') arm(c);
+    else window.addEventListener('load', () => arm(c), { once: true });
+  }
+
+  document.querySelectorAll<HTMLElement>('[data-film-card]').forEach(setupFilmCard);
+</script>
