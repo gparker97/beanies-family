@@ -21,9 +21,9 @@
  *   <id>               → route change        → null  (close)
  *   <id>               → finance perms lost  → null  (close + console.warn)
  *
- * Navigation is plain `router.push` — same as the original flat navbar.
- * No history-state markers, no async coordination — closeStack is a pure
- * UI state change.
+ * Navigation goes through `navigateTo` (`usePlannerToday`), a `router.push`
+ * that puts the planner on today when that is where it lands. No history-state
+ * markers, no async coordination — closeStack is a pure UI state change.
  */
 import { computed, nextTick, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
@@ -40,7 +40,7 @@ import {
   type MobileNavCategory,
   type StackableCategoryId,
 } from '@/constants/navigation';
-import { requestGoToday } from '@/composables/usePlannerToday';
+import { navigateTo } from '@/composables/usePlannerToday';
 
 const route = useRoute();
 const router = useRouter();
@@ -142,15 +142,11 @@ function closeStack() {
 }
 
 function navigate(path: string) {
-  // The planner is reachable from two slots (center Calendar hero + the new
-  // Planning-stack Activities bean); either should jump to today, including when
-  // we're already on /activities (a router.push no-op, so the page's route watch
-  // never fires). The signal handles both the same-page and cross-page cases.
-  if (path === '/activities') requestGoToday();
-  router.push(path).catch((err: unknown) => {
-    // vue-router rejects on duplicate / cancelled navigation; not user-facing.
-    console.warn('[MobileBottomNav] navigation swallowed:', err);
-  });
+  // The planner is reachable from two slots (center Calendar hero + the
+  // Planning-stack Activities bean); either lands on today, including when we're
+  // already on /activities (a duplicate navigation no route watch sees).
+  // `navigateTo` handles that and logs a failed navigation to the firehose.
+  navigateTo(router, path);
 }
 
 // ---------------------------------------------------------------------------

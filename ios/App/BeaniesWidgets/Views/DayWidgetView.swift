@@ -66,7 +66,7 @@ struct DayWidgetView: View {
                         )
                     }
                 }
-                // Any tap outside an item opens the Nook.
+                // Any tap outside an item opens the calendar on today.
                 .widgetURL(WidgetLinks.url(snapshot.links.nook, size))
             } else {
                 refreshState(size: size, m: m)
@@ -81,7 +81,7 @@ struct DayWidgetView: View {
             title: String(localized: "widget_refresh"),
             line: nil,
             image: "covering-eyes",
-            link: WidgetLinks.url(WidgetLinks.nookFallback, size),
+            link: WidgetLinks.url(WidgetLinks.calendarFallback, size),
             m: m
         )
     }

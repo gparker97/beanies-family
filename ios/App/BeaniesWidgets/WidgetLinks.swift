@@ -26,15 +26,15 @@ enum WidgetLinks {
     /// The signed-out state's target (no snapshot exists, so it cannot come from one).
     static let signedOut = "https://app.beanies.family/welcome?src=widget"
     /// The unreadable state's target, and the fallback for a missing or malformed link.
-    static let nookFallback = "https://app.beanies.family/nook?src=widget"
+    static let calendarFallback = "https://app.beanies.family/activities?view=day&src=widget"
 
     /// `raw` with `w=<size>` appended to its query. Snapshot links are absolute https URLs
     /// that already carry `src=widget`; anything else (empty, unparseable, another scheme)
-    /// falls back to the Nook so a tap always lands somewhere sensible.
+    /// falls back to the calendar on today so a tap always lands somewhere sensible.
     static func url(_ raw: String?, _ size: WidgetSizeKey) -> URL {
         if let raw, let url = tagged(raw, size) { return url }
-        if let url = tagged(nookFallback, size) { return url }
-        return URL(string: "https://app.beanies.family/nook")!
+        if let url = tagged(calendarFallback, size) { return url }
+        return URL(string: "https://app.beanies.family/activities?view=day")!
     }
 
     private static func tagged(_ raw: String, _ size: WidgetSizeKey) -> URL? {

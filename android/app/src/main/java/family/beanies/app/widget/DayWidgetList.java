@@ -57,7 +57,7 @@ final class DayWidgetList {
     private final WidgetSizes.Size size;
     private final boolean whosWhere;
     private final boolean isChild;
-    private final String nookLink;
+    private final String fallbackLink;
     private final String tomorrowLabel;
     private final float leadDp;
     /** The widget's Text size multiplier ({@link WidgetSizes#textScale}). */
@@ -73,7 +73,7 @@ final class DayWidgetList {
         this.textScale = textScale;
         this.whosWhere = plan.shows(WidgetFill.WHOS_WHERE);
         this.isChild = plan.isChild;
-        this.nookLink = plan.snapshot.links.nook;
+        this.fallbackLink = plan.snapshot.links.nook;
         this.tomorrowLabel = plan.snapshot.labels.tomorrow;
         this.leadDp = WidgetViews.leadColumnDp(context, plan, textScale);
     }
@@ -209,6 +209,6 @@ final class DayWidgetList {
 
     /** The row's link + `w=<size>`, merged into the list's click template. */
     private Intent fillIn(String link) {
-        return new Intent().setData(WidgetViews.withSize(WidgetViews.or(link, nookLink), size));
+        return new Intent().setData(WidgetViews.withSize(WidgetViews.or(link, fallbackLink), size));
     }
 }

@@ -13,6 +13,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 ### Changed
 
 - The homepage no longer shows the five-star rating counter beside the store badges; it returns on its own once the stores pass 50 ratings. The named reviews and badges stay.
+- Tapping an event on the home-screen widget now opens that day in the calendar; the date and the widget itself open today.
+
+### Fixed
+
+- The calendar always opens on today when you reach it from the menu, the tab bar, the Nook or the widget; it no longer comes back on an earlier day.
 
 ## 2026-11-01
 

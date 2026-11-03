@@ -270,7 +270,9 @@ export function useMonthStream(
   }
 
   function probeMonthInView(): void {
-    if (!scroller) return;
+    const root = options.root.value;
+    // A root under `display:none` (App.vue's `v-show` cold start) measures every header at one offset.
+    if (!scroller || !root || root.offsetParent === null) return;
     // Upper-third probe line: the month filling the top of the screen is the
     // one the user reads as "current", which is what the label should say.
     const probeLine = scroller.scrollTop + scroller.clientHeight / 3;

@@ -88,7 +88,12 @@ import { WIDGET_PAGE_PATHS } from '@/constants/externalDeepLinkPaths';
 import { mealDisplayName } from '@/utils/mealDisplayName';
 import { tripDayProgress, tripPhase } from '@/utils/vacation';
 import { birthdaysInRange, MAX_AGE_SHOWN_ON_CALENDAR } from '@/utils/birthdays';
-import { ENTITY_DEEP_LINKS, entityDeepLink, type DeepLink } from '@/utils/entityDeepLink';
+import {
+  ENTITY_DEEP_LINKS,
+  entityDeepLink,
+  plannerDayLink,
+  type DeepLink,
+} from '@/utils/entityDeepLink';
 import { shareableOrigin } from '@/utils/shareableOrigin';
 import { formatUiDate } from '@/utils/uiLocale';
 import { addDaysYmd, extractDatePart, formatTime12 } from '@/utils/date';
@@ -433,7 +438,7 @@ const eventsPart: DayPart = {
             isDutyDone(role === 'dropoff' ? a.dropoffCompletions : a.pickupCompletions, occ.date)
           ),
         handoff: null,
-        link: widgetLink(ctx.origin, entityDeepLink('activity', a.id, { date: occ.date })),
+        link: widgetLink(ctx.origin, plannerDayLink(occ.date)),
       };
       ctx.entries.push({ occ, ctx: actx, row });
     }
@@ -1228,7 +1233,7 @@ export function buildWidgetSnapshot(
       circleToDo: t('widget.circleToDo'),
     },
     links: {
-      nook: widgetLink(origin, { path: WIDGET_PAGE_PATHS.nook, query: {} }),
+      nook: widgetLink(origin, plannerDayLink()),
       todo: todoPageLink(origin),
     },
     days,

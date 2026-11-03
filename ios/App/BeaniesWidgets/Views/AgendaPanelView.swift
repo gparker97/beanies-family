@@ -128,7 +128,7 @@ struct AgendaPanelView: View {
 }
 
 /// The footer under the panel: "tonight: **tacos**, Sam cooks" (meals block) or, when the
-/// snapshot is stale, "as of 07:12", and "later ›" (the Nook) on the right.
+/// snapshot is stale, "as of 07:12", and "later ›" (the calendar on today) on the right.
 struct FooterView: View {
     let tonight: WSTonight?
     let asOf: String?

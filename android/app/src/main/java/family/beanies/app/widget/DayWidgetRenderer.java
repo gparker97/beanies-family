@@ -194,7 +194,7 @@ final class DayWidgetRenderer {
 
         bindTasks(v, context, id, size, textScale, plan);
 
-        // Footer: tonight (meals block) and "later ›" (always, to the Nook).
+        // Footer: tonight (meals block) and "later ›" (always, to the calendar on today).
         boolean tonight = plan.shows(WidgetFill.MEALS) && day != null && day.tonight != null
                 && !day.tonight.text.text.isEmpty();
         v.setViewVisibility(R.id.footer_tonight, tonight ? View.VISIBLE : View.INVISIBLE);
@@ -433,7 +433,7 @@ final class DayWidgetRenderer {
     /** File present but unreadable / an unknown version: never shown as signed out. */
     private static RemoteViews refresh(Context context, int id, WidgetSizes.Size size, float widthDp,
             WidgetPrefs prefs, float textScale) {
-        return message(context, id, size, widthDp, prefs, textScale, WidgetViews.FALLBACK_NOOK,
+        return message(context, id, size, widthDp, prefs, textScale, WidgetViews.FALLBACK_CALENDAR,
                 context.getString(R.string.widget_refresh), "");
     }
 
@@ -552,7 +552,7 @@ final class DayWidgetRenderer {
         // the edge read as a separate ring. Solid: the inner surface stays, as before.
         v.setInt(R.id.widget_inner, "setImageAlpha", opacity < 100 ? 0 : 255);
         WidgetViews.onClick(v, R.id.widget_root, context, id, WidgetViews.SLOT_ROOT,
-                WidgetViews.or(link, WidgetViews.FALLBACK_NOOK), size);
+                WidgetViews.or(link, WidgetViews.FALLBACK_CALENDAR), size);
     }
 
     /**

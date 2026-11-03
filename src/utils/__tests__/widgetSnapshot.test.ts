@@ -904,6 +904,30 @@ describe('buildWidgetSnapshot: failure isolation and links', () => {
     }
   });
 
+  it('opens the calendar Day view: event rows on their date, the date column on today', () => {
+    const s = build().snapshot;
+    const events = today(s).my!.rows.filter((r) => r.kind === 'event');
+    expect(events.length).toBeGreaterThan(0);
+    for (const row of events) {
+      expect(row.link).toBe(`${ORIGIN}/activities?view=day&d=${TODAY}&src=widget`);
+    }
+    for (const h of today(s).my!.handoffs ?? []) {
+      expect(h.link).toBe(`${ORIGIN}/activities?view=day&d=${TODAY}&src=widget`);
+    }
+    expect(s.links.nook).toBe(`${ORIGIN}/activities?view=day&src=widget`);
+  });
+
+  it('keeps the item links for to-dos, lists, trips and birthdays', () => {
+    const links = (kind: string) =>
+      s.days
+        .flatMap((d) => [...(d.my?.rows ?? []), ...(d.our?.rows ?? [])])
+        .filter((r) => r.kind === kind);
+    const s = build().snapshot;
+    for (const row of links('birthday')) expect(row.link).toContain('/family?edit=');
+    for (const row of links('trip')) expect(row.link).toContain('/travel?vacation=');
+    expect(s.links.todo).toContain('/todo');
+  });
+
   it('links the meal planner only while its flag is on', () => {
     const off = build({ flags: { mealPlanner: false, helpfulHints: true } }).snapshot;
     expect(today(off).my!.tonight).toBeNull();

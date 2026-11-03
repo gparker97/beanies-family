@@ -16,6 +16,8 @@ import { usePassphraseNudge } from '@/composables/usePassphraseNudge';
 import { installNativeAuthListener } from '@/services/google/googleAuth';
 import { installInboundLinkListener } from '@/services/share/inboundLinkBridge';
 import { isSameOriginReturnPath } from '@/services/google/redirectState';
+import { navigateTo } from '@/composables/usePlannerToday';
+import { PLANNER_ROUTE_NAME } from '@/constants/navigation';
 import { isNative } from '@/services/sync/capabilities';
 import { useLocalNotifications } from '@/composables/useLocalNotifications';
 import { useWidgetSnapshot } from '@/composables/useWidgetSnapshot';
@@ -431,7 +433,7 @@ const headerReclaimed = useHeaderReclaimed();
 // would otherwise leave a band where events scroll visibly above the pinned bar
 // (sticky `top:0` rests at the padding edge), so we drop ONLY the top padding on
 // that route — both breakpoints. The command bar supplies its own top spacing.
-const isPlannerRoute = computed(() => route.name === 'Activities');
+const isPlannerRoute = computed(() => route.name === PLANNER_ROUTE_NAME);
 // Phase 4: ONE active auth prompt at a time, resolved by the data-driven sequencer
 // in `authPrompts.ts` (pin → kit → native-biometric → trust). null = nothing shown.
 const activeAuthPrompt = ref<AuthPromptId | null>(null);
@@ -1974,9 +1976,8 @@ installNativeAuthListener((returnPath) => {
 // listener and re-checks the OAuth shape itself, so the two cannot double-handle one
 // event. Without this the Universal Link / App Link opens the app and nothing happens.
 installInboundLinkListener(
-  (path) => {
-    void router.replace(isSameOriginReturnPath(path) ? path : '/');
-  },
+  // A warm native widget tap can arrive while the planner is already mounted; navigateTo puts it on today.
+  (path) => navigateTo(router, isSameOriginReturnPath(path) ? path : '/', { replace: true }),
   // Native device-approval delivery. Injected rather than inferred from a route change —
   // see the warning on `installInboundLinkListener` and on the removed watcher above.
   (key, delivery) => approvalDelivery.deliver(key, delivery)

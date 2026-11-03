@@ -15,6 +15,7 @@ import { showToast } from '@/composables/useToast';
 import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry';
 import { QUICK_ADD_CONTEXT_KEYS } from '@/constants/quickAddItems';
+import { PLANNER_ROUTE_NAME } from '@/constants/navigation';
 import { isFlagEnabled, type DevFlag } from '@/config/flags';
 import { isPlanPageReachable } from '@/services/billing/pricingGate';
 import { tryRecoverChunkLoad } from '@/utils/hardReload';
@@ -267,7 +268,7 @@ const routes: RouteRecordRaw[] = [
   // so Back from a day returns to the month on that date; it owns its scroller (`scrollRestore`).
   {
     path: '/activities',
-    name: 'Activities',
+    name: PLANNER_ROUTE_NAME,
     component: () => import('@/pages/FamilyPlannerPage.vue'),
     meta: { titleKey: 'nav.activities', requiresAuth: true, scrollRestore: false },
   },

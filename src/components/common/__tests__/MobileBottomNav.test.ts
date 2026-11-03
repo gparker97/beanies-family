@@ -9,9 +9,12 @@ vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: vi.fn() }));
 const mockRoute = reactive({ path: '/nook' });
 const mockPush = vi.fn(() => Promise.resolve());
 
-vi.mock('vue-router', () => ({
+// Keep the real exports (navigateTo uses isNavigationFailure); stub only the composables.
+vi.mock('vue-router', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('vue-router')>()),
   useRoute: () => mockRoute,
-  useRouter: () => ({ push: mockPush }),
+  // navigateTo reads where the push landed; a non-planner route sets no today flag.
+  useRouter: () => ({ push: mockPush, currentRoute: { value: { name: 'Home', query: {} } } }),
 }));
 
 vi.mock('@/composables/useTranslation', () => ({

@@ -91,7 +91,7 @@ struct DayAccessoryView: View {
         if isSignedOut {
             return WidgetLinks.url(WidgetLinks.signedOut, .accessory)
         }
-        return WidgetLinks.url(WidgetLinks.nookFallback, .accessory)
+        return WidgetLinks.url(WidgetLinks.calendarFallback, .accessory)
     }
 
     @ViewBuilder private var content: some View {
@@ -235,7 +235,7 @@ struct DayAccessoryView: View {
         WidgetFill.circle(day, labels: snapshot.labels, show: entry.blocks.circleShow, blocks: entry.blocks, at: entry.date)
     }
 
-    /// The circle's tap target: the item or the handoff's activity, the to-dos page, or the Nook.
+    /// The circle's tap target: the item or the handoff's activity, the to-dos page, or the calendar on today.
     private func circleLink(_ pick: CirclePick, _ snapshot: WSSnapshot) -> String {
         switch pick {
         case .nextUp(let next): return next?.row.link ?? snapshot.links.nook

@@ -55,6 +55,23 @@ export const ENTITY_DEEP_LINKS: Readonly<Record<DeepLinkType, { path: string; pa
   } as const);
 
 /**
+ * The planner's Day view, on `ymd` (a `YYYY-MM-DD` string), or on today when `ymd` is omitted
+ * (a fresh planner mount with no `d` is today). Widgets mint this for every calendar tap.
+ *
+ * The RECEIVER is `parsePlannerQuery` in `src/composables/usePlannerUrlState.ts`; the in-app
+ * writer of the same `view`/`d` keys is `toPlannerQuery` there. The two are deliberately
+ * separate: this module must stay free of Vue and vue-router so `widgetSnapshot.ts` and the
+ * OS-claim tripwire can import it. They are held in step by the round-trip unit test in
+ * `__tests__/entityDeepLink.test.ts`.
+ */
+export function plannerDayLink(ymd?: string): DeepLink {
+  return {
+    path: ENTITY_DEEP_LINKS.activity.path,
+    query: ymd ? { view: 'day', d: ymd } : { view: 'day' },
+  };
+}
+
+/**
  * `extra` adds companion query params the receiver reads beside the id, e.g.
  * `{ date }` so an activity link opens on one session of a repeating activity.
  */

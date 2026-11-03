@@ -39,7 +39,7 @@ enum SampleSnapshot {
             )
         }
 
-        let nook = WidgetLinks.nookFallback
+        let nook = WidgetLinks.calendarFallback
         let sam = WSDot.member(initial: "S", color: "#2C3E50", ink: "#FFFFFF")
         let jo = WSDot.member(initial: "J", color: "#AED6F1", ink: "#2C3E50")
         let ava = WSDot.member(initial: "A", color: "#E67E22", ink: "#2C3E50")

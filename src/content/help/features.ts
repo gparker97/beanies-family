@@ -317,7 +317,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       "A beanies widget shows today's plan right on your phone's Home Screen, so you can see what's on without opening the app, and one tap takes you to the right screen.",
     icon: '\u{1F4F1}',
     readTime: 5,
-    updatedDate: '2026-10-18',
+    updatedDate: '2026-11-03',
     sections: [
       {
         type: 'paragraph',
@@ -489,8 +489,8 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         type: 'list',
         content: '',
         items: [
-          'Tap an event to open it, dinner to open the meal planner, or what is due to open your to-dos.',
-          'Tap <strong>later ›</strong> to open beanies on the Nook.',
+          'Tap an event to open that day in the calendar; dinner opens the meal planner; what is due opens your to-dos.',
+          'Tap the date, or <strong>later ›</strong>, to open today in the calendar.',
           'If the widget says <strong>open beanies to refresh</strong>, it could not read its information. Opening beanies fixes it.',
           'If it says <strong>sign in to see your day</strong>, you are signed out. Open beanies and sign in.',
         ],

@@ -439,7 +439,10 @@ export interface WidgetWeather {
 
 /** Absolute https links (with `src=widget`) for surfaces that are not an item. */
 export interface WidgetLinks {
-  /** The date column, "later ›", and any tap outside an item. */
+  /**
+   * The date column, "later ›", and any tap outside an item: the calendar on today
+   * (historically the Nook; JSON key kept for v3 readers).
+   */
   nook: string;
   /** The due count. */
   todo: string;

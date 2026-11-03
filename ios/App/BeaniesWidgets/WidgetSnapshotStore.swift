@@ -199,8 +199,9 @@ struct WSLabels {
 }
 
 struct WSLinks {
-    var nook: String = WidgetLinks.nookFallback
-    var todo: String = WidgetLinks.nookFallback
+    /// The calendar on today (historically the Nook; the JSON key `nook` is kept for v3 snapshots).
+    var nook: String = WidgetLinks.calendarFallback
+    var todo: String = WidgetLinks.calendarFallback
 }
 
 struct WSViewer {
@@ -548,9 +549,9 @@ extension WSLinks: Decodable {
     private enum CodingKeys: String, CodingKey { case nook, todo }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        let nookLink = c.lenient(String.self, .nook, WidgetLinks.nookFallback)
-        nook = nookLink
-        todo = c.lenient(String.self, .todo, nookLink)
+        let calendarLink = c.lenient(String.self, .nook, WidgetLinks.calendarFallback)
+        nook = calendarLink
+        todo = c.lenient(String.self, .todo, calendarLink)
     }
 }
 

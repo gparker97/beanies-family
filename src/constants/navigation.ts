@@ -85,6 +85,13 @@ function mobileCategoriesOf(item: {
 /** The Bean Pod's anchor: the hugging beanies at icon size (source in packages/brand/assets/shared). */
 export const POD_ANCHOR_SRC = '/brand/beanies_family_hugging_transparent_64x64.png';
 
+/**
+ * The family planner's route name (`/activities` in `router/index.ts`). Every
+ * "are we on the planner?" check reads this, so a rename cannot silently disable
+ * the planner's URL state or its reset-to-today wiring.
+ */
+export const PLANNER_ROUTE_NAME = 'Activities';
+
 /** Sidebar/drawer accordion sections, in display order (the phone tab order). */
 export const NAV_SECTIONS: NavSectionDef[] = [
   {

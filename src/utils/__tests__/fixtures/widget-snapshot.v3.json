@@ -30,7 +30,7 @@
     "circleToDo": "to do"
   },
   "links": {
-    "nook": "https://app.beanies.family/nook?src=widget",
+    "nook": "https://app.beanies.family/activities?view=day&src=widget",
     "todo": "https://app.beanies.family/todo?src=widget"
   },
   "days": [
@@ -65,7 +65,7 @@
               "line": "Sam drops off, Jo picks up 12:30pm",
               "avatars": ["father", "mother"]
             },
-            "link": "https://app.beanies.family/activities?date=2026-10-11&activity=party&src=widget"
+            "link": "https://app.beanies.family/activities?view=day&d=2026-10-11&src=widget"
           },
           {
             "id": "swim:2026-10-11",
@@ -86,7 +86,7 @@
             },
             "isDone": false,
             "handoff": null,
-            "link": "https://app.beanies.family/activities?date=2026-10-11&activity=swim&src=widget"
+            "link": "https://app.beanies.family/activities?view=day&d=2026-10-11&src=widget"
           },
           {
             "id": "piano:2026-10-11",
@@ -110,7 +110,7 @@
               "inlineTitle": "piano, Jo drives",
               "avatars": []
             },
-            "link": "https://app.beanies.family/activities?date=2026-10-11&activity=piano&src=widget"
+            "link": "https://app.beanies.family/activities?view=day&d=2026-10-11&src=widget"
           },
           {
             "id": "soccer:2026-10-11",
@@ -134,7 +134,7 @@
               "line": "Sam picks up 6:30pm",
               "avatars": ["father"]
             },
-            "link": "https://app.beanies.family/activities?date=2026-10-11&activity=soccer&src=widget"
+            "link": "https://app.beanies.family/activities?view=day&d=2026-10-11&src=widget"
           },
           {
             "id": "bedtime:2026-10-11",
@@ -155,7 +155,7 @@
             },
             "isDone": false,
             "handoff": null,
-            "link": "https://app.beanies.family/activities?date=2026-10-11&activity=bedtime&src=widget"
+            "link": "https://app.beanies.family/activities?view=day&d=2026-10-11&src=widget"
           }
         ],
         "tonight": {
@@ -267,13 +267,13 @@
             "at": 1791713700000,
             "kind": "dropoff",
             "name": "Max",
-            "link": "https://app.beanies.family/activities?date=2026-10-11&activity=party&src=widget"
+            "link": "https://app.beanies.family/activities?view=day&d=2026-10-11&src=widget"
           },
           {
             "at": 1791743400000,
             "kind": "pickup",
             "name": "Max",
-            "link": "https://app.beanies.family/activities?date=2026-10-11&activity=soccer&src=widget"
+            "link": "https://app.beanies.family/activities?view=day&d=2026-10-11&src=widget"
           }
         ]
       },
@@ -295,7 +295,7 @@
             },
             "isDone": false,
             "handoff": null,
-            "link": "https://app.beanies.family/activities?date=2026-10-11&activity=pancakes&src=widget"
+            "link": "https://app.beanies.family/activities?view=day&d=2026-10-11&src=widget"
           },
           {
             "id": "party:2026-10-11",
@@ -319,7 +319,7 @@
               "line": "Sam drops off, Jo picks up 12:30pm",
               "avatars": ["father", "mother"]
             },
-            "link": "https://app.beanies.family/activities?date=2026-10-11&activity=party&src=widget"
+            "link": "https://app.beanies.family/activities?view=day&d=2026-10-11&src=widget"
           },
           {
             "id": "swim:2026-10-11",
@@ -340,7 +340,7 @@
             },
             "isDone": false,
             "handoff": null,
-            "link": "https://app.beanies.family/activities?date=2026-10-11&activity=swim&src=widget"
+            "link": "https://app.beanies.family/activities?view=day&d=2026-10-11&src=widget"
           },
           {
             "id": "vet:2026-10-11",
@@ -361,7 +361,7 @@
             },
             "isDone": false,
             "handoff": null,
-            "link": "https://app.beanies.family/activities?date=2026-10-11&activity=vet&src=widget"
+            "link": "https://app.beanies.family/activities?view=day&d=2026-10-11&src=widget"
           },
           {
             "id": "piano:2026-10-11",
@@ -385,7 +385,7 @@
               "inlineTitle": "piano, Jo drives",
               "avatars": []
             },
-            "link": "https://app.beanies.family/activities?date=2026-10-11&activity=piano&src=widget"
+            "link": "https://app.beanies.family/activities?view=day&d=2026-10-11&src=widget"
           },
           {
             "id": "soccer:2026-10-11",
@@ -409,7 +409,7 @@
               "line": "Sam picks up 6:30pm",
               "avatars": ["father"]
             },
-            "link": "https://app.beanies.family/activities?date=2026-10-11&activity=soccer&src=widget"
+            "link": "https://app.beanies.family/activities?view=day&d=2026-10-11&src=widget"
           },
           {
             "id": "bedtime:2026-10-11",
@@ -430,7 +430,7 @@
             },
             "isDone": false,
             "handoff": null,
-            "link": "https://app.beanies.family/activities?date=2026-10-11&activity=bedtime&src=widget"
+            "link": "https://app.beanies.family/activities?view=day&d=2026-10-11&src=widget"
           }
         ],
         "tonight": {
@@ -597,7 +597,7 @@
               "inlineTitle": "playdate, Jo drives",
               "avatars": []
             },
-            "link": "https://app.beanies.family/activities?date=2026-10-12&activity=playdate&src=widget"
+            "link": "https://app.beanies.family/activities?view=day&d=2026-10-12&src=widget"
           }
         ],
         "tonight": null,
@@ -704,7 +704,7 @@
             },
             "isDone": false,
             "handoff": null,
-            "link": "https://app.beanies.family/activities?date=2026-10-12&activity=grandma&src=widget"
+            "link": "https://app.beanies.family/activities?view=day&d=2026-10-12&src=widget"
           },
           {
             "id": "playdate:2026-10-12",
@@ -728,7 +728,7 @@
               "inlineTitle": "playdate, Jo drives",
               "avatars": []
             },
-            "link": "https://app.beanies.family/activities?date=2026-10-12&activity=playdate&src=widget"
+            "link": "https://app.beanies.family/activities?view=day&d=2026-10-12&src=widget"
           }
         ],
         "tonight": null,
@@ -1092,7 +1092,7 @@
             },
             "isDone": false,
             "handoff": null,
-            "link": "https://app.beanies.family/activities?date=2026-10-14&activity=parents-evening&src=widget"
+            "link": "https://app.beanies.family/activities?view=day&d=2026-10-14&src=widget"
           }
         ],
         "tonight": null,
@@ -1202,7 +1202,7 @@
             },
             "isDone": false,
             "handoff": null,
-            "link": "https://app.beanies.family/activities?date=2026-10-14&activity=parents-evening&src=widget"
+            "link": "https://app.beanies.family/activities?view=day&d=2026-10-14&src=widget"
           }
         ],
         "tonight": null,

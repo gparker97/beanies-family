@@ -325,17 +325,37 @@ watch(
  * pixels off-screen with the card present in the DOM, so not even
  * `stream-anchor-failed` fires. This is the `scrollToTodayWhenSettled` guard
  * the old CalendarGrid carried, kept for the same reason.
+ *
+ * It also waits until the stream is RENDERED. On a cold start App.vue mounts the
+ * router-view under `v-show="!isLoadingData"` (the loading skeleton), so the
+ * planner mounts `display:none`: the scroller's height reads "stable" at once,
+ * every month header measures at the same offset, the anchor scrolls to 0 and the
+ * stream is left on the top of its window (the previous month) when the skeleton
+ * clears. The scroller cannot detect this: it is `<main>` (`getAppScroller`), which
+ * WRAPS the hidden router-view and keeps its full height throughout. The stream's
+ * own root can: `offsetParent` is null under a `display:none` ancestor. That test
+ * is also null for a `position: fixed` element, so the root must stay unpositioned.
+ * While hidden the loop waits one frame at a time without counting stable frames
+ * or starting the deadline; it ends when the root is gone (Vue nulls the template
+ * ref on unmount, including a view switch that removes the stream).
  */
 function whenLayoutSettles(run: () => void): void {
   if (typeof window === 'undefined' || typeof requestAnimationFrame !== 'function') {
     run();
     return;
   }
-  const deadline = performance.now() + 1500;
+  let deadline: number | null = null;
   let lastHeight = -1;
   let stableFrames = 0;
   const tick = () => {
-    const h = getAppScroller(rootRef.value)?.scrollHeight ?? -1;
+    const root = rootRef.value;
+    if (!root) return;
+    if (root.offsetParent === null) {
+      requestAnimationFrame(tick);
+      return;
+    }
+    deadline ??= performance.now() + 1500;
+    const h = getAppScroller(root)?.scrollHeight ?? -1;
     if (h === lastHeight) stableFrames += 1;
     else {
       stableFrames = 0;

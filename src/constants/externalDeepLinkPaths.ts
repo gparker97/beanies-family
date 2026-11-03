@@ -38,11 +38,15 @@ const REDIRECT_TARGETS = ['/pod'];
 const AUTH_PATHS = ['/join', '/welcome'];
 
 /**
- * Page links the home-screen widgets open (#130): the date column and "later ›" open the
- * Nook, the "tonight" line opens the meal planner. PAGE paths, not entities, so they are
- * not in `ENTITY_DEEP_LINKS` (which is keyed by an id param). `/meal-planner` is
- * flag-gated; the router guard redirects it when `mealPlanner` is off, and the widget only
- * mints it when the flag is on.
+ * Page links the home-screen widgets open (#130): the "tonight" line opens the meal planner.
+ * PAGE paths, not entities, so they are not in `ENTITY_DEEP_LINKS` (which is keyed by an id
+ * param). `/meal-planner` is flag-gated; the router guard redirects it when `mealPlanner` is
+ * off, and the widget only mints it when the flag is on.
+ *
+ * `nook` stays claimed because widgets on native builds before 2026-11-03 still mint and
+ * fall back to `/nook`; it now has no minting caller. The calendar link (the date, "later ›",
+ * the widget itself) comes from `plannerDayLink`, and `/activities` is already claimed via
+ * `ENTITY_DEEP_LINKS`.
  */
 export const WIDGET_PAGE_PATHS = { nook: '/nook', mealPlanner: '/meal-planner' } as const;
 

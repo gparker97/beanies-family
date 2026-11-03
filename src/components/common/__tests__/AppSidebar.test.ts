@@ -3,9 +3,12 @@ import { mount } from '@vue/test-utils';
 import { ref } from 'vue';
 
 const mockPush = vi.fn(() => Promise.resolve());
-vi.mock('vue-router', () => ({
+// Keep the real exports (navigateTo uses isNavigationFailure); stub only the composables.
+vi.mock('vue-router', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('vue-router')>()),
   useRoute: () => ({ path: '/nook' }),
-  useRouter: () => ({ push: mockPush }),
+  // navigateTo reads where the push landed; a non-planner route sets no today flag.
+  useRouter: () => ({ push: mockPush, currentRoute: { value: { name: 'Home', query: {} } } }),
 }));
 vi.mock('@/composables/useTranslation', () => ({
   useTranslation: () => ({ t: (key: string) => key }),

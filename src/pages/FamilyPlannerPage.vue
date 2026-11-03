@@ -822,9 +822,10 @@ function handleMonthInView(firstOfMonth: Date) {
   referenceDate.value = new Date(y, m, Math.min(referenceDate.value.getDate(), daysInTarget));
 }
 
-// A calendar nav tap (center button / Planning-stack Activities) jumps to today —
-// incl. the already-on-this-page case where router.push is a no-op.
-usePlannerTodayConsumer(handleToday);
+// A calendar nav tap (tab bar, sidebar, drawer) or a warm native widget tap jumps to
+// today, incl. the already-on-this-page case where the navigation is a no-op (see
+// `navigateTo`). A day rollover while the planner sits on the old today snaps it too.
+usePlannerTodayConsumer(handleToday, referenceDate);
 function setView(view: string) {
   if (isPlannerView(view)) activeView.value = view;
   else

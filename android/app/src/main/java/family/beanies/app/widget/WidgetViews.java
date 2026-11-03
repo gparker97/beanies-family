@@ -32,7 +32,7 @@ final class WidgetViews {
 
     /** The origin every widget link lives on (`shareableOrigin()` on the JS side). */
     static final String ORIGIN = "https://app.beanies.family";
-    static final String FALLBACK_NOOK = ORIGIN + "/nook?src=widget";
+    static final String FALLBACK_CALENDAR = ORIGIN + "/activities?view=day&src=widget";
     static final String SIGNED_OUT_LINK = ORIGIN + "/welcome?src=widget";
 
     /** Request-code slots per widget id, so every PendingIntent is distinct. */
@@ -51,12 +51,12 @@ final class WidgetViews {
     private WidgetViews() {}
 
     /**
-     * The link with `w=<size>` appended. A missing or non-https link falls back to the Nook, so
+     * The link with `w=<size>` appended. A missing or non-https link falls back to the calendar on today, so
      * a malformed snapshot can never produce a tap that goes nowhere.
      */
     static Uri withSize(String link, WidgetSizes.Size size) {
         Uri uri = link == null || link.isEmpty() ? null : Uri.parse(link);
-        if (uri == null || !"https".equals(uri.getScheme())) uri = Uri.parse(FALLBACK_NOOK);
+        if (uri == null || !"https".equals(uri.getScheme())) uri = Uri.parse(FALLBACK_CALENDAR);
         return uri.buildUpon().appendQueryParameter("w", size.key).build();
     }
 

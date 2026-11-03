@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { entityDeepLink } from '@/utils/entityDeepLink';
+import { ENTITY_DEEP_LINKS, entityDeepLink, plannerDayLink } from '@/utils/entityDeepLink';
+import { parsePlannerQuery } from '@/composables/usePlannerUrlState';
 
 describe('entityDeepLink', () => {
   // The two kinds notifications actually deep-link (the rest stay covered by the
@@ -41,6 +42,34 @@ describe('entityDeepLink', () => {
     expect(entityDeepLink('activity', 'a1', { activity: 'other' })).toEqual({
       path: '/activities',
       query: { activity: 'a1' },
+    });
+  });
+});
+
+describe('plannerDayLink', () => {
+  it('names the Day view on a date, or on today when no date is given', () => {
+    expect(plannerDayLink('2026-11-03')).toEqual({
+      path: ENTITY_DEEP_LINKS.activity.path,
+      query: { view: 'day', d: '2026-11-03' },
+    });
+    expect(plannerDayLink()).toEqual({
+      path: ENTITY_DEEP_LINKS.activity.path,
+      query: { view: 'day' },
+    });
+  });
+
+  // The external writer and the in-app reader are separate on purpose (this module stays
+  // free of Vue); this round trip is what stops them drifting apart.
+  it('round-trips through parsePlannerQuery', () => {
+    expect(parsePlannerQuery(plannerDayLink('2026-11-03').query)).toEqual({
+      view: 'day',
+      ymd: '2026-11-03',
+      invalid: [],
+    });
+    expect(parsePlannerQuery(plannerDayLink().query, '2026-10-19')).toEqual({
+      view: 'day',
+      ymd: '2026-10-19',
+      invalid: [],
     });
   });
 });

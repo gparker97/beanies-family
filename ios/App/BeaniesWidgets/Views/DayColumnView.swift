@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The slim left column on medium and large: the date at the top (a link to the Nook), the
+/// The slim left column on medium and large: the date at the top (a link to the calendar on today), the
 /// weather under the month (#134), and at its foot the audience label (large, "my day" only)
 /// and the to-dos count.
 ///

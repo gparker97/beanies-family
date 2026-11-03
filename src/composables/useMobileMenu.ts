@@ -1,6 +1,7 @@
 import { computed, ref, type ComputedRef } from 'vue';
 import { useRoute } from 'vue-router';
 import { useBreakpoint } from '@/composables/useBreakpoint';
+import { PLANNER_ROUTE_NAME } from '@/constants/navigation';
 
 /**
  * Mobile hamburger-menu open state + the "planner reclaimed the top bar"
@@ -46,5 +47,5 @@ export function useMobileMenu() {
 export function useHeaderReclaimed(): ComputedRef<boolean> {
   const route = useRoute();
   const { isMobile } = useBreakpoint();
-  return computed(() => isMobile.value && route.name === 'Activities');
+  return computed(() => isMobile.value && route.name === PLANNER_ROUTE_NAME);
 }
