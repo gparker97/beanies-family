@@ -95,7 +95,7 @@ describe('videoObject', () => {
   it('describes the film for the JSON-LD graph', () => {
     expect(videoObject(MUSICAL)).toEqual({
       '@type': 'VideoObject',
-      name: 'your crazy family musical',
+      name: 'the morning routine musical',
       description: MUSICAL.description,
       thumbnailUrl: MUSICAL.urls.poster,
       uploadDate: '2026-11-03',

@@ -55,7 +55,7 @@ function mediaUrls(keyPrefix: string): FilmUrls {
 }
 
 export const MUSICAL: Film = {
-  title: 'your crazy family musical',
+  title: 'the morning routine musical',
   description:
     'a 67-second animated musical about the chaos of a family morning, written and produced by greg, the dad who makes beanies.family.',
   durationS: 67,
