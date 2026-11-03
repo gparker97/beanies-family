@@ -3,6 +3,7 @@ import committed from '../../data/store-proof.json';
 import {
   appStoreCount,
   fiveStarTotal,
+  PROOF_SHOW_FROM,
   mergeStoreProof,
   parseAppStoreListing,
   parsePlayListing,
@@ -453,5 +454,14 @@ describe('mergeStoreProof', () => {
       today: TODAY,
     });
     expect(parseStoreProof(next)).toEqual(next);
+  });
+});
+
+describe('PROOF_SHOW_FROM: the counter waits for a number that can carry itself', () => {
+  it('is the agreed threshold (2026-11-03) and the committed total is still below it', () => {
+    expect(PROOF_SHOW_FROM).toBe(50);
+    // When this fails because the stores crossed 50, the counter and the aggregateRating
+    // return on their own; update this expectation, not the threshold.
+    expect(fiveStarTotal(base())).toBeLessThan(PROOF_SHOW_FROM);
   });
 });

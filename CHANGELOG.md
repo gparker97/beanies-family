@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-11-03
+
+### Changed
+
+- The homepage no longer shows the five-star rating counter beside the store badges; it returns on its own once the stores pass 50 ratings. The named reviews and badges stay.
+
 ## 2026-11-01
 
 ### Added

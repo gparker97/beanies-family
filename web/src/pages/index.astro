@@ -8,7 +8,7 @@ import { SOFTWARE_APPLICATION } from '@beanies/brand/schema';
 import { APP_URL, SITE_URL } from '@beanies/brand/nav';
 import { PRICES, TRIAL_DAYS, numericPrice } from '../lib/pricing';
 import { proofQuote } from '../lib/proof';
-import { parseStoreProof, fiveStarTotal } from '../lib/storeProof';
+import { parseStoreProof, fiveStarTotal, PROOF_SHOW_FROM } from '../lib/storeProof';
 import storeProof from '../data/store-proof.json';
 
 /**
@@ -16,11 +16,14 @@ import storeProof from '../data/store-proof.json';
  * JSON-LD aggregateRating both read `total`, and both exist only while `hasProof`,
  * so the page and its markup cannot disagree. `parseStoreProof` fails the build,
  * naming the field, if the committed file is malformed; `fiveStarTotal` is 0 (and
- * both disappear) if the App Store average is no longer exactly 5.0. The number is
- * refreshed by `node web/scripts/store-proof.mjs`, never typed by hand.
+ * both disappear) if the App Store average is no longer exactly 5.0, and the page
+ * shows neither until `total` reaches `PROOF_SHOW_FROM` (2026-11-03: a perfect score
+ * on a small count reads as thin, so the strip carries notes and badges alone until
+ * then). The number is refreshed by `node web/scripts/store-proof.mjs`, never typed
+ * by hand.
  */
 const total = fiveStarTotal(parseStoreProof(storeProof));
-const hasProof = total > 0;
+const hasProof = total >= PROOF_SHOW_FROM;
 
 // The LCP element. Single source of truth: this same path feeds BOTH the
 // `<link rel="preload" as="image">` (via BaseLayout's `lcpImage`) and the

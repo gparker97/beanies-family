@@ -21,6 +21,16 @@
  * that could drift from it.
  */
 
+/**
+ * The homepage shows the five-star counter (and the JSON-LD aggregateRating that
+ * must never outlive it) only from this many ratings. Decided 2026-11-03: a perfect
+ * score on a small count reads as thin rather than impressive (Baymard: 4.5 stars on
+ * 57 ratings beats 5.0 on a handful almost two to one), so the strip keeps the
+ * named notes and the store badges until the number can carry itself. Nothing
+ * else changes: `fiveStarTotal` still answers the data question, the page compares.
+ */
+export const PROOF_SHOW_FROM = 50;
+
 /** Drift-tested against `STORE_URL.ios` in `@beanies/brand/nav` (proof.test.ts). */
 export const APP_STORE_ID = '6798513944';
 /** Drift-tested against `STORE_URL.android` in `@beanies/brand/nav` (proof.test.ts). */
