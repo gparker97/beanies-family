@@ -38,10 +38,8 @@ export function resolveWallSleep(raw: Partial<WallSleepSettings> | undefined): W
   };
 }
 
-/** "HH:mm" of a Date, in local time. */
-export function localHHmm(date: Date): string {
-  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
-}
+/** "HH:mm" of a Date, in local time: the same function as `toTimeInputValue`. */
+export { toTimeInputValue as localHHmm } from '@/utils/date';
 
 /**
  * Is `now` inside the night window? The window includes its start and excludes its end,

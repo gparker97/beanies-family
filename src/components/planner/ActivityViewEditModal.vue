@@ -28,6 +28,7 @@ import {
   formatDate,
   formatDateWithDay,
   addHourToTime,
+  endFollowsStart,
   toDateInputValue,
   addDays,
   parseLocalDate,
@@ -45,7 +46,8 @@ import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
 import MemberChip from '@/components/ui/MemberChip.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
-import TimePresetPicker from '@/components/ui/TimePresetPicker.vue';
+import BeanieTimePicker from '@/components/ui/BeanieTimePicker.vue';
+import BeanieTimeRange from '@/components/ui/BeanieTimeRange.vue';
 import { normalizeAssignees, toAssigneePayload } from '@/utils/assignees';
 import { useClash } from '@/composables/useClash';
 import { useOverlapAckStore } from '@/stores/overlapAckStore';
@@ -810,8 +812,9 @@ function handleRescheduleEndDate(value: string) {
 }
 
 function handleRescheduleStartTime(value: string) {
+  const endFollows = endFollowsStart(rescheduleStartTime.value, value, rescheduleEndTime.value);
   rescheduleStartTime.value = value;
-  if (value) rescheduleEndTime.value = addHourToTime(value);
+  if (value && endFollows) rescheduleEndTime.value = addHourToTime(value);
 }
 
 function handleRescheduleEndTime(value: string) {
@@ -1202,20 +1205,12 @@ async function confirmReschedule() {
             <FormFieldGroup :label="t('planner.rescheduleTo')">
               <BeanieDatePicker v-model="rescheduleDate" />
             </FormFieldGroup>
-            <div class="grid grid-cols-2 gap-3">
-              <FormFieldGroup :label="t('modal.startTime')">
-                <TimePresetPicker
-                  :model-value="rescheduleStartTime"
-                  @update:model-value="handleRescheduleStartTime"
-                />
-              </FormFieldGroup>
-              <FormFieldGroup :label="t('modal.endTime')">
-                <TimePresetPicker
-                  :model-value="rescheduleEndTime"
-                  @update:model-value="handleRescheduleEndTime"
-                />
-              </FormFieldGroup>
-            </div>
+            <BeanieTimeRange
+              :start="rescheduleStartTime"
+              :end="rescheduleEndTime"
+              @update:start="handleRescheduleStartTime"
+              @update:end="handleRescheduleEndTime"
+            />
           </div>
 
           <div class="flex gap-2">
@@ -1315,7 +1310,7 @@ async function confirmReschedule() {
                 </span>
               </template>
               <template #edit>
-                <TimePresetPicker
+                <BeanieTimePicker
                   :model-value="draftStartTime"
                   @update:model-value="handleStartTimeChange"
                 />
@@ -1341,7 +1336,7 @@ async function confirmReschedule() {
                 </span>
               </template>
               <template #edit>
-                <TimePresetPicker
+                <BeanieTimePicker
                   :model-value="draftEndTime"
                   @update:model-value="handleEndTimeChange"
                 />

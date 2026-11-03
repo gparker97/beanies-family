@@ -64,7 +64,7 @@ function mounted(meal: Record<string, unknown>) {
           emits: ['update:modelValue'],
           template: '<div />',
         },
-        TimePresetPicker: true,
+        BeanieTimePicker: true,
         TogglePillGroup: true,
         InferredHint: true,
         CookLogFormModal: true,

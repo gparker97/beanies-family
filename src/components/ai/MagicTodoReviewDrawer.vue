@@ -26,7 +26,7 @@ import AutoGrowTextarea from '@/components/ui/AutoGrowTextarea.vue';
 import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import InferredHint from '@/components/ui/InferredHint.vue';
 import LinkList from '@/components/ui/LinkList.vue';
-import TimePresetPicker from '@/components/ui/TimePresetPicker.vue';
+import BeanieTimePicker from '@/components/ui/BeanieTimePicker.vue';
 import MagicMiscategorisedBanner from '@/components/ai/MagicMiscategorisedBanner.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { showToast } from '@/composables/useToast';
@@ -559,7 +559,7 @@ function logClosed(action: 'dismissed' | 'corrected'): void {
                     {{ dueSuffix(d) }}
                   </span>
                 </div>
-                <TimePresetPicker
+                <BeanieTimePicker
                   v-if="d.dueDate"
                   :model-value="d.dueTime ?? ''"
                   clearable

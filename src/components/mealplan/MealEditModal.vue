@@ -13,7 +13,7 @@
 import { ref, computed } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
-import TimePresetPicker from '@/components/ui/TimePresetPicker.vue';
+import BeanieTimePicker from '@/components/ui/BeanieTimePicker.vue';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
 import InferredHint from '@/components/ui/InferredHint.vue';
 import CookLogFormModal from '@/components/pod/CookLogFormModal.vue';
@@ -357,7 +357,7 @@ async function onCookLogClosed(): Promise<void> {
         </div>
         <div>
           <div class="mp-label">{{ t('mealPlanner.editor.serveTime') }}</div>
-          <TimePresetPicker v-model="serveTime" />
+          <BeanieTimePicker v-model="serveTime" />
         </div>
       </div>
 

@@ -57,7 +57,7 @@ function mountCard(over?: Partial<TimelineItem>, props?: Record<string, unknown>
         PhotoThumbnail: { template: '<div class="thumb" />' },
         ExpandableText: true,
         BeanieDatePicker: true,
-        BeanieTimeInput: true,
+        BeanieTimePicker: true,
       },
     },
   });

@@ -1625,7 +1625,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       'Schedule lessons, appointments, and recurring activities for your family with calendar views and smart recurrence.',
     icon: '\u{1F4C5}',
     readTime: 4,
-    updatedDate: '2026-11-01',
+    updatedDate: '2026-11-03',
     sections: [
       {
         type: 'heading',
@@ -1648,6 +1648,11 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         type: 'paragraph',
         content:
           'Click <strong>+ Add Activity</strong> to open the activity form. Give it a title, pick a category from the grouped list (appointments, lessons, sports, school, food, fun, occasions, parties, pets, work and more), and set a date. You can assign the activity to a specific family member and add a start/end time.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'To set the time, tap the <strong>start time</strong>, then pick the hour and the minute, or tap a recent time. Your picks show in orange, and the time you already have shows in blue. Tap <strong>End time</strong> and the same sheet asks how long the activity lasts; tap a length, then <strong>Done</strong>. For anything else, type a time such as <strong>415p</strong>. Tap <strong>All day</strong> to skip times altogether. The end time follows the start until you set it yourself.',
       },
       {
         type: 'paragraph',

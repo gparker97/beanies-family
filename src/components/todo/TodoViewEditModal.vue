@@ -15,7 +15,7 @@ import MemberChip from '@/components/ui/MemberChip.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import CreatedMeta from '@/components/common/CreatedMeta.vue';
 import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
-import TimePresetPicker from '@/components/ui/TimePresetPicker.vue';
+import BeanieTimePicker from '@/components/ui/BeanieTimePicker.vue';
 import LinkList from '@/components/ui/LinkList.vue';
 import LinkedActivityChip from '@/components/todo/LinkedActivityChip.vue';
 import LinkedCardChip from '@/components/todo/LinkedCardChip.vue';
@@ -595,7 +595,7 @@ async function handleDelete() {
             </span>
           </template>
           <template #edit>
-            <TimePresetPicker :model-value="draftDueTime" @update:model-value="handleTimeChange" />
+            <BeanieTimePicker :model-value="draftDueTime" @update:model-value="handleTimeChange" />
           </template>
         </InlineEditField>
       </FormFieldGroup>

@@ -115,7 +115,7 @@ const stubs = {
   BeanieFormModal: BeanieFormModalStub,
   AssigneePickerButton: true,
   BeanieDatePicker: true,
-  TimePresetPicker: true,
+  BeanieTimePicker: true,
   LinkList: true,
   InferredHint: true,
   MagicMiscategorisedBanner: true,
@@ -432,7 +432,7 @@ describe('MagicTodoReviewDrawer', () => {
   it('shows a stated time beside its date, saves it, and counts a time with no date', async () => {
     createTodos.mockImplementation(async (inputs: { id: string }[]) => inputs);
     const w = mountDrawer(timedReady());
-    const pickers = w.findAllComponents({ name: 'TimePresetPicker' });
+    const pickers = w.findAllComponents({ name: 'BeanieTimePicker' });
     // Only the dated row gets a time field.
     expect(pickers).toHaveLength(1);
     expect(pickers[0]!.props('modelValue')).toBe('10:00');
@@ -465,7 +465,7 @@ describe('MagicTodoReviewDrawer', () => {
       primaryKind: 'event',
     });
     expect(
-      w.findAllComponents({ name: 'TimePresetPicker' }).map((p) => p.props('modelValue'))
+      w.findAllComponents({ name: 'BeanieTimePicker' }).map((p) => p.props('modelValue'))
     ).toEqual(['', '23:59']);
     expect(loggedActions().filter((c) => c.message === 'due_time_dropped')).toEqual([
       expect.objectContaining({
@@ -479,7 +479,7 @@ describe('MagicTodoReviewDrawer', () => {
     const w = mountDrawer(timedReady());
     w.findAllComponents({ name: 'BeanieDatePicker' })[0]!.vm.$emit('update:modelValue', '');
     await nextTick();
-    expect(w.findAllComponents({ name: 'TimePresetPicker' })).toHaveLength(0);
+    expect(w.findAllComponents({ name: 'BeanieTimePicker' })).toHaveLength(0);
 
     // A new date does not bring the old time back.
     w.findAllComponents({ name: 'BeanieDatePicker' })[0]!.vm.$emit(
@@ -487,7 +487,7 @@ describe('MagicTodoReviewDrawer', () => {
       '2030-10-01'
     );
     await nextTick();
-    expect(w.findComponent({ name: 'TimePresetPicker' }).props('modelValue')).toBe('');
+    expect(w.findComponent({ name: 'BeanieTimePicker' }).props('modelValue')).toBe('');
 
     await saveButton(w).trigger('click');
     await flushPromises();

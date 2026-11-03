@@ -12,6 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Changed
 
+- Picking a time is quicker: tap the hour and minute, type a time like 415p, or pick how long an activity lasts, all in one sheet.
 - The homepage no longer shows the five-star rating counter beside the store badges; it returns on its own once the stores pass 50 ratings. The named reviews and badges stay.
 - Tapping an event on the home-screen widget now opens that day in the calendar; the date and the widget itself open today.
 

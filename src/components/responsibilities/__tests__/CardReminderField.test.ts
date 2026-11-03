@@ -45,7 +45,7 @@ const PickerStub = defineComponent({
   template: '<div data-testid="picker" />',
 });
 const TimeStub = defineComponent({
-  name: 'TimePresetPicker',
+  name: 'BeanieTimePicker',
   props: ['modelValue', 'clearable'],
   emits: ['update:modelValue'],
   template: '<div />',
@@ -75,7 +75,7 @@ function mountField(props: Partial<InstanceType<typeof CardReminderField>['$prop
       expanded: true,
       ...props,
     },
-    global: { stubs: { RecurrencePicker: PickerStub, TimePresetPicker: TimeStub } },
+    global: { stubs: { RecurrencePicker: PickerStub, BeanieTimePicker: TimeStub } },
   });
 }
 const lastValue = (w: ReturnType<typeof mountField>) =>

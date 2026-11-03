@@ -2306,6 +2306,14 @@ export interface Settings {
   helpfulHintsEnabled?: boolean; // #40: master on/off for auto-generated Helpful Hint to-dos (default: true). Family-scoped.
   helpfulHintLeadDays?: Partial<Record<HelpfulHintType, number>>; // #40: per-type days-before-event override; missing type → HINT_LEAD_DAYS default. Family-scoped.
   dismissedHintKeys?: Record<string, string>; // #40: hintKey → that hint's event date (YYYY-MM-DD). A hint someone dismissed (or deleted) is never regenerated. Merged per key (MERGE_FIELDS); the entry is pruned once its event has passed. Family-scoped.
+  /**
+   * The family's last few start times picked in `BeanieTimeRange` (`HH:mm` only, newest first,
+   * at most four, no duplicates), shown as the start step's Recent row. Family-scoped (synced),
+   * so the row follows every member; it holds clock times only, never what they were for.
+   * Read it through `settingsStore.recentStartTimes`, which sanitizes a CRDT-merged list, and
+   * write it only through `settingsStore.rememberStartTime`. Absent = none yet.
+   */
+  recentStartTimes?: string[];
   feedbackOptOut?: boolean; // #45: when true, the periodic in-app feedback/NPS prompt never auto-opens (default: false). Family-scoped.
   /** Phase 4 (login rethink): ISO timestamp of the family's "I stored my recovery
    *  kit" confirmation (wizard kit step or Settings). Inside the ciphertext, synced.

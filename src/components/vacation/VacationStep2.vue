@@ -10,7 +10,7 @@ import { vacationSegmentEntityId } from '@/services/photos/photoCollectionHooks'
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
-import BeanieTimeInput from '@/components/ui/BeanieTimeInput.vue';
+import BeanieTimePicker from '@/components/ui/BeanieTimePicker.vue';
 import { BaseCombobox } from '@/components/ui';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
 import {
@@ -472,7 +472,8 @@ const segmentEntityId = (segId: string): string => vacationSegmentEntityId('', s
                 :label="t('vacation.field.departureTime')"
                 :required="seg.status === 'booked'"
               >
-                <BeanieTimeInput
+                <BeanieTimePicker
+                  clearable
                   :model-value="seg.departureTime ?? ''"
                   @update:model-value="updateSegment(idx, 'departureTime', $event)"
                 />
@@ -482,7 +483,8 @@ const segmentEntityId = (segId: string): string => vacationSegmentEntityId('', s
                 :required="seg.status === 'booked'"
               >
                 <div class="flex items-center gap-1.5">
-                  <BeanieTimeInput
+                  <BeanieTimePicker
+                    clearable
                     :model-value="seg.arrivalTime ?? ''"
                     class="min-w-0 flex-1"
                     @update:model-value="updateSegment(idx, 'arrivalTime', $event)"
@@ -606,7 +608,8 @@ const segmentEntityId = (segId: string): string => vacationSegmentEntityId('', s
                 :label="t('vacation.field.embarkationTime')"
                 :required="seg.status === 'booked'"
               >
-                <BeanieTimeInput
+                <BeanieTimePicker
+                  clearable
                   :model-value="seg.embarkationTime ?? ''"
                   @update:model-value="updateSegment(idx, 'embarkationTime', $event)"
                 />
@@ -658,7 +661,8 @@ const segmentEntityId = (segId: string): string => vacationSegmentEntityId('', s
         </FormFieldGroup>
         <div class="grid grid-cols-2 gap-3">
           <FormFieldGroup :label="t('vacation.field.leavingTime')">
-            <BeanieTimeInput
+            <BeanieTimePicker
+              clearable
               :model-value="seg.leavingTime ?? ''"
               @update:model-value="updateSegment(idx, 'leavingTime', $event)"
             />
@@ -761,13 +765,15 @@ const segmentEntityId = (segId: string): string => vacationSegmentEntityId('', s
                 :label="t('vacation.field.departureTime')"
                 :required="seg.status === 'booked'"
               >
-                <BeanieTimeInput
+                <BeanieTimePicker
+                  clearable
                   :model-value="seg.departureTime ?? ''"
                   @update:model-value="updateSegment(idx, 'departureTime', $event)"
                 />
               </FormFieldGroup>
               <FormFieldGroup :label="t('vacation.field.arrivalTime')">
-                <BeanieTimeInput
+                <BeanieTimePicker
+                  clearable
                   :model-value="seg.arrivalTime ?? ''"
                   @update:model-value="updateSegment(idx, 'arrivalTime', $event)"
                 />

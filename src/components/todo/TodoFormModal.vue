@@ -32,7 +32,7 @@ import BaseInput from '@/components/ui/BaseInput.vue';
 import BaseTextarea from '@/components/ui/BaseTextarea.vue';
 import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
 import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
-import TimePresetPicker from '@/components/ui/TimePresetPicker.vue';
+import BeanieTimePicker from '@/components/ui/BeanieTimePicker.vue';
 import ToggleRow from '@/components/ui/ToggleRow.vue';
 import ConditionalSection from '@/components/ui/ConditionalSection.vue';
 import RecurrencePicker from '@/components/ui/RecurrencePicker.vue';
@@ -194,7 +194,7 @@ async function handleSave(): Promise<void> {
       </FormFieldGroup>
       <!-- A time only means something with a date; `toCreateTodoInput` also drops an orphan. -->
       <FormFieldGroup v-if="dueDate" :label="t('todo.dueTime')" optional>
-        <TimePresetPicker v-model="dueTime" clearable />
+        <BeanieTimePicker v-model="dueTime" clearable />
       </FormFieldGroup>
     </div>
 

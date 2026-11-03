@@ -35,7 +35,18 @@ import { logEvent } from '@/services/telemetry/logEvent';
 export function useAnchoredOverlay(
   isOpen: Ref<boolean>,
   close: () => void,
-  opts: { surface: string }
+  opts: {
+    surface: string;
+    /**
+     * Veto the focus restore on close (default: always restore). A host whose close can come
+     * from a click on another field returns false when focus has already moved there, so
+     * closing does not pull it back to the trigger. It is read when the `isOpen` watcher runs,
+     * so it relies on the close arriving AFTER focus moved: a `click`-based outside-click
+     * closer (mousedown has already focused the field) satisfies that; a `pointerdown` or
+     * `mousedown` closer would not, and needs its own handling.
+     */
+    shouldRestoreFocus?: () => boolean;
+  }
 ): {
   isMobile: Readonly<Ref<boolean>>;
   inset: Readonly<Ref<number>>;
@@ -57,6 +68,7 @@ export function useAnchoredOverlay(
     const el = restoreFocusTo.value;
     restoreFocusTo.value = null;
     if (!el || !el.isConnected) return;
+    if (opts.shouldRestoreFocus && !opts.shouldRestoreFocus()) return;
     try {
       el.focus();
     } catch (err) {

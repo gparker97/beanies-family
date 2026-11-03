@@ -310,6 +310,49 @@ export function isWallClockTime(value: string): boolean {
 }
 
 /**
+ * A time a person typed → the stored `HH:mm`, or `null` when it is not a time.
+ *
+ * Accepts `415p`, `4:15pm`, `4.15 pm`, `4:15 p.m.`, `1615`, `6`, `noon` and `midnight`
+ * (case and spaces ignored). With an am/pm marker the hour must be 1 to 12. Without one:
+ *  - a bare 1 to 6 reads as PM and 7 to 11 as AM, which is what a family means by
+ *    "swim at 4" or "school at 7:30";
+ *  - 0 and 12 to 23 are 24-hour, and so is any hour written with a leading zero (`0415`).
+ * Anything else (`99`, `4:75`, `13pm`, `abc`) returns `null`, so the caller can say so
+ * rather than guess. The picker's preview shows the parsed result before Enter, so a
+ * surprising reading is visible first.
+ *
+ * Unlike `isWallClockTime`, which gates the one stored format and rejects `9:00` on purpose,
+ * this is the deliberate normaliser for human input.
+ */
+export function parseTypedTime(raw: string): string | null {
+  const s = raw.trim().toLowerCase().replace(/\s+/g, '').replace(/\./g, '');
+  if (!s) return null;
+  if (s === 'noon') return '12:00';
+  if (s === 'midnight') return '00:00';
+  // Two flat patterns rather than one with nested optional groups (security/detect-unsafe-regex).
+  const markerMatch = /([ap])m?$/.exec(s);
+  const marker = markerMatch?.[1];
+  const digits = markerMatch ? s.slice(0, markerMatch.index) : s;
+  const match = /^(\d{1,2}):?(\d{2})$|^(\d{1,2})$/.exec(digits);
+  if (!match) return null;
+  const hourDigits = match[3] ?? match[1] ?? '';
+  const minuteDigits = match[3] === undefined ? match[2] : undefined;
+  let hours = Number(hourDigits);
+  const minutes = minuteDigits === undefined ? 0 : Number(minuteDigits);
+  if (minutes > 59) return null;
+  if (marker) {
+    if (hours < 1 || hours > 12) return null;
+    if (marker === 'p' && hours < 12) hours += 12;
+    if (marker === 'a' && hours === 12) hours = 0;
+  } else if (hours > 23) {
+    return null;
+  } else if (hours >= 1 && hours <= 6 && !hourDigits.startsWith('0')) {
+    hours += 12;
+  }
+  return toHHmm(hours, minutes);
+}
+
+/**
  * `YYYY-MM-DD` → the ymd of the first day of its week, per the user's `weekStartDay`.
  *
  * Returns the input unchanged if it is not a real date — see `isRealYmd`.
@@ -634,13 +677,61 @@ export function parseLocalDate(dateStr: string): Date {
 }
 
 /**
- * Add one hour to an HH:MM time string, capping at 23:xx.
- * Returns empty string if input is empty.
+ * Add one hour to an `HH:mm` time, capped at 23:59 (see `addMinutesToTime`).
+ * Returns `''` for empty or unparseable input.
  */
 export function addHourToTime(time: string): string {
-  if (!time) return '';
-  const [h, m] = time.split(':').map(Number);
-  return `${String(Math.min((h ?? 0) + 1, 23)).padStart(2, '0')}:${String(m ?? 0).padStart(2, '0')}`;
+  return addMinutesToTime(time, 60);
+}
+
+/**
+ * The one `HH:mm` builder: zero-padded 24-hour hours and minutes.
+ *
+ * Not named `hhmm`, which `minutesOfDay`'s parameter would shadow in this file and which
+ * `WallTimeGrid` already uses for a private, wrapping minutes-to-label helper.
+ */
+export function toHHmm(hours: number, minutes: number): string {
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+}
+
+/** The last minute of the day: a same-day time never moves past it. */
+const LAST_MINUTE_OF_DAY = 23 * 60 + 59;
+
+/**
+ * `HH:mm` plus `minutes`, capped at 23:59 (and floored at 00:00): the same-day rule the
+ * activity forms enforce with their `endTime < startTime` clamp, so a 10pm start plus three
+ * hours gives 11:59pm rather than an end that wraps to before its start.
+ *
+ * Returns `''` for empty or unparseable input (never `NaN:NaN`); parsing goes through
+ * `minutesOfDay`, the one definition of a time-of-day offset.
+ */
+export function addMinutesToTime(time: string, minutes: number): string {
+  const start = minutesOfDay(time);
+  if (start === null) return '';
+  const total = Math.max(0, Math.min(start + minutes, LAST_MINUTE_OF_DAY));
+  return toHHmm(Math.floor(total / 60), total % 60);
+}
+
+/**
+ * Does the end time still "follow" the start, so a start change should move it?
+ *
+ * True when the end is empty, when it is exactly one hour after the OLD start (the value a
+ * start change wrote, or one a person set to the same thing), or when it is at or before the
+ * NEW start. `HH:mm` compares as text, as the forms' clamps already do.
+ *
+ * The third clause is load-bearing. An end set by hand stays put when the start moves, but
+ * moving the start past it would leave an inverted pair that no watcher repairs (the end
+ * clamp fires only when the end changes): the week grid draws it as a negative sliver and
+ * `useScheduledReminders` drops its reminders. So a start that reaches the end takes the end
+ * along.
+ *
+ * Read at the moment it matters, never stored: by the start watchers in `ActivityModal`,
+ * `OnboardingActivity` and `ActivityViewEditModal` (before moving the end), and by
+ * `BeanieTimeRange` (before deciding whether the sheet flows on to the end step), so "the end
+ * moves" and "the picker advances" are one rule.
+ */
+export function endFollowsStart(oldStart: string, newStart: string, end: string): boolean {
+  return !end || end === addMinutesToTime(oldStart, 60) || end <= newStart;
 }
 
 /**
@@ -697,9 +788,7 @@ export function relativeDayLabel(dateStr: string, t: (key: UIStringKey) => strin
  * `<input type="time">`. Mirrors `toDateInputValue` for time inputs.
  */
 export function toTimeInputValue(date: Date): string {
-  const h = date.getHours();
-  const m = date.getMinutes();
-  return `${h < 10 ? '0' : ''}${h}:${m < 10 ? '0' : ''}${m}`;
+  return toHHmm(date.getHours(), date.getMinutes());
 }
 
 /**
@@ -793,9 +882,9 @@ export function safeOccurredOn(
  * A `null` is a value the caller is forced to handle.
  *
  * This is the single definition for grid positioning: both the planner and the wall read
- * it through `timedSpanMinutes` (`calendar/timeSpans.ts`). `addHourToTime` and
- * `formatTime12` in this file still re-FORMAT rather than compute an offset and are not
- * converged (follow-up F4 in `docs/plans/2026-09-03-wall-time-grid.md`).
+ * it through `timedSpanMinutes` (`calendar/timeSpans.ts`). `addMinutesToTime` (and
+ * `addHourToTime` on it) computes through it too, which closed most of follow-up F4 in
+ * `docs/plans/2026-09-03-wall-time-grid.md`; `formatTime12` still re-FORMATs.
  */
 export function minutesOfDay(hhmm: string | undefined | null): number | null {
   if (!hhmm) return null;

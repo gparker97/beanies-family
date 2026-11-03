@@ -288,7 +288,7 @@ const isTomorrowDisabled = computed(() => {
       <span v-if="required" class="text-primary-500 dark:text-accent-lift">*</span>
     </label>
 
-    <!-- Trigger: bean-pill, mirrors TimePresetPicker -->
+    <!-- Trigger: bean-pill, mirrors TimePickerPill -->
     <button
       type="button"
       :disabled="disabled"

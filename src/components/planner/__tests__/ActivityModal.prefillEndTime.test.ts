@@ -53,11 +53,10 @@ function mountModal(prefill: Record<string, unknown>) {
   });
 }
 
-/** Read a TimePresetPicker's current value through its v-model binding. */
+/** Read the start and end through BeanieTimeRange's v-model bindings. */
 function timeValues(w: ReturnType<typeof mountModal>): string[] {
-  return w
-    .findAllComponents({ name: 'TimePresetPicker' })
-    .map((c) => String(c.props('modelValue')));
+  const range = w.findComponent({ name: 'BeanieTimeRange' });
+  return [String(range.props('start')), String(range.props('end'))];
 }
 
 beforeEach(() => {

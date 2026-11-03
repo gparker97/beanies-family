@@ -18,7 +18,7 @@ import {
 } from '@/utils/timeZone';
 import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry/logEvent';
-import { toISODateString } from '@/utils/date';
+import { isWallClockTime, toISODateString } from '@/utils/date';
 import * as globalSettingsRepo from '@/services/indexeddb/repositories/globalSettingsRepository';
 import type {
   Settings,
@@ -48,6 +48,9 @@ import {
 import { HINT_LEAD_DAYS } from '@/utils/helpfulHints';
 import { resolveWallSleep } from '@/utils/wallSleep';
 import { defaultUnitFor } from '@/utils/weather/weatherReading';
+
+/** How many recent start times the time picker's Recent row keeps. */
+const RECENT_START_TIMES_MAX = 4;
 
 export const useSettingsStore = defineStore('settings', () => {
   // State
@@ -228,6 +231,21 @@ export const useSettingsStore = defineStore('settings', () => {
   // #45: when true, the periodic in-app feedback/NPS prompt never auto-opens.
   // Family-scoped (synced); default OFF (prompts enabled).
   const feedbackOptOut = computed<boolean>(() => settings.value.feedbackOptOut ?? false);
+  // The time picker's Recent row: the family's last start times, sanitized on READ because two
+  // devices' writes can merge into a longer list (or a peer on an older build can write a
+  // malformed one), and the row must never render a bad chip. Wall-clock only, deduped,
+  // newest first, at most RECENT_START_TIMES_MAX.
+  const recentStartTimes = computed<string[]>(() => {
+    const raw: unknown = settings.value.recentStartTimes;
+    if (!Array.isArray(raw)) return [];
+    const out: string[] = [];
+    for (const time of raw) {
+      if (typeof time !== 'string' || !isWallClockTime(time) || out.includes(time)) continue;
+      out.push(time);
+      if (out.length === RECENT_START_TIMES_MAX) break;
+    }
+    return out;
+  });
   // #109 Who Owns What: family check-in rhythm in weeks (0 = off). Family-scoped
   // (synced); default every 4 weeks.
   const responsibilityCheckInWeeks = computed<0 | 2 | 4 | 8>(
@@ -677,6 +695,42 @@ export const useSettingsStore = defineStore('settings', () => {
     persistAiSetting('feedback.settings.toggleLabel', 'feedbackOptOut', () =>
       settingsRepo.setFeedbackOptOut(optOut)
     );
+
+  // A start time picked in BeanieTimeRange joins the family's Recent row. Background write, the
+  // `recordFeedbackPrompted` idiom: silent guards, try/catch, a warning, NEVER throws (the time
+  // is already in the form, so a failed write costs only the shortcut). Guarded on the
+  // AUTHORITATIVE doc because writes in the snapshot fast-paint window throw, and a pick made
+  // right after launch would otherwise be warning noise. `preserveTimestamp`: this is
+  // bookkeeping, like the sync writes, not a settings edit.
+  // Writes are chained so each one reads the list the previous one saved: two quick start
+  // picks otherwise both build from the pre-save list and the later save drops the earlier time.
+  let recentWrite: Promise<void> = Promise.resolve();
+  function rememberStartTime(time: string): Promise<void> {
+    recentWrite = recentWrite.then(() => writeRecentStartTime(time));
+    return recentWrite;
+  }
+
+  // Everything sits inside the try: one throw anywhere would otherwise leave `recentWrite`
+  // rejected for good and silently stop every later write this session.
+  async function writeRecentStartTime(time: string): Promise<void> {
+    try {
+      if (!isWallClockTime(time) || !isAuthoritativeDocLoaded()) return;
+      const current = recentStartTimes.value;
+      const next = [time, ...current.filter((t) => t !== time)].slice(0, RECENT_START_TIMES_MAX);
+      if (next.length === current.length && next.every((t, i) => t === current[i])) return;
+      settings.value = await settingsRepo.saveSettings(
+        { recentStartTimes: next },
+        { preserveTimestamp: true }
+      );
+    } catch (error) {
+      reportError({
+        surface: 'time-picker',
+        severity: 'warning',
+        message: 'failed to save recent start time',
+        error,
+      });
+    }
+  }
 
   // #45: stamp the feedback cadence clock (date-only) when the prompt auto-opens or on
   // submit. Background (non-user-initiated) family-only write: guard on isDocLoaded, and
@@ -1308,6 +1362,7 @@ export const useSettingsStore = defineStore('settings', () => {
     helpfulHintLeadDays,
     dismissedHintKeys,
     feedbackOptOut,
+    recentStartTimes,
     responsibilityCheckInWeeks,
     isTrustedDevice,
     trustedDevicePromptShown,
@@ -1315,6 +1370,7 @@ export const useSettingsStore = defineStore('settings', () => {
     // Actions
     setFeedbackOptOut,
     recordFeedbackPrompted,
+    rememberStartTime,
     loadGlobalSettings,
     loadSettings,
     setBaseCurrency,

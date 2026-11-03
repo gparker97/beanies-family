@@ -64,7 +64,7 @@ const stubs = {
   MagicBeansQuickCard: true,
   FamilyChipPicker: true,
   BeanieDatePicker: true,
-  TimePresetPicker: true,
+  BeanieTimePicker: true,
   RecurrencePicker: true,
 };
 
@@ -91,7 +91,7 @@ describe('TodoFormModal', () => {
     await w.find('textarea').setValue('Due at the office');
     await pick(w, 'FamilyChipPicker', ['m-leo']);
     await pick(w, 'BeanieDatePicker', '2030-10-13');
-    await pick(w, 'TimePresetPicker', '08:30');
+    await pick(w, 'BeanieTimePicker', '08:30');
 
     await save(w).trigger('click');
     await flushPromises();
@@ -155,10 +155,10 @@ describe('TodoFormModal', () => {
 
   it('only offers a time once there is a date', async () => {
     const w = await mountOpen();
-    expect(w.findComponent({ name: 'TimePresetPicker' }).exists()).toBe(false);
+    expect(w.findComponent({ name: 'BeanieTimePicker' }).exists()).toBe(false);
 
     await pick(w, 'BeanieDatePicker', '2030-10-13');
-    expect(w.findComponent({ name: 'TimePresetPicker' }).exists()).toBe(true);
+    expect(w.findComponent({ name: 'BeanieTimePicker' }).exists()).toBe(true);
   });
 
   it('writes once when Save is tapped twice while saving', async () => {
@@ -188,7 +188,7 @@ describe('TodoFormModal', () => {
     const w = await mountOpen();
     await w.find('input').setValue('Sign the slip');
     await pick(w, 'BeanieDatePicker', '2030-10-13');
-    await pick(w, 'TimePresetPicker', '08:30');
+    await pick(w, 'BeanieTimePicker', '08:30');
 
     await pick(w, 'BeanieDatePicker', '');
     await pick(w, 'BeanieDatePicker', '2030-10-14');
@@ -258,7 +258,7 @@ describe('TodoFormModal: Repeat (#123)', () => {
     expect(w.findComponent({ name: 'BeanieDatePicker' }).props('modelValue')).toBe('2030-10-10');
 
     await pick(w, 'BeanieDatePicker', '2030-10-13');
-    await pick(w, 'TimePresetPicker', '20:00');
+    await pick(w, 'BeanieTimePicker', '20:00');
     expect(picker(w).props()).toMatchObject({ startDate: '2030-10-13', time: '20:00' });
   });
 

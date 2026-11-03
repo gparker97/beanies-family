@@ -5,7 +5,7 @@ import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
-import BeanieTimeInput from '@/components/ui/BeanieTimeInput.vue';
+import BeanieTimePicker from '@/components/ui/BeanieTimePicker.vue';
 import BaseTextarea from '@/components/ui/BaseTextarea.vue';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
 import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
@@ -302,7 +302,7 @@ async function handleSave() {
             :label="t('vacation.field.departureTime')"
             v-bind="validation.bind('departureTime')"
           >
-            <BeanieTimeInput v-model="departureTime" />
+            <BeanieTimePicker v-model="departureTime" clearable />
           </FormFieldGroup>
         </div>
       </template>
@@ -330,7 +330,7 @@ async function handleSave() {
             <BeanieDatePicker v-model="pickupDate" />
           </FormFieldGroup>
           <FormFieldGroup :label="t('vacation.field.pickupTime')">
-            <BeanieTimeInput v-model="pickupTime" />
+            <BeanieTimePicker v-model="pickupTime" clearable />
           </FormFieldGroup>
         </div>
         <div class="grid grid-cols-2 gap-3">
@@ -341,7 +341,7 @@ async function handleSave() {
             <BeanieDatePicker v-model="returnDate" />
           </FormFieldGroup>
           <FormFieldGroup :label="t('vacation.field.returnTime')">
-            <BeanieTimeInput v-model="returnTime" />
+            <BeanieTimePicker v-model="returnTime" clearable />
           </FormFieldGroup>
         </div>
       </template>
@@ -359,7 +359,7 @@ async function handleSave() {
             :label="t('vacation.field.pickupTime')"
             v-bind="validation.bind('pickupTime')"
           >
-            <BeanieTimeInput v-model="pickupTime" />
+            <BeanieTimePicker v-model="pickupTime" clearable />
           </FormFieldGroup>
         </div>
         <div class="grid grid-cols-2 gap-3">
@@ -367,7 +367,7 @@ async function handleSave() {
             <BeanieDatePicker v-model="returnDate" />
           </FormFieldGroup>
           <FormFieldGroup :label="t('vacation.field.returnTime')">
-            <BeanieTimeInput v-model="returnTime" />
+            <BeanieTimePicker v-model="returnTime" clearable />
           </FormFieldGroup>
         </div>
       </template>

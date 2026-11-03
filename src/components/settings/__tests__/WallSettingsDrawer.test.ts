@@ -40,7 +40,7 @@ const stubs = {
     template:
       '<button data-test="sleep-toggle" @click="$emit(\'update:modelValue\', !modelValue)" />',
   },
-  BeanieTimeInput: { template: '<input data-test="sleep-time" />' },
+  BeanieTimePicker: { template: '<input data-test="sleep-time" />' },
   // One button per option, so the idle-wait pills and the weather-size pills are told apart.
   TogglePillGroup: {
     props: ['options'],

@@ -15,7 +15,7 @@ import { vacationSegmentEntityId } from '@/services/photos/photoCollectionHooks'
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
-import BeanieTimeInput from '@/components/ui/BeanieTimeInput.vue';
+import BeanieTimePicker from '@/components/ui/BeanieTimePicker.vue';
 import BaseTextarea from '@/components/ui/BaseTextarea.vue';
 
 const props = withDefaults(
@@ -212,7 +212,8 @@ function isBus(type: VacationTransportationType): boolean {
               />
             </FormFieldGroup>
             <FormFieldGroup :label="t('vacation.field.departureTime')">
-              <BeanieTimeInput
+              <BeanieTimePicker
+                clearable
                 :model-value="item.departureTime ?? ''"
                 @update:model-value="updateItem(index, 'departureTime', $event)"
               />
@@ -276,7 +277,8 @@ function isBus(type: VacationTransportationType): boolean {
               />
             </FormFieldGroup>
             <FormFieldGroup :label="t('vacation.field.pickupTime')">
-              <BeanieTimeInput
+              <BeanieTimePicker
+                clearable
                 :model-value="item.pickupTime ?? ''"
                 @update:model-value="updateItem(index, 'pickupTime', $event)"
               />
@@ -290,7 +292,8 @@ function isBus(type: VacationTransportationType): boolean {
               />
             </FormFieldGroup>
             <FormFieldGroup :label="t('vacation.field.returnTime')">
-              <BeanieTimeInput
+              <BeanieTimePicker
+                clearable
                 :model-value="item.returnTime ?? ''"
                 @update:model-value="updateItem(index, 'returnTime', $event)"
               />
@@ -315,7 +318,8 @@ function isBus(type: VacationTransportationType): boolean {
               />
             </FormFieldGroup>
             <FormFieldGroup :label="t('vacation.field.pickupTime')">
-              <BeanieTimeInput
+              <BeanieTimePicker
+                clearable
                 :model-value="item.pickupTime ?? ''"
                 @update:model-value="updateItem(index, 'pickupTime', $event)"
               />
@@ -339,7 +343,8 @@ function isBus(type: VacationTransportationType): boolean {
               />
             </FormFieldGroup>
             <FormFieldGroup :label="t('vacation.field.pickupTime')">
-              <BeanieTimeInput
+              <BeanieTimePicker
+                clearable
                 :model-value="item.pickupTime ?? ''"
                 @update:model-value="updateItem(index, 'pickupTime', $event)"
               />

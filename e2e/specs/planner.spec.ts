@@ -171,9 +171,15 @@ test.describe('Family Planner', () => {
     await selectAssignee(page);
     await selectBeanieDate(page.locator('div[role="dialog"]'), '2026-03-04');
 
-    // Open start time dropdown (trigger shows "9:00 AM" by default) then select 3:00 PM
-    await page.getByRole('button', { name: '9:00 AM' }).first().click();
-    await page.getByRole('button', { name: '3:00 PM' }).click();
+    // Open the start time picker (trigger shows "9am" by default), type 3p + Enter (that fills
+    // the picker and waits), then Done writes it. The end still follows the start, so the form
+    // moves it to 4pm on its own.
+    await page.getByTestId('time-picker-trigger').first().click();
+    const timeCard = page.getByTestId('time-picker-card');
+    const typedTime = timeCard.getByRole('textbox', { name: ui('time.typeAriaLabel') });
+    await typedTime.fill('3p');
+    await typedTime.press('Enter');
+    await timeCard.getByTestId('time-picker-done').click();
 
     // End time auto-updates to startTime + 1hr = 4:00 PM — no action needed
     // Weekly is the default CADENCE once recurring is chosen.

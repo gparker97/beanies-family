@@ -1,26 +1,13 @@
-import { ref, nextTick, onMounted, onUnmounted, type Ref } from 'vue';
+import { ref, nextTick, type Ref } from 'vue';
 import { useEscapeClose } from '@/composables/useEscapeClose';
+import { useAnchoredPosition } from '@/composables/useAnchoredPosition';
+import { useOutsideClick } from '@/composables/useOutsideClick';
 
-/**
- * The z-index every anchored popover paints at: above every modal and drawer layer
- * (BaseModal `top` z-[250] and `gate` z-[260], BaseSidePanel up to z-[255], the onboarding
- * overlay at 200), below toasts (z-[270]) and the fatal / splash overlays (z-[300]). A
- * popover is transient and must show over whatever surface opened it: at a page-level tier
- * (z-50 / z-[70]) a picker opened inside the onboarding overlay rendered invisibly behind it.
- * It rides `popoverStyle`, so a consumer that binds the style cannot pick a different tier.
- */
-export const ANCHORED_POPOVER_Z_INDEX = 265;
-
-/**
- * Run a document-level outside-click check in the CAPTURE phase, before the clicked element's
- * own handler. In a real browser Vue's re-render runs as a microtask between one listener and the
- * next, so a bubble-phase document listener can see a target that has already left the DOM:
- * TimePresetPicker's "+ Custom time" row swaps itself for the time input, `contains()` on the
- * detached row is false, and the list closed the moment it opened (2026-11-01). In the capture
- * phase nothing has reacted to the click yet, so the target is still where the person tapped.
- * A scripted `el.click()` does not flush Vue between listeners, which is why tests missed it.
- */
-export const OUTSIDE_CLICK_CAPTURE = true;
+// The z tier and the capture-phase flag live with the halves that use them; re-exported here
+// because AssigneePickerButton, BaseCombobox, InfoHintBadge, SaveStatusIndicator, SortMenu and
+// OverflowMenu import them from this module.
+export { ANCHORED_POPOVER_Z_INDEX } from '@/composables/useAnchoredPosition';
+export { OUTSIDE_CLICK_CAPTURE } from '@/composables/useOutsideClick';
 
 /** Typing targets: arrow keys there step the field (a time input's hours), never rove the menu. */
 function isEditableTarget(target: EventTarget | null): boolean {
@@ -70,11 +57,16 @@ export interface AnchoredPopoverOptions {
  * position AND the z tier, `ANCHORED_POPOVER_Z_INDEX`) and `onMenuKeydown` onto
  * the menu element. Arrow keys typed into a field inside the menu are left alone.
  *
- * TODO(consolidation): consumers are SortMenu, OverflowMenu and TimePresetPicker. BeanHero's add
- * menu is the next one to migrate. AssigneePickerButton, BaseCombobox,
- * BeanieDatePicker, BeanieTimeInput and InfoHintBadge still carry their own copy
- * of this idiom (their anchoring differs: pickers/inputs, not menus); fold each
- * in when it's next touched, extending the options rather than forking.
+ * Composed from `useAnchoredPosition` (placement, scroll/resize follow, z tier),
+ * `useOutsideClick` (capture-phase outside click, listening only while open) and
+ * `useEscapeClose`, plus the roving focus that only a menu needs.
+ *
+ * TODO(consolidation): consumers are SortMenu and OverflowMenu. BeanHero's add menu is the
+ * next one to migrate. `TimePickerHost` consumes the two extracted halves directly (its
+ * Escape comes from `useAnchoredOverlay`). AssigneePickerButton, BaseCombobox,
+ * BeanieDatePicker, InfoHintBadge and SaveStatusIndicator still hand-copy the outside-click
+ * idiom; fold each into `useOutsideClick` (and `useAnchoredPosition` where it positions a
+ * teleported popover) when it is next touched, extending the options rather than forking.
  */
 export function useAnchoredPopover(options: AnchoredPopoverOptions) {
   const {
@@ -89,33 +81,19 @@ export function useAnchoredPopover(options: AnchoredPopoverOptions) {
   } = options;
 
   const show = ref(false);
-  const popoverStyle = ref<Record<string, string>>({});
+  const { popoverStyle, reposition } = useAnchoredPosition({
+    anchorRef,
+    popoverRef,
+    active: show,
+    align,
+    widthEstimate,
+    heightEstimate,
+  });
 
-  function positionPopover() {
-    if (!anchorRef.value) return;
-    const rect = anchorRef.value.getBoundingClientRect();
-    const height = popoverRef.value?.offsetHeight ?? heightEstimate;
-    const width = popoverRef.value?.offsetWidth ?? widthEstimate;
-    const MARGIN = 8;
-    const spaceBelow = window.innerHeight - rect.bottom;
-
-    // Flip up when there isn't room below but there is above.
-    const dropUp = spaceBelow < height + 16 && rect.top > height + 16;
-    const top = dropUp ? rect.top - height - 6 : rect.bottom + 6;
-
-    // Anchor the menu to the trigger's `align` edge, then clamp to the viewport so a
-    // trigger near the edge can't push the menu off-screen.
-    let left = align === 'start' ? rect.left : rect.right - width;
-    if (left + width > window.innerWidth - MARGIN) left = window.innerWidth - width - MARGIN;
-    if (left < MARGIN) left = MARGIN;
-
-    popoverStyle.value = {
-      position: 'fixed',
-      top: `${Math.max(MARGIN, top)}px`,
-      left: `${left}px`,
-      zIndex: String(ANCHORED_POPOVER_Z_INDEX),
-    };
-  }
+  // The menu is teleported to <body>, so it's outside the anchor: both count as inside.
+  useOutsideClick(show, [anchorRef, popoverRef], () => {
+    show.value = false;
+  });
 
   function menuItems(): HTMLElement[] {
     if (!popoverRef.value) return [];
@@ -125,7 +103,7 @@ export function useAnchoredPopover(options: AnchoredPopoverOptions) {
   function open() {
     show.value = true;
     nextTick(() => {
-      positionPopover();
+      reposition();
       // Move focus into the menu so keyboard users land on a row.
       const items = menuItems();
       const idx = Math.max(0, initialFocusIndex?.() ?? 0);
@@ -144,7 +122,7 @@ export function useAnchoredPopover(options: AnchoredPopoverOptions) {
   }
 
   function onMenuKeydown(e: KeyboardEvent) {
-    // A field inside the menu (TimePresetPicker's custom time) keeps its own arrow keys.
+    // A field inside the menu keeps its own arrow keys.
     if (isEditableTarget(e.target)) return;
     const items = menuItems();
     if (items.length === 0) return;
@@ -161,28 +139,6 @@ export function useAnchoredPopover(options: AnchoredPopoverOptions) {
   }
 
   useEscapeClose(show, () => close(true));
-
-  function onDocClick(e: MouseEvent) {
-    const target = e.target as Node;
-    // The menu is teleported to <body>, so it's outside the anchor — check it too.
-    if (anchorRef.value?.contains(target) || popoverRef.value?.contains(target)) return;
-    show.value = false;
-  }
-
-  function handleViewportChange() {
-    if (show.value) positionPopover();
-  }
-
-  onMounted(() => {
-    document.addEventListener('click', onDocClick, OUTSIDE_CLICK_CAPTURE);
-    window.addEventListener('scroll', handleViewportChange, true);
-    window.addEventListener('resize', handleViewportChange);
-  });
-  onUnmounted(() => {
-    document.removeEventListener('click', onDocClick, OUTSIDE_CLICK_CAPTURE);
-    window.removeEventListener('scroll', handleViewportChange, true);
-    window.removeEventListener('resize', handleViewportChange);
-  });
 
   return { show, popoverStyle, open, close, toggle, onMenuKeydown };
 }

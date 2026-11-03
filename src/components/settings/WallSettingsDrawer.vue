@@ -14,7 +14,7 @@
  */
 import { computed } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
-import BeanieTimeInput from '@/components/ui/BeanieTimeInput.vue';
+import BeanieTimePicker from '@/components/ui/BeanieTimePicker.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
 import SettingToggleRow from '@/components/settings/SettingToggleRow.vue';
@@ -106,13 +106,13 @@ function updateWeatherStyle(value: string) {
     <div v-if="sleep.enabled" class="space-y-4 pb-1">
       <div class="grid grid-cols-2 gap-3">
         <FormFieldGroup :label="t('wall.sleep.starts')">
-          <BeanieTimeInput
+          <BeanieTimePicker
             :model-value="sleep.startTime"
             @update:model-value="updateSleep('startTime', { startTime: $event })"
           />
         </FormFieldGroup>
         <FormFieldGroup :label="t('wall.sleep.ends')">
-          <BeanieTimeInput
+          <BeanieTimePicker
             :model-value="sleep.endTime"
             @update:model-value="updateSleep('endTime', { endTime: $event })"
           />

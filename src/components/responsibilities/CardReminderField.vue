@@ -7,7 +7,7 @@
  *  - A `ToggleRow` ("Remind the Holder", or "Remind {holder}" on a split part) whose hint
  *    names who it reminds today, or says nobody holds the part yet.
  *  - Expanded: What to Say (placeholder = the card name, which is also what a blank saves),
- *    How Often (`RecurrencePicker`, no Ends row) and At (`TimePresetPicker`).
+ *    How Often (`RecurrencePicker`, no Ends row) and At (`BeanieTimePicker`).
  *  - Collapsed with a reminder (a split part another part's control is open over): the
  *    summary, what it says, and Change.
  *
@@ -22,7 +22,7 @@ import ConditionalSection from '@/components/ui/ConditionalSection.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import RecurrencePicker from '@/components/ui/RecurrencePicker.vue';
-import TimePresetPicker from '@/components/ui/TimePresetPicker.vue';
+import BeanieTimePicker from '@/components/ui/BeanieTimePicker.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useRecurrenceLabel } from '@/composables/useRecurrenceLabel';
 import { useToday } from '@/composables/useToday';
@@ -220,7 +220,7 @@ function onTime(value: string): void {
           />
         </FormFieldGroup>
         <FormFieldGroup :label="t('whoOwnsWhat.reminder.at')">
-          <TimePresetPicker :model-value="time" clearable @update:model-value="onTime" />
+          <BeanieTimePicker :model-value="time" clearable @update:model-value="onTime" />
         </FormFieldGroup>
       </div>
     </ConditionalSection>

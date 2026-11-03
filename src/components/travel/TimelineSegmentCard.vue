@@ -22,7 +22,7 @@ import MemberChip from '@/components/ui/MemberChip.vue';
 import PhotoThumbnail from '@/components/media/PhotoThumbnail.vue';
 import ExpandableText from '@/components/ui/ExpandableText.vue';
 import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
-import BeanieTimeInput from '@/components/ui/BeanieTimeInput.vue';
+import BeanieTimePicker from '@/components/ui/BeanieTimePicker.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useMemberInfo } from '@/composables/useMemberInfo';
 import { safeExternalHref } from '@/utils/url';
@@ -169,7 +169,8 @@ async function copy(value: string): Promise<void> {
         </div>
 
         <div v-else-if="row.field && row.inputType === 'time'" class="max-w-[140px] min-w-0 shrink">
-          <BeanieTimeInput
+          <BeanieTimePicker
+            clearable
             :model-value="String(row.value ?? '')"
             @update:model-value="emit('inline-save', item, row.field!, $event)"
           />

@@ -17,6 +17,12 @@ import {
   startOfWeekYmd,
   defaultDueBeforeEvent,
   isWallClockTime,
+  toHHmm,
+  addMinutesToTime,
+  addHourToTime,
+  endFollowsStart,
+  parseTypedTime,
+  toTimeInputValue,
 } from '../date';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 
@@ -530,5 +536,118 @@ describe('defaultDueBeforeEvent', () => {
     expect(defaultDueBeforeEvent('2026-10-06T10:00:00', '2026-09-29T08:00:00.000Z')).toBe(
       '2026-10-05'
     );
+  });
+});
+
+describe('toHHmm', () => {
+  it('zero-pads hours and minutes', () => {
+    expect(toHHmm(0, 0)).toBe('00:00');
+    expect(toHHmm(9, 5)).toBe('09:05');
+    expect(toHHmm(16, 15)).toBe('16:15');
+    expect(toHHmm(23, 59)).toBe('23:59');
+  });
+
+  it('is what toTimeInputValue builds from a local Date', () => {
+    expect(toTimeInputValue(new Date(2026, 10, 3, 7, 4))).toBe('07:04');
+  });
+});
+
+describe('addMinutesToTime', () => {
+  it('adds minutes across the hour', () => {
+    expect(addMinutesToTime('16:15', 90)).toBe('17:45');
+    expect(addMinutesToTime('09:00', 30)).toBe('09:30');
+  });
+
+  it('caps at 23:59, never wrapping past midnight', () => {
+    expect(addMinutesToTime('22:00', 180)).toBe('23:59');
+    expect(addMinutesToTime('23:30', 60)).toBe('23:59');
+  });
+
+  it('returns empty for empty or malformed input, never NaN', () => {
+    expect(addMinutesToTime('', 60)).toBe('');
+    for (const bad of ['abc', '9', '25:00', '09:60', '9:5:1']) {
+      expect(addMinutesToTime(bad, 60)).toBe('');
+    }
+  });
+
+  it('backs addHourToTime', () => {
+    for (const t of ['00:00', '09:30', '16:15', '22:59', '23:00', '23:30', '']) {
+      expect(addHourToTime(t)).toBe(addMinutesToTime(t, 60));
+    }
+    expect(addHourToTime('14:30')).toBe('15:30');
+    expect(addHourToTime('23:30')).toBe('23:59');
+    expect(addHourToTime('not a time')).toBe('');
+  });
+});
+
+describe('endFollowsStart', () => {
+  it('follows when the end is empty', () => {
+    expect(endFollowsStart('09:00', '10:00', '')).toBe(true);
+    expect(endFollowsStart('', '10:00', '')).toBe(true);
+  });
+
+  it('follows when the end is exactly one hour after the old start', () => {
+    expect(endFollowsStart('09:00', '08:00', '10:00')).toBe(true);
+    expect(endFollowsStart('09:15', '16:15', '10:15')).toBe(true);
+  });
+
+  it('follows when the new start reaches or passes the end', () => {
+    expect(endFollowsStart('09:00', '12:00', '11:30')).toBe(true);
+    expect(endFollowsStart('09:00', '11:30', '11:30')).toBe(true);
+  });
+
+  it('stays put for any other end (one set by hand)', () => {
+    expect(endFollowsStart('09:00', '08:00', '11:30')).toBe(false);
+    expect(endFollowsStart('09:00', '10:00', '11:30')).toBe(false);
+    expect(endFollowsStart('', '10:00', '11:30')).toBe(false);
+  });
+
+  it('uses the capped end for a late start: 23:30 + 1 hour is 23:59', () => {
+    expect(endFollowsStart('23:30', '22:00', '23:59')).toBe(true);
+    expect(endFollowsStart('23:30', '22:00', '23:45')).toBe(false);
+  });
+});
+
+describe('parseTypedTime', () => {
+  it.each([
+    ['415p', '16:15'],
+    ['4:15pm', '16:15'],
+    ['4.15 pm', '16:15'],
+    ['4:15 P.M.', '16:15'],
+    ['1052a', '10:52'],
+    ['10:52 am', '10:52'],
+    ['12a', '00:00'],
+    ['12pm', '12:00'],
+    ['12:30a', '00:30'],
+    ['1615', '16:15'],
+    ['0415', '04:15'],
+    ['6', '18:00'],
+    ['1', '13:00'],
+    ['4:15', '16:15'],
+    ['7', '07:00'],
+    ['730', '07:30'],
+    ['11', '11:00'],
+    ['0', '00:00'],
+    ['12', '12:00'],
+    ['18', '18:00'],
+    ['23:59', '23:59'],
+    ['noon', '12:00'],
+    ['Midnight', '00:00'],
+    ['  9a  ', '09:00'],
+  ])('reads %j as %s', (raw, expected) => {
+    expect(parseTypedTime(raw)).toBe(expected);
+  });
+
+  it.each(['', '   ', '99', '24', '4:75', '13pm', '0am', 'abc', '4m', '4:1', '12345', 'noonish'])(
+    'rejects %j',
+    (raw) => {
+      expect(parseTypedTime(raw)).toBeNull();
+    }
+  );
+
+  it('always returns the stored wall-clock shape', () => {
+    for (const raw of ['415p', '1', '0415', 'noon', '9a']) {
+      expect(isWallClockTime(parseTypedTime(raw)!)).toBe(true);
+    }
   });
 });

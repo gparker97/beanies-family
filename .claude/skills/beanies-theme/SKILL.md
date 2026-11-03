@@ -697,7 +697,8 @@ These components are used inside BeanieFormModal forms. **Prefer these over buil
 | `EmojiPicker` | Grid of emoji options for type/icon |
 | `FrequencyChips` | Chip selector for recurring patterns |
 | `DayOfWeekSelector` | Day-of-week multi-select |
-| `TimePresetPicker` | Time input with common presets |
+| `BeanieTimePicker` | Single time field: hour and minute chips, type-a-time box, optional Clear |
+| `BeanieTimeRange` | Start and end pair in one sheet: recents, All day, then durations for the end |
 | `AmountInput` | Currency-aware number input |
 | `TogglePillGroup` | Toggle between 2-3 options |
 | `ConditionalSection` | Animated show/hide wrapper |

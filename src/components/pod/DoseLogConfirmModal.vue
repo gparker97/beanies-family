@@ -23,7 +23,7 @@
 import { computed, ref, watch } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
-import BeanieTimeInput from '@/components/ui/BeanieTimeInput.vue';
+import BeanieTimePicker from '@/components/ui/BeanieTimePicker.vue';
 import MedicationLogRow from '@/components/pod/MedicationLogRow.vue';
 import { useDoseConfirm } from '@/composables/useDoseConfirm';
 import { useMedicationsStore } from '@/stores/medicationsStore';
@@ -198,7 +198,7 @@ function onSave(): void {
         </h3>
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto_auto]">
           <BeanieDatePicker v-model="dateValue" :placeholder="t('medicationLog.dateFieldLabel')" />
-          <BeanieTimeInput v-model="timeValue" :placeholder="t('medicationLog.timeFieldLabel')" />
+          <BeanieTimePicker v-model="timeValue" :placeholder="t('medicationLog.timeFieldLabel')" />
           <button
             type="button"
             class="font-outfit dark:text-accent-lift rounded-xl bg-[var(--tint-orange-8)] px-3 py-2 text-xs font-bold tracking-wider text-[#F15D22] uppercase transition-colors hover:bg-[var(--tint-orange-15)] focus:bg-[var(--tint-orange-15)] focus:outline-none"

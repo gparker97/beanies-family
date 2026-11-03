@@ -7,7 +7,7 @@ import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
 import FrequencyChips from '@/components/ui/FrequencyChips.vue';
 import RecurrencePicker from '@/components/ui/RecurrencePicker.vue';
-import TimePresetPicker from '@/components/ui/TimePresetPicker.vue';
+import BeanieTimeRange from '@/components/ui/BeanieTimeRange.vue';
 import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
 import AssigneePickerButton from '@/components/ui/AssigneePickerButton.vue';
 import CurrencyAmountInput from '@/components/ui/CurrencyAmountInput.vue';
@@ -41,6 +41,7 @@ import { useOccasionForm, type OccasionAutoField } from '@/composables/useOccasi
 import { getActivityCategoryColor, getActivityFallbackEmoji } from '@/constants/activityCategories';
 import {
   addHourToTime,
+  endFollowsStart,
   formatNookDate,
   extractDatePart,
   addDaysYmd,
@@ -575,9 +576,13 @@ watch(
     }
   }
 );
-watch(startTime, (newStart) => {
+// The end follows the start only while it is untouched (empty, start + 1h, or now before the
+// start); an end set by hand stays put. See `endFollowsStart`.
+watch(startTime, (newStart, oldStart) => {
   if (suppressTimeWatchers || !newStart) return;
-  endTime.value = addHourToTime(newStart);
+  if (endFollowsStart(oldStart ?? '', newStart, endTime.value)) {
+    endTime.value = addHourToTime(newStart);
+  }
 });
 // Clamp endTime to not be before startTime — a USER edit only. See the flag's header for why
 // it must stand down while a block of fields is seeded.
@@ -1279,14 +1284,14 @@ function handleSave() {
             }}</span>
           </div>
         </FormFieldGroup>
-        <div v-if="!isAllDay" class="grid grid-cols-2 gap-4">
-          <FormFieldGroup :label="t('modal.startTime')">
-            <TimePresetPicker v-model="startTime" />
-          </FormFieldGroup>
-          <FormFieldGroup :label="t('modal.endTime')">
-            <TimePresetPicker v-model="endTime" />
-          </FormFieldGroup>
-        </div>
+        <BeanieTimeRange
+          v-if="!isAllDay"
+          v-model:start="startTime"
+          v-model:end="endTime"
+          all-day-affordance
+          clearable-end
+          @all-day="isAllDay = true"
+        />
       </template>
       <!-- One-off: Date (+ optional end date if all-day), or Date + times -->
       <template v-else>
@@ -1302,14 +1307,13 @@ function handleSave() {
           <FormFieldGroup :label="t('planner.field.dateOnly')" v-bind="v.bind('date')">
             <BeanieDatePicker v-model="date" required />
           </FormFieldGroup>
-          <div class="grid grid-cols-2 gap-3">
-            <FormFieldGroup :label="t('modal.startTime')">
-              <TimePresetPicker v-model="startTime" />
-            </FormFieldGroup>
-            <FormFieldGroup :label="t('modal.endTime')">
-              <TimePresetPicker v-model="endTime" />
-            </FormFieldGroup>
-          </div>
+          <BeanieTimeRange
+            v-model:start="startTime"
+            v-model:end="endTime"
+            all-day-affordance
+            clearable-end
+            @all-day="isAllDay = true"
+          />
         </div>
       </template>
 

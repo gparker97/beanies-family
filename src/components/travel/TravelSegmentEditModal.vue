@@ -5,7 +5,7 @@ import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
-import BeanieTimeInput from '@/components/ui/BeanieTimeInput.vue';
+import BeanieTimePicker from '@/components/ui/BeanieTimePicker.vue';
 import BaseTextarea from '@/components/ui/BaseTextarea.vue';
 import { BaseCombobox } from '@/components/ui';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
@@ -709,8 +709,9 @@ async function handleSave() {
                 :label="t('vacation.field.departureTime')"
                 v-bind="validation.bind('departureTime')"
               >
-                <BeanieTimeInput
+                <BeanieTimePicker
                   v-model="departureTime"
+                  clearable
                   @update:model-value="handleDepartureTimeChange"
                 />
               </FormFieldGroup>
@@ -719,7 +720,7 @@ async function handleSave() {
                 v-bind="validation.bind('arrivalTime')"
               >
                 <div class="flex items-center gap-1.5">
-                  <BeanieTimeInput v-model="arrivalTime" class="min-w-0 flex-1" />
+                  <BeanieTimePicker v-model="arrivalTime" clearable class="min-w-0 flex-1" />
                   <!-- One tap cycles 0 → +1 → +2 → 0. A westbound date-line crossing
                        lands two calendar days later, which the old boolean could not
                        say — and an uncoverable night then showed as unbooked. -->
@@ -829,7 +830,7 @@ async function handleSave() {
                 :label="t('vacation.field.embarkationTime')"
                 v-bind="validation.bind('embarkationTime')"
               >
-                <BeanieTimeInput v-model="embarkationTime" />
+                <BeanieTimePicker v-model="embarkationTime" clearable />
               </FormFieldGroup>
               <FormFieldGroup :label="t('vacation.field.cabinNumber')">
                 <BaseInput v-model="cabinNumber" :placeholder="t('vacation.field.cabinNumber')" />
@@ -863,7 +864,7 @@ async function handleSave() {
         </FormFieldGroup>
         <div class="grid grid-cols-2 gap-3">
           <FormFieldGroup :label="t('vacation.field.leavingTime')">
-            <BeanieTimeInput v-model="leavingTime" />
+            <BeanieTimePicker v-model="leavingTime" clearable />
           </FormFieldGroup>
           <FormFieldGroup :label="t('vacation.field.carLabel')">
             <BaseInput v-model="carLabel" :placeholder="t('vacation.field.carLabelPlaceholder')" />
@@ -890,7 +891,7 @@ async function handleSave() {
             <BeanieDatePicker v-model="departureDate" />
           </FormFieldGroup>
           <FormFieldGroup :label="t('vacation.field.startTime')">
-            <BeanieTimeInput v-model="startTime" />
+            <BeanieTimePicker v-model="startTime" clearable />
           </FormFieldGroup>
           <FormFieldGroup :label="t('vacation.field.duration')">
             <BaseInput
@@ -993,10 +994,10 @@ async function handleSave() {
             :label="t('vacation.field.departureTime')"
             v-bind="validation.bind('departureTime')"
           >
-            <BeanieTimeInput v-model="departureTime" />
+            <BeanieTimePicker v-model="departureTime" clearable />
           </FormFieldGroup>
           <FormFieldGroup :label="t('vacation.field.arrivalTime')">
-            <BeanieTimeInput v-model="arrivalTime" />
+            <BeanieTimePicker v-model="arrivalTime" clearable />
           </FormFieldGroup>
         </div>
         <FormFieldGroup :label="t('vacation.field.bookingReference')">

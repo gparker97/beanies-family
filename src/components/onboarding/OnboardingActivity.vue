@@ -4,7 +4,7 @@ import OnboardingStepHeader from './OnboardingStepHeader.vue';
 import OnboardingStepShell from './OnboardingStepShell.vue';
 import OnboardingAddedRow from './OnboardingAddedRow.vue';
 import DayOfWeekSelector from '@/components/ui/DayOfWeekSelector.vue';
-import TimePresetPicker from '@/components/ui/TimePresetPicker.vue';
+import BeanieTimeRange from '@/components/ui/BeanieTimeRange.vue';
 import CurrencyAmountInput from '@/components/ui/CurrencyAmountInput.vue';
 import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
 import { showToast } from '@/composables/useToast';
@@ -13,7 +13,7 @@ import { useFamilyStore } from '@/stores/familyStore';
 import { useActivityStore } from '@/stores/activityStore';
 import { toAssigneePayload } from '@/utils/assignees';
 import { useTranslation } from '@/composables/useTranslation';
-import { addHourToTime, formatTime12 } from '@/utils/date';
+import { addHourToTime, endFollowsStart, formatTime12 } from '@/utils/date';
 import { ACTIVITY_PRESETS, type ActivityPreset } from '@/constants/activityPresets';
 import { useActivityCategoryLabel } from '@/composables/useActivityCategoryLabel';
 import { ErrorSurfaces } from './errorSurfaces';
@@ -56,8 +56,10 @@ interface AddedActivity {
 }
 const addedActivities = ref<AddedActivity[]>([]);
 
-watch(startTime, (newStart) => {
-  if (newStart) endTime.value = addHourToTime(newStart);
+watch(startTime, (newStart, oldStart) => {
+  if (newStart && endFollowsStart(oldStart ?? '', newStart, endTime.value)) {
+    endTime.value = addHourToTime(newStart);
+  }
 });
 
 function defaultAssigneeIds(): string[] {
@@ -278,16 +280,16 @@ function formatActivityMeta(activity: AddedActivity): string {
             <DayOfWeekSelector v-model="activityDays" />
           </div>
           <div class="ob-time-col">
-            <div class="grid grid-cols-2 gap-2">
-              <div>
-                <div class="ob-detail-label">{{ t('onboarding.startTime') }}</div>
-                <TimePresetPicker v-model="startTime" />
-              </div>
-              <div>
-                <div class="ob-detail-label">{{ t('onboarding.endTime') }}</div>
-                <TimePresetPicker v-model="endTime" />
-              </div>
-            </div>
+            <BeanieTimeRange
+              v-model:start="startTime"
+              v-model:end="endTime"
+              :start-label="t('onboarding.startTime')"
+              :end-label="t('onboarding.endTime')"
+            >
+              <template #label="{ text }">
+                <div class="ob-detail-label">{{ text }}</div>
+              </template>
+            </BeanieTimeRange>
           </div>
         </div>
 
