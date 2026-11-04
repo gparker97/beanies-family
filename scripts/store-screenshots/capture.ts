@@ -35,7 +35,8 @@ import { bypassLoginIfNeeded } from '../../e2e/helpers/auth';
 import { IndexedDBHelper } from '../../e2e/helpers/indexeddb';
 import { mockRegistry } from '../../e2e/helpers/registry-mock';
 import { labelExact, labelLoose } from '../promo-video/labels';
-import { buildDemoFamily, DEMO_PHOTO_FILES } from '../promo-video/seed';
+import { buildDemoFamily } from '../promo-video/seed';
+import { mockPhotoCdn } from '../promo-video/take';
 import { PROFILES } from '../../playwright.screenshots.config';
 
 const DEMO_FAMILY_NAME = 'The Bean Family';
@@ -44,32 +45,6 @@ const ROOT = process.cwd();
 
 /** CSS widths below this render the mobile layout (bottom tab bar). */
 const MOBILE_MAX_WIDTH = 767;
-
-/**
- * Serve brand art in place of the Google Drive photo CDN.
- *
- * `photoStore.getPublicUrl` is pure — it builds the URL from `driveFileId` and
- * never checks whether Drive is configured — so seeded photo metadata renders as
- * long as the request resolves. Unmapped ids abort rather than 404, because a
- * 404 pushes the photo into `unresolvedIds` and the app then renders a permanent
- * broken tile for it.
- */
-async function mockPhotoCdn(page: Page): Promise<void> {
-  await page.route('https://lh3.googleusercontent.com/**', async (route) => {
-    // URL shape: /d/<driveFileId>=w<px>
-    const match = /\/d\/([^=/?]+)/.exec(route.request().url());
-    const rel = match ? DEMO_PHOTO_FILES[decodeURIComponent(match[1]!)] : undefined;
-    if (!rel) return route.abort();
-
-    const file = path.join(ROOT, 'public', rel);
-    if (!fs.existsSync(file)) return route.abort();
-    await route.fulfill({
-      status: 200,
-      contentType: rel.endsWith('.webp') ? 'image/webp' : 'image/png',
-      body: fs.readFileSync(file),
-    });
-  });
-}
 
 /**
  * Reveal financial figures. `usePrivacyMode` starts LOCKED on every load and is

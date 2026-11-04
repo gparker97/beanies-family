@@ -33,6 +33,7 @@
     "test:e2e:report": "playwright show-report",
     "promo:record": "playwright test -c playwright.video.config.ts",
     "promo:compose": "bash scripts/promo-video/compose.sh",
+    "promo:store": "playwright test -c playwright.store-preview.config.ts",
     "store:screenshots": "playwright test -c playwright.screenshots.config.ts",
     "update-airports": "node scripts/updateAirports.mjs",
     "generate:holidays": "node scripts/generateHolidays.mjs",

@@ -34,7 +34,7 @@
  * Compositing lives in `compose.sh` (trim + centre on a brand canvas + H.264).
  * Full pipeline: `npm run promo:record && npm run promo:compose`.
  */
-import { test, expect, type Page, type Locator } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { UIStringKey } from '../../src/services/translation/uiStrings';
@@ -42,11 +42,8 @@ import { bypassLoginIfNeeded } from '../../e2e/helpers/auth';
 import { IndexedDBHelper } from '../../e2e/helpers/indexeddb';
 import { mockRegistry } from '../../e2e/helpers/registry-mock';
 import { installCursor, glideTo } from './cursor';
-import { labelExact, labelLoose } from './labels';
 import { buildDemoFamily } from './seed';
-
-/** A blocked click means an overlay is eating pointer events — fail fast, don't stall. */
-const CLICK_TIMEOUT = 5000;
+import { dismissCelebration as dismissCelebrationIn, openTab } from './take';
 
 const DEMO_FAMILY_NAME = 'The Bean Family';
 const OUT = path.join(process.cwd(), 'scripts', 'promo-video', '.out');
@@ -59,93 +56,10 @@ const mark = (name: string) => {
   console.log(`  ${name.padEnd(14)} @ ${(atMs / 1000).toFixed(2)}s`);
 };
 
-/**
- * Report what is actually sitting at a point, so a "blocked" click names its
- * blocker instead of leaving us guessing. Also drops a screenshot next to the
- * footage. Diagnostic only — never throws.
- */
-async function diagnoseBlock(page: Page, x: number, y: number, what: string): Promise<void> {
-  const top = await page
-    .evaluate(
-      ({ x, y }) => {
-        const el = document.elementFromPoint(x, y);
-        if (!el) return 'nothing at point';
-        const chain: string[] = [];
-        for (let n: Element | null = el; n && chain.length < 4; n = n.parentElement) {
-          const cls = typeof n.className === 'string' ? n.className.slice(0, 60) : '';
-          chain.push(
-            `${n.tagName.toLowerCase()}${cls ? '.' + cls.trim().split(/\s+/).join('.') : ''}`
-          );
-        }
-        return chain.join('  <  ');
-      },
-      { x, y }
-    )
-    .catch(() => 'evaluate failed');
-  console.warn(`    ↳ topmost at (${Math.round(x)},${Math.round(y)}): ${top}`);
-  fs.mkdirSync(OUT, { recursive: true });
-  await page.screenshot({ path: path.join(OUT, `blocked-${what}.png`) }).catch(() => {});
-}
+/** The shared dismisser, bound to this take's output folder. */
+const dismissCelebration = (page: Page) => dismissCelebrationIn(page, OUT);
 
-/** Glide onto a locator's centre and click. Returns false if it isn't there / is blocked. */
-async function glideClick(page: Page, target: Locator, what = 'target'): Promise<boolean> {
-  const box = await target.boundingBox().catch(() => null);
-  if (!box) {
-    console.warn(`    ↳ "${what}" has no bounding box (absent or display:none)`);
-    return false;
-  }
-  const cx = box.x + box.width / 2;
-  const cy = box.y + box.height / 2;
-  await glideTo(page, cx, cy);
-  await page.waitForTimeout(240);
-  try {
-    await target.click({ timeout: CLICK_TIMEOUT });
-    return true;
-  } catch {
-    await diagnoseBlock(page, cx, cy, what); // an overlay is eating pointer events
-    return false;
-  }
-}
-
-/**
- * Dismiss the celebration modal (`z-[200]`, full-screen `bg-black/40` backdrop)
- * that fires when the first to-do is ticked. It does NOT auto-dismiss — it waits
- * on its "let's go" button — so anything that follows is pointer-blocked until
- * it's cleared. Returns true if one was actually dismissed.
- */
-async function dismissCelebration(page: Page): Promise<boolean> {
-  const go = page.getByRole('button', { name: labelExact('celebration.letsGo') }).last();
-  if (!(await go.isVisible().catch(() => false))) return false;
-  await glideClick(page, go, 'celebration');
-  await page.waitForTimeout(400);
-  return true;
-}
-
-/**
- * Dismiss the bean-stack overlay if it's open. Called whenever a card beat is
- * abandoned — otherwise the overlay swallows every later tab click and the take
- * stalls out at the test ceiling (the 2026-07-09 failure). Clears a celebration
- * modal first, since that sits above the stack.
- */
-async function dismissStack(page: Page): Promise<void> {
-  await dismissCelebration(page);
-  const closer = page.getByLabel(labelExact('mobile.closeMenu')).last();
-  if (await closer.isVisible().catch(() => false)) {
-    await closer.click({ timeout: CLICK_TIMEOUT }).catch(() => {});
-  } else {
-    await page.keyboard.press('Escape').catch(() => {});
-  }
-  await page.waitForTimeout(300);
-}
-
-/**
- * Tap a bottom-nav tab. `nook` and `calendar` route directly; `planning`,
- * `money` and `pod` fan out side-cards behind a full-screen close-menu overlay —
- * so those need a second click on the card (a `role="menuitem"` button).
- *
- * Labels are resolved from the string table and match either the `en` or the
- * `beanie` rendering — never hardcoded prose.
- */
+/** Tap a bottom-nav tab (and its fan-out card), mark the beat and dwell on it. */
 async function tapTab(
   page: Page,
   tabKey: UIStringKey,
@@ -153,25 +67,7 @@ async function tapTab(
   dwellMs: number,
   cardKey?: UIStringKey
 ) {
-  const tab = page.getByLabel(labelExact(tabKey)).last();
-  if (!(await glideClick(page, tab, `tab-${name}`))) {
-    console.warn(`  ! tab "${tabKey}" not found or blocked — skipping`);
-    await dismissStack(page);
-    return;
-  }
-  if (cardKey) {
-    const target = page
-      .getByRole('menuitem')
-      .filter({ hasText: labelLoose(cardKey) })
-      .last();
-    await target.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-    if (!(await glideClick(page, target, `card-${name}`))) {
-      console.warn(`  ! card "${cardKey}" not found under "${tabKey}" — dismissing stack`);
-      await dismissStack(page);
-      return;
-    }
-  }
-  await page.getByTestId('app-content').waitFor({ state: 'visible', timeout: 20000 });
+  if (!(await openTab(page, tabKey, OUT, cardKey))) return;
   mark(name);
   await page.waitForTimeout(dwellMs);
 }
