@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-11-05
 
+### Added
+
+- An open day on the phone month grid now has a close button, so you can fold it away and go back to the plain month.
+
 ### Fixed
 
 - Event titles on the phone month grid now use the same weight as other small text in the app.

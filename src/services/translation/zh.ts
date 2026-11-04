@@ -4099,6 +4099,7 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'planner.dayRow.count.one': '1 项安排',
   'planner.dayRow.count.other': '{count} 项安排',
   'planner.dayRow.tapAgain': '再点一次查看当天',
+  'planner.dayRow.close': '收起当天',
   'planner.monthGrid.densityLabel': '显示密度',
   'planner.monthGrid.compact': '紧凑',
   'planner.monthGrid.comfortable': '宽松',

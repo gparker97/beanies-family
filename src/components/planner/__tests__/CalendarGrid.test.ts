@@ -800,6 +800,23 @@ describe('CalendarGrid phone', () => {
     w.unmount();
   });
 
+  it("the row's close button folds it back, logs day_closed and returns focus to the day", async () => {
+    const w = mountPhone();
+    await w.get('[data-date="2026-04-14"]').trigger('click');
+    expect(dayRows(w)).toHaveLength(1);
+    const close = w.get('[data-testid="month-day-row-close"]');
+    expect(close.attributes('aria-label')).toBe('planner.dayRow.close');
+    await close.trigger('click');
+    expect(dayRows(w)).toHaveLength(0);
+    expect(w.get('[data-date="2026-04-14"]').attributes('aria-expanded')).toBe('false');
+    expect(w.emitted('selectDate')).toBeUndefined();
+    const closed = vi.mocked(logEvent).mock.calls.find(([e]) => e.message === 'day_closed');
+    expect(closed?.[0].context).toMatchObject({ stage: 'close_button' });
+    await nextTick();
+    expect(document.activeElement?.getAttribute('data-date')).toBe('2026-04-14');
+    w.unmount();
+  });
+
   it('Escape closes the open day row', async () => {
     const w = mountPhone();
     await w.get('[data-date="2026-04-14"]').trigger('click');

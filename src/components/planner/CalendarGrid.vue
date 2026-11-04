@@ -305,10 +305,28 @@ watch([currentYear, currentMonth], () => {
 });
 useEscapeClose(
   computed(() => selectedDate.value !== null),
-  () => {
-    selectedDate.value = null;
-  }
+  () => closeDayRow('escape')
 );
+
+/**
+ * Fold the open day row back to the plain grid (the row's close button, or Escape), and
+ * hand focus back to the day's cell so a keyboard or screen-reader user is not dropped
+ * onto the page body when the button they pressed unmounts.
+ */
+function closeDayRow(stage: 'close_button' | 'escape'): void {
+  const date = selectedDate.value;
+  if (date === null) return;
+  selectedDate.value = null;
+  logEvent({
+    level: 'info',
+    surface: 'calendar-month-grid',
+    message: 'day_closed',
+    context: { action: 'day_closed', format: 'phone', stage },
+  });
+  void nextTick(() => {
+    gridBodyRef.value?.querySelector<HTMLElement>(`[data-date="${date}"]`)?.focus();
+  });
+}
 
 function onTapDay(date: string): void {
   if (selectedDate.value === date) {
@@ -470,6 +488,7 @@ useCalendarSlide(swipeRef, {
           v-if="selectedCell && selectedCell.weekRow === w"
           :id="dayRowId"
           :cell="selectedCell"
+          @close="closeDayRow('close_button')"
           @view-activity="(id, date) => emit('view-activity', id, date)"
           @vacation-click="(vid) => emit('vacation-click', vid)"
           @view-segment="(vid, sidx) => emit('view-segment', vid, sidx)"

@@ -9493,6 +9493,7 @@ const STRING_DEFS = {
   'planner.dayRow.count.other': { en: '{count} things on', beanie: '{count} things on' },
   // #141: the phone day row's header hint (a second tap on the day opens the Day view).
   'planner.dayRow.tapAgain': { en: 'Tap again for the day', beanie: 'tap again for the day' },
+  'planner.dayRow.close': { en: 'Close Day', beanie: 'close day' },
   // #141: the desktop month grid's density menu and day-numeral label.
   'planner.monthGrid.densityLabel': { en: 'Density', beanie: 'density' },
   'planner.monthGrid.compact': { en: 'Compact', beanie: 'compact' },
