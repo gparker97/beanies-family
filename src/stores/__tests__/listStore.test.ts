@@ -453,29 +453,126 @@ describe('listStore', () => {
       list({ id: 'b', linkedActivityId: 'act1' }),
       list({ id: 'c' }),
     ];
-    vi.mocked(listRepo.updateList).mockImplementation(async (id, input) => {
-      const cur = store.lists.find((x) => x.id === id)!;
-      return { ...cur, ...(input as Partial<FamilyList>) } as FamilyList;
-    });
-
-    await store.clearLinksFor('trip', 'v1');
-    expect(store.lists.find((l) => l.id === 'a')!.linkedVacationId).toBeUndefined();
-    expect(store.lists.find((l) => l.id === 'b')!.linkedActivityId).toBe('act1'); // untouched
-
     vi.mocked(listRepo.patchLists).mockImplementation(async (ids, input) =>
       store.lists
         .filter((x) => ids.includes(x.id))
         .map((x) => ({ ...x, ...(input as Partial<FamilyList>) }) as FamilyList)
     );
+
+    await store.clearLinksFor('trip', 'v1');
+    expect(store.lists.find((l) => l.id === 'a')!.linkedVacationId).toBeUndefined();
+    expect(store.lists.find((l) => l.id === 'b')!.linkedActivityId).toBe('act1'); // untouched
+    // ONE batched, reported write for the trip branch too (it used to be N `updateList`s).
+    expect(listRepo.patchLists).toHaveBeenCalledWith(
+      ['a'],
+      { linkedVacationId: undefined },
+      { onMissing: 'skip' }
+    );
+    expect(listRepo.updateList).not.toHaveBeenCalled();
+
     await store.clearLinksFor('activity', 'act1');
     expect(store.lists.find((l) => l.id === 'b')!.linkedActivityId).toBeUndefined();
     // ONE batched write for the activity branch, id + session date cleared together.
-    expect(listRepo.patchLists).toHaveBeenCalledTimes(1);
-    expect(listRepo.patchLists).toHaveBeenCalledWith(
+    expect(listRepo.patchLists).toHaveBeenCalledTimes(2);
+    expect(listRepo.patchLists).toHaveBeenLastCalledWith(
       ['b'],
       { linkedActivityId: undefined, activityDate: undefined },
       { onMissing: 'skip' }
     );
+  });
+
+  describe('trip links and attaching', () => {
+    const patchEcho = () =>
+      vi.mocked(listRepo.patchLists).mockImplementation(async (ids, input) =>
+        useListStore()
+          .lists.filter((x) => ids.includes(x.id))
+          .map((x) => ({ ...x, ...(input as Partial<FamilyList>) }) as FamilyList)
+      );
+
+    it('linkListsToTrip links (and with null unlinks) in one write, skipping missing ids', async () => {
+      const store = useListStore();
+      store.lists = [list({ id: 'a' })];
+      patchEcho();
+
+      const linked = await store.linkListsToTrip(['a', 'gone'], 'trip-1');
+      expect(listRepo.patchLists).toHaveBeenCalledWith(
+        ['a', 'gone'],
+        { linkedVacationId: 'trip-1' },
+        { onMissing: 'skip' }
+      );
+      expect(linked).toHaveLength(1);
+      expect(store.lists[0]!.linkedVacationId).toBe('trip-1');
+
+      await store.linkListsToTrip(['a'], null);
+      expect(store.lists[0]!.linkedVacationId).toBeUndefined();
+    });
+
+    it('linkListsToTrip returns null on a failed write, reported under its own action', async () => {
+      const store = useListStore();
+      store.lists = [list({ id: 'a', linkedVacationId: 'trip-1' })];
+      vi.mocked(listRepo.patchLists).mockRejectedValue(new Error('write failed'));
+
+      expect(await store.linkListsToTrip(['a'], null)).toBeNull();
+      expect(store.lists[0]!.linkedVacationId).toBe('trip-1');
+    });
+
+    it('listsForTrip returns the lists linked to that trip, filed ones included', () => {
+      const store = useListStore();
+      store.lists = [
+        list({ id: 'a', linkedVacationId: 'trip-1' }),
+        list({ id: 'filed', linkedVacationId: 'trip-1', completed: true }),
+        list({ id: 'other', linkedVacationId: 'trip-2' }),
+        list({ id: 'act', linkedActivityId: 'trip-1' }),
+      ];
+      expect(store.listsForTrip('trip-1').map((l) => l.id)).toEqual(['a', 'filed']);
+    });
+
+    it('attachableLists offers unfiled lists with no link of that kind, newest first', () => {
+      const store = useListStore();
+      store.lists = [
+        list({ id: 'old', createdAt: '2026-01-01T00:00:00.000Z' }),
+        list({ id: 'new', createdAt: '2026-09-01T00:00:00.000Z' }),
+        list({ id: 'filed', completed: true }),
+        list({ id: 'on-trip', linkedVacationId: 'trip-9' }),
+        list({ id: 'on-activity', linkedActivityId: 'act-9' }),
+      ];
+      expect(store.attachableLists('trip').map((l) => l.id)).toEqual(['new', 'on-activity', 'old']);
+      expect(store.attachableLists('activity').map((l) => l.id)).toEqual(['new', 'on-trip', 'old']);
+    });
+
+    it('attachLists never moves a list that was linked elsewhere since it was picked', async () => {
+      const store = useListStore();
+      store.lists = [list({ id: 'free' }), list({ id: 'taken', linkedVacationId: 'trip-9' })];
+      patchEcho();
+
+      const attached = await store.attachLists(['free', 'taken'], {
+        kind: 'trip',
+        vacationId: 'trip-1',
+      });
+      expect(listRepo.patchLists).toHaveBeenCalledWith(
+        ['free'],
+        { linkedVacationId: 'trip-1' },
+        { onMissing: 'skip' }
+      );
+      expect(attached!.map((l) => l.id)).toEqual(['free']);
+      expect(store.lists.find((l) => l.id === 'taken')!.linkedVacationId).toBe('trip-9');
+    });
+
+    it('attachLists to an activity session writes the id and session date together', async () => {
+      const store = useListStore();
+      store.lists = [list({ id: 'free' })];
+      patchEcho();
+
+      await store.attachLists(['free'], {
+        kind: 'activity',
+        link: { activityId: 'series', activityDate: '2026-10-06' },
+      });
+      expect(listRepo.patchLists).toHaveBeenCalledWith(
+        ['free'],
+        { linkedActivityId: 'series', activityDate: '2026-10-06' },
+        { onMissing: 'skip' }
+      );
+    });
   });
 
   describe('activity links (#114)', () => {
@@ -534,6 +631,23 @@ describe('listStore', () => {
         ['whole', 'every-session'],
         ['this', 'session'],
       ]);
+    });
+
+    it('createBlankList defaults to Home when the category is absent or undefined', async () => {
+      const store = useListStore();
+      vi.mocked(listRepo.createList).mockImplementation(
+        async (input) => ({ ...list(), ...input, id: 'new' }) as FamilyList
+      );
+
+      await store.createBlankList('m-1', { category: undefined, linkedVacationId: 'trip-1' });
+      await store.createBlankList('m-1');
+
+      for (const [input] of vi.mocked(listRepo.createList).mock.calls) {
+        expect(input.category).toBe('home');
+      }
+      expect(listRepo.createList).toHaveBeenCalledWith(
+        expect.objectContaining({ linkedVacationId: 'trip-1' })
+      );
     });
 
     it('createBlankList seeds a one-off list and spreads overrides last', async () => {

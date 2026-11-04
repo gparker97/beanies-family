@@ -3,7 +3,7 @@
 // embed (one source of truth for the row). Done check is the mockup's orange
 // gradient (heritage→terracotta), not the green to-do tick.
 //
-// Edit + drag are OPT-IN via props so the read-only LinkedLists embed (which
+// Edit + drag are OPT-IN via props so the read-only embedded card (`LinkedListCard`, which
 // omits them) renders exactly as before. The row owns its in-flight edit draft
 // (so the modal needs no per-row draft) and self-commits on blur / unmount /
 // editing→false while dirty, so closing the drawer mid-edit never loses text.
@@ -146,7 +146,7 @@ function setDraft(value: string): void {
       >
     </button>
 
-    <!-- READ-ONLY text (default; the LinkedLists embed). -->
+    <!-- READ-ONLY text (default; the embedded `LinkedListCard`). -->
     <span
       v-else
       class="min-w-0 flex-1 text-sm wrap-anywhere"

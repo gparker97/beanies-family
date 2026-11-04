@@ -136,12 +136,12 @@ test('activity todos walk', async ({ page }) => {
 
   const drawer = () => page.getByRole('dialog').filter({ has: page.getByTestId('activity-todos') });
   const todosSection = () => page.getByTestId('activity-todos');
-  const listsSection = () => page.getByTestId('activity-lists');
+  const listsSection = () => page.getByTestId('linked-lists');
 
   // ── 1. One-off party: the empty state ────────────────────────────────────────
   await gotoRoute(page, `/activities?activity=${party.id}`);
   await drawer().waitFor({ timeout: 15000 });
-  await expect(page.getByTestId('activity-lists-empty')).toBeVisible();
+  await expect(page.getByTestId('linked-lists-empty')).toBeVisible();
   await probe(page, drawer(), '1 party empty');
   await shotMatrix(page, '01-party-empty', listsSection);
 
@@ -180,7 +180,7 @@ test('activity todos walk', async ({ page }) => {
   await shotMatrix(page, '03-party-ticked', todosSection);
 
   // ── 4. From a Template: Suggested party prep, linked ─────────────────────────
-  await page.getByTestId('activity-lists-template').first().click();
+  await page.getByTestId('linked-lists-template').first().click();
   const sheet = page.getByRole('dialog').filter({ has: page.getByTestId('suggested-badge') });
   await sheet.waitFor({ timeout: 5000 });
   await shotMatrix(page, '04-template-suggested');
@@ -203,7 +203,7 @@ test('activity todos walk', async ({ page }) => {
 
   // ── 4d. "+ New List" closed untouched leaves nothing behind ──────────────────
   const listsBefore = ((await db.exportData()) as unknown as { lists?: FamilyList[] }).lists ?? [];
-  await listsSection().getByTestId('activity-lists-blank').first().click();
+  await listsSection().getByTestId('linked-lists-blank').first().click();
   await page.waitForTimeout(800);
   const afterCreate = ((await db.exportData()) as unknown as { lists?: FamilyList[] }).lists ?? [];
   expect(afterCreate.length, 'the blank list exists while it is open').toBe(listsBefore.length + 1);

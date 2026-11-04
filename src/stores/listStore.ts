@@ -14,7 +14,15 @@ import { computeRecurringReset, isDueSoon, isFiled, isRecurring } from '@/utils/
 import { buildCopySeeds, freshItems } from '@/utils/listSeed';
 import { getListTemplateByKey } from '@/constants/listTemplates';
 import { getListCategory } from '@/constants/listCategories';
-import { itemsForSession, listLink, listLinkPatch, type ActivityLink } from '@/utils/activityLinks';
+import {
+  itemsForSession,
+  listLink,
+  listLinkPatch,
+  listTripPatch,
+  type ActivityLink,
+  type ListLinkPatch,
+  type ListLinkTarget,
+} from '@/utils/activityLinks';
 import { useTranslationStore } from '@/stores/translationStore';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -474,15 +482,17 @@ export const useListStore = defineStore('lists', () => {
 
   /**
    * Create a blank one-off list. `memberId` becomes the creator and the default owner;
-   * `overrides` are spread last (a category, an owner, an activity link via `listLinkPatch`).
-   * The emoji follows the (overridden) category. Mirrors `createFromTemplate`. `null` has
+   * `overrides` are spread last (an owner, a link via `listTargetPatch`). The STORE owns the
+   * Home default: `category` is taken out of `overrides` first, so a caller passing
+   * `category: undefined` (an optional prop left unset) gets Home rather than erasing the
+   * category. The emoji follows the category. Mirrors `createFromTemplate`. `null` has
    * already been toasted and reported by `createList`.
    */
   async function createBlankList(
     memberId: string,
     overrides: Partial<CreateFamilyListInput> = {}
   ): Promise<FamilyList | null> {
-    const category = overrides.category ?? 'home';
+    const { category = 'home', ...rest } = overrides;
     return createList({
       title: useTranslationStore().t('lists.new.blankTitle'),
       // Read, not hardcoded: `getListCategory` is nullable, the fallback unreachable by construction.
@@ -493,7 +503,7 @@ export const useListStore = defineStore('lists', () => {
       lifecycle: 'oneoff',
       completed: false,
       createdBy: memberId,
-      ...overrides,
+      ...rest,
     });
   }
 
@@ -1032,56 +1042,108 @@ export const useListStore = defineStore('lists', () => {
   }
 
   /**
-   * Clear any list link to a now-deleted trip/activity, so the travel-page embed
-   * simply stops rendering it (no orphan, no crash). Called from the
-   * vacation/activity delete paths.
-   */
-  /**
+   * Clear any list link to a now-deleted trip/activity, so the trip or activity simply stops
+   * showing it (no orphan, no crash). Called from the vacation/activity delete paths. Each kind
+   * is ONE batched write, reported via `wrapAsync`.
+   *
    * ⚠️ NO 'recipe' case, deliberately. Recipe links are cleared inside
-   * `recipeRepository.deleteRecipeCascade`'s ATOMIC batch (#88), because this loop
-   * is N separate writes and ignores every `updateList` return value — a failed
-   * unlink here leaves a permanently orphaned link with no telemetry, in a window
-   * after the parent has already atomically gone. Do not "fix" the asymmetry.
+   * `recipeRepository.deleteRecipeCascade`'s ATOMIC batch (#88): a write from here, however
+   * well reported, is a separate change that lands AFTER the parent has already atomically gone,
+   * so a failure would leave a permanently orphaned link. Do not "fix" the asymmetry.
    */
   async function clearLinksFor(kind: 'trip' | 'activity', id: string): Promise<void> {
     if (kind === 'activity') {
-      // ONE batched write that clears the id AND any session date, reported via `wrapAsync`.
+      // Clears the id AND any session date together.
       const ids = lists.value.filter((l) => l.linkedActivityId === id).map((l) => l.id);
       await linkListsToActivity(ids, null);
       return;
     }
-    for (const l of lists.value) {
-      if (l.linkedVacationId === id) {
-        await updateList(l.id, { linkedVacationId: undefined });
-      }
-    }
+    await linkListsToTrip(
+      listsForTrip(id).map((l) => l.id),
+      null
+    );
   }
 
   /**
-   * Link (or, for `null`, unlink) lists to an activity in ONE write, always writing the id and
-   * the session date together (`listLinkPatch`). A list deleted meanwhile (here or on another
-   * device) is skipped, never a failure. Returns the patched lists, or `null` when the write
-   * failed (already toasted + reported by `wrapAsync`). Mirrors `todoStore.linkTodosToActivity`.
+   * The ONE writer of list link fields: one Automerge change for every list in `ids`. A list
+   * deleted meanwhile (here or on another device) is skipped, never a failure. Returns the
+   * patched lists, or `null` when the write failed (already toasted + reported by `wrapAsync`
+   * under `action`, so trip and activity failures stay distinguishable). Private: callers use
+   * the named verbs below, which build the patch through `activityLinks`.
    */
-  async function linkListsToActivity(
+  async function patchListLinks(
     ids: readonly string[],
-    link: ActivityLink | null
+    patch: ListLinkPatch,
+    action: string
   ): Promise<FamilyList[] | null> {
     if (!ids.length) return [];
     const result = await wrapAsync(
       isLoading,
       error,
       async () => {
-        const patched = await listRepo.patchLists(ids, listLinkPatch(link), {
-          onMissing: 'skip',
-        });
+        const patched = await listRepo.patchLists(ids, patch, { onMissing: 'skip' });
         const byId = new Map(patched.map((l) => [l.id, l]));
         lists.value = lists.value.map((l) => byId.get(l.id) ?? l);
         return patched;
       },
-      { action: 'listStore:linkListsToActivity', surface: 'lists' }
+      { action, surface: 'lists' }
     );
     return result ?? null;
+  }
+
+  /**
+   * Link (or, for `null`, unlink) lists to an activity in ONE write, always writing the id and
+   * the session date together (`listLinkPatch`). Mirrors `todoStore.linkTodosToActivity`.
+   */
+  function linkListsToActivity(
+    ids: readonly string[],
+    link: ActivityLink | null
+  ): Promise<FamilyList[] | null> {
+    return patchListLinks(ids, listLinkPatch(link), 'listStore:linkListsToActivity');
+  }
+
+  /** Link (or, for `null`, unlink) lists to a trip in ONE write. */
+  function linkListsToTrip(
+    ids: readonly string[],
+    vacationId: string | null
+  ): Promise<FamilyList[] | null> {
+    return patchListLinks(ids, listTripPatch(vacationId), 'listStore:linkListsToTrip');
+  }
+
+  /** The lists linked to a trip (filed ones included, as the trip shows them). */
+  function listsForTrip(vacationId: string): FamilyList[] {
+    return lists.value.filter((l) => l.linkedVacationId === vacationId);
+  }
+
+  /**
+   * Lists that can be attached to a trip or an activity: not filed, and not already linked to
+   * one of that kind. Reads the UNFILTERED `lists` (not the member-filtered `activeLists`), so a
+   * global member filter never hides a family list from the picker, the same reasoning as
+   * `shoppingDestinations`. Newest first.
+   */
+  function attachableLists(kind: ListLinkTarget['kind']): FamilyList[] {
+    return lists.value
+      .filter((l) => !isFiled(l) && !(kind === 'trip' ? l.linkedVacationId : l.linkedActivityId))
+      .sort(byCreatedDesc);
+  }
+
+  /**
+   * Attach existing lists to a trip or an activity session. The ONE place the "attaching never
+   * moves a list" rule lives: ids not attachable when this runs (linked elsewhere, filed or gone
+   * since the caller read them) are dropped before the write. It is a check, not a lock: a link
+   * made on another device DURING the awaited write is not seen. The repo also skips ids deleted
+   * meanwhile, so the result can be shorter than `ids`. Returns the patched lists, or `null`
+   * when the write failed.
+   */
+  function attachLists(
+    ids: readonly string[],
+    target: ListLinkTarget
+  ): Promise<FamilyList[] | null> {
+    const still = new Set(attachableLists(target.kind).map((l) => l.id));
+    const keep = ids.filter((id) => still.has(id));
+    return target.kind === 'trip'
+      ? linkListsToTrip(keep, target.vacationId)
+      : linkListsToActivity(keep, target.link);
   }
 
   /**
@@ -1261,6 +1323,10 @@ export const useListStore = defineStore('lists', () => {
     setAllItemsCompleted,
     clearLinksFor,
     linkListsToActivity,
+    linkListsToTrip,
+    listsForTrip,
+    attachableLists,
+    attachLists,
     listsForActivitySession,
     reconcileRecurringLists,
     resetState,

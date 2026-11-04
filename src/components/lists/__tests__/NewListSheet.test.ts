@@ -79,8 +79,34 @@ describe('NewListSheet — blank list', () => {
     const wrapper = mount(NewListSheet, { props: { open: true }, global: { stubs } });
     await tile(wrapper, 'lists.new.blank').trigger('click');
     await Promise.resolve();
-    expect(createBlankList).toHaveBeenCalledWith('me', { category: 'home' });
+    // No pill and no `blankCategory`: the store's own default (Home) applies.
+    expect(createBlankList).toHaveBeenCalledWith('me', { category: undefined });
     expect(wrapper.emitted('created')?.[0]).toEqual(['blank-list']);
+  });
+
+  it("starts a blank list in the host's blankCategory when no pill is picked", async () => {
+    const wrapper = mount(NewListSheet, {
+      props: { open: true, blankCategory: 'trips' },
+      global: { stubs },
+    });
+    await tile(wrapper, 'lists.new.blank').trigger('click');
+    expect(createBlankList).toHaveBeenCalledWith('me', { category: 'trips' });
+  });
+
+  it('creates once on a double tap (a second untracked blank would never be discarded)', async () => {
+    let release!: (v: { id: string }) => void;
+    createBlankList.mockImplementationOnce(
+      () => new Promise<{ id: string }>((resolve) => (release = resolve))
+    );
+    const wrapper = mount(NewListSheet, { props: { open: true }, global: { stubs } });
+    const blank = tile(wrapper, 'lists.new.blank');
+    await blank.trigger('click');
+    await blank.trigger('click');
+    await tile(wrapper, 'lists.template.honeydo.name').trigger('click');
+    release({ id: 'blank-list' });
+    await Promise.resolve();
+    expect(createBlankList).toHaveBeenCalledTimes(1);
+    expect(createFromTemplate).not.toHaveBeenCalled();
   });
 });
 
@@ -116,7 +142,7 @@ describe('NewListSheet — caller overrides (#114)', () => {
       global: { stubs },
     });
     await tile(wrapper, 'lists.new.blank').trigger('click');
-    expect(createBlankList).toHaveBeenCalledWith('me', { category: 'home', ...link });
+    expect(createBlankList).toHaveBeenCalledWith('me', { category: undefined, ...link });
   });
 });
 

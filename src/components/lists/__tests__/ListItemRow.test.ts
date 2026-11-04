@@ -4,7 +4,7 @@
  * Written against the UNCONVERTED component, before `useInlineRename` was
  * extracted from it, so that the extraction has a real gate rather than an
  * assumed one. The component had no unit test and no E2E coverage at all
- * despite being consumed by `ListDetailModal`, `LinkedLists` and
+ * despite being consumed by `ListDetailModal`, `LinkedListCard` and
  * `ListCycleModal`.
  *
  * The Enter/blur asymmetry below is the load-bearing part and is easy to

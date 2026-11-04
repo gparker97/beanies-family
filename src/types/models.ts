@@ -1093,9 +1093,9 @@ export interface FamilyList {
    * far more often than recipe delete.
    *
    * Cleared by `recipeRepository.deleteRecipeCascade`'s atomic batch — NOT by
-   * `listStore.clearLinksFor`, which is N separate writes that ignore their return
-   * values. Nothing renders this field today: it records provenance, and the
-   * list→recipe affordance is deliberately not in v1.
+   * `listStore.clearLinksFor`, whose write is a separate change that would land
+   * after the recipe had already gone. Nothing renders this field today: it records
+   * provenance, and the list→recipe affordance is deliberately not in v1.
    */
   linkedRecipeId?: UUID;
   templateKey?: string; // which template seeded it (audit/analytics)

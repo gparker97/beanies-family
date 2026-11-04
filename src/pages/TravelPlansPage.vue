@@ -7,7 +7,9 @@ import ErrorBanner from '@/components/common/ErrorBanner.vue';
 import TimelineSegmentCard from '@/components/travel/TimelineSegmentCard.vue';
 import TripCard from '@/components/travel/TripCard.vue';
 import TripIdeasPanel from '@/components/travel/TripIdeasPanel.vue';
-import ListDetailModal from '@/components/lists/ListDetailModal.vue';
+import TripLists from '@/components/lists/TripLists.vue';
+import { isFlagEnabled } from '@/config/flags';
+import type { UIStringKey } from '@/services/translation/uiStrings';
 import VacationWizard from '@/components/vacation/VacationWizard.vue';
 import TripBadgeChip from '@/components/vacation/TripBadgeChip.vue';
 import TripDatesHeader from '@/components/travel/TripDatesHeader.vue';
@@ -322,9 +324,8 @@ async function onAttachmentRemove(photoId: string): Promise<void> {
   await photoStore.markDeleted(photoId);
 }
 
-// Linked Beanie List opened from the embed — shown as a drawer over this page
-// (no navigation), so closing it leaves the user on the trip. `null` = closed.
-const linkedListId = ref<string | null>(null);
+// The trip's Lists section, reached for the "+ Add a Plan" → List chip.
+const tripListsRef = ref<InstanceType<typeof TripLists> | null>(null);
 
 // Ideas state
 const quickIdeaText = ref('');
@@ -682,6 +683,50 @@ async function addActivitySegment() {
   editingItemIndex.value = travelSegments.length - 1;
   editModalType.value = 'travel';
 }
+
+/** "+ Add a Plan" → List: start a list linked to this trip (the Lists section's new-list sheet). */
+function addList() {
+  if (!requireEdit()) return;
+  showAddMenu.value = false;
+  tripListsRef.value?.openNewList();
+}
+
+/** The "+ Add a Plan" menu, one chip each. List only with Beanie Lists on. */
+interface AddPlanChip {
+  key: string;
+  emoji: string;
+  labelKey: UIStringKey;
+  run: () => void;
+}
+// Typed, not cast, so a renamed or removed key still fails the type-check.
+const listChip: AddPlanChip = {
+  key: 'list',
+  emoji: '📋',
+  labelKey: 'travel.addList',
+  run: addList,
+};
+const addPlanChips = computed<AddPlanChip[]>(() => [
+  {
+    key: 'travel',
+    emoji: '✈️',
+    labelKey: 'vacation.step.travel',
+    run: () => addSegmentViaWizard(2),
+  },
+  { key: 'stay', emoji: '🏨', labelKey: 'vacation.step.stay', run: () => addSegmentViaWizard(3) },
+  {
+    key: 'getting-around',
+    emoji: '🚗',
+    labelKey: 'vacation.step.gettingAround',
+    run: () => addSegmentViaWizard(4),
+  },
+  {
+    key: 'activity',
+    emoji: '🎭',
+    labelKey: 'vacation.segment.activity',
+    run: () => void addActivitySegment(),
+  },
+  ...(isFlagEnabled('familyLists') ? [listChip] : []),
+]);
 
 // ── Collapsible cards ────────────────────────────────────────────────────────
 
@@ -1337,28 +1382,14 @@ async function addQuickIdea() {
             >
               <div v-if="showAddMenu" class="flex flex-wrap gap-1.5">
                 <button
-                  class="dark:bg-surface-overlay dark:text-ink-soft rounded-full bg-[var(--tint-slate-5)] px-2.5 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-[rgba(0,180,216,0.08)] hover:text-[#00B4D8]"
-                  @click="addSegmentViaWizard(2)"
+                  v-for="chip in addPlanChips"
+                  :key="chip.key"
+                  type="button"
+                  class="dark:bg-surface-overlay dark:text-ink-soft dark:hover:bg-surface-hover dark:hover:text-ink rounded-full bg-[var(--tint-slate-5)] px-2.5 py-1 text-xs font-medium text-[var(--color-text-muted)] transition-colors hover:bg-[rgba(0,180,216,0.08)] hover:text-[#00B4D8]"
+                  :data-testid="`add-plan-${chip.key}`"
+                  @click="chip.run"
                 >
-                  ✈️ {{ t('vacation.step.travel') }}
-                </button>
-                <button
-                  class="dark:bg-surface-overlay dark:text-ink-soft rounded-full bg-[var(--tint-slate-5)] px-2.5 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-[rgba(0,180,216,0.08)] hover:text-[#00B4D8]"
-                  @click="addSegmentViaWizard(3)"
-                >
-                  🏨 {{ t('vacation.step.stay') }}
-                </button>
-                <button
-                  class="dark:bg-surface-overlay dark:text-ink-soft rounded-full bg-[var(--tint-slate-5)] px-2.5 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-[rgba(0,180,216,0.08)] hover:text-[#00B4D8]"
-                  @click="addSegmentViaWizard(4)"
-                >
-                  🚗 {{ t('vacation.step.gettingAround') }}
-                </button>
-                <button
-                  class="dark:bg-surface-overlay dark:text-ink-soft rounded-full bg-[var(--tint-slate-5)] px-2.5 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-[rgba(0,180,216,0.08)] hover:text-[#00B4D8]"
-                  @click="addActivitySegment"
-                >
-                  🎭 {{ t('vacation.segment.activity') }}
+                  {{ chip.emoji }} {{ t(chip.labelKey) }}
                 </button>
               </div>
             </Transition>
@@ -1398,8 +1429,15 @@ async function addQuickIdea() {
           @vote="handleVote"
           @edit-idea="openIdeaEdit"
           @delete-idea="handleIdeaDelete"
-          @open-list="(id: string) => (linkedListId = id)"
-        />
+        >
+          <template #lists>
+            <TripLists
+              ref="tripListsRef"
+              :key="selectedVacation.id"
+              :vacation-id="selectedVacation.id"
+            />
+          </template>
+        </TripIdeasPanel>
       </div>
     </template>
 
@@ -1489,9 +1527,6 @@ async function addQuickIdea() {
         closeIdeaEdit();
       "
     />
-
-    <!-- Linked Beanie List drawer — opened from the embed, overlays the page (#33) -->
-    <ListDetailModal :list-id="linkedListId" @close="linkedListId = null" />
 
     <TravelExtractReviewModal
       :open="reviewReady !== null"

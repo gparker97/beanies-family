@@ -20,6 +20,19 @@ describe('SectionEyebrow', () => {
     expect(wrapper.find('[aria-hidden="true"]').text()).toBe('✅');
   });
 
+  it('wraps only when it carries #end content, so a label + count eyebrow still truncates', () => {
+    const withEnd = mount(SectionEyebrow, {
+      props: { label: 'Lists' },
+      slots: { end: '<button>+ New List</button>' },
+    });
+    expect(withEnd.classes()).toContain('flex-wrap');
+    const countOnly = mount(SectionEyebrow, {
+      props: { label: 'To-dos' },
+      slots: { default: '2 open' },
+    });
+    expect(countOnly.classes()).not.toContain('flex-wrap');
+  });
+
   it('never fades readable text with an opacity modifier', () => {
     const html = mount(SectionEyebrow, { props: { label: 'Lists' } }).html();
     expect(html).toContain('dark:text-ink-faint');

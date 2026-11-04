@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // One Beanie List (#33) embedded on a trip or an activity (#114). The same store entry as on the
-// Lists page, so it is one source of truth; the containers (`LinkedLists`, `ActivityLists`) only
-// loop over these.
+// Lists page, so it is one source of truth; the container (`LinkedListsSection`, behind `TripLists`
+// and `ActivityLists`) only loops over these.
 //
 // Design: the card is tinted by the list's own category color (the identity it carries on the
 // Lists page), giving provenance for free; a "Beanie list" eyebrow + tappable header (with an

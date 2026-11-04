@@ -34,6 +34,16 @@ vi.mock('@/composables/useMagicReader', () => ({
   useMagicReader: () => ({ canReadTravelDoc: { value: false } }),
   useMagicReaderConsumer: vi.fn(),
 }));
+// Beanie Lists on by default; one test turns it off to check the "+ Add a Plan" List chip.
+const flagState = vi.hoisted(() => ({ familyLists: true }));
+vi.mock('@/config/flags', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@/config/flags')>();
+  return {
+    ...real,
+    isFlagEnabled: (id: Parameters<typeof real.isFlagEnabled>[0]) =>
+      id === 'familyLists' ? flagState.familyLists : real.isFlagEnabled(id),
+  };
+});
 vi.mock('@/services/telemetry', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/services/telemetry')>()),
   logEvent: vi.fn(),
@@ -90,6 +100,7 @@ describe('TravelPlansPage — smoke', () => {
     // runs, so it passed in isolation and failed together. A test that depends on run order
     // is not a safety net.
     routeState.query = {};
+    flagState.familyLists = true;
     vi.stubGlobal(
       'fetch',
       vi
@@ -150,6 +161,24 @@ describe('TravelPlansPage — smoke', () => {
     expect(w.text()).not.toContain('Japan Trip');
     expect(w.findAll('trip-card-stub').length).toBe(0);
     expect(w.text()).not.toContain('travel.notFound.title');
+  }, 20_000);
+
+  it('offers a List chip in "+ Add a Plan" only with Beanie Lists on', async () => {
+    const { useVacationStore } = await import('@/stores/vacationStore');
+    useVacationStore().vacations = [trip()];
+    routeState.query = { vacation: 'vac-1' };
+    const { default: Page } = await import('../TravelPlansPage.vue');
+
+    for (const on of [true, false]) {
+      flagState.familyLists = on;
+      const w = mount(Page, { global: { stubs: { teleport: true } }, shallow: true });
+      await w.vm.$nextTick();
+      const addPlan = w.findAll('button').find((b) => b.text().includes('travel.addAPlan'))!;
+      await addPlan.trigger('click');
+      expect(w.find('[data-testid="add-plan-travel"]').exists()).toBe(true);
+      expect(w.find('[data-testid="add-plan-list"]').exists()).toBe(on);
+      w.unmount();
+    }
   }, 20_000);
 
   it('shows not-found, with a way back, for a `?vacation=` no trip matches, and logs it once', async () => {

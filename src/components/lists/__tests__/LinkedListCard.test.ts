@@ -1,21 +1,16 @@
 /**
- * LinkedLists (trip embed) + LinkedListCard (one embedded list, shared with the activity drawer's
- * ActivityLists, #114).
+ * LinkedListCard: one embedded list, shown by the Lists section on a trip or an activity
+ * (`LinkedListsSection`, #114).
  */
 import { flushPromises, mount } from '@vue/test-utils';
 import { setActivePinia, createPinia } from 'pinia';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { FamilyList } from '@/types/models';
 
-const h = vi.hoisted(() => ({
-  flagOn: true,
-  lists: [] as FamilyList[],
-  toggleItem: vi.fn(),
-}));
+const h = vi.hoisted(() => ({ toggleItem: vi.fn() }));
 
-vi.mock('@/config/flags', () => ({ isFlagEnabled: () => h.flagOn }));
 vi.mock('@/stores/listStore', () => ({
-  useListStore: () => ({ lists: h.lists, toggleItem: h.toggleItem }),
+  useListStore: () => ({ toggleItem: h.toggleItem }),
 }));
 vi.mock('@/stores/familyStore', () => ({
   useFamilyStore: () => ({ currentMember: { id: 'me' } }),
@@ -26,7 +21,6 @@ vi.mock('@/composables/useTranslation', () => ({
   }),
 }));
 
-import LinkedLists from '../LinkedLists.vue';
 import LinkedListCard from '../LinkedListCard.vue';
 
 const stubs = { MemberChip: true, EverySessionTag: { template: '<span data-testid="tag" />' } };
@@ -54,41 +48,6 @@ function list(overrides: Partial<FamilyList> = {}): FamilyList {
 beforeEach(() => {
   setActivePinia(createPinia());
   vi.clearAllMocks();
-  h.flagOn = true;
-  h.lists.length = 0;
-});
-
-describe('LinkedLists (trip)', () => {
-  it("renders a card per list linked to the trip, and none of another trip's", () => {
-    h.lists.push(
-      list({ id: 'a', linkedVacationId: 'trip-1' }),
-      list({ id: 'b', linkedVacationId: 'trip-2' }),
-      list({ id: 'c', linkedActivityId: 'trip-1' })
-    );
-    const w = mount(LinkedLists, { props: { vacationId: 'trip-1' }, global: { stubs } });
-    const cards = w.findAllComponents(LinkedListCard);
-    expect(cards.map((c) => c.props('list').id)).toEqual(['a']);
-    expect(w.text()).toContain('lists.embed.section');
-  });
-
-  it('renders nothing with the flag off or nothing linked', () => {
-    h.lists.push(list({ linkedVacationId: 'trip-1' }));
-    h.flagOn = false;
-    expect(
-      mount(LinkedLists, { props: { vacationId: 'trip-1' }, global: { stubs } }).html()
-    ).not.toContain('section');
-    h.flagOn = true;
-    expect(
-      mount(LinkedLists, { props: { vacationId: 'other' }, global: { stubs } }).html()
-    ).not.toContain('section');
-  });
-
-  it('re-emits open from a card', async () => {
-    h.lists.push(list({ id: 'a', linkedVacationId: 'trip-1' }));
-    const w = mount(LinkedLists, { props: { vacationId: 'trip-1' }, global: { stubs } });
-    await w.find('article button').trigger('click');
-    expect(w.emitted('open')?.[0]).toEqual(['a']);
-  });
 });
 
 describe('LinkedListCard', () => {

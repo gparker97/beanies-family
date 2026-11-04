@@ -18,6 +18,10 @@
 // Every link WRITE goes through `todoLinkPatch` / `listLinkPatch`, which always carry both keys
 // (`undefined` clears), so a stale session date can never survive a relink. That rule is enforced
 // by the `activityLinkWrites.test.ts` source-scan guard.
+//
+// A list's TRIP link (`FamilyList.linkedVacationId`) is built here too (`listTripPatch`), so the
+// one typed `ListLinkTarget` can say where a new or attached list goes and `listTargetPatch` can
+// turn it into the patch, with the link kind always explicit rather than read off a patch's keys.
 
 import type { FamilyActivity, FamilyList, TodoItem } from '@/types/models';
 import { isRepeatingActivity } from '@/utils/calendar/activityDays';
@@ -169,6 +173,23 @@ export function listLinkPatch(link: ActivityLink | null): {
   activityDate: string | undefined;
 } {
   return { linkedActivityId: link?.activityId, activityDate: link?.activityDate };
+}
+
+/** The patch that sets (or, for `null`, clears) a list's trip link. `undefined` clears. */
+export function listTripPatch(vacationId: string | null): { linkedVacationId: string | undefined } {
+  return { linkedVacationId: vacationId ?? undefined };
+}
+
+/** A patch that writes ONLY a list's link fields (never its category, owner or items). */
+export type ListLinkPatch = ReturnType<typeof listLinkPatch> | ReturnType<typeof listTripPatch>;
+
+/** Where a list made or attached from a host goes: a trip, or an activity (session). */
+export type ListLinkTarget =
+  { kind: 'trip'; vacationId: string } | { kind: 'activity'; link: ActivityLink };
+
+/** The link patch for a target. Link fields only, by type. */
+export function listTargetPatch(target: ListLinkTarget): ListLinkPatch {
+  return target.kind === 'trip' ? listTripPatch(target.vacationId) : listLinkPatch(target.link);
 }
 
 /**

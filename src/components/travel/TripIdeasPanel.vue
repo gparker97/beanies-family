@@ -1,7 +1,8 @@
 <script setup lang="ts">
 /**
- * The trip's ideas rail — "still deciding", planned, the quick-add box, and any Beanie Lists
- * linked to the trip.
+ * The trip's ideas rail — "still deciding", planned, the quick-add box, and (through the
+ * `lists` slot) the trip's Lists section, which the page renders so it can reach it by ref for
+ * the "+ Add a Plan" → List entry point.
  *
  * Extracted from ~100 lines of inline page template. Presentational: it renders ideas and
  * emits intents. The page keeps the permission gate, the store writes and the toasts, which
@@ -12,7 +13,6 @@
  * silently discards what the user typed.
  */
 import VacationIdeaCard from '@/components/vacation/VacationIdeaCard.vue';
-import LinkedLists from '@/components/lists/LinkedLists.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFamilyStore } from '@/stores/familyStore';
 import { computed, ref } from 'vue';
@@ -31,7 +31,6 @@ const emit = defineEmits<{
   vote: [ideaId: string];
   'edit-idea': [ideaId: string];
   'delete-idea': [ideaId: string];
-  'open-list': [listId: string];
 }>();
 
 const quickIdeaInput = ref<HTMLInputElement | null>(null);
@@ -143,7 +142,7 @@ const currentMemberId = computed(() => familyStore.currentMemberId);
       </button>
     </div>
 
-    <!-- Beanie Lists linked to this trip (#33) — rendered like ideas -->
-    <LinkedLists :vacation-id="vacation.id" @open="(id: string) => emit('open-list', id)" />
+    <!-- The trip's Lists section (the page renders `TripLists` here) -->
+    <slot name="lists" />
   </div>
 </template>

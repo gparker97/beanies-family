@@ -2,7 +2,10 @@
 /**
  * The small uppercase label that heads a drawer section ("To-dos", "Lists"), with an
  * optional decorative icon. The default slot sits inline after the label (e.g. an
- * "N open" count); `#end` is pushed to the right edge (e.g. section actions).
+ * "N open" count); `#end` is pushed to the right edge (e.g. section actions). When the end
+ * content does not fit beside the label (three action pills in a narrow column), it wraps
+ * onto its own right-aligned line and wraps within it, rather than overflowing. Only an
+ * eyebrow WITH end content wraps, so a label + count eyebrow (To-dos) still truncates its label.
  *
  * Text is `ink-faint` in dark (never an opacity modifier on readable text), rem sizes only.
  */
@@ -16,6 +19,7 @@ defineProps<{
 
 <template>
   <div
+    :class="{ 'flex-wrap': $slots.end }"
     class="font-outfit dark:text-ink-faint mb-2.5 flex items-center gap-1.5 text-xs font-bold tracking-[0.09em] text-[var(--color-text-muted)] uppercase"
   >
     <span v-if="icon" aria-hidden="true" class="flex-none">{{ icon }}</span>
@@ -25,7 +29,7 @@ defineProps<{
     /></span>
     <span
       v-if="$slots.end"
-      class="ms-auto inline-flex flex-none items-center gap-1.5 tracking-normal normal-case"
+      class="ms-auto flex min-w-0 flex-wrap items-center justify-end gap-1.5 tracking-normal normal-case"
       ><slot name="end"
     /></span>
   </div>

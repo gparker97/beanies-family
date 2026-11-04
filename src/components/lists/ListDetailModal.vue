@@ -334,7 +334,7 @@ function openLinkPicker(kind: 'trip' | 'activity'): void {
   editingLink.value = editingLink.value === kind ? null : kind;
 }
 function linkTrip(id: string): void {
-  if (list.value) void listStore.updateList(list.value.id, { linkedVacationId: id });
+  if (list.value) void listStore.linkListsToTrip([list.value.id], id);
   editingLink.value = null;
 }
 // Activity links are written whole (id + session date together) so relinking from here
@@ -345,7 +345,7 @@ function linkActivity(id: string): void {
 }
 const shortDate = (d?: string): string => (d ? formatDateShort(d) : '');
 function unlinkTrip(): void {
-  if (list.value) void listStore.updateList(list.value.id, { linkedVacationId: undefined });
+  if (list.value) void listStore.linkListsToTrip([list.value.id], null);
 }
 function unlinkActivity(): void {
   if (list.value) void listStore.linkListsToActivity([list.value.id], null);

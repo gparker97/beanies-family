@@ -21,6 +21,11 @@ const props = defineProps<{
   overrides?: Partial<CreateFamilyListInput>;
   /** A template to list first with a "Suggested" badge (e.g. party prep on a birthday). */
   suggestedTemplateKey?: string;
+  /**
+   * The category "Start Blank List" uses when no category pill is picked (e.g. Trips on a
+   * trip). Unset means the store's own default (Home).
+   */
+  blankCategory?: ListCategory;
   /** Stack above another open drawer (e.g. when opened from the activity drawer). */
   stacked?: boolean;
 }>();
@@ -68,7 +73,27 @@ const tileHints = computed<Record<string, string>>(() =>
   )
 );
 
-async function pickTemplate(key: string): Promise<void> {
+/**
+ * One create at a time. Without it a double tap makes two lists, and a host that discards an
+ * untouched blank (`LinkedListsSection`) only tracks the second, leaving the first linked and
+ * empty.
+ */
+const isCreating = ref(false);
+async function createOnce(run: () => Promise<void>): Promise<void> {
+  if (isCreating.value) return;
+  isCreating.value = true;
+  try {
+    await run();
+  } finally {
+    isCreating.value = false;
+  }
+}
+
+function pickTemplate(key: string): Promise<void> {
+  return createOnce(() => createFromTemplate(key));
+}
+
+async function createFromTemplate(key: string): Promise<void> {
   const overrides: Partial<CreateFamilyListInput> = selectedCategory.value
     ? { category: selectedCategory.value }
     : {};
@@ -92,14 +117,16 @@ async function pickTemplate(key: string): Promise<void> {
   close();
 }
 
-async function startBlank(): Promise<void> {
-  const created = await listStore.createBlankList(meId.value, {
-    category: selectedCategory.value ?? 'home',
-    ...props.overrides,
+function startBlank(): Promise<void> {
+  return createOnce(async () => {
+    const created = await listStore.createBlankList(meId.value, {
+      category: selectedCategory.value ?? props.blankCategory,
+      ...props.overrides,
+    });
+    if (created) emit('created', created.id);
+    else emit('failed');
+    close();
   });
-  if (created) emit('created', created.id);
-  else emit('failed');
-  close();
 }
 
 // Watch open → reset selection when (re)opened.

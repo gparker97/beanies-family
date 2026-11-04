@@ -5,6 +5,8 @@ import {
   linkForSession,
   listLink,
   listLinkPatch,
+  listTargetPatch,
+  listTripPatch,
   resolveLink,
   sessionLinkMatcher,
   todoLink,
@@ -174,6 +176,25 @@ describe('writers always carry both keys', () => {
     const cleared = todoLinkPatch(null);
     expect(Object.keys(cleared).sort()).toEqual(['activityDate', 'activityId']);
     expect(Object.values(cleared)).toEqual([undefined, undefined]);
+  });
+
+  it('listTripPatch sets, and with null clears, the trip link', () => {
+    expect(listTripPatch('trip-1')).toEqual({ linkedVacationId: 'trip-1' });
+    const cleared = listTripPatch(null);
+    expect(Object.keys(cleared)).toEqual(['linkedVacationId']);
+    expect(cleared.linkedVacationId).toBeUndefined();
+  });
+
+  it('listTargetPatch builds link fields only, for either kind', () => {
+    expect(listTargetPatch({ kind: 'trip', vacationId: 'trip-1' })).toEqual({
+      linkedVacationId: 'trip-1',
+    });
+    const session = listTargetPatch({
+      kind: 'activity',
+      link: { activityId: 'series', activityDate: '2026-10-06' },
+    });
+    expect(session).toEqual({ linkedActivityId: 'series', activityDate: '2026-10-06' });
+    expect(Object.keys(session).sort()).toEqual(['activityDate', 'linkedActivityId']);
   });
 
   it('listLinkPatch', () => {

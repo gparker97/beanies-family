@@ -1403,6 +1403,17 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       },
       {
         type: 'heading',
+        content: 'Lists for your trip',
+        level: 3,
+        id: 'trip-lists',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Under the ideas, the <strong>Lists</strong> section keeps the trip\u2019s checklists with the trip: tap <strong>+ New List</strong>, pick a template such as <strong>Vacation Packing</strong>, or <strong>Attach a List</strong> you already have. You can also start one from <strong>+ Add a Plan</strong> \u2192 <strong>List</strong>. Tick items off right there, or open a list to edit it.',
+      },
+      {
+        type: 'heading',
         content: 'Trip countdown',
         level: 2,
         id: 'countdown',
@@ -1921,7 +1932,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'A packing list really belongs <em>with</em> your trip. Link them and the list appears right on that trip (or activity) under <strong>Checklists</strong> — so you can tick items off without leaving the page.',
+          'A packing list really belongs <em>with</em> your trip. Link them and the list appears right on that trip (or activity) under <strong>Lists</strong> — so you can tick items off without leaving the page.',
       },
       {
         type: 'steps',
@@ -1942,7 +1953,12 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'You can also start a list from the activity itself. Open the activity and, under <strong>Lists</strong>, tap <strong>+ New List</strong> for a blank one or <strong>From a Template</strong> to pick a ready-made list. Either way it is linked to the activity and opens so you can fill it in. A blank list you close without adding anything is removed again. For a party or a day out, the template that fits best is marked <strong>Suggested</strong>.',
+          'You can also start or attach a list from the trip or activity itself. Open it and, under <strong>Lists</strong>, tap <strong>+ New List</strong> for a blank one, <strong>From a Template</strong> to pick a ready-made list, or <strong>Attach a List</strong> to link lists you already have. A new list is linked straight away and opens so you can fill it in; a blank list you close without adding anything is removed again. On a trip, <strong>Vacation Packing</strong> is marked <strong>Suggested</strong> and a blank list starts in Trips; for a party or a day out, the template that fits best is suggested. On a trip you can also start one from <strong>+ Add a Plan</strong> → <strong>List</strong>.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          '<strong>Attach a List</strong> shows the lists that aren’t on a trip (or an activity) yet, so attaching never quietly moves a list away from another one. To move a list that is already linked somewhere else, open it and change its <strong>Link</strong> row.',
       },
       {
         type: 'paragraph',
@@ -1980,7 +1996,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
           '<strong>The Beanie Lists page</strong> — a <strong>Due soon</strong> shelf at the top, your lists grouped by category below, and a <strong>Completed</strong> area at the bottom. The filter chips (<strong>All</strong>, Home, Kids…) narrow the view.',
           '<strong>Your Daily Briefing</strong> — a one-off list that’s due today, overdue, or simply still has items to do gets a gentle nudge. A repeating list nudges you once per round, on the day it resets.',
           '<strong>The menu badge</strong> — the little orange number beside Beanie Lists counts lists that are overdue or due today, so you know at a glance when something needs you.',
-          '<strong>A linked trip or activity</strong> — any list you’ve linked appears there under Checklists.',
+          '<strong>A linked trip or activity</strong> — any list you’ve linked appears there under Lists.',
         ],
       },
       {

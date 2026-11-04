@@ -13,6 +13,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 ### Added
 
 - The homepage now plays a short silent loop of "the morning routine musical" under the store badges; tapping it opens the full 67-second film with sound. The film is served from beanies.family and loads only when you scroll to it.
+- A trip now has a Lists section: start a new list (Vacation Packing is suggested), or attach lists you already have, right from the trip or from "+ Add a Plan". Activities can attach existing lists too.
 
 ## 2026-11-03
 

@@ -2216,6 +2216,8 @@ const STRING_DEFS = {
   'travel.gapNights.one': { en: '{count} night', beanie: '{count} night' },
   'travel.gapNights.other': { en: '{count} nights', beanie: '{count} nights' },
   'travel.addAPlan': { en: 'Add a Plan', beanie: 'add a plan' },
+  // The "+ Add a Plan" menu chip that starts a list linked to the trip.
+  'travel.addList': { en: 'List', beanie: 'list' },
   'travel.calendarStale.title': {
     en: 'Trip Saved, Calendar May Lag',
     beanie: 'trip saved, calendar may lag',
@@ -7632,18 +7634,26 @@ const STRING_DEFS = {
     en: 'No upcoming activities',
     beanie: 'no upcoming activities',
   },
-  // Activity Details Lists section (#114): start a list linked to the session being viewed.
-  'activityLists.section': { en: 'Lists', beanie: 'lists' },
-  'activityLists.newList': { en: '+ New List', beanie: '+ new list' },
-  'activityLists.fromTemplate': { en: 'From a Template', beanie: 'from a template' },
-  'activityLists.empty': { en: 'No lists yet', beanie: 'no lists yet' },
+  // The Lists section on a trip or an activity (#114): start or attach a list linked to it.
+  'linkedLists.section': { en: 'Lists', beanie: 'lists' },
+  'linkedLists.newList': { en: '+ New List', beanie: '+ new list' },
+  'linkedLists.fromTemplate': { en: 'From a Template', beanie: 'from a template' },
+  'linkedLists.empty': { en: 'No lists yet', beanie: 'no lists yet' },
+  // "Attach a List": the section's pill and the sheet's title.
+  'linkedLists.attach': { en: 'Attach a List', beanie: 'attach a list' },
+  'linkedLists.attachAction': { en: 'Attach', beanie: 'attach' },
+  'linkedLists.attachEmpty': { en: 'No other lists to attach', beanie: 'no other lists to attach' },
+  'linkedLists.attachNote': {
+    en: 'Missing a list? One already on another trip or activity can be moved from its own Link row.',
+    beanie:
+      'missing a list? one already on another trip or activity can be moved from its own link row.',
+  },
   // The badge on the template suggested for the activity's category (NewListSheet).
   'lists.new.suggested': { en: 'Suggested', beanie: 'suggested' },
-  // Embedded linked list (rendered on a trip page or an activity drawer)
-  'lists.embed.section': { en: 'Checklists', beanie: 'checklists' },
   // Activity to-dos and lists (#114): the tag on an item linked to the whole of a repeating
   // activity, shown on every session.
   'activityLinks.everySession': { en: 'Every Session', beanie: 'every session' },
+  // Embedded linked list card (rendered on a trip page or an activity drawer)
   'lists.embed.provenance': { en: 'Beanie list', beanie: 'beanie list' },
   'lists.embed.open': { en: 'Open list', beanie: 'open list' },
   'lists.embed.openShort': { en: 'Open', beanie: 'open' },

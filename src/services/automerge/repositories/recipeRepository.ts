@@ -43,10 +43,9 @@ export async function deleteRecipeCascade(recipeId: string): Promise<void> {
   const mealIds = mealIdsForRecipe(recipeId);
   // Shopping lists built from this recipe (#88) are UNLINKED, never deleted — the
   // list is the family's own work and outlives the recipe it came from. Done here,
-  // in the same batch, rather than through `listStore.clearLinksFor`: that helper
-  // is a loop of N separate writes which ignores each return value, so a failed
-  // unlink would leave a permanently orphaned link with no telemetry, in a window
-  // AFTER the recipe had already atomically gone.
+  // in the same batch, rather than through `listStore.clearLinksFor`: that helper's
+  // write is a separate change, so a failed unlink would leave a permanently
+  // orphaned link in a window AFTER the recipe had already atomically gone.
   const linkedListIds = listIdsForRecipe(recipeId);
   const now = toISODateString(new Date());
   const ops: MutationOp[] = [

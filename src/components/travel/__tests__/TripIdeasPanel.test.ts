@@ -44,9 +44,14 @@ function trip(): FamilyVacation {
   } as FamilyVacation;
 }
 
-function mountPanel(unplanned: VacationIdea[] = [], planned: VacationIdea[] = []) {
+function mountPanel(
+  unplanned: VacationIdea[] = [],
+  planned: VacationIdea[] = [],
+  slots: Record<string, string> = {}
+) {
   setActivePinia(createPinia());
   return mount(TripIdeasPanel, {
+    slots,
     props: {
       vacation: trip(),
       unplannedIdeas: unplanned,
@@ -54,12 +59,17 @@ function mountPanel(unplanned: VacationIdea[] = [], planned: VacationIdea[] = []
       quickIdeaText: '',
       'onUpdate:quickIdeaText': vi.fn(),
     },
-    global: { stubs: { VacationIdeaCard: true, LinkedLists: true } },
+    global: { stubs: { VacationIdeaCard: true } },
     attachTo: document.body,
   });
 }
 
 describe('TripIdeasPanel', () => {
+  it('renders the page-provided Lists section in its lists slot', () => {
+    const w = mountPanel([], [], { lists: '<section data-testid="trip-lists-slot" />' });
+    expect(w.find('[data-testid="trip-lists-slot"]').exists()).toBe(true);
+  });
+
   it('exposes focusQuickAdd, which the page needs after scrolling', () => {
     // The input moved in here with the panel, so the page's `quickIdeaInput` ref stopped
     // binding. Leaving that broken would have silently killed the "add an idea" affordance.
