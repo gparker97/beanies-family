@@ -12,6 +12,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Added
 
+- A filmed App Store and Google Play preview of "the morning routine musical": the real app, timed to the song, built with `npm run promo:store`.
+
 - The month calendar now fits the whole month on one screen. On a computer, a Density menu switches between Compact and Comfortable (with Hide Times and Hide Faces on Solo Chips); on a phone, a Grid view sits beside the day-by-day list (tap the M button twice to switch), with Faces, Bars and Titles by pinch or tap, and a tap on any day shows its list under the week.
 
 - The muted homepage teaser is now a six-shot cut of "the morning routine musical" in story order (the table, the boy at the pot, the phone arm, the fall, the beanie wall, out the door) instead of one continuous dinner clip.
