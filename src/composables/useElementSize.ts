@@ -9,15 +9,14 @@
  *
  * ⚠️ It is deliberately NARROW — reactive `width`/`height` plus an imperative
  * `measure()`. No `onResize` callback, no CSS-variable publishing, no clamp or
- * threshold options. Two hand-rolled `ResizeObserver`s already exist
- * (`ExpandableText.vue`, `CalendarCommandBar.vue`) and NEITHER consumes a size
- * value — one reads `scrollHeight - clientHeight` imperatively, the other pushes
- * `offsetHeight` into a custom property with bespoke unmount cleanup. Growing
- * this composable to serve all three would produce exactly the multi-mode API
- * `WallBeanColumn`'s docblock warns against. They migrate only if they can do so
- * WITHOUT adding a mode flag — follow-up F3 in
- * `docs/plans/2026-09-03-wall-time-grid.md`. Until then, please do not write a
- * fourth observer: extend this one, or say why it does not fit.
+ * threshold options. Growing this composable into a multi-mode API is exactly what
+ * `WallBeanColumn`'s docblock warns against; consumers compose it instead.
+ * `CalendarCommandBar`'s hand-rolled observer has migrated (follow-up F3 in
+ * `docs/plans/2026-09-03-wall-time-grid.md`), through `usePublishedHeight` and with no
+ * mode flag, and the month grid's viewport fit (`useMonthGridFit`) observes through it
+ * too. `ExpandableText.vue` is the one remaining hand-rolled observer (it reads
+ * `scrollHeight - clientHeight` imperatively). Please do not write another: extend
+ * this one, or say why it does not fit.
  *
  * Everything that can fail, fails loudly and keeps working:
  *  - no `ResizeObserver` (an old iPad, a test DOM) → one `warn`, then measure on
@@ -25,6 +24,9 @@
  *  - a throw inside the observer callback → caught. An uncaught throw out of a
  *    ResizeObserver callback kills the observer permanently and silently, which
  *    is the lesson `CalendarCommandBar` learned the hard way.
+ *  - a layout read that throws (or, defensively, the callback around it) → the last
+ *    size is kept, and one `element_size_measure_failed` warn per instance reaches
+ *    the firehose on the caller's `surface`, like `element_size_unobservable`.
  */
 import { onMounted, onScopeDispose, ref, watch, type Ref } from 'vue';
 import { logEvent } from '@/services/telemetry/logEvent';
@@ -37,7 +39,7 @@ export interface ElementSize {
 }
 
 export function useElementSize(
-  target: Ref<HTMLElement | null>,
+  target: Readonly<Ref<HTMLElement | null>>,
   options: { surface?: string } = {}
 ): ElementSize {
   const surface = options.surface ?? 'element-size';
@@ -47,6 +49,26 @@ export function useElementSize(
   let observer: ResizeObserver | null = null;
   let frame: number | null = null;
   let warned = false;
+  let measureWarned = false;
+
+  /** One console warn per failure, and one firehose event per instance. */
+  function warnMeasureFailed(code: 'measure_threw' | 'callback_threw', err: unknown): void {
+    console.warn(
+      code === 'measure_threw'
+        ? `[${surface}] element measurement threw; keeping the last size`
+        : `[${surface}] resize callback threw; observer kept alive`,
+      err
+    );
+    if (measureWarned) return;
+    measureWarned = true;
+    logEvent({
+      level: 'warn',
+      surface,
+      message: 'element_size_measure_failed',
+      context: { action: 'measure', error_code: code },
+      error: err,
+    });
+  }
 
   function measure(): void {
     const el = target.value;
@@ -57,7 +79,7 @@ export function useElementSize(
     } catch (err) {
       // Reading layout can throw on a detached or cross-document node. Never let
       // it escape — see the observer note above.
-      console.warn(`[${surface}] element measurement threw; keeping the last size`, err);
+      warnMeasureFailed('measure_threw', err);
     }
   }
 
@@ -104,7 +126,7 @@ export function useElementSize(
       try {
         measure();
       } catch (err) {
-        console.warn(`[${surface}] resize callback threw; observer kept alive`, err);
+        warnMeasureFailed('callback_threw', err);
       }
     });
     observer.observe(el);

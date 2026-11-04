@@ -373,11 +373,19 @@ export function startOfWeekYmd(ymd: string, weekStartDay: number): string {
 }
 
 /**
- * The inclusive date span of the rendered month grid for `referenceDate` — the
+ * Every month grid draws exactly six week rows (#141), so a four- or five-row
+ * month keeps the same row height as a six-row one and the grid never jumps
+ * when paging. The surplus rows are padding days from the neighbouring months.
+ */
+export const MONTH_GRID_CELLS = 42;
+
+/**
+ * The inclusive date span of the rendered month grid for `referenceDate`: the
  * 6-week grid INCLUDING the leading/trailing adjacent-month padding days, NOT the
- * 1st→last of the calendar month. `weekStartDay` is 0=Sun..6=Sat. Single source of
- * truth for "what days the month view actually shows" (consumed by the calendar
- * grid and the clash-window derivation).
+ * 1st→last of the calendar month. Always `MONTH_GRID_CELLS` days. `weekStartDay` is
+ * 0=Sun..6=Sat. Single source of truth for "what days the month view actually
+ * shows" (consumed by the calendar grid, `monthCellsFrom`, the stream's prefetch
+ * window and the clash-window derivation).
  */
 export function monthGridRange(
   referenceDate: Date,
@@ -386,13 +394,20 @@ export function monthGridRange(
   const year = referenceDate.getFullYear();
   const month = referenceDate.getMonth();
   const firstDay = new Date(year, month, 1);
-  const lastDay = new Date(year, month + 1, 0);
   const startOffset = (firstDay.getDay() - weekStartDay + 7) % 7;
-  const totalGridCells = Math.ceil((startOffset + lastDay.getDate()) / 7) * 7;
   return {
     startYmd: toDateInputValue(new Date(year, month, 1 - startOffset)),
-    endYmd: toDateInputValue(new Date(year, month, 1 - startOffset + totalGridCells - 1)),
+    endYmd: toDateInputValue(new Date(year, month, 1 - startOffset + MONTH_GRID_CELLS - 1)),
   };
+}
+
+/**
+ * Is this `YYYY-MM-DD` a Saturday or a Sunday? Independent of the family's week
+ * start: a Monday-start week and a Sunday-start week share the same weekend.
+ */
+export function isWeekendYmd(ymd: string): boolean {
+  const dow = parseLocalDate(ymd).getDay();
+  return dow === 0 || dow === 6;
 }
 
 export function addMonths(date: Date, months: number): Date {

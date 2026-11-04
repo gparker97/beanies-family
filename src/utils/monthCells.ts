@@ -12,19 +12,87 @@
 // scans on every recompute.
 
 import type { ActivityOccurrence } from '@/utils/calendar/occurrence';
-import { extractDatePart, formatNookDate, toDateInputValue, monthGridRange } from '@/utils/date';
+import {
+  addDaysYmd,
+  extractDatePart,
+  formatNookDate,
+  toDateInputValue,
+  monthGridRange,
+  MONTH_GRID_CELLS,
+} from '@/utils/date';
 import { computeAllDaySpans } from '@/utils/allDaySpans';
 import { tripTypeEmoji, type TravelSegmentOccurrence } from '@/utils/vacation';
 import { relativeWeekLabelKey, type RelativeWeekLabelKey } from '@/utils/calendarWeek';
-import type {
-  MonthDayCellData,
-  CellAllDayItem,
-  CellTimedOccurrence,
-  CellVacation,
-} from '@/components/planner/MonthDayCard.vue';
-import type { FamilyVacation } from '@/types/models';
+import type { FamilyActivity, FamilyVacation } from '@/types/models';
 import type { DayExtra } from '@/utils/calendarDay';
-import { isAllDayActivity } from '@/utils/calendar/activityDays';
+import { isAllDayActivity, spanOffsetDays } from '@/utils/calendar/activityDays';
+
+// ── Cell types ─────────────────────────────────────────────────────────────
+// The outputs of this module. They used to live in `MonthDayCard.vue`, which
+// made a pure util import its types from a component; they live with the code
+// that builds them now (#141).
+
+/**
+ * One all-day activity on one day: a slice of a run when the activity spans
+ * several days, or the whole of a single-day one.
+ */
+export interface CellAllDayItem {
+  activity: FamilyActivity;
+  /**
+   * The ONLY key that groups all-day slices into one run:
+   * `${activity.id}:${span.startYmd}` for a span (a one-off's `date`, or the
+   * repeat's own start, never the row-clipped start), `${activity.id}:${date}`
+   * for a single day. `computeAllDaySpans` alone decides which days join.
+   */
+  spanKey: string;
+  /** This cell is the run's true first day (not merely the first in its week row). True for singles. */
+  isFirstDay: boolean;
+  /** This cell is the run's true last day (not merely the last in its week row). True for singles. */
+  isLastDay: boolean;
+}
+
+export interface CellVacation {
+  id: string;
+  name: string;
+  emoji: string;
+  /** First covered day of the trip (the unclipped trip start), so it is the true end. */
+  isStart: boolean;
+  /** Last covered day of the trip (the unclipped trip end), so a multi-day trip
+   *  reads as one connected band across its cells. */
+  isEnd: boolean;
+  /** The trip's travellers (`FamilyVacation.assigneeIds`), resolved to members by
+   *  `membersByIds` at the render site. */
+  travellerIds: string[];
+}
+
+export interface CellTimedOccurrence {
+  activity: FamilyActivity;
+  date: string;
+}
+
+export interface MonthDayCellData {
+  date: string;
+  day: number;
+  isCurrentMonth: boolean;
+  isToday: boolean;
+  weekRow: number;
+  timedOccurrences: CellTimedOccurrence[];
+  vacations: CellVacation[];
+  segments: TravelSegmentOccurrence[];
+  allDayItems: CellAllDayItem[];
+  /** Birthdays, public holidays, trips: one list, from `useDayExtras`. */
+  extras: DayExtra[];
+}
+
+/**
+ * Split a month's cells into week rows of 7. The ONE row split, shared by
+ * `monthCellsFrom`'s per-row passes, `assignMonthLayout` and `CalendarGrid`.
+ */
+export function weekRows<T>(days: readonly T[]): T[][] {
+  const rows: T[][] = [];
+  for (let i = 0; i < days.length; i += 7) rows.push(days.slice(i, i + 7));
+  return rows;
+}
 
 /** One activity occurrence as `activityStore.activitiesInRange` yields it: the
  *  shared shape (`calendar/occurrence.ts`), `repeatStart` included. */
@@ -140,6 +208,7 @@ export function prepareCellData(input: PrepareCellDataInput): PreparedCellData {
         emoji,
         isStart: dateStr === vStart,
         isEnd: dateStr === vEnd,
+        travellerIds: v.assigneeIds ?? [],
       });
       vacationDates.add(dateStr);
     }
@@ -228,9 +297,6 @@ export function monthCellsFrom(
   data: PreparedCellData
 ): MonthCellsResult {
   const { year, month, weekStartDay, todayStr } = meta;
-  const firstDay = new Date(year, month, 1);
-  const lastDay = new Date(year, month + 1, 0);
-  const startOffset = (firstDay.getDay() - weekStartDay + 7) % 7;
   const days: MonthDayCellData[] = [];
   const dateTimedOccurrences = data.timed;
   const allDayOccurrences = data.allDay;
@@ -253,49 +319,47 @@ export function monthCellsFrom(
     });
   };
 
-  // Previous-month padding
-  const prevMonth = new Date(year, month, 0);
-  for (let i = startOffset - 1; i >= 0; i--) {
-    const d = prevMonth.getDate() - i;
-    pushCell(toDateInputValue(new Date(year, month - 1, d)), d, false);
-  }
-  // Current month
-  for (let d = 1; d <= lastDay.getDate(); d++) {
-    pushCell(toDateInputValue(new Date(year, month, d)), d, true);
-  }
-  // Next-month padding (complete the final row)
-  const remaining = 7 - (days.length % 7);
-  if (remaining < 7) {
-    for (let d = 1; d <= remaining; d++) {
-      pushCell(toDateInputValue(new Date(year, month + 1, d)), d, false);
-    }
+  // Walk the grid's own range rather than deriving the padding a second time:
+  // `monthGridRange` is the one answer to "which days does the grid show", for
+  // the grid, the clash window and the stream alike.
+  const { startYmd } = monthGridRange(new Date(year, month, 1), weekStartDay);
+  const monthKey = toDateInputValue(new Date(year, month, 1)).slice(0, 7);
+  for (let i = 0; i < MONTH_GRID_CELLS; i++) {
+    const date = addDaysYmd(startYmd, i);
+    pushCell(date, Number(date.slice(8)), date.slice(0, 7) === monthKey);
   }
 
+  const rows = weekRows(days);
+
   // ── All-day spans, once per week row ────────────────────────────────────
-  const numRows = Math.ceil(days.length / 7);
-  for (let row = 0; row < numRows; row++) {
-    const rowDays = days.slice(row * 7, row * 7 + 7);
-    if (rowDays.length === 0) continue;
+  for (const rowDays of rows) {
     const rowDateSet = new Set(rowDays.map((d) => d.date));
     const result = computeAllDaySpans(
       allDayOccurrences.filter((o) => rowDateSet.has(o.date)),
       rowDays.map((d) => ({ dateStr: d.date }))
     );
     for (const span of result.spans) {
+      const spanKey = `${span.activity.id}:${span.startYmd}`;
+      const lastYmd = addDaysYmd(span.startYmd, spanOffsetDays(span.activity));
       for (let i = 0; i < span.span; i++) {
         const cell = rowDays[span.startCol + i];
         if (!cell) continue;
-        const item: CellAllDayItem = {
+        cell.allDayItems.push({
           activity: span.activity,
-          isStart: i === 0,
-          isEnd: i === span.span - 1,
-        };
-        cell.allDayItems.push(item);
+          spanKey,
+          isFirstDay: cell.date === span.startYmd,
+          isLastDay: cell.date === lastYmd,
+        });
       }
     }
     for (const cell of rowDays) {
       for (const a of result.singleByDate.get(cell.date) ?? []) {
-        cell.allDayItems.push({ activity: a, isStart: true, isEnd: true });
+        cell.allDayItems.push({
+          activity: a,
+          spanKey: `${a.id}:${cell.date}`,
+          isFirstDay: true,
+          isLastDay: true,
+        });
       }
     }
   }
@@ -314,10 +378,11 @@ export function monthCellsFrom(
     }
   }
 
+  // Every row gets an entry, including a sixth row made only of next-month
+  // padding; the stream never reads that one, because it labels only rows that
+  // hold a current-month day (the separator loop above).
   const weekRanges = new Map<number, WeekRangeMeta>();
-  for (let row = 0; row < numRows; row++) {
-    const rowDays = days.slice(row * 7, row * 7 + 7);
-    if (rowDays.length === 0) continue;
+  rows.forEach((rowDays, row) => {
     const startCell = rowDays[0]!;
     const endCell = rowDays[rowDays.length - 1]!;
     // Shared 5-way classifier (this/next/last/upcoming/earlier) — one source of
@@ -328,7 +393,7 @@ export function monthCellsFrom(
       labelKey,
       isCurrent: labelKey === 'planner.weekThis',
     });
-  }
+  });
 
   // Tint sets are scoped to the cells this month actually rendered — the
   // window-wide sets would tint dates belonging to a neighbouring month.

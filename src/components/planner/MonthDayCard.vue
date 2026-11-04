@@ -1,85 +1,33 @@
 <script setup lang="ts">
 /**
- * One cell of the month calendar grid. Owns the visual rendering for a
- * single day: the day number (with today highlight), holiday + all-day
- * chip lane, timed-activity chip row (via `MonthChip`), travel-segment
- * chips, and vacation bars.
+ * The mobile month stream's day card: the shell around one day (#141).
  *
- * Extracted from `CalendarGrid.vue` during Phase A of the calendar
- * refactor so the parent stays focused on month-level data assembly
- * (occurrence map, vacation spans, holidays) while this owns rendering.
+ * It owns the date column (the day of week, the numeral, and today's caption and
+ * marker), the today outline and wash, and the empty-today exception. The day's
+ * contents come from `MonthDayContents` with the stream's fixed `STREAM_DAY_CAPS`, the
+ * same list the desktop popover and the phone day row render, so the three cannot
+ * order, cap or call a day empty differently.
  *
- * Layout adapts at the `md` breakpoint:
- *   - desktop (md+) → vertical stack: day number on top, events below
- *   - mobile (<md)  → horizontal card: DOW + number on the left, events on the right
- * The 7-column grid → vertical day-stack collapse lives in the parent
- * `CalendarGrid` (which switches its own layout); this card just adapts
- * its internal direction to match.
+ * Only `CalendarMonthStream` mounts it, and only below 768px: the desktop grid draws its
+ * own `MonthGridCell`s. So it carries no desktop markup and no day tint.
+ *
+ * Recorded follow-up: the root `<button>` still nests the chip buttons, as it always
+ * has. The fix, when it is done, is to provide `MONTH_CELL_CHIPS` with `interactive:
+ * false` here, as the phone grid cell does.
  */
 import { computed } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { parseLocalDate } from '@/utils/date';
-import HolidayChip from '@/components/planner/HolidayChip.vue';
-import BirthdayChip from '@/components/planner/BirthdayChip.vue';
-import type { DayExtra } from '@/utils/calendarDay';
 import type { BirthdayOccurrence } from '@/utils/birthdays';
-import AllDayActivityChip from '@/components/planner/AllDayActivityChip.vue';
-import TravelSegmentChip from '@/components/planner/TravelSegmentChip.vue';
-import MonthChip from '@/components/planner/MonthChip.vue';
-import type { FamilyActivity, HolidayOccurrence } from '@/types/models';
-import type { TravelSegmentOccurrence } from '@/utils/vacation';
-import {
-  CALENDAR_TODAY,
-  calendarDayBackground,
-  type CalendarDayTint,
-} from '@/constants/tileStyles';
-
-export interface CellAllDayItem {
-  activity: FamilyActivity;
-  isStart: boolean;
-  isEnd: boolean;
-}
-
-export interface CellVacation {
-  id: string;
-  name: string;
-  emoji: string;
-  /** First covered day of the trip — renders the name + rounds the left edge. */
-  isStart: boolean;
-  /** Last covered day of the trip — rounds the right edge so a multi-day trip
-   *  reads as one connected band across its cells. */
-  isEnd: boolean;
-}
-
-export interface CellTimedOccurrence {
-  activity: FamilyActivity;
-  date: string;
-}
-
-export interface MonthDayCellData {
-  date: string;
-  day: number;
-  isCurrentMonth: boolean;
-  isToday: boolean;
-  weekRow: number;
-  timedOccurrences: CellTimedOccurrence[];
-  vacations: CellVacation[];
-  segments: TravelSegmentOccurrence[];
-  allDayItems: CellAllDayItem[];
-  /** Birthdays, public holidays, trips — one list, from `useDayExtras`. */
-  extras: DayExtra[];
-}
+import type { HolidayOccurrence } from '@/types/models';
+import type { MonthDayCellData } from '@/utils/monthCells';
+import { dayCount } from '@/utils/monthDayItems';
+import { STREAM_DAY_CAPS } from '@/constants/calendarCaps';
+import { CALENDAR_TODAY, calendarDayBackground } from '@/constants/tileStyles';
+import MonthDayContents from '@/components/planner/MonthDayContents.vue';
 
 const props = defineProps<{
   cell: MonthDayCellData;
-  /** Visible cap for the all-day lane on this cell. Parent owns the number
-      so future tuning (or breakpoint-aware caps) live in one place. */
-  allDayCap: number;
-  /** Visible cap for the timed chip row. */
-  timedCap: number;
-  /** Parent-chosen day tint (desktop vacation/holiday); when set it replaces the today wash
-      and the resting surface. */
-  tint?: CalendarDayTint;
 }>();
 
 const emit = defineEmits<{
@@ -94,9 +42,8 @@ const emit = defineEmits<{
 
 const { t } = useTranslation();
 
-// DOW abbreviation (mobile only). Uses the same translation keys as the
-// CalendarGrid column headers so beanie mode + future locales pick up the
-// override automatically.
+// The DOW abbreviation uses the same translation keys as the grid's column headers, so
+// beanie mode and future locales pick up the override automatically.
 const DOW_KEYS = [
   'planner.day.sun',
   'planner.day.mon',
@@ -112,123 +59,44 @@ const dowLabel = computed(() => {
   return t(DOW_KEYS[idx]!);
 });
 
-// Timed chips visible vs overflow count. Cap protects against extremely
-// busy days ballooning a single row's height beyond reason.
-const visibleTimed = computed(() => props.cell.timedOccurrences.slice(0, props.timedCap));
-
-const timedOverflow = computed(() =>
-  Math.max(0, props.cell.timedOccurrences.length - props.timedCap)
-);
+/** An empty today shows nothing beyond its "Today" caption: it keeps its outline, wash
+ *  and caption, and never reads "Nothing planned". Every other empty day does. */
+const showContents = computed(() => !(props.cell.isToday && dayCount(props.cell) === 0));
 
 /**
- * The all-day lane, shared by three sources competing for `allDayCap`.
- *
- * Order is birthdays, then holidays, then the family's own all-day activities: a
- * birthday is about somebody in this family, a public holiday is reference data
- * about the country, and both are context for the day.
- *
- * ⚠️ But REFERENCE DAYS GET A RESERVED SHARE, NOT PRIORITY OVER EVERYTHING.
- * `ALL_DAY_VISIBLE_CAP` is 2. A straight priority order meant a day carrying a
- * birthday AND a holiday consumed the entire budget and pushed every one of the
- * family's own all-day events behind "+N" — on Christmas Day with somebody's
- * birthday, their actual plans vanished. The family's own events are the answer
- * to "what are we doing today"; the reference days are the caption.
- *
- * So reference days may claim at most half the cap (floored at one), and the
- * family's events take the rest — EXCEPT that neither side may strand a slot the
- * other is not using, which is what `Math.max(reserved, cap - allDayItems)`
- * buys. At a cap of 2 that resolves to: one reference day plus one event on a
- * contested day; both reference days when there are no events to show; and
- * exactly today's behaviour whenever there are no reference days at all.
- */
-const REFERENCE_SHARE = computed(() => Math.max(1, Math.floor(props.allDayCap / 2)));
-
-/** How many of the day's extras actually fit, given what else the day is doing. */
-const visibleReferenceCount = computed(() =>
-  Math.min(
-    props.cell.extras.length,
-    Math.max(REFERENCE_SHARE.value, props.allDayCap - props.cell.allDayItems.length)
-  )
-);
-
-/** The extras that fit, already in the shared cross-surface order. */
-const visibleExtras = computed(() => props.cell.extras.slice(0, visibleReferenceCount.value));
-
-const visibleAllDayItems = computed(() =>
-  props.cell.allDayItems.slice(0, Math.max(0, props.allDayCap - visibleReferenceCount.value))
-);
-
-const allDayOverflow = computed(() =>
-  Math.max(0, props.cell.extras.length + props.cell.allDayItems.length - props.allDayCap)
-);
-
-/** A day with nothing on it — collapsed to a thin "nothing planned" line on
- *  mobile (today is never collapsed; it keeps its outline, wash and "Today" caption). */
-const isEmptyDay = computed(
-  () =>
-    props.cell.timedOccurrences.length === 0 &&
-    props.cell.allDayItems.length === 0 &&
-    props.cell.extras.length === 0 &&
-    props.cell.segments.length === 0 &&
-    props.cell.vacations.length === 0
-);
-
-/**
- * Border and background of the card root. Each is ONE class set per property per
- * breakpoint: Tailwind v4 orders base < `md:` < `dark:` < `md:dark:`, so two classes
- * setting the same property would resolve by variant, not template order. Mobile-only
- * resting classes use `max-md:` so they never compete with the desktop tint.
+ * Border and background of the card root. Each is ONE class set per property, so two
+ * classes never compete for the same property through Tailwind's variant order.
  */
 const borderClass = computed(() =>
   props.cell.isToday
-    ? CALENDAR_TODAY.outline
-    : 'border-transparent max-md:border max-md:border-gray-200/60 max-md:dark:border-line/60'
+    ? `border-2 ${CALENDAR_TODAY.outline}`
+    : 'border border-gray-200/60 dark:border-line/60'
 );
 const backgroundClass = computed(() =>
-  calendarDayBackground(
-    props.tint,
-    props.cell.isToday,
-    'max-md:bg-white max-md:dark:bg-surface-raised/40 md:hover:bg-gray-50 md:dark:hover:bg-surface-hover/50'
-  )
+  calendarDayBackground(undefined, props.cell.isToday, 'bg-white dark:bg-surface-raised/40')
 );
-
-function onCellClick() {
-  emit('select-date', props.cell.date);
-}
-
-function onMoreClick(event: MouseEvent) {
-  event.stopPropagation();
-  // Same affordance as the day number: opens the day-detail surface via
-  // the existing select-date handler. Distinct from the chip clicks which
-  // open the activity drawer.
-  emit('select-date', props.cell.date);
-}
 </script>
 
 <template>
   <button
     :data-date="cell.date"
     type="button"
-    class="font-outfit relative flex w-full min-w-0 cursor-pointer flex-row gap-3 rounded-xl border-2 p-2.5 text-left transition-colors md:h-auto md:min-h-[140px] md:flex-col md:items-center md:gap-1 md:px-1.5 md:pt-1.5 md:pb-1"
-    :class="[
-      cell.isCurrentMonth
-        ? 'text-secondary-500 dark:text-ink'
-        : 'text-secondary-500/30 dark:text-ink-faint',
-      borderClass,
-      backgroundClass,
-    ]"
+    class="font-outfit text-secondary-500 dark:text-ink relative flex w-full min-w-0 cursor-pointer flex-row gap-3 rounded-xl p-2.5 text-left transition-colors"
+    :class="[borderClass, backgroundClass]"
     :aria-current="cell.isToday ? 'date' : undefined"
-    @click="onCellClick"
+    @click="emit('select-date', cell.date)"
   >
-    <!-- Mobile-only DOW + day-number column on the left. Today's caption sits at
-         the top so the row reads as today even when its events column is empty. -->
-    <div class="flex w-10 flex-shrink-0 flex-col items-center gap-0.5 pt-0.5 md:hidden">
+    <!-- DOW + day-number column on the left. Today's caption sits at the top so the row
+         reads as today even when its contents are empty. -->
+    <div class="flex w-10 flex-shrink-0 flex-col items-center gap-0.5 pt-0.5">
       <span v-if="cell.isToday" class="text-xs font-bold" :class="CALENDAR_TODAY.text">
         {{ t('planner.today') }}
       </span>
       <span
-        class="text-[0.625rem] font-bold tracking-[0.14em] uppercase"
-        :class="cell.isToday ? CALENDAR_TODAY.text : 'text-secondary-500/50 dark:text-ink-faint'"
+        class="text-xs font-bold tracking-[0.14em] uppercase"
+        :class="
+          cell.isToday ? CALENDAR_TODAY.text : 'dark:text-ink-faint text-[var(--color-text-muted)]'
+        "
       >
         {{ dowLabel }}
       </span>
@@ -240,132 +108,16 @@ function onMoreClick(event: MouseEvent) {
       </span>
     </div>
 
-    <!-- Desktop-only centered day-number pill, with the "Today" word beside it (wraps
-         under the pill on a narrow column) -->
-    <div class="hidden flex-wrap items-center justify-center gap-x-1.5 md:flex">
-      <span
-        class="flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold"
-        :class="cell.isToday ? CALENDAR_TODAY.pill : ''"
-      >
-        {{ cell.day }}
-      </span>
-      <span v-if="cell.isToday" class="text-xs font-bold" :class="CALENDAR_TODAY.text">
-        {{ t('planner.today') }}
-      </span>
-    </div>
-
-    <!-- Events column — right of day-num on mobile, stacked below on desktop -->
-    <div class="flex min-w-0 flex-1 flex-col gap-1 md:w-full md:gap-px">
-      <!-- Birthdays + holidays + all-day chips share a lane, capped to `allDayCap`. -->
-      <template v-if="cell.extras.length > 0 || cell.allDayItems.length > 0">
-        <template v-for="extra in visibleExtras" :key="extra.id">
-          <BirthdayChip
-            v-if="extra.kind === 'birthday' && extra.birthday"
-            :birthday="extra.birthday"
-            class="block w-full"
-            @click.stop="emit('birthday-click', extra.birthday)"
-          />
-          <HolidayChip
-            v-else-if="extra.kind === 'holiday' && extra.holiday"
-            :holiday="extra.holiday"
-            :is-start="true"
-            :is-end="true"
-            class="block w-full"
-            @click.stop="emit('holiday-click', extra.holiday!)"
-          />
-        </template>
-        <AllDayActivityChip
-          v-for="(item, i) in visibleAllDayItems"
-          :key="item.activity.id + ':' + i"
-          :activity="item.activity"
-          :date="cell.date"
-          :is-start="item.isStart"
-          :is-end="item.isEnd"
-          :data-activity-id="item.activity.id"
-          :data-occurrence-date="cell.date"
-          class="block w-full"
-          @click.stop="emit('view-activity', item.activity.id, cell.date)"
-        />
-        <span
-          v-if="allDayOverflow > 0"
-          class="text-secondary-500/40 dark:text-ink-faint px-0.5 text-[0.5625rem] leading-tight"
-          aria-hidden="true"
-        >
-          +{{ allDayOverflow }}
-        </span>
-      </template>
-
-      <!-- Timed chips (NEW — replaces the legacy colored-dot row) -->
-      <MonthChip
-        v-for="occ in visibleTimed"
-        :key="occ.activity.id + ':timed:' + occ.date"
-        :occurrence="occ"
-        @view-activity="(id, date) => emit('view-activity', id, date)"
-      />
-      <button
-        v-if="timedOverflow > 0"
-        type="button"
-        class="font-outfit text-secondary-500/50 hover:text-primary-500 dark:text-ink-faint self-start rounded-md px-1 py-0.5 text-[0.625rem] font-semibold tracking-wide transition-colors"
-        :aria-label="t('planner.moreEvents').replace('{count}', String(timedOverflow))"
-        @click="onMoreClick"
-      >
-        +{{ timedOverflow }} {{ t('planner.moreEventsShort') }}
-      </button>
-
-      <!-- Travel-segment chips (kept as-is — they share the chip-row real estate) -->
-      <div v-if="cell.segments.length > 0" class="flex flex-wrap items-center gap-[2px]">
-        <TravelSegmentChip
-          v-for="seg in cell.segments.slice(0, 2)"
-          :key="seg.segmentId + '-' + seg.kind"
-          :occurrence="seg"
-          @click="(vid, sidx) => emit('view-segment', vid, sidx)"
-        />
-        <span
-          v-if="cell.segments.length > 2"
-          class="text-secondary-500/40 dark:text-ink-faint text-[0.5625rem]"
-          aria-hidden="true"
-        >
-          +{{ cell.segments.length - 2 }}
-        </span>
-      </div>
-
-      <!-- Empty-day collapse (mobile only): a thin "nothing planned" line so
-           busy days stand out in the agenda. Today is never collapsed. -->
-      <span
-        v-if="isEmptyDay && !cell.isToday"
-        class="font-inter text-secondary-500/40 dark:text-ink-faint self-start text-xs italic md:hidden"
-      >
-        {{ t('planner.nothingPlanned') }}
-      </span>
-
-      <!-- Vacation band (anchored to bottom of cell on desktop, inline on mobile).
-           Rounds only the trip's outer ends so a multi-day trip reads as one
-           connected band across its cells. -->
-      <div class="hidden flex-1 md:block" />
-      <div
-        v-for="vac in cell.vacations"
-        :key="vac.id"
-        class="w-full cursor-pointer overflow-hidden"
-        :class="
-          vac.isStart && vac.isEnd
-            ? 'rounded-md'
-            : vac.isStart
-              ? 'rounded-l-md'
-              : vac.isEnd
-                ? 'rounded-r-md'
-                : 'rounded-none'
-        "
-        style="background: rgb(0 180 216 / 12%)"
-        @click.stop="emit('vacation-click', vac.id)"
-      >
-        <span
-          v-if="vac.isStart"
-          class="font-outfit block truncate px-1 text-[0.625rem] leading-tight font-bold text-[#0077B6] dark:text-[#00B4D8]"
-        >
-          {{ vac.emoji }} {{ vac.name }}
-        </span>
-        <span v-else class="block h-[10px]" />
-      </div>
-    </div>
+    <MonthDayContents
+      v-if="showContents"
+      :cell="cell"
+      :caps="STREAM_DAY_CAPS"
+      @more="emit('select-date', cell.date)"
+      @view-activity="(id, date) => emit('view-activity', id, date)"
+      @vacation-click="(vid) => emit('vacation-click', vid)"
+      @view-segment="(vid, sidx) => emit('view-segment', vid, sidx)"
+      @holiday-click="(h) => emit('holiday-click', h)"
+      @birthday-click="(b) => emit('birthday-click', b)"
+    />
   </button>
 </template>

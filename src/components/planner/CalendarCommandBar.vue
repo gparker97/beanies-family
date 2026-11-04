@@ -24,24 +24,43 @@ import AddEntityButton from '@/components/ui/AddEntityButton.vue';
 import HamburgerButton from '@/components/common/HamburgerButton.vue';
 import SearchButton from '@/components/common/SearchButton.vue';
 import NotificationsBell from '@/components/notifications/NotificationsBell.vue';
-import { onBeforeUnmount, onMounted, ref, computed } from 'vue';
+import SortMenu, { type SortMenuOption, type SortMenuToggle } from '@/components/ui/SortMenu.vue';
+import { ref, computed } from 'vue';
+import { usePublishedHeight } from '@/composables/usePublishedHeight';
 import { useTranslation } from '@/composables/useTranslation';
 import { useMobileMenu, useHeaderReclaimed } from '@/composables/useMobileMenu';
 import { useSyncStore } from '@/stores/syncStore';
 import { SAVE_STATUS_PRESENTATION } from '@/components/ui/saveStatusPresentation';
 import type { PlannerView } from '@/composables/usePlannerNavigation';
+import { useBreakpoint } from '@/composables/useBreakpoint';
+import {
+  flippedPrefValue,
+  type MonthPrefChange,
+  type MonthPrefValues,
+} from '@/composables/useMonthGridPrefs';
+import type { DesktopDensity } from '@/constants/calendarCaps';
 
-defineProps<{
-  label: string;
-  /** Optional caption under the period row (e.g. "Times are in Singapore Standard Time").
-   *  Renders nothing when absent. */
-  note?: string;
-  activeView: PlannerView;
-  canAdd: boolean;
-  isAllActive: boolean;
-  isMemberActive: (id: string) => boolean;
-  activeMemberNames: string[];
-}>();
+const props = withDefaults(
+  defineProps<{
+    label: string;
+    /** Optional caption under the period row (e.g. "Times are in Singapore Standard Time").
+     *  Renders nothing when absent. */
+    note?: string;
+    activeView: PlannerView;
+    canAdd: boolean;
+    isAllActive: boolean;
+    isMemberActive: (id: string) => boolean;
+    activeMemberNames: string[];
+    /** The month grid's per-device preferences (one snapshot from the page's
+     *  `useMonthGridPrefs`); the bar derives what it shows from it. */
+    monthPrefs: MonthPrefValues;
+    /** Whether the grid's cells have room for times; false hides the Hide Times toggle.
+     *  Defaulted explicitly: Vue casts an absent boolean prop to false, which would hide
+     *  the toggle everywhere the page does not bind it (the same trap as AllDayChip.showLabel). */
+    timesRoom?: boolean;
+  }>(),
+  { timesRoom: true }
+);
 
 const emit = defineEmits<{
   prev: [];
@@ -53,6 +72,8 @@ const emit = defineEmits<{
   'select-all': [];
   'select-member': [id: string];
   'vacation-click': [id: string];
+  /** A month grid preference changed from the density menu. */
+  'set-month-pref': [change: MonthPrefChange, via: 'menu' | 'm_pill'];
 }>();
 
 const { t } = useTranslation();
@@ -70,41 +91,81 @@ const saveNeedsAttention = computed(() => SAVE_STATUS_PRESENTATION[syncStore.sav
 
 // Publish this bar's rendered height as a CSS var so the views can dock their
 // own column headers (weekday row / member row) right beneath it via
-// `sticky; top: var(--planner-cmdbar-h)`. A ResizeObserver keeps it correct as
+// `sticky; top: var(--planner-cmdbar-h)`. `usePublishedHeight` keeps it correct as
 // the bar's height changes (ribbon collapse, mobile two-row layout, member-chip
-// wrap). This is a layout-measurement concern, not business logic.
+// wrap) through the one guarded observer. A layout concern, not business logic.
 const rootEl = ref<HTMLElement | null>(null);
-let ro: ResizeObserver | null = null;
+usePublishedHeight(rootEl, '--planner-cmdbar-h', 'calendar-command-bar');
 
-function publishHeight(): void {
-  if (typeof document === 'undefined' || !rootEl.value) return;
-  // Measurement must never throw out of the ResizeObserver callback — a single
-  // failure would kill the observer and freeze the docking offset for the views.
-  try {
-    document.documentElement.style.setProperty(
-      '--planner-cmdbar-h',
-      `${rootEl.value.offsetHeight}px`
-    );
-  } catch (err) {
-    console.warn('[CalendarCommandBar] failed to publish --planner-cmdbar-h', err);
-  }
+// ── Month grid density menu (#141) ──────────────────────────────────────────
+// Declared beside the menu, as `CookbookControls` declares its sort options: a
+// `SortMenuOption` is a UI type that `constants/` must not import.
+const DENSITY_OPTIONS: readonly SortMenuOption<DesktopDensity>[] = [
+  {
+    value: 'compact',
+    labelKey: 'planner.monthGrid.compact',
+    icon: '▦',
+    testid: 'month-density-compact',
+  },
+  {
+    value: 'comfortable',
+    labelKey: 'planner.monthGrid.comfortable',
+    icon: '▤',
+    testid: 'month-density-comfortable',
+  },
+];
+
+const { isTablet } = useBreakpoint();
+
+/**
+ * The toggles after the densities. Their ids are the preference names. "Hide Times" only
+ * in Compact and never on a tablet, where times are always hidden (it would do nothing).
+ */
+const densityToggles = computed<SortMenuToggle[]>(() => [
+  ...(props.monthPrefs.density === 'compact' && !isTablet.value && props.timesRoom
+    ? [
+        {
+          id: 'times',
+          labelKey: 'planner.monthGrid.hideTimes' as const,
+          checked: props.monthPrefs.times === 'hidden',
+          testid: 'month-density-hide-times',
+        },
+      ]
+    : []),
+  {
+    id: 'soloFaces',
+    labelKey: 'planner.monthGrid.hideSoloFaces',
+    checked: props.monthPrefs.soloFaces === 'hidden',
+    testid: 'month-density-hide-solo-faces',
+  },
+]);
+
+function onDensity(value: DesktopDensity): void {
+  emit('set-month-pref', { name: 'density', value }, 'menu');
 }
 
-onMounted(() => {
-  publishHeight();
-  if (typeof ResizeObserver !== 'undefined' && rootEl.value) {
-    ro = new ResizeObserver(() => publishHeight());
-    ro.observe(rootEl.value);
+function onDensityToggle(id: string): void {
+  if (id !== 'times' && id !== 'soloFaces') {
+    console.warn('[CalendarCommandBar] unknown density toggle', id);
+    return;
   }
-});
+  const change: MonthPrefChange =
+    id === 'times'
+      ? { name: 'times', value: flippedPrefValue('times', props.monthPrefs) }
+      : { name: 'soloFaces', value: flippedPrefValue('soloFaces', props.monthPrefs) };
+  emit('set-month-pref', change, 'menu');
+}
 
-onBeforeUnmount(() => {
-  ro?.disconnect();
-  ro = null;
-  if (typeof document !== 'undefined') {
-    document.documentElement.style.removeProperty('--planner-cmdbar-h');
-  }
-});
+/** Phone only (#141): the M pill's second tap flips Month between Grid and List. On the
+ *  planner route `headerReclaimed` is exactly `isMobile`, so it agrees with the page's
+ *  `monthSurface`. */
+function onToggleMonthMode(): void {
+  emit(
+    'set-month-pref',
+    { name: 'phoneMode', value: flippedPrefValue('phoneMode', props.monthPrefs) },
+    'm_pill'
+  );
+}
 </script>
 
 <template>
@@ -247,7 +308,9 @@ onBeforeUnmount(() => {
           <ViewToggle
             :active-view="activeView"
             :compact="headerReclaimed"
+            :month-mode="headerReclaimed ? monthPrefs.phoneMode : undefined"
             @update:active-view="emit('update:activeView', $event)"
+            @toggle-month-mode="onToggleMonthMode"
           />
 
           <!-- Mobile member filter — kept compact (icon-only when "all"; shows
@@ -297,16 +360,31 @@ onBeforeUnmount(() => {
     </div>
 
     <!-- Optional caption under the period row. Caption level, `ink-soft` pair, no paint.
-         Its height is picked up by the ResizeObserver above (--planner-cmdbar-h). -->
+         Its height is picked up by `usePublishedHeight` above (--planner-cmdbar-h). -->
     <p v-if="note" class="dark:text-ink-soft text-secondary-500 mt-1.5 text-xs">{{ note }}</p>
 
-    <!-- Desktop member chips on their own row (mobile uses the pinned filter above) -->
-    <div v-if="!headerReclaimed" class="mt-3 hidden sm:flex">
+    <!-- Desktop member chips on their own row (mobile uses the pinned filter above). The
+         chips double as the month grid's legend; the density menu sits at the row's
+         right end, in Month view only. -->
+    <div v-if="!headerReclaimed" class="mt-3 hidden items-start gap-3 sm:flex">
       <MemberChipFilter
+        class="min-w-0 flex-1"
         :is-all-active="isAllActive"
         :is-member-active="isMemberActive"
         @select-all="emit('select-all')"
         @select-member="emit('select-member', $event)"
+      />
+      <SortMenu
+        v-if="activeView === 'month'"
+        class="ml-auto"
+        :model-value="monthPrefs.density"
+        :options="DENSITY_OPTIONS"
+        trigger-label-key="planner.monthGrid.densityLabel"
+        icon="▦"
+        :toggles="densityToggles"
+        data-testid="month-density-menu"
+        @update:model-value="onDensity"
+        @toggle="onDensityToggle"
       />
     </div>
 

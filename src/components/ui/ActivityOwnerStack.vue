@@ -42,7 +42,12 @@ const props = withDefaults(
      * who", which is the job at this size.
      */
     dense?: boolean;
-    size?: 'xs' | 'sm' | 'md';
+    /**
+     * `2xs` (14px faces) is the month grid's chip size (#141): a thinner ring, a
+     * tighter overlap, and the overflow as plain "+N" text rather than a circle, because
+     * a 14px circle cannot hold a legible 12px count.
+     */
+    size?: '2xs' | 'xs' | 'sm' | 'md';
   }>(),
   { max: 3, size: 'sm', dense: false }
 );
@@ -67,6 +72,14 @@ const OVERFLOW_SIZE: Record<string, string> = {
   md: 'h-10 w-10',
 };
 const overflowSize = computed(() => OVERFLOW_SIZE[props.size] ?? OVERFLOW_SIZE.xs);
+
+const isTiny = computed(() => props.size === '2xs');
+/** Ring and overlap per size: `2xs` takes `ring-1` / `-ml-1`, every other size is unchanged. */
+const faceClass = computed(() =>
+  isTiny.value
+    ? 'dark:ring-surface-raised -ml-1 ring-1 ring-white first:ml-0'
+    : 'dark:ring-surface-raised -ml-1.5 ring-2 ring-white first:ml-0'
+);
 </script>
 
 <template>
@@ -78,10 +91,16 @@ const overflowSize = computed(() => OVERFLOW_SIZE[props.size] ?? OVERFLOW_SIZE.x
       fallback="initials"
       :size="size"
       aria-hidden="true"
-      class="dark:ring-surface-raised -ml-1.5 ring-2 ring-white first:ml-0"
+      :class="faceClass"
     />
     <span
-      v-if="overflow"
+      v-if="overflow && isTiny"
+      class="ml-0.5 text-xs font-semibold text-[var(--muted-text)]"
+      aria-hidden="true"
+      >+{{ overflow }}</span
+    >
+    <span
+      v-else-if="overflow"
       :class="overflowSize"
       class="font-outfit dark:bg-surface-hover dark:text-ink dark:ring-surface-raised -ml-1.5 grid place-items-center rounded-full bg-[var(--tint-slate-10)] text-xs font-bold text-[var(--color-text-muted)] ring-2 ring-white"
       aria-hidden="true"

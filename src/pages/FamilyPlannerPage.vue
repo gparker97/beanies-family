@@ -17,6 +17,13 @@ import CalendarMonthStream, {
 import WeeklyCalendarView from '@/components/planner/WeeklyCalendarView.vue';
 import DailyCalendarView from '@/components/planner/DailyCalendarView.vue';
 import CalendarConnectNudge from '@/components/planner/CalendarConnectNudge.vue';
+import { useCalendarNudge } from '@/composables/useCalendarNudge';
+import {
+  useMonthGridPrefs,
+  type MonthPrefChange,
+  type MonthPrefVia,
+} from '@/composables/useMonthGridPrefs';
+import type { MonthGridDisplay } from '@/utils/monthGridLayout';
 import ActivityModal from '@/components/planner/ActivityModal.vue';
 import ActivityViewEditModal from '@/components/planner/ActivityViewEditModal.vue';
 import TravelSegmentEditModal from '@/components/travel/TravelSegmentEditModal.vue';
@@ -84,8 +91,8 @@ import type {
 } from '@/types/models';
 
 const { t } = useTranslation();
-// Month view has two sibling surfaces; this picks which one mounts.
-const { isMobile } = useBreakpoint();
+// Month view has sibling surfaces; `monthSurface` (below) picks which one mounts.
+const { isMobile, isTablet } = useBreakpoint();
 const { categoryLabel } = useActivityCategoryLabel();
 const router = useRouter();
 const { canEditActivities } = usePermissions();
@@ -143,6 +150,50 @@ const { referenceDate, label, goPrev, goNext, goToday } = usePlannerNavigation(a
 // month on that date; a drill-in is the only writer that adds a history entry.
 const { drillToDay } = usePlannerUrlState({ activeView, referenceDate });
 const showInactive = ref(false);
+
+// ── Month at a glance: surface, display, prefs (#141) ────────────────────────
+// The grid's per-device preferences. ONE instance, here: the command bar and the grid
+// stay presentational and both bind `onSetMonthPref`.
+const prefs = useMonthGridPrefs();
+// Module-level state, so this call and the nudge component's own read the same value.
+const { showNudge } = useCalendarNudge();
+/** False while the desktop grid's cells are too narrow for start times (the grid reports it). */
+const timesRoom = ref(true);
+
+/**
+ * Which month surface is mounted: the SINGLE answer, read by the template's `v-if`,
+ * `isDateShown` and `viewKind`, so the three cannot drift. `null` outside Month.
+ */
+const monthSurface = computed<'desktop-grid' | 'phone-grid' | 'phone-list' | null>(() => {
+  if (activeView.value !== 'month') return null;
+  if (!isMobile.value) return 'desktop-grid';
+  // Phones open in Grid on a fresh device; the M pill's second tap flips to the list.
+  return prefs.values.value.phoneMode === 'list' ? 'phone-list' : 'phone-grid';
+});
+
+/** The grid's one presentation input. Times never show on a tablet (768-1023px). */
+const monthGridDisplay = computed<MonthGridDisplay>(() => {
+  const v = prefs.values.value;
+  if (isMobile.value) return { variant: 'phone', density: v.phoneDensity };
+  return {
+    variant: 'desktop',
+    density: v.density,
+    showTime: v.density === 'compact' && v.times === 'shown' && !isTablet.value,
+    hideSoloFace: v.soloFaces === 'hidden',
+  };
+});
+
+/**
+ * Everything rendered below the month grid; see the template comment there. While it is
+ * all absent the grid bleeds into `<main>`'s bottom padding, so the page has zero scroll.
+ */
+const contentBelowGrid = computed(
+  () => showNudge.value || activityStore.inactiveActivities.length > 0
+);
+
+function onSetMonthPref(change: MonthPrefChange, via: MonthPrefVia): void {
+  prefs.setPref(change, via);
+}
 
 // ── External-calendar clash nudge (#34) ──────────────────────────────────────
 // Derive the VISIBLE window (the rendered grid, not the calendar month) + its
@@ -202,12 +253,13 @@ const plannerRootRef = ref<HTMLElement | null>(null);
 
 /**
  * Is `ymd` on screen in the active view? Two views draw less than `visibleRange`: the mobile
- * month stream shows whole months (no padding days), and mobile week shows only the focused
- * day's timeline below its strip.
+ * month stream (List) shows whole months (no padding days), and mobile week shows only the
+ * focused day's timeline below its strip. The phone grid draws all 42 days, so it falls
+ * through to `visibleRange` like the desktop grid.
  */
 function isDateShown(ymd: string): boolean {
   const shownYmd = toDateInputValue(referenceDate.value);
-  if (isMobile.value && activeView.value === 'month') {
+  if (monthSurface.value === 'phone-list') {
     return ymd.slice(0, 7) === shownYmd.slice(0, 7);
   }
   if (isMobile.value && activeView.value === 'week') return ymd === shownYmd;
@@ -222,10 +274,21 @@ function showDate(ymd: string): boolean {
   return true;
 }
 
+/** The reveal log's view kind per month surface; the existing values are kept so the
+ *  logs stay continuous, and the phone grid gets its own. */
+const MONTH_VIEW_KIND = {
+  'desktop-grid': 'month-desktop',
+  'phone-list': 'month-mobile',
+  'phone-grid': 'month-mobile-grid',
+} as const;
+
 const activityReveal = useActivityReveal({
   root: plannerRootRef,
   showDate,
-  viewKind: () => `${activeView.value}-${isMobile.value ? 'mobile' : 'desktop'}`,
+  viewKind: () =>
+    monthSurface.value
+      ? MONTH_VIEW_KIND[monthSurface.value]
+      : `${activeView.value}-${isMobile.value ? 'mobile' : 'desktop'}`,
 });
 
 const showModal = ref(false);
@@ -1121,6 +1184,9 @@ function handleActivitySwapped(newId: string) {
       :is-all-active="isAllActive"
       :is-member-active="isMemberActive"
       :active-member-names="activeMemberNames"
+      :month-prefs="prefs.values.value"
+      :times-room="timesRoom"
+      @set-month-pref="onSetMonthPref"
       @prev="handlePrev"
       @next="handleNext"
       @today="handleToday"
@@ -1133,11 +1199,11 @@ function handleActivitySwapped(newId: string) {
     />
 
     <!-- Calendar views (conditional on activeView), controlled by referenceDate.
-         Month view has two sibling surfaces: the continuous day-stack stream on
-         mobile, the 7-column grid at md+. Mounting them here (rather than
-         branching inside CalendarGrid) keeps the grid's interface untouched. -->
+         Month view has sibling surfaces, picked by `monthSurface`: on phones the
+         continuous day-stack stream (List) or the phone grid (Grid, the default), at
+         md+ the desktop grid. The grid is keyed by variant, so crossing 768px remounts it. -->
     <CalendarMonthStream
-      v-if="activeView === 'month' && isMobile"
+      v-if="monthSurface === 'phone-list'"
       :reference-date="referenceDate"
       :anchor="streamAnchor"
       @select-date="handleCalendarDateClick"
@@ -1152,8 +1218,13 @@ function handleActivitySwapped(newId: string) {
     />
 
     <CalendarGrid
-      v-else-if="activeView === 'month'"
+      v-else-if="monthSurface"
+      :key="monthGridDisplay.variant"
       :reference-date="referenceDate"
+      :display="monthGridDisplay"
+      :bleed-bottom="!contentBelowGrid"
+      @update:times-room="(v: boolean) => (timesRoom = v)"
+      @set-month-pref="onSetMonthPref"
       @select-date="handleCalendarDateClick"
       @prev="handlePrev"
       @next="handleNext"
@@ -1198,6 +1269,10 @@ function handleActivitySwapped(newId: string) {
       @holiday-click="handleHolidayClick"
       @birthday-click="handleBirthdayClick"
     />
+
+    <!-- ⚠️ Anything rendered here, between the month grid and the modals, must be counted
+         in `contentBelowGrid`: the grid bleeds into `<main>`'s bottom padding when nothing
+         follows it, and a missed entry would be pulled up over the card. -->
 
     <!-- Connect-Google-Calendar nudge — below the calendar (month view), self-
          gating (flag on + not connected + not dismissed). Never above the grid.

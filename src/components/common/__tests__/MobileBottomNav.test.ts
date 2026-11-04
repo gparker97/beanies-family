@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount } from '@vue/test-utils';
 import { reactive, ref, computed } from 'vue';
 import MobileBottomNav from '@/components/common/MobileBottomNav.vue';
+import { publishedHeight } from '@/composables/usePublishedHeight';
 import { POD_ANCHOR_SRC } from '@/constants/navigation';
 
 vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: vi.fn() }));
@@ -314,5 +315,26 @@ describe('MobileBottomNav v3', () => {
       // Money is at index 3 (Calendar leaf sits at index 2).
       expect(buttons[3]!.find('span.absolute.top-1.left-1').exists()).toBe(true);
     });
+  });
+});
+
+describe('MobileBottomNav published height', () => {
+  it('publishes --mobile-nav-h from its rendered height, and clears it on unmount', async () => {
+    const desc = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight');
+    Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
+      configurable: true,
+      get: () => 64,
+    });
+    const wrapper = mount(MobileBottomNav, { attachTo: document.body });
+    try {
+      await wrapper.vm.$nextTick();
+      expect(document.documentElement.style.getPropertyValue('--mobile-nav-h')).toBe('64px');
+      expect(publishedHeight('--mobile-nav-h')).toBe(64);
+    } finally {
+      wrapper.unmount();
+      if (desc) Object.defineProperty(HTMLElement.prototype, 'offsetHeight', desc);
+      else delete (HTMLElement.prototype as unknown as Record<string, unknown>).offsetHeight;
+    }
+    expect(document.documentElement.style.getPropertyValue('--mobile-nav-h')).toBe('');
   });
 });

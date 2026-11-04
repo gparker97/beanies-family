@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { transportEmoji, type TravelSegmentOccurrence } from '@/utils/vacation';
-import { formatTime12 } from '@/utils/date';
+import { travelSegmentLabels, type TravelSegmentOccurrence } from '@/utils/vacation';
 import { useTranslation } from '@/composables/useTranslation';
 
 interface Props {
@@ -12,26 +11,11 @@ const props = defineProps<Props>();
 const emit = defineEmits<{ click: [vacationId: string, segmentIndex: number] }>();
 const { t } = useTranslation();
 
-const emoji = computed(() => transportEmoji(props.occurrence.transportType, props.occurrence.kind));
-const isPending = computed(() => props.occurrence.status === 'pending');
-const formattedTime = computed(() =>
-  props.occurrence.time ? formatTime12(props.occurrence.time) : ''
-);
-// Short kind label rendered as a title prefix so a 9am departure and a
-// 5:30pm arrival of the same flight don't read as two separate flights.
-const kindLabelShort = computed(() =>
-  props.occurrence.kind === 'departure'
-    ? t('planner.segmentDepartureShort')
-    : t('planner.segmentArrivalShort')
-);
-// Full label still used for the tooltip / aria-label (screen readers).
-const ariaLabel = computed(() => {
-  const fullKindLabel =
-    props.occurrence.kind === 'departure'
-      ? t('planner.segmentDeparture')
-      : t('planner.segmentArrival');
-  return `${fullKindLabel}: ${props.occurrence.title}`;
-});
+// Emoji, pending flag, time and the short / full kind labels, from the ONE pure
+// helper the month grid's `MonthSegmentChip` shares, so the two chips cannot
+// describe one flight differently. The short kind label is a title prefix, so a
+// 9am departure and a 5:30pm arrival of the same flight don't read as two flights.
+const labels = computed(() => travelSegmentLabels(props.occurrence, t));
 
 function onClick() {
   emit('click', props.occurrence.vacationId, props.occurrence.segmentIndex);
@@ -42,15 +26,15 @@ function onClick() {
   <button
     type="button"
     class="travel-chip"
-    :class="isPending ? 'travel-chip-pending' : 'travel-chip-booked'"
-    :title="ariaLabel"
-    :aria-label="ariaLabel"
+    :class="labels.isPending ? 'travel-chip-pending' : 'travel-chip-booked'"
+    :title="labels.ariaLabel"
+    :aria-label="labels.ariaLabel"
     @click.stop="onClick"
   >
-    <span class="travel-chip-emoji" aria-hidden="true">{{ emoji }}</span>
-    <span class="travel-chip-kind" aria-hidden="true">{{ kindLabelShort }}</span>
+    <span class="travel-chip-emoji" aria-hidden="true">{{ labels.emoji }}</span>
+    <span class="travel-chip-kind" aria-hidden="true">{{ labels.kindLabelShort }}</span>
     <span class="travel-chip-title">{{ occurrence.title }}</span>
-    <span v-if="formattedTime" class="travel-chip-time">{{ formattedTime }}</span>
+    <span v-if="labels.formattedTime" class="travel-chip-time">{{ labels.formattedTime }}</span>
   </button>
 </template>
 

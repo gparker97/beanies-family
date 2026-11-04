@@ -9488,6 +9488,35 @@ const STRING_DEFS = {
   'planner.view.day': { en: 'Day', beanie: 'day' },
   'planner.view.agenda': { en: 'Agenda', beanie: 'agenda' },
   'planner.nothingPlanned': { en: 'Nothing planned', beanie: 'nothing planned' },
+  // #141: a day's item count (`dayCountLabel`); the zero case is `planner.nothingPlanned`.
+  'planner.dayRow.count.one': { en: '1 thing on', beanie: '1 thing on' },
+  'planner.dayRow.count.other': { en: '{count} things on', beanie: '{count} things on' },
+  // #141: the phone day row's header hint (a second tap on the day opens the Day view).
+  'planner.dayRow.tapAgain': { en: 'Tap again for the day', beanie: 'tap again for the day' },
+  // #141: the desktop month grid's density menu and day-numeral label.
+  'planner.monthGrid.densityLabel': { en: 'Density', beanie: 'density' },
+  'planner.monthGrid.compact': { en: 'Compact', beanie: 'compact' },
+  'planner.monthGrid.comfortable': { en: 'Comfortable', beanie: 'comfortable' },
+  'planner.monthGrid.hideTimes': { en: 'Hide Times', beanie: 'hide times' },
+  'planner.monthGrid.hideSoloFaces': {
+    en: 'Hide Faces on Solo Chips',
+    beanie: 'hide faces on solo chips',
+  },
+  'planner.monthGrid.openDay': { en: 'Open {date}', beanie: 'open {date}' },
+  // #141: the phone month grid's density label row (Faces · Bars · Titles).
+  'planner.monthGrid.phoneDensity': { en: 'Grid Density', beanie: 'grid density' },
+  'planner.monthGrid.faces': { en: 'Faces', beanie: 'faces' },
+  'planner.monthGrid.bars': { en: 'Bars', beanie: 'bars' },
+  'planner.monthGrid.titles': { en: 'Titles', beanie: 'titles' },
+  // #141: the phone M pill's accessible name, naming the current mode and the flip.
+  'planner.monthMode.showList': {
+    en: 'Month, grid. Tap again for the list',
+    beanie: 'month, grid. tap again for the list',
+  },
+  'planner.monthMode.showGrid': {
+    en: 'Month, list. Tap again for the grid',
+    beanie: 'month, list. tap again for the grid',
+  },
   'planner.tripRibbonLabel': { en: 'Coming up', beanie: 'coming up' },
   'planner.tripRibbonHide': { en: 'Hide upcoming trips', beanie: 'hide trips' },
   'planner.tripRibbonShow': { en: 'Show upcoming trips', beanie: 'show trips' },

@@ -1,22 +1,15 @@
 <script setup lang="ts">
 /**
- * Timed-activity chip for the month calendar. Replaces the previous
- * colored-dot row with a readable [left member-color bar][emoji][time][title]
- * lineup. On mobile (where the 7-column grid collapses to a vertical
- * day-stack via the parent) multi-person events also surface a right-edge
- * avatar stack so users can tell "everyone vs just the parents" at a glance.
+ * Timed-activity content adapter for the month chip (#141). It says WHAT the chip
+ * shows and nothing about how it draws: identity (whose hue, wash, dashed edge, faces,
+ * celebration) from `useActivityIdentity.identityFor`, the title, the start time and a
+ * spoken label, handed to `MonthChipFrame`, which owns every density's anatomy and
+ * reads the month chip context. So no presentation prop exists here, and the reveal
+ * hooks (`data-activity-id` / `data-occurrence-date`) are set once, by `MonthDayItem`.
  *
- * The color resolution rule (confirmed during planning):
- *  - 0 assignees  → "family" — Heritage Orange bar, stack = all human members
- *  - 1 assignee   → "solo"   — member's own color, no right-edge stack
- *  - 2+ assignees → "shared" — Heritage Orange bar, stack = selected members
- *
- * The avatar stack renders only when `kind !== 'solo'` AND we're below the
- * `md` breakpoint — the left bar already conveys "whose" for solo events,
- * and the desktop grid is too tight to fit avatars without crowding titles.
- *
- * Phase B will promote `classify()` to a shared composable so weekly event
- * blocks consume the same rule.
+ * The colour rule is the planner-wide one in `useActivityIdentity`: family (no owner)
+ * = Heritage Orange; solo = the member's hue; shared = the first owner's edge over a
+ * blend of the first two hues, with a dashed edge and the face stack.
  */
 import { computed } from 'vue';
 import { useMemberInfo } from '@/composables/useMemberInfo';
@@ -26,8 +19,8 @@ import { useActivityCategoryLabel } from '@/composables/useActivityCategoryLabel
 import { formatNameList, normalizeAssignees } from '@/utils/assignees';
 import { formatTime12 } from '@/utils/date';
 import { useClash } from '@/composables/useClash';
-import ActivityOwnerStack from '@/components/ui/ActivityOwnerStack.vue';
 import ClashIndicator from '@/components/planner/ClashIndicator.vue';
+import MonthChipFrame from '@/components/planner/MonthChipFrame.vue';
 import type { ActivityOccurrence } from '@/utils/calendar/occurrence';
 
 const props = defineProps<{
@@ -44,7 +37,6 @@ const { categoryLabel: resolveCategoryLabel } = useActivityCategoryLabel();
 
 /** Whose, which faces, which glyph, celebration, wash — one call, one rule. */
 const identity = computed(() => identityFor(props.occurrence.activity));
-const emoji = computed(() => identity.value.emoji);
 
 const time = computed(() => {
   const t = props.occurrence.activity.startTime;
@@ -83,59 +75,34 @@ const ariaLabel = computed(() => {
     .join(' · ');
 });
 
-function onClick(event: MouseEvent) {
-  event.stopPropagation();
+// The frame stops propagation itself, so a chip click never also opens the day.
+function onClick() {
   emit('view-activity', props.occurrence.activity.id, props.occurrence.date);
 }
 </script>
 
 <template>
-  <button
-    type="button"
-    class="font-inter text-secondary-500 dark:text-ink flex w-full min-w-0 items-center gap-1 overflow-hidden rounded-md border-l-[3px] py-0.5 pr-1.5 pl-1 text-left text-xs leading-tight transition-opacity hover:opacity-80"
-    :class="[
-      identity.dashed ? 'border-dashed' : '',
-      // No `data-sticker` here: the chip is `overflow-hidden` for title truncation, so
-      // an overhanging sticker would be clipped away. The gradient border plus the
-      // category emoji already inline carry it at this size.
-      identity.celebration.celebrating ? 'is-celebration' : '',
-    ]"
-    :style="identity.style"
-    :aria-label="ariaLabel"
-    :data-activity-id="occurrence.activity.id"
-    :data-occurrence-date="occurrence.date"
-    data-testid="month-chip"
+  <MonthChipFrame
+    :color="identity.style.borderLeftColor ?? identity.color"
+    :wash="identity.style.background"
+    :dashed="identity.dashed"
+    :celebrating="identity.celebration.celebrating"
+    :emoji="identity.emoji"
+    :label="title"
+    :time="time"
+    :faces="identity.stackMembers"
+    :solo="identity.kind === 'solo'"
+    :spoken-label="ariaLabel"
+    testid="month-chip"
     @click="onClick"
   >
-    <CelebrationConfetti
-      v-if="identity.celebration.celebrating"
-      :activity-id="occurrence.activity.id"
-      density="month"
-    />
-    <span aria-hidden="true" class="flex-shrink-0 text-[0.6875rem] leading-none">{{ emoji }}</span>
-
-    <!-- Time — hidden on the cramped 7-column desktop grid, shown on the
-         mobile day-stack rows (where the parent flips to `compactable`
-         layout and the chip has room). Tablet (md → lg) keeps the title-
-         only treatment so titles aren't crowded. -->
-    <span
-      v-if="time"
-      class="text-secondary-500/60 dark:text-ink-soft hidden flex-shrink-0 font-medium tabular-nums"
-      aria-hidden="true"
-    >
-      {{ time }}
-    </span>
-
-    <span class="min-w-0 flex-1 truncate font-medium">{{ title }}</span>
-
+    <template #decor>
+      <CelebrationConfetti
+        v-if="identity.celebration.celebrating"
+        :activity-id="occurrence.activity.id"
+        density="month"
+      />
+    </template>
     <ClashIndicator :clash="clash" class="flex-shrink-0" />
-
-    <!--
-      Right-anchored owner faces. No longer `md:hidden`: the month grid on desktop
-      showed no faces at all, so hue was the sole identity signal on the very surface
-      where the most events are visible at once. And no longer skipped for solo — the
-      month grid is not a bean lane, so nothing else here names the owner.
-    -->
-    <ActivityOwnerStack :members="identity.stackMembers" size="xs" dense class="ml-0.5" />
-  </button>
+  </MonthChipFrame>
 </template>

@@ -3,6 +3,12 @@ import { setActivePinia, createPinia } from 'pinia';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { nextTick } from 'vue';
 import CalendarGrid from '../CalendarGrid.vue';
+
+/** The desktop grid's presentation input (#141); the page builds it in the app. */
+const GRID_PROPS = {
+  display: { variant: 'desktop', density: 'compact', showTime: true, hideSoloFace: false },
+  bleedBottom: false,
+} as const;
 import type { FamilyActivity } from '@/types/models';
 
 // Why a SEPARATE file from CalendarGrid.test.ts: `vi.mock` is one-per-module, and
@@ -57,6 +63,13 @@ function setToday(date: string): void {
   holder.todayRef!.value = date;
 }
 
+/** The today pill: a gradient numeral, one per grid at most. */
+function pillDates(wrapper: VueWrapper): string[] {
+  return wrapper
+    .findAll('[data-testid="month-cell-numeral"].bg-gradient-to-br')
+    .map((el) => el.element.closest('[data-date]')?.getAttribute('data-date') ?? '');
+}
+
 function markedTodayDates(wrapper: VueWrapper): string[] {
   return wrapper
     .findAll('[data-date][aria-current="date"]')
@@ -72,22 +85,24 @@ afterEach(() => {
   document.body.innerHTML = '';
 });
 
-describe('CalendarGrid today marker — live midnight rollover', () => {
-  it('moves the border to the new day when today changes in place (no remount)', async () => {
-    const wrapper = mount(CalendarGrid, { props: { referenceDate: APRIL_2026 } });
+describe('CalendarGrid today pill — live midnight rollover', () => {
+  it('moves the pill to the new day when today changes in place (no remount)', async () => {
+    const wrapper = mount(CalendarGrid, { props: { ...GRID_PROPS, referenceDate: APRIL_2026 } });
 
     expect(markedTodayDates(wrapper)).toEqual(['2026-04-15']);
+    expect(pillDates(wrapper)).toEqual(['2026-04-15']);
 
     // Cross midnight WITHOUT remounting — the fix recomputes calendarDays off the
-    // reactive ref, so the border must relocate on its own.
+    // reactive ref, so the pill must relocate on its own.
     setToday('2026-04-16');
     await nextTick();
 
     expect(markedTodayDates(wrapper)).toEqual(['2026-04-16']);
+    expect(pillDates(wrapper)).toEqual(['2026-04-16']);
   });
 
-  it('shows no today border when today falls outside the displayed month', async () => {
-    const wrapper = mount(CalendarGrid, { props: { referenceDate: APRIL_2026 } });
+  it('shows no today pill when today falls outside the displayed month', async () => {
+    const wrapper = mount(CalendarGrid, { props: { ...GRID_PROPS, referenceDate: APRIL_2026 } });
     expect(markedTodayDates(wrapper)).toEqual(['2026-04-15']);
 
     // A May date is not a current-month April cell → no today marker, degrades
@@ -96,5 +111,13 @@ describe('CalendarGrid today marker — live midnight rollover', () => {
     await nextTick();
 
     expect(markedTodayDates(wrapper)).toEqual([]);
+    expect(pillDates(wrapper)).toEqual([]);
+  });
+
+  it('never marks today with a border (the pill is the only marker)', () => {
+    const wrapper = mount(CalendarGrid, { props: { ...GRID_PROPS, referenceDate: APRIL_2026 } });
+    const todayCell = wrapper.get('[data-date="2026-04-15"]');
+    expect(todayCell.classes()).not.toContain('border-primary-500');
+    expect(todayCell.classes()).not.toContain('border-2');
   });
 });

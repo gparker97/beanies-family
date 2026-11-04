@@ -183,3 +183,59 @@ describe('AllDayActivityChip', () => {
     expect(wrapper.attributes('title')).toBe("Uncle Bob's birthday (turns 60)");
   });
 });
+
+describe('AllDayActivityChip month grid options (#141)', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  const props = { activity: activity(), date: '2026-05-13', isStart: true, isEnd: true };
+  const inner = (w: ReturnType<typeof mount>) => w.findComponent({ name: 'AllDayChip' });
+
+  it('faces are off by default (the week view is unchanged)', () => {
+    expect(inner(mount(AllDayActivityChip, { props })).props('faces')).toBeUndefined();
+  });
+
+  it('withFaces passes the identity stack members and the solo flag', () => {
+    const w = mount(AllDayActivityChip, { props: { ...props, withFaces: true } });
+    expect(Array.isArray(inner(w).props('faces'))).toBe(true);
+    expect(typeof inner(w).props('solo')).toBe('boolean');
+  });
+
+  it('draws neutral ink on every surface, not the owner hue', () => {
+    expect(inner(mount(AllDayActivityChip, { props })).props('ink')).toBe('var(--color-text)');
+  });
+
+  it('takes the theme-aware flat wash from identity, never a hue-suffixed alpha', () => {
+    const w = mount(AllDayActivityChip, { props });
+    const bg = String(inner(w).props('bgColor'));
+    expect(bg).toBeTruthy();
+    expect(bg).not.toContain('gradient');
+    // The old `${color}22` hex-alpha wash had no dark partner.
+    expect(bg).not.toMatch(/^#[0-9a-f]{6}22$/i);
+  });
+
+  it('the flat wash is theme-aware: light alpha, then the deeper dark alpha', () => {
+    const light = String(inner(mount(AllDayActivityChip, { props })).props('bgColor'));
+    expect(light).toMatch(/^rgba\(\d+, \d+, \d+, 0\.13\)$/);
+    document.documentElement.classList.add('dark');
+    try {
+      const dark = String(inner(mount(AllDayActivityChip, { props })).props('bgColor'));
+      expect(dark).toMatch(/^rgba\(\d+, \d+, \d+, 0\.24\)$/);
+    } finally {
+      document.documentElement.classList.remove('dark');
+    }
+  });
+
+  it('showLabel passes through, and unset still follows isStart', () => {
+    expect(
+      mount(AllDayActivityChip, { props: { ...props, isStart: false, isEnd: false } }).text()
+    ).not.toContain("Beau's birthday");
+    expect(
+      mount(AllDayActivityChip, {
+        props: { ...props, isStart: false, isEnd: false, showLabel: true },
+      }).text()
+    ).toContain("Beau's birthday");
+  });
+});

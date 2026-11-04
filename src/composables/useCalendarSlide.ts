@@ -1,5 +1,5 @@
 import { computed, onScopeDispose, ref, watch, type Ref } from 'vue';
-import { useHorizontalSwipe } from './useHorizontalSwipe';
+import { useHorizontalSwipe, type PinchDirection } from './useHorizontalSwipe';
 import { useReducedMotion } from './useReducedMotion';
 
 /**
@@ -44,6 +44,11 @@ export interface UseCalendarSlideOptions {
   threshold?: number;
   /** Optional reactive flag to disable the gesture without unmounting. */
   enabled?: Ref<boolean>;
+  /**
+   * Optional two-finger pinch, passed straight through to `useHorizontalSwipe` (which
+   * documents it). Not gated by `enabled` or the animation lockout.
+   */
+  onPinch?: (dir: PinchDirection) => void;
 }
 
 /** iOS system page-transition easing: fast start, gentle settle. */
@@ -54,6 +59,15 @@ const SPRING_BACK_MS = 220;
 
 /** Rubber-band damping ratio applied to drag motion past `threshold`. */
 const PAST_THRESHOLD_RESISTANCE = 0.45;
+
+/**
+ * A cancelled Web Animation rejects `finished` with an `AbortError`: expected here (dispose,
+ * or a programmatic cancel), so it returns quietly. Anything else is a real failure and warns.
+ */
+function warnUnlessAborted(what: string, err: unknown): void {
+  if ((err as { name?: unknown } | null)?.name === 'AbortError') return;
+  console.warn(`[useCalendarSlide] animation ${what} failed`, err);
+}
 
 export function useCalendarSlide(
   target: Ref<HTMLElement | null>,
@@ -121,8 +135,9 @@ export function useCalendarSlide(
     activeAnimation = animation;
     try {
       await animation.finished;
-    } catch {
-      // Animation may be cancelled on dispose or programmatic abort — both fine.
+    } catch (err) {
+      // Cancelled on dispose or by a programmatic abort: an expected AbortError.
+      warnUnlessAborted('finished', err);
     }
     if (activeAnimation === animation) activeAnimation = null;
     // Commit the keyframe end state to inline style + cancel the animation
@@ -130,8 +145,8 @@ export function useCalendarSlide(
     applyTransform(toPx);
     try {
       animation.cancel();
-    } catch {
-      // already disposed
+    } catch (err) {
+      warnUnlessAborted('cancel', err);
     }
   }
 
@@ -211,6 +226,7 @@ export function useCalendarSlide(
   useHorizontalSwipe(target, {
     threshold,
     enabled: swipeEnabled,
+    onPinch: options.onPinch,
     onProgress: (dx) => {
       if (committing) return;
       if (dx === 0) {
@@ -256,8 +272,8 @@ export function useCalendarSlide(
     if (activeAnimation) {
       try {
         activeAnimation.cancel();
-      } catch {
-        // already disposed
+      } catch (err) {
+        warnUnlessAborted('cancel on dispose', err);
       }
       activeAnimation = null;
     }

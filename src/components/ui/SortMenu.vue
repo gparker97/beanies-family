@@ -13,6 +13,20 @@ export interface SortMenuOption<T extends string = string> {
   labelKey: UIStringKey;
   /** Decorative leading glyph. */
   icon: string;
+  /** Optional `data-testid` for the row. */
+  testid?: string;
+}
+
+/**
+ * An on/off row after the choices (a `menuitemcheckbox`). Selecting one emits `toggle`
+ * with its `id` and keeps the menu open, so several can be flipped in one visit.
+ */
+export interface SortMenuToggle {
+  id: string;
+  labelKey: UIStringKey;
+  checked: boolean;
+  /** Optional `data-testid` for the row. */
+  testid?: string;
 }
 
 /**
@@ -32,8 +46,12 @@ const props = defineProps<{
   options: readonly SortMenuOption<T>[];
   /** Names the control on the trigger and as the menu's accessible name. */
   triggerLabelKey: UIStringKey;
+  /** Optional checkbox rows after the choices. */
+  toggles?: readonly SortMenuToggle[];
+  /** The trigger's decorative glyph (default ⇅). Bound, so no lint allowlist entry. */
+  icon?: string;
 }>();
-const emit = defineEmits<{ 'update:modelValue': [value: T] }>();
+const emit = defineEmits<{ 'update:modelValue': [value: T]; toggle: [id: string] }>();
 
 const { t } = useTranslation();
 
@@ -58,10 +76,12 @@ const { show, popoverStyle, close, toggle, onMenuKeydown } = useAnchoredPopover(
   anchorRef: el,
   triggerRef,
   popoverRef,
-  itemSelector: '[role="menuitemradio"]',
+  itemSelector: '[role="menuitemradio"],[role="menuitemcheckbox"]',
   // Focus the active option so keyboard users land on the current sort.
   initialFocusIndex: () => props.options.findIndex((o) => o.value === props.modelValue),
 });
+
+const triggerIcon = computed(() => props.icon ?? '⇅');
 
 function select(value: T) {
   emit('update:modelValue', value);
@@ -83,7 +103,7 @@ function select(value: T) {
       <span
         class="dark:text-accent-lift flex h-6 w-6 items-center justify-center rounded-lg bg-[var(--tint-orange-8)] text-sm text-[#F15D22]"
         aria-hidden="true"
-        >⇅</span
+        >{{ triggerIcon }}</span
       >
       <span class="font-outfit text-xs text-[var(--color-text-muted)]">
         {{ t(triggerLabelKey) }}
@@ -116,10 +136,11 @@ function select(value: T) {
           type="button"
           role="menuitemradio"
           :aria-checked="option.value === modelValue ? 'true' : 'false'"
+          :data-testid="option.testid"
           class="font-outfit flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm font-semibold transition-colors"
           :class="
             option.value === modelValue
-              ? 'dark:text-accent-lift bg-[var(--tint-orange-8)] text-[#F15D22]'
+              ? 'text-secondary-500 dark:text-accent-lift bg-[var(--tint-orange-8)]'
               : 'text-[var(--color-text)] hover:bg-[var(--tint-slate-5)]'
           "
           @click="select(option.value)"
@@ -128,11 +149,31 @@ function select(value: T) {
           <span class="flex-1">{{ t(option.labelKey) }}</span>
           <span
             v-if="option.value === modelValue"
-            class="dark:text-accent-lift text-[#F15D22]"
+            class="text-primary-500 dark:text-accent-lift"
             aria-hidden="true"
             >✓</span
           >
         </button>
+        <template v-if="toggles?.length">
+          <div role="separator" class="dark:border-line my-1 border-t border-gray-200" />
+          <button
+            v-for="row in toggles"
+            :key="row.id"
+            type="button"
+            role="menuitemcheckbox"
+            :aria-checked="row.checked ? 'true' : 'false'"
+            class="font-outfit flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm font-semibold text-[var(--color-text)] transition-colors hover:bg-[var(--tint-slate-5)]"
+            :data-testid="row.testid"
+            @click="emit('toggle', row.id)"
+          >
+            <span
+              class="text-primary-500 dark:text-accent-lift w-4 text-center text-sm"
+              aria-hidden="true"
+              ><template v-if="row.checked">✓</template></span
+            >
+            <span class="flex-1">{{ t(row.labelKey) }}</span>
+          </button>
+        </template>
       </div>
     </Teleport>
   </div>

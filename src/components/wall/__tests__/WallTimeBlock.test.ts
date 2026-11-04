@@ -35,6 +35,7 @@ const identity: ActivityIdentity = {
   sticker: '',
   style: {},
   edgeStyle: { borderLeftColor: '#F15D22' },
+  flatWash: 'rgba(241, 93, 34, 0.13)',
   dashed: false,
 };
 

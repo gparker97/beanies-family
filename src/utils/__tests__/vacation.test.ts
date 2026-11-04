@@ -18,7 +18,9 @@ import {
   buildAirlineOptions,
   resolveTripTarget,
   overrideTripTarget,
+  travelSegmentLabels,
   type SupportedTravelType,
+  type TravelSegmentOccurrence,
 } from '../vacation';
 import { AIRPORTS } from '@/constants/airports';
 import type { FamilyVacation, VacationTravelSegment } from '@/types/models';
@@ -726,5 +728,51 @@ describe('airportLabel / airlineLabel', () => {
     expect(airportLabel(undefined)).toBe('');
     expect(airportLabel('  ')).toBe('');
     expect(airportLabel(airportLabel('SIN'))).toBe('Singapore (SIN)');
+  });
+});
+
+describe('travelSegmentLabels', () => {
+  const t = (key: string) => key as never;
+  const occ = (over: Partial<TravelSegmentOccurrence> = {}): TravelSegmentOccurrence => ({
+    vacationId: 'v1',
+    segmentIndex: 0,
+    segmentId: 'seg-1',
+    transportType: 'flight_outbound',
+    kind: 'departure',
+    status: 'booked',
+    date: '2026-08-10',
+    time: '09:05',
+    title: 'SFO to JFK',
+    tripAssigneeIds: [],
+    ...over,
+  });
+
+  it('labels a departure with the short and full departure keys', () => {
+    const labels = travelSegmentLabels(occ(), t);
+    expect(labels.kindLabelShort).toBe('planner.segmentDepartureShort');
+    expect(labels.ariaLabel).toBe('planner.segmentDeparture: SFO to JFK');
+    expect(labels.emoji).toBe('🛫');
+  });
+
+  it('labels an arrival with the short and full arrival keys', () => {
+    const labels = travelSegmentLabels(occ({ kind: 'arrival' }), t);
+    expect(labels.kindLabelShort).toBe('planner.segmentArrivalShort');
+    expect(labels.ariaLabel).toBe('planner.segmentArrival: SFO to JFK');
+    expect(labels.emoji).toBe('🛬');
+  });
+
+  it('flags only a pending segment', () => {
+    expect(travelSegmentLabels(occ({ status: 'pending' }), t).isPending).toBe(true);
+    expect(travelSegmentLabels(occ({ status: 'booked' }), t).isPending).toBe(false);
+  });
+
+  it('formats the time in 12-hour form, dropping :00', () => {
+    expect(travelSegmentLabels(occ({ time: '09:05' }), t).formattedTime).toBe('9:05am');
+    expect(travelSegmentLabels(occ({ time: '17:30' }), t).formattedTime).toBe('5:30pm');
+    expect(travelSegmentLabels(occ({ time: '12:00' }), t).formattedTime).toBe('12pm');
+  });
+
+  it('gives an empty time for an untimed segment', () => {
+    expect(travelSegmentLabels(occ({ time: undefined }), t).formattedTime).toBe('');
   });
 });

@@ -13,6 +13,9 @@ import {
   getWeekdayOrdinalInMonth,
   nthWeekdayOfMonth,
   monthGridRange,
+  MONTH_GRID_CELLS,
+  isWeekendYmd,
+  addDaysYmd,
   weekStartOffset,
   startOfWeekYmd,
   defaultDueBeforeEvent,
@@ -411,36 +414,49 @@ describe('relativeDayLabel', () => {
   });
 });
 
-describe('monthGridRange (regression vs CalendarGrid inline math)', () => {
-  // The original inline formula that lived in CalendarGrid.vue — the extraction
-  // must reproduce it exactly so the visible grid span never drifts.
-  function legacy(referenceDate: Date, weekStartDay: number) {
-    const year = referenceDate.getFullYear();
-    const month = referenceDate.getMonth();
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-    const startOffset = (firstDay.getDay() - weekStartDay + 7) % 7;
-    const totalGridCells = Math.ceil((startOffset + lastDay.getDate()) / 7) * 7;
-    return {
-      startYmd: toDateInputValue(new Date(year, month, 1 - startOffset)),
-      endYmd: toDateInputValue(new Date(year, month, 1 - startOffset + totalGridCells - 1)),
-    };
-  }
+describe('monthGridRange (always six rows, #141)', () => {
+  // Fixed expectations, written out: a four- or five-row month is padded to six
+  // rows with the neighbouring months' days (an intentional change from the old
+  // "only the rows the month needs" grid).
+  it('Nov 2026, Monday start, spans 26 Oct to 6 Dec', () => {
+    expect(monthGridRange(new Date(2026, 10, 15), 1)).toEqual({
+      startYmd: '2026-10-26',
+      endYmd: '2026-12-06',
+    });
+  });
 
-  const cases = [
-    new Date(2026, 5, 15), // June 2026
-    new Date(2026, 7, 1), // Aug 2026 (starts Sat → 6-week grid)
-    new Date(2026, 1, 10), // Feb 2026
-    new Date(2027, 0, 31), // Jan 2027
-  ];
+  it('Oct 2026, Monday start, spans 28 Sep to 8 Nov', () => {
+    expect(monthGridRange(new Date(2026, 9, 1), 1)).toEqual({
+      startYmd: '2026-09-28',
+      endYmd: '2026-11-08',
+    });
+  });
 
-  for (const ref of cases) {
-    for (const weekStart of [0, 1]) {
-      it(`${ref.toDateString()} weekStart=${weekStart} matches the legacy grid bounds`, () => {
-        expect(monthGridRange(ref, weekStart)).toEqual(legacy(ref, weekStart));
-      });
+  it('Feb 2026, Sunday start (a four-row month), spans 1 Feb to 14 Mar', () => {
+    expect(monthGridRange(new Date(2026, 1, 10), 0)).toEqual({
+      startYmd: '2026-02-01',
+      endYmd: '2026-03-14',
+    });
+  });
+
+  it('always spans MONTH_GRID_CELLS days, for every month and week start', () => {
+    for (let m = 0; m < 24; m++) {
+      for (let weekStart = 0; weekStart < 7; weekStart++) {
+        const { startYmd, endYmd } = monthGridRange(new Date(2026, m, 1), weekStart);
+        expect(addDaysYmd(startYmd, MONTH_GRID_CELLS - 1)).toBe(endYmd);
+        expect(startYmd <= toDateInputValue(new Date(2026, m, 1))).toBe(true);
+      }
     }
-  }
+  });
+});
+
+describe('isWeekendYmd', () => {
+  it('is true on Saturday and Sunday only', () => {
+    expect(isWeekendYmd('2026-11-07')).toBe(true); // Sat
+    expect(isWeekendYmd('2026-11-08')).toBe(true); // Sun
+    expect(isWeekendYmd('2026-11-09')).toBe(false); // Mon
+    expect(isWeekendYmd('2026-11-06')).toBe(false); // Fri
+  });
 });
 
 describe('weekStartOffset', () => {

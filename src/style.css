@@ -142,6 +142,11 @@
   --holiday-clay: #b5654a;
   --holiday-clay-tint: rgb(181 101 74 / 7%);
 
+  /* Trip bars on the month grid (#141, `TripChip`): text and start edge over
+     `--tint-silk-30`. Deep Slate in light (the mockup's #1f5f8a is not a CIG
+     colour); the Sky Silk lift in dark (7.99 on raised). */
+  --trip-ink: #2c3e50;
+
   /* Family birthdays (derived, read-only — see `utils/birthdays.ts`). The same
      family as the `birthday` activity category so a derived birthday and a
      birthday PARTY someone scheduled read as the same kind of day, but DEEPENED
@@ -213,6 +218,7 @@
   --vacation-gold-tint: rgb(255 217 61 / 16%);
   --holiday-clay: #c98c75;
   --holiday-clay-tint: rgb(201 140 117 / 12%);
+  --trip-ink: var(--color-silk-lift);
 
   /* 6.28:1 on surface-raised, 7.25:1 on surface-ground. */
   --birthday-orange: #ff8a5b;

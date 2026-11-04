@@ -3,9 +3,11 @@ import type { DayExtra } from '@/utils/calendarDay';
 import { setActivePinia, createPinia } from 'pinia';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import MonthDayCard from '../MonthDayCard.vue';
-import type { MonthDayCellData } from '../MonthDayCard.vue';
+import MonthDayContents from '../MonthDayContents.vue';
+import { STREAM_DAY_CAPS } from '@/constants/calendarCaps';
+import type { MonthDayCellData } from '@/utils/monthCells';
 import type { FamilyActivity, FamilyMember, HolidayOccurrence } from '@/types/models';
-import { CALENDAR_DAY_TINT, CALENDAR_TODAY } from '@/constants/tileStyles';
+import { CALENDAR_TODAY } from '@/constants/tileStyles';
 
 vi.mock('@/composables/useTranslation', () => ({
   useTranslation: () => ({
@@ -120,10 +122,9 @@ afterEach(() => {
   document.body.innerHTML = '';
 });
 
-const baseProps = {
-  allDayCap: 2,
-  timedCap: 4,
-};
+// The caps are fixed now (`STREAM_DAY_CAPS`, read by the card itself), so there are no
+// per-mount props; kept as an empty spread so every mount below reads the same.
+const baseProps = {};
 
 describe('MonthDayCard structure', () => {
   it('renders the day number', () => {
@@ -149,13 +150,6 @@ describe('MonthDayCard structure', () => {
     expect(wrapper.emitted('select-date')).toEqual([['2026-05-19']]);
   });
 
-  it('marks today via gradient class', () => {
-    const wrapper = mount(MonthDayCard, {
-      props: { cell: makeCell({ isToday: true }), ...baseProps },
-    });
-    expect(wrapper.html()).toContain('from-primary-500');
-  });
-
   it('marks today with aria-current, the outline and the Today word, even with timed items', () => {
     const wrapper = mount(MonthDayCard, {
       props: {
@@ -177,16 +171,6 @@ describe('MonthDayCard structure', () => {
       props: { cell: makeCell({ isToday: true }), ...baseProps },
     });
     expect(wrapper.get('button').classes()).toContain(CALENDAR_TODAY.wash);
-  });
-
-  it('lets a vacation tint win the background but keeps the today outline', () => {
-    const wrapper = mount(MonthDayCard, {
-      props: { cell: makeCell({ isToday: true }), ...baseProps, tint: 'vacation' },
-    });
-    const classes = wrapper.get('button').classes();
-    expect(classes).toContain(CALENDAR_DAY_TINT.vacation);
-    expect(classes).not.toContain(CALENDAR_TODAY.wash);
-    for (const cls of CALENDAR_TODAY.outline.split(' ')) expect(classes).toContain(cls);
   });
 
   it('has no aria-current and no Today word on other days', () => {
@@ -261,9 +245,24 @@ describe('MonthDayCard all-day lane', () => {
 
   it('shows overflow indicator when holidays + all-day items exceed cap', () => {
     const items = [
-      { activity: makeActivity({ id: 'ad-1', isAllDay: true }), isStart: true, isEnd: true },
-      { activity: makeActivity({ id: 'ad-2', isAllDay: true }), isStart: true, isEnd: true },
-      { activity: makeActivity({ id: 'ad-3', isAllDay: true }), isStart: true, isEnd: true },
+      {
+        activity: makeActivity({ id: 'ad-1', isAllDay: true }),
+        spanKey: 'ad-1:2026-05-19',
+        isFirstDay: true,
+        isLastDay: true,
+      },
+      {
+        activity: makeActivity({ id: 'ad-2', isAllDay: true }),
+        spanKey: 'ad-2:2026-05-19',
+        isFirstDay: true,
+        isLastDay: true,
+      },
+      {
+        activity: makeActivity({ id: 'ad-3', isAllDay: true }),
+        spanKey: 'ad-3:2026-05-19',
+        isFirstDay: true,
+        isLastDay: true,
+      },
     ];
     const wrapper = mount(MonthDayCard, {
       props: { cell: makeCell({ allDayItems: items }), ...baseProps },
@@ -273,61 +272,93 @@ describe('MonthDayCard all-day lane', () => {
   });
 });
 
-/**
- * The all-day lane's budget, shared three ways.
- *
- * `allDayCap` is 2 in production, so this arithmetic decides whether a family
- * sees their own plans on a busy day. A straight priority order let a birthday
- * plus a holiday eat the whole budget and push every real event behind "+N".
- */
-describe("the all-day cap, split between reference days and the family's own events", () => {
-  const allDay = (id: string, title: string) => ({
-    activity: makeActivity({ id, title, isAllDay: true }),
-    isStart: true,
-    isEnd: true,
+// The reference-share cap arithmetic (a birthday plus a holiday never strand the family's own
+// event) now lives in `capDayContents` and is covered by `monthDayItems.test.ts`.
+
+describe('MonthDayCard as the stream card shell (#141)', () => {
+  const allDayItem = (id: string) => ({
+    activity: makeActivity({ id, title: id, isAllDay: true }),
+    spanKey: `${id}:2026-05-19`,
+    isFirstDay: true,
+    isLastDay: true,
   });
 
-  it('leaves the family an event when the day carries a birthday AND a holiday', () => {
+  it('renders MonthDayContents with the stream caps', () => {
+    const wrapper = mount(MonthDayCard, { props: { cell: makeCell() } });
+    expect(wrapper.findComponent(MonthDayContents).props('caps')).toEqual(STREAM_DAY_CAPS);
+  });
+
+  it('applies the stream caps: two bars and a +N, four timed and a "+N more"', () => {
     const wrapper = mount(MonthDayCard, {
       props: {
         cell: makeCell({
-          extras: [birthdayExtra('m1', 'Joey'), holidayExtra()],
-          allDayItems: [allDay('ad-1', 'Bin night')],
+          allDayItems: [allDayItem('ad-1'), allDayItem('ad-2'), allDayItem('ad-3')],
+          timedOccurrences: Array.from({ length: 6 }, (_, i) => ({
+            activity: makeActivity({ id: `t-${i}`, title: `T${i}` }),
+            date: '2026-05-19',
+          })),
         }),
-        ...baseProps,
       },
     });
-    // One reference day (the birthday leads), and the family's own event keeps
-    // the other slot — it answers "what are we doing today".
-    expect(wrapper.findAll('[data-testid="birthday-chip"]')).toHaveLength(1);
-    expect(wrapper.findAll('[data-testid="holiday-chip"]')).toHaveLength(0);
-    expect(wrapper.text()).toContain('Bin night');
+    expect(wrapper.findAll('[data-testid="all-day-activity-chip"]')).toHaveLength(2);
+    expect(wrapper.findAll('[data-testid="month-chip"]')).toHaveLength(4);
+    expect(wrapper.get('[data-testid="day-contents-more"]').text()).toContain('+2');
   });
 
-  it('does not strand a slot when the day has no events of its own', () => {
+  it('an empty today renders no contents at all (no "Nothing planned")', () => {
+    const wrapper = mount(MonthDayCard, { props: { cell: makeCell({ isToday: true }) } });
+    expect(wrapper.findComponent(MonthDayContents).exists()).toBe(false);
+    expect(wrapper.text()).not.toContain('planner.nothingPlanned');
+    expect(wrapper.text()).toContain('planner.today');
+  });
+
+  it('an empty other day says "Nothing planned"', () => {
+    const wrapper = mount(MonthDayCard, { props: { cell: makeCell() } });
+    expect(wrapper.text()).toContain('planner.nothingPlanned');
+  });
+
+  it('a today with items still renders its contents', () => {
     const wrapper = mount(MonthDayCard, {
       props: {
         cell: makeCell({
-          extras: [birthdayExtra('m1', 'Joey'), holidayExtra()],
-          allDayItems: [],
+          isToday: true,
+          timedOccurrences: [{ activity: makeActivity(), date: '2026-05-19' }],
         }),
-        ...baseProps,
       },
     });
-    // Nothing competing, so BOTH reference days show rather than one and a gap.
-    expect(wrapper.findAll('[data-testid="birthday-chip"]')).toHaveLength(1);
-    expect(wrapper.text()).toContain('Vesak Day');
+    expect(wrapper.findComponent(MonthDayContents).exists()).toBe(true);
   });
 
-  it('behaves exactly as before on a day with no reference days', () => {
+  it('forwards birthday-click from its contents', async () => {
+    const extra = birthdayExtra('m1', 'Joey');
+    const wrapper = mount(MonthDayCard, { props: { cell: makeCell({ extras: [extra] }) } });
+    await wrapper.get('[data-testid="birthday-chip"]').trigger('click');
+    expect(wrapper.emitted('birthday-click')).toEqual([[extra.birthday]]);
+    expect(wrapper.emitted('select-date')).toBeFalsy();
+  });
+
+  it('the contents "+N more" opens the day', async () => {
     const wrapper = mount(MonthDayCard, {
       props: {
         cell: makeCell({
-          allDayItems: [allDay('a1', 'One'), allDay('a2', 'Two'), allDay('a3', 'Three')],
+          timedOccurrences: Array.from({ length: 6 }, (_, i) => ({
+            activity: makeActivity({ id: `t-${i}`, title: `T${i}` }),
+            date: '2026-05-19',
+          })),
         }),
-        ...baseProps,
       },
     });
-    expect(wrapper.text()).toContain('+1');
+    await wrapper.get('[data-testid="day-contents-more"]').trigger('click');
+    expect(wrapper.emitted('select-date')).toEqual([['2026-05-19']]);
+  });
+
+  it('has no desktop markup (no md: classes on the root)', () => {
+    const wrapper = mount(MonthDayCard, { props: { cell: makeCell() } });
+    expect(
+      wrapper
+        .get('button')
+        .classes()
+        .some((c) => c.startsWith('md:'))
+    ).toBe(false);
   });
 });

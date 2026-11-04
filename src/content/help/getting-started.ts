@@ -748,7 +748,7 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
         type: 'list',
         content: '',
         items: [
-          'On the <strong>month view</strong>: the holiday\u2019s day cell gets a soft clay-coloured background and a little italic label \u2014 e.g. \u201cMemorial Day (US)\u201d, \u201cVesak Day (SG)\u201d.',
+          'On the <strong>month view</strong>: the holiday\u2019s name sits beside the day number on a soft clay-tinted day, e.g. \u201cMemorial Day (US)\u201d, \u201cVesak Day (SG)\u201d.',
           'On the <strong>week view</strong>: the day\u2019s header is tinted, with the holiday name in the all-day row.',
           'On the <strong>day view</strong> and the day agenda: a small banner at the top \u2014 \u201cVesak Day (SG) \u2014 public holiday\u201d.',
           'Upcoming holidays in the next 30 days also show in the planner\u2019s sidebar.',

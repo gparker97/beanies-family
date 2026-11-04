@@ -1,3 +1,5 @@
+import type { FamilyMember } from '@/types/models';
+
 /**
  * Normalize assignee fields from either the new array field or legacy single field.
  * This is the single source of truth — all consumers use this instead of reading assigneeId directly.
@@ -121,6 +123,23 @@ export function toAssigneePayload(ids: string[]): {
     assigneeIds: ids,
     assigneeId: ids[0] ?? undefined,
   };
+}
+
+/**
+ * Resolve member ids to members, in `ids` order, dropping any id that no longer
+ * resolves (a removed member, a stale CRDT entry). Pure: the caller passes the
+ * roster (`familyStore.members`). Used for trip travellers (`TripChip`, the phone
+ * month grid's Faces density).
+ */
+export function membersByIds(
+  roster: readonly FamilyMember[],
+  ids: readonly string[]
+): FamilyMember[] {
+  const byId = new Map(roster.map((m) => [m.id, m]));
+  return ids.flatMap((id) => {
+    const member = byId.get(id);
+    return member ? [member] : [];
+  });
 }
 
 /**

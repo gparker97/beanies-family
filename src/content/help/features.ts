@@ -1635,8 +1635,8 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
     excerpt:
       'Schedule lessons, appointments, and recurring activities for your family with calendar views and smart recurrence.',
     icon: '\u{1F4C5}',
-    readTime: 4,
-    updatedDate: '2026-11-03',
+    readTime: 5,
+    updatedDate: '2026-11-04',
     sections: [
       {
         type: 'heading',
@@ -1784,10 +1784,65 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         type: 'list',
         content: '',
         items: [
-          '<strong>Month</strong> \u2014 A full-month grid. Each day shows colour-coded chips so you can see who\u2019s got what on at a glance. Tap a day to open it in Day view. On phones the month becomes a tidy day-by-day agenda, and quiet days fold down to a thin line so the busy ones stand out. Keep scrolling past the end of a month and the next one carries straight on, with its name marking where it starts \u2014 the month shown at the top follows along as you go. Swiping still works too \\u2014 swipe either way and you arrive at the start of that month, with its name in view. On a computer, keep scrolling at the edge of the calendar and it turns to the next month, one month per scroll.',
+          '<strong>Month</strong>: the whole month on one screen, with no scrolling. See <strong>Month at a glance</strong> below. On a computer, keep scrolling at the edge of the calendar and it turns to the next month, one month per scroll. Swipe on a phone and you arrive at the start of the next or previous month.',
           '<strong>Week</strong> \u2014 A timeline of the week. On phones a two-week strip across the top lets you hop between days at a glance; it tucks down to a single week as you scroll into the timeline so your events get more room.',
           '<strong>Day</strong> \u2014 A single day in detail, with a column for each family member so you can see who\u2019s doing what. The <strong>Agenda</strong> button opens a tidy, time-sorted list for that day.',
         ],
+      },
+      {
+        type: 'heading',
+        content: 'Month at a glance',
+        level: 2,
+        id: 'month-at-a-glance',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'The Month view shows the whole month on one screen. Days from the month before and after fade in at the edges of the grid, so every week is a full row of seven. Open the Month view and everything fits: no scrolling to find the last week.',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>Trips</strong> appear as one named bar across the week, with the faces of the family members who are travelling.',
+          '<strong>Today</strong> is the day number filled in with orange.',
+          '<strong>Birthdays</strong> show a small cake beside the day number. Tap it to see whose birthday it is.',
+          '<strong>Holidays</strong> tint the day a soft clay. On a computer the name sits beside the day number; on a phone, tap the day to see it.',
+          '<strong>+N more</strong> opens that day in place, so you can see everything on it without leaving the month.',
+        ],
+      },
+      {
+        type: 'heading',
+        content: 'Density on a computer',
+        level: 3,
+        id: 'month-density',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Above the grid, the <strong>Density</strong> menu changes how much each day shows. <strong>Compact</strong> fits the most days and activities on screen. <strong>Comfortable</strong> gives each activity a little more room. Two switches sit in the same menu: <strong>Hide Times</strong> (Compact only) drops the start times so titles get more space, and <strong>Hide Faces on Solo Chips</strong> hides the face on an activity that belongs to just one person.',
+      },
+      {
+        type: 'heading',
+        content: 'On a phone',
+        level: 3,
+        id: 'month-on-phone',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          'Tap the <strong>M</strong> button a second time to switch between <strong>Grid</strong> and <strong>List</strong>. The small picture under the M shows which one you are on. Grid is the whole month at a glance; List is the day-by-day agenda.',
+          'In Grid, choose how much each day shows: <strong>Faces</strong> (who is busy), <strong>Bars</strong> (coloured bars for each activity) or <strong>Titles</strong> (the activity names). Pinch two fingers together or spread them apart to change it, or tap the word above the grid.',
+          'Tap a day to see its list right under that week. Tap the same day again to open it in Day view.',
+        ],
+      },
+      {
+        type: 'infoBox',
+        content:
+          'Density, the Hide Times and Hide Faces switches, Grid or List, and Faces, Bars or Titles stay on the device you set them on. Your phone and your laptop can each look the way you like.',
+        title: 'Set per device',
+        icon: '\u{1F4F1}',
       },
       {
         type: 'heading',

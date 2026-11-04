@@ -10,8 +10,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { defineComponent, h, ref, type Ref } from 'vue';
 import { mount, type VueWrapper } from '@vue/test-utils';
-import { useHorizontalSwipe, type UseHorizontalSwipeOptions } from '../useHorizontalSwipe';
-import { pointer, swipe } from '@/test/pointerSwipe';
+import {
+  useHorizontalSwipe,
+  pinchDirection,
+  type UseHorizontalSwipeOptions,
+} from '../useHorizontalSwipe';
+import { pointer, swipe, pinch } from '@/test/pointerSwipe';
 
 interface SwipeHarness {
   wrapper: VueWrapper;
@@ -177,6 +181,235 @@ describe('useHorizontalSwipe', () => {
       enabled.value = true;
       swipe(h.el, { x: 200, y: 100 }, { x: 100, y: 100 });
       expect(h.onSwipeLeft).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('multi-touch cancel', () => {
+    it('a second pointer cancels the swipe and reports onProgress(0)', () => {
+      const h = makeHarness();
+      pointer('pointerdown', h.el, { x: 200, y: 100, pointerId: 1 });
+      pointer('pointermove', h.el, { x: 150, y: 100, pointerId: 1 });
+      h.onProgress.mockClear();
+      pointer('pointerdown', h.el, { x: 250, y: 100, pointerId: 2 });
+      expect(h.onProgress).toHaveBeenCalledWith(0);
+      pointer('pointermove', h.el, { x: 50, y: 100, pointerId: 1 });
+      pointer('pointerup', h.el, { x: 50, y: 100, pointerId: 1 });
+      pointer('pointerup', h.el, { x: 250, y: 100, pointerId: 2 });
+      expect(h.onSwipeLeft).not.toHaveBeenCalled();
+      expect(h.onSwipeRight).not.toHaveBeenCalled();
+    });
+
+    it('does not swipe again until every pointer has lifted', () => {
+      const h = makeHarness();
+      pointer('pointerdown', h.el, { x: 200, y: 100, pointerId: 1 });
+      pointer('pointerdown', h.el, { x: 250, y: 100, pointerId: 2 });
+      pointer('pointerup', h.el, { x: 200, y: 100, pointerId: 1 });
+      // Finger 2 still down: moving it must not start a swipe.
+      pointer('pointermove', h.el, { x: 150, y: 100, pointerId: 2 });
+      pointer('pointermove', h.el, { x: 50, y: 100, pointerId: 2 });
+      pointer('pointerup', h.el, { x: 50, y: 100, pointerId: 2 });
+      expect(h.onSwipeLeft).not.toHaveBeenCalled();
+      // Everything lifted: a fresh single-pointer swipe works.
+      swipe(h.el, { x: 200, y: 100 }, { x: 100, y: 100 });
+      expect(h.onSwipeLeft).toHaveBeenCalledTimes(1);
+    });
+
+    it('a single-pointer swipe still commits', () => {
+      const h = makeHarness();
+      swipe(h.el, { x: 100, y: 100 }, { x: 220, y: 100 });
+      expect(h.onSwipeRight).toHaveBeenCalledTimes(1);
+    });
+
+    it('a second finger inside the edge-ignore zone still cancels', () => {
+      const h = makeHarness();
+      pointer('pointerdown', h.el, { x: 200, y: 100, pointerId: 1 });
+      pointer('pointermove', h.el, { x: 150, y: 100, pointerId: 1 });
+      h.onProgress.mockClear();
+      pointer('pointerdown', h.el, { x: 5, y: 100, pointerId: 2 });
+      expect(h.onProgress).toHaveBeenCalledWith(0);
+      pointer('pointermove', h.el, { x: 50, y: 100, pointerId: 1 });
+      pointer('pointerup', h.el, { x: 50, y: 100, pointerId: 1 });
+      expect(h.onSwipeLeft).not.toHaveBeenCalled();
+    });
+
+    it('a new primary pointerdown after a lost pointerup swipes normally', () => {
+      const h = makeHarness();
+      // Finger 1 goes down and its pointerup is lost.
+      pointer('pointerdown', h.el, { x: 200, y: 100, pointerId: 1 });
+      // A new touch sequence: a primary pointer clears the stale entry.
+      swipe(h.el, { x: 200, y: 100 }, { x: 100, y: 100 });
+      expect(h.onSwipeLeft).toHaveBeenCalledTimes(1);
+    });
+
+    it('releases pointer capture only after a horizontal lock', () => {
+      const release = vi.fn();
+      Element.prototype.releasePointerCapture = release;
+      const h = makeHarness();
+      // Vertical gesture, then a second finger: nothing was captured.
+      pointer('pointerdown', h.el, { x: 100, y: 100, pointerId: 1 });
+      pointer('pointermove', h.el, { x: 100, y: 200, pointerId: 1 });
+      pointer('pointerdown', h.el, { x: 150, y: 100, pointerId: 2 });
+      expect(release).not.toHaveBeenCalled();
+      pointer('pointerup', h.el, { x: 100, y: 200, pointerId: 1 });
+      pointer('pointerup', h.el, { x: 150, y: 100, pointerId: 2 });
+      // Horizontal lock, then a second finger: capture is released.
+      pointer('pointerdown', h.el, { x: 100, y: 100, pointerId: 1 });
+      pointer('pointermove', h.el, { x: 160, y: 100, pointerId: 1 });
+      pointer('pointerdown', h.el, { x: 150, y: 100, pointerId: 2 });
+      expect(release).toHaveBeenCalledWith(1);
+    });
+
+    it('capture failures warn instead of throwing', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      Element.prototype.setPointerCapture = vi.fn(() => {
+        throw new Error('gone');
+      });
+      Element.prototype.releasePointerCapture = vi.fn(() => {
+        throw new Error('gone');
+      });
+      const h = makeHarness();
+      swipe(h.el, { x: 200, y: 100 }, { x: 100, y: 100 });
+      expect(h.onSwipeLeft).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('[useHorizontalSwipe] pointer capture failed'),
+        expect.any(Error)
+      );
+      warn.mockRestore();
+    });
+  });
+
+  describe('pinchDirection', () => {
+    it('spreads at or above the ratio', () => {
+      expect(pinchDirection(100, 125, 1.25)).toBe('spread');
+      expect(pinchDirection(100, 200, 1.25)).toBe('spread');
+    });
+
+    it('pinches at or below the inverse ratio', () => {
+      expect(pinchDirection(100, 80, 1.25)).toBe('pinch');
+      expect(pinchDirection(100, 20, 1.25)).toBe('pinch');
+    });
+
+    it('is null between the thresholds', () => {
+      expect(pinchDirection(100, 110, 1.25)).toBeNull();
+      expect(pinchDirection(100, 90, 1.25)).toBeNull();
+      expect(pinchDirection(100, 100, 1.25)).toBeNull();
+    });
+
+    it('is null when the starting distance is not positive', () => {
+      expect(pinchDirection(0, 100, 1.25)).toBeNull();
+      expect(pinchDirection(-5, 100, 1.25)).toBeNull();
+    });
+  });
+
+  describe('onPinch', () => {
+    const A0 = { x: 100, y: 100 };
+    const B0 = { x: 200, y: 100 };
+
+    it('fires spread once per gesture', () => {
+      const onPinch = vi.fn();
+      const h = makeHarness({ onPinch });
+      pointer('pointerdown', h.el, { ...A0, pointerId: 1 });
+      pointer('pointerdown', h.el, { ...B0, pointerId: 2 });
+      pointer('pointermove', h.el, { x: 80, y: 100, pointerId: 1 });
+      pointer('pointermove', h.el, { x: 230, y: 100, pointerId: 2 });
+      pointer('pointermove', h.el, { x: 40, y: 100, pointerId: 1 });
+      pointer('pointermove', h.el, { x: 300, y: 100, pointerId: 2 });
+      expect(onPinch).toHaveBeenCalledTimes(1);
+      expect(onPinch).toHaveBeenCalledWith('spread');
+    });
+
+    it('a third finger lifting re-baselines the pair, so no bogus pinch fires', () => {
+      const onPinch = vi.fn();
+      const h = makeHarness({ onPinch });
+      pointer('pointerdown', h.el, { ...A0, pointerId: 1 });
+      pointer('pointerdown', h.el, { ...B0, pointerId: 2 });
+      pointer('pointerdown', h.el, { x: 150, y: 300, pointerId: 3 });
+      pointer('pointerup', h.el, { x: 150, y: 300, pointerId: 3 });
+      // Same distance as they started: nothing to report.
+      pointer('pointermove', h.el, { ...A0, pointerId: 1 });
+      pointer('pointermove', h.el, { ...B0, pointerId: 2 });
+      expect(onPinch).not.toHaveBeenCalled();
+      // Now spread past the ratio.
+      pointer('pointermove', h.el, { x: 40, y: 100, pointerId: 1 });
+      pointer('pointermove', h.el, { x: 300, y: 100, pointerId: 2 });
+      expect(onPinch).toHaveBeenCalledTimes(1);
+      expect(onPinch).toHaveBeenCalledWith('spread');
+    });
+
+    it('fires pinch when the fingers close in', () => {
+      const onPinch = vi.fn();
+      const h = makeHarness({ onPinch });
+      pinch(
+        h.el,
+        [A0, B0],
+        [
+          { x: 140, y: 100 },
+          { x: 160, y: 100 },
+        ]
+      );
+      expect(onPinch).toHaveBeenCalledTimes(1);
+      expect(onPinch).toHaveBeenCalledWith('pinch');
+    });
+
+    it('fires again for the next gesture', () => {
+      const onPinch = vi.fn();
+      const h = makeHarness({ onPinch });
+      pinch(
+        h.el,
+        [A0, B0],
+        [
+          { x: 140, y: 100 },
+          { x: 160, y: 100 },
+        ]
+      );
+      pinch(
+        h.el,
+        [A0, B0],
+        [
+          { x: 40, y: 100 },
+          { x: 260, y: 100 },
+        ]
+      );
+      expect(onPinch.mock.calls.map((c) => c[0])).toEqual(['pinch', 'spread']);
+    });
+
+    it('fires while enabled is false', () => {
+      const onPinch = vi.fn();
+      const h = makeHarness({ onPinch, enabled: ref(false) });
+      pinch(
+        h.el,
+        [A0, B0],
+        [
+          { x: 40, y: 100 },
+          { x: 260, y: 100 },
+        ]
+      );
+      expect(onPinch).toHaveBeenCalledWith('spread');
+    });
+
+    it('does nothing for one pointer', () => {
+      const onPinch = vi.fn();
+      const h = makeHarness({ onPinch });
+      pointer('pointerdown', h.el, { ...A0, pointerId: 1 });
+      pointer('pointermove', h.el, { x: 300, y: 100, pointerId: 1 });
+      pointer('pointerup', h.el, { x: 300, y: 100, pointerId: 1 });
+      expect(onPinch).not.toHaveBeenCalled();
+    });
+
+    it('does nothing without onPinch', () => {
+      const h = makeHarness();
+      expect(() =>
+        pinch(
+          h.el,
+          [A0, B0],
+          [
+            { x: 40, y: 100 },
+            { x: 260, y: 100 },
+          ]
+        )
+      ).not.toThrow();
+      expect(h.onSwipeLeft).not.toHaveBeenCalled();
+      expect(h.onSwipeRight).not.toHaveBeenCalled();
     });
   });
 });

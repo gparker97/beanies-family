@@ -51,7 +51,7 @@ interface Props {
   /** Member's profile color for the ring border + pastel background */
   color?: string;
   /** Size preset */
-  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl';
+  size?: '2xs' | 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl';
   /** Accessible label */
   ariaLabel?: string;
   /**
@@ -89,6 +89,8 @@ const emit = defineEmits<{
 // byte-identical on purpose: 24 call-site files depend on them and this change is meant
 // to be invisible to every one of them.
 const SIZE_CLASSES: Record<string, string> = {
+  // `2xs` (14px) is the month grid's chip face (#141): an ornament inside a 20px chip.
+  '2xs': 'h-3.5 w-3.5',
   xs: 'h-6 w-6',
   sm: 'h-8 w-8',
   md: 'h-10 w-10',
@@ -103,6 +105,13 @@ const SIZE_CLASSES: Record<string, string> = {
 
 /** Initials scale with the circle; all rem-based, so Large reading mode carries them. */
 const TEXT_CLASSES: Record<string, string> = {
+  // ⚠️ The one sub-12px size, and a documented ornament exception to the text-xs floor:
+  // a 14px face cannot hold a 12px initial. The face is `aria-hidden` wherever it is
+  // used (`ActivityOwnerStack` hides every face), and the owner is named by the parent's
+  // accessible name, so nothing a reader needs is carried by this glyph. Rem-based, so
+  // Large reading mode still scales it (the `DocumentTile` / `AssigneePickerButton`
+  // precedent for rem ornaments).
+  '2xs': 'text-[0.5rem]',
   xs: 'text-xs',
   sm: 'text-xs',
   md: 'text-sm',

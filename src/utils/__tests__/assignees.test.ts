@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeAssignees, toAssigneePayload } from '../assignees';
+import { membersByIds, normalizeAssignees, toAssigneePayload } from '../assignees';
+import { member } from '@/test/monthCellFixtures';
 
 describe('normalizeAssignees', () => {
   it('returns assigneeIds when present and non-empty', () => {
@@ -47,5 +48,22 @@ describe('toAssigneePayload', () => {
       assigneeIds: [],
       assigneeId: undefined,
     });
+  });
+});
+
+describe('membersByIds', () => {
+  const roster = [member('a'), member('b'), member('c')];
+
+  it('returns members in the order of the ids, not the roster', () => {
+    expect(membersByIds(roster, ['c', 'a']).map((m) => m.id)).toEqual(['c', 'a']);
+  });
+
+  it('drops unknown ids', () => {
+    expect(membersByIds(roster, ['a', 'ghost', 'b']).map((m) => m.id)).toEqual(['a', 'b']);
+  });
+
+  it('returns nothing for no ids or an empty roster', () => {
+    expect(membersByIds(roster, [])).toEqual([]);
+    expect(membersByIds([], ['a'])).toEqual([]);
   });
 });

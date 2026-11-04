@@ -13,6 +13,7 @@ import {
   detectNightFlight,
   daysBetween,
   addDaysYmd,
+  formatTime12,
 } from '@/utils/date';
 import { AIRLINES, type AirlineInfo } from '@/constants/airlines';
 import { AIRPORTS, type AirportInfo } from '@/constants/airports';
@@ -1652,6 +1653,41 @@ export function transportEmoji(type: SupportedTravelType, kind?: 'departure' | '
     return kind === 'departure' ? '🛫' : '🛬';
   }
   return TRANSPORT_EMOJI[type] ?? '';
+}
+
+/** What a travel-segment chip says, whichever chip draws it. */
+export interface TravelSegmentLabels {
+  emoji: string;
+  isPending: boolean;
+  /** 12-hour time, or '' for an untimed segment. */
+  formattedTime: string;
+  /** "Dep" / "Arr": a title prefix, so a 9am departure and a 5:30pm arrival of the
+   *  same flight don't read as two separate flights. */
+  kindLabelShort: string;
+  /** The full kind label plus the title, for the tooltip and screen readers. */
+  ariaLabel: string;
+}
+
+/**
+ * The labels for one travel-segment occurrence. Pure, and shared by
+ * `TravelSegmentChip` (week, day and timeline views) and the month grid's
+ * `MonthSegmentChip`, so the two chips cannot describe one flight differently.
+ */
+export function travelSegmentLabels(
+  occurrence: TravelSegmentOccurrence,
+  t: Translate
+): TravelSegmentLabels {
+  const isDeparture = occurrence.kind === 'departure';
+  const fullKindLabel = isDeparture ? t('planner.segmentDeparture') : t('planner.segmentArrival');
+  return {
+    emoji: transportEmoji(occurrence.transportType, occurrence.kind),
+    isPending: occurrence.status === 'pending',
+    formattedTime: occurrence.time ? formatTime12(occurrence.time) : '',
+    kindLabelShort: isDeparture
+      ? t('planner.segmentDepartureShort')
+      : t('planner.segmentArrivalShort'),
+    ariaLabel: `${fullKindLabel}: ${occurrence.title}`,
+  };
 }
 
 /** Bucket items by whether they have a `time`. Used by week/day/DayTimeline rendering. */

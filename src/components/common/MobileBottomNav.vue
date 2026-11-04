@@ -24,6 +24,10 @@
  * Navigation goes through `navigateTo` (`usePlannerToday`), a `router.push`
  * that puts the planner on today when that is where it lands. No history-state
  * markers, no async coordination — closeStack is a pure UI state change.
+ *
+ * It publishes its rendered height (safe-area padding included) as `--mobile-nav-h`
+ * through `usePublishedHeight`, so the phone month grid (#141) can fit six weeks above
+ * it. The grid reads the value reactively, so mount order does not matter.
  */
 import { computed, nextTick, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
@@ -41,12 +45,16 @@ import {
   type StackableCategoryId,
 } from '@/constants/navigation';
 import { navigateTo } from '@/composables/usePlannerToday';
+import { usePublishedHeight } from '@/composables/usePublishedHeight';
 
 const route = useRoute();
 const router = useRouter();
 const { t } = useTranslation();
 const { canViewFinances } = usePermissions();
 const { categoryAttention } = useNavBadges();
+
+const rootEl = ref<HTMLElement | null>(null);
+usePublishedHeight(rootEl, '--mobile-nav-h', 'mobile-bottom-nav');
 
 const openCategoryId = ref<StackableCategoryId | null>(null);
 const tabRefs = ref<Record<MobileCategoryId, HTMLButtonElement | null>>({
@@ -170,6 +178,7 @@ watch(
 
 <template>
   <nav
+    ref="rootEl"
     class="dark:border-line dark:bg-surface-ground fixed right-0 bottom-0 left-0 z-40 flex items-stretch border-t border-gray-200 bg-white"
     style="padding-bottom: env(safe-area-inset-bottom)"
     :aria-label="t('mobile.navigation')"

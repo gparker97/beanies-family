@@ -21,8 +21,27 @@ import { onMounted, onScopeDispose, watch, type Ref } from 'vue';
  * 3. **Threshold** — only commits if the final |dx| is at least `threshold`
  *    pixels. Smaller motions are treated as accidental.
  *
+ * 4. **Multi-touch cancels**: the moment a second touch or pen pointer is
+ *    down, any swipe in progress is cancelled (`onProgress(0)`), and no swipe
+ *    starts again until every finger has lifted. A pinch can never swipe. This
+ *    applies to EVERY consumer, including `DealPileStage`, where a second finger
+ *    used to silently restart the gesture on the new pointer.
+ *
  * Pointer capture is set after axis-lock so the gesture doesn't break if the
- * finger leaves the element mid-drag.
+ * finger leaves the element mid-drag, and released only when it was set.
+ *
+ * **Optional pinch** (`onPinch`): with exactly two touch or pen pointers down,
+ * the distance between them is recorded; once it grows or shrinks by
+ * `pinchRatio` (see the pure {@link pinchDirection}) `onPinch('spread' |
+ * 'pinch')` fires ONCE, latched until every finger lifts. Its opt-in is the
+ * presence of `onPinch`, NOT `enabled`: a consumer (`useCalendarSlide`) holds
+ * `enabled` false during the spring-back that the multi-touch cancel itself
+ * triggers, so gating the pinch on it would drop a pinch whose first finger had
+ * already started a swipe.
+ *
+ * One pointer map serves both the cancel and the pinch. A `pointerdown` with
+ * `isPrimary` (the first finger of a new touch sequence) clears it first, so a
+ * lost `pointerup` can never leave the gesture wedged in multi-touch.
  */
 export interface UseHorizontalSwipeOptions {
   /** Finger moves left → user wants to move forward in a sequence (next page, next day, etc.). */
@@ -44,6 +63,30 @@ export interface UseHorizontalSwipeOptions {
    * swipe must not hijack). Default false: mouse drags swipe too.
    */
   ignoreMouse?: boolean;
+  /** Optional two-finger pinch: fires once per gesture (see the docblock). */
+  onPinch?: (dir: PinchDirection) => void;
+  /** Distance ratio a pinch must reach (or its inverse). Default 1.25. */
+  pinchRatio?: number;
+}
+
+export type PinchDirection = 'spread' | 'pinch';
+
+/**
+ * The pinch threshold, pure: `'spread'` once the finger distance `d` has grown to at least
+ * `ratio` × the starting distance `d0`, `'pinch'` once it has shrunk to `1 / ratio` of it,
+ * otherwise (and whenever `d0` is not positive) `null`.
+ */
+export function pinchDirection(d0: number, d: number, ratio: number): PinchDirection | null {
+  if (!(d0 > 0)) return null;
+  const r = d / d0;
+  if (r >= ratio) return 'spread';
+  if (r <= 1 / ratio) return 'pinch';
+  return null;
+}
+
+/** Touch and pen pointers count toward multi-touch; a mouse is only ever one pointer. */
+function isTouchLike(e: PointerEvent): boolean {
+  return e.pointerType === 'touch' || e.pointerType === 'pen';
 }
 
 export function useHorizontalSwipe(
@@ -53,6 +96,7 @@ export function useHorizontalSwipe(
   const threshold = options.threshold ?? 60;
   const axisLockRatio = options.axisLockRatio ?? 1.5;
   const edgeIgnore = options.edgeIgnore ?? 20;
+  const pinchRatio = options.pinchRatio ?? 1.25;
 
   let attached: HTMLElement | null = null;
   let startX = 0;
@@ -61,13 +105,82 @@ export function useHorizontalSwipe(
   let locked: 'horizontal' | 'vertical' | null = null;
   let activePointerId = -1;
 
+  /** Every touch / pen pointer currently down, by id (guardrail 4 and the pinch). */
+  const pointers = new Map<number, { x: number; y: number }>();
+  /** Set from the second pointer until the map empties: the swipe handlers stand down. */
+  let multiTouch = false;
+  /** The two fingers' starting distance; 0 = no pinch being tracked. */
+  let pinchStart = 0;
+  /** A pinch fired this gesture; latched until the map empties. */
+  let pinchFired = false;
+
   function reset() {
     active = false;
     locked = null;
     activePointerId = -1;
   }
 
+  function clearPointers() {
+    pointers.clear();
+    multiTouch = false;
+    pinchStart = 0;
+    pinchFired = false;
+  }
+
+  function pointerDistance(): number {
+    const [a, b] = [...pointers.values()];
+    if (!a || !b) return 0;
+    return Math.hypot(a.x - b.x, a.y - b.y);
+  }
+
+  function warnCapture(err: unknown) {
+    console.warn('[useHorizontalSwipe] pointer capture failed (pointer already gone)', err);
+  }
+
+  function releaseCapture(pointerId: number) {
+    try {
+      attached?.releasePointerCapture(pointerId);
+    } catch (err) {
+      warnCapture(err);
+    }
+  }
+
+  /** A second pointer landed: cancel any swipe and stand down until every finger lifts. */
+  function enterMultiTouch() {
+    if (active) {
+      options.onProgress?.(0);
+      // Capture was only ever set after a horizontal lock, so only then is there one to
+      // release (releasing an uncaptured pointer can throw).
+      if (locked === 'horizontal') releaseCapture(activePointerId);
+    }
+    multiTouch = true;
+    reset();
+  }
+
+  /** Keeps the pointer map current; runs before every early return in `onPointerDown`. */
+  function trackPointerDown(e: PointerEvent) {
+    if (!isTouchLike(e)) return;
+    // The first finger of a new touch sequence: anything left in the map is stale (a lost
+    // pointerup), and must not wedge the gesture in multi-touch for the rest of the session.
+    if (e.isPrimary) clearPointers();
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.size < 2) return;
+    if (!multiTouch) enterMultiTouch();
+    if (pointers.size === 2 && options.onPinch && !pinchFired) pinchStart = pointerDistance();
+  }
+
+  /** A pointer lifted or was cancelled; the map emptying ends the multi-touch gesture. */
+  function trackPointerEnd(e: PointerEvent) {
+    pointers.delete(e.pointerId);
+    if (pointers.size === 0) clearPointers();
+    // A third finger lifting leaves a different pair down: re-baseline, or the next move
+    // would compare the new pair against the old pair's distance and fire a bogus pinch.
+    else if (pointers.size === 2 && options.onPinch && !pinchFired) pinchStart = pointerDistance();
+  }
+
   function onPointerDown(e: PointerEvent) {
+    trackPointerDown(e);
+    if (multiTouch) return;
     if (options.enabled && !options.enabled.value) return;
     if (options.ignoreMouse && e.pointerType === 'mouse') return;
     // Only primary mouse button; touch/pen always primary.
@@ -83,6 +196,18 @@ export function useHorizontalSwipe(
   }
 
   function onPointerMove(e: PointerEvent) {
+    // The pinch runs BEFORE the swipe's guards and is not gated by `enabled` (docblock).
+    if (pointers.has(e.pointerId)) {
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (options.onPinch && pointers.size === 2 && !pinchFired) {
+        const dir = pinchDirection(pinchStart, pointerDistance(), pinchRatio);
+        if (dir) {
+          pinchFired = true;
+          options.onPinch(dir);
+        }
+      }
+    }
+    if (multiTouch) return;
     if (!active || e.pointerId !== activePointerId) return;
     const dx = e.clientX - startX;
     const dy = e.clientY - startY;
@@ -97,9 +222,10 @@ export function useHorizontalSwipe(
         locked = 'horizontal';
         try {
           attached?.setPointerCapture(e.pointerId);
-        } catch {
+        } catch (err) {
           // setPointerCapture can throw if the pointer is already gone
           // (rare race in mobile Safari). Gesture still works without it.
+          warnCapture(err);
         }
       } else {
         // Vertical-ish gesture — release so native scroll takes over.
@@ -114,6 +240,9 @@ export function useHorizontalSwipe(
   }
 
   function onPointerUp(e: PointerEvent) {
+    const wasMultiTouch = multiTouch;
+    trackPointerEnd(e);
+    if (wasMultiTouch) return;
     if (!active || e.pointerId !== activePointerId) {
       reset();
       return;
@@ -125,15 +254,15 @@ export function useHorizontalSwipe(
       else options.onSwipeRight?.();
     }
     options.onProgress?.(0);
-    try {
-      attached?.releasePointerCapture(e.pointerId);
-    } catch {
-      // pointer already released — fine
-    }
+    if (locked === 'horizontal') releaseCapture(e.pointerId);
     reset();
   }
 
-  function onPointerCancel() {
+  function onPointerCancel(e: PointerEvent) {
+    const wasMultiTouch = multiTouch;
+    trackPointerEnd(e);
+    // The multi-touch cancel already reported `onProgress(0)` and reset.
+    if (wasMultiTouch) return;
     options.onProgress?.(0);
     reset();
   }
@@ -154,6 +283,7 @@ export function useHorizontalSwipe(
     attached.removeEventListener('pointercancel', onPointerCancel);
     attached = null;
     reset();
+    clearPointers();
   }
 
   // Initial bind on mount (template refs are populated by then) + watch for

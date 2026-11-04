@@ -117,3 +117,89 @@ describe('SortMenu', () => {
     expect(menuEl()).toBeNull();
   });
 });
+
+describe('SortMenu toggles (#141)', () => {
+  afterEach(() => {
+    while (mounted.length) mounted.pop()!.unmount();
+  });
+
+  const TOGGLES = [
+    { id: 'times', labelKey: 'planner.monthGrid.hideTimes', checked: false, testid: 'tg-times' },
+    {
+      id: 'soloFaces',
+      labelKey: 'planner.monthGrid.hideSoloFaces',
+      checked: true,
+      testid: 'tg-faces',
+    },
+  ] as const;
+
+  const factoryWithToggles = (props: Record<string, unknown> = {}) =>
+    factory({ toggles: TOGGLES, ...props });
+
+  it('renders checkbox rows after a separator, with aria-checked and a leading check', async () => {
+    const wrapper = factoryWithToggles();
+    await open(wrapper);
+    const menu = menuEl()!;
+    expect(menu.querySelectorAll('[role="separator"]')).toHaveLength(1);
+    const boxes = menu.querySelectorAll<HTMLElement>('[role="menuitemcheckbox"]');
+    expect(boxes).toHaveLength(2);
+    expect(boxes[0]!.getAttribute('aria-checked')).toBe('false');
+    expect(boxes[1]!.getAttribute('aria-checked')).toBe('true');
+    expect(boxes[0]!.textContent).not.toContain('✓');
+    expect(boxes[1]!.textContent).toContain('✓');
+    // The radio rows are untouched.
+    expect(menu.querySelectorAll('[role="menuitemradio"]')).toHaveLength(3);
+  });
+
+  it('renders no separator or checkbox rows without toggles', async () => {
+    const wrapper = factory();
+    await open(wrapper);
+    expect(menuEl()!.querySelector('[role="separator"]')).toBeNull();
+    expect(menuEl()!.querySelector('[role="menuitemcheckbox"]')).toBeNull();
+  });
+
+  it('a toggle emits toggle with its id and keeps the menu open', async () => {
+    const wrapper = factoryWithToggles();
+    await open(wrapper);
+    menuEl()!
+      .querySelector<HTMLElement>('[data-testid="tg-times"]')!
+      .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await nextTick();
+    expect(wrapper.emitted('toggle')).toEqual([['times']]);
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined();
+    expect(menuEl()).not.toBeNull();
+  });
+
+  it('a choice still closes the menu when toggles are present', async () => {
+    const wrapper = factoryWithToggles();
+    await open(wrapper);
+    menuEl()!
+      .querySelectorAll<HTMLElement>('[role="menuitemradio"]')[1]!
+      .dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await nextTick();
+    expect(menuEl()).toBeNull();
+  });
+
+  it('roving focus walks both radio and checkbox rows', async () => {
+    const wrapper = factoryWithToggles();
+    await open(wrapper);
+    await nextTick();
+    const rows = Array.from(
+      menuEl()!.querySelectorAll<HTMLElement>('[role="menuitemradio"],[role="menuitemcheckbox"]')
+    );
+    expect(rows).toHaveLength(5);
+    rows[2]!.focus(); // the last radio
+    menuEl()!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    expect(document.activeElement).toBe(rows[3]); // the first checkbox
+    menuEl()!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    menuEl()!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    expect(document.activeElement).toBe(rows[0]); // wraps
+  });
+
+  it('the trigger glyph defaults to ⇅ and takes an icon prop', () => {
+    expect(factory().find('[aria-haspopup="menu"] span[aria-hidden="true"]').text()).toBe('⇅');
+    expect(
+      factory({ icon: '▦' }).find('[aria-haspopup="menu"] span[aria-hidden="true"]').text()
+    ).toBe('▦');
+  });
+});

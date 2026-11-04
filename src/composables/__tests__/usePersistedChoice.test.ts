@@ -9,6 +9,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { nextTick } from 'vue';
 import { usePersistedChoice } from '../usePersistedChoice';
+import { logEvent } from '@/services/telemetry/logEvent';
+
+// #141: each warn path also reaches the firehose. Mocked so the console assertions below
+// count only this composable's own warns; the telemetry assertions are in their own block.
+vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: vi.fn() }));
 
 const KEY = 'beanies:testChoice';
 const ALLOWED = ['a', 'b', 'c'] as const;
@@ -16,6 +21,7 @@ const ALLOWED = ['a', 'b', 'c'] as const;
 let warn: ReturnType<typeof vi.spyOn>;
 
 beforeEach(() => {
+  vi.mocked(logEvent).mockClear();
   localStorage.clear();
   warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
@@ -89,5 +95,58 @@ describe('usePersistedChoice', () => {
     await nextTick();
     expect(group.value).toBe('a');
     expect(localStorage.getItem('beanies:two')).toBeNull();
+  });
+});
+
+describe('usePersistedChoice telemetry (#141)', () => {
+  const expected = (message: string) =>
+    expect.objectContaining({
+      level: 'warn',
+      surface: 'persisted-choice',
+      message,
+      context: { action: message, detail: KEY },
+    });
+
+  it('logs invalid_stored_value naming the key, never the stored value', () => {
+    localStorage.setItem(KEY, 'removed-mode');
+    usePersistedChoice(KEY, ALLOWED, 'a');
+    expect(logEvent).toHaveBeenCalledTimes(1);
+    expect(logEvent).toHaveBeenCalledWith(expected('invalid_stored_value'));
+    expect(JSON.stringify(vi.mocked(logEvent).mock.calls)).not.toContain('removed-mode');
+  });
+
+  it('logs read_failed naming the key, with the error', () => {
+    const boom = new DOMException('denied');
+    const spy = vi.spyOn(localStorage, 'getItem').mockImplementation(() => {
+      throw boom;
+    });
+    try {
+      usePersistedChoice(KEY, ALLOWED, 'b');
+      expect(logEvent).toHaveBeenCalledWith(expected('read_failed'));
+      expect(vi.mocked(logEvent).mock.calls[0][0]).toMatchObject({ error: boom });
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('logs write_failed naming the key', async () => {
+    const spy = vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+      throw new DOMException('quota');
+    });
+    try {
+      const choice = usePersistedChoice(KEY, ALLOWED, 'a');
+      choice.value = 'c';
+      await nextTick();
+      expect(logEvent).toHaveBeenCalledWith(expected('write_failed'));
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('logs nothing on the happy path', async () => {
+    const choice = usePersistedChoice(KEY, ALLOWED, 'a');
+    choice.value = 'b';
+    await nextTick();
+    expect(logEvent).not.toHaveBeenCalled();
   });
 });

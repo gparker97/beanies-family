@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { monthCells, monthSpan } from '../monthCells';
+import { monthCells, monthSpan, weekRows } from '../monthCells';
+import { monthGridRange } from '@/utils/date';
 import type { FamilyActivity, FamilyVacation } from '@/types/models';
 import type { DayExtra } from '@/utils/calendarDay';
 
@@ -49,7 +50,7 @@ describe('monthSpan', () => {
 describe('monthCells — grid shape', () => {
   it('emits whole weeks with leading and trailing padding', () => {
     const { days } = monthCells(BASE);
-    expect(days.length % 7).toBe(0);
+    expect(days).toHaveLength(42);
     expect(days.filter((d) => d.isCurrentMonth)).toHaveLength(31);
     expect(days[0]!.isCurrentMonth).toBe(false); // July padding
   });
@@ -184,9 +185,11 @@ describe('monthCells — tint sets', () => {
 });
 
 describe('monthCells — week separators (the mobile stream labels)', () => {
-  it('places one separator per week, always on a current-month cell', () => {
+  it('places one separator per week that holds a current-month day, always on a current-month cell', () => {
+    // The grid always draws six rows (#141), so a row can be made only of
+    // next-month padding; that row has no separator.
     const { days, weekSeparatorIndexes } = monthCells(BASE);
-    const rows = new Set(days.map((d) => d.weekRow));
+    const rows = new Set(days.filter((d) => d.isCurrentMonth).map((d) => d.weekRow));
     expect(weekSeparatorIndexes.size).toBe(rows.size);
     for (const i of weekSeparatorIndexes) {
       expect(days[i]!.isCurrentMonth).toBe(true);
@@ -235,7 +238,7 @@ describe('multi-day repeats in the month grid', () => {
       const item = cells
         .find((c) => c.date === date)!
         .allDayItems.find((i) => i.activity.id === 'wf')!;
-      return [item.isStart, item.isEnd];
+      return [item.isFirstDay, item.isLastDay];
     };
     expect([edges('2026-08-05'), edges('2026-08-06'), edges('2026-08-07')]).toEqual([
       [true, false],
@@ -243,5 +246,153 @@ describe('multi-day repeats in the month grid', () => {
       [false, true],
     ]);
     expect(edges('2026-08-12')).toEqual([true, false]);
+  });
+});
+
+describe('monthCells: six-row grid (#141)', () => {
+  it('emits 42 cells for 4-, 5- and 6-row months alike', () => {
+    // Feb 2026 (Sunday start) is exactly 4 rows; Aug 2026 needs 6; Nov 2026 (Sunday start) needs 5.
+    for (const month of [1, 7, 10]) {
+      expect(monthCells({ ...BASE, month }).days).toHaveLength(42);
+    }
+  });
+
+  it("starts and ends on monthGridRange's own ends (one derivation)", () => {
+    for (const [month, weekStartDay] of [
+      [1, 0],
+      [7, 0],
+      [9, 1],
+      [10, 1],
+    ] as const) {
+      const { days } = monthCells({ ...BASE, month, weekStartDay });
+      const range = monthGridRange(new Date(2026, month, 1), weekStartDay);
+      expect(days[0]!.date).toBe(range.startYmd);
+      expect(days[41]!.date).toBe(range.endYmd);
+    }
+  });
+
+  it('weekRows splits 42 cells into six rows of seven', () => {
+    const { days } = monthCells(BASE);
+    const rows = weekRows(days);
+    expect(rows).toHaveLength(6);
+    expect(rows.every((r) => r.length === 7)).toBe(true);
+    expect(rows.flat()).toEqual(days);
+    expect(days.map((d) => d.weekRow)).toEqual(rows.flatMap((r, i) => r.map(() => i)));
+  });
+
+  it('weekRows keeps a short tail as a short last row', () => {
+    expect(weekRows([1, 2, 3, 4, 5, 6, 7, 8])).toEqual([[1, 2, 3, 4, 5, 6, 7], [8]]);
+    expect(weekRows([])).toEqual([]);
+  });
+
+  it('padding cells on both sides carry events and extras', () => {
+    // Aug 2026 (Sunday start): grid is 26 Jul .. 5 Sep.
+    const { days } = monthCells({
+      ...BASE,
+      occurrences: [
+        { activity: activity({ id: 'lead', startTime: '09:00' }), date: '2026-07-27' },
+        { activity: activity({ id: 'trail', startTime: '09:00' }), date: '2026-09-04' },
+      ],
+      extras: [
+        { kind: 'birthday', id: 'b:1', ymd: '2026-07-28', label: 'Lead birthday' } as DayExtra,
+        { kind: 'holiday', id: 'h:1', ymd: '2026-09-02', label: 'Trail holiday' } as DayExtra,
+      ],
+    });
+    const at = (d: string) => days.find((c) => c.date === d)!;
+    expect(at('2026-07-27').isCurrentMonth).toBe(false);
+    expect(at('2026-09-04').isCurrentMonth).toBe(false);
+    expect(at('2026-07-27').timedOccurrences).toHaveLength(1);
+    expect(at('2026-09-04').timedOccurrences).toHaveLength(1);
+    expect(at('2026-07-28').extras).toHaveLength(1);
+    expect(at('2026-09-02').extras).toHaveLength(1);
+  });
+
+  it('gives all-day spans to the sixth row too', () => {
+    // Sep 1 2026 is in row 5 (the sixth row) of August's grid.
+    const { days } = monthCells({
+      ...BASE,
+      occurrences: [
+        {
+          activity: activity({ id: 'ad', isAllDay: true, date: '2026-09-03' }),
+          date: '2026-09-03',
+        },
+      ],
+    });
+    expect(days.find((d) => d.date === '2026-09-03')!.weekRow).toBe(5);
+    expect(days.find((d) => d.date === '2026-09-03')!.allDayItems).toHaveLength(1);
+  });
+
+  it('places a separator on every row that holds a current-month day: a 4-row month (Feb 2026, Sunday start) has exactly four', () => {
+    const { days, weekSeparatorIndexes, weekRanges } = monthCells({ ...BASE, month: 1 });
+    expect(weekSeparatorIndexes.size).toBe(4);
+    expect([...weekSeparatorIndexes].map((i) => days[i]!.weekRow)).toEqual([0, 1, 2, 3]);
+    // Rows 4 and 5 are only March padding: no separator, but label metadata exists.
+    expect(days.filter((d) => d.weekRow >= 4).some((d) => d.isCurrentMonth)).toBe(false);
+    expect(weekRanges.has(5)).toBe(true);
+  });
+
+  it("carries the trip's travellers on every day slice", () => {
+    const { days } = monthCells({
+      ...BASE,
+      vacations: [
+        {
+          id: 'v1',
+          name: 'Japan',
+          tripType: 'fly_and_stay',
+          startDate: '2026-08-10',
+          endDate: '2026-08-11',
+          assigneeIds: ['m1', 'm2'],
+        } as FamilyVacation,
+        {
+          id: 'v2',
+          name: 'Solo',
+          tripType: 'fly_and_stay',
+          startDate: '2026-08-20',
+          endDate: '2026-08-20',
+        } as FamilyVacation,
+      ],
+    });
+    const at = (d: string) => days.find((c) => c.date === d)!;
+    expect(at('2026-08-10').vacations[0]!.travellerIds).toEqual(['m1', 'm2']);
+    expect(at('2026-08-11').vacations[0]!.travellerIds).toEqual(['m1', 'm2']);
+    expect(at('2026-08-20').vacations[0]!.travellerIds).toEqual([]);
+  });
+
+  it('keeps isStart/isEnd on the true trip ends even when the grid clips the trip', () => {
+    const { days } = monthCells({
+      ...BASE,
+      vacations: [
+        {
+          id: 'v1',
+          name: 'Long',
+          tripType: 'fly_and_stay',
+          startDate: '2026-07-01',
+          endDate: '2026-12-01',
+        } as FamilyVacation,
+      ],
+    });
+    expect(days[0]!.vacations[0]).toMatchObject({ isStart: false, isEnd: false });
+    expect(days[41]!.vacations[0]).toMatchObject({ isStart: false, isEnd: false });
+  });
+
+  it('shows an overnight event once, on its start day', () => {
+    const { days } = monthCells({
+      ...BASE,
+      occurrences: [
+        {
+          activity: activity({
+            id: 'sleepover',
+            startTime: '21:00',
+            endTime: '08:00',
+            endDate: '2026-08-11',
+          }),
+          date: '2026-08-10',
+        },
+      ],
+    });
+    const holders = days.filter((d) =>
+      d.timedOccurrences.some((o) => o.activity.id === 'sleepover')
+    );
+    expect(holders.map((d) => d.date)).toEqual(['2026-08-10']);
   });
 });

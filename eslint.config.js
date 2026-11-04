@@ -539,6 +539,10 @@ export default [
       '.claude/worktrees/**',
       'playwright-report/**',
       'test-results/**',
+      // Rendered verification artefacts and the throwaway drivers beside them (gitignored; see
+      // .claude/skills/beanies-build-auto/references/browser-verification.md).
+      'scratch-shots/**',
+      'screenshots/**',
       '.github/**',
       // CloudFront Functions use a constrained JS runtime with a global
       // `handler` entrypoint — not ESM. Linted via the AWS console on upload.

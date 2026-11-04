@@ -194,3 +194,67 @@ describe('MonthChip content', () => {
     expect(wrapper.emitted('view-activity')).toEqual([['a-99', '2026-05-19']]);
   });
 });
+
+describe('MonthChip as a content adapter over MonthChipFrame (#141)', () => {
+  const frame = (w: ReturnType<typeof mount>) => w.findComponent({ name: 'MonthChipFrame' });
+
+  it('passes solo and the owner face from identity for a one-owner activity', () => {
+    const w = mount(MonthChip, {
+      props: { occurrence: makeOccurrence(makeActivity({ assigneeIds: ['m-aria'] })) },
+    });
+    expect(frame(w).props('solo')).toBe(true);
+    expect(frame(w).props('faces')).toHaveLength(1);
+  });
+
+  it('passes solo false and every owner for a shared activity', () => {
+    const w = mount(MonthChip, {
+      props: {
+        occurrence: makeOccurrence(makeActivity({ assigneeIds: ['m-greg', 'm-mira'] })),
+      },
+    });
+    expect(frame(w).props('solo')).toBe(false);
+    expect(frame(w).props('faces')).toHaveLength(2);
+    expect(frame(w).props('dashed')).toBe(true);
+  });
+
+  it('passes celebrating from identity (an occasion on its own day)', () => {
+    const plain = mount(MonthChip, {
+      props: { occurrence: makeOccurrence(makeActivity({ assigneeIds: ['m-aria'] })) },
+    });
+    expect(frame(plain).props('celebrating')).toBe(false);
+    expect(frame(plain).classes()).not.toContain('is-celebration');
+  });
+
+  it('takes the colour, wash, title, time and spoken label from the activity', () => {
+    const w = mount(MonthChip, {
+      props: {
+        occurrence: makeOccurrence(
+          makeActivity({ assigneeIds: ['m-aria'], title: 'Piano', startTime: '16:00' })
+        ),
+      },
+    });
+    expect(String(frame(w).props('color')).toLowerCase()).toBe('#6aa84f');
+    expect(frame(w).props('wash')).toBeTruthy();
+    expect(frame(w).props('label')).toBe('Piano');
+    expect(frame(w).props('time')).toBe('4pm');
+    expect(frame(w).props('spokenLabel')).toContain('Piano');
+    expect(frame(w).props('testid')).toBe('month-chip');
+  });
+
+  it('fills the default slot with the clash indicator', () => {
+    const w = mount(MonthChip, {
+      props: { occurrence: makeOccurrence(makeActivity({ assigneeIds: ['m-aria'] })) },
+    });
+    expect(w.findComponent({ name: 'ClashIndicator' }).exists()).toBe(true);
+  });
+
+  it('has no presentation props and sets no reveal attributes (MonthDayItem does)', () => {
+    expect(Object.keys(MonthChip.props ?? {})).toEqual(['occurrence']);
+    const w = mount(MonthChip, {
+      props: { occurrence: makeOccurrence(makeActivity({ assigneeIds: ['m-aria'] })) },
+    });
+    const root = w.get('[data-testid="month-chip"]');
+    expect(root.attributes('data-activity-id')).toBeUndefined();
+    expect(root.attributes('data-occurrence-date')).toBeUndefined();
+  });
+});

@@ -40,4 +40,19 @@ export const STORAGE_KEYS = {
    *  and `placeKey` it belongs to, so sign-out is a single removal. Device-local, never in
    *  the pod; not read by the `index.html` bootstrap. */
   WEATHER: 'beanies:weather',
+  /** #141: the desktop month grid's density (`compact` | `comfortable`). Device-local;
+   *  not read by the `index.html` bootstrap. */
+  MONTH_GRID_DENSITY: 'beanies:monthGridDensity',
+  /** #141: whether the desktop month grid's chips show times (`shown` | `hidden`).
+   *  Device-local; not read by the `index.html` bootstrap. */
+  MONTH_GRID_TIMES: 'beanies:monthGridTimes',
+  /** #141: whether one-owner chips on the desktop month grid show their face (`shown` |
+   *  `hidden`). Device-local; not read by the `index.html` bootstrap. */
+  MONTH_GRID_SOLO_FACES: 'beanies:monthGridSoloFaces',
+  /** #141: the phone Month view's mode (`grid` | `list`). Device-local; not read by the
+   *  `index.html` bootstrap. */
+  PHONE_MONTH_MODE: 'beanies:phoneMonthMode',
+  /** #141: the phone month grid's density (`faces` | `bars` | `titles`). Device-local;
+   *  not read by the `index.html` bootstrap. */
+  PHONE_MONTH_DENSITY: 'beanies:phoneMonthDensity',
 } as const;

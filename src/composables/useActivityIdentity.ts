@@ -63,6 +63,12 @@ export interface ActivityIdentity {
   style: Record<string, string>;
   /** Edge only — for cards that keep their own background. */
   edgeStyle: Record<string, string>;
+  /**
+   * The owner hue's wash as ONE flat colour, theme-aware like `style.background` but never
+   * the shared gradient. For surfaces painted one slice per day cell (all-day bars): a
+   * gradient restarts in every cell and leaves a seam at each day boundary.
+   */
+  flatWash: string;
   /** Shared events keep a dashed edge — the one cue that needs no colour vision. */
   dashed: boolean;
 }
@@ -230,6 +236,7 @@ export function useActivityIdentity() {
       sticker: celebration.celebrating ? celebrationSticker(emoji) : '',
       style,
       edgeStyle,
+      flatWash: wash(color),
       dashed,
     };
   }

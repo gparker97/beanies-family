@@ -19,7 +19,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { defineComponent, h, ref, type Ref } from 'vue';
 import { mount, type VueWrapper } from '@vue/test-utils';
 import { useCalendarSlide, type UseCalendarSlideOptions } from '../useCalendarSlide';
-import { pointer, swipe } from '@/test/pointerSwipe';
+import { pointer, swipe, pinch } from '@/test/pointerSwipe';
 
 interface SlideHarness {
   wrapper: VueWrapper;
@@ -305,6 +305,61 @@ describe('useCalendarSlide', () => {
       pointer('pointerdown', h.el, { x: 100, y: 100 });
       pointer('pointermove', h.el, { x: 200, y: 100 });
       expect(h.el.style.transform).toBe('');
+    });
+  });
+
+  describe('pinch passthrough', () => {
+    it('forwards onPinch to the swipe', () => {
+      const onPinch = vi.fn();
+      const h = makeHarness({ onPinch });
+      pinch(
+        h.el,
+        [
+          { x: 100, y: 100 },
+          { x: 200, y: 100 },
+        ],
+        [
+          { x: 40, y: 100 },
+          { x: 260, y: 100 },
+        ]
+      );
+      expect(onPinch).toHaveBeenCalledTimes(1);
+      expect(onPinch).toHaveBeenCalledWith('spread');
+    });
+  });
+
+  describe('animation failures', () => {
+    /** An animate() whose `finished` rejects with the given error. */
+    function installRejectingAnimate(err: unknown) {
+      Element.prototype.animate = function () {
+        const finished = Promise.reject(err);
+        finished.catch(() => {});
+        return { finished, cancel: () => {} } as unknown as Animation;
+      } as Element['animate'];
+    }
+
+    it('an AbortError is quiet', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      installRejectingAnimate(Object.assign(new Error('aborted'), { name: 'AbortError' }));
+      const h = makeHarness();
+      swipe(h.el, { x: 200, y: 100 }, { x: 80, y: 100 });
+      await flushMicrotasks();
+      expect(h.onNext).toHaveBeenCalledTimes(1);
+      expect(warn).not.toHaveBeenCalled();
+      warn.mockRestore();
+    });
+
+    it('any other rejection warns', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      installRejectingAnimate(new Error('boom'));
+      const h = makeHarness();
+      swipe(h.el, { x: 200, y: 100 }, { x: 80, y: 100 });
+      await flushMicrotasks();
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('[useCalendarSlide] animation finished failed'),
+        expect.any(Error)
+      );
+      warn.mockRestore();
     });
   });
 });

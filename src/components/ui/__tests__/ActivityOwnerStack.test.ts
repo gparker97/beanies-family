@@ -73,6 +73,44 @@ describe('ActivityOwnerStack', () => {
     );
   });
 
+  describe('2xs (the month grid chip size, #141)', () => {
+    const tiny = (members: FamilyMember[], max?: number) =>
+      mount(ActivityOwnerStack, { props: { members, size: '2xs', ...(max ? { max } : {}) } });
+    const four = ['a', 'b', 'c', 'd'].map((x, i) => m(String(i), x));
+
+    it('draws the 14px face size with a thin ring and a tight overlap', () => {
+      const faces = tiny([m('1', 'A'), m('2', 'B')]).findAllComponents({ name: 'BeanieAvatar' });
+      expect(faces).toHaveLength(2);
+      expect(faces[0]!.props('size')).toBe('2xs');
+      for (const f of faces)
+        expect(f.classes()).toEqual(expect.arrayContaining(['ring-1', '-ml-1']));
+      expect(faces[0]!.classes()).not.toContain('ring-2');
+    });
+
+    it('draws the overflow as plain +N text, never a circle', () => {
+      const w = tiny(four, 2);
+      expect(w.findAllComponents({ name: 'BeanieAvatar' })).toHaveLength(2);
+      const overflow = w.findAll('span[aria-hidden="true"]').find((s) => s.text() === '+2');
+      expect(overflow).toBeDefined();
+      expect(overflow!.classes()).toEqual(expect.arrayContaining(['text-xs', 'font-semibold']));
+      expect(overflow!.classes()).not.toContain('rounded-full');
+    });
+
+    it('shows no +N when everyone fits', () => {
+      expect(tiny([m('1', 'A')]).text()).not.toContain('+');
+    });
+
+    it('leaves the other sizes unchanged (ring-2, -ml-1.5, a circle overflow)', () => {
+      const w = mount(ActivityOwnerStack, {
+        props: { members: four, size: 'xs', max: 2 },
+      });
+      const face = w.findAllComponents({ name: 'BeanieAvatar' })[0]!;
+      expect(face.classes()).toEqual(expect.arrayContaining(['ring-2', '-ml-1.5']));
+      const circle = w.findAll('span').find((s) => s.text() === '+2');
+      expect(circle!.classes()).toContain('rounded-full');
+    });
+  });
+
   it('imports no store', async () => {
     // Classification must happen once per activity, not once per face — a stack that
     // resolved its own members would re-derive the owner set on every avatar render

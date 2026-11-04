@@ -25,7 +25,13 @@ import { useDayExtras } from '@/composables/useDayExtras';
 import type { BirthdayOccurrence } from '@/utils/birthdays';
 import { useTranslation } from '@/composables/useTranslation';
 import { formatMonthYear } from '@/utils/date';
-import { monthCellsFrom, prepareCellData, monthSpan, type WeekRangeMeta } from '@/utils/monthCells';
+import {
+  monthCellsFrom,
+  prepareCellData,
+  monthSpan,
+  type MonthDayCellData,
+  type WeekRangeMeta,
+} from '@/utils/monthCells';
 import {
   useMonthStream,
   monthKeyOf,
@@ -39,8 +45,7 @@ import { useCalendarSlide } from '@/composables/useCalendarSlide';
 import { useToday } from '@/composables/useToday';
 import { reportError } from '@/utils/errorReporter';
 import { logEvent } from '@/services/telemetry';
-import MonthDayCard, { type MonthDayCellData } from '@/components/planner/MonthDayCard.vue';
-import { ALL_DAY_VISIBLE_CAP, TIMED_VISIBLE_CAP } from '@/constants/calendarCaps';
+import MonthDayCard from '@/components/planner/MonthDayCard.vue';
 import type { HolidayOccurrence } from '@/types/models';
 
 /** Where an imperative anchor request should land the view. */
@@ -443,8 +448,6 @@ defineExpose({ anchorTo });
 
           <MonthDayCard
             :cell="cell"
-            :all-day-cap="ALL_DAY_VISIBLE_CAP"
-            :timed-cap="TIMED_VISIBLE_CAP"
             @select-date="(d) => emit('selectDate', d)"
             @view-activity="(id, date) => emit('view-activity', id, date)"
             @holiday-click="(h) => emit('holiday-click', h)"

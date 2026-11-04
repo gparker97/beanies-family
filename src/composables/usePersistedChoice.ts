@@ -1,4 +1,5 @@
 import { ref, watch, type Ref } from 'vue';
+import { logEvent } from '@/services/telemetry/logEvent';
 
 /**
  * A `ref` that remembers its value on THIS device, for small closed-set UI preferences —
@@ -19,7 +20,9 @@ import { ref, watch, type Ref } from 'vue';
  *
  * Every warn NAMES THE KEY. A generic helper warning "could not read preference" is
  * undiagnosable without a stack trace, which would be a regression on the named-composable
- * warns this replaces.
+ * warns this replaces. Each warn path also reaches the firehose (surface `persisted-choice`,
+ * message `invalid_stored_value` | `read_failed` | `write_failed`, `detail` = the key), so a
+ * corrupt or blocked store is triageable without a repro. The stored VALUE is never sent.
  *
  * @param key      the `localStorage` key, e.g. `'beanies:cookbookSort'`
  * @param allowed  every valid value — also the validator for what comes back out of storage
@@ -32,6 +35,19 @@ export function usePersistedChoice<T extends string>(
 ): Ref<T> {
   const tag = `[usePersistedChoice:${key}]`;
 
+  function report(
+    message: 'invalid_stored_value' | 'read_failed' | 'write_failed',
+    error?: unknown
+  ): void {
+    logEvent({
+      level: 'warn',
+      surface: 'persisted-choice',
+      message,
+      context: { action: message, detail: key },
+      error,
+    });
+  }
+
   const isAllowed = (value: unknown): value is T =>
     typeof value === 'string' && (allowed as readonly string[]).includes(value);
 
@@ -43,9 +59,11 @@ export function usePersistedChoice<T extends string>(
       console.warn(
         `${tag} ignoring invalid stored value "${stored}" — falling back to "${fallback}"`
       );
+      report('invalid_stored_value');
       return fallback;
     } catch (err) {
       console.warn(`${tag} could not read preference — falling back to "${fallback}":`, err);
+      report('read_failed', err);
       return fallback;
     }
   }
@@ -58,6 +76,7 @@ export function usePersistedChoice<T extends string>(
         `${tag} could not persist preference "${value}" (it will not survive a reload):`,
         err
       );
+      report('write_failed', err);
     }
   }
 

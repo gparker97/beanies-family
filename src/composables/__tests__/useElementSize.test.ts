@@ -124,4 +124,30 @@ describe('useElementSize', () => {
     wrapper.unmount();
     expect(disconnect).toHaveBeenCalled();
   });
+
+  it('⭐ a throwing layout read logs element_size_measure_failed once per instance', async () => {
+    const { Comp } = harness(200);
+    const wrapper = mount(Comp, { attachTo: document.body });
+    await nextTick();
+    logEvent.mockClear();
+
+    Object.defineProperty(HTMLElement.prototype, 'clientHeight', {
+      configurable: true,
+      get() {
+        throw new Error('detached');
+      },
+    });
+    const vm = wrapper.vm as unknown as { measure: () => void };
+    vm.measure();
+    vm.measure();
+    const failures = logEvent.mock.calls.filter(
+      ([e]) => (e as { message: string }).message === 'element_size_measure_failed'
+    );
+    expect(failures).toHaveLength(1);
+    expect(failures[0][0]).toMatchObject({
+      level: 'warn',
+      surface: 'test-surface',
+      context: { action: 'measure', error_code: 'measure_threw' },
+    });
+  });
 });
