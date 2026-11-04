@@ -21,6 +21,7 @@ import BirthdayDetailsModal from '@/components/planner/BirthdayDetailsModal.vue'
 import type { BirthdayOccurrence } from '@/utils/birthdays';
 import WallTickBurst from '@/components/wall/WallTickBurst.vue';
 import WallNavArrow from '@/components/wall/WallNavArrow.vue';
+import WallBackButton from '@/components/wall/WallBackButton.vue';
 import WallStatusStamp from '@/components/wall/WallStatusStamp.vue';
 import WallNightButton from '@/components/wall/WallNightButton.vue';
 import WallViewSwitcher from '@/components/wall/WallViewSwitcher.vue';
@@ -36,6 +37,7 @@ import { WALL_BURST } from '@/components/wall/wallBurstKey';
 import { WALL_WEATHER } from '@/components/wall/wallWeatherKey';
 import { useWeatherStore } from '@/stores/weatherStore';
 import { useMediaQuery } from '@/composables/useMediaQuery';
+import { useFirstThatFits } from '@/composables/useFirstThatFits';
 import { useWallAutoSleep } from '@/composables/useWallAutoSleep';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useWallRoomGate } from '@/composables/useWallRoomGate';
@@ -56,7 +58,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { getWallReturnPath } from '@/router';
 import { useToast } from '@/composables/useToast';
-import { addDaysYmd, formatDayLong, parseLocalDate } from '@/utils/date';
+import { addDaysYmd, formatDateFull, parseLocalDate } from '@/utils/date';
 import { formatWeekRange } from '@/composables/useCalendarNavigation';
 import { anchorOffsetDays, stepDaysFor } from '@/utils/wallAnchor';
 import {
@@ -269,19 +271,52 @@ const wallTier = computed(() => wallTierFor(Math.min(viewportWidth.value, viewpo
 const wallChrome = computed(() => wallChromeFor(wallTier.value));
 
 /**
- * The date, in one place.
+ * The header date, longest first: "Wednesday, November 4" → "Wed, November 4" → "Wed, Nov 4".
  *
- * It was written out twice — the wall face and the night screen each built their
- * own `toLocaleDateString` with the same three options, which is two places to
- * forget when the format changes.
+ * ⚠️ A landscape wall keeps its header on ONE row (see the `.wall-header` rules), so on the
+ * views that keep their step arrows in the header (Each bean, Today) the date is what pays for
+ * them. Wrapping was the old answer and cost a whole header row of calendar on a 1280x800
+ * Lenovo 10" (greg, 2026-11-04); ellipsising "Wednesday, Novem…" is no better. So the header
+ * shows the longest form that actually fits, measured (`useFirstThatFits`), and `truncate` is
+ * only the backstop. The night screen keeps the long form: it has the whole width.
+ *
+ * Built in one place for both: the wall face and the night screen each used to build their own
+ * `toLocaleDateString` with the same options, two places to forget when the format changes.
  */
-const dateLabel = computed(() =>
-  new Date(`${today.value}T00:00:00`).toLocaleDateString(undefined, {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-  })
+const HEADER_DATE_FORMATS: readonly Intl.DateTimeFormatOptions[] = [
+  { weekday: 'long', day: 'numeric', month: 'long' },
+  { weekday: 'short', day: 'numeric', month: 'long' },
+  { weekday: 'short', day: 'numeric', month: 'short' },
+];
+const dateCandidates = computed(() => {
+  const day = new Date(`${today.value}T00:00:00`);
+  return HEADER_DATE_FORMATS.map((format) => day.toLocaleDateString(undefined, format));
+});
+const headerTitleEl = ref<HTMLElement | null>(null);
+const dateMeasurerEl = ref<HTMLElement | null>(null);
+const { index: headerDateIndex } = useFirstThatFits(headerTitleEl, dateMeasurerEl, {
+  surface: 'wall-header',
+  deps: () => dateCandidates.value.join('|'),
+});
+/**
+ * The subtitle under it, the same way: "Week of November 4 · 4 things on today", then just
+ * "4 things on today". The count is the half that matters; on a narrow title an ellipsis was
+ * eating it ("4 things o…") while keeping the week, which the date already implies.
+ */
+const subtitleWeeks = computed(() => (weekLabel.value ? [weekLabel.value, ''] : ['']));
+const subtitleMeasurerEl = ref<HTMLElement | null>(null);
+const { index: subtitleIndex } = useFirstThatFits(headerTitleEl, subtitleMeasurerEl, {
+  surface: 'wall-header',
+  deps: () => `${subtitleWeeks.value.join('|')}|${thingsTemplate.value}|${todayCount.value}`,
+});
+const subtitleWeek = computed(
+  () => subtitleWeeks.value[Math.min(subtitleIndex.value, subtitleWeeks.value.length - 1)]!
 );
+const headerDate = computed(
+  () => dateCandidates.value[Math.min(headerDateIndex.value, dateCandidates.value.length - 1)]!
+);
+/** The long form, for the night screen. */
+const dateLabel = computed(() => dateCandidates.value[0]!);
 
 const daysLayout = computed(() =>
   daysLayoutFor(viewportWidth.value, isPortrait.value, wallChrome.value)
@@ -448,7 +483,13 @@ const clockNow = ref(new Date());
 const clockTimer = setInterval(() => (clockNow.value = new Date()), 20_000);
 const currentView = computed(() => wallViewById(activeView.value));
 /** Names the back control after the view it returns to. */
-const backLabel = computed(() => t(wallViewById(lastCalendarView.value).labelKey).toLowerCase());
+const backView = computed(() => wallViewById(lastCalendarView.value));
+const backLabel = computed(() => t(backView.value.labelKey).toLowerCase());
+/** The header's compact form of the same control (Today view). */
+const backCompact = computed(() => ({
+  name: t(backView.value.labelKey),
+  glyph: backView.value.glyph,
+}));
 
 /**
  * Is there a DIFFERENT view to go back to?
@@ -526,7 +567,10 @@ const anchorLabel = computed(() => {
     const days = weekDays.value.slice(0, Math.max(1, daysLayout.value.columns));
     return formatWeekRange(parseLocalDate(days[0]!), parseLocalDate(days[days.length - 1]!));
   }
-  return isAnchoredToToday.value ? t('wall.today.today') : formatDayLong(anchorYmd.value);
+  // "Thu, 5 Nov 2026", the week label's own style. The long form ("Thursday, 5 November 2026")
+  // was 95px wider and, on Each bean and Today, it is what pushed a browsed day's header past
+  // its row. The year stays: the wall browses up to a year either way.
+  return isAnchoredToToday.value ? t('wall.today.today') : formatDateFull(anchorYmd.value);
 });
 
 /**
@@ -904,20 +948,67 @@ watch(activeView, () => (sheet.value = null));
            in proportion to base sizes — which include the nav label — so the arrows become
            label-dependent again. Growing to take the slack keeps free space positive, and
            `truncate` on the date is what lets this actually shrink. -->
-      <div class="wall-header-title min-w-0">
+      <div ref="headerTitleEl" class="wall-header-title relative min-w-0">
         <h1 class="font-outfit text-secondary-500 wall-date dark:text-ink truncate font-extrabold">
-          {{ dateLabel }}
+          {{ headerDate }}
         </h1>
-        <p class="font-inter wall-subtitle mt-1.5 text-[var(--muted-text,#4d5d6c)]">
-          <template v-if="weekLabel">{{ weekLabel }} · </template>
+        <!-- `truncate`: on a one-row header a wrapped subtitle would cost the row it saved. -->
+        <p class="font-inter wall-subtitle mt-1.5 truncate text-[var(--muted-text,#4d5d6c)]">
+          <template v-if="subtitleWeek">{{ subtitleWeek }} · </template>
           <HandwrittenLine
             :template="thingsTemplate"
             :values="{ count: todayCount }"
             class="wall-subtitle-hand text-primary-500 dark:text-accent-lift"
           />
         </p>
+        <!-- Every date (and subtitle) form laid out on one line, hidden, so the visible lines
+             show the first that fits. -->
+        <div
+          ref="dateMeasurerEl"
+          class="pointer-events-none invisible absolute inset-x-0 top-0 h-0 overflow-hidden"
+          aria-hidden="true"
+        >
+          <p
+            v-for="(label, i) in dateCandidates"
+            :key="i"
+            class="font-outfit wall-date font-extrabold whitespace-nowrap"
+          >
+            {{ label }}
+          </p>
+        </div>
+        <div
+          ref="subtitleMeasurerEl"
+          class="pointer-events-none invisible absolute inset-x-0 top-0 h-0 overflow-hidden"
+          aria-hidden="true"
+        >
+          <p
+            v-for="(week, i) in subtitleWeeks"
+            :key="i"
+            class="font-inter wall-subtitle whitespace-nowrap"
+          >
+            <template v-if="week">{{ week }} · </template>
+            <HandwrittenLine
+              :template="thingsTemplate"
+              :values="{ count: todayCount }"
+              class="wall-subtitle-hand"
+            />
+          </p>
+        </div>
       </div>
       <div class="wall-header-controls ml-auto flex items-center gap-3">
+        <!--
+          The Today view's way back, in the header rather than in a row of its own over the
+          grid (greg, 2026-11-04: that row cost the calendar ~45px). FIRST in the cluster, so
+          appearing and disappearing moves only what is to its left, never the step arrows.
+          Compact ("‹ Each bean", "‹ 👥" on a narrow wall): the row has no width for the
+          sentence, which stays its accessible name. The chore board keeps its own, beside its title.
+        -->
+        <WallBackButton
+          v-if="activeView === 'today' && canGoBack"
+          :back-label="backLabel"
+          :compact="backCompact"
+          @back="onGoBack"
+        />
         <!--
           The period navigator. Hidden on the jobs board, which has no date at
           all (`stepUnit: null` in the registry).
@@ -1390,7 +1481,10 @@ watch(activeView, () => (sheet.value = null));
 
 .wall-root .wall-clock-col {
   /* A FIXED reservation, not a floor — see the template. Wide enough for a 12-hour clock at
-     2.3rem plus the longest status stamp, and the stamp truncates inside it. */
+     2.3rem plus the longest status stamp, and the stamp truncates inside it. `shrink-0`: on a
+     full row the nav label is what gives way; a squeezed column wrapped "11:28 AM" onto two
+     lines and grew the header by a row's worth. A narrow wall lets it yield, below. */
+  flex-shrink: 0;
   width: var(--wall-clock-col);
 }
 
@@ -1532,6 +1626,28 @@ watch(activeView, () => (sheet.value = null));
   font-size: 0.95rem;
 }
 
+/* In the header it is one of the row's tap targets, so it takes the row's height. */
+.wall-header :deep(.wall-back) {
+  font-size: var(--wall-nav-label);
+  min-height: var(--wall-tap);
+}
+
+/* The name on a wide wall, the destination's switcher glyph on a narrow one (the same 1200px
+   line as the mid header below): beside the arrows, "‹ Each bean" clipped "Today" to "To…". */
+.wall-header :deep(.wall-back-glyph) {
+  display: none;
+}
+
+@media (width < 1200px) {
+  .wall-header :deep(.wall-back-name) {
+    display: none;
+  }
+
+  .wall-header :deep(.wall-back-glyph) {
+    display: inline;
+  }
+}
+
 .wall-root :deep(.wall-board-title) {
   font-size: 1.7rem;
 }
@@ -1611,27 +1727,25 @@ watch(activeView, () => (sheet.value = null));
 /*
  * ⚠️ NOWRAP by default, and this is the whole trade.
  *
- * Wrapping buys a whole date at the cost of a header row. That is the right way
- * round on a tall wall and the WRONG way round on a short one: greg caught a
- * mounted Tab M8 in landscape (853x533) losing a row of calendar the moment he
- * switched to Each-bean or Today, because those views keep their step arrows in
- * the header while the week view puts them inside the calendar.
+ * Wrapping buys a whole date at the cost of a header row, and on a LANDSCAPE wall that row is
+ * the most expensive thing on the screen: the calendar under it is what the family reads, and
+ * height is its scarce axis. greg caught it twice, on the views that keep their step arrows in
+ * the header (Each bean, Today; the week view puts its own inside the calendar):
+ *   - a Tab M8 in landscape (853x533), 2026-09;
+ *   - a Lenovo 10" at 1280x800, 2026-11-04. This rule was then keyed on `height >= 700px`, on
+ *     the theory that a tall wall could afford the row. It could not: 24px of arrows wrapped the
+ *     header from 104px to 176px and took 72px from the calendar on two views of four.
  *
- * So the rule is keyed on the axis that is actually scarce. Below 700px of
- * height the header stays on one row and the date truncates if it must; above
- * it, the date keeps its width and the controls take their own row. It is NOT
- * keyed on orientation — that was the original defect, and a 961x601 landscape
- * wall and a 601x961 portrait one want opposite answers for the same reason.
- *
- * With the tier scale applied to every control (including the lock button,
- * above) the date does not in fact truncate at any size we admit; the nowrap
- * path is what guarantees the row, not a fallback we expect to hit.
+ * So the header wraps on a PORTRAIT wall only, where the controls alone fill the width and the
+ * height is plentiful. A landscape wall keeps one row at every height, and the date pays for
+ * the arrows by stepping down its own form ("Wednesday, November 4" → "Wed, Nov 4", measured
+ * in the page's `headerDate`), with `truncate` as the last resort.
  */
 .wall-header {
   flex-wrap: nowrap;
 }
 
-@media (height >= 700px) {
+@media (orientation: portrait) {
   .wall-header {
     flex-wrap: wrap;
   }
@@ -1648,19 +1762,58 @@ watch(activeView, () => (sheet.value = null));
   flex: 1 1 auto;
 }
 
+/* ⚠️ On a landscape wall a ZERO basis is the header's priority order: the title gets exactly
+   the room the controls leave and never competes with them for it. With `auto`, flexbox shared
+   a shortfall in proportion to each item's width, so the date kept "Wed, November 4" (its share
+   still fit it) while the nav label beside the arrows clipped "Today" to "Tod…". The date and
+   subtitle have shorter forms to step down to (measured, in the page script); the label does
+   not, so it truncates only when the controls alone overrun the row.
+
+   NOT in portrait: there the header wraps on the title's size, and a zero basis put the date on
+   the controls' row with its `11ch` floor drawn over them. */
+@media (orientation: landscape) {
+  .wall-header-title {
+    flex-basis: 0;
+  }
+}
+
 .wall-header-controls {
   /*
-   * The controls may wrap among themselves as well. Dropping them onto their
-   * own row is not enough on the narrowest walls: the navigator, the switcher
-   * and the clock together still overran a 533px row by ~57px, and `.wall-root`
-   * is `overflow-hidden`, so the overrun was invisible rather than absent — it
-   * simply cut the clock off. Wrapping is the honest fallback, and `min-width: 0`
-   * is what lets it happen inside a flex parent at all.
+   * ⚠️ The controls NEVER wrap among themselves. They used to, as a backstop against
+   * overrunning a 533px row, and every time it fired it cost a header row for two arrows: an
+   * 853x533 wall (2026-09), and an 800x1280 portrait wall browsing a day on Each bean, where
+   * "Thursday, 5 November 2026" wrapped the controls onto a THIRD row (2026-11-04). The row
+   * holds by other means: the nav label is `min-w-0 truncate`, the date has its measured
+   * ladder, a short wall tightens the gaps and a narrow one lets the clock yield (both below).
+   * `min-width: 0` is what lets the label truncate inside a flex parent at all.
    */
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: flex-end;
   margin-left: auto;
   min-width: 0;
+}
+
+/*
+ * A NARROW wall at the full tier takes the mid tier's HEADER.
+ *
+ * The tier is keyed on the short side, so a 1024x768 iPad is `full` and got the full header:
+ * 744px of controls on a 968px row, which left the date about 200px and clipped the nav label
+ * even on today. An 800x1280 portrait wall gives the controls a row of their own and still ran
+ * out on a browsed day. The header's constraint is WIDTH, so this steps it down by width; the
+ * vertical density (day numbers, weather, blocks) still follows the tier. These are the mid
+ * tier's header values, as the short-wall block below holds the compact tier's. 1200px is where
+ * the full header stops fitting a browsed day on Each bean / Today, measured with
+ * `scripts/design-screenshots/wall-header-rows-capture.ts`.
+ */
+@media (width < 1200px) {
+  .wall-root[data-tier='full'] {
+    --wall-date: 1.85rem;
+    --wall-subtitle: 0.85rem;
+    --wall-clock: 1.7rem;
+    --wall-clock-col: 8.5rem;
+    --wall-nav-label: 0.9rem;
+    --wall-tap: 2.5rem;
+  }
 }
 
 /*
@@ -1763,11 +1916,10 @@ watch(activeView, () => (sheet.value = null));
   /*
    * ⚠️ The controls stay on ONE row here, and the tighter gap is what pays for it.
    *
-   * `.wall-header-controls` carries `flex-wrap: wrap` as a backstop so nothing
-   * can ever overflow the row. On the views that keep their step arrows in the
-   * header (Each bean, Today — the week view puts its own inside the calendar)
-   * that backstop was firing for the sake of NINETEEN pixels: 504px of controls
-   * plus 48px of gaps against a 533px line. The cost was a second header row,
+   * `.wall-header-controls` used to carry `flex-wrap: wrap` as a backstop. On the
+   * views that keep their step arrows in the header (Each bean, Today — the week
+   * view puts its own inside the calendar) that backstop was firing for the sake
+   * of NINETEEN pixels: 504px of controls plus 48px of gaps against a 533px line. The cost was a second header row,
    * which on an 853x533 wall took the header from 94px to 153px, 29% of the
    * whole screen, for two arrows.
    *
@@ -1776,7 +1928,6 @@ watch(activeView, () => (sheet.value = null));
    * width. greg caught this on a mounted Tab M8.
    */
   .wall-header-controls {
-    flex-wrap: nowrap;
     gap: 0.375rem;
   }
 }
@@ -1796,15 +1947,17 @@ watch(activeView, () => (sheet.value = null));
  * rather than a width, and the status stamp under the time already truncates.
  * The clock is the only control that can yield — every other one is a tap target
  * at its floor.
+ *
+ * Under 900px rather than 700 since the Today view's back control joined the row
+ * (2026-11-04): an 800px portrait wall browsing a day clipped its label by 47px.
  */
-@media (width <= 700px) {
+@media (width < 900px) {
   .wall-header-controls {
-    flex-wrap: nowrap;
     gap: 0.375rem;
-    min-width: 0;
   }
 
   .wall-root .wall-clock-col {
+    flex-shrink: 1;
     max-width: var(--wall-clock-col);
     min-width: 0;
     width: auto;

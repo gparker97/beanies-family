@@ -13,13 +13,11 @@
  * marker on every other view can no longer disagree.
  */
 import { computed } from 'vue';
-import WallBackButton from '@/components/wall/WallBackButton.vue';
 import WallTimeGrid from '@/components/wall/WallTimeGrid.vue';
 import type { BirthdayOccurrence } from '@/utils/birthdays';
 import WallViewShell from '@/components/wall/WallViewShell.vue';
 import { AXIS_WIDTH_PX } from '@/utils/wallTimeGrid';
 import { useActivityStore } from '@/stores/activityStore';
-import { useTranslation } from '@/composables/useTranslation';
 import { wallDayAllDay, wallEvents } from '@/utils/wallActivities';
 import { computeAllDaySpans } from '@/utils/allDaySpans';
 import { useWallReferenceDays } from '@/composables/useWallReferenceDays';
@@ -42,10 +40,6 @@ const props = defineProps<{
   now: Date;
   /** The wall's shared anchor — the day this panel renders. */
   anchorYmd: string;
-  /** Names the view the back control returns to. */
-  backLabel: string;
-  /** False when there is nowhere different to go — see `canGoBackFrom`. */
-  canGoBack: boolean;
   /** The job/list bundle, forwarded whole to the shell. */
   peripherals: WallPeripheralData;
   /** The wall's person filter, which this view applies to its own content too. */
@@ -58,14 +52,11 @@ const emit = defineEmits<{
   'open-birthday': [birthday: BirthdayOccurrence];
   /** Move the wall's shared anchor to this day. See `useWallAnchor`. */
   focusDay: [string];
-  /** Return to the view this one was opened from. */
-  back: [];
   open: [WallSheetTarget];
   openChores: [];
 }>();
 
 const activityStore = useActivityStore();
-const { t } = useTranslation();
 const { identityFor } = useActivityIdentity();
 
 /**
@@ -153,17 +144,6 @@ function eventsOn(ymd: string) {
 function colourFor(activity: FamilyActivity) {
   return identityFor(activity).color;
 }
-
-/** Names the day on screen. With the drawer gone, this is what tells you where you are. */
-const focusLabel = computed(() =>
-  isToday.value
-    ? t('wall.today.today')
-    : new Date(`${focusYmd.value}T00:00:00`).toLocaleDateString(undefined, {
-        weekday: 'long',
-        day: 'numeric',
-        month: 'long',
-      })
-);
 </script>
 
 <template>
@@ -178,25 +158,11 @@ const focusLabel = computed(() =>
     @open-chores="emit('openChores')"
   >
     <template #main>
-      <div
-        class="flex shrink-0 items-center justify-between gap-3"
-        :style="{ paddingLeft: `${AXIS_WIDTH_PX}px` }"
-      >
-        <p class="font-outfit text-secondary-500 wall-slot-title dark:text-ink font-bold">
-          {{ focusLabel }}
-        </p>
-        <!--
-          The way back, named after where you came from. Reuses the jobs board's
-          control and its string — greg's call, over my recommendation that the
-          always-visible view switcher made it unnecessary.
-
-          Shown only when there is somewhere different to go: `canGoBack` is a
-          READ-side check because no write-side rule can see `today -> jobs ->
-          back` coming, which leaves this naming the view you are already in.
-        -->
-        <WallBackButton v-if="canGoBack" :back-label="backLabel" @back="emit('back')" />
-      </div>
-
+      <!--
+        No row of its own above the grid. It named the day and held the back control; the
+        header's nav label already names the day ("Today" / "Thu, 5 Nov 2026") and the back
+        control now sits in the header beside it, so the grid takes the row (greg, 2026-11-04).
+      -->
       <WallTimeGrid
         :columns="gridColumns"
         :all-day-spans="allDaySpans"
