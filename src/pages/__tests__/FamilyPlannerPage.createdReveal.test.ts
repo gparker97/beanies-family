@@ -5,9 +5,9 @@
  * (no confirmation) reveals straight away; "+ add another", deleting it from the view modal, or
  * an inline edit there that swaps the record drops the pending reveal.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { flushPromises, shallowMount } from '@vue/test-utils';
-import { createPinia, setActivePinia } from 'pinia';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { flushPromises, shallowMount, type VueWrapper } from '@vue/test-utils';
+import { createPinia, setActivePinia, type Pinia } from 'pinia';
 import { nextTick, ref } from 'vue';
 import FamilyPlannerPage from '@/pages/FamilyPlannerPage.vue';
 import { useActivityStore } from '@/stores/activityStore';
@@ -55,8 +55,24 @@ async function settle() {
   await nextTick();
 }
 
+/**
+ * Each test's own pinia, handed to the page explicitly. Relying on the ACTIVE pinia is racy: a
+ * store action re-activates its own pinia when it runs, so an async tail of the previous test
+ * (an action finishing after its page unmounted) can flip the active pinia back after
+ * `beforeEach` set a fresh one. The page would then mount on the old store while the test writes
+ * to the new one (seen under full-suite load as a swap that "did nothing").
+ */
+let pinia: Pinia;
+let mounted: VueWrapper | null = null;
+const activityStore = () => useActivityStore(pinia);
+
 function mountPage() {
-  return shallowMount(FamilyPlannerPage, { attachTo: document.body });
+  const w = shallowMount(FamilyPlannerPage, {
+    attachTo: document.body,
+    global: { plugins: [pinia] },
+  });
+  mounted = w;
+  return w;
 }
 
 type Wrapper = ReturnType<typeof mountPage>;
@@ -89,13 +105,22 @@ async function createActivity(w: Wrapper) {
 }
 
 beforeEach(() => {
-  setActivePinia(createPinia());
+  pinia = createPinia();
+  setActivePinia(pinia);
   vi.clearAllMocks();
-  const store = useActivityStore();
+  const store = activityStore();
   store.createActivity = vi.fn(async () => {
     store.activities = [...store.activities, CREATED];
     return CREATED;
   }) as never;
+});
+
+// Unmount even when a test failed before its own `w.unmount()`: a page left attached would be
+// the root `drawChip` finds in the next test, failing it for no reason of its own.
+afterEach(() => {
+  mounted?.unmount();
+  mounted = null;
+  document.body.innerHTML = '';
 });
 
 describe('FamilyPlannerPage: reveal a just-created activity', () => {
@@ -114,7 +139,6 @@ describe('FamilyPlannerPage: reveal a just-created activity', () => {
     await settle();
     expect(confirmModal(w).props('open')).toBe(false);
     expect(reveal).toHaveBeenCalledWith(chip, 'attention-ring');
-    w.unmount();
   });
 
   it('"View Activity" opens it, and the reveal waits for the view modal to close', async () => {
@@ -133,7 +157,6 @@ describe('FamilyPlannerPage: reveal a just-created activity', () => {
     await settle();
     expect(viewModal(w).props('activity')).toBeNull();
     expect(reveal).toHaveBeenCalledWith(chip, 'attention-ring');
-    w.unmount();
   });
 
   it('deleting it from the view modal drops the parked reveal', async () => {
@@ -149,7 +172,6 @@ describe('FamilyPlannerPage: reveal a just-created activity', () => {
     await settle();
     expect(viewModal(w).props('activity')).toBeNull();
     expect(reveal).not.toHaveBeenCalled();
-    w.unmount();
   });
 
   it('a swap in the view modal (an inline edit) drops the parked reveal', async () => {
@@ -159,7 +181,7 @@ describe('FamilyPlannerPage: reveal a just-created activity', () => {
     confirmModal(w).vm.$emit('view');
     await settle();
 
-    const store = useActivityStore();
+    const store = activityStore();
     const swapped = { ...CREATED, id: 'act-override' } as FamilyActivity;
     store.activities = [...store.activities, swapped];
     viewModal(w).vm.$emit('activity-swapped', swapped.id);
@@ -177,7 +199,6 @@ describe('FamilyPlannerPage: reveal a just-created activity', () => {
     viewModal(w).vm.$emit('close');
     await settle();
     expect(reveal).not.toHaveBeenCalled();
-    w.unmount();
   });
 
   it('"+ add another" drops the pending reveal', async () => {
@@ -191,11 +212,10 @@ describe('FamilyPlannerPage: reveal a just-created activity', () => {
     activityModal(w).vm.$emit('close');
     await settle();
     expect(reveal).not.toHaveBeenCalled();
-    w.unmount();
   });
 
   it('reveals an eager-created activity straight away (no confirmation)', async () => {
-    const store = useActivityStore();
+    const store = activityStore();
     store.activities = [CREATED];
     store.updateActivity = vi.fn().mockResolvedValue(true) as never;
     const w = mountPage();
@@ -205,6 +225,5 @@ describe('FamilyPlannerPage: reveal a just-created activity', () => {
     await settle();
     expect(confirmModal(w).props('open')).toBe(false);
     expect(reveal).toHaveBeenCalledWith(chip, 'attention-ring');
-    w.unmount();
   });
 });
