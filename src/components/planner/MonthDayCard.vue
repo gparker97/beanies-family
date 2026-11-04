@@ -11,17 +11,17 @@
  * Only `CalendarMonthStream` mounts it, and only below 768px: the desktop grid draws its
  * own `MonthGridCell`s. So it carries no desktop markup and no day tint.
  *
- * Recorded follow-up: the root `<button>` still nests the chip buttons, as it always
- * has. The fix, when it is done, is to provide `MONTH_CELL_CHIPS` with `interactive:
- * false` here, as the phone grid cell does.
+ * The root is the `<button>` (a tap anywhere opens the day), so everything inside it is
+ * non-interactive: it provides `MONTH_CELL_CHIPS` with `interactive: false`, as the phone
+ * grid cell does, and its chips and "+N more" render as `aria-hidden` spans. Buttons
+ * never nest. The spoken name (`dayButtonLabel`) carries the date, holidays and count.
  */
-import { computed } from 'vue';
+import { computed, provide } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { parseLocalDate } from '@/utils/date';
-import type { BirthdayOccurrence } from '@/utils/birthdays';
-import type { HolidayOccurrence } from '@/types/models';
 import type { MonthDayCellData } from '@/utils/monthCells';
-import { dayCount } from '@/utils/monthDayItems';
+import { dayButtonLabel, dayCount } from '@/utils/monthDayItems';
+import { DEFAULT_CELL_CHIPS, MONTH_CELL_CHIPS } from '@/components/planner/monthCellChipsKey';
 import { STREAM_DAY_CAPS } from '@/constants/calendarCaps';
 import { CALENDAR_TODAY, calendarDayBackground } from '@/constants/tileStyles';
 import MonthDayContents from '@/components/planner/MonthDayContents.vue';
@@ -32,15 +32,18 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'select-date': [date: string];
-  'view-activity': [activityId: string, date: string];
-  'holiday-click': [holiday: HolidayOccurrence];
-  /** A derived birthday was tapped — the parent opens the read-only drawer. */
-  'birthday-click': [birthday: BirthdayOccurrence];
-  'vacation-click': [vacationId: string];
-  'view-segment': [vacationId: string, segmentIndex: number];
 }>();
 
 const { t } = useTranslation();
+
+provide(
+  MONTH_CELL_CHIPS,
+  computed(() => ({ ...DEFAULT_CELL_CHIPS, interactive: false }))
+);
+
+const rootLabel = computed(
+  () => dayButtonLabel(props.cell, t) + (props.cell.isToday ? `, ${t('planner.today')}` : '')
+);
 
 // The DOW abbreviation uses the same translation keys as the grid's column headers, so
 // beanie mode and future locales pick up the override automatically.
@@ -84,6 +87,7 @@ const backgroundClass = computed(() =>
     class="font-outfit text-secondary-500 dark:text-ink relative flex w-full min-w-0 cursor-pointer flex-row gap-3 rounded-xl p-2.5 text-left transition-colors"
     :class="[borderClass, backgroundClass]"
     :aria-current="cell.isToday ? 'date' : undefined"
+    :aria-label="rootLabel"
     @click="emit('select-date', cell.date)"
   >
     <!-- DOW + day-number column on the left. Today's caption sits at the top so the row
@@ -108,16 +112,6 @@ const backgroundClass = computed(() =>
       </span>
     </div>
 
-    <MonthDayContents
-      v-if="showContents"
-      :cell="cell"
-      :caps="STREAM_DAY_CAPS"
-      @more="emit('select-date', cell.date)"
-      @view-activity="(id, date) => emit('view-activity', id, date)"
-      @vacation-click="(vid) => emit('vacation-click', vid)"
-      @view-segment="(vid, sidx) => emit('view-segment', vid, sidx)"
-      @holiday-click="(h) => emit('holiday-click', h)"
-      @birthday-click="(b) => emit('birthday-click', b)"
-    />
+    <MonthDayContents v-if="showContents" :cell="cell" :caps="STREAM_DAY_CAPS" />
   </button>
 </template>

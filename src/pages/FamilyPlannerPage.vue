@@ -1210,11 +1210,6 @@ function handleActivitySwapped(newId: string) {
       @prev="handlePrev"
       @next="handleNext"
       @month-in-view="handleMonthInView"
-      @vacation-click="handleVacationClick"
-      @view-segment="handleViewSegment"
-      @view-activity="(id: string, date: string) => openViewModal(id, date)"
-      @holiday-click="handleHolidayClick"
-      @birthday-click="handleBirthdayClick"
     />
 
     <CalendarGrid

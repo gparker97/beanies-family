@@ -203,12 +203,14 @@ describe('MonthDayCard chip row', () => {
       props: { cell: makeCell({ timedOccurrences: occs }), ...baseProps },
     });
     expect(wrapper.findAll('[data-testid="month-chip"]').length).toBe(4);
-    const moreBtn = wrapper.findAll('button').find((b) => b.text().includes('+2'));
-    expect(moreBtn).toBeDefined();
-    expect(moreBtn?.element.tagName).toBe('BUTTON');
+    // The card root is the button, so the "+N more" is a span inside it.
+    const more = wrapper.get('[data-testid="day-contents-more"]');
+    expect(more.text()).toContain('+2');
+    expect(more.element.tagName).toBe('SPAN');
+    expect(more.attributes('aria-hidden')).toBe('true');
   });
 
-  it('re-emits view-activity when a chip is clicked (not the cell)', async () => {
+  it('a chip tap opens the day (chips are not controls inside the card button)', async () => {
     const occ = {
       activity: makeActivity({ id: 'a-99', title: 'Soccer' }),
       date: '2026-05-19',
@@ -216,10 +218,28 @@ describe('MonthDayCard chip row', () => {
     const wrapper = mount(MonthDayCard, {
       props: { cell: makeCell({ timedOccurrences: [occ] }), ...baseProps },
     });
-    await wrapper.get('[data-testid="month-chip"]').trigger('click');
-    expect(wrapper.emitted('view-activity')).toEqual([['a-99', '2026-05-19']]);
-    // Cell select-date should NOT also fire (chip's @click.stop)
-    expect(wrapper.emitted('select-date')).toBeFalsy();
+    const chip = wrapper.get('[data-testid="month-chip"]');
+    expect(chip.element.tagName).toBe('SPAN');
+    expect(chip.attributes('aria-hidden')).toBe('true');
+    await chip.trigger('click');
+    expect(wrapper.emitted('select-date')).toEqual([['2026-05-19']]);
+  });
+
+  it('never nests buttons, and speaks the day through the root label', () => {
+    const wrapper = mount(MonthDayCard, {
+      props: {
+        cell: makeCell({
+          extras: [birthdayExtra('m1', 'Joey')],
+          timedOccurrences: Array.from({ length: 6 }, (_, i) => ({
+            activity: makeActivity({ id: `n-${i}`, title: `N${i}` }),
+            date: '2026-05-19',
+          })),
+        }),
+        ...baseProps,
+      },
+    });
+    expect(wrapper.findAll('button')).toHaveLength(1);
+    expect(wrapper.get('button').attributes('aria-label')).toContain('planner.dayRow.count.other');
   });
 });
 
@@ -329,12 +349,11 @@ describe('MonthDayCard as the stream card shell (#141)', () => {
     expect(wrapper.findComponent(MonthDayContents).exists()).toBe(true);
   });
 
-  it('forwards birthday-click from its contents', async () => {
+  it('a birthday chip tap opens the day', async () => {
     const extra = birthdayExtra('m1', 'Joey');
     const wrapper = mount(MonthDayCard, { props: { cell: makeCell({ extras: [extra] }) } });
     await wrapper.get('[data-testid="birthday-chip"]').trigger('click');
-    expect(wrapper.emitted('birthday-click')).toEqual([[extra.birthday]]);
-    expect(wrapper.emitted('select-date')).toBeFalsy();
+    expect(wrapper.emitted('select-date')).toEqual([['2026-05-19']]);
   });
 
   it('the contents "+N more" opens the day', async () => {

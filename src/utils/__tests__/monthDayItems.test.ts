@@ -4,6 +4,7 @@ import {
   byStartTime,
   capDayContents,
   dayCount,
+  dayButtonLabel,
   dayCountLabel,
   dayItemKey,
   dayItems,
@@ -135,6 +136,21 @@ describe('dayCount and dayCountLabel', () => {
   it('labels many with the count filled in', () => {
     const c = cell({ extras: [birthday()], timedOccurrences: [timed('a'), timed('b')] });
     expect(dayCountLabel(c, t)).toBe('3 things on');
+  });
+});
+
+describe('dayButtonLabel', () => {
+  it('speaks the date, the holiday names (not birthdays) and the count', () => {
+    const c = cell({ extras: [birthday(), holiday()], timedOccurrences: [timed('a')] });
+    const label = dayButtonLabel(c, t);
+    const parts = label.split(' · ');
+    expect(parts).toHaveLength(3);
+    expect(parts[1]).toBe('Vesak Day (SG)');
+    expect(parts[2]).toBe('3 things on');
+  });
+
+  it('drops the holiday part on a day without one', () => {
+    expect(dayButtonLabel(cell(), t).split(' · ')).toHaveLength(2);
   });
 });
 

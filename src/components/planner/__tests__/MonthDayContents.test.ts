@@ -147,18 +147,29 @@ describe('MonthDayContents empty day and context', () => {
     const w = mount(MonthDayContents, {
       props: { cell: c },
       global: {
-        provide: {
-          [MONTH_CELL_CHIPS as symbol]: ref({
-            ...DEFAULT_CELL_CHIPS,
-            density: 'bars',
-            interactive: false,
-          }),
-        },
+        provide: { [MONTH_CELL_CHIPS as symbol]: ref({ ...DEFAULT_CELL_CHIPS, density: 'bars' }) },
       },
     });
     const chip = w.get('[data-testid="month-chip"]');
     expect(chip.element.tagName).toBe('BUTTON');
     expect(chip.text()).toContain('Soccer');
+  });
+
+  it('inherits interactive: inside a button parent, chips and "+N more" are spans', () => {
+    const c = cell({
+      timedOccurrences: Array.from({ length: 6 }, (_, i) => timed(`T${i}`, '16:00')),
+    });
+    const w = mount(MonthDayContents, {
+      props: { cell: c, caps: STREAM_DAY_CAPS },
+      global: {
+        provide: {
+          [MONTH_CELL_CHIPS as symbol]: ref({ ...DEFAULT_CELL_CHIPS, interactive: false }),
+        },
+      },
+    });
+    expect(w.findAll('button')).toHaveLength(0);
+    expect(w.get('[data-testid="month-chip"]').text()).toContain('T0');
+    expect(w.get('[data-testid="day-contents-more"]').element.tagName).toBe('SPAN');
   });
 
   it('every item and extra carries data-day-item for roving focus', () => {

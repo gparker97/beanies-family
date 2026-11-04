@@ -16,13 +16,17 @@
  * The ONLY providers, and adding one needs a reason written here:
  *  - `MonthGridCell`: the grid densities, muted out-of-month days, and `interactive:
  *    false` inside a phone cell, whose root is the button (never nest buttons).
+ *  - `MonthDayCard`: `interactive: false`, because the stream card's root is the button
+ *    (never nest buttons). Everything else is the default.
  *  - `MonthDayContents`: full anatomy for every day list (the stream card, the desktop
  *    popover, the phone day row). Vue's `inject` reads the PARENT chain, so a provider
- *    affects only its descendants, and this one overrides any grid context above it.
+ *    affects only its descendants, and this one overrides any grid context above it,
+ *    except `interactive`, which it passes through from its parent.
  *
  * The ONLY readers, and adding one needs a reason written here:
  *  - `MonthChipFrame` (one-line chips) and `AllDayChip` (spanning bars). Adapters pass
  *    content, never presentation.
+ *  - `MonthDayContents`, for its parent's `interactive` (and its own "+N more").
  *
  * The scope matches the per-cell `--mg-*` CSS vars: the popover and the phone day row
  * are siblings of the cells, not descendants, so they never inherit grid presentation.

@@ -28,7 +28,7 @@ import { computed, provide } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { formatTodayCaption } from '@/utils/date';
 import { fillTemplate } from '@/utils/fillTemplate';
-import { dayCountLabel, dayItemKey, dayItems, type DayItem } from '@/utils/monthDayItems';
+import { dayButtonLabel, dayItemKey, dayItems, type DayItem } from '@/utils/monthDayItems';
 import { faceCluster, type CellLayout, type MonthGridDisplay } from '@/utils/monthGridLayout';
 import { resolveSegmentTravellers } from '@/utils/segmentTravellers';
 import { useActivityIdentity } from '@/composables/useActivityIdentity';
@@ -91,8 +91,7 @@ const caption = computed(() => formatTodayCaption(props.cell.date));
 const rootLabel = computed(() => {
   if (!isPhone.value) return caption.value + (props.cell.isToday ? `, ${t('planner.today')}` : '');
   // The phone cell has no room for the holiday name, so its label carries it.
-  const names = holidays.value.map((h) => h.label).join(', ');
-  return [caption.value, names, dayCountLabel(props.cell, t)].filter(Boolean).join(' · ');
+  return dayButtonLabel(props.cell, t);
 });
 
 /**

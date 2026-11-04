@@ -22,6 +22,7 @@ import type { DayExtra } from '@/utils/calendarDay';
 import type { DayCaps } from '@/constants/calendarCaps';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import { fillTemplate } from '@/utils/fillTemplate';
+import { formatTodayCaption } from '@/utils/date';
 
 /** One renderable thing on a day, other than a birthday or holiday. */
 export type DayItem =
@@ -114,6 +115,19 @@ export function dayCountLabel(cell: MonthDayCellData, t: Translate): string {
   return fillTemplate(t(count === 1 ? 'planner.dayRow.count.one' : 'planner.dayRow.count.other'), {
     count,
   });
+}
+
+/**
+ * The spoken name of a day whose root is the button and whose chips are therefore
+ * `aria-hidden` (the phone grid cell, the stream card): "Thu, 5 November · Deepavali ·
+ * 3 things on". The holiday name rides along because neither surface speaks its chips.
+ */
+export function dayButtonLabel(cell: MonthDayCellData, t: Translate): string {
+  const names = cell.extras
+    .filter((e) => e.kind === 'holiday' && e.holiday)
+    .map((e) => e.label)
+    .join(', ');
+  return [formatTodayCaption(cell.date), names, dayCountLabel(cell, t)].filter(Boolean).join(' · ');
 }
 
 export interface CappedDayContents {

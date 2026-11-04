@@ -16,8 +16,9 @@
  * Every bar renders standalone with its label, because a vertical list has no
  * neighbouring cell to continue into. It provides the month chip context as full
  * anatomy (`DEFAULT_CELL_CHIPS`) with times shown when uncapped, overriding any grid
- * context above it. Every item and extra carries `data-day-item` for the popover's
- * roving focus.
+ * context above it, except `interactive`, which it inherits: inside the stream card
+ * (whose root is the button) the chips and the "+N more" are spans, so buttons never
+ * nest. Every item and extra carries `data-day-item` for the popover's roving focus.
  */
 import { computed, provide } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
@@ -27,7 +28,11 @@ import type { MonthDayCellData } from '@/utils/monthCells';
 import type { DayCaps } from '@/constants/calendarCaps';
 import type { BirthdayOccurrence } from '@/utils/birthdays';
 import type { HolidayOccurrence } from '@/types/models';
-import { DEFAULT_CELL_CHIPS, MONTH_CELL_CHIPS } from '@/components/planner/monthCellChipsKey';
+import {
+  DEFAULT_CELL_CHIPS,
+  MONTH_CELL_CHIPS,
+  useMonthCellChips,
+} from '@/components/planner/monthCellChipsKey';
 import BirthdayChip from '@/components/planner/BirthdayChip.vue';
 import HolidayChip from '@/components/planner/HolidayChip.vue';
 import MonthDayItem from '@/components/planner/MonthDayItem.vue';
@@ -51,12 +56,22 @@ const emit = defineEmits<{
 
 const { t } = useTranslation();
 
+// Read BEFORE providing, so this resolves the parent's context, not our own.
+const parentChips = useMonthCellChips();
+const interactive = computed(() => parentChips.value.interactive);
 provide(
   MONTH_CELL_CHIPS,
-  computed(() => ({ ...DEFAULT_CELL_CHIPS, showTime: !props.caps }))
+  computed(() => ({ ...DEFAULT_CELL_CHIPS, showTime: !props.caps, interactive: interactive.value }))
 );
 
 const c = computed(() => capDayContents(props.cell, props.caps));
+
+function onMore(event: MouseEvent) {
+  // A span lets the tap reach the button around it (the stream card opens the day).
+  if (!interactive.value) return;
+  event.stopPropagation();
+  emit('more');
+}
 const isEmpty = computed(() => dayCount(props.cell) === 0);
 const moreLabel = computed(() =>
   fillTemplate(t('planner.moreEvents'), { count: c.value.hidden.timeline })
@@ -110,17 +125,20 @@ const moreLabel = computed(() =>
       @vacation-click="(vid) => emit('vacation-click', vid)"
       @view-segment="(vid, sidx) => emit('view-segment', vid, sidx)"
     />
-    <button
+    <component
+      :is="interactive ? 'button' : 'span'"
       v-if="c.hidden.timeline > 0"
-      type="button"
-      class="font-outfit hover:text-primary-500 dark:hover:text-accent-lift dark:text-ink-faint self-start rounded-md px-1 py-0.5 text-xs font-semibold tracking-wide text-[var(--color-text-muted)] transition-colors"
-      :aria-label="moreLabel"
+      :type="interactive ? 'button' : undefined"
+      class="font-outfit dark:text-ink-faint self-start rounded-md px-1 py-0.5 text-xs font-semibold tracking-wide text-[var(--color-text-muted)] transition-colors"
+      :class="interactive ? 'hover:text-primary-500 dark:hover:text-accent-lift' : ''"
+      :aria-label="interactive ? moreLabel : undefined"
+      :aria-hidden="interactive ? undefined : 'true'"
       data-day-item
       data-testid="day-contents-more"
-      @click.stop="emit('more')"
+      @click="onMore"
     >
       +{{ c.hidden.timeline }} {{ t('planner.moreEventsShort') }}
-    </button>
+    </component>
 
     <span
       v-if="isEmpty"
