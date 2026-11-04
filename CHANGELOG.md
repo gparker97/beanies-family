@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-11-05
+
+### Fixed
+
+- Trip date buttons, the trip dates panel and the new-trip panel in travel import show their light teal wash again.
+
 ## 2026-11-04
 
 ### Added

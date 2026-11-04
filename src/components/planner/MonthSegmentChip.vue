@@ -8,7 +8,7 @@
  *
  * The washes are themed in `style.css` for light and dark: `--vacation-teal-15`, and
  * `--vacation-teal-tint` for a pending (unbooked) segment, which also takes the dashed
- * edge. (`--vacation-teal-5` is not defined anywhere, so it is not used.)
+ * edge.
  */
 import { computed } from 'vue';
 import { travelSegmentLabels, type TravelSegmentOccurrence } from '@/utils/vacation';

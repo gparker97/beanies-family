@@ -131,6 +131,7 @@
   --tint-slate-10: rgb(44 62 80 / 10%);
   --tint-success-10: rgb(39 174 96 / 10%);
   --vacation-teal: #00b4d8;
+  --vacation-teal-5: rgb(0 180 216 / 5%);
   --vacation-teal-tint: rgb(0 180 216 / 8%);
   --vacation-teal-15: rgb(0 180 216 / 15%);
   --vacation-gold: #ffd93d;
@@ -212,6 +213,7 @@
   --tint-slate-10: rgb(255 255 255 / 10%);
   --tint-success-10: rgb(39 174 96 / 15%);
   --vacation-teal: #00b4d8;
+  --vacation-teal-5: rgb(0 180 216 / 8%);
   --vacation-teal-tint: rgb(0 180 216 / 12%);
   --vacation-teal-15: rgb(0 180 216 / 20%);
   --vacation-gold: #ffd93d;
