@@ -11,7 +11,7 @@
  *    (max 2 plus "+N").
  *  - `comfortable`: the chip the month grid has always drawn (time shown only where the
  *    context asks, the popover and day lists).
- *  - `titles`: a 2px edge and the label only.
+ *  - `titles`: a 2px edge and the label only, medium weight like every other chip label.
  *  - `bars`: a plain colour bar, no children.
  *  - `muted` (out-of-month days): edge only, no wash, muted ink; decorative faces and
  *    bars fade, readable text never takes opacity.
@@ -165,8 +165,10 @@ function onClick(event: MouseEvent) {
       />
     </template>
 
-    <span v-else-if="density === 'titles'" class="min-w-0 flex-1 truncate text-xs leading-none">{{
-      label
-    }}</span>
+    <span
+      v-else-if="density === 'titles'"
+      class="min-w-0 flex-1 truncate text-xs leading-none font-medium"
+      >{{ label }}</span
+    >
   </component>
 </template>

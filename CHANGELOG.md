@@ -12,6 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
+- Event titles on the phone month grid now use the same weight as other small text in the app.
 - In the phone month list, a tap anywhere on a day card opens that day, and screen readers announce each day with what is on it.
 - Trip date buttons, the trip dates panel and the new-trip panel in travel import show their light teal wash again.
 
