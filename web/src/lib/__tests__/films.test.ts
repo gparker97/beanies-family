@@ -76,7 +76,7 @@ describe('durations', () => {
 
 describe('MUSICAL urls', () => {
   it('are absolute https URLs under the versioned media prefix', () => {
-    const base = `${SITE_URL}/media/musical/v1/`;
+    const base = `${SITE_URL}/media/musical/v2/`;
     for (const url of Object.values(MUSICAL.urls)) {
       expect(url.startsWith(base)).toBe(true);
       expect(new URL(url).protocol).toBe('https:');
@@ -98,7 +98,7 @@ describe('videoObject', () => {
       name: 'the morning routine musical',
       description: MUSICAL.description,
       thumbnailUrl: MUSICAL.urls.poster,
-      uploadDate: '2026-11-03',
+      uploadDate: '2026-11-04',
       duration: 'PT1M7S',
       contentUrl: MUSICAL.urls.film1080,
       publisher: { '@id': ORGANIZATION['@id'] },

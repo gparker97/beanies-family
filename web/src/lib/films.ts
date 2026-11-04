@@ -59,9 +59,9 @@ export const MUSICAL: Film = {
   description:
     'a 67-second animated musical about the chaos of a family morning, written and produced by greg, the dad who makes beanies.family.',
   durationS: 67,
-  uploadDate: '2026-11-03', // bump to the deploy date when deploy-web.yml ships this page
+  uploadDate: '2026-11-04', // bump to the deploy date when deploy-web.yml ships this page
   eventPrefix: 'Musical',
-  urls: mediaUrls('musical/v1'),
+  urls: mediaUrls('musical/v2'), // v2 (2026-11-04): the six-shot teaser loop; v1 carried the dinner loop
 };
 
 type Timed = Pick<Film, 'durationS'>;
