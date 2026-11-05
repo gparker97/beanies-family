@@ -65,12 +65,12 @@ export default defineConfig({
       // /oauth/* is the native OAuth return bridge — a machine-facing redirect
       // surface that must never be indexed or surfaced to a human via search.
       // /unsubscribe carries a token in its URL and is noindex for the same reason.
-      // /discord and /musical are noindex forward pages (ForwardPage.astro): listing them
+      // /discord, /musical and /yt-musical are noindex forward pages (ForwardPage.astro): listing them
       // would submit URLs that tell Google not to index them.
       filter: (page) =>
         !page.includes('/og/') &&
         !page.includes('/oauth/') &&
-        !/\/(unsubscribe|discord|musical)(\.html|\/)?$/.test(new URL(page).pathname),
+        !/\/(unsubscribe|discord|musical|yt-musical)(\.html|\/)?$/.test(new URL(page).pathname),
     }),
     // Fails the build if any link into the app lacks data-cta. See the file
     // header for why this is checked on built HTML rather than in lint.

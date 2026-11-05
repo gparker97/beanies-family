@@ -4,8 +4,11 @@ import { ORGANIZATION } from '@beanies/brand/schema';
 import { parseAttribution } from '@beanies/brand/attribution';
 import {
   MUSICAL,
+  MUSICAL_ANCHOR,
   MUSICAL_SHORT_PATH,
   MUSICAL_SHORT_TARGET,
+  MUSICAL_YT_PATH,
+  MUSICAL_YT_TARGET,
   durationClock,
   durationIso,
   durationSpoken,
@@ -132,15 +135,25 @@ describe('errorReason', () => {
   });
 });
 
-describe('the /musical short link', () => {
-  it('is a short root path', () => {
+describe('the musical short links', () => {
+  it('are short root paths', () => {
     expect(MUSICAL_SHORT_PATH).toBe('/musical');
+    expect(MUSICAL_YT_PATH).toBe('/yt-musical');
   });
 
-  it('forwards to the homepage with the YouTube long-form campaign tag', () => {
+  it('/musical lands on the homepage film card with no campaign tag', () => {
     const url = new URL(MUSICAL_SHORT_TARGET, SITE_URL);
     expect(url.origin).toBe(new URL(SITE_URL).origin);
     expect(url.pathname).toBe('/');
+    expect(url.search).toBe('');
+    expect(url.hash).toBe(`#${MUSICAL_ANCHOR}`);
+  });
+
+  it('/yt-musical lands on the film card with the YouTube long-form campaign tag', () => {
+    const url = new URL(MUSICAL_YT_TARGET, SITE_URL);
+    expect(url.origin).toBe(new URL(SITE_URL).origin);
+    expect(url.pathname).toBe('/');
+    expect(url.hash).toBe(`#${MUSICAL_ANCHOR}`);
     expect(parseAttribution(url.search)).toMatchObject({
       utm_source: 'youtube',
       utm_medium: 'social',

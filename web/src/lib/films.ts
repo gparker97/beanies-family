@@ -64,20 +64,31 @@ export const MUSICAL: Film = {
   urls: mediaUrls('musical/v2'), // v2 (2026-11-04): the six-shot teaser loop; v1 carried the dinner loop
 };
 
+/** The film card's element id on the homepage: the fragment both short links below land on. */
+export const MUSICAL_ANCHOR = 'musical';
+
 /**
- * The short link to the musical, for places where a link is shown as typed text (a YouTube
- * description cannot hold anchor text, so a 130-character UTM URL would be the first thing
- * every viewer reads). `/musical` forwards to the homepage, where the film card plays, with
- * the YouTube long-form tag, so the visit still lands in Plausible and first-touch attribution
- * as `musical-nov26`. Channels whose link is hidden (Pinterest, ads) keep the full UTM URL.
+ * Short links to the musical, for places where a link is shown as typed text. Both forward to
+ * the homepage scrolled to the film card (`#musical`).
+ *
+ * - `/musical` is the marketing link (video end cards, print, anywhere a person types it). It
+ *   carries NO campaign tag, because it is shown on every channel: a tag here would credit one
+ *   channel with all of them.
+ * - `/yt-musical` is the YouTube description link (a description cannot hold anchor text, so a
+ *   130-character UTM URL would be the first thing every viewer reads). It carries the YouTube
+ *   long-form tag, so the visit lands in Plausible and first-touch attribution as `musical-nov26`.
+ *
+ * Channels whose link is hidden (Pinterest, ads) keep the full UTM URL instead.
  */
 export const MUSICAL_SHORT_PATH = '/musical';
-export const MUSICAL_SHORT_TARGET = `/?${new URLSearchParams({
+export const MUSICAL_SHORT_TARGET = `/#${MUSICAL_ANCHOR}`;
+export const MUSICAL_YT_PATH = '/yt-musical';
+export const MUSICAL_YT_TARGET = `/?${new URLSearchParams({
   utm_source: 'youtube',
   utm_medium: 'social',
   utm_campaign: 'musical-nov26',
   utm_content: 'long-form',
-})}`;
+})}#${MUSICAL_ANCHOR}`;
 
 type Timed = Pick<Film, 'durationS'>;
 

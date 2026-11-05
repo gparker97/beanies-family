@@ -34,13 +34,16 @@ interface Props {
   film: Film;
   /** `location` prop on every event and the card's `data-cta-loc`. */
   loc: string;
+  /** Element id, so a link can land on the card (the homepage's is MUSICAL_ANCHOR, for /musical). */
+  id?: string;
 }
 
-const { film, loc } = Astro.props;
+const { film, loc, id } = Astro.props;
 ---
 
 <div
   class="film-card"
+  id={id}
   data-film-card
   data-film720={film.urls.film720}
   data-film1080={film.urls.film1080}
@@ -104,6 +107,8 @@ const { film, loc } = Astro.props;
   .film-card {
     margin: 26px auto 0;
     position: relative;
+    /* a link to #<id> lands the card below the floating nav (top 16px + ~52px), not under it */
+    scroll-margin-top: 96px;
     width: min(100%, 35rem);
   }
 

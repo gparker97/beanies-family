@@ -1,0 +1,16 @@
+---
+// beanies.family/yt-musical: the short link in the YouTube description of "the morning routine
+// musical". It forwards to the homepage film card with the YouTube long-form campaign tag; see
+// MUSICAL_YT_TARGET in ../lib/films.ts (and /musical for the untagged marketing link).
+import { SITE_URL } from '@beanies/brand/nav';
+import ForwardPage from '../components/ForwardPage.astro';
+import { MUSICAL, MUSICAL_YT_TARGET } from '../lib/films';
+---
+
+<ForwardPage
+  to={MUSICAL_YT_TARGET}
+  canonical={`${SITE_URL}/`}
+  title={`${MUSICAL.title} | beanies.family`}
+  message="taking you to the morning routine musical… 🫘"
+  linkText="tap here to watch it on beanies.family"
+/>

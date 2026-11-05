@@ -9,7 +9,7 @@ import { SOFTWARE_APPLICATION } from '@beanies/brand/schema';
 import { APP_URL, SITE_URL } from '@beanies/brand/nav';
 import { PRICES, TRIAL_DAYS, numericPrice } from '../lib/pricing';
 import { proofQuote } from '../lib/proof';
-import { MUSICAL, videoObject } from '../lib/films';
+import { MUSICAL, MUSICAL_ANCHOR, videoObject } from '../lib/films';
 import { parseStoreProof, fiveStarTotal, PROOF_SHOW_FROM } from '../lib/storeProof';
 import storeProof from '../data/store-proof.json';
 
@@ -159,7 +159,7 @@ const HERO_MASCOT = '/brand/beanies_family_hugging_transparent_512x512.webp';
 
       <!-- The musical (plan 2026-11-03-musical-homepage-and-media-hosting): a muted loop under
            the badges that opens the full film in a dialog. Its media loads only after `load`. -->
-      <FilmCard film={MUSICAL} loc="homepage-hero" />
+      <FilmCard film={MUSICAL} loc="homepage-hero" id={MUSICAL_ANCHOR} />
 
       <!-- App preview: browser-framed desktop + two phones on desktop; a swipe
            carousel of the app screens on mobile. Pure-CSS (no images) so it adds
