@@ -27,6 +27,9 @@
  *  - `MonthChipFrame` (one-line chips) and `AllDayChip` (spanning bars). Adapters pass
  *    content, never presentation.
  *  - `MonthDayContents`, for its parent's `interactive` (and its own "+N more").
+ *  - `MonthDayItem`, for `interactive` only: it places the drag source (#142) on the two
+ *    activity chips, and a drag source is a control, so it exists only where the chip is a
+ *    control (never inside a phone cell or the stream card, whose roots are the buttons).
  *
  * The scope matches the per-cell `--mg-*` CSS vars: the popover and the phone day row
  * are siblings of the cells, not descendants, so they never inherit grid presentation.

@@ -11,6 +11,7 @@ import {
 import {
   clusterOverlapping,
   MINUTES_PER_DAY,
+  PLANNER_ASSUMED_DURATION_MIN,
   timedSpanMinutes,
   type TimedSpan,
 } from '@/utils/calendar/timeSpans';
@@ -138,8 +139,6 @@ const MIN_CARD_HEIGHT = 1.5; // rem — minimum for short activities (1.5rem = 2
  * dividing so the value is exact and the `>=` touching test sees no float error.
  */
 const MIN_CARD_MINUTES = (MIN_CARD_HEIGHT * 60) / ROW_HEIGHT;
-/** How long an activity with no end time is assumed to run on the planner. */
-const PLANNER_ASSUMED_DURATION_MIN = 60;
 
 const SURFACE = 'planner-time-grid';
 

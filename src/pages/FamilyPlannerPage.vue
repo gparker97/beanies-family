@@ -978,8 +978,8 @@ async function handleSave(
       !isPaymentChange
     ) {
       // Recurring occurrence edit (not payment-related) — show scope modal
-      const saved = await handleScopedSave(data.id, editingOccurrenceDate.value, data.data);
-      if (!saved) return; // cancelled — keep modal open
+      const outcome = await handleScopedSave(data.id, editingOccurrenceDate.value, data.data);
+      if (outcome.kind !== 'saved') return; // cancelled, refused or failed — keep modal open
     } else {
       // Direct update: non-recurring, or adding/removing a payment (a payment is
       // a SERIES-level concern, so it always applies to the template).

@@ -44,6 +44,7 @@ vi.mock('@/composables/useToast', () => ({
   dismissToast: toast.dismiss,
   invokeToastAction: toast.invoke,
   hasToastAction: (id: number) => toast.toasts.value.some((t) => t.id === id && !!t.actionFn),
+  UNDO_TOAST_MS: 6000,
 }));
 
 const family = reactive({

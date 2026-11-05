@@ -13,6 +13,14 @@ import type { ActivityOccurrence } from '@/utils/calendar/occurrence';
  * the filtered activity/vacation/todo lists. This lets DailyCalendarView
  * and WeeklyCalendarView use one timeline with their own navigation
  * wrappers (prev/next arrows vs. day-pill strip).
+ *
+ * Drag and drop (#142): the event column is a timeline drop target, every timed card except
+ * an overnight event's next-morning tail is a `move` source with the bottom-edge resize
+ * handle, and the all-day activity chips are sources too when `allDayDraggable` (their only
+ * target is the week strip's day pills, which only the phone week view has; the phone day
+ * view leaves it off, so a long-press there never lifts a chip with nowhere to go). The parent's `useCalendarDrag` (this
+ * timeline sits inside its root) does the gesture; `dropSlot` is its `overSlot`, drawn here
+ * as the slot preview when it falls on this day.
  */
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import ActivityOwnerStack from '@/components/ui/ActivityOwnerStack.vue';
@@ -26,6 +34,12 @@ import {
 import { useTranslation } from '@/composables/useTranslation';
 import { useActivityIdentity } from '@/composables/useActivityIdentity';
 import CelebrationConfetti from '@/components/ui/CelebrationConfetti.vue';
+import PlannerResizeHandle from '@/components/planner/PlannerResizeHandle.vue';
+import PlannerSlotPreview from '@/components/planner/PlannerSlotPreview.vue';
+import { useActivityDragAttrs } from '@/composables/drag/useActivityDragAttrs';
+import type { TimelineSlot } from '@/composables/drag/timelineSlot';
+import { timeDropAttrs } from '@/utils/calendar/dragDom';
+import { isDraggableActivity } from '@/utils/calendar/dragMath';
 
 import { formatTime12, addHourToTime } from '@/utils/date';
 import { isAllDayActivity } from '@/utils/calendar/activityDays';
@@ -72,6 +86,10 @@ interface Props {
    * one the family noticed on exactly the day it mattered.
    */
   birthdays?: BirthdayOccurrence[];
+  /** The lifted block's would-be slot (#142, the parent's `useCalendarDrag().overSlot`). */
+  dropSlot?: TimelineSlot | null;
+  /** All-day chips are drag sources (#142): only where the parent renders day targets. */
+  allDayDraggable?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -79,6 +97,8 @@ const props = withDefaults(defineProps<Props>(), {
   segments: () => [],
   holiday: null,
   birthdays: () => [],
+  dropSlot: null,
+  allDayDraggable: false,
 });
 
 const emit = defineEmits<{
@@ -114,7 +134,7 @@ const timedRef = computed(() => {
   }
   return items;
 });
-const { hours, totalHeight, getPosition, formatHourLabel, ROW_HEIGHT } = useTimeGrid(
+const { timeRange, hours, totalHeight, getPosition, formatHourLabel, ROW_HEIGHT } = useTimeGrid(
   timedRef,
   'day-mobile'
 );
@@ -234,6 +254,12 @@ function handleSlotClick(hour: number): void {
 }
 
 const { identityFor, displayTitle } = useActivityIdentity();
+const activityDragAttrs = useActivityDragAttrs();
+/** A card that may lift: never a next-morning tail (its head card moves the whole event). */
+const isDragSource = (card: TimedCard) => !card.isTail && isDraggableActivity(card.activity);
+/** An all-day chip lifts only where the parent has day targets (`allDayDraggable`). */
+const isAllDaySource = (activity: FamilyActivity) =>
+  props.allDayDraggable && isDraggableActivity(activity);
 </script>
 
 <template>
@@ -284,12 +310,16 @@ const { identityFor, displayTitle } = useActivityIdentity();
         v-for="occ in untimedActivities"
         :key="'untimed-' + occ.activity.id"
         class="flex cursor-pointer items-center gap-1.5 rounded-md border-l-[3px] px-2 py-1 text-xs font-medium transition-opacity hover:opacity-80"
-        :class="identityFor(occ.activity).celebration.celebrating ? 'is-celebration' : ''"
+        :class="[
+          identityFor(occ.activity).celebration.celebrating ? 'is-celebration' : '',
+          isAllDaySource(occ.activity) ? 'select-none [-webkit-touch-callout:none]' : '',
+        ]"
         :style="{
           ...identityFor(occ.activity).style,
         }"
         :data-activity-id="occ.activity.id"
         :data-occurrence-date="occ.date"
+        v-bind="activityDragAttrs(occ.activity, isAllDaySource(occ.activity))"
         @click="emit('view-activity', occ.activity.id, occ.date)"
       >
         <span class="min-w-0 flex-1 truncate">
@@ -349,7 +379,10 @@ const { identityFor, displayTitle } = useActivityIdentity();
       </div>
 
       <!-- Single event column -->
-      <div class="dark:border-line-strong/30 relative border-l border-gray-200/40">
+      <div
+        class="dark:border-line-strong/30 relative border-l border-gray-200/40"
+        v-bind="timeDropAttrs(dateStr, timeRange.start, timeRange.end)"
+      >
         <!-- Hour row borders (tappable to add) -->
         <div
           v-for="(hour, hi) in hours"
@@ -374,8 +407,11 @@ const { identityFor, displayTitle } = useActivityIdentity();
           v-for="ev in positionedEvents"
           :key="ev.card.key"
           type="button"
-          class="dark:bg-surface-raised absolute z-[2] overflow-hidden rounded-lg border-l-[3px] bg-white px-2 py-1 text-left shadow-sm transition-all hover:-translate-y-[1px] hover:shadow-md"
-          :class="identityFor(ev.card.activity).celebration.celebrating ? 'is-celebration' : ''"
+          class="group dark:bg-surface-raised absolute z-[2] overflow-hidden rounded-lg border-l-[3px] bg-white px-2 py-1 text-left shadow-sm transition-all [&:not(.drag-placeholder)]:hover:-translate-y-[1px] [&:not(.drag-placeholder)]:hover:shadow-md"
+          :class="[
+            identityFor(ev.card.activity).celebration.celebrating ? 'is-celebration' : '',
+            isDragSource(ev.card) ? 'select-none [-webkit-touch-callout:none]' : '',
+          ]"
           :style="{
             top: ev.top,
             height: ev.height,
@@ -385,6 +421,7 @@ const { identityFor, displayTitle } = useActivityIdentity();
           }"
           :data-activity-id="ev.card.activity.id"
           :data-occurrence-date="ev.card.eventDate"
+          v-bind="activityDragAttrs(ev.card.activity, isDragSource(ev.card))"
           @click="emit('view-activity', ev.card.activity.id, ev.card.eventDate)"
         >
           <!-- Confetti only where the block is tall enough to hold it; a 30-minute
@@ -418,7 +455,15 @@ const { identityFor, displayTitle } = useActivityIdentity();
             </div>
             <ActivityOwnerStack :members="identityFor(ev.card.activity).stackMembers" size="xs" />
           </div>
+          <PlannerResizeHandle v-if="isDragSource(ev.card)" />
         </button>
+
+        <!-- Where the lifted block would land (#142). -->
+        <PlannerSlotPreview
+          v-if="dropSlot && dropSlot.date === dateStr"
+          :preview="dropSlot"
+          :get-position="getPosition"
+        />
 
         <!-- Timed travel-segment chips (1h synthetic block at the segment time).
              Wrapper is `pointer-events-none` + chip is `pointer-events-auto` so

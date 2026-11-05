@@ -236,6 +236,14 @@ describe('uiStrings', () => {
       // captions, the nudge) is cosmetic and deliberately NOT covered.
       'weather.search.failed',
       'weather.unavailable',
+      // Planner refusals (#142, 2026-11-05): a blocked move or resize tells a parent why the
+      // calendar did not do what they asked and what to do instead. "this bean sprouts on more
+      // than one day" made a scheduling rule read as a riddle. Real nouns only.
+      'planner.multiDayMoveBlocked.',
+      'planner.scopeEditFailed.',
+      'planner.drag.tooShort',
+      'planner.drag.crossesMidnight',
+      'planner.drag.googleUnchanged',
     ];
     const KEY_SUFFIXES =
       /(deleteConfirm|DeleteConfirm|ConfirmMessage|confirmMessage|Failed|Error)$/;

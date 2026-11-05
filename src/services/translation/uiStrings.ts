@@ -9430,14 +9430,53 @@ const STRING_DEFS = {
       "this plan's series couldn't be found, so the new date wasn't saved. close and reopen the plan, then try again.",
   },
   'planner.multiDayMoveBlocked.title': {
-    en: 'Pick a different option to move this',
-    beanie: 'pick a different option to move this',
+    en: 'This activity repeats on multiple days each week',
+    beanie: 'this activity repeats on multiple days each week',
   },
   'planner.multiDayMoveBlocked.message': {
-    en: 'This activity repeats on more than one day each week, so moving one session can’t be applied to the whole series. Choose “This occurrence only” to move just this one, or edit the days it repeats on.',
+    en: 'Moving one session can’t change the whole series. To move only this session, choose “This occurrence only”. To change the schedule, open the activity and edit the days it repeats on.',
     beanie:
-      'this bean sprouts on more than one day each week, so moving one session can’t change the whole series. choose “this occurrence only” to move just this one, or change the days it repeats on.',
+      'moving one session can’t change the whole series. to move only this session, choose “this occurrence only”. to change the schedule, open the activity and edit the days it repeats on.',
   },
+  // Calendar drag and drop (#142): drop toasts, refusals and screen-reader announcements.
+  'planner.drag.moved': { en: 'Moved {title} to {when}', beanie: 'moved {title} to {when}' },
+  /** The drop toast when its full title could not be built (the move is saved either way). */
+  'planner.drag.movedPlain': { en: 'Moved {title}', beanie: 'moved {title}' },
+  'planner.drag.movedSeries': {
+    en: 'Moved {title} and later sessions to {when}',
+    beanie: 'moved {title} and later sessions to {when}',
+  },
+  'planner.drag.resized': {
+    en: '{title} now ends at {time}',
+    beanie: '{title} now ends at {time}',
+  },
+  'planner.drag.reassigned': {
+    en: 'Moved {title} to {member}, {when}',
+    beanie: 'moved {title} to {member}, {when}',
+  },
+  'planner.drag.tooShort': {
+    en: 'An activity needs at least 15 minutes',
+    beanie: 'an activity needs at least 15 minutes',
+  },
+  'planner.drag.crossesMidnight': {
+    en: 'To run past midnight, open the activity and set its end',
+    beanie: 'to run past midnight, open the activity and set its end',
+  },
+  'planner.drag.googleUnchanged': {
+    en: "Google's copy wasn't changed: your family doesn't own that event",
+    beanie: "google's copy wasn't changed: your family doesn't own that event",
+  },
+  'planner.drag.a11y.lifted': {
+    en: 'Picked up {title}. Use the arrow keys to move, Enter to drop, Escape to cancel.',
+    beanie: 'picked up {title}. use the arrow keys to move, enter to drop, escape to cancel.',
+  },
+  'planner.drag.a11y.over': { en: 'Over {when}', beanie: 'over {when}' },
+  'planner.drag.a11y.dropped': {
+    en: 'Dropped {title} on {when}',
+    beanie: 'dropped {title} on {when}',
+  },
+  'planner.drag.a11y.cancelled': { en: 'Move cancelled', beanie: 'move cancelled' },
+  'planner.drag.a11y.dragHint': { en: 'Press Space to move', beanie: 'press space to move' },
   'planner.addAnotherActivity': {
     en: '+ add another activity',
     beanie: '+ add another activity',

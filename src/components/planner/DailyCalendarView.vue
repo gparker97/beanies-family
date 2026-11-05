@@ -3,7 +3,8 @@ import type { ActivityOccurrence } from '@/utils/calendar/occurrence';
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import DayTimeline from '@/components/planner/DayTimeline.vue';
 import CelebrationConfetti from '@/components/ui/CelebrationConfetti.vue';
-import ActivityOwnerStack from '@/components/ui/ActivityOwnerStack.vue';
+import PlannerTimedBlock from '@/components/planner/PlannerTimedBlock.vue';
+import PlannerSlotPreview from '@/components/planner/PlannerSlotPreview.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
 import {
@@ -15,6 +16,9 @@ import {
 } from '@/composables/useCalendarNavigation';
 import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useCalendarSlide } from '@/composables/useCalendarSlide';
+import { useCalendarDrag } from '@/composables/useCalendarDrag';
+import { timelineSlot } from '@/composables/drag/timelineSlot';
+import { timeDropAttrs } from '@/utils/calendar/dragDom';
 import { useTranslation } from '@/composables/useTranslation';
 import { useActivityStore } from '@/stores/activityStore';
 import { useActivityIdentity } from '@/composables/useActivityIdentity';
@@ -26,13 +30,12 @@ import { useTodoStore } from '@/stores/todoStore';
 import { useDayExtras } from '@/composables/useDayExtras';
 import { belongsInMemberColumn, matchesAssigneeFilter } from '@/utils/assignees';
 import { isAllDayActivity } from '@/utils/calendar/activityDays';
-import { extractDatePart, formatTime12, addHourToTime } from '@/utils/date';
+import { extractDatePart, addHourToTime } from '@/utils/date';
 import { tripTypeEmoji, splitTimedUntimed, type TravelSegmentOccurrence } from '@/utils/vacation';
 import TravelSegmentChip from '@/components/planner/TravelSegmentChip.vue';
 import HolidayBanner from '@/components/planner/HolidayBanner.vue';
 import BirthdayChip from '@/components/planner/BirthdayChip.vue';
 import type { BirthdayOccurrence } from '@/utils/birthdays';
-import ClashIndicator from '@/components/planner/ClashIndicator.vue';
 import { useClashLookup } from '@/composables/useClash';
 import type { FamilyMember, TodoItem, HolidayOccurrence } from '@/types/models';
 
@@ -181,7 +184,7 @@ const allTimedActivities = computed(() => {
   return items;
 });
 
-const { hours, totalHeight, getPosition, formatHourLabel, ROW_HEIGHT } = useTimeGrid(
+const { timeRange, hours, totalHeight, getPosition, formatHourLabel, ROW_HEIGHT } = useTimeGrid(
   allTimedActivities,
   'day-lanes'
 );
@@ -271,9 +274,21 @@ const gridRef = ref<HTMLElement | null>(null);
 // needs `touch-action: pan-y` so vertical scroll still works natively
 // while horizontal pans reach our pointer-event handler.
 const swipeRef = ref<HTMLElement | null>(null);
+
+// Drag and drop (#142): one binding on the root covers the desktop member columns (each a
+// timeline target naming its member, so a single-owner block dropped in another bean's
+// column changes hands) and the phone `DayTimeline`. No edge paging: a day move belongs to
+// the week and month. The swipe stands down while something is lifted.
+const { isLifted, liveLabel, overSlot, onKeydown, onKeyup } = useCalendarDrag(swipeRef, {
+  view: 'day',
+  autoScroll: true,
+  steps: () => ({ memberIds: isMobile.value ? [] : visibleMembers.value.map((m) => m.id) }),
+  snap: timelineSlot,
+});
 useCalendarSlide(swipeRef, {
   onNext: () => emit('next'),
   onPrev: () => emit('prev'),
+  enabled: computed(() => !isLifted.value),
 });
 
 // Auto-scroll the timeline to the current hour. On first mount only when the
@@ -352,7 +367,11 @@ const familyRowSpan = computed(() => Math.max(1, visibleMembers.value.length));
     ref="swipeRef"
     class="dark:bg-surface-raised rounded-3xl bg-white p-5 pt-3 shadow-[0_4px_20px_rgba(44,62,80,0.05)]"
     style="touch-action: pan-y; will-change: transform"
+    @keydown="onKeydown"
+    @keyup="onKeyup"
   >
+    <!-- The drag's spoken progress (#142): lifted / over / dropped / cancelled. -->
+    <span class="sr-only" aria-live="polite" data-testid="day-drag-live">{{ liveLabel }}</span>
     <!-- Public holiday banner (desktop — mobile gets it via DayTimeline) -->
     <HolidayBanner
       v-if="!isMobile && holidayForCurrentDay"
@@ -551,6 +570,7 @@ const familyRowSpan = computed(() => Math.max(1, visibleMembers.value.length));
             v-for="member in visibleMembers"
             :key="'col-' + member.id"
             class="dark:border-line-strong/30 relative border-l border-gray-200/40"
+            v-bind="timeDropAttrs(currentDay.dateStr, timeRange.start, timeRange.end, member.id)"
           >
             <!--
               The lane IS the bean, for the whole height of the day.
@@ -590,68 +610,32 @@ const familyRowSpan = computed(() => Math.max(1, visibleMembers.value.length));
               v-for="(group, gi) in groupOverlapping(cardsByMember.get(member.id) ?? [])"
               :key="gi"
             >
-              <div
-                v-for="({ activity, startTime, endTime, eventDate, key }, ai) in group"
+              <PlannerTimedBlock
+                v-for="({ activity, startTime, endTime, eventDate, key, isTail }, ai) in group"
                 :key="key"
-                class="dark:bg-surface-raised absolute z-10 flex cursor-pointer flex-col gap-0.5 overflow-hidden rounded-lg border-l-[3px] bg-white px-1.5 py-1 text-xs shadow-sm transition-shadow hover:shadow-md"
-                :class="[
-                  identityFor(activity, { laneMemberId: member.id }).dashed ? 'border-dashed' : '',
-                  identityFor(activity, { laneMemberId: member.id }).celebration.celebrating
-                    ? 'is-celebration'
-                    : '',
-                ]"
-                :style="{
-                  ...getPosition(startTime!, endTime),
-                  left: `${(ai / group.length) * 100}%`,
-                  width: `calc(${100 / group.length}% - 2px)`,
-                  ...identityFor(activity, { laneMemberId: member.id }).edgeStyle,
-                }"
-                :data-activity-id="activity.id"
-                :data-occurrence-date="eventDate"
-                @click.stop="emit('view-activity', activity.id, eventDate)"
-              >
-                <!--
-                  DESKTOP bean lanes. `DayTimeline` covers the MOBILE path only, so a
-                  celebration reached this view on a phone and nowhere else.
-                -->
-                <CelebrationConfetti
-                  v-if="identityFor(activity, { laneMemberId: member.id }).celebration.celebrating"
-                  :activity-id="activity.id"
-                  density="week"
-                />
-                <div
-                  class="font-outfit flex items-center truncate text-xs font-semibold"
-                  style="color: var(--color-text)"
-                >
-                  <span aria-hidden="true">{{ identityFor(activity).emoji }}</span>
-                  <span class="truncate">{{ displayTitle(activity, eventDate) }}</span>
-                  <ClashIndicator :clash="clashFor(activity.id, eventDate)" class="ml-1" />
-                </div>
-                <div class="flex min-w-0 items-center gap-1">
-                  <span class="text-primary-500 truncate text-[0.6875rem] leading-tight opacity-70">
-                    {{ formatTime12(activity.startTime!)
-                    }}{{ activity.endTime ? `-${formatTime12(activity.endTime)}` : '' }}
-                  </span>
-                  <span
-                    v-if="activity.location"
-                    class="text-secondary-500/60 dark:text-ink-soft min-w-0 flex-1 truncate text-[0.6875rem] leading-tight"
-                  >
-                    · 📍 {{ activity.location }}
-                  </span>
-                  <!--
-                    Lane-aware: this IS a member column, so the header already names its
-                    bean. A face here therefore always means "someone else is in this
-                    too", which is what lets a shared event read as shared with no
-                    decoration at all.
-                  -->
-                  <ActivityOwnerStack
-                    :members="identityFor(activity, { laneMemberId: member.id }).stackMembers"
-                    size="xs"
-                    class="ml-auto"
-                  />
-                </div>
-              </div>
+                :activity="activity"
+                :event-date="eventDate"
+                :start-time="startTime!"
+                :end-time="endTime"
+                :lane-index="ai"
+                :lane-count="group.length"
+                :identity="identityFor(activity, { laneMemberId: member.id })"
+                :get-position="getPosition"
+                :title="displayTitle(activity, eventDate)"
+                :clash="clashFor(activity.id, eventDate)"
+                surface="lanes"
+                resizable
+                :draggable="!isTail"
+                @view-activity="(id, date) => emit('view-activity', id, date)"
+              />
             </template>
+
+            <!-- Where the lifted block would land (#142), in the column it would land in. -->
+            <PlannerSlotPreview
+              v-if="overSlot?.memberId === member.id"
+              :preview="overSlot"
+              :get-position="getPosition"
+            />
           </div>
         </div>
 
@@ -680,6 +664,7 @@ const familyRowSpan = computed(() => Math.max(1, visibleMembers.value.length));
         :is-today="currentDay.isToday"
         :holiday="holidayForCurrentDay"
         :birthdays="birthdaysForCurrentDay"
+        :drop-slot="overSlot"
         @birthday-click="(b) => emit('birthday-click', b)"
         @view-activity="(id, date) => emit('view-activity', id, date)"
         @view-todo="(todo) => emit('view-todo', todo)"

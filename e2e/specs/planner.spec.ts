@@ -10,12 +10,14 @@ import {
 } from '../helpers/activity-modal';
 import { selectBeanieDate } from '../helpers/date-picker';
 import { tomorrowOrTodayStr } from '../helpers/test-dates';
+import { TestDataFactory } from '../fixtures/data';
 
 /**
  * E2E tests for the Family Planner page.
  *
- * Tests activity CRUD lifecycle and recurring activity edit scopes
- * (this only, this & all future, all occurrences, reschedule).
+ * Tests activity CRUD lifecycle, recurring activity edit scopes
+ * (this only, this & all future, all occurrences, reschedule), and the
+ * calendar drag and drop (#142): a real pointer drag in the week view plus its Undo.
  */
 
 test.describe('Family Planner', () => {
@@ -452,5 +454,79 @@ test.describe('Family Planner', () => {
     // originalOccurrenceDate should be set and differ from the rescheduled date
     expect(override!.originalOccurrenceDate).toBeDefined();
     expect(override!.originalOccurrenceDate).not.toBe(rescheduleStr);
+  });
+
+  test('Drag a timed activity in the week view to the next day, 30 min later, then Undo', async ({
+    page,
+  }) => {
+    // Desktop week view: the pointer drag (mouse lifts on 4 px of movement, no hold).
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await setupPlanner(page);
+
+    // A one-off 10:00-11:00 on the coming Tuesday, so Tuesday -> Wednesday stays inside
+    // the same week whichever day the week starts on.
+    const today = new Date();
+    const tuesday = addDaysStr(
+      `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(
+        today.getDate()
+      ).padStart(2, '0')}`,
+      (2 - today.getDay() + 7) % 7 || 7
+    );
+    const wednesday = addDaysStr(tuesday, 1);
+    // The owner the create flow made, once the reloaded planner has projected it.
+    await expect
+      .poll(async () => (await dbHelper.exportData()).familyMembers.length, { timeout: 15000 })
+      .toBeGreaterThan(0);
+    const owner = (await dbHelper.exportData()).familyMembers[0]!;
+    const seeded = TestDataFactory.createActivity(owner.id, {
+      title: 'Drag Me',
+      date: tuesday,
+      startTime: '10:00',
+      endTime: '11:00',
+      recurrence: 'none',
+      daysOfWeek: undefined,
+      assigneeIds: [owner.id],
+    });
+    await dbHelper.seedData({ activities: [seeded] });
+    await gotoRoute(page, `/activities?view=week&d=${tuesday}`);
+
+    const block = page.locator(`[data-activity-id="${seeded.id}"][data-drag="move"]`);
+    await block.scrollIntoViewIfNeeded();
+    await expect(block).toBeVisible({ timeout: 15000 });
+    const column = page.locator(`[data-drop="time"][data-date="${wednesday}"]`);
+    const from = (await block.boundingBox())!;
+    const col = (await column.boundingBox())!;
+    const hourStart = Number(await column.getAttribute('data-hour-start'));
+    const hourEnd = Number(await column.getAttribute('data-hour-end'));
+    const hourPx = col.height / (hourEnd - hourStart + 1);
+
+    // Press mid-block, cross the slop first, then travel in steps to the next column,
+    // half an hour lower. The grab offset is kept, so the start moves by exactly +30 min.
+    const start = { x: from.x + from.width / 2, y: from.y + from.height / 2 };
+    const end = { x: col.x + col.width / 2, y: start.y + hourPx / 2 };
+    await page.mouse.move(start.x, start.y);
+    await page.mouse.down();
+    await page.mouse.move(start.x + 6, start.y + 2, { steps: 2 });
+    await page.mouse.move(end.x, end.y, { steps: 12 });
+    await page.mouse.up();
+
+    // The confirmation toast carries the Undo; the write is asserted on the export.
+    const undo = page.getByRole('button', { name: ui('action.undo'), exact: true });
+    await expect(undo).toBeVisible({ timeout: 5000 });
+    const read = async () => {
+      const { activities } = await dbHelper.exportData();
+      const a = activities.find((x) => x.id === seeded.id)!;
+      return { date: a.date.slice(0, 10), startTime: a.startTime, endTime: a.endTime };
+    };
+    await expect
+      .poll(read, { timeout: 5000 })
+      .toEqual({ date: wednesday, startTime: '10:30', endTime: '11:30' });
+
+    await undo.click();
+    await expect
+      .poll(read, { timeout: 5000 })
+      .toEqual({ date: tuesday, startTime: '10:00', endTime: '11:00' });
+    // Still one record: the move and its Undo rewrote it in place.
+    expect((await dbHelper.exportData()).activities).toHaveLength(1);
   });
 });

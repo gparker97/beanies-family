@@ -2,8 +2,8 @@
 import type { ActivityOccurrence } from '@/utils/calendar/occurrence';
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import DayTimeline from '@/components/planner/DayTimeline.vue';
-import CelebrationConfetti from '@/components/ui/CelebrationConfetti.vue';
-import ActivityOwnerStack from '@/components/ui/ActivityOwnerStack.vue';
+import PlannerTimedBlock from '@/components/planner/PlannerTimedBlock.vue';
+import PlannerSlotPreview from '@/components/planner/PlannerSlotPreview.vue';
 import {
   useWeekNavigation,
   useTimeGrid,
@@ -13,6 +13,11 @@ import {
 } from '@/composables/useCalendarNavigation';
 import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useCalendarSlide } from '@/composables/useCalendarSlide';
+import { useCalendarDrag } from '@/composables/useCalendarDrag';
+import { timelineSlot } from '@/composables/drag/timelineSlot';
+import { useActivityDragAttrs } from '@/composables/drag/useActivityDragAttrs';
+import { dayDropAttrs, timeDropAttrs } from '@/utils/calendar/dragDom';
+import { DROP_TARGET_RING } from '@/constants/dragStyles';
 import { useTranslation } from '@/composables/useTranslation';
 import { useActivityStore } from '@/stores/activityStore';
 import { useActivityIdentity } from '@/composables/useActivityIdentity';
@@ -24,7 +29,6 @@ import { matchesAssigneeFilter } from '@/utils/assignees';
 import {
   toDateInputValue,
   extractDatePart,
-  formatTime12,
   addHourToTime,
   addDays,
   parseLocalDate,
@@ -38,8 +42,6 @@ import BirthdayChip from '@/components/planner/BirthdayChip.vue';
 import type { BirthdayOccurrence } from '@/utils/birthdays';
 import { useDayExtras } from '@/composables/useDayExtras';
 import { isAllDayActivity } from '@/utils/calendar/activityDays';
-import PhotoIndicator from '@/components/media/PhotoIndicator.vue';
-import ClashIndicator from '@/components/planner/ClashIndicator.vue';
 import { useClashLookup } from '@/composables/useClash';
 import WeekStripNav, {
   type WeekStripDay,
@@ -112,18 +114,49 @@ const { weekDays } = useWeekNavigation(referenceDate);
  */
 const stripAnchorDate = ref<Date>(props.referenceDate);
 
-// ── Swipe gesture ──────────────────────────────────────────────────────────
+// ── Swipe gesture + drag and drop ──────────────────────────────────────────
 // Horizontal swipe emits the navigation intent; the page advances the shared
 // reference date (the view never mutates the date itself).
+//
+// Drag and drop (#142): one binding on the root covers the desktop grid (day columns are
+// timeline targets, the all-day row's cells day targets) and the phone branch (the
+// `DayTimeline` column and the week strip's pills). Holding a lifted block at the left or
+// right edge pages the week; the swipe stands down while something is lifted.
 const swipeRef = ref<HTMLElement | null>(null);
+const { isLifted, liveLabel, overTarget, overSlot, onKeydown, onKeyup } = useCalendarDrag(
+  swipeRef,
+  {
+    view: 'week',
+    onEdge: (dir) => (dir === 'prev' ? emit('prev') : emit('next')),
+    autoScroll: true,
+    steps: () => ({ dates: weekDays.value.map((d) => d.dateStr) }),
+    snap: timelineSlot,
+  }
+);
+const activityDragAttrs = useActivityDragAttrs();
 useCalendarSlide(swipeRef, {
   onNext: () => emit('next'),
   onPrev: () => emit('prev'),
+  enabled: computed(() => !isLifted.value),
 });
 
 // Mobile: the focused day within the week (drives the single-day timeline +
 // the strip's strongest "selected" pill). Derived from the page-owned date.
 const selectedMobileDay = computed(() => toDateInputValue(props.referenceDate));
+
+/** The desktop all-day cell a lifted item would land on (#142). */
+const allDayDropDate = computed(() =>
+  overTarget.value?.kind === 'day' ? overTarget.value.date : null
+);
+/**
+ * The phone strip pill a lifted item would land on: a pill itself, or (a keyboard lift
+ * stepping ←/→) another day of the week, whose column the phone timeline does not show.
+ */
+const stripDropDate = computed(() => {
+  const target = overTarget.value;
+  if (!target) return null;
+  return target.kind === 'day' || target.date !== selectedMobileDay.value ? target.date : null;
+});
 
 // Public holidays in the visible week, from the SHARED day-extras query rather
 // than a second read of the holiday store. At most one is rendered per day (the
@@ -247,7 +280,7 @@ const allTimedActivities = computed(() => {
   return items;
 });
 
-const { hours, totalHeight, getPosition, formatHourLabel, ROW_HEIGHT } = useTimeGrid(
+const { timeRange, hours, totalHeight, getPosition, formatHourLabel, ROW_HEIGHT } = useTimeGrid(
   allTimedActivities,
   'week'
 );
@@ -670,7 +703,11 @@ function onStripDayClick(dateStr: string) {
     ref="swipeRef"
     class="dark:bg-surface-raised rounded-3xl bg-white p-5 pt-3 shadow-[0_4px_20px_rgba(44,62,80,0.05)]"
     style="touch-action: pan-y; will-change: transform"
+    @keydown="onKeydown"
+    @keyup="onKeyup"
   >
+    <!-- The drag's spoken progress (#142): lifted / over / dropped / cancelled. -->
+    <span class="sr-only" aria-live="polite" data-testid="week-drag-live">{{ liveLabel }}</span>
     <!-- 2-week date navigator — MOBILE ONLY. Desktop already shows the
          full week in the time grid below + has prev/next arrows for week
          navigation, so the strip is redundant there. Stays static when
@@ -687,6 +724,7 @@ function onStripDayClick(dateStr: string) {
         :weeks="weekStripData"
         :selected-date="selectedMobileDay"
         :collapsed="!peeked"
+        :drop-target-date="stripDropDate"
         @select-date="onStripDayClick"
         @toggle-peek="peeked = !peeked"
       />
@@ -741,8 +779,29 @@ function onStripDayClick(dateStr: string) {
       <!-- Untimed / all-day items row -->
       <div
         v-if="hasAnyUntimedContent"
-        class="dark:border-line-strong/40 dark:bg-surface-overlay/30 relative mb-1 grid grid-cols-[56px_repeat(7,1fr)] gap-px rounded-xl border border-gray-200/60 bg-[var(--tint-slate-5)] py-1.5"
+        class="dark:border-line-strong/40 dark:bg-surface-overlay/30 relative isolate mb-1 grid grid-cols-[56px_repeat(7,1fr)] gap-px rounded-xl border border-gray-200/60 bg-[var(--tint-slate-5)] py-1.5"
+        :class="isLifted ? '*:pointer-events-none' : ''"
       >
+        <!--
+          The day drop targets (#142): one cell per day, the row's full height, BEHIND the
+          chips (the row is `isolate`, so `-z-10` stays above its own wash). The chips do not
+          sit inside these cells (spanning bars cross several), so while something is lifted
+          every direct child of the row stops taking the pointer and the hit test falls
+          through to the cell under it; the cells opt back in with `pointer-events-auto`.
+        -->
+        <div
+          class="absolute inset-0 -z-10 grid grid-cols-[56px_repeat(7,1fr)] gap-px"
+          aria-hidden="true"
+        >
+          <div />
+          <div
+            v-for="day in weekDays"
+            :key="'allday-drop-' + day.dateStr"
+            v-bind="dayDropAttrs(day.dateStr)"
+            class="pointer-events-auto rounded-lg"
+            :class="allDayDropDate === day.dateStr ? DROP_TARGET_RING : ''"
+          />
+        </div>
         <div class="flex items-center justify-center">
           <span
             class="font-outfit text-secondary-500/40 dark:text-ink-faint text-xs font-semibold uppercase"
@@ -783,6 +842,7 @@ function onStripDayClick(dateStr: string) {
             :is-end="true"
             :data-activity-id="span.activity.id"
             :data-occurrence-date="weekDays[span.startCol]?.dateStr ?? span.startYmd"
+            v-bind="activityDragAttrs(span.activity)"
             class="block w-full"
             @click="
               emit(
@@ -831,6 +891,7 @@ function onStripDayClick(dateStr: string) {
               :is-end="true"
               :data-activity-id="occ.activity.id"
               :data-occurrence-date="day.dateStr"
+              v-bind="activityDragAttrs(occ.activity)"
               class="mb-0.5 block w-full"
               @click="emit('view-activity', occ.activity.id, day.dateStr)"
             />
@@ -881,6 +942,7 @@ function onStripDayClick(dateStr: string) {
             :key="'col-' + day.dateStr"
             class="relative"
             :class="day.isToday ? CALENDAR_TODAY.columnWash : ''"
+            v-bind="timeDropAttrs(day.dateStr, timeRange.start, timeRange.end)"
           >
             <!-- Hour row borders (clickable to add activity) -->
             <div
@@ -905,69 +967,33 @@ function onStripDayClick(dateStr: string) {
               v-for="(group, gi) in groupOverlapping(cardsByDay.get(day.dateStr) ?? [])"
               :key="gi"
             >
-              <div
-                v-for="({ activity, startTime, endTime, eventDate, key }, ai) in group"
+              <PlannerTimedBlock
+                v-for="({ activity, startTime, endTime, eventDate, key, isTail }, ai) in group"
                 :key="key"
-                class="absolute z-10 flex cursor-pointer flex-col gap-0.5 overflow-hidden rounded-lg border-l-[3px] px-1.5 py-1 text-xs transition-shadow hover:shadow-md"
-                :class="identityFor(activity).celebration.celebrating ? 'is-celebration' : ''"
-                :style="{
-                  ...getPosition(startTime!, endTime),
-                  left: `${(ai / group.length) * 100}%`,
-                  width: `calc(${100 / group.length}% - 2px)`,
-                  ...identityFor(activity).style,
-                }"
-                :data-activity-id="activity.id"
-                :data-occurrence-date="eventDate"
-                @click.stop="emit('view-activity', activity.id, eventDate)"
-              >
-                <!--
-                  DESKTOP week grid. `DayTimeline` covers the MOBILE path only, so a
-                  celebration reached this view on a phone and nowhere else.
-                -->
-                <CelebrationConfetti
-                  v-if="identityFor(activity).celebration.celebrating"
-                  :activity-id="activity.id"
-                  density="week"
-                />
-                <div
-                  class="font-outfit flex items-center truncate text-xs font-semibold"
-                  style="color: var(--color-text)"
-                >
-                  <span aria-hidden="true">{{ identityFor(activity).emoji }}</span>
-                  <span class="truncate">{{ displayTitle(activity, eventDate) }}</span>
-                  <PhotoIndicator :photo-ids="activity.photoIds" />
-                  <ClashIndicator :clash="clashFor(activity.id, eventDate)" class="ml-1" />
-                </div>
-                <div class="flex min-w-0 items-center gap-1">
-                  <span
-                    class="text-primary-500 dark:text-accent-lift truncate text-[0.6875rem] leading-tight"
-                  >
-                    {{ formatTime12(activity.startTime!)
-                    }}{{ activity.endTime ? `-${formatTime12(activity.endTime)}` : '' }}
-                  </span>
-                  <span
-                    v-if="activity.location"
-                    class="text-secondary-500/60 dark:text-ink-soft min-w-0 flex-1 truncate text-[0.6875rem] leading-tight"
-                  >
-                    · 📍 {{ activity.location }}
-                  </span>
-                  <!--
-                    `ml-auto shrink-0` — faces are ALWAYS right-anchored, which is what keeps
-                    a title's left edge identical on every card. Without it this stack sat
-                    wherever the preceding content ended: the location span carries `flex-1`,
-                    so a card WITH a location pushed the faces right and a card without one
-                    left them mid-row. `DailyCalendarView` already does this; this was the
-                    one call site that relied on a sibling to do it.
-                  -->
-                  <ActivityOwnerStack
-                    :members="identityFor(activity).stackMembers"
-                    size="xs"
-                    dense
-                    class="ml-auto shrink-0"
-                  />
-                </div>
-              </div>
+                :activity="activity"
+                :event-date="eventDate"
+                :start-time="startTime!"
+                :end-time="endTime"
+                :lane-index="ai"
+                :lane-count="group.length"
+                :identity="identityFor(activity)"
+                :get-position="getPosition"
+                :title="displayTitle(activity, eventDate)"
+                :clash="clashFor(activity.id, eventDate)"
+                surface="week"
+                show-photos
+                resizable
+                :draggable="!isTail"
+                @view-activity="(id, date) => emit('view-activity', id, date)"
+              />
             </template>
+
+            <!-- Where the lifted block would land (#142). -->
+            <PlannerSlotPreview
+              v-if="overSlot?.date === day.dateStr"
+              :preview="overSlot"
+              :get-position="getPosition"
+            />
 
             <!-- Timed travel-segment chips (1h synthetic block, positioned at
                  the segment time). The wrapper is `pointer-events-none` and the
@@ -1023,6 +1049,8 @@ function onStripDayClick(dateStr: string) {
         :is-today="selectedMobileDay === toDateInputValue(new Date())"
         :holiday="holidayForDay(selectedMobileDay) ?? null"
         :birthdays="birthdaysForDay(selectedMobileDay)"
+        :drop-slot="overSlot"
+        all-day-draggable
         @birthday-click="(b) => emit('birthday-click', b)"
         @view-activity="(id, date) => emit('view-activity', id, date)"
         @view-todo="(todo) => emit('view-todo', todo)"

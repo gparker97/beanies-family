@@ -23,6 +23,12 @@
  * label row above the day headers; a two-finger pinch steps the same density. A tap on
  * a day opens its `MonthDayRow` under that week (Escape or a month change closes it); a
  * second tap on the same day drills into the Day view.
+ *
+ * Drag and drop (#142): one `useCalendarDrag` on the root covers the cells, the phone day
+ * row and (as a portal, it is teleported) the desktop "+N more" popover. Each cell is a day
+ * drop target; `overTarget` rings the cell a lifted chip would land on, holding it at the
+ * grid's left/right edge pages the month, and swipe and wheel paging stand down while
+ * something is lifted. A pointer lift closes the popover so the cells are visible.
  */
 import { ref, computed, nextTick, watch, useId } from 'vue';
 import { useActivityStore } from '@/stores/activityStore';
@@ -52,6 +58,7 @@ import { prefersReducedMotion } from '@/utils/prefersReducedMotion';
 import MonthGridCell from '@/components/planner/MonthGridCell.vue';
 import MonthDayPopover from '@/components/planner/MonthDayPopover.vue';
 import MonthDayRow from '@/components/planner/MonthDayRow.vue';
+import { useCalendarDrag } from '@/composables/useCalendarDrag';
 import { useCalendarSlide } from '@/composables/useCalendarSlide';
 import { useWheelMonthPaging } from '@/composables/useWheelMonthPaging';
 import { useMonthGridFit } from '@/composables/useMonthGridFit';
@@ -387,12 +394,22 @@ const densityWordClass = (active: boolean) =>
     : 'dark:text-ink-faint text-[var(--color-text-muted)]';
 
 // ── Gestures ───────────────────────────────────────────────────────────────
+// Drag and drop (#142). Declared first: the swipe and the wheel pager gate on `isLifted`.
+const { isLifted, liveLabel, overTarget, onKeydown, onKeyup } = useCalendarDrag(swipeRef, {
+  view: 'month',
+  onEdge: (dir) => (dir === 'prev' ? emit('prev') : emit('next')),
+  autoScroll: false,
+  portal: computed(() => popover.value?.el ?? null),
+  onLift: () => popover.value?.close(false),
+});
+const dropDate = computed(() => (overTarget.value?.kind === 'day' ? overTarget.value.date : null));
+
 // Continuing to scroll at the grid's own edge turns the month (desktop only; the
 // page's surface choice, via `display.variant`, is the single source).
 const { isPaging } = useWheelMonthPaging(gridBodyRef, {
   onNext: () => emit('next'),
   onPrev: () => emit('prev'),
-  enabled: computed(() => isDesktop),
+  enabled: computed(() => isDesktop && !isLifted.value),
 });
 
 // Swipe emits the navigation intent; the page advances the shared reference
@@ -404,7 +421,7 @@ const { isPaging } = useWheelMonthPaging(gridBodyRef, {
 useCalendarSlide(swipeRef, {
   onNext: () => emit('next'),
   onPrev: () => emit('prev'),
-  enabled: computed(() => !isPaging.value),
+  enabled: computed(() => !isPaging.value && !isLifted.value),
   onPinch: isDesktop ? undefined : onPinch,
 });
 </script>
@@ -415,7 +432,11 @@ useCalendarSlide(swipeRef, {
     class="flex flex-col overflow-hidden"
     :class="cardClass"
     :style="[{ touchAction: 'pan-y', willChange: 'transform' }, cardStyle]"
+    @keydown="onKeydown"
+    @keyup="onKeyup"
   >
+    <!-- The drag's spoken progress (#142): lifted / over / dropped / cancelled. -->
+    <span class="sr-only" aria-live="polite" data-testid="month-drag-live">{{ liveLabel }}</span>
     <!-- Phone density label row (Faces · Bars · Titles), a 1rem row of toggle buttons
          (not a radiogroup, so no arrow-key roving to build). Pinch steps the same pref. -->
     <div
@@ -472,6 +493,7 @@ useCalendarSlide(swipeRef, {
             :css-vars="cssVars"
             :day-row-id="dayRowId"
             :selected="selectedCell?.date === entry.cell.date"
+            :is-drop-target="dropDate === entry.cell.date"
             @select-date="handleDayClick"
             @tap-day="onTapDay"
             @more="onMore"

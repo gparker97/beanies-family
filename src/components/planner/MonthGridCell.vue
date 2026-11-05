@@ -19,6 +19,10 @@
  * Today is marked by its filled numeral only; the grid never draws the today wash or
  * an orange cell border.
  *
+ * Drag and drop (#142): the root is a day drop target (`dayDropAttrs`, which also stamps the
+ * `data-date` the reveal and focus hooks read); `isDropTarget` rings it in Heritage Orange
+ * while a lifted chip is over it.
+ *
  * Phone densities: Titles and Bars are the same stack, drawn by the leaves from the
  * context's `density`. Faces replaces the stack with a wrapped cluster of who is busy that
  * day (`faceCluster` over EVERY `dayItems` entry, the lane winner included); the lane
@@ -43,6 +47,8 @@ import {
   type CalendarDayTint,
 } from '@/constants/tileStyles';
 import { MONTH_CELL_CHIPS } from '@/components/planner/monthCellChipsKey';
+import { DROP_TARGET_RING } from '@/constants/dragStyles';
+import { dayDropAttrs } from '@/utils/calendar/dragDom';
 import MonthDayItem from '@/components/planner/MonthDayItem.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 
@@ -57,6 +63,8 @@ const props = defineProps<{
   selected?: boolean;
   /** The id of the grid's one day row, for `aria-controls` while selected. */
   dayRowId: string;
+  /** A lifted chip (#142) would land on this day: ring it. */
+  isDropTarget?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -102,15 +110,20 @@ const rootLabel = computed(() => {
  * white card and the phone's page ground; `surface-hover` is its dark partner.
  */
 const HOVER_WASH = 'hover:bg-[var(--tint-slate-10)] dark:hover:bg-surface-hover transition-colors';
-const backgroundClass = computed(
-  () => `${calendarDayBackground(props.tint, false, '')} ${HOVER_WASH}`
+// The drop ring (#142) replaces the tint and hover wash.
+const backgroundClass = computed(() =>
+  props.isDropTarget
+    ? DROP_TARGET_RING
+    : `${calendarDayBackground(props.tint, false, '')} ${HOVER_WASH}`
 );
 
 const rootClass = computed(() =>
   isPhone.value
     ? [
         'px-0.5 text-left',
-        props.selected ? 'ring-primary-500 dark:ring-accent-lift ring-2 ring-inset' : '',
+        props.selected && !props.isDropTarget
+          ? 'ring-primary-500 dark:ring-accent-lift ring-2 ring-inset'
+          : '',
       ]
     : 'cursor-pointer border-r border-b border-[var(--color-border)] px-1 last:border-r-0 dark:border-line'
 );
@@ -206,7 +219,7 @@ function forwardViewActivity(id: string, date: string): void {
     :aria-expanded="isPhone ? !!selected : undefined"
     :aria-controls="isPhone && selected ? dayRowId : undefined"
     :aria-current="cell.isToday ? 'date' : undefined"
-    :data-date="cell.date"
+    v-bind="dayDropAttrs(cell.date)"
     :style="cssVars"
     class="relative flex min-w-0 flex-col overflow-hidden pt-[var(--mg-pad-t)] pb-[var(--mg-pad-b)]"
     :class="[rootClass, backgroundClass]"

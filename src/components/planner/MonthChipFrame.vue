@@ -17,6 +17,8 @@
  *    bars fade, readable text never takes opacity.
  *  - `interactive: false` (inside a phone cell, whose root is the button): an
  *    `aria-hidden` span with no click, so buttons never nest.
+ *  - `interactive: true` also means "may be a drag source" (#142, `MonthDayItem` places the
+ *    source): the button takes `select-none` and no iOS long-press callout.
  *
  * Height is never set here. In the grid the cell passes `h-[var(--mg-chip-h)]` by
  * fallthrough; elsewhere the chip is content-sized. Data attributes (the reveal hooks)
@@ -91,7 +93,10 @@ const rootClass = computed(() => [
   density.value === 'bars' ? (muted.value ? 'opacity-60' : '') : inkClass.value,
   props.dashed && density.value !== 'bars' ? 'border-dashed' : '',
   props.celebrating && isRich.value ? 'is-celebration' : '',
-  interactive.value ? 'cursor-pointer transition-opacity hover:opacity-80' : '',
+  // A control is also a drag source (#142): no long-press callout or text selection.
+  interactive.value
+    ? 'cursor-pointer transition-opacity select-none hover:opacity-80 [-webkit-touch-callout:none]'
+    : '',
 ]);
 
 const rootStyle = computed(() => {

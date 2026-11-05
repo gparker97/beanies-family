@@ -21,6 +21,7 @@ import {
   defaultDueBeforeEvent,
   isWallClockTime,
   toHHmm,
+  minutesToHHmm,
   addMinutesToTime,
   addHourToTime,
   endFollowsStart,
@@ -565,6 +566,21 @@ describe('toHHmm', () => {
 
   it('is what toTimeInputValue builds from a local Date', () => {
     expect(toTimeInputValue(new Date(2026, 10, 3, 7, 4))).toBe('07:04');
+  });
+});
+
+describe('minutesToHHmm', () => {
+  it('turns minutes of the day into HH:mm', () => {
+    expect(minutesToHHmm(0)).toBe('00:00');
+    expect(minutesToHHmm(16 * 60 + 15)).toBe('16:15');
+    expect(minutesToHHmm(23 * 60 + 45)).toBe('23:45');
+  });
+
+  it('clamps to the day: never 24:00, never a negative, a fraction floors', () => {
+    expect(minutesToHHmm(1440)).toBe('23:59');
+    expect(minutesToHHmm(2000)).toBe('23:59');
+    expect(minutesToHHmm(-15)).toBe('00:00');
+    expect(minutesToHHmm(90.7)).toBe('01:30');
   });
 });
 

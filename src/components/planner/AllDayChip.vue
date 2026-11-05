@@ -28,7 +28,8 @@
  *    `hideSoloFace`.
  *  - The month chip context (`useMonthCellChips`, `monthCellChipsKey.ts`):
  *    `interactive: false` renders an `aria-hidden` span with no click (inside a phone
- *    cell, whose root is the button); `density: 'bars'` leaves a plain bar with no
+ *    cell, whose root is the button), and `interactive: true` adds `select-none` and no
+ *    iOS long-press callout, since an interactive activity bar is a drag source (#142); `density: 'bars'` leaves a plain bar with no
  *    label or faces; `density: 'titles'` drops the emoji and faces and sits the text
  *    `leading-none` inside the short bar. No provider = today's look.
  */
@@ -117,7 +118,9 @@ const showFaces = computed(
     :type="interactive ? 'button' : undefined"
     class="font-outfit flex min-w-0 items-center gap-1 truncate px-1.5 text-xs font-medium"
     :class="{
-      'cursor-pointer transition-opacity hover:opacity-80': interactive,
+      // A control is also a drag source (#142): no long-press callout or text selection.
+      'cursor-pointer transition-opacity select-none [-webkit-touch-callout:none] hover:opacity-80':
+        interactive,
       'py-0 leading-none': isTitles,
       'py-0.5': !isTitles,
       'rounded-l-md': isStart,

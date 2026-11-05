@@ -18,6 +18,7 @@ const logEvent = vi.fn();
 vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: (...a: unknown[]) => logEvent(...a) }));
 
 import { useActivityReveal, findRevealElement } from '@/composables/useActivityReveal';
+import { dayDropAttrs, timeDropAttrs } from '@/utils/calendar/dragDom';
 import { useActivityStore } from '@/stores/activityStore';
 
 function activity(overrides: Partial<FamilyActivity>): FamilyActivity {
@@ -310,5 +311,20 @@ describe('findRevealElement', () => {
     host.append(exact);
     expect(findRevealElement(host, target)).toEqual({ el: exact, match: 'occurrence' });
     expect(findRevealElement(host, { id: 'nope', date: '2030-12-01' })).toBeNull();
+  });
+
+  it('a day drop target is a day cell, but a timeline time column (#142) is not', () => {
+    const host = document.createElement('div');
+    const target = { id: 'act-1', date: '2030-10-13' };
+    const block = chip('act-1', '2030-10-06');
+    const column = document.createElement('div');
+    for (const [k, v] of Object.entries(timeDropAttrs('2030-10-13', 7, 19)))
+      column.setAttribute(k, v);
+    host.append(column, block);
+    expect(findRevealElement(host, target)).toEqual({ el: block, match: 'activity' });
+    const cell = document.createElement('div');
+    for (const [k, v] of Object.entries(dayDropAttrs('2030-10-13'))) cell.setAttribute(k, v);
+    host.append(cell);
+    expect(findRevealElement(host, target)).toEqual({ el: cell, match: 'day' });
   });
 });

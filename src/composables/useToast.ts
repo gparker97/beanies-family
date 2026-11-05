@@ -79,6 +79,8 @@ export interface Toast {
 let nextId = 0;
 const MAX_VISIBLE = 5;
 const AUTO_DISMISS_MS = 5000;
+/** How long a toast carrying an Undo action stays up: long enough to react. */
+export const UNDO_TOAST_MS = 6000;
 
 // Module-level state — shared across all callers
 const toasts = ref<Toast[]>([]);

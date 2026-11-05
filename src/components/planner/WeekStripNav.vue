@@ -12,10 +12,18 @@
  * into the monthly view. Renders on desktop AND mobile — on mobile it
  * complements (not replaces) the existing pill-strip + single-day
  * timeline pattern.
+ *
+ * Drag and drop (#142): every day pill is a day drop target (`dayDropAttrs`), so on the phone
+ * week a block lifted in the timeline below can be dropped on another day at the same time.
+ * `dropTargetDate` (from the view's `useCalendarDrag().overTarget`) rings the pill it would
+ * land on; the ring replaces the pill's own state so it reads on the filled selected pill too.
+ * A drop never produces a click (the drag guards swallow it), so tapping is unaffected.
  */
 import { computed } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import SmoothHeight from '@/components/ui/SmoothHeight.vue';
+import { dayDropAttrs } from '@/utils/calendar/dragDom';
+import { DROP_TARGET_RING } from '@/constants/dragStyles';
 import type { RelativeWeekLabelKey } from '@/utils/calendarWeek';
 
 export interface WeekStripDay {
@@ -54,6 +62,8 @@ const props = defineProps<{
   /** When true (smart-collapse on scroll), show only the focused week so the
    *  day timeline below gets more room. Defaults to the full two weeks. */
   collapsed?: boolean;
+  /** A lifted item (#142) would land on this day: ring its pill. */
+  dropTargetDate?: string | null;
 }>();
 
 const emit = defineEmits<{
@@ -72,6 +82,20 @@ const visibleWeeks = computed(() => {
   const focused = props.weeks.filter((w) => w.isFocused);
   return focused.length ? focused : props.weeks.slice(0, 1);
 });
+
+/** The drop ring (#142): it replaces the pill's state classes, so it reads on the filled selected pill too. */
+const DROP_TARGET = `border-primary-500 text-primary-500 dark:text-accent-lift ${DROP_TARGET_RING}`;
+
+function pillClass(day: WeekStripDay, week: WeekStripWeek): string {
+  if (props.dropTargetDate && day.dateStr === props.dropTargetDate) return DROP_TARGET;
+  if (day.dateStr === props.selectedDate)
+    return 'border-primary-500 bg-primary-500 text-white shadow-[0_2px_8px_rgba(241,93,34,0.25)]';
+  if (day.isToday)
+    return 'border-primary-500 bg-primary-500/10 text-primary-500 dark:text-accent-lift';
+  return week.isFocused
+    ? 'text-secondary-500 dark:border-line-strong/60 dark:bg-surface-overlay/60 dark:text-ink border-sky-200/60 bg-white hover:border-sky-300'
+    : 'text-secondary-500/70 dark:border-line/60 dark:bg-surface-raised/40 dark:text-ink-soft border-gray-200/60 bg-white hover:border-gray-300';
+}
 
 function onDayClick(dateStr: string) {
   emit('select-date', dateStr);
@@ -97,7 +121,7 @@ function onDayClick(dateStr: string) {
           class="font-outfit flex flex-col justify-center pr-2 text-right leading-tight"
           :class="
             week.isFocused
-              ? 'text-primary-500 relative pl-2'
+              ? 'text-primary-500 dark:text-accent-lift relative pl-2'
               : 'text-secondary-500/50 dark:text-ink-faint'
           "
         >
@@ -122,17 +146,9 @@ function onDayClick(dateStr: string) {
           :key="day.dateStr"
           type="button"
           class="font-outfit flex min-h-[44px] flex-col items-center justify-center gap-0.5 rounded-lg border px-0.5 py-1 transition-colors md:min-h-[48px]"
-          :class="[
-            day.dateStr === selectedDate
-              ? 'border-primary-500 bg-primary-500 text-white shadow-[0_2px_8px_rgba(241,93,34,0.25)]'
-              : day.isToday
-                ? 'border-primary-500 bg-primary-500/10 text-primary-500'
-                : week.isFocused
-                  ? 'text-secondary-500 dark:border-line-strong/60 dark:bg-surface-overlay/60 dark:text-ink border-sky-200/60 bg-white hover:border-sky-300'
-                  : 'text-secondary-500/70 dark:border-line/60 dark:bg-surface-raised/40 dark:text-ink-soft border-gray-200/60 bg-white hover:border-gray-300',
-            day.isOutsideCurrentMonth ? 'opacity-60' : '',
-          ]"
+          :class="[pillClass(day, week), day.isOutsideCurrentMonth ? 'opacity-60' : '']"
           :aria-label="`${day.dowLabel} ${day.dayNum}`"
+          v-bind="dayDropAttrs(day.dateStr)"
           @click="onDayClick(day.dateStr)"
         >
           <span class="text-[0.5625rem] font-bold tracking-[0.12em] uppercase opacity-70">

@@ -5,6 +5,7 @@ import { logEvent } from '@/services/telemetry/logEvent';
 import { waitForElement, waitForScrollSettle } from '@/utils/waitForElement';
 import { getAppScroller } from '@/utils/getAppScroller';
 import { addDaysYmd, parseLocalDate } from '@/utils/date';
+import { DRAG_ATTR } from '@/utils/calendar/dragDom';
 
 /**
  * Show a just-created activity on the planner: move the calendar to it, then scroll to its chip
@@ -68,11 +69,17 @@ export type RevealMatch = 'occurrence' | 'day' | 'activity';
  *      the activity's first occurrence, i.e. the span's own first day, which the moved view
  *      shows;
  *   2. the target's day cell (`data-date`, the month views), where the chip may be folded into
- *      a "+N" overflow;
+ *      a "+N" overflow. A day drop target (#142: month cells, and on the timelines a week
+ *      all-day column or a week-strip pill) is that day's cell too; a timeline's TIME column
+ *      (`data-drop="time"`, a whole day of hours) is not, so a block on a time grid still
+ *      resolves through (3);
  *   3. only then any element of the activity, for a view with no day cells (the time grids).
  * Taking (3) before (2) would pulse another week's chip of a repeat whose target occurrence is
  * folded away, which points at the wrong day.
  */
+/** Fallback (2): a day's cell, never a timeline's time column (see `findRevealElement`). */
+const DAY_CELL_SELECTOR = `[${DRAG_ATTR.date}]:not([${DRAG_ATTR.drop}="time"])`;
+
 export function findRevealElement(
   root: ParentNode,
   target: ActivityRevealTarget
@@ -83,7 +90,7 @@ export function findRevealElement(
     if (el.dataset.occurrenceDate === target.date) return { el, match: 'occurrence' };
     anyOccurrence ??= el;
   }
-  for (const el of root.querySelectorAll<HTMLElement>('[data-date]')) {
+  for (const el of root.querySelectorAll<HTMLElement>(DAY_CELL_SELECTOR)) {
     if (el.dataset.date === target.date) return { el, match: 'day' };
   }
   return anyOccurrence ? { el: anyOccurrence, match: 'activity' } : null;

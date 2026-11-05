@@ -713,6 +713,16 @@ export function toHHmm(hours: number, minutes: number): string {
 const LAST_MINUTE_OF_DAY = 23 * 60 + 59;
 
 /**
+ * Minutes of the day (`0`–`1439`) → `HH:mm`: the inverse of `minutesOfDay`. A finite input
+ * outside the day clamps to it (`1440` is `23:59`, never `24:00`; a negative is `00:00`) and a
+ * fractional minute floors, so the result is a valid same-day time.
+ */
+export function minutesToHHmm(minutes: number): string {
+  const m = Math.max(0, Math.min(Math.floor(minutes), LAST_MINUTE_OF_DAY));
+  return toHHmm(Math.floor(m / 60), m % 60);
+}
+
+/**
  * `HH:mm` plus `minutes`, capped at 23:59 (and floored at 00:00): the same-day rule the
  * activity forms enforce with their `endTime < startTime` clamp, so a 10pm start plus three
  * hours gives 11:59pm rather than an end that wraps to before its start.
@@ -723,8 +733,7 @@ const LAST_MINUTE_OF_DAY = 23 * 60 + 59;
 export function addMinutesToTime(time: string, minutes: number): string {
   const start = minutesOfDay(time);
   if (start === null) return '';
-  const total = Math.max(0, Math.min(start + minutes, LAST_MINUTE_OF_DAY));
-  return toHHmm(Math.floor(total / 60), total % 60);
+  return minutesToHHmm(Math.max(0, Math.min(start + minutes, LAST_MINUTE_OF_DAY)));
 }
 
 /**

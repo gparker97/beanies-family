@@ -5,6 +5,7 @@ import DayOfWeekSelector from '@/components/ui/DayOfWeekSelector.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { ruleKey } from '@/services/recurrence/cadence';
 import { describeRuleAt, WEEKDAY_SHORT } from '@/services/recurrence/describe';
+import { retargetRuleForAnchor } from '@/services/recurrence/retargetRule';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { getOrdinalSuffix } from '@/utils/format';
 import {
@@ -247,21 +248,24 @@ watch(
 // Every anchor the rule derives follows the start date (greg's steer) — but only
 // on a genuine start-date change, so a loaded rule's stored values survive
 // opening the form.
+//
+// The rules live in `retargetRuleForAnchor` (shared with calendar drag, which moves
+// a series with no form). It runs on the editable STATE, not the built rule, so it
+// is NOT gated on the active unit: a start-date change made while Weekly is
+// selected must still move the monthly anchor, or switching to Monthly afterwards
+// emits a rule anchored on a day the series never starts on. Weekdays re-anchor
+// only while untouched (exactly the previous start date's weekday); a user-chosen
+// set is never rewritten. (Same "untouched" heuristic ActivityModal used before it
+// adopted this control, so the modal no longer needs its own date watcher.)
 watch(anchorYmd, (newYmd, oldYmd) => {
-  // NOT gated on the active unit: a start-date change made while Weekly is
-  // selected must still move the monthly anchor, or switching to Monthly
-  // afterwards emits a rule anchored on a day the series never starts on.
-  if (s.monthlyMode === 'date') s.monthlyDay = deriveMonthlyDay();
-  // Weekdays re-anchor too, but ONLY while untouched — i.e. still exactly the
-  // previous start date's weekday. A user-chosen set is never rewritten. Without
-  // this a series moved from a Monday to a Tuesday keeps repeating on Mondays.
-  // (Same "untouched" heuristic ActivityModal used before it adopted this
-  // control, so the modal no longer needs its own date watcher.)
-  if (!oldYmd || oldYmd === newYmd) return;
-  const prevDow = parseLocalDate(oldYmd).getDay();
-  if (s.weekdays.length === 1 && s.weekdays[0] === prevDow) {
-    s.weekdays = [parseLocalDate(newYmd).getDay()];
-  }
+  if (!oldYmd) return;
+  const next = retargetRuleForAnchor(
+    { weekdays: s.weekdays, monthlyAnchor: s.monthlyMode, monthlyDay: s.monthlyDay },
+    oldYmd,
+    newYmd
+  );
+  if (next.weekdays) s.weekdays = next.weekdays;
+  if (next.monthlyDay !== undefined) s.monthlyDay = next.monthlyDay;
 });
 
 watch(

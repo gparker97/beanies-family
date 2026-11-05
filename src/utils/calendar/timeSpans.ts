@@ -21,6 +21,14 @@ import { minutesOfDay } from '@/utils/date';
 /** So an activity running past midnight is a real span, not a negative one. */
 export const MINUTES_PER_DAY = 1440;
 
+/**
+ * How long an activity with no end time is assumed to run on the PLANNER (the wall
+ * assumes its own 90). Shared by the planner's time grid (`useCalendarNavigation.ts`)
+ * and calendar drag (`dragMath.ts`), so a moved end-less block keeps the length it was
+ * drawn with.
+ */
+export const PLANNER_ASSUMED_DURATION_MIN = 60;
+
 export interface TimedSpan {
   start: number;
   end: number;

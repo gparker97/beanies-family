@@ -15,7 +15,19 @@
  *
  * `run` is the cell's slice of a lane run; the default is a standalone bar (rounded at
  * both ends and labelled), which is what a stack or a vertical day list wants.
+ *
+ * Drag and drop (#142): the two ACTIVITY chips (`MonthChip`, `AllDayActivityChip`) carry the
+ * drag source and the "Press Space to move" description (`useActivityDragAttrs`), by
+ * fallthrough beside the reveal hooks, and only where the month chip context says the chip
+ * is a control (`interactive`): a drag source is a control. So a phone grid cell's chips
+ * (inside the cell's button) never lift; the open day row's and the desktop chips do. Trips,
+ * segments, birthdays and holidays are not activities and never get a source, and neither
+ * does a vacation-linked activity (it belongs to its trip).
  */
+import { computed } from 'vue';
+import type { FamilyActivity } from '@/types/models';
+import { useMonthCellChips } from '@/components/planner/monthCellChipsKey';
+import { useActivityDragAttrs } from '@/composables/drag/useActivityDragAttrs';
 import type { DayItem } from '@/utils/monthDayItems';
 import type { LaneRun } from '@/utils/monthGridLayout';
 import MonthChip from '@/components/planner/MonthChip.vue';
@@ -23,7 +35,7 @@ import MonthSegmentChip from '@/components/planner/MonthSegmentChip.vue';
 import TripChip from '@/components/planner/TripChip.vue';
 import AllDayActivityChip from '@/components/planner/AllDayActivityChip.vue';
 
-withDefaults(defineProps<{ item: DayItem; run?: LaneRun }>(), {
+const props = withDefaults(defineProps<{ item: DayItem; run?: LaneRun }>(), {
   run: () => ({ isStart: true, isEnd: true, showLabel: true }),
 });
 
@@ -32,6 +44,19 @@ const emit = defineEmits<{
   'vacation-click': [vacationId: string];
   'view-segment': [vacationId: string, segmentIndex: number];
 }>();
+
+const chips = useMonthCellChips();
+const activityDragAttrs = useActivityDragAttrs();
+
+const activity = computed<FamilyActivity | null>(() => {
+  const item = props.item;
+  if (item.kind === 'timed') return item.occurrence.activity;
+  return item.kind === 'allday' ? item.item.activity : null;
+});
+
+const dragAttrs = computed(() =>
+  activity.value ? activityDragAttrs(activity.value, chips.value.interactive) : {}
+);
 </script>
 
 <template>
@@ -40,6 +65,7 @@ const emit = defineEmits<{
     :occurrence="item.occurrence"
     :data-activity-id="item.occurrence.activity.id"
     :data-occurrence-date="item.occurrence.date"
+    v-bind="dragAttrs"
     @view-activity="(id, date) => emit('view-activity', id, date)"
   />
   <MonthSegmentChip
@@ -57,7 +83,7 @@ const emit = defineEmits<{
     v-else
     :activity="item.item.activity"
     :date="item.date"
-    v-bind="run"
+    v-bind="{ ...run, ...dragAttrs }"
     :with-faces="true"
     :data-activity-id="item.item.activity.id"
     :data-occurrence-date="item.date"

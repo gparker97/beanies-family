@@ -1203,13 +1203,22 @@ export const useActivityStore = defineStore('activities', () => {
   }
 
   /**
+   * The override child of `parentId` for the occurrence keyed `occurrenceYmd` (its
+   * `originalOccurrenceDate`, else its date), or `undefined`. The calendar drag's Undo
+   * (#142) reads it to capture a child a 'this only' save will reuse.
+   */
+  function findOverride(parentId: string, occurrenceYmd: string): FamilyActivity | undefined {
+    return overridesByParent.value.get(parentId)?.get(occurrenceYmd);
+  }
+
+  /**
    * The calendar session a to-do's or list's link opens (the override child when that session
    * was edited, `null` when it does not resolve or was cancelled). See `utils/activityLinks`.
    */
   function resolveActivityLink(link: ActivityLink): ResolvedActivityLink | null {
     return resolveLink(link, {
       byId: (id) => activities.value.find((a) => a.id === id),
-      overrideFor: (seriesId, ymd) => overridesByParent.value.get(seriesId)?.get(ymd),
+      overrideFor: findOverride,
     });
   }
 
@@ -1805,6 +1814,7 @@ export const useActivityStore = defineStore('activities', () => {
     splitActivity,
     materializeOverride,
     resetOccurrenceToSeries,
+    findOverride,
     resolveActivityLink,
     removeFromMemory,
     resetState,

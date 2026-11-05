@@ -1,6 +1,6 @@
 import { ref } from 'vue';
 import { useActivityStore } from '@/stores/activityStore';
-import { chooseScope } from '@/composables/useRecurringEditScope';
+import { chooseScope, type RecurringEditScope } from '@/composables/useRecurringEditScope';
 import {
   toDateInputValue,
   addDays,
@@ -15,7 +15,27 @@ import { reportSessionActionFailed } from '@/utils/actionFailure';
 import { showToast } from '@/composables/useToast';
 import { useTranslationStore } from '@/stores/translationStore';
 import { logEvent } from '@/services/telemetry';
+import { activityShadowFromRule, resolveActivityRule } from '@/services/recurrence/adapters';
+import { retargetRuleForAnchor } from '@/services/recurrence/retargetRule';
 import type { FamilyActivity, ISODateString, UpdateFamilyActivityInput } from '@/types/models';
+
+/**
+ * What a scoped save did, so a caller can tell a cancel from a failure and build on the
+ * write (the calendar drag's Undo, #142).
+ *
+ * - `saved`: `writtenId` is the record the branch wrote (the template for 'all', the
+ *   override child for 'this-only', the new split template for 'this-and-future');
+ *   `reapedCount` is the override children the truncation reap deleted (0 when it did not
+ *   run).
+ * - `cancelled`: the scope prompt was dismissed; nothing was written.
+ * - `refused`: the multi-weekday guard refused a series-scope date move (it toasted).
+ * - `failed`: a write failed (already reported to the user).
+ */
+export type ScopedSaveOutcome =
+  | { kind: 'saved'; scope: RecurringEditScope; writtenId: string; reapedCount: number }
+  | { kind: 'cancelled' }
+  | { kind: 'refused'; reason: 'multi-weekday' }
+  | { kind: 'failed' };
 
 /**
  * Shared composable for scope-aware activity view/edit.
@@ -83,7 +103,7 @@ export function useActivityScopeEdit() {
   async function reapOrphansAfterTruncation(
     id: string,
     changes: UpdateFamilyActivityInput
-  ): Promise<void> {
+  ): Promise<number> {
     let cutYmd: string | null = null;
     if (typeof changes.recurrenceEndDate === 'string') {
       cutYmd = changes.recurrenceEndDate;
@@ -94,24 +114,75 @@ export function useActivityScopeEdit() {
       // is an orphan. `null` for a never-ending rule — nothing to reap.
       if (anchor) cutYmd = lastOccurrenceOf(changes.rule, anchor);
     }
-    if (!cutYmd) return;
-    await activityStore.deleteChildrenFrom(
+    if (!cutYmd) return 0;
+    return activityStore.deleteChildrenFrom(
       id,
       toDateInputValue(addDays(parseLocalDate(cutYmd), 1))
     );
   }
 
   /**
-   * Scope-aware save. Shows scope modal when saving changes to a recurring
-   * activity occurrence. Returns true if saved, false if cancelled.
+   * A date move at a SERIES scope with no rule in the patch (the calendar drag, #142: it has
+   * no form, so nothing re-anchored the rule the way `RecurrencePicker` does for the edit
+   * sheet) re-targets the record's rule onto the new anchor, so a weekly Wednesday series
+   * moved to a Thursday repeats on Thursdays. The legacy shadow is rewritten with it
+   * (minus `recurrenceEndDate`, which the move does not change): a stale `daysOfWeek` would
+   * permanently refuse series-scope moves and poison the Google push hash.
+   *
+   * Empty when the patch already carries a rule (the form supplied its own), when the
+   * anchor did not move, or when the re-targeted rule is unchanged (a daily series). A
+   * record whose rule cannot be resolved is left alone and logged at `warn`.
+   */
+  function retargetedRulePatch(
+    record: FamilyActivity,
+    oldAnchor: string,
+    newAnchor: string,
+    changes: UpdateFamilyActivityInput,
+    scope: RecurringEditScope
+  ): UpdateFamilyActivityInput {
+    if ('rule' in changes || oldAnchor === newAnchor) return {};
+    const source = resolveActivityRule(record)?.rule;
+    if (!source) {
+      logEvent({
+        surface: 'activity-scope-edit',
+        level: 'warn',
+        message: 'Could not resolve the rule of a moved series; its rule was not re-targeted',
+        context: { action: 'rule-retarget-skipped', recur_scope: scope },
+      });
+      return {};
+    }
+    const rule = retargetRuleForAnchor(source, oldAnchor, newAnchor);
+    if (JSON.stringify(rule) === JSON.stringify(source)) return {};
+    const { recurrenceEndDate: _end, ...shadow } = activityShadowFromRule(rule);
+    void _end;
+    return { rule, ...shadow };
+  }
+
+  /**
+   * How many weekdays a series repeats on, read from its RULE (the source of truth; a
+   * rule-only record carries no `daysOfWeek` shadow), or from the legacy shadow when no rule
+   * resolves. Only a weekly rule names weekdays; any other unit counts 0.
+   */
+  function seriesWeekdayCount(record: FamilyActivity): number {
+    const rule = resolveActivityRule(record)?.rule;
+    if (!rule) return record.daysOfWeek?.length ?? 0;
+    return rule.unit === 'week' ? (rule.weekdays?.length ?? 0) : 0;
+  }
+
+  /**
+   * Scope-aware save. Shows the scope modal when saving changes to a recurring
+   * activity occurrence, and says what happened (see `ScopedSaveOutcome`).
+   * `opts.source` names the calling path for the store's `span_rebased` event
+   * (defaults: 'scope-all' / 'scope-this-and-future').
    */
   async function handleScopedSave(
     templateId: string,
     occurrenceDate: string,
-    changes: UpdateFamilyActivityInput
-  ): Promise<boolean> {
+    changes: UpdateFamilyActivityInput,
+    opts: { source?: string } = {}
+  ): Promise<ScopedSaveOutcome> {
     const scope = await chooseScope();
-    if (!scope) return false;
+    if (!scope) return { kind: 'cancelled' };
 
     const template = activityStore.activities.find((a) => a.id === templateId);
     // `changes` is a minimal diff, so `date` is present ONLY if the user
@@ -125,7 +196,7 @@ export function useActivityScopeEdit() {
     // chips alone in that case. Shifting the start date anyway would discard the
     // move AND push the first occurrence before the new start, dropping it from
     // the calendar. Refuse with guidance instead of corrupting the series.
-    if (movedTo && scope !== 'this-only' && (template?.daysOfWeek?.length ?? 0) > 1) {
+    if (movedTo && scope !== 'this-only' && template && seriesWeekdayCount(template) > 1) {
       showToast(
         'error',
         t('planner.multiDayMoveBlocked.title'),
@@ -135,7 +206,7 @@ export function useActivityScopeEdit() {
           context: { action: 'multi-weekday-move-refused', recur_scope: scope },
         }
       );
-      return false;
+      return { kind: 'refused', reason: 'multi-weekday' };
     }
 
     /** The moved occurrence's day-shift, applied to a series anchor date. */
@@ -156,6 +227,8 @@ export function useActivityScopeEdit() {
       };
     }
 
+    let writtenId: string;
+    let reapedCount = 0;
     if (scope === 'all') {
       // Apply the DELTA to the template's start rather than assigning the
       // occurrence date to it (which would drag the series start forward to
@@ -178,29 +251,46 @@ export function useActivityScopeEdit() {
             context: { action: 'template-missing', recur_scope: scope },
           }
         );
-        return false;
+        return { kind: 'failed' };
       }
-      if (movedTo && template) patch.date = shiftAnchor(template.date);
+      if (movedTo && template) {
+        patch.date = shiftAnchor(template.date);
+        Object.assign(
+          patch,
+          retargetedRulePatch(template, template.date, patch.date, changes, scope)
+        );
+      }
       const targetDate = patch.date ?? template?.date;
       const withLasts = targetDate ? { ...patch, ...lastsOnto(targetDate) } : patch;
       // A move carries the series' span along (`updateActivity` owns that rule).
-      if (!(await activityStore.updateActivity(templateId, withLasts, { source: 'scope-all' }))) {
+      if (
+        !(await activityStore.updateActivity(templateId, withLasts, {
+          source: opts.source ?? 'scope-all',
+        }))
+      ) {
         reportSessionActionFailed();
-        return false;
+        return { kind: 'failed' };
       }
+      writtenId = templateId;
+      // An "ends" edit (or a re-targeted rule with an end) truncates the series in
+      // place: same orphan risk as the delete path, same reap, against the PATCHED
+      // rule so it cuts at the new anchor's last occurrence.
+      reapedCount = await reapOrphansAfterTruncation(templateId, withLasts);
     } else if (scope === 'this-only') {
       // An untouched date is simply ABSENT from the diff, so `materializeOverride`
       // resolves it to `occurrenceDate` — the occurrence stays where the user
       // clicked. A present date is a deliberate reschedule.
-      if (!(await activityStore.materializeOverride(templateId, occurrenceDate, changes))) {
+      const child = await activityStore.materializeOverride(templateId, occurrenceDate, changes);
+      if (!child) {
         reportSessionActionFailed();
-        return false;
+        return { kind: 'failed' };
       }
-    } else if (scope === 'this-and-future') {
+      writtenId = child.id;
+    } else {
       const newTemplate = await activityStore.splitActivity(templateId, occurrenceDate);
       if (!newTemplate) {
         reportSessionActionFailed();
-        return false;
+        return { kind: 'failed' };
       }
       // `splitActivity` anchors the new template at `occurrenceDate`, so the
       // form's raw `date` must not overwrite it (Recurring Invariant 3) — but a
@@ -217,24 +307,25 @@ export function useActivityScopeEdit() {
       const safeChanges = {
         ...rest,
         ...moved,
+        ...(moved.date
+          ? retargetedRulePatch(newTemplate, newTemplate.date, moved.date, changes, scope)
+          : {}),
         ...lastsOnto(moved.date ?? newTemplate.date),
       } as UpdateFamilyActivityInput;
       if (
         Object.keys(safeChanges).length > 0 &&
         !(await activityStore.updateActivity(newTemplate.id, safeChanges, {
-          source: 'scope-this-and-future',
+          source: opts.source ?? 'scope-this-and-future',
         }))
       ) {
         reportSessionActionFailed();
-        return false;
+        return { kind: 'failed' };
       }
+      writtenId = newTemplate.id;
       // Truncating a series via an "ends on" edit strands the children past the
       // cut exactly as the delete path does (Recurring Invariant 7).
-      await reapOrphansAfterTruncation(newTemplate.id, safeChanges);
+      reapedCount = await reapOrphansAfterTruncation(newTemplate.id, safeChanges);
     }
-    // An "ends" edit at 'all' scope truncates the series in place — same orphan
-    // risk, same reap.
-    if (scope === 'all') await reapOrphansAfterTruncation(templateId, changes);
     logEvent({
       surface: 'activity-scope-edit',
       level: 'info',
@@ -246,7 +337,7 @@ export function useActivityScopeEdit() {
         recur_rescheduled: 'date' in changes,
       },
     });
-    return true;
+    return { kind: 'saved', scope, writtenId, reapedCount };
   }
 
   return {

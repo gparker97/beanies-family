@@ -15,7 +15,13 @@
  * A component that shows its own trace of an action (the deal pile's emoji row under a
  * face) passes `onUndone`, called only when the toast's Undo actually landed.
  */
-import { dismissToast, hasToastAction, invokeToastAction, showToast } from '@/composables/useToast';
+import {
+  dismissToast,
+  hasToastAction,
+  invokeToastAction,
+  showToast,
+  UNDO_TOAST_MS,
+} from '@/composables/useToast';
 import { useTranslation } from '@/composables/useTranslation';
 import { useMemberInfo } from '@/composables/useMemberInfo';
 import { useResponsibilityCardLabel } from '@/composables/useResponsibilityCardLabel';
@@ -24,7 +30,7 @@ import { fillTemplate } from '@/utils/fillTemplate';
 import type { ResolvedCard } from '@/utils/responsibilityDeck';
 import type { UndoToken } from '@/utils/responsibilityOps';
 
-export const UNDO_TOAST_MS = 6000;
+export { UNDO_TOAST_MS };
 
 export interface DealActionOptions {
   /** Called after the toast's Undo landed (never on a refused or failed undo). */

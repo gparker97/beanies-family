@@ -143,8 +143,8 @@ async function handleActivitySave(
 ) {
   if ('id' in data && 'data' in data) {
     if (editingOccurrenceDate.value && editingActivity.value?.recurrence !== 'none') {
-      const saved = await handleScopedSave(data.id, editingOccurrenceDate.value, data.data);
-      if (!saved) return;
+      const outcome = await handleScopedSave(data.id, editingOccurrenceDate.value, data.data);
+      if (outcome.kind !== 'saved') return;
     } else {
       await activityStore.updateActivity(data.id, data.data);
     }

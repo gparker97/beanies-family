@@ -165,4 +165,39 @@ describe('WeekStripNav', () => {
     const wrapper = mount(WeekStripNav, { props: { weeks: [] } });
     expect(wrapper.findAll('button').length).toBe(0);
   });
+
+  describe('drag and drop (#142)', () => {
+    const pills = (w: ReturnType<typeof mount>) => w.findAll('button[aria-label]');
+
+    it('every day pill is a day drop target for its date', () => {
+      const w = mount(WeekStripNav, { props: { weeks: [makeWeek()] } });
+      for (const [i, pill] of pills(w).entries()) {
+        expect(pill.attributes('data-drop')).toBe('day');
+        expect(pill.attributes('data-date')).toBe(`2026-05-${18 + i}`);
+      }
+    });
+
+    it('dropTargetDate rings that pill only, over the selected fill, with a dark lift', () => {
+      const w = mount(WeekStripNav, {
+        props: { weeks: [makeWeek()], selectedDate: '2026-05-20', dropTargetDate: '2026-05-20' },
+      });
+      const ringed = pills(w).filter((p) => p.classes().includes('ring-2'));
+      expect(ringed).toHaveLength(1);
+      expect(ringed[0]!.attributes('data-date')).toBe('2026-05-20');
+      expect(ringed[0]!.classes()).toEqual(
+        expect.arrayContaining([
+          'ring-primary-500',
+          'dark:ring-accent-lift',
+          'dark:text-accent-lift',
+        ])
+      );
+      // The ring replaces the selected pill's white-on-orange fill, so it stays readable.
+      expect(ringed[0]!.classes()).not.toContain('bg-primary-500');
+    });
+
+    it('no dropTargetDate, no ring', () => {
+      const w = mount(WeekStripNav, { props: { weeks: [makeWeek()], selectedDate: '2026-05-20' } });
+      expect(pills(w).some((p) => p.classes().includes('ring-2'))).toBe(false);
+    });
+  });
 });

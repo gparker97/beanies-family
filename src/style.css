@@ -1478,3 +1478,30 @@ html.dark .magic-tagline-band {
     --celebration-surface: #1e2a36; /* surface-raised */
   }
 }
+
+/* Calendar drag and drop (#142): the place a lifted chip or block leaves behind while its
+   ghost (a clone, `useDragGhost`) follows the pointer. A dashed outline, no fill, and the
+   contents faded: decorative, since the readable copy is the ghost. Applied by the drag
+   binding to elements of several components, so it cannot be a scoped rule. `!important`
+   because every chip paints its wash with an inline `background`. */
+@layer components {
+  .drag-placeholder {
+    background: transparent !important;
+    box-shadow: none;
+    outline: 2px dashed rgb(44 62 80 / 60%); /* Deep Slate, about 3.5:1 on the white card */
+    outline-offset: -2px;
+  }
+
+  .drag-placeholder > * {
+    opacity: 0.4;
+  }
+
+  /* A keyboard lift: no ghost carries the copy, so the placeholder's text stays readable. */
+  .drag-placeholder-solid > * {
+    opacity: 1;
+  }
+
+  html.dark .drag-placeholder {
+    outline-color: var(--color-line-strong);
+  }
+}

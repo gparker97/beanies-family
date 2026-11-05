@@ -46,6 +46,7 @@ afterEach(() => {
 
 import MonthGridCell from '../MonthGridCell.vue';
 import { CALENDAR_TODAY } from '@/constants/tileStyles';
+import { DROP_TARGET_RING } from '@/constants/dragStyles';
 import { MONTH_CELL_METRICS, monthCellCssVars } from '@/constants/calendarCaps';
 import type { CellLayout, MonthGridDisplay } from '@/utils/monthGridLayout';
 import type { MonthDayCellData } from '@/utils/monthCells';
@@ -78,6 +79,7 @@ function mountCell(
     layout?: CellLayout;
     capacity?: { shown: number; hidden: number };
     tint?: 'holiday' | 'weekend';
+    isDropTarget?: boolean;
   } = {}
 ) {
   const stack = stackOf(c);
@@ -90,6 +92,7 @@ function mountCell(
       cssVars: monthCellCssVars(MONTH_CELL_METRICS.compact),
       tint: over.tint,
       dayRowId: 'day-row',
+      isDropTarget: over.isDropTarget,
     },
   });
 }
@@ -424,5 +427,33 @@ describe('MonthGridCell phone', () => {
       },
     });
     expect(w.get('[data-testid="trip-chip"]').text()).not.toContain('Bali');
+  });
+});
+
+describe('MonthGridCell drop target (#142)', () => {
+  it('the root is a day drop target for its date', () => {
+    const w = mountCell(cell());
+    expect(w.attributes('data-drop')).toBe('day');
+    expect(w.attributes('data-date')).toBe(FIXTURE_DATE);
+  });
+
+  it('rings in Heritage Orange (lifted on dark) with the orange wash, in place of the tint', () => {
+    const w = mountCell(cell(), { tint: 'weekend', isDropTarget: true });
+    expect(w.classes()).toEqual(
+      expect.arrayContaining([
+        'ring-2',
+        'ring-inset',
+        'ring-primary-500',
+        'dark:ring-accent-lift',
+        'bg-[var(--tint-orange-15)]',
+      ])
+    );
+    expect(w.classes().some((c) => c.startsWith('hover:bg-'))).toBe(false);
+    expect(mountCell(cell(), { tint: 'weekend' }).classes()).not.toContain('ring-2');
+  });
+
+  it('paints the one shared drop ring (DROP_TARGET_RING), not a local copy', () => {
+    const w = mountCell(cell(), { isDropTarget: true });
+    expect(w.classes()).toEqual(expect.arrayContaining(DROP_TARGET_RING.split(' ')));
   });
 });

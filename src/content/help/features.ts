@@ -1636,7 +1636,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       'Schedule lessons, appointments, and recurring activities for your family with calendar views and smart recurrence.',
     icon: '\u{1F4C5}',
     readTime: 5,
-    updatedDate: '2026-11-04',
+    updatedDate: '2026-11-05',
     sections: [
       {
         type: 'heading',
@@ -1843,6 +1843,46 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
           'Density, the Hide Times and Hide Faces switches, Grid or List, and Faces, Bars or Titles stay on the device you set them on. Your phone and your laptop can each look the way you like.',
         title: 'Set per device',
         icon: '\u{1F4F1}',
+      },
+      {
+        type: 'heading',
+        content: 'Moving things by dragging',
+        level: 2,
+        id: 'moving-by-dragging',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Plans change. Instead of opening an activity to edit its date, you can pick it up and drop it where it belongs, and resize it to change how long it lasts.',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>Month:</strong> on a computer, press an activity and move it onto another day. On a phone, tap a day to open its list, then press and hold an activity and drop it on a day in the grid.',
+          '<strong>Week and Day:</strong> drag an activity to a new day or a new time. Drag from the bottom edge to change when it ends. Times move in 15-minute steps, and an activity is always at least 15 minutes long.',
+          '<strong>Day view on a computer:</strong> drop an activity into another person\u2019s column to give it to them. This works when the activity belongs to just one person.',
+          '<strong>Week on a phone:</strong> drop an activity on a day in the strip at the top to change its day.',
+          '<strong>Repeating activities</strong> always ask first: just this one, this and later ones, or all of them.',
+          '<strong>Birthdays, holidays and trips</strong> cannot be dragged.',
+        ],
+      },
+      {
+        type: 'paragraph',
+        content:
+          'After a move, tap <strong>Undo</strong> in the message to put it back. The one exception is <strong>this and later</strong>, which has no Undo; drag the activity back to change it again.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          '<strong>Using the keyboard:</strong> press <strong>Space</strong> on an activity to pick it up, use the arrow keys to move it, press <strong>Enter</strong> to drop it, or <strong>Escape</strong> to cancel. On the Week and Day views, hold <strong>Shift</strong> with the up and down arrows to change when it ends.',
+      },
+      {
+        type: 'infoBox',
+        content:
+          'If an activity came from Google Calendar and your family owns the event, it moves in Google Calendar too. If someone else invited your family to it, it moves only in beanies.family, and the message tells you Google\u2019s copy wasn\u2019t changed.',
+        title: 'Google Calendar',
+        icon: '\u{1F4C6}',
       },
       {
         type: 'heading',

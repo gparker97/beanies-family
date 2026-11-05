@@ -16,7 +16,11 @@
  * Positioning, outside click, Escape (focus back to the trigger) and roving arrow-key
  * focus over `[data-day-item]` come from `useAnchoredPopover`, the SortMenu idiom.
  * Teleported to `<body>`, so it sits outside the planner root and
- * `useActivityReveal.findRevealElement` never matches its chips.
+ * `useActivityReveal.findRevealElement` never matches its chips. Its activity chips are
+ * drag sources (#142): the grid passes the panel (`el`) to its drag binding as a portal, and
+ * a pointer lift closes the popover so the cells are visible. The binding hears the panel's
+ * keys itself (they never reach the grid root), so Space lifts a chip here too; a keyboard
+ * lift keeps the popover open, the focused chip staying the keys' target.
  */
 import { ref, watch } from 'vue';
 import { useAnchoredPopover } from '@/composables/useAnchoredPopover';
@@ -96,7 +100,9 @@ function closeThen(fn: () => void): void {
   fn();
 }
 
-defineExpose({ openFor, close });
+// `el` is the teleported panel: the grid's drag binding (#142) listens on it as a portal,
+// since its chips are drag sources but it sits outside the grid root.
+defineExpose({ openFor, close, el: popoverRef });
 </script>
 
 <template>

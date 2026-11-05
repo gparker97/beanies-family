@@ -42,7 +42,10 @@ afterEach(() => {
   document.body.innerHTML = '';
 });
 
+import { ref } from 'vue';
 import MonthDayItem from '../MonthDayItem.vue';
+import { DEFAULT_CELL_CHIPS, MONTH_CELL_CHIPS } from '@/components/planner/monthCellChipsKey';
+import { useActivityDragAttrs } from '@/composables/drag/useActivityDragAttrs';
 import type { DayItem } from '@/utils/monthDayItems';
 import { allDay, segment, timed, trip, FIXTURE_DATE } from '@/test/monthCellFixtures';
 
@@ -158,5 +161,62 @@ describe('MonthDayItem emits', () => {
     );
     await w.get('button').trigger('click');
     expect(parent).not.toHaveBeenCalled();
+  });
+});
+
+describe('MonthDayItem drag source (#142)', () => {
+  const NOT_INTERACTIVE = {
+    global: {
+      provide: {
+        [MONTH_CELL_CHIPS as symbol]: ref({ ...DEFAULT_CELL_CHIPS, interactive: false }),
+      },
+    },
+  };
+
+  it('the two activity chips carry the move source and the Space hint where they are controls', () => {
+    for (const item of [timedItem(), allDayItem()]) {
+      const w = mount(MonthDayItem, { props: { item } });
+      expect(w.attributes('data-drag')).toBe('move');
+      expect(w.attributes('aria-description')).toBe('planner.drag.a11y.dragHint');
+    }
+  });
+
+  it("binds exactly the shared useActivityDragAttrs output (one definition of a source's attributes)", () => {
+    const item = timedItem();
+    const expected = useActivityDragAttrs()(
+      (item as Extract<DayItem, { kind: 'timed' }>).occurrence.activity
+    );
+    const w = mount(MonthDayItem, { props: { item } });
+    for (const [name, value] of Object.entries(expected)) {
+      expect(w.attributes(name)).toBe(value);
+    }
+  });
+
+  it('trips and segments never get a source', () => {
+    for (const item of [tripItem(), segmentItem()]) {
+      const w = mount(MonthDayItem, { props: { item } });
+      expect(w.attributes('data-drag')).toBeUndefined();
+      expect(w.attributes('aria-description')).toBeUndefined();
+    }
+  });
+
+  it('inside a phone cell (not a control) no chip is a source', () => {
+    for (const item of [timedItem(), allDayItem()]) {
+      const w = mount(MonthDayItem, { props: { item }, ...NOT_INTERACTIVE });
+      expect(w.attributes('data-drag')).toBeUndefined();
+    }
+  });
+
+  it('a vacation-linked activity belongs to its trip and never lifts', () => {
+    const occurrence = timed('t-trip');
+    occurrence.activity = { ...occurrence.activity, vacationId: 'v1' };
+    const w = mount(MonthDayItem, { props: { item: { kind: 'timed', occurrence } } });
+    expect(w.attributes('data-drag')).toBeUndefined();
+  });
+
+  it('an interactive chip opts out of the long-press callout and text selection', () => {
+    for (const item of [timedItem(), allDayItem()]) {
+      expect(mount(MonthDayItem, { props: { item } }).classes()).toContain('select-none');
+    }
   });
 });

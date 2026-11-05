@@ -11,7 +11,10 @@ import { setActivePinia, createPinia } from 'pinia';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useActivityScopeEdit } from '@/composables/useActivityScopeEdit';
 import { useActivityStore } from '@/stores/activityStore';
-import type { FamilyActivity } from '@/types/models';
+import { logEvent } from '@/services/telemetry';
+import { previewNext } from '@/services/recurrence/recurrenceEngine';
+import type { FamilyActivity, UpdateFamilyActivityInput } from '@/types/models';
+import type { RecurrenceRule } from '@/types/recurrence';
 
 const chooseScope = vi.fn();
 vi.mock('@/composables/useRecurringEditScope', () => ({
@@ -69,7 +72,9 @@ describe('useActivityScopeEdit', () => {
       chooseScope.mockResolvedValue(null);
       const { handleScopedSave } = useActivityScopeEdit();
 
-      expect(await handleScopedSave(TEMPLATE_ID, OCCURRENCE, { title: 'X' })).toBe(false);
+      expect(await handleScopedSave(TEMPLATE_ID, OCCURRENCE, { title: 'X' })).toEqual({
+        kind: 'cancelled',
+      });
       expect(store.materializeOverride).not.toHaveBeenCalled();
       expect(store.updateActivity).not.toHaveBeenCalled();
     });
@@ -103,7 +108,9 @@ describe('useActivityScopeEdit', () => {
         vi.mocked(store.materializeOverride).mockResolvedValue(null);
         const { handleScopedSave } = useActivityScopeEdit();
 
-        expect(await handleScopedSave(TEMPLATE_ID, OCCURRENCE, { title: 'X' })).toBe(false);
+        expect(await handleScopedSave(TEMPLATE_ID, OCCURRENCE, { title: 'X' })).toEqual({
+          kind: 'failed',
+        });
         expect(reportSessionActionFailed).toHaveBeenCalled();
       });
     });
@@ -128,10 +135,16 @@ describe('useActivityScopeEdit', () => {
         await handleScopedSave(TEMPLATE_ID, OCCURRENCE, { date: '2026-04-02' });
 
         // The series start must shift by the same +1 day, NOT jump to the
-        // occurrence date — which would drag the whole series to April.
+        // occurrence date — which would drag the whole series to April. The
+        // (legacy) weekly rule follows it onto Thursdays.
         expect(store.updateActivity).toHaveBeenCalledWith(
           TEMPLATE_ID,
-          { date: '2026-03-05' },
+          {
+            date: '2026-03-05',
+            rule: { unit: 'week', interval: 1, weekdays: [4], end: { kind: 'never' } },
+            recurrence: 'weekly',
+            daysOfWeek: [4],
+          },
           { source: 'scope-all' }
         );
       });
@@ -150,8 +163,38 @@ describe('useActivityScopeEdit', () => {
         store.activities = [makeTemplate({ daysOfWeek: [1, 3] })];
         const { handleScopedSave } = useActivityScopeEdit();
 
-        expect(await handleScopedSave(TEMPLATE_ID, OCCURRENCE, { date: '2026-04-02' })).toBe(false);
+        expect(await handleScopedSave(TEMPLATE_ID, OCCURRENCE, { date: '2026-04-02' })).toEqual({
+          kind: 'refused',
+          reason: 'multi-weekday',
+        });
         expect(store.updateActivity).not.toHaveBeenCalled();
+      });
+
+      it('refuses a date move on a RULE-ONLY multi-weekday series (no daysOfWeek shadow)', async () => {
+        // The rule is the source of truth: a Mon+Wed rule with no legacy shadow must not
+        // slip past the guard, or the anchor shifts while the rule keeps Mon+Wed.
+        store.activities = [
+          makeTemplate({
+            daysOfWeek: undefined,
+            rule: { unit: 'week', interval: 1, weekdays: [1, 3], end: { kind: 'never' } },
+          }),
+        ];
+        const { handleScopedSave } = useActivityScopeEdit();
+
+        expect(await handleScopedSave(TEMPLATE_ID, OCCURRENCE, { date: '2026-04-02' })).toEqual({
+          kind: 'refused',
+          reason: 'multi-weekday',
+        });
+        expect(store.updateActivity).not.toHaveBeenCalled();
+      });
+
+      it('does not refuse a monthly series whose stale daysOfWeek shadow names two days', async () => {
+        store.activities = [makeTemplate({ recurrence: 'monthly', daysOfWeek: [1, 3] })];
+        const { handleScopedSave } = useActivityScopeEdit();
+
+        expect(
+          await handleScopedSave(TEMPLATE_ID, OCCURRENCE, { date: '2026-04-02' })
+        ).toMatchObject({ kind: 'saved' });
       });
 
       it('reaps orphaned children when an "ends on" edit truncates the series', async () => {
@@ -202,7 +245,27 @@ describe('useActivityScopeEdit', () => {
         store.activities = [makeTemplate({ daysOfWeek: [1, 3] })];
         const { handleScopedSave } = useActivityScopeEdit();
 
-        expect(await handleScopedSave(TEMPLATE_ID, OCCURRENCE, { date: '2026-04-02' })).toBe(false);
+        expect(await handleScopedSave(TEMPLATE_ID, OCCURRENCE, { date: '2026-04-02' })).toEqual({
+          kind: 'refused',
+          reason: 'multi-weekday',
+        });
+        expect(store.splitActivity).not.toHaveBeenCalled();
+        expect(store.updateActivity).not.toHaveBeenCalled();
+      });
+
+      it('refuses a date move on a RULE-ONLY multi-weekday series (no daysOfWeek shadow)', async () => {
+        store.activities = [
+          makeTemplate({
+            daysOfWeek: undefined,
+            rule: { unit: 'week', interval: 1, weekdays: [1, 3], end: { kind: 'never' } },
+          }),
+        ];
+        const { handleScopedSave } = useActivityScopeEdit();
+
+        expect(await handleScopedSave(TEMPLATE_ID, OCCURRENCE, { date: '2026-04-02' })).toEqual({
+          kind: 'refused',
+          reason: 'multi-weekday',
+        });
         expect(store.splitActivity).not.toHaveBeenCalled();
         expect(store.updateActivity).not.toHaveBeenCalled();
       });
@@ -219,7 +282,9 @@ describe('useActivityScopeEdit', () => {
         vi.mocked(store.splitActivity).mockResolvedValue(null);
         const { handleScopedSave } = useActivityScopeEdit();
 
-        expect(await handleScopedSave(TEMPLATE_ID, OCCURRENCE, { title: 'X' })).toBe(false);
+        expect(await handleScopedSave(TEMPLATE_ID, OCCURRENCE, { title: 'X' })).toEqual({
+          kind: 'failed',
+        });
         expect(reportSessionActionFailed).toHaveBeenCalled();
         expect(store.updateActivity).not.toHaveBeenCalled();
       });
@@ -239,7 +304,13 @@ describe('useActivityScopeEdit', () => {
     beforeEach(() => {
       store.activities = [weekend()];
       vi.spyOn(store, 'splitActivity').mockResolvedValue(
-        makeTemplate({ id: 'tpl-2', date: '2026-05-15', endDate: '2026-05-17', isAllDay: true })
+        makeTemplate({
+          id: 'tpl-2',
+          date: '2026-05-15',
+          endDate: '2026-05-17',
+          isAllDay: true,
+          daysOfWeek: [5],
+        })
       );
     });
 
@@ -248,10 +319,11 @@ describe('useActivityScopeEdit', () => {
       const { handleScopedSave } = useActivityScopeEdit();
       // Move the 2026-05-15 repeat to Saturday the 16th.
       await handleScopedSave(TEMPLATE_ID, '2026-05-15', { date: '2026-05-16' });
-      // `updateActivity` re-bases `endDate` itself (store test covers it).
+      // `updateActivity` re-bases `endDate` itself (store test covers it); the
+      // weekly rule follows the start onto Saturdays.
       expect(store.updateActivity).toHaveBeenCalledWith(
         TEMPLATE_ID,
-        { date: '2026-05-02' },
+        expect.objectContaining({ date: '2026-05-02', daysOfWeek: [6] }),
         { source: 'scope-all' }
       );
     });
@@ -287,7 +359,7 @@ describe('useActivityScopeEdit', () => {
       await handleScopedSave(TEMPLATE_ID, '2026-05-15', { date: '2026-05-16' });
       expect(store.updateActivity).toHaveBeenCalledWith(
         'tpl-2',
-        { date: '2026-05-16' },
+        expect.objectContaining({ date: '2026-05-16', daysOfWeek: [6] }),
         { source: 'scope-this-and-future' }
       );
     });
@@ -299,6 +371,203 @@ describe('useActivityScopeEdit', () => {
       expect(viewingOccurrenceDate.value).toBe('2026-05-17');
       // ... while the edit keys on the repeat's Friday.
       expect(handleViewOpenEdit(weekend()).occurrenceDate).toBe('2026-05-15');
+    });
+  });
+
+  describe('outcomes and the rule re-target (calendar drag, #142)', () => {
+    const weeklyRule = (over: Partial<RecurrenceRule> = {}): RecurrenceRule => ({
+      unit: 'week',
+      interval: 1,
+      weekdays: [3],
+      end: { kind: 'never' },
+      ...over,
+    });
+
+    /** Make `updateActivity` apply its patch, as the real store does, so the reap reads it. */
+    function applyWrites() {
+      vi.mocked(store.updateActivity).mockImplementation(
+        async (id: string, patch: UpdateFamilyActivityInput) => {
+          store.activities = store.activities.map((a) =>
+            a.id === id ? ({ ...a, ...patch } as FamilyActivity) : a
+          );
+          return store.activities.find((a) => a.id === id) ?? null;
+        }
+      );
+    }
+
+    it('names the written record per branch', async () => {
+      const { handleScopedSave } = useActivityScopeEdit();
+
+      chooseScope.mockResolvedValue('all');
+      expect(await handleScopedSave(TEMPLATE_ID, OCCURRENCE, { title: 'X' })).toEqual({
+        kind: 'saved',
+        scope: 'all',
+        writtenId: TEMPLATE_ID,
+        reapedCount: 0,
+      });
+
+      chooseScope.mockResolvedValue('this-only');
+      expect(await handleScopedSave(TEMPLATE_ID, OCCURRENCE, { title: 'X' })).toEqual({
+        kind: 'saved',
+        scope: 'this-only',
+        writtenId: 'child-1',
+        reapedCount: 0,
+      });
+
+      chooseScope.mockResolvedValue('this-and-future');
+      expect(await handleScopedSave(TEMPLATE_ID, OCCURRENCE, { title: 'X' })).toEqual({
+        kind: 'saved',
+        scope: 'this-and-future',
+        writtenId: 'tpl-2',
+        reapedCount: 0,
+      });
+    });
+
+    it('a template that vanished before an "all" move is a failure, not a silent success', async () => {
+      chooseScope.mockResolvedValue('all');
+      store.activities = [];
+      const { handleScopedSave } = useActivityScopeEdit();
+      expect(await handleScopedSave(TEMPLATE_ID, OCCURRENCE, { date: '2026-04-02' })).toEqual({
+        kind: 'failed',
+      });
+    });
+
+    it("forwards the caller's source to the store's span_rebased event", async () => {
+      const { handleScopedSave } = useActivityScopeEdit();
+      chooseScope.mockResolvedValue('all');
+      await handleScopedSave(TEMPLATE_ID, OCCURRENCE, { title: 'X' }, { source: 'drag' });
+      chooseScope.mockResolvedValue('this-and-future');
+      await handleScopedSave(TEMPLATE_ID, OCCURRENCE, { title: 'X' }, { source: 'drag' });
+      const sources = vi.mocked(store.updateActivity).mock.calls.map((c) => c[2]);
+      expect(sources).toEqual([{ source: 'drag' }, { source: 'drag' }]);
+    });
+
+    it("weekly Wed -> Thu at 'this-and-future' repeats on Thursdays", async () => {
+      chooseScope.mockResolvedValue('this-and-future');
+      vi.mocked(store.splitActivity).mockResolvedValue(
+        makeTemplate({ id: 'tpl-2', date: OCCURRENCE, rule: weeklyRule() })
+      );
+      const { handleScopedSave } = useActivityScopeEdit();
+      await handleScopedSave(TEMPLATE_ID, OCCURRENCE, { date: '2026-04-02' });
+
+      const [id, patch] = vi.mocked(store.updateActivity).mock.calls[0]!;
+      expect(id).toBe('tpl-2');
+      expect(patch.date).toBe('2026-04-02');
+      expect(patch.rule).toEqual(weeklyRule({ weekdays: [4] }));
+      expect(patch.daysOfWeek).toEqual([4]);
+      expect(patch.recurrence).toBe('weekly');
+      expect('recurrenceEndDate' in patch).toBe(false);
+      // Every expanded session lands on a Thursday.
+      const days = previewNext(patch.rule!, patch.date!, patch.date!, 4).map((d) =>
+        new Date(d + 'T00:00:00').getDay()
+      );
+      expect(days).toEqual([4, 4, 4, 4]);
+    });
+
+    it("re-targets a legacy (no rule) weekly template at 'all'", async () => {
+      chooseScope.mockResolvedValue('all');
+      // The default template is legacy: recurrence 'weekly' + daysOfWeek [3], no `rule`.
+      const { handleScopedSave } = useActivityScopeEdit();
+      await handleScopedSave(TEMPLATE_ID, OCCURRENCE, { date: '2026-04-02' });
+
+      const [, patch] = vi.mocked(store.updateActivity).mock.calls[0]!;
+      expect(patch.rule).toEqual(weeklyRule({ weekdays: [4] }));
+      expect(patch.daysOfWeek).toEqual([4]);
+    });
+
+    it("a monthly series' day of the month follows the moved anchor", async () => {
+      chooseScope.mockResolvedValue('all');
+      const monthly: RecurrenceRule = {
+        unit: 'month',
+        interval: 1,
+        monthlyAnchor: 'date',
+        monthlyDay: 4,
+        end: { kind: 'never' },
+      };
+      store.activities = [
+        makeTemplate({ recurrence: 'monthly', daysOfWeek: undefined, rule: monthly }),
+      ];
+      const { handleScopedSave } = useActivityScopeEdit();
+      // The April 4th session moved to the 6th, for all.
+      await handleScopedSave(TEMPLATE_ID, '2026-04-04', { date: '2026-04-06' });
+
+      const [, patch] = vi.mocked(store.updateActivity).mock.calls[0]!;
+      expect(patch.date).toBe('2026-03-06');
+      expect(patch.rule).toEqual({ ...monthly, monthlyDay: 6 });
+      expect(patch.recurrence).toBe('monthly');
+      expect('daysOfWeek' in patch).toBe(true);
+      expect(patch.daysOfWeek).toBeUndefined();
+    });
+
+    it('never overrides a rule the form supplied', async () => {
+      chooseScope.mockResolvedValue('all');
+      const formRule = weeklyRule({ weekdays: [4], interval: 2 });
+      const { handleScopedSave } = useActivityScopeEdit();
+      await handleScopedSave(TEMPLATE_ID, OCCURRENCE, { date: '2026-04-02', rule: formRule });
+
+      const [, patch] = vi.mocked(store.updateActivity).mock.calls[0]!;
+      expect(patch).toEqual({ date: '2026-03-05', rule: formRule });
+    });
+
+    it("'all' with no date in the patch never shifts or re-targets the series", async () => {
+      chooseScope.mockResolvedValue('all');
+      store.activities = [makeTemplate({ rule: weeklyRule() })];
+      const { handleScopedSave } = useActivityScopeEdit();
+      await handleScopedSave(TEMPLATE_ID, OCCURRENCE, { startTime: '16:00', endTime: '17:00' });
+
+      const [, patch] = vi.mocked(store.updateActivity).mock.calls[0]!;
+      expect(patch).toEqual({ startTime: '16:00', endTime: '17:00' });
+    });
+
+    it('an unresolvable rule moves the date without a re-target, and says so', async () => {
+      chooseScope.mockResolvedValue('all');
+      store.activities = [
+        makeTemplate({ recurrence: 'fortnightly-ish' as FamilyActivity['recurrence'] }),
+      ];
+      const { handleScopedSave } = useActivityScopeEdit();
+      await handleScopedSave(TEMPLATE_ID, OCCURRENCE, { date: '2026-04-02' });
+
+      const [, patch] = vi.mocked(store.updateActivity).mock.calls[0]!;
+      expect(patch).toEqual({ date: '2026-03-05' });
+      expect(logEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          level: 'warn',
+          surface: 'activity-scope-edit',
+          context: expect.objectContaining({ action: 'rule-retarget-skipped' }),
+        })
+      );
+    });
+
+    it("an 'all' move on a count-ended series reaps against the re-targeted rule", async () => {
+      chooseScope.mockResolvedValue('all');
+      applyWrites();
+      vi.mocked(store.deleteChildrenFrom).mockResolvedValue(1);
+      // Wed 2026-03-04, five sessions: the last is Wed 2026-04-01.
+      store.activities = [
+        makeTemplate({ rule: weeklyRule({ end: { kind: 'afterCount', count: 5 } }) }),
+      ];
+      const { handleScopedSave } = useActivityScopeEdit();
+      // Every session moves a day later: the last is now Thu 2026-04-02.
+      const outcome = await handleScopedSave(TEMPLATE_ID, OCCURRENCE, { date: '2026-04-02' });
+
+      expect(store.deleteChildrenFrom).toHaveBeenCalledWith(TEMPLATE_ID, '2026-04-03');
+      expect(outcome).toEqual({
+        kind: 'saved',
+        scope: 'all',
+        writtenId: TEMPLATE_ID,
+        reapedCount: 1,
+      });
+    });
+
+    it('a pure move on a never-ending series reaps nothing', async () => {
+      chooseScope.mockResolvedValue('all');
+      applyWrites();
+      store.activities = [makeTemplate({ rule: weeklyRule() })];
+      const { handleScopedSave } = useActivityScopeEdit();
+      const outcome = await handleScopedSave(TEMPLATE_ID, OCCURRENCE, { date: '2026-04-02' });
+
+      expect(store.deleteChildrenFrom).not.toHaveBeenCalled();
+      expect(outcome).toMatchObject({ kind: 'saved', reapedCount: 0 });
     });
   });
 });

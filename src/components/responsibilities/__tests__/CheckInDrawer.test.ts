@@ -15,7 +15,11 @@ vi.mock('@/composables/useTranslation', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
 }));
 vi.mock('@/composables/useToday', () => ({ useToday: () => ({ today: { value: '2026-09-26' } }) }));
-vi.mock('@/composables/useToast', () => ({ showToast: vi.fn(() => 1), dismissToast: vi.fn() }));
+vi.mock('@/composables/useToast', () => ({
+  showToast: vi.fn(() => 1),
+  dismissToast: vi.fn(),
+  UNDO_TOAST_MS: 6000,
+}));
 
 const family = reactive({
   members: [
