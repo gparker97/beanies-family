@@ -1798,7 +1798,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'The Month view shows the whole month on one screen. Days from the month before and after fade in at the edges of the grid, so every week is a full row of seven. Open the Month view and everything fits: no scrolling to find the last week.',
+          'The Month view shows the whole month on one screen. Days from the month before and after are greyed at the edges of the grid, so every week is a full row of seven and the month you are looking at stands out. Weekends are marked in terracotta. Open the Month view and everything fits: no scrolling to find the last week.',
       },
       {
         type: 'list',
@@ -1833,7 +1833,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         content: '',
         items: [
           'Tap the <strong>M</strong> button a second time to switch between <strong>Grid</strong> and <strong>List</strong>. The small picture under the M shows which one you are on. Grid is the whole month at a glance; List is the day-by-day agenda.',
-          'In Grid, choose how much each day shows: <strong>Faces</strong> (who is busy), <strong>Bars</strong> (coloured bars for each activity) or <strong>Titles</strong> (the activity names). Pinch two fingers together or spread them apart to change it, or tap the word above the grid.',
+          'In Grid, choose how much each day shows: <strong>Faces</strong> (who is busy), <strong>Bars</strong> (coloured bars for each activity) or <strong>Titles</strong> (the activity names). The choice lives in <strong>Settings → Appearance</strong> under <strong>Month Grid on a Phone</strong>, and pinching two fingers together or apart on the grid changes it too.',
           'Tap a day to see its list right under that week. Tap the same day again to open it in Day view.',
         ],
       },

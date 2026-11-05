@@ -8,7 +8,7 @@
  */
 import { mount, type VueWrapper } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { defineComponent, h, nextTick, reactive, ref } from 'vue';
+import { defineComponent, h, nextTick, reactive, ref, type Ref } from 'vue';
 import { useMonthGridFit, type MonthGridFit } from '@/composables/useMonthGridFit';
 
 const settings = reactive({ textSize: 'normal' as 'normal' | 'large' });
@@ -27,6 +27,7 @@ interface Geom {
   cardTop: number;
   bodyTop: number;
   parentClientH: number;
+  insetH: number;
   hidden: boolean;
 }
 const geom: Geom = {} as Geom;
@@ -38,6 +39,7 @@ function resetGeom(): void {
     cardTop: 100,
     bodyTop: 140,
     parentClientH: 700,
+    insetH: 0,
     hidden: false,
   } satisfies Geom);
 }
@@ -55,7 +57,14 @@ const minRowPx = vi.fn((rem: number) => (rem === 19 ? 108 : minRow));
 
 type Mounted = { wrapper: VueWrapper; fit: MonthGridFit };
 
-function mountFit(opts: { withMain?: boolean; format?: 'desktop' | 'phone' } = {}): Mounted {
+function mountFit(
+  opts: {
+    withMain?: boolean;
+    format?: 'desktop' | 'phone';
+    /** Renders a `data-role="inset"` element inside the card while true (the day row). */
+    inset?: Ref<boolean>;
+  } = {}
+): Mounted {
   const host = document.createElement(opts.withMain === false ? 'div' : 'main');
   host.style.paddingBottom = '24px';
   host.dataset.role = 'main';
@@ -65,17 +74,20 @@ function mountFit(opts: { withMain?: boolean; format?: 'desktop' | 'phone' } = {
     setup() {
       const card = ref<HTMLElement | null>(null);
       const body = ref<HTMLElement | null>(null);
+      const inset = ref<HTMLElement | null>(null);
       fit = useMonthGridFit(card, body, {
         format: opts.format ?? 'desktop',
         reservePx: () => reserve.value,
         minRowPx,
+        insetRef: opts.inset ? inset : undefined,
       });
-      return { card, body };
+      return { card, body, inset };
     },
     render() {
       return h('div', { 'data-role': 'parent' }, [
         h('section', { ref: 'card', 'data-role': 'card' }, [
           h('div', { ref: 'body', 'data-role': 'body' }),
+          opts.inset?.value ? h('div', { ref: 'inset', 'data-role': 'inset' }) : null,
         ]),
       ]);
     },
@@ -105,7 +117,19 @@ beforeEach(() => {
     configurable: true,
     get(this: HTMLElement) {
       const role = this.dataset.role;
-      return role === 'main' ? geom.mainClientH : role === 'parent' ? geom.parentClientH : 0;
+      return role === 'main'
+        ? geom.mainClientH
+        : role === 'parent'
+          ? geom.parentClientH
+          : role === 'inset'
+            ? geom.insetH
+            : 0;
+    },
+  });
+  Object.defineProperty(proto, 'offsetHeight', {
+    configurable: true,
+    get(this: HTMLElement) {
+      return this.dataset.role === 'inset' ? geom.insetH : 0;
     },
   });
   Object.defineProperty(proto, 'scrollTop', {
@@ -198,15 +222,49 @@ describe('useMonthGridFit', () => {
     wrapper.unmount();
   });
 
-  it('CONVERGENCE: a taller parent (a day row inserted) leaves rowPx unchanged', async () => {
+  it('CONVERGENCE: a taller parent alone leaves rowPx unchanged', async () => {
     const { fit, wrapper } = mountFit();
     await settle();
     const before = fit.rowPx.value;
-    geom.parentClientH = 1100; // the phone day row added content; scroller and offsets did not move
+    geom.parentClientH = 1100; // the card grew; scroller and offsets did not move
     fireObservers();
     await settle();
     expect(fit.rowPx.value).toBe(before);
     expect(reportError).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
+  it('a taller inset element lowers rowPx', async () => {
+    const open = ref(true);
+    geom.insetH = 120;
+    const { fit, wrapper } = mountFit({ format: 'phone', inset: open });
+    await settle();
+    // 940 - 100 - 40 - 120 inset = 680 -> 113
+    expect(fit.rowPx.value).toBe(113);
+    geom.insetH = 180; // the open day row grew (a different day, more items)
+    fireObservers();
+    await settle();
+    // 940 - 100 - 40 - 180 = 620 -> 103
+    expect(fit.rowPx.value).toBe(103);
+    expect(fit.degraded.value).toBe(false);
+    wrapper.unmount();
+  });
+
+  it('the inset ref going null restores it', async () => {
+    const open = ref(false);
+    geom.insetH = 120;
+    const { fit, wrapper } = mountFit({ format: 'phone', inset: open });
+    await settle();
+    expect(fit.rowPx.value).toBe(133);
+    open.value = true; // the day row opens
+    await settle();
+    fireObservers();
+    await settle();
+    expect(fit.rowPx.value).toBe(113);
+    // Closing it: no observer fires (the element is gone), only the ref goes null.
+    open.value = false;
+    await settle();
+    expect(fit.rowPx.value).toBe(133);
     wrapper.unmount();
   });
 

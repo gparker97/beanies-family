@@ -5,8 +5,9 @@
  * EXTRACTED from `MonthDayCard`'s events column, not written fresh.
  *
  * One rendering path over `capDayContents(cell, caps)`, so this component holds no cap
- * logic: with `caps` (the stream's `STREAM_DAY_CAPS`) it shows what fits plus the two
- * "+N" counts; without (the popover and the day row) it shows everything.
+ * logic: with `caps` (the stream's `STREAM_DAY_CAPS`, the phone day row's
+ * `PHONE_DAY_ROW_CAPS`) it shows what fits plus the two "+N" counts; without (the
+ * popover) it shows everything.
  *
  * Order: birthdays and holidays (inline, so `allDaySurfaces.test.ts` sees them), trips
  * and all-day bars, the all-day "+N" right after the bars it counts, then timed items
@@ -15,7 +16,8 @@
  *
  * Every bar renders standalone with its label, because a vertical list has no
  * neighbouring cell to continue into. It provides the month chip context as full
- * anatomy (`DEFAULT_CELL_CHIPS`) with times shown when uncapped, overriding any grid
+ * anatomy (`DEFAULT_CELL_CHIPS`) with times per `showTime` (default on; the stream card
+ * turns them off, independently of its caps), overriding any grid
  * context above it, except `interactive`, which it inherits: inside the stream card
  * (whose root is the button) the chips and the "+N more" are spans, so buttons never
  * nest. Every item and extra carries `data-day-item` for the popover's roving focus.
@@ -37,11 +39,16 @@ import BirthdayChip from '@/components/planner/BirthdayChip.vue';
 import HolidayChip from '@/components/planner/HolidayChip.vue';
 import MonthDayItem from '@/components/planner/MonthDayItem.vue';
 
-const props = defineProps<{
-  cell: MonthDayCellData;
-  /** The stream's fixed caps; omitted (the popover, the day row) shows everything. */
-  caps?: DayCaps;
-}>();
+const props = withDefaults(
+  defineProps<{
+    cell: MonthDayCellData;
+    /** Fixed caps (the stream card, the phone day row); omitted (the popover) shows everything. */
+    caps?: DayCaps;
+    /** Start times on the timed chips. Default true; the stream card passes false. */
+    showTime?: boolean;
+  }>(),
+  { caps: undefined, showTime: true }
+);
 
 const emit = defineEmits<{
   'view-activity': [activityId: string, date: string];
@@ -61,7 +68,11 @@ const parentChips = useMonthCellChips();
 const interactive = computed(() => parentChips.value.interactive);
 provide(
   MONTH_CELL_CHIPS,
-  computed(() => ({ ...DEFAULT_CELL_CHIPS, showTime: !props.caps, interactive: interactive.value }))
+  computed(() => ({
+    ...DEFAULT_CELL_CHIPS,
+    showTime: props.showTime,
+    interactive: interactive.value,
+  }))
 );
 
 const c = computed(() => capDayContents(props.cell, props.caps));

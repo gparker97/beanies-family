@@ -402,12 +402,17 @@ export function monthGridRange(
 }
 
 /**
- * Is this `YYYY-MM-DD` a Saturday or a Sunday? Independent of the family's week
- * start: a Monday-start week and a Sunday-start week share the same weekend.
+ * Is this day of the week (`Date.getDay()`: 0 = Sunday, 6 = Saturday) a Saturday or a
+ * Sunday? Independent of the family's week start: a Monday-start week and a Sunday-start
+ * week share the same weekend.
  */
-export function isWeekendYmd(ymd: string): boolean {
-  const dow = parseLocalDate(ymd).getDay();
+export function isWeekendDow(dow: number): boolean {
   return dow === 0 || dow === 6;
+}
+
+/** Is this `YYYY-MM-DD` a Saturday or a Sunday? See `isWeekendDow`. */
+export function isWeekendYmd(ymd: string): boolean {
+  return isWeekendDow(parseLocalDate(ymd).getDay());
 }
 
 export function addMonths(date: Date, months: number): Date {
@@ -664,6 +669,14 @@ export function formatMonthYear(date: Date): string {
  */
 export function formatMonthYearShort(date: Date): string {
   return `${MONTHS_SHORT[date.getMonth()]} ${date.getFullYear()}`;
+}
+
+/**
+ * Format a date as "Jan '26": the narrowest month label, for a header with no room
+ * for the full year.
+ */
+export function formatMonthYearTiny(date: Date): string {
+  return `${MONTHS_SHORT[date.getMonth()]} '${String(date.getFullYear() % 100).padStart(2, '0')}`;
 }
 
 /**

@@ -67,23 +67,26 @@ export interface WeekDay {
 }
 
 /**
- * Format a week's span as a human label, e.g. "18 – 24 May, 2026",
- * "28 May – 3 Jun, 2026", or "30 Dec, 2025 – 5 Jan, 2026". Pure — shared
- * by `useWeekNavigation.weekLabel` and the page-level `usePlannerNavigation`
- * so the command-bar period label and the week view never drift apart.
+ * Format a week's span as a human label, e.g. "18 May – 24, 2026",
+ * "28 May – 3 Jun, 2026", or "30 Dec, 2025 – 5 Jan, 2026". With `withYear` false
+ * every year segment is dropped ("18 May – 24", "28 May – 3 Jun", "30 Dec – 5 Jan"),
+ * for a header too narrow for the year. Pure: shared by `useWeekNavigation.weekLabel`
+ * and the page-level `usePlannerNavigation` so the command-bar period label and the
+ * week view never drift apart.
  */
-export function formatWeekRange(first: Date, last: Date): string {
+export function formatWeekRange(first: Date, last: Date, withYear = true): string {
   const sameMonth = first.getMonth() === last.getMonth();
   const sameYear = first.getFullYear() === last.getFullYear();
   const fmtDay = (d: Date) => formatDateShort(toDateInputValue(d));
+  const year = (d: Date) => (withYear ? `, ${d.getFullYear()}` : '');
 
   if (sameMonth) {
-    return `${fmtDay(first)} – ${last.getDate()}, ${first.getFullYear()}`;
+    return `${fmtDay(first)} – ${last.getDate()}${year(first)}`;
   }
   if (sameYear) {
-    return `${fmtDay(first)} – ${fmtDay(last)}, ${first.getFullYear()}`;
+    return `${fmtDay(first)} – ${fmtDay(last)}${year(first)}`;
   }
-  return `${fmtDay(first)}, ${first.getFullYear()} – ${fmtDay(last)}, ${last.getFullYear()}`;
+  return `${fmtDay(first)}${year(first)} – ${fmtDay(last)}${year(last)}`;
 }
 
 export function useWeekNavigation(referenceDate: Ref<Date>) {

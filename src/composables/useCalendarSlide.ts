@@ -49,6 +49,13 @@ export interface UseCalendarSlideOptions {
    * documents it). Not gated by `enabled` or the animation lockout.
    */
   onPinch?: (dir: PinchDirection) => void;
+  /**
+   * Required |dx|/|dy| ratio to lock the gesture as horizontal, passed straight through to
+   * `useHorizontalSwipe` (default 1.5 there). Read once at setup: keep it constant for the
+   * instance. The phone month grid passes 1, so a swipe that is at least as sideways as it
+   * is down turns the month.
+   */
+  axisLockRatio?: number;
 }
 
 /** iOS system page-transition easing: fast start, gentle settle. */
@@ -225,6 +232,7 @@ export function useCalendarSlide(
 
   useHorizontalSwipe(target, {
     threshold,
+    axisLockRatio: options.axisLockRatio,
     enabled: swipeEnabled,
     onPinch: options.onPinch,
     onProgress: (dx) => {

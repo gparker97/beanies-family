@@ -51,6 +51,7 @@ afterEach(() => {
 import MonthDayRow from '../MonthDayRow.vue';
 import MonthDayContents from '../MonthDayContents.vue';
 import { allDay, birthday, cell, holiday, timed } from '@/test/monthCellFixtures';
+import { PHONE_DAY_ROW_CAPS } from '@/constants/calendarCaps';
 
 describe('MonthDayRow', () => {
   it('shows the day caption, the count label and the tap-again hint', () => {
@@ -71,13 +72,26 @@ describe('MonthDayRow', () => {
     expect(w.get('p').text()).toContain('Nothing planned');
   });
 
-  it('renders MonthDayContents for the cell without caps', () => {
+  it('renders with the row caps and times shown', () => {
     const c = cell({ timedOccurrences: ['t1', 't2', 't3', 't4', 't5'].map((id) => timed(id)) });
     const w = mount(MonthDayRow, { props: { cell: c } });
     const inner = w.getComponent(MonthDayContents);
     expect(inner.props('cell')).toStrictEqual(c);
-    expect(inner.props('caps')).toBeUndefined();
-    expect(w.findAll('[data-day-item]')).toHaveLength(5);
+    expect(inner.props('caps')).toStrictEqual(PHONE_DAY_ROW_CAPS);
+    expect(inner.props('showTime')).toBe(true);
+    // Capped timeline items plus the "+N more" (which also carries data-day-item).
+    expect(w.findAll('[data-testid="month-chip"]')).toHaveLength(PHONE_DAY_ROW_CAPS.timed);
+    expect(w.get('[data-testid="month-chip"]').text()).toContain('4pm');
+    expect(w.get('[data-testid="day-contents-more"]').text()).toContain(
+      `+${5 - PHONE_DAY_ROW_CAPS.timed}`
+    );
+  });
+
+  it('forwards "+N more" as more', async () => {
+    const c = cell({ timedOccurrences: ['t1', 't2', 't3', 't4', 't5'].map((id) => timed(id)) });
+    const w = mount(MonthDayRow, { props: { cell: c } });
+    await w.get('[data-testid="day-contents-more"]').trigger('click');
+    expect(w.emitted('more')).toHaveLength(1);
   });
 
   it('forwards birthday-click, holiday-click and view-activity', async () => {

@@ -23,6 +23,8 @@ vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: vi.fn() }));
 // The fit measures a real layout, which happy-dom does not have (rowPx stays null). A test
 // that needs a measured grid sets `fitOverride`; everything else runs the real composable.
 const fitHolder = vi.hoisted(() => ({
+  /** The options of the latest `useMonthGridFit` call (the grid's inset wiring). */
+  lastOpts: null as null | { insetRef?: { value: HTMLElement | null } },
   override: null as null | {
     rowPx: { value: number | null };
     remPx: { value: number };
@@ -34,8 +36,10 @@ vi.mock('@/composables/useMonthGridFit', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/composables/useMonthGridFit')>();
   return {
     ...actual,
-    useMonthGridFit: (...args: Parameters<typeof actual.useMonthGridFit>) =>
-      fitHolder.override ?? actual.useMonthGridFit(...args),
+    useMonthGridFit: (...args: Parameters<typeof actual.useMonthGridFit>) => {
+      fitHolder.lastOpts = args[2];
+      return fitHolder.override ?? actual.useMonthGridFit(...args);
+    },
   };
 });
 
@@ -77,10 +81,10 @@ vi.mock('@/stores/activityStore', () => ({
   getActivityColor: (a: FamilyActivity) => (a.color as string | undefined) ?? '#F15D22',
 }));
 
+// Mutable so a test can flip the week start; reset to Sunday in beforeEach.
+const settingsHolder = vi.hoisted(() => ({ weekStartDay: 0 }));
 vi.mock('@/stores/settingsStore', () => ({
-  useSettingsStore: () => ({
-    weekStartDay: 0,
-  }),
+  useSettingsStore: () => settingsHolder,
 }));
 
 // Reactive "today" is mocked so the real composable's import-time singleton
@@ -142,6 +146,8 @@ beforeEach(() => {
   setActivePinia(createPinia());
   mockActivityOccurrences.length = 0;
   fitHolder.override = null;
+  fitHolder.lastOpts = null;
+  settingsHolder.weekStartDay = 0;
   wheelSpy.enabled.length = 0;
   vi.mocked(logEvent).mockClear();
   // Pin the calendar to April 2026 so test data lands on visible cells
@@ -498,12 +504,12 @@ function seedDay(date: string, count: number): void {
   }
 }
 
-function fakeFit(rowPx: number | null, bleedPx = 24, cellPx = 139) {
+function fakeFit(rowPx: number | null, bleedPx = 24, cellPx = 139, degraded = false) {
   fitHolder.override = {
     rowPx: ref(rowPx),
     remPx: ref(16),
     bleedPx: ref(bleedPx),
-    degraded: ref(false),
+    degraded: ref(degraded),
     cellPx: ref(cellPx),
   } as unknown as NonNullable<typeof fitHolder.override>;
 }
@@ -546,13 +552,65 @@ describe('CalendarGrid structure', () => {
     expect(noTime.get('[data-testid="month-chip"]').text()).not.toContain('8am');
   });
 
-  it('tints weekend cells and gives every cell the muted ink rule for padding days', () => {
+  it('tints out-of-month cells, never in-month ones', () => {
     const wrapper = mountGrid();
-    // 2026-04-18 is a Saturday.
-    expect(wrapper.get('[data-date="2026-04-18"]').classes()).toContain('bg-[var(--tint-slate-5)]');
-    expect(wrapper.get('[data-date="2026-04-14"]').classes()).not.toContain(
-      'bg-[var(--tint-slate-5)]'
-    );
+    const OUT_OF_MONTH = 'bg-[var(--tint-slate-5)]';
+    // 2026-03-29 and 2026-05-09 pad April's grid; 2026-04-18 is an in-month Saturday.
+    expect(wrapper.get('[data-date="2026-03-29"]').classes()).toContain(OUT_OF_MONTH);
+    expect(wrapper.get('[data-date="2026-05-09"]').classes()).toContain(OUT_OF_MONTH);
+    expect(wrapper.get('[data-date="2026-04-18"]').classes()).not.toContain(OUT_OF_MONTH);
+    expect(wrapper.get('[data-date="2026-04-14"]').classes()).not.toContain(OUT_OF_MONTH);
+  });
+});
+
+describe('CalendarGrid weekday header', () => {
+  // Every header cell carries `border-b-2` (transparent on weekdays) so the row stays one
+  // height; only the colour marks the weekend.
+  const WEEKEND = [
+    'text-terracotta-600',
+    'dark:text-terracotta-lift',
+    'font-bold',
+    'border-terracotta-600',
+    'dark:border-terracotta-lift',
+  ];
+  const headers = (w: ReturnType<typeof mountGrid>) =>
+    w.findAll('[data-testid="month-weekday-header"]');
+  const weekendColumns = (w: ReturnType<typeof mountGrid>) =>
+    headers(w).flatMap((hd, i) => (hd.classes().includes('text-terracotta-600') ? [i] : []));
+
+  it('Sunday start: the first and last columns carry the terracotta weekend treatment', () => {
+    const w = mountGrid();
+    expect(headers(w).map((hd) => hd.text())).toEqual([
+      'planner.day.sun',
+      'planner.day.mon',
+      'planner.day.tue',
+      'planner.day.wed',
+      'planner.day.thu',
+      'planner.day.fri',
+      'planner.day.sat',
+    ]);
+    expect(weekendColumns(w)).toEqual([0, 6]);
+    for (const cls of WEEKEND) expect(headers(w)[0]!.classes()).toContain(cls);
+    // A weekday keeps the muted ink and none of the weekend classes; both keep the type.
+    const weekday = headers(w)[1]!.classes();
+    expect(weekday).toContain('text-[var(--color-text-muted)]');
+    expect(weekday).toContain('dark:text-ink-faint');
+    for (const cls of WEEKEND) expect(weekday).not.toContain(cls);
+    expect(weekday).toContain('border-b-2');
+    expect(weekday).toContain('border-transparent');
+    for (const cls of ['font-outfit', 'text-xs', 'uppercase', 'tracking-wide', 'py-1.5']) {
+      expect(headers(w)[0]!.classes()).toContain(cls);
+      expect(weekday).toContain(cls);
+    }
+    expect(headers(w)[0]!.classes()).not.toContain('text-[var(--color-text-muted)]');
+  });
+
+  it('Monday start: the last two columns carry it', () => {
+    settingsHolder.weekStartDay = 1;
+    const w = mountGrid();
+    expect(headers(w)[0]!.text()).toBe('planner.day.mon');
+    expect(weekendColumns(w)).toEqual([5, 6]);
+    for (const cls of WEEKEND) expect(headers(w)[5]!.classes()).toContain(cls);
   });
 });
 
@@ -745,11 +803,10 @@ describe('CalendarGrid phone', () => {
     Element.prototype.releasePointerCapture = vi.fn();
   });
 
-  it('draws the phone variant: density label row, no popover, root-button cells', () => {
+  it('draws the phone variant: no density label row, no popover, root-button cells', () => {
     const w = mountPhone();
-    expect(w.find('[role="group"][aria-label="planner.monthGrid.phoneDensity"]').exists()).toBe(
-      true
-    );
+    expect(w.find('[role="group"]').exists()).toBe(false);
+    expect(w.find('[data-testid^="month-density-"]').exists()).toBe(false);
     expect(w.get('[data-date="2026-04-14"]').element.tagName).toBe('BUTTON');
     expect(document.body.querySelector('[data-testid="month-day-popover"]')).toBeNull();
     w.unmount();
@@ -826,16 +883,34 @@ describe('CalendarGrid phone', () => {
     w.unmount();
   });
 
-  it('the density label emits set-month-pref with phoneDensity, and the active word emits nothing', async () => {
+  it('"+N more" in the day row drills into the day, logging stage more', async () => {
+    seedDay('2026-04-14', 6);
     const w = mountPhone();
-    await w.get('[data-testid="month-density-faces"]').trigger('click');
-    expect(w.emitted('set-month-pref')).toEqual([
-      [{ name: 'phoneDensity', value: 'faces' }, 'label'],
-    ]);
+    await w.get('[data-date="2026-04-14"]').trigger('click');
+    vi.mocked(logEvent).mockClear();
+    await w.get('[data-testid="month-day-row"] [data-testid="day-contents-more"]').trigger('click');
+    expect(w.emitted('selectDate')).toEqual([['2026-04-14']]);
+    const drilled = vi.mocked(logEvent).mock.calls.find(([e]) => e.message === 'day_drilled');
+    expect(drilled?.[0].context).toMatchObject({ action: 'day_drilled', stage: 'more' });
+    w.unmount();
+  });
 
-    await w.get('[data-testid="month-density-titles"]').trigger('click'); // the active one
-    expect(w.emitted('set-month-pref')).toHaveLength(1);
-    expect(w.get('[data-testid="month-density-titles"]').attributes('aria-pressed')).toBe('true');
+  it('the open day row is the fit inset, following the row to an earlier week and clearing on close', async () => {
+    const w = mountPhone();
+    const inset = () => fitHolder.lastOpts?.insetRef?.value ?? null;
+    const row = () => w.get('[data-testid="month-day-row"]').element;
+    expect(inset()).toBeNull();
+    await w.get('[data-date="2026-04-21"]').trigger('click');
+    expect(inset()).toBe(row());
+    // An EARLIER week: Vue mounts the new row before the old one's unmount nulls the ref.
+    await w.get('[data-date="2026-04-07"]').trigger('click');
+    expect(inset()).toBe(row());
+    expect(inset()?.isConnected).toBe(true);
+    // A later week.
+    await w.get('[data-date="2026-04-28"]').trigger('click');
+    expect(inset()).toBe(row());
+    await w.get('[data-testid="month-day-row-close"]').trigger('click');
+    expect(inset()).toBeNull();
     w.unmount();
   });
 
@@ -881,6 +956,46 @@ describe('CalendarGrid phone', () => {
     expect(wheelSpy.enabled.at(-1)?.value).toBe(false);
     mountGrid().unmount();
     expect(wheelSpy.enabled.at(-1)?.value).toBe(true);
+  });
+
+  describe('touch-action', () => {
+    const touchAction = (w: ReturnType<typeof mountGrid>) =>
+      (w.element as HTMLElement).style.touchAction;
+
+    it('is none when the rows fit and the card bleeds (the page cannot scroll)', () => {
+      fakeFit(120, 24, 55, false);
+      const w = mountPhone({ bleedBottom: true });
+      expect(touchAction(w)).toBe('none');
+      w.unmount();
+    });
+
+    it('is pan-y when something renders below the grid', () => {
+      fakeFit(120, 24, 55, false);
+      const w = mountPhone({ bleedBottom: false });
+      expect(touchAction(w)).toBe('pan-y');
+      w.unmount();
+    });
+
+    it('is pan-y when the rows sit at their floor (degraded, the page scrolls)', () => {
+      fakeFit(120, 24, 55, true);
+      const w = mountPhone({ bleedBottom: true });
+      expect(touchAction(w)).toBe('pan-y');
+      w.unmount();
+    });
+
+    it('is pan-y when the measure failed (rowPx null, content-sized rows)', () => {
+      fakeFit(null, 24, 55, false);
+      const w = mountPhone({ bleedBottom: true });
+      expect(touchAction(w)).toBe('pan-y');
+      w.unmount();
+    });
+
+    it('is always pan-y on desktop', () => {
+      fakeFit(120, 24, 139, false);
+      const w = mountGrid({ bleedBottom: true });
+      expect(touchAction(w)).toBe('pan-y');
+      w.unmount();
+    });
   });
 
   it('the phone card is full-bleed with no radius or shadow', () => {

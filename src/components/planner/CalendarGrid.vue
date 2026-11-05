@@ -19,10 +19,13 @@
  * `useMonthGridFit`. Geometry is `MONTH_CELL_METRICS[density]`, bound on each cell as
  * `--mg-*` custom properties.
  *
- * Phone (Phase 2): a full-bleed card on the page ground with a Faces · Bars · Titles
- * label row above the day headers; a two-finger pinch steps the same density. A tap on
- * a day opens its `MonthDayRow` under that week (Escape or a month change closes it); a
- * second tap on the same day drills into the Day view.
+ * Phone (Phase 2): a full-bleed card on the page ground; a two-finger pinch steps the
+ * density (Faces · Bars · Titles, also chosen in Settings → Appearance). A tap on a day
+ * opens its `MonthDayRow` under that week (Escape or a month change closes it); the fit
+ * subtracts the row as an inset, so the six rows shrink to make room rather than the
+ * page scrolling. A second tap on the same day, or the row's "+N more", drills into the
+ * Day view. While the page cannot scroll the card takes `touch-action: none`, so the app
+ * owns every gesture on it (see `pageStill`).
  *
  * Drag and drop (#142): one `useCalendarDrag` on the root covers the cells, the phone day
  * row and (as a portal, it is teleported) the desktop "+N more" popover. Each cell is a day
@@ -30,7 +33,7 @@
  * grid's left/right edge pages the month, and swipe and wheel paging stand down while
  * something is lifted. A pointer lift closes the popover so the cells are visible.
  */
-import { ref, computed, nextTick, watch, useId } from 'vue';
+import { ref, computed, nextTick, watch, useId, type ComponentPublicInstance } from 'vue';
 import { useActivityStore } from '@/stores/activityStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -48,12 +51,11 @@ import {
 } from '@/utils/monthGridLayout';
 import {
   MONTH_CELL_METRICS,
-  PHONE_DENSITIES,
   monthCellCssVars,
   type PhoneDensity,
   MIN_CELL_PX_FOR_TIMES,
 } from '@/constants/calendarCaps';
-import { isWeekendYmd } from '@/utils/date';
+import { isWeekendDow } from '@/utils/date';
 import { prefersReducedMotion } from '@/utils/prefersReducedMotion';
 import MonthGridCell from '@/components/planner/MonthGridCell.vue';
 import MonthDayPopover from '@/components/planner/MonthDayPopover.vue';
@@ -92,8 +94,8 @@ const emit = defineEmits<{
   /** Swipe navigation — the page advances the shared reference date. */
   prev: [];
   next: [];
-  /** A preference changed from the grid itself (phone pinch or density label). */
-  'set-month-pref': [change: MonthPrefChange, via: 'pinch' | 'label'];
+  /** A preference changed from the grid itself (the phone pinch). */
+  'set-month-pref': [change: MonthPrefChange, via: 'pinch'];
   /**
    * Whether a desktop cell is wide enough to show start times (`MIN_CELL_PX_FOR_TIMES`).
    * The command bar hides its Hide Times toggle while this is false, so the toggle never
@@ -129,10 +131,20 @@ const allDayLabels = [
   () => t('planner.day.sat'),
 ];
 
+/** The column headers in week-start order; Saturday and Sunday carry the weekend treatment. */
 const dayLabels = computed(() => {
   const start = settingsStore.weekStartDay;
-  return Array.from({ length: 7 }, (_, i) => allDayLabels[(i + start) % 7]!());
+  return Array.from({ length: 7 }, (_, i) => {
+    const dow = (i + start) % 7;
+    return { label: allDayLabels[dow]!(), weekend: isWeekendDow(dow) };
+  });
 });
+// Every header cell carries the same 2px bottom border (transparent on weekdays) so the
+// weekend underline never makes two cells taller than the other five.
+const HEADER_INK =
+  'dark:text-ink-faint text-[var(--color-text-muted)] font-semibold border-b-2 border-transparent';
+const HEADER_WEEKEND =
+  'text-terracotta-600 dark:text-terracotta-lift font-bold border-b-2 border-terracotta-600 dark:border-terracotta-lift';
 
 /**
  * The grid's full span INCLUDING padding cells, hoisted so the shared day-extras
@@ -169,13 +181,13 @@ const metrics = computed(() => MONTH_CELL_METRICS[props.display.density]);
 const cssVars = computed(() => monthCellCssVars(metrics.value));
 
 /**
- * The cell tint: holiday, else weekend. (The old `'vacation'` day tint is not used here:
- * the trip lane carries trips now. The tint entry stays for other callers.)
+ * The cell tint: holiday, else out-of-month (a day of a neighbouring month). (The old
+ * `'vacation'` day tint is not used here: the trip lane carries trips now. The tint entry
+ * stays for other callers.)
  */
 function cellTint(cell: MonthDayCellData): CalendarDayTint | undefined {
   if (monthData.value.holidayDates.has(cell.date)) return 'holiday';
-  if (isWeekendYmd(cell.date)) return 'weekend';
-  return undefined;
+  return !cell.isCurrentMonth ? 'outOfMonth' : undefined;
 }
 
 // ── Viewport fit ───────────────────────────────────────────────────────────
@@ -186,10 +198,25 @@ const swipeRef = ref<HTMLElement | null>(null);
  *  grid stuck at `opacity: 0` when a swipe's cleanup landed after a commit). */
 const gridBodyRef = ref<HTMLElement | null>(null);
 
+/**
+ * The open phone day row's root element, the fit's inset: the six rows shrink to make room
+ * for it. A named function ref (never an inline arrow, which is re-created and re-invoked
+ * every render) is called per instance, even inside the week `v-for`. Vue calls it
+ * synchronously, so when the row moves to an EARLIER week the new row mounts before the old
+ * one unmounts and that unmount's `null` arrives last. Exactly one row is mounted whenever a
+ * day is selected, so a `null` while a day is still selected is the outgoing row's.
+ */
+const dayRowEl = ref<HTMLElement | null>(null);
+function setDayRowEl(c: Element | ComponentPublicInstance | null): void {
+  if (c) dayRowEl.value = ('$el' in c ? c.$el : c) as HTMLElement;
+  else if (selectedCell.value === null) dayRowEl.value = null;
+}
+
 const { rowPx, remPx, bleedPx, degraded, cellPx } = useMonthGridFit(swipeRef, gridBodyRef, {
   format,
   reservePx: () => (format === 'phone' ? publishedHeight('--mobile-nav-h') : 0),
   minRowPx: (rem) => minRowPx(metrics.value, rem),
+  insetRef: dayRowEl,
 });
 
 /**
@@ -247,6 +274,18 @@ const cardClass = computed(() =>
 const cardStyle = computed(() =>
   props.bleedBottom && rowPx.value !== null ? { marginBottom: `-${bleedPx.value}px` } : undefined
 );
+
+/**
+ * The page genuinely cannot scroll: nothing renders below the grid (`bleedBottom`), the
+ * rows were measured (`rowPx === null` is a failed measure, whose content-sized rows may
+ * overflow) and they fit above their floor (`degraded` means the page scrolls). Only then
+ * does the phone card take `touch-action: none`. Under `pan-y`, iOS claims a vertical pan
+ * the moment the finger drifts down and fires `pointercancel`, which springs a slightly
+ * diagonal swipe back mid-gesture; with `none` the swipe commits whatever the drift. Any
+ * time the page may scroll the card stays `pan-y`, so that scroll still works.
+ */
+const pageStill = computed(() => props.bleedBottom && rowPx.value !== null && !degraded.value);
+const touchAction = computed(() => (isDesktop || !pageStill.value ? 'pan-y' : 'none'));
 
 // ── grid_fit telemetry ─────────────────────────────────────────────────────
 // Fires after the first successful measure (rowPx is null until then, and while the
@@ -335,15 +374,20 @@ function closeDayRow(stage: 'close_button' | 'escape'): void {
   });
 }
 
+/** Open the Day view for `date`: a second tap on the open day, or the row's "+N more". */
+function drillDay(date: string, stage: 'second_tap' | 'more'): void {
+  logEvent({
+    level: 'info',
+    surface: 'calendar-month-grid',
+    message: 'day_drilled',
+    context: { action: 'day_drilled', format: 'phone', stage },
+  });
+  emit('selectDate', date);
+}
+
 function onTapDay(date: string): void {
   if (selectedDate.value === date) {
-    logEvent({
-      level: 'info',
-      surface: 'calendar-month-grid',
-      message: 'day_drilled',
-      context: { action: 'day_drilled', format: 'phone', stage: 'second_tap' },
-    });
-    emit('selectDate', date);
+    drillDay(date, 'second_tap');
     return;
   }
   selectedDate.value = date;
@@ -365,33 +409,18 @@ function handleDayClick(date: string) {
   emit('selectDate', date);
 }
 
-// ── Phone density (label row and pinch) ────────────────────────────────────
-const PHONE_DENSITY_LABEL_KEYS = {
-  faces: 'planner.monthGrid.faces',
-  bars: 'planner.monthGrid.bars',
-  titles: 'planner.monthGrid.titles',
-} as const satisfies Record<PhoneDensity, string>;
-
+// ── Phone density (pinch; the choice also lives in Settings → Appearance) ──
 const phoneDensity = computed<PhoneDensity | null>(() =>
   props.display.variant === 'phone' ? props.display.density : null
 );
 
-/** Emit a phone density change; a no-op (the active word, a pinch at a clamp end) emits nothing. */
-function setPhoneDensity(value: PhoneDensity, via: 'pinch' | 'label'): void {
-  if (phoneDensity.value === null || value === phoneDensity.value) return;
-  emit('set-month-pref', { name: 'phoneDensity', value }, via);
-}
-
-/** Spread = more detail, pinch = less, clamped at Faces and Titles. */
+/** Spread = more detail, pinch = less, clamped at Faces and Titles; a pinch at a clamp end emits nothing. */
 function onPinch(dir: PinchDirection): void {
   if (phoneDensity.value === null) return;
-  setPhoneDensity(stepDensity(phoneDensity.value, dir === 'spread' ? 1 : -1), 'pinch');
+  const value = stepDensity(phoneDensity.value, dir === 'spread' ? 1 : -1);
+  if (value === phoneDensity.value) return;
+  emit('set-month-pref', { name: 'phoneDensity', value }, 'pinch');
 }
-
-const densityWordClass = (active: boolean) =>
-  active
-    ? 'text-secondary-500 decoration-primary-500 dark:text-accent-lift dark:decoration-accent-lift font-semibold underline decoration-2 underline-offset-4'
-    : 'dark:text-ink-faint text-[var(--color-text-muted)]';
 
 // ── Gestures ───────────────────────────────────────────────────────────────
 // Drag and drop (#142). Declared first: the swipe and the wheel pager gate on `isLifted`.
@@ -418,11 +447,14 @@ const { isPaging } = useWheelMonthPaging(gridBodyRef, {
 // slide cannot emit a SECOND `next` for what the user felt as one gesture.
 // A two-finger pinch on the phone steps the density (reading the variant at setup is
 // safe: the instance is keyed by it). The pinch is not gated by `enabled`.
+// The phone relaxes the axis lock to 1 (at least as sideways as down), a constant for the
+// instance; on a degraded `pan-y` card the browser still scrolls when it wins the gesture.
 useCalendarSlide(swipeRef, {
   onNext: () => emit('next'),
   onPrev: () => emit('prev'),
   enabled: computed(() => !isPaging.value && !isLifted.value),
   onPinch: isDesktop ? undefined : onPinch,
+  axisLockRatio: isDesktop ? undefined : 1,
 });
 </script>
 
@@ -431,49 +463,25 @@ useCalendarSlide(swipeRef, {
     ref="swipeRef"
     class="flex flex-col overflow-hidden"
     :class="cardClass"
-    :style="[{ touchAction: 'pan-y', willChange: 'transform' }, cardStyle]"
+    :style="[{ touchAction, willChange: 'transform' }, cardStyle]"
     @keydown="onKeydown"
     @keyup="onKeyup"
   >
     <!-- The drag's spoken progress (#142): lifted / over / dropped / cancelled. -->
     <span class="sr-only" aria-live="polite" data-testid="month-drag-live">{{ liveLabel }}</span>
-    <!-- Phone density label row (Faces · Bars · Titles), a 1rem row of toggle buttons
-         (not a radiogroup, so no arrow-key roving to build). Pinch steps the same pref. -->
-    <div
-      v-if="phoneDensity"
-      role="group"
-      :aria-label="t('planner.monthGrid.phoneDensity')"
-      class="flex h-4 flex-none items-center justify-end gap-3 px-2"
-    >
-      <template v-for="(density, i) in PHONE_DENSITIES" :key="density">
-        <span
-          v-if="i > 0"
-          class="dark:text-ink-faint text-xs text-[var(--color-text-muted)]"
-          aria-hidden="true"
-          >·</span
-        >
-        <button
-          type="button"
-          class="text-xs leading-none"
-          :class="densityWordClass(density === phoneDensity)"
-          :aria-pressed="density === phoneDensity"
-          :data-testid="`month-density-${density}`"
-          @click="setPhoneDensity(density, 'label')"
-        >
-          {{ t(PHONE_DENSITY_LABEL_KEYS[density]) }}
-        </button>
-      </template>
-    </div>
-
     <!-- Day-of-week column headers -->
     <div class="dark:border-line grid flex-none grid-cols-7 border-b border-[var(--color-border)]">
       <div
-        v-for="label in dayLabels"
-        :key="label"
-        class="font-outfit dark:text-ink-faint text-center text-xs leading-none font-semibold tracking-wide text-[var(--color-text-muted)] uppercase"
-        :class="isDesktop ? 'py-1.5' : 'py-[0.3125rem]'"
+        v-for="day in dayLabels"
+        :key="day.label"
+        class="font-outfit text-center text-xs leading-none tracking-wide uppercase"
+        :class="[
+          day.weekend ? HEADER_WEEKEND : HEADER_INK,
+          isDesktop ? 'py-1.5' : 'py-[0.3125rem]',
+        ]"
+        data-testid="month-weekday-header"
       >
-        {{ label }}
+        {{ day.label }}
       </div>
     </div>
 
@@ -504,13 +512,16 @@ useCalendarSlide(swipeRef, {
             @birthday-click="(b) => emit('birthday-click', b)"
           />
         </div>
-        <!-- Phone: the tapped day's row, a block between week rows (rows keep their fitted
-           height; the page scrolls to show it). -->
+        <!-- Phone: the tapped day's row, a block between week rows. The fit subtracts its
+           height (an inset), so the six rows shrink to make room; only when they hit
+           their floor does the page scroll to show it. -->
         <MonthDayRow
           v-if="selectedCell && selectedCell.weekRow === w"
           :id="dayRowId"
+          :ref="setDayRowEl"
           :cell="selectedCell"
           @close="closeDayRow('close_button')"
+          @more="drillDay(selectedCell.date, 'more')"
           @view-activity="(id, date) => emit('view-activity', id, date)"
           @vacation-click="(vid) => emit('vacation-click', vid)"
           @view-segment="(vid, sidx) => emit('view-segment', vid, sidx)"

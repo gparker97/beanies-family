@@ -9,18 +9,23 @@
  * and ends at the viewport (or nav) edge within the flooring slack.
  *
  * Observes through `useElementSize` (the one guarded observer, no new ResizeObserver):
- * the app scroller (window resizes) and the card's PARENT (command-bar height changes,
- * the router view becoming visible). Re-measures on the next tick when either height
- * changes, when the root font size moves (Large reading mode, the `useFirstThatFits`
- * precedent), when `reservePx()` changes, and when the density's floor changes.
+ * the app scroller (window resizes), the card's PARENT (command-bar height changes,
+ * the router view becoming visible) and the optional INSET (the phone day row, an element
+ * inside the card the rows make room for). Re-measures on the next tick when any of those
+ * heights changes, when the inset element itself appears or goes, when the root font size
+ * moves (Large reading mode, the `useFirstThatFits` precedent), when `reservePx()` changes,
+ * and when the density's floor changes.
  *
  * ⚠️ CONVERGENCE INVARIANT. No input to `measure()` depends on the card's own height or on
  * the rows it sizes: `available` is the scroller's client height minus the card's offset
- * from the scroller's top, the reserve and the header (label row plus weekday row, which
- * the rows do not size). So a re-measure triggered by the grid's own resize returns the
- * same `rowPx`, and the observer loop settles after one pass. That is why `rowPx` comes
- * from the AVAILABLE height, never from the body's laid-out height. Inserting content
- * inside the card (the phone day row) does not move it, and no "frozen" flag is needed.
+ * from the scroller's top, the reserve, the header (the weekday row, which the rows do not
+ * size) and the inset's height (the phone day row: a capped, content-sized list whose
+ * height never depends on `rowPx`). So a re-measure triggered by the grid's own resize
+ * returns the same `rowPx`, and the observer loop settles after one pass. That is why
+ * `rowPx` comes from the AVAILABLE height, never from the body's laid-out height. Opening
+ * the day row subtracts it as an inset and the six rows shrink to make room for it;
+ * closing it grows them back. The inset is never folded into the reserve: `bleedPx`
+ * subtracts the reserve from the scroller's padding, which the day row has nothing to do with.
  *
  * Why whole pixels: six fractional rows can sum to a subpixel more than the available
  * height, and `<main>`'s integer `scrollHeight` then rounds up to a 1px scroll. Flooring
@@ -53,6 +58,11 @@ export interface MonthGridFitOptions {
   reservePx: () => number;
   /** The row floor for the current density at a root font size, in px. */
   minRowPx: (remPx: number) => number;
+  /**
+   * An element inside the card the rows must make room for (the phone day row); its
+   * height is content-sized and never depends on `rowPx`. `null` (or omitted) = no inset.
+   */
+  insetRef?: Readonly<Ref<HTMLElement | null>>;
 }
 
 export interface MonthGridFit {
@@ -86,6 +96,9 @@ export function useMonthGridFit(
     surface: SURFACE,
   });
   const { height: parentHeight } = useElementSize(parentRef, { surface: SURFACE });
+  const { height: insetHeight } = useElementSize(opts.insetRef ?? ref(null), {
+    surface: SURFACE,
+  });
 
   let reported = false;
   function fail(detail: 'no_scroller' | 'measure_threw', error?: unknown): void {
@@ -119,7 +132,8 @@ export function useMonthGridFit(
       const top = cardTop - scroller.getBoundingClientRect().top + scroller.scrollTop;
       const headerPx = body.getBoundingClientRect().top - cardTop;
       const reserve = opts.reservePx();
-      const available = scroller.clientHeight - top - reserve - headerPx;
+      const inset = opts.insetRef?.value?.offsetHeight ?? 0;
+      const available = scroller.clientHeight - top - reserve - headerPx - inset;
       const min = opts.minRowPx(rem);
       const even = Math.floor(available / ROWS);
       remPx.value = rem;
@@ -140,6 +154,9 @@ export function useMonthGridFit(
   }
 
   watch([scrollerWidth, scrollerHeight, parentHeight], remeasure);
+  // The element watch is what grows the rows back when the day row closes:
+  // `useElementSize` keeps its last height when its target goes null.
+  watch([insetHeight, () => opts.insetRef?.value ?? null], remeasure);
   watch(() => settingsStore.textSize, remeasure);
   watch(() => opts.reservePx(), remeasure);
   // A density change moves the floor (the grid is not remounted for it).

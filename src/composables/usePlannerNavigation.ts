@@ -3,11 +3,13 @@ import {
   addDays,
   formatDayLong,
   formatMonthYear,
+  formatMonthYearShort,
+  formatMonthYearTiny,
   formatTodayCaption,
   toDateInputValue,
 } from '@/utils/date';
 import { useToday } from '@/composables/useToday';
-import { useWeekNavigation } from '@/composables/useCalendarNavigation';
+import { formatWeekRange, useWeekNavigation } from '@/composables/useCalendarNavigation';
 import { useBreakpoint } from '@/composables/useBreakpoint';
 
 /** Every planner view, in switcher order. The one source for the type and its guard. */
@@ -25,9 +27,16 @@ export function isPlannerView(value: unknown): value is PlannerView {
  *
  * The Family Planner page owns ONE `referenceDate`; the Month / Week / Day
  * views are controlled — they receive `referenceDate` as a prop and render
- * off it. This composable derives the period `label` and the prev/next/today
+ * off it. This composable derives the period `labels` and the prev/next/today
  * intents for the active view, reusing the existing date formatters and
- * `useWeekNavigation`'s week-range label (no parallel label logic).
+ * `formatWeekRange` over `useWeekNavigation`'s `weekDays` (no parallel label logic).
+ *
+ * `labels` is a LADDER, longest first: the command bar renders the first one that
+ * fits its title slot on one line (`useFirstThatFits`), so a narrow phone header
+ * still shows the month and year. Month: "March 2026" → "Mar 2026" → "Mar '26".
+ * Week: the range with the year → without it → the reference date's month ("Oct 2026"
+ * → "Oct '26"; the strip below names the days, and the Month view titles the same month). Day: one label (the phone caption or
+ * the desktop long form), so nothing is measured.
  *
  * Data-flow invariant (keep it one-way):
  *   - `referenceDate` flows page → views (props down). Views NEVER mutate it.
@@ -42,7 +51,7 @@ export function isPlannerView(value: unknown): value is PlannerView {
  */
 export function usePlannerNavigation(activeView: Ref<PlannerView>): {
   referenceDate: Ref<Date>;
-  label: ComputedRef<string>;
+  labels: ComputedRef<string[]>;
   goPrev: () => void;
   goNext: () => void;
   goToday: () => void;
@@ -50,21 +59,38 @@ export function usePlannerNavigation(activeView: Ref<PlannerView>): {
   const { startOfToday } = useToday();
   const { isMobile } = useBreakpoint();
   const referenceDate = ref<Date>(startOfToday.value);
-  const { weekLabel } = useWeekNavigation(referenceDate);
+  const { weekDays } = useWeekNavigation(referenceDate);
 
-  const label = computed(() => {
+  const labels = computed<string[]>(() => {
     switch (activeView.value) {
-      case 'week':
-        return weekLabel.value;
+      case 'week': {
+        const days = weekDays.value;
+        const first = days[0]!.date;
+        const last = days[6]!.date;
+        // Past the year-less range the week strip already names every day, so the title
+        // falls back to the reference date's month (the same month the Month view would
+        // title, so toggling Week and Month on one date never flips the name).
+        const d = referenceDate.value;
+        return [
+          formatWeekRange(first, last),
+          formatWeekRange(first, last, false),
+          formatMonthYearShort(d),
+          formatMonthYearTiny(d),
+        ];
+      }
       case 'day':
         // Phones have little horizontal room in the reclaimed command bar, so
         // drop the year ("Wed, 27 May") — it's implicit once you're on the day.
         // Desktop keeps the full "Wednesday, 27 May 2026".
-        return isMobile.value
-          ? formatTodayCaption(toDateInputValue(referenceDate.value))
-          : formatDayLong(toDateInputValue(referenceDate.value));
-      default:
-        return formatMonthYear(referenceDate.value);
+        return [
+          isMobile.value
+            ? formatTodayCaption(toDateInputValue(referenceDate.value))
+            : formatDayLong(toDateInputValue(referenceDate.value)),
+        ];
+      default: {
+        const d = referenceDate.value;
+        return [formatMonthYear(d), formatMonthYearShort(d), formatMonthYearTiny(d)];
+      }
     }
   });
 
@@ -96,5 +122,5 @@ export function usePlannerNavigation(activeView: Ref<PlannerView>): {
     referenceDate.value = startOfToday.value;
   }
 
-  return { referenceDate, label, goPrev, goNext, goToday };
+  return { referenceDate, labels, goPrev, goNext, goToday };
 }

@@ -13,8 +13,8 @@
  *    context asks, the popover and day lists).
  *  - `titles`: a 2px edge and the label only, medium weight like every other chip label.
  *  - `bars`: a plain colour bar, no children.
- *  - `muted` (out-of-month days): edge only, no wash, muted ink; decorative faces and
- *    bars fade, readable text never takes opacity.
+ *  - Out-of-month days are not a frame concern: `MonthGridCell` fades its whole content
+ *    block, so the frame always draws its normal ink and wash.
  *  - `interactive: false` (inside a phone cell, whose root is the button): an
  *    `aria-hidden` span with no click, so buttons never nest.
  *  - `interactive: true` also means "may be a drag source" (#142, `MonthDayItem` places the
@@ -64,18 +64,11 @@ const emit = defineEmits<{ click: [] }>();
 const chips = useMonthCellChips();
 const density = computed(() => chips.value.density);
 const interactive = computed(() => chips.value.interactive);
-const muted = computed(() => chips.value.muted);
 const showTime = computed(() => chips.value.showTime && !!props.time);
 const isRich = computed(() => density.value === 'compact' || density.value === 'comfortable');
 
 const shownFaces = computed(() =>
   props.solo && chips.value.hideSoloFace ? [] : (props.faces ?? [])
-);
-
-const inkClass = computed(() =>
-  muted.value
-    ? 'text-[var(--color-text-muted)] dark:text-ink-faint'
-    : 'text-secondary-500 dark:text-ink'
 );
 
 /** One literal class set per density, so Tailwind's source scan sees every class. */
@@ -90,7 +83,7 @@ const DENSITY_CLASS: Record<string, string> = {
 
 const rootClass = computed(() => [
   DENSITY_CLASS[density.value] ?? DENSITY_CLASS.comfortable,
-  density.value === 'bars' ? (muted.value ? 'opacity-60' : '') : inkClass.value,
+  density.value === 'bars' ? '' : 'text-secondary-500 dark:text-ink',
   props.dashed && density.value !== 'bars' ? 'border-dashed' : '',
   props.celebrating && isRich.value ? 'is-celebration' : '',
   // A control is also a drag source (#142): no long-press callout or text selection.
@@ -101,9 +94,9 @@ const rootClass = computed(() => [
 
 const rootStyle = computed(() => {
   if (density.value === 'bars') return { background: props.color };
-  return muted.value || !props.wash
-    ? { borderLeftColor: props.color }
-    : { borderLeftColor: props.color, background: props.wash };
+  return props.wash
+    ? { borderLeftColor: props.color, background: props.wash }
+    : { borderLeftColor: props.color };
 });
 
 function onClick(event: MouseEvent) {
@@ -139,12 +132,7 @@ function onClick(event: MouseEvent) {
         >{{ time }}</span
       >
       <slot />
-      <ActivityOwnerStack
-        :members="shownFaces"
-        size="2xs"
-        :max="2"
-        :class="muted ? 'opacity-60' : ''"
-      />
+      <ActivityOwnerStack :members="shownFaces" size="2xs" :max="2" />
     </template>
 
     <template v-else-if="density === 'comfortable'">
@@ -161,13 +149,7 @@ function onClick(event: MouseEvent) {
       </span>
       <span class="min-w-0 flex-1 truncate font-medium">{{ label }}</span>
       <slot />
-      <ActivityOwnerStack
-        :members="shownFaces"
-        size="xs"
-        dense
-        class="ml-0.5"
-        :class="muted ? 'opacity-60' : ''"
-      />
+      <ActivityOwnerStack :members="shownFaces" size="xs" dense class="ml-0.5" />
     </template>
 
     <span

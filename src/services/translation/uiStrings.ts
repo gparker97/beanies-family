@@ -2717,6 +2717,11 @@ const STRING_DEFS = {
     en: 'Choose which day the calendar week starts on',
     beanie: 'choose which day the calendar week starts on',
   },
+  'settings.phoneMonthDensity': { en: 'Month Grid on a Phone', beanie: 'month grid on a phone' },
+  'settings.phoneMonthDensityHint': {
+    en: "What each day shows in the phone's month grid. Pinching the grid changes it too.",
+    beanie: "what each day shows in the phone's month grid. pinching the grid changes it too.",
+  },
   'settings.country': { en: 'Country', beanie: 'country' },
   'settings.countryNotSet': { en: 'Not set', beanie: 'not set' },
   'settings.countryHelp': {
@@ -9543,8 +9548,7 @@ const STRING_DEFS = {
     beanie: 'hide faces on solo chips',
   },
   'planner.monthGrid.openDay': { en: 'Open {date}', beanie: 'open {date}' },
-  // #141: the phone month grid's density label row (Faces · Bars · Titles).
-  'planner.monthGrid.phoneDensity': { en: 'Grid Density', beanie: 'grid density' },
+  // #141: the phone month grid's densities (Faces · Bars · Titles), chosen in Settings or by pinch.
   'planner.monthGrid.faces': { en: 'Faces', beanie: 'faces' },
   'planner.monthGrid.bars': { en: 'Bars', beanie: 'bars' },
   'planner.monthGrid.titles': { en: 'Titles', beanie: 'titles' },

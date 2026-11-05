@@ -12,9 +12,13 @@
  * | phoneMode    | `PHONE_MONTH_MODE`           | grid, list               | grid      |
  * | phoneDensity | `PHONE_MONTH_DENSITY`        | faces, bars, titles      | titles    |
  *
- * Instantiate it ONCE, in `FamilyPlannerPage`, and pass `values` down: the command bar and
- * the grid stay presentational, and `usePersistedChoice` refs do not share state between
- * instances, so a second instance would disagree with the first.
+ * One instance per mounted page: `FamilyPlannerPage` owns one and passes `values` down (the
+ * command bar and the grid stay presentational), and the Settings page owns another for its
+ * phone-density select. `usePersistedChoice` refs do not share state between instances, but
+ * the planner and Settings are never mounted at the same time (separate routes under one
+ * router-view, no KeepAlive), so each reads the stored value fresh when it mounts. If a
+ * future surface needs two instances live at once, make this a module singleton (the
+ * `useStaleTabRefresh` pattern) rather than letting them disagree.
  *
  * Every change goes through the one setter, `setPref`, with the typed `MonthPrefChange`
  * (a discriminated union, so a mismatched name and value is a compile error wherever it is
@@ -63,7 +67,7 @@ export type MonthPrefChange = {
 }[MonthPrefName];
 
 /** Where a change came from (the `stage` of `pref_changed`). */
-export type MonthPrefVia = 'menu' | 'pinch' | 'label' | 'm_pill';
+export type MonthPrefVia = 'menu' | 'pinch' | 'm_pill' | 'settings';
 
 /** The two-value preferences, which a toggle flips. */
 export type MonthPrefToggleName = 'times' | 'soloFaces' | 'phoneMode';

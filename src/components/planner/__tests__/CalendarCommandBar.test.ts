@@ -1,8 +1,23 @@
 import { mount, type VueWrapper } from '@vue/test-utils';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ref, computed, nextTick } from 'vue';
+import { setActivePinia, createPinia } from 'pinia';
 import CalendarCommandBar from '../CalendarCommandBar.vue';
 import { publishedHeight } from '@/composables/usePublishedHeight';
+
+// jsdom has no layout, so the title ladder always settles on its first rung; a test that
+// needs another rung forces the index here. `null` runs the real composable.
+const forcedFit = vi.hoisted(() => ({ index: null as number | null }));
+vi.mock('@/composables/useFirstThatFits', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@/composables/useFirstThatFits')>();
+  const { ref: vueRef } = await import('vue');
+  return {
+    useFirstThatFits: (...args: Parameters<typeof real.useFirstThatFits>) =>
+      forcedFit.index === null
+        ? real.useFirstThatFits(...args)
+        : { index: vueRef(forcedFit.index), settled: vueRef(true), remeasure: () => {} },
+  };
+});
 
 // A tablet flips the Hide Times toggle off (times are always hidden there).
 const tablet = ref(false);
@@ -70,6 +85,7 @@ function mountBar(
     activeView?: 'month' | 'week' | 'day';
     monthPrefs?: object;
     timesRoom?: boolean;
+    labels?: string[];
   } = {},
   attach = false
 ) {
@@ -77,8 +93,8 @@ function mountBar(
   return mount(CalendarCommandBar, {
     ...(attach ? { attachTo: document.body } : {}),
     props: {
+      labels: ['May 2026', 'May 2026', "May '26"],
       ...rest,
-      label: 'May 2026',
       activeView: activeView ?? ('month' as const),
       canAdd: true,
       isAllActive: true,
@@ -96,6 +112,12 @@ function mountBar(
     global: { stubs },
   });
 }
+
+// `useFirstThatFits` reads the settings store (the text-size flip re-measures the ladder).
+beforeEach(() => {
+  setActivePinia(createPinia());
+  forcedFit.index = null;
+});
 
 describe('CalendarCommandBar', () => {
   beforeEach(() => {
@@ -150,6 +172,73 @@ describe('CalendarCommandBar', () => {
     expect(note.classes()).toEqual(
       expect.arrayContaining(['text-secondary-500', 'dark:text-ink-soft'])
     );
+  });
+});
+
+describe('CalendarCommandBar title ladder + compact Today', () => {
+  const LADDER = ['September 2026', 'Sep 2026', "Sep '26"];
+
+  beforeEach(() => {
+    reclaimed.value = false;
+  });
+
+  it('shows the first candidate before anything is measured', () => {
+    const w = mountBar({ labels: LADDER });
+    expect(w.get('h1').text()).toBe('September 2026');
+  });
+
+  it('shows the candidate the ladder picked, keeping truncate as the backstop', () => {
+    forcedFit.index = 2;
+    const w = mountBar({ labels: LADDER });
+    const h1 = w.get('h1');
+    expect(h1.text()).toBe("Sep '26");
+    expect(h1.classes()).toContain('truncate');
+  });
+
+  it('falls back to the first candidate when the index is past the end', () => {
+    forcedFit.index = 5;
+    const w = mountBar({ labels: ['Wednesday, 25 February 2026'] });
+    expect(w.get('h1').text()).toBe('Wednesday, 25 February 2026');
+  });
+
+  it('lays every candidate out on one line in a hidden measurer, in order', () => {
+    const w = mountBar({ labels: LADDER });
+    const measurer = w.get('[data-testid="calendar-title-measurer"]');
+    expect(measurer.attributes('aria-hidden')).toBe('true');
+    expect(measurer.classes()).toEqual(expect.arrayContaining(['invisible', 'absolute', 'h-0']));
+    const rows = measurer.findAll(':scope > div');
+    expect(rows.map((r) => r.text())).toEqual(LADDER);
+    for (const r of rows) {
+      expect(r.classes()).toEqual(
+        expect.arrayContaining(['whitespace-nowrap', 'text-xl', 'font-extrabold', 'sm:text-2xl'])
+      );
+    }
+  });
+
+  it('reclaimed header: Today is a compact calendar icon button labelled Today', async () => {
+    reclaimed.value = true;
+    const w = mountBar();
+    const today = w.findAll('[data-testid="calendar-today"]');
+    expect(today).toHaveLength(1);
+    const btn = today[0]!;
+    expect(btn.text()).toBe('');
+    expect(btn.find('svg').exists()).toBe(true);
+    expect(btn.attributes('aria-label')).toBe('planner.today');
+    expect(btn.attributes('title')).toBe('planner.today');
+    expect(btn.classes()).toEqual(
+      expect.arrayContaining(['h-8', 'w-8', 'text-primary-500', 'dark:text-accent-lift'])
+    );
+    await btn.trigger('click');
+    expect(w.emitted('today')).toHaveLength(1);
+  });
+
+  it('desktop: Today stays the text button', () => {
+    reclaimed.value = false;
+    const w = mountBar();
+    const today = w.findAll('[data-testid="calendar-today"]');
+    expect(today).toHaveLength(1);
+    expect(today[0]!.text()).toBe('planner.today');
+    expect(today[0]!.find('svg').exists()).toBe(false);
   });
 });
 

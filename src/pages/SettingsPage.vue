@@ -97,6 +97,9 @@ import { useTranslationStore } from '@/stores/translationStore';
 import { useBeanTips } from '@/composables/useBeanTips';
 import { resetAllAppStores } from '@/utils/resetStores';
 import { track } from '@/services/analytics/plausible';
+import { useBreakpoint } from '@/composables/useBreakpoint';
+import { useMonthGridPrefs } from '@/composables/useMonthGridPrefs';
+import { PHONE_DENSITIES, type PhoneDensity } from '@/constants/calendarCaps';
 
 const router = useRouter();
 const route = useRoute();
@@ -360,6 +363,23 @@ const textSizeOptions = computed(() => [
   { value: 'normal', label: t('settings.textSize.normal') },
   { value: 'large', label: t('settings.textSize.large') },
 ]);
+
+// The phone month grid's density (#141). Device-local like theme and text size, and only
+// shown on a phone: a desktop user never sees a setting that does nothing there. This
+// instance is the page's own; the planner owns another, and the two routes are never
+// mounted together (see `useMonthGridPrefs`).
+const { isMobile } = useBreakpoint();
+const monthGridPrefs = useMonthGridPrefs();
+const phoneDensityOptions = computed(() =>
+  PHONE_DENSITIES.map((d) => ({ value: d, label: t(`planner.monthGrid.${d}`) }))
+);
+function updatePhoneDensity(value: string | number): void {
+  // `setPref` validates against the spec at runtime and logs `invalid_pref_value`.
+  monthGridPrefs.setPref(
+    { name: 'phoneDensity', value: String(value) as PhoneDensity },
+    'settings'
+  );
+}
 
 const showRatesWarning = ref(false);
 const pendingCurrency = ref<string | null>(null);
@@ -2261,6 +2281,15 @@ async function handleDeleteFamilyClick() {
         :label="t('settings.textSize')"
         :hint="t('settings.textSizeHint')"
         @update:model-value="updateTextSize"
+      />
+
+      <BaseSelect
+        v-if="isMobile"
+        :model-value="monthGridPrefs.values.value.phoneDensity"
+        :options="phoneDensityOptions"
+        :label="t('settings.phoneMonthDensity')"
+        :hint="t('settings.phoneMonthDensityHint')"
+        @update:model-value="updatePhoneDensity"
       />
 
       <BaseSelect

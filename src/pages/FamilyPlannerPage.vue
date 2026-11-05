@@ -145,7 +145,7 @@ useDeepLinkParam({
 const activeView = ref<PlannerView>('month');
 // Single source of truth for the calendar's period — the views are controlled
 // off this (props down); navigation intents flow back up (events).
-const { referenceDate, label, goPrev, goNext, goToday } = usePlannerNavigation(activeView);
+const { referenceDate, labels, goPrev, goNext, goToday } = usePlannerNavigation(activeView);
 // The view and date ride the URL (`?view=&d=`) so Back from a day returns to the
 // month on that date; a drill-in is the only writer that adds a history entry.
 const { drillToDay } = usePlannerUrlState({ activeView, referenceDate });
@@ -1177,7 +1177,7 @@ function handleActivitySwapped(newId: string) {
     <!-- Sticky command bar — period hero + nav + view toggle + filter + Add
          + trip ribbon. The calendar is the page hero; nothing above it. -->
     <CalendarCommandBar
-      :label="label"
+      :labels="labels"
       :note="homeTimeZoneNote"
       :active-view="activeView"
       :can-add="canEditActivities"

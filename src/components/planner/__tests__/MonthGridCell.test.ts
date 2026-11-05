@@ -3,6 +3,7 @@
  * `aria-expanded`, no nested interactive elements, the Faces cluster).
  */
 import { mount } from '@vue/test-utils';
+import { defineComponent, h } from 'vue';
 import { setActivePinia, createPinia } from 'pinia';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { member } from '@/test/monthCellFixtures';
@@ -48,6 +49,7 @@ import MonthGridCell from '../MonthGridCell.vue';
 import { CALENDAR_TODAY } from '@/constants/tileStyles';
 import { DROP_TARGET_RING } from '@/constants/dragStyles';
 import { MONTH_CELL_METRICS, monthCellCssVars } from '@/constants/calendarCaps';
+import { useMonthCellChips } from '../monthCellChipsKey';
 import type { CellLayout, MonthGridDisplay } from '@/utils/monthGridLayout';
 import type { MonthDayCellData } from '@/utils/monthCells';
 import type { DayItem } from '@/utils/monthDayItems';
@@ -78,7 +80,7 @@ function mountCell(
     display?: MonthGridDisplay;
     layout?: CellLayout;
     capacity?: { shown: number; hidden: number };
-    tint?: 'holiday' | 'weekend';
+    tint?: 'holiday' | 'outOfMonth';
     isDropTarget?: boolean;
   } = {}
 ) {
@@ -146,6 +148,49 @@ describe('MonthGridCell today', () => {
   });
 });
 
+describe('MonthGridCell weekends and the month boundary', () => {
+  const SATURDAY = '2026-05-23';
+  const numeral = (w: ReturnType<typeof mountCell>) => w.get('[data-testid="month-cell-numeral"]');
+
+  it('an in-month Saturday numeral is bold terracotta, lifted on dark', () => {
+    const classes = numeral(mountCell(cell({ date: SATURDAY }))).classes();
+    expect(classes).toEqual(
+      expect.arrayContaining(['text-terracotta-600', 'dark:text-terracotta-lift', 'font-bold'])
+    );
+    expect(classes).not.toContain('font-semibold');
+    // A weekday keeps the default ink.
+    expect(numeral(mountCell(cell())).classes()).not.toContain('text-terracotta-600');
+  });
+
+  it("today's pill wins over the weekend", () => {
+    const classes = numeral(mountCell(cell({ date: SATURDAY, isToday: true }))).classes();
+    for (const cls of CALENDAR_TODAY.pill.split(' ')) expect(classes).toContain(cls);
+    expect(classes).not.toContain('text-terracotta-600');
+    expect(classes).not.toContain('font-bold');
+  });
+
+  it('an out-of-month Saturday stays muted, never terracotta', () => {
+    const classes = numeral(mountCell(cell({ date: SATURDAY, isCurrentMonth: false }))).classes();
+    expect(classes).toContain('text-[var(--color-text-muted)]');
+    expect(classes).toContain('dark:text-ink-faint');
+    expect(classes).not.toContain('text-terracotta-600');
+  });
+
+  it('an out-of-month cell fades its content block as one; an in-month cell does not', () => {
+    const day = cell({ timedOccurrences: [timed('Soccer', '16:00')] });
+    const out = mountCell({ ...day, isCurrentMonth: false });
+    expect(out.get('[data-testid="month-cell-contents"]').classes()).toEqual(
+      expect.arrayContaining(['opacity-50', 'saturate-50'])
+    );
+    // The numeral sits outside the faded block, and the chip keeps its normal wash.
+    expect(out.get('[data-testid="month-cell-numeral"]').classes()).not.toContain('opacity-50');
+    expect(out.get('[data-testid="month-chip"]').attributes('style')).toContain('background');
+    const inMonth = mountCell(day).get('[data-testid="month-cell-contents"]').classes();
+    expect(inMonth).not.toContain('opacity-50');
+    expect(inMonth).not.toContain('saturate-50');
+  });
+});
+
 describe('MonthGridCell numeral row', () => {
   it('the numeral is a button labelled with the formatted caption, never the ISO date', async () => {
     const w = mountCell(cell());
@@ -185,9 +230,9 @@ describe('MonthGridCell tint', () => {
     expect(w.classes()).toContain('bg-[var(--holiday-clay-tint)]');
     expect(w.classes()).toContain('hover:bg-[var(--tint-slate-10)]');
     expect(w.classes()).toContain('dark:hover:bg-surface-hover');
-    const weekend = mountCell(cell(), { tint: 'weekend' });
-    expect(weekend.classes()).toContain('bg-[var(--tint-slate-5)]');
-    expect(weekend.classes()).toContain('hover:bg-[var(--tint-slate-10)]');
+    const outOfMonth = mountCell(cell(), { tint: 'outOfMonth' });
+    expect(outOfMonth.classes()).toContain('bg-[var(--tint-slate-5)]');
+    expect(outOfMonth.classes()).toContain('hover:bg-[var(--tint-slate-10)]');
   });
 
   it('no tint leaves the hover wash, and today does not paint the today wash', () => {
@@ -225,13 +270,32 @@ describe('MonthGridCell chips and the chip context', () => {
     expect(w.get('[data-testid="month-chip"]').classes()).toContain('py-0.5');
   });
 
-  it('provides muted for an out-of-month cell: no wash on the chip', () => {
-    const style = mountCell({ ...day(), isCurrentMonth: false })
-      .get('[data-testid="month-chip"]')
-      .attributes('style');
-    expect(style).not.toContain('background');
-    const inMonth = mountCell(day()).get('[data-testid="month-chip"]').attributes('style');
-    expect(inMonth).toContain('background');
+  it('provides no muted flag: an out-of-month cell fades as a block, not per chip', () => {
+    let seen: Record<string, unknown> | undefined;
+    const Probe = defineComponent({
+      setup() {
+        const chips = useMonthCellChips();
+        return () => {
+          seen = { ...chips.value };
+          return h('i');
+        };
+      },
+    });
+    const c = { ...day(), isCurrentMonth: false };
+    mount(MonthGridCell, {
+      props: {
+        cell: c,
+        layout: { lane: null, stack: stackOf(c) },
+        display: DESKTOP,
+        capacity: { shown: 1, hidden: 0 },
+        cssVars: monthCellCssVars(MONTH_CELL_METRICS.compact),
+        dayRowId: 'day-row',
+      },
+      global: { stubs: { MonthDayItem: Probe } },
+    });
+    expect(seen).toBeDefined();
+    expect(seen).not.toHaveProperty('muted');
+    expect(seen).toMatchObject({ density: 'compact', interactive: true });
   });
 
   it('provides interactive chips on desktop (buttons) and hideSoloFace from the display', () => {
@@ -438,7 +502,7 @@ describe('MonthGridCell drop target (#142)', () => {
   });
 
   it('rings in Heritage Orange (lifted on dark) with the orange wash, in place of the tint', () => {
-    const w = mountCell(cell(), { tint: 'weekend', isDropTarget: true });
+    const w = mountCell(cell(), { tint: 'outOfMonth', isDropTarget: true });
     expect(w.classes()).toEqual(
       expect.arrayContaining([
         'ring-2',
@@ -449,7 +513,7 @@ describe('MonthGridCell drop target (#142)', () => {
       ])
     );
     expect(w.classes().some((c) => c.startsWith('hover:bg-'))).toBe(false);
-    expect(mountCell(cell(), { tint: 'weekend' }).classes()).not.toContain('ring-2');
+    expect(mountCell(cell(), { tint: 'outOfMonth' }).classes()).not.toContain('ring-2');
   });
 
   it('paints the one shared drop ring (DROP_TARGET_RING), not a local copy', () => {

@@ -27,6 +27,7 @@ import NotificationsBell from '@/components/notifications/NotificationsBell.vue'
 import SortMenu, { type SortMenuOption, type SortMenuToggle } from '@/components/ui/SortMenu.vue';
 import { ref, computed } from 'vue';
 import { usePublishedHeight } from '@/composables/usePublishedHeight';
+import { useFirstThatFits } from '@/composables/useFirstThatFits';
 import { useTranslation } from '@/composables/useTranslation';
 import { useMobileMenu, useHeaderReclaimed } from '@/composables/useMobileMenu';
 import { useSyncStore } from '@/stores/syncStore';
@@ -42,7 +43,9 @@ import type { DesktopDensity } from '@/constants/calendarCaps';
 
 const props = withDefaults(
   defineProps<{
-    label: string;
+    /** The period title, longest first ("March 2026", "Mar 2026", "Mar '26"). The bar shows
+     *  the first that fits the title slot on one line; one entry means nothing is measured. */
+    labels: string[];
     /** Optional caption under the period row (e.g. "Times are in Singapore Standard Time").
      *  Renders nothing when absent. */
     note?: string;
@@ -96,6 +99,17 @@ const saveNeedsAttention = computed(() => SAVE_STATUS_PRESENTATION[syncStore.sav
 // wrap) through the one guarded observer. A layout concern, not business logic.
 const rootEl = ref<HTMLElement | null>(null);
 usePublishedHeight(rootEl, '--planner-cmdbar-h', 'calendar-command-bar');
+
+// The period title ladder: the hidden measurer lays every candidate out on one line inside
+// the title slot, and the visible <h1> shows the first that fits (the Nook caption pattern).
+// On a phone the month and year always show, abbreviated as far as "Mar '26"; `truncate` on
+// the <h1> stays as the backstop when even the last candidate does not fit.
+const titleSlotEl = ref<HTMLElement | null>(null);
+const titleMeasurerEl = ref<HTMLElement | null>(null);
+const { index: titleIndex } = useFirstThatFits(titleSlotEl, titleMeasurerEl, {
+  deps: () => props.labels.join('|'),
+  surface: 'calendar-command-bar',
+});
 
 // ── Month grid density menu (#141) ──────────────────────────────────────────
 // Declared beside the menu, as `CookbookControls` declares its sort options: a
@@ -217,15 +231,32 @@ function onToggleMonthMode(): void {
              and search 50/35/20px past the page edge, because every other child of this row is
              `flex-shrink-0` and nothing could absorb it. A truncated month beats controls off
              the screen, and `truncate` has handled the narrow case on phones all along. -->
-        <div class="min-w-0 flex-1">
+        <!-- `relative` anchors the ladder's measurer. The <h1> is keyed by the LONGEST candidate,
+             so a resize that re-picks the rung swaps the text in place and only a period change
+             crossfades. -->
+        <div ref="titleSlotEl" class="relative min-w-0 flex-1">
           <Transition name="cal-label" mode="out-in">
             <h1
-              :key="label"
+              :key="labels[0]"
               class="font-outfit text-secondary-500 dark:text-ink truncate text-xl font-extrabold sm:text-2xl"
             >
-              {{ label }}
+              {{ labels[titleIndex] ?? labels[0] }}
             </h1>
           </Transition>
+          <div
+            ref="titleMeasurerEl"
+            class="pointer-events-none invisible absolute inset-x-0 top-0 h-0 overflow-hidden"
+            aria-hidden="true"
+            data-testid="calendar-title-measurer"
+          >
+            <div
+              v-for="(candidate, i) in labels"
+              :key="i"
+              class="font-outfit text-xl font-extrabold whitespace-nowrap sm:text-2xl"
+            >
+              {{ candidate }}
+            </div>
+          </div>
         </div>
 
         <!-- RECLAIMED-HEADER WIDTHS ONLY. This row has always been stable here — the title
@@ -240,6 +271,7 @@ function onToggleMonthMode(): void {
              instead of two, so a `getByLabel` query cannot go ambiguous. -->
         <CalendarPeriodNav
           v-if="headerReclaimed"
+          compact
           @prev="emit('prev')"
           @today="emit('today')"
           @next="emit('next')"

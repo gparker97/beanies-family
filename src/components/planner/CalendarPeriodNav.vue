@@ -25,9 +25,14 @@
  * name belongs in the top-left corner.
  *
  * Mockup + the industry survey: `docs/mockups/calendar-nav-stability-2026-09-14.html`.
+ *
+ * `compact` (the phone mount) draws Today as a 32×32 calendar icon like the arrows, which frees
+ * about 40px of the identity row for the period title; desktop keeps the text button.
  */
+import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import { useTranslation } from '@/composables/useTranslation';
 
+defineProps<{ compact?: boolean }>();
 defineEmits<{ prev: []; today: []; next: [] }>();
 const { t } = useTranslation();
 </script>
@@ -45,6 +50,18 @@ const { t } = useTranslation();
       </svg>
     </button>
     <button
+      v-if="compact"
+      type="button"
+      class="text-primary-500 dark:text-accent-lift hover:bg-primary-500/10 flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg transition-colors"
+      :aria-label="t('planner.today')"
+      :title="t('planner.today')"
+      data-testid="calendar-today"
+      @click="$emit('today')"
+    >
+      <BeanieIcon name="calendar" size="sm" />
+    </button>
+    <button
+      v-else
       type="button"
       class="font-outfit text-primary-500 dark:text-accent-lift hover:bg-primary-500/10 cursor-pointer rounded-xl px-3 py-1.5 text-sm font-semibold transition-colors"
       data-testid="calendar-today"

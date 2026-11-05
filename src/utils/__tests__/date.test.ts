@@ -15,6 +15,8 @@ import {
   monthGridRange,
   MONTH_GRID_CELLS,
   isWeekendYmd,
+  isWeekendDow,
+  formatMonthYearTiny,
   addDaysYmd,
   weekStartOffset,
   startOfWeekYmd,
@@ -457,6 +459,31 @@ describe('isWeekendYmd', () => {
     expect(isWeekendYmd('2026-11-08')).toBe(true); // Sun
     expect(isWeekendYmd('2026-11-09')).toBe(false); // Mon
     expect(isWeekendYmd('2026-11-06')).toBe(false); // Fri
+  });
+});
+
+describe('isWeekendDow', () => {
+  it('is true for Sunday (0) and Saturday (6) only', () => {
+    expect([0, 1, 2, 3, 4, 5, 6].map(isWeekendDow)).toEqual([
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+    ]);
+  });
+});
+
+describe('formatMonthYearTiny', () => {
+  it('renders the short month with an apostrophe and a two-digit year', () => {
+    expect(formatMonthYearTiny(new Date(2026, 2, 15))).toBe("Mar '26");
+    expect(formatMonthYearTiny(new Date(2030, 11, 1))).toBe("Dec '30");
+  });
+
+  it('pads a year ending in a single digit', () => {
+    expect(formatMonthYearTiny(new Date(2009, 0, 1))).toBe("Jan '09");
   });
 });
 

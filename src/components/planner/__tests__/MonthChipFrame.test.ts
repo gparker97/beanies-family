@@ -108,16 +108,6 @@ describe('MonthChipFrame states', () => {
     expect(style).toContain('background');
   });
 
-  it('muted drops the wash, keeps the edge, mutes the ink and fades the faces', () => {
-    const w = factory({ density: 'compact', muted: true });
-    const style = w.attributes('style')?.toLowerCase() ?? '';
-    expect(style).toContain('border-left-color: #6aa84f');
-    expect(style).not.toContain('background');
-    expect(w.classes().join(' ')).toContain('text-[var(--color-text-muted)]');
-    const stack = w.findComponent({ name: 'ActivityOwnerStack' });
-    expect(stack.classes()).toContain('opacity-60');
-  });
-
   it('celebrating adds is-celebration on a rich density only', () => {
     expect(factory({ density: 'compact' }, { celebrating: true }).classes()).toContain(
       'is-celebration'

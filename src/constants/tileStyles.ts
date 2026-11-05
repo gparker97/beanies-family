@@ -41,9 +41,10 @@ export const CALENDAR_TODAY = {
 export const CALENDAR_DAY_TINT = {
   vacation: 'bg-[var(--vacation-teal-tint)]',
   holiday: 'bg-[var(--holiday-clay-tint)]',
-  /** Saturdays and Sundays on the month grid (#141): a hair darker. Slate 5% on
-   *  light, white 5% on dark (both defined in `style.css`). */
-  weekend: 'bg-[var(--tint-slate-5)]',
+  /** The month grid's one wash with one meaning: a day that belongs to a neighbouring
+   *  month (#141). A hair darker: slate 5% on light, white 5% on dark (both defined in
+   *  `style.css`). */
+  outOfMonth: 'bg-[var(--tint-slate-5)]',
 } as const;
 export type CalendarDayTint = keyof typeof CALENDAR_DAY_TINT;
 

@@ -134,12 +134,19 @@ describe('MonthDayContents empty day and context', () => {
     expect(w.text()).not.toContain('planner.nothingPlanned');
   });
 
-  it('provides showTime = !caps: times show uncapped and are hidden in the stream', () => {
+  it('showTime is its own prop, default on, independent of caps', () => {
     const c = cell({ timedOccurrences: [timed('t1', '16:00')] });
     expect(mount(MonthDayContents, { props: { cell: c } }).text()).toContain('4pm');
+    // Capped (the phone day row) still shows times unless told otherwise.
+    expect(mount(MonthDayContents, { props: { cell: c, caps: STREAM_DAY_CAPS } }).text()).toContain(
+      '4pm'
+    );
     expect(
-      mount(MonthDayContents, { props: { cell: c, caps: STREAM_DAY_CAPS } }).text()
+      mount(MonthDayContents, { props: { cell: c, caps: STREAM_DAY_CAPS, showTime: false } }).text()
     ).not.toContain('4pm');
+    expect(mount(MonthDayContents, { props: { cell: c, showTime: false } }).text()).not.toContain(
+      '4pm'
+    );
   });
 
   it('overrides a grid context above it: a Bars provider still gets labelled chips', () => {

@@ -175,6 +175,21 @@ describe('useCalendarSlide', () => {
       expect(h.el.style.transform).toContain('translate3d(30px');
     });
 
+    it('axisLockRatio passes through: dx 10 / dy 8 previews at ratio 1, not at the default 1.5', () => {
+      installAnimateShim();
+      const relaxed = makeHarness({ axisLockRatio: 1 });
+      pointer('pointerdown', relaxed.el, { x: 100, y: 100 });
+      pointer('pointermove', relaxed.el, { x: 110, y: 108 });
+      expect(relaxed.el.style.transform).toContain('translate3d(10px');
+      relaxed.wrapper.unmount();
+
+      const strict = makeHarness();
+      pointer('pointerdown', strict.el, { x: 100, y: 100 });
+      pointer('pointermove', strict.el, { x: 110, y: 108 });
+      expect(strict.el.style.transform).toBe('');
+      strict.wrapper.unmount();
+    });
+
     it('rubber-bands past threshold (damping coefficient 0.45)', () => {
       installAnimateShim();
       const h = makeHarness();

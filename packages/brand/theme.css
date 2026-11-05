@@ -55,6 +55,7 @@
   /* Terracotta */
   --color-terracotta-400: #e67e22;
   --color-terracotta-500: #ca6f1e;
+  --color-terracotta-600: #a85a18; /* 5.07 on white, 4.81 on Cloud White */
 
   /* Purple (To-Do accent) */
   --color-purple-400: #9b59b6;

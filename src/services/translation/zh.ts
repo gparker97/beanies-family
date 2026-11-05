@@ -1476,6 +1476,8 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'settings.weekStart.sunday': '星期日',
   'settings.weekStart.monday': '星期一',
   'settings.weekStartHint': '选择日历中每周从哪一天开始',
+  'settings.phoneMonthDensity': '手机上的月视图网格',
+  'settings.phoneMonthDensityHint': '手机月视图网格中每天显示的内容。在网格上捏合也可以切换。',
   'settings.country': '国家/地区',
   'settings.countryNotSet': '未设置',
   'settings.countryHelp':
@@ -4119,7 +4121,6 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'planner.monthGrid.hideTimes': '隐藏时间',
   'planner.monthGrid.hideSoloFaces': '单人活动不显示头像',
   'planner.monthGrid.openDay': '打开{date}',
-  'planner.monthGrid.phoneDensity': '网格显示方式',
   'planner.monthGrid.faces': '头像',
   'planner.monthGrid.bars': '色条',
   'planner.monthGrid.titles': '标题',

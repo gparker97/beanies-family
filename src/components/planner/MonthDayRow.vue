@@ -12,7 +12,10 @@
  * an array).
  *
  * It is a SIBLING of the week rows, so it inherits none of the cells' `--mg-*` heights
- * or their month chip context; `MonthDayContents` provides full anatomy itself.
+ * or their month chip context; `MonthDayContents` provides full anatomy itself, with
+ * start times. Its list is capped (`PHONE_DAY_ROW_CAPS`) so the grid can make room for
+ * the row without scrolling (the fit subtracts its height as an inset); "+N more"
+ * emits `more`, which the grid treats as the second tap (the Day view).
  */
 import { useTranslation } from '@/composables/useTranslation';
 import { formatTodayCaption } from '@/utils/date';
@@ -23,6 +26,7 @@ import type { HolidayOccurrence } from '@/types/models';
 import MonthDayContents from '@/components/planner/MonthDayContents.vue';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import { FOCUS_RING } from '@/constants/tileStyles';
+import { PHONE_DAY_ROW_CAPS } from '@/constants/calendarCaps';
 
 defineProps<{ cell: MonthDayCellData }>();
 
@@ -34,6 +38,8 @@ const emit = defineEmits<{
   'birthday-click': [birthday: BirthdayOccurrence];
   /** The header's close button: fold the row back to the plain grid. */
   close: [];
+  /** The capped list's "+N more": the grid opens the Day view. */
+  more: [];
 }>();
 
 const { t } = useTranslation();
@@ -73,6 +79,8 @@ const { t } = useTranslation();
     </div>
     <MonthDayContents
       :cell="cell"
+      :caps="PHONE_DAY_ROW_CAPS"
+      @more="emit('more')"
       @view-activity="(id, date) => emit('view-activity', id, date)"
       @vacation-click="(vid) => emit('vacation-click', vid)"
       @view-segment="(vid, sidx) => emit('view-segment', vid, sidx)"

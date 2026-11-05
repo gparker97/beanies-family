@@ -303,9 +303,11 @@ describe('MonthDayCard as the stream card shell (#141)', () => {
     isLastDay: true,
   });
 
-  it('renders MonthDayContents with the stream caps', () => {
+  it('renders MonthDayContents with the stream caps and no start times', () => {
     const wrapper = mount(MonthDayCard, { props: { cell: makeCell() } });
-    expect(wrapper.findComponent(MonthDayContents).props('caps')).toEqual(STREAM_DAY_CAPS);
+    const contents = wrapper.findComponent(MonthDayContents);
+    expect(contents.props('caps')).toEqual(STREAM_DAY_CAPS);
+    expect(contents.props('showTime')).toBe(false);
   });
 
   it('applies the stream caps: two bars and a +N, four timed and a "+N more"', () => {

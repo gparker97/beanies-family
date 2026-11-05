@@ -33,6 +33,10 @@ export interface DayCaps {
  *  `MonthDayCard` passes them to `MonthDayContents`. */
 export const STREAM_DAY_CAPS: DayCaps = { allDay: 2, timed: 4, segments: 2 };
 
+/** The phone month grid's open day row (`MonthDayRow`). Bounded, unlike the full day
+ *  view, so the fitted week rows can make room for it without the page scrolling. */
+export const PHONE_DAY_ROW_CAPS: DayCaps = { allDay: 2, timed: 3, segments: 1 };
+
 /**
  * One density's cell geometry, in rem so Large reading mode scales it. The grid's
  * capacity maths (`fitCount`, `cellCapacity`, `minRowPx`) and the cell's CSS

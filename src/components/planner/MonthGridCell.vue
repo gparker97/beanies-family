@@ -27,10 +27,15 @@
  * context's `density`. Faces replaces the stack with a wrapped cluster of who is busy that
  * day (`faceCluster` over EVERY `dayItems` entry, the lane winner included); the lane
  * still draws above it.
+ *
+ * Month boundary: the month is the only bright area. A neighbour-month cell takes the
+ * `outOfMonth` wash (`tint`, decided by the grid), a faint numeral, and its whole content
+ * block fades as one (see the content container). In-month Saturday and Sunday numerals
+ * are terracotta; the weekend paints no wash.
  */
 import { computed, provide } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
-import { formatTodayCaption } from '@/utils/date';
+import { formatTodayCaption, isWeekendYmd } from '@/utils/date';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { dayButtonLabel, dayItemKey, dayItems, type DayItem } from '@/utils/monthDayItems';
 import { faceCluster, type CellLayout, type MonthGridDisplay } from '@/utils/monthGridLayout';
@@ -87,7 +92,6 @@ provide(
   MONTH_CELL_CHIPS,
   computed(() => ({
     density: props.display.density,
-    muted: !props.cell.isCurrentMonth,
     interactive: !isPhone.value,
     showTime: props.display.variant === 'desktop' && props.display.showTime,
     hideSoloFace: props.display.variant === 'desktop' && props.display.hideSoloFace,
@@ -128,13 +132,23 @@ const rootClass = computed(() =>
     : 'cursor-pointer border-r border-b border-[var(--color-border)] px-1 last:border-r-0 dark:border-line'
 );
 
-const numeralClass = computed(() =>
-  props.cell.isToday
-    ? `${CALENDAR_TODAY.pill} grid h-[var(--mg-numeral-h)] w-[var(--mg-numeral-h)] place-items-center rounded-full`
-    : props.cell.isCurrentMonth
-      ? 'text-[var(--muted-text)]'
-      : 'text-[var(--color-text-muted)] dark:text-ink-faint'
-);
+const isWeekend = computed(() => isWeekendYmd(props.cell.date));
+
+/**
+ * Four states, first match wins: today's pill, a faint out-of-month numeral (a neighbour
+ * weekend stays faint too, never terracotta), an in-month weekend in terracotta (`-600`
+ * clears AA for 12px text on white and Cloud White; it lifts on dark), then the default.
+ * The weight lives here too, so a numeral never carries two competing weight classes.
+ */
+function numeralClassFor(): string {
+  if (props.cell.isToday)
+    return `${CALENDAR_TODAY.pill} grid h-[var(--mg-numeral-h)] w-[var(--mg-numeral-h)] place-items-center rounded-full font-semibold`;
+  if (!props.cell.isCurrentMonth)
+    return 'font-semibold text-[var(--color-text-muted)] dark:text-ink-faint';
+  if (isWeekend.value) return 'text-terracotta-600 dark:text-terracotta-lift font-bold';
+  return 'font-semibold text-[var(--muted-text)]';
+}
+const numeralClass = computed(numeralClassFor);
 
 const holidays = computed(() => props.cell.extras.filter((e) => e.kind === 'holiday' && e.holiday));
 const birthdays = computed(() =>
@@ -254,16 +268,13 @@ function forwardViewActivity(id: string, date: string): void {
           <span aria-hidden="true">{{ extra.emoji }}</span>
         </button>
       </template>
-      <span
-        v-if="isPhone"
-        class="font-outfit text-xs font-semibold tabular-nums"
-        :class="numeralClass"
-        >{{ cell.day }}</span
-      >
+      <span v-if="isPhone" class="font-outfit text-xs tabular-nums" :class="numeralClass">{{
+        cell.day
+      }}</span>
       <button
         v-else
         type="button"
-        class="font-outfit text-xs font-semibold tabular-nums"
+        class="font-outfit text-xs tabular-nums"
         :class="numeralClass"
         :aria-label="fillTemplate(t('planner.monthGrid.openDay'), { date: caption })"
         data-testid="month-cell-numeral"
@@ -273,7 +284,14 @@ function forwardViewActivity(id: string, date: string): void {
       </button>
     </div>
 
-    <div class="flex min-w-0 flex-col gap-[var(--mg-gap)]">
+    <!-- The one sanctioned opacity on readable text: a neighbour-month cell's decoration
+         (lane, chips, bars, faces, "+N") fades as a block, so the month is the only bright
+         area. The numeral sits outside this container and stays readable at full ink. -->
+    <div
+      class="flex min-w-0 flex-col gap-[var(--mg-gap)]"
+      :class="cell.isCurrentMonth ? '' : 'opacity-50 saturate-50'"
+      data-testid="month-cell-contents"
+    >
       <MonthDayItem
         v-if="layout.lane && laneRun"
         :item="layout.lane.item"
@@ -288,7 +306,6 @@ function forwardViewActivity(id: string, date: string): void {
       <div
         v-if="faces"
         class="flex flex-wrap items-center justify-center gap-[0.1875rem] pt-1"
-        :class="cell.isCurrentMonth ? '' : 'opacity-60'"
         aria-hidden="true"
         data-testid="month-cell-faces"
       >

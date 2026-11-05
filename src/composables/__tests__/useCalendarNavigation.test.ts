@@ -11,6 +11,7 @@ const logEvent = vi.fn();
 vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: (e: unknown) => logEvent(e) }));
 
 import {
+  formatWeekRange,
   groupOverlapping,
   plannerExtent,
   timedCards,
@@ -164,5 +165,21 @@ describe('timedCards', () => {
   it('drops all-day occurrences', () => {
     const allDay = { id: 'a', date: '2026-06-10', isAllDay: true } as FamilyActivity;
     expect(timedCards([{ activity: allDay, date: '2026-06-10' }])).toEqual([]);
+  });
+});
+
+describe('formatWeekRange', () => {
+  const d = (y: number, m: number, day: number) => new Date(y, m - 1, day);
+
+  it('carries the year by default in all three shapes', () => {
+    expect(formatWeekRange(d(2026, 11, 2), d(2026, 11, 8))).toBe('2 Nov – 8, 2026');
+    expect(formatWeekRange(d(2026, 10, 27), d(2026, 11, 2))).toBe('27 Oct – 2 Nov, 2026');
+    expect(formatWeekRange(d(2026, 12, 29), d(2027, 1, 4))).toBe('29 Dec, 2026 – 4 Jan, 2027');
+  });
+
+  it('drops every year segment when withYear is false', () => {
+    expect(formatWeekRange(d(2026, 11, 2), d(2026, 11, 8), false)).toBe('2 Nov – 8');
+    expect(formatWeekRange(d(2026, 10, 27), d(2026, 11, 2), false)).toBe('27 Oct – 2 Nov');
+    expect(formatWeekRange(d(2026, 12, 29), d(2027, 1, 4), false)).toBe('29 Dec – 4 Jan');
   });
 });

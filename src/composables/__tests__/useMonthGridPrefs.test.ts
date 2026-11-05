@@ -61,6 +61,21 @@ describe('useMonthGridPrefs', () => {
     });
   });
 
+  it('names the Settings page as the origin of a change made there', () => {
+    const { setPref } = useMonthGridPrefs();
+    setPref({ name: 'phoneDensity', value: 'bars' }, 'settings');
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'pref_changed',
+        context: expect.objectContaining({
+          kind: 'phoneDensity',
+          detail: 'bars',
+          stage: 'settings',
+        }),
+      })
+    );
+  });
+
   it('ignores an invalid value and logs invalid_pref_value', async () => {
     const { values, setPref } = useMonthGridPrefs();
     setPref({ name: 'times', value: 'bogus' } as unknown as MonthPrefChange, 'menu');

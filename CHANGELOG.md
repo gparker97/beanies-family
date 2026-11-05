@@ -16,6 +16,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - An open day on the phone month grid now has a close button, so you can fold it away and go back to the plain month.
 - beanies.family/musical is a short link that opens the homepage at "the morning routine musical"; beanies.family/yt-musical does the same for the YouTube description.
 
+### Changed
+
+- The phone month grid now holds still on one screen, and swiping between months is reliable.
+- Faces, Bars and Titles moved to Settings → Appearance; pinching on the month grid still works.
+- The planner header always shows the month and year, shortening to "Mar 2026" or "Mar '26" when space is tight, and Today is an icon on phones.
+- On the month grid, weekends are marked in terracotta and the days of neighboring months are greyed, so the month stands out.
+
 ### Fixed
 
 - Event titles on the phone month grid now use the same weight as other small text in the app.

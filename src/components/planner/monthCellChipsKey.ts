@@ -1,6 +1,7 @@
 /**
- * How a month chip draws (#141): its density, whether it is muted, whether it is a
- * control, and whether it shows times and solo faces.
+ * How a month chip draws (#141): its density, whether it is a control, and whether it
+ * shows times and solo faces. An out-of-month day is not a chip concern: `MonthGridCell`
+ * fades its whole content block, so chips always draw their normal ink and wash.
  *
  * A typed provide rather than props, the `WALL_LOCK` / `WALL_WEATHER` precedent. The
  * cell decides the presentation and the two leaf renderers act on it, but between them
@@ -14,8 +15,8 @@
  * `AllDayChip` with no provider) render exactly as they did.
  *
  * The ONLY providers, and adding one needs a reason written here:
- *  - `MonthGridCell`: the grid densities, muted out-of-month days, and `interactive:
- *    false` inside a phone cell, whose root is the button (never nest buttons).
+ *  - `MonthGridCell`: the grid densities, and `interactive: false` inside a phone cell,
+ *    whose root is the button (never nest buttons).
  *  - `MonthDayCard`: `interactive: false`, because the stream card's root is the button
  *    (never nest buttons). Everything else is the default.
  *  - `MonthDayContents`: full anatomy for every day list (the stream card, the desktop
@@ -43,8 +44,6 @@ import type { MonthGridDensity } from '@/constants/calendarCaps';
 
 export interface MonthCellChips {
   density: MonthGridDensity;
-  /** Out-of-month cell: edge only, muted ink (`MonthChipFrame` only). */
-  muted: boolean;
   /** False inside a phone cell, whose root is the button. */
   interactive: boolean;
   showTime: boolean;
@@ -57,7 +56,6 @@ export const MONTH_CELL_CHIPS: InjectionKey<Readonly<Ref<MonthCellChips>>> =
 /** Today's look: what every chip outside the month grid and day lists renders. */
 export const DEFAULT_CELL_CHIPS: MonthCellChips = {
   density: 'comfortable',
-  muted: false,
   interactive: true,
   showTime: true,
   hideSoloFace: false,

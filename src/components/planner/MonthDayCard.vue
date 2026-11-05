@@ -112,6 +112,6 @@ const backgroundClass = computed(() =>
       </span>
     </div>
 
-    <MonthDayContents v-if="showContents" :cell="cell" :caps="STREAM_DAY_CAPS" />
+    <MonthDayContents v-if="showContents" :cell="cell" :caps="STREAM_DAY_CAPS" :show-time="false" />
   </button>
 </template>
