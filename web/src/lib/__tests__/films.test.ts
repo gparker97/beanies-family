@@ -1,8 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { SITE_URL } from '@beanies/brand/nav';
 import { ORGANIZATION } from '@beanies/brand/schema';
+import { parseAttribution } from '@beanies/brand/attribution';
 import {
   MUSICAL,
+  MUSICAL_SHORT_PATH,
+  MUSICAL_SHORT_TARGET,
   durationClock,
   durationIso,
   durationSpoken,
@@ -126,5 +129,23 @@ describe('errorReason', () => {
     expect(errorReason('boom')).toBe('unknown');
     expect(errorReason({ code: 9 })).toBe('unknown');
     expect(errorReason({})).toBe('unknown');
+  });
+});
+
+describe('the /musical short link', () => {
+  it('is a short root path', () => {
+    expect(MUSICAL_SHORT_PATH).toBe('/musical');
+  });
+
+  it('forwards to the homepage with the YouTube long-form campaign tag', () => {
+    const url = new URL(MUSICAL_SHORT_TARGET, SITE_URL);
+    expect(url.origin).toBe(new URL(SITE_URL).origin);
+    expect(url.pathname).toBe('/');
+    expect(parseAttribution(url.search)).toMatchObject({
+      utm_source: 'youtube',
+      utm_medium: 'social',
+      utm_campaign: 'musical-nov26',
+      utm_content: 'long-form',
+    });
   });
 });

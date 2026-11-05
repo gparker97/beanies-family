@@ -1,0 +1,78 @@
+---
+/**
+ * A stable short URL on beanies.family that forwards somewhere else: /discord (the current
+ * invite) and /musical (the homepage film, carrying its campaign tag). The short URL is what
+ * gets printed, pasted into a YouTube description or put in an app bundle; the target can
+ * change here with a small web deploy.
+ *
+ * Deliberately a minimal standalone page (NOT BaseLayout): no nav/footer, no analytics and,
+ * crucially, none of BaseLayout's standalone-PWA escape-hatch script. It is a pure forward,
+ * so the visit is counted once, by the page it lands on.
+ */
+interface Props {
+  /** Where to send the visitor: absolute, or root-relative on beanies.family. */
+  to: string;
+  /** The tab title while forwarding. */
+  title: string;
+  /** The one line shown while forwarding. */
+  message: string;
+  /** The fallback link's text, for when meta-refresh and the script are both blocked. */
+  linkText: string;
+  /** The canonical URL. Defaults to `to`, so search engines credit the target, not the short URL. */
+  canonical?: string;
+}
+
+const { to, title, message, linkText, canonical = to } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="refresh" content={`0; url=${to}`} />
+    <link rel="canonical" href={canonical} />
+    <meta name="robots" content="noindex" />
+    <title>{title}</title>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        background: #f8f9fa;
+        color: #2c3e50;
+        font-family: Outfit, system-ui, sans-serif;
+        text-align: center;
+        padding: 24px;
+      }
+      a {
+        color: #f15d22;
+        font-weight: 600;
+      }
+      /* The CIG dark ground, ink and Heritage Orange lift (packages/brand/theme.css). */
+      @media (prefers-color-scheme: dark) {
+        body {
+          background: #151e27;
+          color: #f2f5f7;
+        }
+        a {
+          color: #ff8b5e;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <p>{message}</p>
+    <p>
+      not redirected? <a href={to} rel="noopener">{linkText}</a>.
+    </p>
+    <script is:inline define:vars={{ to }}>
+      // Belt-and-braces: also redirect via JS in case meta-refresh is delayed.
+      window.location.replace(to);
+    </script>
+  </body>
+</html>

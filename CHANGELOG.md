@@ -13,6 +13,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 ### Added
 
 - An open day on the phone month grid now has a close button, so you can fold it away and go back to the plain month.
+- beanies.family/musical is a short link to the homepage, where "the morning routine musical" plays.
 
 ### Fixed
 

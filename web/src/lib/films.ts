@@ -64,6 +64,21 @@ export const MUSICAL: Film = {
   urls: mediaUrls('musical/v2'), // v2 (2026-11-04): the six-shot teaser loop; v1 carried the dinner loop
 };
 
+/**
+ * The short link to the musical, for places where a link is shown as typed text (a YouTube
+ * description cannot hold anchor text, so a 130-character UTM URL would be the first thing
+ * every viewer reads). `/musical` forwards to the homepage, where the film card plays, with
+ * the YouTube long-form tag, so the visit still lands in Plausible and first-touch attribution
+ * as `musical-nov26`. Channels whose link is hidden (Pinterest, ads) keep the full UTM URL.
+ */
+export const MUSICAL_SHORT_PATH = '/musical';
+export const MUSICAL_SHORT_TARGET = `/?${new URLSearchParams({
+  utm_source: 'youtube',
+  utm_medium: 'social',
+  utm_campaign: 'musical-nov26',
+  utm_content: 'long-form',
+})}`;
+
 type Timed = Pick<Film, 'durationS'>;
 
 function minutesSeconds({ durationS }: Timed): [number, number] {
