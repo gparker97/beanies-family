@@ -8,6 +8,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-11-06
+
+### Performance
+
+- The marketing site and the app are now served from CloudFront edges worldwide, including Singapore and the rest of Asia-Pacific, instead of North America and Europe only. Pages load faster outside those regions and the homepage musical no longer stalls while buffering.
+- Site deploys no longer evict the homepage film and other media from the CDN cache, so the first viewer after a deploy no longer waits for a cold fetch.
+
 ## 2026-11-05
 
 ### Added

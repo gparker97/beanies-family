@@ -85,10 +85,40 @@ jobs:
             --content-type "application/json"
 
       - name: Invalidate CloudFront cache
+        # Paths come from the top level of web/dist, NOT "/*": the apex distribution also
+        # serves the film and other large media from a separate bucket at /media/*, under
+        # immutable, versioned keys that never change in place (a new cut is a new key).
+        # A "/*" invalidation evicted them from every edge on every site deploy, so the
+        # first viewer per edge waited for a cold refetch from the origin. Nothing under
+        # /media/ is ever in dist, so it never appears here. Directories become one
+        # wildcard each (CloudFront allows 15 wildcard paths in progress; dist has ~10),
+        # hashed _astro/ assets need none, and every file gets both its literal key and
+        # the clean URL the apex function rewrites to it. If the create fails (two deploys
+        # back to back can exceed the wildcard limit) fall back to "/*": the deploy stays
+        # correct and the only cost is the cold media refetch this step normally avoids.
         run: |
+          paths=("/")
+          for entry in web/dist/* web/dist/.well-known; do
+            [ -e "$entry" ] || continue
+            name=$(basename "$entry")
+            if [ -d "$entry" ]; then
+              [ "$name" = "_astro" ] && continue
+              paths+=("/$name/*")
+            else
+              paths+=("/$name")
+              case "$name" in *.html) paths+=("/${name%.html}");; esac
+            fi
+          done
+          echo "Invalidating ${#paths[@]} paths (media untouched)"
           aws cloudfront create-invalidation \
             --distribution-id ${{ vars.APEX_CLOUDFRONT_DISTRIBUTION_ID }} \
-            --paths "/*"
+            --paths "${paths[@]}" \
+          || {
+            echo "::warning::path-list invalidation failed; falling back to /*"
+            aws cloudfront create-invalidation \
+              --distribution-id ${{ vars.APEX_CLOUDFRONT_DISTRIBUTION_ID }} \
+              --paths "/*"
+          }
 
       - name: Ping IndexNow
         env:
