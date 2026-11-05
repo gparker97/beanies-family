@@ -17,6 +17,59 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.11.05',
+    date: '2026-11-05',
+    month: '5 november 2026',
+    spotlight: true,
+    summary: {
+      en: 'Drag and drop is here, and the whole month fits on your phone.',
+      beanie: 'drag and drop is here, and the whole month fits on your phone.',
+    },
+    features: [
+      {
+        icon: '🖐️',
+        title: { en: 'Drag and drop', beanie: 'drag and drop' },
+        description: {
+          en: 'Move an activity by dragging it to another day on the Month view, or to a new day and time on Week and Day. Pull its bottom edge to make it longer or shorter. Repeating activities ask which sessions to move, and Undo is one tap away.',
+          beanie:
+            'move an activity by dragging it to another day on the month view, or to a new day and time on week and day. pull its bottom edge to make it longer or shorter. repeating activities ask which sessions to move, and undo is one tap away.',
+        },
+        tryItRoute: '/activities',
+      },
+      {
+        icon: '📅',
+        title: { en: 'The month at a glance', beanie: 'the month at a glance' },
+        description: {
+          en: 'On a phone, the new Grid view sits beside the day-by-day list and shows the whole month on one screen: faces, bars or titles for each day, pinch to switch, and tap a day to see its plans. On a computer, a Density menu fits the month to your screen.',
+          beanie:
+            'on a phone, the new grid view sits beside the day-by-day list and shows the whole month on one screen: faces, bars or titles for each day, pinch to switch, and tap a day to see its plans. on a computer, a density menu fits the month to your screen.',
+        },
+      },
+      {
+        icon: '💌',
+        title: { en: 'Special days', beanie: 'special days' },
+        description: {
+          en: 'Birthdays, anniversaries and days to remember for family and friends outside your pod live under Occasions. Each one repeats every year, with a reminder on the day and a heads-up a week before.',
+          beanie:
+            'birthdays, anniversaries and days to remember for family and friends outside your pod live under special days. each one repeats every year, with a reminder on the day and a heads-up a week before.',
+        },
+      },
+      {
+        icon: '💬',
+        title: { en: 'Join us on Discord', beanie: 'join us on discord' },
+        description: {
+          en: "Get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+          beanie:
+            "get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+        },
+        cta: {
+          label: { en: 'Join the Discord', beanie: 'join the discord' },
+          href: 'https://beanies.family/discord',
+        },
+      },
+    ],
+  },
+  {
     version: '2026.11.01',
     date: '2026-11-01',
     month: '1 november 2026',
