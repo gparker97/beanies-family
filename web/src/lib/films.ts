@@ -68,15 +68,16 @@ export const MUSICAL: Film = {
 export const MUSICAL_ANCHOR = 'musical';
 
 /**
- * Short links to the musical, for places where a link is shown as typed text. Both forward to
- * the homepage scrolled to the film card (`#musical`).
+ * Short links to the musical, for places where a link is shown as typed text.
  *
  * - `/musical` is the marketing link (video end cards, print, anywhere a person types it). It
- *   carries NO campaign tag, because it is shown on every channel: a tag here would credit one
- *   channel with all of them.
+ *   forwards to the homepage scrolled to the film card (`#musical`), and carries NO campaign
+ *   tag, because it is shown on every channel: a tag here would credit one channel with all of them.
  * - `/yt-musical` is the YouTube description link (a description cannot hold anchor text, so a
- *   130-character UTM URL would be the first thing every viewer reads). It carries the YouTube
- *   long-form tag, so the visit lands in Plausible and first-touch attribution as `musical-nov26`.
+ *   130-character UTM URL would be the first thing every viewer reads). It forwards to the TOP of
+ *   the homepage, not the film card: its visitor has just watched the film, so the headline and
+ *   the get-started button are what they came for. It carries the YouTube long-form tag, so the
+ *   visit lands in Plausible and first-touch attribution as `musical-nov26`.
  *
  * Channels whose link is hidden (Pinterest, ads) keep the full UTM URL instead.
  */
@@ -88,7 +89,7 @@ export const MUSICAL_YT_TARGET = `/?${new URLSearchParams({
   utm_medium: 'social',
   utm_campaign: 'musical-nov26',
   utm_content: 'long-form',
-})}#${MUSICAL_ANCHOR}`;
+})}`;
 
 type Timed = Pick<Film, 'durationS'>;
 

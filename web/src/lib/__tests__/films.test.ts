@@ -149,11 +149,11 @@ describe('the musical short links', () => {
     expect(url.hash).toBe(`#${MUSICAL_ANCHOR}`);
   });
 
-  it('/yt-musical lands on the film card with the YouTube long-form campaign tag', () => {
+  it('/yt-musical lands on the top of the homepage with the YouTube long-form campaign tag', () => {
     const url = new URL(MUSICAL_YT_TARGET, SITE_URL);
     expect(url.origin).toBe(new URL(SITE_URL).origin);
     expect(url.pathname).toBe('/');
-    expect(url.hash).toBe(`#${MUSICAL_ANCHOR}`);
+    expect(url.hash).toBe('');
     expect(parseAttribution(url.search)).toMatchObject({
       utm_source: 'youtube',
       utm_medium: 'social',

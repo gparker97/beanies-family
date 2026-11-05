@@ -14,7 +14,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - Activities can now be moved by dragging on the Month, Week and Day views, and resized from the bottom edge on Week and Day. Repeating activities ask which sessions to move, Undo appears after a move, and the keyboard works too (Space to pick up, arrow keys to move, Enter to drop).
 - An open day on the phone month grid now has a close button, so you can fold it away and go back to the plain month.
-- beanies.family/musical is a short link that opens the homepage at "the morning routine musical"; beanies.family/yt-musical does the same for the YouTube description.
+- beanies.family/musical is a short link that opens the homepage at "the morning routine musical"; beanies.family/yt-musical opens the homepage from the YouTube description.
 
 ### Changed
 
