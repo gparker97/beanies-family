@@ -10,6 +10,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-11-06
 
+### Added
+
+- A new blog post, "the world premiere of the beanie family musical!", introduces the film and shows how it was made.
+
+### Fixed
+
+- The "daddy come look at my bed!" post now shows the day it was actually published, November 1.
+
 ### Changed
 
 - A child's repeating to-dos, card reminders and repeating lists no longer appear on every grown-up's daily briefing, bell and reminders each day. They now show for grown-ups only once a set time has passed unticked, or every time when the new **Keep Parents Posted** switch is on for that item (grown-ups only). A child's one-off to-dos and lists still show for grown-ups as before.
