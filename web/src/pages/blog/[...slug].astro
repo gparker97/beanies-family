@@ -612,6 +612,33 @@ const jsonLd = post.data.author === 'greg' ? [blogPosting, AUTHOR] : [blogPostin
   max-width: none;
   width: min(880px, 100vw - 32px);
 }
+/* An inline film (post #68 embeds the musical from the media bucket as a
+   plain <video>): full column width, the same card chrome as an image,
+   no zoom cursor because the controls are the interaction. The caption
+   pairing below mirrors the image caption rule. */
+.blog-prose video {
+  background: white;
+  border: 1px solid var(--tint-accent, rgb(241 93 34 / 18%));
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgb(44 62 80 / 6%);
+  display: block;
+  height: auto;
+  margin: 1.5rem auto;
+  width: 100%;
+}
+.blog-prose p:has(> video) + p:has(> em:only-child) > em {
+  color: rgb(44 62 80 / 70%);
+  display: block;
+  font-family: 'Fraunces Variable', Fraunces, 'Source Serif 4', Georgia, serif;
+  font-feature-settings: 'ss01';
+  font-size: 0.85rem;
+  font-style: italic;
+  text-align: center;
+}
+.blog-prose p:has(> video) + p:has(> em:only-child) {
+  margin-top: -1.6rem;
+  text-align: center;
+}
 /* A linked image is a button. It must not wear the illustration chrome
    above -- the framed card, the drop shadow and above all `cursor: zoom-in`,
    which promises a lightbox the click handler now (correctly) refuses to
