@@ -16,7 +16,7 @@ draft: false
 
 <video controls playsinline preload="none" poster="https://beanies.family/media/musical/v2/poster-1280.webp" aria-label="the beanie family, a real life musical"><source src="https://beanies.family/media/musical/v2/film-1080.mp4" type="video/mp4" /></video>
 
-_i spent all that time (and money) on this?!_
+_i spent all that time (and money) to end up with this?!_
 
 You can also [watch it on YouTube](https://youtu.be/Ye2d70NJTUk).
 
@@ -42,7 +42,7 @@ _the biggest struggle here was that you can’t easily tweak what suno spits out
 
 **We’ve got instruments. What about singing?**
 
-After that, of course, we needed actual words. I used Synthesizer V Studio 2 Pro to produce the vocals (NOT cheap, by the way - in case anybody was wondering, no, none of this is sponsored), and do some overall music production.
+After that, of course, we needed actual words. I used Synthesizer V Studio 2 Pro to produce the vocals and do some overall music production (NOT cheap, by the way, and in case anybody was wondering, no, none of this is sponsored).
 
 ![Synthesizer V Studio 2 Pro with separate vocal tracks for mom, dad, girl and boy, and the piano roll showing the phonemes for "oh, what's for dinner"](/blog/the-beanie-family-musical-synthesizer-v.webp 'wide')
 
@@ -50,13 +50,13 @@ _another thing that blew me away - synthetic voice technology has really come a 
 
 **So we defied the odds and somehow created a song... _now_ what?**
 
-After the song, we needed actual video: Creating the character designs, storyboarding with Nano Banana, animation testing with several different models (by the way - also NOT cheap), and then hundreds (actually, maybe thousands) of rounds of tweaking, re-writes, re-drawing, and re-thinking every major decision I’ve ever made in my life that led me up to this point.
+After the song, we needed actual video: Next was creating the character designs, storyboarding with Nano Banana, animation testing with several different models (by the way - also NOT cheap), and then hundreds (actually, maybe thousands) of rounds of tweaking, re-writes, re-drawing, and re-thinking every major decision I’ve ever made in my life that led me up to this point.
 
 ![A grid of 48 tiny animation frames from the kitchen scene, two versions of the film side by side, each frame stamped with its version and timecode](/blog/the-beanie-family-musical-animation-strips.webp 'wide')
 
 _reviewing animation strips is the kind of thing that will make you want to jump off an animated bridge holding a “goodbye” sign_
 
-So after what has been one of the weirder stretches of my experience to this point building [beanies.family](https://beanies.family/?utm_source=blog&utm_medium=post&utm_campaign=the-world-premiere-of-the-beanie-family-musical&utm_content=body), I’m proud to announce that I’m roughly $967 poorer. But I’m also much _more_ pleased to announce the world premiere of [**THE BEANIE FAMILY - a real life musical**](https://beanies.family/?utm_source=blog&utm_medium=post&utm_campaign=the-world-premiere-of-the-beanie-family-musical&utm_content=film-title#musical)!
+So, after what has been one of the weirder stretches of my life to this point building [beanies.family](https://beanies.family/?utm_source=blog&utm_medium=post&utm_campaign=the-world-premiere-of-the-beanie-family-musical&utm_content=body), I’m proud to announce that I’m roughly $967 poorer. But I’m also much _more_ pleased to announce the world premiere of [**THE BEANIE FAMILY - a real life musical**](https://beanies.family/?utm_source=blog&utm_medium=post&utm_campaign=the-world-premiere-of-the-beanie-family-musical&utm_content=film-title#musical)!
 
 There’s a lot more to say - maybe one day I’ll write a post with even more (excruciating) detail about the process of _actually_ putting this thing together. But for now, I think I just need to get some sleep.
 
