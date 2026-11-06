@@ -733,6 +733,63 @@ describe('buildWidgetSnapshot: the to-dos section', () => {
     ]);
   });
 
+  // greg, 2026-11-06: a child's routine stays off a parent's "my day" while on track. The
+  // snapshot has no clock, so there is no "missed" case here; only the opt-in brings it back.
+  describe("a child's routine on a parent's my day", () => {
+    const DAILY = { unit: 'day', interval: 1, end: { kind: 'never' } } as const;
+    const plants = (over: Partial<TodoItem> = {}) =>
+      todo({
+        id: 'plants',
+        title: 'water the plants',
+        assigneeIds: ['ava'],
+        dueDate: TODAY,
+        repeat: { rule: DAILY, anchor: TODAY } as TodoItem['repeat'],
+        repeatLog: [],
+        ...over,
+      });
+    const chores = (over: Partial<FamilyList> = {}): FamilyList =>
+      ({
+        ...MEDS_LIST,
+        id: 'chores',
+        title: 'morning chores',
+        ownerId: 'ava',
+        category: 'kids',
+        lifecycle: 'recurring',
+        frequency: 'daily',
+        cadence: undefined,
+        createdAt: TODAY,
+        lastResetDate: TODAY,
+        items: [{ id: 'c1', title: 'teeth', completed: false }],
+        ...over,
+      }) as FamilyList;
+    const myTitles = (over: Partial<WidgetSnapshotInput>) =>
+      (today(build({ hintTodos: [], ...over }).snapshot).my?.tasks.items ?? []).map((i) => i.title);
+
+    it('excludes an on-track repeating to-do and recurring list', () => {
+      expect(myTitles({ todos: [plants()], lists: [chores()] })).toEqual([]);
+    });
+
+    it('includes them with notifyParents', () => {
+      expect(
+        myTitles({
+          todos: [plants({ notifyParents: true })],
+          lists: [chores({ notifyParents: true })],
+        })
+      ).toEqual(expect.arrayContaining(['water the plants', 'morning chores, 1 left']));
+    });
+
+    it("a child's one-off to-do is unchanged", () => {
+      expect(
+        myTitles({ todos: [plants({ repeat: undefined, repeatLog: undefined })], lists: [] })
+      ).toEqual(['water the plants']);
+    });
+
+    it("the child's own day is unchanged (a child session publishes no to-dos)", () => {
+      const { snapshot } = build({ currentMember: AVA, todos: [plants()], lists: [chores()] });
+      expect(today(snapshot).my?.tasks.items).toEqual([]);
+    });
+  });
+
   describe('repeating lists', () => {
     // Anchored on TODAY, so every-2-days resets on entries 0, 2, 4, 6 (the 11th, 13th, 15th, 17th).
     const repeating = (over: Partial<FamilyList> = {}): FamilyList =>

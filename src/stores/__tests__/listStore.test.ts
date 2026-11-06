@@ -45,6 +45,9 @@ vi.mock('@/composables/useMemberFiltered', () => ({
     },
   }),
 }));
+// Captured so the store's telemetry can be asserted (`notify_parents_set`).
+const { logEventMock } = vi.hoisted(() => ({ logEventMock: vi.fn() }));
+vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: logEventMock }));
 // Identity translate — createFromTemplate resolves the template name via the store.
 vi.mock('@/stores/translationStore', () => ({
   useTranslationStore: () => ({ t: (k: string) => k }),
@@ -932,7 +935,70 @@ describe('listStore', () => {
     expect(patch.lifecycle).toBe('oneoff');
     expect(patch.completed).toBeUndefined();
     expect(patch.completedAt).toBeUndefined();
+    // The flag is NOT touched: only `setNotifyParents` (adults only) may change it.
+    expect(patch).not.toHaveProperty('notifyParents');
     expect(store.completedLists).toEqual([]); // not filed despite the stale flag
+  });
+
+  // ── "Keep Parents Posted" (greg, 2026-11-06) ───────────────────────────────
+
+  describe('setNotifyParents', () => {
+    const notifyEvents = (message = 'notify_parents_set') =>
+      logEventMock.mock.calls
+        .map(([e]) => e)
+        .filter((e) => e.surface === 'recurrence' && e.message === message);
+
+    /** Keep Parents Posted is adults-only: sign a member in. */
+    async function signInAs(over: Record<string, unknown>): Promise<void> {
+      const { useFamilyStore } = await import('@/stores/familyStore');
+      const fam = useFamilyStore();
+      fam.members = [
+        { id: 'm-viewer', name: 'Viewer', role: 'owner', ageGroup: 'adult', ...over },
+      ] as never;
+      fam.setCurrentMember((over.id as string) ?? 'm-viewer');
+    }
+
+    it('writes true when on and undefined (never false) when off, and logs each', async () => {
+      await signInAs({});
+      const store = useListStore();
+      store.lists = [list({ id: 'r', lifecycle: 'recurring', frequency: 'daily' })];
+      vi.mocked(listRepo.updateList).mockImplementation(async (id, input) => {
+        const cur = store.lists.find((x) => x.id === id)!;
+        return { ...cur, ...(input as Partial<FamilyList>) } as FamilyList;
+      });
+
+      await store.setNotifyParents('r', true);
+      await store.setNotifyParents('r', false);
+
+      expect(vi.mocked(listRepo.updateList).mock.calls.map((c) => c[1])).toEqual([
+        { notifyParents: true },
+        { notifyParents: undefined },
+      ]);
+      expect(notifyEvents().map((e) => [e.level, e.context])).toEqual([
+        ['info', { recur_surface: 'list', action: 'on' }],
+        ['info', { recur_surface: 'list', action: 'off' }],
+      ]);
+    });
+
+    it('refuses, never silently: a missing list, a one-off list and a child viewer', async () => {
+      const store = useListStore();
+      await signInAs({});
+      store.lists = [list({ id: 'o', lifecycle: 'oneoff' })];
+      expect(await store.setNotifyParents('gone', true)).toBeNull();
+      expect(await store.setNotifyParents('o', true)).toBeNull();
+
+      await signInAs({ id: 'm-kid', role: 'member', ageGroup: 'child' });
+      store.lists = [list({ id: 'r', lifecycle: 'recurring', frequency: 'daily' })];
+      expect(await store.setNotifyParents('r', false)).toBeNull();
+
+      expect(listRepo.updateList).not.toHaveBeenCalled();
+      expect(notifyEvents()).toEqual([]);
+      expect(notifyEvents('refused').map((e) => [e.level, e.context])).toEqual([
+        ['warn', { action: 'notify-parents', recur_surface: 'list', detail: 'not-found' }],
+        ['warn', { action: 'notify-parents', recur_surface: 'list', detail: 'not-recurring' }],
+        ['warn', { action: 'notify-parents', recur_surface: 'list', detail: 'not-adult' }],
+      ]);
+    });
   });
 
   // ── edit + reorder (2026-06-20) ──────────────────────────────────────────

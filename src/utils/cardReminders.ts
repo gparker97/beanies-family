@@ -10,7 +10,7 @@
  *   - ONE to-do per (card, part) with a reminder, a holder, and a kept card. Its id is
  *     DETERMINISTIC (`cardTodoId`), so two adult devices converge on one record.
  *   - The card OWNS the fields in `CARD_MANAGED_FIELDS` (title, assignee, due time, repeat,
- *     open state). The diff (`reconcileCardTodos`) and the orchestrator's watch key
+ *     open state, "Keep Parents Posted"). The diff (`reconcileCardTodos`) and the orchestrator's watch key
  *     (`cardRemindersKey`) are both built from that one table, so a managed field cannot be
  *     patched without also being watched. `dueDate` (the store's roll), `description` and
  *     `repeatLog` (the family's) are deliberately NOT managed and never written here, except
@@ -50,12 +50,19 @@ export type DesiredCardTodo = CreateTodoInput & {
 /** The fields a managed-field fingerprint reads (shared by desired and existing to-dos). */
 type CardTodoFields = Pick<
   TodoItem,
-  'title' | 'assigneeIds' | 'assigneeId' | 'dueTime' | 'repeat' | 'completed' | 'someday'
+  | 'title'
+  | 'assigneeIds'
+  | 'assigneeId'
+  | 'dueTime'
+  | 'repeat'
+  | 'completed'
+  | 'someday'
+  | 'notifyParents'
 >;
 
 /** One field the card owns on its to-do. */
 export interface CardManagedField {
-  field: 'title' | 'assignee' | 'dueTime' | 'repeat' | 'completed' | 'someday';
+  field: 'title' | 'assignee' | 'dueTime' | 'repeat' | 'completed' | 'someday' | 'notifyParents';
   /** A canonical string for this field's value, the unit of both the diff and the watch key. */
   value(todo: CardTodoFields): string;
   /** Does `existing` already carry `desired`'s value for this field? */
@@ -85,7 +92,8 @@ function repeatValue(repeat: TodoItem['repeat']): string {
  * field here is the whole change. A repeat change and a reopen both re-date the to-do to the
  * desired first occurrence (`reconcileCardTodos` then steps past any already-logged date).
  * `someday` is managed because an old client's "Track as someday" clears the due date, and
- * the store's roll never touches a someday to-do.
+ * the store's roll never touches a someday to-do. `notifyParents` mirrors the reminder's flag
+ * (only the literal `true` counts as on; `undefined` clears it).
  */
 export const CARD_MANAGED_FIELDS: readonly CardManagedField[] = [
   managed(
@@ -124,6 +132,11 @@ export const CARD_MANAGED_FIELDS: readonly CardManagedField[] = [
     (t) => (t.someday ? '1' : '0'),
     (d) => ({ someday: undefined, dueDate: d.dueDate })
   ),
+  managed(
+    'notifyParents',
+    (t) => (t.notifyParents === true ? '1' : '0'),
+    (d) => ({ notifyParents: d.notifyParents ? true : undefined })
+  ),
 ];
 
 /**
@@ -159,6 +172,9 @@ export function computeDesiredCardTodos(
         cardPartKey: part.key,
       };
       if (reminder.time) todo.dueTime = reminder.time;
+      // Strict: a malformed flag from any client is simply "off" (`isValidCardReminder` stays
+      // unchanged, since rejecting the reminder would remove the child's to-do everywhere).
+      if (reminder.notifyParents === true) todo.notifyParents = true;
       out.push(todo);
     }
   }
@@ -265,11 +281,12 @@ export function reminderStartDate(reminder: CardReminder | null, todayYmd: strin
  * The reminder the editor saves. `say` is trimmed and falls back to `fallbackSay` (the card's
  * name) so it is always stored; the anchor is kept while the cadence is unchanged and becomes
  * `startYmd` (the picker's start date, `reminderStartDate`) when it changes. Components never
- * compute anchors themselves.
+ * compute anchors themselves. `notifyParents` is kept from `prev` unless the input sets it, and
+ * stored only as `true`.
  */
 export function buildCardReminder(
   prev: CardReminder | null,
-  input: { say: string; rule: RecurrenceRule; time?: string | null },
+  input: { say: string; rule: RecurrenceRule; time?: string | null; notifyParents?: boolean },
   fallbackSay: string,
   startYmd: string
 ): CardReminder {
@@ -281,5 +298,7 @@ export function buildCardReminder(
     anchor: keepAnchor ? prev.anchor : startYmd,
   };
   if (input.time) out.time = input.time;
+  const notify = input.notifyParents ?? prev?.notifyParents;
+  if (notify === true) out.notifyParents = true;
   return out;
 }

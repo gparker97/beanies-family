@@ -2020,7 +2020,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'Each list has one <strong>Owner</strong>. Unlike a to-do (which can be shared among several people), a list belongs to a single person — the one looking after it. The owner’s due lists turn up in their <strong>Daily Briefing</strong>. If a list belongs to a child, grown-ups see it in their briefing too, framed by the child’s name, so the parent who actually makes it happen doesn’t miss it.',
+          'Each list has one <strong>Owner</strong>. Unlike a to-do (which can be shared among several people), a list belongs to a single person — the one looking after it. The owner’s due lists turn up in their <strong>Daily Briefing</strong>. If a one-off list belongs to a child, grown-ups see it in their briefing too, framed by the child’s name, so the parent who actually makes it happen doesn’t miss it. A child’s repeating list stays off the grown-ups’ briefing unless you turn on <strong>Keep Parents Posted</strong> in the list’s Repeats section.',
       },
 
       { type: 'heading', content: 'Linking a list to a trip or activity', level: 2, id: 'linking' },
@@ -3114,7 +3114,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'On a phone, open the <strong>Reminders</strong> section below your open to-dos. On desktop, the <strong>Family Reminders</strong> panel sits on the right of the To-Dos page. Both list everything that repeats, grouped by the person it reminds, with how often it repeats and when it is <strong>Next</strong> due. Tap a row to open the to-do. A child’s group also notes that adults see it too, and the member filter at the top of the page applies here as well.',
+          'On a phone, open the <strong>Reminders</strong> section below your open to-dos. On desktop, the <strong>Family Reminders</strong> panel sits on the right of the To-Dos page. Both list everything that repeats, grouped by the person it reminds, with how often it repeats and when it is <strong>Next</strong> due. Tap a row to open the to-do. The member filter at the top of the page applies here as well.',
       },
       {
         type: 'heading',
@@ -3145,7 +3145,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         items: [
           '<strong>It follows the holder.</strong> The reminder lands on whoever holds the card today. When the card is re-dealt, it moves to the new holder. If nobody holds it yet, it starts as soon as someone does.',
           '<strong>Split cards:</strong> each part can have its own reminder, going to that part’s holder.',
-          '<strong>Kids:</strong> a reminder for a child holder belongs to the child, and adults see it too.',
+          '<strong>Kids:</strong> a reminder for a child holder belongs to the child. Grown-ups see it in their briefing once its time has passed and it is still unticked, or every time if you turn on <strong>Keep Parents Posted</strong> on the card reminder (or on the to-do itself, for a repeating to-do you made on the To-Dos page).',
           '<strong>Turning it off:</strong> edit the card and turn off <strong>Remind the Holder</strong>. Skipping the card also stops it.',
         ],
       },

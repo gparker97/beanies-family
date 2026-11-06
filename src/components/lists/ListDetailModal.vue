@@ -12,6 +12,7 @@ import { useListCategoryLabel } from '@/composables/useListCategoryLabel';
 import { useMemberInfo } from '@/composables/useMemberInfo';
 import { getListCategory } from '@/constants/listCategories';
 import { isRecurring } from '@/utils/listLifecycle';
+import { canSetNotifyParents, isChildOnly } from '@/utils/audience';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { formatDateShort, extractDatePart } from '@/utils/date';
 import { resolveListRule, listShadowFromCadence } from '@/services/recurrence/adapters';
@@ -21,6 +22,7 @@ import { confirmAndDeleteList } from '@/composables/useListDeletion';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
 import RecurrencePicker from '@/components/ui/RecurrencePicker.vue';
+import NotifyParentsToggle from '@/components/ui/NotifyParentsToggle.vue';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
 import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import MemberChip from '@/components/ui/MemberChip.vue';
@@ -46,7 +48,7 @@ const familyStore = useFamilyStore();
 const vacationStore = useVacationStore();
 const activityStore = useActivityStore();
 const { categoryLabel } = useListCategoryLabel();
-const { getMemberName } = useMemberInfo();
+const { getMemberName, getMemberById } = useMemberInfo();
 
 const list = computed(() =>
   props.listId ? (listStore.lists.find((l) => l.id === props.listId) ?? null) : null
@@ -531,6 +533,19 @@ async function handleDelete(): Promise<void> {
               mode="reset"
               accent="purple"
               @update:model-value="setCadence"
+            />
+          </div>
+          <div
+            v-if="
+              isChildOnly([list.ownerId], getMemberById) &&
+              canSetNotifyParents(familyStore.currentMember)
+            "
+            class="mt-3"
+          >
+            <NotifyParentsToggle
+              :model-value="list.notifyParents === true"
+              testid="list-notify-parents"
+              @update:model-value="(on) => void listStore.setNotifyParents(list!.id, on)"
             />
           </div>
         </template>

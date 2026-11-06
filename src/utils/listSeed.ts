@@ -70,6 +70,7 @@ export function buildCopySeeds(args: BuildCopySeedsArgs): CreateFamilyListInput[
     lifecycle: source.lifecycle,
     frequency: source.frequency,
     cadence: source.cadence,
+    notifyParents: source.notifyParents,
     lastResetDate,
     cycleCelebrated: false,
     completed: false,

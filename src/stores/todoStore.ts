@@ -6,7 +6,8 @@ import { wrapAsync } from '@/composables/useStoreActions';
 import { useToday } from '@/composables/useToday';
 import * as todoRepo from '@/services/automerge/repositories/todoRepository';
 import { normalizeAssignees } from '@/utils/assignees';
-import { classifyAudience } from '@/utils/audience';
+import { canSetNotifyParents, classifyAudience } from '@/utils/audience';
+import { useFamilyStore } from '@/stores/familyStore';
 import { isTodoOverdue, sortTodos } from '@/utils/todo';
 import {
   itemsForSession,
@@ -123,7 +124,17 @@ function logRepeatSet(action: 'create' | 'change' | 'off', rule: RecurrenceRule 
   });
 }
 
-type RefusedAction = 'set-repeat' | 'someday' | 'skip' | 'delete';
+/** "Keep Parents Posted" turned on (at creation or in the drawer) or off. */
+function logNotifyParentsSet(on: boolean): void {
+  logEvent({
+    level: 'info',
+    surface: RECURRENCE_SURFACE,
+    message: 'notify_parents_set',
+    context: { recur_surface: 'todo', action: on ? 'on' : 'off' },
+  });
+}
+
+type RefusedAction = 'set-repeat' | 'someday' | 'skip' | 'delete' | 'notify-parents';
 
 export const useTodoStore = defineStore('todos', () => {
   // State
@@ -247,6 +258,7 @@ export const useTodoStore = defineStore('todos', () => {
     );
     // #123: the one place a repeat set at creation is counted (every create path lands here).
     if (result?.repeat) logRepeatSet('create', result.repeat.rule);
+    if (result?.notifyParents) logNotifyParentsSet(true);
     return trackFeature(result ?? null, 'todo');
   }
 
@@ -754,6 +766,10 @@ export const useTodoStore = defineStore('todos', () => {
 
     if (rule === null) {
       if (!existing.repeat) return existing;
+      // `notifyParents` is deliberately KEPT: it is inert on a non-repeating to-do (the routine
+      // gate only acts on routines), and clearing it here would let anyone who can edit the
+      // repeat (a child included) drop the parents' setting by toggling repeat off and on.
+      // `setNotifyParents` (adults only) is its one write path.
       const off = await updateTodo(id, { repeat: undefined, repeatLog: undefined });
       if (off) logRepeatSet('off', current?.rule);
       return off;
@@ -782,6 +798,36 @@ export const useTodoStore = defineStore('todos', () => {
       ...(existing.someday ? { someday: false } : {}),
     });
     if (result) logRepeatSet('change', rule);
+    return result;
+  }
+
+  /**
+   * "Keep Parents Posted" on a child's routine: parents see it every time, not only when missed
+   * (`utils/audience.ts`). Written as `true` or cleared with `undefined`, never `false`. Allowed
+   * only where `todoCapabilities(...).editNotifyParents` (a user-made repeating to-do; a card
+   * to-do's flag is owned by the card's reminder).
+   */
+  async function setNotifyParents(id: string, on: boolean): Promise<TodoItem | null> {
+    const existing = todos.value.find((t) => t.id === id);
+    if (!existing) {
+      refuse('notify-parents', 'not-found', 'todo.error.notFound');
+      return null;
+    }
+    if (!todoCapabilities(existing).editNotifyParents) {
+      const card = isCardTodo(existing);
+      refuse(
+        'notify-parents',
+        card ? 'card-made' : 'not-repeating',
+        card ? 'todo.error.repeatCardManaged' : 'todo.error.repeatNotRepeating'
+      );
+      return null;
+    }
+    if (!canSetNotifyParents(useFamilyStore().currentMember)) {
+      refuse('notify-parents', 'not-adult', 'recurrence.notifyParents.adultsOnly');
+      return null;
+    }
+    const result = await updateTodo(id, { notifyParents: on ? true : undefined });
+    if (result) logNotifyParentsSet(on);
     return result;
   }
 
@@ -892,6 +938,7 @@ export const useTodoStore = defineStore('todos', () => {
     // #123: repeating to-dos
     skipOccurrence,
     setRepeat,
+    setNotifyParents,
     acknowledgeHint,
     resetState,
   };

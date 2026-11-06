@@ -6,7 +6,7 @@
  *     repeat" hint, and the title row's Skip This Time pill goes to `todoStore.skipOccurrence`
  *     (the pill shows only on an open repeating to-do, never on a plain or completed one),
  *   - a card-made to-do: no Delete (with the "turn it off on the card" caption), the Linked Card
- *     row, the "Made by the {card} card" meta, and the adults note for a child assignee,
+ *     row, the "Made by the {card} card" meta, and the read-only Keep Parents Posted hint for a child assignee,
  *   - a cadence saved on ✓ goes through `todoStore.setRepeat`.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -35,6 +35,7 @@ const store = vi.hoisted(() => ({
   toggleComplete: vi.fn(),
   skipOccurrence: vi.fn(),
   setRepeat: vi.fn(),
+  setNotifyParents: vi.fn(),
   updateTodo: vi.fn(),
   setSomeday: vi.fn(),
   discardTodo: vi.fn(),
@@ -96,6 +97,8 @@ describe('TodoViewEditModal (#123)', () => {
       { id: 'm-sofia', name: 'Sofia', role: 'owner', ageGroup: 'adult' },
       { id: 'm-leo', name: 'Leo', role: 'member', ageGroup: 'child' },
     ] as never;
+    // A grown-up is signed in (Keep Parents Posted is adults-only).
+    useFamilyStore().setCurrentMember('m-sofia');
   });
 
   it('ticks through the checkbox beside the title; the footer has no complete button', async () => {
@@ -176,7 +179,11 @@ describe('TodoViewEditModal (#123)', () => {
     );
     expect(w.getComponent(BeanieFormModalStub).props('showDelete')).toBe(false);
     expect(w.find('[data-testid="todo-delete-on-card"]').exists()).toBe(true);
-    expect(w.find('[data-testid="todo-adults-see"]').exists()).toBe(true);
+    // Managed on the card: a read-only hint, never a switch.
+    expect(w.find('[data-testid="todo-notify-parents-hint"]').text()).toBe(
+      'recurrence.notifyParents.hintOff'
+    );
+    expect(w.find('[data-testid="todo-notify-parents"]').exists()).toBe(false);
     expect(w.getComponent(LinkedCardChip).props()).toMatchObject({
       cardId: 'plants',
       variant: 'row',
@@ -184,5 +191,61 @@ describe('TodoViewEditModal (#123)', () => {
     expect(w.getComponent(CreatedMeta).props('label')).toBe('todo.linkedCard.madeBy');
     // Title, assignee, due date, due time and repeat are the card's.
     expect(w.findAllComponents(InlineEditField).filter((f) => f.props('disabled'))).toHaveLength(5);
+  });
+
+  describe('Keep Parents Posted', () => {
+    const childRoutine = (over: Partial<TodoItem> = {}) =>
+      todo({
+        dueDate: '2026-10-14',
+        repeat,
+        repeatLog: [],
+        assigneeIds: ['m-leo'],
+        ...over,
+      });
+    const sw = (w: ReturnType<typeof mountDrawer>) => w.find('[data-testid="todo-notify-parents"]');
+
+    it('a child-only repeating to-do offers the switch, which saves through setNotifyParents', async () => {
+      const w = mountDrawer(childRoutine());
+      expect(sw(w).exists()).toBe(true);
+      await sw(w).trigger('click');
+      expect(store.setNotifyParents).toHaveBeenCalledWith('t-1', true);
+    });
+
+    it('reflects the saved flag and turns it off', async () => {
+      const w = mountDrawer(childRoutine({ notifyParents: true }));
+      expect(sw(w).attributes('aria-checked')).toBe('true');
+      await sw(w).trigger('click');
+      expect(store.setNotifyParents).toHaveBeenCalledWith('t-1', false);
+    });
+
+    it('is not offered to a child viewer: only a grown-up may set it', () => {
+      useFamilyStore().setCurrentMember('m-leo');
+      expect(sw(mountDrawer(childRoutine())).exists()).toBe(false);
+    });
+
+    it('is not offered for an adult assignee, a one-off, or a completed to-do', () => {
+      expect(sw(mountDrawer(childRoutine({ assigneeIds: ['m-sofia'] }))).exists()).toBe(false);
+      expect(
+        sw(mountDrawer(todo({ dueDate: '2026-10-14', assigneeIds: ['m-leo'] }))).exists()
+      ).toBe(false);
+      expect(sw(mountDrawer(childRoutine({ completed: true }))).exists()).toBe(false);
+    });
+
+    it('a card to-do has no interactive switch, and the read-only hint follows its flag', () => {
+      cards.set('plants', {
+        id: 'plants',
+        custom: { name: 'Plants', emoji: '🪴' },
+        splitMode: 'single',
+        parts: [{ key: 'main', holderId: 'm-leo' }],
+        state: null,
+      });
+      const w = mountDrawer(
+        childRoutine({ cardId: 'plants', cardPartKey: 'main', notifyParents: true })
+      );
+      expect(sw(w).exists()).toBe(false);
+      expect(w.get('[data-testid="todo-notify-parents-hint"]').text()).toBe(
+        'recurrence.notifyParents.hintOn'
+      );
+    });
   });
 });

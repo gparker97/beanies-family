@@ -66,7 +66,8 @@ import {
 } from '@/utils/reminderSchedule';
 import {
   classifyAudience,
-  classifyOwnerAudience,
+  classifyListAudience,
+  classifyTodoAudience,
   isDutyDone,
   ownerItemSurfaces,
 } from '@/utils/audience';
@@ -719,7 +720,7 @@ function completedOn(todo: TodoItem, ymd: string): boolean {
 
 /**
  * "My day": the briefing's to-do rule (`useCriticalItems`): not hidden from the viewer by
- * `classifyAudience`. Hints come through `hintTodos` instead, so they are skipped here. Open
+ * `classifyTodoAudience`. Hints come through `hintTodos` instead, so they are skipped here. Open
  * to-dos, plus (marked `done`) those completed on the day, for `doneToday`.
  */
 function myTodoDrafts(ctx: DayContext): TaskDraft[] {
@@ -729,7 +730,11 @@ function myTodoDrafts(ctx: DayContext): TaskDraft[] {
     if (isHint(todo) || todo.someday) continue;
     if (todo.completed && !completedOn(todo, ctx.ymd)) continue;
     const owners = normalizeAssignees(todo);
-    if (classifyAudience(owners, ctx.viewer, ctx.input.resolveMember).kind === 'hidden') continue;
+    // `missed` is false: the snapshot has no clock, and the roll keeps a routine's date ≥ today,
+    // so a child's on-track routine stays off a parent's widget unless it carries `notifyParents`.
+    if (classifyTodoAudience(todo, ctx.viewer, ctx.input.resolveMember, false).kind === 'hidden') {
+      continue;
+    }
     out.push(todoDraft(ctx, todo, owners, 'todo'));
   }
   return out;
@@ -842,9 +847,7 @@ function listDrafts(ctx: DayContext): TaskDraft[] {
     if (isFiled(list)) continue;
     const visible =
       ctx.rules.lists === 'owner'
-        ? ownerItemSurfaces(
-            classifyOwnerAudience(list.ownerId, ctx.viewer, ctx.input.resolveMember)
-          )
+        ? ownerItemSurfaces(classifyListAudience(list, ctx.viewer, ctx.input.resolveMember, false))
         : isWallSafeList(list);
     if (!visible) continue;
     const plate = listDraftDue(ctx, list);

@@ -80,6 +80,8 @@ export interface TodoCreateFields {
   activityDate?: string;
   /** Make it a repeating to-do (#123). Ignored without a due date, which anchors the series. */
   repeat?: RecurrenceRule;
+  /** "Keep Parents Posted" on a child's routine. Written only when the repeat starts. */
+  notifyParents?: boolean;
 }
 
 /**
@@ -93,7 +95,8 @@ export interface TodoCreateFields {
  *   - assignees are written only when there are some;
  *   - an activity link is written only with an id, through `todoLinkPatch`;
  *   - a repeat is written only with a due date, through `startRepeat` (the due date is the
- *     anchor, and `dueDate` becomes the series' first occurrence on or after today).
+ *     anchor, and `dueDate` becomes the series' first occurrence on or after today);
+ *   - `notifyParents` is written (as `true`) only alongside a started repeat.
  *
  * Built FIELD BY FIELD and never by spreading `fields`: the review drawer passes whole drafts,
  * which carry keys that must never be persisted (`matchDate`, `timeDropped`, `dueDerived`,
@@ -113,7 +116,12 @@ export function toCreateTodoInput(
     title: fields.title.trim(),
     ...(description ? { description } : {}),
     ...(started
-      ? { dueDate: started.dueDate, repeat: started.repeat, repeatLog: started.repeatLog }
+      ? {
+          dueDate: started.dueDate,
+          repeat: started.repeat,
+          repeatLog: started.repeatLog,
+          ...(fields.notifyParents ? { notifyParents: true } : {}),
+        }
       : dueDate
         ? { dueDate }
         : {}),

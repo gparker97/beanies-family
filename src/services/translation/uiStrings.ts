@@ -7429,7 +7429,6 @@ const STRING_DEFS = {
   'todo.linkedCard.heldBy': { en: 'Held by {name}', beanie: 'held by {name}' },
   'todo.linkedCard.madeBy': { en: 'Made by the {card} card', beanie: 'made by the {card} card' },
   'todo.linkedCard.open': { en: 'Open the card', beanie: 'open the card' },
-  'whoOwnsWhat.reminder.adultsSee': { en: 'Adults see it too.', beanie: 'adults see it too.' },
   'whoOwnsWhat.reminder.field': { en: 'Reminder', beanie: 'reminder' },
   'whoOwnsWhat.reminder.toggle': { en: 'Remind the Holder', beanie: 'remind the holder' },
   'whoOwnsWhat.reminder.togglePart': { en: 'Remind {name}', beanie: 'remind {name}' },
@@ -9817,6 +9816,19 @@ const STRING_DEFS = {
   'recurrence.desc.untilDate': { en: 'until {date}', beanie: 'until {date}' },
   'recurrence.desc.timesN': { en: '{n} times', beanie: '{n} times' },
   'recurrence.desc.atTime': { en: '{cadence} at {time}', beanie: '{cadence} at {time}' },
+  'recurrence.notifyParents.title': { en: 'Keep Parents Posted', beanie: 'keep parents posted' },
+  'recurrence.notifyParents.hintOff': {
+    en: 'Off. Grown-ups see this routine only if it has a set time that passes unticked.',
+    beanie: 'off. grown-ups see this routine only if it has a set time that passes unticked.',
+  },
+  'recurrence.notifyParents.hintOn': {
+    en: 'On. Grown-ups see this routine every time, in their briefing and reminders.',
+    beanie: 'on. grown-ups see this routine every time, in their briefing and reminders.',
+  },
+  'recurrence.notifyParents.adultsOnly': {
+    en: 'Only a grown-up can change Keep Parents Posted.',
+    beanie: 'only a grown-up can change keep parents posted.',
+  },
 
   // Planner — Fee schedule labels
   'planner.fee.none': { en: 'No fees', beanie: 'no fees' },

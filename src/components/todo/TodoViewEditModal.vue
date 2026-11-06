@@ -21,8 +21,10 @@ import LinkedActivityChip from '@/components/todo/LinkedActivityChip.vue';
 import LinkedCardChip from '@/components/todo/LinkedCardChip.vue';
 import TodoCompleteCheckbox from '@/components/todo/TodoCompleteCheckbox.vue';
 import TodoRepeatField from '@/components/todo/TodoRepeatField.vue';
+import NotifyParentsToggle from '@/components/ui/NotifyParentsToggle.vue';
 import { useTodoCardLink } from '@/composables/useTodoCardLink';
-import { isAdultMember } from '@/composables/useMemberInfo';
+import { useMemberInfo } from '@/composables/useMemberInfo';
+import { canSetNotifyParents, isChildOnly } from '@/utils/audience';
 import { isCardTodo, isRepeating, todoCapabilities } from '@/utils/todoRecurrence';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { todoLink } from '@/utils/activityLinks';
@@ -51,6 +53,7 @@ const emit = defineEmits<{
 const { t } = useTranslation();
 const { playWhoosh, playPop } = useSounds();
 const todoStore = useTodoStore();
+const { getMemberById } = useMemberInfo();
 const familyStore = useFamilyStore();
 
 // Live-lookup from store so display stays reactive after inline edits
@@ -203,16 +206,8 @@ const deleteOnCardCaption = computed(() =>
 // Computed display values
 const viewAssigneeIds = computed(() => (todo.value ? normalizeAssignees(todo.value) : []));
 
-/** A card-made to-do held by a child is the child's, and every adult sees it too. */
-const showAdultsSee = computed(
-  () =>
-    !!todo.value &&
-    isCardTodo(todo.value) &&
-    viewAssigneeIds.value.some((id) => {
-      const member = familyStore.members.find((m) => m.id === id);
-      return !!member && !member.isPet && !isAdultMember(member);
-    })
-);
+/** Child-only assignees: "Keep Parents Posted" (and its read-only hint on a card to-do) applies. */
+const childOnly = computed(() => isChildOnly(viewAssigneeIds.value, getMemberById));
 
 const viewCompletedBy = computed(() => {
   if (!todo.value?.completedBy) return null;
@@ -646,6 +641,23 @@ async function handleDelete() {
         </InlineEditField>
       </FormFieldGroup>
 
+      <!-- Keep Parents Posted: instant-save, repeating child-only to-dos made here (a card to-do's
+           flag is managed on its card, see the read-only hint under Assign To). -->
+      <div
+        v-if="
+          caps?.editNotifyParents &&
+          childOnly &&
+          !todo.completed &&
+          canSetNotifyParents(familyStore.currentMember)
+        "
+      >
+        <NotifyParentsToggle
+          :model-value="todo.notifyParents === true"
+          testid="todo-notify-parents"
+          @update:model-value="(on) => void todoStore.setNotifyParents(todo!.id, on)"
+        />
+      </div>
+
       <!-- Assignee — inline editable -->
       <FormFieldGroup :label="t('todo.assignTo')">
         <InlineEditField
@@ -685,13 +697,13 @@ async function handleDelete() {
             </div>
           </template>
         </InlineEditField>
-        <p
-          v-if="showAdultsSee"
-          class="dark:text-ink-faint mt-1 px-1 text-xs text-[var(--color-text-muted)]"
-          data-testid="todo-adults-see"
-        >
-          {{ t('whoOwnsWhat.reminder.adultsSee') }}
-        </p>
+        <NotifyParentsToggle
+          v-if="isCardTodo(todo) && childOnly"
+          readonly
+          class="mt-1 px-1"
+          :model-value="todo.notifyParents === true"
+          testid="todo-notify-parents-hint"
+        />
       </FormFieldGroup>
 
       <!-- Description — inline editable -->

@@ -174,13 +174,38 @@ describe('CardReminderField', () => {
     expect(w.emitted('update:expanded')).toEqual([[true]]);
   });
 
-  it('a child holder: adults see it too', () => {
-    expect(mountField({ modelValue: MONDAYS, childHolder: true }).text()).toContain(
-      'whoOwnsWhat.reminder.adultsSee'
-    );
-    expect(mountField({ modelValue: MONDAYS }).text()).not.toContain(
-      'whoOwnsWhat.reminder.adultsSee'
-    );
+  describe('Keep Parents Posted', () => {
+    const sw = (w: ReturnType<typeof mountField>) =>
+      w.find('[data-testid="card-reminder-notify-parents"]');
+
+    it('is offered for a child holder with a cadence, and never for an adult or before one', () => {
+      expect(sw(mountField({ modelValue: MONDAYS, childHolder: true })).exists()).toBe(true);
+      expect(sw(mountField({ modelValue: MONDAYS })).exists()).toBe(false);
+      expect(sw(mountField({ modelValue: null, childHolder: true })).exists()).toBe(false);
+    });
+
+    it('turning it on emits the reminder with notifyParents: true', async () => {
+      const w = mountField({ modelValue: MONDAYS, childHolder: true });
+      await sw(w).trigger('click');
+      expect(lastValue(w)).toEqual({ ...MONDAYS, notifyParents: true });
+    });
+
+    it('turning it off clears the flag, and an unrelated edit keeps it', async () => {
+      const on: CardReminder = { ...MONDAYS, notifyParents: true };
+      const w = mountField({ modelValue: on, childHolder: true });
+      expect(sw(w).attributes('aria-checked')).toBe('true');
+      w.findComponent(TimeStub).vm.$emit('update:modelValue', '19:30');
+      expect(lastValue(w)).toEqual({ ...on, time: '19:30' });
+
+      await sw(w).trigger('click');
+      expect(lastValue(w)).not.toHaveProperty('notifyParents');
+    });
+
+    it('no longer carries the old "adults see it too" line', () => {
+      expect(mountField({ modelValue: MONDAYS, childHolder: true }).text()).not.toContain(
+        'whoOwnsWhat.reminder.adultsSee'
+      );
+    });
   });
   it('hands the picker the stored cadence as a rule (the picker recognises its own echo)', async () => {
     const w = mountField({ modelValue: MONDAYS });

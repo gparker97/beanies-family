@@ -111,6 +111,20 @@ describe('computeDesiredCardTodos', () => {
     expect(desired([trashHeldBy('greg', allDay)])[0]).not.toHaveProperty('dueTime');
   });
 
+  it('carries "Keep Parents Posted" onto the to-do, and nothing when it is off', () => {
+    expect(desired([trashHeldBy('leo', { ...TRASH, notifyParents: true })])[0]).toMatchObject({
+      notifyParents: true,
+    });
+    expect(desired([trashHeldBy('leo')])[0]).not.toHaveProperty('notifyParents');
+  });
+
+  it('ignores a non-boolean flag (only the literal true counts)', () => {
+    const malformed = { ...TRASH, notifyParents: 'yes' as unknown as boolean };
+    const [todo] = desired([trashHeldBy('leo', malformed)]);
+    expect(todo).toBeDefined(); // the reminder (and so the child's to-do) survives
+    expect(todo).not.toHaveProperty('notifyParents');
+  });
+
   it('a child split makes one to-do per held part with a reminder, assigned to that part holder', () => {
     const todos = desired([
       state('lunchboxes', {
@@ -257,6 +271,16 @@ describe('reconcileCardTodos', () => {
     });
   });
 
+  it('"Keep Parents Posted" on patches { notifyParents: true }; off patches it away', () => {
+    const on = desired([trashHeldBy('greg', { ...TRASH, notifyParents: true })]);
+    expect(reconcileCardTodos(on, [stored(d!)], TODAY).toPatch).toEqual([
+      { id: 'card-trash-main', patch: { notifyParents: true } },
+    ]);
+    const patch = reconcileCardTodos(want, [stored(on[0]!)], TODAY).toPatch[0]!.patch;
+    expect(patch).toHaveProperty('notifyParents', undefined);
+    expect(Object.keys(patch)).toEqual(['notifyParents']);
+  });
+
   it('removes a card to-do no card wants any more, and ignores plain to-dos', () => {
     const plain: TodoItem = {
       id: 'plain',
@@ -285,6 +309,7 @@ describe('reconcileCardTodos', () => {
       'completedBy',
       'completedAt',
       'someday',
+      'notifyParents',
     ]);
     for (const f of CARD_MANAGED_FIELDS) {
       for (const key of Object.keys(f.patch(d!))) expect(allowed.has(key)).toBe(true);
@@ -319,6 +344,12 @@ describe('cardRemindersKey', () => {
     expect(cardRemindersKey(want, [stored(want[0]!, { completed: true })])).not.toBe(key);
     expect(cardRemindersKey(want, [])).not.toBe(key);
     expect(cardRemindersKey(desired([trashHeldBy('sofia')]), existing)).not.toBe(key);
+  });
+
+  it('changes when only "Keep Parents Posted" changes, on either side', () => {
+    const on = desired([trashHeldBy('greg', { ...TRASH, notifyParents: true })]);
+    expect(cardRemindersKey(on, existing)).not.toBe(key);
+    expect(cardRemindersKey(want, [stored(want[0]!, { notifyParents: true })])).not.toBe(key);
   });
 
   it('ignores plain to-dos', () => {
@@ -356,6 +387,32 @@ describe('buildCardReminder', () => {
       NEXT_WED
     );
     expect(r).toEqual({ ...TRASH, say: 'Bins!', time: '19:00' });
+  });
+
+  it('keeps, sets and clears "Keep Parents Posted"', () => {
+    const on: CardReminder = { ...TRASH, notifyParents: true };
+    // Kept from prev when the input says nothing (a cadence or time edit).
+    expect(
+      buildCardReminder(on, { say: TRASH.say, rule: weekly([3]), time: '19:00' }, 'Trash', TODAY)
+    ).toMatchObject({ notifyParents: true, time: '19:00' });
+    // Set.
+    expect(
+      buildCardReminder(
+        TRASH,
+        { say: TRASH.say, rule: weekly([3]), time: TRASH.time, notifyParents: true },
+        'Trash',
+        TODAY
+      )
+    ).toEqual(on);
+    // Cleared: off is stored as absent, never as false.
+    const off = buildCardReminder(
+      on,
+      { say: TRASH.say, rule: weekly([3]), time: TRASH.time, notifyParents: false },
+      'Trash',
+      TODAY
+    );
+    expect(off).toEqual(TRASH);
+    expect(off).not.toHaveProperty('notifyParents');
   });
 
   it('a cadence change stores the given start date as the anchor (not today)', () => {

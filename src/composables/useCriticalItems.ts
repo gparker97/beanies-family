@@ -31,7 +31,9 @@ import { isTodoOverdue } from '@/utils/todo';
 import { isCardTodo } from '@/utils/todoRecurrence';
 import {
   classifyAudience,
+  classifyListAudience,
   classifyOwnerAudience,
+  classifyTodoAudience,
   isDutyDone,
   ownerItemSurfaces,
 } from '@/utils/audience';
@@ -319,19 +321,21 @@ export function useCriticalItems() {
     }
 
     // ── To-dos for the current member ─────────────────────────────────
-    // Visibility per `classifyAudience` above: assignees see their own,
-    // every adult sees child-only to-dos, everyone sees unassigned ones.
+    // Visibility per `classifyTodoAudience`: assignees see their own, every adult
+    // sees a child's one-off to-dos and a child's routine (repeating, incl. card
+    // to-dos) only once it is overdue or opted in (`notifyParents`); everyone sees
+    // unassigned ones.
     // #40: `manualActiveTodos` excludes Helpful Hints — a hint's nudge-date
     // dueDate is in the past for its whole lead window, so through this loop's
     // overdue/today/noDue tables it would read as "overdue". Hints have their
     // own loop below with a single fixed framing.
     for (const todo of todoStore.manualActiveTodos) {
-      const audience = classifyAudience(normalizeAssignees(todo), currentMember, getMemberById);
+      const isOverdue = isTodoOverdue(todo);
+      const audience = classifyTodoAudience(todo, currentMember, getMemberById, isOverdue);
       if (audience.kind === 'hidden') continue;
 
       const dueDate = todo.dueDate?.split('T')[0] ?? '';
       const hasDate = dueDate !== '';
-      const isOverdue = isTodoOverdue(todo);
       const isDueToday = dueDate === todayStr.value;
       // A to-do with a due date still in the future isn't on anyone's plate yet.
       if (hasDate && !isOverdue && !isDueToday) continue;
@@ -393,14 +397,19 @@ export function useCriticalItems() {
     // tile/store) and the single-owner audience classifier.
     if (isFlagEnabled('familyLists')) {
       for (const list of listStore.activeLists) {
-        const audience = classifyOwnerAudience(list.ownerId, currentMember, getMemberById);
+        const due = isListDue(list, todayStr.value); // 'overdue' | 'today' | 'noDue' | null
+        const audience = classifyListAudience(
+          list,
+          currentMember,
+          getMemberById,
+          due === 'overdue'
+        );
         // `ownerItemSurfaces`, not `!== 'hidden'` — the SAME predicate the bell
         // deriver and the OS scheduler use. `classifyOwnerAudience` maps an empty
         // or unresolvable `ownerId` to 'unassigned', so the looser test put a list
         // owned by nobody on every member's plate while producing no bell entry
         // and no reminder for anyone: three surfaces, two answers.
         if (!ownerItemSurfaces(audience)) continue;
-        const due = isListDue(list, todayStr.value); // 'overdue' | 'today' | 'noDue' | null
         if (due === null) continue; // future-dated, or a repeating list between resets
 
         const remaining = listProgress(list).open;

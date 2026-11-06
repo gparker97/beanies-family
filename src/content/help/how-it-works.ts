@@ -325,7 +325,7 @@ export const HOW_IT_WORKS_ARTICLES: HelpArticle[] = [
       {
         type: 'callout',
         content:
-          'The daily briefing is mostly personal \u2014 it shows the things <em>you</em> need to do today, and every family member sees their own when they sign in. Two kinds of item also surface for the grown-ups even when they aren\u2019t yours: a to-do or activity assigned <em>only to a child</em>, and a to-do <em>nobody</em>\u2019s been assigned to yet (more on both below). Family-wide schedules live in the <strong>Family Planner</strong> and <strong>To-Do</strong> pages.',
+          'The daily briefing is mostly personal \u2014 it shows the things <em>you</em> need to do today, and every family member sees their own when they sign in. Two kinds of item also surface for the grown-ups even when they aren\u2019t yours: a one-off to-do or activity assigned <em>only to a child</em> (a child\u2019s repeating routine joins them only once it\u2019s been missed, or when you ask), and a to-do <em>nobody</em>\u2019s been assigned to yet (more on both below). Family-wide schedules live in the <strong>Family Planner</strong> and <strong>To-Do</strong> pages.',
         title: 'Mostly yours \u2014 with a couple of family-wide exceptions',
         icon: '\u{1F464}',
       },
@@ -419,7 +419,7 @@ export const HOW_IT_WORKS_ARTICLES: HelpArticle[] = [
         type: 'list',
         content: '',
         items: [
-          '<strong>Assigned only to a child</strong> 📋 — You’ll see it framed by the child’s name: <em>"Emma: wear AM uniform for school photos today!"</em> The child sees it as her own to-do too. This way the parent who actually has to make it happen doesn’t miss it. Want just <em>one</em> parent on the hook? Add that parent as an assignee alongside the child — then only that parent (and the child) see it, not every grown-up.',
+          '<strong>Assigned only to a child</strong> 📋 — You’ll see it framed by the child’s name: <em>"Emma: wear AM uniform for school photos today!"</em> The child sees it as her own to-do too. This way the parent who actually has to make it happen doesn’t miss it. This is for one-off to-dos and lists. A child\u2019s <em>repeating</em> to-do (a daily chore) stays out of the grown-ups\u2019 briefing while the child is on track, and shows up only once its set time has passed and it\u2019s still unticked. A child\u2019s repeating list (a morning routine), or a repeating to-do with no set time, only shows for grown-ups when <strong>Keep Parents Posted</strong> is on. Turn that switch on for any routine you want to see every time, on the to-do, list or card reminder; only a grown-up can change it. The home-screen widget shows a child\u2019s routine only with the switch on too. Want just <em>one</em> parent on the hook? Add that parent as an assignee alongside the child — then only that parent (and the child) see it, not every grown-up.',
           '<strong>Assigned to no one</strong> 📋 — An unassigned to-do is treated as "whoever’s free", so it shows up for <em>everyone</em>: <em>"Buy milk (anyone can do this)"</em>. It stays in everyone’s briefing until someone ticks it off — so a loose task doesn’t get lost.',
         ],
       },

@@ -90,18 +90,6 @@ describe('TodoRemindersRoster', () => {
     expect(w.find('[data-group="m-sofia"]').text()).toMatch(/1 reminder\b/i);
   });
 
-  it("notes that adults see a child's reminders, only on the child's group", () => {
-    const w = mount(TodoRemindersRoster, {
-      props: { todos: [todo('plants', ['m-leo']), todo('trash', ['m-sofia'])] },
-    });
-    expect(w.find('[data-group="m-leo"] [data-testid="todo-reminders-adults-see"]').exists()).toBe(
-      true
-    );
-    expect(
-      w.find('[data-group="m-sofia"] [data-testid="todo-reminders-adults-see"]').exists()
-    ).toBe(false);
-  });
-
   it('a row shows the cadence with time and Next, ↻ for a plain one, the card emoji for a card one', async () => {
     cards.set('trash', {
       id: 'trash',

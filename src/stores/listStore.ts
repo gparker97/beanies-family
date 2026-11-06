@@ -26,6 +26,7 @@ import {
 import { useTranslationStore } from '@/stores/translationStore';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import { useFamilyStore } from '@/stores/familyStore';
+import { canSetNotifyParents } from '@/utils/audience';
 import { toISODateString } from '@/utils/date';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { reportError } from '@/utils/errorReporter';
@@ -1037,8 +1038,54 @@ export const useListStore = defineStore('lists', () => {
             cadence: undefined,
             lastResetDate: undefined,
             cycleCelebrated: undefined,
+            // `notifyParents` is deliberately KEPT (inert on a one-off list): clearing it here
+            // would let a child drop the parents' setting via one-off -> recurring. Its one
+            // write path is `setNotifyParents` (adults only).
           };
     return updateList(listId, patch);
+  }
+
+  /**
+   * "Keep Parents Posted" on a child's recurring list: parents see it every time, not only when
+   * missed (`utils/audience.ts`). Written as `true` or cleared with `undefined`, never `false`.
+   * The flag's ONE write path. Refuses (returns null, logs `refused`) a missing list, a one-off
+   * list and a non-adult viewer (`canSetNotifyParents`); only the last toasts, since it is the
+   * one the person can act on. A failed write is reported by `updateList`'s `wrapAsync`.
+   */
+  async function setNotifyParents(listId: string, on: boolean): Promise<FamilyList | null> {
+    const list = lists.value.find((l) => l.id === listId);
+    // A stale drawer (the list was deleted, or turned one-off on another device and the change
+    // just synced) or a child viewer: refuse, and say why in the firehose. Only the non-adult
+    // case is something the person can act on, so only it toasts.
+    const refused = !list
+      ? 'not-found'
+      : !isRecurring(list)
+        ? 'not-recurring'
+        : !canSetNotifyParents(useFamilyStore().currentMember)
+          ? 'not-adult'
+          : null;
+    if (refused) {
+      logEvent({
+        level: 'warn',
+        surface: 'recurrence',
+        message: 'refused',
+        context: { action: 'notify-parents', recur_surface: 'list', detail: refused },
+      });
+      if (refused === 'not-adult') {
+        showToast('info', useTranslationStore().t('recurrence.notifyParents.adultsOnly'));
+      }
+      return null;
+    }
+    const result = await updateList(listId, { notifyParents: on ? true : undefined });
+    if (result) {
+      logEvent({
+        level: 'info',
+        surface: 'recurrence',
+        message: 'notify_parents_set',
+        context: { recur_surface: 'list', action: on ? 'on' : 'off' },
+      });
+    }
+    return result;
   }
 
   /**
@@ -1320,6 +1367,7 @@ export const useListStore = defineStore('lists', () => {
     updateItemText,
     reorderItems,
     setLifecycle,
+    setNotifyParents,
     setAllItemsCompleted,
     clearLinksFor,
     linkListsToActivity,

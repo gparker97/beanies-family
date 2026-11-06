@@ -566,6 +566,52 @@ describe('buildReminderSchedule: a rolled repeating to-do (#123)', () => {
   });
 });
 
+describe("buildReminderSchedule: a child's routine on a parent's device (greg, 2026-11-06)", () => {
+  // ⚠️ The viewer must be an ADULT (`role: 'owner'`): the shared fixtures carry no role or
+  // ageGroup, so they classify as children and the gate would pass for the wrong reason.
+  const parent = { id: 'me', name: 'Greg', role: 'owner' } as FamilyMember;
+  const kid = { id: 'kid', name: 'Joey', isPet: false } as FamilyMember;
+  const resolve = (id: string) => (id === 'kid' ? kid : id === 'me' ? parent : undefined);
+  const routine = (over: Partial<TodoItem> = {}) =>
+    todo({
+      id: 't-kid' as UUID,
+      assigneeIds: ['kid'] as UUID[],
+      repeat: {
+        rule: { unit: 'week', interval: 1, weekdays: [6], end: { kind: 'never' } },
+        anchor: '2026-05-23',
+      },
+      repeatLog: [],
+      ...over,
+    });
+  const build = (todos: TodoItem[], viewer: FamilyMember = parent) =>
+    buildReminderSchedule(
+      input({ todos, currentMember: viewer, resolveMember: resolve }),
+      NOW,
+      PREFS
+    );
+
+  it('arms nothing for a child’s repeating to-do, and counts it as gated', () => {
+    const { reminders, gated } = build([routine()]);
+    expect(reminders).toHaveLength(0);
+    expect(gated).toBe(1);
+  });
+
+  it('arms it with notifyParents', () => {
+    const { reminders, gated } = build([routine({ notifyParents: true })]);
+    expect(reminders.map((r) => r.id)).toEqual([todoDueId('t-kid', '2026-05-23')]);
+    expect(gated).toBe(0);
+  });
+
+  it('a child’s one-off to-do still arms on the parent’s device', () => {
+    const { reminders } = build([routine({ repeat: undefined, repeatLog: undefined })]);
+    expect(reminders).toHaveLength(1);
+  });
+
+  it('the child’s own device still arms the routine', () => {
+    expect(build([routine()], kid).reminders).toHaveLength(1);
+  });
+});
+
 describe('buildReminderSchedule — resilience, cap, gating', () => {
   it('returns [] when the master toggle is off', () => {
     const { reminders } = buildReminderSchedule(

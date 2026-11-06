@@ -130,6 +130,16 @@ describe('buildCopySeeds', () => {
     expect(seeds[0].cadence).toBe(cadence);
   });
 
+  it('carries "Keep Parents Posted" to every copy, and nothing when it is off', () => {
+    const seeds = build(
+      source({ lifecycle: 'recurring', frequency: 'daily', notifyParents: true })
+    );
+    expect(seeds.map((x) => x.notifyParents)).toEqual([true, true]);
+    expect(build(source({ lifecycle: 'recurring', frequency: 'daily' }))[0].notifyParents).toBe(
+      undefined
+    );
+  });
+
   it('stamps lastResetDate only for a recurring source, so a copy does not reset today', () => {
     expect(build(source({ lifecycle: 'recurring', frequency: 'weekly' }))[0].lastResetDate).toBe(
       '2026-09-07'

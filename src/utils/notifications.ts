@@ -20,7 +20,12 @@ import type { AppNotification } from '@/types/notifications';
 import type { TranslateFn } from '@/utils/format';
 import { activityDisplayTitle } from '@/utils/occasions';
 import { normalizeAssignees } from '@/utils/assignees';
-import { classifyAudience, classifyOwnerAudience, ownerItemSurfaces } from '@/utils/audience';
+import {
+  classifyAudience,
+  classifyListAudience,
+  gateTodoAudience,
+  ownerItemSurfaces,
+} from '@/utils/audience';
 import { isFiled, isRecurring, listProgress } from '@/utils/listLifecycle';
 import { entityDeepLink } from '@/utils/entityDeepLink';
 import { CALENDAR_SYNC_OPEN } from '@/constants/settingsDeepLinks';
@@ -263,6 +268,7 @@ export function deriveNotifications(input: DeriveInput, now: Date): AppNotificat
               ? (localDateTime(todo.dueDate, todo.dueTime) ?? endOfLocalDay(dueDay))
               : endOfLocalDay(dueDay);
             const overdue = nowMs > dueMoment.getTime();
+            if (gateTodoAudience(audience, todo, overdue).kind === 'hidden') continue; // an on-track child routine
             const id = todoDueId(todo.id, todo.dueDate);
             const link = entityDeepLink('todo', todo.id);
             out.push({
@@ -299,7 +305,9 @@ export function deriveNotifications(input: DeriveInput, now: Date): AppNotificat
       // Every item ticked but not yet filed → nothing left to shop for. Same
       // `listProgress(...).open` the briefing and the OS builder read, so the three cannot disagree.
       if (listProgress(list).open === 0) continue;
-      const audience = classifyOwnerAudience(list.ownerId, currentMember, resolveMember);
+      // The routine gate is inert here (recurring lists are skipped above); called anyway so
+      // every list consumer goes through the one entry point.
+      const audience = classifyListAudience(list, currentMember, resolveMember, false);
       if (!ownerItemSurfaces(audience)) continue;
 
       const dueDay = localDateTime(list.dueDate);

@@ -34,6 +34,7 @@ import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
 import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import BeanieTimePicker from '@/components/ui/BeanieTimePicker.vue';
 import ToggleRow from '@/components/ui/ToggleRow.vue';
+import NotifyParentsToggle from '@/components/ui/NotifyParentsToggle.vue';
 import ConditionalSection from '@/components/ui/ConditionalSection.vue';
 import RecurrencePicker from '@/components/ui/RecurrencePicker.vue';
 import RepeatGlyph from '@/components/todo/RepeatGlyph.vue';
@@ -44,6 +45,9 @@ import { useFormValidation } from '@/composables/useFormValidation';
 import { useTodoCreate } from '@/composables/useTodoCreate';
 import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useToday } from '@/composables/useToday';
+import { useMemberInfo } from '@/composables/useMemberInfo';
+import { canSetNotifyParents, isChildOnly } from '@/utils/audience';
+import { useFamilyStore } from '@/stores/familyStore';
 import type { RecurrenceRule } from '@/types/models';
 
 const props = defineProps<{
@@ -59,6 +63,7 @@ const { t } = useTranslation();
 const { createTodoFrom } = useTodoCreate();
 const { isDesktop } = useBreakpoint();
 const { today } = useToday();
+const { getMemberById } = useMemberInfo();
 
 const title = ref('');
 const description = ref('');
@@ -67,6 +72,14 @@ const dueDate = ref('');
 const dueTime = ref('');
 const repeatOn = ref(false);
 const repeatRule = ref<RecurrenceRule | null>(null);
+const notifyParents = ref(false);
+// "Keep Parents Posted" only means something for a repeating, child-only to-do. One computed
+// gates both the row and what is saved, so a hidden toggle can never persist a stale flag.
+const familyStore = useFamilyStore();
+const childOnly = computed(() => isChildOnly(assigneeIds.value, getMemberById));
+const notifyParentsShown = computed(
+  () => repeatOn.value && childOnly.value && canSetNotifyParents(familyStore.currentMember)
+);
 const titleField = ref<InstanceType<typeof BaseInput> | null>(null);
 
 /** Bumped on every open, so a save from an earlier open never reports into this one. */
@@ -91,7 +104,10 @@ function onRepeatToggle(on: boolean): void {
   // A repeat starts from a date; with none yet, it starts today.
   if (on && !dueDate.value) dueDate.value = today.value;
   repeatOn.value = on;
-  if (!on) repeatRule.value = null;
+  if (!on) {
+    repeatRule.value = null;
+    notifyParents.value = false;
+  }
 }
 
 const { isSubmitting } = useFormModal(
@@ -115,6 +131,7 @@ function reset(): void {
   dueTime.value = '';
   repeatOn.value = false;
   repeatRule.value = null;
+  notifyParents.value = false;
   // Desktop only: on a phone the keyboard would cover the drawer as it slides in.
   if (isDesktop.value) void focusTitle();
 }
@@ -141,6 +158,7 @@ async function handleSave(): Promise<void> {
         dueTime: dueTime.value,
         assigneeIds: assigneeIds.value,
         ...(repeatOn.value && repeatRule.value ? { repeat: repeatRule.value } : {}),
+        ...(notifyParentsShown.value && notifyParents.value ? { notifyParents: true } : {}),
       },
       'TodoFormModal',
       'sidebar'
@@ -221,6 +239,11 @@ async function handleSave(): Promise<void> {
         default-cadence="weekly"
         :start-date="dueDate"
         :time="dueTime || undefined"
+      />
+      <NotifyParentsToggle
+        v-if="notifyParentsShown"
+        v-model="notifyParents"
+        testid="todo-notify-parents"
       />
     </ConditionalSection>
   </BeanieFormModal>

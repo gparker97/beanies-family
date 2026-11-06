@@ -275,6 +275,35 @@ describe('toCreateTodoInput', () => {
       expect(input).not.toHaveProperty('repeat');
       expect(input).not.toHaveProperty('repeatLog');
     });
+
+    it('writes notifyParents: true only alongside a started repeat', () => {
+      const on = toCreateTodoInput(
+        { title: 'Trash', dueDate: '2026-10-09', repeat: weeklyWed, notifyParents: true },
+        'm-1',
+        '2026-10-09'
+      );
+      expect(on.notifyParents).toBe(true);
+      expect(
+        toCreateTodoInput(
+          { title: 'Trash', dueDate: '2026-10-09', repeat: weeklyWed, notifyParents: false },
+          'm-1',
+          '2026-10-09'
+        )
+      ).not.toHaveProperty('notifyParents');
+      // No repeat (none given, or no due date to anchor it) → no flag.
+      for (const fields of [
+        { title: 'Trash', dueDate: '2026-10-09', notifyParents: true },
+        { title: 'Trash', repeat: weeklyWed, notifyParents: true },
+        {
+          title: 'Trash',
+          dueDate: '2026-10-09',
+          repeat: { ...weeklyWed, interval: 0 },
+          notifyParents: true,
+        },
+      ]) {
+        expect(toCreateTodoInput(fields, 'm-1', '2026-10-09')).not.toHaveProperty('notifyParents');
+      }
+    });
   });
 });
 

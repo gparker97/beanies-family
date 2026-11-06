@@ -1,7 +1,7 @@
 import { setActivePinia, createPinia, getActivePinia } from 'pinia';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { flushPromises } from '@vue/test-utils';
-import type { RecurrenceRule, TodoItem } from '@/types/models';
+import type { FamilyMember, RecurrenceRule, TodoItem } from '@/types/models';
 
 vi.mock('@/services/automerge/repositories/todoRepository', () => ({
   getAllTodos: vi.fn().mockResolvedValue([]),
@@ -66,6 +66,7 @@ vi.mock('@/composables/useMemberFiltered', () => ({
 }));
 
 import { useTodoStore } from '../todoStore';
+import { useFamilyStore } from '../familyStore';
 import * as todoRepo from '@/services/automerge/repositories/todoRepository';
 import * as todayModule from '@/composables/useToday';
 import { celebrate } from '@/composables/useCelebration';
@@ -878,13 +879,14 @@ describe('todoStore: repeating to-dos (#123)', () => {
     expect(todoRepo.updateTodo).not.toHaveBeenCalled();
   });
 
-  it('setRepeat(null) turns the repeat off and keeps the to-do on its date', async () => {
+  it('setRepeat(null) turns the repeat off, keeps notifyParents (inert) and keeps the to-do on its date', async () => {
     const store = useTodoStore();
-    store.todos = [repeatingTodo()];
+    store.todos = [repeatingTodo({ notifyParents: true })];
     echoUpdates(store);
 
     await store.setRepeat('r', null);
 
+    // The flag is NOT in the patch: only `setNotifyParents` (adults only) may change it.
     expect(todoRepo.updateTodo).toHaveBeenCalledWith('r', {
       repeat: undefined,
       repeatLog: undefined,
@@ -969,6 +971,126 @@ describe('todoStore: repeating to-dos (#123)', () => {
         recur_end: 'never',
       },
     ]);
+  });
+
+  it('createTodo with notifyParents emits one notify_parents_set and an unchanged repeat_set', async () => {
+    const store = useTodoStore();
+    vi.mocked(todoRepo.createTodo).mockResolvedValueOnce(repeatingTodo({ notifyParents: true }));
+    const {
+      id: _i,
+      createdAt: _c,
+      updatedAt: _u,
+      ...input
+    } = repeatingTodo({
+      notifyParents: true,
+    });
+
+    await store.createTodo(input);
+
+    expect(recurrenceEvents('notify_parents_set').map((e) => [e.level, e.context])).toEqual([
+      ['info', { recur_surface: 'todo', action: 'on' }],
+    ]);
+    expect(recurrenceEvents('repeat_set').map((e) => e.context)).toEqual([
+      {
+        recur_surface: 'todo',
+        action: 'create',
+        recur_unit: 'week',
+        recur_interval: 1,
+        recur_end: 'never',
+      },
+    ]);
+  });
+
+  it('createTodo without the flag emits no notify_parents_set', async () => {
+    const store = useTodoStore();
+    vi.mocked(todoRepo.createTodo).mockResolvedValueOnce(repeatingTodo());
+    const { id: _i, createdAt: _c, updatedAt: _u, ...input } = repeatingTodo();
+
+    await store.createTodo(input);
+
+    expect(recurrenceEvents('notify_parents_set')).toEqual([]);
+  });
+
+  /** Keep Parents Posted is adults-only: sign a member in for the `setNotifyParents` cases. */
+  function signInAs(over: Partial<FamilyMember>): void {
+    const familyStore = useFamilyStore();
+    const m = {
+      id: 'm-viewer',
+      name: 'Viewer',
+      email: 'viewer@example.invalid',
+      color: '#000',
+      requiresPassword: false,
+      createdAt: '2030-01-01T00:00:00.000Z',
+      updatedAt: '2030-01-01T00:00:00.000Z',
+      role: 'owner',
+      ageGroup: 'adult',
+      ...over,
+    } as FamilyMember;
+    familyStore.members.push(m);
+    familyStore.setCurrentMember(m.id);
+  }
+
+  it('setNotifyParents writes true when on and undefined (never false) when off, and logs', async () => {
+    const store = useTodoStore();
+    signInAs({});
+    store.todos = [repeatingTodo()];
+    echoUpdates(store);
+
+    await store.setNotifyParents('r', true);
+    await store.setNotifyParents('r', false);
+
+    expect(vi.mocked(todoRepo.updateTodo).mock.calls).toEqual([
+      ['r', { notifyParents: true }],
+      ['r', { notifyParents: undefined }],
+    ]);
+    expect(recurrenceEvents('notify_parents_set').map((e) => [e.level, e.context])).toEqual([
+      ['info', { recur_surface: 'todo', action: 'on' }],
+      ['info', { recur_surface: 'todo', action: 'off' }],
+    ]);
+  });
+
+  it('setNotifyParents does not log when the write fails', async () => {
+    const store = useTodoStore();
+    signInAs({});
+    store.todos = [repeatingTodo()];
+    vi.mocked(todoRepo.updateTodo).mockResolvedValueOnce(null as never);
+
+    expect(await store.setNotifyParents('r', true)).toBeNull();
+    expect(recurrenceEvents('notify_parents_set')).toEqual([]);
+  });
+
+  it('setNotifyParents is refused for a child viewer, with a toast and a refused event', async () => {
+    const store = useTodoStore();
+    signInAs({ id: 'm-kid', role: 'member', ageGroup: 'child' });
+    store.todos = [repeatingTodo()];
+
+    expect(await store.setNotifyParents('r', false)).toBeNull();
+    expect(vi.mocked(todoRepo.updateTodo)).not.toHaveBeenCalled();
+    expect(recurrenceEvents('refused').map((e) => e.context)).toEqual([
+      { action: 'notify-parents', detail: 'not-adult' },
+    ]);
+  });
+
+  it('setNotifyParents is refused for a card to-do, a non-repeating one and an unknown id', async () => {
+    const store = useTodoStore();
+    signInAs({});
+    store.todos = [
+      repeatingTodo({ id: 'card', cardId: 'c-1', cardPartKey: 'main' }),
+      todo({ id: 'plain', dueDate: '2026-10-14' }),
+    ];
+
+    expect(await store.setNotifyParents('card', true)).toBeNull();
+    expect(await store.setNotifyParents('plain', true)).toBeNull();
+    expect(await store.setNotifyParents('gone', true)).toBeNull();
+
+    expect(todoRepo.updateTodo).not.toHaveBeenCalled();
+    expect(recurrenceEvents('refused').map((e) => [e.level, e.context])).toEqual([
+      ['warn', { action: 'notify-parents', detail: 'card-made' }],
+      ['warn', { action: 'notify-parents', detail: 'not-repeating' }],
+      ['warn', { action: 'notify-parents', detail: 'not-found' }],
+    ]);
+    expect(showToastMock).toHaveBeenCalledTimes(3);
+    expect(recurrenceEvents('notify_parents_set')).toEqual([]);
   });
 
   it('createTodos({ ifAbsent }) passes it through and merges only the created to-dos', async () => {

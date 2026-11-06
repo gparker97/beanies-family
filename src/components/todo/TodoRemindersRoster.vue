@@ -17,7 +17,6 @@ import { useTranslation } from '@/composables/useTranslation';
 import { useRecurrenceLabel } from '@/composables/useRecurrenceLabel';
 import { useToday } from '@/composables/useToday';
 import { useTodoCardLink } from '@/composables/useTodoCardLink';
-import { isAdultMember } from '@/composables/useMemberInfo';
 import { useFamilyStore } from '@/stores/familyStore';
 import { normalizeAssignees } from '@/utils/assignees';
 import { dueDayLabel } from '@/utils/todo';
@@ -99,13 +98,6 @@ function cardEmoji(todo: TodoItem): string | null {
       :caption="caption(group.todos.length)"
       :data-group="group.key"
     >
-      <p
-        v-if="group.member && !isAdultMember(group.member)"
-        class="dark:text-ink-faint -mt-1.5 text-xs text-[var(--color-text-muted)]"
-        data-testid="todo-reminders-adults-see"
-      >
-        {{ t('whoOwnsWhat.reminder.adultsSee') }}
-      </p>
       <ul>
         <li
           v-for="todo in group.todos"

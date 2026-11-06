@@ -352,6 +352,25 @@ describe('CardEditDrawer reminders (#123)', () => {
   const fields = (w: Awaited<ReturnType<typeof openEdit>>) =>
     w.findAllComponents(ReminderFieldStub);
 
+  it('passes childHolder for a child holder and false for an adult or a pet', async () => {
+    family.members = [
+      ...family.members,
+      { id: 'leo', name: 'Leo', role: 'member', ageGroup: 'child' },
+      { id: 'rex', name: 'Rex', role: 'member', ageGroup: 'child', isPet: true },
+    ] as never;
+    const childHolder = async (holderId: string) => {
+      withCard({
+        ...LAUNDRY_REMINDING,
+        parts: [{ key: 'main', holderId, reminder: REMINDER }],
+      });
+      return fields(await openEdit('laundry'))[0]!.props('childHolder');
+    };
+    expect(await childHolder('leo')).toBe(true);
+    expect(await childHolder('greg')).toBe(false);
+    expect(await childHolder('rex')).toBe(false);
+    family.members = family.members.filter((m) => m.id !== 'leo' && m.id !== 'rex');
+  });
+
   it('a new card has no Reminder field', async () => {
     const w = await openEdit(null);
     expect(fields(w)).toHaveLength(0);
@@ -672,7 +691,7 @@ describe('CardViewDrawer', () => {
       expect(stub.text()).not.toContain('whoOwnsWhat.reminder.partNone');
       const field = w.find('[data-testid="card-view-reminder"]');
       expect(field.text()).toContain('whoOwnsWhat.reminder.goesOn');
-      expect(field.text()).not.toContain('whoOwnsWhat.reminder.adultsSee');
+      expect(field.find('[data-testid="card-view-notify-parents"]').exists()).toBe(false);
       expect(w.findComponent(LinkedTodoStub).props('todoId')).toBe('card-laundry-main');
     });
 
@@ -683,7 +702,7 @@ describe('CardViewDrawer', () => {
       expect(w.emitted('close')).toHaveLength(1);
     });
 
-    it('a child holder: adults see it too', () => {
+    it('a child holder: a read-only Keep Parents Posted hint, off by default and on when set', () => {
       family.members = [
         ...family.members,
         { id: 'leo', name: 'Leo', role: 'member', ageGroup: 'child' },
@@ -692,8 +711,22 @@ describe('CardViewDrawer', () => {
         ...LAUNDRY_REMINDING,
         parts: [{ key: 'main', holderId: 'leo', reminder: REMINDER }],
       });
-      const w = mountView(false);
-      expect(w.find('[data-testid="card-view-reminder-adults"]').exists()).toBe(true);
+      const hint = (w: ReturnType<typeof mountView>) =>
+        w.find('[data-testid="card-view-notify-parents"]');
+      expect(hint(mountView(false)).text()).toBe('recurrence.notifyParents.hintOff');
+
+      withCard({
+        ...LAUNDRY_REMINDING,
+        parts: [{ key: 'main', holderId: 'leo', reminder: { ...REMINDER, notifyParents: true } }],
+      });
+      expect(hint(mountView(false)).text()).toBe('recurrence.notifyParents.hintOn');
+    });
+
+    it('an adult holder has no Keep Parents Posted hint', () => {
+      withCard(LAUNDRY_REMINDING);
+      expect(mountView(false).find('[data-testid="card-view-notify-parents"]').exists()).toBe(
+        false
+      );
     });
 
     it('a split card: a stub line per held part, and each split row says its reminder', () => {

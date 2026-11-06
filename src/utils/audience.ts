@@ -15,9 +15,23 @@
  *     items land, all degrading gracefully.
  *   • Anything else                              → 'hidden' for this viewer.
  * Pets never get a briefing.
+ *
+ * The routine rule (greg, 2026-11-06; partially reverses #123's "adults see it too"):
+ *   • A child's ROUTINE (a repeating to-do, which includes every card to-do, or a
+ *     recurring list) is 'hidden' for adults while the child is on track. It turns
+ *     back into 'forChild' once it is missed (the caller's own overdue predicate,
+ *     passed in as `missed`) or when the item carries `notifyParents: true`.
+ *   • One-offs, the child's own view, siblings and unassigned items are untouched.
+ *   Consumers apply it through `classifyTodoAudience` / `gateTodoAudience` /
+ *   `classifyListAudience`; the gate itself stays private so no caller can hand-roll
+ *   "is this a routine" (the two encodings are `isRepeating` and `isRecurring`).
+ *   `isChildOnly` asks the same "child-only" question viewer-free, for the toggle UI.
  */
 import { isAdultMember } from '@/composables/useMemberInfo';
-import type { DutyCompletion, FamilyMember } from '@/types/models';
+import { normalizeAssignees } from '@/utils/assignees';
+import { isRecurring } from '@/utils/listLifecycle';
+import { isRepeating } from '@/utils/todoRecurrence';
+import type { DutyCompletion, FamilyList, FamilyMember, TodoItem } from '@/types/models';
 
 export type BriefingAudience =
   | { kind: 'assignee' }
@@ -30,21 +44,114 @@ export function isDutyDone(completions: DutyCompletion[] | undefined, date: stri
   return completions?.some((c) => c.date === date) ?? false;
 }
 
+type Resolve = (id: string) => FamilyMember | undefined;
+
+/** The ids that still resolve to a member (stale ids dropped). */
+function resolveKnown(ids: readonly string[], resolveMember: Resolve): FamilyMember[] {
+  return ids.map(resolveMember).filter((m): m is FamilyMember => m !== undefined);
+}
+
+/** No adult among `known`, at least one non-pet: the shape `classifyAudience` calls `forChild`. */
+function childrenAmong(known: readonly FamilyMember[]): FamilyMember[] {
+  return known.some(isAdultMember) ? [] : known.filter((m) => !m.isPet);
+}
+
 export function classifyAudience(
   assigneeIds: string[],
   viewer: FamilyMember,
-  resolveMember: (id: string) => FamilyMember | undefined
+  resolveMember: Resolve
 ): BriefingAudience {
-  const known = assigneeIds.map(resolveMember).filter((m): m is FamilyMember => m !== undefined);
+  const known = resolveKnown(assigneeIds, resolveMember);
   if (known.some((m) => m.id === viewer.id)) return { kind: 'assignee' };
   if (known.some(isAdultMember)) return { kind: 'hidden' }; // a parent owns it → only assignees see it
-  const kids = known.filter((m) => !m.isPet); // already non-adult — any adult would have returned above
+  const kids = childrenAmong(known); // already non-adult — any adult would have returned above
   if (kids.length > 0) {
     return isAdultMember(viewer)
       ? { kind: 'forChild', childNames: kids.map((m) => m.name) }
       : { kind: 'hidden' }; // other children don't get this kid's item
   }
   return viewer.isPet ? { kind: 'hidden' } : { kind: 'unassigned' }; // none / all-stale / pet-only
+}
+
+/**
+ * Who may change "Keep Parents Posted": a grown-up only. It is the parents' oversight setting,
+ * so a child with edit rights must not be able to switch it off (code review, 2026-11-06).
+ * The ONE rule for both stores' refusal and the toggles' visibility.
+ */
+export function canSetNotifyParents(viewer: FamilyMember | null | undefined): boolean {
+  return !!viewer && isAdultMember(viewer);
+}
+
+/**
+ * Does a toggle about parents apply to this item? The same "child-only" rule as
+ * `classifyAudience`'s `forChild` branch, asked without a viewer (shared helpers, so the two
+ * cannot drift; locked by an equivalence test).
+ */
+export function isChildOnly(ids: readonly string[], resolveMember: Resolve): boolean {
+  return childrenAmong(resolveKnown(ids, resolveMember)).length > 0;
+}
+
+interface RoutineFacts {
+  /** A repeating to-do or a recurring list. */
+  routine: boolean;
+  /** Already overdue by the caller's own predicate. */
+  missed: boolean;
+  /** The item's `notifyParents` flag (strictly `true`). */
+  notifyParents: boolean;
+}
+
+/**
+ * PRIVATE. Parents follow a child's ROUTINE only once it is missed, or when the item asks them to
+ * (`notifyParents`). One-offs, the child's own view, siblings and unassigned items are untouched.
+ * greg, 2026-11-06. Partially reverses #123's "adults see it too".
+ */
+function gateRoutine(audience: BriefingAudience, f: RoutineFacts): BriefingAudience {
+  if (audience.kind !== 'forChild' || !f.routine || f.missed || f.notifyParents) return audience;
+  return { kind: 'hidden' };
+}
+
+type RoutineTodo = Pick<TodoItem, 'repeat' | 'notifyParents'>;
+type RoutineList = Pick<FamilyList, 'lifecycle' | 'notifyParents'>;
+
+/** The routine gate over an audience the caller already classified (one resolve per to-do). */
+export function gateTodoAudience(
+  audience: BriefingAudience,
+  todo: RoutineTodo,
+  missed: boolean
+): BriefingAudience {
+  return gateRoutine(audience, {
+    routine: isRepeating(todo),
+    missed,
+    notifyParents: todo.notifyParents === true,
+  });
+}
+
+/** `classifyAudience` for a to-do, with the routine gate applied. */
+export function classifyTodoAudience(
+  todo: RoutineTodo & Pick<TodoItem, 'assigneeIds' | 'assigneeId'>,
+  viewer: FamilyMember,
+  resolveMember: Resolve,
+  missed: boolean
+): BriefingAudience {
+  return gateTodoAudience(
+    classifyAudience(normalizeAssignees(todo), viewer, resolveMember),
+    todo,
+    missed
+  );
+}
+
+/** `classifyOwnerAudience` for a Beanie List, with the routine gate applied. */
+export function classifyListAudience(
+  list: RoutineList & Pick<FamilyList, 'ownerId'>,
+  viewer: FamilyMember,
+  resolveMember: Resolve,
+  missed: boolean
+): BriefingAudience {
+  return gateRoutine(classifyOwnerAudience(list.ownerId, viewer, resolveMember), {
+    routine: isRecurring(list),
+    missed,
+    notifyParents: list.notifyParents === true,
+  });
 }
 
 /**
@@ -81,7 +188,7 @@ export function ownerItemSurfaces(audience: BriefingAudience): boolean {
 export function classifyOwnerAudience(
   ownerId: string | null | undefined,
   viewer: FamilyMember,
-  resolveMember: (id: string) => FamilyMember | undefined
+  resolveMember: Resolve
 ): BriefingAudience {
   // A single owner is just an assignee list of length 0 or 1 — delegate to the
   // one classifier so the rule can't diverge (this file's own header forbids

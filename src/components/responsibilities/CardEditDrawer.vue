@@ -34,13 +34,14 @@ import CardReminderField from '@/components/responsibilities/CardReminderField.v
 import { useTranslation } from '@/composables/useTranslation';
 import { useFormModal } from '@/composables/useFormModal';
 import { useFormValidation } from '@/composables/useFormValidation';
-import { isAdultMember, useMemberInfo } from '@/composables/useMemberInfo';
+import { useMemberInfo } from '@/composables/useMemberInfo';
 import { useResponsibilityCardLabel } from '@/composables/useResponsibilityCardLabel';
 import { showToast } from '@/composables/useToast';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useResponsibilityStore } from '@/stores/responsibilityStore';
 import { MAIN_PART_KEY, type ResolvedCard } from '@/utils/responsibilityDeck';
 import { fillTemplate } from '@/utils/fillTemplate';
+import { isChildOnly } from '@/utils/audience';
 import { draftRemindersForMode, type CardDraft } from '@/utils/responsibilityOps';
 import type { CardPart, CardReminder, ListCategory } from '@/types/models';
 import type { UIStringKey } from '@/services/translation/uiStrings';
@@ -191,7 +192,10 @@ const reminderFallbackSay = computed(() => {
 /** Who a part's reminder goes to today, for the control's copy. */
 function reminderHolder(part: CardPart): { name: string | null; child: boolean } {
   const member = getMemberById(part.holderId);
-  return { name: member ? member.name : null, child: !!member && !isAdultMember(member) };
+  return {
+    name: member ? member.name : null,
+    child: isChildOnly(part.holderId ? [part.holderId] : [], getMemberById),
+  };
 }
 
 function setReminder(key: string, value: CardReminder | null): void {

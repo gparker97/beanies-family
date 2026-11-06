@@ -797,6 +797,13 @@ export interface TodoItem {
   /** Present only on a repeating to-do: one rolling record whose `dueDate` follows the rule. */
   repeat?: TodoRepeat;
   /**
+   * Repeating to-dos only: parents see this child's routine every time, not only when missed.
+   * Absent = off. Inert (kept) when the repeat is turned off; written only by
+   * `todoStore.setNotifyParents` (adults only). On a card to-do it mirrors
+   * `CardReminder.notifyParents`.
+   */
+  notifyParents?: boolean;
+  /**
    * A repeating to-do's handled occurrences: the newest `REPEAT_LOG_KEEP`
    * (`utils/todoRecurrence`), keyed by `date`. "Missed" is derived, never stored. Seeded as
    * `[]` whenever a series starts, so a concurrent first append merges.
@@ -989,6 +996,11 @@ export interface CardReminder {
   time?: string;
   /** YYYY-MM-DD: the picker's start date when the cadence was set. Fixed, never moved by a roll. */
   anchor: ISODateString;
+  /**
+   * Parents see the holder's reminder every day, not only when missed. Propagated to the card
+   * to-do by `CARD_MANAGED_FIELDS`.
+   */
+  notifyParents?: boolean;
 }
 
 /**
@@ -1074,6 +1086,11 @@ export interface FamilyList {
    * `Cadence`, not a `RecurrenceRule`: a reset genuinely has no end.
    */
   cadence?: Cadence;
+  /**
+   * Parents see this child's routine every time, not only when missed. Acts on recurring lists only
+   * (kept, inert, on a one-off); written only by `listStore.setNotifyParents` (adults only).
+   */
+  notifyParents?: boolean;
   lastResetDate?: ISODateString; // recurring bookkeeping (last auto-reset day)
   cycleCelebrated?: boolean; // guard: celebrate once per cycle (recurring)
   linkedActivityId?: UUID; // optional attach to an activity

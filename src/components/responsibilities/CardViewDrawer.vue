@@ -34,6 +34,7 @@ import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import ModalSecondaryButton from '@/components/ui/ModalSecondaryButton.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
+import NotifyParentsToggle from '@/components/ui/NotifyParentsToggle.vue';
 import MemberChip from '@/components/ui/MemberChip.vue';
 import CardBack from '@/components/responsibilities/CardBack.vue';
 import DealPileStage from '@/components/responsibilities/DealPileStage.vue';
@@ -41,8 +42,9 @@ import LinkedTodoRow from '@/components/todo/LinkedTodoRow.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useResponsibilityCardLabel } from '@/composables/useResponsibilityCardLabel';
 import { useRecurrenceLabel } from '@/composables/useRecurrenceLabel';
-import { isAdultMember, useMemberInfo } from '@/composables/useMemberInfo';
+import { useMemberInfo } from '@/composables/useMemberInfo';
 import { formatNookDate, formatTime12 } from '@/utils/date';
+import { isChildOnly } from '@/utils/audience';
 import { cadenceToRule } from '@/services/recurrence/cadence';
 import { cardTodoId } from '@/utils/cardReminders';
 import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
@@ -184,7 +186,8 @@ const singleReminder = computed(() => {
     reminder: r ?? null,
     summary: r ? reminderSummary(r) : '',
     hint,
-    adultsSee: !!r && !!holder && !isAdultMember(holder),
+    childOnly: !!r && isChildOnly(holder ? [holder.id] : [], getMemberById),
+    notifyParents: r?.notifyParents === true,
     todoId: cardTodoId(c.id, part.key),
   };
 });
@@ -438,13 +441,12 @@ const { onDelete } = useCardDrawerEnd({
               >
                 {{ singleReminder.hint }}
               </p>
-              <p
-                v-if="singleReminder.adultsSee"
-                class="dark:text-ink-faint text-xs text-[var(--color-text-muted)]"
-                data-testid="card-view-reminder-adults"
-              >
-                {{ t('whoOwnsWhat.reminder.adultsSee') }}
-              </p>
+              <NotifyParentsToggle
+                v-if="singleReminder.childOnly"
+                readonly
+                :model-value="singleReminder.notifyParents"
+                testid="card-view-notify-parents"
+              />
             </div>
           </div>
           <LinkedTodoRow :todo-id="singleReminder.todoId" @open="emit('close')" />

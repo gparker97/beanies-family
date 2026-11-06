@@ -18,6 +18,7 @@
  */
 import { computed, ref, watch } from 'vue';
 import ToggleRow from '@/components/ui/ToggleRow.vue';
+import NotifyParentsToggle from '@/components/ui/NotifyParentsToggle.vue';
 import ConditionalSection from '@/components/ui/ConditionalSection.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
@@ -39,7 +40,7 @@ const props = withDefaults(
     holderName: string | null;
     /** The card's name: the What to Say placeholder, and what a blank saves. */
     cardName: string;
-    /** The holder is a child (adults see the to-do too). */
+    /** The holder is a child, so "Keep Parents Posted" applies to this reminder. */
     childHolder: boolean;
     /** Set on a split card's part ("for Leo", "upstairs"): the per-part look. */
     partLabel?: string;
@@ -107,14 +108,19 @@ const hint = computed(() => {
   return fillTemplate(t(key), { name: props.holderName });
 });
 
-function emitWith(next: { rule?: RecurrenceRule; time?: string }): void {
+function emitWith(next: { rule?: RecurrenceRule; time?: string; notifyParents?: boolean }): void {
   const r = next.rule ?? rule.value;
   if (!r) return;
   emit(
     'update:modelValue',
     buildCardReminder(
       props.modelValue,
-      { say: say.value, rule: r, time: next.time ?? time.value },
+      {
+        say: say.value,
+        rule: r,
+        time: next.time ?? time.value,
+        notifyParents: next.notifyParents,
+      },
       props.cardName,
       startYmd.value
     )
@@ -158,13 +164,6 @@ function onTime(value: string): void {
       testid="card-reminder-toggle"
       @update:model-value="onToggle"
     >
-      <p
-        v-if="isOn && childHolder"
-        class="dark:text-ink-faint text-xs text-[var(--color-text-muted)]"
-        data-testid="card-reminder-adults"
-      >
-        {{ t('whoOwnsWhat.reminder.adultsSee') }}
-      </p>
       <div
         v-if="modelValue && !expanded"
         class="mt-1 flex min-w-0 flex-wrap items-baseline gap-x-2"
@@ -222,6 +221,12 @@ function onTime(value: string): void {
         <FormFieldGroup :label="t('whoOwnsWhat.reminder.at')">
           <BeanieTimePicker :model-value="time" clearable @update:model-value="onTime" />
         </FormFieldGroup>
+        <NotifyParentsToggle
+          v-if="childHolder && rule"
+          :model-value="modelValue?.notifyParents === true"
+          testid="card-reminder-notify-parents"
+          @update:model-value="(on) => emitWith({ notifyParents: on })"
+        />
       </div>
     </ConditionalSection>
   </div>

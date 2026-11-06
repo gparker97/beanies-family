@@ -3224,7 +3224,6 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'todo.linkedCard.heldBy': '由{name}负责',
   'todo.linkedCard.madeBy': '由“{card}”卡片创建',
   'todo.linkedCard.open': '打开卡片',
-  'whoOwnsWhat.reminder.adultsSee': '大人们也能看到。',
   'whoOwnsWhat.reminder.field': '提醒',
   'whoOwnsWhat.reminder.toggle': '提醒负责人',
   'whoOwnsWhat.reminder.togglePart': '提醒{name}',
@@ -4323,6 +4322,11 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'recurrence.desc.untilDate': '至 {date}',
   'recurrence.desc.timesN': '共 {n} 次',
   'recurrence.desc.atTime': '{cadence} {time}',
+  'recurrence.notifyParents.title': '让家长知晓',
+  'recurrence.notifyParents.hintOff':
+    '已关闭。只有设定了时间、过了时间还没完成，大人才会看到这项日常。',
+  'recurrence.notifyParents.hintOn': '已打开。大人每次都会在简报和提醒里看到这项日常。',
+  'recurrence.notifyParents.adultsOnly': '只有大人才能更改“让家长知晓”。',
 
   // Planner — Fee schedule labels
   'planner.fee.none': '无费用',

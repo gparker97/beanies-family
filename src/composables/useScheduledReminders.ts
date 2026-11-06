@@ -52,12 +52,11 @@ import { activityReminderId, listDueId, todoDueId, travelReminderId } from '@/ut
 import { dedupeHintsByKey } from '@/utils/helpfulHints';
 import { entityDeepLink, type DeepLink } from '@/utils/entityDeepLink';
 import {
-  classifyAudience,
-  classifyOwnerAudience,
+  classifyListAudience,
+  classifyTodoAudience,
   isDutyDone,
   ownerItemSurfaces,
 } from '@/utils/audience';
-import { normalizeAssignees } from '@/utils/assignees';
 import { resolveSegmentTravellers } from '@/utils/segmentTravellers';
 import { isFiled, isRecurring, listProgress } from '@/utils/listLifecycle';
 import { isFlagEnabled } from '@/config/flags';
@@ -288,13 +287,17 @@ export function buildActivityReminders(
 /**
  * Timed-to-do reminders — active, dated todos, device lead.
  *
- * The `classifyAudience` gate is NOT optional: `input.todos` is the whole
+ * The `classifyTodoAudience` gate is NOT optional: `input.todos` is the whole
  * family's unfiltered active list, so without it a to-do another adult assigned
  * privately to themselves is pushed to every family member's lock screen —
- * content the app deliberately hides in-app. This is the fourth caller of that
- * rule (`utils/notifications.ts:173`, `useCriticalItems.ts:254`,
- * `reminderSchedule.ts` via `activityReminderContext`, and here); if you add a
- * fifth surface, call the shared classifier rather than re-deriving it.
+ * content the app deliberately hides in-app. It also applies the routine rule: a
+ * child's repeating to-do (incl. a card reminder) arms nothing on a parent's
+ * device unless it carries `notifyParents` (`missed` is always false here: this
+ * builder only arms future fire times). Callers of the same rule:
+ * `utils/notifications.ts` (`deriveNotifications`), `useCriticalItems.ts`,
+ * `utils/widgetSnapshot.ts`, `reminderSchedule.ts` via `activityReminderContext`,
+ * and here; if you add another surface, call the shared classifier rather than
+ * re-deriving it.
  */
 export function buildTodoReminders(
   input: ReminderInput,
@@ -308,11 +311,7 @@ export function buildTodoReminders(
   for (const todo of input.todos) {
     try {
       if (todo.completed || !todo.dueDate) continue;
-      const audience = classifyAudience(
-        normalizeAssignees(todo),
-        input.currentMember,
-        input.resolveMember
-      );
+      const audience = classifyTodoAudience(todo, input.currentMember, input.resolveMember, false);
       if (audience.kind === 'hidden') {
         gated++;
         continue; // someone else's — never surface it
@@ -434,7 +433,7 @@ export function buildTravelReminders(
  * also what lets the body read "Due today" unconditionally: `listFireTime` can
  * only ever return a moment on the due day itself.
  *
- * `classifyOwnerAudience` is NOT optional, for exactly the reason spelled out on
+ * `classifyListAudience` is NOT optional, for exactly the reason spelled out on
  * `buildTodoReminders`: `input.lists` is the whole family's corpus, so without it
  * a list one parent owns is pushed to every family member's lock screen.
  */
@@ -461,11 +460,9 @@ export function buildListReminders(
       // `ownerId` degrades to 'unassigned' and would arm every phone in the house.
       // `deleteMember` does not cascade to lists, so that is permanent stored
       // state, not a transient race.
-      const audience = classifyOwnerAudience(
-        list.ownerId,
-        input.currentMember,
-        input.resolveMember
-      );
+      // The routine gate is inert here (recurring lists are skipped above); called anyway so
+      // every list consumer goes through the one entry point.
+      const audience = classifyListAudience(list, input.currentMember, input.resolveMember, false);
       if (!ownerItemSurfaces(audience)) {
         gated++;
         continue; // not this viewer's to act on — never surface it

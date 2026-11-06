@@ -224,6 +224,50 @@ describe('deriveNotifications — todo-due', () => {
   });
 });
 
+// greg, 2026-11-06: a child's routine reaches a parent's bell only once it is missed, or when
+// the to-do asks to keep parents posted.
+describe("deriveNotifications — a child's repeating to-do (the routine gate)", () => {
+  const routine = (o: Partial<TodoItem> = {}) =>
+    todo({
+      assigneeIds: ['c'],
+      dueDate: '2026-05-27',
+      dueTime: '09:20', // trigger 08:50 is active at 09:00; due moment not yet passed
+      repeat: { rule: { unit: 'day', interval: 1, end: { kind: 'never' } }, anchor: '2026-05-01' },
+      repeatLog: [],
+      ...o,
+    });
+  const id = todoDueId('t1', '2026-05-27');
+
+  it('is absent for the adult before its due time', () => {
+    expect(byId(derive({ todos: [routine()] }), id)).toBeUndefined();
+  });
+
+  it('is present, overdue and framed by the child, once its due time has passed', () => {
+    const n = byId(derive({ todos: [routine()] }, new Date(2026, 4, 27, 9, 30, 0, 0)), id);
+    expect(n).toBeDefined();
+    expect(n?.overdue).toBe(true);
+    expect(n?.subtitle).toBe('C');
+  });
+
+  it('is present before its due time with notifyParents', () => {
+    const n = byId(derive({ todos: [routine({ notifyParents: true })] }), id);
+    expect(n).toBeDefined();
+    expect(n?.overdue).toBe(false);
+    expect(n?.subtitle).toBe('C');
+  });
+
+  it("the child's own todo-due and todo-assigned are unaffected", () => {
+    const out = derive({ todos: [routine()], currentMember: child });
+    expect(byId(out, id)).toBeDefined();
+    expect(byId(out, todoAssignedId('t1'))).toBeDefined(); // made by 'v', assigned to 'c'
+  });
+
+  it('a one-off child to-do still reaches the adult before its due time', () => {
+    const n = byId(derive({ todos: [routine({ repeat: undefined, repeatLog: undefined })] }), id);
+    expect(n).toBeDefined();
+  });
+});
+
 describe('deriveNotifications — todo-assigned', () => {
   it('fires when someone else assigned it to me (no date)', () => {
     const out = derive({ todos: [todo({ assigneeIds: ['v'], createdBy: 'o' })] });

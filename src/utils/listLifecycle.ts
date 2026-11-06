@@ -16,7 +16,7 @@ import { firstDueOnOrAfter, isResetDue } from '@/services/recurrence/recurrenceE
 import { addDaysYmd } from '@/utils/date';
 
 /** A recurring (schedule-driven, auto-resetting) list. */
-export function isRecurring(list: FamilyList): boolean {
+export function isRecurring(list: Pick<FamilyList, 'lifecycle'>): boolean {
   return list.lifecycle === 'recurring';
 }
 

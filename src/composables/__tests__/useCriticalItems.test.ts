@@ -959,17 +959,42 @@ describe('useCriticalItems', () => {
       );
     });
 
-    it("an adult sees a child's reminder framed by the child's name; another child does not", () => {
+    // greg, 2026-11-06: a child's routine stays off a parent's briefing until it is missed,
+    // unless the reminder asks to keep parents posted. Partially reverses #123's "adults see it too".
+    it("an adult sees a child's reminder only once its time has passed; another child never", () => {
       const childTodo = cardTodo({ assigneeIds: ['child-1'], title: 'Water the plants' });
-      familyStore.setCurrentMember('parent-2');
       todoStore.todos.push(childTodo);
+
+      // 08:00, on track: not on the parent's plate, but on the child's.
+      familyStore.setCurrentMember('parent-2');
+      expect(useCriticalItems().criticalItems.value).toEqual([]);
+      familyStore.setCurrentMember('child-1');
+      expect(useCriticalItems().criticalItems.value).toHaveLength(1);
+      familyStore.setCurrentMember('child-2');
+      expect(useCriticalItems().criticalItems.value).toEqual([]);
+
+      // 20:30, missed: the parent sees the same reminder line, with the bell.
+      vi.setSystemTime(new Date(TODAY + 'T20:30:00'));
+      familyStore.setCurrentMember('parent-2');
       const items = useCriticalItems().criticalItems.value;
       expect(items).toHaveLength(1);
       expect(items[0]!.message).toMatch(/^reminder for Emma: water the plants at 8pm!$/i);
       expect(items[0]!.icon).toBe('🔔');
-
+      familyStore.setCurrentMember('child-1');
+      expect(useCriticalItems().criticalItems.value).toHaveLength(1);
       familyStore.setCurrentMember('child-2');
-      expect(useCriticalItems().criticalItems.value).toHaveLength(0);
+      expect(useCriticalItems().criticalItems.value).toEqual([]);
+    });
+
+    it("notifyParents puts a child's reminder on an adult's plate while still on track", () => {
+      familyStore.setCurrentMember('parent-2');
+      todoStore.todos.push(
+        cardTodo({ assigneeIds: ['child-1'], title: 'Water the plants', notifyParents: true })
+      );
+      const items = useCriticalItems().criticalItems.value;
+      expect(items).toHaveLength(1);
+      expect(items[0]!.message).toMatch(/^reminder for Emma: water the plants at 8pm!$/i);
+      expect(items[0]!.icon).toBe('🔔');
     });
 
     it('not on its day, or a plain repeating to-do: the generic rows are unchanged', () => {
@@ -1519,12 +1544,23 @@ describe('useCriticalItems', () => {
       expect(useCriticalItems().criticalItems.value).toEqual([]);
     });
 
-    it('frames a child-owned list by the child for a grown-up', () => {
+    // greg, 2026-11-06: a child's recurring list is a routine; it never reads as overdue, so
+    // a grown-up sees it only when the list asks to keep parents posted.
+    it("keeps a child-owned list off a grown-up's plate unless notifyParents is on", () => {
       familyStore.setCurrentMember('parent-1');
       useListStore().lists = [repeating({ ownerId: 'child-1' })];
+      expect(useCriticalItems().criticalItems.value).toEqual([]);
+
+      useListStore().lists = [repeating({ ownerId: 'child-1', notifyParents: true })];
       const { criticalItems } = useCriticalItems();
       expect(criticalItems.value).toHaveLength(1);
       expect(criticalItems.value[0]!.message).toBe('Emma’s list “Morning routine” is due today');
+    });
+
+    it('a child still sees their own recurring list', () => {
+      familyStore.setCurrentMember('child-1');
+      useListStore().lists = [repeating({ ownerId: 'child-1' })];
+      expect(useCriticalItems().criticalItems.value).toHaveLength(1);
     });
   });
 });

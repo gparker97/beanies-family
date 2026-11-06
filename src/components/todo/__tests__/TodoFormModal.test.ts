@@ -8,6 +8,8 @@
  *   - the time field only exists alongside a date, and clearing the date clears the time,
  *   - a double tap while saving writes once,
  *   - a save still in flight from an earlier open never reports into (or locks) a new one,
+ *   - "Keep Parents Posted": offered only for a repeating, child-only to-do, cleared when the
+ *     repeat turns off, and `notifyParents: true` reaches the created input,
  *   - the Repeat switch (#123): its copy swaps when on, it seeds a date when there is none,
  *     clearing the date turns it off, a reopen resets it, and only an "on" switch sends a rule.
  */
@@ -30,6 +32,27 @@ vi.mock('@/composables/useBreakpoint', () => ({
   useBreakpoint: () => ({ isDesktop: ref(false) }),
 }));
 vi.mock('@/composables/useToday', () => ({ useToday: () => ({ today: ref('2030-10-10') }) }));
+
+const members = vi.hoisted(
+  () =>
+    new Map<string, { id: string; name: string; ageGroup: string; role: string; isPet?: boolean }>()
+);
+vi.mock('@/composables/useMemberInfo', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/composables/useMemberInfo')>()),
+  useMemberInfo: () => ({ getMemberById: (id: string) => members.get(id) }),
+}));
+
+/** The signed-in member; a grown-up unless a test says otherwise (Keep Parents Posted is adults-only). */
+const viewer = vi.hoisted(() => ({
+  current: { id: 'm-dad', ageGroup: 'adult', role: 'owner' } as Record<string, unknown>,
+}));
+vi.mock('@/stores/familyStore', () => ({
+  useFamilyStore: () => ({
+    get currentMember() {
+      return viewer.current;
+    },
+  }),
+}));
 
 const createTodo = vi.fn();
 vi.mock('@/stores/todoStore', () => ({ useTodoStore: () => ({ createTodo }) }));
@@ -80,6 +103,9 @@ const pick = (w: Awaited<ReturnType<typeof mountOpen>>, name: string, value: unk
 
 beforeEach(() => {
   vi.clearAllMocks();
+  members.clear();
+  members.set('m-dad', { id: 'm-dad', name: 'Dad', ageGroup: 'adult', role: 'owner' });
+  members.set('m-emma', { id: 'm-emma', name: 'Emma', ageGroup: 'child', role: 'member' });
   resolveOrToast.mockReturnValue('m-greg');
   createTodo.mockResolvedValue({ id: 'todo-new' });
 });
@@ -302,5 +328,80 @@ describe('TodoFormModal: Repeat (#123)', () => {
     await save(w).trigger('click');
     await flushPromises();
     expect(createTodo.mock.calls[1]![0]).not.toHaveProperty('repeat');
+  });
+});
+
+describe('TodoFormModal: Keep Parents Posted', () => {
+  const WEEKLY_SUN: RecurrenceRule = {
+    unit: 'week',
+    interval: 1,
+    weekdays: [0],
+    end: { kind: 'never' },
+  };
+  const toggle = (w: Awaited<ReturnType<typeof mountOpen>>) =>
+    w.find('[data-testid="todo-repeat-toggle"]');
+  const notify = (w: Awaited<ReturnType<typeof mountOpen>>) =>
+    w.find('[data-testid="todo-notify-parents"]');
+
+  async function setup(assignees: string[]) {
+    const w = await mountOpen();
+    await w.find('input').setValue('Put the trash out');
+    await pick(w, 'BeanieDatePicker', '2030-10-13');
+    await w.findComponent({ name: 'FamilyChipPicker' }).vm.$emit('update:modelValue', assignees);
+    await toggle(w).trigger('click');
+    await w.findComponent({ name: 'RecurrencePicker' }).vm.$emit('update:modelValue', WEEKLY_SUN);
+    return w;
+  }
+
+  it('is hidden for an adult assignee and shown for a child when repeat is on', async () => {
+    const w = await setup(['m-dad']);
+    expect(notify(w).exists()).toBe(false);
+    await w.findComponent({ name: 'FamilyChipPicker' }).vm.$emit('update:modelValue', ['m-emma']);
+    expect(notify(w).exists()).toBe(true);
+  });
+
+  it('is hidden for a child viewer: only a grown-up may set it', async () => {
+    viewer.current = { id: 'm-emma', ageGroup: 'child', role: 'member' };
+    try {
+      const w = await setup(['m-emma']);
+      expect(notify(w).exists()).toBe(false);
+    } finally {
+      viewer.current = { id: 'm-dad', ageGroup: 'adult', role: 'owner' };
+    }
+  });
+
+  it('is hidden while repeat is off, even for a child', async () => {
+    const w = await mountOpen();
+    await w.findComponent({ name: 'FamilyChipPicker' }).vm.$emit('update:modelValue', ['m-emma']);
+    expect(notify(w).exists()).toBe(false);
+  });
+
+  it('sends notifyParents: true when switched on', async () => {
+    const w = await setup(['m-emma']);
+    await notify(w).trigger('click');
+    await save(w).trigger('click');
+    await flushPromises();
+    expect(createTodo.mock.calls[0]![0]).toMatchObject({ notifyParents: true });
+  });
+
+  it('is cleared when the repeat turns off, so it is not sent or resurrected', async () => {
+    const w = await setup(['m-emma']);
+    await notify(w).trigger('click');
+    await toggle(w).trigger('click');
+    await save(w).trigger('click');
+    await flushPromises();
+    expect(createTodo.mock.calls[0]![0].notifyParents).toBeUndefined();
+
+    await toggle(w).trigger('click');
+    expect(notify(w).attributes('aria-checked')).toBe('false');
+  });
+
+  it('is not sent when the assignee changes to an adult after switching it on', async () => {
+    const w = await setup(['m-emma']);
+    await notify(w).trigger('click');
+    await w.findComponent({ name: 'FamilyChipPicker' }).vm.$emit('update:modelValue', ['m-dad']);
+    await save(w).trigger('click');
+    await flushPromises();
+    expect(createTodo.mock.calls[0]![0].notifyParents).toBeUndefined();
   });
 });

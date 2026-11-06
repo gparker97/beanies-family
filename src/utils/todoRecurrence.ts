@@ -53,6 +53,8 @@ export interface TodoCapabilities {
   editDueDate: boolean;
   editDueTime: boolean;
   editRepeat: boolean;
+  /** "Keep Parents Posted": a user-made repeating to-do only (a card to-do's flag is the card's). */
+  editNotifyParents: boolean;
   someday: boolean;
   delete: boolean;
   skip: boolean;
@@ -63,7 +65,8 @@ export interface TodoCapabilities {
  *   - card-made: title, assignee, due time, repeat and delete are the card's (off);
  *   - repeating (and card-made, which always repeats): due date and someday are off, because
  *     only the roll may move the date and someday would clear it;
- *   - skip is on only for an open repeating to-do.
+ *   - skip is on only for an open repeating to-do;
+ *   - notify-parents is on only for a repeating to-do that is not card-made.
  */
 export function todoCapabilities(
   todo: Pick<TodoItem, 'repeat' | 'cardId' | 'completed'>
@@ -77,6 +80,7 @@ export function todoCapabilities(
     editDueDate: !scheduled,
     editDueTime: !card,
     editRepeat: !card,
+    editNotifyParents: repeating && !card,
     someday: !scheduled,
     delete: !card,
     skip: repeating && !todo.completed,

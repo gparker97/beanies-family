@@ -71,6 +71,7 @@ describe('todoCapabilities', () => {
       editDueDate: true,
       editDueTime: true,
       editRepeat: true,
+      editNotifyParents: false,
       someday: true,
       delete: true,
       skip: false,
@@ -84,6 +85,7 @@ describe('todoCapabilities', () => {
       editDueDate: false,
       editDueTime: true,
       editRepeat: true,
+      editNotifyParents: true,
       someday: false,
       delete: true,
       skip: true,
@@ -97,6 +99,7 @@ describe('todoCapabilities', () => {
       editDueDate: false,
       editDueTime: false,
       editRepeat: false,
+      editNotifyParents: false,
       someday: false,
       delete: false,
       skip: true,
@@ -105,6 +108,13 @@ describe('todoCapabilities', () => {
 
   it('completed repeating: no skip', () => {
     expect(todoCapabilities(repeating({ completed: true })).skip).toBe(false);
+  });
+
+  it('notify-parents: a user-made repeating to-do only', () => {
+    expect(todoCapabilities(todo()).editNotifyParents).toBe(false);
+    expect(todoCapabilities(repeating()).editNotifyParents).toBe(true);
+    expect(todoCapabilities(repeating({ completed: true })).editNotifyParents).toBe(true);
+    expect(todoCapabilities(repeating({ cardId: 'c-1' })).editNotifyParents).toBe(false);
   });
 });
 
