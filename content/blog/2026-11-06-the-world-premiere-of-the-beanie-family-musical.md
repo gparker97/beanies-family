@@ -56,14 +56,14 @@ After the song, we needed actual video: Creating the character designs, storyboa
 
 _reviewing animation strips is the kind of thing that will make you want to jump off an animated bridge holding a “goodbye” sign_
 
-So after what has been one of the craziest stretches of my experience to this point building [beanies.family](https://beanies.family/?utm_source=blog&utm_medium=post&utm_campaign=the-world-premiere-of-the-beanie-family-musical&utm_content=body), I’m proud to announce that I’m roughly $967 poorer. But I’m also much _more_ pleased to announce the world premiere of **THE BEANIE FAMILY - a real life musical**!
+So after what has been one of the weirder stretches of my experience to this point building [beanies.family](https://beanies.family/?utm_source=blog&utm_medium=post&utm_campaign=the-world-premiere-of-the-beanie-family-musical&utm_content=body), I’m proud to announce that I’m roughly $967 poorer. But I’m also much _more_ pleased to announce the world premiere of [**THE BEANIE FAMILY - a real life musical**](https://beanies.family/?utm_source=blog**THE BEANIE FAMILY - a real life musical**!utm_medium=post**THE BEANIE FAMILY - a real life musical**!utm_campaign=the-world-premiere-of-the-beanie-family-musical&utm_content=film-title#musical)!
 
 There’s a lot more to say - maybe one day I’ll write a post with even more (excruciating) detail about the process of _actually_ putting this thing together. But for now, I think I just need to get some sleep.
 
 **… Well?**
 
-So, what do you think? Be brutal, I can take it. Actually, what am I talking about? No I can’t (and my _claude-bot_ will not tolerate people being mean to me). I’ve poured way too much of my time and energy into this to absorb negative criticism gracefully. So, tell me what you think, but be nice 🙂
+I made this for everybody here, so I’m keen to know - what do you think? Be brutal, I can take it. Actually, what am I talking about? No, I can’t. (Not to mention, my _claude-bot_ will not tolerate people being mean to me). I’ve probably poured too much of my time and energy into this to absorb negative criticism gracefully. So tell me what you think - just be nice 🙂
 
 Enjoy, my beanies, and I hope you like it.
 
--greg (assistant creative director, composer, lyricist, and animator, [beanies.family](https://beanies.family/?utm_source=blog&utm_medium=post&utm_campaign=the-world-premiere-of-the-beanie-family-musical&utm_content=signature). Right after my wife.)
+-greg (2nd creative director, composer, lyricist, and animator, [beanies.family](https://beanies.family/?utm_source=blog&utm_medium=post&utm_campaign=the-world-premiere-of-the-beanie-family-musical&utm_content=signature). After my wife.)
