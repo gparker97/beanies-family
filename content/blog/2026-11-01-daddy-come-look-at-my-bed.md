@@ -1,7 +1,7 @@
 ---
 title: 'daddy come look at my bed!'
 slug: daddy-come-look-at-my-bed
-date: 2026-11-06
+date: 2026-11-01
 category: stories
 coverEmoji: 🛏️
 coverImage: /blog/daddy-come-look-at-my-bed-beanie-wall.webp
