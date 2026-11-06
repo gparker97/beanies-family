@@ -66,4 +66,4 @@ I made this for everybody here, so I’m keen to know - what do you think? Be br
 
 Enjoy, my beanies, and I hope you like it.
 
--greg (composer, lyricist, and animator, and 2nd creative director, [beanies.family](https://beanies.family/?utm_source=blog&utm_medium=post&utm_campaign=the-world-premiere-of-the-beanie-family-musical&utm_content=signature). After my wife.)
+-greg (composer, lyricist, animator, and 2nd creative director, [beanies.family](https://beanies.family/?utm_source=blog&utm_medium=post&utm_campaign=the-world-premiere-of-the-beanie-family-musical&utm_content=signature). After my wife.)
