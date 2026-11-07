@@ -49,6 +49,7 @@ import {
   fetchFlightLegs,
   isFlightStatusConfigured,
 } from '@/services/flightStatus/flightStatusApi';
+import { devFetchBudgetActive, takeDevFetchTokens } from '@/services/flightStatus/devFetchBudget';
 import {
   clearFlightStatusCache,
   emptyFlightStatusCache,
@@ -329,6 +330,22 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
       surface: SURFACE,
       message: 'flight check not configured',
       context: { action: 'check_failed', error_code: 'not_configured' },
+    });
+  }
+
+  const devCapGate = createChangeGate();
+  /** Dev only: the day's provider fetches are spent. Once per UTC day, on the console too,
+   *  since the chip just says "Couldn't check" and a dev would otherwise hunt for a bug. */
+  function logDevCap(used: number, cap: number, nowMs: number): void {
+    if (!devCapGate(new Date(nowMs).toISOString().slice(0, 10))) return;
+    console.warn(
+      `[flight-status] dev build spent its ${used}/${cap} provider fetches for today; flights show "Couldn't check" until UTC midnight (DEV_DAILY_FETCH_CAP in devFetchBudget.ts)`
+    );
+    logEvent({
+      level: 'warn',
+      surface: SURFACE,
+      message: 'flight check dev budget spent',
+      context: { action: 'refused', detail: 'dev_cap', count: used },
     });
   }
 
@@ -624,8 +641,17 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
     }
 
     due.sort((a, b) => a.departureMs - b.departureMs);
-    const batch = due.slice(0, MAX_FETCHES_PER_RUN);
+    let batch = due.slice(0, MAX_FETCHES_PER_RUN);
     if (due.length > batch.length) histogram.set('over_cap', due.length - batch.length);
+    // Dev builds spend the production provider's quota; cap them per device per day.
+    if (devFetchBudgetActive() && batch.length > 0) {
+      const grant = takeDevFetchTokens(batch.length, now);
+      if (grant.granted < batch.length) {
+        histogram.set('dev_cap', batch.length - grant.granted);
+        logDevCap(grant.used, grant.cap, now);
+        batch = batch.slice(0, grant.granted);
+      }
+    }
 
     logRefused(globalReason);
     if (globalReason === 'not_configured') logNotConfigured();

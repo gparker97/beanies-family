@@ -13,6 +13,7 @@ import { reactive, ref } from 'vue';
 import type { FamilyVacation, VacationTravelSegment } from '@/types/models';
 import type { FlightLeg } from '@/types/flightStatus';
 import { makeFlight, makeLeg, t } from '@/utils/flightStatus/__tests__/fixtures';
+import { DEV_DAILY_FETCH_CAP } from '@/services/flightStatus/devFetchBudget';
 
 const NOW = Date.parse('2026-12-12T09:00:00Z');
 const MIN = 60_000;
@@ -139,6 +140,9 @@ beforeEach(() => {
   vi.setSystemTime(NOW);
   vi.stubEnv('VITE_FLIGHT_STATUS_URL', 'https://api.example.test/flight-status');
   vi.stubEnv('VITE_FLIGHT_STATUS_API_KEY', 'k');
+  // Vitest runs as a dev build; the suite models production, where the dev fetch budget is
+  // not in play (its own test below turns it back on).
+  vi.stubEnv('DEV', false);
   localStorage.clear();
   setActivePinia(createPinia());
   h.logEvent.mockReset();
@@ -511,6 +515,40 @@ describe('failures and fairness', () => {
     const dates = h.fetchFlightLegs.mock.calls.map((c) => c[0].date);
     expect(dates).toEqual(['2026-12-13', '2026-12-13', '2026-12-13', '2026-12-14']);
     expect(events('flight check run')[0]?.context.detail).toBe('over_cap=2');
+  });
+
+  it(`a dev build spends at most ${DEV_DAILY_FETCH_CAP} provider fetches a day, then skips`, async () => {
+    vi.stubEnv('DEV', true);
+    // Twelve flights, all due: three runs fetch 4 + 4 + 2, the fourth fetches nothing.
+    vacationsState.vacations = [
+      trip(
+        Array.from({ length: 12 }, (_, i) =>
+          makeFlight({ id: `s${i}`, departureDate: '2026-12-13', departureTime: `${10 + i}:00` })
+        )
+      ),
+    ];
+    h.fetchFlightLegs.mockResolvedValue(answer([]));
+    const store = useFlightStatusStore();
+    for (let i = 0; i < 4; i++) await store.run('tick');
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(DEV_DAILY_FETCH_CAP);
+    const runs = events('flight check run').map((e) => e.context.detail);
+    expect(runs[2]).toContain('dev_cap=2');
+    expect(runs[3]).toContain('dev_cap=2');
+    // Said once per day, on the console as well as the firehose.
+    expect(events('flight check dev budget spent')).toHaveLength(1);
+    expect(events('flight check dev budget spent')[0]?.context).toEqual({
+      action: 'refused',
+      detail: 'dev_cap',
+      count: DEV_DAILY_FETCH_CAP,
+    });
+    expect(console.warn).toHaveBeenCalledWith(
+      expect.stringContaining('provider fetches for today')
+    );
+
+    // The next UTC day starts fresh: the 10 checked flights are stale too, so a full batch goes.
+    vi.setSystemTime(Date.parse('2026-12-13T00:00:01Z'));
+    await store.run('tick');
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(DEV_DAILY_FETCH_CAP + MAX_FETCHES_PER_RUN);
   });
 });
 

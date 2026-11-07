@@ -46,6 +46,10 @@ export const STORAGE_KEYS = {
    *  answers only (public flight data), never synced. Device-local, never in the pod; not read
    *  by the `index.html` bootstrap. */
   FLIGHT_STATUS: 'beanies:flight-status',
+  /** #143: DEV BUILDS ONLY. How many provider fetches this device spent today
+   *  (`services/flightStatus/devFetchBudget.ts`), so a dev server left open cannot drain the
+   *  production provider quota. Never written by a production build. */
+  FLIGHT_STATUS_DEV_BUDGET: 'beanies:flight-status-dev',
   /** #141: the desktop month grid's density (`compact` | `comfortable`). Device-local;
    *  not read by the `index.html` bootstrap. */
   MONTH_GRID_DENSITY: 'beanies:monthGridDensity',
