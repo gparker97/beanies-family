@@ -15316,7 +15316,10 @@ const STRING_DEFS = {
   },
   'flightChecks.was.landing': { en: 'Was landing at {time}', beanie: 'was landing at {time}' },
   'flightChecks.was.landingOn': { en: 'Was landing on {date}', beanie: 'was landing on {date}' },
-  'flightChecks.note.was': { en: '{was} until {date}', beanie: '{was} until {date}' },
+  'flightChecks.note.was': {
+    en: 'Changed on {date}: {was}',
+    beanie: 'changed on {date}: {was}',
+  },
   'flightChecks.note.filled': {
     en: '{what} added from {airline}, {date}',
     beanie: '{what} added from {airline}, {date}',

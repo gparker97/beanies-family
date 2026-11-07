@@ -349,7 +349,7 @@ describe('shouldApply / planChange: idempotency', () => {
         arrivalTime: '23:10',
       },
       liveAppliedAt: new Date(NOW).toISOString(),
-      notes: expect.stringMatching(/^Window seats\nWas 5pm from Terminal 2 until /),
+      notes: expect.stringMatching(/^Window seats\nChanged on .*: Was 5pm from Terminal 2$/),
       arrivesNextDay: true,
     });
     expect(patch.sortDate).toBeUndefined();

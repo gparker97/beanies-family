@@ -174,8 +174,8 @@ export function wasLine(t: TranslateFn, was: ScheduleTuple, lang?: LanguageCode)
   return '';
 }
 
-/** The notes line an applied change appends: "Was 5pm from Terminal 2 until 12 Dec".
- *  `untilYmd` is the day the change was applied. */
+/** The notes line an applied change appends: "Changed on 12 Dec: Was 5pm from Terminal 2"
+ *  (`wasLine` supplies the "Was …" half). `untilYmd` is the day the change was applied (the last day the old values held). */
 export function changeNoteLine(
   t: TranslateFn,
   was: ScheduleTuple,

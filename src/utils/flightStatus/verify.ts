@@ -322,7 +322,7 @@ function withArrivesNextDay(seg: VacationTravelSegment, patch: SegmentPatch): Se
  *  - Cancellation: `status: 'pending'`, `liveCancelledAt`, the cancel revision, a notes line.
  *  - Change (some field the segment held differs): every changed and filled field, the
  *    revision, `liveWas` (the prior values of those fields + `at`), `liveAppliedAt`, the notes
- *    line "Was 17:00 from Terminal 2 until 12 Dec", `arrivesNextDay` re-derived.
+ *    line "Changed on 12 Dec: Was 17:00 from Terminal 2", `arrivesNextDay` re-derived.
  *  - Quiet fill (the airline only published values the segment never had, e.g. a terminal):
  *    those fields, the revision and a notes line; NO `liveWas` and NO `liveAppliedAt`, so no
  *    notice, no strike-out, the chip stays `verified`.

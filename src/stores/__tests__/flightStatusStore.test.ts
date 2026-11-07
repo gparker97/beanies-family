@@ -580,7 +580,7 @@ describe('revert and take the airline', () => {
     await store.run('open');
     const appliedNotes = segment().notes;
     const appliedAt = segment().liveAppliedAt;
-    expect(appliedNotes?.match(/until/g)).toHaveLength(1);
+    expect(appliedNotes?.match(/Changed on/g)).toHaveLength(1);
     for (let i = 0; i < 2; i++) {
       vi.setSystemTime(NOW + LATER * (i + 1));
       expect(await store.revert('seg-1')).toBe('saved');

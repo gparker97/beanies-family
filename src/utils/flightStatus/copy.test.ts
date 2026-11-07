@@ -100,10 +100,10 @@ describe('was lines and notes', () => {
     expect(wasLine(t, {})).toBe('');
   });
 
-  it('the notes line "Was 5pm from Terminal 2 until <date>"', () => {
+  it('the notes line "Changed on <date>: Was 5pm from Terminal 2"', () => {
     expect(
       changeNoteLine(t, { departureTime: '17:00', terminal: 'Terminal 2' }, '2026-12-12', 'en')
-    ).toBe('Was 5pm from Terminal 2 until 12 Dec');
+    ).toBe('Changed on 12 Dec: Was 5pm from Terminal 2');
   });
 
   it('the notice line', () => {

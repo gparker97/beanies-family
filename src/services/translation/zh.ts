@@ -6965,7 +6965,7 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'flightChecks.was.dateTimeTerminal': '原为 {date} {time}，{terminal}',
   'flightChecks.was.landing': '原为 {time} 降落',
   'flightChecks.was.landingOn': '原为 {date} 降落',
-  'flightChecks.note.was': '{was}（{date} 前）',
+  'flightChecks.note.was': '{date} 变更：{was}',
   'flightChecks.note.filled': '{what}，{date} 由{airline}补充',
   'flightChecks.note.cancelled': '{date} 被{airline}取消',
   'flightChecks.field.departureDate': '出发日期 {value}',
