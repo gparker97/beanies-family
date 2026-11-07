@@ -9,6 +9,9 @@
  * `chipLabel` (utils/flightStatus/copy.ts), so the chip says what the briefing and bell say.
  * A flight that is over carries no chip (`hasFlightChip`): this renders nothing for it.
  *
+ * With `reveals` the chip is a button ("Show what changed"): the card sets it when the notice
+ * block under the band was folded away with "Got it", so the undo is one tap from the chip.
+ *
  * Display-only provider statuses (`CanceledUncertain` → "May be cancelled", `Diverted`) ride on
  * a `verified` verification; they are painted orange with the alert glyph, never green.
  *
@@ -31,7 +34,11 @@ const props = defineProps<{
   nowMs: number;
   /** Tighter padding for dense rows (the wall, the desktop rail). */
   compact?: boolean;
+  /** Render as a button that reopens a dismissed notice (emits `click`). */
+  reveals?: boolean;
 }>();
+
+const emit = defineEmits<{ click: [] }>();
 
 const { t, currentLanguage } = useTranslation();
 
@@ -72,11 +79,22 @@ const fresh = computed(
 </script>
 
 <template>
-  <span
+  <component
+    :is="reveals ? 'button' : 'span'"
     v-if="label !== null"
+    :type="reveals ? 'button' : undefined"
     class="font-outfit inline-flex max-w-full min-w-0 shrink-0 items-center rounded-full border text-xs leading-tight font-semibold whitespace-nowrap"
-    :class="[LOOK_CLASS[look], compact ? 'gap-1 px-2 py-px' : 'gap-1.5 px-2.5 py-0.5']"
+    :class="[
+      LOOK_CLASS[look],
+      compact ? 'gap-1 px-2 py-px' : 'gap-1.5 px-2.5 py-0.5',
+      reveals
+        ? 'focus-visible:ring-primary-500 cursor-pointer focus:outline-none focus-visible:ring-2'
+        : '',
+    ]"
     :data-state="verification.state"
+    :title="reveals ? t('flightChecks.chip.showNotice') : undefined"
+    :aria-label="reveals ? t('flightChecks.chip.showNotice') : undefined"
+    @click="reveals && emit('click')"
   >
     <span
       v-if="look === 'verified'"
@@ -138,5 +156,5 @@ const fresh = computed(
       <path d="M8 5v3.5M8 11h.01" />
     </svg>
     <span class="min-w-0 truncate">{{ label }}</span>
-  </span>
+  </component>
 </template>

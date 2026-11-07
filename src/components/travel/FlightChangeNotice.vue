@@ -10,8 +10,13 @@
  *  - `conflict`: the plan and the airline disagree (a hand edit after an apply, or "Put it
  *    back"). Shows both values; "Use the airline's" writes the airline's.
  *  - `cancelled`: the airline cancelled; the flight is pending. Red is earned here and only
- *    here. Practical, not alarmed, and no buttons: the booking is still there for the call.
- *    Not yet recorded on this device (`applied: false`): the same not-updated-yet line.
+ *    here. Practical, not alarmed, and no decision to make: the booking is still there for
+ *    the call. Not yet recorded on this device (`applied: false`): the same not-updated-yet line.
+ *
+ * A change that is in the plan, and a recorded cancellation, carry a quiet "Got it" that folds
+ * the block away on this device (`dismiss`; the chip and the struck-out values stay, and the
+ * chip reopens it). A Conflict never does: it is asking for a decision. A notice with nothing
+ * written yet has no "Got it" either: the news is not in the plan, so it must keep showing.
  *
  * Renders nothing for any other state. Presentational: the actions leave as emits and the page
  * owns permissions, the write and the toasts. Every sentence comes from `copy.ts` (the same
@@ -43,6 +48,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   revert: [];
   'take-airline': [];
+  /** "Got it": fold this block away on this device for the current revision. */
+  dismiss: [];
 }>();
 
 const { t, currentLanguage } = useTranslation();
@@ -64,6 +71,8 @@ const view = computed<{
   note: string;
   meta: string;
   action: 'revert' | 'take-airline' | null;
+  /** Offers "Got it". */
+  dismissable: boolean;
 } | null>(() => {
   const v = props.verification;
   const flight = props.segment.label;
@@ -79,6 +88,7 @@ const view = computed<{
           note,
           meta: v.checkedAt !== undefined ? checkedAgo(t, v.checkedAt, props.nowMs) : '',
           action: null,
+          dismissable: false,
         };
       }
       const at = seenAtMs.value;
@@ -91,6 +101,7 @@ const view = computed<{
             ? changedByLine(t, was, airline.value, agoText(t, at, props.nowMs), lang.value)
             : '',
         action: 'revert',
+        dismissable: true,
       };
     }
     case 'conflict': {
@@ -106,6 +117,7 @@ const view = computed<{
           note: '',
           meta,
           action: 'take-airline',
+          dismissable: false,
         };
       }
       return {
@@ -118,6 +130,7 @@ const view = computed<{
         note: '',
         meta,
         action: 'take-airline',
+        dismissable: false,
       };
     }
     case 'cancelled': {
@@ -137,6 +150,7 @@ const view = computed<{
         note,
         meta: v.checkedAt !== undefined ? checkedAgo(t, v.checkedAt, props.nowMs) : '',
         action: null,
+        dismissable: v.applied !== false,
       };
     }
     default:
@@ -169,7 +183,7 @@ const view = computed<{
     <p v-if="view.meta" class="text-secondary-400 dark:text-ink-faint mt-1 text-xs">
       {{ view.meta }}
     </p>
-    <div v-if="view.action" class="mt-2.5 flex flex-wrap gap-2">
+    <div v-if="view.action || view.dismissable" class="mt-2.5 flex flex-wrap gap-2">
       <BaseButton
         v-if="view.action === 'revert'"
         variant="outline"
@@ -180,13 +194,22 @@ const view = computed<{
         {{ t('flightChecks.action.putBack') }}
       </BaseButton>
       <BaseButton
-        v-else
+        v-else-if="view.action === 'take-airline'"
         variant="outline"
         size="sm"
         data-testid="flight-use-airline"
         @click="emit('take-airline')"
       >
         {{ t('flightChecks.action.useAirline') }}
+      </BaseButton>
+      <BaseButton
+        v-if="view.dismissable"
+        variant="ghost"
+        size="sm"
+        data-testid="flight-got-it"
+        @click="emit('dismiss')"
+      >
+        {{ t('flightChecks.action.gotIt') }}
       </BaseButton>
     </div>
   </div>

@@ -61,13 +61,14 @@ function mountCard(over?: Partial<TimelineItem>, props?: Record<string, unknown>
         BeanieTimePicker: true,
         FlightCheckChip: {
           name: 'FlightCheckChip',
-          props: ['verification', 'nowMs'],
-          template: '<span class="chip" />',
+          props: ['verification', 'nowMs', 'compact', 'reveals'],
+          emits: ['click'],
+          template: '<span class="chip" :data-reveals="reveals" @click="$emit(\'click\')" />',
         },
         FlightChangeNotice: {
           name: 'FlightChangeNotice',
           props: ['verification', 'segment', 'nowMs'],
-          emits: ['revert', 'take-airline'],
+          emits: ['revert', 'take-airline', 'dismiss'],
           template: '<div class="notice" />',
         },
       },
@@ -188,5 +189,30 @@ describe('TimelineSegmentCard', () => {
       detailRows: [{ label: 'travel.live.row.gate', value: 'C21', live: true }],
     });
     expect(w.text()).toContain('travel.live.pill');
+  });
+
+  it('"Got it" re-emits as dismiss-notice; a dismissed notice is folded and the chip reopens it', async () => {
+    const shown = mountCard(
+      { flight: FLIGHT },
+      { verification: { state: 'changed', was: { departureTime: '17:00' } }, nowMs: 2 }
+    );
+    shown.findComponent({ name: 'FlightChangeNotice' }).vm.$emit('dismiss');
+    await shown.vm.$nextTick();
+    expect(shown.emitted('dismiss-notice')![0]![0]).toMatchObject({ id: 'seg-1' });
+    expect(shown.find('.chip').attributes('data-reveals')).toBe('false');
+
+    const folded = mountCard(
+      { flight: FLIGHT },
+      {
+        verification: { state: 'changed', dismissed: true, was: { departureTime: '17:00' } },
+        nowMs: 2,
+      }
+    );
+    expect(folded.findComponent({ name: 'FlightChangeNotice' }).exists()).toBe(false);
+    const chips = folded.findAll('.chip');
+    expect(chips.length).toBeGreaterThan(0);
+    expect(chips[0]!.attributes('data-reveals')).toBe('true');
+    await chips[0]!.trigger('click');
+    expect(folded.emitted('show-notice')![0]![0]).toMatchObject({ id: 'seg-1' });
   });
 });

@@ -169,6 +169,10 @@ export interface FlightVerification {
    * and offers no buttons. Undefined without a provider answer (the synced-fields fallback).
    */
   applied?: boolean;
+  /** THIS device tapped "Got it" on the notice for the current revision: the sentence block
+   *  folds away, the chip and the struck-out values stay, and the chip reopens it. Device
+   *  state (`flightStatusStore.dismissNotice`), never synced; a new revision is a new notice. */
+  dismissed?: boolean;
   live?: FlightLiveInfo;
   /** The airline's schedule, when a check exists. */
   provider?: ScheduleTuple;

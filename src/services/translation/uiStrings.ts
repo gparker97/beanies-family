@@ -15383,6 +15383,8 @@ const STRING_DEFS = {
   'flightChecks.chip.diverted': { en: 'Diverted', beanie: 'diverted' },
   'flightChecks.action.putBack': { en: 'Put it back', beanie: 'put it back' },
   'flightChecks.action.useAirline': { en: "Use the airline's", beanie: "use the airline's" },
+  'flightChecks.action.gotIt': { en: 'Got it', beanie: 'got it' },
+  'flightChecks.chip.showNotice': { en: 'Show what changed', beanie: 'show what changed' },
   // Live flight checks on the trip timeline (#143, Commit 3). An important surface like
   // `flightChecks.`: the beanie values keep the real nouns (flight, plan, airline, booking).
   'travel.live.conflictSentence': {

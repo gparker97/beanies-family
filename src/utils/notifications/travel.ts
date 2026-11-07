@@ -13,7 +13,12 @@
  *
  * Pure and total (a malformed occurrence is skipped). `deriveNotifications` calls it once.
  */
-import type { FamilyMember, LanguageCode, SupportedTravelType } from '@/types/models';
+import type {
+  FamilyMember,
+  LanguageCode,
+  SegmentLiveState,
+  SupportedTravelType,
+} from '@/types/models';
 import type { AppNotification } from '@/types/notifications';
 import type { TranslateFn } from '@/utils/format';
 import type { TravelSegmentOccurrence } from '@/utils/vacation';
@@ -23,7 +28,11 @@ import { formatNameList } from '@/utils/assignees';
 import { resolveSegmentTravellers } from '@/utils/segmentTravellers';
 import { DEFAULT_TRAVEL_LEADS, localDateTime, minusMinutes } from '@/utils/reminderSchedule';
 import { isChangeRecipient } from '@/utils/flightStatus/audience';
-import { flightLabel, occurrenceNotice } from '@/utils/flightStatus/occurrenceNotice';
+import {
+  flightLabel,
+  noticeRevision,
+  occurrenceNotice,
+} from '@/utils/flightStatus/occurrenceNotice';
 
 // OS travel-departure reminder AND the bell's departure entry share this id (one per segment
 // departure occurrence; the date keeps it stable across reschedules).
@@ -33,6 +42,16 @@ export const travelChangeId = (segmentId: string, revision: string): string =>
   `travel-change:${segmentId}:${revision}`;
 export const travelCancelId = (segmentId: string, revision: string): string =>
   `travel-cancel:${segmentId}:${revision}`;
+
+/** The bell/OS id of the notice a segment carries right now (`noticeRevision`), or null. The
+ *  device-side dismissal is keyed on it, so it shares the "what counts as new" rule. */
+export function liveNoticeId(segmentId: string, live: SegmentLiveState | undefined): string | null {
+  const key = noticeRevision(live);
+  if (!key) return null;
+  return key.kind === 'cancelled'
+    ? travelCancelId(segmentId, key.revision)
+    : travelChangeId(segmentId, key.revision);
+}
 
 export interface TravelNotificationContext {
   viewer: FamilyMember;

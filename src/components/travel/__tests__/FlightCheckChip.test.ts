@@ -136,4 +136,21 @@ describe('FlightCheckChip', () => {
     expect(root.classes()).toContain('px-2');
     expect(root.text()).toBe('flightChecks.chip.changed');
   });
+
+  it('is a plain span unless it reveals a folded notice, when it is a labelled button', async () => {
+    const plain = mountChip({ state: 'changed' });
+    expect(plain.get('[data-state="changed"]').element.tagName).toBe('SPAN');
+    await plain.get('[data-state="changed"]').trigger('click');
+    expect(plain.emitted('click')).toBeUndefined();
+
+    const w = mount(FlightCheckChip, {
+      props: { verification: { state: 'changed' }, nowMs: NOW, reveals: true },
+    });
+    const root = w.get('[data-state="changed"]');
+    expect(root.element.tagName).toBe('BUTTON');
+    expect(root.attributes('type')).toBe('button');
+    expect(root.attributes('aria-label')).toBe('flightChecks.chip.showNotice');
+    await root.trigger('click');
+    expect(w.emitted('click')).toHaveLength(1);
+  });
 });

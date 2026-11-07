@@ -6,7 +6,7 @@
  *
  * Pure: the translator comes first (the `copy.ts` convention) and nothing is logged.
  */
-import type { LanguageCode } from '@/types/models';
+import type { LanguageCode, SegmentLiveState } from '@/types/models';
 import type { TranslateFn } from '@/utils/format';
 import { flightCodeLabel, type TravelSegmentOccurrence } from '@/utils/vacation';
 import { normaliseFlightNumber } from './flightNumber';
@@ -67,30 +67,48 @@ export function occurrenceNotice(
   o: TravelSegmentOccurrence,
   lang?: LanguageCode
 ): OccurrenceNotice | null {
-  const live = o.live;
-  if (o.kind !== 'departure' || !live) return null;
+  if (o.kind !== 'departure') return null;
+  const key = noticeRevision(o.live);
+  if (!key) return null;
   const flight = flightLabel(o);
-  const cancelledMs = parseMs(live.liveCancelledAt);
-  if (cancelledMs !== null && isCancelRevision(live.liveRevision)) {
+  if (key.kind === 'cancelled') {
     const airline = o.airline?.replace(/\s*\([A-Z0-9]{2,3}\)\s*$/, '').trim();
     return {
-      kind: 'cancelled',
-      revision: `${live.liveRevision!}@${live.liveCancelledAt!}`,
-      atMs: cancelledMs,
+      ...key,
       flight,
       message: cancelSentence(t, { airline, flight, date: o.date }, lang),
       was: '',
     };
   }
-  const appliedMs = parseMs(live.liveAppliedAt);
-  const was = tupleFromWas(live.liveWas);
-  if (appliedMs === null || !was || !live.liveRevision) return null;
+  const was = tupleFromWas(o.live?.liveWas)!;
   return {
-    kind: 'changed',
-    revision: live.liveRevision,
-    atMs: appliedMs,
+    ...key,
     flight,
     message: changeSentence(t, flight, o.schedule ?? {}, was, lang),
     was: wasLine(t, was, lang),
   };
+}
+
+/**
+ * The identity of the notice a segment's synced live fields carry right now (see
+ * `OccurrenceNotice.revision` for the keying rules), or null when there is nothing to tell.
+ * The one place that rule lives: the bell/OS ids, the briefing row and the device-side
+ * dismissal (`flightStatusStore.dismissNotice`) all key on it, so a new airline revision is
+ * a new notice everywhere at once.
+ */
+export function noticeRevision(
+  live: SegmentLiveState | undefined
+): Pick<OccurrenceNotice, 'kind' | 'revision' | 'atMs'> | null {
+  if (!live) return null;
+  const cancelledMs = parseMs(live.liveCancelledAt);
+  if (cancelledMs !== null && isCancelRevision(live.liveRevision)) {
+    return {
+      kind: 'cancelled',
+      revision: `${live.liveRevision!}@${live.liveCancelledAt!}`,
+      atMs: cancelledMs,
+    };
+  }
+  const appliedMs = parseMs(live.liveAppliedAt);
+  if (appliedMs === null || !tupleFromWas(live.liveWas) || !live.liveRevision) return null;
+  return { kind: 'changed', revision: live.liveRevision, atMs: appliedMs };
 }

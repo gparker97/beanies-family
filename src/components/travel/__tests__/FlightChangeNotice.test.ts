@@ -128,7 +128,7 @@ describe('FlightChangeNotice', () => {
     expect(w.find('[data-testid="flight-use-airline"]').exists()).toBe(true);
   });
 
-  it('cancelled: the red variant, the booking still here, and no buttons', () => {
+  it('cancelled: the red variant, the booking still here, and no decision to make', () => {
     const w = mountNotice({ state: 'cancelled', checkedAt: NOW - 4 * 60_000 });
     const text = w.text();
     expect(text).toContain('Singapore Airlines cancelled SQ318 on');
@@ -141,7 +141,8 @@ describe('FlightChangeNotice', () => {
         'bg-[var(--tint-danger-10)]',
       ])
     );
-    expect(w.findAll('button')).toHaveLength(0);
+    // Only "Got it" (the dismissal); nothing to put back or take.
+    expect(w.findAll('button').map((b) => b.attributes('data-testid'))).toEqual(['flight-got-it']);
   });
 
   it('cancelled with no booking reference drops that sentence', () => {
@@ -153,5 +154,45 @@ describe('FlightChangeNotice', () => {
     for (const state of ['verified', 'unavailable', 'not-live'] as const) {
       expect(mountNotice({ state }).html()).not.toContain('<p');
     }
+  });
+
+  it('"Got it" folds an applied change away on this device; a Conflict and an unwritten change never offer it', async () => {
+    const applied = mountNotice({
+      state: 'changed',
+      mine: { departureTime: '18:30' },
+      was: { departureTime: '17:00' },
+    });
+    await applied.get('[data-testid="flight-got-it"]').trigger('click');
+    expect(applied.emitted('dismiss')).toHaveLength(1);
+    expect(applied.emitted('revert')).toBeUndefined();
+
+    const unwritten = mountNotice({
+      state: 'changed',
+      applied: false,
+      mine: { departureTime: '17:00' },
+      was: { departureTime: '17:00' },
+      provider: { departureTime: '18:30' },
+    });
+    expect(unwritten.find('[data-testid="flight-got-it"]').exists()).toBe(false);
+
+    const conflict = mountNotice({
+      state: 'conflict',
+      mine: { departureTime: '17:00' },
+      provider: { departureTime: '18:30' },
+    });
+    expect(conflict.find('[data-testid="flight-got-it"]').exists()).toBe(false);
+    expect(conflict.find('[data-testid="flight-use-airline"]').exists()).toBe(true);
+  });
+
+  it('a recorded cancellation offers "Got it" (and nothing else); one not yet recorded does not', async () => {
+    const recorded = mountNotice({ state: 'cancelled', applied: true });
+    expect(recorded.find('[data-testid="flight-put-back"]').exists()).toBe(false);
+    await recorded.get('[data-testid="flight-got-it"]').trigger('click');
+    expect(recorded.emitted('dismiss')).toHaveLength(1);
+    expect(
+      mountNotice({ state: 'cancelled', applied: false })
+        .find('[data-testid="flight-got-it"]')
+        .exists()
+    ).toBe(false);
   });
 });

@@ -3589,7 +3589,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
           'The old time stays on the card, struck through, until you fly, so you can see what moved.',
           'A note on the flight records what it was before.',
           'Your reminder moves with the new time.',
-          'Changed your mind? Tap <strong>Put it back</strong> to restore the old values.',
+          'Changed your mind? Tap <strong>Put it back</strong> to restore the old values. Tap <strong>Got it</strong> to tuck the notice away on this device; the Changed chip and the struck-out old values stay on the card until the flight leaves, and tapping the chip brings the notice back.',
         ],
       },
       {

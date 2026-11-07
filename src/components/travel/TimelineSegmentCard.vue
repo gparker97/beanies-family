@@ -63,6 +63,10 @@ const emit = defineEmits<{
   revert: [item: TimelineItem];
   /** "Use the airline's": write the airline's schedule over a Conflict. */
   'take-airline': [item: TimelineItem];
+  /** "Got it": fold the notice block away on this device. */
+  'dismiss-notice': [item: TimelineItem];
+  /** The chip on a dismissed notice: show the block again. */
+  'show-notice': [item: TimelineItem];
 }>();
 
 const { t } = useTranslation();
@@ -83,8 +87,12 @@ const showChip = computed(() => !!flightCheck.value && hasFlightChip(flightCheck
 
 const showNotice = computed(() => {
   const s = flightCheck.value?.state;
-  return s === 'changed' || s === 'conflict' || s === 'cancelled';
+  return (
+    (s === 'changed' || s === 'conflict' || s === 'cancelled') && !flightCheck.value?.dismissed
+  );
 });
+/** The block was folded away with "Got it": the chip reopens it. */
+const chipReveals = computed(() => flightCheck.value?.dismissed === true);
 
 /** The foot line for the kinds that are never checked live (and say so plainly). */
 const NOT_LIVE_FOOT: Record<string, UIStringKey> = {
@@ -138,7 +146,12 @@ async function copy(value: string): Promise<void> {
          with a subset of travellers -->
     <template v-if="showChip || (item.showTravellers && collapsed)" #header-trailing>
       <span v-if="showChip && flightCheck" class="hidden min-w-0 shrink-0 sm:inline-flex">
-        <FlightCheckChip :verification="flightCheck" :now-ms="clock" />
+        <FlightCheckChip
+          :verification="flightCheck"
+          :now-ms="clock"
+          :reveals="chipReveals"
+          @click="emit('show-notice', item)"
+        />
       </span>
       <div
         v-if="item.showTravellers && collapsed"
@@ -158,7 +171,13 @@ async function copy(value: string): Promise<void> {
 
     <template v-if="showChip && flightCheck" #header-below>
       <div class="mt-1 flex min-w-0 sm:hidden">
-        <FlightCheckChip :verification="flightCheck" :now-ms="clock" compact />
+        <FlightCheckChip
+          :verification="flightCheck"
+          :now-ms="clock"
+          compact
+          :reveals="chipReveals"
+          @click="emit('show-notice', item)"
+        />
       </div>
     </template>
 
@@ -174,6 +193,7 @@ async function copy(value: string): Promise<void> {
       :now-ms="clock"
       @revert="emit('revert', item)"
       @take-airline="emit('take-airline', item)"
+      @dismiss="emit('dismiss-notice', item)"
     />
 
     <!-- Expanded: always list who's travelling -->

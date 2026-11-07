@@ -41,10 +41,22 @@ describe('read / write / clear', () => {
     expect(readFlightStatusCache('fam-1')).toEqual(record());
   });
 
-  it('a record written before `noticed` existed reads as {}', () => {
-    const { noticed: _drop, ...legacy } = record();
+  it('a record written before `noticed` / `dismissed` existed reads them as {}', () => {
+    const { noticed: _drop, dismissed: _drop2, ...legacy } = record();
     localStorage.setItem(STORAGE_KEYS.FLIGHT_STATUS, JSON.stringify(legacy));
     expect(readFlightStatusCache('fam-1')?.noticed).toEqual({});
+    expect(readFlightStatusCache('fam-1')?.dismissed).toEqual({});
+  });
+
+  it('round-trips the dismissal stamps, and a non-numeric one is corrupt', () => {
+    writeFlightStatusCache(record({ dismissed: { 'travel-change:seg-1:r': 456 } }));
+    expect(readFlightStatusCache('fam-1')?.dismissed).toEqual({ 'travel-change:seg-1:r': 456 });
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    localStorage.setItem(
+      STORAGE_KEYS.FLIGHT_STATUS,
+      JSON.stringify(record({ dismissed: { x: 'soon' as never } }))
+    );
+    expect(readFlightStatusCache('fam-1')).toBeNull();
   });
 
   it('round-trips the first-seen stamps', () => {
@@ -152,6 +164,15 @@ describe('pruneFlightStatusCache', () => {
     });
     const out = pruneFlightStatusCache(cache, new Set(['seg-1', 'seg-2']), now);
     expect(out.noticed).toEqual({ fresh: now - MAX_CHECK_AGE_MS });
+  });
+
+  it('drops dismissal stamps older than 7 days the same way', () => {
+    const now = 10 * MAX_CHECK_AGE_MS;
+    const cache = record({
+      dismissed: { old: now - MAX_CHECK_AGE_MS - 1, fresh: now - MAX_CHECK_AGE_MS },
+    });
+    const out = pruneFlightStatusCache(cache, new Set(['seg-1', 'seg-2']), now);
+    expect(out.dismissed).toEqual({ fresh: now - MAX_CHECK_AGE_MS });
   });
 
   it('keeps nothing past 7 days, matched or not', () => {

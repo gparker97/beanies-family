@@ -44,11 +44,15 @@ export interface FlightStatusCacheRecord {
    *  per revision per device (a fireAt that moves on every write re-arms a delivered one).
    *  A record written before this field existed reads as `{}`. */
   noticed: Record<string, number>;
+  /** Change/cancel notice id → epoch ms this device dismissed it ("Got it"). The same ids as
+   *  `noticed`, so a new airline revision is undismissed by construction. A record written
+   *  before this field existed reads as `{}`. */
+  dismissed: Record<string, number>;
 }
 
 /** An empty record for a family (a miss, a fresh device). */
 export function emptyFlightStatusCache(familyId: string): FlightStatusCacheRecord {
-  return { v: 1, familyId, checks: {}, failures: {}, noticed: {} };
+  return { v: 1, familyId, checks: {}, failures: {}, noticed: {}, dismissed: {} };
 }
 
 /**
@@ -71,7 +75,7 @@ export function readFlightStatusCache(familyId: string): FlightStatusCacheRecord
     return null;
   }
   return read.value.familyId === familyId
-    ? { ...read.value, noticed: read.value.noticed ?? {} }
+    ? { ...read.value, noticed: read.value.noticed ?? {}, dismissed: read.value.dismissed ?? {} }
     : null;
 }
 
@@ -127,7 +131,12 @@ export function pruneFlightStatusCache(
     if (nowMs - firstSeen <= MAX_CHECK_AGE_MS) noticed[id] = firstSeen;
     else dropped = true;
   }
-  return dropped ? { ...cache, checks, failures, noticed } : cache;
+  const dismissed: Record<string, number> = {};
+  for (const [id, at] of Object.entries(cache.dismissed)) {
+    if (nowMs - at <= MAX_CHECK_AGE_MS) dismissed[id] = at;
+    else dropped = true;
+  }
+  return dropped ? { ...cache, checks, failures, noticed, dismissed } : cache;
 }
 
 /** Remove the record; a refused removal is logged (the next write overwrites it anyway). */
@@ -144,6 +153,9 @@ function removeCache(): void {
 }
 
 const isFiniteNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+/** `noticed` / `dismissed`: absent (an older record) or id → epoch ms. */
+const isStampMap = (v: unknown): boolean =>
+  v === undefined || (isObject(v) && Object.values(v).every(isFiniteNumber));
 
 function isCheck(id: string, v: unknown): v is FlightCheck {
   return (
@@ -172,8 +184,8 @@ function isRecord(v: unknown): v is FlightStatusCacheRecord {
     typeof v.familyId === 'string' &&
     isObject(v.checks) &&
     isObject(v.failures) &&
-    (v.noticed === undefined ||
-      (isObject(v.noticed) && Object.values(v.noticed).every(isFiniteNumber))) &&
+    isStampMap(v.noticed) &&
+    isStampMap(v.dismissed) &&
     Object.entries(v.checks).every(([id, c]) => isCheck(id, c)) &&
     Object.values(v.failures).every(isFailure)
   );

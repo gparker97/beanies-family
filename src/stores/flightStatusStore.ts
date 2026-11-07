@@ -61,6 +61,7 @@ import { logEvent } from '@/services/telemetry';
 import { createChangeGate, type ChangeGate } from '@/services/telemetry/emitPolicy';
 import { nextBackoffMs } from '@/utils/backoff';
 import { createTrailingSingleFlight } from '@/utils/trailingSingleFlight';
+import { liveNoticeId } from '@/utils/notifications/travel';
 import { isFlightType } from '@/utils/travelCodes';
 import { normaliseFlightNumber } from '@/utils/flightStatus/flightNumber';
 import { operatedAs, pickLeg } from '@/utils/flightStatus/match';
@@ -124,6 +125,8 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
   const failures = ref<Record<string, FlightCheckFailure>>({});
   /** Change/cancel notice id → epoch ms this device first saw it (see `noticeFirstSeen`). */
   const noticed = ref<Record<string, number>>({});
+  /** Notice id → epoch ms this device tapped "Got it" (see `dismissNotice`). */
+  const dismissed = ref<Record<string, number>>({});
   /** Segment ids with a request in flight. */
   const inFlight = ref<Set<string>>(new Set());
   /** The clock the verifications read: bumped by every run, answer and tick. */
@@ -202,7 +205,7 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
   function verify(seg: VacationTravelSegment): FlightVerification {
     const check = usableCheck(seg);
     const timing = flightTiming(seg, check, homeZone.value, nowMs.value);
-    return deriveVerification(seg, check, failures.value[seg.id], {
+    const v = deriveVerification(seg, check, failures.value[seg.id], {
       nowMs: nowMs.value,
       inWindow: timing.inWindow,
       ...(timing.opensAt !== undefined ? { opensAt: new Date(timing.opensAt).toISOString() } : {}),
@@ -213,6 +216,13 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
       configured: isFlightStatusConfigured(),
       online: isOnline.value,
     });
+    // The device-side fold of the notice block rides on the verification, so the card has one
+    // input. Keyed on the notice id: a new airline revision is a new, undismissed notice.
+    if (v.state === 'changed' || v.state === 'cancelled') {
+      const id = liveNoticeId(seg.id, seg);
+      if (id !== null && dismissed.value[id] !== undefined) return { ...v, dismissed: true };
+    }
+    return v;
   }
 
   /** One verification per travel segment, rebuilt from the checks, failures, clock and
@@ -246,6 +256,7 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
     checks.value = cached ? { ...cached.checks } : {};
     failures.value = cached ? { ...cached.failures } : {};
     noticed.value = cached ? { ...cached.noticed } : {};
+    dismissed.value = cached ? { ...cached.dismissed } : {};
   }
 
   let cacheWriteWarned = false;
@@ -256,6 +267,7 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
       checks: checks.value,
       failures: failures.value,
       noticed: noticed.value,
+      dismissed: dismissed.value,
     });
     if (written.ok || cacheWriteWarned) return;
     // The in-memory checks still show; only the next cold start refetches. Once per session.
@@ -278,12 +290,14 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
       checks: checks.value,
       failures: failures.value,
       noticed: noticed.value,
+      dismissed: dismissed.value,
     };
     const after = pruneFlightStatusCache(before, new Set(segmentsById.value.keys()), now);
     if (after === before) return;
     checks.value = after.checks;
     failures.value = after.failures;
     noticed.value = after.noticed;
+    dismissed.value = after.dismissed;
     persist();
   }
 
@@ -785,6 +799,52 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
    * run to settle, drop the checks and only then delete the device cache, so no answer can
    * write the departing family's flights back. Never throws.
    */
+  /**
+   * "Got it": fold the change/cancel notice block away ON THIS DEVICE for the segment's
+   * current revision. The chip and the struck-out values stay, and the chip reopens the block
+   * (`showNotice`). Nothing is written to the pod: each family member reads the news once for
+   * themselves. False when the segment carries no notice (nothing to dismiss).
+   */
+  function dismissNotice(segmentId: string): boolean {
+    return setDismissed(segmentId, true);
+  }
+
+  /** The chip was tapped on a dismissed notice: show the block again. */
+  function showNotice(segmentId: string): boolean {
+    return setDismissed(segmentId, false);
+  }
+
+  function setDismissed(segmentId: string, on: boolean): boolean {
+    const c = current(segmentId);
+    const id = c ? liveNoticeId(segmentId, c.segment) : null;
+    if (id === null) {
+      logEvent({
+        level: 'warn',
+        surface: SURFACE,
+        message: 'flight notice dismiss skipped',
+        context: { action: on ? 'dismiss_skipped' : 'reopen_skipped', detail: 'no_notice' },
+      });
+      return false;
+    }
+    if (on) {
+      dismissed.value = { ...dismissed.value, [id]: Date.now() };
+    } else {
+      const { [id]: _gone, ...rest } = dismissed.value;
+      dismissed.value = rest;
+    }
+    persist();
+    logEvent({
+      level: 'info',
+      surface: SURFACE,
+      message: on ? 'flight notice dismissed' : 'flight notice reopened',
+      context: {
+        action: on ? 'dismissed' : 'reopened',
+        flight_state: verificationFor(segmentId)?.state,
+      },
+    });
+    return true;
+  }
+
   async function haltForSignOut(): Promise<void> {
     halted.value = true;
     for (const c of controllers) c.abort();
@@ -794,6 +854,7 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
     checks.value = {};
     failures.value = {};
     noticed.value = {};
+    dismissed.value = {};
     loadedFamilyId = null;
     clearFlightStatusCache();
   }
@@ -868,6 +929,8 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
     run,
     revert,
     takeAirline,
+    dismissNotice,
+    showNotice,
     tick,
     haltForSignOut,
     setup,

@@ -815,6 +815,14 @@ async function takeAirlineFlight(item: TimelineItem): Promise<void> {
   await flightStatusStore.takeAirline(item.id);
 }
 
+/** "Got it" / the chip on a folded notice: device state only, so no edit permission needed. */
+function dismissFlightNotice(item: TimelineItem): void {
+  flightStatusStore.dismissNotice(item.id);
+}
+function showFlightNotice(item: TimelineItem): void {
+  flightStatusStore.showNotice(item.id);
+}
+
 function openEditModal(item: TimelineItem) {
   if (!requireEdit()) return;
   editingItemIndex.value = item.arrayIndex;
@@ -1417,6 +1425,8 @@ async function addQuickIdea() {
                       @open-attachment="openAttachmentViewer"
                       @revert="revertFlight"
                       @take-airline="takeAirlineFlight"
+                      @dismiss-notice="dismissFlightNotice"
+                      @show-notice="showFlightNotice"
                     />
                   </div>
                 </div>
@@ -1476,6 +1486,8 @@ async function addQuickIdea() {
               @open-attachment="openAttachmentViewer"
               @revert="revertFlight"
               @take-airline="takeAirlineFlight"
+              @dismiss-notice="dismissFlightNotice"
+              @show-notice="showFlightNotice"
             />
           </div>
         </div>

@@ -609,6 +609,59 @@ describe('revert and take the airline', () => {
   });
 });
 
+describe('"Got it" on this device', () => {
+  it('folds the notice for the current revision, survives a new session, and the chip reopens it', async () => {
+    h.fetchFlightLegs.mockResolvedValue(answer([moved]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    expect(store.verificationFor('seg-1')).toMatchObject({ state: 'changed' });
+    expect(store.verificationFor('seg-1')?.dismissed).toBeUndefined();
+
+    expect(store.dismissNotice('seg-1')).toBe(true);
+    expect(store.verificationFor('seg-1')?.dismissed).toBe(true);
+    expect(events('flight notice dismissed')[0]?.context).toEqual({
+      action: 'dismissed',
+      flight_state: 'changed',
+    });
+    // Device state only: nothing more was written to the pod.
+    expect(updateSegment).toHaveBeenCalledTimes(1);
+
+    setActivePinia(createPinia());
+    const fresh = useFlightStatusStore();
+    expect(fresh.verificationFor('seg-1')?.dismissed).toBe(true);
+
+    expect(fresh.showNotice('seg-1')).toBe(true);
+    expect(fresh.verificationFor('seg-1')?.dismissed).toBeUndefined();
+    expect(events('flight notice reopened')).toHaveLength(1);
+  });
+
+  it('a new airline revision is a new, undismissed notice', async () => {
+    h.fetchFlightLegs.mockResolvedValue(answer([moved]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    store.dismissNotice('seg-1');
+    expect(store.verificationFor('seg-1')?.dismissed).toBe(true);
+
+    vi.setSystemTime(NOW + LATER);
+    h.fetchFlightLegs.mockResolvedValue(answer([nextDay]));
+    await store.run('tick');
+    expect(updateSegment).toHaveBeenCalledTimes(2);
+    expect(store.verificationFor('seg-1')).toMatchObject({ state: 'changed' });
+    expect(store.verificationFor('seg-1')?.dismissed).toBeUndefined();
+  });
+
+  it('a flight with nothing to tell has nothing to dismiss, and says so', async () => {
+    h.fetchFlightLegs.mockResolvedValue(answer([makeLeg({})]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    expect(store.dismissNotice('seg-1')).toBe(false);
+    expect(events('flight notice dismiss skipped')[0]?.context).toEqual({
+      action: 'dismiss_skipped',
+      detail: 'no_notice',
+    });
+  });
+});
+
 describe('cache and sign-out', () => {
   it('a new session hydrates the checks from the device cache', async () => {
     h.fetchFlightLegs.mockResolvedValue(answer([makeLeg({})]));
