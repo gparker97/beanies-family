@@ -136,8 +136,12 @@ export const useEntitlementStore = defineStore('entitlement', () => {
     return isPricingAvailable() && e?.enforced === true;
   }
 
+  /** Would the client act on the current answer (the pricing flag is on AND the server said
+   *  `enforced: true`)? False during the dry-run soak, so a feature gated on the plan treats
+   *  everyone as entitled until enforcement starts (#143 live flight checks). */
+  const enforces = computed(() => acts(entitlement.value));
   /** The one value that blocks writes (Phase 3) and shows the band. */
-  const isReadOnly = computed(() => acts(entitlement.value) && state.value === 'read_only');
+  const isReadOnly = computed(() => enforces.value && state.value === 'read_only');
   /** Read-only in every respect except that nothing acts on it: the dry-run soak signal. */
   const wouldBeReadOnly = computed(() => state.value === 'read_only' && !isReadOnly.value);
 
@@ -442,6 +446,7 @@ export const useEntitlementStore = defineStore('entitlement', () => {
     cancelAt,
     pastDue,
     interval,
+    enforces,
     isReadOnly,
     wouldBeReadOnly,
     trialDaysLeft,

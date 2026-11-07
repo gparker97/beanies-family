@@ -55,9 +55,12 @@ const statusConfig = computed(() => {
       text: 'text-green-700 dark:text-success-lift',
       key: 'vacation.status.booked',
     },
+    // The literal #B8860B measured 3.09 in light and 2.94 on a dark card (both under AA for a
+    // 12px pill), with no dark partner. This is the gold "needs booking" pair the wall already
+    // uses: amber-700 4.80 light, terracotta-lift 5.19 dark, on this tint.
     pending: {
       bg: 'bg-[var(--vacation-gold-tint)]',
-      text: 'text-[#B8860B]',
+      text: 'text-amber-700 dark:text-terracotta-lift',
       key: 'vacation.status.pending',
     },
   };
@@ -92,19 +95,20 @@ async function handleDelete() {
           {{ t(statusConfig.key as any) }}
         </span>
 
-        <!-- Title (read-only display) -->
-        <span
-          class="font-outfit dark:text-ink min-w-0 shrink truncate text-sm font-semibold text-slate-900"
-        >
-          {{ title }}
-        </span>
+        <!-- Title (read-only display). The block takes the free space AND is the thing that
+             shrinks (min-w-0 + truncate), so trailing chips can never squeeze it to one letter
+             or push the chevron out of the card. -->
+        <div class="flex min-w-0 flex-1 items-center gap-2">
+          <span
+            class="font-outfit dark:text-ink min-w-0 truncate text-sm font-semibold text-slate-900"
+          >
+            {{ title }}
+          </span>
 
-        <span v-if="subtitle" class="dark:text-ink-soft hidden text-xs text-gray-500 sm:inline">
-          {{ subtitle }}
-        </span>
-
-        <!-- Spacer to push actions to right -->
-        <div class="flex-1" />
+          <span v-if="subtitle" class="dark:text-ink-soft hidden text-xs text-gray-500 sm:inline">
+            {{ subtitle }}
+          </span>
+        </div>
 
         <!-- Trailing header content (e.g. a collapsed traveller avatar stack) -->
         <slot name="header-trailing" />
@@ -134,6 +138,12 @@ async function handleDelete() {
         >
           <span class="transition-transform" :class="{ 'rotate-90': !collapsed }">▸</span>
         </button>
+      </div>
+
+      <!-- A second header line (e.g. a flight's live-check chip on a phone, where the row has
+           no room for it). Part of the header, so it shows collapsed and expanded. -->
+      <div v-if="$slots['header-below']" class="pl-8">
+        <slot name="header-below" />
       </div>
 
       <!-- Key info line — shown below title when collapsed -->

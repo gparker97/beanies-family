@@ -233,6 +233,7 @@ export const DEFAULT_TODO_LEAD = 30;
 export const DEFAULT_TRAVEL_LEADS: Record<SupportedTravelType, number> = {
   flight_outbound: 120,
   flight_return: 120,
+  flight_other: 120,
   cruise: 120,
   train: 60,
   ferry: 60,

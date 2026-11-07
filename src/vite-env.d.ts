@@ -33,6 +33,10 @@ interface ImportMetaEnv {
   readonly VITE_AI_EXTRACT_API_KEY: string | undefined;
   readonly VITE_CONTENT_FETCH_URL?: string;
   readonly VITE_CONTENT_FETCH_API_KEY?: string;
+  /** Live flight checks proxy endpoint (#143), `https://api.beanies.family/flight-status`. Unset means flights are "Not checked live". */
+  readonly VITE_FLIGHT_STATUS_URL?: string;
+  /** Soft API key sent to the flight-status proxy (#143). Ships in the bundle; mirrors VITE_CONTENT_FETCH_API_KEY. */
+  readonly VITE_FLIGHT_STATUS_API_KEY?: string;
   /** Stripe publishable key (#95). Public by design; unset means the Plan page shows "checkout couldn't load". Web deploy only. */
   readonly VITE_STRIPE_PUBLISHABLE_KEY?: string;
   /** Base URL of the billing routes, resolved in src/config/features.ts (`billingBaseUrl`). Dev builds REQUIRE it (the deployed sandbox lane, https://api.beanies.family/sandbox, or the local harness http://localhost:8787); production builds default to VITE_REGISTRY_API_URL. */

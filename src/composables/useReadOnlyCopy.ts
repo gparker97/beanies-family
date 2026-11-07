@@ -60,5 +60,5 @@ export function useReadOnlyCopy() {
     void router.push({ name: PLAN_ROUTE_NAME });
   }
 
-  return { paragraphs, showSeePlans, seePlans };
+  return { paragraphs, showSeePlans, planRouteExists, seePlans };
 }

@@ -6,16 +6,11 @@
  * What a reading MEANS is `weatherReading.ts`; this file only decides when to ask, so a
  * change to the cadence never touches the display rules and the reverse.
  */
-import type { WeatherErrorCode } from '@/types/weather';
-
 const MINUTE_MS = 60_000;
 /** A reading younger than this is not refetched: one combined call per half hour at most. */
 export const REFRESH_AFTER_MS = 30 * MINUTE_MS;
 /** The store's visible-tab poll. Each tick only asks; the decision below usually skips. */
 export const WEATHER_POLL_MS = 5 * MINUTE_MS;
-/** The failure backoff ladder: 5, 10, 20, 40, then 60 min. */
-const BACKOFF_BASE_MS = 5 * MINUTE_MS;
-const BACKOFF_MAX_MS = 60 * MINUTE_MS;
 
 /** Why a refresh did not run, checked in this order. Rides `detail` on `weather_skipped`. */
 export type WeatherSkipReason =
@@ -57,13 +52,5 @@ export function pickWeatherRefresh(input: WeatherRefreshInput): WeatherRefreshDe
   return { action: 'fetch', reason: 'stale' };
 }
 
-/**
- * How long to wait after the `failureCount`th failure in a row: 5, 10, 20, 40, then 60 min,
- * so a provider outage cannot multiply the call volume. A `rate_limited` answer waits the
- * full hour straight away (the quota resets on the hour at the earliest).
- */
-export function nextBackoffMs(failureCount: number, code: WeatherErrorCode): number {
-  if (code === 'rate_limited') return BACKOFF_MAX_MS;
-  const steps = Math.max(0, Math.floor(failureCount) - 1);
-  return Math.min(BACKOFF_MAX_MS, BACKOFF_BASE_MS * 2 ** Math.min(steps, 10));
-}
+/** The shared ladder (`utils/backoff.ts`), re-exported so weather callers are unchanged. */
+export { nextBackoffMs } from '@/utils/backoff';

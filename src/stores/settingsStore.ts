@@ -129,6 +129,15 @@ export const useSettingsStore = defineStore('settings', () => {
   const widgetLockScreenTitles = computed(
     () => globalSettings.value.widgetLockScreenTitles ?? true
   );
+  /** #143: the Live Flight Checks switch on this device; on by default. The magic beans gate
+   *  is `flightStatusStore.isEnabled`'s, applied on read, so the switch keeps its position. */
+  const liveFlightChecksEnabled = computed(
+    () => globalSettings.value.liveFlightChecksEnabled ?? true
+  );
+  /** #143: "Tell Me When a Flight Changes" on this device; on by default. */
+  const liveFlightChangeAlerts = computed(
+    () => globalSettings.value.liveFlightChangeAlerts ?? true
+  );
   /** When the beanie wall sleeps on this device; always complete (see `resolveWallSleep`). */
   const wallSleep = computed(() => resolveWallSleep(globalSettings.value.wall?.sleep));
   /** #134: this wall's weather card size (device-only). Absent = large. */
@@ -842,6 +851,10 @@ export const useSettingsStore = defineStore('settings', () => {
     persistGlobalSetting('reminders.title', 'remindersEnabled', enabled);
   const setWidgetLockScreenTitles = (enabled: boolean) =>
     persistGlobalSetting('reminders.title', 'widgetLockScreenTitles', enabled);
+  const setLiveFlightChecksEnabled = (enabled: boolean) =>
+    persistGlobalSetting('reminders.title', 'liveFlightChecksEnabled', enabled);
+  const setLiveFlightChangeAlerts = (enabled: boolean) =>
+    persistGlobalSetting('reminders.title', 'liveFlightChangeAlerts', enabled);
   const setTodoReminderLead = (minutes: number) =>
     persistGlobalSetting('reminders.title', 'todoReminderLead', minutes);
   const setActivityReminderLead = (minutes: number) =>
@@ -1338,6 +1351,8 @@ export const useSettingsStore = defineStore('settings', () => {
     beanieLabEnabled,
     remindersEnabled,
     widgetLockScreenTitles,
+    liveFlightChecksEnabled,
+    liveFlightChangeAlerts,
     wallSleep,
     wallWeatherStyle,
     todoReminderLead,
@@ -1396,6 +1411,8 @@ export const useSettingsStore = defineStore('settings', () => {
     setBeanieLabEnabled,
     setRemindersEnabled,
     setWidgetLockScreenTitles,
+    setLiveFlightChecksEnabled,
+    setLiveFlightChangeAlerts,
     setWallSleep,
     setWallWeather,
     setTodoReminderLead,

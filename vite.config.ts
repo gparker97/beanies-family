@@ -274,7 +274,13 @@ export default defineConfig({
         // IndexedDB (see referenceDataCacheRepository) — never precache it, or
         // the service-worker install would balloon by the whole dataset.
         globIgnores: ['**/holidays/*.json'],
-        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024, // 4 MiB — Automerge WASM is ~2.65 MB
+        // 5 MiB. The Automerge WASM is ~3.6 MB, and on 2026-11-07 the main JS chunk
+        // crossed 4 MiB (prod was 4,165,300 bytes; live flight checks added ~69 KB).
+        // This is a precache ceiling, not a performance budget: the real fix is to
+        // split the main chunk (the eagerly imported airports table in
+        // src/constants/airports.ts is the obvious first candidate), tracked as a
+        // follow-up from tracker #143.
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         // When a new SW activates, clean up previous-deploy precache entries
         // (old hashed chunks nothing references anymore).
         cleanupOutdatedCaches: true,

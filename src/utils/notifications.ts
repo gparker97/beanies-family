@@ -12,12 +12,14 @@
  * `types/notifications.ts` + `components/notifications/notificationKinds.ts`.
  */
 import type { ActivityOccurrence } from '@/utils/calendar/occurrence';
-import type { TodoItem, FamilyList, FamilyMember } from '@/types/models';
+import type { TodoItem, FamilyList, FamilyMember, SupportedTravelType } from '@/types/models';
 import type { ReleaseNote } from '@/content/release-notes';
 import type { Announcement } from '@/content/announcements';
 import type { BeanTip } from '@/content/tips';
 import type { AppNotification } from '@/types/notifications';
 import type { TranslateFn } from '@/utils/format';
+import type { TravelSegmentOccurrence } from '@/utils/vacation';
+import { deriveTravelNotifications } from '@/utils/notifications/travel';
 import { activityDisplayTitle } from '@/utils/occasions';
 import { normalizeAssignees } from '@/utils/assignees';
 import {
@@ -118,6 +120,11 @@ export interface DeriveInput {
    * occurrences survive and the same month isn't re-expanded per day).
    */
   occurrencesByDate: Record<string, NotificationOccurrence[]>;
+  /** Departure occurrences for the travel entries (#143): the next few weeks, from
+   *  `vacationStore.travelSegmentOccurrencesInRange`. Absent ⟹ no travel entries. */
+  travelOccurrences?: readonly TravelSegmentOccurrence[];
+  /** Device travel lead per type (`settingsStore.travelReminderLeads`), injected for purity. */
+  travelReminderLeads?: Partial<Record<SupportedTravelType, number>>;
   /** The app's translator (`notificationsStore` supplies `useTranslationStore().t`), for
    *  the occasion milestone in an activity reminder's title. Injected to stay pure. */
   t: TranslateFn;
@@ -141,10 +148,8 @@ export const activityReminderId = (
   role
     ? `activity-reminder:${activityId}:${occurrenceDate}:${role}`
     : `activity-reminder:${activityId}:${occurrenceDate}`;
-// OS travel-departure reminder (no in-app equivalent kind). One per segment
-// departure occurrence; the date keeps it stable across reschedules.
-export const travelReminderId = (segmentId: string, occurrenceDate: string): string =>
-  `travel-reminder:${segmentId}:${occurrenceDate}`;
+// The travel ids (`travel-reminder:`, `travel-change:`, `travel-cancel:`) live with their deriver.
+export { travelReminderId } from '@/utils/notifications/travel';
 /**
  * OS due-date reminder for a one-off list (no in-app equivalent kind — a dated
  * list already reaches the bell's owner through the daily briefing, and a third
@@ -404,6 +409,18 @@ export function deriveNotifications(input: DeriveInput, now: Date): AppNotificat
       }
     }
   }
+
+  // ── travel-departure + travel-change (#143), one pure deriver ────────────────
+  out.push(
+    ...deriveTravelNotifications(input.travelOccurrences ?? [], {
+      viewer: currentMember,
+      resolveMember,
+      t: input.t,
+      leads: input.travelReminderLeads ?? {},
+      inWindow,
+      isRead,
+    })
+  );
 
   // ── whats-new (window-exempt; always retained, bounded by release count) ─────
   for (const rel of releaseNotes) {

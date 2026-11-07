@@ -42,6 +42,12 @@ export type SignOutStepName =
    * included. Halts the weather store first (an answer in flight must land before the delete).
    */
   | 'clearWeatherCache'
+  /**
+   * Delete this device's live flight checks (#143, ADR-045): answers about the family's booked
+   * flights, keyed by segment id. Beside `clearWeatherCache` on every tier, for its reason (one
+   * device key, so the same step serves every tier). Halts the flight-status store first.
+   */
+  | 'clearFlightStatusCache'
   | 'captureDepartingAccount'
   | 'clearGoogleSessionKeepTokens'
   | 'clearGoogleSessionDropTokens'
@@ -122,6 +128,7 @@ export const SIGN_OUT_TRUSTED_STEPS: readonly SignOutStepName[] = [
   'cancelReminders',
   'clearWidgetSnapshot',
   'clearWeatherCache',
+  'clearFlightStatusCache',
   'clearGoogleSessionKeepTokens',
   'resetSyncState',
   'resetDocClient',
@@ -147,6 +154,7 @@ export const SIGN_OUT_UNTRUSTED_STEPS: readonly SignOutStepName[] = [
   'cancelReminders',
   'clearWidgetSnapshot',
   'clearWeatherCache',
+  'clearFlightStatusCache',
   'captureDepartingAccount',
   'clearGoogleSessionDropTokens',
   'resetSyncState',
@@ -169,6 +177,7 @@ export const SIGN_OUT_CLEAR_STEPS: readonly SignOutStepName[] = [
   'cancelReminders',
   'clearWidgetSnapshot',
   'clearWeatherCache',
+  'clearFlightStatusCache',
   'captureDepartingAccount',
   'clearGoogleSessionDropTokens',
   'clearAllRefreshTokens',
@@ -245,6 +254,7 @@ export const SIGN_OUT_EVICTION_LOCK_STEPS: readonly SignOutStepName[] = [
   'cancelReminders',
   'clearWidgetSnapshot',
   'clearWeatherCache',
+  'clearFlightStatusCache',
   'resetSyncState',
   'resetDocClient',
   // NO `announceSessionEnded` (round 3): the channel is per FAMILY, and the people still in
@@ -309,6 +319,7 @@ export const SIGN_OUT_START_OVER_STEPS: readonly SignOutStepName[] = [
   'cancelReminders',
   'clearWidgetSnapshot',
   'clearWeatherCache',
+  'clearFlightStatusCache',
   'clearGoogleSessionDropTokens',
   'clearFamilyRefreshToken',
   'resetSyncState',

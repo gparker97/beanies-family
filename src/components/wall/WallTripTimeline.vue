@@ -16,18 +16,33 @@
  * travel page renders, so the wall cannot hold a second opinion about when a
  * flight leaves or what a trip contains. This file only decides how it looks at
  * wall scale.
+ *
+ * Live flight checks (#143): a flight row carries its compact `FlightCheckChip` in the title
+ * line, beside the "needs booking" pill, so the kitchen can see that today's flight still
+ * leaves when the plan says. Read-only: the wall never offers "Put it back".
  */
 import SegmentWhenBand from '@/components/travel/SegmentWhenBand.vue';
+import FlightCheckChip from '@/components/travel/FlightCheckChip.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { nookDateParts } from '@/utils/date';
 import type { DateGroup, TimelineItem } from '@/composables/useVacationTimeline';
+import type { FlightVerification } from '@/types/flightStatus';
 
-defineProps<{
+const props = defineProps<{
   /** Dated bookings, already ordered and grouped. */
   groups: DateGroup[];
   /** Bookings with no date yet. Shown, never dropped. */
   undated: TimelineItem[];
+  /** `flightStatusStore.verificationFor`; omitted = no chips. */
+  verificationFor?: (segmentId: string) => FlightVerification | undefined;
+  /** The clock the chips measure "checked N min ago" against. */
+  nowMs?: number;
 }>();
+
+/** A flight row's verification, or undefined (no chip) for everything else. */
+function flightCheck(item: TimelineItem): FlightVerification | undefined {
+  return item.flight ? props.verificationFor?.(item.id) : undefined;
+}
 
 const { t } = useTranslation();
 </script>
@@ -76,8 +91,18 @@ const { t } = useTranslation();
               >
                 <span aria-hidden="true">⏳</span> {{ t('wall.trip.unbookedLeg') }}
               </span>
+              <FlightCheckChip
+                v-if="flightCheck(item)"
+                :verification="flightCheck(item)!"
+                :now-ms="nowMs ?? Date.now()"
+                compact
+              />
             </p>
-            <SegmentWhenBand v-if="item.timing" :band="item.timing.band" />
+            <SegmentWhenBand
+              v-if="item.timing"
+              :band="item.timing.band"
+              :was="flightCheck(item)?.was"
+            />
           </div>
         </div>
       </div>

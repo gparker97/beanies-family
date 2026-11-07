@@ -5,13 +5,20 @@
  * ("starts") or two ("departs → arrives" / "check-in → check-out" etc). Purely
  * presentational: it formats the raw values the composable put on `item.timing.band`.
  * Stays inside the ocean-teal travel identity.
+ *
+ * `was` (live flight checks, #143): the values an airline change replaced. When present, a
+ * value that moved renders in Heritage Orange with the old one struck beside it, on whichever
+ * line it lives (the big time, or the date under it). `start` is the departure and `end` the
+ * arrival, which is the flight band's shape; `was` is only ever passed for a flight in the
+ * `changed` state. The band shows no terminal, so a terminal change is told by the notice.
  */
 import { computed } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { formatDateShort, formatTime12 } from '@/utils/date';
+import type { ScheduleTuple } from '@/types/flightStatus';
 import type { WhenBand, WhenCell } from '@/utils/vacation';
 
-const props = defineProps<{ band: WhenBand }>();
+const props = defineProps<{ band: WhenBand; was?: ScheduleTuple }>();
 
 const { t } = useTranslation();
 
@@ -25,6 +32,32 @@ function secondary(cell: WhenCell): string {
   return cell.time && cell.date ? formatDateShort(cell.date) : '';
 }
 
+/** The struck-out old values of one cell, per line ('' = that line did not move). */
+interface CellWas {
+  big: string;
+  sub: string;
+}
+
+/** "9:05" and "09:05:00" are the same time; only a real move is struck out. */
+const hhmm = (v: string) => v.trim().padStart(5, '0').slice(0, 5);
+
+function cellWas(cell: WhenCell, time?: string, date?: string): CellWas {
+  const oldTime = time && cell.time && hhmm(time) !== hhmm(cell.time) ? formatTime12(time) : '';
+  const oldDate = date && cell.date && date.slice(0, 10) !== cell.date ? formatDateShort(date) : '';
+  // The date is the big line only when the cell has no time.
+  return cell.time ? { big: oldTime, sub: oldDate } : { big: oldDate, sub: '' };
+}
+
+const NONE: CellWas = { big: '', sub: '' };
+const startWas = computed(() =>
+  props.was ? cellWas(props.band.start, props.was.departureTime, props.was.departureDate) : NONE
+);
+const endWas = computed(() =>
+  props.was && props.band.end
+    ? cellWas(props.band.end, props.was.arrivalTime, props.was.arrivalDate)
+    : NONE
+);
+
 const hasEnd = computed(() => !!props.band.end);
 </script>
 
@@ -32,8 +65,16 @@ const hasEnd = computed(() => !!props.band.end);
   <div class="when-band" :class="{ 'when-band--single': !hasEnd }">
     <div class="when-cell">
       <div class="when-cap">{{ t(band.start.captionKey) }}</div>
-      <div class="font-outfit when-big">{{ primary(band.start) }}</div>
-      <div v-if="secondary(band.start)" class="when-sub">{{ secondary(band.start) }}</div>
+      <div class="font-outfit when-big" :class="{ 'is-live': startWas.big }">
+        {{ primary(band.start) }}
+      </div>
+      <div v-if="secondary(band.start)" class="when-sub" :class="{ 'is-live': startWas.sub }">
+        {{ secondary(band.start) }}
+      </div>
+      <div v-if="startWas.big || startWas.sub" class="when-was-line">
+        <s v-if="startWas.big" class="when-was">{{ startWas.big }}</s>
+        <s v-if="startWas.sub" class="when-was">{{ startWas.sub }}</s>
+      </div>
     </div>
 
     <template v-if="band.end">
@@ -45,8 +86,16 @@ const hasEnd = computed(() => !!props.band.end);
             t('travel.timeline.nextDay')
           }}</span>
         </div>
-        <div class="font-outfit when-big">{{ primary(band.end) }}</div>
-        <div v-if="secondary(band.end)" class="when-sub">{{ secondary(band.end) }}</div>
+        <div class="font-outfit when-big" :class="{ 'is-live': endWas.big }">
+          {{ primary(band.end) }}
+        </div>
+        <div v-if="secondary(band.end)" class="when-sub" :class="{ 'is-live': endWas.sub }">
+          {{ secondary(band.end) }}
+        </div>
+        <div v-if="endWas.big || endWas.sub" class="when-was-line">
+          <s v-if="endWas.big" class="when-was">{{ endWas.big }}</s>
+          <s v-if="endWas.sub" class="when-was">{{ endWas.sub }}</s>
+        </div>
       </div>
     </template>
   </div>
@@ -87,7 +136,8 @@ const hasEnd = computed(() => !!props.band.end);
 }
 
 .when-nextday {
-  color: var(--heritage-orange, #f15d22);
+  /* primary-700, not the swatch: Heritage Orange read 3.14 on this teal cell (5.49 here). */
+  color: var(--color-primary-700, #b33e15);
   font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: normal;
@@ -134,5 +184,47 @@ html.dark .when-arrow {
  */
 html.dark .when-band {
   --when-cap: var(--color-teal-lift, #4fd1be);
+}
+
+/*
+ * Live flight checks (#143): an airline-changed value, and the value it replaced. Heritage
+ * Orange with its lift partner on dark (an accent used as text); the struck value recedes to
+ * the faint ink tier, never to an opacity. No new background: the cell keeps its teal wash.
+ * (0,3,0) beats `.when-big` / `.when-sub` above; the dark rules are plain scoped rules.
+ */
+.when-big.is-live,
+.when-sub.is-live {
+  /* primary-700, not the swatch: primary-500 read 3.14 on the teal cell, this reads 5.49. */
+  color: var(--color-primary-700, #b33e15);
+}
+
+/* The replaced values sit on their OWN small line under the live ones, never inline beside
+   the big time: inline, "12:40am" overflowed a 360px phone's cell. */
+.when-was-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 0.375rem;
+  margin-top: 0.0625rem;
+}
+
+.when-was {
+  color: var(--color-secondary-400, #506b7a);
+  font-family: Inter, sans-serif;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+html.dark .when-big.is-live,
+html.dark .when-sub.is-live {
+  color: var(--color-accent-lift, #ff8b5e);
+}
+
+html.dark .when-was {
+  color: var(--color-ink-faint, #9aa9b4);
+}
+
+/* The "+1 day" mark is accent text: its lift on dark (it read 3.73 on the dark teal cell). */
+html.dark .when-nextday {
+  color: var(--color-accent-lift, #ff8b5e);
 }
 </style>

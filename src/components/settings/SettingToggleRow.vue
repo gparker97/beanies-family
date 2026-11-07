@@ -30,8 +30,12 @@ defineEmits<{ 'update:modelValue': [boolean] }>();
     ]"
   >
     <div>
-      <p class="dark:text-ink text-[0.8rem] font-semibold text-[var(--deep-slate)]">
+      <p
+        class="dark:text-ink flex flex-wrap items-center gap-1.5 text-[0.8rem] font-semibold text-[var(--deep-slate)]"
+      >
         {{ title }}
+        <!-- A badge beside the title (e.g. the magic beans pill). -->
+        <slot name="title-suffix" />
       </p>
       <p v-if="hint" class="dark:text-ink-faint text-secondary-400 text-[0.65rem] leading-snug">
         {{ hint }}

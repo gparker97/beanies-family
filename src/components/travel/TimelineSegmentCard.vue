@@ -14,10 +14,20 @@
  *
  * Presentational: every mutation leaves as an emit. The page keeps permission checks,
  * persistence and toasts.
+ *
+ * Live flight checks (#143): a flight card carries its `FlightCheckChip` in the header (none
+ * once the flight is over, `hasFlightChip`), passes the airline-replaced values
+ * (`verification.was`) to the band, and shows the `FlightChangeNotice` under it for changed /
+ * conflict / cancelled. `verification` and `nowMs`
+ * are props from the page (`flightStatusStore`), never read here. Trains, ferries, cruises and
+ * buses get a quiet foot line instead of a chip, so a card that cannot be checked never looks
+ * unverified.
  */
 import { computed } from 'vue';
 import VacationSegmentCard from '@/components/vacation/VacationSegmentCard.vue';
 import SegmentWhenBand from '@/components/travel/SegmentWhenBand.vue';
+import FlightCheckChip from '@/components/travel/FlightCheckChip.vue';
+import FlightChangeNotice from '@/components/travel/FlightChangeNotice.vue';
 import MemberChip from '@/components/ui/MemberChip.vue';
 import PhotoThumbnail from '@/components/media/PhotoThumbnail.vue';
 import ExpandableText from '@/components/ui/ExpandableText.vue';
@@ -26,7 +36,10 @@ import BeanieTimePicker from '@/components/ui/BeanieTimePicker.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useMemberInfo } from '@/composables/useMemberInfo';
 import { safeExternalHref } from '@/utils/url';
+import { hasFlightChip } from '@/utils/flightStatus/copy';
 import type { TimelineItem } from '@/composables/useVacationTimeline';
+import type { FlightVerification } from '@/types/flightStatus';
+import type { UIStringKey } from '@/services/translation/uiStrings';
 
 const props = defineProps<{
   item: TimelineItem;
@@ -34,6 +47,10 @@ const props = defineProps<{
   readOnly: boolean;
   /** The hint for THIS item, already resolved by the page — not the whole map. */
   hint?: { message?: string; nightFlight?: 'early-morning' | 'late-night' } | undefined;
+  /** This segment's live flight check (`flightStatusStore.verificationFor(item.id)`). */
+  verification?: FlightVerification;
+  /** The clock the chip and notice measure "checked N min ago" against. */
+  nowMs?: number;
 }>();
 
 const emit = defineEmits<{
@@ -42,6 +59,10 @@ const emit = defineEmits<{
   delete: [item: TimelineItem];
   'update:collapsed': [id: string, collapsed: boolean];
   'open-attachment': [segmentId: string, photoIds: string[], photoId: string];
+  /** "Put it back": restore the values from before the airline's change. */
+  revert: [item: TimelineItem];
+  /** "Use the airline's": write the airline's schedule over a Conflict. */
+  'take-airline': [item: TimelineItem];
 }>();
 
 const { t } = useTranslation();
@@ -49,6 +70,31 @@ const { getMemberName } = useMemberInfo();
 
 const travellerNamesLabel = computed(() =>
   props.item.travellers.map((id) => getMemberName(id)).join(', ')
+);
+
+/** A flight with a verification: the chip and (when something happened) the notice show. */
+const flightCheck = computed(() =>
+  props.item.flight && props.verification ? props.verification : undefined
+);
+const clock = computed(() => props.nowMs ?? Date.now());
+
+/** A flight that is over carries no chip (`hasFlightChip`); its band and notes stay. */
+const showChip = computed(() => !!flightCheck.value && hasFlightChip(flightCheck.value));
+
+const showNotice = computed(() => {
+  const s = flightCheck.value?.state;
+  return s === 'changed' || s === 'conflict' || s === 'cancelled';
+});
+
+/** The foot line for the kinds that are never checked live (and say so plainly). */
+const NOT_LIVE_FOOT: Record<string, UIStringKey> = {
+  'travel:train': 'travel.live.notLiveFoot.train',
+  'travel:ferry': 'travel.live.notLiveFoot.ferry',
+  'travel:cruise': 'travel.live.notLiveFoot.cruise',
+  'transportation:bus': 'travel.live.notLiveFoot.bus',
+};
+const notLiveFootKey = computed(
+  () => NOT_LIVE_FOOT[`${props.item.kind}:${props.item.segmentType}`]
 );
 
 /** Copy a booking reference. Clipboard failures are non-fatal and need no toast. */
@@ -87,9 +133,15 @@ async function copy(value: string): Promise<void> {
     @edit="emit('edit', item)"
     @delete="emit('delete', item)"
   >
-    <!-- Collapsed: a compact avatar stack, only when travellers are a subset -->
-    <template v-if="item.showTravellers && collapsed" #header-trailing>
+    <!-- Header: a flight's live-check chip (always; in the row from `sm:`, on its own line
+         below the title on a phone), and the compact avatar stack beside it when collapsed
+         with a subset of travellers -->
+    <template v-if="showChip || (item.showTravellers && collapsed)" #header-trailing>
+      <span v-if="showChip && flightCheck" class="hidden min-w-0 shrink-0 sm:inline-flex">
+        <FlightCheckChip :verification="flightCheck" :now-ms="clock" />
+      </span>
       <div
+        v-if="item.showTravellers && collapsed"
         class="flex shrink-0 items-center pr-1"
         :title="travellerNamesLabel"
         :aria-label="travellerNamesLabel"
@@ -104,8 +156,25 @@ async function copy(value: string): Promise<void> {
       </div>
     </template>
 
-    <!-- "When" hero band — date/time leads, above the detail rows -->
-    <SegmentWhenBand v-if="item.timing?.band" :band="item.timing.band" />
+    <template v-if="showChip && flightCheck" #header-below>
+      <div class="mt-1 flex min-w-0 sm:hidden">
+        <FlightCheckChip :verification="flightCheck" :now-ms="clock" compact />
+      </div>
+    </template>
+
+    <!-- "When" hero band — date/time leads, above the detail rows. An airline change strikes
+         out what it replaced (`was` is set only while the flight shows Changed). -->
+    <SegmentWhenBand v-if="item.timing?.band" :band="item.timing.band" :was="flightCheck?.was" />
+
+    <!-- Live flight checks: what the airline changed, disputes or cancelled -->
+    <FlightChangeNotice
+      v-if="showNotice && flightCheck && item.flight"
+      :verification="flightCheck"
+      :segment="item.flight"
+      :now-ms="clock"
+      @revert="emit('revert', item)"
+      @take-airline="emit('take-airline', item)"
+    />
 
     <!-- Expanded: always list who's travelling -->
     <div class="dark:divide-surface-overlay/40 divide-y divide-gray-100">
@@ -217,9 +286,15 @@ async function copy(value: string): Promise<void> {
           <span class="shrink-0 text-xs opacity-40">🔗</span>
         </div>
 
-        <!-- Plain read-only value -->
+        <!-- Plain read-only value (a live flight value carries its "live" pill) -->
         <span v-else class="dark:text-ink text-sm text-gray-900">
           {{ row.value }}
+          <span
+            v-if="row.live"
+            class="font-outfit text-secondary-500 dark:text-silk-lift ml-1.5 inline-flex items-center rounded-full bg-[var(--tint-silk-20)] px-1.5 text-xs font-semibold"
+          >
+            {{ t('travel.live.pill') }}
+          </span>
         </span>
       </div>
     </div>
@@ -236,5 +311,10 @@ async function copy(value: string): Promise<void> {
         @open="emit('open-attachment', item.id, item.photoIds ?? [], pid)"
       />
     </div>
+
+    <!-- Kinds that are never checked live say so, once, at the foot -->
+    <p v-if="notLiveFootKey" class="text-secondary-400 dark:text-ink-faint mt-3 text-xs">
+      {{ t(notLiveFootKey) }}
+    </p>
   </VacationSegmentCard>
 </template>

@@ -1,0 +1,54 @@
+[
+  {
+    "greatCircleDistance": {
+      "meter": 10885000.0,
+      "km": 10885.0,
+      "mile": 6763.6,
+      "nm": 5877.4,
+      "feet": 35711942.0
+    },
+    "departure": {
+      "airport": {
+        "icao": "WSSS",
+        "iata": "SIN",
+        "name": "Singapore, Changi",
+        "shortName": "Changi",
+        "municipalityName": "Singapore",
+        "location": { "lat": 1.35019, "lon": 103.994 },
+        "countryCode": "SG",
+        "timeZone": "Asia/Singapore"
+      },
+      "scheduledTime": { "utc": "2026-12-13 15:05Z", "local": "2026-12-13 23:05+08:00" },
+      "revisedTime": { "utc": "2026-12-13 15:20Z", "local": "2026-12-13 23:20+08:00" },
+      "terminal": "3",
+      "checkInDesk": "6-7",
+      "gate": "B4",
+      "quality": ["Basic", "Live"]
+    },
+    "arrival": {
+      "airport": {
+        "icao": "EGLL",
+        "iata": "LHR",
+        "name": "London Heathrow",
+        "shortName": "Heathrow",
+        "municipalityName": "London",
+        "location": { "lat": 51.4706, "lon": -0.461941 },
+        "countryCode": "GB",
+        "timeZone": "Europe/London"
+      },
+      "scheduledTime": { "utc": "2026-12-14 05:40Z", "local": "2026-12-14 05:40+00:00" },
+      "predictedTime": { "utc": "2026-12-14 05:52Z", "local": "2026-12-14 05:52+00:00" },
+      "terminal": "2",
+      "baggageBelt": "7",
+      "quality": ["Basic"]
+    },
+    "lastUpdatedUtc": "2026-12-13 09:12Z",
+    "number": "SQ 318",
+    "callSign": "SIA318",
+    "status": "Expected",
+    "codeshareStatus": "IsOperator",
+    "isCargo": false,
+    "aircraft": { "reg": "9V-XXA", "modeS": "000000", "model": "Airbus A380-800" },
+    "airline": { "name": "Singapore Airlines", "iata": "SQ", "icao": "SIA" }
+  }
+]

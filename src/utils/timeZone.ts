@@ -216,6 +216,29 @@ export function zoneDisplayName(zone: string, locale: string): string {
   }
 }
 
+/** `wallClockInZone`'s formatter per zone. Building an `Intl.DateTimeFormat` is the costly
+ *  part (live flight checks call this several times per flight on every clock tick), and its
+ *  options are fixed, so one per zone is reused. A zone the engine rejects throws in the
+ *  constructor and is never stored. */
+const wallClockFormatters = new Map<string, Intl.DateTimeFormat>();
+
+function wallClockFormatter(zone: string): Intl.DateTimeFormat {
+  let fmt = wallClockFormatters.get(zone);
+  if (!fmt) {
+    fmt = new Intl.DateTimeFormat('en-US', {
+      timeZone: zone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    });
+    wallClockFormatters.set(zone, fmt);
+  }
+  return fmt;
+}
+
 /**
  * The wall clock an instant shows in `zone`: `{ ymd: 'YYYY-MM-DD', hhmm: 'HH:mm' }`.
  *
@@ -224,15 +247,7 @@ export function zoneDisplayName(zone: string, locale: string): string {
  * to apply.
  */
 export function wallClockInZone(date: Date, zone: string): { ymd: string; hhmm: string } {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: zone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  }).formatToParts(date);
+  const parts = wallClockFormatter(zone).formatToParts(date);
   const get = (type: Intl.DateTimeFormatPartTypes): string =>
     parts.find((p) => p.type === type)?.value ?? '';
   // ⚠️ Some engines still print midnight as "24" despite `h23`; it is "00" of that day.

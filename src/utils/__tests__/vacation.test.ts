@@ -42,18 +42,19 @@ function flightSeg(overrides: Partial<VacationTravelSegment> = {}): VacationTrav
 }
 
 describe('isSupportedTravelType', () => {
-  it('returns true for the 5 supported types', () => {
+  it('returns true for the 6 supported types', () => {
     expect(isSupportedTravelType('flight_outbound')).toBe(true);
     expect(isSupportedTravelType('flight_return')).toBe(true);
+    // #143: flight_other is a real flight, so it gets occurrences and OS reminders too.
+    expect(isSupportedTravelType('flight_other')).toBe(true);
     expect(isSupportedTravelType('train')).toBe(true);
     expect(isSupportedTravelType('ferry')).toBe(true);
     expect(isSupportedTravelType('cruise')).toBe(true);
   });
 
-  it('returns false for the 3 unsupported types', () => {
+  it('returns false for the 2 unsupported types', () => {
     expect(isSupportedTravelType('car')).toBe(false);
     expect(isSupportedTravelType('activity')).toBe(false);
-    expect(isSupportedTravelType('flight_other')).toBe(false);
   });
 });
 
@@ -147,12 +148,48 @@ describe('extractSegmentOccurrences', () => {
     expect(out[1]).toMatchObject({ kind: 'arrival', date: '2026-06-16', time: '02:30' });
   });
 
-  it('returns empty array for unsupported types (car, activity, flight_other)', () => {
+  it('returns empty array for unsupported types (car, activity)', () => {
     expect(extractSegmentOccurrences('vac-1', flightSeg({ type: 'car' }), 0, [])).toEqual([]);
     expect(extractSegmentOccurrences('vac-1', flightSeg({ type: 'activity' }), 0, [])).toEqual([]);
-    expect(extractSegmentOccurrences('vac-1', flightSeg({ type: 'flight_other' }), 0, [])).toEqual(
+  });
+
+  it('derives departure + arrival occurrences for flight_other (#143)', () => {
+    const out = extractSegmentOccurrences('vac-1', flightSeg({ type: 'flight_other' }), 0, []);
+    expect(out.map((o) => o.kind)).toEqual(['departure', 'arrival']);
+    expect(out[0]!.transportType).toBe('flight_other');
+  });
+
+  it('carries the booking fields and the live state on every occurrence (#143)', () => {
+    const was = { departureTime: '17:00', at: '2026-06-10T08:00:00.000Z' };
+    const out = extractSegmentOccurrences(
+      'vac-1',
+      flightSeg({
+        airline: 'Singapore Airlines (SQ)',
+        flightNumber: 'SQ318',
+        terminal: '3',
+        liveRevision: '2026-06-15|09:00|3|2026-06-15|17:30',
+        liveWas: was,
+        liveAppliedAt: '2026-06-10T08:00:00.000Z',
+      }),
+      0,
       []
     );
+    for (const o of out) {
+      expect(o).toMatchObject({ airline: 'Singapore Airlines (SQ)', flightNumber: 'SQ318' });
+      expect(o.live).toEqual({
+        liveRevision: '2026-06-15|09:00|3|2026-06-15|17:30',
+        liveWas: was,
+        liveAppliedAt: '2026-06-10T08:00:00.000Z',
+      });
+    }
+    // The current schedule (departure terminal included) rides the departure side only.
+    expect(out[0]!.schedule).toMatchObject({ departureTime: '09:00', terminal: '3' });
+    expect(out[1]!.schedule).toBeUndefined();
+  });
+
+  it('leaves live undefined for a segment that has never been changed (#143)', () => {
+    const out = extractSegmentOccurrences('vac-1', flightSeg(), 0, []);
+    expect(out[0]!.live).toBeUndefined();
   });
 
   it('logs and skips a side with a malformed date — does not throw', () => {
@@ -215,6 +252,8 @@ describe('transportEmoji', () => {
     expect(transportEmoji('flight_outbound', 'arrival')).toBe('🛬');
     expect(transportEmoji('flight_return', 'departure')).toBe('🛫');
     expect(transportEmoji('flight_return', 'arrival')).toBe('🛬');
+    expect(transportEmoji('flight_other', 'departure')).toBe('🛫');
+    expect(transportEmoji('flight_other', 'arrival')).toBe('🛬');
   });
 
   it('keeps the generic emoji for non-flight types regardless of kind', () => {

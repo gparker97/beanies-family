@@ -1,0 +1,73 @@
+{
+  "_readme": "Spike 0 bookings for scripts/spikes/flight-status-spike.mts. EVERY flight number, date, time and airport below is a PLACEHOLDER: replace each with a real, public, upcoming flight before running live (dates inside AeroDataBox's window, ideally within the next few days so live fields appear). Booking refs are invented and must stay invented: no real PNRs, names or card details in this repo. Keep the five SHAPES: bare number + carried code on the 2nd sector of a multi-stop number, a spaced lower-case number on an overnight flight, a name-only airline with name-only airports, a codeshare marketing number, and a multi-stop number booked end to end.",
+  "bookings": [
+    {
+      "ref": "SPIKE-REF-A1",
+      "shape": "bare number '25' + 'Singapore Airlines (SQ)'; booked on the SECOND sector of multi-stop SQ25 (FRA→JFK)",
+      "airline": "Singapore Airlines (SQ)",
+      "flightNumber": "25",
+      "departureAirport": "Frankfurt (FRA)",
+      "arrivalAirport": "New York (JFK)",
+      "departureDate": "2026-12-14",
+      "departureTime": "08:45",
+      "terminal": "Terminal 1",
+      "arrivalDate": "2026-12-14",
+      "arrivalTime": "11:40",
+      "expect": { "multiStop": true, "pickedFrom": "FRA" }
+    },
+    {
+      "ref": "SPIKE-REF-B2",
+      "shape": "spaced lower-case 'sq 318', no airline; overnight arrival (next day)",
+      "airline": "",
+      "flightNumber": "sq 318",
+      "departureAirport": "SIN",
+      "arrivalAirport": "LHR",
+      "departureDate": "2026-12-13",
+      "departureTime": "23:05",
+      "terminal": "T3",
+      "arrivalDate": "2026-12-14",
+      "arrivalTime": "05:40",
+      "expect": {}
+    },
+    {
+      "ref": "SPIKE-REF-C3",
+      "shape": "name-only airline and name-only airports (the name-match path)",
+      "airline": "British Airways",
+      "flightNumber": "BA12",
+      "departureAirport": "Singapore Changi",
+      "arrivalAirport": "London Heathrow",
+      "departureDate": "2026-12-13",
+      "departureTime": "23:50",
+      "arrivalDate": "2026-12-14",
+      "arrivalTime": "06:25",
+      "expect": {}
+    },
+    {
+      "ref": "SPIKE-REF-D4",
+      "shape": "codeshare: a MARKETING number operated by another airline (replace with a real one)",
+      "airline": "Qantas (QF)",
+      "flightNumber": "QF 9999",
+      "departureAirport": "Singapore (SIN)",
+      "arrivalAirport": "Sydney (SYD)",
+      "departureDate": "2026-12-15",
+      "departureTime": "20:00",
+      "arrivalDate": "2026-12-16",
+      "arrivalTime": "06:10",
+      "expect": { "codeshare": true }
+    },
+    {
+      "ref": "SPIKE-REF-E5",
+      "shape": "multi-stop SQ25 booked END TO END (SIN→JFK via FRA): arrival half from the 2nd sector",
+      "airline": "SQ",
+      "flightNumber": "SQ25",
+      "departureAirport": "SIN",
+      "arrivalAirport": "JFK",
+      "departureDate": "2026-12-13",
+      "departureTime": "23:55",
+      "terminal": "Terminal 3",
+      "arrivalDate": "2026-12-14",
+      "arrivalTime": "11:40",
+      "expect": { "multiStop": true, "pickedFrom": "SIN", "arrivalFrom": "FRA" }
+    }
+  ]
+}

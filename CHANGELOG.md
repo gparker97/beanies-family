@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-11-07
+
+### Added
+
+- Flights in a trip are now checked against the airline's live schedule; a moved time or terminal updates the plan and tells the travelers, a cancelled flight goes back to pending, and every departure shows up in the daily briefing on its day. A magic beans feature, included in the free trial.
+
 ## 2026-11-06
 
 ### Added

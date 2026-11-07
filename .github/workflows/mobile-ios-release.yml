@@ -177,6 +177,10 @@ jobs:
           # debug build silently loses the ability to capture a recipe from a link.
           VITE_CONTENT_FETCH_URL: ${{ vars.CONTENT_FETCH_URL }}
           VITE_CONTENT_FETCH_API_KEY: ${{ secrets.CONTENT_FETCH_API_KEY }}
+          # Live flight checks (#143): the anonymous flight-status proxy. Unset means flights show
+          # "Not checked live" (the client's not_configured path), never an error.
+          VITE_FLIGHT_STATUS_URL: ${{ vars.FLIGHT_STATUS_URL }}
+          VITE_FLIGHT_STATUS_API_KEY: ${{ secrets.FLIGHT_STATUS_API_KEY }}
           VITE_PLAUSIBLE_DOMAIN: jvjpzIr6FM9tDKaS1gZaK
           VITE_NEWSLETTER_SUBSCRIBE_URL: https://everybeancounts.substack.com/api/v1/free
           # Open-Meteo "API Standard" key (#134, ADR-043). Unset today, so the build uses the

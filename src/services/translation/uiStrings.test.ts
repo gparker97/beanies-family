@@ -214,6 +214,10 @@ describe('uiStrings', () => {
       'calendarImport.failed.',
       // Who Owns What (#109): deleting a family-made card and restoring the default deck
       // both destroy history for good. "bean" must never stand in for a card or the deck.
+      // Live flight checks (#143): an airline changed or cancelled a booked flight and the plan
+      // was rewritten. "bean" must never stand in for the flight, the plan or the airline.
+      'flightChecks.',
+      'travel.live.',
       'whoOwnsWhat.delete',
       'whoOwnsWhat.restore',
       // Magic beans to-dos (#113): deleting an activity with linked to-dos, and a failed

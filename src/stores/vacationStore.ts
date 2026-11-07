@@ -432,6 +432,11 @@ export const useVacationStore = defineStore('vacations', () => {
    *
    * Searches all three buckets, because a segment id is unique across them and the caller
    * should not have to know which list its booking lives in.
+   *
+   * THE `sortDate` RULE lives here, once (#143): a `travelSegments` patch that carries a
+   * primary date (`departureDate`, or `embarkationDate` for a cruise) and no explicit
+   * `sortDate` moves `sortDate` with it, so the timeline order follows the inline editor, a
+   * live airline change and "Put it back" alike, and none of those callers mention it.
    */
   async function updateSegment(
     vacationId: string,
@@ -447,13 +452,24 @@ export const useVacationStore = defineStore('vacations', () => {
       const arr = (vacation[key] ?? []) as Array<{ id: string }>;
       const idx = arr.findIndex((seg) => seg.id === segmentId);
       if (idx < 0) continue;
-      const nextArr = arr.map((seg, i) => (i === idx ? { ...seg, ...patch } : seg));
+      const merged = key === 'travelSegments' ? withSortDate(patch) : patch;
+      const nextArr = arr.map((seg, i) => (i === idx ? { ...seg, ...merged } : seg));
       const saved = await updateVacation(vacationId, {
         [key]: nextArr,
       } as UpdateFamilyVacationInput);
       return saved !== null ? 'saved' : 'failed';
     }
     return segmentMissing('update_missing', 'segment');
+  }
+
+  /** `updateSegment`'s `sortDate` rule for a travel segment patch (see there). A cleared date
+   *  (an empty value) leaves `sortDate` where it was. */
+  function withSortDate(patch: Record<string, unknown>): Record<string, unknown> {
+    if ('sortDate' in patch) return patch;
+    const primary = [patch.departureDate, patch.embarkationDate].find(
+      (v): v is string => typeof v === 'string' && v.length > 0
+    );
+    return primary ? { ...patch, sortDate: primary } : patch;
   }
 
   /** Remove one booking segment by id, from whichever bucket holds it. */

@@ -117,6 +117,7 @@ import { useGoalsStore } from '@/stores/goalsStore';
 import { useMemberFilterStore } from '@/stores/memberFilterStore';
 import { useEntitlementStore } from '@/stores/entitlementStore';
 import { useWeatherStore } from '@/stores/weatherStore';
+import { useFlightStatusStore } from '@/stores/flightStatusStore';
 import { installDataPolicy } from '@/services/registry/dataPolicy';
 import { installMainScrollRestoration } from '@/composables/useMainScrollRestoration';
 import { useRecurringStore } from '@/stores/recurringStore';
@@ -223,6 +224,9 @@ useEntitlementStore();
 // #134: weather for the family's home town. Wired in its setup (cache hydrate, refresh watch,
 // visible-tab poll), so it is instantiated once here; nothing in this file reads it.
 useWeatherStore();
+// #143: live flight checks. `setup()` installs its triggers once (open, online, foreground,
+// the visible-tab poll and the debounced segment watch); nothing else in this file reads it.
+useFlightStatusStore().setup();
 // #117: the served Counter-write policy. Installed beside the entitlement observer, before any
 // unlock can reach `setFamilyKey`, so the worker gets the persisted value with the key.
 installDataPolicy();

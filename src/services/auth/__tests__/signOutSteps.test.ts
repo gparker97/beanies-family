@@ -249,6 +249,13 @@ describe('clearWeatherCache (#134): on every tier that has clearWidgetSnapshot',
   it('is not key material: it never trips the sign-out kit guard', () => {
     expect(KEY_MATERIAL_STEPS.has('clearWeatherCache')).toBe(false);
   });
+
+  it('clearFlightStatusCache (#143) runs right after it on every tier, and is not key material', () => {
+    for (const [, steps] of TIERS) {
+      expect(steps.indexOf('clearFlightStatusCache')).toBe(steps.indexOf('clearWeatherCache') + 1);
+    }
+    expect(KEY_MATERIAL_STEPS.has('clearFlightStatusCache')).toBe(false);
+  });
 });
 
 describe('Start over (2026-10-19): forgets the never-finished family', () => {

@@ -50,7 +50,8 @@ function mountCard(over?: Partial<TimelineItem>, props?: Record<string, unknown>
         VacationSegmentCard: {
           name: 'VacationSegmentCard',
           emits: ['edit', 'delete', 'update:title', 'update:collapsed'],
-          template: '<div><slot /><slot name="header-trailing" /></div>',
+          template:
+            '<div><slot name="header-trailing" /><slot name="header-below" /><slot /></div>',
         },
         SegmentWhenBand: true,
         MemberChip: true,
@@ -58,6 +59,17 @@ function mountCard(over?: Partial<TimelineItem>, props?: Record<string, unknown>
         ExpandableText: true,
         BeanieDatePicker: true,
         BeanieTimePicker: true,
+        FlightCheckChip: {
+          name: 'FlightCheckChip',
+          props: ['verification', 'nowMs'],
+          template: '<span class="chip" />',
+        },
+        FlightChangeNotice: {
+          name: 'FlightChangeNotice',
+          props: ['verification', 'segment', 'nowMs'],
+          emits: ['revert', 'take-airline'],
+          template: '<div class="notice" />',
+        },
       },
     },
   });
@@ -90,5 +102,91 @@ describe('TimelineSegmentCard', () => {
     expect(w.emitted('edit')).toBeTruthy();
     expect(w.emitted('delete')).toBeTruthy();
     expect(w.emitted('edit')![0]![0]).toMatchObject({ id: 'seg-1' });
+  });
+
+  // ── Live flight checks (#143) ────────────────────────────────────────────────
+  const FLIGHT = { label: 'SQ318', airline: 'Singapore Airlines (SQ)', flightNumber: '318' };
+
+  it('a phone gets the chip on its own header line; the row carries it from sm: up', () => {
+    const w = mountCard(
+      { flight: FLIGHT },
+      { verification: { state: 'verified', checkedAt: 1 }, nowMs: 2 }
+    );
+    const chips = w.findAllComponents({ name: 'FlightCheckChip' });
+    expect(chips).toHaveLength(2);
+    expect(chips.map((c) => c.element.parentElement!.className)).toEqual([
+      expect.stringContaining('sm:inline-flex'),
+      expect.stringContaining('sm:hidden'),
+    ]);
+  });
+
+  it('a flight shows its chip in the header always, expanded or collapsed', () => {
+    const v = { state: 'verified' as const, checkedAt: 1 };
+    expect(
+      mountCard({ flight: FLIGHT }, { verification: v, nowMs: 2 }).find('.chip').exists()
+    ).toBe(true);
+    expect(
+      mountCard({ flight: FLIGHT }, { verification: v, nowMs: 2, collapsed: true })
+        .find('.chip')
+        .exists()
+    ).toBe(true);
+  });
+
+  it('a flight that is over shows no chip (nothing left to check)', () => {
+    const w = mountCard(
+      { flight: FLIGHT },
+      { verification: { state: 'unavailable', reason: 'past' }, nowMs: 2 }
+    );
+    expect(w.findAllComponents({ name: 'FlightCheckChip' })).toHaveLength(0);
+  });
+
+  it('a non-flight never gets a chip, even with a not-live verification', () => {
+    const w = mountCard(
+      { kind: 'travel', segmentType: 'train' },
+      { verification: { state: 'not-live' }, nowMs: 2 }
+    );
+    expect(w.find('.chip').exists()).toBe(false);
+    expect(w.text()).toContain('travel.live.notLiveFoot.train');
+  });
+
+  it('the foot line covers trains, ferries, cruises and buses only', () => {
+    expect(mountCard({ kind: 'transportation', segmentType: 'bus' }).text()).toContain(
+      'travel.live.notLiveFoot.bus'
+    );
+    expect(mountCard({ kind: 'travel', segmentType: 'flight_outbound' }).text()).not.toContain(
+      'notLiveFoot'
+    );
+    expect(mountCard({ kind: 'accommodation', segmentType: 'hotel' }).text()).not.toContain(
+      'notLiveFoot'
+    );
+  });
+
+  it('shows the notice for changed / conflict / cancelled only, and re-emits its actions', async () => {
+    const changed = mountCard(
+      { flight: FLIGHT },
+      { verification: { state: 'changed', was: { departureTime: '17:00' } }, nowMs: 2 }
+    );
+    const notice = changed.findComponent({ name: 'FlightChangeNotice' });
+    expect(notice.exists()).toBe(true);
+    notice.vm.$emit('revert');
+    notice.vm.$emit('take-airline');
+    await changed.vm.$nextTick();
+    expect(changed.emitted('revert')![0]![0]).toMatchObject({ id: 'seg-1' });
+    expect(changed.emitted('take-airline')![0]![0]).toMatchObject({ id: 'seg-1' });
+
+    for (const state of ['verified', 'unavailable'] as const) {
+      expect(
+        mountCard({ flight: FLIGHT }, { verification: { state }, nowMs: 2 })
+          .findComponent({ name: 'FlightChangeNotice' })
+          .exists()
+      ).toBe(false);
+    }
+  });
+
+  it('draws the "live" pill on a live row', () => {
+    const w = mountCard({
+      detailRows: [{ label: 'travel.live.row.gate', value: 'C21', live: true }],
+    });
+    expect(w.text()).toContain('travel.live.pill');
   });
 });

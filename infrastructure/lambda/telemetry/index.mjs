@@ -439,6 +439,12 @@ export const ALLOWED_CONTEXT_KEYS = new Set([
   // Weather (#134, surface 'weather'): the reading's age in whole minutes, capped at 10080,
   // or -1 when there is none. A bounded integer. Mirror of src/utils/diagnosticContext.ts.
   'weather_age_min',
+  // Live flight checks (#143, surface 'travel-verify'): a verification state, how the leg was
+  // matched, and the model field NAMES an airline change rewrote. Closed vocabularies, never a
+  // flight number, date or route. Mirror of src/utils/diagnosticContext.ts.
+  'flight_state',
+  'flight_match',
+  'flight_fields',
 ]);
 
 function getHeaders(event) {

@@ -45,6 +45,10 @@ import { isFlagEnabled } from '@/config/flags';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { HELP_PATHS, openHelpArticle } from '@/utils/helpLinks';
 import InfoHintBadge from '@/components/ui/InfoHintBadge.vue';
+import BetaBadge from '@/components/ui/BetaBadge.vue';
+import BaseButton from '@/components/ui/BaseButton.vue';
+import { useFlightStatusStore } from '@/stores/flightStatusStore';
+import { useReadOnlyCopy } from '@/composables/useReadOnlyCopy';
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue';
 import type { SupportedTravelType, HelpfulHintType } from '@/types/models';
 import type { UIStringKey } from '@/services/translation/uiStrings';
@@ -54,6 +58,8 @@ defineEmits<{ close: [] }>();
 
 const { t } = useTranslation();
 const settingsStore = useSettingsStore();
+const flightStatusStore = useFlightStatusStore();
+const { planRouteExists, seePlans } = useReadOnlyCopy();
 
 const remindersEnabled = computed(() => settingsStore.remindersEnabled);
 
@@ -71,8 +77,8 @@ const activityLeadOptions = computed(() =>
   }))
 );
 
-// One row per travel type the app can fire on. "Flights" drives both the
-// outbound and return legs (they share a lead).
+// One row per travel type the app can fire on. "Flights" drives all three
+// flight legs (outbound, return, other: they share a lead).
 const TRAVEL_ROWS: {
   key: string;
   emoji: string;
@@ -82,7 +88,7 @@ const TRAVEL_ROWS: {
   {
     key: 'flights',
     emoji: '✈️',
-    types: ['flight_outbound', 'flight_return'],
+    types: ['flight_outbound', 'flight_return', 'flight_other'],
     labelKey: 'reminders.flights',
   },
   { key: 'cruises', emoji: '🚢', types: ['cruise'], labelKey: 'reminders.cruises' },
@@ -101,6 +107,29 @@ async function onToggle(enabled: boolean): Promise<void> {
   } catch {
     // Already surfaced (toast + console.error) and re-thrown; the toggle reads
     // the persisted value, so a failed write simply stays where it was.
+  }
+}
+
+// ── Live flight checks (#143) — two device switches, magic beans only ──
+// What the switch SHOWS is the stored choice AND the plan. The gate is a read-only derivation:
+// it never writes the setting, so a family that subscribes again gets its own positions back.
+const isEntitled = computed(() => flightStatusStore.isEntitled);
+const liveChecksOn = computed(() => settingsStore.liveFlightChecksEnabled && isEntitled.value);
+const liveAlertsOn = computed(() => settingsStore.liveFlightChangeAlerts && isEntitled.value);
+
+async function onToggleLiveChecks(enabled: boolean): Promise<void> {
+  try {
+    await settingsStore.setLiveFlightChecksEnabled(enabled);
+  } catch {
+    // Setter toasts + re-throws; the toggle reads the persisted value and reverts.
+  }
+}
+
+async function onToggleLiveAlerts(enabled: boolean): Promise<void> {
+  try {
+    await settingsStore.setLiveFlightChangeAlerts(enabled);
+  } catch {
+    // Setter toasts + re-throws; the toggle reads the persisted value and reverts.
   }
 }
 
@@ -327,6 +356,51 @@ async function onOpenExactAlarmSettings(): Promise<void> {
         @update:model-value="onTodoLead"
       />
     </div>
+
+    <!-- #143: Live flight checks — two device switches, a magic beans feature -->
+    <p
+      class="font-outfit dark:text-ink-faint mt-5 mb-1 text-xs font-semibold tracking-[0.08em] text-[var(--color-text-muted)] uppercase"
+    >
+      {{ t('reminders.liveChecks.title') }}
+    </p>
+    <SettingToggleRow
+      testid="live-flight-checks"
+      divider
+      :title="t('reminders.liveChecks.checks')"
+      :hint="t('reminders.liveChecks.checksHint')"
+      :model-value="liveChecksOn"
+      :disabled="!isEntitled"
+      @update:model-value="onToggleLiveChecks"
+    >
+      <template #title-suffix><BetaBadge tone="beans" label="plan.name.full" /></template>
+    </SettingToggleRow>
+    <SettingToggleRow
+      testid="live-flight-alerts"
+      :title="t('reminders.liveChecks.alerts')"
+      :hint="t('reminders.liveChecks.alertsHint')"
+      :model-value="liveAlertsOn"
+      :disabled="!isEntitled"
+      @update:model-value="onToggleLiveAlerts"
+    >
+      <template #title-suffix><BetaBadge tone="beans" label="plan.name.full" /></template>
+    </SettingToggleRow>
+    <div v-if="!isEntitled" class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+      <p class="dark:text-ink-soft text-xs text-[var(--color-text-muted)]">
+        {{ t('flightChecks.settings.lockedTrial') }}
+      </p>
+      <BaseButton
+        v-if="planRouteExists"
+        variant="ghost"
+        size="sm"
+        data-testid="live-flight-see-plans"
+        @click="seePlans"
+      >
+        {{ t('plan.action.seePlans') }}
+      </BaseButton>
+    </div>
+    <p class="dark:text-ink-faint mt-2 text-xs text-[var(--color-text-muted)]">
+      {{ t('flightChecks.settings.privacy') }}
+    </p>
 
     <!-- #40: Helpful Hints — master (family-synced) + per-device per-type mutes -->
     <template v-if="helpfulHintsFlagOn">

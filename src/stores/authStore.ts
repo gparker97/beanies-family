@@ -3383,6 +3383,12 @@ export const useAuthStore = defineStore('auth', () => {
         const { useWeatherStore } = await import('@/stores/weatherStore');
         await useWeatherStore().haltForSignOut();
       },
+      // #143: this device's live flight checks, the same way: every platform, halt-then-delete
+      // inside the store, dynamic import, a rejection reported once by `runSignOutSteps`.
+      clearFlightStatusCache: async () => {
+        const { useFlightStatusStore } = await import('@/stores/flightStatusStore');
+        await useFlightStatusStore().haltForSignOut();
+      },
       captureDepartingAccount: () => {
         // MUST run before the Google clear nulls the cached email (#62).
         ctx.departedEmail = getGoogleAccountEmail();

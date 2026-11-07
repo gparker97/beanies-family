@@ -11,6 +11,9 @@ import { useHolidayStore } from '@/stores/holidayStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useResponsibilityStore } from '@/stores/responsibilityStore';
 import { useNotificationsStore } from '@/stores/notificationsStore';
+import { useVacationStore } from '@/stores/vacationStore';
+import { useFlightStatusStore } from '@/stores/flightStatusStore';
+import { buildTravelBriefingRows } from '@/composables/criticalItems/travelRows';
 import { useMemberInfo } from '@/composables/useMemberInfo';
 import { useResponsibilityCardLabel } from '@/composables/useResponsibilityCardLabel';
 import { buildCardBriefingRows, ymdOf, type CardBriefingRow } from '@/utils/responsibilityDeck';
@@ -46,7 +49,7 @@ import { showToast } from '@/composables/useToast';
 
 export interface CriticalItem {
   id: string;
-  type: 'todo' | 'activity' | 'medication' | 'holiday' | 'list' | 'meal' | 'card';
+  type: 'todo' | 'activity' | 'medication' | 'holiday' | 'list' | 'meal' | 'card' | 'travel';
   message: string;
   icon: string;
   time: string; // HH:mm for sorting, '' if untimed
@@ -170,9 +173,11 @@ export function useCriticalItems() {
   const settingsStore = useSettingsStore();
   const responsibilityStore = useResponsibilityStore();
   const notificationsStore = useNotificationsStore();
+  const vacationStore = useVacationStore();
+  const flightStatusStore = useFlightStatusStore();
   const { cardName } = useResponsibilityCardLabel();
   const { getMemberName, getMemberById } = useMemberInfo();
-  const { t } = useTranslation();
+  const { t, currentLanguage } = useTranslation();
   const { today: todayStr } = useToday();
 
   /**
@@ -481,6 +486,23 @@ export function useCriticalItems() {
         });
       }
     }
+
+    // ── Today's departures (#143): plain rows, or the airline's change/cancellation ──
+    items.push(
+      ...buildTravelBriefingRows(
+        vacationStore.travelSegmentOccurrencesInRange(todayStr.value, todayStr.value),
+        {
+          today: todayStr.value,
+          nowMs: Date.now(),
+          viewer: currentMember,
+          members: familyStore.members,
+          resolveMember: getMemberById,
+          t,
+          lang: currentLanguage.value,
+          verificationFor: flightStatusStore.verificationFor,
+        }
+      )
+    );
 
     // ── Who Owns What (#109) card rows ───────────────────────────────
     // Untimed, so they keep insertion order: above the hint block, below the rest.

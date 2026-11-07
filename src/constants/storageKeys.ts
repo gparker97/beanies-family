@@ -40,6 +40,12 @@ export const STORAGE_KEYS = {
    *  and `placeKey` it belongs to, so sign-out is a single removal. Device-local, never in
    *  the pod; not read by the `index.html` bootstrap. */
   WEATHER: 'beanies:weather',
+  /** #143: this device's latest live flight check per travel segment
+   *  (`services/flightStatus/flightStatusCache.ts`): ONE key holding the checks, the failure
+   *  backoffs and the `familyId` they belong to, so sign-out is a single removal. Provider
+   *  answers only (public flight data), never synced. Device-local, never in the pod; not read
+   *  by the `index.html` bootstrap. */
+  FLIGHT_STATUS: 'beanies:flight-status',
   /** #141: the desktop month grid's density (`compact` | `comfortable`). Device-local;
    *  not read by the `index.html` bootstrap. */
   MONTH_GRID_DENSITY: 'beanies:monthGridDensity',

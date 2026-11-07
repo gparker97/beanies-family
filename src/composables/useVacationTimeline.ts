@@ -24,8 +24,12 @@ import {
   type TimingSegment,
 } from '@/utils/vacation';
 import { isTravellerSubset, resolveSegmentTravellers } from '@/utils/segmentTravellers';
+import { isFlightType } from '@/utils/travelCodes';
+import { flightLabel } from '@/utils/flightStatus/occurrenceNotice';
+import { splitLocal } from '@/utils/flightStatus/schedule';
 import { useTranslationStore } from '@/stores/translationStore';
 import type { UIStringKey } from '@/services/translation/uiStrings';
+import type { FlightLiveInfo, FlightVerification } from '@/types/flightStatus';
 import type {
   FamilyVacation,
   VacationTravelSegment,
@@ -54,7 +58,22 @@ export interface DetailRow {
   mapLink?: boolean;
   /** Render as a clickable external link */
   isLink?: boolean;
+  /** A display-only live value from this device's flight check (gate, belt, estimate): never
+   *  written to the plan, so it carries a small "live" pill and no editor (#143). */
+  live?: boolean;
 }
+
+/** What the live-check surfaces (chip, change notice, rail) need from a FLIGHT segment (#143).
+ *  `label` is the flight as the family would say it ("SQ318"). */
+export type FlightRef = Pick<
+  VacationTravelSegment,
+  | 'airline'
+  | 'flightNumber'
+  | 'bookingReference'
+  | 'departureDate'
+  | 'liveAppliedAt'
+  | 'liveCancelledAt'
+> & { label: string };
 
 /**
  * The time of day a booking happens, for same-day ordering.
@@ -86,6 +105,10 @@ function timeOfDay(seg: Record<string, unknown>): string {
 export interface TimelineItem {
   id: string;
   kind: 'travel' | 'accommodation' | 'transportation';
+  /** The model's own `type` within `kind` ("flight_outbound", "train", "hotel", "bus"). */
+  segmentType: string;
+  /** Set for flight segments only: what the live flight checks render from (#143). */
+  flight?: FlightRef;
   icon: string;
   title: string;
   keyValue: string;
@@ -259,7 +282,51 @@ function arrivalOffsetLabel(seg: VacationTravelSegment, t: T): string {
   return fillTemplate(t('segmentRow.arrivesPlusDays'), { n: String(n) });
 }
 
-export function travelDetailRows(seg: VacationTravelSegment, t: T): DetailRow[] {
+/**
+ * "5:20pm" (or "5:20pm · 14 Dec" when the estimate lands on another day) for a live estimate,
+ * or null when there is none or it says exactly what the plan says (a duplicate of the band).
+ */
+function estimateValue(
+  local: string | undefined,
+  plannedDate: string | undefined,
+  plannedTime: string | undefined
+): string | null {
+  const est = splitLocal(local);
+  if (!est) return null;
+  const sameDay = !plannedDate || extractDatePart(plannedDate) === est.date;
+  if (sameDay && plannedTime?.padStart(5, '0') === est.time) return null;
+  return sameDay
+    ? formatTime12(est.time)
+    : `${formatTime12(est.time)} · ${formatDateShort(est.date)}`;
+}
+
+/** Read-only rows from this device's live check: gate, check-in desk, estimates, belt. */
+function liveRows(seg: VacationTravelSegment, live: FlightLiveInfo, t: T): DetailRow[] {
+  const rows: DetailRow[] = [];
+  const arrivalDate = seg.arrivalDate || seg.departureDate;
+  const estDeparts = estimateValue(live.estimatedDeparture, seg.departureDate, seg.departureTime);
+  const estArrives = estimateValue(live.estimatedArrival, arrivalDate, seg.arrivalTime);
+  if (live.gate) rows.push({ label: t('travel.live.row.gate'), value: live.gate, live: true });
+  if (live.desk) rows.push({ label: t('travel.live.row.desk'), value: live.desk, live: true });
+  if (estDeparts) {
+    rows.push({ label: t('travel.live.row.estDeparts'), value: estDeparts, live: true });
+  }
+  if (estArrives) {
+    rows.push({ label: t('travel.live.row.estArrives'), value: estArrives, live: true });
+  }
+  if (live.belt) rows.push({ label: t('travel.live.row.belt'), value: live.belt, live: true });
+  return rows;
+}
+
+/**
+ * Detail rows for a travel segment. `live` is this device's display-only flight check
+ * (`FlightVerification.live`); its rows follow the terminal and are never editable.
+ */
+export function travelDetailRows(
+  seg: VacationTravelSegment,
+  t: T,
+  live?: FlightLiveInfo
+): DetailRow[] {
   const rows: DetailRow[] = [];
   const isF = seg.type?.startsWith('flight');
   if (isF) {
@@ -281,6 +348,7 @@ export function travelDetailRows(seg: VacationTravelSegment, t: T): DetailRow[] 
         field: 'flightNumber',
       });
     if (seg.terminal) rows.push({ label: t('segmentRow.terminal'), value: seg.terminal });
+    if (live) rows.push(...liveRows(seg, live, t));
     if (seg.departureDate)
       rows.push({
         label: t('segmentRow.date'),
@@ -538,11 +606,21 @@ function withTiming(
 
 // ── Composable ──────────────────────────────────────────────────────────────
 
+export interface VacationTimelineOptions {
+  /**
+   * Live flight checks (#143): the page passes `flightStatusStore.verificationFor` so flight
+   * rows gain the display-only live details. Injected rather than read here, so the rows stay
+   * a pure function of what the caller hands in (the wall passes nothing and shows none).
+   */
+  verificationFor?: (segmentId: string) => FlightVerification | undefined;
+}
+
 export function useVacationTimeline(
   vacation: ComputedRef<FamilyVacation | undefined>,
   /** Today's local date (`YYYY-MM-DD`), reactive. Read inside the computed so
    *  segment phase (`past`/`now`/`future`) re-derives on the midnight day-roll. */
-  today: Ref<string>
+  today: Ref<string>,
+  options: VacationTimelineOptions = {}
 ) {
   // Reading `t` inside the computeds below makes them re-evaluate on a language
   // switch, so the read-only timeline localizes live.
@@ -569,21 +647,39 @@ export function useVacationTimeline(
     for (let i = 0; i < v.travelSegments.length; i++) {
       const seg = v.travelSegments[i]!;
       const date = seg.sortDate || seg.departureDate || seg.embarkationDate || '';
+      const isFlight = isFlightType(seg.type);
+      const live = isFlight ? options.verificationFor?.(seg.id)?.live : undefined;
       const { detailRows, timing } = withTiming(
         'travel',
         seg,
-        travelDetailRows(seg, t),
+        travelDetailRows(seg, t, live),
         !!date,
         today.value
       );
+      const title =
+        seg.type === 'activity' ? seg.title || 'activity' : buildTravelSegmentTitle(seg);
       items.push({
         id: seg.id,
         kind: 'travel',
+        segmentType: seg.type,
+        ...(isFlight
+          ? {
+              flight: {
+                label: flightLabel({ airline: seg.airline, flightNumber: seg.flightNumber, title }),
+                airline: seg.airline,
+                flightNumber: seg.flightNumber,
+                bookingReference: seg.bookingReference,
+                departureDate: seg.departureDate,
+                liveAppliedAt: seg.liveAppliedAt,
+                liveCancelledAt: seg.liveCancelledAt,
+              },
+            }
+          : {}),
         icon:
           seg.type === 'activity' && seg.activityCategory
             ? (activityCategoryIcons[seg.activityCategory] ?? '🎭')
             : (travelIcons[seg.type] ?? '✈️'),
-        title: seg.type === 'activity' ? seg.title || 'activity' : buildTravelSegmentTitle(seg),
+        title,
         keyValue: buildTravelKeyValue(seg),
         status: seg.status,
         sortDate: date ? extractDatePart(date) : '9999-12-31',
@@ -618,6 +714,7 @@ export function useVacationTimeline(
       items.push({
         id: acc.id,
         kind: 'accommodation',
+        segmentType: acc.type,
         icon: accomIcons[acc.type] ?? '🏨',
         title: buildAccommodationTitle(acc),
         keyValue: kvParts.join(' · '),
@@ -674,6 +771,7 @@ export function useVacationTimeline(
       items.push({
         id: trans.id,
         kind: 'transportation',
+        segmentType: trans.type,
         icon: transportIcons[trans.type] ?? '🚐',
         title: buildTransportationTitle(trans),
         keyValue: kvParts.join(' · '),

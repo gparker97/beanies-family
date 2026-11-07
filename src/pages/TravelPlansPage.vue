@@ -5,6 +5,7 @@ import PageWelcomeSubtitle from '@/components/ui/PageWelcomeSubtitle.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
 import ErrorBanner from '@/components/common/ErrorBanner.vue';
 import TimelineSegmentCard from '@/components/travel/TimelineSegmentCard.vue';
+import TripLiveChecksCard from '@/components/travel/TripLiveChecksCard.vue';
 import TripCard from '@/components/travel/TripCard.vue';
 import TripIdeasPanel from '@/components/travel/TripIdeasPanel.vue';
 import TripLists from '@/components/lists/TripLists.vue';
@@ -19,6 +20,11 @@ import TransportationEditModal from '@/components/travel/TransportationEditModal
 import IdeaEditModal from '@/components/travel/IdeaEditModal.vue';
 import TravelExtractReviewModal from '@/components/travel/TravelExtractReviewModal.vue';
 import { useVacationStore } from '@/stores/vacationStore';
+import { useFlightStatusStore } from '@/stores/flightStatusStore';
+import { isFlightType } from '@/utils/travelCodes';
+import { flightLabel } from '@/utils/flightStatus/occurrenceNotice';
+import { hasFlightChip } from '@/utils/flightStatus/copy';
+import { datePart, normaliseTime } from '@/utils/flightStatus/schedule';
 import { usePhotoStore } from '@/stores/photoStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
@@ -64,6 +70,7 @@ const router = useRouter();
 const { goBack } = useAppBack();
 const { canEditActivities } = usePermissions();
 const vacationStore = useVacationStore();
+const flightStatusStore = useFlightStatusStore();
 const familyStore = useFamilyStore();
 const { copied } = useClipboard();
 const photoStore = usePhotoStore();
@@ -387,8 +394,37 @@ watch(
 const { today: todayISO } = useToday();
 const { groupedByDate, accommodationGaps, undatedItems } = useVacationTimeline(
   selectedVacation,
-  todayISO
+  todayISO,
+  { verificationFor: flightStatusStore.verificationFor }
 );
+
+/**
+ * The desktop rail's "Live checks" rows (#143): every flight in the selected trip, soonest
+ * first, with its verification. Empty (and the card hidden) for a trip with no flight.
+ */
+function liveCheckSortKey(s: { departureDate?: string; departureTime?: string }): string {
+  return `${datePart(s.departureDate) ?? '9999'} ${normaliseTime(s.departureTime) ?? ''}`;
+}
+
+const liveCheckRows = computed(() => {
+  const v = selectedVacation.value;
+  if (!v) return [];
+  return (
+    v.travelSegments
+      .filter((s) => isFlightType(s.type))
+      .map((s) => ({ seg: s, verification: flightStatusStore.verificationFor(s.id) }))
+      // A flight that is over has nothing left to check and carries no chip.
+      .filter((r) => r.verification !== undefined && hasFlightChip(r.verification))
+      // Soonest first, on the tuple's own normalisers: "9:05" sorts before "18:30".
+      .sort((a, b) => liveCheckSortKey(a.seg).localeCompare(liveCheckSortKey(b.seg)))
+      .map(({ seg, verification }) => ({
+        id: seg.id,
+        label: flightLabel(seg),
+        departureDate: seg.departureDate,
+        verification: verification!,
+      }))
+  );
+});
 
 /** Merged timeline: interleave date groups with gap warnings.
  *  The "you are here" today indicator is rendered inline inside today's
@@ -740,9 +776,6 @@ function setCollapsed(id: string, val: boolean) {
 
 // ── Edit modals ──────────────────────────────────────────────────────────────
 
-/** Date fields that should also update sortDate on travel segments */
-const TRAVEL_DATE_FIELDS = new Set(['departureDate', 'embarkationDate']);
-
 /** Inline-edit a single field on a timeline item and save immediately */
 /**
  * AWAITED so a failed save is observed before the inline editor clears. Addressed by segment
@@ -752,13 +785,34 @@ const TRAVEL_DATE_FIELDS = new Set(['departureDate', 'embarkationDate']);
 async function saveInlineField(item: TimelineItem, field: string, value: string) {
   if (!requireEdit()) return;
   if (!selectedVacation.value) return;
-  // Keep sortDate in sync when a primary date field of a travel segment changes
-  const patch: Record<string, unknown> =
-    item.kind === 'travel' && TRAVEL_DATE_FIELDS.has(field)
-      ? { [field]: value, sortDate: value }
-      : { [field]: value };
+  // `sortDate` follows a travel segment's primary date through `updateSegment`'s own rule.
   // The store toasts when the segment is gone; nothing more to do here.
-  await vacationStore.updateSegment(selectedVacation.value.id, item.id, patch);
+  await vacationStore.updateSegment(selectedVacation.value.id, item.id, { [field]: value });
+}
+
+/**
+ * Live flight checks (#143): "Put it back" and "Use the airline's". The write goes through
+ * `flightStatusStore` (which logs it) into `vacationStore.updateSegment`, which already toasts
+ * a gone segment (`missing`) and a failed save (`wrapAsync`), so this adds no second toast for
+ * those. The one case it must explain itself is "Use the airline's" with no airline answer on
+ * THIS device (the cache was pruned or never filled): nothing would be written, silently.
+ */
+async function revertFlight(item: TimelineItem): Promise<void> {
+  if (!requireEdit()) return;
+  await flightStatusStore.revert(item.id);
+}
+
+async function takeAirlineFlight(item: TimelineItem): Promise<void> {
+  if (!requireEdit()) return;
+  if (!flightStatusStore.verificationFor(item.id)?.provider) {
+    showToast(
+      'info',
+      t('travel.live.toast.notChecked.title'),
+      t('travel.live.toast.notChecked.message')
+    );
+    return;
+  }
+  await flightStatusStore.takeAirline(item.id);
 }
 
 function openEditModal(item: TimelineItem) {
@@ -1354,11 +1408,15 @@ async function addQuickIdea() {
                       :collapsed="isCollapsed(item.id)"
                       :read-only="!canEditActivities"
                       :hint="hintMap.get(item.id)"
+                      :verification="flightStatusStore.verificationFor(item.id)"
+                      :now-ms="flightStatusStore.nowMs"
                       @inline-save="saveInlineField"
                       @edit="openEditModal"
                       @delete="deleteTimelineItem"
                       @update:collapsed="setCollapsed"
                       @open-attachment="openAttachmentViewer"
+                      @revert="revertFlight"
+                      @take-airline="takeAirlineFlight"
                     />
                   </div>
                 </div>
@@ -1409,35 +1467,47 @@ async function addQuickIdea() {
               :collapsed="isCollapsed(item.id)"
               :read-only="!canEditActivities"
               :hint="hintMap.get(item.id)"
+              :verification="flightStatusStore.verificationFor(item.id)"
+              :now-ms="flightStatusStore.nowMs"
               @inline-save="saveInlineField"
               @edit="openEditModal"
               @delete="deleteTimelineItem"
               @update:collapsed="setCollapsed"
               @open-attachment="openAttachmentViewer"
+              @revert="revertFlight"
+              @take-airline="takeAirlineFlight"
             />
           </div>
         </div>
 
-        <!-- RIGHT: Ideas panel -->
-        <TripIdeasPanel
-          ref="ideasPanelRef"
-          v-model:quick-idea-text="quickIdeaText"
-          :vacation="selectedVacation"
-          :unplanned-ideas="unplannedIdeas"
-          :planned-ideas="plannedIdeas"
-          @add-idea="addQuickIdea"
-          @vote="handleVote"
-          @edit-idea="openIdeaEdit"
-          @delete-idea="handleIdeaDelete"
-        >
-          <template #lists>
-            <TripLists
-              ref="tripListsRef"
-              :key="selectedVacation.id"
-              :vacation-id="selectedVacation.id"
-            />
-          </template>
-        </TripIdeasPanel>
+        <!-- RIGHT: the live-checks card (desktop, trips with a flight), then the Ideas panel -->
+        <div class="min-w-0">
+          <TripLiveChecksCard
+            v-if="liveCheckRows.length > 0"
+            class="mb-4 hidden lg:block"
+            :rows="liveCheckRows"
+            :now-ms="flightStatusStore.nowMs"
+          />
+          <TripIdeasPanel
+            ref="ideasPanelRef"
+            v-model:quick-idea-text="quickIdeaText"
+            :vacation="selectedVacation"
+            :unplanned-ideas="unplannedIdeas"
+            :planned-ideas="plannedIdeas"
+            @add-idea="addQuickIdea"
+            @vote="handleVote"
+            @edit-idea="openIdeaEdit"
+            @delete-idea="handleIdeaDelete"
+          >
+            <template #lists>
+              <TripLists
+                ref="tripListsRef"
+                :key="selectedVacation.id"
+                :vacation-id="selectedVacation.id"
+              />
+            </template>
+          </TripIdeasPanel>
+        </div>
       </div>
     </template>
 

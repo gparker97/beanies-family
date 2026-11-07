@@ -95,6 +95,10 @@ jobs:
           # debug build silently loses the ability to capture a recipe from a link.
           VITE_CONTENT_FETCH_URL: ${{ vars.CONTENT_FETCH_URL }}
           VITE_CONTENT_FETCH_API_KEY: ${{ secrets.CONTENT_FETCH_API_KEY }}
+          # Live flight checks (#143): the anonymous flight-status proxy. Unset means flights show
+          # "Not checked live" (the client's not_configured path), never an error.
+          VITE_FLIGHT_STATUS_URL: ${{ vars.FLIGHT_STATUS_URL }}
+          VITE_FLIGHT_STATUS_API_KEY: ${{ secrets.FLIGHT_STATUS_API_KEY }}
 
       - name: Sync Capacitor (Android)
         run: npx cap sync android

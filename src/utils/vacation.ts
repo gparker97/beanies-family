@@ -21,6 +21,8 @@ import { CRUISE_LINES } from '@/constants/cruiseLines';
 import { CRUISE_SHIPS } from '@/constants/cruiseShips';
 import { CRUISE_PORTS } from '@/constants/cruisePorts';
 import { fillTemplate } from '@/utils/fillTemplate';
+import { carriedCode, FLIGHT_DESIGNATOR, PLACEHOLDER_CODES, isFlightType } from './travelCodes';
+import { pickLiveState, tupleFromSegment } from './flightStatus/schedule';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import type {
   FamilyVacation,
@@ -31,8 +33,10 @@ import type {
   VacationAccommodation,
   VacationTransportation,
   SupportedTravelType,
+  SegmentLiveState,
   UUID,
 } from '@/types/models';
+import type { ScheduleTuple } from '@/types/flightStatus';
 
 /** Emoji lookup for vacation trip types */
 const TRIP_TYPE_EMOJIS: Record<VacationTripType, string> = {
@@ -859,39 +863,9 @@ export function overrideTripTarget(
 
 // ── Auto-generated segment titles ────────────────────────────────────────────
 
-/**
- * A code-SHAPED token that is not a code. The prompt forbids the model inventing these, but
- * `UNK` is Unalakleet and `NAN` is Nadi, so one reaching a lookup would name a real airport in
- * the wrong hemisphere. Treated as "no code carried", which renders the field verbatim instead.
- */
-const PLACEHOLDER_CODES = new Set(['TBA', 'TBD', 'TBC', 'UNK', 'XXX', 'ZZZ', 'NIL', 'NA', 'XX']);
-// The line is drawn at tokens that read as "I do not know", and it stops there on purpose. `UNK`
-// costs Unalakleet, which is worth it. `NAN` is NOT listed: it is Nadi, Fiji — a genuine family
-// destination and an unlikely placeholder — so a wider net would cost more than it saves.
-
-/**
- * The IATA code a field EXPLICITLY carries, or `undefined` when it carries a name.
- *
- * ONE definition, three consumers (`airportCode`, `flightCodeLabel`, and the extraction
- * telemetry's shape probe), because two of those disagreeing is its own defect class: an
- * anchored probe beside an unanchored extractor logged working input as a translation failure.
- *
- * Two shapes only, and deliberately no cleverer rung. Three rounds of review each broke a new
- * input class as rungs were added — most sharply a leading-bare-code rung placed before the
- * parenthesized one, which turned "LOS ANGELES (LAX)" into LOS (Lagos, Nigeria). The rule that
- * holds is **verbose but true beats short and possibly false**: when the field does not plainly
- * carry a code, the caller renders the whole string rather than guessing which token is one.
- */
-export function carriedCode(value: string | undefined, width: 2 | 3): string | undefined {
-  const v = value?.trim();
-  if (!v) return undefined;
-  const exact = width === 3 ? /^[A-Z]{3}$/ : /^[A-Z0-9]{2}$/;
-  // Unanchored for width 3: the picker's "Sydney (SYD) Terminal 1" is a real stored shape, and
-  // matching parens FIRST is what keeps an all-caps city name from winning over the real code.
-  const parens = width === 3 ? /\(([A-Z]{3})\)/ : /\(([A-Z0-9]{2,3})\)$/;
-  const code = exact.test(v) ? v : (parens.exec(v)?.[1] ?? undefined);
-  return code && !PLACEHOLDER_CODES.has(code) ? code : undefined;
-}
+// `PLACEHOLDER_CODES` and `carriedCode` live in the leaf `./travelCodes` (the flight-status
+// matcher runs under plain node and cannot import this file); re-exported for existing callers.
+export { carriedCode };
 
 // ── code → readable label ───────────────────────────────────────────────────
 //
@@ -963,8 +937,6 @@ function airportCode(airport?: string): string {
  * The field is `flightNumber`, so reading it as one is the right default, and `travelDetailRows`
  * still shows the airline in full — only the one-line summary loses it.
  */
-/** Two alphanumerics (at least one a letter) then 1-4 digits: "SQ25", "HO1602", "6E123". */
-const FLIGHT_DESIGNATOR = /^(?=[a-z0-9]{2}\d)(?=[a-z0-9]*[a-z])[a-z0-9]{2}\d{1,4}$/i;
 export function flightCodeLabel(airline?: string, flightNumber?: string): string {
   const raw = airline?.trim() ?? '';
   // Both shapes through ONE derivation. Branching on "parenthesized" vs "bare" is what left the
@@ -1005,7 +977,7 @@ export function buildTravelSegmentTitle(seg: {
   activityCategory?: string;
 }): string {
   const t = seg.type;
-  if (t === 'flight_outbound' || t === 'flight_return' || t === 'flight_other') {
+  if (isFlightType(t)) {
     const from = airportCode(seg.departureAirport);
     const to = airportCode(seg.arrivalAirport);
     if (from && to) return `${from} → ${to}`;
@@ -1387,6 +1359,104 @@ function detectOutOfRange(v: FamilyVacation, addHint: AddHint, t: Translate): vo
   }
 }
 
+/** `HH:mm` from "9:05" / "09:05:00"; null when it is not a time. */
+function hintTime(value: string | undefined): string | null {
+  const m = /^(\d{1,2}):(\d{2})/.exec(value?.trim() ?? '');
+  return m ? `${m[1]!.padStart(2, '0')}:${m[2]}` : null;
+}
+
+/** A wall-clock moment as a sortable string, `YYYY-MM-DDTHH:mm`; null without both parts. */
+function hintStamp(date: string | undefined, time: string | undefined): string | null {
+  const d = date ? extractDatePart(date) : '';
+  const tm = hintTime(time);
+  return d && tm ? `${d}T${tm}` : null;
+}
+
+/** How a flight is named on ANOTHER card's hint: its code ("SQ318"), else its route. */
+function flightHintTitle(seg: VacationTravelSegment): string {
+  return isFlightType(seg.type)
+    ? flightCodeLabel(seg.airline, seg.flightNumber) || buildTravelSegmentTitle(seg)
+    : buildTravelSegmentTitle(seg) || seg.title;
+}
+
+/**
+ * Live flight checks (#143, plan Requirement 9): an airline change that moved a flight's
+ * ARRIVAL past the next stay's check-in day, or past the next booking's departure, becomes a
+ * hint on both cards. It is a hint, never a change: nothing else in the plan is rewritten.
+ *
+ * Only an airline-applied change counts (`liveAppliedAt` + `liveWas`), and only when the move
+ * crossed the line: the arrival the family booked (`liveWas`, else the unchanged field) was on
+ * or before it. A plan that was already tight before the airline acted is the family's own
+ * choice and is not flagged here. Times are wall-clock local to each place, compared as
+ * written (the connection is at the arrival airport, so both sides share a zone).
+ *
+ *  - Stay: the earliest accommodation checking in on or after the booked arrival day. The
+ *    flight now lands on a LATER day than that check-in (the night the hotel expects you).
+ *  - Connection: the earliest other travel booking with a timed departure at or after the
+ *    booked arrival. The flight now lands after it leaves.
+ */
+function detectLiveLateArrivals(v: FamilyVacation, addHint: AddHint, t: Translate): void {
+  for (const seg of v.travelSegments) {
+    const was = seg.liveWas;
+    if (!seg.liveAppliedAt || !was || !isFlightType(seg.type)) continue;
+    const arrivalDate = seg.arrivalDate || seg.departureDate;
+    const now = hintStamp(arrivalDate, seg.arrivalTime);
+    if (!now) continue;
+    // The booked arrival: a recorded old value, else the field as it stands (it did not move).
+    // A same-day flight stores no arrival date, so its old arrival day is its old departure day.
+    const bookedDate =
+      was.arrivalDate ?? (seg.arrivalDate ? seg.arrivalDate : (was.departureDate ?? arrivalDate));
+    const booked = hintStamp(bookedDate, was.arrivalTime ?? seg.arrivalTime);
+    if (!booked || booked === now) continue;
+    const bookedDay = booked.slice(0, 10);
+    const nowDay = now.slice(0, 10);
+    const flightTitle = flightHintTitle(seg);
+
+    const stay = v.accommodations
+      .filter((a) => a.checkInDate && extractDatePart(a.checkInDate) >= bookedDay)
+      .sort((a, b) =>
+        extractDatePart(a.checkInDate!).localeCompare(extractDatePart(b.checkInDate!))
+      )[0];
+    if (stay && nowDay > extractDatePart(stay.checkInDate!)) {
+      addHint(
+        seg.id,
+        fillTemplate(t('travel.live.hint.landsAfterCheckIn'), {
+          title: buildAccommodationTitle(stay),
+        }),
+        [seg.id, stay.id]
+      );
+      addHint(
+        stay.id,
+        fillTemplate(t('travel.live.hint.checkInBeforeLanding'), { title: flightTitle }),
+        [seg.id, stay.id]
+      );
+    }
+
+    const next = v.travelSegments
+      .filter((o) => o.id !== seg.id)
+      .map((o) => ({
+        seg: o,
+        at: hintStamp(o.departureDate || o.embarkationDate, o.departureTime || o.embarkationTime),
+      }))
+      .filter((o): o is { seg: VacationTravelSegment; at: string } => !!o.at && o.at >= booked)
+      .sort((a, b) => a.at.localeCompare(b.at))[0];
+    if (next && now > next.at) {
+      addHint(
+        seg.id,
+        fillTemplate(t('travel.live.hint.landsAfterConnection'), {
+          title: flightHintTitle(next.seg),
+        }),
+        [seg.id, next.seg.id]
+      );
+      addHint(
+        next.seg.id,
+        fillTemplate(t('travel.live.hint.connectionBeforeLanding'), { title: flightTitle }),
+        [seg.id, next.seg.id]
+      );
+    }
+  }
+}
+
 /**
  * Detect planning issues worth surfacing on the timeline. Returns a
  * map of item ID → hint message; each affected item gets its own entry
@@ -1422,6 +1492,7 @@ export function computeTimelineHints(v: FamilyVacation, t: Translate): Map<strin
   detectFlightDuringCruise(flightItems, cruiseItems, addHint, t);
   detectNightFlights(v, addHint, t);
   detectOutOfRange(v, addHint, t);
+  detectLiveLateArrivals(v, addHint, t);
 
   return hintMap;
 }
@@ -1549,6 +1620,15 @@ export interface TravelSegmentOccurrence {
   /** The trip's assignees, carried so the occurrence is self-contained for that
    *  resolution (the OS reminder scheduler has no vacation in scope). */
   tripAssigneeIds: UUID[];
+  /** Booking fields the live-flight surfaces (briefing row, bell, OS notice) name the flight by. */
+  airline?: string;
+  flightNumber?: string;
+  /** The segment's current schedule (departure terminal included), on the DEPARTURE occurrence
+   *  only: the "now" half of a change sentence ("SQ318 now leaves at 18:30 from Terminal 3"). */
+  schedule?: ScheduleTuple;
+  /** #143: the segment's synced live-check state (`pickLiveState`), the one recipe the
+   *  briefing, the bell and the OS scheduler all read. Absent until an airline change applies. */
+  live?: SegmentLiveState;
 }
 
 type SideField = {
@@ -1569,6 +1649,7 @@ const STD_FLIGHT_RAIL_FERRY_SIDES: SideField[] = [
 const SIDE_FIELDS: Record<SupportedTravelType, SideField[]> = {
   flight_outbound: STD_FLIGHT_RAIL_FERRY_SIDES,
   flight_return: STD_FLIGHT_RAIL_FERRY_SIDES,
+  flight_other: STD_FLIGHT_RAIL_FERRY_SIDES,
   train: STD_FLIGHT_RAIL_FERRY_SIDES,
   ferry: STD_FLIGHT_RAIL_FERRY_SIDES,
   cruise: [
@@ -1586,7 +1667,7 @@ export function isSupportedTravelType(t: VacationTravelType): t is SupportedTrav
 /**
  * Pure: derive 0–2 calendar occurrences for one travel segment.
  *
- * - Returns `[]` for unsupported types (`car`, `activity`, `flight_other`).
+ * - Returns `[]` for unsupported types (`car`, `activity`).
  * - Skips a side that's missing its date.
  * - Skips a side with a malformed date (logs `[vacation]`, never throws).
  *
@@ -1628,6 +1709,10 @@ export function extractSegmentOccurrences(
       title: seg.title,
       travellerIds: seg.travellerIds,
       tripAssigneeIds,
+      airline: seg.airline,
+      flightNumber: seg.flightNumber,
+      schedule: side.kind === 'departure' ? tupleFromSegment(seg) : undefined,
+      live: pickLiveState(seg),
     });
   }
   return out;
@@ -1636,6 +1721,7 @@ export function extractSegmentOccurrences(
 const TRANSPORT_EMOJI: Record<SupportedTravelType, string> = {
   flight_outbound: '✈',
   flight_return: '✈',
+  flight_other: '✈',
   train: '🚆',
   ferry: '⛴',
   cruise: '🚢',
@@ -1649,7 +1735,7 @@ const TRANSPORT_EMOJI: Record<SupportedTravelType, string> = {
  * caller is expected to add a textual "Dep"/"Arr" label for disambiguation.
  */
 export function transportEmoji(type: SupportedTravelType, kind?: 'departure' | 'arrival'): string {
-  if (kind && (type === 'flight_outbound' || type === 'flight_return')) {
+  if (kind && isFlightType(type)) {
     return kind === 'departure' ? '🛫' : '🛬';
   }
   return TRANSPORT_EMOJI[type] ?? '';

@@ -378,6 +378,18 @@ export const ALLOWED_CONTEXT_KEYS = new Set<string>([
   // MIRRORED in infrastructure/lambda/telemetry/index.mjs (pinned by a Lambda test) and
   // declared in docs/runbooks/native-store-submission.md + web/src/pages/privacy.astro.
   'weather_age_min',
+  // Live flight checks (#143, surface 'travel-verify'). THREE closed-vocabulary keys:
+  // `flight_state`, a verification state (verified / changed / conflict / cancelled /
+  // unavailable / not-live); `flight_match`, how the provider's leg was chosen
+  // (deterministic / none); `flight_fields`, the comma-joined MODEL FIELD NAMES an airline
+  // change rewrote (e.g. "departureTime,terminal"). Never a flight number, a date, a time, an
+  // airport, a route or a booking reference. Everything else reuses `action`, `kind`, `count`,
+  // `error_code`, `http_status`, `consecutive_failures`, `perf_duration_ms`, `save_status`,
+  // `detail` and `notif_skipped`. MIRRORED in infrastructure/lambda/telemetry/index.mjs (pinned
+  // by a Lambda test) and declared in ~/projects/beanies-ops/docs/runbooks/native-store-submission.md.
+  'flight_state',
+  'flight_match',
+  'flight_fields',
 ]);
 
 export const MAX_STRING_LEN = 200;

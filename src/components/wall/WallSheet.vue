@@ -26,6 +26,7 @@ import { useEscapeClose } from '@/composables/useEscapeClose';
 import WallAddRow from '@/components/wall/WallAddRow.vue';
 import { useActivityStore } from '@/stores/activityStore';
 import { useFamilyStore } from '@/stores/familyStore';
+import { useFlightStatusStore } from '@/stores/flightStatusStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { fillTemplate } from '@/utils/fillTemplate';
 
@@ -74,6 +75,8 @@ const edit = inject(WALL_EDIT, undefined);
 
 const activityStore = useActivityStore();
 const familyStore = useFamilyStore();
+/** Live flight checks (#143): the wall shows each flight's chip, read-only. */
+const flightStatusStore = useFlightStatusStore();
 const { mealsToday, trip, tripVacation, groupedByDate, accommodationGaps, undatedItems } =
   useWallPeripherals();
 
@@ -772,7 +775,12 @@ const { identityFor } = useActivityIdentity();
               transport alike. This used to be the first three TRAVEL segments
               and nothing else.
             -->
-            <WallTripTimeline :groups="groupedByDate" :undated="undatedItems" />
+            <WallTripTimeline
+              :groups="groupedByDate"
+              :undated="undatedItems"
+              :verification-for="flightStatusStore.verificationFor"
+              :now-ms="flightStatusStore.nowMs"
+            />
           </div>
         </template>
       </div>

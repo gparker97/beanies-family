@@ -19,6 +19,7 @@ import { useActivityStore } from '@/stores/activityStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useCalendarSyncStore } from '@/stores/calendarSyncStore';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { useVacationStore } from '@/stores/vacationStore';
 import { useTranslationStore } from '@/stores/translationStore';
 import { useBeanTips } from '@/composables/useBeanTips';
 import { useCommunityNudge } from '@/composables/useCommunityNudge';
@@ -46,9 +47,12 @@ import {
 } from '@/utils/notifications';
 import type { AppNotification } from '@/types/notifications';
 import { assembleOccurrencesByDate } from '@/utils/occurrenceAssembly';
+import { localYmd } from '@/utils/flightStatus/copy';
 
 const WINDOW_DAYS = 30;
 const MS_PER_DAY = 86_400_000;
+/** How far ahead the bell looks for departures (a departure entry fires one lead before it). */
+const TRAVEL_LOOKAHEAD_DAYS = 30;
 
 export const useNotificationsStore = defineStore('notifications', () => {
   const todoStore = useTodoStore();
@@ -56,6 +60,7 @@ export const useNotificationsStore = defineStore('notifications', () => {
   const activityStore = useActivityStore();
   const familyStore = useFamilyStore();
   const settingsStore = useSettingsStore();
+  const vacationStore = useVacationStore();
   const calendarSyncStore = useCalendarSyncStore();
   const translationStore = useTranslationStore();
   // Bound ONCE at store-setup scope (mirrors the other store bindings above);
@@ -141,6 +146,13 @@ export const useNotificationsStore = defineStore('notifications', () => {
       readState: readState.value,
       windowDays: WINDOW_DAYS,
       occurrencesByDate,
+      // Live flight checks (#143): departures and airline changes for the bell. A change stays
+      // in the bell for the rolling window, so look back as far as it does.
+      travelOccurrences: vacationStore.travelSegmentOccurrencesInRange(
+        localYmd(start.getTime()),
+        localYmd(end.getTime() + TRAVEL_LOOKAHEAD_DAYS * MS_PER_DAY)
+      ),
+      travelReminderLeads: settingsStore.travelReminderLeads,
       // The occasion milestone in an activity reminder's title ("... (turns 60)").
       t: translationStore.t,
     };

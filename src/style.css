@@ -130,6 +130,10 @@
   --tint-slate-5: rgb(44 62 80 / 5%);
   --tint-slate-10: rgb(44 62 80 / 10%);
   --tint-success-10: rgb(39 174 96 / 10%);
+
+  /* Cancellation red (#143 flight checks): the ONE red tint, behind a cancelled flight's chip
+     and notice. Red is reserved for that and for destructive confirmations; never a warning. */
+  --tint-danger-10: rgb(239 68 68 / 10%);
   --vacation-teal: #00b4d8;
   --vacation-teal-5: rgb(0 180 216 / 5%);
   --vacation-teal-tint: rgb(0 180 216 / 8%);
@@ -212,6 +216,7 @@
   --tint-slate-5: rgb(255 255 255 / 5%);
   --tint-slate-10: rgb(255 255 255 / 10%);
   --tint-success-10: rgb(39 174 96 / 15%);
+  --tint-danger-10: rgb(239 68 68 / 14%); /* danger-lift 5.45, ink-faint 5.34 on it over raised */
   --vacation-teal: #00b4d8;
   --vacation-teal-5: rgb(0 180 216 / 8%);
   --vacation-teal-tint: rgb(0 180 216 / 12%);

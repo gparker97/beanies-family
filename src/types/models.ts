@@ -91,6 +91,8 @@ export interface GlobalSettings {
   activityReminderLead?: number; // DEFAULT lead for NEW activities + duty reminders (default DEFAULT_ACTIVITY_LEAD); each activity can still override it
   travelReminderLeads?: Partial<Record<SupportedTravelType, number>>; // per-travel-type override; missing type → DEFAULT_TRAVEL_LEADS
   helpfulHintNotifyByType?: Partial<Record<HelpfulHintType, boolean>>; // #40: per-device per-hint-type notification mute; absent key ⟹ enabled. Never family-synced.
+  liveFlightChecksEnabled?: boolean; // #143: this device checks flights live (a magic beans feature; the plan gate is applied on read, never written here). Absent ⟹ on. Never family-synced
+  liveFlightChangeAlerts?: boolean; // #143: this device is told when an airline changes or cancels a flight. Absent ⟹ on. Never family-synced
   isTrustedDevice?: boolean;
   trustedDevicePromptShown?: boolean;
   cachedFamilyKeys?: Record<string, string>;
@@ -1588,12 +1590,18 @@ export type VacationTravelType =
   | 'car'
   | 'activity';
 
+/** The three flight segment types. Narrow with `isFlightType` (`utils/travelCodes.ts`). */
+export type FlightTravelType = Extract<
+  VacationTravelType,
+  'flight_outbound' | 'flight_return' | 'flight_other'
+>;
+
 /** Travel-segment types that have a meaningful departure/arrival time pair (and
  *  so a calendar occurrence + an OS reminder). Subset of VacationTravelType;
  *  defined here (not in utils/vacation) so model interfaces can key on it
  *  without a circular import. `utils/vacation` re-exports it. */
 export type SupportedTravelType =
-  'flight_outbound' | 'flight_return' | 'train' | 'ferry' | 'cruise';
+  'flight_outbound' | 'flight_return' | 'flight_other' | 'train' | 'ferry' | 'cruise';
 
 export type VacationActivityCategory =
   'show_musical' | 'theme_park' | 'sporting_event' | 'concert' | 'excursion' | 'other';
@@ -1674,7 +1682,35 @@ export interface VacationTravelSegment {
 
   // Family members on THIS segment. Undefined = the whole trip (FamilyVacation.assigneeIds).
   travellerIds?: UUID[];
+
+  /** Live flight checks (#143). Written only by the device that applied an airline schedule change.
+   *  `liveRevision` = canonical string of the provider's scheduled tuple last applied
+   *  (schedule.ts revisionOf, e.g. "2026-12-13|18:30|3|2026-12-14|00:40"); a device writes only when
+   *  the provider's tuple string differs, so N devices make one write. Values differing from the
+   *  provider while the revision matches = a manual edit (Conflict). A persisted value is data
+   *  format, never a hash (see src/utils/stableVariant.ts:7-22). */
+  liveRevision?: string;
+  liveWas?: {
+    departureDate?: string;
+    departureTime?: string;
+    terminal?: string;
+    arrivalDate?: string;
+    arrivalTime?: string;
+    /** ISO */
+    at: string;
+  };
+  /** ISO; drives the change notice and the struck-out band until departure. */
+  liveAppliedAt?: string;
+  /** ISO; set when the airline cancelled and status flipped to pending. */
+  liveCancelledAt?: string;
 }
+
+/** The four synced live-check fields of a segment, copied as one unit by `pickLiveState`
+ *  (`utils/flightStatus/schedule.ts`) so the field list exists once. */
+export type SegmentLiveState = Pick<
+  VacationTravelSegment,
+  'liveRevision' | 'liveWas' | 'liveAppliedAt' | 'liveCancelledAt'
+>;
 
 export interface VacationAccommodation {
   id: UUID;

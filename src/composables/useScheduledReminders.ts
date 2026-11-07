@@ -31,6 +31,7 @@ import { useFamilyStore } from '@/stores/familyStore';
 import { useActivityStore } from '@/stores/activityStore';
 import { useTodoStore } from '@/stores/todoStore';
 import { useVacationStore } from '@/stores/vacationStore';
+import { useFlightStatusStore } from '@/stores/flightStatusStore';
 import { useListStore } from '@/stores/listStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { useToday } from '@/composables/useToday';
@@ -49,6 +50,9 @@ import {
   DEFAULT_TRAVEL_LEADS,
 } from '@/utils/reminderSchedule';
 import { activityReminderId, listDueId, todoDueId, travelReminderId } from '@/utils/notifications';
+import { travelCancelId, travelChangeId } from '@/utils/notifications/travel';
+import { isChangeRecipient } from '@/utils/flightStatus/audience';
+import { occurrenceNotice } from '@/utils/flightStatus/occurrenceNotice';
 import { dedupeHintsByKey } from '@/utils/helpfulHints';
 import { entityDeepLink, type DeepLink } from '@/utils/entityDeepLink';
 import {
@@ -81,7 +85,7 @@ export const REMINDER_WINDOW_DAYS = 14;
  */
 export const MAX_SCHEDULED = 60;
 
-export type ReminderKind = 'activity' | 'travel' | 'todo' | 'list';
+export type ReminderKind = 'activity' | 'travel' | 'travel-change' | 'todo' | 'list';
 
 export interface ScheduledReminder {
   /** Stable id (shared scheme with the in-app system → future unification). */
@@ -108,6 +112,9 @@ export interface ReminderPrefs {
   /** #40: per-device per-hint-type notification mute (absent key ⟹ enabled).
    *  Suppresses ONLY this device owner's notification for a hint to-do. */
   helpfulHintNotifyByType: Partial<Record<HelpfulHintType, boolean>>;
+  /** #143: tell this device when an airline changes or cancels a flight. This device's switch
+   *  AND the plan (`flightStatusStore.alertsEnabled`). Absent ⟹ off. */
+  flightChangeAlerts?: boolean;
 }
 
 export interface ReminderInput {
@@ -127,6 +134,9 @@ export interface ReminderInput {
   /** Inclusive local-day window bounds (YYYY-MM-DD) — occurrences outside are ignored. */
   windowStartISO: string;
   windowEndISO: string;
+  /** #143: epoch ms this device first saw a change/cancel notice id (the flight-status store
+   *  stamps and persists it). Absent ⟹ no change notices. */
+  noticeFirstSeen?: (id: string) => number;
   /** Translation fn (injected → the builder stays pure). */
   t: (key: UIStringKey) => string;
 }
@@ -354,6 +364,44 @@ export function buildTodoReminders(
   return { reminders: out, skipped, gated };
 }
 
+/** An airline change older than this is history, not news: a device that was off for days and
+ *  syncs it for the first time stays quiet (the bell still shows it). */
+const CHANGE_NOTICE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+/** Delay after this device first saw a notice: the OS needs a future instant. */
+const CHANGE_NOTICE_DELAY_MS = 5_000;
+
+/**
+ * The OS notice for an airline change or cancellation (#143): one per revision (the id is keyed
+ * on it), to every adult plus a travelling child (`isChangeRecipient`), fired as soon as the
+ * device knows (`max(now + 5 s, appliedAt)`) and dropped once an hour old. Null when there is
+ * nothing to say to this member.
+ */
+function buildChangeNotice(
+  o: TravelSegmentOccurrence,
+  input: ReminderInput,
+  nowMs: number
+): ScheduledReminder | null {
+  const notice = occurrenceNotice(input.t, o);
+  if (!notice || !isChangeRecipient(input.currentMember, o)) return null;
+  if (!input.noticeFirstSeen || nowMs - notice.atMs > CHANGE_NOTICE_MAX_AGE_MS) return null;
+  const id =
+    notice.kind === 'cancelled'
+      ? travelCancelId(o.segmentId, notice.revision)
+      : travelChangeId(o.segmentId, notice.revision);
+  // Fixed per device and revision: a fireAt that moves on every write re-arms a delivered
+  // reminder. Once it is behind `now` it is simply dropped (it already fired, or is too late).
+  const fireAt = input.noticeFirstSeen(id) + CHANGE_NOTICE_DELAY_MS;
+  if (fireAt <= nowMs) return null;
+  return {
+    id,
+    fireAt: new Date(fireAt),
+    title: notice.message,
+    body: notice.was || o.title,
+    kind: 'travel-change',
+    deepLink: entityDeepLink('vacation', o.vacationId),
+  };
+}
+
 /**
  * Travel reminders — departure occurrences only (SupportedTravelType), per-type lead.
  *
@@ -374,7 +422,14 @@ export function buildTravelReminders(
   const nowMs = now.getTime();
   for (const o of input.travelOccurrences) {
     try {
-      if (o.kind !== 'departure' || !o.time) continue;
+      if (o.kind !== 'departure') continue;
+      // The airline's change notice has its own audience, so it runs before the traveller gate
+      // below (a parent at home hears about the change; they are not reminded to leave).
+      if (prefs.flightChangeAlerts) {
+        const change = buildChangeNotice(o, input, nowMs);
+        if (change) out.push(change);
+      }
+      if (!o.time) continue;
       const travellers = resolveSegmentTravellers(o.travellerIds, o.tripAssigneeIds);
       if (travellers.length > 0 && !travellers.includes(input.currentMember.id)) {
         gated++;
@@ -575,6 +630,7 @@ function createScheduledReminderSources(): ScheduledReminderSources {
   const activityStore = useActivityStore();
   const todoStore = useTodoStore();
   const vacationStore = useVacationStore();
+  const flightStatusStore = useFlightStatusStore();
   const listStore = useListStore();
   const { t } = useTranslation();
   const { today } = useToday();
@@ -585,6 +641,7 @@ function createScheduledReminderSources(): ScheduledReminderSources {
     activityReminderLead: settingsStore.activityReminderLead,
     travelReminderLeads: settingsStore.travelReminderLeads,
     helpfulHintNotifyByType: settingsStore.helpfulHintNotifyByType,
+    flightChangeAlerts: flightStatusStore.alertsEnabled,
   }));
 
   // Reactive to activity/todo/travel data + the day clock. Bounded to the local
@@ -618,6 +675,7 @@ function createScheduledReminderSources(): ScheduledReminderSources {
       resolveMember: (id: string) => familyStore.members.find((m) => m.id === id),
       windowStartISO,
       windowEndISO,
+      noticeFirstSeen: flightStatusStore.noticeFirstSeen,
       t,
     };
   });

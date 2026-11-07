@@ -1,0 +1,24 @@
+/**
+ * The failure backoff ladder shared by every device-side remote fetch (weather, live flight
+ * checks): 5, 10, 20, 40, then 60 min, so a provider outage cannot multiply the call volume.
+ * Moved from `utils/weather/weatherRefresh.ts` (which re-exports it) so the two stores share
+ * one ladder instead of two copies drifting apart.
+ */
+import type { RemoteFetchErrorCode } from '@/types/remoteFetch';
+
+const MINUTE_MS = 60_000;
+const BACKOFF_BASE_MS = 5 * MINUTE_MS;
+/** The ladder's ceiling, and a `rate_limited` answer's wait. */
+export const BACKOFF_MAX_MS = 60 * MINUTE_MS;
+
+/**
+ * How long to wait after the `failureCount`th failure in a row: 5, 10, 20, 40, then 60 min.
+ * A `rate_limited` answer waits the full hour straight away (a quota resets on the hour at the
+ * earliest). Typed on the shared vocabulary: a service-only code such as flight checks'
+ * `not_configured` never enters the ladder (it is a refresh skip reason).
+ */
+export function nextBackoffMs(failureCount: number, code: RemoteFetchErrorCode): number {
+  if (code === 'rate_limited') return BACKOFF_MAX_MS;
+  const steps = Math.max(0, Math.floor(failureCount) - 1);
+  return Math.min(BACKOFF_MAX_MS, BACKOFF_BASE_MS * 2 ** Math.min(steps, 10));
+}

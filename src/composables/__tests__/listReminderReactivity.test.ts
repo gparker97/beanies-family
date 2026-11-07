@@ -42,6 +42,10 @@ h.members = ref<FamilyMember[]>([
 ]);
 h.flagOn = ref(true);
 
+// The reminder prefs read the flight-alert gate (#143); lists are what this suite is about.
+vi.mock('@/stores/flightStatusStore', () => ({
+  useFlightStatusStore: () => ({ alertsEnabled: false, noticeFirstSeen: () => 0 }),
+}));
 vi.mock('@/stores/listStore', () => ({
   useListStore: () => ({
     get lists() {

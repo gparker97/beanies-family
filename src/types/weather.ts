@@ -5,6 +5,7 @@
  * `services/weather/openMeteo.ts` beside the code that throws it.
  */
 import type { WeatherPlace } from './models';
+import type { RemoteFetchErrorCode, RemoteFetchFailure } from './remoteFetch';
 
 export type { WeatherPlace, TemperatureUnit, WallWeatherStyle } from './models';
 
@@ -48,9 +49,9 @@ export type WeatherObservation = Pick<WeatherReading, 'fetchedAt' | 'current' | 
  */
 export type WeatherFreshness = 'fresh' | 'aged' | 'old' | 'none';
 
-/** Every way a provider call can fail. `aborted` = the caller moved on (never logged or shown). */
-export type WeatherErrorCode =
-  'aborted' | 'network' | 'timeout' | 'http_4xx' | 'http_5xx' | 'rate_limited' | 'parse';
+/** Every way a provider call can fail. `aborted` = the caller moved on (never logged or shown).
+ *  The shared remote-fetch vocabulary (`types/remoteFetch.ts`), named for weather's callers. */
+export type WeatherErrorCode = RemoteFetchErrorCode;
 
 /** A home-town search, as a value: the field renders its states from it with no try/catch. */
 export type WeatherSearchResult =
@@ -106,12 +107,7 @@ export type WeatherAtom =
   | { state: 'unavailable'; errorCode: WeatherErrorCode | null };
 
 /** The store's failure record: one assignment clears or resets it. */
-export interface WeatherFailure {
-  code: WeatherErrorCode;
-  count: number;
-  /** Epoch ms before which the store does not ask again (the backoff). */
-  until: number;
-}
+export type WeatherFailure = RemoteFetchFailure<WeatherErrorCode>;
 
 /** What started a refresh. Rides the `kind` context key on `weather_fetch*`. */
 export type WeatherRefreshKind = 'tick' | 'foreground' | 'settings' | 'online';

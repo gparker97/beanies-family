@@ -3545,4 +3545,124 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       },
     ],
   },
+  {
+    slug: 'live-flight-checks',
+    category: 'features',
+    title: 'Live flight checks',
+    excerpt:
+      'beanies.family checks your family’s flights against the airline’s live schedule, so the plan you trust is the plan the airline is running.',
+    icon: '✈\u{FE0F}',
+    readTime: 4,
+    updatedDate: '2026-11-07',
+    sections: [
+      {
+        type: 'paragraph',
+        content:
+          'You booked the flight weeks ago and typed it into your trip once. Airlines move times and terminals, and sometimes cancel. <strong>Live flight checks</strong> let beanies.family keep an eye on that for you, so the plan you trust is the plan the airline is actually running.',
+      },
+      {
+        type: 'heading',
+        content: 'What gets checked',
+        level: 2,
+        id: 'what-is-checked',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Any flight in a trip that has a flight number and a date. Checks begin <strong>three days before departure</strong>. Before that, the flight shows <strong>Checks from</strong> and the date it starts. Once checks are on, beanies looks when you open the app and every so often on the day, and a small chip on the flight tells you how fresh the answer is, such as <strong>Checked 12 min ago</strong>.',
+      },
+      {
+        type: 'heading',
+        content: 'When the airline changes the time, terminal or date',
+        level: 2,
+        id: 'changes',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'The plan updates itself. You do not have to confirm anything, and everyone travelling is told, for example: <strong>SQ318 now leaves at 18:30 from Terminal 3. Your plan has been updated.</strong>',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          'The old time stays on the card, struck through, until you fly, so you can see what moved.',
+          'A note on the flight records what it was before.',
+          'Your reminder moves with the new time.',
+          'Changed your mind? Tap <strong>Put it back</strong> to restore the old values.',
+        ],
+      },
+      {
+        type: 'heading',
+        content: 'When a flight is cancelled',
+        level: 2,
+        id: 'cancellations',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'The flight goes back to <strong>pending</strong>, and everyone travelling is told. Your booking reference stays right there on the card, ready for when you call the airline.',
+      },
+      {
+        type: 'heading',
+        content: 'The Conflict chip',
+        level: 2,
+        id: 'conflict',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'If you change a flight by hand, your edit wins. beanies will not overwrite it. But if the airline’s schedule and your plan disagree, the flight shows <strong>Conflict</strong> with both values side by side. This also happens after you tap <strong>Put it back</strong>. Tap <strong>Use the airline’s</strong> to take the airline’s value, or leave it as it is. If the airline changes the flight again, the new change is applied as usual.',
+      },
+      {
+        type: 'heading',
+        content: 'Live gate and estimated times',
+        level: 2,
+        id: 'live-info',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'On the day, you may also see the <strong>gate</strong>, the <strong>baggage belt</strong> and an <strong>estimated</strong> departure or arrival. These are shown for information only. They are never written into your plan, so a running-late estimate will not change the time you booked.',
+      },
+      {
+        type: 'heading',
+        content: 'What is not checked',
+        level: 2,
+        id: 'not-checked',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Trains, cruises, buses, hotels and rental cars are not checked live, and their cards say <strong>Not checked live</strong>. You still get your reminder before each departure, and every timed departure appears in the daily briefing on its day.',
+      },
+      {
+        type: 'heading',
+        content: 'Your privacy',
+        level: 2,
+        id: 'privacy',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'To check a flight, beanies.family sends only the <strong>flight number and the date</strong>. Your trip, your names and your bookings stay in your family file.',
+      },
+      {
+        type: 'heading',
+        content: 'The switches and who gets it',
+        level: 2,
+        id: 'switches',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Live flight checks are a <strong>magic beans</strong> feature, included in your free trial. There are two switches in <strong>Settings → Reminders</strong>, under <strong>Live flight checks</strong>: <strong>Live Flight Checks</strong>, and <strong>Tell Me When a Flight Changes</strong>. Both are on by default and apply to this device. Flight reminders stay on for every plan, with or without magic beans.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Related: <a href="/help/features/travel-plans-and-vacations">Travel plans and vacations</a>.',
+      },
+    ],
+  },
 ];

@@ -4,6 +4,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { generateUUID } from '@/utils/id';
 import { addHourToTime, addDaysYmd } from '@/utils/date';
 import { arrivalDayOffset, MAX_ARRIVAL_DAY_OFFSET } from '@/utils/vacation';
+import { isFlightType } from '@/utils/travelCodes';
 import VacationSegmentCard from './VacationSegmentCard.vue';
 import PhotoAttachments from '@/components/media/PhotoAttachments.vue';
 import { vacationSegmentEntityId } from '@/services/photos/photoCollectionHooks';
@@ -121,10 +122,6 @@ function buildKeyValue(seg: VacationTravelSegment): string {
 }
 
 const cruiseShipOptions = buildCruiseShipOptions;
-
-function isFlightType(type: VacationTravelType): boolean {
-  return type === 'flight_outbound' || type === 'flight_return' || type === 'flight_other';
-}
 
 function isTrainOrFerry(type: VacationTravelType): boolean {
   return type === 'train' || type === 'ferry';

@@ -625,6 +625,111 @@ describe('computeTimelineHints — detectOutOfRange', () => {
   });
 });
 
+// ── computeTimelineHints — live late arrivals (#143) ──
+
+describe('computeTimelineHints — an airline change that lands late', () => {
+  // `t` returns the key, so `message` is the hint key (the templates hold the title).
+  const t = ((k: string) => k) as unknown as Parameters<typeof computeTimelineHints>[1];
+
+  /** SQ318 booked Sat 13 Dec 17:00 → 23:10; the airline moved it to 18:30 → Sun 00:40. */
+  function moved(overrides?: Partial<VacationTravelSegment>): VacationTravelSegment {
+    return makeTravelSegment({
+      id: 'sq318',
+      airline: 'Singapore Airlines (SQ)',
+      flightNumber: '318',
+      departureDate: '2026-12-13',
+      departureTime: '18:30',
+      arrivalDate: '2026-12-14',
+      arrivalTime: '00:40',
+      liveAppliedAt: '2026-12-12T09:00:00.000Z',
+      liveWas: {
+        departureTime: '17:00',
+        arrivalDate: '2026-12-13',
+        arrivalTime: '23:10',
+        at: '2026-12-12T09:00:00.000Z',
+      },
+      ...overrides,
+    });
+  }
+
+  it('flags both cards when the change moves the landing past the next check-in day', () => {
+    const v = makeVacation({
+      travelSegments: [moved()],
+      accommodations: [
+        makeAccommodation({ id: 'hoxton', name: 'The Hoxton', checkInDate: '2026-12-13' }),
+      ],
+    });
+    const hints = computeTimelineHints(v, t);
+    expect(hints.get('sq318')?.message).toBe('travel.live.hint.landsAfterCheckIn');
+    expect(hints.get('hoxton')?.message).toBe('travel.live.hint.checkInBeforeLanding');
+    expect(hints.get('hoxton')?.affectedIds).toEqual(['sq318', 'hoxton']);
+  });
+
+  it('a check-in on the new landing day is fine', () => {
+    const v = makeVacation({
+      travelSegments: [moved()],
+      accommodations: [makeAccommodation({ id: 'hoxton', checkInDate: '2026-12-14' })],
+    });
+    expect(computeTimelineHints(v, t).get('hoxton')).toBeUndefined();
+  });
+
+  it('flags a connection the moved flight now lands after', () => {
+    const v = makeVacation({
+      travelSegments: [
+        moved(),
+        makeTravelSegment({
+          id: 'train',
+          type: 'train',
+          departureDate: '2026-12-14',
+          departureTime: '00:15',
+        }),
+      ],
+    });
+    const hints = computeTimelineHints(v, t);
+    expect(hints.get('sq318')?.message).toBe('travel.live.hint.landsAfterConnection');
+    // (A 00:15 train also earns the existing night-departure hint; the messages join.)
+    expect(hints.get('train')?.message).toContain('travel.live.hint.connectionBeforeLanding');
+  });
+
+  it('a connection after the new landing is fine', () => {
+    const v = makeVacation({
+      travelSegments: [
+        moved(),
+        makeTravelSegment({
+          id: 'train',
+          type: 'train',
+          departureDate: '2026-12-14',
+          departureTime: '09:00',
+        }),
+      ],
+    });
+    expect(computeTimelineHints(v, t).get('train')).toBeUndefined();
+  });
+
+  it('says nothing for a plan that was already tight before the airline acted', () => {
+    // No `liveAppliedAt`: the family typed these times themselves.
+    const v = makeVacation({
+      travelSegments: [moved({ liveAppliedAt: undefined, liveWas: undefined })],
+      accommodations: [makeAccommodation({ id: 'hoxton', checkInDate: '2026-12-13' })],
+    });
+    expect(computeTimelineHints(v, t).get('hoxton')).toBeUndefined();
+  });
+
+  it('says nothing when the change did not move the arrival', () => {
+    const v = makeVacation({
+      travelSegments: [
+        moved({
+          arrivalDate: '2026-12-13',
+          arrivalTime: '23:10',
+          liveWas: { departureTime: '17:00', at: '2026-12-12T09:00:00.000Z' },
+        }),
+      ],
+      accommodations: [makeAccommodation({ id: 'hoxton', checkInDate: '2026-12-13' })],
+    });
+    expect(computeTimelineHints(v, t).get('hoxton')).toBeUndefined();
+  });
+});
+
 // ── classifyTripDay ──
 
 describe('classifyTripDay', () => {

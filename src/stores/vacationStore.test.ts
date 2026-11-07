@@ -1146,6 +1146,59 @@ describe('vacationStore', () => {
       expect(vacationRepo.updateVacation).not.toHaveBeenCalled();
     });
 
+    describe('the sortDate rule (#143): a travel segment sorts by its primary date', () => {
+      async function patchAndRead(segmentId: string, patch: Record<string, unknown>) {
+        const store = useVacationStore();
+        const existing = tripWithThree();
+        existing.accommodations = [
+          { id: 'h-1', type: 'hotel', name: 'Hoxton', status: 'booked' } as never,
+        ];
+        store.vacations.push(existing);
+        vi.mocked(vacationRepo.updateVacation).mockImplementation(async (_id, input) => ({
+          ...existing,
+          ...input,
+        }));
+        vi.mocked(activityRepo.updateActivity).mockResolvedValue(makeActivity());
+        expect(await store.updateSegment('vac-1', segmentId, patch)).toBe('saved');
+        const saved = vi.mocked(vacationRepo.updateVacation).mock.calls[0]![1] as Record<
+          string,
+          Array<Record<string, unknown>>
+        >;
+        const bucket = saved.travelSegments ?? saved.accommodations!;
+        return bucket.find((x) => x.id === segmentId)!;
+      }
+
+      it('a departureDate patch moves sortDate with it', async () => {
+        const seg = await patchAndRead('s-a', { departureDate: '2026-12-14' });
+        expect(seg.sortDate).toBe('2026-12-14');
+      });
+
+      it('an embarkationDate patch moves sortDate with it (cruises)', async () => {
+        const seg = await patchAndRead('s-b', { embarkationDate: '2026-12-20' });
+        expect(seg.sortDate).toBe('2026-12-20');
+      });
+
+      it('an explicit sortDate wins', async () => {
+        const seg = await patchAndRead('s-a', {
+          departureDate: '2026-12-14',
+          sortDate: '2026-12-01',
+        });
+        expect(seg.sortDate).toBe('2026-12-01');
+      });
+
+      it('a patch without a primary date, or with a cleared one, leaves sortDate alone', async () => {
+        expect((await patchAndRead('s-a', { departureTime: '18:30' })).sortDate).toBeUndefined();
+        vi.mocked(vacationRepo.updateVacation).mockClear();
+        setActivePinia(createPinia());
+        expect((await patchAndRead('s-a', { departureDate: '' })).sortDate).toBeUndefined();
+      });
+
+      it('only travel segments carry the rule', async () => {
+        const seg = await patchAndRead('h-1', { departureDate: '2026-12-14' });
+        expect(seg.sortDate).toBeUndefined();
+      });
+    });
+
     it('updateSegmentPhotoIds delegates to updateSegment, patching only photoIds by id', async () => {
       const store = useVacationStore();
       const existing = tripWithThree();

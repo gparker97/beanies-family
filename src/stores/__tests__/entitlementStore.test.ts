@@ -337,6 +337,8 @@ describe('isReadOnly vs wouldBeReadOnly', () => {
       const s = useEntitlementStore();
       expect(s.isReadOnly).toBe(c.readOnly);
       expect(s.wouldBeReadOnly).toBe(c.would);
+      // `enforces` is the same predicate, public for plan-gated features (#143).
+      expect(s.enforces).toBe(c.flag && c.enforced);
       expect(logged('applied')[0]!.context).toMatchObject({ dry_run: !c.readOnly });
     });
   }

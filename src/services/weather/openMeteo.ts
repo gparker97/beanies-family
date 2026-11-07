@@ -20,6 +20,7 @@ import type { WeatherDaily, WeatherErrorCode, WeatherObservation } from '@/types
 import { isNetworkError } from '@/utils/transientFailure';
 import { timeoutSignal } from '@/utils/timing';
 import { isNative } from '@/services/sync/capabilities';
+import { RemoteFetchError } from '@/services/remoteFetchError';
 
 /** One request's deadline. Measured p95 was about 1.1s on the free tier (2026-10-16 spike). */
 export const WEATHER_REQUEST_TIMEOUT_MS = 10_000;
@@ -37,20 +38,14 @@ const CUSTOMER_GEOCODING = 'https://customer-geocoding-api.open-meteo.com';
 
 const FIXTURES_HINT = 'compare with src/utils/weather/__tests__/fixtures';
 
-/** A provider call that failed, classified. Only the service and the store import it. */
-export class WeatherFetchError extends Error {
-  readonly code: WeatherErrorCode;
-  readonly httpStatus?: number;
-  /** The developer's next step, for the console only (never the firehose). */
-  readonly devHint: string;
-
+/** A provider call that failed, classified. Only the service and the store import it. The
+ *  fields and message live on the shared `RemoteFetchError`; this subclass keeps the weather
+ *  store's `instanceof` check to weather failures. */
+export class WeatherFetchError extends RemoteFetchError<WeatherErrorCode> {
   constructor(code: WeatherErrorCode, devHint: string, httpStatus?: number) {
-    super(`weather request failed: ${code}${httpStatus ? ` (HTTP ${httpStatus})` : ''}`);
+    super('weather', code, devHint, httpStatus);
     // Literal string, never a class name: the prod build minifies class names.
     this.name = 'WeatherFetchError';
-    this.code = code;
-    this.httpStatus = httpStatus;
-    this.devHint = devHint;
   }
 }
 

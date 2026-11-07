@@ -10901,6 +10901,47 @@ const STRING_DEFS = {
   'reminders.todoBody': { en: 'Due at {time}', beanie: 'due at {time}' },
   'reminders.todoBodyAllDay': { en: 'Due today', beanie: 'due today' },
   'reminders.travelBody': { en: 'Departs at {time}', beanie: 'departs at {time}' },
+  'nook.criticalTravelGate': {
+    en: 'Gate {gate}',
+    beanie: 'gate {gate}',
+  },
+  'notifications.kindTravelDeparture': {
+    en: 'Departure',
+    beanie: 'departure',
+  },
+  'notifications.kindTravelChange': {
+    en: 'Travel Change',
+    beanie: 'travel change',
+  },
+  'reminders.liveChecks.title': {
+    en: 'Live Flight Checks',
+    beanie: 'live flight checks',
+  },
+  'reminders.liveChecks.checks': {
+    en: 'Live Flight Checks',
+    beanie: 'live flight checks',
+  },
+  'reminders.liveChecks.checksHint': {
+    en: 'Checks your flights with the airline, from three days before takeoff.',
+    beanie: 'checks your flights with the airline, from three days before takeoff.',
+  },
+  'reminders.liveChecks.alerts': {
+    en: 'Tell Me When a Flight Changes',
+    beanie: 'tell me when a flight changes',
+  },
+  'reminders.liveChecks.alertsHint': {
+    en: 'A new time, terminal or cancellation is shown here and on this device.',
+    beanie: 'a new time, terminal or cancellation is shown here and on this device.',
+  },
+  'flightChecks.settings.lockedTrial': {
+    en: "Live flight checks were part of your free trial. They're included with magic beans.",
+    beanie: "live flight checks were part of your free trial. they're included with magic beans.",
+  },
+  'flightChecks.settings.privacy': {
+    en: 'To check a flight, beanies sends only the flight number and date. Your trip, names and bookings stay in your family file.',
+    beanie:
+      'to check a flight, beanies sends only the flight number and date. your trip, names and bookings stay in your family file.',
+  },
   // List due-date reminder. Nounless "{n} left" mirrors the briefing's own
   // `lists.briefing.*` phrasing, so one wording covers singular and plural with
   // no `.one`/`.other` split, and beanie mode needs no euphemism for "item".
@@ -15217,6 +15258,208 @@ const STRING_DEFS = {
     beanie: "it's a partly cloudy {temp} night on {date}",
   },
   'nook.todayCaptionPlain': { en: "It's {date}", beanie: "it's {date}" },
+  // Live flight checks (#143). Changes to a booked plan are an important surface: the beanie
+  // values keep the real nouns (flight, plan, airline). Built by utils/flightStatus/copy.ts.
+  'flightChecks.terminal': { en: 'Terminal {terminal}', beanie: 'terminal {terminal}' },
+  'flightChecks.theAirline': { en: 'the airline', beanie: 'the airline' },
+  'flightChecks.change.leaves': {
+    en: '{flight} now leaves at {time}.',
+    beanie: '{flight} now leaves at {time}.',
+  },
+  'flightChecks.change.leavesTerminal': {
+    en: '{flight} now leaves at {time} from {terminal}.',
+    beanie: '{flight} now leaves at {time} from {terminal}.',
+  },
+  'flightChecks.change.leavesOn': {
+    en: '{flight} now leaves on {date} at {time}.',
+    beanie: '{flight} now leaves on {date} at {time}.',
+  },
+  'flightChecks.change.leavesOnTerminal': {
+    en: '{flight} now leaves on {date} at {time} from {terminal}.',
+    beanie: '{flight} now leaves on {date} at {time} from {terminal}.',
+  },
+  'flightChecks.change.leavesFrom': {
+    en: '{flight} now leaves from {terminal}.',
+    beanie: '{flight} now leaves from {terminal}.',
+  },
+  'flightChecks.change.lands': {
+    en: '{flight} now lands at {time}.',
+    beanie: '{flight} now lands at {time}.',
+  },
+  'flightChecks.change.landsOn': {
+    en: '{flight} now lands on {date} at {time}.',
+    beanie: '{flight} now lands on {date} at {time}.',
+  },
+  'flightChecks.change.updated': {
+    en: 'Your plan has been updated.',
+    beanie: 'your plan has been updated.',
+  },
+  'flightChecks.cancel.airline': {
+    en: '{airline} cancelled {flight} on {date}. This flight is now pending.',
+    beanie: '{airline} cancelled {flight} on {date}. this flight is now pending.',
+  },
+  'flightChecks.cancel.noAirline': {
+    en: '{flight} on {date} was cancelled. This flight is now pending.',
+    beanie: '{flight} on {date} was cancelled. this flight is now pending.',
+  },
+  'flightChecks.was.time': { en: 'Was {time}', beanie: 'was {time}' },
+  'flightChecks.was.timeTerminal': {
+    en: 'Was {time} from {terminal}',
+    beanie: 'was {time} from {terminal}',
+  },
+  'flightChecks.was.terminal': { en: 'Was from {terminal}', beanie: 'was from {terminal}' },
+  'flightChecks.was.date': { en: 'Was {date}', beanie: 'was {date}' },
+  'flightChecks.was.dateTime': { en: 'Was {date} at {time}', beanie: 'was {date} at {time}' },
+  'flightChecks.was.dateTimeTerminal': {
+    en: 'Was {date} at {time} from {terminal}',
+    beanie: 'was {date} at {time} from {terminal}',
+  },
+  'flightChecks.was.landing': { en: 'Was landing at {time}', beanie: 'was landing at {time}' },
+  'flightChecks.was.landingOn': { en: 'Was landing on {date}', beanie: 'was landing on {date}' },
+  'flightChecks.note.was': { en: '{was} until {date}', beanie: '{was} until {date}' },
+  'flightChecks.note.filled': {
+    en: '{what} added from {airline}, {date}',
+    beanie: '{what} added from {airline}, {date}',
+  },
+  'flightChecks.note.cancelled': {
+    en: 'Cancelled by {airline}, {date}',
+    beanie: 'cancelled by {airline}, {date}',
+  },
+  'flightChecks.field.departureDate': {
+    en: 'Departure date {value}',
+    beanie: 'departure date {value}',
+  },
+  'flightChecks.field.departureTime': {
+    en: 'Departure time {value}',
+    beanie: 'departure time {value}',
+  },
+  'flightChecks.field.arrivalDate': { en: 'Arrival date {value}', beanie: 'arrival date {value}' },
+  'flightChecks.field.arrivalTime': { en: 'Arrival time {value}', beanie: 'arrival time {value}' },
+  'flightChecks.notice.changedBy': {
+    en: '{was}. Changed by {airline} · checked {ago}.',
+    beanie: '{was}. changed by {airline} · checked {ago}.',
+  },
+  'flightChecks.ago.justNow': { en: 'just now', beanie: 'just now' },
+  'flightChecks.ago.minutes': { en: '{n} min ago', beanie: '{n} min ago' },
+  'flightChecks.ago.hours': { en: '{n} h ago', beanie: '{n} h ago' },
+  'flightChecks.ago.days': { en: '{n} d ago', beanie: '{n} d ago' },
+  'flightChecks.checked': { en: 'Checked {ago}', beanie: 'checked {ago}' },
+  'flightChecks.row.everyoneFlies': {
+    en: 'Everyone flies at {time} today',
+    beanie: 'everyone flies at {time} today',
+  },
+  'flightChecks.row.flies.one': {
+    en: '{names} flies at {time} today',
+    beanie: '{names} flies at {time} today',
+  },
+  'flightChecks.row.flies.other': {
+    en: '{names} fly at {time} today',
+    beanie: '{names} fly at {time} today',
+  },
+  'flightChecks.row.everyoneLeaves': {
+    en: 'Everyone leaves at {time} today',
+    beanie: 'everyone leaves at {time} today',
+  },
+  'flightChecks.row.leaves.one': {
+    en: '{names} leaves at {time} today',
+    beanie: '{names} leaves at {time} today',
+  },
+  'flightChecks.row.leaves.other': {
+    en: '{names} leave at {time} today',
+    beanie: '{names} leave at {time} today',
+  },
+  'flightChecks.chip.checksFrom': { en: 'Checks from {date}', beanie: 'checks from {date}' },
+  'flightChecks.chip.checking': { en: 'Checking…', beanie: 'checking…' },
+  'flightChecks.chip.unavailable': { en: "Couldn't check", beanie: "couldn't check" },
+  'flightChecks.chip.noMatch': {
+    en: "Couldn't match this flight",
+    beanie: "couldn't match this flight",
+  },
+  'flightChecks.chip.notLive': { en: 'Not checked live', beanie: 'not checked live' },
+  'flightChecks.chip.conflict': { en: 'Conflict', beanie: 'conflict' },
+  'flightChecks.chip.changed': { en: 'Changed', beanie: 'changed' },
+  'flightChecks.chip.cancelled': { en: 'Cancelled', beanie: 'cancelled' },
+  'flightChecks.chip.mayBeCancelled': { en: 'May be cancelled', beanie: 'may be cancelled' },
+  'flightChecks.chip.diverted': { en: 'Diverted', beanie: 'diverted' },
+  'flightChecks.action.putBack': { en: 'Put it back', beanie: 'put it back' },
+  'flightChecks.action.useAirline': { en: "Use the airline's", beanie: "use the airline's" },
+  // Live flight checks on the trip timeline (#143, Commit 3). An important surface like
+  // `flightChecks.`: the beanie values keep the real nouns (flight, plan, airline, booking).
+  'travel.live.conflictSentence': {
+    en: 'Your plan says {mine}. {airline} says {theirs}.',
+    beanie: 'your plan says {mine}. {airline} says {theirs}.',
+  },
+  'travel.live.phrase.fromTerminal': { en: 'from {terminal}', beanie: 'from {terminal}' },
+  'travel.live.phrase.onDate': { en: 'on {date}', beanie: 'on {date}' },
+  'travel.live.phrase.landingAt': { en: 'landing at {time}', beanie: 'landing at {time}' },
+  'travel.live.phrase.landingOn': { en: 'landing on {date}', beanie: 'landing on {date}' },
+  'travel.live.phrase.landingOnAt': {
+    en: 'landing on {date} at {time}',
+    beanie: 'landing on {date} at {time}',
+  },
+  'travel.live.conflictCancelled': {
+    en: '{airline} lists {flight} as cancelled. Your plan still has it booked.',
+    beanie: '{airline} lists {flight} as cancelled. your plan still has it booked.',
+  },
+  'travel.live.notSet': { en: 'not set', beanie: 'not set' },
+  'travel.live.bookingStillHere': {
+    en: 'Your booking {ref} is still here for when you call.',
+    beanie: 'your booking {ref} is still here for when you call.',
+  },
+  'travel.live.notWrittenYet': {
+    en: "Your plan hasn't been updated on this device yet.",
+    beanie: "your plan hasn't been updated on this device yet.",
+  },
+  'travel.live.notLiveFoot.train': {
+    en: "Trains are not checked live. You'll still get your reminder before departure.",
+    beanie: "trains are not checked live. you'll still get your reminder before departure.",
+  },
+  'travel.live.notLiveFoot.ferry': {
+    en: "Ferries are not checked live. You'll still get your reminder before departure.",
+    beanie: "ferries are not checked live. you'll still get your reminder before departure.",
+  },
+  'travel.live.notLiveFoot.cruise': {
+    en: "Cruises are not checked live. You'll still get your reminder before departure.",
+    beanie: "cruises are not checked live. you'll still get your reminder before departure.",
+  },
+  'travel.live.notLiveFoot.bus': {
+    en: 'Buses are not checked live.',
+    beanie: 'buses are not checked live.',
+  },
+  'travel.live.pill': { en: 'Live', beanie: 'live' },
+  'travel.live.row.gate': { en: 'Gate', beanie: 'gate' },
+  'travel.live.row.desk': { en: 'Check-in', beanie: 'check-in' },
+  'travel.live.row.belt': { en: 'Bag Belt', beanie: 'bag belt' },
+  'travel.live.row.estDeparts': { en: 'Est. Departs', beanie: 'est. departs' },
+  'travel.live.row.estArrives': { en: 'Est. Arrives', beanie: 'est. arrives' },
+  'travel.live.railTitle': { en: 'Live Checks', beanie: 'live checks' },
+  'travel.live.railLastCheck': { en: 'Last Check', beanie: 'last check' },
+  'travel.live.railNote': {
+    en: 'Flights are checked when you open beanies and every few hours on the day. Trains, stays and cars are not checked live.',
+    beanie:
+      'flights are checked when you open beanies and every few hours on the day. trains, stays and cars are not checked live.',
+  },
+  'travel.live.hint.landsAfterCheckIn': {
+    en: 'Now lands after the {title} check-in day.',
+    beanie: 'now lands after the {title} check-in day.',
+  },
+  'travel.live.hint.checkInBeforeLanding': {
+    en: '{title} now lands after this check-in day.',
+    beanie: '{title} now lands after this check-in day.',
+  },
+  'travel.live.hint.landsAfterConnection': {
+    en: 'Now lands after {title} leaves.',
+    beanie: 'now lands after {title} leaves.',
+  },
+  'travel.live.hint.connectionBeforeLanding': {
+    en: '{title} now lands after this leaves.',
+    beanie: '{title} now lands after this leaves.',
+  },
+  'travel.live.toast.notChecked.title': { en: 'Not Checked Yet', beanie: 'not checked yet' },
+  'travel.live.toast.notChecked.message': {
+    en: "beanies hasn't heard from the airline on this device yet. Try again in a few minutes.",
+    beanie: "beanies hasn't heard from the airline on this device yet. try again in a few minutes.",
+  },
 } satisfies Record<string, StringEntry>;
 
 /**
