@@ -30,13 +30,13 @@ import {
 import { useToday } from '@/composables/useToday';
 import { normalizeAssignees, formatNameList } from '@/utils/assignees';
 import { fillTemplate } from '@/utils/fillTemplate';
-import { isTodoOverdue } from '@/utils/todo';
 import { isCardTodo } from '@/utils/todoRecurrence';
+import { plateClock, platedTodos, type ShownPlate } from '@/utils/todoPlate';
 import {
   classifyAudience,
   classifyListAudience,
   classifyOwnerAudience,
-  classifyTodoAudience,
+  classifyPlateTodo,
   isDutyDone,
   ownerItemSurfaces,
 } from '@/utils/audience';
@@ -53,6 +53,9 @@ export interface CriticalItem {
   message: string;
   icon: string;
   time: string; // HH:mm for sorting, '' if untimed
+  /** Not today's business (a to-do not due yet, a Helpful Hint): sorts below every row
+   * that belongs to today, in insertion order (upcoming to-dos, then hints). */
+  later?: boolean;
   occurrenceDate?: string; // for activity modal opening
   completable?: boolean; // whether this item can be checked off inline
   completed?: boolean; // whether this item is done
@@ -96,24 +99,31 @@ export const CRITICAL_ITEMS_INITIAL_VISIBLE = 5;
 type DateState = 'overdue' | 'today' | 'noDue';
 
 // Message-key lookup tables — `satisfies` keeps every key real and the tables
-// exhaustive, so a typo or a missing variant is a compile error.
+// exhaustive, so a typo or a missing variant is a compile error. The to-do tables are
+// keyed by the to-do's plate (`utils/todoPlate`); a `waiting` to-do never reaches them.
 const TODO_ASSIGNEE_KEYS = {
   overdue: { self: 'nook.criticalTodoSelfOverdue', other: 'nook.criticalTodoAssignedOverdue' },
   today: { self: 'nook.criticalTodoSelf', other: 'nook.criticalTodoAssigned' },
-  noDue: { self: 'nook.criticalTodoSelfNoDue', other: 'nook.criticalTodoAssignedNoDue' },
-} satisfies Record<DateState, Record<'self' | 'other', UIStringKey>>;
+  undated: { self: 'nook.criticalTodoSelfNoDue', other: 'nook.criticalTodoAssignedNoDue' },
+  upcoming: {
+    self: 'nook.criticalTodoSelfUpcoming',
+    other: 'nook.criticalTodoAssignedUpcoming',
+  },
+} satisfies Record<ShownPlate, Record<'self' | 'other', UIStringKey>>;
 
 const TODO_FORCHILD_KEYS = {
   overdue: 'nook.criticalTodoForChildOverdue',
   today: 'nook.criticalTodoForChild',
-  noDue: 'nook.criticalTodoForChildNoDue',
-} satisfies Record<DateState, UIStringKey>;
+  undated: 'nook.criticalTodoForChildNoDue',
+  upcoming: 'nook.criticalTodoForChildUpcoming',
+} satisfies Record<ShownPlate, UIStringKey>;
 
 const TODO_UNASSIGNED_KEYS = {
   overdue: 'nook.criticalTodoUnassignedOverdue',
   today: 'nook.criticalTodoUnassigned',
-  noDue: 'nook.criticalTodoUnassignedNoDue',
-} satisfies Record<DateState, UIStringKey>;
+  undated: 'nook.criticalTodoUnassignedNoDue',
+  upcoming: 'nook.criticalTodoUnassignedUpcoming',
+} satisfies Record<ShownPlate, UIStringKey>;
 
 const ACTIVITY_ASSIGNEE_KEYS = {
   timed: 'nook.criticalActivity',
@@ -326,34 +336,38 @@ export function useCriticalItems() {
     }
 
     // ── To-dos for the current member ─────────────────────────────────
-    // Visibility per `classifyTodoAudience`: assignees see their own, every adult
-    // sees a child's one-off to-dos and a child's routine (repeating, incl. card
-    // to-dos) only once it is overdue or opted in (`notifyParents`); everyone sees
-    // unassigned ones.
+    // Which to-dos and where they sit: `platedTodos` (plate order: overdue, today, undated,
+    // upcoming) and `classifyPlateTodo` (the rule the widget shares). A to-do not showing yet
+    // (its "Show from" date is ahead) is left out. Visibility per `classifyTodoAudience`:
+    // assignees see their own, every adult sees a child's one-off to-dos and a child's routine
+    // (repeating, incl. card to-dos) only once it is overdue or opted in (`notifyParents`);
+    // everyone sees unassigned ones.
     // #40: `manualActiveTodos` excludes Helpful Hints — a hint's nudge-date
     // dueDate is in the past for its whole lead window, so through this loop's
-    // overdue/today/noDue tables it would read as "overdue". Hints have their
-    // own loop below with a single fixed framing.
-    for (const todo of todoStore.manualActiveTodos) {
-      const isOverdue = isTodoOverdue(todo);
-      const audience = classifyTodoAudience(todo, currentMember, getMemberById, isOverdue);
-      if (audience.kind === 'hidden') continue;
+    // tables it would read as "overdue". Hints have their own loop below with a
+    // single fixed framing.
+    // `todayStr` is read above, so this recomputes at midnight; the clock adds the minute.
+    const clock = plateClock();
+    for (const { todo } of platedTodos(todoStore.manualActiveTodos, clock)) {
+      const classified = classifyPlateTodo(todo, currentMember, getMemberById, clock);
+      if (!classified) continue;
+      const { plate, audience } = classified;
 
-      const dueDate = todo.dueDate?.split('T')[0] ?? '';
-      const hasDate = dueDate !== '';
-      const isDueToday = dueDate === todayStr.value;
-      // A to-do with a due date still in the future isn't on anyone's plate yet.
-      if (hasDate && !isOverdue && !isDueToday) continue;
-
-      const dateState: DateState = isOverdue ? 'overdue' : isDueToday ? 'today' : 'noDue';
+      const dueDate = todo.dueDate?.slice(0, 10) ?? '';
       const taskTitle = lowercaseFirst(todo.title);
-      const dateLabel = isOverdue ? formatDateShort(dueDate) : '';
+      const dateLabel =
+        plate === 'overdue'
+          ? formatDateShort(dueDate)
+          : plate === 'upcoming'
+            ? formatNookDate(dueDate)
+            : '';
 
       let message: string;
-      let icon = isOverdue ? '⏰' : '📋';
-      if (isCardTodo(todo) && todo.repeat && isDueToday) {
+      let icon = plate === 'overdue' ? '⏰' : '📋';
+      if (isCardTodo(todo) && todo.repeat && dueDate === clock.ymd) {
         // #123: a card reminder on its due day reads as the reminder itself, for every
-        // audience the loop admits ("Reminder for Sofia: put the trash out at 8:00 PM!").
+        // audience the loop admits ("Reminder for Sofia: put the trash out at 8:00 PM!"),
+        // including once its time has passed (a missed reminder still names its time).
         const sole = normalizeAssignees(todo)[0];
         const name = getMemberName(sole, t('family.unknownMemberInline'));
         message = todo.dueTime
@@ -366,20 +380,20 @@ export function useCriticalItems() {
         icon = '🔔';
       } else if (audience.kind === 'assignee') {
         const fromOther = !!todo.createdBy && todo.createdBy !== memberId;
-        const key = TODO_ASSIGNEE_KEYS[dateState][fromOther ? 'other' : 'self'];
+        const key = TODO_ASSIGNEE_KEYS[plate][fromOther ? 'other' : 'self'];
         message = buildMessage(key, {
           creator: getMemberName(todo.createdBy),
           task: taskTitle,
           date: dateLabel,
         });
       } else if (audience.kind === 'forChild') {
-        message = buildMessage(TODO_FORCHILD_KEYS[dateState], {
+        message = buildMessage(TODO_FORCHILD_KEYS[plate], {
           children: formatNameList(audience.childNames),
           task: taskTitle,
           date: dateLabel,
         });
       } else {
-        message = buildMessage(TODO_UNASSIGNED_KEYS[dateState], {
+        message = buildMessage(TODO_UNASSIGNED_KEYS[plate], {
           task: taskTitle,
           date: dateLabel,
         });
@@ -390,7 +404,8 @@ export function useCriticalItems() {
         type: 'todo',
         message,
         icon,
-        time: isDueToday ? (todo.dueTime ?? '') : '',
+        time: plate === 'today' ? (todo.dueTime ?? '') : '',
+        ...(plate === 'upcoming' ? { later: true } : {}),
         completable: true,
         completed: false, // open todos are never completed (completed ones are filtered out)
       });
@@ -505,7 +520,8 @@ export function useCriticalItems() {
     );
 
     // ── Who Owns What (#109) card rows ───────────────────────────────
-    // Untimed, so they keep insertion order: above the hint block, below the rest.
+    // Untimed, so they keep insertion order among today's rows: below the rest of today,
+    // above the `later` tail (upcoming to-dos, then hints).
     const cardRows = buildCardBriefingRows({
       cards: responsibilityStore.resolved,
       moves: responsibilityStore.moves,
@@ -525,8 +541,8 @@ export function useCriticalItems() {
     // ⏰. Audience is the store's own `visibleHintTodos` so a surprise-sensitive
     // hint (the birthday person's present) stays hidden from them.
     //
-    // Untimed, and pushed LAST: the sort below returns 0 for any two untimed
-    // items, so tail position is insertion order alone. Keep this the final block
+    // Untimed, flagged `later` and pushed LAST: the sort keeps insertion order within the
+    // `later` tail, so hints sit after upcoming to-dos and after every row of today. Keep this the final block
     // before the sort — a new item kind goes ABOVE it. The "hints after a manual
     // to-do" unit test is what locks this.
     if (isFlagEnabled('helpfulHints')) {
@@ -550,16 +566,19 @@ export function useCriticalItems() {
           // Only an un-kept hint is dismissed outright. A KEPT hint is the family's own
           // to-do now: its ✕ just hides it for today, like any other to-do.
           dismissHint: isFreshHint(hint),
+          later: true,
         });
       }
     }
 
-    // Sort: timed items first (ascending), untimed last
+    // Sort: timed items first (ascending), untimed next, not-yet-due to-dos last
     items.sort((a, b) => {
       if (a.time && b.time) return a.time.localeCompare(b.time);
       if (a.time && !b.time) return -1;
       if (!a.time && b.time) return 1;
-      return 0;
+      // Not-yet-due to-dos and hints sit below everything that belongs to today (lists,
+      // meals, cards), keeping insertion order among themselves: to-dos, then hints.
+      return Number(!!a.later) - Number(!!b.later);
     });
 
     // ── Tomorrow's public holiday (pinned to position 0) ──────────────

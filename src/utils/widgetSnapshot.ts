@@ -5,17 +5,19 @@
  * paint (contract: `types/widgetSnapshot.ts`). The composable `useWidgetSnapshot` assembles
  * the input from the stores and publishes the result; this file only computes.
  *
- * ⚠️ THIS MODULE MAKES NO AUDIENCE DECISION OF ITS OWN. "My day" is the Nook briefing's rule
- * and "our day" is the beanie wall's, and every gate below is a call into `audience.ts`,
- * `reminderSchedule.ts` or `wallJobs.ts`, so the widget cannot drift from the Nook and the
- * wall without those modules changing too. The per-audience differences live in ONE
- * `AUDIENCE_RULES` value per audience, never as `if (audience === ...)` in a block.
+ * ⚠️ THIS MODULE MAKES NO AUDIENCE DECISION OF ITS OWN. The family view shows every calendar
+ * event and the daily briefing's to-dos and lists (the viewer's own, unassigned ones and their
+ * children's, with the briefing's routine gate), and every gate below is a call into
+ * `audience.ts` or `reminderSchedule.ts`, so the widget cannot drift from the briefing without
+ * those modules changing too. The one deliberate difference: the widget never shows a surprise
+ * hint (a home screen is glanceable by the person it is for). The family / child differences
+ * live in ONE `AUDIENCE_RULES` value per view, never as `if (audience === ...)` in a block.
  *
- * Shape: `buildWidgetSnapshot` calls `buildWidgetDay` for each of the `WIDGET_DAYS` days,
- * for `my` and (unless the viewer is a child) `our`. A day is two sections (round 9b): the
+ * Shape: `buildWidgetSnapshot` calls `buildWidgetDay` once for each of the `WIDGET_DAYS` days:
+ * the family view, or a child's own. A day is two sections (round 9b): the
  * CALENDAR (`rows`: trips, birthdays, events) and the TO-DOS (`tasks`: to-dos, hints and
  * lists in one due order, built as if that day were today). Each day walks `DAY_PARTS` with
- * ONE try/catch: a throw empties that part for that day and audience, counts as `skipped`,
+ * ONE try/catch: a throw empties that part for that day, counts as `skipped`,
  * and warns with the part and the record it was on (the `buildReminderSchedule` pattern).
  * One malformed record never empties the whole widget. The picker switches are applied
  * natively; every part is always built.
@@ -24,6 +26,12 @@
  * formatters as the web atom, so there is no second formatter), the viewer's handoffs, the
  * to-dos done today, and each row's one-word forms (`shortTitle`, `whoFirst`) for the
  * lock-screen circle.
+ *
+ * v4 replaces each day's `my` + `our` with one `view` and drops the "my day" / "our day"
+ * labels: there is no whose-day choice on the home screen any more. The lock screen still
+ * shows only the viewer's own day, so each row carries `mine` (the old "my day" rule,
+ * `isViewersOwnActivity`) and each day an `ownThingsText` counting only those rows; the
+ * viewer's `pickups` and `handoffs` are their own already.
  */
 import type {
   FamilyActivity,
@@ -67,11 +75,11 @@ import {
 import {
   classifyAudience,
   classifyListAudience,
-  classifyTodoAudience,
+  classifyPlateTodo,
   isDutyDone,
   ownerItemSurfaces,
 } from '@/utils/audience';
-import { buildWallJobs, isWallSafeList, jobOwnerIds, uniqueTodoJobs } from '@/utils/wallJobs';
+import { plateClock, type PlateClock, type ShownPlate } from '@/utils/todoPlate';
 import {
   isFiled,
   isListDue,
@@ -161,92 +169,70 @@ export interface WidgetWeatherInput {
 
 export interface WidgetSnapshotResult {
   snapshot: WidgetSnapshot;
-  /** Blocks dropped by a THROWN error across all days and audiences: a data bug. */
+  /** Blocks dropped by a THROWN error across all days: a data bug. */
   skipped: number;
 }
 
 // ── Audience rules ──────────────────────────────────────────────────────────
 
-type AudienceKey = 'my' | 'our' | 'child';
+/** The family's view (every adult), or a child session's own. */
+type AudienceKey = 'family' | 'child';
 
 /**
- * Everything that differs between the three views of a day, in one place. Each predicate
- * delegates to the app's own classifier; none of them decides anything itself.
+ * Everything that differs between the two views of a day, in one place. Each predicate
+ * delegates to the app's own classifier; none of them decides anything itself. What both views
+ * share is not a rule: the viewer's own pick-ups and handoffs are always listed, "you cook"
+ * always addresses the viewer, and lists always follow the briefing's owner audience.
  */
 interface AudienceRules {
   /** Which activity occurrences become rows. */
   showsActivity(ctx: ActivityReminderContext): boolean;
-  /** Which to-do rule applies: the briefing's to-do loop, the wall's jobs, or none. */
-  due: 'briefing' | 'wall' | 'none';
-  /** Which lists may show: the owner's (briefing), the wall-safe ones, or none (`due: 'none'`). */
-  lists: 'owner' | 'wall';
-  /** Whether an undated task counts toward the date column's "for you today" count. */
-  countUndated: boolean;
-  /** Count copy at the foot of the date column. */
-  countKeys: { one: UIStringKey; other: UIStringKey };
+  /**
+   * Which of those rows are the viewer's own (`WidgetRow.mine`): the lock screen shows only
+   * these, the home-screen widget shows every row.
+   */
+  ownsActivity(ctx: ActivityReminderContext): boolean;
+  /**
+   * Whether the to-dos section is built: the briefing's to-dos and lists and the viewer's hints
+   * (never a surprise). Off for a child, whose widget is their calendar only.
+   */
+  showsTasks: boolean;
   /** Whether a task's dot may be the viewer's own (and the family's when nobody owns it). */
   dueNamesViewer: boolean;
-  /** Which hints may show. */
-  hints: 'viewer' | 'noSurprise' | 'none';
-  /**
-   * Whether the viewer's own duties are listed: `pickups` (the lock-screen inline slot) and,
-   * from v3, `handoffs` (drop-offs and pick-ups, the circle's "Next handoff").
-   */
-  pickups: boolean;
   /** Whether a trip must concern the viewer (`classifyAudience`) to be counted down (child only). */
   tripsForViewerOnly: boolean;
-  /**
-   * Whether copy may address the viewer as "you" ("tonight: tacos, you cook"). Off on the
-   * family view, which reads the same whoever's phone it is on ("Sam cooks").
-   */
-  addressesViewer: boolean;
   /** Whether "coming up" counts down only the viewer's own birthday (the child view). */
   birthdaysForViewerOnly: boolean;
 }
 
+/**
+ * The viewer's own activity, the Nook briefing's rule (v2/v3's "my day"): a drop-off or pick-up
+ * duty on it, or `classifyAudience` says it is the viewer's or their child's. A family-wide
+ * event with nobody assigned is not the viewer's own (`ownerItemSurfaces` excludes
+ * `unassigned`), nor is another adult's.
+ */
+const isViewersOwnActivity = (ctx: ActivityReminderContext): boolean =>
+  ctx.dutyRoles.length > 0 || ownerItemSurfaces(ctx.audience);
+
 const AUDIENCE_RULES: Readonly<Record<AudienceKey, AudienceRules>> = Object.freeze({
-  // The Nook briefing: a duty on it, or `classifyAudience` says it is mine or my child's.
-  my: {
-    showsActivity: (ctx) => ctx.dutyRoles.length > 0 || ownerItemSurfaces(ctx.audience),
-    due: 'briefing',
-    lists: 'owner',
-    countUndated: true,
-    countKeys: { one: 'widget.forYouToday.one', other: 'widget.forYouToday.other' },
-    dueNamesViewer: false,
-    hints: 'viewer',
-    pickups: true,
-    // Every family trip, whoever is going: a partner away is the most relevant fact about the
-    // parent at home's day, unlike another adult's to-do. The row names who is going.
-    tripsForViewerOnly: false,
-    addressesViewer: true,
-    birthdaysForViewerOnly: false,
-  },
-  // The beanie wall's day lanes: everything on the day, no private lists, no surprises.
-  our: {
+  // The family's day: every event on the calendar, and the briefing's to-dos and lists.
+  family: {
     showsActivity: () => true,
-    due: 'wall',
-    lists: 'wall',
-    countUndated: false,
-    countKeys: { one: 'widget.dueToday.one', other: 'widget.dueToday.other' },
+    ownsActivity: isViewersOwnActivity,
+    showsTasks: true,
     dueNamesViewer: true,
-    hints: 'noSurprise',
-    pickups: false,
+    // Every family trip, whoever is going. The row names who is going.
     tripsForViewerOnly: false,
-    addressesViewer: false,
     birthdaysForViewerOnly: false,
   },
   // A child session: the child's own rows only; no to-dos, no hints.
   child: {
     showsActivity: (ctx) => ctx.audience.kind === 'assignee',
-    due: 'none',
-    lists: 'owner',
-    countUndated: false,
-    countKeys: { one: 'widget.forYouToday.one', other: 'widget.forYouToday.other' },
+    // Every row a child sees is already their own.
+    ownsActivity: () => true,
+    showsTasks: false,
     dueNamesViewer: false,
-    hints: 'none',
-    pickups: true,
     tripsForViewerOnly: true,
-    addressesViewer: true,
     birthdaysForViewerOnly: true,
   },
 });
@@ -316,8 +302,15 @@ interface RowEntry {
 interface DayContext {
   input: WidgetSnapshotInput;
   ymd: string;
-  /** The last day of the look-ahead from `ymd` (later tasks beyond it are left out). */
+  /** The last day of the look-ahead from `ymd` (later hints and lists beyond it are left out). */
   horizon: string;
+  /**
+   * The to-do plate clock for the day being built: today's real minute on today, the start of
+   * the day on every later day (each is built as if it were today, from midnight).
+   */
+  clock: PlateClock;
+  /** When the snapshot is built: today's minute for `clock`. */
+  now: Date;
   viewer: FamilyMember;
   rules: AudienceRules;
   origin: string;
@@ -432,6 +425,7 @@ const eventsPart: DayPart = {
         who: firstNames(ctx, assignees),
         ...rowWords(ctx, a.title, assignees),
         dot: rowDot(ctx, assignees),
+        mine: ctx.rules.ownsActivity(actx),
         // The viewer's duty is done when every duty they hold here is ticked for this date.
         isDone:
           actx.dutyRoles.length > 0 &&
@@ -509,7 +503,6 @@ const whosWherePart: DayPart = {
           avatars: [avatar(pickup)],
         };
       }
-      if (!ctx.rules.pickups) continue;
       // A drop-off is at the start (null for an all-day row); a pick-up at the end time.
       if (dropoff?.id === ctx.viewer.id && row.startsAt !== null) {
         handoffs.push({
@@ -552,7 +545,7 @@ const mealsPart: DayPart = {
     const name = mealDisplayName(meal, ctx.input.recipes, t);
     const cook = member(ctx, meal.cookMemberId);
     const text =
-      cook?.id === ctx.viewer.id && ctx.rules.addressesViewer
+      cook?.id === ctx.viewer.id
         ? fillTemplate(t('widget.tonightYouCook'), { meal: name })
         : cook
           ? fillTemplate(t('widget.tonight'), { meal: name, name: firstName(cook.name) })
@@ -617,6 +610,9 @@ function tripRows(ctx: DayContext): WidgetRow[] {
         who: firstNames(ctx, assignees),
         ...rowWords(ctx, title, assignees),
         dot: rowDot(ctx, assignees),
+        // Every family trip is the viewer's own, whoever is going (as on v2/v3's "my day"): a
+        // partner away is part of the parent at home's day. A child sees only their own.
+        mine: true,
         isDone: false,
         handoff: null,
         link: widgetLink(ctx.origin, entityDeepLink('vacation', v.id)),
@@ -652,6 +648,8 @@ function birthdayRows(ctx: DayContext): WidgetRow[] {
       who: name,
       ...rowWords(ctx, title, [b.memberId]),
       dot: rowDot(ctx, [b.memberId]),
+      // Every birthday is the viewer's own (as on v2/v3's "my day"); a child sees only theirs.
+      mine: true,
       isDone: false,
       handoff: null,
       link: widgetLink(ctx.origin, entityDeepLink('member', b.memberId)),
@@ -694,6 +692,11 @@ interface TaskDraft {
    * (every hint and list) are false.
    */
   done: boolean;
+  /**
+   * A to-do's bucket, precomputed from its plate (`utils/todoPlate`): to-dos follow the show
+   * rule and have no look-ahead. Absent on hints and lists, which use `taskBucket`.
+   */
+  bucket?: WidgetTaskBucket;
 }
 
 /** The most to-dos and lists (and, separately, hints) one day carries; `overflow` counts the rest. */
@@ -702,7 +705,15 @@ export const MAX_WIDGET_TASKS = 16;
 /** The order of the section: overdue, today, undated, later this week. */
 const TASK_BUCKET_ORDER: readonly WidgetTaskBucket[] = ['overdue', 'today', 'undated', 'later'];
 
-/** Which bucket `due` falls in on the day, or null when it is past the look-ahead. */
+/** A shown to-do plate as the widget's bucket. */
+const PLATE_TO_TASK_BUCKET = {
+  overdue: 'overdue',
+  today: 'today',
+  undated: 'undated',
+  upcoming: 'later',
+} as const satisfies Record<ShownPlate, WidgetTaskBucket>;
+
+/** Which bucket a hint's or list's `due` falls in on the day, or null past the look-ahead. */
 function taskBucket(ctx: DayContext, due: string): WidgetTaskBucket | null {
   if (!due) return 'undated';
   if (due < ctx.ymd) return 'overdue';
@@ -719,47 +730,32 @@ function completedOn(todo: TodoItem, ymd: string): boolean {
 }
 
 /**
- * "My day": the briefing's to-do rule (`useCriticalItems`): not hidden from the viewer by
- * `classifyTodoAudience`. Hints come through `hintTodos` instead, so they are skipped here. Open
- * to-dos, plus (marked `done`) those completed on the day, for `doneToday`.
+ * The briefing's to-do rule (`classifyPlateTodo`, shared with `useCriticalItems`): showing on
+ * the day (not `waiting`) and not hidden from the viewer, so a partner's to-do never shows and a
+ * child's routine shows only when missed or kept posted. Every day after today is `projected`,
+ * so a child's routine due today never reads as missed (and shown to a parent) on the days
+ * after it. Hints come through `hintTodos` instead, so they are skipped here. Open to-dos, plus
+ * (marked `done`) those completed on the day, for `doneToday`.
  */
-function myTodoDrafts(ctx: DayContext): TaskDraft[] {
+function todoDrafts(ctx: DayContext): TaskDraft[] {
   const out: TaskDraft[] = [];
+  const projected = ctx.ymd !== ctx.input.today;
   for (const todo of ctx.input.todos) {
     ctx.cursor = todo.id;
     if (isHint(todo) || todo.someday) continue;
     if (todo.completed && !completedOn(todo, ctx.ymd)) continue;
-    const owners = normalizeAssignees(todo);
-    // `missed` is false: the snapshot has no clock, and the roll keeps a routine's date ≥ today,
-    // so a child's on-track routine stays off a parent's widget unless it carries `notifyParents`.
-    if (classifyTodoAudience(todo, ctx.viewer, ctx.input.resolveMember, false).kind === 'hidden') {
-      continue;
-    }
-    out.push(todoDraft(ctx, todo, owners, 'todo'));
-  }
-  return out;
-}
-
-/**
- * "Our day": the wall's to-do card (`buildWallJobs` + `uniqueTodoJobs`), one row per to-do.
- * The wall keeps a job completed on the day (struck through) and drops older completions, so
- * its done jobs are exactly the drafts `todoDraft` marks `done`. Hints come through `hintTodos`, so
- * wall jobs for a hint are skipped.
- */
-function ourTodoDrafts(ctx: DayContext): TaskDraft[] {
-  const byId = new Map(ctx.input.todos.map((todo) => [todo.id, todo]));
-  const { todos } = buildWallJobs({
-    todos: ctx.input.todos,
-    lists: ctx.input.lists,
-    memberIds: ctx.input.members.map((m) => m.id),
-    todayYmd: ctx.ymd,
-  });
-  const out: TaskDraft[] = [];
-  for (const job of uniqueTodoJobs(todos)) {
-    const todo = job.todoId ? byId.get(job.todoId) : undefined;
-    if (!todo || isHint(todo)) continue;
-    ctx.cursor = todo.id;
-    out.push(todoDraft(ctx, todo, jobOwnerIds(job), 'todo'));
+    const classified = classifyPlateTodo(
+      todo,
+      ctx.viewer,
+      ctx.input.resolveMember,
+      ctx.clock,
+      projected
+    );
+    if (!classified) continue;
+    out.push({
+      ...todoDraft(ctx, todo, normalizeAssignees(todo), 'todo'),
+      bucket: PLATE_TO_TASK_BUCKET[classified.plate],
+    });
   }
   return out;
 }
@@ -783,7 +779,8 @@ function todoDraft(
 }
 
 /**
- * Hints the viewer may see, minus surprises on "our day"; none for a child. A hint ranks
+ * Hints the viewer may see, never a surprise (the one difference from the briefing: a home
+ * screen is glanceable by the person the surprise is for); none for a child. A hint ranks
  * like an undated to-do, or as due today on the day of its event: its `dueDate` is the
  * NUDGE date (in the past for the whole lead window, `utils/helpfulHints.ts`), so ranking
  * by it would read every hint as overdue. The briefing ignores it for the same reason
@@ -791,13 +788,12 @@ function todoDraft(
  */
 function hintDrafts(ctx: DayContext): TaskDraft[] {
   const { rules, input } = ctx;
-  if (!input.flags.helpfulHints || rules.hints === 'none') return [];
+  if (!input.flags.helpfulHints || !rules.showsTasks) return [];
   const out: TaskDraft[] = [];
   // `input.hintTodos` is soonest event first (sorted once, in `buildWidgetSnapshot`).
   for (const hint of input.hintTodos) {
     ctx.cursor = hint.id;
-    if (hint.completed) continue;
-    if (rules.hints === 'noSurprise' && isSurpriseHint(hint.hintType)) continue;
+    if (hint.completed || isSurpriseHint(hint.hintType)) continue;
     const event = hint.hintEventDate?.slice(0, 10) ?? '';
     if (event && event < ctx.ymd) continue;
     // A hint is about an event; whose it is never needs a dot, and it has no due time.
@@ -835,9 +831,12 @@ function listDraftDue(
 /**
  * Lists with open items that are due: overdue, today, undated (the briefing's `isListDue`
  * rule) or later this week. A repeating list is due on the day it resets (and `later` ahead
- * of its next scheduled reset); filed lists never are. "My day" uses the single-owner
- * audience the briefing and the OS reminders share; "our day" uses the wall's
- * `isWallSafeList`, so a private list never reaches a shared view.
+ * of its next scheduled reset); filed lists never are. Who sees a list is the single-owner
+ * audience the briefing and the OS reminders share: the viewer's own and their children's
+ * (private categories included, as on the briefing), never another adult's, and a child's
+ * recurring list only when it keeps parents posted. `missed` is false: a recurring list never
+ * reads as overdue (`isListDue`), and the routine gate only applies to recurring lists, so the
+ * briefing's `due === 'overdue'` would be false for every list it gates.
  */
 function listDrafts(ctx: DayContext): TaskDraft[] {
   const { t } = ctx.input;
@@ -845,11 +844,8 @@ function listDrafts(ctx: DayContext): TaskDraft[] {
   for (const list of ctx.input.lists) {
     ctx.cursor = list.id;
     if (isFiled(list)) continue;
-    const visible =
-      ctx.rules.lists === 'owner'
-        ? ownerItemSurfaces(classifyListAudience(list, ctx.viewer, ctx.input.resolveMember, false))
-        : isWallSafeList(list);
-    if (!visible) continue;
+    const audience = classifyListAudience(list, ctx.viewer, ctx.input.resolveMember, false);
+    if (!ownerItemSurfaces(audience)) continue;
     const plate = listDraftDue(ctx, list);
     if (!plate || plate.remaining === 0) continue;
     out.push({
@@ -868,7 +864,7 @@ function listDrafts(ctx: DayContext): TaskDraft[] {
   return out;
 }
 
-/** The dot beside a task: whose it is when that is not the viewer ("our day": anyone's). */
+/** The dot beside a task: whose it is (the family's when nobody owns it); never on a hint. */
 function taskDot(ctx: DayContext, draft: TaskDraft): WidgetDot | null {
   if (draft.kind === 'hint') return null;
   const owners = ctx.rules.dueNamesViewer
@@ -890,7 +886,11 @@ function taskRow(ctx: DayContext, draft: TaskDraft, bucket: WidgetTaskBucket): W
       ? fillTemplate(t('widget.dueBy'), { time: formatTime12(draft.dueTime ?? '') })
       : t('widget.taskToday');
   } else if (bucket === 'later') {
-    tag = shortDate(ctx.input, draft.due);
+    // A to-do has no look-ahead, so one due beyond it names its month too ("Dec 18").
+    tag =
+      draft.due > ctx.horizon
+        ? formatUiDate(draft.due, ctx.input.language, { month: 'short', day: 'numeric' })
+        : shortDate(ctx.input, draft.due);
     tagTone = 'soft';
   }
   return {
@@ -914,23 +914,15 @@ function taskRow(ctx: DayContext, draft: TaskDraft, bucket: WidgetTaskBucket): W
 const tasksPart: DayPart = {
   build(day, ctx) {
     const { rules, input } = ctx;
-    if (rules.due === 'none' && rules.hints === 'none') return;
-    const drafts = [
-      ...(rules.due === 'briefing'
-        ? myTodoDrafts(ctx)
-        : rules.due === 'wall'
-          ? ourTodoDrafts(ctx)
-          : []),
-      ...hintDrafts(ctx),
-      ...(rules.due === 'none' ? [] : listDrafts(ctx)),
-    ];
+    if (!rules.showsTasks) return;
+    const drafts = [...todoDrafts(ctx), ...hintDrafts(ctx), ...listDrafts(ctx)];
     const ranked: { draft: TaskDraft; bucket: WidgetTaskBucket }[] = [];
     let doneToday = 0;
     for (const draft of drafts) {
-      const bucket = taskBucket(ctx, draft.due);
+      const bucket = draft.bucket ?? taskBucket(ctx, draft.due);
       if (!bucket) continue;
       // A to-do done on the day is never a row; it counts when it would have counted open.
-      if (draft.done) doneToday += Number(countsNow(rules, draft.kind, bucket));
+      if (draft.done) doneToday += Number(countsNow(draft.kind, bucket));
       else ranked.push({ draft, bucket });
     }
     // Stable: bucket, then due date, then timed before untimed by time; source order last.
@@ -949,7 +941,7 @@ const tasksPart: DayPart = {
     });
     // The count covers what the `due` switch shows (to-dos and lists), never hints, so the
     // date column never counts a row the hint switch hides.
-    const count = all.filter((i) => countsNow(rules, i.kind, i.bucket)).length;
+    const count = all.filter((i) => countsNow(i.kind, i.bucket)).length;
     // Capped per switch (no widget draws more, and the list is carried for 14 day-views), so a
     // long to-do list never crowds out the hints, in display order.
     const isHintTask = (i: WidgetTask) => i.kind === 'hint';
@@ -981,19 +973,12 @@ const tasksPart: DayPart = {
 };
 
 /**
- * Whether a task counts toward the date column's "due now" count: to-dos and lists (never
- * hints) that are overdue or due today, plus undated ones on "my day". The same rule picks
- * which completed to-dos count in `doneToday`, so the circle's ring and the count agree.
+ * Whether a task counts toward the date column's "N due today" count: to-dos and lists (never
+ * hints) that are overdue or due today. The same rule picks which completed to-dos count in
+ * `doneToday`, so the circle's ring and the count agree.
  */
-function countsNow(
-  rules: AudienceRules,
-  kind: WidgetTask['kind'],
-  bucket: WidgetTaskBucket
-): boolean {
-  return (
-    kind !== 'hint' &&
-    (bucket === 'overdue' || bucket === 'today' || (bucket === 'undated' && rules.countUndated))
-  );
+function countsNow(kind: WidgetTask['kind'], bucket: WidgetTaskBucket): boolean {
+  return kind !== 'hint' && (bucket === 'overdue' || bucket === 'today');
 }
 
 /** One part of a day, in `DAY_PARTS` order; each is isolated by the build loop. */
@@ -1025,12 +1010,15 @@ function shortDate(input: WidgetSnapshotInput, ymd: string): string {
 }
 
 /**
- * "**4** for you today" at the foot of the date column. Empty when nothing is due: a "0 due
+ * "**4** due today" at the foot of the date column. Empty when nothing is due: a "0 due
  * today" line is noise on a home screen, and both renderers hide an empty `WidgetText`.
  */
 function taskCountText(ctx: DayContext, count: number): WidgetText {
   return count > 0
-    ? emphasised(counted(ctx.input.t, ctx.rules.countKeys, count), String(count))
+    ? emphasised(
+        counted(ctx.input.t, { one: 'widget.dueToday.one', other: 'widget.dueToday.other' }, count),
+        String(count)
+      )
     : { text: '' };
 }
 
@@ -1046,19 +1034,30 @@ function emptyTasks(ctx: DayContext): WidgetTasks {
   };
 }
 
-/** One audience's view of one day: every part, each isolated. */
+/**
+ * The plate clock for building `ymd`: the real minute when `ymd` is the device-local day of
+ * `now` (today; the calendar days are device-local too, `input.days`), else the start of the
+ * day, since every later day is built as if it had just begun.
+ */
+function dayClock(ymd: string, now: Date): PlateClock {
+  const live = plateClock(now);
+  return { ymd, hhmm: live.ymd === ymd ? live.hhmm : '00:00' };
+}
+
+/** One view of one day (the family's, or a child's): every part, each isolated. */
 function buildWidgetDay(
   ymd: string,
   audience: AudienceKey,
   base: Omit<
     DayContext,
-    'ymd' | 'horizon' | 'rules' | 'entries' | 'tripRows' | 'birthdayRows' | 'cursor'
+    'ymd' | 'horizon' | 'clock' | 'rules' | 'entries' | 'tripRows' | 'birthdayRows' | 'cursor'
   >
 ): { day: WidgetDay; skipped: number } {
   const ctx: DayContext = {
     ...base,
     ymd,
     horizon: addDaysYmd(ymd, WIDGET_DAYS - 1),
+    clock: dayClock(ymd, base.now),
     rules: AUDIENCE_RULES[audience],
     entries: [],
     tripRows: [],
@@ -1070,6 +1069,7 @@ function buildWidgetDay(
     tonight: null,
     tasks: emptyTasks(ctx),
     thingsText: '',
+    ownThingsText: '',
     pickups: [],
     handoffs: [],
   };
@@ -1089,19 +1089,20 @@ function buildWidgetDay(
   }
   // The calendar: trips, then birthdays, then the day's events (timed, then untimed).
   day.rows = [...ctx.tripRows, ...ctx.birthdayRows, ...ctx.entries.map((e) => e.row)];
-  const { t } = ctx.input;
-  day.thingsText =
-    day.rows.length === 0
-      ? t('widget.thingsOnToday.none')
-      : counted(
-          t,
-          { one: 'widget.thingsOnToday.one', other: 'widget.thingsOnToday.other' },
-          day.rows.length
-        );
+  day.thingsText = thingsText(ctx, day.rows.length);
+  day.ownThingsText = thingsText(ctx, day.rows.filter((r) => r.mine).length);
   return { day, skipped };
 }
 
-function dayEntry(ymd: string, input: WidgetSnapshotInput): Omit<WidgetDayEntry, 'my' | 'our'> {
+/** "6 things on today" / "nothing on today", the small widget's and the lock screen's line. */
+function thingsText(ctx: DayContext, n: number): string {
+  const { t } = ctx.input;
+  return n === 0
+    ? t('widget.thingsOnToday.none')
+    : counted(t, { one: 'widget.thingsOnToday.one', other: 'widget.thingsOnToday.other' }, n);
+}
+
+function dayEntry(ymd: string, input: WidgetSnapshotInput): Omit<WidgetDayEntry, 'view'> {
   const { language } = input;
   return {
     ymd,
@@ -1177,24 +1178,16 @@ export function buildWidgetSnapshot(
   const viewer = input.currentMember;
   const isChild = !isAdultMember(viewer);
   const origin = shareableOrigin();
-  const base = { input, viewer, origin };
+  const base = { input, viewer, origin, now };
   const { t } = input;
   let skipped = 0;
 
-  const view = (ymd: string, audience: AudienceKey): WidgetDay => {
+  const audience: AudienceKey = isChild ? 'child' : 'family';
+  const days: WidgetDayEntry[] = input.days.map((ymd) => {
     const built = buildWidgetDay(ymd, audience, base);
     skipped += built.skipped;
-    return built.day;
-  };
-  const audiences: { my: AudienceKey; our: AudienceKey | null } = {
-    my: isChild ? 'child' : 'my',
-    our: isChild ? null : 'our',
-  };
-  const days: WidgetDayEntry[] = input.days.map((ymd) => ({
-    ...dayEntry(ymd, input),
-    my: view(ymd, audiences.my),
-    our: audiences.our ? view(ymd, audiences.our) : null,
-  }));
+    return { ...dayEntry(ymd, input), view: built.day };
+  });
 
   // Isolated like a day part: a malformed reading drops the weather, never the widget.
   let weather: WidgetWeather | null = null;
@@ -1224,8 +1217,6 @@ export function buildWidgetSnapshot(
       tomorrow: t('widget.tomorrow'),
       more: t('widget.more'),
       nothingToday: t('widget.thingsOnToday.none'),
-      myDay: t('widget.myDay'),
-      ourDay: t('widget.ourDay'),
       childsDay: fillTemplate(t('widget.childsDay'), { name: viewerFirstName }),
       nothingOnToday: t('widget.nothingOnToday'),
       enjoy: t('widget.enjoy'),

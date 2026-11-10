@@ -5,6 +5,7 @@
  * can be built (and tested) without importing the composable that produces it.
  */
 import type { FamilyList, TodoItem } from '@/types/models';
+import type { PlateClock, ShownPlate } from '@/utils/todoPlate';
 
 export type WallViewId = 'days' | 'lanes' | 'today' | 'jobs';
 
@@ -19,12 +20,12 @@ export type WallJobSource = 'todo' | 'list';
  * here is the whole point of the wall's "my jobs" idea.
  */
 /**
- * When a to-do is due, relative to today. Drives both grouping and emphasis:
- * the wall leads with what is due now and still SHOWS what is coming, rather
- * than hiding it — a to-do list that only ever shows today looks broken to
- * anyone who knows they have eight of them.
+ * Where a to-do sits on today's plate (`utils/todoPlate`, the rule every surface shares).
+ * Drives both grouping and emphasis: the wall leads with what is due now and still shows
+ * what is coming up, unless the to-do's "Show from" date is still ahead (a repeating chore
+ * waits for its due date by default). Those wait on the To-Dos page, never here.
  */
-export type WallTodoBucket = 'overdue' | 'today' | 'upcoming' | 'undated';
+export type WallTodoBucket = ShownPlate;
 
 export interface WallJob {
   /** Stable within a render; `${source}:${id}` (list items add the list id). */
@@ -133,7 +134,8 @@ export interface WallJobsInput {
   todos: TodoItem[];
   lists: FamilyList[];
   memberIds: string[];
-  todayYmd: string;
+  /** Now, device-local (`plateClock`): the day, and the minute a timed to-do turns overdue. */
+  clock: PlateClock;
 }
 
 /**

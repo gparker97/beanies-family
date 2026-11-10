@@ -1,19 +1,6 @@
 import AppIntents
 import WidgetKit
 
-/// Whose day a widget shows. A child session only ever publishes `my`, and the widget then
-/// shows the child's day whatever is chosen here.
-enum WidgetAudienceOption: String, AppEnum {
-    case my
-    case our
-
-    static var typeDisplayRepresentation: TypeDisplayRepresentation = "Whose day"
-    static var caseDisplayRepresentations: [WidgetAudienceOption: DisplayRepresentation] = [
-        .my: "My day",
-        .our: "Our day",
-    ]
-}
-
 /// How solid the widget's card is, in percent. The same three choices as Android's
 /// configuration screen (`WidgetPrefs.OPACITIES`). Only the card thins; the agenda panel and
 /// every readable string stay as they are, so ink contrast holds over any wallpaper. Moot in
@@ -66,7 +53,7 @@ enum WidgetTextSizeOption: String, AppEnum {
 
 /// The per-widget picker ("Edit Widget"). Titles are keys in Localizable.xcstrings
 /// (en + zh-Hans): they render before any snapshot exists, so they cannot come from one.
-/// Defaults: our day, everything on (`WIDGET_DEFAULT_BLOCKS` in src/types/widgetSnapshot.ts). Each
+/// Defaults: everything on (`WIDGET_DEFAULT_BLOCKS` in src/types/widgetSnapshot.ts). Each
 /// switch shows or hides a kind of row and only ever fills room that would otherwise be
 /// empty, so nothing competes for space by being on. The property names are the stored
 /// keys: relabel freely, and give a switch a new key only when its meaning changes (see
@@ -74,9 +61,6 @@ enum WidgetTextSizeOption: String, AppEnum {
 struct DayWidgetConfigIntent: WidgetConfigurationIntent {
     static var title: LocalizedStringResource = "Your day"
     static var description: IntentDescription? = IntentDescription("Today's plans, handoffs and dinner at a glance.")
-
-    @Parameter(title: "Whose day", default: .our)
-    var audience: WidgetAudienceOption
 
     @Parameter(title: "Events", default: true)
     var events: Bool
@@ -114,7 +98,6 @@ struct DayWidgetConfigIntent: WidgetConfigurationIntent {
 /// App Intent type (and the lock-screen widget, whose only choice is the circle's, can use
 /// the defaults).
 struct WidgetBlocks: Equatable {
-    var audience: WidgetAudienceOption
     var events: Bool
     var whosWhere: Bool
     var meals: Bool
@@ -130,7 +113,7 @@ struct WidgetBlocks: Equatable {
     var circleShow: CircleShowOption = .nextUp
 
     static let defaults = WidgetBlocks(
-        audience: .my, events: true, whosWhere: true, meals: true, due: true, comingUp: true, hint: true
+        events: true, whosWhere: true, meals: true, due: true, comingUp: true, hint: true
     )
 
     func isOn(_ kind: WidgetBlockKind) -> Bool {
@@ -148,7 +131,6 @@ struct WidgetBlocks: Equatable {
 extension WidgetBlocks {
     init(_ configuration: DayWidgetConfigIntent) {
         self.init(
-            audience: configuration.audience,
             events: configuration.events,
             whosWhere: configuration.whosWhere,
             meals: configuration.meals,

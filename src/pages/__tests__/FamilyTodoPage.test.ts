@@ -15,7 +15,7 @@
  *     desktop the reverse; both list only repeating to-dos, honour the member lens, and a tap
  *     on a roster row opens the drawer.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { flushPromises, shallowMount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import { defineComponent, h, nextTick, ref } from 'vue';
@@ -349,5 +349,71 @@ describe('FamilyTodoPage: the family reminders (#123)', () => {
     expect(w.findComponent({ name: 'TodoViewEditModal' }).props('todo')).toMatchObject({
       id: 'trash',
     });
+  });
+});
+
+describe('FamilyTodoPage: the Open groups ("Show from")', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2030, 9, 10, 12, 0)); // Thu 10 Oct 2030, noon
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    localStorage.removeItem('beanies:todoSort');
+  });
+
+  function seed(): void {
+    useTodoStore().todos = [
+      { ...openTodo('late', '2030-10-08'), createdAt: '2030-10-01T08:00:00.000Z' },
+      { ...openTodo('now', '2030-10-10'), createdAt: '2030-10-02T08:00:00.000Z' },
+      { ...openTodo('loose'), createdAt: '2030-10-03T08:00:00.000Z' },
+      { ...openTodo('soon', '2030-10-12'), createdAt: '2030-10-04T08:00:00.000Z' },
+      { ...openTodo('wait', '2030-10-20'), showFrom: '2030-10-15' },
+      { ...openTodo('waitDue', '2030-10-25'), showOn: 'due' },
+    ];
+  }
+  const mountGroups = () =>
+    shallowMount(FamilyTodoPage, {
+      global: { stubs: { QuickAddBar: QuickAddBarStub }, renderStubDefaultSlot: true },
+    });
+  const groups = (w: ReturnType<typeof mountGroups>) =>
+    w
+      .findAllComponents({ name: 'TodoSection' })
+      .filter((s) => String(s.attributes('data-testid') ?? '').startsWith('todo-group-'))
+      .map((s) => ({
+        id: String(s.attributes('data-testid')).replace('todo-group-', ''),
+        label: s.props('label') as string,
+        ids: (s.props('todos') as TodoItem[]).map((t) => t.id),
+      }));
+
+  it('groups Overdue, Due today, Coming up and Not showing yet, in that order', () => {
+    seed();
+    expect(groups(mountGroups())).toEqual([
+      { id: 'overdue', label: 'todo.section.overdue', ids: ['late'] },
+      { id: 'today', label: 'todo.section.dueToday', ids: ['now'] },
+      { id: 'upcoming', label: 'todo.section.comingUp', ids: ['soon', 'loose'] },
+      { id: 'waiting', label: 'todo.section.notShowingYet', ids: ['wait', 'waitDue'] },
+    ]);
+  });
+
+  it.each(['newest', 'oldest', 'dueDate'] as const)(
+    'keeps Overdue and Due today on top under the %s sort and sorts inside each group',
+    (sort) => {
+      seed();
+      localStorage.setItem('beanies:todoSort', sort);
+      const g = groups(mountGroups());
+      expect(g.map((x) => x.id)).toEqual(['overdue', 'today', 'upcoming', 'waiting']);
+      const upcoming = g.find((x) => x.id === 'upcoming')!.ids;
+      if (sort === 'newest') expect(upcoming).toEqual(['soon', 'loose']);
+      if (sort === 'oldest') expect(upcoming).toEqual(['loose', 'soon']);
+      if (sort === 'dueDate') expect(upcoming).toEqual(['soon', 'loose']);
+    }
+  );
+
+  it('leaves empty groups out and shows the one empty text when nothing is open', () => {
+    useTodoStore().todos = [{ ...openTodo('only', '2030-10-12') }];
+    const w = mountGroups();
+    expect(groups(w).map((g) => g.id)).toEqual(['upcoming']);
+    expect(w.find('[data-testid="todo-open-empty"]').exists()).toBe(false);
   });
 });

@@ -19,7 +19,7 @@ struct DayWidgetView: View {
 
     private var cardOpacity: Double {
         if case .ready(let snapshot) = entry.state,
-           DayResolver.resolve(snapshot, at: entry.date, audience: entry.blocks.audience) != nil {
+           DayResolver.resolve(snapshot, at: entry.date) != nil {
             return entry.blocks.background.opacity
         }
         return 1
@@ -41,7 +41,7 @@ struct DayWidgetView: View {
         case .unreadable:
             refreshState(size: size, m: m)
         case .ready(let snapshot):
-            if let resolved = DayResolver.resolve(snapshot, at: entry.date, audience: entry.blocks.audience) {
+            if let resolved = DayResolver.resolve(snapshot, at: entry.date) {
                 // Judged once per entry against the entry's own date (#134); nil = no weather.
                 let weather = WidgetWeather.glance(snapshot.weather, labels: snapshot.labels, at: entry.date)
                 Group {
@@ -158,7 +158,6 @@ struct DayLayoutView: View {
                         taskCount: plan.taskCount,
                         weather: weather,
                         staleLabelShown: asOf != nil,
-                        showAudienceLabel: isLarge && resolved.audience == .my,
                         size: size,
                         m: m
                     )

@@ -31,6 +31,7 @@ import { isAdultMember } from '@/composables/useMemberInfo';
 import { normalizeAssignees } from '@/utils/assignees';
 import { isRecurring } from '@/utils/listLifecycle';
 import { isRepeating } from '@/utils/todoRecurrence';
+import { todoPlate, type PlateClock, type ShownPlate } from '@/utils/todoPlate';
 import type { DutyCompletion, FamilyList, FamilyMember, TodoItem } from '@/types/models';
 
 export type BriefingAudience =
@@ -138,6 +139,31 @@ export function classifyTodoAudience(
     todo,
     missed
   );
+}
+
+/**
+ * Where a to-do sits on the clock's day and who sees it there: the ONE rule the daily briefing
+ * and the widget's to-dos share. null when it is not showing yet (`waiting`) or is hidden from
+ * this viewer. "Missed" (for the routine gate) is the plate being `overdue`, except on a
+ * `projected` day (every widget day after today): a child's chore due today would otherwise
+ * read as overdue on the days after it, and be shown to the parent there.
+ */
+export function classifyPlateTodo(
+  todo: TodoItem,
+  viewer: FamilyMember,
+  resolveMember: Resolve,
+  clock: PlateClock,
+  projected = false
+): { plate: ShownPlate; audience: BriefingAudience } | null {
+  const plate = todoPlate(todo, clock);
+  if (plate === 'waiting') return null;
+  const audience = classifyTodoAudience(
+    todo,
+    viewer,
+    resolveMember,
+    !projected && plate === 'overdue'
+  );
+  return audience.kind === 'hidden' ? null : { plate, audience };
 }
 
 /** `classifyOwnerAudience` for a Beanie List, with the routine gate applied. */

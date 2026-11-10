@@ -36,6 +36,7 @@ import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useTodoSort, SORT_OPTIONS } from '@/composables/useTodoSort';
 import { useDeepLinkParam } from '@/composables/useDeepLinkParam';
 import { sortTodos } from '@/utils/todo';
+import { groupOpenTodos } from '@/utils/todoPlate';
 
 const { t } = useTranslation();
 const { canEditActivities } = usePermissions();
@@ -132,7 +133,16 @@ function withMemberFilterAndSort(items: TodoItem[]): TodoItem[] {
   return sortTodos(filtered, sortBy.value);
 }
 
-const displayedOpenTodos = computed(() => withMemberFilterAndSort(todoStore.filteredActiveTodos));
+// The Open section: Overdue, Due today, Coming up, Not showing yet. The member filter and the sort
+// menu apply inside each group, so the first two stay on top under every sort. Empty groups
+// (including ones the member filter emptied) are left out.
+const openGroups = computed(() =>
+  groupOpenTodos(todoStore.filteredPlatedTodos)
+    .map((group) => ({ ...group, todos: withMemberFilterAndSort(group.todos) }))
+    .filter((group) => group.todos.length > 0)
+);
+// The groups as drawn, top to bottom: what the deep-link reveal looks the to-do up in.
+const displayedOpenTodos = computed(() => openGroups.value.flatMap((group) => group.todos));
 // #123: every repeating to-do (open), through the same lenses and sort as the Open section. One
 // host shows them at a time: the Reminders section on a phone, the Family Reminders panel on
 // desktop.
@@ -409,16 +419,25 @@ async function handleAcknowledge(id: string) {
       <template v-if="hasAnyTodos">
         <!-- Open to-dos -->
         <TodoSection
-          :label="t('todo.section.open')"
-          label-class="text-purple-500 dark:text-purple-lift"
-          :todos="displayedOpenTodos"
-          :empty-text="t('todo.noTodos')"
+          v-for="group in openGroups"
+          :key="group.id"
+          :label="t(group.labelKey)"
+          label-class="text-secondary-400 dark:text-ink-faint"
+          :todos="group.todos"
+          :data-testid="`todo-group-${group.id}`"
           @toggle="handleToggle"
           @view="openModal"
           @edit="openModal"
           @delete="handleDelete"
           @set-someday="handleSetSomeday"
         />
+        <p
+          v-if="openGroups.length === 0"
+          class="dark:text-ink-soft py-6 text-center text-sm text-[var(--color-text-muted)]"
+          data-testid="todo-open-empty"
+        >
+          {{ t('todo.noTodos') }}
+        </p>
 
         <!-- #123: Reminders (phone): everything that repeats, by who it reminds -->
         <TodoSection

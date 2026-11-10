@@ -7,9 +7,6 @@
     <string name="widget_sign_in_to_see">登录后查看你的一天</string>
     <string name="widget_refresh">打开 beanies 以刷新</string>
     <string name="widget_config_title">“你的一天”小组件</string>
-    <string name="widget_config_whose_day">显示谁的一天</string>
-    <string name="widget_config_my_day">我的一天</string>
-    <string name="widget_config_our_day">我们的一天</string>
     <string name="widget_config_show">显示内容</string>
     <string name="widget_config_events">活动</string>
     <string name="widget_config_whos_where">谁在哪里</string>

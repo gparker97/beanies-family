@@ -298,7 +298,7 @@ export const HOW_IT_WORKS_ARTICLES: HelpArticle[] = [
     icon: '\u{1F4CB}',
     readTime: 5,
     popular: true,
-    updatedDate: '2026-09-26',
+    updatedDate: '2026-11-10',
     sections: [
       {
         type: 'heading',
@@ -400,8 +400,8 @@ export const HOW_IT_WORKS_ARTICLES: HelpArticle[] = [
       {
         type: 'callout',
         content:
-          'To-dos with a due date <em>in the future</em> (not today, not overdue) won\u2019t appear in the briefing yet. They\u2019ll show up when the day comes.',
-        title: 'Future to-dos',
+          'To-dos with a due date <em>in the future</em> now show in the briefing too, tagged with their due date, until you tick them off. If a to-do has a later <strong>Show from</strong> date, or is a repeating one that is not due yet, it waits on the To-Do page (under <strong>Not Showing Yet</strong>) and joins the briefing on that day.',
+        title: 'Future and waiting to-dos',
         icon: '\u{1F4C5}',
       },
       {

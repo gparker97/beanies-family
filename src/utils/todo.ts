@@ -2,38 +2,26 @@ import type { CreateTodoInput, RecurrenceRule, TodoItem, TodoSort } from '@/type
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import { toAssigneePayload } from './assignees';
 import { formatNookDate, localToday } from './date';
-import { parseIsoDateSafely } from './safeDate';
 import { todoLink, todoLinkPatch } from './activityLinks';
 import { startRepeat } from './todoRecurrence';
+import { plateClock, showRulePatch, todoPlate, type TodoShowRule } from './todoPlate';
 
 /**
- * Check whether a todo item is overdue (past its due date/time).
- * Handles both date-only and date+time precision. Corrupt dueDates are
- * logged via parseIsoDateSafely and treated as not-overdue (rather than
- * silently dropping the comparison via Invalid Date).
+ * Is this open to-do overdue (past its due date, or due today with its time already past)?
+ * One definition everywhere: `todoPlate` with the device-local clock, compared as strings,
+ * so a to-do due on the 24th is never overdue before the 24th ends in any time zone. A
+ * malformed due date reads as undated (never overdue).
  */
 export function isTodoOverdue(todo: TodoItem): boolean {
-  if (todo.completed || !todo.dueDate) return false;
-  const dueDate = parseIsoDateSafely(todo.dueDate, `todo ${todo.id}.dueDate`);
-  if (!dueDate) return false;
-  if (todo.dueTime) {
-    const parts = todo.dueTime.split(':').map(Number);
-    dueDate.setHours(parts[0] ?? 23, parts[1] ?? 59, 0, 0);
-  } else {
-    dueDate.setHours(23, 59, 59, 999);
-  }
-  return new Date() > dueDate;
+  return !todo.completed && todoPlate(todo, plateClock()) === 'overdue';
 }
 
 /**
- * Check whether a todo item is due today (date matches local-today and not
- * overdue). Overdue takes precedence: a todo with `dueTime` earlier than now
- * but `dueDate` matching today is overdue, not due-today.
+ * Is this open to-do due today and not yet overdue? Overdue takes precedence: a to-do due
+ * today with a time already past is overdue, not due-today (`todoPlate`).
  */
 export function isTodoDueToday(todo: TodoItem): boolean {
-  if (todo.completed || !todo.dueDate) return false;
-  if (isTodoOverdue(todo)) return false;
-  return todo.dueDate.slice(0, 10) === localToday();
+  return !todo.completed && todoPlate(todo, plateClock()) === 'today';
 }
 
 /**
@@ -82,6 +70,8 @@ export interface TodoCreateFields {
   repeat?: RecurrenceRule;
   /** "Keep Parents Posted" on a child's routine. Written only when the repeat starts. */
   notifyParents?: boolean;
+  /** "Show from" (`utils/todoPlate`). Ignored without a due date (an undated to-do always shows). */
+  show?: TodoShowRule;
 }
 
 /**
@@ -96,7 +86,10 @@ export interface TodoCreateFields {
  *   - an activity link is written only with an id, through `todoLinkPatch`;
  *   - a repeat is written only with a due date, through `startRepeat` (the due date is the
  *     anchor, and `dueDate` becomes the series' first occurrence on or after today);
- *   - `notifyParents` is written (as `true`) only alongside a started repeat.
+ *   - `notifyParents` is written (as `true`) only alongside a started repeat;
+ *   - a show rule is written only with a due date, through `showRulePatch` (for the kind the
+ *     to-do ends up as: a repeat that could not start writes the one-off rule), and only its
+ *     non-default fields.
  *
  * Built FIELD BY FIELD and never by spreading `fields`: the review drawer passes whole drafts,
  * which carry keys that must never be persisted (`matchDate`, `timeDropped`, `dueDerived`,
@@ -112,6 +105,7 @@ export function toCreateTodoInput(
   const dueTime = dueDate ? fields.dueTime?.trim() || undefined : undefined;
   const assigneeIds = fields.assigneeIds ?? [];
   const started = dueDate && fields.repeat ? startRepeat(fields.repeat, dueDate, todayYmd) : null;
+  const show = dueDate && fields.show ? showRulePatch(fields.show, !!started) : null;
   return {
     title: fields.title.trim(),
     ...(description ? { description } : {}),
@@ -126,6 +120,9 @@ export function toCreateTodoInput(
         ? { dueDate }
         : {}),
     ...(dueTime ? { dueTime } : {}),
+    ...(show?.showFrom ? { showFrom: show.showFrom } : {}),
+    ...(show?.showOn ? { showOn: show.showOn } : {}),
+    ...(show?.showLeadDays ? { showLeadDays: show.showLeadDays } : {}),
     ...(assigneeIds.length ? toAssigneePayload([...assigneeIds]) : {}),
     // Through the link writer, so the id and session date are always written together.
     ...(fields.activityId ? todoLinkPatch(todoLink(fields)) : {}),

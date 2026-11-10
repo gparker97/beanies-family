@@ -2,7 +2,7 @@
 <!--
   The 52dp date column of the medium and large widgets (#130): numeral, weekday (accent), month,
   the weather row and its range/age line (#134), and at the foot the "as of" stale line, the
-  audience label and the due count. Which optional lines show is decided from the placed height
+  child's label and the due count. Which optional lines show is decided from the placed height
   (WidgetFill.dateColumnLines; RemoteViews has no ViewThatFits). Taps open the
   Nook. The foot's three lines hold "2 for you today" / "as of 12:40 am" at the Larger text
   size (two cut the last word silently); at Standard and Large they take two. The view is 62dp with 6dp/4dp side padding so a see-through card can give it a tile

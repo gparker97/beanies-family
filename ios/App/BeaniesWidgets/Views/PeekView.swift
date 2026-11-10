@@ -2,15 +2,15 @@ import SwiftUI
 import UIKit
 import WidgetKit
 
-/// Who peeks over the agenda panel's top-right edge: the family on "our day", the viewer
-/// alone on "my day" (and a child sees themself).
+/// Who peeks over the agenda panel's top-right edge: the family for an adult, the child
+/// alone for a child.
 enum PeekKind {
     case family
     /// A `WidgetAvatar` asset name.
     case solo(String)
 
     static func forDay(_ resolved: ResolvedDay, viewer: WSViewer) -> PeekKind {
-        resolved.audience == .our ? .family : .solo(viewer.avatar)
+        resolved.isChild ? .solo(viewer.avatar) : .family
     }
 
     /// Inset from the panel's right edge (mockup `.pk8` 6pt, `.pk8.solo` 12pt).

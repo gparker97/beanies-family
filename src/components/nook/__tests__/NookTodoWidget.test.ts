@@ -20,7 +20,7 @@ vi.mock('@/composables/useTranslation', () => ({
 
 const createTodo = vi.fn();
 vi.mock('@/stores/todoStore', () => ({
-  useTodoStore: () => ({ createTodo, filteredActiveTodos: [], todos: [] }),
+  useTodoStore: () => ({ createTodo, filteredPlateTodos: [], todos: [] }),
 }));
 vi.mock('@/stores/familyStore', () => ({
   useFamilyStore: () => ({ currentMember: { id: 'm-greg' } }),

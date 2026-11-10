@@ -360,19 +360,85 @@ describe('useCriticalItems', () => {
     expect(criticalItems.value).toHaveLength(0);
   });
 
-  it('excludes todos with a future due date', () => {
+  // "Show from": a dated one-off shows every day until it is done (greg, 2026-11-10).
+  it('shows a future-dated to-do every day before it is due, with its due date', () => {
     familyStore.setCurrentMember('parent-1');
     todoStore.todos.push(
       makeTodo({
         assigneeId: 'parent-1',
-        dueDate: '2026-03-11', // tomorrow
+        dueDate: '2026-03-13', // Friday
+        dueTime: '09:00',
         createdBy: 'parent-1',
         title: 'Future task',
       })
     );
 
     const { criticalItems } = useCriticalItems();
-    expect(criticalItems.value).toHaveLength(0);
+    expect(criticalItems.value).toHaveLength(1);
+    expect(criticalItems.value[0]!.message).toMatch(/^coming up: future task, due Fri, 13 Mar$/i);
+    expect(criticalItems.value[0]!.icon).toBe('📋');
+    // Only a to-do due today carries its time (and sorts with the timed rows).
+    expect(criticalItems.value[0]!.time).toBe('');
+  });
+
+  it('uses the upcoming variant for every audience', () => {
+    familyStore.setCurrentMember('parent-1');
+    todoStore.todos.push(
+      makeTodo({ id: 'asked', assigneeId: 'parent-1', dueDate: '2026-03-13', title: 'Asked' }),
+      makeTodo({ id: 'kid', assigneeIds: ['child-1'], dueDate: '2026-03-13', title: 'Kid' }),
+      makeTodo({ id: 'anyone', dueDate: '2026-03-13', title: 'Anyone' })
+    );
+    const byId = Object.fromEntries(
+      useCriticalItems().criticalItems.value.map((i) => [i.id, i.message])
+    );
+    expect(byId.asked).toMatch(/^Mom asked you: asked, due Fri, 13 Mar$/i);
+    expect(byId.kid).toMatch(/^Emma: kid, due Fri, 13 Mar$/i);
+    expect(byId.anyone).toMatch(/^anyone, due Fri, 13 Mar \(anyone can do this\)$/i);
+  });
+
+  it('leaves out a to-do whose show date is still ahead, and a repeating one before its day', () => {
+    familyStore.setCurrentMember('parent-1');
+    todoStore.todos.push(
+      makeTodo({
+        id: 'later',
+        assigneeId: 'parent-1',
+        dueDate: '2026-03-20',
+        showFrom: '2026-03-15',
+      }),
+      makeTodo({ id: 'on-due', assigneeId: 'parent-1', dueDate: '2026-03-20', showOn: 'due' }),
+      makeTodo({
+        id: 'weekly',
+        assigneeId: 'parent-1',
+        dueDate: '2026-03-17',
+        repeat: {
+          rule: { unit: 'week', interval: 1, weekdays: [2], end: { kind: 'never' } },
+          anchor: '2026-03-03',
+        },
+        repeatLog: [],
+      })
+    );
+    expect(useCriticalItems().criticalItems.value).toEqual([]);
+  });
+
+  it('orders untimed to-dos overdue, today, undated, then upcoming (soonest first)', () => {
+    familyStore.setCurrentMember('parent-1');
+    const mine = (id: string, dueDate?: string) =>
+      makeTodo({ id, assigneeId: 'parent-1', createdBy: 'parent-1', title: id, dueDate });
+    // Pushed in reverse so the order comes from the plate, not insertion.
+    todoStore.todos.push(
+      mine('later', '2026-03-20'),
+      mine('soon', '2026-03-12'),
+      mine('undated'),
+      mine('today', TODAY),
+      mine('late', '2026-03-09')
+    );
+    expect(useCriticalItems().criticalItems.value.map((i) => i.id)).toEqual([
+      'late',
+      'today',
+      'undated',
+      'soon',
+      'later',
+    ]);
   });
 
   it('includes todos with no due date', () => {
@@ -1528,6 +1594,30 @@ describe('useCriticalItems', () => {
         'your list “morning routine” is due today'
       );
       expect(criticalItems.value[0]!.icon).toBe('🧾');
+    });
+
+    it('sorts a coming-up to-do after an untimed list due today and an undated to-do', () => {
+      familyStore.setCurrentMember('parent-1');
+      // Pushed first, so only the `upcoming` rank (not insertion order) can put it last.
+      todoStore.todos.push(
+        makeTodo({
+          id: 'soon',
+          assigneeId: 'parent-1',
+          createdBy: 'parent-1',
+          title: 'soon',
+          dueDate: '2026-03-12',
+        }),
+        makeTodo({
+          id: 'undated',
+          assigneeId: 'parent-1',
+          createdBy: 'parent-1',
+          title: 'undated',
+        })
+      );
+      useListStore().lists = [repeating()];
+      const ids = useCriticalItems().criticalItems.value.map((i) => i.id);
+      expect(ids).toHaveLength(3);
+      expect(ids.at(-1)).toBe('soon');
     });
 
     it('stays off the briefing when the list reset yesterday', () => {

@@ -64,8 +64,8 @@ export interface ActivityReminderContext {
   dutyRole?: 'dropoff' | 'pickup';
   /**
    * `classifyAudience` over the activity's assignees for this viewer, already computed for
-   * `relevant`. Exposed so the home-screen widget (#130) applies the Nook briefing's rule
-   * (`dutyRoles.length > 0 || ownerItemSurfaces(audience)`) without classifying twice.
+   * `relevant`. Exposed so the home-screen widget (#130) picks a child session's own rows
+   * (`audience.kind === 'assignee'`) without classifying twice.
    */
   audience: BriefingAudience;
 }

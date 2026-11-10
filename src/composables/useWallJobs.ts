@@ -23,6 +23,7 @@ import { showToast } from '@/composables/useToast';
 import { useTranslationStore } from '@/stores/translationStore';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { buildWallJobs, captureListRemoval, sortJobs } from '@/utils/wallJobs';
+import { plateClock } from '@/utils/todoPlate';
 import { useAuthStore } from '@/stores/authStore';
 import { UNASSIGNED } from '@/utils/wallJobs';
 import type { WallJob, WallListGroup } from '@/types/wall';
@@ -144,7 +145,9 @@ export function useWallJobs() {
       // at least findable. (`ListDetailModal`'s picker does let you hand a list
       // to the dog.)
       memberIds: familyStore.sortedHumans.map((m) => m.id),
-      todayYmd: today.value,
+      // The day is the reactive `today` (so the board recomputes at midnight); the clock adds
+      // the minute a timed to-do turns overdue at.
+      clock: { ...plateClock(), ymd: today.value },
     })
   );
 

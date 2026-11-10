@@ -12,8 +12,9 @@
  *   a bean's LISTS = every wall-safe list they own, repeating or one-off,
  *                    each rendered whole under their name
  *   orphan lists   = lists whose owner is not a member we know about
- *   to-dos         = every to-do bar `someday` and surprise hints, tagged by
- *                    when it is due, assigned or not
+ *   to-dos         = every to-do bar `someday`, surprise hints and those whose
+ *                    "Show from" date is still ahead, tagged by their plate
+ *                    (`utils/todoPlate`), assigned or not
  *
  * Lists are NOT split by lifecycle any more. A recurring "leo's jobs" and a
  * one-off "swim bag" are both Leo's list; parking one under his name and the
@@ -40,6 +41,7 @@ import type {
 import { normalizeAssignees } from '@/utils/assignees';
 import { isFiled, isRecurring } from '@/utils/listLifecycle';
 import { daysBetweenYmd, extractDatePart } from '@/utils/date';
+import { plateClock, todoPlate, type PlateClock } from '@/utils/todoPlate';
 
 /**
  * Dedupe key. The same task legitimately exists as both a dated to-do and an
@@ -78,13 +80,13 @@ function dedupeKey(ownerId: string, title: string): string {
 
 /**
  * Which bucket a to-do falls in, or `null` when it does not belong on the wall
- * at all.
+ * at all (a completion from an earlier day, or a to-do not showing yet).
  *
  * A completion stays until the end of the day it was made, in every bucket, so the row
  * never deletes itself out from under the finger and a mis-tick can be undone. Yesterday's
  * completions are history and drop off.
  */
-function todoBucket(todo: TodoItem, todayYmd: string): WallTodoBucket | null {
+function todoBucket(todo: TodoItem, clock: PlateClock): WallTodoBucket | null {
   // A completion stays put for the rest of the day it happened, whatever bucket it is in,
   // struck through and still tappable so a mis-tick can be undone. It drops off tomorrow,
   // when it is history rather than work.
@@ -100,12 +102,18 @@ function todoBucket(todo: TodoItem, todayYmd: string): WallTodoBucket | null {
   // compares a UTC date to a local one, so east of UTC every morning tick and west of it
   // every evening tick reads as a different day — reinstating, for most of the world's
   // waking hours, the exact vanish-under-the-finger glitch this branch exists to remove.
-  if (todo.completed && extractDatePart(todo.completedAt ?? '') !== todayYmd) return null;
+  if (todo.completed && extractDatePart(todo.completedAt ?? '') !== clock.ymd) return null;
 
-  const due = todo.dueDate?.slice(0, 10);
-  if (!due) return 'undated';
-  if (due === todayYmd) return 'today';
-  return due < todayYmd ? 'overdue' : 'upcoming';
+  // The one date rule (time-aware). `todoPlate` ignores `completed`, so a to-do ticked today
+  // keeps its bucket; one not showing yet stays off the wall, ticked or not.
+  // A ticked to-do is placed by the clock AT ITS COMPLETION: one done before its time must
+  // not slide into Late when that time passes, and one done late must not jump from Late to
+  // Today under the finger.
+  const at = todo.completed && todo.completedAt ? new Date(todo.completedAt) : null;
+  const placed =
+    at && !Number.isNaN(at.getTime()) ? { ymd: clock.ymd, hhmm: plateClock(at).hhmm } : clock;
+  const plate = todoPlate(todo, placed);
+  return plate === 'waiting' ? null : plate;
 }
 
 function todoJob(
@@ -163,7 +171,8 @@ function listJob(list: FamilyList, item: FamilyListItem): WallJob {
  * nothing is ever written to either store here.
  */
 export function buildWallJobs(input: WallJobsInput): WallJobsResult {
-  const { todos, lists, memberIds, todayYmd } = input;
+  const { todos, lists, memberIds, clock } = input;
+  const todayYmd = clock.ymd;
 
   const listsByMember: Record<string, WallListGroup[]> = {};
   const orphanLists: WallListGroup[] = [];
@@ -196,7 +205,7 @@ export function buildWallJobs(input: WallJobsInput): WallJobsResult {
     // A surprise hint stays off a shared screen (`SURPRISE_HINT_TYPES`).
     if (isSurpriseHint(todo.hintType)) continue;
 
-    const bucket = todoBucket(todo, todayYmd);
+    const bucket = todoBucket(todo, clock);
     if (!bucket) continue;
 
     // Compare the raw date prefix, matching todoStore.dueTodayTodos and

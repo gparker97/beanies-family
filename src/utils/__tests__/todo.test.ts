@@ -88,6 +88,47 @@ describe('todo helpers', () => {
     it('handles full ISO datetime values (slices the date portion)', () => {
       expect(isTodoDueToday(todo({ dueDate: '2026-05-16T22:00:00.000Z' }))).toBe(true);
     });
+
+    it('reads a malformed due date as undated: never overdue, never due today', () => {
+      expect(isTodoOverdue(todo({ dueDate: 'not-a-date' }))).toBe(false);
+      expect(isTodoDueToday(todo({ dueDate: 'not-a-date' }))).toBe(false);
+    });
+  });
+});
+
+// The early-overdue bug: `new Date('YYYY-MM-DD')` is read as UTC midnight, and `setHours` then
+// applied local hours to it, so west of UTC a to-do due on the 24th turned overdue at 00:00 on
+// the 24th (local). The string-based plate rule (`todoPlate`) never parses the date.
+describe('isTodoOverdue / isTodoDueToday west of UTC (regression)', () => {
+  const tz = process.env.TZ;
+  beforeEach(() => {
+    process.env.TZ = 'America/Los_Angeles';
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    process.env.TZ = tz;
+  });
+
+  it('a to-do due on the 24th is due today all day on the 24th, and overdue on the 25th', () => {
+    const due24 = todo({ dueDate: '2026-11-24' });
+    // Local LA times (the Date is built after TZ is set).
+    vi.setSystemTime(new Date(2026, 10, 24, 0, 30));
+    expect(isTodoOverdue(due24)).toBe(false);
+    expect(isTodoDueToday(due24)).toBe(true);
+    vi.setSystemTime(new Date(2026, 10, 24, 23, 59));
+    expect(isTodoOverdue(due24)).toBe(false);
+    vi.setSystemTime(new Date(2026, 10, 25, 0, 1));
+    expect(isTodoOverdue(due24)).toBe(true);
+    expect(isTodoDueToday(due24)).toBe(false);
+  });
+
+  it('a timed to-do turns overdue at its local time', () => {
+    const at9 = todo({ dueDate: '2026-11-24', dueTime: '09:00' });
+    vi.setSystemTime(new Date(2026, 10, 24, 8, 59));
+    expect(isTodoOverdue(at9)).toBe(false);
+    vi.setSystemTime(new Date(2026, 10, 24, 9, 1));
+    expect(isTodoOverdue(at9)).toBe(true);
   });
 });
 
@@ -233,6 +274,38 @@ describe('toCreateTodoInput', () => {
     expect(input.assigneeIds).not.toBe(ids);
   });
 
+  describe('with a show rule ("Show from")', () => {
+    it('writes only the non-default field, and nothing for "right away"', () => {
+      const make = (show: Parameters<typeof toCreateTodoInput>[0]['show']) =>
+        toCreateTodoInput({ title: 'Dentist', dueDate: '2026-12-04', show }, 'm-1', '2026-11-10');
+      expect(make({ kind: 'from', date: '2026-11-24' })).toEqual({
+        title: 'Dentist',
+        dueDate: '2026-12-04',
+        showFrom: '2026-11-24',
+        completed: false,
+        createdBy: 'm-1',
+      });
+      expect(make({ kind: 'due' }).showOn).toBe('due');
+      expect(Object.keys(make({ kind: 'now' })).sort()).toEqual([
+        'completed',
+        'createdBy',
+        'dueDate',
+        'title',
+      ]);
+      // A lead is repeating-only: on a one-off it is "right away".
+      expect(make({ kind: 'lead', days: 3 })).not.toHaveProperty('showLeadDays');
+    });
+
+    it('ignores a show rule without a due date (an undated to-do always shows)', () => {
+      const input = toCreateTodoInput(
+        { title: 'Dentist', show: { kind: 'from', date: '2026-11-24' } },
+        'm-1',
+        '2026-11-10'
+      );
+      expect(Object.keys(input).sort()).toEqual(['completed', 'createdBy', 'title']);
+    });
+  });
+
   describe('with a repeat (#123)', () => {
     const weeklyWed: RecurrenceRule = {
       unit: 'week',
@@ -274,6 +347,39 @@ describe('toCreateTodoInput', () => {
       expect(input.dueDate).toBe('2026-10-09');
       expect(input).not.toHaveProperty('repeat');
       expect(input).not.toHaveProperty('repeatLog');
+    });
+
+    it('writes a repeating show rule for the repeat it started (never a one-off date)', () => {
+      const make = (show: Parameters<typeof toCreateTodoInput>[0]['show']) =>
+        toCreateTodoInput(
+          { title: 'Trash', dueDate: '2026-10-09', repeat: weeklyWed, show },
+          'm-1',
+          '2026-10-09'
+        );
+      expect(make({ kind: 'lead', days: 3 }).showLeadDays).toBe(3);
+      expect(make({ kind: 'now' }).showOn).toBe('now');
+      for (const show of [
+        { kind: 'due' } as const,
+        { kind: 'from', date: '2026-10-12' } as const,
+      ]) {
+        const input = make(show);
+        expect(input).not.toHaveProperty('showFrom');
+        expect(input).not.toHaveProperty('showOn');
+        expect(input).not.toHaveProperty('showLeadDays');
+      }
+      // A repeat that could not start writes the one-off rule.
+      expect(
+        toCreateTodoInput(
+          {
+            title: 'Trash',
+            dueDate: '2026-10-09',
+            repeat: { ...weeklyWed, interval: 0 },
+            show: { kind: 'from', date: '2026-10-08' },
+          },
+          'm-1',
+          '2026-10-07'
+        ).showFrom
+      ).toBe('2026-10-08');
     });
 
     it('writes notifyParents: true only alongside a started repeat', () => {

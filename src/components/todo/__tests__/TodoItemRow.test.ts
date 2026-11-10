@@ -187,3 +187,39 @@ describe('TodoItemRow', () => {
     });
   });
 });
+
+describe('TodoItemRow: waiting tag ("Show from")', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 10, 10, 12, 0));
+  });
+  afterEach(() => vi.useRealTimers());
+
+  const tag = (w: ReturnType<typeof mount>) => w.find('[data-testid="todo-waiting-tag"]');
+
+  it('tags a to-do that is not showing yet, and mutes its title', () => {
+    const w = mount(TodoItemRow, {
+      props: { todo: todo({ dueDate: '2026-12-04', showFrom: '2026-11-24' }) },
+    });
+    expect(tag(w).text()).toMatch(/shows from/i);
+    expect(w.find('p.font-outfit').classes()).toContain('dark:text-ink-soft');
+  });
+
+  it('says nothing once the to-do shows', () => {
+    const w = mount(TodoItemRow, {
+      props: { todo: todo({ dueDate: '2026-12-04', showFrom: '2026-11-09' }) },
+    });
+    expect(tag(w).exists()).toBe(false);
+  });
+
+  it('never tags a done or someday row that kept a show date', () => {
+    const base = { dueDate: '2026-12-04', showFrom: '2026-11-24' };
+    expect(
+      tag(mount(TodoItemRow, { props: { todo: todo({ ...base, completed: true }) } })).exists()
+    ).toBe(false);
+    expect(
+      tag(mount(TodoItemRow, { props: { todo: todo({ ...base, someday: true }) } })).exists()
+    ).toBe(false);
+  });
+});

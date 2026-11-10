@@ -22,7 +22,7 @@ import java.util.List;
  * 31+ (so a row-end re-render re-sends the whole widget), through {@link DayWidgetFactory} on API
  * 24-30. The medium and large
  * share one layout (round 9b) and differ only in how many task rows the fixed to-dos section has
- * and in the "my day" / "our day" label at the foot of the date column (large only).
+ * and in the child's label at the foot of the date column.
  *
  * EVERY PATH SETS EVERY VIEW IT COULD LEAVE BEHIND. The launcher re-applies a new RemoteViews
  * onto the views it already inflated when the layout id is unchanged, so a view one render showed
@@ -135,12 +135,8 @@ final class DayWidgetRenderer {
         v.setTextViewText(R.id.date_month, plan.entry.month);
         WidgetViews.onClick(v, R.id.date_column, context, id, WidgetViews.SLOT_DATE, s.links.nook, size);
         String asOf = asOf(context, plan);
-        String audience = "";
-        if (plan.isChild) {
-            audience = s.labels.childsDay;
-        } else if (size == WidgetSizes.Size.LARGE) {
-            audience = plan.isOurDay ? s.labels.ourDay : s.labels.myDay;
-        }
+        // The child's "Ava's day" label; an adult's family view has none.
+        String audience = plan.isChild ? s.labels.childsDay : "";
         // countText.text is '' when nothing is due; an empty WidgetText is never drawn.
         boolean dueCount = plan.shows(WidgetFill.DUE) && day != null && day.tasks.count > 0
                 && !day.tasks.countText.text.isEmpty();

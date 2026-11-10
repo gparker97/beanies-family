@@ -2,15 +2,18 @@
  * The home-screen widget snapshot builder (#130). Local factories, no Pinia (the
  * `wallJobs.test.ts` shape).
  *
- * The fixture test is the cross-platform contract: `fixtures/widget-snapshot.v3.json` is the
+ * The fixture test is the cross-platform contract: `fixtures/widget-snapshot.v4.json` is the
  * builder's output for the mockup's family, and the Swift and Java readers use it as their
  * sample. Regenerate it ONLY on a deliberate schema or copy change, and review the diff:
  *
  *   UPDATE_WIDGET_FIXTURE=1 npx vitest run src/utils/__tests__/widgetSnapshot.test.ts
- *   npx prettier --write src/utils/__tests__/fixtures/widget-snapshot.v3.json
+ *   npx prettier --write src/utils/__tests__/fixtures/widget-snapshot.v4.json
  *
- * `fixtures/widget-snapshot.v2.json` is frozen: the older shape the readers still accept
- * (readers take 2 and 3). A test below proves v3 only ADDED optional fields to it.
+ * `fixtures/widget-snapshot.v3.json` and `.v2.json` are frozen: the older shapes the readers
+ * still accept (readers take 2, 3 and 4). Tests below prove v3 only ADDED optional fields to
+ * v2, and that v4 only folded v3's `my` + `our` into one `view` and dropped the two day
+ * labels. Delete the v3 fixture (and the native `view ?? our ?? my` fallback) when 3 leaves
+ * the readable versions.
  *
  * (The comparison is on the parsed JSON, so Prettier's layout never fails the test.)
  *
@@ -54,7 +57,8 @@ import type { WeatherReading } from '@/types/weather';
 import { addDaysYmd } from '@/utils/date';
 import { AGE_SHOW_MS, CURRENT_MAX_MS } from '@/utils/weather/weatherReading';
 
-const FIXTURE = resolve(__dirname, 'fixtures/widget-snapshot.v3.json');
+const FIXTURE = resolve(__dirname, 'fixtures/widget-snapshot.v4.json');
+const FIXTURE_V3 = resolve(__dirname, 'fixtures/widget-snapshot.v3.json');
 const FIXTURE_V2 = resolve(__dirname, 'fixtures/widget-snapshot.v2.json');
 const ORIGIN = 'https://app.beanies.family';
 // The mockup's "Saturday 11" is a Sunday in 2026; the date (and its numeral) is kept.
@@ -358,26 +362,22 @@ function familyInput(over: Partial<WidgetSnapshotInput> = {}): WidgetSnapshotInp
 const build = (over: Partial<WidgetSnapshotInput> = {}) =>
   buildWidgetSnapshot(familyInput(over), NOW);
 const today = (s: WidgetSnapshot) => s.days[0]!;
-const titles = (day: WidgetDay | null) => (day?.rows ?? []).map((r) => r.title);
+const titles = (day: WidgetDay) => day.rows.map((r) => r.title);
 
 /** Local wall time read as UTC, so the fixture's epochs do not depend on the machine's zone. */
 function normaliseEpochs(snapshot: WidgetSnapshot): WidgetSnapshot {
   const shift = (ms: number) => ms - new Date(ms).getTimezoneOffset() * 60_000;
-  const day = (d: WidgetDay | null): WidgetDay | null =>
-    d && {
-      ...d,
-      rows: d.rows.map((r) => ({
-        ...r,
-        startsAt: r.startsAt === null ? null : shift(r.startsAt),
-        endsAt: r.endsAt === null ? null : shift(r.endsAt),
-      })),
-      pickups: d.pickups.map((p) => ({ ...p, at: shift(p.at) })),
-      handoffs: d.handoffs?.map((h) => ({ ...h, at: shift(h.at) })),
-    };
-  return {
-    ...snapshot,
-    days: snapshot.days.map((e) => ({ ...e, my: day(e.my), our: day(e.our) })),
-  };
+  const day = (d: WidgetDay): WidgetDay => ({
+    ...d,
+    rows: d.rows.map((r) => ({
+      ...r,
+      startsAt: r.startsAt === null ? null : shift(r.startsAt),
+      endsAt: r.endsAt === null ? null : shift(r.endsAt),
+    })),
+    pickups: d.pickups.map((p) => ({ ...p, at: shift(p.at) })),
+    handoffs: d.handoffs?.map((h) => ({ ...h, at: shift(h.at) })),
+  });
+  return { ...snapshot, days: snapshot.days.map((e) => ({ ...e, view: day(e.view) })) };
 }
 
 /** Every `link` string anywhere in the snapshot. */
@@ -403,7 +403,7 @@ afterEach(() => {
 });
 
 /**
- * Every key path in a JSON value, array indices collapsed to `[]` ("days[].my.rows[].title"),
+ * Every key path in a JSON value, array indices collapsed to `[]` ("days[].view.rows[].title"),
  * so two snapshots of the same family compare by SHAPE.
  */
 function keyPaths(value: unknown, prefix = '', out = new Set<string>()): Set<string> {
@@ -418,8 +418,8 @@ function keyPaths(value: unknown, prefix = '', out = new Set<string>()): Set<str
   return out;
 }
 
-describe('buildWidgetSnapshot: the v3 fixture (cross-platform contract)', () => {
-  it('equals fixtures/widget-snapshot.v3.json for the mockup family', () => {
+describe('buildWidgetSnapshot: the v4 fixture (cross-platform contract)', () => {
+  it('equals fixtures/widget-snapshot.v4.json for the mockup family', () => {
     const { snapshot, skipped } = build();
     expect(skipped).toBe(0);
     const actual = normaliseEpochs(snapshot);
@@ -427,15 +427,58 @@ describe('buildWidgetSnapshot: the v3 fixture (cross-platform contract)', () => 
       writeFileSync(FIXTURE, `${JSON.stringify(actual, null, 2)}\n`);
     }
     expect(actual).toEqual(JSON.parse(readFileSync(FIXTURE, 'utf8')));
-    expect(actual.version).toBe(3);
+    expect(actual.version).toBe(4);
+    expect(WIDGET_SNAPSHOT_VERSION).toBe(4);
+    expect([...WIDGET_SNAPSHOT_READABLE_VERSIONS]).toEqual([2, 3, 4]);
+  });
+
+  it('carries one view per day: no my / our, and no my-day / our-day labels', () => {
+    const { snapshot } = build();
+    for (const entry of snapshot.days) {
+      expect(Object.keys(entry)).toContain('view');
+      expect(Object.keys(entry)).not.toContain('my');
+      expect(Object.keys(entry)).not.toContain('our');
+    }
+    expect(Object.keys(snapshot.labels)).not.toContain('myDay');
+    expect(Object.keys(snapshot.labels)).not.toContain('ourDay');
+  });
+
+  // The frozen v3 file is what the native fallback (`view ?? our ?? my`) and the Android tests
+  // read as "a snapshot stored before the update": it must keep the OLD shape.
+  it('keeps the frozen v3 fixture in its old shape (my + our, the two day labels)', () => {
+    const v3 = JSON.parse(readFileSync(FIXTURE_V3, 'utf8')) as {
+      version: number;
+      labels: Record<string, string>;
+      days: Record<string, unknown>[];
+    };
+    expect(v3.version).toBe(3);
+    expect(v3.days[0]).toHaveProperty('my');
+    expect(v3.days[0]).toHaveProperty('our');
+    expect(v3.days[0]).not.toHaveProperty('view');
+    expect(v3.labels).toHaveProperty('myDay');
+    expect(v3.labels).toHaveProperty('ourDay');
+  });
+
+  it('is the v3 shape with my + our folded into view, the day labels dropped, and two optional additions', () => {
+    const v3 = JSON.parse(readFileSync(FIXTURE_V3, 'utf8')) as unknown;
+    const v4 = JSON.parse(readFileSync(FIXTURE, 'utf8')) as unknown;
+    const folded = new Set(
+      [...keyPaths(v3)]
+        .filter((p) => p !== 'labels.myDay' && p !== 'labels.ourDay')
+        .map((p) => p.replace(/^days\[\]\.(my|our)(?=\.|$)/, 'days[].view'))
+    );
+    // The lock screen's own-day fields: optional, so a v2/v3 reader is unaffected.
+    const V4_ADDITIONS = ['days[].view.rows[].mine', 'days[].view.ownThingsText'];
+    const v4Paths = keyPaths(v4);
+    expect([...folded].filter((p) => !v4Paths.has(p))).toEqual([]);
+    expect([...v4Paths].filter((p) => !folded.has(p))).toEqual(V4_ADDITIONS);
   });
 
   it('is the v2 shape plus optional fields only, so a v3 reader still reads the v2 fixture', () => {
     const v2 = JSON.parse(readFileSync(FIXTURE_V2, 'utf8')) as { version: number };
-    const v3 = JSON.parse(readFileSync(FIXTURE, 'utf8')) as WidgetSnapshot;
+    const v3 = JSON.parse(readFileSync(FIXTURE_V3, 'utf8')) as { version: number };
     expect(v2.version).toBe(2);
-    expect(v3.version).toBe(WIDGET_SNAPSHOT_VERSION);
-    expect([...WIDGET_SNAPSHOT_READABLE_VERSIONS]).toEqual([2, 3]);
+    expect(v3.version).toBe(3);
 
     const v2Paths = keyPaths(v2);
     const v3Paths = keyPaths(v3);
@@ -469,43 +512,123 @@ describe('buildWidgetSnapshot: the v3 fixture (cross-platform contract)', () => 
 });
 
 describe('buildWidgetSnapshot: who sees what', () => {
-  it("never puts another adult's assignee-only activity in my day; our day has it", () => {
+  it("shows every event on an adult's widget: another adult's, a child's and the family's", () => {
     const s = build().snapshot;
-    expect(titles(today(s).my)).not.toContain('Biscuit to the vet');
-    expect(titles(today(s).our)).toContain('Biscuit to the vet');
-  });
-
-  it("shows a child's activity to an adult (forChild), and family-wide events only on our day", () => {
-    const s = build().snapshot;
-    expect(titles(today(s).my)).toContain('swimming lesson at Tampines pool');
-    expect(titles(today(s).my)).not.toContain('pancakes with grandpa');
-    expect(today(s).our?.rows.find((r) => r.title === 'pancakes with grandpa')?.dot).toEqual({
+    expect(titles(today(s).view)).toEqual([
+      'pancakes with grandpa',
+      "Carter's party",
+      'swimming lesson at Tampines pool',
+      'Biscuit to the vet',
+      'piano',
+      'soccer practice',
+      'bedtime story',
+    ]);
+    expect(today(s).view.rows.find((r) => r.title === 'pancakes with grandpa')?.dot).toEqual({
       kind: 'family',
     });
+    // The same family calendar on every adult's phone.
+    expect(titles(today(build({ currentMember: JO }).snapshot).view)).toEqual(
+      titles(today(s).view)
+    );
   });
 
-  it('a child session publishes only the child’s own day: no our day, no hints, no to-dos', () => {
+  // The lock screen keeps to the viewer's own day (v2/v3's "my day" rule); the home screen
+  // shows the whole family's.
+  it("marks the viewer's own rows mine: a partner's event and a family-wide one are not", () => {
+    const s = build().snapshot;
+    const mine = (title: string) => today(s).view.rows.find((r) => r.title === title)?.mine;
+    // Jo's own event is on the family view, but never on Sam's lock screen.
+    expect(mine('Biscuit to the vet')).toBe(false);
+    // Nobody assigned: a family-wide event is not the viewer's own (as on the old my day).
+    expect(mine('pancakes with grandpa')).toBe(false);
+    // Sam's own, his child's, and Max's party Sam drops off at.
+    expect(mine('bedtime story')).toBe(true);
+    expect(mine('swimming lesson at Tampines pool')).toBe(true);
+    expect(mine("Carter's party")).toBe(true);
+    // Ava's piano, which Jo drives: still Sam's child's.
+    expect(mine('piano')).toBe(true);
+    // From Jo's phone the vet is hers.
+    const jo = build({ currentMember: JO }).snapshot;
+    expect(today(jo).view.rows.find((r) => r.title === 'Biscuit to the vet')?.mine).toBe(true);
+    expect(today(jo).view.rows.find((r) => r.title === 'bedtime story')?.mine).toBe(false);
+  });
+
+  it('marks an event the whole family is assigned to mine, and every trip and birthday', () => {
+    const everyone = activity({
+      id: 'everyone',
+      title: 'family photo',
+      startTime: '11:00',
+      endTime: '11:30',
+      assigneeIds: ['sam', 'jo', 'ava', 'max'],
+    });
+    const partnerTrip = { ...LAKE_TRIP, id: 'jo-trip', name: 'conference', assigneeIds: ['jo'] };
+    const s = build({
+      occurrencesByDate: { [TODAY]: [occ(everyone), occ(VET)] },
+      vacations: [LAKE_TRIP, partnerTrip],
+    }).snapshot;
+    expect(today(s).view.rows.find((r) => r.id.startsWith('everyone'))?.mine).toBe(true);
+    const comingUp = s.days.flatMap((d) => d.view.rows.filter((r) => r.kind !== 'event'));
+    expect(comingUp.map((r) => r.title)).toEqual(
+      expect.arrayContaining([expect.stringContaining('conference'), "Jo's birthday"])
+    );
+    expect(comingUp.every((r) => r.mine === true)).toBe(true);
+  });
+
+  it("counts only the viewer's own rows in ownThingsText", () => {
+    const s = build().snapshot;
+    const day = today(s).view;
+    expect(day.rows).toHaveLength(7);
+    expect(day.thingsText).toBe('7 things on today');
+    expect(day.rows.filter((r) => r.mine)).toHaveLength(5);
+    expect(day.ownThingsText).toBe('5 things on today');
+    // A day with only someone else's event: the family has one thing on, the viewer nothing.
+    const quiet = build({ occurrencesByDate: { [TODAY]: [occ(VET)] }, vacations: [] }).snapshot;
+    expect(today(quiet).view.thingsText).toBe('1 thing on today');
+    expect(today(quiet).view.ownThingsText).toBe('nothing on today');
+  });
+
+  it("the viewer's pick-ups and handoffs on the family view are only their own", () => {
+    const s = build({ currentMember: JO }).snapshot;
+    const day = today(s).view;
+    // Jo collects Max from the party and drives Ava to piano; Sam's soccer pick-up is not hers.
+    expect(day.handoffs?.map((h) => [h.kind, h.name])).toEqual([
+      ['pickup', 'Max'],
+      ['dropoff', 'Ava'],
+      ['pickup', 'Ava'],
+    ]);
+    expect(day.pickups.map((p) => p.text)).toEqual(['pick-up 12:30pm, Max', 'pick-up 5:15pm, Ava']);
+  });
+
+  it("a child's view marks every row mine, so its own things text is its things text", () => {
+    const { snapshot } = build({ currentMember: AVA });
+    for (const entry of snapshot.days) {
+      expect(entry.view.rows.every((r) => r.mine === true)).toBe(true);
+      expect(entry.view.ownThingsText).toBe(entry.view.thingsText);
+    }
+  });
+
+  it('a child session publishes only the child’s own day: no hints, no to-dos', () => {
     const { snapshot } = build({ currentMember: AVA, hintTodos: [GIFT_HINT] });
     expect(snapshot.viewer).toMatchObject({ memberId: 'ava', isChild: true, avatar: 'girl' });
     for (const entry of snapshot.days) {
-      expect(entry.our).toBeNull();
-      expect(entry.my?.tasks.items).toEqual([]);
-      expect(entry.my?.tasks.count).toBe(0);
+      expect(entry.view.tasks.items).toEqual([]);
+      expect(entry.view.tasks.count).toBe(0);
+      expect(entry.view.tasks.countText).toEqual({ text: '' });
     }
-    expect(titles(today(snapshot).my)).toEqual(['piano']);
-    expect(titles(snapshot.days[1]!.my)).toEqual(['playdate']);
+    expect(titles(today(snapshot).view)).toEqual(['piano']);
+    expect(titles(snapshot.days[1]!.view)).toEqual(['playdate']);
   });
 
   it("never names another member's birthday on a child's widget", () => {
     const birthdays = (s: WidgetSnapshot) =>
-      s.days.flatMap((d) =>
-        (d.my?.rows ?? []).filter((r) => r.kind === 'birthday').map((r) => r.title)
-      );
+      s.days.flatMap((d) => d.view.rows.filter((r) => r.kind === 'birthday').map((r) => r.title));
     expect(birthdays(build().snapshot)).toEqual(["Jo's birthday"]);
     expect(birthdays(build({ currentMember: AVA }).snapshot)).toEqual([]);
   });
 
-  it('a surprise hint reaches the viewer it is for, never our day', () => {
+  // The one deliberate difference from the briefing: a home screen is glanceable by the person
+  // the surprise is for, so the widget never shows a surprise hint, even to its assignee.
+  it('never shows a surprise hint, even to the viewer it is for; a plain hint shows', () => {
     const present = hint({
       id: 'present',
       title: "a present for Max's birthday",
@@ -513,43 +636,91 @@ describe('buildWidgetSnapshot: who sees what', () => {
       assigneeIds: ['sam', 'jo'],
       hintEventDate: '2026-11-01',
     });
-    const s = build({ hintTodos: [present] }).snapshot;
-    const tasks = (d: WidgetDay | null) => (d?.tasks.items ?? []).map((i) => i.title);
-    expect(tasks(today(s).my)).toContain("a present for Max's birthday");
-    expect(tasks(today(s).our)).not.toContain("a present for Max's birthday");
+    const s = build({ hintTodos: [present, GIFT_HINT] }).snapshot;
+    const tasks = today(s).view.tasks.items.map((i) => i.title);
+    expect(tasks).not.toContain("a present for Max's birthday");
+    expect(tasks).toContain("wrap a gift for Carter's party");
   });
 
-  it('never carries a private list, on either audience', () => {
+  it("never carries another adult's private list", () => {
     const json = JSON.stringify(build().snapshot);
     expect(json).not.toContain('give Max his inhaler');
     expect(json).not.toContain("Max's meds");
+  });
+
+  // greg, 2026-11-10: the widget's to-dos and lists are the daily briefing's, so private
+  // categories follow the briefing too: the viewer's own and their children's, never a partner's.
+  it("shows the viewer's own and a child's private list, never another adult's", () => {
+    const priv = (id: string, ownerId: string): FamilyList =>
+      ({
+        ...GROCERIES,
+        id,
+        title: `${id} list`,
+        category: 'health',
+        ownerId,
+        dueDate: TODAY,
+      }) as FamilyList;
+    const s = build({
+      todos: [],
+      hintTodos: [],
+      lists: [priv('sams', 'sam'), priv('avas', 'ava'), priv('jos', 'jo')],
+    }).snapshot;
+    expect(today(s).view.tasks.items.map((i) => i.title)).toEqual([
+      'sams list, 2 left',
+      'avas list, 2 left',
+    ]);
+  });
+
+  it("never shows a partner's to-dos or lists; unassigned and children's to-dos do show", () => {
+    const shared = todo({ id: 'shared', title: 'book the plumber', dueDate: TODAY });
+    const jos = { ...GROCERIES, id: 'jos', title: "Jo's errands", ownerId: 'jo' } as FamilyList;
+    const s = build({
+      todos: [PASSPORTS, LIBRARY, shared],
+      lists: [jos],
+      hintTodos: [],
+    }).snapshot;
+    const shown = today(s).view.tasks.items.map((i) => i.title);
+    expect(shown).toEqual(['return library book', 'book the plumber']);
+    // Jo sees her own passports and errands, and the same unassigned and children's to-dos.
+    const jo = today(
+      build({ currentMember: JO, todos: [PASSPORTS, LIBRARY, shared], lists: [jos], hintTodos: [] })
+        .snapshot
+    ).view.tasks.items.map((i) => i.title);
+    expect(jo).toEqual(
+      expect.arrayContaining([
+        'passports for the lake trip',
+        'return library book',
+        'book the plumber',
+      ])
+    );
+    expect(jo).toContain("Jo's errands, 2 left");
   });
 });
 
 describe('buildWidgetSnapshot: the calendar section', () => {
   it('fills every part for a full day', () => {
-    const my = today(build().snapshot).my!;
-    expect(my.rows.length).toBeGreaterThan(0);
-    expect(my.rows.every((r) => r.kind === 'event')).toBe(true);
-    expect(my.rows.some((r) => r.handoff)).toBe(true);
-    expect(my.tonight?.text).toBe('tonight: tacos, you cook');
-    expect(my.tasks.items.length).toBeGreaterThan(0);
+    const view = today(build().snapshot).view;
+    expect(view.rows.length).toBeGreaterThan(0);
+    expect(view.rows.every((r) => r.kind === 'event')).toBe(true);
+    expect(view.rows.some((r) => r.handoff)).toBe(true);
+    expect(view.tonight?.text).toBe('tonight: tacos, you cook');
+    expect(view.tasks.items.length).toBeGreaterThan(0);
   });
 
   it('carries the calendar only: trips, then birthdays, then events, never a to-do', () => {
     const thu = build().snapshot.days.find((d) => d.ymd === '2026-10-16')!;
-    expect(thu.our!.rows.map((r) => [r.kind, r.title])).toEqual([
+    expect(thu.view.rows.map((r) => [r.kind, r.title])).toEqual([
       ['trip', 'lake trip · day 2 of 4'],
       ['birthday', "Jo's birthday"],
     ]);
-    const json = JSON.stringify(build().snapshot.days.map((d) => d.my?.rows));
+    const json = JSON.stringify(build().snapshot.days.map((d) => d.view.rows));
     expect(json).not.toContain('pack swim bag');
   });
 
   it("starts a trip on its first day for the look-ahead, and pins a running trip to today's only", () => {
     const days = build().snapshot.days;
     const trip = (ymd: string) =>
-      days.find((d) => d.ymd === ymd)!.my!.rows.find((r) => r.kind === 'trip');
+      days.find((d) => d.ymd === ymd)!.view.rows.find((r) => r.kind === 'trip');
     expect(trip('2026-10-14')).toBeUndefined();
     expect(trip('2026-10-15')).toMatchObject({
       title: 'lake trip · starts',
@@ -559,7 +730,7 @@ describe('buildWidgetSnapshot: the calendar section', () => {
     expect(trip('2026-10-16')).toMatchObject({ title: 'lake trip · day 2 of 4', todayOnly: true });
   });
 
-  it("shows another adult's trip on my day too, but not on a child's", () => {
+  it("shows another adult's trip on an adult's widget, but not on a child's", () => {
     const solo = {
       ...LAKE_TRIP,
       id: 'solo',
@@ -567,10 +738,9 @@ describe('buildWidgetSnapshot: the calendar section', () => {
       assigneeIds: ['jo'],
     } as FamilyVacation;
     const days = build({ vacations: [solo] }).snapshot.days;
-    expect(days.some((d) => d.my!.rows.some((r) => r.kind === 'trip'))).toBe(true);
-    expect(days.some((d) => d.our!.rows.some((r) => r.kind === 'trip'))).toBe(true);
+    expect(days.some((d) => d.view.rows.some((r) => r.kind === 'trip'))).toBe(true);
     const child = build({ vacations: [solo], currentMember: AVA }).snapshot.days;
-    expect(child.some((d) => d.my!.rows.some((r) => r.kind === 'trip'))).toBe(false);
+    expect(child.some((d) => d.view.rows.some((r) => r.kind === 'trip'))).toBe(false);
   });
 
   it('orders timed rows first, and an all-day row has no instants and no time', () => {
@@ -585,7 +755,7 @@ describe('buildWidgetSnapshot: the calendar section', () => {
       vacations: [],
       members: [SAM, AVA, MAX],
     }).snapshot;
-    const rows = today(s).my!.rows;
+    const rows = today(s).view.rows;
     expect(rows.map((r) => r.title)).toEqual(['bedtime story', 'school fair']);
     expect(rows[1]).toMatchObject({ time: '', startsAt: null, endsAt: null });
     expect(rows[0]!.time).toBe('7:30pm');
@@ -600,14 +770,14 @@ describe('buildWidgetSnapshot: the calendar section', () => {
     const s = build({
       occurrencesByDate: { [TODAY]: [occ(done), occ(SOCCER), occ(SWIM)], [TOMORROW]: [] },
     }).snapshot;
-    const byTitle = new Map(today(s).my!.rows.map((r) => [r.title, r.isDone]));
+    const byTitle = new Map(today(s).view.rows.map((r) => [r.title, r.isDone]));
     expect(byTitle.get("Carter's party")).toBe(true);
     expect(byTitle.get('soccer practice')).toBe(false);
     expect(byTitle.get('swimming lesson at Tampines pool')).toBe(false);
   });
 
   it('writes the handoff as "drives" for one driver and as a line for two', () => {
-    const rows = today(build().snapshot).my!.rows;
+    const rows = today(build().snapshot).view.rows;
     expect(rows.find((r) => r.title === 'piano')?.handoff).toEqual({
       inlineTitle: 'piano, Jo drives',
       avatars: [],
@@ -618,12 +788,11 @@ describe('buildWidgetSnapshot: the calendar section', () => {
     });
   });
 
-  it("lists the viewer's pick-ups on my day only", () => {
+  it("lists the viewer's own pick-ups, never another adult's", () => {
     const s = build().snapshot;
-    expect(today(s).my!.pickups).toEqual([
+    expect(today(s).view.pickups).toEqual([
       { at: new Date(2026, 9, 11, 18, 30).getTime(), text: 'pick-up 6:30pm, Max' },
     ]);
-    expect(today(s).our!.pickups).toEqual([]);
   });
 
   it('never puts an activity title in a pick-up line (it is shown on the lock screen)', () => {
@@ -637,7 +806,7 @@ describe('buildWidgetSnapshot: the calendar section', () => {
       pickupMemberId: 'sam',
     });
     const s = build({ occurrencesByDate: { [TODAY]: [occ(errand)], [TOMORROW]: [] } }).snapshot;
-    expect(today(s).my!.pickups.map((p) => p.text)).toEqual(['pick-up 3pm']);
+    expect(today(s).view.pickups.map((p) => p.text)).toEqual(['pick-up 3pm']);
   });
 
   it('names the child being collected, never the driver, in a pick-up line', () => {
@@ -651,7 +820,7 @@ describe('buildWidgetSnapshot: the calendar section', () => {
       pickupMemberId: 'sam',
     });
     const s = build({ occurrencesByDate: { [TODAY]: [occ(lesson)], [TOMORROW]: [] } }).snapshot;
-    expect(today(s).my!.pickups.map((p) => p.text)).toEqual(['pick-up 3pm, Max']);
+    expect(today(s).view.pickups.map((p) => p.text)).toEqual(['pick-up 3pm, Max']);
   });
 
   it('shows a trip on its departure day only', () => {
@@ -670,28 +839,28 @@ describe('buildWidgetSnapshot: the calendar section', () => {
         vacations: [],
         occurrencesByDate: { [date]: [occ(trip, date)] },
       }).snapshot;
-    expect(titles(today(on('2026-10-11')).our)).toEqual([]);
-    expect(titles(today(on('2026-10-10')).our)).toEqual(['drive to the lake']);
+    expect(titles(today(on('2026-10-11')).view)).toEqual([]);
+    expect(titles(today(on('2026-10-10')).view)).toEqual(['drive to the lake']);
   });
 
   it('carries the whole look-ahead, each day with its divider date', () => {
     const s = build().snapshot;
     expect(s.days.map((d) => d.ymd)).toEqual(daysFrom(TODAY));
     expect(s.days[1]).toMatchObject({ weekday: 'Monday', numeral: '12', dividerDate: 'Mon 12' });
-    expect(titles(s.days[1]!.our)).toEqual(["lunch at grandma's", 'playdate']);
-    expect(titles(s.days[3]!.my)).toEqual(["parents' evening"]);
+    expect(titles(s.days[1]!.view)).toEqual(["lunch at grandma's", 'playdate']);
+    expect(titles(s.days[3]!.view)).toEqual(["parents' evening"]);
   });
 });
 
 describe('buildWidgetSnapshot: the to-dos section', () => {
-  const tasks = (d: WidgetDay | null) =>
-    (d?.tasks.items ?? []).map((i) => [i.kind, i.title, i.tag, i.tagTone]);
+  const tasks = (d: WidgetDay) => d.tasks.items.map((i) => [i.kind, i.title, i.tag, i.tagTone]);
 
   it('ranks to-dos, hints and lists together by when they are due, never by kind', () => {
     // Sam's view: the overdue candles; today, the timed swim bag, then Ava's library book and
     // the gift hint (a hint ranks exactly like a to-do); later this week, the groceries list
-    // (tomorrow) and the plumber (Thursday). Jo's passports are another adult's.
-    expect(tasks(today(build().snapshot).my)).toEqual([
+    // (tomorrow) and the plumber (Thursday). Jo's passports and Max's meds list are another
+    // adult's, so (as on the briefing) they never show.
+    expect(tasks(today(build().snapshot).view)).toEqual([
       ['todo', 'buy birthday candles', 'overdue', 'accent'],
       ['todo', 'pack swim bag', 'by 5pm', 'accent'],
       ['todo', 'return library book', 'today', 'accent'],
@@ -701,21 +870,21 @@ describe('buildWidgetSnapshot: the to-dos section', () => {
     ]);
   });
 
-  it('counts what is due now, never what is later this week', () => {
-    const s = build().snapshot;
-    const my = today(s).my!.tasks;
-    // Hints are listed but not counted: the count is what the `due` switch shows.
-    expect(my.count).toBe(3);
-    expect(my.countText).toEqual({ text: '3 for you today', emphasis: '3' });
-    expect(my.heading).toBe('to-dos and lists');
-    const our = today(s).our!.tasks;
-    // Wall rule: every owner, overdue and today (undated is not counted on our day).
-    expect(our.count).toBe(4);
-    expect(our.countText.text).toBe('4 due today');
+  it('counts what is due now, never what is undated or later this week', () => {
+    const renew = todo({ id: 'renew', title: "renew Ava's passport", assigneeIds: ['sam'] });
+    const tasks = today(
+      build({ todos: [SWIM_BAG, PASSPORTS, CANDLES, LIBRARY, PLUMBER, GIFT_HINT, renew] }).snapshot
+    ).view.tasks;
+    // Hints are listed but not counted: the count is what the `due` switch shows. The undated
+    // to-do is listed but not counted either (v4: the "for you today" count is gone).
+    expect(tasks.items.map((i) => i.title)).toContain("renew Ava's passport");
+    expect(tasks.count).toBe(3);
+    expect(tasks.countText).toEqual({ text: '3 due today', emphasis: '3' });
+    expect(tasks.heading).toBe('to-dos and lists');
   });
 
   it('builds each day as if it were today, so the order holds after midnight', () => {
-    const tomorrow = build().snapshot.days[1]!.my!.tasks.items;
+    const tomorrow = build().snapshot.days[1]!.view.tasks.items;
     expect(tomorrow.find((i) => i.kind === 'list')).toMatchObject({
       bucket: 'today',
       tag: 'today',
@@ -725,7 +894,7 @@ describe('buildWidgetSnapshot: the to-dos section', () => {
 
   it('shows an undated to-do of mine with no tag, after today and before later', () => {
     const renew = todo({ id: 'renew', title: "renew Ava's passport", assigneeIds: ['sam'] });
-    const items = today(build({ todos: [renew, PLUMBER], hintTodos: [], lists: [] }).snapshot).my!
+    const items = today(build({ todos: [renew, PLUMBER], hintTodos: [], lists: [] }).snapshot).view
       .tasks.items;
     expect(items.map((i) => [i.title, i.bucket, i.tag])).toEqual([
       ["renew Ava's passport", 'undated', ''],
@@ -733,9 +902,9 @@ describe('buildWidgetSnapshot: the to-dos section', () => {
     ]);
   });
 
-  // greg, 2026-11-06: a child's routine stays off a parent's "my day" while on track. The
-  // snapshot has no clock, so there is no "missed" case here; only the opt-in brings it back.
-  describe("a child's routine on a parent's my day", () => {
+  // greg, 2026-11-06 / 2026-11-10: a child's routine stays off a parent's widget while on track,
+  // exactly as on the briefing (`gateRoutine`); the opt-in or a missed to-do brings it back.
+  describe("a child's routine on a parent's widget", () => {
     const DAILY = { unit: 'day', interval: 1, end: { kind: 'never' } } as const;
     const plants = (over: Partial<TodoItem> = {}) =>
       todo({
@@ -763,19 +932,45 @@ describe('buildWidgetSnapshot: the to-dos section', () => {
         ...over,
       }) as FamilyList;
     const myTitles = (over: Partial<WidgetSnapshotInput>) =>
-      (today(build({ hintTodos: [], ...over }).snapshot).my?.tasks.items ?? []).map((i) => i.title);
+      today(build({ hintTodos: [], ...over }).snapshot).view.tasks.items.map((i) => i.title);
+    const titlesByDay = (over: Partial<WidgetSnapshotInput>) =>
+      build({ hintTodos: [], ...over }).snapshot.days.map((d) =>
+        d.view.tasks.items.map((i) => i.title)
+      );
 
-    it('excludes an on-track repeating to-do and recurring list', () => {
-      expect(myTitles({ todos: [plants()], lists: [chores()] })).toEqual([]);
+    it('excludes an on-track repeating to-do and recurring list, on every widget day', () => {
+      expect(titlesByDay({ todos: [plants()], lists: [chores()] })).toEqual(
+        Array.from({ length: WIDGET_DAYS }, () => [])
+      );
     });
 
-    it('includes them with notifyParents', () => {
-      expect(
-        myTitles({
-          todos: [plants({ notifyParents: true })],
-          lists: [chores({ notifyParents: true })],
-        })
-      ).toEqual(expect.arrayContaining(['water the plants', 'morning chores, 1 left']));
+    it('includes them with notifyParents, on every widget day', () => {
+      for (const titles of titlesByDay({
+        todos: [plants({ notifyParents: true })],
+        lists: [chores({ notifyParents: true })],
+      })) {
+        expect(titles).toEqual(
+          expect.arrayContaining(['water the plants', 'morning chores, 1 left'])
+        );
+      }
+    });
+
+    // A repeating to-do whose date has not been rolled forward yet reads as overdue: missed, so
+    // a parent sees it today. Days 2-7 are projections, never missed, so it stays off them.
+    it('includes a missed repeating to-do today only, never on the projected days', () => {
+      const missed = plants({ dueDate: '2026-10-10' });
+      const [first, ...rest] = titlesByDay({ todos: [missed], lists: [] });
+      expect(first).toEqual(['water the plants']);
+      for (const titles of rest) expect(titles).toEqual([]);
+    });
+
+    // A recurring list never reads as overdue (`isListDue`), so it has no missed case: only
+    // notifyParents brings it to a parent. A child's one-off list is not a routine at all.
+    it("a recurring list is never missed; a child's one-off list always shows", () => {
+      const lapsed = chores({ lastResetDate: '2026-10-05' });
+      expect(titlesByDay({ todos: [], lists: [lapsed] }).flat()).toEqual([]);
+      const oneOff = chores({ lifecycle: 'oneoff', dueDate: '2026-10-09', frequency: undefined });
+      expect(myTitles({ todos: [], lists: [oneOff] })).toEqual(['morning chores, 1 left']);
     });
 
     it("a child's one-off to-do is unchanged", () => {
@@ -786,7 +981,7 @@ describe('buildWidgetSnapshot: the to-dos section', () => {
 
     it("the child's own day is unchanged (a child session publishes no to-dos)", () => {
       const { snapshot } = build({ currentMember: AVA, todos: [plants()], lists: [chores()] });
-      expect(today(snapshot).my?.tasks.items).toEqual([]);
+      expect(today(snapshot).view.tasks.items).toEqual([]);
     });
   });
 
@@ -810,7 +1005,7 @@ describe('buildWidgetSnapshot: the to-dos section', () => {
         ...over,
       }) as FamilyList;
     const listRow = (s: WidgetSnapshot, i: number) =>
-      s.days[i]!.my!.tasks.items.find((r) => r.kind === 'list');
+      s.days[i]!.view.tasks.items.find((r) => r.kind === 'list');
 
     it('is a today row with the open count on the day it reset, then predicts every entry', () => {
       const s = build({ lists: [repeating()], todos: [], hintTodos: [] }).snapshot;
@@ -850,7 +1045,7 @@ describe('buildWidgetSnapshot: the to-dos section', () => {
         todos: [],
         hintTodos: [],
       }).snapshot;
-      expect(today(s).my!.tasks.items.filter((r) => r.bucket === 'today')).toEqual([]);
+      expect(today(s).view.tasks.items.filter((r) => r.bucket === 'today')).toEqual([]);
       expect(listRow(s, 0)).toMatchObject({ bucket: 'later' });
     });
 
@@ -858,32 +1053,99 @@ describe('buildWidgetSnapshot: the to-dos section', () => {
       const lists = [repeating(), repeating({ id: 'rep2', lastResetDate: '2026-10-10' })];
       const s = build({ lists, todos: [], hintTodos: [] }).snapshot;
       for (const day of s.days) {
-        for (const view of [day.my, day.our]) {
-          const buckets = (view?.tasks.items ?? []).map((r) => r.bucket);
-          expect(buckets).not.toContain('overdue');
-          expect(buckets).not.toContain('undated');
-        }
+        const buckets = day.view.tasks.items.map((r) => r.bucket);
+        expect(buckets).not.toContain('overdue');
+        expect(buckets).not.toContain('undated');
       }
     });
 
-    it('honours isWallSafeList on our day', () => {
+    it("follows the briefing's owner audience: my private list shows, another adult's never", () => {
       const s = build({
         lists: [repeating({ ownerId: 'jo' }), repeating({ id: 'priv', category: 'health' })],
         todos: [],
         hintTodos: [],
       }).snapshot;
-      expect(s.days[0]!.our!.tasks.items.filter((r) => r.kind === 'list')).toHaveLength(1);
+      for (const day of s.days) {
+        expect(day.view.tasks.items.filter((r) => r.kind === 'list').map((r) => r.id)).toEqual([
+          'list:priv',
+        ]);
+      }
     });
   });
 
-  it("leaves out a task due past the look-ahead, an emptied list and another adult's list", () => {
-    const far = todo({ id: 'far', title: 'far off', assigneeIds: ['sam'], dueDate: '2026-10-30' });
+  it("leaves out an emptied list and another adult's list", () => {
     const empty = { ...GROCERIES, id: 'empty', title: 'empty', items: [] } as FamilyList;
     const jos = { ...GROCERIES, id: 'jos', title: "Jo's list", ownerId: 'jo' } as FamilyList;
-    const titlesOf = (d: WidgetDay | null) => (d?.tasks.items ?? []).map((i) => i.title);
-    const s = build({ todos: [far], lists: [empty, jos], hintTodos: [] }).snapshot;
-    expect(titlesOf(today(s).my)).toEqual([]);
-    expect(titlesOf(today(s).our)).toEqual(["Jo's list, 2 left"]);
+    const s = build({ todos: [], lists: [empty, jos], hintTodos: [] }).snapshot;
+    expect(today(s).view.tasks.items).toEqual([]);
+  });
+
+  // "Show from": a to-do has no look-ahead; it shows until it is done, unless its show date is
+  // still ahead. One due beyond the look-ahead names its month.
+  it('shows a to-do due past the look-ahead, tagged with its month', () => {
+    const far = todo({ id: 'far', title: 'far off', assigneeIds: ['sam'], dueDate: '2026-10-30' });
+    const s = build({ todos: [far], lists: [], hintTodos: [] }).snapshot;
+    expect(today(s).view.tasks.items).toEqual([
+      expect.objectContaining({ title: 'far off', bucket: 'later', tag: 'Oct 30' }),
+    ]);
+  });
+
+  it('leaves a to-do off every day before its show date, and on from that day', () => {
+    const later = todo({
+      id: 'later',
+      title: 'renew insurance',
+      assigneeIds: ['sam'],
+      dueDate: '2026-10-30',
+      showFrom: '2026-10-14',
+    });
+    const s = build({ todos: [later], lists: [], hintTodos: [] }).snapshot;
+    const titlesOn = (ymd: string) =>
+      s.days.find((d) => d.ymd === ymd)!.view.tasks.items.map((i) => i.title);
+    expect(titlesOn(TODAY)).toEqual([]);
+    expect(titlesOn('2026-10-13')).toEqual([]);
+    expect(titlesOn('2026-10-14')).toEqual(['renew insurance']);
+  });
+
+  it("a child's repeating chore stays off a parent's widget on every day, including after its due day", () => {
+    const daily = {
+      rule: { unit: 'day', interval: 1, end: { kind: 'never' } },
+      anchor: '2026-10-01',
+    } as TodoItem['repeat'];
+    const chore = todo({
+      id: 'chore',
+      title: 'feed the fish',
+      assigneeIds: ['ava'],
+      repeat: daily,
+      repeatLog: [],
+      dueDate: TODAY,
+    });
+    const s = build({ todos: [chore], lists: [], hintTodos: [] }).snapshot;
+    // Days 2-7 are projected: the chore due today would read as overdue there, but is not missed.
+    for (const day of s.days) expect(day.view.tasks.items).toEqual([]);
+    // Kept posted: on the parent's widget from its due day (and, as a projection, after it).
+    const posted = build({
+      todos: [{ ...chore, notifyParents: true }],
+      lists: [],
+      hintTodos: [],
+    }).snapshot;
+    expect(today(posted).view.tasks.items.map((i) => i.title)).toEqual(['feed the fish']);
+  });
+
+  it('turns a timed to-do overdue once its time has passed today, never on a later day', () => {
+    const local = new Date(2026, 9, 11, 18, 0); // 18:00 device-local on TODAY
+    const timed = todo({
+      id: 'timed',
+      title: 'call the plumber',
+      assigneeIds: ['sam'],
+      dueDate: TODAY,
+      dueTime: '17:00',
+    });
+    const at = (now: Date) =>
+      buildWidgetSnapshot(familyInput({ todos: [timed], lists: [], hintTodos: [] }), now).snapshot;
+    expect(today(at(local)).view.tasks.items[0]).toMatchObject({ bucket: 'overdue' });
+    expect(today(at(new Date(2026, 9, 11, 16, 0))).view.tasks.items[0]).toMatchObject({
+      bucket: 'today',
+    });
   });
 
   it('ranks a hint by its event, never its nudge date: never overdue, no time', () => {
@@ -896,19 +1158,19 @@ describe('buildWidgetSnapshot: the to-dos section', () => {
       hintEventDate: '2026-10-17',
     });
     const s = build({ todos: [], lists: [], hintTodos: [cake] }).snapshot;
-    expect(today(s).my!.tasks.items).toEqual([
+    expect(today(s).view.tasks.items).toEqual([
       expect.objectContaining({ kind: 'hint', bucket: 'undated', tag: '', timed: false }),
     ]);
-    expect(today(s).my!.tasks.count).toBe(0);
-    const onTheDay = s.days.find((d) => d.ymd === '2026-10-17')!.my!.tasks.items[0];
+    expect(today(s).view.tasks.count).toBe(0);
+    const onTheDay = s.days.find((d) => d.ymd === '2026-10-17')!.view.tasks.items[0];
     expect(onTheDay).toMatchObject({ bucket: 'today', tag: 'today' });
   });
 
   it('caps a day at MAX_WIDGET_TASKS and says how many there were', () => {
     const many = Array.from({ length: 30 }, (_, i) =>
-      todo({ id: `t${i}`, title: `to-do ${i}`, assigneeIds: ['sam'] })
+      todo({ id: `t${i}`, title: `to-do ${i}`, assigneeIds: ['sam'], dueDate: TODAY })
     );
-    const tasks = today(build({ todos: many, lists: [], hintTodos: [] }).snapshot).my!.tasks;
+    const tasks = today(build({ todos: many, lists: [], hintTodos: [] }).snapshot).view.tasks;
     expect(tasks.items).toHaveLength(MAX_WIDGET_TASKS);
     expect(tasks.overflow).toEqual({ due: 30 - MAX_WIDGET_TASKS, hint: 0 });
     expect(tasks.count).toBe(30);
@@ -919,7 +1181,7 @@ describe('buildWidgetSnapshot: the to-dos section', () => {
       todo({ id: `t${i}`, title: `to-do ${i}`, assigneeIds: ['sam'], dueDate: '2026-10-01' })
     );
     const gift = hint({ id: 'g', title: 'wrap the gift', hintEventDate: '2026-10-13' });
-    const tasks = today(build({ todos: many, lists: [], hintTodos: [gift] }).snapshot).my!.tasks;
+    const tasks = today(build({ todos: many, lists: [], hintTodos: [gift] }).snapshot).view.tasks;
     expect(tasks.items.filter((i) => i.kind === 'hint').map((i) => i.title)).toEqual([
       'wrap the gift',
     ]);
@@ -927,11 +1189,14 @@ describe('buildWidgetSnapshot: the to-dos section', () => {
     expect(tasks.heading).toBe('to-dos');
   });
 
-  it("puts a dot on someone else's task, and none on my own or a hint", () => {
-    const items = today(build().snapshot).my!.tasks.items;
+  it("puts its owner's dot on every to-do and list (the family's when unowned), none on a hint", () => {
+    const shared = todo({ id: 'shared', title: 'book the plumber', dueDate: TODAY });
+    const items = today(build({ todos: [SWIM_BAG, CANDLES, GIFT_HINT, shared] }).snapshot).view
+      .tasks.items;
     const dot = (title: string) => items.find((i) => i.title === title)?.dot;
     expect(dot('pack swim bag')).toMatchObject({ kind: 'member', initial: 'M' });
-    expect(dot('buy birthday candles')).toBeNull();
+    expect(dot('buy birthday candles')).toMatchObject({ kind: 'member', initial: 'S' });
+    expect(dot('book the plumber')).toEqual({ kind: 'family' });
     expect(dot("wrap a gift for Carter's party")).toBeNull();
   });
 });
@@ -941,11 +1206,11 @@ describe('buildWidgetSnapshot: failure isolation and links', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const malformed = [null as unknown as MealPlanEntry];
     const { snapshot, skipped } = build({ mealsByDate: { [TODAY]: malformed, [TOMORROW]: [] } });
-    // One malformed meal on today: the meals block of today's my AND our day.
-    expect(skipped).toBe(2);
-    expect(today(snapshot).my!.tonight).toBeNull();
-    expect(today(snapshot).my!.rows.length).toBeGreaterThan(0);
-    expect(today(snapshot).my!.tasks.items.length).toBeGreaterThan(0);
+    // One malformed meal on today: the meals block of today's one view.
+    expect(skipped).toBe(1);
+    expect(today(snapshot).view.tonight).toBeNull();
+    expect(today(snapshot).view.rows.length).toBeGreaterThan(0);
+    expect(today(snapshot).view.tasks.items.length).toBeGreaterThan(0);
     expect(warn).toHaveBeenCalledWith(
       expect.stringContaining("dropped 'meals'"),
       expect.anything()
@@ -963,12 +1228,12 @@ describe('buildWidgetSnapshot: failure isolation and links', () => {
 
   it('opens the calendar Day view: event rows on their date, the date column on today', () => {
     const s = build().snapshot;
-    const events = today(s).my!.rows.filter((r) => r.kind === 'event');
+    const events = today(s).view.rows.filter((r) => r.kind === 'event');
     expect(events.length).toBeGreaterThan(0);
     for (const row of events) {
       expect(row.link).toBe(`${ORIGIN}/activities?view=day&d=${TODAY}&src=widget`);
     }
-    for (const h of today(s).my!.handoffs ?? []) {
+    for (const h of today(s).view.handoffs ?? []) {
       expect(h.link).toBe(`${ORIGIN}/activities?view=day&d=${TODAY}&src=widget`);
     }
     expect(s.links.nook).toBe(`${ORIGIN}/activities?view=day&src=widget`);
@@ -976,9 +1241,7 @@ describe('buildWidgetSnapshot: failure isolation and links', () => {
 
   it('keeps the item links for to-dos, lists, trips and birthdays', () => {
     const links = (kind: string) =>
-      s.days
-        .flatMap((d) => [...(d.my?.rows ?? []), ...(d.our?.rows ?? [])])
-        .filter((r) => r.kind === kind);
+      s.days.flatMap((d) => d.view.rows).filter((r) => r.kind === kind);
     const s = build().snapshot;
     for (const row of links('birthday')) expect(row.link).toContain('/family?edit=');
     for (const row of links('trip')) expect(row.link).toContain('/travel?vacation=');
@@ -987,7 +1250,7 @@ describe('buildWidgetSnapshot: failure isolation and links', () => {
 
   it('links the meal planner only while its flag is on', () => {
     const off = build({ flags: { mealPlanner: false, helpfulHints: true } }).snapshot;
-    expect(today(off).my!.tonight).toBeNull();
+    expect(today(off).view.tonight).toBeNull();
     expect(JSON.stringify(off)).not.toContain('/meal-planner');
   });
 });
@@ -1054,31 +1317,30 @@ describe('buildWidgetSnapshot: v3 weather', () => {
     const { snapshot, skipped } = build({ weather: { ...WEATHER, reading: broken } });
     expect(snapshot.weather).toBeNull();
     expect(skipped).toBe(1);
-    expect(titles(today(snapshot).my).length).toBeGreaterThan(0);
+    expect(titles(today(snapshot).view).length).toBeGreaterThan(0);
   });
 });
 
 describe('buildWidgetSnapshot: v3 handoffs', () => {
   const at = (h: number, m: number) => new Date(2026, 9, 11, h, m).getTime();
 
-  it("lists the viewer's own drop-offs and pick-ups, both kinds, on my day only", () => {
+  it("lists the viewer's own drop-offs and pick-ups, both kinds", () => {
     const s = build().snapshot;
-    const partyLink = today(s).my!.rows.find((r) => r.title === "Carter's party")!.link;
-    expect(today(s).my!.handoffs).toEqual([
+    const partyLink = today(s).view.rows.find((r) => r.title === "Carter's party")!.link;
+    expect(today(s).view.handoffs).toEqual([
       { at: at(10, 15), kind: 'dropoff', name: 'Max', link: partyLink },
       {
         at: at(18, 30),
         kind: 'pickup',
         name: 'Max',
-        link: today(s).my!.rows.find((r) => r.title === 'soccer practice')!.link,
+        link: today(s).view.rows.find((r) => r.title === 'soccer practice')!.link,
       },
     ]);
-    expect(today(s).our!.handoffs).toEqual([]);
   });
 
   it("never lists another adult's duties", () => {
     const jo = build({ currentMember: JO }).snapshot;
-    expect(today(jo).my!.handoffs!.map((h) => [h.kind, h.at, h.name])).toEqual([
+    expect(today(jo).view.handoffs!.map((h) => [h.kind, h.at, h.name])).toEqual([
       ['pickup', at(12, 30), 'Max'],
       ['dropoff', at(16, 30), 'Ava'],
       ['pickup', at(17, 15), 'Ava'],
@@ -1137,21 +1399,17 @@ describe('buildWidgetSnapshot: v3 doneToday', () => {
         doneLater,
       ],
     }).snapshot;
-    for (const view of ['my', 'our'] as const) {
-      const tasks = today(s)[view]!.tasks;
-      expect(tasks.doneToday).toBe(2);
-      expect(tasks.count).toBe(before[view]!.tasks.count);
-      expect(tasks.items.map((i) => i.title)).toEqual(
-        before[view]!.tasks.items.map((i) => i.title)
-      );
-    }
-    expect(build().snapshot.days[0]!.my!.tasks.doneToday).toBe(0);
+    const tasks = today(s).view.tasks;
+    expect(tasks.doneToday).toBe(2);
+    expect(tasks.count).toBe(before.view.tasks.count);
+    expect(tasks.items.map((i) => i.title)).toEqual(before.view.tasks.items.map((i) => i.title));
+    expect(build().snapshot.days[0]!.view.tasks.doneToday).toBe(0);
   });
 });
 
 describe('buildWidgetSnapshot: v3 row words', () => {
   it('gives each row its first word, in English and in Chinese', () => {
-    const rows = today(build().snapshot).my!.rows;
+    const rows = today(build().snapshot).view.rows;
     expect(rows.find((r) => r.title.startsWith('swimming'))?.shortTitle).toBe('swimming');
     expect(rows.find((r) => r.title === "Carter's party")?.shortTitle).toBe("Carter's");
 
@@ -1160,7 +1418,7 @@ describe('buildWidgetSnapshot: v3 row words', () => {
     const zh = today(
       build({ language: 'zh', occurrencesByDate: { [TODAY]: [occ(swim)], [TOMORROW]: [] } })
         .snapshot
-    ).our!.rows[0]!;
+    ).view.rows[0]!;
     expect(zh.shortTitle!.length).toBeGreaterThan(0);
     expect(zh.shortTitle!.length).toBeLessThan(title.length);
     expect(title.startsWith(zh.shortTitle!)).toBe(true);
@@ -1177,7 +1435,7 @@ describe('buildWidgetSnapshot: v3 row words', () => {
     const family = activity({ id: 'family', title: 'family walk', startTime: '09:00' });
     const rows = today(
       build({ occurrencesByDate: { [TODAY]: [occ(duo), occ(family)], [TOMORROW]: [] } }).snapshot
-    ).our!.rows;
+    ).view.rows;
     expect(rows.find((r) => r.id.startsWith('duo'))).toMatchObject({
       who: 'Ava & Max',
       whoFirst: 'Ava',

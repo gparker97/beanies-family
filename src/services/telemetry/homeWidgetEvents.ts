@@ -40,11 +40,11 @@ function emit(level: LogLevel, message: string, context: Record<string, unknown>
  */
 export function emitSnapshotPublished(payload: {
   reason: WidgetRefreshReason;
-  /** Rows on today's "my day", the widget's default view. */
+  /** Calendar rows on today's view (the family's, or a child's own). */
   rowsToday: number;
-  /** Tasks in today's "my day" to-dos section (before the cap). */
+  /** Tasks in today's to-dos section (before the cap). */
   tasksToday: number;
-  /** Calendar rows on the six look-ahead days of "my day". */
+  /** Calendar rows on the six look-ahead days. */
   aheadRows: number;
   /** The snapshot JSON's size, in whole kilobytes (rounded up). */
   kb: number;

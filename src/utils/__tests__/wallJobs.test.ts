@@ -44,8 +44,10 @@ function list(over: Partial<FamilyList> = {}): FamilyList {
 }
 
 const members = ['greg', 'leo', 'milo'];
-const build = (todos: TodoItem[], lists: FamilyList[]) =>
-  buildWallJobs({ todos, lists, memberIds: members, todayYmd: TODAY });
+/** The start of TODAY, so no timed to-do due today has passed its time yet. */
+const CLOCK = { ymd: TODAY, hhmm: '00:00' };
+const build = (todos: TodoItem[], lists: FamilyList[], clock = CLOCK) =>
+  buildWallJobs({ todos, lists, memberIds: members, clock });
 
 /** Every job on a bean's lists, flattened. */
 const choresOf = (r: ReturnType<typeof build>, id: string) =>
@@ -189,6 +191,26 @@ describe('buildWallJobs', () => {
  * The wall used to show ONLY to-dos due today, so a family with eight of them
  * saw one and reasonably concluded it was broken.
  */
+describe('timed to-do completed today', () => {
+  const at17 = { ymd: TODAY, hhmm: '17:00' };
+  const bucketAt17 = (t: Partial<TodoItem>) => build([todo(t)], [], at17).todos[0]?.bucket;
+
+  // Local wall-clock times, so the test reads the same in any time zone.
+  const localAt = (hhmm: string) => new Date(`${TODAY}T${hhmm}:00`).toISOString();
+  const timed = { dueDate: TODAY, dueTime: '16:00' };
+
+  it('stays in today at 17:00 when ticked before its time, but is overdue when not', () => {
+    expect(bucketAt17({ ...timed, completed: true, completedAt: localAt('12:00') })).toBe('today');
+    expect(bucketAt17(timed)).toBe('overdue');
+  });
+
+  it('stays in Late when ticked after its time (no jump under the finger)', () => {
+    expect(bucketAt17({ ...timed, completed: true, completedAt: localAt('16:30') })).toBe(
+      'overdue'
+    );
+  });
+});
+
 describe('to-do buckets', () => {
   const bucketOf = (t: Partial<TodoItem>) => build([todo(t)], []).todos[0]?.bucket;
 
@@ -480,6 +502,47 @@ describe('buildWallJobs: repeating and card-made to-dos (#123)', () => {
   it('leaves a plain repeating to-do and a one-off to-do editable', () => {
     const result = build([todo({ repeat }), todo({ id: 't2', title: 'sign the slip' })], []);
     expect(todosOf(result, 'leo').every((j) => !j.locked)).toBe(true);
+  });
+});
+
+describe('buildWallJobs: the plate rule ("Show from")', () => {
+  const repeat: TodoRepeat = {
+    rule: { unit: 'week', interval: 1, weekdays: [1], end: { kind: 'never' } },
+    anchor: TODAY,
+  };
+  const bucketsOf = (todos: TodoItem[], clock = CLOCK) =>
+    Object.fromEntries(build(todos, [], clock).todos.map((j) => [j.todoId, j.bucket]));
+
+  it('keeps a repeating chore off the wall until its due date (the repeating default)', () => {
+    expect(
+      bucketsOf([
+        todo({ id: 'next-week', repeat, dueDate: '2026-09-07' }),
+        todo({ id: 'today', repeat, dueDate: TODAY }),
+        todo({ id: 'every-day', repeat, dueDate: '2026-09-07', showOn: 'now' }),
+      ])
+    ).toEqual({ today: 'today', 'every-day': 'upcoming' });
+  });
+
+  it('keeps a one-off off the wall until its show date, ticked or not', () => {
+    expect(
+      bucketsOf([
+        todo({ id: 'later', dueDate: '2026-09-10', showFrom: '2026-09-05' }),
+        todo({
+          id: 'later-done',
+          dueDate: '2026-09-10',
+          showFrom: '2026-09-05',
+          completed: true,
+          completedAt: `${TODAY}T09:00:00.000Z`,
+        }),
+        todo({ id: 'shown', dueDate: '2026-09-10', showFrom: TODAY }),
+      ])
+    ).toEqual({ shown: 'upcoming' });
+  });
+
+  it('turns a timed to-do overdue once its time has passed today', () => {
+    const timed = todo({ id: 'timed', dueDate: TODAY, dueTime: '09:00' });
+    expect(bucketsOf([timed], { ymd: TODAY, hhmm: '08:59' })).toEqual({ timed: 'today' });
+    expect(bucketsOf([timed], { ymd: TODAY, hhmm: '09:01' })).toEqual({ timed: 'overdue' });
   });
 });
 

@@ -178,6 +178,53 @@ describe('todoStore — someday lane', () => {
   });
 });
 
+describe('todoStore — clearing the due date clears the show rule', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+  });
+
+  const written = () => vi.mocked(todoRepo.updateTodo).mock.calls[0]![1] as Partial<TodoItem>;
+  const echo = (original: TodoItem) =>
+    vi.mocked(todoRepo.updateTodo).mockImplementation(async (_id, input) => ({
+      ...original,
+      ...(input as Partial<TodoItem>),
+    }));
+  // `TodoViewEditModal.saveField('dueDate')` writes `null` when the date is emptied.
+  const CLEARED_DUE = { dueDate: null } as unknown as Partial<TodoItem>;
+
+  it.each([
+    ['showOn due', { showOn: 'due' as const }],
+    ['showFrom', { showFrom: '2026-11-20' }],
+    ['repeating with showLeadDays', { showLeadDays: 3 }],
+  ])('wipes the rule (%s) when the update clears dueDate', async (_label, rule) => {
+    const store = useTodoStore();
+    const original = todo({ id: 't', dueDate: '2026-11-25', ...rule });
+    store.todos = [original];
+    echo(original);
+
+    await store.updateTodo('t', CLEARED_DUE);
+
+    const w = written();
+    expect(w.dueDate).toBeNull();
+    expect(w.showFrom).toBeUndefined();
+    expect(w.showOn).toBeUndefined();
+    expect(w.showLeadDays).toBeUndefined();
+    expect('showFrom' in w && 'showOn' in w && 'showLeadDays' in w).toBe(true); // explicitly cleared
+  });
+
+  it('leaves the rule alone when dueDate is not touched', async () => {
+    const store = useTodoStore();
+    const original = todo({ id: 't', dueDate: '2026-11-25', showOn: 'due' });
+    store.todos = [original];
+    echo(original);
+
+    await store.updateTodo('t', { title: 'Renamed' });
+
+    expect(written()).toEqual({ title: 'Renamed' });
+  });
+});
+
 describe('todoStore — Helpful Hints (#40)', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
@@ -1232,5 +1279,227 @@ describe('todoStore: reconcileRepeatingTodos, the auto-roll (#123)', () => {
     await vi.waitFor(() =>
       expect(store.todos.find((t) => t.id === 'overdue')?.dueDate).toBe('2026-10-14')
     );
+  });
+});
+
+describe('todoStore: "Show from" (show rules and plates)', () => {
+  // Wednesday 14 October 2026, 12:00 device-local. Only `Date` is faked: the store's own
+  // timers (the roll loop) stay real.
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 9, 14, 12, 0));
+    todayRef.value = '2026-10-14';
+    docLoaded.value = false;
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** The logEvent calls on the to-do visibility surface with this message. */
+  const visibilityEvents = (message: string) =>
+    logEventMock.mock.calls
+      .map(([e]) => e)
+      .filter((e) => e.surface === 'todo-visibility' && e.message === message);
+
+  /** The single patch `updateTodo` was called with. */
+  const patchOf = () => vi.mocked(todoRepo.updateTodo).mock.calls[0]![1] as Partial<TodoItem>;
+
+  it('plates: filteredPlatedTodos in plate order; filteredPlateTodos drops waiting ones', () => {
+    const store = useTodoStore();
+    store.todos = [
+      todo({ id: 'waiting', dueDate: '2026-10-30', showFrom: '2026-10-20' }),
+      todo({ id: 'upcoming', dueDate: '2026-10-16' }),
+      todo({ id: 'undated' }),
+      todo({ id: 'today', dueDate: '2026-10-14', dueTime: '18:00' }),
+      todo({ id: 'overdue-timed', dueDate: '2026-10-14', dueTime: '09:00' }),
+      todo({
+        id: 'routine-waiting',
+        dueDate: '2026-10-21',
+        repeat: { rule: WEEKLY_WED, anchor: '2026-10-07' },
+      }),
+      todo({ id: 'done', dueDate: '2026-10-10', completed: true }),
+      todo({ id: 'someday', someday: true }),
+    ];
+    expect(store.filteredPlatedTodos.map((p) => [p.todo.id, p.plate])).toEqual([
+      ['overdue-timed', 'overdue'],
+      ['today', 'today'],
+      ['undated', 'undated'],
+      ['upcoming', 'upcoming'],
+      ['waiting', 'waiting'],
+      ['routine-waiting', 'waiting'],
+    ]);
+    expect(store.filteredPlateTodos.map((t) => t.id)).toEqual([
+      'overdue-timed',
+      'today',
+      'undated',
+      'upcoming',
+    ]);
+    // The badge lists read the same rule (time-aware).
+    expect(store.overdueTodos.map((t) => t.id)).toEqual(['overdue-timed']);
+    expect(store.dueTodayTodos.map((t) => t.id)).toEqual(['today']);
+  });
+
+  it('a waiting to-do appears when the day reaches its show date', async () => {
+    const store = useTodoStore();
+    store.todos = [todo({ id: 'w', dueDate: '2026-10-30', showFrom: '2026-10-15' })];
+    expect(store.filteredPlateTodos).toEqual([]);
+    vi.setSystemTime(new Date(2026, 9, 15, 0, 1));
+    todayRef.value = '2026-10-15';
+    expect(store.filteredPlateTodos.map((t) => t.id)).toEqual(['w']);
+  });
+
+  it('existing repeating to-dos wait for their due date with no write (the default)', () => {
+    const store = useTodoStore();
+    store.todos = [repeatingTodo({ id: 'next', dueDate: '2026-10-21' }), repeatingTodo()];
+    expect(store.filteredPlatedTodos.map((p) => [p.todo.id, p.plate])).toEqual([
+      ['r', 'today'],
+      ['next', 'waiting'],
+    ]);
+    expect(todoRepo.updateTodo).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [{ kind: 'from', date: '2026-10-20' } as const, { showFrom: '2026-10-20' }],
+    [{ kind: 'due' } as const, { showOn: 'due' }],
+    [{ kind: 'now' } as const, {}],
+  ])('setShowRule on a one-off writes %j exclusively and logs it', async (rule, written) => {
+    const store = useTodoStore();
+    store.todos = [todo({ id: 'p', dueDate: '2026-10-30', showOn: 'due', showFrom: '2026-10-18' })];
+    echoUpdates(store);
+
+    await store.setShowRule('p', rule);
+
+    const patch = patchOf();
+    // Every field is in the patch: the ones not written are cleared, never left stale.
+    expect(Object.keys(patch).sort()).toEqual(['showFrom', 'showLeadDays', 'showOn']);
+    expect(Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined))).toEqual(
+      written
+    );
+    expect(visibilityEvents('show rule set')[0]).toMatchObject({
+      level: 'info',
+      context: { action: rule.kind, detail: 'once' },
+    });
+  });
+
+  it('setShowRule on a repeating to-do: lead, every day, and a from date read as the default', async () => {
+    const store = useTodoStore();
+    store.todos = [repeatingTodo()];
+    echoUpdates(store);
+
+    await store.setShowRule('r', { kind: 'lead', days: 3 });
+    expect(patchOf()).toMatchObject({ showLeadDays: 3 });
+    expect(visibilityEvents('show rule set')[0]?.context).toEqual({
+      action: 'lead',
+      detail: 'repeat',
+      count: 3,
+    });
+
+    vi.mocked(todoRepo.updateTodo).mockClear();
+    await store.setShowRule('r', { kind: 'from', date: '2026-10-12' });
+    const patch = patchOf();
+    expect(['showFrom', 'showOn', 'showLeadDays'].map((k) => patch[k as keyof TodoItem])).toEqual([
+      undefined,
+      undefined,
+      undefined,
+    ]);
+    expect(visibilityEvents('show rule set')[1]?.context).toMatchObject({ action: 'due' });
+  });
+
+  it.each([
+    ['card-made', repeatingTodo({ cardId: 'c-1', cardPartKey: 'main' })],
+    ['completed', todo({ id: 'r', dueDate: '2026-10-30', completed: true })],
+    ['someday', todo({ id: 'r', someday: true })],
+    ['hint', todo({ id: 'r', dueDate: '2026-10-30', hintType: 'trip-packing' })],
+  ])('setShowRule is refused on a %s to-do (logged + toasted, no write)', async (detail, item) => {
+    const store = useTodoStore();
+    store.todos = [item];
+    expect(await store.setShowRule('r', { kind: 'due' })).toBeNull();
+    expect(todoRepo.updateTodo).not.toHaveBeenCalled();
+    expect(visibilityEvents('refused').map((e) => [e.level, e.context])).toEqual([
+      ['warn', { action: 'show-rule', detail }],
+    ]);
+    expect(showToastMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('setShowRule refuses an unknown id, a malformed date and a bad lead', async () => {
+    const store = useTodoStore();
+    store.todos = [todo({ id: 'p', dueDate: '2026-10-30' }), repeatingTodo()];
+    expect(await store.setShowRule('gone', { kind: 'now' })).toBeNull();
+    expect(await store.setShowRule('p', { kind: 'from', date: '20 Oct' })).toBeNull();
+    expect(await store.setShowRule('p', { kind: 'lead', days: 3 })).toBeNull(); // one-off
+    expect(await store.setShowRule('r', { kind: 'lead', days: 0 })).toBeNull();
+    expect(await store.setShowRule('r', { kind: 'lead', days: 31 })).toBeNull();
+    expect(await store.setShowRule('r', { kind: 'lead', days: 2.5 })).toBeNull();
+    expect(todoRepo.updateTodo).not.toHaveBeenCalled();
+    expect(visibilityEvents('refused').map((e) => e.context.detail)).toEqual([
+      'not-found',
+      'invalid-date',
+      'invalid-lead',
+      'invalid-lead',
+      'invalid-lead',
+      'invalid-lead',
+    ]);
+  });
+
+  it('setShowRule does not log when the write fails', async () => {
+    const store = useTodoStore();
+    store.todos = [todo({ id: 'p', dueDate: '2026-10-30' })];
+    vi.mocked(todoRepo.updateTodo).mockRejectedValueOnce(new Error('worker down'));
+    expect(await store.setShowRule('p', { kind: 'due' })).toBeNull();
+    expect(visibilityEvents('show rule set')).toEqual([]);
+  });
+
+  it('setSomeday(true) clears all three show fields with the due date', async () => {
+    const store = useTodoStore();
+    store.todos = [todo({ id: 't', dueDate: '2026-10-30', showFrom: '2026-10-20' })];
+    echoUpdates(store);
+    await store.setSomeday('t', true);
+    const patch = patchOf();
+    for (const k of ['showFrom', 'showOn', 'showLeadDays', 'dueDate', 'dueTime']) {
+      expect(k in patch && patch[k as keyof TodoItem] === undefined, k).toBe(true);
+    }
+  });
+
+  it('setRepeat on clears showFrom; setRepeat off clears the lead', async () => {
+    const store = useTodoStore();
+    store.todos = [
+      todo({ id: 'p', dueDate: '2026-10-20', showFrom: '2026-10-16' }),
+      repeatingTodo({ showLeadDays: 3 }),
+    ];
+    echoUpdates(store);
+
+    await store.setRepeat('p', WEEKLY_WED);
+    const on = patchOf();
+    expect('showFrom' in on && on.showFrom === undefined).toBe(true);
+
+    vi.mocked(todoRepo.updateTodo).mockClear();
+    await store.setRepeat('r', null);
+    const off = patchOf();
+    expect('showLeadDays' in off && off.showLeadDays === undefined).toBe(true);
+  });
+
+  it('createTodo logs a non-default show rule only', async () => {
+    const store = useTodoStore();
+    vi.mocked(todoRepo.createTodo).mockImplementation(
+      async (input) => ({ ...input, id: 'n', createdAt: 'x', updatedAt: 'x' }) as TodoItem
+    );
+    await store.createTodo({
+      title: 'a',
+      dueDate: '2026-10-30',
+      completed: false,
+      createdBy: 'm-1',
+    });
+    await store.createTodo({
+      title: 'b',
+      dueDate: '2026-10-30',
+      showFrom: '2026-10-20',
+      completed: false,
+      createdBy: 'm-1',
+    });
+    expect(visibilityEvents('show rule set').map((e) => e.context)).toEqual([
+      { action: 'from', detail: 'once' },
+    ]);
   });
 });

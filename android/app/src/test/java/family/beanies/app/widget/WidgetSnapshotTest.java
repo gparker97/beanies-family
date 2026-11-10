@@ -4,6 +4,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
@@ -25,11 +26,12 @@ public class WidgetSnapshotTest {
     private static final String FIXTURES = "src/utils/__tests__/fixtures/";
 
     @Test
-    public void readsVersionsTwoAndThreeOnly() {
+    public void readsVersionsTwoToFourOnly() {
         assertFalse(WidgetSnapshot.isReadable(1));
         assertTrue(WidgetSnapshot.isReadable(2));
         assertTrue(WidgetSnapshot.isReadable(3));
-        assertFalse(WidgetSnapshot.isReadable(4));
+        assertTrue(WidgetSnapshot.isReadable(4));
+        assertFalse(WidgetSnapshot.isReadable(5));
         assertFalse(WidgetSnapshot.isReadable(-1));
     }
 
@@ -93,6 +95,73 @@ public class WidgetSnapshotTest {
         assertEquals("Max", first.whoFirst);
     }
 
+    // remove with v3: the fallback tests below go when 3 leaves WIDGET_SNAPSHOT_READABLE_VERSIONS.
+    @Test
+    public void aV3SnapshotShowsTheFamilyViewAndFallsBackToMyForAChild() throws Exception {
+        WidgetSnapshot s = WidgetSnapshot.from(fixture("widget-snapshot.v3.json"));
+        WidgetSnapshot.DayEntry today = s.days.get(0);
+        assertNull(today.view);
+        assertNotNull(today.our);
+        assertSame(today.our, today.day());
+        // A child's v3 snapshot carries `my` only.
+        JSONObject root = fixture("widget-snapshot.v3.json");
+        JSONArray days = root.getJSONArray("days");
+        for (int i = 0; i < days.length(); i++) days.getJSONObject(i).remove("our");
+        WidgetSnapshot.DayEntry child = WidgetSnapshot.from(root).days.get(0);
+        assertSame(child.my, child.day());
+        assertNotNull(child.day());
+    }
+
+    @Test
+    public void aV4SnapshotCarriesOneViewPerDay() throws Exception {
+        // The v3 fixture rewritten to the v4 shape: `view` replaces `my` + `our`, and the
+        // myDay / ourDay labels are gone.
+        JSONObject root = fixture("widget-snapshot.v3.json");
+        root.put("version", 4);
+        root.getJSONObject("labels").remove("myDay");
+        root.getJSONObject("labels").remove("ourDay");
+        JSONArray days = root.getJSONArray("days");
+        for (int i = 0; i < days.length(); i++) {
+            JSONObject entry = days.getJSONObject(i);
+            JSONObject family = entry.optJSONObject("our");
+            entry.put("view", family != null ? family : entry.getJSONObject("my"));
+            entry.remove("my");
+            entry.remove("our");
+        }
+        WidgetSnapshot s = WidgetSnapshot.from(root);
+        assertTrue(WidgetSnapshot.isReadable(s.version));
+        assertEquals(4, s.version);
+        for (WidgetSnapshot.DayEntry entry : s.days) {
+            assertNotNull(entry.view);
+            assertNull(entry.my);
+            assertNull(entry.our);
+            assertSame(entry.view, entry.day());
+        }
+        assertFalse(s.days.get(0).day().rows.isEmpty());
+    }
+
+    @Test
+    public void readsTheCommittedV4Fixture() throws Exception {
+        // The file the TypeScript builder test pins: what the app actually writes at v4.
+        WidgetSnapshot s = WidgetSnapshot.from(fixture("widget-snapshot.v4.json"));
+        assertEquals(4, s.version);
+        assertTrue(WidgetSnapshot.isReadable(s.version));
+        assertFalse(s.days.isEmpty());
+        for (WidgetSnapshot.DayEntry entry : s.days) {
+            assertNotNull(entry.view);
+            assertSame(entry.view, entry.day());
+        }
+    }
+
+    @Test
+    public void aV4ViewWinsOverALeftoverV3Pair() throws Exception {
+        JSONObject root = fixture("widget-snapshot.v3.json");
+        JSONObject entry = root.getJSONArray("days").getJSONObject(0);
+        entry.put("view", entry.getJSONObject("my"));
+        WidgetSnapshot.DayEntry parsed = WidgetSnapshot.from(root).days.get(0);
+        assertSame(parsed.view, parsed.day());
+    }
+
     @Test
     public void weatherWithoutItsInstantsIsNoWeather() throws Exception {
         JSONObject root = fixture("widget-snapshot.v3.json");
@@ -153,7 +222,7 @@ public class WidgetSnapshotTest {
                 .append(s.viewer.isChild).append('|').append(s.lockScreenTitles).append('|');
         WidgetSnapshot.Labels l = s.labels;
         b.append(l.asOf).append(l.later).append(l.next).append(l.tomorrow).append(l.more)
-                .append(l.nothingToday).append(l.myDay).append(l.ourDay).append(l.childsDay)
+                .append(l.nothingToday).append(l.childsDay)
                 .append(l.nothingOnToday).append(l.enjoy).append('|')
                 .append(s.links.nook).append(s.links.todo).append('\n');
         for (WidgetSnapshot.DayEntry e : s.days) {

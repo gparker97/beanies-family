@@ -172,10 +172,10 @@ export async function publishWidgetSnapshot(
     });
     json = JSON.stringify(built.snapshot);
     const [today, ...ahead] = built.snapshot.days;
-    rowsToday = today?.my?.rows.length ?? 0;
-    const tasks = today?.my?.tasks;
+    rowsToday = today?.view.rows.length ?? 0;
+    const tasks = today?.view.tasks;
     tasksToday = tasks ? tasks.items.length + tasks.overflow.due + tasks.overflow.hint : 0;
-    aheadRows = ahead.reduce((n, d) => n + (d.my?.rows.length ?? 0), 0);
+    aheadRows = ahead.reduce((n, d) => n + d.view.rows.length, 0);
     skipped = built.skipped;
     hasWeather = !!built.snapshot.weather;
   } catch (e) {

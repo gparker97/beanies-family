@@ -12,11 +12,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Added
 
+- To-dos with a due date are now shown every day until they are done, and a new "Show from" date lets one wait until the day it should start showing; repeating to-dos can also show a chosen number of days before each due date.
+- The To-Dos page now groups open to-dos into Overdue, Due Today, Coming Up and Not Showing Yet.
 - A flight is now checked once as soon as it is entered or changed, however far away it is, and a live gate or estimate that matches the airline's latest answer carries a small tick in its "Live" pill.
 - The flight terminal now carries the "Live" tick when the airline confirms it, and choosing "Update with airline data" is now one step with a confirmation you can undo.
 
+### Changed
+
+- Phone widgets now show one family view, with no more "My day" and "Our day" choice, and a kid's routine is no longer shown on a parent's widget unless it is posted.
+
 ### Fixed
 
+- To-dos are no longer marked overdue early in time zones west of UTC.
 - A far-away flight whose first check could not be settled is now checked again after a week.
 
 ## 2026-11-09

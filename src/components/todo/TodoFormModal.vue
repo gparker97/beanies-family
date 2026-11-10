@@ -24,6 +24,11 @@
  * a date: turning it on with none sets today, and clearing the date turns it off (visibly, never
  * a silent drop). The picker emits its default rule on mount; that is the initial value here,
  * because this form saves explicitly.
+ *
+ * Show from: the due date, due time and `TodoShowField` share one bordered box. The rule starts
+ * at the kind's default (`now`, or `due` for a repeat) and follows the due date: a `from` date at
+ * or past a new due date becomes `due`, clearing the date resets it, and turning Repeat on or
+ * off resets it to that kind's default.
  */
 import { computed, nextTick, ref, watch } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
@@ -38,6 +43,7 @@ import NotifyParentsToggle from '@/components/ui/NotifyParentsToggle.vue';
 import ConditionalSection from '@/components/ui/ConditionalSection.vue';
 import RecurrencePicker from '@/components/ui/RecurrencePicker.vue';
 import RepeatGlyph from '@/components/todo/RepeatGlyph.vue';
+import TodoShowField from '@/components/todo/TodoShowField.vue';
 import MagicBeansQuickCard from '@/components/ai/MagicBeansQuickCard.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFormModal } from '@/composables/useFormModal';
@@ -48,6 +54,7 @@ import { useToday } from '@/composables/useToday';
 import { useMemberInfo } from '@/composables/useMemberInfo';
 import { canSetNotifyParents, isChildOnly } from '@/utils/audience';
 import { useFamilyStore } from '@/stores/familyStore';
+import { defaultShowRule, type TodoShowRule } from '@/utils/todoPlate';
 import type { RecurrenceRule } from '@/types/models';
 
 const props = defineProps<{
@@ -73,6 +80,7 @@ const dueTime = ref('');
 const repeatOn = ref(false);
 const repeatRule = ref<RecurrenceRule | null>(null);
 const notifyParents = ref(false);
+const showRule = ref<TodoShowRule>(defaultShowRule(false));
 // "Keep Parents Posted" only means something for a repeating, child-only to-do. One computed
 // gates both the row and what is saved, so a hidden toggle can never persist a stale flag.
 const familyStore = useFamilyStore();
@@ -88,9 +96,15 @@ let generation = 0;
 // A cleared date takes its time with it, so an old time never comes back with a new date. It
 // takes the repeat too: a series is anchored on its date, so the switch visibly turns off.
 watch(dueDate, (date) => {
-  if (date) return;
+  if (date) {
+    // A `from` date at or past the new due date means "on the due date", so it becomes the flag.
+    const rule = showRule.value;
+    if (rule.kind === 'from' && rule.date >= date.slice(0, 10)) showRule.value = { kind: 'due' };
+    return;
+  }
   dueTime.value = '';
   repeatOn.value = false;
+  showRule.value = defaultShowRule(false);
 });
 
 const repeatTitle = computed(() =>
@@ -104,6 +118,7 @@ function onRepeatToggle(on: boolean): void {
   // A repeat starts from a date; with none yet, it starts today.
   if (on && !dueDate.value) dueDate.value = today.value;
   repeatOn.value = on;
+  showRule.value = defaultShowRule(on);
   if (!on) {
     repeatRule.value = null;
     notifyParents.value = false;
@@ -132,6 +147,7 @@ function reset(): void {
   repeatOn.value = false;
   repeatRule.value = null;
   notifyParents.value = false;
+  showRule.value = defaultShowRule(false);
   // Desktop only: on a phone the keyboard would cover the drawer as it slides in.
   if (isDesktop.value) void focusTitle();
 }
@@ -156,6 +172,7 @@ async function handleSave(): Promise<void> {
         description: description.value,
         dueDate: dueDate.value,
         dueTime: dueTime.value,
+        show: showRule.value,
         assigneeIds: assigneeIds.value,
         ...(repeatOn.value && repeatRule.value ? { repeat: repeatRule.value } : {}),
         ...(notifyParentsShown.value && notifyParents.value ? { notifyParents: true } : {}),
@@ -206,14 +223,21 @@ async function handleSave(): Promise<void> {
       />
     </FormFieldGroup>
 
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-      <FormFieldGroup :label="t('todo.dueDate')" optional>
-        <BeanieDatePicker v-model="dueDate" />
-      </FormFieldGroup>
-      <!-- A time only means something with a date; `toCreateTodoInput` also drops an orphan. -->
-      <FormFieldGroup v-if="dueDate" :label="t('todo.dueTime')" optional>
-        <BeanieTimePicker v-model="dueTime" clearable />
-      </FormFieldGroup>
+    <!-- One box: due date, due time and (with a date) when it starts showing -->
+    <div
+      class="dark:border-line dark:bg-surface-overlay space-y-3 rounded-[14px] border border-[var(--tint-slate-10)] bg-white px-3 py-3"
+      data-testid="todo-when-box"
+    >
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <FormFieldGroup :label="t('todo.dueDate')" optional>
+          <BeanieDatePicker v-model="dueDate" />
+        </FormFieldGroup>
+        <!-- A time only means something with a date; `toCreateTodoInput` also drops an orphan. -->
+        <FormFieldGroup v-if="dueDate" :label="t('todo.dueTime')" optional>
+          <BeanieTimePicker v-model="dueTime" clearable />
+        </FormFieldGroup>
+      </div>
+      <TodoShowField v-model="showRule" :repeating="repeatOn" :due-date="dueDate" />
     </div>
 
     <FormFieldGroup :label="t('todo.repeat.label')" optional>

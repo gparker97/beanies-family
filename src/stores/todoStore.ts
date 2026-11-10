@@ -8,7 +8,20 @@ import * as todoRepo from '@/services/automerge/repositories/todoRepository';
 import { normalizeAssignees } from '@/utils/assignees';
 import { canSetNotifyParents, classifyAudience } from '@/utils/audience';
 import { useFamilyStore } from '@/stores/familyStore';
-import { isTodoOverdue, sortTodos } from '@/utils/todo';
+import { sortTodos } from '@/utils/todo';
+import {
+  isShowLeadDays,
+  isYmd,
+  plateClock,
+  platedTodos,
+  showPatchOnDueChange,
+  showRulePatch,
+  todoPlate,
+  todoShowRule,
+  type ShownPlate,
+  type PlatedTodo,
+  type TodoShowRule,
+} from '@/utils/todoPlate';
 import {
   itemsForSession,
   todoLink,
@@ -134,7 +147,37 @@ function logNotifyParentsSet(on: boolean): void {
   });
 }
 
-type RefusedAction = 'set-repeat' | 'someday' | 'skip' | 'delete' | 'notify-parents';
+// "Show from" (`utils/todoPlate`): the show-rule writes and their refusals share one surface, so
+// one CloudWatch filter isolates the feature. Context reuses the allowlisted `action`, `detail`,
+// `count`.
+const VISIBILITY_SURFACE = 'todo-visibility';
+
+/**
+ * A show rule set (by `setShowRule`), or a non-default one at creation. `action` is the rule
+ * actually stored, `detail` the to-do's kind, `count` the lead in days.
+ */
+function logShowRuleSet(rule: TodoShowRule, repeating: boolean): void {
+  logEvent({
+    level: 'info',
+    surface: VISIBILITY_SURFACE,
+    message: 'show rule set',
+    context: {
+      action: rule.kind,
+      detail: repeating ? 'repeat' : 'once',
+      ...(rule.kind === 'lead' ? { count: rule.days } : {}),
+    },
+  });
+}
+
+/** Why `todoCapabilities(...).editShowRule` is off, as the refusal's `detail`. */
+function showRuleRefusal(todo: TodoItem): string {
+  if (isCardTodo(todo)) return 'card-made';
+  if (isHint(todo)) return 'hint';
+  if (todo.completed) return 'completed';
+  return 'someday';
+}
+
+type RefusedAction = 'set-repeat' | 'someday' | 'skip' | 'delete' | 'notify-parents' | 'show-rule';
 
 export const useTodoStore = defineStore('todos', () => {
   // State
@@ -175,16 +218,17 @@ export const useTodoStore = defineStore('todos', () => {
   // Single source of truth: anywhere that needs "what's overdue or due
   // today" reads from here, not from inline filters. Hint to-dos never appear
   // here (they derive from manualActiveTodos), so they stay gentle.
+  // Both read `todoPlate` (the one date rule) with a clock taken inside a computed that
+  // depends on `today`, so they recompute at midnight; a timed to-do turns overdue on the next
+  // recompute (the date or the to-dos changing).
   const { today } = useToday();
-  const overdueTodos = computed(() => manualActiveTodos.value.filter((t) => isTodoOverdue(t)));
-  const dueTodayTodos = computed(() =>
-    manualActiveTodos.value.filter((t) => {
-      if (!t.dueDate || isTodoOverdue(t)) return false;
-      // dueDate is an ISODateString; slice handles both date-only and
-      // full datetime forms. Comparing as strings avoids re-parsing.
-      return t.dueDate.slice(0, 10) === today.value;
-    })
-  );
+  function manualOnPlate(plate: ShownPlate): TodoItem[] {
+    void today.value;
+    const clock = plateClock();
+    return manualActiveTodos.value.filter((t) => todoPlate(t, clock) === plate);
+  }
+  const overdueTodos = computed(() => manualOnPlate('overdue'));
+  const dueTodayTodos = computed(() => manualOnPlate('today'));
 
   // #40: hint to-dos, deduped by hintKey (CRDT-merge collision resolver). The
   // ONLY getter that surfaces hints (to-do page + daily briefing).
@@ -228,6 +272,21 @@ export const useTodoStore = defineStore('todos', () => {
 
   const filteredUndatedTodos = computed(() => filteredActiveTodos.value.filter((t) => !t.dueDate));
 
+  /**
+   * The open (member-filtered, hint-free) to-dos with their plates, in plate order
+   * (`platedTodos`): the To-Dos page's groups and the Nook's today card. Depends on `today`,
+   * so a to-do whose show date arrives appears at midnight.
+   */
+  const filteredPlatedTodos = computed<PlatedTodo[]>(() => {
+    void today.value;
+    return platedTodos(filteredActiveTodos.value, plateClock());
+  });
+
+  /** What the Nook shows: `filteredPlatedTodos` without the to-dos not showing yet. */
+  const filteredPlateTodos = computed<TodoItem[]>(() =>
+    filteredPlatedTodos.value.filter((p) => p.plate !== 'waiting').map((p) => p.todo)
+  );
+
   // Actions
   async function loadTodos() {
     await wrapAsync(
@@ -259,6 +318,10 @@ export const useTodoStore = defineStore('todos', () => {
     // #123: the one place a repeat set at creation is counted (every create path lands here).
     if (result?.repeat) logRepeatSet('create', result.repeat.rule);
     if (result?.notifyParents) logNotifyParentsSet(true);
+    // "Show from": counted only when the create stored a non-default rule.
+    if (result?.showFrom || result?.showOn || result?.showLeadDays) {
+      logShowRuleSet(todoShowRule(result), isRepeating(result));
+    }
     return trackFeature(result ?? null, 'todo');
   }
 
@@ -267,7 +330,17 @@ export const useTodoStore = defineStore('todos', () => {
       isLoading,
       error,
       async () => {
-        const updated = await todoRepo.updateTodo(id, input);
+        // The show rule follows the due date (`showPatchOnDueChange`): clearing the date
+        // clears the rule, and a "show from" at or past a moved due date becomes "on the due
+        // date". A write that names the show fields itself (`setShowRule`, `setSomeday`) wins.
+        const existing = todos.value.find((t) => t.id === id);
+        const namesRule = 'showFrom' in input || 'showOn' in input || 'showLeadDays' in input;
+        const follow =
+          existing && 'dueDate' in input && !namesRule
+            ? showPatchOnDueChange(existing, input.dueDate)
+            : null;
+        const patch = follow ? { ...input, ...follow } : input;
+        const updated = await todoRepo.updateTodo(id, patch);
         if (updated) {
           // Immutable update: assign a new array so downstream computeds re-evaluate
           todos.value = todos.value.map((t) => (t.id === id ? updated : t));
@@ -628,8 +701,16 @@ export const useTodoStore = defineStore('todos', () => {
       );
       return null;
     }
+    // The show rule goes with the due date (a someday to-do has neither).
     return someday
-      ? updateTodo(id, { someday: true, dueDate: undefined, dueTime: undefined })
+      ? updateTodo(id, {
+          someday: true,
+          dueDate: undefined,
+          dueTime: undefined,
+          showFrom: undefined,
+          showOn: undefined,
+          showLeadDays: undefined,
+        })
       : updateTodo(id, { someday: false });
   }
 
@@ -640,10 +721,15 @@ export const useTodoStore = defineStore('todos', () => {
    * same function, so reaching here means a stale screen or an old path. Never silent: one
    * `refused` event (with the capability rule that refused, as `detail`) and an info toast.
    */
-  function refuse(action: RefusedAction, detail: string, messageKey: UIStringKey): void {
+  function refuse(
+    action: RefusedAction,
+    detail: string,
+    messageKey: UIStringKey,
+    surface: string = RECURRENCE_SURFACE
+  ): void {
     logEvent({
       level: 'warn',
-      surface: RECURRENCE_SURFACE,
+      surface,
       message: 'refused',
       context: { action, detail },
     });
@@ -770,7 +856,12 @@ export const useTodoStore = defineStore('todos', () => {
       // gate only acts on routines), and clearing it here would let anyone who can edit the
       // repeat (a child included) drop the parents' setting by toggling repeat off and on.
       // `setNotifyParents` (adults only) is its one write path.
-      const off = await updateTodo(id, { repeat: undefined, repeatLog: undefined });
+      // The lead ("days before") is repeating-only, so it goes with the repeat.
+      const off = await updateTodo(id, {
+        repeat: undefined,
+        repeatLog: undefined,
+        showLeadDays: undefined,
+      });
       if (off) logRepeatSet('off', current?.rule);
       return off;
     }
@@ -794,10 +885,49 @@ export const useTodoStore = defineStore('todos', () => {
     }
     const result = await updateTodo(id, {
       ...started,
+      // "Show from" is one-off only (`todoShowRule` ignores it on a repeating to-do anyway).
+      showFrom: undefined,
       // A repeating to-do is never someday (it always has a due date).
       ...(existing.someday ? { someday: false } : {}),
     });
     if (result) logRepeatSet('change', rule);
+    return result;
+  }
+
+  /**
+   * "Show from": when the to-do starts showing on the daily briefing, the Nook, the wall and the
+   * widget (`utils/todoPlate`). Allowed only where `todoCapabilities(...).editShowRule`; a
+   * `from` date must be `YYYY-MM-DD`, and a `lead` needs a repeating to-do and 1-30 days. Writes
+   * `showRulePatch` (the one writer of the three fields). No "after the due date" or "before
+   * today" checks: the rule never hides a to-do on or after its due date, and the picker bounds
+   * the choice.
+   */
+  async function setShowRule(id: string, rule: TodoShowRule): Promise<TodoItem | null> {
+    const existing = todos.value.find((t) => t.id === id);
+    if (!existing) {
+      refuse('show-rule', 'not-found', 'todo.error.notFound', VISIBILITY_SURFACE);
+      return null;
+    }
+    if (!todoCapabilities(existing).editShowRule) {
+      refuse(
+        'show-rule',
+        showRuleRefusal(existing),
+        'todo.error.showRuleRefused',
+        VISIBILITY_SURFACE
+      );
+      return null;
+    }
+    const repeating = isRepeating(existing);
+    if (rule.kind === 'from' && !isYmd(rule.date)) {
+      refuse('show-rule', 'invalid-date', 'todo.error.showRuleRefused', VISIBILITY_SURFACE);
+      return null;
+    }
+    if (rule.kind === 'lead' && (!repeating || !isShowLeadDays(rule.days))) {
+      refuse('show-rule', 'invalid-lead', 'todo.error.showRuleRefused', VISIBILITY_SURFACE);
+      return null;
+    }
+    const result = await updateTodo(id, showRulePatch(rule, repeating));
+    if (result) logShowRuleSet(todoShowRule(result), repeating);
     return result;
   }
 
@@ -920,6 +1050,9 @@ export const useTodoStore = defineStore('todos', () => {
     filteredCompletedTodos,
     filteredScheduledTodos,
     filteredUndatedTodos,
+    // "Show from": plates, in plate order (`utils/todoPlate`)
+    filteredPlatedTodos,
+    filteredPlateTodos,
     // Actions
     loadTodos,
     createTodo,
@@ -939,6 +1072,8 @@ export const useTodoStore = defineStore('todos', () => {
     skipOccurrence,
     setRepeat,
     setNotifyParents,
+    // "Show from"
+    setShowRule,
     acknowledgeHint,
     resetState,
   };

@@ -5,6 +5,8 @@ import { useTranslation } from '@/composables/useTranslation';
 import { effectiveAssignees } from '@/utils/assignees';
 import { formatNookDate } from '@/utils/date';
 import { isTodoOverdue, isTodoDueToday } from '@/utils/todo';
+import { showRuleLabel, todoShowRule } from '@/utils/todoPlate';
+import { useToday } from '@/composables/useToday';
 import { todoCapabilities } from '@/utils/todoRecurrence';
 import { useRecurrenceLabel } from '@/composables/useRecurrenceLabel';
 import {
@@ -56,6 +58,14 @@ const isSomeday = computed(() => !!props.todo.someday);
 const isDone = computed(() => !!props.todo.completed);
 const isOverdue = computed(() => isTodoOverdue(props.todo));
 const isDueToday = computed(() => isTodoDueToday(props.todo));
+// "Not showing yet": the tag says when this to-do starts showing. `todoPlate` ignores
+// `completed`, so a done, someday or hint row must never carry it.
+const { today } = useToday();
+const waitingLabel = computed(() =>
+  isDone.value || isSomeday.value || isHintRow.value
+    ? ''
+    : showRuleLabel(todoShowRule(props.todo), props.todo.dueDate ?? '', today.value, t)
+);
 // #40: `isHintRow` = any hint (drives the persistent subtle marker). `isFreshHint`
 // = an open, un-kept hint (the shared `isFreshHint`; a completed hint counts as kept)
 // (gets the gentle wash + Keep/Dismiss + explainer, and
@@ -174,7 +184,9 @@ function ownersOf(entity: { assigneeIds?: string[]; assigneeId?: string }) {
           compact ? 'truncate' : 'md:text-base',
           isDone
             ? 'dark:text-ink-faint text-[var(--color-text-muted)] line-through'
-            : 'text-[var(--color-text)]',
+            : waitingLabel
+              ? 'dark:text-ink-soft text-[var(--color-text-muted)]'
+              : 'text-[var(--color-text)]',
         ]"
       >
         <!-- eslint-disable-next-line vue/no-bare-strings-in-template -->
@@ -213,6 +225,15 @@ function ownersOf(entity: { assigneeIds?: string[]; assigneeId?: string }) {
           :text="t('todo.hint.whatsThis')"
           :link="{ text: t('todo.hint.learnMore'), href: hintHelpUrl }"
         />
+
+        <!-- Waiting tag: when this to-do starts showing (To-Dos page "Not showing yet") -->
+        <span
+          v-if="waitingLabel"
+          class="font-outfit dark:bg-surface-hover dark:text-ink-soft inline-flex items-center rounded-full bg-[var(--tint-slate-10)] px-2 py-0.5 text-xs font-semibold text-[var(--color-text-muted)] md:px-2.5"
+          data-testid="todo-waiting-tag"
+        >
+          {{ waitingLabel }}
+        </span>
 
         <!-- Overdue date badge (never for a hint — see the marker chip above) -->
         <span

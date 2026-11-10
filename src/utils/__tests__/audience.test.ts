@@ -5,6 +5,7 @@ import {
   classifyAudience,
   classifyListAudience,
   classifyOwnerAudience,
+  classifyPlateTodo,
   classifyTodoAudience,
   gateTodoAudience,
   isChildOnly,
@@ -163,8 +164,11 @@ describe('ownerItemSurfaces — one rule for all three list surfaces', () => {
     ];
     for (const f of consumers) {
       const src = read(f);
+      // `classifyPlateTodo` applies the gate through `classifyTodoAudience` (tested below).
       expect(
-        src.includes('classifyTodoAudience(') || src.includes('gateTodoAudience('),
+        src.includes('classifyTodoAudience(') ||
+          src.includes('gateTodoAudience(') ||
+          src.includes('classifyPlateTodo('),
         `${f} gates its to-dos`
       ).toBe(true);
     }
@@ -261,6 +265,67 @@ describe('classifyTodoAudience', () => {
   });
   it('an unassigned repeating to-do is unchanged', () => {
     expect(classifyTodoAudience({ repeat }, adult, r, false).kind).toBe('unassigned');
+  });
+});
+
+describe('classifyPlateTodo — plate + audience, the briefing and widget rule', () => {
+  const weekly: TodoItem['repeat'] = {
+    rule: { unit: 'week', interval: 1, weekdays: [2], end: { kind: 'never' } },
+    anchor: '2026-11-03',
+  };
+  const TODAY = { ymd: '2026-11-10', hhmm: '12:00' }; // a Tuesday
+  const t = (extra: Partial<TodoItem>): TodoItem =>
+    ({
+      id: 't',
+      title: 't',
+      completed: false,
+      createdBy: 'a',
+      createdAt: '',
+      updatedAt: '',
+      ...extra,
+    }) as TodoItem;
+
+  it('null when the to-do is not showing yet, whoever looks', () => {
+    const waiting = t({ dueDate: '2026-11-20', showFrom: '2026-11-15' });
+    expect(classifyPlateTodo(waiting, adult, resolve, TODAY)).toBeNull();
+    expect(classifyPlateTodo(waiting, kid, resolve, TODAY)).toBeNull();
+  });
+
+  it('the plate and the audience together; null when hidden', () => {
+    expect(classifyPlateTodo(t({ dueDate: '2026-11-20' }), adult, resolve, TODAY)).toEqual({
+      plate: 'upcoming',
+      audience: { kind: 'unassigned' },
+    });
+    // Another adult's to-do is hidden from this adult.
+    expect(
+      classifyPlateTodo(t({ assigneeIds: ['a2'], dueDate: '2026-11-10' }), adult, resolve, TODAY)
+    ).toBeNull();
+  });
+
+  it("a child's routine reaches a parent only once overdue (missed) or posted", () => {
+    const due = t({ assigneeIds: ['k'], repeat: weekly, dueDate: '2026-11-10', dueTime: '09:00' });
+    // 12:00 is past 09:00: overdue, so missed, so forChild.
+    expect(classifyPlateTodo(due, adult, resolve, TODAY)?.audience.kind).toBe('forChild');
+    // At 08:00 it is due today, on track: hidden from the parent.
+    expect(classifyPlateTodo(due, adult, resolve, { ...TODAY, hhmm: '08:00' })).toBeNull();
+    // A lead window (upcoming) is not missed either.
+    const lead = t({ assigneeIds: ['k'], repeat: weekly, dueDate: '2026-11-17', showLeadDays: 7 });
+    expect(classifyPlateTodo(lead, kid, resolve, TODAY)?.plate).toBe('upcoming');
+    expect(classifyPlateTodo(lead, adult, resolve, TODAY)).toBeNull();
+    expect(
+      classifyPlateTodo({ ...lead, notifyParents: true }, adult, resolve, TODAY)?.audience.kind
+    ).toBe('forChild');
+  });
+
+  it('a projected day never reads an overdue routine as missed (widget days 2-7)', () => {
+    const chore = t({ assigneeIds: ['k'], repeat: weekly, dueDate: '2026-11-10' });
+    const tomorrow = { ymd: '2026-11-11', hhmm: '00:00' };
+    expect(classifyPlateTodo(chore, adult, resolve, tomorrow, true)).toBeNull();
+    // Unprojected (the real day after), the same chore is missed.
+    expect(classifyPlateTodo(chore, adult, resolve, tomorrow)?.plate).toBe('overdue');
+    // A child's one-off is not a routine: projected or not, the parent sees it.
+    const oneOff = t({ assigneeIds: ['k'], dueDate: '2026-11-10' });
+    expect(classifyPlateTodo(oneOff, adult, resolve, tomorrow, true)?.plate).toBe('overdue');
   });
 });
 

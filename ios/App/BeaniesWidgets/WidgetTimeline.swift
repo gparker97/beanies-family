@@ -15,7 +15,7 @@ struct DayEntry: TimelineEntry {
     let blocks: WidgetBlocks
 }
 
-/// One day after today, in the audience the widget shows (the look-ahead).
+/// One day after today (the look-ahead).
 struct LaterDay {
     let entry: WSDayEntry
     let day: WSDay
@@ -25,10 +25,8 @@ struct LaterDay {
 struct ResolvedDay {
     let entry: WSDayEntry
     let day: WSDay
-    /// The days after `entry` in the snapshot, ascending, in the same audience as `day`.
+    /// The days after `entry` in the snapshot, ascending.
     let later: [LaterDay]
-    /// The audience actually shown (a child, or a missing `our`, falls back to `my`).
-    let audience: WidgetAudienceOption
     let isChild: Bool
     /// Content stays, plus "as of HH:MM": the snapshot is over 24h old, or it has no day
     /// for the entry's date (its last day is before today).
@@ -79,7 +77,10 @@ enum DayResolver {
         return ymd(tomorrow)
     }
 
-    static func resolve(_ snapshot: WSSnapshot, at date: Date, audience: WidgetAudienceOption) -> ResolvedDay? {
+    /// The day an entry shows. `ownDay`: the lock screen's projection, the viewer's own day
+    /// only (`viewersOwnDay`), for today and every look-ahead day alike; else the one view the
+    /// home screen shows (`shownDay`).
+    static func resolve(_ snapshot: WSSnapshot, at date: Date, ownDay: Bool = false) -> ResolvedDay? {
         guard !snapshot.days.isEmpty else { return nil }
         let today = ymd(date)
 
@@ -99,27 +100,33 @@ enum DayResolver {
         }
 
         let isChild = snapshot.viewer.isChild
-        let wanted: WidgetAudienceOption = isChild ? .my : audience
-        let day: WSDay
-        let shown: WidgetAudienceOption
-        if wanted == .our, let our = entry.our {
-            day = our
-            shown = .our
-        } else if let my = entry.my {
-            day = my
-            shown = .my
-        } else {
-            // A missing "my day" is an empty day, never the family's view (same as Android).
-            day = WSDay()
-            shown = .my
+        let pick = { (dayEntry: WSDayEntry) -> WSDay in
+            ownDay ? DayResolver.viewersOwnDay(dayEntry) : DayResolver.shownDay(dayEntry)
         }
-        // The look-ahead keeps the audience actually shown; a later day without it is empty.
         let later = snapshot.days[(index + 1)...].map { next in
-            LaterDay(entry: next, day: (shown == .our ? next.our : next.my) ?? WSDay())
+            LaterDay(entry: next, day: pick(next))
         }
-        return ResolvedDay(
-            entry: entry, day: day, later: later, audience: shown, isChild: isChild, stale: stale
-        )
+        return ResolvedDay(entry: entry, day: pick(entry), later: later, isChild: isChild, stale: stale)
+    }
+
+    /// The home screen's day: one view per day (v4). A v2/v3 snapshot carries `my` + `our`:
+    /// the family view is `our`, and a child's snapshot only has `my`. A day with none is empty.
+    private static func shownDay(_ entry: WSDayEntry) -> WSDay {
+        entry.view ?? entry.our ?? entry.my ?? WSDay() // remove with v3
+    }
+
+    /// The lock screen's day: only the viewer's own, since it is readable without unlocking.
+    /// v4's `view` narrowed to the rows marked `mine` (a row without the mark is left out), with
+    /// `ownThingsText` in place of the family's count. `pickups` and `handoffs` are the viewer's
+    /// own on every view, and the to-dos are not calendar rows, so they stay as they are. A
+    /// v2/v3 snapshot's `my` is already the viewer's own day (a child's too); a missing one is
+    /// an empty day, never the family's.
+    private static func viewersOwnDay(_ entry: WSDayEntry) -> WSDay {
+        guard let view = entry.view else { return entry.my ?? WSDay() } // remove with v3
+        var own = view
+        own.rows = view.rows.filter { $0.mine == true }
+        own.thingsText = view.ownThingsText ?? view.thingsText
+        return own
     }
 }
 
@@ -149,7 +156,7 @@ enum WidgetTimeline {
             return Timeline(entries: entries, policy: .atEnd)
 
         case .ready(let snapshot):
-            let dates = entryDates(snapshot, audience: blocks.audience, now: now, lockScreen: lockScreen)
+            let dates = entryDates(snapshot, now: now, lockScreen: lockScreen)
             let entries = dates.map { DayEntry(date: $0, state: .ready(snapshot), blocks: blocks) }
             return Timeline(entries: entries, policy: .atEnd)
         }
@@ -162,13 +169,14 @@ enum WidgetTimeline {
     /// resolves the snapshot's next day as today, so its divider leaves the look-ahead, the
     /// following day becomes "tomorrow", and its to-dos (built as if it were today) take
     /// over. `.atEnd` then asks for a fresh timeline just after midnight.
-    static func entryDates(_ snapshot: WSSnapshot, audience: WidgetAudienceOption, now: Date, lockScreen: Bool) -> [Date] {
+    static func entryDates(_ snapshot: WSSnapshot, now: Date, lockScreen: Bool) -> [Date] {
         let midnight = nextMidnight(after: now)
         var instants: [Date] = []
         func ms(_ value: Double, plus seconds: TimeInterval = 0) -> Date {
             Date(timeIntervalSince1970: value / 1000 + seconds)
         }
-        if let resolved = DayResolver.resolve(snapshot, at: now, audience: audience) {
+        // The lock screen's instants come from the viewer's own day, the day it paints.
+        if let resolved = DayResolver.resolve(snapshot, at: now, ownDay: lockScreen) {
             // +1s: a row is past when `endsAt < now`, so the entry lands just after the end.
             for row in resolved.day.rows {
                 if let endsAt = row.endsAt { instants.append(ms(endsAt, plus: 1)) }

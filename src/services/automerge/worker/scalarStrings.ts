@@ -123,6 +123,7 @@ export const SCALAR_FIELDS: ReadonlySet<string> = new Set([
   'administeredOn',
   'occurredOn',
   'cookedOn',
+  'showFrom', // a to-do's "Show from" date (`YYYY-MM-DD`)
   // other dates and times of day (`HH:mm` from a time input, the same class as a date)
   'anchor',
   'deadline',
@@ -177,6 +178,7 @@ export const SCALAR_FIELDS: ReadonlySet<string> = new Set([
   'avatar', // the beanie avatar variant key
   'cardNetwork',
   'carType',
+  'showOn', // a to-do's show rule: 'now' | 'due'
   'chain',
   'costType',
   'course',

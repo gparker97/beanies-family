@@ -162,12 +162,13 @@ public class DayWidgetProvider extends AppWidgetProvider {
         if (generated > 0 && generated + WidgetFill.STALE_AFTER_MS > now) {
             at = Math.min(at, generated + WidgetFill.STALE_AFTER_MS);
         }
-        // Row ends across BOTH audiences of today's entry, so every placed widget is covered.
+        // Row ends across every view of today's entry (v2/v3 files carry two), so every placed widget is covered.
         String today = WidgetFill.ymd(now, 0);
         for (WidgetSnapshot.DayEntry entry : result.snapshot.days) {
             if (!today.equals(entry.ymd)) continue;
-            at = Math.min(at, earliestEnd(entry.my, now));
-            at = Math.min(at, earliestEnd(entry.our, now));
+            at = Math.min(at, earliestEnd(entry.view, now));
+            at = Math.min(at, earliestEnd(entry.my, now)); // remove with v3
+            at = Math.min(at, earliestEnd(entry.our, now)); // remove with v3
         }
         // The weather's age line appears or its temperature goes: instants the snapshot carries.
         at = Math.min(at, WidgetWeather.nextChange(result.snapshot.weather, now));

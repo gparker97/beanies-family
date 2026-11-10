@@ -1,12 +1,11 @@
 import SwiftUI
 
 /// The slim left column on medium and large: the date at the top (a link to the calendar on today), the
-/// weather under the month (#134), and at its foot the audience label (large, "my day" only)
-/// and the to-dos count.
+/// weather under the month (#134), and at its foot the to-dos count.
 ///
 /// Nothing here may clip at a bigger Text size, so the lines below the weather's glyph +
 /// temperature row drop in a fixed order until the column fits: the range (or the age)
-/// first, then "my day", then the count. The glyph + temperature row is outside that
+/// first, then the count. The glyph + temperature row is outside that
 /// choice, so it never drops. Android draws the same order from `WidgetFill.dateColumnLines`.
 struct DayColumnView: View {
     let entry: WSDayEntry
@@ -19,7 +18,6 @@ struct DayColumnView: View {
     /// The footer's stale "as of …" is showing: the weather's age would say the same thing
     /// twice ("as of Oct 17"), so it is not drawn. Mirrors Android.
     let staleLabelShown: Bool
-    let showAudienceLabel: Bool
     let size: WidgetSizeKey
     let m: WidgetMetrics
 
@@ -60,10 +58,9 @@ struct DayColumnView: View {
             // Candidates in drop order; `ViewThatFits` takes the first whose lines fit and
             // falls back to the last (no optional line at all).
             ViewThatFits(in: .vertical) {
-                lines(detail: true, audience: true, count: true)
-                lines(detail: false, audience: true, count: true)
-                lines(detail: false, audience: false, count: true)
-                lines(detail: false, audience: false, count: false)
+                lines(detail: true, count: true)
+                lines(detail: false, count: true)
+                lines(detail: false, count: false)
             }
         }
     }
@@ -114,7 +111,7 @@ struct DayColumnView: View {
     // MARK: lines
 
     /// One candidate: the weather's detail line under the row, then the foot.
-    private func lines(detail: Bool, audience: Bool, count: Bool) -> some View {
+    private func lines(detail: Bool, count: Bool) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             if detail, let text = weatherDetail {
                 Text(text)
@@ -131,13 +128,6 @@ struct DayColumnView: View {
             Spacer(minLength: m.s(8))
 
             VStack(alignment: .leading, spacing: 7) {
-                if audience && showAudienceLabel {
-                    Text(labels.myDay)
-                        .font(.sys(size: m.s(11), weight: .medium))
-                        .foregroundStyle(Color.wInkSoft)
-                        .lineLimit(1)
-                        .minimumScaleFactor(m.standardFloor(0.85))
-                }
                 if count, let tasks = taskCount {
                     Link(destination: WidgetLinks.url(tasks.link.isEmpty ? links.todo : tasks.link, size)) {
                         WidgetTextView(

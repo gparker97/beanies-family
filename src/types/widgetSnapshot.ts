@@ -2,40 +2,48 @@
  * The home-screen widget snapshot (#130, ADR-042).
  *
  * The app computes the family's day once, in JS, with the same rules the Nook briefing
- * and the beanie wall use, and hands this JSON to the native widget through the
+ * uses, and hands this JSON to the native widget through the
  * `WidgetBridge` plugin. The widgets on iOS (WidgetKit, `ios/App/BeaniesWidgets/`) and
  * Android (RemoteViews, `android/.../widget/`) only PAINT it: they make no audience
  * decision, translate nothing they can read from here, and never compute a colour.
  *
  * ⚠️ THIS FILE IS A CROSS-PLATFORM CONTRACT. The Swift `Codable` mirror
  * (`WidgetSnapshotStore.swift`) and the Java reader (`WidgetSnapshot.java`) parse the
- * same shape. `src/utils/__tests__/fixtures/widget-snapshot.v3.json` is the committed
+ * same shape. `src/utils/__tests__/fixtures/widget-snapshot.v4.json` is the committed
  * example the builder test asserts against, so a change here shows up as a diff there
- * (`widget-snapshot.v2.json` is kept as the older shape the readers must still accept).
+ * (`widget-snapshot.v3.json` and `.v2.json` are kept, frozen, as the older shapes the readers
+ * must still accept).
  * Adding an OPTIONAL field is safe (both readers ignore unknown keys). Renaming, removing
  * or retyping a field needs `WIDGET_SNAPSHOT_VERSION` bumped and both readers updated in
  * the same change; a reader that meets a version it does not know shows "open beanies to
  * refresh" rather than guessing.
  *
  * Privacy: plain data on the device, wiped at sign-out (sign-out step
- * `clearWidgetSnapshot`). It never carries finance data, private lists, surprise hints,
- * or an item `classifyAudience` hides from the viewer.
+ * `clearWidgetSnapshot`). It never carries finance data, surprise hints, or an item
+ * `classifyAudience` hides from the viewer. Its to-dos and lists are the daily briefing's: a
+ * private-category list (health, people, me) shows to its owner and, for a child's list, to
+ * the child's parents, exactly as on the briefing, never to another adult; a partner's to-dos
+ * and lists never show.
  */
 import type { WeatherGlyph } from './weather';
 
 /**
- * The version the app WRITES. Readers ACCEPT 2 and 3 (`WIDGET_SNAPSHOT_READABLE_VERSIONS`):
+ * The version the app WRITES. Readers ACCEPT 2, 3 and 4 (`WIDGET_SNAPSHOT_READABLE_VERSIONS`):
  * v3 (#134, 2026-10) is v2 plus optional fields only (`weather`, the `labels.weather*` /
  * `labels.circle*` strings, `WidgetDay.handoffs`, `WidgetTasks.doneToday`,
- * `WidgetRow.shortTitle` / `whoFirst`), so a v3 reader paints a v2 file with those absent,
- * and the bump exists so an OLD (v2-only) reader shows "open beanies to refresh" instead of
- * a widget missing its weather. Swift `supportedVersions = 2...3`, Java `MIN_VERSION = 2`,
- * `MAX_VERSION = 3`.
+ * `WidgetRow.shortTitle` / `whoFirst`), so a v3 reader paints a v2 file with those absent.
+ * v4 (2026-11) replaces each day's `my` + `our` with one `view` (the family's, or a child's
+ * own) and drops `labels.myDay` / `labels.ourDay`, adding the optional `WidgetRow.mine` and
+ * `WidgetDay.ownThingsText` so the lock screen can keep to the viewer's own day (it reads `my`
+ * from an older snapshot); the home screen reads `view ?? our ?? my` so a
+ * snapshot stored before the update still paints (remove that fallback, and the v3 fixture,
+ * when 3 leaves the readable versions). Swift `supportedVersions = 2...4`, Java
+ * `MIN_VERSION = 2`, `MAX_VERSION = 4`.
  */
-export const WIDGET_SNAPSHOT_VERSION = 3 as const;
+export const WIDGET_SNAPSHOT_VERSION = 4 as const;
 
 /** Every version the native readers accept, oldest first; the last is the one written. */
-export const WIDGET_SNAPSHOT_READABLE_VERSIONS = [2, WIDGET_SNAPSHOT_VERSION] as const;
+export const WIDGET_SNAPSHOT_READABLE_VERSIONS = [2, 3, WIDGET_SNAPSHOT_VERSION] as const;
 
 /**
  * Every placement size a widget can report or be opened from. The native side appends
@@ -104,9 +112,6 @@ export const WIDGET_DEFAULT_BLOCKS: Readonly<Record<WidgetBlockKind, boolean>> =
 
 /** How many days the snapshot carries: today and the six after it (the look-ahead). */
 export const WIDGET_DAYS = 7;
-
-/** Whose day a widget shows. A child session only ever publishes `my`. */
-export type WidgetAudience = 'my' | 'our';
 
 /**
  * The beanie art a native widget paints for a person. Each maps to one bundled image
@@ -199,6 +204,15 @@ export interface WidgetRow {
   whoFirst?: string;
   dot: WidgetDot | null;
   /**
+   * v4: the row is the viewer's own, by v2/v3's "my day" rule: an event with a drop-off or
+   * pick-up duty for the viewer, or assigned to the viewer or (for an adult) their child; every
+   * trip and birthday. Not another adult's event, nor a family-wide one with nobody assigned.
+   * Every row of a child's view is `true`. The lock-screen accessories show only these rows
+   * (the home-screen widget shows every row). Set on every v4 row; absent before v4, whose
+   * lock screen reads the `my` day instead.
+   */
+  mine?: boolean;
+  /**
    * The viewer's drop-off/pick-up duty on this row is ticked. In a child view the renderers
    * draw the green tick when `isDone` OR the row is past (`endsAt < now`): a child's day is
    * a list of things to get through, so finished reads as done.
@@ -217,7 +231,9 @@ export type WidgetTaskKind = 'todo' | 'hint' | 'list';
 
 /**
  * When a task is due, relative to the day it was built for. The section is ordered by this,
- * then by date and time, whatever the kind: overdue, today, undated, later this week.
+ * then by date and time, whatever the kind: overdue, today, undated, later. A later hint or
+ * list is one due this week; a later to-do is any showing one due after the day (its "Show
+ * from" rule, `utils/todoPlate`, decides when it appears; to-dos have no look-ahead).
  */
 export type WidgetTaskBucket = 'overdue' | 'today' | 'undated' | 'later';
 
@@ -237,7 +253,7 @@ export interface WidgetTask {
   tagTone: 'accent' | 'soft';
   /** The to-do has a due time: native fills the ring. */
   timed: boolean;
-  /** Whose it is, when that is someone other than the viewer (or the family on "our day"). */
+  /** Whose it is (the family's when nobody owns it); null on a hint. */
   dot: WidgetDot | null;
   link: string;
 }
@@ -258,12 +274,12 @@ export interface WidgetTasks {
   /** "to-dos" or "to-dos and lists" (when any list is among `items`). */
   heading: string;
   /**
-   * How many to-dos and lists are due now (overdue or today, plus undated on "my day"): the
-   * count at the foot of the date column, shown with the `due` switch. Later-this-week tasks
-   * and hints are listed but never counted.
+   * How many to-dos and lists are due now (overdue or today): the count at the foot of the
+   * date column, shown with the `due` switch. Undated and later tasks and hints are listed but
+   * never counted.
    */
   count: number;
-  /** "**4** for you today" / "**4** due today"; `text` is '' when `count` is 0. */
+  /** "**4** due today"; `text` is '' when `count` is 0. */
   countText: WidgetText;
   /**
    * v3: to-dos completed on this day (`completedAt`'s local date) among those that would
@@ -298,7 +314,7 @@ export interface WidgetDayHandoff {
   link: string;
 }
 
-/** One audience's view of one day. */
+/** One view of one day: the family's, or a child session's own. */
 export interface WidgetDay {
   /**
    * The calendar section: trips, then birthdays, then timed events by start, then untimed
@@ -314,11 +330,19 @@ export interface WidgetDay {
   tasks: WidgetTasks;
   /** "6 things on today" / "nothing on today", the small widget's handwritten line. */
   thingsText: string;
-  /** Pick-ups the viewer does on this day, ascending (my day only; empty on our day). */
+  /**
+   * v4: `thingsText` counting only the `mine` rows ("2 things on today"), the lock screen's
+   * fallback line. Absent before v4.
+   */
+  ownThingsText?: string;
+  /**
+   * Pick-ups the viewer does on this day, ascending. Always the viewer's own (their duty), so
+   * the lock screen reads them as they are.
+   */
   pickups: WidgetPickup[];
   /**
-   * v3: the viewer's own timed drop-offs and pick-ups on this day, ascending by `at` (my day
-   * only; empty on our day). Absent in a v2 snapshot. `pickups` stays for the inline slot.
+   * v3: the viewer's own timed drop-offs and pick-ups on this day, ascending by `at`. Absent
+   * in a v2 snapshot. `pickups` stays for the inline slot. Always the viewer's own.
    */
   handoffs?: WidgetDayHandoff[];
 }
@@ -340,9 +364,11 @@ export interface WidgetDayEntry {
    * midnight never calls the wrong day tomorrow.
    */
   dividerDate: string;
-  my: WidgetDay | null;
-  /** null for a child session. */
-  our: WidgetDay | null;
+  /**
+   * v4: the day: the family's (every event, the briefing's to-dos and lists) for an adult, the
+   * child's own for a child session. Replaces v2/v3's `my` + `our`.
+   */
+  view: WidgetDay;
 }
 
 /**
@@ -364,9 +390,6 @@ export interface WidgetLabels {
   more: string;
   /** "nothing on today": the calendar's first line when today has no rows. */
   nothingToday: string;
-  /** "my day" / "our day" for the foot of the date column. */
-  myDay: string;
-  ourDay: string;
   /** "Ava's day" (child view header), already filled. */
   childsDay: string;
   /**

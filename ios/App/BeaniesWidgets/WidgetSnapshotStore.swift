@@ -5,16 +5,22 @@ import Foundation
 // the one reader of the file the app writes (`WidgetBridgePlugin.swift`).
 //
 // ⚠️ CROSS-PLATFORM CONTRACT. The TS file is the source of truth; the committed example is
-// `src/utils/__tests__/fixtures/widget-snapshot.v3.json` (`widget-snapshot.v2.json` is the
-// older shape this reader still accepts). Every key below must match the TS field name
+// `src/utils/__tests__/fixtures/widget-snapshot.v4.json` (`widget-snapshot.v3.json` and
+// `widget-snapshot.v2.json` are the older shapes this reader still accepts). Every key below must match the TS field name
 // exactly. Adding an OPTIONAL field there is safe (unknown keys are ignored here).
 // Renaming/removing/retyping a field bumps `WIDGET_SNAPSHOT_VERSION` there and
 // `supportedVersions` here in the same change.
 //
 // v3 (#134) is v2 plus optional fields only: `weather`, the `labels.weatherAsOf` and
-// `labels.circle*` strings, `days[].my.handoffs`, `tasks.doneToday`, `rows[].shortTitle` and
+// `labels.circle*` strings, `days[].view.handoffs`, `tasks.doneToday`, `rows[].shortTitle` and
 // `rows[].whoFirst`. Each is an optional here, and nil means "a v2 file": every renderer that
 // reads one has a v2 path (no weather, the circle falls back to Next up).
+//
+// v4 replaces each day's `my` + `our` with one `view` (the family's, or a child's own) and drops
+// `labels.myDay` / `labels.ourDay`. A v2/v3 file still decodes: the resolver reads
+// `view ?? our ?? my`. v4 also adds the optional `rows[].mine` and `ownThingsText`, which the
+// lock screen's own-day projection reads (`DayResolver.resolve(ownDay: true)`); for a v2/v3
+// file the lock screen reads `my`, which is already the viewer's own.
 //
 // TOLERANT BY DESIGN. Only `version`, `generatedAt` and `days` are required; every other
 // field decodes leniently with a sensible default, and one malformed array element (a row,
@@ -69,7 +75,7 @@ struct WSTasks {
     var overflowHint = 0
     /// "to-dos" or "to-dos and lists".
     var heading: String = ""
-    /// Due now (overdue or today, plus undated on "my day"): the date column's count.
+    /// Due now (overdue or today): the date column's count.
     var count = 0
     var countText = WSText()
     /// v3: to-dos completed today among those `count` would count; nil in a v2 file.
@@ -121,6 +127,10 @@ struct WSRow {
     /// v3: the first assignee's first name ("Max"), the circle's word with titles off.
     var whoFirst: String? = nil
     var dot: WSDot? = nil
+    /// v4: the viewer's own row (the old "my day" rule, set by the app). The lock screen shows
+    /// only rows where this is `true` (`DayResolver`'s own-day projection); nil before v4,
+    /// whose lock screen reads the `my` day instead.
+    var mine: Bool? = nil
     var isDone = false
     var handoff: WSHandoff? = nil
     var link: String = ""
@@ -138,8 +148,11 @@ struct WSDay {
     /// The to-dos section, built as if this day were today. Empty for a child.
     var tasks = WSTasks()
     var thingsText: String = ""
+    /// v4: `thingsText` counting only the `mine` rows, the lock screen's line. nil before v4.
+    var ownThingsText: String? = nil
+    /// Always the viewer's own pick-ups (their duty), on every view.
     var pickups: [WSPickup] = []
-    /// v3: the viewer's own drop-offs and pick-ups, ascending (my day only). nil in a v2
+    /// v3: the viewer's own drop-offs and pick-ups, ascending (the viewer's own, so only on the family view). nil in a v2
     /// file, which the circle's Next handoff treats like an empty list.
     var handoffs: [WSDayHandoff]? = nil
 }
@@ -167,8 +180,11 @@ struct WSDayEntry {
     /// "Wed 15": this day's look-ahead divider. "tomorrow" is added at render time from the
     /// device clock, never stored, so a widget that rolled past midnight stays right.
     var dividerDate: String = ""
-    var my: WSDay? = nil
-    var our: WSDay? = nil
+    /// v4: the one day view (the family's, or a child's own).
+    var view: WSDay? = nil
+    /// v2/v3 only: the old "my day" / "our day" views. Readers take `view ?? our ?? my`.
+    var my: WSDay? = nil // remove with v3
+    var our: WSDay? = nil // remove with v3
 }
 
 /// Labels native composes at render time. The English defaults are used only if the app
@@ -182,8 +198,6 @@ struct WSLabels {
     var more: String = "{n} more"
     /// The calendar's first line when today is empty and there are tasks.
     var nothingToday: String = "nothing on today"
-    var myDay: String = "my day"
-    var ourDay: String = "our day"
     var childsDay: String = ""
     var nothingOnToday: String = "nothing on today,"
     var enjoy: String = "enjoy"
@@ -408,7 +422,7 @@ extension WSHandoff: Decodable {
 extension WSRow: Decodable {
     private enum CodingKeys: String, CodingKey {
         case id, kind, todayOnly, time, startsAt, endsAt, title, titleEmphasis, who, shortTitle, whoFirst
-        case dot, isDone, handoff, link
+        case dot, mine, isDone, handoff, link
     }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -424,6 +438,7 @@ extension WSRow: Decodable {
         shortTitle = c.opt(String.self, .shortTitle)
         whoFirst = c.opt(String.self, .whoFirst)
         dot = c.opt(WSDot.self, .dot)
+        mine = c.opt(Bool.self, .mine)
         isDone = c.lenient(Bool.self, .isDone, false)
         handoff = c.opt(WSHandoff.self, .handoff)
         link = c.lenient(String.self, .link, "")
@@ -432,7 +447,7 @@ extension WSRow: Decodable {
 
 extension WSDay: Decodable {
     private enum CodingKeys: String, CodingKey {
-        case rows, tonight, tasks, thingsText, pickups, handoffs
+        case rows, tonight, tasks, thingsText, ownThingsText, pickups, handoffs
     }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -440,6 +455,7 @@ extension WSDay: Decodable {
         tonight = c.opt(WSTonight.self, .tonight)
         tasks = c.lenient(WSTasks.self, .tasks, WSTasks())
         thingsText = c.lenient(String.self, .thingsText, "")
+        ownThingsText = c.opt(String.self, .ownThingsText)
         pickups = c.list(WSPickup.self, .pickups)
         // Present (even empty) = a v3 file; absent stays nil.
         handoffs = c.contains(.handoffs) ? c.list(WSDayHandoff.self, .handoffs) : nil
@@ -502,7 +518,7 @@ extension WSWeather: Decodable {
 
 extension WSDayEntry: Decodable {
     private enum CodingKeys: String, CodingKey {
-        case ymd, numeral, weekday, month, weekdayShort, dividerDate, my, our
+        case ymd, numeral, weekday, month, weekdayShort, dividerDate, view, my, our
     }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -513,14 +529,15 @@ extension WSDayEntry: Decodable {
         month = c.lenient(String.self, .month, "")
         weekdayShort = c.lenient(String.self, .weekdayShort, "")
         dividerDate = c.lenient(String.self, .dividerDate, "")
-        my = c.opt(WSDay.self, .my)
-        our = c.opt(WSDay.self, .our)
+        view = c.opt(WSDay.self, .view)
+        my = c.opt(WSDay.self, .my) // remove with v3
+        our = c.opt(WSDay.self, .our) // remove with v3
     }
 }
 
 extension WSLabels: Decodable {
     private enum CodingKeys: String, CodingKey {
-        case asOf, later, next, tomorrow, more, nothingToday, myDay, ourDay, childsDay
+        case asOf, later, next, tomorrow, more, nothingToday, childsDay
         case nothingOnToday, enjoy, weatherAsOf, circleLeft, circleAllDone, circleAllClear, circleToDo
     }
     init(from decoder: Decoder) throws {
@@ -532,8 +549,6 @@ extension WSLabels: Decodable {
         tomorrow = c.lenient(String.self, .tomorrow, d.tomorrow)
         more = c.lenient(String.self, .more, d.more)
         nothingToday = c.lenient(String.self, .nothingToday, d.nothingToday)
-        myDay = c.lenient(String.self, .myDay, d.myDay)
-        ourDay = c.lenient(String.self, .ourDay, d.ourDay)
         childsDay = c.lenient(String.self, .childsDay, d.childsDay)
         nothingOnToday = c.lenient(String.self, .nothingOnToday, d.nothingOnToday)
         enjoy = c.lenient(String.self, .enjoy, d.enjoy)
@@ -619,7 +634,7 @@ enum WidgetSnapshotStore {
 
     /// The schema versions this build understands (`WIDGET_SNAPSHOT_READABLE_VERSIONS`); the
     /// upper bound is the one the app writes (`WIDGET_SNAPSHOT_VERSION`).
-    static let supportedVersions = 2...3
+    static let supportedVersions = 2...4
 
     /// Read the snapshot. Never throws, never crashes.
     static func read() -> SnapshotReadOutcome {

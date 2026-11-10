@@ -1,8 +1,12 @@
 import SwiftUI
 import WidgetKit
 
-/// The lock-screen accessories: inline, rectangular, circular. Always the viewer's own day
-/// (`my`). Respects the per-device "Show event titles on the lock screen" setting
+/// The lock-screen accessories: inline, rectangular, circular. Always the viewer's own day, as
+/// it is readable without unlocking: `DayResolver.resolve(ownDay: true)` narrows the family
+/// view to the rows marked `mine` (the viewer's own, their children's, the ones they drive,
+/// every trip and birthday) and the matching "N things" line, once, for every face, today and
+/// the look-ahead alike. The home-screen widget shows the whole family. Respects the
+/// per-device "Show event titles on the lock screen" setting
 /// (`settings.lockScreenTitles`): off → times and first names only. Inline and rectangular
 /// show the next calendar item even when it falls on a later day, and then name the day
 /// ("Wed 4:30pm piano"). Inline and rectangular also carry the current temperature when
@@ -63,9 +67,10 @@ struct DayAccessoryView: View {
 
     // MARK: state
 
+    /// The viewer's own day (the one projection every face below reads).
     private var resolved: (WSSnapshot, ResolvedDay)? {
         guard case .ready(let snapshot) = entry.state,
-              let day = DayResolver.resolve(snapshot, at: entry.date, audience: .my)
+              let day = DayResolver.resolve(snapshot, at: entry.date, ownDay: true)
         else { return nil }
         return (snapshot, day)
     }

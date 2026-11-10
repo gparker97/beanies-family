@@ -21,6 +21,7 @@ import LinkedActivityChip from '@/components/todo/LinkedActivityChip.vue';
 import LinkedCardChip from '@/components/todo/LinkedCardChip.vue';
 import TodoCompleteCheckbox from '@/components/todo/TodoCompleteCheckbox.vue';
 import TodoRepeatField from '@/components/todo/TodoRepeatField.vue';
+import TodoShowField from '@/components/todo/TodoShowField.vue';
 import NotifyParentsToggle from '@/components/ui/NotifyParentsToggle.vue';
 import { useTodoCardLink } from '@/composables/useTodoCardLink';
 import { useMemberInfo } from '@/composables/useMemberInfo';
@@ -32,6 +33,13 @@ import { extractUrls } from '@/utils/url';
 import { formatDateWithDay } from '@/utils/date';
 import { normalizeAssignees, toAssigneePayload } from '@/utils/assignees';
 import { isTodoOverdue, isTodoDueToday } from '@/utils/todo';
+import {
+  defaultShowRule,
+  showFieldApplies,
+  todoShowRule,
+  type TodoShowRule,
+} from '@/utils/todoPlate';
+import { useToday } from '@/composables/useToday';
 import { isFreshHint as isFreshHintTodo } from '@/utils/helpfulHints';
 import type { RecurrenceRule, TodoItem } from '@/types/models';
 
@@ -189,6 +197,27 @@ const repeatFieldShown = computed(() => {
   if (repeating.value || editingField.value === 'repeat') return true;
   return !!caps.value?.editRepeat && !item.completed && !item.someday;
 });
+
+// "Show from": editable when the capability table allows it and there is a due date. Otherwise
+// the rule is read-only text, and only when it is not the kind's default (so nothing for most).
+const showRule = computed(() => (todo.value ? todoShowRule(todo.value) : null));
+const showFieldEditable = computed(() => !!caps.value?.editShowRule && !!todo.value?.dueDate);
+const showFieldReadonly = computed(() => {
+  const item = todo.value;
+  if (!item?.dueDate || showFieldEditable.value || item.someday || item.completed) return false;
+  return showRule.value?.kind !== defaultShowRule(repeating.value).kind;
+});
+const { today: todayYmd } = useToday();
+/** The row exists only when the field has something to render (`showFieldApplies`). */
+const showFieldShown = computed(
+  () =>
+    !!todo.value?.dueDate &&
+    showFieldApplies(repeating.value, todo.value.dueDate, todayYmd.value) &&
+    (showFieldEditable.value || showFieldReadonly.value)
+);
+function handleShowChange(rule: TodoShowRule) {
+  if (todo.value) void todoStore.setShowRule(todo.value.id, rule);
+}
 
 const { resolveCardLink } = useTodoCardLink();
 const cardLink = computed(() => (todo.value ? resolveCardLink(todo.value) : null));
@@ -491,7 +520,7 @@ async function handleDelete() {
         </span>
         <span
           v-else
-          class="font-outfit inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-purple-700"
+          class="font-outfit dark:text-purple-lift inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold text-purple-700"
           style="background: var(--tint-purple-15)"
         >
           {{ t('todo.status.open') }}
@@ -594,6 +623,21 @@ async function handleDelete() {
           </template>
         </InlineEditField>
       </FormFieldGroup>
+
+      <!-- Show from: when this to-do starts showing (the store refuses, toasts and logs) -->
+      <div
+        v-if="todo.dueDate && showRule && showFieldShown"
+        class="px-1"
+        data-testid="todo-show-edit"
+      >
+        <TodoShowField
+          :model-value="showRule"
+          :repeating="repeating"
+          :due-date="todo.dueDate"
+          :readonly="!showFieldEditable"
+          @update:model-value="handleShowChange"
+        />
+      </div>
 
       <!-- #123: Repeats (the block's markup lives in TodoRepeatField; this keeps the wiring) -->
       <FormFieldGroup

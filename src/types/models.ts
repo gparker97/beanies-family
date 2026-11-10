@@ -818,6 +818,23 @@ export interface TodoItem {
   cardId?: string;
   /** #123 Phase B: the card part this to-do belongs to (`'main'` for a single card). Immutable. */
   cardPartKey?: string;
+  /**
+   * "Show from" (one-off only): `YYYY-MM-DD`, the day the to-do starts showing on the daily
+   * briefing, the Nook, the wall and the widget. Absent = no start date. Never hides it on or
+   * after the due date, ignored on a repeating or undated to-do, and a malformed value reads
+   * as "right away". Written only through `showRulePatch` (`utils/todoPlate`).
+   */
+  showFrom?: ISODateString;
+  /**
+   * `'due'` = only from the due date; `'now'` = right away. Absent = the default for its kind:
+   * `'due'` for a repeating to-do, `'now'` for a one-off. Written only through `showRulePatch`.
+   */
+  showOn?: 'now' | 'due';
+  /**
+   * Repeating only: start showing this many days (a whole number, 1-30) before each due date.
+   * Ignored on a one-off and when out of range. Written only through `showRulePatch`.
+   */
+  showLeadDays?: number;
 }
 
 /** Helpful Hints (#40) — the closed set of rule-based hint triggers. */

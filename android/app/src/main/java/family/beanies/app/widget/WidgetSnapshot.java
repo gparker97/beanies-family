@@ -19,19 +19,20 @@ import org.json.JSONObject;
  * and {@link WidgetSnapshotStore} then shows "open beanies to refresh" for a version outside
  * {@link #MIN_VERSION}..{@link #MAX_VERSION} rather than guessing.
  *
- * Native only paints: there is no audience decision, no translation and no colour computation
+ * Native only paints: there is no whose-day decision, no translation and no colour computation
  * in any class here.
  */
 final class WidgetSnapshot {
 
     /**
      * Mirrors WIDGET_SNAPSHOT_READABLE_VERSIONS in src/types/widgetSnapshot.ts: the app WRITES
-     * the last (WIDGET_SNAPSHOT_VERSION, 3) and this reader accepts every version from the first.
+     * the last (WIDGET_SNAPSHOT_VERSION, 4) and this reader accepts every version from the first.
      * v3 (#134) is v2 plus optional fields only (weather, labels.weatherAsOf / circle*, a day's
-     * handoffs, tasks.doneToday, a row's shortTitle / whoFirst). Swift: `supportedVersions = 2...3`.
+     * handoffs, tasks.doneToday, a row's shortTitle / whoFirst). v4 replaces a day's `my` + `our` with one
+     * `view` and drops labels.myDay / ourDay. Swift: `supportedVersions = 2...4`.
      */
     static final int MIN_VERSION = 2;
-    static final int MAX_VERSION = 3;
+    static final int MAX_VERSION = 4;
 
     /** A version this reader can paint ({@link WidgetSnapshotStore} rejects any other). */
     static boolean isReadable(int version) {
@@ -105,8 +106,6 @@ final class WidgetSnapshot {
         final String more;
         /** "nothing on today": the calendar's first line when today has no rows. */
         final String nothingToday;
-        final String myDay;
-        final String ourDay;
         final String childsDay;
         final String nothingOnToday;
         final String enjoy;
@@ -125,8 +124,6 @@ final class WidgetSnapshot {
             tomorrow = str(o, "tomorrow");
             more = str(o, "more");
             nothingToday = str(o, "nothingToday");
-            myDay = str(o, "myDay");
-            ourDay = str(o, "ourDay");
             childsDay = str(o, "childsDay");
             nothingOnToday = str(o, "nothingOnToday");
             enjoy = str(o, "enjoy");
@@ -157,9 +154,12 @@ final class WidgetSnapshot {
         final String weekdayShort;
         /** "Sun 12": this day's divider in the look-ahead (and the small widget's "next · Sun 12"). */
         final String dividerDate;
-        final Day my;
-        /** null for a child session. */
-        final Day our;
+        /** v4: the one day view (the family's, or a child's own); null in a v2/v3 file. */
+        final Day view;
+        /** v2/v3 only: the viewer's own day. Read through {@link #day()}. */
+        final Day my; // remove with v3
+        /** v2/v3 only: the family's day; null for a child session. Read through {@link #day()}. */
+        final Day our; // remove with v3
 
         DayEntry(JSONObject o) {
             ymd = str(o, "ymd");
@@ -168,14 +168,21 @@ final class WidgetSnapshot {
             month = str(o, "month");
             weekdayShort = str(o, "weekdayShort");
             dividerDate = str(o, "dividerDate");
-            JSONObject m = o.optJSONObject("my");
-            JSONObject u = o.optJSONObject("our");
-            my = m == null ? null : new Day(m);
-            our = u == null ? null : new Day(u);
+            JSONObject v = o.optJSONObject("view");
+            JSONObject m = o.optJSONObject("my"); // remove with v3
+            JSONObject u = o.optJSONObject("our"); // remove with v3
+            view = v == null ? null : new Day(v);
+            my = m == null ? null : new Day(m); // remove with v3
+            our = u == null ? null : new Day(u); // remove with v3
+        }
+
+        /** The day to paint: {@code view ?? our ?? my}; null when the entry carries none. */
+        Day day() {
+            return view != null ? view : our != null ? our : my; // remove with v3
         }
     }
 
-    /** One audience's view of one day (WidgetDay). */
+    /** The view of one day (WidgetDay). */
     static final class Day {
         /** The calendar section: trips, birthdays, timed events, untimed events. */
         final List<Row> rows;
@@ -183,7 +190,7 @@ final class WidgetSnapshot {
         final Linked tonight;
         final Tasks tasks;
         final String thingsText;
-        /** v3: the viewer's own timed drop-offs and pick-ups, ascending (my day only); empty in v2. */
+        /** v3: the viewer's own timed drop-offs and pick-ups, ascending (family view only); empty in v2. */
         final List<DayHandoff> handoffs;
 
         Day(JSONObject o) {

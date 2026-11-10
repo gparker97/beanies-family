@@ -144,8 +144,7 @@ final class WidgetViews {
     }
 
     /**
-     * The peek over the panel: the family on "our day", the viewer's own beanie on "my day" (and
-     * for a child). An unknown avatar falls back to the family. On the small widget the weather
+     * The peek over the panel: the family for an adult, the viewer's own beanie for a child. An unknown avatar falls back to the family. On the small widget the weather
      * (#134) takes the peek's slot while a current temperature exists ({@code weatherInSlot}, the
      * caller binds `small_weather`): both peeks hide, and return on the first render without one.
      * The medium and large always pass false (their weather lives in the date column).
@@ -210,7 +209,7 @@ final class WidgetViews {
 
     /** The viewer's avatar drawable for the peek, or 0 when the family peek shows. */
     static int peekAvatar(WidgetFill.Plan plan) {
-        return plan.isOurDay ? 0 : avatarRes(plan.snapshot.viewer.avatar);
+        return !plan.isChild ? 0 : avatarRes(plan.snapshot.viewer.avatar);
     }
 
     /** The width (dp) of the peek {@link #bindPeek} shows, from the same dimens as the layout. */

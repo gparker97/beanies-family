@@ -13,7 +13,7 @@ import java.util.TimeZone;
 /**
  * What one placed widget shows, decided once and shared by the provider (date column, to-dos
  * section, footer, small widget) and the list factory (the calendar), so the two halves of a
- * widget can never disagree about the day, the audience, the switches or which rows show (#130).
+ * widget can never disagree about the day, the switches or which rows show (#130).
  *
  * TWO SECTIONS (round 9b). The calendar is the scrolling list: today's rows in full, then every
  * later day that has a row, under its date divider. The to-dos section sits in a fixed place under
@@ -116,7 +116,7 @@ final class WidgetFill {
     static final int COLUMN_AGE = 1 << 2;
     /** The snapshot's own "as of" line (a stale snapshot). Counted, never dropped. */
     static final int COLUMN_STALE = 1 << 3;
-    /** "my day" / "our day" / "Ava's day". */
+    /** "Ava's day": the child's label (an adult has none). */
     static final int COLUMN_AUDIENCE = 1 << 4;
     /** "2 for you today". */
     static final int COLUMN_DUE = 1 << 5;
@@ -133,7 +133,7 @@ final class WidgetFill {
     /** One body line (11sp) and each further wrapped line. */
     static final float COLUMN_LINE_DP = 14.6f;
     static final float COLUMN_WRAP_DP = 12.9f;
-    /** The 2dp top margin of the weekday, the weather sub line, the audience and the due count. */
+    /** The 2dp top margin of the weekday, the weather sub line, the child label and the due count. */
     static final float COLUMN_GAP_DP = 2f;
     /** The weather row: a 3dp top margin, then the taller of the 14dp glyph and 13sp Outfit temp. */
     static final float COLUMN_WEATHER_GAP_DP = 3f;
@@ -156,7 +156,7 @@ final class WidgetFill {
      *
      * The weather row and a stale snapshot's "as of" always stay. Only the wanted lines are
      * weighed; none is added or rewritten here. When the rest does not fit the lines go in the plan's order (#134 requirement 12, the same order as iOS's ViewThatFits
-     * candidates): the weather's range/age line first, then the audience, then the due count. A
+     * candidates): the weather's range/age line first, then the child label, then the due count. A
      * host that reports no height (0) keeps everything, as before weather.
      */
     static int dateColumnLines(float heightDp, float textScale, int flags) {
@@ -218,10 +218,9 @@ final class WidgetFill {
     static final class Plan {
         final WidgetSnapshot snapshot;
         final WidgetSnapshot.DayEntry entry;
-        /** The audience's day; null when the snapshot has none for this entry. */
+        /** The entry's day view; null when the snapshot has none for this entry. */
         final WidgetSnapshot.Day day;
         final boolean isChild;
-        final boolean isOurDay;
         final boolean stale;
         /** Today's calendar rows the switches show (todayOnly rows included). */
         final List<WidgetSnapshot.Row> todayRows;
@@ -238,7 +237,6 @@ final class WidgetFill {
                 WidgetSnapshot.DayEntry entry,
                 WidgetSnapshot.Day day,
                 boolean isChild,
-                boolean isOurDay,
                 boolean stale,
                 boolean[] shown,
                 List<WidgetSnapshot.Row> todayRows,
@@ -249,7 +247,6 @@ final class WidgetFill {
             this.entry = entry;
             this.day = day;
             this.isChild = isChild;
-            this.isOurDay = isOurDay;
             this.stale = stale;
             this.shown = shown;
             this.todayRows = todayRows;
@@ -355,9 +352,7 @@ final class WidgetFill {
 
         WidgetSnapshot.DayEntry entry = s.days.get(index);
         boolean isChild = s.viewer.isChild;
-        boolean wantsOur = !isChild && WidgetPrefs.AUDIENCE_OUR.equals(prefs.audience);
-        boolean isOur = wantsOur && entry.our != null;
-        WidgetSnapshot.Day day = pick(entry, isOur);
+        WidgetSnapshot.Day day = entry.day();
 
         boolean[] shown = new boolean[FILL_ORDER.length];
         for (int i = 0; i < FILL_ORDER.length; i++) {
@@ -376,7 +371,7 @@ final class WidgetFill {
         String tomorrowYmd = ymd(now, 1);
         for (int i = index + 1; i < s.days.size(); i++) {
             WidgetSnapshot.DayEntry next = s.days.get(i);
-            List<WidgetSnapshot.Row> r = rows(pick(next, isOur), events, comingUp, false);
+            List<WidgetSnapshot.Row> r = rows(next.day(), events, comingUp, false);
             if (!r.isEmpty()) later.add(new LaterDay(next, tomorrowYmd.equals(next.ymd), r));
         }
 
@@ -388,7 +383,7 @@ final class WidgetFill {
             }
         }
         float calendarDp = calendarDp(todayRows, later, events, shown[indexOf(WHOS_WHERE)]);
-        return new Plan(s, entry, day, isChild, isOur, stale, shown,
+        return new Plan(s, entry, day, isChild, stale, shown,
                 Collections.unmodifiableList(todayRows), Collections.unmodifiableList(later),
                 Collections.unmodifiableList(tasks), taskRows(size, heightDp, calendarDp));
     }
@@ -454,15 +449,6 @@ final class WidgetFill {
             if (row.isComingUp() ? comingUp : events) out.add(row);
         }
         return out;
-    }
-
-    /**
-     * The audience's day. "Our day" missing falls back to the viewer's own day (a child session
-     * publishes no "our"); "my day" missing is an empty day, never the family's view, so a
-     * damaged entry can never put other adults' items on a "my day" widget (same as iOS).
-     */
-    private static WidgetSnapshot.Day pick(WidgetSnapshot.DayEntry entry, boolean our) {
-        return our && entry.our != null ? entry.our : entry.my;
     }
 
     /** The device-local calendar date `offsetDays` after `now`, as "yyyy-MM-dd". */

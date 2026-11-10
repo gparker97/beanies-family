@@ -7305,6 +7305,12 @@ const STRING_DEFS = {
     beanie:
       "this to-do comes from a card's reminder. to stop it, turn the reminder off on the card.",
   },
+  // "Show from": `todoStore.setShowRule` refused (a card-made, done, someday or hint to-do, or
+  // a malformed date or lead). The backstop behind the field's own limits.
+  'todo.error.showRuleRefused': {
+    en: "When this to-do shows can't be changed.",
+    beanie: "when this to-do shows can't be changed.",
+  },
   'todo.field.title': { en: 'To-do', beanie: 'to-do' },
   'todo.magicHint': {
     en: 'Snap a note, a list or a school email',
@@ -7335,6 +7341,67 @@ const STRING_DEFS = {
   'todo.sort.dueDate': { en: 'Due date', beanie: 'due date' },
   'todo.section.open': { en: 'Open To-dos', beanie: 'open to-dos' },
   'todo.section.completed': { en: 'Completed', beanie: 'completed' },
+  // "Show from": the To-Dos page's Open groups (`utils/todoPlate` TODO_GROUP_HEADER).
+  'todo.section.overdue': { en: 'Overdue', beanie: 'overdue' },
+  'todo.section.dueToday': { en: 'Due Today', beanie: 'due today' },
+  'todo.section.comingUp': { en: 'Coming Up', beanie: 'coming up' },
+  'todo.section.notShowingYet': { en: 'Not Showing Yet', beanie: 'not showing yet' },
+  // "Show from": the tag on a to-do that is not showing yet (`showRuleLabel`). {date} is the
+  // compact Nook date; {n} the days before each due date (a repeating to-do).
+  'todo.show.tag.from': { en: 'Shows from {date}', beanie: 'shows from {date}' },
+  'todo.show.tag.due': { en: 'Shows on the due date', beanie: 'shows on the due date' },
+  'todo.show.tag.lead.one': { en: 'Shows 1 day before', beanie: 'shows 1 day before' },
+  'todo.show.tag.lead.other': { en: 'Shows {n} days before', beanie: 'shows {n} days before' },
+  'todo.show.label': { en: 'Show From', beanie: 'show from' },
+  'todo.show.today': { en: 'Today', beanie: 'today' },
+  'todo.show.onDueDate': { en: 'On the Due Date', beanie: 'on the due date' },
+  'todo.show.repeat.label': { en: 'Show', beanie: 'show' },
+  'todo.show.repeat.due': { en: 'On Each Due Date', beanie: 'on each due date' },
+  'todo.show.repeat.lead': { en: 'Days Before', beanie: 'days before' },
+  'todo.show.repeat.now': { en: 'Every Day', beanie: 'every day' },
+  'todo.show.lead.suffix.one': {
+    en: 'day before each due date',
+    beanie: 'day before each due date',
+  },
+  'todo.show.lead.suffix.other': {
+    en: 'days before each due date',
+    beanie: 'days before each due date',
+  },
+  'todo.show.lead.aria': { en: 'Days before each due date', beanie: 'days before each due date' },
+  'todo.show.hint.once.now': {
+    en: 'Shows on the daily briefing, the Nook and your widgets every day until it is done, tagged "Due {due}".',
+    beanie:
+      'shows on the daily briefing, the nook and your widgets every day until it is done, tagged "due {due}".',
+  },
+  'todo.show.hint.once.from': {
+    en: 'Shows on the daily briefing, the Nook and your widgets from {date}, and is not overdue until {due}. Always on the To-Dos page.',
+    beanie:
+      'shows on the daily briefing, the nook and your widgets from {date}, and is not overdue until {due}. always on the to-dos page.',
+  },
+  'todo.show.hint.once.due': {
+    en: 'Shows on the daily briefing, the Nook and your widgets on {due}, the day it is due. Always on the To-Dos page.',
+    beanie:
+      'shows on the daily briefing, the nook and your widgets on {due}, the day it is due. always on the to-dos page.',
+  },
+  'todo.show.hint.repeat.due': {
+    en: 'Shows on the daily briefing, the Nook and your widgets on each due date. Always on the To-Dos page.',
+    beanie:
+      'shows on the daily briefing, the nook and your widgets on each due date. always on the to-dos page.',
+  },
+  'todo.show.hint.repeat.lead.one': {
+    en: 'Shows on the daily briefing, the Nook and your widgets 1 day before each due date. Always on the To-Dos page.',
+    beanie:
+      'shows on the daily briefing, the nook and your widgets 1 day before each due date. always on the to-dos page.',
+  },
+  'todo.show.hint.repeat.lead.other': {
+    en: 'Shows on the daily briefing, the Nook and your widgets {n} days before each due date. Always on the To-Dos page.',
+    beanie:
+      'shows on the daily briefing, the nook and your widgets {n} days before each due date. always on the to-dos page.',
+  },
+  'todo.show.hint.repeat.now': {
+    en: 'Shows on the daily briefing, the Nook and your widgets every day until it is done.',
+    beanie: 'shows on the daily briefing, the nook and your widgets every day until it is done.',
+  },
   'todo.someday': { en: 'Someday · Maybe', beanie: 'someday · maybe' },
   'todo.somedayHint': {
     en: 'Things you might do — no pressure, no due date.',
@@ -8781,6 +8848,24 @@ const STRING_DEFS = {
   'nook.criticalTodoUnassignedOverdue': {
     en: 'A gentle reminder: {task} — it was due {date} (anyone can do this)',
     beanie: 'a gentle nudge: {task} — was due {date} (anyone can do this)',
+  },
+  // "Show from": a to-do due on a later day that is already showing. {date} is the compact
+  // Nook date ("Fri, 13 Nov").
+  'nook.criticalTodoSelfUpcoming': {
+    en: 'Coming up: {task}, due {date}',
+    beanie: 'coming up: {task}, due {date}',
+  },
+  'nook.criticalTodoAssignedUpcoming': {
+    en: '{creator} asked you: {task}, due {date}',
+    beanie: '{creator} asked you: {task}, due {date}',
+  },
+  'nook.criticalTodoForChildUpcoming': {
+    en: '{children}: {task}, due {date}',
+    beanie: '{children}: {task}, due {date}',
+  },
+  'nook.criticalTodoUnassignedUpcoming': {
+    en: '{task}, due {date} (anyone can do this)',
+    beanie: '{task}, due {date} (anyone can do this)',
   },
   // An activity assigned only to a child (no adult assignee): shown to every adult.
   'nook.criticalActivityForChild': {
@@ -15065,8 +15150,6 @@ const STRING_DEFS = {
   'widget.asOf': { en: 'as of {time}', beanie: 'as of {time}' },
   'widget.later': { en: 'later ›', beanie: 'later ›' },
   'widget.next': { en: 'next', beanie: 'next' },
-  'widget.myDay': { en: 'my day', beanie: 'my day' },
-  'widget.ourDay': { en: 'our day', beanie: 'our day' },
   'widget.childsDay': { en: "{name}'s day", beanie: "{name}'s day" },
   'widget.nothingOnToday': { en: 'nothing on today,', beanie: 'nothing on today,' },
   'widget.enjoy': { en: 'enjoy', beanie: 'enjoy' },
@@ -15075,8 +15158,6 @@ const STRING_DEFS = {
   'widget.thingsOnToday.other': { en: '{n} things on today', beanie: '{n} things on today' },
   'widget.dueToday.one': { en: '{n} due today', beanie: '{n} due today' },
   'widget.dueToday.other': { en: '{n} due today', beanie: '{n} due today' },
-  'widget.forYouToday.one': { en: '{n} for you today', beanie: '{n} for you today' },
-  'widget.forYouToday.other': { en: '{n} for you today', beanie: '{n} for you today' },
   'widget.tonight': {
     en: 'tonight: {meal}, {name} cooks',
     beanie: 'tonight: {meal}, {name} cooks',

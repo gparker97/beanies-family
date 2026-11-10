@@ -24,24 +24,13 @@ const {
 
 // ── Display ─────────────────────────────────────────────────────────────────
 const MAX_VISIBLE = 8;
-const openCount = computed(() => todoStore.filteredActiveTodos.length);
-const displayTodos = computed(() => {
-  const todos = [...todoStore.filteredActiveTodos];
-  // Sort: overdue first, then by due date (soonest first), undated last
-  todos.sort((a, b) => {
-    const aDate = a.dueDate?.split('T')[0] ?? '';
-    const bDate = b.dueDate?.split('T')[0] ?? '';
-    // Both have dates: sort ascending (soonest first)
-    if (aDate && bDate) return aDate.localeCompare(bDate);
-    // Dated before undated
-    if (aDate && !bDate) return -1;
-    if (!aDate && bDate) return 1;
-    return 0;
-  });
-  return todos.slice(0, MAX_VISIBLE);
-});
-const hasMore = computed(() => todoStore.filteredActiveTodos.length > MAX_VISIBLE);
-const remainingCount = computed(() => todoStore.filteredActiveTodos.length - MAX_VISIBLE);
+// What the Nook shows: the to-dos already showing (`filteredPlateTodos`, in plate order:
+// overdue, due today, undated, then upcoming). A to-do whose "Show from" date is ahead waits
+// on the To-Dos page.
+const openCount = computed(() => todoStore.filteredPlateTodos.length);
+const displayTodos = computed(() => todoStore.filteredPlateTodos.slice(0, MAX_VISIBLE));
+const hasMore = computed(() => openCount.value > MAX_VISIBLE);
+const remainingCount = computed(() => openCount.value - MAX_VISIBLE);
 
 // ── View/edit modal ─────────────────────────────────────────────────────────
 const selectedTodoId = ref<string | null>(null);

@@ -66,7 +66,8 @@ const todayActivitiesCount = computed(() => {
   return activityStore.upcomingActivities.filter(({ date }) => date === today.value).length;
 });
 
-const openTodosCount = computed(() => todoStore.filteredActiveTodos.length);
+// The to-dos showing today (a to-do whose "Show from" date is ahead is not counted).
+const openTodosCount = computed(() => todoStore.filteredPlateTodos.length);
 
 const subtitle = computed(() => {
   return t('nook.statusSummary')

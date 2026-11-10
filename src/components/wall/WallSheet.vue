@@ -244,6 +244,10 @@ function todoNote(job: WallJob): WallJobNote | null {
         : fillTemplate(t('wall.todo.daysLate'), { n: job.daysLate });
     return { text, tone: 'late' };
   }
+  // Late today (past its time, same day): no day count to show, so keep the time, in the late tone.
+  if (job.bucket === 'overdue' && job.dueTime) {
+    return { text: fillTemplate(t('wall.todo.byTime'), { time: job.dueTime }), tone: 'late' };
+  }
   if (job.bucket === 'today' && job.dueTime) {
     return { text: fillTemplate(t('wall.todo.byTime'), { time: job.dueTime }), tone: 'time' };
   }

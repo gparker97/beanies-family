@@ -20,7 +20,7 @@ import androidx.core.view.WindowInsetsControllerCompat;
 import family.beanies.app.R;
 
 /**
- * The widget's configuration screen (#130): whose day, the six blocks, background opacity and
+ * The widget's configuration screen (#130): the six blocks, background opacity and
  * text size. Shown by the launcher when a widget is placed (optional on Android 12+) and from
  * "reconfigure".
  *
@@ -112,17 +112,6 @@ public class DayWidgetConfigActivity extends AppCompatActivity {
     }
 
     private void bind(WidgetPrefs prefs) {
-        // A child session only ever publishes "my day"; the choice would do nothing.
-        WidgetSnapshotStore.Result result = WidgetSnapshotStore.read(this);
-        boolean child = result.state == WidgetSnapshotStore.State.READY && result.snapshot.viewer.isChild;
-        int audienceVisibility = child ? View.GONE : View.VISIBLE;
-        findViewById(R.id.config_audience_heading).setVisibility(audienceVisibility);
-        findViewById(R.id.config_audience).setVisibility(audienceVisibility);
-
-        ((RadioGroup) findViewById(R.id.config_audience))
-                .check(WidgetPrefs.AUDIENCE_OUR.equals(prefs.audience)
-                        ? R.id.config_audience_our
-                        : R.id.config_audience_my);
         for (int i = 0; i < BLOCK_IDS.length; i++) {
             ((CheckBox) findViewById(BLOCK_IDS[i])).setChecked(prefs.blocks[i]);
         }
@@ -153,8 +142,6 @@ public class DayWidgetConfigActivity extends AppCompatActivity {
             finish();
             return;
         }
-        boolean our = ((RadioGroup) findViewById(R.id.config_audience)).getCheckedRadioButtonId()
-                == R.id.config_audience_our;
         boolean[] blocks = new boolean[BLOCK_IDS.length];
         for (int i = 0; i < BLOCK_IDS.length; i++) {
             blocks[i] = ((CheckBox) findViewById(BLOCK_IDS[i])).isChecked();
@@ -163,8 +150,7 @@ public class DayWidgetConfigActivity extends AppCompatActivity {
                 checkedIndex(R.id.config_opacity, OPACITY_IDS, indexOf(WidgetPrefs.OPACITIES, WidgetPrefs.DEFAULT_OPACITY))];
         WidgetPrefs.TextSize textSize =
                 WidgetPrefs.TextSize.values()[checkedIndex(R.id.config_text_size, TEXT_SIZE_IDS, 0)];
-        new WidgetPrefs(our ? WidgetPrefs.AUDIENCE_OUR : WidgetPrefs.AUDIENCE_MY, blocks, opacity, textSize)
-                .save(this, appWidgetId);
+        new WidgetPrefs(blocks, opacity, textSize).save(this, appWidgetId);
 
         try {
             DayWidgetProvider.renderAll(this);

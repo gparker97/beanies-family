@@ -405,3 +405,60 @@ describe('TodoFormModal: Keep Parents Posted', () => {
     expect(createTodo.mock.calls[0]![0].notifyParents).toBeUndefined();
   });
 });
+
+describe('TodoFormModal: Show from', () => {
+  const field = (w: Awaited<ReturnType<typeof mountOpen>>) =>
+    w.findComponent({ name: 'TodoShowField' });
+  const toggle = (w: Awaited<ReturnType<typeof mountOpen>>) =>
+    w.find('[data-testid="todo-repeat-toggle"]');
+  const create = async (w: Awaited<ReturnType<typeof mountOpen>>) => {
+    await w.find('input').setValue('Book the dentist');
+    await save(w).trigger('click');
+    await flushPromises();
+    return createTodo.mock.calls.at(-1)![0];
+  };
+
+  it('shows the row in the same box as the date, only once a date is set', async () => {
+    const w = await mountOpen();
+    expect(w.find('[data-testid="todo-show-field"]').exists()).toBe(false);
+    await pick(w, 'BeanieDatePicker', '2030-10-20');
+    expect(w.find('[data-testid="todo-when-box"] [data-testid="todo-show-field"]').exists()).toBe(
+      true
+    );
+  });
+
+  it('writes nothing by default, and a from date when one is chosen', async () => {
+    const w = await mountOpen();
+    await pick(w, 'BeanieDatePicker', '2030-10-20');
+    expect(await create(w)).not.toHaveProperty('showFrom');
+
+    await field(w).vm.$emit('update:modelValue', { kind: 'from', date: '2030-10-15' });
+    expect(await create(w)).toMatchObject({ showFrom: '2030-10-15' });
+  });
+
+  it('a from date at or past a moved due date becomes the due-date flag', async () => {
+    const w = await mountOpen();
+    await pick(w, 'BeanieDatePicker', '2030-10-20');
+    await field(w).vm.$emit('update:modelValue', { kind: 'from', date: '2030-10-15' });
+    await pick(w, 'BeanieDatePicker', '2030-10-14');
+    expect(field(w).props('modelValue')).toEqual({ kind: 'due' });
+  });
+
+  it('clearing the date resets the rule to now', async () => {
+    const w = await mountOpen();
+    await pick(w, 'BeanieDatePicker', '2030-10-20');
+    await field(w).vm.$emit('update:modelValue', { kind: 'due' });
+    await pick(w, 'BeanieDatePicker', '');
+    expect(field(w).props('modelValue')).toEqual({ kind: 'now' });
+  });
+
+  it('turning Repeat on starts on each due date, and off returns to right away', async () => {
+    const w = await mountOpen();
+    await pick(w, 'BeanieDatePicker', '2030-10-20');
+    await field(w).vm.$emit('update:modelValue', { kind: 'due' });
+    await toggle(w).trigger('click');
+    expect(field(w).props()).toMatchObject({ repeating: true, modelValue: { kind: 'due' } });
+    await toggle(w).trigger('click');
+    expect(field(w).props()).toMatchObject({ repeating: false, modelValue: { kind: 'now' } });
+  });
+});

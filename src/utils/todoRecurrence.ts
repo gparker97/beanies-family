@@ -14,6 +14,7 @@ import {
 } from '@/services/recurrence/recurrenceEngine';
 import { isOccurrence } from '@/services/recurrence/cadence';
 import { extractDatePart } from '@/utils/date';
+import { isHint } from '@/utils/helpfulHints';
 
 /**
  * Repeating to-dos (#123): ONE rolling record whose `dueDate` follows a rule. Pure: no store,
@@ -58,6 +59,8 @@ export interface TodoCapabilities {
   someday: boolean;
   delete: boolean;
   skip: boolean;
+  /** "Show from" (`utils/todoPlate`): a user-made, open, scheduled to-do that is not a hint. */
+  editShowRule: boolean;
 }
 
 /**
@@ -66,11 +69,11 @@ export interface TodoCapabilities {
  *   - repeating (and card-made, which always repeats): due date and someday are off, because
  *     only the roll may move the date and someday would clear it;
  *   - skip is on only for an open repeating to-do;
- *   - notify-parents is on only for a repeating to-do that is not card-made.
+ *   - notify-parents is on only for a repeating to-do that is not card-made;
+ *   - the show rule is off on a card-made, completed, someday or hint to-do (a card to-do
+ *     always follows the repeating default, "on each due date").
  */
-export function todoCapabilities(
-  todo: Pick<TodoItem, 'repeat' | 'cardId' | 'completed'>
-): TodoCapabilities {
+export function todoCapabilities(todo: TodoItem): TodoCapabilities {
   const card = isCardTodo(todo);
   const repeating = isRepeating(todo);
   const scheduled = repeating || card;
@@ -84,6 +87,7 @@ export function todoCapabilities(
     someday: !scheduled,
     delete: !card,
     skip: repeating && !todo.completed,
+    editShowRule: !card && !todo.completed && !todo.someday && !isHint(todo),
   };
 }
 

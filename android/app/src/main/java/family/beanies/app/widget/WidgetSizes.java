@@ -16,7 +16,7 @@ import family.beanies.app.R;
  * `MAX_WIDTH` are the landscape pair). Narrower than {@link #SMALL_MAX_WIDTH_DP} is the 2x2;
  * otherwise the widget is the 4x3 when it is at least {@link #LARGE_MIN_HEIGHT_DP} tall, else the
  * 4x2. Since round 9b the two share one layout and differ only in how many to-do rows the fixed
- * section keeps ({@link WidgetFill#taskRows}) and the "my day" label in the date column. Deciding
+ * section keeps ({@link WidgetFill#taskRows}). Deciding
  * by height rather than by a guessed cell count holds across launchers whose cells differ.
  * A host that reports no height falls back to `MIN_HEIGHT`; one that reports nothing (0) lands
  * on the 4x2, the default placement.

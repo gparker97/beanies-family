@@ -13,17 +13,11 @@ import org.junit.Test;
 public class WidgetPrefsTest {
 
     @Test
-    public void audienceDefaultsToOurDay() {
-        assertEquals(WidgetPrefs.AUDIENCE_OUR, WidgetPrefs.DEFAULT_AUDIENCE);
+    public void unknownOpacityAndMissingTextSizeReadAsTheDefaults() {
         boolean[] blocks = new boolean[WidgetFill.FILL_ORDER.length];
-        assertEquals("our", new WidgetPrefs(null, blocks, WidgetPrefs.DEFAULT_OPACITY, null).audience);
-        assertEquals("our", new WidgetPrefs("bogus", blocks, WidgetPrefs.DEFAULT_OPACITY, null).audience);
-    }
-
-    @Test
-    public void aStoredMyDayIsKept() {
-        boolean[] blocks = new boolean[WidgetFill.FILL_ORDER.length];
-        assertEquals("my", new WidgetPrefs("my", blocks, WidgetPrefs.DEFAULT_OPACITY, null).audience);
+        WidgetPrefs prefs = new WidgetPrefs(blocks, 13, null);
+        assertEquals(WidgetPrefs.DEFAULT_OPACITY, prefs.opacity);
+        assertEquals(WidgetPrefs.TextSize.STANDARD, prefs.textSize);
     }
 
     @Test

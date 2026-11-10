@@ -145,24 +145,6 @@
         }
       }
     },
-    "My day": {
-      "comment": "Widget setting option: the signed-in member's own day.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "My day"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "我的一天"
-          }
-        }
-      }
-    },
     "Next handoff": {
       "comment": "Lock-screen circle option: the viewer's next drop-off or pick-up.",
       "extractionState": "manual",
@@ -195,24 +177,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "接下来"
-          }
-        }
-      }
-    },
-    "Our day": {
-      "comment": "Widget setting option: the whole family's day.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Our day"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "我们的一天"
           }
         }
       }
@@ -411,24 +375,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "谁在哪儿"
-          }
-        }
-      }
-    },
-    "Whose day": {
-      "comment": "Widget setting: whose day the widget shows.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Whose day"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "谁的一天"
           }
         }
       }

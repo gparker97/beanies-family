@@ -36,21 +36,20 @@ const todayFormatted = computed(() => formatNookDate(todayStr.value));
 const todayItems = computed<ScheduleItem[]>(() => {
   const items: ScheduleItem[] = [];
 
-  // Todos due today
-  for (const todo of todoStore.filteredActiveTodos) {
-    const dateStr = todo.dueDate?.split('T')[0] ?? '';
-    if (dateStr === todayStr.value) {
-      items.push({
-        id: todo.id,
-        type: 'todo',
-        title: todo.title,
-        date: dateStr,
-        time: todo.dueTime ?? '',
-        endTime: '',
-        displayDate: formatNookDate(dateStr),
-        icon: '✅',
-      });
-    }
+  // To-dos overdue or due today (`todoPlate`, the one date rule)
+  for (const { todo, plate } of todoStore.filteredPlatedTodos) {
+    if (plate !== 'overdue' && plate !== 'today') continue;
+    const dateStr = todo.dueDate?.slice(0, 10) ?? '';
+    items.push({
+      id: todo.id,
+      type: 'todo',
+      title: todo.title,
+      date: dateStr,
+      time: todo.dueTime ?? '',
+      endTime: '',
+      displayDate: formatNookDate(dateStr),
+      icon: '✅',
+    });
   }
 
   // Activities today (from upcomingActivities which already expands recurring)

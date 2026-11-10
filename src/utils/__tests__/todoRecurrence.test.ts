@@ -75,6 +75,7 @@ describe('todoCapabilities', () => {
       someday: true,
       delete: true,
       skip: false,
+      editShowRule: true,
     });
   });
 
@@ -89,6 +90,7 @@ describe('todoCapabilities', () => {
       someday: false,
       delete: true,
       skip: true,
+      editShowRule: true,
     });
   });
 
@@ -103,6 +105,7 @@ describe('todoCapabilities', () => {
       someday: false,
       delete: false,
       skip: true,
+      editShowRule: false,
     });
   });
 
@@ -115,6 +118,15 @@ describe('todoCapabilities', () => {
     expect(todoCapabilities(repeating()).editNotifyParents).toBe(true);
     expect(todoCapabilities(repeating({ completed: true })).editNotifyParents).toBe(true);
     expect(todoCapabilities(repeating({ cardId: 'c-1' })).editNotifyParents).toBe(false);
+  });
+
+  it('show rule: off on a card-made, completed, someday or hint to-do', () => {
+    expect(todoCapabilities(todo()).editShowRule).toBe(true);
+    expect(todoCapabilities(repeating()).editShowRule).toBe(true);
+    expect(todoCapabilities(repeating({ cardId: 'c-1' })).editShowRule).toBe(false);
+    expect(todoCapabilities(todo({ completed: true })).editShowRule).toBe(false);
+    expect(todoCapabilities(todo({ someday: true })).editShowRule).toBe(false);
+    expect(todoCapabilities(todo({ hintType: 'trip-packing' })).editShowRule).toBe(false);
   });
 });
 

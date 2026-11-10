@@ -317,7 +317,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       "A beanies widget shows today's plan right on your phone's Home Screen, so you can see what's on without opening the app, and one tap takes you to the right screen.",
     icon: '\u{1F4F1}',
     readTime: 5,
-    updatedDate: '2026-11-03',
+    updatedDate: '2026-11-10',
     sections: [
       {
         type: 'paragraph',
@@ -392,7 +392,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          '<strong>To-dos and lists sit underneath</strong>, in the same place every time. To-dos, helpful hints, reminders and lists share one order: overdue first, then what is due today, then anything without a date, then what is due later this week. When there are to-dos, they always keep a little room, and "2 more" tells you how many did not fit.',
+          '<strong>To-dos and lists sit underneath</strong>, in the same place every time. To-dos, helpful hints, reminders and lists share one order: overdue first, then what is due today, then anything without a date, then what is due later. A to-do with a <strong>Show from</strong> date waits until that day. When there are to-dos, they always keep a little room, and "2 more" tells you how many did not fit.',
       },
       {
         type: 'paragraph',
@@ -401,14 +401,14 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       },
       {
         type: 'heading',
-        content: 'My day or our day',
+        content: 'What the widget shows',
         level: 2,
-        id: 'my-day-or-our-day',
+        id: 'what-the-widget-shows',
       },
       {
         type: 'paragraph',
         content:
-          '<strong>My day</strong> shows what is yours today, the same as your daily briefing on the Nook. <strong>Our day</strong> shows the whole family’s day, like the beanie wall. You can also pick which parts show: the plan, who is where, dinner, to-dos and lists, trips and birthdays, and helpful hints. To make the text bigger, choose a <strong>Text size</strong>: Standard, Large or Larger. Bigger text means fewer rows fit, never squashed ones, and the widget also follows your phone’s own text size. Set the <strong>Background</strong> to 70% or 40% to let your wallpaper show through (100% is solid).',
+          'The widget shows the whole family’s calendar, so every activity is there. The to-dos and lists underneath are the same ones as in your daily briefing on the Nook: yours, anything nobody has been given, and your children’s. A child’s routine stays off your widget unless <strong>Keep parents posted</strong> is on for it, or it was missed. You can also pick which parts show: the plan, who is where, dinner, to-dos and lists, trips and birthdays, and helpful hints. To make the text bigger, choose a <strong>Text size</strong>: Standard, Large or Larger. Bigger text means fewer rows fit, never squashed ones, and the widget also follows your phone’s own text size. Set the <strong>Background</strong> to 70% or 40% to let your wallpaper show through (100% is solid).',
       },
       {
         type: 'steps',
@@ -443,7 +443,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'On iPhone you can also add a small beanies widget to your Lock Screen. The inline and rectangular ones show the current temperature along with your next pick-up or the next thing on. The circle shows one thing at a glance, and you choose which.',
+          'On iPhone you can also add a small beanies widget to your Lock Screen. Because anyone can read a Lock Screen, these widgets show only your own events, your children’s and the ones you drive, never another adult’s. The inline and rectangular ones show the current temperature along with your next pick-up or the next thing on. The circle shows one thing at a glance, and you choose which.',
       },
       {
         type: 'steps',
@@ -889,7 +889,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
     icon: '\u2705',
     readTime: 6,
     popular: true,
-    updatedDate: '2026-09-29',
+    updatedDate: '2026-11-10',
     sections: [
       {
         type: 'heading',
@@ -996,6 +996,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
           '<strong>Title</strong> \u2014 Click the title text to rename it',
           '<strong>Due date</strong> \u2014 Click to set or change when the task is due',
           '<strong>Due time</strong> \u2014 Appears once a due date is set. Pick a specific time if needed',
+          '<strong>Show from</strong> \u2014 Appears once a due date is set. Choose the day the to-do starts showing on your daily briefing, the Nook and your widgets (see <em>When a to-do starts showing</em> below)',
           '<strong>Assignees</strong> \u2014 Assign the task to one or more family members',
           '<strong>Description</strong> \u2014 Add notes or extra details. Any links you include are automatically detected and shown as clickable buttons',
         ],
@@ -1096,6 +1097,27 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         type: 'paragraph',
         content:
           'On desktop, you\u2019ll also see <strong>member filter chips</strong> below the sort menu. Tap a family member\u2019s name to see only their tasks.',
+      },
+      {
+        type: 'heading',
+        content: 'When a to-do starts showing',
+        level: 2,
+        id: 'show-from',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'A to-do with a due date shows on your daily briefing, the Nook and your widgets every day until it is done, tagged with its due date. <strong>Show from</strong> sits beside the due date and starts at today. Move it later, up to the due date, to keep the to-do out of the way until then. <strong>On the due date</strong> is the one-tap shortcut. A to-do is never hidden on or after its due date, and one with no due date always shows.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'A repeating to-do has three choices instead of a date: <strong>On each due date</strong> (the default), <strong>Days before</strong> (from 1 to 30, starting at 3, so a monthly rent reminder can start showing on the 28th) and <strong>Every day</strong>.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'The To-Do page always shows everything, in groups: <strong>Overdue</strong>, <strong>Due Today</strong>, <strong>Coming Up</strong> and <strong>Not Showing Yet</strong>. A to-do that is not showing yet is tagged with the day it starts, for example <em>Shows from Tue 24 Nov</em>. It still reminds you on time: the bell and phone reminders follow the due date and time, whatever Show from says.',
       },
       {
         type: 'heading',
@@ -1203,7 +1225,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'Your open tasks also appear on the <strong>Family Nook</strong> homepage in the To-Do widget, with a quick-add bar so you can jot things down without leaving the Nook. Tasks assigned to you that are due today, overdue, or without a due date also show up in your <strong>daily briefing</strong> (the orange box).',
+          'Your open tasks also appear on the <strong>Family Nook</strong> homepage in the To-Do widget, with a quick-add bar so you can jot things down without leaving the Nook. Tasks assigned to you that are due today, overdue, due later, or without a due date also show up in your <strong>daily briefing</strong> (the orange box), unless you chose a later <strong>Show from</strong> date.',
       },
       {
         type: 'paragraph',
