@@ -16,6 +16,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - "Show from" now sits directly under a to-do's due date, above the time.
 - A beanstalk post pasted into a chat or a social post now previews with its title, its cover image and the beanies.family wordmark, in place of the plain orange card.
 
+### Fixed
+
+- A flight check that the flight-data provider refuses for arriving in a burst is now retried once, so a trip's flights no longer show "Couldn't check" when they are checked together.
+
 ## 2026-11-10
 
 ### Added

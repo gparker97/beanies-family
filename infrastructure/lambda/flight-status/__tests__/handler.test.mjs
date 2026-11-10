@@ -20,6 +20,9 @@ const {
   BAD_MODE_PREFIX,
   PROVIDER_UNITS_LOW_PREFIX,
   normaliseFlight,
+  RATE_LIMIT_RETRY_MS,
+  RATE_LIMIT_RETRY_JITTER_MS,
+  PROVIDER_BURST_RETRIED_PREFIX,
 } = await import('../createHandler.mjs');
 const { __setDdbClientForTests } = await import('../ddb.mjs');
 const { TTL_EMPTY_SECONDS, TTL_FAR_SECONDS, TTL_NEAR_SECONDS, ttlSecondsFor, ipKey } =
@@ -144,6 +147,11 @@ function make({ env = {}, provider = fakeProvider(), now = NOW } = {}) {
     fetchImpl: () => {
       throw new Error('the fake provider must never reach fetch');
     },
+    // The 429 retry's wait, recorded and skipped.
+    sleep: async (ms) => {
+      sleeps.push(ms);
+    },
+    random: () => 0.5,
   });
   return { handler, provider };
 }
@@ -178,7 +186,9 @@ function assertCode(res, code) {
 /** Capture console output so tests can assert alarmed prefixes, and keep the run quiet. */
 let logs;
 const originals = {};
+let sleeps = [];
 beforeEach(() => {
+  sleeps = [];
   logs = { log: [], warn: [], error: [] };
   for (const level of Object.keys(logs)) {
     originals[level] = console[level];
@@ -542,7 +552,8 @@ describe('provider errors', () => {
       const res = await handler(ev());
       assert.equal(res.statusCode, status);
       assertCode(res, code);
-      assert.equal(provider.calls.length, 1, 'no retry');
+      // Only a 429 is retried, once (see the rate-limit retry tests below).
+      assert.equal(provider.calls.length, code === 'upstream_rate_limited' ? 2 : 1);
       assert.equal(ddb.items.has(`SQ318#${FAR_DATE}`), false);
       const line = requestLines()[0];
       assert.equal(line.outcome, 'provider_error');
@@ -575,6 +586,36 @@ describe('provider errors', () => {
       }),
     }).handler(ev());
     assert.equal(logs.error.length, 0);
+  });
+
+  test('a 429 that clears on the retry answers 200, warns without alarming, spends one day token', async () => {
+    useDdb();
+    let n = 0;
+    const provider = fakeProvider(() => {
+      n += 1;
+      if (n === 1) throw new FakeProviderError('upstream_rate_limited', 429);
+      return { legs: [], status: 204, quota: null };
+    });
+    const res = await make({ provider }).handler(ev());
+    assert.equal(res.statusCode, 200);
+    assert.equal(provider.calls.length, 2);
+    assert.deepEqual(sleeps, [RATE_LIMIT_RETRY_MS + RATE_LIMIT_RETRY_JITTER_MS / 2]);
+    assert.equal(logs.error.length, 0, 'a cleared burst must not trip the alarm');
+    assert.ok(logs.warn.some((l) => l.startsWith(PROVIDER_BURST_RETRIED_PREFIX)));
+    assert.equal(requestLines().at(-1).rate_limit_retry, true);
+    assert.equal(ddb.items.get('g#2026-12-01').n.N, '1');
+  });
+
+  test('a 429 with too little of the invocation left is not retried', async () => {
+    useDdb();
+    const provider = fakeProvider(() => {
+      throw new FakeProviderError('upstream_rate_limited', 429);
+    });
+    const res = await make({ provider }).handler(ev(), { getRemainingTimeInMillis: () => 4000 });
+    assertCode(res, 'upstream_rate_limited');
+    assert.equal(provider.calls.length, 1);
+    assert.deepEqual(sleeps, []);
+    assert.ok(logs.error.some((l) => l.startsWith(ALARMING_PREFIXES.providerRateLimited)));
   });
 
   test('a throw that is not a ProviderError is a clean 500 internal_error', async () => {

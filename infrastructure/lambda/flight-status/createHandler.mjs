@@ -113,6 +113,19 @@ const PROVIDER_BUDGET_MS = 8000;
 /** Kept back from the deadline for the cache write and the response. */
 const DEADLINE_SLACK_MS = 1500;
 
+/**
+ * One retry of a 429, after this wait. The provider enforces a short-burst limit beside the
+ * plan's units, and one trip's flights are checked together, so two of four parallel checks
+ * were refused with thousands of units left (2026-11-10). The wait clears a per-second window;
+ * the jitter keeps two refused requests from landing on the same instant again.
+ */
+export const RATE_LIMIT_RETRY_MS = 1100;
+export const RATE_LIMIT_RETRY_JITTER_MS = 600;
+/** The retry is skipped unless this much of the invocation is left after the wait. */
+const RATE_LIMIT_RETRY_MIN_BUDGET_MS = 2000;
+/** Logged at `warn` (NOT alarmed) when a 429 cleared on the retry. */
+export const PROVIDER_BURST_RETRIED_PREFIX = '[flight-status] provider burst limit, retry ok';
+
 /** An array, a Set or a frozen map of values → array. Tolerant of how the adapter exports a list. */
 function listOf(x) {
   if (!x) return [];
@@ -155,6 +168,8 @@ function unitsLow(quota) {
  * @param {object=}  deps.env        Defaults to `process.env`; read once, here.
  * @param {Function=} deps.now       Clock (epoch ms). Injectable so tests need no clock control.
  * @param {Function=} deps.fetchImpl Passed to the adapter; defaults to global fetch.
+ * @param {Function=} deps.sleep     `(ms) => Promise`; the wait before the one 429 retry.
+ * @param {Function=} deps.random    `() => [0, 1)`; the retry's jitter.
  * @param {object=}  deps.ddb        `{ send, commands }`; otherwise ddb.mjs's seam/default client.
  * @param {object=}  deps.alertsProvider  The bound alerts client (tests inject a fake); otherwise
  *                                   built from `provider.createAlertsClient`.
@@ -166,6 +181,8 @@ export function createHandler({
   env = process.env,
   now = () => Date.now(),
   fetchImpl = globalThis.fetch,
+  sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  random = Math.random,
   ddb,
   alertsProvider,
   senders,
@@ -305,25 +322,45 @@ export function createHandler({
         });
       }
 
-      // 4. The provider. NO retry, on a 429 above all: the client's backoff ladder already waits,
-      //    and a retry here spends a second unit of the budget the 429 is telling us about.
-      const remaining =
+      // 4. The provider. One retry, and only of a 429: the provider has a short-burst limit beside
+      //    the plan's units, and a trip's flights arrive together (see RATE_LIMIT_RETRY_MS). Every
+      //    other failure is answered at once; the client's backoff ladder already waits. The retry
+      //    takes no second day token: the refused call was not served.
+      const remainingMs = () =>
         typeof context?.getRemainingTimeInMillis === 'function'
           ? context.getRemainingTimeInMillis()
           : Infinity;
-      const budgetMs = Math.max(1000, Math.min(PROVIDER_BUDGET_MS, remaining - DEADLINE_SLACK_MS));
-      const started = Date.now();
-      let legs;
-      let quota = null;
-      try {
-        const result = await provider.fetchLegs({
+      const callProvider = () =>
+        provider.fetchLegs({
           flight,
           date,
           apiKey: PROVIDER_KEY,
           mode: MODE,
           fetchImpl,
-          signal: AbortSignal.timeout(budgetMs),
+          signal: AbortSignal.timeout(
+            Math.max(1000, Math.min(PROVIDER_BUDGET_MS, remainingMs() - DEADLINE_SLACK_MS))
+          ),
         });
+      const started = Date.now();
+      let legs;
+      let quota = null;
+      try {
+        let result;
+        try {
+          result = await callProvider();
+        } catch (err) {
+          const waitMs = RATE_LIMIT_RETRY_MS + Math.floor(random() * RATE_LIMIT_RETRY_JITTER_MS);
+          const canRetry =
+            err?.code === 'upstream_rate_limited' &&
+            remainingMs() - DEADLINE_SLACK_MS - waitMs >= RATE_LIMIT_RETRY_MIN_BUDGET_MS;
+          if (!canRetry) throw err;
+          log.rate_limit_retry = true;
+          await sleep(waitMs);
+          result = await callProvider();
+          console.warn(
+            `${PROVIDER_BURST_RETRIED_PREFIX} wait_ms=${waitMs} mode=${MODE}: a 429 cleared on the one retry, so it was the short-burst limit, not the plan's units.`
+          );
+        }
         if (!Array.isArray(result?.legs)) throw new TypeError('provider returned no legs array');
         legs = result.legs;
         quota = result.quota ?? null;
@@ -343,8 +380,9 @@ export function createHandler({
           );
         } else if (code === 'upstream_rate_limited') {
           console.error(
-            `${PROVIDER_RATE_LIMITED_PREFIX} http_status=${httpStatus} mode=${MODE}\n` +
-              "The provider is refusing on quota or rate: the plan's monthly units may be spent. Check the provider dashboard and size var.daily_provider_call_cap to the plan."
+            `${PROVIDER_RATE_LIMITED_PREFIX} http_status=${httpStatus} mode=${MODE} ` +
+              `retried=${log.rate_limit_retry === true}\n` +
+              "The provider answered 429 and the one retry did not clear it (or there was no time left to retry). Either its short-burst limit is under sustained load, or the plan's monthly units are spent: the last `units_remaining` in the request lines says which. Check the provider dashboard and size var.daily_provider_call_cap to the plan."
           );
         } else {
           console.warn(
