@@ -155,6 +155,9 @@ export interface FlightVerification {
   state: FlightVerificationState;
   /** Epoch ms of the last successful check on this device. */
   checkedAt?: number;
+  /** Set only with a provider answer: the latest check is younger than the cadence we promise
+   *  (`minIntervalMs`). Drives the chip's pulse only; the pill tick (`confirmedLive`) ignores it. */
+  fresh?: boolean;
   reason?: FlightUnavailableReason;
   /** ISO; when the check window opens ("Checks from <date>"). */
   opensAt?: string;

@@ -7014,6 +7014,7 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'travel.live.notLiveFoot.cruise': '邮轮不会实时核对。出发前你仍会收到提醒。',
   'travel.live.notLiveFoot.bus': '巴士不会实时核对。',
   'travel.live.pill': '实时',
+  'travel.live.pillConfirmed': '已与航空公司确认',
   'travel.live.row.gate': '登机口',
   'travel.live.row.desk': '值机柜台',
   'travel.live.row.belt': '行李转盘',
@@ -7030,4 +7031,6 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'travel.live.toast.notChecked.title': '还没核对',
   'travel.live.toast.notChecked.message':
     'beanies 在这台设备上还没收到航空公司的信息，请过几分钟再试。',
+  'travel.live.toast.updated.title': '已按航空公司信息更新',
+  'travel.live.toast.updated.message': '你的行程现在与航空公司的信息一致了。',
 };

@@ -73,6 +73,7 @@ import { devFetchBudgetActive, takeDevFetchTokens } from '@/services/flightStatu
 import {
   clearFlightStatusCache,
   emptyFlightStatusCache,
+  entryQuestion,
   pruneFlightStatusCache,
   readFlightStatusCache,
   writeFlightStatusCache,
@@ -81,8 +82,14 @@ import {
 import { logEvent } from '@/services/telemetry';
 import { createChangeGate, type ChangeGate } from '@/services/telemetry/emitPolicy';
 import { nextBackoffMs } from '@/utils/backoff';
+import { captureBefore } from '@/utils/captureBefore';
 import { createTrailingSingleFlight } from '@/utils/trailingSingleFlight';
-import { CHANGE_NOTICE_DELAY_MS, liveNoticeId } from '@/utils/notifications/travel';
+import {
+  CHANGE_NOTICE_DELAY_MS,
+  liveNoticeId,
+  travelCancelId,
+  travelChangeId,
+} from '@/utils/notifications/travel';
 import { entityDeepLink, type DeepLink } from '@/utils/entityDeepLink';
 import { raceTimeout } from '@/utils/timing';
 import {
@@ -94,6 +101,7 @@ import {
   type AlertSpec,
 } from '@/utils/flightStatus/alerts';
 import { isFlightType } from '@/utils/travelCodes';
+import { noticeRevision } from '@/utils/flightStatus/occurrenceNotice';
 import { normaliseFlightNumber } from '@/utils/flightStatus/flightNumber';
 import { operatedAs, pickLeg } from '@/utils/flightStatus/match';
 import {
@@ -103,11 +111,14 @@ import {
   tupleFromSegment,
 } from '@/utils/flightStatus/schedule';
 import {
+  cancelRevisionOf,
+  carriesNotice,
   deriveVerification,
   planChange,
   revertPlan,
   shouldApply,
   takeProviderPatch,
+  unresolvedEntry,
   usableCheck as usableCheckFor,
   type SegmentPatch,
 } from '@/utils/flightStatus/verify';
@@ -115,6 +126,7 @@ import {
   FLIGHT_POLL_MS,
   flightTiming,
   pickFlightRefresh,
+  type FlightRefreshDecision,
   type FlightSkipReason,
 } from '@/utils/flightStatus/window';
 import { useOnline } from '@/composables/useOnline';
@@ -140,6 +152,25 @@ export const PUSH_WAIT_MS = 5_000;
 export type FlightRefreshKind =
   'open' | 'foreground' | 'online' | 'tick' | 'segment-changed' | 'push-token';
 
+/** Why a run fetches a flight (`pickFlightRefresh`); `'entry'` is the stamped one. */
+type FetchReason = Extract<FlightRefreshDecision, { action: 'fetch' }>['reason'];
+
+/** "Update with airline data": what the write did, and the way back when it saved. */
+export interface TakeAirlineResult {
+  result: SegmentWriteResult;
+  /** Present only when a `saved` take wrote exactly what the person was shown (the Conflict's
+   *  provider values): writes the values it replaced back. A take that recorded a newer airline
+   *  revision has none; that change is announced like any airline change ("Put it back"). */
+  undo?: () => Promise<SegmentWriteResult>;
+}
+
+/** An answer whose write is still owed (see `run`); `outOfWindow` ones back off. */
+interface OwedWrite {
+  c: Candidate;
+  check: FlightCheck;
+  outOfWindow: boolean;
+}
+
 interface Candidate {
   vacationId: string;
   segment: VacationTravelSegment;
@@ -164,6 +195,8 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
   const noticed = ref<Record<string, number>>({});
   /** Notice id → epoch ms this device tapped "Got it" (see `dismissNotice`). */
   const dismissed = ref<Record<string, number>>({});
+  /** Segment id → the question (`entryQuestion`) already asked out of window (see the cache). */
+  const entryChecked = ref<Record<string, string>>({});
   /** Segment id → the flight alert the server holds for this device (`recordRegistration`). */
   const alerts = ref<Record<string, AlertRegistration>>({});
   /** The push token every entry of `alerts` was registered under. */
@@ -179,6 +212,12 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
   let loadedFamilyId: string | null = null;
   /** Controllers of the requests in flight (not reactive), aborted on sign-out. */
   const controllers = new Set<AbortController>();
+  /** Session-only backoff for an out-of-window owed write that keeps failing (the `skipGates`
+   *  precedent): never persisted, cleared in `hydrate`. Written only by `retryOwed`. */
+  const owedRetry = new Map<string, { count: number; until: number }>();
+  /** Notice keys a take folded this session and its Undo may reopen. Any person action on a
+   *  key ("Got it", the chip) removes it: from then on the fold is theirs. Cleared in `hydrate`. */
+  const takeFolds = new Set<string>();
   /** The alert token the server refused this session: not offered again until the registry
    *  sends a different one. */
   let rejectedAlertToken: string | null = null;
@@ -259,14 +298,40 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
       entitled: isEntitled.value,
       configured: isFlightStatusConfigured(),
       online: isOnline.value,
+      minIntervalMs: timing.minIntervalMs,
     });
     // The device-side fold of the notice block rides on the verification, so the card has one
-    // input. Keyed on the notice id: a new airline revision is a new, undismissed notice.
-    if (v.state === 'changed' || v.state === 'conflict' || v.state === 'cancelled') {
-      const id = liveNoticeId(seg.id, seg);
+    // input. Keyed on the notice (`noticeKey`): a new airline revision is a new, undismissed one.
+    if (carriesNotice(v)) {
+      const id = noticeKey(seg.id, seg, v);
       if (id !== null && dismissed.value[id] !== undefined) return { ...v, dismissed: true };
     }
     return v;
+  }
+
+  /**
+   * The key "Got it" folds a segment's notice under on this device: its bell/OS id
+   * (`liveNoticeId`, from the synced fields), except for an airline change or cancellation
+   * NOT in the plan (`applied: false`: this member may not edit trips, or the write failed),
+   * which has no synced id, or only an older revision's. That one is keyed on the provider's
+   * revision: the id `liveNoticeId` gives a change once it is written, and a new airline
+   * revision is a new key. A cancellation is keyed on its revision alone on BOTH paths (never
+   * the bell/OS id's `@liveCancelledAt`), so one dismissed before its write lands stays
+   * dismissed once it is written. `liveNoticeId` itself stays the bell/OS id.
+   */
+  function noticeKey(
+    segmentId: string,
+    seg: VacationTravelSegment,
+    v: FlightVerification
+  ): string | null {
+    if (v.applied === false && v.provider) {
+      if (v.state === 'changed') return travelChangeId(segmentId, revisionOf(v.provider));
+      if (v.state === 'cancelled') return travelCancelId(segmentId, cancelRevisionOf(v.provider));
+    }
+    if (noticeRevision(seg)?.kind === 'cancelled') {
+      return travelCancelId(segmentId, seg.liveRevision!);
+    }
+    return liveNoticeId(segmentId, seg);
   }
 
   /** One verification per travel segment, rebuilt from the checks, failures, clock and
@@ -302,6 +367,7 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
       failures: failures.value,
       noticed: noticed.value,
       dismissed: dismissed.value,
+      entryChecked: entryChecked.value,
       alerts: alerts.value,
       pushToken: registeredToken.value,
     };
@@ -314,12 +380,15 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
     failures.value = { ...r.failures };
     noticed.value = { ...r.noticed };
     dismissed.value = { ...r.dismissed };
+    entryChecked.value = { ...r.entryChecked };
     alerts.value = { ...r.alerts };
     registeredToken.value = r.pushToken;
   }
 
   function hydrate(familyId: string | null): void {
     loadedFamilyId = familyId;
+    owedRetry.clear();
+    takeFolds.clear();
     restore(familyId ? readFlightStatusCache(familyId) : null);
   }
 
@@ -340,14 +409,55 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
   }
 
   /** Drop entries for deleted segments and flights that are over. Only once the doc is
-   *  loaded: before that, every segment looks deleted. */
+   *  loaded: before that, every segment looks deleted. A notice is live only while the
+   *  segment's CURRENT verification carries one (`carriesNotice`; a finished flight is
+   *  `unavailable`, so never), under both of its ids: the bell/OS one (`noticed`) and the
+   *  dismiss key (`dismissed`), which differ for a cancellation. Only a flight with synced
+   *  live fields or a check of its own can carry a notice, so nothing else is verified. */
   function prune(now: number): void {
     if (!loadedFamilyId || !docReady.value) return;
     const before = snapshot(loadedFamilyId);
-    const after = pruneFlightStatusCache(before, new Set(segmentsById.value.keys()), now);
+    const liveNoticeIds = new Set<string>();
+    /** Segments whose answer left something unresolved: their entry stamp is released when
+     *  the answer ages out (`pruneFlightStatusCache`), so the flight is asked once more. */
+    const unresolved = new Set<string>();
+    // Only a resolved member's "may not edit" is a reason to keep the stamp: before the
+    // member resolves, `mayEdit()` reads false on an editor's device too, and a kept stamp
+    // there would never be asked again.
+    const canWrite = useFamilyStore().currentMember ? mayEdit() : true;
+    for (const [id, { segment: seg }] of segmentsById.value) {
+      if (!isFlightType(seg.type)) continue;
+      const hasLive = !!(seg.liveRevision || seg.liveAppliedAt || seg.liveCancelledAt);
+      const check = checks.value[id];
+      if (!hasLive && !check) continue;
+      if (check && unresolvedEntry(seg, check, canWrite)) unresolved.add(id);
+      const v = verificationFor(id);
+      if (!v || !carriesNotice(v)) continue;
+      for (const key of [liveNoticeId(id, seg), noticeKey(id, seg, v)]) {
+        if (key !== null) liveNoticeIds.add(key);
+      }
+    }
+    const after = pruneFlightStatusCache(
+      before,
+      new Set(segmentsById.value.keys()),
+      liveNoticeIds,
+      now,
+      unresolved
+    );
     if (after === before) return;
     restore(after);
     persist();
+    const released = [...unresolved].filter(
+      (id) => before.entryChecked[id] !== undefined && after.entryChecked[id] === undefined
+    ).length;
+    if (released > 0) {
+      logEvent({
+        level: 'info',
+        surface: SURFACE,
+        message: 'flight entry stamp released',
+        context: { action: 'entry_released', count: released },
+      });
+    }
   }
 
   /**
@@ -559,16 +669,32 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
     return result;
   }
 
-  async function applyIfDue(c: Candidate, check: FlightCheck): Promise<void> {
+  /** Write the check's change when it is due; null = nothing was due. */
+  async function applyIfDue(c: Candidate, check: FlightCheck): Promise<SegmentWriteResult | null> {
     const leg = check.leg;
-    if (!leg || !shouldApply(c.segment, leg, check.arrivalLeg)) return;
+    if (!leg || !shouldApply(c.segment, leg, check.arrivalLeg)) return null;
     const patch = planChange(c.segment, leg, check.arrivalLeg, Date.now(), copy());
     const cancelled = patch.status === 'pending' && patch.liveCancelledAt !== undefined;
-    await write(c, patch, {
+    return write(c, patch, {
       state: cancelled ? 'cancelled' : patch.liveAppliedAt ? 'changed' : 'verified',
       fields: cancelled ? 'status' : fieldsOf(c.segment, check),
       quiet: !cancelled && patch.liveAppliedAt === undefined,
     });
+  }
+
+  /** An owed write, retried from the cache. The ONLY writer of `owedRetry`, and only for an
+   *  out-of-window entry (an in-window retry is bounded by the poll cadence): a failure backs
+   *  the next retry off the plain ladder, a save (or nothing due) clears it. */
+  async function retryOwed(o: OwedWrite, now: number): Promise<void> {
+    const result = await applyIfDue(o.c, o.check);
+    if (!o.outOfWindow) return;
+    const id = o.c.segment.id;
+    if (result === null || result === 'saved') {
+      owedRetry.delete(id);
+      return;
+    }
+    const count = (owedRetry.get(id)?.count ?? 0) + 1;
+    owedRetry.set(id, { count, until: now + nextBackoffMs(count) });
   }
 
   // ── Fetching ───────────────────────────────────────────────────────────────
@@ -673,6 +799,36 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
     });
   }
 
+  /** Mark every out-of-window flight about to be fetched as asked for its current question.
+   *  Called AFTER the cap slices, so a cut flight stays unstamped; stamped on issue, not on
+   *  outcome (see the cache record). A segment re-stamped for a NEW question loses its old
+   *  answer in the same write: that answer was to the old question (`usableCheck` ignores
+   *  airports), so a failed re-ask after an airport fix must not keep "Couldn't find this
+   *  flight" up for the corrected booking. One persist for the batch. */
+  function stampEntryChecks(
+    batch: ReadonlyArray<{ c: Candidate; reason: FetchReason; question: string }>,
+    kind: FlightRefreshKind
+  ): void {
+    const entries = batch.filter((d) => d.reason === 'entry');
+    if (entries.length === 0) return;
+    const next = { ...entryChecked.value };
+    const answers = { ...checks.value };
+    for (const d of entries) {
+      const id = d.c.segment.id;
+      if (next[id] !== undefined && next[id] !== d.question) delete answers[id];
+      next[id] = d.question;
+    }
+    entryChecked.value = next;
+    if (Object.keys(answers).length !== Object.keys(checks.value).length) checks.value = answers;
+    persist();
+    logEvent({
+      level: 'info',
+      surface: SURFACE,
+      message: 'flight entry check',
+      context: { action: 'entry_check', kind, count: entries.length },
+    });
+  }
+
   /** One pass over the candidates: decide each, fetch the due ones (soonest first, capped). */
   async function run(kind: FlightRefreshKind): Promise<void> {
     const now = Date.now();
@@ -684,10 +840,17 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
 
     const configured = isFlightStatusConfigured();
     const histogram = new Map<string, number>();
-    const due: Array<{ c: Candidate; query: string; date: string; departureMs: number }> = [];
-    /** Fresh answers whose write is still owed (refused or failed earlier): retried from the
-     *  cache, with no provider call. */
-    const owed: Array<{ c: Candidate; check: FlightCheck }> = [];
+    const due: Array<{
+      c: Candidate;
+      query: string;
+      date: string;
+      departureMs: number;
+      reason: FetchReason;
+      question: string;
+    }> = [];
+    /** Answers not due a fetch (fresh, or a far-out flight already asked) whose write is still
+     *  owed (refused or failed earlier): retried from the cache, with no provider call. */
+    const owed: OwedWrite[] = [];
     let globalReason: FlightSkipReason | null = null;
 
     for (const c of candidateSegments.value) {
@@ -695,6 +858,10 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
       const number = normaliseFlightNumber(seg.airline, seg.flightNumber);
       const check = usableCheck(seg);
       const timing = flightTiming(seg, check, homeZone.value, now);
+      const date = seg.departureDate?.slice(0, 10) ?? '';
+      const question = number
+        ? entryQuestion(number.query, date, seg.departureAirport, seg.arrivalAirport)
+        : '';
       const decision = pickFlightRefresh({
         halted: halted.value,
         entitled: isEntitled.value,
@@ -708,17 +875,18 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
         lastCheckedAt: check?.checkedAt ?? null,
         minIntervalMs: timing.minIntervalMs,
         backoffUntil: failures.value[seg.id]?.until ?? 0,
+        entryDone: entryChecked.value[seg.id] === question,
       });
       if (decision.action === 'skip') {
         histogram.set(decision.reason, (histogram.get(decision.reason) ?? 0) + 1);
         if (
-          decision.reason === 'fresh' &&
+          (decision.reason === 'fresh' || decision.reason === 'out_of_window') &&
           check?.leg &&
           !inFlight.value.has(seg.id) &&
           shouldApply(seg, check.leg, check.arrivalLeg) &&
           mayEdit()
         ) {
-          owed.push({ c, check });
+          owed.push({ c, check, outOfWindow: decision.reason === 'out_of_window' });
         }
         if (
           ['halted', 'unentitled', 'disabled', 'not_configured', 'offline'].includes(
@@ -733,8 +901,10 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
       due.push({
         c,
         query: number.query,
-        date: seg.departureDate!.slice(0, 10),
+        date,
         departureMs: timing.departureMs ?? Number.MAX_SAFE_INTEGER,
+        reason: decision.reason,
+        question,
       });
     }
 
@@ -750,6 +920,8 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
         batch = batch.slice(0, grant.granted);
       }
     }
+
+    stampEntryChecks(batch, kind);
 
     logRefused(globalReason);
     if (globalReason === 'not_configured') logNotConfigured();
@@ -767,16 +939,27 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
       },
     });
 
+    // An out-of-window owed write that failed recently waits out its backoff; in-window ones
+    // never do. A deferred write is counted only on the retry event (its `notif_skipped`),
+    // never in the run histogram. A run that only defers logs it at debug (count 0), so the
+    // backoff stays visible without an info event per tick.
+    const ready = owed.filter(
+      (o) => !o.outOfWindow || (owedRetry.get(o.c.segment.id)?.until ?? 0) <= now
+    );
     if (owed.length > 0) {
       logEvent({
-        level: 'info',
+        level: ready.length > 0 ? 'info' : 'debug',
         surface: SURFACE,
         message: 'flight change write retried',
-        context: { action: 'apply_retry', count: owed.length },
+        context: {
+          action: 'apply_retry',
+          count: ready.length,
+          notif_skipped: owed.length - ready.length,
+        },
       });
     }
     await Promise.all([
-      ...owed.map((o) => applyIfDue(o.c, o.check)),
+      ...ready.map((o) => retryOwed(o, now)),
       ...batch.map((d) => checkOne(d.c, d.query, d.date, kind)),
     ]);
     await reconcileAlerts(familyId);
@@ -994,6 +1177,34 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
   }
 
   // ── Actions ────────────────────────────────────────────────────────────────
+  /** Write a patch that returns segment values (Put it back, Undo of a take) and log the
+   *  outcome: `reverted` / `apply_failed` (with `detail: 'revert'`) for Put it back,
+   *  `undo_take` / `undo_failed` for an Undo. A refused write (no permission) answers
+   *  `'failed'`. */
+  async function writeBack(
+    c: Candidate,
+    patch: SegmentPatch,
+    detail: 'revert' | 'undo_take'
+  ): Promise<SegmentWriteResult> {
+    const written = await writeSegment(c, patch, 'revert');
+    if (written === 'refused') return 'failed';
+    const result = written;
+    logEvent({
+      level: result === 'saved' ? 'info' : 'warn',
+      surface: SURFACE,
+      message: result === 'saved' ? 'flight change reverted' : 'flight change apply failed',
+      context:
+        detail === 'revert'
+          ? result === 'saved'
+            ? { action: 'reverted', detail }
+            : { action: 'apply_failed', save_status: result, detail }
+          : result === 'saved'
+            ? { action: 'undo_take' }
+            : { action: 'undo_failed', save_status: result },
+    });
+    return result;
+  }
+
   /** "Put it back": restore the values from before the airline's change. The segment then
    *  disagrees with the airline while the revision matches, so it shows Conflict. */
   async function revert(segmentId: string): Promise<SegmentWriteResult> {
@@ -1010,28 +1221,52 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
       });
       return 'missing';
     }
-    const written = await writeSegment(c, patch, 'revert');
-    if (written === 'refused') return 'failed';
-    const result = written;
-    logEvent({
-      level: result === 'saved' ? 'info' : 'warn',
-      surface: SURFACE,
-      message: result === 'saved' ? 'flight change reverted' : 'flight change apply failed',
-      context:
-        result === 'saved'
-          ? { action: 'reverted' }
-          : { action: 'apply_failed', save_status: result, detail: 'revert' },
-    });
-    return result;
+    return writeBack(c, patch, 'revert');
+  }
+
+  /** The Undo of a take: the values it replaced go back, and the fold the take added (if any)
+   *  is removed, since Conflict and Changed share one notice key and the restored Conflict
+   *  must come back visible. A fold the person made themselves is not ours to remove: one made
+   *  before the take was never added, and touching the notice during the toast (`setDismissed`)
+   *  takes the key out of `takeFolds`. */
+  function undoTake(
+    c: Candidate,
+    prior: SegmentPatch,
+    addedKey: string | null
+  ): () => Promise<SegmentWriteResult> {
+    return async () => {
+      const result = await writeBack(c, prior, 'undo_take');
+      if (result === 'saved' && addedKey && takeFolds.has(addedKey)) {
+        takeFolds.delete(addedKey);
+        markDismissed(c.segment.id, addedKey, false, 'undo_take');
+      }
+      return result;
+    };
+  }
+
+  /** The keys a take's Undo writes back: every key the provider patch wrote (schedule fields,
+   *  `status`, `arrivesNextDay`), and `sortDate` whenever the date moved (`updateSegment` moves
+   *  it with `departureDate` unless the patch names one, so naming it restores a custom order,
+   *  or clears one the move added). */
+  function undoKeys(patch: SegmentPatch): (keyof VacationTravelSegment)[] {
+    const keys = Object.keys(patch) as (keyof VacationTravelSegment)[];
+    return patch.departureDate !== undefined ? [...keys, 'sortDate'] : keys;
   }
 
   /** "Update with airline data" (Conflict): write the cached leg, skipping `shouldApply` (whose
    *  revision rule is exactly what keeps a manual edit). `missing` without a USABLE cached
    *  leg: none at all, or one for another flight number or day (a stale answer is never
-   *  written over the family's edit), logged so the refusal is visible. */
-  async function takeAirline(segmentId: string): Promise<SegmentWriteResult> {
+   *  written over the family's edit), logged so the refusal is visible.
+   *
+   *  Two paths. The provider patch (the person decided exactly what the Conflict showed) is
+   *  final in one step: the notice block it would raise is folded for the person, and `undo`
+   *  writes the values captured BEFORE the write back (not `liveWas`, which predates the
+   *  airline's change). When a newer airline revision landed between render and tap, the take
+   *  records it through `planChange` like any airline change: no fold and no `undo`, so the
+   *  Changed notice ("Put it back") and the OS/bell notice announce what the person never saw. */
+  async function takeAirline(segmentId: string): Promise<TakeAirlineResult> {
     const c = current(segmentId);
-    if (!c) return 'missing';
+    if (!c) return { result: 'missing' };
     const check = usableCheck(c.segment);
     if (!check?.leg) {
       logEvent({
@@ -1043,15 +1278,17 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
           detail: !checks.value[segmentId] ? 'no_check' : check ? 'no_leg' : 'stale',
         },
       });
-      return 'missing';
+      return { result: 'missing' };
     }
     // An airline answer not yet recorded (a newer revision) is a real change: record it once,
     // with its notes line. Otherwise the change is already recorded and only the values return.
-    const patch = shouldApply(c.segment, check.leg, check.arrivalLeg)
+    const newerRevision = shouldApply(c.segment, check.leg, check.arrivalLeg);
+    const patch = newerRevision
       ? planChange(c.segment, check.leg, check.arrivalLeg, Date.now(), copy())
       : takeProviderPatch(c.segment, check.leg, check.arrivalLeg);
+    const prior = newerRevision ? null : captureBefore(c.segment, undoKeys(patch));
     const written = await writeSegment(c, patch, 'take_airline');
-    if (written === 'refused') return 'failed';
+    if (written === 'refused') return { result: 'failed' };
     const result = written;
     logEvent({
       level: result === 'saved' ? 'info' : 'warn',
@@ -1062,7 +1299,11 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
           ? { action: 'take_airline', flight_fields: fieldsOf(c.segment, check) }
           : { action: 'apply_failed', save_status: result, detail: 'take_airline' },
     });
-    return result;
+    if (result !== 'saved' || !prior) return { result };
+    const key = currentNoticeKey(segmentId);
+    const addedKey = key && markDismissed(segmentId, key, true, 'take_airline') ? key : null;
+    if (addedKey) takeFolds.add(addedKey);
+    return { result, undo: undoTake(c, prior, addedKey) };
   }
 
   /**
@@ -1080,22 +1321,21 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
     return setDismissed(segmentId, false);
   }
 
-  function setDismissed(segmentId: string, on: boolean): boolean {
+  /** The key this segment's CURRENT notice folds under, or null when it carries none. */
+  function currentNoticeKey(segmentId: string): string | null {
     const c = current(segmentId);
-    const id = c ? liveNoticeId(segmentId, c.segment) : null;
-    if (id === null) {
-      logEvent({
-        level: 'warn',
-        surface: SURFACE,
-        message: 'flight notice dismiss skipped',
-        context: { action: on ? 'dismiss_skipped' : 'reopen_skipped', detail: 'no_notice' },
-      });
-      return false;
-    }
+    const v = verificationFor(segmentId);
+    return c && v && carriesNotice(v) ? noticeKey(segmentId, c.segment, v) : null;
+  }
+
+  /** Fold (`on`) or reopen one notice key on this device. False, writing and logging nothing,
+   *  when the entry is already in the requested state; `detail` names a non-tap cause. */
+  function markDismissed(segmentId: string, key: string, on: boolean, detail?: string): boolean {
+    if ((dismissed.value[key] !== undefined) === on) return false;
     if (on) {
-      dismissed.value = { ...dismissed.value, [id]: Date.now() };
+      dismissed.value = { ...dismissed.value, [key]: Date.now() };
     } else {
-      const { [id]: _gone, ...rest } = dismissed.value;
+      const { [key]: _gone, ...rest } = dismissed.value;
       dismissed.value = rest;
     }
     persist();
@@ -1106,8 +1346,26 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
       context: {
         action: on ? 'dismissed' : 'reopened',
         flight_state: verificationFor(segmentId)?.state,
+        ...(detail ? { detail } : {}),
       },
     });
+    return true;
+  }
+
+  function setDismissed(segmentId: string, on: boolean): boolean {
+    const key = currentNoticeKey(segmentId);
+    if (key === null) {
+      logEvent({
+        level: 'warn',
+        surface: SURFACE,
+        message: 'flight notice dismiss skipped',
+        context: { action: on ? 'dismiss_skipped' : 'reopen_skipped', detail: 'no_notice' },
+      });
+      return false;
+    }
+    // The person acted on this notice: a fold a take made is theirs now, not Undo's.
+    takeFolds.delete(key);
+    markDismissed(segmentId, key, on);
     return true;
   }
 

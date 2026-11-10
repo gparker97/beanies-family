@@ -51,6 +51,7 @@ vi.mock('@/services/automerge/repositories/activityRepository', () => ({
 
 import * as vacationRepo from '@/services/automerge/repositories/vacationRepository';
 import * as activityRepo from '@/services/automerge/repositories/activityRepository';
+import { toPlain } from '@/services/automerge/automergeRepository';
 
 const NOW = '2026-03-01T00:00:00.000Z';
 
@@ -533,6 +534,47 @@ describe('vacationStore', () => {
           context: { action: 'delete_missing', kind: 'segment' },
         })
       );
+    });
+  });
+
+  describe('updateSegment sortDate rule', () => {
+    function setup(segment: Record<string, unknown>) {
+      const store = useVacationStore();
+      const existing = makeVacation({ travelSegments: [segment] } as never);
+      store.vacations.push(existing);
+      vi.mocked(vacationRepo.updateVacation).mockImplementation(async (_id, input) => ({
+        ...existing,
+        ...input,
+      }));
+      vi.mocked(activityRepo.updateActivity).mockResolvedValue(makeActivity());
+      return store;
+    }
+    const written = () =>
+      (vi.mocked(vacationRepo.updateVacation).mock.calls.at(-1)![1] as FamilyVacation)
+        .travelSegments[0] as unknown as Record<string, unknown>;
+
+    it('a moved departureDate carries sortDate with it when the patch names none', async () => {
+      const store = setup({ id: 's-a', type: 'flight', title: 'A', departureDate: '2026-07-01' });
+      expect(await store.updateSegment('vac-1', 's-a', { departureDate: '2026-07-02' })).toBe(
+        'saved'
+      );
+      expect(written().sortDate).toBe('2026-07-02');
+    });
+
+    it('an explicit sortDate: undefined (a take Undo on a segment that had none) clears it', async () => {
+      const store = setup({
+        id: 's-a',
+        type: 'flight',
+        title: 'A',
+        departureDate: '2026-07-02',
+        sortDate: '2026-07-02',
+      });
+      const patch = { departureDate: '2026-07-01', sortDate: undefined };
+      expect(await store.updateSegment('vac-1', 's-a', patch)).toBe('saved');
+      // Not re-derived from departureDate, and absent once serialised for the CRDT write.
+      expect(written().sortDate).toBeUndefined();
+      expect('sortDate' in toPlain(written())).toBe(false);
+      expect(toPlain(written())).toMatchObject({ departureDate: '2026-07-01' });
     });
   });
 

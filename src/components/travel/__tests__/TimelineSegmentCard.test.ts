@@ -14,6 +14,7 @@ import { mount } from '@vue/test-utils';
 import { setActivePinia, createPinia } from 'pinia';
 import TimelineSegmentCard from '../TimelineSegmentCard.vue';
 import type { TimelineItem } from '@/composables/useVacationTimeline';
+import type { FlightVerification } from '@/types/flightStatus';
 
 vi.mock('@/composables/useTranslation', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
@@ -182,6 +183,33 @@ describe('TimelineSegmentCard', () => {
           .exists()
       ).toBe(false);
     }
+  });
+
+  describe('the confirmed tick in the live pill', () => {
+    const LIVE_ROWS = [{ label: 'travel.live.row.gate', value: 'C21', live: true }];
+    const pill = (verification: FlightVerification) =>
+      mountCard({ flight: FLIGHT, detailRows: LIVE_ROWS }, { verification, nowMs: 2 });
+
+    it('shows a tick and the sr-only text when verified, however old the check', () => {
+      const w = pill({ state: 'verified', checkedAt: 1, fresh: false });
+      const el = w.get('[title="travel.live.pillConfirmed"]');
+      expect(el.find('svg[aria-hidden="true"]').exists()).toBe(true);
+      expect(el.find('.sr-only').text()).toBe('travel.live.pillConfirmed');
+      expect(el.text()).toContain('travel.live.pill');
+    });
+
+    it('is the plain pill with no airline answer, or changed and not applied', () => {
+      for (const v of [
+        { state: 'verified', fresh: false },
+        { state: 'verified' },
+        { state: 'changed', checkedAt: 1, applied: false },
+      ] as FlightVerification[]) {
+        const w = pill(v);
+        expect(w.text()).toContain('travel.live.pill');
+        expect(w.find('[title="travel.live.pillConfirmed"]').exists()).toBe(false);
+        expect(w.find('.sr-only').exists()).toBe(false);
+      }
+    });
   });
 
   it('draws the "live" pill on a live row', () => {

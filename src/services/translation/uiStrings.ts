@@ -15436,6 +15436,10 @@ const STRING_DEFS = {
     beanie: 'buses are not checked live.',
   },
   'travel.live.pill': { en: 'Live', beanie: 'live' },
+  'travel.live.pillConfirmed': {
+    en: 'Confirmed with the airline',
+    beanie: 'confirmed with the airline',
+  },
   'travel.live.row.gate': { en: 'Gate', beanie: 'gate' },
   'travel.live.row.desk': { en: 'Check-in', beanie: 'check-in' },
   'travel.live.row.belt': { en: 'Bag Belt', beanie: 'bag belt' },
@@ -15468,6 +15472,14 @@ const STRING_DEFS = {
   'travel.live.toast.notChecked.message': {
     en: "beanies hasn't heard from the airline on this device yet. Try again in a few minutes.",
     beanie: "beanies hasn't heard from the airline on this device yet. try again in a few minutes.",
+  },
+  'travel.live.toast.updated.title': {
+    en: 'Updated With Airline Data',
+    beanie: 'updated with airline data',
+  },
+  'travel.live.toast.updated.message': {
+    en: 'Your plan now matches the airline.',
+    beanie: 'your plan now matches the airline.',
   },
 } satisfies Record<string, StringEntry>;
 

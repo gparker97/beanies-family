@@ -8,12 +8,13 @@
  */
 import type { ScopedSaveOutcome } from '@/composables/useActivityScopeEdit';
 import type { FamilyActivity, UpdateFamilyActivityInput } from '@/types/models';
+import { captureBefore } from '@/utils/captureBefore';
 
 /** Defined beside `handleScopedSave`, which returns it; re-exported for the pure layer. */
 export type { ScopedSaveOutcome };
 
 /** Every field a drop can change (date/time, span, owner, and a re-targeted rule + shadow). */
-export const MOVE_KEYS = [
+export const MOVE_KEYS: readonly (keyof FamilyActivity)[] = [
   'date',
   'endDate',
   'startTime',
@@ -24,7 +25,7 @@ export const MOVE_KEYS = [
   'rule',
   'daysOfWeek',
   'originalOccurrenceDate',
-] as const satisfies readonly (keyof UpdateFamilyActivityInput)[];
+];
 
 export type UndoRecipe =
   /** A one-off, a reused override child, or an 'all' template: write the prior fields back. */
@@ -33,30 +34,16 @@ export type UndoRecipe =
   | { kind: 'remove-override'; childId: string };
 
 /**
- * A detached plain copy, so a later write to the live record (a reactive / CRDT-backed
- * object) cannot change what Undo restores. The moved fields are strings, string arrays and
- * the plain `RecurrenceRule` object, so a JSON round trip is exact.
- */
-function detach<T>(value: T): T {
-  return value !== null && typeof value === 'object'
-    ? (JSON.parse(JSON.stringify(value)) as T)
-    : value;
-}
-
-/**
  * The prior values of `keys` on `activity`, as a patch that writes them back. A key the record
  * does not carry is present as an explicit `undefined`, so restoring it CLEARS whatever the
- * drop added (a `diffPayload`-style present-`undefined` is a deliberate clear, and it stops
- * `updateActivity` from rebasing `endDate` on the way back).
+ * drop added (and stops `updateActivity` from rebasing `endDate` on the way back). The generic
+ * capture lives in `utils/captureBefore.ts`; this is its typed face for activities.
  */
-export function captureBefore(
+export function captureActivityBefore(
   activity: FamilyActivity,
-  keys: readonly (keyof UpdateFamilyActivityInput)[]
+  keys: readonly (keyof FamilyActivity)[]
 ): UpdateFamilyActivityInput {
-  const before: Record<string, unknown> = {};
-  // eslint-disable-next-line security/detect-object-injection -- keys are typed activity fields
-  for (const key of keys) before[key] = detach(activity[key]);
-  return before as UpdateFamilyActivityInput;
+  return captureBefore<FamilyActivity>(activity, keys);
 }
 
 /**

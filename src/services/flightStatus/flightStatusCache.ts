@@ -20,6 +20,14 @@
  * delete, every existing record. A registration is pruned only once the server's own item
  * has expired (`ALERT_EXPIRES_AFTER_MS`): a deleted segment or a closed window is the
  * reconcile's job, which must still hold the registration to unsubscribe it.
+ *
+ * `entryChecked` (the one-off check when a flight is entered) is stamped when the fetch is
+ * ISSUED and pruned with its segment, and by age only when its answer was UNRESOLVED (a change
+ * this device could not write, or "Couldn't find this flight"): such a stamp is released when
+ * the check ages out at 7 days, so the flight is asked once more. A resolved answer's stamp
+ * outlives the 7-day check or the flight would be re-asked. `noticed` / `dismissed` live as long as their notice does (kept
+ * while the id is the current notice of a flight that is not over, and for at least 7 days),
+ * since an applied far-out change stays `changed` until departure.
  */
 import type {
   AlertRegistration,
@@ -37,6 +45,7 @@ import {
 import { logEvent } from '@/services/telemetry';
 import { isFlightLeg, isObject } from '@/utils/flightStatus/guards';
 import { parseUtcMs } from '@/utils/flightStatus/schedule';
+import { airportCode } from '@/utils/travelCodes';
 
 const LABEL = 'flight-status';
 const SURFACE = 'travel-verify';
@@ -65,6 +74,12 @@ export interface FlightStatusCacheRecord {
    *  `noticed`, so a new airline revision is undismissed by construction. A record written
    *  before this field existed reads as `{}`. */
   dismissed: Record<string, number>;
+  /** Segment id → the question (`entryQuestion`) this device already asked the provider while
+   *  the flight was outside its check window. Written when the fetch is ISSUED, not on its
+   *  outcome: the backoff ladder caps at 60 min, so it bounds how often a retry happens, not
+   *  how many; a persistent failure (`date_out_of_range`) would otherwise be re-asked hourly
+   *  for weeks. A record written before this field existed reads as `{}`. */
+  entryChecked: Record<string, string>;
   /** Segment id → the flight alert this device registered for it (Phase 2). A record written
    *  before this field existed reads as `{}`. */
   alerts: Record<string, AlertRegistration>;
@@ -81,9 +96,24 @@ export function emptyFlightStatusCache(familyId: string): FlightStatusCacheRecor
     failures: {},
     noticed: {},
     dismissed: {},
+    entryChecked: {},
     alerts: {},
     pushToken: null,
   };
+}
+
+/** The question an entry check asks, the one string the `entryChecked` stamp holds: the
+ *  fields `pickLeg` treats as a different question. Airports go through `airportCode`, as
+ *  `pickLeg` reads them, so "SFO" and "San Francisco (SFO)" are one question while "sfo" is
+ *  another. (`candidateSignature` stays raw: a cosmetic edit still triggers a run, which then
+ *  skips as `out_of_window`.) */
+export function entryQuestion(
+  flight: string,
+  date: string,
+  departureAirport?: string,
+  arrivalAirport?: string
+): string {
+  return `${flight}|${date}|${airportCode(departureAirport)}|${airportCode(arrivalAirport)}`;
 }
 
 /**
@@ -110,6 +140,7 @@ export function readFlightStatusCache(familyId: string): FlightStatusCacheRecord
         ...read.value,
         noticed: read.value.noticed ?? {},
         dismissed: read.value.dismissed ?? {},
+        entryChecked: read.value.entryChecked ?? {},
         alerts: read.value.alerts ?? {},
         pushToken: read.value.pushToken ?? null,
       }
@@ -145,39 +176,60 @@ function alertExpired(alert: AlertRegistration, nowMs: number): boolean {
 
 /**
  * A copy of `cache` without entries for segments that no longer exist (`liveSegmentIds`),
- * checks for flights that are over, and checks older than 7 days. A failure record goes with
- * its segment only (its backoff must survive a deleted check). A flight alert goes only once
+ * checks for flights that are over, and checks older than 7 days. A failure record and an
+ * `entryChecked` stamp go with their segment (a backoff must survive a deleted check; a
+ * stamp must outlive its check), except a stamp released below. `noticed` / `dismissed` are kept while their id is the
+ * current notice of a flight that is not over (`liveNoticeIds`), however old, and in any case
+ * for 7 days from their stamp: a just-finished flight's OS notice is still built for 24 h
+ * after its change (`useScheduledReminders`), and a forgotten first-seen stamp would fire it
+ * a second time. A flight alert goes only once
  * its server item has expired (see the header). Pure; returns the SAME object when nothing
  * was dropped, so the store can skip a pointless write.
+ *
+ * `unresolvedIds` are segments whose answer left something unresolved (`unresolvedEntry`). When
+ * such a segment's check is dropped BY AGE alone (segment live, flight not over), its
+ * `entryChecked` stamp is released too, so the next run asks once more.
  */
 export function pruneFlightStatusCache(
   cache: FlightStatusCacheRecord,
   liveSegmentIds: ReadonlySet<string>,
-  nowMs: number
+  liveNoticeIds: ReadonlySet<string>,
+  nowMs: number,
+  unresolvedIds: ReadonlySet<string> = new Set()
 ): FlightStatusCacheRecord {
   let dropped = false;
   const checks: Record<string, FlightCheck> = {};
+  const released = new Set<string>();
   for (const [id, check] of Object.entries(cache.checks)) {
-    const keep =
-      liveSegmentIds.has(id) &&
-      !isOver(check, nowMs) &&
-      nowMs - check.checkedAt <= MAX_CHECK_AGE_MS;
-    if (keep) checks[id] = check;
-    else dropped = true;
+    const aged = nowMs - check.checkedAt > MAX_CHECK_AGE_MS;
+    const live = liveSegmentIds.has(id);
+    const over = isOver(check, nowMs);
+    if (live && !over && !aged) checks[id] = check;
+    else {
+      dropped = true;
+      if (live && !over && unresolvedIds.has(id)) released.add(id);
+    }
   }
   const failures: Record<string, FlightCheckFailure> = {};
   for (const [id, failure] of Object.entries(cache.failures)) {
     if (liveSegmentIds.has(id)) failures[id] = failure;
     else dropped = true;
   }
+  const entryChecked: Record<string, string> = {};
+  for (const [id, question] of Object.entries(cache.entryChecked)) {
+    if (liveSegmentIds.has(id) && !released.has(id)) entryChecked[id] = question;
+    else dropped = true;
+  }
+  const keepNotice = (id: string, stamp: number) =>
+    liveNoticeIds.has(id) || nowMs - stamp <= MAX_CHECK_AGE_MS;
   const noticed: Record<string, number> = {};
   for (const [id, firstSeen] of Object.entries(cache.noticed)) {
-    if (nowMs - firstSeen <= MAX_CHECK_AGE_MS) noticed[id] = firstSeen;
+    if (keepNotice(id, firstSeen)) noticed[id] = firstSeen;
     else dropped = true;
   }
   const dismissed: Record<string, number> = {};
   for (const [id, at] of Object.entries(cache.dismissed)) {
-    if (nowMs - at <= MAX_CHECK_AGE_MS) dismissed[id] = at;
+    if (keepNotice(id, at)) dismissed[id] = at;
     else dropped = true;
   }
   const alerts: Record<string, AlertRegistration> = {};
@@ -185,7 +237,7 @@ export function pruneFlightStatusCache(
     if (!alertExpired(alert, nowMs)) alerts[id] = alert;
     else dropped = true;
   }
-  return dropped ? { ...cache, checks, failures, noticed, dismissed, alerts } : cache;
+  return dropped ? { ...cache, checks, failures, entryChecked, noticed, dismissed, alerts } : cache;
 }
 
 /** Remove the record; a refused removal is logged (the next write overwrites it anyway). */
@@ -202,9 +254,13 @@ function removeCache(): void {
 }
 
 const isFiniteNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
-/** `noticed` / `dismissed`: absent (an older record) or id → epoch ms. */
-const isStampMap = (v: unknown): boolean =>
-  v === undefined || (isObject(v) && Object.values(v).every(isFiniteNumber));
+/** A tolerant optional map: absent (a record older than the field) reads true; otherwise
+ *  every value must pass `pred`. */
+const isMapOf =
+  (pred: (x: unknown) => boolean) =>
+  (v: unknown): boolean =>
+    v === undefined || (isObject(v) && Object.values(v).every(pred));
+const isString = (v: unknown): v is string => typeof v === 'string';
 
 function isCheck(id: string, v: unknown): v is FlightCheck {
   return (
@@ -234,10 +290,6 @@ function isAlert(v: unknown): v is AlertRegistration {
   );
 }
 
-/** `alerts`: absent (an older record) or segment id → registration. */
-const isAlertMap = (v: unknown): boolean =>
-  v === undefined || (isObject(v) && Object.values(v).every(isAlert));
-
 function isFailure(v: unknown): v is FlightCheckFailure {
   return (
     isObject(v) && typeof v.code === 'string' && isFiniteNumber(v.count) && isFiniteNumber(v.until)
@@ -251,9 +303,12 @@ function isRecord(v: unknown): v is FlightStatusCacheRecord {
     typeof v.familyId === 'string' &&
     isObject(v.checks) &&
     isObject(v.failures) &&
-    isStampMap(v.noticed) &&
-    isStampMap(v.dismissed) &&
-    isAlertMap(v.alerts) &&
+    // Tolerant optional maps: `noticed` / `dismissed` id → epoch ms, `entryChecked` segment
+    // id → question, `alerts` segment id → registration.
+    isMapOf(isFiniteNumber)(v.noticed) &&
+    isMapOf(isFiniteNumber)(v.dismissed) &&
+    isMapOf(isString)(v.entryChecked) &&
+    isMapOf(isAlert)(v.alerts) &&
     (v.pushToken === undefined || v.pushToken === null || typeof v.pushToken === 'string') &&
     Object.entries(v.checks).every(([id, c]) => isCheck(id, c)) &&
     Object.values(v.failures).every(isFailure)

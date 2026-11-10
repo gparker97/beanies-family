@@ -56,6 +56,20 @@ export function carriedCode(value: string | undefined, width: 2 | 3): string | u
   return code && !PLACEHOLDER_CODES.has(code) ? code : undefined;
 }
 
+/**
+ * The airport code for a title, from whatever shape the field holds: a bare "SIN" (what the
+ * extraction prompt now asks the model for), the picker's "Singapore (SIN)", or a name.
+ *
+ * The first-word fallback this replaced is the bug: "John F. Kennedy International Airport"
+ * titled a flight "John". Falling back to the WHOLE string is longer but never wrong, and a
+ * name only reaches here when the model could not identify the airport (or the segment predates
+ * the prompt asking). Resolving a name to a code is the model's job, not ours — see
+ * `TRAVEL_JSON_SHAPE` in `extractionPrompt.ts`. Case-sensitive, like `carriedCode`.
+ */
+export function airportCode(airport?: string): string {
+  return carriedCode(airport, 3) ?? airport?.trim() ?? '';
+}
+
 /** Two alphanumerics (at least one a letter) then 1-4 digits: "SQ25", "HO1602", "6E123". */
 export const FLIGHT_DESIGNATOR = /^(?=[a-z0-9]{2}\d)(?=[a-z0-9]*[a-z])[a-z0-9]{2}\d{1,4}$/i;
 

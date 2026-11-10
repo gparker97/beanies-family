@@ -31,7 +31,7 @@ import type { FamilyActivity, UpdateFamilyActivityInput } from '@/types/models';
 import { reportSessionActionFailed } from '@/utils/actionFailure';
 import { isAllDayActivity, isRepeatingActivity } from '@/utils/calendar/activityDays';
 import {
-  captureBefore,
+  captureActivityBefore,
   MOVE_KEYS,
   undoRecipeFor,
   type UndoRecipe,
@@ -270,7 +270,7 @@ export async function commitCalendarMove(req: CalendarMoveRequest): Promise<Move
 
   let outcome: MoveOutcome;
   if (!isRepeatingActivity(activity)) {
-    const before = captureBefore(activity, MOVE_KEYS);
+    const before = captureActivityBefore(activity, MOVE_KEYS);
     // An override child's first move pins its occurrence key (Recurring Invariant 4):
     // without it the master's slot stops being suppressed and the session renders twice.
     const patch =
@@ -294,9 +294,9 @@ export async function commitCalendarMove(req: CalendarMoveRequest): Promise<Move
     // Capture both possible Undo subjects before the write: the template ('all') and an
     // override child that a 'this only' save would REUSE (another device created it since
     // render), which Undo must restore rather than delete.
-    const beforeTemplate = captureBefore(activity, MOVE_KEYS);
+    const beforeTemplate = captureActivityBefore(activity, MOVE_KEYS);
     const child = activityStore.findOverride(activity.id, req.source.seriesDate);
-    const beforeChild = child ? captureBefore(child, MOVE_KEYS) : null;
+    const beforeChild = child ? captureActivityBefore(child, MOVE_KEYS) : null;
     const { handleScopedSave } = useActivityScopeEdit();
     const saved = await handleScopedSave(activity.id, req.source.seriesDate, req.patch, {
       source: 'drag',

@@ -14,10 +14,11 @@ export const BACKOFF_MAX_MS = 60 * MINUTE_MS;
 /**
  * How long to wait after the `failureCount`th failure in a row: 5, 10, 20, 40, then 60 min.
  * A `rate_limited` answer waits the full hour straight away (a quota resets on the hour at the
- * earliest). Typed on the shared vocabulary: a service-only code such as flight checks'
+ * earliest). With no `code` (a failed pod write, which has no remote error code) it is the
+ * plain ladder. Typed on the shared vocabulary: a service-only code such as flight checks'
  * `not_configured` never enters the ladder (it is a refresh skip reason).
  */
-export function nextBackoffMs(failureCount: number, code: RemoteFetchErrorCode): number {
+export function nextBackoffMs(failureCount: number, code?: RemoteFetchErrorCode): number {
   if (code === 'rate_limited') return BACKOFF_MAX_MS;
   const steps = Math.max(0, Math.floor(failureCount) - 1);
   return Math.min(BACKOFF_MAX_MS, BACKOFF_BASE_MS * 2 ** Math.min(steps, 10));

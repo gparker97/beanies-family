@@ -37,7 +37,7 @@ import { useAppBack } from '@/composables/useAppBack';
 import { logEvent } from '@/services/telemetry';
 import { reportError } from '@/utils/errorReporter';
 import BackLink from '@/components/common/BackLink.vue';
-import { showToast } from '@/composables/useToast';
+import { showToast, UNDO_TOAST_MS } from '@/composables/useToast';
 import { useDocumentToTravel, type TravelReady } from '@/composables/useDocumentToTravel';
 import { useMagicReader, useMagicReaderConsumer } from '@/composables/useMagicReader';
 import MagicBeansDoor from '@/components/ai/MagicBeansDoor.vue';
@@ -791,7 +791,8 @@ async function saveInlineField(item: TimelineItem, field: string, value: string)
 }
 
 /**
- * Live flight checks (#143): "Put it back" and "Update with airline data". The write goes through
+ * Live flight checks (#143): "Put it back" and "Update with airline data" (which ends in a
+ * confirmation toast with Undo, `undoTakeAirline`). The write goes through
  * `flightStatusStore` (which logs it) into `vacationStore.updateSegment`, which already toasts
  * a gone segment (`missing`) and a failed save (`wrapAsync`), so this adds no second toast for
  * those. The one case it must explain itself is "Update with airline data" with no airline answer on
@@ -812,7 +813,27 @@ async function takeAirlineFlight(item: TimelineItem): Promise<void> {
     );
     return;
   }
-  await flightStatusStore.takeAirline(item.id);
+  const { result, undo } = await flightStatusStore.takeAirline(item.id);
+  // No `undo` on a saved take means a newer airline revision landed before the tap: the store
+  // applied it like any airline change, and its Changed notice ("Put it back") is the feedback.
+  if (result !== 'saved' || !undo) return;
+  showToast(
+    'success',
+    t('travel.live.toast.updated.title'),
+    t('travel.live.toast.updated.message'),
+    {
+      actionLabel: t('action.undo'),
+      actionFn: () => undoTakeAirline(undo),
+      durationMs: UNDO_TOAST_MS,
+    }
+  );
+}
+
+/** The toast's Undo. A gone segment, a failed save and a thrown error each surface their own
+ *  toast (`updateSegment`, `wrapAsync`, `useToast`), so nothing here is silent. */
+async function undoTakeAirline(undo: () => Promise<unknown>): Promise<void> {
+  if (!requireEdit()) return;
+  await undo();
 }
 
 /** "Got it" / the chip on a folded notice: device state only, so no edit permission needed. */

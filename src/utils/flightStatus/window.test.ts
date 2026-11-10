@@ -153,6 +153,7 @@ describe('pickFlightRefresh', () => {
     lastCheckedAt: null,
     minIntervalMs: INTERVAL_DAY_MS,
     backoffUntil: 0,
+    entryDone: false,
   };
 
   it('fetches a flight never checked, and a stale one', () => {
@@ -171,11 +172,49 @@ describe('pickFlightRefresh', () => {
     ['offline', { online: false }],
     ['no_flight_number', { hasFlightNumber: false }],
     ['past', { past: true, inWindow: false }],
-    ['out_of_window', { inWindow: false }],
+    ['out_of_window', { inWindow: false, entryDone: true }],
     ['backoff', { backoffUntil: NOW + 1 }],
     ['fresh', { lastCheckedAt: NOW - INTERVAL_DAY_MS + 1 }],
   ] as const)('skips: %s', (reason, over) => {
     expect(pickFlightRefresh({ ...base, ...over })).toEqual({ action: 'skip', reason });
+  });
+
+  it('out of window: fetches once per question (entry), with or without a usable check', () => {
+    const far = { ...base, inWindow: false };
+    expect(pickFlightRefresh(far)).toEqual({ action: 'fetch', reason: 'entry' });
+    expect(pickFlightRefresh({ ...far, lastCheckedAt: NOW - 1_000 })).toEqual({
+      action: 'fetch',
+      reason: 'entry',
+    });
+    expect(pickFlightRefresh({ ...far, entryDone: true })).toEqual({
+      action: 'skip',
+      reason: 'out_of_window',
+    });
+    expect(pickFlightRefresh({ ...far, entryDone: true, lastCheckedAt: null })).toEqual({
+      action: 'skip',
+      reason: 'out_of_window',
+    });
+  });
+
+  it('out of window: a backoff holds an entry check', () => {
+    expect(pickFlightRefresh({ ...base, inWindow: false, backoffUntil: NOW + 1 })).toEqual({
+      action: 'skip',
+      reason: 'backoff',
+    });
+  });
+
+  it('in window: entryDone is inert (same decision for either value)', () => {
+    const cases: Array<Partial<FlightRefreshInput>> = [
+      {},
+      { lastCheckedAt: NOW - INTERVAL_DAY_MS },
+      { lastCheckedAt: NOW - INTERVAL_DAY_MS + 1 },
+      { backoffUntil: NOW + 1 },
+    ];
+    for (const over of cases) {
+      expect(pickFlightRefresh({ ...base, ...over, entryDone: true })).toEqual(
+        pickFlightRefresh({ ...base, ...over, entryDone: false })
+      );
+    }
   });
 
   it('freshness is by time only: a just-applied date move is still fresh', () => {

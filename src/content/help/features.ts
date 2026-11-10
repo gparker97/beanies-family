@@ -3553,7 +3553,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       'beanies.family checks your family’s flights against the airline’s live schedule, so the plan you trust is the plan the airline is running.',
     icon: '✈\u{FE0F}',
     readTime: 4,
-    updatedDate: '2026-11-09',
+    updatedDate: '2026-11-10',
     sections: [
       {
         type: 'paragraph',
@@ -3569,7 +3569,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'Any flight in a trip that has a flight number and a date. Checks begin <strong>three days before departure</strong>. Before that, the flight shows <strong>Checks from</strong> and the date it starts. Once checks are on, beanies looks when you open the app and every so often on the day, and a small chip on the flight tells you how fresh the answer is, such as <strong>Checked 12 min ago</strong>.',
+          "Any flight in a trip that has a flight number and a date. A flight is checked <strong>once when you enter or change it</strong>, so a schedule the airline has already moved, or a number that flies a different route, shows up right away. After that, checks begin <strong>three days before departure</strong>. Until then, the flight shows <strong>Checks from</strong> and the date it starts. Once checks are on, beanies looks when you open the app and every so often on the day, and a small chip on the flight tells you how fresh the answer is, such as <strong>Checked 12 min ago</strong>. A small tick in a <strong>Live</strong> pill means the airline's latest answer matches that value; the terminal gets one too when the airline agrees with your plan. If a far-away flight's first check left something unresolved, such as a change that could not be saved or a flight the airline could not find, beanies asks again after a week.",
       },
       {
         type: 'heading',
@@ -3612,7 +3612,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'If you change a flight by hand, your edit wins. beanies will not overwrite it. But if the airline’s schedule and your plan disagree, the flight shows <strong>Conflict</strong> with both values side by side. This also happens after you tap <strong>Put it back</strong>. Tap <strong>Update with airline data</strong> to take the airline’s value, or <strong>Got it</strong> to keep yours and fold the message away; the Conflict chip stays and brings it back. If the airline changes the flight again, the new change is applied as usual.',
+          'If you change a flight by hand, your edit wins. beanies will not overwrite it. But if the airline’s schedule and your plan disagree, the flight shows <strong>Conflict</strong> with both values side by side. This also happens after you tap <strong>Put it back</strong>. Tap <strong>Update with airline data</strong> to take the airline’s value; your plan updates and a confirmation appears with <strong>Undo</strong>, which puts your own values back. Or tap <strong>Got it</strong> to keep yours and fold the message away; the Conflict chip stays and brings it back. If the airline changes the flight again, the new change is applied as usual.',
       },
       {
         type: 'heading',

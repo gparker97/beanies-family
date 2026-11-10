@@ -20,7 +20,7 @@ function mountChip(verification: FlightVerification, compact = false) {
 
 describe('FlightCheckChip', () => {
   it('verified: green dot that pulses while the check is fresh, success pair', () => {
-    const w = mountChip({ state: 'verified', checkedAt: NOW - 12 * 60_000 });
+    const w = mountChip({ state: 'verified', checkedAt: NOW - 12 * 60_000, fresh: true });
     const root = w.get('[data-state="verified"]');
     // `t` is the identity stub, so the label is the template key (fillTemplate leaves it).
     expect(root.text()).toBe('flightChecks.checked');
@@ -30,8 +30,8 @@ describe('FlightCheckChip', () => {
     expect(root.find('.live-dot').exists()).toBe(true);
   });
 
-  it('verified: the dot stops pulsing once the check is over an hour old', () => {
-    const w = mountChip({ state: 'verified', checkedAt: NOW - 2 * 60 * 60_000 });
+  it('verified: the dot stops pulsing once the verification is no longer fresh', () => {
+    const w = mountChip({ state: 'verified', checkedAt: NOW - 2 * 60 * 60_000, fresh: false });
     expect(w.find('.live-dot').exists()).toBe(false);
     expect(w.find('span.rounded-full span.bg-current').exists()).toBe(true);
   });

@@ -26,6 +26,7 @@ import {
 import { isTravellerSubset, resolveSegmentTravellers } from '@/utils/segmentTravellers';
 import { isFlightType } from '@/utils/travelCodes';
 import { flightLabel } from '@/utils/flightStatus/occurrenceNotice';
+import { confirmsTerminal } from '@/utils/flightStatus/copy';
 import { splitLocal } from '@/utils/flightStatus/schedule';
 import { useTranslationStore } from '@/stores/translationStore';
 import type { UIStringKey } from '@/services/translation/uiStrings';
@@ -58,8 +59,9 @@ export interface DetailRow {
   mapLink?: boolean;
   /** Render as a clickable external link */
   isLink?: boolean;
-  /** A display-only live value from this device's flight check (gate, belt, estimate): never
-   *  written to the plan, so it carries a small "live" pill and no editor (#143). */
+  /** A value this device's check reads (gate, belt, estimate), or a plan value it confirms
+   *  (the flight terminal); never editable, so it carries a small "live" pill and no editor
+   *  (#143). */
   live?: boolean;
 }
 
@@ -319,13 +321,14 @@ function liveRows(seg: VacationTravelSegment, live: FlightLiveInfo, t: T): Detai
 }
 
 /**
- * Detail rows for a travel segment. `live` is this device's display-only flight check
- * (`FlightVerification.live`); its rows follow the terminal and are never editable.
+ * Detail rows for a travel segment. `v` is this device's flight verification: its `live` rows
+ * (gate, desk, estimates, belt) follow the terminal and are never editable, and the flight
+ * terminal row itself carries the live pill when the airline's latest answer matches it (`confirmsTerminal`).
  */
 export function travelDetailRows(
   seg: VacationTravelSegment,
   t: T,
-  live?: FlightLiveInfo
+  v?: FlightVerification
 ): DetailRow[] {
   const rows: DetailRow[] = [];
   const isF = seg.type?.startsWith('flight');
@@ -347,8 +350,14 @@ export function travelDetailRows(
         value: seg.flightNumber,
         field: 'flightNumber',
       });
-    if (seg.terminal) rows.push({ label: t('segmentRow.terminal'), value: seg.terminal });
-    if (live) rows.push(...liveRows(seg, live, t));
+    if (seg.terminal) {
+      rows.push({
+        label: t('segmentRow.terminal'),
+        value: seg.terminal,
+        ...(confirmsTerminal(v, seg.terminal) ? { live: true } : {}),
+      });
+    }
+    if (v?.live) rows.push(...liveRows(seg, v.live, t));
     if (seg.departureDate)
       rows.push({
         label: t('segmentRow.date'),
@@ -648,11 +657,11 @@ export function useVacationTimeline(
       const seg = v.travelSegments[i]!;
       const date = seg.sortDate || seg.departureDate || seg.embarkationDate || '';
       const isFlight = isFlightType(seg.type);
-      const live = isFlight ? options.verificationFor?.(seg.id)?.live : undefined;
+      const verification = isFlight ? options.verificationFor?.(seg.id) : undefined;
       const { detailRows, timing } = withTiming(
         'travel',
         seg,
-        travelDetailRows(seg, t, live),
+        travelDetailRows(seg, t, verification),
         !!date,
         today.value
       );

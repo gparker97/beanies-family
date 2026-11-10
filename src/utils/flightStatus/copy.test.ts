@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ZH_STRINGS } from '@/services/translation/zh';
 import type { UIStringKey } from '@/services/translation/uiStrings';
+import type { FlightVerification } from '@/types/flightStatus';
 import {
   agoText,
   airlineName,
@@ -10,7 +11,10 @@ import {
   changedByLine,
   checkedAgo,
   chipLabel,
+  confirmedLive,
+  confirmsTerminal,
   hasFlightChip,
+  isAlertStatus,
   conflictSentence,
   departureRowMessage,
   fillNoteLine,
@@ -265,5 +269,70 @@ describe('Chinese', () => {
     // The band's formatter is not localised, and the notice follows the band.
     expect(shortDate('2026-12-13', 'zh')).toBe('13 Dec');
     expect(checkedAgo(zh, 0, 12 * MIN)).toBe('12 分钟前已核对');
+  });
+});
+
+describe('confirmsTerminal', () => {
+  const fresh = (terminal?: string): FlightVerification => ({
+    state: 'verified',
+    checkedAt: 1,
+    provider: { terminal },
+  });
+
+  it('true when the latest answer agrees, however old and however the terminal is spelled', () => {
+    expect(confirmsTerminal(fresh('3'), '3')).toBe(true);
+    expect(confirmsTerminal({ ...fresh('2'), fresh: false }, '2')).toBe(true);
+    expect(confirmsTerminal(fresh('T2'), 'Terminal 2')).toBe(true);
+  });
+
+  it('false when mismatched, without a provider terminal, or without a verification', () => {
+    expect(confirmsTerminal(fresh('2'), '3')).toBe(false);
+    expect(confirmsTerminal(fresh(undefined), '2')).toBe(false);
+    expect(confirmsTerminal({ state: 'verified', checkedAt: 1 }, '2')).toBe(false);
+    expect(confirmsTerminal({ state: 'verified', provider: { terminal: '2' } }, '2')).toBe(false);
+    expect(confirmsTerminal(undefined, '2')).toBe(false);
+    expect(confirmsTerminal(fresh('2'), undefined)).toBe(false);
+  });
+});
+
+describe('confirmedLive', () => {
+  it('true for a verified answer, and an airline change the plan carries, however old the check', () => {
+    expect(confirmedLive({ state: 'verified', checkedAt: 1 })).toBe(true);
+    // Stale is not unconfirmed: the tick does not wait for the poll (greg, 2026-11-10).
+    expect(confirmedLive({ state: 'verified', checkedAt: 1, fresh: false })).toBe(true);
+    expect(confirmedLive({ state: 'changed', checkedAt: 1, fresh: false, applied: true })).toBe(
+      true
+    );
+    expect(confirmedLive({ state: 'changed', checkedAt: 1, applied: true })).toBe(true);
+  });
+
+  it('false without an airline answer, or for unapplied, conflict, cancelled', () => {
+    expect(confirmedLive({ state: 'verified' })).toBe(false);
+    expect(confirmedLive({ state: 'verified', fresh: false })).toBe(false);
+    expect(confirmedLive({ state: 'changed', checkedAt: 1, applied: false })).toBe(false);
+    expect(confirmedLive({ state: 'changed', checkedAt: 1 })).toBe(false);
+    expect(confirmedLive({ state: 'conflict', checkedAt: 1, applied: false })).toBe(false);
+    expect(confirmedLive({ state: 'cancelled', checkedAt: 1, applied: true })).toBe(false);
+  });
+
+  it('never ticks an alert status, on either arm (verified, or a change the plan carries)', () => {
+    for (const status of ['CanceledUncertain', 'Diverted']) {
+      expect(confirmedLive({ state: 'verified', checkedAt: 1, live: { status } })).toBe(false);
+      expect(
+        confirmedLive({ state: 'changed', checkedAt: 1, applied: true, live: { status } })
+      ).toBe(false);
+    }
+  });
+
+  it('false for a verified answer in the alert look (Diverted, May be cancelled), as the chip paints it', () => {
+    for (const status of ['Diverted', 'CanceledUncertain'] as const) {
+      expect(isAlertStatus(status)).toBe(true);
+      expect(confirmedLive({ state: 'verified', checkedAt: 1, live: { status } })).toBe(false);
+    }
+    expect(isAlertStatus('Expected')).toBe(false);
+    expect(isAlertStatus(undefined)).toBe(false);
+    expect(confirmedLive({ state: 'verified', checkedAt: 1, live: { status: 'Expected' } })).toBe(
+      true
+    );
   });
 });

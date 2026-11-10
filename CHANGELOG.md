@@ -8,6 +8,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-11-10
+
+### Added
+
+- A flight is now checked once as soon as it is entered or changed, however far away it is, and a live gate or estimate that matches the airline's latest answer carries a small tick in its "Live" pill.
+- The flight terminal now carries the "Live" tick when the airline confirms it, and choosing "Update with airline data" is now one step with a confirmation you can undo.
+
+### Fixed
+
+- A far-away flight whose first check could not be settled is now checked again after a week.
+
 ## 2026-11-09
 
 ### Added

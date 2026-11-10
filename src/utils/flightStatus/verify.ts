@@ -69,6 +69,8 @@ export interface VerifyContext {
   /** The flight-status endpoint is configured in this build. */
   configured: boolean;
   online: boolean;
+  /** From `flightTiming` (`minIntervalMs`): a check younger than this is `fresh`. */
+  minIntervalMs: number;
 }
 
 /** The translator + language the notes lines are written in (`planChange` only). */
@@ -176,6 +178,8 @@ export function deriveVerification(
     const base: FlightVerification = {
       state: 'verified',
       checkedAt: usable.checkedAt,
+      // Within the cadence AND inside the window: out of window there is no cadence.
+      fresh: ctx.inWindow && ctx.nowMs - usable.checkedAt < ctx.minIntervalMs,
       provider,
       mine,
       ...(liveInfo(usable, leg) ? { live: liveInfo(usable, leg) } : {}),
@@ -225,16 +229,24 @@ export function deriveVerification(
   if (gate) return unavailable(gate);
   // A check needs a carrier + digits AND a date; a booking missing either reads the same.
   if (!number || !seg.departureDate) return unavailable('no_flight_number');
+  // A real flight that does not fly the booked route reads the same in and out of the window;
+  // `no_coverage` (nothing published yet, or no such number) is never a fault far out.
+  if (usable && usable.miss !== 'no_coverage') return unavailable('no_match');
   if (!ctx.inWindow) {
     return ctx.opensAt
       ? { ...unavailable('before_window'), opensAt: ctx.opensAt }
       : unavailable('before_window');
   }
-  if (usable) return unavailable(usable.miss ?? 'no_match');
+  if (usable) return unavailable('no_coverage');
   if (!ctx.online) return unavailable('offline');
   if (failure) return unavailable('failed');
   // Inside the window, online, never answered: the first check is on its way.
   return unavailable();
+}
+
+/** The verification carries a notice (the card's notice block, "Got it", the bell). */
+export function carriesNotice(v: FlightVerification): boolean {
+  return v.state === 'changed' || v.state === 'conflict' || v.state === 'cancelled';
 }
 
 // ── Writes ───────────────────────────────────────────────────────────────────
@@ -301,6 +313,25 @@ export function shouldApply(
   if (leg.status === 'Canceled') return !isCancelRevision(seg.liveRevision);
   if (isCancelRevision(seg.liveRevision)) return FIRM_RUNNING_STATUSES.has(leg.status);
   return !tuplesEqual(tupleFromSegment(seg), provider) && revisionOf(provider) !== seg.liveRevision;
+}
+
+/**
+ * An entry-check answer that left something unresolved, so its stamp is worth releasing when
+ * the answer ages out: the airline has no such flight on this route (`no_match`), or it holds a
+ * change the plan does not carry (`shouldApply`) and this device may write it (`canWrite`: the
+ * write kept failing). A change a view-only device may not write is not unresolved FOR IT:
+ * asking again would only fetch the same answer it still cannot act on (an editor's device
+ * writes it). `no_coverage` (nothing published yet) and a verified or applied answer are not.
+ */
+export function unresolvedEntry(
+  seg: VacationTravelSegment,
+  check: FlightCheck,
+  canWrite: boolean
+): boolean {
+  return (
+    check.miss === 'no_match' ||
+    (canWrite && check.leg !== null && shouldApply(seg, check.leg, check.arrivalLeg))
+  );
 }
 
 function appendNote(notes: string | undefined, line: string): string {

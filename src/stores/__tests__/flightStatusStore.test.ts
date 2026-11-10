@@ -13,7 +13,7 @@ import { reactive, ref } from 'vue';
 import type { FamilyVacation, VacationTravelSegment } from '@/types/models';
 import type { FlightLeg } from '@/types/flightStatus';
 import { makeFlight, makeLeg, t } from '@/utils/flightStatus/__tests__/fixtures';
-import { DEV_DAILY_FETCH_CAP } from '@/services/flightStatus/devFetchBudget';
+import { DEV_DAILY_FETCH_CAP, takeDevFetchTokens } from '@/services/flightStatus/devFetchBudget';
 
 const NOW = Date.parse('2026-12-12T09:00:00Z');
 const MIN = 60_000;
@@ -183,6 +183,7 @@ beforeEach(() => {
   updateSegment.mockClear();
   online.value = true;
   canEdit.value = true;
+  family.currentMember = { id: 'mum', name: 'Mum', role: 'owner', ageGroup: 'adult' };
   familyContext.activeFamilyId = 'fam-1';
   settings.liveFlightChecksEnabled = true;
   Object.assign(entitlement, {
@@ -365,7 +366,7 @@ describe('a check only answers the segment it still fits (flight AND day)', () =
     const v = vacationsState.vacations[0]!;
     v.travelSegments = v.travelSegments.map((s) => ({ ...s, departureDate: '2026-12-20' }));
     updateSegment.mockClear();
-    expect(await store.takeAirline('seg-1')).toBe('missing');
+    expect((await store.takeAirline('seg-1')).result).toBe('missing');
     expect(updateSegment).not.toHaveBeenCalled();
     expect(events('flight airline refused')[0]?.context).toEqual({
       action: 'take_airline',
@@ -419,6 +420,7 @@ describe('writes need the edit permission', () => {
     expect(events('flight change write retried')[0]?.context).toEqual({
       action: 'apply_retry',
       count: 1,
+      notif_skipped: 0,
     });
     // Written: the next run owes nothing.
     await store.run('tick');
@@ -449,7 +451,7 @@ describe('writes need the edit permission', () => {
     expect(store.verificationFor('seg-1')).toMatchObject({ state: 'cancelled', applied: false });
     // Nothing to put back on a cancellation (no `liveWas`): a no-op, not a refused write.
     expect(await store.revert('seg-1')).toBe('missing');
-    expect(await store.takeAirline('seg-1')).toBe('failed');
+    expect((await store.takeAirline('seg-1')).result).toBe('failed');
     expect(updateSegment).not.toHaveBeenCalled();
   });
 });
@@ -600,6 +602,379 @@ describe('failures and fairness', () => {
   });
 });
 
+describe('the entry check (a flight far outside its window)', () => {
+  const DAY = 24 * 60 * MIN;
+  const FAR = '2027-06-10';
+  const far = (over: Partial<VacationTravelSegment> = {}) =>
+    makeFlight({ departureDate: FAR, arrivalDate: FAR, ...over });
+  const farLeg = (terminal = '2') =>
+    makeLeg({
+      dep: { scheduledLocal: `${FAR} 17:00+08:00`, scheduledUtc: `${FAR} 09:00Z`, terminal },
+      arr: { scheduledLocal: `${FAR} 23:10+00:00`, scheduledUtc: `${FAR} 23:10Z` },
+    });
+  const stamps = () => readFlightStatusCache('fam-1')?.entryChecked ?? {};
+
+  beforeEach(() => {
+    vacationsState.vacations = [trip([far()])];
+  });
+
+  it('fetches once on the first run and stamps; a later run, even after the check is pruned, does not', async () => {
+    h.fetchFlightLegs.mockResolvedValue(answer([farLeg()]));
+    const store = useFlightStatusStore();
+    await store.run('segment-changed');
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(1);
+    expect(stamps()['seg-1']).toBe('SQ318|2027-06-10|SIN|LHR');
+    expect(events('flight entry check')[0]?.context).toEqual({
+      action: 'entry_check',
+      kind: 'segment-changed',
+      count: 1,
+    });
+    await store.run('tick');
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(1);
+    // 8 days on the 7-day check is pruned; the stamp still holds the flight back.
+    vi.setSystemTime(NOW + 8 * DAY);
+    await store.run('tick');
+    expect(store.checks['seg-1']).toBeUndefined();
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(1);
+    expect(events('flight entry check')).toHaveLength(1);
+  });
+
+  it('a changed number, date or airport is a new question and fetches again', async () => {
+    h.fetchFlightLegs.mockResolvedValue(answer([]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(1);
+    const edits: Array<Partial<VacationTravelSegment>> = [
+      { flightNumber: 'SQ319' },
+      { flightNumber: 'SQ319', departureDate: '2027-06-11' },
+      { flightNumber: 'SQ319', departureDate: '2027-06-11', departureAirport: 'Hong Kong (HKG)' },
+      {
+        flightNumber: 'SQ319',
+        departureDate: '2027-06-11',
+        departureAirport: 'Hong Kong (HKG)',
+        arrivalAirport: 'Gatwick (LGW)',
+      },
+    ];
+    let calls = 1;
+    for (const edit of edits) {
+      vacationsState.vacations = [trip([far(edit)])];
+      await store.run('segment-changed');
+      expect(h.fetchFlightLegs).toHaveBeenCalledTimes(++calls);
+    }
+  });
+
+  it('a failed entry fetch is stamped and not re-asked after its backoff', async () => {
+    h.fetchFlightLegs.mockRejectedValue(new FlightStatusApiError('http_5xx', 'down', 503));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    expect(stamps()['seg-1']).toBeDefined();
+    vi.setSystemTime(NOW + 2 * 60 * MIN);
+    await store.run('tick');
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(1);
+  });
+
+  it('a flight cut by over_cap is not stamped, and goes on the next run', async () => {
+    vacationsState.vacations = [
+      trip(Array.from({ length: 6 }, (_, i) => far({ id: `s${i}`, departureTime: `0${i}:00` }))),
+    ];
+    h.fetchFlightLegs.mockResolvedValue(answer([]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    expect(Object.keys(stamps())).toHaveLength(MAX_FETCHES_PER_RUN);
+    expect(events('flight entry check')[0]?.context.count).toBe(MAX_FETCHES_PER_RUN);
+    await store.run('tick');
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(6);
+    expect(Object.keys(stamps())).toHaveLength(6);
+  });
+
+  it('a flight cut by dev_cap is not stamped either', async () => {
+    vi.stubEnv('DEV', true);
+    takeDevFetchTokens(DEV_DAILY_FETCH_CAP - 2, NOW);
+    vacationsState.vacations = [
+      trip(Array.from({ length: 4 }, (_, i) => far({ id: `s${i}`, departureTime: `0${i}:00` }))),
+    ];
+    h.fetchFlightLegs.mockResolvedValue(answer([]));
+    await useFlightStatusStore().run('open');
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(2);
+    expect(events('flight check run')[0]?.context.detail).toContain('dev_cap=2');
+    expect(Object.keys(stamps()).sort()).toEqual(['s0', 's1']);
+    expect(events('flight entry check')[0]?.context.count).toBe(2);
+  });
+
+  it('a far-out change whose write failed is retried from the cache next run: no provider call', async () => {
+    h.writeResult = 'failed';
+    h.fetchFlightLegs.mockResolvedValue(answer([farLeg('3')]));
+    const store = useFlightStatusStore();
+    await store.run('segment-changed');
+    expect(updateSegment).toHaveBeenCalledTimes(1);
+    expect(store.verificationFor('seg-1')).toMatchObject({ state: 'changed', applied: false });
+    h.writeResult = 'saved';
+    await store.run('tick');
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(1);
+    expect(events('flight check run').at(-1)?.context.detail).toBe('out_of_window=1');
+    expect(updateSegment).toHaveBeenCalledTimes(2);
+    expect(segment().terminal).toBe('3');
+    expect(store.verificationFor('seg-1')).toMatchObject({ state: 'changed', applied: true });
+    expect(events('flight change write retried')[0]?.context).toEqual({
+      action: 'apply_retry',
+      count: 1,
+      notif_skipped: 0,
+    });
+  });
+
+  it('a corrected airport drops the old answer: a failed re-ask does not keep "Couldn\'t find this flight"', async () => {
+    vacationsState.vacations = [trip([far({ departureAirport: 'Hong Kong (HKG)' })])];
+    h.fetchFlightLegs.mockResolvedValue(answer([farLeg()]));
+    const store = useFlightStatusStore();
+    await store.run('segment-changed');
+    expect(store.verificationFor('seg-1')).toMatchObject({
+      state: 'unavailable',
+      reason: 'no_match',
+    });
+    vacationsState.vacations = [trip([far()])];
+    h.fetchFlightLegs.mockRejectedValue(new FlightStatusApiError('http_5xx', 'down', 503));
+    await store.run('segment-changed');
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(2);
+    expect(store.checks['seg-1']).toBeUndefined();
+    expect(readFlightStatusCache('fam-1')?.checks['seg-1']).toBeUndefined();
+    expect(store.verificationFor('seg-1')).toMatchObject({
+      state: 'unavailable',
+      reason: 'before_window',
+    });
+  });
+
+  it('an in-window flight is not an entry check', async () => {
+    vacationsState.vacations = [trip([makeFlight()])];
+    h.fetchFlightLegs.mockResolvedValue(answer([makeLeg({})]));
+    await useFlightStatusStore().run('open');
+    expect(events('flight entry check')).toHaveLength(0);
+    expect(stamps()).toEqual({});
+  });
+
+  it('a far-out change stays dismissed across a prune 8 days later', async () => {
+    h.fetchFlightLegs.mockResolvedValue(answer([farLeg('3')]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    expect(store.verificationFor('seg-1')).toMatchObject({ state: 'changed' });
+    const id = liveNoticeId('seg-1', segment('seg-1'))!;
+    store.noticeFirstSeen(id, 'seg-1');
+    expect(store.dismissNotice('seg-1')).toBe(true);
+    vi.setSystemTime(NOW + 8 * DAY);
+    await store.run('tick');
+    expect(store.verificationFor('seg-1')?.dismissed).toBe(true);
+    expect(readFlightStatusCache('fam-1')?.dismissed[id]).toBeDefined();
+    expect(readFlightStatusCache('fam-1')?.noticed[id]).toBeDefined();
+  });
+
+  it('a far-out written cancellation keeps its dismissal and notice stamp across the prune', async () => {
+    h.fetchFlightLegs.mockResolvedValue(answer([{ ...farLeg(), status: 'Canceled' }]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    expect(store.verificationFor('seg-1')).toMatchObject({ state: 'cancelled', applied: true });
+    const bellId = liveNoticeId('seg-1', segment('seg-1'))!;
+    store.noticeFirstSeen(bellId, 'seg-1');
+    expect(store.dismissNotice('seg-1')).toBe(true);
+    vi.setSystemTime(NOW + 8 * DAY);
+    await store.run('tick');
+    expect(store.verificationFor('seg-1')?.dismissed).toBe(true);
+    expect(readFlightStatusCache('fam-1')?.noticed[bellId]).toBeDefined();
+  });
+
+  it('synced live fields with no notice left do not hold notice state past the floor', async () => {
+    // This device does not check (switch off): the synced fields alone decide.
+    settings.liveFlightChecksEnabled = false;
+    const at = new Date(NOW).toISOString();
+    vacationsState.vacations = [
+      trip([
+        far({
+          departureTime: '18:30',
+          liveRevision: 'rev-far',
+          liveAppliedAt: at,
+          liveWas: { departureTime: '17:00', at },
+        }),
+      ]),
+    ];
+    const store = useFlightStatusStore();
+    await store.run('open');
+    expect(store.verificationFor('seg-1')).toMatchObject({ state: 'changed' });
+    const id = liveNoticeId('seg-1', segment('seg-1'))!;
+    store.noticeFirstSeen(id, 'seg-1');
+    expect(store.dismissNotice('seg-1')).toBe(true);
+    // Put back by hand on another device: the plan matches `liveWas` again, so there is no
+    // notice, while the synced live fields (and so the bell id) stay.
+    segment('seg-1').departureTime = '17:00';
+    expect(store.verificationFor('seg-1')?.state).toBe('unavailable');
+    expect(liveNoticeId('seg-1', segment('seg-1'))).toBe(id);
+    vi.setSystemTime(NOW + 8 * DAY);
+    await store.run('tick');
+    const cached = readFlightStatusCache('fam-1')!;
+    expect(cached.dismissed[id]).toBeUndefined();
+    expect(cached.noticed[id]).toBeUndefined();
+  });
+
+  it('registers no flight alert for a flight outside its window (Phase 2 untouched)', async () => {
+    h.platform = 'ios';
+    h.fetchFlightLegs.mockResolvedValue(answer([farLeg()]));
+    await useFlightStatusStore().run('open');
+    expect(h.subscribeAlert).not.toHaveBeenCalled();
+  });
+});
+
+describe('option C: unresolved far-out answers', () => {
+  const DAY = 24 * 60 * MIN;
+  const FAR = '2027-06-10';
+  const far = (over: Partial<VacationTravelSegment> = {}) =>
+    makeFlight({ departureDate: FAR, arrivalDate: FAR, ...over });
+  const farLeg = (terminal = '2') =>
+    makeLeg({
+      dep: { scheduledLocal: `${FAR} 17:00+08:00`, scheduledUtc: `${FAR} 09:00Z`, terminal },
+      arr: { scheduledLocal: `${FAR} 23:10+00:00`, scheduledUtc: `${FAR} 23:10Z` },
+    });
+
+  beforeEach(() => {
+    vacationsState.vacations = [trip([far()])];
+  });
+
+  it('an unresolved answer that ages out releases its stamp and is asked once more, same run', async () => {
+    h.writeResult = 'failed';
+    h.fetchFlightLegs.mockResolvedValue(answer([farLeg('3')]));
+    const store = useFlightStatusStore();
+    await store.run('segment-changed');
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(1);
+    vi.setSystemTime(NOW + 8 * DAY);
+    await store.run('tick');
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(2);
+    expect(events('flight entry stamp released')[0]?.context).toEqual({
+      action: 'entry_released',
+      count: 1,
+    });
+  });
+
+  it('a "no such flight" answer is released too; a verified one is never asked again', async () => {
+    h.fetchFlightLegs.mockResolvedValue(answer([makeLeg({ number: 'SQ 999' })]));
+    const store = useFlightStatusStore();
+    await store.run('segment-changed');
+    expect(store.verificationFor('seg-1')).toMatchObject({ reason: 'no_match' });
+    vi.setSystemTime(NOW + 8 * DAY);
+    await store.run('tick');
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(2);
+
+    h.fetchFlightLegs.mockReset();
+    h.fetchFlightLegs.mockResolvedValue(answer([farLeg('2')]));
+    setActivePinia(createPinia());
+    localStorage.clear();
+    const other = useFlightStatusStore();
+    vi.setSystemTime(NOW);
+    await other.run('segment-changed');
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(1);
+    vi.setSystemTime(NOW + 8 * DAY);
+    await other.run('tick');
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(1);
+  });
+
+  it('an out-of-window owed write backs off 5, 10 minutes, then retries and clears on success', async () => {
+    h.writeResult = 'failed';
+    h.fetchFlightLegs.mockResolvedValue(answer([farLeg('3')]));
+    const store = useFlightStatusStore();
+    await store.run('segment-changed');
+    expect(updateSegment).toHaveBeenCalledTimes(1);
+
+    await store.run('tick'); // first owed retry: fails, backs off 5 min
+    expect(updateSegment).toHaveBeenCalledTimes(2);
+
+    expect(events('flight change write retried')).toHaveLength(1);
+    expect(events('flight change write retried')[0]).toMatchObject({
+      level: 'info',
+      context: { action: 'apply_retry', count: 1, notif_skipped: 0 },
+    });
+
+    vi.setSystemTime(NOW + 1 * MIN);
+    await store.run('tick');
+    expect(updateSegment).toHaveBeenCalledTimes(2);
+    // Everything owed is waiting out its backoff: the deferral still shows, at debug.
+    expect(events('flight change write retried')).toHaveLength(2);
+    expect(events('flight change write retried')[1]).toMatchObject({
+      level: 'debug',
+      context: { action: 'apply_retry', count: 0, notif_skipped: 1 },
+    });
+
+    vi.setSystemTime(NOW + 6 * MIN);
+    await store.run('tick'); // due: fails again, backs off 10 min
+    expect(updateSegment).toHaveBeenCalledTimes(3);
+    vi.setSystemTime(NOW + 12 * MIN);
+    await store.run('tick');
+    expect(updateSegment).toHaveBeenCalledTimes(3);
+
+    h.writeResult = 'saved';
+    vi.setSystemTime(NOW + 17 * MIN);
+    await store.run('tick');
+    expect(updateSegment).toHaveBeenCalledTimes(4);
+    expect(segment().terminal).toBe('3');
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('option C: who may resolve, and the retry event', () => {
+  const DAY = 24 * 60 * MIN;
+  const FAR = '2027-06-10';
+  const farLeg = makeLeg({
+    dep: { scheduledLocal: `${FAR} 17:00+08:00`, scheduledUtc: `${FAR} 09:00Z`, terminal: '3' },
+    arr: { scheduledLocal: `${FAR} 23:10+00:00`, scheduledUtc: `${FAR} 23:10Z` },
+  });
+
+  it('a change a view-only device may not write keeps its stamp: not asked again', async () => {
+    vacationsState.vacations = [trip([makeFlight({ departureDate: FAR, arrivalDate: FAR })])];
+    canEdit.value = false;
+    h.fetchFlightLegs.mockResolvedValue(answer([farLeg]));
+    const store = useFlightStatusStore();
+    await store.run('segment-changed');
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(1);
+    vi.setSystemTime(NOW + 8 * DAY);
+    await store.run('tick');
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(1);
+    expect(events('flight entry stamp released')).toHaveLength(0);
+  });
+
+  it('an editor whose member has not resolved yet at prune is not stranded: the stamp is released', async () => {
+    vacationsState.vacations = [trip([makeFlight({ departureDate: FAR, arrivalDate: FAR })])];
+    // Before the member resolves, the edit permission reads false on an editor's device too.
+    canEdit.value = false;
+    family.currentMember = null;
+    h.fetchFlightLegs.mockResolvedValue(answer([farLeg]));
+    const store = useFlightStatusStore();
+    await store.run('segment-changed');
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(1);
+    vi.setSystemTime(NOW + 8 * DAY);
+    await store.run('tick');
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(2);
+    expect(events('flight entry stamp released')).toHaveLength(1);
+  });
+
+  it('a retry run that defers some owed writes counts them in notif_skipped', async () => {
+    vacationsState.vacations = [
+      trip([makeFlight(), makeFlight({ id: 'seg-2', departureDate: FAR, arrivalDate: FAR })]),
+    ];
+    h.writeResult = 'failed';
+    h.fetchFlightLegs.mockImplementation(async ({ date }: { date: string }) =>
+      answer([date === FAR ? farLeg : moved])
+    );
+    const store = useFlightStatusStore();
+    await store.run('open');
+    await store.run('tick'); // both owed and retried; the far one backs off 5 min
+    vi.setSystemTime(NOW + 1 * MIN);
+    await store.run('tick');
+    expect(events('flight change write retried').at(-1)).toMatchObject({
+      level: 'info',
+      context: { action: 'apply_retry', count: 1, notif_skipped: 1 },
+    });
+    expect(events('flight change write retried').at(-1)?.context).toEqual({
+      action: 'apply_retry',
+      count: 1,
+      notif_skipped: 1,
+    });
+  });
+});
+
 describe('revert and take the airline', () => {
   it('"Put it back" is a Conflict; "Use the airline\'s" is changed again', async () => {
     h.fetchFlightLegs.mockResolvedValue(answer([moved]));
@@ -609,6 +984,10 @@ describe('revert and take the airline', () => {
     expect(segment()).toMatchObject({ departureTime: '17:00', terminal: 'Terminal 2' });
     expect(store.verificationFor('seg-1')?.state).toBe('conflict');
     expect(events('flight change reverted')).toHaveLength(1);
+    expect(events('flight change reverted')[0]?.context).toEqual({
+      action: 'reverted',
+      detail: 'revert',
+    });
 
     // A later run must not undo the family's choice.
     vi.setSystemTime(NOW + LATER);
@@ -616,7 +995,7 @@ describe('revert and take the airline', () => {
     expect(segment().departureTime).toBe('17:00');
     expect(events('flight conflict shown')).toHaveLength(1);
 
-    expect(await store.takeAirline('seg-1')).toBe('saved');
+    expect((await store.takeAirline('seg-1')).result).toBe('saved');
     expect(segment().departureTime).toBe('18:30');
     expect(store.verificationFor('seg-1')?.state).toBe('changed');
     expect(events('flight airline taken')[0]?.context.action).toBe('take_airline');
@@ -632,7 +1011,7 @@ describe('revert and take the airline', () => {
     for (let i = 0; i < 2; i++) {
       vi.setSystemTime(NOW + LATER * (i + 1));
       expect(await store.revert('seg-1')).toBe('saved');
-      expect(await store.takeAirline('seg-1')).toBe('saved');
+      expect((await store.takeAirline('seg-1')).result).toBe('saved');
     }
     expect(segment().notes).toBe(appliedNotes);
     expect(segment().liveAppliedAt).toBe(appliedAt);
@@ -653,7 +1032,179 @@ describe('revert and take the airline', () => {
   });
 
   it('take the airline without a cached leg is missing', async () => {
-    expect(await useFlightStatusStore().takeAirline('seg-1')).toBe('missing');
+    expect((await useFlightStatusStore().takeAirline('seg-1')).result).toBe('missing');
+  });
+});
+
+describe('one-step conflict resolution (take the airline, then Undo)', () => {
+  /** The airline moved the flight, the plan took it, then the family edited the time by hand. */
+  async function handEditConflict() {
+    h.fetchFlightLegs.mockResolvedValue(answer([moved]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    const v = vacationsState.vacations[0]!;
+    v.travelSegments = v.travelSegments.map((s) => ({ ...s, departureTime: '19:00' }));
+    expect(store.verificationFor('seg-1')?.state).toBe('conflict');
+    return store;
+  }
+
+  it('take folds the notice it would raise; Undo gives the family values and the visible Conflict back', async () => {
+    const store = await handEditConflict();
+    const { result, undo } = await store.takeAirline('seg-1');
+    expect(result).toBe('saved');
+    expect(segment().departureTime).toBe('18:30');
+    expect(store.verificationFor('seg-1')).toMatchObject({ state: 'changed', dismissed: true });
+    expect(events('flight notice dismissed').at(-1)?.context).toMatchObject({
+      action: 'dismissed',
+      detail: 'take_airline',
+    });
+
+    expect(await undo!()).toBe('saved');
+    expect(segment().departureTime).toBe('19:00');
+    expect(store.verificationFor('seg-1')?.state).toBe('conflict');
+    expect(store.verificationFor('seg-1')?.dismissed).toBeUndefined();
+    expect(events('flight notice reopened')).toHaveLength(1);
+    expect(events('flight notice reopened')[0]?.context).toMatchObject({ detail: 'undo_take' });
+    expect(events('flight change reverted').at(-1)?.context).toEqual({ action: 'undo_take' });
+  });
+
+  it('a failed Undo is logged as undo_failed, never as a Put it back failure', async () => {
+    const store = await handEditConflict();
+    const { undo } = await store.takeAirline('seg-1');
+    h.writeResult = 'failed';
+    expect(await undo!()).toBe('failed');
+    expect(events('flight change apply failed').at(-1)?.context).toEqual({
+      action: 'undo_failed',
+      save_status: 'failed',
+    });
+    expect(events('flight notice reopened')).toHaveLength(0);
+  });
+
+  it('a cancel-Conflict taken on the provider path: Undo puts the status and the Conflict back', async () => {
+    h.fetchFlightLegs.mockResolvedValue(answer([makeLeg({ status: 'Canceled' })]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    const v = vacationsState.vacations[0]!;
+    v.travelSegments = v.travelSegments.map((s) => ({ ...s, status: 'booked' as const }));
+    expect(store.verificationFor('seg-1')?.state).toBe('conflict');
+    const { result, undo } = await store.takeAirline('seg-1');
+    expect(result).toBe('saved');
+    expect(segment().status).toBe('pending');
+    expect(store.verificationFor('seg-1')).toMatchObject({ state: 'cancelled', dismissed: true });
+    expect(await undo!()).toBe('saved');
+    expect(updateSegment.mock.calls.at(-1)?.[2]).toEqual({ status: 'booked' });
+    expect(segment().status).toBe('booked');
+    expect(store.verificationFor('seg-1')?.state).toBe('conflict');
+    expect(store.verificationFor('seg-1')?.dismissed).toBeUndefined();
+  });
+
+  it('a Conflict the person had already folded stays folded after Undo, with no false reopen', async () => {
+    const store = await handEditConflict();
+    expect(store.dismissNotice('seg-1')).toBe(true);
+    const { undo } = await store.takeAirline('seg-1');
+    expect(await undo!()).toBe('saved');
+    expect(store.verificationFor('seg-1')).toMatchObject({ state: 'conflict', dismissed: true });
+    expect(events('flight notice reopened')).toHaveLength(0);
+  });
+
+  it('a quiet-fill Conflict has no notice to fold: no dismiss_skipped warn, Undo still works', async () => {
+    vacationsState.vacations = [trip([makeFlight({ terminal: undefined })])];
+    h.fetchFlightLegs.mockResolvedValue(answer([makeLeg({})]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    const v = vacationsState.vacations[0]!;
+    v.travelSegments = v.travelSegments.map((s) => ({ ...s, departureTime: '19:00' }));
+    expect(store.verificationFor('seg-1')?.state).toBe('conflict');
+    const { result, undo } = await store.takeAirline('seg-1');
+    expect(result).toBe('saved');
+    expect(events('flight notice dismiss skipped')).toHaveLength(0);
+    expect(events('flight notice dismissed')).toHaveLength(0);
+    expect(await undo!()).toBe('saved');
+    expect(segment().departureTime).toBe('19:00');
+    expect(events('flight notice reopened')).toHaveLength(0);
+  });
+
+  it('a fold the person re-made during the toast is theirs: Undo leaves it, with no reopen', async () => {
+    const store = await handEditConflict();
+    const { undo } = await store.takeAirline('seg-1');
+    // Same millisecond as the take's fold: ownership is by action, not by timestamp.
+    expect(store.showNotice('seg-1')).toBe(true);
+    expect(store.dismissNotice('seg-1')).toBe(true);
+    expect(await undo!()).toBe('saved');
+    expect(store.verificationFor('seg-1')).toMatchObject({ state: 'conflict', dismissed: true });
+    const undoReopens = events('flight notice reopened').filter(
+      (e) => e.context.detail === 'undo_take'
+    );
+    expect(undoReopens).toHaveLength(0);
+  });
+
+  it('a take that records a newer airline revision is announced like any change: no Undo, no fold', async () => {
+    // The change was not written (no permission), so the plan still holds the old values when
+    // the person taps: the take records the airline's revision through planChange.
+    canEdit.value = false;
+    h.fetchFlightLegs.mockResolvedValue(answer([moved]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    expect(store.verificationFor('seg-1')).toMatchObject({ state: 'changed', applied: false });
+    canEdit.value = true;
+    const out = await store.takeAirline('seg-1');
+    expect(out).toEqual({ result: 'saved' });
+    expect(segment().liveRevision).toBeDefined();
+    expect(segment().notes).toMatch(/Changed on/);
+    expect(store.verificationFor('seg-1')).toMatchObject({ state: 'changed', applied: true });
+    expect(store.verificationFor('seg-1')?.dismissed).toBeUndefined();
+    expect(events('flight notice dismissed')).toHaveLength(0);
+  });
+
+  it('Undo of a take that moved the date writes the custom sortDate back with it', async () => {
+    h.fetchFlightLegs.mockResolvedValue(answer([nextDay]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    expect(segment().departureDate).toBe('2026-12-14');
+    const v = vacationsState.vacations[0]!;
+    v.travelSegments = v.travelSegments.map((s) => ({
+      ...s,
+      departureDate: '2026-12-13',
+      sortDate: '2026-12-01',
+    }));
+    expect(store.verificationFor('seg-1')?.state).toBe('conflict');
+    const { undo } = await store.takeAirline('seg-1');
+    expect(segment().departureDate).toBe('2026-12-14');
+    expect(await undo!()).toBe('saved');
+    // `updateSegment` only fills sortDate from departureDate when the patch names none.
+    expect(updateSegment.mock.calls.at(-1)?.[2]).toMatchObject({
+      departureDate: '2026-12-13',
+      sortDate: '2026-12-01',
+    });
+  });
+
+  it('Undo of a take that moved the date on a segment with no sortDate clears the one the move added', async () => {
+    h.fetchFlightLegs.mockResolvedValue(answer([nextDay]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    const v = vacationsState.vacations[0]!;
+    v.travelSegments = v.travelSegments.map(({ sortDate: _s, ...s }) => ({
+      ...s,
+      departureDate: '2026-12-13',
+    }));
+    expect('sortDate' in segment()).toBe(false);
+    expect(store.verificationFor('seg-1')?.state).toBe('conflict');
+    const { undo } = await store.takeAirline('seg-1');
+    expect(await undo!()).toBe('saved');
+    const patch = updateSegment.mock.calls.at(-1)?.[2] as Record<string, unknown>;
+    expect(patch).toMatchObject({ departureDate: '2026-12-13' });
+    // Present and undefined: `updateSegment` keeps it (no re-derive) and the write clears it.
+    expect('sortDate' in patch).toBe(true);
+    expect(patch.sortDate).toBeUndefined();
+  });
+
+  it('a failed take has no Undo and folds nothing', async () => {
+    const store = await handEditConflict();
+    h.writeResult = 'failed';
+    const out = await store.takeAirline('seg-1');
+    expect(out).toEqual({ result: 'failed' });
+    expect(events('flight notice dismissed')).toHaveLength(0);
+    expect(store.verificationFor('seg-1')?.state).toBe('conflict');
   });
 });
 
@@ -696,6 +1247,69 @@ describe('"Got it" on this device', () => {
     expect(updateSegment).toHaveBeenCalledTimes(2);
     expect(store.verificationFor('seg-1')).toMatchObject({ state: 'changed' });
     expect(store.verificationFor('seg-1')?.dismissed).toBeUndefined();
+  });
+
+  it('an airline change not in the plan (no permission) can be dismissed, and stays dismissed', async () => {
+    canEdit.value = false;
+    h.fetchFlightLegs.mockResolvedValue(answer([moved]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    expect(store.verificationFor('seg-1')).toMatchObject({ state: 'changed', applied: false });
+    expect(store.dismissNotice('seg-1')).toBe(true);
+    expect(store.verificationFor('seg-1')?.dismissed).toBe(true);
+    expect(events('flight notice dismiss skipped')).toHaveLength(0);
+    // The next due run brings the same answer: still folded, and in a new session too.
+    vi.setSystemTime(NOW + LATER);
+    await store.run('tick');
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(2);
+    expect(store.verificationFor('seg-1')?.dismissed).toBe(true);
+    setActivePinia(createPinia());
+    expect(useFlightStatusStore().verificationFor('seg-1')?.dismissed).toBe(true);
+  });
+
+  it('a new airline revision reopens a dismissed change that is not in the plan', async () => {
+    canEdit.value = false;
+    h.fetchFlightLegs.mockResolvedValue(answer([moved]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    expect(store.dismissNotice('seg-1')).toBe(true);
+    vi.setSystemTime(NOW + LATER);
+    h.fetchFlightLegs.mockResolvedValue(answer([nextDay]));
+    await store.run('tick');
+    expect(store.verificationFor('seg-1')).toMatchObject({ state: 'changed', applied: false });
+    expect(store.verificationFor('seg-1')?.dismissed).toBeUndefined();
+  });
+
+  it('a cancellation dismissed before its write lands stays dismissed once written', async () => {
+    canEdit.value = false;
+    h.fetchFlightLegs.mockResolvedValue(answer([makeLeg({ status: 'Canceled' })]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    expect(store.verificationFor('seg-1')).toMatchObject({ state: 'cancelled', applied: false });
+    expect(store.dismissNotice('seg-1')).toBe(true);
+    // The member gains the edit permission; the next run writes the cancellation.
+    canEdit.value = true;
+    vi.setSystemTime(NOW + LATER);
+    await store.run('tick');
+    expect(segment().liveCancelledAt).toBeDefined();
+    expect(store.verificationFor('seg-1')).toMatchObject({ state: 'cancelled', applied: true });
+    expect(store.verificationFor('seg-1')?.dismissed).toBe(true);
+  });
+
+  it("a finished flight's notice state drops at the first prune a week on", async () => {
+    h.fetchFlightLegs.mockResolvedValue(answer([moved]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    const id = liveNoticeId('seg-1', segment())!;
+    store.noticeFirstSeen(id, 'seg-1');
+    expect(store.dismissNotice('seg-1')).toBe(true);
+    // The flight landed on the 13th; the segment (and its notice id) is still in the trip.
+    vi.setSystemTime(NOW + 8 * 24 * 60 * MIN);
+    await store.run('tick');
+    expect(liveNoticeId('seg-1', segment())).toBe(id);
+    const cached = readFlightStatusCache('fam-1')!;
+    expect(cached.dismissed[id]).toBeUndefined();
+    expect(cached.noticed[id]).toBeUndefined();
   });
 
   it('a flight with nothing to tell has nothing to dismiss, and says so', async () => {

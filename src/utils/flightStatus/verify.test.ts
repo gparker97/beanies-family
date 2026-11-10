@@ -12,6 +12,7 @@ import {
   revertPlan,
   shouldApply,
   takeProviderPatch,
+  unresolvedEntry,
   usableCheck,
   type VerifyContext,
 } from './verify';
@@ -29,6 +30,7 @@ const ctx = (over: Partial<VerifyContext> = {}): VerifyContext => ({
   entitled: true,
   configured: true,
   online: true,
+  minIntervalMs: 30 * 60_000,
   ...over,
 });
 
@@ -231,6 +233,18 @@ describe('deriveVerification: unavailable reasons', () => {
 
   it('no match, and no coverage, from the cached miss', () => {
     expect(reason(makeFlight(), makeCheck(null))).toBe('no_match');
+    expect(reason(makeFlight(), makeCheck(null, { miss: 'no_coverage' }))).toBe('no_coverage');
+  });
+
+  it('far out: a real flight on another route reads no_match; no_coverage reads Checks from', () => {
+    const far = { inWindow: false, opensAt: '2026-12-10T09:00:00.000Z' };
+    expect(reason(makeFlight(), makeCheck(null), far)).toBe('no_match');
+    expect(reason(makeFlight(), makeCheck(null, { miss: undefined }), far)).toBe('no_match');
+    expect(reason(makeFlight(), makeCheck(null, { miss: 'no_coverage' }), far)).toBe(
+      'before_window'
+    );
+    // A legacy check without `miss` reads the same in the window.
+    expect(reason(makeFlight(), makeCheck(null, { miss: undefined }))).toBe('no_match');
     expect(reason(makeFlight(), makeCheck(null, { miss: 'no_coverage' }))).toBe('no_coverage');
   });
 
@@ -449,6 +463,34 @@ describe('shouldApply / planChange: idempotency', () => {
   });
 });
 
+describe('unresolvedEntry', () => {
+  it('a flight the airline does not fly on this route is unresolved, on any device', () => {
+    expect(unresolvedEntry(makeFlight(), makeCheck(null), true)).toBe(true);
+    expect(unresolvedEntry(makeFlight(), makeCheck(null), false)).toBe(true);
+  });
+
+  it('a change the plan does not carry is unresolved for a device that may write it', () => {
+    expect(unresolvedEntry(makeFlight(), makeCheck(moved), true)).toBe(true);
+  });
+
+  it('a change a view-only device may not write is not unresolved for it', () => {
+    expect(unresolvedEntry(makeFlight(), makeCheck(moved), false)).toBe(false);
+  });
+
+  it('a verified answer, and an applied one, are resolved', () => {
+    expect(unresolvedEntry(makeFlight(), makeCheck(makeLeg({})), true)).toBe(false);
+    const seg = makeFlight();
+    const applied = { ...seg, ...planChange(seg, moved, undefined, NOW, COPY) };
+    expect(unresolvedEntry(applied, makeCheck(moved), true)).toBe(false);
+  });
+
+  it('no_coverage (nothing published yet) is not unresolved', () => {
+    expect(unresolvedEntry(makeFlight(), makeCheck(null, { miss: 'no_coverage' }), true)).toBe(
+      false
+    );
+  });
+});
+
 describe('usableCheck: the check answers this flight on this day', () => {
   it('needs the current flight number', () => {
     expect(usableCheck(makeFlight(), makeCheck(makeLeg({})))).toBeDefined();
@@ -562,5 +604,31 @@ describe('delayMinutes', () => {
 
   it('null without an estimate', () => {
     expect(delayMinutes(makeLeg({}))).toBeNull();
+  });
+});
+
+describe('deriveVerification: fresh', () => {
+  it('is true inside the cadence and false at it, and absent without a provider answer', () => {
+    const at = (age: number) =>
+      deriveVerification(
+        makeFlight(),
+        makeCheck(makeLeg({}), { checkedAt: NOW - age }),
+        undefined,
+        ctx({ minIntervalMs: 30 * 60_000 })
+      );
+    expect(at(30 * 60_000 - 1).fresh).toBe(true);
+    expect(at(30 * 60_000).fresh).toBe(false);
+    expect(deriveVerification(makeFlight(), undefined, undefined, ctx()).fresh).toBeUndefined();
+  });
+
+  it('is false outside the check window, however young the check (no cadence out there)', () => {
+    const v = deriveVerification(
+      makeFlight(),
+      makeCheck(makeLeg({}), { checkedAt: NOW - 60_000 }),
+      undefined,
+      ctx({ inWindow: false, minIntervalMs: 30 * 60_000 })
+    );
+    expect(v.state).toBe('verified');
+    expect(v.fresh).toBe(false);
   });
 });

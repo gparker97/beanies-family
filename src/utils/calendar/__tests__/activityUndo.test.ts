@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { FamilyActivity } from '@/types/models';
 import {
   MOVE_KEYS,
-  captureBefore,
+  captureActivityBefore,
   undoRecipeFor,
   type ScopedSaveOutcome,
 } from '@/utils/calendar/activityUndo';
@@ -40,9 +40,9 @@ const saved = (
   reapedCount,
 });
 
-describe('captureBefore', () => {
+describe('captureActivityBefore', () => {
   it('captures every move key, with explicit undefined for absent ones', () => {
-    const before = captureBefore(makeActivity(), MOVE_KEYS);
+    const before = captureActivityBefore(makeActivity(), MOVE_KEYS);
     expect(Object.keys(before).sort()).toEqual([...MOVE_KEYS].sort());
     expect(before).toMatchObject({ date: '2026-09-02', startTime: '16:00', endTime: '17:00' });
     expect('endDate' in before).toBe(true);
@@ -53,7 +53,7 @@ describe('captureBefore', () => {
 
   it('detaches arrays and the rule from the live record', () => {
     const live = makeActivity();
-    const before = captureBefore(live, MOVE_KEYS);
+    const before = captureActivityBefore(live, MOVE_KEYS);
     live.assigneeIds!.push('m2');
     live.rule!.weekdays = [4];
     expect(before.assigneeIds).toEqual(['m1']);
@@ -66,7 +66,7 @@ describe('captureBefore', () => {
   });
 
   it('captures only the keys asked for', () => {
-    expect(captureBefore(makeActivity(), ['date', 'endDate'])).toEqual({
+    expect(captureActivityBefore(makeActivity(), ['date', 'endDate'])).toEqual({
       date: '2026-09-02',
       endDate: undefined,
     });
@@ -89,8 +89,8 @@ describe('captureBefore', () => {
 });
 
 describe('undoRecipeFor', () => {
-  const beforeTemplate = captureBefore(makeActivity(), MOVE_KEYS);
-  const beforeChild = captureBefore(
+  const beforeTemplate = captureActivityBefore(makeActivity(), MOVE_KEYS);
+  const beforeChild = captureActivityBefore(
     makeActivity({ id: 'child', parentActivityId: 'tpl', recurrence: 'none', rule: undefined }),
     MOVE_KEYS
   );

@@ -9,6 +9,9 @@
  * `chipLabel` (utils/flightStatus/copy.ts), so the chip says what the briefing and bell say.
  * A flight that is over carries no chip (`hasFlightChip`): this renders nothing for it.
  *
+ * The dot pulses while the verification is `fresh` (the store's one freshness rule: the latest
+ * answer is within the cadence we promise); the live pill's tick uses the same flag.
+ *
  * With `reveals` the chip is a button ("Show what changed"): the card sets it when the notice
  * block under the band was folded away with "Got it", so the undo is one tap from the chip.
  *
@@ -26,7 +29,7 @@
 import { computed } from 'vue';
 import type { FlightVerification } from '@/types/flightStatus';
 import { useTranslation } from '@/composables/useTranslation';
-import { chipLabel } from '@/utils/flightStatus/copy';
+import { chipLabel, isAlertStatus } from '@/utils/flightStatus/copy';
 
 const props = defineProps<{
   verification: FlightVerification;
@@ -42,18 +45,12 @@ const emit = defineEmits<{ click: [] }>();
 
 const { t, currentLanguage } = useTranslation();
 
-/** The pulse runs while a check is fresh (under an hour), then the dot sits still. */
-const FRESH_MS = 60 * 60 * 1000;
-
 type Look =
   'verified' | 'alert' | 'changed' | 'conflict' | 'cancelled' | 'unavailable' | 'not-live';
 
 const look = computed<Look>(() => {
   const v = props.verification;
-  if (v.state === 'verified') {
-    const s = v.live?.status;
-    return s === 'CanceledUncertain' || s === 'Diverted' ? 'alert' : 'verified';
-  }
+  if (v.state === 'verified') return isAlertStatus(v.live?.status) ? 'alert' : 'verified';
   return v.state;
 });
 
@@ -70,12 +67,6 @@ const LOOK_CLASS: Record<Look, string> = {
 };
 
 const label = computed(() => chipLabel(t, props.verification, props.nowMs, currentLanguage?.value));
-
-const fresh = computed(
-  () =>
-    props.verification.checkedAt !== undefined &&
-    props.nowMs - props.verification.checkedAt < FRESH_MS
-);
 </script>
 
 <template>
@@ -99,7 +90,7 @@ const fresh = computed(
     <span
       v-if="look === 'verified'"
       class="inline-block h-2 w-2 shrink-0 rounded-full bg-current"
-      :class="{ 'live-dot': fresh }"
+      :class="{ 'live-dot': verification.fresh }"
       aria-hidden="true"
     />
     <!-- Changed: an arrow ("it moved") -->

@@ -382,6 +382,45 @@ export function hasFlightChip(v: FlightVerification): boolean {
 }
 
 /**
+ * The display-only provider statuses that paint a `verified` chip orange with the alert glyph
+ * ("May be cancelled", "Diverted"), never green. The chip's `alert` look and `confirmedLive`
+ * both ask this.
+ */
+export function isAlertStatus(status: string | undefined): boolean {
+  return status === 'CanceledUncertain' || status === 'Diverted';
+}
+
+/**
+ * This value is confirmed: the airline's latest answer on this device (`checkedAt`, however old;
+ * the chip says how long ago) is verified, or is an airline change this plan already carries,
+ * and in either case is not an alert status (`isAlertStatus`: "May be cancelled", "Diverted").
+ * Drives the tick in the live pill. Deliberately NOT gated on `fresh` (greg, 2026-11-10): a
+ * cadence gate hid the tick whenever the tab had been in the background or the 15-minute poll
+ * had not yet caught up, which in practice was most of the time. The chip's pulse stays `fresh`.
+ */
+export function confirmedLive(v: FlightVerification): boolean {
+  if (v.checkedAt === undefined || isAlertStatus(v.live?.status)) return false;
+  return v.state === 'verified' || (v.state === 'changed' && v.applied === true);
+}
+
+/**
+ * The plan's terminal is confirmed: a `confirmedLive` answer whose airline terminal is the plan's
+ * (compared as `normaliseTerminal` reads it: "T2" is "Terminal 2"). Drives the pill on the flight
+ * terminal row, which is plan data rather than a live reading.
+ */
+export function confirmsTerminal(
+  v: FlightVerification | undefined,
+  terminal: string | undefined
+): boolean {
+  return (
+    !!v &&
+    confirmedLive(v) &&
+    !!v.provider?.terminal &&
+    normaliseTerminal(v.provider.terminal) === normaliseTerminal(terminal)
+  );
+}
+
+/**
  * The chip's label for a verification, or null when it carries no chip (`hasFlightChip`).
  * Display-only provider statuses (`CanceledUncertain`, `Diverted`) override `verified`, never
  * a written state.

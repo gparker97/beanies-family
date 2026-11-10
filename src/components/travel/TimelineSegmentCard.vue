@@ -36,7 +36,8 @@ import BeanieTimePicker from '@/components/ui/BeanieTimePicker.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useMemberInfo } from '@/composables/useMemberInfo';
 import { safeExternalHref } from '@/utils/url';
-import { hasFlightChip } from '@/utils/flightStatus/copy';
+import { confirmedLive, hasFlightChip } from '@/utils/flightStatus/copy';
+import { carriesNotice } from '@/utils/flightStatus/verify';
 import type { TimelineItem } from '@/composables/useVacationTimeline';
 import type { FlightVerification } from '@/types/flightStatus';
 import type { UIStringKey } from '@/services/translation/uiStrings';
@@ -82,15 +83,15 @@ const flightCheck = computed(() =>
 );
 const clock = computed(() => props.nowMs ?? Date.now());
 
+/** The live values on this card match the airline's latest answer (`confirmedLive`). */
+const confirmed = computed(() => !!flightCheck.value && confirmedLive(flightCheck.value));
+
 /** A flight that is over carries no chip (`hasFlightChip`); its band and notes stay. */
 const showChip = computed(() => !!flightCheck.value && hasFlightChip(flightCheck.value));
 
-const showNotice = computed(() => {
-  const s = flightCheck.value?.state;
-  return (
-    (s === 'changed' || s === 'conflict' || s === 'cancelled') && !flightCheck.value?.dismissed
-  );
-});
+const showNotice = computed(
+  () => !!flightCheck.value && carriesNotice(flightCheck.value) && !flightCheck.value.dismissed
+);
 /** The block was folded away with "Got it": the chip reopens it. */
 const chipReveals = computed(() => flightCheck.value?.dismissed === true);
 
@@ -311,9 +312,23 @@ async function copy(value: string): Promise<void> {
           {{ row.value }}
           <span
             v-if="row.live"
-            class="font-outfit text-secondary-500 dark:text-silk-lift ml-1.5 inline-flex items-center rounded-full bg-[var(--tint-silk-20)] px-1.5 text-xs font-semibold"
+            class="font-outfit text-secondary-500 dark:text-silk-lift ml-1.5 inline-flex items-center gap-1 rounded-full bg-[var(--tint-silk-20)] px-1.5 text-xs font-semibold"
+            :title="confirmed ? t('travel.live.pillConfirmed') : undefined"
           >
+            <svg
+              v-if="confirmed"
+              class="dark:text-success-lift h-3 w-3 shrink-0 text-green-800"
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              aria-hidden="true"
+            >
+              <path d="M3.5 8.5l3 3 6-7" />
+            </svg>
             {{ t('travel.live.pill') }}
+            <span v-if="confirmed" class="sr-only">{{ t('travel.live.pillConfirmed') }}</span>
           </span>
         </span>
       </div>

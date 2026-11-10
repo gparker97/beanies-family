@@ -230,7 +230,8 @@ export type FlightSkipReason =
   | 'fresh';
 
 export type FlightRefreshDecision =
-  { action: 'skip'; reason: FlightSkipReason } | { action: 'fetch'; reason: 'no-check' | 'stale' };
+  | { action: 'skip'; reason: FlightSkipReason }
+  | { action: 'fetch'; reason: 'no-check' | 'stale' | 'entry' };
 
 export interface FlightRefreshInput {
   /** Sign-out is under way (`haltForSignOut`). */
@@ -255,10 +256,20 @@ export interface FlightRefreshInput {
   minIntervalMs: number;
   /** Epoch ms before which a failure's backoff holds (0 when none). */
   backoffUntil: number;
+  /** This device has already issued an out-of-window check for this segment's CURRENT
+   *  question (`entryChecked` stamp equals `entryQuestion`). Inert inside the window. */
+  entryDone: boolean;
 }
 
 /** The refresh decision for one flight. Skip reasons are checked in `FlightSkipReason` order:
- *  the device-wide gates first, then the flight's own. */
+ *  the device-wide gates first, then the flight's own.
+ *
+ * Out of the window a flight is fetched ONCE per question (`'entry'`: its number, day and
+ * airports as entered), so a typo or an already-moved schedule shows up when the flight is
+ * typed, not three days before departure. The stamp (`entryDone`) is the only out-of-window
+ * gate: not the trigger kind (`segment-changed` also fires on every doc load), not the clock,
+ * and not `lastCheckedAt` (a usable `no_match` answer must not block a re-ask once the
+ * question changes). The decision lives here so `backoff` and the stamp are one ordering. */
 export function pickFlightRefresh(input: FlightRefreshInput): FlightRefreshDecision {
   if (input.halted) return { action: 'skip', reason: 'halted' };
   if (!input.entitled) return { action: 'skip', reason: 'unentitled' };
@@ -267,8 +278,9 @@ export function pickFlightRefresh(input: FlightRefreshInput): FlightRefreshDecis
   if (!input.online) return { action: 'skip', reason: 'offline' };
   if (!input.hasFlightNumber) return { action: 'skip', reason: 'no_flight_number' };
   if (input.past) return { action: 'skip', reason: 'past' };
-  if (!input.inWindow) return { action: 'skip', reason: 'out_of_window' };
+  if (!input.inWindow && input.entryDone) return { action: 'skip', reason: 'out_of_window' };
   if (input.nowMs < input.backoffUntil) return { action: 'skip', reason: 'backoff' };
+  if (!input.inWindow) return { action: 'fetch', reason: 'entry' };
   if (input.lastCheckedAt === null) return { action: 'fetch', reason: 'no-check' };
   if (input.nowMs - input.lastCheckedAt < input.minIntervalMs) {
     return { action: 'skip', reason: 'fresh' };
