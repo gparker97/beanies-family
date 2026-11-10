@@ -17,16 +17,6 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
-    version: '2026.11.10.1',
-    date: '2026-11-10',
-    month: '10 november 2026',
-    summary: {
-      en: "Flight details that match the airline now show a small tick, and updating to the airline's times is one tap with Undo.",
-      beanie:
-        "flight details that match the airline now show a small tick, and updating to the airline's times is one tap with undo.",
-    },
-  },
-  {
     version: '2026.11.10',
     date: '2026-11-10',
     month: '10 november 2026',
