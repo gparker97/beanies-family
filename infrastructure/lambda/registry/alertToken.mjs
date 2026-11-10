@@ -2,7 +2,7 @@
  * The flight-alert entitlement token, SIGNER half (#143 Phase 2, requirement 17).
  *
  *   exp   = epoch seconds, the start of the NEXT whole UTC hour after minting, plus 7 days
- *   sig   = base64url(HMAC-SHA256(FLIGHT_ALERT_TOKEN_SECRET, "alert:v1:" + exp))   (43 chars)
+ *   sig   = the base64url of an HMAC-SHA256 over `alert:v1:<exp>` keyed with the token secret   (43 chars)
  *   token = `v1.${exp}.${sig}`
  *
  * Minted by the registry GET (`entitlementFor` in index.mjs) inside the `entitlement` object, for
