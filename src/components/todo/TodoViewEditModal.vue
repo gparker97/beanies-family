@@ -287,6 +287,16 @@ function handleDescriptionKeydown(e: KeyboardEvent) {
 }
 
 // Auto-save handlers for picker components
+function handleDateChange(value: string) {
+  draftDueDate.value = value;
+  saveField('dueDate');
+}
+
+// The calendar closed without a pick (Escape, a tap outside): back to the read view.
+function endDateEdit() {
+  if (editingField.value === 'dueDate') cancelEdit();
+}
+
 function handleTimeChange(value: string) {
   draftDueTime.value = value;
   saveField('dueTime');
@@ -565,25 +575,13 @@ async function handleDelete() {
             </span>
           </template>
           <template #edit>
-            <div class="flex items-center gap-2">
-              <div class="flex-1">
-                <BeanieDatePicker v-model="draftDueDate" />
-              </div>
-              <button
-                class="dark:text-purple-lift flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-purple-600 transition-colors hover:bg-purple-100 dark:hover:bg-purple-900/30"
-                @click.stop="saveField('dueDate')"
-              >
-                <svg
-                  class="h-4 w-4"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2.5"
-                  viewBox="0 0 24 24"
-                >
-                  <path d="M5 13l4 4L19 7" />
-                </svg>
-              </button>
-            </div>
+            <!-- A pick is the whole edit: it saves at once, like the time beside it -->
+            <BeanieDatePicker
+              :model-value="draftDueDate"
+              auto-open
+              @update:model-value="handleDateChange"
+              @close="endDateEdit"
+            />
           </template>
         </InlineEditField>
         <!-- #123: only the repeat moves a repeating to-do's date -->
@@ -596,16 +594,28 @@ async function handleDelete() {
         </p>
       </FormFieldGroup>
 
-      <!-- Due time — only shown when a date exists (never for someday · maybe), inline editable -->
-      <FormFieldGroup
-        v-if="!todo.someday && (todo.dueDate || editingField === 'dueDate')"
-        :label="t('modal.startTime')"
+      <!-- Show from: when this to-do starts showing (the store refuses, toasts and logs) -->
+      <div
+        v-if="todo.dueDate && showRule && showFieldShown"
+        class="px-1"
+        data-testid="todo-show-edit"
       >
+        <TodoShowField
+          :model-value="showRule"
+          :repeating="repeating"
+          :due-date="todo.dueDate"
+          :readonly="!showFieldEditable"
+          @update:model-value="handleShowChange"
+        />
+      </div>
+
+      <!-- Due time — only shown when a date exists (never for someday · maybe), inline editable -->
+      <FormFieldGroup v-if="!todo.someday && todo.dueDate" :label="t('modal.startTime')">
         <InlineEditField
           :editing="editingField === 'dueTime'"
           :disabled="!caps?.editDueTime"
           tint-color="purple"
-          @start-edit="(todo.dueDate || draftDueDate) && startEdit('dueTime')"
+          @start-edit="startEdit('dueTime')"
         >
           <template #view>
             <span
@@ -623,21 +633,6 @@ async function handleDelete() {
           </template>
         </InlineEditField>
       </FormFieldGroup>
-
-      <!-- Show from: when this to-do starts showing (the store refuses, toasts and logs) -->
-      <div
-        v-if="todo.dueDate && showRule && showFieldShown"
-        class="px-1"
-        data-testid="todo-show-edit"
-      >
-        <TodoShowField
-          :model-value="showRule"
-          :repeating="repeating"
-          :due-date="todo.dueDate"
-          :readonly="!showFieldEditable"
-          @update:model-value="handleShowChange"
-        />
-      </div>
 
       <!-- #123: Repeats (the block's markup lives in TodoRepeatField; this keeps the wiring) -->
       <FormFieldGroup

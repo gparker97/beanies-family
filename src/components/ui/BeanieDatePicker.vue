@@ -28,6 +28,11 @@ interface Props {
    * every other call site keeps the pill.
    */
   variant?: 'default' | 'composer';
+  /**
+   * Open the calendar as soon as the picker mounts. For inline-edit hosts, where the tap that
+   * revealed the picker already said "change this date" and a second tap on the trigger is noise.
+   */
+  autoOpen?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -38,10 +43,13 @@ const props = withDefaults(defineProps<Props>(), {
   label: '',
   required: false,
   variant: 'default',
+  autoOpen: false,
 });
 
 const emit = defineEmits<{
   'update:modelValue': [value: string];
+  /** The calendar closed, with or without a pick (a pick emits `update:modelValue` first). */
+  close: [];
 }>();
 
 const { t } = useTranslation();
@@ -154,7 +162,9 @@ function openPopover() {
 }
 
 function closePopover() {
+  if (!isOpen.value) return;
   isOpen.value = false;
+  emit('close');
 }
 
 function toggle() {
@@ -257,6 +267,7 @@ onMounted(() => {
   document.addEventListener('keydown', handleKeydown);
   window.addEventListener('scroll', handleViewportChange, true);
   window.addEventListener('resize', handleViewportChange);
+  if (props.autoOpen) openPopover();
 });
 onBeforeUnmount(() => {
   document.removeEventListener('mousedown', handleClickOutside);

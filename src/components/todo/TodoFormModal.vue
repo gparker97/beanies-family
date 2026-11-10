@@ -223,21 +223,21 @@ async function handleSave(): Promise<void> {
       />
     </FormFieldGroup>
 
-    <!-- One box: due date, due time and (with a date) when it starts showing -->
+    <!-- One box: due date, (with a date) when it starts showing, then the due time -->
     <div
       class="dark:border-line dark:bg-surface-overlay space-y-3 rounded-[14px] border border-[var(--tint-slate-10)] bg-white px-3 py-3"
       data-testid="todo-when-box"
     >
-      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <FormFieldGroup :label="t('todo.dueDate')" optional>
-          <BeanieDatePicker v-model="dueDate" />
-        </FormFieldGroup>
-        <!-- A time only means something with a date; `toCreateTodoInput` also drops an orphan. -->
-        <FormFieldGroup v-if="dueDate" :label="t('todo.dueTime')" optional>
-          <BeanieTimePicker v-model="dueTime" clearable />
-        </FormFieldGroup>
-      </div>
+      <!-- Date, then when it shows, then the time: the date unlocks the show choice, the time
+           changes neither -->
+      <FormFieldGroup :label="t('todo.dueDate')" optional>
+        <BeanieDatePicker v-model="dueDate" />
+      </FormFieldGroup>
       <TodoShowField v-model="showRule" :repeating="repeatOn" :due-date="dueDate" />
+      <!-- A time only means something with a date; `toCreateTodoInput` also drops an orphan. -->
+      <FormFieldGroup v-if="dueDate" :label="t('todo.dueTime')" optional>
+        <BeanieTimePicker v-model="dueTime" clearable />
+      </FormFieldGroup>
     </div>
 
     <FormFieldGroup :label="t('todo.repeat.label')" optional>

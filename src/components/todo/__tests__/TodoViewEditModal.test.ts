@@ -18,6 +18,7 @@ import TodoRepeatField from '../TodoRepeatField.vue';
 import LinkedCardChip from '../LinkedCardChip.vue';
 import CreatedMeta from '@/components/common/CreatedMeta.vue';
 import InlineEditField from '@/components/ui/InlineEditField.vue';
+import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import { useFamilyStore } from '@/stores/familyStore';
 import type { TodoItem, TodoRepeat } from '@/types/models';
 
@@ -116,6 +117,41 @@ describe('TodoViewEditModal (#123)', () => {
     expect(fieldLabels(w)).toContain('todo.repeat.label');
     expect(w.getComponent(BeanieFormModalStub).props('showDelete')).toBe(true);
     expect(w.find('[data-testid="todo-date-follows"]').exists()).toBe(false);
+  });
+
+  it('picking a due date saves it at once: no confirm step, and the read view returns', async () => {
+    const w = mountDrawer(todo({ dueDate: '2026-10-14' }));
+    const dateField = w
+      .findAllComponents({ name: 'FormFieldGroup' })
+      .find((f) => f.props('label') === 'todo.dueDate')!;
+    await dateField.getComponent(InlineEditField).trigger('click');
+    const picker = dateField.getComponent(BeanieDatePicker);
+    expect(picker.props('autoOpen')).toBe(true);
+
+    picker.vm.$emit('update:modelValue', '2026-10-20');
+    await flushPromises();
+    expect(store.updateTodo).toHaveBeenCalledWith('t-1', { dueDate: '2026-10-20' });
+    expect(dateField.findComponent(BeanieDatePicker).exists()).toBe(false);
+  });
+
+  it('closing the calendar without a pick saves nothing and returns to the read view', async () => {
+    const w = mountDrawer(todo({ dueDate: '2026-10-14' }));
+    const dateField = w
+      .findAllComponents({ name: 'FormFieldGroup' })
+      .find((f) => f.props('label') === 'todo.dueDate')!;
+    await dateField.getComponent(InlineEditField).trigger('click');
+    dateField.getComponent(BeanieDatePicker).vm.$emit('close');
+    await flushPromises();
+    expect(store.updateTodo).not.toHaveBeenCalled();
+    expect(dateField.findComponent(BeanieDatePicker).exists()).toBe(false);
+  });
+
+  it('Show From sits directly under the due date, above the time', () => {
+    const w = mountDrawer(todo({ dueDate: '2099-10-14' }));
+    const html = w.html();
+    const show = html.indexOf('data-testid="todo-show-edit"');
+    expect(show).toBeGreaterThan(-1);
+    expect(show).toBeLessThan(html.indexOf('modal.startTime'));
   });
 
   it('a repeating to-do: no Track as, Due Date locked with its hint, Skip goes to the store', async () => {

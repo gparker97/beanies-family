@@ -262,6 +262,16 @@ function handleDescriptionKeydown(e: KeyboardEvent) {
 }
 
 // Auto-save for category picker
+function handleDateChange(value: string) {
+  draftDate.value = value;
+  saveField('date');
+}
+
+// The calendar closed without a pick (Escape, a tap outside): back to the read view.
+function endDateEdit() {
+  if (editingField.value === 'date') cancelEdit();
+}
+
 function handleCategoryChange(value: string) {
   draftCategory.value = value;
   saveField('category');
@@ -534,25 +544,13 @@ async function handleDelete() {
             </div>
           </template>
           <template #edit>
-            <div class="flex items-center gap-2">
-              <div class="flex-1">
-                <BeanieDatePicker v-model="draftDate" />
-              </div>
-              <button
-                class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-orange-600 transition-colors hover:bg-orange-100 dark:hover:bg-orange-900/30"
-                @click.stop="saveField('date')"
-              >
-                <svg
-                  class="h-4 w-4"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2.5"
-                  viewBox="0 0 24 24"
-                >
-                  <path d="M5 13l4 4L19 7" />
-                </svg>
-              </button>
-            </div>
+            <!-- A pick is the whole edit: it saves at once -->
+            <BeanieDatePicker
+              :model-value="draftDate"
+              auto-open
+              @update:model-value="handleDateChange"
+              @close="endDateEdit"
+            />
           </template>
         </InlineEditField>
       </FormFieldGroup>
