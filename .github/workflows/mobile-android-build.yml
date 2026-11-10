@@ -3,7 +3,8 @@ name: Mobile — Android debug APK
 # Spike (ADR-029): build an installable, UNSIGNED debug APK for the Capacitor
 # Android wrapper so we can validate on a real device that the app loads and the
 # Automerge WASM initializes in the WebView. Public repo → free runners; a debug
-# APK needs no signing, so this needs no secrets and no Apple/Google account.
+# APK needs no signing, so this needs no signing secrets and no Apple/Google account.
+# It does need GOOGLE_SERVICES_JSON (the Firebase client config for flight-change push).
 #
 # Builds on pushes to main (the Capacitor work merged from spike/capacitor-mobile)
 # + manual dispatch. Docs-only pushes are skipped. This is a free, unsigned
@@ -99,6 +100,22 @@ jobs:
           # "Not checked live" (the client's not_configured path), never an error.
           VITE_FLIGHT_STATUS_URL: ${{ vars.FLIGHT_STATUS_URL }}
           VITE_FLIGHT_STATUS_API_KEY: ${{ secrets.FLIGHT_STATUS_API_KEY }}
+
+      - name: Write google-services.json (FCM, Android push)
+        # Flight-change push (#143 Phase 2): @capacitor/push-notifications pulls
+        # firebase-messaging, and the Gradle guard in android/app/build.gradle applies
+        # the google-services plugin only when this file exists. The file is
+        # gitignored (android/.gitignore) and written here from a repo secret holding
+        # the raw JSON. An empty secret fails the job loudly rather than shipping a
+        # build whose push registration silently never works.
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -z "$GOOGLE_SERVICES_JSON" ]; then
+            echo "::error::GOOGLE_SERVICES_JSON secret is empty; android/app/google-services.json cannot be written"
+            exit 1
+          fi
+          printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
 
       - name: Sync Capacitor (Android)
         run: npx cap sync android

@@ -1,18 +1,22 @@
-/* global process, Buffer */
+/* global process */
 /**
  * The flight-status dispatcher, as a factory (#143). `index.mjs` is the Lambda entry point and
- * carries the design header; read it first.
+ * carries the design header (and the module map); read it first.
  *
  * WHY A FACTORY: the provider adapter is a dependency, not a global. `index.mjs` wires the real
  * AeroDataBox adapter; `__tests__/handler.test.mjs` passes a fake one plus an `env` object and a
  * clock, so the handler suite needs no network, no module mocking and no edits to the adapter.
- * Everything the handler reads from the environment is read ONCE, here, at cold start.
+ * Everything the handler reads from the environment is read ONCE, at cold start.
  *
- * This file owns HTTP shape, validation, the limits and the cache. No vendor field is named here:
+ * This file owns two things: the Phase 1 PROXY (`POST /flight-status`: validation, the limits and
+ * the cache) and the DISPATCH to the Phase 2 modules, one job each (plan 2026-11-09, "one module
+ * per job, one factory shape"): `alerts.mjs` (subscribe/unsubscribe), `webhook.mjs` (the
+ * provider's callback) and `cleanup.mjs` (the 6-hourly sweep). No vendor field is named here:
  * the adapter returns beanies `FlightLeg`s and throws `ProviderError { code, httpStatus? }`.
  */
 
 import {
+  BUDGET_EXHAUSTED_PREFIX,
   CACHE_UNAVAILABLE_PREFIX,
   RATE_STORE_UNAVAILABLE_PREFIX,
   cacheKey,
@@ -21,13 +25,46 @@ import {
   takeToken,
   ttlSecondsFor,
 } from './store.mjs';
+import {
+  DEFAULT_DAILY_PROVIDER_CAP,
+  DEFAULT_IP_LIMIT,
+  STATUS_FOR_CODE,
+  UPSTREAM_CODES,
+  checkDate,
+  corsHeaders,
+  errorResponse,
+  errorText,
+  jsonResponse,
+  logLine,
+  normaliseFlight,
+  parseOrigins,
+  positiveInt,
+  readJsonBody,
+  softKeyOk,
+} from './http.mjs';
+import { STORE_UNAVAILABLE_PREFIX } from './alertsStore.mjs';
+import { PROVIDER_SUBSCRIBE_FAILED_PREFIX, createAlerts } from './alerts.mjs';
+import { PUSH_SEND_FAILED_PREFIX, WEBHOOK_REJECTED_PREFIX, createWebhook } from './webhook.mjs';
+import { PROVIDER_CANCEL_FAILED_PREFIX, createCleanup } from './cleanup.mjs';
+import { CREDIT_EXHAUSTED_PREFIX, CREDIT_REFILL_FAILED_PREFIX } from './credits.mjs';
+import { createSenders } from './push/index.mjs';
+
+export {
+  STATUS_FOR_CODE,
+  ERROR_CODES,
+  FLIGHT_RE,
+  DATE_RE,
+  normaliseFlight,
+  checkDate,
+} from './http.mjs';
+export { CLEANUP_HEARTBEAT_PREFIX } from './cleanup.mjs';
 
 // ── Alarmed log prefixes ─────────────────────────────────────────────────────────────────────
 // ⚠️ Each is matched VERBATIM by a metric filter in the ops repo's modules/flight-status/main.tf,
 // pinned by its __tests__/alarm-prefixes.test.mjs. Rewording one is a change to both repos.
 export const PROVIDER_AUTH_FAILED_PREFIX = '[flight-status] provider auth FAILED';
 export const PROVIDER_RATE_LIMITED_PREFIX = '[flight-status] provider rate limited';
-export const BUDGET_EXHAUSTED_PREFIX = '[flight-status] daily budget exhausted';
+export { BUDGET_EXHAUSTED_PREFIX };
 
 export const ALARMING_PREFIXES = Object.freeze({
   providerAuthFailed: PROVIDER_AUTH_FAILED_PREFIX,
@@ -35,6 +72,14 @@ export const ALARMING_PREFIXES = Object.freeze({
   cacheUnavailable: CACHE_UNAVAILABLE_PREFIX,
   rateStoreUnavailable: RATE_STORE_UNAVAILABLE_PREFIX,
   budgetExhausted: BUDGET_EXHAUSTED_PREFIX,
+  // Phase 2 (flight change push). Each lives beside the code that writes it.
+  webhookRejected: WEBHOOK_REJECTED_PREFIX,
+  pushSendFailed: PUSH_SEND_FAILED_PREFIX,
+  providerSubscribeFailed: PROVIDER_SUBSCRIBE_FAILED_PREFIX,
+  providerCancelFailed: PROVIDER_CANCEL_FAILED_PREFIX,
+  alertsStoreUnavailable: STORE_UNAVAILABLE_PREFIX,
+  creditBalanceExhausted: CREDIT_EXHAUSTED_PREFIX,
+  creditRefillFailed: CREDIT_REFILL_FAILED_PREFIX,
 });
 
 /**
@@ -48,56 +93,19 @@ export const UNITS_LOW_FRACTION = 0.1;
 /** Logged (not alarmed: terraform's validation block already refuses a bad value) at cold start. */
 export const BAD_MODE_PREFIX = '[flight-status] bad AERODATABOX_MODE';
 
-// ── Error codes ──────────────────────────────────────────────────────────────────────────────
-/**
- * code → HTTP status + a short human message. One mapping, so no branch invents its own, and
- * every non-2xx body carries `{ error, code }`. The client's `FLIGHT_STATUS_CODES` parity test
- * imports `ERROR_CODES` from index.mjs.
- */
-export const STATUS_FOR_CODE = Object.freeze({
-  method_not_allowed: { status: 405, message: 'Method not allowed' },
-  unauthorized: { status: 401, message: 'Unauthorized' },
-  too_large: { status: 413, message: 'Payload too large' },
-  bad_request: { status: 400, message: 'Malformed JSON body' },
-  bad_flight: { status: 400, message: 'Flight number not recognised' },
-  bad_date: { status: 400, message: 'Date must be YYYY-MM-DD' },
-  date_out_of_range: { status: 400, message: 'Date outside the checkable range' },
-  rate_limited: { status: 429, message: 'Too many requests' },
-  budget_exhausted: { status: 503, message: 'Daily flight-check budget used up' },
-  upstream_timeout: { status: 504, message: 'Flight data provider timed out' },
-  upstream_network: { status: 502, message: 'Flight data provider unreachable' },
-  upstream_auth: { status: 502, message: 'Flight data provider refused our credentials' },
-  upstream_rate_limited: { status: 503, message: 'Flight data provider is rate limiting' },
-  upstream_unavailable: { status: 503, message: 'Flight data provider unavailable' },
-  upstream_http: { status: 502, message: 'Flight data provider error' },
-  internal_error: { status: 500, message: 'Internal error' },
+// ── Routes ───────────────────────────────────────────────────────────────────────────────────
+/** API Gateway `routeKey`s, as modules/flight-status/main.tf declares them. */
+export const ROUTES = Object.freeze({
+  proxy: 'POST /flight-status',
+  subscribe: 'POST /flight-status/subscribe',
+  unsubscribe: 'POST /flight-status/unsubscribe',
+  webhook: 'POST /flight-status/webhook/{secret}',
 });
 
-/** Every `code` this handler can return. */
-export const ERROR_CODES = Object.freeze(Object.keys(STATUS_FOR_CODE));
-
-/** The `ProviderError.code`s the adapter may throw; anything else thrown is a bug → 500. */
-const UPSTREAM_CODES = new Set([
-  'upstream_timeout',
-  'upstream_network',
-  'upstream_auth',
-  'upstream_rate_limited',
-  'upstream_unavailable',
-  'upstream_http',
-]);
-
-// ── Input rules ──────────────────────────────────────────────────────────────────────────────
-/** Two-character carrier (IATA, may contain a digit: `U2`, `3K`) + 1-4 digits, after normalising. */
-export const FLIGHT_RE = /^[A-Z0-9]{2}\d{1,4}$/;
-export const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+// ── Proxy input rules ────────────────────────────────────────────────────────────────────────
 /** `{ "flight": "SQ318", "date": "2026-12-13" }` is ~40 bytes. */
 export const MAX_BODY_BYTES = 1024;
-const PAST_DAYS = 2;
-const FUTURE_DAYS = 365;
-const DAY_MS = 86_400_000;
 
-export const DEFAULT_IP_LIMIT = 240;
-export const DEFAULT_DAILY_PROVIDER_CAP = 600;
 export const DEFAULT_MODE = 'direct';
 
 /** The adapter's own fetch is capped at 8 s; never hand it more than the function has left. */
@@ -105,39 +113,12 @@ const PROVIDER_BUDGET_MS = 8000;
 /** Kept back from the deadline for the cache write and the response. */
 const DEADLINE_SLACK_MS = 1500;
 
-/** Upper-case, strip spaces and hyphens, then FLIGHT_RE. `sq 318` / `SQ-318` → `SQ318`. */
-export function normaliseFlight(raw) {
-  if (typeof raw !== 'string' || raw.length > 16) return null;
-  const value = raw.toUpperCase().replace(/[\s-]/g, '');
-  return FLIGHT_RE.test(value) ? value : null;
-}
-
-/** `bad_date` for a malformed or impossible date (2026-02-30), `date_out_of_range` outside the window. */
-export function checkDate(raw, nowMs) {
-  if (typeof raw !== 'string' || !DATE_RE.test(raw)) return 'bad_date';
-  const t = Date.parse(`${raw}T00:00:00Z`);
-  if (!Number.isFinite(t) || new Date(t).toISOString().slice(0, 10) !== raw) return 'bad_date';
-  const n = new Date(nowMs);
-  const today = Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate());
-  if (t < today - PAST_DAYS * DAY_MS || t > today + FUTURE_DAYS * DAY_MS)
-    return 'date_out_of_range';
-  return null;
-}
-
 /** An array, a Set or a frozen map of values → array. Tolerant of how the adapter exports a list. */
 function listOf(x) {
   if (!x) return [];
   if (Array.isArray(x)) return x;
   if (x instanceof Set) return [...x];
   return typeof x === 'object' ? Object.values(x) : [];
-}
-
-function positiveInt(raw, fallback, name) {
-  if (raw === undefined || raw === '') return fallback;
-  const n = Number(raw);
-  if (Number.isInteger(n) && n > 0) return n;
-  console.warn(`[flight-status] ${name} is not a positive integer; using ${fallback}`);
-  return fallback;
 }
 
 function resolveMode(raw, modes) {
@@ -150,15 +131,6 @@ function resolveMode(raw, modes) {
       `${allowed.join('|')}; falling back to "${DEFAULT_MODE}". Fix var.aerodatabox_mode.`
   );
   return DEFAULT_MODE;
-}
-
-/**
- * One structured JSON line per request. Flight and date are public data and no family id exists in
- * this Lambda. NEVER a header, the soft key or the provider key.
- */
-function logLine(msg, fields = {}) {
-  // eslint-disable-next-line no-console -- structured decision line, read by CloudWatch
-  console.log(JSON.stringify({ msg, ...fields }));
 }
 
 /** `{ units_remaining }` for the request line when the provider reported it, else `{}`. */
@@ -178,11 +150,16 @@ function unitsLow(quota) {
 
 /**
  * @param {object}   deps
- * @param {object}   deps.provider   `{ fetchLegs, PROVIDER_MODES }` (the adapter module namespace).
+ * @param {object}   deps.provider   The adapter module namespace: `{ fetchLegs, PROVIDER_MODES,
+ *                                   createAlertsClient?, parseWebhook? }`.
  * @param {object=}  deps.env        Defaults to `process.env`; read once, here.
  * @param {Function=} deps.now       Clock (epoch ms). Injectable so tests need no clock control.
  * @param {Function=} deps.fetchImpl Passed to the adapter; defaults to global fetch.
  * @param {object=}  deps.ddb        `{ send, commands }`; otherwise ddb.mjs's seam/default client.
+ * @param {object=}  deps.alertsProvider  The bound alerts client (tests inject a fake); otherwise
+ *                                   built from `provider.createAlertsClient`.
+ * @param {object=}  deps.senders    `{ senderFor, close }` (tests inject fakes); otherwise
+ *                                   `push/index.mjs`'s `createSenders(env)`.
  */
 export function createHandler({
   provider,
@@ -190,6 +167,8 @@ export function createHandler({
   now = () => Date.now(),
   fetchImpl = globalThis.fetch,
   ddb,
+  alertsProvider,
+  senders,
 } = {}) {
   if (typeof provider?.fetchLegs !== 'function') {
     throw new TypeError('createHandler: provider.fetchLegs is required');
@@ -205,38 +184,33 @@ export function createHandler({
     'DAILY_PROVIDER_CAP'
   );
   const MODE = resolveMode(env.AERODATABOX_MODE, provider.PROVIDER_MODES);
-  const ALLOWED_ORIGINS = (env.CORS_ORIGINS || 'https://app.beanies.family')
-    .split(',')
-    .map((o) => o.trim())
-    .filter(Boolean);
+  const ALLOWED_ORIGINS = parseOrigins(env.CORS_ORIGINS);
 
-  // CORS exactly as content-fetch: echo an allowed origin, else the first one.
-  function getHeaders(event) {
-    const origin = event?.headers?.origin || ALLOWED_ORIGINS[0];
-    const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
-    return {
-      'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': allowedOrigin,
-      'Access-Control-Allow-Headers': 'Content-Type, x-api-key',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    };
-  }
+  // Phase 2 modules: one factory each, the same process-level deps.
+  const alertsClient =
+    alertsProvider ??
+    (typeof provider.createAlertsClient === 'function'
+      ? provider.createAlertsClient({ apiKey: PROVIDER_KEY, mode: MODE, fetchImpl })
+      : null);
+  const moduleDeps = {
+    provider: alertsClient,
+    env,
+    ddb,
+    now,
+    senders: senders ?? createSenders(env),
+  };
+  const alerts = createAlerts(moduleDeps);
+  const webhook = createWebhook(moduleDeps);
+  const cleanup = createCleanup(moduleDeps);
 
-  function response(statusCode, body, event) {
-    return {
-      statusCode,
-      headers: getHeaders(event),
-      body: body === null ? '' : JSON.stringify(body),
-    };
-  }
-
-  return async function handler(event, context) {
+  async function proxy(event, context) {
+    const headers = corsHeaders(event, ALLOWED_ORIGINS);
     const method = event?.requestContext?.http?.method;
-    if (method === 'OPTIONS') return response(204, null, event);
 
     // Every log line carries the same field set, so a Logs Insights query never meets a gap
     // (plus `units_remaining` on a provider answer, when the provider reported its units).
     const log = {
+      route: ROUTES.proxy,
       flight: null,
       date: null,
       outcome: 'bad_request',
@@ -246,35 +220,17 @@ export function createHandler({
       ttl_s: null,
     };
     const fail = (code, outcome, extra = {}) => {
-      const { status, message } = STATUS_FOR_CODE[code];
-      logLine('flight-status', { ...log, outcome, status, code });
-      return response(status, { error: message, code, ...extra }, event);
+      logLine('flight-status', { ...log, outcome, status: STATUS_FOR_CODE[code].status, code });
+      return errorResponse(code, headers, extra);
     };
 
     if (method !== 'POST') return fail('method_not_allowed', 'bad_request');
-
-    // `!API_KEY ||` so an unset key refuses everything rather than accepting an absent header.
-    const key = event?.headers?.['x-api-key'];
-    if (!API_KEY || key !== API_KEY) return fail('unauthorized', 'bad_request');
+    if (!softKeyOk(event, API_KEY)) return fail('unauthorized', 'bad_request');
 
     try {
-      let rawBody = event?.body || '';
-      // Cheap guard before decoding anything: base64 is 4/3 of the bytes it carries.
-      if (rawBody.length > MAX_BODY_BYTES * 2) return fail('too_large', 'bad_request');
-      if (event?.isBase64Encoded) rawBody = Buffer.from(rawBody, 'base64').toString('utf8');
-      if (Buffer.byteLength(rawBody, 'utf8') > MAX_BODY_BYTES) {
-        return fail('too_large', 'bad_request');
-      }
-
-      let parsed;
-      try {
-        parsed = JSON.parse(rawBody || '{}');
-      } catch {
-        return fail('bad_request', 'bad_request');
-      }
-      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-        return fail('bad_request', 'bad_request');
-      }
+      const read = readJsonBody(event, MAX_BODY_BYTES);
+      if (!read.ok) return fail(read.code, 'bad_request');
+      const parsed = read.body;
 
       const flight = normaliseFlight(parsed.flight);
       if (!flight) return fail('bad_flight', 'bad_request');
@@ -312,7 +268,11 @@ export function createHandler({
           status: 200,
           legs: hit.legs.length,
         });
-        return response(200, { legs: hit.legs, fetchedAt: hit.fetchedAt, cached: true }, event);
+        return jsonResponse(
+          200,
+          { legs: hit.legs, fetchedAt: hit.fetchedAt, cached: true },
+          headers
+        );
       }
 
       // A missing provider key would 401 at the vendor on every miss. Say so with the alarmed
@@ -373,9 +333,7 @@ export function createHandler({
         const httpStatus = Number.isFinite(err?.httpStatus) ? err.httpStatus : '-';
         if (!code) {
           // The adapter is contracted to throw only ProviderError; anything else is a bug.
-          console.error(
-            `[flight-status] unhandled provider error mode=${MODE}: ${err?.name}: ${String(err?.message).slice(0, 200)}`
-          );
+          console.error(`[flight-status] unhandled provider error mode=${MODE}: ${errorText(err)}`);
           return fail('internal_error', 'provider_error');
         }
         if (code === 'upstream_auth') {
@@ -416,18 +374,45 @@ export function createHandler({
         ttl_s: ttl,
         ...units,
       });
-      return response(
+      return jsonResponse(
         200,
         { legs, fetchedAt: new Date(nowMs).toISOString(), cached: false },
-        event
+        headers
       );
     } catch (err) {
       // Nothing above is meant to throw (the store fails open, the provider is caught); if
       // something does, the caller still gets a clean CORS-bearing 500 rather than a gateway error.
-      console.error(
-        `[flight-status] unhandled error: ${err?.name}: ${String(err?.message).slice(0, 200)}`
-      );
+      console.error(`[flight-status] unhandled error: ${errorText(err)}`);
       return fail('internal_error', 'internal_error');
+    }
+  }
+
+  /**
+   * THE DISPATCH. `event.task === 'cleanup'` FIRST: the EventBridge rule's constant input
+   * REPLACES the scheduled event, so the sweep arrives as exactly `{ task: 'cleanup' }`. An HTTP
+   * invocation can never carry a top-level `task` (payload 2.0 puts the body in `event.body`, a
+   * string), so this cannot be reached from the internet. Then `event.routeKey`, which API
+   * Gateway HTTP APIs always set; anything else is 404.
+   */
+  return async function handler(event, context) {
+    if (event?.task === 'cleanup') return cleanup(event);
+
+    if (event?.requestContext?.http?.method === 'OPTIONS') {
+      return jsonResponse(204, null, corsHeaders(event, ALLOWED_ORIGINS));
+    }
+
+    switch (event?.routeKey) {
+      case ROUTES.proxy:
+        return proxy(event, context);
+      case ROUTES.subscribe:
+        return alerts.subscribe(event);
+      case ROUTES.unsubscribe:
+        return alerts.unsubscribe(event);
+      case ROUTES.webhook:
+        return webhook(event);
+      default:
+        logLine('flight-status', { route: null, outcome: 'not_found', status: 404 });
+        return errorResponse('not_found', corsHeaders(event, ALLOWED_ORIGINS));
     }
   };
 }

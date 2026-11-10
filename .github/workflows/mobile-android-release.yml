@@ -167,6 +167,22 @@ jobs:
       # cannot self-heal by reloading.
       - name: Enclave crypto stays lazy (no HPKE in the cold-load path)
         run: npm run check:crypto-chunk
+      - name: Write google-services.json (FCM, Android push)
+        # Flight-change push (#143 Phase 2): @capacitor/push-notifications pulls
+        # firebase-messaging, and the Gradle guard in android/app/build.gradle applies
+        # the google-services plugin only when this file exists. The file is
+        # gitignored (android/.gitignore) and written here from a repo secret holding
+        # the raw JSON. An empty secret fails the job loudly rather than shipping a
+        # build whose push registration silently never works.
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -z "$GOOGLE_SERVICES_JSON" ]; then
+            echo "::error::GOOGLE_SERVICES_JSON secret is empty; android/app/google-services.json cannot be written"
+            exit 1
+          fi
+          printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+
       - name: Sync Capacitor (Android)
         run: npx cap sync android
 

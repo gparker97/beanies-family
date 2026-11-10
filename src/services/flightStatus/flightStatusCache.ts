@@ -13,8 +13,20 @@
  * shared device never shows one family's flights to another; sign-out is a single removal.
  * Entries are pruned when their segment is deleted and when the flight is over (arrival + 2 h,
  * or `Arrived`), and nothing is ever kept past 7 days (the provider's cache limit).
+ *
+ * Phase 2 (#143, ADR-046) adds the flight alerts this device registered (`alerts`) and the
+ * ONE push token they were registered under (`pushToken`). Both are optional on the `v: 1`
+ * record and read tolerant (`{}` / `null`): bumping `v` would make `isRecord` reject, and so
+ * delete, every existing record. A registration is pruned only once the server's own item
+ * has expired (`ALERT_EXPIRES_AFTER_MS`): a deleted segment or a closed window is the
+ * reconcile's job, which must still hold the registration to unsubscribe it.
  */
-import type { FlightCheck, FlightCheckFailure, FlightLeg } from '@/types/flightStatus';
+import type {
+  AlertRegistration,
+  FlightCheck,
+  FlightCheckFailure,
+  FlightLeg,
+} from '@/types/flightStatus';
 import { STORAGE_KEYS } from '@/constants/storageKeys';
 import {
   readStoredJson,
@@ -34,6 +46,9 @@ const HOUR_MS = 3_600_000;
 const AFTER_ARRIVAL_MS = 2 * HOUR_MS;
 /** AeroDataBox's terms: provider data is cached for at most 7 days. */
 export const MAX_CHECK_AGE_MS = 7 * 24 * HOUR_MS;
+/** The server's one TTL rule for a device item (`expiresAtFor` in the Lambda's
+ *  `alertsStore.mjs`): the registered date's UTC midnight plus 72 h. */
+export const ALERT_EXPIRES_AFTER_MS = 72 * HOUR_MS;
 
 export interface FlightStatusCacheRecord {
   v: 1;
@@ -42,17 +57,33 @@ export interface FlightStatusCacheRecord {
   failures: Record<string, FlightCheckFailure>;
   /** Change/cancel notice id → epoch ms this device FIRST saw it. Lets the OS notice fire once
    *  per revision per device (a fireAt that moves on every write re-arms a delivered one).
+   *  A stamp EARLIER than first sight means a push told this device first (the push was the
+   *  notice, `pushCovered`): its fireAt is already behind now, so no local OS notice fires.
    *  A record written before this field existed reads as `{}`. */
   noticed: Record<string, number>;
   /** Change/cancel notice id → epoch ms this device dismissed it ("Got it"). The same ids as
    *  `noticed`, so a new airline revision is undismissed by construction. A record written
    *  before this field existed reads as `{}`. */
   dismissed: Record<string, number>;
+  /** Segment id → the flight alert this device registered for it (Phase 2). A record written
+   *  before this field existed reads as `{}`. */
+  alerts: Record<string, AlertRegistration>;
+  /** The push token every entry of `alerts` was registered under; null before the first. */
+  pushToken: string | null;
 }
 
 /** An empty record for a family (a miss, a fresh device). */
 export function emptyFlightStatusCache(familyId: string): FlightStatusCacheRecord {
-  return { v: 1, familyId, checks: {}, failures: {}, noticed: {}, dismissed: {} };
+  return {
+    v: 1,
+    familyId,
+    checks: {},
+    failures: {},
+    noticed: {},
+    dismissed: {},
+    alerts: {},
+    pushToken: null,
+  };
 }
 
 /**
@@ -75,7 +106,13 @@ export function readFlightStatusCache(familyId: string): FlightStatusCacheRecord
     return null;
   }
   return read.value.familyId === familyId
-    ? { ...read.value, noticed: read.value.noticed ?? {}, dismissed: read.value.dismissed ?? {} }
+    ? {
+        ...read.value,
+        noticed: read.value.noticed ?? {},
+        dismissed: read.value.dismissed ?? {},
+        alerts: read.value.alerts ?? {},
+        pushToken: read.value.pushToken ?? null,
+      }
     : null;
 }
 
@@ -100,11 +137,18 @@ function isOver(check: FlightCheck, nowMs: number): boolean {
   return landsAt !== null && nowMs > landsAt + AFTER_ARRIVAL_MS;
 }
 
+/** The registration's server item has expired: nothing is left to unsubscribe. */
+function alertExpired(alert: AlertRegistration, nowMs: number): boolean {
+  const day = Date.parse(`${alert.date}T00:00:00Z`);
+  return Number.isNaN(day) || nowMs > day + ALERT_EXPIRES_AFTER_MS;
+}
+
 /**
  * A copy of `cache` without entries for segments that no longer exist (`liveSegmentIds`),
  * checks for flights that are over, and checks older than 7 days. A failure record goes with
- * its segment only (its backoff must survive a deleted check). Pure; returns the SAME object
- * when nothing was dropped, so the store can skip a pointless write.
+ * its segment only (its backoff must survive a deleted check). A flight alert goes only once
+ * its server item has expired (see the header). Pure; returns the SAME object when nothing
+ * was dropped, so the store can skip a pointless write.
  */
 export function pruneFlightStatusCache(
   cache: FlightStatusCacheRecord,
@@ -136,7 +180,12 @@ export function pruneFlightStatusCache(
     if (nowMs - at <= MAX_CHECK_AGE_MS) dismissed[id] = at;
     else dropped = true;
   }
-  return dropped ? { ...cache, checks, failures, noticed, dismissed } : cache;
+  const alerts: Record<string, AlertRegistration> = {};
+  for (const [id, alert] of Object.entries(cache.alerts)) {
+    if (!alertExpired(alert, nowMs)) alerts[id] = alert;
+    else dropped = true;
+  }
+  return dropped ? { ...cache, checks, failures, noticed, dismissed, alerts } : cache;
 }
 
 /** Remove the record; a refused removal is logged (the next write overwrites it anyway). */
@@ -171,6 +220,24 @@ function isCheck(id: string, v: unknown): v is FlightCheck {
   );
 }
 
+const isOptionalString = (v: unknown): boolean => v === undefined || typeof v === 'string';
+
+function isAlert(v: unknown): v is AlertRegistration {
+  return (
+    isObject(v) &&
+    typeof v.flight === 'string' &&
+    typeof v.date === 'string' &&
+    typeof v.dep === 'string' &&
+    isOptionalString(v.arr) &&
+    typeof v.rev === 'string' &&
+    typeof v.confirmed === 'boolean'
+  );
+}
+
+/** `alerts`: absent (an older record) or segment id → registration. */
+const isAlertMap = (v: unknown): boolean =>
+  v === undefined || (isObject(v) && Object.values(v).every(isAlert));
+
 function isFailure(v: unknown): v is FlightCheckFailure {
   return (
     isObject(v) && typeof v.code === 'string' && isFiniteNumber(v.count) && isFiniteNumber(v.until)
@@ -186,6 +253,8 @@ function isRecord(v: unknown): v is FlightStatusCacheRecord {
     isObject(v.failures) &&
     isStampMap(v.noticed) &&
     isStampMap(v.dismissed) &&
+    isAlertMap(v.alerts) &&
+    (v.pushToken === undefined || v.pushToken === null || typeof v.pushToken === 'string') &&
     Object.entries(v.checks).every(([id, c]) => isCheck(id, c)) &&
     Object.values(v.failures).every(isFailure)
   );

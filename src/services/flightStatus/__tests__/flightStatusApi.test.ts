@@ -9,6 +9,8 @@ import {
   FlightStatusApiError,
   fetchFlightLegs,
   isFlightStatusConfigured,
+  subscribeAlert,
+  unsubscribeAlert,
 } from '../flightStatusApi';
 import { RemoteFetchError } from '@/services/remoteFetchError';
 import { WeatherFetchError } from '@/services/weather/openMeteo';
@@ -172,5 +174,68 @@ describe('the shared error class', () => {
     expect(w.name).toBe('WeatherFetchError');
     expect(w.message).toBe('weather request failed: timeout (HTTP 504)');
     expect(f.service).toBe('flight-status');
+  });
+});
+
+describe('the alert routes (Phase 2)', () => {
+  const body = {
+    flight: 'SQ318',
+    date: '2026-12-13',
+    dep: 'SIN',
+    arr: 'LHR',
+    rev: '2026-12-13|17:00|2|2026-12-13|23:10',
+    platform: 'ios' as const,
+    lang: 'en' as const,
+    token: 'push-tok',
+    alert: 'v1.1765000000.sig',
+  };
+
+  it('subscribe POSTs the body to /subscribe with the soft key and reads `provider`', async () => {
+    fetchMock.mockResolvedValue(respond(200, { ok: true, provider: 'pending' }));
+    expect(await subscribeAlert(body)).toEqual({ provider: 'pending' });
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toBe(`${URL_}/subscribe`);
+    expect(JSON.parse(init.body as string)).toEqual(body);
+    expect((init.headers as Record<string, string>)['x-api-key']).toBe('soft-key');
+    fetchMock.mockResolvedValue(respond(200, { ok: true, provider: 'ready' }));
+    expect(await subscribeAlert(body)).toEqual({ provider: 'ready' });
+  });
+
+  it('anything but a literal ready or pending is unknown (never confirms)', async () => {
+    fetchMock.mockResolvedValue(respond(200, { ok: true }));
+    expect(await subscribeAlert(body)).toEqual({ provider: 'unknown' });
+    fetchMock.mockResolvedValue(respond(200, { ok: true, provider: 'Ready' }));
+    expect(await subscribeAlert(body)).toEqual({ provider: 'unknown' });
+  });
+
+  it('unsubscribe POSTs flight, date and token only, to /unsubscribe', async () => {
+    fetchMock.mockResolvedValue(respond(200, { ok: true }));
+    await unsubscribeAlert({ flight: 'SQ318', date: '2026-12-13', token: 'push-tok' });
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toBe(`${URL_}/unsubscribe`);
+    expect(JSON.parse(init.body as string)).toEqual({
+      flight: 'SQ318',
+      date: '2026-12-13',
+      token: 'push-tok',
+    });
+  });
+
+  it.each([
+    [401, 'alert_token_rejected', 'http_4xx'],
+    [409, 'subscription_full', 'http_4xx'],
+    [503, 'alerts_unavailable', 'http_5xx'],
+    [429, 'budget_exhausted', 'rate_limited'],
+  ])('HTTP %i %s is %s, with the Lambda code kept', async (status, code, want) => {
+    fetchMock.mockResolvedValue(respond(status, { code }));
+    const e = await failure(subscribeAlert(body));
+    expect(e.code).toBe(want);
+    expect(e.lambdaCode).toBe(code);
+    expect(e.httpStatus).toBe(status);
+    expect(e.devHint).toContain('/subscribe');
+  });
+
+  it('a 200 that is not a JSON object is parse', async () => {
+    fetchMock.mockResolvedValue(respond(200, '[1]'));
+    expect((await failure(subscribeAlert(body))).code).toBe('parse');
   });
 });

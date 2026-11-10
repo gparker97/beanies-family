@@ -10930,17 +10930,18 @@ const STRING_DEFS = {
     beanie: 'tell me when a flight changes',
   },
   'reminders.liveChecks.alertsHint': {
-    en: 'A new time, terminal or cancellation is shown here and on this device.',
-    beanie: 'a new time, terminal or cancellation is shown here and on this device.',
+    en: 'A new time, terminal or cancellation is shown here and on this device. On a phone, it also reaches you when the app is closed.',
+    beanie:
+      'a new time, terminal or cancellation is shown here and on this device. on a phone, it also reaches you when the app is closed.',
   },
   'flightChecks.settings.lockedTrial': {
     en: "Live flight checks were part of your free trial. They're included with magic beans.",
     beanie: "live flight checks were part of your free trial. they're included with magic beans.",
   },
   'flightChecks.settings.privacy': {
-    en: 'To check a flight, beanies sends only the flight number and date. Your trip, names and bookings stay in your family file.',
+    en: "To check a flight, beanies sends only the flight number and date. To warn you while the app is closed, beanies' server also keeps that flight number and date with a push address for this phone until the flight has landed. Your trip, names and bookings stay in your family file.",
     beanie:
-      'to check a flight, beanies sends only the flight number and date. your trip, names and bookings stay in your family file.',
+      "to check a flight, beanies sends only the flight number and date. to warn you while the app is closed, beanies' server also keeps that flight number and date with a push address for this phone until the flight has landed. your trip, names and bookings stay in your family file.",
   },
   // List due-date reminder. Nounless "{n} left" mirrors the briefing's own
   // `lists.briefing.*` phrasing, so one wording covers singular and plural with

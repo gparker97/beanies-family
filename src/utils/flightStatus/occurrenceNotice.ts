@@ -60,7 +60,7 @@ function parseMs(iso: string | undefined): number | null {
  * leaves set) is only its timestamp. A recorded cancellation wins over an earlier change; a
  * change counts only when it carries the values it replaced.
  * `nowMs` is not consulted: how long a notice stays news is each surface's own rule
- * (`CHANGE_NEWS_MS` for the briefing, a rolling window for the bell, an hour for the OS).
+ * (`CHANGE_NEWS_MS` for the briefing, a rolling window for the bell, 24 hours for the OS).
  */
 export function occurrenceNotice(
   t: TranslateFn,

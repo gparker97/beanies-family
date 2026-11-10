@@ -14,6 +14,9 @@
  *       Scan the prod registry; for every live (non-tombstoned) family, set cohort = pre_v1 on
  *       its billing row WHERE NO COHORT IS SET YET. Idempotent, and never downgrades first_ten.
  *       Run once, at launch, per the pricing runbook.
+ *   node scripts/billing-cohort.mjs --pre-v1 <familyId> [--apply] [--force]
+ *       Set cohort = pre_v1 (the 50%-for-life coupon) on ONE family, only where it has no cohort
+ *       (never downgrades first_ten). --force overwrites an existing cohort on purpose.
  *   node scripts/billing-cohort.mjs --first-ten <familyId> [--apply]
  *       Set cohort = first_ten ($1/mo, $12/yr Prices). Overwrites pre_v1 on purpose.
  *   node scripts/billing-cohort.mjs --trial-ends-at <familyId> <iso> [--apply]
@@ -63,27 +66,34 @@ export function isExplicitInstant(value) {
 // Each returns the UpdateItem input minus the SDK marshalling, so the test can assert that the
 // expression names this script's attributes and nothing else.
 
-/** cohort = pre_v1, only where no cohort exists: the snapshot never downgrades first_ten. */
-export function snapshotPreV1Update(familyId) {
+/**
+ * The one cohort write. `condition: true` adds `attribute_not_exists(#cohort)` so an existing
+ * cohort is never overwritten; `false` overwrites on purpose.
+ */
+export function cohortUpdate(familyId, cohort, { condition } = { condition: true }) {
   return {
     TableName: BILLING_TABLE,
     Key: { familyId },
     UpdateExpression: 'SET #cohort = :cohort',
-    ConditionExpression: 'attribute_not_exists(#cohort)',
+    ...(condition ? { ConditionExpression: 'attribute_not_exists(#cohort)' } : {}),
     ExpressionAttributeNames: { '#cohort': 'cohort' },
-    ExpressionAttributeValues: { ':cohort': COHORTS.preV1 },
+    ExpressionAttributeValues: { ':cohort': cohort },
   };
+}
+
+/** cohort = pre_v1, only where no cohort exists: the snapshot never downgrades first_ten. */
+export function snapshotPreV1Update(familyId) {
+  return cohortUpdate(familyId, COHORTS.preV1, { condition: true });
+}
+
+/** cohort = pre_v1 on one named family. Guarded (never overwrites a cohort) unless `force`. */
+export function preV1Update(familyId, { force = false } = {}) {
+  return cohortUpdate(familyId, COHORTS.preV1, { condition: !force });
 }
 
 /** cohort = first_ten, unconditionally (upgrading a pre_v1 family is the point). */
 export function firstTenUpdate(familyId) {
-  return {
-    TableName: BILLING_TABLE,
-    Key: { familyId },
-    UpdateExpression: 'SET #cohort = :cohort',
-    ExpressionAttributeNames: { '#cohort': 'cohort' },
-    ExpressionAttributeValues: { ':cohort': COHORTS.firstTen },
-  };
+  return cohortUpdate(familyId, COHORTS.firstTen, { condition: false });
 }
 
 /** trialEndsAt = the override, normalised to a full ISO string (what entitlement.mjs parses). */
@@ -125,6 +135,7 @@ export function selectPreV1Targets(registry, billing) {
 
 const USAGE = `Usage:
   node scripts/billing-cohort.mjs --snapshot-pre-v1 [--apply]
+  node scripts/billing-cohort.mjs --pre-v1 <familyId> [--apply] [--force]
   node scripts/billing-cohort.mjs --first-ten <familyId> [--apply]
   node scripts/billing-cohort.mjs --trial-ends-at <familyId> <iso-with-offset> [--apply]
       e.g. 2027-01-15T00:00:00Z; counts before launch too (runs this family's trial clock)`;
@@ -132,7 +143,8 @@ const USAGE = `Usage:
 /** Parse argv into one command, or throw with the reason and the usage text. */
 export function parseArgs(argv) {
   const apply = argv.includes('--apply');
-  const rest = argv.filter((a) => a !== '--apply');
+  const force = argv.includes('--force');
+  const rest = argv.filter((a) => a !== '--apply' && a !== '--force');
   const [flag, ...params] = rest;
   const fail = (why) => {
     throw new Error(`${why}\n\n${USAGE}`);
@@ -144,12 +156,18 @@ export function parseArgs(argv) {
 
   switch (flag) {
     case '--snapshot-pre-v1':
+      if (force) fail('--force applies only to --pre-v1.');
       if (params.length) fail(`--snapshot-pre-v1 takes no arguments.`);
       return { mode: 'snapshot', apply };
+    case '--pre-v1':
+      if (params.length !== 1) fail('--pre-v1 takes exactly one familyId.');
+      return { mode: 'pre-v1', familyId: requireFamilyId(params[0]), apply, force };
     case '--first-ten':
+      if (force) fail('--force applies only to --pre-v1.');
       if (params.length !== 1) fail('--first-ten takes exactly one familyId.');
       return { mode: 'first-ten', familyId: requireFamilyId(params[0]), apply };
     case '--trial-ends-at': {
+      if (force) fail('--force applies only to --pre-v1.');
       if (params.length !== 2) fail('--trial-ends-at takes a familyId and an ISO date.');
       const iso = params[1];
       if (!isExplicitInstant(iso)) {
@@ -288,7 +306,25 @@ async function singleFamily(sdk, cmd) {
   );
 
   let input;
-  if (cmd.mode === 'first-ten') {
+  let refused = false;
+  if (cmd.mode === 'pre-v1') {
+    input = preV1Update(cmd.familyId, { force: cmd.force });
+    const hasCohort = !!before && Object.hasOwn(before, 'cohort');
+    const current = hasCohort ? (before.cohort ?? 'NULL') : '(none)';
+    if (hasCohort && !cmd.force) {
+      console.log(
+        `no change: cohort already set (${current}); --apply will be refused by the condition; use --force to overwrite`
+      );
+      refused = true;
+    } else {
+      console.log(`Change:  cohort ${current} -> pre_v1`);
+    }
+    if (cmd.force && hasCohort) {
+      console.log(
+        `!!! DOWNGRADE/OVERWRITE: --force replaces the current cohort (${current}) with pre_v1 !!!`
+      );
+    }
+  } else if (cmd.mode === 'first-ten') {
     input = firstTenUpdate(cmd.familyId);
     console.log(`Change:  cohort ${before?.cohort ?? '(none)'} -> first_ten`);
   } else if (cmd.mode === 'trial-ends-at') {
@@ -301,11 +337,21 @@ async function singleFamily(sdk, cmd) {
   }
 
   if (!cmd.apply) {
-    console.log(`\nDry-run complete. Re-run with --apply to write.`);
+    if (!refused) console.log(`\nDry-run complete. Re-run with --apply to write.`);
     return;
   }
 
-  await sendUpdate(sdk, input);
+  try {
+    await sendUpdate(sdk, input);
+  } catch (err) {
+    if (err?.name === 'ConditionalCheckFailedException') {
+      throw new Error(
+        `${cmd.familyId} already has a cohort (${before && Object.hasOwn(before, 'cohort') ? (before.cohort ?? 'NULL') : 'set since the read'}); ` +
+          'refusing to overwrite it. Re-run with --force to replace it on purpose.'
+      );
+    }
+    throw err;
+  }
   console.log('\nDone.');
 }
 

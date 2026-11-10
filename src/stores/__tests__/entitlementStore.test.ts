@@ -420,6 +420,27 @@ describe('the registry observer', () => {
   });
 });
 
+describe('the flight-alert token (#143 Phase 2)', () => {
+  it('rides inside the answer: applied, cached, and read back from the cache next session', () => {
+    const s = useEntitlementStore();
+    expect(s.flightAlertToken).toBeNull();
+    h.observer!(entry(ent({ flightAlertToken: 'v1.1765000000.sig' })));
+    expect(s.flightAlertToken).toBe('v1.1765000000.sig');
+    const cached = JSON.parse(localStorage.getItem(`beanies:entitlement:${FAMILY}`)!);
+    expect(cached.entitlement.flightAlertToken).toBe('v1.1765000000.sig');
+
+    freshPinia();
+    expect(useEntitlementStore().flightAlertToken).toBe('v1.1765000000.sig');
+  });
+
+  it('an answer without one (not eligible, or an older server) is null', () => {
+    const s = useEntitlementStore();
+    h.observer!(entry(ent({ flightAlertToken: 'v1.1765000000.sig' })));
+    h.observer!(entry(ent({ state: 'read_only', reason: 'trial_ended' })));
+    expect(s.flightAlertToken).toBeNull();
+  });
+});
+
 /** A promise the test resolves by hand, to hold a lookup in flight. */
 function deferred<T>() {
   let resolve!: (v: T) => void;

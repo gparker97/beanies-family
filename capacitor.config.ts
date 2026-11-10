@@ -40,6 +40,11 @@ const config: CapacitorConfig = {
       // Heritage Orange — the accent Android draws alongside the silhouette.
       iconColor: '#F15D22',
     },
+    PushNotifications: {
+      // Flight-change push (#143 Phase 2). Without this a push that arrives while the app is
+      // OPEN is swallowed by iOS; with it the system banner shows as it does when closed.
+      presentationOptions: ['badge', 'sound', 'alert'],
+    },
   },
 };
 

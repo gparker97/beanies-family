@@ -158,6 +158,7 @@ function ev({
   const headers = { origin };
   if (key !== null) headers['x-api-key'] = key;
   return {
+    routeKey: 'POST /flight-status',
     requestContext: { http: { method, sourceIp: ip } },
     headers,
     body: typeof body === 'string' ? body : JSON.stringify(body),
@@ -684,7 +685,7 @@ describe('logging', () => {
         Object.keys(l)
           .filter((k) => k !== 'code')
           .sort(),
-        ['date', 'flight', 'legs', 'msg', 'outcome', 'provider_ms', 'status', 'ttl_s']
+        ['date', 'flight', 'legs', 'msg', 'outcome', 'provider_ms', 'route', 'status', 'ttl_s']
       );
     }
     assert.deepEqual(
@@ -771,8 +772,15 @@ describe('contract exports', () => {
     assert.equal(new Set(ERROR_CODES).size, ERROR_CODES.length);
   });
 
-  test('ALARMING_PREFIXES: the five alarmed prefixes', () => {
+  test('ALARMING_PREFIXES: the five Phase 1 and seven Phase 2 alarmed prefixes', () => {
     assert.deepEqual(Object.values(ALARMING_PREFIXES).sort(), [
+      '[flight-alerts] credit balance exhausted',
+      '[flight-alerts] credit refill FAILED',
+      '[flight-alerts] provider cancel FAILED',
+      '[flight-alerts] provider subscribe FAILED',
+      '[flight-alerts] push send FAILED',
+      '[flight-alerts] store unavailable',
+      '[flight-alerts] webhook rejected',
       '[flight-status] cache unavailable',
       '[flight-status] daily budget exhausted',
       '[flight-status] provider auth FAILED',

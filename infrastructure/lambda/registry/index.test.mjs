@@ -1738,6 +1738,50 @@ describe('registry GET: entitlement (#95)', () => {
     expect(computedLines()).toHaveLength(0);
   });
 
+  describe('flightAlertToken (#143 Phase 2)', () => {
+    const SECRET = 'alert-secret-0123456789abcdef0123456789abcdef';
+    afterEach(() => delete process.env.FLIGHT_ALERT_TOKEN_SECRET);
+    const minted = () =>
+      logSpy.mock.calls
+        .map((c) => c[0])
+        .filter((l) => typeof l === 'string' && l.includes('alert_token_minted'))
+        .map((l) => JSON.parse(l));
+
+    it('an eligible family gets an hour-rounded token INSIDE entitlement, naming no family', async () => {
+      process.env.FLIGHT_ALERT_TOKEN_SECRET = SECRET;
+      const { body } = await get(ROW);
+      expect(body.entitlement.flightAlertToken).toMatch(/^v1\.\d+\.[A-Za-z0-9_-]{43}$/);
+      expect(body.entitlement.flightAlertToken).not.toContain(FAMILY_ID);
+      expect(body).not.toHaveProperty('flightAlertToken');
+      const exp = Number(body.entitlement.flightAlertToken.split('.')[1]);
+      expect(exp % 3600).toBe(0);
+      expect(minted()).toEqual([
+        {
+          msg: 'alert_token_minted',
+          family_id_hash: expect.stringMatching(/^[0-9a-f]{64}$/),
+          eligible: true,
+          minted: true,
+        },
+      ]);
+    });
+
+    it('a family past its trial (enforced, read_only) gets no token', async () => {
+      process.env.FLIGHT_ALERT_TOKEN_SECRET = SECRET;
+      process.env.V1_LAUNCH_AT = '2020-01-01T00:00:00.000Z';
+      process.env.BILLING_ENFORCE = 'true';
+      const { body } = await get({ ...ROW, createdAt: '2020-01-01T00:00:00.000Z' });
+      expect(body.entitlement.state).toBe('read_only');
+      expect(body.entitlement).not.toHaveProperty('flightAlertToken');
+      expect(minted()[0]).toMatchObject({ eligible: false, minted: false });
+    });
+
+    it('an unset secret: the field is absent', async () => {
+      const { body } = await get(ROW);
+      expect(body.entitlement).not.toHaveProperty('flightAlertToken');
+      expect(minted()[0]).toMatchObject({ eligible: true, minted: false });
+    });
+  });
+
   it('discards a failed billing read on a 404 without logging it', async () => {
     const { res } = await get(null, { billing: new Error('boom') });
     expect(res.statusCode).toBe(404);

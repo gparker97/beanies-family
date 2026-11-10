@@ -22,16 +22,25 @@
  * Capacitor event — unlike the OAuth redirect, the JS context is never torn
  * down — and because `{ immediate: true }` means the watch consumes any intent
  * stashed before it was created, so ordering can never lose the tap.
+ *
+ * REMOTE PUSH (#143 Phase 2): a tap on a flight-change push lands here too
+ * (`onPushTap(handleReminderTap)` in App.vue). Its payload is `{ kind, flight, date }`
+ * with no link (the server knows no trip), so the intent is the `flight` arm and is
+ * resolved once ready by `flightStatusStore.deepLinkFor`: the trip holding that flight,
+ * else `/travel` (`no_segment`: the flight was deleted or moved since).
  */
 import { ref, computed, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/authStore';
 import { docVersion, isDocLoaded } from '@/services/automerge/docService';
 import { type DeepLink } from '@/utils/entityDeepLink';
+import { useFlightStatusStore } from '@/stores/flightStatusStore';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { reportError } from '@/utils/errorReporter';
 
 const SURFACE = 'local-notifications';
+/** Flight pushes log on the live-flight-checks surface, beside the rest of that journey. */
+const PUSH_SURFACE = 'travel-verify';
 
 /**
  * The notification `extra` payload contract — written by
@@ -43,24 +52,36 @@ export interface ReminderExtra {
   kind?: string;
   at?: number;
   link?: DeepLink;
+  /** A flight-change push (#143 Phase 2): the normalised number and the registered date. */
+  flight?: string;
+  date?: string;
 }
 
-/** One definition of the tap event, so every outcome is shaped identically. */
-function logTapOutcome(
-  outcome: 'navigated' | 'deferred' | 'ignored-no-target',
-  kind?: string
-): void {
+/** A tap waiting to be opened: a link carried in the payload, or a flight to look up. */
+type TapIntent =
+  | { kind: 'link'; link: DeepLink; label?: string }
+  | { kind: 'flight'; flight: string; date: string; label?: string };
+
+type TapOutcome = 'navigated' | 'deferred' | 'ignored-no-target' | 'no_segment';
+
+/** One definition of the tap event, so every outcome is shaped identically. A flight push
+ *  logs as `push_tap` on the flight surface; a local reminder as before. */
+function logTapOutcome(outcome: TapOutcome, label?: string, push = false): void {
   logEvent({
     level: 'info',
-    surface: SURFACE,
+    surface: push ? PUSH_SURFACE : SURFACE,
     message: 'notification tapped',
-    context: { ...(kind ? { notif_kind: kind } : {}), notif_tap_outcome: outcome },
+    context: {
+      ...(push ? { action: 'push_tap' } : {}),
+      ...(label ? { notif_kind: label } : {}),
+      notif_tap_outcome: outcome,
+    },
   });
 }
 
 /** The pending tap, held until the app is ready to navigate. Module-scoped so it
  *  survives from the launch tap until `useReminderTapResume`'s watch runs. */
-const pendingIntent = ref<{ link: DeepLink; kind?: string } | null>(null);
+const pendingIntent = ref<TapIntent | null>(null);
 
 /**
  * The single entry point the notification tap listener calls. Stashes a
@@ -70,8 +91,17 @@ const pendingIntent = ref<{ link: DeepLink; kind?: string } | null>(null);
  */
 export function handleReminderTap(extra: ReminderExtra | undefined): void {
   if (extra?.link) {
-    pendingIntent.value = { link: extra.link, kind: extra.kind };
+    pendingIntent.value = { kind: 'link', link: extra.link, label: extra.kind };
     return; // the watch below resolves this to 'navigated' or 'deferred'
+  }
+  if (typeof extra?.flight === 'string' && typeof extra.date === 'string') {
+    pendingIntent.value = {
+      kind: 'flight',
+      flight: extra.flight,
+      date: extra.date,
+      label: extra.kind,
+    };
+    return; // resolved to the trip (or /travel) once ready
   }
   logTapOutcome('ignored-no-target', extra?.kind);
 }
@@ -110,7 +140,7 @@ export function useReminderTapResume(): void {
       // want a deferral storm in the firehose.
       if (!deferredLogged) {
         deferredLogged = true;
-        logTapOutcome('deferred', intent.kind);
+        logTapOutcome('deferred', intent.label, intent.kind === 'flight');
       }
       return;
     }
@@ -118,9 +148,15 @@ export function useReminderTapResume(): void {
     // a rejecting/broken link can never re-enter and loop.
     pendingIntent.value = null;
     deferredLogged = false;
+    const found =
+      intent.kind === 'link'
+        ? intent.link
+        : useFlightStatusStore().deepLinkFor(intent.flight, intent.date);
+    const target: DeepLink = found ?? { path: '/travel', query: {} };
+    const outcome: TapOutcome = found ? 'navigated' : 'no_segment';
     void router
-      .push(intent.link)
-      .then(() => logTapOutcome('navigated', intent.kind))
+      .push(target)
+      .then(() => logTapOutcome(outcome, intent.label, intent.kind === 'flight'))
       .catch((e) =>
         // NOTE: must be `.catch`, not try/catch — push is a Promise, so a
         // navigation-guard rejection would otherwise escape as an unhandled

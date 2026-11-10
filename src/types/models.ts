@@ -2657,6 +2657,14 @@ export interface Entitlement {
   /** BILLING_ENFORCE on the server. False = dry-run: display the state, never act on it. */
   enforced: boolean;
   serverTime: ISODateString;
+  /**
+   * #143 Phase 2 (ADR-046): the signed, identity-free token that lets this device register for
+   * flight change pushes (`v1.<exp>.<sig>`, a 7-day expiry rounded to the hour, shared by every
+   * entitled family minted in that hour). Present only while the family is eligible (the
+   * server's `alertEligible`); absent on older records and for everyone else. Rides inside the
+   * entitlement so the cache and `applyFromServer` carry it with no change of their own.
+   */
+  flightAlertToken?: string;
 }
 
 /**

@@ -186,3 +186,29 @@ export type FlightStatusErrorCode = RemoteFetchErrorCode | 'not_configured';
 
 /** The per-segment failure record (weather's backoff shape). */
 export type FlightCheckFailure = RemoteFetchFailure<FlightStatusErrorCode>;
+
+/**
+ * One flight alert this device registered with the `flight-status` Lambda (#143 Phase 2,
+ * ADR-046), held in the device cache record (`alerts`, keyed by segment id). What the SERVER
+ * was told, so the reconcile can diff it against the desired set and the suppression rule
+ * (`pushCovered`) can read `rev` as its evidence. The push token it was registered under is
+ * the record's one `pushToken`, never repeated here.
+ */
+export interface AlertRegistration {
+  /** The normalised flight number registered, e.g. "SQ318". */
+  flight: string;
+  /** The segment's departure date when registered, YYYY-MM-DD (the server item's date). */
+  date: string;
+  /** The provider's departure IATA of the leg this device matched. */
+  dep: string;
+  /** The provider's arrival IATA of the arrival sector; absent = no arrival half. */
+  arr?: string;
+  /** The revision this device's plan held when it registered (`registrationRev`). */
+  rev: string;
+  /**
+   * True once the server answered `ready` (it holds a provider subscription for the number).
+   * False records a `pending` or unreadable answer: re-asked each run, and never muting the
+   * local notice (`pushCovered`). Device state only; never sent to the server.
+   */
+  confirmed: boolean;
+}

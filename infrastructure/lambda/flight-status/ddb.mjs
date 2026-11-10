@@ -25,11 +25,15 @@ import { createHash } from 'node:crypto';
  *
  * Lazy so a cold start that 401s, 413s or 400s never pays for SDK initialisation.
  *
- * `maxAttempts` and `requestTimeout` are a DEADLINE, not tuning. The function has 10 s and the
+ * `maxAttempts` and `requestTimeout` are a DEADLINE, not tuning. The function's timeout is 20 s,
+ * raised for the 6-hourly sweep only; every HTTP path keeps the old 10 s budget. The proxy's
  * provider call is allowed 8 s; up to three store calls run before it (IP token, cache read, day
  * token) and one after (cache write). At 2 x 500 ms each a fully degraded store costs ~2 s before
  * the provider, and every one of these calls fails OPEN, so a slow store is latency, never a
  * refusal. The handler also hands the provider a signal bounded by the time actually remaining.
+ * The webhook has the provider's own 10 s window: one Query, a capped fan-out at 3 s per send and
+ * at most one 3 s refill, so a degraded store (1 s per call) still answers inside it. The alerts
+ * store (alertsStore.mjs) fails CLOSED instead, answering `alerts_unavailable`.
  */
 let ddbPromise = null;
 export function defaultClient() {

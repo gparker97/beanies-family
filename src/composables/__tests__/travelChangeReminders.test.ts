@@ -54,7 +54,7 @@ function occ(over: Partial<TravelSegmentOccurrence> = {}): TravelSegmentOccurren
 /** A fake of the store's first-seen stamp: the first call for an id stores `at`. */
 function stamps(at: number = NOW.getTime()) {
   const seen = new Map<string, number>();
-  return (id: string): number => {
+  return (id: string, _segmentId: string): number => {
     if (!seen.has(id)) seen.set(id, at);
     return seen.get(id)!;
   };
@@ -109,6 +109,17 @@ describe('travel change notices (OS)', () => {
     const [n] = notices(i, PREFS, lateNow);
     expect(n!.fireAt.getTime()).toBe(lateNow.getTime() + 5000);
     expect(notices(i, PREFS, new Date(lateNow.getTime() + 60_000))).toEqual([]);
+  });
+
+  it('asks the store with the notice id AND the segment id (the push-covered rule reads it)', () => {
+    const seen = vi.fn(stamps());
+    notices(input(mum, [occ()], seen));
+    expect(seen).toHaveBeenCalledWith('travel-change:seg-1:rev-1', 'seg-1');
+  });
+
+  it('a stamp pre-dated by the store (a push was the notice) fires nothing', () => {
+    const covered = stamps(NOW.getTime() - 10_000);
+    expect(notices(input(mum, [occ()], covered))).toEqual([]);
   });
 
   it('a stale change (over 24 h) first seen now does not fire, and is not stamped', () => {

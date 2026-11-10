@@ -3553,7 +3553,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       'beanies.family checks your family’s flights against the airline’s live schedule, so the plan you trust is the plan the airline is running.',
     icon: '✈\u{FE0F}',
     readTime: 4,
-    updatedDate: '2026-11-07',
+    updatedDate: '2026-11-09',
     sections: [
       {
         type: 'paragraph',
@@ -3648,6 +3648,11 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
           'To check a flight, beanies.family sends only the <strong>flight number and the date</strong>. Your trip, your names and your bookings stay in your family file.',
       },
       {
+        type: 'paragraph',
+        content:
+          'On a phone, a change can also reach you while the app is closed. To make that possible, beanies.family’s server keeps the <strong>flight number and date</strong> together with a <strong>push address</strong> for the phone, until the flight has landed. The server cannot tell whose phone it is: it holds no family, no name, no trip and no booking, and nothing else leaves your device.',
+      },
+      {
         type: 'heading',
         content: 'The switches and who gets it',
         level: 2,
@@ -3657,6 +3662,11 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         type: 'paragraph',
         content:
           'Live flight checks are a <strong>magic beans</strong> feature, included in your free trial. There are two switches in <strong>Settings → Reminders</strong>, under <strong>Live flight checks</strong>: <strong>Live Flight Checks</strong>, and <strong>Tell Me When a Flight Changes</strong>. Both are on by default and apply to this device. Flight reminders stay on for every plan, with or without magic beans.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          '<strong>Tell Me When a Flight Changes</strong> also covers alerts while the app is closed, on the iPhone and Android apps. When the airline moves a flight, the phone shows a notice even if beanies.family is not open, and the plan itself is updated the next time you open the app. The web app shows changes when you open it. Notices go to every adult in the family, and to a travelling child’s phone. When the notice arrives depends on the airline’s feed, so a delivery time cannot be promised; the change always shows up in the app on your next open.',
       },
       {
         type: 'paragraph',

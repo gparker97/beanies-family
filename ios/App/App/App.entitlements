@@ -20,6 +20,14 @@
   ShareExtension target's entitlements, and the identifier must be registered in the
   Developer portal (Identifiers → App Groups) before signing can resolve it.
 
+  Push Notifications (#143 Phase 2): `aps-environment` = production. Flight changes are
+  pushed through APNs while the app is closed. The Lambda speaks to the PRODUCTION APNs
+  host only, so a debug build signed with `development` would get a sandbox token it
+  refuses (BadDeviceToken); test on a TestFlight build. The entitlements file alone
+  carries the capability for signing; project.pbxproj has no SystemCapabilities block
+  (Xcode 16 stores capabilities in the entitlements file), and the App ID must have
+  Push Notifications enabled in the Developer portal.
+
   The former webcredentials:app.beanies.family (passkey) association was retired with
   the native WebAuthn-PRF pivot to the hardware Keystore (ADR-029, 2026-07-14) — native
   biometric no longer uses WebAuthn. Both AASA files now carry the real Apple Team ID
@@ -31,6 +39,8 @@
 -->
 <plist version="1.0">
 <dict>
+	<key>aps-environment</key>
+	<string>production</string>
 	<key>com.apple.developer.associated-domains</key>
 	<array>
 		<string>applinks:beanies.family</string>

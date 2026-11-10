@@ -6,7 +6,7 @@ import LegalLayout from '../layouts/LegalLayout.astro';
   title="privacy policy — beanies.family"
   description="beanies.family is local-first. your family's data lives on your device. we don't collect it, we don't store it, and we don't sell it. ever."
   canonicalPath="/privacy"
-  lastUpdated="16 October 2026"
+  lastUpdated="9 November 2026"
   breadcrumbLabel="privacy policy"
 >
   <section>
@@ -150,6 +150,27 @@ import LegalLayout from '../layouts/LegalLayout.astro';
       <a href="https://open-meteo.com" rel="noopener noreferrer">Open-Meteo</a> only, never through our servers. your
       device's location services and GPS are never used. turning <strong>Show Weather</strong> off stops every lookup,
       and weather readings are cached on your device only.
+    </p>
+  </section>
+
+  <section id="live-flight-checks">
+    <h2>live flight checks</h2>
+    <p>
+      live flight checks compare the flights in a trip with the airline's live schedule. to check a flight, the app
+      sends only the <strong>flight number and the date</strong> to a small beanies.family service, which asks
+      <a href="https://aerodatabox.com" rel="noopener noreferrer">AeroDataBox</a> for that flight. the request carries
+      no family id, no name, no trip and no booking, and AeroDataBox sees only the flight number, the date and the
+      address the request came from, never a family.
+    </p>
+    <p>
+      on the iPhone and Android apps, if "Tell Me When a Flight Changes" is on and you have allowed notifications, a
+      change can also reach you while the app is closed. to make that work, our server keeps the flight number and
+      date together with a <strong>push address</strong> for the phone (the address Apple or Google issues so a
+      notification can find the app), the phone's language and the airline's airport codes for that flight, until the
+      flight has landed. it holds no family, name, trip or booking, so it cannot tell whose phone it is, it is not
+      used for advertising or shared with anyone, and Apple and Google carry the notification. turning the switch off,
+      or signing out, removes it. the change itself is written into your plan on your device, the next time you open
+      the app.
     </p>
   </section>
 
@@ -301,6 +322,7 @@ import LegalLayout from '../layouts/LegalLayout.astro';
       <li><strong>Google Drive:</strong> only if you explicitly enable it — encrypted data only</li>
       <li><strong>Google OAuth:</strong> only when you choose to sign in</li>
       <li><strong>Amazon Web Services:</strong> hosts the family registry, our diagnostic logs and the first-party event record, and sends our occasional owner emails (Amazon SES)</li>
+      <li><strong>AeroDataBox:</strong> only when live flight checks are on — receives a flight number and date (never a family) to look up the flight's live schedule, and sends us change notices that name no one</li>
       <li><strong>Substack:</strong> receives the owner's email address if they opt in to our newsletter at sign-up</li>
       <li><strong>Google Play's install referrer:</strong> Android only; Google passes our own utm tags from the Play link to the app on first launch</li>
       <li>

@@ -129,6 +129,8 @@ export const useEntitlementStore = defineStore('entitlement', () => {
   const cancelAt = computed(() => entitlement.value?.cancelAt ?? null);
   const pastDue = computed(() => entitlement.value?.pastDue === true);
   const interval = computed(() => entitlement.value?.interval ?? null);
+  /** #143 Phase 2: the flight-alert token, or null (not eligible, or an older answer). */
+  const flightAlertToken = computed(() => entitlement.value?.flightAlertToken ?? null);
 
   /** Would the client act on a read-only answer? The flag is read at call time (it changes
    *  only on reload), the server's `enforced` per answer. */
@@ -446,6 +448,7 @@ export const useEntitlementStore = defineStore('entitlement', () => {
     cancelAt,
     pastDue,
     interval,
+    flightAlertToken,
     enforces,
     isReadOnly,
     wouldBeReadOnly,

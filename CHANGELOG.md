@@ -8,6 +8,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-11-09
+
+### Added
+
+- Flight changes now reach your phone as a notification even when the app is closed (magic beans; on during the free trial).
+
 ## 2026-11-08
 
 ### Added

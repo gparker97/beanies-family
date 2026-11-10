@@ -43,6 +43,14 @@ export const travelChangeId = (segmentId: string, revision: string): string =>
 export const travelCancelId = (segmentId: string, revision: string): string =>
   `travel-cancel:${segmentId}:${revision}`;
 
+/**
+ * How long after this device first saw a change/cancel notice its OS notice fires (the OS
+ * needs a future instant). Shared by the reminder builder (`fireAt = firstSeen + this`) and
+ * `flightStatusStore.noticeFirstSeen`, whose pre-dated stamp (a push was the notice) relies on
+ * exactly this sum landing behind now.
+ */
+export const CHANGE_NOTICE_DELAY_MS = 5_000;
+
 /** The bell/OS id of the notice a segment carries right now (`noticeRevision`), or null. The
  *  device-side dismissal is keyed on it, so it shares the "what counts as new" rule. */
 export function liveNoticeId(segmentId: string, live: SegmentLiveState | undefined): string | null {

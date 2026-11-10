@@ -33,22 +33,42 @@
  * leaves an unentitled or switched-off device, and its cards fall back to the synced fields.
  *
  * SIGN-OUT HALTS FIRST, THEN DELETES (`haltForSignOut`, the weather precedent).
+ *
+ * PHASE 2: PUSH (ADR-046). On native, each run ends with `reconcileAlerts`: the pure
+ * `desiredAlerts` / `diffAlerts` (`utils/flightStatus/alerts.ts`) say which flights this
+ * device should be registered for with the Lambda and which calls move it there; the store
+ * acquires a push token when it needs one (`services/native/pushRegistration`, never a
+ * prompt), makes the calls and records the outcome through `recordRegistration`, the ONE
+ * writer of `alerts`. The registration's `rev` is also the suppression evidence:
+ * `noticeFirstSeen` pre-dates the stamp of a notice a push already delivered
+ * (`pushCovered`), so the local OS notice never fires twice; a registration the server has
+ * not confirmed (`pending`) is re-asked each run and never counts. Sign-out unsubscribes first.
  */
 import { defineStore } from 'pinia';
 import { computed, effectScope, ref, watch } from 'vue';
 import type {
+  AlertRegistration,
   FlightCheck,
   FlightCheckFailure,
   FlightStatusErrorCode,
   FlightVerification,
 } from '@/types/flightStatus';
-import type { FamilyVacation, VacationTravelSegment } from '@/types/models';
+import type { FamilyVacation, UUID, VacationTravelSegment } from '@/types/models';
 import { docVersion, isDocLoaded } from '@/services/automerge/docService';
 import {
   FlightStatusApiError,
   fetchFlightLegs,
   isFlightStatusConfigured,
+  subscribeAlert,
+  unsubscribeAlert,
 } from '@/services/flightStatus/flightStatusApi';
+import {
+  ensurePushToken,
+  onTokenChanged,
+  pushPlatform,
+  pushToken as osPushToken,
+  reportPushTokenFailure,
+} from '@/services/native/pushRegistration';
 import { devFetchBudgetActive, takeDevFetchTokens } from '@/services/flightStatus/devFetchBudget';
 import {
   clearFlightStatusCache,
@@ -56,12 +76,23 @@ import {
   pruneFlightStatusCache,
   readFlightStatusCache,
   writeFlightStatusCache,
+  type FlightStatusCacheRecord,
 } from '@/services/flightStatus/flightStatusCache';
 import { logEvent } from '@/services/telemetry';
 import { createChangeGate, type ChangeGate } from '@/services/telemetry/emitPolicy';
 import { nextBackoffMs } from '@/utils/backoff';
 import { createTrailingSingleFlight } from '@/utils/trailingSingleFlight';
-import { liveNoticeId } from '@/utils/notifications/travel';
+import { CHANGE_NOTICE_DELAY_MS, liveNoticeId } from '@/utils/notifications/travel';
+import { entityDeepLink, type DeepLink } from '@/utils/entityDeepLink';
+import { raceTimeout } from '@/utils/timing';
+import {
+  desiredAlerts,
+  diffAlerts,
+  pushCovered,
+  sameFlightDay,
+  type AlertKey,
+  type AlertSpec,
+} from '@/utils/flightStatus/alerts';
 import { isFlightType } from '@/utils/travelCodes';
 import { normaliseFlightNumber } from '@/utils/flightStatus/flightNumber';
 import { operatedAs, pickLeg } from '@/utils/flightStatus/match';
@@ -92,6 +123,7 @@ import { usePollWhileVisible } from '@/composables/usePollWhileVisible';
 import { useToday } from '@/composables/useToday';
 import { useEntitlementStore } from './entitlementStore';
 import { useFamilyContextStore } from './familyContextStore';
+import { useFamilyStore } from './familyStore';
 import { useSettingsStore } from './settingsStore';
 import { useTranslationStore } from './translationStore';
 import { useVacationStore, type SegmentWriteResult } from './vacationStore';
@@ -101,13 +133,18 @@ const SURFACE = 'travel-verify';
 export const MAX_FETCHES_PER_RUN = 4;
 /** The segment watch's debounce: a typing family member is one request, not ten. */
 export const SEGMENT_CHANGE_DEBOUNCE_MS = 2_000;
+/** How long a run waits for the OS to issue a push token, and sign-out for its unsubscribes. */
+export const PUSH_WAIT_MS = 5_000;
 
-/** What started a run. Rides the `kind` context key. */
-export type FlightRefreshKind = 'open' | 'foreground' | 'online' | 'tick' | 'segment-changed';
+/** What started a run. Rides the `kind` context key. `push-token`: the OS rotated the token. */
+export type FlightRefreshKind =
+  'open' | 'foreground' | 'online' | 'tick' | 'segment-changed' | 'push-token';
 
 interface Candidate {
   vacationId: string;
   segment: VacationTravelSegment;
+  /** The trip's travellers (who receives the change notice, `isChangeRecipient`). */
+  tripAssigneeIds: UUID[];
 }
 
 export const useFlightStatusStore = defineStore('flightStatus', () => {
@@ -127,6 +164,10 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
   const noticed = ref<Record<string, number>>({});
   /** Notice id → epoch ms this device tapped "Got it" (see `dismissNotice`). */
   const dismissed = ref<Record<string, number>>({});
+  /** Segment id → the flight alert the server holds for this device (`recordRegistration`). */
+  const alerts = ref<Record<string, AlertRegistration>>({});
+  /** The push token every entry of `alerts` was registered under. */
+  const registeredToken = ref<string | null>(null);
   /** Segment ids with a request in flight. */
   const inFlight = ref<Set<string>>(new Set());
   /** The clock the verifications read: bumped by every run, answer and tick. */
@@ -138,6 +179,9 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
   let loadedFamilyId: string | null = null;
   /** Controllers of the requests in flight (not reactive), aborted on sign-out. */
   const controllers = new Set<AbortController>();
+  /** The alert token the server refused this session: not offered again until the registry
+   *  sends a different one. */
+  let rejectedAlertToken: string | null = null;
 
   // ── Derived ────────────────────────────────────────────────────────────────
   const docReady = computed(() => {
@@ -181,7 +225,7 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
     vacationStore.upcomingVacations.flatMap((v: FamilyVacation) =>
       (v.travelSegments ?? [])
         .filter((s) => isFlightType(s.type) && !!s.departureDate)
-        .map((segment) => ({ vacationId: v.id, segment }))
+        .map((segment) => ({ vacationId: v.id, segment, tripAssigneeIds: v.assigneeIds ?? [] }))
     )
   );
 
@@ -190,7 +234,7 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
     const map = new Map<string, Candidate>();
     for (const v of vacationStore.vacations) {
       for (const segment of v.travelSegments ?? []) {
-        map.set(segment.id, { vacationId: v.id, segment });
+        map.set(segment.id, { vacationId: v.id, segment, tripAssigneeIds: v.assigneeIds ?? [] });
       }
     }
     return map;
@@ -250,25 +294,39 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
   });
 
   // ── Cache ──────────────────────────────────────────────────────────────────
+  /** The device record as the store holds it now: the ONE place a record field is listed. */
+  function snapshot(familyId: string): FlightStatusCacheRecord {
+    return {
+      ...emptyFlightStatusCache(familyId),
+      checks: checks.value,
+      failures: failures.value,
+      noticed: noticed.value,
+      dismissed: dismissed.value,
+      alerts: alerts.value,
+      pushToken: registeredToken.value,
+    };
+  }
+
+  /** Load a record into state (null = empty: a miss, a sign-out). */
+  function restore(record: FlightStatusCacheRecord | null): void {
+    const r = record ?? emptyFlightStatusCache('');
+    checks.value = { ...r.checks };
+    failures.value = { ...r.failures };
+    noticed.value = { ...r.noticed };
+    dismissed.value = { ...r.dismissed };
+    alerts.value = { ...r.alerts };
+    registeredToken.value = r.pushToken;
+  }
+
   function hydrate(familyId: string | null): void {
     loadedFamilyId = familyId;
-    const cached = familyId ? readFlightStatusCache(familyId) : null;
-    checks.value = cached ? { ...cached.checks } : {};
-    failures.value = cached ? { ...cached.failures } : {};
-    noticed.value = cached ? { ...cached.noticed } : {};
-    dismissed.value = cached ? { ...cached.dismissed } : {};
+    restore(familyId ? readFlightStatusCache(familyId) : null);
   }
 
   let cacheWriteWarned = false;
   function persist(): void {
     if (!loadedFamilyId || halted.value) return;
-    const written = writeFlightStatusCache({
-      ...emptyFlightStatusCache(loadedFamilyId),
-      checks: checks.value,
-      failures: failures.value,
-      noticed: noticed.value,
-      dismissed: dismissed.value,
-    });
+    const written = writeFlightStatusCache(snapshot(loadedFamilyId));
     if (written.ok || cacheWriteWarned) return;
     // The in-memory checks still show; only the next cold start refetches. Once per session.
     cacheWriteWarned = true;
@@ -285,34 +343,60 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
    *  loaded: before that, every segment looks deleted. */
   function prune(now: number): void {
     if (!loadedFamilyId || !docReady.value) return;
-    const before = {
-      ...emptyFlightStatusCache(loadedFamilyId),
-      checks: checks.value,
-      failures: failures.value,
-      noticed: noticed.value,
-      dismissed: dismissed.value,
-    };
+    const before = snapshot(loadedFamilyId);
     const after = pruneFlightStatusCache(before, new Set(segmentsById.value.keys()), now);
     if (after === before) return;
-    checks.value = after.checks;
-    failures.value = after.failures;
-    noticed.value = after.noticed;
-    dismissed.value = after.dismissed;
+    restore(after);
     persist();
   }
 
   /**
    * When THIS device first saw a change/cancel notice (epoch ms); stamped and persisted on the
-   * first call for an id. The OS notice fires at this + 5 s, so a revision fires once per device
-   * (including one that syncs it days later) and a reschedule never moves it.
+   * first call for an id. The OS notice fires at this + `CHANGE_NOTICE_DELAY_MS`, so a revision
+   * fires once per device (including one that syncs it days later) and a reschedule never
+   * moves it.
+   *
+   * Phase 2: when a push already told this device (`pushCovered`: a registration for the
+   * segment's flight, CONFIRMED by the server, whose `rev` is not the segment's current `liveRevision`), the stamp is
+   * PRE-DATED, so the reminder builder finds its fireAt behind now and drops it, on this
+   * rebuild and every later one. Twice the delay, not once: the builder captured its `now`
+   * a few milliseconds before calling here, and a stamp only one delay back would put fireAt
+   * just ahead of it.
    */
-  function noticeFirstSeen(id: string): number {
+  function noticeFirstSeen(id: string, segmentId: string): number {
     const known = noticed.value[id];
     if (known !== undefined) return known;
+    const seg = current(segmentId)?.segment;
+    const covered = !!seg && pushCovered(alerts.value[segmentId], seg, seg.liveRevision);
     const now = Date.now();
-    noticed.value = { ...noticed.value, [id]: now };
+    const stamp = covered ? now - 2 * CHANGE_NOTICE_DELAY_MS : now;
+    noticed.value = { ...noticed.value, [id]: stamp };
     persist();
-    return now;
+    if (covered) {
+      logEvent({
+        level: 'info',
+        surface: SURFACE,
+        message: 'notice suppressed',
+        context: { action: 'notice_suppressed', detail: 'push_registered' },
+      });
+    }
+    return stamp;
+  }
+
+  /**
+   * The ONE writer of `alerts[segmentId]` (`next` null = forget it). Before it replaces a
+   * registration with one of another `rev`, or forgets it, it stamps the segment's current
+   * notice (a no-op when already stamped), so the evidence a push was the notice is read
+   * before it is gone and no caller has to remember that rule.
+   */
+  function recordRegistration(segmentId: string, next: AlertRegistration | null): void {
+    const prev = alerts.value[segmentId];
+    const seg = current(segmentId)?.segment;
+    const noticeId = seg ? liveNoticeId(segmentId, seg) : null;
+    if (prev && prev.rev !== next?.rev && noticeId) noticeFirstSeen(noticeId, segmentId);
+    const { [segmentId]: _old, ...rest } = alerts.value;
+    alerts.value = next ? { ...rest, [segmentId]: next } : rest;
+    persist();
   }
 
   // ── Logging ────────────────────────────────────────────────────────────────
@@ -695,6 +779,192 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
       ...owed.map((o) => applyIfDue(o.c, o.check)),
       ...batch.map((d) => checkOne(d.c, d.query, d.date, kind)),
     ]);
+    await reconcileAlerts(familyId);
+  }
+
+  // ── Flight alerts (Phase 2) ────────────────────────────────────────────────
+  /** This install's push token, acquiring one (bounded) when the OS has issued none yet. */
+  async function currentPushToken(): Promise<string | null> {
+    if (osPushToken.value) return osPushToken.value;
+    const token = await raceTimeout(ensurePushToken(), PUSH_WAIT_MS);
+    if (token === undefined) reportPushTokenFailure('timeout');
+    return token ?? null;
+  }
+
+  /** A new push token replaces every registration: forget them (through the one writer, so
+   *  the evidence is stamped) and record the token the next ones are made under. */
+  function adoptPushToken(token: string): void {
+    for (const segmentId of Object.keys(alerts.value)) recordRegistration(segmentId, null);
+    registeredToken.value = token;
+    persist();
+  }
+
+  /** A failed alert call: classified and logged, the devHint on the console. Never shown to
+   *  the person (the Phase 1 path still shows every change on open). */
+  function onAlertFailure(
+    action: 'alert_subscribe_failed' | 'alert_unsubscribe_failed',
+    error: unknown,
+    os: string,
+    alertToken?: string
+  ): void {
+    const typed = error instanceof FlightStatusApiError ? error : null;
+    if (typed?.code === 'aborted') return;
+    if (typed?.lambdaCode === 'alert_token_rejected' && alertToken) rejectedAlertToken = alertToken;
+    const code = typed?.lambdaCode ?? typed?.code ?? 'unexpected';
+    console.warn(
+      `[flight-status] ${action.replace(/_/g, ' ')} (${code}): ${typed?.devHint ?? 'unexpected error, see the report'}`
+    );
+    logEvent({
+      level: 'warn',
+      surface: SURFACE,
+      message:
+        action === 'alert_subscribe_failed' ? 'alert subscribe failed' : 'alert unsubscribe failed',
+      context: { action, error_code: code, http_status: typed?.httpStatus ?? 0, os },
+      error,
+    });
+  }
+
+  async function subscribeOne(
+    spec: AlertSpec,
+    token: string,
+    alertToken: string,
+    os: 'ios' | 'android',
+    familyId: string
+  ): Promise<void> {
+    const { segmentId, ...registration } = spec;
+    try {
+      const answer = await subscribeAlert({
+        ...registration,
+        platform: os,
+        lang: translationStore.currentLanguage,
+        token,
+        alert: alertToken,
+      });
+      // Contract drift is logged even when the answer is no longer this record's.
+      const unreadable = answer.provider === 'unknown';
+      if (unreadable) {
+        console.warn(
+          '[flight-status] alert subscribe answered "unknown": the response did not match the ' +
+            'contract. Compare subscribeAlert in flightStatusApi.ts with the 200 answers in ' +
+            'infrastructure/lambda/flight-status/alerts.mjs.'
+        );
+      }
+      logEvent({
+        level: unreadable ? 'warn' : 'info',
+        surface: SURFACE,
+        message: 'alert subscribed',
+        context: { action: 'alert_subscribed', os, detail: answer.provider },
+      });
+      // Signed out, or the token moved on, while the call was in flight: not this record's.
+      if (halted.value || familyId !== loadedFamilyId || registeredToken.value !== token) return;
+      recordRegistration(segmentId, { ...registration, confirmed: answer.provider === 'ready' });
+    } catch (e) {
+      onAlertFailure('alert_subscribe_failed', e, os, alertToken);
+    }
+  }
+
+  async function unsubscribeOne(key: AlertKey, os: string, familyId: string): Promise<void> {
+    try {
+      await unsubscribeAlert({ flight: key.flight, date: key.date, token: key.token });
+      const held = alerts.value[key.segmentId];
+      // Forget it only if the record still holds THIS registration (a subscribe for the
+      // segment's new flight or token may have landed first).
+      if (
+        familyId === loadedFamilyId &&
+        registeredToken.value === key.token &&
+        held?.flight === key.flight &&
+        held.date === key.date
+      ) {
+        recordRegistration(key.segmentId, null);
+      }
+      logEvent({
+        level: 'info',
+        surface: SURFACE,
+        message: 'alert unsubscribed',
+        context: { action: 'alert_unsubscribed', os },
+      });
+    } catch (e) {
+      onAlertFailure('alert_unsubscribe_failed', e, os);
+    }
+  }
+
+  /**
+   * The end of every run, native only and online: move this device's registrations to the
+   * desired set. The decisions are `desiredAlerts` / `diffAlerts`; this acquires a push token
+   * when one is needed (null: registers nothing this run), makes the calls (capped) and logs.
+   */
+  async function reconcileAlerts(familyId: string): Promise<void> {
+    const os = pushPlatform();
+    if (!os || halted.value || !isOnline.value) return;
+    const offered = useEntitlementStore().flightAlertToken;
+    const alertToken = offered !== rejectedAlertToken ? offered : null;
+    const desired = desiredAlerts(candidateSegments.value, checks.value, {
+      nowMs: Date.now(),
+      alertsEnabled: alertsEnabled.value,
+      currentMember: useFamilyStore().currentMember ?? null,
+      alertToken,
+      homeZone: homeZone.value,
+    });
+    const token = desired.size > 0 ? await currentPushToken() : osPushToken.value;
+    if (halted.value || familyId !== loadedFamilyId) return;
+    const plan = diffAlerts(
+      desired,
+      { alerts: alerts.value, pushToken: registeredToken.value },
+      token
+    );
+    if (plan.retoken && token) adoptPushToken(token);
+    if (plan.subscribe.length + plan.unsubscribe.length === 0) return;
+    logEvent({
+      level: 'info',
+      surface: SURFACE,
+      message: 'alert reconcile',
+      context: {
+        action: 'alert_reconcile',
+        count: desired.size,
+        notif_skipped: plan.unchanged,
+        detail: `sub=${plan.subscribe.length},reconfirm=${plan.reconfirm},unsub=${plan.unsubscribe.length},over_cap=${plan.overCap}`,
+      },
+    });
+    await Promise.allSettled([
+      ...plan.unsubscribe.map((k) => unsubscribeOne(k, os, familyId)),
+      // A subscribe exists only with a token and a desired set, which needs an alert token.
+      ...plan.subscribe.map((spec) => subscribeOne(spec, token!, alertToken!, os, familyId)),
+    ]);
+  }
+
+  /** Sign-out: tell the server to stop pushing this device's flights, bounded; never throws. */
+  async function unsubscribeAllForSignOut(): Promise<void> {
+    const token = registeredToken.value;
+    const keys = Object.values(alerts.value);
+    if (!token || keys.length === 0) return;
+    const results = await raceTimeout(
+      Promise.allSettled(
+        keys.map((a) => unsubscribeAlert({ flight: a.flight, date: a.date, token }))
+      ),
+      PUSH_WAIT_MS
+    );
+    const ok = results?.filter((r) => r.status === 'fulfilled').length ?? 0;
+    const failed = results ? keys.length - ok : 0;
+    logEvent({
+      level: failed > 0 || !results ? 'warn' : 'info',
+      surface: SURFACE,
+      message: 'alert unsubscribe on sign-out',
+      context: {
+        action: 'alert_unsubscribe_signout',
+        count: keys.length,
+        detail: `ok=${ok},failed=${failed},timed_out=${results === undefined}`,
+      },
+    });
+  }
+
+  /** Where a tap on a flight push lands: the trip holding that flight (same number, within a
+   *  day of the pushed date, `sameFlightDay`), or null when none does any more. */
+  function deepLinkFor(flight: string, date: string): DeepLink | null {
+    for (const c of segmentsById.value.values()) {
+      if (sameFlightDay({ flight, date }, c.segment))
+        return entityDeepLink('vacation', c.vacationId);
+    }
+    return null;
   }
 
   // The latest trigger's kind wins: it is the one the trailing run answers.
@@ -795,11 +1065,6 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
   }
 
   /**
-   * Sign-out, BEFORE the session ends: stop asking, abort the requests in flight, wait for the
-   * run to settle, drop the checks and only then delete the device cache, so no answer can
-   * write the departing family's flights back. Never throws.
-   */
-  /**
    * "Got it": fold the change/cancel notice block away ON THIS DEVICE for the segment's
    * current revision. The chip and the struck-out values stay, and the chip reopens the block
    * (`showNotice`). Nothing is written to the pod: each family member reads the news once for
@@ -845,16 +1110,21 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
     return true;
   }
 
+  /**
+   * Sign-out, BEFORE the session ends: stop asking, abort the requests in flight, wait for the
+   * run to settle, unsubscribe this device's flight alerts (bounded, `PUSH_WAIT_MS`), drop the
+   * checks and only then delete the device cache, so no answer can write the departing
+   * family's flights back and no push follows the person out. Never throws.
+   */
   async function haltForSignOut(): Promise<void> {
     halted.value = true;
     for (const c of controllers) c.abort();
     controllers.clear();
     const pending = flight.pending();
     if (pending) await pending.catch(() => undefined);
-    checks.value = {};
-    failures.value = {};
-    noticed.value = {};
-    dismissed.value = {};
+    await unsubscribeAllForSignOut();
+    rejectedAlertToken = null;
+    restore(null);
     loadedFamilyId = null;
     clearFlightStatusCache();
   }
@@ -899,6 +1169,8 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
       });
       watch(lastVisibleAt, () => void request('foreground'));
       usePollWhileVisible(() => tick(), FLIGHT_POLL_MS, { surface: SURFACE });
+      // A rotated push token: re-subscribe every desired flight under it (a no-op on web).
+      onTokenChanged(() => void request('push-token'));
       let timer: ReturnType<typeof setTimeout> | null = null;
       watch([candidateSignature, isEnabled], () => {
         if (timer) clearTimeout(timer);
@@ -924,6 +1196,8 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
     verifications,
     verificationFor,
     noticeFirstSeen,
+    alerts,
+    deepLinkFor,
     lastCheckedAt,
     request,
     run,

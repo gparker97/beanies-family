@@ -30,6 +30,7 @@ import {
 import { SCORING, applyHeardVia, scoreFamily, wantsCreateInference } from './inference.mjs';
 import { countryForTimeZone } from './timeZoneCountry.mjs';
 import { notifyLeaverSlack } from './slack.mjs';
+import { alertEligible, mintAlertToken } from './alertToken.mjs';
 
 const client = new DynamoDBClient({});
 // Each table pair falls back to prod when no dev table is configured (safe fallback).
@@ -49,6 +50,14 @@ const API_KEY = process.env.REGISTRY_API_KEY;
 const envFlag = (name) => process.env[name] === 'true';
 const COUNTER_WRITES = envFlag('COUNTER_WRITES_ENABLED');
 const SCALAR_WRITES = envFlag('SCALAR_WRITES_ENABLED');
+// The flight-alert token secret (#143 Phase 2). Read per GET like the entitlement env; checked once
+// here so an apply that forgot it says so at cold start instead of silently minting nothing.
+if (!process.env.FLIGHT_ALERT_TOKEN_SECRET) {
+  console.error(
+    '[registry] flight_alert_token_unset: FLIGHT_ALERT_TOKEN_SECRET is empty, so no family receives ' +
+      'a flightAlertToken and closed-app flight alerts cannot register. Set var.flight_alert_token_secret and re-apply modules/registry.'
+  );
+}
 const ALLOWED_ORIGINS = (process.env.CORS_ORIGIN || 'https://beanies.family')
   .split(',')
   .map((o) => o.trim());
@@ -542,7 +551,32 @@ function entitlementFor(familyId, row, billingRead) {
     })
   );
 
-  return entitlement;
+  return withAlertToken(familyId, entitlement);
+}
+
+/**
+ * Add `flightAlertToken` INSIDE the entitlement (#143 Phase 2, requirement 17) when the family is
+ * eligible and FLIGHT_ALERT_TOKEN_SECRET is set; otherwise the field is absent (the client reads
+ * absent as "not eligible" and keeps Phase 1 behaviour). Riding inside `entitlement` means the
+ * client cache, store and registry observer need no change. The token names no family; the log
+ * line carries the hash as every GET line does.
+ */
+function withAlertToken(familyId, entitlement) {
+  const secret = process.env.FLIGHT_ALERT_TOKEN_SECRET || '';
+  const eligible = alertEligible(entitlement);
+  const minted = eligible && secret.length > 0;
+  // eslint-disable-next-line no-console -- structured success-path line, read by CloudWatch
+  console.log(
+    JSON.stringify({
+      msg: 'alert_token_minted',
+      family_id_hash: familyIdHash(familyId),
+      eligible,
+      minted,
+    })
+  );
+  return minted
+    ? { ...entitlement, flightAlertToken: mintAlertToken(secret, Date.now()) }
+    : entitlement;
 }
 
 /**

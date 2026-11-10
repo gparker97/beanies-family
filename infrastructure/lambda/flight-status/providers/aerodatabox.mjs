@@ -17,6 +17,9 @@
  * Also imported by Spike 0 (`scripts/spikes/flight-status-spike.mts`), so it stays dependency-free.
  */
 
+// Provider number spellings ("SQ 318", "sq318") → "SQ318" by the request rule, one zip, one rule.
+import { normaliseFlight } from '../http.mjs';
+
 /** Our own ceiling on one provider call, combined with the caller's `signal`. */
 export const PROVIDER_TIMEOUT_MS = 8000;
 
@@ -251,4 +254,187 @@ export function mapLeg(vendorLeg) {
     departure: mapSide(vendorLeg.departure, 'checkInDesk'),
     arrival: mapSide(vendorLeg.arrival, 'baggageBelt'),
   });
+}
+
+// ── Flight Alert API (#143 Phase 2) ──────────────────────────────────────────────────────────
+//
+// Webhook subscriptions per flight NUMBER (no date), a separate credit balance, and the
+// notification payload. Spike 1 (a)-(c): same paths on every channel, the usual auth headers; a
+// subscription never expires and bills 1 credit per flight item per notification (retries
+// again); at zero credits every subscription pauses; the provider signs nothing (the secret
+// callback path is the authentication); the payload carries full legs (`mapLeg` reads them).
+//
+// `listAlerts` is the only function that sees a subscription's callback url. That url carries
+// the webhook secret: it is returned to the sweep for matching and NEVER logged (this module logs
+// nothing; the sweep logs counts only).
+
+/** Each alerts call is capped at 3 s: the webhook must answer the provider inside its 10 s. */
+export const ALERT_TIMEOUT_MS = 3000;
+/** One retry on a non-2xx or a 10 s timeout; the webhook's claim-before-send makes it harmless. */
+export const ALERT_MAX_DELIVERY_RETRIES = 1;
+/** Ceiling on the notification id we key a replay guard on (a uuid in practice). */
+const MAX_EVENT_ID = 128;
+
+const finiteOrNull = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+
+/**
+ * The notification body → `{ eventId, flight, legs, creditsRemaining, attempt }`, or null when it
+ * is not a notification we can act on. `flight` is the subscription subject's number (the
+ * number we subscribed), falling back to the first item's; `legs` are beanies `FlightLeg`s.
+ *
+ * @param {unknown} body  The parsed JSON body.
+ */
+export function parseWebhook(body) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return null;
+  const eventId = typeof body.id === 'string' ? body.id.trim() : '';
+  if (!eventId || eventId.length > MAX_EVENT_ID || !/^[\w-]+$/.test(eventId)) return null;
+  const items = Array.isArray(body.flights) ? body.flights : null;
+  if (!items) return null;
+  const subject = body.subscription?.subject;
+  const flight =
+    (subject?.type === 'FlightByNumber' ? normaliseFlight(subject?.id) : null) ??
+    normaliseFlight(items[0]?.number);
+  if (!flight) return null;
+  const legs = [];
+  for (const item of items) {
+    const leg = mapLeg(item);
+    if (leg) legs.push(leg);
+  }
+  return {
+    eventId,
+    flight,
+    legs,
+    creditsRemaining: finiteOrNull(body.balance?.creditsRemaining),
+    attempt: finiteOrNull(body.deliveryAttempt?.seqNo),
+  };
+}
+
+/**
+ * The alerts calls, bound to one key and channel, with the signatures the handlers use.
+ * Each throws `ProviderError` exactly as `fetchLegs` does (an unset key is `upstream_auth`
+ * before any network call).
+ *
+ * @param {{ apiKey: string, mode?: string, fetchImpl?: typeof fetch }} cfg
+ */
+export function createAlertsClient({ apiKey, mode = 'direct', fetchImpl = fetch } = {}) {
+  const cfg = MODE_CONFIG[mode];
+  if (!cfg) {
+    throw new Error(
+      `aerodatabox: unknown mode "${mode}" (expected one of ${PROVIDER_MODES.join('|')})`
+    );
+  }
+
+  /** One call. Returns `{ status, body, quota }`; `body` is null for 204 or an empty answer. */
+  async function call(method, path, payload) {
+    if (!apiKey) throw new ProviderError('upstream_auth');
+    const signal = AbortSignal.timeout(ALERT_TIMEOUT_MS);
+    let res;
+    try {
+      res = await fetchImpl(`${cfg.base}${path}`, {
+        method,
+        headers: {
+          Accept: 'application/json',
+          ...(payload ? { 'Content-Type': 'application/json' } : {}),
+          ...cfg.headers(apiKey),
+        },
+        ...(payload ? { body: JSON.stringify(payload) } : {}),
+        signal,
+      });
+    } catch (err) {
+      throw new ProviderError(signal.aborted ? 'upstream_timeout' : 'upstream_network', {
+        cause: err,
+      });
+    }
+    const status = res.status;
+    if (status < 200 || status >= 300) {
+      await discard(res);
+      throw new ProviderError(codeForStatus(status), { httpStatus: status });
+    }
+    let text = '';
+    try {
+      text = await res.text();
+    } catch (err) {
+      throw new ProviderError(signal.aborted ? 'upstream_timeout' : 'upstream_http', {
+        httpStatus: status,
+        cause: err,
+      });
+    }
+    let body = null;
+    if (text.trim() !== '') {
+      try {
+        body = JSON.parse(text);
+      } catch (err) {
+        throw new ProviderError('upstream_http', { httpStatus: status, cause: err });
+      }
+    }
+    return { status, body, quota: parseQuota(res.headers) };
+  }
+
+  return {
+    /** Subscribe the number's webhook. @returns {Promise<{ id: string }>} */
+    async subscribeAlert(flight, callbackUrl) {
+      const { status, body } = await call(
+        'POST',
+        `/subscriptions/webhook/FlightByNumber/${encodeURIComponent(flight)}`,
+        { url: callbackUrl, maxDeliveryRetries: ALERT_MAX_DELIVERY_RETRIES }
+      );
+      const id = typeof body?.id === 'string' ? body.id : null;
+      if (!id) throw new ProviderError('upstream_http', { httpStatus: status });
+      return { id };
+    },
+
+    /** Cancel one subscription. A 404 (already gone) counts as done. */
+    async cancelAlert(id) {
+      try {
+        await call('DELETE', `/subscriptions/webhook/${encodeURIComponent(id)}`);
+      } catch (err) {
+        if (err?.httpStatus === 404) return;
+        throw err;
+      }
+    },
+
+    /**
+     * Every webhook subscription on this key (global to the key, not to this Lambda):
+     * `[{ id, flight, url }]`. `url` is the subscriber id of a webhook subscriber (the spec puts
+     * it in `subscriber.id`; a top-level `url` is read too). `flight` is null for a subject that
+     * is not a flight number. NEVER log a `url`.
+     */
+    async listAlerts() {
+      const { body } = await call('GET', '/subscriptions/webhook');
+      if (body === null) return [];
+      if (!Array.isArray(body)) throw new ProviderError('upstream_http', { httpStatus: 200 });
+      const out = [];
+      for (const s of body) {
+        const id = typeof s?.id === 'string' ? s.id : null;
+        if (!id) continue;
+        const url =
+          typeof s.url === 'string'
+            ? s.url
+            : /webhook/i.test(String(s.subscriber?.type ?? '')) &&
+                typeof s.subscriber?.id === 'string'
+              ? s.subscriber.id
+              : '';
+        const flight = s.subject?.type === 'FlightByNumber' ? normaliseFlight(s.subject?.id) : null;
+        out.push({ id, flight, url });
+      }
+      return out;
+    },
+
+    /** The credit balance, or null when the provider has no balance row yet (its empty 200/204). */
+    async getBalance() {
+      const { body } = await call('GET', '/subscriptions/balance');
+      return finiteOrNull(body?.creditsRemaining);
+    },
+
+    /**
+     * Move `credits` units of API quota into the alert balance.
+     * @returns {Promise<{ creditsRemaining: number | null, quota: object | null }>}
+     */
+    async refillCredits(credits) {
+      const { body, quota } = await call('POST', '/subscriptions/balance/refill', { credits });
+      return { creditsRemaining: finiteOrNull(body?.creditsRemaining), quota };
+    },
+
+    parseWebhook,
+  };
 }

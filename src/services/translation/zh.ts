@@ -4909,10 +4909,11 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'reminders.liveChecks.checks': '实时航班查询',
   'reminders.liveChecks.checksHint': '从起飞前三天开始，向航空公司核对你的航班。',
   'reminders.liveChecks.alerts': '航班变动时通知我',
-  'reminders.liveChecks.alertsHint': '新的时间、航站楼或取消，会在这里和本设备上提示。',
+  'reminders.liveChecks.alertsHint':
+    '新的时间、航站楼或取消，会在这里和本设备上提示。在手机上，即使应用已关闭，也会通知你。',
   'flightChecks.settings.lockedTrial': '实时航班查询是免费试用的一部分。魔法豆包含此功能。',
   'flightChecks.settings.privacy':
-    '查询航班时，beanies 只发送航班号和日期。你的行程、姓名和预订信息都留在家庭文件里。',
+    '查询航班时，beanies 只发送航班号和日期。为了在应用关闭时提醒你，beanies 的服务器还会保存该航班号和日期，以及这部手机的推送地址，直到航班降落。你的行程、姓名和预订信息都留在家庭文件里。',
   'reminders.listBody': '今天截止，还剩 {n} 项',
   'reminders.listBodyForChild': '{who}的清单，还剩 {n} 项',
 

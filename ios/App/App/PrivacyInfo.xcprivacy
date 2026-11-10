@@ -55,6 +55,11 @@
       Apple's manifest allows ONE entry per data type, so both surfaces are declared
       by the single ProductInteraction entry below. It is marked Linked because (a) is
       — the never-under-declare answer — even though (b) on its own is not.
+    - Device ID (2026-11, #143 Phase 2): the APNs push address of this phone, held on our
+      server together with a flight number and date (public facts, no name, no family id,
+      no trip) until the flight has landed, so a flight change can reach the phone while the
+      app is closed. Used only for that notification: app functionality, not linked to a
+      person, not tracking, not shared. No advertising identifier is read.
   Family CONTENT (accounts, activities, documents) never leaves the device to us —
   it lives in the user's own encrypted .beanpod / their Google Drive.
 
@@ -143,6 +148,18 @@
 			<array>
 				<string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
 				<string>NSPrivacyCollectedDataTypePurposeDeveloperAdvertising</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSPrivacyCollectedDataType</key>
+			<string>NSPrivacyCollectedDataTypeDeviceID</string>
+			<key>NSPrivacyCollectedDataTypeLinked</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypeTracking</key>
+			<false/>
+			<key>NSPrivacyCollectedDataTypePurposes</key>
+			<array>
+				<string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
 			</array>
 		</dict>
 		<dict>

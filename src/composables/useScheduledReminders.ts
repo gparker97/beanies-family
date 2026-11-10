@@ -50,7 +50,11 @@ import {
   DEFAULT_TRAVEL_LEADS,
 } from '@/utils/reminderSchedule';
 import { activityReminderId, listDueId, todoDueId, travelReminderId } from '@/utils/notifications';
-import { travelCancelId, travelChangeId } from '@/utils/notifications/travel';
+import {
+  CHANGE_NOTICE_DELAY_MS,
+  travelCancelId,
+  travelChangeId,
+} from '@/utils/notifications/travel';
 import { isChangeRecipient } from '@/utils/flightStatus/audience';
 import { occurrenceNotice } from '@/utils/flightStatus/occurrenceNotice';
 import { dedupeHintsByKey } from '@/utils/helpfulHints';
@@ -134,9 +138,10 @@ export interface ReminderInput {
   /** Inclusive local-day window bounds (YYYY-MM-DD) — occurrences outside are ignored. */
   windowStartISO: string;
   windowEndISO: string;
-  /** #143: epoch ms this device first saw a change/cancel notice id (the flight-status store
-   *  stamps and persists it). Absent ⟹ no change notices. */
-  noticeFirstSeen?: (id: string) => number;
+  /** #143: epoch ms this device first saw a change/cancel notice id for a segment (the
+   *  flight-status store stamps and persists it, pre-dated when a push was the notice).
+   *  Absent ⟹ no change notices. */
+  noticeFirstSeen?: (id: string, segmentId: string) => number;
   /** Translation fn (injected → the builder stays pure). */
   t: (key: UIStringKey) => string;
 }
@@ -367,14 +372,14 @@ export function buildTodoReminders(
 /** An airline change older than this is history, not news: a device that was off for days and
  *  syncs it for the first time stays quiet (the bell still shows it). */
 const CHANGE_NOTICE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
-/** Delay after this device first saw a notice: the OS needs a future instant. */
-const CHANGE_NOTICE_DELAY_MS = 5_000;
 
 /**
  * The OS notice for an airline change or cancellation (#143): one per revision (the id is keyed
  * on it), to every adult plus a travelling child (`isChangeRecipient`), fired as soon as the
- * device knows (`max(now + 5 s, appliedAt)`) and dropped once an hour old. Null when there is
- * nothing to say to this member.
+ * device knows (its first-seen stamp + `CHANGE_NOTICE_DELAY_MS`) and dropped once the change
+ * is 24 hours old (`CHANGE_NOTICE_MAX_AGE_MS`). A stamp the store pre-dated because a push
+ * was the notice (#143 Phase 2) puts fireAt behind now, so it is dropped here too. Null when
+ * there is nothing to say to this member.
  */
 function buildChangeNotice(
   o: TravelSegmentOccurrence,
@@ -390,7 +395,7 @@ function buildChangeNotice(
       : travelChangeId(o.segmentId, notice.revision);
   // Fixed per device and revision: a fireAt that moves on every write re-arms a delivered
   // reminder. Once it is behind `now` it is simply dropped (it already fired, or is too late).
-  const fireAt = input.noticeFirstSeen(id) + CHANGE_NOTICE_DELAY_MS;
+  const fireAt = input.noticeFirstSeen(id, o.segmentId) + CHANGE_NOTICE_DELAY_MS;
   if (fireAt <= nowMs) return null;
   return {
     id,

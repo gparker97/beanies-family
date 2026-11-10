@@ -23,6 +23,13 @@ const LATER = 6 * 60 * MIN + MIN;
 const h = vi.hoisted(() => ({
   logEvent: vi.fn(),
   fetchFlightLegs: vi.fn(),
+  subscribeAlert: vi.fn(),
+  unsubscribeAlert: vi.fn(),
+  /** pushRegistration: null = web (the default: Phase 1 exactly). */
+  platform: null as 'ios' | 'android' | null,
+  ensurePushToken: vi.fn(),
+  reportPushTokenFailure: vi.fn(),
+  tokenChanged: null as (() => void) | null,
   poll: null as (() => unknown) | null,
   writeResult: 'saved' as 'saved' | 'missing' | 'failed',
 }));
@@ -31,7 +38,22 @@ vi.mock('@/services/telemetry', () => ({ logEvent: h.logEvent }));
 vi.mock('@/services/flightStatus/flightStatusApi', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/services/flightStatus/flightStatusApi')>()),
   fetchFlightLegs: h.fetchFlightLegs,
+  subscribeAlert: h.subscribeAlert,
+  unsubscribeAlert: h.unsubscribeAlert,
 }));
+vi.mock('@/services/native/pushRegistration', async () => {
+  const { ref: vueRef } = await import('vue');
+  return {
+    pushToken: vueRef<string | null>(null),
+    pushPlatform: () => h.platform,
+    ensurePushToken: h.ensurePushToken,
+    reportPushTokenFailure: h.reportPushTokenFailure,
+    onTokenChanged: (cb: () => void) => {
+      h.tokenChanged = cb;
+      return () => {};
+    },
+  };
+});
 vi.mock('@/services/automerge/docService', async () => {
   const { ref: vueRef } = await import('vue');
   return { docVersion: vueRef(0), isDocLoaded: () => true };
@@ -60,14 +82,21 @@ const settings = reactive({
   resolveHomeTimeZoneNow: () => ({ zone: 'Asia/Singapore', source: 'stored' }),
 });
 vi.mock('@/stores/settingsStore', () => ({ useSettingsStore: () => settings }));
+/** 2027-01-15: an unexpired alert token at NOW. */
+const ALERT_TOKEN = 'v1.1800000000.c2lnbmF0dXJl';
 const entitlement = reactive({
   enforces: false,
   state: 'trial' as string | null,
   plan: null as string | null,
+  flightAlertToken: ALERT_TOKEN as string | null,
 });
 vi.mock('@/stores/entitlementStore', () => ({ useEntitlementStore: () => entitlement }));
 const translation = reactive({ currentLanguage: 'en' as const, t });
 vi.mock('@/stores/translationStore', () => ({ useTranslationStore: () => translation }));
+const family = reactive({
+  currentMember: { id: 'mum', name: 'Mum', role: 'owner', ageGroup: 'adult' } as object | null,
+});
+vi.mock('@/stores/familyStore', () => ({ useFamilyStore: () => family }));
 
 const vacationsState = reactive({ vacations: [] as FamilyVacation[] });
 const updateSegment = vi.fn(async (vacationId: string, segmentId: string, patch: object) => {
@@ -92,6 +121,9 @@ vi.mock('@/stores/vacationStore', () => ({
 import { STORAGE_KEYS } from '@/constants/storageKeys';
 import { FlightStatusApiError } from '@/services/flightStatus/flightStatusApi';
 import { readFlightStatusCache } from '@/services/flightStatus/flightStatusCache';
+import { pushToken as osPushToken } from '@/services/native/pushRegistration';
+import { CHANGE_NOTICE_DELAY_MS, liveNoticeId } from '@/utils/notifications/travel';
+import { revisionOf, tupleFromLeg } from '@/utils/flightStatus/schedule';
 import { MAX_FETCHES_PER_RUN, useFlightStatusStore } from '../flightStatusStore';
 
 /** The airline moved SQ318 to 18:30 from Terminal 3. */
@@ -153,7 +185,23 @@ beforeEach(() => {
   canEdit.value = true;
   familyContext.activeFamilyId = 'fam-1';
   settings.liveFlightChecksEnabled = true;
-  Object.assign(entitlement, { enforces: false, state: 'trial', plan: null });
+  Object.assign(entitlement, {
+    enforces: false,
+    state: 'trial',
+    plan: null,
+    flightAlertToken: ALERT_TOKEN,
+  });
+  settings.liveFlightChangeAlerts = true;
+  h.platform = null;
+  osPushToken.value = null;
+  h.tokenChanged = null;
+  h.subscribeAlert.mockReset();
+  h.subscribeAlert.mockResolvedValue({ provider: 'ready' });
+  h.unsubscribeAlert.mockReset();
+  h.unsubscribeAlert.mockResolvedValue(undefined);
+  h.ensurePushToken.mockReset();
+  h.ensurePushToken.mockResolvedValue('tok-1');
+  h.reportPushTokenFailure.mockReset();
   vacationsState.vacations = [trip([makeFlight()])];
   vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
@@ -726,5 +774,381 @@ describe('privacy', () => {
     for (const leak of ['SQ', '318', '2026-', '18:30', '17:00', 'SIN', 'LHR', 'Terminal']) {
       expect(logged).not.toContain(leak);
     }
+  });
+});
+
+describe('flight alerts (Phase 2): the reconcile', () => {
+  const LEG_REV = revisionOf(tupleFromLeg(makeLeg({})));
+  const body = (over: object = {}) => ({
+    flight: 'SQ318',
+    date: '2026-12-13',
+    dep: 'SIN',
+    arr: 'LHR',
+    rev: LEG_REV,
+    platform: 'ios',
+    lang: 'en',
+    token: 'tok-1',
+    alert: ALERT_TOKEN,
+    ...over,
+  });
+
+  beforeEach(() => {
+    h.platform = 'ios';
+  });
+
+  it('web registers nothing and never asks for a token', async () => {
+    h.platform = null;
+    h.fetchFlightLegs.mockResolvedValue(answer([makeLeg({})]));
+    await useFlightStatusStore().run('open');
+    expect(h.ensurePushToken).not.toHaveBeenCalled();
+    expect(h.subscribeAlert).not.toHaveBeenCalled();
+  });
+
+  it('acquires a push token first, then registers the matched flight in the same run', async () => {
+    h.fetchFlightLegs.mockResolvedValue(answer([makeLeg({})]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    expect(h.ensurePushToken).toHaveBeenCalledTimes(1);
+    expect(h.ensurePushToken.mock.invocationCallOrder[0]!).toBeLessThan(
+      h.subscribeAlert.mock.invocationCallOrder[0]!
+    );
+    expect(h.subscribeAlert).toHaveBeenCalledWith(body());
+    expect(store.alerts['seg-1']).toEqual({
+      flight: 'SQ318',
+      date: '2026-12-13',
+      dep: 'SIN',
+      arr: 'LHR',
+      rev: LEG_REV,
+      confirmed: true,
+    });
+    expect(readFlightStatusCache('fam-1')).toMatchObject({
+      pushToken: 'tok-1',
+      alerts: { 'seg-1': { rev: LEG_REV } },
+    });
+    expect(events('alert reconcile')[0]?.context).toEqual({
+      action: 'alert_reconcile',
+      count: 1,
+      notif_skipped: 0,
+      detail: 'sub=1,reconfirm=0,unsub=0,over_cap=0',
+    });
+    expect(events('alert subscribed')[0]?.context).toEqual({
+      action: 'alert_subscribed',
+      os: 'ios',
+      detail: 'ready',
+    });
+
+    // Nothing changed: the next run makes no call and logs no reconcile.
+    vi.setSystemTime(NOW + LATER);
+    await store.run('tick');
+    expect(h.subscribeAlert).toHaveBeenCalledTimes(1);
+    expect(events('alert reconcile')).toHaveLength(1);
+  });
+
+  it('an unreadable (unknown) answer logs alert_subscribed at warn; ready and pending stay info', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    h.subscribeAlert.mockResolvedValueOnce({ provider: 'unknown' });
+    h.fetchFlightLegs.mockResolvedValue(answer([makeLeg({})]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    expect(store.alerts['seg-1']?.confirmed).toBe(false);
+    const logged = events('alert subscribed')[0];
+    expect(logged?.level).toBe('warn');
+    expect(logged?.context).toMatchObject({ action: 'alert_subscribed', detail: 'unknown' });
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('alerts.mjs'));
+    warn.mockRestore();
+  });
+
+  it('an unknown answer still logs the drift warning when the family switched mid-call', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    h.subscribeAlert.mockImplementationOnce(async () => {
+      familyContext.activeFamilyId = 'fam-2';
+      return { provider: 'unknown' };
+    });
+    h.fetchFlightLegs.mockResolvedValue(answer([makeLeg({})]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    const logged = events('alert subscribed')[0];
+    expect(logged?.level).toBe('warn');
+    expect(logged?.context).toMatchObject({ detail: 'unknown' });
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('alerts.mjs'));
+    expect(store.alerts['seg-1']).toBeUndefined();
+    familyContext.activeFamilyId = 'fam-1';
+    warn.mockRestore();
+  });
+
+  it('a pending answer is recorded unconfirmed, re-asked next run, and a ready answer settles it', async () => {
+    h.subscribeAlert.mockResolvedValueOnce({ provider: 'pending' });
+    h.fetchFlightLegs.mockResolvedValue(answer([makeLeg({})]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    expect(store.alerts['seg-1']?.confirmed).toBe(false);
+    expect(events('alert subscribed')[0]?.context).toMatchObject({ detail: 'pending' });
+    expect(events('alert subscribed')[0]?.level).toBe('info');
+
+    vi.setSystemTime(NOW + LATER);
+    await store.run('tick');
+    expect(h.subscribeAlert).toHaveBeenCalledTimes(2);
+    expect(h.subscribeAlert).toHaveBeenLastCalledWith(body());
+    expect(events('alert reconcile')[1]?.context?.detail).toBe(
+      'sub=1,reconfirm=1,unsub=0,over_cap=0'
+    );
+    expect(store.alerts['seg-1']?.confirmed).toBe(true);
+
+    vi.setSystemTime(NOW + 2 * LATER);
+    await store.run('tick');
+    expect(h.subscribeAlert).toHaveBeenCalledTimes(2);
+  });
+
+  it('no token (no permission, an OS refusal) registers nothing this run', async () => {
+    h.ensurePushToken.mockResolvedValue(null);
+    h.fetchFlightLegs.mockResolvedValue(answer([makeLeg({})]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    expect(h.subscribeAlert).not.toHaveBeenCalled();
+    expect(store.alerts).toEqual({});
+  });
+
+  it('a token that does not come within the wait is reported as a timeout', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+    vi.setSystemTime(NOW);
+    h.ensurePushToken.mockReturnValue(new Promise(() => {}));
+    h.fetchFlightLegs.mockResolvedValue(answer([makeLeg({})]));
+    const running = useFlightStatusStore().run('open');
+    await vi.advanceTimersByTimeAsync(5_000);
+    await running;
+    expect(h.reportPushTokenFailure).toHaveBeenCalledWith('timeout');
+    expect(h.subscribeAlert).not.toHaveBeenCalled();
+  });
+
+  it('nothing desired (alerts off): no token is requested and no call is made', async () => {
+    settings.liveFlightChangeAlerts = false;
+    h.fetchFlightLegs.mockResolvedValue(answer([makeLeg({})]));
+    await useFlightStatusStore().run('open');
+    expect(h.ensurePushToken).not.toHaveBeenCalled();
+    expect(h.subscribeAlert).not.toHaveBeenCalled();
+  });
+
+  it('a flight no longer desired is unsubscribed under its token and forgotten', async () => {
+    h.fetchFlightLegs.mockResolvedValue(answer([makeLeg({})]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    settings.liveFlightChangeAlerts = false;
+    await store.run('tick');
+    expect(h.unsubscribeAlert).toHaveBeenCalledWith({
+      flight: 'SQ318',
+      date: '2026-12-13',
+      token: 'tok-1',
+    });
+    expect(store.alerts).toEqual({});
+    expect(events('alert unsubscribed')[0]?.context).toEqual({
+      action: 'alert_unsubscribed',
+      os: 'ios',
+    });
+  });
+
+  it('a rotated push token re-subscribes under the new one and unsubscribes the old', async () => {
+    h.fetchFlightLegs.mockResolvedValue(answer([makeLeg({})]));
+    const store = useFlightStatusStore();
+    store.setup();
+    await settle();
+    expect(h.subscribeAlert).toHaveBeenCalledTimes(1);
+    osPushToken.value = 'tok-2';
+    h.tokenChanged!();
+    await settle();
+    expect(events('flight check run').map((e) => e.context.kind)).toContain('push-token');
+    expect(h.unsubscribeAlert).toHaveBeenCalledWith({
+      flight: 'SQ318',
+      date: '2026-12-13',
+      token: 'tok-1',
+    });
+    expect(h.subscribeAlert).toHaveBeenLastCalledWith(body({ token: 'tok-2' }));
+    expect(readFlightStatusCache('fam-1')?.pushToken).toBe('tok-2');
+    expect(store.alerts['seg-1']).toBeDefined();
+  });
+
+  it('a rejected alert token is logged, never offered again this session, and its flights leave', async () => {
+    h.subscribeAlert.mockRejectedValue(
+      new FlightStatusApiError(
+        'http_4xx',
+        'flight-status/subscribe answered HTTP 401',
+        401,
+        'alert_token_rejected'
+      )
+    );
+    h.fetchFlightLegs.mockResolvedValue(answer([makeLeg({})]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    expect(events('alert subscribe failed')[0]?.context).toEqual({
+      action: 'alert_subscribe_failed',
+      error_code: 'alert_token_rejected',
+      http_status: 401,
+      os: 'ios',
+    });
+    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('alert_token_rejected'));
+    vi.setSystemTime(NOW + LATER);
+    await store.run('tick');
+    expect(h.subscribeAlert).toHaveBeenCalledTimes(1);
+    // A different token from the registry is offered again.
+    entitlement.flightAlertToken = 'v1.1800003600.bmV3';
+    await store.run('tick');
+    expect(h.subscribeAlert).toHaveBeenCalledTimes(2);
+  });
+
+  it('a store fault (503) records nothing and the next run retries', async () => {
+    h.subscribeAlert.mockRejectedValueOnce(
+      new FlightStatusApiError('http_5xx', 'down', 503, 'alerts_unavailable')
+    );
+    h.fetchFlightLegs.mockResolvedValue(answer([makeLeg({})]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    expect(store.alerts).toEqual({});
+    await store.run('tick');
+    expect(store.alerts['seg-1']).toBeDefined();
+  });
+
+  it('a new session hydrates the registrations and the token (snapshot / restore round trip)', async () => {
+    h.fetchFlightLegs.mockResolvedValue(answer([makeLeg({})]));
+    await useFlightStatusStore().run('open');
+    setActivePinia(createPinia());
+    const fresh = useFlightStatusStore();
+    await fresh.run('tick');
+    expect(fresh.alerts['seg-1']?.rev).toBe(LEG_REV);
+    expect(h.subscribeAlert).toHaveBeenCalledTimes(1);
+  });
+
+  it('sign-out unsubscribes every registration first, logs it, then deletes the cache', async () => {
+    h.fetchFlightLegs.mockResolvedValue(answer([makeLeg({})]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    await store.haltForSignOut();
+    expect(h.unsubscribeAlert).toHaveBeenCalledWith({
+      flight: 'SQ318',
+      date: '2026-12-13',
+      token: 'tok-1',
+    });
+    expect(events('alert unsubscribe on sign-out')[0]?.context).toEqual({
+      action: 'alert_unsubscribe_signout',
+      count: 1,
+      detail: 'ok=1,failed=0,timed_out=false',
+    });
+    expect(store.alerts).toEqual({});
+    expect(localStorage.getItem(STORAGE_KEYS.FLIGHT_STATUS)).toBeNull();
+  });
+
+  it('logs no flight number, date, airport or token', async () => {
+    h.fetchFlightLegs.mockResolvedValue(answer([makeLeg({})]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    await store.haltForSignOut();
+    const logged = JSON.stringify(h.logEvent.mock.calls.map((c) => c[0].context));
+    for (const leak of ['SQ', '318', '2026-', 'SIN', 'LHR', 'tok-1', ALERT_TOKEN]) {
+      expect(logged).not.toContain(leak);
+    }
+  });
+});
+
+describe('flight alerts (Phase 2): one notice per revision', () => {
+  const MOVED_REV = revisionOf(tupleFromLeg(moved));
+  const noticeId = () => liveNoticeId('seg-1', segment())!;
+  /** The reminder builder's own rule: a notice fires only when fireAt is still ahead. */
+  const fires = (stamp: number) => stamp + CHANGE_NOTICE_DELAY_MS > Date.now();
+
+  beforeEach(() => {
+    h.platform = 'ios';
+  });
+
+  /** Another device applied the airline's change; it reaches this device by sync. */
+  function syncChangeIn(): void {
+    const seg = segment();
+    Object.assign(seg, {
+      departureTime: '18:30',
+      terminal: '3',
+      liveRevision: MOVED_REV,
+      liveWas: { departureTime: '17:00', terminal: 'Terminal 2', at: new Date(NOW).toISOString() },
+      liveAppliedAt: new Date(NOW).toISOString(),
+    });
+  }
+
+  it('a registration with the old rev pre-dates the stamp: no local notice, logged', async () => {
+    h.fetchFlightLegs.mockResolvedValue(answer([makeLeg({})]));
+    canEdit.value = false;
+    const store = useFlightStatusStore();
+    await store.run('open'); // registered with the old revision
+    syncChangeIn();
+    const stamp = store.noticeFirstSeen(noticeId(), 'seg-1');
+    expect(fires(stamp)).toBe(false);
+    expect(events('notice suppressed')[0]?.context).toEqual({
+      action: 'notice_suppressed',
+      detail: 'push_registered',
+    });
+    // First-call-only: a later call returns the same stamp.
+    expect(store.noticeFirstSeen(noticeId(), 'seg-1')).toBe(stamp);
+  });
+
+  it('an unconfirmed registration with the old rev never mutes the local notice', async () => {
+    h.subscribeAlert.mockResolvedValue({ provider: 'pending' });
+    h.fetchFlightLegs.mockResolvedValue(answer([makeLeg({})]));
+    canEdit.value = false;
+    const store = useFlightStatusStore();
+    await store.run('open');
+    syncChangeIn();
+    expect(fires(store.noticeFirstSeen(noticeId(), 'seg-1'))).toBe(true);
+    expect(events('notice suppressed')).toEqual([]);
+  });
+
+  it('no registration: the local notice fires', async () => {
+    const store = useFlightStatusStore();
+    syncChangeIn();
+    expect(fires(store.noticeFirstSeen(noticeId(), 'seg-1'))).toBe(true);
+    expect(events('notice suppressed')).toEqual([]);
+  });
+
+  it('the same run that applied it registers it: no push was owed, the local notice fires once', async () => {
+    h.fetchFlightLegs.mockResolvedValue(answer([moved]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    expect(segment().liveRevision).toBe(MOVED_REV);
+    expect(store.alerts['seg-1']?.rev).toBe(MOVED_REV);
+    expect(fires(store.noticeFirstSeen(noticeId(), 'seg-1'))).toBe(true);
+  });
+
+  it('a registration moving to the new rev stamps the unstamped notice covered first', async () => {
+    h.fetchFlightLegs.mockResolvedValueOnce(answer([makeLeg({})]));
+    const store = useFlightStatusStore();
+    await store.run('open'); // registered: old rev
+    // The airline moved it; this device applies it and re-registers in the same run.
+    h.fetchFlightLegs.mockResolvedValue(answer([moved]));
+    vi.setSystemTime(NOW + LATER);
+    await store.run('tick');
+    expect(store.alerts['seg-1']?.rev).toBe(MOVED_REV);
+    // The stamp was taken while the old registration was still held: covered.
+    expect(fires(store.noticeFirstSeen(noticeId(), 'seg-1'))).toBe(false);
+  });
+
+  it('a covered stamp stays covered after the registration catches up', async () => {
+    h.fetchFlightLegs.mockResolvedValue(answer([makeLeg({})]));
+    canEdit.value = false;
+    const store = useFlightStatusStore();
+    await store.run('open');
+    syncChangeIn();
+    const stamp = store.noticeFirstSeen(noticeId(), 'seg-1');
+    vi.setSystemTime(NOW + LATER);
+    await store.run('tick'); // re-registers with the synced revision
+    expect(store.alerts['seg-1']?.rev).toBe(MOVED_REV);
+    expect(store.noticeFirstSeen(noticeId(), 'seg-1')).toBe(stamp);
+    expect(fires(stamp)).toBe(false);
+  });
+});
+
+describe('deepLinkFor (a push tap)', () => {
+  it('the trip holding the flight, within a day of the pushed date; null when none', () => {
+    const store = useFlightStatusStore();
+    expect(store.deepLinkFor('SQ318', '2026-12-13')).toEqual({
+      path: '/travel',
+      query: { vacation: 'vac-1' },
+    });
+    expect(store.deepLinkFor('SQ318', '2026-12-12')).not.toBeNull();
+    expect(store.deepLinkFor('SQ318', '2026-12-20')).toBeNull();
+    expect(store.deepLinkFor('SQ999', '2026-12-13')).toBeNull();
   });
 });

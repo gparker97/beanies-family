@@ -4,6 +4,7 @@ import { nextTick } from 'vue';
 // Hoisted so the vi.mock factories below can reference them.
 const mocks = vi.hoisted(() => ({
   push: vi.fn(),
+  deepLinkFor: vi.fn(),
   logEvent: vi.fn(),
   reportError: vi.fn(),
 }));
@@ -11,6 +12,9 @@ const mocks = vi.hoisted(() => ({
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: mocks.push }) }));
 vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: mocks.logEvent }));
 vi.mock('@/utils/errorReporter', () => ({ reportError: mocks.reportError }));
+vi.mock('@/stores/flightStatusStore', () => ({
+  useFlightStatusStore: () => ({ deepLinkFor: mocks.deepLinkFor }),
+}));
 
 // Mirrors the REAL module shape: `docVersion` is a reactive trigger, while
 // `isDocLoaded()` is a plain function over a non-reactive boolean. The
@@ -158,5 +162,70 @@ describe('useReminderTapResume', () => {
     await nextTick();
 
     expect(mocks.push).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('a tap on a flight-change push (#143 Phase 2)', () => {
+  const TRIP = { path: '/travel', query: { vacation: 'vac-1' } };
+  const PUSH = { kind: 'travel-change', flight: 'SQ318', date: '2026-12-13' };
+
+  function tapEvents() {
+    return mocks.logEvent.mock.calls.map((c) => c[0] as { surface: string; context: object });
+  }
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    mocks.push.mockResolvedValue(undefined);
+    __resetReminderTapForTesting();
+    podCreated.value = true;
+    docState.loaded = true;
+    docVersion.value = 0;
+  });
+
+  it('opens the trip holding the flight, and logs push_tap navigated', async () => {
+    mocks.deepLinkFor.mockReturnValue(TRIP);
+    useReminderTapResume();
+    handleReminderTap(PUSH);
+    await nextTick();
+    await Promise.resolve();
+    expect(mocks.deepLinkFor).toHaveBeenCalledWith('SQ318', '2026-12-13');
+    expect(mocks.push).toHaveBeenCalledWith(TRIP);
+    expect(tapEvents().at(-1)).toMatchObject({
+      surface: 'travel-verify',
+      context: { action: 'push_tap', notif_kind: 'travel-change', notif_tap_outcome: 'navigated' },
+    });
+  });
+
+  it('no matching flight (deleted since): opens /travel and logs no_segment', async () => {
+    mocks.deepLinkFor.mockReturnValue(null);
+    useReminderTapResume();
+    handleReminderTap(PUSH);
+    await nextTick();
+    await Promise.resolve();
+    expect(mocks.push).toHaveBeenCalledWith({ path: '/travel', query: {} });
+    expect(outcomes()).toContain('no_segment');
+  });
+
+  it('cold start: defers until ready, resolving the flight only then', async () => {
+    docState.loaded = false;
+    docVersion.value += 1; // re-evaluate readiness now (earlier suites' watches share it)
+    mocks.deepLinkFor.mockReturnValue(TRIP);
+    useReminderTapResume();
+    handleReminderTap(PUSH);
+    await nextTick();
+    expect(mocks.deepLinkFor).not.toHaveBeenCalled();
+    expect(outcomes()).toContain('deferred');
+    docState.loaded = true;
+    docVersion.value += 1;
+    await nextTick();
+    expect(mocks.push).toHaveBeenCalledWith(TRIP);
+  });
+
+  it('a link payload still wins over flight fields (a local reminder is unchanged)', async () => {
+    useReminderTapResume();
+    handleReminderTap({ kind: 'todo', link: LINK, flight: 'SQ318', date: '2026-12-13' });
+    await nextTick();
+    expect(mocks.push).toHaveBeenCalledWith(LINK);
+    expect(mocks.deepLinkFor).not.toHaveBeenCalled();
   });
 });

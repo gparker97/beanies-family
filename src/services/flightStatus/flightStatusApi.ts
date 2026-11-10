@@ -5,6 +5,11 @@
  * date") is literally true. The provider key lives in the Lambda; the client never sees vendor
  * fields, only the normalised `FlightLeg[]`.
  *
+ * Phase 2 (ADR-046) adds the two alert routes beside it, `/subscribe` and `/unsubscribe`
+ * (`subscribeAlert` / `unsubscribeAlert`): a flight number, a date, the provider's leg codes,
+ * the revision this device knows, a push address and the entitlement token. Still no family
+ * id and no names. All three calls share ONE request path, `postFlightStatus`.
+ *
  * Pinia-free (the `recipeFetchService` pattern): only `flightStatusStore` calls this, and only
  * the store decides what an answer means, logs it, or retries (there are no retries in here).
  * Every failure is a typed `FlightStatusApiError` whose `devHint` is the developer's next step.
@@ -44,6 +49,15 @@ export const FLIGHT_STATUS_CODES = [
   'upstream_unavailable',
   'upstream_http',
   'internal_error',
+  // Phase 2 (ADR-046): routing, the alert routes and the webhook.
+  'not_found',
+  'alert_token_rejected',
+  'subscription_full',
+  'alerts_unavailable',
+  'webhook_rejected',
+  'bad_platform',
+  'bad_token',
+  'bad_codes',
 ] as const;
 export type FlightStatusLambdaCode = (typeof FLIGHT_STATUS_CODES)[number];
 
@@ -74,6 +88,14 @@ export const CODE_TO_ERROR: Readonly<Record<FlightStatusLambdaCode, FlightStatus
     upstream_unavailable: 'http_5xx',
     upstream_http: 'http_5xx',
     internal_error: 'http_5xx',
+    not_found: 'http_4xx',
+    alert_token_rejected: 'http_4xx',
+    subscription_full: 'http_4xx',
+    alerts_unavailable: 'http_5xx',
+    webhook_rejected: 'http_4xx',
+    bad_platform: 'http_4xx',
+    bad_token: 'http_4xx',
+    bad_codes: 'http_4xx',
   });
 
 /** A flight-status call that failed, classified. Only this service and the store import it. */
@@ -148,6 +170,76 @@ function statusClass(status: number): FlightStatusErrorCode {
 }
 
 /**
+ * POST `body` to the flight-status Lambda at `path` ('' = the proxy, `/subscribe`,
+ * `/unsubscribe`) and return the parsed 200 body, which is always a JSON object. The one
+ * request path: endpoint, deadline, soft key, body read and code mapping live only here.
+ * Throws `FlightStatusApiError` for everything else (a non-object 200 is `parse`).
+ */
+export async function postFlightStatus(
+  path: '' | '/subscribe' | '/unsubscribe',
+  body: Record<string, unknown>,
+  callerSignal?: AbortSignal
+): Promise<Record<string, unknown>> {
+  const target = endpoint();
+  if (!target) {
+    throw new FlightStatusApiError(
+      'not_configured',
+      'Set VITE_FLIGHT_STATUS_URL and VITE_FLIGHT_STATUS_API_KEY (the flight_status_url terraform output)'
+    );
+  }
+  const signal = timeoutSignal(FLIGHT_STATUS_TIMEOUT_MS, callerSignal);
+  let res: Response;
+  try {
+    res = await fetch(`${target.url.replace(/\/+$/, '')}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': target.key },
+      body: JSON.stringify(body),
+      signal,
+    });
+  } catch (e) {
+    throw classifyThrown(e, signal, callerSignal, 'request');
+  }
+
+  let text: string;
+  try {
+    text = await res.text();
+  } catch (e) {
+    // An abort landing while the BODY streams rejects here, not at the fetch: a slow
+    // connection (`timeout`), not a broken response (the `recipeFetchService.post` rule).
+    throw classifyThrown(e, signal, callerSignal, 'body');
+  }
+  let parsed: unknown = null;
+  let ok = true;
+  try {
+    parsed = text ? (JSON.parse(text) as unknown) : null;
+  } catch {
+    ok = false;
+  }
+
+  if (!res.ok) {
+    const code = isObject(parsed) && typeof parsed.code === 'string' ? parsed.code : undefined;
+    const mapped =
+      code && Object.prototype.hasOwnProperty.call(CODE_TO_ERROR, code)
+        ? CODE_TO_ERROR[code as FlightStatusLambdaCode]
+        : statusClass(res.status);
+    throw new FlightStatusApiError(
+      mapped,
+      `flight-status${path} answered HTTP ${res.status}${code ? ` (${code})` : ''}`,
+      res.status,
+      code
+    );
+  }
+  if (!ok || !isObject(parsed)) {
+    throw new FlightStatusApiError(
+      'parse',
+      `flight-status${path} answered 200 with a body that is not a JSON object`,
+      res.status
+    );
+  }
+  return parsed;
+}
+
+/**
  * Ask the Lambda for the legs of `flight` (e.g. "SQ318", already normalised by
  * `normaliseFlightNumber`) departing on `date` (`YYYY-MM-DD`, the departure airport's local
  * date). An empty `legs` is a valid answer (the provider has no such flight). Throws
@@ -158,61 +250,12 @@ export async function fetchFlightLegs(input: {
   date: string;
   signal?: AbortSignal;
 }): Promise<FlightLegsAnswer> {
-  const target = endpoint();
-  if (!target) {
-    throw new FlightStatusApiError(
-      'not_configured',
-      'Set VITE_FLIGHT_STATUS_URL and VITE_FLIGHT_STATUS_API_KEY (the flight_status_url terraform output)'
-    );
-  }
-  const signal = timeoutSignal(FLIGHT_STATUS_TIMEOUT_MS, input.signal);
-  let res: Response;
-  try {
-    res = await fetch(target.url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': target.key },
-      body: JSON.stringify({ flight: input.flight, date: input.date }),
-      signal,
-    });
-  } catch (e) {
-    throw classifyThrown(e, signal, input.signal, 'request');
-  }
-
-  let text: string;
-  try {
-    text = await res.text();
-  } catch (e) {
-    // An abort landing while the BODY streams rejects here, not at the fetch: a slow
-    // connection (`timeout`), not a broken response (the `recipeFetchService.post` rule).
-    throw classifyThrown(e, signal, input.signal, 'body');
-  }
-  let body: unknown = null;
-  let parsed = true;
-  try {
-    body = text ? (JSON.parse(text) as unknown) : null;
-  } catch {
-    parsed = false;
-  }
-
-  if (!res.ok) {
-    const code = isObject(body) && typeof body.code === 'string' ? body.code : undefined;
-    const mapped =
-      code && Object.prototype.hasOwnProperty.call(CODE_TO_ERROR, code)
-        ? CODE_TO_ERROR[code as FlightStatusLambdaCode]
-        : statusClass(res.status);
-    throw new FlightStatusApiError(
-      mapped,
-      `flight-status answered HTTP ${res.status}${code ? ` (${code})` : ''}`,
-      res.status,
-      code
-    );
-  }
-
-  if (!parsed || !isObject(body) || !Array.isArray(body.legs) || !body.legs.every(isFlightLeg)) {
+  const body = await postFlightStatus('', { flight: input.flight, date: input.date }, input.signal);
+  if (!Array.isArray(body.legs) || !body.legs.every(isFlightLeg)) {
     throw new FlightStatusApiError(
       'parse',
       'flight-status answered 200 with an unexpected shape: compare with providers/aerodatabox.mjs mapLeg',
-      res.status
+      200
     );
   }
   return {
@@ -220,4 +263,49 @@ export async function fetchFlightLegs(input: {
     fetchedAt: typeof body.fetchedAt === 'string' ? body.fetchedAt : new Date().toISOString(),
     cached: body.cached === true,
   };
+}
+
+/** What `/flight-status/subscribe` takes (plan requirement 15). */
+export interface SubscribeAlertBody {
+  flight: string;
+  date: string;
+  /** The provider's departure IATA of the leg this device matched. */
+  dep: string;
+  /** The provider's arrival IATA; absent = no arrival half. */
+  arr?: string;
+  /** The revision this device's plan holds (`registrationRev`). */
+  rev: string;
+  platform: 'ios' | 'android';
+  lang: 'en' | 'zh';
+  /** The push token. */
+  token: string;
+  /** The entitlement's alert token (`entitlement.flightAlertToken`). */
+  alert: string;
+}
+
+/**
+ * Register this device for pushes about one flight. `provider` is the server's own side
+ * (`ready`: it holds a provider subscription; `pending`: another request is filling it):
+ * either way the server holds this device's address, so the caller records the registration.
+ * Only a literal `ready` confirms it: a literal `pending` is pending; anything else (missing,
+ * misspelled, a future value) is `unknown`, which the caller records unconfirmed.
+ */
+export async function subscribeAlert(
+  body: SubscribeAlertBody,
+  signal?: AbortSignal
+): Promise<{ provider: 'ready' | 'pending' | 'unknown' }> {
+  const answer = await postFlightStatus('/subscribe', { ...body }, signal);
+  return {
+    provider:
+      answer.provider === 'ready' || answer.provider === 'pending' ? answer.provider : 'unknown',
+  };
+}
+
+/** Stop pushes about one flight to this push token. Needs no alert token (a lapsed family
+ *  must still be able to leave); a repeat is a no-op on the server. */
+export async function unsubscribeAlert(
+  body: { flight: string; date: string; token: string },
+  signal?: AbortSignal
+): Promise<void> {
+  await postFlightStatus('/unsubscribe', { ...body }, signal);
 }

@@ -29,6 +29,8 @@ import { countOne, hash, resolveClient, marshalKey, safeWrite } from './ddb.mjs'
 // index.mjs's ALARMING_PREFIXES. Changing one means changing that module in the same change.
 export const CACHE_UNAVAILABLE_PREFIX = '[flight-status] cache unavailable';
 export const RATE_STORE_UNAVAILABLE_PREFIX = '[flight-status] rate-limit store unavailable';
+/** Logged by every caller refused by the `day` cap (the proxy and alert subscribe both spend it). */
+export const BUDGET_EXHAUSTED_PREFIX = '[flight-status] daily budget exhausted';
 
 const HOUR_SECONDS = 3600;
 const DAY_SECONDS = 86_400;

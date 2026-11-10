@@ -10,6 +10,7 @@ vi.mock('@/services/telemetry', () => ({ logEvent: h.logEvent }));
 
 import { STORAGE_KEYS } from '@/constants/storageKeys';
 import {
+  ALERT_EXPIRES_AFTER_MS,
   MAX_CHECK_AGE_MS,
   clearFlightStatusCache,
   emptyFlightStatusCache,
@@ -57,6 +58,70 @@ describe('read / write / clear', () => {
       JSON.stringify(record({ dismissed: { x: 'soon' as never } }))
     );
     expect(readFlightStatusCache('fam-1')).toBeNull();
+  });
+
+  it('a record written before `alerts` / `pushToken` existed reads them as {} / null', () => {
+    const { alerts: _a, pushToken: _p, ...legacy } = record();
+    localStorage.setItem(STORAGE_KEYS.FLIGHT_STATUS, JSON.stringify(legacy));
+    const read = readFlightStatusCache('fam-1');
+    expect(read?.alerts).toEqual({});
+    expect(read?.pushToken).toBeNull();
+    expect(read?.checks['seg-1']).toBeDefined();
+  });
+
+  it('round-trips the alert registrations and the push token; a malformed one is corrupt', () => {
+    const alerts = {
+      'seg-1': {
+        flight: 'SQ318',
+        date: '2026-12-13',
+        dep: 'SIN',
+        arr: 'LHR',
+        rev: 'r1',
+        confirmed: true,
+      },
+      'seg-2': { flight: 'SQ25', date: '2026-12-14', dep: 'SIN', rev: 'r2', confirmed: false },
+    };
+    writeFlightStatusCache(record({ alerts, pushToken: 'tok-1' }));
+    expect(readFlightStatusCache('fam-1')).toMatchObject({ alerts, pushToken: 'tok-1' });
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    localStorage.setItem(
+      STORAGE_KEYS.FLIGHT_STATUS,
+      JSON.stringify(record({ alerts: { 'seg-1': { flight: 'SQ318' } as never } }))
+    );
+    expect(readFlightStatusCache('fam-1')).toBeNull();
+    localStorage.setItem(
+      STORAGE_KEYS.FLIGHT_STATUS,
+      JSON.stringify(record({ pushToken: 42 as never }))
+    );
+    expect(readFlightStatusCache('fam-1')).toBeNull();
+  });
+
+  it.each([
+    ['an alert without `confirmed`', { flight: 'SQ318', date: '2026-12-13', dep: 'SIN', rev: 'r' }],
+    [
+      'an alert with a non-boolean `confirmed`',
+      { flight: 'SQ318', date: '2026-12-13', dep: 'SIN', rev: 'r', confirmed: 'yes' },
+    ],
+  ])('%s is corrupt: the record is removed and warned once', (_name, alert) => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    localStorage.setItem(
+      STORAGE_KEYS.FLIGHT_STATUS,
+      JSON.stringify(record({ alerts: { 'seg-1': alert as never } }))
+    );
+    expect(readFlightStatusCache('fam-1')).toBeNull();
+    expect(localStorage.getItem(STORAGE_KEYS.FLIGHT_STATUS)).toBeNull();
+    expect(h.logEvent).toHaveBeenCalledTimes(1);
+    expect(h.logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ context: { action: 'cache_corrupt' } })
+    );
+  });
+
+  it('accepts an alert with `confirmed: false`', () => {
+    const alerts = {
+      'seg-1': { flight: 'SQ318', date: '2026-12-13', dep: 'SIN', rev: 'r', confirmed: false },
+    };
+    writeFlightStatusCache(record({ alerts }));
+    expect(readFlightStatusCache('fam-1')?.alerts).toEqual(alerts);
   });
 
   it('round-trips the first-seen stamps', () => {
@@ -173,6 +238,24 @@ describe('pruneFlightStatusCache', () => {
     });
     const out = pruneFlightStatusCache(cache, new Set(['seg-1', 'seg-2']), now);
     expect(out.dismissed).toEqual({ fresh: now - MAX_CHECK_AGE_MS });
+  });
+
+  it("keeps an alert until its server item expires, even for a deleted segment (the reconcile's to unsubscribe)", () => {
+    const day = Date.parse('2026-12-13T00:00:00Z');
+    const alert = {
+      flight: 'SQ318',
+      date: '2026-12-13',
+      dep: 'SIN',
+      rev: 'r1',
+      confirmed: true,
+    };
+    const cache = record({ alerts: { gone: alert } });
+    expect(pruneFlightStatusCache(cache, new Set(), day + ALERT_EXPIRES_AFTER_MS).alerts).toEqual({
+      gone: alert,
+    });
+    expect(
+      pruneFlightStatusCache(cache, new Set(), day + ALERT_EXPIRES_AFTER_MS + 1).alerts
+    ).toEqual({});
   });
 
   it('keeps nothing past 7 days, matched or not', () => {

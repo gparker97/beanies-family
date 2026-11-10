@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   BILLING_TABLE,
+  cohortUpdate,
   firstTenUpdate,
   isExplicitInstant,
   parseArgs,
+  preV1Update,
   selectPreV1Targets,
   snapshotPreV1Update,
   trialEndsAtUpdate,
@@ -33,6 +35,7 @@ function namedAttrs(input) {
 describe('billing-cohort: write discipline (UpdateItem SET on own attributes only)', () => {
   const builders = {
     snapshot: snapshotPreV1Update(FAMILY_ID),
+    preV1: preV1Update(FAMILY_ID),
     firstTen: firstTenUpdate(FAMILY_ID),
     trialEndsAt: trialEndsAtUpdate(FAMILY_ID, '2027-01-01'),
   };
@@ -51,6 +54,20 @@ describe('billing-cohort: write discipline (UpdateItem SET on own attributes onl
   it('the snapshot never overwrites an existing cohort (so first_ten is never downgraded)', () => {
     expect(builders.snapshot.ConditionExpression).toBe('attribute_not_exists(#cohort)');
     expect(builders.snapshot.ExpressionAttributeValues[':cohort']).toBe('pre_v1');
+  });
+
+  it('--pre-v1 is guarded by default (never downgrades first_ten); --force overwrites', () => {
+    expect(builders.preV1.ConditionExpression).toBe('attribute_not_exists(#cohort)');
+    expect(preV1Update(FAMILY_ID, { force: true }).ConditionExpression).toBeUndefined();
+    expect(preV1Update(FAMILY_ID, { force: true }).ExpressionAttributeValues[':cohort']).toBe(
+      'pre_v1'
+    );
+  });
+
+  it('all cohort writes share one builder', () => {
+    expect(builders.snapshot).toEqual(cohortUpdate(FAMILY_ID, 'pre_v1', { condition: true }));
+    expect(builders.preV1).toEqual(builders.snapshot);
+    expect(builders.firstTen).toEqual(cohortUpdate(FAMILY_ID, 'first_ten', { condition: false }));
   });
 
   it('first_ten is unconditional (it upgrades pre_v1)', () => {
@@ -74,6 +91,27 @@ describe('billing-cohort: arguments', () => {
       familyId: FAMILY_ID,
       apply: true,
     });
+  });
+
+  it('parses --pre-v1 for one family', () => {
+    expect(parseArgs(['--pre-v1', FAMILY_ID])).toEqual({
+      mode: 'pre-v1',
+      familyId: FAMILY_ID,
+      apply: false,
+      force: false,
+    });
+    expect(parseArgs(['--pre-v1', FAMILY_ID, '--force', '--apply'])).toMatchObject({
+      apply: true,
+      force: true,
+    });
+    expect(() => parseArgs(['--first-ten', FAMILY_ID, '--force'])).toThrow(/only to --pre-v1/);
+    expect(() => parseArgs(['--snapshot-pre-v1', '--force'])).toThrow(/only to --pre-v1/);
+    expect(() =>
+      parseArgs(['--trial-ends-at', FAMILY_ID, '2027-01-01T00:00:00Z', '--force'])
+    ).toThrow(/only to --pre-v1/);
+    expect(cohortUpdate(FAMILY_ID, 'pre_v1').ConditionExpression).toBeDefined();
+    expect(() => parseArgs(['--pre-v1'])).toThrow(/exactly one familyId/);
+    expect(preV1Update(FAMILY_ID).ExpressionAttributeValues).toEqual({ ':cohort': 'pre_v1' });
   });
 
   it('parses each single-family mode', () => {

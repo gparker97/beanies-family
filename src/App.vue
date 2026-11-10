@@ -26,7 +26,8 @@ import { useCardReminders } from '@/composables/useCardReminders';
 import { useNotifications } from '@/composables/useNotifications';
 import { useCalendarRedirectResume } from '@/composables/useCalendarRedirectResume';
 import { useUnifiedRedirectResume } from '@/composables/useUnifiedRedirectResume';
-import { useReminderTapResume } from '@/composables/useReminderTapResume';
+import { handleReminderTap, useReminderTapResume } from '@/composables/useReminderTapResume';
+import { onPushTap } from '@/services/native/pushRegistration';
 import { useNativeShell } from '@/composables/useNativeShell';
 import BeanieSpinner from '@/components/ui/BeanieSpinner.vue';
 import CelebrationOverlay from '@/components/ui/CelebrationOverlay.vue';
@@ -1992,6 +1993,10 @@ installInboundLinkListener(
 // generated on-device from already-decrypted data (no server sees the schedule).
 // No-op on web. See ADR-029.
 useLocalNotifications();
+// #143 Phase 2: a tap on a flight-change PUSH (cold or warm) takes the same road as a reminder
+// tap: `handleReminderTap` stashes it and `useReminderTapResume` below opens the trip once the
+// app is ready. Installed this early so a cold-start tap is not missed. No-op on web.
+onPushTap((data) => handleReminderTap(data));
 
 // Home-screen widgets (#130): publish today's and tomorrow's family day to the native
 // widgets on data change and foreground (debounced). Native only; no-op on web.
