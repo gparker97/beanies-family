@@ -17,6 +17,68 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.11.11',
+    date: '2026-11-11',
+    month: '11 november 2026',
+    spotlight: true,
+    summary: {
+      en: 'To-dos now show up when you want them to.',
+      beanie: 'to-dos now show up when you want them to.',
+    },
+    features: [
+      {
+        icon: '🗓️',
+        title: { en: 'Choose when a to-do shows', beanie: 'choose when a to-do shows' },
+        description: {
+          en: 'A to-do with a due date is now shown every day on the daily briefing, the Nook and your widgets until it is done. A new Show From date lets one stay out of sight until the day it should start showing, and a repeating to-do can be shown a chosen number of days before each due date.',
+          beanie:
+            'a to-do with a due date is now shown every day on the daily briefing, the nook and your widgets until it is done. a new show from date lets one stay out of sight until the day it should start showing, and a repeating to-do can be shown a chosen number of days before each due date.',
+        },
+        tryItRoute: '/todo',
+      },
+      {
+        icon: '📋',
+        title: { en: 'A tidier To-Dos page', beanie: 'a tidier to-dos page' },
+        description: {
+          en: 'Open to-dos are now grouped into Overdue, Due Today, Coming Up and Not Showing Yet, so what needs doing first is at the top.',
+          beanie:
+            'open to-dos are now grouped into overdue, due today, coming up and not showing yet, so what needs doing first is at the top.',
+        },
+      },
+      {
+        icon: '📱',
+        title: { en: 'One family view on your widgets', beanie: 'one family view on your widgets' },
+        description: {
+          en: 'Phone widgets now show a single family view, with no My Day or Our Day choice to make. The lock screen still shows your own events.',
+          beanie:
+            'phone widgets now show a single family view, with no my day or our day choice to make. the lock screen still shows your own events.',
+        },
+      },
+      {
+        icon: '⚡',
+        title: { en: 'Dates save in one tap', beanie: 'dates save in one tap' },
+        description: {
+          en: "A date picked in a to-do's or a transaction's details is now saved right away, with no extra tick to tap.",
+          beanie:
+            "a date picked in a to-do's or a transaction's details is now saved right away, with no extra tick to tap.",
+        },
+      },
+      {
+        icon: '💬',
+        title: { en: 'Join us on Discord', beanie: 'join us on discord' },
+        description: {
+          en: "Get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+          beanie:
+            "get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+        },
+        cta: {
+          label: { en: 'Join the Discord', beanie: 'join the discord' },
+          href: 'https://beanies.family/discord',
+        },
+      },
+    ],
+  },
+  {
     version: '2026.11.10',
     date: '2026-11-10',
     month: '10 november 2026',
