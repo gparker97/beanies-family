@@ -12,6 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Added
 
+- Every live-flight notice on a trip (changed, conflict, cancelled, not yet written on this device) now carries a "Got it" to fold it away on that device; the Conflict action reads "Update with airline data".
 - Flight changes now reach your phone as a notification even when the app is closed (magic beans; on during the free trial).
 
 ## 2026-11-08

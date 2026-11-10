@@ -6996,7 +6996,7 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'flightChecks.chip.mayBeCancelled': '可能已取消',
   'flightChecks.chip.diverted': '已备降',
   'flightChecks.action.putBack': '改回原样',
-  'flightChecks.action.useAirline': '采用航空公司的',
+  'flightChecks.action.useAirline': '按航空公司数据更新',
   'flightChecks.action.gotIt': '知道了',
   'flightChecks.chip.showNotice': '查看变动',
   'travel.live.conflictSentence': '你的计划是 {mine}。{airline} 显示的是 {theirs}。',

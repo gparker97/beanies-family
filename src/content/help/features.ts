@@ -3612,7 +3612,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'If you change a flight by hand, your edit wins. beanies will not overwrite it. But if the airline’s schedule and your plan disagree, the flight shows <strong>Conflict</strong> with both values side by side. This also happens after you tap <strong>Put it back</strong>. Tap <strong>Use the airline’s</strong> to take the airline’s value, or leave it as it is. If the airline changes the flight again, the new change is applied as usual.',
+          'If you change a flight by hand, your edit wins. beanies will not overwrite it. But if the airline’s schedule and your plan disagree, the flight shows <strong>Conflict</strong> with both values side by side. This also happens after you tap <strong>Put it back</strong>. Tap <strong>Update with airline data</strong> to take the airline’s value, or <strong>Got it</strong> to keep yours and fold the message away; the Conflict chip stays and brings it back. If the airline changes the flight again, the new change is applied as usual.',
       },
       {
         type: 'heading',

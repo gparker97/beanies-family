@@ -317,7 +317,7 @@ function withArrivesNextDay(seg: VacationTravelSegment, patch: SegmentPatch): Se
 
 /**
  * The patch that writes the matched leg into the segment. Only ever called after
- * `shouldApply` or from "Use the airline's" (`takeAirline`).
+ * `shouldApply` or from "Update with airline data" (`takeAirline`).
  *
  *  - Cancellation: `status: 'pending'`, `liveCancelledAt`, the cancel revision, a notes line.
  *  - Change (some field the segment held differs): every changed and filled field, the
@@ -385,10 +385,10 @@ export function planChange(
 }
 
 /**
- * "Use the airline's" over a Conflict whose airline change is ALREADY recorded (the revision
+ * "Update with airline data" over a Conflict whose airline change is ALREADY recorded (the revision
  * matches, so `shouldApply` is false): write the airline's schedule fields back, and
  * `arrivesNextDay` when the dates move, and nothing else. No notes line and no `live*` key:
- * the original apply wrote both, and rewriting them made "Put it back" → "Use the airline's"
+ * the original apply wrote both, and rewriting them made "Put it back" → "Update with airline data"
  * → repeat append one identical notes line per cycle and restamp `liveAppliedAt` (which drives
  * the change notices). The live keys staying as they were is what returns the card to Changed.
  *

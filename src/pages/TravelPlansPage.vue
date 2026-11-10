@@ -791,10 +791,10 @@ async function saveInlineField(item: TimelineItem, field: string, value: string)
 }
 
 /**
- * Live flight checks (#143): "Put it back" and "Use the airline's". The write goes through
+ * Live flight checks (#143): "Put it back" and "Update with airline data". The write goes through
  * `flightStatusStore` (which logs it) into `vacationStore.updateSegment`, which already toasts
  * a gone segment (`missing`) and a failed save (`wrapAsync`), so this adds no second toast for
- * those. The one case it must explain itself is "Use the airline's" with no airline answer on
+ * those. The one case it must explain itself is "Update with airline data" with no airline answer on
  * THIS device (the cache was pruned or never filled): nothing would be written, silently.
  */
 async function revertFlight(item: TimelineItem): Promise<void> {

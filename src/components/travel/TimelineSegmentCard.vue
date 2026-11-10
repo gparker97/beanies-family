@@ -61,7 +61,7 @@ const emit = defineEmits<{
   'open-attachment': [segmentId: string, photoIds: string[], photoId: string];
   /** "Put it back": restore the values from before the airline's change. */
   revert: [item: TimelineItem];
-  /** "Use the airline's": write the airline's schedule over a Conflict. */
+  /** "Update with airline data": write the airline's schedule over a Conflict. */
   'take-airline': [item: TimelineItem];
   /** "Got it": fold the notice block away on this device. */
   'dismiss-notice': [item: TimelineItem];

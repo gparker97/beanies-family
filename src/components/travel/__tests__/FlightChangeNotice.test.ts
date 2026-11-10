@@ -156,7 +156,7 @@ describe('FlightChangeNotice', () => {
     }
   });
 
-  it('"Got it" folds an applied change away on this device; a Conflict and an unwritten change never offer it', async () => {
+  it('"Got it" folds every notice away on this device: an applied change, an unwritten change and a Conflict (beside its action)', async () => {
     const applied = mountNotice({
       state: 'changed',
       mine: { departureTime: '18:30' },
@@ -173,18 +173,21 @@ describe('FlightChangeNotice', () => {
       was: { departureTime: '17:00' },
       provider: { departureTime: '18:30' },
     });
-    expect(unwritten.find('[data-testid="flight-got-it"]').exists()).toBe(false);
+    expect(unwritten.find('[data-testid="flight-got-it"]').exists()).toBe(true);
 
     const conflict = mountNotice({
       state: 'conflict',
       mine: { departureTime: '17:00' },
       provider: { departureTime: '18:30' },
     });
-    expect(conflict.find('[data-testid="flight-got-it"]').exists()).toBe(false);
+    expect(conflict.find('[data-testid="flight-got-it"]').exists()).toBe(true);
     expect(conflict.find('[data-testid="flight-use-airline"]').exists()).toBe(true);
+    await conflict.get('[data-testid="flight-got-it"]').trigger('click');
+    expect(conflict.emitted('dismiss')).toHaveLength(1);
+    expect(conflict.emitted('take-airline')).toBeUndefined();
   });
 
-  it('a recorded cancellation offers "Got it" (and nothing else); one not yet recorded does not', async () => {
+  it('a recorded cancellation offers "Got it" (and nothing else); one not yet recorded offers it too', async () => {
     const recorded = mountNotice({ state: 'cancelled', applied: true });
     expect(recorded.find('[data-testid="flight-put-back"]').exists()).toBe(false);
     await recorded.get('[data-testid="flight-got-it"]').trigger('click');
@@ -193,6 +196,6 @@ describe('FlightChangeNotice', () => {
       mountNotice({ state: 'cancelled', applied: false })
         .find('[data-testid="flight-got-it"]')
         .exists()
-    ).toBe(false);
+    ).toBe(true);
   });
 });

@@ -15386,7 +15386,10 @@ const STRING_DEFS = {
   'flightChecks.chip.mayBeCancelled': { en: 'May be cancelled', beanie: 'may be cancelled' },
   'flightChecks.chip.diverted': { en: 'Diverted', beanie: 'diverted' },
   'flightChecks.action.putBack': { en: 'Put it back', beanie: 'put it back' },
-  'flightChecks.action.useAirline': { en: "Use the airline's", beanie: "use the airline's" },
+  'flightChecks.action.useAirline': {
+    en: 'Update with airline data',
+    beanie: 'update with airline data',
+  },
   'flightChecks.action.gotIt': { en: 'Got it', beanie: 'got it' },
   'flightChecks.chip.showNotice': { en: 'Show what changed', beanie: 'show what changed' },
   // Live flight checks on the trip timeline (#143, Commit 3). An important surface like

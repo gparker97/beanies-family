@@ -8,15 +8,16 @@
  *    or this member may not edit trips): the same sentence, "Your plan hasn't been updated
  *    on this device yet.", and no buttons, since there is nothing to put back.
  *  - `conflict`: the plan and the airline disagree (a hand edit after an apply, or "Put it
- *    back"). Shows both values; "Use the airline's" writes the airline's.
+ *    back"). Shows both values; "Update with airline data" writes the airline's.
  *  - `cancelled`: the airline cancelled; the flight is pending. Red is earned here and only
  *    here. Practical, not alarmed, and no decision to make: the booking is still there for
  *    the call. Not yet recorded on this device (`applied: false`): the same not-updated-yet line.
  *
- * A change that is in the plan, and a recorded cancellation, carry a quiet "Got it" that folds
- * the block away on this device (`dismiss`; the chip and the struck-out values stay, and the
- * chip reopens it). A Conflict never does: it is asking for a decision. A notice with nothing
- * written yet has no "Got it" either: the news is not in the plan, so it must keep showing.
+ * EVERY notice carries a quiet "Got it" that folds the block away on this device (`dismiss`;
+ * the chip and the struck-out values stay, and the chip reopens it), the Conflict included:
+ * folding it keeps the family's own values, which is a decision too (greg, 2026-11-10). A
+ * notice with nothing written yet folds the same way; the chip still says what the airline
+ * reported.
  *
  * Renders nothing for any other state. Presentational: the actions leave as emits and the page
  * owns permissions, the write and the toasts. Every sentence comes from `copy.ts` (the same
@@ -88,7 +89,7 @@ const view = computed<{
           note,
           meta: v.checkedAt !== undefined ? checkedAgo(t, v.checkedAt, props.nowMs) : '',
           action: null,
-          dismissable: false,
+          dismissable: true,
         };
       }
       const at = seenAtMs.value;
@@ -117,7 +118,7 @@ const view = computed<{
           note: '',
           meta,
           action: 'take-airline',
-          dismissable: false,
+          dismissable: true,
         };
       }
       return {
@@ -130,7 +131,7 @@ const view = computed<{
         note: '',
         meta,
         action: 'take-airline',
-        dismissable: false,
+        dismissable: true,
       };
     }
     case 'cancelled': {
@@ -150,7 +151,7 @@ const view = computed<{
         note,
         meta: v.checkedAt !== undefined ? checkedAgo(t, v.checkedAt, props.nowMs) : '',
         action: null,
-        dismissable: v.applied !== false,
+        dismissable: true,
       };
     }
     default:

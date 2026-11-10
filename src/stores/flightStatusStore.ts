@@ -24,7 +24,7 @@
  * warning because the live value is still shown and the next run retries.
  *
  * WRITES ARE PERMISSIONED. Every pod write from here (apply, cancellation, reinstatement,
- * "Put it back", "Use the airline's") goes through `writeSegment`, which requires the page's
+ * "Put it back", "Update with airline data") goes through `writeSegment`, which requires the page's
  * own edit permission (`usePermissions().canEditActivities`). A member who may not edit trips
  * still fetches and sees the airline's word (`changed` with `applied: false`), and their
  * device never writes it.
@@ -262,7 +262,7 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
     });
     // The device-side fold of the notice block rides on the verification, so the card has one
     // input. Keyed on the notice id: a new airline revision is a new, undismissed notice.
-    if (v.state === 'changed' || v.state === 'cancelled') {
+    if (v.state === 'changed' || v.state === 'conflict' || v.state === 'cancelled') {
       const id = liveNoticeId(seg.id, seg);
       if (id !== null && dismissed.value[id] !== undefined) return { ...v, dismissed: true };
     }
@@ -1024,7 +1024,7 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
     return result;
   }
 
-  /** "Use the airline's" (Conflict): write the cached leg, skipping `shouldApply` (whose
+  /** "Update with airline data" (Conflict): write the cached leg, skipping `shouldApply` (whose
    *  revision rule is exactly what keeps a manual edit). `missing` without a USABLE cached
    *  leg: none at all, or one for another flight number or day (a stale answer is never
    *  written over the family's edit), logged so the refusal is visible. */
