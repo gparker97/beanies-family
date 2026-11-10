@@ -17,6 +17,37 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.11.10',
+    date: '2026-11-10',
+    month: '10 november 2026',
+    spotlight: true,
+    summary: {
+      en: 'Flight changes now reach your phone, even when the app is closed.',
+      beanie: 'flight changes now reach your phone, even when the app is closed.',
+    },
+    features: [
+      {
+        icon: '✈️',
+        title: { en: 'Flight changes find you', beanie: 'flight changes find you' },
+        description: {
+          en: 'When an airline moves a flight in your travel plans to a new time, day or terminal, or cancels it, a notification is sent to your iPhone or Android phone even while the app is closed. The plan is updated the next time the app is opened. Included with magic beans, and on during the free trial.',
+          beanie:
+            'when an airline moves a flight in your travel plans to a new time, day or terminal, or cancels it, a notification is sent to your iphone or android phone even while the app is closed. the plan is updated the next time the app is opened. included with magic beans, and on during the free trial.',
+        },
+        tryItRoute: '/travel',
+      },
+      {
+        icon: '🔒',
+        title: { en: 'Your trip stays yours', beanie: 'your trip stays yours' },
+        description: {
+          en: 'To send that notification, only the flight number, the date and a push address for your phone are kept on the beanies.family server, and only until the flight has landed. Names, trips and bookings never leave your family file.',
+          beanie:
+            'to send that notification, only the flight number, the date and a push address for your phone are kept on the beanies.family server, and only until the flight has landed. names, trips and bookings never leave your family file.',
+        },
+      },
+    ],
+  },
+  {
     version: '2026.11.05',
     date: '2026-11-05',
     month: '5 november 2026',
