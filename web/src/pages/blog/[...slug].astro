@@ -59,7 +59,7 @@ const { post, prevPost, nextPost, related, issueNumber, minutesToRead } = Astro.
 const { Content } = await render(post);
 
 const canonicalPath = `/blog/${post.data.slug}`;
-const ogImageUrl = new URL(`/og/${post.data.slug}.png`, SITE_URL).toString();
+const ogImageUrl = new URL(`/og/${post.data.slug}.jpg`, SITE_URL).toString();
 
 // Typed against BlogCategory (the enum in content.config.ts) so adding a
 // category to the vocabulary forces a matching badge here — TS won't compile

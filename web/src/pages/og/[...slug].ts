@@ -1,37 +1,55 @@
 /**
- * Dynamic OG images for blog posts (1200×630).
- * Generated at build time via astro-og-canvas (CanvasKit / WASM Skia).
- * URL pattern: /og/<slug>.png
+ * Link-preview cards for beanstalk posts (1200x630), built at build time.
+ * URL pattern: /og/<slug>.jpg (the earlier generator wrote .png; the new extension also makes
+ * platforms that cached an old card fetch the new one).
+ *
+ * A post with a cover image gets the composed card from `~/lib/postCard`. A post without one
+ * (or whose cover file is missing) gets the site-wide hugging-family card, so a link never
+ * previews as a broken image.
  */
-
-import { OGImageRoute } from 'astro-og-canvas';
+import { existsSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+import type { APIRoute, GetStaticPaths } from 'astro';
 import { getCollection } from 'astro:content';
 import { isPublished } from '~/utils/content';
+import sharp from 'sharp';
+import { renderPostCard } from '~/lib/postCard';
 
-const posts = await getCollection('blog', isPublished);
+const PUBLIC_DIR = path.resolve('public');
+const DEFAULT_CARD = path.join(PUBLIC_DIR, 'brand/og-default.png');
 
-const pages = Object.fromEntries(
-  posts.map((post) => [post.data.slug, { title: post.data.title, description: post.data.excerpt }])
-);
+interface CardProps {
+  title: string;
+  category: string;
+  coverImage?: string;
+}
 
-export const { getStaticPaths, GET } = await OGImageRoute({
-  pages,
-  getImageOptions: (_slug, page) => ({
-    title: page.title,
-    description: page.description,
-    bgGradient: [
-      [241, 93, 34], // Heritage Orange
-      [230, 126, 34], // Terracotta
-    ],
-    border: { color: [44, 62, 80], width: 0 },
-    padding: 80,
-    // Use default system fonts to avoid fontsource.org fetches at build
-    // time (flaky, 10s timeout). Self-hosted Outfit/Inter can be wired
-    // later via `fonts: [buffer, buffer]` if desired.
-    font: {
-      title: { color: [255, 255, 255], weight: 'Bold', size: 64, lineHeight: 1.15 },
-      description: { color: [255, 255, 255], size: 28, lineHeight: 1.4 },
-    },
-    logo: { path: './public/brand/beanies-logo.png', size: [140] },
-  }),
-});
+export const getStaticPaths: GetStaticPaths = async () => {
+  const posts = await getCollection('blog', isPublished);
+  return posts.map((post) => ({
+    params: { slug: `${post.data.slug}.jpg` },
+    props: {
+      title: post.data.title,
+      category: post.data.category,
+      coverImage: post.data.coverImage,
+    } satisfies CardProps,
+  }));
+};
+
+export const GET: APIRoute = async ({ props, params }) => {
+  const { title, category, coverImage } = props as CardProps;
+  const coverPath = coverImage ? path.join(PUBLIC_DIR, coverImage) : '';
+  let body: Buffer;
+  if (coverPath && existsSync(coverPath)) {
+    body = await renderPostCard({ title, category, coverPath });
+  } else {
+    if (coverImage) {
+      console.warn(`[og] ${params.slug}: cover ${coverImage} not found, using the default card`);
+    }
+    body = await sharp(await readFile(DEFAULT_CARD))
+      .jpeg({ quality: 90, mozjpeg: true })
+      .toBuffer();
+  }
+  return new Response(new Uint8Array(body), { headers: { 'Content-Type': 'image/jpeg' } });
+};

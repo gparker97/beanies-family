@@ -8,6 +8,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-11-11
+
+### Changed
+
+- Picking a date in a to-do's or a transaction's details now saves it right away, with no separate tick to tap, and the calendar opens on the first tap.
+- "Show from" now sits directly under a to-do's due date, above the time.
+- A beanstalk post pasted into a chat or a social post now previews with its title, its cover image and the beanies.family wordmark, in place of the plain orange card.
+
 ## 2026-11-10
 
 ### Added
