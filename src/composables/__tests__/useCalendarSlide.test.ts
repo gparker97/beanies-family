@@ -7,19 +7,22 @@
  *      gates respected.
  *   2. Visual transform — a horizontal drag applies translate3d to the
  *      target, with rubber-band damping past threshold.
- *   3. Re-entrancy — a second commit attempted while an animation is in
- *      flight is dropped (the swipe is rejected via the enabled-flag wired
- *      through useHorizontalSwipe).
+ *   3. Re-entrancy: a swipe made while an animation is in flight is not
+ *      rejected; its page turn is queued (a signed count) and runs when the
+ *      animation ends, and live progress is ignored until then.
  *
  * jsdom doesn't ship the Web Animations API, so we stub element.animate
  * with a Promise-backed shim and assert that runAnimation's `from`/`to`
  * frames + `applyTransform` end-state both land as expected.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { defineComponent, h, ref, type Ref } from 'vue';
+import { defineComponent, h, nextTick, ref, type Ref } from 'vue';
 import { mount, type VueWrapper } from '@vue/test-utils';
 import { useCalendarSlide, type UseCalendarSlideOptions } from '../useCalendarSlide';
 import { pointer, swipe, pinch } from '@/test/pointerSwipe';
+import { logEvent } from '@/services/telemetry/logEvent';
+
+vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: vi.fn() }));
 
 interface SlideHarness {
   wrapper: VueWrapper;
@@ -28,16 +31,22 @@ interface SlideHarness {
   onPrev: ReturnType<typeof vi.fn>;
 }
 
-function makeHarness(opts: Partial<UseCalendarSlideOptions> = {}, width = 300): SlideHarness {
+function makeHarness(
+  opts: Partial<UseCalendarSlideOptions> = {},
+  width = 300,
+  /** Changing it renders a NEW target element (a target swap). */
+  elementKey = ref(0)
+): SlideHarness {
   const onNext = vi.fn();
   const onPrev = vi.fn();
 
   const Comp = defineComponent({
     setup() {
       const target = ref<HTMLElement | null>(null) as Ref<HTMLElement | null>;
-      useCalendarSlide(target, { onNext, onPrev, ...opts });
+      useCalendarSlide(target, { name: 'month-grid', onNext, onPrev, ...opts });
       return () =>
         h('div', {
+          key: elementKey.value,
           ref: target,
           style: `width:${width}px;height:300px`,
         });
@@ -63,7 +72,7 @@ interface RecordedAnimation {
   resolveFinished: () => void;
   cancelled: boolean;
 }
-function installAnimateShim(): RecordedAnimation[] {
+function installAnimateShim(auto = true): RecordedAnimation[] {
   const recorded: RecordedAnimation[] = [];
   Element.prototype.animate = function (
     keyframes: Keyframe[] | PropertyIndexedKeyframes | null,
@@ -91,8 +100,9 @@ function installAnimateShim(): RecordedAnimation[] {
     } as unknown as Animation;
     rec.resolveFinished = () => resolveFn(animation);
     // Microtask resolution lets `await animation.finished` in the composable
-    // settle once tests yield (await flushMicrotasks).
-    Promise.resolve().then(() => rec.resolveFinished());
+    // settle once tests yield (await flushMicrotasks). With `auto` false the
+    // test ends each animation itself (see `settle`).
+    if (auto) Promise.resolve().then(() => rec.resolveFinished());
     return animation;
   } as Element['animate'];
   return recorded;
@@ -111,12 +121,27 @@ async function flushMicrotasks() {
   }
 }
 
+/** The context of every `queue_dropped` logged so far. */
+function queueDrops() {
+  return vi
+    .mocked(logEvent)
+    .mock.calls.filter(([e]) => e.message === 'queue_dropped')
+    .map(([e]) => e.context);
+}
+
+/** Ends one manually driven animation and lets the composable run on from it. */
+async function settle(rec: RecordedAnimation | undefined) {
+  rec!.resolveFinished();
+  await flushMicrotasks();
+}
+
 describe('useCalendarSlide', () => {
   let _originalAnimate: Element['animate'] | undefined;
 
   beforeEach(() => {
     Element.prototype.setPointerCapture = vi.fn();
     Element.prototype.releasePointerCapture = vi.fn();
+    vi.mocked(logEvent).mockClear();
     _originalAnimate = Element.prototype.animate;
     // matchMedia stub — default to "motion OK" so animations run.
     window.matchMedia = vi.fn().mockImplementation((query: string) => ({
@@ -236,50 +261,289 @@ describe('useCalendarSlide', () => {
     });
   });
 
-  describe('re-entrancy', () => {
-    it('drops a second commit fired mid-animation', async () => {
-      // First gesture's animation never resolves so we stay in the
-      // committing state while the second gesture is dispatched.
-      const animations: RecordedAnimation[] = [];
-      Element.prototype.animate = function (
-        keyframes: Keyframe[] | PropertyIndexedKeyframes | null,
-        options?: number | KeyframeAnimationOptions
-      ) {
-        const rec: RecordedAnimation = {
-          keyframes: (keyframes ?? []) as Keyframe[],
-          options,
-          resolveFinished: () => {},
-          cancelled: false,
-        };
-        animations.push(rec);
-        const finished = new Promise<Animation>(() => {
-          /* never resolves */
-        });
-        return {
-          finished,
-          cancel: () => {
-            rec.cancelled = true;
-          },
-          play: () => {},
-          pause: () => {},
-          onfinish: null,
-        } as unknown as Animation;
-      } as Element['animate'];
+  describe('browser cancel', () => {
+    it('a cancel past threshold runs the commit animation path, not the spring-back', async () => {
+      const animations = installAnimateShim();
+      const h = makeHarness({}, 300);
+      pointer('pointerdown', h.el, { x: 200, y: 100 });
+      pointer('pointermove', h.el, { x: 150, y: 100 });
+      pointer('pointermove', h.el, { x: 100, y: 100 });
+      pointer('pointercancel', h.el, { x: 0, y: 0 });
+      await flushMicrotasks();
+      expect(h.onNext).toHaveBeenCalledTimes(1);
+      expect(h.onPrev).not.toHaveBeenCalled();
+      // Phase A out to -width, then phase B in from +width: the commit, not a spring to 0.
+      expect(animations).toHaveLength(2);
+      expect((animations[0]!.keyframes[1] as Keyframe).transform).toBe('translate3d(-300px, 0, 0)');
+      expect((animations[1]!.keyframes[0] as Keyframe).transform).toBe('translate3d(300px, 0, 0)');
+      expect(h.el.style.transform).toBe('');
+    });
 
+    it('a cancel below threshold springs back', async () => {
+      const animations = installAnimateShim();
       const h = makeHarness();
-      // First commit — phase A animation kicks off and hangs (never resolves
-      // in this test). onNext won't fire until phase A completes (mid-flight
-      // content swap is by design); what we're proving here is that the
-      // second gesture doesn't even start a second animation.
+      pointer('pointerdown', h.el, { x: 200, y: 100 });
+      pointer('pointermove', h.el, { x: 160, y: 100 });
+      pointer('pointercancel', h.el, { x: 0, y: 0 });
+      await flushMicrotasks();
+      expect(h.onNext).not.toHaveBeenCalled();
+      expect(animations).toHaveLength(1);
+      expect((animations[0]!.keyframes[1] as Keyframe).transform).toBe('translate3d(0px, 0, 0)');
+      expect(h.el.style.transform).toBe('');
+    });
+  });
+
+  describe('reversal through zero', () => {
+    it('a finger that reverses through dx 0 mid-swipe still turns the page once', async () => {
+      installAnimateShim();
+      const h = makeHarness();
+      pointer('pointerdown', h.el, { x: 200, y: 100 });
+      pointer('pointermove', h.el, { x: 230, y: 100 });
+      // Back through the start: onProgress(0) starts a spring-back while the finger is
+      // still down. The gesture under the finger must survive it.
+      pointer('pointermove', h.el, { x: 200, y: 100 });
+      await flushMicrotasks();
+      pointer('pointermove', h.el, { x: 100, y: 100 });
+      pointer('pointerup', h.el, { x: 100, y: 100 });
+      await flushMicrotasks();
+      expect(h.onNext).toHaveBeenCalledTimes(1);
+      expect(h.onPrev).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('queued page turn', () => {
+    it('a second swipe released during the commit animation turns the page twice, in order', async () => {
+      const animations = installAnimateShim(false);
+      const h = makeHarness();
+      swipe(h.el, { x: 200, y: 100 }, { x: 80, y: 100 }); // next
+      swipe(h.el, { x: 80, y: 100 }, { x: 200, y: 100 }); // prev, during phase A
+      expect(animations).toHaveLength(1);
+      await settle(animations[0]); // phase A ends: the first turn lands
+      expect(h.onNext).toHaveBeenCalledTimes(1);
+      expect(h.onPrev).not.toHaveBeenCalled();
+      await settle(animations[1]); // phase B ends: the queued turn starts
+      expect(h.onPrev).not.toHaveBeenCalled();
+      expect(animations).toHaveLength(3);
+      // The queued turn starts from centre (its own phase A out to +width).
+      expect((animations[2]!.keyframes[0] as Keyframe).transform).toBe('translate3d(0px, 0, 0)');
+      expect((animations[2]!.keyframes[1] as Keyframe).transform).toBe('translate3d(300px, 0, 0)');
+      await settle(animations[2]);
+      expect(h.onPrev).toHaveBeenCalledTimes(1);
+      expect(h.onNext.mock.invocationCallOrder[0]!).toBeLessThan(
+        h.onPrev.mock.invocationCallOrder[0]!
+      );
+      await settle(animations[3]);
+      expect(h.el.style.transform).toBe('');
+    });
+
+    it('a swipe released during a spring-back turns the page once the spring-back ends', async () => {
+      const animations = installAnimateShim(false);
+      const h = makeHarness();
+      swipe(h.el, { x: 200, y: 100 }, { x: 170, y: 100 }); // short: springs back
+      expect(animations).toHaveLength(1);
       swipe(h.el, { x: 200, y: 100 }, { x: 80, y: 100 });
       expect(animations).toHaveLength(1);
       expect(h.onNext).not.toHaveBeenCalled();
-      // Second commit attempted — useHorizontalSwipe's enabled flag is now
-      // false (computed off isAnimating), so the gesture is rejected at
-      // pointerdown and no second animation is queued.
+      await settle(animations[0]); // spring-back ends: the queued turn starts
+      expect(animations).toHaveLength(2);
+      await settle(animations[1]);
+      expect(h.onNext).toHaveBeenCalledTimes(1);
+      await settle(animations[2]);
+      expect(h.onNext).toHaveBeenCalledTimes(1);
+    });
+
+    it('the reversal trace released at once (no flush after the zero) turns the page exactly once', async () => {
+      const animations = installAnimateShim();
+      const h = makeHarness();
+      pointer('pointerdown', h.el, { x: 200, y: 100 });
+      pointer('pointermove', h.el, { x: 230, y: 100 });
+      pointer('pointermove', h.el, { x: 200, y: 100 }); // dx 0: a spring-back starts
+      pointer('pointermove', h.el, { x: 100, y: 100 });
+      pointer('pointerup', h.el, { x: 100, y: 100 });
+      await flushMicrotasks();
+      await flushMicrotasks();
+      expect(h.onNext).toHaveBeenCalledTimes(1);
+      expect(h.onPrev).not.toHaveBeenCalled();
+      // The spring-back, then the queued turn's two phases.
+      expect(animations).toHaveLength(3);
+      expect(h.el.style.transform).toBe('');
+    });
+
+    it('queued turns add up: next then prev cancel out, so no further turn runs', async () => {
+      const animations = installAnimateShim(false);
+      const h = makeHarness();
+      swipe(h.el, { x: 200, y: 100 }, { x: 80, y: 100 }); // next: animates
+      swipe(h.el, { x: 200, y: 100 }, { x: 80, y: 100 }); // next, queued (+1)
+      swipe(h.el, { x: 80, y: 100 }, { x: 200, y: 100 }); // prev, queued (0)
+      await settle(animations[0]);
+      await settle(animations[1]);
+      expect(h.onNext).toHaveBeenCalledTimes(1);
+      expect(h.onPrev).not.toHaveBeenCalled();
+      expect(animations).toHaveLength(2);
+    });
+
+    it('next + next queued: two more turns, one after another', async () => {
+      const animations = installAnimateShim(false);
+      const h = makeHarness();
       swipe(h.el, { x: 200, y: 100 }, { x: 80, y: 100 });
-      expect(animations).toHaveLength(1);
+      swipe(h.el, { x: 200, y: 100 }, { x: 80, y: 100 });
+      swipe(h.el, { x: 200, y: 100 }, { x: 80, y: 100 });
+      await settle(animations[0]);
+      await settle(animations[1]); // first turn done: the second starts
+      expect(animations).toHaveLength(3);
+      expect(h.onNext).toHaveBeenCalledTimes(1);
+      await settle(animations[2]);
+      expect(h.onNext).toHaveBeenCalledTimes(2);
+      await settle(animations[3]); // second done: the third starts
+      expect(animations).toHaveLength(5);
+      await settle(animations[4]);
+      await settle(animations[5]);
+      expect(h.onNext).toHaveBeenCalledTimes(3);
+      expect(h.onPrev).not.toHaveBeenCalled();
+      expect(animations).toHaveLength(6);
+    });
+
+    it('next + prev queued: no further turn', async () => {
+      const animations = installAnimateShim(false);
+      const h = makeHarness();
+      swipe(h.el, { x: 80, y: 100 }, { x: 200, y: 100 }); // prev: animates
+      swipe(h.el, { x: 200, y: 100 }, { x: 80, y: 100 }); // next, queued
+      swipe(h.el, { x: 80, y: 100 }, { x: 200, y: 100 }); // prev, queued: nets out
+      await settle(animations[0]);
+      await settle(animations[1]);
+      expect(h.onPrev).toHaveBeenCalledTimes(1);
       expect(h.onNext).not.toHaveBeenCalled();
+      expect(animations).toHaveLength(2);
+    });
+
+    it('the queue holds at most three turns either way', async () => {
+      const animations = installAnimateShim(false);
+      const h = makeHarness();
+      for (let i = 0; i < 6; i++) swipe(h.el, { x: 200, y: 100 }, { x: 80, y: 100 });
+      for (let i = 0; i < 12 && animations.at(i); i++) await settle(animations.at(i));
+      // The first turn plus three queued.
+      expect(h.onNext).toHaveBeenCalledTimes(4);
+      expect(animations).toHaveLength(8);
+    });
+
+    it("a queued turn is dropped if the consumer's enabled is false when the animation ends", async () => {
+      const animations = installAnimateShim(false);
+      const enabled = ref(true);
+      const h = makeHarness({ enabled });
+      swipe(h.el, { x: 200, y: 100 }, { x: 80, y: 100 });
+      swipe(h.el, { x: 80, y: 100 }, { x: 200, y: 100 }); // queued
+      enabled.value = false;
+      await settle(animations[0]);
+      await settle(animations[1]);
+      expect(h.onNext).toHaveBeenCalledTimes(1);
+      expect(h.onPrev).not.toHaveBeenCalled();
+      expect(animations).toHaveLength(2);
+      expect(queueDrops()).toEqual([
+        {
+          action: 'queue_dropped',
+          format: 'month-grid',
+          detail: 'disabled',
+          count: 1,
+        },
+      ]);
+      // Dropped, not deferred: re-enabling later does not run it.
+      enabled.value = true;
+      await flushMicrotasks();
+      expect(h.onPrev).not.toHaveBeenCalled();
+    });
+
+    it('live progress during an animation applies no transform; after it ends, progress applies again', async () => {
+      const animations = installAnimateShim(false);
+      const h = makeHarness();
+      swipe(h.el, { x: 200, y: 100 }, { x: 80, y: 100 });
+      const during = h.el.style.transform;
+      pointer('pointerdown', h.el, { x: 200, y: 100 });
+      pointer('pointermove', h.el, { x: 150, y: 100 });
+      expect(h.el.style.transform).toBe(during);
+      await settle(animations[0]);
+      await settle(animations[1]);
+      expect(h.el.style.transform).toBe('');
+      // dx -30, shown relative to the -50 ignored during the animation (no jump).
+      pointer('pointermove', h.el, { x: 170, y: 100 });
+      expect(h.el.style.transform).toBe('translate3d(20px, 0, 0)');
+    });
+
+    it('an idle dispose logs nothing', () => {
+      installAnimateShim(false);
+      makeHarness().wrapper.unmount();
+      expect(queueDrops()).toEqual([]);
+    });
+
+    it('a target-element swap drops the queued turn', async () => {
+      const animations = installAnimateShim(false);
+      const key = ref(0);
+      const h = makeHarness({ name: 'week' }, 300, key);
+      await nextTick(); // the first bind (null to the element) drops nothing
+      swipe(h.el, { x: 200, y: 100 }, { x: 80, y: 100 });
+      swipe(h.el, { x: 80, y: 100 }, { x: 200, y: 100 }); // queued
+      key.value = 1; // a new element
+      await nextTick();
+      expect(queueDrops()).toEqual([
+        expect.objectContaining({ format: 'week', detail: 'target_changed', count: 1 }),
+      ]);
+      for (let i = 0; i < 4 && animations.at(i); i++) await settle(animations.at(i));
+      expect(h.onNext).toHaveBeenCalledTimes(1);
+      expect(h.onPrev).not.toHaveBeenCalled();
+      h.wrapper.unmount();
+    });
+
+    it('a finger still down when the animation ends: the card follows from where it is, no jump', async () => {
+      const animations = installAnimateShim(false);
+      const h = makeHarness();
+      swipe(h.el, { x: 280, y: 100 }, { x: 160, y: 100 }); // a turn animates
+      pointer('pointerdown', h.el, { x: 200, y: 100 });
+      pointer('pointermove', h.el, { x: 150, y: 100 }); // -50, ignored
+      await settle(animations[0]);
+      await settle(animations[1]);
+      expect(h.el.style.transform).toBe('');
+      pointer('pointermove', h.el, { x: 148, y: 100 }); // -52: 2px from where it was
+      expect(h.el.style.transform).toBe('translate3d(-2px, 0, 0)');
+      pointer('pointermove', h.el, { x: 120, y: 100 }); // -80
+      expect(h.el.style.transform).toBe('translate3d(-30px, 0, 0)');
+      // The threshold is still on the real dx: the release turns the page.
+      pointer('pointerup', h.el, { x: 120, y: 100 });
+      await settle(animations[2]);
+      expect(h.onNext).toHaveBeenCalledTimes(2);
+    });
+
+    it('a throwing onNext under reduced motion still lets the next swipe turn the page', () => {
+      window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+        matches: query.includes('reduce'),
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })) as unknown as typeof window.matchMedia;
+      installAnimateShim();
+      const h = makeHarness();
+      h.onNext.mockImplementationOnce(() => {
+        throw new Error('consumer failed');
+      });
+      // The error surfaces at once (the test DOM rethrows a listener's error).
+      expect(() => swipe(h.el, { x: 200, y: 100 }, { x: 80, y: 100 })).toThrow('consumer failed');
+      swipe(h.el, { x: 200, y: 100 }, { x: 80, y: 100 });
+      expect(h.onNext).toHaveBeenCalledTimes(2);
+    });
+
+    it('dispose with a queued turn runs nothing', async () => {
+      const animations = installAnimateShim(false);
+      const h = makeHarness();
+      swipe(h.el, { x: 200, y: 100 }, { x: 80, y: 100 });
+      swipe(h.el, { x: 80, y: 100 }, { x: 200, y: 100 }); // queued
+      h.wrapper.unmount();
+      expect(queueDrops()).toEqual([expect.objectContaining({ detail: 'dispose', count: 1 })]);
+      // Run on whatever the in-flight turn still animates (the array grows as it goes).
+      for (let i = 0; i < 4 && animations.at(i); i++) await settle(animations.at(i));
+      expect(h.onPrev).not.toHaveBeenCalled();
+      expect(animations.length).toBeLessThanOrEqual(2);
     });
   });
 

@@ -98,7 +98,7 @@ function nextDay() {
  * is a mouse-only API, so the two gestures never contend on the same input.
  */
 const mobileSwipeRef = ref<HTMLElement | null>(null);
-useCalendarSlide(mobileSwipeRef, { onNext: nextDay, onPrev: prevDay });
+useCalendarSlide(mobileSwipeRef, { name: 'meals', onNext: nextDay, onPrev: prevDay });
 
 // ── Editor + picker (single hosted instances) ───────────────────────────────
 const editMeal = ref<MealPlanEntry | null>(null);

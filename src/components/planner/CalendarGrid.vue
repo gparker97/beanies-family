@@ -299,7 +299,10 @@ const fitKey = computed(() => {
     metrics: metrics.value,
     hasLane: false,
   });
-  return { slots, key: `${format}|${props.display.density}|${slots}|${degraded.value}` };
+  return {
+    slots,
+    key: `${format}|${props.display.density}|${slots}|${degraded.value}|${pageStill.value}`,
+  };
 });
 watch(
   () => fitKey.value?.key,
@@ -315,6 +318,7 @@ watch(
         kind: props.display.density,
         count: fitKey.value.slots,
         detail: degraded.value ? 'scroll' : 'fits',
+        stage: pageStill.value ? 'page-still' : 'page-scrolls',
         viewport_w: window.innerWidth,
         viewport_h: window.innerHeight,
       },
@@ -450,6 +454,7 @@ const { isPaging } = useWheelMonthPaging(gridBodyRef, {
 // The phone relaxes the axis lock to 1 (at least as sideways as down), a constant for the
 // instance; on a degraded `pan-y` card the browser still scrolls when it wins the gesture.
 useCalendarSlide(swipeRef, {
+  name: 'month-grid',
   onNext: () => emit('next'),
   onPrev: () => emit('prev'),
   enabled: computed(() => !isPaging.value && !isLifted.value),

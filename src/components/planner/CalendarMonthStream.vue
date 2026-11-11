@@ -180,6 +180,7 @@ function weekMeta(
 // Emits the intent only; the page advances the shared reference date, then
 // bumps `anchor` so the stream lands at the right end of the target month.
 useCalendarSlide(rootRef, {
+  name: 'month-stream',
   onNext: () => emit('next'),
   onPrev: () => emit('prev'),
 });

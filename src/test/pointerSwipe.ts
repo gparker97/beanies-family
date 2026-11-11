@@ -2,9 +2,9 @@
  * Synthetic pointer gestures for tests of anything built on `useHorizontalSwipe` (the
  * composable itself, `useCalendarSlide`, the deal pile's stage, the Card Details drawer).
  *
- * The test DOM has no usable `PointerEvent` constructor, so these dispatch a plain `Event`
- * carrying the fields the handlers read (clientX, clientY, pointerId, pointerType, button,
- * isPrimary).
+ * The test DOM has no usable `PointerEvent` / `TouchEvent` constructors, so these dispatch a
+ * plain `Event` carrying the fields the handlers read (clientX, clientY, pointerId,
+ * pointerType, button, isPrimary; or a touch's `touches` list).
  */
 export interface PointerInit {
   x: number;
@@ -19,26 +19,51 @@ export interface PointerInit {
 
 type Point = { x: number; y: number };
 
+/** Dispatches a bubbling plain `Event` of `type` carrying `fields`, and returns it. */
+function dispatch<T extends object>(
+  el: HTMLElement,
+  type: string,
+  fields: T,
+  cancelable = true
+): Event & T {
+  const e = Object.assign(new Event(type, { bubbles: true, cancelable }), fields);
+  el.dispatchEvent(e);
+  return e;
+}
+
 export function pointer(
   type: 'pointerdown' | 'pointermove' | 'pointerup' | 'pointercancel',
   el: HTMLElement,
   init: PointerInit
 ): void {
-  const e = new Event(type, { bubbles: true, cancelable: true }) as Event & {
-    clientX: number;
-    clientY: number;
-    pointerId: number;
-    pointerType: string;
-    button: number;
-    isPrimary: boolean;
-  };
-  e.clientX = init.x;
-  e.clientY = init.y;
-  e.pointerId = init.pointerId ?? 1;
-  e.pointerType = init.pointerType ?? 'touch';
-  e.button = init.button ?? 0;
-  e.isPrimary = init.isPrimary ?? e.pointerId === 1;
-  el.dispatchEvent(e);
+  const pointerId = init.pointerId ?? 1;
+  dispatch(el, type, {
+    clientX: init.x,
+    clientY: init.y,
+    pointerId,
+    pointerType: init.pointerType ?? 'touch',
+    button: init.button ?? 0,
+    isPrimary: init.isPrimary ?? pointerId === 1,
+  });
+}
+
+export interface TouchMoveInit {
+  x: number;
+  y: number;
+  /** Default true. A real `touchmove` stops being cancelable once the browser's pan begins. */
+  cancelable?: boolean;
+  /** How many fingers are down (each at x, y). Default 1. */
+  touches?: number;
+}
+
+/**
+ * A `touchmove` with its `touches` list, for the swipe's touch guard. Returns the dispatched
+ * event so a test can assert `defaultPrevented`.
+ */
+export function touchMove(el: HTMLElement, init: TouchMoveInit): Event {
+  const touch = { clientX: init.x, clientY: init.y };
+  const touches = Array.from({ length: init.touches ?? 1 }, () => touch);
+  return dispatch(el, 'touchmove', { touches }, init.cancelable ?? true);
 }
 
 /**

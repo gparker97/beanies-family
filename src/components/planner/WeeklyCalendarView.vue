@@ -135,6 +135,7 @@ const { isLifted, liveLabel, overTarget, overSlot, onKeydown, onKeyup } = useCal
 );
 const activityDragAttrs = useActivityDragAttrs();
 useCalendarSlide(swipeRef, {
+  name: 'week',
   onNext: () => emit('next'),
   onPrev: () => emit('prev'),
   enabled: computed(() => !isLifted.value),

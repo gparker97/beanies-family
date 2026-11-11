@@ -26,6 +26,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 ### Fixed
 
 - A widget set to show only to-dos no longer leaves a large empty space above them.
+- Swiping sideways on the calendar, meal planner and card deck is now reliable on iPhone, even when the page can scroll.
+- A swipe made while the calendar is still sliding from the previous one is no longer ignored; it turns the page as soon as the slide finishes.
 - A flight check that the flight-data provider refuses for arriving in a burst is now retried once, so a trip's flights no longer show "Couldn't check" when they are checked together.
 
 ## 2026-11-10

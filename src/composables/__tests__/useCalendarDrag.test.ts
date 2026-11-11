@@ -65,7 +65,7 @@ const Harness = defineComponent({
     const root = ref<HTMLElement | null>(null);
     drag = useCalendarDrag(root, { view: 'month' });
     // The view's swipe, bubble phase on the same root, exactly as `useCalendarSlide` binds it.
-    useHorizontalSwipe(root, { onSwipeLeft: swipeLeft, onProgress: progress });
+    useHorizontalSwipe(root, { name: 'month-grid', onSwipeLeft: swipeLeft, onProgress: progress });
     return () =>
       h(
         'div',

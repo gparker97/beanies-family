@@ -85,6 +85,7 @@ const chipCount = computed(() =>
 // on a desktop selects text. The same guards as the arrows.
 const rootEl = useTemplateRef<HTMLElement>('rootEl');
 useHorizontalSwipe(rootEl, {
+  name: 'deal-pile',
   onSwipeLeft: () => {
     if (props.canNext) emit('step', 1, 'swipe');
   },

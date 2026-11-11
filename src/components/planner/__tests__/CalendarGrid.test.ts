@@ -690,6 +690,31 @@ describe('CalendarGrid fit and bleed', () => {
     });
   });
 
+  it('grid_fit carries stage: page-scrolls when the card does not bleed', () => {
+    fakeFit(120);
+    mountGrid();
+    const calls = vi.mocked(logEvent).mock.calls.filter(([e]) => e.message === 'grid_fit');
+    expect(calls[0]![0].context).toMatchObject({ stage: 'page-scrolls' });
+  });
+
+  it('grid_fit carries stage: page-still when the rows fit and the card bleeds', () => {
+    fakeFit(120, 24, 55, false);
+    mountGrid({ bleedBottom: true });
+    const calls = vi.mocked(logEvent).mock.calls.filter(([e]) => e.message === 'grid_fit');
+    expect(calls[0]![0].context).toMatchObject({ stage: 'page-still' });
+  });
+
+  it('grid_fit re-logs when the page starts to scroll', async () => {
+    fakeFit(120, 24, 55, false);
+    const wrapper = mountGrid({ bleedBottom: true });
+    await wrapper.setProps({ bleedBottom: false });
+    const stages = vi
+      .mocked(logEvent)
+      .mock.calls.filter(([e]) => e.message === 'grid_fit')
+      .map(([e]) => e.context?.stage);
+    expect(stages).toEqual(['page-still', 'page-scrolls']);
+  });
+
   it('logs no grid_fit while unmeasured', () => {
     mountGrid();
     expect(vi.mocked(logEvent).mock.calls.some(([e]) => e.message === 'grid_fit')).toBe(false);

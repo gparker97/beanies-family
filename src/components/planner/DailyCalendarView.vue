@@ -286,6 +286,7 @@ const { isLifted, liveLabel, overSlot, onKeydown, onKeyup } = useCalendarDrag(sw
   snap: timelineSlot,
 });
 useCalendarSlide(swipeRef, {
+  name: 'day',
   onNext: () => emit('next'),
   onPrev: () => emit('prev'),
   enabled: computed(() => !isLifted.value),
