@@ -52,6 +52,8 @@ import { claimInterruption } from '@/composables/useSessionInterruption';
 import UnifiedReconnectToast from '@/components/common/UnifiedReconnectToast.vue';
 import SaveFailureBanner from '@/components/google/SaveFailureBanner.vue';
 import DurabilityBanner from '@/components/common/DurabilityBanner.vue';
+import StorageStallBanner from '@/components/common/StorageStallBanner.vue';
+import { storageStalled } from '@/utils/storageStall';
 import LineageBanner from '@/components/common/LineageBanner.vue';
 import ReadOnlyBanner from '@/components/common/ReadOnlyBanner.vue';
 import LocalDocUnreadableBanner from '@/components/common/LocalDocUnreadableBanner.vue';
@@ -2203,6 +2205,17 @@ watch(
         class="pointer-events-none fixed inset-0 z-[300] flex flex-col items-center justify-center bg-[#FDFBF9] dark:bg-[#1a252f]"
       >
         <BeanieSpinner size="xl" label />
+        <!-- Storage not answering while the app is still starting: say so here, because
+             this overlay covers the banner. The typed error follows at 15s and brings the
+             recovery screen with its Reload button. -->
+        <p
+          v-if="storageStalled"
+          class="text-secondary-500 dark:text-ink-soft mt-6 max-w-xs px-6 text-center text-sm"
+          role="status"
+          data-testid="boot-storage-stall"
+        >
+          {{ t('app.initError.registryBlocked') }}
+        </p>
       </div>
     </Transition>
 
@@ -2576,6 +2589,9 @@ watch(
 
         <!-- Local-durability-cache failure — inline (pushes the header down), bound to
              syncStore.cachePersistFailed. See #50. -->
+        <!-- Browser storage not answering (a leftover tab holding the database). Also
+             rendered in the sign-in branch below, where the hang mostly happens. -->
+        <StorageStallBanner />
         <DurabilityBanner />
         <LineageBanner />
         <LocalDocUnreadableBanner />
@@ -2618,6 +2634,7 @@ watch(
     </div>
 
     <div v-else>
+      <StorageStallBanner />
       <router-view />
     </div>
   </div>

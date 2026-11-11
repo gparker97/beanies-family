@@ -3357,7 +3357,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       'What the 90-day trial includes, what changes when it ends, how to choose a plan from the website, and what happens to your family’s data if you stop paying (nothing).',
     icon: '\u{1F331}',
     readTime: 5,
-    updatedDate: '2026-10-18',
+    updatedDate: '2026-11-11',
     sections: [
       {
         type: 'paragraph',
@@ -3420,7 +3420,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         content: '',
         items: [
           '<strong>beanies basic</strong>: the whole app for the whole family, sold by the year. Includes one magic bean a month, so the paperwork reader is there when you need it.',
-          '<strong>the magic beans plan</strong>: everything in basic, plus <span data-bean-limit="full" data-live="{count} magic beans a day">a daily allowance of magic beans</span>, so statements, invitations, recipes and itineraries can be read straight into the app. Monthly or yearly.',
+          '<strong>the magic beans plan</strong>: everything in basic, plus <span data-bean-limit="full" data-live="{count} magic beans a day">a daily allowance of magic beans</span>, so statements, invitations, recipes and itineraries can be read straight into the app. It also includes <a href="/help/features/live-flight-checks">live flight checks</a>: your flights are checked with the airline, and you are told when one changes. Monthly or yearly.',
         ],
       },
       {

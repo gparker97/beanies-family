@@ -2207,6 +2207,8 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'auth.selectMember': '选择你的个人资料',
   'auth.enterPassword': '请输入密码',
   'auth.loadingFile': '正在数豆子…',
+  'auth.loadingSlow':
+    '仍在处理中，这次比平时慢一些。如果一直没有完成，请关闭其他 beanies.family 标签页，然后刷新此页面。',
   'auth.reconnectFile': '已找到你的数据文件，但需要访问权限。请点击下方重新连接。',
   'auth.reconnectButton': '重新连接数据文件',
   'auth.fileLoadFailed': '文件加载失败，请重试。',
@@ -3683,6 +3685,7 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'plan.bullets.full1': '每天 {count} 颗魔法豆',
   'plan.bullets.full1Fallback': '每天都有魔法豆额度',
   'plan.bullets.full2': '对账单、邀请函、食谱、行程单',
+  'plan.bullets.fullFlights': '实时航班查询与变动提醒',
   'plan.bullets.full3': '随时可在本页取消',
   'plan.cycle.label': '计费周期',
   'plan.cycle.yearly': '按年',
@@ -4581,6 +4584,7 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   // Initialization error recovery
   'app.initError.title': '出了点问题',
   'app.initError.description': '应用未能正常启动。你可以试试刷新，或者清除数据重新开始。',
+  'storageStall.title': '此浏览器的存储没有响应',
   'app.initError.registryBlocked':
     'beanies.family 已在另一个标签页或窗口中打开，正在阻塞一次存储更新。请关闭其他 beanies.family 标签页和窗口（包括已安装的应用），然后刷新此页面。',
   'app.initError.stalled': '启动时间比预期长。请刷新重试。',

@@ -4319,6 +4319,13 @@ const STRING_DEFS = {
   'auth.selectMember': { en: 'Select your profile', beanie: 'select your profile' },
   'auth.enterPassword': { en: 'Please enter your password', beanie: 'please enter your password' },
   'auth.loadingFile': { en: 'counting beans...', beanie: 'counting beans...' },
+  // Shown under a sign-in spinner that has been up for 10 seconds. Important surface:
+  // real nouns, and one thing the person can do.
+  'auth.loadingSlow': {
+    en: 'Still working. This is taking longer than usual. If it does not finish, close any other beanies.family tabs and reload this page.',
+    beanie:
+      'still working. this is taking longer than usual. if it does not finish, close any other beanies.family tabs and reload this page.',
+  },
   'auth.reconnectFile': {
     en: 'Your data file was found but needs permission to access. Click below to reconnect.',
     beanie: 'your data file was found but needs permission to access. click below to reconnect.',
@@ -8334,6 +8341,10 @@ const STRING_DEFS = {
     en: 'Statements, invitations, recipes, itineraries',
     beanie: 'statements, invitations, recipes, itineraries',
   },
+  'plan.bullets.fullFlights': {
+    en: 'Live flight checks and change alerts',
+    beanie: 'live flight checks and change alerts',
+  },
   'plan.bullets.full3': {
     en: 'Cancel any time from this page',
     beanie: 'cancel any time from this page',
@@ -10256,6 +10267,10 @@ const STRING_DEFS = {
     en: 'The app failed to start properly. You can try reloading, or clear your data and start fresh.',
     beanie:
       'the app failed to start properly. you can try reloading, or clear your data and start fresh.',
+  },
+  'storageStall.title': {
+    en: "This browser's storage is not responding",
+    beanie: "this browser's storage is not responding",
   },
   'app.initError.registryBlocked': {
     en: 'beanies.family is open in another tab or window, and it is holding up a storage update. Close your other beanies.family tabs and windows (including the installed app), then reload this page.',

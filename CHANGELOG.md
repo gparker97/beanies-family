@@ -24,6 +24,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - "Days before" on a repeating to-do is now limited to what fits between two of its due dates (6 for a weekly to-do), and is not offered on a daily one.
 - A beanstalk post pasted into a chat or a social post now previews with its title, its cover image and the beanies.family wordmark, in place of the plain orange card.
 - The founder story (the first beanstalk post and the home page) now describes bank and calendar support as it is today.
+- The pricing page, the plan page in the app and the Help Center now list live flight checks as part of the magic beans plan.
 
 ### Fixed
 
@@ -50,6 +51,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - To-dos are no longer marked overdue early in time zones west of UTC.
 - A far-away flight whose first check could not be settled is now checked again after a week.
 - The app's page height now follows the visible screen in phone browsers, a fix for the header going missing there.
+- When a browser's storage stops responding (usually another beanies.family tab holding it), a banner now says so and what to do, in place of a long silent spinner; sign-in spinners also explain themselves after ten seconds.
 - The web app in a browser now brings itself up to date instead of staying on an old version, and a family file saved by a newer version now updates the web app (or offers an Update button) in place of a dead end.
 
 ## 2026-11-09

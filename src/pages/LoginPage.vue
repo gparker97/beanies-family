@@ -40,6 +40,7 @@ import { reportError } from '@/utils/errorReporter';
 import { endCreateAttempt } from '@/services/telemetry/onboardingAttempt';
 import { hasPendingKeptRecipe, KEPT_RECIPE_DESTINATION } from '@/utils/recipeKeepStash';
 import { setPreAuthIdle } from '@/utils/appUpdateSignals';
+import LoginSlowNotice from '@/components/login/LoginSlowNotice.vue';
 
 const router = useRouter();
 const route = useRoute();
@@ -873,6 +874,7 @@ async function handleStartOver() {
       <div
         class="border-t-primary-500 mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-gray-300"
       ></div>
+      <LoginSlowNotice where="init" />
     </div>
 
     <template v-else>
@@ -935,6 +937,7 @@ async function handleStartOver() {
               class="border-t-primary-500 mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-gray-300"
             ></div>
             <p class="dark:text-ink-soft text-sm text-gray-500">{{ t('auth.loadingFile') }}</p>
+            <LoginSlowNotice where="flow" />
           </div>
         </div>
       </template>
@@ -959,6 +962,7 @@ async function handleStartOver() {
             class="border-t-primary-500 mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-gray-300"
           ></div>
           <p class="dark:text-ink-soft text-sm text-gray-500">{{ t('auth.loadingFile') }}</p>
+          <LoginSlowNotice where="loading" />
         </div>
       </div>
 

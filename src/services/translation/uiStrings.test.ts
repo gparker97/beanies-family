@@ -73,6 +73,8 @@ describe('uiStrings', () => {
       'podAccess.recovery.updateApp',
       'join.recovery.updateApp',
       'appUpdate.',
+      'storageStall.',
+      'auth.loadingSlow',
       'podLineage.',
       'podMerge.',
       'podUnreadable.',

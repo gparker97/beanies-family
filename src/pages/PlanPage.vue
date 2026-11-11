@@ -88,6 +88,7 @@ const { fullPerDay } = usePlanLimits();
 const FULL_BULLETS = computed<UIStringKey[]>(() => [
   fullPerDay.value === null ? 'plan.bullets.full1Fallback' : 'plan.bullets.full1',
   'plan.bullets.full2',
+  'plan.bullets.fullFlights',
   'plan.bullets.full3',
 ]);
 
