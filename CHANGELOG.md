@@ -12,6 +12,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Added
 
+- Apple Pay and Google Pay are now offered when paying for a plan, in browsers that support them (Apple Pay in Safari with a card in Wallet).
 - The beanie wall's trip drawer now lists every upcoming trip, so you can tap between them; the trip card shows how many more are coming.
 - The home-screen widget has a new Focus setting: Your day (as before) or To-dos, which fills the widget with your to-dos from the top, grouped as overdue, due today and coming up, on every size. Upcoming events and tonight's meal can be added as extras.
 - Widget text size has a new Automatic option, which shows a short to-do list in bigger text on the medium and large sizes.

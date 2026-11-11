@@ -78,3 +78,13 @@ as of the first Play upload (2026-07-12), the **Play App Signing** fingerprint
 Protected with Play → App signing). Add any further **release** fingerprints to
 **both** on any future signing-key event. Get fingerprints per
 `web/public/.well-known/README.md`.
+
+## `apple-developer-merchantid-domain-association` — Apple Pay in Stripe Checkout
+
+Stripe's domain-association file (identical for every Stripe account, downloaded from
+`https://stripe.com/files/apple-pay/apple-developer-merchantid-domain-association`). Apple
+verifies that we control `app.beanies.family` by fetching it before Apple Pay is offered inside
+Embedded Checkout on the Plan page. `app.beanies.family` is registered as a payment method
+domain in both the live and sandbox Stripe Dashboards (2026-11-11). No file extension, served
+as-is. If Stripe ever rotates the file, re-download and redeploy; the Dashboard's domain row
+shows the verification state.
