@@ -8327,8 +8327,8 @@ const STRING_DEFS = {
   'plan.per.year': { en: 'a year', beanie: 'a year' },
   'plan.per.month': { en: 'a month', beanie: 'a month' },
   'plan.bullets.basic1': {
-    en: 'Every feature, every member, every device',
-    beanie: 'every feature, every member, every device',
+    en: 'All basic features, every member, every device',
+    beanie: 'all basic features, every member, every device',
   },
   'plan.bullets.basic2': { en: '1 magic bean a month', beanie: '1 magic bean a month' },
   'plan.bullets.basic3': { en: 'Your own AI key: unlimited', beanie: 'your own AI key: unlimited' },

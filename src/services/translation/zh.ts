@@ -3679,7 +3679,7 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'plan.full.for': '包含基础版的全部功能，还能让 beanies 帮你看各种文件资料。',
   'plan.per.year': '/年',
   'plan.per.month': '/月',
-  'plan.bullets.basic1': '所有功能、所有成员、所有设备',
+  'plan.bullets.basic1': '全部基础功能、所有成员、所有设备',
   'plan.bullets.basic2': '每月 1 颗魔法豆',
   'plan.bullets.basic3': '使用自己的 AI 密钥：不限次数',
   'plan.bullets.full1': '每天 {count} 颗魔法豆',

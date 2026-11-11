@@ -24,7 +24,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - "Days before" on a repeating to-do is now limited to what fits between two of its due dates (6 for a weekly to-do), and is not offered on a daily one.
 - A beanstalk post pasted into a chat or a social post now previews with its title, its cover image and the beanies.family wordmark, in place of the plain orange card.
 - The founder story (the first beanstalk post and the home page) now describes bank and calendar support as it is today.
-- The pricing page, the plan page in the app and the Help Center now list live flight checks as part of the magic beans plan.
+- The pricing page, the plan page in the app and the Help Center now list live flight checks as part of the magic beans plan, and beanies basic is described as all basic features.
 
 ### Fixed
 
