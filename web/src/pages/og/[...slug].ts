@@ -39,8 +39,13 @@ export const getStaticPaths: GetStaticPaths = async () => {
 
 export const GET: APIRoute = async ({ props, params }) => {
   const { title, category, coverImage } = props as CardProps;
-  const coverPath = coverImage ? path.join(PUBLIC_DIR, coverImage) : '';
+  // A cover is a file under `public/` named by our own frontmatter; anything that resolves
+  // outside it is treated as no cover.
+  const resolved = coverImage ? path.join(PUBLIC_DIR, coverImage) : '';
+  const coverPath = resolved.startsWith(PUBLIC_DIR + path.sep) ? resolved : '';
   let body: Buffer;
+  // Build-time only, and confined to `public/` above: not a request-controlled path.
+  // eslint-disable-next-line security/detect-non-literal-fs-filename
   if (coverPath && existsSync(coverPath)) {
     body = await renderPostCard({ title, category, coverPath });
   } else {
