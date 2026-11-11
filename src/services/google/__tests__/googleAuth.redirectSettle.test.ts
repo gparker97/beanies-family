@@ -140,6 +140,33 @@ describe('googleAuth — ensureRedirectAuthSettled (iOS redirect-auth race fix)'
     });
   });
 
+  describe('isRedirectAuthUnsettled (read-only probe for the web updater)', () => {
+    it('is false with nothing pending, and NEVER starts the exchange', async () => {
+      const { exchangeCodeForTokens } = await import('../oauthProxy');
+      expect(googleAuth.isRedirectAuthUnsettled()).toBe(false);
+      seedPendingCode();
+      expect(googleAuth.isRedirectAuthUnsettled()).toBe(true);
+      // Looking did not redeem: the code is still there and no exchange ran.
+      expect(sessionStorage.getItem('beanies_redirect_auth_code')).toBe('code-xyz');
+      expect(exchangeCodeForTokens).not.toHaveBeenCalled();
+    });
+
+    it('stays true while the exchange is in flight and false once it settles', async () => {
+      seedPendingCode();
+      const settling = googleAuth.ensureRedirectAuthSettled();
+      expect(googleAuth.isRedirectAuthUnsettled()).toBe(true);
+      await settling;
+      await Promise.resolve();
+      expect(googleAuth.isRedirectAuthUnsettled()).toBe(false);
+    });
+
+    it('is false on native (the appUrlOpen listener owns redemption there)', () => {
+      caps.native = true;
+      seedPendingCode();
+      expect(googleAuth.isRedirectAuthUnsettled()).toBe(false);
+    });
+  });
+
   it('__resetRedirectSettleForTesting clears the memo so a later redemption re-runs', async () => {
     seedPendingCode();
     await googleAuth.ensureRedirectAuthSettled();

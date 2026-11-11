@@ -19,6 +19,7 @@ import { generateUUID } from '@/utils/id';
 import { APP_VERSION } from '@/constants/appVersion';
 import type { PodLineage } from '@/types/models';
 import { UnsupportedBeanpodVersionError } from '@/types/sync';
+import { signalNewerFileSeen } from '@/utils/appUpdateSignals';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import type {
   BeanpodFileV4,
@@ -166,7 +167,12 @@ export function parseBeanpodV4(jsonString: string): BeanpodFileV4 {
     throw new Error(`Invalid beanpod: missing version`);
   }
   if (typeof obj.version !== 'string' || !KNOWN_BEANPOD_VERSIONS.has(obj.version)) {
-    throw new UnsupportedBeanpodVersionError(String(obj.version));
+    const err = new UnsupportedBeanpodVersionError(String(obj.version));
+    // A file from the FUTURE means this build may be stale: tell the web updater
+    // (a no-op on native and in tests, where nothing subscribes). It never throws,
+    // so it cannot mask the real error below.
+    if (err.direction === 'newer') signalNewerFileSeen();
+    throw err;
   }
 
   if (typeof obj.familyId !== 'string') throw new Error('Invalid beanpod: missing familyId');

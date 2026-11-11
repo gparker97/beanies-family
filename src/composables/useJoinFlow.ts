@@ -198,7 +198,7 @@ function asJoinDecryptError(result: {
 }
 
 export type RecoveryAction =
-  'retry' | 'signInDifferentAccount' | 'tryAnotherDevice' | 'pickDifferentBean';
+  'retry' | 'signInDifferentAccount' | 'tryAnotherDevice' | 'pickDifferentBean' | 'updateApp';
 
 /**
  * Alias of the shared `StructuredErrorEntry` (`@/utils/structuredError`), narrowed
@@ -381,7 +381,7 @@ export const JOIN_ERRORS = {
   /** The family file was saved by a newer beanies. Update, then reopen the link. */
   FILE_NEWER_VERSION: {
     messageKey: 'join.error.newerVersion',
-    recoveries: [],
+    recoveries: ['updateApp'],
     severity: 'warning',
     impact: 'degraded',
   },

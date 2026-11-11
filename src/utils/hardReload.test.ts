@@ -15,9 +15,16 @@ import {
   startChunkRecovery,
   isChunkRecoveryInProgress,
   __resetChunkRecoveryStateForTests,
+  __resetHardReloadForTesting,
+  HARD_RELOAD_HOLD_MS,
   CHUNK_RELOAD_FLAG,
   CHUNK_RELOAD_MAX_ATTEMPTS,
 } from './hardReload';
+
+beforeEach(() => {
+  // The single-flight slot is held after a (mocked) replace; every test starts free.
+  __resetHardReloadForTesting();
+});
 
 describe('isChunkLoadError', () => {
   it('matches Chrome/Edge dynamic import failure', () => {
@@ -321,6 +328,49 @@ describe('tryRecoverChunkLoad (shared chunk-reload budget)', () => {
     expect(readChunkAttempts()).toBe(1);
     resetChunkAttempts();
     expect(readChunkAttempts()).toBe(0);
+  });
+});
+
+describe('hardReload single-flight', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('a second call during a run joins it: one cleanup, one replace', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const replace = vi.spyOn(window.location, 'replace').mockImplementation(() => {});
+    const first = hardReload();
+    const second = hardReload();
+    expect(second).toBe(first);
+    await first;
+    expect(replace).toHaveBeenCalledTimes(1);
+  });
+
+  it('HOLDS the slot after replace returns (the old document is still running), then releases', async () => {
+    vi.useFakeTimers();
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const replace = vi.spyOn(window.location, 'replace').mockImplementation(() => {});
+    await hardReload();
+    await hardReload(); // e.g. chunk recovery, triggered by the eviction itself
+    expect(replace).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(HARD_RELOAD_HOLD_MS);
+    await hardReload();
+    expect(replace).toHaveBeenCalledTimes(2);
+    vi.useRealTimers();
+  });
+
+  it('releases at once when the page was NOT replaced, so a retry can run', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const replace = vi
+      .spyOn(window.location, 'replace')
+      .mockImplementationOnce(() => {
+        throw new Error('blocked');
+      })
+      .mockImplementation(() => {});
+    await expect(hardReload()).rejects.toThrow('blocked');
+    await hardReload();
+    expect(replace).toHaveBeenCalledTimes(2);
   });
 });
 

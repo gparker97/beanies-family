@@ -17,6 +17,7 @@ import { useFileDrop } from '@/composables/useFileDrop';
 import { POD_FILE_ACCEPT } from '@/constants/beanpodFile';
 import { useClipboard } from '@/composables/useClipboard';
 import { isTemporaryEmail } from '@/utils/email';
+import { runAppUpdateAction } from '@/utils/appUpdateAction';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { resolveErrorView } from '@/utils/structuredError';
 import { useJoinFlow, JOIN_ERRORS, type RecoveryAction } from '@/composables/useJoinFlow';
@@ -152,6 +153,7 @@ const recoveryHandlers: Record<RecoveryAction, () => void | Promise<void>> = {
   retry: () => flow.handleRetry(),
   signInDifferentAccount: () => flow.handleSignInDifferent(),
   tryAnotherDevice: () => flow.handleTryAnotherDevice(),
+  updateApp: () => runAppUpdateAction(),
   pickDifferentBean: () => {
     flow.clearError();
     // Navigation back to the member-pick step is handled by the composable

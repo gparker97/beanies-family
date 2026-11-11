@@ -5131,6 +5131,11 @@ const STRING_DEFS = {
     en: 'Update beanies',
     beanie: 'update beanies',
   },
+  // Toast after the "Update beanies" button on the web finds nothing newer.
+  'appUpdate.alreadyCurrent': {
+    en: 'beanies is already up to date.',
+    beanie: 'beanies is already up to date.',
+  },
   'settings.importFailed': {
     en: 'That file could not be imported.',
     beanie: 'that file could not be imported.',
@@ -6739,6 +6744,7 @@ const STRING_DEFS = {
     en: 'Continue on another device',
     beanie: 'continue on another device',
   },
+  'join.recovery.updateApp': { en: 'Update beanies', beanie: 'update beanies' },
   'join.recovery.pickDifferentBean': {
     en: 'Pick a different member',
     beanie: 'pick a different bean',
@@ -6803,6 +6809,7 @@ const STRING_DEFS = {
     en: 'Use a different Google account',
     beanie: 'use a different google account',
   },
+  'podAccess.recovery.updateApp': { en: 'Update beanies', beanie: 'update beanies' },
   'podAccess.recovery.switchToCanonical': {
     en: "Switch to your family's file",
     beanie: "switch to your family's file",

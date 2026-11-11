@@ -23,6 +23,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - "Show from" now sits directly under a to-do's due date, above the time.
 - "Days before" on a repeating to-do is now limited to what fits between two of its due dates (6 for a weekly to-do), and is not offered on a daily one.
 - A beanstalk post pasted into a chat or a social post now previews with its title, its cover image and the beanies.family wordmark, in place of the plain orange card.
+- The founder story (the first beanstalk post and the home page) now describes bank and calendar support as it is today.
 
 ### Fixed
 
@@ -48,6 +49,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - To-dos are no longer marked overdue early in time zones west of UTC.
 - A far-away flight whose first check could not be settled is now checked again after a week.
+- The app's page height now follows the visible screen in phone browsers, a fix for the header going missing there.
+- The web app in a browser now brings itself up to date instead of staying on an old version, and a family file saved by a newer version now updates the web app (or offers an Update button) in place of a dead end.
 
 ## 2026-11-09
 

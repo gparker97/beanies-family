@@ -42,12 +42,11 @@ export type PodAccessErrorCode =
   | 'VERIFY_UNAVAILABLE'
   | 'CANONICAL_MISMATCH'
   | 'NO_HOME'
-  // The file was saved by a NEWER beanies. `recoveries: []` is deliberate and
-  // has precedent (`JOIN_ERRORS.NO_UNCLAIMED_MEMBERS`): no button in the app
-  // can update the app.
+  // The file was saved by a NEWER beanies. One button fixes it: `updateApp`
+  // updates the web app in place, or opens the store listing on native.
   | 'FILE_NEWER_VERSION'
   // The file was saved by a beanies OLDER than the oldest format this build
-  // reads. Same shape as the newer case — no button in the app can fix it — but
+  // reads. No button in the app can fix it (unlike the newer case, where updating does) and
   // the opposite sentence: telling someone to update would send them looking for
   // a fix that does not exist. It reached `VERIFY_UNAVAILABLE` before, which is
   // a RETRYABLE warning, i.e. endless retry on a file no retry can open.
@@ -72,7 +71,8 @@ export type PodRecoveryAction =
   | 'reconnectAccount'
   | 'pickFamilyFile'
   | 'pickFamilyFileOtherAccount'
-  | 'switchToCanonical';
+  | 'switchToCanonical'
+  | 'updateApp';
 
 export interface PodAccessEntry extends StructuredErrorEntry {
   recoveries: readonly PodRecoveryAction[];
@@ -92,8 +92,9 @@ export interface PodAccessEntry extends StructuredErrorEntry {
  * NOTE there is deliberately no "create a new file" recovery, and there must
  * never be one. If a future code has no usable recovery, give it `recoveries: []`
  * and let the prose carry the action — the precedent is
- * `JOIN_ERRORS.NO_UNCLAIMED_MEMBERS`. A button that can't do the thing is worse
- * than a sentence that tells the truth.
+ * `FILE_OLDER_VERSION` and `JOIN_ERRORS.NO_UNCLAIMED_MEMBERS`. A button that
+ * can't do the thing is worse than a sentence that tells the truth. (A file from
+ * a NEWER beanies is the counter-case: `updateApp` can fix it, so it has the button.)
  */
 export const POD_ACCESS_ERRORS = {
   OFFLINE: {
@@ -140,7 +141,7 @@ export const POD_ACCESS_ERRORS = {
   },
   FILE_NEWER_VERSION: {
     messageKey: 'podAccess.error.newerVersion',
-    recoveries: [],
+    recoveries: ['updateApp'],
     severity: 'warning',
     impact: 'degraded',
   },

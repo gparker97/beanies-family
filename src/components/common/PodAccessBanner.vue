@@ -21,6 +21,7 @@ import ErrorBanner from '@/components/common/ErrorBanner.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useSyncStore } from '@/stores/syncStore';
 import { useDriveFileReselect } from '@/composables/useDriveFileReselect';
+import { runAppUpdateAction } from '@/utils/appUpdateAction';
 import { assertNever } from '@/utils/assertNever';
 import { showToast } from '@/composables/useToast';
 import { useGoogleReconnect, reconnectSucceeded } from '@/composables/useGoogleReconnect';
@@ -147,6 +148,7 @@ const handlers: Record<PodRecoveryAction, () => Promise<void>> = {
   pickFamilyFile,
   pickFamilyFileOtherAccount,
   switchToCanonical,
+  updateApp: () => runAppUpdateAction(),
 };
 
 async function runRecovery(action: string): Promise<void> {

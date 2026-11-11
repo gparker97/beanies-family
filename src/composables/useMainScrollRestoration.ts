@@ -1,7 +1,7 @@
 /**
  * Scroll restoration for the app's real scroller, `<main>` in `App.vue`.
  *
- * The window never scrolls (`App.vue`'s shell is `h-screen overflow-hidden`), so Vue Router's
+ * The window never scrolls (`App.vue`'s shell is `h-dvh overflow-hidden`), so Vue Router's
  * `scrollBehavior` could never have any effect. This module saves `<main>`'s `scrollTop` per
  * history entry and gives it back on a back/forward step (browser, Android hardware back, or an
  * in-app back button through `useAppBack`), so returning from a recipe lands on the recipe card,

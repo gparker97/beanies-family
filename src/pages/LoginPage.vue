@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, watchEffect } from 'vue';
+import { ref, onMounted, onBeforeUnmount, watch, watchEffect } from 'vue';
 import { PayloadLoadError, payloadErrorMessageKey } from '@/types/sync';
 import { reportPayloadFailure } from '@/utils/payloadFailureSurface';
 import type { WatchStopHandle } from 'vue';
@@ -39,6 +39,7 @@ import {
 import { reportError } from '@/utils/errorReporter';
 import { endCreateAttempt } from '@/services/telemetry/onboardingAttempt';
 import { hasPendingKeptRecipe, KEPT_RECIPE_DESTINATION } from '@/utils/recipeKeepStash';
+import { setPreAuthIdle } from '@/utils/appUpdateSignals';
 
 const router = useRouter();
 const route = useRoute();
@@ -137,6 +138,18 @@ const isSingleFamilyAutoSelect = ref(false);
 // delete this + the create block's InviteGateOverlay + InviteGateOverlay/InviteDiscordButton/
 // inviteToken.ts + the inviteGate.* strings.
 const inviteGateLocked = ref(features.inviteGate);
+
+// Tell the web updater (`webUpdate.ts`) when this page sits IDLE on its landing view,
+// the one login screen it may reload into a newer build unprompted. Every other view
+// (family picker, load-pod password, decrypt spinner, create wizard) lives on this
+// same route with no navigation between them, so the route proves nothing; the
+// initial resume dispatch (`isInitializing`) and the demo-code modal are not idle either.
+watch(
+  () => !isInitializing.value && activeView.value === 'welcome' && !showReviewDemoModal.value,
+  (idle) => setPreAuthIdle(idle),
+  { immediate: true }
+);
+onBeforeUnmount(() => setPreAuthIdle(false));
 
 // ── The login-flow machine (2026-08-28 rethink) ─────────────────────────────
 // LoginPage is a thin renderer over it for the returning-user path: 'flow' view

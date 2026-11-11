@@ -253,6 +253,8 @@ describe('POD_ACCESS_ERRORS registry', () => {
       'pickFamilyFile',
       'pickFamilyFileOtherAccount',
       'switchToCanonical',
+      // Updates the app; never touches the family file.
+      'updateApp',
     ]);
     for (const code of ALL_CODES) {
       for (const action of POD_ACCESS_ERRORS[code].recoveries) {
@@ -271,9 +273,9 @@ describe('classifyDriveFailure and a file from a newer beanies', () => {
       'FILE_NEWER_VERSION'
     );
   });
-  it('does not page for it, and offers no recovery button', () => {
+  it('does not page for it, and offers the update button', () => {
     expect(POD_ACCESS_ERRORS.FILE_NEWER_VERSION.impact).toBe('degraded');
-    expect(POD_ACCESS_ERRORS.FILE_NEWER_VERSION.recoveries).toEqual([]);
+    expect(POD_ACCESS_ERRORS.FILE_NEWER_VERSION.recoveries).toEqual(['updateApp']);
   });
   it('still reads a plain offline failure as OFFLINE', () => {
     setOnline(false);

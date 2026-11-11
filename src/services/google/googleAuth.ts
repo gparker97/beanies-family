@@ -3124,6 +3124,8 @@ const REDIRECT_AUTH_SETTLE_TIMEOUT_MS = 20_000;
 // redirect (= a new page load, which resets this module state). Do NOT convert
 // this to a retry-on-reject scheme — retrying a consumed code always fails.
 let redirectSettlePromise: Promise<string | null> | null = null;
+/** True from the moment the exchange starts until it settles either way. */
+let redirectSettleInFlight = false;
 
 /**
  * The single web-side funnel for redeeming a pending redirect `code`. Memoized
@@ -3152,8 +3154,39 @@ export function ensureRedirectAuthSettled(): Promise<string | null> {
       REDIRECT_AUTH_SETTLE_TIMEOUT_MS,
       'completeRedirectAuth() timed out — redirect-auth settle exceeded budget'
     );
+    redirectSettleInFlight = true;
+    const settled = () => {
+      redirectSettleInFlight = false;
+    };
+    // Bookkeeping only: the rejection itself is surfaced by the awaiting boot owner.
+    redirectSettlePromise.then(settled, settled);
   }
   return redirectSettlePromise;
+}
+
+/**
+ * READ-ONLY: is a redirect sign-in still to be redeemed, or being redeemed right now?
+ *
+ * For callers that must merely stay out of the way (the web updater must not reload
+ * the page under an exchange). Unlike `whenRedirectAuthSettled()` this NEVER starts
+ * the exchange: awaiting that function from a boot-time poll could redeem the one-time
+ * code before App.vue has set the family id and registered the account assertion.
+ * True while a one-time code sits in sessionStorage (Drive or calendar) or the
+ * exchange is in flight. A storage read that throws answers false (nothing readable
+ * means nothing to protect) and says so on the console.
+ */
+export function isRedirectAuthUnsettled(): boolean {
+  if (isNative()) return false;
+  if (redirectSettleInFlight) return true;
+  try {
+    return (
+      sessionStorage.getItem(REDIRECT_AUTH_CODE_KEY) !== null ||
+      sessionStorage.getItem(REDIRECT_AUTH_CODE_KEY_CALENDAR) !== null
+    );
+  } catch (e) {
+    console.warn('[googleAuth] redirect-code probe could not read sessionStorage:', e);
+    return false;
+  }
 }
 
 /**
@@ -3187,6 +3220,7 @@ export function whenRedirectAuthSettled(): Promise<void> {
  */
 export function __resetRedirectSettleForTesting(): void {
   redirectSettlePromise = null;
+  redirectSettleInFlight = false;
 }
 
 // ─── Native (Capacitor) round-trip settlement ───────────────────────────────

@@ -33,6 +33,11 @@ export const HARD_RELOAD_CLEANUP_DEADLINE_MS = 8000;
  *   - The error-overlay "Reload" button in `App.vue`
  *   - The "Sign Out & Clear Data" path
  *   - The "new version ready" action toast from the header refresh icon
+ *   - The web updater's forced update (`forcedUpdate.ts`, driven by
+ *     `webUpdate.runUpdateCheck`): a build that `/version.json` proves is behind
+ *     is replaced at an idle or quiet moment, or when the person asks. This is a
+ *     deliberate HEALTHY-path call; its own loop guard is a once-per-sha
+ *     sessionStorage record, not the chunk-recovery counter below.
  *
  * Loop protection for the auto-recovery paths lives in
  * `startChunkRecovery` / `tryRecoverChunkLoad` below: a bounded attempt
@@ -40,7 +45,39 @@ export const HARD_RELOAD_CLEANUP_DEADLINE_MS = 8000;
  * flag, so if the new HTML *also* fails (e.g. network down) we surface the
  * error overlay instead of looping.
  */
-export async function hardReload(): Promise<void> {
+let hardReloadInFlight: Promise<void> | null = null;
+
+/**
+ * Single-flight. Two concurrent runs race the unregister and the cache eviction, and
+ * since the web updater became a caller the overlap is reachable: a forced update is
+ * clearing the precache, a lazy chunk import fails because of it, and chunk recovery
+ * asks for a reload too. Every caller joins the run in progress.
+ *
+ * The slot is HELD after `location.replace()` returns: the old document keeps running
+ * until the navigation commits, and that is exactly when the chunk failure arrives. It
+ * is released at once if the page was NOT replaced (the rejection path), and after
+ * `HARD_RELOAD_HOLD_MS` as a last resort, so a navigation that never commits cannot
+ * leave the Reload button dead.
+ */
+export const HARD_RELOAD_HOLD_MS = 15_000;
+
+export function hardReload(): Promise<void> {
+  if (hardReloadInFlight) return hardReloadInFlight;
+  const run = runHardReload();
+  hardReloadInFlight = run;
+  const release = () => {
+    if (hardReloadInFlight === run) hardReloadInFlight = null;
+  };
+  run.then(() => setTimeout(release, HARD_RELOAD_HOLD_MS), release);
+  return run;
+}
+
+/** Test-only: the slot otherwise survives until the page is replaced. */
+export function __resetHardReloadForTesting(): void {
+  hardReloadInFlight = null;
+}
+
+async function runHardReload(): Promise<void> {
   let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
   const deadline = new Promise<'deadline'>((resolve) => {
     deadlineTimer = setTimeout(() => resolve('deadline'), HARD_RELOAD_CLEANUP_DEADLINE_MS);
@@ -89,10 +126,13 @@ async function evictServiceWorkerAndCaches(): Promise<'done'> {
       // loop when registerType: 'prompt' has held a new SW in waiting
       // limbo — `update()` + `SKIP_WAITING` are no-ops there, and
       // workbox's NavigationRoute can still serve stale `index.html`
-      // even after `caches.delete(all)`. `hardReload()` is only ever
-      // called from recovery paths (router.onError, vite:preloadError,
-      // App.vue init catch, the user-Reload button) — never on a healthy
-      // path — so the brief offline gap is always an acceptable trade.
+      // even after `caches.delete(all)`. `hardReload()` is called from
+      // recovery paths (router.onError, vite:preloadError, App.vue init
+      // catch, the user-Reload button) and from ONE deliberate healthy
+      // path: the web updater's forced update (`forcedUpdate.ts`), which
+      // only runs when the build is proven behind and the screen is idle
+      // or quiet (or the person asked). In every case the brief offline
+      // gap is an acceptable trade: the SW comes back on the fresh load.
       try {
         await reg.unregister();
       } catch (e) {

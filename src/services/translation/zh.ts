@@ -2476,6 +2476,7 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'appUpdate.prompt.confirm': '更新',
   'appUpdate.prompt.notNow': '以后再说',
   'appUpdate.openStore': '更新 beanies',
+  'appUpdate.alreadyCurrent': 'beanies 已是最新版本。',
   'settings.importFailed': '这个文件无法导入。',
   'settings.importNeedsPassword': '这个文件已加密。请输入它的密码后导入。',
   'podAccess.error.newerVersion':
@@ -2980,6 +2981,7 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
 
   // Recovery action button labels.
   'join.recovery.retry': '重试',
+  'join.recovery.updateApp': '更新 beanies',
   'join.recovery.signInDifferentAccount': '换一个账户登录',
   'join.recovery.tryAnotherDevice': '在另一台设备上继续',
   'join.recovery.pickDifferentBean': '选择其他成员',
@@ -3004,6 +3006,7 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'podAccess.recovery.reconnectAccount': '重新连接 Google',
   'podAccess.recovery.pickFamilyFile': '选择你的家庭文件',
   'podAccess.recovery.pickFamilyFileOtherAccount': '使用其他 Google 账户',
+  'podAccess.recovery.updateApp': '更新 beanies',
   'podAccess.recovery.switchToCanonical': '切换到你的家庭文件',
   'join.diagnostic.link': '复制诊断信息',
   'join.diagnostic.title': '诊断信息',

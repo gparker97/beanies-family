@@ -66,6 +66,13 @@ describe('uiStrings', () => {
     // brand nouns and stay; the bare app name "beanies" is allowed unless it is
     // being used as a noun for data ("your beanies").
     const IMPORTANT_PREFIXES = [
+      // The "Update beanies" action and its outcomes (web stale-build plan, 2026-11-11):
+      // a person who cannot open their family file must be told plainly what the button does.
+      // Exact keys for the two recovery labels: their tables also hold older playful labels
+      // (`join.recovery.pickDifferentBean`) that predate this floor.
+      'podAccess.recovery.updateApp',
+      'join.recovery.updateApp',
+      'appUpdate.',
       'podLineage.',
       'podMerge.',
       'podUnreadable.',

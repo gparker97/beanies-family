@@ -13,17 +13,35 @@
  * would silently discard; popovers and menus register there too, and deferring a reload until
  * they close is equally right (`useKeyboardShortcuts` already treats an open layer as busy).
  * It can only DEFER a reload, never cause one.
+ *
+ * A SECOND DELIBERATE ADDITION (2026-11-11, web stale-build plan): `appQuietBlocker()` names
+ * WHICH check failed, so the web updater's `deferred` event can say why a reload is waiting.
+ * It is the same three checks, in the same order, inside the same one try/catch, and
+ * `isAppQuiet()` is now defined as "no blocker". The answer to "quiet or not" is unchanged
+ * for every input; only the reason became visible.
  */
 import { hasOpenOverlays } from '@/utils/overlayStack';
 import { hasOpenEscapeLayer } from '@/composables/useEscapeClose';
 import { useSyncStore } from '@/stores/syncStore';
 
+/** Why now is NOT a safe moment, or `null` when it is. */
+export type QuietBlocker = 'overlay' | 'escape-layer' | 'syncing' | 'not-ready';
+
+/** The first check that fails, in the original order, or `null` when quiet. */
+export function appQuietBlocker(): QuietBlocker | null {
+  try {
+    if (hasOpenOverlays()) return 'overlay';
+    if (hasOpenEscapeLayer()) return 'escape-layer';
+    if (useSyncStore().isSyncing) return 'syncing';
+    return null;
+  } catch {
+    // Pre-init / store not ready — classified as 'not-ready', i.e. NOT quiet (defer the
+    // reload). Callers log the blocker, so this is not silent.
+    return 'not-ready';
+  }
+}
+
 /** Quiet = nothing the user would lose if we reload right now. */
 export function isAppQuiet(): boolean {
-  try {
-    return !hasOpenOverlays() && !hasOpenEscapeLayer() && !useSyncStore().isSyncing;
-  } catch {
-    // Pre-init / store not ready — treat as NOT quiet (defer the reload).
-    return false;
-  }
+  return appQuietBlocker() === null;
 }

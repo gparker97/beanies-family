@@ -260,7 +260,10 @@ jobs:
         # `index.html`, the chunks it references still exist; AND the stale
         # window shrinks to seconds, not hours.
         run: |
-          aws s3 sync dist/ s3://${{ vars.APP_S3_BUCKET }}
+          # `version.json` is excluded here and uploaded LAST (below): the sync would
+          # otherwise upload it first, with default cache headers, and a client could
+          # see the new sha before the new build is fetchable.
+          aws s3 sync dist/ s3://${{ vars.APP_S3_BUCKET }} --exclude version.json
           aws s3 cp dist/index.html s3://${{ vars.APP_S3_BUCKET }}/index.html \
             --cache-control "no-cache, max-age=0, must-revalidate" \
             --content-type "text/html; charset=utf-8"
@@ -279,6 +282,13 @@ jobs:
           # HTML, finds no JSON, and reports nothing anywhere.
           aws s3 cp dist/.well-known/apple-app-site-association \
             s3://${{ vars.APP_S3_BUCKET }}/.well-known/apple-app-site-association \
+            --content-type "application/json"
+          # The web freshness probe (`src/utils/buildFreshness.ts`), uploaded LAST so
+          # its new sha only becomes visible once everything it points at is in S3.
+          # no-cache for the same reason as `index.html`: a cached probe would keep
+          # answering "current" to a stale browser.
+          aws s3 cp dist/version.json s3://${{ vars.APP_S3_BUCKET }}/version.json \
+            --cache-control "no-cache, max-age=0, must-revalidate" \
             --content-type "application/json"
 
       - name: Invalidate CloudFront cache

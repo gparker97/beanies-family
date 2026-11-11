@@ -121,6 +121,7 @@ import { useWeatherStore } from '@/stores/weatherStore';
 import { useFlightStatusStore } from '@/stores/flightStatusStore';
 import { installDataPolicy } from '@/services/registry/dataPolicy';
 import { installMainScrollRestoration } from '@/composables/useMainScrollRestoration';
+import { useShellViewport } from '@/composables/useShellViewport';
 import { useRecurringStore } from '@/stores/recurringStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTodoStore } from '@/stores/todoStore';
@@ -549,6 +550,7 @@ const showLayout = computed(() =>
     needsPodSetup: authStore.needsPodSetup,
   })
 );
+useShellViewport(showLayout);
 
 /**
  * Awaited `router.replace` with structured failure handling.
@@ -1254,6 +1256,14 @@ onMounted(async () => {
     if (postUpdatePath) {
       sessionStorage.removeItem(PWA_POST_UPDATE_ROUTE_KEY);
       pendingUpdateToast = true; // fire once the init loader clears (see watcher)
+      // The SW apply path's "did it take" signal (the forced path logs its own
+      // `applied via=forced` from usePwaUpdater's record).
+      logEvent({
+        level: 'info',
+        surface: 'pwa-updater',
+        message: 'service worker update applied',
+        context: { action: 'applied', detail: 'via=sw' },
+      });
       if (postUpdatePath !== route.fullPath) {
         initBreadcrumbs.push(`pwa-resume: navigating to ${postUpdatePath}`);
         await router.replace(postUpdatePath);
@@ -2178,7 +2188,7 @@ watch(
        status bar. Keep bg-gray-50 / dark:bg-surface-ground in sync with the native
        @color/windowBackground (android/app/src/main/res/values{,-night}/colors.xml)
        so the pre-paint strip and the WebView show one colour (no seam). -->
-  <div class="dark:bg-surface-ground min-h-screen bg-gray-50">
+  <div class="dark:bg-surface-ground min-h-dvh bg-gray-50">
     <!-- Loading overlay with pod spinner -->
     <Transition
       enter-active-class="transition-opacity duration-200"
@@ -2532,7 +2542,7 @@ watch(
     <!-- The ONE sign-out confirm / recovery-kit guard / progress overlay (useSignOut). -->
     <SignOutHost />
 
-    <div v-if="showLayout" class="flex h-screen overflow-hidden">
+    <div v-if="showLayout" class="flex h-dvh overflow-hidden">
       <!-- Desktop sidebar -->
       <AppSidebar v-if="isDesktop" />
 

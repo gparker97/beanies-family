@@ -33,7 +33,7 @@ vi.mock('@/stores/syncStore', () => ({
 }));
 
 import { effectScope, ref } from 'vue';
-import { isAppQuiet } from '../appQuiet';
+import { isAppQuiet, appQuietBlocker } from '../appQuiet';
 import { useEscapeClose, __resetEscapeCloseForTests } from '@/composables/useEscapeClose';
 
 describe('isAppQuiet', () => {
@@ -65,6 +65,45 @@ describe('isAppQuiet', () => {
     syncing.throws = true;
     expect(() => isAppQuiet()).not.toThrow();
     expect(isAppQuiet()).toBe(false);
+  });
+
+  describe('appQuietBlocker (names the check that failed; same checks, same order)', () => {
+    it('is null exactly when isAppQuiet is true', () => {
+      expect(appQuietBlocker()).toBeNull();
+      expect(isAppQuiet()).toBe(true);
+    });
+
+    it('reports each blocker on its own', () => {
+      overlays.open = true;
+      expect(appQuietBlocker()).toBe('overlay');
+      overlays.open = false;
+
+      const scope = effectScope();
+      scope.run(() => useEscapeClose(ref(true), () => {}));
+      expect(appQuietBlocker()).toBe('escape-layer');
+      scope.stop();
+
+      syncing.value = true;
+      expect(appQuietBlocker()).toBe('syncing');
+    });
+
+    it('keeps the original order: overlay, then escape layer, then saving', () => {
+      const scope = effectScope();
+      scope.run(() => useEscapeClose(ref(true), () => {}));
+      overlays.open = true;
+      syncing.value = true;
+      expect(appQuietBlocker()).toBe('overlay');
+      overlays.open = false;
+      expect(appQuietBlocker()).toBe('escape-layer');
+      scope.stop();
+      expect(appQuietBlocker()).toBe('syncing');
+    });
+
+    it("classifies a store that is not ready as 'not-ready' instead of throwing", () => {
+      syncing.throws = true;
+      expect(() => appQuietBlocker()).not.toThrow();
+      expect(appQuietBlocker()).toBe('not-ready');
+    });
   });
 
   describe('an open Escape layer (#119: the non-modal desktop composer)', () => {

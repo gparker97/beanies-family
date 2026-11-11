@@ -21,12 +21,22 @@
  *
  * @param registration  the active ServiceWorkerRegistration
  * @param source        short label for the call site (used in the log line)
+ * @param onError       optional extra sink for the rejection (the web updater logs it
+ *                      to the firehose as `sw-update-failed`). Default: console only.
+ *                      A throwing sink is contained, so this still never rejects.
  */
 export function safeServiceWorkerUpdate(
   registration: ServiceWorkerRegistration,
-  source: string
+  source: string,
+  onError?: (err: unknown) => void
 ): void {
   registration.update().catch((err: unknown) => {
     console.warn(`[serviceWorker] update from ${source} failed (transient):`, err);
+    if (!onError) return;
+    try {
+      onError(err);
+    } catch (sinkErr) {
+      console.warn(`[serviceWorker] onError sink for ${source} threw:`, sinkErr);
+    }
   });
 }

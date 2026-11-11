@@ -147,6 +147,37 @@ function featureFlagWriterDev() {
   };
 }
 
+/**
+ * The build identity, resolved ONCE so the bundle's `define` block and the emitted
+ * `version.json` cannot disagree. `deploy.yml` sets VITE_BUILD_SHA (= github.sha);
+ * local builds fall back to 'dev', which the web freshness check never runs on.
+ */
+const BUILD_SHA = process.env.VITE_BUILD_SHA || 'dev';
+const BUILD_TIME = process.env.VITE_BUILD_TIME || new Date().toISOString();
+
+/**
+ * Emit `dist/version.json` (`{ sha, builtAt }`) for the web freshness check
+ * (`src/utils/buildFreshness.ts`). Nothing else goes in it, because nothing reads it.
+ * It is kept OUT of the precache (`globIgnores` below) and uploaded LAST by
+ * `deploy.yml` with no-cache headers, so a client never sees a new sha before the
+ * new build is fetchable.
+ */
+function emitVersionJson() {
+  return {
+    name: 'beanies:emit-version-json',
+    apply: 'build' as const,
+    generateBundle(this: {
+      emitFile: (file: { type: 'asset'; fileName: string; source: string }) => string;
+    }) {
+      this.emitFile({
+        type: 'asset',
+        fileName: 'version.json',
+        source: JSON.stringify({ sha: BUILD_SHA, builtAt: BUILD_TIME }),
+      });
+    },
+  };
+}
+
 // https://vite.dev/config/
 export default defineConfig({
   // Worker bundles do NOT inherit the top-level `plugins`, so the Automerge WASM
@@ -172,6 +203,7 @@ export default defineConfig({
   plugins: [
     assertOfficialBuildEnv(),
     featureFlagWriterDev(),
+    emitVersionJson(),
     wasm(),
     topLevelAwait(),
     vue(),
@@ -273,7 +305,11 @@ export default defineConfig({
         // fetched on demand for the family's country only and cached in
         // IndexedDB (see referenceDataCacheRepository) — never precache it, or
         // the service-worker install would balloon by the whole dataset.
-        globIgnores: ['**/holidays/*.json'],
+        //
+        // `version.json` is the web freshness probe (see `emitVersionJson` above). The
+        // `json` glob would otherwise precache it, and a precached probe always answers
+        // "current", which is the stale-build trap it exists to escape.
+        globIgnores: ['**/holidays/*.json', 'version.json'],
         // 5 MiB. The Automerge WASM is ~3.6 MB, and on 2026-11-07 the main JS chunk
         // crossed 4 MiB (prod was 4,165,300 bytes; live flight checks added ~69 KB).
         // This is a precache ceiling, not a performance budget: the real fix is to
@@ -331,13 +367,11 @@ export default defineConfig({
     // Falls back to 'dev' for local builds. Read at runtime via
     // `import.meta.env.VITE_BUILD_SHA` (the errorReporter ships this in
     // every Slack message so we can correlate bugs to specific deploys).
-    'import.meta.env.VITE_BUILD_SHA': JSON.stringify(process.env.VITE_BUILD_SHA || 'dev'),
+    'import.meta.env.VITE_BUILD_SHA': JSON.stringify(BUILD_SHA),
     // Build timestamp — evaluated when Vite builds. In CI that is the deploy
     // time; locally it's the local build time. Paired with the SHA to show a
     // human-readable "which version am I on?" marker on the welcome gate. No
     // CI wiring needed: `new Date()` runs at build time on the runner.
-    'import.meta.env.VITE_BUILD_TIME': JSON.stringify(
-      process.env.VITE_BUILD_TIME || new Date().toISOString()
-    ),
+    'import.meta.env.VITE_BUILD_TIME': JSON.stringify(BUILD_TIME),
   },
 });

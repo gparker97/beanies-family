@@ -208,6 +208,11 @@ describe('useJoinFlow', () => {
   beforeEach(reset);
 
   describe('JOIN_ERRORS registry', () => {
+    it('a newer-version file offers exactly the Update action', async () => {
+      const { JOIN_ERRORS } = await import('../useJoinFlow');
+      expect(JOIN_ERRORS.FILE_NEWER_VERSION.recoveries).toEqual(['updateApp']);
+    });
+
     it('has an entry for every JoinErrorCode (exhaustiveness guard)', async () => {
       const { JOIN_ERRORS } = await import('../useJoinFlow');
       const keys = Object.keys(JOIN_ERRORS).sort();
