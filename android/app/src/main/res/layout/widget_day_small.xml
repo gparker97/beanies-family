@@ -256,7 +256,9 @@
              row's height like the weather; GONE in Your day and when nothing is due today (the
              weather or peek return). Readable text, so below 100% it sits on the header's 95%
              tile (DayWidgetRenderer.tile): 6dp side padding with no end margin keeps the text
-             where the 6dp peek margin puts it, and the 60dp box stays inside the peek's budget. -->
+             where the 6dp peek margin puts it. The 66dp box is exactly the budget
+             smallHeaderScale gives the slot (the 60dp peek + its 6dp end margin), leaving 54dp
+             of text; a count wider than that wraps onto its second line. -->
         <TextView
             android:id="@+id/small_count"
             android:layout_width="wrap_content"
@@ -268,7 +270,7 @@
             android:paddingEnd="@dimen/widget_small_peek_end"
             android:gravity="center_vertical|end"
             android:maxLines="2"
-            android:maxWidth="@dimen/widget_peek_family_width"
+            android:maxWidth="66dp"
             android:textColor="@color/widget_ink_soft"
             android:textSize="@dimen/widget_text_body"
             android:visibility="gone" />

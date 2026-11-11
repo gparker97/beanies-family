@@ -364,7 +364,8 @@ final class WidgetViews {
     private static final float TASK_LEAD_GAP_DP = 6f;
     private static final float TASK_TAG_GAP_DP = 4f;
     private static final float TASK_DOT_GAP_DP = 4f;
-    private static final float TASK_DOT_DP = 14f;
+    /** A task row's member dot (the include's 14dp in widget_task_row.xml), × the step when stepped. */
+    static final float TASK_DOT_DP = 14f;
 
     /**
      * The device side of {@link WidgetFill.StepWidthCheck}, the ONE implementation the renderer
@@ -380,7 +381,7 @@ final class WidgetViews {
      */
     static WidgetFill.StepWidthCheck titleWidthCheck(Context context, float panelDp, float textScale) {
         return (tasks, calendarTimes, factor) -> {
-            float leadDp = Math.max(LEAD_MIN_DP, leadColumnDp(context, calendarTimes, false, textScale));
+            float leadDp = leadColumnDp(context, calendarTimes, false, textScale);
             float bodySp = sp(context, R.dimen.widget_text_body) * textScale;
             Paint title = paint(Typeface.DEFAULT);
             Paint tag = paint(Typeface.DEFAULT_BOLD);

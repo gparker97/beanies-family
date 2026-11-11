@@ -140,11 +140,12 @@ struct TaskRowView: View {
         let size = textSize * scale
         var room = rowWidth - leadWidth - spacing
         if !task.tag.isEmpty {
+            let face = tagFace(task, scale: scale)
             let tagWidth: CGFloat
-            if task.tagIsAccent {
-                tagWidth = TextMeasure.systemWidth(of: [task.tag], size: size, semibold: true)
+            if face.outfitBold {
+                tagWidth = TextMeasure.width(of: [task.tag], fontName: WidgetFontName.outfitBold, size: face.size)
             } else {
-                tagWidth = TextMeasure.width(of: [task.tag], fontName: WidgetFontName.outfitBold, size: size)
+                tagWidth = TextMeasure.systemWidth(of: [task.tag], size: face.size, semibold: true)
             }
             room -= spacing + tagWidth
         }
@@ -186,17 +187,31 @@ struct TaskRowView: View {
         .frame(height: height)
     }
 
+    /// The tag's face and size, the one definition `tag` draws with and `titleFits` measures
+    /// with: the system face semibold for an accent tag, Outfit Bold otherwise.
+    static func tagFace(_ task: WSTask, scale: CGFloat) -> (outfitBold: Bool, size: CGFloat) {
+        (outfitBold: !task.tagIsAccent, size: textSize * scale)
+    }
+
+    static func tagFont(_ task: WSTask, scale: CGFloat) -> Font {
+        let face = tagFace(task, scale: scale)
+        if face.outfitBold {
+            return Font.outfit(size: face.size, weight: .bold)
+        }
+        return Font.sys(size: face.size, weight: .semibold)
+    }
+
     /// The word carries the meaning; the colour only sorts "now" from "later". Never Alert Red.
     @ViewBuilder private var tag: some View {
         if task.tagIsAccent {
             Text(task.tag)
-                .font(.sys(size: m.s(11), weight: .semibold))
+                .font(Self.tagFont(task, scale: m.scale))
                 .foregroundStyle(Color.wAccent)
                 .lineLimit(1)
                 .fixedSize()
         } else {
             Text(task.tag)
-                .font(.outfit(size: m.s(11), weight: .bold))
+                .font(Self.tagFont(task, scale: m.scale))
                 .foregroundStyle(Color.wInkSoft)
                 .lineLimit(1)
                 .fixedSize()

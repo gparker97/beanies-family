@@ -120,8 +120,8 @@ struct AgendaPanelView: View {
     /// The To-dos layout's section: the heading at Standard with the count on its right ("N
     /// more" moves to the footer), the groups and rows at the plan's step. The fill charged
     /// `rowHeight x taskStep` per row, so that is the height drawn. The lead column does not
-    /// step (it stays the calendar's time column, as on Android): the stepped glyph still fits,
-    /// and the titles keep their edge.
+    /// step (as on Android): it is the width the title check measured with (`taskLeadWidth`),
+    /// else the calendar's time column. The stepped glyph still fits in it.
     private func todosSection(_ section: WSTasks, timeColumn: CGFloat) -> some View {
         let rows = m.stepped(plan.taskStep)
         return TaskSectionView(
@@ -130,7 +130,7 @@ struct AgendaPanelView: View {
             moreCount: 0,
             labels: labels,
             fallbackLink: links.todo,
-            leadWidth: timeColumn,
+            leadWidth: plan.taskLeadWidth ?? timeColumn,
             rowHeight: rowHeight * plan.taskStep,
             size: size,
             m: m,

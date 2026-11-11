@@ -4,8 +4,8 @@
      To-dos layout (2026-11-11) reuses it for its group headings ("overdue" in the accent, "due
      today" / "coming up" in the softer ink, set in code: the to-dos section is built fresh on
      every render; pinned by `divider_root` on API 31+) and for the "next up" heading over the
-     events extra (the label in divider_tomorrow, divider_date empty), so the list keeps its four
-     item layouts and never sets a colour on a recycled list item. -->
+     events extra (the label in divider_heading, divider_date empty, divider_tomorrow GONE), so
+     the list keeps its four item layouts and never sets a colour on a recycled list item. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/divider_root"
     android:layout_width="match_parent"
@@ -14,6 +14,18 @@
     android:minHeight="19dp"
     android:orientation="horizontal"
     android:paddingTop="2dp">
+
+    <!-- A heading ("next up"): the date's bold weight and size in the soft ink, from the layout
+         (never coloured from code). GONE on a date divider. -->
+    <TextView
+        android:id="@+id/divider_heading"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:singleLine="true"
+        android:textColor="@color/widget_ink_soft"
+        android:textSize="@dimen/widget_text_body"
+        android:textStyle="bold"
+        android:visibility="gone" />
 
     <TextView
         android:id="@+id/divider_date"

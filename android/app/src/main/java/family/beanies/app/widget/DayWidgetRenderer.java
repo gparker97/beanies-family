@@ -94,10 +94,9 @@ final class DayWidgetRenderer {
     private static final float SMALL_PANEL_INSET_DP = 35f;
     /** Message padding 14 + 14. */
     private static final float MESSAGE_INSET_DP = 28f;
-    /** A task row's glyph sizes (widget_task_box's 10dp, the 12dp glyphs) and its 14dp member dot. */
+    /** A task row's glyph sizes (widget_task_box's 10dp, the 12dp glyphs); the dot is WidgetViews.TASK_DOT_DP. */
     private static final float TASK_BOX_DP = 10f;
     private static final float TASK_GLYPH_DP = 12f;
-    private static final float DOT_DP = 14f;
     /** The small To-dos rows' lead column (API 31+): the glyph and a little air, not a time's width. */
     private static final float SMALL_TASK_LEAD_DP = 16f;
 
@@ -401,7 +400,7 @@ final class DayWidgetRenderer {
         row.setImageViewResource(R.id.task_glyph_step, glyph);
         WidgetViews.pinSize(row, R.id.task_glyph_step,
                 (glyph == R.drawable.widget_task_box ? TASK_BOX_DP : TASK_GLYPH_DP) * step);
-        WidgetViews.pinSize(row, R.id.dot_frame, DOT_DP * step);
+        WidgetViews.pinSize(row, R.id.dot_frame, WidgetViews.TASK_DOT_DP * step);
         WidgetViews.bindDot(row, task.dot, false, step);
     }
 

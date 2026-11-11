@@ -116,7 +116,8 @@ struct FillPlan {
     var tonight: WSTonight? = nil
     /// The to-dos block for the foot of the date column, when the count is on.
     var taskCount: WSTasks? = nil
-    /// The to-dos section (heading and link), when at least one task fits.
+    /// The to-dos section (heading and link): when at least one task fits, and in the To-dos
+    /// layout's all clear when the snapshot's heading has text (the heading row alone).
     var taskSection: WSTasks? = nil
     var tasks: [WSTask] = []
     /// Tasks that passed the switches but did not fit: the heading's "{n} more" (the footer's,
@@ -133,6 +134,10 @@ struct FillPlan {
     var taskHeadingCount: WSText? = nil
     /// The To-dos layout: "next up" over today's events, when any are placed.
     var eventsHeading: String? = nil
+    /// The To-dos layout: the lead column the Automatic step's title check measured with, so
+    /// the rows are drawn with exactly that width. nil when no check ran (the rows then use
+    /// the calendar's time column).
+    var taskLeadWidth: CGFloat? = nil
 }
 
 /// The next calendar item, for the small widget and the lock screen.
@@ -281,9 +286,10 @@ enum WidgetFill {
             // with to-dos due always shows one), and never gated on the events switch, which
             // is off by default in the To-dos focus.
             if tasks.isEmpty {
-                // The section heading row stays over the all clear, as in the mockup.
+                // The section heading row stays over the all clear, as in the mockup. An empty
+                // heading draws nothing and costs nothing (as on Android).
                 let sectionCost = sectionHeadingHeight * scale
-                if remaining >= sectionCost {
+                if !day.tasks.heading.isEmpty, remaining >= sectionCost {
                     plan.taskSection = day.tasks
                     remaining -= sectionCost
                 }
@@ -445,6 +451,9 @@ enum WidgetFill {
                     }
                 }
                 let lead = AgendaPanelView.timeColumnWidth(times, child: false, scale: scale)
+                // The rows are drawn with this same lead, so a title the check calls whole at x1
+                // is whole on screen.
+                plan.taskLeadWidth = lead
                 let rowWidth = spec.taskRowWidth
                 let wholeAtStandard = Array(tasks.prefix(maxTaskRows)).filter { task in
                     TaskRowView.titleFits(task, rowWidth: rowWidth, leadWidth: lead, scale: scale)

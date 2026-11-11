@@ -111,8 +111,10 @@ public final class WidgetSizes {
     /**
      * The ceiling on a stepped to-do row's effective scale. Mirrors iOS `WidgetMetrics.taskStepMax`
      * (ios/App/BeaniesWidgets/WidgetStyle.swift); change both. A ceiling of its own beside
-     * {@link #TEXT_SCALE_MAX} because the fit covers height only, never a title's width, so a step
-     * must not compound with accessibility text (1.3 × 1.6 would be 2.08).
+     * {@link #TEXT_SCALE_MAX} so a step never compounds with accessibility text (1.3 × 1.6 would be
+     * 2.08). The height fit is {@link WidgetFill#todosFill}; before it, the width check
+     * (`WidgetFill.StepWidthCheck`, `WidgetViews.titleWidthCheck`) drops any factor at which a
+     * title that fits at ×1 would be cut.
      */
     static final float TASK_STEP_MAX = 1.6f;
 

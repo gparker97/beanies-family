@@ -67,9 +67,10 @@ struct WidgetMetrics {
     static let maxScale: CGFloat = 1.3
 
     /// The ceiling on the To-dos focus's Automatic steps (`WidgetFill.taskStepFactors`), in the
-    /// same clamp shape as `maxScale`. Its own ceiling because the fit check covers height, not
-    /// title width: the steps must not compound with accessibility text (1.3 x 1.6 would be
-    /// 2.08). Mirrors Android `WidgetSizes.TASK_STEP_MAX`; change both.
+    /// same clamp shape as `maxScale`. Its own ceiling so the steps never compound with
+    /// accessibility text (1.3 x 1.6 would be 2.08): the height fit and the title check
+    /// (`WidgetFill.factorsKeepingTitles`) keep a step readable, and this caps how big it can
+    /// get. Mirrors Android `WidgetSizes.TASK_STEP_MAX`; change both.
     static let taskStepMax: CGFloat = 1.6
 
     /// The absolute effective scale every design size multiplies by.

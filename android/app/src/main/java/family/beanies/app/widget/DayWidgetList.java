@@ -29,7 +29,7 @@ import java.util.List;
  * THE TO-DOS LAYOUT (2026-11-11). The list is the upcoming-events extra under the to-dos: today's
  * rows arrive without the ones already ended ({@link WidgetFill#plan} leaves them out, so the
  * events slot it reserves is counted from the same rows), led by a "next up" heading (the divider
- * layout with the label in its soft-ink aside, so {@link #VIEW_TYPE_COUNT} stays 4 and no list
+ * layout with the label in its own soft-ink heading view, so {@link #VIEW_TYPE_COUNT} stays 4 and no list
  * item ever gets a colour set), and an all-clear day with events gets its one
  * handwritten all-clear line on top. Your day is unchanged.
  *
@@ -113,9 +113,7 @@ final class DayWidgetList {
         if (!allClear.isEmpty()) out.add(nothing(allClear));
         String nextUp = plan.snapshot.labels.eventsHeading;
         if (plan.layout == WidgetFill.Layout.TODOS && !plan.todayRows.isEmpty() && !nextUp.isEmpty()) {
-            // In the divider's soft-ink aside, the date left empty: no colour is set on a list
-            // item, so a recycled one never carries it into a date divider.
-            out.add(divider("", nextUp));
+            out.add(heading(nextUp));
         }
         addRows(out, plan.todayRows, now);
         for (WidgetFill.LaterDay later : plan.laterDays) {
@@ -200,19 +198,28 @@ final class DayWidgetList {
 
     /** "Wed 15" in the accent, "tomorrow" beside it when it is the device's tomorrow, a hairline. */
     private RemoteViews divider(String date, boolean isTomorrow) {
-        return divider(date, isTomorrow ? tomorrowLabel : "");
-    }
-
-    /**
-     * The divider item: {@code date} in the layout's accent, {@code aside} in its soft ink (or
-     * GONE). Colours stay the layout's, resolved by the launcher per light/dark mode.
-     */
-    private RemoteViews divider(String date, String aside) {
         RemoteViews v = new RemoteViews(context.getPackageName(), R.layout.widget_day_divider);
         WidgetViews.textSize(v, context, textScale, R.dimen.widget_text_body,
                 R.id.divider_date, R.id.divider_tomorrow);
         v.setTextViewText(R.id.divider_date, date);
-        WidgetViews.textOrGone(v, R.id.divider_tomorrow, aside);
+        WidgetViews.textOrGone(v, R.id.divider_tomorrow, isTomorrow ? tomorrowLabel : "");
+        // A recycled "next up" item must not keep its heading.
+        v.setViewVisibility(R.id.divider_heading, View.GONE);
+        return v;
+    }
+
+    /**
+     * The To-dos "next up" heading on the divider layout: its own soft-ink bold view, the date
+     * empty and "tomorrow" GONE. Every view is set, and no colour (the layout's resolves per
+     * light/dark mode), so a recycled item carries nothing into a date divider or back.
+     */
+    private RemoteViews heading(String label) {
+        RemoteViews v = new RemoteViews(context.getPackageName(), R.layout.widget_day_divider);
+        WidgetViews.textSize(v, context, textScale, R.dimen.widget_text_body,
+                R.id.divider_heading, R.id.divider_date, R.id.divider_tomorrow);
+        WidgetViews.textOrGone(v, R.id.divider_heading, label);
+        v.setTextViewText(R.id.divider_date, "");
+        v.setViewVisibility(R.id.divider_tomorrow, View.GONE);
         return v;
     }
 
