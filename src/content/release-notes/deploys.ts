@@ -22,8 +22,8 @@ export const DEPLOY_NOTES: ReleaseNote[] = [
     month: '11 november 2026',
     spotlight: true,
     summary: {
-      en: 'To-dos now show up when you want them to.',
-      beanie: 'to-dos now show up when you want them to.',
+      en: 'To-dos now show up when you want them to, and your widget can be all about them.',
+      beanie: 'to-dos now show up when you want them to, and your widget can be all about them.',
     },
     features: [
       {
@@ -61,6 +61,36 @@ export const DEPLOY_NOTES: ReleaseNote[] = [
           en: "A date picked in a to-do's or a transaction's details is now saved right away, with no extra tick to tap.",
           beanie:
             "a date picked in a to-do's or a transaction's details is now saved right away, with no extra tick to tap.",
+        },
+      },
+      {
+        icon: '📱',
+        title: { en: 'A To-dos focus for your widget', beanie: 'a to-dos focus for your widget' },
+        description: {
+          en: "A widget's Focus can now be set to To-dos. It fills with your to-dos from the top, grouped into overdue, due today and coming up, on every size. Upcoming events and tonight's meal can be added as extras.",
+          beanie:
+            "a widget's focus can now be set to to-dos. it fills with your to-dos from the top, grouped into overdue, due today and coming up, on every size. upcoming events and tonight's meal can be added as extras.",
+        },
+      },
+      {
+        icon: '🔎',
+        title: { en: 'Automatic text size', beanie: 'automatic text size' },
+        description: {
+          en: 'With the To-dos focus on a medium or large widget, a short list is now shown in bigger text, so it is easier to read at a glance.',
+          beanie:
+            'with the to-dos focus on a medium or large widget, a short list is now shown in bigger text, so it is easier to read at a glance.',
+        },
+      },
+      {
+        icon: '🧳',
+        title: {
+          en: 'Every upcoming trip on the beanie wall',
+          beanie: 'every upcoming trip on the beanie wall',
+        },
+        description: {
+          en: "The wall's trip drawer now lists every upcoming trip, so you can tap between them.",
+          beanie:
+            "the wall's trip drawer now lists every upcoming trip, so you can tap between them.",
         },
       },
       {
