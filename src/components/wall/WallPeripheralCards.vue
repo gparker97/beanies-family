@@ -26,7 +26,7 @@ import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import WeatherGlyph from '@/components/weather/WeatherGlyph.vue';
 import { WALL_WEATHER } from '@/components/wall/wallWeatherKey';
 import { useWeatherStore } from '@/stores/weatherStore';
-import { useWallPeripherals } from '@/composables/useWallPeripherals';
+import { useWallPeripherals, wallTripDates } from '@/composables/useWallPeripherals';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { fillTemplate } from '@/utils/fillTemplate';
@@ -68,7 +68,7 @@ const emit = defineEmits<{ open: [WallSheetTarget]; openChores: [] }>();
 
 const { t } = useTranslation();
 const familyStore = useFamilyStore();
-const { tonight, trip, timelineItems } = useWallPeripherals();
+const { tonight, trip, upcomingTrips, timelineItems } = useWallPeripherals();
 const weatherStore = useWeatherStore();
 
 /**
@@ -233,22 +233,9 @@ function percent(jobs: WallJob[]): number {
   return total ? Math.round((done / total) * 100) : 0;
 }
 
-/** "31 Aug – 2 Sep", or a single date when the trip is one day. */
-const tripDates = computed(() => {
-  const value = trip.value;
-  if (!value?.startDate) return '';
-  const opts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' };
-  const start = new Date(`${value.startDate.slice(0, 10)}T00:00:00`).toLocaleDateString(
-    undefined,
-    opts
-  );
-  if (!value.endDate || value.endDate.slice(0, 10) === value.startDate.slice(0, 10)) return start;
-  const end = new Date(`${value.endDate.slice(0, 10)}T00:00:00`).toLocaleDateString(
-    undefined,
-    opts
-  );
-  return `${start} – ${end}`;
-});
+const tripDates = computed(() => (trip.value ? wallTripDates(trip.value) : ''));
+/** Trips behind the one on the card. The drawer lists them; the card only says they exist. */
+const moreTrips = computed(() => Math.max(0, upcomingTrips.value.length - 1));
 
 /**
  * Does the strip have anything to show?
@@ -530,7 +517,18 @@ const STRIP_CELL =
       <span class="mb-2 flex items-center gap-2.5">
         <span class="wall-card-emoji leading-none" aria-hidden="true">🛫</span>
         <span class="min-w-0">
-          <span class="font-outfit wall-card-meal block truncate font-bold">{{ trip.name }}</span>
+          <span class="flex items-center gap-2">
+            <span class="font-outfit wall-card-meal min-w-0 truncate font-bold">{{
+              trip.name
+            }}</span>
+            <!-- The slab is Deep Slate in both modes, so this pill needs no dark partner. -->
+            <span
+              v-if="moreTrips"
+              class="font-outfit wall-card-sub wall-trip-more shrink-0 rounded-full bg-[#3d5166] px-2 py-0.5 font-semibold text-[#dfe6ec]"
+            >
+              {{ fillTemplate(t('wall.trip.more'), { count: moreTrips }) }}
+            </span>
+          </span>
           <span class="font-inter wall-card-sub block text-[#bdc3c7]">
             <template v-for="(person, i) in trip.travellers" :key="person.id"
               >{{ i ? ', ' : '' }}{{ person.name }}</template

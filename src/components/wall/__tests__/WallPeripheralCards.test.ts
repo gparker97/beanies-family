@@ -32,8 +32,10 @@ vi.mock('@/stores/weatherStore', () => ({
 
 const tonight = ref<unknown>(null);
 const trip = ref<unknown>(null);
+const upcomingTrips = ref<unknown[]>([]);
 vi.mock('@/composables/useWallPeripherals', () => ({
-  useWallPeripherals: () => ({ tonight, trip, timelineItems: ref([]) }),
+  useWallPeripherals: () => ({ tonight, trip, upcomingTrips, timelineItems: ref([]) }),
+  wallTripDates: () => '20 Oct – 25 Oct',
 }));
 
 const todo: WallJob = {
@@ -87,6 +89,18 @@ beforeEach(() => {
     endDate: '2026-10-25',
     percent: 0,
   };
+  upcomingTrips.value = [trip.value];
+});
+
+describe('WallPeripheralCards trip', () => {
+  it('says nothing about other trips when there is only one', () => {
+    expect(mountCards('band', 'full').find('.wall-trip-more').exists()).toBe(false);
+  });
+
+  it('counts the trips behind the one on the card', () => {
+    upcomingTrips.value = [trip.value, { name: 'Bali' }, { name: 'Perth' }];
+    expect(mountCards('band', 'full').get('.wall-trip-more').text()).toBe('wall.trip.more');
+  });
 });
 
 describe('WallPeripheralCards weather', () => {

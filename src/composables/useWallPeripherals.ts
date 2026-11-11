@@ -10,7 +10,7 @@
  *
  * Read-only by design: every write on the wall goes through `useWallJobs`.
  */
-import { computed } from 'vue';
+import { computed, type Ref } from 'vue';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useListStore } from '@/stores/listStore';
 import { useMealPlanStore } from '@/stores/mealPlanStore';
@@ -25,7 +25,13 @@ import { isWallSafeList } from '@/utils/wallJobs';
 import { isFiled } from '@/utils/listLifecycle';
 import { tripDayProgress, tripPhase } from '@/utils/vacation';
 import { SLOT_EMOJI, SLOT_INDEX, pickTonight } from '@/constants/mealSlots';
-import type { FamilyList, FamilyMember, MealPlanEntry, MealSlot } from '@/types/models';
+import type {
+  FamilyList,
+  FamilyMember,
+  FamilyVacation,
+  MealPlanEntry,
+  MealSlot,
+} from '@/types/models';
 
 export interface WallMeal {
   id: string;
@@ -48,7 +54,27 @@ export interface WallTrip {
   phase: ReturnType<typeof tripPhase>;
 }
 
-export function useWallPeripherals() {
+/**
+ * "31 Aug – 2 Sep", or a single date when the trip is one day; '' with no start.
+ * One formatter for the card and the drawer's trip chips, so they cannot disagree.
+ */
+export function wallTripDates(trip: Pick<WallTrip, 'startDate' | 'endDate'>): string {
+  if (!trip.startDate) return '';
+  const opts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' };
+  const day = (iso: string) =>
+    new Date(`${iso.slice(0, 10)}T00:00:00`).toLocaleDateString(undefined, opts);
+  const start = day(trip.startDate);
+  if (!trip.endDate || trip.endDate.slice(0, 10) === trip.startDate.slice(0, 10)) return start;
+  return `${start} – ${day(trip.endDate)}`;
+}
+
+/**
+ * @param selectedTripId The trip the caller is looking at. The drawer passes its own ref so a
+ * family can page through every upcoming trip; the cards pass nothing and always get the next
+ * one. An id that is no longer upcoming (the trip ended or was deleted while the drawer was
+ * open) falls back to the next trip rather than rendering an empty body.
+ */
+export function useWallPeripherals(selectedTripId?: Ref<string | null>) {
   const familyStore = useFamilyStore();
   const listStore = useListStore();
   const mealPlanStore = useMealPlanStore();
@@ -80,18 +106,7 @@ export function useWallPeripherals() {
   /** "Tonight": dinner, else the last meal of the day (`pickTonight`, shared with the widget). */
   const tonight = computed<WallMeal | null>(() => pickTonight(mealsToday.value));
 
-  /**
-   * The raw vacation behind the wall's trip, exposed so the sheet does not
-   * re-look it up. That second lookup was both a second source of truth and a
-   * real if rare failure mode: when the find missed, the whole trip body
-   * rendered empty with nothing logged.
-   */
-  const tripVacation = computed(() => vacationStore.upcomingVacations[0]);
-
-  /** The trip in flight, else the next one coming. */
-  const trip = computed<WallTrip | null>(() => {
-    const vacation = tripVacation.value;
-    if (!vacation) return null;
+  function toWallTrip(vacation: FamilyVacation): WallTrip {
     const progress = tripDayProgress(vacation, today.value);
     return {
       id: vacation.id,
@@ -104,7 +119,29 @@ export function useWallPeripherals() {
       percent: progress ? Math.round((progress.day / progress.total) * 100) : 0,
       phase: tripPhase(vacation, today.value),
     };
+  }
+
+  /** Every trip in flight or still to come, soonest first: the drawer's trip chips. */
+  const upcomingTrips = computed<WallTrip[]>(() => vacationStore.upcomingVacations.map(toWallTrip));
+
+  /**
+   * The raw vacation behind the wall's trip, exposed so the sheet does not
+   * re-look it up. That second lookup was both a second source of truth and a
+   * real if rare failure mode: when the find missed, the whole trip body
+   * rendered empty with nothing logged.
+   *
+   * The caller's selection when it is still upcoming, else the next trip.
+   */
+  const tripVacation = computed(() => {
+    const upcoming = vacationStore.upcomingVacations;
+    const selectedId = selectedTripId?.value;
+    return (selectedId && upcoming.find((v) => v.id === selectedId)) || upcoming[0];
   });
+
+  /** The selected trip, else the one in flight, else the next one coming. */
+  const trip = computed<WallTrip | null>(() =>
+    tripVacation.value ? toWallTrip(tripVacation.value) : null
+  );
 
   /**
    * The itinerary, from the app's OWN timeline rule.
@@ -144,6 +181,7 @@ export function useWallPeripherals() {
     mealsToday,
     tonight,
     trip,
+    upcomingTrips,
     tripVacation,
     timelineItems,
     groupedByDate,

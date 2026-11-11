@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-11-11
 
+### Added
+
+- The beanie wall's trip drawer now lists every upcoming trip, so you can tap between them; the trip card shows how many more are coming.
+
 ### Changed
 
 - Picking a date in a to-do's or a transaction's details now saves it right away, with no separate tick to tap, and the calendar opens on the first tap.

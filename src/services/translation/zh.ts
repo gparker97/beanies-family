@@ -3496,6 +3496,8 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'wall.trip': '旅行',
   'wall.trip.booked': '已预订{booked}/{total}',
   'wall.trip.allBooked': '全部已预订',
+  'wall.trip.more': '另有{count}个',
+  'wall.trip.switcher': '即将出发的旅行',
   'wall.trip.unbookedLeg': '未预订',
   'wall.trip.gaps.one': '{count}晚还没订住处',
   'wall.trip.gaps.other': '{count}晚还没订住处',

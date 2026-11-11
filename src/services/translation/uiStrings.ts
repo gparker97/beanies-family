@@ -7932,6 +7932,8 @@ const STRING_DEFS = {
   'wall.trip': { en: 'The trip', beanie: 'the trip' },
   'wall.trip.booked': { en: '{booked} of {total} booked', beanie: '{booked} of {total} booked' },
   'wall.trip.allBooked': { en: 'All booked', beanie: 'all booked' },
+  'wall.trip.more': { en: '+{count} more', beanie: '+{count} more' },
+  'wall.trip.switcher': { en: 'Upcoming Trips', beanie: 'upcoming trips' },
   'wall.trip.unbookedLeg': { en: 'Not booked', beanie: 'not booked' },
   'wall.trip.gaps.one': {
     en: '{count} night without a bed',

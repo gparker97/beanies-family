@@ -19,7 +19,8 @@ import WallTripTimeline from '@/components/wall/WallTripTimeline.vue';
 import WallJobList from '@/components/wall/WallJobList.vue';
 import WallBucketIcon from '@/components/wall/WallBucketIcon.vue';
 import HandwrittenLine from '@/components/ui/HandwrittenLine.vue';
-import { useWallPeripherals } from '@/composables/useWallPeripherals';
+import { useWallPeripherals, wallTripDates } from '@/composables/useWallPeripherals';
+import { logEvent } from '@/services/telemetry/logEvent';
 import { useWallLock } from '@/components/wall/wallLockKey';
 import { WALL_EDIT } from '@/components/wall/wallEditKey';
 import { useEscapeClose } from '@/composables/useEscapeClose';
@@ -77,8 +78,34 @@ const activityStore = useActivityStore();
 const familyStore = useFamilyStore();
 /** Live flight checks (#143): the wall shows each flight's chip, read-only. */
 const flightStatusStore = useFlightStatusStore();
-const { mealsToday, trip, tripVacation, groupedByDate, accommodationGaps, undatedItems } =
-  useWallPeripherals();
+/**
+ * Which upcoming trip the drawer is showing. Null means "the next one", which is what the
+ * card shows too. It lives here, and the sheet is `v-if`'d by its parent, so closing the
+ * drawer forgets it: the wall always reopens on the next trip, never on one somebody
+ * browsed to last week.
+ */
+const selectedTripId = ref<string | null>(null);
+const {
+  mealsToday,
+  trip,
+  upcomingTrips,
+  tripVacation,
+  groupedByDate,
+  accommodationGaps,
+  undatedItems,
+} = useWallPeripherals(selectedTripId);
+
+/** Looking, not editing, so it works while the wall is locked. */
+function selectTrip(id: string) {
+  if (id === trip.value?.id) return;
+  selectedTripId.value = id;
+  logEvent({
+    level: 'info',
+    surface: 'beanie-wall',
+    message: 'wall_trip_switched',
+    context: { action: 'trip_switched' },
+  });
+}
 
 /**
  * Read the discriminated union through a local first. Narrowing on
@@ -680,6 +707,39 @@ const { identityFor } = useActivityIdentity();
 
         <!-- the trip -->
         <template v-else-if="target.kind === 'trip'">
+          <!--
+            Every upcoming trip, soonest first. Shown only when there is a choice to make, so
+            a family with one trip sees the drawer exactly as before. Wraps rather than
+            scrolls: a chip hidden off the edge of a wall is a trip nobody finds.
+          -->
+          <div
+            v-if="trip && upcomingTrips.length > 1"
+            role="group"
+            :aria-label="t('wall.trip.switcher')"
+            class="wall-trip-switcher mb-3 flex flex-wrap gap-2"
+          >
+            <button
+              v-for="option in upcomingTrips"
+              :key="option.id"
+              type="button"
+              class="wall-chip-person flex min-h-[var(--wall-tap)] max-w-full items-center gap-2 rounded-full px-4 py-1 shadow-[var(--card-shadow)]"
+              :class="
+                option.id === trip.id
+                  ? 'bg-secondary-500 dark:bg-ink dark:text-surface-ground text-white'
+                  : 'text-secondary-500 dark:bg-surface-raised dark:text-ink bg-white'
+              "
+              :aria-pressed="option.id === trip.id"
+              @click="selectTrip(option.id)"
+            >
+              <span class="font-outfit truncate font-semibold">{{ option.name }}</span>
+              <span
+                v-if="wallTripDates(option)"
+                class="font-inter shrink-0"
+                :class="option.id === trip.id ? '' : 'dark:text-ink-soft text-[#4d5d6c]'"
+                >{{ wallTripDates(option) }}</span
+              >
+            </button>
+          </div>
           <div
             v-if="trip"
             class="dark:bg-surface-raised rounded-[26px] bg-white p-5 shadow-[var(--card-shadow)]"
