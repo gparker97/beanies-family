@@ -35,6 +35,51 @@ struct FillSpec {
     /// Medium and large (not the child view) have the date column whose foot shows the count.
     var hasDateColumn: Bool
     var scale: CGFloat
+    /// The To-dos layout: event rows held for the Upcoming events extra before the to-dos take
+    /// the room (medium 1, large 3), plus their heading.
+    var eventSlot: Int
+    /// The To-dos layout: task rows shown when the host reports no height (medium 4, large 10).
+    var noHeightTaskRows: Int
+}
+
+/// Which layout one render uses, decided once by `WidgetFill.effective`. `day` is the calendar
+/// on top and the to-dos above the footer; `todos` is the to-dos section from the top.
+enum WidgetLayout {
+    case day
+    case todos
+}
+
+/// The To-dos layout's groups, from `WSTask.bucket`, as on the To-Dos page.
+enum TaskGroupKind {
+    case overdue
+    /// `today`.
+    case today
+    /// `undated` and `later`.
+    case comingUp
+}
+
+/// One run of tasks in the snapshot's order. `kind` is nil only for a first run whose bucket is
+/// unrecognised or empty (any later one joins the run before it).
+struct TaskRun {
+    var kind: TaskGroupKind?
+    var tasks: [WSTask]
+}
+
+/// One group the To-dos layout draws: its heading (nil = the snapshot has no label for it, or
+/// the run has no group) and the rows that fit.
+struct TaskGroupPlan {
+    var heading: String?
+    /// The heading is the accent; the others are the soft ink.
+    var isOverdue: Bool
+    var tasks: [WSTask]
+}
+
+/// `WidgetFill.todosFill`'s answer: the step factor (1 = Standard), the rows shown per group
+/// (parallel to the group sizes it was given), and "N more".
+struct TodosFillResult {
+    var step: CGFloat
+    var shownPerGroup: [Int]
+    var more: Int
 }
 
 /// One line of the calendar section.
@@ -50,6 +95,8 @@ enum NothingLine {
     case withTasks
     /// "nothing on today, enjoy".
     case clear
+    /// The To-dos layout with no tasks but events under them: "all clear, enjoy" on one line.
+    case allClear
 }
 
 /// What one widget will show. Built ONCE per render by `WidgetFill.plan`; views only paint it.
@@ -69,8 +116,20 @@ struct FillPlan {
     /// The to-dos section (heading and link), when at least one task fits.
     var taskSection: WSTasks? = nil
     var tasks: [WSTask] = []
-    /// Tasks that passed the switches but did not fit: the heading's "{n} more".
+    /// Tasks that passed the switches but did not fit: the heading's "{n} more" (the footer's,
+    /// in the To-dos layout).
     var moreTasks = 0
+    /// The layout this plan was built for (`WidgetFill.effective`).
+    var layout: WidgetLayout = .day
+    /// The To-dos layout's Automatic step for the task rows and group headings (1 = Standard).
+    var taskStep: CGFloat = 1
+    /// The To-dos layout: `tasks` in their groups. Empty in Your day.
+    var taskGroups: [TaskGroupPlan] = []
+    /// The To-dos layout: `tasks.countText` at the right of the section heading; nil when the
+    /// snapshot's is empty (nothing due today) or in Your day.
+    var taskHeadingCount: WSText? = nil
+    /// The To-dos layout: "next up" over today's events, when any are placed.
+    var eventsHeading: String? = nil
 }
 
 /// The next calendar item, for the small widget and the lock screen.
@@ -101,28 +160,96 @@ enum CirclePick {
 ///       stopping at the first day whose divider and first row do not fit;
 ///   (d) the tasks take everything left (at least the reserved rows), "N more" for the rest.
 /// Anything that does not fit is DROPPED whole, never squeezed.
+///
+/// The To-dos layout (`WidgetLayout.todos`) runs the to-dos FIRST (`todosFill`, which may hold a
+/// small slot for the Upcoming events extra), then (a) and (c) in the room left with nothing
+/// reserved, and never (d). Your day (`.day`) is exactly the four steps above.
 enum WidgetFill {
     // Design costs in points at scale 1 (mockup round 9b).
     /// `.cav9`: the handwritten "nothing on today" line.
     static let nothingLineHeight: CGFloat = 19
-    /// `.dv9`: a look-ahead day's divider.
+    /// `.dv9`: a look-ahead day's divider (also the To-dos layout's group and "next up" headings).
     static let dividerHeight: CGFloat = 15
     /// `.sec9`: the to-dos section heading.
     static let sectionHeadingHeight: CGFloat = 13
     /// The relaxed "nothing on today, / enjoy" state with the hug.
     static let messageHeight: CGFloat = 46
+    /// Task rows on one widget, whatever fits: the snapshot caps to-dos+lists and hints at 16
+    /// EACH, so a widget with hints on can carry 32. Mirrors Android `WidgetFill.MAX_TASK_ROWS`.
+    static let maxTaskRows = 16
+    /// The To-dos focus's Automatic steps, before the `WidgetMetrics.taskStepMax` clamp.
+    static let taskSteps: [CGFloat] = [1.0, 1.3, 1.6]
 
-    static func plan(resolved: ResolvedDay, blocks: WidgetBlocks, spec: FillSpec, at date: Date) -> FillPlan {
+    // MARK: the focus
+
+    /// The switches one render uses, and its layout, from the STORED picker values. Called once
+    /// per render, in `DayWidgetView`, where the resolved day (and so the viewer) is known:
+    /// `WidgetBlocks` is built before any snapshot exists, and the small widget never calls
+    /// `plan`. Every reader downstream keeps reading the switches; nothing else learns about
+    /// Focus. `focus`, `textSize` and the extras are copied through unchanged, so the result
+    /// still says what was STORED (`taskStepFactors` reads that). Mirrors Android
+    /// `WidgetFill.effective`.
+    ///   child viewer                         -> stored switches, Your day (a child has no to-dos)
+    ///   focus To-dos                         -> events = todosEvents, meals = todosMeals, due on,
+    ///                                           who's where, trips and birthdays, hints off; To-dos
+    ///   Your day, events and trips and birthdays off, to-dos on
+    ///                                        -> stored switches, To-dos (the old to-dos-only widget)
+    ///   otherwise                            -> stored switches, Your day
+    static func effective(_ stored: WidgetBlocks, isChild: Bool) -> (blocks: WidgetBlocks, layout: WidgetLayout) {
+        if isChild {
+            return (stored, .day)
+        }
+        if stored.focus == .todos {
+            var blocks = stored
+            blocks.events = stored.todosEvents
+            blocks.whosWhere = false
+            blocks.meals = stored.todosMeals
+            blocks.due = true
+            blocks.comingUp = false
+            blocks.hint = false
+            return (blocks, .todos)
+        }
+        if !stored.events && !stored.comingUp && stored.due {
+            return (stored, .todos)
+        }
+        return (stored, .day)
+    }
+
+    /// The step factors `todosFill` may pick from. `[1]` unless the STORED focus is To-dos and
+    /// the stored Text size is Automatic: the inferred to-dos-only widget never steps (it keeps
+    /// its fixed size on both platforms). `plan` is only called for medium and large, and the
+    /// small widget passes `[1]` itself. Each factor is relative to `scale`, clamped the same way
+    /// as `WidgetMetrics.init`, so accessibility text never compounds past `taskStepMax`.
+    static func taskStepFactors(_ blocks: WidgetBlocks, scale: CGFloat) -> [CGFloat] {
+        guard blocks.focus == .todos, blocks.isAutomaticTextSize, scale > 0 else { return [1.0] }
+        return taskSteps.map { factor in
+            Swift.max(scale, Swift.min(scale * factor, WidgetMetrics.taskStepMax)) / scale
+        }
+    }
+
+    static func plan(
+        resolved: ResolvedDay, blocks: WidgetBlocks, layout: WidgetLayout, labels: WSLabels,
+        spec: FillSpec, at date: Date
+    ) -> FillPlan {
         var plan = FillPlan()
+        plan.layout = layout
         var remaining = spec.bodyHeight
         let scale = spec.scale
         let day = resolved.day
         let child = resolved.isChild
+        let todos = layout == .todos
 
-        let todayRows = shownRows(day.rows, blocks: blocks, today: true)
+        // The To-dos layout leaves out today's events that are already over: its calendar has
+        // no scroll position, so medium's one event row would otherwise be a finished morning.
+        let shownToday = shownRows(day.rows, blocks: blocks, today: true)
+        let todayRows = todos
+            ? shownToday.filter { $0.kind != .event || !$0.isPast(at: date) }
+            : shownToday
         let lookAhead = lookAheadDays(resolved, blocks: blocks)
         let tasks = shownTasks(day.tasks.items, blocks: blocks, child: child)
         let calendarOn = blocks.events || blocks.comingUp
+        // What the snapshot's per-switch cap left out, for the switches that are on.
+        let capped = cappedTasks(day.tasks, blocks: blocks, child: child)
 
         // The footer and the date column cost nothing from the body budget.
         if spec.hasFooter, blocks.meals, let tonight = day.tonight, !tonight.text.isEmpty {
@@ -134,8 +261,30 @@ enum WidgetFill {
             plan.taskCount = day.tasks
         }
 
-        // "Nothing on" is only ever said with the events switch on: hidden events are not nothing.
-        if blocks.events, todayRows.isEmpty, lookAhead.isEmpty, tasks.isEmpty {
+        if todos {
+            // All clear is the day having no tasks to show: never how many rows fit (a widget
+            // with to-dos due always shows one), and never gated on the events switch, which
+            // is off by default in the To-dos focus.
+            if tasks.isEmpty {
+                if todayRows.isEmpty, lookAhead.isEmpty {
+                    if remaining >= messageHeight * scale { plan.relaxed = true }
+                    return plan
+                }
+                // The Upcoming events extra has rows: they show under a one-line all clear.
+                let cost = nothingLineHeight * scale
+                if remaining >= cost {
+                    plan.nothingLine = .allClear
+                    remaining -= cost
+                }
+            } else {
+                let used = placeTodos(
+                    tasks, into: &plan, day: day, todayRows: todayRows, lookAhead: lookAhead,
+                    blocks: blocks, labels: labels, spec: spec, height: remaining, overflow: capped
+                )
+                remaining -= used
+            }
+        } else if blocks.events, todayRows.isEmpty, lookAhead.isEmpty, tasks.isEmpty {
+            // "Nothing on" is only ever said with the events switch on: hidden events are not nothing.
             if remaining >= messageHeight * scale { plan.relaxed = true }
             return plan
         }
@@ -143,42 +292,58 @@ enum WidgetFill {
         // (a) Today first, in full where it fits.
         if calendarOn {
             if todayRows.isEmpty {
+                // The To-dos layout never says "nothing on today": its events are an extra.
                 let cost = nothingLineHeight * scale
-                if blocks.events, remaining >= cost {
+                if !todos, blocks.events, remaining >= cost {
                     plan.nothingLine = tasks.isEmpty ? .clear : .withTasks
                     remaining -= cost
                 }
             } else {
-                // Trips and birthdays (never past) stay pinned first; only the events are windowed,
-                // and to what fits by height, so a finished morning never hides the afternoon.
-                var placed: [WSRow] = []
-                let pinned = todayRows.filter { $0.kind != .event }
-                let events = todayRows.filter { $0.kind == .event }
-                let fit = spec.rowHeight > 0 ? Int(remaining / spec.rowHeight) : 0
-                let limit = Swift.min(spec.maxRows, fit)
-                let keptPinned = Array(pinned.prefix(limit))
-                let eventLimit = Swift.max(0, limit - keptPinned.count)
-                for row in keptPinned + window(events, limit: eventLimit, at: date) {
-                    if remaining < spec.rowHeight { break }
-                    placed.append(row)
-                    remaining -= spec.rowHeight
+                // The To-dos layout heads today's events with "next up", drawn only with a row
+                // under it. Without the label (an older snapshot) the rows go in unheaded.
+                var placeToday = true
+                if todos, let heading = labels.eventsHeading, !heading.isEmpty {
+                    let nextUpCost = dividerHeight * scale
+                    if remaining >= nextUpCost + spec.rowHeight {
+                        plan.eventsHeading = heading
+                        remaining -= nextUpCost
+                    } else {
+                        placeToday = false
+                    }
                 }
-                plan.calendar = placed.map { CalendarItem.row($0) }
-                if blocks.whosWhere {
-                    for row in placed {
-                        guard let line = row.handoff?.line, !line.isEmpty else { continue }
-                        if remaining < spec.subLineHeight { break }
-                        plan.subLineIds.insert(row.id)
-                        remaining -= spec.subLineHeight
+                if placeToday {
+                    // Trips and birthdays (never past) stay pinned first; only the events are windowed,
+                    // and to what fits by height, so a finished morning never hides the afternoon.
+                    var placed: [WSRow] = []
+                    let pinned = todayRows.filter { $0.kind != .event }
+                    let events = todayRows.filter { $0.kind == .event }
+                    let fit = spec.rowHeight > 0 ? Int(remaining / spec.rowHeight) : 0
+                    let limit = Swift.min(spec.maxRows, fit)
+                    let keptPinned = Array(pinned.prefix(limit))
+                    let eventLimit = Swift.max(0, limit - keptPinned.count)
+                    for row in keptPinned + window(events, limit: eventLimit, at: date) {
+                        if remaining < spec.rowHeight { break }
+                        placed.append(row)
+                        remaining -= spec.rowHeight
+                    }
+                    plan.calendar = placed.map { CalendarItem.row($0) }
+                    if blocks.whosWhere {
+                        for row in placed {
+                            guard let line = row.handoff?.line, !line.isEmpty else { continue }
+                            if remaining < spec.subLineHeight { break }
+                            plan.subLineIds.insert(row.id)
+                            remaining -= spec.subLineHeight
+                        }
                     }
                 }
             }
         }
         plan.inlineHandoffs = blocks.whosWhere
 
-        // (b) Hold the to-dos section's minimum before the look-ahead may take the room.
+        // (b) Hold the to-dos section's minimum before the look-ahead may take the room. The
+        // To-dos layout has already placed its to-dos, so it holds nothing.
         let headingCost = sectionHeadingHeight * scale
-        let reserved: CGFloat = tasks.isEmpty
+        let reserved: CGFloat = (tasks.isEmpty || todos)
             ? 0
             : headingCost + spec.rowHeight * CGFloat(Swift.min(spec.taskReserve, tasks.count))
 
@@ -199,8 +364,8 @@ enum WidgetFill {
             }
         }
 
-        // (d) The tasks take everything left.
-        if !tasks.isEmpty, remaining >= headingCost + spec.rowHeight {
+        // (d) The tasks take everything left. Not in the To-dos layout: they went first.
+        if !todos, !tasks.isEmpty, remaining >= headingCost + spec.rowHeight {
             remaining -= headingCost
             for task in tasks {
                 if remaining < spec.rowHeight { break }
@@ -208,12 +373,221 @@ enum WidgetFill {
                 remaining -= spec.rowHeight
             }
             plan.taskSection = day.tasks
-            // Plus what the snapshot's per-switch cap left out, for the switches that are on.
-            let capped = (blocks.due ? day.tasks.overflowDue : 0)
-                + (blocks.hint && isAllowed(.hint, child: child) ? day.tasks.overflowHint : 0)
+            // Plus what the snapshot's per-switch cap left out (`capped`).
             plan.moreTasks = capped + tasks.count - plan.tasks.count
         }
         return plan
+    }
+
+    // MARK: the To-dos layout
+
+    /// The To-dos layout's section, placed before anything else: `todosFill` picks the step and
+    /// the rows per group, and the plan gets the groups, the step, "N more" and the heading's
+    /// count. Returns the height it used, at the chosen step.
+    private static func placeTodos(
+        _ tasks: [WSTask], into plan: inout FillPlan, day: WSDay, todayRows: [WSRow],
+        lookAhead: [(WSDayEntry, [WSRow])], blocks: WidgetBlocks, labels: WSLabels, spec: FillSpec,
+        height: CGFloat, overflow: Int
+    ) -> CGFloat {
+        let scale = spec.scale
+        let sectionCost = sectionHeadingHeight * scale
+        let groupCost = dividerHeight * scale
+        let runs = taskRuns(tasks)
+        let headings: [String?] = runs.map { run in groupLabel(run.kind, labels: labels) }
+
+        // The Upcoming events extra's slot, held first: one heading and up to `eventSlot` rows.
+        // Only this slot can push a to-do off the widget (it then counts toward "N more").
+        var reserve: CGFloat = 0
+        if blocks.events {
+            var available = todayRows.filter { $0.kind == .event }.count
+            for (_, rows) in lookAhead {
+                available += rows.count
+            }
+            if available > 0 {
+                reserve = groupCost + spec.rowHeight * CGFloat(Swift.min(spec.eventSlot, available))
+            }
+        }
+
+        let fill = todosFill(
+            height: height,
+            heading: sectionCost,
+            row: spec.rowHeight,
+            groupHeadings: headings.map { (label: String?) -> CGFloat in label == nil ? 0 : groupCost },
+            reserve: reserve,
+            groupSizes: runs.map { run in run.tasks.count },
+            stepFactors: taskStepFactors(blocks, scale: scale),
+            overflow: overflow,
+            noHeightRows: spec.noHeightTaskRows
+        )
+
+        var used = sectionCost
+        for (index, run) in runs.enumerated() {
+            let count = fill.shownPerGroup[index]
+            if count == 0 { continue }
+            let shown = Array(run.tasks.prefix(count))
+            plan.taskGroups.append(
+                TaskGroupPlan(heading: headings[index], isOverdue: run.kind == TaskGroupKind.overdue, tasks: shown)
+            )
+            plan.tasks.append(contentsOf: shown)
+            if headings[index] != nil {
+                used += groupCost * fill.step
+            }
+            used += spec.rowHeight * fill.step * CGFloat(count)
+        }
+        plan.taskSection = day.tasks
+        plan.taskStep = fill.step
+        plan.moreTasks = fill.more
+        if !day.tasks.countText.text.isEmpty {
+            plan.taskHeadingCount = day.tasks.countText
+        }
+        return used
+    }
+
+    /// The To-dos fill: how many task rows show, at which step. Numbers only (it never reads the
+    /// snapshot or the OS), so it is the same function as Android's `WidgetFill.todosFill` line
+    /// for line, and Android's `WidgetFillTest` vectors prove its logic. They do not prove iOS's
+    /// numbers: the constants differ (here the heading is 13 and a group heading is a 15pt
+    /// divider; Android's are 15 and 19).
+    ///   - height: the room for the section (H). 0 or less = a host that reports no height:
+    ///     Standard size and `noHeightRows` rows.
+    ///   - heading: the section heading row; never stepped.
+    ///   - row: one task row at step 1.
+    ///   - groupHeadings: each group's heading at step 1, parallel to `groupSizes`; 0 for a
+    ///     group drawn without one (its label is missing, or the run has no group).
+    ///   - reserve: room held for the Upcoming events slot, taken before any to-do.
+    ///   - stepFactors: the factors to try (`taskStepFactors`); `[1]` never steps.
+    ///   - overflow: tasks the snapshot's cap already left out, added to "N more".
+    /// Every task fits at the largest factor whose cost (heading + each shown group's heading x f
+    /// + rows x row x f + reserve) is within H, with at most `maxTaskRows`. Else, at step 1,
+    /// rows go in order while they fit (a group heading only with a row of its own under it),
+    /// never past `maxTaskRows`, and never fewer than one: a day with tasks never looks clear.
+    static func todosFill(
+        height: CGFloat,
+        heading: CGFloat,
+        row: CGFloat,
+        groupHeadings: [CGFloat],
+        reserve: CGFloat,
+        groupSizes: [Int],
+        stepFactors: [CGFloat],
+        overflow: Int,
+        noHeightRows: Int
+    ) -> TodosFillResult {
+        let total = groupSizes.reduce(0, +)
+        var result = TodosFillResult(
+            step: 1, shownPerGroup: Array(repeating: 0, count: groupSizes.count), more: overflow + total
+        )
+        if total == 0 { return result }
+
+        func groupHeading(_ index: Int) -> CGFloat {
+            index < groupHeadings.count ? groupHeadings[index] : 0
+        }
+
+        // No height reported: a fixed count at Standard, mirroring the Your day fallback.
+        if height <= 0 {
+            var left = Swift.max(1, Swift.min(noHeightRows, maxTaskRows))
+            var shown = 0
+            for index in groupSizes.indices {
+                let take = Swift.min(Swift.max(0, groupSizes[index]), left)
+                result.shownPerGroup[index] = take
+                left -= take
+                shown += take
+            }
+            result.more = overflow + total - shown
+            return result
+        }
+
+        // Everything at the largest step that fits.
+        if total <= maxTaskRows {
+            var best: CGFloat = 0
+            for factor in stepFactors {
+                var cost = heading + reserve + CGFloat(total) * row * factor
+                for index in groupSizes.indices where groupSizes[index] > 0 {
+                    cost += groupHeading(index) * factor
+                }
+                if cost <= height && factor > best {
+                    best = factor
+                }
+            }
+            if best > 0 {
+                result.step = best
+                result.shownPerGroup = groupSizes
+                result.more = overflow
+                return result
+            }
+        }
+
+        // Not everything fits: rows in order at Standard while they fit.
+        var room = height - heading - reserve
+        var shown = 0
+        filling: for index in groupSizes.indices where groupSizes[index] > 0 {
+            for rowIndex in 0 ..< groupSizes[index] {
+                let cost = row + (rowIndex == 0 ? groupHeading(index) : 0)
+                if shown >= maxTaskRows || room < cost { break filling }
+                result.shownPerGroup[index] += 1
+                shown += 1
+                room -= cost
+            }
+        }
+        if shown == 0, let first = groupSizes.firstIndex(where: { $0 > 0 }) {
+            result.shownPerGroup[first] = 1
+            shown = 1
+        }
+        result.more = overflow + total - shown
+        return result
+    }
+
+    /// The group a bucket belongs to; nil for an unrecognised or empty one.
+    static func taskGroupKind(_ bucket: String) -> TaskGroupKind? {
+        switch bucket {
+        case "overdue": return .overdue
+        case "today": return .today
+        case "undated", "later": return .comingUp
+        default: return nil
+        }
+    }
+
+    /// The tasks split into runs. The snapshot already orders them bucket-first (overdue, today,
+    /// undated, later), so grouping is a run-length split, not a sort. A task whose bucket is
+    /// unrecognised or empty joins the run before it, with no heading of its own.
+    static func taskRuns(_ tasks: [WSTask]) -> [TaskRun] {
+        var runs: [TaskRun] = []
+        for task in tasks {
+            let kind = taskGroupKind(task.bucket)
+            if !runs.isEmpty && (kind == nil || kind == runs[runs.count - 1].kind) {
+                runs[runs.count - 1].tasks.append(task)
+            } else {
+                runs.append(TaskRun(kind: kind, tasks: [task]))
+            }
+        }
+        return runs
+    }
+
+    /// A group's heading from the snapshot; nil (no heading) when the label is missing or empty.
+    static func groupLabel(_ kind: TaskGroupKind?, labels: WSLabels) -> String? {
+        let label: String?
+        switch kind {
+        case .some(.overdue): label = labels.groupOverdue
+        case .some(.today): label = labels.groupToday
+        case .some(.comingUp): label = labels.groupComingUp
+        case .none: label = nil
+        }
+        guard let text = label, !text.isEmpty else { return nil }
+        return text
+    }
+
+    /// The empty To-dos layout's title: "all clear,", or the existing "nothing on today," in a
+    /// snapshot from before the label.
+    static func allClearTitle(_ labels: WSLabels) -> String {
+        if let title = labels.todosAllClear, !title.isEmpty { return title }
+        return labels.nothingOnToday
+    }
+
+    /// How many tasks the snapshot's per-switch cap left out, for the switches that are on: the
+    /// part of "N more" that was never in `items`.
+    static func cappedTasks(_ tasks: WSTasks, blocks: WidgetBlocks, child: Bool) -> Int {
+        let dueCap = blocks.due ? tasks.overflowDue : 0
+        let hintCap = (blocks.hint && isAllowed(.hint, child: child)) ? tasks.overflowHint : 0
+        return dueCap + hintCap
     }
 
     // MARK: what the switches show

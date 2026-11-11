@@ -26,6 +26,12 @@ import java.util.List;
  * yesterday's date on the two list-bearing sizes while the list-free 2x2 updated from the same
  * render pass (2026-10-14, 2026-10-16).
  *
+ * THE TO-DOS LAYOUT (2026-11-11). The list is the upcoming-events extra under the to-dos: today's
+ * rows arrive without the ones already ended ({@link WidgetFill#plan} leaves them out, so the
+ * events slot it reserves is counted from the same rows), led by a "next up" heading (the divider
+ * layout, so {@link #VIEW_TYPE_COUNT} stays 4), and an all-clear day with events gets its one
+ * handwritten all-clear line on top. Your day is unchanged.
+ *
  * Built from the SAME {@link WidgetFill.Plan} as the rest of the widget, so the list can never show
  * a different day, audience or set of rows. "Past" is judged on the device clock at build time
  * (`endsAt < now`); the provider's re-render alarm at the next row end rebuilds the list.
@@ -101,6 +107,13 @@ final class DayWidgetList {
         List<RemoteViews> out = new ArrayList<>();
         String nothing = plan.nothingTodayLine();
         if (!nothing.isEmpty()) out.add(nothing(nothing));
+        // To-dos only (both are "" or empty in Your day): the all-clear line, and "next up".
+        String allClear = plan.allClearLine();
+        if (!allClear.isEmpty()) out.add(nothing(allClear));
+        String nextUp = plan.snapshot.labels.eventsHeading;
+        if (plan.layout == WidgetFill.Layout.TODOS && !plan.todayRows.isEmpty() && !nextUp.isEmpty()) {
+            out.add(WidgetViews.heading(context, textScale, nextUp, R.color.widget_ink_soft, ""));
+        }
         addRows(out, plan.todayRows, now);
         for (WidgetFill.LaterDay later : plan.laterDays) {
             out.add(divider(later.entry.dividerDate, later.isTomorrow));
@@ -184,12 +197,8 @@ final class DayWidgetList {
 
     /** "Wed 15" in the accent, "tomorrow" beside it when it is the device's tomorrow, a hairline. */
     private RemoteViews divider(String date, boolean isTomorrow) {
-        RemoteViews v = new RemoteViews(context.getPackageName(), R.layout.widget_day_divider);
-        WidgetViews.textSize(v, context, textScale, R.dimen.widget_text_body,
-                R.id.divider_date, R.id.divider_tomorrow);
-        v.setTextViewText(R.id.divider_date, date);
-        WidgetViews.textOrGone(v, R.id.divider_tomorrow, isTomorrow ? tomorrowLabel : "");
-        return v;
+        return WidgetViews.heading(context, textScale, date, R.color.widget_accent_text,
+                isTomorrow ? tomorrowLabel : "");
     }
 
     private RemoteViews nothing(String line) {

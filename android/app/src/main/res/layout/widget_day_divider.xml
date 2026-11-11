@@ -1,7 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- A later day's divider in the calendar look-ahead (#130, round 9 `.dv9`): "Wed 15" in the
-     accent, "tomorrow" in quieter ink when it is the device's tomorrow, then a hairline. -->
+     accent, "tomorrow" in quieter ink when it is the device's tomorrow, then a hairline. The
+     To-dos layout (2026-11-11) reuses it for its group headings ("overdue" in the accent, "due
+     today" / "coming up" in the softer ink, pinned by `divider_root` on API 31+) and for the
+     "next up" heading over the events extra, so the list keeps its four item layouts. Every bind
+     sets divider_date's colour: a recycled item keeps the last one otherwise. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/divider_root"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:gravity="center_vertical"

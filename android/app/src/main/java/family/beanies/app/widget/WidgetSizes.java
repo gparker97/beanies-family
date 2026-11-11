@@ -2,6 +2,7 @@ package family.beanies.app.widget;
 
 import android.appwidget.AppWidgetManager;
 import android.content.Context;
+import android.os.Build;
 import android.os.Bundle;
 import family.beanies.app.R;
 
@@ -16,7 +17,8 @@ import family.beanies.app.R;
  * `MAX_WIDTH` are the landscape pair). Narrower than {@link #SMALL_MAX_WIDTH_DP} is the 2x2;
  * otherwise the widget is the 4x3 when it is at least {@link #LARGE_MIN_HEIGHT_DP} tall, else the
  * 4x2. Since round 9b the two share one layout and differ only in how many to-do rows the fixed
- * section keeps ({@link WidgetFill#taskRows}). Deciding
+ * section keeps ({@link WidgetFill#taskRows}, or in the To-dos layout {@link WidgetFill#todosFill}
+ * and the events slot it reserves). Deciding
  * by height rather than by a guessed cell count holds across launchers whose cells differ.
  * A host that reports no height falls back to `MIN_HEIGHT`; one that reports nothing (0) lands
  * on the 4x2, the default placement.
@@ -98,6 +100,60 @@ public final class WidgetSizes {
         float fs = fontScale(context);
         float effective = Math.max(fs, Math.min(fs * size.factor, TEXT_SCALE_MAX));
         return effective / fs;
+    }
+
+    /**
+     * The To-dos layout's Automatic text steps (2026-11-11), on the effective scale: the fill
+     * ({@link WidgetFill#todosFill}) takes the largest at which every to-do fits.
+     */
+    static final float[] TASK_STEPS = {1f, 1.3f, 1.6f};
+
+    /**
+     * The ceiling on a stepped to-do row's effective scale. Mirrors iOS `WidgetMetrics.taskStepMax`
+     * (ios/App/BeaniesWidgets/WidgetStyle.swift); change both. A ceiling of its own beside
+     * {@link #TEXT_SCALE_MAX} because the fit covers height only, never a title's width, so a step
+     * must not compound with accessibility text (1.3 × 1.6 would be 2.08).
+     */
+    static final float TASK_STEP_MAX = 1.6f;
+
+    /** The one-step answer: no stepping. */
+    private static final float[] NO_STEPS = {1f};
+
+    /**
+     * The step factors the To-dos fill may choose from for this widget: {@code {1}} unless the
+     * STORED focus is To-dos (the inferred to-dos-only path never steps), Text size is Automatic,
+     * the size is medium or large, and the API level is 31+ (pinning a row's height and resizing
+     * its glyph and dot need setViewLayoutHeight / Width). The ONE reader of the API level for the
+     * fill: the renderer and the list factory both call this, so their plans agree, and
+     * {@link WidgetFill} itself never reads it (the JVM tests see SDK_INT 0).
+     */
+    static float[] taskStepFactors(Context context, WidgetPrefs prefs, Size size) {
+        return taskStepFactors(prefs, size, Build.VERSION.SDK_INT,
+                effectiveScale(context, textScale(context, prefs.textSize)));
+    }
+
+    /** Pure: {@link #taskStepFactors(Context, WidgetPrefs, Size)} for an API level and effective scale. */
+    static float[] taskStepFactors(WidgetPrefs prefs, Size size, int sdkInt, float effectiveScale) {
+        boolean steps = prefs.focus == WidgetPrefs.Focus.TODOS
+                && prefs.textSize == WidgetPrefs.TextSize.AUTO
+                && size != Size.SMALL
+                && sdkInt >= Build.VERSION_CODES.S;
+        return steps ? stepFactors(effectiveScale) : NO_STEPS.clone();
+    }
+
+    /**
+     * Pure: each of {@link #TASK_STEPS} as a multiplier on what a row already draws at, for a
+     * widget whose effective text scale is {@code scale}: `max(scale, min(scale × f,
+     * TASK_STEP_MAX)) / scale`, the same clamp shape as {@link #textScale}. Worked values: scale 1
+     * → 1 / 1.3 / 1.6; scale 1.3 → 1 / 1.23 / 1.23; scale 2 → 1 / 1 / 1.
+     */
+    static float[] stepFactors(float scale) {
+        float s = scale > 0 ? scale : 1f;
+        float[] out = new float[TASK_STEPS.length];
+        for (int i = 0; i < TASK_STEPS.length; i++) {
+            out[i] = Math.max(s, Math.min(s * TASK_STEPS[i], TASK_STEP_MAX)) / s;
+        }
+        return out;
     }
 
     /**

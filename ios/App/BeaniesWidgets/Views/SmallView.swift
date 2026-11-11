@@ -10,10 +10,16 @@ import WidgetKit
 /// glyph and the temperature in the peek's place, and the panel has no peek. The peek comes
 /// back with no reading, or once the reading is past `currentUntil` (the small widget has no
 /// room for a range).
+///
+/// The To-dos layout: the header's right side holds `tasks.countText` (no weather, no peek),
+/// the panel the to-dos in the snapshot's order at Standard size with no group headings, then
+/// "{n} more"; no extras. The caller's `widgetURL` opens the To-Dos page.
 struct SmallView: View {
     let snapshot: WSSnapshot
     let resolved: ResolvedDay
+    /// The effective switches (`WidgetFill.effective`), not the stored ones.
     let blocks: WidgetBlocks
+    let layout: WidgetLayout
     let weather: WeatherGlance?
     let date: Date
     let m: WidgetMetrics
@@ -29,6 +35,7 @@ struct SmallView: View {
         let next = WidgetFill.nextRow(resolved, blocks: blocks, at: date)
         // Only a reading with a current temperature takes the peek's place.
         let current = weather?.temp == nil ? nil : weather
+        let todos = layout == .todos
 
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .firstTextBaseline, spacing: 5) {
@@ -44,7 +51,10 @@ struct SmallView: View {
                         .lineLimit(1)
                 }
                 .cardTile(blocks.background, outset: EdgeInsets(top: 0, leading: 6, bottom: 2, trailing: 6))
-                if let current, let temp = current.temp {
+                if todos {
+                    Spacer(minLength: 4)
+                    todosCount(day.tasks.countText)
+                } else if let current, let temp = current.temp {
                     Spacer(minLength: 4)
                     HStack(alignment: .firstTextBaseline, spacing: 3) {
                         WeatherGlyphView(glyph: current.glyph, size: m.s(16))
@@ -67,7 +77,7 @@ struct SmallView: View {
 
             panel(day: day, next: next)
                 .overlay(alignment: .topTrailing) {
-                    if current == nil {
+                    if current == nil && !todos {
                         PeekView(kind: peek, height: Self.peekHeight)
                             .offset(x: -peek.rightInset, y: -(Self.peekHeight - PeekView.overlap))
                     }
@@ -88,7 +98,9 @@ struct SmallView: View {
     /// The relaxed state only when the calendar is on and the whole week ahead is clear.
     private func panel(day: WSDay, next: NextRow?) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            if blocks.events && next == nil
+            if layout == .todos {
+                todosContent(day: day)
+            } else if blocks.events && next == nil
                 && WidgetFill.shownRows(day.rows, blocks: blocks, today: true).isEmpty {
                 MessageStateView(
                     style: .relaxed,
@@ -153,6 +165,93 @@ struct SmallView: View {
                     .lineLimit(1)
             }
         }
+    }
+
+    // MARK: the To-dos layout
+
+    /// The count in the header's right slot, "**5** due today", which may wrap to two lines.
+    /// Nothing when nothing is due today (the snapshot's text is then empty).
+    @ViewBuilder private func todosCount(_ text: WSText) -> some View {
+        if !text.text.isEmpty {
+            WidgetTextView(
+                text: text,
+                font: .sys(size: m.s(11)),
+                color: .wInkSoft,
+                emphasisFont: .outfit(size: m.s(15), weight: .bold),
+                emphasisColor: .wAccent
+            )
+            .lineLimit(2)
+            .multilineTextAlignment(.trailing)
+            .minimumScaleFactor(0.8)
+            .cardTile(blocks.background, outset: EdgeInsets(top: 0, leading: 4, bottom: 2, trailing: 4))
+        }
+    }
+
+    /// All clear when the day has no tasks to show (never decided by how many fit), else the
+    /// rows that fit the panel's real height.
+    @ViewBuilder private func todosContent(day: WSDay) -> some View {
+        let tasks = WidgetFill.shownTasks(day.tasks.items, blocks: blocks, child: resolved.isChild)
+        if tasks.isEmpty {
+            MessageStateView(
+                style: .relaxed,
+                title: WidgetFill.allClearTitle(snapshot.labels),
+                line: snapshot.labels.enjoy,
+                image: "family-hug",
+                m: m
+            )
+        } else {
+            let overflow = WidgetFill.cappedTasks(day.tasks, blocks: blocks, child: resolved.isChild)
+            GeometryReader { proxy in
+                todoRows(tasks, overflow: overflow, height: proxy.size.height)
+            }
+        }
+    }
+
+    /// The rows at Standard (the small widget never steps), unlinked (one tap target), then
+    /// "{n} more" at the foot when not all fit.
+    private func todoRows(_ tasks: [WSTask], overflow: Int, height: CGFloat) -> some View {
+        let rowHeight = m.s(19)
+        let moreHeight = m.s(15)
+        let fill = smallFill(count: tasks.count, overflow: overflow, height: height, rowHeight: rowHeight, moreHeight: moreHeight)
+        let shown = Array(tasks.prefix(fill.shownPerGroup.first ?? 0))
+        return VStack(alignment: .leading, spacing: 0) {
+            ForEach(shown.indices, id: \.self) { index in
+                TaskRowView(
+                    task: shown[index],
+                    fallbackLink: snapshot.links.todo,
+                    leadWidth: m.s(14),
+                    height: rowHeight,
+                    size: .small,
+                    m: m,
+                    linked: false
+                )
+            }
+            Spacer(minLength: 0)
+            if fill.more > 0 {
+                Text(snapshot.labels.more.replacingOccurrences(of: "{n}", with: String(fill.more)))
+                    .font(.sys(size: m.s(11), weight: .medium))
+                    .foregroundStyle(Color.wInkFaint)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .frame(height: moreHeight)
+            }
+        }
+    }
+
+    /// `WidgetFill.todosFill` as one group with no headings and one factor. The "{n} more" line
+    /// is only held when something does not fit, so a list that fits exactly is not cut by one.
+    private func smallFill(
+        count: Int, overflow: Int, height: CGFloat, rowHeight: CGFloat, moreHeight: CGFloat
+    ) -> TodosFillResult {
+        let withoutMore = WidgetFill.todosFill(
+            height: height, heading: 0, row: rowHeight, groupHeadings: [0], reserve: 0,
+            groupSizes: [count], stepFactors: [1], overflow: overflow, noHeightRows: 3
+        )
+        if withoutMore.more == 0 { return withoutMore }
+        return WidgetFill.todosFill(
+            height: height, heading: 0, row: rowHeight, groupHeadings: [0], reserve: moreHeight,
+            groupSizes: [count], stepFactors: [1], overflow: overflow, noHeightRows: 3
+        )
     }
 
     /// "next", or "next · Wed 15" when the item is on a later day.

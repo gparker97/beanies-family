@@ -44,12 +44,17 @@ struct DayWidgetView: View {
             if let resolved = DayResolver.resolve(snapshot, at: entry.date) {
                 // Judged once per entry against the entry's own date (#134); nil = no weather.
                 let weather = WidgetWeather.glance(snapshot.weather, labels: snapshot.labels, at: entry.date)
+                // The one place the stored picker values become this render's switches and
+                // layout: the first point the viewer is known. Everything below reads these.
+                let effective = WidgetFill.effective(entry.blocks, isChild: resolved.isChild)
+                let smallTodos = family == .systemSmall && effective.layout == .todos
                 Group {
                     if family == .systemSmall {
                         SmallView(
                             snapshot: snapshot,
                             resolved: resolved,
-                            blocks: entry.blocks,
+                            blocks: effective.blocks,
+                            layout: effective.layout,
                             weather: weather,
                             date: entry.date,
                             m: m
@@ -58,7 +63,8 @@ struct DayWidgetView: View {
                         DayLayoutView(
                             snapshot: snapshot,
                             resolved: resolved,
-                            blocks: entry.blocks,
+                            blocks: effective.blocks,
+                            layout: effective.layout,
                             weather: weather,
                             date: entry.date,
                             size: size,
@@ -66,8 +72,9 @@ struct DayWidgetView: View {
                         )
                     }
                 }
-                // Any tap outside an item opens the calendar on today.
-                .widgetURL(WidgetLinks.url(snapshot.links.nook, size))
+                // Any tap outside an item opens the calendar on today; the small widget in the
+                // To-dos layout (one tap target, no `Link`s) opens the To-Dos page instead.
+                .widgetURL(WidgetLinks.url(smallTodos ? snapshot.links.todo : snapshot.links.nook, size))
             } else {
                 refreshState(size: size, m: m)
             }
@@ -90,11 +97,14 @@ struct DayWidgetView: View {
 /// Medium and large (placement E, round 9b): the 52pt date column, the agenda panel 13pt
 /// down with the peek on its edge (the calendar on top, the to-dos section above the
 /// footer), then the footer. The large is the same layout, taller. A child session swaps the
-/// column for a "<Name>'s day" header and bigger rows.
+/// column for a "<Name>'s day" header and bigger rows. In the To-dos layout the panel puts the
+/// to-dos section first and the footer's right side opens the To-Dos page.
 struct DayLayoutView: View {
     let snapshot: WSSnapshot
     let resolved: ResolvedDay
+    /// The effective switches (`WidgetFill.effective`), not the stored ones.
     let blocks: WidgetBlocks
+    let layout: WidgetLayout
     /// Drawn in the date column; the child view has no column, so no weather.
     let weather: WeatherGlance?
     let date: Date
@@ -130,9 +140,13 @@ struct DayLayoutView: View {
             taskReserve: isLarge ? 4 : 2,
             hasFooter: true,
             hasDateColumn: !child,
-            scale: m.scale
+            scale: m.scale,
+            eventSlot: isLarge ? 3 : 1,
+            noHeightTaskRows: isLarge ? 10 : 4
         )
-        return WidgetFill.plan(resolved: resolved, blocks: blocks, spec: spec, at: date)
+        return WidgetFill.plan(
+            resolved: resolved, blocks: blocks, layout: layout, labels: snapshot.labels, spec: spec, at: date
+        )
     }
 
     private func layout(_ plan: FillPlan) -> some View {
@@ -182,7 +196,8 @@ struct DayLayoutView: View {
                     FooterView(
                         tonight: plan.tonight,
                         asOf: asOf,
-                        later: snapshot.labels.later,
+                        trailing: footerTrailing(plan),
+                        trailingLink: plan.layout == .todos ? snapshot.links.todo : snapshot.links.nook,
                         nook: snapshot.links.nook,
                         size: size,
                         m: m
@@ -194,6 +209,16 @@ struct DayLayoutView: View {
             .frame(maxHeight: .infinity, alignment: .top)
         }
         .padding(insets)
+    }
+
+    /// The footer's right side: "later ›" in Your day; in the To-dos layout "{n} more" when
+    /// not every to-do fit, else "all to-dos ›" (nothing in a snapshot without that label).
+    private func footerTrailing(_ plan: FillPlan) -> String? {
+        guard plan.layout == .todos else { return snapshot.labels.later }
+        if plan.moreTasks > 0 {
+            return snapshot.labels.more.replacingOccurrences(of: "{n}", with: String(plan.moreTasks))
+        }
+        return snapshot.labels.allTodos
     }
 }
 

@@ -29,6 +29,18 @@
             android:layout_gravity="start|center_vertical"
             android:importantForAccessibility="no"
             android:scaleType="centerInside" />
+
+        <!-- The To-dos layout's stepped glyph (Automatic text, API 31+): centerInside never scales
+             a drawable UP and RemoteViews cannot change a scale type, so a stepped row shows this
+             fitCenter copy at the glyph's size × the step and hides task_glyph. GONE otherwise. -->
+        <ImageView
+            android:id="@+id/task_glyph_step"
+            android:layout_width="12dp"
+            android:layout_height="12dp"
+            android:layout_gravity="start|center_vertical"
+            android:importantForAccessibility="no"
+            android:scaleType="fitCenter"
+            android:visibility="gone" />
     </FrameLayout>
 
     <TextView

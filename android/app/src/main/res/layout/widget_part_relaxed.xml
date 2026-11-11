@@ -3,7 +3,9 @@
   The relaxed state (#130): the whole look-ahead is clear and no task shows. Drawn INSIDE the agenda
   panel where the calendar would be, matching iOS: the date column, peek and footer all stay. Included by the medium /
   large panel (widget_part_panel.xml) and the small panel; GONE until the renderer shows it in
-  place of the list (RemoteViews cannot add or remove views, so both are always present).
+  place of the list. Both are always present and only their visibility changes: RemoteViews can
+  empty a container (removeAllViews) and add views to it, but never remove one child from a panel
+  that holds others, so content that moves (the to-dos section) gets empty slots of its own.
 -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"

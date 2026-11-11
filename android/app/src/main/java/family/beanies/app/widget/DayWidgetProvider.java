@@ -111,8 +111,9 @@ public class DayWidgetProvider extends AppWidgetProvider {
                             app, id, size, widthDp, heightDp, prefs, textScale, result, now);
                 } catch (RuntimeException e) {
                     // A malformed snapshot must not leave the widget on "Can't load widget".
+                    // Relayed as `render_failed;<root cause>`, so a render bug names its cause.
                     Log.w(TAG, "widget render failed; showing the refresh state", e);
-                    WidgetPrefs.recordReadOutcome(app, "render_failed");
+                    WidgetPrefs.recordReadOutcome(app, WidgetPrefs.failureToken("render_failed", e));
                     views = DayWidgetRenderer.build(
                             app, id, size, widthDp, heightDp, prefs, textScale,
                             WidgetSnapshotStore.Result.unreadableForRender(), now);

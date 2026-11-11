@@ -10,18 +10,26 @@ import java.util.List;
 /**
  * Per-widget choices from {@link DayWidgetConfigActivity}, plus the read-outcome relay slot, in
  * `SharedPreferences("beanies_widgets")` (#130). The ONE place that knows the key format:
- * `<id>.block.<kind>`, `<id>.opacity`, `<id>.textSize`, and `read_outcome`.
+ * `<id>.block.<kind>`, `<id>.opacity`, `<id>.textSize`, `<id>.focus`, `<id>.todos.events`,
+ * `<id>.todos.meals`, and `read_outcome`. Stored keys are forever: the To-dos extras have keys of
+ * their own rather than reusing `block.events` / `block.meals`, whose stored default is on.
  *
  * A widget the launcher placed without running the configuration activity (Android 12+
  * `configuration_optional`) has no keys and reads the defaults: every block on
  * (WIDGET_DEFAULT_BLOCKS in src/types/widgetSnapshot.ts), a 70% background ({@link #DEFAULT_OPACITY}),
- * Standard text. A `<id>.audience` value stored by an older build ("My day" / "Our day") is never
- * read and goes with the widget's other keys on {@link #clear}.
+ * Automatic text ({@link TextSize#AUTO}, Standard everywhere but the To-dos layout), the Your day
+ * focus and both To-dos extras off. A `<id>.audience` value stored by an older build ("My day" /
+ * "Our day") is never read and goes with the widget's other keys on {@link #clear}.
  */
 public final class WidgetPrefs {
 
     static final String FILE = "beanies_widgets";
     static final String KEY_READ_OUTCOME = "read_outcome";
+    /** Per-widget key suffixes (after `<id>.`). */
+    private static final String KEY_TEXT_SIZE = "textSize";
+    private static final String KEY_FOCUS = "focus";
+    private static final String KEY_TODOS_EVENTS = "todos.events";
+    private static final String KEY_TODOS_MEALS = "todos.meals";
 
     /** The three background-opacity choices, in percent. */
     static final int[] OPACITIES = {100, 70, 40};
@@ -34,12 +42,21 @@ public final class WidgetPrefs {
     /**
      * The text-size choice: the stored key and the factor on the system text size. The rule that
      * turns it into a multiplier (with the ceiling) is {@link WidgetSizes#textScale}; this enum is
-     * only what is stored. Declaration order is the configuration screen's radio order.
+     * only what is stored. The configuration screen maps each value to its radio through an
+     * explicit table ({@link WidgetConfigIds}), never through the declaration order.
+     *
+     * {@link #AUTO} (2026-11-11) draws at Standard's factor everywhere; only the To-dos fill reads
+     * the difference ({@link WidgetSizes#taskStepFactors}: the largest of three steps at which
+     * every to-do fits). It is the default, so a widget with no stored choice picks it up; an
+     * explicitly stored Standard / Large / Larger is never changed.
      */
     enum TextSize {
+        AUTO("automatic", 1f),
         STANDARD("standard", 1f),
         LARGE("large", 1.15f),
         LARGER("larger", 1.3f);
+
+        static final TextSize DEFAULT = AUTO;
 
         final String key;
         final float factor;
@@ -49,22 +66,61 @@ public final class WidgetPrefs {
             this.factor = factor;
         }
 
-        /** The stored choice; absent or unknown reads as Standard (the same rule as opacity). */
+        /**
+         * The stored choice; absent or unknown reads as {@link #DEFAULT} (the same rule as
+         * opacity). Pure: {@link #load} logs an unknown stored value, this parser never does.
+         */
         static TextSize fromKey(String key) {
             for (TextSize t : values()) if (t.key.equals(key)) return t;
-            return STANDARD;
+            return DEFAULT;
         }
     }
 
-    /** Indexed like {@link WidgetFill#FILL_ORDER}. */
+    /**
+     * What the widget is for (2026-11-11): Your day (the calendar first, today's widget) or
+     * To-dos (the to-dos from the top; {@link WidgetFill#effective} turns it into switches and a
+     * layout). The configuration screen maps it through {@link WidgetConfigIds}.
+     */
+    enum Focus {
+        DAY("day"),
+        TODOS("todos");
+
+        static final Focus DEFAULT = DAY;
+
+        final String key;
+
+        Focus(String key) {
+            this.key = key;
+        }
+
+        /** The stored choice; absent or unknown reads as Your day. Pure, like {@link TextSize#fromKey}. */
+        static Focus fromKey(String key) {
+            for (Focus f : values()) if (f.key.equals(key)) return f;
+            return DEFAULT;
+        }
+    }
+
+    /** Indexed like {@link WidgetFill#FILL_ORDER}: the Your day switches, as stored. */
     final boolean[] blocks;
     final int opacity;
     final TextSize textSize;
+    final Focus focus;
+    /** The To-dos focus extras, stored apart from the Your day switches; off by default. */
+    final boolean todosEvents;
+    final boolean todosMeals;
 
     WidgetPrefs(boolean[] blocks, int opacity, TextSize textSize) {
+        this(blocks, opacity, textSize, Focus.DEFAULT, false, false);
+    }
+
+    WidgetPrefs(boolean[] blocks, int opacity, TextSize textSize, Focus focus,
+            boolean todosEvents, boolean todosMeals) {
         this.blocks = blocks.clone();
         this.opacity = isKnownOpacity(opacity) ? opacity : DEFAULT_OPACITY;
-        this.textSize = textSize == null ? TextSize.STANDARD : textSize;
+        this.textSize = textSize == null ? TextSize.DEFAULT : textSize;
+        this.focus = focus == null ? Focus.DEFAULT : focus;
+        this.todosEvents = todosEvents;
+        this.todosMeals = todosMeals;
     }
 
     private static SharedPreferences prefs(Context context) {
@@ -79,10 +135,36 @@ public final class WidgetPrefs {
             String kind = WidgetFill.FILL_ORDER[i];
             blocks[i] = p.getBoolean(prefix + blockKey(kind), WidgetFill.isDefaultOn(kind));
         }
+        String textSizeKey = p.getString(prefix + KEY_TEXT_SIZE, null);
+        TextSize textSize = TextSize.fromKey(textSizeKey);
+        if (textSizeKey != null && !textSize.key.equals(textSizeKey)) {
+            Log.w(DayWidgetProvider.TAG, "widget " + appWidgetId + ": unknown stored " + KEY_TEXT_SIZE
+                    + " \"" + textSizeKey + "\"; using " + textSize.key);
+        }
+        String focusKey = p.getString(prefix + KEY_FOCUS, null);
+        Focus focus = Focus.fromKey(focusKey);
+        if (focusKey != null && !focus.key.equals(focusKey)) {
+            Log.w(DayWidgetProvider.TAG, "widget " + appWidgetId + ": unknown stored " + KEY_FOCUS
+                    + " \"" + focusKey + "\"; using " + focus.key);
+        }
         return new WidgetPrefs(
                 blocks,
                 p.getInt(prefix + "opacity", DEFAULT_OPACITY),
-                TextSize.fromKey(p.getString(prefix + "textSize", TextSize.STANDARD.key)));
+                textSize,
+                focus,
+                p.getBoolean(prefix + KEY_TODOS_EVENTS, false),
+                p.getBoolean(prefix + KEY_TODOS_MEALS, false));
+    }
+
+    /**
+     * Whether placed widget {@code appWidgetId}'s SETTINGS select the To-dos layout (a stored
+     * To-dos focus, or the to-dos-only switches {@link WidgetFill#effective} infers it from), for
+     * the placements report's `todos` counts. A settings-only question: it does not know the
+     * viewer, so a child's widget set to To-dos counts too (it draws Your day). The fill never
+     * calls this; it reads {@link WidgetFill.Plan#layout}.
+     */
+    public static boolean selectsTodosLayout(Context context, int appWidgetId) {
+        return WidgetFill.effective(load(context, appWidgetId), false).layout == WidgetFill.Layout.TODOS;
     }
 
     @SuppressLint("ApplySharedPref") // see the commit() note below
@@ -93,7 +175,10 @@ public final class WidgetPrefs {
             e.putBoolean(prefix + blockKey(WidgetFill.FILL_ORDER[i]), blocks[i]);
         }
         e.putInt(prefix + "opacity", opacity);
-        e.putString(prefix + "textSize", textSize.key);
+        e.putString(prefix + KEY_TEXT_SIZE, textSize.key);
+        e.putString(prefix + KEY_FOCUS, focus.key);
+        e.putBoolean(prefix + KEY_TODOS_EVENTS, todosEvents);
+        e.putBoolean(prefix + KEY_TODOS_MEALS, todosMeals);
         // commit, not apply: the activity renders straight after and must read these values.
         e.commit();
     }

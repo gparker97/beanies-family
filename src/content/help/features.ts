@@ -317,7 +317,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       "A beanies widget shows today's plan right on your phone's Home Screen, so you can see what's on without opening the app, and one tap takes you to the right screen.",
     icon: '\u{1F4F1}',
     readTime: 5,
-    updatedDate: '2026-11-10',
+    updatedDate: '2026-11-11',
     sections: [
       {
         type: 'paragraph',
@@ -373,10 +373,31 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         type: 'list',
         content: '',
         items: [
-          '<strong>Small</strong> shows the date, the weather, how many things are on today, and the next thing coming up, even when that is later in the week.',
+          '<strong>Small</strong> shows the date, the weather, how many things are on today, and the next thing coming up, even when that is later in the week. That is the <strong>Your day</strong> focus; set <strong>Focus</strong> to <strong>To-dos</strong> and it shows how many to-dos you have, then the to-dos themselves, with "N more" when they do not all fit.',
           "<strong>Medium</strong> shows your calendar, with drop-offs and pick-ups, tonight's dinner, and your to-dos underneath.",
           '<strong>Large</strong> shows the same, with room for more of the week and more to-dos.',
         ],
+      },
+      {
+        type: 'heading',
+        content: 'Focus on your day or your to-dos',
+        level: 2,
+        id: 'focus',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Each widget has a <strong>Focus</strong> setting, the first row of its settings. <strong>Your day</strong> is the layout described below: the calendar on top, the to-dos underneath. <strong>To-dos</strong> puts your to-dos at the top instead, with no blank calendar space above them. On the medium and large widgets they are grouped under <strong>overdue</strong>, <strong>due today</strong> and <strong>coming up</strong>, starting from the top. When there is nothing to do, the widget says "all clear".',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'With the To-dos focus you can add two optional extras, both off to start: <strong>Upcoming events</strong>, a short list of what is coming up under your to-dos, and <strong>Tonight’s meal</strong>. Neither shows on the small widget. Choosing To-dos swaps the Your day part switches for these two, and each focus remembers its own settings.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Tap a to-do and beanies opens on it. You cannot tick a to-do off from the widget. A child’s widget always stays on Your day. Settings belong to each widget, so two widgets on the same phone can have different foci.',
       },
       {
         type: 'heading',
@@ -408,7 +429,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'The widget shows the whole family’s calendar, so every activity is there. The to-dos and lists underneath are the same ones as in your daily briefing on the Nook: yours, anything nobody has been given, and your children’s. A child’s routine stays off your widget unless <strong>Keep parents posted</strong> is on for it, or it was missed. You can also pick which parts show: the plan, who is where, dinner, to-dos and lists, trips and birthdays, and helpful hints. To make the text bigger, choose a <strong>Text size</strong>: Standard, Large or Larger. Bigger text means fewer rows fit, never squashed ones, and the widget also follows your phone’s own text size. Set the <strong>Background</strong> to 70% or 40% to let your wallpaper show through (100% is solid).',
+          'The widget shows the whole family’s calendar, so every activity is there. The to-dos and lists underneath are the same ones as in your daily briefing on the Nook: yours, anything nobody has been given, and your children’s. A child’s routine stays off your widget unless <strong>Keep parents posted</strong> is on for it, or it was missed. You can also pick which parts show: the plan, who is where, dinner, to-dos and lists, trips and birthdays, and helpful hints. To change the text, choose a <strong>Text size</strong>: Automatic, Standard, Large or Larger. With <strong>Automatic</strong>, a widget whose Focus is To-dos shows a short list in bigger text on the medium and large sizes, and everywhere else it matches Standard. Pick Standard, Large or Larger for a fixed size. A widget whose text size was already set keeps that size until you pick Automatic. Bigger text means fewer rows fit, never squashed ones, and the widget also follows your phone’s own text size. Set the <strong>Background</strong> to 70% or 40% to let your wallpaper show through (100% is solid).',
       },
       {
         type: 'steps',

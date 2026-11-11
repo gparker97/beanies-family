@@ -89,7 +89,7 @@ public final class WidgetSnapshotStore {
         try {
             JSONObject root = new JSONObject(json);
             int version = root.optInt("version", -1);
-            // Any version this reader knows (v2 and v3); outside the range the detail names the
+            // Any version this reader knows (MIN_VERSION..MAX_VERSION, v2 to v4 today); outside the range the detail names the
             // version it saw, so the firehose can tell an old reader from a damaged file.
             if (!WidgetSnapshot.isReadable(version)) {
                 return unreadable(context, "decode_failed;v=" + version, null);

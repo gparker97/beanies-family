@@ -18,6 +18,12 @@
     <string name="widget_sign_in_to_see">sign in to see your day</string>
     <string name="widget_refresh">open beanies to refresh</string>
     <string name="widget_config_title">Your day widget</string>
+    <string name="widget_config_focus">Focus</string>
+    <string name="widget_config_focus_day">Your day</string>
+    <string name="widget_config_focus_todos">To-dos</string>
+    <string name="widget_config_also_show">Also show</string>
+    <string name="widget_config_todos_events">Upcoming events</string>
+    <string name="widget_config_todos_meals">Tonight\'s meal</string>
     <string name="widget_config_show">Show</string>
     <string name="widget_config_events">Events</string>
     <string name="widget_config_whos_where">Who\'s where</string>
@@ -30,6 +36,7 @@
     <string name="widget_config_opacity_70" translatable="false">70%</string>
     <string name="widget_config_opacity_40" translatable="false">40%</string>
     <string name="widget_config_text_size">Text size</string>
+    <string name="widget_config_text_auto">Automatic</string>
     <string name="widget_config_text_standard">Standard</string>
     <string name="widget_config_text_large">Large</string>
     <string name="widget_config_text_larger">Larger</string>

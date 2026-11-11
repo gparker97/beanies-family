@@ -443,6 +443,18 @@ describe('buildWidgetSnapshot: the v4 fixture (cross-platform contract)', () => 
     expect(Object.keys(snapshot.labels)).not.toContain('ourDay');
   });
 
+  it('carries the six To-dos focus labels', () => {
+    const { snapshot } = build();
+    expect(snapshot.labels).toMatchObject({
+      groupOverdue: 'overdue',
+      groupToday: 'due today',
+      groupComingUp: 'coming up',
+      allTodos: 'all to-dos ›',
+      todosAllClear: 'all clear,',
+      eventsHeading: 'next up',
+    });
+  });
+
   // The frozen v3 file is what the native fallback (`view ?? our ?? my`) and the Android tests
   // read as "a snapshot stored before the update": it must keep the OLD shape.
   it('keeps the frozen v3 fixture in its old shape (my + our, the two day labels)', () => {
@@ -468,7 +480,17 @@ describe('buildWidgetSnapshot: the v4 fixture (cross-platform contract)', () => 
         .map((p) => p.replace(/^days\[\]\.(my|our)(?=\.|$)/, 'days[].view'))
     );
     // The lock screen's own-day fields: optional, so a v2/v3 reader is unaffected.
-    const V4_ADDITIONS = ['days[].view.rows[].mine', 'days[].view.ownThingsText'];
+    // The To-dos focus labels (2026-11-11) are optional too: native tolerates their absence.
+    const V4_ADDITIONS = [
+      'labels.groupOverdue',
+      'labels.groupToday',
+      'labels.groupComingUp',
+      'labels.allTodos',
+      'labels.todosAllClear',
+      'labels.eventsHeading',
+      'days[].view.rows[].mine',
+      'days[].view.ownThingsText',
+    ];
     const v4Paths = keyPaths(v4);
     expect([...folded].filter((p) => !v4Paths.has(p))).toEqual([]);
     expect([...v4Paths].filter((p) => !folded.has(p))).toEqual(V4_ADDITIONS);

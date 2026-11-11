@@ -25,7 +25,13 @@
     "circleLeft": "left",
     "circleAllDone": "all done",
     "circleAllClear": "all clear",
-    "circleToDo": "to do"
+    "circleToDo": "to do",
+    "groupOverdue": "overdue",
+    "groupToday": "due today",
+    "groupComingUp": "coming up",
+    "allTodos": "all to-dos ›",
+    "todosAllClear": "all clear,",
+    "eventsHeading": "next up"
   },
   "links": {
     "nook": "https://app.beanies.family/activities?view=day&src=widget",

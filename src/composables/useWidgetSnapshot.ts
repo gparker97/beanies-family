@@ -29,6 +29,7 @@ import {
   emitReadOutcome,
   emitSignOutHaltIncomplete,
   emitSnapshotPublished,
+  splitPlacements,
   type WidgetRefreshReason,
 } from '@/services/telemetry/homeWidgetEvents';
 
@@ -126,13 +127,17 @@ function reportPublishFailure(stage: PublishStage, errorCode: string, error: unk
 
 /** Log placements once per session, and again only when the set (or a circle's option) changes. */
 function logPlacementsOnChange(placements: WidgetPublishResult['placements']): void {
-  const { circle, ...sizes } = placements ?? {};
+  const { sizes, circle, todos } = splitPlacements(placements);
   const key = [
     ...Object.entries(sizes)
       .filter(([, n]) => (n ?? 0) > 0)
       .map(([size, n]) => `${size}:${n}`)
       .sort(),
     circle ? circleOptionsToken(circle) : '',
+    ...Object.entries(todos)
+      .filter(([, n]) => (n ?? 0) > 0)
+      .map(([size, n]) => `todos:${size}:${n}`)
+      .sort(),
   ].join(',');
   if (key === lastPlacementsKey) return;
   lastPlacementsKey = key;

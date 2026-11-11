@@ -4,8 +4,14 @@
   not ended yet (from a later day, named, when today has none), or the relaxed block on a clear week. The 28dp peek sits on the panel: its top is 8dp below the 14dp padding and the
   panel starts 34dp below it, so the peek ends 2dp inside the panel. While a current temperature
   exists the weather (#134) takes the peek's slot instead.
+
+  The To-dos layout (2026-11-11) uses the same frame: the due count in the peek's slot (weather and
+  peeks hidden), the to-do rows (`tasks_rows`, weight 1 so the "N more" line sits at the foot), and
+  `small_more`; the count line and the next item are hidden. Your day hides `tasks_rows`,
+  `small_count` and `small_more`, so it lays out exactly as before.
 -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
@@ -153,11 +159,34 @@
                         android:textSize="@dimen/widget_text_small_title" />
                 </LinearLayout>
 
+                <!-- To-dos: the rows (widget_task_row.xml, added per render). Weight 1, so it is
+                     also the spacer that puts small_more at the foot; GONE in Your day. Nested in
+                     the weighted panel like the relaxed block beside it: one short column. -->
+                <LinearLayout
+                    android:id="@+id/tasks_rows"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical"
+                    android:visibility="gone"
+                    tools:ignore="NestedWeights" />
+
                 <include
                     layout="@layout/widget_part_relaxed"
                     android:layout_width="match_parent"
                     android:layout_height="0dp"
                     android:layout_weight="1" />
+
+                <!-- To-dos: "3 more" when not every to-do fits (WidgetFill.SMALL_MORE_DP). -->
+                <TextView
+                    android:id="@+id/small_more"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="end"
+                    android:singleLine="true"
+                    android:textColor="@color/widget_ink_faint"
+                    android:textSize="@dimen/widget_text_body"
+                    android:visibility="gone" />
 
                 <TextView
                     android:id="@+id/date_as_of"
@@ -222,5 +251,22 @@
                 android:layout_marginStart="3dp"
                 android:scaleType="fitStart" />
         </LinearLayout>
+
+        <!-- To-dos: the due count ("3 due today", the number bold) in the peek's slot, the header
+             row's height and end margin like the weather. GONE in Your day. -->
+        <TextView
+            android:id="@+id/small_count"
+            android:layout_width="wrap_content"
+            android:layout_height="@dimen/widget_small_header_height"
+            android:layout_gravity="top|end"
+            android:layout_marginTop="-2dp"
+            android:layout_marginEnd="@dimen/widget_small_peek_end"
+            android:ellipsize="end"
+            android:gravity="center_vertical|end"
+            android:maxLines="2"
+            android:maxWidth="@dimen/widget_peek_family_width"
+            android:textColor="@color/widget_ink_soft"
+            android:textSize="@dimen/widget_text_body"
+            android:visibility="gone" />
     </FrameLayout>
 </FrameLayout>

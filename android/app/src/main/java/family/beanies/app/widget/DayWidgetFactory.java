@@ -57,9 +57,11 @@ final class DayWidgetFactory implements RemoteViewsService.RemoteViewsFactory {
             size = WidgetSizes.sizeFor(options);
             WidgetPrefs prefs = WidgetPrefs.load(context, appWidgetId);
             textScale = WidgetSizes.textScale(context, prefs.textSize);
+            // The same step factors as the renderer (one source), so both resolve the same plan.
             plan = result.state == WidgetSnapshotStore.State.READY
                     ? WidgetFill.plan(result.snapshot, prefs, size,
-                            WidgetSizes.layoutHeightDp(context, options, textScale), now)
+                            WidgetSizes.layoutHeightDp(context, options, textScale), now,
+                            WidgetSizes.taskStepFactors(context, prefs, size))
                     : null;
             panelDp = DayWidgetRenderer.agendaPanelDp(WidgetSizes.widthDp(options, size));
         } catch (RuntimeException e) {

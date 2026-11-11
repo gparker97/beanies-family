@@ -138,17 +138,21 @@ struct RowGlyph: View {
 }
 
 /// A look-ahead day's divider: "Wed 15" in the accent, "tomorrow" in soft ink when the day
-/// is the device's tomorrow, then a hairline to the right edge (mockup `.dv9`).
+/// is the device's tomorrow, then a hairline to the right edge (mockup `.dv9`). The To-dos
+/// layout reuses it for its group headings and "next up", whose word may be the soft ink.
 struct DayDividerView: View {
     let date: String
     let tomorrow: String?
     let m: WidgetMetrics
+    /// The first word's ink: the accent (a date, "overdue") or `wInkSoft`. Both are paired
+    /// light/dark tokens.
+    var dateColor: Color = Color.wAccent
 
     var body: some View {
         HStack(spacing: 5) {
             Text(date)
                 .font(.outfit(size: m.s(11), weight: .bold))
-                .foregroundStyle(Color.wAccent)
+                .foregroundStyle(dateColor)
                 .lineLimit(1)
                 .fixedSize()
             if let tomorrow {

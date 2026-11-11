@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The widget's configuration screen (#130): the six blocks in fill order, the
-     background opacity. Labels from strings.xml (en + zh); not a RemoteViews layout. -->
+<!-- The widget's configuration screen (#130): the Focus first (2026-11-11), then Your day's six
+     blocks in fill order or the To-dos focus's two extras (DayWidgetConfigActivity shows one block
+     per focus; each keeps its own values), the background opacity and the text size. Labels from
+     strings.xml (en + zh); not a RemoteViews layout. -->
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/config_root"
     android:layout_width="match_parent"
@@ -26,37 +28,91 @@
 
         <TextView
             style="@style/WidgetConfigHeading"
-            android:text="@string/widget_config_show" />
+            android:text="@string/widget_config_focus" />
 
-        <CheckBox
-            android:id="@+id/config_block_events"
-            style="@style/WidgetConfigOption"
-            android:text="@string/widget_config_events" />
+        <!-- Order: WidgetConfigIds.FOCUSES. -->
+        <RadioGroup
+            android:id="@+id/config_focus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
 
-        <CheckBox
-            android:id="@+id/config_block_whos_where"
-            style="@style/WidgetConfigOption"
-            android:text="@string/widget_config_whos_where" />
+            <RadioButton
+                android:id="@+id/config_focus_day"
+                style="@style/WidgetConfigOption"
+                android:layout_marginEnd="24dp"
+                android:text="@string/widget_config_focus_day" />
 
-        <CheckBox
-            android:id="@+id/config_block_meals"
-            style="@style/WidgetConfigOption"
-            android:text="@string/widget_config_meals" />
+            <RadioButton
+                android:id="@+id/config_focus_todos"
+                style="@style/WidgetConfigOption"
+                android:text="@string/widget_config_focus_todos" />
+        </RadioGroup>
 
-        <CheckBox
-            android:id="@+id/config_block_due"
-            style="@style/WidgetConfigOption"
-            android:text="@string/widget_config_due" />
+        <!-- Your day: the six parts. Visible only while Focus is Your day. -->
+        <LinearLayout
+            android:id="@+id/config_show_block"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
 
-        <CheckBox
-            android:id="@+id/config_block_coming_up"
-            style="@style/WidgetConfigOption"
-            android:text="@string/widget_config_coming_up" />
+            <TextView
+                style="@style/WidgetConfigHeading"
+                android:text="@string/widget_config_show" />
 
-        <CheckBox
-            android:id="@+id/config_block_hint"
-            style="@style/WidgetConfigOption"
-            android:text="@string/widget_config_hint" />
+            <CheckBox
+                android:id="@+id/config_block_events"
+                style="@style/WidgetConfigOption"
+                android:text="@string/widget_config_events" />
+
+            <CheckBox
+                android:id="@+id/config_block_whos_where"
+                style="@style/WidgetConfigOption"
+                android:text="@string/widget_config_whos_where" />
+
+            <CheckBox
+                android:id="@+id/config_block_meals"
+                style="@style/WidgetConfigOption"
+                android:text="@string/widget_config_meals" />
+
+            <CheckBox
+                android:id="@+id/config_block_due"
+                style="@style/WidgetConfigOption"
+                android:text="@string/widget_config_due" />
+
+            <CheckBox
+                android:id="@+id/config_block_coming_up"
+                style="@style/WidgetConfigOption"
+                android:text="@string/widget_config_coming_up" />
+
+            <CheckBox
+                android:id="@+id/config_block_hint"
+                style="@style/WidgetConfigOption"
+                android:text="@string/widget_config_hint" />
+        </LinearLayout>
+
+        <!-- To-dos: the two optional extras, both off to start. Visible only while Focus is To-dos. -->
+        <LinearLayout
+            android:id="@+id/config_also_block"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                style="@style/WidgetConfigHeading"
+                android:text="@string/widget_config_also_show" />
+
+            <CheckBox
+                android:id="@+id/config_todos_events"
+                style="@style/WidgetConfigOption"
+                android:text="@string/widget_config_todos_events" />
+
+            <CheckBox
+                android:id="@+id/config_todos_meals"
+                style="@style/WidgetConfigOption"
+                android:text="@string/widget_config_todos_meals" />
+        </LinearLayout>
 
         <TextView
             style="@style/WidgetConfigHeading"
@@ -90,13 +146,18 @@
             style="@style/WidgetConfigHeading"
             android:text="@string/widget_config_text_size" />
 
-        <!-- Vertical: three word labels overflow a narrow screen at a large system font. Order is
-             WidgetPrefs.TextSize's declaration order (DayWidgetConfigActivity.TEXT_SIZE_IDS). -->
+        <!-- Vertical: the word labels overflow a narrow screen at a large system font. Order:
+             WidgetConfigIds.TEXT_SIZES (an explicit table, never the enum's ordinal). -->
         <RadioGroup
             android:id="@+id/config_text_size"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical">
+
+            <RadioButton
+                android:id="@+id/config_text_auto"
+                style="@style/WidgetConfigOption"
+                android:text="@string/widget_config_text_auto" />
 
             <RadioButton
                 android:id="@+id/config_text_standard"

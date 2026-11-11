@@ -26,17 +26,24 @@ enum WidgetBackgroundOption: String, AppEnum {
     }
 }
 
-/// How big the widget's text is, on top of the phone's own text size: Standard (today's look),
-/// Large, Larger. Never smaller than Standard, and never past `WidgetMetrics.maxScale` overall
-/// (the rule is `WidgetMetrics.init`). Bigger text shows fewer rows, never clipped ones. Android's
-/// configuration screen has the same three (`WidgetPrefs.TextSize`).
+/// How big the widget's text is, on top of the phone's own text size: Automatic (the default),
+/// Standard (today's look), Large, Larger. Never smaller than Standard, and never past
+/// `WidgetMetrics.maxScale` overall (the rule is `WidgetMetrics.init`). Bigger text shows fewer
+/// rows, never clipped ones. Android's configuration screen has the same four
+/// (`WidgetPrefs.TextSize`).
+///
+/// Automatic draws at Standard's scale everywhere. Only the To-dos focus on medium and large
+/// reads the difference: a short list steps up (`WidgetFill.taskStepFactors`). The raw values
+/// are stored keys, so a widget with Standard, Large or Larger stored keeps it.
 enum WidgetTextSizeOption: String, AppEnum {
+    case automatic
     case standard
     case large
     case larger
 
     static var typeDisplayRepresentation: TypeDisplayRepresentation = "Text size"
     static var caseDisplayRepresentations: [WidgetTextSizeOption: DisplayRepresentation] = [
+        .automatic: "Automatic",
         .standard: "Standard",
         .large: "Large",
         .larger: "Larger",
@@ -44,11 +51,26 @@ enum WidgetTextSizeOption: String, AppEnum {
 
     var factor: CGFloat {
         switch self {
+        case .automatic: return 1.0
         case .standard: return 1.0
         case .large: return 1.15
         case .larger: return 1.3
         }
     }
+}
+
+/// What the home-screen widget is about: Your day (the calendar, then the to-dos; the
+/// default) or To-dos (the to-dos from the top, grouped). The raw values are stored keys
+/// (Android `WidgetPrefs.Focus` keys are the same words): never rename one.
+enum WidgetFocusOption: String, AppEnum {
+    case day
+    case todos
+
+    static var typeDisplayRepresentation: TypeDisplayRepresentation = "Focus"
+    static var caseDisplayRepresentations: [WidgetFocusOption: DisplayRepresentation] = [
+        .day: "Your day",
+        .todos: "To-dos",
+    ]
 }
 
 /// The per-widget picker ("Edit Widget"). Titles are keys in Localizable.xcstrings
@@ -58,9 +80,24 @@ enum WidgetTextSizeOption: String, AppEnum {
 /// empty, so nothing competes for space by being on. The property names are the stored
 /// keys: relabel freely, and give a switch a new key only when its meaning changes (see
 /// `tripsAndBirthdays`), so an old stored value never carries over to a new meaning.
+///
+/// Focus is the first row. To-dos swaps the six part switches for its own two extras, both
+/// off by default and on their OWN keys (`todosEvents`, `todosMeals`): reusing `events` and
+/// `meals` would carry their stored "on" into the To-dos focus. Each focus keeps its values.
 struct DayWidgetConfigIntent: WidgetConfigurationIntent {
     static var title: LocalizedStringResource = "Your day"
     static var description: IntentDescription? = IntentDescription("Today's plans, handoffs and dinner at a glance.")
+
+    @Parameter(title: "Focus", default: .day)
+    var focus: WidgetFocusOption
+
+    /// To-dos focus: the next events under the to-dos.
+    @Parameter(title: "Upcoming events", default: false)
+    var todosEvents: Bool
+
+    /// To-dos focus: tonight's meal in the footer.
+    @Parameter(title: "Tonight's meal", default: false)
+    var todosMeals: Bool
 
     @Parameter(title: "Events", default: true)
     var events: Bool
@@ -90,8 +127,36 @@ struct DayWidgetConfigIntent: WidgetConfigurationIntent {
     @Parameter(title: "Background", default: .lighter)
     var background: WidgetBackgroundOption
 
-    @Parameter(title: "Text size", default: .standard)
+    /// Automatic by default: it equals Standard outside the To-dos focus, so a widget placed
+    /// before the option existed looks the same whichever value iOS hands it.
+    @Parameter(title: "Text size", default: .automatic)
     var textSize: WidgetTextSizeOption
+
+    // The Edit Widget sheet lists the rows named here, in this order. If iOS does not swap
+    // them for a widget intent, every row stays visible and each focus reads only its own.
+    static var parameterSummary: some ParameterSummary {
+        When(\.$focus, .equalTo, WidgetFocusOption.todos) {
+            Summary("Your day") {
+                \.$focus
+                \.$todosEvents
+                \.$todosMeals
+                \.$background
+                \.$textSize
+            }
+        } otherwise: {
+            Summary("Your day") {
+                \.$focus
+                \.$events
+                \.$whosWhere
+                \.$meals
+                \.$due
+                \.$tripsAndBirthdays
+                \.$hint
+                \.$background
+                \.$textSize
+            }
+        }
+    }
 }
 
 /// The picker's choices as a plain value, so the views and the fill logic never touch the
@@ -111,6 +176,15 @@ struct WidgetBlocks: Equatable {
     /// The lock-screen circle's choice (`AccessoryConfigIntent`); the home-screen widget
     /// never reads it.
     var circleShow: CircleShowOption = .nextUp
+    /// The STORED focus and its two extras. Nothing here is resolved: `WidgetFill.effective`
+    /// turns them into the switches a render uses, once the viewer is known. The defaults
+    /// (Your day, extras off) keep `defaults` and the lock-screen widget on Your day.
+    var focus: WidgetFocusOption = .day
+    var todosEvents: Bool = false
+    var todosMeals: Bool = false
+
+    /// The stored Text size is Automatic (the lock-screen widget's Standard is not).
+    var isAutomaticTextSize: Bool { textSize == .automatic }
 
     static let defaults = WidgetBlocks(
         events: true, whosWhere: true, meals: true, due: true, comingUp: true, hint: true
@@ -138,7 +212,10 @@ extension WidgetBlocks {
             comingUp: configuration.tripsAndBirthdays,
             hint: configuration.hint,
             background: configuration.background,
-            textSize: configuration.textSize
+            textSize: configuration.textSize,
+            focus: configuration.focus,
+            todosEvents: configuration.todosEvents,
+            todosMeals: configuration.todosMeals
         )
     }
 }

@@ -12,6 +12,7 @@ import android.util.Log;
 import android.util.TypedValue;
 import android.view.View;
 import android.widget.RemoteViews;
+import androidx.annotation.ColorRes;
 import androidx.annotation.DimenRes;
 import androidx.annotation.IdRes;
 import family.beanies.app.MainActivity;
@@ -145,13 +146,14 @@ final class WidgetViews {
 
     /**
      * The peek over the panel: the family for an adult, the viewer's own beanie for a child. An unknown avatar falls back to the family. On the small widget the weather
-     * (#134) takes the peek's slot while a current temperature exists ({@code weatherInSlot}, the
-     * caller binds `small_weather`): both peeks hide, and return on the first render without one.
-     * The medium and large always pass false (their weather lives in the date column).
+     * (#134) takes the peek's slot while a current temperature exists, and in the To-dos layout the
+     * due count does ({@code slotTaken}; the caller binds `small_weather` / `small_count`): both
+     * peeks hide, and return on the first render without one. The medium and large always pass
+     * false (their weather lives in the date column).
      */
-    static void bindPeek(RemoteViews views, WidgetFill.Plan plan, boolean weatherInSlot) {
-        int avatar = weatherInSlot ? 0 : peekAvatar(plan);
-        views.setViewVisibility(R.id.peek_family, !weatherInSlot && avatar == 0 ? View.VISIBLE : View.GONE);
+    static void bindPeek(RemoteViews views, WidgetFill.Plan plan, boolean slotTaken) {
+        int avatar = slotTaken ? 0 : peekAvatar(plan);
+        views.setViewVisibility(R.id.peek_family, !slotTaken && avatar == 0 ? View.VISIBLE : View.GONE);
         views.setViewVisibility(R.id.peek_avatar, avatar == 0 ? View.GONE : View.VISIBLE);
         if (avatar != 0) views.setImageViewResource(R.id.peek_avatar, avatar);
     }
@@ -230,6 +232,14 @@ final class WidgetViews {
      * never computed here. Family: the hug icon. A child's done row: the green tick instead.
      */
     static void bindDot(RemoteViews views, WidgetSnapshot.Dot dot, boolean tick) {
+        bindDot(views, dot, tick, 1f);
+    }
+
+    /**
+     * {@link #bindDot(RemoteViews, WidgetSnapshot.Dot, boolean)} with the initial scaled by
+     * {@code scale}, for a dot the caller has grown with a To-dos text step ({@link #pinSize}).
+     */
+    static void bindDot(RemoteViews views, WidgetSnapshot.Dot dot, boolean tick, float scale) {
         if (tick) {
             views.setViewVisibility(R.id.dot_frame, View.VISIBLE);
             show(views, R.id.dot_tick, true);
@@ -255,7 +265,7 @@ final class WidgetViews {
         views.setTextColor(R.id.dot_initial, parseColor(dot.ink, Color.WHITE));
         // Two-letter initials ("Jo", "AB") step down so they stay inside the circle.
         views.setTextViewTextSize(
-                R.id.dot_initial, TypedValue.COMPLEX_UNIT_SP, dot.initial.length() > 1 ? 6.5f : 8f);
+                R.id.dot_initial, TypedValue.COMPLEX_UNIT_SP, (dot.initial.length() > 1 ? 6.5f : 8f) * scale);
     }
 
     private static void show(RemoteViews views, int id, boolean visible) {
@@ -297,6 +307,51 @@ final class WidgetViews {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             views.setViewLayoutWidth(viewId, Math.max(LEAD_MIN_DP, dp), TypedValue.COMPLEX_UNIT_DIP);
         }
+    }
+
+    /**
+     * API 31+: fix a view's height (dp). Below 31 the layout's own height holds; the To-dos fill
+     * never steps there ({@link WidgetSizes#taskStepFactors}), so its estimates stay safe.
+     */
+    static void pinHeight(RemoteViews views, @IdRes int viewId, float dp) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            views.setViewLayoutHeight(viewId, dp, TypedValue.COMPLEX_UNIT_DIP);
+        }
+    }
+
+    /**
+     * API 31+: fix a view's width (dp), with no floor (unlike {@link #leadWidth}, whose
+     * {@link #LEAD_MIN_DP} lines a column up with the calendar's times).
+     */
+    static void pinWidth(RemoteViews views, @IdRes int viewId, float dp) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            views.setViewLayoutWidth(viewId, dp, TypedValue.COMPLEX_UNIT_DIP);
+        }
+    }
+
+    /** API 31+: fix a view's width and height (dp), as {@link #pinHeight}. */
+    static void pinSize(RemoteViews views, @IdRes int viewId, float dp) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            views.setViewLayoutWidth(viewId, dp, TypedValue.COMPLEX_UNIT_DIP);
+            views.setViewLayoutHeight(viewId, dp, TypedValue.COMPLEX_UNIT_DIP);
+        }
+    }
+
+    /**
+     * A heading item (`widget_day_divider.xml`): {@code text} in {@code colorRes}, {@code aside}
+     * ("tomorrow") beside it in the softer ink or GONE, then the hairline. The calendar's date
+     * dividers and its "next up" heading (DayWidgetList) and the To-dos group headings
+     * (DayWidgetRenderer) are all this one view, sized at the body size × {@code textScale} and
+     * coloured on every bind, so a recycled list item never keeps another heading's colour.
+     */
+    static RemoteViews heading(Context context, float textScale, CharSequence text,
+            @ColorRes int colorRes, CharSequence aside) {
+        RemoteViews v = new RemoteViews(context.getPackageName(), R.layout.widget_day_divider);
+        textSize(v, context, textScale, R.dimen.widget_text_body, R.id.divider_date, R.id.divider_tomorrow);
+        v.setTextViewText(R.id.divider_date, text);
+        textColorRes(v, context, R.id.divider_date, colorRes);
+        textOrGone(v, R.id.divider_tomorrow, aside);
+        return v;
     }
 
     /**

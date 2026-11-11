@@ -1225,6 +1225,12 @@ export function buildWidgetSnapshot(
       circleAllDone: t('widget.circleAllDone'),
       circleAllClear: t('widget.circleAllClear'),
       circleToDo: t('widget.circleToDo'),
+      groupOverdue: t('widget.taskOverdue'),
+      groupToday: t('widget.group.today'),
+      groupComingUp: t('widget.group.comingUp'),
+      allTodos: t('widget.allTodos'),
+      todosAllClear: t('widget.todosAllClear'),
+      eventsHeading: t('widget.nextUp'),
     },
     links: {
       nook: widgetLink(origin, plannerDayLink()),

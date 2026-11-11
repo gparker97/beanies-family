@@ -5,6 +5,11 @@ import WidgetKit
 /// heading ("to-dos and lists", a hairline, "2 more" when not every task fits), then the
 /// rows `WidgetFill` placed, in the snapshot's order (overdue, today, undated, later),
 /// whatever their kind. Never drawn for a child.
+///
+/// The To-dos layout draws the same section at the top of the panel, with `groups` (each under
+/// its "overdue" / "due today" / "coming up" heading), the count on the heading's right, and the
+/// rows at `rowMetrics` (its Automatic step). The rows are the same `TaskRowView`s, so the
+/// tinted and clear renderings behave as in Your day.
 struct TaskSectionView: View {
     let section: WSTasks
     let tasks: [WSTask]
@@ -17,25 +22,63 @@ struct TaskSectionView: View {
     let leadWidth: CGFloat
     let rowHeight: CGFloat
     let size: WidgetSizeKey
+    /// The heading's metrics (always Standard step).
     let m: WidgetMetrics
+    /// The To-dos layout: the rows in their groups. Empty = the flat `tasks` (Your day).
+    var groups: [TaskGroupPlan] = []
+    /// The To-dos layout: `tasks.countText` on the heading's right, in place of "{n} more".
+    var headingCount: WSText? = nil
+    /// The rows' and group headings' metrics (the To-dos layout's step); nil = `m`.
+    var rowMetrics: WidgetMetrics? = nil
 
     var body: some View {
+        let rows = rowMetrics ?? m
+        let link = section.link.isEmpty ? fallbackLink : section.link
         VStack(alignment: .leading, spacing: 0) {
-            Link(destination: WidgetLinks.url(section.link.isEmpty ? fallbackLink : section.link, size)) {
+            Link(destination: WidgetLinks.url(link, size)) {
                 heading
             }
-            ForEach(tasks.indices, id: \.self) { index in
-                TaskRowView(
-                    task: tasks[index],
-                    fallbackLink: section.link.isEmpty ? fallbackLink : section.link,
-                    leadWidth: leadWidth,
-                    height: rowHeight,
-                    size: size,
-                    m: m
-                )
+            if groups.isEmpty {
+                ForEach(tasks.indices, id: \.self) { index in
+                    TaskRowView(
+                        task: tasks[index],
+                        fallbackLink: link,
+                        leadWidth: leadWidth,
+                        height: rowHeight,
+                        size: size,
+                        m: rows
+                    )
+                }
+            } else {
+                ForEach(groups.indices, id: \.self) { index in
+                    groupView(groups[index], rows: rows, link: link)
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// One group: its heading (a divider, the accent for "overdue", the soft ink otherwise;
+    /// none when the snapshot has no label) and its rows.
+    @ViewBuilder private func groupView(_ group: TaskGroupPlan, rows: WidgetMetrics, link: String) -> some View {
+        if let title = group.heading {
+            DayDividerView(
+                date: title,
+                tomorrow: nil,
+                m: rows,
+                dateColor: group.isOverdue ? Color.wAccent : Color.wInkSoft
+            )
+        }
+        ForEach(group.tasks.indices, id: \.self) { index in
+            TaskRowView(
+                task: group.tasks[index],
+                fallbackLink: link,
+                leadWidth: leadWidth,
+                height: rowHeight,
+                size: size,
+                m: rows
+            )
+        }
     }
 
     /// Mockup `.sec9`: the heading in soft ink (a boundary, not a date), the hairline, and
@@ -50,7 +93,17 @@ struct TaskSectionView: View {
                     .fixedSize()
             }
             Hairline()
-            if moreCount > 0 {
+            if let count = headingCount {
+                WidgetTextView(
+                    text: count,
+                    font: .sys(size: m.s(11), weight: .medium),
+                    color: .wInkSoft,
+                    emphasisFont: .outfit(size: m.s(11), weight: .bold),
+                    emphasisColor: .wAccent
+                )
+                .lineLimit(1)
+                .fixedSize()
+            } else if moreCount > 0 {
                 Text(labels.more.replacingOccurrences(of: "{n}", with: String(moreCount)))
                     .font(.sys(size: m.s(11), weight: .medium))
                     .foregroundStyle(Color.wInkSoft)
@@ -71,29 +124,39 @@ struct TaskRowView: View {
     let height: CGFloat
     let size: WidgetSizeKey
     let m: WidgetMetrics
+    /// false on the small widget, which cannot hold `Link`s (its one target is `widgetURL`).
+    var linked: Bool = true
 
     var body: some View {
-        Link(destination: WidgetLinks.url(task.link.isEmpty ? fallbackLink : task.link, size)) {
-            HStack(spacing: 6) {
-                TaskGlyphView(kind: task.kind, m: m)
-                    .frame(width: leadWidth, alignment: .leading)
-                // Regular, not medium: the second cue (after the checkbox) that this is a task
-                // under the day and not an event in it. Event titles stay medium.
-                Text(task.title)
-                    .font(.sys(size: m.s(11), weight: .regular))
-                    .foregroundStyle(Color.wInk)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                if !task.tag.isEmpty {
-                    tag
-                }
-                if let dot = task.dot {
-                    MemberDotView(dot: dot, diameter: m.s(14), m: m)
-                }
+        if linked {
+            Link(destination: WidgetLinks.url(task.link.isEmpty ? fallbackLink : task.link, size)) {
+                row
             }
-            .frame(height: height)
+        } else {
+            row
         }
+    }
+
+    private var row: some View {
+        HStack(spacing: 6) {
+            TaskGlyphView(kind: task.kind, m: m)
+                .frame(width: leadWidth, alignment: .leading)
+            // Regular, not medium: the second cue (after the checkbox) that this is a task
+            // under the day and not an event in it. Event titles stay medium.
+            Text(task.title)
+                .font(.sys(size: m.s(11), weight: .regular))
+                .foregroundStyle(Color.wInk)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if !task.tag.isEmpty {
+                tag
+            }
+            if let dot = task.dot {
+                MemberDotView(dot: dot, diameter: m.s(14), m: m)
+            }
+        }
+        .frame(height: height)
     }
 
     /// The word carries the meaning; the colour only sorts "now" from "later". Never Alert Red.

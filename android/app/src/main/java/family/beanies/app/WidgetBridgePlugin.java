@@ -114,16 +114,22 @@ public class WidgetBridgePlugin extends Plugin {
 
     /**
      * Count placed widgets of our provider into {@code counts} by size key (`android-2x2` /
-     * `-4x2` / `-4x3`). Returns a `placements_failed;<Exception>` token on failure, else null.
+     * `-4x2` / `-4x3`), plus a nested `todos` object with the same keys counting the widgets whose
+     * SETTINGS select the To-dos layout ({@link WidgetPrefs#selectsTodosLayout}; child viewers
+     * included, since the plugin does not know the viewer). `todos` is present only when one is
+     * placed. Returns a `placements_failed;<Exception>` token on failure, else null.
      */
     private static String placements(Context context, JSObject counts) {
         try {
             AppWidgetManager manager = AppWidgetManager.getInstance(context);
             int[] ids = manager.getAppWidgetIds(new ComponentName(context, DayWidgetProvider.class));
+            JSObject todos = new JSObject();
             for (int id : ids) {
                 String key = WidgetSizes.sizeFor(manager.getAppWidgetOptions(id)).key;
                 counts.put(key, counts.optInt(key, 0) + 1);
+                if (WidgetPrefs.selectsTodosLayout(context, id)) todos.put(key, todos.optInt(key, 0) + 1);
             }
+            if (todos.length() > 0) counts.put("todos", todos);
         } catch (RuntimeException e) {
             android.util.Log.w(DayWidgetProvider.TAG, "could not count widget placements", e);
             return WidgetPrefs.failureToken("placements_failed", e);

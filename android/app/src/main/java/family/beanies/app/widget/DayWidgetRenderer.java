@@ -24,6 +24,12 @@ import java.util.List;
  * share one layout (round 9b) and differ only in how many task rows the fixed to-dos section has
  * and in the child's label at the foot of the date column.
  *
+ * TWO LAYOUTS (2026-11-11), from {@link WidgetFill.Plan#layout}: Your day, unchanged, and To-dos,
+ * where the to-dos section is added into the panel's TOP slot with group headings, its rows pinned
+ * (API 31+) to the heights the fill charged and drawn at its size step, and the footer's right side
+ * is "N more" / "all to-dos ›" to the To-Dos page. The small To-dos widget draws the count in the
+ * peek's slot and the rows under the header, and opens the To-Dos page.
+ *
  * EVERY PATH SETS EVERY VIEW IT COULD LEAVE BEHIND. The launcher re-applies a new RemoteViews
  * onto the views it already inflated when the layout id is unchanged, so a view one render showed
  * and the next render does not mention keeps its old text (signed out → unreadable once kept
@@ -88,6 +94,12 @@ final class DayWidgetRenderer {
     private static final float SMALL_PANEL_INSET_DP = 35f;
     /** Message padding 14 + 14. */
     private static final float MESSAGE_INSET_DP = 28f;
+    /** A task row's glyph sizes (widget_task_box's 10dp, the 12dp glyphs) and its 14dp member dot. */
+    private static final float TASK_BOX_DP = 10f;
+    private static final float TASK_GLYPH_DP = 12f;
+    private static final float DOT_DP = 14f;
+    /** The small To-dos rows' lead column (API 31+): the glyph and a little air, not a time's width. */
+    private static final float SMALL_TASK_LEAD_DP = 16f;
 
     private DayWidgetRenderer() {}
 
@@ -106,7 +118,8 @@ final class DayWidgetRenderer {
         }
         WidgetFill.Plan plan =
                 result.state == WidgetSnapshotStore.State.READY
-                        ? WidgetFill.plan(result.snapshot, prefs, size, heightDp, now)
+                        ? WidgetFill.plan(result.snapshot, prefs, size, heightDp, now,
+                                WidgetSizes.taskStepFactors(context, prefs, size))
                         : null;
         if (plan == null) return refresh(context, appWidgetId, size, widthDp, prefs, textScale);
 
@@ -190,7 +203,9 @@ final class DayWidgetRenderer {
 
         bindTasks(v, context, id, size, textScale, plan);
 
-        // Footer: tonight (meals block) and "later ›" (always, to the calendar on today).
+        // Footer: tonight (meals block) and "later ›" (always, to the calendar on today); in To-dos
+        // the right side is "N more" / "all to-dos ›" to the To-Dos page ("" without the label).
+        boolean todos = plan.layout == WidgetFill.Layout.TODOS;
         boolean tonight = plan.shows(WidgetFill.MEALS) && day != null && day.tonight != null
                 && !day.tonight.text.text.isEmpty();
         v.setViewVisibility(R.id.footer_tonight, tonight ? View.VISIBLE : View.INVISIBLE);
@@ -199,11 +214,12 @@ final class DayWidgetRenderer {
             WidgetViews.onClick(v, R.id.footer_tonight, context, id, WidgetViews.SLOT_TONIGHT,
                     WidgetViews.or(day.tonight.link, s.links.nook), size);
         }
-        if (WidgetViews.textOrGone(v, R.id.footer_later, s.labels.later)) {
-            WidgetViews.onClick(v, R.id.footer_later, context, id, WidgetViews.SLOT_LATER, s.links.nook, size);
+        String right = todos ? plan.todosFooterText() : s.labels.later;
+        if (WidgetViews.textOrGone(v, R.id.footer_later, right)) {
+            WidgetViews.onClick(v, R.id.footer_later, context, id, WidgetViews.SLOT_LATER,
+                    todos ? s.links.todo : s.links.nook, size);
         }
-        v.setViewVisibility(
-                R.id.panel_footer, tonight || !s.labels.later.isEmpty() ? View.VISIBLE : View.GONE);
+        v.setViewVisibility(R.id.panel_footer, tonight || !right.isEmpty() ? View.VISIBLE : View.GONE);
         return v;
     }
 
@@ -273,43 +289,119 @@ final class DayWidgetRenderer {
     }
 
     /**
-     * The fixed to-dos section between the list and the footer: the heading ("to-dos and lists",
-     * a hairline, "2 more" when not every task fits) and up to {@link WidgetFill#taskRows} rows,
-     * each a nested RemoteViews (`widget_task_row.xml`) so every row has its own dot views. GONE
-     * when no task shows; the row container is emptied on every render so no old row survives.
+     * The to-dos section (`widget_part_tasks.xml`): the heading ("to-dos and lists", a hairline,
+     * and at its right "2 more" in Your day or the due count in To-dos, whose "N more" is in the
+     * footer) and the rows. Built once per render as a nested RemoteViews and added into ONE slot:
+     * under the calendar in Your day, above it in To-dos. Both slots are emptied first on every
+     * render, so no old section survives. Your day adds nothing when no task shows; To-dos keeps
+     * the heading over the all-clear block.
      */
     private static void bindTasks(RemoteViews v, Context context, int id, WidgetSizes.Size size,
             float textScale, WidgetFill.Plan plan) {
+        v.removeAllViews(R.id.tasks_slot_top);
+        v.removeAllViews(R.id.tasks_slot_bottom);
+        boolean todos = plan.layout == WidgetFill.Layout.TODOS;
+        WidgetSnapshot.Day day = plan.day;
+        boolean show = !plan.visibleTasks.isEmpty() || (todos && day != null && !day.tasks.heading.isEmpty());
+        if (!show) return;
+
         WidgetSnapshot s = plan.snapshot;
-        List<WidgetSnapshot.Task> tasks = plan.visibleTasks;
-        v.removeAllViews(R.id.tasks_rows);
-        v.setViewVisibility(R.id.tasks, tasks.isEmpty() ? View.GONE : View.VISIBLE);
-        if (tasks.isEmpty()) return;
-
-        String sectionLink = WidgetViews.or(plan.day.tasks.link, s.links.todo);
-        WidgetViews.textOrGone(v, R.id.tasks_heading, plan.day.tasks.heading);
-        WidgetViews.textOrGone(v, R.id.tasks_more, plan.moreText());
-        WidgetViews.onClick(v, R.id.tasks_heading_row, context, id, WidgetViews.SLOT_TASKS_HEADING,
+        RemoteViews section = new RemoteViews(context.getPackageName(), R.layout.widget_part_tasks);
+        WidgetViews.textSize(section, context, textScale, R.dimen.widget_text_body,
+                R.id.tasks_heading, R.id.tasks_more);
+        String sectionLink = WidgetViews.or(day.tasks.link, s.links.todo);
+        WidgetViews.textOrGone(section, R.id.tasks_heading, day.tasks.heading);
+        WidgetViews.textOrGone(section, R.id.tasks_more,
+                todos ? WidgetText.emphasised(day.tasks.countText) : plan.moreText());
+        WidgetViews.onClick(section, R.id.tasks_heading_row, context, id, WidgetViews.SLOT_TASKS_HEADING,
                 sectionLink, size);
+        addTaskRows(section, context, id, size, textScale, plan, sectionLink, true);
+        v.addView(todos ? R.id.tasks_slot_top : R.id.tasks_slot_bottom, section);
+    }
 
+    /**
+     * The task rows into {@code target}'s `tasks_rows` (the section's, or the small widget's):
+     * each a nested RemoteViews (`widget_task_row.xml`) so every row has its own dot views and,
+     * when {@code rowClicks}, its own tap slot. In To-dos each group with a label is led by its
+     * heading, and on API 31+ every row and heading is pinned to the height the fill charged
+     * ({@link WidgetFill#ROW_DP} / {@link WidgetFill#GROUP_HEADING_DP} × the step) in real dp:
+     * the fill's dp are text-scaled (`WidgetSizes.layoutHeightDp` divides by max(1, scale)).
+     */
+    private static void addTaskRows(RemoteViews target, Context context, int id, WidgetSizes.Size size,
+            float textScale, WidgetFill.Plan plan, String sectionLink, boolean rowClicks) {
+        boolean todos = plan.layout == WidgetFill.Layout.TODOS;
+        float step = plan.taskStep;
+        float realDp = Math.max(1f, WidgetSizes.effectiveScale(context, textScale));
         float leadDp = WidgetViews.leadColumnDp(context, plan, textScale);
-        for (int i = 0; i < tasks.size(); i++) {
-            WidgetSnapshot.Task task = tasks.get(i);
-            RemoteViews row = new RemoteViews(context.getPackageName(), R.layout.widget_task_row);
-            WidgetViews.textSize(row, context, textScale, R.dimen.widget_text_body,
-                    R.id.task_title, R.id.task_tag);
-            row.setImageViewResource(R.id.task_glyph, taskGlyph(task));
-            WidgetViews.leadWidth(row, R.id.task_lead, leadDp);
-            row.setTextViewText(R.id.task_title, task.title);
-            if (WidgetViews.textOrGone(row, R.id.task_tag, task.tag)) {
-                WidgetViews.textColorRes(row, context, R.id.task_tag,
-                        task.tagAccent ? R.color.widget_accent_text : R.color.widget_ink_soft);
+        int slot = 0;
+        if (!todos) {
+            for (WidgetSnapshot.Task task : plan.visibleTasks) {
+                target.addView(R.id.tasks_rows, taskRow(context, id, size, textScale, task, slot++,
+                        sectionLink, leadDp, rowClicks));
             }
-            WidgetViews.bindDot(row, task.dot, false);
-            WidgetViews.onClick(row, R.id.task_root, context, id, WidgetViews.SLOT_TASK + i,
-                    WidgetViews.or(task.link, sectionLink), size);
-            v.addView(R.id.tasks_rows, row);
+            return;
         }
+        for (WidgetFill.TaskGroup group : plan.taskGroups) {
+            if (!group.label.isEmpty()) {
+                RemoteViews heading = WidgetViews.heading(context, textScale * step, group.label,
+                        group.isAccent() ? R.color.widget_accent_text : R.color.widget_ink_soft, "");
+                WidgetViews.pinHeight(heading, R.id.divider_root, WidgetFill.GROUP_HEADING_DP * step * realDp);
+                target.addView(R.id.tasks_rows, heading);
+            }
+            for (WidgetSnapshot.Task task : group.tasks) {
+                RemoteViews row = taskRow(context, id, size, textScale * step, task, slot++,
+                        sectionLink, leadDp, rowClicks);
+                WidgetViews.pinHeight(row, R.id.task_root, WidgetFill.ROW_DP * step * realDp);
+                if (size == WidgetSizes.Size.SMALL) {
+                    WidgetViews.pinWidth(row, R.id.task_lead, SMALL_TASK_LEAD_DP);
+                }
+                if (step > 1f && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    stepGlyphAndDot(row, task, step);
+                }
+                target.addView(R.id.tasks_rows, row);
+            }
+        }
+    }
+
+    /**
+     * One task row at {@code textScale} (the widget's, × the To-dos step when stepping). A tap
+     * opens the task ({@code rowClicks}); the small widget passes false, so its rows fall through
+     * to the whole-widget tap (the To-Dos page), as on iOS.
+     */
+    private static RemoteViews taskRow(Context context, int id, WidgetSizes.Size size, float textScale,
+            WidgetSnapshot.Task task, int index, String sectionLink, float leadDp, boolean rowClicks) {
+        RemoteViews row = new RemoteViews(context.getPackageName(), R.layout.widget_task_row);
+        WidgetViews.textSize(row, context, textScale, R.dimen.widget_text_body,
+                R.id.task_title, R.id.task_tag);
+        row.setImageViewResource(R.id.task_glyph, taskGlyph(task));
+        WidgetViews.leadWidth(row, R.id.task_lead, leadDp);
+        row.setTextViewText(R.id.task_title, task.title);
+        if (WidgetViews.textOrGone(row, R.id.task_tag, task.tag)) {
+            WidgetViews.textColorRes(row, context, R.id.task_tag,
+                    task.tagAccent ? R.color.widget_accent_text : R.color.widget_ink_soft);
+        }
+        WidgetViews.bindDot(row, task.dot, false);
+        if (rowClicks) {
+            WidgetViews.onClick(row, R.id.task_root, context, id, WidgetViews.SLOT_TASK + index,
+                    WidgetViews.or(task.link, sectionLink), size);
+        }
+        return row;
+    }
+
+    /**
+     * API 31+, a stepped To-dos row: the glyph and the member dot grow with the text. The glyph
+     * moves to its fitCenter copy (centerInside never scales up) at its own size × the step.
+     */
+    @RequiresApi(Build.VERSION_CODES.S)
+    private static void stepGlyphAndDot(RemoteViews row, WidgetSnapshot.Task task, float step) {
+        int glyph = taskGlyph(task);
+        row.setViewVisibility(R.id.task_glyph, View.GONE);
+        row.setViewVisibility(R.id.task_glyph_step, View.VISIBLE);
+        row.setImageViewResource(R.id.task_glyph_step, glyph);
+        WidgetViews.pinSize(row, R.id.task_glyph_step,
+                (glyph == R.drawable.widget_task_box ? TASK_BOX_DP : TASK_GLYPH_DP) * step);
+        WidgetViews.pinSize(row, R.id.dot_frame, DOT_DP * step);
+        WidgetViews.bindDot(row, task.dot, false, step);
     }
 
     /** A to-do's checkbox, a hint's bean, a list's checklist mark (the time is in the tag). */
@@ -327,35 +419,40 @@ final class DayWidgetRenderer {
         WidgetSizes.Size size = WidgetSizes.Size.SMALL;
         WidgetSnapshot s = plan.snapshot;
         RemoteViews v = new RemoteViews(context.getPackageName(), size.layout);
+        // To-dos: the due count takes the peek's slot and the whole widget opens the To-Dos page.
+        boolean todos = plan.layout == WidgetFill.Layout.TODOS;
         // The weather takes the peek's slot only while a current temperature exists (#134).
         WidgetWeather.Shown weather = WidgetWeather.at(s.weather, now);
-        WidgetWeather.Shown slot = weather != null && weather.hasCurrent() ? weather : null;
+        WidgetWeather.Shown slot = !todos && weather != null && weather.hasCurrent() ? weather : null;
         float headerScale = smallHeaderScale(context, widthDp, textScale, plan, slot);
         sizeSmallText(v, context, textScale, headerScale);
-        frame(v, context, id, size, prefs.opacity, s.links.nook);
+        String link = todos ? s.links.todo : s.links.nook;
+        frame(v, context, id, size, prefs.opacity, link);
         dateTile(v, prefs.opacity);
 
         WidgetTextBitmaps.bind(v, context, R.id.date_weekday, plan.entry.weekdayShort, SMALL_WEEKDAY,
                 headerScale, 0, R.color.widget_accent_text);
         WidgetTextBitmaps.bind(v, context, R.id.date_numeral, plan.entry.numeral, SMALL_NUMERAL,
                 headerScale, 0, R.color.widget_ink);
-        WidgetViews.onClick(v, R.id.date_column, context, id, WidgetViews.SLOT_DATE, s.links.nook, size);
-        WidgetViews.bindPeek(v, plan, slot != null);
+        WidgetViews.onClick(v, R.id.date_column, context, id, WidgetViews.SLOT_DATE, link, size);
+        WidgetViews.bindPeek(v, plan, slot != null || todos);
         bindSmallWeather(v, context, headerScale, slot);
         WidgetViews.textOrGone(v, R.id.date_as_of, asOf(context, plan));
 
         WidgetSnapshot.Day day = plan.day;
-        // A clear week: the relaxed block replaces only the panel's content (the small has no
-        // to-dos section, so tasks never hold it back: its visibleTasks is always empty).
+        // A clear week: the relaxed block replaces only the panel's content (Your day's small has
+        // no to-dos section, so tasks never hold it back: its visibleTasks is always empty). In
+        // To-dos it is the all-clear state: no task at all.
         float panelDp = widthDp - SMALL_PANEL_INSET_DP;
         boolean relaxed = bindRelaxed(v, context, plan, textScale, panelDp);
-        boolean events = !relaxed && plan.shows(WidgetFill.EVENTS) && day != null;
+        bindSmallTasks(v, context, id, textScale, plan, todos);
+        boolean events = !todos && !relaxed && plan.shows(WidgetFill.EVENTS) && day != null;
         WidgetTextBitmaps.bind(v, context, R.id.small_things, events ? day.thingsText : "",
                 CAVEAT_LINE, textScale, panelDp, R.color.widget_accent_text);
 
         // Next: the shared search (WidgetFill.Plan#next, the same rule as iOS), named with its
         // day when it falls on a later one ("next · Wed 15").
-        WidgetFill.Next found = relaxed ? null : plan.next(now);
+        WidgetFill.Next found = relaxed || todos ? null : plan.next(now);
         WidgetSnapshot.Row next = found == null ? null : found.row;
         String label = s.labels.next;
         if (found != null && found.later != null && !found.later.entry.dividerDate.isEmpty()) {
@@ -384,6 +481,26 @@ final class DayWidgetRenderer {
     }
 
     /**
+     * The small widget's To-dos parts, set on every path: the due count in the peek's slot, the
+     * rows under the header (no headings, no per-row tap) and "N more" at the foot. Your day
+     * hides all three, so its small lays out as before.
+     */
+    private static void bindSmallTasks(RemoteViews v, Context context, int id, float textScale,
+            WidgetFill.Plan plan, boolean todos) {
+        v.removeAllViews(R.id.tasks_rows);
+        boolean rows = todos && !plan.visibleTasks.isEmpty();
+        v.setViewVisibility(R.id.tasks_rows, rows ? View.VISIBLE : View.GONE);
+        WidgetSnapshot.Day day = plan.day;
+        WidgetViews.textOrGone(v, R.id.small_count,
+                todos && day != null ? WidgetText.emphasised(day.tasks.countText) : "");
+        WidgetViews.textOrGone(v, R.id.small_more, rows ? plan.moreText() : "");
+        if (rows) {
+            addTaskRows(v, context, id, WidgetSizes.Size.SMALL, textScale, plan,
+                    WidgetViews.or(day.tasks.link, plan.snapshot.links.todo), false);
+        }
+    }
+
+    /**
      * The small header's weather in the peek's slot: glyph + temperature at the header's scale
      * (so a narrow 2x2 shrinks them together), soft ink while the reading shows its age; GONE
      * when {@code slot} is null and the peek is back. No range or age line: the 2x2 has no room.
@@ -402,7 +519,8 @@ final class DayWidgetRenderer {
     // ---- message states ------------------------------------------------------------------
 
     /**
-     * Show the relaxed block ("nothing on today," in Caveat over "enjoy", the hug at the panel's
+     * Show the relaxed block ("nothing on today," in Caveat over "enjoy", or "all clear," in the
+     * To-dos layout ({@link WidgetFill.Plan#relaxedTitle}), the hug at the panel's
      * bottom right; `widget_part_relaxed.xml`) when {@link WidgetFill.Plan#isRelaxed}. Returns
      * whether it is shown; the caller hides the panel content it replaces. Its "enjoy" line is
      * sized by the caller's sizing helper.
@@ -412,7 +530,7 @@ final class DayWidgetRenderer {
         boolean relaxed = plan.isRelaxed();
         v.setViewVisibility(R.id.relaxed, relaxed ? View.VISIBLE : View.GONE);
         if (relaxed) {
-            WidgetTextBitmaps.bind(v, context, R.id.relaxed_title, plan.snapshot.labels.nothingOnToday,
+            WidgetTextBitmaps.bind(v, context, R.id.relaxed_title, plan.relaxedTitle(),
                     CAVEAT_LINE, textScale, panelDp, R.color.widget_accent_text);
             WidgetViews.textOrGone(v, R.id.relaxed_enjoy, plan.snapshot.labels.enjoy);
         }
@@ -449,12 +567,15 @@ final class DayWidgetRenderer {
 
     // ---- text sizes (one helper per layout, called first) -----------------------------------
 
-    /** Medium + large: the date column, the to-dos heading, the footer and the relaxed line. */
+    /**
+     * Medium + large: the date column, the footer and the relaxed line. The to-dos section is a
+     * nested RemoteViews sized where it is built ({@link #bindTasks}).
+     */
     private static void sizeAgendaText(
             RemoteViews v, Context context, float textScale, WidgetSnapshot.DayEntry entry) {
         WidgetViews.textSize(v, context, textScale, R.dimen.widget_text_body,
                 R.id.date_weather_sub, R.id.date_as_of, R.id.date_audience, R.id.date_due,
-                R.id.tasks_heading, R.id.tasks_more, R.id.footer_tonight, R.id.footer_later);
+                R.id.footer_tonight, R.id.footer_later);
         WidgetViews.textSize(v, context, textScale, R.dimen.widget_text_relaxed, R.id.relaxed_enjoy);
         // The weekday and month fill the fixed 52dp column: a short name grows with the choice, a
         // long one ("Wednesday", "September") shrinks to fit, never below DATE_COLUMN_MIN_SP.
@@ -502,7 +623,7 @@ final class DayWidgetRenderer {
      */
     private static void sizeSmallText(RemoteViews v, Context context, float textScale, float headerScale) {
         WidgetViews.textSize(v, context, textScale, R.dimen.widget_text_body,
-                R.id.small_next_label, R.id.date_as_of);
+                R.id.small_next_label, R.id.date_as_of, R.id.small_count, R.id.small_more);
         WidgetViews.textSize(v, context, textScale, R.dimen.widget_text_small_title, R.id.small_next_title);
         WidgetViews.textSize(v, context, textScale, R.dimen.widget_text_small_time, R.id.small_next_time);
         WidgetViews.textSize(v, context, textScale, R.dimen.widget_text_relaxed, R.id.relaxed_enjoy);
@@ -520,6 +641,8 @@ final class DayWidgetRenderer {
             v.setViewLayoutHeight(R.id.date_column, grown, TypedValue.COMPLEX_UNIT_DIP);
             // The weather in the peek's slot is the header row's height, so it stays level with it.
             v.setViewLayoutHeight(R.id.small_weather, grown, TypedValue.COMPLEX_UNIT_DIP);
+            // The To-dos due count holds the same slot.
+            v.setViewLayoutHeight(R.id.small_count, grown, TypedValue.COMPLEX_UNIT_DIP);
             float peekTop = WidgetViews.dp(context, R.dimen.widget_small_peek_top) + grown - header;
             v.setViewLayoutMargin(R.id.peek_family, RemoteViews.MARGIN_TOP, peekTop, TypedValue.COMPLEX_UNIT_DIP);
             v.setViewLayoutMargin(R.id.peek_avatar, RemoteViews.MARGIN_TOP, peekTop, TypedValue.COMPLEX_UNIT_DIP);

@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The to-dos section of the medium and large widgets (#130; moved out of widget_part_panel.xml on
+  2026-11-11): the heading row ("to-dos and lists", a hairline, and at its right "2 more" in Your
+  day or the due count in To-dos), then the rows, each a nested RemoteViews (widget_task_row.xml;
+  in To-dos the group headings are widget_day_divider.xml). DayWidgetRenderer builds this ONCE per
+  render as a nested RemoteViews and adds it into one of the panel's two empty slots:
+  `tasks_slot_bottom` (Your day, under the calendar) or `tasks_slot_top` (To-dos, above it).
+  Never added when nothing shows, so nothing of an earlier render survives.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/tasks"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="2dp"
+    android:orientation="vertical">
+
+    <LinearLayout
+        android:id="@+id/tasks_heading_row"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:minHeight="15dp"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/tasks_heading"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="sans-serif-medium"
+            android:singleLine="true"
+            android:textColor="@color/widget_ink_soft"
+            android:textSize="@dimen/widget_text_body" />
+
+        <FrameLayout
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_marginStart="5dp"
+            android:layout_weight="1"
+            android:background="@drawable/widget_hairline" />
+
+        <TextView
+            android:id="@+id/tasks_more"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="5dp"
+            android:singleLine="true"
+            android:textColor="@color/widget_ink_soft"
+            android:textSize="@dimen/widget_text_body"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/tasks_rows"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical" />
+</LinearLayout>

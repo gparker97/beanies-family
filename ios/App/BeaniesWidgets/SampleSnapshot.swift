@@ -137,6 +137,13 @@ enum SampleSnapshot {
         labels.circleAllDone = "all done"
         labels.circleAllClear = "all clear"
         labels.circleToDo = "to do"
+        // The To-dos focus, so a gallery preview set to To-dos draws its group headings.
+        labels.groupOverdue = "overdue"
+        labels.groupToday = "due today"
+        labels.groupComingUp = "coming up"
+        labels.allTodos = "all to-dos ›"
+        labels.todosAllClear = "all clear,"
+        labels.eventsHeading = "next up"
 
         return WSSnapshot(
             version: WidgetSnapshotStore.supportedVersions.upperBound,

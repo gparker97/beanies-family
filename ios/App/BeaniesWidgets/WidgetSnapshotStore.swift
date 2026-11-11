@@ -210,6 +210,18 @@ struct WSLabels {
     var circleAllDone: String? = nil
     var circleAllClear: String? = nil
     var circleToDo: String? = nil
+    // The To-dos focus (optional at v4, no version bump), no English default either: nil means
+    // a snapshot written before the labels, and the To-dos layout then draws no heading there.
+    /// The group headings: "overdue", "due today", "coming up" (undated and later).
+    var groupOverdue: String? = nil
+    var groupToday: String? = nil
+    var groupComingUp: String? = nil
+    /// "all to-dos ›": the footer's link to the To-Dos page when every to-do fits.
+    var allTodos: String? = nil
+    /// "all clear,": the empty To-dos layout's title, over `enjoy`.
+    var todosAllClear: String? = nil
+    /// "next up": the heading over today's events under the to-dos.
+    var eventsHeading: String? = nil
 }
 
 struct WSLinks {
@@ -539,6 +551,7 @@ extension WSLabels: Decodable {
     private enum CodingKeys: String, CodingKey {
         case asOf, later, next, tomorrow, more, nothingToday, childsDay
         case nothingOnToday, enjoy, weatherAsOf, circleLeft, circleAllDone, circleAllClear, circleToDo
+        case groupOverdue, groupToday, groupComingUp, allTodos, todosAllClear, eventsHeading
     }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -557,6 +570,12 @@ extension WSLabels: Decodable {
         circleAllDone = c.opt(String.self, .circleAllDone)
         circleAllClear = c.opt(String.self, .circleAllClear)
         circleToDo = c.opt(String.self, .circleToDo)
+        groupOverdue = c.opt(String.self, .groupOverdue)
+        groupToday = c.opt(String.self, .groupToday)
+        groupComingUp = c.opt(String.self, .groupComingUp)
+        allTodos = c.opt(String.self, .allTodos)
+        todosAllClear = c.opt(String.self, .todosAllClear)
+        eventsHeading = c.opt(String.self, .eventsHeading)
     }
 }
 

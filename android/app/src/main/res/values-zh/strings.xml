@@ -7,6 +7,12 @@
     <string name="widget_sign_in_to_see">登录后查看你的一天</string>
     <string name="widget_refresh">打开 beanies 以刷新</string>
     <string name="widget_config_title">“你的一天”小组件</string>
+    <string name="widget_config_focus">重点</string>
+    <string name="widget_config_focus_day">你的一天</string>
+    <string name="widget_config_focus_todos">待办</string>
+    <string name="widget_config_also_show">同时显示</string>
+    <string name="widget_config_todos_events">即将到来的活动</string>
+    <string name="widget_config_todos_meals">今晚的餐食</string>
     <string name="widget_config_show">显示内容</string>
     <string name="widget_config_events">活动</string>
     <string name="widget_config_whos_where">谁在哪里</string>
@@ -16,6 +22,7 @@
     <string name="widget_config_hint">贴心提示</string>
     <string name="widget_config_background">背景</string>
     <string name="widget_config_text_size">文字大小</string>
+    <string name="widget_config_text_auto">自动</string>
     <string name="widget_config_text_standard">标准</string>
     <string name="widget_config_text_large">大</string>
     <string name="widget_config_text_larger">更大</string>

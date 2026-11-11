@@ -66,6 +66,12 @@ struct WidgetMetrics {
     /// (android/.../widget/WidgetSizes.java); change both.
     static let maxScale: CGFloat = 1.3
 
+    /// The ceiling on the To-dos focus's Automatic steps (`WidgetFill.taskStepFactors`), in the
+    /// same clamp shape as `maxScale`. Its own ceiling because the fit check covers height, not
+    /// title width: the steps must not compound with accessibility text (1.3 x 1.6 would be
+    /// 2.08). Mirrors Android `WidgetSizes.TASK_STEP_MAX`; change both.
+    static let taskStepMax: CGFloat = 1.6
+
     /// The absolute effective scale every design size multiplies by.
     let scale: CGFloat
 
@@ -81,6 +87,17 @@ struct WidgetMetrics {
         }
         // Bigger up to the ceiling, never smaller, never past what Dynamic Type alone does.
         scale = max(system, min(system * textSize.factor, Self.maxScale))
+    }
+
+    private init(scale: CGFloat) {
+        self.scale = scale
+    }
+
+    /// These metrics at an Automatic step (`FillPlan.taskStep`): bigger, never smaller, never
+    /// past `taskStepMax`. The To-dos rows and group headings are drawn with it; everything
+    /// else in the widget keeps `self`. A step of 1 returns the same scale.
+    func stepped(_ factor: CGFloat) -> WidgetMetrics {
+        WidgetMetrics(scale: max(scale, min(scale * factor, Self.taskStepMax)))
     }
 
     /// A design size in points, scaled.

@@ -20,8 +20,9 @@ import androidx.core.view.WindowInsetsControllerCompat;
 import family.beanies.app.R;
 
 /**
- * The widget's configuration screen (#130): the six blocks, background opacity and
- * text size. Shown by the launcher when a widget is placed (optional on Android 12+) and from
+ * The widget's configuration screen (#130): the Focus (2026-11-11), then Your day's six blocks or
+ * the To-dos extras (one block shown per focus, each keeping its own values, all saved), the
+ * background opacity and the text size. Shown by the launcher when a widget is placed (optional on Android 12+) and from
  * "reconfigure".
  *
  * EXPORTED, SO THE ID IS UNTRUSTED. The launcher must be able to start this activity, which means
@@ -48,11 +49,6 @@ public class DayWidgetConfigActivity extends AppCompatActivity {
         R.id.config_opacity_100, R.id.config_opacity_70, R.id.config_opacity_40,
     };
 
-    /** Radio ids in {@link WidgetPrefs.TextSize} declaration order. */
-    private static final int[] TEXT_SIZE_IDS = {
-        R.id.config_text_standard, R.id.config_text_large, R.id.config_text_larger,
-    };
-
     private int appWidgetId = AppWidgetManager.INVALID_APPWIDGET_ID;
 
     @Override
@@ -70,6 +66,8 @@ public class DayWidgetConfigActivity extends AppCompatActivity {
         setContentView(R.layout.widget_config_activity);
         applySystemBars();
         bind(WidgetPrefs.load(this, appWidgetId));
+        ((RadioGroup) findViewById(R.id.config_focus)).setOnCheckedChangeListener(
+                (group, checkedId) -> showFocusBlock(focusFor(checkedId)));
         findViewById(R.id.config_done).setOnClickListener(v -> save());
     }
 
@@ -119,7 +117,25 @@ public class DayWidgetConfigActivity extends AppCompatActivity {
             ((RadioButton) findViewById(OPACITY_IDS[i]))
                     .setChecked(WidgetPrefs.OPACITIES[i] == prefs.opacity);
         }
-        ((RadioGroup) findViewById(R.id.config_text_size)).check(TEXT_SIZE_IDS[prefs.textSize.ordinal()]);
+        ((RadioGroup) findViewById(R.id.config_text_size)).check(WidgetConfigIds.idOf(
+                WidgetConfigIds.TEXT_SIZES, WidgetConfigIds.TEXT_SIZE_IDS, prefs.textSize));
+        ((CheckBox) findViewById(R.id.config_todos_events)).setChecked(prefs.todosEvents);
+        ((CheckBox) findViewById(R.id.config_todos_meals)).setChecked(prefs.todosMeals);
+        ((RadioGroup) findViewById(R.id.config_focus)).check(WidgetConfigIds.idOf(
+                WidgetConfigIds.FOCUSES, WidgetConfigIds.FOCUS_IDS, prefs.focus));
+        showFocusBlock(prefs.focus);
+    }
+
+    private static WidgetPrefs.Focus focusFor(int checkedId) {
+        return WidgetConfigIds.valueOf(
+                WidgetConfigIds.FOCUSES, WidgetConfigIds.FOCUS_IDS, checkedId, WidgetPrefs.Focus.DEFAULT);
+    }
+
+    /** Your day's "Show" block for Your day, the "Also show" extras for To-dos. */
+    private void showFocusBlock(WidgetPrefs.Focus focus) {
+        boolean todos = focus == WidgetPrefs.Focus.TODOS;
+        findViewById(R.id.config_show_block).setVisibility(todos ? View.GONE : View.VISIBLE);
+        findViewById(R.id.config_also_block).setVisibility(todos ? View.VISIBLE : View.GONE);
     }
 
     private static int indexOf(int[] values, int value) {
@@ -148,9 +164,17 @@ public class DayWidgetConfigActivity extends AppCompatActivity {
         }
         int opacity = WidgetPrefs.OPACITIES[
                 checkedIndex(R.id.config_opacity, OPACITY_IDS, indexOf(WidgetPrefs.OPACITIES, WidgetPrefs.DEFAULT_OPACITY))];
-        WidgetPrefs.TextSize textSize =
-                WidgetPrefs.TextSize.values()[checkedIndex(R.id.config_text_size, TEXT_SIZE_IDS, 0)];
-        new WidgetPrefs(blocks, opacity, textSize).save(this, appWidgetId);
+        WidgetPrefs.TextSize textSize = WidgetConfigIds.valueOf(
+                WidgetConfigIds.TEXT_SIZES, WidgetConfigIds.TEXT_SIZE_IDS,
+                ((RadioGroup) findViewById(R.id.config_text_size)).getCheckedRadioButtonId(),
+                WidgetPrefs.TextSize.DEFAULT);
+        WidgetPrefs.Focus focus =
+                focusFor(((RadioGroup) findViewById(R.id.config_focus)).getCheckedRadioButtonId());
+        // Every value is saved, the hidden block's too: each focus keeps its own switches.
+        new WidgetPrefs(blocks, opacity, textSize, focus,
+                ((CheckBox) findViewById(R.id.config_todos_events)).isChecked(),
+                ((CheckBox) findViewById(R.id.config_todos_meals)).isChecked())
+                .save(this, appWidgetId);
 
         try {
             DayWidgetProvider.renderAll(this);

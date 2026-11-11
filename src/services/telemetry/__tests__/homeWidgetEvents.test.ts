@@ -9,6 +9,7 @@ import {
   emitReadOutcome,
   emitSnapshotPublished,
   isReadOutcomeToken,
+  splitPlacements,
 } from '../homeWidgetEvents';
 
 /**
@@ -22,6 +23,7 @@ describe('homeWidgetEvents: read outcome grammar', () => {
     'read_failed',
     'read_failed;no_container',
     'render_failed',
+    'render_failed;IllegalStateException',
     'decode_failed;v=0',
     'decode_failed;v=12',
     'decode_failed;v=unknown',
@@ -122,5 +124,50 @@ describe('homeWidgetEvents: v3 tokens', () => {
       { kind: 'ios-accessory', count: 2, detail: 'circle=nextUp:1,handoff:0,todos:0,left:1' },
       { kind: 'ios-accessory', count: 1 },
     ]);
+  });
+});
+
+describe('homeWidgetEvents: To-dos focus placements', () => {
+  beforeEach(() => logEvent.mockReset());
+
+  const contexts = () =>
+    logEvent.mock.calls.map((c) => (c[0] as { context: Record<string, unknown> }).context);
+
+  it('splitPlacements picks sizes by membership and never reports todos or circle as a size', () => {
+    const { sizes, circle, todos } = splitPlacements({
+      'android-4x2': 2,
+      'ios-accessory': 1,
+      circle: { nextUp: 1 },
+      todos: { 'android-4x2': 1 },
+      mystery: 5,
+    } as never);
+    expect(sizes).toEqual({ 'android-4x2': 2, 'ios-accessory': 1 });
+    expect(circle).toEqual({ nextUp: 1 });
+    expect(todos).toEqual({ 'android-4x2': 1 });
+    expect(splitPlacements(undefined)).toEqual({ sizes: {}, circle: undefined, todos: {} });
+  });
+
+  it('adds todos=<n> to the size it counts, after any circle token, and never as its own event', () => {
+    emitPlacements({
+      'android-4x2': 2,
+      'android-2x2': 1,
+      todos: { 'android-4x2': 1, 'android-4x3': 3 },
+    });
+    expect(contexts()).toEqual([
+      { kind: 'android-2x2', count: 1 },
+      { kind: 'android-4x2', count: 2, detail: 'todos=1' },
+    ]);
+  });
+
+  it('routes render_failed;<Cause> to snapshot_unreadable and keeps the bare token', () => {
+    emitReadOutcome('render_failed;IllegalStateException|render_failed|render_failed;bad cause!');
+    const ctx = contexts();
+    expect(ctx[0]).toMatchObject({
+      error_code: 'snapshot_unreadable',
+      detail: 'render_failed;IllegalStateException',
+    });
+    expect(ctx[1]).toMatchObject({ error_code: 'snapshot_unreadable', detail: 'render_failed' });
+    expect(ctx[2]).toMatchObject({ error_code: 'snapshot_unreadable', detail: 'unrecognised' });
+    expect(isReadOutcomeToken('render_failed;')).toBe(false);
   });
 });

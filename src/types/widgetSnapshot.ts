@@ -37,7 +37,10 @@ import type { WeatherGlyph } from './weather';
  * `WidgetDay.ownThingsText` so the lock screen can keep to the viewer's own day (it reads `my`
  * from an older snapshot); the home screen reads `view ?? our ?? my` so a
  * snapshot stored before the update still paints (remove that fallback, and the v3 fixture,
- * when 3 leaves the readable versions). Swift `supportedVersions = 2...4`, Java
+ * when 3 leaves the readable versions). The To-dos focus labels (`labels.groupOverdue`,
+ * `groupToday`, `groupComingUp`, `allTodos`, `todosAllClear`, `eventsHeading`, 2026-11-11) are
+ * additive optional labels at v4 with no version bump: readers ignore unknown keys and
+ * tolerate missing ones. Swift `supportedVersions = 2...4`, Java
  * `MIN_VERSION = 2`, `MAX_VERSION = 4`.
  */
 export const WIDGET_SNAPSHOT_VERSION = 4 as const;
@@ -411,6 +414,22 @@ export interface WidgetLabels {
   circleAllClear?: string;
   /** v3, the circle: "to do" ("4 to do", To-dos left). */
   circleToDo?: string;
+  /**
+   * To-dos focus (2026-11): additive optional labels at v4, no version bump. Readers ignore
+   * unknown keys and tolerate a missing one (no heading is drawn).
+   * "overdue", the To-dos layout's first group heading.
+   */
+  groupOverdue?: string;
+  /** "due today", the second group heading. */
+  groupToday?: string;
+  /** "coming up", the third group heading (undated and later to-dos). */
+  groupComingUp?: string;
+  /** "all to-dos ›", the footer link to the To-Dos page when every to-do fits. */
+  allTodos?: string;
+  /** "all clear,", the To-dos layout's empty-state title (over `enjoy`). */
+  todosAllClear?: string;
+  /** "next up", the heading above the optional upcoming-events extra. */
+  eventsHeading?: string;
 }
 
 /** How many home-zone days `WidgetWeather.days` carries: today and the four after it. */

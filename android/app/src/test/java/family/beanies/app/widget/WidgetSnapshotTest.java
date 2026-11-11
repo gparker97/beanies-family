@@ -7,10 +7,9 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.junit.Test;
@@ -22,8 +21,6 @@ import org.junit.Test;
  * follow fails here.
  */
 public class WidgetSnapshotTest {
-
-    private static final String FIXTURES = "src/utils/__tests__/fixtures/";
 
     @Test
     public void readsVersionsTwoToFourOnly() {
@@ -154,6 +151,47 @@ public class WidgetSnapshotTest {
     }
 
     @Test
+    public void theV4FixtureCarriesTaskBucketsInGroupOrder() throws Exception {
+        WidgetSnapshot.Day today = WidgetSnapshot.from(fixture("widget-snapshot.v4.json")).days.get(0).day();
+        List<String> buckets = new ArrayList<>();
+        for (WidgetSnapshot.Task task : today.tasks.items) buckets.add(task.bucket);
+        assertEquals(Arrays.asList("overdue", "today", "today", "today", "later", "later"), buckets);
+    }
+
+    @Test
+    public void aTaskWithNoBucketReadsEmpty() throws Exception {
+        JSONObject root = fixture("widget-snapshot.v4.json");
+        root.getJSONArray("days").getJSONObject(0).getJSONObject("view").getJSONObject("tasks")
+                .getJSONArray("items").getJSONObject(0).remove("bucket");
+        assertEquals("", WidgetSnapshot.from(root).days.get(0).day().tasks.items.get(0).bucket);
+    }
+
+    @Test
+    public void olderSnapshotsCarryNoToDosLabels() throws Exception {
+        for (String name : new String[] {"widget-snapshot.v2.json", "widget-snapshot.v3.json"}) {
+            WidgetSnapshot.Labels l = WidgetSnapshot.from(fixture(name)).labels;
+            assertEquals(name, "", l.groupOverdue);
+            assertEquals(name, "", l.groupToday);
+            assertEquals(name, "", l.groupComingUp);
+            assertEquals(name, "", l.allTodos);
+            assertEquals(name, "", l.todosAllClear);
+            assertEquals(name, "", l.eventsHeading);
+        }
+    }
+
+    @Test
+    public void theV4FixtureCarriesTheToDosLabels() throws Exception {
+        // Written by the TypeScript builder (2026-11-11): optional at v4, no version bump.
+        WidgetSnapshot.Labels l = WidgetSnapshot.from(fixture("widget-snapshot.v4.json")).labels;
+        assertEquals("overdue", l.groupOverdue);
+        assertEquals("due today", l.groupToday);
+        assertEquals("coming up", l.groupComingUp);
+        assertEquals("all to-dos ›", l.allTodos);
+        assertEquals("all clear,", l.todosAllClear);
+        assertEquals("next up", l.eventsHeading);
+    }
+
+    @Test
     public void aV4ViewWinsOverALeftoverV3Pair() throws Exception {
         JSONObject root = fixture("widget-snapshot.v3.json");
         JSONObject entry = root.getJSONArray("days").getJSONObject(0);
@@ -258,16 +296,7 @@ public class WidgetSnapshotTest {
         }
     }
 
-    /** A committed fixture, found by walking up from the test's working directory (android/app). */
     private static JSONObject fixture(String name) throws Exception {
-        File dir = new File(System.getProperty("user.dir")).getAbsoluteFile();
-        while (dir != null) {
-            File f = new File(dir, FIXTURES + name);
-            if (f.isFile()) {
-                return new JSONObject(new String(Files.readAllBytes(f.toPath()), StandardCharsets.UTF_8));
-            }
-            dir = dir.getParentFile();
-        }
-        throw new IOException("fixture not found above " + System.getProperty("user.dir") + ": " + name);
+        return WidgetFixtures.fixture(name);
     }
 }

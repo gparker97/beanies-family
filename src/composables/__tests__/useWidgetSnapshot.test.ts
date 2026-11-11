@@ -443,6 +443,23 @@ describe('publishWidgetSnapshot: failures and relayed native state', () => {
     ]);
   });
 
+  it('logs placements again when only the To-dos-focus count changes', async () => {
+    plugin.publish.mockResolvedValue({
+      placements: { 'android-4x2': 2, todos: { 'android-4x2': 1 } },
+    });
+    await publishWidgetSnapshot(widgetInput(), 'data-change', now);
+    await publishWidgetSnapshot(widgetInput(), 'data-change', now);
+    plugin.publish.mockResolvedValue({
+      placements: { 'android-4x2': 2, todos: { 'android-4x2': 2 } },
+    });
+    await publishWidgetSnapshot(widgetInput(), 'data-change', now);
+
+    expect(events('placements')).toEqual([
+      { kind: 'android-4x2', count: 2, detail: 'todos=1' },
+      { kind: 'android-4x2', count: 2, detail: 'todos=2' },
+    ]);
+  });
+
   it('logs placements once, then only when the set changes', async () => {
     plugin.publish.mockResolvedValue({ placements: { 'ios-medium': 1 } });
     await publishWidgetSnapshot(widgetInput(), 'data-change', now);

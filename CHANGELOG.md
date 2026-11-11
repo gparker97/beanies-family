@@ -13,6 +13,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 ### Added
 
 - The beanie wall's trip drawer now lists every upcoming trip, so you can tap between them; the trip card shows how many more are coming.
+- The home-screen widget has a new Focus setting: Your day (as before) or To-dos, which fills the widget with your to-dos from the top, grouped as overdue, due today and coming up, on every size. Upcoming events and tonight's meal can be added as extras.
+- Widget text size has a new Automatic option, which shows a short to-do list in bigger text on the medium and large sizes.
 
 ### Changed
 
@@ -23,6 +25,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Fixed
 
+- A widget set to show only to-dos no longer leaves a large empty space above them.
 - A flight check that the flight-data provider refuses for arriving in a burst is now retried once, so a trip's flights no longer show "Couldn't check" when they are checked together.
 
 ## 2026-11-10

@@ -15,6 +15,11 @@ export type WidgetPlacements = Partial<Record<WidgetSize, number>> & {
    * builds; an absent option = none placed.
    */
   circle?: Partial<Record<CircleShowOption, number>>;
+  /**
+   * Android: per size, how many placed widgets select the To-dos layout (Focus = To-dos).
+   * Absent on iOS (not built yet) and on older builds; an absent size = none.
+   */
+  todos?: Partial<Record<WidgetSize, number>>;
 };
 
 export interface WidgetPublishResult {

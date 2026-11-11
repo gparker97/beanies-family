@@ -1,6 +1,24 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "Automatic": {
+      "comment": "Widget Text size option: the largest size at which a short to-do list fits (in the To-dos focus); Standard elsewhere.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatic"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动"
+          }
+        }
+      }
+    },
     "Background": {
       "comment": "Widget setting: how solid the widget card is (100% / 70% / 40%).",
       "extractionState": "manual",
@@ -33,6 +51,24 @@
           "stringUnit": {
             "state": "translated",
             "value": "活动"
+          }
+        }
+      }
+    },
+    "Focus": {
+      "comment": "Widget setting, first in the list: what the widget is about (Your day / To-dos).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Focus"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重点"
           }
         }
       }
@@ -253,6 +289,24 @@
         }
       }
     },
+    "To-dos": {
+      "comment": "Widget Focus option: the to-dos from the top of the widget, grouped.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "To-dos"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "待办"
+          }
+        }
+      }
+    },
     "To-dos and lists": {
       "comment": "Widget setting toggle: show to-dos and lists (the to-dos section).",
       "extractionState": "manual",
@@ -307,6 +361,24 @@
         }
       }
     },
+    "Tonight's meal": {
+      "comment": "Widget setting toggle in the To-dos focus: show tonight's dinner in the footer.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tonight's meal"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今晚的餐食"
+          }
+        }
+      }
+    },
     "Trips and birthdays": {
       "comment": "Widget setting toggle: show trips and birthdays on the calendar.",
       "extractionState": "manual",
@@ -321,6 +393,24 @@
           "stringUnit": {
             "state": "translated",
             "value": "旅行和生日"
+          }
+        }
+      }
+    },
+    "Upcoming events": {
+      "comment": "Widget setting toggle in the To-dos focus: show the next events under the to-dos.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Upcoming events"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "即将到来的活动"
           }
         }
       }

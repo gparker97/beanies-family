@@ -16,6 +16,7 @@
 import { logEvent, type LogLevel } from '@/services/telemetry/logEvent';
 import {
   CIRCLE_SHOW_OPTIONS,
+  WIDGET_SIZES,
   type CircleShowOption,
   type WidgetSize,
 } from '@/types/widgetSnapshot';
@@ -94,18 +95,42 @@ export function circleOptionsToken(circle: Partial<Record<CircleShowOption, numb
 }
 
 /**
+ * Split a placements result into its per-size counts, the circle option counts and the
+ * To-dos-focus counts. Sizes are picked by membership in `WIDGET_SIZES`, never by rest-spread:
+ * a spread turns any key native adds later (`todos`, `circle`) into a bogus "size".
+ */
+export function splitPlacements(placements: WidgetPlacements | null | undefined): {
+  sizes: Partial<Record<WidgetSize, number>>;
+  circle: Partial<Record<CircleShowOption, number>> | undefined;
+  todos: Partial<Record<WidgetSize, number>>;
+} {
+  const sizes: Partial<Record<WidgetSize, number>> = {};
+  for (const size of WIDGET_SIZES) {
+    const n = placements?.[size];
+    if (n !== undefined) sizes[size] = n;
+  }
+  return { sizes, circle: placements?.circle, todos: placements?.todos ?? {} };
+}
+
+/**
  * Placed widgets, one event per size with at least one placement. The circle option counts
  * (iOS, #134) ride the `ios-accessory` event as its `detail` token, since circles are
- * accessories.
+ * accessories. A size with To-dos-focus widgets (Android) carries `todos=<n>` in `detail`,
+ * after any circle token, joined with `;`.
  */
 export function emitPlacements(placements: WidgetPlacements): void {
-  const { circle, ...sizes } = placements;
-  for (const [size, count] of Object.entries(sizes) as [WidgetSize, number | undefined][]) {
+  const { sizes, circle, todos } = splitPlacements(placements);
+  for (const size of WIDGET_SIZES) {
+    const count = sizes[size];
     if (!count || count <= 0) continue;
+    const tokens = [
+      ...(size === 'ios-accessory' && circle ? [circleOptionsToken(circle)] : []),
+      ...(todos[size] !== undefined ? [`todos=${safeCount(todos[size])}`] : []),
+    ];
     emit('info', 'placements', {
       kind: size,
       count,
-      ...(size === 'ios-accessory' && circle ? { detail: circleOptionsToken(circle) } : {}),
+      ...(tokens.length > 0 ? { detail: tokens.join(';') } : {}),
     });
   }
 }
@@ -118,6 +143,7 @@ const READ_OUTCOME_TOKENS: readonly RegExp[] = [
   /^read_failed$/,
   /^read_failed;[a-z_]{1,40}$/,
   /^render_failed$/,
+  /^render_failed;[A-Za-z_]{1,40}$/,
   /^decode_failed;v=-?\d{1,6}$/,
   /^decode_failed;v=unknown$/,
   /^placements_failed;[A-Za-z_]{1,40}$/,

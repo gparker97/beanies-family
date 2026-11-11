@@ -15186,6 +15186,12 @@ const STRING_DEFS = {
   'widget.tasks': { en: 'to-dos', beanie: 'to-dos' },
   'widget.tasksAndLists': { en: 'to-dos and lists', beanie: 'to-dos and lists' },
   'widget.taskOverdue': { en: 'overdue', beanie: 'overdue' },
+  // To-dos focus (2026-11-11): group headings, the footer link, the empty state, the extras heading.
+  'widget.group.today': { en: 'due today', beanie: 'due today' },
+  'widget.group.comingUp': { en: 'coming up', beanie: 'coming up' },
+  'widget.allTodos': { en: 'all to-dos ›', beanie: 'all to-dos ›' },
+  'widget.todosAllClear': { en: 'all clear,', beanie: 'all clear,' },
+  'widget.nextUp': { en: 'next up', beanie: 'next up' },
   'widget.taskToday': { en: 'today', beanie: 'today' },
   'widget.listRemaining': { en: '{list}, {n} left', beanie: '{list}, {n} left' },
   'widget.tripRow': { en: '{name} · {status}', beanie: '{name} · {status}' },

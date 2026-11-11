@@ -3,7 +3,9 @@
   The agenda panel of the medium and large widgets (#130, round 9b): the scrolling calendar
   (a ListView whose rows DayWidgetList builds: inline in the update on API 31+, through
   DayWidgetService on API 24-30; or the relaxed block in its place on a clear week), the
-  fixed to-dos section under it (never part of the scroll), the "tonight" footer with "later ›",
+  fixed to-dos section (widget_part_tasks.xml, never part of the scroll) in one of two slots:
+  under the list in Your day, above it in To-dos (2026-11-11), the "tonight" footer with "later ›"
+  (in To-dos "N more" / "all to-dos ›"),
   and the peek over the panel's top-right edge. Geometry (root padding top 5dp): the peek's top is 5dp below the widget's top, the panel's
   top 20dp below that (= 13dp below the 12dp content top), so the 22dp peek ends 2dp inside the
   panel, 6dp in from its right edge. The 13dp right padding leaves room for the scrollbar.
@@ -27,6 +29,15 @@
         android:paddingEnd="13dp"
         android:paddingBottom="3dp">
 
+        <!-- The to-dos section's slot above the calendar (the To-dos layout). Both slots are
+             emptied on every render and the section (widget_part_tasks.xml) is added into one;
+             the weight-1 list (or relaxed block) under a top-slotted section is its spacer. -->
+        <LinearLayout
+            android:id="@+id/tasks_slot_top"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+
         <ListView
             android:id="@+id/agenda_list"
             android:layout_width="match_parent"
@@ -44,57 +55,12 @@
             android:layout_height="0dp"
             android:layout_weight="1" />
 
-        <!-- The to-dos section: heading row, then up to 2 (medium) or 4 (large) task rows added
-             as nested RemoteViews (widget_task_row.xml). GONE when no task shows. -->
+        <!-- The to-dos section's slot under the calendar (Your day). -->
         <LinearLayout
-            android:id="@+id/tasks"
+            android:id="@+id/tasks_slot_bottom"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:orientation="vertical"
-            android:visibility="gone">
-
-            <LinearLayout
-                android:id="@+id/tasks_heading_row"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center_vertical"
-                android:minHeight="15dp"
-                android:orientation="horizontal">
-
-                <TextView
-                    android:id="@+id/tasks_heading"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:fontFamily="sans-serif-medium"
-                    android:singleLine="true"
-                    android:textColor="@color/widget_ink_soft"
-                    android:textSize="@dimen/widget_text_body" />
-
-                <FrameLayout
-                    android:layout_width="0dp"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="5dp"
-                    android:layout_weight="1"
-                    android:background="@drawable/widget_hairline" />
-
-                <TextView
-                    android:id="@+id/tasks_more"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="5dp"
-                    android:singleLine="true"
-                    android:textColor="@color/widget_ink_soft"
-                    android:textSize="@dimen/widget_text_body"
-                    android:visibility="gone" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/tasks_rows"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical" />
-        </LinearLayout>
+            android:orientation="vertical" />
 
         <LinearLayout
             android:id="@+id/panel_footer"

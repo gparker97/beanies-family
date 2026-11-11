@@ -116,6 +116,21 @@ final class WidgetSnapshot {
         final String circleAllDone;
         final String circleAllClear;
         final String circleToDo;
+        /**
+         * The To-dos layout (2026-11-11), optional at v4 with no version bump; "" when absent (a
+         * snapshot stored before the update), which the fill treats as a designed fallback: a
+         * group with no label has no heading, and a missing footer or title label falls back as
+         * {@link WidgetFill.Plan} documents. "overdue", "due today", "coming up".
+         */
+        final String groupOverdue;
+        final String groupToday;
+        final String groupComingUp;
+        /** "all to-dos ›": the footer's right side when every to-do fits. */
+        final String allTodos;
+        /** "all clear,": the empty-state title (over {@link #enjoy}). */
+        final String todosAllClear;
+        /** "next up": the heading above the upcoming-events extra. */
+        final String eventsHeading;
 
         Labels(JSONObject o) {
             asOf = str(o, "asOf");
@@ -132,6 +147,12 @@ final class WidgetSnapshot {
             circleAllDone = str(o, "circleAllDone");
             circleAllClear = str(o, "circleAllClear");
             circleToDo = str(o, "circleToDo");
+            groupOverdue = str(o, "groupOverdue");
+            groupToday = str(o, "groupToday");
+            groupComingUp = str(o, "groupComingUp");
+            allTodos = str(o, "allTodos");
+            todosAllClear = str(o, "todosAllClear");
+            eventsHeading = str(o, "eventsHeading");
         }
     }
 
@@ -373,6 +394,11 @@ final class WidgetSnapshot {
         final boolean tagAccent;
         /** The to-do has a due time: the ring is filled. */
         final boolean timed;
+        /**
+         * 'overdue' | 'today' | 'undated' | 'later' (WidgetTaskBucket); the items arrive grouped in
+         * that order. "" when absent, which {@link WidgetFill#taskRuns} joins to the current run.
+         */
+        final String bucket;
         final Dot dot;
         final String link;
 
@@ -382,6 +408,7 @@ final class WidgetSnapshot {
             tag = str(o, "tag");
             tagAccent = "accent".equals(str(o, "tagTone"));
             timed = o.optBoolean("timed", false);
+            bucket = str(o, "bucket");
             JSONObject d = o.optJSONObject("dot");
             dot = d == null ? null : new Dot(d);
             link = str(o, "link");
