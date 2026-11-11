@@ -12,7 +12,7 @@
  *
  * `readonly` swaps the controls for the plain-language hint (a completed or card-made to-do).
  */
-import { computed } from 'vue';
+import { computed, watch } from 'vue';
 import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
 import ChipButton from '@/components/ui/ChipButton.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
@@ -22,12 +22,13 @@ import { useTranslation } from '@/composables/useTranslation';
 import { useToday } from '@/composables/useToday';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { formatNookDate } from '@/utils/date';
+import type { Cadence } from '@/types/recurrence';
 import {
   fieldShowRule,
   showFieldApplies,
   showRuleField,
   SHOW_LEAD_DEFAULT,
-  SHOW_LEAD_MAX,
+  maxShowLead,
   type TodoShowRule,
 } from '@/utils/todoPlate';
 
@@ -36,6 +37,8 @@ const props = defineProps<{
   repeating: boolean;
   dueDate: string;
   readonly?: boolean;
+  /** The repeat's cadence: it bounds "days before" (`maxShowLead`). */
+  cadence?: Cadence | null;
 }>();
 
 const emit = defineEmits<{ 'update:modelValue': [rule: TodoShowRule] }>();
@@ -65,14 +68,31 @@ const repeatChoice = computed(() => {
   const kind = props.modelValue.kind;
   return kind === 'from' ? 'due' : kind;
 });
+/** The longest lead that fits between two occurrences; 0 on a daily repeat (not offered). */
+const leadMax = computed(() => maxShowLead(props.cadence));
 const repeatOptions = computed(() => [
   { value: 'due', label: t('todo.show.repeat.due') },
-  { value: 'lead', label: t('todo.show.repeat.lead') },
+  ...(leadMax.value >= 1 ? [{ value: 'lead', label: t('todo.show.repeat.lead') }] : []),
   { value: 'now', label: t('todo.show.repeat.now') },
 ]);
 
 const leadDays = computed(() =>
-  props.modelValue.kind === 'lead' ? props.modelValue.days : SHOW_LEAD_DEFAULT
+  Math.min(
+    props.modelValue.kind === 'lead' ? props.modelValue.days : SHOW_LEAD_DEFAULT,
+    Math.max(1, leadMax.value)
+  )
+);
+
+// A draft lead the repeat no longer leaves room for (the repeat was shortened after it was
+// picked) follows the repeat. A saved to-do never reaches here over the limit: `todoShowRule`
+// already reads it clamped.
+watch(
+  [leadMax, () => props.modelValue],
+  ([max, rule]) => {
+    if (props.readonly || !props.repeating || rule.kind !== 'lead' || rule.days <= max) return;
+    emit('update:modelValue', max >= 1 ? { kind: 'lead', days: max } : { kind: 'due' });
+  },
+  { immediate: true }
 );
 
 function onRepeatChoice(value: string): void {
@@ -147,7 +167,7 @@ const hint = computed(() => {
             <NumberStepper
               :model-value="leadDays"
               :min="1"
-              :max="SHOW_LEAD_MAX"
+              :max="leadMax"
               :label="t('todo.show.lead.aria')"
               :unit="
                 leadDays === 1 ? t('todo.show.lead.suffix.one') : t('todo.show.lead.suffix.other')

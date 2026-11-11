@@ -14,6 +14,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - Picking a date in a to-do's or a transaction's details now saves it right away, with no separate tick to tap, and the calendar opens on the first tap.
 - "Show from" now sits directly under a to-do's due date, above the time.
+- "Days before" on a repeating to-do is now limited to what fits between two of its due dates (6 for a weekly to-do), and is not offered on a daily one.
 - A beanstalk post pasted into a chat or a social post now previews with its title, its cover image and the beanies.family wordmark, in place of the plain orange card.
 
 ### Fixed

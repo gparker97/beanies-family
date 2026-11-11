@@ -18,6 +18,7 @@
  *     today keeps its bucket.
  */
 import type { TodoItem } from '@/types/models';
+import type { Cadence } from '@/types/recurrence';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import { addDaysYmd, formatNookDate, toDateInputValue, toTimeInputValue } from './date';
 import { fillTemplate } from './fillTemplate';
@@ -89,6 +90,49 @@ export function isYmd(value: unknown): value is string {
   return typeof value === 'string' && YMD.test(value);
 }
 
+/**
+ * The longest lead a cadence leaves room for: one day less than the SHORTEST gap between two
+ * occurrences, never past `SHOW_LEAD_MAX`. A lead as long as the gap would show the to-do all
+ * the time, which is what "Every day" already says. 0 means there is no room (a daily repeat),
+ * so "days before" is not offered. No cadence (a legacy or malformed rule) is the plain ceiling.
+ *
+ * Gaps: `interval` days; 7 x `interval` days, or the closest pair of weekdays on a plain weekly
+ * rule with several; 28 x `interval` for months (the shortest month); 365 x `interval` for years.
+ */
+export function maxShowLead(cadence: Cadence | null | undefined): number {
+  if (!cadence) return SHOW_LEAD_MAX;
+  const interval =
+    Number.isInteger(cadence.interval) && cadence.interval >= 1 ? cadence.interval : 1;
+  let gap: number;
+  switch (cadence.unit) {
+    case 'day':
+      gap = interval;
+      break;
+    case 'week': {
+      gap = 7 * interval;
+      const days = [...new Set(cadence.weekdays ?? [])]
+        .filter((d) => Number.isInteger(d) && d >= 0 && d <= 6)
+        .sort((a, b) => a - b);
+      if (interval === 1 && days.length > 1) {
+        days.forEach((d, i) => {
+          const next = days[(i + 1) % days.length]!;
+          gap = Math.min(gap, (next - d + 7) % 7 || 7);
+        });
+      }
+      break;
+    }
+    case 'month':
+      gap = 28 * interval;
+      break;
+    case 'year':
+      gap = 365 * interval;
+      break;
+    default:
+      return SHOW_LEAD_MAX;
+  }
+  return Math.max(0, Math.min(SHOW_LEAD_MAX, gap - 1));
+}
+
 /** Is `days` a usable lead: a whole number from 1 to `SHOW_LEAD_MAX`? */
 export function isShowLeadDays(days: unknown): days is number {
   return typeof days === 'number' && Number.isInteger(days) && days >= 1 && days <= SHOW_LEAD_MAX;
@@ -108,7 +152,10 @@ const DUE: TodoShowRule = Object.freeze({ kind: 'due' });
  *   - an undated to-do is always `now` (there is no due date to wait for, and no UI to
  *     change a rule it cannot see);
  *   - repeating: `showOn: 'now'`, then a valid `showLeadDays` (`lead`), then `due` (the
- *     repeating default); `showFrom` is ignored;
+ *     repeating default); `showFrom` is ignored. A stored lead longer than the cadence leaves
+ *     room for (`maxShowLead`: the repeat was shortened later, or another device wrote it) READS
+ *     as the longest that fits, and as `due` when none fits; the stored value is left alone, so
+ *     lengthening the repeat again brings it back;
  *   - one-off: an explicit `showOn` (`'due'`, then `'now'`) wins over `showFrom`; a valid
  *     `showFrom` is `from`; anything else (absent, malformed) is `now`. `showLeadDays` is
  *     ignored.
@@ -117,7 +164,10 @@ export function todoShowRule(todo: ShowFields): TodoShowRule {
   if (!dueYmdOf(todo)) return NOW;
   if (isRepeating(todo)) {
     if (todo.showOn === 'now') return NOW;
-    if (isShowLeadDays(todo.showLeadDays)) return { kind: 'lead', days: todo.showLeadDays };
+    if (isShowLeadDays(todo.showLeadDays)) {
+      const days = Math.min(todo.showLeadDays, maxShowLead(todo.repeat?.rule));
+      if (days >= 1) return { kind: 'lead', days };
+    }
     return DUE;
   }
   if (todo.showOn === 'due') return DUE;

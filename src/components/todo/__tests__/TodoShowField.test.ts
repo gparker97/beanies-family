@@ -8,6 +8,7 @@
  *   - the hint names the surfaces and never calls them lists,
  *   - readonly shows the hint only.
  */
+import type { Cadence } from '@/types/recurrence';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
 import { mount } from '@vue/test-utils';
@@ -32,6 +33,7 @@ function mountField(props: {
   repeating?: boolean;
   dueDate?: string;
   readonly?: boolean;
+  cadence?: Cadence | null;
 }) {
   return mount(TodoShowField, {
     props: { repeating: false, dueDate: DUE, ...props },
@@ -171,5 +173,55 @@ describe('TodoShowField', () => {
     expect(w.findComponent(BeanieDatePicker).exists()).toBe(false);
     expect(w.find('[data-testid="todo-show-shortcut"]').exists()).toBe(false);
     expect(w.get('[data-testid="todo-show-hint"]').text()).toContain('the day it is due');
+  });
+  describe('the repeat bounds "days before"', () => {
+    const cadence = (over: Partial<Cadence>): Cadence => ({ unit: 'week', interval: 1, ...over });
+    const optionValues = (w: ReturnType<typeof mountField>) =>
+      (w.getComponent(FrequencyChips).props('options') as { value: string }[]).map((o) => o.value);
+
+    it('a weekly repeat caps the stepper at 6', () => {
+      const w = mountField({
+        modelValue: { kind: 'lead', days: 3 },
+        repeating: true,
+        cadence: cadence({}),
+      });
+      expect(w.getComponent({ name: 'NumberStepper' }).props('max')).toBe(6);
+      expect(w.emitted('update:modelValue')).toBeUndefined();
+    });
+
+    it('a daily repeat does not offer "days before"', () => {
+      const w = mountField({
+        modelValue: { kind: 'due' },
+        repeating: true,
+        cadence: cadence({ unit: 'day' }),
+      });
+      expect(optionValues(w)).toEqual(['due', 'now']);
+    });
+
+    it('a draft lead follows a repeat that is shortened: clamped, or back to each due date', async () => {
+      const w = mountField({
+        modelValue: { kind: 'lead', days: 10 },
+        repeating: true,
+        cadence: cadence({ interval: 2 }),
+      });
+      expect(w.emitted('update:modelValue')).toBeUndefined();
+      await w.setProps({ cadence: cadence({}) });
+      expect(lastEmit(w)).toEqual({ kind: 'lead', days: 6 });
+      await w.setProps({
+        modelValue: { kind: 'lead', days: 6 },
+        cadence: cadence({ unit: 'day' }),
+      });
+      expect(lastEmit(w)).toEqual({ kind: 'due' });
+    });
+
+    it('choosing "days before" on a twice-a-week repeat starts within the cap', async () => {
+      const w = mountField({
+        modelValue: { kind: 'due' },
+        repeating: true,
+        cadence: cadence({ weekdays: [1, 4] }),
+      });
+      await w.getComponent(FrequencyChips).vm.$emit('update:modelValue', 'lead');
+      expect(lastEmit(w)).toEqual({ kind: 'lead', days: 2 });
+    });
   });
 });

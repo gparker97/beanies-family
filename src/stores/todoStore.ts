@@ -11,6 +11,7 @@ import { useFamilyStore } from '@/stores/familyStore';
 import { sortTodos } from '@/utils/todo';
 import {
   isShowLeadDays,
+  maxShowLead,
   isYmd,
   plateClock,
   platedTodos,
@@ -897,7 +898,8 @@ export const useTodoStore = defineStore('todos', () => {
   /**
    * "Show from": when the to-do starts showing on the daily briefing, the Nook, the wall and the
    * widget (`utils/todoPlate`). Allowed only where `todoCapabilities(...).editShowRule`; a
-   * `from` date must be `YYYY-MM-DD`, and a `lead` needs a repeating to-do and 1-30 days. Writes
+   * `from` date must be `YYYY-MM-DD`, and a `lead` needs a repeating to-do and 1-30 days that fit
+   * between two occurrences (`maxShowLead`). Writes
    * `showRulePatch` (the one writer of the three fields). No "after the due date" or "before
    * today" checks: the rule never hides a to-do on or after its due date, and the picker bounds
    * the choice.
@@ -922,7 +924,10 @@ export const useTodoStore = defineStore('todos', () => {
       refuse('show-rule', 'invalid-date', 'todo.error.showRuleRefused', VISIBILITY_SURFACE);
       return null;
     }
-    if (rule.kind === 'lead' && (!repeating || !isShowLeadDays(rule.days))) {
+    if (
+      rule.kind === 'lead' &&
+      (!repeating || !isShowLeadDays(rule.days) || rule.days > maxShowLead(existing.repeat?.rule))
+    ) {
       refuse('show-rule', 'invalid-lead', 'todo.error.showRuleRefused', VISIBILITY_SURFACE);
       return null;
     }

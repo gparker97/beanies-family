@@ -309,7 +309,7 @@ describe('classifyPlateTodo — plate + audience, the briefing and widget rule',
     // At 08:00 it is due today, on track: hidden from the parent.
     expect(classifyPlateTodo(due, adult, resolve, { ...TODAY, hhmm: '08:00' })).toBeNull();
     // A lead window (upcoming) is not missed either.
-    const lead = t({ assigneeIds: ['k'], repeat: weekly, dueDate: '2026-11-17', showLeadDays: 7 });
+    const lead = t({ assigneeIds: ['k'], repeat: weekly, dueDate: '2026-11-16', showLeadDays: 6 });
     expect(classifyPlateTodo(lead, kid, resolve, TODAY)?.plate).toBe('upcoming');
     expect(classifyPlateTodo(lead, adult, resolve, TODAY)).toBeNull();
     expect(

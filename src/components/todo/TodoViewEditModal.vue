@@ -604,6 +604,7 @@ async function handleDelete() {
           :model-value="showRule"
           :repeating="repeating"
           :due-date="todo.dueDate"
+          :cadence="todo.repeat?.rule"
           :readonly="!showFieldEditable"
           @update:model-value="handleShowChange"
         />

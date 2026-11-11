@@ -5,6 +5,7 @@ import { UI_STRINGS } from '@/services/translation/uiStrings';
 import {
   SHOW_LEAD_DEFAULT,
   SHOW_LEAD_MAX,
+  maxShowLead,
   TODO_PLATE_ORDER,
   fieldShowRule,
   groupOpenTodos,
@@ -134,7 +135,8 @@ describe('todoShowRule', () => {
     ['repeating, showOn due → due', { showOn: 'due' }, { kind: 'due' }],
     ['repeating, showFrom → ignored (due)', { showFrom: '2026-11-20' }, { kind: 'due' }],
     ['repeating, lead 1', { showLeadDays: 1 }, { kind: 'lead', days: 1 }],
-    ['repeating, lead 30', { showLeadDays: 30 }, { kind: 'lead', days: 30 }],
+    ['repeating weekly, lead 6', { showLeadDays: 6 }, { kind: 'lead', days: 6 }],
+    ['repeating weekly, lead 30 → reads as 6', { showLeadDays: 30 }, { kind: 'lead', days: 6 }],
     ['repeating, lead 0 → due', { showLeadDays: 0 }, { kind: 'due' }],
     ['repeating, lead 31 → due', { showLeadDays: 31 }, { kind: 'due' }],
     ['repeating, lead 2.5 → due', { showLeadDays: 2.5 }, { kind: 'due' }],
@@ -169,6 +171,46 @@ describe('todoShowRule', () => {
 
 // ── showRulePatch: the one writer ────────────────────────────────────────────
 
+describe('maxShowLead (one day less than the shortest gap between occurrences)', () => {
+  const never = { kind: 'never' } as const;
+  const c = (over: Partial<RecurrenceRule>): RecurrenceRule => ({
+    unit: 'week',
+    interval: 1,
+    end: never,
+    ...over,
+  });
+  it.each([
+    ['daily', c({ unit: 'day' }), 0],
+    ['every 3 days', c({ unit: 'day', interval: 3 }), 2],
+    ['weekly', c({}), 6],
+    ['weekly on one day', c({ weekdays: [2] }), 6],
+    ['weekly on Mon and Thu', c({ weekdays: [1, 4] }), 2],
+    ['weekly on Sat and Sun (wraps the week)', c({ weekdays: [6, 0] }), 0],
+    ['weekly on Mon, Wed, Fri', c({ weekdays: [1, 3, 5] }), 1],
+    ['every 2 weeks', c({ interval: 2, weekdays: [2] }), 13],
+    ['monthly', c({ unit: 'month' }), 27],
+    ['every 2 months → the ceiling', c({ unit: 'month', interval: 2 }), 30],
+    ['yearly → the ceiling', c({ unit: 'year' }), 30],
+    ['a malformed interval reads as 1', c({ unit: 'day', interval: 0 }), 0],
+  ])('%s → %i', (_name, cadence, max) => {
+    expect(maxShowLead(cadence)).toBe(max);
+  });
+
+  it('no cadence is the plain ceiling', () => {
+    expect(maxShowLead(undefined)).toBe(SHOW_LEAD_MAX);
+    expect(maxShowLead(null)).toBe(SHOW_LEAD_MAX);
+  });
+
+  it('a daily repeat has no room for a lead: a stored one reads as "on each due date"', () => {
+    const daily = repeating({
+      dueDate: '2026-11-17',
+      repeat: { rule: c({ unit: 'day' }), anchor: '2026-11-01' },
+      showLeadDays: 3,
+    });
+    expect(todoShowRule(daily)).toEqual({ kind: 'due' });
+  });
+});
+
 describe('showRulePatch', () => {
   const cleared = { showFrom: undefined, showOn: undefined, showLeadDays: undefined };
   it.each<[string, TodoShowRule, boolean, Partial<TodoItem>]>([
@@ -197,7 +239,7 @@ describe('showRulePatch', () => {
       [{ kind: 'due' }, false],
       [{ kind: 'now' }, true],
       [{ kind: 'due' }, true],
-      [{ kind: 'lead', days: 7 }, true],
+      [{ kind: 'lead', days: 6 }, true],
     ];
     for (const [rule, rep] of cases) {
       const base = rep ? repeating({ dueDate: DUE }) : todo({ dueDate: DUE });
@@ -307,9 +349,13 @@ describe('todoPlate', () => {
       { dueDate: '2026-11-17', showOn: 'now' },
       'upcoming',
     ],
-    ['lead 7, due in 7 days → upcoming', { dueDate: '2026-11-17', showLeadDays: 7 }, 'upcoming'],
+    [
+      'lead 7 on a weekly repeat reads as 6: due in 7 days → waiting',
+      { dueDate: '2026-11-17', showLeadDays: 7 },
+      'waiting',
+    ],
+    ['lead 6, due in 6 days → upcoming', { dueDate: '2026-11-16', showLeadDays: 6 }, 'upcoming'],
     ['lead 6, due in 7 days → waiting', { dueDate: '2026-11-17', showLeadDays: 6 }, 'waiting'],
-    ['lead 30 → upcoming', { dueDate: '2026-11-17', showLeadDays: 30 }, 'upcoming'],
     [
       'lead 31 (out of range) → the default (waiting)',
       { dueDate: '2026-11-17', showLeadDays: 31 },

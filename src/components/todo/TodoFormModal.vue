@@ -233,7 +233,12 @@ async function handleSave(): Promise<void> {
       <FormFieldGroup :label="t('todo.dueDate')" optional>
         <BeanieDatePicker v-model="dueDate" />
       </FormFieldGroup>
-      <TodoShowField v-model="showRule" :repeating="repeatOn" :due-date="dueDate" />
+      <TodoShowField
+        v-model="showRule"
+        :repeating="repeatOn"
+        :due-date="dueDate"
+        :cadence="repeatOn ? repeatRule : null"
+      />
       <!-- A time only means something with a date; `toCreateTodoInput` also drops an orphan. -->
       <FormFieldGroup v-if="dueDate" :label="t('todo.dueTime')" optional>
         <BeanieTimePicker v-model="dueTime" clearable />
