@@ -3,6 +3,7 @@ package family.beanies.app.widget;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
@@ -89,12 +90,66 @@ final class WidgetFill {
      * {@link #PANEL_CHROME_DP} is the medium / large chrome only.
      */
     static final float SMALL_CHROME_DP = 66f;
-    /** The small widget's "N more" line under its to-do rows: always reserved. */
+    /** The small widget's "N more" line under its to-do rows: reserved only when not all fit. */
     static final float SMALL_MORE_DP = 15f;
     /** The fill's comparison slack: the stepped sums are floats. */
     private static final float FIT_EPSILON_DP = 0.01f;
-    /** The one-step answer: no stepping (the 5-argument {@link #plan}). */
-    private static final float[] NO_STEPS = {1f};
+    /**
+     * The one-step answer: no stepping (the 5-argument {@link #plan}, and
+     * `WidgetSizes.taskStepFactors` whenever the widget cannot step). Never mutate it: share
+     * through {@code clone()}.
+     */
+    static final float[] NO_STEPS = {1f};
+
+    /**
+     * Whether every to-do title still fits its row at a size step (2026-11-11): the fill weighs
+     * height only, so a step that fits the panel can still cut "buy birthday candles" to "buy
+     * birthday ca…". Supplied by the device callers from ONE implementation
+     * (`WidgetViews.titleWidthCheck`, Paint-measured) because measuring text needs a Context;
+     * {@link #plan} applies it to the candidate factors before {@link #todosFill}, which stays
+     * pure. {@code calendarTimes} sets the lead column the rows share with the calendar.
+     */
+    interface StepWidthCheck {
+        boolean fits(List<WidgetSnapshot.Task> tasks, List<String> calendarTimes, float factor);
+    }
+
+    /** The check the 5- and 6-argument {@link #plan} overloads pass: every step fits. */
+    static final StepWidthCheck ANY_WIDTH = (tasks, calendarTimes, factor) -> true;
+
+    /** One task row's widths at a factor, in dp: what its title needs and the room it has. */
+    interface RowMeasure {
+        float titleDp(WidgetSnapshot.Task task, float factor);
+
+        float roomDp(WidgetSnapshot.Task task, float factor);
+    }
+
+    /**
+     * The width rule, pure: a step {@code factor} is allowed only if no title that fits its row
+     * at ×1 would be cut at {@code factor}. A title already too long at ×1 does not block a step
+     * (it is cut at every size).
+     */
+    static boolean noNewTruncation(List<WidgetSnapshot.Task> tasks, float factor, RowMeasure m) {
+        for (WidgetSnapshot.Task task : tasks) {
+            boolean fitsAtOne = m.titleDp(task, 1f) <= m.roomDp(task, 1f);
+            if (fitsAtOne && m.titleDp(task, factor) > m.roomDp(task, factor)) return false;
+        }
+        return true;
+    }
+
+    /**
+     * {@code factors} without the steps above ×1 that {@code check} rejects for {@code tasks};
+     * ×1 (and anything below it) always stays. The check is never called when nothing steps.
+     */
+    static float[] widthAllowedSteps(float[] factors, List<WidgetSnapshot.Task> tasks,
+            List<String> calendarTimes, StepWidthCheck check) {
+        if (factors == null || factors.length == 0) return NO_STEPS.clone();
+        float[] kept = new float[factors.length];
+        int n = 0;
+        for (float f : factors) {
+            if (f <= 1f || check.fits(tasks, calendarTimes, f)) kept[n++] = f;
+        }
+        return n == 0 ? NO_STEPS.clone() : Arrays.copyOf(kept, n);
+    }
 
     /** Which layout a placed widget draws, resolved once per render by {@link #effective}. */
     enum Layout {
@@ -617,12 +672,7 @@ final class WidgetFill {
 
         /** The calendar rows' times (today, then the look-ahead), for the shared lead column. */
         List<String> calendarTimes() {
-            List<String> times = new ArrayList<>();
-            for (WidgetSnapshot.Row row : todayRows) times.add(row.time);
-            for (LaterDay later : laterDays) {
-                for (WidgetSnapshot.Row row : later.rows) times.add(row.time);
-            }
-            return times;
+            return times(todayRows, laterDays);
         }
     }
 
@@ -673,6 +723,16 @@ final class WidgetFill {
      */
     static Plan plan(WidgetSnapshot s, WidgetPrefs prefs, WidgetSizes.Size size, float heightDp,
             long now, float[] stepFactors) {
+        return plan(s, prefs, size, heightDp, now, stepFactors, ANY_WIDTH);
+    }
+
+    /**
+     * The full plan: {@code widthCheck} drops the To-dos steps at which a title that fits at ×1
+     * would be cut ({@link StepWidthCheck}); the renderer and the list factory both pass
+     * `WidgetViews.titleWidthCheck`, so their plans agree.
+     */
+    static Plan plan(WidgetSnapshot s, WidgetPrefs prefs, WidgetSizes.Size size, float heightDp,
+            long now, float[] stepFactors, StepWidthCheck widthCheck) {
         if (s.days.isEmpty()) return null;
         int index = todayIndex(s, now);
         // A negative index means no entry for today: the latest day before today is shown and
@@ -756,15 +816,24 @@ final class WidgetFill {
         int overflow = capped(day, due, hint);
         TodosFill fill;
         if (small) {
-            // Under the header; the "N more" line (and a stale snapshot's "as of") reserved.
+            // Under the header (a stale snapshot's "as of" reserved). The "N more" line is held
+            // only when something does not fit, as on iOS: first without it, then with it.
             float room = heightDp <= 0 ? 0f : Math.max(FIT_EPSILON_DP, heightDp - SMALL_CHROME_DP);
-            float reserve = SMALL_MORE_DP + (stale ? SUB_LINE_DP : 0f);
-            fill = todosFill(room, 0f, ROW_DP, headings, reserve, sizes, NO_STEPS, overflow,
+            float asOf = stale ? SUB_LINE_DP : 0f;
+            fill = todosFill(room, 0f, ROW_DP, headings, asOf, sizes, NO_STEPS, overflow,
                     noHeightRows(size));
+            if (fill.more > 0) {
+                fill = todosFill(room, 0f, ROW_DP, headings, asOf + SMALL_MORE_DP, sizes, NO_STEPS,
+                        overflow, noHeightRows(size));
+            }
         } else {
+            // Steps that would cut a title are dropped first; the fill itself weighs height only.
+            List<WidgetSnapshot.Task> candidates = tasks.subList(0, Math.min(tasks.size(), MAX_TASK_ROWS));
+            float[] factors = widthAllowedSteps(stepFactors, candidates, times(todayRows, later),
+                    widthCheck == null ? ANY_WIDTH : widthCheck);
             float room = heightDp <= 0 ? 0f : Math.max(FIT_EPSILON_DP, heightDp - PANEL_CHROME_DP);
             fill = todosFill(room, TASKS_HEADING_DP, ROW_DP, headings,
-                    eventsReserve(size, events, todayRows, later), sizes, stepFactors, overflow,
+                    eventsReserve(size, events, todayRows, later), sizes, factors, overflow,
                     noHeightRows(size));
         }
         List<TaskGroup> groups = new ArrayList<>();
@@ -814,6 +883,16 @@ final class WidgetFill {
     private static int capped(WidgetSnapshot.Day day, boolean due, boolean hint) {
         if (day == null) return 0;
         return (due ? day.tasks.overflowDue : 0) + (hint ? day.tasks.overflowHint : 0);
+    }
+
+    /** The calendar rows' times, today then the look-ahead (the shared lead column's widths). */
+    private static List<String> times(List<WidgetSnapshot.Row> todayRows, List<LaterDay> later) {
+        List<String> times = new ArrayList<>();
+        for (WidgetSnapshot.Row row : todayRows) times.add(row.time);
+        for (LaterDay day : later) {
+            for (WidgetSnapshot.Row row : day.rows) times.add(row.time);
+        }
+        return times;
     }
 
     /** {@code rows} without the ones that have already ended at {@code now}. */

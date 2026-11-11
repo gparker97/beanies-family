@@ -6903,7 +6903,7 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'widget.group.today': '今天到期',
   'widget.group.comingUp': '即将到来',
   'widget.allTodos': '全部待办 ›',
-  'widget.todosAllClear': '全部完成，',
+  'widget.todosAllClear': '没有待办，',
   'widget.nextUp': '接下来',
   'widget.taskToday': '今天',
   'widget.listRemaining': '{list}，剩 {n} 项',

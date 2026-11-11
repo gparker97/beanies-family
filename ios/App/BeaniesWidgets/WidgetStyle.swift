@@ -97,7 +97,13 @@ struct WidgetMetrics {
     /// past `taskStepMax`. The To-dos rows and group headings are drawn with it; everything
     /// else in the widget keeps `self`. A step of 1 returns the same scale.
     func stepped(_ factor: CGFloat) -> WidgetMetrics {
-        WidgetMetrics(scale: max(scale, min(scale * factor, Self.taskStepMax)))
+        WidgetMetrics(scale: Self.steppedScale(scale, by: factor))
+    }
+
+    /// The one clamp for an Automatic step: `scale` x `factor`, never below `scale`, never past
+    /// `taskStepMax`. `stepped` and `WidgetFill.taskStepFactors` both go through it.
+    static func steppedScale(_ scale: CGFloat, by factor: CGFloat) -> CGFloat {
+        max(scale, min(scale * factor, taskStepMax))
     }
 
     /// A design size in points, scaled.

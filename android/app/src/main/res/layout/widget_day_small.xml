@@ -253,15 +253,19 @@
         </LinearLayout>
 
         <!-- To-dos: the due count ("3 due today", the number bold) in the peek's slot, the header
-             row's height and end margin like the weather. GONE in Your day. -->
+             row's height like the weather; GONE in Your day and when nothing is due today (the
+             weather or peek return). Readable text, so below 100% it sits on the header's 95%
+             tile (DayWidgetRenderer.tile): 6dp side padding with no end margin keeps the text
+             where the 6dp peek margin puts it, and the 60dp box stays inside the peek's budget. -->
         <TextView
             android:id="@+id/small_count"
             android:layout_width="wrap_content"
             android:layout_height="@dimen/widget_small_header_height"
             android:layout_gravity="top|end"
             android:layout_marginTop="-2dp"
-            android:layout_marginEnd="@dimen/widget_small_peek_end"
             android:ellipsize="end"
+            android:paddingStart="6dp"
+            android:paddingEnd="@dimen/widget_small_peek_end"
             android:gravity="center_vertical|end"
             android:maxLines="2"
             android:maxWidth="@dimen/widget_peek_family_width"

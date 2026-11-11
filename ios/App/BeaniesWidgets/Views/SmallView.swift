@@ -11,9 +11,10 @@ import WidgetKit
 /// back with no reading, or once the reading is past `currentUntil` (the small widget has no
 /// room for a range).
 ///
-/// The To-dos layout: the header's right side holds `tasks.countText` (no weather, no peek),
-/// the panel the to-dos in the snapshot's order at Standard size with no group headings, then
-/// "{n} more"; no extras. The caller's `widgetURL` opens the To-Dos page.
+/// The To-dos layout: the header's right side holds `tasks.countText` in place of the weather
+/// or the peek (both come back, exactly as in Your day, when the count is empty: only undated
+/// or later to-dos); the panel holds the to-dos in the snapshot's order at Standard size with
+/// no group headings, then "{n} more"; no extras. The caller's `widgetURL` opens the To-Dos page.
 struct SmallView: View {
     let snapshot: WSSnapshot
     let resolved: ResolvedDay
@@ -35,7 +36,8 @@ struct SmallView: View {
         let next = WidgetFill.nextRow(resolved, blocks: blocks, at: date)
         // Only a reading with a current temperature takes the peek's place.
         let current = weather?.temp == nil ? nil : weather
-        let todos = layout == .todos
+        // The count takes the weather's or the peek's slot only when there is one to show.
+        let showCount = layout == .todos && !day.tasks.countText.text.isEmpty
 
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .firstTextBaseline, spacing: 5) {
@@ -51,7 +53,7 @@ struct SmallView: View {
                         .lineLimit(1)
                 }
                 .cardTile(blocks.background, outset: EdgeInsets(top: 0, leading: 6, bottom: 2, trailing: 6))
-                if todos {
+                if showCount {
                     Spacer(minLength: 4)
                     todosCount(day.tasks.countText)
                 } else if let current, let temp = current.temp {
@@ -77,7 +79,7 @@ struct SmallView: View {
 
             panel(day: day, next: next)
                 .overlay(alignment: .topTrailing) {
-                    if current == nil && !todos {
+                    if current == nil && !showCount {
                         PeekView(kind: peek, height: Self.peekHeight)
                             .offset(x: -peek.rightInset, y: -(Self.peekHeight - PeekView.overlap))
                     }
@@ -170,21 +172,19 @@ struct SmallView: View {
     // MARK: the To-dos layout
 
     /// The count in the header's right slot, "**5** due today", which may wrap to two lines.
-    /// Nothing when nothing is due today (the snapshot's text is then empty).
-    @ViewBuilder private func todosCount(_ text: WSText) -> some View {
-        if !text.text.isEmpty {
-            WidgetTextView(
-                text: text,
-                font: .sys(size: m.s(11)),
-                color: .wInkSoft,
-                emphasisFont: .outfit(size: m.s(15), weight: .bold),
-                emphasisColor: .wAccent
-            )
-            .lineLimit(2)
-            .multilineTextAlignment(.trailing)
-            .minimumScaleFactor(0.8)
-            .cardTile(blocks.background, outset: EdgeInsets(top: 0, leading: 4, bottom: 2, trailing: 4))
-        }
+    /// Only drawn when the text is not empty (`showCount`).
+    private func todosCount(_ text: WSText) -> some View {
+        WidgetTextView(
+            text: text,
+            font: .sys(size: m.s(11)),
+            color: .wInkSoft,
+            emphasisFont: .outfit(size: m.s(15), weight: .bold),
+            emphasisColor: .wAccent
+        )
+        .lineLimit(2)
+        .multilineTextAlignment(.trailing)
+        .minimumScaleFactor(0.8)
+        .cardTile(blocks.background, outset: EdgeInsets(top: 0, leading: 4, bottom: 2, trailing: 4))
     }
 
     /// All clear when the day has no tasks to show (never decided by how many fit), else the
@@ -228,7 +228,7 @@ struct SmallView: View {
             }
             Spacer(minLength: 0)
             if fill.more > 0 {
-                Text(snapshot.labels.more.replacingOccurrences(of: "{n}", with: String(fill.more)))
+                Text(snapshot.labels.moreText(fill.more))
                     .font(.sys(size: m.s(11), weight: .medium))
                     .foregroundStyle(Color.wInkFaint)
                     .lineLimit(1)

@@ -224,6 +224,13 @@ struct WSLabels {
     var eventsHeading: String? = nil
 }
 
+extension WSLabels {
+    /// `more` with its {n} filled in ("3 more"): the one fill-in for every "N more" line.
+    func moreText(_ count: Int) -> String {
+        more.replacingOccurrences(of: "{n}", with: String(count))
+    }
+}
+
 struct WSLinks {
     /// The calendar on today (historically the Nook; the JSON key `nook` is kept for v3 snapshots).
     var nook: String = WidgetLinks.calendarFallback

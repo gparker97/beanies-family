@@ -116,9 +116,6 @@ public final class WidgetSizes {
      */
     static final float TASK_STEP_MAX = 1.6f;
 
-    /** The one-step answer: no stepping. */
-    private static final float[] NO_STEPS = {1f};
-
     /**
      * The step factors the To-dos fill may choose from for this widget: {@code {1}} unless the
      * STORED focus is To-dos (the inferred to-dos-only path never steps), Text size is Automatic,
@@ -138,7 +135,7 @@ public final class WidgetSizes {
                 && prefs.textSize == WidgetPrefs.TextSize.AUTO
                 && size != Size.SMALL
                 && sdkInt >= Build.VERSION_CODES.S;
-        return steps ? stepFactors(effectiveScale) : NO_STEPS.clone();
+        return steps ? stepFactors(effectiveScale) : WidgetFill.NO_STEPS.clone();
     }
 
     /**

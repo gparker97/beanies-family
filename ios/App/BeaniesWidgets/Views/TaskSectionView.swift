@@ -104,7 +104,7 @@ struct TaskSectionView: View {
                 .lineLimit(1)
                 .fixedSize()
             } else if moreCount > 0 {
-                Text(labels.more.replacingOccurrences(of: "{n}", with: String(moreCount)))
+                Text(labels.moreText(moreCount))
                     .font(.sys(size: m.s(11), weight: .medium))
                     .foregroundStyle(Color.wInkSoft)
                     .lineLimit(1)
@@ -127,6 +127,33 @@ struct TaskRowView: View {
     /// false on the small widget, which cannot hold `Link`s (its one target is `widgetURL`).
     var linked: Bool = true
 
+    /// The row's design sizes at scale 1, shared by `body` and `titleFits`.
+    static let spacing: CGFloat = 6
+    static let textSize: CGFloat = 11
+    static let dotSize: CGFloat = 14
+
+    /// Whether `task`'s title is drawn whole in a row `rowWidth` wide whose lead column is
+    /// `leadWidth`, at `scale`: the same fonts, sizes and spacings `body` draws (the tag and the
+    /// member dot keep their size, the title takes what is left). For the To-dos layout's
+    /// Automatic step (`WidgetFill.factorsKeepingTitles`).
+    static func titleFits(_ task: WSTask, rowWidth: CGFloat, leadWidth: CGFloat, scale: CGFloat) -> Bool {
+        let size = textSize * scale
+        var room = rowWidth - leadWidth - spacing
+        if !task.tag.isEmpty {
+            let tagWidth: CGFloat
+            if task.tagIsAccent {
+                tagWidth = TextMeasure.systemWidth(of: [task.tag], size: size, semibold: true)
+            } else {
+                tagWidth = TextMeasure.width(of: [task.tag], fontName: WidgetFontName.outfitBold, size: size)
+            }
+            room -= spacing + tagWidth
+        }
+        if task.dot != nil {
+            room -= spacing + dotSize * scale
+        }
+        return TextMeasure.systemWidth(of: [task.title], size: size, semibold: false) <= room
+    }
+
     var body: some View {
         if linked {
             Link(destination: WidgetLinks.url(task.link.isEmpty ? fallbackLink : task.link, size)) {
@@ -138,13 +165,13 @@ struct TaskRowView: View {
     }
 
     private var row: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: Self.spacing) {
             TaskGlyphView(kind: task.kind, m: m)
                 .frame(width: leadWidth, alignment: .leading)
             // Regular, not medium: the second cue (after the checkbox) that this is a task
             // under the day and not an event in it. Event titles stay medium.
             Text(task.title)
-                .font(.sys(size: m.s(11), weight: .regular))
+                .font(.sys(size: m.s(Self.textSize), weight: .regular))
                 .foregroundStyle(Color.wInk)
                 .lineLimit(1)
                 .truncationMode(.tail)
@@ -153,7 +180,7 @@ struct TaskRowView: View {
                 tag
             }
             if let dot = task.dot {
-                MemberDotView(dot: dot, diameter: m.s(14), m: m)
+                MemberDotView(dot: dot, diameter: m.s(Self.dotSize), m: m)
             }
         }
         .frame(height: height)

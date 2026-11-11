@@ -40,6 +40,9 @@ struct FillSpec {
     var eventSlot: Int
     /// The To-dos layout: task rows shown when the host reports no height (medium 4, large 10).
     var noHeightTaskRows: Int
+    /// The To-dos layout: a task row's width inside the panel (the panel's width less its side
+    /// padding), for the Automatic step's title check. 0 = unknown, and then nothing steps.
+    var taskRowWidth: CGFloat
 }
 
 /// Which layout one render uses, decided once by `WidgetFill.effective`. `day` is the calendar
@@ -179,6 +182,9 @@ enum WidgetFill {
     static let maxTaskRows = 16
     /// The To-dos focus's Automatic steps, before the `WidgetMetrics.taskStepMax` clamp.
     static let taskSteps: [CGFloat] = [1.0, 1.3, 1.6]
+    /// The fill's comparison slack: the stepped sums are floats. Mirrors Android
+    /// `WidgetFill.FIT_EPSILON_DP`.
+    static let fitEpsilon: CGFloat = 0.01
 
     // MARK: the focus
 
@@ -223,8 +229,17 @@ enum WidgetFill {
     static func taskStepFactors(_ blocks: WidgetBlocks, scale: CGFloat) -> [CGFloat] {
         guard blocks.focus == .todos, blocks.isAutomaticTextSize, scale > 0 else { return [1.0] }
         return taskSteps.map { factor in
-            Swift.max(scale, Swift.min(scale * factor, WidgetMetrics.taskStepMax)) / scale
+            WidgetMetrics.steppedScale(scale, by: factor) / scale
         }
+    }
+
+    /// The step factors at which no title that is whole at x1 would be cut: a factor above 1 is
+    /// kept only when `fits` says so; x1 always stays. Titles already too long at x1 never block
+    /// a step (they are cut either way). Filters `todosFill`'s input so the fill stays numbers
+    /// only. Mirrors Android `WidgetFill.widthAllowedSteps`.
+    static func factorsKeepingTitles(_ factors: [CGFloat], fits: (CGFloat) -> Bool) -> [CGFloat] {
+        let kept = factors.filter { factor in factor <= 1 || fits(factor) }
+        return kept.isEmpty ? [1.0] : kept
     }
 
     static func plan(
@@ -266,6 +281,12 @@ enum WidgetFill {
             // with to-dos due always shows one), and never gated on the events switch, which
             // is off by default in the To-dos focus.
             if tasks.isEmpty {
+                // The section heading row stays over the all clear, as in the mockup.
+                let sectionCost = sectionHeadingHeight * scale
+                if remaining >= sectionCost {
+                    plan.taskSection = day.tasks
+                    remaining -= sectionCost
+                }
                 if todayRows.isEmpty, lookAhead.isEmpty {
                     if remaining >= messageHeight * scale { plan.relaxed = true }
                     return plan
@@ -408,6 +429,38 @@ enum WidgetFill {
             }
         }
 
+        // A step is only taken if it cuts no title that is whole at x1, so the check measures the
+        // day's shown tasks (at most `maxTaskRows`) the way `TaskRowView` draws them, with the
+        // lead column at its widest possible (every event time that could be drawn).
+        var factors = taskStepFactors(blocks, scale: scale)
+        if factors.count > 1 {
+            if spec.taskRowWidth > 0 {
+                var times: [String] = []
+                for row in todayRows where !row.time.isEmpty {
+                    times.append(row.time)
+                }
+                for (_, rows) in lookAhead {
+                    for row in rows where !row.time.isEmpty {
+                        times.append(row.time)
+                    }
+                }
+                let lead = AgendaPanelView.timeColumnWidth(times, child: false, scale: scale)
+                let rowWidth = spec.taskRowWidth
+                let wholeAtStandard = Array(tasks.prefix(maxTaskRows)).filter { task in
+                    TaskRowView.titleFits(task, rowWidth: rowWidth, leadWidth: lead, scale: scale)
+                }
+                let fits: (CGFloat) -> Bool = { factor in
+                    let stepped = WidgetMetrics.steppedScale(scale, by: factor)
+                    return wholeAtStandard.allSatisfy { task in
+                        TaskRowView.titleFits(task, rowWidth: rowWidth, leadWidth: lead, scale: stepped)
+                    }
+                }
+                factors = factorsKeepingTitles(factors, fits: fits)
+            } else {
+                factors = [1.0]
+            }
+        }
+
         let fill = todosFill(
             height: height,
             heading: sectionCost,
@@ -415,7 +468,7 @@ enum WidgetFill {
             groupHeadings: headings.map { (label: String?) -> CGFloat in label == nil ? 0 : groupCost },
             reserve: reserve,
             groupSizes: runs.map { run in run.tasks.count },
-            stepFactors: taskStepFactors(blocks, scale: scale),
+            stepFactors: factors,
             overflow: overflow,
             noHeightRows: spec.noHeightTaskRows
         )
@@ -504,7 +557,7 @@ enum WidgetFill {
                 for index in groupSizes.indices where groupSizes[index] > 0 {
                     cost += groupHeading(index) * factor
                 }
-                if cost <= height && factor > best {
+                if cost <= height + fitEpsilon && factor > best {
                     best = factor
                 }
             }
@@ -516,21 +569,19 @@ enum WidgetFill {
             }
         }
 
-        // Not everything fits: rows in order at Standard while they fit.
-        var room = height - heading - reserve
+        // Not everything fits: rows in order at Standard while they fit. The first row is always
+        // taken, so a day with tasks never looks clear.
+        var used = heading + reserve
         var shown = 0
         filling: for index in groupSizes.indices where groupSizes[index] > 0 {
             for rowIndex in 0 ..< groupSizes[index] {
-                let cost = row + (rowIndex == 0 ? groupHeading(index) : 0)
-                if shown >= maxTaskRows || room < cost { break filling }
+                if shown >= maxTaskRows { break filling }
+                let need = row + (rowIndex == 0 ? groupHeading(index) : 0)
+                if shown > 0 && used + need > height + fitEpsilon { break filling }
+                used += need
                 result.shownPerGroup[index] += 1
                 shown += 1
-                room -= cost
             }
-        }
-        if shown == 0, let first = groupSizes.firstIndex(where: { $0 > 0 }) {
-            result.shownPerGroup[first] = 1
-            shown = 1
         }
         result.more = overflow + total - shown
         return result

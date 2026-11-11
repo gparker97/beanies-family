@@ -425,4 +425,65 @@ public class WidgetFillTest {
         WidgetPrefs inferred = prefs(INFERRED, WidgetPrefs.Focus.DAY, false, false);
         assertArrayEquals(FIXED, WidgetSizes.taskStepFactors(inferred, WidgetSizes.Size.LARGE, API_31, 1f), EPS);
     }
+
+    // ---- the width rule on steps (2026-11-11 review) -------------------------------------------
+
+    private static WidgetSnapshot.Task task(String title) throws Exception {
+        return new WidgetSnapshot.Task(new org.json.JSONObject().put("kind", "todo").put("title", title));
+    }
+
+    /** A row whose title needs {@code len x 6dp x f} and whose room is {@code 120dp - 20dp x f}. */
+    private static final WidgetFill.RowMeasure FAKE = new WidgetFill.RowMeasure() {
+        @Override
+        public float titleDp(WidgetSnapshot.Task t, float f) {
+            return t.title.length() * 6f * f;
+        }
+
+        @Override
+        public float roomDp(WidgetSnapshot.Task t, float f) {
+            return 120f - 20f * f;
+        }
+    };
+
+    @Test
+    public void aCheckThatRejectsTheLargestStepLeavesTheMiddle() {
+        WidgetFill.StepWidthCheck rejects16 = (tasks, times, f) -> f < 1.5f;
+        assertArrayEquals(new float[] {1f, 1.3f},
+                WidgetFill.widthAllowedSteps(STEPS, Arrays.<WidgetSnapshot.Task>asList(), Arrays.<String>asList(), rejects16), EPS);
+        // Fed to the fill, the 2, 1 vector that steps to x1.6 on height alone settles on x1.3.
+        assertEquals(1.3f, fill(WidgetFill.widthAllowedSteps(STEPS, Arrays.<WidgetSnapshot.Task>asList(),
+                Arrays.<String>asList(), rejects16), 2, 1).step, EPS);
+    }
+
+    @Test
+    public void aCheckThatRejectsBothStepsLeavesStandard() {
+        WidgetFill.StepWidthCheck none = (tasks, times, f) -> false;
+        float[] kept = WidgetFill.widthAllowedSteps(STEPS, Arrays.<WidgetSnapshot.Task>asList(), Arrays.<String>asList(), none);
+        assertArrayEquals(FIXED, kept, EPS);
+        assertEquals(1f, fill(kept, 2, 1).step, EPS);
+    }
+
+    @Test
+    public void theCheckIsNeverAskedAboutStandard() {
+        WidgetFill.StepWidthCheck boom = (tasks, times, f) -> {
+            throw new AssertionError("asked about x" + f);
+        };
+        assertArrayEquals(FIXED, WidgetFill.widthAllowedSteps(FIXED, Arrays.<WidgetSnapshot.Task>asList(),
+                Arrays.<String>asList(), boom), EPS);
+    }
+
+    @Test
+    public void aTitleThatFitsAtStandardBlocksTheStepThatWouldCutIt() throws Exception {
+        // 15 chars: 90dp of 100 at x1; 117 of 94 at x1.3.
+        assertFalse(WidgetFill.noNewTruncation(Arrays.asList(task("buy the candles")), 1.3f, FAKE));
+        // 8 chars: 48 / 62.4 / 76.8 against 100 / 94 / 88: every step fits.
+        assertTrue(WidgetFill.noNewTruncation(Arrays.asList(task("pack bag")), 1.6f, FAKE));
+    }
+
+    @Test
+    public void aTitleAlreadyTooLongAtStandardDoesNotBlock() throws Exception {
+        // 30 chars: 180dp of 100 at x1, cut at every size.
+        String long_ = "renew every passport this week";
+        assertTrue(WidgetFill.noNewTruncation(Arrays.asList(task(long_), task("pack bag")), 1.6f, FAKE));
+    }
 }

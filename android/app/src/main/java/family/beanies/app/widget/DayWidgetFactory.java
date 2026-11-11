@@ -57,13 +57,15 @@ final class DayWidgetFactory implements RemoteViewsService.RemoteViewsFactory {
             size = WidgetSizes.sizeFor(options);
             WidgetPrefs prefs = WidgetPrefs.load(context, appWidgetId);
             textScale = WidgetSizes.textScale(context, prefs.textSize);
-            // The same step factors as the renderer (one source), so both resolve the same plan.
+            panelDp = DayWidgetRenderer.agendaPanelDp(WidgetSizes.widthDp(options, size));
+            // The same step factors and width check as the renderer (one source each), so both
+            // resolve the same plan.
             plan = result.state == WidgetSnapshotStore.State.READY
                     ? WidgetFill.plan(result.snapshot, prefs, size,
                             WidgetSizes.layoutHeightDp(context, options, textScale), now,
-                            WidgetSizes.taskStepFactors(context, prefs, size))
+                            WidgetSizes.taskStepFactors(context, prefs, size),
+                            WidgetViews.titleWidthCheck(context, panelDp, textScale))
                     : null;
-            panelDp = DayWidgetRenderer.agendaPanelDp(WidgetSizes.widthDp(options, size));
         } catch (RuntimeException e) {
             // The same read and plan fail the provider's render too, which relays `render_failed`;
             // here the list must only never take the launcher's binder thread down.

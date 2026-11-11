@@ -119,7 +119,8 @@ final class DayWidgetRenderer {
         WidgetFill.Plan plan =
                 result.state == WidgetSnapshotStore.State.READY
                         ? WidgetFill.plan(result.snapshot, prefs, size, heightDp, now,
-                                WidgetSizes.taskStepFactors(context, prefs, size))
+                                WidgetSizes.taskStepFactors(context, prefs, size),
+                                WidgetViews.titleWidthCheck(context, agendaPanelDp(widthDp), textScale))
                         : null;
         if (plan == null) return refresh(context, appWidgetId, size, widthDp, prefs, textScale);
 
@@ -419,23 +420,27 @@ final class DayWidgetRenderer {
         WidgetSizes.Size size = WidgetSizes.Size.SMALL;
         WidgetSnapshot s = plan.snapshot;
         RemoteViews v = new RemoteViews(context.getPackageName(), size.layout);
-        // To-dos: the due count takes the peek's slot and the whole widget opens the To-Dos page.
+        // To-dos: the whole widget opens the To-Dos page, and the due count takes the peek's slot
+        // while there is one ("" with only undated / later to-dos: the slot is then Your day's).
         boolean todos = plan.layout == WidgetFill.Layout.TODOS;
+        boolean countInSlot = todos && plan.day != null && !plan.day.tasks.countText.text.isEmpty();
         // The weather takes the peek's slot only while a current temperature exists (#134).
         WidgetWeather.Shown weather = WidgetWeather.at(s.weather, now);
-        WidgetWeather.Shown slot = !todos && weather != null && weather.hasCurrent() ? weather : null;
+        WidgetWeather.Shown slot = !countInSlot && weather != null && weather.hasCurrent() ? weather : null;
         float headerScale = smallHeaderScale(context, widthDp, textScale, plan, slot);
         sizeSmallText(v, context, textScale, headerScale);
         String link = todos ? s.links.todo : s.links.nook;
         frame(v, context, id, size, prefs.opacity, link);
         dateTile(v, prefs.opacity);
+        // The count is readable text in the header row, so it gets the header's tile too.
+        tile(v, R.id.small_count, prefs.opacity);
 
         WidgetTextBitmaps.bind(v, context, R.id.date_weekday, plan.entry.weekdayShort, SMALL_WEEKDAY,
                 headerScale, 0, R.color.widget_accent_text);
         WidgetTextBitmaps.bind(v, context, R.id.date_numeral, plan.entry.numeral, SMALL_NUMERAL,
                 headerScale, 0, R.color.widget_ink);
         WidgetViews.onClick(v, R.id.date_column, context, id, WidgetViews.SLOT_DATE, link, size);
-        WidgetViews.bindPeek(v, plan, slot != null || todos);
+        WidgetViews.bindPeek(v, plan, slot != null || countInSlot);
         bindSmallWeather(v, context, headerScale, slot);
         WidgetViews.textOrGone(v, R.id.date_as_of, asOf(context, plan));
 
@@ -445,7 +450,7 @@ final class DayWidgetRenderer {
         // To-dos it is the all-clear state: no task at all.
         float panelDp = widthDp - SMALL_PANEL_INSET_DP;
         boolean relaxed = bindRelaxed(v, context, plan, textScale, panelDp);
-        bindSmallTasks(v, context, id, textScale, plan, todos);
+        bindSmallTasks(v, context, id, textScale, plan, todos, countInSlot);
         boolean events = !todos && !relaxed && plan.shows(WidgetFill.EVENTS) && day != null;
         WidgetTextBitmaps.bind(v, context, R.id.small_things, events ? day.thingsText : "",
                 CAVEAT_LINE, textScale, panelDp, R.color.widget_accent_text);
@@ -486,13 +491,13 @@ final class DayWidgetRenderer {
      * hides all three, so its small lays out as before.
      */
     private static void bindSmallTasks(RemoteViews v, Context context, int id, float textScale,
-            WidgetFill.Plan plan, boolean todos) {
+            WidgetFill.Plan plan, boolean todos, boolean countInSlot) {
         v.removeAllViews(R.id.tasks_rows);
         boolean rows = todos && !plan.visibleTasks.isEmpty();
         v.setViewVisibility(R.id.tasks_rows, rows ? View.VISIBLE : View.GONE);
         WidgetSnapshot.Day day = plan.day;
         WidgetViews.textOrGone(v, R.id.small_count,
-                todos && day != null ? WidgetText.emphasised(day.tasks.countText) : "");
+                countInSlot ? WidgetText.emphasised(day.tasks.countText) : "");
         WidgetViews.textOrGone(v, R.id.small_more, rows ? plan.moreText() : "");
         if (rows) {
             addTaskRows(v, context, id, WidgetSizes.Size.SMALL, textScale, plan,
@@ -680,7 +685,12 @@ final class DayWidgetRenderer {
      * date column and keeps its card solid.
      */
     private static void dateTile(RemoteViews v, int opacity) {
-        v.setInt(R.id.date_column, "setBackgroundResource", opacity < 100 ? R.drawable.widget_tile_bg : 0);
+        tile(v, R.id.date_column, opacity);
+    }
+
+    /** {@link #dateTile}'s 95% tile behind {@code viewId}, only while the card is see-through. */
+    private static void tile(RemoteViews v, int viewId, int opacity) {
+        v.setInt(viewId, "setBackgroundResource", opacity < 100 ? R.drawable.widget_tile_bg : 0);
     }
 
     /** "as of 08:30" (device time format) when the plan is stale; "" otherwise. */

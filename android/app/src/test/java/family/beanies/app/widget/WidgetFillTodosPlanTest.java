@@ -249,4 +249,35 @@ public class WidgetFillTodosPlanTest {
         assertEquals(WidgetFill.MAX_TASK_ROWS, p.visibleTasks.size());
         assertEquals("4 more", p.todosFooterText());
     }
+
+    @Test
+    public void aWidthCheckHoldsTheStepBackFromCuttingATitle() throws Exception {
+        // The large picks x1.6 on height alone (aShortListOnTheLargeStepsToTheLargestSize).
+        WidgetFill.StepWidthCheck rejects16 = (tasks, times, f) -> {
+            assertEquals(5, tasks.size());
+            return f < 1.5f;
+        };
+        WidgetFill.Plan p = WidgetFill.plan(WidgetSnapshot.from(v4()), todos(false, false),
+                WidgetSizes.Size.LARGE, 344, SUN_NOON, STEPS, rejects16);
+        assertEquals(1.3f, p.taskStep, EPS);
+        WidgetFill.Plan none = WidgetFill.plan(WidgetSnapshot.from(v4()), todos(false, false),
+                WidgetSizes.Size.LARGE, 344, SUN_NOON, STEPS, (tasks, times, f) -> false);
+        assertEquals(1f, none.taskStep, EPS);
+        assertEquals(5, none.visibleTasks.size());
+    }
+
+    @Test
+    public void theSmallHoldsTheMoreLineOnlyWhenSomethingDoesNotFit() throws Exception {
+        // A 2x2 at 150dp: room 84. Four to-dos take 76, so all four show with no "more" line.
+        JSONObject root = v4();
+        JSONArray items = today(root).getJSONObject("tasks").getJSONArray("items");
+        items.remove(items.length() - 1);
+        WidgetFill.Plan four = plan(root, todos(false, false), WidgetSizes.Size.SMALL, 150, STEPS);
+        assertEquals(4, four.visibleTasks.size());
+        assertEquals("", four.moreText());
+        // Five do not fit: the line is reserved (84 - 15 = 69), so three show and "2 more".
+        WidgetFill.Plan five = plan(v4(), todos(false, false), WidgetSizes.Size.SMALL, 150, STEPS);
+        assertEquals(3, five.visibleTasks.size());
+        assertEquals("2 more", five.moreText());
+    }
 }

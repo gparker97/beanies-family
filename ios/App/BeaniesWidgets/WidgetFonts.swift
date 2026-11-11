@@ -47,6 +47,17 @@ extension WidgetFontName {
 enum TextMeasure {
     static func width(of strings: [String], fontName: String, size: CGFloat) -> CGFloat {
         let font = UIFont(name: fontName, size: size) ?? UIFont.systemFont(ofSize: size, weight: .semibold)
+        return width(of: strings, font: font)
+    }
+
+    /// The system face as `Font.sys` draws it (regular, or semibold): the to-do rows' title and
+    /// accent tag, for the To-dos layout's title check (`TaskRowView.titleFits`).
+    static func systemWidth(of strings: [String], size: CGFloat, semibold: Bool) -> CGFloat {
+        let font = UIFont.systemFont(ofSize: size, weight: semibold ? .semibold : .regular)
+        return width(of: strings, font: font)
+    }
+
+    private static func width(of strings: [String], font: UIFont) -> CGFloat {
         let widest = strings
             .map { ($0 as NSString).size(withAttributes: [.font: font]).width }
             .max() ?? 0

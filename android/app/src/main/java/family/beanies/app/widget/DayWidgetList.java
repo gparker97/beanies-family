@@ -29,7 +29,8 @@ import java.util.List;
  * THE TO-DOS LAYOUT (2026-11-11). The list is the upcoming-events extra under the to-dos: today's
  * rows arrive without the ones already ended ({@link WidgetFill#plan} leaves them out, so the
  * events slot it reserves is counted from the same rows), led by a "next up" heading (the divider
- * layout, so {@link #VIEW_TYPE_COUNT} stays 4), and an all-clear day with events gets its one
+ * layout with the label in its soft-ink aside, so {@link #VIEW_TYPE_COUNT} stays 4 and no list
+ * item ever gets a colour set), and an all-clear day with events gets its one
  * handwritten all-clear line on top. Your day is unchanged.
  *
  * Built from the SAME {@link WidgetFill.Plan} as the rest of the widget, so the list can never show
@@ -112,7 +113,9 @@ final class DayWidgetList {
         if (!allClear.isEmpty()) out.add(nothing(allClear));
         String nextUp = plan.snapshot.labels.eventsHeading;
         if (plan.layout == WidgetFill.Layout.TODOS && !plan.todayRows.isEmpty() && !nextUp.isEmpty()) {
-            out.add(WidgetViews.heading(context, textScale, nextUp, R.color.widget_ink_soft, ""));
+            // In the divider's soft-ink aside, the date left empty: no colour is set on a list
+            // item, so a recycled one never carries it into a date divider.
+            out.add(divider("", nextUp));
         }
         addRows(out, plan.todayRows, now);
         for (WidgetFill.LaterDay later : plan.laterDays) {
@@ -197,8 +200,20 @@ final class DayWidgetList {
 
     /** "Wed 15" in the accent, "tomorrow" beside it when it is the device's tomorrow, a hairline. */
     private RemoteViews divider(String date, boolean isTomorrow) {
-        return WidgetViews.heading(context, textScale, date, R.color.widget_accent_text,
-                isTomorrow ? tomorrowLabel : "");
+        return divider(date, isTomorrow ? tomorrowLabel : "");
+    }
+
+    /**
+     * The divider item: {@code date} in the layout's accent, {@code aside} in its soft ink (or
+     * GONE). Colours stay the layout's, resolved by the launcher per light/dark mode.
+     */
+    private RemoteViews divider(String date, String aside) {
+        RemoteViews v = new RemoteViews(context.getPackageName(), R.layout.widget_day_divider);
+        WidgetViews.textSize(v, context, textScale, R.dimen.widget_text_body,
+                R.id.divider_date, R.id.divider_tomorrow);
+        v.setTextViewText(R.id.divider_date, date);
+        WidgetViews.textOrGone(v, R.id.divider_tomorrow, aside);
+        return v;
     }
 
     private RemoteViews nothing(String line) {

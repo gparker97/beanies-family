@@ -122,16 +122,23 @@ struct DayLayoutView: View {
     /// The panel's drop below the top padding (13pt; the peek lives there), or the child header.
     private var headerHeight: CGFloat { child ? m.s(38) : 13 }
     private static let panelPadding: CGFloat = 4 + 3
+    private static let dateColumnWidth: CGFloat = 52
+    private static let columnGap: CGFloat = 8
 
     var body: some View {
         GeometryReader { proxy in
-            layout(plan(forHeight: proxy.size.height))
+            layout(plan(forHeight: proxy.size.height, width: proxy.size.width))
         }
     }
 
-    /// The fill budget is the real widget height (it differs by device) minus the fixed chrome.
-    private func plan(forHeight height: CGFloat) -> FillPlan {
+    /// The fill budget is the real widget height (it differs by device) minus the fixed chrome;
+    /// the task row width is the real widget width less the insets, the date column and the
+    /// panel's own side padding.
+    private func plan(forHeight height: CGFloat, width: CGFloat) -> FillPlan {
         let chrome = insets.top + insets.bottom + headerHeight + Self.panelPadding + m.s(16)
+        let column = child ? 0 : Self.dateColumnWidth + Self.columnGap
+        let panelSides = AgendaPanelView.contentInsets.leading + AgendaPanelView.contentInsets.trailing
+        let taskRowWidth = Swift.max(0, width - insets.leading - insets.trailing - column - panelSides)
         let spec = FillSpec(
             bodyHeight: Swift.max(0, height - chrome),
             maxRows: isLarge ? (child ? 8 : 9) : (child ? 3 : 5),
@@ -142,7 +149,8 @@ struct DayLayoutView: View {
             hasDateColumn: !child,
             scale: m.scale,
             eventSlot: isLarge ? 3 : 1,
-            noHeightTaskRows: isLarge ? 10 : 4
+            noHeightTaskRows: isLarge ? 10 : 4,
+            taskRowWidth: taskRowWidth
         )
         return WidgetFill.plan(
             resolved: resolved, blocks: blocks, layout: layout, labels: snapshot.labels, spec: spec, at: date
@@ -163,7 +171,7 @@ struct DayLayoutView: View {
                 .frame(height: headerHeight)
                 .cardTile(blocks.background, outset: EdgeInsets(top: 2, leading: 6, bottom: 2, trailing: 6))
             }
-            HStack(alignment: .top, spacing: 8) {
+            HStack(alignment: .top, spacing: Self.columnGap) {
                 if !child {
                     DayColumnView(
                         entry: resolved.entry,
@@ -175,7 +183,7 @@ struct DayLayoutView: View {
                         size: size,
                         m: m
                     )
-                    .frame(width: 52)
+                    .frame(width: Self.dateColumnWidth)
                     .frame(maxHeight: .infinity, alignment: .top)
                     // Gap to the panel is the 8pt spacing; the tile takes 4 of it.
                     .cardTile(blocks.background, outset: EdgeInsets(top: 6, leading: 6, bottom: 0, trailing: 4))
@@ -216,7 +224,7 @@ struct DayLayoutView: View {
     private func footerTrailing(_ plan: FillPlan) -> String? {
         guard plan.layout == .todos else { return snapshot.labels.later }
         if plan.moreTasks > 0 {
-            return snapshot.labels.more.replacingOccurrences(of: "{n}", with: String(plan.moreTasks))
+            return snapshot.labels.moreText(plan.moreTasks)
         }
         return snapshot.labels.allTodos
     }

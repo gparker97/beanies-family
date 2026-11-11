@@ -288,10 +288,15 @@ final class WidgetViews {
      * {@link #LEAD_MIN_DP}. The list factory and the renderer both call this with the same plan.
      */
     static float leadColumnDp(Context context, WidgetFill.Plan plan, float textScale) {
+        return leadColumnDp(context, plan.calendarTimes(), plan.isChild, textScale);
+    }
+
+    /** {@link #leadColumnDp(Context, WidgetFill.Plan, float)} from the times themselves. */
+    static float leadColumnDp(Context context, java.util.List<String> times, boolean isChild, float textScale) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return LEAD_MIN_DP;
-        float sp = sp(context, rowDimen(plan.isChild)) * textScale;
-        Typeface face = plan.isChild ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT;
-        float widest = widestDp(context, plan.calendarTimes(), sp, face);
+        float sp = sp(context, rowDimen(isChild)) * textScale;
+        Typeface face = isChild ? Typeface.DEFAULT_BOLD : Typeface.DEFAULT;
+        float widest = widestDp(context, times, sp, face);
         // +2dp: sub-pixel rounding between this Paint and the host's TextView must never ellipsize.
         return Math.max(LEAD_MIN_DP, widest == 0 ? 0 : widest + 2f);
     }
@@ -338,11 +343,12 @@ final class WidgetViews {
     }
 
     /**
-     * A heading item (`widget_day_divider.xml`): {@code text} in {@code colorRes}, {@code aside}
-     * ("tomorrow") beside it in the softer ink or GONE, then the hairline. The calendar's date
-     * dividers and its "next up" heading (DayWidgetList) and the To-dos group headings
-     * (DayWidgetRenderer) are all this one view, sized at the body size × {@code textScale} and
-     * coloured on every bind, so a recycled list item never keeps another heading's colour.
+     * A To-dos group heading (`widget_day_divider.xml`, "overdue" / "due today" / "coming up"):
+     * {@code text} in {@code colorRes}, {@code aside} beside it or GONE, then the hairline, at the
+     * body size × {@code textScale}. Only for the to-dos section, which is built fresh on every
+     * render, so the colour set here can never ride on a recycled view. The calendar list never
+     * sets a divider colour (DayWidgetList keeps the layout's own, which the launcher resolves
+     * per light/dark mode).
      */
     static RemoteViews heading(Context context, float textScale, CharSequence text,
             @ColorRes int colorRes, CharSequence aside) {
@@ -352,6 +358,48 @@ final class WidgetViews {
         textColorRes(v, context, R.id.divider_date, colorRes);
         textOrGone(v, R.id.divider_tomorrow, aside);
         return v;
+    }
+
+    /** The task row's fixed widths (widget_task_row.xml), for {@link #titleWidthCheck}. */
+    private static final float TASK_LEAD_GAP_DP = 6f;
+    private static final float TASK_TAG_GAP_DP = 4f;
+    private static final float TASK_DOT_GAP_DP = 4f;
+    private static final float TASK_DOT_DP = 14f;
+
+    /**
+     * The device side of {@link WidgetFill.StepWidthCheck}, the ONE implementation the renderer
+     * and the list factory pass to {@link WidgetFill#plan}: Paint-measured in the typefaces the
+     * HOST draws a task row in (system sans regular for the title, bold for the tag: `@font` is
+     * ignored in launcher RemoteViews) at the body size × {@code textScale} × the step, through the
+     * device font scale. A title's room at a step is {@code panelDp} (the panel's inner width,
+     * `DayWidgetRenderer.agendaPanelDp`) less the lead column (as wide as the calendar's widest
+     * time, {@link #leadColumnDp}) and its 6dp gap, the tag and its 4dp gap, and the member dot
+     * (14dp × the step, the size the stepped row gives it) and its 4dp gap. The +2dp of
+     * {@link #fitSp} covers the Paint / TextView rounding difference. The pure rule is
+     * {@link WidgetFill#noNewTruncation}.
+     */
+    static WidgetFill.StepWidthCheck titleWidthCheck(Context context, float panelDp, float textScale) {
+        return (tasks, calendarTimes, factor) -> {
+            float leadDp = Math.max(LEAD_MIN_DP, leadColumnDp(context, calendarTimes, false, textScale));
+            float bodySp = sp(context, R.dimen.widget_text_body) * textScale;
+            Paint title = paint(Typeface.DEFAULT);
+            Paint tag = paint(Typeface.DEFAULT_BOLD);
+            WidgetFill.RowMeasure measure = new WidgetFill.RowMeasure() {
+                @Override
+                public float titleDp(WidgetSnapshot.Task task, float f) {
+                    return widestDp(context, java.util.Collections.singletonList(task.title), bodySp * f, title) + 2f;
+                }
+
+                @Override
+                public float roomDp(WidgetSnapshot.Task task, float f) {
+                    float tagDp = task.tag.isEmpty() ? 0f : TASK_TAG_GAP_DP
+                            + widestDp(context, java.util.Collections.singletonList(task.tag), bodySp * f, tag);
+                    float dotDp = task.dot == null ? 0f : TASK_DOT_GAP_DP + TASK_DOT_DP * f;
+                    return panelDp - leadDp - TASK_LEAD_GAP_DP - tagDp - dotDp;
+                }
+            };
+            return WidgetFill.noNewTruncation(tasks, factor, measure);
+        };
     }
 
     /**

@@ -397,7 +397,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'Tap a to-do and beanies opens on it. You cannot tick a to-do off from the widget. A child’s widget always stays on Your day. Settings belong to each widget, so two widgets on the same phone can have different foci.',
+          'On the medium and large widgets, tap a to-do and beanies opens on it; a tap on the small widget opens your To-Dos page. You cannot tick a to-do off from the widget. A child’s widget always stays on Your day. Settings belong to each widget, so two widgets on the same phone can each have a different focus.',
       },
       {
         type: 'heading',
@@ -408,7 +408,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'The widget is always laid out the same way. <strong>The calendar is at the top:</strong> today’s activities, family trips ("day 3 of 6"), including ones you are not on, and birthdays. When today is quiet, the rest of the week fills the space, each day under its own date, with <strong>tomorrow</strong> marked, so you always know when you are looking ahead.',
+          'With the Your day focus the widget is always laid out the same way. <strong>The calendar is at the top:</strong> today’s activities, family trips ("day 3 of 6"), including ones you are not on, and birthdays. When today is quiet, the rest of the week fills the space, each day under its own date, with <strong>tomorrow</strong> marked, so you always know when you are looking ahead.',
       },
       {
         type: 'paragraph',

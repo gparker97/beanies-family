@@ -23,6 +23,10 @@ struct AgendaPanelView: View {
 
     static let peekHeight: CGFloat = 22
 
+    /// The panel's padding around its rows. `DayLayoutView` takes the sides off the panel's
+    /// width for the To-dos layout's title check.
+    static let contentInsets = EdgeInsets(top: 4, leading: 6, bottom: 3, trailing: 6)
+
     /// The widest visible time in this widget (min 31; the child view's bigger type, min 62).
     /// Trip and birthday rows put a glyph there instead, so they never widen it.
     private var timeWidth: CGFloat {
@@ -30,16 +34,24 @@ struct AgendaPanelView: View {
             if case .row(let row) = item, !row.time.isEmpty { return row.time }
             return nil
         }
+        return Self.timeColumnWidth(times, child: child, scale: m.scale)
+    }
+
+    /// The time column for `times` at `scale`. Also `WidgetFill`'s widest-case lead column for
+    /// the To-dos layout's title check, before the calendar is placed.
+    static func timeColumnWidth(_ times: [String], child: Bool, scale: CGFloat) -> CGFloat {
         if child {
-            return Swift.max(m.s(62), TextMeasure.width(of: times, fontName: WidgetFontName.outfitBold, size: m.s(19)))
+            return Swift.max(62 * scale, TextMeasure.width(of: times, fontName: WidgetFontName.outfitBold, size: 19 * scale))
         }
-        return Swift.max(m.s(31), TextMeasure.width(of: times, fontName: WidgetFontName.outfitSemiBold, size: m.s(11)))
+        return Swift.max(31 * scale, TextMeasure.width(of: times, fontName: WidgetFontName.outfitSemiBold, size: 11 * scale))
     }
 
     var body: some View {
         let timeColumn = timeWidth
         VStack(alignment: .leading, spacing: 0) {
-            if plan.layout == .todos, let section = plan.taskSection, !plan.tasks.isEmpty {
+            // With no tasks (all clear) the plan still sets the section: its heading row is drawn
+            // alone, over the relaxed block or the one-line all clear.
+            if plan.layout == .todos, let section = plan.taskSection {
                 todosSection(section, timeColumn: timeColumn)
             }
             if plan.relaxed {
@@ -80,7 +92,7 @@ struct AgendaPanelView: View {
                 )
             }
         }
-        .padding(EdgeInsets(top: 4, leading: 6, bottom: 3, trailing: 6))
+        .padding(Self.contentInsets)
         // The panel fills its exact budget on both sizes, so the to-dos section sits on the
         // footer and the room between it and the calendar stays empty (in the To-dos layout,
         // the room under the calendar).
@@ -107,8 +119,9 @@ struct AgendaPanelView: View {
 
     /// The To-dos layout's section: the heading at Standard with the count on its right ("N
     /// more" moves to the footer), the groups and rows at the plan's step. The fill charged
-    /// `rowHeight x taskStep` per row, so that is the height drawn; the lead column grows with
-    /// the glyph but never narrows below the calendar's time column.
+    /// `rowHeight x taskStep` per row, so that is the height drawn. The lead column does not
+    /// step (it stays the calendar's time column, as on Android): the stepped glyph still fits,
+    /// and the titles keep their edge.
     private func todosSection(_ section: WSTasks, timeColumn: CGFloat) -> some View {
         let rows = m.stepped(plan.taskStep)
         return TaskSectionView(
@@ -117,7 +130,7 @@ struct AgendaPanelView: View {
             moreCount: 0,
             labels: labels,
             fallbackLink: links.todo,
-            leadWidth: Swift.max(rows.s(31), timeColumn),
+            leadWidth: timeColumn,
             rowHeight: rowHeight * plan.taskStep,
             size: size,
             m: m,
