@@ -37,7 +37,7 @@ I built this app to track all that stuff I mentioned above: your family finances
 
 But also, I built this to track your _actual_ family life: piano lessons, schoolwork, sports practice, ballet class, family vacations (we may even give you advice), and, of course, who will pick up whom (yes, _whom_). In short, **anything we can help you with, even in a small way, as you navigate the joys and sorrows of a complicated, crowded, chaotic, stressful, but of course, rewarding?** (sorry, I meant, rewarding) **family life.**
 
-It's not a perfect app. It doesn't pull in stuff from Google Calendar (yet) or sync with banks (I doubt it ever will). But it gives you a rough idea of how much you have, how much you will have, and what in this heavenly world you actually have to do _today_. (Of course, only if you tell it that stuff first. It's not magic.)
+It's not a perfect app. It can read in the transactions you feed us, but it doesn't automatically sync with banks (and I doubt it ever will), and we push events to your external calendars rather than doing a 2-way sync (although [we have a good reason for that](/blog/google-calendar-integration)). But it gives you a rough idea of how much you have, how much you will have, and what in this heavenly world you actually have to do _today_. (Of course, only if you tell it that stuff first. It's not magic.)
 
 Treat [beanies.family](https://beanies.family/?utm_source=blog&utm_medium=post&utm_campaign=welcome-to-the-beanstalk) like a friend, and it will reward you in spades. Maybe it'll even buy you a beer the next time you can spare 22 minutes after work and have $7 saved from meticulously tracking your budget every month. (Is that how much beers cost nowadays? I wouldn't know.)
 
