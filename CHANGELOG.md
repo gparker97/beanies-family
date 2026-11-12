@@ -22,6 +22,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - The beanie wall's drawers open taller, and the trip chips now sit in the drawer's title row.
 - The "live" pill beside a flight detail is now green when it matches the airline, and says "conflict" or "changed" on the exact value that differs.
+- The more compact way of storing family data can now be switched on one family at a time (it is still off for everyone).
 
 ### Fixed
 

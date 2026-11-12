@@ -780,7 +780,7 @@ async function del(existing = null, queryStringParameters = undefined) {
  */
 async function get(
   existing = null,
-  { billing = null, origin = 'https://app.beanies.family' } = {}
+  { billing = null, origin = 'https://app.beanies.family', familyId = FAMILY_ID } = {}
 ) {
   sendMock.mockReset();
   sendMock.mockImplementation((command) => {
@@ -792,7 +792,7 @@ async function get(
   });
   const res = await handler({
     headers: { 'x-api-key': API_KEY, origin },
-    pathParameters: { familyId: FAMILY_ID },
+    pathParameters: { familyId },
     requestContext: { http: { method: 'GET' } },
   });
   return { res, body: JSON.parse(res.body) };
@@ -1445,13 +1445,16 @@ describe('registry GET: dataPolicy (#117 served Counter-write policy)', () => {
     handler = fileHandler;
     delete process.env.COUNTER_WRITES_ENABLED;
     delete process.env.SCALAR_WRITES_ENABLED;
+    delete process.env.SCALAR_WRITES_FAMILY_IDS;
   });
 
-  async function loadWith(value, scalar) {
+  async function loadWith(value, scalar, families) {
     if (value === undefined) delete process.env.COUNTER_WRITES_ENABLED;
     else process.env.COUNTER_WRITES_ENABLED = value;
     if (scalar === undefined) delete process.env.SCALAR_WRITES_ENABLED;
     else process.env.SCALAR_WRITES_ENABLED = scalar;
+    if (families === undefined) delete process.env.SCALAR_WRITES_FAMILY_IDS;
+    else process.env.SCALAR_WRITES_FAMILY_IDS = families;
     vi.resetModules();
     ({ handler } = await import('./index.mjs'));
   }
@@ -1460,29 +1463,49 @@ describe('registry GET: dataPolicy (#117 served Counter-write policy)', () => {
     await loadWith('true');
     const { res, body } = await get(ROW);
     expect(res.statusCode).toBe(200);
-    expect(body.dataPolicy).toEqual({ counterWrites: true, scalarWrites: false });
+    expect(body.dataPolicy).toEqual({
+      counterWrites: true,
+      scalarWrites: false,
+      scalarWritesFamily: false,
+    });
   });
 
   it('serves counterWrites: false when COUNTER_WRITES_ENABLED is "false"', async () => {
     await loadWith('false');
     const { res, body } = await get(ROW);
     expect(res.statusCode).toBe(200);
-    expect(body.dataPolicy).toEqual({ counterWrites: false, scalarWrites: false });
+    expect(body.dataPolicy).toEqual({
+      counterWrites: false,
+      scalarWrites: false,
+      scalarWritesFamily: false,
+    });
   });
 
   it('serves counterWrites: false when COUNTER_WRITES_ENABLED is unset', async () => {
     await loadWith(undefined);
-    expect((await get(ROW)).body.dataPolicy).toEqual({ counterWrites: false, scalarWrites: false });
+    expect((await get(ROW)).body.dataPolicy).toEqual({
+      counterWrites: false,
+      scalarWrites: false,
+      scalarWritesFamily: false,
+    });
   });
 
   it('serves scalarWrites: true when SCALAR_WRITES_ENABLED is "true", independent of counterWrites', async () => {
     await loadWith(undefined, 'true');
-    expect((await get(ROW)).body.dataPolicy).toEqual({ counterWrites: false, scalarWrites: true });
+    expect((await get(ROW)).body.dataPolicy).toEqual({
+      counterWrites: false,
+      scalarWrites: true,
+      scalarWritesFamily: false,
+    });
   });
 
   it('serves scalarWrites: false when SCALAR_WRITES_ENABLED is "false" or mistyped', async () => {
     await loadWith('true', 'false');
-    expect((await get(ROW)).body.dataPolicy).toEqual({ counterWrites: true, scalarWrites: false });
+    expect((await get(ROW)).body.dataPolicy).toEqual({
+      counterWrites: true,
+      scalarWrites: false,
+      scalarWritesFamily: false,
+    });
     await loadWith('true', 'TRUE');
     expect((await get(ROW)).body.dataPolicy.scalarWrites).toBe(false);
   });
@@ -1492,6 +1515,77 @@ describe('registry GET: dataPolicy (#117 served Counter-write policy)', () => {
     const { res, body } = await get(null);
     expect(res.statusCode).toBe(404);
     expect(body.dataPolicy).toBeUndefined();
+  });
+
+  describe('scalarWritesFamily (#124 per-family canary)', () => {
+    const OTHER = '99999999-8888-4777-8666-555555555555';
+    let errorSpy;
+    beforeEach(() => {
+      errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    });
+    afterEach(() => errorSpy.mockRestore());
+
+    it('serves true for a listed family and false for any other, leaving scalarWrites alone', async () => {
+      await loadWith(undefined, undefined, `${OTHER},${FAMILY_ID}`);
+      expect((await get(ROW)).body.dataPolicy).toEqual({
+        counterWrites: false,
+        scalarWrites: false,
+        scalarWritesFamily: true,
+      });
+      await loadWith(undefined, undefined, OTHER);
+      expect((await get(ROW)).body.dataPolicy).toEqual({
+        counterWrites: false,
+        scalarWrites: false,
+        scalarWritesFamily: false,
+      });
+    });
+
+    it('matches an upper-case family id in the request against the lowercase list', async () => {
+      await loadWith(undefined, undefined, FAMILY_ID);
+      const { res, body } = await get(ROW, { familyId: FAMILY_ID.toUpperCase() });
+      expect(res.statusCode).toBe(200);
+      expect(body.dataPolicy.scalarWritesFamily).toBe(true);
+    });
+
+    it('trims, lowercases and keeps valid entries; drops and logs a malformed one', async () => {
+      await loadWith(undefined, undefined, ` not-a-uuid , ${FAMILY_ID.toUpperCase()} ,,`);
+      expect((await get(ROW)).body.dataPolicy.scalarWritesFamily).toBe(true);
+      const dropped = errorSpy.mock.calls.filter((c) =>
+        String(c[0]).includes('SCALAR_WRITES_FAMILY_IDS')
+      );
+      expect(dropped).toHaveLength(1);
+      expect(String(dropped[0][0])).toContain('not-a-uuid');
+    });
+
+    it('a malformed entry matches nothing, even a family whose id it resembles', async () => {
+      await loadWith(undefined, undefined, `${FAMILY_ID}x`);
+      expect((await get(ROW)).body.dataPolicy.scalarWritesFamily).toBe(false);
+    });
+
+    it('serves false for every family when the env is unset or empty', async () => {
+      await loadWith(undefined, undefined, undefined);
+      expect((await get(ROW)).body.dataPolicy.scalarWritesFamily).toBe(false);
+      await loadWith(undefined, undefined, '');
+      expect((await get(ROW)).body.dataPolicy.scalarWritesFamily).toBe(false);
+      expect(
+        errorSpy.mock.calls.some((c) => String(c[0]).includes('SCALAR_WRITES_FAMILY_IDS'))
+      ).toBe(false);
+    });
+
+    it('the fleet flag is unaffected by the list, in both directions', async () => {
+      await loadWith('true', 'true', OTHER);
+      expect((await get(ROW)).body.dataPolicy).toEqual({
+        counterWrites: true,
+        scalarWrites: true,
+        scalarWritesFamily: false,
+      });
+      await loadWith(undefined, 'false', FAMILY_ID);
+      expect((await get(ROW)).body.dataPolicy).toEqual({
+        counterWrites: false,
+        scalarWrites: false,
+        scalarWritesFamily: true,
+      });
+    });
   });
 });
 

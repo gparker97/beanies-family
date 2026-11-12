@@ -9,8 +9,10 @@
  *
  * One import for everything scalar: the classification table, the read half (`str`,
  * `isImmutableString`, `isMapValue`) and the write half (`docValue`, `stampUpdatedAt`, the mint
- * slot). Writer ON is exactly "a mint is installed" (`setScalarMint`, by the worker realm's
- * `setDataPolicy` dispatch); there is no second switch.
+ * slot). Writer ON is exactly "a mint is installed" (`setScalarMint`); there is no second switch.
+ * In a realm the slot is owned by `applyAndProject`'s gate, which sets it at the start of every
+ * dispatched RPC from the stored policy and the family that RPC writes for (#124 per-family
+ * canary); `setDataPolicy` only stores the policy.
  */
 
 /** Turns a plain string into the engine's scalar-string value. */
@@ -18,7 +20,10 @@ export type ScalarMint = (s: string) => unknown;
 
 let mint: ScalarMint | null = null;
 
-/** Installed by the worker realm's `setDataPolicy` dispatch; `null` = writer OFF. */
+/**
+ * `null` = writer OFF. In a realm, `dispatch()` owns this slot and overwrites it on every RPC
+ * (`gateScalarWriter`); only a test driving `docOps` directly sets it by hand.
+ */
 export function setScalarMint(fn: ScalarMint | null): void {
   mint = fn;
 }

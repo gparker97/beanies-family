@@ -12,7 +12,11 @@ import {
   getHeads,
   getChangesSince,
   frameChanges,
+  nextLineage,
+  docLineage,
 } from '../docOps';
+import { foldDoc } from '../counterFields';
+import { isImmutableString, scalarMint } from '../scalarStrings';
 import * as cache from '../cache';
 import {
   configure,
@@ -29,6 +33,7 @@ import {
   reset,
   __resetApplyAndProjectForTesting,
   __hasDocForTesting,
+  exportSnapshot,
   postingSink,
   type WorkerSink,
 } from '../applyAndProject';
@@ -41,11 +46,12 @@ const base = () => migrateDoc(Automerge.init<FamilyDocument>());
 
 const envelopeFor = async (
   doc: Automerge.Doc<FamilyDocument>,
-  key: CryptoKey
+  key: CryptoKey,
+  familyId = FAMILY_ID
 ): Promise<BeanpodFileV4> =>
   ({
     version: '4.0',
-    familyId: FAMILY_ID,
+    familyId,
     familyName: 'Test',
     keyId: 'k1',
     wrappedKeys: {},
@@ -179,6 +185,7 @@ describe('worker/applyAndProject', () => {
       changes: expect.any(Number),
       bytes: expect.any(Number),
       durationMs: expect.any(Number),
+      scalarOn: false, // #124: no policy reached this realm
     });
     expect(res.docStats!.ops).toBeGreaterThan(0);
     expect(res.docStats!.changes).toBeGreaterThan(0);
@@ -1055,6 +1062,415 @@ describe('worker/applyAndProject', () => {
     });
   });
 });
+
+/**
+ * #124 per-family canary: the scalar-writer gate at the top of `dispatch()`. Every case drives
+ * `dispatch('setDataPolicy')` then a dispatched RPC, never the exported `mutate()` (which bypasses
+ * the gate). The mint slot is read straight after an RPC: only the gate writes it, so it still
+ * holds what that RPC ran under. Reads use the exported `exportSnapshot`, never a dispatch.
+ */
+describe('worker/applyAndProject: the scalar-writer gate (#124 per-family canary)', () => {
+  const A = 'gate-fam-a';
+  const B = 'gate-fam-b';
+  let key: CryptoKey;
+
+  const policy = (scalarFamilies: unknown, scalarWrites: boolean | null = null) =>
+    dispatch('setDataPolicy', { counterWrites: null, scalarWrites, scalarFamilies });
+  const setTodo = (id: string) =>
+    dispatch('mutate', {
+      op: 'set',
+      collection: 'todos',
+      id,
+      entity: { id, title: 'a person typed this' },
+    });
+  /** How many `ImmutableString`s the realm's live document holds, anywhere. */
+  const scalarsInDoc = () => countScalars(Automerge.load(exportSnapshot().binary));
+  const idOf = (todo: string) =>
+    (
+      Automerge.load(exportSnapshot().binary) as unknown as {
+        todos?: Record<string, { id?: unknown }>;
+      }
+    ).todos?.[todo]?.id;
+  const isScalar = (v: unknown) => isImmutableString(v);
+  /** Install a fresh document for `family` the way the store does after a cache miss. */
+  const installFor = async (family: string, doc = base()) =>
+    dispatch('mergeRemoteEnvelope', {
+      envelope: await envelopeFor(doc, key, family),
+      familyId: family,
+      basis: { kind: 'no-local-document' },
+    });
+
+  beforeEach(async () => {
+    __resetApplyAndProjectForTesting();
+    cache.__resetCacheForTesting();
+    configure({ pushChunk() {}, perf() {}, cachePersistFailed() {}, cacheReleased() {} });
+    key = await generateFamilyKey();
+    await dispatch('setKey', { key, familyId: A });
+  });
+
+  afterEach(async () => {
+    await reset({ clearing: true });
+    await cache.clearCache(A).catch(() => {});
+    await cache.clearCache(B).catch(() => {});
+    __resetApplyAndProjectForTesting();
+  });
+
+  it('setDataPolicy only stores: the mint is installed by the NEXT RPC, for a listed family', async () => {
+    await installFor(A);
+    await policy([A]);
+    expect(scalarMint()).toBeNull(); // the gate ran BEFORE the store
+    await setTodo('t1');
+    expect(scalarMint()).not.toBeNull();
+    expect(isScalar(idOf('t1'))).toBe(true);
+  });
+
+  it('an unlisted resident family writes the old form', async () => {
+    await installFor(A);
+    await policy([B]);
+    await setTodo('t1');
+    expect(scalarMint()).toBeNull();
+    expect(scalarsInDoc()).toBe(0);
+  });
+
+  it('removing the family from the list turns the writer off at the next RPC', async () => {
+    await installFor(A);
+    await policy([A]);
+    await setTodo('t1');
+    await policy([]);
+    await setTodo('t2');
+    expect(isScalar(idOf('t1'))).toBe(true);
+    expect(idOf('t2')).toBe('t2');
+  });
+
+  it('A listed, then unlisted B opened in the same realm WITHOUT a reset: B writes the old form', async () => {
+    await installFor(A);
+    await policy([A]);
+    await setTodo('t1');
+    expect(scalarsInDoc()).toBeGreaterThan(0);
+
+    await dispatch('setKey', { key, familyId: B });
+    const miss = await dispatch('initAndLoadCache', { familyId: B });
+    expect((miss.result as { loaded: boolean }).loaded).toBe(false);
+    await installFor(B);
+    expect(scalarMint()).toBeNull();
+    expect(scalarsInDoc()).toBe(0);
+    await setTodo('t2');
+    expect(scalarMint()).toBeNull();
+    expect(scalarsInDoc()).toBe(0);
+  });
+
+  it('A listed, then unlisted B opened after a reset: B writes the old form', async () => {
+    await installFor(A);
+    await policy([A]);
+    await setTodo('t1');
+    await dispatch('reset', {});
+    await dispatch('setKey', { key, familyId: B });
+    await installFor(B);
+    await setTodo('t2');
+    expect(scalarMint()).toBeNull();
+    expect(scalarsInDoc()).toBe(0);
+  });
+
+  it("a key for listed B posted while unlisted A's document is live: a mutate writes the old form", async () => {
+    await installFor(A);
+    await policy([B]);
+    await dispatch('setKey', { key, familyId: B });
+    await setTodo('t1');
+    expect(scalarMint()).toBeNull();
+    expect(scalarsInDoc()).toBe(0);
+  });
+
+  it('a policy post that never arrived, then a key for an unlisted family: the old form', async () => {
+    await policy([A]); // an earlier post listed A; the next one (whatever it said) failed
+    await dispatch('setKey', { key, familyId: B });
+    await installFor(B);
+    await setTodo('t1');
+    expect(scalarMint()).toBeNull();
+    expect(scalarsInDoc()).toBe(0);
+  });
+
+  it('initDoc (no family yet) is OFF for the family part; the fleet flag is unaffected', async () => {
+    await installFor(A);
+    await policy([A]);
+    await dispatch('initDoc', {});
+    await setTodo('t1');
+    expect(idOf('t1')).toBe('t1');
+
+    await policy([], true); // fleet-wide ON keeps its meaning
+    await setTodo('t2');
+    expect(isScalar(idOf('t2'))).toBe(true);
+  });
+
+  it('a malformed list is [] with a warning; an absent one (older main) is [] silently', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await installFor(A);
+    await policy(A); // a bare string, not string[]
+    await setTodo('t1');
+    expect(idOf('t1')).toBe('t1');
+    expect(warn.mock.calls.some((c) => String(c[0]).includes('scalarFamilies'))).toBe(true);
+
+    warn.mockClear();
+    await dispatch('setDataPolicy', { counterWrites: null, scalarWrites: null });
+    await setTodo('t2');
+    expect(idOf('t2')).toBe('t2');
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it("an inline caller's array cannot change what the realm holds", async () => {
+    await installFor(A);
+    const list = [B];
+    await policy(list);
+    list.push(A);
+    await setTodo('t1');
+    expect(scalarsInDoc()).toBe(0);
+  });
+
+  it('the test reset clears the stored policy and the mint slot', async () => {
+    await installFor(A);
+    await policy([A]);
+    await setTodo('t1');
+    expect(scalarMint()).not.toBeNull();
+    __resetApplyAndProjectForTesting();
+    expect(scalarMint()).toBeNull();
+    configure({ pushChunk() {}, perf() {}, cachePersistFailed() {}, cacheReleased() {} });
+    await dispatch('setKey', { key, familyId: A });
+    await installFor(A);
+    await setTodo('t2');
+    expect(scalarsInDoc()).toBe(0);
+  });
+
+  describe('the setDataPolicy answer (the posted verdict)', () => {
+    const verdict = async (scalarFamilies: unknown) =>
+      (await policy(scalarFamilies)).result as {
+        scalarOn: boolean;
+        family: string | null;
+        listOk: boolean;
+      };
+
+    it('on for a listed resident family, off for an unlisted one', async () => {
+      await installFor(A);
+      expect(await verdict([A])).toEqual({ scalarOn: true, family: A, listOk: true });
+      expect(await verdict([B])).toEqual({ scalarOn: false, family: A, listOk: true });
+    });
+
+    it('names no family before a document is named', async () => {
+      expect(await verdict([A])).toEqual({ scalarOn: false, family: null, listOk: true });
+    });
+
+    it('reports a malformed list (replaced by []) as listOk false', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      await installFor(A);
+      expect(await verdict([A, 7])).toEqual({ scalarOn: false, family: A, listOk: false });
+      warn.mockRestore();
+    });
+  });
+
+  describe('docStats.scalarOn (the doc-load signal)', () => {
+    /** Seed `family`'s cache with one document, then drop it from the realm. */
+    const seedCache = async (family: string) => {
+      await dispatch('setKey', { key, familyId: family });
+      await dispatch('initAndLoadCache', { familyId: family });
+      await installFor(family);
+      await dispatch('flush', {});
+      await dispatch('reset', {});
+      await dispatch('setKey', { key, familyId: family });
+    };
+    const open = async (family: string) =>
+      (
+        (await dispatch('initAndLoadCache', { familyId: family })).result as {
+          docStats?: { scalarOn?: boolean };
+        }
+      ).docStats?.scalarOn;
+
+    it('is false on a fresh realm that never received a policy (a failed post)', async () => {
+      await seedCache(A);
+      expect(await open(A)).toBe(false);
+    });
+
+    it('is true for a listed family and false for an unlisted one', async () => {
+      // Seeding tears the realm down, and a teardown drops the family list (as a sign-out
+      // does), so the policy is posted after it, the way `docClient` posts before every key.
+      await seedCache(A);
+      await policy([A]);
+      expect(await open(A)).toBe(true);
+      await seedCache(B);
+      await policy([A]);
+      expect(await open(B)).toBe(false);
+    });
+
+    it('a realm teardown drops the family list: with no fresh post, nothing is on', async () => {
+      await policy([A]);
+      await seedCache(A); // tears the realm down after the post
+      expect(await open(A)).toBe(false);
+    });
+  });
+
+  describe('merges', () => {
+    /** The shared starting point, the peer's offline add, and the compacted remote. */
+    const fixture = () => {
+      let shared = base();
+      shared = Automerge.change(shared, (d) => {
+        (d.todos as Record<string, unknown>).keep = { id: 'keep', title: 'shared' };
+      });
+      let peer = Automerge.load<FamilyDocument>(Automerge.save(shared));
+      peer = Automerge.change(peer, (d) => {
+        (d.todos as Record<string, unknown>).added = { id: 'added', title: 'made offline' };
+      });
+      return { shared, peer, heads: Automerge.getHeads(shared), remote: compacted(shared) };
+    };
+    /** The peer's document resident in the realm, named `family` (or unnamed: `null`). */
+    const residentPeer = async (peer: Automerge.Doc<FamilyDocument>, family: string | null) => {
+      await dispatch('loadSnapshot', { binary: Automerge.save(peer) });
+      if (family) await dispatch('openCache', { familyId: family });
+    };
+    const rebaseMerge = async (
+      remote: Automerge.Doc<FamilyDocument>,
+      family: string | null,
+      heads: string[],
+      envelopeFamily?: string
+    ) =>
+      (
+        await dispatch('mergeRemoteEnvelope', {
+          envelope: await envelopeFor(remote, key, envelopeFamily ?? family ?? undefined),
+          familyId: family,
+          basis: { kind: 'baseline', heads },
+        })
+      ).result as { action: string; replayed?: number };
+
+    it('(a) A listed resident, B cache miss, no-local-document install of unlisted B: no scalar, mint null', async () => {
+      await installFor(A);
+      await policy([A]);
+      await setTodo('t1');
+      await dispatch('setKey', { key, familyId: B });
+      await dispatch('initAndLoadCache', { familyId: B });
+      await installFor(B);
+      expect(scalarMint()).toBeNull(); // the slot the install RPC ran under
+      expect(scalarsInDoc()).toBe(0);
+      await setTodo('t2');
+      expect(idOf('t2')).toBe('t2');
+    });
+
+    it('(b) a rebase-path merge for listed resident A writes scalars in the replay', async () => {
+      const { peer, heads, remote } = fixture();
+      await residentPeer(peer, A);
+      await policy([A]);
+      const res = await rebaseMerge(remote, A, heads);
+      expect(res.action).toBe('rebased');
+      expect(scalarMint()).not.toBeNull();
+      expect(isScalar(idOf('added'))).toBe(true);
+    });
+
+    it('(c) no resident family (after a snapshot load), rebase merge for listed A: replay old form, then scalars', async () => {
+      const { peer, heads, remote } = fixture();
+      await residentPeer(peer, null);
+      await policy([A]);
+      const res = await rebaseMerge(remote, A, heads);
+      expect(res.action).toBe('rebased');
+      expect(scalarMint()).toBeNull();
+      expect(idOf('added')).toBe('added');
+      expect(scalarsInDoc()).toBe(0);
+      // The merge named the document A, so the next RPC is A's and A is listed.
+      await setTodo('t1');
+      expect(isScalar(idOf('t1'))).toBe(true);
+    });
+
+    it('(d) A listed resident, rebase-path merge naming unlisted B: the installed document holds no scalar', async () => {
+      const { peer, heads, remote } = fixture();
+      await residentPeer(peer, A);
+      await policy([A]);
+      const res = await rebaseMerge(remote, B, heads);
+      expect(res.action).toBe('rebased');
+      expect(res.replayed).toBeGreaterThan(0); // the replay really wrote
+      expect(scalarMint()).toBeNull();
+      expect(scalarsInDoc()).toBe(0);
+      await setTodo('t1');
+      expect(scalarsInDoc()).toBe(0);
+    });
+
+    it('a merge that names no family (familyId null) while listed A is resident writes no scalar', async () => {
+      const { peer, heads, remote } = fixture();
+      await residentPeer(peer, A);
+      await policy([A]);
+      const res = await rebaseMerge(remote, null, heads, A);
+      expect(res.action).toBe('rebased');
+      expect(scalarMint()).toBeNull();
+      expect(scalarsInDoc()).toBe(0);
+      // Nothing renamed the document, so the next unnamed RPC is A's again, and A is listed.
+      await setTodo('t1');
+      expect(isScalar(idOf('t1'))).toBe(true);
+    });
+
+    it('a merge whose envelope names B while args.familyId says A writes no scalar', async () => {
+      const { peer, heads, remote } = fixture();
+      await residentPeer(peer, A);
+      await policy([A]);
+      const res = await rebaseMerge(remote, A, heads, B);
+      expect(res.action).toBe('rebased');
+      expect(scalarMint()).toBeNull();
+      expect(scalarsInDoc()).toBe(0);
+    });
+
+    describe('(d) the user-file restore path, with removed members to carry', () => {
+      const restore = async (named: string) => {
+        // The device holds the NEWER (compacted) lineage with a removal; the chosen file predates
+        // both, so the restore stamps a new generation and carries the tombstone (C10).
+        const older = base();
+        let held = compacted(older);
+        held = Automerge.change(held, (d) => {
+          (d.removedMembers as Record<string, unknown>).m1 = {
+            id: 'm1',
+            removedAt: '2026-11-01T00:00:00.000Z',
+            removedByMemberId: null,
+            createdAt: '2026-11-01T00:00:00.000Z',
+            updatedAt: '2026-11-01T00:00:00.000Z',
+          };
+        });
+        await residentPeer(held, A);
+        await policy([A]);
+        return (
+          await dispatch('mergeRemoteEnvelope', {
+            envelope: await envelopeFor(older, key, named),
+            familyId: named,
+            basis: { kind: 'user-file' },
+          })
+        ).result as { action: string; removedMembers?: { carried: number } };
+      };
+
+      it('naming unlisted B: the carried tombstone is written in the old form', async () => {
+        const res = await restore(B);
+        expect(res.action).toBe('adopted');
+        expect(res.removedMembers?.carried).toBe(1);
+        expect(scalarMint()).toBeNull();
+        expect(scalarsInDoc()).toBe(0);
+      });
+
+      it('control: naming listed resident A, the same carry writes scalars', async () => {
+        const res = await restore(A);
+        expect(res.removedMembers?.carried).toBe(1);
+        expect(scalarsInDoc()).toBeGreaterThan(0);
+      });
+    });
+  });
+});
+
+/** Every `ImmutableString` under `v` (a loaded document or any value inside one). */
+function countScalars(v: unknown): number {
+  if (isImmutableString(v)) return 1;
+  if (v === null || typeof v !== 'object') return 0;
+  let n = 0;
+  for (const x of Object.values(v as Record<string, unknown>)) n += countScalars(x);
+  return n;
+}
+
+/** A compacted copy of `doc` (new history, the next lineage stamp), as `compactDoc` builds it. */
+function compacted(doc: Automerge.Doc<FamilyDocument>): Automerge.Doc<FamilyDocument> {
+  const lineage = { ...nextLineage(docLineage(doc)), id: 'L-GATE' };
+  return Automerge.from({
+    ...foldDoc(doc, lineage.seq),
+    podLineage: lineage,
+  }) as unknown as Automerge.Doc<FamilyDocument>;
+}
 
 // Helper: decrypt an exported payload back into a doc (mirrors decryptToDoc).
 async function mergeReadBack(

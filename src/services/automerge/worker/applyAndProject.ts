@@ -96,8 +96,16 @@ import type {
   CacheReplay,
   InitAndLoadResult,
   DocStats,
+  ScalarPolicy,
+  SetDataPolicyResult,
 } from './protocol';
-import { NoDocumentLoadedError, FENCE_GIVE_UP_MERGES } from './protocol';
+import {
+  NoDocumentLoadedError,
+  FENCE_GIVE_UP_MERGES,
+  emptyDataPolicy,
+  isFamilyIdList,
+  scalarWritesOn,
+} from './protocol';
 import { canonicalEqual, type ReconcileNote } from './reconcile';
 
 type Doc = Automerge.Doc<FamilyDocument>;
@@ -305,8 +313,15 @@ let fenceMergeCounted = false;
 /**
  * The family whose document `currentDoc` is, when this realm knows it: set by a cache load,
  * `openCache`, and a merge or install for a named family; cleared by `initDoc`, `dropDoc` and
- * `reset`. Read only to recognise a SAME-family live document (C5e) and to decide whether a
- * pending persist may be flushed into the open cache.
+ * `reset`. Read to recognise a SAME-family live document (C5e), to decide whether a pending
+ * persist may be flushed into the open cache, and by the scalar-writer gate (#124,
+ * `gateScalarWriter`).
+ *
+ * ⚠️ THE SCALAR GATE IS EVALUATED ONCE, AT RPC ENTRY, FROM THIS VALUE. No handler may write a
+ * scalar string after it reassigns `docFamilyId`, and a handler that writes for a family other
+ * than the resident one must name it in `args.familyId` (or carry an envelope naming it): the gate
+ * turns the writer off when any family the RPC names differs from this value, and for a
+ * `mergeRemoteEnvelope` that names no family at all.
  */
 let docFamilyId: string | null = null;
 /**
@@ -1058,8 +1073,12 @@ export async function initAndLoadCache(id: string): Promise<InitAndLoadResult> {
     return { loaded: false, remoteBaseline: null };
   }
   // R8: sampled on every open (`stats` measured < 0.01 ms). Before `migrateDoc`, which consumes
-  // the handle.
-  const docStats = docStatsOf(loaded.doc, loaded.baseBytes, loadMs);
+  // the handle. `scalarOn` (#124) is this realm's gate for the family the open installs, so
+  // `doc-load` reports what the worker will do, not what main retains.
+  const docStats: DocStats = {
+    ...docStatsOf(loaded.doc, loaded.baseBytes, loadMs),
+    scalarOn: scalarWritesOn(scalarPolicy, id),
+  };
   const replay: CacheReplay = {
     recovered: loaded.recovered,
     droppedIncrements: loaded.droppedIncrements,
@@ -2250,6 +2269,11 @@ function teardownRealm(): void {
   cachePersistFailed = false;
   lineageFence = null;
   fenceMergeCounted = false;
+  // #124: the per-family list dies with the realm's family. `docClient` re-posts the policy
+  // before every key, so the next family gets the current list; if that post fails, the realm
+  // is left with NO family switched on (fail closed) instead of the previous family's list.
+  // The fleet flags are retained on purpose (device-wide, see `docClient`'s `dataPolicy`).
+  scalarPolicy = { ...scalarPolicy, scalarFamilies: [] };
   // One lifetime, not two: the actor is retained beside the key and dies with it.
   resetDocActor();
   resetDocCursors();
@@ -2483,8 +2507,19 @@ export function exportSnapshot(): { binary: Uint8Array } {
 
 // ─── Dispatch (single method→handler map; shared by worker loop + inline) ────
 
-/** The one Automerge-bound line of the scalar writer (#124): installed at `setDataPolicy` dispatch. */
+/**
+ * The one Automerge-bound line of the scalar writer (#124): installed (or removed) by
+ * `gateScalarWriter` at the start of every dispatched RPC.
+ */
 const mintImmutableString: ScalarMint = (s) => new Automerge.ImmutableString(s);
+
+/**
+ * The scalar half of the last `setDataPolicy` (#124). Realm module state that `teardownRealm`
+ * deliberately does NOT clear (like the Counter policy): `docClient` posts the policy once per
+ * realm and not again at sign-in, and the family scoping comes from `docFamilyId`, which teardown
+ * does clear.
+ */
+let scalarPolicy: ScalarPolicy = emptyDataPolicy();
 
 /** A `setDataPolicy` flag: only `boolean | null` is valid; anything else is treated as `null`. */
 function policyFlag(name: string, v: unknown): boolean | null {
@@ -2494,10 +2529,59 @@ function policyFlag(name: string, v: unknown): boolean | null {
   return null;
 }
 
+/**
+ * `setDataPolicy.scalarFamilies`: only a list of non-empty strings is valid. Absent (an older
+ * main) is `[]` silently, like `policyFlag`'s `null`; anything else is `[]` with a warning and
+ * `ok: false`, which the `setDataPolicy` answer carries to main's telemetry. Copied and frozen, so
+ * an inline caller's array can never change what this realm holds.
+ */
+function policyFamilies(v: unknown): { families: readonly string[]; ok: boolean } {
+  if (v === null || v === undefined) return { families: [], ok: true };
+  if (isFamilyIdList(v)) return { families: Object.freeze([...v]), ok: true };
+  console.warn('[worker] setDataPolicy.scalarFamilies is not string[]; treating as []', v);
+  return { families: [], ok: false };
+}
+
+/**
+ * THE scalar-writer gate (#124 per-family canary). The first line of `dispatch()`, so it runs once
+ * at the entry of every RPC in both realms, and installs the mint iff `scalarWritesOn` holds for
+ * the family this RPC writes for: `docFamilyId`, except that the family part is OFF for the RPC
+ * when
+ *  - any family it names differs from `docFamilyId`: `args.familyId`, or the `familyId` an
+ *    `args.envelope` carries in the clear (a `BeanpodFileV4` names its family outside the
+ *    encrypted payload), or
+ *  - it is a `mergeRemoteEnvelope` that names no family (`familyId` null or absent).
+ * So the family part is on only when the resident document's family and every family the RPC
+ * names are the same listed family; a merge naming family B while family A's document is
+ * resident writes the old form.
+ *
+ * ⚠️ Evaluated once, at RPC entry: no handler may write a scalar string after it reassigns
+ * `docFamilyId`, and a handler that writes for a family other than the resident one must name it.
+ * Sound because the realm serialises RPCs (both realms run an async FIFO), so no other RPC can
+ * move the slot while one is in flight.
+ */
+function gateScalarWriter(method: string, args: unknown): void {
+  const a = (args !== null && typeof args === 'object' ? args : {}) as Record<string, unknown>;
+  const envelope = a.envelope;
+  const named = [
+    a.familyId,
+    envelope !== null && typeof envelope === 'object'
+      ? (envelope as { familyId?: unknown }).familyId
+      : undefined,
+  ];
+  const off =
+    named.some((n) => typeof n === 'string' && n !== docFamilyId) ||
+    (method === 'mergeRemoteEnvelope' && typeof a.familyId !== 'string');
+  setScalarMint(
+    scalarWritesOn(scalarPolicy, off ? null : docFamilyId) ? mintImmutableString : null
+  );
+}
+
 /** Route one RPC method to its handler. Returns the `{result, delta}` envelope
  * (delta only for `mutate`). Used by BOTH `docWorker` (over the async-FIFO) and
  * the inline fallback executor — one dispatch table, no drift. */
 export async function dispatch(method: string, args: unknown): Promise<DispatchReply> {
+  gateScalarWriter(method, args);
   const a = (args ?? {}) as Record<string, unknown>;
   switch (method) {
     case 'setKey':
@@ -2513,10 +2597,24 @@ export async function dispatch(method: string, args: unknown): Promise<DispatchR
     case 'setActor':
       setActor((a.actor as string | null) ?? null);
       return {};
-    case 'setDataPolicy':
+    case 'setDataPolicy': {
+      // The Counter policy applies at once. The scalar half is only STORED: the gate above
+      // installs or removes the mint at the start of the NEXT RPC, against that RPC's family.
       setCounterWrites(policyFlag('counterWrites', a.counterWrites));
-      setScalarMint(policyFlag('scalarWrites', a.scalarWrites) ? mintImmutableString : null);
-      return {};
+      const list = policyFamilies(a.scalarFamilies);
+      scalarPolicy = {
+        scalarWrites: policyFlag('scalarWrites', a.scalarWrites),
+        scalarFamilies: list.families,
+      };
+      // The realm's own verdict for the resident family, so main can log worker truth mid-session
+      // (an always-on device never re-opens its cache, so `doc-load` alone cannot show a change).
+      const result: SetDataPolicyResult = {
+        scalarOn: scalarWritesOn(scalarPolicy, docFamilyId),
+        family: docFamilyId,
+        listOk: list.ok,
+      };
+      return { result };
+    }
     case 'initDoc':
       return { result: initDoc() };
     case 'initAndLoadCache':
@@ -2616,6 +2714,9 @@ export function __resetApplyAndProjectForTesting(): void {
   resetDocCursors();
   persistInFlight = Promise.resolve();
   sink = NOOP_SINK;
+  // #124: a family-list test must not bleed into the suites that rely on this reset.
+  scalarPolicy = emptyDataPolicy();
+  setScalarMint(null);
 }
 
 /** Test-only: peek at whether a doc is currently loaded. */

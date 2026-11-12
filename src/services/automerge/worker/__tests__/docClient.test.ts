@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { reactive, isReactive } from 'vue';
 import { CorruptPayloadError, PayloadTooLargeError } from '@/types/sync';
 import { PodLineageError, lineageBlockError } from '@/services/sync/podLineage';
-import { serializeError, type RpcRequest } from '../protocol';
+import { emptyDataPolicy as emptyPolicy, serializeError, type RpcRequest } from '../protocol';
 import { generateFamilyKey } from '@/services/crypto/familyKeyService';
 
 vi.mock('@/composables/useToast', () => ({ showToast: vi.fn() }));
@@ -1594,17 +1594,23 @@ describe('docClient — the served data policy (#117 Counter writes, #124 scalar
             perf_doc_bytes: 7890,
             perf_doc_ops: 1234,
             perf_doc_changes: 56,
-            detail: 'scalar=off',
+            detail: 'scalar=off,family=fam-1',
             family_id: 'fam-1',
           },
         }),
       ]);
     });
 
-    it('reports scalar=on once the retained policy serves it', async () => {
-      await applyDataPolicy({ counterWrites: null, scalarWrites: true });
+    it("reports the WORKER's gate (stats.scalarOn) and the opened family, never the retained policy", async () => {
+      await applyDataPolicy({ counterWrites: null, scalarWrites: true, scalarFamilies: ['fam-1'] });
       await loadWith(stats);
-      expect(docLoads()[0]!.context).toMatchObject({ detail: 'scalar=on' });
+      // The worker did not say it is on (a failed post, an older worker): off, whatever main holds.
+      expect(docLoads()[0]!.context).toMatchObject({ detail: 'scalar=off,family=fam-1' });
+    });
+
+    it('reports scalar=on when the worker says its gate is on for the opened family', async () => {
+      await loadWith({ ...stats, scalarOn: true });
+      expect(docLoads()[0]!.context).toMatchObject({ detail: 'scalar=on,family=fam-1' });
     });
 
     it('logs nothing when the open read no cache (no docStats)', async () => {
@@ -1617,7 +1623,7 @@ describe('docClient — the served data policy (#117 Counter writes, #124 scalar
     const spawn = vi.fn(() => new FakeWorker());
     setWorkerFactory(spawn);
 
-    await applyDataPolicy({ counterWrites: true, scalarWrites: null });
+    await applyDataPolicy({ counterWrites: true, scalarWrites: null, scalarFamilies: [] });
 
     expect(spawn).not.toHaveBeenCalled();
     // The per-flag `applied` log lives in registry/dataPolicy.ts, not here.
@@ -1626,7 +1632,7 @@ describe('docClient — the served data policy (#117 Counter writes, #124 scalar
 
   it('posts the retained value in setFamilyKey, after setActor and before setKey', async () => {
     const { created } = useWorkers([acceptAll]);
-    await applyDataPolicy({ counterWrites: true, scalarWrites: null });
+    await applyDataPolicy({ counterWrites: true, scalarWrites: null, scalarFamilies: [] });
 
     await setFamilyKey(await generateFamilyKey(), 'fam-1');
 
@@ -1646,31 +1652,35 @@ describe('docClient — the served data policy (#117 Counter writes, #124 scalar
   it('posts null (the worker default) in setFamilyKey when no policy was ever served', async () => {
     const { created } = useWorkers([acceptAll]);
     await setFamilyKey(await generateFamilyKey(), 'fam-1');
-    expect(policyPosts(created[0])).toEqual([{ counterWrites: null, scalarWrites: null }]);
+    expect(policyPosts(created[0])).toEqual([
+      { counterWrites: null, scalarWrites: null, scalarFamilies: [] },
+    ]);
   });
 
   it('posts a change made while the session is live', async () => {
     const { created } = useWorkers([acceptAll]);
     await setFamilyKey(await generateFamilyKey(), 'fam-1');
 
-    await applyDataPolicy({ counterWrites: true, scalarWrites: null });
+    await applyDataPolicy({ counterWrites: true, scalarWrites: null, scalarFamilies: [] });
 
     expect(policyPosts(created[0])).toEqual([
-      { counterWrites: null, scalarWrites: null },
-      { counterWrites: true, scalarWrites: null },
+      { counterWrites: null, scalarWrites: null, scalarFamilies: [] },
+      { counterWrites: true, scalarWrites: null, scalarFamilies: [] },
     ]);
   });
 
   it('re-drives the retained value on a respawned worker, before its setKey', async () => {
     const { created } = useWorkers([acceptAll, acceptAll]);
-    await applyDataPolicy({ counterWrites: false, scalarWrites: null });
+    await applyDataPolicy({ counterWrites: false, scalarWrites: null, scalarFamilies: [] });
     await setFamilyKey(await generateFamilyKey(), 'fam-1');
 
     created[0]!.onerror?.(new Error('reaped'));
     await getHeads();
 
     const order = methods(created[1]);
-    expect(policyPosts(created[1])).toEqual([{ counterWrites: false, scalarWrites: null }]);
+    expect(policyPosts(created[1])).toEqual([
+      { counterWrites: false, scalarWrites: null, scalarFamilies: [] },
+    ]);
     expect(order.indexOf('setDataPolicy')).toBeLessThan(order.indexOf('setKey'));
   });
 
@@ -1684,7 +1694,7 @@ describe('docClient — the served data policy (#117 Counter writes, #124 scalar
       throw new Error('no workers here');
     });
     vi.spyOn(console, 'error').mockImplementation(() => {});
-    await applyDataPolicy({ counterWrites: true, scalarWrites: null });
+    await applyDataPolicy({ counterWrites: true, scalarWrites: null, scalarFamilies: [] });
 
     await setFamilyKey(await generateFamilyKey(), 'fam-1');
 
@@ -1694,6 +1704,7 @@ describe('docClient — the served data policy (#117 Counter writes, #124 scalar
     expect(calls.find((c) => c.method === 'setDataPolicy')?.args).toEqual({
       counterWrites: true,
       scalarWrites: null,
+      scalarFamilies: [],
     });
     expect(first).toBeLessThan(order.indexOf('setKey'));
     setInlineExecutor(null);
@@ -1710,9 +1721,10 @@ describe('docClient — the served data policy (#117 Counter writes, #124 scalar
 
     // The pod still opens: the key reaches the worker even though the policy post failed.
     await expect(setFamilyKey(await generateFamilyKey(), 'fam-1')).resolves.toBeUndefined();
+    // Resolves false (the post failed, already reported), so the caller retries on its next GET.
     await expect(
-      applyDataPolicy({ counterWrites: true, scalarWrites: null })
-    ).resolves.toBeUndefined();
+      applyDataPolicy({ counterWrites: true, scalarWrites: null, scalarFamilies: [] })
+    ).resolves.toBe(false);
 
     const failures = policyFailures();
     expect(failures).toHaveLength(2);
@@ -1733,7 +1745,7 @@ describe('docClient — the served data policy (#117 Counter writes, #124 scalar
       throw new Error('no workers here');
     });
     vi.spyOn(console, 'error').mockImplementation(() => {});
-    await applyDataPolicy({ counterWrites: true, scalarWrites: null });
+    await applyDataPolicy({ counterWrites: true, scalarWrites: null, scalarFamilies: [] });
 
     await setFamilyKey(await generateFamilyKey(), 'fam-1');
 
@@ -1747,12 +1759,200 @@ describe('docClient — the served data policy (#117 Counter writes, #124 scalar
     const { created } = useWorkers([acceptAll]);
     await setFamilyKey(await generateFamilyKey(), 'fam-1');
 
-    await applyDataPolicy({ counterWrites: false, scalarWrites: true });
+    await applyDataPolicy({ counterWrites: false, scalarWrites: true, scalarFamilies: [] });
 
-    expect(policyPosts(created[0]).at(-1)).toEqual({ counterWrites: false, scalarWrites: true });
+    expect(policyPosts(created[0]).at(-1)).toEqual({
+      counterWrites: false,
+      scalarWrites: true,
+      scalarFamilies: [],
+    });
   });
 
   it('is an idempotent state post, safe to replay after a respawn', () => {
     expect(__RETRYABLE_METHODS_FOR_TESTING.has('setDataPolicy')).toBe(true);
+  });
+
+  describe('applyDataPolicy resolves whether the policy got through (#124 retry)', () => {
+    it('true when retained before a family key, true when posted, false when the post failed', async () => {
+      let refuse = false;
+      useWorkers([
+        (req) =>
+          req.method === 'setDataPolicy' && refuse
+            ? { cid: req.cid, ok: false, error: serializeError(new Error('worker said no')) }
+            : acceptAll(req),
+      ]);
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      await expect(applyDataPolicy(emptyPolicy())).resolves.toBe(true);
+      await setFamilyKey(await generateFamilyKey(), 'fam-1');
+      await expect(applyDataPolicy(emptyPolicy())).resolves.toBe(true);
+      refuse = true;
+      await expect(applyDataPolicy(emptyPolicy())).resolves.toBe(false);
+      expect(policyFailures().at(-1)![0]).toMatchObject({ context: { stage: 'live' } });
+    });
+  });
+
+  describe("data-policy posted: the worker's verdict after each post (#124)", () => {
+    const answering =
+      (result: unknown): Responder =>
+      (req) =>
+        req.method === 'setDataPolicy' ? { cid: req.cid, ok: true, result } : acceptAll(req);
+    const posted = () =>
+      vi
+        .mocked(logEvent)
+        .mock.calls.map(([e]) => e)
+        .filter((e) => e.surface === 'data-policy' && e.context?.action === 'posted');
+
+    it('logs scalar=on with the family, at info', async () => {
+      useWorkers([answering({ scalarOn: true, family: 'fam-a', listOk: true })]);
+      await setFamilyKey(await generateFamilyKey(), 'fam-a');
+      expect(posted()).toEqual([
+        expect.objectContaining({
+          level: 'info',
+          message: 'policy posted to the doc realm',
+          context: {
+            action: 'posted',
+            stage: 'set-family-key',
+            detail: 'scalar=on,family=fam-a,list_ok=1',
+          },
+        }),
+      ]);
+    });
+
+    it('logs nothing when no family is resident yet and the list is fine (every unlock would)', async () => {
+      useWorkers([answering({ scalarOn: false, family: null, listOk: true })]);
+      await setFamilyKey(await generateFamilyKey(), 'fam-a');
+      expect(posted()).toEqual([]);
+    });
+
+    it('logs a malformed list as a warning with list_ok=0', async () => {
+      useWorkers([answering({ scalarOn: false, family: 'fam-a', listOk: false })]);
+      await setFamilyKey(await generateFamilyKey(), 'fam-a');
+      expect(posted()[0]).toMatchObject({
+        level: 'warn',
+        context: { detail: 'scalar=off,family=fam-a,list_ok=0' },
+      });
+    });
+
+    it('an older worker (no answer) logs nothing and does not throw', async () => {
+      useWorkers([answering(undefined)]);
+      await expect(setFamilyKey(await generateFamilyKey(), 'fam-a')).resolves.toBeUndefined();
+      await expect(applyDataPolicy(emptyPolicy())).resolves.toBe(true);
+      expect(posted()).toHaveLength(0);
+    });
+
+    it('is change-gated on the detail: a repeat is not re-logged, a new verdict is', async () => {
+      let verdict = { scalarOn: false, family: 'fam-a', listOk: true };
+      useWorkers([
+        (req) =>
+          req.method === 'setDataPolicy'
+            ? { cid: req.cid, ok: true, result: verdict }
+            : acceptAll(req),
+      ]);
+      await setFamilyKey(await generateFamilyKey(), 'fam-a');
+      await applyDataPolicy(emptyPolicy());
+      verdict = { scalarOn: true, family: 'fam-a', listOk: true };
+      await applyDataPolicy(emptyPolicy());
+      expect(posted().map((e) => (e.context as { detail: string }).detail)).toEqual([
+        'scalar=off,family=fam-a,list_ok=1',
+        'scalar=on,family=fam-a,list_ok=1',
+      ]);
+      expect(posted().map((e) => (e.context as { stage: string }).stage)).toEqual([
+        'set-family-key',
+        'live',
+      ]);
+    });
+
+    it('the inline re-drive logs the verdict too, with stage inline', async () => {
+      setInlineExecutor(async (method) =>
+        method === 'setDataPolicy'
+          ? { result: { scalarOn: true, family: 'fam-a', listOk: true } }
+          : {}
+      );
+      setWorkerFactory(() => {
+        throw new Error('no workers here');
+      });
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      await applyDataPolicy({ ...emptyPolicy(), scalarFamilies: ['fam-a'] });
+      await setFamilyKey(await generateFamilyKey(), 'fam-a');
+      expect(posted()[0]!.context).toMatchObject({
+        stage: 'inline',
+        detail: 'scalar=on,family=fam-a,list_ok=1',
+      });
+      setInlineExecutor(null);
+    });
+  });
+
+  describe('the family list (#124 per-family canary): carried unchanged, never matched here', () => {
+    const LISTED = { counterWrites: null, scalarWrites: null, scalarFamilies: ['fam-a'] };
+
+    it('posts the list in setFamilyKey and on a live change, whatever family the key is', async () => {
+      const { created } = useWorkers([acceptAll]);
+      await applyDataPolicy(LISTED);
+      // A key for ANOTHER family: main still posts the list as-is; the worker decides.
+      await setFamilyKey(await generateFamilyKey(), 'fam-b');
+      await applyDataPolicy({ ...LISTED, scalarFamilies: ['fam-a', 'fam-c'] });
+
+      const posts = policyPosts(created[0]);
+      expect(posts.at(-2)).toEqual(LISTED);
+      expect(posts.at(-1)).toEqual({ ...LISTED, scalarFamilies: ['fam-a', 'fam-c'] });
+    });
+
+    it('a list alone is a policy: the respawn re-drive posts it before setKey', async () => {
+      const { created } = useWorkers([acceptAll, acceptAll]);
+      await applyDataPolicy(LISTED);
+      await setFamilyKey(await generateFamilyKey(), 'fam-a');
+
+      created[0]!.onerror?.(new Error('reaped'));
+      await getHeads();
+
+      const order = methods(created[1]);
+      expect(policyPosts(created[1])).toEqual([LISTED]);
+      expect(order.indexOf('setDataPolicy')).toBeLessThan(order.indexOf('setKey'));
+    });
+
+    it('a list alone is a policy: the inline re-drive posts it before the key', async () => {
+      const calls: Array<{ method: string; args: unknown }> = [];
+      setInlineExecutor(async (method, args) => {
+        calls.push({ method, args });
+        return {};
+      });
+      setWorkerFactory(() => {
+        throw new Error('no workers here');
+      });
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      await applyDataPolicy(LISTED);
+
+      await setFamilyKey(await generateFamilyKey(), 'fam-a');
+
+      const order = calls.map((c) => c.method);
+      expect(calls.find((c) => c.method === 'setDataPolicy')?.args).toEqual(LISTED);
+      expect(order.indexOf('setDataPolicy')).toBeLessThan(order.indexOf('setKey'));
+      setInlineExecutor(null);
+    });
+
+    it("retains its own copy: mutating the caller's array changes nothing posted", async () => {
+      const { created } = useWorkers([acceptAll]);
+      const list = ['fam-a'];
+      await applyDataPolicy({ counterWrites: null, scalarWrites: null, scalarFamilies: list });
+      list.push('fam-b');
+
+      await setFamilyKey(await generateFamilyKey(), 'fam-a');
+
+      expect(policyPosts(created[0]).at(-1)).toEqual(LISTED);
+    });
+
+    it('the test reset hands out a fresh empty list (no shared array across cases)', async () => {
+      const { created } = useWorkers([acceptAll]);
+      await setFamilyKey(await generateFamilyKey(), 'fam-1');
+      const first = policyPosts(created[0]).at(-1) as { scalarFamilies: string[] };
+      first.scalarFamilies.push('leaked');
+
+      __resetDocClientForTesting();
+      const { created: again } = useWorkers([acceptAll]);
+      await setFamilyKey(await generateFamilyKey(), 'fam-1');
+      expect(policyPosts(again[0])).toEqual([
+        { counterWrites: null, scalarWrites: null, scalarFamilies: [] },
+      ]);
+    });
   });
 });

@@ -126,6 +126,12 @@ export interface DocStats {
   changes: number;
   bytes: number;
   durationMs: number;
+  /**
+   * #124: the worker's own scalar-writer gate for the family this cache open installed
+   * (`scalarWritesOn` over the policy the realm holds). Set only by `initAndLoadCache`; absent
+   * from an older worker, which `doc-load` reports as `off`.
+   */
+  scalarOn?: boolean;
 }
 
 export interface MergeOutcome {
@@ -381,8 +387,61 @@ export type PatchSettingsArgs = {
  * `setDataPolicy` (#117 Counter writes, #124 scalar strings): the served data policy, retained by
  * `docClient` and re-posted with `setActor` at the same three sites. A `null` flag means no policy
  * has ever reached this device for it; the worker falls back to `COUNTER_WRITES_DEFAULT` / no mint.
+ *
+ * `scalarFamilies` (#124 per-family canary): the family ids whose family-scoped scalar value is
+ * EFFECTIVELY on (served `scalarWritesFamily: true` and the update floor open). The worker stores
+ * the scalar half and decides per RPC, against the family of the document being written
+ * (`scalarWritesOn`); main never matches a family. An older main sends no list, which the worker
+ * reads as `[]`: fail closed both ways.
  */
-export type SetDataPolicyArgs = { counterWrites: boolean | null; scalarWrites: boolean | null };
+export type SetDataPolicyArgs = {
+  counterWrites: boolean | null;
+  scalarWrites: boolean | null;
+  scalarFamilies: string[];
+};
+
+/**
+ * No policy has reached this device or realm: every flag `null`, no family listed. THE empty
+ * policy for main (`docClient`, `registry/dataPolicy.ts`) and the worker alike. A factory, so no
+ * holder can share (and mutate) one array.
+ */
+export function emptyDataPolicy(): SetDataPolicyArgs {
+  return { counterWrites: null, scalarWrites: null, scalarFamilies: [] };
+}
+
+/** THE shape check for a family list: an array of non-empty strings. */
+export function isFamilyIdList(v: unknown): v is string[] {
+  return Array.isArray(v) && v.every((id) => typeof id === 'string' && id !== '');
+}
+
+/**
+ * What `setDataPolicy` answers (#124): the worker's own verdict right after storing the policy.
+ * `scalarOn` is `scalarWritesOn` for the resident family (`family`, `null` = none named yet);
+ * `listOk` is `false` when `scalarFamilies` was malformed and replaced by `[]`. An older worker
+ * answers nothing.
+ */
+export interface SetDataPolicyResult {
+  scalarOn: boolean;
+  family: string | null;
+  listOk: boolean;
+}
+
+/** The scalar half of the policy, as the worker stores it. */
+export interface ScalarPolicy {
+  scalarWrites: boolean | null;
+  scalarFamilies: readonly string[];
+}
+
+/**
+ * THE scalar-writer predicate (#124), used ONLY by the worker's gate: on when the fleet flag is
+ * on, or when `familyId` (the family the RPC writes for; `null` = unknown, which never matches)
+ * is on the list. Pure, so `doc-load`'s `scalarOn` and the gate cannot disagree.
+ */
+export function scalarWritesOn(policy: ScalarPolicy, familyId: string | null): boolean {
+  return (
+    policy.scalarWrites === true || (familyId !== null && policy.scalarFamilies.includes(familyId))
+  );
+}
 
 /** A request from main → worker. `method` names the handler; `args` is its input. */
 export interface RpcRequest {

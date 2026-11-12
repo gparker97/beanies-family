@@ -71,12 +71,15 @@ import {
   type CacheReplay,
   type ProjectionDelta,
   type SetDataPolicyArgs,
+  type SetDataPolicyResult,
+  emptyDataPolicy,
 } from './protocol';
 import type { ReconcileNote } from './reconcile';
 import { ReadOnlyError, readWriteGate, setWriteGate, type WriteGateVerdict } from './writeGate';
 import type { CollectionName } from '@/types/automerge';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
 import { bump as bumpOpenCycle } from '@/services/telemetry/openCycle';
+import { createChangeGate } from '@/services/telemetry/emitPolicy';
 
 /** Minimal Worker surface — real `Worker` satisfies it; tests inject a fake. */
 export interface DocWorkerLike {
@@ -226,11 +229,17 @@ let docActor: string | null = null;
  * `COUNTER_WRITES_DEFAULT`, and the scalar mint stays uninstalled (#124). Set by
  * `applyDataPolicy` from `registry/dataPolicy.ts`.
  *
- * ⚠️ NOT cleared by `reset()`. It is a device-wide policy served to the whole fleet, not realm
- * state: a sign-out followed by a sign-in in the same page must still post it, and the registry
- * observer hands a value over only when it changes, so nothing would re-supply it.
+ * ⚠️ NOT cleared by `reset()`. It is device state, not realm state: the fleet flags plus the
+ * family list (`scalarFamilies`, every family whose family-scoped scalar value is on), and a
+ * sign-out followed by a sign-in in the same page must still post it, because the registry
+ * observer hands a value over only when it changes, so nothing would re-supply it. Keeping the
+ * list across a family switch is safe because main never matches a family: the worker gates each
+ * RPC against the family of the document it writes (`applyAndProject.gateScalarWriter`), and a
+ * key or a policy post for another family cannot change that.
  */
-let dataPolicy: SetDataPolicyArgs = { counterWrites: null, scalarWrites: null };
+let dataPolicy: SetDataPolicyArgs = emptyDataPolicy();
+/** `data-policy posted` fires when the worker's verdict changes (plus a heartbeat), never per post. */
+let policyPostedGate = createChangeGate();
 let currentFamilyId: string | null = null;
 let rehydrator: ((familyId: string) => Promise<void>) | null = null;
 let needsRehydrate = false;
@@ -642,11 +651,14 @@ async function enterInlineMode(reason: 'spawn-failed' | 'handshake-timeout'): Pr
       console.error('[docClient] inline setActor re-drive failed', e);
     }
   }
-  // The Counter policy rides with the actor (both are retained realm state the dead worker had
-  // and the inline realm does not). A fresh realm already holds the default, so `null` is skipped.
+  // The data policy rides with the actor (both are retained realm state the dead worker had and
+  // the inline realm does not). A fresh realm already holds the default, so "none" is skipped.
   if (hasDataPolicy()) {
     try {
-      await inlineExecutor('setDataPolicy', { ...dataPolicy } satisfies SetDataPolicyArgs);
+      const reply = await inlineExecutor('setDataPolicy', {
+        ...dataPolicy,
+      } satisfies SetDataPolicyArgs);
+      logPolicyPosted('inline', reply.result);
     } catch (e) {
       reportDataPolicyPostFailed('inline', e);
     }
@@ -973,7 +985,8 @@ const RETRYABLE_METHODS = new Set([
   // means "args that could carry a Vue proxy".
   'setActor',
   // #117/#124: the same shape as `setActor`, a retained state post. Re-issuing it sets the same
-  // booleans, and its arg is a plain `{ counterWrites, scalarWrites }` (not JSON_SAFE for the same reason).
+  // values, and its arg is a plain `{ counterWrites, scalarWrites, scalarFamilies }` of booleans
+  // and a string array (not JSON_SAFE for the same reason).
   'setDataPolicy',
   // ⚠️ `compactDoc` is deliberately ABSENT. A transparent re-issue after a
   // respawn would re-compact a document that has already been replaced, so the
@@ -1660,7 +1673,11 @@ type DataPolicyPostStage = 'live' | 'set-family-key' | 'inline';
 
 /** Has any policy reached this device? A fresh realm already holds the defaults, so none is skipped. */
 function hasDataPolicy(): boolean {
-  return dataPolicy.counterWrites !== null || dataPolicy.scalarWrites !== null;
+  return (
+    dataPolicy.counterWrites !== null ||
+    dataPolicy.scalarWrites !== null ||
+    dataPolicy.scalarFamilies.length > 0
+  );
 }
 
 /**
@@ -1681,14 +1698,55 @@ function reportDataPolicyPostFailed(stage: DataPolicyPostStage, e: unknown): voi
   });
 }
 
-/** Post the retained policy to the live realm. Never throws (see the reporter above). */
-async function postDataPolicy(stage: DataPolicyPostStage): Promise<void> {
+/** Is `v` a `setDataPolicy` answer? An older worker answers nothing (`undefined` / `null`). */
+function isPolicyResult(v: unknown): v is SetDataPolicyResult {
+  if (v === null || typeof v !== 'object') return false;
+  const r = v as Record<string, unknown>;
+  return (
+    typeof r.scalarOn === 'boolean' &&
+    typeof r.listOk === 'boolean' &&
+    (r.family === null || typeof r.family === 'string')
+  );
+}
+
+/**
+ * #124: log the worker's own verdict after a policy post (`data-policy posted`), so CloudWatch
+ * has worker truth per family mid-session, and a malformed list (`list_ok=0`, a warning) is
+ * visible. Change-gated on `detail`, so a repeat post does not flood. An older worker answers
+ * nothing: nothing is logged and nothing throws.
+ */
+function logPolicyPosted(stage: DataPolicyPostStage, result: unknown): void {
+  if (!isPolicyResult(result)) return;
+  // Before a document is named the verdict can only be "off, no family": every unlock on
+  // every device would log it, and it says nothing. A malformed list is still reported.
+  if (result.family === null && result.listOk) return;
+  const detail =
+    `scalar=${result.scalarOn ? 'on' : 'off'},family=${result.family ?? 'none'},` +
+    `list_ok=${result.listOk ? 1 : 0}`;
+  if (!policyPostedGate(detail)) return;
+  logEvent({
+    level: result.listOk ? 'info' : 'warn',
+    surface: 'data-policy',
+    message: 'policy posted to the doc realm',
+    context: { action: 'posted', stage, detail },
+  });
+}
+
+/**
+ * Post the retained policy to the live realm. Never throws (see the reporter above). Resolves
+ * `false` only when the post failed (already reported as `post_failed`).
+ */
+async function postDataPolicy(stage: DataPolicyPostStage): Promise<boolean> {
   const args: SetDataPolicyArgs = { ...dataPolicy };
+  let result: unknown;
   try {
-    await request('setDataPolicy', args, { quiet: true });
+    result = await request('setDataPolicy', args, { quiet: true });
   } catch (e) {
     reportDataPolicyPostFailed(stage, e);
+    return false;
   }
+  logPolicyPosted(stage, result);
+  return true;
 }
 
 /**
@@ -1700,11 +1758,15 @@ async function postDataPolicy(stage: DataPolicyPostStage): Promise<void> {
  * `setFamilyKey` and both re-drives can post them; they are posted now ONLY when a family key is
  * set, because `request` spawns the worker and a signed-out boot must not spawn one (the worker is
  * first spawned at unlock). Per-flag `applied` logging lives in `dataPolicy.ts`. Never throws.
+ *
+ * Resolves `true` when the policy was posted, or retained with no family key yet (`setFamilyKey`
+ * posts it); `false` when the live post failed (already reported as `post_failed`), so the caller
+ * can hand it over again on its next registry GET.
  */
-export async function applyDataPolicy(policy: SetDataPolicyArgs): Promise<void> {
-  dataPolicy = { ...policy };
-  if (!familyKey) return;
-  await postDataPolicy('live');
+export async function applyDataPolicy(policy: SetDataPolicyArgs): Promise<boolean> {
+  dataPolicy = { ...policy, scalarFamilies: [...policy.scalarFamilies] };
+  if (!familyKey) return true;
+  return postDataPolicy('live');
 }
 
 /**
@@ -1785,9 +1847,14 @@ export async function initAndLoadCache(familyId: string): Promise<InitAndLoadRes
 
 /**
  * R8: one `doc-load` event per cache open, on the success path and unconditional (not subject to
- * the 250 ms perf floor), so op counts and load times are a per-family time series. `detail` is
- * the scalar-write policy this realm RETAINS: `held` (served ON, floor closed) is not knowable
- * here and is logged by `scalar-policy held` in `registry/dataPolicy.ts`, so only `on|off`.
+ * the 250 ms perf floor), so op counts and load times are a per-family time series.
+ *
+ * `detail` is `scalar=on|off,family=<opened id>` (#124): `scalar` is the WORKER's own gate for the
+ * family this open installed (`stats.scalarOn`), never the policy main retains, so a failed post
+ * or an older worker truthfully reads `off`. `family` names the family OPENED, because
+ * `family_id` is the ACTIVE family (the telemetry enricher overwrites it) and a join or recovery
+ * open can differ. `held` (served ON, floor closed) is logged by `scalar-policy held` in
+ * `registry/dataPolicy.ts`.
  */
 function logDocLoad(stats: DocStats, familyId: string): void {
   logEvent({
@@ -1800,7 +1867,7 @@ function logDocLoad(stats: DocStats, familyId: string): void {
       perf_doc_bytes: stats.bytes,
       perf_doc_ops: stats.ops,
       perf_doc_changes: stats.changes,
-      detail: `scalar=${dataPolicy.scalarWrites ? 'on' : 'off'}`,
+      detail: `scalar=${stats.scalarOn ? 'on' : 'off'},family=${familyId}`,
       family_id: familyId,
     },
   });
@@ -2540,7 +2607,8 @@ export function __resetDocClientForTesting(): void {
   familyKeyRaw = null;
   familyKeyFamilyId = null;
   docActor = null;
-  dataPolicy = { counterWrites: null, scalarWrites: null };
+  dataPolicy = emptyDataPolicy();
+  policyPostedGate = createChangeGate();
   releaseActorLease();
   currentFamilyId = null;
   cacheProvenEmptyFor = null;

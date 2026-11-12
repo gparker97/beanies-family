@@ -2653,11 +2653,15 @@ export interface RegistryEntry {
    * #117: the served data-layer policy, set by Terraform `counter_writes_enabled` through the
    * registry Lambda's env (never stored in the row). `counterWrites` turns Counter adjustments
    * on for every device; `scalarWrites` (#124, `scalar_writes_enabled`) lets the worker write
-   * structural strings as scalars once the update floor allows it. Absent from a Lambda older
-   * than the flag (`scalarWrites` is optional for that reason); the client then keeps its last
-   * persisted value (`registry/dataPolicy.ts`).
+   * structural strings as scalars once the update floor allows it. Both are fleet-wide.
+   * `scalarWritesFamily` (#124 per-family canary, `scalar_writes_family_ids`) answers for THIS
+   * row's family only: the client keeps a session-only list of the families served `true`, and
+   * the doc worker writes scalars only into a document of a listed family. Absent from a Lambda
+   * older than the flag (`scalarWrites` and `scalarWritesFamily` are optional for that reason);
+   * the client then keeps what it holds: a fleet flag's last persisted value, the family list
+   * as this session left it (`registry/dataPolicy.ts`).
    */
-  dataPolicy?: { counterWrites: boolean; scalarWrites?: boolean };
+  dataPolicy?: { counterWrites: boolean; scalarWrites?: boolean; scalarWritesFamily?: boolean };
   updatedAt: ISODateString;
 }
 

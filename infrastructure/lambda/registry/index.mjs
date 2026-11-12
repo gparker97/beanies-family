@@ -50,6 +50,30 @@ const API_KEY = process.env.REGISTRY_API_KEY;
 const envFlag = (name) => process.env[name] === 'true';
 const COUNTER_WRITES = envFlag('COUNTER_WRITES_ENABLED');
 const SCALAR_WRITES = envFlag('SCALAR_WRITES_ENABLED');
+
+/**
+ * A comma-separated env var of family ids, parsed once at cold start: each entry trimmed,
+ * checked with `UUID_RE` and lowercased. An entry that is not a UUID is dropped and logged, so a
+ * typo can never match a family; Terraform's validation on the variable is the first layer.
+ */
+function familyIdSet(name) {
+  const ids = new Set();
+  for (const raw of (process.env[name] || '').split(',')) {
+    const id = raw.trim();
+    if (id === '') continue;
+    if (UUID_RE.test(id)) ids.add(id.toLowerCase());
+    else {
+      console.error(
+        `[registry] ${name}: dropped an entry that is not a UUID (${JSON.stringify(id.slice(0, 64))}); no family matches it.`
+      );
+    }
+  }
+  return ids;
+}
+// The per-family scalar-strings canary (#124): Terraform `scalar_writes_family_ids`. Served as
+// `dataPolicy.scalarWritesFamily`, a NEW key, so a build that predates it never reads it and
+// cannot be switched on by it. `scalarWrites` keeps its fleet-wide meaning.
+const SCALAR_WRITES_FAMILIES = familyIdSet('SCALAR_WRITES_FAMILY_IDS');
 // The flight-alert token secret (#143 Phase 2). Read per GET like the entitlement env; checked once
 // here so an apply that forgot it says so at cold start instead of silently minting nothing.
 if (!process.env.FLIGHT_ALERT_TOKEN_SECRET) {
@@ -1751,12 +1775,18 @@ export async function handler(event) {
       delete publicRow.attributionInferred;
       // `dataPolicy` (#117) is a response-only field like `entitlement`: the client persists it
       // device-locally and hands it to the doc worker; it is never a row attribute.
+      // `scalarWritesFamily` answers for THIS family only (the UUID check above is
+      // case-insensitive, the set is lowercase).
       return response(
         200,
         {
           ...publicRow,
           entitlement,
-          dataPolicy: { counterWrites: COUNTER_WRITES, scalarWrites: SCALAR_WRITES },
+          dataPolicy: {
+            counterWrites: COUNTER_WRITES,
+            scalarWrites: SCALAR_WRITES,
+            scalarWritesFamily: SCALAR_WRITES_FAMILIES.has(familyId.toLowerCase()),
+          },
         },
         event
       );
