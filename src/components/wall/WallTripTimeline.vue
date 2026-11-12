@@ -24,6 +24,7 @@
 import SegmentWhenBand from '@/components/travel/SegmentWhenBand.vue';
 import FlightCheckChip from '@/components/travel/FlightCheckChip.vue';
 import { useTranslation } from '@/composables/useTranslation';
+import { bandChecks } from '@/utils/flightStatus/copy';
 import { nookDateParts } from '@/utils/date';
 import type { DateGroup, TimelineItem } from '@/composables/useVacationTimeline';
 import type { FlightVerification } from '@/types/flightStatus';
@@ -102,6 +103,7 @@ const { t } = useTranslation();
               v-if="item.timing"
               :band="item.timing.band"
               :was="flightCheck(item)?.was"
+              :checks="bandChecks(flightCheck(item))"
             />
           </div>
         </div>

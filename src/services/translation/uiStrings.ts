@@ -15601,6 +15601,14 @@ const STRING_DEFS = {
     en: 'Confirmed with the airline',
     beanie: 'confirmed with the airline',
   },
+  'travel.live.pillConflict': {
+    en: 'Your plan and the airline disagree',
+    beanie: 'your plan and the airline disagree',
+  },
+  'travel.live.pillChanged': {
+    en: 'The airline changed this',
+    beanie: 'the airline changed this',
+  },
   'travel.live.row.gate': { en: 'Gate', beanie: 'gate' },
   'travel.live.row.desk': { en: 'Check-in', beanie: 'check-in' },
   'travel.live.row.belt': { en: 'Bag Belt', beanie: 'bag belt' },
@@ -15641,6 +15649,21 @@ const STRING_DEFS = {
   'travel.live.toast.updated.message': {
     en: 'Your plan now matches the airline.',
     beanie: 'your plan now matches the airline.',
+  },
+  'travel.live.checkNow': { en: 'Check Now', beanie: 'check now' },
+  'travel.live.checking': { en: 'Checking...', beanie: 'checking...' },
+  'travel.live.toast.fresh.title': { en: 'Already Up to Date', beanie: 'already up to date' },
+  'travel.live.toast.fresh.message': {
+    en: 'These flights were checked in the last few minutes.',
+    beanie: 'these flights were checked in the last few minutes.',
+  },
+  'travel.live.toast.notDue.title': {
+    en: 'Nothing to Check Right Now',
+    beanie: 'nothing to check right now',
+  },
+  'travel.live.toast.notDue.message': {
+    en: 'Flights are checked from three days before they leave, while this device is online.',
+    beanie: 'flights are checked from three days before they leave, while this device is online.',
   },
 } satisfies Record<string, StringEntry>;
 

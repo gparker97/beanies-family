@@ -1107,7 +1107,26 @@ describe('one-step conflict resolution (take the airline, then Undo)', () => {
     expect(events('flight notice reopened')).toHaveLength(0);
   });
 
-  it('a quiet-fill Conflict has no notice to fold: no dismiss_skipped warn, Undo still works', async () => {
+  it('"Got it" folds a Conflict on a flight whose revision was recorded with no announced change', async () => {
+    vacationsState.vacations = [trip([makeFlight({ terminal: undefined })])];
+    h.fetchFlightLegs.mockResolvedValue(answer([makeLeg({})]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    const v = vacationsState.vacations[0]!;
+    v.travelSegments = v.travelSegments.map((s) => ({ ...s, departureTime: '19:00' }));
+    expect(store.verificationFor('seg-1')?.state).toBe('conflict');
+    expect(liveNoticeId('seg-1', segment())).toBeNull();
+    expect(store.dismissNotice('seg-1')).toBe(true);
+    expect(store.verificationFor('seg-1')).toMatchObject({ state: 'conflict', dismissed: true });
+    expect(events('flight notice dismiss skipped')).toHaveLength(0);
+    // The fold survives a prune (its key is a live notice id) and the chip reopens it.
+    await store.run('tick');
+    expect(store.verificationFor('seg-1')?.dismissed).toBe(true);
+    expect(store.showNotice('seg-1')).toBe(true);
+    expect(store.verificationFor('seg-1')?.dismissed).toBeUndefined();
+  });
+
+  it('taking the airline over a quiet-fill Conflict leaves no notice to fold, and Undo restores it open', async () => {
     vacationsState.vacations = [trip([makeFlight({ terminal: undefined })])];
     h.fetchFlightLegs.mockResolvedValue(answer([makeLeg({})]));
     const store = useFlightStatusStore();
@@ -1118,10 +1137,12 @@ describe('one-step conflict resolution (take the airline, then Undo)', () => {
     const { result, undo } = await store.takeAirline('seg-1');
     expect(result).toBe('saved');
     expect(events('flight notice dismiss skipped')).toHaveLength(0);
+    // The plan now agrees with the airline: no notice is left, so nothing is folded.
     expect(events('flight notice dismissed')).toHaveLength(0);
     expect(await undo!()).toBe('saved');
     expect(segment().departureTime).toBe('19:00');
-    expect(events('flight notice reopened')).toHaveLength(0);
+    expect(store.verificationFor('seg-1')).toMatchObject({ state: 'conflict' });
+    expect(store.verificationFor('seg-1')?.dismissed).toBeUndefined();
   });
 
   it('a fold the person re-made during the toast is theirs: Undo leaves it, with no reopen', async () => {
@@ -1351,6 +1372,48 @@ describe('cache and sign-out', () => {
     expect(localStorage.getItem(STORAGE_KEYS.FLIGHT_STATUS)).toBeNull();
     await store.run('tick');
     expect(h.fetchFlightLegs).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('"Check now" (a manual check)', () => {
+  it('asks again once the last answer is five minutes old, and says fresh before that', async () => {
+    h.fetchFlightLegs.mockResolvedValue(answer([makeLeg({})]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(1);
+
+    vi.setSystemTime(NOW + 4 * MIN);
+    expect(store.checkNow(['seg-1'])).toBe('fresh');
+    await settle();
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(1);
+
+    vi.setSystemTime(NOW + 5 * MIN);
+    expect(store.checkNow(['seg-1'])).toBe('started');
+    await settle();
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(2);
+    expect(store.verificationFor('seg-1')?.checkedAt).toBe(NOW + 5 * MIN);
+    expect(events('flight check run').at(-1)?.context.kind).toBe('manual');
+    expect(events('flight manual check').map((e) => e.context)).toEqual([
+      { action: 'manual_check', kind: 'manual', count: 0, detail: 'fresh:fresh' },
+      { action: 'manual_check', kind: 'manual', count: 1, detail: 'started' },
+    ]);
+
+    // The tap lowered the floor for that run only: a tick right after asks nothing.
+    await store.run('tick');
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(2);
+  });
+
+  it('starts nothing offline or for an unknown flight, and names the reason', async () => {
+    h.fetchFlightLegs.mockResolvedValue(answer([makeLeg({})]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    vi.setSystemTime(NOW + 10 * MIN);
+    online.value = false;
+    expect(store.checkNow(['seg-1', 'gone'])).toBe('not_due');
+    await settle();
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(1);
+    expect(events('flight manual check').at(-1)?.context.detail).toBe('not_due:offline');
+    online.value = true;
   });
 });
 

@@ -17,6 +17,28 @@ const BAND: WhenBand = {
 };
 
 describe('SegmentWhenBand', () => {
+  it('each cell carries its own check on its date line; an unchecked cell carries none', () => {
+    const w = mount(SegmentWhenBand, {
+      props: { band: BAND, checks: { start: 'confirmed' } },
+    });
+    const [start, end] = w.findAll('.when-cell');
+    const pill = start!.get('.when-sub [title="travel.live.pillConfirmed"]');
+    expect(pill.find('svg').exists()).toBe(true);
+    expect(pill.find('.sr-only').text()).toBe('travel.live.pillConfirmed');
+    expect(end!.find('.live-pill').exists()).toBe(false);
+    const disputed = mount(SegmentWhenBand, {
+      props: { band: BAND, checks: { start: 'confirmed', end: 'conflict' } },
+    });
+    expect(
+      disputed.findAll('.when-cell')[1]!.get('.when-sub .live-pill').attributes()
+    ).toMatchObject({ 'data-status': 'conflict', title: 'travel.live.pillConflict' });
+    expect(
+      mount(SegmentWhenBand, { props: { band: BAND } })
+        .find('.live-pill')
+        .exists()
+    ).toBe(false);
+  });
+
   it('without `was`, nothing is struck or highlighted', () => {
     const w = mount(SegmentWhenBand, { props: { band: BAND } });
     expect(w.findAll('s')).toHaveLength(0);

@@ -177,6 +177,9 @@ export interface FlightVerification {
    *  state (`flightStatusStore.dismissNotice`), never synced; a new revision is a new notice. */
   dismissed?: boolean;
   live?: FlightLiveInfo;
+  /** The IATA codes of the airports the matched leg flies between (the arrival from the
+   *  arrival sector of a multi-stop number; absent when unknown). Drives the From / To pill. */
+  route?: { from?: string; to?: string };
   /** The airline's schedule, when a check exists. */
   provider?: ScheduleTuple;
   /** The segment's own schedule. */

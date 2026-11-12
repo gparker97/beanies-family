@@ -12,7 +12,9 @@ import {
   checkedAgo,
   chipLabel,
   confirmedLive,
-  confirmsTerminal,
+  airportCheck,
+  bandChecks,
+  fieldCheck,
   hasFlightChip,
   isAlertStatus,
   conflictSentence,
@@ -272,26 +274,83 @@ describe('Chinese', () => {
   });
 });
 
-describe('confirmsTerminal', () => {
-  const fresh = (terminal?: string): FlightVerification => ({
+describe('fieldCheck / bandChecks / airportCheck', () => {
+  const plan = {
+    departureDate: '2026-12-13',
+    departureTime: '18:30',
+    terminal: 'Terminal 2',
+    arrivalDate: '2026-12-14',
+    arrivalTime: '00:40',
+  };
+  const v = (over: Partial<FlightVerification> = {}): FlightVerification => ({
     state: 'verified',
     checkedAt: 1,
-    provider: { terminal },
+    mine: plan,
+    provider: { ...plan, terminal: 'T2' },
+    route: { from: 'SIN', to: 'LHR' },
+    ...over,
   });
 
-  it('true when the latest answer agrees, however old and however the terminal is spelled', () => {
-    expect(confirmsTerminal(fresh('3'), '3')).toBe(true);
-    expect(confirmsTerminal({ ...fresh('2'), fresh: false }, '2')).toBe(true);
-    expect(confirmsTerminal(fresh('T2'), 'Terminal 2')).toBe(true);
+  it('confirmed for each value the airline states and the plan matches, however old or spelled', () => {
+    expect(fieldCheck(v(), ['terminal'])).toBe('confirmed');
+    expect(fieldCheck(v({ fresh: false }), ['terminal'])).toBe('confirmed');
+    expect(bandChecks(v())).toEqual({ start: 'confirmed', end: 'confirmed' });
+    expect(bandChecks(v({ provider: { ...plan, departureTime: '18:30:00' } })).start).toBe(
+      'confirmed'
+    );
+    expect(bandChecks(v({ state: 'changed', applied: true })).end).toBe('confirmed');
   });
 
-  it('false when mismatched, without a provider terminal, or without a verification', () => {
-    expect(confirmsTerminal(fresh('2'), '3')).toBe(false);
-    expect(confirmsTerminal(fresh(undefined), '2')).toBe(false);
-    expect(confirmsTerminal({ state: 'verified', checkedAt: 1 }, '2')).toBe(false);
-    expect(confirmsTerminal({ state: 'verified', provider: { terminal: '2' } }, '2')).toBe(false);
-    expect(confirmsTerminal(undefined, '2')).toBe(false);
-    expect(confirmsTerminal(fresh('2'), undefined)).toBe(false);
+  it('a value the airline does not state is never marked', () => {
+    const provider = { departureDate: plan.departureDate, departureTime: plan.departureTime };
+    expect(bandChecks(v({ provider }))).toEqual({ start: 'confirmed', end: undefined });
+    expect(fieldCheck(v({ provider }), ['terminal'])).toBeUndefined();
+  });
+
+  it('in a Conflict, the disputed values say conflict and the agreed ones stay confirmed', () => {
+    const c = v({
+      state: 'conflict',
+      applied: false,
+      mine: { ...plan, departureTime: '19:00', terminal: '3' },
+    });
+    expect(bandChecks(c)).toEqual({ start: 'conflict', end: 'confirmed' });
+    expect(fieldCheck(c, ['terminal'])).toBe('conflict');
+  });
+
+  it('an airline change not yet in the plan says changed on the moved value only', () => {
+    const c = v({ state: 'changed', applied: false, provider: { ...plan, arrivalTime: '01:10' } });
+    expect(bandChecks(c)).toEqual({ start: 'confirmed', end: 'changed' });
+  });
+
+  it('a quiet fill (the plan lacks a value under verified) carries no mark', () => {
+    const { terminal: _t, ...noTerminal } = plan;
+    expect(fieldCheck(v({ mine: noTerminal }), ['terminal'])).toBeUndefined();
+  });
+
+  it('nothing is marked without a usable answer: unchecked, cancelled, alert, no provider', () => {
+    for (const bad of [
+      v({ checkedAt: undefined }),
+      v({ provider: undefined }),
+      v({ state: 'cancelled', applied: true }),
+      v({ state: 'conflict', live: { status: 'Canceled' } }),
+      v({ live: { status: 'Diverted' } }),
+      v({ state: 'unavailable' }),
+      undefined,
+    ]) {
+      expect(bandChecks(bad)).toEqual({ start: undefined, end: undefined });
+      expect(fieldCheck(bad, ['terminal'])).toBeUndefined();
+      expect(airportCheck(bad, 'SIN', 'from')).toBeUndefined();
+    }
+  });
+
+  it("an airport is confirmed only when the booking carries the matched leg's code", () => {
+    expect(airportCheck(v(), 'SIN', 'from')).toBe('confirmed');
+    expect(airportCheck(v(), 'London Heathrow (LHR)', 'to')).toBe('confirmed');
+    expect(airportCheck(v({ state: 'conflict', applied: false }), 'SIN', 'from')).toBe('confirmed');
+    expect(airportCheck(v(), 'London', 'to')).toBeUndefined();
+    expect(airportCheck(v(), 'LGW', 'to')).toBeUndefined();
+    expect(airportCheck(v({ route: {} }), 'SIN', 'from')).toBeUndefined();
+    expect(airportCheck(v(), undefined, 'from')).toBeUndefined();
   });
 });
 

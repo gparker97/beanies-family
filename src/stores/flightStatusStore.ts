@@ -150,7 +150,10 @@ export const PUSH_WAIT_MS = 5_000;
 
 /** What started a run. Rides the `kind` context key. `push-token`: the OS rotated the token. */
 export type FlightRefreshKind =
-  'open' | 'foreground' | 'online' | 'tick' | 'segment-changed' | 'push-token';
+  'open' | 'foreground' | 'online' | 'tick' | 'segment-changed' | 'push-token' | 'manual';
+
+/** What a "Check now" tap did (`flightStatusStore.checkNow`). */
+export type ManualCheckResult = 'started' | 'fresh' | 'not_due';
 
 /** Why a run fetches a flight (`pickFlightRefresh`); `'entry'` is the stamped one. */
 type FetchReason = Extract<FlightRefreshDecision, { action: 'fetch' }>['reason'];
@@ -210,6 +213,8 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
 
   /** The family the in-memory checks belong to. */
   let loadedFamilyId: string | null = null;
+  /** The flights the last "Check now" tap asked for; consumed by the next run (`checkNow`). */
+  let manualIds: Set<string> | null = null;
   /** Controllers of the requests in flight (not reactive), aborted on sign-out. */
   const controllers = new Set<AbortController>();
   /** Session-only backoff for an out-of-window owed write that keeps failing (the `skipGates`
@@ -317,7 +322,8 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
    * revision: the id `liveNoticeId` gives a change once it is written, and a new airline
    * revision is a new key. A cancellation is keyed on its revision alone on BOTH paths (never
    * the bell/OS id's `@liveCancelledAt`), so one dismissed before its write lands stays
-   * dismissed once it is written. `liveNoticeId` itself stays the bell/OS id.
+   * dismissed once it is written. `liveNoticeId` itself stays the bell/OS id. Every notice
+   * with a provider answer therefore has a key; only the synced-fields fallback can lack one.
    */
   function noticeKey(
     segmentId: string,
@@ -331,7 +337,14 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
     if (noticeRevision(seg)?.kind === 'cancelled') {
       return travelCancelId(segmentId, seg.liveRevision!);
     }
-    return liveNoticeId(segmentId, seg);
+    // A notice the synced fields cannot name: a Conflict on a flight whose airline revision was
+    // recorded with no announced change (the first answer matched, or only filled a terminal),
+    // then edited by hand. Keyed on the provider's revision like the unwritten change above, so
+    // "Got it" folds it and a new airline revision is a new notice.
+    return (
+      liveNoticeId(segmentId, seg) ??
+      (v.provider ? travelChangeId(segmentId, revisionOf(v.provider)) : null)
+    );
   }
 
   /** One verification per travel segment, rebuilt from the checks, failures, clock and
@@ -829,10 +842,45 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
     });
   }
 
+  /** Everything a run needs to know about one flight right now, and whether to ask about it
+   *  (`pickFlightRefresh`). `manual`: the person tapped "Check now" for this flight. The one
+   *  place the decision's inputs are gathered, for `run` and `checkNow` alike. */
+  function decide(c: Candidate, now: number, configured: boolean, manual: boolean) {
+    const seg = c.segment;
+    const number = normaliseFlightNumber(seg.airline, seg.flightNumber);
+    const check = usableCheck(seg);
+    const timing = flightTiming(seg, check, homeZone.value, now);
+    const date = seg.departureDate?.slice(0, 10) ?? '';
+    const question = number
+      ? entryQuestion(number.query, date, seg.departureAirport, seg.arrivalAirport)
+      : '';
+    const decision = pickFlightRefresh({
+      halted: halted.value,
+      entitled: isEntitled.value,
+      enabled: settingsStore.liveFlightChecksEnabled,
+      configured,
+      online: isOnline.value,
+      hasFlightNumber: number !== null,
+      past: timing.past,
+      inWindow: timing.inWindow,
+      nowMs: now,
+      lastCheckedAt: check?.checkedAt ?? null,
+      minIntervalMs: timing.minIntervalMs,
+      backoffUntil: failures.value[seg.id]?.until ?? 0,
+      entryDone: entryChecked.value[seg.id] === question,
+      manual,
+    });
+    return { number, check, timing, date, question, decision };
+  }
+
   /** One pass over the candidates: decide each, fetch the due ones (soonest first, capped). */
   async function run(kind: FlightRefreshKind): Promise<void> {
     const now = Date.now();
     nowMs.value = now;
+    // The flights a "Check now" tap asked for ride on the next run, whatever kind wins the
+    // trailing slot, and on that run only.
+    const manual = manualIds;
+    manualIds = null;
     const familyId = familyContextStore.activeFamilyId;
     if (familyId !== loadedFamilyId) hydrate(familyId);
     if (!familyId) return;
@@ -855,28 +903,12 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
 
     for (const c of candidateSegments.value) {
       const seg = c.segment;
-      const number = normaliseFlightNumber(seg.airline, seg.flightNumber);
-      const check = usableCheck(seg);
-      const timing = flightTiming(seg, check, homeZone.value, now);
-      const date = seg.departureDate?.slice(0, 10) ?? '';
-      const question = number
-        ? entryQuestion(number.query, date, seg.departureAirport, seg.arrivalAirport)
-        : '';
-      const decision = pickFlightRefresh({
-        halted: halted.value,
-        entitled: isEntitled.value,
-        enabled: settingsStore.liveFlightChecksEnabled,
+      const { number, check, timing, date, question, decision } = decide(
+        c,
+        now,
         configured,
-        online: isOnline.value,
-        hasFlightNumber: number !== null,
-        past: timing.past,
-        inWindow: timing.inWindow,
-        nowMs: now,
-        lastCheckedAt: check?.checkedAt ?? null,
-        minIntervalMs: timing.minIntervalMs,
-        backoffUntil: failures.value[seg.id]?.until ?? 0,
-        entryDone: entryChecked.value[seg.id] === question,
-      });
+        manual?.has(seg.id) ?? false
+      );
       if (decision.action === 'skip') {
         histogram.set(decision.reason, (histogram.get(decision.reason) ?? 0) + 1);
         if (
@@ -1171,6 +1203,51 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
     });
   }
 
+  /**
+   * "Check now": ask the airline again about these flights (one trip's), on the person's word.
+   * A tap only lowers the freshness floor to `MANUAL_CHECK_FLOOR_MS`; the window, the backoff,
+   * the per-run cap and every refusal hold, so it cannot be used to spend the provider quota.
+   *  - `started`: at least one flight is being asked (or already was);
+   *  - `fresh`: every flight that could be asked was checked inside the floor;
+   *  - `not_due`: nothing can be asked right now (outside the window, offline, checks off).
+   */
+  function checkNow(segmentIds: readonly string[]): ManualCheckResult {
+    const now = Date.now();
+    const configured = isFlightStatusConfigured();
+    const reasons = new Set<string>();
+    let due = 0;
+    let busy = 0;
+    for (const id of segmentIds) {
+      const c = current(id);
+      if (!c || !isFlightType(c.segment.type)) continue;
+      if (inFlight.value.has(id)) {
+        busy += 1;
+        continue;
+      }
+      const { decision } = decide(c, now, configured, true);
+      if (decision.action === 'fetch') due += 1;
+      else reasons.add(decision.reason);
+    }
+    const result: ManualCheckResult =
+      due > 0 || busy > 0 ? 'started' : reasons.has('fresh') ? 'fresh' : 'not_due';
+    logEvent({
+      level: 'info',
+      surface: SURFACE,
+      message: 'flight manual check',
+      context: {
+        action: 'manual_check',
+        kind: 'manual',
+        count: due,
+        detail: result === 'started' ? result : `${result}:${[...reasons].sort().join(',')}`,
+      },
+    });
+    if (due > 0) {
+      manualIds = new Set(segmentIds);
+      void request('manual');
+    }
+    return result;
+  }
+
   /** The visible-tab tick: move the clock the chips read, then ask. */
   function tick(): Promise<void> {
     return request('tick');
@@ -1460,6 +1537,7 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
     lastCheckedAt,
     request,
     run,
+    checkNow,
     revert,
     takeAirline,
     dismissNotice,

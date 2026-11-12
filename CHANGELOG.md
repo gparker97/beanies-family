@@ -15,15 +15,19 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - The beanie wall can now show a sleep slideshow of your family's photos (milestones, beans and recipe dishes), around the clock or full screen, with its own speed and brightness.
 - Tapping a bean's face on the beanie wall now opens the family scrapbook to read, even while the wall is locked.
 - The Scrapbook page has a new Timeline view next to the usual spreads.
+- Flight times, and the From and To airports, now carry the green "live" tick once the airline's latest answer matches your plan, on the travel page and the beanie wall.
+- The Live Checks card has a Check Now link, which asks the airline again about a trip's flights (at most once every five minutes per flight) and reads "Checking..." while it does.
 
 ### Changed
 
 - The beanie wall's drawers open taller, and the trip chips now sit in the drawer's title row.
+- The "live" pill beside a flight detail is now green when it matches the airline, and says "conflict" or "changed" on the exact value that differs.
 
 ### Fixed
 
 - A scrapbook photo that cannot load no longer shows as a broken image.
 - Fixed a beanie wall setting that sometimes did not save.
+- "Got it" now closes a flight conflict notice in every case.
 
 ## 2026-11-11
 

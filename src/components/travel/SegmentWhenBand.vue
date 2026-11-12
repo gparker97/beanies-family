@@ -11,14 +11,26 @@
  * line it lives (the big time, or the date under it). `start` is the departure and `end` the
  * arrival, which is the flight band's shape; `was` is only ever passed for a flight in the
  * `changed` state. The band shows no terminal, so a terminal change is told by the notice.
+ *
+ * `checks`: what the airline's latest answer says about each cell (`bandChecks`): confirmed,
+ * in conflict, or changed and not yet in the plan. The cell carries the matching `LivePill` on
+ * its date line (beside the big line when there is no date line), the same mark the terminal
+ * row gets. Not beside the caption: with "+1 day" there, the pill wrapped onto its own line in
+ * a 360px phone's cell and pushed the two times out of line.
  */
 import { computed } from 'vue';
+import LivePill from '@/components/travel/LivePill.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { formatDateShort, formatTime12 } from '@/utils/date';
 import type { ScheduleTuple } from '@/types/flightStatus';
+import type { FieldCheck } from '@/utils/flightStatus/copy';
 import type { WhenBand, WhenCell } from '@/utils/vacation';
 
-const props = defineProps<{ band: WhenBand; was?: ScheduleTuple }>();
+const props = defineProps<{
+  band: WhenBand;
+  was?: ScheduleTuple;
+  checks?: { start?: FieldCheck; end?: FieldCheck };
+}>();
 
 const { t } = useTranslation();
 
@@ -67,9 +79,11 @@ const hasEnd = computed(() => !!props.band.end);
       <div class="when-cap">{{ t(band.start.captionKey) }}</div>
       <div class="font-outfit when-big" :class="{ 'is-live': startWas.big }">
         {{ primary(band.start) }}
+        <LivePill v-if="checks?.start && !secondary(band.start)" :status="checks.start" />
       </div>
       <div v-if="secondary(band.start)" class="when-sub" :class="{ 'is-live': startWas.sub }">
         {{ secondary(band.start) }}
+        <LivePill v-if="checks?.start" :status="checks.start" />
       </div>
       <div v-if="startWas.big || startWas.sub" class="when-was-line">
         <s v-if="startWas.big" class="when-was">{{ startWas.big }}</s>
@@ -88,9 +102,11 @@ const hasEnd = computed(() => !!props.band.end);
         </div>
         <div class="font-outfit when-big" :class="{ 'is-live': endWas.big }">
           {{ primary(band.end) }}
+          <LivePill v-if="checks?.end && !secondary(band.end)" :status="checks.end" />
         </div>
         <div v-if="secondary(band.end)" class="when-sub" :class="{ 'is-live': endWas.sub }">
           {{ secondary(band.end) }}
+          <LivePill v-if="checks?.end" :status="checks.end" />
         </div>
         <div v-if="endWas.big || endWas.sub" class="when-was-line">
           <s v-if="endWas.big" class="when-was">{{ endWas.big }}</s>
@@ -149,6 +165,14 @@ const hasEnd = computed(() => !!props.band.end);
   font-size: 1.125rem;
   font-weight: 700;
   line-height: 1.15;
+}
+
+.when-big,
+.when-sub {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 0.375rem;
 }
 
 .when-sub {

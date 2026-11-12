@@ -182,6 +182,10 @@ export function deriveVerification(
       fresh: ctx.inWindow && ctx.nowMs - usable.checkedAt < ctx.minIntervalMs,
       provider,
       mine,
+      route: compact({
+        from: leg.departure.iata,
+        to: arrivalSide(leg, usable.arrivalLeg)?.arrival.iata,
+      }),
       ...(liveInfo(usable, leg) ? { live: liveInfo(usable, leg) } : {}),
     };
     if (leg.status === 'Canceled') {

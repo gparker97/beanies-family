@@ -836,6 +836,23 @@ async function undoTakeAirline(undo: () => Promise<unknown>): Promise<void> {
   await undo();
 }
 
+/** A request for one of the selected trip's flights is in flight ("Checking..."). */
+const liveChecking = computed(() =>
+  liveCheckRows.value.some((r) => flightStatusStore.inFlight.has(r.id))
+);
+
+/** "Check now" on the live-checks card. Reads only, so no edit permission is needed; the store
+ *  holds the five-minute floor, and a tap that starts nothing says why. */
+function checkFlightsNow(): void {
+  const result = flightStatusStore.checkNow(liveCheckRows.value.map((r) => r.id));
+  if (result === 'started') return;
+  showToast(
+    'info',
+    t(result === 'fresh' ? 'travel.live.toast.fresh.title' : 'travel.live.toast.notDue.title'),
+    t(result === 'fresh' ? 'travel.live.toast.fresh.message' : 'travel.live.toast.notDue.message')
+  );
+}
+
 /** "Got it" / the chip on a folded notice: device state only, so no edit permission needed. */
 function dismissFlightNotice(item: TimelineItem): void {
   flightStatusStore.dismissNotice(item.id);
@@ -1520,6 +1537,8 @@ async function addQuickIdea() {
             class="mb-4 hidden lg:block"
             :rows="liveCheckRows"
             :now-ms="flightStatusStore.nowMs"
+            :checking="liveChecking"
+            @check-now="checkFlightsNow"
           />
           <TripIdeasPanel
             ref="ideasPanelRef"

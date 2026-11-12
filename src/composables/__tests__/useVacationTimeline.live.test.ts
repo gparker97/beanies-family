@@ -64,28 +64,46 @@ describe('travelDetailRows live rows', () => {
   });
 });
 
-describe('travelDetailRows terminal confirmation', () => {
-  const terminalRow = (rows: ReturnType<typeof travelDetailRows>) =>
-    rows.find((r) => r.label === 'segmentRow.terminal');
-  const confirmed = (terminal: string): FlightVerification => ({
+describe('travelDetailRows plan-value checks (terminal, from, to)', () => {
+  const rowOf = (rows: ReturnType<typeof travelDetailRows>, label: string) =>
+    rows.find((r) => r.label === label);
+  const answer = (
+    terminal: string,
+    over: Partial<FlightVerification> = {}
+  ): FlightVerification => ({
     state: 'verified',
     checkedAt: 1,
+    mine: { terminal: 'Terminal 2' },
     provider: { terminal },
+    ...over,
   });
 
-  it("marks the flight terminal live when the airline's latest answer agrees, however old", () => {
+  it("marks the flight terminal with what the airline's latest answer says, however old", () => {
     const seg = flight({ terminal: 'Terminal 2' });
-    expect(terminalRow(travelDetailRows(seg, t as never, confirmed('T2')))?.live).toBe(true);
-    expect(terminalRow(travelDetailRows(seg, t as never, confirmed('3')))?.live).toBeUndefined();
-    expect(
-      terminalRow(travelDetailRows(seg, t as never, { ...confirmed('2'), fresh: false }))?.live
-    ).toBe(true);
-    expect(terminalRow(travelDetailRows(seg, t as never))?.live).toBeUndefined();
+    const check = (v?: FlightVerification) =>
+      rowOf(travelDetailRows(seg, t as never, v), 'segmentRow.terminal')?.check;
+    expect(check(answer('T2'))).toBe('confirmed');
+    expect(check(answer('2', { fresh: false }))).toBe('confirmed');
+    expect(check(answer('3', { state: 'conflict', applied: false }))).toBe('conflict');
+    expect(check()).toBeUndefined();
+  });
+
+  it("marks From / To when the booking carries the matched leg's airport code", () => {
+    const seg = flight({ departureAirport: 'Singapore (SIN)', arrivalAirport: 'Tokyo' });
+    const rows = travelDetailRows(
+      seg,
+      t as never,
+      answer('2', { route: { from: 'SIN', to: 'NRT' } })
+    );
+    expect(rowOf(rows, 'segmentRow.from')?.check).toBe('confirmed');
+    expect(rowOf(rows, 'segmentRow.to')?.check).toBeUndefined();
   });
 
   it('never marks a cruise terminal', () => {
     const cruise = flight({ type: 'cruise', terminal: 'Terminal 2' });
-    expect(terminalRow(travelDetailRows(cruise, t as never, confirmed('2')))?.live).toBeUndefined();
+    expect(
+      rowOf(travelDetailRows(cruise, t as never, answer('2')), 'segmentRow.terminal')?.check
+    ).toBeUndefined();
   });
 });
 

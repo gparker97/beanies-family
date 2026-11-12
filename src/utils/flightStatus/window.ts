@@ -31,6 +31,14 @@ export const FLIGHT_POLL_MS = 15 * MINUTE_MS;
 export const INTERVAL_FAR_MS = 6 * HOUR_MS;
 export const INTERVAL_DAY_MS = 30 * MINUTE_MS;
 export const INTERVAL_NEAR_MS = 10 * MINUTE_MS;
+/**
+ * The floor for a check the person asked for ("Check now"): a flight inside its window is
+ * asked again once its last answer is this old, whatever the automatic floor says. Only ever
+ * LOWERS a floor (inside 3 h the automatic one is already tighter than most taps), and changes
+ * nothing else: the window, the backoff and every refusal apply to a tap exactly as to a tick,
+ * so a tap can never spend more than one provider call per flight per five minutes.
+ */
+export const MANUAL_CHECK_FLOOR_MS = 5 * MINUTE_MS;
 
 type TimedSegment = Pick<
   VacationTravelSegment,
@@ -256,6 +264,9 @@ export interface FlightRefreshInput {
   minIntervalMs: number;
   /** Epoch ms before which a failure's backoff holds (0 when none). */
   backoffUntil: number;
+  /** The person tapped "Check now" for this flight: the freshness floor is at most
+   *  `MANUAL_CHECK_FLOOR_MS`. Nothing else changes. */
+  manual?: boolean;
   /** This device has already issued an out-of-window check for this segment's CURRENT
    *  question (`entryChecked` stamp equals `entryQuestion`). Inert inside the window. */
   entryDone: boolean;
@@ -282,7 +293,10 @@ export function pickFlightRefresh(input: FlightRefreshInput): FlightRefreshDecis
   if (input.nowMs < input.backoffUntil) return { action: 'skip', reason: 'backoff' };
   if (!input.inWindow) return { action: 'fetch', reason: 'entry' };
   if (input.lastCheckedAt === null) return { action: 'fetch', reason: 'no-check' };
-  if (input.nowMs - input.lastCheckedAt < input.minIntervalMs) {
+  const floor = input.manual
+    ? Math.min(input.minIntervalMs, MANUAL_CHECK_FLOOR_MS)
+    : input.minIntervalMs;
+  if (input.nowMs - input.lastCheckedAt < floor) {
     return { action: 'skip', reason: 'fresh' };
   }
   return { action: 'fetch', reason: 'stale' };

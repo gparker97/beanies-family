@@ -26,7 +26,7 @@ import {
 import { isTravellerSubset, resolveSegmentTravellers } from '@/utils/segmentTravellers';
 import { isFlightType } from '@/utils/travelCodes';
 import { flightLabel } from '@/utils/flightStatus/occurrenceNotice';
-import { confirmsTerminal } from '@/utils/flightStatus/copy';
+import { airportCheck, fieldCheck, type FieldCheck } from '@/utils/flightStatus/copy';
 import { splitLocal } from '@/utils/flightStatus/schedule';
 import { useTranslationStore } from '@/stores/translationStore';
 import type { UIStringKey } from '@/services/translation/uiStrings';
@@ -63,6 +63,9 @@ export interface DetailRow {
    *  (the flight terminal); never editable, so it carries a small "live" pill and no editor
    *  (#143). */
   live?: boolean;
+  /** What the airline's latest answer says about this PLAN value (terminal, from, to):
+   *  `fieldCheck` / `airportCheck`. The pill shows it; absent = no pill. */
+  check?: FieldCheck;
 }
 
 /** What the live-check surfaces (chip, change notice, rail) need from a FLIGHT segment (#143).
@@ -323,7 +326,7 @@ function liveRows(seg: VacationTravelSegment, live: FlightLiveInfo, t: T): Detai
 /**
  * Detail rows for a travel segment. `v` is this device's flight verification: its `live` rows
  * (gate, desk, estimates, belt) follow the terminal and are never editable, and the flight
- * terminal row itself carries the live pill when the airline's latest answer matches it (`confirmsTerminal`).
+ * terminal, from and to rows carry what the airline's latest answer says about them (`check`).
  */
 export function travelDetailRows(
   seg: VacationTravelSegment,
@@ -339,9 +342,17 @@ export function travelDetailRows(
     // Expanded for READING only — a bare "SIN" becomes "Singapore (SIN)", the same shape the
     // dropdown shows. Anything that already carries text stays exactly as stored.
     if (seg.departureAirport)
-      rows.push({ label: t('segmentRow.from'), value: airportLabel(seg.departureAirport) });
+      rows.push({
+        label: t('segmentRow.from'),
+        value: airportLabel(seg.departureAirport),
+        check: airportCheck(v, seg.departureAirport, 'from'),
+      });
     if (seg.arrivalAirport)
-      rows.push({ label: t('segmentRow.to'), value: airportLabel(seg.arrivalAirport) });
+      rows.push({
+        label: t('segmentRow.to'),
+        value: airportLabel(seg.arrivalAirport),
+        check: airportCheck(v, seg.arrivalAirport, 'to'),
+      });
     if (seg.airline)
       rows.push({ label: t('segmentRow.airline'), value: airlineLabel(seg.airline) });
     if (seg.flightNumber)
@@ -354,7 +365,7 @@ export function travelDetailRows(
       rows.push({
         label: t('segmentRow.terminal'),
         value: seg.terminal,
-        ...(confirmsTerminal(v, seg.terminal) ? { live: true } : {}),
+        check: fieldCheck(v, ['terminal']),
       });
     }
     if (v?.live) rows.push(...liveRows(seg, v.live, t));

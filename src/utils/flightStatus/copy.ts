@@ -15,6 +15,7 @@ import type { FlightVerification, ScheduleTuple } from '@/types/flightStatus';
 import type { TranslateFn } from '@/utils/format';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { formatDateShort, formatTime12 } from '@/utils/date';
+import { carriedCode } from '@/utils/travelCodes';
 import { diffTuple, normaliseTerminal, type TupleField } from './schedule';
 
 const MINUTE_MS = 60_000;
@@ -404,20 +405,77 @@ export function confirmedLive(v: FlightVerification): boolean {
 }
 
 /**
- * The plan's terminal is confirmed: a `confirmedLive` answer whose airline terminal is the plan's
- * (compared as `normaliseTerminal` reads it: "T2" is "Terminal 2"). Drives the pill on the flight
- * terminal row, which is plan data rather than a live reading.
+ * What the airline's latest answer says about ONE value of the plan. The pill beside the value
+ * (`LivePill`) shows exactly this, so the card's values and the flight's chip tell one story:
+ *  - `confirmed`: the airline states it and the plan matches;
+ *  - `conflict`: the flight is in Conflict and this is a value the two disagree on;
+ *  - `changed`: the airline moved this value and the plan has not been updated on this device.
  */
-export function confirmsTerminal(
-  v: FlightVerification | undefined,
-  terminal: string | undefined
-): boolean {
+export type FieldCheck = 'confirmed' | 'conflict' | 'changed';
+
+/**
+ * A provider answer the per-value marks can be read from: checked on this device, with the
+ * airline's schedule in hand, the flight running (not `Canceled`: nothing about a cancelled
+ * flight is "confirmed") and not an alert status (`isAlertStatus`).
+ */
+function answered(
+  v: FlightVerification | undefined
+): v is FlightVerification & { provider: ScheduleTuple } {
   return (
     !!v &&
-    confirmedLive(v) &&
-    !!v.provider?.terminal &&
-    normaliseTerminal(v.provider.terminal) === normaliseTerminal(terminal)
+    v.checkedAt !== undefined &&
+    !!v.provider &&
+    (v.state === 'verified' || v.state === 'changed' || v.state === 'conflict') &&
+    v.live?.status !== 'Canceled' &&
+    !isAlertStatus(v.live?.status)
   );
+}
+
+/**
+ * The check on one value of the plan, or on a group shown as one (a band cell is a date and a
+ * time). Undefined when there is nothing to say: no usable answer, or the airline does not
+ * state every field (no published terminal; the unknown arrival half of a multi-stop number,
+ * `tupleFromLeg`), because an unknown value is never shown as confirmed. Deliberately not gated
+ * on `fresh` (the `confirmedLive` rule): the chip says how old the answer is.
+ */
+export function fieldCheck(
+  v: FlightVerification | undefined,
+  fields: readonly TupleField[]
+): FieldCheck | undefined {
+  if (!answered(v)) return undefined;
+  const { changed, filled } = diffTuple(v.mine ?? {}, v.provider);
+  if (fields.some((f) => changed.includes(f) || filled.includes(f))) {
+    // A value the plan lacks and the airline states under `verified` is a quiet fill: no mark.
+    return v.state === 'conflict' || v.state === 'changed' ? v.state : undefined;
+  }
+  return fields.every((f) => v.provider[f] !== undefined) ? 'confirmed' : undefined;
+}
+
+/** The checks on the two cells of a flight's "when" band (departs, arrives). */
+export function bandChecks(v: FlightVerification | undefined): {
+  start?: FieldCheck;
+  end?: FieldCheck;
+} {
+  return {
+    start: fieldCheck(v, ['departureDate', 'departureTime']),
+    end: fieldCheck(v, ['arrivalDate', 'arrivalTime']),
+  };
+}
+
+/**
+ * The plan's airport on one side is the one the matched flight uses: the booking carries an
+ * IATA code (`carriedCode`; a bare city name is never guessed at) equal to the leg's. Only ever
+ * `confirmed`: the matcher picks a leg on EITHER airport, so the other side can differ on a
+ * verified flight, and that is left unmarked, never called a Conflict the chip does not show.
+ */
+export function airportCheck(
+  v: FlightVerification | undefined,
+  airport: string | undefined,
+  side: 'from' | 'to'
+): FieldCheck | undefined {
+  if (!answered(v)) return undefined;
+  const code = v.route?.[side];
+  return code !== undefined && carriedCode(airport, 3) === code ? 'confirmed' : undefined;
 }
 
 /**

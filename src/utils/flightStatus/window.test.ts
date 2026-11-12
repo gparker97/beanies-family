@@ -10,6 +10,7 @@ import {
   departureInstant,
   flightTiming,
   minIntervalMs,
+  MANUAL_CHECK_FLOOR_MS,
   pickFlightRefresh,
   zonedInstant,
   type FlightRefreshInput,
@@ -177,6 +178,33 @@ describe('pickFlightRefresh', () => {
     ['fresh', { lastCheckedAt: NOW - INTERVAL_DAY_MS + 1 }],
   ] as const)('skips: %s', (reason, over) => {
     expect(pickFlightRefresh({ ...base, ...over })).toEqual({ action: 'skip', reason });
+  });
+
+  it('a manual check only lowers the freshness floor to five minutes; every refusal still holds', () => {
+    const manual = { ...base, manual: true };
+    expect(
+      pickFlightRefresh({ ...manual, lastCheckedAt: NOW - MANUAL_CHECK_FLOOR_MS + 1 })
+    ).toEqual({ action: 'skip', reason: 'fresh' });
+    expect(pickFlightRefresh({ ...manual, lastCheckedAt: NOW - MANUAL_CHECK_FLOOR_MS })).toEqual({
+      action: 'fetch',
+      reason: 'stale',
+    });
+    // Never RAISES a floor that is already tighter.
+    expect(
+      pickFlightRefresh({ ...manual, minIntervalMs: 60_000, lastCheckedAt: NOW - 60_000 })
+    ).toEqual({ action: 'fetch', reason: 'stale' });
+    expect(pickFlightRefresh({ ...manual, backoffUntil: NOW + 1 })).toEqual({
+      action: 'skip',
+      reason: 'backoff',
+    });
+    expect(pickFlightRefresh({ ...manual, inWindow: false, entryDone: true })).toEqual({
+      action: 'skip',
+      reason: 'out_of_window',
+    });
+    expect(pickFlightRefresh({ ...manual, online: false })).toEqual({
+      action: 'skip',
+      reason: 'offline',
+    });
   });
 
   it('out of window: fetches once per question (entry), with or without a usable check', () => {

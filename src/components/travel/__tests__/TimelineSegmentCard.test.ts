@@ -212,6 +212,23 @@ describe('TimelineSegmentCard', () => {
     });
   });
 
+  it('a checked plan value carries its own status, whatever the card-level tick says', () => {
+    const w = mountCard(
+      {
+        flight: FLIGHT,
+        detailRows: [
+          { label: 'segmentRow.terminal', value: '3', check: 'conflict' },
+          { label: 'segmentRow.from', value: 'SIN', check: 'confirmed' },
+        ],
+      },
+      { verification: { state: 'conflict', checkedAt: 1, applied: false }, nowMs: 2 }
+    );
+    expect(w.get('.live-pill[data-status="conflict"]').text()).toContain(
+      'flightChecks.chip.conflict'
+    );
+    expect(w.find('.live-pill[data-status="confirmed"]').exists()).toBe(true);
+  });
+
   it('draws the "live" pill on a live row', () => {
     const w = mountCard({
       detailRows: [{ label: 'travel.live.row.gate', value: 'C21', live: true }],
