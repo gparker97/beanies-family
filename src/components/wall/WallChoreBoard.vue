@@ -26,6 +26,7 @@
 import { computed, inject } from 'vue';
 import WallBackButton from '@/components/wall/WallBackButton.vue';
 import WallJobList from '@/components/wall/WallJobList.vue';
+import WallFaceButton from '@/components/wall/WallFaceButton.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
 import { useWallLock } from '@/components/wall/wallLockKey';
@@ -246,7 +247,9 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
           class="wall-chore-head dark:border-line flex flex-col items-center gap-1 border-b border-[rgba(44,62,80,0.06)] px-2.5 py-2 text-center"
           :style="{ background: `${member.color}2e` }"
         >
-          <BeanieAvatar v-bind="memberAvatarBindings(member)" fallback="initials" size="lg" />
+          <WallFaceButton :name="member.name" source="face-chore" class="inline-flex">
+            <BeanieAvatar v-bind="memberAvatarBindings(member)" fallback="initials" size="lg" />
+          </WallFaceButton>
           <div>
             <p class="font-outfit text-secondary-500 wall-bean-name dark:text-ink font-bold">
               {{ member.name }}
@@ -374,9 +377,11 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
       <p class="font-outfit text-secondary-500 wall-list-title dark:text-ink font-bold uppercase">
         {{ t('wall.jobs.allClear') }}
       </p>
-      <div
+      <WallFaceButton
         v-for="member in partitioned.idle"
         :key="member.id"
+        :name="member.name"
+        source="face-chore"
         class="flex shrink-0 items-center gap-1.5"
       >
         <BeanieAvatar v-bind="memberAvatarBindings(member)" fallback="initials" size="sm" />
@@ -385,7 +390,7 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
         >
           {{ member.name }}
         </span>
-      </div>
+      </WallFaceButton>
     </div>
   </div>
 </template>
@@ -486,8 +491,13 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
     text-align: left;
   }
 
+  /* The face's wrapper (`WallFaceButton`) and the avatar inside it, which is what has the
+     size: capping only the wrapper would leave a 3rem face spilling out of a 2.25rem box. */
   .wall-chore-head > :first-child {
     flex-shrink: 0;
+  }
+
+  .wall-chore-head > :first-child :deep([data-testid='beanie-avatar']) {
     height: 2.25rem;
     width: 2.25rem;
   }
@@ -503,9 +513,13 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
     text-align: left;
   }
 
-  /* The avatar is the tall part, and its size is a prop, so it is capped here. */
+  /* The avatar is the tall part, and its size is a prop, so it is capped here (inside its
+     `WallFaceButton` wrapper, as above). */
   .wall-chore-head > :first-child {
     flex-shrink: 0;
+  }
+
+  .wall-chore-head > :first-child :deep([data-testid='beanie-avatar']) {
     height: 2.25rem;
     width: 2.25rem;
   }

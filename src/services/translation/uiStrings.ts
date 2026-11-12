@@ -716,6 +716,8 @@ const STRING_DEFS = {
   'scrapbook.section.milestones': { en: 'Big moments', beanie: 'big moments' },
   'scrapbook.section.notes': { en: 'About them', beanie: 'about them' },
   'scrapbook.seeAll': { en: 'see all →', beanie: 'see all →' },
+  'scrapbook.timeline.beans': { en: 'Whose Memories', beanie: 'whose memories' },
+  'scrapbook.timeline.jump': { en: 'Jump to a Month', beanie: 'jump to a month' },
   // ── Medication administration log ────────────────────────────────────────
   // Log-entry creation, undo, confirmation, and delete strings.
   // Brand voice: friendly + factual. Heritage Orange for the confirm variant,
@@ -1033,6 +1035,9 @@ const STRING_DEFS = {
     beanie: 'e.g. asks for it every sunday. eats it with a big spoon.',
   },
   // Family Scrapbook
+  'scrapbook.view.label': { en: 'Scrapbook view', beanie: 'scrapbook view' },
+  'scrapbook.view.spreads': { en: 'Spreads', beanie: 'spreads' },
+  'scrapbook.view.timeline': { en: 'Timeline', beanie: 'timeline' },
   'scrapbook.title': { en: 'Family Scrapbook', beanie: 'family scrapbook' },
   'scrapbook.subtitle': {
     en: 'everything about your family, in one place',
@@ -8188,6 +8193,51 @@ const STRING_DEFS = {
   'wall.sleep.idle': { en: 'After Nobody Touches It For', beanie: 'after nobody touches it for' },
   'wall.sleep.idle.minutes': { en: '{n} minutes', beanie: '{n} minutes' },
   'wall.sleep.idle.hour': { en: '1 hour', beanie: '1 hour' },
+  'settings.wall.memories.section': { en: 'Family Memories', beanie: 'family memories' },
+  'settings.wall.memories.viewer': { en: 'Scrapbook on the Wall', beanie: 'scrapbook on the wall' },
+  'settings.wall.memories.viewerHint': {
+    en: 'A tap on a face opens the family scrapbook.',
+    beanie: 'a tap on a face opens the family scrapbook.',
+  },
+  'settings.wall.memories.show': { en: 'What to Show', beanie: 'what to show' },
+  'settings.wall.memories.type.milestone': {
+    en: 'Photos and Milestones',
+    beanie: 'photos and milestones',
+  },
+  'settings.wall.memories.type.favorite': { en: 'Favorites', beanie: 'favorites' },
+  'settings.wall.memories.type.saying': { en: 'Sayings', beanie: 'sayings' },
+  'settings.wall.memories.type.note': { en: 'Notes', beanie: 'notes' },
+  'settings.wall.memories.slideshow': { en: 'Sleep Slideshow', beanie: 'sleep slideshow' },
+  'settings.wall.memories.slideshow.off': { en: 'Off', beanie: 'off' },
+  'settings.wall.memories.slideshow.around': { en: 'Around the Clock', beanie: 'around the clock' },
+  'settings.wall.memories.slideshow.full': { en: 'Full Screen', beanie: 'full screen' },
+  'settings.wall.memories.brightness': { en: 'Brightness', beanie: 'brightness' },
+  'settings.wall.memories.brightness.dim': { en: 'Dim', beanie: 'dim' },
+  'settings.wall.memories.brightness.medium': { en: 'Medium', beanie: 'medium' },
+  'settings.wall.memories.brightness.bright': { en: 'Bright', beanie: 'bright' },
+  'settings.wall.memories.speed': { en: 'Speed', beanie: 'speed' },
+  'settings.wall.memories.speed.slow': { en: 'Slow', beanie: 'slow' },
+  'settings.wall.memories.speed.medium': { en: 'Medium', beanie: 'medium' },
+  'settings.wall.memories.speed.fast': { en: 'Fast', beanie: 'fast' },
+  'settings.wall.memories.hint': {
+    en: "psst: tap a bean's face on the wall to open the scrapbook",
+    beanie: "psst: tap a bean's face on the wall to open the scrapbook",
+  },
+  'wall.memories.title': { en: 'Our Family Scrapbook', beanie: 'our family scrapbook' },
+  'wall.memories.titleFor': { en: "{name}'s Moments", beanie: "{name}'s moments" },
+  'wall.memories.newestFirst': { en: 'Newest first', beanie: 'newest first' },
+  'wall.memories.openFor': {
+    en: '{name}: open the family scrapbook',
+    beanie: '{name}: open the family scrapbook',
+  },
+  'wall.memories.empty.typesOff': {
+    en: 'Nothing to show here yet. Turn on a kind of memory in the wall settings.',
+    beanie: 'nothing to show here yet. turn on a kind of memory in the wall settings.',
+  },
+  'wall.memories.empty.noEntries': {
+    en: 'No memories here yet. Add milestones, sayings, favorites and notes in the Scrapbook.',
+    beanie: 'no memories here yet. add milestones, sayings, favorites and notes in the scrapbook.',
+  },
   'wall.sleep.deviceOnly': {
     en: 'These wall settings apply to this device only.',
     beanie: 'these wall settings apply to this device only.',

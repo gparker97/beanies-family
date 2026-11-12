@@ -22,17 +22,17 @@
  * cards, washi-tape dividers between sections, kraft-paper page
  * background (page-level), Caveat handwriting for headers and labels.
  */
-import { computed, ref, watch } from 'vue';
+import { computed } from 'vue';
 import { stableFraction } from '@/utils/stableVariant';
 import ScrapbookEntryCard from '@/components/scrapbook/ScrapbookEntryCard.vue';
 import EmptyState from '@/components/pod/shared/EmptyState.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import { useTranslation } from '@/composables/useTranslation';
-import { useScrapbookFeed } from '@/composables/useScrapbookFeed';
+import { useFamilyScrapbookFeed } from '@/composables/useFamilyScrapbookFeed';
 import { getMemberAvatarUrl, markMemberAvatarError } from '@/composables/useMemberInfo';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useFamilyContextStore } from '@/stores/familyContextStore';
-import type { ScrapbookEntry, ScrapType } from '@/composables/useScrapbookFeed';
+import type { ScrapbookEntry } from '@/composables/useScrapbookFeed';
 import type { AvatarVariant } from '@/constants/avatars';
 import type { FamilyMember, UUID } from '@/types/models';
 
@@ -52,21 +52,7 @@ const familyStore = useFamilyStore();
 const familyContextStore = useFamilyContextStore();
 
 // Pull the entire family's feed — slicing happens locally per section.
-const memberIdsRef = ref<UUID[]>([]);
-const contentTypesRef = ref<Set<ScrapType>>(new Set());
-
-watch(
-  () => familyStore.members,
-  (members) => {
-    memberIdsRef.value = members.map((m) => m.id);
-  },
-  { immediate: true }
-);
-
-const { entries } = useScrapbookFeed({
-  memberIds: memberIdsRef,
-  contentTypes: contentTypesRef,
-});
+const { entries } = useFamilyScrapbookFeed();
 
 // --- Section computeds ------------------------------------------------
 

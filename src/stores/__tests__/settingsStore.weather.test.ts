@@ -137,7 +137,7 @@ describe('settingsStore weather', () => {
       const sleep = store.wallSleep;
       await store.setWallWeather('small');
       expect(h.saveGlobalSettings).toHaveBeenLastCalledWith({
-        wall: { sleep, weather: 'small' },
+        wall: { sleep: { idleMinutes: 30 }, weather: 'small' },
       });
       expect(store.wallWeatherStyle).toBe('small');
       expect(store.wallSleep).toEqual(sleep);

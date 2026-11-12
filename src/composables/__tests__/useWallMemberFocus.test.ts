@@ -113,3 +113,37 @@ describe('when the roster changes underneath a mounted wall', () => {
     expect(f.visibleMemberIds.value).toBeNull();
   });
 });
+
+describe('isOnlyFocused (the second-tap rule)', () => {
+  it('is false for everyone when nobody is lit', () => {
+    const f = withFocus(['m1', 'm2']);
+    expect(f.isOnlyFocused('m1')).toBe(false);
+    expect(f.isOnlyFocused('m2')).toBe(false);
+  });
+
+  it('is true for the one lit bean and false for the others', () => {
+    const f = withFocus(['m1', 'm2']);
+    f.toggle('m1');
+    expect(f.isOnlyFocused('m1')).toBe(true);
+    expect(f.isOnlyFocused('m2')).toBe(false);
+  });
+
+  it('is false for both when two are lit', () => {
+    // With two lit, a tap only drops that bean; it must never open the scrapbook.
+    const f = withFocus(['m1', 'm2']);
+    f.toggle('m1');
+    f.toggle('m2');
+    expect(f.isOnlyFocused('m1')).toBe(false);
+    expect(f.isOnlyFocused('m2')).toBe(false);
+  });
+
+  it('ignores a departed member still in the raw choice', () => {
+    // m1 leaves the roster: m2 is now the only lit bean, so its next tap opens the scrapbook.
+    const f = withFocus(['m1', 'm2']);
+    f.toggle('m1');
+    f.toggle('m2');
+    f.roster.value = ['m2'];
+    expect(f.isOnlyFocused('m2')).toBe(true);
+    expect(f.isOnlyFocused('m1')).toBe(false);
+  });
+});

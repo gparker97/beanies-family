@@ -10,13 +10,14 @@
  * Read-only apart from ticking list items, which is the one edit a locked wall
  * allows anywhere (same rule as `WallJobRow`).
  */
-import { computed, inject, ref } from 'vue';
+import { computed, inject, onMounted, ref, useId, watch } from 'vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import { activityEmoji } from '@/utils/activityEmoji';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
 import WallTripTimeline from '@/components/wall/WallTripTimeline.vue';
 import WallJobList from '@/components/wall/WallJobList.vue';
+import WallFaceButton from '@/components/wall/WallFaceButton.vue';
 import WallBucketIcon from '@/components/wall/WallBucketIcon.vue';
 import HandwrittenLine from '@/components/ui/HandwrittenLine.vue';
 import { useWallPeripherals, wallTripDates } from '@/composables/useWallPeripherals';
@@ -106,6 +107,37 @@ function selectTrip(id: string) {
     context: { action: 'trip_switched' },
   });
 }
+
+/** The dialog's accessible name: the `h2`, which stays in the tree even when the chips stand in for it. */
+const titleId = useId();
+
+/**
+ * Two or more trips: the chips ARE the trip drawer's title. They sit in the title row (the
+ * selected one names the trip on screen) instead of in a second row that pushed the trip
+ * down; the `h2` stays for screen readers, visually hidden. One trip: the plain title.
+ */
+const tripChipsInHeader = computed(
+  () => target.value.kind === 'trip' && !!trip.value && upcomingTrips.value.length > 1
+);
+
+/**
+ * The strip scrolls sideways rather than wrapping, so the selected chip is brought into view
+ * on open and on every switch: a selection scrolled off the edge would be a title nobody can
+ * read. Measured by hand rather than `scrollIntoView`, which may also scroll the wall's own
+ * overflow-hidden boxes.
+ */
+const tripStrip = ref<HTMLElement | null>(null);
+function revealSelectedTrip() {
+  const strip = tripStrip.value;
+  const chip = strip?.querySelector<HTMLElement>('[aria-pressed="true"]');
+  if (!strip || !chip) return;
+  const box = strip.getBoundingClientRect();
+  const at = chip.getBoundingClientRect();
+  if (at.left < box.left) strip.scrollLeft -= box.left - at.left;
+  else if (at.right > box.right) strip.scrollLeft += at.right - box.right;
+}
+onMounted(revealSelectedTrip);
+watch(() => trip.value?.id, revealSelectedTrip, { flush: 'post' });
 
 /**
  * Read the discriminated union through a local first. Narrowing on
@@ -342,12 +374,19 @@ const { identityFor } = useActivityIdentity();
     class="absolute inset-0 z-30 flex items-end bg-[rgba(44,62,80,0.42)]"
     role="dialog"
     aria-modal="true"
+    :aria-labelledby="titleId"
     @click.self="emit('close')"
   >
+    <!--
+      94% of the wall: the dimmed strip left above it is the tap-to-close area. A small wall
+      (compact tier, or under 700px tall) takes the full height with square corners and
+      tighter chrome, from the `.wall-sheet-panel` / `.wall-sheet-head` rules in
+      `BeanieWallPage`, beside the rest of the sheet's wall scale. Close is the way out there.
+    -->
     <div
-      class="dark:bg-surface-ground flex h-[84%] w-full flex-col overflow-hidden rounded-t-[30px] bg-[var(--cloud-white,#F8F9FA)] px-7 pt-6 pb-6"
+      class="wall-sheet-panel dark:bg-surface-ground flex h-[94%] w-full flex-col overflow-hidden rounded-t-[30px] bg-[var(--cloud-white,#F8F9FA)] px-7 pt-6 pb-6"
     >
-      <div class="mb-4 flex shrink-0 items-center gap-3.5">
+      <div class="wall-sheet-head mb-4 flex shrink-0 items-center gap-3.5">
         <!--
           The category, as the emoji every card surface already uses — beside the title,
           where it reads as identity rather than as a labelled data field competing with
@@ -360,9 +399,50 @@ const { identityFor } = useActivityIdentity();
           aria-hidden="true"
           >{{ activityEmoji(activity) }}</span
         >
-        <h2 class="font-outfit text-secondary-500 wall-sheet-title dark:text-ink font-extrabold">
+        <h2
+          :id="titleId"
+          class="font-outfit text-secondary-500 wall-sheet-title dark:text-ink font-extrabold"
+          :class="tripChipsInHeader ? 'sr-only' : ''"
+        >
           {{ sheetTitle }}
         </h2>
+        <!--
+          Every upcoming trip, soonest first, standing in for the title. Shown only when there
+          is a choice to make, so a family with one trip sees the plain title. One row that
+          scrolls sideways: the selected chip is scrolled into view, and a chip cut by the
+          edge says there are more. A chip is capped at 85% of the strip so, on a narrow
+          wall where one long name would fill it, the next chip still peeks in. `-m-2 p-2`
+          gives the chips' shadows room inside the scroll box without growing the row.
+        -->
+        <div
+          v-if="tripChipsInHeader && trip"
+          ref="tripStrip"
+          role="group"
+          :aria-label="t('wall.trip.switcher')"
+          class="wall-trip-switcher -m-2 flex min-w-0 flex-1 gap-2 overflow-x-auto overflow-y-hidden p-2"
+        >
+          <button
+            v-for="option in upcomingTrips"
+            :key="option.id"
+            type="button"
+            class="wall-chip-person flex min-h-[var(--wall-tap)] max-w-[85%] shrink-0 items-center gap-2 rounded-full px-4 py-1 shadow-[var(--card-shadow)]"
+            :class="
+              option.id === trip.id
+                ? 'bg-secondary-500 dark:bg-ink dark:text-surface-ground text-white'
+                : 'text-secondary-500 dark:bg-surface-raised dark:text-ink bg-white'
+            "
+            :aria-pressed="option.id === trip.id"
+            @click="selectTrip(option.id)"
+          >
+            <span class="font-outfit truncate font-semibold">{{ option.name }}</span>
+            <span
+              v-if="wallTripDates(option)"
+              class="font-inter shrink-0"
+              :class="option.id === trip.id ? '' : 'dark:text-ink-soft text-[#4d5d6c]'"
+              >{{ wallTripDates(option) }}</span
+            >
+          </button>
+        </div>
         <button
           type="button"
           class="wall-sheet-close dark:bg-surface-raised ml-auto grid shrink-0 place-items-center rounded-2xl bg-white shadow-[var(--card-shadow)]"
@@ -537,14 +617,16 @@ const { identityFor } = useActivityIdentity();
               </p>
             </div>
             <div class="mt-4 flex flex-wrap items-center gap-2">
-              <span
+              <WallFaceButton
                 v-for="person in membersForActivity(activity)"
                 :key="person.id"
+                :name="person.name"
+                source="face-sheet"
                 class="flex items-center gap-2 rounded-full bg-[var(--tint-slate-5)] px-3 py-1"
               >
                 <BeanieAvatar v-bind="memberAvatarBindings(person)" fallback="initials" size="sm" />
                 <span class="font-inter wall-sheet-line">{{ person.name }}</span>
-              </span>
+              </WallFaceButton>
             </div>
             <span
               class="mt-4 block h-1.5 w-16 rounded-full"
@@ -707,39 +789,6 @@ const { identityFor } = useActivityIdentity();
 
         <!-- the trip -->
         <template v-else-if="target.kind === 'trip'">
-          <!--
-            Every upcoming trip, soonest first. Shown only when there is a choice to make, so
-            a family with one trip sees the drawer exactly as before. Wraps rather than
-            scrolls: a chip hidden off the edge of a wall is a trip nobody finds.
-          -->
-          <div
-            v-if="trip && upcomingTrips.length > 1"
-            role="group"
-            :aria-label="t('wall.trip.switcher')"
-            class="wall-trip-switcher mb-3 flex flex-wrap gap-2"
-          >
-            <button
-              v-for="option in upcomingTrips"
-              :key="option.id"
-              type="button"
-              class="wall-chip-person flex min-h-[var(--wall-tap)] max-w-full items-center gap-2 rounded-full px-4 py-1 shadow-[var(--card-shadow)]"
-              :class="
-                option.id === trip.id
-                  ? 'bg-secondary-500 dark:bg-ink dark:text-surface-ground text-white'
-                  : 'text-secondary-500 dark:bg-surface-raised dark:text-ink bg-white'
-              "
-              :aria-pressed="option.id === trip.id"
-              @click="selectTrip(option.id)"
-            >
-              <span class="font-outfit truncate font-semibold">{{ option.name }}</span>
-              <span
-                v-if="wallTripDates(option)"
-                class="font-inter shrink-0"
-                :class="option.id === trip.id ? '' : 'dark:text-ink-soft text-[#4d5d6c]'"
-                >{{ wallTripDates(option) }}</span
-              >
-            </button>
-          </div>
           <div
             v-if="trip"
             class="dark:bg-surface-raised rounded-[26px] bg-white p-5 shadow-[var(--card-shadow)]"
@@ -825,14 +874,16 @@ const { identityFor } = useActivityIdentity();
               </span>
             </div>
             <div class="mb-3 flex flex-wrap items-center gap-2">
-              <span
+              <WallFaceButton
                 v-for="person in trip.travellers"
                 :key="person.id"
+                :name="person.name"
+                source="face-sheet"
                 class="flex items-center gap-2 rounded-full bg-[var(--tint-slate-5)] px-3 py-1"
               >
                 <BeanieAvatar v-bind="memberAvatarBindings(person)" fallback="initials" size="sm" />
                 <span class="font-inter wall-sheet-line">{{ person.name }}</span>
-              </span>
+              </WallFaceButton>
             </div>
             <!--
               Every booking, in the order it happens: flights, stays and ground
@@ -878,6 +929,19 @@ html.dark .wall-today-band {
 .wall-bucket-disc {
   height: 1.9em;
   width: 1.9em;
+}
+
+/*
+ * The trip chips' strip scrolls by touch with no bar: a scrollbar under a title row reads as a
+ * rule, and on a desktop setup browser it would sit across the chips' shadows.
+ */
+.wall-trip-switcher {
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+
+.wall-trip-switcher::-webkit-scrollbar {
+  display: none;
 }
 
 /* Caveat runs small for its size; this keeps the countdown the trip sheet's headline. */

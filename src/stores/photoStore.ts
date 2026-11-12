@@ -71,8 +71,6 @@ const TOMBSTONE_GRACE_MS = 24 * 60 * 60 * 1000; // 24 hours
  * has not synced yet); without a grace the sweep would delete a photo the person just added.
  */
 const ORPHAN_GRACE_MS = 24 * 60 * 60 * 1000; // 24 hours
-const DEFAULT_THUMB_SIZE = 400;
-const DEFAULT_FULL_SIZE = 2048;
 
 /** HTTP status off a Drive error, for the `http_status` context key. */
 function httpStatus(e: unknown): number | undefined {
@@ -155,7 +153,19 @@ function isTransientUploadError(e: unknown): boolean {
   return false;
 }
 
-export type PhotoSize = 'thumb' | 'full';
+export type PhotoSize = 'thumb' | 'screen' | 'full';
+
+/**
+ * Pixel width each `PhotoSize` asks Drive for. A `Record` rather than a ternary so a new
+ * size cannot silently fall through to the thumbnail width. `screen` is for a photo that
+ * fills a wall tablet or a long scrolled timeline, where decoding many 2048 px images
+ * would cost far more memory than the screen can show.
+ */
+const PHOTO_SIZE_PX: Record<PhotoSize, number> = {
+  thumb: 400,
+  screen: 1280,
+  full: 2048,
+};
 
 export type PhotoResolution =
   { status: 'ok'; url: string } | { status: 'pending' } | { status: 'missing' };
@@ -828,7 +838,7 @@ export const usePhotoStore = defineStore('photos', () => {
     const photo = photos.value[photoId];
     if (!photo || photo.deletedAt) return null;
 
-    const px = size === 'full' ? DEFAULT_FULL_SIZE : DEFAULT_THUMB_SIZE;
+    const px = PHOTO_SIZE_PX[size];
     const baseUrl = await fetchThumbnailBaseUrl(photo.driveFileId, photoId);
     if (!baseUrl) return null;
     return resizeThumbnailUrl(baseUrl, px);
@@ -922,14 +932,23 @@ export const usePhotoStore = defineStore('photos', () => {
    * has been flagged unresolved (usually a genuine Drive 404 from a
    * deleted file — UI shows the broken-image tile for these).
    *
+   * `ignoreUnresolved` skips only the unresolved flag (missing and tombstoned photos still
+   * return null). It is for surfaces that keep their own per-image failure state and must
+   * not be blanked for a whole session by one failed `<img>` elsewhere, such as a wall that
+   * stays open for weeks. Such callers must never call `markUnresolved` themselves.
+   *
    * Sync. Deterministic. No caching needed.
    */
-  function getPublicUrl(photoId: UUID, size: PhotoSize = 'thumb'): string | null {
+  function getPublicUrl(
+    photoId: UUID,
+    size: PhotoSize = 'thumb',
+    opts?: { ignoreUnresolved?: boolean }
+  ): string | null {
     const photo = photos.value[photoId];
     if (!photo || photo.deletedAt) return null;
-    if (unresolvedIds.value.has(photoId)) return null;
+    if (!opts?.ignoreUnresolved && unresolvedIds.value.has(photoId)) return null;
     const id = encodeURIComponent(photo.driveFileId);
-    const px = size === 'full' ? DEFAULT_FULL_SIZE : DEFAULT_THUMB_SIZE;
+    const px = PHOTO_SIZE_PX[size];
     return `https://lh3.googleusercontent.com/d/${id}=w${px}`;
   }
 

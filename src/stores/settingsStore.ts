@@ -35,6 +35,9 @@ import type {
   WallSleepSettings,
   WallDeviceSettings,
   WallWeatherStyle,
+  WallMemoriesSettings,
+  StoredWallMemories,
+  ScrapType,
   WeatherPlace,
   TemperatureUnit,
 } from '@/types/models';
@@ -47,6 +50,7 @@ import {
 } from '@/utils/reminderSchedule';
 import { HINT_LEAD_DAYS } from '@/utils/helpfulHints';
 import { resolveWallSleep } from '@/utils/wallSleep';
+import { resolveWallMemories } from '@/utils/wallMemories';
 import { defaultUnitFor } from '@/utils/weather/weatherReading';
 
 /** How many recent start times the time picker's Recent row keeps. */
@@ -140,6 +144,8 @@ export const useSettingsStore = defineStore('settings', () => {
   );
   /** When the beanie wall sleeps on this device; always complete (see `resolveWallSleep`). */
   const wallSleep = computed(() => resolveWallSleep(globalSettings.value.wall?.sleep));
+  /** #140: family memories on this wall; always complete (see `resolveWallMemories`). */
+  const wallMemories = computed(() => resolveWallMemories(globalSettings.value.wall?.memories));
   /** #134: this wall's weather card size (device-only). Absent = large. */
   const wallWeatherStyle = computed<WallWeatherStyle>(
     () => globalSettings.value.wall?.weather ?? 'large'
@@ -839,14 +845,53 @@ export const useSettingsStore = defineStore('settings', () => {
     persistGlobalSetting('settings.beanieLab.title', 'beanieLabEnabled', enabled);
 
   // ── OS reminder prefs (#55) actions — device-scoped via persistGlobalSetting. ──
-  /** The one writer of the wall's device object: the spread of `wall` lives only here. */
-  const patchWall = (patch: Partial<WallDeviceSettings>) =>
-    persistGlobalSetting('wall.setup.title', 'wall', { ...globalSettings.value.wall, ...patch });
-  /** Change some of the beanie wall's sleep settings; the rest keep their current values. */
+  /**
+   * The one writer of the wall's device object: the spread of `wall` lives only here.
+   * `globalSettings` only updates once a save resolves, so two quick taps on a shared wall
+   * (Notes off, then Sayings off) would each spread the same stale object and the second
+   * would revert the first. Writes therefore queue on one chain, and each builds its patch
+   * from the state current when its turn comes. A failed write still toasts and rejects
+   * to its own caller, and the chain moves on to the next.
+   */
+  let wallWrites: Promise<void> = Promise.resolve();
+  function patchWall(build: () => Partial<WallDeviceSettings>): Promise<void> {
+    const write = wallWrites.then(() =>
+      // `toRaw`: spreading the reactive `wall` copies its OTHER groups as reactive proxies,
+      // and IndexedDB cannot clone a proxy (DataCloneError), so a memories write after a
+      // sleep write, or the reverse, failed to save. The raw object's children are raw.
+      persistGlobalSetting('wall.setup.title', 'wall', {
+        ...toRaw(globalSettings.value.wall ?? {}),
+        ...build(),
+      })
+    );
+    wallWrites = write.catch(() => undefined);
+    return write;
+  }
+  /**
+   * Change some of the beanie wall's sleep settings; the rest keep their current values. The
+   * patch goes over the STORED record, not the resolved one, so untouched fields stay absent
+   * and keep following their default (`resolveWallSleep` fills them on read).
+   */
   const setWallSleep = (patch: Partial<WallSleepSettings>) =>
-    patchWall({ sleep: { ...wallSleep.value, ...patch } });
+    patchWall(() => ({ sleep: { ...toRaw(globalSettings.value.wall?.sleep), ...patch } }));
   /** #134: this wall's weather card size; its sleep settings are untouched. */
-  const setWallWeather = (style: WallWeatherStyle) => patchWall({ weather: style });
+  const setWallWeather = (style: WallWeatherStyle) => patchWall(() => ({ weather: style }));
+  /**
+   * #140: the stored memories record exactly as saved (only the fields this device has ever
+   * set). Writes patch THIS, never the resolved getter, so a field the device never touched
+   * stays absent and keeps following the default (`resolveWallMemories` fills it on read).
+   */
+  const rawWallMemories = (): StoredWallMemories =>
+    toRaw(globalSettings.value.wall?.memories) ?? {};
+  /** #140: change the memories viewer, slideshow mode or brightness; the types are untouched. */
+  const setWallMemories = (patch: Partial<Omit<WallMemoriesSettings, 'show'>>) =>
+    patchWall(() => ({ memories: { ...rawWallMemories(), ...patch } }));
+  /** #140: switch one memory type on or off for the viewer and the slideshow. */
+  const setWallMemoryType = (type: ScrapType, on: boolean) =>
+    patchWall(() => {
+      const raw = rawWallMemories();
+      return { memories: { ...raw, show: { ...toRaw(raw.show), [type]: on } } };
+    });
   const setRemindersEnabled = (enabled: boolean) =>
     persistGlobalSetting('reminders.title', 'remindersEnabled', enabled);
   const setWidgetLockScreenTitles = (enabled: boolean) =>
@@ -1355,6 +1400,7 @@ export const useSettingsStore = defineStore('settings', () => {
     liveFlightChangeAlerts,
     wallSleep,
     wallWeatherStyle,
+    wallMemories,
     todoReminderLead,
     activityReminderLead,
     activityReminderBackfilledAt,
@@ -1415,6 +1461,8 @@ export const useSettingsStore = defineStore('settings', () => {
     setLiveFlightChangeAlerts,
     setWallSleep,
     setWallWeather,
+    setWallMemories,
+    setWallMemoryType,
     setTodoReminderLead,
     setActivityReminderLead,
     setActivityReminderBackfilledAt,

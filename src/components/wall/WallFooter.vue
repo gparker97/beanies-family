@@ -21,11 +21,12 @@
  * persisted and shared with the planner, and a child poking the wall must not silently
  * re-filter a parent's phone. That reasoning is untouched by going multi-select.
  */
-import { computed } from 'vue';
+import { computed, inject } from 'vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
+import { WALL_MEMORIES } from '@/components/wall/wallMemoriesKey';
 
 /** `focused` is EMPTY for everyone — never a list that matches nobody. */
 const props = defineProps<{ focused: readonly string[] }>();
@@ -44,6 +45,14 @@ const familyStore = useFamilyStore();
 const members = computed(() => familyStore.sortedHumans);
 
 const { memberAvatarBindings } = useMemberAvatarBindings();
+
+/**
+ * A second tap on the ONLY lit bean opens the family scrapbook (#140) instead of dropping it;
+ * the page routes the tap, this only announces it. Same rule, read from the one place it
+ * lives, so the chip never says "popup" for a tap that filters.
+ */
+const memories = inject(WALL_MEMORIES, null);
+const popupFor = (id: string) => (memories?.opensOnTap(id) ? 'dialog' : undefined);
 </script>
 
 <template>
@@ -82,6 +91,7 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
           : 'text-secondary-500 dark:bg-surface-raised dark:text-ink bg-white'
       "
       :aria-pressed="isFocused(member.id)"
+      :aria-haspopup="popupFor(member.id)"
       @click="emit('select', member.id)"
     >
       <BeanieAvatar v-bind="memberAvatarBindings(member)" fallback="initials" size="sm" />

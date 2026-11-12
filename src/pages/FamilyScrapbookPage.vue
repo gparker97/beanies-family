@@ -22,12 +22,17 @@ import { useRouter } from 'vue-router';
 import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import BackLink from '@/components/common/BackLink.vue';
 import PhotoViewer from '@/components/media/PhotoViewer.vue';
+import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
+import ScrapbookTimeline from '@/components/scrapbook/ScrapbookTimeline.vue';
 import ScrapbookSpine from '@/components/scrapbook/ScrapbookSpine.vue';
 import EveryoneSpread from '@/components/scrapbook/EveryoneSpread.vue';
 import BeanSpread from '@/components/scrapbook/BeanSpread.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useQuickAddIntent } from '@/composables/useQuickAddIntent';
 import { useQuickAdd } from '@/composables/useQuickAdd';
+import { usePersistedChoice } from '@/composables/usePersistedChoice';
+import { logEvent } from '@/services/telemetry/logEvent';
+import { WALL_MEMORY_TYPES } from '@/utils/wallMemories';
 import { useMilestoneLightbox } from '@/composables/useMilestoneLightbox';
 import { useFamilyStore } from '@/stores/familyStore';
 import type { ScrapbookEntry, ScrapType } from '@/composables/useScrapbookFeed';
@@ -38,6 +43,35 @@ const { t } = useTranslation();
 const familyStore = useFamilyStore();
 const { open: openQuickAddSheet } = useQuickAdd();
 const lightbox = useMilestoneLightbox();
+
+// --- View switch (Spreads / Timeline) ----------------------------------
+
+type ScrapbookView = 'spreads' | 'timeline';
+const SCRAPBOOK_VIEWS: readonly ScrapbookView[] = ['spreads', 'timeline'];
+
+/** Per device, like the cookbook's sort: one person's choice never re-lays another's screen. */
+const view = usePersistedChoice<ScrapbookView>('beanies:scrapbookView', SCRAPBOOK_VIEWS, 'spreads');
+
+const viewOptions = computed(() => [
+  { value: 'spreads', label: t('scrapbook.view.spreads') },
+  { value: 'timeline', label: t('scrapbook.view.timeline') },
+]);
+
+function onViewChange(next: string): void {
+  if (next !== 'spreads' && next !== 'timeline') return;
+  if (next === view.value) return;
+  view.value = next;
+  logEvent({
+    level: 'info',
+    surface: 'scrapbook',
+    message: 'scrapbook_view_change',
+    context: { kind: next },
+  });
+}
+
+/** The timeline's own bean filter; the page's full memory set, never narrowed. */
+const timelineMemberId = ref<UUID | null>(null);
+const timelineTypes: ReadonlySet<ScrapType> = new Set(WALL_MEMORY_TYPES);
 
 // --- Spread switcher --------------------------------------------------
 
@@ -173,6 +207,21 @@ function onEntryClick(entry: ScrapbookEntry): void {
           <p class="font-caveat dark:text-terracotta-lift mt-1 text-xl font-medium text-[#E67E22]">
             {{ t('scrapbook.subtitle') }}
           </p>
+          <!-- The pills' resting ink is slate-500, made for white cards; on this pastel band it
+               measures 3.6-3.8:1. Scoped here to the house muted ink for tinted grounds
+               (`--muted-text`, 5.4:1 on the band), so other callers keep their look. Dark mode
+               reads `ink-soft` from the pill itself and never sees this token. -->
+          <div
+            role="group"
+            :aria-label="t('scrapbook.view.label')"
+            class="mt-3 [--color-text-muted:var(--muted-text)]"
+          >
+            <TogglePillGroup
+              :model-value="view"
+              :options="viewOptions"
+              @update:model-value="onViewChange"
+            />
+          </div>
         </div>
         <button
           type="button"
@@ -186,30 +235,51 @@ function onEntryClick(entry: ScrapbookEntry): void {
       </div>
     </header>
 
-    <ScrapbookSpine
+    <!-- The app's <main> scrolls this page and pads its top by 1rem (md: 1.5rem). Telling the
+         timeline lets its bean row stick flush under the app header instead of that far below.
+         `timeline-fit` gives it the scroller's real visible height for its month rail. -->
+    <ScrapbookTimeline
+      v-if="view === 'timeline'"
+      v-model:member-id="timelineMemberId"
+      class="timeline-fit [--scrapbook-timeline-scroller-pad:1rem] md:[--scrapbook-timeline-scroller-pad:1.5rem]"
       :beans="familyStore.sortedMembers"
-      :active-id="activeSpread"
-      @select="onSpineSelect"
-    />
+      :types="timelineTypes"
+      :read-only="false"
+      @entry-click="onEntryClick"
+    >
+      <template #empty>
+        <p class="font-caveat dark:text-ink-soft text-secondary-500 py-8 text-center text-xl">
+          {{ t('scrapbook.everyone.empty') }}
+        </p>
+      </template>
+    </ScrapbookTimeline>
 
-    <div class="spread-stage">
-      <Transition :name="transitionName" mode="out-in">
-        <EveryoneSpread
-          v-if="activeSpread === 'everyone'"
-          key="everyone"
-          @entry-click="onEntryClick"
-          @open-add="openAddSheet"
-          @select-bean="onSpineSelect"
-        />
-        <BeanSpread
-          v-else
-          :key="activeSpread"
-          :member-id="activeSpread"
-          @entry-click="onEntryClick"
-          @open-add="openAddSheet"
-        />
-      </Transition>
-    </div>
+    <template v-else>
+      <ScrapbookSpine
+        :beans="familyStore.sortedMembers"
+        :active-id="activeSpread"
+        @select="onSpineSelect"
+      />
+
+      <div class="spread-stage">
+        <Transition :name="transitionName" mode="out-in">
+          <EveryoneSpread
+            v-if="activeSpread === 'everyone'"
+            key="everyone"
+            @entry-click="onEntryClick"
+            @open-add="openAddSheet"
+            @select-bean="onSpineSelect"
+          />
+          <BeanSpread
+            v-else
+            :key="activeSpread"
+            :member-id="activeSpread"
+            @entry-click="onEntryClick"
+            @open-add="openAddSheet"
+          />
+        </Transition>
+      </div>
+    </template>
 
     <!-- Read-only lightbox for milestone photos. Wired to the
          module-level `useMilestoneLightbox` singleton so any
@@ -225,6 +295,23 @@ function onEntryClick(entry: ScrapbookEntry): void {
 </template>
 
 <style scoped>
+/*
+ * The timeline's month rail is capped to the visible part of the scroller, so a long history
+ * scrolls inside the rail instead of running below the fold. That is `<main>` (App.vue
+ * publishes its height, so the app header and any banner are already out of it) less the
+ * phone tab bar that overlays its bottom (unset on desktop, so 0).
+ *
+ * The quick-add button floats in the bottom-right corner (`QuickAddFab`: 4rem tall, at
+ * `--fab-anchor-bottom` from the screen's bottom), over the rail's last buttons. The rail's
+ * end padding lets its last month scroll clear of it: the button's top, measured from the
+ * rail's bottom edge (which sits above the tab bar on a phone), plus a small gap. The wall
+ * viewer has no such button and keeps the default.
+ */
+.timeline-fit {
+  --scrapbook-timeline-viewport: calc(var(--app-main-h, 100dvh) - var(--mobile-nav-h, 0px));
+  --scrapbook-timeline-rail-end: calc(var(--fab-anchor-bottom) + 4.5rem - var(--mobile-nav-h, 0px));
+}
+
 /* 3D perspective on the spread container so child rotateY transforms
    read as a paper-page hinging in/out, not a flat sprite skew. */
 .spread-stage {

@@ -9,6 +9,25 @@ export const WALL_SLEEP_CHECK_MS = 30_000;
 const ACTIVITY_EVENTS = ['pointerdown', 'keydown', 'wheel', 'touchstart'] as const;
 
 /**
+ * Calls `cb` on anything a person does at the wall, and returns the unsubscribe.
+ *
+ * The one copy of this wiring, shared by auto-sleep and the memories viewer's idle close.
+ * Capture phase, so a component that stops propagation still counts as activity; passive,
+ * so it never delays a scroll; and `touchstart` is in the list because a tap on some
+ * tablets reaches the page as touch before (or instead of) pointer events.
+ */
+export function onWallActivity(cb: () => void, target: EventTarget = window): () => void {
+  for (const type of ACTIVITY_EVENTS) {
+    target.addEventListener(type, cb, { capture: true, passive: true });
+  }
+  return () => {
+    for (const type of ACTIVITY_EVENTS) {
+      target.removeEventListener(type, cb, { capture: true });
+    }
+  };
+}
+
+/**
  * Puts the beanie wall to sleep on its own during night hours, once nobody has touched it for
  * `idleMinutes`, and wakes it when the night hours end.
  *
@@ -35,9 +54,7 @@ export function useWallAutoSleep(options: {
   const noteActivity = () => {
     lastActivity = now().getTime();
   };
-  for (const type of ACTIVITY_EVENTS) {
-    target.addEventListener(type, noteActivity, { capture: true, passive: true });
-  }
+  const stopListening = onWallActivity(noteActivity, target);
 
   watch(options.asleep, (asleep) => {
     const s = options.settings();
@@ -62,9 +79,7 @@ export function useWallAutoSleep(options: {
 
   onScopeDispose(() => {
     clearInterval(timer);
-    for (const type of ACTIVITY_EVENTS) {
-      target.removeEventListener(type, noteActivity, { capture: true });
-    }
+    stopListening();
   });
 
   return { check };

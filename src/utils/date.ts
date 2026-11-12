@@ -658,10 +658,27 @@ export function formatBirthdayShort(dob: DateOfBirth | undefined | null): string
 }
 
 /**
- * Format a date as "January 2026"
+ * Format a date as "January 2026".
+ *
+ * `locale` is the UI language (`useTranslation().currentLanguage`). English, or no locale,
+ * keeps the fixed English names every existing caller relies on; any other language goes
+ * through `Intl`, so a Chinese-language family reads 「2026年11月」 beside headings that
+ * already came through `t()`, rather than two languages in one column.
  */
-export function formatMonthYear(date: Date): string {
+export function formatMonthYear(date: Date, locale?: string): string {
+  if (locale && locale !== 'en') {
+    return date.toLocaleDateString(locale, { month: 'long', year: 'numeric' });
+  }
   return `${MONTHS_LONG[date.getMonth()]} ${date.getFullYear()}`;
+}
+
+/**
+ * The month alone, short: "Nov" (「11月」 in Chinese). For a list that already sits under
+ * its year heading, like the scrapbook timeline's month rail. `locale` as `formatMonthYear`.
+ */
+export function formatMonthShort(date: Date, locale?: string): string {
+  if (locale && locale !== 'en') return date.toLocaleDateString(locale, { month: 'short' });
+  return MONTHS_SHORT[date.getMonth()] ?? '';
 }
 
 /**

@@ -811,7 +811,7 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
       'Turn a spare tablet into the family wall display, and set the two device settings that keep it awake and keep small hands inside the app.',
     icon: '\u{1F9F1}',
     readTime: 6,
-    updatedDate: '2026-10-16',
+    updatedDate: '2026-11-12',
     sections: [
       {
         type: 'paragraph',
@@ -1009,6 +1009,53 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
           'A tablet held at 100% all day, every day, will swell its battery over a year or two. Many Android tablets can cap the charge for exactly this reason (look for Battery protection or Protect battery, often around 85%). Most iPads have no equivalent hard cap, though Optimised Battery Charging helps. If you can, put it on a socket or smart plug you can switch off overnight.',
         title: 'Do not leave it charging at 100% forever',
         icon: '\u{1F50B}',
+      },
+      {
+        type: 'heading',
+        content: 'Family memories on the wall',
+        level: 2,
+        id: 'family-memories',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'While the wall sleeps, it can show your family\u2019s own photos instead of a dark screen: milestone photos, bean photos and recipe dish photos. Choose how in <strong>Settings</strong>, <strong>Beanie Wall</strong>, <strong>Family Memories</strong>, under <strong>Sleep Slideshow</strong>:',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>Around the Clock</strong> shows photos around the time',
+          '<strong>Full Screen</strong> shows one photo at a time',
+          '<strong>Off</strong> keeps the plain clock',
+        ],
+      },
+      {
+        type: 'paragraph',
+        content:
+          'It is on by default (Around the Clock, Medium brightness, Medium speed). <strong>Brightness</strong> can be <strong>Dim</strong>, <strong>Medium</strong> or <strong>Bright</strong>, and it changes the memories only, not the clock. <strong>Speed</strong> sets how often the memories change: <strong>Slow</strong> (every minute), <strong>Medium</strong> (every 30 seconds, the default) or <strong>Fast</strong> (every 15 seconds). Photos need the internet the first time each night. If the wall cannot load them, it shows notes and sayings, or the plain clock.',
+      },
+      {
+        type: 'heading',
+        content: 'Opening the scrapbook from the wall',
+        level: 3,
+        id: 'scrapbook-on-the-wall',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Tap a bean\u2019s face on the wall (on a chore column, or in an activity\u2019s details) to open the family scrapbook as a timeline, newest first, to read. In the bottom row, tapping a bean filters the wall to them; tapping that same bean again while it is the only one lit opens the scrapbook too. <strong>Everyone</strong> clears the filter.',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          'The scrapbook can be opened while the wall is locked, and visitors can read it',
+          'Nothing can be added or changed from the wall',
+          'Each kind of memory has its own switch under <strong>What to Show</strong>: <strong>Photos and Milestones</strong>, <strong>Favorites</strong>, <strong>Sayings</strong> and <strong>Notes</strong>',
+          '<strong>Scrapbook on the Wall</strong> turns the whole thing off',
+          'These settings belong to that device only',
+        ],
       },
       {
         type: 'heading',

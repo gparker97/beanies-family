@@ -12,7 +12,7 @@
  * Humans only. Pets belong on the family roster, but a lane headed "Bella · 0
  * today" is dead space on the one screen that cannot afford it.
  */
-import { computed } from 'vue';
+import { computed, inject } from 'vue';
 import WallBeanHeader from '@/components/wall/WallBeanHeader.vue';
 import WallTimeGrid from '@/components/wall/WallTimeGrid.vue';
 import type { BirthdayOccurrence } from '@/utils/birthdays';
@@ -22,6 +22,7 @@ import { addDaysYmd, weekdayShort } from '@/utils/date';
 import { useActivityStore } from '@/stores/activityStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
+import { WALL_MEMORIES } from '@/components/wall/wallMemoriesKey';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { belongsInMemberColumn } from '@/utils/assignees';
 import { sortByTime, wallSharedAllDay } from '@/utils/wallActivities';
@@ -212,6 +213,14 @@ const inlineHeaders = computed(() => !props.portrait && members.value.length <= 
  */
 const isFocused = computed(() => props.visibleMemberIds !== null);
 
+/**
+ * A second tap on the lone lit lane opens the family scrapbook (#140). The page routes the
+ * tap; this only announces it, from the same rule (`opensOnTap`), and needs no prop, which
+ * would fall through the page's generic `<component :is>` to every view.
+ */
+const memories = inject(WALL_MEMORIES, null);
+const popupFor = (id: string) => (memories?.opensOnTap(id) ? 'dialog' : undefined);
+
 function tomorrowCount(memberId: string) {
   return tomorrowEvents.value.filter((e) => belongsInMemberColumn(e.activity, memberId)).length;
 }
@@ -281,6 +290,7 @@ function subtitleFor(memberId: string) {
           class="min-w-0 rounded-2xl px-1.5 py-1"
           :class="isFocused ? 'bg-[var(--tint-orange-8)]' : ''"
           :aria-pressed="isFocused"
+          :aria-haspopup="popupFor(member.id)"
           @click="emit('focusMember', member.id)"
         >
           <WallBeanHeader

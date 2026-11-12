@@ -1,0 +1,146 @@
+/*
+ * Slot geometry and drift for the sleeping wall's memories (#140), from the approved
+ * mockup (.p1 to .p5, .n1, .n2, .fl). One definition shared by the photo tiles and the
+ * paper pieces so a text memory in a photo slot lands exactly where a photo would.
+ * Transform and opacity are the only things that ever animate.
+ *
+ * LANDSCAPE: the clock column is centred and ~19.75rem tall with a weather reading and the
+ * hint, and with a 12-hour time ("10:48 AM") it is ~35rem wide, so on a 1024 to 1180 px wall
+ * nothing fits beside it: the pieces sit in a band above it and a band below it. A corner
+ * tile is as tall as its band allows (`--wall-mem-corner`, 4:3: half the height less half the
+ * column, the 0.7rem the drift rises and the edge offsets). The brand mark takes the bottom-
+ * left corner, so p2 starts just right of it and n1 follows p2.
+ */
+.wall-mem-p1,
+.wall-mem-p2,
+.wall-mem-p3,
+.wall-mem-p4,
+.wall-mem-n1 {
+  --wall-mem-corner: clamp(12%, calc((50dvh - 11.5rem) * 4 / 3), 30%);
+}
+
+.wall-mem-p1 {
+  left: 2%;
+  top: 1.25rem;
+  width: var(--wall-mem-corner);
+}
+
+.wall-mem-p2 {
+  bottom: 0.625rem;
+  left: 12.5rem;
+  width: min(25%, var(--wall-mem-corner));
+}
+
+.wall-mem-p3 {
+  right: 2%;
+  top: 1.25rem;
+  width: min(26%, var(--wall-mem-corner));
+}
+
+.wall-mem-p4 {
+  bottom: 0.625rem;
+  right: 2%;
+  width: var(--wall-mem-corner);
+}
+
+.wall-mem-p5 {
+  left: 35%;
+  top: 4%;
+  width: 16%;
+}
+
+.wall-mem-n1 {
+  bottom: 6%;
+  left: calc(13.75rem + min(25%, var(--wall-mem-corner)));
+  transform: rotate(-2deg);
+  width: 15%;
+}
+
+.wall-mem-n2 {
+  right: 30%;
+  top: 6%;
+  transform: rotate(3deg);
+  width: 14%;
+}
+
+/*
+ * A PORTRAIT wall (`.wall-portrait` on the wall root, the wall's one orientation switch): the
+ * landscape slots above come out ~90 px wide at 600 px, so a note ran one word per line and a
+ * caption covered its whole photo. Portrait keeps four large tiles, two above the clock and
+ * two below, on the same corners as p1 to p4. The slot state (`wallSlideshowSlots.ts`) is told the
+ * shape (the page's `isPortrait`, the signal behind this class) and has no p5, n1 or n2 there: p4
+ * carries a text memory instead, so nothing is assigned to a slot that is not drawn.
+ *
+ * Width is 44% unless the wall is too short for it: the clock column is ~16rem tall and
+ * centred, and the brand mark takes the bottom 4rem, so a 4:3 tile may be at most
+ * `50dvh - 14.5rem` tall to clear both (with the bottom tiles' 5rem offset below). The wall
+ * root is `100dvh` tall, so `dvh` is its height.
+ */
+.wall-portrait .wall-mem-p1,
+.wall-portrait .wall-mem-p2,
+.wall-portrait .wall-mem-p3,
+.wall-portrait .wall-mem-p4 {
+  width: min(44%, calc((50dvh - 14.5rem) * 4 / 3));
+}
+
+.wall-portrait .wall-mem-p1 {
+  left: 4%;
+  top: 3.5%;
+}
+
+.wall-portrait .wall-mem-p3 {
+  right: 4%;
+  top: 5%;
+}
+
+.wall-portrait .wall-mem-p2 {
+  bottom: 5rem;
+  left: 4%;
+}
+
+.wall-portrait .wall-mem-p4 {
+  bottom: 5.5rem;
+  right: 4%;
+}
+
+/* One fade for every paper piece and layer (the stage's Transition, each TransitionGroup). */
+.wall-mem-fade-enter-active,
+.wall-mem-fade-leave-active {
+  transition: opacity 1.2s ease-in-out;
+}
+
+.wall-mem-fade-enter-from,
+.wall-mem-fade-leave-to {
+  opacity: 0;
+}
+
+.wall-fl {
+  animation: wall-mem-drift 19s ease-in-out infinite alternate;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* One fade for every paper piece and layer (the stage's Transition, each TransitionGroup). */
+  .wall-mem-fade-enter-active,
+  .wall-mem-fade-leave-active {
+    transition: opacity 1.2s ease-in-out;
+  }
+
+  .wall-mem-fade-enter-from,
+  .wall-mem-fade-leave-to {
+    opacity: 0;
+  }
+
+  .wall-fl {
+    animation: none;
+  }
+}
+
+@keyframes wall-mem-drift {
+  from {
+    translate: 0 0;
+  }
+
+  to {
+    translate: 0.5rem -0.7rem;
+  }
+}

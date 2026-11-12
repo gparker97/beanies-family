@@ -124,6 +124,7 @@ import { useFlightStatusStore } from '@/stores/flightStatusStore';
 import { installDataPolicy } from '@/services/registry/dataPolicy';
 import { installMainScrollRestoration } from '@/composables/useMainScrollRestoration';
 import { useShellViewport } from '@/composables/useShellViewport';
+import { usePublishedHeight } from '@/composables/usePublishedHeight';
 import { useRecurringStore } from '@/stores/recurringStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTodoStore } from '@/stores/todoStore';
@@ -237,6 +238,9 @@ installDataPolicy();
 // `<main>` is the app's real scroller: Back returns to where you were on it, forward opens at the top.
 const mainEl = ref<HTMLElement | null>(null);
 installMainScrollRestoration(router, mainEl);
+// Its visible height, for a page whose sticky parts must fit inside it (the scrapbook
+// timeline's month rail). The phone tab bar overlays it and publishes `--mobile-nav-h`.
+usePublishedHeight(mainEl, '--app-main-h', 'app-main');
 
 const authStore = useAuthStore();
 const notificationsStore = useNotificationsStore();

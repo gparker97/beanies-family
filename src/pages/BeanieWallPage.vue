@@ -15,8 +15,10 @@ import { isNavigationFailure, useRouter } from 'vue-router';
 import WallFooter from '@/components/wall/WallFooter.vue';
 import HandwrittenLine from '@/components/ui/HandwrittenLine.vue';
 import WallLockMenu from '@/components/wall/WallLockMenu.vue';
+import WallMemorySlideshow from '@/components/wall/WallMemorySlideshow.vue';
 import WallNightScreen from '@/components/wall/WallNightScreen.vue';
 import WallSheet from '@/components/wall/WallSheet.vue';
+import WallMemoriesViewer from '@/components/wall/WallMemoriesViewer.vue';
 import BirthdayDetailsModal from '@/components/planner/BirthdayDetailsModal.vue';
 import type { BirthdayOccurrence } from '@/utils/birthdays';
 import WallTickBurst from '@/components/wall/WallTickBurst.vue';
@@ -32,6 +34,7 @@ import {
   wallViewTransition,
 } from '@/components/wall/wallViews';
 import { WALL_LOCK } from '@/components/wall/wallLockKey';
+import { WALL_MEMORIES } from '@/components/wall/wallMemoriesKey';
 import { WALL_EDIT } from '@/components/wall/wallEditKey';
 import { WALL_BURST } from '@/components/wall/wallBurstKey';
 import { WALL_WEATHER } from '@/components/wall/wallWeatherKey';
@@ -54,6 +57,7 @@ import { logEvent } from '@/services/telemetry/logEvent';
 import { useActivityStore } from '@/stores/activityStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useWallMemberFocus } from '@/composables/useWallMemberFocus';
+import { useWallMemories, type WallMemoriesOpenSource } from '@/composables/useWallMemories';
 import { useTranslation } from '@/composables/useTranslation';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { getWallReturnPath } from '@/router';
@@ -85,6 +89,8 @@ const activeView = ref<WallViewId>(DEFAULT_WALL_VIEW);
 /** Where "back" from the jobs board returns to — never the jobs board itself. */
 const lastCalendarView = ref<WallViewId>(DEFAULT_WALL_VIEW);
 const nightNow = ref(false);
+/** The night face's layout, reported by the slideshow; 'plain' whenever it is not showing. */
+const nightLayout = ref<'plain' | 'around' | 'full'>('plain');
 /**
  * Who the wall is showing. Wall-local, never persisted, and never the account holder's filter.
  * The two rules that make it safe on a glanceable screen live in the composable.
@@ -94,7 +100,24 @@ const {
   visibleMemberIds,
   toggle: onFocusMember,
   clear: clearFocus,
+  isOnlyFocused,
 } = useWallMemberFocus(() => familyStore.sortedHumans.map((m) => m.id));
+
+/**
+ * The family scrapbook on the wall (#140). Every rule and close path lives in the composable;
+ * the page only routes the bean taps it already owned. A second tap on the ONLY lit bean opens
+ * the scrapbook; any other tap filters, as before.
+ */
+const memories = useWallMemories({
+  focus: { isOnlyFocused },
+  asleep: nightNow,
+  settings: () => settingsStore.wallMemories,
+});
+provide(WALL_MEMORIES, memories);
+function onBeanTap(id: string, source: Extract<WallMemoriesOpenSource, `${string}-second-tap`>) {
+  if (memories.opensOnTap(id)) memories.open(source);
+  else onFocusMember(id);
+}
 /** The open drill-in sheet, or null. One at a time — this is a wall, not a desktop. */
 const sheet = ref<WallSheetTarget | null>(null);
 
@@ -729,6 +752,7 @@ function enterNight(source: 'face' | 'lock-menu' | 'auto') {
  */
 function onWake() {
   nightNow.value = false;
+  nightLayout.value = 'plain';
   clearFocus();
 }
 
@@ -1148,7 +1172,7 @@ watch(activeView, () => (sheet.value = null));
         @back="onGoBack"
         @open-day="onOpenDay"
         @open-birthday="onOpenBirthday"
-        @focus-member="onFocusMember"
+        @focus-member="onBeanTap($event, 'lane-second-tap')"
         @focus-day="onFocusDay"
         @step="onStep"
         @open="openSheet"
@@ -1178,7 +1202,20 @@ watch(activeView, () => (sheet.value = null));
       />
     </main>
 
-    <WallFooter :focused="focusedMemberIds" @select="onFocusMember" @clear="clearFocus" />
+    <WallFooter
+      :focused="focusedMemberIds"
+      @select="onBeanTap($event, 'chip-second-tap')"
+      @clear="clearFocus"
+    />
+
+    <!-- z-[45]: above the sheet (z-30) and the header (z-40), below the night screen (z-[50]). -->
+    <WallMemoriesViewer
+      v-if="memories.isOpen.value"
+      :beans="familyStore.sortedHumans"
+      :types="memories.types.value"
+      @close="memories.close"
+      @empty="memories.reportEmpty"
+    />
 
     <WallTickBurst :bursts="bursts" />
 
@@ -1201,8 +1238,17 @@ watch(activeView, () => (sheet.value = null));
       :date="dateLabel"
       :tomorrow-count="tomorrowCount"
       :weather="nightWeather"
+      :layout="nightLayout === 'full' ? 'corner' : 'center'"
       @wake="onWake"
-    />
+    >
+      <template #backdrop>
+        <WallMemorySlideshow
+          v-if="settingsStore.wallMemories.slideshow !== 'off'"
+          :portrait="isPortrait"
+          @layout="nightLayout = $event"
+        />
+      </template>
+    </WallNightScreen>
   </div>
 </template>
 
@@ -1479,6 +1525,35 @@ watch(activeView, () => (sheet.value = null));
   font-size: 1.35rem;
 }
 
+/*
+ * The drawer on a SMALL wall: the compact tier, or any wall under 700px tall (the same
+ * height signal the header steps down on, below). Its 94% left a strip too thin to aim at
+ * and cost the body rows it needed, so here the panel takes the full height, squares its
+ * corners (nothing shows above them) and tightens the chrome over the title row. Close is
+ * the way out. Tap targets are untouched: only padding and margin step down.
+ */
+.wall-root[data-tier='compact'] :deep(.wall-sheet-panel) {
+  border-radius: 0;
+  height: 100%;
+  padding-top: 0.75rem;
+}
+
+.wall-root[data-tier='compact'] :deep(.wall-sheet-head) {
+  margin-bottom: 0.5rem;
+}
+
+@media (height <= 699px) {
+  .wall-root :deep(.wall-sheet-panel) {
+    border-radius: 0;
+    height: 100%;
+    padding-top: 0.75rem;
+  }
+
+  .wall-root :deep(.wall-sheet-head) {
+    margin-bottom: 0.5rem;
+  }
+}
+
 .wall-root .wall-clock-col {
   /* A FIXED reservation, not a floor — see the template. Wide enough for a 12-hour clock at
      2.3rem plus the longest status stamp, and the stamp truncates inside it. `shrink-0`: on a
@@ -1676,6 +1751,41 @@ watch(activeView, () => (sheet.value = null));
   font-size: 0.9rem;
 }
 
+/* Full-screen memory photo: the clock drops to the corner at the mockup's .full-block size. */
+.wall-root :deep(.wall-night-time-corner) {
+  font-size: 4.6rem;
+}
+
+/* The sleeping wall's memories (#140). 1rem here is the mockup's 1em at its 1180 px frame. */
+.wall-root :deep(.wall-memory-caption) {
+  font-size: 1.35rem;
+}
+
+.wall-root :deep(.wall-memory-full-cap) {
+  font-size: 1.9rem;
+}
+
+.wall-root :deep(.wall-memory-slot .wall-memory-sticky) {
+  font-size: 1.2rem;
+}
+
+.wall-root :deep(.wall-memory-pin .wall-memory-sticky) {
+  font-size: 1.5rem;
+}
+
+.wall-root :deep(.wall-memory-slot .wall-memory-card) {
+  font-size: 0.95rem;
+}
+
+.wall-root :deep(.wall-memory-pin .wall-memory-card) {
+  font-size: 1.05rem;
+}
+
+/* The owner's name under a note: the mockup's .5em would be under the 12px floor. */
+.wall-root :deep(.wall-memory-who) {
+  font-size: 0.75rem;
+}
+
 .wall-root :deep(.wall-night-wx-temp) {
   font-size: 1.85rem;
 }
@@ -1694,6 +1804,39 @@ watch(activeView, () => (sheet.value = null));
 
 .wall-root :deep(.wall-night-brand) {
   font-size: 1rem;
+}
+
+/* The family scrapbook (#140): the viewer's own chrome, then the shared timeline's hooks. */
+.wall-root :deep(.wall-memories-title) {
+  font-size: 1.9rem;
+}
+
+.wall-root :deep(.wall-memories-hand) {
+  /* Caveat runs small; 1.5rem is the top of its 14-24px range. */
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.wall-root :deep(.wall-memories-close) {
+  font-size: 1.1rem;
+  min-height: calc(var(--wall-tap) + 0.25rem);
+}
+
+.wall-root :deep(.wall-memories-empty) {
+  font-size: 1.1rem;
+}
+
+.wall-root :deep(.wall-timeline-month) {
+  font-size: 1.35rem;
+}
+
+.wall-root :deep(.wall-timeline-rail-year) {
+  font-size: 1rem;
+}
+
+.wall-root :deep(.wall-timeline-rail-month) {
+  font-size: 0.95rem;
+  min-height: var(--wall-tap);
 }
 
 /**

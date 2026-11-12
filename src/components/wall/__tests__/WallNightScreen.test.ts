@@ -14,9 +14,9 @@ vi.mock('@/composables/useTranslation', () => ({
 
 const DIM = 'text-[#8ea3b8]';
 
-function mountNight(weather?: WeatherAtom | null) {
+function mountNight(weather?: WeatherAtom | null, layout?: 'center' | 'corner') {
   return mount(WallNightScreen, {
-    props: { time: '10:48 PM', date: 'Friday, October 16', tomorrowCount: 3, weather },
+    props: { time: '10:48 PM', date: 'Friday, October 16', tomorrowCount: 3, weather, layout },
     global: { stubs: { BeanieIcon: { template: '<i class="pin" />' } } },
   });
 }
@@ -81,5 +81,53 @@ describe('WallNightScreen weather', () => {
     const wrapper = mountNight(null);
     expect(wrapper.get('.wall-night-hint').classes()).toContain(DIM);
     expect(wrapper.html()).not.toContain('63798f');
+  });
+});
+
+describe('WallNightScreen layout and backdrop (#140)', () => {
+  it('renders the backdrop slot behind the clock, inert and hidden', () => {
+    const wrapper = mount(WallNightScreen, {
+      props: { time: '10:48 PM', date: 'Friday', tomorrowCount: 1 },
+      slots: { backdrop: '<i class="memory" />' },
+    });
+    const backdrop = wrapper.get('.memory').element.parentElement!;
+    expect(backdrop.getAttribute('aria-hidden')).toBe('true');
+    expect(backdrop.className).toContain('pointer-events-none');
+    expect(wrapper.html().indexOf('memory')).toBeLessThan(
+      wrapper.html().indexOf('wall-night-time')
+    );
+  });
+
+  it('centers by default, with the full clock, outlook and hint', () => {
+    const wrapper = mountNight(ATOMS.fresh);
+    expect(wrapper.find('.wall-night-time').exists()).toBe(true);
+    expect(wrapper.find('.wall-night-time-corner').exists()).toBe(false);
+    expect(wrapper.find('.weather-outlook').exists()).toBe(true);
+    expect(wrapper.find('.wall-night-hint').exists()).toBe(true);
+  });
+
+  it('corner: smaller clock at the bottom-left, no hint line, reading line without the outlook', () => {
+    const wrapper = mountNight(ATOMS.fresh, 'corner');
+    expect(wrapper.find('.wall-night-time').exists()).toBe(false);
+    expect(wrapper.get('.wall-night-time-corner').text()).toBe('10:48 PM');
+    expect(wrapper.find('.wall-night-hint').exists()).toBe(false);
+    expect(wrapper.text()).not.toContain('wall.night.wake');
+    expect(wrapper.text()).not.toContain('wall.night.tomorrow');
+    const block = wrapper.get('.wall-night-weather');
+    expect(block.text()).toContain('weather.night.nowLine');
+    expect(block.find('.weather-outlook').exists()).toBe(false);
+    expect(block.element.parentElement!.className).toContain('bottom-20');
+  });
+
+  it('a layout change fades the clock out where it is before it appears at its new place', async () => {
+    const wrapper = mountNight(ATOMS.fresh, 'center');
+    const fade = wrapper.get('transition-stub');
+    expect(fade.attributes('name')).toBe('wall-night-clock');
+    expect(fade.attributes('mode')).toBe('out-in');
+    await wrapper.setProps({ layout: 'corner' });
+    expect(wrapper.find('.wall-night-time').exists()).toBe(false);
+    expect(wrapper.get('.wall-night-time-corner').element.parentElement!.className).toContain(
+      'bottom-20'
+    );
   });
 });

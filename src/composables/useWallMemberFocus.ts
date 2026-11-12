@@ -32,6 +32,12 @@ export interface WallMemberFocus {
   toggle: (memberId: string) => void;
   /** Back to everyone. */
   clear: () => void;
+  /**
+   * True only when `memberId` is the ONE lit bean. The wall's second-tap rule (a tap on the lone
+   * lit bean opens the scrapbook) reads this, so it is off the reconciled list: a departed member
+   * still sitting in the raw choice cannot make a present one look "not alone".
+   */
+  isOnlyFocused: (memberId: string) => boolean;
 }
 
 export function useWallMemberFocus(roster: () => readonly string[]): WallMemberFocus {
@@ -82,5 +88,10 @@ export function useWallMemberFocus(roster: () => readonly string[]): WallMemberF
     chosen.value = [];
   }
 
-  return { focusedMemberIds, visibleMemberIds, toggle, clear };
+  function isOnlyFocused(memberId: string): boolean {
+    const ids = focusedMemberIds.value;
+    return ids.length === 1 && ids[0] === memberId;
+  }
+
+  return { focusedMemberIds, visibleMemberIds, toggle, clear, isOnlyFocused };
 }

@@ -456,6 +456,39 @@ describe('photoStore', () => {
     expect(store.getPublicUrl(photoId)).toBeNull();
   });
 
+  it("getPublicUrl serves the 'screen' size at 1280 px", async () => {
+    storeInternals.registerPhotoCollection('activities');
+    await ensureEntity('activities', 'act-screen');
+    const store = usePhotoStore();
+    const { photoId } = await store.addPhoto(makeFile(), 'activities', 'act-screen');
+    const driveFileId = store.photos[photoId]!.driveFileId;
+
+    expect(store.getPublicUrl(photoId, 'screen')).toBe(
+      `https://lh3.googleusercontent.com/d/${encodeURIComponent(driveFileId)}=w1280`
+    );
+  });
+
+  it('getPublicUrl with ignoreUnresolved still returns an unresolved photo, never a missing or tombstoned one', async () => {
+    storeInternals.registerPhotoCollection('activities');
+    await ensureEntity('activities', 'act-ignore');
+    const store = usePhotoStore();
+    const { photoId } = await store.addPhoto(makeFile(), 'activities', 'act-ignore');
+    const driveFileId = store.photos[photoId]!.driveFileId;
+
+    store.markUnresolved(photoId);
+    expect(store.getPublicUrl(photoId, 'screen')).toBeNull();
+    expect(store.getPublicUrl(photoId, 'screen', { ignoreUnresolved: true })).toBe(
+      `https://lh3.googleusercontent.com/d/${encodeURIComponent(driveFileId)}=w1280`
+    );
+    // Reading the URL this way never clears or writes the flag.
+    expect(store.isUnresolved(photoId)).toBe(true);
+
+    expect(store.getPublicUrl('no-such-photo', 'screen', { ignoreUnresolved: true })).toBeNull();
+
+    await backdate(photoId, { deletedAt: new Date().toISOString() });
+    expect(store.getPublicUrl(photoId, 'screen', { ignoreUnresolved: true })).toBeNull();
+  });
+
   it('addPhoto sets anyone-with-link permission after creating the Drive file', async () => {
     storeInternals.registerPhotoCollection('activities');
     await ensureEntity('activities', 'act-perm');

@@ -8,6 +8,23 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-11-12
+
+### Added
+
+- The beanie wall can now show a sleep slideshow of your family's photos (milestones, beans and recipe dishes), around the clock or full screen, with its own speed and brightness.
+- Tapping a bean's face on the beanie wall now opens the family scrapbook to read, even while the wall is locked.
+- The Scrapbook page has a new Timeline view next to the usual spreads.
+
+### Changed
+
+- The beanie wall's drawers open taller, and the trip chips now sit in the drawer's title row.
+
+### Fixed
+
+- A scrapbook photo that cannot load no longer shows as a broken image.
+- Fixed a beanie wall setting that sometimes did not save.
+
 ## 2026-11-11
 
 ### Added

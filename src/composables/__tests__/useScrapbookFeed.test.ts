@@ -183,3 +183,22 @@ describe('useScrapbookFeed — silent-failure paths', () => {
     expect(entries.value.map((e) => e.id)).toEqual(['m-good']);
   });
 });
+
+describe('useScrapbookFeed: memberIds as a getter', () => {
+  it('follows a live roster, so a departed bean drops out with no ref or watch', () => {
+    const roster = ref<UUID[]>(['bean-1', 'bean-2']);
+    sayRef.value = [
+      saying({ id: 's-1', memberId: 'bean-1' }),
+      saying({ id: 's-2', memberId: 'bean-2' }),
+    ];
+
+    const { entries } = useScrapbookFeed({
+      memberIds: () => roster.value,
+      contentTypes: ref<Set<ScrapType>>(new Set()),
+    });
+    expect(entries.value.map((e) => e.id).sort()).toEqual(['s-1', 's-2']);
+
+    roster.value = ['bean-1'];
+    expect(entries.value.map((e) => e.id)).toEqual(['s-1']);
+  });
+});

@@ -19,11 +19,12 @@
  * (e.g. `absolute top-1 left-...` + outline ring on the timeline)
  * without the component needing to know about layout context.
  */
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useMilestonesStore } from '@/stores/milestonesStore';
 import { usePhotoStore } from '@/stores/photoStore';
 import { MILESTONE_CATEGORIES } from '@/constants/milestoneCategories';
+import { logScrapbookImageFailed } from '@/utils/scrapbookImageFailed';
 import type { Milestone } from '@/types/models';
 
 const props = withDefaults(
@@ -39,8 +40,14 @@ const props = withDefaults(
      * to the relevant view rather than open the lightbox in place.
      */
     disableLightbox?: boolean;
+    /**
+     * For a surface that stays open for weeks (the scrapbook, the wall timeline): read the URL
+     * even when the photo is flagged unresolved, and log a failure (`scrapbook_image_failed`).
+     * Off everywhere else, where an unresolved photo shows the emoji without a request.
+     */
+    ignoreUnresolved?: boolean;
   }>(),
-  { size: 'sm', disableLightbox: false }
+  { size: 'sm', disableLightbox: false, ignoreUnresolved: false }
 );
 
 const emit = defineEmits<{
@@ -57,11 +64,29 @@ const photoCount = computed(() => props.milestone.photoIds?.length ?? 0);
 const hasPhotos = computed(() => photoCount.value > 0);
 const isInteractive = computed(() => hasPhotos.value && !props.disableLightbox);
 
+const photoId = computed(() => props.milestone.photoIds?.[0] ?? null);
+
 const photoUrl = computed(() => {
-  const id = props.milestone.photoIds?.[0];
+  const id = photoId.value;
   if (!id) return null;
-  return photoStore.getPublicUrl(id, 'thumb');
+  return photoStore.getPublicUrl(id, 'thumb', { ignoreUnresolved: props.ignoreUnresolved });
 });
+
+// A failed <img> drops to the emoji for this URL (the `MealThumb` pattern). Nothing marks the
+// photo unresolved here; only an opted-in surface logs the failure.
+const imgFailed = ref(false);
+watch(photoUrl, () => {
+  imgFailed.value = false;
+});
+
+function onImgError(): void {
+  if (imgFailed.value) return;
+  imgFailed.value = true;
+  const id = photoId.value;
+  if (!props.ignoreUnresolved || !id) return;
+  // eslint-disable-next-line security/detect-object-injection -- id is a UUID from the doc
+  logScrapbookImageFailed(id, photoStore.photos[id]?.driveFileId);
+}
 
 const emoji = computed(() => {
   const safe = milestonesStore.safeCategoryFor(props.milestone);
@@ -101,12 +126,13 @@ function handleClick(e: MouseEvent): void {
   >
     <span class="relative flex h-full w-full items-center justify-center">
       <img
-        v-if="photoUrl"
+        v-if="photoUrl && !imgFailed"
         :src="photoUrl"
         referrerpolicy="no-referrer"
         alt=""
         loading="lazy"
         class="absolute inset-0 h-full w-full object-cover"
+        @error="onImgError"
       />
       <span
         v-else
@@ -118,7 +144,7 @@ function handleClick(e: MouseEvent): void {
       </span>
       <span
         v-if="photoCount > 1"
-        class="font-outfit pointer-events-none absolute right-1 bottom-1 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-black/65 px-1 text-[0.5625rem] font-bold text-white"
+        class="font-outfit pointer-events-none absolute right-1 bottom-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-black/65 px-1.5 text-xs leading-none font-bold text-white"
         aria-hidden="true"
       >
         +{{ photoCount - 1 }}

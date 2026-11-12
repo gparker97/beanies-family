@@ -13,7 +13,7 @@
  * Shared lightbox singleton is wired at the page level — milestone
  * cards inside `<ScrapbookEntryCard>` open it directly.
  */
-import { computed, ref, watch } from 'vue';
+import { computed, ref } from 'vue';
 import ScrapbookEntryCard from '@/components/scrapbook/ScrapbookEntryCard.vue';
 import EmptyState from '@/components/pod/shared/EmptyState.vue';
 import PolaroidImage from '@/components/pod/shared/PolaroidImage.vue';
@@ -97,18 +97,10 @@ const heroPhotoUrl = computed<string | null>(() => {
 // Bean-scoped feed. We pass this single member's id so the composable
 // returns only their entries; we still want all four content types so
 // pass an empty Set (treated as "all types" by the composable).
-const memberIdsRef = ref<UUID[]>([props.memberId]);
 const contentTypesRef = ref<Set<ScrapType>>(new Set());
 
-watch(
-  () => props.memberId,
-  (id) => {
-    memberIdsRef.value = [id];
-  }
-);
-
 const { entries } = useScrapbookFeed({
-  memberIds: memberIdsRef,
+  memberIds: () => [props.memberId],
   contentTypes: contentTypesRef,
 });
 

@@ -45,8 +45,9 @@ export interface UserFamilyMapping {
 
 // GlobalSettings - Device-level settings (stored in registry DB, not per-family)
 /**
- * What the beanie wall shows when it goes to sleep. Only the night clock today; a photo
- * slideshow is the planned second screen, which is why this is a union of one.
+ * What the beanie wall shows when it goes to sleep: the night clock, a union of one. The
+ * family-memories slideshow (#140) is a layer on that night screen, not a second screen;
+ * it is set in `WallMemoriesSettings.slideshow`.
  */
 export type WallSleepScreen = 'night';
 
@@ -64,11 +65,48 @@ export interface WallSleepSettings {
 /** How big the weather card is on this wall (#134). `off` also hides the night screen's weather. */
 export type WallWeatherStyle = 'large' | 'small' | 'off';
 
+/** The kinds of scrapbook memory. Re-exported from `useScrapbookFeed`, its first home. */
+export type ScrapType = 'favorite' | 'saying' | 'note' | 'milestone';
+
+/** How the night screen shows family memories (#140). `off` leaves the plain night clock. */
+export type WallSlideshowMode = 'off' | 'around' | 'full';
+
+/** How bright the memories are on the night screen; the clock and weather never change. */
+export type WallMemoryBrightness = 'dim' | 'medium' | 'bright';
+
+/** How often the sleep slideshow changes: every 60 s, 30 s or 15 s. */
+export type WallSlideshowSpeed = 'slow' | 'medium' | 'fast';
+
+/** Family memories on this wall (#140): the scrapbook viewer and the sleep slideshow. */
+export interface WallMemoriesSettings {
+  /** A tap on a bean's face opens the read-only family scrapbook. */
+  viewer: boolean;
+  /**
+   * Which memory types the viewer AND the slideshow show. `milestone` also governs the
+   * slideshow's avatar and dish photos: read that rule through `photosEnabled`.
+   */
+  show: Record<ScrapType, boolean>;
+  slideshow: WallSlideshowMode;
+  brightness: WallMemoryBrightness;
+  speed: WallSlideshowSpeed;
+}
+
 /** Beanie-wall-only preferences for this device (the wall is a device, not the family). */
+/**
+ * The memories record as stored: only the fields this device has set. A field left absent
+ * follows the default, so a later default change reaches the device.
+ */
+export type StoredWallMemories = Partial<Omit<WallMemoriesSettings, 'show'>> & {
+  show?: Partial<Record<ScrapType, boolean>>;
+};
+
 export interface WallDeviceSettings {
-  sleep?: WallSleepSettings;
+  /** Only the fields set on this device. Read through `settingsStore.wallSleep`. */
+  sleep?: Partial<WallSleepSettings>;
   /** Absent = `'large'`. Read through `settingsStore.wallWeatherStyle`. */
   weather?: WallWeatherStyle;
+  /** Absent fields = their default. Read through `settingsStore.wallMemories`. */
+  memories?: StoredWallMemories;
 }
 
 export interface GlobalSettings {

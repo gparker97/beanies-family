@@ -1,15 +1,15 @@
 /**
  * Cross-bean scrapbook feed. Merges favorites + sayings + member
  * notes into a single stream, sorted newest-first by `createdAt`.
- * Callers pass the current filter selections (`memberIds`,
- * `contentTypes`) as reactive refs; the feed recomputes when either
+ * Callers pass the current filter selections (`memberIds` as a ref or
+ * getter, `contentTypes` as a ref); the feed recomputes when either
  * changes or when the underlying stores update.
  *
  * Per the plan, malformed entries (missing createdAt, missing
  * memberId) are skipped with a `[scrapbookFeed]`-prefixed console
  * warning — the rest of the feed still renders.
  */
-import { computed, type Ref } from 'vue';
+import { computed, toValue, type MaybeRefOrGetter, type Ref } from 'vue';
 import { useFavoritesStore } from '@/stores/favoritesStore';
 import { useSayingsStore } from '@/stores/sayingsStore';
 import { useMemberNotesStore } from '@/stores/memberNotesStore';
@@ -17,7 +17,8 @@ import { useMilestonesStore } from '@/stores/milestonesStore';
 import { safeOccurredOn } from '@/utils/date';
 import type { FavoriteItem, MemberNote, Milestone, SayingItem, UUID } from '@/types/models';
 
-export type ScrapType = 'favorite' | 'saying' | 'note' | 'milestone';
+import type { ScrapType } from '@/types/models';
+export type { ScrapType };
 
 export interface ScrapbookEntry {
   id: UUID;
@@ -42,8 +43,10 @@ export interface UseScrapbookFeedOptions {
   /**
    * Member ids to include. Empty array means "all members" — the
    * caller should pass every member id in that case, not `[]`.
+   * A getter (`() => familyStore.members.map((m) => m.id)`) keeps the
+   * roster live without a ref + watch in the caller.
    */
-  memberIds: Ref<UUID[]>;
+  memberIds: MaybeRefOrGetter<UUID[]>;
   /**
    * Content types to include. Empty set means "all three types".
    */
@@ -61,7 +64,7 @@ export function useScrapbookFeed(options: UseScrapbookFeedOptions) {
   const milestonesStore = useMilestonesStore();
 
   const entries = computed<ScrapbookEntry[]>(() => {
-    const memberSet = new Set(options.memberIds.value);
+    const memberSet = new Set(toValue(options.memberIds));
     const types = options.contentTypes.value;
     const includeType = (t: ScrapType) => types.size === 0 || types.has(t);
     const out: ScrapbookEntry[] = [];
