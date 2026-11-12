@@ -29,6 +29,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - Fixed a beanie wall setting that sometimes did not save.
 - "Got it" now closes a flight conflict notice in every case.
 
+### Performance
+
+- The family file no longer gets a write every few minutes from an idle calendar check, so it stays smaller and loads faster.
+
 ## 2026-11-11
 
 ### Added

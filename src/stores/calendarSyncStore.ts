@@ -10,7 +10,9 @@
 //    when unavailable). Reconcile is a pure function of (activities, remote state),
 //    so re-running converges; idempotent insert(409→patch)/patch(404→insert)/delete.
 //  - Bounded concurrency over (activity × connection) work-items.
-//  - Cross-device freshness-claim: skip a periodic full scan a peer just did.
+//  - Cross-device freshness-claim: skip a periodic full scan a peer just did. The
+//    claim is refreshed only by a reconcile that wrote something.
+//  - A reconcile whose outcome matches what is stored writes nothing to the doc.
 //  - Forward window + link GC: an out-of-window / inactive activity's event + link
 //    are deleted, so links never grow unbounded.
 //  - SHARED-TOKEN invalid_grant: NEVER delete the shared refreshToken. Park
@@ -91,6 +93,7 @@ import { sameOffsetNow, knownDeviceTimeZone, type HomeTimeZoneSource } from '@/u
 import { useFamilyStore } from '@/stores/familyStore';
 import { matchInstanceForDate } from '@/utils/calendar/matchInstanceForDate';
 import { logEvent } from '@/services/telemetry';
+import { createChangeGate, type ChangeGate } from '@/services/telemetry/emitPolicy';
 import type { CalendarConnection, CalendarEventLink, FamilyActivity } from '@/types/models';
 import { shareableOrigin } from '@/utils/shareableOrigin';
 
@@ -110,7 +113,17 @@ export type SyncOutcome = 'ok' | 'error' | 'needs_reconnect' | 'skipped';
  *  exist (re-create manual remote-deletes). Edits trigger a faster, no-verify pass. */
 const RECONCILE_POLL_MS = 300_000;
 const EDIT_DEBOUNCE_MS = 3_000;
-/** Skip a periodic full scan if a peer device reconciled this connection this recently. */
+/**
+ * Skip a periodic full scan if a peer device claimed this connection this recently.
+ *
+ * The claim (`lastReconciledAt` / `lastReconciledBy`) is refreshed ONLY by a reconcile
+ * that wrote something: a push, a status transition, a `lastError` change. A no-op
+ * reconcile writes nothing (2026-11-12: the idle stamp was ~288 family-doc changes a
+ * day from one always-on device). So this skip now only stops a peer re-scanning
+ * within 120 s of a real change, and idle polls are no longer coordinated between
+ * devices: two visible devices may both run a read-only verify in the same poll.
+ * That costs Google API reads only, never a doc write.
+ */
 const FRESHNESS_WINDOW_MS = 120_000;
 /** Bounded concurrency over (activity × connection) work-items. */
 const MAX_INFLIGHT = 5;
@@ -145,6 +158,16 @@ const invalidGrantCounters = new Map<string, number>();
 /** Device-local K-counter for consecutive non-auth reconcile errors. Drives the
  *  sustained-only Slack page; reset on clean success + wiped in stop(). */
 const reconcileErrorCounters = new Map<string, number>();
+
+/**
+ * Per-connection change gates for the `reconcile-outcome` event: an unchanged outcome
+ * emits on change plus a heartbeat, not on every 5-minute poll. Device-local like the
+ * counters above. Cleared in `stop()` (a gate that survived a family switch would
+ * suppress the next session's first event) and per connection when a disconnect
+ * completes. NOT cleared on reconnect or create: the connection lives on there and
+ * the gate must keep its history.
+ */
+const reconcileOutcomeGates = new Map<string, ChangeGate>();
 
 /**
  * Payloads Google refused with a deterministic 400, `${connectionId}:${activityId}`
@@ -441,6 +464,18 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
 
   // ── Per-connection reconcile ────────────────────────────────────────────────
 
+  /**
+   * Did a PEER claim this connection within `FRESHNESS_WINDOW_MS`?
+   *
+   * Only a reconcile that wrote something refreshes the claim (see the constant), so
+   * this stops a peer re-scanning right after a real change and no longer coordinates
+   * idle polls. The same holds for a connection stuck in a repeated identical error:
+   * that error no longer rewrites the connection, so every visible device re-attempts
+   * and reports on each poll. Accepted: Google reads and one event per device per
+   * poll, never a doc write. Triage note: two always-on devices on one stuck
+   * connection at an `error`-level kind produce ~24 events an hour, which trips the
+   * 15-an-hour client-errors alarm on its own.
+   */
   function shouldSkipForFreshness(connection: CalendarConnection): boolean {
     if (!connection.lastReconciledAt) return false;
     if (connection.lastReconciledBy === deviceId) return false; // our own claim — don't skip
@@ -1061,7 +1096,31 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
         );
       }
 
-      outcome = await settleConnectionStatus(connection, errors, changed);
+      const settled = await settleConnectionStatus(connection, errors, changed);
+      outcome = settled.outcome;
+
+      // Success-path signal for the reconcile loop: the heartbeat makes the reconcile
+      // rate and the no-op share measurable, and `wrote=1` repeating on the heartbeat
+      // with `changed=0` would mean the idle stamp write is back. Gated per connection
+      // so an unchanged outcome emits on change plus a heartbeat, not every poll.
+      // `verify` tells a 5-minute poll (1) from an edit-debounced push (0).
+      // It rides in the detail but NOT in the gate signature, or every edit pass would
+      // flip the gate and the heartbeat would stop measuring the poll rate.
+      const signature = `outcome=${settled.outcome};changed=${changed ? 1 : 0};wrote=${settled.wrote ? 1 : 0}`;
+      const detail = `${signature};verify=${opts.verifyExisting ? 1 : 0}`;
+      let gate = reconcileOutcomeGates.get(connection.id);
+      if (!gate) {
+        gate = createChangeGate();
+        reconcileOutcomeGates.set(connection.id, gate);
+      }
+      if (gate(signature)) {
+        logEvent({
+          level: 'info',
+          surface: 'calendar-sync',
+          message: 'reconcile outcome',
+          context: { action: 'reconcile-outcome', detail },
+        });
+      }
 
       // Dev-only diagnostic — surfaces what each connection actually did so a
       // per-account discrepancy is visible while developing. Keyed by connection id
@@ -1080,13 +1139,23 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
   }
 
   /** Translate the batch's errors into the connection's status (shared-token-safe).
-   *  Returns the outcome so a user-initiated sync can report success vs. failure. */
+   *  Returns the outcome so a user-initiated sync can report success vs. failure, and
+   *  whether it wrote the connection (for the `reconcile-outcome` event).
+   *
+   *  A reconcile whose outcome matches what is already stored writes NOTHING: every
+   *  connection write is a family-doc change plus a Drive save, and an idle 5-minute
+   *  poll that re-stamped `lastReconciledAt` was ~288 of each a day (2026-11-12). The
+   *  "would this change anything" checks read the pre-lock `connection` snapshot only
+   *  to decide whether to SKIP; a skipped write cannot resurrect a stale status, and a
+   *  stale snapshot costs at worst one redundant write or one skipped stamp, both
+   *  self-healing on the next poll. */
   async function settleConnectionStatus(
     connection: CalendarConnection,
     errors: CalendarApiError[],
     changed: boolean
-  ): Promise<SyncOutcome> {
+  ): Promise<{ outcome: 'ok' | 'error' | 'needs_reconnect'; wrote: boolean }> {
     const hasAuth = errors.some((e) => e.kind === 'auth');
+    let wrote = false;
 
     if (hasAuth) {
       // NEVER delete the shared refreshToken. Park needs_reconnect only after K
@@ -1094,10 +1163,16 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
       const n = (invalidGrantCounters.get(connection.id) ?? 0) + 1;
       invalidGrantCounters.set(connection.id, n);
       if (n >= INVALID_GRANT_THRESHOLD && connection.status !== 'needs_reconnect') {
+        // A one-off transition write, so stamping the claim here adds no doc change.
+        // It keeps the reconnect notification's time honest (it reads
+        // `lastReconciledAt`) now that idle polls no longer refresh the stamp.
         await updateCalendarConnection(connection.id, {
           status: 'needs_reconnect',
           lastError: 'auth',
+          lastReconciledAt: nowIso(),
+          lastReconciledBy: deviceId,
         });
+        wrote = true;
         reportError({
           surface: 'calendar-sync',
           // `connectionId` is not in `ALLOWED_CONTEXT_KEYS` (it was dropped with
@@ -1115,7 +1190,7 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
       // auth issue self-heals (a false "sustained"). Auth is handled by the
       // invalidGrant counter above.
       reconcileErrorCounters.delete(connection.id);
-      return 'needs_reconnect';
+      return { outcome: 'needs_reconnect', wrote };
     }
 
     // Any successful access resets the device-local auth counter + self-heals.
@@ -1136,22 +1211,36 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
       // The most ACTIONABLE error, which is the one worth naming in `lastError`
       // and in Settings — a real failure beats a throttle that shares the batch.
       const worst = otherErrors.find((e) => e.kind !== 'rate_limited') ?? otherErrors[0];
-      await updateCalendarConnection(connection.id, {
-        // A throttle is not a broken connection, so it does NOT park the
-        // connection: flipping the Settings row red would tell the family their
-        // calendar is broken for a condition that heals itself and offers them
-        // nothing to do. `lastError` still records what happened.
-        //
-        // ⚠️ The key is OMITTED rather than set to `connection.status`. That
-        // snapshot is read BEFORE the connection lock and the reconcile then runs
-        // for tens of seconds — long enough for the user to tap Reconnect and for
-        // `reconnect()` to write `ok`. Writing the stale value back resurrected
-        // `needs_reconnect` seconds after they had fixed it.
-        ...(throttled ? {} : { status: 'error' as const }),
-        lastError: worst.kind,
-        lastReconciledAt: nowIso(),
-        lastReconciledBy: deviceId,
-      });
+      // A repeated identical error writes nothing: the stored status and `lastError`
+      // already say exactly this, so the patch would only re-stamp the claim (one doc
+      // change and one Drive save per poll for as long as the connection stays
+      // broken). A throttle never writes `status`, so for it only `lastError` must
+      // match. The counter and the report below still run every time.
+      // `!changed`: a reconcile that also pushed something still stamps the claim, so a
+      // peer skips its scan right after a real change.
+      const alreadyStored =
+        !changed &&
+        (throttled || connection.status === 'error') &&
+        connection.lastError === worst.kind;
+      if (!alreadyStored) {
+        await updateCalendarConnection(connection.id, {
+          // A throttle is not a broken connection, so it does NOT park the
+          // connection: flipping the Settings row red would tell the family their
+          // calendar is broken for a condition that heals itself and offers them
+          // nothing to do. `lastError` still records what happened.
+          //
+          // ⚠️ The key is OMITTED rather than set to `connection.status`. That
+          // snapshot is read BEFORE the connection lock and the reconcile then runs
+          // for tens of seconds — long enough for the user to tap Reconnect and for
+          // `reconnect()` to write `ok`. Writing the stale value back resurrected
+          // `needs_reconnect` seconds after they had fixed it.
+          ...(throttled ? {} : { status: 'error' as const }),
+          lastError: worst.kind,
+          lastReconciledAt: nowIso(),
+          lastReconciledBy: deviceId,
+        });
+        wrote = true;
+      }
       // Sustained-only paging: count consecutive non-auth reconcile failures and
       // page Slack exactly ONCE, when we cross the threshold (=== , not >=). A
       // lone transient stays log-only (telemetry still records every reconcile);
@@ -1190,24 +1279,28 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
         // it rides in the message, exactly as the `needs_reconnect` park above does.
         context: { action: 'reconcile-error', consecutive_failures: n },
       });
-      return 'error';
-    }
-
-    // Clean success. If nothing changed AND the connection is already ok AND its
-    // freshness claim is still within the window, skip the write entirely — this is
-    // what stops a no-op reconcile from churning the CRDT / re-triggering itself (F1).
-    if (!changed && connection.status === 'ok') {
-      const lastAt = connection.lastReconciledAt
-        ? new Date(connection.lastReconciledAt).getTime()
-        : 0;
-      if (Date.now() - lastAt < FRESHNESS_WINDOW_MS) return 'ok';
+      return { outcome: 'error', wrote };
     }
 
     // Clean success — the single point a connection is confirmed healthy, so the
-    // single reset site for the reconcile-error counter (no lockstep with the
-    // auth counter to drift). The no-op early-return above only fires when the
-    // connection is already `ok`, where the counter is already 0 — safe to skip.
+    // single reset site for the reconcile-error counter (no lockstep with the auth
+    // counter to drift).
+    //
+    // ⚠️ Reset BEFORE the no-op return below, never after it. The counter is
+    // device-local but the status is shared: another device (or `reconnect()`) can
+    // put the connection back to `ok` while this device still holds a count, and the
+    // no-op return is now the main path. Skipping the reset there would let one later
+    // transient error page as "sustained".
     reconcileErrorCounters.delete(connection.id);
+
+    // Clean success that changed nothing on a connection already stored healthy:
+    // write nothing, at any stamp age. This is what stops an idle poll from adding a
+    // family-doc change and a Drive save every 5 minutes (and re-triggering itself, F1).
+    // A first reconcile with nothing to push therefore leaves `lastSyncedAt` /
+    // `lastReconciledAt` unset; the only reader falls back to `updatedAt`.
+    if (!changed && connection.status === 'ok' && !connection.lastError) {
+      return { outcome: 'ok', wrote };
+    }
 
     // → ok + refresh the freshness-claim.
     await updateCalendarConnection(connection.id, {
@@ -1217,7 +1310,8 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
       lastReconciledAt: nowIso(),
       lastReconciledBy: deviceId,
     });
-    return 'ok';
+    wrote = true;
+    return { outcome: 'ok', wrote };
   }
 
   async function reconcileAll(opts: { verifyExisting: boolean; force?: boolean }): Promise<void> {
@@ -1566,6 +1660,7 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
 
     if (allCleared) {
       invalidGrantCounters.delete(connectionId);
+      reconcileOutcomeGates.delete(connectionId);
       // Revoke the calendar grant so a disconnect doesn't leak a live token (#62)
       // — UNLESS a live Drive grant on the same account would die with it. The
       // skip is observable, never silent.
@@ -1732,6 +1827,7 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     resetCalendarClient();
     invalidGrantCounters.clear();
     reconcileErrorCounters.clear();
+    reconcileOutcomeGates.clear();
     rejectedPushHashes.clear();
     deferredExceptionLogged.clear();
     resolveLogged.clear();

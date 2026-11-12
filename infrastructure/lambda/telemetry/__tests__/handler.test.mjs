@@ -358,6 +358,7 @@ describe('Telemetry Lambda handler', () => {
       assert.deepEqual(mod.ALARMING_PREFIXES, {
         clientError: '[telemetry-lambda] client_error',
         clientCritical: '[telemetry-lambda] client_critical',
+        writeRaced: '[telemetry-lambda] write_raced',
       });
       assert.ok(Object.isFrozen(mod.ALARMING_PREFIXES));
     });
@@ -793,6 +794,33 @@ describe('Telemetry Lambda handler', () => {
       await send({ level: 'info', surface: 'load-perf' });
       assert.deepEqual(tallies(), []);
       assert.equal(logs.length, 1);
+    });
+
+    describe('write_raced', () => {
+      const raced = () => logs.filter((l) => l.startsWith('[telemetry-lambda] write_raced'));
+
+      it('writes write_raced with the family tail for a write-raced event', async () => {
+        await send({
+          level: 'warn',
+          surface: 'sync-save',
+          action: 'write-raced',
+          family_id: '3f1c2a4b-1111-2222-3333-abcdef123456',
+        });
+        assert.deepEqual(raced(), ['[telemetry-lambda] write_raced ef123456']);
+        assert.ok(logs[0].startsWith('{"t":"beanlog"'));
+        assert.equal(logs.length, 2);
+      });
+
+      it('names the family `unknown` when the event carries no family id', async () => {
+        await send({ level: 'warn', surface: 'sync-save', action: 'write-raced', family_id: '' });
+        assert.deepEqual(raced(), ['[telemetry-lambda] write_raced unknown']);
+      });
+
+      it('writes nothing for any other action', async () => {
+        await send({ level: 'info', surface: 'sync-save', action: 'write-advance' });
+        await send({ level: 'warn', surface: 'sync-save' });
+        assert.deepEqual(raced(), []);
+      });
     });
   });
 

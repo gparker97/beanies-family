@@ -32,6 +32,8 @@ import { addDaysYmd, formatDateWithDay, parseLocalDate } from '@/utils/date';
 import type { HelpfulHintType, TodoItem } from '@/types/models';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import { withAppInitiatedWrites } from '@/services/analytics/plausible';
+import { skipWhileReadOnly } from '@/services/automerge/worker/writeGate';
+import { takeAutoWrite } from '@/utils/autoWriteBudget';
 
 const DEBOUNCE_MS = 1000;
 /** Floor for the occurrence-assembly window (the largest configured lead may
@@ -110,12 +112,28 @@ export function useHelpfulHints(): void {
     }
   }
 
-  async function removeAll(hints: TodoItem[]): Promise<number> {
-    let removed = 0;
+  /**
+   * Delete `hints` one by one. `budgeted` is REQUIRED so every caller decides:
+   * `true` for the reconcile diff (stale, expired and dismissed copies, where a
+   * cross-build fight lives), `false` for the master-OFF sweep, which is a family
+   * setting someone switched off, not an unattended writer.
+   */
+  /** Set when the automatic-write cap refused a write in the current reconcile run
+   *  (runs are single-flight, so one flag is enough). Reset at the top of `reconcile`. */
+  let cappedThisRun = false;
+
+  async function removeAll(hints: TodoItem[], opts: { budgeted: boolean }): Promise<TodoItem[]> {
+    const removed: TodoItem[] = [];
     for (const h of hints) {
+      // Capped: every later delete would be refused too. The rest are applied on a
+      // later run, since the reconcile is a diff against current state.
+      if (opts.budgeted && !takeAutoWrite(SURFACE, 'remove')) {
+        cappedThisRun = true;
+        break;
+      }
       // deleteTodo is wrapAsync-guarded (toast + telemetry on failure, returns
       // false); never throws, so one failed delete can't abort the batch.
-      if (await todoStore.deleteTodo(h.id)) removed++;
+      if (await todoStore.deleteTodo(h.id)) removed.push(h);
     }
     return removed;
   }
@@ -125,6 +143,10 @@ export function useHelpfulHints(): void {
     // Family doc not loaded → never reconcile against an empty world (mirrors the
     // reminder path's null-guard), else we'd delete every hint on a cold start.
     if (!currentMember) return;
+    // A read-only family would refuse every write below, so do not attempt them:
+    // a refused write must never spend the automatic-write budget.
+    if (skipWhileReadOnly(SURFACE)) return;
+    cappedThisRun = false;
 
     const flagOn = true; // guaranteed by the init guard
     const masterOn = settingsStore.helpfulHintsEnabled;
@@ -136,7 +158,7 @@ export function useHelpfulHints(): void {
     // generate nothing. Acknowledged/completed hints are the family's own to-dos.
     if (!masterOn) {
       const stale = existing.filter((h) => !h.hintAcknowledged && !h.completed);
-      const pruned = await removeAll(stale);
+      const pruned = (await removeAll(stale, { budgeted: false })).length;
       if (emitGate(`off|${pruned}|${existing.length - pruned}`)) {
         logEvent({
           level: 'info',
@@ -204,6 +226,12 @@ export function useHelpfulHints(): void {
     await withAppInitiatedWrites(async () => {
       for (const d of toCreate) {
         if (seen.has(d.hintKey)) continue;
+        // One automatic doc write per create. Capped: stop, the rest are created on
+        // a later run (a diff against current state, so nothing is lost).
+        if (!takeAutoWrite(SURFACE, 'create')) {
+          cappedThisRun = true;
+          break;
+        }
         const dueDate = reminderBase <= d.eventDate ? reminderBase : d.eventDate;
         const created = await todoStore.createTodo({
           title: d.title,
@@ -222,10 +250,15 @@ export function useHelpfulHints(): void {
       }
     });
 
-    // Remove (expired + stale + dismissed copies). Split the count for triage.
+    // Remove (expired + stale + dismissed copies). Creates and removals each have their
+    // OWN automatic-write budget lane, so neither direction of a fight can starve the
+    // other, and the order here does not matter for the cap. Counts come from what was
+    // ACTUALLY removed: a capped run removes fewer than planned.
     const isDismissedCopy = (h: TodoItem) => !!h.hintKey && dismissed.has(h.hintKey);
-    const dismissedCopies = toRemove.filter(isDismissedCopy).length;
-    const expiredCount = toRemove.filter(
+    const removedItems = await removeAll(toRemove, { budgeted: true });
+    const removed = removedItems.length;
+    const dismissedCopies = removedItems.filter(isDismissedCopy).length;
+    const expired = removedItems.filter(
       (h) => !isDismissedCopy(h) && h.hintEventDate && h.hintEventDate < todayStr
     ).length;
     if (dismissedCopies > 0) {
@@ -238,21 +271,26 @@ export function useHelpfulHints(): void {
         context: { count: dismissedCopies },
       });
     }
-    const removed = await removeAll(toRemove);
     // Housekeeping AFTER the plan is applied, and not awaited: it must never delay or
     // race the create/remove above. Its own failures are logged, never toasted.
     void pruneDismissed(dismissedRecord, todayStr);
 
-    const expired = Math.min(expiredCount, removed);
-    const prunedStale = Math.max(removed - expiredCount - dismissedCopies, 0);
+    const prunedStale = removed - expired - dismissedCopies;
     const total = existing.length - removed + generated;
+    // Planned writes the cap held back this run (0 when not capped). In the signature
+    // so a capped run never looks like an idle one.
+    const deferred = cappedThisRun
+      ? Math.max(toCreate.length + toRemove.length - generated - removed, 0)
+      : 0;
     // Signature covers every field below, so nothing can change silently.
     const signature = `on|${generated}|${expired}|${prunedStale}|${total}|${skipped}|${Object.entries(
       reasons
     )
       .sort()
       .map(([r, c]) => `${r}:${c}`)
-      .join(',')}|card:${cardHolder.used}:${cardHolder.ineligible}|fallback:${audienceFallback}`;
+      .join(
+        ','
+      )}|card:${cardHolder.used}:${cardHolder.ineligible}|fallback:${audienceFallback}|deferred:${deferred}`;
 
     if (emitGate(signature)) {
       logEvent({
@@ -269,6 +307,15 @@ export function useHelpfulHints(): void {
           hint_skipped_records: skipped,
         },
       });
+
+      if (deferred > 0) {
+        logEvent({
+          level: 'warn',
+          surface: SURFACE,
+          message: 'hint writes deferred by the automatic write cap',
+          context: { action: 'auto-write-deferred', count: deferred },
+        });
+      }
 
       // Per-reason "why no hint for X?" trace. Emitted only alongside the
       // reconcile event it explains — repeating the explanation for an outcome

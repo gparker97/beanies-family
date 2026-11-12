@@ -12,6 +12,9 @@
  * proxy; this exists to stop ordinary runaway use before it becomes a bill, and to give the
  * user a friendlier message than a 429 when they hit it. See `docs/adr/035`.
  *
+ * Also consumed by `autoWriteBudget.ts`, which caps unattended family-doc writers (keys `auto-write:*`
+ * and `auto-write-report:*`, a rolling day and half a day), so a cross-build fight cannot grow the file.
+ *
  * ── Why this is not `usePinAttemptLimit` ────────────────────────────────────────────────
  *
  * That module solves a similar-looking problem and is deliberately NOT reused (#83 §4):

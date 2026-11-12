@@ -112,9 +112,13 @@ const SLACK_WEBHOOK_URL = process.env.SLACK_ERROR_WEBHOOK_URL;
 // after its beanlog line: `client_error` for every `level: 'error'` event and
 // `client_critical` for every `severity: 'critical'` one, so the error and
 // critical RATES are alarmable even for surfaces that never page.
+// `write_raced` (with the family's last 8 id chars, or `unknown`) for every
+// `action: 'write-raced'` event, so a writer fight between two devices or builds
+// is alarmable: in November 2026 one ran for three days with nothing paging.
 export const ALARMING_PREFIXES = Object.freeze({
   clientError: '[telemetry-lambda] client_error',
   clientCritical: '[telemetry-lambda] client_critical',
+  writeRaced: '[telemetry-lambda] write_raced',
 });
 
 // Best-effort, per-warm-container page dedup: page signature -> last page
@@ -561,6 +565,9 @@ export async function handler(event) {
       }
       if (sanitized.severity === 'critical') {
         console.log(`${ALARMING_PREFIXES.clientCritical} ${sanitized.surface}`);
+      }
+      if (sanitized.action === 'write-raced') {
+        console.log(`${ALARMING_PREFIXES.writeRaced} ${familyTail(sanitized) ?? 'unknown'}`);
       }
       written++;
       const decision = pageDecision(sanitized, late, now, batchKeys);
