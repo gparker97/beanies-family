@@ -17,6 +17,83 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.11.12',
+    date: '2026-11-12',
+    month: '12 november 2026',
+    spotlight: true,
+    summary: {
+      en: "Your family's photos now light up the beanie wall, along with a round of wall fixes.",
+      beanie:
+        "your family's photos now light up the beanie wall, along with a round of wall fixes.",
+    },
+    features: [
+      {
+        icon: '🖼️',
+        title: {
+          en: 'A photo slideshow for the beanie wall',
+          beanie: 'a photo slideshow for the beanie wall',
+        },
+        description: {
+          en: "The sleeping wall can now show your family's photos: milestones, beans and recipe dishes, around the clock or full screen, at the speed and brightness you choose.",
+          beanie:
+            "the sleeping wall can now show your family's photos: milestones, beans and recipe dishes, around the clock or full screen, at the speed and brightness you choose.",
+        },
+      },
+      {
+        icon: '📖',
+        title: { en: 'The scrapbook, on the wall', beanie: 'the scrapbook, on the wall' },
+        description: {
+          en: "Tapping a bean's face on the wall now opens the family scrapbook to read, even while the wall is locked. The Scrapbook page also has a new Timeline view.",
+          beanie:
+            "tapping a bean's face on the wall now opens the family scrapbook to read, even while the wall is locked. the scrapbook page also has a new timeline view.",
+        },
+      },
+      {
+        icon: '🧱',
+        title: { en: 'A tidier beanie wall', beanie: 'a tidier beanie wall' },
+        description: {
+          en: 'Wall drawers now open taller, trip chips sit in the title row, and a wall setting that sometimes did not save is fixed.',
+          beanie:
+            'wall drawers now open taller, trip chips sit in the title row, and a wall setting that sometimes did not save is fixed.',
+        },
+      },
+      {
+        icon: '✈️',
+        title: {
+          en: 'Live flight checks, value by value',
+          beanie: 'live flight checks, value by value',
+        },
+        description: {
+          en: 'Flight times and airports now carry a green live tick when they match the airline, and a new Check Now link asks the airline again.',
+          beanie:
+            'flight times and airports now carry a green live tick when they match the airline, and a new check now link asks the airline again.',
+        },
+      },
+      {
+        icon: '🌱',
+        title: { en: 'Lighter family files', beanie: 'lighter family files' },
+        description: {
+          en: 'Under the hood, family .beanpod files are now kept smaller and quicker to open as they grow.',
+          beanie:
+            'under the hood, family .beanpod files are now kept smaller and quicker to open as they grow.',
+        },
+      },
+      {
+        icon: '💬',
+        title: { en: 'Join us on Discord', beanie: 'join us on discord' },
+        description: {
+          en: "Get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+          beanie:
+            "get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+        },
+        cta: {
+          label: { en: 'Join the Discord', beanie: 'join the discord' },
+          href: 'https://beanies.family/discord',
+        },
+      },
+    ],
+  },
+  {
     version: '2026.11.11',
     date: '2026-11-11',
     month: '11 november 2026',
