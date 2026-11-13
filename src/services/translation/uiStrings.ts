@@ -7847,7 +7847,7 @@ const STRING_DEFS = {
   'lists.template.honeydo.name': { en: 'Honey-do list', beanie: 'honey-do list' },
   'lists.template.honeydo.desc': { en: 'For your partner', beanie: 'for your partner' },
   'lists.template.kidsChores.name': { en: "Kids' chores", beanie: "kids' chores" },
-  'lists.template.kidsChores.desc': { en: 'Weekly reset', beanie: 'weekly reset' },
+  'lists.template.kidsChores.desc': { en: 'Daily reset', beanie: 'daily reset' },
   'lists.template.beforeSchool.name': { en: 'Before-school', beanie: 'before-school' },
   'lists.template.beforeSchool.desc': { en: 'Daily checklist', beanie: 'daily checklist' },
   'lists.template.partyPrep.name': { en: 'Party prep', beanie: 'party prep' },

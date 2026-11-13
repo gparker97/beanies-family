@@ -3454,7 +3454,7 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'lists.template.honeydo.name': '另一半的待办清单',
   'lists.template.honeydo.desc': '写给你的另一半',
   'lists.template.kidsChores.name': '孩子的家务',
-  'lists.template.kidsChores.desc': '每周重置',
+  'lists.template.kidsChores.desc': '每日重置',
   'lists.template.beforeSchool.name': '上学前',
   'lists.template.beforeSchool.desc': '每日清单',
   'lists.template.partyPrep.name': '派对准备',

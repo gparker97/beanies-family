@@ -2200,7 +2200,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         content: '',
         items: [
           '<strong>Grocery list</strong> — weekly, auto-resets',
-          '<strong>Kids’ chores</strong> — weekly reset',
+          '<strong>Kids’ chores</strong> — daily reset',
           '<strong>Before-school</strong> — daily checklist',
           '<strong>Vacation packing</strong> — one-off; link it to a trip',
           '<strong>Honey-do list</strong> — a one-off list for your partner',

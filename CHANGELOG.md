@@ -18,6 +18,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 ### Changed
 
 - A list with a due date now shows on the daily briefing, the beanie wall and widgets on its due date, unless you choose to show it earlier. Every list is always on the Lists page.
+- The Kids' chores list template now resets every day (it used to reset weekly).
 
 ### Fixed
 

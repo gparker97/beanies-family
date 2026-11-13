@@ -68,7 +68,9 @@ export const LIST_TEMPLATES: ListTemplate[] = [
     descriptionKey: 'lists.template.kidsChores.desc',
     category: 'kids',
     lifecycle: 'recurring',
-    frequency: 'weekly',
+    // Daily: chores are a daily rhythm. A weekly default made a kids' list reset on Mondays
+    // only, which read as "not resetting" (greg's family, 2026-11-13).
+    frequency: 'daily',
     starterItems: [
       'Make the bed',
       'Feed the dog',
