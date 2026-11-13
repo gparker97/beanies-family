@@ -1956,7 +1956,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
     icon: '\u{1F9FE}',
     readTime: 6,
     popular: true,
-    updatedDate: '2026-11-13',
+    updatedDate: '2026-09-01',
     sections: [
       { type: 'heading', content: 'Why Beanie Lists?', level: 2, id: 'why' },
       {
@@ -2013,14 +2013,14 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         type: 'list',
         content: '',
         items: [
-          '<strong>One-off</strong> — a list you finish once, like packing for a trip or party prep. Give it a <strong>Due Date</strong> if timing matters. When every item is ticked, it moves to the <strong>Completed</strong> area.',
-          '<strong>Repeats</strong> — a routine that comes back: <strong>Daily</strong>, <strong>Weekly</strong>, or <strong>Monthly</strong>. A repeating list never “finishes” — instead it unchecks itself at the start of each new period so you start fresh (your grocery list clears every week; before-school clears every morning). On the day it resets, it shows up on your Daily Briefing as due today, so the fresh round lands on your plate.',
+          '<strong>One-off</strong> — a list you finish once, like packing for a trip or party prep. Give it a <strong>Due date</strong> if timing matters. When every item is ticked, it moves to the <strong>Completed</strong> area.',
+          '<strong>Repeats</strong> — a routine that comes back: <strong>Daily</strong>, <strong>Weekly</strong>, or <strong>Monthly</strong>. A repeating list never “finishes” — instead it unchecks itself at the start of each new period so you start fresh (your grocery list clears every week; before-school clears every morning). On the day it resets, it shows up in your Daily Briefing as due today, so the fresh round lands on your plate.',
         ],
       },
       {
         type: 'callout',
         content:
-          'A repeating list clearing its checkmarks isn’t a glitch — it’s the point: it “unchecks itself each cycle so you start fresh.” It shows up on the Nook as due today on the day it resets (and on the day you first set it up), then stays quiet until the next round, unless you choose to show it earlier (see “When a list shows up” below). Your items stay put; only the ticks reset.',
+          'A repeating list clearing its checkmarks isn’t a glitch — it’s the point: it “unchecks itself each cycle so you start fresh.” It shows up on the Nook as due today on the day it resets (and on the day you first set it up), then stays quiet until the next round. Your items stay put; only the ticks reset.',
         title: 'Repeating lists reset themselves',
         icon: '\u{1F504}',
       },
@@ -2034,9 +2034,8 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
           '<strong>Tick items off</strong> as you go — a little progress bar fills up',
           '<strong>Add an item</strong> with the “Add an item…” field',
           '<strong>Rename</strong> the list, or change its <strong>Category</strong>',
-          'Choose who the list is for (see below)',
-          'Set a <strong>Due Date</strong>, or switch <strong>Repeats?</strong> on and pick a frequency',
-          'Choose when it shows up with <strong>Show From</strong> or <strong>Show</strong> (see below)',
+          'Set the <strong>Owner</strong> — who the list belongs to (see below)',
+          'Set a <strong>Due date</strong>, or switch <strong>Repeats?</strong> on and pick a frequency',
           '<strong>Link</strong> it to a trip or activity (see below)',
           '<strong>Delete List</strong> when you’re finished with it for good',
         ],
@@ -2060,40 +2059,11 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         icon: '\u{1F4A1}',
       },
 
-      { type: 'heading', content: 'Who a list is for', level: 2, id: 'owner' },
+      { type: 'heading', content: 'Who a list belongs to', level: 2, id: 'owner' },
       {
         type: 'paragraph',
         content:
-          'A list can be for <strong>one or more people</strong>, just like a to-do. It shows up for each of them, and whoever completes it gets the credit. If a one-off list is for a child, grown-ups see it in their briefing too, framed by the child’s name, so the parent who actually makes it happen doesn’t miss it. A child’s repeating list stays off the grown-ups’ briefing unless you turn on <strong>Keep Parents Posted</strong> in the list’s Repeats section.',
-      },
-      {
-        type: 'infoBox',
-        content:
-          'Putting several people on one list means they <strong>share</strong> it: one list, ticked off together. Copying a list to several beans (<strong>Copy to several beans</strong>) is different: it makes a separate list for each bean, so everyone gets their own set of ticks.',
-        title: 'Shared list or separate copies?',
-        icon: '\u{1F46A}',
-      },
-
-      { type: 'heading', content: 'When a list shows up', level: 2, id: 'when-it-shows' },
-      {
-        type: 'paragraph',
-        content:
-          'A list with a <strong>Due Date</strong> shows on the Daily Briefing, the Nook, the beanie wall and your widgets on its due date, and only then by default. Want a heads-up sooner? Use the show settings in the list:',
-      },
-      {
-        type: 'list',
-        content: '',
-        items: [
-          '<strong>One-off list</strong>: pick a <strong>Show From</strong> date and the list appears from that day, ahead of its due date.',
-          '<strong>Repeating list</strong>: <strong>Show</strong> has three choices: <strong>On Each Due Date</strong> (the default; a weekly list appears on its reset day), <strong>Days Before</strong> (it appears that many days ahead), or <strong>Every Day</strong>.',
-        ],
-      },
-      {
-        type: 'infoBox',
-        content:
-          '<strong>Days Before</strong> brings a repeating list to the Daily Briefing and widgets early, but not to the beanie wall; the wall shows it on its due date, or every day if you pick <strong>Every Day</strong>. Whatever you choose, a list is always on the Beanie Lists page. If one isn’t showing yet, it carries a “Shows from…” tag.',
-        title: 'The Lists page always has everything',
-        icon: '\u{1F4C5}',
+          'Each list has one <strong>Owner</strong>. Unlike a to-do (which can be shared among several people), a list belongs to a single person — the one looking after it. The owner’s due lists turn up in their <strong>Daily Briefing</strong>. If a one-off list belongs to a child, grown-ups see it in their briefing too, framed by the child’s name, so the parent who actually makes it happen doesn’t miss it. A child’s repeating list stays off the grown-ups’ briefing unless you turn on <strong>Keep Parents Posted</strong> in the list’s Repeats section.',
       },
 
       { type: 'heading', content: 'Linking a list to a trip or activity', level: 2, id: 'linking' },
@@ -2161,8 +2131,8 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         type: 'list',
         content: '',
         items: [
-          '<strong>The Beanie Lists page</strong> — a <strong>Due soon</strong> shelf at the top, your lists grouped by category below, and a <strong>Completed</strong> area at the bottom. Every list is always here, with a “Shows from…” tag on any that aren’t showing elsewhere yet. The filter chips (<strong>All</strong>, Home, Kids…) narrow the view.',
-          '<strong>Your Daily Briefing, the Nook, the beanie wall and widgets</strong>: a list shows on its due date by default (a weekly list on its reset day), or earlier if you set <strong>Show From</strong>, <strong>Days Before</strong> or <strong>Every Day</strong>.',
+          '<strong>The Beanie Lists page</strong> — a <strong>Due soon</strong> shelf at the top, your lists grouped by category below, and a <strong>Completed</strong> area at the bottom. The filter chips (<strong>All</strong>, Home, Kids…) narrow the view.',
+          '<strong>Your Daily Briefing</strong> — a one-off list that’s due today, overdue, or simply still has items to do gets a gentle nudge. A repeating list nudges you once per round, on the day it resets.',
           '<strong>The menu badge</strong> — the little orange number beside Beanie Lists counts lists that are overdue or due today, so you know at a glance when something needs you.',
           '<strong>A linked trip or activity</strong> — any list you’ve linked appears there under Lists.',
         ],
