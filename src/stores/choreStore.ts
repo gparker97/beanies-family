@@ -53,6 +53,7 @@ import {
   indexMarks,
   isChoreBlock,
   isValidBlockStarts,
+  normalizeChoreDays,
   orphanChores,
   sameChoreMoment,
   sortChores,
@@ -83,6 +84,7 @@ const REFUSAL_MESSAGE: Record<ChoreRefusal, UIStringKey> = {
   'not-found': 'choreboard.error.notFound',
   'bad-hours': 'choreboard.error.badHours',
   invalid: 'choreboard.error.invalid',
+  exists: 'choreboard.error.exists',
 };
 
 /** Where a tick came from. The wall passes who is credited; the page derives it from the session. */
@@ -104,7 +106,7 @@ export interface ToggleChoreResult {
 /** What `toggleChore` answers: a landed tick or untick, a refusal, or `null` for a failed write. */
 export type ToggleChoreOutcome = ToggleChoreResult | ChoreTickRefused;
 
-/** What a grown-up types or picks for a chore. */
+/** What a grown-up types or picks for a new chore. */
 export interface ChoreDraft {
   title: string;
   emoji: string;
@@ -113,20 +115,41 @@ export interface ChoreDraft {
   block: ChoreBlock;
   /** Weekdays 0-6; empty or absent = every day. */
   days?: number[];
+  /**
+   * Keep Parents Posted. Leave it out and the store decides from the beans' lists
+   * (`notifyFor`); only the bean editor passes it, for a bean with no chores yet.
+   */
   notifyParents?: boolean;
 }
+
+/** What a row edit can change on a chore (the bean's chore list). */
+export type ChoreEdit = Partial<
+  Pick<ChoreDraft, 'title' | 'emoji' | 'illustration' | 'block' | 'days'>
+>;
+
+/**
+ * Which grown-up surface made an edit, for the firehose (logged as `kind`, an allowlisted key).
+ * Absent for the other surfaces (the Add Chores sheet, Copy, the wall).
+ */
+export type ChoreEditVia = 'bean-editor';
+
+/** The optional tail of a grown-up action: where it came from. */
+export interface ChoreEditOpts {
+  via?: ChoreEditVia;
+}
+
+/** `createChore`'s tail: also the new chore's id, when the caller minted it (a row's key). */
+export interface CreateChoreOpts extends ChoreEditOpts {
+  id?: string;
+}
+
+/** `{ kind: via }` for a log context, or nothing. */
+const viaContext = (via: ChoreEditVia | undefined) => (via ? { kind: via } : {});
 
 /** What a batch action added and skipped as a duplicate (same title in the same block). */
 export interface ChoreBatchResult {
   added: number;
   skipped: number;
-}
-
-/** Weekdays as stored: unique integers 0-6, sorted; `undefined` for every day. */
-function normalizeDays(days: readonly number[] | undefined): number[] | undefined {
-  const clean = [...new Set((days ?? []).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6))];
-  clean.sort((a, b) => a - b);
-  return clean.length > 0 && clean.length < 7 ? clean : undefined;
 }
 
 export const useChoreStore = defineStore('chores', () => {
@@ -223,6 +246,20 @@ export const useChoreStore = defineStore('chores', () => {
 
   function nextSortOrder(): number {
     return chores.value.reduce((max, c) => Math.max(max, c.sortOrder ?? 0), -1) + 1;
+  }
+
+  /**
+   * Keep Parents Posted for a NEW chore of `memberId`'s, decided here once for every create path
+   * (the bean editor, the Add Chores sheet, Copy, the wall): on when the bean is a child and every
+   * chore of theirs has it, which is exactly when the bean editor's one switch reads as on, so
+   * adding a chore anywhere never turns that switch off. A bean with no chores takes `fallback`
+   * (off, or the copied chore's own flag). A grown-up's chores never get it.
+   */
+  function notifyFor(memberId: string, fallback = false): boolean {
+    const bean = familyStore.members.find((m) => m.id === memberId);
+    if (!bean || isAdultMember(bean)) return false;
+    const theirs = chores.value.filter((c) => (c.assigneeIds ?? []).includes(memberId));
+    return theirs.length ? theirs.every((c) => c.notifyParents === true) : fallback;
   }
 
   /** Run a write under the one error contract. `undefined` from `wrapAsync` becomes `null`. */
@@ -458,44 +495,62 @@ export const useChoreStore = defineStore('chores', () => {
       illustration: draft.illustration || undefined,
       assigneeIds,
       block: draft.block,
-      days: normalizeDays(draft.days),
-      notifyParents: draft.notifyParents || undefined,
+      days: normalizeChoreDays(draft.days),
+      notifyParents: (draft.notifyParents ?? assigneeIds.every((id) => notifyFor(id))) || undefined,
     };
   }
 
-  async function createChore(draft: ChoreDraft, actorId: string): Promise<Chore | null> {
+  /**
+   * Create one chore: the wall's add and a new row in the bean editor, ONE write path. Keep
+   * Parents Posted follows the beans' lists unless the draft says (`notifyFor`). The id is
+   * `opts.id` when the caller minted it (the bean editor's row key), else a fresh one; the write
+   * is `ifAbsent`, so an id that already exists is the `exists` refusal, never an overwrite.
+   */
+  async function createChore(
+    draft: ChoreDraft,
+    actorId: string,
+    opts: CreateChoreOpts = {}
+  ): Promise<Chore | null> {
     const action = 'createChore';
     const actor = adultActor(actorId, action);
     if (!actor) return null;
     const clean = cleanDraft(draft);
     if (!clean) return refuse('invalid', action);
+    const id = opts.id ?? generateUUID();
+    if (choreById(id)) return refuse('exists', action);
     const created = await write(action, async () => {
-      const chore = await repo.createChore({
-        ...clean,
-        sortOrder: nextSortOrder(),
-        createdBy: actor,
-      });
+      const input = { ...clean, sortOrder: nextSortOrder(), createdBy: actor };
+      const written = await repo.createChores([{ id, input }], { ifAbsent: true });
       await refresh();
+      if (!written.length) return 'exists' as const;
+      const chore = choreById(id);
+      // Written but not read back: a real failure, so `write` toasts and reports it.
+      if (!chore) throw new Error('created chore missing from the projection');
       return chore;
     });
     if (!created) return null;
+    // Already in the document though not yet in this store's last read (another device).
+    if (created === 'exists') return refuse('exists', action);
     log('info', 'chore-saved', {
       action: 'create',
       slot: created.block,
       count: created.assigneeIds.length,
+      ...viaContext(opts.via),
     });
     return created;
   }
 
   /**
-   * Edit a chore. Dead assignee ids are pruned (as `listStore.setAssignees` does), whether or
-   * not the edit touches who it is for; a chore left with no living assignee is refused.
-   * `days: []` clears the days (every day); a cleared `illustration` is removed.
+   * Edit a chore (a row in a bean's chore list). Dead assignee ids are pruned on the way (as
+   * `listStore.setAssignees` does); a chore left with no living assignee is refused. `days: []`
+   * clears the days (every day); a cleared `illustration` is removed. Who a chore is for is
+   * never edited here, and Keep Parents Posted has its own action (`setNotifyParentsFor`).
    */
   async function updateChore(
     id: string,
-    patch: Partial<ChoreDraft>,
-    actorId: string
+    patch: ChoreEdit,
+    actorId: string,
+    opts: ChoreEditOpts = {}
   ): Promise<Chore | null> {
     const action = 'updateChore';
     const actor = adultActor(actorId, action);
@@ -513,16 +568,10 @@ export const useChoreStore = defineStore('chores', () => {
       if (!isChoreBlock(patch.block)) return refuse('invalid', action);
       input.block = patch.block;
     }
-    if ('days' in patch) input.days = normalizeDays(patch.days);
-    if (patch.notifyParents !== undefined) input.notifyParents = patch.notifyParents;
-    const notifyChanged =
-      patch.notifyParents !== undefined && patch.notifyParents !== (current.notifyParents === true);
-    const wanted = patch.assigneeIds ?? current.assigneeIds ?? [];
-    const kept = keepLiving(wanted);
+    if ('days' in patch) input.days = normalizeChoreDays(patch.days);
+    const kept = keepLiving(current.assigneeIds ?? []);
     if (kept.length === 0) return refuse('invalid', action);
-    if (patch.assigneeIds !== undefined || kept.length !== (current.assigneeIds ?? []).length) {
-      input.assigneeIds = kept;
-    }
+    if (kept.length !== (current.assigneeIds ?? []).length) input.assigneeIds = kept;
     const updated = await write(action, async () => {
       const result = await repo.updateChore(id, input);
       await refresh();
@@ -536,10 +585,8 @@ export const useChoreStore = defineStore('chores', () => {
       action: 'update',
       slot: updated.block,
       count: updated.assigneeIds.length,
+      ...viaContext(opts.via),
     });
-    if (notifyChanged) {
-      log('info', 'notify-parents-set', { action: updated.notifyParents ? 'on' : 'off' });
-    }
     return updated;
   }
 
@@ -564,7 +611,7 @@ export const useChoreStore = defineStore('chores', () => {
   }
 
   /**
-   * Put `orderedIds` (a block's chores on a bean's day, as a grown-up dragged them) in that
+   * Put `orderedIds` (a block's chores in a bean's chore list, as a grown-up dragged them) in that
    * order, in ONE change. The ids keep the positions they already hold in the family's one chore
    * order (`sortChores`) and only swap among themselves, then the whole collection is renumbered
    * 0..n-1, so no two chores can end up sharing a `sortOrder` and every other chore keeps its
@@ -573,7 +620,8 @@ export const useChoreStore = defineStore('chores', () => {
    */
   async function reorderChores(
     orderedIds: readonly string[],
-    actorId: string
+    actorId: string,
+    opts: ChoreEditOpts = {}
   ): Promise<true | null> {
     const action = 'reorderChores';
     if (!adultActor(actorId, action)) return null;
@@ -592,13 +640,18 @@ export const useChoreStore = defineStore('chores', () => {
       return true as const;
     });
     if (!ok) return null;
-    log('info', 'chore-saved', { action: 'update', detail: 'reorder', count: known.length });
+    log('info', 'chore-saved', {
+      action: 'update',
+      detail: 'reorder',
+      count: known.length,
+      ...viaContext(opts.via),
+    });
     return true;
   }
 
   /**
-   * Take chores off ONE bean's board, in ONE change (the edit form's "only for Pip", and Select
-   * then Delete on a bean's day). A chore that has no other living bean is deleted; a chore
+   * Take chores off ONE bean's board, in ONE change (a row's ✕ and Remove All in the bean's chore
+   * list). A chore that has no other living bean is deleted; a chore
    * shared with others keeps them and loses only `memberId` (dead ids pruned on the way, as
    * `updateChore` does). Ids that are gone or not this bean's are skipped. Old marks stay; the
    * retention sweep ages them out and every reader ignores a mark for an unknown chore.
@@ -609,7 +662,8 @@ export const useChoreStore = defineStore('chores', () => {
   async function removeChoresForMember(
     choreIds: readonly string[],
     memberId: string,
-    actorId: string
+    actorId: string,
+    opts: ChoreEditOpts = {}
   ): Promise<{ deleted: number; unassigned: number } | null> {
     const action = 'removeChoresForMember';
     if (!adultActor(actorId, action)) return null;
@@ -633,8 +687,46 @@ export const useChoreStore = defineStore('chores', () => {
     log('info', 'chores-removed', {
       count: mine.length,
       detail: `deleted:${deleteIds.length}+unassigned:${reassign.length}`,
+      ...viaContext(opts.via),
     });
     return { deleted: deleteIds.length, unassigned: reassign.length };
+  }
+
+  /**
+   * Keep Parents Posted for a bean's WHOLE chore list (the bean editor's one switch): write
+   * `notifyParents = on` on every chore of `memberId`'s that does not already have it, in ONE
+   * change. There is no per-list flag in the data: the switch reads as on when every chore of the
+   * bean has it, so a chore shared with another bean carries the flag for both. Nothing to change
+   * is a success that writes nothing.
+   *
+   * Telemetry: `notify-parents-set` with `action` on/off and `count` = chores changed.
+   */
+  async function setNotifyParentsFor(
+    memberId: string,
+    on: boolean,
+    actorId: string,
+    opts: ChoreEditOpts = {}
+  ): Promise<{ count: number } | null> {
+    const action = 'setNotifyParentsFor';
+    if (!adultActor(actorId, action)) return null;
+    if (!livingIds.value.has(memberId)) return refuse('invalid', action);
+    const patches = chores.value
+      .filter((c) => (c.assigneeIds ?? []).includes(memberId) && (c.notifyParents === true) !== on)
+      .map((c) => ({ id: c.id, patch: { notifyParents: on } }));
+    if (patches.length) {
+      const ok = await write(action, async () => {
+        await repo.updateChores(patches);
+        await refresh();
+        return true as const;
+      });
+      if (!ok) return null;
+    }
+    log('info', 'notify-parents-set', {
+      action: on ? 'on' : 'off',
+      count: patches.length,
+      ...viaContext(opts.via),
+    });
+    return { count: patches.length };
   }
 
   /** The family's block start hours. Refused unless morning < afternoon < evening. */
@@ -666,9 +758,9 @@ export const useChoreStore = defineStore('chores', () => {
   }
 
   /**
-   * Add the Add Chores sheet's list for `memberIds`, in ONE change: one chore PER BEAN per
-   * draft ("Add 6 Chores Each for Pip and Juno"), so each copy is that bean's own to edit, like
-   * `copyChores`. A shared chore is something a grown-up makes deliberately in the form. A bean
+   * Add the Add Chores sheet's list (or a set added in a bean's chore list) for `memberIds`, in
+   * ONE change: one chore PER BEAN per draft ("Add 6 Chores Each for Pip and Juno"), so each
+   * copy is that bean's own to edit, like `copyChores`. Nothing here makes a shared chore. A bean
    * who already has a chore of that title in that block is skipped for it and counted in
    * `skipped`.
    *
@@ -677,6 +769,9 @@ export const useChoreStore = defineStore('chores', () => {
    * chore's `starterKey` is the suggestion set its row came from (`draft.setKey`, when that is a
    * known set; analytics and dedupe), absent for a row the grown-up added. A draft with no title
    * or an unknown block refuses the whole batch.
+   *
+   * Keep Parents Posted follows each bean's list (`notifyFor`); `opts.notifyParents` overrides it
+   * (the bean editor, for a bean with no chores yet).
    *
    * Telemetry (no titles): `chores-added` (`count` = chores created, `detail` = the suggestion
    * sets used, joined by `+`, or `none`), `chores-add-skipped` when any bean already had one, and
@@ -687,7 +782,12 @@ export const useChoreStore = defineStore('chores', () => {
     memberIds: readonly string[],
     drafts: readonly StarterChoreDraft[],
     actorId: string,
-    opts: { sets?: readonly string[]; edited?: number } = {}
+    opts: {
+      sets?: readonly string[];
+      edited?: number;
+      notifyParents?: boolean;
+      via?: ChoreEditVia;
+    } = {}
   ): Promise<ChoreBatchResult | null> {
     const action = 'addChores';
     const actor = adultActor(actorId, action);
@@ -702,6 +802,7 @@ export const useChoreStore = defineStore('chores', () => {
     let skipped = 0;
     let order = nextSortOrder();
     for (const target of targets) {
+      const notify = (opts.notifyParents ?? notifyFor(target)) || undefined;
       for (const draft of drafts) {
         const title = draft.title.trim();
         if (hasSameChore(target, title, draft.block, pending)) {
@@ -714,7 +815,8 @@ export const useChoreStore = defineStore('chores', () => {
           illustration: draft.illustration || undefined,
           assigneeIds: [target],
           block: draft.block,
-          days: normalizeDays(draft.days),
+          days: normalizeChoreDays(draft.days),
+          notifyParents: notify,
           sortOrder: order++,
           starterKey: setOf(draft),
           createdBy: actor,
@@ -731,6 +833,7 @@ export const useChoreStore = defineStore('chores', () => {
     log('info', 'chores-added', {
       count: pending.length,
       detail: sets.length ? sets.join('+') : 'none',
+      ...viaContext(opts.via),
     });
     if (skipped > 0) log('info', 'chores-add-skipped', { count: skipped });
     if ((opts.edited ?? 0) > 0) log('info', 'chores-add-edited', { count: opts.edited });
@@ -740,7 +843,8 @@ export const useChoreStore = defineStore('chores', () => {
   /**
    * Copy `fromMemberId`'s chores in `blocks` to each of `toMemberIds`, in ONE change: a new
    * chore per target per source chore, so each copy is the target's own to edit. A chore the
-   * target already has by the same title in the same block is skipped.
+   * target already has by the same title in the same block is skipped. Keep Parents Posted
+   * follows the TARGET's list (`notifyFor`); a target with no chores keeps each copied chore's.
    */
   async function copyChores(
     fromMemberId: string,
@@ -760,6 +864,9 @@ export const useChoreStore = defineStore('chores', () => {
     let skipped = 0;
     let order = nextSortOrder();
     for (const target of targets) {
+      // The target's list decides; a target with no chores keeps each copied chore's flag.
+      const theirs = chores.value.some((c) => (c.assigneeIds ?? []).includes(target));
+      const notify = theirs ? notifyFor(target) : undefined;
       for (const c of source) {
         const block = choreBlockOf(c);
         if (hasSameChore(target, c.title, block, pending)) {
@@ -772,8 +879,8 @@ export const useChoreStore = defineStore('chores', () => {
           illustration: c.illustration,
           assigneeIds: [target],
           block,
-          days: normalizeDays(c.days),
-          notifyParents: c.notifyParents,
+          days: normalizeChoreDays(c.days),
+          notifyParents: (notify ?? notifyFor(target, c.notifyParents === true)) || undefined,
           sortOrder: order++,
           starterKey: c.starterKey,
           createdBy: actor,
@@ -898,6 +1005,7 @@ export const useChoreStore = defineStore('chores', () => {
     updateChore,
     deleteChore,
     removeChoresForMember,
+    setNotifyParentsFor,
     reorderChores,
     setBlockStarts,
     addChores,

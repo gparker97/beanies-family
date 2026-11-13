@@ -6,10 +6,11 @@
  *  - `?starter=<set>&for=<ids>` opens Add Chores preselected for grown-ups only: `starter`
  *    must be a known key, `for` is filtered to living people (no pets), and both are stripped
  *    after reading (ignored and stripped for a non-adult);
- *  - every add (header, empty state, a bean's "+", a bean's day, Quick Add) opens the ONE Add
- *    Chores sheet; the form is the edit screen;
- *  - a bean's day lists chores on other weekdays for a grown-up, and Select deletes several in
- *    one confirm and one store call;
+ *  - a bean's chore list (`ChoreBeanEditor`) opens from the card's ONE edit affordance (Edit
+ *    Chores, or "+" with no chores), a chore's name, the day's Edit Chores and Quick Add on a
+ *    day; the header, the empty state and the redirect open the multi-bean Add Chores sheet;
+ *  - a bean's day only ticks: no pencils, handles, Select or Other Days;
+ *  - "No one's" chores have a ✕ that deletes them;
  *  - ticking goes through the page's guarded tick path with `surface: 'app'`.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -42,10 +43,6 @@ vi.mock(
 );
 const logEvent = vi.hoisted(() => vi.fn());
 vi.mock('@/services/telemetry/logEvent', () => ({ logEvent }));
-const confirmFn = vi.hoisted(() => vi.fn());
-vi.mock('@/composables/useConfirm', () => ({ confirm: confirmFn }));
-const toast = vi.hoisted(() => vi.fn());
-vi.mock('@/composables/useToast', () => ({ showToast: toast }));
 const quickAdd = vi.hoisted(() => ({ handler: null as null | ((a: string) => void) }));
 vi.mock('@/composables/useQuickAddIntent', () => ({
   useQuickAddIntent: (h: (a: string) => void) => {
@@ -54,7 +51,6 @@ vi.mock('@/composables/useQuickAddIntent', () => ({
 }));
 
 import ChoreboardPage from '../ChoreboardPage.vue';
-import ChoreBlockSection from '@/components/chores/ChoreBlockSection.vue';
 import {
   chore,
   choreActions,
@@ -68,11 +64,11 @@ import {
 const modalStub = (name: string, props: string[]) =>
   defineComponent({ name, props, template: '<div />' });
 const StarterStub = modalStub('ChoreAddSheet', ['open', 'presetKey', 'presetMemberIds', 'carried']);
-const FormStub = modalStub('ChoreFormModal', ['open', 'choreId', 'beanId']);
+const EditorStub = modalStub('ChoreBeanEditor', ['open', 'memberId']);
 
 const stubs = {
   ChoreAddSheet: StarterStub,
-  ChoreFormModal: FormStub,
+  ChoreBeanEditor: EditorStub,
   ChoreCopyModal: modalStub('ChoreCopyModal', ['open', 'sourceMemberId']),
   ChoreHoursModal: modalStub('ChoreHoursModal', ['open']),
   CardArt: true,
@@ -99,24 +95,29 @@ const guarded = () =>
 const MANAGE = [
   'chore-open-add',
   'chore-open-hours',
-  'chore-day-add',
+  'chore-day-edit',
   'chore-day-copy',
-  'chore-day-select',
-  'chore-day-other-days',
   'chore-bean-add',
   'chore-bean-copy',
   'chore-bean-edit',
   'chore-edit',
-  'chore-row-edit',
+  'chore-row-remove',
   'chore-empty-starters',
+];
+
+/** Controls the old per-chore editing had, gone from every view. */
+const GONE = [
+  'chore-row-edit',
   'chore-drag-handle',
+  'chore-day-add',
+  'chore-day-select',
+  'chore-day-other-days',
+  'chore-row-select',
 ];
 
 beforeEach(() => {
   resetKit();
   logEvent.mockReset();
-  confirmFn.mockReset();
-  toast.mockReset();
   quickAdd.handler = null;
   chores.list = [
     chore('k1', { assigneeIds: ['kid'], title: 'Make bed' }),
@@ -190,7 +191,7 @@ describe('a child viewer', () => {
     const w = await mountPage({ bean: 'kid' });
     quickAdd.handler?.('add-chore');
     await flushPromises();
-    expect(propsOf(w, FormStub).open).toBe(false);
+    expect(propsOf(w, EditorStub).open).toBe(false);
     expect(propsOf(w, StarterStub).open).toBe(false);
   });
 });
@@ -209,27 +210,30 @@ describe('a grown-up viewer', () => {
     expect(w.get('[data-testid="chore-open-add"]').text()).toContain('choreboard.addChores');
     await w.get('[data-testid="chore-open-add"]').trigger('click');
     expect(propsOf(w, StarterStub)).toMatchObject({ open: true, presetMemberIds: [] });
-    expect(propsOf(w, FormStub).open).toBe(false);
+    expect(propsOf(w, EditorStub).open).toBe(false);
     expect(w.find('[data-testid="chore-week-panel"]').exists()).toBe(true);
+    for (const id of GONE) expect(w.find(`[data-testid="${id}"]`).exists(), id).toBe(false);
   });
 
-  it('a bean’s "+" opens Add Chores for that bean only; Edit Chores opens their day', async () => {
+  it('a card’s Edit Chores opens that bean’s chore list; "+" (no chores yet) opens it empty', async () => {
     const w = await mountPage();
-    await w.get('[data-member-id="sib"] [data-testid="chore-bean-add"]').trigger('click');
-    expect(propsOf(w, StarterStub)).toMatchObject({
-      open: true,
-      presetMemberIds: ['sib'],
-      presetKey: null,
-    });
-    expect(propsOf(w, FormStub).open).toBe(false);
     await w.get('[data-member-id="kid"] [data-testid="chore-bean-edit"]').trigger('click');
-    expect(routerFns.push).toHaveBeenCalledWith({ query: { bean: 'kid' } });
+    expect(propsOf(w, EditorStub)).toMatchObject({ open: true, memberId: 'kid' });
+    expect(propsOf(w, StarterStub).open).toBe(false);
+    expect(routerFns.push).not.toHaveBeenCalled();
+    // Mama Bean has no chores: her card's one affordance is "+".
+    expect(w.find('[data-member-id="mom"] [data-testid="chore-bean-edit"]').exists()).toBe(false);
+    await w.get('[data-member-id="mom"] [data-testid="chore-bean-add"]').trigger('click');
+    expect(propsOf(w, EditorStub)).toMatchObject({ open: true, memberId: 'mom' });
+    // The header opens the day.
+    await w.get('[data-member-id="sib"] [data-testid="chore-bean-open"]').trigger('click');
+    expect(routerFns.push).toHaveBeenCalledWith({ query: { bean: 'sib' } });
   });
 
-  it('a pencil on a home card opens the edit form for that chore and bean', async () => {
+  it('a chore’s name on a home card opens that bean’s chore list', async () => {
     const w = await mountPage();
-    await w.get('[data-chore-id="k1"] [data-testid="chore-row-edit"]').trigger('click');
-    expect(propsOf(w, FormStub)).toMatchObject({ open: true, choreId: 'k1', beanId: 'kid' });
+    await w.get('[data-chore-id="k1"] [data-testid="chore-edit"]').trigger('click');
+    expect(propsOf(w, EditorStub)).toMatchObject({ open: true, memberId: 'kid' });
   });
 
   it('an unknown ?bean= falls back to home and is stripped', async () => {
@@ -246,92 +250,27 @@ describe('a grown-up viewer', () => {
     expect(w.find('[data-testid="chore-day-head"]').exists()).toBe(false);
   });
 
-  it('a living ?bean= opens that bean’s day, with back, add and copy', async () => {
+  it('a living ?bean= opens that bean’s day: back, copy, and Edit Chores for their list', async () => {
     const w = await mountPage({ bean: 'sib' });
     expect(routerFns.replace).not.toHaveBeenCalled();
     expect(w.get('[data-testid="chore-day-head"]').attributes('data-member-id')).toBe('sib');
     expect(w.find('[data-testid="chore-day-back"]').exists()).toBe(true);
-    expect(w.find('[data-testid="chore-day-add"]').exists()).toBe(true);
     expect(w.find('[data-testid="chore-day-copy"]').exists()).toBe(true);
     expect(w.find('[data-testid="chore-week-row"]').exists()).toBe(true);
-    await w.get('[data-testid="chore-day-add"]').trigger('click');
-    expect(propsOf(w, StarterStub)).toMatchObject({ open: true, presetMemberIds: ['sib'] });
+    await w.get('[data-testid="chore-day-edit"]').trigger('click');
+    expect(propsOf(w, EditorStub)).toMatchObject({ open: true, memberId: 'sib' });
+    expect(propsOf(w, StarterStub).open).toBe(false);
   });
 
-  it('on a bean’s day, a dragged block reorders through the store and reports whether it landed', async () => {
-    const w = await mountPage({ bean: 'kid' });
-    const section = w.findComponent(ChoreBlockSection);
-    expect(section.props('reorderable')).toBe(true);
-    const reorder = section.props('reorder') as (ids: string[]) => Promise<boolean>;
-    choreActions.reorderChores.mockResolvedValueOnce(true);
-    await expect(reorder(['k2', 'k1'])).resolves.toBe(true);
-    expect(choreActions.reorderChores).toHaveBeenCalledWith(['k2', 'k1'], 'mom');
-    choreActions.reorderChores.mockResolvedValueOnce(null);
-    await expect(reorder(['k2', 'k1'])).resolves.toBe(false);
-  });
-
-  it('a bean’s day lists chores on other weekdays, editable, with no tick', async () => {
+  it('a bean’s day only ticks: no pencils, handles, Select or Other Days; a name opens the list', async () => {
     chores.list = [...chores.list, chore('sat', { assigneeIds: ['kid'], days: [6] })];
     const w = await mountPage({ bean: 'kid' });
-    const other = w.get('[data-testid="chore-day-other-days"]');
-    expect(
-      other.findAll('[data-testid="chore-row"]').map((r) => r.attributes('data-chore-id'))
-    ).toEqual(['sat']);
-    expect(other.find('[data-testid="chore-tick"]').exists()).toBe(false);
-    await other.get('[data-testid="chore-row-edit"]').trigger('click');
-    expect(propsOf(w, FormStub)).toMatchObject({ open: true, choreId: 'sat', beanId: 'kid' });
-  });
-
-  it('Select: pick rows (Other Days too), Select All, one confirm, one store call', async () => {
-    chores.list = [...chores.list, chore('sat', { assigneeIds: ['kid'], days: [6] })];
-    const w = await mountPage({ bean: 'kid' });
-    await w.get('[data-testid="chore-day-select"]').trigger('click');
-    // Every row is selectable, collapsed blocks included; no ticks while selecting.
-    expect(w.findAll('[data-testid="chore-row-select"]')).toHaveLength(3);
-    expect(w.find('[data-testid="chore-tick"]').exists()).toBe(false);
-    const del = w.get('[data-testid="chore-day-delete-selected"]');
-    expect(del.attributes('disabled')).toBeDefined();
-
-    await w.get('[data-chore-id="sat"] [data-testid="chore-row-select"]').trigger('click');
-    expect(del.text()).toContain('choreboard.day.deleteSelected.one');
-    await w.get('[data-testid="chore-day-select-all"]').trigger('click');
-    expect(
-      w.findAll('[data-testid="chore-row-select"]').map((b) => b.attributes('aria-checked'))
-    ).toEqual(['true', 'true', 'true']);
-
-    confirmFn.mockResolvedValueOnce(false);
-    await del.trigger('click');
-    await flushPromises();
-    expect(confirmFn).toHaveBeenCalledWith(expect.objectContaining({ variant: 'danger' }));
-    expect(choreActions.removeChoresForMember).not.toHaveBeenCalled();
-
-    confirmFn.mockResolvedValueOnce(true);
-    choreActions.removeChoresForMember.mockResolvedValueOnce({ deleted: 3, unassigned: 0 });
-    await del.trigger('click');
-    await flushPromises();
-    expect(choreActions.removeChoresForMember).toHaveBeenCalledTimes(1);
-    const [ids, bean, actor] = choreActions.removeChoresForMember.mock.calls[0]!;
-    expect([...ids].sort()).toEqual(['k1', 'k2', 'sat']);
-    expect(bean).toBe('kid');
-    expect(actor).toBe('mom');
-    expect(toast).toHaveBeenCalledWith('success', 'choreboard.day.deleted.other');
-    // Back out of select mode.
-    expect(w.find('[data-testid="chore-day-select-bar"]').exists()).toBe(false);
-  });
-
-  it('Select: a refused or failed delete stays in select mode; Cancel leaves it', async () => {
-    const w = await mountPage({ bean: 'kid' });
-    await w.get('[data-testid="chore-day-select"]').trigger('click');
-    await w.get('[data-chore-id="k1"] [data-testid="chore-row-select"]').trigger('click');
-    confirmFn.mockResolvedValueOnce(true);
-    choreActions.removeChoresForMember.mockResolvedValueOnce(null);
-    await w.get('[data-testid="chore-day-delete-selected"]').trigger('click');
-    await flushPromises();
-    expect(toast).not.toHaveBeenCalled();
-    expect(w.find('[data-testid="chore-day-select-bar"]').exists()).toBe(true);
-    await w.get('[data-testid="chore-day-select-cancel"]').trigger('click');
-    expect(w.find('[data-testid="chore-day-select-bar"]').exists()).toBe(false);
+    for (const id of GONE) expect(w.find(`[data-testid="${id}"]`).exists(), id).toBe(false);
+    // A chore on another weekday is in the bean's list, not on today.
+    expect(w.find('[data-chore-id="sat"]').exists()).toBe(false);
     expect(w.findAll('[data-testid="chore-tick"]').length).toBeGreaterThan(0);
+    await w.get('[data-chore-id="k1"] [data-testid="chore-edit"]').trigger('click');
+    expect(propsOf(w, EditorStub)).toMatchObject({ open: true, memberId: 'kid' });
   });
 
   it('?starter=&for= opens Starter Sets preselected with living people only, then strips both', async () => {
@@ -360,12 +299,18 @@ describe('a grown-up viewer', () => {
     expect(sheet.carried).toBe(false);
   });
 
-  it('the quick-add intent opens Add Chores (for the bean whose day is showing)', async () => {
-    const w = await mountPage({ bean: 'sib' });
+  it('the quick-add intent: on a bean’s day, their chore list; at home, Add Chores', async () => {
+    const day = await mountPage({ bean: 'sib' });
     quickAdd.handler?.('add-chore');
     await flushPromises();
-    expect(propsOf(w, StarterStub)).toMatchObject({ open: true, presetMemberIds: ['sib'] });
-    expect(propsOf(w, FormStub).open).toBe(false);
+    expect(propsOf(day, EditorStub)).toMatchObject({ open: true, memberId: 'sib' });
+    expect(propsOf(day, StarterStub).open).toBe(false);
+    day.unmount();
+    const home = await mountPage();
+    quickAdd.handler?.('add-chore');
+    await flushPromises();
+    expect(propsOf(home, StarterStub)).toMatchObject({ open: true, presetMemberIds: [] });
+    expect(propsOf(home, EditorStub).open).toBe(false);
   });
 
   it('an empty family shows the empty state with one way to start: Add Chores', async () => {
@@ -377,13 +322,15 @@ describe('a grown-up viewer', () => {
     expect(propsOf(w, StarterStub).open).toBe(true);
   });
 
-  it('chores with nobody left show under "No one\'s", editable', async () => {
+  it('chores with nobody left show under "No one\'s", each with a ✕ that deletes it', async () => {
     chores.list = [...chores.list, chore('o1', { assigneeIds: ['gone'], title: 'Orphan' })];
+    choreActions.deleteChore.mockResolvedValue(true);
     const w = await mountPage();
     const orphans = w.get('[data-testid="chore-orphans"]');
     expect(orphans.text()).toContain('Orphan');
     expect(orphans.find('[data-testid="chore-tick"]').exists()).toBe(false);
-    await orphans.get('[data-testid="chore-edit"]').trigger('click');
-    expect(propsOf(w, FormStub).choreId).toBe('o1');
+    expect(orphans.find('[data-testid="chore-edit"]').exists()).toBe(false);
+    await orphans.get('[data-testid="chore-row-remove"]').trigger('click');
+    expect(choreActions.deleteChore).toHaveBeenCalledWith('o1', 'mom');
   });
 });

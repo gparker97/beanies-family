@@ -33,6 +33,9 @@ let sharedListening = false;
 
 function handleKeydown(event: KeyboardEvent) {
   if (event.key !== 'Escape') return;
+  // An Escape that ends an IME composition (pinyin, kana) belongs to the IME: it cancels the
+  // composed text, never the field's edit or the overlay around it. Every caller wants that.
+  if (event.isComposing) return;
   const top = escapeStack[escapeStack.length - 1];
   if (top) top.onClose();
 }

@@ -37,15 +37,15 @@ export type ChoreMarkInput = Omit<ChoreMark, 'id' | 'createdAt' | 'updatedAt'>;
 export const getAllChores = choreRepo.getAll;
 export const getAllChoreMarks = markRepo.getAll;
 
-/** One new chore, with a fresh id. */
-export const createChore = (input: CreateChoreInput): Promise<Chore> => choreRepo.create(input);
-
 /**
- * Several new chores in ONE change (a starter set, a copy). The caller mints the ids, so a
- * retry with the same ids rewrites the same chores rather than adding duplicates.
+ * New chores in ONE change (one chore, a starter set, a copy). The caller mints the ids. With
+ * `ifAbsent`, an id already in the projection is left as it is (never overwritten) and only
+ * the chores this call created are returned.
  */
-export const createChores = (items: readonly { id: string; input: CreateChoreInput }[]) =>
-  choreRepo.createManyWithIds(items);
+export const createChores = (
+  items: readonly { id: string; input: CreateChoreInput }[],
+  opts?: { ifAbsent?: boolean }
+) => choreRepo.createManyWithIds(items, opts);
 
 /** A based patch of one chore; `undefined` when it is gone (deleted here or on another device). */
 export const updateChore = (id: string, input: UpdateChoreInput) => choreRepo.update(id, input);

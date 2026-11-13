@@ -5,14 +5,14 @@
  *  - HOME (grown-ups): one card per bean with today's count, the block happening now open and
  *    tickable; Hours and ONE Add Chores (the sheet, for one chore or a whole set); the "No one's"
  *    group for chores whose people have left the family; the "Week so far" panel; an empty state.
- *  - A BEAN'S DAY (`?bean=<id>`): "Now" first and biggest, later blocks quieter, the all-done
- *    banner, the "This week" row. A child always lands on their own day. For a grown-up it is
- *    also where the bean's chores are edited (each row's pencil, the card's Edit Chores lands
- *    here): an "Other Days" list holds the chores not on today, and Select deletes several at once
- *    (`choreStore.removeChoresForMember`, one change, for this bean only).
+ *  - A BEAN'S DAY (`?bean=<id>`): the tick view. "Now" first and biggest, later blocks quieter,
+ *    the all-done banner, the "This week" row. A child always lands on their own day.
  *
- * Every "add" (the header, the empty state, a bean's "+", a bean's day, Quick Add) opens the Add
- * Chores sheet, with that bean preselected when there is one. `ChoreFormModal` is the edit screen.
+ * Editing is per bean, like a Beanie List: the bean's chore list (`ChoreBeanEditor`, "Pip's
+ * Chores") opens from the bean's card (Edit Chores, or "+" when it has none), the day's Edit
+ * Chores, a chore's name, and Quick Add on a bean's day. The page header's Add Chores, the empty
+ * state and the Beanie Lists redirect open the Add Chores sheet (`ChoreAddSheet`), which adds one
+ * list to several beans at once. "No one's" chores (their people have left) have a ✕ each.
  *
  * MVO: everything read comes from `choreStore` (the one read model, `choreDayFor`); every
  * write is an intent to it, ticks through `useChoreTicks` (the page's in-flight guard). The
@@ -32,8 +32,6 @@
  * `.chore-block-*` in `src/style.css`; accent text pairs with its `-lift`.
  */
 import { computed, onMounted, ref, watch } from 'vue';
-import { confirm } from '@/composables/useConfirm';
-import { showToast } from '@/composables/useToast';
 import { useRoute, useRouter, type LocationQuery } from 'vue-router';
 import PageWelcomeSubtitle from '@/components/ui/PageWelcomeSubtitle.vue';
 import AddEntityButton from '@/components/ui/AddEntityButton.vue';
@@ -43,7 +41,7 @@ import ChoreBlockSection from '@/components/chores/ChoreBlockSection.vue';
 import ChoreRow from '@/components/chores/ChoreRow.vue';
 import ChoreWeekRow from '@/components/chores/ChoreWeekRow.vue';
 import ChoreWeekPanel from '@/components/chores/ChoreWeekPanel.vue';
-import ChoreFormModal from '@/components/chores/ChoreFormModal.vue';
+import ChoreBeanEditor from '@/components/chores/ChoreBeanEditor.vue';
 import ChoreAddSheet from '@/components/chores/ChoreAddSheet.vue';
 import ChoreCopyModal from '@/components/chores/ChoreCopyModal.vue';
 import ChoreHoursModal from '@/components/chores/ChoreHoursModal.vue';
@@ -61,9 +59,7 @@ import { choreStarterSet, type ChoreStarterSetKey } from '@/constants/choreStart
 import {
   blocksInDisplayOrder,
   choreBlockRank,
-  choreOccursOn,
   currentBlock,
-  livingAssignees,
   type ChoreDayBlock,
 } from '@/utils/chores';
 import { firstName as firstWord } from '@/utils/assignees';
@@ -155,10 +151,8 @@ const viewBeanId = computed<string | null>(() => {
 
 // ── Modals (grown-ups only) ─────────────────────────────────────────────────
 
-const formOpen = ref(false);
-const formChoreId = ref<string | null>(null);
-/** The bean whose card or day the edit was opened from (the form's "only for them" delete). */
-const formBeanId = ref<string | null>(null);
+/** The bean whose chore list is open, or `null`. ONE ref drives `ChoreBeanEditor`. */
+const editorBeanId = ref<string | null>(null);
 const starterOpen = ref(false);
 const starterKey = ref<ChoreStarterSetKey | null>(null);
 const starterFor = ref<string[]>([]);
@@ -167,16 +161,14 @@ const starterCarried = ref(false);
 const copySourceId = ref<string | null>(null);
 const hoursOpen = ref(false);
 
-function openEditChore(choreId: string, beanId: string | null = null): void {
-  if (!isAdult.value) return;
-  formChoreId.value = choreId;
-  formBeanId.value = beanId;
-  formOpen.value = true;
+/** Open a bean's chore list: grown-ups only, a living person only. */
+function openBeanEditor(beanId: string): void {
+  if (isAdult.value && choreStore.livingIds.has(beanId)) editorBeanId.value = beanId;
 }
 
 /**
- * The ONE way to add chores: the Add Chores sheet. `forIds` preselects who (only them); `key`
- * puts a suggestion set straight on the list (the Beanie Lists redirect, `carried`).
+ * The Add Chores sheet, for one list to several beans at once. `forIds` preselects who (only
+ * them); `key` puts a suggestion set straight on the list (the Beanie Lists redirect, `carried`).
  */
 function openAddChores(
   forIds: string[] = [],
@@ -201,9 +193,12 @@ watch(
   { immediate: true }
 );
 
-// Quick-Add deep link (`/choreboard?action=add-chore`), grown-ups only.
+// Quick-Add deep link (`/choreboard?action=add-chore`), grown-ups only: on a bean's day, that
+// bean's chore list; otherwise the Add Chores sheet.
 useQuickAddIntent((action) => {
-  if (action === 'add-chore') openAddChores(viewBeanId.value ? [viewBeanId.value] : []);
+  if (action !== 'add-chore') return;
+  if (viewBeanId.value) openBeanEditor(viewBeanId.value);
+  else openAddChores();
 });
 
 // ── Ticking ─────────────────────────────────────────────────────────────────
@@ -216,14 +211,10 @@ function onToggle(choreId: string, memberId: string): void {
   void ticks.toggle(choreId, memberId);
 }
 
-/**
- * A grown-up dragged a block's chores into a new order (the store refuses anyone else). Resolves
- * whether it landed, so the section can put its rows back when it did not.
- */
-async function onReorder(choreIds: string[]): Promise<boolean> {
+/** A "No one's" chore's ✕: it has nobody left, so it is deleted (the store toasts a failure). */
+function removeOrphan(choreId: string): void {
   const actorId = me.value?.id;
-  if (!actorId) return false;
-  return (await choreStore.reorderChores(choreIds, actorId)) === true;
+  if (actorId && isAdult.value) void choreStore.deleteChore(choreId, actorId);
 }
 
 const pendingFor = (memberId: string) => (choreId: string) => ticks.isPending(choreId, memberId);
@@ -340,113 +331,6 @@ const dayEmptyText = computed(() => {
 });
 
 const dayWeek = computed(() => (viewBeanId.value ? choreStore.weekFor(viewBeanId.value) : null));
-
-/** The bean's chores that are not on today (other weekdays): grown-ups edit them from here. */
-const otherDayChores = computed(() => {
-  const id = viewBeanId.value;
-  if (!id || !isAdult.value) return [];
-  return choreStore.sortedChores.filter(
-    (c) =>
-      livingAssignees(c, choreStore.livingIds).includes(id) &&
-      !choreOccursOn(c, choreClock.value.ymd)
-  );
-});
-
-// ── Select and delete (grown-ups, a bean's day) ─────────────────────────────
-
-const selecting = ref(false);
-const selectedIds = ref<string[]>([]);
-const deleting = ref(false);
-
-/** Every chore on the bean's day a grown-up can select: today's, then Other Days. */
-const selectableIds = computed(() => [
-  ...daySections.value.flatMap((s) => s.block.chores.map((i) => i.chore.id)),
-  ...otherDayChores.value.map((c) => c.id),
-]);
-const allSelected = computed(
-  () =>
-    selectableIds.value.length > 0 &&
-    selectableIds.value.every((id) => selectedIds.value.includes(id))
-);
-
-function startSelecting(): void {
-  if (!isAdult.value) return;
-  selectedIds.value = [];
-  selecting.value = true;
-}
-
-function stopSelecting(): void {
-  selecting.value = false;
-  selectedIds.value = [];
-}
-
-function toggleSelected(choreId: string): void {
-  selectedIds.value = selectedIds.value.includes(choreId)
-    ? selectedIds.value.filter((id) => id !== choreId)
-    : [...selectedIds.value, choreId];
-}
-
-function toggleSelectAll(): void {
-  selectedIds.value = allSelected.value ? [] : [...selectableIds.value];
-}
-
-// Leaving the day (or the roster moving under it) ends select mode; a chore that left the day
-// (deleted on another device) leaves the selection, so the count never names a ghost.
-watch(viewBeanId, stopSelecting);
-watch(selectableIds, (ids) => {
-  if (selectedIds.value.some((id) => !ids.includes(id))) {
-    selectedIds.value = selectedIds.value.filter((id) => ids.includes(id));
-  }
-});
-
-const deleteSelectedLabel = computed(() =>
-  fillTemplate(
-    t(
-      selectedIds.value.length === 1
-        ? 'choreboard.day.deleteSelected.one'
-        : 'choreboard.day.deleteSelected.other'
-    ),
-    { count: selectedIds.value.length }
-  )
-);
-
-/** One confirm, one store change: the selected chores come off THIS bean's board. */
-async function deleteSelected(): Promise<void> {
-  const beanId = viewBeanId.value;
-  const actorId = me.value?.id;
-  const ids = [...selectedIds.value];
-  if (!beanId || !actorId || !ids.length || deleting.value || !isAdult.value) return;
-  const ok = await confirm({
-    title: 'choreboard.day.deleteConfirm.title',
-    message: 'choreboard.day.deleteConfirm.message',
-    detail: fillTemplate(
-      t(
-        ids.length === 1
-          ? 'choreboard.day.deleteConfirm.detail.one'
-          : 'choreboard.day.deleteConfirm.detail.other'
-      ),
-      { count: ids.length, name: dayMember.value ? firstName(dayMember.value) : '' }
-    ),
-    variant: 'danger',
-  });
-  if (!ok) return;
-  deleting.value = true;
-  try {
-    const result = await choreStore.removeChoresForMember(ids, beanId, actorId);
-    // null: the store has already toasted the refusal or the failed write. Stay in select mode.
-    if (!result) return;
-    const n = result.deleted + result.unassigned;
-    showToast(
-      'success',
-      fillTemplate(t(n === 1 ? 'choreboard.day.deleted.one' : 'choreboard.day.deleted.other'), {
-        count: n,
-      })
-    );
-    stopSelecting();
-  } finally {
-    deleting.value = false;
-  }
-}
 </script>
 
 <template>
@@ -465,16 +349,7 @@ async function deleteSelected(): Promise<void> {
           {{ t('choreboard.day.back') }}
         </button>
         <span class="flex-1" />
-        <template v-if="isAdult && !selecting">
-          <button
-            v-if="selectableIds.length"
-            type="button"
-            class="font-outfit dark:bg-surface-raised dark:border-line-strong dark:text-ink text-secondary-500 focus-visible:ring-sky-silk-300 rounded-2xl border border-[var(--color-border-strong)] bg-white px-3.5 py-2 text-sm font-semibold focus-visible:ring-2 focus-visible:outline-none"
-            data-testid="chore-day-select"
-            @click="startSelecting"
-          >
-            {{ t('choreboard.day.select') }}
-          </button>
+        <template v-if="isAdult">
           <button
             v-if="dayHasAnyChores"
             type="button"
@@ -484,11 +359,26 @@ async function deleteSelected(): Promise<void> {
           >
             <span aria-hidden="true">📋</span> {{ t('choreboard.day.copy') }}
           </button>
-          <AddEntityButton
-            :label="t('choreboard.addChores')"
-            data-testid="chore-day-add"
-            @click="openAddChores([viewBeanId])"
-          />
+          <button
+            type="button"
+            class="font-outfit from-primary-500 to-terracotta-400 focus-visible:ring-sky-silk-300 inline-flex items-center gap-1.5 rounded-2xl bg-gradient-to-r px-3.5 py-2 text-sm font-semibold text-white focus-visible:ring-2 focus-visible:outline-none"
+            data-testid="chore-day-edit"
+            @click="openBeanEditor(viewBeanId)"
+          >
+            <svg
+              class="h-4 w-4"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M16.9 3.6a2.1 2.1 0 0 1 3 3L8.5 18 4 19.5 5.5 15 16.9 3.6Z" />
+            </svg>
+            {{ t('choreboard.day.edit') }}
+          </button>
         </template>
       </div>
 
@@ -555,89 +445,12 @@ async function deleteSelected(): Promise<void> {
           :open="s.open"
           :celebrate="s.celebrate"
           :starts="starts"
-          :can-tick="canTickFor(viewBeanId) && !selecting"
+          :can-tick="canTickFor(viewBeanId)"
           :can-edit="isAdult"
           :is-pending="pendingFor(viewBeanId)"
-          :reorderable="isAdult"
-          :reorder="onReorder"
-          :selecting="selecting"
-          :selected-ids="selectedIds"
           @toggle="onToggle($event, viewBeanId)"
-          @edit="openEditChore($event, viewBeanId)"
-          @select="toggleSelected"
+          @edit="openBeanEditor(viewBeanId)"
         />
-      </div>
-
-      <!-- Chores on other weekdays: not today's to tick, but a grown-up edits them from here. -->
-      <section
-        v-if="otherDayChores.length"
-        class="dark:bg-surface-raised dark:border-line rounded-3xl bg-white p-4 shadow-[var(--card-shadow)] dark:border"
-        data-testid="chore-day-other-days"
-      >
-        <h3 class="font-outfit dark:text-ink text-secondary-500 text-base font-bold">
-          {{ t('choreboard.day.otherDays') }}
-        </h3>
-        <p class="dark:text-ink-soft text-secondary-400 mt-1 mb-3 text-sm">
-          {{ t('choreboard.day.otherDaysHint') }}
-        </p>
-        <div class="flex flex-col gap-1.5">
-          <ChoreRow
-            v-for="c in otherDayChores"
-            :key="c.id"
-            :chore="c"
-            :member-id="viewBeanId"
-            :done="false"
-            compact
-            :can-tick="false"
-            :show-tick="false"
-            can-edit
-            :selecting="selecting"
-            :selected="selectedIds.includes(c.id)"
-            @edit="openEditChore(c.id, viewBeanId)"
-            @select="toggleSelected(c.id)"
-          />
-        </div>
-      </section>
-
-      <!-- Select mode's bar: Select All, Delete N Chores, Cancel. Clear of the mobile tab bar. -->
-      <div
-        v-if="selecting"
-        class="dark:bg-surface-overlay dark:border-line-strong sticky bottom-24 z-10 flex flex-wrap items-center gap-2 rounded-2xl border border-[var(--color-border-strong)] bg-white p-3 shadow-[var(--card-shadow)] md:bottom-4"
-        data-testid="chore-day-select-bar"
-      >
-        <button
-          type="button"
-          class="font-outfit text-primary-700 dark:text-accent-lift focus-visible:ring-sky-silk-300 rounded-xl px-3 py-2 text-sm font-semibold focus-visible:ring-2 focus-visible:outline-none"
-          :aria-pressed="allSelected ? 'true' : 'false'"
-          data-testid="chore-day-select-all"
-          @click="toggleSelectAll"
-        >
-          {{ t(allSelected ? 'choreboard.day.selectNone' : 'choreboard.day.selectAll') }}
-        </button>
-        <span class="flex-1" />
-        <button
-          type="button"
-          class="font-outfit dark:text-ink-soft text-secondary-500 focus-visible:ring-sky-silk-300 rounded-xl px-3 py-2 text-sm font-semibold focus-visible:ring-2 focus-visible:outline-none"
-          data-testid="chore-day-select-cancel"
-          @click="stopSelecting"
-        >
-          {{ t('action.cancel') }}
-        </button>
-        <button
-          type="button"
-          class="font-outfit focus-visible:ring-sky-silk-300 rounded-xl px-4 py-2 text-sm font-bold focus-visible:ring-2 focus-visible:outline-none"
-          :class="
-            selectedIds.length
-              ? 'from-primary-500 to-terracotta-400 bg-gradient-to-r text-white'
-              : 'dark:bg-surface-hover dark:text-ink-soft text-secondary-500 cursor-not-allowed bg-[var(--tint-slate-10)]'
-          "
-          :disabled="!selectedIds.length || deleting"
-          :aria-busy="deleting ? 'true' : undefined"
-          data-testid="chore-day-delete-selected"
-          @click="deleteSelected"
-        >
-          {{ deleteSelectedLabel }}
-        </button>
       </div>
 
       <ChoreWeekRow v-if="dayWeek && dayHasAnyChores" :week="dayWeek" :today-ymd="choreClock.ymd" />
@@ -715,14 +528,13 @@ async function deleteSelected(): Promise<void> {
             :can-edit="isAdult"
             :is-pending="pendingFor(bean.member.id)"
             @toggle="onToggle($event, bean.member.id)"
-            @edit="openEditChore($event, bean.member.id)"
+            @edit-chores="openBeanEditor(bean.member.id)"
             @open="openDay(bean.member.id)"
             @copy="openCopy(bean.member.id)"
-            @add="openAddChores([bean.member.id])"
           />
         </div>
 
-        <!-- Chores whose people have all left the family: re-assign or delete them. -->
+        <!-- Chores whose people have all left the family: remove the ones not needed. -->
         <section
           v-if="isAdult && choreStore.orphans.length"
           class="dark:bg-surface-raised dark:border-line rounded-3xl bg-white p-4 shadow-[var(--card-shadow)] dark:border"
@@ -743,8 +555,8 @@ async function deleteSelected(): Promise<void> {
               :done="false"
               compact
               :can-tick="false"
-              can-edit
-              @edit="openEditChore(c.id)"
+              removable
+              @remove="removeOrphan(c.id)"
             />
           </div>
         </section>
@@ -759,11 +571,10 @@ async function deleteSelected(): Promise<void> {
 
     <!-- Modals: mounted unconditionally, never `v-if`-gated (they seed on the open transition).
          Only grown-ups can open them (every opener checks), and the store refuses a child. -->
-    <ChoreFormModal
-      :open="formOpen"
-      :chore-id="formChoreId"
-      :bean-id="formBeanId"
-      @close="formOpen = false"
+    <ChoreBeanEditor
+      :open="!!editorBeanId"
+      :member-id="editorBeanId"
+      @close="editorBeanId = null"
     />
     <ChoreAddSheet
       :open="starterOpen"

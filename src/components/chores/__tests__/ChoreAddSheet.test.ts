@@ -39,7 +39,7 @@ const PeopleStub = defineComponent({
 });
 const PictureStub = defineComponent({
   props: { emoji: String, illustration: String },
-  emits: ['update:emoji', 'update:illustration'],
+  emits: ['pick'],
   template: '<div data-testid="picture-stub" />',
 });
 
@@ -283,6 +283,38 @@ describe('ChoreAddSheet: the rows', () => {
     expect(addButton(w).attributes('disabled')).toBeDefined();
   });
 
+  it('the days control works on a draft row: calendar, School Days, then Pick Days', async () => {
+    const w = await openSheet({ presetMemberIds: ['kid'] });
+    await w.get('[data-testid="chore-add-row"][data-block="morning"]').trigger('click');
+    await flushPromises();
+    const row = () => blockRows(w, 'morning')[0]!;
+    const input = row().get('[data-testid="chore-draft-title"]');
+    await input.trigger('focus');
+    await input.setValue('Feed the cat');
+    await input.trigger('blur');
+    // Every day: no tag, only the quiet calendar control.
+    expect(row().find('[data-testid="chore-draft-days"]').exists()).toBe(false);
+    await row().get('[data-testid="chore-draft-days-pick"]').trigger('click');
+    expect(hasOpenEscapeLayer()).toBe(true);
+    await row()
+      .get('[data-testid="chore-draft-days-choices"] [data-mode="school"] button')
+      .trigger('click');
+    // A shortcut closes the chooser; the tag is now the control.
+    expect(row().find('[data-testid="chore-draft-days-choices"]').exists()).toBe(false);
+    expect(hasOpenEscapeLayer()).toBe(false);
+    expect(row().get('[data-testid="chore-draft-days"]').text()).toBe(
+      'choreboard.form.days.school'
+    );
+    await row().get('[data-testid="chore-draft-days"]').trigger('click');
+    await row().get('[data-mode="pick"] button').trigger('click');
+    await row().findAll('[data-testid="chore-draft-days-toggles"] button')[0]!.trigger('click');
+    expect(row().get('[data-testid="chore-draft-days"]').text()).toBe(
+      'planner.day.tue, planner.day.wed, planner.day.thu, planner.day.fri'
+    );
+    await submit(w);
+    expect(sentDrafts()[0]!.days).toEqual([2, 3, 4, 5]);
+  });
+
   it('an add row starts that block: focused; Enter names it and opens the next blank row', async () => {
     const w = await openSheet();
     await w.get('[data-testid="chore-add-row"][data-block="afternoon"]').trigger('click');
@@ -382,7 +414,7 @@ describe('ChoreAddSheet: the rows', () => {
     // A suggested row renamed keeps the set's picture.
     await commitTitle(w, 'make-bed', 'Feed the cat');
     await own().get('[data-testid="chore-draft-picture"]').trigger('click');
-    w.findComponent(PictureStub).vm.$emit('update:emoji', '⭐');
+    w.findComponent(PictureStub).vm.$emit('pick', { emoji: '⭐', illustration: '' });
     await commit('Feed the fish'); // picked by hand: the title no longer chooses
     expect(ownEmoji()).toBe('⭐');
     await submit(w);
@@ -454,6 +486,47 @@ describe('ChoreAddSheet: the rows', () => {
 });
 
 describe('ChoreAddSheet: adding and the session list', () => {
+  it('a title still being typed counts: the button enables and Add sends it (and a rename)', async () => {
+    const w = await openSheet({ presetMemberIds: ['kid'] });
+    await addSetVia(w, 'bedtime');
+    const first = rowOf(w, bedtime.chores[0]!.key).get('[data-testid="chore-draft-title"]');
+    await first.trigger('focus');
+    await first.setValue('Bath with bubbles');
+    await w.get('[data-testid="chore-add-row"][data-block="morning"]').trigger('click');
+    await flushPromises();
+    const input = blockRows(w, 'morning')[0]!.get('[data-testid="chore-draft-title"]');
+    await input.trigger('focus');
+    await input.setValue('Feed the dog');
+    // No blur, no Enter: the row being typed is already counted.
+    expect(addButton(w).attributes('disabled')).toBeUndefined();
+    expect(addButton(w).text()).toBe('choreboard.starter.cta.other');
+    await submit(w);
+    const titles = sentDrafts().map((d) => d.title);
+    expect(titles).toContain('Feed the dog');
+    expect(titles).toContain('Bath with bubbles');
+    expect(titles).not.toContain(bedtime.chores[0]!.titleKey);
+    expect(sentDrafts().find((d) => d.title === 'Feed the dog')!.emoji).toBe('🐕');
+  });
+
+  it('days put back to every day are every day: the row is not edited, Remove from List takes it', async () => {
+    const w = await openSheet();
+    await addSetVia(w, 'bedtime');
+    const key = bedtime.chores[0]!.key;
+    await rowOf(w, key).get('[data-testid="chore-draft-days-pick"]').trigger('click');
+    await rowOf(w, key).get('[data-mode="pick"] button').trigger('click');
+    const monday = () =>
+      rowOf(w, key).findAll('[data-testid="chore-draft-days-toggles"] button')[0]!;
+    await monday().trigger('click');
+    await monday().trigger('click');
+    expect(useChoreAddDraft().rows.find((r) => r.draft.starterChoreKey === key)!.draft.days).toBe(
+      undefined
+    );
+    await chip(w, 'bedtime').trigger('click');
+    await w.get('[data-testid="chore-set-preview-remove"]').trigger('click');
+    await flushPromises();
+    expect(draftRows(w)).toHaveLength(0);
+  });
+
   it('sends every named row in one call, with the sets used and the edit count', async () => {
     const w = await openSheet();
     await addSetVia(w, 'school-morning');
@@ -531,7 +604,7 @@ describe('ChoreAddSheet: adding and the session list', () => {
       .findAll('[data-testid="chore-draft-time-choices"] button')[3]!
       .trigger('click');
     await rowOf(w, 'brush-teeth').get('[data-testid="chore-draft-picture"]').trigger('click');
-    w.findComponent(PictureStub).vm.$emit('update:emoji', '🦷');
+    w.findComponent(PictureStub).vm.$emit('pick', { emoji: '🦷', illustration: '' });
     await rowOf(w, 'eat-breakfast').get('[data-testid="chore-draft-remove"]').trigger('click');
     await submit(w);
     expect(JSON.stringify(CHORE_STARTER_SETS)).toBe(before);

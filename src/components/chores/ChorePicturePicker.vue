@@ -1,8 +1,9 @@
 <script setup lang="ts">
 /**
  * A chore's picture (#146): an emoji, or a card-art picture with the emoji as its fallback. The
- * ONE copy of that choice, shared by the chore form and the Add Chores sheet's draft rows.
- * Picking an emoji clears the art; picking the selected art again clears it.
+ * ONE copy of that choice, opened from a chore row (`ChoreEditRow`) in the Add Chores sheet and
+ * in a bean's chore list. Picking an emoji clears the art; picking the selected art again clears
+ * it. Each pick is ONE `pick` with the whole picture, so a live row saves it in one write.
  *
  * Each row has a small caption (Emoji, Beanie Pictures), so the card-art tiles never read as
  * stray icons.
@@ -23,8 +24,8 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  'update:emoji': [value: string];
-  'update:illustration': [value: string];
+  /** The whole picture after a pick: `illustration` is '' for none. */
+  pick: [picture: { emoji: string; illustration: string }];
 }>();
 
 const { t } = useTranslation();
@@ -34,12 +35,11 @@ const emojiOptions = computed(() =>
 );
 
 function pickEmoji(value: string): void {
-  emit('update:emoji', value);
-  emit('update:illustration', '');
+  emit('pick', { emoji: value, illustration: '' });
 }
 
 function pickArt(key: string): void {
-  emit('update:illustration', props.illustration === key ? '' : key);
+  emit('pick', { emoji: props.emoji, illustration: props.illustration === key ? '' : key });
 }
 </script>
 

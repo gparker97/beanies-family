@@ -140,8 +140,8 @@ export const WEEKEND_DAYS: readonly number[] = [0, 6];
 export type ChoreDaysKind = 'every' | 'school' | 'weekends' | 'some';
 
 /**
- * The ONE weekday classification, shared by the chore form's day shortcuts and the Add Chores
- * sheet's quiet days tag. Empty, absent or all seven days is every day; order never matters.
+ * The ONE weekday classification, shared by the days chooser's shortcuts and every quiet days
+ * tag. Empty, absent or all seven days is every day; order never matters.
  */
 export function choreDaysKind(days: readonly number[] | undefined): ChoreDaysKind {
   const d = [...new Set(days ?? [])];
@@ -151,6 +151,16 @@ export function choreDaysKind(days: readonly number[] | undefined): ChoreDaysKin
   if (same(SCHOOL_DAYS)) return 'school';
   if (same(WEEKEND_DAYS)) return 'weekends';
   return 'some';
+}
+
+/**
+ * Weekdays as stored, the ONE normaliser (the store, the Add Chores list and its edit
+ * fingerprint): unique integers 0-6, sorted; `undefined` for every day (none, or all seven).
+ */
+export function normalizeChoreDays(days: readonly number[] | undefined): number[] | undefined {
+  const clean = [...new Set((days ?? []).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6))];
+  clean.sort((a, b) => a - b);
+  return clean.length > 0 && clean.length < 7 ? clean : undefined;
 }
 
 /**
@@ -176,7 +186,7 @@ export function livingAssignees(
   return (chore.assigneeIds ?? []).filter((id) => living.has(id));
 }
 
-/** Chores with no living assignee: the grown-ups' "No one's" group, to re-assign or delete. */
+/** Chores with no living assignee: the grown-ups' "No one's" group, to remove. */
 export function orphanChores(chores: readonly Chore[], living: ReadonlySet<string>): Chore[] {
   return sortChores(chores.filter((c) => livingAssignees(c, living).length === 0));
 }
@@ -284,7 +294,14 @@ export function sameChoreMoment(a: ChoreClock, b: ChoreClock, starts: ChoreBlock
 
 /** Why a chore action was refused: the `detail` of the store's `edit-refused` event. */
 export type ChoreRefusal =
-  'not-adult' | 'not-yours' | 'not-assigned' | 'not-today' | 'not-found' | 'bad-hours' | 'invalid';
+  | 'not-adult'
+  | 'not-yours'
+  | 'not-assigned'
+  | 'not-today'
+  | 'not-found'
+  | 'bad-hours'
+  | 'invalid'
+  | 'exists';
 
 /**
  * A tick the chore store REFUSED (a guard failed before any write). The store has already

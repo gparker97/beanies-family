@@ -2,6 +2,7 @@
 // the label key and the colour class (`.chore-block-*` in `src/style.css`, which carries the
 // tint, the ink and their dark partners). The block ORDER and every rule about blocks live in
 // `utils/chores.ts`; this file is display data only.
+import { choreDaysKind } from '@/utils/chores';
 import type { ChoreBlock } from '@/types/models';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 
@@ -64,7 +65,28 @@ export const CHORE_DAY_LABEL_KEYS: readonly UIStringKey[] = [
   'planner.day.sat',
 ];
 
-/** The longest chore title, in the chore form and the Add Chores sheet alike. */
+/** Monday first, as the weekday toggles (`DayOfWeekSelector`) are. */
+const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0];
+
+/**
+ * The ONE quiet days label for a chore (a row's tag, a set preview's tag): '' for every day,
+ * "School Days", "Weekends", or the short day list ("Mon, Wed") in week order.
+ */
+export function choreDaysLabel(
+  days: readonly number[] | undefined,
+  resolve: (key: UIStringKey) => string
+): string {
+  const kind = choreDaysKind(days);
+  if (kind === 'every') return '';
+  if (kind === 'school') return resolve('choreboard.form.days.school');
+  if (kind === 'weekends') return resolve('choreboard.form.days.weekends');
+  const set = new Set(days ?? []);
+  return WEEK_ORDER.filter((d) => set.has(d))
+    .map((d) => resolve(CHORE_DAY_LABEL_KEYS[d]!))
+    .join(', ');
+}
+
+/** The longest chore title, in the Add Chores sheet and a bean's chore list alike. */
 export const CHORE_TITLE_MAX = 60;
 
 /**
@@ -222,4 +244,12 @@ export function suggestChoreEmoji(title: string): string | undefined {
     }
   }
   return best?.emoji;
+}
+
+/**
+ * The automatic picture for a chore a grown-up typed (both chore lists' new rows): from its
+ * title (`suggestChoreEmoji`), else the default. Used until a picture is picked by hand.
+ */
+export function pictureForTitle(title: string): string {
+  return suggestChoreEmoji(title) ?? DEFAULT_CHORE_EMOJI;
 }

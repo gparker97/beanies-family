@@ -149,7 +149,7 @@ async function walk(page: Page, tag: string) {
     await rows.evaluateAll((els) =>
       els.map(
         (e) =>
-          `${e.getAttribute('data-block')}:${(e.querySelector('input') as HTMLInputElement | null)?.value}`
+          `${e.getAttribute('data-block')}:${(e.querySelector('textarea') as HTMLTextAreaElement | null)?.value}`
       )
     )
   );
@@ -202,43 +202,48 @@ async function walk(page: Page, tag: string) {
   await page.getByTestId('chore-day-head').waitFor();
   await both(page, `${tag}-05-day`);
 
-  // ── Edit a chore from its pencil; the picture sits last, folded away ──
-  say('pencils on the day', await page.getByTestId('chore-row-edit').count());
-  await page.getByTestId('chore-row-edit').first().click();
-  await page.getByTestId('chore-form-title').waitFor();
-  await page.getByTestId('chore-form-picture-toggle').scrollIntoViewIfNeeded();
-  await page.getByTestId('chore-form-picture-toggle').click();
-  await page.waitForTimeout(300);
-  await page.getByTestId('chore-form-picture').scrollIntoViewIfNeeded();
-  await both(page, `${tag}-04-edit-form`);
-  for (let i = 0; i < 3 && (await page.getByTestId('chore-form-title').isVisible()); i++) {
-    await page.keyboard.press('Escape');
-    await page.waitForTimeout(400);
-  }
-
-  // ── Select mode: delete one chore ──
-  const rowsBefore = await page.getByTestId('chore-row').count();
-  await page.getByTestId('chore-day-select').click();
-  await page.getByTestId('chore-day-select-bar').waitFor();
-  say('selectable rows', await page.getByTestId('chore-row-select').count());
-  await page.getByTestId('chore-row-select').last().click();
-  await page.waitForTimeout(300);
-  await both(page, `${tag}-05b-select-mode`);
-  await page.getByTestId('chore-day-delete-selected').click();
-  await page.waitForTimeout(500);
-  await both(page, `${tag}-05c-delete-confirm`);
-  await page
-    .getByRole('dialog')
-    .last()
-    .getByRole('button', { name: /delete|remove/i })
-    .last()
+  // ── The bean's list editor: everything in one list, saved as you go ──
+  await page.getByTestId('chore-day-edit').click();
+  const editor = page.getByTestId('chore-bean-editor');
+  await editor.waitFor();
+  const erows = editor.getByTestId('chore-draft-row');
+  const eBefore = await erows.count();
+  await both(page, `${tag}-04a-bean-editor`);
+  // Rename with Enter, move the time, set School Days off -> Weekends, remove one.
+  const second = erows.nth(1);
+  await second.getByTestId('chore-draft-title').fill('Brush teeth for two minutes');
+  await second.getByTestId('chore-draft-title').press('Enter');
+  await page.waitForTimeout(400);
+  const lastRow = erows.last();
+  const daysCtl = lastRow
+    .locator('[data-testid="chore-draft-days-pick"], [data-testid="chore-draft-days"]')
+    .first();
+  await daysCtl.scrollIntoViewIfNeeded();
+  await daysCtl.click();
+  await editor.getByTestId('chore-draft-days-choices').waitFor();
+  await both(page, `${tag}-04b-days-chooser`);
+  await editor
+    .locator('[data-testid="chore-draft-days-choices"] [data-mode="weekends"] button')
     .click();
-  await page.waitForTimeout(800);
+  await page.waitForTimeout(400);
+  await erows.nth(2).getByTestId('chore-draft-remove').click();
+  await page.waitForTimeout(600);
+  say('editor rows before / after one ✕', `${eBefore} -> ${await erows.count()}`);
   say(
-    'rows before / after deleting one',
-    `${rowsBefore} -> ${await page.getByTestId('chore-row').count()}`
+    'parents switch present (child)',
+    await editor.getByTestId('chore-bean-editor-notify-parents').count()
   );
-  say('select bar gone', (await page.getByTestId('chore-day-select-bar').count()) === 0);
+  await editor.getByTestId('chore-bean-editor-notify-parents').scrollIntoViewIfNeeded();
+  await both(page, `${tag}-04c-bean-editor-edited`);
+  await page.getByTestId('chore-bean-editor-done').click();
+  await editor.waitFor({ state: 'hidden' });
+  await page.waitForTimeout(500);
+  say(
+    'day rows after editing',
+    await page
+      .locator('[data-testid="chore-row"]')
+      .evaluateAll((els) => els.map((e) => (e.textContent ?? '').trim().slice(0, 30)))
+  );
   const open = page.locator('[data-testid="chore-block"][data-state="open"]').first();
   const openBlock = await open.getAttribute('data-block');
   const ticks = open.getByTestId('chore-tick');

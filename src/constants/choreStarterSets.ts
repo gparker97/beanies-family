@@ -8,7 +8,7 @@
 // templates do), so the stored chore title is the family's own text from then on.
 // `illustration` is a card-art key that must exist as `public/brand/cards/<key>.webp`
 // (pinned by `choreStarterSets.test`).
-import { SCHOOL_DAYS } from '@/utils/chores';
+import { SCHOOL_DAYS, choreDupKey } from '@/utils/chores';
 import type { ChoreBlock } from '@/types/models';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 
@@ -190,5 +190,23 @@ export function starterSetDrafts(
     days: set.days ? [...set.days] : undefined,
     starterChoreKey: c.key,
     setKey: set.key,
+  }));
+}
+
+/**
+ * A set's chores as a preview against a list (the Add Chores sheet's draft, a bean's stored
+ * chores): each draft with whether `have` (keys from `choreDupKey`) already holds it, which is
+ * what a set add skips. The ONE preview rule for both chore lists.
+ */
+export function starterSetPreview(
+  key: string,
+  resolve: (key: UIStringKey) => string,
+  have: ReadonlySet<string>
+): { draft: StarterChoreDraft; dup: boolean }[] {
+  const set = choreStarterSet(key);
+  if (!set) return [];
+  return starterSetDrafts(set, resolve).map((draft) => ({
+    draft,
+    dup: have.has(choreDupKey(draft.title, draft.block)),
   }));
 }

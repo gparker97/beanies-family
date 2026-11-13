@@ -105,33 +105,35 @@ describe('ChoreBeanCard', () => {
     expect(w.get('[data-testid="chore-bean-empty"]').text()).toBe('choreboard.card.none');
   });
 
-  it('grown-up controls (edit, copy, add) only with canEdit; the header opens the day', async () => {
+  it('grown-up controls only with canEdit: ONE edit affordance (Edit Chores) and Copy', async () => {
     chores.list = [chore('m1')];
     const child = mountCard();
-    for (const id of ['chore-bean-edit', 'chore-bean-copy', 'chore-bean-add', 'chore-row-edit']) {
+    for (const id of ['chore-bean-edit', 'chore-bean-copy', 'chore-bean-add', 'chore-edit']) {
       expect(child.find(`[data-testid="${id}"]`).exists(), id).toBe(false);
     }
     const adult = mountCard({ canEdit: true });
     expect(adult.get('[data-testid="chore-bean-edit"]').attributes('aria-label')).toBe(
       'choreboard.card.editAria'
     );
+    // A bean with chores has no separate "+".
+    expect(adult.find('[data-testid="chore-bean-add"]').exists()).toBe(false);
+    expect(adult.find('[data-testid="chore-row-edit"]').exists()).toBe(false);
     await adult.get('[data-testid="chore-bean-copy"]').trigger('click');
-    await adult.get('[data-testid="chore-bean-add"]').trigger('click');
     await adult.get('[data-testid="chore-bean-open"]').trigger('click');
-    // Edit Chores opens the bean's day too: every chore is listed there with its pencil.
     await adult.get('[data-testid="chore-bean-edit"]').trigger('click');
+    // A chore's name opens the same list.
+    await adult.get('[data-testid="chore-edit"]').trigger('click');
     expect(adult.emitted('copy')).toHaveLength(1);
-    expect(adult.emitted('add')).toHaveLength(1);
-    expect(adult.emitted('open')).toHaveLength(2);
-    // The open block's rows carry the pencil for a grown-up.
-    await adult.get('[data-testid="chore-row-edit"]').trigger('click');
-    expect(adult.emitted('edit')).toEqual([['m1']]);
+    expect(adult.emitted('open')).toHaveLength(1);
+    expect(adult.emitted('edit-chores')).toHaveLength(2);
   });
 
-  it('a bean with no chores at all has no Edit Chores (nothing to edit), only "+"', () => {
+  it('a bean with no chores at all has "+" (the same list, empty), no Edit Chores and no Copy', async () => {
     const w = mountCard({ canEdit: true, hasAnyChores: false });
     expect(w.find('[data-testid="chore-bean-edit"]').exists()).toBe(false);
-    expect(w.find('[data-testid="chore-bean-add"]').exists()).toBe(true);
+    expect(w.find('[data-testid="chore-bean-copy"]').exists()).toBe(false);
+    await w.get('[data-testid="chore-bean-add"]').trigger('click');
+    expect(w.emitted('edit-chores')).toHaveLength(1);
   });
 
   it('forwards a tick with the chore id', async () => {

@@ -15848,6 +15848,10 @@ const STRING_DEFS = {
     en: 'Morning must start before Afternoon, and Afternoon before Evening',
     beanie: 'morning must start before afternoon, and afternoon before evening',
   },
+  'choreboard.error.exists': {
+    en: 'That chore is already saved',
+    beanie: 'that chore is already saved',
+  },
   'choreboard.error.invalid': {
     en: 'A chore needs a title and at least one person',
     beanie: 'a chore needs a title and at least one person',
@@ -16013,10 +16017,6 @@ const STRING_DEFS = {
     en: 'Pick a set above, or add your own.',
     beanie: 'pick a set above, or add your own.',
   },
-  'choreboard.add.someDays': {
-    en: 'Some days',
-    beanie: 'some days',
-  },
   'choreboard.add.timeAria': {
     en: 'Time of day for {chore}: {block}. Change it.',
     beanie: 'time of day for {chore}: {block}. change it.',
@@ -16133,10 +16133,6 @@ const STRING_DEFS = {
     en: 'Edit {chore}',
     beanie: 'edit {chore}',
   },
-  'choreboard.row.select': {
-    en: 'Select {chore}',
-    beanie: 'select {chore}',
-  },
   'choreboard.card.none': {
     en: 'No chores today',
     beanie: 'no chores today',
@@ -16166,9 +16162,8 @@ const STRING_DEFS = {
     beanie: "no one's chores",
   },
   'choreboard.orphans.hint': {
-    en: 'The person these were for is no longer in the family. Give them to someone or delete them.',
-    beanie:
-      'the person these were for is no longer in the family. give them to someone or delete them.',
+    en: 'The person these chores were for has left the family. Remove any you do not need.',
+    beanie: 'the person these chores were for has left the family. remove any you do not need.',
   },
   'choreboard.empty.title': {
     en: 'No chores yet',
@@ -16218,58 +16213,60 @@ const STRING_DEFS = {
     en: 'Copy Chores',
     beanie: 'copy chores',
   },
-  'choreboard.day.select': {
-    en: 'Select',
-    beanie: 'select',
+  'choreboard.day.edit': {
+    en: 'Edit Chores',
+    beanie: 'edit chores',
   },
-  'choreboard.day.selectAll': {
-    en: 'Select All',
-    beanie: 'select all',
+  'choreboard.editor.title': {
+    en: "{name}'s Chores",
+    beanie: "{name}'s chores",
   },
-  'choreboard.day.selectNone': {
-    en: 'Clear Selection',
-    beanie: 'clear selection',
+  'choreboard.editor.hint': {
+    en: 'Changes save as you make them.',
+    beanie: 'changes save as you make them.',
   },
-  'choreboard.day.deleteSelected.one': {
-    en: 'Delete {count} Chore',
-    beanie: 'delete {count} chore',
+  'choreboard.editor.list': {
+    en: 'Chores',
+    beanie: 'chores',
   },
-  'choreboard.day.deleteSelected.other': {
-    en: 'Delete {count} Chores',
-    beanie: 'delete {count} chores',
+  'choreboard.editor.notifyHintOff': {
+    en: 'Off. Grown-ups hear about these chores only when a time of day ends with some still to do.',
+    beanie:
+      'off. grown-ups hear about these chores only when a time of day ends with some still to do.',
   },
-  'choreboard.day.deleteConfirm.title': {
-    en: 'Delete these chores?',
-    beanie: 'delete these chores?',
+  'choreboard.editor.notifyHintOn': {
+    en: 'On. Grown-ups see these chores in their daily briefing, not just the ones left undone.',
+    beanie:
+      'on. grown-ups see these chores in their daily briefing, not just the ones left undone.',
   },
-  'choreboard.day.deleteConfirm.message': {
+  'choreboard.editor.sharedWith': {
+    en: 'Shared with {names}',
+    beanie: 'shared with {names}',
+  },
+  'choreboard.editor.daysAria': {
+    en: 'Days for {chore}: {days}. Change them.',
+    beanie: 'days for {chore}: {days}. change them.',
+  },
+  'choreboard.editor.removeAll': {
+    en: 'Remove All',
+    beanie: 'remove all',
+  },
+  'choreboard.editor.removeAll.title': {
+    en: 'Remove all of these chores?',
+    beanie: 'remove all of these chores?',
+  },
+  'choreboard.editor.removeAll.message': {
     en: 'A chore shared with others stays on their choreboard. Chores already done still count in this week.',
     beanie:
       'a chore shared with others stays on their choreboard. chores already done still count in this week.',
   },
-  'choreboard.day.deleteConfirm.detail.one': {
+  'choreboard.editor.removeAll.detail.one': {
     en: "{count} chore comes off {name}'s choreboard.",
     beanie: "{count} chore comes off {name}'s choreboard.",
   },
-  'choreboard.day.deleteConfirm.detail.other': {
+  'choreboard.editor.removeAll.detail.other': {
     en: "{count} chores come off {name}'s choreboard.",
     beanie: "{count} chores come off {name}'s choreboard.",
-  },
-  'choreboard.day.deleted.one': {
-    en: '{count} chore deleted',
-    beanie: '{count} chore deleted',
-  },
-  'choreboard.day.deleted.other': {
-    en: '{count} chores deleted',
-    beanie: '{count} chores deleted',
-  },
-  'choreboard.day.otherDays': {
-    en: 'Other Days',
-    beanie: 'other days',
-  },
-  'choreboard.day.otherDaysHint': {
-    en: 'Chores on other days of the week. Tap one to change it.',
-    beanie: 'chores on other days of the week. tap one to change it.',
   },
   'choreboard.week.title': {
     en: 'This Week',
@@ -16299,37 +16296,9 @@ const STRING_DEFS = {
     en: 'Bean',
     beanie: 'bean',
   },
-  'choreboard.form.titleEdit': {
-    en: 'Edit Chore',
-    beanie: 'edit chore',
-  },
-  'choreboard.form.name': {
-    en: 'Chore',
-    beanie: 'chore',
-  },
-  'choreboard.form.namePlaceholder': {
-    en: 'Make your bed',
-    beanie: 'make your bed',
-  },
   'choreboard.form.who': {
     en: "Who's It For?",
     beanie: "who's it for?",
-  },
-  'choreboard.form.whoShared': {
-    en: 'Each of them gets their own tick.',
-    beanie: 'each of them gets their own tick.',
-  },
-  'choreboard.form.block': {
-    en: 'Time of Day',
-    beanie: 'time of day',
-  },
-  'choreboard.form.allDay': {
-    en: 'All Day',
-    beanie: 'all day',
-  },
-  'choreboard.form.days': {
-    en: 'Which Days?',
-    beanie: 'which days?',
   },
   'choreboard.form.days.every': {
     en: 'Every Day',
@@ -16346,39 +16315,6 @@ const STRING_DEFS = {
   'choreboard.form.days.pick': {
     en: 'Pick Days',
     beanie: 'pick days',
-  },
-  'choreboard.form.saveEdit': {
-    en: 'Save Changes',
-    beanie: 'save changes',
-  },
-  'choreboard.form.deleteConfirm.title': {
-    en: 'Delete this chore?',
-    beanie: 'delete this chore?',
-  },
-  'choreboard.form.deleteConfirm.message': {
-    en: 'It comes off the choreboard for everyone it was for. Chores already done still count in this week.',
-    beanie:
-      'it comes off the choreboard for everyone it was for. chores already done still count in this week.',
-  },
-  'choreboard.form.deleteConfirm.sharedMessage': {
-    en: 'This chore is shared. Who should it come off the choreboard for?',
-    beanie: 'this chore is shared. who should it come off the choreboard for?',
-  },
-  'choreboard.form.deleteConfirm.onlyFor': {
-    en: 'Only for {name}',
-    beanie: 'only for {name}',
-  },
-  'choreboard.form.deleteConfirm.forEveryone': {
-    en: 'For everyone ({names})',
-    beanie: 'for everyone ({names})',
-  },
-  'choreboard.form.deleteConfirm.who': {
-    en: 'It comes off the choreboard for {names}.',
-    beanie: 'it comes off the choreboard for {names}.',
-  },
-  'choreboard.form.changePicture': {
-    en: 'Change Picture',
-    beanie: 'change picture',
   },
   'choreboard.emoji.bed': {
     en: 'Bed',

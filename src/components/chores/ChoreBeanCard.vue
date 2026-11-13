@@ -5,8 +5,9 @@
  * and every other block as a small coloured count. The header opens the bean's day. A bean
  * with no chores at all gets a compact card (and, for a grown-up, a way to add one).
  *
- * A grown-up's header actions: Edit Chores (the bean's day, where every chore has its pencil,
- * and Select can delete several), Copy, and "+" (the Add Chores sheet for this bean only).
+ * A grown-up's header actions: ONE edit affordance and Copy. A bean with chores has the Edit
+ * Chores pencil; a bean with none has "+". Both open the bean's chore list (`edit-chores`, the
+ * page's `ChoreBeanEditor`), as does tapping a chore's name.
  *
  * Reads only the one read model (`BeanChoreDay`); ticks and edits are intents for the page.
  * Dark mode: the card is `surface-raised` with a `line` edge; text is `ink` / `ink-faint`;
@@ -43,10 +44,10 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   toggle: [choreId: string];
-  edit: [choreId: string];
+  /** Open the bean's chore list. */
+  'edit-chores': [];
   open: [];
   copy: [];
-  add: [];
 }>();
 
 const { t } = useTranslation();
@@ -122,7 +123,7 @@ const name = computed(() => props.member.name);
         {{ fillTemplate(t('choreboard.block.count'), { done, total }) }}
       </span>
       <template v-if="canEdit">
-        <!-- Edit Chores: the bean's day, where every chore has its pencil, handle and Select. -->
+        <!-- Edit Chores: the bean's chore list. -->
         <button
           v-if="hasAnyChores"
           type="button"
@@ -130,7 +131,7 @@ const name = computed(() => props.member.name);
           :aria-label="fillTemplate(t('choreboard.card.editAria'), { name })"
           :title="fillTemplate(t('choreboard.card.editAria'), { name })"
           data-testid="chore-bean-edit"
-          @click="emit('open')"
+          @click="emit('edit-chores')"
         >
           <svg
             class="h-4 w-4"
@@ -156,13 +157,15 @@ const name = computed(() => props.member.name);
         >
           <span aria-hidden="true">📋</span>
         </button>
+        <!-- No chores yet: "+" opens the same list, empty, with its sets ready. -->
         <button
+          v-else
           type="button"
           class="text-primary-700 dark:text-accent-lift focus-visible:ring-sky-silk-300 flex h-9 w-9 flex-none items-center justify-center rounded-xl bg-[var(--tint-orange-8)] text-xl font-bold focus-visible:ring-2 focus-visible:outline-none"
           :aria-label="fillTemplate(t('choreboard.card.addAria'), { name })"
           :title="fillTemplate(t('choreboard.card.addAria'), { name })"
           data-testid="chore-bean-add"
-          @click="emit('add')"
+          @click="emit('edit-chores')"
         >
           <span aria-hidden="true">＋</span>
         </button>
@@ -181,7 +184,7 @@ const name = computed(() => props.member.name);
       :can-edit="canEdit"
       :is-pending="isPending"
       @toggle="emit('toggle', $event)"
-      @edit="emit('edit', $event)"
+      @edit="emit('edit-chores')"
     />
 
     <ChoreBlockSection

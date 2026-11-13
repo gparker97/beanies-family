@@ -33,6 +33,20 @@ describe('useEscapeClose', () => {
     scope.stop();
   });
 
+  it('ignores an Escape that ends an IME composition', () => {
+    const isOpen = ref(true);
+    const onClose = vi.fn();
+    const scope = effectScope();
+    scope.run(() => useEscapeClose(isOpen, onClose));
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', isComposing: true }));
+    expect(onClose).not.toHaveBeenCalled();
+    pressKey('Escape');
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    scope.stop();
+  });
+
   it('does not call onClose on Escape while closed', () => {
     const isOpen = ref(false);
     const onClose = vi.fn();

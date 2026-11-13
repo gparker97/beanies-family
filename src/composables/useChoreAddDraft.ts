@@ -1,12 +1,12 @@
 import { reactive } from 'vue';
 import {
   choreStarterSet,
-  starterSetDrafts,
+  starterSetPreview,
   type ChoreStarterSetKey,
   type StarterChoreDraft,
 } from '@/constants/choreStarterSets';
-import { DEFAULT_CHORE_EMOJI, suggestChoreEmoji } from '@/constants/choreBlocks';
-import { choreDupKey } from '@/utils/chores';
+import { DEFAULT_CHORE_EMOJI, pictureForTitle } from '@/constants/choreBlocks';
+import { choreDupKey, normalizeChoreDays } from '@/utils/chores';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import type { ChoreBlock } from '@/types/models';
 
@@ -56,10 +56,16 @@ export function useChoreAddDraft() {
 
 /** What makes a row "the same chore", to tell an edit from how it arrived. */
 export function rowFingerprint(d: StarterChoreDraft): string {
-  return JSON.stringify([d.title.trim(), d.emoji, d.illustration ?? '', d.block]);
+  return JSON.stringify([
+    d.title.trim(),
+    d.emoji,
+    d.illustration ?? '',
+    d.block,
+    (normalizeChoreDays(d.days) ?? []).join(','),
+  ]);
 }
 
-/** A row the grown-up changed (renamed, re-timed, re-pictured) or added themselves. */
+/** A row the grown-up changed (renamed, re-timed, re-pictured, re-dayed) or added themselves. */
 export function isEditedRow(row: ChoreAddRow): boolean {
   return row.origin === undefined || rowFingerprint(row.draft) !== row.origin;
 }
@@ -76,10 +82,7 @@ export function previewSet(
   key: ChoreStarterSetKey,
   resolve: Resolve
 ): { draft: StarterChoreDraft; dup: boolean }[] {
-  const set = choreStarterSet(key);
-  if (!set) return [];
-  const have = listKeys();
-  return starterSetDrafts(set, resolve).map((draft) => ({ draft, dup: have.has(dupKey(draft)) }));
+  return starterSetPreview(key, resolve, listKeys());
 }
 
 /** Is `key` on the list? */
@@ -125,7 +128,7 @@ export function addBlankRow(block: ChoreBlock): ChoreAddRow {
  */
 export function followTitlePicture(row: ChoreAddRow): void {
   if (row.origin !== undefined || row.pictureByHand) return;
-  row.draft.emoji = suggestChoreEmoji(row.draft.title) ?? DEFAULT_CHORE_EMOJI;
+  row.draft.emoji = pictureForTitle(row.draft.title);
 }
 
 /** The grown-up picked `row`'s picture: from now on its title leaves the picture alone. */
@@ -141,7 +144,10 @@ export function removeRow(id: number): void {
   state.rows.splice(at, 1);
 }
 
-/** Rows renamed, re-timed, re-pictured, added (with a name) or removed: `chores-add-edited`. */
+/**
+ * Rows renamed, re-timed, re-pictured, re-dayed, added (with a name) or removed:
+ * `chores-add-edited`.
+ */
 export function editCount(): number {
   const changed = state.rows.filter((r) => r.draft.title.trim() && isEditedRow(r)).length;
   return changed + state.removed;

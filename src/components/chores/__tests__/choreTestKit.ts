@@ -123,6 +123,7 @@ export const choreActions = {
   updateChore: vi.fn(),
   deleteChore: vi.fn(),
   removeChoresForMember: vi.fn(),
+  setNotifyParentsFor: vi.fn(),
   reorderChores: vi.fn(),
   setBlockStarts: vi.fn(),
   addChores: vi.fn(),

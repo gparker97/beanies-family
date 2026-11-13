@@ -57,6 +57,15 @@ describe('useChoreAddDraft', () => {
     ]);
   });
 
+  it('a row whose days were changed counts as edited and stays when its set is taken off', () => {
+    addSet('school-morning', resolve);
+    const row = list.rows[0]!;
+    row.draft.days = [1, 3, 5];
+    expect(editCount()).toBe(1);
+    removeSet('school-morning');
+    expect(list.rows).toEqual([row]);
+  });
+
   it('clear forgets everything; the definitions are never touched', () => {
     const before = JSON.stringify(CHORE_STARTER_SETS);
     addSet('pet-care', resolve);

@@ -8,24 +8,16 @@
  * one is the page's only. The tick and the edit are intents (`toggle`, `edit`): the page owns
  * the in-flight guard and the store call.
  *
- * A grown-up (`canEdit`) gets a quiet pencil on the row (`chore-row-edit`) as well as the tap on
- * the name, so editing is visible. Kids never see it, and the wall never uses this row.
- *
- * Select mode (`selecting`, a grown-up deleting several chores on a bean's day): the tick
- * becomes a selection checkbox (`chore-row-select`), the name toggles it too, and the pencil and
- * drag handle step aside. A row with no tick at all (`canTick` false, the "Other Days" rows)
- * still selects.
- *
- * Grown-ups reorder a block on a bean's day by the row's drag handle (`draggable`), the same
- * handle a Beanie Lists item row has (`.drag-handle`, `touch-none` so a handle drag does not
- * scroll); the block section owns the drag itself.
+ * This row is for TICKING. A grown-up (`canEdit`) can tap the name to open the bean's chore
+ * list, where chores are edited (`edit`); kids never can, and the wall never uses this row. The
+ * "No one's" group (chores whose people have left) passes `removable` for the row's ✕
+ * (`chore-row-remove`, `remove`).
  *
  * Dark mode: the resting row is `surface-overlay` (it sits on a raised card), the done row the
  * orange tint whose dark value lives in `--tint-orange-8`, the picture box `surface-hover`. The
  * ticked tick is the Heritage Orange gradient with white ink in both themes (a filled control,
- * CIG slide 9); the resting tick's ring is `line-strong` on dark. The pencil is `ink-faint`,
- * hovering to Heritage Orange / `accent-lift`. A selected checkbox is the same orange gradient
- * as a tick, so selection reads the same in both themes.
+ * CIG slide 9); the resting tick's ring is `line-strong` on dark. The ✕ is `ink-faint`,
+ * hovering to Heritage Orange / `accent-lift`.
  */
 import { computed } from 'vue';
 import CardArt from '@/components/responsibilities/CardArt.vue';
@@ -48,27 +40,19 @@ const props = withDefaults(
     canEdit?: boolean;
     /** This exact tick is in flight. */
     pending?: boolean;
-    /** Show the drag handle (a grown-up reordering a block on a bean's day). */
-    draggable?: boolean;
-    /** Select mode: the tick is a selection checkbox. */
-    selecting?: boolean;
-    selected?: boolean;
-    /** Draw the tick state at all. False for a chore not on today (the "Other Days" rows). */
-    showTick?: boolean;
+    /** Show the ✕ (the "No one's" group), in place of the tick. */
+    removable?: boolean;
   }>(),
   {
     compact: false,
     canTick: true,
     canEdit: false,
     pending: false,
-    draggable: false,
-    selecting: false,
-    selected: false,
-    showTick: true,
+    removable: false,
   }
 );
 
-const emit = defineEmits<{ toggle: []; edit: []; select: [] }>();
+const emit = defineEmits<{ toggle: []; edit: []; remove: [] }>();
 
 const { t } = useTranslation();
 const familyStore = useFamilyStore();
@@ -97,13 +81,12 @@ const editLabel = computed(() =>
   fillTemplate(t('choreboard.row.edit'), { chore: props.chore.title })
 );
 
-const selectLabel = computed(() =>
-  fillTemplate(t('choreboard.row.select'), { chore: props.chore.title })
+const removeLabel = computed(() =>
+  fillTemplate(t('choreboard.starter.removeAria'), { chore: props.chore.title })
 );
 
 function onName(): void {
-  if (props.selecting) emit('select');
-  else if (props.canEdit) emit('edit');
+  if (props.canEdit) emit('edit');
 }
 
 function onTick(): void {
@@ -123,16 +106,6 @@ function onTick(): void {
     :data-member-id="memberId"
     :data-done="done ? 'true' : 'false'"
   >
-    <!-- Drag handle (opt-in), as on a Beanie Lists item row. -->
-    <button
-      v-if="draggable && !selecting"
-      type="button"
-      class="drag-handle dark:text-ink-faint hover:text-primary-500 dark:hover:text-accent-lift flex-none cursor-grab touch-none px-0.5 text-base leading-none text-[var(--color-text-muted)] transition-colors active:cursor-grabbing"
-      :aria-label="t('lists.detail.dragHandle')"
-      data-testid="chore-drag-handle"
-    >
-      <span aria-hidden="true">⠿</span>
-    </button>
     <span
       class="dark:bg-surface-hover flex flex-none items-center justify-center overflow-hidden bg-white"
       :class="compact ? 'h-9 w-9 rounded-xl text-xl' : 'h-13 w-13 rounded-2xl text-3xl'"
@@ -142,16 +115,16 @@ function onTick(): void {
     </span>
 
     <component
-      :is="canEdit || selecting ? 'button' : 'span'"
-      :type="canEdit || selecting ? 'button' : undefined"
+      :is="canEdit ? 'button' : 'span'"
+      :type="canEdit ? 'button' : undefined"
       class="min-w-0 flex-1 text-left"
       :class="
-        canEdit || selecting
+        canEdit
           ? 'focus-visible:ring-sky-silk-300 rounded-lg focus-visible:ring-2 focus-visible:outline-none'
           : ''
       "
-      :aria-label="selecting ? selectLabel : canEdit ? editLabel : undefined"
-      :data-testid="selecting ? undefined : canEdit ? 'chore-edit' : undefined"
+      :aria-label="canEdit ? editLabel : undefined"
+      :data-testid="canEdit ? 'chore-edit' : undefined"
       @click="onName"
     >
       <span
@@ -170,63 +143,20 @@ function onTick(): void {
       >
     </component>
 
-    <!-- The quiet pencil: editing made visible (grown-ups only, never in select mode). -->
+    <!-- The "No one's" group: the ✕ takes the chore off the board. -->
     <button
-      v-if="canEdit && !selecting"
+      v-if="removable"
       type="button"
-      class="dark:text-ink-faint hover:text-primary-500 dark:hover:text-accent-lift focus-visible:ring-sky-silk-300 -my-1 flex h-11 w-11 flex-none items-center justify-center rounded-xl text-[var(--color-text-muted)] transition-colors focus-visible:ring-2 focus-visible:outline-none"
-      :aria-label="editLabel"
-      :title="editLabel"
-      data-testid="chore-row-edit"
-      @click="emit('edit')"
+      class="dark:text-ink-faint hover:text-primary-500 dark:hover:text-accent-lift focus-visible:ring-sky-silk-300 -my-1 flex h-11 w-11 flex-none items-center justify-center rounded-xl text-xs text-[var(--color-text-muted)] transition-colors focus-visible:ring-2 focus-visible:outline-none"
+      :aria-label="removeLabel"
+      :title="removeLabel"
+      data-testid="chore-row-remove"
+      @click="emit('remove')"
     >
-      <svg
-        class="h-4 w-4"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        aria-hidden="true"
-      >
-        <path d="M16.9 3.6a2.1 2.1 0 0 1 3 3L8.5 18 4 19.5 5.5 15 16.9 3.6Z" />
-      </svg>
-    </button>
-
-    <!-- Select mode: the tick's place becomes a selection checkbox. -->
-    <button
-      v-if="selecting"
-      type="button"
-      role="checkbox"
-      class="focus-visible:ring-sky-silk-300 flex flex-none items-center justify-center rounded-lg transition-all duration-200 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
-      :class="[
-        compact ? 'h-9 w-9' : 'h-11 w-11',
-        selected
-          ? 'from-primary-500 to-terracotta-400 bg-gradient-to-br text-white'
-          : 'border-secondary-400 dark:border-line-strong dark:bg-surface-raised border-2 bg-white',
-      ]"
-      :aria-checked="selected ? 'true' : 'false'"
-      :aria-label="selectLabel"
-      data-testid="chore-row-select"
-      @click="emit('select')"
-    >
-      <svg
-        v-if="selected"
-        class="h-5 w-5"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="3.5"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        aria-hidden="true"
-      >
-        <path d="M5 12.5l4.5 4.5L19 7.5" />
-      </svg>
+      <span aria-hidden="true">✕</span>
     </button>
     <button
-      v-else-if="canTick && showTick"
+      v-else-if="canTick"
       type="button"
       class="focus-visible:ring-sky-silk-300 flex flex-none items-center justify-center rounded-full transition-all duration-200 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
       :class="[
@@ -257,7 +187,7 @@ function onTick(): void {
       </svg>
     </button>
     <span
-      v-else-if="showTick"
+      v-else
       class="flex flex-none items-center justify-center rounded-full"
       :class="[
         compact ? 'h-7 w-7' : 'h-9 w-9',

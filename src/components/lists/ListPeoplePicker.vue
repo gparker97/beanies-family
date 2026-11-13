@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /**
  * Who a list (#147) or a chore (#146) is for: several people allowed, never nobody. The ONE copy
- * of that rule, shared by the list drawer, the new-list sheet, the chore form and the chore
- * Starter Sets sheet, so its hint names no list. A pick that leaves nobody the roster still
+ * of that rule, shared by the list drawer, the new-list sheet and the Add Chores sheet, so its
+ * hint names no list. A pick that leaves nobody the roster still
  * knows (none chosen, or only removed members, which the chip picker keeps) is not emitted: the
  * current people stay and an inline hint in Heritage Orange (never red) says why. The `hint`
  * slot holds the host's resting hint, shown while nothing is refused. The refusal clears on the

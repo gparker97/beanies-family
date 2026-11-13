@@ -1,12 +1,11 @@
 /**
  * A block's four states come from the read model alone: open (with the Now ring and tag),
  * later (one quiet line that opens on the day view), done (the one-line strip) and the all-done
- * banner (with one star per chore, reopenable so a mistaken tick can be undone). A grown-up's
- * rows carry the pencil; a failed reorder puts the rows back; select mode shows every row.
+ * banner (with one star per chore, reopenable so a mistaken tick can be undone). A grown-up can
+ * tap a chore's name (the page opens the bean's chore list); this section only ticks.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { flushPromises, mount } from '@vue/test-utils';
-import { defineComponent, h } from 'vue';
+import { mount } from '@vue/test-utils';
 
 vi.mock(
   '@/composables/useTranslation',
@@ -133,113 +132,22 @@ describe('ChoreBlockSection', () => {
     expect(w.get('[data-testid="chore-block"]').attributes('data-state')).toBe('open');
   });
 
-  it('a viewer who may not tick sees no tick buttons; a grown-up can edit by the title', async () => {
+  it('a viewer who may not tick sees no tick buttons; a grown-up can tap a name to edit', async () => {
     const readOnly = mountSection({ block: block(), canTick: false });
     expect(readOnly.find('[data-testid="chore-tick"]').exists()).toBe(false);
-    // No pencil without edit rights (a child).
-    expect(readOnly.find('[data-testid="chore-row-edit"]').exists()).toBe(false);
+    expect(readOnly.find('[data-testid="chore-edit"]').exists()).toBe(false);
     const grownUp = mountSection({ block: block(), canEdit: true });
     await grownUp.findAll('[data-testid="chore-edit"]')[0]!.trigger('click');
     expect(grownUp.emitted('edit')).toEqual([['c1']]);
-    // The visible pencil does the same, labelled with the chore.
-    const pencil = grownUp.findAll('[data-testid="chore-row-edit"]')[1]!;
-    expect(pencil.attributes('aria-label')).toBe('choreboard.row.edit');
-    expect(pencil.attributes('title')).toBe('choreboard.row.edit');
-    await pencil.trigger('click');
-    expect(grownUp.emitted('edit')).toEqual([['c1'], ['c2']]);
+    // No pencils, no handles, no checkboxes: editing lives in the bean's chore list.
+    for (const id of ['chore-row-edit', 'chore-drag-handle', 'chore-row-select']) {
+      expect(grownUp.find(`[data-testid="${id}"]`).exists(), id).toBe(false);
+    }
   });
 
   it('a shared chore names the other bean', () => {
     const items = [{ chore: chore('c1', { assigneeIds: ['kid', 'sib'] }), done: false }];
     const w = mountSection({ block: block({ chores: items }) });
     expect(w.get('[data-testid="chore-shared-with"]').text()).toBe('choreboard.row.with');
-  });
-});
-
-/** vuedraggable without Sortable: renders `#item` per element and lets a test drive a move. */
-const DraggableStub = defineComponent({
-  name: 'Draggable',
-  props: { modelValue: { type: Array, default: () => [] }, handle: String },
-  emits: ['update:modelValue', 'change'],
-  setup(props, { slots, attrs }) {
-    return () =>
-      h(
-        'div',
-        { 'data-testid': attrs['data-testid'], 'data-handle': props.handle },
-        props.modelValue.map((element) => slots.item?.({ element }))
-      );
-  },
-});
-
-describe('ChoreBlockSection: reorder (grown-ups, a bean’s day)', () => {
-  const mountDraggable = (props: Record<string, unknown>) =>
-    mount(ChoreBlockSection, {
-      props: {
-        memberId: 'kid',
-        beanName: 'Pip',
-        starts: DEFAULT_CHORE_BLOCK_STARTS,
-        ...props,
-      } as never,
-      global: { stubs: { CardArt: true, draggable: DraggableStub } },
-    });
-
-  it('reorderable: each row has the drag handle, and a move sends the new id order', async () => {
-    const reorder = vi.fn(async () => true);
-    const w = mountDraggable({ block: block(), reorderable: true, canEdit: true, reorder });
-    expect(w.get('[data-testid="chore-block-rows"]').attributes('data-handle')).toBe(
-      '.drag-handle'
-    );
-    expect(w.findAll('[data-testid="chore-drag-handle"]')).toHaveLength(2);
-    const drag = w.findComponent(DraggableStub);
-    const [a, b] = drag.props('modelValue') as unknown[];
-    await drag.vm.$emit('update:modelValue', [b, a]);
-    await drag.vm.$emit('change', { moved: { oldIndex: 1, newIndex: 0 } });
-    await flushPromises();
-    expect(reorder).toHaveBeenCalledWith(['c2', 'c1']);
-    // Landed: the copy keeps the new order until the store's re-read flows back.
-    expect(drag.props('modelValue')).toEqual([b, a]);
-  });
-
-  it('a reorder that does not land puts the rows back in the stored order', async () => {
-    const reorder = vi.fn(async () => false); // refused or failed: the read model never changed
-    const w = mountDraggable({ block: block(), reorderable: true, canEdit: true, reorder });
-    const drag = w.findComponent(DraggableStub);
-    const [a, b] = drag.props('modelValue') as unknown[];
-    await drag.vm.$emit('update:modelValue', [b, a]);
-    await drag.vm.$emit('change', { moved: { oldIndex: 1, newIndex: 0 } });
-    await flushPromises();
-    expect(reorder).toHaveBeenCalledTimes(1);
-    expect(drag.props('modelValue')).toEqual([a, b]);
-  });
-
-  it('select mode: no drag list, every row has its checkbox, a later block shows its rows', async () => {
-    const w = mountDraggable({
-      block: block({ block: 'evening', isNow: false }),
-      open: false,
-      reorderable: true,
-      canEdit: true,
-      selecting: true,
-      selectedIds: ['c2'],
-    });
-    expect(w.findComponent(DraggableStub).exists()).toBe(false);
-    const boxes = w.findAll('[data-testid="chore-row-select"]');
-    expect(boxes.map((b) => b.attributes('aria-checked'))).toEqual(['false', 'true']);
-    expect(w.find('[data-testid="chore-row-edit"]').exists()).toBe(false);
-    await boxes[0]!.trigger('click');
-    expect(w.emitted('select')).toEqual([['c1']]);
-  });
-
-  it('not reorderable (a child, or the home card): no handles, no drag list', () => {
-    const w = mountDraggable({ block: block() });
-    expect(w.findComponent(DraggableStub).exists()).toBe(false);
-    expect(w.find('[data-testid="chore-drag-handle"]').exists()).toBe(false);
-  });
-
-  it('one chore has nothing to reorder', () => {
-    const w = mountDraggable({
-      block: block({ chores: [{ chore: chore('c1'), done: false }] }),
-      reorderable: true,
-    });
-    expect(w.findComponent(DraggableStub).exists()).toBe(false);
   });
 });

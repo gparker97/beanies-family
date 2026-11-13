@@ -91,7 +91,6 @@ const db = {
   marks: new Map<string, ChoreMark>(),
   failNext: null as Error | null,
 };
-let nextId = 0;
 function maybeFail(): void {
   if (db.failNext) {
     const e = db.failNext;
@@ -106,24 +105,23 @@ const writes = {
   removeChoreMark: vi.fn(),
   removeChoreMarks: vi.fn(),
   updateChore: vi.fn(),
+  updateChores: vi.fn(),
   removeChores: vi.fn(),
 };
 vi.mock('@/services/automerge/repositories/choreRepository', () => ({
   getAllChores: async () => [...db.chores.values()].map(clone),
   getAllChoreMarks: async () => [...db.marks.values()].map(clone),
-  createChore: async (input: Omit<Chore, 'id' | 'createdAt' | 'updatedAt'>) => {
+  createChores: async (
+    items: { id: string; input: Omit<Chore, 'id'> }[],
+    opts?: { ifAbsent?: boolean }
+  ) => {
+    writes.createChores(items, opts);
     maybeFail();
-    const c = { ...input, id: `chore-${nextId++}`, createdAt: NOW, updatedAt: NOW } as Chore;
-    db.chores.set(c.id, clone(c));
-    return c;
-  },
-  createChores: async (items: { id: string; input: Omit<Chore, 'id'> }[]) => {
-    writes.createChores(items);
-    maybeFail();
-    for (const { id, input } of items) {
+    const toCreate = opts?.ifAbsent ? items.filter(({ id }) => !db.chores.has(id)) : items;
+    for (const { id, input } of toCreate) {
       db.chores.set(id, { ...clone(input), id, createdAt: NOW, updatedAt: NOW } as Chore);
     }
-    return items;
+    return toCreate.map(({ id, input }) => ({ ...input, id }));
   },
   updateChore: async (id: string, input: Record<string, unknown>) => {
     writes.updateChore(id, input);
@@ -139,13 +137,18 @@ vi.mock('@/services/automerge/repositories/choreRepository', () => ({
     return clone(next) as unknown as Chore;
   },
   updateChores: async (items: { id: string; patch: Partial<Chore> }[]) => {
+    writes.updateChores(clone(items));
+    maybeFail();
     for (const { id, patch } of items) {
       const cur = db.chores.get(id);
       if (cur) db.chores.set(id, { ...cur, ...patch });
     }
     return [];
   },
-  deleteChore: async (id: string) => db.chores.delete(id),
+  deleteChore: async (id: string) => {
+    maybeFail();
+    return db.chores.delete(id);
+  },
   removeChores: async (
     deleteIds: readonly string[],
     reassign: readonly { id: string; assigneeIds: readonly string[] }[]
@@ -658,9 +661,9 @@ describe('grown-up actions', () => {
   });
 
   it('updateChore refuses a deleted chore and a chore left with nobody', async () => {
-    await setup([chore('c1')]);
+    await setup([chore('c1', { assigneeIds: ['gone'] })]);
     expect(await store.updateChore('gone', { title: 'X' }, 'mom')).toBeNull();
-    expect(await store.updateChore('c1', { assigneeIds: ['gone'] }, 'mom')).toBeNull();
+    expect(await store.updateChore('c1', { title: 'Y' }, 'mom')).toBeNull();
     expect(logged('edit-refused').map((e) => e.context?.detail)).toEqual(['not-found', 'invalid']);
   });
 
@@ -681,19 +684,13 @@ describe('grown-up actions', () => {
     expect(logged('hours-set')).toHaveLength(1);
   });
 
-  it('updateChore writes Keep Parents Posted and logs notify-parents-set only when it changes', async () => {
-    await setup([chore('c1')]);
-    expect(await store.updateChore('c1', { notifyParents: true }, 'mom')).toMatchObject({
-      notifyParents: true,
-    });
-    expect(logged('notify-parents-set').map((e) => e.context)).toEqual([{ action: 'on' }]);
-    await store.updateChore('c1', { title: 'Renamed', notifyParents: true }, 'mom');
-    expect(logged('notify-parents-set')).toHaveLength(1);
-    await store.updateChore('c1', { notifyParents: false }, 'mom');
-    expect(logged('notify-parents-set').map((e) => e.context)).toEqual([
-      { action: 'on' },
-      { action: 'off' },
-    ]);
+  it('deleteChore: a failed write is toasted and reported, and the chore stays', async () => {
+    await setup([chore('o1', { assigneeIds: ['gone'] })]);
+    db.failNext = new Error('boom');
+    expect(await store.deleteChore('o1', 'mom')).toBeNull();
+    expect(showToast).toHaveBeenCalledWith('error', 'boom', undefined, expect.anything());
+    expect(store.choreById('o1')).toBeDefined();
+    expect(logged('chore-saved')).toHaveLength(0);
   });
 
   it('reorderChores swaps the moved chores among their own places; no sortOrder collides', async () => {
@@ -735,6 +732,172 @@ describe('grown-up actions', () => {
       ['a', 1],
       ['x', 2],
     ]);
+  });
+});
+
+describe('the bean editor (one list per bean)', () => {
+  it('setNotifyParentsFor flags every chore of the bean in ONE write, and logs the count', async () => {
+    await setup([
+      chore('a'),
+      chore('b', { notifyParents: true }),
+      chore('sh', { assigneeIds: ['kid', 'sib'] }),
+      chore('j', { assigneeIds: ['sib'] }),
+    ]);
+    expect(await store.setNotifyParentsFor('kid', true, 'mom', { via: 'bean-editor' })).toEqual({
+      count: 2,
+    });
+    expect(writes.updateChores).toHaveBeenCalledTimes(1);
+    expect(writes.updateChores.mock.calls[0]![0]).toEqual([
+      { id: 'a', patch: { notifyParents: true } },
+      { id: 'sh', patch: { notifyParents: true } },
+    ]);
+    expect(db.chores.get('j')!.notifyParents).toBeUndefined();
+    expect(logged('notify-parents-set').map((e) => e.context)).toEqual([
+      { action: 'on', count: 2, kind: 'bean-editor' },
+    ]);
+    // Off again: the same one write for every flagged chore.
+    expect(await store.setNotifyParentsFor('kid', false, 'mom')).toEqual({ count: 3 });
+    expect(store.chores.filter((c) => c.notifyParents).map((c) => c.id)).toEqual([]);
+  });
+
+  it('setNotifyParentsFor refuses a child, an unknown bean; a failed write resolves null', async () => {
+    await setup([chore('a')]);
+    expect(await store.setNotifyParentsFor('kid', true, 'kid')).toBeNull();
+    expect(await store.setNotifyParentsFor('ghost', true, 'mom')).toBeNull();
+    expect(writes.updateChores).not.toHaveBeenCalled();
+    db.failNext = new Error('boom');
+    expect(await store.setNotifyParentsFor('kid', true, 'mom')).toBeNull();
+    expect(store.choreById('a')!.notifyParents).toBeUndefined();
+    expect(logged('notify-parents-set')).toHaveLength(0);
+  });
+
+  it('nothing to change writes nothing and still answers', async () => {
+    await setup([chore('a', { notifyParents: true })]);
+    expect(await store.setNotifyParentsFor('kid', true, 'mom')).toEqual({ count: 0 });
+    expect(writes.updateChores).not.toHaveBeenCalled();
+  });
+
+  it('every bean-editor write is tagged kind bean-editor; other surfaces are not', async () => {
+    await setup([chore('a', { sortOrder: 0 }), chore('b', { sortOrder: 1 })]);
+    const via = { via: 'bean-editor' as const };
+    await store.updateChore('a', { title: 'Renamed' }, 'mom', via);
+    await store.createChore(
+      { title: 'New', emoji: '🧹', assigneeIds: ['kid'], block: 'morning' },
+      'mom',
+      via
+    );
+    await store.reorderChores(['b', 'a'], 'mom', via);
+    await store.addChores(['kid'], [draft('Set one')], 'mom', { ...via, notifyParents: true });
+    await store.removeChoresForMember(['a'], 'kid', 'mom', via);
+    const kinds = logEvent.mock.calls
+      .map((c) => c[0] as { message: string; context?: Record<string, unknown> })
+      .filter((e) => ['chore-saved', 'chores-added', 'chores-removed'].includes(e.message))
+      .map((e) => e.context?.kind);
+    expect(kinds).toEqual([
+      'bean-editor',
+      'bean-editor',
+      'bean-editor',
+      'bean-editor',
+      'bean-editor',
+    ]);
+    // The set's chore took the switch's state.
+    expect([...db.chores.values()].find((c) => c.title === 'Set one')!.notifyParents).toBe(true);
+    logEvent.mockClear();
+    await store.updateChore('b', { title: 'Plain' }, 'mom');
+    expect(logged('chore-saved')[0]!.context).not.toHaveProperty('kind');
+  });
+});
+
+describe('Keep Parents Posted on a new chore follows the bean (notifyFor)', () => {
+  const posted = (over: Partial<Chore> = {}) =>
+    chore('p' + Math.random(), { notifyParents: true, ...over });
+
+  it('the wall path (createChore with no flag): on for a child whose chores are all flagged', async () => {
+    await setup([posted(), posted({ block: 'evening' })]);
+    const created = await store.createChore(
+      { title: 'From the wall', emoji: '🧹', assigneeIds: ['kid'], block: 'morning' },
+      'mom'
+    );
+    expect(created!.notifyParents).toBe(true);
+    // One unflagged chore: the bean's switch is off, so a new chore is off.
+    await setup([posted(), chore('plain')]);
+    const off = await store.createChore(
+      { title: 'From the wall', emoji: '🧹', assigneeIds: ['kid'], block: 'morning' },
+      'mom'
+    );
+    expect(off!.notifyParents).toBeUndefined();
+  });
+
+  it('the sheet path (addChores): each bean gets their own state; a caller can override', async () => {
+    await setup([posted(), chore('s1', { assigneeIds: ['sib'] })]);
+    await store.addChores(['kid', 'sib', 'dad'], [draft('Shared title')], 'mom');
+    const made = (who: string) =>
+      [...db.chores.values()].find((c) => c.title === 'Shared title' && c.assigneeIds[0] === who)!;
+    expect(made('kid').notifyParents).toBe(true);
+    expect(made('sib').notifyParents).toBeUndefined();
+    expect(made('dad').notifyParents).toBeUndefined();
+    await store.addChores(['sib'], [draft('Forced')], 'mom', { notifyParents: true });
+    expect([...db.chores.values()].find((c) => c.title === 'Forced')!.notifyParents).toBe(true);
+  });
+
+  it('copy keeps the target’s switch on; a target with no chores keeps the copied flag', async () => {
+    await setup([
+      chore('k1', { title: 'Make bed' }),
+      chore('k2', { title: 'Feed fish', notifyParents: true }),
+      posted({ assigneeIds: ['sib'], title: 'Juno only' }),
+    ]);
+    await store.copyChores('kid', ['sib'], ['morning'], 'mom');
+    const sibs = [...db.chores.values()].filter((c) => c.assigneeIds[0] === 'sib');
+    expect(sibs.every((c) => c.notifyParents === true)).toBe(true);
+    // Papa Bean has no chores; a grown-up's copies never get the flag.
+    await store.copyChores('kid', ['dad'], ['morning'], 'mom');
+    const dads = [...db.chores.values()].filter((c) => c.assigneeIds[0] === 'dad');
+    expect(dads.map((c) => c.notifyParents)).toEqual([undefined, undefined]);
+  });
+
+  it('createChore has ONE write path: a fresh id (the wall) or the caller’s (the editor), ifAbsent', async () => {
+    await setup([]);
+    const draftIn = { title: 'Wall', emoji: '🧹', assigneeIds: ['kid'], block: 'morning' as const };
+    const wall = await store.createChore(draftIn, 'mom');
+    const editor = await store.createChore({ ...draftIn, title: 'Row' }, 'mom', { id: 'row-1' });
+    expect(writes.createChores).toHaveBeenCalledTimes(2);
+    for (const call of writes.createChores.mock.calls) expect(call[1]).toEqual({ ifAbsent: true });
+    // The same return shape either way: the stored chore.
+    expect(wall).toEqual(store.choreById(wall!.id));
+    expect(editor).toEqual(store.choreById('row-1'));
+  });
+
+  it('an id that already exists is the exists refusal, never an overwrite', async () => {
+    await setup([chore('taken', { title: 'Original' })]);
+    const draftIn = {
+      title: 'Clash',
+      emoji: '🧹',
+      assigneeIds: ['kid'],
+      block: 'morning' as const,
+    };
+    expect(await store.createChore(draftIn, 'mom', { id: 'taken' })).toBeNull();
+    expect(writes.createChores).not.toHaveBeenCalled();
+    expect(showToast).toHaveBeenCalledWith('info', 'choreboard.error.exists');
+    expect(logged('edit-refused')[0]!.context).toEqual({ action: 'createChore', detail: 'exists' });
+    // In the document but not yet in this store's read (another device): still refused.
+    db.chores.set('elsewhere', chore('elsewhere', { title: 'Theirs' }));
+    expect(await store.createChore(draftIn, 'mom', { id: 'elsewhere' })).toBeNull();
+    expect(db.chores.get('elsewhere')!.title).toBe('Theirs');
+    expect(logged('edit-refused').map((e) => e.context?.detail)).toEqual(['exists', 'exists']);
+  });
+
+  it('createChore with a minted id stores the chore under it', async () => {
+    await setup([]);
+    const created = await store.createChore(
+      { title: 'Keyed', emoji: '🧹', assigneeIds: ['kid'], block: 'morning' },
+      'mom',
+      { id: 'minted-1', via: 'bean-editor' }
+    );
+    expect(created).toMatchObject({ id: 'minted-1', title: 'Keyed' });
+    expect(writes.createChores.mock.calls[0]![0]).toEqual([
+      { id: 'minted-1', input: expect.objectContaining({ title: 'Keyed', assigneeIds: ['kid'] }) },
+    ]);
+    expect(writes.createChores.mock.calls[0]![1]).toEqual({ ifAbsent: true });
   });
 });
 
