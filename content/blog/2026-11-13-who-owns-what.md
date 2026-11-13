@@ -10,7 +10,7 @@ subtitle: 'how beanies.family can help get your household in order'
 featured: false
 author: greg
 longAndShort:
-  built: 'a who owns what page with a deck of about 80 household responsibility cards to keep, skip, hand to someone, or split by child or custom parts.'
+  built: "a who owns what page, inspired by Eve Rodsky's book Fair Play, with a deck of about 80 household responsibility cards to keep, skip, hand to someone, or split by child or custom parts."
   helps: 'every job that keeps your home running has a name on it, so parents stay on the same page and nobody gets left at soccer practice in the rain.'
   where: '`The Treehouse › Who Owns What`'
 ---
@@ -80,3 +80,5 @@ When _who owns what_ becomes not just a question, but a statement, that’s when
 Stay organized, my beans.
 
 -greg
+
+_Note: beanies.family is not affiliated with or endorsed by Fair Play or Eve Rodsky._
