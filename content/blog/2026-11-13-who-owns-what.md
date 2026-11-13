@@ -33,7 +33,7 @@ I talked about how “Fair Play” inspired several features in the app, and how
 
 Firstly, I’m sorry - I got ahead of myself. I was inspired at the time, and I honestly didn’t think that many people would read my post.
 
-But, **secondly**, let me very proudly announce that I’m not ahead of myself anymore. Yes, we are now a _fully-formed, battle-tested, 100% compliant_ (whatever that means) family responsibility platform - let me proudly introduce: **_[who owns what](https://app.beanies.family/who-owns-what)_**!
+But, **secondly**, let me very proudly announce that I’m not ahead of myself anymore. Yes, we are now a _fully-formed, battle-tested, 100% compliant_ (whatever that means) family responsibility platform - let me proudly introduce: **_<a href="https://app.beanies.family/who-owns-what" target="_blank" rel="noopener" data-cta="CTA: Create Pod" data-cta-loc="blog-who-owns-what">who owns what</a>_**!
 
 As a type-A, organization-oriented (some - like my wife - might say “obsessed”) person, I **_love_** the concept of a family breakdown of responsibilities that is shared, clear, and explicit. When division of labor is messy, and responsibilities are not clear, that’s when systems of ownership break down, and hapless kids get left waiting at soccer practice in the rain (hypothetically speaking, of course).
 
@@ -73,7 +73,7 @@ For me, I hold time to myself for things like exercise, runs (2 or 3 times a wee
 
 Getting _who owns what_ into a workable feature for [beanies.family](https://beanies.family/?utm_source=blog&utm_medium=post&utm_campaign=who-owns-what&utm_content=homepage-mention-4) took more rounds of mockups, planning, back and forth coding sessions, and bug and enhancement reviews than I probably care to mention, but this is a feature that I really wanted to get right. I’m keen to hear your thoughts - especially those people on r/FairPlayLife that were so desperately searching for a feature that wasn’t quite cooked yet - apologies (again) for that!
 
-So even if you haven’t read the book, give _[who owns what](https://app.beanies.family/who-owns-what)_ a try for your household, and [let me know on discord](https://beanies.family/discord?utm_source=blog&utm_medium=post&utm_campaign=who-owns-what&utm_content=discord) how it works!
+So even if you haven’t read the book, give _<a href="https://app.beanies.family/who-owns-what" target="_blank" rel="noopener" data-cta="CTA: Create Pod" data-cta-loc="blog-who-owns-what">who owns what</a>_ a try for your household, and [let me know on discord](https://beanies.family/discord?utm_source=blog&utm_medium=post&utm_campaign=who-owns-what&utm_content=discord) how it works!
 
 When _who owns what_ becomes not just a question, but a statement, that’s when your life starts to settle into order. Give it a try, and get those responsibilities down pat.
 
