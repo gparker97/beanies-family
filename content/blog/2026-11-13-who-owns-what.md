@@ -13,7 +13,6 @@ longAndShort:
   built: 'a who owns what page with a deck of about 80 household responsibility cards to keep, skip, hand to someone, or split by child or custom parts.'
   helps: 'every job that keeps your home running has a name on it, so parents stay on the same page and nobody gets left at soccer practice in the rain.'
   where: '`The Treehouse › Who Owns What`'
-draft: false
 ---
 
 I got a bit ahead of myself the other day and made a post on the r/FairPlayLife sub on Reddit that was perhaps a bit premature. I thought it was no big deal, but a few people ended up getting mad, and one person actually deleted his beanpod. Oops.
