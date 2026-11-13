@@ -11,6 +11,7 @@ relatedPosts:
   - buy-fruit
   - mommy-whats-for-dinner-tonight
   - sharing-with-beanies
+  - who-owns-what
 tags:
   - mental-load
   - family-organization
