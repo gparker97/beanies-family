@@ -22,7 +22,7 @@ import {
 import { showToast } from '@/composables/useToast';
 import { useTranslationStore } from '@/stores/translationStore';
 import { fillTemplate } from '@/utils/fillTemplate';
-import { buildWallJobs, captureListRemoval, sortJobs } from '@/utils/wallJobs';
+import { buildWallJobs, captureListRemoval, jobWriteKey, sortJobs } from '@/utils/wallJobs';
 import { plateClock } from '@/utils/todoPlate';
 import { useAuthStore } from '@/stores/authStore';
 import { UNASSIGNED } from '@/utils/wallJobs';
@@ -215,7 +215,8 @@ export function useWallJobs() {
   };
 
   async function toggle(job: WallJob): Promise<void> {
-    if (pending.value.has(job.key)) return;
+    const writeKey = jobWriteKey(job);
+    if (pending.value.has(writeKey)) return;
     // Credit the job's OWNER, not whoever's session opened the wall. The wall
     // is a shared screen: the child standing at it is the one doing the chore,
     // and `completedBy` is rendered as "Done by {name}" across the app.
@@ -227,7 +228,7 @@ export function useWallJobs() {
     const known = familyStore.members.some((m) => m.id === job.ownerId);
     const actor = known ? job.ownerId : (authStore.currentUser?.memberId ?? '');
 
-    pending.value = new Set(pending.value).add(job.key);
+    pending.value = new Set(pending.value).add(writeKey);
     // `write` never throws, so the pending cleanup below needs no `finally`.
     await write(
       'job_toggle',
@@ -238,7 +239,7 @@ export function useWallJobs() {
       () => reportJobToggleFailed(job.source, job.todoId ?? job.listId ?? job.key)
     );
     const next = new Set(pending.value);
-    next.delete(job.key);
+    next.delete(writeKey);
     pending.value = next;
   }
 
@@ -388,7 +389,7 @@ export function useWallJobs() {
     return true;
   }
 
-  const isPending = (job: WallJob) => pending.value.has(job.key);
+  const isPending = (job: WallJob) => pending.value.has(jobWriteKey(job));
 
   return {
     jobsFor,

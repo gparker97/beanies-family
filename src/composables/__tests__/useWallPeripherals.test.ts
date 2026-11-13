@@ -8,9 +8,10 @@
  */
 import { ref, type Ref } from 'vue';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import type { FamilyVacation } from '@/types/models';
+import type { FamilyList, FamilyVacation } from '@/types/models';
 
 const upcomingVacations = ref<FamilyVacation[]>([]);
+const storeLists = ref<FamilyList[]>([]);
 // A plain variable: a ref here would unwrap the ref it is holding.
 let timelineSource: Ref<FamilyVacation | undefined> | null = null;
 
@@ -24,7 +25,13 @@ vi.mock('@/stores/vacationStore', () => ({
 vi.mock('@/stores/familyStore', () => ({
   useFamilyStore: () => ({ members: [{ id: 'm1', name: 'Mia' }] }),
 }));
-vi.mock('@/stores/listStore', () => ({ useListStore: () => ({ lists: [] }) }));
+vi.mock('@/stores/listStore', () => ({
+  useListStore: () => ({
+    get lists() {
+      return storeLists.value;
+    },
+  }),
+}));
 vi.mock('@/stores/mealPlanStore', () => ({ useMealPlanStore: () => ({ todaysMeals: [] }) }));
 vi.mock('@/stores/recipesStore', () => ({ useRecipesStore: () => ({ recipes: [] }) }));
 vi.mock('@/composables/useToday', () => ({ useToday: () => ({ today: ref('2026-11-11') }) }));
@@ -103,5 +110,40 @@ describe('wallTripDates', () => {
     );
     expect(wallTripDates({ startDate: '2027-02-03' })).toBe(day('2027-02-03'));
     expect(wallTripDates({})).toBe('');
+  });
+});
+
+describe('useWallPeripherals lists (the wall show rule)', () => {
+  const TODAY = '2026-11-11'; // useToday is mocked to it above
+  const list = (id: string, over: Partial<FamilyList> = {}): FamilyList =>
+    ({
+      id,
+      title: id,
+      emoji: '🧾',
+      category: 'home',
+      ownerId: 'm1',
+      lifecycle: 'oneoff',
+      items: [{ id: `${id}-1`, title: 'item', completed: false }],
+      completed: false,
+      createdAt: '2026-11-01',
+      updatedAt: '2026-11-01',
+      ...over,
+    }) as FamilyList;
+
+  it('shows what the jobs rule shows: due, undated or early by rule; never waiting or private', () => {
+    storeLists.value = [
+      list('today', { dueDate: TODAY }),
+      list('undated'),
+      list('early', { dueDate: '2026-11-20', showFrom: TODAY }),
+      list('waiting', { dueDate: '2026-11-20' }),
+      list('private', { dueDate: TODAY, category: 'health' }),
+      list('shared', { dueDate: TODAY, assigneeIds: ['m1', 'm2'] }),
+    ];
+    expect(useWallPeripherals().lists.value.map((l) => l.id)).toEqual([
+      'today',
+      'undated',
+      'early',
+      'shared',
+    ]);
   });
 });

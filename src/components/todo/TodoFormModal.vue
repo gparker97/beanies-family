@@ -25,7 +25,7 @@
  * a silent drop). The picker emits its default rule on mount; that is the initial value here,
  * because this form saves explicitly.
  *
- * Show from: the due date, due time and `TodoShowField` share one bordered box. The rule starts
+ * Show from: the due date, due time and `ShowRuleField` share one bordered box. The rule starts
  * at the kind's default (`now`, or `due` for a repeat) and follows the due date: a `from` date at
  * or past a new due date becomes `due`, clearing the date resets it, and turning Repeat on or
  * off resets it to that kind's default.
@@ -43,7 +43,7 @@ import NotifyParentsToggle from '@/components/ui/NotifyParentsToggle.vue';
 import ConditionalSection from '@/components/ui/ConditionalSection.vue';
 import RecurrencePicker from '@/components/ui/RecurrencePicker.vue';
 import RepeatGlyph from '@/components/todo/RepeatGlyph.vue';
-import TodoShowField from '@/components/todo/TodoShowField.vue';
+import ShowRuleField from '@/components/ui/ShowRuleField.vue';
 import MagicBeansQuickCard from '@/components/ai/MagicBeansQuickCard.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import { useFormModal } from '@/composables/useFormModal';
@@ -233,8 +233,9 @@ async function handleSave(): Promise<void> {
       <FormFieldGroup :label="t('todo.dueDate')" optional>
         <BeanieDatePicker v-model="dueDate" />
       </FormFieldGroup>
-      <TodoShowField
+      <ShowRuleField
         v-model="showRule"
+        kind="todo"
         :repeating="repeatOn"
         :due-date="dueDate"
         :cadence="repeatOn ? repeatRule : null"

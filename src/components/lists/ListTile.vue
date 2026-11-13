@@ -4,13 +4,13 @@ import { useTranslation } from '@/composables/useTranslation';
 import { useListCategoryLabel } from '@/composables/useListCategoryLabel';
 import { useToday } from '@/composables/useToday';
 import { getListCategory } from '@/constants/listCategories';
-import { isListDue, isRecurring, listProgress } from '@/utils/listLifecycle';
+import { isListDue, isRecurring, listProgress, listShowLabel } from '@/utils/listLifecycle';
+import { useListPeople } from '@/composables/useListPeople';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { formatDateShort } from '@/utils/date';
 import { resolveListRule } from '@/services/recurrence/adapters';
 import { useRecurrenceLabel } from '@/composables/useRecurrenceLabel';
-import MemberChip from '@/components/ui/MemberChip.vue';
-import { useFamilyStore } from '@/stores/familyStore';
+import ActivityOwnerStack from '@/components/ui/ActivityOwnerStack.vue';
 import ActionButtons from '@/components/ui/ActionButtons.vue';
 import type { FamilyList } from '@/types/models';
 
@@ -18,23 +18,28 @@ const props = defineProps<{ list: FamilyList }>();
 const emit = defineEmits<{ open: [id: string]; copy: [id: string]; delete: [id: string] }>();
 
 const { t } = useTranslation();
-const familyStore = useFamilyStore();
+const { peopleOf, namesOf } = useListPeople();
+
+/** Everyone the list is for (#147), in order; a removed member drops out. */
+const people = computed(() => peopleOf(props.list));
 
 /**
- * The overlay covers the whole tile, so it shadows the owner avatar's `title` tooltip
- * exactly as it shadows the status pill's. The avatar still shows initials, but the
- * full name was only ever available on hover — so it moves into the accessible name
- * here rather than being lost.
+ * The overlay covers the whole tile, so it shadows the faces' names exactly as it shadows
+ * the status pill's title. The faces show initials only, so the names move into the
+ * accessible name here rather than being lost.
  */
 const tileLabel = computed(() => {
-  const owner = familyStore.members.find((m) => m.id === props.list.ownerId);
-  return owner
-    ? fillTemplate(t('lists.tile.openFor'), { list: props.list.title, name: owner.name })
+  const name = namesOf(props.list);
+  return name
+    ? fillTemplate(t('lists.tile.openFor'), { list: props.list.title, name })
     : props.list.title;
 });
 const { describe } = useRecurrenceLabel();
 const { categoryLabel } = useListCategoryLabel();
 const { today } = useToday();
+
+/** "Shows from ...", while the list is not showing on the briefing, wall and widgets yet. */
+const showLabel = computed(() => listShowLabel(props.list, today.value, t));
 
 const category = computed(() => getListCategory(props.list.category));
 const accent = computed(() => category.value?.color ?? 'var(--color-primary-500)');
@@ -116,7 +121,7 @@ const statusPill = computed<Pill | null>(() => {
         <span class="flex min-w-0 items-center gap-1.5 text-xs text-[var(--color-text-muted)]">
           <span class="h-2 w-2 flex-shrink-0 rounded-full" :style="{ backgroundColor: accent }" />
           <span class="truncate">{{ categoryLabel(list.category) }}</span>
-          <MemberChip :member-id="list.ownerId" size="dot" />
+          <ActivityOwnerStack :members="people" size="xs" data-testid="list-tile-people" />
         </span>
         <span
           v-if="statusPill"
@@ -134,6 +139,16 @@ const statusPill = computed<Pill | null>(() => {
           <span aria-hidden="true">{{ statusPill.glyph }}</span> {{ statusPill.text }}
         </span>
       </div>
+
+      <!-- Not showing elsewhere yet: the Lists page always lists it, and says from when. -->
+      <span
+        v-if="showLabel"
+        class="font-outfit inline-flex max-w-full items-center gap-1 self-start truncate rounded-full bg-[var(--tint-silk-20)] px-2 py-0.5 text-xs font-semibold text-[var(--silk-ink)]"
+        :title="showLabel"
+        data-testid="list-tile-show-tag"
+      >
+        <span aria-hidden="true">👀</span> {{ showLabel }}
+      </span>
 
       <!-- Progress -->
       <div class="flex items-center gap-2">

@@ -974,7 +974,13 @@ export interface ListCycle {
   title: string;
   emoji: string;
   category: ListCategory;
+  /** The first assignee at archive time (what older builds read). */
   ownerId: UUID;
+  /**
+   * Everyone the list was for at archive time, `ownerId` first. Absent on cycles archived by
+   * older builds; read only through `listAssignees` (`utils/assignees`).
+   */
+  assigneeIds?: UUID[];
   done: number;
   total: number;
   /** Required. A cycle always carries its marks; there is no summary tier. */
@@ -1125,7 +1131,17 @@ export interface FamilyList {
   title: string;
   emoji: string;
   category: ListCategory;
-  ownerId: UUID; // single owner (no per-item assignees)
+  /**
+   * The first assignee, kept equal to `assigneeIds[0]` so older builds (which read only this)
+   * keep a valid owner. No per-item assignees.
+   */
+  ownerId: UUID;
+  /**
+   * Everyone the list is for, `ownerId` first. Absent on lists written by older builds (they
+   * read as `[ownerId]`). Read only through `listAssignees` and written only through
+   * `toListAssigneePayload` (`utils/assignees`), which keeps the pair in step.
+   */
+  assigneeIds?: UUID[];
   items: FamilyListItem[]; // flat (no sub-sections)
   lifecycle: ListLifecycle;
   dueDate?: ISODateString; // one-off only
@@ -1148,6 +1164,24 @@ export interface FamilyList {
    * (kept, inert, on a one-off); written only by `listStore.setNotifyParents` (adults only).
    */
   notifyParents?: boolean;
+  /**
+   * "Show from" (one-off only): `YYYY-MM-DD`, the day the list starts showing on the daily
+   * briefing, the Nook, the wall and the widget. Absent = no start date. Never hides it on or
+   * after the due date, ignored on a repeating or undated list, and a malformed value reads
+   * as the default. Written only through `showRulePatch` (`utils/todoPlate`).
+   */
+  showFrom?: ISODateString;
+  /**
+   * `'due'` = only from the due date; `'now'` = right away. Absent = the default, which for a
+   * list is `'due'` both one-off and repeating (`ONE_OFF_DEFAULT`, `utils/todoPlate`). A
+   * repeating list's due date is its next reset day. Written only through `showRulePatch`.
+   */
+  showOn?: 'now' | 'due';
+  /**
+   * Repeating only: start showing this many days (a whole number, 1-30) before each reset day.
+   * Ignored on a one-off and when out of range. Written only through `showRulePatch`.
+   */
+  showLeadDays?: number;
   lastResetDate?: ISODateString; // recurring bookkeeping (last auto-reset day)
   cycleCelebrated?: boolean; // guard: celebrate once per cycle (recurring)
   linkedActivityId?: UUID; // optional attach to an activity

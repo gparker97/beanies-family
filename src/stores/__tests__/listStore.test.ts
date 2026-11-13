@@ -54,6 +54,7 @@ vi.mock('@/stores/translationStore', () => ({
 }));
 
 import { useListStore } from '../listStore';
+import { listAssignees } from '@/utils/assignees';
 import * as listRepo from '@/services/automerge/repositories/listRepository';
 import * as cycleRepo from '@/services/automerge/repositories/listCycleRepository';
 import { celebrate } from '@/composables/useCelebration';
@@ -940,6 +941,59 @@ describe('listStore', () => {
     expect(store.completedLists).toEqual([]); // not filed despite the stale flag
   });
 
+  // A stray tap on One-off and back used to turn a daily list weekly, which then stopped
+  // resetting every day (greg's family, 2026-11-13).
+  it('setLifecycle keeps the schedule across recurring → one-off → recurring', async () => {
+    const store = useListStore();
+    const cadence = { unit: 'day', interval: 1 } as const;
+    store.lists = [list({ id: 'd', lifecycle: 'recurring', frequency: 'daily', cadence })];
+    vi.mocked(listRepo.updateList).mockImplementation(async (id, input) => {
+      const cur = store.lists.find((x) => x.id === id)!;
+      const next = { ...cur, ...(input as Partial<FamilyList>) } as FamilyList;
+      store.lists = store.lists.map((x) => (x.id === id ? next : x));
+      return next;
+    });
+
+    await store.setLifecycle('d', 'oneoff');
+    const off = vi.mocked(listRepo.updateList).mock.calls[0]![1] as Partial<FamilyList>;
+    expect(off).not.toHaveProperty('frequency');
+    expect(off).not.toHaveProperty('cadence');
+
+    await store.setLifecycle('d', 'recurring');
+    const back = store.lists.find((x) => x.id === 'd')!;
+    expect(back.lifecycle).toBe('recurring');
+    expect(back.frequency).toBe('daily');
+    expect(back.cadence).toEqual(cadence);
+  });
+
+  // A cadence the legacy enum cannot express keeps `frequency` undefined on purpose; writing
+  // 'weekly' over it would make an older build reset an every-2-weeks list weekly.
+  it('setLifecycle back to recurring leaves a kept custom cadence without a frequency', async () => {
+    const store = useListStore();
+    const cadence = { unit: 'week' as const, interval: 2, weekdays: [3] };
+    store.lists = [list({ id: 'c', lifecycle: 'oneoff', cadence })];
+    vi.mocked(listRepo.updateList).mockImplementation(async (id, input) => {
+      const cur = store.lists.find((x) => x.id === id)!;
+      return { ...cur, ...(input as Partial<FamilyList>) } as FamilyList;
+    });
+    await store.setLifecycle('c', 'recurring');
+    const patch = vi.mocked(listRepo.updateList).mock.calls[0]![1] as Partial<FamilyList>;
+    expect(patch).not.toHaveProperty('frequency');
+    expect(patch).not.toHaveProperty('cadence');
+  });
+
+  it('setLifecycle starts a list that never repeated on the weekly default', async () => {
+    const store = useListStore();
+    store.lists = [list({ id: 'n', lifecycle: 'oneoff' })];
+    vi.mocked(listRepo.updateList).mockImplementation(async (id, input) => {
+      const cur = store.lists.find((x) => x.id === id)!;
+      return { ...cur, ...(input as Partial<FamilyList>) } as FamilyList;
+    });
+    await store.setLifecycle('n', 'recurring');
+    const patch = vi.mocked(listRepo.updateList).mock.calls[0]![1] as Partial<FamilyList>;
+    expect(patch.frequency).toBe('weekly');
+  });
+
   // ── "Keep Parents Posted" (greg, 2026-11-06) ───────────────────────────────
 
   describe('setNotifyParents', () => {
@@ -1361,6 +1415,311 @@ describe('listStore', () => {
       const store = seed([]);
       const updated = await store.setAllItemsCompleted('l1', true, 'm1');
       expect(updated?.completed).toBe(false);
+    });
+  });
+
+  // ── Lists work like to-dos (plan 2026-11-13): several assignees, a show rule ──
+  describe('ownership and the show rule', () => {
+    const events = (surface: string, message: string) =>
+      logEventMock.mock.calls
+        .map(([e]) => e)
+        .filter((e) => e.surface === surface && e.message === message);
+    const writes = () =>
+      vi.mocked(listRepo.updateList).mock.calls.map((c) => c[1] as Partial<FamilyList>);
+    /** The pair is in step after every write: absent, or `ownerId` its first. */
+    const inStep = (l: Partial<FamilyList>) =>
+      l.assigneeIds === undefined || l.assigneeIds[0] === l.ownerId;
+
+    async function family(): Promise<void> {
+      const { useFamilyStore } = await import('@/stores/familyStore');
+      useFamilyStore().members = [
+        { id: 'm-1', name: 'Greg' },
+        { id: 'm-2', name: 'Sam' },
+      ] as never;
+    }
+    function seed(...lists: FamilyList[]) {
+      const store = useListStore();
+      store.lists = lists;
+      mergeUpdate(store);
+      return store;
+    }
+
+    describe('setAssignees', () => {
+      it('saves a stale id plus one added person without the stale id', async () => {
+        await family();
+        const store = seed(list({ assigneeIds: ['m-1', 'ghost'] }));
+        const saved = await store.setAssignees('l-1', ['m-1', 'ghost', 'm-2']);
+        expect(writes()).toEqual([{ assigneeIds: ['m-1', 'm-2'], ownerId: 'm-1' }]);
+        expect(saved && inStep(saved)).toBe(true);
+        expect(events('lists', 'assignees-set').map((e) => e.context)).toEqual([
+          { action: 'assignees', count: 2 },
+        ]);
+        expect(events('lists', 'assignees-pruned').map((e) => e.context)).toEqual([
+          { action: 'assignees', count: 1 },
+        ]);
+      });
+
+      it('makes the first id the owner, de-duplicated', async () => {
+        await family();
+        const store = seed(list());
+        await store.setAssignees('l-1', ['m-2', 'm-1', 'm-2']);
+        expect(writes()).toEqual([{ assigneeIds: ['m-2', 'm-1'], ownerId: 'm-2' }]);
+        // Nothing stale was dropped (a duplicate is not a removed member): no pruned event.
+        expect(events('lists', 'assignees-pruned')).toEqual([]);
+      });
+
+      it('refuses an empty result (none chosen, or only removed members), with a log', async () => {
+        await family();
+        const store = seed(list());
+        expect(await store.setAssignees('l-1', [])).toBeNull();
+        expect(await store.setAssignees('l-1', ['ghost'])).toBeNull();
+        expect(await store.setAssignees('gone', ['m-1'])).toBeNull();
+        expect(listRepo.updateList).not.toHaveBeenCalled();
+        expect(events('lists', 'assignees-refused').map((e) => [e.level, e.context])).toEqual([
+          ['warn', { action: 'assignees', detail: 'empty' }],
+          ['warn', { action: 'assignees', detail: 'empty' }],
+          ['warn', { action: 'assignees', detail: 'not-found' }],
+        ]);
+      });
+    });
+
+    describe('setShowRule', () => {
+      it('refuses an invalid rule with a log on the to-do rule surface', async () => {
+        const store = seed(list({ dueDate: '2026-06-30' }));
+        expect(await store.setShowRule('l-1', { kind: 'from', date: 'soon' })).toBeNull();
+        expect(await store.setShowRule('l-1', { kind: 'lead', days: 3 })).toBeNull(); // one-off
+        expect(await store.setShowRule('gone', { kind: 'now' })).toBeNull();
+        expect(listRepo.updateList).not.toHaveBeenCalled();
+        expect(events('todo-visibility', 'refused').map((e) => e.context)).toEqual([
+          { action: 'show-rule', detail: 'invalid-date', recur_surface: 'list' },
+          { action: 'show-rule', detail: 'invalid-lead', recur_surface: 'list' },
+          { action: 'show-rule', detail: 'not-found', recur_surface: 'list' },
+        ]);
+      });
+
+      it('clamps a weekly list lead to 6, reading the cadence from frequency alone', async () => {
+        // A list made repeating by the lifecycle flip stores `frequency` only.
+        const weekly = list({
+          lifecycle: 'recurring',
+          frequency: 'weekly',
+          lastResetDate: '2026-06-15',
+        });
+        const store = seed(weekly);
+        expect(await store.setShowRule('l-1', { kind: 'lead', days: 7 })).toBeNull();
+        expect(await store.setShowRule('l-1', { kind: 'lead', days: 6 })).toBeTruthy();
+        expect(writes()).toEqual([{ showFrom: undefined, showOn: undefined, showLeadDays: 6 }]);
+        expect(events('todo-visibility', 'show rule set').map((e) => e.context)).toEqual([
+          { action: 'lead', detail: 'repeat', count: 6, recur_surface: 'list' },
+        ]);
+      });
+
+      it("stores a list's default (on the due date) as nothing, and right away as showOn now", async () => {
+        const store = seed(list({ dueDate: '2026-06-30', showFrom: '2026-06-20' }));
+        await store.setShowRule('l-1', { kind: 'due' });
+        await store.setShowRule('l-1', { kind: 'now' });
+        expect(writes()).toEqual([
+          { showFrom: undefined, showOn: undefined, showLeadDays: undefined },
+          { showFrom: undefined, showOn: 'now', showLeadDays: undefined },
+        ]);
+      });
+    });
+
+    describe('the write funnels keep the pair in step', () => {
+      it('createList normalises: assigneeIds wins over a disagreeing ownerId', async () => {
+        await family();
+        const store = useListStore();
+        vi.mocked(listRepo.createList).mockImplementation(
+          async (input) => ({ ...(input as object), id: 'n' }) as FamilyList
+        );
+        const made = await store.createList({
+          ...list(),
+          ownerId: 'm-1',
+          assigneeIds: ['m-2', 'm-1'],
+        } as never);
+        expect(made).toMatchObject({ ownerId: 'm-2', assigneeIds: ['m-2', 'm-1'] });
+        const single = await store.createList({ ...list(), ownerId: 'm-1' } as never);
+        expect(single).toMatchObject({ ownerId: 'm-1', assigneeIds: ['m-1'] });
+        expect([made!, single!].every(inStep)).toBe(true);
+      });
+
+      it('createList refuses any assignee that is not in the family', async () => {
+        await family();
+        const store = useListStore();
+        expect(
+          await store.createList({ ...list(), assigneeIds: ['m-1', 'ghost'] } as never)
+        ).toBeNull();
+        expect(listRepo.createList).not.toHaveBeenCalled();
+      });
+
+      it('updateList rewrites an ownership change as the pair', async () => {
+        const store = seed(list({ assigneeIds: ['m-1', 'm-2'] }));
+        await store.updateList('l-1', { ownerId: 'm-2' });
+        expect(writes()).toEqual([{ ownerId: 'm-2', assigneeIds: ['m-2'] }]);
+        expect(inStep(store.lists[0]!)).toBe(true);
+      });
+
+      // X wrote owner m-2 of [m-2]; Y wrote owner m-1 of [m-1, m-2, m-3]; the merge took
+      // `ownerId` from Y and `assigneeIds` from X. The reading is the owner alone, but storing
+      // it would drop m-2 for good, so an unattended write (a reset) leaves the pair as stored.
+      it('never heals an owner that is not listed: the reset leaves the stored people alone', async () => {
+        const drifted = list({
+          id: 'r',
+          ownerId: 'm-1',
+          assigneeIds: ['m-2'],
+          lifecycle: 'recurring',
+          frequency: 'daily',
+          lastResetDate: '2026-06-16',
+          items: [], // no items: the plain `updateList` reset, not the archive batch
+        });
+        const store = seed(drifted, list({ id: 'ok', assigneeIds: ['m-1'] }));
+        await store.reconcileRecurringLists();
+        await store.renameList('ok', 'Renamed');
+        const [reset, rename] = writes();
+        expect(reset).toMatchObject({ lastResetDate: expect.any(String) });
+        expect('ownerId' in reset! || 'assigneeIds' in reset!).toBe(false);
+        expect(rename).toEqual({ title: 'Renamed' });
+        // Only a person setting the people writes the pair.
+        await family();
+        await store.setAssignees('r', ['m-1', 'm-2']);
+        expect(writes()[2]).toEqual({ assigneeIds: ['m-1', 'm-2'], ownerId: 'm-1' });
+      });
+
+      // An empty owner reads as the stored ids, so storing that reading loses nobody.
+      it('heals an empty owner to the stored ids on the next write', async () => {
+        const store = seed(list({ id: 'e', ownerId: '', assigneeIds: ['m-2', '', 'm-1', 'm-2'] }));
+        expect(listAssignees(store.lists[0]!)).toEqual(['m-2', 'm-1']);
+        await store.renameList('e', 'Renamed');
+        expect(writes()).toEqual([
+          { title: 'Renamed', assigneeIds: ['m-2', 'm-1'], ownerId: 'm-2' },
+        ]);
+        expect(inStep(store.lists[0]!)).toBe(true);
+      });
+
+      // Device A saved [m-1, m-2], device B saved [m-2, m-1]; the merge took `ownerId` from B and
+      // `assigneeIds` from A. Healing to the owner alone would drop m-1 for good.
+      it('heals a pair merged field by field to everyone listed, owner first', async () => {
+        const merged = list({ id: 'x', ownerId: 'm-2', assigneeIds: ['m-1', 'm-2'] });
+        const store = seed(merged);
+        await store.renameList('x', 'Renamed');
+        expect(writes()).toEqual([
+          { title: 'Renamed', assigneeIds: ['m-2', 'm-1'], ownerId: 'm-2' },
+        ]);
+        expect(inStep(store.lists[0]!)).toBe(true);
+      });
+
+      it('archives a shared list cycle with everyone it was for, owner first', async () => {
+        const shared = list({
+          id: 'r',
+          assigneeIds: ['m-1', 'm-2'],
+          lifecycle: 'recurring',
+          frequency: 'daily',
+          lastResetDate: '2026-06-16',
+          items: [item({ id: 'i1', completed: true })],
+        });
+        const store = seed(shared);
+        vi.mocked(listRepo.getListById).mockResolvedValue({
+          ...shared,
+          lastResetDate: '2026-06-17',
+        } as FamilyList);
+        await store.reconcileRecurringLists();
+        const [cycle] = vi.mocked(cycleRepo.archiveCycleAndReset).mock.calls[0]!;
+        expect([cycle.ownerId, cycle.assigneeIds]).toEqual(['m-1', ['m-1', 'm-2']]);
+        // A single-owner list's cycle carries no `assigneeIds`, as older cycles do not.
+        vi.mocked(cycleRepo.archiveCycleAndReset).mockClear();
+        store.lists = [{ ...shared, assigneeIds: undefined }];
+        await store.reconcileRecurringLists();
+        expect('assigneeIds' in vi.mocked(cycleRepo.archiveCycleAndReset).mock.calls[0]![0]).toBe(
+          false
+        );
+      });
+
+      it('the show rule follows a one-off due date (a "Show from" past the new date clears)', async () => {
+        const store = seed(list({ dueDate: '2026-06-30', showFrom: '2026-06-25' }));
+        await store.updateList('l-1', { dueDate: '2026-06-24' });
+        expect(writes()).toEqual([
+          {
+            dueDate: '2026-06-24',
+            showFrom: undefined,
+            showOn: undefined,
+            showLeadDays: undefined,
+          },
+        ]);
+      });
+
+      it('setLifecycle clears the show rule in both directions', async () => {
+        const store = seed(list({ dueDate: '2026-06-30', showFrom: '2026-06-25' }));
+        await store.setLifecycle('l-1', 'recurring');
+        await store.setLifecycle('l-1', 'oneoff');
+        for (const w of writes()) {
+          expect(w).toMatchObject({
+            showFrom: undefined,
+            showOn: undefined,
+            showLeadDays: undefined,
+          });
+          expect('showFrom' in w && 'showOn' in w && 'showLeadDays' in w).toBe(true);
+        }
+      });
+    });
+
+    describe('the load-time audit', () => {
+      it('logs owner-drift and show-rule-invalid once per list per session, and writes nothing', async () => {
+        const lists = [
+          list({ id: 'audit-drift', ownerId: 'm-2', assigneeIds: ['m-1', 'm-2'] }),
+          list({ id: 'audit-moved', ownerId: 'm-3', assigneeIds: ['m-1', 'm-2'] }),
+          list({ id: 'audit-noowner', ownerId: '', assigneeIds: ['m-1'] }),
+          list({ id: 'audit-date', dueDate: '2026-06-30', showFrom: 'next week' }),
+          // Values `showRuleOf` never reads are not faults: an explicit `showOn` decides first,
+          // and an undated one-off is always `now`.
+          list({ id: 'audit-shown', dueDate: '2026-06-30', showOn: 'now', showFrom: 'bad' }),
+          list({ id: 'audit-undated', showFrom: 'bad' }),
+          list({
+            id: 'audit-nowlead',
+            lifecycle: 'recurring',
+            frequency: 'weekly',
+            lastResetDate: '2026-06-15',
+            showOn: 'now',
+            showLeadDays: 0,
+          }),
+          list({
+            id: 'audit-lead',
+            lifecycle: 'recurring',
+            frequency: 'weekly',
+            lastResetDate: '2026-06-15',
+            showLeadDays: 0,
+          }),
+          // A schedule but no baseline: it never comes due, so it reads as waiting.
+          list({ id: 'audit-noreset', lifecycle: 'recurring', frequency: 'daily' }),
+          // No schedule at all: `resolveListRule` says nothing about it, so the audit must.
+          list({ id: 'audit-nosched', lifecycle: 'recurring', lastResetDate: '2026-06-15' }),
+          list({ id: 'audit-ok', assigneeIds: ['m-1', 'm-2'] }),
+          // A lead longer than a weekly repeat allows is clamped on read, kept on purpose.
+          list({
+            id: 'audit-longlead',
+            lifecycle: 'recurring',
+            frequency: 'weekly',
+            lastResetDate: '2026-06-15',
+            showLeadDays: 9,
+          }),
+        ];
+        vi.mocked(listRepo.getAllLists).mockResolvedValue(lists);
+        const store = useListStore();
+        await store.loadLists();
+        await store.loadLists();
+        expect(events('lists', 'owner-drift').map((e) => [e.level, e.context])).toEqual([
+          ['warn', { action: 'owner-drift', detail: 'owner-reordered', count: 2 }],
+          ['warn', { action: 'owner-drift', detail: 'owner-not-listed', count: 2 }],
+          ['warn', { action: 'owner-drift', detail: 'owner-empty', count: 1 }],
+        ]);
+        expect(events('lists', 'show-rule-invalid').map((e) => e.context)).toEqual([
+          { action: 'show-rule-invalid', detail: 'invalid-date', kind: 'once' },
+          { action: 'show-rule-invalid', detail: 'invalid-lead', kind: 'repeat' },
+        ]);
+        // Its own message and once-key, so it never hides (or is hidden by) a rule fault.
+        expect(events('lists', 'list-never-due').map((e) => e.context)).toEqual([
+          { action: 'list-never-due', detail: 'no-reset-day', kind: 'repeat' },
+          { action: 'list-never-due', detail: 'no-schedule', kind: 'repeat' },
+        ]);
+      });
     });
   });
 });

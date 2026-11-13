@@ -126,6 +126,47 @@ export function toAssigneePayload(ids: string[]): {
 }
 
 /**
+ * Who a list (or an archived `ListCycle`) is for: the ONE reader of the `ownerId` /
+ * `assigneeIds` pair, always owner first.
+ *   - in step (`assigneeIds` starts with `ownerId`): `assigneeIds`;
+ *   - `assigneeIds` CONTAINS `ownerId` further along: `[ownerId, ...the rest in order]`. Two
+ *     devices changing the people at once can merge field by field (`ownerId` from one write,
+ *     `assigneeIds` from the other), and an older build moving the owner to someone already
+ *     listed writes `ownerId` alone; either way everyone listed is kept;
+ *   - `ownerId` is NOT in `assigneeIds` (an older build moved the owner to someone else, which
+ *     leaves `assigneeIds` stale, or two concurrent people edits merged field by field):
+ *     `[ownerId]`, the newer owner wins. A READING only: the stored ids may be the half of a
+ *     merge that holds people, so nothing writes this back until a person sets the people;
+ *   - an empty `ownerId`: the stored ids, de-duplicated with blanks dropped (`[]` when there
+ *     are none, which every list surface already reads as nobody);
+ *   - no `assigneeIds`: `[ownerId]`.
+ * Pure and silent (it runs inside computeds); the drift is logged once at load by the list
+ * store, and only the lossless readings (owner listed but not first, empty owner) are stored
+ * back on the list's next write through `updateList`.
+ */
+export function listAssignees(entity: { ownerId: string; assigneeIds?: string[] }): string[] {
+  const ids = entity.assigneeIds;
+  const owner = entity.ownerId;
+  if (!owner) return ids?.length ? toListAssigneePayload(ids).assigneeIds : [];
+  if (ids?.length && ids[0] === owner) return ids;
+  if (ids?.includes(owner)) return [owner, ...ids.filter((id) => id !== owner)];
+  return [owner];
+}
+
+/**
+ * The ONE producer of a list's ownership pair: `assigneeIds` de-duplicated (order kept, blanks
+ * dropped) and `ownerId` its first. Never throws: an empty set gives an empty owner, and the
+ * store refuses an empty or unknown set before it writes.
+ */
+export function toListAssigneePayload(ids: readonly string[]): {
+  assigneeIds: string[];
+  ownerId: string;
+} {
+  const assigneeIds = [...new Set(ids.filter(Boolean))];
+  return { assigneeIds, ownerId: assigneeIds[0] ?? '' };
+}
+
+/**
  * Resolve member ids to members, in `ids` order, dropping any id that no longer
  * resolves (a removed member, a stale CRDT entry). Pure: the caller passes the
  * roster (`familyStore.members`). Used for trip travellers (`TripChip`, the phone

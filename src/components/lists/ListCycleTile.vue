@@ -19,7 +19,8 @@ import { useListCategoryLabel } from '@/composables/useListCategoryLabel';
 import { getListCategory } from '@/constants/listCategories';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { formatDateShort } from '@/utils/date';
-import MemberChip from '@/components/ui/MemberChip.vue';
+import ActivityOwnerStack from '@/components/ui/ActivityOwnerStack.vue';
+import { useListPeople } from '@/composables/useListPeople';
 import type { ListCycle } from '@/types/models';
 
 const props = defineProps<{ cycle: ListCycle }>();
@@ -27,6 +28,10 @@ const emit = defineEmits<{ open: [id: string] }>();
 
 const { t } = useTranslation();
 const { categoryLabel } = useListCategoryLabel();
+const { peopleOf } = useListPeople();
+
+/** Everyone the list was for when this round was filed (#147). */
+const people = computed(() => peopleOf(props.cycle));
 
 const accent = computed(
   () => getListCategory(props.cycle.category)?.color ?? 'var(--color-primary-500)'
@@ -63,7 +68,7 @@ const whenLabel = computed(() =>
       :style="{ backgroundColor: `color-mix(in srgb, ${accent} 12%, transparent)` }"
     >
       <span class="z-[1] text-xl drop-shadow-sm" aria-hidden="true">{{ cycle.emoji }}</span>
-      <MemberChip :member-id="cycle.ownerId" size="dot" />
+      <ActivityOwnerStack :members="people" size="xs" />
       <span
         class="pointer-events-none absolute -right-1 -bottom-3 text-4xl opacity-[0.07]"
         aria-hidden="true"

@@ -21,7 +21,7 @@ import LinkedActivityChip from '@/components/todo/LinkedActivityChip.vue';
 import LinkedCardChip from '@/components/todo/LinkedCardChip.vue';
 import TodoCompleteCheckbox from '@/components/todo/TodoCompleteCheckbox.vue';
 import TodoRepeatField from '@/components/todo/TodoRepeatField.vue';
-import TodoShowField from '@/components/todo/TodoShowField.vue';
+import ShowRuleField from '@/components/ui/ShowRuleField.vue';
 import NotifyParentsToggle from '@/components/ui/NotifyParentsToggle.vue';
 import { useTodoCardLink } from '@/composables/useTodoCardLink';
 import { useMemberInfo } from '@/composables/useMemberInfo';
@@ -600,7 +600,8 @@ async function handleDelete() {
         class="px-1"
         data-testid="todo-show-edit"
       >
-        <TodoShowField
+        <ShowRuleField
+          kind="todo"
           :model-value="showRule"
           :repeating="repeating"
           :due-date="todo.dueDate"

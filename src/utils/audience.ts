@@ -28,11 +28,17 @@
  *   `isChildOnly` asks the same "child-only" question viewer-free, for the toggle UI.
  */
 import { isAdultMember } from '@/composables/useMemberInfo';
-import { normalizeAssignees } from '@/utils/assignees';
-import { isRecurring } from '@/utils/listLifecycle';
+import { listAssignees, normalizeAssignees } from '@/utils/assignees';
+import { isFiled, isRecurring, listRemaining, listSubject } from '@/utils/listLifecycle';
 import { isRepeating } from '@/utils/todoRecurrence';
-import { todoPlate, type PlateClock, type ShownPlate } from '@/utils/todoPlate';
-import type { DutyCompletion, FamilyList, FamilyMember, TodoItem } from '@/types/models';
+import { isYmd, plateOf, todoPlate, type PlateClock, type ShownPlate } from '@/utils/todoPlate';
+import type {
+  DutyCompletion,
+  FamilyList,
+  FamilyMember,
+  ISODateString,
+  TodoItem,
+} from '@/types/models';
 
 export type BriefingAudience =
   | { kind: 'assignee' }
@@ -166,14 +172,18 @@ export function classifyPlateTodo(
   return audience.kind === 'hidden' ? null : { plate, audience };
 }
 
-/** `classifyOwnerAudience` for a Beanie List, with the routine gate applied. */
+/**
+ * `classifyAudience` over a Beanie List's assignees (`listAssignees`), with the routine gate
+ * applied. List surfaces then gate on `ownerItemSurfaces`, not on "not hidden": a list whose
+ * people no longer resolve must not land on every device as `unassigned`.
+ */
 export function classifyListAudience(
-  list: RoutineList & Pick<FamilyList, 'ownerId'>,
+  list: RoutineList & Pick<FamilyList, 'ownerId' | 'assigneeIds'>,
   viewer: FamilyMember,
   resolveMember: Resolve,
   missed: boolean
 ): BriefingAudience {
-  return gateRoutine(classifyOwnerAudience(list.ownerId, viewer, resolveMember), {
+  return gateRoutine(classifyAudience(listAssignees(list), viewer, resolveMember), {
     routine: isRecurring(list),
     missed,
     notifyParents: list.notifyParents === true,
@@ -181,7 +191,41 @@ export function classifyListAudience(
 }
 
 /**
- * Should a single-owner item surface to this viewer at all?
+ * Where a list sits on the clock's day, who sees it there and how many items it counts: the
+ * list twin of `classifyPlateTodo`, the ONE rule the briefing and the widget's lists share.
+ * null for a filed list, one not showing yet (`waiting`, or a repeating list with no reset day),
+ * one that fails `ownerItemSurfaces` for this viewer, or one with nothing left. "Missed" (for
+ * the routine gate) is the plate being `overdue`; no `projected` flag is needed, because a
+ * repeating list is never overdue and the gate applies to repeating lists only. `due` is the
+ * subject's due day (a repeating list: its reset day), absent for an undated list.
+ */
+export function classifyPlateList(
+  list: FamilyList,
+  viewer: FamilyMember,
+  resolveMember: Resolve,
+  clock: PlateClock
+): {
+  plate: ShownPlate;
+  audience: BriefingAudience;
+  remaining: number;
+  due?: ISODateString;
+} | null {
+  if (isFiled(list)) return null;
+  const subject = listSubject(list, clock.ymd);
+  if (!subject) return null;
+  const plate = plateOf(subject, clock);
+  if (plate === 'waiting') return null;
+  const audience = classifyListAudience(list, viewer, resolveMember, plate === 'overdue');
+  if (!ownerItemSurfaces(audience)) return null;
+  const remaining = listRemaining(list, subject);
+  if (remaining === 0) return null;
+  return isYmd(subject.dueDate)
+    ? { plate, audience, remaining, due: subject.dueDate }
+    : { plate, audience, remaining };
+}
+
+/**
+ * Should an owned item (a list, a cook) surface to this viewer at all?
  *
  * `assignee` (mine) or `forChild` (an adult seeing a child's) — the same two the
  * to-do surfaces show. Deliberately EXCLUDES `unassigned`, which for a

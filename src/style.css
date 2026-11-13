@@ -152,6 +152,12 @@
      colour); the Sky Silk lift in dark (7.99 on raised). */
   --trip-ink: #2c3e50;
 
+  /* Ink for the small Sky Silk pills (the `EverySessionTag`, a list's "Shows from ..." tag and
+     drawer pill over `--tint-silk-20`; the import review's silk chip and calendar-import legend
+     chip): 5.9:1 on the tint in light; the Sky Silk lift in dark (5.5:1 on raised, 4.9:1 on
+     overlay). The ONE place this pair lives, so no pill restates it. */
+  --silk-ink: #1f5f80;
+
   /* Family birthdays (derived, read-only — see `utils/birthdays.ts`). The same
      family as the `birthday` activity category so a derived birthday and a
      birthday PARTY someone scheduled read as the same kind of day, but DEEPENED
@@ -226,6 +232,7 @@
   --holiday-clay: #c98c75;
   --holiday-clay-tint: rgb(201 140 117 / 12%);
   --trip-ink: var(--color-silk-lift);
+  --silk-ink: var(--color-silk-lift);
 
   /* 6.28:1 on surface-raised, 7.25:1 on surface-ground. */
   --birthday-orange: #ff8a5b;

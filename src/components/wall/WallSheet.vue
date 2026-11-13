@@ -33,13 +33,14 @@ import { useTranslation } from '@/composables/useTranslation';
 import { fillTemplate } from '@/utils/fillTemplate';
 
 import { isRecurring, listProgress } from '@/utils/listLifecycle';
+import { useListPeople } from '@/composables/useListPeople';
 import { useActivityIdentity } from '@/composables/useActivityIdentity';
 import CelebrationConfetti from '@/components/ui/CelebrationConfetti.vue';
 import { activityDetailRows } from '@/utils/activityDetails';
 import { bookingProgress, daysUntilTrip, tripCountdownKey, tripTypeEmoji } from '@/utils/vacation';
 import type { UIStringKey } from '@/services/translation/uiStrings';
-import type { FamilyList, FamilyMember, FamilyActivity } from '@/types/models';
-import { jobOwnerIds, uniqueTodoJobs } from '@/utils/wallJobs';
+import type { FamilyMember, FamilyActivity } from '@/types/models';
+import { jobOwnerIds, uniqueListGroups, uniqueTodoJobs } from '@/utils/wallJobs';
 import type {
   WallJob,
   WallJobNote,
@@ -199,7 +200,8 @@ const sheetLists = computed<WallListGroup[]>(() => {
     // out of reach.
     ...props.orphanLists,
   ];
-  return all.filter((g) => g.list.id === value.listId);
+  // One group per list: a list for two beans is in both their lanes.
+  return uniqueListGroups(all).filter((g) => g.list.id === value.listId);
 });
 
 /**
@@ -354,10 +356,8 @@ const detailRows = computed(() => {
 function membersForActivity(activity: FamilyActivity): FamilyMember[] {
   return identityFor(activity).stackMembers;
 }
-/** Whose list this is — blank when the owner is not a member we know. */
-function listOwnerName(list: FamilyList): string {
-  return familyStore.members.find((m) => m.id === list.ownerId)?.name ?? '';
-}
+/** Whose list this is, every assignee named (#147); blank when none is a member we know. */
+const { namesOf: listOwnerName } = useListPeople();
 
 const { memberAvatarBindings } = useMemberAvatarBindings();
 

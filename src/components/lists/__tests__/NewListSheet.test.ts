@@ -1,7 +1,9 @@
 /**
  * NewListSheet — Who Owns What (#109) template default: a template mapped to a card
  * owns the new list with the card's single holder, while the current member stays the
- * creator; the tile explains it before the pick.
+ * creator; the tile explains it before the pick. "Who's it for?" (#147): the row starts with
+ * the creator, its choice is passed as `assigneeIds`, it replaces the card default once
+ * changed, and it never goes empty.
  */
 import { mount } from '@vue/test-utils';
 import { setActivePinia, createPinia } from 'pinia';
@@ -13,7 +15,14 @@ vi.mock('@/stores/listStore', () => ({
   useListStore: () => ({ createFromTemplate, createBlankList }),
 }));
 vi.mock('@/stores/familyStore', () => ({
-  useFamilyStore: () => ({ currentMember: { id: 'me' } }),
+  // `members` is the roster `ListPeoplePicker` counts a pick against.
+  useFamilyStore: () => ({
+    currentMember: { id: 'me' },
+    members: [
+      { id: 'me', name: 'Me' },
+      { id: 'jill', name: 'Jill' },
+    ],
+  }),
 }));
 vi.mock('@/composables/useTranslation', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
@@ -32,6 +41,11 @@ import NewListSheet from '../NewListSheet.vue';
 
 const stubs = {
   BaseModal: { template: '<div><slot /></div>' },
+  FamilyChipPicker: {
+    name: 'FamilyChipPicker',
+    props: ['modelValue'],
+    template: '<div data-testid="picker" />',
+  },
   ListCategoryPills: true,
   BaseButton: { template: '<button><slot /></button>' },
 };
@@ -56,7 +70,7 @@ describe('NewListSheet — card holder default (#109)', () => {
   it('owns the list with the holder and keeps the current member as creator', async () => {
     const wrapper = mount(NewListSheet, { props: { open: true }, global: { stubs } });
     await tile(wrapper, 'lists.template.grocery.name').trigger('click');
-    expect(createFromTemplate).toHaveBeenCalledWith('grocery', 'me', { ownerId: 'sofia' });
+    expect(createFromTemplate).toHaveBeenCalledWith('grocery', 'me', { assigneeIds: ['sofia'] });
     expect(logEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         surface: 'lists',
@@ -69,7 +83,7 @@ describe('NewListSheet — card holder default (#109)', () => {
   it("keeps today's owner default for an unmapped template", async () => {
     const wrapper = mount(NewListSheet, { props: { open: true }, global: { stubs } });
     await tile(wrapper, 'lists.template.honeydo.name').trigger('click');
-    expect(createFromTemplate).toHaveBeenCalledWith('honey-do', 'me', {});
+    expect(createFromTemplate).toHaveBeenCalledWith('honey-do', 'me', { assigneeIds: ['me'] });
     expect(logEvent).not.toHaveBeenCalled();
   });
 });
@@ -80,7 +94,10 @@ describe('NewListSheet — blank list', () => {
     await tile(wrapper, 'lists.new.blank').trigger('click');
     await Promise.resolve();
     // No pill and no `blankCategory`: the store's own default (Home) applies.
-    expect(createBlankList).toHaveBeenCalledWith('me', { category: undefined });
+    expect(createBlankList).toHaveBeenCalledWith('me', {
+      category: undefined,
+      assigneeIds: ['me'],
+    });
     expect(wrapper.emitted('created')?.[0]).toEqual(['blank-list']);
   });
 
@@ -90,7 +107,7 @@ describe('NewListSheet — blank list', () => {
       global: { stubs },
     });
     await tile(wrapper, 'lists.new.blank').trigger('click');
-    expect(createBlankList).toHaveBeenCalledWith('me', { category: 'trips' });
+    expect(createBlankList).toHaveBeenCalledWith('me', { category: 'trips', assigneeIds: ['me'] });
   });
 
   it('creates once on a double tap (a second untracked blank would never be discarded)', async () => {
@@ -120,7 +137,10 @@ describe('NewListSheet — caller overrides (#114)', () => {
     });
     await tile(wrapper, 'lists.template.honeydo.name').trigger('click');
     await Promise.resolve();
-    expect(createFromTemplate).toHaveBeenCalledWith('honey-do', 'me', link);
+    expect(createFromTemplate).toHaveBeenCalledWith('honey-do', 'me', {
+      assigneeIds: ['me'],
+      ...link,
+    });
     expect(wrapper.emitted('created')?.[0]).toEqual(['new-list', 'honey-do']);
   });
 
@@ -131,7 +151,7 @@ describe('NewListSheet — caller overrides (#114)', () => {
     });
     await tile(wrapper, 'lists.template.grocery.name').trigger('click');
     expect(createFromTemplate).toHaveBeenCalledWith('grocery', 'me', {
-      ownerId: 'sofia',
+      assigneeIds: ['sofia'],
       ...link,
     });
   });
@@ -142,7 +162,11 @@ describe('NewListSheet — caller overrides (#114)', () => {
       global: { stubs },
     });
     await tile(wrapper, 'lists.new.blank').trigger('click');
-    expect(createBlankList).toHaveBeenCalledWith('me', { category: undefined, ...link });
+    expect(createBlankList).toHaveBeenCalledWith('me', {
+      category: undefined,
+      assigneeIds: ['me'],
+      ...link,
+    });
   });
 });
 
@@ -166,5 +190,57 @@ describe('NewListSheet — suggested template (#114)', () => {
     const wrapper = mount(NewListSheet, { props: { open: true }, global: { stubs } });
     expect(templateTiles(wrapper)[0]!.text()).toContain('lists.template.grocery.name');
     expect(wrapper.find('[data-testid="suggested-badge"]').exists()).toBe(false);
+  });
+});
+
+describe("NewListSheet — who it's for (#147)", () => {
+  const picker = (wrapper: ReturnType<typeof mount>) =>
+    wrapper.findComponent({ name: 'FamilyChipPicker' });
+
+  it('starts with the creator', () => {
+    const wrapper = mount(NewListSheet, { props: { open: true }, global: { stubs } });
+    expect(picker(wrapper).props('modelValue')).toEqual(['me']);
+  });
+
+  it('passes the chosen people to a blank list and to a template', async () => {
+    const wrapper = mount(NewListSheet, { props: { open: true }, global: { stubs } });
+    await picker(wrapper).vm.$emit('update:modelValue', ['me', 'jill']);
+    await tile(wrapper, 'lists.new.blank').trigger('click');
+    await Promise.resolve();
+    expect(createBlankList).toHaveBeenCalledWith('me', {
+      category: undefined,
+      assigneeIds: ['me', 'jill'],
+    });
+
+    const again = mount(NewListSheet, { props: { open: true }, global: { stubs } });
+    await picker(again).vm.$emit('update:modelValue', ['jill']);
+    await tile(again, 'lists.template.honeydo.name').trigger('click');
+    expect(createFromTemplate).toHaveBeenCalledWith('honey-do', 'me', { assigneeIds: ['jill'] });
+  });
+
+  it('a changed row replaces the card default, and its hint goes', async () => {
+    const wrapper = mount(NewListSheet, { props: { open: true }, global: { stubs } });
+    await picker(wrapper).vm.$emit('update:modelValue', ['me', 'jill']);
+    expect(wrapper.find('[data-testid="inferred-hint"]').exists()).toBe(false);
+    await tile(wrapper, 'lists.template.grocery.name').trigger('click');
+    expect(createFromTemplate).toHaveBeenCalledWith('grocery', 'me', {
+      assigneeIds: ['me', 'jill'],
+    });
+    expect(logEvent).not.toHaveBeenCalled();
+  });
+
+  it('keeps at least one person: an empty pick is refused with a hint', async () => {
+    const wrapper = mount(NewListSheet, { props: { open: true }, global: { stubs } });
+    await picker(wrapper).vm.$emit('update:modelValue', []);
+    expect(picker(wrapper).props('modelValue')).toEqual(['me']);
+    expect(wrapper.get('[data-testid="new-list-people-hint"]').text()).toBe('lists.people.keepOne');
+    // The same rule as the drawer (one shared picker): only removed members is nobody too.
+    await picker(wrapper).vm.$emit('update:modelValue', ['m-gone']);
+    expect(picker(wrapper).props('modelValue')).toEqual(['me']);
+    await tile(wrapper, 'lists.new.blank').trigger('click');
+    expect(createBlankList).toHaveBeenCalledWith('me', {
+      category: undefined,
+      assigneeIds: ['me'],
+    });
   });
 });

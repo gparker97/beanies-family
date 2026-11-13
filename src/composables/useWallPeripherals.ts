@@ -21,8 +21,9 @@ import { useToday } from '@/composables/useToday';
 import { useTranslation } from '@/composables/useTranslation';
 import { mealDisplayName } from '@/utils/mealDisplayName';
 import type { UIStringKey } from '@/services/translation/uiStrings';
-import { isWallSafeList } from '@/utils/wallJobs';
+import { isWallSafeList, wallShowsList } from '@/utils/wallJobs';
 import { isFiled } from '@/utils/listLifecycle';
+import { plateClock } from '@/utils/todoPlate';
 import { tripDayProgress, tripPhase } from '@/utils/vacation';
 import { SLOT_EMOJI, SLOT_INDEX, pickTonight } from '@/constants/mealSlots';
 import type {
@@ -169,13 +170,16 @@ export function useWallPeripherals(selectedTripId?: Ref<string | null>) {
    * one child would have blanked "The lists" on the kitchen wall — exactly the
    * cross-contamination `WallFooter` keeps its own filter to avoid.
    *
-   * `isWallSafeList` is the same gate the jobs rule uses, so a health list
-   * cannot reach a shared screen through the lists card after being excluded
-   * from the jobs columns.
+   * `isWallSafeList` and `wallShowsList` are the same gates the jobs rule uses, so a
+   * health list, or one not showing yet, cannot reach a shared screen through the lists
+   * card after being excluded from the jobs columns.
    */
-  const lists = computed<FamilyList[]>(() =>
-    listStore.lists.filter((l) => !isFiled(l) && isWallSafeList(l))
-  );
+  const lists = computed<FamilyList[]>(() => {
+    const clock = { ...plateClock(), ymd: today.value };
+    return listStore.lists.filter(
+      (l) => !isFiled(l) && isWallSafeList(l) && wallShowsList(l, clock)
+    );
+  });
 
   return {
     mealsToday,

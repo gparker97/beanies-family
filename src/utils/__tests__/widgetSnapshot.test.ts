@@ -289,6 +289,10 @@ const MEDS_LIST = {
   updatedAt: '',
 } as unknown as FamilyList;
 
+/**
+ * Due tomorrow and shown right away by choice (`showOn: 'now'`), so it is a `later` row today.
+ * A list's default is its due date only (plan 2026-11-13); without the rule it would wait.
+ */
 const GROCERIES = {
   id: 'groceries',
   title: 'groceries',
@@ -297,6 +301,7 @@ const GROCERIES = {
   ownerId: 'sam',
   lifecycle: 'one-off',
   dueDate: TOMORROW,
+  showOn: 'now',
   items: [
     { id: 'g1', title: 'milk', completed: false },
     { id: 'g2', title: 'eggs', completed: true },
@@ -880,7 +885,7 @@ describe('buildWidgetSnapshot: the to-dos section', () => {
   it('ranks to-dos, hints and lists together by when they are due, never by kind', () => {
     // Sam's view: the overdue candles; today, the timed swim bag, then Ava's library book and
     // the gift hint (a hint ranks exactly like a to-do); later this week, the groceries list
-    // (tomorrow) and the plumber (Thursday). Jo's passports and Max's meds list are another
+    // (tomorrow, shown early by its rule) and the plumber (Thursday). Jo's passports and Max's meds list are another
     // adult's, so (as on the briefing) they never show.
     expect(tasks(today(build().snapshot).view)).toEqual([
       ['todo', 'buy birthday candles', 'overdue', 'accent'],
@@ -1029,15 +1034,44 @@ describe('buildWidgetSnapshot: the to-dos section', () => {
     const listRow = (s: WidgetSnapshot, i: number) =>
       s.days[i]!.view.tasks.items.find((r) => r.kind === 'list');
 
-    it('is a today row with the open count on the day it reset, then predicts every entry', () => {
+    it('is a today row with the open count on the day it reset, then on each reset day only', () => {
       const s = build({ lists: [repeating()], todos: [], hintTodos: [] }).snapshot;
       expect(listRow(s, 0)).toMatchObject({ title: 'rounds, 2 left', bucket: 'today' });
-      for (const i of [1, 3, 5]) {
-        expect(listRow(s, i)).toMatchObject({ title: 'rounds, 3 left', bucket: 'later' });
-      }
+      // Between resets it waits (the list default: its due day, a repeating list's being its
+      // reset day). Before plan 2026-11-13 these entries carried it as `later`.
+      for (const i of [1, 3, 5]) expect(listRow(s, i)).toBeUndefined();
       for (const i of [2, 4, 6]) {
         expect(listRow(s, i)).toMatchObject({ title: 'rounds, 3 left', bucket: 'today' });
       }
+    });
+
+    it('is later between resets under Every Day, counting the round in progress', () => {
+      const s = build({ lists: [repeating({ showOn: 'now' })], todos: [], hintTodos: [] }).snapshot;
+      expect(listRow(s, 0)).toMatchObject({ title: 'rounds, 2 left', bucket: 'today' });
+      // The 12th belongs to the round that began today; the 14th, 16th to later rounds.
+      expect(listRow(s, 1)).toMatchObject({ title: 'rounds, 2 left', bucket: 'later' });
+      for (const i of [3, 5]) {
+        expect(listRow(s, i)).toMatchObject({ title: 'rounds, 3 left', bucket: 'later' });
+      }
+    });
+
+    it('shows a weekly list early by Days Before, counting every item of the next round', () => {
+      // Weekly on Mondays; the next reset is Monday the 12th, so a 1-day lead opens today.
+      const weekly = repeating({
+        cadence: { unit: 'week', interval: 1, weekdays: [1] },
+        createdAt: '2026-10-05',
+        lastResetDate: '2026-10-05',
+        showLeadDays: 1,
+      });
+      const s = build({ lists: [weekly], todos: [], hintTodos: [] }).snapshot;
+      expect(listRow(s, 0)).toMatchObject({ title: 'rounds, 3 left', bucket: 'later' });
+      expect(listRow(s, 1)).toMatchObject({ title: 'rounds, 3 left', bucket: 'today' });
+      const plain = build({
+        lists: [{ ...weekly, showLeadDays: undefined }],
+        todos: [],
+        hintTodos: [],
+      }).snapshot;
+      expect(listRow(plain, 0)).toBeUndefined();
     });
 
     it('shows a daily list as today on every entry', () => {
@@ -1056,19 +1090,22 @@ describe('buildWidgetSnapshot: the to-dos section', () => {
         items: [{ id: 'r1', title: 'a', completed: true }],
       });
       const s = build({ lists: [done], todos: [], hintTodos: [] }).snapshot;
-      // Today's round is done, so today's entry only carries tomorrow's reset as "later".
-      expect(listRow(s, 0)).toMatchObject({ title: 'rounds, 1 left', bucket: 'later' });
+      // Today's round is done, so today's entry carries nothing (tomorrow's reset waits for
+      // its day); tomorrow's entry is that reset, every item unticked.
+      expect(listRow(s, 0)).toBeUndefined();
       expect(listRow(s, 1)).toMatchObject({ title: 'rounds, 1 left', bucket: 'today' });
     });
 
-    it('is later, not today, on the day after its reset', () => {
-      const s = build({
-        lists: [repeating({ createdAt: '2026-10-10', lastResetDate: '2026-10-10' })],
+    it('is not today on the day after its reset: waiting by default, later under Every Day', () => {
+      const dayAfter = repeating({ createdAt: '2026-10-10', lastResetDate: '2026-10-10' });
+      const s = build({ lists: [dayAfter], todos: [], hintTodos: [] }).snapshot;
+      expect(listRow(s, 0)).toBeUndefined();
+      const now = build({
+        lists: [{ ...dayAfter, showOn: 'now' }],
         todos: [],
         hintTodos: [],
       }).snapshot;
-      expect(today(s).view.tasks.items.filter((r) => r.bucket === 'today')).toEqual([]);
-      expect(listRow(s, 0)).toMatchObject({ bucket: 'later' });
+      expect(listRow(now, 0)).toMatchObject({ title: 'rounds, 2 left', bucket: 'later' });
     });
 
     it('is never overdue or undated on any entry', () => {
@@ -1087,11 +1124,41 @@ describe('buildWidgetSnapshot: the to-dos section', () => {
         todos: [],
         hintTodos: [],
       }).snapshot;
-      for (const day of s.days) {
-        expect(day.view.tasks.items.filter((r) => r.kind === 'list').map((r) => r.id)).toEqual([
-          'list:priv',
-        ]);
-      }
+      s.days.forEach((day, i) => {
+        // Reset days only (entries 0, 2, 4, 6); the waiting days carry no list at all.
+        expect(day.view.tasks.items.filter((r) => r.kind === 'list').map((r) => r.id)).toEqual(
+          i % 2 === 0 ? ['list:priv'] : []
+        );
+      });
+    });
+
+    it('shows a list for two assignees to both, with both as its owners', () => {
+      const shared = repeating({ ownerId: 'jo', assigneeIds: ['jo', 'sam'] });
+      const s = build({ lists: [shared], todos: [], hintTodos: [] }).snapshot;
+      expect(listRow(s, 0)).toMatchObject({ id: 'list:rep', title: 'rounds, 2 left' });
+      const jo = build({ currentMember: JO, lists: [shared], todos: [], hintTodos: [] }).snapshot;
+      expect(listRow(jo, 0)).toMatchObject({ id: 'list:rep' });
+    });
+  });
+
+  it('keeps a one-off list off until its due day by default (no look-ahead)', () => {
+    const plain = { ...GROCERIES, id: 'plain', showOn: undefined } as FamilyList;
+    const waiting = {
+      ...GROCERIES,
+      id: 'waiting',
+      showOn: undefined,
+      dueDate: '2026-10-16',
+      showFrom: '2026-10-14',
+    } as FamilyList;
+    const s = build({ todos: [], lists: [plain, waiting], hintTodos: [] }).snapshot;
+    const ids = (i: number) => s.days[i]!.view.tasks.items.map((r) => r.id);
+    expect(ids(0)).toEqual([]);
+    expect(ids(1)).toEqual(['list:plain']);
+    // A "Show from" brings it early: the 14th and 15th as `later`, the 16th as today.
+    expect(ids(3)).toEqual(['list:plain', 'list:waiting']);
+    expect(s.days[3]!.view.tasks.items[1]).toMatchObject({ bucket: 'later' });
+    expect(s.days[5]!.view.tasks.items.find((r) => r.id === 'list:waiting')).toMatchObject({
+      bucket: 'today',
     });
   });
 

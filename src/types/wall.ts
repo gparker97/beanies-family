@@ -76,7 +76,9 @@ export interface WallListGroup {
 
 export interface WallJobsResult {
   /**
-   * EVERY wall-safe list a bean owns, repeating or one-off, each with its items.
+   * EVERY wall-safe list a bean is assigned to that is showing today (`wallShowsList`),
+   * repeating or one-off, each with its items. A list for two beans is under both; a view
+   * that walks every lane collapses it with `uniqueListGroups`.
    *
    * Lists are no longer split by lifecycle for display. A recurring "leo's jobs"
    * and a one-off "swim bag" are both Leo's list; parking one under his name and
@@ -85,7 +87,7 @@ export interface WallJobsResult {
    */
   listsByMember: Record<string, WallListGroup[]>;
   /**
-   * Lists whose owner is not a member the wall knows about (deleted, or not yet
+   * Lists none of whose assignees is a member the wall knows about (deleted, or not yet
    * synced). They still have to be findable — silently dropping a list is worse
    * than showing it without a face.
    */

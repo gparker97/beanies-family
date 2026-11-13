@@ -35,11 +35,13 @@ import {
   jobOwnerIds,
   jobsProgress,
   openLaterTodoJobs,
+  uniqueListGroups,
   uniqueTodoJobs,
   UNASSIGNED,
 } from '@/utils/wallJobs';
 import WallOwnerFaces from '@/components/wall/WallOwnerFaces.vue';
 import { formatNameList } from '@/utils/assignees';
+import { useListPeople } from '@/composables/useListPeople';
 import type { FamilyList, FamilyMember } from '@/types/models';
 import type { WallJob, WallPeripheralData, WallSheetTarget } from '@/types/wall';
 
@@ -211,22 +213,28 @@ const bandColumns = computed(() =>
  * but the card still counted the raw item and showed "0/1" for a list with
  * nothing under it.
  */
-const allGroups = computed(() => [
-  ...beans.value.flatMap((m) => props.peripherals.listsFor(m.id)),
-  ...props.peripherals.orphanLists,
-]);
+const allGroups = computed(() =>
+  // One group per list: a list for two beans is in both their lanes.
+  uniqueListGroups([
+    ...beans.value.flatMap((m) => props.peripherals.listsFor(m.id)),
+    ...props.peripherals.orphanLists,
+  ])
+);
 const visibleLists = computed(() =>
   allGroups.value.filter((g) => g.jobs.length).slice(0, props.variant === 'rail' ? 1 : 4)
 );
 
-/** Whose list this is. A list whose owner we cannot resolve says so, rather
- *  than rendering "'s list" with a hole where the name should be. */
+/** Everyone a list is for (#147) that the roster still knows, in order. */
+const { peopleOf: listPeople, namesOf: listNames } = useListPeople();
+/** Whose list this is, every assignee named. A list none of whose people we can resolve
+ *  says so, rather than rendering "'s list" with a hole where the name should be. */
 function ownerLabel(list: FamilyList): string {
-  const name = familyStore.members.find((m) => m.id === list.ownerId)?.name;
+  const name = listNames(list);
   return name ? fillTemplate(t('wall.list.ownerList'), { name }) : t('wall.orphanLists');
 }
+/** The first known assignee's colour for the dot (the lane the list is credited to first). */
 function ownerColour(list: FamilyList): string {
-  return familyStore.members.find((m) => m.id === list.ownerId)?.color ?? 'transparent';
+  return listPeople(list)[0]?.color ?? 'transparent';
 }
 function percent(jobs: WallJob[]): number {
   const { done, total } = jobsProgress(jobs);

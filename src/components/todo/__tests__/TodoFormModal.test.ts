@@ -408,7 +408,7 @@ describe('TodoFormModal: Keep Parents Posted', () => {
 
 describe('TodoFormModal: Show from', () => {
   const field = (w: Awaited<ReturnType<typeof mountOpen>>) =>
-    w.findComponent({ name: 'TodoShowField' });
+    w.findComponent({ name: 'ShowRuleField' });
   const toggle = (w: Awaited<ReturnType<typeof mountOpen>>) =>
     w.find('[data-testid="todo-repeat-toggle"]');
   const create = async (w: Awaited<ReturnType<typeof mountOpen>>) => {
@@ -420,9 +420,9 @@ describe('TodoFormModal: Show from', () => {
 
   it('shows the row in the same box as the date, only once a date is set', async () => {
     const w = await mountOpen();
-    expect(w.find('[data-testid="todo-show-field"]').exists()).toBe(false);
+    expect(w.find('[data-testid="show-rule-field"]').exists()).toBe(false);
     await pick(w, 'BeanieDatePicker', '2030-10-20');
-    expect(w.find('[data-testid="todo-when-box"] [data-testid="todo-show-field"]').exists()).toBe(
+    expect(w.find('[data-testid="todo-when-box"] [data-testid="show-rule-field"]').exists()).toBe(
       true
     );
   });

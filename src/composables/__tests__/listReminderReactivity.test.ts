@@ -238,6 +238,37 @@ describe('reassigning a list that already exists', () => {
   });
 });
 
+describe('adding a second assignee to a list that already exists', () => {
+  const listReminders = (input: ReturnType<typeof mount>['reminderInput']) =>
+    buildReminderSchedule(input.value, NOW, PREFS).reminders.filter((r) => r.kind === 'list');
+
+  it('🔴 starts reminding the person added alongside the owner', () => {
+    h.lists.value = [existingList({ dueDate: '2026-05-24', ownerId: 'wife' })];
+    const { reminderInput } = mount();
+    expect(listReminders(reminderInput)).toEqual([]);
+
+    // What `listStore.setAssignees` writes: the pair, in step.
+    editList('l-1', { ownerId: 'wife', assigneeIds: ['wife', 'me'] });
+
+    expect(listReminders(reminderInput)).toHaveLength(1);
+  });
+
+  it('keeps its timing: the show rule never moves a reminder off the due date', () => {
+    h.lists.value = [existingList({ dueDate: '2026-05-24', assigneeIds: ['me', 'wife'] })];
+    const { reminderInput } = mount();
+    editList('l-1', { showFrom: '2026-05-23' });
+    const [r] = listReminders(reminderInput);
+    expect(r!.fireAt).toEqual(new Date('2026-05-24T09:00:00'));
+  });
+
+  it('reads a drifted pair (an older build changed the owner) as its owner', () => {
+    h.lists.value = [existingList({ dueDate: '2026-05-24', assigneeIds: ['me'] })];
+    const { reminderInput } = mount();
+    editList('l-1', { ownerId: 'wife' }); // what an older build writes: ownerId alone
+    expect(listReminders(reminderInput)).toEqual([]);
+  });
+});
+
 describe('the familyLists flag', () => {
   it('🔴 passes no lists at all when the flag is off', () => {
     h.flagOn.value = false;

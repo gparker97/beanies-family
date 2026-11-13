@@ -35,7 +35,6 @@
  */
 import type {
   FamilyActivity,
-  FamilyList,
   FamilyMember,
   FamilyVacation,
   LanguageCode,
@@ -74,19 +73,12 @@ import {
 } from '@/utils/reminderSchedule';
 import {
   classifyAudience,
-  classifyListAudience,
+  classifyPlateList,
   classifyPlateTodo,
   isDutyDone,
   ownerItemSurfaces,
 } from '@/utils/audience';
 import { plateClock, type PlateClock, type ShownPlate } from '@/utils/todoPlate';
-import {
-  isFiled,
-  isListDue,
-  isRecurring,
-  listProgress,
-  nextListResetOnOrAfter,
-} from '@/utils/listLifecycle';
 import { sortByTime } from '@/utils/wallActivities';
 import { isTimedContinuation } from '@/utils/calendar/occurrence';
 import { isAllDayActivity } from '@/utils/calendar/activityDays';
@@ -107,7 +99,7 @@ import { shareableOrigin } from '@/utils/shareableOrigin';
 import { formatUiDate } from '@/utils/uiLocale';
 import { addDaysYmd, extractDatePart, formatTime12 } from '@/utils/date';
 import { fillTemplate } from '@/utils/fillTemplate';
-import { firstName, formatNameList, normalizeAssignees } from '@/utils/assignees';
+import { firstName, formatNameList, listAssignees, normalizeAssignees } from '@/utils/assignees';
 import { firstWord } from '@/utils/firstWord';
 import { glyphFor } from '@/utils/weather/weatherCodes';
 import {
@@ -302,7 +294,7 @@ interface RowEntry {
 interface DayContext {
   input: WidgetSnapshotInput;
   ymd: string;
-  /** The last day of the look-ahead from `ymd` (later hints and lists beyond it are left out). */
+  /** The last day of the look-ahead from `ymd` (a later task's tag past it names the month). */
   horizon: string;
   /**
    * The to-do plate clock for the day being built: today's real minute on today, the start of
@@ -693,10 +685,10 @@ interface TaskDraft {
    */
   done: boolean;
   /**
-   * A to-do's bucket, precomputed from its plate (`utils/todoPlate`): to-dos follow the show
-   * rule and have no look-ahead. Absent on hints and lists, which use `taskBucket`.
+   * The row's bucket, precomputed: a to-do's or list's from its plate (`utils/todoPlate`; both
+   * follow the show rule and have no look-ahead), a hint's from its event day.
    */
-  bucket?: WidgetTaskBucket;
+  bucket: WidgetTaskBucket;
 }
 
 /** The most to-dos and lists (and, separately, hints) one day carries; `overflow` counts the rest. */
@@ -705,21 +697,13 @@ export const MAX_WIDGET_TASKS = 16;
 /** The order of the section: overdue, today, undated, later this week. */
 const TASK_BUCKET_ORDER: readonly WidgetTaskBucket[] = ['overdue', 'today', 'undated', 'later'];
 
-/** A shown to-do plate as the widget's bucket. */
+/** A shown to-do or list plate as the widget's bucket. */
 const PLATE_TO_TASK_BUCKET = {
   overdue: 'overdue',
   today: 'today',
   undated: 'undated',
   upcoming: 'later',
 } as const satisfies Record<ShownPlate, WidgetTaskBucket>;
-
-/** Which bucket a hint's or list's `due` falls in on the day, or null past the look-ahead. */
-function taskBucket(ctx: DayContext, due: string): WidgetTaskBucket | null {
-  if (!due) return 'undated';
-  if (due < ctx.ymd) return 'overdue';
-  if (due === ctx.ymd) return 'today';
-  return due <= ctx.horizon ? 'later' : null;
-}
 
 /**
  * A completed to-do's completion falls on `ymd` (local date). `extractDatePart`, never a
@@ -765,7 +749,7 @@ function todoDraft(
   todo: TodoItem,
   ownerIds: string[],
   kind: 'todo' | 'hint'
-): TaskDraft {
+): Omit<TaskDraft, 'bucket'> {
   return {
     id: `todo:${todo.id}`,
     kind,
@@ -797,68 +781,47 @@ function hintDrafts(ctx: DayContext): TaskDraft[] {
     const event = hint.hintEventDate?.slice(0, 10) ?? '';
     if (event && event < ctx.ymd) continue;
     // A hint is about an event; whose it is never needs a dot, and it has no due time.
+    const onTheDay = event === ctx.ymd;
     out.push({
       ...todoDraft(ctx, hint, [], 'hint'),
-      due: event === ctx.ymd ? ctx.ymd : '',
+      due: onTheDay ? ctx.ymd : '',
       dueTime: undefined,
+      bucket: onTheDay ? 'today' : 'undated',
     });
   }
   return out;
 }
 
 /**
- * When a list is on the plate for the day being built, and how many items that is. A one-off
- * passes its own due date through (`taskBucket` sorts overdue/today/later/undated from it; an
- * undated list is `''`). A repeating list is due on the day its round began (`isListDue`); on
- * any other day the engine's first scheduled reset on/after the day, which will untick every
- * item, so all of them count. The on-or-after date is never before the day, so a repeating
- * list never reaches `overdue`; `null` when it has no schedule or no baseline (silent, as today).
- */
-function listDraftDue(
-  ctx: DayContext,
-  list: FamilyList
-): { due: string; remaining: number } | null {
-  if (!isRecurring(list)) {
-    return { due: list.dueDate?.slice(0, 10) ?? '', remaining: listProgress(list).open };
-  }
-  if (isListDue(list, ctx.ymd) === 'today') {
-    return { due: ctx.ymd, remaining: listProgress(list).open };
-  }
-  const next = nextListResetOnOrAfter(list, ctx.ymd);
-  return next ? { due: next, remaining: list.items.length } : null;
-}
-
-/**
- * Lists with open items that are due: overdue, today, undated (the briefing's `isListDue`
- * rule) or later this week. A repeating list is due on the day it resets (and `later` ahead
- * of its next scheduled reset); filed lists never are. Who sees a list is the single-owner
- * audience the briefing and the OS reminders share: the viewer's own and their children's
- * (private categories included, as on the briefing), never another adult's, and a child's
- * recurring list only when it keeps parents posted. `missed` is false: a recurring list never
- * reads as overdue (`isListDue`), and the routine gate only applies to recurring lists, so the
- * briefing's `due === 'overdue'` would be false for every list it gates.
+ * Lists on the plate for the day being built, as if it were today: the briefing's rule
+ * (`classifyPlateList`, shared with `useCriticalItems`) for when a list shows (its show rule:
+ * by default on its due day, a repeating list's being its reset day, and from then until done),
+ * who sees it (its assignees and their children's, never another adult's; a child's repeating
+ * list only when it keeps parents posted) and how many items it counts (`listRemaining`: the
+ * open items for the round in progress, every item for a later round, whose items untick on
+ * its reset). Filed and finished lists never show. The plate maps to the bucket exactly as a
+ * to-do's does, so a list shown early by its rule sits in `later` and one not showing yet is
+ * left out.
  */
 function listDrafts(ctx: DayContext): TaskDraft[] {
   const { t } = ctx.input;
   const out: TaskDraft[] = [];
   for (const list of ctx.input.lists) {
     ctx.cursor = list.id;
-    if (isFiled(list)) continue;
-    const audience = classifyListAudience(list, ctx.viewer, ctx.input.resolveMember, false);
-    if (!ownerItemSurfaces(audience)) continue;
-    const plate = listDraftDue(ctx, list);
-    if (!plate || plate.remaining === 0) continue;
+    const classified = classifyPlateList(list, ctx.viewer, ctx.input.resolveMember, ctx.clock);
+    if (!classified) continue;
     out.push({
       id: `list:${list.id}`,
       kind: 'list',
       title: fillTemplate(t('widget.listRemaining'), {
         list: list.title,
-        n: String(plate.remaining),
+        n: String(classified.remaining),
       }),
-      due: plate.due,
-      ownerIds: list.ownerId ? [list.ownerId] : [],
+      due: classified.due ?? '',
+      ownerIds: listAssignees(list),
       link: widgetLink(ctx.origin, entityDeepLink('list', list.id)),
       done: false,
+      bucket: PLATE_TO_TASK_BUCKET[classified.plate],
     });
   }
   return out;
@@ -886,7 +849,7 @@ function taskRow(ctx: DayContext, draft: TaskDraft, bucket: WidgetTaskBucket): W
       ? fillTemplate(t('widget.dueBy'), { time: formatTime12(draft.dueTime ?? '') })
       : t('widget.taskToday');
   } else if (bucket === 'later') {
-    // A to-do has no look-ahead, so one due beyond it names its month too ("Dec 18").
+    // To-dos and lists have no look-ahead, so one due beyond it names its month too ("Dec 18").
     tag =
       draft.due > ctx.horizon
         ? formatUiDate(draft.due, ctx.input.language, { month: 'short', day: 'numeric' })
@@ -919,8 +882,7 @@ const tasksPart: DayPart = {
     const ranked: { draft: TaskDraft; bucket: WidgetTaskBucket }[] = [];
     let doneToday = 0;
     for (const draft of drafts) {
-      const bucket = draft.bucket ?? taskBucket(ctx, draft.due);
-      if (!bucket) continue;
+      const { bucket } = draft;
       // A to-do done on the day is never a row; it counts when it would have counted open.
       if (draft.done) doneToday += Number(countsNow(draft.kind, bucket));
       else ranked.push({ draft, bucket });

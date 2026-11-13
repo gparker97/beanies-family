@@ -46,6 +46,7 @@ describe('EverySessionTag', () => {
     const wrapper = mount(EverySessionTag);
     expect(wrapper.text()).toContain('activityLinks.everySession');
     expect(wrapper.find('[aria-hidden="true"]').text()).toBe('↻');
-    expect(wrapper.classes()).toContain('dark:text-silk-lift');
+    // The ink is `--silk-ink`, whose dark value is the Sky Silk lift (pinned in silkInk.test).
+    expect(wrapper.classes()).toContain('text-[var(--silk-ink)]');
   });
 });

@@ -58,6 +58,30 @@ describe('freshItems', () => {
 });
 
 describe('buildCopySeeds', () => {
+  it('writes the ownership pair in step for each copy (one bean per copy)', () => {
+    const seeds = build(source({ assigneeIds: ['m-joey', 'm-ollie'] }));
+    expect(seeds.map((x) => [x.ownerId, x.assigneeIds])).toEqual([
+      ['m-joey', ['m-joey']],
+      ['m-ollie', ['m-ollie']],
+    ]);
+  });
+
+  it('carries the show rule on a repeating copy, never on a one-off copy', () => {
+    const rule = { showOn: 'now' as const, showLeadDays: 3, showFrom: '2026-09-10' };
+    const repeating = build(
+      source({ ...rule, lifecycle: 'recurring', frequency: 'weekly', lastResetDate: '2026-09-01' })
+    );
+    expect(repeating.map((x) => [x.showOn, x.showLeadDays, x.showFrom])).toEqual([
+      ['now', 3, undefined],
+      ['now', 3, undefined],
+    ]);
+    const oneOff = build(source({ ...rule, lifecycle: 'oneoff', dueDate: '2026-09-12' }));
+    expect(oneOff.map((x) => [x.showOn, x.showLeadDays, x.showFrom])).toEqual([
+      [undefined, undefined, undefined],
+      [undefined, undefined, undefined],
+    ]);
+  });
+
   it('produces one seed per owner, in selection order, owned by that bean', () => {
     const seeds = build(source());
     expect(seeds).toHaveLength(2);

@@ -16,8 +16,9 @@ import { useFamilyStore } from '@/stores/familyStore';
 import { getListCategory } from '@/constants/listCategories';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { listProgress } from '@/utils/listLifecycle';
+import { useListPeople } from '@/composables/useListPeople';
 import ListItemRow from '@/components/lists/ListItemRow.vue';
-import MemberChip from '@/components/ui/MemberChip.vue';
+import ActivityOwnerStack from '@/components/ui/ActivityOwnerStack.vue';
 import EverySessionTag from '@/components/ui/EverySessionTag.vue';
 import type { FamilyList } from '@/types/models';
 
@@ -27,6 +28,10 @@ const emit = defineEmits<{ open: [id: string] }>();
 const { t } = useTranslation();
 const listStore = useListStore();
 const familyStore = useFamilyStore();
+const { peopleOf } = useListPeople();
+
+/** Everyone the list is for (#147); a removed member drops out. */
+const people = computed(() => peopleOf(props.list));
 
 // How many items to show before clamping to a "+N more" door-back.
 const PREVIEW_LIMIT = 5;
@@ -147,7 +152,7 @@ function toggle(itemId: string): void {
             class="text-xs font-semibold whitespace-nowrap text-[var(--color-text-muted)]"
             >{{ card.progressLabel }}</span
           >
-          <MemberChip :member-id="list.ownerId" size="dot" />
+          <ActivityOwnerStack :members="people" size="xs" />
         </span>
       </span>
     </button>

@@ -127,6 +127,17 @@ describe('listStore.copyListForMembers', () => {
     expect(reportsAt('critical')).toHaveLength(0);
   });
 
+  it('writes each copy for ONE bean with the ownership pair in step, even from a shared list', async () => {
+    projection.lists = [list({ assigneeIds: ['m-joey', 'm-ollie'] })];
+    vi.mocked(listRepo.createLists).mockResolvedValue([]);
+    await useListStore().copyListForMembers('l-1', ['m-ollie', 'm-joey'], '{bean}');
+    const seeds = vi.mocked(listRepo.createLists).mock.calls[0]![0];
+    expect(seeds.map((x) => [x.ownerId, x.assigneeIds])).toEqual([
+      ['m-ollie', ['m-ollie']],
+      ['m-joey', ['m-joey']],
+    ]);
+  });
+
   it('returns null and warns — without paging — when the source is already gone', async () => {
     projection.lists = [];
     const store = useListStore();

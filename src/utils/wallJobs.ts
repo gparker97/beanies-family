@@ -9,9 +9,10 @@
  * path (which lives in `useWallJobs`).
  *
  * THE RULE, in one place:
- *   a bean's LISTS = every wall-safe list they own, repeating or one-off,
- *                    each rendered whole under their name
- *   orphan lists   = lists whose owner is not a member we know about
+ *   a bean's LISTS = every wall-safe list they are assigned to that is showing
+ *                    today (`wallShowsList`), repeating or one-off, each rendered
+ *                    whole under their name (a list for two beans is in both lanes)
+ *   orphan lists   = showing lists none of whose assignees is a member we know about
  *   to-dos         = every to-do bar `someday`, surprise hints and those whose
  *                    "Show from" date is still ahead, tagged by their plate
  *                    (`utils/todoPlate`), assigned or not
@@ -38,10 +39,10 @@ import type {
   WallListGroup,
   WallTodoBucket,
 } from '@/types/wall';
-import { normalizeAssignees } from '@/utils/assignees';
-import { isFiled, isRecurring } from '@/utils/listLifecycle';
+import { listAssignees, normalizeAssignees } from '@/utils/assignees';
+import { isFiled, isRecurring, listSubject } from '@/utils/listLifecycle';
 import { daysBetweenYmd, extractDatePart } from '@/utils/date';
-import { plateClock, todoPlate, type PlateClock } from '@/utils/todoPlate';
+import { plateClock, plateOf, showRuleOf, todoPlate, type PlateClock } from '@/utils/todoPlate';
 
 /**
  * Dedupe key. The same task legitimately exists as both a dated to-do and an
@@ -65,6 +66,26 @@ const PRIVATE_LIST_CATEGORIES: readonly ListCategory[] = ['health', 'people', 'm
  */
 export function isWallSafeList(list: FamilyList): boolean {
   return isKnownListCategory(list.category) && !PRIVATE_LIST_CATEGORIES.includes(list.category);
+}
+
+/**
+ * Is the list on the wall today? The shared date rule (`listSubject` + `plateOf`, what the
+ * briefing and the widget read), with one wall-only narrowing:
+ *   - a one-off list shows unless it is `waiting` (its due date, or its "Show from" date,
+ *     is still ahead; an undated one always shows);
+ *   - a repeating list shows on its reset day (`today`), or between resets under Every Day
+ *     (`upcoming` with the rule `now`). A Days Before window NEVER puts it on the wall: wall
+ *     rows are the list's real items, so in the lead window they would be last round's ticks,
+ *     and anything ticked there would be erased by the reset. Days Before is a heads-up on
+ *     the briefing and widgets only. A repeating list with no resolvable reset day never shows.
+ * Filing and the private categories are the caller's gates (`buildWallJobs`, `isWallSafeList`).
+ */
+export function wallShowsList(list: FamilyList, clock: PlateClock): boolean {
+  const subject = listSubject(list, clock.ymd);
+  if (!subject) return false;
+  const plate = plateOf(subject, clock);
+  if (!subject.repeating) return plate !== 'waiting';
+  return plate === 'today' || (plate === 'upcoming' && showRuleOf(subject).kind === 'now');
 }
 
 /**
@@ -128,9 +149,9 @@ function todoJob(
       ? { daysLate: daysBetweenYmd(todo.dueDate, todayYmd) }
       : {}),
     ...(todo.dueTime ? { dueTime: todo.dueTime } : {}),
-    // The owner is part of the key: a to-do assigned to three beans becomes
-    // three rows, and a bare `todo:${id}` made them ONE key — so the `pending`
-    // guard disabled all three when any one was tapped.
+    // The owner is part of the RENDER key: a to-do assigned to three beans becomes
+    // three rows, which must not share a key. They are still ONE record, so writes
+    // are guarded per to-do (`jobWriteKey`).
     key: `todo:${todo.id}:${ownerId}`,
     title: todo.title,
     done: todo.completed,
@@ -149,18 +170,31 @@ function locked(todo: TodoItem): boolean {
   return !(caps.editTitle && caps.delete);
 }
 
-function listJob(list: FamilyList, item: FamilyListItem): WallJob {
+function listJob(list: FamilyList, item: FamilyListItem, ownerId: string): WallJob {
   return {
-    key: `list:${list.id}:${item.id}`,
+    // The lane owner is part of the RENDER key: a list for two beans renders in both lanes,
+    // which must not share a key. Writes are guarded per item instead (`jobWriteKey`).
+    key: `list:${list.id}:${item.id}:${ownerId}`,
     title: item.title,
     done: item.completed,
-    ownerId: list.ownerId,
+    ownerId,
     source: 'list',
     listId: list.id,
     itemId: item.id,
     listEmoji: list.emoji,
     completedAt: item.completedAt,
   };
+}
+
+/**
+ * What a job's write touches, for the in-flight (`pending`) guard. A list item and a to-do are
+ * each ONE record however many lanes show it (`toggleComplete` flips the to-do's own
+ * `completed`), so the key leaves the lane out: a second tap in another assignee's lane while
+ * the first write is in flight would toggle it again, overwriting `completedBy` or, for a
+ * repeating to-do, rolling it past a second occurrence.
+ */
+export function jobWriteKey(job: WallJob): string {
+  return job.source === 'list' ? `list:${job.listId}:${job.itemId}` : `todo:${job.todoId}`;
 }
 
 /**
@@ -228,24 +262,51 @@ export function buildWallJobs(input: WallJobsInput): WallJobsResult {
     }
   }
 
-  // 2. Lists, whole, under their owner.
+  // 2. Lists, whole, under each known assignee, while showing today.
   for (const list of lists) {
     if (!isWallSafeList(list)) continue;
     // A filed (completed) one-off list is done with; a recurring list resets
     // and is never filed, so this only ever removes finished shopping trips.
     if (!isRecurring(list) && isFiled(list)) continue;
+    if (!wallShowsList(list, clock)) continue;
 
-    const jobs: WallJob[] = [];
-    for (const item of list.items) {
-      if (suppress.has(dedupeKey(list.ownerId, item.title))) continue;
-      jobs.push(listJob(list, item));
+    // Dedupe and placement run per lane: a to-do of Leo's suppresses the item in Leo's
+    // lane only. A list is an orphan only when none of its assignees is known; it then
+    // renders once, faceless, under its first assignee's id.
+    const owners = listAssignees(list).filter((id) => known.has(id));
+    if (owners.length === 0) {
+      orphanLists.push({ list, jobs: list.items.map((item) => listJob(list, item, list.ownerId)) });
+      continue;
     }
-    const group: WallListGroup = { list, jobs };
-    if (known.has(list.ownerId)) listsByMember[list.ownerId].push(group);
-    else orphanLists.push(group);
+    for (const ownerId of owners) {
+      const jobs: WallJob[] = [];
+      for (const item of list.items) {
+        if (suppress.has(dedupeKey(ownerId, item.title))) continue;
+        jobs.push(listJob(list, item, ownerId));
+      }
+      listsByMember[ownerId].push({ list, jobs });
+    }
   }
 
   return { listsByMember, orphanLists, todos: built };
+}
+
+/**
+ * One group per list for a COMBINED view (the lists card, the list sheet).
+ *
+ * `buildWallJobs` emits a list once per known assignee on purpose, so a shared list shows
+ * in each person's lane. A view that walks every lane (`beans.flatMap(listsFor)`) must not
+ * inherit that, or a list for two beans renders as two cards with one `:key`. The first
+ * group per `list.id` is kept, so the list is credited to the first visible assignee's
+ * lane, as a combined to-do row is (`uniqueTodoJobs`).
+ */
+export function uniqueListGroups(groups: readonly WallListGroup[]): WallListGroup[] {
+  const seen = new Set<string>();
+  return groups.filter((group) => {
+    if (seen.has(group.list.id)) return false;
+    seen.add(group.list.id);
+    return true;
+  });
 }
 
 /** Outstanding-first, so what still needs doing is what you read first. */

@@ -1,23 +1,28 @@
 /**
- * Where an open to-do sits on a day ("its plate"), and when it starts showing ("Show from").
+ * Where an open to-do or list sits on a day ("its plate"), and when it starts showing ("Show
+ * from").
  *
- * The ONE date rule for every surface that shows to-dos: the daily briefing, the Nook, the
- * wall, the phone widget and the To-Dos page's groups. Pure and string-based: every comparison
+ * The ONE date rule for every surface that shows to-dos and lists: the daily briefing, the
+ * Nook, the wall, the phone widget and the To-Dos page's groups. The rule reads a `ShowSubject`
+ * (a to-do through `todoSubject`, a list through `listSubject` in `utils/listLifecycle`); the
+ * kinds differ only in the one-off default (`ONE_OFF_DEFAULT`). Pure and string-based: every comparison
  * is a `YYYY-MM-DD` or `HH:mm` string comparison against a `PlateClock`, never `Date`
  * arithmetic, so a to-do's day never depends on how a date string is parsed (a bare
  * `new Date('YYYY-MM-DD')` is UTC, which turned to-dos overdue a day early west of UTC).
  * The one date shift is `addDaysYmd` for a repeating to-do's lead (string in, string out).
  *
- * The show rule is stored as three optional fields on `TodoItem` (`showFrom`, `showOn`,
- * `showLeadDays`), written only through `showRulePatch` and read only through `todoShowRule`.
+ * The show rule is stored as three optional fields on `TodoItem` and `FamilyList` (`showFrom`,
+ * `showOn`, `showLeadDays`), written only through `showRulePatch` and read only through
+ * `showRuleOf` (`todoShowRule` for a to-do).
  * Invariants:
  *   - Never hidden on or after the due date (`todoShowDate` takes the earlier of the two).
- *   - Fails open: a malformed or out-of-range value reads as "right away", never as hidden.
+ *   - Fails open: a malformed or out-of-range value reads as the kind's default, never as
+ *     hidden past the due date.
  *   - An undated to-do always shows, whatever a merge left in its fields.
  *   - `todoPlate` never reads `completed` or `someday`: callers filter, so a to-do finished
  *     today keeps its bucket.
  */
-import type { TodoItem } from '@/types/models';
+import type { ISODateString, TodoItem } from '@/types/models';
 import type { Cadence } from '@/types/recurrence';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import { addDaysYmd, formatNookDate, toDateInputValue, toTimeInputValue } from './date';
@@ -82,6 +87,46 @@ type ShowFields = Pick<
   'dueDate' | 'dueTime' | 'repeat' | 'showFrom' | 'showOn' | 'showLeadDays'
 >;
 
+/** What the rule is applied to. The kinds differ only in their one-off default. */
+export type ShowKind = 'todo' | 'list';
+
+/**
+ * When a one-off with a due date and no stored rule shows: a to-do right away, a list on its
+ * due date (greg, 2026-11-13). Repeating subjects of both kinds default to the due date.
+ */
+export const ONE_OFF_DEFAULT: Readonly<Record<ShowKind, 'now' | 'due'>> = Object.freeze({
+  todo: 'now',
+  list: 'due',
+});
+
+/** The fields the rule reads, whatever is being shown. */
+export interface ShowSubject {
+  kind: ShowKind;
+  /** The day it is due (a repeating list: its reset day). */
+  dueDate?: ISODateString;
+  dueTime?: string;
+  repeating: boolean;
+  /** For the lead clamp (`maxShowLead`). */
+  cadence?: Cadence | null;
+  showFrom?: ISODateString;
+  showOn?: 'now' | 'due';
+  showLeadDays?: number;
+}
+
+/** A to-do as a show subject. */
+function todoSubject(todo: ShowFields): ShowSubject {
+  return {
+    kind: 'todo',
+    dueDate: todo.dueDate,
+    dueTime: todo.dueTime,
+    repeating: isRepeating(todo),
+    cadence: todo.repeat?.rule,
+    showFrom: todo.showFrom,
+    showOn: todo.showOn,
+    showLeadDays: todo.showLeadDays,
+  };
+}
+
 const YMD = /^\d{4}-\d{2}-\d{2}$/;
 const HHMM = /^\d{2}:\d{2}$/;
 
@@ -139,17 +184,22 @@ export function isShowLeadDays(days: unknown): days is number {
 }
 
 /** The due date as `YYYY-MM-DD`, or '' when absent or malformed (which then reads as undated). */
-function dueYmdOf(todo: Pick<TodoItem, 'dueDate'>): string {
-  const due = todo.dueDate?.slice(0, 10) ?? '';
+function dueYmdOf(subject: { dueDate?: string }): string {
+  const due = subject.dueDate?.slice(0, 10) ?? '';
   return isYmd(due) ? due : '';
 }
 
 const NOW: TodoShowRule = Object.freeze({ kind: 'now' });
 const DUE: TodoShowRule = Object.freeze({ kind: 'due' });
 
+/** The one-off default rule for a kind. */
+function oneOffDefault(kind: ShowKind): TodoShowRule {
+  return ONE_OFF_DEFAULT[kind] === 'due' ? DUE : NOW;
+}
+
 /**
  * The effective show rule. Fields from a merge of two devices' edits resolve as:
- *   - an undated to-do is always `now` (there is no due date to wait for, and no UI to
+ *   - an undated subject is always `now` (there is no due date to wait for, and no UI to
  *     change a rule it cannot see);
  *   - repeating: `showOn: 'now'`, then a valid `showLeadDays` (`lead`), then `due` (the
  *     repeating default); `showFrom` is ignored. A stored lead longer than the cadence leaves
@@ -157,29 +207,56 @@ const DUE: TodoShowRule = Object.freeze({ kind: 'due' });
  *     as the longest that fits, and as `due` when none fits; the stored value is left alone, so
  *     lengthening the repeat again brings it back;
  *   - one-off: an explicit `showOn` (`'due'`, then `'now'`) wins over `showFrom`; a valid
- *     `showFrom` is `from`; anything else (absent, malformed) is `now`. `showLeadDays` is
- *     ignored.
+ *     `showFrom` is `from`; anything else (absent, malformed) is the kind's default
+ *     (`ONE_OFF_DEFAULT`). `showLeadDays` is ignored.
  */
-export function todoShowRule(todo: ShowFields): TodoShowRule {
-  if (!dueYmdOf(todo)) return NOW;
-  if (isRepeating(todo)) {
-    if (todo.showOn === 'now') return NOW;
-    if (isShowLeadDays(todo.showLeadDays)) {
-      const days = Math.min(todo.showLeadDays, maxShowLead(todo.repeat?.rule));
+export function showRuleOf(subject: ShowSubject): TodoShowRule {
+  if (!dueYmdOf(subject)) return NOW;
+  if (subject.repeating) {
+    if (subject.showOn === 'now') return NOW;
+    if (isShowLeadDays(subject.showLeadDays)) {
+      const days = Math.min(subject.showLeadDays, maxShowLead(subject.cadence));
       if (days >= 1) return { kind: 'lead', days };
     }
     return DUE;
   }
-  if (todo.showOn === 'due') return DUE;
-  if (todo.showOn === 'now') return NOW;
-  if (isYmd(todo.showFrom)) return { kind: 'from', date: todo.showFrom };
-  return NOW;
+  if (subject.showOn === 'due') return DUE;
+  if (subject.showOn === 'now') return NOW;
+  if (isYmd(subject.showFrom)) return { kind: 'from', date: subject.showFrom };
+  return oneOffDefault(subject.kind);
 }
 
-/** Every show field cleared: the base of every patch, so a write never leaves a stale one. */
-/** The kind's default rule: a repeating to-do shows on each due date, a one-off right away. */
-export function defaultShowRule(repeating: boolean): TodoShowRule {
-  return repeating ? DUE : NOW;
+/** `showRuleOf` for a to-do. */
+export function todoShowRule(todo: ShowFields): TodoShowRule {
+  return showRuleOf(todoSubject(todo));
+}
+
+/**
+ * The default rule: a repeating subject shows on each due date; a one-off by its kind's
+ * `ONE_OFF_DEFAULT` (a to-do right away, a list on its due date).
+ */
+export function defaultShowRule(repeating: boolean, kind: ShowKind = 'todo'): TodoShowRule {
+  return repeating ? DUE : oneOffDefault(kind);
+}
+
+/**
+ * Why a requested rule cannot be stored, or null when it can: a `from` date that is not
+ * `YYYY-MM-DD`, or a `lead` on a one-off, out of 1-30, or longer than the cadence leaves room
+ * for (`maxShowLead`). The one check both stores' `setShowRule` refuse with.
+ */
+export function invalidShowRule(
+  rule: TodoShowRule,
+  repeating: boolean,
+  cadence: Cadence | null | undefined
+): 'invalid-date' | 'invalid-lead' | null {
+  if (rule.kind === 'from' && !isYmd(rule.date)) return 'invalid-date';
+  if (
+    rule.kind === 'lead' &&
+    (!repeating || !isShowLeadDays(rule.days) || rule.days > maxShowLead(cadence))
+  ) {
+    return 'invalid-lead';
+  }
+  return null;
 }
 
 /**
@@ -192,7 +269,8 @@ export function showFieldApplies(repeating: boolean, dueDate: string, todayYmd: 
   return isYmd(due) && (repeating || due > todayYmd);
 }
 
-const CLEARED = Object.freeze({
+/** Every show field cleared: the base of every patch, so a write never leaves a stale one. */
+export const CLEARED = Object.freeze({
   showFrom: undefined,
   showOn: undefined,
   showLeadDays: undefined,
@@ -203,14 +281,19 @@ export type ShowRulePatch = Pick<TodoItem, 'showFrom' | 'showOn' | 'showLeadDays
 /**
  * The ONE writer of the show fields. Writes only a non-default value and always clears the
  * rest, so the stored choice follows the due date as a flag, never as a copied date:
- *   - one-off: `now` → all cleared; `from` → `{showFrom}`; `due` → `{showOn: 'due'}`;
- *     `lead` (repeating only) → written as `now`;
+ *   - one-off: `from` → `{showFrom}`; `now` or `due` → all cleared when it is the kind's
+ *     default (`ONE_OFF_DEFAULT`), else `{showOn}` (a to-do stores `{showOn: 'due'}`, a list
+ *     `{showOn: 'now'}`); `lead` (repeating only) → written as the kind's default;
  *   - repeating: `due` or `from` → all cleared (the repeating default); `now` →
  *     `{showOn: 'now'}`; `lead` → `{showLeadDays}`.
  * A malformed `from` date or lead fails open to the kind's default (the store refuses them
  * before they reach here).
  */
-export function showRulePatch(rule: TodoShowRule, repeating: boolean): ShowRulePatch {
+export function showRulePatch(
+  rule: TodoShowRule,
+  repeating: boolean,
+  kind: ShowKind = 'todo'
+): ShowRulePatch {
   if (repeating) {
     if (rule.kind === 'now') return { ...CLEARED, showOn: 'now' };
     if (rule.kind === 'lead' && isShowLeadDays(rule.days)) {
@@ -218,24 +301,28 @@ export function showRulePatch(rule: TodoShowRule, repeating: boolean): ShowRuleP
     }
     return { ...CLEARED };
   }
-  if (rule.kind === 'due') return { ...CLEARED, showOn: 'due' };
   if (rule.kind === 'from' && isYmd(rule.date)) return { ...CLEARED, showFrom: rule.date };
-  return { ...CLEARED };
+  const showOn = rule.kind === 'now' || rule.kind === 'due' ? rule.kind : ONE_OFF_DEFAULT[kind];
+  return showOn === ONE_OFF_DEFAULT[kind] ? { ...CLEARED } : { ...CLEARED, showOn };
 }
 
-/** The earlier of two `YYYY-MM-DD` strings. */
 /**
  * What a due-date change does to the stored show rule, or null when it does nothing. The one
- * place this lives, called by `todoStore.updateTodo` for every write that carries `dueDate`:
- *   - a due date that EXISTED and is now cleared takes the rule with it (an undated to-do has
- *     no rule; a stale one must not come back when a date is set again). A to-do that had no
+ * place this lives, called by `todoStore.updateTodo` (and `listStore.updateList`, for a one-off
+ * list, with `kind: 'list'`) for every write that carries `dueDate`:
+ *   - a due date that EXISTED and is now cleared takes the rule with it (an undated subject
+ *     has no rule; a stale one must not come back when a date is set again). One that had no
  *     due date to begin with is left alone (a repeat's undo patch writes `dueDate: undefined`);
  *   - a one-off `showFrom` at or past the NEW due date becomes "on the due date" (a flag that
- *     follows the date), exactly as the create form does.
+ *     follows the date; for a list that is its default, so the fields are cleared), exactly as
+ *     the create form does.
+ * A list carries no `repeat`, so `isRepeating` is false for it: the list store calls this for
+ * one-off lists only.
  */
 export function showPatchOnDueChange(
   existing: ShowFields,
-  nextDueDate: string | null | undefined
+  nextDueDate: string | null | undefined,
+  kind: ShowKind = 'todo'
 ): ShowRulePatch | null {
   const hadDue = dueYmdOf(existing) !== '';
   const nextDue = nextDueDate ? nextDueDate.slice(0, 10) : '';
@@ -248,10 +335,11 @@ export function showPatchOnDueChange(
   }
   if (isRepeating(existing) || existing.showOn !== undefined) return null;
   return isYmd(existing.showFrom) && isYmd(nextDue) && existing.showFrom >= nextDue
-    ? showRulePatch(DUE, false)
+    ? showRulePatch(DUE, false, kind)
     : null;
 }
 
+/** The earlier of two `YYYY-MM-DD` strings. */
 const earlierOf = (a: string, b: string): string => (a < b ? a : b);
 
 /** The day `rule` starts showing a to-do due on `dueYmd`, or undefined for `now`. */
@@ -270,33 +358,43 @@ function ruleShowDate(rule: TodoShowRule, dueYmd: string): string | undefined {
 }
 
 /**
- * The day the to-do starts showing, or undefined when it shows right away. Never after the
+ * The day the subject starts showing, or undefined when it shows right away. Never after the
  * due date. On a repeating to-do with a lead, the date moves with each roll: `rollOverdue`
  * keeps `dueDate` at the next occurrence, so a ticked occurrence waits again until the next
- * lead window opens.
+ * lead window opens (a repeating list's due day is its next reset, so it moves the same way).
  */
+export function showDateOf(subject: ShowSubject): string | undefined {
+  return ruleShowDate(showRuleOf(subject), dueYmdOf(subject));
+}
+
+/** `showDateOf` for a to-do. */
 export function todoShowDate(todo: ShowFields): string | undefined {
-  return ruleShowDate(todoShowRule(todo), dueYmdOf(todo));
+  return showDateOf(todoSubject(todo));
 }
 
 /**
- * Where the to-do sits on the clock's day. Tests in order: overdue (due before today, or
+ * Where the subject sits on the clock's day. Tests in order: overdue (due before today, or
  * today with a due time already past), today, waiting (its show date is after today),
  * undated, upcoming. Date-only: never reads `completed` or `someday`.
  */
-export function todoPlate(todo: ShowFields, clock: PlateClock): TodoPlate {
-  const due = dueYmdOf(todo);
+export function plateOf(subject: ShowSubject, clock: PlateClock): TodoPlate {
+  const due = dueYmdOf(subject);
   if (due) {
     if (due < clock.ymd) return 'overdue';
     if (due === clock.ymd) {
       // A malformed time reads as untimed (end of the day): never overdue early.
-      const time = todo.dueTime && HHMM.test(todo.dueTime) ? todo.dueTime : '';
+      const time = subject.dueTime && HHMM.test(subject.dueTime) ? subject.dueTime : '';
       return time && time < clock.hhmm ? 'overdue' : 'today';
     }
   }
-  const show = todoShowDate(todo);
+  const show = showDateOf(subject);
   if (show && show > clock.ymd) return 'waiting';
   return due ? 'upcoming' : 'undated';
+}
+
+/** `plateOf` for a to-do. */
+export function todoPlate(todo: ShowFields, clock: PlateClock): TodoPlate {
+  return plateOf(todoSubject(todo), clock);
 }
 
 /** A to-do and its plate, computed once. */
@@ -423,5 +521,10 @@ export function showRuleLabel(
     return fillTemplate(t(key), { n: rule.days });
   }
   if (show === due) return t('todo.show.tag.due');
-  return fillTemplate(t('todo.show.tag.from'), { date: formatNookDate(show) });
+  return showFromTag(show, t);
+}
+
+/** "Shows from Tue, 24 Nov": the one format of a tag that names the day something shows. */
+export function showFromTag(showYmd: string, t: (key: UIStringKey) => string): string {
+  return fillTemplate(t('todo.show.tag.from'), { date: formatNookDate(showYmd) });
 }

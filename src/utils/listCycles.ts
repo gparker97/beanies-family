@@ -10,6 +10,7 @@
  * in December.
  */
 import { listProgress } from '@/utils/listLifecycle';
+import { listAssignees } from '@/utils/assignees';
 import type { FamilyList, ListCycle, ListCycleMark } from '@/types/models';
 
 /**
@@ -59,6 +60,10 @@ export function buildCycleSnapshot(
     emoji: list.emoji,
     category: list.category,
     ownerId: list.ownerId,
+    // Everyone the list was for, read through the one reader (a drifted pair reads owner
+    // first). Absent when the list never had several assignees, so older cycles and new
+    // single-owner ones look alike, and no `undefined` reaches Automerge.
+    ...(list.assigneeIds?.length ? { assigneeIds: listAssignees(list) } : {}),
     done,
     total,
     items,

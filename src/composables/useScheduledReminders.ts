@@ -467,7 +467,8 @@ export function buildTravelReminders(
 }
 
 /**
- * Due-date reminders for one-off Beanie Lists — morning-of, owner only.
+ * Due-date reminders for one-off Beanie Lists: morning-of, assignees only (each of a
+ * list's assignees, and a child assignee's adults). The list's show rule does not move them.
  *
  * The rule, and why each half of it is deliberate:
  *
@@ -515,9 +516,9 @@ export function buildListReminders(
       // `ownerItemSurfaces` — the SAME predicate the in-app deriver uses, so the
       // drawer and the lock screen can never disagree about the same list (a review
       // caught them doing exactly that). Gating on `!== 'hidden'`, the shape
-      // `buildTodoReminders` uses, would be wrong here: `classifyOwnerAudience`
-      // answers 'hidden' only for an ADULT owner, so an empty or unresolvable
-      // `ownerId` degrades to 'unassigned' and would arm every phone in the house.
+      // `buildTodoReminders` uses, would be wrong here: an empty or unresolvable
+      // set of assignees (`listAssignees`) degrades to 'unassigned' and would arm
+      // every phone in the house.
       // `deleteMember` does not cascade to lists, so that is permanent stored
       // state, not a transient race.
       // The routine gate is inert here (recurring lists are skipped above); called anyway so

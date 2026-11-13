@@ -11,8 +11,12 @@ import { useActivityStore } from '@/stores/activityStore';
 import { useListCategoryLabel } from '@/composables/useListCategoryLabel';
 import { useMemberInfo } from '@/composables/useMemberInfo';
 import { getListCategory } from '@/constants/listCategories';
-import { isRecurring } from '@/utils/listLifecycle';
+import { isRecurring, listShowLabel, listSubject } from '@/utils/listLifecycle';
 import { canSetNotifyParents, isChildOnly } from '@/utils/audience';
+import { listAssignees } from '@/utils/assignees';
+import { useListPeople } from '@/composables/useListPeople';
+import { showRuleOf, type TodoShowRule } from '@/utils/todoPlate';
+import { useToday } from '@/composables/useToday';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { formatDateShort, extractDatePart } from '@/utils/date';
 import { resolveListRule, listShadowFromCadence } from '@/services/recurrence/adapters';
@@ -20,14 +24,16 @@ import { useRecurrenceLabel } from '@/composables/useRecurrenceLabel';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import { confirmAndDeleteList } from '@/composables/useListDeletion';
 import BaseInput from '@/components/ui/BaseInput.vue';
-import FamilyChipPicker from '@/components/ui/FamilyChipPicker.vue';
 import RecurrencePicker from '@/components/ui/RecurrencePicker.vue';
 import NotifyParentsToggle from '@/components/ui/NotifyParentsToggle.vue';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
 import BeanieDatePicker from '@/components/ui/BeanieDatePicker.vue';
-import MemberChip from '@/components/ui/MemberChip.vue';
+import ActivityOwnerStack from '@/components/ui/ActivityOwnerStack.vue';
+import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
+import ShowRuleField from '@/components/ui/ShowRuleField.vue';
 import ListItemRow from './ListItemRow.vue';
 import ListCategoryPills from './ListCategoryPills.vue';
+import ListPeoplePicker from './ListPeoplePicker.vue';
 import type { FamilyListItem, ListCategory, ListLifecycle } from '@/types/models';
 import type { RecurrenceRule, Cadence } from '@/types/recurrence';
 
@@ -48,7 +54,8 @@ const familyStore = useFamilyStore();
 const vacationStore = useVacationStore();
 const activityStore = useActivityStore();
 const { categoryLabel } = useListCategoryLabel();
-const { getMemberName, getMemberById } = useMemberInfo();
+const { getMemberById } = useMemberInfo();
+const { today } = useToday();
 
 const list = computed(() =>
   props.listId ? (listStore.lists.find((l) => l.id === props.listId) ?? null) : null
@@ -118,13 +125,13 @@ function onClose(): void {
 
 // Meta-band pills are display by default; tapping one reveals an inline editor.
 const editingCategory = ref(false);
-const editingOwner = ref(false);
+const editingPeople = ref(false);
 const editingLink = ref<'trip' | 'activity' | null>(null);
 watch(
   () => props.listId,
   () => {
     editingCategory.value = false;
-    editingOwner.value = false;
+    editingPeople.value = false;
     editingLink.value = null;
     // Commit an in-flight title edit to the OLD list (via editingListId) before
     // it re-projects; item rows self-commit on unmount. Don't clear
@@ -140,10 +147,17 @@ function setCategory(value: ListCategory): void {
   if (list.value) void listStore.updateList(list.value.id, { category: value });
   editingCategory.value = false;
 }
-function setOwner(value: string | string[]): void {
-  const id = Array.isArray(value) ? value[0] : value;
-  if (list.value && id) void listStore.updateList(list.value.id, { ownerId: id });
-  editingOwner.value = false;
+// ── Who it is for (#147): one or more people, written only through `setAssignees` ──
+// The never-nobody rule and its hint live in `ListPeoplePicker`, shared with the new-list sheet.
+const { peopleOf, namesOf } = useListPeople();
+const assigneeIds = computed(() => (list.value ? listAssignees(list.value) : []));
+const people = computed(() => (list.value ? peopleOf(list.value) : []));
+const peopleNames = computed(() => (list.value ? namesOf(list.value) : ''));
+function togglePeople(): void {
+  editingPeople.value = !editingPeople.value;
+}
+function setPeople(ids: string[]): void {
+  if (list.value) void listStore.setAssignees(list.value.id, ids);
 }
 
 // Repeats / frequency / due date
@@ -244,6 +258,18 @@ function stableCadenceKey(c: Cadence): string {
 function setDueDate(value: string): void {
   if (list.value) void listStore.updateList(list.value.id, { dueDate: value || undefined });
 }
+
+// ── When it shows (#147): the shared to-do rule over the list's subject ───────────────────
+/** The list as the show rule reads it today: a repeating list's due day is its next reset. */
+const subject = computed(() => (list.value ? listSubject(list.value, today.value) : null));
+const showRule = computed<TodoShowRule>(() =>
+  subject.value ? showRuleOf(subject.value) : { kind: 'due' }
+);
+function setShowRule(rule: TodoShowRule): void {
+  if (list.value) void listStore.setShowRule(list.value.id, rule);
+}
+/** The meta band's "Shows from ..." pill, only while the list is waiting to show. */
+const showLabel = computed(() => (list.value ? listShowLabel(list.value, today.value, t) : null));
 
 // Meta-band due / recurrence pill text
 const recurrenceText = computed(() => {
@@ -435,15 +461,28 @@ async function handleDelete(): Promise<void> {
           <span class="h-2 w-2 rounded-full" :style="{ backgroundColor: category?.color }" />
           {{ categoryLabel(list.category) }}
         </button>
-        <button type="button" class="mb-pill" @click="editingOwner = !editingOwner">
-          <MemberChip :member-id="list.ownerId" size="dot" />
-          {{ getMemberName(list.ownerId, '') }}
+        <button
+          type="button"
+          class="mb-pill mb-people"
+          data-testid="list-people-pill"
+          :aria-expanded="editingPeople"
+          :title="t('lists.detail.editPeople')"
+          @click="togglePeople"
+        >
+          <!-- The names beside it already say who; the faces are decoration here. -->
+          <span aria-hidden="true" class="flex shrink-0">
+            <ActivityOwnerStack :members="people" size="xs" />
+          </span>
+          <span class="truncate">{{ peopleNames }}</span>
         </button>
         <span v-if="dueText" class="mb-pill mb-due"
           ><span aria-hidden="true">📅</span> {{ dueText }}</span
         >
         <span v-else-if="recurrenceText" class="mb-pill mb-recur"
           ><span aria-hidden="true">🔁</span> {{ recurrenceText }}</span
+        >
+        <span v-if="showLabel" class="mb-pill mb-show" data-testid="list-show-pill"
+          ><span aria-hidden="true">👀</span> {{ showLabel }}</span
         >
       </div>
 
@@ -453,13 +492,13 @@ async function handleDelete(): Promise<void> {
         :model-value="list.category"
         @update:model-value="(id) => id && setCategory(id)"
       />
-      <!-- Inline owner picker -->
-      <FamilyChipPicker
-        v-if="editingOwner"
-        :model-value="list.ownerId"
-        mode="single"
-        compact
-        @update:model-value="setOwner"
+      <!-- Inline people picker: several allowed, never nobody -->
+      <ListPeoplePicker
+        v-if="editingPeople"
+        :model-value="assigneeIds"
+        hint-testid="list-people-hint"
+        data-testid="list-people-picker"
+        @update:model-value="setPeople"
       />
 
       <!-- Items — draggable to reorder. One-way bound (`:list` + `@change`):
@@ -535,9 +574,28 @@ async function handleDelete(): Promise<void> {
               @update:model-value="setCadence"
             />
           </div>
+          <!-- When each round starts showing (the shared to-do rule, on the reset day) -->
+          <div v-if="subject?.dueDate" class="mt-3" data-testid="list-show-repeat">
+            <ShowRuleField
+              kind="list"
+              :model-value="showRule"
+              :repeating="true"
+              :due-date="subject.dueDate"
+              :cadence="subject.cadence"
+              @update:model-value="setShowRule"
+            />
+            <!-- The wall's rows are the real items, so it never shows a round early. -->
+            <p
+              v-if="showRule.kind === 'lead'"
+              class="dark:text-ink-faint mt-1.5 text-xs text-[var(--color-text-muted)]"
+              data-testid="list-show-lead-wall"
+            >
+              {{ t('lists.show.leadNotOnWall') }}
+            </p>
+          </div>
           <div
             v-if="
-              isChildOnly([list.ownerId], getMemberById) &&
+              isChildOnly(assigneeIds, getMemberById) &&
               canSetNotifyParents(familyStore.currentMember)
             "
             class="mt-3"
@@ -551,10 +609,24 @@ async function handleDelete(): Promise<void> {
         </template>
       </div>
 
-      <!-- Due date (one-off only) -->
-      <div v-if="!isRecurring(list)" class="setsec">
-        <p class="lbl">{{ t('lists.detail.dueDateLabel') }}</p>
-        <BeanieDatePicker :model-value="list.dueDate ?? ''" @update:model-value="setDueDate" />
+      <!-- Due date and, once there is one ahead, Show From beside it (one-off only) -->
+      <div v-if="!isRecurring(list)" class="setsec" data-testid="list-when">
+        <ShowRuleField
+          kind="list"
+          :model-value="showRule"
+          :repeating="false"
+          :due-date="list.dueDate ?? ''"
+          @update:model-value="setShowRule"
+        >
+          <template #due>
+            <FormFieldGroup :label="t('lists.detail.dueDateLabel')">
+              <BeanieDatePicker
+                :model-value="list.dueDate ?? ''"
+                @update:model-value="setDueDate"
+              />
+            </FormFieldGroup>
+          </template>
+        </ShowRuleField>
       </div>
 
       <!-- Link -->
@@ -684,6 +756,34 @@ html.dark .mb-pill {
 .mb-recur {
   background: var(--tint-purple-12, rgb(155 89 182 / 12%));
   color: #7c3aed;
+}
+
+/* "Shows from ...": Sky Silk, the calm "not yet" colour. Ink and tint both carry their own dark
+   values (style.css `--silk-ink`, `--tint-silk-20`), shared with `EverySessionTag` and the tile. */
+.mb-show {
+  background: var(--tint-silk-20);
+  color: var(--silk-ink);
+}
+
+.mb-people {
+  max-width: 100%;
+  min-width: 0;
+}
+
+/* Dark partners. `html.dark .mb-pill` above repaints every pill on surface-overlay and outranks
+   these modifiers' light rules, so each accent pill restates its own dark ground and lifts its
+   ink (accents get lighter on dark, never darker). */
+html.dark .mb-due {
+  color: var(--color-accent-lift);
+}
+
+html.dark .mb-recur {
+  background: var(--tint-purple-12, rgb(155 89 182 / 12%));
+  color: var(--color-purple-lift);
+}
+
+html.dark .mb-show {
+  background: var(--tint-silk-20);
 }
 
 .setsec {

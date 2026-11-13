@@ -737,6 +737,22 @@ describe('list-due', () => {
     expect(n.subtitle).toBe('C'); // the child's name, so it is not read as the viewer's own
   });
 
+  it('reaches each of two assignees, first-named or not', () => {
+    expect(dueNotifs({ ownerId: 'o', assigneeIds: ['o', 'v'] })).toHaveLength(1);
+    expect(dueNotifs({ ownerId: 'v', assigneeIds: ['v', 'o'] })).toHaveLength(1);
+  });
+
+  it('reads a drifted pair (an older build changed the owner) as its owner', () => {
+    expect(dueNotifs({ ownerId: 'o', assigneeIds: ['v'] })).toHaveLength(0);
+  });
+
+  it('keeps the due date as its trigger whatever the show rule', () => {
+    // Shown early since the 25th: the bell still keys on the due date, not the show date.
+    const [n] = dueNotifs({ showFrom: '2026-05-25' });
+    expect(n?.eventDate).toBe('2026-05-27');
+    expect(n?.id).toBe('list-due:l1:2026-05-27');
+  });
+
   it('skips a malformed list without losing the rest', () => {
     const bad = { id: 'bad', dueDate: '2026-05-27', lifecycle: 'oneoff', ownerId: 'v' };
     const out = derive({

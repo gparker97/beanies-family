@@ -10,6 +10,7 @@ import BaseModal from '@/components/ui/BaseModal.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import InferredHint from '@/components/ui/InferredHint.vue';
 import ListCategoryPills from './ListCategoryPills.vue';
+import ListPeoplePicker from './ListPeoplePicker.vue';
 import type { CreateFamilyListInput, ListCategory } from '@/types/models';
 
 const props = defineProps<{
@@ -47,6 +48,15 @@ const familyStore = useFamilyStore();
 const meId = computed(() => familyStore.currentMember?.id ?? '');
 const selectedCategory = ref<ListCategory | null>(null);
 
+/**
+ * Who the new list is for (#147). Untouched (null), it reads as the creator, and a template
+ * mapped to a Who Owns What card still goes to that card's holder; once someone changes the
+ * row, their choice wins for every template. Never empty: `ListPeoplePicker` refuses a pick
+ * that leaves nobody.
+ */
+const pickedPeople = ref<string[] | null>(null);
+const people = computed(() => pickedPeople.value ?? (meId.value ? [meId.value] : []));
+
 const templates = computed(() => {
   const shown = selectedCategory.value
     ? getListTemplatesForCategory(selectedCategory.value)
@@ -57,6 +67,7 @@ const templates = computed(() => {
 
 function reset(): void {
   selectedCategory.value = null;
+  pickedPeople.value = null;
 }
 function close(): void {
   reset();
@@ -68,9 +79,15 @@ function close(): void {
 // (the sheet closes on pick) and is derived, never stored.
 const { holderFor, holdsHint } = useCardDefaultHint();
 const tileHints = computed<Record<string, string>>(() =>
-  Object.fromEntries(
-    templates.value.map((tmpl) => [tmpl.key, holdsHint({ kind: 'listTemplate', key: tmpl.key })])
-  )
+  // A chosen "Who's it for?" replaces the card default, so the hint would no longer be true.
+  pickedPeople.value
+    ? {}
+    : Object.fromEntries(
+        templates.value.map((tmpl) => [
+          tmpl.key,
+          holdsHint({ kind: 'listTemplate', key: tmpl.key }),
+        ])
+      )
 );
 
 /**
@@ -97,10 +114,11 @@ async function createFromTemplate(key: string): Promise<void> {
   const overrides: Partial<CreateFamilyListInput> = selectedCategory.value
     ? { category: selectedCategory.value }
     : {};
-  // `meId` stays the creator (`createdBy`); only the owner comes from the card.
-  const holder = holderFor({ kind: 'listTemplate', key });
+  // `meId` stays the creator (`createdBy`); the people come from the row, or from the card
+  // when the row was left as it opened.
+  const holder = pickedPeople.value ? null : holderFor({ kind: 'listTemplate', key });
+  overrides.assigneeIds = holder ? [holder.memberId] : people.value;
   if (holder) {
-    overrides.ownerId = holder.memberId;
     logEvent({
       level: 'info',
       surface: 'lists',
@@ -121,6 +139,7 @@ function startBlank(): Promise<void> {
   return createOnce(async () => {
     const created = await listStore.createBlankList(meId.value, {
       category: selectedCategory.value ?? props.blankCategory,
+      assigneeIds: people.value,
       ...props.overrides,
     });
     if (created) emit('created', created.id);
@@ -143,6 +162,22 @@ const isOpen = computed(() => props.open);
   >
     <div class="space-y-5">
       <p class="text-sm text-[var(--color-text-muted)]">{{ t('lists.new.subtitle') }}</p>
+
+      <!-- Who it is for: starts with the creator; several allowed, never nobody -->
+      <div data-testid="new-list-people">
+        <p class="lists-label">{{ t('lists.new.whoLabel') }}</p>
+        <ListPeoplePicker
+          :model-value="people"
+          hint-testid="new-list-people-hint"
+          @update:model-value="(ids) => (pickedPeople = ids)"
+        >
+          <template #hint>
+            <p class="dark:text-ink-faint mt-1.5 text-xs text-[var(--color-text-muted)]">
+              {{ t('lists.new.whoHint') }}
+            </p>
+          </template>
+        </ListPeoplePicker>
+      </div>
 
       <!-- Category pills -->
       <div>

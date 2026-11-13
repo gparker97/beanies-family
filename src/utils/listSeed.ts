@@ -11,6 +11,7 @@ import { generateUUID } from './id';
 import { getListCategory } from '@/constants/listCategories';
 import { fillTemplate } from './fillTemplate';
 import { isRecurring } from './listLifecycle';
+import { toListAssigneePayload } from './assignees';
 import type { CreateFamilyListInput, FamilyList, FamilyListItem } from '@/types/models';
 
 /**
@@ -51,13 +52,19 @@ export interface BuildCopySeedsArgs {
  * `completedAt`, `dueDate`, and
  * `templateKey` (it means "which curated template seeded this", and a copy of a copy
  * was seeded by neither — carrying it would corrupt template analytics).
+ *
+ * Each copy is for ONE bean (several assignees is one shared list; a copy is one list per
+ * bean), written through `toListAssigneePayload` so the ownership pair is in step. A
+ * repeating copy carries the show rule (`showOn` / `showLeadDays`), as it carries `cadence`
+ * and `notifyParents`; a one-off copy carries none, since its `dueDate` is dropped too.
  */
 export function buildCopySeeds(args: BuildCopySeedsArgs): CreateFamilyListInput[] {
   const { source, owners, titleTemplate, today, createdBy } = args;
   const itemTitles = source.items.map((i) => i.title);
   // Read lifecycle through the shared predicate, never an inline `lifecycle === …`
   // — the invariant `models.ts` states on `FamilyList` and `listStore` re-states.
-  const lastResetDate = isRecurring(source) ? today : undefined;
+  const recurring = isRecurring(source);
+  const lastResetDate = recurring ? today : undefined;
 
   return owners.map((owner) => ({
     // An emptied `{bean}` token must not yield a nameless list. Falling back to the
@@ -65,12 +72,14 @@ export function buildCopySeeds(args: BuildCopySeedsArgs): CreateFamilyListInput[
     title: fillTemplate(titleTemplate, { bean: owner.name }).trim() || source.title,
     emoji: source.emoji,
     category: source.category,
-    ownerId: owner.id,
+    ...toListAssigneePayload([owner.id]),
     items: freshItems(itemTitles),
     lifecycle: source.lifecycle,
     frequency: source.frequency,
     cadence: source.cadence,
     notifyParents: source.notifyParents,
+    showOn: recurring ? source.showOn : undefined,
+    showLeadDays: recurring ? source.showLeadDays : undefined,
     lastResetDate,
     cycleCelebrated: false,
     completed: false,

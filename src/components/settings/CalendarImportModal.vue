@@ -249,7 +249,7 @@ async function onCommit(): Promise<void> {
                tint, so this chip grounds on white to stay visible against it. -->
           <div class="flex items-baseline gap-2">
             <span
-              class="dark:bg-silk-lift/15 dark:text-silk-lift font-outfit shrink-0 rounded-full bg-white px-2.5 py-0.5 text-xs font-semibold text-[#1f5f80]"
+              class="dark:bg-silk-lift/15 font-outfit shrink-0 rounded-full bg-white px-2.5 py-0.5 text-xs font-semibold text-[var(--silk-ink)]"
               >{{ t('calendarImport.chip.copy') }}</span
             >
             <span class="text-secondary-400 dark:text-ink-soft text-xs">{{

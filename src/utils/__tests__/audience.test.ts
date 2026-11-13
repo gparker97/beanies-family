@@ -5,6 +5,7 @@ import {
   classifyAudience,
   classifyListAudience,
   classifyOwnerAudience,
+  classifyPlateList,
   classifyPlateTodo,
   classifyTodoAudience,
   gateTodoAudience,
@@ -148,7 +149,13 @@ describe('ownerItemSurfaces — one rule for all three list surfaces', () => {
       'composables/useScheduledReminders.ts', // the OS scheduler
       'utils/widgetSnapshot.ts', // the home-screen widget
     ]) {
-      expect(read(f)).toContain('ownerItemSurfaces(');
+      // `classifyPlateList` applies `ownerItemSurfaces` itself (the briefing and the widget's
+      // lists go through it, plan 2026-11-13), as `classifyPlateTodo` gates the to-dos.
+      const src = read(f);
+      expect(
+        src.includes('ownerItemSurfaces(') || src.includes('classifyPlateList('),
+        `${f} gates its lists on ownerItemSurfaces`
+      ).toBe(true);
     }
   });
 
@@ -173,9 +180,12 @@ describe('ownerItemSurfaces — one rule for all three list surfaces', () => {
       ).toBe(true);
     }
     for (const f of consumers) {
-      expect(read(f), `${f} classifies lists through classifyListAudience`).toContain(
-        'classifyListAudience('
-      );
+      // `classifyPlateList` classifies through `classifyListAudience` (tested in this file).
+      const src = read(f);
+      expect(
+        src.includes('classifyListAudience(') || src.includes('classifyPlateList('),
+        `${f} classifies lists through classifyListAudience`
+      ).toBe(true);
     }
   });
 });
@@ -359,6 +369,138 @@ describe('classifyListAudience', () => {
     const res = classifyListAudience(list({ ownerId: '' }), adult, resolve, false);
     expect(res.kind).toBe('unassigned');
     expect(ownerItemSurfaces(res)).toBe(false);
+  });
+
+  it('reads every assignee: the second assignee sees it as their own', () => {
+    const shared = list({ ownerId: 'a', assigneeIds: ['a', 'a2'], lifecycle: 'oneoff' });
+    expect(classifyListAudience(shared, adult, resolve, false).kind).toBe('assignee');
+    expect(classifyListAudience(shared, adult2, resolve, false).kind).toBe('assignee');
+  });
+  it('a drifted pair keeps everyone listed when the owner is among them', () => {
+    const merged = list({ ownerId: 'a', assigneeIds: ['a2', 'a'], lifecycle: 'oneoff' });
+    expect(classifyListAudience(merged, adult, resolve, false).kind).toBe('assignee');
+    expect(classifyListAudience(merged, adult2, resolve, false).kind).toBe('assignee');
+  });
+  it('a drifted pair whose owner is not listed reads as its ownerId only', () => {
+    const moved = list({ ownerId: 'a', assigneeIds: ['a2'], lifecycle: 'oneoff' });
+    expect(classifyListAudience(moved, adult, resolve, false).kind).toBe('assignee');
+    expect(classifyListAudience(moved, adult2, resolve, false).kind).toBe('hidden');
+  });
+});
+
+describe('classifyPlateList — plate, audience and count, the briefing and widget rule', () => {
+  const TODAY = { ymd: '2026-11-10', hhmm: '12:00' }; // a Tuesday
+  const items = [
+    { id: 'i1', title: 'socks', completed: true },
+    { id: 'i2', title: 'toothbrush', completed: false },
+  ];
+  const l = (extra: Partial<FamilyList>): FamilyList => ({
+    id: 'l',
+    title: 'Packing',
+    emoji: '🧳',
+    category: 'out',
+    ownerId: 'a',
+    items,
+    lifecycle: 'oneoff',
+    completed: false,
+    createdBy: 'a',
+    createdAt: '2026-11-02T00:00:00.000Z',
+    updatedAt: '2026-11-02T00:00:00.000Z',
+    ...extra,
+  });
+  // A weekly (Monday) routine that reset on Monday 9 Nov.
+  const routine = (extra: Partial<FamilyList> = {}) =>
+    l({ lifecycle: 'recurring', frequency: 'weekly', lastResetDate: '2026-11-09', ...extra });
+
+  it('an adult assignee: plate, audience, the open count and the due day', () => {
+    expect(classifyPlateList(l({ dueDate: '2026-11-10' }), adult, resolve, TODAY)).toEqual({
+      plate: 'today',
+      audience: { kind: 'assignee' },
+      remaining: 1,
+      due: '2026-11-10',
+    });
+    // Undated: shows right away, with no due day.
+    expect(classifyPlateList(l({}), adult, resolve, TODAY)).toEqual({
+      plate: 'undated',
+      audience: { kind: 'assignee' },
+      remaining: 1,
+    });
+  });
+
+  it('the second assignee sees it too; another adult does not', () => {
+    const shared = l({ ownerId: 'a', assigneeIds: ['a', 'a2'], dueDate: '2026-11-10' });
+    expect(classifyPlateList(shared, adult2, resolve, TODAY)?.audience).toEqual({
+      kind: 'assignee',
+    });
+    const mine = l({ dueDate: '2026-11-10' });
+    expect(classifyPlateList(mine, adult2, resolve, TODAY)).toBeNull();
+  });
+
+  it('null while waiting to show, once filed, or with nothing left', () => {
+    expect(classifyPlateList(l({ dueDate: '2026-11-20' }), adult, resolve, TODAY)).toBeNull();
+    expect(
+      classifyPlateList(l({ dueDate: '2026-11-20', showFrom: '2026-11-15' }), adult, resolve, TODAY)
+    ).toBeNull();
+    expect(
+      classifyPlateList(l({ dueDate: '2026-11-10', completed: true }), adult, resolve, TODAY)
+    ).toBeNull();
+    const done = items.map((i) => ({ ...i, completed: true }));
+    expect(classifyPlateList(l({ items: done }), adult, resolve, TODAY)).toBeNull();
+  });
+
+  it('shown early by choice: upcoming, with the due day for the "Due {date}" line', () => {
+    const early = l({ dueDate: '2026-11-20', showFrom: '2026-11-08' });
+    expect(classifyPlateList(early, adult, resolve, TODAY)).toMatchObject({
+      plate: 'upcoming',
+      due: '2026-11-20',
+    });
+  });
+
+  it("a child's routine reaches a parent only with Keep Parents Posted", () => {
+    const kids = routine({ ownerId: 'k', showOn: 'now' });
+    // Every Day, between resets: the child sees the round in progress.
+    expect(classifyPlateList(kids, kid, resolve, TODAY)).toEqual({
+      plate: 'upcoming',
+      audience: { kind: 'assignee' },
+      remaining: 1,
+      due: '2026-11-16',
+    });
+    expect(classifyPlateList(kids, adult, resolve, TODAY)).toBeNull();
+    expect(
+      classifyPlateList({ ...kids, notifyParents: true }, adult, resolve, TODAY)?.audience
+    ).toEqual({ kind: 'forChild', childNames: ['k'] });
+  });
+
+  it("a child's one-off reaches a parent as forChild; a sibling never sees it", () => {
+    const kidsOneOff = l({ ownerId: 'k', dueDate: '2026-11-09' });
+    expect(classifyPlateList(kidsOneOff, adult, resolve, TODAY)).toMatchObject({
+      plate: 'overdue',
+      audience: { kind: 'forChild' },
+    });
+    const kid2 = member('k2', 'child');
+    const pool = (id: string) => [...all, kid2].find((m) => m.id === id);
+    expect(classifyPlateList(kidsOneOff, kid2, pool, TODAY)).toBeNull();
+  });
+
+  it('an owner that no longer resolves is hidden from everyone (never unassigned)', () => {
+    const orphan = l({ ownerId: 'ghost', assigneeIds: ['ghost'], dueDate: '2026-11-10' });
+    for (const viewer of [adult, adult2, kid]) {
+      expect(classifyPlateList(orphan, viewer, resolve, TODAY)).toBeNull();
+    }
+  });
+
+  it('a repeating list on its reset day counts open items; on a later reset day, all items', () => {
+    const r = routine();
+    expect(classifyPlateList(r, adult, resolve, { ymd: '2026-11-09', hhmm: '08:00' })).toEqual({
+      plate: 'today',
+      audience: { kind: 'assignee' },
+      remaining: 1,
+      due: '2026-11-09',
+    });
+    expect(classifyPlateList(r, adult, resolve, TODAY)).toBeNull(); // waiting for 16 Nov
+    expect(
+      classifyPlateList(r, adult, resolve, { ymd: '2026-11-16', hhmm: '00:00' })
+    ).toMatchObject({ plate: 'today', remaining: 2, due: '2026-11-16' });
   });
 });
 

@@ -732,6 +732,18 @@ describe('list due-date reminders', () => {
     ).toBe(1);
   });
 
+  it('reminds each of two assignees, first-named or not', () => {
+    expect(listsOf(list({ ownerId: 'neil', assigneeIds: ['neil', 'me'] }))).toHaveLength(1);
+    expect(listsOf(list({ assigneeIds: ['me', 'neil'] }))).toHaveLength(1);
+  });
+
+  it('keeps the due-date timing for a list shown early, or waiting, by its show rule', () => {
+    const [early] = listsOf(list({ showFrom: '2026-05-22' }));
+    expect(early!.fireAt).toEqual(new Date('2026-05-24T09:00:00'));
+    const [waiting] = listsOf(list({ showFrom: '2026-05-24' }));
+    expect(waiting!.fireAt).toEqual(new Date('2026-05-24T09:00:00'));
+  });
+
   it('schedules nothing for a recurring list', () => {
     expect(listsOf(list({ lifecycle: 'recurring', frequency: 'weekly' }))).toEqual([]);
     // Even on the day it reset (due today in the briefing), the OS stays quiet.

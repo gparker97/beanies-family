@@ -40,8 +40,8 @@ defineEmits<{ click: [] }>();
 
 const selectedClass = computed(() =>
   props.accent === 'purple'
-    ? 'border-purple-500 text-purple-500 dark:bg-purple-500/15 border-2 bg-[var(--tint-purple-12)]'
-    : 'border-primary-500 text-primary-500 dark:bg-primary-500/15 border-2 bg-[var(--tint-orange-8)]'
+    ? 'border-purple-500 text-purple-500 dark:text-purple-lift dark:bg-purple-500/15 border-2 bg-[var(--tint-purple-12)]'
+    : 'border-primary-500 text-primary-500 dark:text-accent-lift dark:bg-primary-500/15 border-2 bg-[var(--tint-orange-8)]'
 );
 
 // `0` is a real count and must render; only an absent badge is hidden. `v-if="badge"` would

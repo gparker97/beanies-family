@@ -8,6 +8,21 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-11-13
+
+### Added
+
+- A list can now be for more than one person, and shows up for each of them.
+- Lists have a Show From setting, like to-dos: pick a date for a one-off list, or days before or every day for a repeating one.
+
+### Changed
+
+- A list with a due date now shows on the daily briefing, the beanie wall and widgets on its due date, unless you choose to show it earlier. Every list is always on the Lists page.
+
+### Fixed
+
+- Switching a repeating list to One-off and back to Repeats now keeps its schedule (it used to come back as weekly).
+
 ## 2026-11-12
 
 ### Added

@@ -6,9 +6,19 @@ import {
   isDueSoon,
   nextListResetOnOrAfter,
   computeRecurringReset,
+  listPlate,
   listProgress,
+  listRemaining,
+  listShowLabel,
+  listSubject,
+  type ListSubject,
 } from './listLifecycle';
 import type { FamilyList } from '@/types/models';
+import type { UIStringKey } from '@/services/translation/uiStrings';
+import { UI_STRINGS } from '@/services/translation/uiStrings';
+import { addDaysYmd, formatNookDate } from './date';
+import { fillTemplate } from './fillTemplate';
+import { invalidShowRule, showRuleOf } from './todoPlate';
 
 function list(overrides: Partial<FamilyList> = {}): FamilyList {
   return {
@@ -195,6 +205,214 @@ describe('listLifecycle predicates', () => {
           '2026-07-01'
         ).shouldReset
       ).toBe(false);
+    });
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// THE SHOW RULE FOR LISTS (plan 2026-11-13-lists-work-like-todos)
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe('lists on the shared date rule', () => {
+  // 2026-06-15 and -22 are Mondays (the legacy weekly reset day); 2026-06-17 is a Wednesday.
+  const items = [
+    { id: 'a', title: 'a', completed: true },
+    { id: 'b', title: 'b', completed: false },
+    { id: 'c', title: 'c', completed: false },
+  ];
+  const weekly = (over: Partial<FamilyList> = {}) =>
+    list({
+      lifecycle: 'recurring',
+      frequency: 'weekly',
+      lastResetDate: '2026-06-15',
+      items,
+      ...over,
+    });
+  const at = (ymd: string) => ({ ymd, hhmm: '12:00' });
+  const t = (key: UIStringKey): string => UI_STRINGS[key];
+  const subjectOf = (l: FamilyList, ymd: string): ListSubject => {
+    const s = listSubject(l, ymd);
+    if (!s) throw new Error(`no subject for ${l.id} on ${ymd}`);
+    return s;
+  };
+
+  describe('listSubject', () => {
+    it('a one-off is its due date, always the live round', () => {
+      expect(listSubject(list({ dueDate: '2026-06-25T00:00:00.000Z' }), '2026-06-17')).toEqual({
+        kind: 'list',
+        dueDate: '2026-06-25',
+        repeating: false,
+        cadence: null,
+        showFrom: undefined,
+        showOn: undefined,
+        showLeadDays: undefined,
+        liveRound: true,
+      });
+      expect(listSubject(list(), '2026-06-17')).toMatchObject({ dueDate: undefined });
+    });
+    it('a repeating list on its reset day is due today, the live round', () => {
+      expect(listSubject(weekly(), '2026-06-15')).toMatchObject({
+        dueDate: '2026-06-15',
+        repeating: true,
+        liveRound: true,
+        cadence: { unit: 'week', interval: 1, weekdays: [1] },
+      });
+    });
+    it('between resets it is due on the next reset day, a later round', () => {
+      expect(listSubject(weekly(), '2026-06-17')).toMatchObject({
+        dueDate: '2026-06-22',
+        liveRound: false,
+      });
+    });
+    // A device in a time zone ahead reset the list just after ITS midnight and stamped its own
+    // date, which is still tomorrow here. The reset has run: this is the round in progress.
+    it('a cycle start stamped ahead of this device is the live round, due today', () => {
+      const ahead = weekly({ frequency: 'daily', lastResetDate: '2026-06-18' });
+      expect(listSubject(ahead, '2026-06-17')).toMatchObject({
+        dueDate: '2026-06-17',
+        liveRound: true,
+      });
+      expect(listPlate(ahead, at('2026-06-17'))).toBe('today');
+      expect(isListDue(ahead, '2026-06-17')).toBe('today');
+      expect(listRemaining(ahead, subjectOf(ahead, '2026-06-17'))).toBe(2);
+      expect(listShowLabel(ahead, '2026-06-17', t)).toBeNull();
+    });
+    // No time zone is two days ahead: a start that far out is a bad stamp, not the live round.
+    it('a cycle start more than a day ahead is not the live round: it waits for its next reset', () => {
+      const far = weekly({ frequency: 'daily', lastResetDate: '2026-06-19' });
+      expect(listSubject(far, '2026-06-17')).toMatchObject({
+        dueDate: '2026-06-20',
+        liveRound: false,
+      });
+      expect(listPlate(far, at('2026-06-17'))).toBe('waiting');
+    });
+    it('a repeating list with no resolvable reset day has no subject (it reads as waiting)', () => {
+      const noRule = weekly({ frequency: undefined, lastResetDate: '2026-06-10' });
+      const noBaseline = weekly({ lastResetDate: undefined });
+      expect(listSubject(noRule, '2026-06-17')).toBeNull();
+      expect(listSubject(noBaseline, '2026-06-17')).toBeNull();
+      expect(listPlate(noRule, at('2026-06-17'))).toBe('waiting');
+    });
+    it('the lead clamp reads the resolved cadence: frequency weekly with no cadence clamps to 6', () => {
+      const l = weekly({ showLeadDays: 20 });
+      const s = subjectOf(l, '2026-06-17');
+      expect(showRuleOf(s)).toEqual({ kind: 'lead', days: 6 });
+      expect(invalidShowRule({ kind: 'lead', days: 7 }, true, s.cadence)).toBe('invalid-lead');
+      expect(invalidShowRule({ kind: 'lead', days: 6 }, true, s.cadence)).toBeNull();
+    });
+  });
+
+  describe('listPlate', () => {
+    it('a one-off with a due date waits for it by default, and shows from then on', () => {
+      const l = list({ dueDate: '2026-06-25' });
+      expect(listPlate(l, at('2026-06-17'))).toBe('waiting');
+      expect(listPlate(l, at('2026-06-25'))).toBe('today');
+      expect(listPlate(l, at('2026-06-26'))).toBe('overdue');
+      expect(listPlate(list({ dueDate: '2026-06-25', showOn: 'now' }), at('2026-06-17'))).toBe(
+        'upcoming'
+      );
+      expect(
+        listPlate(list({ dueDate: '2026-06-25', showFrom: '2026-06-20' }), at('2026-06-20'))
+      ).toBe('upcoming');
+      expect(listPlate(list(), at('2026-06-17'))).toBe('undated');
+    });
+    it('a repeating list is never overdue, whatever the cadence, baseline or day', () => {
+      const lists = [
+        weekly(),
+        weekly({ lastResetDate: '2026-06-01' }), // a reset day missed while the app was closed
+        weekly({ frequency: 'daily' }),
+        weekly({ frequency: 'monthly', lastResetDate: '2026-06-01' }),
+        weekly({ showOn: 'now' }),
+        weekly({ showLeadDays: 3 }),
+      ];
+      for (const l of lists) {
+        for (let d = '2026-06-15'; d <= '2026-07-20'; d = addDaysYmd(d, 1)) {
+          expect(listPlate(l, at(d)), `${l.frequency} ${d}`).not.toBe('overdue');
+        }
+      }
+    });
+    it('a weekly list shows on its reset day by default; Every Day and Days Before widen it', () => {
+      expect(listPlate(weekly(), at('2026-06-15'))).toBe('today');
+      expect(listPlate(weekly(), at('2026-06-17'))).toBe('waiting');
+      expect(listPlate(weekly({ showOn: 'now' }), at('2026-06-17'))).toBe('upcoming');
+      expect(listPlate(weekly({ showLeadDays: 3 }), at('2026-06-18'))).toBe('waiting');
+      expect(listPlate(weekly({ showLeadDays: 3 }), at('2026-06-19'))).toBe('upcoming');
+    });
+  });
+
+  describe('listRemaining (the one count the briefing and the widget share)', () => {
+    it.each<[string, FamilyList, string, number]>([
+      ['one-off list: open items', list({ items, dueDate: '2026-06-17' }), '2026-06-17', 2],
+      ['repeating, on its real reset day: open items', weekly(), '2026-06-15', 2],
+      [
+        'repeating, Every Day, between resets: the round in progress',
+        weekly({ showOn: 'now' }),
+        '2026-06-17',
+        2,
+      ],
+      [
+        'repeating, shown early by Days Before: all items',
+        weekly({ showLeadDays: 3 }),
+        '2026-06-19',
+        3,
+      ],
+      [
+        'repeating, a projected day that is a future reset day: all items',
+        weekly(),
+        '2026-06-22',
+        3,
+      ],
+      [
+        'repeating, Every Day, on the next reset day: all items',
+        weekly({ showOn: 'now' }),
+        '2026-06-22',
+        3,
+      ],
+      [
+        'repeating, Every Day, a projected day after the next reset: all items',
+        weekly({ showOn: 'now' }),
+        '2026-06-23',
+        3,
+      ],
+    ])('%s', (_, l, ymd, count) => {
+      expect(listRemaining(l, subjectOf(l, ymd))).toBe(count);
+    });
+  });
+
+  describe('listShowLabel (only while the list is waiting to show)', () => {
+    const today = '2026-06-17';
+    it('a one-off due later carries "on the due date", or its show-from date', () => {
+      expect(listShowLabel(list({ dueDate: '2026-06-25' }), today, t)).toBe(t('todo.show.tag.due'));
+      expect(listShowLabel(list({ dueDate: '2026-06-25', showFrom: '2026-06-20' }), today, t)).toBe(
+        fillTemplate(t('todo.show.tag.from'), { date: formatNookDate('2026-06-20') })
+      );
+    });
+    it('null once it shows: due today, right away, a show-from reached, or undated', () => {
+      expect(listShowLabel(list({ dueDate: today }), today, t)).toBeNull();
+      expect(listShowLabel(list({ dueDate: '2026-06-25', showOn: 'now' }), today, t)).toBeNull();
+      expect(listShowLabel(list({ dueDate: '2026-06-25', showFrom: today }), today, t)).toBeNull();
+      expect(listShowLabel(list(), today, t)).toBeNull();
+    });
+    // A repeating list has no due date in its UI, so its tag names the real day it next shows.
+    it('a repeating list names the day it next shows: its next reset, less any lead', () => {
+      const from = (ymd: string) =>
+        fillTemplate(t('todo.show.tag.from'), { date: formatNookDate(ymd) });
+      expect(listShowLabel(weekly(), today, t)).toBe(from('2026-06-22'));
+      expect(listShowLabel(weekly(), '2026-06-15', t)).toBeNull();
+      expect(listShowLabel(weekly({ showLeadDays: 3 }), today, t)).toBe(from('2026-06-19'));
+      expect(listShowLabel(weekly({ showOn: 'now' }), today, t)).toBeNull();
+      expect(listShowLabel(weekly({ lastResetDate: undefined }), today, t)).toBeNull();
+    });
+  });
+
+  describe('isListDue is the plate, mapped', () => {
+    it('a future one-off is null whatever its rule; a waiting or early repeating list is null', () => {
+      const today = '2026-06-17';
+      expect(isListDue(list({ dueDate: '2026-06-25', showOn: 'now' }), today)).toBeNull();
+      expect(isListDue(list({ dueDate: '2026-06-25', showFrom: '2026-06-10' }), today)).toBeNull();
+      expect(isListDue(weekly({ showOn: 'now' }), today)).toBeNull();
+      expect(isListDue(weekly({ showLeadDays: 6 }), today)).toBeNull();
+      expect(isListDue(weekly(), '2026-06-15')).toBe('today');
     });
   });
 });

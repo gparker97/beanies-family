@@ -7,7 +7,9 @@ import {
   jobsProgress,
   openLaterTodoJobs,
   sortJobs,
+  uniqueListGroups,
   uniqueTodoJobs,
+  wallShowsList,
 } from '@/utils/wallJobs';
 import type { FamilyList, TodoItem, TodoRepeat } from '@/types/models';
 
@@ -34,7 +36,10 @@ function list(over: Partial<FamilyList> = {}): FamilyList {
     emoji: '🧹',
     category: 'kids',
     ownerId: 'leo',
+    // A daily chore list that reset today: due today, so on the wall by the shared date rule.
     lifecycle: 'recurring',
+    frequency: 'daily',
+    lastResetDate: TODAY,
     items: [{ id: 'i1', title: 'hoover the stairs', completed: false }],
     completed: false,
     createdAt: '',
@@ -543,6 +548,115 @@ describe('buildWallJobs: the plate rule ("Show from")', () => {
     const timed = todo({ id: 'timed', dueDate: TODAY, dueTime: '09:00' });
     expect(bucketsOf([timed], { ymd: TODAY, hhmm: '08:59' })).toEqual({ timed: 'today' });
     expect(bucketsOf([timed], { ymd: TODAY, hhmm: '09:01' })).toEqual({ timed: 'overdue' });
+  });
+});
+
+describe('buildWallJobs: when a list is on the wall (the shared date rule)', () => {
+  // TODAY (2026-08-31) is a Monday, and a weekly list resets on Mondays: this one reset today.
+  const weekly = (over: Partial<FamilyList> = {}) =>
+    list({ frequency: 'weekly', lastResetDate: TODAY, createdAt: '2026-08-03', ...over });
+  /** Wednesday of the same week: between resets (the next is Monday 2026-09-07). */
+  const WEDNESDAY = { ymd: '2026-09-02', hhmm: '00:00' };
+  const shownIds = (lists: FamilyList[], clock = CLOCK) =>
+    build([], lists, clock).listsByMember.leo.map((g) => g.list.id);
+
+  it('hides a waiting one-off list (due later, or a "Show from" still ahead)', () => {
+    const oneoff = { lifecycle: 'oneoff' as const };
+    expect(
+      shownIds([
+        list({ ...oneoff, id: 'due-later', dueDate: '2026-09-05' }),
+        list({ ...oneoff, id: 'from-later', dueDate: '2026-09-05', showFrom: '2026-09-02' }),
+        list({ ...oneoff, id: 'due-today', dueDate: TODAY }),
+        list({ ...oneoff, id: 'overdue', dueDate: '2026-08-20' }),
+        list({ ...oneoff, id: 'undated' }),
+      ])
+    ).toEqual(['due-today', 'overdue', 'undated']);
+  });
+
+  it('shows a one-off list early once its "Show from" date is reached', () => {
+    const early = list({
+      id: 'early',
+      lifecycle: 'oneoff',
+      dueDate: '2026-09-05',
+      showFrom: TODAY,
+    });
+    expect(shownIds([early])).toEqual(['early']);
+  });
+
+  it('shows a weekly list on its reset day only by default, and between resets under Every Day', () => {
+    expect(shownIds([weekly({ id: 'reset-today' })])).toEqual(['reset-today']);
+    expect(
+      shownIds([weekly({ id: 'between' }), weekly({ id: 'every-day', showOn: 'now' })], WEDNESDAY)
+    ).toEqual(['every-day']);
+  });
+
+  it('never puts a repeating list on the wall in its Days Before window', () => {
+    // Next reset Monday 2026-09-07; a 6-day lead opened on 2026-09-01.
+    const lead = weekly({ id: 'lead', showLeadDays: 6 });
+    expect(wallShowsList(lead, WEDNESDAY)).toBe(false);
+    expect(shownIds([lead], WEDNESDAY)).toEqual([]);
+  });
+
+  // A device in a time zone ahead reset it after ITS midnight and stamped tomorrow's date.
+  it('shows a list whose round a device ahead began "tomorrow" (the reset has run)', () => {
+    const ahead = weekly({ id: 'ahead', frequency: 'daily', lastResetDate: '2026-09-01' });
+    expect(wallShowsList(ahead, CLOCK)).toBe(true);
+    expect(shownIds([ahead])).toEqual(['ahead']);
+  });
+
+  it('hides a repeating list with no resolvable reset day', () => {
+    const never = list({
+      id: 'never',
+      frequency: undefined,
+      cadence: undefined,
+      lastResetDate: '2026-08-30',
+    });
+    expect(shownIds([never])).toEqual([]);
+  });
+});
+
+describe('buildWallJobs: a list for several beans', () => {
+  const shared = (over: Partial<FamilyList> = {}) =>
+    list({ id: 'ls', ownerId: 'leo', assigneeIds: ['leo', 'milo'], ...over });
+
+  it('renders the list in every known assignee lane, each row keyed by its lane', () => {
+    const r = build([], [shared()]);
+    expect(r.listsByMember.leo.map((g) => g.list.id)).toEqual(['ls']);
+    expect(r.listsByMember.milo.map((g) => g.list.id)).toEqual(['ls']);
+    const keys = [...choresOf(r, 'leo'), ...choresOf(r, 'milo')].map((j) => j.key);
+    expect(keys).toEqual(['list:ls:i1:leo', 'list:ls:i1:milo']);
+    expect(choresOf(r, 'milo')[0].ownerId).toBe('milo');
+  });
+
+  it("dedupes per lane: Leo's to-do suppresses the item in Leo's lane only", () => {
+    const dupe = todo({ title: 'hoover the stairs' });
+    const r = build([dupe], [shared()]);
+    expect(choresOf(r, 'leo')).toEqual([]);
+    expect(choresOf(r, 'milo').map((j) => j.title)).toEqual(['hoover the stairs']);
+  });
+
+  it('places a list under its known assignees, an orphan only when none is known', () => {
+    const half = build([], [shared({ assigneeIds: ['leo', 'ghost'] })]);
+    expect(half.listsByMember.leo.map((g) => g.list.id)).toEqual(['ls']);
+    expect(half.orphanLists).toEqual([]);
+    const none = build([], [shared({ ownerId: 'ghost', assigneeIds: ['ghost', 'ghost-2'] })]);
+    expect(none.orphanLists.map((g) => g.list.id)).toEqual(['ls']);
+  });
+
+  it('reads a drifted pair (an older build changed the owner) as its ownerId', () => {
+    const r = build([], [shared({ ownerId: 'greg', assigneeIds: ['leo', 'milo'] })]);
+    expect(r.listsByMember.greg.map((g) => g.list.id)).toEqual(['ls']);
+    expect(r.listsByMember.leo).toEqual([]);
+  });
+
+  it('collapses to one group per list for a combined view (uniqueListGroups)', () => {
+    const r = build([], [shared(), list({ id: 'solo' })]);
+    const all = [...r.listsByMember.leo, ...r.listsByMember.milo];
+    expect(all.map((g) => g.list.id)).toEqual(['ls', 'solo', 'ls']);
+    const unique = uniqueListGroups(all);
+    expect(unique.map((g) => g.list.id)).toEqual(['ls', 'solo']);
+    // The first lane's group is kept (credited to the first visible assignee).
+    expect(unique[0].jobs[0].ownerId).toBe('leo');
   });
 });
 

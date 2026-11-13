@@ -173,6 +173,7 @@ export default [
             '⏭️', // Who Owns What skip action + skipped tray (#109)
             '🃏', // Who Owns What deal pile, all sorted (#109)
             '🙋', // Who Owns What nav emoji, deal board title (#109)
+            '👀', // a list's "Shows from ..." tag and drawer pill (#147)
             '⏰',
             '⏳',
             '⚠',

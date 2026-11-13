@@ -1,12 +1,14 @@
 /**
  * The widget's to-dos and lists are the daily briefing's (greg, 2026-11-10): for the same member
- * and day, the family widget's today shows exactly the to-dos and lists the briefing does. Two
- * documented differences, pinned below:
+ * and day, the family widget's today shows exactly the to-dos and lists the briefing does. One
+ * documented difference, pinned below:
  *
  * - Surprise hints: the briefing shows one to the person it is for; the widget never does (a
  *   home screen is glanceable by anyone, including the person the surprise is about).
- * - Lists coming later this week: the widget's to-dos section looks ahead for lists (bucket
- *   `later`), the briefing does not. Who sees a list is identical; only the look-ahead differs.
+ *
+ * Lists no longer differ (plan 2026-11-13, lists work like to-dos): both surfaces read the list's
+ * show rule through `classifyPlateList`, so a list due later this week is on neither until its
+ * rule says so, and one shown early is `later` on the widget and "coming up" on the briefing.
  *
  * Both surfaces run on real stores here: the briefing through `useCriticalItems`, the widget
  * through `buildWidgetSnapshot` fed the same to-dos and lists `useScheduledReminders` hands it
@@ -194,6 +196,20 @@ function seed(): void {
     list('emma-chores', 'emma', { ...recurring, dueDate: undefined }),
     list('noah-chores-posted', 'noah', { ...recurring, dueDate: undefined, notifyParents: true }),
     list('dad-filed', 'dad', { completed: true, completedAt: STAMP }),
+    // Two assignees: Dad sees both, first-named or not.
+    list('dad-and-mom', 'dad', { assigneeIds: ['dad', 'mom'] }),
+    list('mom-and-dad', 'mom', { assigneeIds: ['mom', 'dad'] }),
+    // Waiting: a "Show from" still ahead.
+    list('dad-list-waiting', 'dad', { dueDate: '2026-03-20', showFrom: '2026-03-15' }),
+    // Shown early by rule: a "Show from" already reached; a weekly list under Every Day.
+    list('dad-list-early', 'dad', { dueDate: '2026-03-20', showFrom: '2026-03-09' }),
+    list('dad-weekly-now', 'dad', {
+      lifecycle: 'recurring',
+      frequency: 'weekly',
+      lastResetDate: '2026-03-09',
+      dueDate: undefined,
+      showOn: 'now',
+    }),
   ] as FamilyList[];
 }
 
@@ -256,6 +272,8 @@ describe('the widget shows the daily briefing’s to-dos and lists', () => {
   });
 
   it('the same to-dos, for the same member and day', () => {
+    // Lists have their own case below; clearing them keeps every to-do under the widget's cap.
+    useListStore().lists = [];
     const widget = widgetToday()
       .filter((i) => i.kind === 'todo')
       .map((i) => i.id.replace(/^todo:/, ''));
@@ -279,11 +297,13 @@ describe('the widget shows the daily briefing’s to-dos and lists', () => {
     );
   });
 
-  it('the same lists (who sees them), apart from the widget looking ahead this week', () => {
+  it('the same lists (who sees them and when), with nothing only the widget carries', () => {
+    // To-dos have their own case above; clearing them keeps every list under the widget's cap.
+    useTodoStore().todos = [];
     const items = widgetToday().filter((i) => i.kind === 'list');
-    const dueNow = items.filter((i) => i.bucket !== 'later').map((i) => i.id.replace(/^list:/, ''));
-    expect(sorted(dueNow)).toEqual(sorted(briefingIds().lists));
-    expect(sorted(dueNow)).toEqual(
+    const ids = items.map((i) => i.id.replace(/^list:/, ''));
+    expect(sorted(ids)).toEqual(sorted(briefingIds().lists));
+    expect(sorted(ids)).toEqual(
       sorted([
         'dad-list',
         'dad-list-overdue',
@@ -291,12 +311,22 @@ describe('the widget shows the daily briefing’s to-dos and lists', () => {
         'dad-private',
         'emma-private',
         'noah-chores-posted',
+        'dad-and-mom',
+        'mom-and-dad',
+        'dad-list-early',
+        'dad-weekly-now',
       ])
     );
-    // The one list only the widget carries is due later this week, and it is Dad's own.
-    expect(items.filter((i) => i.bucket === 'later').map((i) => i.id)).toEqual([
-      'list:dad-list-later',
+    // Shown early by its rule: `later` on the widget, "coming up" (later) on the briefing. A list
+    // merely due later this week (`dad-list-later`) and one still waiting are on neither.
+    expect(sorted(items.filter((i) => i.bucket === 'later').map((i) => i.id))).toEqual([
+      'list:dad-list-early',
+      'list:dad-weekly-now',
     ]);
+    const later = useCriticalItems()
+      .criticalItems.value.filter((i) => i.type === 'list' && i.later)
+      .map((i) => i.id);
+    expect(sorted(later)).toEqual(['dad-list-early', 'dad-weekly-now']);
   });
 
   it('the same hints, except a surprise, which only the briefing shows', () => {

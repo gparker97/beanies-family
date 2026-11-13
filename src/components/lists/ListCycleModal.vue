@@ -16,6 +16,8 @@
 import { computed } from 'vue';
 import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import MemberChip from '@/components/ui/MemberChip.vue';
+import ActivityOwnerStack from '@/components/ui/ActivityOwnerStack.vue';
+import { useListPeople } from '@/composables/useListPeople';
 import { useTranslation } from '@/composables/useTranslation';
 import { useListStore } from '@/stores/listStore';
 import { fillTemplate } from '@/utils/fillTemplate';
@@ -29,6 +31,11 @@ const { t } = useTranslation();
 const listStore = useListStore();
 
 const cycle = computed(() => listStore.cycles.find((c) => c.id === props.cycleId) ?? null);
+
+/** Everyone the list was for when this round was filed (#147). */
+const { peopleOf, namesOf } = useListPeople();
+const people = computed(() => (cycle.value ? peopleOf(cycle.value) : []));
+const peopleNames = computed(() => (cycle.value ? namesOf(cycle.value) : ''));
 
 const accent = computed(() =>
   cycle.value
@@ -72,7 +79,16 @@ const whenLabel = computed(() => {
     <div class="flex flex-col gap-4">
       <div class="flex items-center justify-between gap-3">
         <span class="text-xs text-[var(--color-text-muted)]">{{ whenLabel }}</span>
-        <MemberChip :member-id="cycle.ownerId" size="sm" />
+        <span
+          v-if="people.length"
+          class="dark:text-ink-soft flex min-w-0 items-center gap-1.5 text-xs font-semibold text-[var(--color-text)]"
+          data-testid="list-cycle-people"
+        >
+          <span aria-hidden="true" class="flex shrink-0">
+            <ActivityOwnerStack :members="people" size="xs" />
+          </span>
+          <span class="truncate">{{ peopleNames }}</span>
+        </span>
       </div>
 
       <div class="flex items-center gap-2">

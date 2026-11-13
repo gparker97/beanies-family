@@ -14,7 +14,7 @@ export const REVIEW_CHIP_TONES = {
   /** Heritage Orange tint: "sync with Google", repeat pattern, "look familiar". */
   accent: 'bg-primary-50 text-primary-700 dark:bg-accent-lift/15 dark:text-accent-lift',
   /** Sky Silk tint: "copy into beanies", original-currency amount. */
-  silk: 'bg-sky-silk-50 text-[#1f5f80] dark:bg-silk-lift/15 dark:text-silk-lift',
+  silk: 'bg-sky-silk-50 text-[var(--silk-ink)] dark:bg-silk-lift/15',
   /** De-emphasised: already imported, imported once. */
   muted: 'bg-secondary-50 text-secondary-400 dark:bg-surface-hover dark:text-ink-faint',
 } as const;

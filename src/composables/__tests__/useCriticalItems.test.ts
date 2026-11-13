@@ -1620,10 +1620,31 @@ describe('useCriticalItems', () => {
       expect(ids.at(-1)).toBe('soon');
     });
 
-    it('stays off the briefing when the list reset yesterday', () => {
+    it('stays off the briefing between resets (a weekly list that reset yesterday)', () => {
       familyStore.setCurrentMember('parent-1');
-      useListStore().lists = [repeating({ lastResetDate: '2026-03-09' })];
+      // Weekly resets on Mondays: it reset on Monday the 9th, the next is the 16th.
+      useListStore().lists = [repeating({ frequency: 'weekly', lastResetDate: '2026-03-09' })];
       expect(useCriticalItems().criticalItems.value).toEqual([]);
+    });
+
+    it('shows a weekly list early under Every Day, as coming up with its reset day', () => {
+      familyStore.setCurrentMember('parent-1');
+      useListStore().lists = [
+        repeating({ frequency: 'weekly', lastResetDate: '2026-03-09', showOn: 'now' }),
+      ];
+      const [item] = useCriticalItems().criticalItems.value;
+      expect(item).toMatchObject({ id: 'list-rec', type: 'list', later: true });
+      expect(item!.message.toLowerCase()).toBe(
+        'coming up: your list “morning routine”, due mon, 16 mar'
+      );
+    });
+
+    it('shows a list for two assignees to both of them', () => {
+      useListStore().lists = [repeating({ assigneeIds: ['parent-1', 'parent-2'] })];
+      for (const id of ['parent-1', 'parent-2']) {
+        familyStore.setCurrentMember(id);
+        expect(useCriticalItems().criticalItems.value.map((i) => i.id)).toEqual(['list-rec']);
+      }
     });
 
     it('stays off the briefing when every item is already ticked', () => {
@@ -1651,6 +1672,67 @@ describe('useCriticalItems', () => {
       familyStore.setCurrentMember('child-1');
       useListStore().lists = [repeating({ ownerId: 'child-1' })];
       expect(useCriticalItems().criticalItems.value).toHaveLength(1);
+    });
+  });
+
+  describe('one-off lists and their show rule', () => {
+    const oneOff = (over: Partial<FamilyList> = {}): FamilyList =>
+      ({
+        id: 'list-trip',
+        title: 'Packing',
+        emoji: '🧳',
+        category: 'out',
+        ownerId: 'parent-1',
+        items: [
+          { id: 'p1', title: 'passports', completed: false },
+          { id: 'p2', title: 'chargers', completed: true },
+        ],
+        lifecycle: 'oneoff',
+        completed: false,
+        createdBy: 'parent-1',
+        createdAt: '2026-03-01',
+        updatedAt: '2026-03-01',
+        ...over,
+      }) as FamilyList;
+
+    it('keeps a list due later off the briefing by default, and one still waiting to show', () => {
+      familyStore.setCurrentMember('parent-1');
+      useListStore().lists = [
+        oneOff({ id: 'due-later', dueDate: '2026-03-18' }),
+        oneOff({ id: 'waiting', dueDate: '2026-03-18', showFrom: '2026-03-12' }),
+      ];
+      expect(useCriticalItems().criticalItems.value).toEqual([]);
+    });
+
+    it('shows a list early once its "Show from" date is reached, as coming up', () => {
+      familyStore.setCurrentMember('parent-1');
+      useListStore().lists = [oneOff({ dueDate: '2026-03-18', showFrom: TODAY })];
+      const [item] = useCriticalItems().criticalItems.value;
+      expect(item).toMatchObject({ id: 'list-trip', later: true, icon: '🧾' });
+      expect(item!.message.toLowerCase()).toBe('coming up: your list “packing”, due wed, 18 mar');
+    });
+
+    it('names the child on an early-shown list a parent sees for them', () => {
+      familyStore.setCurrentMember('parent-1');
+      useListStore().lists = [oneOff({ ownerId: 'child-1', dueDate: '2026-03-18', showOn: 'now' })];
+      expect(useCriticalItems().criticalItems.value[0]!.message.toLowerCase()).toBe(
+        'emma’s list “packing”, due wed, 18 mar'
+      );
+    });
+
+    it('shows a list for two assignees to each of them, never to another adult', () => {
+      useListStore().lists = [
+        oneOff({ ownerId: 'parent-2', assigneeIds: ['parent-2', 'child-1'], dueDate: TODAY }),
+      ];
+      familyStore.setCurrentMember('parent-2');
+      expect(useCriticalItems().criticalItems.value[0]!.message.toLowerCase()).toBe(
+        'your list “packing” is due today'
+      );
+      familyStore.setCurrentMember('child-1');
+      expect(useCriticalItems().criticalItems.value).toHaveLength(1);
+      // Another adult's, shared with a child: hidden from Dad, exactly as a to-do is.
+      familyStore.setCurrentMember('parent-1');
+      expect(useCriticalItems().criticalItems.value).toEqual([]);
     });
   });
 });

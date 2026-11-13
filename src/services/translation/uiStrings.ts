@@ -4766,6 +4766,10 @@ const STRING_DEFS = {
     en: 'That list needs a family member',
     beanie: 'that list needs a family member',
   },
+  'lists.error.showRuleRefused': {
+    en: "When this list shows can't be changed.",
+    beanie: "when this list shows can't be changed.",
+  },
   'lists.error.unknownOwnerHelp': {
     en: 'Pick who the list is for, then try again. A list with no one attached would not reach anybody.',
     beanie:
@@ -7371,6 +7375,8 @@ const STRING_DEFS = {
   'todo.show.tag.due': { en: 'Shows on the due date', beanie: 'shows on the due date' },
   'todo.show.tag.lead.one': { en: 'Shows 1 day before', beanie: 'shows 1 day before' },
   'todo.show.tag.lead.other': { en: 'Shows {n} days before', beanie: 'shows {n} days before' },
+  // The page that always lists a subject, filled into the hints' {page} (`showRuleKinds`).
+  'todo.show.page': { en: 'the To-Dos page', beanie: 'the to-dos page' },
   'todo.show.label': { en: 'Show From', beanie: 'show from' },
   'todo.show.today': { en: 'Today', beanie: 'today' },
   'todo.show.onDueDate': { en: 'On the Due Date', beanie: 'on the due date' },
@@ -7393,29 +7399,29 @@ const STRING_DEFS = {
       'shows on the daily briefing, the nook and your widgets every day until it is done, tagged "due {due}".',
   },
   'todo.show.hint.once.from': {
-    en: 'Shows on the daily briefing, the Nook and your widgets from {date}, and is not overdue until {due}. Always on the To-Dos page.',
+    en: 'Shows on the daily briefing, the Nook and your widgets from {date}, and is not overdue until {due}. Always on {page}.',
     beanie:
-      'shows on the daily briefing, the nook and your widgets from {date}, and is not overdue until {due}. always on the to-dos page.',
+      'shows on the daily briefing, the nook and your widgets from {date}, and is not overdue until {due}. always on {page}.',
   },
   'todo.show.hint.once.due': {
-    en: 'Shows on the daily briefing, the Nook and your widgets on {due}, the day it is due. Always on the To-Dos page.',
+    en: 'Shows on the daily briefing, the Nook and your widgets on {due}, the day it is due. Always on {page}.',
     beanie:
-      'shows on the daily briefing, the nook and your widgets on {due}, the day it is due. always on the to-dos page.',
+      'shows on the daily briefing, the nook and your widgets on {due}, the day it is due. always on {page}.',
   },
   'todo.show.hint.repeat.due': {
-    en: 'Shows on the daily briefing, the Nook and your widgets on each due date. Always on the To-Dos page.',
+    en: 'Shows on the daily briefing, the Nook and your widgets on each due date. Always on {page}.',
     beanie:
-      'shows on the daily briefing, the nook and your widgets on each due date. always on the to-dos page.',
+      'shows on the daily briefing, the nook and your widgets on each due date. always on {page}.',
   },
   'todo.show.hint.repeat.lead.one': {
-    en: 'Shows on the daily briefing, the Nook and your widgets 1 day before each due date. Always on the To-Dos page.',
+    en: 'Shows on the daily briefing, the Nook and your widgets 1 day before each due date. Always on {page}.',
     beanie:
-      'shows on the daily briefing, the nook and your widgets 1 day before each due date. always on the to-dos page.',
+      'shows on the daily briefing, the nook and your widgets 1 day before each due date. always on {page}.',
   },
   'todo.show.hint.repeat.lead.other': {
-    en: 'Shows on the daily briefing, the Nook and your widgets {n} days before each due date. Always on the To-Dos page.',
+    en: 'Shows on the daily briefing, the Nook and your widgets {n} days before each due date. Always on {page}.',
     beanie:
-      'shows on the daily briefing, the nook and your widgets {n} days before each due date. always on the to-dos page.',
+      'shows on the daily briefing, the nook and your widgets {n} days before each due date. always on {page}.',
   },
   'todo.show.hint.repeat.now': {
     en: 'Shows on the daily briefing, the Nook and your widgets every day until it is done.',
@@ -7710,6 +7716,22 @@ const STRING_DEFS = {
   'lists.detail.freq.weekly': { en: 'Weekly', beanie: 'weekly' },
   'lists.detail.freq.monthly': { en: 'Monthly', beanie: 'monthly' },
   'lists.detail.dueDateLabel': { en: 'Due date', beanie: 'due date' },
+  // Who a list is for (#147): the drawer's people pill and the new-list sheet's row.
+  'lists.detail.editPeople': {
+    en: 'Change who this list is for',
+    beanie: 'change who this list is for',
+  },
+  'lists.people.keepOne': {
+    en: 'A list needs at least one person.',
+    beanie: 'a list needs at least one person.',
+  },
+  // When a list shows (#147): the page named in the show hints, and the Days Before note.
+  'lists.show.page': { en: 'the Lists page', beanie: 'the lists page' },
+  'lists.show.leadNotOnWall': {
+    en: 'Shows early on the daily briefing and your widgets only. The Beanie Wall waits for each due date.',
+    beanie:
+      'shows early on the daily briefing and your widgets only. the beanie wall waits for each due date.',
+  },
   'lists.detail.setDueDate': { en: 'Set a due date', beanie: 'set a due date' },
   'lists.detail.linkLabel': { en: 'Link', beanie: 'link' },
   'lists.detail.linkTrip': { en: 'Link to a trip', beanie: 'link to a trip' },
@@ -7768,6 +7790,11 @@ const STRING_DEFS = {
     beanie: 'pick a category, then a template — or start fresh!',
   },
   'lists.new.categoryLabel': { en: 'Category', beanie: 'category' },
+  'lists.new.whoLabel': { en: 'Who’s It For?', beanie: 'who’s it for?' },
+  'lists.new.whoHint': {
+    en: 'Starts with you. Pick more than one and the list shows for each of them.',
+    beanie: 'starts with you. pick more than one and the list shows for each of them.',
+  },
   'lists.new.templatesLabel': { en: 'Start from a Template', beanie: 'start from a template' },
   'lists.new.blank': { en: 'Start Blank List', beanie: 'start a blank list' },
   'lists.new.blankTitle': { en: 'My List', beanie: 'my list' },
@@ -7868,6 +7895,19 @@ const STRING_DEFS = {
   'lists.briefing.unassigned.noDue': {
     en: 'Family list “{list}” has {remaining} left',
     beanie: 'family list “{list}” has {remaining} left',
+  },
+  // A list shown early by its show rule ("Show From", Days Before, Every Day)
+  'lists.briefing.owner.upcoming': {
+    en: 'Coming up: your list “{list}”, due {date}',
+    beanie: 'coming up: your list “{list}”, due {date}',
+  },
+  'lists.briefing.forChild.upcoming': {
+    en: '{children}’s list “{list}”, due {date}',
+    beanie: '{children}’s list “{list}”, due {date}',
+  },
+  'lists.briefing.unassigned.upcoming': {
+    en: 'Family list “{list}”, due {date}',
+    beanie: 'family list “{list}”, due {date}',
   },
   // Derived "list completed" notification
   'lists.notif.finishedBy': { en: 'Finished by {finisher}', beanie: 'finished by {finisher}' },

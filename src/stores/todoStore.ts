@@ -10,9 +10,7 @@ import { canSetNotifyParents, classifyAudience } from '@/utils/audience';
 import { useFamilyStore } from '@/stores/familyStore';
 import { sortTodos } from '@/utils/todo';
 import {
-  isShowLeadDays,
-  maxShowLead,
-  isYmd,
+  invalidShowRule,
   plateClock,
   platedTodos,
   showPatchOnDueChange,
@@ -23,6 +21,7 @@ import {
   type PlatedTodo,
   type TodoShowRule,
 } from '@/utils/todoPlate';
+import { VISIBILITY_SURFACE, logShowRuleSet } from '@/utils/showRuleLog';
 import {
   itemsForSession,
   todoLink,
@@ -148,27 +147,8 @@ function logNotifyParentsSet(on: boolean): void {
   });
 }
 
-// "Show from" (`utils/todoPlate`): the show-rule writes and their refusals share one surface, so
-// one CloudWatch filter isolates the feature. Context reuses the allowlisted `action`, `detail`,
-// `count`.
-const VISIBILITY_SURFACE = 'todo-visibility';
-
-/**
- * A show rule set (by `setShowRule`), or a non-default one at creation. `action` is the rule
- * actually stored, `detail` the to-do's kind, `count` the lead in days.
- */
-function logShowRuleSet(rule: TodoShowRule, repeating: boolean): void {
-  logEvent({
-    level: 'info',
-    surface: VISIBILITY_SURFACE,
-    message: 'show rule set',
-    context: {
-      action: rule.kind,
-      detail: repeating ? 'repeat' : 'once',
-      ...(rule.kind === 'lead' ? { count: rule.days } : {}),
-    },
-  });
-}
+// "Show from" (`utils/todoPlate`): the show-rule writes and their refusals share one surface
+// (`VISIBILITY_SURFACE`, `utils/showRuleLog`), so one CloudWatch filter isolates the feature.
 
 /** Why `todoCapabilities(...).editShowRule` is off, as the refusal's `detail`. */
 function showRuleRefusal(todo: TodoItem): string {
@@ -920,15 +900,9 @@ export const useTodoStore = defineStore('todos', () => {
       return null;
     }
     const repeating = isRepeating(existing);
-    if (rule.kind === 'from' && !isYmd(rule.date)) {
-      refuse('show-rule', 'invalid-date', 'todo.error.showRuleRefused', VISIBILITY_SURFACE);
-      return null;
-    }
-    if (
-      rule.kind === 'lead' &&
-      (!repeating || !isShowLeadDays(rule.days) || rule.days > maxShowLead(existing.repeat?.rule))
-    ) {
-      refuse('show-rule', 'invalid-lead', 'todo.error.showRuleRefused', VISIBILITY_SURFACE);
+    const invalid = invalidShowRule(rule, repeating, existing.repeat?.rule);
+    if (invalid) {
+      refuse('show-rule', invalid, 'todo.error.showRuleRefused', VISIBILITY_SURFACE);
       return null;
     }
     const result = await updateTodo(id, showRulePatch(rule, repeating));

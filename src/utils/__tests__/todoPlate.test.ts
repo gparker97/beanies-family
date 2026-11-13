@@ -1,10 +1,20 @@
 import { describe, it, expect } from 'vitest';
 import type { RecurrenceRule, TodoItem } from '@/types/models';
+import type { Cadence } from '@/types/recurrence';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import { UI_STRINGS } from '@/services/translation/uiStrings';
 import {
+  CLEARED as CLEARED_PATCH,
+  ONE_OFF_DEFAULT,
   SHOW_LEAD_DEFAULT,
   SHOW_LEAD_MAX,
+  defaultShowRule,
+  invalidShowRule,
+  plateOf,
+  showDateOf,
+  showRuleOf,
+  type ShowKind,
+  type ShowSubject,
   maxShowLead,
   TODO_PLATE_ORDER,
   fieldShowRule,
@@ -21,6 +31,7 @@ import {
   todoShowDate,
   todoShowRule,
   type PlateClock,
+  type TodoPlate,
   type TodoShowRule,
 } from '../todoPlate';
 import { advanceRepeat } from '../todoRecurrence';
@@ -596,5 +607,162 @@ describe('showFieldApplies', () => {
   it('always offers it for a repeating to-do with a due date', () => {
     expect(showFieldApplies(true, '2026-11-10', '2026-11-10')).toBe(true);
     expect(showFieldApplies(true, '', '2026-11-10')).toBe(false);
+  });
+});
+
+// ── The show subject: one rule for to-dos and lists, differing only in the one-off default ──
+
+describe('show subjects (to-do and list kinds)', () => {
+  const DUE = '2026-11-24';
+  const subject = (over: Partial<ShowSubject> = {}): ShowSubject => ({
+    kind: 'todo',
+    repeating: false,
+    ...over,
+  });
+  const WEEKLY: Cadence = { unit: 'week', interval: 1, weekdays: [2] };
+
+  it('the one-off default is right away for a to-do and the due date for a list', () => {
+    expect(ONE_OFF_DEFAULT).toEqual({ todo: 'now', list: 'due' });
+    expect(defaultShowRule(false)).toEqual({ kind: 'now' });
+    expect(defaultShowRule(false, 'todo')).toEqual({ kind: 'now' });
+    expect(defaultShowRule(false, 'list')).toEqual({ kind: 'due' });
+    // Repeating defaults to the due date for both kinds.
+    expect(defaultShowRule(true)).toEqual({ kind: 'due' });
+    expect(defaultShowRule(true, 'list')).toEqual({ kind: 'due' });
+  });
+
+  it.each<[string, Partial<ShowSubject>, TodoShowRule, TodoShowRule]>([
+    ['one-off, nothing set', { dueDate: DUE }, { kind: 'now' }, { kind: 'due' }],
+    [
+      'one-off, malformed showFrom',
+      { dueDate: DUE, showFrom: 'x' },
+      { kind: 'now' },
+      { kind: 'due' },
+    ],
+    ['one-off, showOn now', { dueDate: DUE, showOn: 'now' }, { kind: 'now' }, { kind: 'now' }],
+    ['one-off, showOn due', { dueDate: DUE, showOn: 'due' }, { kind: 'due' }, { kind: 'due' }],
+    [
+      'one-off, showFrom',
+      { dueDate: DUE, showFrom: '2026-11-20' },
+      { kind: 'from', date: '2026-11-20' },
+      { kind: 'from', date: '2026-11-20' },
+    ],
+    ['undated (always right away)', { showOn: 'due' }, { kind: 'now' }, { kind: 'now' }],
+    ['repeating, nothing set', { dueDate: DUE, repeating: true }, { kind: 'due' }, { kind: 'due' }],
+    [
+      'repeating, lead clamped by the cadence',
+      { dueDate: DUE, repeating: true, cadence: WEEKLY, showLeadDays: 20 },
+      { kind: 'lead', days: 6 },
+      { kind: 'lead', days: 6 },
+    ],
+  ])('showRuleOf: %s (to-do, list)', (_, over, asTodo, asList) => {
+    expect(showRuleOf(subject({ ...over, kind: 'todo' }))).toEqual(asTodo);
+    expect(showRuleOf(subject({ ...over, kind: 'list' }))).toEqual(asList);
+  });
+
+  it('a to-do subject reads exactly as todoShowRule / todoShowDate / todoPlate', () => {
+    const cases: Partial<TodoItem>[] = [
+      { dueDate: DUE },
+      { dueDate: DUE, showFrom: '2026-11-20' },
+      { dueDate: DUE, showOn: 'due' },
+      { dueDate: TODAY, dueTime: '09:00' },
+      {},
+    ];
+    for (const over of cases) {
+      const item = todo(over);
+      const s = subject({ ...over, kind: 'todo' });
+      expect(showRuleOf(s)).toEqual(todoShowRule(item));
+      expect(showDateOf(s)).toEqual(todoShowDate(item));
+      expect(plateOf(s, NOON)).toEqual(todoPlate(item, NOON));
+    }
+  });
+
+  it.each<[string, Partial<ShowSubject>, TodoPlate, TodoPlate]>([
+    ['due later, nothing set', { dueDate: DUE }, 'upcoming', 'waiting'],
+    ['due later, showOn now', { dueDate: DUE, showOn: 'now' }, 'upcoming', 'upcoming'],
+    ['due later, show from today', { dueDate: DUE, showFrom: TODAY }, 'upcoming', 'upcoming'],
+    [
+      'due later, show from tomorrow',
+      { dueDate: DUE, showFrom: '2026-11-11' },
+      'waiting',
+      'waiting',
+    ],
+    ['due today', { dueDate: TODAY }, 'today', 'today'],
+    ['overdue (never hidden after the due date)', { dueDate: '2026-11-01' }, 'overdue', 'overdue'],
+    ['undated', {}, 'undated', 'undated'],
+  ])('plateOf: %s (to-do, list)', (_, over, asTodo, asList) => {
+    expect(plateOf(subject({ ...over, kind: 'todo' }), NOON)).toBe(asTodo);
+    expect(plateOf(subject({ ...over, kind: 'list' }), NOON)).toBe(asList);
+  });
+
+  it('showRulePatch writes only the non-default value for each kind', () => {
+    const kinds: ShowKind[] = ['todo', 'list'];
+    const written = (rule: TodoShowRule, kind: ShowKind) => showRulePatch(rule, false, kind);
+    expect(written({ kind: 'now' }, 'todo')).toEqual(CLEARED_PATCH);
+    expect(written({ kind: 'due' }, 'todo')).toEqual({ ...CLEARED_PATCH, showOn: 'due' });
+    expect(written({ kind: 'now' }, 'list')).toEqual({ ...CLEARED_PATCH, showOn: 'now' });
+    expect(written({ kind: 'due' }, 'list')).toEqual(CLEARED_PATCH);
+    for (const kind of kinds) {
+      expect(written({ kind: 'from', date: '2026-11-20' }, kind)).toEqual({
+        ...CLEARED_PATCH,
+        showFrom: '2026-11-20',
+      });
+      // A lead or a malformed date on a one-off fails to the kind's default.
+      expect(written({ kind: 'lead', days: 3 }, kind)).toEqual(CLEARED_PATCH);
+      expect(written({ kind: 'from', date: 'x' }, kind)).toEqual(CLEARED_PATCH);
+      // Repeating writes are kind-free.
+      expect(showRulePatch({ kind: 'now' }, true, kind)).toEqual(
+        showRulePatch({ kind: 'now' }, true)
+      );
+    }
+  });
+
+  it('every pickable rule round-trips through showRuleOf for a list', () => {
+    const cases: [TodoShowRule, boolean][] = [
+      [{ kind: 'now' }, false],
+      [{ kind: 'from', date: '2026-11-20' }, false],
+      [{ kind: 'due' }, false],
+      [{ kind: 'now' }, true],
+      [{ kind: 'due' }, true],
+      [{ kind: 'lead', days: 6 }, true],
+    ];
+    for (const [rule, rep] of cases) {
+      const s = subject({ kind: 'list', dueDate: DUE, repeating: rep, cadence: WEEKLY });
+      expect(showRuleOf({ ...s, ...showRulePatch(rule, rep, 'list') })).toEqual(rule);
+    }
+  });
+
+  it('showPatchOnDueChange: a list show-from at or past the moved due date reads as its default', () => {
+    const existing = { dueDate: '2026-12-20', showFrom: '2026-12-10' };
+    expect(showPatchOnDueChange(existing, '2026-12-05', 'list')).toEqual(CLEARED_PATCH);
+    expect(showPatchOnDueChange(existing, '2026-12-30', 'list')).toBeNull();
+    // An explicit "right away" on a list is left alone when the date moves.
+    expect(
+      showPatchOnDueChange({ dueDate: '2026-12-20', showOn: 'now' }, '2026-12-05', 'list')
+    ).toBeNull();
+    // Clearing the due date clears the rule, as for a to-do.
+    expect(showPatchOnDueChange({ dueDate: '2026-12-20', showOn: 'now' }, null, 'list')).toEqual(
+      CLEARED_PATCH
+    );
+  });
+});
+
+describe('invalidShowRule (the one check both stores refuse with)', () => {
+  const WEEKLY: Cadence = { unit: 'week', interval: 1, weekdays: [2] };
+  it.each<[string, TodoShowRule, boolean, ReturnType<typeof invalidShowRule>]>([
+    ['now', { kind: 'now' }, false, null],
+    ['due', { kind: 'due' }, true, null],
+    ['valid from', { kind: 'from', date: '2026-11-20' }, false, null],
+    ['malformed from', { kind: 'from', date: '20 Nov' }, false, 'invalid-date'],
+    ['lead on a one-off', { kind: 'lead', days: 3 }, false, 'invalid-lead'],
+    ['lead that fits', { kind: 'lead', days: 6 }, true, null],
+    ['lead past the cadence', { kind: 'lead', days: 7 }, true, 'invalid-lead'],
+    ['lead out of range', { kind: 'lead', days: 0 }, true, 'invalid-lead'],
+  ])('%s', (_, rule, rep, expected) => {
+    expect(invalidShowRule(rule, rep, WEEKLY)).toBe(expected);
+  });
+  it('with no cadence the ceiling is SHOW_LEAD_MAX', () => {
+    expect(invalidShowRule({ kind: 'lead', days: 30 }, true, undefined)).toBeNull();
+    expect(invalidShowRule({ kind: 'lead', days: 31 }, true, null)).toBe('invalid-lead');
   });
 });

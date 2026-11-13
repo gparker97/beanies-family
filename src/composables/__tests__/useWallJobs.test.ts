@@ -31,6 +31,7 @@ vi.mock('@/composables/useToday', () => ({ useToday: () => ({ today: { value: '2
 import { useWallJobs } from '../useWallJobs';
 import { useListStore } from '@/stores/listStore';
 import { useTodoStore } from '@/stores/todoStore';
+import { useFamilyStore } from '@/stores/familyStore';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { reportError } from '@/utils/errorReporter';
 import {
@@ -397,5 +398,113 @@ describe('useWallJobs write contract', () => {
 
       await expect(useWallJobs().addListItem('l1', 'Bread')).resolves.toBe(false);
     });
+  });
+});
+
+/**
+ * Which lists reach the wall, and in whose lanes (plan 2026-11-13: lists work like to-dos). The
+ * rule itself is table-tested in `wallJobs.test.ts`; this pins that the composable feeds it
+ * the reactive day and the humans, and that a tick credits the lane it was made in.
+ */
+describe('useWallJobs lists', () => {
+  const TODAY = '2026-09-10'; // a Thursday (useToday is mocked to it above)
+  const list = (over: Partial<FamilyList> = {}): FamilyList =>
+    ({
+      id: 'l1',
+      title: 'packing',
+      emoji: '🧳',
+      category: 'out',
+      ownerId: 'leo',
+      lifecycle: 'oneoff',
+      items: [{ id: 'i1', title: 'swimsuit', completed: false }],
+      completed: false,
+      createdBy: 'greg',
+      createdAt: '2026-09-01',
+      updatedAt: '2026-09-01',
+      ...over,
+    }) as FamilyList;
+
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+    useFamilyStore().members = [
+      { id: 'leo', name: 'Leo', ageGroup: 'child' },
+      { id: 'milo', name: 'Milo', ageGroup: 'child' },
+    ] as never;
+  });
+
+  const laneIds = (memberId: string) =>
+    useWallJobs()
+      .listsFor(memberId)
+      .map((g) => g.list.id);
+
+  it('puts a list for two beans in both lanes', () => {
+    useListStore().lists = [list({ assigneeIds: ['leo', 'milo'], dueDate: TODAY })];
+    expect(laneIds('leo')).toEqual(['l1']);
+    expect(laneIds('milo')).toEqual(['l1']);
+  });
+
+  it('keeps a waiting list off the wall (due later, no show rule)', () => {
+    useListStore().lists = [list({ dueDate: '2026-09-14' })];
+    expect(laneIds('leo')).toEqual([]);
+  });
+
+  it('shows a list early when its rule says so', () => {
+    useListStore().lists = [list({ dueDate: '2026-09-14', showFrom: TODAY })];
+    expect(laneIds('leo')).toEqual(['l1']);
+  });
+
+  it("credits the lane's bean when a shared list's item is ticked there", async () => {
+    useListStore().lists = [list({ assigneeIds: ['leo', 'milo'], dueDate: TODAY })];
+    const toggleItem = vi.spyOn(useListStore(), 'toggleItem').mockResolvedValue({} as never);
+    const wall = useWallJobs();
+    const [miloJob] = wall.listsFor('milo')[0]!.jobs;
+    await wall.toggle(miloJob!);
+    expect(toggleItem).toHaveBeenCalledWith('l1', 'i1', 'milo');
+  });
+
+  // One item, two lanes: a tap in the second lane while the first write is in flight must not
+  // tick it again (which would overwrite `completedBy` and could celebrate twice).
+  it('guards a shared list item across lanes while a tick is in flight', async () => {
+    useListStore().lists = [list({ assigneeIds: ['leo', 'milo'], dueDate: TODAY })];
+    let release: (v: unknown) => void = () => {};
+    const toggleItem = vi
+      .spyOn(useListStore(), 'toggleItem')
+      .mockImplementation(() => new Promise((r) => (release = r)) as never);
+    const wall = useWallJobs();
+    const [leoJob] = wall.listsFor('leo')[0]!.jobs;
+    const [miloJob] = wall.listsFor('milo')[0]!.jobs;
+    expect(leoJob!.key).not.toBe(miloJob!.key); // two rows still render with their own keys
+    const first = wall.toggle(leoJob!);
+    expect(wall.isPending(miloJob!)).toBe(true);
+    await wall.toggle(miloJob!);
+    release({});
+    await first;
+    expect(toggleItem).toHaveBeenCalledTimes(1);
+    expect(wall.isPending(miloJob!)).toBe(false);
+  });
+
+  // A to-do for two beans is two rows but ONE record, so the same race applies.
+  it('guards a shared to-do across lanes while a tick is in flight', async () => {
+    let release: (v: unknown) => void = () => {};
+    const toggleComplete = vi
+      .spyOn(useTodoStore(), 'toggleComplete')
+      .mockImplementation(() => new Promise((r) => (release = r)) as never);
+    const row = (ownerId: string): WallJob => ({
+      key: `todo:t1:${ownerId}`,
+      title: 'passports',
+      done: false,
+      ownerId,
+      source: 'todo',
+      todoId: 't1',
+    });
+    const wall = useWallJobs();
+    const first = wall.toggle(row('leo'));
+    expect(wall.isPending(row('milo'))).toBe(true);
+    await wall.toggle(row('milo'));
+    release({});
+    await first;
+    expect(toggleComplete).toHaveBeenCalledTimes(1);
+    expect(wall.isPending(row('milo'))).toBe(false);
   });
 });

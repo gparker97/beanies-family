@@ -2,7 +2,8 @@ import { mount } from '@vue/test-utils';
 import { setActivePinia, createPinia } from 'pinia';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import ListTile from '../ListTile.vue';
-import type { FamilyList } from '@/types/models';
+import { useFamilyStore } from '@/stores/familyStore';
+import type { FamilyList, FamilyMember } from '@/types/models';
 
 vi.mock('@/composables/useTranslation', () => ({
   useTranslation: () => ({
@@ -112,5 +113,66 @@ describe('ListTile', () => {
   it('shows an overdue pill for a past-due one-off list', () => {
     const wrapper = mount(ListTile, { props: { list: list({ dueDate: '2026-06-10' }) } });
     expect(wrapper.text()).toContain('lists.status.overdue');
+  });
+});
+
+describe('ListTile: people and when it shows (#147)', () => {
+  const member = (id: string, name: string) =>
+    ({ id, name, color: '#2C3E50', isPet: false }) as unknown as FamilyMember;
+
+  it('stacks every assignee and names them all in the open label', () => {
+    useFamilyStore().members = [member('m-1', 'Greg'), member('m-2', 'Jill')];
+    const wrapper = mount(ListTile, {
+      props: { list: list({ assigneeIds: ['m-1', 'm-2'] }) },
+    });
+    expect(wrapper.get('[data-testid="list-tile-people"]').attributes('aria-label')).toBe(
+      'Greg, Jill'
+    );
+    expect(wrapper.get('[data-testid="list-tile-open"]').attributes('aria-label')).toBe(
+      'lists.tile.openFor'
+    );
+  });
+
+  it('reads a drifted pair owner first: everyone when the owner is listed, else the owner alone', () => {
+    useFamilyStore().members = [member('m-1', 'Greg'), member('m-2', 'Jill'), member('m-3', 'Sam')];
+    const people = (ownerId: string) =>
+      mount(ListTile, { props: { list: list({ ownerId, assigneeIds: ['m-1', 'm-2'] }) } })
+        .get('[data-testid="list-tile-people"]')
+        .attributes('aria-label');
+    expect(people('m-2')).toBe('Jill, Greg');
+    expect(people('m-3')).toBe('Sam');
+  });
+
+  it('tags a dated list that is not showing yet, and only then', () => {
+    const tag = '[data-testid="list-tile-show-tag"]';
+    // A list's default: it shows on its due date, so a future one waits.
+    expect(
+      mount(ListTile, { props: { list: list({ dueDate: '2026-06-25' }) } })
+        .get(tag)
+        .text()
+    ).toContain('todo.show.tag.due');
+    expect(
+      mount(ListTile, {
+        props: { list: list({ dueDate: '2026-06-25', showFrom: '2026-06-20' }) },
+      })
+        .get(tag)
+        .text()
+    ).toContain('todo.show.tag.from');
+    // Shows right away, due today, or undated: nothing to tag.
+    expect(
+      mount(ListTile, { props: { list: list({ dueDate: '2026-06-25', showOn: 'now' }) } })
+        .find(tag)
+        .exists()
+    ).toBe(false);
+    expect(
+      mount(ListTile, { props: { list: list({ dueDate: '2026-06-17' }) } })
+        .find(tag)
+        .exists()
+    ).toBe(false);
+    expect(
+      mount(ListTile, { props: { list: list() } })
+        .find(tag)
+        .exists()
+    ).toBe(false);
   });
 });

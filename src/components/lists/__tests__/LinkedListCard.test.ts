@@ -13,7 +13,7 @@ vi.mock('@/stores/listStore', () => ({
   useListStore: () => ({ toggleItem: h.toggleItem }),
 }));
 vi.mock('@/stores/familyStore', () => ({
-  useFamilyStore: () => ({ currentMember: { id: 'me' } }),
+  useFamilyStore: () => ({ currentMember: { id: 'me' }, members: [] }),
 }));
 vi.mock('@/composables/useTranslation', () => ({
   useTranslation: () => ({
@@ -23,7 +23,10 @@ vi.mock('@/composables/useTranslation', () => ({
 
 import LinkedListCard from '../LinkedListCard.vue';
 
-const stubs = { MemberChip: true, EverySessionTag: { template: '<span data-testid="tag" />' } };
+const stubs = {
+  ActivityOwnerStack: true,
+  EverySessionTag: { template: '<span data-testid="tag" />' },
+};
 
 function list(overrides: Partial<FamilyList> = {}): FamilyList {
   return {

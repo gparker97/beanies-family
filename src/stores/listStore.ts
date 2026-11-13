@@ -10,7 +10,26 @@ import * as cycleRepo from '@/services/automerge/repositories/listCycleRepositor
 import { buildCycleSnapshot, expiredCycleIds, CYCLE_SWEEP_ENABLED } from '@/utils/listCycles';
 import { clockVerdict, readSweepDay, recordSweepDay } from '@/utils/cycleSweepClock';
 import { list as projectionList } from '@/services/automerge/projection';
-import { computeRecurringReset, isDueSoon, isFiled, isRecurring } from '@/utils/listLifecycle';
+import {
+  computeRecurringReset,
+  isDueSoon,
+  isFiled,
+  isRecurring,
+  listSubject,
+  type ListSubject,
+} from '@/utils/listLifecycle';
+import { resolveListRule } from '@/services/recurrence/adapters';
+import { listAssignees, toListAssigneePayload } from '@/utils/assignees';
+import {
+  CLEARED,
+  invalidShowRule,
+  isYmd,
+  showPatchOnDueChange,
+  showRuleOf,
+  showRulePatch,
+  type TodoShowRule,
+} from '@/utils/todoPlate';
+import { VISIBILITY_SURFACE, logShowRuleSet } from '@/utils/showRuleLog';
 import { buildCopySeeds, freshItems } from '@/utils/listSeed';
 import { getListTemplateByKey } from '@/constants/listTemplates';
 import { getListCategory } from '@/constants/listCategories';
@@ -66,6 +85,170 @@ class CopyFailure extends Error {
     this.code = code;
     this.userMessageKey = userMessageKey;
   }
+}
+
+/**
+ * The ownership pair a write carries, normalised, or null when it carries none. The store's
+ * two write funnels (`createList`, `updateList`) pass every input through this, so callers
+ * (`useShoppingListCommit`, the demo fixture, `ShoppingListDestination`) stay single-owner
+ * and still write a pair in step. `assigneeIds` wins over a disagreeing `ownerId`; an empty
+ * `assigneeIds` falls back to `ownerId`.
+ */
+function ownershipOf(input: {
+  ownerId?: string;
+  assigneeIds?: string[];
+}): { assigneeIds: string[]; ownerId: string } | null {
+  if (input.assigneeIds === undefined && input.ownerId === undefined) return null;
+  const ids = input.assigneeIds?.length ? input.assigneeIds : input.ownerId ? [input.ownerId] : [];
+  return toListAssigneePayload(ids);
+}
+
+/**
+ * How the list's owner and assignees disagree, or null when they are in step (or there are no
+ * `assigneeIds`). Only an older build (which writes `ownerId` alone) or two devices' concurrent
+ * edits merging field by field can cause it. `owner-reordered`: the owner is listed but not
+ * first, which reads as everyone listed, owner first; `owner-empty`: no owner, which reads as the
+ * stored ids; `owner-not-listed`: it reads as the owner alone (`listAssignees`). The first two
+ * readings keep everyone listed, so they heal to it on the list's next write through
+ * `updateList`; `owner-not-listed` is never healed automatically (see `healsOwnerDrift`).
+ */
+type OwnerDrift = 'owner-reordered' | 'owner-empty' | 'owner-not-listed';
+function ownerDrift(list: Pick<FamilyList, 'ownerId' | 'assigneeIds'>): OwnerDrift | null {
+  const ids = list.assigneeIds;
+  if (!ids?.length) return null;
+  if (!list.ownerId) return ids.some(Boolean) ? 'owner-empty' : null;
+  if (ids[0] === list.ownerId) return null;
+  return ids.includes(list.ownerId) ? 'owner-reordered' : 'owner-not-listed';
+}
+
+/**
+ * Whether an unattended write may store the drifted list's reading. Only the lossless cases:
+ * `owner-not-listed` can be the field-by-field merge of two people edits (X wrote [B], Y wrote
+ * owner A of [A, B, C]; merged owner A, ids [B]), and writing its `[ownerId]` reading would
+ * delete B for good on the next reset. It stays as stored, read as the owner alone, until a
+ * person sets the people (`setAssignees`).
+ */
+function healsOwnerDrift(drift: OwnerDrift | null): boolean {
+  return drift === 'owner-reordered' || drift === 'owner-empty';
+}
+
+/**
+ * Why a stored show rule reads as a fallback instead of what it says, or null when it reads as
+ * stored. Only a value `showRuleOf` (`utils/todoPlate`) actually READS and rejects is a fault,
+ * walking its own order, and the date and lead checks are `invalidShowRule`'s:
+ *   - an undated subject (or none: `neverDueFault`'s case) is always `now` and reads nothing;
+ *   - a `showOn` that is neither value;
+ *   - repeating: a lead outside 1-30, unless `showOn: 'now'` already decided it;
+ *   - one-off: a malformed `showFrom`, unless an explicit `showOn` already decided it.
+ * A lead longer than the cadence leaves room for is NOT a fault: `showRuleOf` clamps it on read
+ * and keeps the stored value on purpose (lengthening the repeat brings it back), so the check
+ * takes no cadence.
+ */
+function storedShowRuleFault(subject: ListSubject | null): string | null {
+  if (!subject || !isYmd(subject.dueDate ?? '')) return null;
+  const { showOn } = subject;
+  if (showOn !== undefined && showOn !== 'now' && showOn !== 'due') return 'invalid-show-on';
+  if (subject.repeating) {
+    const days = subject.showLeadDays;
+    if (showOn === 'now' || days === undefined) return null;
+    return invalidShowRule({ kind: 'lead', days }, true, null);
+  }
+  const date = subject.showFrom;
+  if (showOn !== undefined || date === undefined) return null;
+  return invalidShowRule({ kind: 'from', date }, false, null);
+}
+
+/**
+ * Why a repeating list never comes due (`listSubject` is null), or null when it does or is a
+ * one-off. `no-schedule`: neither `cadence` nor `frequency`, which `resolveListRule` returns as
+ * null without a word (a list that never resets, preserved exactly); `no-reset-day`: a schedule
+ * but no baseline or no next reset. An unknown `frequency` is left out: `resolveListRule`
+ * reports it itself.
+ */
+function neverDueFault(list: FamilyList, subject: ListSubject | null): string | null {
+  if (!isRecurring(list) || subject) return null;
+  if (!list.cadence && list.frequency === undefined) return 'no-schedule';
+  return resolveListRule(list) ? 'no-reset-day' : null;
+}
+
+/**
+ * Lists already reported by `auditLists` this session, as `<event>:<list id>`: the once-set
+ * pattern of `reportUnmappable` (`recurrence/adapters`), so a list that stays drifted is
+ * reported once, not on every load.
+ */
+const auditedLists = new Set<string>();
+
+/**
+ * The load-time audit. Pure reads, never a write (no migration): logs, once per list per
+ * session, `owner-drift` (owner and assignees disagree, requirement 12's fleet signal),
+ * `list-never-due` (a repeating list that never comes due, so it never shows: no schedule, or a
+ * schedule with no resolvable reset day) and `show-rule-invalid` (a stored rule that reads as a
+ * fallback). Each has its own once-key, so one list can report both. `listAssignees` and
+ * `listPlate` stay pure; the warning lives here.
+ */
+function auditLists(all: readonly FamilyList[], todayYmd: string): void {
+  const once = (event: string, id: string): boolean => {
+    const key = `${event}:${id}`;
+    if (auditedLists.has(key)) return false;
+    auditedLists.add(key);
+    return true;
+  };
+  for (const list of all) {
+    const drift = ownerDrift(list);
+    if (drift && once('owner-drift', list.id)) {
+      logEvent({
+        level: 'warn',
+        surface: 'lists',
+        message: 'owner-drift',
+        context: { action: 'owner-drift', detail: drift, count: list.assigneeIds?.length ?? 0 },
+      });
+    }
+    const subject = listSubject(list, todayYmd);
+    const kind = isRecurring(list) ? 'repeat' : 'once';
+    const neverDue = neverDueFault(list, subject);
+    if (neverDue && once('list-never-due', list.id)) {
+      logEvent({
+        level: 'warn',
+        surface: 'lists',
+        message: 'list-never-due',
+        context: { action: 'list-never-due', detail: neverDue, kind },
+      });
+    }
+    const fault = storedShowRuleFault(subject);
+    if (fault && once('show-rule-invalid', list.id)) {
+      logEvent({
+        level: 'warn',
+        surface: 'lists',
+        message: 'show-rule-invalid',
+        context: { action: 'show-rule-invalid', detail: fault, kind },
+      });
+    }
+  }
+}
+
+/** A refused people change: logged with the reason, explained to the person in place. */
+function refuseAssignees(detail: 'not-found' | 'empty'): void {
+  logEvent({
+    level: 'warn',
+    surface: 'lists',
+    message: 'assignees-refused',
+    context: { action: 'assignees', detail },
+  });
+  if (detail === 'empty') {
+    const t = useTranslationStore().t;
+    showToast('info', t('lists.error.unknownOwner'), t('lists.error.unknownOwnerHelp'));
+  }
+}
+
+/** A refused show-rule change, on the to-do rule's surface with `recur_surface: 'list'`. */
+function refuseShowRule(detail: string): void {
+  logEvent({
+    level: 'warn',
+    surface: VISIBILITY_SURFACE,
+    message: 'refused',
+    context: { action: 'show-rule', detail, recur_surface: 'list' },
+  });
+  showToast('info', useTranslationStore().t('lists.error.showRuleRefused'));
 }
 
 // Sort comparators — newest-created first / most-recently-completed first
@@ -160,12 +343,13 @@ export const useListStore = defineStore('lists', () => {
 
   // ========== GETTERS ==========
 
-  // Every display getter honors the global member filter (single owner → scalar
-  // id; `createMemberFiltered` treats a no-id as always-included and returns the
-  // full set when the filter is 'all', so default behavior is unchanged). The
+  // Every display getter honors the global member filter (a list's assignees, through
+  // `listAssignees`; `createMemberFiltered` keeps a list when ANY of them is selected,
+  // treats no ids as always-included and returns the full set when the filter is 'all',
+  // so default behavior is unchanged). The
   // Lists page reads these the same way To-Dos/Activities read their filtered
   // getters, so selecting a member narrows /lists identically.
-  const filteredLists = createMemberFiltered(lists, (l) => l.ownerId);
+  const filteredLists = createMemberFiltered(lists, (l) => listAssignees(l));
 
   const activeLists = computed(() =>
     filteredLists.value.filter((l) => !isFiled(l)).sort(byCreatedDesc)
@@ -178,7 +362,7 @@ export const useListStore = defineStore('lists', () => {
    * Archived cycles, newest first, narrowed by the same global member filter as lists so
    * history behaves identically to the live shelf.
    */
-  const filteredCycles = createMemberFiltered(cycles, (c) => c.ownerId);
+  const filteredCycles = createMemberFiltered(cycles, (c) => listAssignees(c));
   const archivedCycles = computed(() =>
     [...filteredCycles.value].sort((a, b) => b.endedOn.localeCompare(a.endedOn))
   );
@@ -240,6 +424,7 @@ export const useListStore = defineStore('lists', () => {
       },
       { action: 'listStore:loadLists' }
     );
+    auditLists(lists.value, today.value);
     await loadCycles();
     // Only AFTER the collections are populated, so a watcher race can't run against an
     // empty set. Idempotent — a same-day re-run is a no-op.
@@ -445,14 +630,21 @@ export const useListStore = defineStore('lists', () => {
    * up arming the 09:00 reminder on every device in the house — the audience gate
    * in `buildListReminders` now refuses it, and this refuses to create it.
    */
-  async function createList(input: CreateFamilyListInput): Promise<FamilyList | null> {
+  async function createList(raw: CreateFamilyListInput): Promise<FamilyList | null> {
+    // The ownership pair is normalised here, whoever the caller is: `assigneeIds` wins,
+    // `ownerId` is always its first (`toListAssigneePayload`).
+    const input: CreateFamilyListInput = { ...raw, ...ownershipOf(raw) };
     const roster = useFamilyStore().members;
     // ⚠️ Only enforced once the roster is actually LOADED. Refusing against an
     // empty `members` would block list creation in any flow that seeds before the
     // family store has hydrated (first-run, template seeding) — a total failure,
     // and a strictly worse one than the dangling owner this prevents. With a
-    // loaded roster, an empty or unresolvable `ownerId` is a genuine bug.
-    if (roster.length > 0 && (!input.ownerId || !roster.some((m) => m.id === input.ownerId))) {
+    // loaded roster, an empty set or any unresolvable assignee is a genuine bug.
+    const assignees = listAssignees(input);
+    if (
+      roster.length > 0 &&
+      (assignees.length === 0 || !assignees.every((id) => roster.some((m) => m.id === id)))
+    ) {
       const t = useTranslationStore().t;
       // `silent`: reported here under a precise surface, so the toast must not
       // also auto-report on the catch-all `app` surface.
@@ -462,9 +654,9 @@ export const useListStore = defineStore('lists', () => {
       reportError({
         surface: 'lists',
         message:
-          'refused to create a list whose ownerId does not resolve to a family member. Check the caller resolves an owner before calling createList — an unowned list reaches nobody and arms reminders on every device.',
+          'refused to create a list with no assignee, or one that does not resolve to a family member. Check the caller resolves its people before calling createList; an unowned list reaches nobody and arms reminders on every device.',
         severity: 'error',
-        context: { action: 'create_unknown_owner' },
+        context: { action: 'create_unknown_owner', count: assignees.length },
       });
       return null;
     }
@@ -665,12 +857,36 @@ export const useListStore = defineStore('lists', () => {
     return trackFeature(result ?? null, 'list');
   }
 
+  /**
+   * The store's shared write funnel. Besides the caller's patch it keeps two invariants:
+   *   - ownership: any `ownerId` / `assigneeIds` in the input is rewritten as one pair in
+   *     step (`ownershipOf`); a write that carries none on a list drifted LOSSLESSLY (the
+   *     owner listed but not first, or an empty owner: `healsOwnerDrift`) heals it in the same
+   *     write to what it already reads as (`listAssignees`: everyone listed, owner first).
+   *     Idempotent across devices, so the unattended reset in `reconcileRecurringLists` may
+   *     carry it too. An owner that is not listed is left as stored: its reading drops people;
+   *   - the show rule follows a one-off list's due date (`showPatchOnDueChange`, as
+   *     `todoStore.updateTodo` does). A write that names the show fields itself wins.
+   */
   async function updateList(id: string, input: UpdateFamilyListInput): Promise<FamilyList | null> {
+    const existing = lists.value.find((l) => l.id === id);
+    const ownership =
+      ownershipOf(input) ??
+      (existing && healsOwnerDrift(ownerDrift(existing))
+        ? toListAssigneePayload(listAssignees(existing))
+        : null);
+    const namesRule = 'showFrom' in input || 'showOn' in input || 'showLeadDays' in input;
+    const oneOff = existing && !isRecurring(existing) && input.lifecycle !== 'recurring';
+    const follow =
+      oneOff && 'dueDate' in input && !namesRule
+        ? showPatchOnDueChange(existing, input.dueDate, 'list')
+        : null;
+    const patch: UpdateFamilyListInput = { ...input, ...ownership, ...follow };
     const result = await wrapAsync(
       isLoading,
       error,
       async () => {
-        const updated = await listRepo.updateList(id, input);
+        const updated = await listRepo.updateList(id, patch);
         if (updated) {
           lists.value = lists.value.map((l) => (l.id === id ? updated : l));
         }
@@ -1007,7 +1223,8 @@ export const useListStore = defineStore('lists', () => {
    * flip lives. Always clears the completion triple (`completed`/`completedBy`/
    * `completedAt`) via explicit `undefined` so a stale completion can't leak
    * across the flip (a recurring list must never be filed; a one-off must
-   * re-derive filing from its items), and sets/clears the recurrence fields.
+   * re-derive filing from its items), and sets/clears the reset bookkeeping. The schedule
+   * itself survives a round trip: only a list that never repeated starts on the weekly default.
    * Delegates to `updateList`, inheriting its `wrapAsync` toast + `reportError`.
    */
   async function setLifecycle(
@@ -1016,13 +1233,25 @@ export const useListStore = defineStore('lists', () => {
   ): Promise<FamilyList | null> {
     const list = lists.value.find((l) => l.id === listId);
     if (!list) return null;
-    const cleared = { completed: undefined, completedBy: undefined, completedAt: undefined };
+    // The show rule is cleared too: its kinds differ between one-off and repeating (a
+    // "show from" date has no meaning on a repeating list, a lead none on a one-off).
+    const cleared = {
+      completed: undefined,
+      completedBy: undefined,
+      completedAt: undefined,
+      ...CLEARED,
+    };
     const patch: UpdateFamilyListInput =
       lifecycle === 'recurring'
         ? {
             ...cleared,
             lifecycle: 'recurring',
-            frequency: list.frequency ?? 'weekly',
+            // A kept `cadence` is the schedule, and its `frequency` shadow is left exactly as
+            // stored: it is deliberately undefined for a cadence the legacy enum cannot express
+            // (`listShadowFromCadence`), and writing 'weekly' there would make an older build
+            // reset an every-2-weeks list weekly. Only a list with no cadence gets a frequency,
+            // and the weekly default only when it never had one.
+            ...(list.cadence ? {} : { frequency: list.frequency ?? 'weekly' }),
             dueDate: undefined,
             lastResetDate: today.value,
             cycleCelebrated: false,
@@ -1030,12 +1259,13 @@ export const useListStore = defineStore('lists', () => {
         : {
             ...cleared,
             lifecycle: 'oneoff',
-            frequency: undefined,
-            // #70: `cadence` must be cleared alongside `frequency`. Leaving it
-            // means a recurring -> oneoff -> recurring round-trip resurrects the
-            // OLD cadence, which `resolveListRule` reads in preference to the
-            // 'weekly' the recurring branch above just wrote.
-            cadence: undefined,
+            // The schedule (`frequency` + `cadence`) is deliberately KEPT, inert on a one-off
+            // list (`resolveListRule` returns null unless the lifecycle is recurring). Clearing
+            // it meant one stray tap on One-off and a tap back on Repeats turned a daily list
+            // into a weekly one (the default below), which then stopped resetting every day
+            // (greg's family, 2026-11-13). Both fields are kept together, untouched, so the round
+            // trip restores exactly the schedule the list had, shadow included (the recurring
+            // branch above writes no `frequency` over a kept cadence).
             lastResetDate: undefined,
             cycleCelebrated: undefined,
             // `notifyParents` is deliberately KEPT (inert on a one-off list): clearing it here
@@ -1084,6 +1314,77 @@ export const useListStore = defineStore('lists', () => {
         message: 'notify_parents_set',
         context: { recur_surface: 'list', action: on ? 'on' : 'off' },
       });
+    }
+    return result;
+  }
+
+  /**
+   * Who a list is for: the ONE ownership write path from the drawer. Once the roster is
+   * loaded it drops ids that no longer resolve (the people picker keeps ids outside its
+   * member list, and nothing cascades lists on member removal, so refusing them would block
+   * every people edit on a list holding a removed member). Refuses only an empty result
+   * (toast + `assignees-refused`) and a missing list (logged only). Logs `assignees-set`
+   * with the assignee count and, when stale ids were dropped, `assignees-pruned` with how
+   * many (`count`), so neither event overloads `detail`, which is a refusal's reason. A
+   * failed write is reported by `updateList`'s `wrapAsync`.
+   */
+  async function setAssignees(id: string, ids: readonly string[]): Promise<FamilyList | null> {
+    if (!lists.value.some((l) => l.id === id)) {
+      refuseAssignees('not-found');
+      return null;
+    }
+    const roster = useFamilyStore().members;
+    const wanted = [...new Set(ids.filter(Boolean))];
+    const kept = roster.length > 0 ? wanted.filter((m) => roster.some((r) => r.id === m)) : wanted;
+    if (kept.length === 0) {
+      refuseAssignees('empty');
+      return null;
+    }
+    const result = await updateList(id, toListAssigneePayload(kept));
+    if (result) {
+      logEvent({
+        level: 'info',
+        surface: 'lists',
+        message: 'assignees-set',
+        context: { action: 'assignees', count: kept.length },
+      });
+      const pruned = wanted.length - kept.length;
+      if (pruned > 0) {
+        logEvent({
+          level: 'info',
+          surface: 'lists',
+          message: 'assignees-pruned',
+          context: { action: 'assignees', count: pruned },
+        });
+      }
+    }
+    return result;
+  }
+
+  /**
+   * When a list shows on the briefing, the Nook, the wall and the widget (`utils/todoPlate`).
+   * Refuses (toast + log on the to-do rule's surface) a missing list and a rule
+   * `invalidShowRule` rejects, with the lead clamped by the RESOLVED cadence
+   * (`resolveListRule`), never `list.cadence`: a list made repeating by the lifecycle flip
+   * stores `frequency` only. Writes through `showRulePatch` (non-default values only) and
+   * logs the rule actually stored through the shared `logShowRuleSet`.
+   */
+  async function setShowRule(id: string, rule: TodoShowRule): Promise<FamilyList | null> {
+    const list = lists.value.find((l) => l.id === id);
+    if (!list) {
+      refuseShowRule('not-found');
+      return null;
+    }
+    const repeating = isRecurring(list);
+    const invalid = invalidShowRule(rule, repeating, resolveListRule(list)?.rule);
+    if (invalid) {
+      refuseShowRule(invalid);
+      return null;
+    }
+    const result = await updateList(id, showRulePatch(rule, repeating, 'list'));
+    if (result) {
+      const subject = listSubject(result, today.value);
+      logShowRuleSet(subject ? showRuleOf(subject) : rule, repeating, 'list');
     }
     return result;
   }
@@ -1368,6 +1669,8 @@ export const useListStore = defineStore('lists', () => {
     reorderItems,
     setLifecycle,
     setNotifyParents,
+    setAssignees,
+    setShowRule,
     setAllItemsCompleted,
     clearLinksFor,
     linkListsToActivity,

@@ -34,13 +34,11 @@ import { isCardTodo } from '@/utils/todoRecurrence';
 import { plateClock, platedTodos, type ShownPlate } from '@/utils/todoPlate';
 import {
   classifyAudience,
-  classifyListAudience,
   classifyOwnerAudience,
+  classifyPlateList,
   classifyPlateTodo,
   isDutyDone,
-  ownerItemSurfaces,
 } from '@/utils/audience';
-import { isListDue, listProgress } from '@/utils/listLifecycle';
 import { isFlagEnabled } from '@/config/flags';
 import { getActivityFallbackEmoji } from '@/constants/activityCategories';
 import { hintEmoji, isFreshHint } from '@/utils/helpfulHints';
@@ -53,8 +51,8 @@ export interface CriticalItem {
   message: string;
   icon: string;
   time: string; // HH:mm for sorting, '' if untimed
-  /** Not today's business (a to-do not due yet, a Helpful Hint): sorts below every row
-   * that belongs to today, in insertion order (upcoming to-dos, then hints). */
+  /** Not today's business (a to-do or list not due yet, a Helpful Hint): sorts below every
+   * row that belongs to today, in insertion order (upcoming to-dos, lists, then hints). */
   later?: boolean;
   occurrenceDate?: string; // for activity modal opening
   completable?: boolean; // whether this item can be checked off inline
@@ -96,8 +94,6 @@ export const CRITICAL_ITEMS_INITIAL_VISIBLE = 5;
 // the in-app notification deriver so the two can't drift. Mirrored in the "Your
 // Daily Briefing" help article.
 
-type DateState = 'overdue' | 'today' | 'noDue';
-
 // Message-key lookup tables — `satisfies` keeps every key real and the tables
 // exhaustive, so a typo or a missing variant is a compile error. The to-do tables are
 // keyed by the to-do's plate (`utils/todoPlate`); a `waiting` to-do never reaches them.
@@ -135,24 +131,27 @@ const ACTIVITY_FORCHILD_KEYS = {
   untimed: 'nook.criticalActivityForChildNoTime',
 } satisfies Record<'timed' | 'untimed', UIStringKey>;
 
-// Beanie Lists (#33) — briefing message keys (owner / for-child / unassigned ×
-// due-state), mirroring the to-do tables. `classifyOwnerAudience`'s 'assignee'
-// kind (= you own it) maps to the owner table.
+// Beanie Lists (#33): briefing message keys (assignee / for-child / unassigned ×
+// plate), mirroring the to-do tables. The 'assignee' audience (= the list is yours)
+// maps to the owner table; `upcoming` is a list shown early by its show rule.
 const LIST_OWNER_KEYS = {
   overdue: 'lists.briefing.owner.overdue',
   today: 'lists.briefing.owner.today',
-  noDue: 'lists.briefing.owner.noDue',
-} satisfies Record<DateState, UIStringKey>;
+  undated: 'lists.briefing.owner.noDue',
+  upcoming: 'lists.briefing.owner.upcoming',
+} satisfies Record<ShownPlate, UIStringKey>;
 const LIST_FORCHILD_KEYS = {
   overdue: 'lists.briefing.forChild.overdue',
   today: 'lists.briefing.forChild.today',
-  noDue: 'lists.briefing.forChild.noDue',
-} satisfies Record<DateState, UIStringKey>;
+  undated: 'lists.briefing.forChild.noDue',
+  upcoming: 'lists.briefing.forChild.upcoming',
+} satisfies Record<ShownPlate, UIStringKey>;
 const LIST_UNASSIGNED_KEYS = {
   overdue: 'lists.briefing.unassigned.overdue',
   today: 'lists.briefing.unassigned.today',
-  noDue: 'lists.briefing.unassigned.noDue',
-} satisfies Record<DateState, UIStringKey>;
+  undated: 'lists.briefing.unassigned.noDue',
+  upcoming: 'lists.briefing.unassigned.upcoming',
+} satisfies Record<ShownPlate, UIStringKey>;
 
 // Meal planner (#27) — a cook assignment for today's meal. Briefing-only (like
 // medication/lists); no due-state, so one key per audience kind.
@@ -412,60 +411,44 @@ export function useCriticalItems() {
     }
 
     // ── Beanie Lists for the current member (whole lists, never items) ──
-    // Gated behind `familyLists`; flag off → no list items at all. Uses the
-    // shared `isListDue` predicate (so the briefing rule can't diverge from the
-    // tile/store) and the single-owner audience classifier.
+    // Gated behind `familyLists`; flag off → no list items at all. Which lists and where
+    // they sit: `classifyPlateList`, the rule the widget shares (the list's show rule, its
+    // assignees through `ownerItemSurfaces`, and its "N left"). It leaves out a list not
+    // showing yet, one nobody known is assigned to (the SAME gate the bell deriver and the
+    // OS scheduler use, so a list owned by nobody never lands on every member's plate), a
+    // filed list and one with nothing left. `upcoming` is a list shown early by its rule.
     if (isFlagEnabled('familyLists')) {
       for (const list of listStore.activeLists) {
-        const due = isListDue(list, todayStr.value); // 'overdue' | 'today' | 'noDue' | null
-        const audience = classifyListAudience(
-          list,
-          currentMember,
-          getMemberById,
-          due === 'overdue'
-        );
-        // `ownerItemSurfaces`, not `!== 'hidden'` — the SAME predicate the bell
-        // deriver and the OS scheduler use. `classifyOwnerAudience` maps an empty
-        // or unresolvable `ownerId` to 'unassigned', so the looser test put a list
-        // owned by nobody on every member's plate while producing no bell entry
-        // and no reminder for anyone: three surfaces, two answers.
-        if (!ownerItemSurfaces(audience)) continue;
-        if (due === null) continue; // future-dated, or a repeating list between resets
-
-        const remaining = listProgress(list).open;
-        // Don't surface empty / fully-checked lists ("0 left"): an undated list
-        // only belongs on the plate while it still has open items.
-        if (remaining === 0) continue;
-        const dateLabel = due === 'overdue' && list.dueDate ? formatDateShort(list.dueDate) : '';
+        const classified = classifyPlateList(list, currentMember, getMemberById, clock);
+        if (!classified) continue;
+        const { plate, audience, remaining, due } = classified;
+        const dateLabel =
+          plate === 'overdue' && due
+            ? formatDateShort(due)
+            : plate === 'upcoming' && due
+              ? formatNookDate(due)
+              : '';
+        const params = { list: list.title, date: dateLabel, remaining: String(remaining) };
 
         let message: string;
         if (audience.kind === 'assignee') {
-          message = buildMessage(LIST_OWNER_KEYS[due], {
-            list: list.title,
-            date: dateLabel,
-            remaining: String(remaining),
-          });
+          message = buildMessage(LIST_OWNER_KEYS[plate], params);
         } else if (audience.kind === 'forChild') {
-          message = buildMessage(LIST_FORCHILD_KEYS[due], {
+          message = buildMessage(LIST_FORCHILD_KEYS[plate], {
+            ...params,
             children: formatNameList(audience.childNames),
-            list: list.title,
-            date: dateLabel,
-            remaining: String(remaining),
           });
         } else {
-          message = buildMessage(LIST_UNASSIGNED_KEYS[due], {
-            list: list.title,
-            date: dateLabel,
-            remaining: String(remaining),
-          });
+          message = buildMessage(LIST_UNASSIGNED_KEYS[plate], params);
         }
 
         items.push({
           id: list.id,
           type: 'list',
           message,
-          icon: due === 'overdue' ? '⏰' : '🧾',
+          icon: plate === 'overdue' ? '⏰' : '🧾',
           time: '', // untimed — tapping opens /lists?view=<id>
+          ...(plate === 'upcoming' ? { later: true } : {}),
           completable: false,
         });
       }
