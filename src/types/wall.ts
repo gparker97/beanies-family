@@ -4,13 +4,21 @@
  * Declared here rather than inferred from a composable's return type so a view
  * can be built (and tested) without importing the composable that produces it.
  */
-import type { FamilyList, TodoItem } from '@/types/models';
+import type { ChoreBlock, FamilyList, TodoItem } from '@/types/models';
+import type { BeanChoreDay } from '@/utils/chores';
 import type { PlateClock, ShownPlate } from '@/utils/todoPlate';
 
-export type WallViewId = 'days' | 'lanes' | 'today' | 'jobs';
+/**
+ * `chores` is the choreboard's lanes (#146), offered only while the `choreboard` gate is on
+ * (`wallViewsFor`); `jobs` is the lists board, titled "Lists" while the gate is on.
+ */
+export type WallViewId = 'days' | 'lanes' | 'today' | 'jobs' | 'chores';
 
-/** Where a job came from. Drives the write path in `useWallJobs.toggle`. */
-export type WallJobSource = 'todo' | 'list';
+/**
+ * Where a job came from. Drives the write path in `useWallJobs.toggle`. Every branch on it is
+ * an exhaustive `switch`: a third source used to be silently treated as a list or a to-do.
+ */
+export type WallJobSource = 'todo' | 'list' | 'chore';
 
 /**
  * One tickable thing belonging to one bean.
@@ -39,7 +47,9 @@ export interface WallJob {
   /** Both present when `source === 'list'`. */
   listId?: string;
   itemId?: string;
-  /** The owning list's emoji, shown as a quiet provenance tag. */
+  /** Present when `source === 'chore'`. The row's bean is `ownerId` (a shared chore is ticked per bean). */
+  choreId?: string;
+  /** The owning list's emoji, or a chore's own picture, shown as a quiet tag after the title. */
   listEmoji?: string;
   /** When it was ticked — the wall shows it, because a wall has the room. */
   completedAt?: string;
@@ -98,6 +108,40 @@ export interface WallJobsResult {
    * board with chores mixed in, when a chore board is the point.
    */
   todos: WallJob[];
+  /**
+   * One chore lane per known (human) bean, keyed by member id: the choreboard's read model
+   * (`beanChoreDay`) turned into wall jobs. Empty when the caller passes no chore days, which
+   * is what it does while the `choreboard` gate is off.
+   */
+  choreLanesByMember: Record<string, WallChoreLane>;
+}
+
+/** One time-of-day block of a bean's chore lane, its chores as wall jobs. */
+export interface WallChoreBlock {
+  block: ChoreBlock;
+  /** In chore order. A done chore stays where it is, so a child sees what they did. */
+  jobs: WallJob[];
+  done: number;
+  total: number;
+  /** Every chore done. False for a block with no chores. */
+  allDone: boolean;
+  isNow: boolean;
+  /** The block's window has passed. */
+  ended: boolean;
+}
+
+/** A bean's chores today, as the wall's chore lanes draw them. */
+export interface WallChoreLane {
+  memberId: string;
+  /** The timed block happening now (never `anytime`), whether or not this bean has chores in it. */
+  current: ChoreBlock;
+  /**
+   * Blocks with at least one chore today: the block happening now first, then Anytime, then
+   * the blocks still to come, then the ones whose window has passed.
+   */
+  blocks: WallChoreBlock[];
+  done: number;
+  total: number;
 }
 
 /**
@@ -120,6 +164,11 @@ export interface WallPeripheralData {
   allTodos: WallJob[];
   listsFor: (memberId: string) => WallListGroup[];
   orphanLists: WallListGroup[];
+  /**
+   * A bean's chore lane (#146). ABSENT while the `choreboard` gate is off: the page reads the
+   * flag once and leaves this out, so every card and view below keeps today's behaviour.
+   */
+  choreLaneFor?: (memberId: string) => WallChoreLane | null;
   /** The wall's person filter, so a card agrees with the view above it. */
   /**
    * Who the wall is showing; `null` is "everyone", kept distinct from an empty list so a view
@@ -138,6 +187,11 @@ export interface WallJobsInput {
   memberIds: string[];
   /** Now, device-local (`plateClock`): the day, and the minute a timed to-do turns overdue. */
   clock: PlateClock;
+  /**
+   * Each bean's chore day (`choreStore.choreDayFor`), keyed by member id. Omitted or empty
+   * while the `choreboard` gate is off: the rule itself never reads the flag.
+   */
+  choreDays?: Readonly<Record<string, BeanChoreDay>>;
 }
 
 /**

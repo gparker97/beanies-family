@@ -452,6 +452,46 @@ const SUPPLEMENT: Record<string, Json[]> = {
   responsibilityCheckIns: [
     { id: 'checkin-1', byId: 'm1', kind: 'weekly', savedIds: ['card-1'], talkedIds: ['card-1'] },
   ],
+  // The choreboard (#146): a starter chore with card art and chosen days, and one mark of each kind.
+  chores: [
+    {
+      id: 'chore-1',
+      title: 'Make your bed',
+      emoji: '🛏️',
+      illustration: 'make-bed',
+      assigneeIds: ['m2', 'm3'],
+      block: 'morning',
+      days: [1, 2, 3, 4, 5],
+      notifyParents: true,
+      sortOrder: 0,
+      starterKey: 'school-morning',
+      createdBy: 'm1',
+      createdAt: T,
+      updatedAt: T,
+    },
+  ],
+  choreMarks: [
+    {
+      id: `done:m2:${D}:chore-1`,
+      kind: 'done',
+      memberId: 'm2',
+      date: D,
+      ref: 'chore-1',
+      by: 'm2',
+      createdAt: T,
+      updatedAt: T,
+    },
+    {
+      id: `celebrated:m2:${D}:morning`,
+      kind: 'celebrated',
+      memberId: 'm2',
+      date: D,
+      ref: 'morning',
+      by: 'm2',
+      createdAt: T,
+      updatedAt: T,
+    },
+  ],
 };
 
 /** A representative settings singleton: the fixture seeds none. */
@@ -464,6 +504,7 @@ const SETTINGS_SAMPLE = {
     { from: 'USD', to: 'GBP', rate: 0.8, updatedAt: '2026-10-01T00:00:00.000Z' },
   ],
   aiApiKeys: { claude: 'sk-ant-test', openai: 'sk-test', gemini: 'g-test' },
+  choreBlockStarts: { morning: '06:00', afternoon: '12:00', evening: '17:00' },
   dismissedHintKeys: { 'birthday-gift': T },
   preferredCurrencies: ['USD'],
   customInstitutions: ['Example Bank'],

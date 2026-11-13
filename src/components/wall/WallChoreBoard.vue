@@ -58,6 +58,11 @@ const props = defineProps<{
   peripherals: WallPeripheralData;
   isPending: (job: WallJob) => boolean;
   backLabel: string;
+  /**
+   * The board's heading. Absent: "The chore board", as always. The page passes "Lists" while
+   * the `choreboard` gate is on (#146), where this board shows lists and chores have their own.
+   */
+  boardTitle?: string;
 }>();
 const emit = defineEmits<{ toggle: [WallJob]; back: []; open: [WallSheetTarget] }>();
 
@@ -189,7 +194,7 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
     <div class="flex shrink-0 items-center gap-4">
       <WallBackButton :back-label="backLabel" @back="emit('back')" />
       <h2 class="font-outfit text-secondary-500 wall-board-title dark:text-ink font-extrabold">
-        {{ t('wall.jobsBoard.title') }}
+        {{ boardTitle ?? t('wall.jobsBoard.title') }}
       </h2>
       <p class="font-inter wall-board-sum text-[var(--muted-text,#4d5d6c)]">
         {{

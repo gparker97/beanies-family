@@ -224,8 +224,10 @@ defineExpose({
       </div>
     </section>
 
+    <!-- `hide-chores`: the choreboard redirect would drop this list's link (#146) -->
     <NewListSheet
       :open="showTemplates"
+      hide-chores
       :overrides="overrides"
       :suggested-template-key="suggestedTemplateKey"
       :blank-category="blankCategory"

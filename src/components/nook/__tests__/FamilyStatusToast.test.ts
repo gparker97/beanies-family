@@ -69,4 +69,33 @@ describe('FamilyStatusToast generic card rows', () => {
     ]);
     expect(wrapper.emitted('open-activity')).toBeUndefined();
   });
+
+  it('a chore line (#146) routes to the bean’s day and paints its icon in the block’s colour', async () => {
+    items.value = [
+      {
+        id: 'kid-1',
+        type: 'chores',
+        message: 'Juno has 2 morning chores left',
+        icon: '🌅',
+        time: '',
+        completable: false,
+        dismissKey: 'briefing-hide:chores:kid-1:2026-11-13',
+        choreBlock: 'morning',
+        route: { path: '/choreboard', query: { bean: 'kid-1' } },
+      },
+    ];
+    const wrapper = mount(FamilyStatusToast);
+    const row = wrapper.get('[data-testid="briefing-chore-line"]');
+    // No tick: a chore line is not ticked from the briefing.
+    expect(row.findAll('button')).toHaveLength(1);
+    expect(row.get('[data-testid="briefing-chore-block"]').classes()).toEqual(
+      expect.arrayContaining(['critical-icon-chore', 'chore-block-morning'])
+    );
+    await row.trigger('click');
+    expect(wrapper.emitted('open-route')).toEqual([
+      [{ path: '/choreboard', query: { bean: 'kid-1' } }],
+    ]);
+    expect(wrapper.emitted('open-list')).toBeUndefined();
+    expect(wrapper.emitted('open-activity')).toBeUndefined();
+  });
 });

@@ -32,7 +32,9 @@ import {
   canGoBackFrom,
   wallViewById,
   wallViewTransition,
+  wallViewsFor,
 } from '@/components/wall/wallViews';
+import { isFlagEnabled } from '@/config/flags';
 import { WALL_LOCK } from '@/components/wall/wallLockKey';
 import { WALL_MEMORIES } from '@/components/wall/wallMemoriesKey';
 import { WALL_EDIT } from '@/components/wall/wallEditKey';
@@ -133,7 +135,16 @@ function onOpenBirthday(birthday: BirthdayOccurrence) {
   birthdaySheet.value = birthday;
 }
 
-const jobs = useWallJobs();
+/**
+ * The choreboard gate (#146), read ONCE for the whole wall. Off, the wall is exactly what it
+ * was: no chore lanes are built, the cards and views are today's, and the lists board keeps its
+ * title. On, the chore lanes are a NEW view (`chores`), the combined card becomes "Lists", and a
+ * chores card opens the lanes. Every gated surface below takes this value; none reads the flag.
+ */
+const choreboardOn = isFlagEnabled('choreboard');
+const wallViews = wallViewsFor(choreboardOn);
+
+const jobs = useWallJobs({ chores: choreboardOn });
 const lock = useWallLock();
 const orientation = useWallOrientation(SURFACE);
 const { bursts, burst } = useWallBurst();
@@ -170,6 +181,10 @@ provide(WALL_EDIT, {
   addTodo: jobs.addTodo,
   renameJob: jobs.renameJob,
   removeJob: jobs.removeJob,
+  // A chore added at the wall is created BY the grown-up who unlocked it (the store checks
+  // they are an adult); an empty id is refused by the store with its own toast.
+  addChore: (memberId: string, title: string) =>
+    jobs.addChore(memberId, title, lock.unlockedBy.value?.id ?? ''),
 });
 
 /**
@@ -494,6 +509,8 @@ const peripherals = computed<WallPeripheralData>(() => ({
   allTodos: jobs.allTodos.value,
   listsFor: jobs.listsFor,
   orphanLists: jobs.orphanLists.value,
+  // Absent while the gate is off, which is how every card and view knows to stay as it was.
+  ...(choreboardOn ? { choreLaneFor: jobs.choreLaneFor } : {}),
   visibleMemberIds: visibleMemberIds.value,
 }));
 
@@ -504,9 +521,9 @@ const peripherals = computed<WallPeripheralData>(() => ({
  */
 const clockNow = ref(new Date());
 const clockTimer = setInterval(() => (clockNow.value = new Date()), 20_000);
-const currentView = computed(() => wallViewById(activeView.value));
+const currentView = computed(() => wallViewById(activeView.value, wallViews));
 /** Names the back control after the view it returns to. */
-const backView = computed(() => wallViewById(lastCalendarView.value));
+const backView = computed(() => wallViewById(lastCalendarView.value, wallViews));
 const backLabel = computed(() => t(backView.value.labelKey).toLowerCase());
 /** The header's compact form of the same control (Today view). */
 const backCompact = computed(() => ({
@@ -1108,7 +1125,7 @@ watch(activeView, () => (sheet.value = null));
             @step="onStep"
           />
         </div>
-        <WallViewSwitcher :active="activeView" @select="selectView" />
+        <WallViewSwitcher :active="activeView" :views="wallViews" @select="selectView" />
         <!-- Beside the switcher, not inside it: night is an action, the switcher is a radio
              group. One tap, on the face, where the lock menu hid it two taps deep. -->
         <WallNightButton @night-now="enterNight('face')" />
@@ -1168,6 +1185,7 @@ watch(activeView, () => (sheet.value = null));
         :visible-member-ids="visibleMemberIds"
         :back-label="backLabel"
         :can-go-back="canGoBack"
+        :board-title="choreboardOn ? t('wall.card.lists') : undefined"
         @toggle="onToggle"
         @back="onGoBack"
         @open-day="onOpenDay"
@@ -1177,6 +1195,7 @@ watch(activeView, () => (sheet.value = null));
         @step="onStep"
         @open="openSheet"
         @open-chores="selectView('jobs')"
+        @open-chore-lanes="selectView('chores')"
       />
 
       <BirthdayDetailsModal

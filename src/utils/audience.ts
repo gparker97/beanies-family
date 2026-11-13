@@ -23,7 +23,7 @@
  *     passed in as `missed`) or when the item carries `notifyParents: true`.
  *   • One-offs, the child's own view, siblings and unassigned items are untouched.
  *   Consumers apply it through `classifyTodoAudience` / `gateTodoAudience` /
- *   `classifyListAudience`; the gate itself stays private so no caller can hand-roll
+ *   `classifyListAudience` / `classifyChoreAudience` (#146, per bean); the gate itself stays private so no caller can hand-roll
  *   "is this a routine" (the two encodings are `isRepeating` and `isRecurring`).
  *   `isChildOnly` asks the same "child-only" question viewer-free, for the toggle UI.
  */
@@ -32,7 +32,10 @@ import { listAssignees, normalizeAssignees } from '@/utils/assignees';
 import { isFiled, isRecurring, listRemaining, listSubject } from '@/utils/listLifecycle';
 import { isRepeating } from '@/utils/todoRecurrence';
 import { isYmd, plateOf, todoPlate, type PlateClock, type ShownPlate } from '@/utils/todoPlate';
+import type { BeanChoreDay } from '@/utils/chores';
 import type {
+  Chore,
+  ChoreBlock,
   DutyCompletion,
   FamilyList,
   FamilyMember,
@@ -188,6 +191,119 @@ export function classifyListAudience(
     missed,
     notifyParents: list.notifyParents === true,
   });
+}
+
+/**
+ * `classifyAudience` for ONE bean's share of a chore (#146), with the routine gate applied (a
+ * chore always repeats). Classified PER BEAN, `classifyAudience([beanId], ...)`, never over the
+ * chore's whole `assigneeIds`: for a chore shared by a parent and a child the whole set is not
+ * child-only, so the parent would see the child's share as `hidden`, and the child would see
+ * the parent's as their own. Per bean: the bean always sees their own; a grown-up sees a
+ * child's only when the chore keeps parents posted or `missed` (its block `ended` with it
+ * undone); siblings and other grown-ups never.
+ */
+export function classifyChoreAudience(
+  chore: Pick<Chore, 'notifyParents'>,
+  beanId: string,
+  viewer: FamilyMember,
+  resolveMember: Resolve,
+  missed: boolean
+): BriefingAudience {
+  return gateRoutine(classifyAudience([beanId], viewer, resolveMember), {
+    routine: true,
+    missed,
+    notifyParents: chore.notifyParents === true,
+  });
+}
+
+/** One bean's chore line, as a viewer may see it: the briefing's line and the widget's row. */
+export interface ChoreLine {
+  beanId: string;
+  /** The block the line is about (see `choreLineFor`). */
+  block: ChoreBlock;
+  /** Counted over the chores in `block` that pass the gate for this viewer, never the rest. */
+  left: number;
+  total: number;
+  done: number;
+  /** `block` has ended with chores left: the line is about missed chores. */
+  missed: boolean;
+  /** The viewer is the bean ("You have ..."). */
+  own: boolean;
+}
+
+/**
+ * The ONE line a viewer may see for a bean's chore day (#146), shared by the daily briefing
+ * and the widget so the two cannot drift. Each chore passes or fails `classifyChoreAudience`
+ * (`ownerItemSurfaces`, so an unresolvable bean is nobody's line), with `missed` = its block
+ * ended and it is undone. Only blocks that have started count (ended, now, or Anytime); a later
+ * block is not yet anyone's business. The block, in order of preference:
+ *   1. the earliest ended block with chores left (missed);
+ *   2. the current block, with chores left;
+ *   3. Anytime, with chores left;
+ *   4. nothing left: the current block, else the latest started block with chores (a "Done"
+ *      line, `left` 0).
+ * null when no chore passes in any started block, so a bean with nothing today, or whose
+ * chores this viewer may not follow, has no line. A fully done bean returns its "Done" line:
+ * the widget shows it as "Done", the briefing shows no line for it (`left` 0).
+ *
+ * This is the first of `choreLinesFor`, the candidates in that order. The briefing walks the
+ * candidates itself so a line the viewer hid for the day gives way to the next one.
+ */
+export function choreLineFor(
+  day: BeanChoreDay,
+  beanId: string,
+  viewer: FamilyMember,
+  resolveMember: Resolve
+): ChoreLine | null {
+  return choreLinesFor(day, beanId, viewer, resolveMember)[0] ?? null;
+}
+
+/**
+ * Every line a viewer may see for a bean's chore day, best first (the order `choreLineFor`
+ * documents): each ended block with chores left, then the current block and Anytime with chores
+ * left, then the single "Done" fallback only when nothing is left anywhere. One entry per block.
+ * A surface that can hide a line (the briefing's day dismissal) takes the first one it has not
+ * hidden, so hiding the missed Morning line lets the Afternoon line through instead of blanking
+ * the bean for the day.
+ */
+export function choreLinesFor(
+  day: BeanChoreDay,
+  beanId: string,
+  viewer: FamilyMember,
+  resolveMember: Resolve
+): ChoreLine[] {
+  const started = day.blocks
+    .filter((b) => b.ended || b.isNow || b.block === 'anytime')
+    .map((b) => {
+      const shown = b.chores.filter((i) =>
+        ownerItemSurfaces(
+          classifyChoreAudience(i.chore, beanId, viewer, resolveMember, b.ended && !i.done)
+        )
+      );
+      const done = shown.filter((i) => i.done).length;
+      return { b, total: shown.length, done, left: shown.length - done };
+    });
+  // Anytime is never `ended` nor `isNow` (`choreDayFor`), so each block lands here at most once.
+  const picks = [
+    ...started.filter((s) => s.b.ended && s.left > 0),
+    ...started.filter((s) => s.b.isNow && s.left > 0),
+    ...started.filter((s) => s.b.block === 'anytime' && s.left > 0),
+  ];
+  if (picks.length === 0) {
+    const done =
+      started.find((s) => s.b.isNow && s.total > 0) ??
+      [...started].reverse().find((s) => s.total > 0);
+    if (done) picks.push(done);
+  }
+  return picks.map((pick) => ({
+    beanId,
+    block: pick.b.block,
+    left: pick.left,
+    total: pick.total,
+    done: pick.done,
+    missed: pick.b.ended && pick.left > 0,
+    own: viewer.id === beanId,
+  }));
 }
 
 /**

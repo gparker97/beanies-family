@@ -38,6 +38,8 @@ import { computeInitials } from '@/utils/memberInitials';
 import type { HintTodo } from '@/utils/helpfulHints';
 import type { ActivityOccurrence } from '@/utils/calendar/occurrence';
 import type {
+  Chore,
+  ChoreMark,
   FamilyActivity,
   FamilyList,
   FamilyMember,
@@ -1530,5 +1532,107 @@ describe('buildWidgetSnapshot: v3 row words', () => {
       whoFirst: 'Ava',
     });
     expect(rows.find((r) => r.id.startsWith('family'))?.whoFirst).toBe('');
+  });
+});
+
+describe('buildWidgetSnapshot: chore rows (#146)', () => {
+  const STARTS = { morning: '06:00', afternoon: '12:00', evening: '17:00' };
+  const BEANS = ['sam', 'jo', 'ava', 'max'];
+  function chore(id: string, assigneeIds: string[], extra: Partial<Chore> = {}): Chore {
+    return {
+      id,
+      title: id,
+      emoji: '🧹',
+      assigneeIds,
+      block: 'morning',
+      sortOrder: 0,
+      createdBy: 'sam',
+      createdAt: '2026-10-01T00:00:00.000Z',
+      updatedAt: '2026-10-01T00:00:00.000Z',
+      ...extra,
+    } as Chore;
+  }
+  function done(memberId: string, ref: string): ChoreMark {
+    return {
+      id: `done:${memberId}:${TODAY}:${ref}`,
+      kind: 'done',
+      memberId,
+      date: TODAY,
+      ref,
+      by: memberId,
+      createdAt: `${TODAY}T00:10:00.000Z`,
+      updatedAt: `${TODAY}T00:10:00.000Z`,
+    };
+  }
+  const CHORES = [
+    chore('sam-1', ['sam']),
+    chore('sam-2', ['sam']),
+    chore('ava-1', ['ava'], { notifyParents: true }),
+    chore('ava-2', ['ava'], { notifyParents: true }),
+    chore('max-1', ['max']),
+  ];
+  const withChores = (marks: ChoreMark[] = [], now: Date = NOW, chores = CHORES) =>
+    buildWidgetSnapshot(
+      familyInput({ chores: { chores, marks, starts: STARTS, beanIds: BEANS } }),
+      now
+    ).snapshot;
+  const choreRows = (s: WidgetSnapshot, i = 0) =>
+    s.days[i]!.view.tasks.items.filter((r) => r.kind === 'chore');
+
+  it('adds one row per bean the viewer may follow, by the briefing’s rule', () => {
+    const rows = choreRows(withChores([done('ava', 'ava-1')]));
+    // Sam's own and Ava's (kept posted); never Max's on-track chore.
+    expect(rows.map((r) => r.id)).toEqual(['chore:sam', 'chore:ava']);
+    expect(rows[0]).toEqual({
+      id: 'chore:sam',
+      kind: 'chore',
+      bucket: 'today',
+      title: 'Sam · 2 left',
+      tag: 'morning',
+      tagTone: 'accent',
+      timed: false,
+      dot: expect.objectContaining({ kind: 'member', color: '#3b82f6' }),
+      link: `${ORIGIN}/nook?src=widget`,
+    });
+    expect(rows[1]).toMatchObject({ title: 'Ava · 1 left', tag: 'morning' });
+  });
+
+  it('a bean with nothing left reads "done" in the soft tone', () => {
+    const rows = choreRows(withChores([done('sam', 'sam-1'), done('sam', 'sam-2')]));
+    expect(rows[0]).toMatchObject({ id: 'chore:sam', title: 'Sam · done', tagTone: 'soft' });
+  });
+
+  it('a missed child chore reaches the parent as overdue', () => {
+    // 1 pm local on the day: Morning has ended, Max's chore is undone.
+    const rows = choreRows(withChores([], new Date(2026, 9, 11, 13, 0)));
+    const max = rows.find((r) => r.id === 'chore:max');
+    expect(max).toMatchObject({ title: 'Max · 1 left', bucket: 'overdue', tag: 'overdue' });
+  });
+
+  it('shows chores on today only, and never counts them as due', () => {
+    const plain = build().snapshot;
+    const s = withChores();
+    expect(s.days.slice(1).every((d) => d.view.tasks.items.every((r) => r.kind !== 'chore'))).toBe(
+      true
+    );
+    expect(today(s).view.tasks.count).toBe(today(plain).view.tasks.count);
+    expect(today(s).view.tasks.doneToday).toBe(today(plain).view.tasks.doneToday);
+  });
+
+  it('a child’s widget stays their calendar: no chore rows', () => {
+    const s = buildWidgetSnapshot(
+      familyInput({
+        currentMember: AVA,
+        chores: { chores: CHORES, marks: [], starts: STARTS, beanIds: BEANS },
+      }),
+      NOW
+    ).snapshot;
+    expect(s.days.every((d) => d.view.tasks.items.length === 0)).toBe(true);
+  });
+
+  it('no chores input (the flag off) is today’s snapshot exactly, at the same version', () => {
+    expect(build({ chores: null }).snapshot).toEqual(build().snapshot);
+    expect(withChores([], NOW, []).days).toEqual(build().snapshot.days);
+    expect(withChores().version).toBe(4);
   });
 });

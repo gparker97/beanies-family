@@ -197,6 +197,38 @@ describe('QuickAddSheet', () => {
       expect(w.find('[data-testid="quick-add-more"]').exists()).toBe(false);
     });
 
+    it('the Family Scrapbook sheet draws all four tiles under Family, none under Everyday', async () => {
+      const w = mountSheet();
+      openQuickAdd({ filter: ['add-saying', 'add-favorite', 'add-note', 'add-milestone'] });
+      await flushPromises();
+      // No Everyday section at all (it would hold Milestone alone under the Everyday kicker).
+      expect(w.find('#quick-add-everyday-kicker').exists()).toBe(false);
+      const familyTiles = w
+        .findAll('h3')
+        .find((h) => h.text().includes('quickAdd.groups.family.title'))!
+        .element.parentElement!.querySelectorAll('[data-testid^="quick-add-item-"]');
+      expect([...familyTiles].map((el) => el.getAttribute('data-testid'))).toEqual([
+        'quick-add-item-favorite',
+        'quick-add-item-saying',
+        'quick-add-item-milestone',
+        'quick-add-item-note',
+      ]);
+    });
+
+    it('a filtered Milestone tile opens its member picker after the Family section', async () => {
+      const w = mountSheet();
+      openQuickAdd({ filter: ['add-saying', 'add-favorite', 'add-note', 'add-milestone'] });
+      await flushPromises();
+      await w.find('[data-testid="quick-add-item-milestone"]').trigger('click');
+      await flushPromises();
+      expect(w.findAll('[data-test="member-picker"]')).toHaveLength(1);
+      // Still drawn under Family: the picker sits after that section.
+      const picker = w.find('[data-test="member-picker"]').element;
+      expect(picker.previousElementSibling?.querySelector('h3')?.textContent).toContain(
+        'quickAdd.groups.family.title'
+      );
+    });
+
     it('a member who cannot read gets the tiles only', async () => {
       hoisted.canReadAny.value = false;
       const w = mountSheet();
@@ -506,6 +538,22 @@ describe('QuickAddSheet', () => {
       closeQuickAdd();
       await flushPromises();
       await fabOpen();
+      expect(w.find('[data-testid="quick-add-item-saying"]').exists()).toBe(false);
+    });
+
+    it('the main menu draws milestone among Everyday, its picker right after, and no dead row', async () => {
+      const w = mountSheet();
+      await fabOpen();
+      const everyday = w.find('[aria-labelledby="quick-add-everyday-kicker"]');
+      expect(everyday.find('[data-testid="quick-add-item-milestone"]').exists()).toBe(true);
+      expect(everyday.find('[data-testid="quick-add-item-recipe"]').exists()).toBe(true);
+      await everyday.find('[data-testid="quick-add-item-milestone"]').trigger('click');
+      await flushPromises();
+      const picker = w.find('[data-test="member-picker"]');
+      expect(picker.exists()).toBe(true);
+      expect(picker.element.previousElementSibling).toBe(everyday.element);
+      // The sections below the picker are hidden, so the disclosure row would toggle nothing.
+      expect(w.find('[data-testid="quick-add-more"]').exists()).toBe(false);
       expect(w.find('[data-testid="quick-add-item-saying"]').exists()).toBe(false);
     });
 

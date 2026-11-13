@@ -158,6 +158,25 @@
      overlay). The ONE place this pair lives, so no pill restates it. */
   --silk-ink: #1f5f80;
 
+  /* The choreboard's time-of-day colours (#146), defined ONCE here with their dark partners
+     below; every chore surface reads them through the `.chore-block-*` classes at the end of
+     this block, never a hex of its own. Each block is a tint (the painted background) and an
+     ink (text and glyphs on that tint). Measured on white (the card the tint sits on):
+       morning   Terracotta tint, deepened Terracotta ink   5.71:1 (terracotta-600 is 4.43
+                 on this tint, under the floor, so the ink is a step deeper, as
+                 `--birthday-orange` deepens Heritage Orange)
+       afternoon Sky Silk tint, `--silk-ink`                5.82:1
+       evening   Deep Slate tint, Deep Slate ink            9.27:1
+       anytime   plain: the slate-5 tint, secondary-400 ink  5.16:1 */
+  --chore-morning-tint: rgb(230 126 34 / 14%);
+  --chore-morning-ink: #8f4c14;
+  --chore-afternoon-tint: rgb(174 214 241 / 45%);
+  --chore-afternoon-ink: var(--silk-ink);
+  --chore-evening-tint: rgb(44 62 80 / 10%);
+  --chore-evening-ink: var(--color-secondary-500);
+  --chore-anytime-tint: var(--tint-slate-5);
+  --chore-anytime-ink: var(--color-secondary-400);
+
   /* Family birthdays (derived, read-only — see `utils/birthdays.ts`). The same
      family as the `birthday` activity category so a derived birthday and a
      birthday PARTY someone scheduled read as the same kind of day, but DEEPENED
@@ -234,6 +253,19 @@
   --trip-ink: var(--color-silk-lift);
   --silk-ink: var(--color-silk-lift);
 
+  /* Choreboard blocks on dark (CIG slide 9: accents get LIGHTER). Measured on surface-raised
+     / surface-overlay: morning terracotta-lift 5.07 / 4.67, afternoon silk-lift 5.61 / 5.13.
+     Deep Slate is invisible on the dark ground, so evening is a raised slate (surface-hover)
+     with `ink` (10.03). Anytime stays plain with `ink-soft` (7.82 on raised). */
+  --chore-morning-tint: rgb(240 160 90 / 14%);
+  --chore-morning-ink: var(--color-terracotta-lift);
+  --chore-afternoon-tint: rgb(143 199 232 / 14%);
+  --chore-afternoon-ink: var(--color-silk-lift);
+  --chore-evening-tint: var(--color-surface-hover);
+  --chore-evening-ink: var(--color-ink);
+  --chore-anytime-tint: rgb(255 255 255 / 5%);
+  --chore-anytime-ink: var(--color-ink-soft);
+
   /* 6.28:1 on surface-raised, 7.25:1 on surface-ground. */
   --birthday-orange: #ff8a5b;
   --birthday-orange-tint: rgb(241 93 34 / 14%);
@@ -246,6 +278,30 @@
   --tint-terracotta-5: rgb(230 126 34 / 8%);
   --tint-orange-4: rgb(241 93 34 / 6%);
   --tint-amber-10: rgb(245 188 80 / 14%);
+}
+
+/* ─── Choreboard time-of-day blocks (#146) ──────────────────────────────────
+   One class per block sets the two locals every chore surface paints with:
+   `background: var(--chore-tint); color: var(--chore-ink)`. The values (and their dark
+   partners) live in the `--chore-*` tokens above, so a component never restates a colour. */
+.chore-block-morning {
+  --chore-tint: var(--chore-morning-tint);
+  --chore-ink: var(--chore-morning-ink);
+}
+
+.chore-block-afternoon {
+  --chore-tint: var(--chore-afternoon-tint);
+  --chore-ink: var(--chore-afternoon-ink);
+}
+
+.chore-block-evening {
+  --chore-tint: var(--chore-evening-tint);
+  --chore-ink: var(--chore-evening-ink);
+}
+
+.chore-block-anytime {
+  --chore-tint: var(--chore-anytime-tint);
+  --chore-ink: var(--chore-anytime-ink);
 }
 
 /* ─── Micro-animation keyframes ────────────────────────────────────────── */

@@ -13,6 +13,7 @@ import { useResponsibilityStore } from '@/stores/responsibilityStore';
 import { useNotificationsStore } from '@/stores/notificationsStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useFlightStatusStore } from '@/stores/flightStatusStore';
+import { useChoreStore } from '@/stores/choreStore';
 import { buildTravelBriefingRows } from '@/composables/criticalItems/travelRows';
 import { useMemberInfo } from '@/composables/useMemberInfo';
 import { useResponsibilityCardLabel } from '@/composables/useResponsibilityCardLabel';
@@ -37,17 +38,21 @@ import {
   classifyOwnerAudience,
   classifyPlateList,
   classifyPlateTodo,
+  choreLinesFor,
   isDutyDone,
 } from '@/utils/audience';
+import { CHORE_BLOCK_META } from '@/constants/choreBlocks';
 import { isFlagEnabled } from '@/config/flags';
 import { getActivityFallbackEmoji } from '@/constants/activityCategories';
 import { hintEmoji, isFreshHint } from '@/utils/helpfulHints';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import { showToast } from '@/composables/useToast';
+import type { ChoreBlock } from '@/types/models';
 
 export interface CriticalItem {
   id: string;
-  type: 'todo' | 'activity' | 'medication' | 'holiday' | 'list' | 'meal' | 'card' | 'travel';
+  type:
+    'todo' | 'activity' | 'medication' | 'holiday' | 'list' | 'meal' | 'card' | 'travel' | 'chores';
   message: string;
   icon: string;
   time: string; // HH:mm for sorting, '' if untimed
@@ -69,6 +74,8 @@ export interface CriticalItem {
   dismissHint?: boolean;
   /** Generic: tapping the row routes here (never falls through to open-activity). */
   route?: RouteLocationRaw;
+  /** A `chores` row's time-of-day block: the view paints the row's icon in its colour. */
+  choreBlock?: ChoreBlock;
 }
 
 /** The hide toast's second line: says the item itself is untouched (still open). */
@@ -159,6 +166,18 @@ const MEAL_OWNER_KEY = 'mealPlanner.briefing.owner' satisfies UIStringKey;
 const MEAL_FORCHILD_KEY = 'mealPlanner.briefing.forChild' satisfies UIStringKey;
 const MEAL_UNASSIGNED_KEY = 'mealPlanner.briefing.unassigned' satisfies UIStringKey;
 
+// The choreboard (#146): one line per bean, `.one` / `.other` by the count; `{block}` is the
+// block's lowercase word (`CHORE_BLOCK_META[block].wordKey`, shared with the widget). The viewer's
+// own line is "You have ...".
+const CHORE_LINE_KEYS = {
+  self: { one: 'choreboard.briefing.self.one', other: 'choreboard.briefing.self.other' },
+  bean: { one: 'choreboard.briefing.bean.one', other: 'choreboard.briefing.bean.other' },
+} satisfies Record<'self' | 'bean', Record<'one' | 'other', UIStringKey>>;
+const CHOREBOARD_PATH = '/choreboard';
+/** A briefing chore line's id: bean, block and the missed state, so each is dismissed alone. */
+const choreLineId = (line: { beanId: string; block: ChoreBlock; missed: boolean }): string =>
+  `${line.beanId}:${line.block}${line.missed ? ':missed' : ''}`;
+
 // Helpful Hints (#40) — one fixed framing, no due-state table (see the loop).
 const HINT_KEY = 'nook.criticalHint' satisfies UIStringKey;
 
@@ -184,6 +203,7 @@ export function useCriticalItems() {
   const notificationsStore = useNotificationsStore();
   const vacationStore = useVacationStore();
   const flightStatusStore = useFlightStatusStore();
+  const choreStore = useChoreStore();
   const { cardName } = useResponsibilityCardLabel();
   const { getMemberName, getMemberById } = useMemberInfo();
   const { t, currentLanguage } = useTranslation();
@@ -517,6 +537,54 @@ export function useCriticalItems() {
     });
     for (const row of cardRows) items.push(cardItem(row));
 
+    // ── The choreboard (#146): one line per bean the viewer may follow ─────
+    // Gated behind `choreboard` (flag off → no chore lines at all). The numbers come from the
+    // read model (`choreDayFor`, today on the one chore clock) through `choreLinesFor`, the rule
+    // the widget shares: a bean always sees their own; a grown-up sees a child's chore only when
+    // it keeps parents posted or its block has ended with it undone; siblings never. A bean with
+    // nothing left has no line here (the widget shows it as "Done"). Untimed and not `later`, so
+    // the lines sit among today's rows, above the hints. The viewer's own line comes first.
+    if (isFlagEnabled('choreboard')) {
+      const beans = [...familyStore.humans].sort(
+        (a, b) => Number(b.id === memberId) - Number(a.id === memberId)
+      );
+      const readState = notificationsStore.readState;
+      for (const bean of beans) {
+        // The candidates come best first; the first one the viewer has not hidden today wins,
+        // so hiding the missed Morning line hands over to the Afternoon line rather than
+        // blanking the bean (the widget, which hides nothing, shows the first candidate).
+        const line = choreLinesFor(
+          choreStore.choreDayFor(bean.id),
+          bean.id,
+          currentMember,
+          getMemberById
+        ).find(
+          (l) =>
+            l.left > 0 &&
+            !readState[hideKey({ type: 'chores', id: choreLineId(l) }, todayStr.value)]
+        );
+        if (!line) continue;
+        const keys = CHORE_LINE_KEYS[line.own ? 'self' : 'bean'];
+        items.push({
+          // The line's id carries its block and whether it is about missed chores, because the
+          // day's hide key is built from it: hiding the morning line must not hide the same
+          // bean's afternoon line, nor the line that later says the morning was missed.
+          id: choreLineId(line),
+          type: 'chores',
+          message: buildMessage(line.left === 1 ? keys.one : keys.other, {
+            name: bean.name,
+            n: String(line.left),
+            block: t(CHORE_BLOCK_META[line.block].wordKey),
+          }),
+          icon: CHORE_BLOCK_META[line.block].emoji,
+          time: '',
+          completable: false,
+          choreBlock: line.block,
+          route: { path: CHOREBOARD_PATH, query: { bean: bean.id } },
+        });
+      }
+    }
+
     // ── Helpful Hints (#40) for the current member ─────────────────────
     // Hints ride their own loop, never the to-do loop: a hint's dueDate is its
     // nudge date, so through the overdue/today/noDue tables every hint would read
@@ -600,7 +668,10 @@ export function useCriticalItems() {
    * for that session only; everything else keys on today, so a to-do that is still
    * overdue (or a dose still owed) is back in tomorrow's briefing.
    */
-  function hideKey(item: CriticalItem, today: string): string {
+  function hideKey(
+    item: Pick<CriticalItem, 'type' | 'id' | 'occurrenceDate'>,
+    today: string
+  ): string {
     return `${BRIEFING_HIDE_PREFIX}${item.type}:${item.id}:${item.occurrenceDate ?? today}`;
   }
 

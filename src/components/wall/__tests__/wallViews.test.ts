@@ -10,8 +10,10 @@ import {
   DEFAULT_WALL_VIEW,
   WALL_VIEWS,
   canGoBackFrom,
+  isBoardView,
   wallViewById,
   wallViewTransition,
+  wallViewsFor,
   type WallViewState,
 } from '../wallViews';
 
@@ -101,5 +103,46 @@ describe('the back target', () => {
       s = wallViewTransition(s, id);
       if (canGoBackFrom(s)) expect(s.back).not.toBe(s.active);
     }
+  });
+});
+
+describe('the choreboard gate (#146)', () => {
+  it('gate off: exactly the registry, no chore lanes, the lists board as "The chore board"', () => {
+    expect(wallViewsFor(false)).toBe(WALL_VIEWS);
+    expect(wallViewsFor(false).map((v) => v.id)).not.toContain('chores');
+  });
+
+  it('gate on: the chore lanes join the boards, ahead of the lists board, renamed "Lists"', () => {
+    const views = wallViewsFor(true);
+    expect(views.map((v) => v.id)).toEqual(['days', 'lanes', 'today', 'chores', 'jobs']);
+    const chores = views.find((v) => v.id === 'chores')!;
+    expect(chores).toMatchObject({
+      labelKey: 'wall.view.chores',
+      stepUnit: null,
+      dividerBefore: true,
+    });
+    expect(chores.arrowsInView).toBe(false);
+    const lists = views.find((v) => v.id === 'jobs')!;
+    expect(lists.labelKey).toBe('wall.view.lists');
+    expect(lists.dividerBefore).toBe(false);
+    // the registry itself is untouched
+    expect(WALL_VIEWS.find((v) => v.id === 'jobs')!.labelKey).toBe('wall.view.jobs');
+  });
+
+  it('resolves an id against the views on offer', () => {
+    expect(wallViewById('chores', wallViewsFor(true)).id).toBe('chores');
+    expect(wallViewById('chores', wallViewsFor(false)).id).toBe('days');
+  });
+
+  it('treats both boards as boards: leaving one never records it as "back"', () => {
+    expect(isBoardView('chores')).toBe(true);
+    expect(isBoardView('jobs')).toBe(true);
+    expect(isBoardView('today')).toBe(false);
+    const s = walk(start(), 'today', 'chores', 'jobs');
+    expect(s.active).toBe('jobs');
+    expect(s.back).toBe('today');
+    expect(canGoBackFrom(s)).toBe(true);
+    const back = walk(start(), 'lanes', 'chores', 'lanes');
+    expect(back.back).not.toBe('chores');
   });
 });

@@ -64,7 +64,7 @@ import type { UIStringKey } from '@/services/translation/uiStrings';
 import InlineMemberPicker from '@/components/ui/InlineMemberPicker.vue';
 import CardArt from '@/components/responsibilities/CardArt.vue';
 import DeckActionButton from './DeckActionButton.vue';
-import DeckCelebration from './DeckCelebration.vue';
+import CelebrationBanner from '@/components/ui/CelebrationBanner.vue';
 import DealPileBanner from './DealPileBanner.vue';
 import DealPileLists from './DealPileLists.vue';
 import DealPileStage, { type StageStepVia } from './DealPileStage.vue';
@@ -496,7 +496,7 @@ const waitingLine = computed(() => {
   <div class="mx-auto flex w-full max-w-3xl flex-col items-center gap-6" data-testid="deal-pile">
     <div class="flex w-full max-w-md flex-col items-center gap-4">
       <!-- Completion: every card has a holder, or the pile is done with some still waiting. -->
-      <DeckCelebration
+      <CelebrationBanner
         v-if="finished && store.isFullyDealt && total > 0"
         :title="t('whoOwnsWhat.pile.celebrateTitle')"
         :body="fillTemplate(t('whoOwnsWhat.pile.celebrateBody'), { count: store.stats.deck })"

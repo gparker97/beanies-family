@@ -94,7 +94,7 @@ function mountDrawer() {
         InlineMemberPicker: PickerStub,
         TogglePillGroup: PillsStub,
         MemberChip: true,
-        DeckCelebration: true,
+        CelebrationBanner: true,
       },
     },
   });
@@ -268,14 +268,14 @@ describe('CheckInDrawer', () => {
     const w = mountDrawer();
     await w.find('[data-testid="save"]').trigger('click');
     await flushPromises();
-    w.findComponent({ name: 'DeckCelebration' }).vm.$emit('action');
+    w.findComponent({ name: 'CelebrationBanner' }).vm.$emit('action');
     expect(w.emitted('deal-remaining')).toHaveLength(1);
     expect(w.emitted('close')).toBeUndefined();
     store.remaining = 0;
     const w2 = mountDrawer();
     await w2.find('[data-testid="save"]').trigger('click');
     await flushPromises();
-    w2.findComponent({ name: 'DeckCelebration' }).vm.$emit('action');
+    w2.findComponent({ name: 'CelebrationBanner' }).vm.$emit('action');
     expect(w2.emitted('close')).toHaveLength(1);
     expect(w2.emitted('deal-remaining')).toBeUndefined();
   });

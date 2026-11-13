@@ -32,6 +32,8 @@ import type {
   ResponsibilityCardState,
   ResponsibilityMove,
   ResponsibilityCheckIn,
+  Chore,
+  ChoreMark,
   Settings,
   PodLineage,
 } from './models';
@@ -108,6 +110,17 @@ export interface FamilyDocument {
   responsibilityCards: Record<string, ResponsibilityCardState>;
   responsibilityMoves: Record<string, ResponsibilityMove>;
   responsibilityCheckIns: Record<string, ResponsibilityCheckIn>;
+  /**
+   * The choreboard (#146). `chores` are definitions, small and rarely written. `choreMarks` are
+   * FLAT, WRITE-ONCE facts keyed `${kind}:${memberId}:${date}:${ref}` (`choreMarkId`): a tick is a
+   * `set` of that id, an untick a `remove`, so concurrent ticks converge and two devices that
+   * each made a bean's first tick of the day offline both keep theirs. Deliberately not one
+   * record per bean per day: two devices creating that record would each create their own
+   * object and one device's ticks would vanish at the merge. The only write surface for both is
+   * `choreRepository.ts`.
+   */
+  chores: Record<string, Chore>;
+  choreMarks: Record<string, ChoreMark>;
   settings: Settings | null;
   /**
    * Which HISTORY this document descends from — see `PodLineage` and ADR-036.
@@ -222,6 +235,8 @@ const COLLECTION_NAME_SEED: Record<CollectionName, 0> = {
   responsibilityCards: 0,
   responsibilityMoves: 0,
   responsibilityCheckIns: 0,
+  chores: 0,
+  choreMarks: 0,
 };
 export const COLLECTION_NAMES = Object.keys(COLLECTION_NAME_SEED) as CollectionName[];
 

@@ -14,16 +14,38 @@ const createBlankList = vi.fn(async () => ({ id: 'blank-list' }));
 vi.mock('@/stores/listStore', () => ({
   useListStore: () => ({ createFromTemplate, createBlankList }),
 }));
+// `fam.me` is the session member: a non-adult by default (the cases below set an adult).
+const fam = vi.hoisted(() => ({ me: { id: 'me' } as Record<string, unknown> }));
 vi.mock('@/stores/familyStore', () => ({
   // `members` is the roster `ListPeoplePicker` counts a pick against.
   useFamilyStore: () => ({
-    currentMember: { id: 'me' },
+    currentMember: fam.me,
     members: [
       { id: 'me', name: 'Me' },
       { id: 'jill', name: 'Jill' },
+      { id: 'pip', name: 'Pip' },
     ],
   }),
 }));
+// The session-is-a-grown-up rule, through its one home (`usePermissions().isAdult`).
+vi.mock('@/composables/usePermissions', async () => {
+  const { computed } = await import('vue');
+  const { isAdultMember } = await import('@/composables/useMemberInfo');
+  // A fresh computed per sheet: `fam.me` is a plain object the cases reassign.
+  return { usePermissions: () => ({ isAdult: computed(() => isAdultMember(fam.me)) }) };
+});
+// The choreboard flag (#146), read once when the sheet mounts.
+const flags = vi.hoisted(() => ({ choreboard: true }));
+vi.mock('@/config/flags', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/config/flags')>();
+  return {
+    ...actual,
+    isFlagEnabled: (flag: string) =>
+      flag === 'choreboard' ? flags.choreboard : actual.isFlagEnabled(flag as never),
+  };
+});
+const push = vi.fn(async () => undefined);
+vi.mock('vue-router', () => ({ useRouter: () => ({ push }) }));
 vi.mock('@/composables/useTranslation', () => ({
   useTranslation: () => ({ t: (k: string) => k }),
 }));
@@ -57,6 +79,8 @@ function tile(wrapper: ReturnType<typeof mount>, text: string) {
 beforeEach(() => {
   setActivePinia(createPinia());
   vi.clearAllMocks();
+  flags.choreboard = true;
+  fam.me = { id: 'me' };
 });
 
 describe('NewListSheet — card holder default (#109)', () => {
@@ -242,5 +266,134 @@ describe("NewListSheet — who it's for (#147)", () => {
       category: undefined,
       assigneeIds: ['me'],
     });
+  });
+});
+
+describe('NewListSheet — chores start on the choreboard (#146)', () => {
+  const ADULT = { id: 'me', role: 'owner', ageGroup: 'adult' };
+  const picker = (wrapper: ReturnType<typeof mount>) =>
+    wrapper.findComponent({ name: 'FamilyChipPicker' });
+  const choreTiles = (wrapper: ReturnType<typeof mount>) =>
+    wrapper.findAll('[data-testid="new-list-chore-template"]');
+  const redirectEvents = () =>
+    logEvent.mock.calls
+      .map((c) => c[0] as { surface: string; message: string; context: unknown })
+      .filter((e) => e.message === 'lists-redirect');
+
+  it('shows the kids row and tags both chore templates, and only those', () => {
+    const wrapper = mount(NewListSheet, { props: { open: true }, global: { stubs } });
+    expect(wrapper.find('[data-testid="new-list-chores-row"]').exists()).toBe(true);
+    const tiles = choreTiles(wrapper);
+    expect(tiles.map((b) => b.text())).toEqual([
+      expect.stringContaining('lists.template.kidsChores.name'),
+      expect.stringContaining('lists.template.beforeSchool.name'),
+    ]);
+    expect(wrapper.findAll('[data-testid="chores-tag"]')).toHaveLength(2);
+    for (const tile of tiles) expect(tile.text()).toContain('lists.new.choresTag');
+  });
+
+  it('a chore template never creates a list: Go routes with its set and the chosen people', async () => {
+    fam.me = ADULT;
+    const wrapper = mount(NewListSheet, { props: { open: true }, global: { stubs } });
+    await picker(wrapper).vm.$emit('update:modelValue', ['jill', 'pip']);
+    await tile(wrapper, 'lists.template.beforeSchool.name').trigger('click');
+    expect(createFromTemplate).not.toHaveBeenCalled();
+    expect(wrapper.find('[data-testid="chores-redirect-confirm"]').exists()).toBe(true);
+    expect(wrapper.get('[data-testid="chores-redirect-body"]').text()).toBe('lists.new.choresBody');
+    await wrapper.get('[data-testid="chores-redirect-go"]').trigger('click');
+    expect(push).toHaveBeenCalledWith({
+      path: '/choreboard',
+      query: { starter: 'school-morning', for: 'jill,pip' },
+    });
+    expect(wrapper.emitted('close')).toHaveLength(1);
+    expect(createFromTemplate).not.toHaveBeenCalled();
+    expect(redirectEvents()).toEqual([
+      {
+        level: 'info',
+        surface: 'choreboard',
+        message: 'lists-redirect',
+        context: { action: 'go', detail: 'before-school' },
+      },
+    ]);
+  });
+
+  it('the kids row lands on Tidy-Up; untouched people carry nobody', async () => {
+    fam.me = ADULT;
+    const wrapper = mount(NewListSheet, { props: { open: true }, global: { stubs } });
+    await wrapper.get('[data-testid="new-list-chores-row"]').trigger('click');
+    expect(wrapper.get('[data-testid="chores-redirect-body"]').text()).toBe(
+      'lists.new.choresBodyNoPeople'
+    );
+    await wrapper.get('[data-testid="chores-redirect-go"]').trigger('click');
+    expect(push).toHaveBeenCalledWith({ path: '/choreboard', query: { starter: 'tidy-up' } });
+    expect(redirectEvents()[0]!.context).toEqual({ action: 'go', detail: 'kids-row' });
+  });
+
+  it('the Kids’ chores template maps to Tidy-Up too', async () => {
+    fam.me = ADULT;
+    const wrapper = mount(NewListSheet, { props: { open: true }, global: { stubs } });
+    await tile(wrapper, 'lists.template.kidsChores.name').trigger('click');
+    await wrapper.get('[data-testid="chores-redirect-go"]').trigger('click');
+    expect(push).toHaveBeenCalledWith({ path: '/choreboard', query: { starter: 'tidy-up' } });
+    expect(createFromTemplate).not.toHaveBeenCalled();
+  });
+
+  it('Stay Here returns to the sheet as it was, with nothing created or routed', async () => {
+    fam.me = ADULT;
+    const wrapper = mount(NewListSheet, { props: { open: true }, global: { stubs } });
+    await picker(wrapper).vm.$emit('update:modelValue', ['jill']);
+    await tile(wrapper, 'lists.template.kidsChores.name').trigger('click');
+    await wrapper.get('[data-testid="chores-redirect-stay"]').trigger('click');
+    expect(wrapper.find('[data-testid="chores-redirect-confirm"]').exists()).toBe(false);
+    expect(picker(wrapper).props('modelValue')).toEqual(['jill']);
+    expect(push).not.toHaveBeenCalled();
+    expect(createFromTemplate).not.toHaveBeenCalled();
+    expect(wrapper.emitted('close')).toBeUndefined();
+    expect(redirectEvents()[0]!.context).toEqual({ action: 'stay', detail: 'kids-chores' });
+  });
+
+  it('a non-adult is asked to fetch a grown-up, with Stay Here only', async () => {
+    const wrapper = mount(NewListSheet, { props: { open: true }, global: { stubs } });
+    await wrapper.get('[data-testid="new-list-chores-row"]').trigger('click');
+    expect(wrapper.get('[data-testid="chores-redirect-ask"]').text()).toBe(
+      'lists.new.choresAskGrownUp'
+    );
+    expect(wrapper.find('[data-testid="chores-redirect-go"]').exists()).toBe(false);
+    expect(redirectEvents().map((e) => e.context)).toEqual([
+      { action: 'ask-grown-up', detail: 'kids-row' },
+    ]);
+    await wrapper.get('[data-testid="chores-redirect-stay"]').trigger('click');
+    expect(wrapper.find('[data-testid="new-list-chores-row"]').exists()).toBe(true);
+    expect(push).not.toHaveBeenCalled();
+    expect(redirectEvents()).toHaveLength(1);
+  });
+
+  it('hideChores hides the row and both chore templates', () => {
+    const wrapper = mount(NewListSheet, {
+      props: { open: true, hideChores: true },
+      global: { stubs },
+    });
+    expect(wrapper.find('[data-testid="new-list-chores-row"]').exists()).toBe(false);
+    expect(wrapper.text()).not.toContain('lists.template.kidsChores.name');
+    expect(wrapper.text()).not.toContain('lists.template.beforeSchool.name');
+    expect(wrapper.text()).toContain('lists.template.grocery.name');
+  });
+
+  it("flag off: today's sheet exactly, and a chore template creates its list", async () => {
+    flags.choreboard = false;
+    for (const hideChores of [false, true]) {
+      const wrapper = mount(NewListSheet, {
+        props: { open: true, hideChores },
+        global: { stubs },
+      });
+      expect(wrapper.find('[data-testid="new-list-chores-row"]').exists()).toBe(false);
+      expect(choreTiles(wrapper)).toHaveLength(0);
+      expect(wrapper.find('[data-testid="chores-tag"]').exists()).toBe(false);
+      expect(wrapper.text()).toContain('lists.template.kidsChores.name');
+    }
+    const wrapper = mount(NewListSheet, { props: { open: true }, global: { stubs } });
+    await tile(wrapper, 'lists.template.kidsChores.name').trigger('click');
+    expect(createFromTemplate).toHaveBeenCalledWith('kids-chores', 'me', { assigneeIds: ['me'] });
+    expect(push).not.toHaveBeenCalled();
   });
 });

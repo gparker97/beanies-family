@@ -359,7 +359,7 @@ test('who owns what walk', async ({ page }) => {
   await page.getByRole('button', { name: ui('whoOwnsWhat.checkinDrawer.finish') }).click();
   await page.getByTestId('checkin-done').waitFor();
   // Deal the Remaining from the done screen opens the deal pile.
-  const action = page.getByTestId('deck-celebration-action');
+  const action = page.getByTestId('celebration-banner-action');
   console.log('[walk] done action:', await action.innerText());
   await action.click();
   await page.getByTestId('deal-pile').waitFor();

@@ -19,7 +19,7 @@ import {
  * `useQuickAdd` module singleton (which has no Pinia context).
  */
 export function useQuickAddAvailability() {
-  const { canViewFinances, canEditActivities } = usePermissions();
+  const { canViewFinances, canEditActivities, isAdult } = usePermissions();
 
   // Exhaustive map keyed by the permission union: adding a new
   // `QuickAddPermission` becomes a compile error here (fail-closed) rather than
@@ -27,6 +27,7 @@ export function useQuickAddAvailability() {
   const permissionGate: Record<QuickAddPermission, Ref<boolean>> = {
     finance: canViewFinances,
     activities: canEditActivities,
+    adult: isAdult,
   };
 
   /** Flag + permission gate — the sheet adds its caller-filter after this. */

@@ -27,6 +27,8 @@ import type {
   Account,
   Asset,
   Budget,
+  Chore,
+  ChoreMark,
   FamilyActivity,
   FamilyList,
   FamilyMember,
@@ -41,6 +43,8 @@ import type {
   UUID,
 } from '@/types/models';
 import type { FamilyDocument } from '@/types/automerge';
+import { toDateInputValue } from '@/utils/date';
+import { choreMarkId } from '@/utils/chores';
 
 /**
  * What the fixture hands to `seedDocument`: collections as ARRAYS of whole
@@ -752,6 +756,67 @@ export function materializeFixture(args: { today: Date; ownerMemberId: UUID }): 
     },
   ];
 
+  // The choreboard (#146): a few chores for the kids across the four blocks, and a couple of
+  // today's ticks so the board opens part-way through the morning rather than empty. The marks
+  // use the DEVICE-LOCAL day, exactly as the chore clock reads it (`plateClock` →
+  // `toDateInputValue`), not `dayOffset`'s UTC day, or an evening reviewer west of UTC would see
+  // yesterday's ticks and an untouched board. Ticks sit only on every-day chores, so they count
+  // on any weekday, and never finish a block (even on a weekend, without the backpack), so the
+  // reviewer's own completing tick still plays the celebration.
+  const choreDay = toDateInputValue(today);
+  const chore = (
+    id: string,
+    title: string,
+    emoji: string,
+    block: Chore['block'],
+    assigneeIds: UUID[],
+    sortOrder: number,
+    days?: number[]
+  ): Chore => ({
+    id,
+    title,
+    emoji,
+    assigneeIds,
+    block,
+    ...(days ? { days } : {}),
+    sortOrder,
+    createdBy: ownerMemberId,
+    createdAt: created,
+    updatedAt: created,
+  });
+  const chores: Chore[] = [
+    chore('demo-chore-teeth', 'Brush your teeth', '🪥', 'morning', [ID.kidA, ID.kidB, ID.kidC], 0),
+    chore('demo-chore-bed', 'Make your bed', '🛏️', 'morning', [ID.kidA, ID.kidB], 1),
+    chore(
+      'demo-chore-backpack',
+      'Pack your backpack',
+      '🎒',
+      'morning',
+      [ID.kidA, ID.kidB],
+      2,
+      [1, 2, 3, 4, 5]
+    ),
+    chore('demo-chore-cat', 'Feed the cat', '🐾', 'afternoon', [ID.kidA], 3),
+    chore('demo-chore-table', 'Set the table', '🍽️', 'evening', [ID.kidB], 4),
+    chore('demo-chore-toys', 'Pick up your toys', '🧸', 'evening', [ID.kidC], 5),
+    chore('demo-chore-plants', 'Water the plants', '🪴', 'anytime', [ID.kidC], 6),
+  ];
+  const tickedAt = today.toISOString();
+  const doneMark = (memberId: UUID, choreId: string): ChoreMark => ({
+    id: choreMarkId('done', memberId, choreDay, choreId),
+    kind: 'done',
+    memberId,
+    date: choreDay,
+    ref: choreId,
+    by: memberId,
+    createdAt: tickedAt,
+    updatedAt: tickedAt,
+  });
+  const choreMarks: ChoreMark[] = [
+    doneMark(ID.kidA, 'demo-chore-teeth'),
+    doneMark(ID.kidB, 'demo-chore-bed'),
+  ];
+
   return {
     familyMembers: members,
     accounts,
@@ -767,5 +832,7 @@ export function materializeFixture(args: { today: Date; ownerMemberId: UUID }): 
     medications,
     sayings,
     milestones,
+    chores,
+    choreMarks,
   };
 }

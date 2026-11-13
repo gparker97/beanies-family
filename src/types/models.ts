@@ -1116,6 +1116,71 @@ export interface ResponsibilityCheckIn {
   savedIds?: string[];
 }
 
+// The choreboard (#146). Chores are their own feature, separate from Beanie Lists. Read and
+// write them ONLY through `choreStore` and the pure rules in `src/utils/chores.ts`; every write
+// surface is `choreRepository.ts`. Plan: `~/projects/beanies-ops/docs/plans/2026-11-13-the-choreboard.md`.
+
+/** The four fixed times of day a chore belongs to. Ordered by `CHORE_BLOCKS` in `utils/chores`. */
+export type ChoreBlock = 'morning' | 'afternoon' | 'evening' | 'anytime';
+
+/**
+ * One chore: ONE task for one or more beans, in one block, repeating every day or on chosen
+ * weekdays. A definition only; "done today" is never stored here, it is derived from
+ * `ChoreMark`s, so nothing is written at midnight.
+ */
+export interface Chore {
+  id: UUID;
+  title: string;
+  emoji: string;
+  /** Card-art key (`public/brand/cards/`) when a starter chore has art. */
+  illustration?: string;
+  /** One or more people; never empty. Each assignee has their own tick. */
+  assigneeIds: UUID[];
+  block: ChoreBlock;
+  /** Weekdays 0-6 (0 = Sunday). Absent or empty = every day. */
+  days?: number[];
+  /** Keep Parents Posted, same flag and rules as lists and to-dos. */
+  notifyParents?: boolean;
+  sortOrder: number;
+  /** Which starter set seeded it (analytics, dedupe). */
+  starterKey?: string;
+  createdBy: UUID;
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
+}
+
+/** `'done'`: a bean ticked a chore that day. `'celebrated'`: a bean's block celebration played. */
+export type ChoreMarkKind = 'done' | 'celebrated';
+
+/**
+ * One fact about one bean on one chore day. FLAT and WRITE-ONCE: a tick is a `set` of a
+ * deterministic id (`choreMarkId`), so two devices that tick the same chore converge on one
+ * record, and two devices that each make a bean's FIRST tick of the day offline keep both. An
+ * untick is a `remove`. Never patched. Old marks are deleted by the retention sweep.
+ * `createdAt` / `updatedAt` are stamped by the repository, so there is no separate `at`.
+ */
+export interface ChoreMark {
+  /** `${kind}:${memberId}:${date}:${ref}`, from `choreMarkId` only. Never parse it. */
+  id: string;
+  kind: ChoreMarkKind;
+  memberId: UUID;
+  /** YYYY-MM-DD, the chore day (from the one chore clock). */
+  date: ISODateString;
+  /** `'done'`: the chore id. `'celebrated'`: the block. */
+  ref: string;
+  /** Who is credited with the tick. */
+  by: UUID;
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
+}
+
+/** The family's start hours (HH:mm) for the three timed blocks. Anytime has no hours. */
+export interface ChoreBlockStarts {
+  morning: string;
+  afternoon: string;
+  evening: string;
+}
+
 /**
  * A named family checklist. The fields below are split by lifecycle —
  * read them ONLY through the predicates in `@/utils/listLifecycle.ts`, never
@@ -2473,6 +2538,12 @@ export interface Settings {
   feedbackLastPromptedAt?: ISODateString; // #45: date-only cadence clock — the last time the feedback prompt was shown or a submission was made. Absent until first use. Family-scoped.
   /** #109 Who Owns What: family check-in rhythm in weeks; 0 = off (default 4 via getDefaultSettings). Family-scoped. The last check-in is derived from the check-in records, never stored here. */
   responsibilityCheckInWeeks?: 0 | 2 | 4 | 8;
+  /**
+   * #146 the choreboard: the start hour of Morning, Afternoon and Evening. Written WHOLE through
+   * one setter (`choreStore.setBlockStarts`), never per key, so an edit cannot be half of two
+   * devices' edits. Absent = the defaults, which `blockStarts()` applies and never stores.
+   */
+  choreBlockStarts?: ChoreBlockStarts;
   /**
    * #95: the family's plan token, a bearer secret the billing Lambda hands out once on the
    * first paid claim (Phase 5). It gates the Customer Portal and the `full` AI allowance and

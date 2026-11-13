@@ -228,9 +228,14 @@ export interface WidgetRow {
 
 /**
  * What a row in the to-dos section is: a to-do (`due` switch), a helpful hint or reminder
- * (`hint` switch), or a list with open items (`due` switch). All three share ONE order.
+ * (`hint` switch), a list with open items (`due` switch), or a bean's chores (#146, `due`
+ * switch: "Juno · 2 left" / "Juno · done", on today only). All four share ONE order.
+ *
+ * `chore` is additive at v4, with no version bump and no native change: iOS decodes an unknown
+ * kind as a to-do (`WidgetSnapshotStore.swift`) and Android draws it as a checkbox row
+ * (`DayWidgetRenderer.java`). A chore row never counts toward `count` or `doneToday`.
  */
-export type WidgetTaskKind = 'todo' | 'hint' | 'list';
+export type WidgetTaskKind = 'todo' | 'hint' | 'list' | 'chore';
 
 /**
  * When a task is due, relative to the day it was built for. The section is ordered by this,
@@ -242,7 +247,7 @@ export type WidgetTaskBucket = 'overdue' | 'today' | 'undated' | 'later';
 
 /** One row of the to-dos section. */
 export interface WidgetTask {
-  /** Stable within a snapshot (`todo:<id>`, `list:<id>`). */
+  /** Stable within a snapshot (`todo:<id>`, `list:<id>`, `chore:<memberId>`). */
   id: string;
   kind: WidgetTaskKind;
   bucket: WidgetTaskBucket;

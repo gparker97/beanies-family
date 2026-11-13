@@ -10,15 +10,21 @@ import WallPeripheralCards from '../WallPeripheralCards.vue';
 import { WALL_WEATHER } from '../wallWeatherKey';
 import type { WallWeatherSize } from '../wallLayout';
 import type { WeatherAtom } from '@/types/weather';
-import type { FamilyList } from '@/types/models';
-import type { WallJob, WallPeripheralData } from '@/types/wall';
+import type { FamilyList, FamilyMember } from '@/types/models';
+import type { WallChoreLane, WallJob, WallPeripheralData } from '@/types/wall';
 import { ATOMS } from './wallWeatherFixtures';
 
 vi.mock('@/composables/useTranslation', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
+let humans: FamilyMember[] = [];
 vi.mock('@/stores/familyStore', () => ({
-  useFamilyStore: () => ({ sortedHumans: [], members: [] }),
+  useFamilyStore: () => ({
+    get sortedHumans() {
+      return humans;
+    },
+    members: [],
+  }),
 }));
 
 let atom: WeatherAtom | null = null;
@@ -80,6 +86,7 @@ function mountCards(
 }
 
 beforeEach(() => {
+  humans = [];
   atom = ATOMS.fresh;
   tonight.value = { emoji: '🍕', name: 'Pizza night', slotKey: 'meal.dinner', cook: null };
   trip.value = {
@@ -192,5 +199,113 @@ describe('WallPeripheralCards weather', () => {
       expect(wrapper.find('.wall-weather-card').exists()).toBe(false);
       expect(wrapper.find('.wall-weather-strip').exists()).toBe(false);
     });
+  });
+});
+
+/**
+ * The choreboard's cards (#146). The gate reaches this component only as the presence of
+ * `choreLaneFor` (the page reads the flag once), so "gate off" here is a bundle without it.
+ */
+describe('WallPeripheralCards: the choreboard (#146)', () => {
+  const pip = { id: 'pip', name: 'Pip', color: '#F15D22' } as FamilyMember;
+  const juno = { id: 'juno', name: 'Juno', color: '#AED6F1' } as FamilyMember;
+
+  function lane(memberId: string, done: number, total: number): WallChoreLane {
+    return {
+      memberId,
+      current: 'morning',
+      blocks: total
+        ? [
+            {
+              block: 'morning',
+              jobs: [],
+              done,
+              total,
+              allDone: done === total,
+              isNow: true,
+              ended: false,
+            },
+          ]
+        : [],
+      done,
+      total,
+    };
+  }
+
+  function mountChores(
+    lanes: Record<string, WallChoreLane> | null,
+    variant: 'band' | 'strip' = 'band'
+  ) {
+    const base = peripherals(true);
+    return mount(WallPeripheralCards, {
+      props: {
+        variant,
+        mealsYmd: '2026-11-13',
+        peripherals: {
+          ...base,
+          ...(lanes ? { choreLaneFor: (id: string) => lanes[id] ?? null } : {}),
+        },
+      },
+      global: { stubs: { BeanieIcon: true, WallOwnerFaces: true } },
+    });
+  }
+
+  beforeEach(() => {
+    atom = null;
+    humans = [pip, juno];
+  });
+
+  it('gate off: exactly today\'s cards, the combined card titled "Chores & Lists"', () => {
+    const w = mountChores(null);
+    expect(w.find('[data-testid="wall-card-chores"]').exists()).toBe(false);
+    const lists = w.find('[data-testid="wall-card-lists"]');
+    expect(lists.text()).toContain('wall.card.choresAndLists');
+    expect(lists.classes()).toContain('wall-card-chores');
+  });
+
+  it('gate on: a chores card leads, the combined card is "Lists", and each opens its own view', async () => {
+    const w = mountChores({ pip: lane('pip', 2, 4), juno: lane('juno', 5, 8) });
+    const chores = w.find('[data-testid="wall-card-chores"]');
+    const lists = w.find('[data-testid="wall-card-lists"]');
+    expect(chores.exists()).toBe(true);
+    expect(w.find('[data-testid="wall-card-chores-progress"]').text()).toBe(
+      'wall.chores.progress.morning.other'
+    );
+    expect(chores.text()).toContain('2/4');
+    expect(chores.text()).toContain('5/8');
+    expect(lists.text()).toContain('wall.card.lists');
+    expect(lists.text()).not.toContain('wall.card.choresAndLists');
+    expect(lists.classes()).not.toContain('wall-card-chores');
+    // the chores card comes first
+    const html = w.html();
+    expect(html.indexOf('wall-card-chores"')).toBeLessThan(html.indexOf('wall-card-lists'));
+    await chores.trigger('click');
+    expect(w.emitted('openChoreLanes')).toHaveLength(1);
+    await lists.trigger('click');
+    expect(w.emitted('openChores')).toHaveLength(1);
+  });
+
+  it('gate on but no chores today: no chores card, and the lists card is still "Lists"', () => {
+    const w = mountChores({ pip: lane('pip', 0, 0) });
+    expect(w.find('[data-testid="wall-card-chores"]').exists()).toBe(false);
+    expect(w.find('[data-testid="wall-card-lists"]').text()).toContain('wall.card.lists');
+  });
+
+  it('uses the singular when the block has one chore in all', () => {
+    const w = mountChores({ pip: lane('pip', 0, 1) });
+    expect(w.find('[data-testid="wall-card-chores-progress"]').text()).toBe(
+      'wall.chores.progress.morning.one'
+    );
+  });
+
+  it('the strip gets a chores cell that opens the lanes, only with the gate on', async () => {
+    expect(mountChores(null, 'strip').find('[data-testid="wall-card-chores-strip"]').exists()).toBe(
+      false
+    );
+    const w = mountChores({ pip: lane('pip', 1, 3) }, 'strip');
+    const cell = w.find('[data-testid="wall-card-chores-strip"]');
+    expect(cell.text()).toContain('1 / 3');
+    await cell.trigger('click');
+    expect(w.emitted('openChoreLanes')).toHaveLength(1);
   });
 });

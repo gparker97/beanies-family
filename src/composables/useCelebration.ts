@@ -22,7 +22,8 @@ export type CelebrationTrigger =
   | 'recipe-5star'
   | 'list-complete'
   | 'deck-dealt'
-  | 'check-in-done';
+  | 'check-in-done'
+  | 'chore-block-complete';
 
 interface Celebration {
   id: number;
@@ -136,6 +137,15 @@ const configs: Record<
     type: 'toast',
     messageKey: 'celebration.checkInDone',
     asset: '/brand/beanies_celebrating_circle_transparent_300x300.png',
+  },
+  // The choreboard (#146): a bean's last chore in a block was ticked. ONCE per bean, per block,
+  // per day, on every device: `choreStore.toggleChore` fires it only in the same write as the
+  // block's `celebrated` mark. No `onUndo`: a tick is undone by tapping it again, and the
+  // once-only mark stays, so a re-tick shows the banner only.
+  'chore-block-complete': {
+    type: 'shower',
+    messageKey: 'celebration.choreBlockComplete',
+    asset: '/brand/beanies_celebrating_line_transparent_560x225.png',
   },
 };
 

@@ -40,6 +40,7 @@ import type {
   ScrapType,
   WeatherPlace,
   TemperatureUnit,
+  ChoreBlockStarts,
 } from '@/types/models';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import {
@@ -1096,6 +1097,21 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
+  /**
+   * #146 the choreboard's block start hours, written WHOLE (never per key, so an edit cannot be
+   * half of two devices' edits). THROWS on failure: its one caller, `choreStore.setBlockStarts`,
+   * validates first and runs this under `wrapAsync`, which toasts and reports exactly once.
+   */
+  async function setChoreBlockStarts(starts: ChoreBlockStarts): Promise<void> {
+    settings.value = await settingsRepo.saveSettings({
+      choreBlockStarts: {
+        morning: starts.morning,
+        afternoon: starts.afternoon,
+        evening: starts.evening,
+      },
+    });
+  }
+
   async function setWeekStartDay(day: 0 | 1): Promise<void> {
     try {
       settings.value = await settingsRepo.saveSettings({ weekStartDay: day });
@@ -1410,6 +1426,7 @@ export const useSettingsStore = defineStore('settings', () => {
     customInstitutions,
     onboardingCompleted,
     weekStartDay,
+    setChoreBlockStarts,
     country,
     showPublicHolidays,
     skipDocumentConsentPrompt,

@@ -27,8 +27,9 @@ export type QuickAddGroup = 'everyday' | 'family' | 'money' | 'care';
  * to act on, so e.g. a member without `canViewFinances` never sees
  * "Transaction" in the sheet. `activities` maps to `canEditActivities`
  * and covers every non-finance add (recipes, todos, medications, etc).
+ * `adult` maps to `isAdult`: things only a grown-up may create (a chore, #146).
  */
-export type QuickAddPermission = 'finance' | 'activities';
+export type QuickAddPermission = 'finance' | 'activities' | 'adult';
 
 /** Parent id key pre-filled into the target modal when the user is on the parent's detail route. */
 export type QuickAddContextKey = 'memberId' | 'recipeId' | 'vacationId' | 'medicationId';
@@ -61,6 +62,19 @@ interface QuickAddItemShape {
    * names this action (e.g. the Family Scrapbook's sheet).
    */
   readonly onlyWhenFiltered?: true;
+  /**
+   * Where this tile sits when a caller opens the sheet with a filter (the Family Scrapbook),
+   * when that differs from its main-menu `group` / `order`. Recipe and milestone moved to the
+   * main menu's Everyday group on 2026-11-13; a filtered sheet still lists them where it did
+   * before the move, so the scrapbook's Milestone never lands alone under the Everyday kicker.
+   */
+  readonly filteredPlacement?: QuickAddPlacement;
+}
+
+/** A tile's section and position within it. */
+export interface QuickAddPlacement {
+  readonly group: QuickAddGroup;
+  readonly order: number;
 }
 
 export const QUICK_ADD_ITEMS = [
@@ -98,6 +112,20 @@ export const QUICK_ADD_ITEMS = [
     action: 'add-list',
     requiredPermission: 'activities',
     requiresFlag: 'familyLists',
+  },
+  {
+    // #146. Grown-ups only: kids tick chores, grown-ups make them. A 7th Everyday tile while the
+    // `choreboard` gate is on; which tile makes room for it is decided at gate removal.
+    id: 'chore',
+    group: 'everyday',
+    order: 7,
+    emoji: '\u{1F9F9}', // 🧹
+    labelKey: 'quickAdd.chore.label',
+    hintKey: 'quickAdd.chore.hint',
+    route: '/choreboard',
+    action: 'add-chore',
+    requiredPermission: 'adult',
+    requiresFlag: 'choreboard',
   },
   {
     id: 'transaction',
@@ -170,25 +198,29 @@ export const QUICK_ADD_ITEMS = [
     action: 'add-note',
     contextKey: 'memberId',
     requiredPermission: 'activities',
-    // Out of the main menu (greg, 2026-09-30: Everyday and Family stay at 6 and 4 tiles).
+    // Out of the main menu (greg, 2026-09-30). Since 2026-11-13 Everyday holds nine tiles and
+    // Family two (saying, favorite).
     // Still offered by the Family Scrapbook's filtered sheet and the member hero's button.
     onlyWhenFiltered: true,
   },
   {
+    // Everyday since 2026-11-13 (greg: Everyday grows to nine tiles, three full rows).
     id: 'recipe',
-    group: 'family',
-    order: 3,
+    group: 'everyday',
+    order: 8,
     emoji: '\u{1F35C}', // 🍜
     labelKey: 'quickAdd.recipe.label',
     hintKey: 'quickAdd.recipe.hint',
     route: '/pod/cookbook',
     action: 'add-recipe',
     requiredPermission: 'activities',
+    filteredPlacement: { group: 'family', order: 3 },
   },
   {
+    // Everyday since 2026-11-13, with recipe (see above).
     id: 'milestone',
-    group: 'family',
-    order: 4,
+    group: 'everyday',
+    order: 9,
     emoji: '\u{1F31F}', // 🌟
     labelKey: 'quickAdd.milestone.label',
     hintKey: 'quickAdd.milestone.hint',
@@ -196,6 +228,7 @@ export const QUICK_ADD_ITEMS = [
     action: 'add-milestone',
     contextKey: 'memberId',
     requiredPermission: 'activities',
+    filteredPlacement: { group: 'family', order: 4 },
   },
 
   // — Money (setup) —
@@ -323,6 +356,7 @@ export interface QuickAddItem {
   readonly requiredPermission: QuickAddPermission;
   readonly requiresFlag?: DevFlag;
   readonly onlyWhenFiltered?: true;
+  readonly filteredPlacement?: QuickAddPlacement;
 }
 
 /**
@@ -333,10 +367,33 @@ export interface QuickAddItem {
  */
 export const VALID_ACTIONS: ReadonlySet<string> = new Set(QUICK_ADD_ITEMS.map((i) => i.action));
 
-/** Pre-computed group index — the sheet renders sections directly from this. */
-export const QUICK_ADD_BY_GROUP: Record<QuickAddGroup, readonly QuickAddItem[]> = {
-  everyday: QUICK_ADD_ITEMS.filter((i) => i.group === 'everyday').sort((a, b) => a.order - b.order),
-  family: QUICK_ADD_ITEMS.filter((i) => i.group === 'family').sort((a, b) => a.order - b.order),
-  money: QUICK_ADD_ITEMS.filter((i) => i.group === 'money').sort((a, b) => a.order - b.order),
-  care: QUICK_ADD_ITEMS.filter((i) => i.group === 'care').sort((a, b) => a.order - b.order),
-};
+/**
+ * A tile's placement: its `group` / `order` in the main menu, or its `filteredPlacement` (when
+ * it has one) in a filtered sheet. The ONE answer to "which section is this tile in", so the
+ * sheet's tiles and its inline member picker cannot disagree.
+ */
+export function quickAddPlacement(item: QuickAddItem, filtered: boolean): QuickAddPlacement {
+  return (filtered && item.filteredPlacement) || { group: item.group, order: item.order };
+}
+
+function indexByGroup(filtered: boolean): Record<QuickAddGroup, readonly QuickAddItem[]> {
+  const items: readonly QuickAddItem[] = QUICK_ADD_ITEMS;
+  const inGroup = (g: QuickAddGroup) =>
+    items
+      .filter((i) => quickAddPlacement(i, filtered).group === g)
+      .sort((a, b) => quickAddPlacement(a, filtered).order - quickAddPlacement(b, filtered).order);
+  return {
+    everyday: inGroup('everyday'),
+    family: inGroup('family'),
+    money: inGroup('money'),
+    care: inGroup('care'),
+  };
+}
+
+/** Pre-computed group index for the main menu: the sheet renders sections directly from this. */
+export const QUICK_ADD_BY_GROUP: Record<QuickAddGroup, readonly QuickAddItem[]> =
+  indexByGroup(false);
+
+/** The same index for a filtered sheet (`openQuickAdd({ filter })`): `filteredPlacement` applies. */
+export const QUICK_ADD_BY_GROUP_FILTERED: Record<QuickAddGroup, readonly QuickAddItem[]> =
+  indexByGroup(true);

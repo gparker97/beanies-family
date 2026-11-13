@@ -136,12 +136,13 @@ function sharedPermissions(): ReturnType<typeof usePermissions> {
 }
 
 export function isReaderEnabled(reader: MagicReader): boolean {
-  const { canEditActivities, canViewFinances } = sharedPermissions();
+  const { canEditActivities, canViewFinances, isAdult } = sharedPermissions();
   // Exhaustive over the permission union, so a new permission is a compile error here rather
   // than a reader that silently falls open (the same shape as `useQuickAddAvailability`).
   const permissionGate: Record<QuickAddPermission, Ref<boolean>> = {
     finance: canViewFinances,
     activities: canEditActivities,
+    adult: isAdult,
   };
   const { flag, permission } = MAGIC_READERS[reader];
   return permissionGate[permission].value && (flag === undefined || isFlagEnabled(flag));

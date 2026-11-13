@@ -160,6 +160,15 @@ export const NAV_ITEMS: NavItemDef[] = [
     mobileCategory: 'planning',
   },
   {
+    // #146. No nav badge on purpose: a badge that never clears before bedtime is noise.
+    labelKey: 'nav.choreboard',
+    path: '/choreboard',
+    emoji: '🧹',
+    section: 'treehouse',
+    requiresFlag: 'choreboard',
+    mobileCategory: 'planning',
+  },
+  {
     labelKey: 'nav.mealPlanner',
     path: '/meal-planner',
     emoji: '\u{1F372}',
@@ -409,6 +418,7 @@ const HINT_KEY_BY_PATH: Record<string, UIStringKey> = {
   '/activities': 'mobileNav.hint.activities',
   '/todo': 'mobileNav.hint.todo',
   '/lists': 'mobileNav.hint.lists',
+  '/choreboard': 'mobileNav.hint.choreboard',
   '/meal-planner': 'mobileNav.hint.mealPlanner',
   '/who-owns-what': 'mobileNav.hint.whoOwnsWhat',
   '/travel': 'mobileNav.hint.travel',

@@ -12,6 +12,7 @@ import { useTodoStore } from '@/stores/todoStore';
 import { useTranslationStore } from '@/stores/translationStore';
 import { useVacationStore } from '@/stores/vacationStore';
 import { useWeatherStore } from '@/stores/weatherStore';
+import { useChoreStore } from '@/stores/choreStore';
 import { isFlagEnabled } from '@/config/flags';
 import { addDaysYmd, daysBetweenYmd } from '@/utils/date';
 import { WIDGET_DAYS } from '@/types/widgetSnapshot';
@@ -228,6 +229,7 @@ export function useWidgetSnapshot(): void {
   const translationStore = useTranslationStore();
   const vacationStore = useVacationStore();
   const weatherStore = useWeatherStore();
+  const choreStore = useChoreStore();
 
   const lockScreenTitles = computed(() => settingsStore.widgetLockScreenTitles);
 
@@ -276,6 +278,17 @@ export function useWidgetSnapshot(): void {
             reading: weatherStore.reading,
             unit: settingsStore.temperatureUnit,
             zone: weatherStore.homeZone,
+          }
+        : null,
+      // The choreboard (#146), read once here (the builder stays flag-free). Raw chores and
+      // marks, never `choreDayFor`: that reads the one-minute chore clock, and an input that
+      // changed every minute would republish every minute.
+      chores: isFlagEnabled('choreboard')
+        ? {
+            chores: choreStore.chores,
+            marks: choreStore.choreMarks,
+            starts: choreStore.starts,
+            beanIds: [...choreStore.livingIds],
           }
         : null,
     };

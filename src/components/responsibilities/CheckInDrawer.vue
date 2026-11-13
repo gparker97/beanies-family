@@ -42,7 +42,7 @@ import InlineMemberPicker from '@/components/ui/InlineMemberPicker.vue';
 import TogglePillGroup from '@/components/ui/TogglePillGroup.vue';
 import MemberChip from '@/components/ui/MemberChip.vue';
 import CardArt from '@/components/responsibilities/CardArt.vue';
-import DeckCelebration from './DeckCelebration.vue';
+import CelebrationBanner from '@/components/ui/CelebrationBanner.vue';
 import { useDealActions } from './useDealActions';
 
 const props = defineProps<{ open: boolean }>();
@@ -389,7 +389,7 @@ function onDoneAction(): void {
     @close="emit('close')"
     @save="onSave"
   >
-    <DeckCelebration
+    <CelebrationBanner
       v-if="completed"
       :title="t('whoOwnsWhat.checkinDrawer.doneTitle')"
       :body="completedBody"

@@ -77,5 +77,8 @@ export const MIGRATION_CHANGES: Record<MigratedRootKey, string> = {
     'hW9Kg/bK6TQBOQAIwgaaIR98sx4BAQAAAAUVGDQBQgJWAnACfxZyZXNwb25zaWJpbGl0eUNoZWNrSW5zAX8AfwB/AA==',
   // Appended 2026-10-03 with @automerge/automerge 3.4.1.
   counterDeltas: 'hW9Kg23iG3ABMAAI7QPUHg/rglIBAQAAAAUVDzQBQgJWAnACfw1jb3VudGVyRGVsdGFzAX8AfwB/AA==',
+  // Appended 2026-11-13 with @automerge/automerge 3.5.0.
+  chores: 'hW9Kg8ih7REBKQAIJoA88IHpoXgBAQAAAAUVCDQBQgJWAnACfwZjaG9yZXMBfwB/AH8A',
+  choreMarks: 'hW9Kg97DxucBLQAIl7swnbcUihABAQAAAAUVDDQBQgJWAnACfwpjaG9yZU1hcmtzAX8AfwB/AA==',
   // generateMigrationChanges.mjs appends new entries above this line.
 };

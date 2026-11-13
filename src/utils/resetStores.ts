@@ -11,11 +11,13 @@ import { useTodoStore } from '@/stores/todoStore';
 import { useListStore } from '@/stores/listStore';
 import { useActivityStore } from '@/stores/activityStore';
 import { useResponsibilityStore } from '@/stores/responsibilityStore';
+import { useChoreStore } from '@/stores/choreStore';
 import { useHolidayStore } from '@/stores/holidayStore';
 import { useCalendarSyncStore } from '@/stores/calendarSyncStore';
 import { useCalendarClashStore } from '@/stores/calendarClashStore';
 import { isFlagEnabled } from '@/config/flags';
 import { clearDemoSession } from '@/utils/reviewDemo';
+import { clearChoreAddDraft } from '@/composables/useChoreAddDraft';
 
 /**
  * Reset every Pinia store that holds family-scoped state — call on sign-out and
@@ -37,6 +39,10 @@ export function resetAllAppStores(): void {
   useListStore().resetState();
   useActivityStore().resetState();
   useResponsibilityStore().resetState();
+  useChoreStore().resetState();
+  // The Add Chores sheet's list (memory only, never in the family file) holds this family's
+  // chore names: it must not follow the session into another pod.
+  clearChoreAddDraft();
   useHolidayStore().resetState();
   // Tear down the calendar sync engine (pollers + watchers + module state) so it
   // doesn't keep running after sign-out / family-switch (F7). Flag-gated so the

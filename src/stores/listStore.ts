@@ -8,7 +8,7 @@ import { isDocLoaded } from '@/services/automerge/docService';
 import * as listRepo from '@/services/automerge/repositories/listRepository';
 import * as cycleRepo from '@/services/automerge/repositories/listCycleRepository';
 import { buildCycleSnapshot, expiredCycleIds, CYCLE_SWEEP_ENABLED } from '@/utils/listCycles';
-import { clockVerdict, readSweepDay, recordSweepDay } from '@/utils/cycleSweepClock';
+import { clockVerdict, listCycleSweepClock } from '@/utils/cycleSweepClock';
 import { list as projectionList } from '@/services/automerge/projection';
 import {
   computeRecurringReset,
@@ -501,7 +501,7 @@ export const useListStore = defineStore('lists', () => {
     }
 
     // 3. The clock. A wrong clock can only ever DELAY a deletion.
-    const verdict = clockVerdict(today.value, readSweepDay());
+    const verdict = clockVerdict(today.value, listCycleSweepClock.read());
     if (verdict !== 'sweep') {
       // Each skip decides for itself whether to advance the cursor, because the two
       // answers have opposite failure modes and one rule cannot serve both:
@@ -516,7 +516,7 @@ export const useListStore = defineStore('lists', () => {
       //                the write that would let a wrong clock accelerate a deletion.
       //   same-day   — nothing to do, and deliberately silent: this is the normal path.
       if (verdict !== 'skip-regressed' && verdict !== 'skip-same-day') {
-        recordSweepDay(today.value);
+        listCycleSweepClock.record(today.value);
       }
       if (verdict === 'skip-first-run') logSweepSkip('first-run');
       else if (verdict === 'skip-jumped') logSweepSkip('clock-jumped');
@@ -534,14 +534,14 @@ export const useListStore = defineStore('lists', () => {
       // the trusted-jump bound every eighth day and fires a false `clock-jumped` warning
       // forever, drowning the one signal that detects a genuinely bad clock.
       if (!stored.length) {
-        recordSweepDay(today.value);
+        listCycleSweepClock.record(today.value);
         return;
       }
 
       // 5. The pure predicate — keep-on-doubt, capped, oldest first.
       const ids = expiredCycleIds(stored, today.value);
       if (!ids.length) {
-        recordSweepDay(today.value);
+        listCycleSweepClock.record(today.value);
         return;
       }
 
@@ -552,7 +552,7 @@ export const useListStore = defineStore('lists', () => {
       //    the cap degrades into 50-per-invocation and a whole archive can go in one
       //    session. Failing to reserve costs one day of retention; not reserving can cost
       //    the history.
-      if (!recordSweepDay(today.value)) {
+      if (!listCycleSweepClock.record(today.value)) {
         logSweepSkip('cursor-write-failed');
         return;
       }

@@ -22,6 +22,12 @@ export interface WallEditContext {
   addTodo: (title: string) => Promise<boolean>;
   renameJob: (job: WallJob, title: string) => Promise<boolean>;
   removeJob: (job: WallJob) => Promise<boolean>;
+  /**
+   * Add a chore for one bean (#146), the wall's only chore edit. Optional: the page binds it to
+   * the grown-up who unlocked (`useWallLock().unlockedBy`), and a lane mounted without it
+   * simply offers no add row.
+   */
+  addChore?: (memberId: string, title: string) => Promise<boolean>;
 }
 
 export const WALL_EDIT: InjectionKey<WallEditContext> = Symbol('wallEdit');

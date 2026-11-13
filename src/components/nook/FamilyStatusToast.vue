@@ -13,6 +13,7 @@ import { useExpandableList } from '@/composables/useExpandableList';
 import { useToday } from '@/composables/useToday';
 import { useSounds } from '@/composables/useSounds';
 import ShowMoreToggle from '@/components/ui/ShowMoreToggle.vue';
+import { CHORE_BLOCK_META } from '@/constants/choreBlocks';
 import SmoothHeight from '@/components/ui/SmoothHeight.vue';
 
 const { t } = useTranslation();
@@ -126,6 +127,8 @@ const title = computed(() => {
 });
 
 function handleItemClick(item: CriticalItem) {
+  // Generic rows carry their own `route`: a Who Owns What card, a chore line (#146,
+  // `/choreboard?bean=<id>`).
   if (item.route) emit('open-route', item.route);
   else if (item.type === 'todo') emit('open-todo', item.id);
   else if (item.type === 'medication') emit('open-medication', item.id);
@@ -168,6 +171,7 @@ function handleItemClick(item: CriticalItem) {
           v-for="(item, index) in shownItems"
           :key="item.id + item.type + item.time"
           class="critical-item"
+          :data-testid="item.type === 'chores' ? 'briefing-chore-line' : undefined"
           :class="{
             'opacity-50': item.completed,
             'cursor-default': item.type === 'holiday',
@@ -197,7 +201,16 @@ function handleItemClick(item: CriticalItem) {
           </button>
 
           <!-- Icon with subtle glow ring -->
-          <span class="critical-icon">
+          <!-- A chore line's icon sits on its time-of-day colour (#146) -->
+          <span
+            class="critical-icon"
+            :class="
+              item.choreBlock
+                ? ['critical-icon-chore', CHORE_BLOCK_META[item.choreBlock].colorClass]
+                : undefined
+            "
+            :data-testid="item.choreBlock ? 'briefing-chore-block' : undefined"
+          >
             {{ item.icon }}
           </span>
 
@@ -370,6 +383,18 @@ function handleItemClick(item: CriticalItem) {
   height: 30px;
   justify-content: center;
   width: 30px;
+}
+
+/* A chore line's icon (#146): its block's tint (`.chore-block-*`, `src/style.css`) laid over
+   an opaque chip, so the colour reads on the orange gradient. The gradient and its white ink
+   are the same in both modes; the chip under the tint is the dark partner. */
+.critical-icon-chore {
+  background: linear-gradient(var(--chore-tint), var(--chore-tint)), rgb(255 255 255 / 92%);
+  box-shadow: none;
+}
+
+html.dark .critical-icon-chore {
+  background: linear-gradient(var(--chore-tint), var(--chore-tint)), var(--color-surface-raised);
 }
 
 /* Row dismiss: a ✕ on a phone, "✕ Dismiss" where there is room */

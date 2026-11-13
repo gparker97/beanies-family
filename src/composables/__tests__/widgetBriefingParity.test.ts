@@ -10,9 +10,14 @@
  * show rule through `classifyPlateList`, so a list due later this week is on neither until its
  * rule says so, and one shown early is `later` on the widget and "coming up" on the briefing.
  *
+ * Chores (#146): both surfaces draw one line per bean through `choreLineFor`, from the same read
+ * model. One documented difference, pinned below: a bean with nothing left is a "done" row on
+ * the widget and no line in the briefing.
+ *
  * Both surfaces run on real stores here: the briefing through `useCriticalItems`, the widget
- * through `buildWidgetSnapshot` fed the same to-dos and lists `useScheduledReminders` hands it
- * (`dedupeHintsByKey(activeTodos)`, every list).
+ * through `buildWidgetSnapshot` fed the same to-dos, lists and chores `useScheduledReminders` and
+ * `useWidgetSnapshot` hand it (`dedupeHintsByKey(activeTodos)`, every list, the chore store's raw
+ * chores and marks).
  */
 import { setActivePinia, createPinia } from 'pinia';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -66,12 +71,20 @@ import { useCriticalItems } from '@/composables/useCriticalItems';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useTodoStore } from '@/stores/todoStore';
 import { useListStore } from '@/stores/listStore';
+import { useChoreStore } from '@/stores/choreStore';
 import { buildWidgetSnapshot } from '@/utils/widgetSnapshot';
 import { dedupeHintsByKey, isHint } from '@/utils/helpfulHints';
 import { UI_STRINGS, type UIStringKey } from '@/services/translation/uiStrings';
 import { addDaysYmd } from '@/utils/date';
 import { WIDGET_DAYS } from '@/types/widgetSnapshot';
-import type { FamilyList, FamilyMember, TodoItem, TodoRepeat } from '@/types/models';
+import type {
+  Chore,
+  ChoreMark,
+  FamilyList,
+  FamilyMember,
+  TodoItem,
+  TodoRepeat,
+} from '@/types/models';
 
 const TODAY = '2026-03-10'; // Tuesday
 const STAMP = '2026-03-01T00:00:00.000Z';
@@ -219,6 +232,7 @@ function widgetToday() {
   const todoStore = useTodoStore();
   const viewer = family.currentMember!;
   const resolveMember = (id: string) => family.members.find((m) => m.id === id);
+  const chores = useChoreStore();
   const { snapshot } = buildWidgetSnapshot(
     {
       occurrencesByDate: {},
@@ -240,6 +254,12 @@ function widgetToday() {
       language: 'en',
       familyId: 'family-parity',
       weather: null,
+      chores: {
+        chores: chores.chores,
+        marks: chores.choreMarks,
+        starts: chores.starts,
+        beanIds: [...chores.livingIds],
+      },
     },
     new Date()
   );
@@ -335,5 +355,58 @@ describe('the widget shows the daily briefing’s to-dos and lists', () => {
       .map((i) => i.id.replace(/^todo:/, ''));
     expect(sorted(briefingIds().hints)).toEqual(['hint-plain', 'hint-surprise']);
     expect(widget).toEqual(['hint-plain']);
+  });
+
+  it('the same chore lines, plus a "done" row only the widget carries', () => {
+    useTodoStore().todos = [];
+    useListStore().lists = [];
+    const chore = (id: string, who: string, extra: Partial<Chore> = {}): Chore =>
+      ({
+        id,
+        title: id,
+        emoji: '🧹',
+        assigneeIds: [who],
+        block: 'morning',
+        sortOrder: 0,
+        createdBy: 'dad',
+        createdAt: STAMP,
+        updatedAt: STAMP,
+        ...extra,
+      }) as Chore;
+    const done = (memberId: string, ref: string): ChoreMark => ({
+      id: `done:${memberId}:${TODAY}:${ref}`,
+      kind: 'done',
+      memberId,
+      date: TODAY,
+      ref,
+      by: memberId,
+      createdAt: STAMP,
+      updatedAt: STAMP,
+    });
+    const store = useChoreStore();
+    store.chores = [
+      chore('dad-1', 'dad'),
+      chore('mom-1', 'mom'),
+      chore('emma-1', 'emma'), // on track, not posted: on neither
+      chore('emma-2', 'emma', { notifyParents: true }),
+      chore('noah-1', 'noah', { notifyParents: true }),
+    ];
+    store.choreMarks = [done('noah', 'noah-1')];
+
+    const briefing = useCriticalItems().criticalItems.value.filter((i) => i.type === 'chores');
+    const widget = widgetToday().filter((i) => i.kind === 'chore');
+    const count = (text: string) => Number(/(\d+)/.exec(text)?.[1] ?? NaN);
+
+    // A briefing line's id is bean + block (+ missed), so each line is dismissed on its own.
+    expect(briefing.map((i) => i.id)).toEqual(['dad:morning', 'emma:morning']);
+    expect(widget.map((i) => i.id)).toEqual(['chore:dad', 'chore:emma', 'chore:noah']);
+    // The same numbers for the beans both show.
+    for (const row of briefing) {
+      const bean = (row.route as { query: { bean: string } }).query.bean;
+      const twin = widget.find((w) => w.id === `chore:${bean}`)!;
+      expect(count(twin.title)).toBe(count(row.message));
+    }
+    // The one difference: Noah is done, a soft "done" row on the widget, no briefing line.
+    expect(widget[2]).toMatchObject({ title: 'Noah · done', tagTone: 'soft' });
   });
 });

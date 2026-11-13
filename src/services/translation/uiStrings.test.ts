@@ -257,6 +257,16 @@ describe('uiStrings', () => {
       'planner.drag.tooShort',
       'planner.drag.crossesMidnight',
       'planner.drag.googleUnchanged',
+      // The choreboard (#146): a refused tick or edit tells a child or a parent why nothing
+      // changed. "bean" must never stand in for the chore, the person or the grown-up here.
+      'choreboard.error',
+      // Deleting a chore, and chores whose person has left the family: a destructive confirm
+      // and a removed member, so the chore and the person keep their real nouns.
+      'choreboard.form.deleteConfirm',
+      'choreboard.orphans',
+      // Select and delete on a bean's day: the button, its confirm and its result toast
+      // (`deleteSelected`, `deleteConfirm`, `deleted`) keep "chores" and the person.
+      'choreboard.day.delete',
     ];
     const KEY_SUFFIXES =
       /(deleteConfirm|DeleteConfirm|ConfirmMessage|confirmMessage|Failed|Error)$/;

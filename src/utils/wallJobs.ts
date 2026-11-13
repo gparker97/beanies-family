@@ -16,6 +16,10 @@
  *   to-dos         = every to-do bar `someday`, surprise hints and those whose
  *                    "Show from" date is still ahead, tagged by their plate
  *                    (`utils/todoPlate`), assigned or not
+ *   chore lanes    = each known bean's chore day (`beanChoreDay`, the choreboard's ONE read
+ *                    model, #146) as wall jobs, the block happening now first. Passed in by
+ *                    the caller, which passes nothing while the `choreboard` gate is off: this
+ *                    rule never reads the flag.
  *
  * Lists are NOT split by lifecycle any more. A recurring "leo's jobs" and a
  * one-off "swim bag" are both Leo's list; parking one under his name and the
@@ -29,10 +33,21 @@
  * in both places is one job, not two, and the dated to-do wins.
  */
 import { todoCapabilities } from '@/utils/todoRecurrence';
-import type { FamilyList, FamilyListItem, ListCategory, TodoItem } from '@/types/models';
+import { assertNever } from '@/utils/assertNever';
+import { blocksInDisplayOrder, type BeanChoreDay } from '@/utils/chores';
+import type {
+  Chore,
+  ChoreBlock,
+  FamilyList,
+  FamilyListItem,
+  ListCategory,
+  TodoItem,
+} from '@/types/models';
 import { isSurpriseHint } from '@/constants/helpfulHints';
 import { isKnownListCategory } from '@/constants/listCategories';
 import type {
+  WallChoreBlock,
+  WallChoreLane,
   WallJob,
   WallJobsInput,
   WallJobsResult,
@@ -187,14 +202,72 @@ function listJob(list: FamilyList, item: FamilyListItem, ownerId: string): WallJ
 }
 
 /**
+ * A chore as a wall job. Always `locked`: a chore is renamed, moved and deleted in the app (the
+ * wall's one chore edit is adding one), and the tick still works. The owner is part of the key
+ * because a shared chore is ticked separately per bean (one `done` mark each).
+ */
+function choreJob(chore: Chore, done: boolean, ownerId: string): WallJob {
+  return {
+    key: `chore:${chore.id}:${ownerId}`,
+    title: chore.title,
+    done,
+    ownerId,
+    source: 'chore',
+    choreId: chore.id,
+    ...(chore.emoji ? { listEmoji: chore.emoji } : {}),
+    locked: true,
+  };
+}
+
+/**
  * What a job's write touches, for the in-flight (`pending`) guard. A list item and a to-do are
  * each ONE record however many lanes show it (`toggleComplete` flips the to-do's own
  * `completed`), so the key leaves the lane out: a second tap in another assignee's lane while
  * the first write is in flight would toggle it again, overwriting `completedBy` or, for a
  * repeating to-do, rolling it past a second occurrence.
+ *
+ * A chore is the opposite: each bean's tick is its OWN record (a `done` mark keyed by member),
+ * so the key keeps the owner. Without it every bean's copy of a shared chore would share one
+ * pending key, and Pip's tick would block Juno's.
  */
 export function jobWriteKey(job: WallJob): string {
-  return job.source === 'list' ? `list:${job.listId}:${job.itemId}` : `todo:${job.todoId}`;
+  switch (job.source) {
+    case 'list':
+      return `list:${job.listId}:${job.itemId}`;
+    case 'todo':
+      return `todo:${job.todoId}`;
+    case 'chore':
+      return `chore:${job.choreId}:${job.ownerId}`;
+    default:
+      return assertNever(job.source, 'jobWriteKey');
+  }
+}
+
+/**
+ * One bean's chore day as a wall lane. Empty blocks are dropped; the order is the choreboard's
+ * one display order (`blocksInDisplayOrder`): now, Anytime, still to come, passed.
+ */
+function choreLane(memberId: string, day: BeanChoreDay): WallChoreLane {
+  const blocks = day.blocks;
+  const current: ChoreBlock = blocks.find((b) => b.isNow)?.block ?? 'morning';
+  const laneBlocks: WallChoreBlock[] = blocksInDisplayOrder(blocks.filter((b) => b.total > 0)).map(
+    (b) => ({
+      block: b.block,
+      jobs: b.chores.map((item) => choreJob(item.chore, item.done, memberId)),
+      done: b.done,
+      total: b.total,
+      allDone: b.allDone,
+      isNow: b.isNow,
+      ended: b.ended,
+    })
+  );
+  return {
+    memberId,
+    current,
+    blocks: laneBlocks,
+    done: laneBlocks.reduce((n, b) => n + b.done, 0),
+    total: laneBlocks.reduce((n, b) => n + b.total, 0),
+  };
 }
 
 /**
@@ -205,7 +278,7 @@ export function jobWriteKey(job: WallJob): string {
  * nothing is ever written to either store here.
  */
 export function buildWallJobs(input: WallJobsInput): WallJobsResult {
-  const { todos, lists, memberIds, clock } = input;
+  const { todos, lists, memberIds, clock, choreDays = {} } = input;
   const todayYmd = clock.ymd;
 
   const listsByMember: Record<string, WallListGroup[]> = {};
@@ -288,7 +361,49 @@ export function buildWallJobs(input: WallJobsInput): WallJobsResult {
     }
   }
 
-  return { listsByMember, orphanLists, todos: built };
+  // 3. Chore lanes, one per KNOWN bean. A day for a member the wall does not know (removed, or
+  //    a pet) is ignored; `beanChoreDay` already leaves a removed member's chores out of every
+  //    living bean's day. Built only from what the caller passed, so an empty `choreDays`
+  //    (the gate off) gives exactly the board this function built before chores existed.
+  const choreLanesByMember: Record<string, WallChoreLane> = {};
+  for (const id of memberIds) {
+    const day = choreDays[id];
+    if (day) choreLanesByMember[id] = choreLane(id, day);
+  }
+
+  return { listsByMember, orphanLists, todos: built, choreLanesByMember };
+}
+
+/** Done / total for the chores card and the chores view's header line. */
+export interface WallChoreProgress {
+  /** The block the count is for, or `null` when it counts the whole day. */
+  block: ChoreBlock | null;
+  done: number;
+  total: number;
+}
+
+/**
+ * How the visible beans are doing with their chores: the block happening now ("7 of 12 morning
+ * chores done"), or the whole day when nobody has a chore in that block. Every lane shares one
+ * clock, so they agree on which block is now.
+ */
+export function choreProgress(lanes: readonly WallChoreLane[]): WallChoreProgress {
+  let done = 0;
+  let total = 0;
+  let dayDone = 0;
+  let dayTotal = 0;
+  for (const lane of lanes) {
+    dayDone += lane.done;
+    dayTotal += lane.total;
+    const now = lane.blocks.find((b) => b.block === lane.current);
+    if (now) {
+      done += now.done;
+      total += now.total;
+    }
+  }
+  const current = lanes[0]?.current ?? null;
+  if (total > 0 && current) return { block: current, done, total };
+  return { block: null, done: dayDone, total: dayTotal };
 }
 
 /**

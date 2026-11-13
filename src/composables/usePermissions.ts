@@ -1,6 +1,7 @@
 import { computed, watch } from 'vue';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useAuthStore } from '@/stores/authStore';
+import { isAdultMember } from '@/composables/useMemberInfo';
 
 /** Routes that require canViewFinances permission */
 export const FINANCE_ROUTES = [
@@ -91,5 +92,12 @@ export function usePermissions() {
     }
   });
 
-  return { isOwner, canManagePod, canViewFinances, canEditActivities, rosterLoaded };
+  /** A grown-up session: an owner or an adult member (never a pet). The choreboard's
+   *  "grown-ups create, edit and delete chores" rule (#146) reads this one predicate. */
+  const isAdult = computed(() => {
+    const member = familyStore.currentMember;
+    return !!member && isAdultMember(member);
+  });
+
+  return { isOwner, canManagePod, canViewFinances, canEditActivities, isAdult, rosterLoaded };
 }

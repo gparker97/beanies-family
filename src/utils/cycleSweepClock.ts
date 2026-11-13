@@ -13,11 +13,22 @@
  *
  * `runDailyMaintenance` fires on every app start and after every remote merge, so this
  * also serves a second purpose: it makes the sweep run at most once per device per day.
+ *
+ * ONE CURSOR PER SWEEP (#146). Each retention sweep gets its own `createSweepClock(key, …)`:
+ * two sweeps sharing one key would make whichever runs second read `skip-same-day` forever.
+ * `clockVerdict`, the policy, is shared.
  */
 import { reportError } from '@/utils/errorReporter';
 import { MAX_TRUSTED_CLOCK_JUMP_DAYS } from '@/utils/listCycles';
 
-const KEY = 'beanies_cycle_sweep_day';
+/**
+ * The list-cycle sweep's cursor. ⚠️ BYTE-IDENTICAL to the key this file always used (pinned by
+ * a test): renaming it would read as a first run on every device and skip a day of retention.
+ */
+export const LIST_CYCLE_SWEEP_KEY = 'beanies_cycle_sweep_day';
+/** The choreboard's mark-retention sweep cursor (#146). */
+export const CHORE_MARK_SWEEP_KEY = 'beanies_chore_mark_sweep_day';
+
 const YMD = /^\d{4}-\d{2}-\d{2}$/;
 
 export type ClockVerdict =
@@ -69,35 +80,58 @@ export function clockVerdict(todayYmd: string, storedYmd: string | null): ClockV
   return 'sweep';
 }
 
-/** Last day this device swept, or `null` when unknown. Never throws. */
-export function readSweepDay(): string | null {
-  try {
-    return localStorage.getItem(KEY);
-  } catch (e) {
-    console.warn('[cycleSweepClock] could not read the sweep high-water mark', e);
-    return null;
-  }
+/** A per-device sweep cursor: read the last swept day, record today. */
+export interface SweepClock {
+  /** Last day this device swept, or `null` when unknown. Never throws. */
+  read(): string | null;
+  /**
+   * Record that this device has reached `todayYmd`.
+   *
+   * @returns `false` when the write failed. The caller must then SKIP the sweep: a cursor
+   *   that cannot advance would otherwise re-evaluate the same clock jump forever.
+   */
+  record(todayYmd: string): boolean;
 }
 
 /**
- * Record that this device has reached `todayYmd`.
- *
- * @returns `false` when the write failed. The caller must then SKIP the sweep: a cursor
- *   that cannot advance would otherwise re-evaluate the same clock jump forever.
+ * A sweep cursor stored under `key`. `surface` names the failure report; `context` is its
+ * (allowlisted) context. Never throws: a bad read warns, a failed write is reported.
  */
-export function recordSweepDay(todayYmd: string): boolean {
-  try {
-    localStorage.setItem(KEY, todayYmd);
-    return true;
-  } catch (e) {
-    reportError({
-      surface: 'listStore.sweepExpiredCycles',
-      message:
-        'could not persist the cycle-sweep high-water day — the sweep is skipped so a stuck cursor cannot re-evaluate the same clock jump on every load',
-      error: e,
-      severity: 'warning',
-      context: { recur_surface: 'list', recur_outcome: 'write-failed' },
-    });
-    return false;
-  }
+export function createSweepClock(
+  key: string,
+  surface: string,
+  context?: Record<string, string>
+): SweepClock {
+  return {
+    read() {
+      try {
+        return localStorage.getItem(key);
+      } catch (e) {
+        console.warn(`[cycleSweepClock] could not read the sweep high-water mark (${key})`, e);
+        return null;
+      }
+    },
+    record(todayYmd) {
+      try {
+        localStorage.setItem(key, todayYmd);
+        return true;
+      } catch (e) {
+        reportError({
+          surface,
+          message: `could not persist the sweep high-water day (${key}); the sweep is skipped so a stuck cursor cannot re-evaluate the same clock jump on every load`,
+          error: e,
+          severity: 'warning',
+          ...(context ? { context } : {}),
+        });
+        return false;
+      }
+    },
+  };
 }
+
+/** The list-cycle retention sweep's cursor (`listStore.sweepExpiredCycles`). */
+export const listCycleSweepClock: SweepClock = createSweepClock(
+  LIST_CYCLE_SWEEP_KEY,
+  'listStore.sweepExpiredCycles',
+  { recur_surface: 'list', recur_outcome: 'write-failed' }
+);

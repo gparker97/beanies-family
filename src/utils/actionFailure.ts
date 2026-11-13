@@ -15,6 +15,7 @@
 import { showToast } from '@/composables/useToast';
 import { useTranslationStore } from '@/stores/translationStore';
 import type { UIStringKey } from '@/services/translation/uiStrings';
+import type { WallJobSource } from '@/types/wall';
 
 /**
  * A recurring-ACTIVITY session action the store refused (materialize / split /
@@ -83,7 +84,7 @@ function reportWallFailure(
  * On a wall this is the worst failure the feature has: a child ticks a chore,
  * the row looks done, and nothing was written. It must never be silent.
  */
-export function reportJobToggleFailed(source: 'todo' | 'list', id: string): void {
+export function reportJobToggleFailed(source: WallJobSource, id: string): void {
   // A null return has TWO causes and we cannot tell them apart here: the record
   // was not found (a genuine refusal), OR `wrapAsync` caught a write failure,
   // toasted, and returned undefined. Say both rather than asserting the wrong
@@ -141,7 +142,7 @@ export function reportTodoAddFailed(): void {
  */
 export function reportJobEditFailed(
   op: 'rename' | 'remove' | 'undo',
-  source: 'todo' | 'list',
+  source: WallJobSource,
   id: string
 ): void {
   const copy = {
@@ -151,10 +152,16 @@ export function reportJobEditFailed(
   } as const satisfies Record<string, readonly [UIStringKey, UIStringKey]>;
   const [titleKey, messageKey] = copy[op];
   reportWallFailure(
-    `[beanie-wall] could not ${op} the ${source} "${id}". Either the record is gone ` +
-      '(deleted on another device since this screen last synced) or the write failed ' +
-      'and wrapAsync already reported it. Check for a preceding store-write error on ' +
-      'this surface before assuming a missing record.',
+    source === 'chore'
+      ? // A chore row is built `locked` (`wallJobs.choreJob`), so reaching this is a caller
+        // that offered an edit it should not have: nothing was written, and nothing can be.
+        `[beanie-wall] refused to ${op} the chore "${id}": chores are edited in the app, ` +
+          'never on the wall. The row should have been locked; look for the control that ' +
+          'offered this edit.'
+      : `[beanie-wall] could not ${op} the ${source} "${id}". Either the record is gone ` +
+          '(deleted on another device since this screen last synced) or the write failed ' +
+          'and wrapAsync already reported it. Check for a preceding store-write error on ' +
+          'this surface before assuming a missing record.',
     titleKey,
     messageKey
   );

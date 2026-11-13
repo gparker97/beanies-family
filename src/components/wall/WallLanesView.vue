@@ -69,6 +69,8 @@ const emit = defineEmits<{
    */
   focusMember: [string];
   openChores: [];
+  /** The chores card (#146, gate on): open the chore lanes. */
+  openChoreLanes: [];
 }>();
 
 const activityStore = useActivityStore();
@@ -257,6 +259,7 @@ function subtitleFor(memberId: string) {
     :peripherals="peripherals"
     @open="emit('open', $event)"
     @open-chores="emit('openChores')"
+    @open-chore-lanes="emit('openChoreLanes')"
   >
     <template #main>
       <!-- lane headers, on the same column track as the plot -->

@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve as resolve_ } from 'node:path';
 import {
+  choreLineFor,
   classifyAudience,
+  classifyChoreAudience,
   classifyListAudience,
   classifyOwnerAudience,
   classifyPlateList,
@@ -14,7 +16,8 @@ import {
   isDutyDone,
   type BriefingAudience,
 } from '@/utils/audience';
-import type { FamilyList, FamilyMember, TodoItem } from '@/types/models';
+import type { Chore, FamilyList, FamilyMember, TodoItem } from '@/types/models';
+import { beanChoreDay, indexMarks, type BeanChoreDay } from '@/utils/chores';
 
 function member(
   id: string,
@@ -536,5 +539,172 @@ describe('isChildOnly', () => {
         classifyAudience(ids, viewer, r).kind === 'forChild'
       );
     }
+  });
+});
+
+// ── The choreboard (#146) ────────────────────────────────────────────────────
+
+function chore(id: string, assigneeIds: string[], extra: Partial<Chore> = {}): Chore {
+  return {
+    id,
+    title: id,
+    emoji: '🧹',
+    assigneeIds,
+    block: 'morning',
+    sortOrder: 0,
+    createdBy: 'a',
+    createdAt: '2026-11-01T00:00:00.000Z',
+    updatedAt: '2026-11-01T00:00:00.000Z',
+    ...extra,
+  } as Chore;
+}
+
+describe('classifyChoreAudience (per bean)', () => {
+  const kid2 = member('k2', 'child');
+  const pool = [...all, kid2];
+  const r = (id: string) => pool.find((m) => m.id === id);
+  const kind = (c: Chore, bean: string, viewer: FamilyMember, missed = false) =>
+    classifyChoreAudience(c, bean, viewer, r, missed).kind;
+
+  it('a bean always sees their own chore', () => {
+    expect(kind(chore('c', ['k']), 'k', kid)).toBe('assignee');
+    expect(kind(chore('c', ['a']), 'a', adult)).toBe('assignee');
+  });
+
+  it('a grown-up sees a child’s chore only when it keeps parents posted', () => {
+    expect(kind(chore('c', ['k']), 'k', adult)).toBe('hidden');
+    expect(kind(chore('c', ['k'], { notifyParents: true }), 'k', adult)).toBe('forChild');
+  });
+
+  it('a grown-up sees a missed child chore', () => {
+    expect(kind(chore('c', ['k']), 'k', adult, true)).toBe('forChild');
+  });
+
+  it('siblings and other grown-ups never', () => {
+    expect(kind(chore('c', ['k'], { notifyParents: true }), 'k', kid2, true)).toBe('hidden');
+    expect(kind(chore('c', ['a2'], { notifyParents: true }), 'a2', adult, true)).toBe('hidden');
+  });
+
+  it('a chore shared by a parent and a child is classified per bean, never over the set', () => {
+    const shared = chore('c', ['a', 'k']);
+    // Over the whole set ['a', 'k'] the child would see it as their own share AND the parent's;
+    // per bean, the parent's share is the parent's alone and the child's is gated as a routine.
+    expect(kind(shared, 'a', kid)).toBe('hidden');
+    expect(kind(shared, 'k', adult)).toBe('hidden');
+    expect(kind(shared, 'k', adult, true)).toBe('forChild');
+    expect(kind({ ...shared, notifyParents: true }, 'k', adult)).toBe('forChild');
+    expect(kind(shared, 'a', adult)).toBe('assignee');
+  });
+});
+
+describe('choreLineFor', () => {
+  const STARTS = { morning: '06:00', afternoon: '12:00', evening: '17:00' };
+  const YMD = '2026-11-13';
+  const living = new Set(['a', 'a2', 'k']);
+  function day(chores: Chore[], doneIds: string[], hhmm: string, bean = 'k'): BeanChoreDay {
+    const marks = doneIds.map((ref) => ({
+      id: `done:${bean}:${YMD}:${ref}`,
+      kind: 'done' as const,
+      memberId: bean,
+      date: YMD,
+      ref,
+      by: bean,
+      createdAt: `${YMD}T07:00:00.000Z`,
+      updatedAt: `${YMD}T07:00:00.000Z`,
+    }));
+    return beanChoreDay(chores, indexMarks(marks), bean, { ymd: YMD, hhmm }, STARTS, living);
+  }
+  const line = (d: BeanChoreDay, viewer: FamilyMember, bean = 'k') =>
+    choreLineFor(d, bean, viewer, resolve);
+
+  const m1 = chore('m1', ['k']);
+  const m2 = chore('m2', ['k'], { sortOrder: 1 });
+  const p1 = chore('p1', ['k'], { block: 'afternoon' });
+  const any1 = chore('any1', ['k'], { block: 'anytime' });
+  const posted = (c: Chore) => ({ ...c, notifyParents: true });
+
+  it.each([
+    // [case, chores, done, hhmm, viewer, expected (null or the line's fields)]
+    ['own, the current block', [m1, m2, p1], [], '07:30', kid, { block: 'morning', left: 2 }],
+    [
+      'own, counts only the block',
+      [m1, m2, p1],
+      ['m1'],
+      '07:30',
+      kid,
+      { block: 'morning', left: 1, done: 1, total: 2 },
+    ],
+    ['own, a later block is not yet a line', [p1], [], '07:30', kid, null],
+    ['own, nothing today', [], [], '07:30', kid, null],
+    [
+      'own, block done reads Done',
+      [m1, m2],
+      ['m1', 'm2'],
+      '07:30',
+      kid,
+      { block: 'morning', left: 0, done: 2 },
+    ],
+    [
+      'own, Anytime when the block has nothing left',
+      [m1, any1],
+      ['m1'],
+      '07:30',
+      kid,
+      { block: 'anytime', left: 1 },
+    ],
+    ['own, missed first', [m1, p1], [], '13:00', kid, { block: 'morning', left: 1, missed: true }],
+    [
+      'own, finished morning then the afternoon',
+      [m1, p1],
+      ['m1'],
+      '13:00',
+      kid,
+      { block: 'afternoon', left: 1, missed: false },
+    ],
+    [
+      'own, all done in a quiet block reads Done',
+      [m1],
+      ['m1'],
+      '13:00',
+      kid,
+      { block: 'morning', left: 0 },
+    ],
+    ['parent, an on-track child chore is hidden', [m1, m2], [], '07:30', adult, null],
+    [
+      'parent, kept posted',
+      [posted(m1), m2],
+      ['m1'],
+      '07:30',
+      adult,
+      { block: 'morning', left: 0, done: 1, total: 1 },
+    ],
+    [
+      'parent, missed counts only the missed chores',
+      [m1, m2],
+      ['m1'],
+      '13:00',
+      adult,
+      { block: 'morning', left: 1, total: 1, missed: true },
+    ],
+    ['parent, a done child never reads Done unposted', [m1], ['m1'], '13:00', adult, null],
+  ] as const)('%s', (_name, chores, done, hhmm, viewer, expected) => {
+    const got = line(day([...chores], [...done], hhmm), viewer);
+    if (expected === null) expect(got).toBeNull();
+    else expect(got).toMatchObject({ beanId: 'k', own: viewer.id === 'k', ...expected });
+  });
+
+  it('a sibling never gets a line, posted or missed', () => {
+    const kid2 = member('k2', 'child');
+    const r = (id: string) => [...all, kid2].find((m) => m.id === id);
+    const d = day([posted(m1)], [], '13:00');
+    expect(choreLineFor(d, 'k', kid2, r)).toBeNull();
+  });
+
+  it('a shared chore: the parent’s own line counts the parent’s share only', () => {
+    const shared = chore('s', ['a', 'k']);
+    const d = day([shared], [], '07:30', 'a');
+    expect(line(d, adult, 'a')).toMatchObject({ beanId: 'a', own: true, left: 1 });
+    // The child's share of the same chore is gated as the child's routine.
+    expect(line(day([shared], [], '07:30'), adult)).toBeNull();
   });
 });

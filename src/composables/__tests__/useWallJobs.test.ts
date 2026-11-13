@@ -27,6 +27,10 @@ vi.mock('@/stores/translationStore', () => ({
   useTranslationStore: () => ({ t: (key: string) => key }),
 }));
 vi.mock('@/composables/useToday', () => ({ useToday: () => ({ today: { value: '2026-09-10' } }) }));
+// The chore clock: Friday 13 November 2026, 7:42 in the morning (the Morning block).
+vi.mock('@/composables/useChoreClock', () => ({
+  useChoreClock: () => ({ choreClock: { value: { ymd: '2026-11-13', hhmm: '07:42' } } }),
+}));
 
 import { useWallJobs } from '../useWallJobs';
 import { useListStore } from '@/stores/listStore';
@@ -36,12 +40,14 @@ import { logEvent } from '@/services/telemetry/logEvent';
 import { reportError } from '@/utils/errorReporter';
 import {
   reportJobEditFailed,
+  reportJobToggleFailed,
   reportListAddFailed,
   reportTodoAddFailed,
 } from '@/utils/actionFailure';
+import { useChoreStore } from '@/stores/choreStore';
 import { showToast } from '@/composables/useToast';
 import type { WallJob } from '@/types/wall';
-import type { FamilyList, TodoItem } from '@/types/models';
+import type { Chore, FamilyList, TodoItem } from '@/types/models';
 
 const SURFACE = 'beanie-wall';
 
@@ -506,5 +512,233 @@ describe('useWallJobs lists', () => {
     await first;
     expect(toggleComplete).toHaveBeenCalledTimes(1);
     expect(wall.isPending(row('milo'))).toBe(false);
+  });
+});
+
+/**
+ * The choreboard on the wall (#146): the chore lanes, the chore writer, and the edit paths that
+ * must refuse a chore rather than fall through to the list store with undefined ids.
+ */
+describe('useWallJobs chores (#146)', () => {
+  const chore = (id: string, over: Partial<Chore> = {}): Chore => ({
+    id,
+    title: id,
+    emoji: '🧹',
+    assigneeIds: ['pip'],
+    block: 'morning',
+    sortOrder: 0,
+    createdBy: 'mama',
+    createdAt: '2026-11-01T08:00:00.000Z',
+    updatedAt: '2026-11-01T08:00:00.000Z',
+    ...over,
+  });
+
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+    useFamilyStore().members = [
+      { id: 'mama', name: 'Mama', ageGroup: 'adult' },
+      { id: 'pip', name: 'Pip', ageGroup: 'child' },
+      { id: 'juno', name: 'Juno', ageGroup: 'child' },
+    ] as never;
+    useChoreStore().chores = [
+      chore('bed'),
+      chore('teeth', { sortOrder: 1 }),
+      chore('dog', { assigneeIds: ['pip', 'juno'], sortOrder: 2 }),
+    ];
+  });
+
+  const jobOf = (wall: ReturnType<typeof useWallJobs>, memberId: string, choreId: string) =>
+    wall
+      .choreLaneFor(memberId)!
+      .blocks.flatMap((b) => b.jobs)
+      .find((j) => j.choreId === choreId)!;
+
+  it('builds no lanes while the gate is off (the default), whatever the store holds', () => {
+    const wall = useWallJobs();
+    expect(wall.choresOn).toBe(false);
+    expect(wall.choreLaneFor('pip')).toBeNull();
+  });
+
+  it('builds a lane per bean from the store when the page passes the gate on', () => {
+    const wall = useWallJobs({ chores: true });
+    expect(wall.choresOn).toBe(true);
+    expect(wall.choreLaneFor('pip')!.blocks[0]!.jobs.map((j) => j.choreId)).toEqual([
+      'bed',
+      'teeth',
+      'dog',
+    ]);
+    expect(wall.choreLaneFor('juno')!.blocks[0]!.jobs.map((j) => j.choreId)).toEqual(['dog']);
+    expect(wall.choreLaneFor('mama')!.total).toBe(0);
+  });
+
+  it("ticks a chore through the store for the lane's bean, credited to them, and logs it", async () => {
+    const toggle = vi
+      .spyOn(useChoreStore(), 'toggleChore')
+      .mockResolvedValue({ action: 'tick', completed: null, celebrated: false });
+    const wall = useWallJobs({ chores: true });
+    await wall.toggle(jobOf(wall, 'juno', 'dog'));
+    expect(toggle).toHaveBeenCalledWith('dog', 'juno', { surface: 'wall', by: 'juno' });
+    expect(logEvent).toHaveBeenCalledWith({
+      level: 'info',
+      surface: SURFACE,
+      message: 'wall_job_toggled',
+      context: { action: 'job_toggle', kind: 'chore' },
+    });
+    expect(reportError).not.toHaveBeenCalled();
+  });
+
+  it('lets two DIFFERENT chores be in flight together', async () => {
+    const releases: ((v: unknown) => void)[] = [];
+    const toggle = vi
+      .spyOn(useChoreStore(), 'toggleChore')
+      .mockImplementation(() => new Promise((r) => releases.push(r)) as never);
+    const wall = useWallJobs({ chores: true });
+    const bed = jobOf(wall, 'pip', 'bed');
+    const teeth = jobOf(wall, 'pip', 'teeth');
+    const first = wall.toggle(bed);
+    const second = wall.toggle(teeth);
+    expect(wall.isPending(bed)).toBe(true);
+    expect(wall.isPending(teeth)).toBe(true);
+    expect(toggle).toHaveBeenCalledTimes(2);
+    releases.forEach((r) => r({ action: 'tick', completed: null, celebrated: false }));
+    await Promise.all([first, second]);
+    expect(wall.isPending(bed)).toBe(false);
+    expect(wall.isPending(teeth)).toBe(false);
+  });
+
+  it("keeps one shared chore's lanes independent: each bean's tick is its own write", async () => {
+    const releases: ((v: unknown) => void)[] = [];
+    const toggle = vi
+      .spyOn(useChoreStore(), 'toggleChore')
+      .mockImplementation(() => new Promise((r) => releases.push(r)) as never);
+    const wall = useWallJobs({ chores: true });
+    const pipDog = jobOf(wall, 'pip', 'dog');
+    const junoDog = jobOf(wall, 'juno', 'dog');
+    const first = wall.toggle(pipDog);
+    expect(wall.isPending(junoDog)).toBe(false);
+    const second = wall.toggle(junoDog);
+    expect(toggle).toHaveBeenNthCalledWith(1, 'dog', 'pip', { surface: 'wall', by: 'pip' });
+    expect(toggle).toHaveBeenNthCalledWith(2, 'dog', 'juno', { surface: 'wall', by: 'juno' });
+    // ...while a double-tap in the SAME lane is still guarded.
+    await wall.toggle(pipDog);
+    expect(toggle).toHaveBeenCalledTimes(2);
+    releases.forEach((r) => r({ action: 'tick', completed: null, celebrated: false }));
+    await Promise.all([first, second]);
+  });
+
+  it('reports a failed chore tick once, naming the chore', async () => {
+    vi.spyOn(useChoreStore(), 'toggleChore').mockResolvedValue(null);
+    const wall = useWallJobs({ chores: true });
+    await wall.toggle(jobOf(wall, 'pip', 'bed'));
+    expect(reportJobToggleFailed).toHaveBeenCalledWith('chore', 'bed');
+    expect(reportError).toHaveBeenCalledTimes(1);
+    expect(reportError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'wall_job_toggle_failed',
+        severity: 'critical',
+        context: { action: 'job_toggle', kind: 'chore' },
+      })
+    );
+  });
+
+  it('a REFUSED chore tick is the store’s to report: no failure toast, no page, no success log', async () => {
+    // The store has already toasted and logged `edit-refused` (e.g. the chore was deleted on
+    // another device while its row was on the wall). Before the fix the wall read the refusal
+    // as a failed write: a second toast and a critical `wall_job_toggle_failed`.
+    vi.spyOn(useChoreStore(), 'toggleChore').mockResolvedValue({
+      action: 'refused',
+      detail: 'not-found',
+    });
+    const wall = useWallJobs({ chores: true });
+    const job = jobOf(wall, 'pip', 'bed');
+    await wall.toggle(job);
+    expect(reportJobToggleFailed).not.toHaveBeenCalled();
+    expect(reportError).not.toHaveBeenCalled();
+    expect(logEvent).not.toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'wall_job_toggled' })
+    );
+    expect(wall.isPending(job)).toBe(false);
+  });
+
+  it('refuses to rename a chore, touching no store, and says so', async () => {
+    const listRename = vi.spyOn(useListStore(), 'updateItemText');
+    const todoRename = vi.spyOn(useTodoStore(), 'updateTodo');
+    const wall = useWallJobs({ chores: true });
+    await expect(wall.renameJob(jobOf(wall, 'pip', 'bed'), 'make the bed')).resolves.toBe(false);
+    expect(listRename).not.toHaveBeenCalled();
+    expect(todoRename).not.toHaveBeenCalled();
+    expect(reportJobEditFailed).toHaveBeenCalledWith('rename', 'chore', 'bed');
+    expect(logEvent).toHaveBeenCalledWith({
+      level: 'warn',
+      surface: SURFACE,
+      message: 'wall_chore_edit_refused',
+      context: { action: 'job_rename', kind: 'chore' },
+    });
+    expect(reportError).not.toHaveBeenCalled();
+  });
+
+  it('refuses to remove a chore, touching no store and offering no undo', async () => {
+    const listRemove = vi.spyOn(useListStore(), 'removeItem');
+    const todoDelete = vi.spyOn(useTodoStore(), 'deleteTodo');
+    const wall = useWallJobs({ chores: true });
+    await expect(wall.removeJob(jobOf(wall, 'pip', 'bed'))).resolves.toBe(false);
+    expect(listRemove).not.toHaveBeenCalled();
+    expect(todoDelete).not.toHaveBeenCalled();
+    expect(showToast).not.toHaveBeenCalled();
+    expect(reportJobEditFailed).toHaveBeenCalledWith('remove', 'chore', 'bed');
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'warn',
+        message: 'wall_chore_edit_refused',
+        context: { action: 'job_remove', kind: 'chore' },
+      })
+    );
+  });
+
+  it('adds a chore for a bean in the block happening now, created by the grown-up', async () => {
+    const create = vi
+      .spyOn(useChoreStore(), 'createChore')
+      .mockResolvedValue(chore('new') as never);
+    await expect(
+      useWallJobs({ chores: true }).addChore('pip', '  feed fish ', 'mama')
+    ).resolves.toBe(true);
+    expect(create).toHaveBeenCalledWith(
+      { title: 'feed fish', emoji: '🧹', assigneeIds: ['pip'], block: 'morning' },
+      'mama'
+    );
+    expect(logEvent).toHaveBeenCalledWith({
+      level: 'info',
+      surface: SURFACE,
+      message: 'wall_chore_added',
+      context: { action: 'chore_add', kind: 'chore', slot: 'morning' },
+    });
+  });
+
+  it('leaves a refused add to the store, which has already said why (no second report)', async () => {
+    vi.spyOn(useChoreStore(), 'createChore').mockResolvedValue(null);
+    await expect(useWallJobs({ chores: true }).addChore('pip', 'feed fish', '')).resolves.toBe(
+      false
+    );
+    expect(reportError).not.toHaveBeenCalled();
+    expect(logEvent).not.toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'wall_chore_added' })
+    );
+  });
+
+  it('reports a throw escaping the store, critically, and resolves false', async () => {
+    vi.spyOn(useChoreStore(), 'createChore').mockRejectedValue(new Error('boom'));
+    await expect(useWallJobs({ chores: true }).addChore('pip', 'feed fish', 'mama')).resolves.toBe(
+      false
+    );
+    expect(reportError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'wall_chore_add_failed', severity: 'critical' })
+    );
+  });
+
+  it('never calls createChore for a blank title', async () => {
+    const create = vi.spyOn(useChoreStore(), 'createChore');
+    await expect(useWallJobs({ chores: true }).addChore('pip', '   ', 'mama')).resolves.toBe(false);
+    expect(create).not.toHaveBeenCalled();
   });
 });

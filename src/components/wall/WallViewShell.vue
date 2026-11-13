@@ -56,7 +56,7 @@ const props = defineProps<{
   peripherals: WallPeripheralData;
 }>();
 
-const emit = defineEmits<{ open: [WallSheetTarget]; openChores: [] }>();
+const emit = defineEmits<{ open: [WallSheetTarget]; openChores: []; openChoreLanes: [] }>();
 
 const useRail = computed(() => props.rail && !props.portrait);
 
@@ -106,6 +106,7 @@ const peripheralVariant = computed(() =>
         :peripherals="peripherals"
         @open="emit('open', $event)"
         @open-chores="emit('openChores')"
+        @open-chore-lanes="emit('openChoreLanes')"
       />
     </div>
   </div>

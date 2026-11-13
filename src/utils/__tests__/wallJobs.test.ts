@@ -3,6 +3,8 @@ import {
   UNASSIGNED,
   buildWallJobs,
   captureListRemoval,
+  choreProgress,
+  jobWriteKey,
   jobOwnerIds,
   jobsProgress,
   openLaterTodoJobs,
@@ -11,7 +13,16 @@ import {
   uniqueTodoJobs,
   wallShowsList,
 } from '@/utils/wallJobs';
-import type { FamilyList, TodoItem, TodoRepeat } from '@/types/models';
+import {
+  DEFAULT_CHORE_BLOCK_STARTS,
+  beanChoreDay,
+  choreMarkId,
+  indexMarks,
+  type BeanChoreDay,
+  type ChoreClock,
+} from '@/utils/chores';
+import type { Chore, ChoreMark, FamilyList, TodoItem, TodoRepeat } from '@/types/models';
+import type { WallJob } from '@/types/wall';
 
 const TODAY = '2026-08-31';
 
@@ -695,5 +706,221 @@ describe('openLaterTodoJobs (keeps the to-do card reachable)', () => {
       'shared',
       'nobody',
     ]);
+  });
+});
+
+// ── The choreboard on the wall (#146) ─────────────────────────────────────────────────────
+describe('buildWallJobs: chore lanes (#146)', () => {
+  // 2026-11-13 is a Friday, 2026-11-14 a Saturday.
+  const FRI = '2026-11-13';
+  const SAT = '2026-11-14';
+  const beans = ['pip', 'juno'];
+
+  function chore(id: string, over: Partial<Chore> = {}): Chore {
+    return {
+      id,
+      title: id,
+      emoji: '🧹',
+      assigneeIds: ['pip'],
+      block: 'morning',
+      sortOrder: 0,
+      createdBy: 'mama',
+      createdAt: '2026-11-01T08:00:00.000Z',
+      updatedAt: '2026-11-01T08:00:00.000Z',
+      ...over,
+    };
+  }
+  function done(memberId: string, ymd: string, choreId: string): ChoreMark {
+    return {
+      id: choreMarkId('done', memberId, ymd, choreId),
+      kind: 'done',
+      memberId,
+      date: ymd,
+      ref: choreId,
+      by: memberId,
+      createdAt: `${ymd}T08:00:00.000Z`,
+      updatedAt: `${ymd}T08:00:00.000Z`,
+    };
+  }
+  /** Each bean's day exactly as the store's `choreDayFor` builds it (living = `beans`). */
+  function days(
+    chores: Chore[],
+    marks: ChoreMark[] = [],
+    clock: ChoreClock = { ymd: FRI, hhmm: '07:42' }
+  ): Record<string, BeanChoreDay> {
+    const index = indexMarks(marks);
+    const living = new Set(beans);
+    return Object.fromEntries(
+      beans.map((id) => [
+        id,
+        beanChoreDay(chores, index, id, clock, DEFAULT_CHORE_BLOCK_STARTS, living),
+      ])
+    );
+  }
+  const lanes = (choreDays: Record<string, BeanChoreDay>, ymd = FRI) =>
+    buildWallJobs({
+      todos: [],
+      lists: [],
+      memberIds: beans,
+      clock: { ymd, hhmm: '07:42' },
+      choreDays,
+    }).choreLanesByMember;
+
+  it("groups a bean's chores by block, the block happening now first", () => {
+    const r = lanes(
+      days(
+        [
+          chore('bath', { block: 'evening' }),
+          chore('toys', { block: 'afternoon' }),
+          chore('water', { block: 'anytime' }),
+          chore('bed'),
+          chore('teeth', { sortOrder: 1 }),
+        ],
+        [done('pip', FRI, 'bed')]
+      )
+    );
+    const pip = r.pip!;
+    expect(pip.current).toBe('morning');
+    expect(pip.blocks.map((b) => b.block)).toEqual(['morning', 'anytime', 'afternoon', 'evening']);
+    expect(pip.blocks[0]!.jobs.map((j) => j.title)).toEqual(['bed', 'teeth']);
+    expect(pip.blocks[0]).toMatchObject({ done: 1, total: 2, allDone: false, isNow: true });
+    expect(pip).toMatchObject({ done: 1, total: 5 });
+  });
+
+  it('puts the current block first in the afternoon too, and a passed block last', () => {
+    const r = lanes(
+      days(
+        [chore('bed'), chore('toys', { block: 'afternoon' }), chore('bath', { block: 'evening' })],
+        [],
+        { ymd: FRI, hhmm: '13:00' }
+      )
+    );
+    expect(r.pip!.current).toBe('afternoon');
+    expect(r.pip!.blocks.map((b) => [b.block, b.ended])).toEqual([
+      ['afternoon', false],
+      ['evening', false],
+      ['morning', true],
+    ]);
+  });
+
+  it('builds chore jobs locked, with the chore id, the owner and the picture', () => {
+    const job = lanes(days([chore('bed', { emoji: '🛏️' })])).pip!.blocks[0]!.jobs[0]!;
+    expect(job).toMatchObject({
+      source: 'chore',
+      choreId: 'bed',
+      ownerId: 'pip',
+      done: false,
+      locked: true,
+      listEmoji: '🛏️',
+      key: 'chore:bed:pip',
+    });
+  });
+
+  it("shows a shared chore in each assignee's lane, each with its own key and its own tick", () => {
+    const shared = chore('dog', { assigneeIds: ['pip', 'juno'] });
+    const r = lanes(days([shared], [done('juno', FRI, 'dog')]));
+    const pipJob = r.pip!.blocks[0]!.jobs[0]!;
+    const junoJob = r.juno!.blocks[0]!.jobs[0]!;
+    expect(pipJob.done).toBe(false);
+    expect(junoJob.done).toBe(true);
+    expect(pipJob.key).not.toBe(junoJob.key);
+    expect(jobWriteKey(pipJob)).not.toBe(jobWriteKey(junoJob));
+  });
+
+  it('leaves a weekday chore out of every lane on the wrong day', () => {
+    const school = chore('bag', { days: [1, 2, 3, 4, 5] });
+    expect(lanes(days([school])).pip!.total).toBe(1);
+    const sat = lanes(days([school], [], { ymd: SAT, hhmm: '07:42' }), SAT);
+    expect(sat.pip!.total).toBe(0);
+    expect(sat.pip!.blocks).toEqual([]);
+  });
+
+  it("puts a removed member's chore in no lane, and gives the removed member no lane", () => {
+    const theirs = chore('rake', { assigneeIds: ['gone'] });
+    const shared = chore('dishes', { assigneeIds: ['gone', 'juno'] });
+    const choreDays = {
+      ...days([theirs, shared]),
+      // A day for a member the wall does not know is ignored.
+      gone: beanChoreDay(
+        [theirs],
+        indexMarks([]),
+        'gone',
+        { ymd: FRI, hhmm: '07:42' },
+        DEFAULT_CHORE_BLOCK_STARTS
+      ),
+    };
+    const r = lanes(choreDays);
+    expect(Object.keys(r).sort()).toEqual(['juno', 'pip']);
+    const all = Object.values(r).flatMap((l) =>
+      l.blocks.flatMap((b) => b.jobs.map((j) => j.choreId))
+    );
+    expect(all).not.toContain('rake');
+    expect(r.juno!.blocks[0]!.jobs.map((j) => j.choreId)).toEqual(['dishes']);
+  });
+
+  it("gives exactly today's result when no chore days are passed (the gate off)", () => {
+    const input = { todos: [todo()], lists: [list()], memberIds: members, clock: CLOCK };
+    const off = buildWallJobs(input);
+    expect(off.choreLanesByMember).toEqual({});
+    expect(buildWallJobs({ ...input, choreDays: {} })).toEqual(off);
+    // and the lists and to-dos are what they always were
+    expect(off.listsByMember.leo).toHaveLength(1);
+    expect(off.todos).toHaveLength(1);
+  });
+});
+
+describe('jobWriteKey (one write per record)', () => {
+  const base = { key: 'k', title: 't', done: false, ownerId: 'pip' };
+  it("keys a to-do by the to-do, whoever's lane it is in", () => {
+    const a: WallJob = { ...base, source: 'todo', todoId: 't1' };
+    expect(jobWriteKey(a)).toBe('todo:t1');
+    expect(jobWriteKey({ ...a, ownerId: 'juno' })).toBe('todo:t1');
+  });
+  it("keys a list item by list and item, whoever's lane it is in", () => {
+    const a: WallJob = { ...base, source: 'list', listId: 'l1', itemId: 'i1' };
+    expect(jobWriteKey(a)).toBe('list:l1:i1');
+    expect(jobWriteKey({ ...a, ownerId: 'juno' })).toBe('list:l1:i1');
+  });
+  it('keys a chore by chore AND bean: a shared chore is one tick per bean', () => {
+    const a: WallJob = { ...base, source: 'chore', choreId: 'c1' };
+    expect(jobWriteKey(a)).toBe('chore:c1:pip');
+    expect(jobWriteKey({ ...a, ownerId: 'juno' })).toBe('chore:c1:juno');
+  });
+});
+
+describe('choreProgress (the chores card and the lanes header)', () => {
+  const lane = (current: 'morning' | 'afternoon', blocks: [string, number, number][]) => ({
+    memberId: 'x',
+    current,
+    blocks: blocks.map(([block, done, total]) => ({
+      block: block as 'morning',
+      jobs: [],
+      done,
+      total,
+      allDone: done === total,
+      isNow: block === current,
+      ended: false,
+    })),
+    done: blocks.reduce((n, b) => n + b[1], 0),
+    total: blocks.reduce((n, b) => n + b[2], 0),
+  });
+  it('counts the block happening now across every lane', () => {
+    expect(
+      choreProgress([
+        lane('morning', [
+          ['morning', 2, 4],
+          ['evening', 0, 3],
+        ]),
+        lane('morning', [['morning', 5, 8]]),
+      ])
+    ).toEqual({ block: 'morning', done: 7, total: 12 });
+  });
+  it('falls back to the whole day when nobody has a chore in the block happening now', () => {
+    expect(choreProgress([lane('afternoon', [['evening', 1, 3]])])).toEqual({
+      block: null,
+      done: 1,
+      total: 3,
+    });
+    expect(choreProgress([])).toEqual({ block: null, done: 0, total: 0 });
   });
 });

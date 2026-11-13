@@ -44,7 +44,9 @@ const AUTH_PATHS = ['/join', '/welcome'];
  * off, and the widget only mints it when the flag is on.
  *
  * `nook` stays claimed because widgets on native builds before 2026-11-03 still mint and
- * fall back to `/nook`; it now has no minting caller. The calendar link (the date, "later ›",
+ * fall back to `/nook`. Its one minting caller is the widget's chore row (#146), which opens
+ * the Nook because `/choreboard` is not claimed here (adding it needs both native manifests
+ * and a store release; recorded for the next native release). The calendar link (the date, "later ›",
  * the widget itself) comes from `plannerDayLink`, and `/activities` is already claimed via
  * `ENTITY_DEEP_LINKS`.
  */

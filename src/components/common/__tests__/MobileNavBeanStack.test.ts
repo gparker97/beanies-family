@@ -5,13 +5,15 @@ import { MOBILE_NAV_CATEGORIES } from '@/constants/navigation';
 
 const mockRoute = { path: '/nook' };
 
-// Planning has two flag-gated beans: Beanie Lists (`familyLists`) and the Meal
-// Planner (`mealPlanner`). These tests assert the 5-bean Planning stack
-// (Activities, Travel, To-do, Meal Planner, Who Owns What), so keep `mealPlanner`
-// ON and only `familyLists` OFF (its bean is out of scope here).
+// Planning has three flag-gated beans: Beanie Lists (`familyLists`), The Choreboard
+// (`choreboard`, #146) and the Meal Planner (`mealPlanner`). These tests assert the 5-bean
+// Planning stack (Activities, Travel, To-do, Meal Planner, Who Owns What), so keep
+// `mealPlanner` ON and `familyLists` / `choreboard` OFF; the choreboard test below flips its
+// flag on to prove the bean appears.
+const offFlags = vi.hoisted(() => new Set<string>(['familyLists', 'choreboard']));
 vi.mock('@/config/flags', async (orig) => ({
   ...(await orig<typeof import('@/config/flags')>()),
-  isFlagEnabled: (flag: string) => flag !== 'familyLists',
+  isFlagEnabled: (flag: string) => !offFlags.has(flag),
 }));
 
 vi.mock('vue-router', () => ({
@@ -127,6 +129,21 @@ describe('MobileNavBeanStack', () => {
   it('renders 5 beans for Planning (Activities, Travel, To-do, Meal Planner, Who Owns What)', () => {
     const wrapper = mountStack({ category: planning });
     expect(wrapper.findAll('[role=menuitem]')).toHaveLength(5);
+  });
+
+  it('shows The Choreboard bean (with its hint) only while its flag is on (#146)', () => {
+    const off = mountStack({ category: planning });
+    expect(off.text()).not.toContain('nav.choreboard');
+    off.unmount();
+    offFlags.delete('choreboard');
+    try {
+      const on = mountStack({ category: planning });
+      expect(on.findAll('[role=menuitem]')).toHaveLength(6);
+      expect(on.text()).toContain('nav.choreboard');
+      expect(on.text()).toContain('mobileNav.hint.choreboard');
+    } finally {
+      offFlags.add('choreboard');
+    }
   });
 
   it('renders 6 beans for Money', () => {

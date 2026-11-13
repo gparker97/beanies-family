@@ -34,6 +34,9 @@
  * viewer's `pickups` and `handoffs` are their own already.
  */
 import type {
+  Chore,
+  ChoreBlockStarts,
+  ChoreMark,
   FamilyActivity,
   FamilyMember,
   FamilyVacation,
@@ -72,12 +75,15 @@ import {
   type ActivityReminderContext,
 } from '@/utils/reminderSchedule';
 import {
+  choreLineFor,
   classifyAudience,
   classifyPlateList,
   classifyPlateTodo,
   isDutyDone,
   ownerItemSurfaces,
 } from '@/utils/audience';
+import { beanChoreDay, indexMarks } from '@/utils/chores';
+import { CHORE_BLOCK_META } from '@/constants/choreBlocks';
 import { plateClock, type PlateClock, type ShownPlate } from '@/utils/todoPlate';
 import { sortByTime } from '@/utils/wallActivities';
 import { isTimedContinuation } from '@/utils/calendar/occurrence';
@@ -148,6 +154,24 @@ export interface WidgetSnapshotInput extends Pick<
    * tick, and every publish reloads every widget (WidgetKit's reload budget).
    */
   weather: WidgetWeatherInput | null;
+  /**
+   * The choreboard (#146), or null / absent when its flag is off (the caller reads the flag;
+   * this module stays flag-free). Raw, time-independent inputs, never `choreStore.choreDayFor`:
+   * that reads the one-minute chore clock, and a computed input that changed every minute
+   * would republish (and reload every widget) every minute. The builder derives the same read
+   * model (`beanChoreDay`) at `now`.
+   */
+  chores?: WidgetChoreInput | null;
+}
+
+/** What the chore rows read: the store's chores and marks, the block hours, who can have chores. */
+export interface WidgetChoreInput {
+  chores: readonly Chore[];
+  marks: readonly ChoreMark[];
+  /** `choreStore.starts` (`blockStarts(settings)`, already validated). */
+  starts: ChoreBlockStarts;
+  /** `choreStore.livingIds`: living, non-pet people, in family order. */
+  beanIds: readonly string[];
 }
 
 export interface WidgetWeatherInput {
@@ -689,6 +713,8 @@ interface TaskDraft {
    * follow the show rule and have no look-ahead), a hint's from its event day.
    */
   bucket: WidgetTaskBucket;
+  /** A tag the row carries instead of the bucket's (a chore row's block word). */
+  tag?: { text: string; tone: WidgetTask['tagTone'] };
 }
 
 /** The most to-dos and lists (and, separately, hints) one day carries; `overflow` counts the rest. */
@@ -827,6 +853,63 @@ function listDrafts(ctx: DayContext): TaskDraft[] {
   return out;
 }
 
+/**
+ * The choreboard's rows (#146): one per bean the viewer may follow, by the briefing's rule
+ * (`choreLineFor`, shared with `useCriticalItems`), on TODAY only (a chore day is today's
+ * marks; a later day would only ever read "N left"). "Juno · 2 left", tagged with the block
+ * word, or "Juno · done" in the soft tone, where the briefing shows no line. A line about
+ * missed chores sits in `overdue` and says so. The dot is the bean. The link is the Nook,
+ * because `/choreboard` is not a path the apps claim (`EXTERNAL_DEEP_LINK_PATHS`; adding it
+ * needs both native manifests and a store release).
+ */
+function choreDrafts(ctx: DayContext): TaskDraft[] {
+  const { input } = ctx;
+  const chores = input.chores;
+  if (!chores || ctx.ymd !== input.today) return [];
+  const { t } = input;
+  const index = indexMarks(chores.marks);
+  const living = new Set(chores.beanIds);
+  const beans = [...chores.beanIds].sort(
+    (a, b) => Number(b === ctx.viewer.id) - Number(a === ctx.viewer.id)
+  );
+  const out: TaskDraft[] = [];
+  for (const beanId of beans) {
+    ctx.cursor = beanId;
+    const day = beanChoreDay(chores.chores, index, beanId, ctx.clock, chores.starts, living);
+    const line = choreLineFor(day, beanId, ctx.viewer, input.resolveMember);
+    if (!line) continue;
+    const name = firstName(member(ctx, beanId)?.name ?? '');
+    const title =
+      line.left === 0
+        ? fillTemplate(t('choreboard.widget.done'), { name })
+        : fillTemplate(
+            counted(
+              t,
+              { one: 'choreboard.widget.left.one', other: 'choreboard.widget.left.other' },
+              line.left
+            ),
+            { name }
+          );
+    out.push({
+      id: `chore:${beanId}`,
+      kind: 'chore',
+      title,
+      due: ctx.ymd,
+      ownerIds: [beanId],
+      link: widgetLink(ctx.origin, { path: WIDGET_PAGE_PATHS.nook, query: {} }),
+      done: false,
+      bucket: line.missed ? 'overdue' : 'today',
+      tag: line.missed
+        ? { text: t('widget.taskOverdue'), tone: 'accent' }
+        : {
+            text: t(CHORE_BLOCK_META[line.block].wordKey),
+            tone: line.left === 0 ? 'soft' : 'accent',
+          },
+    });
+  }
+  return out;
+}
+
 /** The dot beside a task: whose it is (the family's when nobody owns it); never on a hint. */
 function taskDot(ctx: DayContext, draft: TaskDraft): WidgetDot | null {
   if (draft.kind === 'hint') return null;
@@ -842,7 +925,10 @@ function taskRow(ctx: DayContext, draft: TaskDraft, bucket: WidgetTaskBucket): W
   const timed = !!draft.dueTime;
   let tag = '';
   let tagTone: WidgetTask['tagTone'] = 'accent';
-  if (bucket === 'overdue') {
+  if (draft.tag) {
+    tag = draft.tag.text;
+    tagTone = draft.tag.tone;
+  } else if (bucket === 'overdue') {
     tag = t('widget.taskOverdue');
   } else if (bucket === 'today') {
     tag = timed
@@ -878,7 +964,12 @@ const tasksPart: DayPart = {
   build(day, ctx) {
     const { rules, input } = ctx;
     if (!rules.showsTasks) return;
-    const drafts = [...todoDrafts(ctx), ...hintDrafts(ctx), ...listDrafts(ctx)];
+    const drafts = [
+      ...todoDrafts(ctx),
+      ...hintDrafts(ctx),
+      ...listDrafts(ctx),
+      ...choreDrafts(ctx),
+    ];
     const ranked: { draft: TaskDraft; bucket: WidgetTaskBucket }[] = [];
     let doneToday = 0;
     for (const draft of drafts) {
@@ -936,11 +1027,12 @@ const tasksPart: DayPart = {
 
 /**
  * Whether a task counts toward the date column's "N due today" count: to-dos and lists (never
- * hints) that are overdue or due today. The same rule picks which completed to-dos count in
- * `doneToday`, so the circle's ring and the count agree.
+ * hints, never a bean's chore row, which counts chores of its own and can read "done") that are
+ * overdue or due today. The same rule picks which completed to-dos count in `doneToday`, so the
+ * circle's ring and the count agree.
  */
 function countsNow(kind: WidgetTask['kind'], bucket: WidgetTaskBucket): boolean {
-  return kind !== 'hint' && (bucket === 'overdue' || bucket === 'today');
+  return (kind === 'todo' || kind === 'list') && (bucket === 'overdue' || bucket === 'today');
 }
 
 /** One part of a day, in `DAY_PARTS` order; each is isolated by the build loop. */

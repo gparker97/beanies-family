@@ -10,7 +10,9 @@ import { computed, ref } from 'vue';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useListStore } from '@/stores/listStore';
 import { useTodoStore } from '@/stores/todoStore';
+import { useChoreStore } from '@/stores/choreStore';
 import { useToday } from '@/composables/useToday';
+import { useChoreClock } from '@/composables/useChoreClock';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { reportError } from '@/utils/errorReporter';
 import {
@@ -24,10 +26,12 @@ import { useTranslationStore } from '@/stores/translationStore';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { buildWallJobs, captureListRemoval, jobWriteKey, sortJobs } from '@/utils/wallJobs';
 import { plateClock } from '@/utils/todoPlate';
+import { assertNever } from '@/utils/assertNever';
+import { currentBlock, isChoreRefusal, type BeanChoreDay } from '@/utils/chores';
+import { DEFAULT_CHORE_EMOJI } from '@/constants/choreBlocks';
 import { useAuthStore } from '@/stores/authStore';
 import { UNASSIGNED } from '@/utils/wallJobs';
-import type { WallJob, WallListGroup } from '@/types/wall';
-import type { FamilyListItem, TodoItem } from '@/types/models';
+import type { WallChoreLane, WallJob, WallListGroup } from '@/types/wall';
 
 const SURFACE = 'beanie-wall';
 
@@ -70,11 +74,18 @@ const WRITE_OPS: Record<WriteOp, { ok: string; failed: string }> = {
  * `onRefused` is the user-facing half: `actionFailure`'s reporters toast the
  * family in their own language and print a cause plus a fix to the console.
  * Nothing here can fail silently — a refusal and a throw take the same path.
+ *
+ * `run` may instead answer `'handled'`: the store REFUSED the write and has
+ * already told the family and logged why (the chore store's tagged refusal,
+ * `isChoreRefusal`). That is not a failure, so it is neither reported nor
+ * paged a second time, and it is not a success either: `write` answers false.
  */
+type RunOutcome = boolean | 'handled';
+
 async function write(
   op: WriteOp,
   kind: WallJob['source'],
-  run: () => Promise<boolean>,
+  run: () => Promise<RunOutcome>,
   onRefused: () => void
 ): Promise<boolean> {
   // One definition of "this write failed", so a refusal and a throw cannot
@@ -112,7 +123,9 @@ async function write(
     // `wrapAsync` swallows real store failures and answers the same way a
     // not-found refusal does, so this branch — not the catch — is where most
     // store-originated failures actually land. It carries the paging signal too.
-    if (!(await run())) return fail();
+    const outcome = await run();
+    if (outcome === 'handled') return false;
+    if (!outcome) return fail();
   } catch (error) {
     return fail(error);
   }
@@ -125,31 +138,49 @@ async function write(
   return true;
 }
 
-export function useWallJobs() {
+export interface UseWallJobsOptions {
+  /**
+   * Build the chore lanes (#146). The PAGE reads the `choreboard` gate once and passes it here;
+   * off (the default), no chore day is read and the result is exactly the pre-chores board.
+   */
+  chores?: boolean;
+}
+
+export function useWallJobs(options: UseWallJobsOptions = {}) {
   const familyStore = useFamilyStore();
   const listStore = useListStore();
   const todoStore = useTodoStore();
+  const choreStore = useChoreStore();
   const authStore = useAuthStore();
   const { today } = useToday();
+  const { choreClock } = useChoreClock();
+  const choresOn = options.chores === true;
 
   /** Rows mid-write, so a double-tap cannot fire two writes for one job. */
   const pending = ref<Set<string>>(new Set());
 
-  const result = computed(() =>
-    buildWallJobs({
+  const result = computed(() => {
+    // HUMANS only, matching every renderer. Passing all members meant a
+    // pet-owned list was filed under the pet — a key nothing iterates — so it
+    // appeared in no column, no orphan block and no drawer. As an orphan it is
+    // at least findable. (`ListDetailModal`'s picker does let you hand a list
+    // to the dog.)
+    const memberIds = familyStore.sortedHumans.map((m) => m.id);
+    // Each bean's chore day from the store's ONE getter (the page, the briefing and the widget
+    // read the same one), so the wall cannot count a chore differently. Not read at all while
+    // the gate is off.
+    const choreDays: Record<string, BeanChoreDay> = {};
+    if (choresOn) for (const id of memberIds) choreDays[id] = choreStore.choreDayFor(id);
+    return buildWallJobs({
       todos: todoStore.todos,
       lists: listStore.lists,
-      // HUMANS only, matching every renderer. Passing all members meant a
-      // pet-owned list was filed under the pet — a key nothing iterates — so it
-      // appeared in no column, no orphan block and no drawer. As an orphan it is
-      // at least findable. (`ListDetailModal`'s picker does let you hand a list
-      // to the dog.)
-      memberIds: familyStore.sortedHumans.map((m) => m.id),
+      memberIds,
       // The day is the reactive `today` (so the board recomputes at midnight); the clock adds
       // the minute a timed to-do turns overdue at.
       clock: { ...plateClock(), ymd: today.value },
-    })
-  );
+      choreDays,
+    });
+  });
 
   /** Every wall-safe list this bean owns, whole, in list order. */
   const listsFor = (memberId: string): WallListGroup[] =>
@@ -202,16 +233,25 @@ export function useWallJobs() {
   /** Everything this bean owes today — what a lane shows. */
   const jobsFor = (memberId: string): WallJob[] => todosFor(memberId);
 
+  /** A bean's chore lane, or `null` (the gate is off, or the wall does not know the bean). */
+  const choreLaneFor = (memberId: string): WallChoreLane | null =>
+    result.value.choreLanesByMember[memberId] ?? null;
+
   /**
-   * Tick a job, whichever store it actually lives in.
+   * Tick a job, whichever store it actually lives in. `actor` is who is credited.
    *
-   * A two-entry map rather than an if/else: a third job source later is one
-   * more entry, not a third arm grafted onto a branch.
+   * A map rather than an if/else: a new job source is one more entry, and the
+   * `Record` type refuses to compile until it has one.
+   *
+   * A chore is ticked FOR the lane's bean (`ownerId`: a shared chore is one mark per bean) and
+   * credited to `actor`, the same crediting rule as the other two. The store passes
+   * `errorToast: false` for the wall, because `write()` below reports a failed toggle.
    */
-  const writers: Record<WallJob['source'], (job: WallJob, memberId: string) => Promise<unknown>> = {
-    todo: (job, memberId) => todoStore.toggleComplete(job.todoId as string, memberId),
-    list: (job, memberId) =>
-      listStore.toggleItem(job.listId as string, job.itemId as string, memberId),
+  const writers: Record<WallJob['source'], (job: WallJob, actor: string) => Promise<unknown>> = {
+    todo: (job, actor) => todoStore.toggleComplete(job.todoId as string, actor),
+    list: (job, actor) => listStore.toggleItem(job.listId as string, job.itemId as string, actor),
+    chore: (job, actor) =>
+      choreStore.toggleChore(job.choreId as string, job.ownerId, { surface: 'wall', by: actor }),
   };
 
   async function toggle(job: WallJob): Promise<void> {
@@ -234,9 +274,13 @@ export function useWallJobs() {
       'job_toggle',
       job.source,
       // `!== null` deliberately, matching the previous behaviour exactly: the
-      // stores normalise a swallowed failure to null.
-      () => writers[job.source](job, actor).then((written) => written !== null),
-      () => reportJobToggleFailed(job.source, job.todoId ?? job.listId ?? job.key)
+      // stores normalise a swallowed failure to null. A chore tick the store
+      // refused (already toasted and logged) is `'handled'`, never a failure.
+      () =>
+        writers[job.source](job, actor).then((written) =>
+          isChoreRefusal(written) ? 'handled' : written !== null
+        ),
+      () => reportJobToggleFailed(job.source, job.choreId ?? job.todoId ?? job.listId ?? job.key)
     );
     const next = new Set(pending.value);
     next.delete(writeKey);
@@ -289,6 +333,65 @@ export function useWallJobs() {
   }
 
   /**
+   * Add a chore for `memberId` from an unlocked wall (#146): the block happening now, every
+   * day, credited to `actorId` (the grown-up who unlocked). The wall's ONE chore edit;
+   * anything richer (a picture, the days, who else) belongs in the app.
+   *
+   * Not routed through `write()`: `createChore` already toasts and logs its own refusal (not
+   * an adult, no title) and its own write failure (`wrapAsync`), so a second report here would
+   * double the toast. Only a throw escaping the store is reported here.
+   */
+  async function addChore(memberId: string, title: string, actorId: string): Promise<boolean> {
+    const trimmed = title.trim();
+    if (!trimmed) return false;
+    const block = currentBlock(choreClock.value.hhmm, choreStore.starts);
+    try {
+      const created = await choreStore.createChore(
+        { title: trimmed, emoji: DEFAULT_CHORE_EMOJI, assigneeIds: [memberId], block },
+        actorId
+      );
+      if (!created) return false;
+      logEvent({
+        level: 'info',
+        surface: SURFACE,
+        message: 'wall_chore_added',
+        context: { action: 'chore_add', kind: 'chore', slot: block },
+      });
+      return true;
+    } catch (error) {
+      reportError({
+        surface: SURFACE,
+        message: 'wall_chore_add_failed',
+        severity: 'critical',
+        error: error instanceof Error ? error : new Error(String(error)),
+        context: { action: 'chore_add', kind: 'chore', slot: block },
+      });
+      return false;
+    }
+  }
+
+  /**
+   * A chore row is built `locked` (`wallJobs.choreJob`): chores are renamed and deleted in the
+   * app. A rename or remove that reaches here anyway is refused BEFORE any store is touched,
+   * told to the family and logged, never passed to the list store with undefined ids.
+   * A warning, not a page: nothing was written and no data is at risk.
+   */
+  function refuseChoreEdit(op: 'rename' | 'remove', job: WallJob): false {
+    try {
+      logEvent({
+        level: 'warn',
+        surface: SURFACE,
+        message: 'wall_chore_edit_refused',
+        context: { action: op === 'rename' ? 'job_rename' : 'job_remove', kind: 'chore' },
+      });
+      reportJobEditFailed(op, 'chore', job.choreId ?? job.key);
+    } catch (reportingError) {
+      console.error(`[${SURFACE}] could not report a refused chore ${op}`, reportingError);
+    }
+    return false;
+  }
+
+  /**
    * Rename a job in place, whichever store it lives in.
    *
    * Both stores no-op an empty or unchanged title, which is what lets the row's
@@ -298,14 +401,23 @@ export function useWallJobs() {
   async function renameJob(job: WallJob, title: string): Promise<boolean> {
     const trimmed = title.trim();
     if (!trimmed || trimmed === job.title) return false;
+    let run: () => Promise<unknown>;
+    switch (job.source) {
+      case 'todo':
+        run = () => todoStore.updateTodo(job.todoId as string, { title: trimmed });
+        break;
+      case 'list':
+        run = () => listStore.updateItemText(job.listId as string, job.itemId as string, trimmed);
+        break;
+      case 'chore':
+        return refuseChoreEdit('rename', job);
+      default:
+        return assertNever(job.source, 'useWallJobs.renameJob');
+    }
     return write(
       'job_rename',
       job.source,
-      () =>
-        (job.source === 'todo'
-          ? todoStore.updateTodo(job.todoId as string, { title: trimmed })
-          : listStore.updateItemText(job.listId as string, job.itemId as string, trimmed)
-        ).then((written) => written !== null),
+      () => run().then((written) => written !== null),
       () => reportJobEditFailed('rename', job.source, job.todoId ?? job.itemId ?? job.key)
     );
   }
@@ -327,40 +439,52 @@ export function useWallJobs() {
   async function removeJob(job: WallJob): Promise<boolean> {
     const { t } = useTranslationStore();
 
-    // Captured up front; `undefined` if the record is already gone, in which
-    // case the delete below will refuse and report before undo is ever offered.
-    // ONE item and its position, never a snapshot of the whole array: the undo
-    // is offered for six seconds while an add row sits under the same list, and
-    // writing a pre-delete array back would destroy anything added in between.
-    const listRemoval: { item: FamilyListItem; index: number } | null =
-      job.source === 'list'
-        ? (() => {
-            const list = listStore.lists.find((l) => l.id === job.listId);
-            return list ? captureListRemoval(list, job.itemId as string) : null;
-          })()
-        : null;
-    const todoSnapshot: TodoItem | undefined =
-      job.source === 'todo' ? todoStore.todos.find((td) => td.id === job.todoId) : undefined;
+    /**
+     * Per source: the delete, and the undo for it (captured up front; `null` if the record is
+     * already gone, in which case the delete below will refuse and report before undo is ever
+     * offered). For a list that is ONE item and its position, never a snapshot of the whole
+     * array: the undo is offered for six seconds while an add row sits under the same list,
+     * and writing a pre-delete array back would destroy anything added in between.
+     */
+    let remove: () => Promise<boolean>;
+    let restore: (() => Promise<unknown>) | null;
+    switch (job.source) {
+      case 'list': {
+        const list = listStore.lists.find((l) => l.id === job.listId);
+        const removal = list ? captureListRemoval(list, job.itemId as string) : null;
+        remove = () =>
+          listStore
+            .removeItem(job.listId as string, job.itemId as string)
+            .then((written) => written !== null);
+        restore = removal
+          ? () => listStore.restoreItem(job.listId as string, removal.item, removal.index)
+          : null;
+        break;
+      }
+      case 'todo': {
+        const snapshot = todoStore.todos.find((td) => td.id === job.todoId);
+        // `deleteTodo` answers with a bare boolean, and returns false for a
+        // throw as well as a refusal, so that branch is the whole failure
+        // signal on this path.
+        remove = () => todoStore.deleteTodo(job.todoId as string);
+        restore = snapshot ? () => todoStore.restoreTodo(snapshot) : null;
+        break;
+      }
+      case 'chore':
+        return refuseChoreEdit('remove', job);
+      default:
+        return assertNever(job.source, 'useWallJobs.removeJob');
+    }
 
-    const removed = await write(
-      'job_remove',
-      job.source,
-      () =>
-        job.source === 'todo'
-          ? // `deleteTodo` answers with a bare boolean, and returns false for a
-            // throw as well as a refusal, so that branch is the whole failure
-            // signal on this path.
-            todoStore.deleteTodo(job.todoId as string)
-          : listStore
-              .removeItem(job.listId as string, job.itemId as string)
-              .then((written) => written !== null),
-      () => reportJobEditFailed('remove', job.source, job.todoId ?? job.itemId ?? job.key)
+    const removed = await write('job_remove', job.source, remove, () =>
+      reportJobEditFailed('remove', job.source, job.todoId ?? job.itemId ?? job.key)
     );
     if (!removed) return false;
 
     // Nothing to offer if the snapshot could not be taken. Say so rather than
     // showing an Undo that would do nothing.
-    if (!listRemoval && !todoSnapshot) return true;
+    if (!restore) return true;
+    const undo = restore;
 
     showToast('info', fillTemplate(t('wall.job.removed'), { title: job.title }), undefined, {
       surface: SURFACE,
@@ -373,15 +497,7 @@ export function useWallJobs() {
         await write(
           'job_remove_undo',
           job.source,
-          () =>
-            (todoSnapshot
-              ? todoStore.restoreTodo(todoSnapshot)
-              : listStore.restoreItem(
-                  job.listId as string,
-                  (listRemoval as { item: FamilyListItem; index: number }).item,
-                  (listRemoval as { item: FamilyListItem; index: number }).index
-                )
-            ).then((written) => written !== null),
+          () => undo().then((written) => written !== null),
           () => reportJobEditFailed('undo', job.source, job.todoId ?? job.itemId ?? job.key)
         );
       },
@@ -392,7 +508,10 @@ export function useWallJobs() {
   const isPending = (job: WallJob) => pending.value.has(jobWriteKey(job));
 
   return {
+    /** The `choreboard` gate as the page passed it. */
+    choresOn,
     jobsFor,
+    choreLaneFor,
     listsFor,
     orphanLists,
     choresFor,
@@ -402,6 +521,7 @@ export function useWallJobs() {
     toggle,
     addListItem,
     addTodo,
+    addChore,
     renameJob,
     removeJob,
     isPending,

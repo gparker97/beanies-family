@@ -23,6 +23,7 @@ import { useMilestonesStore } from './milestonesStore';
 import { useRecipesStore } from './recipesStore';
 import { useMealPlanStore } from './mealPlanStore';
 import { useResponsibilityStore } from './responsibilityStore';
+import { useChoreStore } from './choreStore';
 import { useEmergencyContactsStore } from './emergencyContactsStore';
 import { useSettingsStore } from './settingsStore';
 import { useFamilyContextStore } from './familyContextStore';
@@ -4713,6 +4714,7 @@ export const useSyncStore = defineStore('sync', () => {
       const recipesStoreInst = useRecipesStore();
       const mealPlanStoreInst = useMealPlanStore();
       const responsibilityStoreInst = useResponsibilityStore();
+      const choreStoreInst = useChoreStore();
       const emergencyContactsStoreInst = useEmergencyContactsStore();
 
       // Snapshot permission state before reload for diagnostics
@@ -4746,6 +4748,7 @@ export const useSyncStore = defineStore('sync', () => {
           recipesStoreInst.loadRecipes(),
           mealPlanStoreInst.loadMealPlans(),
           responsibilityStoreInst.load(),
+          choreStoreInst.loadChores(),
           emergencyContactsStoreInst.loadEmergencyContacts(),
         ])
       );

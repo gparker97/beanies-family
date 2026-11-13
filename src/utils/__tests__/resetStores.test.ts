@@ -35,6 +35,11 @@ for (const store of [
   const name = `use${store[0]!.toUpperCase()}${store.slice(1)}`;
   vi.doMock(`@/stores/${store}`, () => ({ [name]: () => resetState() }));
 }
+// The choreboard store (#146) gets its own spy, so the fan-out to it is pinned below.
+const choreReset = vi.hoisted(() => ({ fn: null as null | (() => void) }));
+vi.doMock('@/stores/choreStore', () => ({
+  useChoreStore: () => ({ resetState: () => choreReset.fn?.() }),
+}));
 vi.mock('@/stores/calendarSyncStore', () => ({ useCalendarSyncStore: () => ({ stop: vi.fn() }) }));
 vi.mock('@/stores/calendarClashStore', () => ({
   useCalendarClashStore: () => ({ stop: vi.fn() }),
@@ -56,5 +61,24 @@ describe('resetAllAppStores', () => {
     resetAllAppStores();
 
     expect(isDemoSession.value).toBe(false);
+  });
+
+  it('resets the chore store (#146), so a family switch cannot show the last family its chores', async () => {
+    const spy = vi.fn();
+    choreReset.fn = spy;
+    const { resetAllAppStores } = await import('@/utils/resetStores');
+    resetAllAppStores();
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears the Add Chores list (#146), so one family’s chore names cannot reach the next', async () => {
+    const draft = await import('@/composables/useChoreAddDraft');
+    const { resetAllAppStores } = await import('@/utils/resetStores');
+    draft.addSet('bedtime', (k) => k);
+    draft.addBlankRow('morning').draft.title = 'Our family’s own chore';
+    expect(draft.useChoreAddDraft().rows.length).toBeGreaterThan(0);
+    resetAllAppStores();
+    expect(draft.useChoreAddDraft().rows).toEqual([]);
+    expect(draft.useChoreAddDraft().sets).toEqual([]);
   });
 });

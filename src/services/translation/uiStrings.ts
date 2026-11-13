@@ -7721,9 +7721,10 @@ const STRING_DEFS = {
     en: 'Change who this list is for',
     beanie: 'change who this list is for',
   },
+  // Shared by every `ListPeoplePicker` host (lists, chores, starter sets), so it names no list.
   'lists.people.keepOne': {
-    en: 'A list needs at least one person.',
-    beanie: 'a list needs at least one person.',
+    en: 'Pick at least one person.',
+    beanie: 'pick at least one person.',
   },
   // When a list shows (#147): the page named in the show hints, and the Days Before note.
   'lists.show.page': { en: 'the Lists page', beanie: 'the lists page' },
@@ -7798,6 +7799,30 @@ const STRING_DEFS = {
   'lists.new.templatesLabel': { en: 'Start from a Template', beanie: 'start from a template' },
   'lists.new.blank': { en: 'Start Blank List', beanie: 'start a blank list' },
   'lists.new.blankTitle': { en: 'My List', beanie: 'my list' },
+  // The choreboard redirect (#146): chores always start on the choreboard, never as a list.
+  'lists.new.choresRow': {
+    en: 'Making a chores list for the kids?',
+    beanie: 'making a chores list for the kids?',
+  },
+  'lists.new.choresHome': {
+    en: 'Chores live on the choreboard',
+    beanie: 'chores live on the choreboard',
+  },
+  'lists.new.choresTag': { en: 'On the Choreboard', beanie: 'on the choreboard' },
+  'lists.new.choresBody': {
+    en: 'Let’s set up {set} there for {names}, so all their chores are in one place.',
+    beanie: 'let’s set up {set} there for {names}, so all their chores are in one place.',
+  },
+  'lists.new.choresBodyNoPeople': {
+    en: 'Let’s set up {set} there, so all the chores are in one place.',
+    beanie: 'let’s set up {set} there, so all the chores are in one place.',
+  },
+  'lists.new.choresAskGrownUp': {
+    en: 'Ask a grown-up to set up chores on the choreboard.',
+    beanie: 'ask a grown-up to set up chores on the choreboard.',
+  },
+  'lists.new.choresGo': { en: 'Go to the Choreboard', beanie: 'go to the choreboard' },
+  'lists.new.choresStay': { en: 'Stay Here', beanie: 'stay here' },
 
   // Copy a list to one or several beans (#91).
   'lists.copy.title': { en: 'Copy List', beanie: 'copy list' },
@@ -8144,6 +8169,95 @@ const STRING_DEFS = {
   'wall.todo.byTime': { en: 'By {time}', beanie: 'by {time}' },
   'wall.notes': { en: 'Notes', beanie: 'notes' },
   'wall.card.choresAndLists': { en: 'Chores & Lists', beanie: 'chores & lists' },
+  // The choreboard on the wall (#146, gate on): the chore lanes view, its cards and lane copy.
+  'wall.view.chores': {
+    en: 'Chores',
+    beanie: 'chores',
+  },
+  'wall.view.lists': {
+    en: 'Lists',
+    beanie: 'lists',
+  },
+  'wall.card.lists': {
+    en: 'Lists',
+    beanie: 'lists',
+  },
+  'wall.chores.progress.morning.one': {
+    en: '{done} of {total} morning chore done',
+    beanie: '{done} of {total} morning chore done',
+  },
+  'wall.chores.progress.morning.other': {
+    en: '{done} of {total} morning chores done',
+    beanie: '{done} of {total} morning chores done',
+  },
+  'wall.chores.progress.afternoon.one': {
+    en: '{done} of {total} afternoon chore done',
+    beanie: '{done} of {total} afternoon chore done',
+  },
+  'wall.chores.progress.afternoon.other': {
+    en: '{done} of {total} afternoon chores done',
+    beanie: '{done} of {total} afternoon chores done',
+  },
+  'wall.chores.progress.evening.one': {
+    en: '{done} of {total} evening chore done',
+    beanie: '{done} of {total} evening chore done',
+  },
+  'wall.chores.progress.evening.other': {
+    en: '{done} of {total} evening chores done',
+    beanie: '{done} of {total} evening chores done',
+  },
+  'wall.chores.progress.today.one': {
+    en: '{done} of {total} chore done today',
+    beanie: '{done} of {total} chore done today',
+  },
+  'wall.chores.progress.today.other': {
+    en: '{done} of {total} chores done today',
+    beanie: '{done} of {total} chores done today',
+  },
+  'wall.chores.lane.progress.morning': {
+    en: '{done} of {total} this morning',
+    beanie: '{done} of {total} this morning',
+  },
+  'wall.chores.lane.progress.afternoon': {
+    en: '{done} of {total} this afternoon',
+    beanie: '{done} of {total} this afternoon',
+  },
+  'wall.chores.lane.progress.evening': {
+    en: '{done} of {total} this evening',
+    beanie: '{done} of {total} this evening',
+  },
+  'wall.chores.lane.allDone': {
+    en: '{block} all done',
+    beanie: '{block} all done',
+  },
+  'wall.chores.lane.nothing.morning': {
+    en: 'Nothing this morning',
+    beanie: 'nothing this morning',
+  },
+  'wall.chores.lane.nothing.afternoon': {
+    en: 'Nothing this afternoon',
+    beanie: 'nothing this afternoon',
+  },
+  'wall.chores.lane.nothing.evening': {
+    en: 'Nothing this evening',
+    beanie: 'nothing this evening',
+  },
+  'wall.chores.lane.clear': {
+    en: 'All clear for now',
+    beanie: 'all clear for now',
+  },
+  'wall.chores.add.morning': {
+    en: 'Add a morning chore',
+    beanie: 'add a morning chore',
+  },
+  'wall.chores.add.afternoon': {
+    en: 'Add an afternoon chore',
+    beanie: 'add an afternoon chore',
+  },
+  'wall.chores.add.evening': {
+    en: 'Add an evening chore',
+    beanie: 'add an evening chore',
+  },
   'wall.meals.slot.breakfast': { en: 'Breakfast', beanie: 'breakfast' },
   'wall.meals.slot.lunch': { en: 'Lunch', beanie: 'lunch' },
   'wall.meals.slot.dinner': { en: 'Dinner', beanie: 'dinner' },
@@ -8571,6 +8685,10 @@ const STRING_DEFS = {
   'celebration.checkInDone': {
     en: 'Deck checked! See you at the next check-in.',
     beanie: 'deck checked! see you at the next check-in.',
+  },
+  'celebration.choreBlockComplete': {
+    en: 'All chores done! The beanies are cheering!',
+    beanie: 'all chores done! the beanies are going wild!',
   },
 
   // Setup Progress Modal
@@ -15705,6 +15823,810 @@ const STRING_DEFS = {
     en: 'Flights are checked from three days before they leave, while this device is online.',
     beanie: 'flights are checked from three days before they leave, while this device is online.',
   },
+  // The choreboard (#146): refusals and errors (real nouns in beanie mode), starter sets.
+  'choreboard.error.notAdult': {
+    en: 'Only grown-ups can change chores',
+    beanie: 'only grown-ups can change chores',
+  },
+  'choreboard.error.notYours': {
+    en: 'You can only tick your own chores',
+    beanie: 'you can only tick your own chores',
+  },
+  'choreboard.error.notAssigned': {
+    en: "This chore isn't on their list",
+    beanie: "this chore isn't on their list",
+  },
+  'choreboard.error.notToday': {
+    en: "This chore isn't on for today",
+    beanie: "this chore isn't on for today",
+  },
+  'choreboard.error.notFound': {
+    en: 'This chore was removed',
+    beanie: 'this chore was removed',
+  },
+  'choreboard.error.badHours': {
+    en: 'Morning must start before Afternoon, and Afternoon before Evening',
+    beanie: 'morning must start before afternoon, and afternoon before evening',
+  },
+  'choreboard.error.invalid': {
+    en: 'A chore needs a title and at least one person',
+    beanie: 'a chore needs a title and at least one person',
+  },
+  'choreboard.starterSet.schoolMorning': {
+    en: 'School Morning',
+    beanie: 'school morning',
+  },
+  'choreboard.starterSet.bedtime': {
+    en: 'Bedtime',
+    beanie: 'bedtime',
+  },
+  'choreboard.starterSet.petCare': {
+    en: 'Pet Care',
+    beanie: 'pet care',
+  },
+  'choreboard.starterSet.tidyUp': {
+    en: 'Tidy-Up',
+    beanie: 'tidy-up',
+  },
+  'choreboard.starterChore.makeBed': {
+    en: 'Make your bed',
+    beanie: 'make your bed',
+  },
+  'choreboard.starterChore.getDressed': {
+    en: 'Get dressed',
+    beanie: 'get dressed',
+  },
+  'choreboard.starterChore.brushTeeth': {
+    en: 'Brush teeth',
+    beanie: 'brush teeth',
+  },
+  'choreboard.starterChore.eatBreakfast': {
+    en: 'Eat breakfast',
+    beanie: 'eat breakfast',
+  },
+  'choreboard.starterChore.packBag': {
+    en: 'Pack your school bag',
+    beanie: 'pack your school bag',
+  },
+  'choreboard.starterChore.shoesOn': {
+    en: 'Put on shoes',
+    beanie: 'put on shoes',
+  },
+  'choreboard.starterChore.bath': {
+    en: 'Bath or shower',
+    beanie: 'bath or shower',
+  },
+  'choreboard.starterChore.pajamas': {
+    en: 'Put on pajamas',
+    beanie: 'put on pajamas',
+  },
+  'choreboard.starterChore.clothesTomorrow': {
+    en: 'Pick out clothes for tomorrow',
+    beanie: 'pick out clothes for tomorrow',
+  },
+  'choreboard.starterChore.readBook': {
+    en: 'Read a book',
+    beanie: 'read a book',
+  },
+  'choreboard.starterChore.feedPetBreakfast': {
+    en: 'Feed the pet breakfast',
+    beanie: 'feed the pet breakfast',
+  },
+  'choreboard.starterChore.freshWater': {
+    en: 'Fresh water for the pet',
+    beanie: 'fresh water for the pet',
+  },
+  'choreboard.starterChore.walkDog': {
+    en: 'Walk the dog',
+    beanie: 'walk the dog',
+  },
+  'choreboard.starterChore.feedPetDinner': {
+    en: 'Feed the pet dinner',
+    beanie: 'feed the pet dinner',
+  },
+  'choreboard.starterChore.brushPet': {
+    en: 'Brush the pet',
+    beanie: 'brush the pet',
+  },
+  'choreboard.starterChore.toysAway': {
+    en: 'Put toys away',
+    beanie: 'put toys away',
+  },
+  'choreboard.starterChore.clothesHamper': {
+    en: 'Clothes in the hamper',
+    beanie: 'clothes in the hamper',
+  },
+  'choreboard.starterChore.clearPlate': {
+    en: 'Clear your plate',
+    beanie: 'clear your plate',
+  },
+  'choreboard.starterChore.tidyRoom': {
+    en: 'Tidy your room',
+    beanie: 'tidy your room',
+  },
+  'choreboard.starterChore.takeOutTrash': {
+    en: 'Take out the trash',
+    beanie: 'take out the trash',
+  },
+  // The choreboard (#146), package 2: the page, its components, nav and quick-add.
+  'nav.choreboard': {
+    en: 'The Choreboard',
+    beanie: 'the choreboard',
+  },
+  'mobileNav.hint.choreboard': {
+    en: "kids' chores by time of day",
+    beanie: "who's doing what today",
+  },
+  'quickAdd.chore.label': {
+    en: 'Chore',
+    beanie: 'chore',
+  },
+  'quickAdd.chore.hint': {
+    en: 'Add a chore to the choreboard',
+    beanie: 'add a chore to the choreboard',
+  },
+  'choreboard.welcomeSubtitle': {
+    en: "Who's doing what today?",
+    beanie: "who's doing what today? 🌱",
+  },
+  'choreboard.hours': {
+    en: 'Hours',
+    beanie: 'hours',
+  },
+  'choreboard.addChores': {
+    en: 'Add Chores',
+    beanie: 'add chores',
+  },
+  'choreboard.add.sets': {
+    en: 'Add a Set of Chores',
+    beanie: 'add a set of chores',
+  },
+  'choreboard.add.previewClose': {
+    en: 'Close the preview',
+    beanie: 'close the preview',
+  },
+  'choreboard.add.previewDup': {
+    en: 'Already in your list',
+    beanie: 'already in your list',
+  },
+  'choreboard.add.previewAdd.one': {
+    en: 'Add 1 to List',
+    beanie: 'add 1 to list',
+  },
+  'choreboard.add.previewAdd.other': {
+    en: 'Add {count} to List',
+    beanie: 'add {count} to list',
+  },
+  'choreboard.add.previewRemove': {
+    en: 'Remove from List',
+    beanie: 'remove from list',
+  },
+  'choreboard.add.list': {
+    en: 'Chores to Add',
+    beanie: 'chores to add',
+  },
+  'choreboard.add.clear': {
+    en: 'Clear List',
+    beanie: 'clear list',
+  },
+  'choreboard.add.hint': {
+    en: 'Pick a set above, or add your own.',
+    beanie: 'pick a set above, or add your own.',
+  },
+  'choreboard.add.someDays': {
+    en: 'Some days',
+    beanie: 'some days',
+  },
+  'choreboard.add.timeAria': {
+    en: 'Time of day for {chore}: {block}. Change it.',
+    beanie: 'time of day for {chore}: {block}. change it.',
+  },
+  'choreboard.block.morning': {
+    en: 'Morning',
+    beanie: 'morning',
+  },
+  'choreboard.block.afternoon': {
+    en: 'Afternoon',
+    beanie: 'afternoon',
+  },
+  'choreboard.block.evening': {
+    en: 'Evening',
+    beanie: 'evening',
+  },
+  'choreboard.block.anytime': {
+    en: 'Anytime',
+    beanie: 'anytime',
+  },
+  'choreboard.now.pill': {
+    en: '{block} now',
+    beanie: '{block} now',
+  },
+  'choreboard.now.until': {
+    en: 'until {time}',
+    beanie: 'until {time}',
+  },
+  'choreboard.now.tag': {
+    en: 'Now',
+    beanie: 'now',
+  },
+  'choreboard.block.from': {
+    en: 'from {time}',
+    beanie: 'from {time}',
+  },
+  'choreboard.block.anytimeHint': {
+    en: 'whenever you like',
+    beanie: 'whenever you like',
+  },
+  'choreboard.block.count': {
+    en: '{done} of {total}',
+    beanie: '{done} of {total}',
+  },
+  'choreboard.block.toGo': {
+    en: '{count} to go',
+    beanie: '{count} to go',
+  },
+  'choreboard.block.chores.one': {
+    en: '{count} chore',
+    beanie: '{count} chore',
+  },
+  'choreboard.block.chores.other': {
+    en: '{count} chores',
+    beanie: '{count} chores',
+  },
+  'choreboard.block.allDone': {
+    en: 'All Done',
+    beanie: 'all done',
+  },
+  'choreboard.block.expand': {
+    en: 'Show {block} chores',
+    beanie: 'show {block} chores',
+  },
+  'choreboard.block.collapse': {
+    en: 'Hide {block} chores',
+    beanie: 'hide {block} chores',
+  },
+  'choreboard.block.showChores': {
+    en: 'Show Chores',
+    beanie: 'show chores',
+  },
+  'choreboard.block.hideChores': {
+    en: 'Hide Chores',
+    beanie: 'hide chores',
+  },
+  'choreboard.block.chipAria': {
+    en: '{block}: {count} to do',
+    beanie: '{block}: {count} to do',
+  },
+  'choreboard.block.more': {
+    en: 'More Today',
+    beanie: 'more today',
+  },
+  'choreboard.done.title': {
+    en: '{block}, all done!',
+    beanie: '{block}, all done!',
+  },
+  'choreboard.done.body.one': {
+    en: '{count} star. Nice work, {name}.',
+    beanie: '{count} star. nice work, {name}.',
+  },
+  'choreboard.done.body.other': {
+    en: '{count} stars. Nice work, {name}.',
+    beanie: '{count} stars. nice work, {name}.',
+  },
+  'choreboard.done.imageAlt': {
+    en: 'The beanies cheering',
+    beanie: 'the beanies cheering',
+  },
+  'choreboard.row.with': {
+    en: 'with {names}',
+    beanie: 'with {names}',
+  },
+  'choreboard.row.tick': {
+    en: 'Tick {chore}',
+    beanie: 'tick {chore}',
+  },
+  'choreboard.row.untick': {
+    en: 'Untick {chore}',
+    beanie: 'untick {chore}',
+  },
+  'choreboard.row.edit': {
+    en: 'Edit {chore}',
+    beanie: 'edit {chore}',
+  },
+  'choreboard.row.select': {
+    en: 'Select {chore}',
+    beanie: 'select {chore}',
+  },
+  'choreboard.card.none': {
+    en: 'No chores today',
+    beanie: 'no chores today',
+  },
+  'choreboard.card.noneYet': {
+    en: 'No chores yet',
+    beanie: 'no chores yet',
+  },
+  'choreboard.card.openDay': {
+    en: "Open {name}'s day",
+    beanie: "open {name}'s day",
+  },
+  'choreboard.card.copyAria': {
+    en: "Copy {name}'s chores",
+    beanie: "copy {name}'s chores",
+  },
+  'choreboard.card.addAria': {
+    en: 'Add chores for {name}',
+    beanie: 'add chores for {name}',
+  },
+  'choreboard.card.editAria': {
+    en: "Edit {name}'s chores",
+    beanie: "edit {name}'s chores",
+  },
+  'choreboard.orphans.title': {
+    en: "No One's Chores",
+    beanie: "no one's chores",
+  },
+  'choreboard.orphans.hint': {
+    en: 'The person these were for is no longer in the family. Give them to someone or delete them.',
+    beanie:
+      'the person these were for is no longer in the family. give them to someone or delete them.',
+  },
+  'choreboard.empty.title': {
+    en: 'No chores yet',
+    beanie: 'no chores yet',
+  },
+  'choreboard.empty.body': {
+    en: 'Start with a set, or add your first chore.',
+    beanie: 'start with a set, or add your first chore.',
+  },
+  'choreboard.empty.child': {
+    en: 'No chores yet. Ask a grown-up to add some.',
+    beanie: 'no chores yet. ask a grown-up to add some.',
+  },
+  'choreboard.empty.childToday': {
+    en: 'Nothing to do today. Enjoy!',
+    beanie: 'nothing to do today. enjoy!',
+  },
+  'choreboard.empty.forBean': {
+    en: 'No chores for {name} yet.',
+    beanie: 'no chores for {name} yet.',
+  },
+  'choreboard.empty.forBeanToday': {
+    en: 'Nothing for {name} today.',
+    beanie: 'nothing for {name} today.',
+  },
+  'choreboard.day.back': {
+    en: 'Back to the Choreboard',
+    beanie: 'back to the choreboard',
+  },
+  'choreboard.day.greeting.morning': {
+    en: 'Good morning, {name}!',
+    beanie: 'good morning, {name}!',
+  },
+  'choreboard.day.greeting.afternoon': {
+    en: 'Good afternoon, {name}!',
+    beanie: 'good afternoon, {name}!',
+  },
+  'choreboard.day.greeting.evening': {
+    en: 'Good evening, {name}!',
+    beanie: 'good evening, {name}!',
+  },
+  'choreboard.day.progressAria': {
+    en: '{done} of {total} done today',
+    beanie: '{done} of {total} done today',
+  },
+  'choreboard.day.copy': {
+    en: 'Copy Chores',
+    beanie: 'copy chores',
+  },
+  'choreboard.day.select': {
+    en: 'Select',
+    beanie: 'select',
+  },
+  'choreboard.day.selectAll': {
+    en: 'Select All',
+    beanie: 'select all',
+  },
+  'choreboard.day.selectNone': {
+    en: 'Clear Selection',
+    beanie: 'clear selection',
+  },
+  'choreboard.day.deleteSelected.one': {
+    en: 'Delete {count} Chore',
+    beanie: 'delete {count} chore',
+  },
+  'choreboard.day.deleteSelected.other': {
+    en: 'Delete {count} Chores',
+    beanie: 'delete {count} chores',
+  },
+  'choreboard.day.deleteConfirm.title': {
+    en: 'Delete these chores?',
+    beanie: 'delete these chores?',
+  },
+  'choreboard.day.deleteConfirm.message': {
+    en: 'A chore shared with others stays on their choreboard. Chores already done still count in this week.',
+    beanie:
+      'a chore shared with others stays on their choreboard. chores already done still count in this week.',
+  },
+  'choreboard.day.deleteConfirm.detail.one': {
+    en: "{count} chore comes off {name}'s choreboard.",
+    beanie: "{count} chore comes off {name}'s choreboard.",
+  },
+  'choreboard.day.deleteConfirm.detail.other': {
+    en: "{count} chores come off {name}'s choreboard.",
+    beanie: "{count} chores come off {name}'s choreboard.",
+  },
+  'choreboard.day.deleted.one': {
+    en: '{count} chore deleted',
+    beanie: '{count} chore deleted',
+  },
+  'choreboard.day.deleted.other': {
+    en: '{count} chores deleted',
+    beanie: '{count} chores deleted',
+  },
+  'choreboard.day.otherDays': {
+    en: 'Other Days',
+    beanie: 'other days',
+  },
+  'choreboard.day.otherDaysHint': {
+    en: 'Chores on other days of the week. Tap one to change it.',
+    beanie: 'chores on other days of the week. tap one to change it.',
+  },
+  'choreboard.week.title': {
+    en: 'This Week',
+    beanie: 'this week',
+  },
+  'choreboard.week.totalAria.one': {
+    en: '{count} chore done this week',
+    beanie: '{count} chore done this week',
+  },
+  'choreboard.week.totalAria.other': {
+    en: '{count} chores done this week',
+    beanie: '{count} chores done this week',
+  },
+  'choreboard.week.panelTitle': {
+    en: 'Week So Far',
+    beanie: 'week so far',
+  },
+  'choreboard.week.panelHint': {
+    en: 'Chores done each day',
+    beanie: 'chores done each day',
+  },
+  'choreboard.week.total': {
+    en: 'Total',
+    beanie: 'total',
+  },
+  'choreboard.week.bean': {
+    en: 'Bean',
+    beanie: 'bean',
+  },
+  'choreboard.form.titleEdit': {
+    en: 'Edit Chore',
+    beanie: 'edit chore',
+  },
+  'choreboard.form.name': {
+    en: 'Chore',
+    beanie: 'chore',
+  },
+  'choreboard.form.namePlaceholder': {
+    en: 'Make your bed',
+    beanie: 'make your bed',
+  },
+  'choreboard.form.who': {
+    en: "Who's It For?",
+    beanie: "who's it for?",
+  },
+  'choreboard.form.whoShared': {
+    en: 'Each of them gets their own tick.',
+    beanie: 'each of them gets their own tick.',
+  },
+  'choreboard.form.block': {
+    en: 'Time of Day',
+    beanie: 'time of day',
+  },
+  'choreboard.form.allDay': {
+    en: 'All Day',
+    beanie: 'all day',
+  },
+  'choreboard.form.days': {
+    en: 'Which Days?',
+    beanie: 'which days?',
+  },
+  'choreboard.form.days.every': {
+    en: 'Every Day',
+    beanie: 'every day',
+  },
+  'choreboard.form.days.school': {
+    en: 'School Days',
+    beanie: 'school days',
+  },
+  'choreboard.form.days.weekends': {
+    en: 'Weekends',
+    beanie: 'weekends',
+  },
+  'choreboard.form.days.pick': {
+    en: 'Pick Days',
+    beanie: 'pick days',
+  },
+  'choreboard.form.saveEdit': {
+    en: 'Save Changes',
+    beanie: 'save changes',
+  },
+  'choreboard.form.deleteConfirm.title': {
+    en: 'Delete this chore?',
+    beanie: 'delete this chore?',
+  },
+  'choreboard.form.deleteConfirm.message': {
+    en: 'It comes off the choreboard for everyone it was for. Chores already done still count in this week.',
+    beanie:
+      'it comes off the choreboard for everyone it was for. chores already done still count in this week.',
+  },
+  'choreboard.form.deleteConfirm.sharedMessage': {
+    en: 'This chore is shared. Who should it come off the choreboard for?',
+    beanie: 'this chore is shared. who should it come off the choreboard for?',
+  },
+  'choreboard.form.deleteConfirm.onlyFor': {
+    en: 'Only for {name}',
+    beanie: 'only for {name}',
+  },
+  'choreboard.form.deleteConfirm.forEveryone': {
+    en: 'For everyone ({names})',
+    beanie: 'for everyone ({names})',
+  },
+  'choreboard.form.deleteConfirm.who': {
+    en: 'It comes off the choreboard for {names}.',
+    beanie: 'it comes off the choreboard for {names}.',
+  },
+  'choreboard.form.changePicture': {
+    en: 'Change Picture',
+    beanie: 'change picture',
+  },
+  'choreboard.emoji.bed': {
+    en: 'Bed',
+    beanie: 'bed',
+  },
+  'choreboard.emoji.teeth': {
+    en: 'Teeth',
+    beanie: 'teeth',
+  },
+  'choreboard.emoji.clothes': {
+    en: 'Clothes',
+    beanie: 'clothes',
+  },
+  'choreboard.emoji.schoolBag': {
+    en: 'School Bag',
+    beanie: 'school bag',
+  },
+  'choreboard.emoji.shoes': {
+    en: 'Shoes',
+    beanie: 'shoes',
+  },
+  'choreboard.emoji.breakfast': {
+    en: 'Breakfast',
+    beanie: 'breakfast',
+  },
+  'choreboard.emoji.table': {
+    en: 'Table',
+    beanie: 'table',
+  },
+  'choreboard.emoji.toys': {
+    en: 'Toys',
+    beanie: 'toys',
+  },
+  'choreboard.emoji.laundry': {
+    en: 'Laundry',
+    beanie: 'laundry',
+  },
+  'choreboard.emoji.tidy': {
+    en: 'Tidy Up',
+    beanie: 'tidy up',
+  },
+  'choreboard.emoji.trash': {
+    en: 'Trash',
+    beanie: 'trash',
+  },
+  'choreboard.emoji.pet': {
+    en: 'Pet',
+    beanie: 'pet',
+  },
+  'choreboard.emoji.plants': {
+    en: 'Plants',
+    beanie: 'plants',
+  },
+  'choreboard.emoji.reading': {
+    en: 'Reading',
+    beanie: 'reading',
+  },
+  'choreboard.emoji.homework': {
+    en: 'Homework',
+    beanie: 'homework',
+  },
+  'choreboard.emoji.bath': {
+    en: 'Bath',
+    beanie: 'bath',
+  },
+  'choreboard.picture.emojiCaption': {
+    en: 'Emoji',
+    beanie: 'emoji',
+  },
+  'choreboard.picture.artCaption': {
+    en: 'Beanie Pictures',
+    beanie: 'beanie pictures',
+  },
+  'choreboard.art.school': {
+    en: 'School Morning Picture',
+    beanie: 'school morning picture',
+  },
+  'choreboard.art.bedtime': {
+    en: 'Bedtime Picture',
+    beanie: 'bedtime picture',
+  },
+  'choreboard.art.laundry': {
+    en: 'Laundry Picture',
+    beanie: 'laundry picture',
+  },
+  'choreboard.art.dinner': {
+    en: 'Dinner Picture',
+    beanie: 'dinner picture',
+  },
+  'choreboard.art.trash': {
+    en: 'Trash Picture',
+    beanie: 'trash picture',
+  },
+  'choreboard.art.groceries': {
+    en: 'Groceries Picture',
+    beanie: 'groceries picture',
+  },
+  'choreboard.starter.carried': {
+    en: '{names} came with you from the list sheet.',
+    beanie: '{names} came with you from the list sheet.',
+  },
+  'choreboard.starter.cta.one': {
+    en: 'Add {count} Chore for {names}',
+    beanie: 'add {count} chore for {names}',
+  },
+  'choreboard.starter.cta.other': {
+    en: 'Add {count} Chores for {names}',
+    beanie: 'add {count} chores for {names}',
+  },
+  'choreboard.starter.ctaEach.one': {
+    en: 'Add {count} Chore Each for {names}',
+    beanie: 'add {count} chore each for {names}',
+  },
+  'choreboard.starter.ctaEach.other': {
+    en: 'Add {count} Chores Each for {names}',
+    beanie: 'add {count} chores each for {names}',
+  },
+  'choreboard.starter.renameAria': {
+    en: 'Rename {chore}',
+    beanie: 'rename {chore}',
+  },
+  'choreboard.starter.pictureAria': {
+    en: 'Change the picture for {chore}',
+    beanie: 'change the picture for {chore}',
+  },
+  'choreboard.starter.newPlaceholder': {
+    en: 'Name the chore',
+    beanie: 'name the chore',
+  },
+  'choreboard.starter.removeAria': {
+    en: 'Remove {chore}',
+    beanie: 'remove {chore}',
+  },
+  'choreboard.starter.addInBlock': {
+    en: 'Add to {block}',
+    beanie: 'add to {block}',
+  },
+  'choreboard.starter.ctaNone': {
+    en: 'Add Chores',
+    beanie: 'add chores',
+  },
+  'choreboard.starter.added.one': {
+    en: 'Added {count} chore',
+    beanie: 'added {count} chore',
+  },
+  'choreboard.starter.added.other': {
+    en: 'Added {count} chores',
+    beanie: 'added {count} chores',
+  },
+  'choreboard.batch.skipped.one': {
+    en: '{count} was already there, so it was skipped.',
+    beanie: '{count} was already there, so it was skipped.',
+  },
+  'choreboard.batch.skipped.other': {
+    en: '{count} were already there, so they were skipped.',
+    beanie: '{count} were already there, so they were skipped.',
+  },
+  'choreboard.batch.nothingNew': {
+    en: 'Everyone already has these chores.',
+    beanie: 'everyone already has these chores.',
+  },
+  'choreboard.copy.title': {
+    en: "Copy {name}'s Chores",
+    beanie: "copy {name}'s chores",
+  },
+  'choreboard.copy.to': {
+    en: 'Copy To',
+    beanie: 'copy to',
+  },
+  'choreboard.copy.which': {
+    en: 'Which Chores?',
+    beanie: 'which chores?',
+  },
+  'choreboard.copy.hint': {
+    en: 'A chore someone already has by the same name is skipped, so nothing doubles up.',
+    beanie: 'a chore someone already has by the same name is skipped, so nothing doubles up.',
+  },
+  'choreboard.copy.save.one': {
+    en: 'Copy {count} Chore to {names}',
+    beanie: 'copy {count} chore to {names}',
+  },
+  'choreboard.copy.save.other': {
+    en: 'Copy {count} Chores to {names}',
+    beanie: 'copy {count} chores to {names}',
+  },
+  'choreboard.copy.saveNone': {
+    en: 'Copy Chores',
+    beanie: 'copy chores',
+  },
+  'choreboard.copy.done.one': {
+    en: 'Copied {count} chore',
+    beanie: 'copied {count} chore',
+  },
+  'choreboard.copy.done.other': {
+    en: 'Copied {count} chores',
+    beanie: 'copied {count} chores',
+  },
+  'choreboard.copy.noOthers': {
+    en: 'There is no one else to copy to yet.',
+    beanie: 'there is no one else to copy to yet.',
+  },
+  'choreboard.hoursModal.title': {
+    en: 'Time of Day Hours',
+    beanie: 'time of day hours',
+  },
+  'choreboard.hoursModal.startsAt': {
+    en: 'Starts At',
+    beanie: 'starts at',
+  },
+  'choreboard.hoursModal.allDay': {
+    en: 'Shows all day',
+    beanie: 'shows all day',
+  },
+  'choreboard.hoursModal.hint': {
+    en: 'The same hours apply to everyone in the family. The four blocks themselves stay fixed.',
+    beanie:
+      'the same hours apply to everyone in the family. the four blocks themselves stay fixed.',
+  },
+  'choreboard.hoursModal.save': {
+    en: 'Save Hours',
+    beanie: 'save hours',
+  },
+  // The Nook daily briefing's chore line (#146), one per bean; {block} is a word below.
+  'choreboard.briefing.self.one': {
+    en: 'You have {n} {block} chore left',
+    beanie: 'you have {n} {block} chore left',
+  },
+  'choreboard.briefing.self.other': {
+    en: 'You have {n} {block} chores left',
+    beanie: 'you have {n} {block} chores left',
+  },
+  'choreboard.briefing.bean.one': {
+    en: '{name} has {n} {block} chore left',
+    beanie: '{name} has {n} {block} chore left',
+  },
+  'choreboard.briefing.bean.other': {
+    en: '{name} has {n} {block} chores left',
+    beanie: '{name} has {n} {block} chores left',
+  },
+  // The block as a lowercase word, mid-sentence in the briefing and as the widget row's tag.
+  'choreboard.briefing.block.morning': { en: 'morning', beanie: 'morning' },
+  'choreboard.briefing.block.afternoon': { en: 'afternoon', beanie: 'afternoon' },
+  'choreboard.briefing.block.evening': { en: 'evening', beanie: 'evening' },
+  'choreboard.briefing.block.anytime': { en: 'anytime', beanie: 'anytime' },
+  // The home-screen widget's chore row, one per bean (lowercase, as every widget string).
+  'choreboard.widget.left.one': { en: '{name} · {n} left', beanie: '{name} · {n} left' },
+  'choreboard.widget.left.other': { en: '{name} · {n} left', beanie: '{name} · {n} left' },
+  'choreboard.widget.done': { en: '{name} · done', beanie: '{name} · done' },
 } satisfies Record<string, StringEntry>;
 
 /**

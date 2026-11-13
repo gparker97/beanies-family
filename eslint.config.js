@@ -238,6 +238,8 @@ export default [
             '🫘',
             '🪘',
             '📦',
+            // The choreboard's Starter Sets (#146).
+            '🎒',
             '☁️',
             '🪟',
             '📎',

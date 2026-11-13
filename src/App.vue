@@ -142,6 +142,7 @@ import { useMedicationsStore } from '@/stores/medicationsStore';
 import { useRecipesStore } from '@/stores/recipesStore';
 import { useMealPlanStore } from '@/stores/mealPlanStore';
 import { useResponsibilityStore } from '@/stores/responsibilityStore';
+import { useChoreStore } from '@/stores/choreStore';
 import { useEmergencyContactsStore } from '@/stores/emergencyContactsStore';
 import { useTransactionsStore } from '@/stores/transactionsStore';
 import { useSyncStore } from '@/stores/syncStore';
@@ -192,6 +193,7 @@ const medicationsStore = useMedicationsStore();
 const recipesStore = useRecipesStore();
 const mealPlanStore = useMealPlanStore();
 const responsibilityStore = useResponsibilityStore();
+const choreStore = useChoreStore();
 const emergencyContactsStore = useEmergencyContactsStore();
 const settingsStore = useSettingsStore();
 // Seed the family's unset home time zone (calendar sync + import resolve through it).
@@ -1155,6 +1157,8 @@ async function loadFamilyDataInner(openToken: OpenToken): Promise<'handed-off' |
         // Same batch as activities/meals: the deck must be loaded before useHelpfulHints'
         // first debounced reconcile, or a hint created in that gap keeps its default audience.
         responsibilityStore.load(),
+        // The choreboard (#146): loads whatever the flag says (the gate hides surfaces, not data).
+        choreStore.loadChores(),
         emergencyContactsStore.loadEmergencyContacts(),
       ]);
 

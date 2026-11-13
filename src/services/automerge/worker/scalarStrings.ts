@@ -211,6 +211,7 @@ export const SCALAR_FIELDS: ReadonlySet<string> = new Set([
   'textSize',
   'tripPurpose',
   'tripType',
+  'block', // a chore's time of day: 'morning' | 'afternoon' | 'evening' | 'anytime'
   // codes: currency, country, time zone, OAuth scopes, airports and airlines (picked from
   // reference data; a rare "Other" typed value is still one value, never edited in place)
   'baseCurrency',
@@ -239,10 +240,14 @@ export const SCALAR_FIELDS: ReadonlySet<string> = new Set([
   'hintKey',
   'cardPartKey',
   'key', // a responsibility card part's key ('main' | child id | 'label-<uuid>')
+  'ref', // a chore mark's referent: the chore id ('done') or the block ('celebrated')
+  'starterKey', // which choreboard starter set seeded a chore
+  'illustration', // a card-art key under public/brand/cards/, picked, never typed
   // dynamic-keyed maps of strings (their VALUES classify by the container)
   'dismissedHintKeys',
   'aiApiKeys',
   'notificationReads', // the collection: memberId → (notificationId → ISO readAt)
+  'choreBlockStarts', // morning/afternoon/evening → HH:mm, written whole
   // `exchangeRates` identity (`KEY_FIELDS`): only ever currency codes
   'from',
   'to',

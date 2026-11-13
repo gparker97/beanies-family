@@ -8,7 +8,17 @@
  */
 import { describe, it, expect } from 'vitest';
 import { materializeFixture } from '@/services/demo/demoFixture';
-import type { FamilyMember, Account, Transaction, FamilyActivity, TodoItem } from '@/types/models';
+import { choreMarkId } from '@/utils/chores';
+import { toDateInputValue } from '@/utils/date';
+import type {
+  FamilyMember,
+  Account,
+  Transaction,
+  FamilyActivity,
+  TodoItem,
+  Chore,
+  ChoreMark,
+} from '@/types/models';
 
 const OWNER = 'owner-member-id';
 const TODAY = new Date('2026-08-20T09:00:00Z');
@@ -21,6 +31,8 @@ function build(today = TODAY, owner = OWNER) {
     transactions: f.transactions as Transaction[],
     activities: f.activities as FamilyActivity[],
     todos: f.todos as TodoItem[],
+    chores: f.chores as Chore[],
+    choreMarks: f.choreMarks as ChoreMark[],
     raw: f,
   };
 }
@@ -112,5 +124,61 @@ describe('materializeFixture', () => {
       f.todos.length;
     expect(total).toBeGreaterThan(40);
     expect(total).toBeLessThan(90);
+  });
+
+  describe('the choreboard (#146)', () => {
+    it('has chores for the kids in every block, each for living, non-pet people only', () => {
+      const { members, chores } = build();
+      const humans = new Set(members.filter((m) => !m.isPet).map((m) => m.id));
+      const kids = new Set(members.filter((m) => m.ageGroup === 'child').map((m) => m.id));
+      expect(chores.length).toBeGreaterThanOrEqual(4);
+      expect(new Set(chores.map((c) => c.block))).toEqual(
+        new Set(['morning', 'afternoon', 'evening', 'anytime'])
+      );
+      for (const c of chores) {
+        expect(c.assigneeIds.length).toBeGreaterThan(0);
+        for (const id of c.assigneeIds) expect(humans).toContain(id);
+        expect(c.createdBy).toBe(OWNER);
+      }
+      // More than one bean has chores, so the home shows several cards.
+      const owners = new Set(chores.flatMap((c) => c.assigneeIds));
+      expect([...owners].filter((id) => kids.has(id)).length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('ticks a couple of chores on TODAY (the device-local day the chore clock reads)', () => {
+      const today = new Date('2027-03-05T09:00:00Z');
+      const { chores, choreMarks } = build(today);
+      const ymd = toDateInputValue(today);
+      const byId = new Map(chores.map((c) => [c.id, c]));
+      expect(choreMarks.length).toBeGreaterThanOrEqual(2);
+      for (const m of choreMarks) {
+        expect(m.kind).toBe('done');
+        expect(m.date).toBe(ymd);
+        expect(m.id).toBe(choreMarkId('done', m.memberId, m.date, m.ref));
+        const c = byId.get(m.ref);
+        expect(c).toBeDefined();
+        expect(c!.assigneeIds).toContain(m.memberId);
+        // An every-day chore, so the tick counts whatever weekday the reviewer opens it on.
+        expect(c!.days?.length ?? 0).toBe(0);
+      }
+      expect(new Set(choreMarks.map((m) => m.id)).size).toBe(choreMarks.length);
+      // No block is finished by the seed, on any weekday (counting only every-day chores, the
+      // weekend's set): the reviewer's own completing tick still celebrates.
+      for (const m of choreMarks) {
+        const block = byId.get(m.ref)!.block;
+        const everyDay = chores.filter(
+          (x) => x.block === block && x.assigneeIds.includes(m.memberId) && !x.days?.length
+        );
+        const done = choreMarks.filter(
+          (x) => x.memberId === m.memberId && everyDay.some((c) => c.id === x.ref)
+        );
+        expect(done.length).toBeLessThan(everyDay.length);
+      }
+    });
+
+    it('has unique chore ids', () => {
+      const ids = build().chores.map((c) => c.id);
+      expect(new Set(ids).size).toBe(ids.length);
+    });
   });
 });

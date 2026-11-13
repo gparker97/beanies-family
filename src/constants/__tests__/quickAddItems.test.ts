@@ -7,6 +7,7 @@ import { describe, it, expect } from 'vitest';
 import {
   QUICK_ADD_ITEMS,
   QUICK_ADD_BY_GROUP,
+  QUICK_ADD_BY_GROUP_FILTERED,
   QUICK_ADD_CONTEXT_KEYS,
   VALID_ACTIONS,
   type QuickAddAction,
@@ -31,21 +32,21 @@ const ALLOWED_CONTEXT_KEYS: readonly QuickAddContextKey[] = [
 ];
 
 describe('QUICK_ADD_ITEMS — invariants', () => {
-  it('has exactly 19 items (4 groups: 6 everyday + 5 family + 4 money + 4 care)', () => {
-    expect(QUICK_ADD_ITEMS).toHaveLength(19);
-    expect(QUICK_ADD_ITEMS.filter((i) => i.group === 'everyday')).toHaveLength(6);
-    expect(QUICK_ADD_ITEMS.filter((i) => i.group === 'family')).toHaveLength(5);
+  it('has exactly 20 items (4 groups: 7 everyday + 5 family + 4 money + 4 care)', () => {
+    expect(QUICK_ADD_ITEMS).toHaveLength(20);
+    expect(QUICK_ADD_ITEMS.filter((i) => i.group === 'everyday')).toHaveLength(9);
+    expect(QUICK_ADD_ITEMS.filter((i) => i.group === 'family')).toHaveLength(3);
     expect(QUICK_ADD_ITEMS.filter((i) => i.group === 'money')).toHaveLength(4);
     expect(QUICK_ADD_ITEMS.filter((i) => i.group === 'care')).toHaveLength(4);
   });
 
-  it('the main FAB menu shows at most 6 Everyday tiles (two rows) and 4 Family tiles', () => {
-    const inMainMenu = (g: string) =>
-      QUICK_ADD_ITEMS.filter(
-        (i) => i.group === g && !('onlyWhenFiltered' in i && i.onlyWhenFiltered)
-      );
-    expect(inMainMenu('everyday').length).toBeLessThanOrEqual(6);
-    expect(inMainMenu('family')).toHaveLength(4);
+  it('the main FAB menu shows nine Everyday tiles (three full rows) and two Family tiles', () => {
+    // greg, 2026-11-13: Everyday grew from six to nine. Chore (#146) is one of the nine and is
+    // hidden while its gate is off, so production shows eight until the choreboard ships.
+    const inMainMenu = (g: string) => ITEMS.filter((i) => i.group === g && !i.onlyWhenFiltered);
+    expect(inMainMenu('everyday')).toHaveLength(9);
+    expect(inMainMenu('everyday').filter((i) => i.requiresFlag === 'choreboard')).toHaveLength(1);
+    expect(inMainMenu('family')).toHaveLength(2);
   });
 
   it('has unique item ids', () => {
@@ -129,6 +130,59 @@ describe('QUICK_ADD_BY_GROUP — pre-computed index', () => {
   });
 });
 
+describe('the main menu vs a filtered sheet (owner decision 2026-11-13)', () => {
+  const ids = (items: readonly QuickAddItem[]) => items.map((i) => i.id);
+
+  it('the main menu: nine Everyday tiles (recipe and milestone last) and two Family tiles', () => {
+    const main = (g: QuickAddGroup) => QUICK_ADD_BY_GROUP[g].filter((i) => !i.onlyWhenFiltered);
+    expect(ids(main('everyday'))).toEqual([
+      'activity',
+      'todo',
+      'transaction',
+      'trip',
+      'cook-log',
+      'list',
+      'chore',
+      'recipe',
+      'milestone',
+    ]);
+    expect(ids(main('family'))).toEqual(['favorite', 'saying']);
+  });
+
+  it('a filtered sheet keeps the pre-move sections: recipe and milestone under Family', () => {
+    // Exactly the HEAD-of-2026-11-12 index, so the Family Scrapbook's sheet (saying, favorite,
+    // note, milestone) still draws all four under Family and none under the Everyday kicker.
+    expect(ids(QUICK_ADD_BY_GROUP_FILTERED.everyday)).toEqual([
+      'activity',
+      'todo',
+      'transaction',
+      'trip',
+      'cook-log',
+      'list',
+      'chore',
+    ]);
+    expect(ids(QUICK_ADD_BY_GROUP_FILTERED.family)).toEqual([
+      'favorite',
+      'saying',
+      'recipe',
+      'milestone',
+      'note',
+    ]);
+    const scrapbook = ['add-saying', 'add-favorite', 'add-note', 'add-milestone'];
+    const inScrapbook = (g: QuickAddGroup) =>
+      ids(QUICK_ADD_BY_GROUP_FILTERED[g].filter((i) => scrapbook.includes(i.action)));
+    expect(inScrapbook('everyday')).toEqual([]);
+    expect(inScrapbook('family')).toEqual(['favorite', 'saying', 'milestone', 'note']);
+  });
+
+  it('the filtered index holds every item once, and money and care are unchanged', () => {
+    const flat = ALLOWED_GROUPS.flatMap((g) => ids(QUICK_ADD_BY_GROUP_FILTERED[g]));
+    expect(new Set(flat).size).toBe(QUICK_ADD_ITEMS.length);
+    expect(QUICK_ADD_BY_GROUP_FILTERED.money).toEqual(QUICK_ADD_BY_GROUP.money);
+    expect(QUICK_ADD_BY_GROUP_FILTERED.care).toEqual(QUICK_ADD_BY_GROUP.care);
+  });
+});
+
 describe('QUICK_ADD_CONTEXT_KEYS', () => {
   it('lists all four allowed context keys', () => {
     expect([...QUICK_ADD_CONTEXT_KEYS].sort()).toEqual([...ALLOWED_CONTEXT_KEYS].sort());
@@ -144,6 +198,7 @@ describe('derived QuickAddAction type', () => {
       'add-activity',
       'add-todo',
       'add-list',
+      'add-chore',
       'add-transaction',
       'add-trip',
       'add-cooklog',

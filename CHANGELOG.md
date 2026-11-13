@@ -13,12 +13,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 ### Added
 
 - A list can now be for more than one person, and shows up for each of them.
+- The choreboard, a new home for chores sorted by time of day, is built and switched off for now while it is tested.
 - Lists have a Show From setting, like to-dos: pick a date for a one-off list, or days before or every day for a repeating one.
 
 ### Changed
 
 - A list with a due date now shows on the daily briefing, the beanie wall and widgets on its due date, unless you choose to show it earlier. Every list is always on the Lists page.
 - The Kids' chores list template now resets every day (it used to reset weekly).
+- The quick-add menu's Everyday group now shows Recipe and Milestone, alongside the usual tiles.
 
 ### Fixed
 

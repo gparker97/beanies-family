@@ -98,6 +98,20 @@ export const FLAG_REGISTRY = [
     description:
       'Settings plan card (trial, active, read-only) and, when the server enforces it, read-only mode after the trial.',
   },
+  {
+    // #146. Gates every choreboard SURFACE (nav, route, quick-add, the wall's chore board, the
+    // briefing lines, the widget rows and the Beanie Lists redirect), never the data: the chore
+    // store loads for everyone, like the meal planner's.
+    // ⚠️ ROLLOUT RULE: do NOT commit this on until the update floor has been raised to the
+    // build that knows both collections (`chores`, `choreMarks`) and the fleet has drained onto
+    // it. An older build that meets an unknown root collection in a merge falls back to a full
+    // projection rebuild (`touchedBetween` answers null); ticks arrive many times a day, so a
+    // stale device would rebuild on nearly every merge. Same sequencing as `podCompaction`.
+    id: 'choreboard',
+    label: 'The Choreboard',
+    description:
+      "Chores in their own place under The Treehouse, by time of day, on the wall and in the briefing. Keep OFF until the update floor is raised to the build that knows 'chores' and 'choreMarks'.",
+  },
 ] as const;
 
 /** Union of all known flag ids — derived from the registry (single source of truth). */

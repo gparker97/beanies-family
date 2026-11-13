@@ -8,7 +8,11 @@ import { useMedicationsStore } from '@/stores/medicationsStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useResponsibilityStore } from '@/stores/responsibilityStore';
 import { useListStore } from '@/stores/listStore';
+import { useChoreStore } from '@/stores/choreStore';
+import { useChoreClock } from '@/composables/useChoreClock';
 import type {
+  Chore,
+  ChoreMark,
   FamilyActivity,
   FamilyList,
   FamilyMember,
@@ -52,13 +56,19 @@ vi.mock('@/services/automerge/repositories/medicationLogRepository', () => ({
 
 // Toggle `helpfulHints` per-test so the briefing's hint loop can be proven
 // flag-gated (under vitest `isFlagEnabled` is otherwise true for every flag).
-const { flagState } = vi.hoisted(() => ({ flagState: { helpfulHints: true } }));
+const { flagState } = vi.hoisted(() => ({
+  flagState: { helpfulHints: true, choreboard: true },
+}));
 vi.mock('@/config/flags', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/config/flags')>();
   return {
     ...actual,
     isFlagEnabled: (flag: string) =>
-      flag === 'helpfulHints' ? flagState.helpfulHints : actual.isFlagEnabled(flag as never),
+      flag === 'helpfulHints'
+        ? flagState.helpfulHints
+        : flag === 'choreboard'
+          ? flagState.choreboard
+          : actual.isFlagEnabled(flag as never),
   };
 });
 
@@ -190,6 +200,7 @@ describe('useCriticalItems', () => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
     flagState.helpfulHints = true;
+    flagState.choreboard = true;
     readStateBox.value = {};
 
     familyStore = useFamilyStore();
@@ -1733,6 +1744,153 @@ describe('useCriticalItems', () => {
       // Another adult's, shared with a child: hidden from Dad, exactly as a to-do is.
       familyStore.setCurrentMember('parent-1');
       expect(useCriticalItems().criticalItems.value).toEqual([]);
+    });
+  });
+  describe('choreboard lines (#146)', () => {
+    function makeChore(id: string, assigneeIds: string[], extra: Partial<Chore> = {}): Chore {
+      return {
+        id,
+        title: id,
+        emoji: '🧹',
+        assigneeIds,
+        block: 'morning',
+        sortOrder: 0,
+        createdBy: 'parent-1',
+        createdAt: NOW,
+        updatedAt: NOW,
+        ...extra,
+      } as Chore;
+    }
+    function doneMark(memberId: string, ref: string): ChoreMark {
+      return {
+        id: `done:${memberId}:${TODAY}:${ref}`,
+        kind: 'done',
+        memberId,
+        date: TODAY,
+        ref,
+        by: memberId,
+        createdAt: NOW,
+        updatedAt: NOW,
+      };
+    }
+    const choreRows = () =>
+      useCriticalItems().criticalItems.value.filter((i) => i.type === 'chores');
+
+    it('gives a child their own line, routed to their day, in the block’s colour', () => {
+      familyStore.setCurrentMember('child-1');
+      useChoreStore().chores = [makeChore('c1', ['child-1']), makeChore('c2', ['child-1'])];
+      const rows = choreRows();
+      expect(rows).toHaveLength(1);
+      expect(rows[0]!.message).toMatch(/^you have 2 morning chores left$/i);
+      expect(rows[0]).toMatchObject({
+        id: 'child-1:morning',
+        icon: '🌅',
+        choreBlock: 'morning',
+        completable: false,
+        route: { path: '/choreboard', query: { bean: 'child-1' } },
+      });
+    });
+
+    it('uses the .one form for one chore left', () => {
+      familyStore.setCurrentMember('child-1');
+      useChoreStore().chores = [makeChore('c1', ['child-1']), makeChore('c2', ['child-1'])];
+      useChoreStore().choreMarks = [doneMark('child-1', 'c1')];
+      expect(choreRows()[0]!.message).toMatch(/^you have 1 morning chore left$/i);
+    });
+
+    it('a parent sees a child’s line only when it keeps parents posted', () => {
+      familyStore.setCurrentMember('parent-1');
+      const store = useChoreStore();
+      store.chores = [makeChore('c1', ['child-1']), makeChore('c2', ['child-2'])];
+      expect(choreRows()).toHaveLength(0);
+      store.chores = [
+        makeChore('c1', ['child-1'], { notifyParents: true }),
+        makeChore('c3', ['child-1'], { notifyParents: true }),
+        makeChore('c2', ['child-2'], { notifyParents: true }),
+      ];
+      const rows = choreRows();
+      expect(rows.map((r) => r.id)).toEqual(['child-1:morning', 'child-2:morning']);
+      expect(rows[0]!.message).toMatch(/^emma has 2 morning chores left$/i);
+      expect(rows[1]!.message).toMatch(/^noah has 1 morning chore left$/i);
+    });
+
+    it('shows no line for a bean with nothing left, and the viewer’s own line first', () => {
+      familyStore.setCurrentMember('parent-1');
+      const store = useChoreStore();
+      store.chores = [
+        makeChore('c1', ['child-1'], { notifyParents: true }),
+        makeChore('d1', ['parent-1'], { block: 'anytime' }),
+      ];
+      expect(choreRows().map((r) => r.id)).toEqual(['parent-1:anytime', 'child-1:morning']);
+      expect(choreRows()[0]!.message).toMatch(/^you have 1 anytime chore left$/i);
+      store.choreMarks = [doneMark('child-1', 'c1')];
+      expect(choreRows().map((r) => r.id)).toEqual(['parent-1:anytime']);
+    });
+
+    it('hiding the morning line hides only that line: the missed line and the next block still show', () => {
+      familyStore.setCurrentMember('child-1');
+      const store = useChoreStore();
+      store.chores = [
+        makeChore('m1', ['child-1']),
+        makeChore('a1', ['child-1'], { block: 'afternoon' }),
+      ];
+      const [morning] = choreRows();
+      expect(morning!.id).toBe('child-1:morning');
+      readStateBox.value = { [morning!.dismissKey!]: NOW };
+      expect(choreRows()).toHaveLength(0);
+      // 13:00: Morning has ended with its chore undone. Before the fix the line's id was the
+      // bean's alone, so this missed line (and every later one) stayed hidden all day.
+      vi.setSystemTime(new Date(TODAY + 'T13:00:00'));
+      useChoreClock(); // the clock reads the minute it is called in
+      expect(choreRows().map((r) => r.id)).toEqual(['child-1:morning:missed']);
+      store.choreMarks = [doneMark('child-1', 'm1')];
+      expect(choreRows().map((r) => r.id)).toEqual(['child-1:afternoon']);
+    });
+
+    it('hiding the missed morning line hands over to the afternoon line while morning stays undone', () => {
+      vi.setSystemTime(new Date(TODAY + 'T13:00:00'));
+      useChoreClock(); // the clock reads the minute it is called in
+      familyStore.setCurrentMember('child-1');
+      useChoreStore().chores = [
+        makeChore('m1', ['child-1']),
+        makeChore('a1', ['child-1'], { block: 'afternoon' }),
+      ];
+      const [missed] = choreRows();
+      expect(missed!.id).toBe('child-1:morning:missed');
+      // m1 stays undone: the afternoon line must still reach the bean after the hide.
+      readStateBox.value = { [missed!.dismissKey!]: NOW };
+      const rows = choreRows();
+      expect(rows.map((r) => r.id)).toEqual(['child-1:afternoon']);
+      expect(rows[0]!.message).toMatch(/^you have 1 afternoon chore left$/i);
+    });
+
+    it('shows no chore lines when the choreboard flag is off', () => {
+      flagState.choreboard = false;
+      familyStore.setCurrentMember('child-1');
+      useChoreStore().chores = [makeChore('c1', ['child-1'])];
+      expect(choreRows()).toHaveLength(0);
+    });
+
+    it('sits above the helpful-hint block', () => {
+      familyStore.setCurrentMember('parent-1');
+      useChoreStore().chores = [makeChore('d1', ['parent-1'])];
+      todoStore.todos.push(
+        makeTodo({
+          id: 'hint-1',
+          title: 'Pack for the trip',
+          hintType: 'trip-packing',
+          hintKey: 'trip-packing:v1:2026-03-12',
+          hintEventDate: '2026-03-12',
+          dueDate: TODAY,
+          assigneeIds: ['parent-1'],
+          createdBy: 'parent-1',
+        })
+      );
+      const items = useCriticalItems().criticalItems.value;
+      const choreAt = items.findIndex((i) => i.type === 'chores');
+      const hintAt = items.findIndex((i) => i.id === 'hint-1');
+      expect(choreAt).toBeGreaterThanOrEqual(0);
+      expect(hintAt).toBeGreaterThan(choreAt);
     });
   });
 });

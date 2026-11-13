@@ -32,6 +32,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { isRecurring } from '@/utils/listLifecycle';
 import {
+  choreProgress,
   jobOwnerIds,
   jobsProgress,
   openLaterTodoJobs,
@@ -39,11 +40,13 @@ import {
   uniqueTodoJobs,
   UNASSIGNED,
 } from '@/utils/wallJobs';
+import { wallChoreProgressText } from '@/components/wall/wallChoreText';
+import { DEFAULT_CHORE_EMOJI } from '@/constants/choreBlocks';
 import WallOwnerFaces from '@/components/wall/WallOwnerFaces.vue';
 import { formatNameList } from '@/utils/assignees';
 import { useListPeople } from '@/composables/useListPeople';
 import type { FamilyList, FamilyMember } from '@/types/models';
-import type { WallJob, WallPeripheralData, WallSheetTarget } from '@/types/wall';
+import type { WallChoreLane, WallJob, WallPeripheralData, WallSheetTarget } from '@/types/wall';
 
 const props = defineProps<{
   /**
@@ -66,7 +69,13 @@ const props = defineProps<{
   /** The job/list bundle, as one object — see `WallPeripheralData`. */
   peripherals: WallPeripheralData;
 }>();
-const emit = defineEmits<{ open: [WallSheetTarget]; openChores: [] }>();
+const emit = defineEmits<{
+  open: [WallSheetTarget];
+  /** The lists board (the `jobs` view). */
+  openChores: [];
+  /** The chore lanes (the `chores` view, #146). */
+  openChoreLanes: [];
+}>();
 
 const { t } = useTranslation();
 const familyStore = useFamilyStore();
@@ -185,6 +194,7 @@ const outstandingTodos = computed(() => {
  */
 const CARD_WEIGHTS: Record<string, number> = {
   weather: 1.1,
+  chores: 1.4,
   lists: 1.55,
   todos: 1,
   meals: 0.95,
@@ -194,6 +204,7 @@ const CARD_WEIGHTS: Record<string, number> = {
 const visibleCards = computed(() => {
   const on: string[] = [];
   if (weather.value) on.push('weather');
+  if (showChores.value) on.push('chores');
   if (visibleLists.value.length) on.push('lists');
   if (showTodos.value) on.push('todos');
   if (tonight.value) on.push('meals');
@@ -222,6 +233,45 @@ const allGroups = computed(() =>
 );
 const visibleLists = computed(() =>
   allGroups.value.filter((g) => g.jobs.length).slice(0, props.variant === 'rail' ? 1 : 4)
+);
+
+/**
+ * THE CHOREBOARD (#146). `choreLaneFor` is present only while the gate is on (the page reads
+ * the flag once and leaves it out otherwise), so with the gate off none of this shows and the
+ * lists card keeps its "Chores & Lists" title and its Sky Silk identity. With it on, chores get
+ * their own card (the anchor of the band, so it takes the Sky Silk tone) and the lists card is
+ * titled "Lists": chores are no longer mixed in.
+ */
+const choresOn = computed(() => !!props.peripherals.choreLaneFor);
+const choreLanes = computed(() => {
+  const laneFor = props.peripherals.choreLaneFor;
+  if (!laneFor) return [];
+  return beans.value
+    .map((member) => ({ member, lane: laneFor(member.id) }))
+    .filter(
+      (e): e is { member: FamilyMember; lane: WallChoreLane } => !!e.lane && e.lane.total > 0
+    );
+});
+const choreSummary = computed(() => choreProgress(choreLanes.value.map((e) => e.lane)));
+const showChores = computed(() => choresOn.value && choreSummary.value.total > 0);
+const choreSummaryText = computed(() => wallChoreProgressText(choreSummary.value, t));
+const chorePercent = computed(() =>
+  choreSummary.value.total
+    ? Math.round((choreSummary.value.done / choreSummary.value.total) * 100)
+    : 0
+);
+/** One row per bean on the card: their count in the same scope as the summary line. */
+const choreRows = computed(() =>
+  choreLanes.value.slice(0, rows.value).map(({ member, lane }) => {
+    const block = choreSummary.value.block;
+    const scoped = block ? lane.blocks.find((b) => b.block === block) : null;
+    const done = block ? (scoped?.done ?? 0) : lane.done;
+    const total = block ? (scoped?.total ?? 0) : lane.total;
+    return { member, done, total };
+  })
+);
+const listsTitle = computed(() =>
+  choresOn.value ? t('wall.card.lists') : t('wall.card.choresAndLists')
 );
 
 /** Everyone a list is for (#147) that the roster still knows, in order. */
@@ -256,6 +306,7 @@ const moreTrips = computed(() => Math.max(0, upcomingTrips.value.length - 1));
 const stripHasContent = computed(
   () =>
     Boolean(weather.value) ||
+    showChores.value ||
     Boolean(tonight.value) ||
     showTodos.value ||
     visibleLists.value.length > 0 ||
@@ -364,6 +415,17 @@ const STRIP_CELL =
       <span v-else>{{ fillTemplate(t('wall.card.todosOpen'), { count: laterTodoCount }) }}</span>
     </button>
     <button
+      v-if="showChores"
+      type="button"
+      :class="STRIP_CELL"
+      :aria-label="t('wall.card.chores')"
+      data-testid="wall-card-chores-strip"
+      @click="emit('openChoreLanes')"
+    >
+      <span aria-hidden="true">{{ DEFAULT_CHORE_EMOJI }}</span>
+      <span>{{ choreSummary.done }} / {{ choreSummary.total }}</span>
+    </button>
+    <button
       v-if="visibleLists.length"
       type="button"
       :class="STRIP_CELL"
@@ -403,11 +465,56 @@ const STRIP_CELL =
       the repeating chore lists among them — which is both more useful and one
       card fewer.
     -->
+    <!--
+      THE CHOREBOARD (#146, gate on only): how the visible beans are doing in the block happening
+      now, and a door to the chore lanes. No star row: stars are only on a finished block.
+    -->
     <WallCard
-      v-if="visibleLists.length"
-      :title="t('wall.card.choresAndLists')"
+      v-if="showChores"
+      :title="t('wall.card.chores')"
       tone="chores"
       class="wall-card-chores"
+      data-testid="wall-card-chores"
+      @open="emit('openChoreLanes')"
+    >
+      <span
+        v-for="row in choreRows"
+        :key="row.member.id"
+        class="dark:border-line flex items-center gap-2.5 border-b border-[rgba(44,62,80,0.06)] py-1.5 last:border-b-0"
+      >
+        <WallOwnerFaces :members="[row.member]" />
+        <span
+          class="font-outfit wall-card-line text-secondary-500 dark:text-ink min-w-0 flex-1 truncate font-semibold"
+        >
+          {{ row.member.name }}
+        </span>
+        <b class="font-outfit wall-card-line text-secondary-500 dark:text-ink shrink-0">
+          {{ row.done }}/{{ row.total }}
+        </b>
+      </span>
+      <span
+        class="font-inter wall-card-sub dark:text-ink-soft mt-2 block text-[var(--muted-text,#4d5d6c)]"
+        data-testid="wall-card-chores-progress"
+      >
+        {{ choreSummaryText }}
+      </span>
+      <span class="mt-1 block h-1.5 overflow-hidden rounded-full bg-[var(--tint-slate-10)]">
+        <span
+          class="from-primary-500 to-terracotta-400 block h-full rounded-full bg-gradient-to-r"
+          :style="{ width: `${chorePercent}%` }"
+        />
+      </span>
+    </WallCard>
+    <!--
+      Gate on: "Lists", plain, since chores have their own card above. Gate off: today's
+      "Chores & Lists" anchor card, exactly as it was.
+    -->
+    <WallCard
+      v-if="visibleLists.length"
+      :title="listsTitle"
+      :tone="choresOn ? undefined : 'chores'"
+      :class="choresOn ? '' : 'wall-card-chores'"
+      data-testid="wall-card-lists"
       @open="emit('openChores')"
     >
       <span

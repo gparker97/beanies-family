@@ -303,6 +303,12 @@ const routes: RouteRecordRaw[] = [
     meta: { titleKey: 'nav.lists', requiresAuth: true, requiresFlag: 'familyLists' },
   },
   {
+    path: '/choreboard',
+    name: 'Choreboard',
+    component: () => import('@/pages/ChoreboardPage.vue'),
+    meta: { titleKey: 'nav.choreboard', requiresAuth: true, requiresFlag: 'choreboard' },
+  },
+  {
     path: '/budgets',
     name: 'Budgets',
     component: () => import('@/pages/BudgetPage.vue'),

@@ -26,8 +26,10 @@
  * `useComposerSession`); scoped opens (Family Scrapbook / Timeline / Care & Safety) and
  * `startItem` picker opens get the tiles only.
  *
- * Section ordering is driven entirely by `QUICK_ADD_BY_GROUP`: no hard-coded item lists in the
- * template, so adding an entity to the config automatically lands it in the right place.
+ * Section ordering is driven entirely by `QUICK_ADD_BY_GROUP` (the main menu) and
+ * `QUICK_ADD_BY_GROUP_FILTERED` (a filtered open, where a tile's `filteredPlacement` applies):
+ * no hard-coded item lists in the template, so adding an entity to the config automatically
+ * lands it in the right place.
  */
 import { computed, nextTick, onScopeDispose, ref } from 'vue';
 import { useRouter } from 'vue-router';
@@ -39,6 +41,8 @@ import BeanieIcon from '@/components/ui/BeanieIcon.vue';
 import ShowMoreToggle from '@/components/ui/ShowMoreToggle.vue';
 import {
   QUICK_ADD_BY_GROUP,
+  QUICK_ADD_BY_GROUP_FILTERED,
+  quickAddPlacement,
   type QuickAddGroup,
   type QuickAddItem,
 } from '@/constants/quickAddItems';
@@ -202,12 +206,18 @@ function itemAllowed(item: QuickAddItem): boolean {
   return !item.onlyWhenFiltered;
 }
 
-const allowedByGroup = computed<Record<QuickAddGroup, readonly QuickAddItem[]>>(() => ({
-  everyday: QUICK_ADD_BY_GROUP.everyday.filter(itemAllowed),
-  family: QUICK_ADD_BY_GROUP.family.filter(itemAllowed),
-  money: QUICK_ADD_BY_GROUP.money.filter(itemAllowed),
-  care: QUICK_ADD_BY_GROUP.care.filter(itemAllowed),
-}));
+/** A caller-filtered open: tiles take their `filteredPlacement` (see `quickAddItems.ts`). */
+const isFiltered = computed(() => allowedActions.value !== null);
+
+const allowedByGroup = computed<Record<QuickAddGroup, readonly QuickAddItem[]>>(() => {
+  const index = isFiltered.value ? QUICK_ADD_BY_GROUP_FILTERED : QUICK_ADD_BY_GROUP;
+  return {
+    everyday: index.everyday.filter(itemAllowed),
+    family: index.family.filter(itemAllowed),
+    money: index.money.filter(itemAllowed),
+    care: index.care.filter(itemAllowed),
+  };
+});
 
 /** Narrowed picker-stage payload: `null` in main mode. */
 const pickerItem = computed<QuickAddItem | null>(() =>
@@ -220,6 +230,11 @@ const pickerItem = computed<QuickAddItem | null>(() =>
  * view-swap: they're list-shaped and can be long.
  */
 const isMemberInlinePicker = computed(() => pickerItem.value?.contextKey === 'memberId');
+
+/** The section the pending tile is drawn in, so its inline picker slots in after that one. */
+const pickerGroup = computed<QuickAddGroup | null>(() =>
+  pickerItem.value ? quickAddPlacement(pickerItem.value, isFiltered.value).group : null
+);
 
 /** True when the view-swap picker (recipe / medication) replaces the header and tiles. */
 const isSwapPicker = computed(() => pickerItem.value !== null && !isMemberInlinePicker.value);
@@ -243,13 +258,13 @@ const GROUP_ORDER: Record<QuickAddGroup, number> = {
 };
 
 function showSection(group: QuickAddGroup): boolean {
-  if (!isMemberInlinePicker.value || !pickerItem.value) return true;
-  return GROUP_ORDER[group] <= GROUP_ORDER[pickerItem.value.group];
+  if (!isMemberInlinePicker.value || !pickerGroup.value) return true;
+  return GROUP_ORDER[group] <= GROUP_ORDER[pickerGroup.value];
 }
 
 function pickerAfter(group: QuickAddGroup): boolean {
-  if (!isMemberInlinePicker.value || !pickerItem.value) return false;
-  return pickerItem.value.group === group;
+  if (!isMemberInlinePicker.value || !pickerGroup.value) return false;
+  return pickerGroup.value === group;
 }
 
 /** The secondary groups, in display order, behind the disclosure row. */
@@ -283,12 +298,10 @@ const moreLabel = computed(() => secondaryWithItems.value.map((g) => t(g.titleKe
  */
 const forceExpanded = computed(
   () =>
-    allowedActions.value !== null ||
+    isFiltered.value ||
     !composerShown.value ||
     allowedByGroup.value.everyday.length === 0 ||
-    (isMemberInlinePicker.value &&
-      pickerItem.value !== null &&
-      pickerItem.value.group !== 'everyday')
+    (isMemberInlinePicker.value && pickerGroup.value !== null && pickerGroup.value !== 'everyday')
 );
 
 const groupsExpanded = computed(() => moreOpen.value || forceExpanded.value);
@@ -487,9 +500,11 @@ function handleItemClick(item: QuickAddItem): void {
           </template>
 
           <!-- The "Family · Money · Care" row expands the groups in place (house List
-               Disclosure rule: never navigates). -->
+               Disclosure rule: never navigates). Hidden while an Everyday tile's inline member
+               picker is open (milestone): the sections below it are hidden then, so the row
+               would toggle nothing, and the picker stays the bottom of the card. -->
           <ShowMoreToggle
-            v-if="!forceExpanded && secondaryWithItems.length > 0"
+            v-if="!forceExpanded && !isMemberInlinePicker && secondaryWithItems.length > 0"
             :can-show-more="!moreOpen"
             :can-show-less="moreOpen"
             :more-label="moreLabel"

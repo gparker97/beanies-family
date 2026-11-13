@@ -1,10 +1,17 @@
 <script setup lang="ts">
-/** Data-driven from WALL_VIEWS. Not a fork of ViewToggle: different glyph set, four items, wall scale. */
-import { WALL_VIEWS } from '@/components/wall/wallViews';
+/** Data-driven from the view registry. Not a fork of ViewToggle: different glyph set, wall scale. */
+import { WALL_VIEWS, type WallViewDef } from '@/components/wall/wallViews';
 import { useTranslation } from '@/composables/useTranslation';
 import type { WallViewId } from '@/types/wall';
 
-defineProps<{ active: WallViewId }>();
+withDefaults(
+  defineProps<{
+    active: WallViewId;
+    /** The views on offer: the page passes `wallViewsFor(gate)`; the registry by default. */
+    views?: readonly WallViewDef[];
+  }>(),
+  { views: () => WALL_VIEWS }
+);
 defineEmits<{ select: [WallViewId] }>();
 const { t } = useTranslation();
 </script>
@@ -13,7 +20,7 @@ const { t } = useTranslation();
   <div
     class="dark:bg-surface-raised flex shrink-0 gap-0.5 rounded-[18px] bg-white p-1 shadow-[var(--card-shadow)]"
   >
-    <template v-for="view in WALL_VIEWS" :key="view.id">
+    <template v-for="view in views" :key="view.id">
       <span
         v-if="view.dividerBefore"
         class="mx-0.5 my-1.5 w-px bg-[rgba(44,62,80,0.1)]"
@@ -30,6 +37,8 @@ const { t } = useTranslation();
         :title="t(view.labelKey)"
         :aria-label="t(view.labelKey)"
         :aria-pressed="active === view.id"
+        data-testid="wall-view-switch"
+        :data-view="view.id"
         @click="$emit('select', view.id)"
       >
         <span aria-hidden="true">{{ view.glyph }}</span>

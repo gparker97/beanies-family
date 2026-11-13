@@ -87,6 +87,8 @@ const emit = defineEmits<{
   step: [-1 | 1];
   open: [WallSheetTarget];
   openChores: [];
+  /** The chores card (#146, gate on): open the chore lanes. */
+  openChoreLanes: [];
 }>();
 
 const activityStore = useActivityStore();
@@ -195,6 +197,7 @@ function colourFor(activity: FamilyActivity) {
     :peripherals="peripherals"
     @open="emit('open', $event)"
     @open-chores="emit('openChores')"
+    @open-chore-lanes="emit('openChoreLanes')"
   >
     <template #main>
       <!--

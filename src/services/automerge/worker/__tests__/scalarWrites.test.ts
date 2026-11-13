@@ -183,9 +183,13 @@ function leaves(node: unknown, path = '', out = new Map<string, boolean>()): Map
  * sequence run against `main` before #124 (4f09dae4) gives the same two numbers. With no mint
  * `docValue` IS the JSON copy every shipped build makes, so this is the shipped op count; a
  * change here means the OFF writer no longer writes what main does.
+ *
+ * +2 on 2026-11-13 (#146, 910 → 912 and 80 → 82): the migrated starting document gained the two
+ * choreboard root maps (`chores`, `choreMarks`), one `makeMap` op each from their stored
+ * migration changes. The scripted writes themselves are unchanged.
  */
-const OFF_NUM_OPS = 910;
-const OFF_SET_SETTINGS_NUM_OPS = 80;
+const OFF_NUM_OPS = 912;
+const OFF_SET_SETTINGS_NUM_OPS = 82;
 
 describe('scalar writer OFF: the shipped write path, unchanged (#124 acceptance 2)', () => {
   it('the scripted sequence lands on the recorded op count, with no ImmutableString anywhere', () => {
