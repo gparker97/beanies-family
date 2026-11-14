@@ -16093,14 +16093,6 @@ const STRING_DEFS = {
     en: 'Hide Chores',
     beanie: 'hide chores',
   },
-  'choreboard.block.chipAria': {
-    en: '{block}: {count} to do',
-    beanie: '{block}: {count} to do',
-  },
-  'choreboard.block.more': {
-    en: 'More Today',
-    beanie: 'more today',
-  },
   'choreboard.done.title': {
     en: '{block}, all done!',
     beanie: '{block}, all done!',
@@ -16256,9 +16248,8 @@ const STRING_DEFS = {
     beanie: 'remove all of these chores?',
   },
   'choreboard.editor.removeAll.message': {
-    en: 'A chore shared with others stays on their choreboard. Chores already done still count in this week.',
-    beanie:
-      'a chore shared with others stays on their choreboard. chores already done still count in this week.',
+    en: 'A chore shared with others stays on their choreboard.',
+    beanie: 'a chore shared with others stays on their choreboard.',
   },
   'choreboard.editor.removeAll.detail.one': {
     en: "{count} chore comes off {name}'s choreboard.",
@@ -16280,21 +16271,133 @@ const STRING_DEFS = {
     en: '{count} chores done this week',
     beanie: '{count} chores done this week',
   },
+  'choreboard.card.left.one': {
+    en: '{count} left today',
+    beanie: '{count} left today',
+  },
+  'choreboard.card.left.other': {
+    en: '{count} left today',
+    beanie: '{count} left today',
+  },
+  'choreboard.card.allDone': {
+    en: 'All done today',
+    beanie: 'all done today',
+  },
+  'choreboard.summary.title': {
+    en: 'Today',
+    beanie: 'today',
+  },
+  'choreboard.summary.hint': {
+    en: 'by time of day',
+    beanie: 'by time of day',
+  },
+  'choreboard.summary.left.one': {
+    en: '{count} left',
+    beanie: '{count} left',
+  },
+  'choreboard.summary.left.other': {
+    en: '{count} left',
+    beanie: '{count} left',
+  },
+  'choreboard.summary.niceWork': {
+    en: 'Nice work, {name}.',
+    beanie: 'nice work, {name}.',
+  },
+  'choreboard.summary.done': {
+    en: '{done} of {total} done',
+    beanie: '{done} of {total} done',
+  },
+  'choreboard.summary.goTo': {
+    en: 'Go to {block}',
+    beanie: 'go to {block}',
+  },
+  'choreboard.week.noneYet': {
+    en: 'None yet this week',
+    beanie: 'none yet this week',
+  },
+  'choreboard.week.legend.some': {
+    en: 'Some Done',
+    beanie: 'some done',
+  },
+  'choreboard.week.legend.none': {
+    en: 'Nothing Done',
+    beanie: 'nothing done',
+  },
+  'choreboard.week.legend.future': {
+    en: 'Still to Come',
+    beanie: 'still to come',
+  },
+  'choreboard.cell.of': {
+    en: 'of {total}',
+    beanie: 'of {total}',
+  },
+  'choreboard.cell.done': {
+    en: '{name}, {day}: {done} of {total} done',
+    beanie: '{name}, {day}: {done} of {total} done',
+  },
+  'choreboard.cell.none': {
+    en: '{name}, {day}: nothing done',
+    beanie: '{name}, {day}: nothing done',
+  },
+  'choreboard.cell.noneYet': {
+    en: '{name}, {day}: nothing done yet',
+    beanie: '{name}, {day}: nothing done yet',
+  },
+  'choreboard.cell.future': {
+    en: '{name}, {day}: still to come',
+    beanie: '{name}, {day}: still to come',
+  },
+  'choreboard.pop.title': {
+    en: '{name}, {day}',
+    beanie: '{name}, {day}',
+  },
+  'choreboard.pop.titleToday': {
+    en: '{name}, {day} (today)',
+    beanie: '{name}, {day} (today)',
+  },
+  'choreboard.pop.nothing': {
+    en: 'Nothing ticked',
+    beanie: 'nothing ticked',
+  },
+  'choreboard.pop.nothingYet': {
+    en: 'Nothing ticked yet',
+    beanie: 'nothing ticked yet',
+  },
+  'choreboard.pop.noChores': {
+    en: 'No chores that day',
+    beanie: 'no chores that day',
+  },
+  'choreboard.pop.itemDone': {
+    en: '{chore}, done',
+    beanie: '{chore}, done',
+  },
+  'choreboard.pop.itemNotDone': {
+    en: '{chore}, not done',
+    beanie: '{chore}, not done',
+  },
+  'choreboard.pop.footPast': {
+    en: 'What was ticked that day',
+    beanie: 'what was ticked that day',
+  },
+  'choreboard.pop.footToday': {
+    en: 'Today so far',
+    beanie: 'today so far',
+  },
+  'choreboard.pop.readOnly': {
+    en: 'Read Only',
+    beanie: 'read only',
+  },
+  'choreboard.pop.openDay': {
+    en: "Open {name}'s Day",
+    beanie: "open {name}'s day",
+  },
   'choreboard.week.panelTitle': {
-    en: 'Week So Far',
-    beanie: 'week so far',
+    en: 'Chores Done',
+    beanie: 'chores done',
   },
   'choreboard.week.panelHint': {
-    en: 'Chores done each day',
-    beanie: 'chores done each day',
-  },
-  'choreboard.week.total': {
-    en: 'Total',
-    beanie: 'total',
-  },
-  'choreboard.week.bean': {
-    en: 'Bean',
-    beanie: 'bean',
+    en: 'Tap a day to see it',
+    beanie: 'tap a day to see it',
   },
   'choreboard.form.who': {
     en: "Who's It For?",

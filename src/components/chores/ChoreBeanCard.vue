@@ -1,38 +1,35 @@
 <script setup lang="ts">
 /**
- * A bean's card on the choreboard home (#146): today's count, the block happening now open and
- * tickable, Anytime beside it, finished blocks folded to an "All Done" strip with their stars,
- * and every other block as a small coloured count. The header opens the bean's day. A bean
- * with no chores at all gets a compact card (and, for a grown-up, a way to add one).
+ * A bean's card on the choreboard home (#146), "four segments": the header (avatar, name, "5 left
+ * today", the day's "5 of 11", and a grown-up's Edit Chores and Copy), then one
+ * `ChoreBlockSummary` row per time of day the bean has chores in today, in day order. The block
+ * happening now is open with its tickable rows (unless it is finished); any other row opens on a
+ * tap, one at a time beside Now. The header opens the bean's day.
  *
- * A grown-up's header actions: ONE edit affordance and Copy. A bean with chores has the Edit
- * Chores pencil; a bean with none has "+". Both open the bean's chore list (`edit-chores`, the
- * page's `ChoreBeanEditor`), as does tapping a chore's name.
+ * A bean with chores on other days only keeps the header with "No chores today". A bean with no
+ * chores at all is a slim row with Add Chores (grown-ups), which opens their chore list
+ * (`edit-chores`, the page's `ChoreBeanEditor`), as do Edit Chores and a chore's name.
  *
  * Reads only the one read model (`BeanChoreDay`); ticks and edits are intents for the page.
  * Dark mode: the card is `surface-raised` with a `line` edge; text is `ink` / `ink-faint`;
- * the progress track is `surface-hover` under the brand gradient.
+ * accent text pairs with `accent-lift`.
  */
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
-import ChoreBlockSection from '@/components/chores/ChoreBlockSection.vue';
+import ChoreBlockSummary from '@/components/chores/ChoreBlockSummary.vue';
+import ChoreRow from '@/components/chores/ChoreRow.vue';
 import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
 import { useTranslation } from '@/composables/useTranslation';
-import { CHORE_BLOCK_META } from '@/constants/choreBlocks';
 import { fillTemplate } from '@/utils/fillTemplate';
-import {
-  blocksInDisplayOrder,
-  choreBlockRank,
-  type BeanChoreDay,
-  type ChoreDayBlock,
-} from '@/utils/chores';
-import type { ChoreBlockStarts, FamilyMember } from '@/types/models';
+import { firstName as firstWord } from '@/utils/assignees';
+import type { BeanChoreDay, ChoreDayBlock } from '@/utils/chores';
+import type { ChoreBlock, ChoreBlockStarts, FamilyMember } from '@/types/models';
 
 const props = withDefaults(
   defineProps<{
     member: FamilyMember;
     day: BeanChoreDay;
-    /** The bean has at least one chore on some day (false draws the compact card). */
+    /** The bean has at least one chore on some day (false draws the slim row). */
     hasAnyChores: boolean;
     starts: ChoreBlockStarts;
     canTick?: boolean;
@@ -55,38 +52,84 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
 
 const total = computed(() => props.day.blocks.reduce((n, b) => n + b.total, 0));
 const done = computed(() => total.value - props.day.left);
-const pct = computed(() => (total.value ? Math.round((done.value / total.value) * 100) : 0));
 
-/** The bean's blocks with chores, in the one display order (`blocksInDisplayOrder`). */
-const withChores = computed(() =>
-  blocksInDisplayOrder(props.day.blocks.filter((b) => b.total > 0))
-);
-/** Shown as sections: the block happening now and Anytime (open, or their done strip). */
-const sections = computed(() => withChores.value.filter((b) => choreBlockRank(b) < 2));
-/** Every other block: a done strip when finished, otherwise a coloured count. */
-const others = computed(() => withChores.value.filter((b) => choreBlockRank(b) >= 2));
-const otherDone = computed(() => others.value.filter((b) => b.allDone));
-const chips = computed(() => others.value.filter((b) => !b.allDone));
+/** The blocks with chores today, in day order (morning, afternoon, evening, anytime). */
+const blocks = computed(() => props.day.blocks.filter((b) => b.total > 0));
 
-const chipAria = (b: ChoreDayBlock) =>
-  fillTemplate(t('choreboard.block.chipAria'), {
-    block: t(CHORE_BLOCK_META[b.block].labelKey),
-    count: b.total - b.done,
-  });
+/** The Now block, open by default while it has chores to do; a tap folds it. */
+const nowFolded = ref(false);
+/** The one other block opened by a tap. */
+const opened = ref<ChoreBlock | null>(null);
+
+const nowOpensItself = (b: ChoreDayBlock) => b.isNow && !b.allDone;
+
+function isOpen(b: ChoreDayBlock): boolean {
+  return nowOpensItself(b) ? !nowFolded.value : opened.value === b.block;
+}
+
+function onActivate(b: ChoreDayBlock): void {
+  if (nowOpensItself(b)) nowFolded.value = !nowFolded.value;
+  else opened.value = opened.value === b.block ? null : b.block;
+}
 
 const name = computed(() => props.member.name);
+const first = computed(() => firstWord(props.member.name) || props.member.name);
+
+const subline = computed(() => {
+  if (total.value === 0) return t('choreboard.card.none');
+  if (props.day.left === 0) return t('choreboard.card.allDone');
+  return fillTemplate(
+    t(props.day.left === 1 ? 'choreboard.card.left.one' : 'choreboard.card.left.other'),
+    { count: props.day.left }
+  );
+});
 </script>
 
 <template>
+  <!-- ═══ A bean with no chores at all: one slim row ═══ -->
+  <div
+    v-if="!hasAnyChores"
+    class="dark:bg-surface-raised dark:border-line flex min-w-0 items-center gap-2.5 rounded-[1.25rem] bg-white py-2 pr-2 pl-2.5 shadow-[var(--card-shadow)] dark:border"
+    data-testid="chore-bean-card"
+    :data-member-id="member.id"
+    data-slim="true"
+  >
+    <BeanieAvatar v-bind="memberAvatarBindings(member)" size="sm" />
+    <span class="min-w-0 flex-1">
+      <span
+        class="font-outfit dark:text-ink text-secondary-500 block truncate text-sm leading-tight font-bold"
+        >{{ name }}</span
+      >
+      <span
+        class="dark:text-ink-faint text-secondary-400 block text-xs"
+        data-testid="chore-bean-empty"
+        >{{ t('choreboard.card.noneYet') }}</span
+      >
+    </span>
+    <button
+      v-if="canEdit"
+      type="button"
+      class="font-outfit text-primary-700 dark:text-accent-lift focus-visible:ring-sky-silk-300 inline-flex flex-none items-center gap-1 rounded-[0.875rem] bg-[var(--tint-orange-8)] px-3 py-1.5 text-sm font-bold whitespace-nowrap focus-visible:ring-2 focus-visible:outline-none"
+      :aria-label="fillTemplate(t('choreboard.card.addAria'), { name })"
+      data-testid="chore-bean-add"
+      @click="emit('edit-chores')"
+    >
+      <span aria-hidden="true">＋</span>
+      {{ t('choreboard.addChores') }}
+    </button>
+  </div>
+
+  <!-- ═══ The card ═══ -->
   <article
-    class="dark:bg-surface-raised dark:border-line flex flex-col gap-2.5 rounded-3xl bg-white p-3 shadow-[var(--card-shadow)] dark:border"
+    v-else
+    class="dark:bg-surface-raised dark:border-line flex min-w-0 flex-col gap-2 rounded-3xl bg-white p-3 shadow-[var(--card-shadow)] dark:border"
     data-testid="chore-bean-card"
     :data-member-id="member.id"
   >
     <div class="flex items-center gap-2.5">
       <button
         type="button"
-        class="focus-visible:ring-sky-silk-300 flex min-w-0 flex-1 items-center gap-2.5 rounded-2xl text-left focus-visible:ring-2 focus-visible:outline-none"
+        class="group focus-visible:ring-sky-silk-300 flex min-w-0 flex-1 items-center gap-2.5 rounded-2xl text-left focus-visible:ring-2 focus-visible:outline-none"
         :aria-label="fillTemplate(t('choreboard.card.openDay'), { name })"
         data-testid="chore-bean-open"
         @click="emit('open')"
@@ -94,24 +137,19 @@ const name = computed(() => props.member.name);
         <BeanieAvatar v-bind="memberAvatarBindings(member)" size="md" />
         <span class="min-w-0 flex-1">
           <span
-            class="font-outfit dark:text-ink text-secondary-500 block truncate text-base leading-tight font-bold"
+            class="font-outfit dark:text-ink text-secondary-500 group-hover:text-primary-700 dark:group-hover:text-accent-lift block truncate text-base leading-tight font-bold"
             >{{ name }}</span
           >
           <span
-            v-if="total > 0"
-            class="dark:bg-surface-hover mt-1.5 block h-2 overflow-hidden rounded-full bg-[var(--tint-slate-10)]"
-            aria-hidden="true"
-          >
-            <span
-              class="from-primary-500 to-terracotta-400 block h-full rounded-full bg-gradient-to-r transition-[width] duration-300"
-              :style="{ width: `${pct}%` }"
-            />
-          </span>
-          <span
-            v-else
-            class="dark:text-ink-faint text-secondary-400 mt-0.5 block text-xs"
-            data-testid="chore-bean-empty"
-            >{{ t(hasAnyChores ? 'choreboard.card.none' : 'choreboard.card.noneYet') }}</span
+            class="block truncate text-xs"
+            :class="
+              total > 0 && day.left === 0
+                ? 'text-primary-700 dark:text-accent-lift font-semibold'
+                : 'dark:text-ink-faint text-secondary-400'
+            "
+            :data-testid="total === 0 ? 'chore-bean-empty' : 'chore-bean-left'"
+            >{{ subline
+            }}<span v-if="total > 0 && day.left === 0" aria-hidden="true"> ⭐</span></span
           >
         </span>
       </button>
@@ -125,7 +163,6 @@ const name = computed(() => props.member.name);
       <template v-if="canEdit">
         <!-- Edit Chores: the bean's chore list. -->
         <button
-          v-if="hasAnyChores"
           type="button"
           class="dark:text-ink-soft dark:hover:bg-surface-hover text-secondary-400 hover:text-primary-500 dark:hover:text-accent-lift focus-visible:ring-sky-silk-300 flex h-9 w-9 flex-none items-center justify-center rounded-xl hover:bg-[var(--tint-slate-5)] focus-visible:ring-2 focus-visible:outline-none"
           :aria-label="fillTemplate(t('choreboard.card.editAria'), { name })"
@@ -147,7 +184,6 @@ const name = computed(() => props.member.name);
           </svg>
         </button>
         <button
-          v-if="hasAnyChores"
           type="button"
           class="dark:text-ink-soft dark:hover:bg-surface-hover text-secondary-400 focus-visible:ring-sky-silk-300 flex h-9 w-9 flex-none items-center justify-center rounded-xl hover:bg-[var(--tint-slate-5)] focus-visible:ring-2 focus-visible:outline-none"
           :aria-label="fillTemplate(t('choreboard.card.copyAria'), { name })"
@@ -157,66 +193,35 @@ const name = computed(() => props.member.name);
         >
           <span aria-hidden="true">📋</span>
         </button>
-        <!-- No chores yet: "+" opens the same list, empty, with its sets ready. -->
-        <button
-          v-else
-          type="button"
-          class="text-primary-700 dark:text-accent-lift focus-visible:ring-sky-silk-300 flex h-9 w-9 flex-none items-center justify-center rounded-xl bg-[var(--tint-orange-8)] text-xl font-bold focus-visible:ring-2 focus-visible:outline-none"
-          :aria-label="fillTemplate(t('choreboard.card.addAria'), { name })"
-          :title="fillTemplate(t('choreboard.card.addAria'), { name })"
-          data-testid="chore-bean-add"
-          @click="emit('edit-chores')"
-        >
-          <span aria-hidden="true">＋</span>
-        </button>
       </template>
     </div>
 
-    <ChoreBlockSection
-      v-for="b in sections"
-      :key="b.block"
-      :block="b"
-      :member-id="member.id"
-      :bean-name="name"
-      variant="card"
-      :starts="starts"
-      :can-tick="canTick"
-      :can-edit="canEdit"
-      :is-pending="isPending"
-      @toggle="emit('toggle', $event)"
-      @edit="emit('edit-chores')"
-    />
-
-    <ChoreBlockSection
-      v-for="b in otherDone"
-      :key="b.block"
-      :block="b"
-      :member-id="member.id"
-      :bean-name="name"
-      variant="card"
-      :starts="starts"
-    />
-
-    <div
-      v-if="chips.length"
-      class="flex flex-wrap items-center gap-1.5"
-      data-testid="chore-bean-chips"
-    >
-      <span class="dark:text-ink-faint text-secondary-400 text-xs">{{
-        t('choreboard.block.more')
-      }}</span>
-      <span
-        v-for="b in chips"
+    <div v-if="blocks.length" class="flex flex-col gap-1.5">
+      <ChoreBlockSummary
+        v-for="b in blocks"
         :key="b.block"
-        class="font-outfit inline-flex items-center gap-1 rounded-full bg-[var(--chore-tint)] px-2.5 py-1 text-xs font-semibold text-[var(--chore-ink)]"
-        :class="CHORE_BLOCK_META[b.block].colorClass"
-        :aria-label="chipAria(b)"
-        data-testid="chore-bean-chip"
-        :data-block="b.block"
+        :block="b"
+        :starts="starts"
+        :bean-name="first"
+        :expanded="isOpen(b)"
+        @activate="onActivate(b)"
       >
-        <span aria-hidden="true">{{ CHORE_BLOCK_META[b.block].emoji }}</span>
-        <span aria-hidden="true">{{ b.total - b.done }}</span>
-      </span>
+        <div class="flex flex-col gap-1.5" data-testid="chore-block-rows">
+          <ChoreRow
+            v-for="item in b.chores"
+            :key="item.chore.id"
+            :chore="item.chore"
+            :member-id="member.id"
+            :done="item.done"
+            compact
+            :can-tick="canTick"
+            :can-edit="canEdit"
+            :pending="isPending(item.chore.id)"
+            @toggle="emit('toggle', item.chore.id)"
+            @edit="emit('edit-chores')"
+          />
+        </div>
+      </ChoreBlockSummary>
     </div>
   </article>
 </template>

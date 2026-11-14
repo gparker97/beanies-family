@@ -57,12 +57,12 @@ import {
   orphanChores,
   sameChoreMoment,
   sortChores,
-  weekCounts,
+  choreWeekRecord,
   type BeanChoreDay,
   type ChoreClock,
   type ChoreRefusal,
   type ChoreTickRefused,
-  type ChoreWeekCounts,
+  type ChoreWeekRecord,
 } from '@/utils/chores';
 import { choreStarterSet, type StarterChoreDraft } from '@/constants/choreStarterSets';
 export type { StarterChoreDraft } from '@/constants/choreStarterSets';
@@ -187,6 +187,9 @@ export const useChoreStore = defineStore('chores', () => {
     return prev && sameChoreMoment(prev, next, starts.value) ? prev : { ...next };
   });
 
+  /** Today's date as chore state sees it: moves at midnight, never with the minute. */
+  const todayYmd = computed(() => dayClock.value.ymd);
+
   function choreById(id: string): Chore | undefined {
     return chores.value.find((c) => c.id === id);
   }
@@ -203,9 +206,20 @@ export const useChoreStore = defineStore('chores', () => {
     );
   }
 
-  /** A bean's chores done per day for the week holding `weekOfYmd` (today by default). */
-  function weekFor(memberId: string, weekOfYmd: string = choreClock.value.ymd): ChoreWeekCounts {
-    return weekCounts(markIndex.value, memberId, weekOfYmd, settingsStore.weekStartDay);
+  /**
+   * A bean's week (the Chores Done board): one `choreDayRecord` per day for the week holding
+   * `weekOfYmd`, today by default. Reads the day clock, never the minute clock, so a board built
+   * on it is not rebuilt every minute.
+   */
+  function weekFor(memberId: string, weekOfYmd: string = todayYmd.value): ChoreWeekRecord {
+    return choreWeekRecord(
+      chores.value,
+      markIndex.value,
+      memberId,
+      weekOfYmd,
+      settingsStore.weekStartDay,
+      livingIds.value
+    );
   }
 
   // ========== TELEMETRY + REFUSALS ==========
@@ -926,29 +940,29 @@ export const useChoreStore = defineStore('chores', () => {
       logSweepSkip('not-loaded');
       return;
     }
-    const todayYmd = choreClock.value.ymd;
-    const verdict = clockVerdict(todayYmd, sweepClock.read());
+    const sweepDay = choreClock.value.ymd;
+    const verdict = clockVerdict(sweepDay, sweepClock.read());
     if (verdict !== 'sweep') {
       // Same cursor rules as the list cycle sweep: advance on everything except a regressed
       // clock (moving the cursor back is what would let a wrong clock accelerate a deletion)
       // and the silent same-day repeat.
-      if (verdict !== 'skip-regressed' && verdict !== 'skip-same-day') sweepClock.record(todayYmd);
+      if (verdict !== 'skip-regressed' && verdict !== 'skip-same-day') sweepClock.record(sweepDay);
       if (verdict !== 'skip-same-day') logSweepSkip(verdict.replace('skip-', ''));
       return;
     }
     try {
       // The PROJECTION, not the reactive array: a stale array must never widen a deletion.
       const stored = await repo.getAllChoreMarks();
-      const ids = expiredMarkIds(stored, todayYmd);
+      const ids = expiredMarkIds(stored, sweepDay);
       if (!ids.length) {
-        sweepClock.record(todayYmd);
+        sweepClock.record(sweepDay);
         return;
       }
       // An automatic write: bounded so two devices or builds cannot fight forever. A refusal
       // is reported by the budget itself; the cursor stays, so a later run retries.
       if (!takeAutoWrite('chore-marks-sweep')) return;
       // Reserve the day BEFORE deleting, so the cap is per day, not per invocation.
-      if (!sweepClock.record(todayYmd)) {
+      if (!sweepClock.record(sweepDay)) {
         logSweepSkip('cursor-write-failed');
         return;
       }
@@ -995,6 +1009,7 @@ export const useChoreStore = defineStore('chores', () => {
     starts,
     sortedChores,
     orphans,
+    todayYmd,
     choreById,
     choreDayFor,
     weekFor,

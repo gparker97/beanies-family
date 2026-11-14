@@ -158,7 +158,7 @@ defineExpose({ focusRow });
       data-testid="chore-add-block"
       :data-block="g.block"
     >
-      <!-- The block heading: the same header as `ChoreBlockSection` (card size). -->
+      <!-- The block heading: a small chip in the block's colour, as the day summary's group heads. -->
       <h3
         v-if="lanes[g.block].length"
         class="font-outfit flex items-center gap-2 rounded-xl bg-[var(--chore-tint)] px-2.5 py-1.5 text-xs font-bold text-[var(--chore-ink)]"

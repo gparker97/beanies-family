@@ -177,6 +177,15 @@
   --chore-anytime-tint: var(--tint-slate-5);
   --chore-anytime-ink: var(--color-secondary-400);
 
+  /* The Chores Done board's day cells (#146): Heritage Orange, stronger in four steps as more
+     of the day was done (step 4 = every chore). Readable text on every step: Deep Slate on
+     step 4 over white is 6.5:1. The dark partners below are stronger, so the steps still read
+     on surface-raised (ink on step 4 is 6.1:1). */
+  --chore-heat-1: rgb(241 93 34 / 10%);
+  --chore-heat-2: rgb(241 93 34 / 20%);
+  --chore-heat-3: rgb(241 93 34 / 32%);
+  --chore-heat-4: rgb(241 93 34 / 45%);
+
   /* Family birthdays (derived, read-only — see `utils/birthdays.ts`). The same
      family as the `birthday` activity category so a derived birthday and a
      birthday PARTY someone scheduled read as the same kind of day, but DEEPENED
@@ -265,6 +274,10 @@
   --chore-evening-ink: var(--color-ink);
   --chore-anytime-tint: rgb(255 255 255 / 5%);
   --chore-anytime-ink: var(--color-ink-soft);
+  --chore-heat-1: rgb(241 93 34 / 16%);
+  --chore-heat-2: rgb(241 93 34 / 28%);
+  --chore-heat-3: rgb(241 93 34 / 40%);
+  --chore-heat-4: rgb(241 93 34 / 55%);
 
   /* 6.28:1 on surface-raised, 7.25:1 on surface-ground. */
   --birthday-orange: #ff8a5b;

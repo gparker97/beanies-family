@@ -1,32 +1,35 @@
 <script setup lang="ts">
 /**
- * One time-of-day block of a bean's day on the choreboard page (#146), in its block colour.
+ * One time-of-day block of a bean's day (#146), in its block colour: the tick view of
+ * `?bean=<id>`. (The home card draws its blocks with `ChoreBlockSummary`.)
  * Every state comes from the ONE read model (`beanChoreDay` → `ChoreDayBlock`), nothing here
  * decides "done" or "now":
  *
  *  - open:    the colour header (with the Heritage Orange ring and "Now" tag when it is the block
  *             happening now) and its chores, tickable;
- *  - later:   one quiet line in the block colour (day view: tap to open it);
- *  - done:    every chore ticked. On a bean's day, the block happening now (and Anytime) shows
- *             the all-done `CelebrationBanner` with one star per chore; elsewhere it folds to a
- *             one-line "All Done" strip with its stars. Either can reopen its chores, so a tick
- *             made by mistake can be undone. The celebration itself is the store's (once per
+ *  - later:   one quiet line in the block colour (tap to open it);
+ *  - done:    every chore ticked. The block happening now (and Anytime) shows the all-done
+ *             `CelebrationBanner` with one star per chore; any other folds to a one-line
+ *             "All Done" strip with its stars. Either can reopen its chores, so a tick made by
+ *             mistake can be undone. The celebration itself is the store's (once per
  *             bean, block and day); this only ever draws the banner.
  *
  * A grown-up (`canEdit`) can tap a chore's name (`edit`); the page opens the bean's chore list,
  * where chores are edited and reordered (`ChoreBeanEditor`). This section only ticks.
  *
+ * `reveal()` (exposed) opens a quiet block and brings it into view with focus: the day's
+ * "Today" summary calls it when a row is tapped.
+ *
  * Colours: the block's tint and ink come from `.chore-block-*` (`src/style.css`), which holds
  * their dark partners. The done strip is the orange tint with `primary-700` / `accent-lift`
  * ink. The banner is the fixed brand gradient with white ink in both themes.
  */
-import { computed, ref } from 'vue';
+import { computed, nextTick, ref } from 'vue';
 import ChoreRow from '@/components/chores/ChoreRow.vue';
 import CelebrationBanner from '@/components/ui/CelebrationBanner.vue';
 import { useTranslation } from '@/composables/useTranslation';
-import { CHORE_BLOCK_META, choreEmoji } from '@/constants/choreBlocks';
+import { CHORE_BLOCK_META, choreBlockHint, choreEmoji } from '@/constants/choreBlocks';
 import { fillTemplate } from '@/utils/fillTemplate';
-import { formatTime12 } from '@/utils/date';
 import type { ChoreDayBlock } from '@/utils/chores';
 import type { ChoreBlockStarts } from '@/types/models';
 
@@ -36,7 +39,6 @@ const props = withDefaults(
     memberId: string;
     /** The bean's first name, for the banner's "Nice work, {name}." */
     beanName: string;
-    variant?: 'card' | 'day';
     /** Show the chores (the Now block, Anytime). False draws the quiet "later" line. */
     open?: boolean;
     /** A finished block draws the big banner (true) or the one-line strip (false). */
@@ -47,7 +49,6 @@ const props = withDefaults(
     isPending?: (choreId: string) => boolean;
   }>(),
   {
-    variant: 'day',
     open: true,
     celebrate: false,
     canTick: true,
@@ -68,40 +69,19 @@ const expanded = ref(false);
 
 const meta = computed(() => CHORE_BLOCK_META[props.block.block]);
 const label = computed(() => t(meta.value.labelKey));
-const isCard = computed(() => props.variant === 'card');
 
 type State = 'open' | 'later' | 'done' | 'banner';
 const state = computed<State>(() => {
-  if (props.block.allDone) return props.celebrate && !isCard.value ? 'banner' : 'done';
+  if (props.block.allDone) return props.celebrate ? 'banner' : 'done';
   return props.open ? 'open' : 'later';
 });
 const showRows = computed(() => state.value === 'open' || expanded.value);
 
-/** The hour this block ends: the next block's start. Evening runs to midnight; Anytime has none. */
-const endsAt = computed(() => {
-  if (props.block.block === 'morning') return props.starts.afternoon;
-  if (props.block.block === 'afternoon') return props.starts.evening;
-  return '';
-});
-const startsAt = computed(() => {
-  const b = props.block.block;
-  return b === 'anytime' ? '' : props.starts[b];
-});
-
-const subtitle = computed(() => {
-  if (props.block.block === 'anytime') return t('choreboard.block.anytimeHint');
-  if (props.block.isNow) {
-    return endsAt.value
-      ? fillTemplate(t('choreboard.now.until'), { time: formatTime12(endsAt.value) })
-      : '';
-  }
-  if (props.block.ended) return '';
-  return fillTemplate(t('choreboard.block.from'), { time: formatTime12(startsAt.value) });
-});
+const subtitle = computed(() => choreBlockHint(props.block, props.starts, t));
 
 const left = computed(() => props.block.total - props.block.done);
 const countText = computed(() =>
-  isCard.value || props.block.ended
+  props.block.ended
     ? fillTemplate(t('choreboard.block.count'), {
         done: props.block.done,
         total: props.block.total,
@@ -134,17 +114,34 @@ const toggleLabel = computed(() =>
     block: label.value,
   })
 );
+
+const root = ref<HTMLElement | null>(null);
+
+/** Open this block (a quiet line, a done strip, a banner) and bring it into view with focus. */
+function reveal(): void {
+  if (state.value !== 'open') expanded.value = true;
+  void nextTick(() => {
+    const el = root.value;
+    if (!el) return;
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    el.scrollIntoView?.({ block: 'nearest', behavior: reduce ? 'auto' : 'smooth' });
+    el.focus({ preventScroll: true });
+  });
+}
+
+defineExpose({ reveal });
 </script>
 
 <template>
   <section
-    class="flex flex-col"
+    ref="root"
+    tabindex="-1"
+    class="flex scroll-mt-4 flex-col gap-2 focus:outline-none"
     :class="[
-      isCard ? 'gap-1.5' : 'gap-2',
-      state === 'open' && !isCard
+      state === 'open'
         ? 'dark:bg-surface-raised dark:border-line overflow-hidden rounded-3xl bg-white shadow-[var(--card-shadow)] dark:border'
         : '',
-      state === 'open' && !isCard && block.isNow
+      state === 'open' && block.isNow
         ? 'ring-primary-500 shadow-[0_10px_28px_rgba(241,93,34,0.16)] ring-2'
         : '',
     ]"
@@ -153,7 +150,7 @@ const toggleLabel = computed(() =>
     :data-state="state"
     :data-now="block.isNow ? 'true' : 'false'"
   >
-    <!-- The all-done banner: a bean's day, the block happening now (or Anytime). -->
+    <!-- The all-done banner: the block happening now (or Anytime). -->
     <template v-if="state === 'banner'">
       <CelebrationBanner
         :title="bannerTitle"
@@ -170,34 +167,31 @@ const toggleLabel = computed(() =>
     </template>
 
     <!-- The one-line "All Done" strip, with its stars. -->
-    <component
-      :is="isCard ? 'div' : 'button'"
+    <button
       v-else-if="state === 'done'"
-      :type="isCard ? undefined : 'button'"
-      class="font-outfit text-primary-700 dark:text-accent-lift flex w-full items-center gap-2 bg-[var(--tint-orange-8)] text-left font-bold"
-      :class="isCard ? 'rounded-xl px-2.5 py-1.5 text-xs' : 'rounded-2xl px-4 py-3 text-sm'"
-      :aria-expanded="isCard ? undefined : expanded ? 'true' : 'false'"
-      :aria-label="isCard ? undefined : toggleLabel"
+      type="button"
+      class="font-outfit text-primary-700 dark:text-accent-lift flex w-full items-center gap-2 rounded-2xl bg-[var(--tint-orange-8)] px-4 py-3 text-left text-sm font-bold"
+      :aria-expanded="expanded ? 'true' : 'false'"
+      :aria-label="toggleLabel"
       data-testid="chore-done-strip"
-      @click="!isCard && (expanded = !expanded)"
+      @click="expanded = !expanded"
     >
       <span aria-hidden="true">{{ meta.emoji }}</span>
       <span class="min-w-0 flex-1 truncate">{{ label }}</span>
       <span class="truncate" aria-hidden="true">{{ stars }}</span>
       <span>{{ t('choreboard.block.allDone') }}</span>
-    </component>
+    </button>
 
     <!-- A later block: one quiet line in its colour. -->
-    <component
-      :is="isCard ? 'div' : 'button'"
+    <button
       v-else-if="state === 'later'"
-      :type="isCard ? undefined : 'button'"
+      type="button"
       class="font-outfit flex w-full items-center gap-2.5 rounded-2xl bg-[var(--chore-tint)] px-4 py-2.5 text-left text-sm font-semibold text-[var(--chore-ink)]"
       :class="meta.colorClass"
-      :aria-expanded="isCard ? undefined : expanded ? 'true' : 'false'"
-      :aria-label="isCard ? undefined : toggleLabel"
+      :aria-expanded="expanded ? 'true' : 'false'"
+      :aria-label="toggleLabel"
       data-testid="chore-block-later"
-      @click="!isCard && (expanded = !expanded)"
+      @click="expanded = !expanded"
     >
       <span class="text-lg" aria-hidden="true">{{ meta.emoji }}</span>
       <span class="min-w-0 flex-1 truncate">
@@ -221,48 +215,35 @@ const toggleLabel = computed(() =>
           clip-rule="evenodd"
         />
       </svg>
-    </component>
+    </button>
 
     <!-- An open block's colour header. -->
     <header
       v-else
-      class="font-outfit flex items-center gap-2 bg-[var(--chore-tint)] font-bold text-[var(--chore-ink)]"
-      :class="[
-        meta.colorClass,
-        isCard ? 'rounded-xl px-2.5 py-1.5 text-xs' : 'px-4 py-2.5 text-base',
-      ]"
+      class="font-outfit flex items-center gap-2 bg-[var(--chore-tint)] px-4 py-2.5 text-base font-bold text-[var(--chore-ink)]"
+      :class="meta.colorClass"
     >
-      <span :class="isCard ? 'text-sm' : 'text-xl'" aria-hidden="true">{{ meta.emoji }}</span>
+      <span class="text-xl" aria-hidden="true">{{ meta.emoji }}</span>
       <span class="min-w-0 flex-1 truncate">
         {{ label }}
-        <span v-if="subtitle && !isCard" class="font-inter text-xs font-medium">{{
-          subtitle
-        }}</span>
+        <span v-if="subtitle" class="font-inter text-xs font-medium">{{ subtitle }}</span>
       </span>
-      <span class="whitespace-nowrap" :class="isCard ? '' : 'font-inter text-xs font-medium'">{{
-        countText
-      }}</span>
+      <span class="font-inter text-xs font-medium whitespace-nowrap">{{ countText }}</span>
       <span
-        v-if="block.isNow && !isCard"
+        v-if="block.isNow"
         class="from-primary-500 to-terracotta-400 rounded-full bg-gradient-to-br px-2.5 py-0.5 text-xs font-bold text-white"
         data-testid="chore-now-tag"
         >{{ t('choreboard.now.tag') }}</span
       >
     </header>
 
-    <div
-      v-if="showRows"
-      class="flex flex-col"
-      :class="isCard ? 'gap-1' : 'gap-1.5 p-2'"
-      data-testid="chore-block-rows"
-    >
+    <div v-if="showRows" class="flex flex-col gap-1.5 p-2" data-testid="chore-block-rows">
       <ChoreRow
         v-for="item in block.chores"
         :key="item.chore.id"
         :chore="item.chore"
         :member-id="memberId"
         :done="item.done"
-        :compact="isCard"
         :can-tick="canTick"
         :can-edit="canEdit"
         :pending="isPending(item.chore.id)"

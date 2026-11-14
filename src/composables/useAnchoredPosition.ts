@@ -1,4 +1,4 @@
-import { onScopeDispose, ref, watch, type Ref } from 'vue';
+import { onScopeDispose, ref, toValue, watch, type MaybeRefOrGetter, type Ref } from 'vue';
 
 /**
  * The z-index every anchored popover paints at: above every modal and drawer layer
@@ -24,6 +24,14 @@ export interface AnchoredPositionOptions {
    * idiom; `'start'` left-aligns it, for a picker that drops down from its pill.
    */
   align?: 'start' | 'end';
+  /**
+   * Which side of the anchor the popover opens on: `'below'` (default) under it, flipped up when
+   * there is no room below; `'start'` beside it on the left, level with it and clamped to the
+   * viewport, for a popover opened from a narrow right-hand rail so it covers the page beside
+   * the rail rather than the rail itself. With no room on the left, `'start'` falls back to
+   * `'below'`. Read on every `reposition()`, so a getter can follow a layout change.
+   */
+  side?: MaybeRefOrGetter<'below' | 'start'>;
   widthEstimate?: number;
   heightEstimate?: number;
 }
@@ -47,6 +55,7 @@ export function useAnchoredPosition(options: AnchoredPositionOptions) {
     popoverRef,
     active,
     align = 'end',
+    side = 'below',
     widthEstimate = 208,
     heightEstimate = 156,
   } = options;
@@ -59,6 +68,22 @@ export function useAnchoredPosition(options: AnchoredPositionOptions) {
     const height = popoverRef.value?.offsetHeight ?? heightEstimate;
     const width = popoverRef.value?.offsetWidth ?? widthEstimate;
     const MARGIN = 8;
+    const zIndex = String(ANCHORED_POPOVER_Z_INDEX);
+
+    // Beside the anchor, on its left, when there is room there.
+    const GAP = 12;
+    if (toValue(side) === 'start' && rect.left - width - GAP >= MARGIN) {
+      const centred = rect.top + rect.height / 2 - height / 2;
+      const top = Math.max(MARGIN, Math.min(centred, window.innerHeight - height - MARGIN));
+      popoverStyle.value = {
+        position: 'fixed',
+        top: `${top}px`,
+        left: `${rect.left - width - GAP}px`,
+        zIndex,
+      };
+      return;
+    }
+
     const spaceBelow = window.innerHeight - rect.bottom;
 
     // Flip up when there isn't room below but there is above.
@@ -75,7 +100,7 @@ export function useAnchoredPosition(options: AnchoredPositionOptions) {
       position: 'fixed',
       top: `${Math.max(MARGIN, top)}px`,
       left: `${left}px`,
-      zIndex: String(ANCHORED_POPOVER_Z_INDEX),
+      zIndex,
     };
   }
 

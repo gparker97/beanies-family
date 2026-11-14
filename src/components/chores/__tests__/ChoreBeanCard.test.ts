@@ -1,7 +1,8 @@
 /**
- * A bean's home card: today's count, the block happening now open (and Anytime), finished
- * blocks as All Done strips, every other block as a coloured count; the compact card for a
- * bean with no chores; grown-up controls only for grown-ups.
+ * A bean's home card, "four segments": the header (count, "N left today"), one summary row per
+ * time of day in day order, the block happening now open with its ticks, other rows opening on
+ * a tap (one at a time beside Now); the slim row for a bean with no chores; grown-up controls
+ * only for grown-ups.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount } from '@vue/test-utils';
@@ -50,53 +51,94 @@ function mountCard(props: Record<string, unknown> = {}) {
 beforeEach(() => resetKit());
 
 describe('ChoreBeanCard', () => {
-  it('shows the count, the Now block open, Anytime, and later blocks as coloured counts', () => {
+  it('one summary row per block in day order; Now open with its ticks; the header counts', () => {
     chores.list = [
+      chore('x1', { block: 'anytime' }),
+      chore('e1', { block: 'evening' }),
       chore('m1'),
       chore('m2'),
       chore('a1', { block: 'afternoon' }),
       chore('a2', { block: 'afternoon' }),
-      chore('e1', { block: 'evening' }),
-      chore('x1', { block: 'anytime' }),
     ];
     chores.marks = [doneMark('kid', 'm1')];
     const w = mountCard();
     expect(w.get('[data-testid="chore-bean-count"]').text()).toBe('choreboard.block.count');
-    const sections = w.findAll('[data-testid="chore-block"]');
-    expect(sections.map((s) => s.attributes('data-block'))).toEqual(['morning', 'anytime']);
-    expect(sections.every((s) => s.attributes('data-state') === 'open')).toBe(true);
-    // Compact rows for the overview.
-    expect(w.findAll('[data-testid="chore-row"]')).toHaveLength(3);
-    const chips = w.findAll('[data-testid="chore-bean-chip"]');
-    expect(chips.map((c) => [c.attributes('data-block'), c.text().replace(/\s/g, '')])).toEqual([
-      ['afternoon', '☀️2'],
-      ['evening', '🌙1'],
+    expect(w.get('[data-testid="chore-bean-left"]').text()).toBe('choreboard.card.left.other');
+    const rows = w.findAll('[data-testid="chore-summary"]');
+    expect(rows.map((r) => r.attributes('data-block'))).toEqual([
+      'morning',
+      'afternoon',
+      'evening',
+      'anytime',
     ]);
+    expect(rows[0]!.attributes('data-now')).toBe('true');
+    // Only the Now block's chores are showing.
+    expect(
+      w.findAll('[data-testid="chore-row"]').map((r) => r.attributes('data-chore-id'))
+    ).toEqual(['m1', 'm2']);
+    // The "More Today" chips are gone.
+    expect(w.find('[data-testid="chore-bean-chips"]').exists()).toBe(false);
   });
 
-  it('a finished Now block folds to its All Done strip', () => {
+  it('a tap opens another block, one at a time beside Now; a tap on Now folds it', async () => {
+    chores.list = [
+      chore('m1'),
+      chore('a1', { block: 'afternoon' }),
+      chore('e1', { block: 'evening' }),
+    ];
+    const w = mountCard();
+    const toggle = (block: string) =>
+      w.get(
+        `[data-testid="chore-summary"][data-block="${block}"] [data-testid="chore-summary-toggle"]`
+      );
+    const shown = () =>
+      w.findAll('[data-testid="chore-row"]').map((r) => r.attributes('data-chore-id'));
+    await toggle('afternoon').trigger('click');
+    expect(shown()).toEqual(['m1', 'a1']);
+    await toggle('evening').trigger('click');
+    expect(shown()).toEqual(['m1', 'e1']);
+    await toggle('evening').trigger('click');
+    expect(shown()).toEqual(['m1']);
+    await toggle('morning').trigger('click');
+    expect(shown()).toEqual([]);
+    expect(toggle('morning').attributes('aria-expanded')).toBe('false');
+  });
+
+  it('a finished Now block folds to its stars and All Done', () => {
     chores.list = [chore('m1'), chore('a1', { block: 'afternoon' })];
     chores.marks = [doneMark('kid', 'm1')];
     const w = mountCard();
-    const morning = w.get('[data-block="morning"]');
+    const morning = w.get('[data-testid="chore-summary"][data-block="morning"]');
     expect(morning.attributes('data-state')).toBe('done');
-    expect(w.find('[data-testid="chore-done-strip"]').exists()).toBe(true);
-    expect(w.find('[data-testid="chore-done-banner"]').exists()).toBe(false);
+    expect(w.find('[data-testid="chore-row"]').exists()).toBe(false);
   });
 
-  it('a later block finished early is a strip too, not a count', () => {
-    chores.list = [chore('m1'), chore('e1', { block: 'evening' })];
-    chores.marks = [doneMark('kid', 'e1')];
+  it('a block whose time passed with chores left says how many, in orange', () => {
+    clock.hhmm = '18:15';
+    chores.list = [chore('m1'), chore('m2'), chore('e1', { block: 'evening' })];
+    chores.marks = [doneMark('kid', 'm1')];
     const w = mountCard();
-    expect(w.get('[data-block="evening"]').attributes('data-state')).toBe('done');
-    expect(w.find('[data-testid="chore-bean-chip"]').exists()).toBe(false);
+    const morning = w.get('[data-testid="chore-summary"][data-block="morning"]');
+    expect(morning.attributes('data-state')).toBe('left');
+    expect(morning.get('[data-testid="chore-summary-left"]').text()).toBe(
+      'choreboard.summary.left.one'
+    );
   });
 
-  it('a bean with no chores gets the compact card', () => {
+  it('every chore done: "All done today"', () => {
+    chores.list = [chore('m1')];
+    chores.marks = [doneMark('kid', 'm1')];
+    const w = mountCard();
+    expect(w.get('[data-testid="chore-bean-left"]').text()).toContain('choreboard.card.allDone');
+  });
+
+  it('a bean with no chores is a slim row', () => {
     const w = mountCard({ hasAnyChores: false });
+    expect(w.get('[data-testid="chore-bean-card"]').attributes('data-slim')).toBe('true');
     expect(w.get('[data-testid="chore-bean-empty"]').text()).toBe('choreboard.card.noneYet');
-    expect(w.find('[data-testid="chore-block"]').exists()).toBe(false);
+    expect(w.find('[data-testid="chore-summary"]').exists()).toBe(false);
     expect(w.find('[data-testid="chore-bean-count"]').exists()).toBe(false);
+    expect(w.find('[data-testid="chore-bean-open"]').exists()).toBe(false);
   });
 
   it('chores on other days only: "No chores today"', () => {
@@ -128,10 +170,14 @@ describe('ChoreBeanCard', () => {
     expect(adult.emitted('edit-chores')).toHaveLength(2);
   });
 
-  it('a bean with no chores at all has "+" (the same list, empty), no Edit Chores and no Copy', async () => {
+  it('a bean with no chores at all has Add Chores (the same list, empty), no Edit Chores and no Copy', async () => {
     const w = mountCard({ canEdit: true, hasAnyChores: false });
     expect(w.find('[data-testid="chore-bean-edit"]').exists()).toBe(false);
     expect(w.find('[data-testid="chore-bean-copy"]').exists()).toBe(false);
+    expect(w.get('[data-testid="chore-bean-add"]').text()).toContain('choreboard.addChores');
+    expect(mountCard({ hasAnyChores: false }).find('[data-testid="chore-bean-add"]').exists()).toBe(
+      false
+    );
     await w.get('[data-testid="chore-bean-add"]').trigger('click');
     expect(w.emitted('edit-chores')).toHaveLength(1);
   });

@@ -2,11 +2,17 @@
 /**
  * The choreboard (#146): chores in their own place, by time of day. Two views:
  *
- *  - HOME (grown-ups): one card per bean with today's count, the block happening now open and
- *    tickable; Hours and ONE Add Chores (the sheet, for one chore or a whole set); the "No one's"
- *    group for chores whose people have left the family; the "Week so far" panel; an empty state.
+ *  - HOME (grown-ups): one card per bean with chores ("four segments": a summary row per time
+ *    of day, the block happening now open and tickable), in two lanes from 768px (each next card
+ *    into the shorter lane, by an estimate from its blocks and the Now block's chores, so a short
+ *    card leaves no hole and a tick never moves a card), beans with no chores as slim rows
+ *    below; Hours and ONE Add Chores (the sheet, for one chore or a whole set); the "No one's"
+ *    group for chores whose people have left the family; the "Chores Done" board, in a right
+ *    rail (days down) from 1280px and below the cards (days across) under it; an empty state.
  *  - A BEAN'S DAY (`?bean=<id>`): the tick view. "Now" first and biggest, later blocks quieter,
- *    the all-done banner, the "This week" row. A child always lands on their own day.
+ *    the all-done banner; beside it (from 1280px) or above and below it, the "Today" summary
+ *    (`ChoreBlockSummary`, rows, or the tile strip on a phone; a tap opens and scrolls to that
+ *    block) and the bean's own Chores Done week. A child always lands on their own day.
  *
  * Editing is per bean, like a Beanie List: the bean's chore list (`ChoreBeanEditor`, "Pip's
  * Chores") opens from the bean's card (Edit Chores, or "+" when it has none), the day's Edit
@@ -30,6 +36,10 @@
  * Each guard that changes the URL logs `query-guarded` with its reason, so a report of "the
  * link opened the wrong thing" can be read from the firehose.
  *
+ * Performance: the board reads `choreStore.weekFor`, which reads the store's day clock (it moves
+ * at a block boundary or midnight, never every minute) and the marks; there are no per-cell
+ * watchers.
+ *
  * Dark mode: the page sits on `surface-ground`; cards and the day's sections are
  * `surface-raised` (line edges), rows `surface-overlay`. Block colours come from
  * `.chore-block-*` in `src/style.css`; accent text pairs with its `-lift`.
@@ -41,8 +51,8 @@ import AddEntityButton from '@/components/ui/AddEntityButton.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import ChoreBeanCard from '@/components/chores/ChoreBeanCard.vue';
 import ChoreBlockSection from '@/components/chores/ChoreBlockSection.vue';
+import ChoreBlockSummary from '@/components/chores/ChoreBlockSummary.vue';
 import ChoreRow from '@/components/chores/ChoreRow.vue';
-import ChoreWeekRow from '@/components/chores/ChoreWeekRow.vue';
 import ChoreWeekPanel from '@/components/chores/ChoreWeekPanel.vue';
 import ChoreBeanEditor from '@/components/chores/ChoreBeanEditor.vue';
 import ChoreAddSheet from '@/components/chores/ChoreAddSheet.vue';
@@ -54,21 +64,23 @@ import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
 import { useChoreClock } from '@/composables/useChoreClock';
 import { useChoreTicks } from '@/composables/useChoreTicks';
 import { usePermissions } from '@/composables/usePermissions';
+import { useBreakpoint } from '@/composables/useBreakpoint';
+import { useMediaQuery } from '@/composables/useMediaQuery';
 import { useChoreStore } from '@/stores/choreStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { logEvent } from '@/services/telemetry/logEvent';
-import { CHORE_BLOCK_META } from '@/constants/choreBlocks';
+import { CHORE_BLOCK_META, choreBlockHint } from '@/constants/choreBlocks';
 import { choreStarterSet, type ChoreStarterSetKey } from '@/constants/choreStarterSets';
 import {
   blocksInDisplayOrder,
   choreBlockRank,
   currentBlock,
+  type BeanChoreDay,
   type ChoreDayBlock,
 } from '@/utils/chores';
 import { firstName as firstWord } from '@/utils/assignees';
 import { fillTemplate } from '@/utils/fillTemplate';
-import { formatTime12 } from '@/utils/date';
-import type { FamilyMember } from '@/types/models';
+import type { ChoreBlock, FamilyMember } from '@/types/models';
 
 const { t } = useTranslation();
 const route = useRoute();
@@ -78,6 +90,9 @@ const choreStore = useChoreStore();
 const { choreClock } = useChoreClock();
 const ticks = useChoreTicks();
 const { memberAvatarBindings } = useMemberAvatarBindings();
+const { isMobile } = useBreakpoint();
+/** Tailwind's `xl`: the desktop right rail (home board, day summary and week). */
+const isWide = useMediaQuery('(min-width: 80rem)');
 
 onMounted(() => {
   // The boot sequence loads chores; this covers a page reached before that finished.
@@ -227,15 +242,9 @@ const pendingFor = (memberId: string) => (choreId: string) => ticks.isPending(ch
 const starts = computed(() => choreStore.starts);
 const nowBlock = computed(() => currentBlock(choreClock.value.hhmm, starts.value));
 const nowMeta = computed(() => CHORE_BLOCK_META[nowBlock.value]);
-const nowUntil = computed(() => {
-  const end =
-    nowBlock.value === 'morning'
-      ? starts.value.afternoon
-      : nowBlock.value === 'afternoon'
-        ? starts.value.evening
-        : '';
-  return end ? fillTemplate(t('choreboard.now.until'), { time: formatTime12(end) }) : '';
-});
+const nowUntil = computed(() =>
+  choreBlockHint({ block: nowBlock.value, isNow: true, ended: false }, starts.value, t)
+);
 
 /** Members with at least one chore on some day (a living assignee). */
 const choreOwners = computed(() => {
@@ -248,24 +257,63 @@ const firstName = (m: FamilyMember) => firstWord(m.name) || m.name;
 
 // ── Home ────────────────────────────────────────────────────────────────────
 
-const homeBeans = computed(() => {
-  const humans = familyStore.sortedHumans;
-  const withChores = humans.filter((m) => choreOwners.value.has(m.id));
-  const without = humans.filter((m) => !choreOwners.value.has(m.id));
-  return [...withChores, ...without].map((member) => ({
-    member,
-    day: choreStore.choreDayFor(member.id),
-    hasAnyChores: choreOwners.value.has(member.id),
-  }));
+interface HomeBean {
+  member: FamilyMember;
+  day: BeanChoreDay;
+}
+
+/** Beans with a chore on some day: one card each, in family order. */
+const cardBeans = computed<HomeBean[]>(() =>
+  familyStore.sortedHumans
+    .filter((m) => choreOwners.value.has(m.id))
+    .map((member) => ({ member, day: choreStore.choreDayFor(member.id) }))
+);
+/** Beans with no chores at all: the slim rows under the cards. */
+const slimBeans = computed(() =>
+  familyStore.sortedHumans.filter((m) => !choreOwners.value.has(m.id))
+);
+
+/**
+ * A card's height, estimated in summary rows: the header, one row per block, and the Now
+ * block's chores (open on the card). It reads only which chores are due when, never which are
+ * done, so a tick never moves a card to the other lane.
+ */
+function cardWeight(day: BeanChoreDay): number {
+  const blocks = day.blocks.filter((b) => b.total > 0);
+  const now = blocks.find((b) => b.isNow);
+  return 1.6 + blocks.length * 1.1 + (now ? now.total * 1.05 : 0);
+}
+
+/**
+ * The cards in lanes: one on a phone (family order), two from 768px, each next card into the
+ * shorter lane (ties to the first), so a short card leaves no hole beside a long one. Pure and
+ * deterministic: no measuring, so no layout thrash.
+ */
+const lanes = computed<HomeBean[][]>(() => {
+  if (isMobile.value) return [cardBeans.value];
+  const out: HomeBean[][] = [[], []];
+  const heights = [0, 0];
+  for (const bean of cardBeans.value) {
+    const i = heights[1]! < heights[0]! ? 1 : 0;
+    out[i]!.push(bean);
+    heights[i]! += cardWeight(bean.day);
+  }
+  return out;
 });
 
 const isEmpty = computed(() => choreStore.isLoaded && choreStore.chores.length === 0);
+
+/** Today as the board reads it: the store's day clock, not the minute clock. */
+const todayYmd = computed(() => choreStore.todayYmd);
 
 const weekRows = computed(() =>
   familyStore.sortedHumans
     .map((member) => ({ member, week: choreStore.weekFor(member.id) }))
     .filter((r) => choreOwners.value.has(r.member.id) || r.week.total > 0)
 );
+const showBoard = computed(() => isAdult.value && weekRows.value.length > 0);
+/** The home board sits in the right rail (days down) only on a wide screen. */
+const homeRail = computed(() => isWide.value && showBoard.value);
 
 function openDay(memberId: string): void {
   void router.push({ query: { ...route.query, bean: memberId } });
@@ -338,7 +386,28 @@ const dayEditLabel = computed(() =>
   t(dayHasAnyChores.value ? 'choreboard.day.edit' : 'choreboard.addChores')
 );
 
-const dayWeek = computed(() => (viewBeanId.value ? choreStore.weekFor(viewBeanId.value) : null));
+/** The "Today" summary: the bean's blocks with chores today, in day order. */
+const summaryBlocks = computed(() => (day.value?.blocks ?? []).filter((b) => b.total > 0));
+
+const dayWeekRows = computed(() =>
+  dayMember.value && dayHasAnyChores.value
+    ? [{ member: dayMember.value, week: choreStore.weekFor(dayMember.value.id) }]
+    : []
+);
+/** The day page's rail: only when there is something to put in it. */
+const dayRail = computed(
+  () => isWide.value && (summaryBlocks.value.length > 0 || dayWeekRows.value.length > 0)
+);
+
+/** The day's sections, by block, so a summary row can open and scroll to its section. */
+const sectionRefs = new Map<ChoreBlock, { reveal: () => void }>();
+function setSectionRef(block: ChoreBlock, el: unknown): void {
+  if (el) sectionRefs.set(block, el as { reveal: () => void });
+  else sectionRefs.delete(block);
+}
+function revealBlock(block: ChoreBlock): void {
+  sectionRefs.get(block)?.reveal();
+}
 </script>
 
 <template>
@@ -354,7 +423,9 @@ const dayWeek = computed(() => (viewBeanId.value ? choreStore.weekFor(viewBeanId
           @click="backHome"
         >
           <span aria-hidden="true">←</span>
-          {{ t('choreboard.day.back') }}
+          <!-- A phone has room for one row: "Back" there, the full label from 640px. -->
+          <span class="hidden sm:inline">{{ t('choreboard.day.back') }}</span>
+          <span class="sm:hidden">{{ t('action.back') }}</span>
         </button>
         <span class="flex-1" />
         <template v-if="isAdult">
@@ -362,10 +433,12 @@ const dayWeek = computed(() => (viewBeanId.value ? choreStore.weekFor(viewBeanId
             v-if="dayHasAnyChores"
             type="button"
             class="font-outfit dark:bg-surface-raised dark:border-line-strong dark:text-ink text-secondary-500 focus-visible:ring-sky-silk-300 rounded-2xl border border-[var(--color-border-strong)] bg-white px-3.5 py-2 text-sm font-semibold focus-visible:ring-2 focus-visible:outline-none"
+            :aria-label="t('choreboard.day.copy')"
             data-testid="chore-day-copy"
             @click="openCopy(viewBeanId)"
           >
-            <span aria-hidden="true">📋</span> {{ t('choreboard.day.copy') }}
+            <span aria-hidden="true">📋</span>
+            <span class="hidden sm:inline" aria-hidden="true">{{ t('choreboard.day.copy') }}</span>
           </button>
           <!-- With no chores at all there is nothing to edit: it reads Add Chores. -->
           <button
@@ -431,60 +504,104 @@ const dayWeek = computed(() => (viewBeanId.value ? choreStore.weekFor(viewBeanId
         </div>
       </div>
 
-      <div
-        v-if="daySections.length === 0"
-        class="dark:bg-surface-raised dark:border-line rounded-3xl bg-white px-5 py-10 text-center shadow-[var(--card-shadow)] dark:border"
-        data-testid="chore-day-empty"
-      >
-        <img
-          src="/brand/beanies_celebrating_line_transparent_560x225.png"
-          :alt="t('choreboard.done.imageAlt')"
-          class="mx-auto mb-4 w-44"
-        />
-        <p class="font-outfit dark:text-ink text-secondary-500 text-base font-semibold">
-          {{ dayEmptyText }}
-        </p>
-        <!-- Grown-ups only: no chores at all, Add Chores; chores on other days, Edit Chores.
-             Both open this bean's chore list. A child sees the card alone. -->
-        <div v-if="isAdult" class="mt-5 flex justify-center">
-          <AddEntityButton
-            v-if="!dayHasAnyChores"
-            :label="t('choreboard.addChores')"
-            data-testid="chore-day-empty-add"
-            @click="openBeanEditor(viewBeanId)"
-          />
-          <button
-            v-else
-            type="button"
-            class="font-outfit dark:bg-surface-overlay dark:border-line-strong dark:text-ink text-secondary-500 focus-visible:ring-sky-silk-300 rounded-2xl border border-[var(--color-border-strong)] bg-white px-4 py-2.5 text-sm font-semibold focus-visible:ring-2 focus-visible:outline-none"
-            data-testid="chore-day-empty-edit"
-            @click="openBeanEditor(viewBeanId)"
+      <!-- One DOM for both layouts: from 1280px the blocks fill the main column and the summary
+           and the week sit in the rail beside them; below, they stack (summary, blocks, week). -->
+      <div class="grid grid-cols-1 items-start gap-4" :class="{ 'day-grid-rail': dayRail }">
+        <section
+          v-if="summaryBlocks.length"
+          class="dark:bg-surface-raised dark:border-line flex min-w-0 flex-col gap-1 rounded-3xl bg-white px-3.5 pt-3.5 pb-3 shadow-[var(--card-shadow)] dark:border"
+          data-area="sum"
+          data-testid="chore-day-summary"
+        >
+          <div class="mb-1 flex items-baseline gap-2">
+            <h2 class="font-outfit dark:text-ink text-secondary-500 text-base font-bold">
+              {{ t('choreboard.summary.title') }}
+            </h2>
+            <span class="dark:text-ink-faint text-secondary-400 text-xs">{{
+              t('choreboard.summary.hint')
+            }}</span>
+          </div>
+          <div
+            :class="
+              isMobile ? 'grid auto-cols-fr grid-flow-col gap-1.5 pt-2.5' : 'flex flex-col gap-1.5'
+            "
           >
-            {{ t('choreboard.day.edit') }}
-          </button>
-        </div>
-      </div>
+            <ChoreBlockSummary
+              v-for="b in summaryBlocks"
+              :key="b.block"
+              :block="b"
+              :starts="starts"
+              :bean-name="firstName(dayMember)"
+              :variant="isMobile ? 'tile' : 'row'"
+              mode="jump"
+              @activate="revealBlock(b.block)"
+            />
+          </div>
+        </section>
 
-      <div v-else class="flex flex-col gap-3" data-testid="chore-day-sections">
-        <ChoreBlockSection
-          v-for="s in daySections"
-          :key="s.block.block"
-          :block="s.block"
-          :member-id="viewBeanId"
-          :bean-name="firstName(dayMember)"
-          variant="day"
-          :open="s.open"
-          :celebrate="s.celebrate"
-          :starts="starts"
-          :can-tick="canTickFor(viewBeanId)"
-          :can-edit="isAdult"
-          :is-pending="pendingFor(viewBeanId)"
-          @toggle="onToggle($event, viewBeanId)"
-          @edit="openBeanEditor(viewBeanId)"
+        <div class="min-w-0" data-area="main">
+          <div
+            v-if="daySections.length === 0"
+            class="dark:bg-surface-raised dark:border-line rounded-3xl bg-white px-5 py-10 text-center shadow-[var(--card-shadow)] dark:border"
+            data-testid="chore-day-empty"
+          >
+            <img
+              src="/brand/beanies_celebrating_line_transparent_560x225.png"
+              :alt="t('choreboard.done.imageAlt')"
+              class="mx-auto mb-4 w-44"
+            />
+            <p class="font-outfit dark:text-ink text-secondary-500 text-base font-semibold">
+              {{ dayEmptyText }}
+            </p>
+            <!-- Grown-ups only: no chores at all, Add Chores; chores on other days, Edit Chores.
+                 Both open this bean's chore list. A child sees the card alone. -->
+            <div v-if="isAdult" class="mt-5 flex justify-center">
+              <AddEntityButton
+                v-if="!dayHasAnyChores"
+                :label="t('choreboard.addChores')"
+                data-testid="chore-day-empty-add"
+                @click="openBeanEditor(viewBeanId)"
+              />
+              <button
+                v-else
+                type="button"
+                class="font-outfit dark:bg-surface-overlay dark:border-line-strong dark:text-ink text-secondary-500 focus-visible:ring-sky-silk-300 rounded-2xl border border-[var(--color-border-strong)] bg-white px-4 py-2.5 text-sm font-semibold focus-visible:ring-2 focus-visible:outline-none"
+                data-testid="chore-day-empty-edit"
+                @click="openBeanEditor(viewBeanId)"
+              >
+                {{ t('choreboard.day.edit') }}
+              </button>
+            </div>
+          </div>
+
+          <div v-else class="flex flex-col gap-3" data-testid="chore-day-sections">
+            <ChoreBlockSection
+              v-for="s in daySections"
+              :key="s.block.block"
+              :ref="(el) => setSectionRef(s.block.block, el)"
+              :block="s.block"
+              :member-id="viewBeanId"
+              :bean-name="firstName(dayMember)"
+              :open="s.open"
+              :celebrate="s.celebrate"
+              :starts="starts"
+              :can-tick="canTickFor(viewBeanId)"
+              :can-edit="isAdult"
+              :is-pending="pendingFor(viewBeanId)"
+              @toggle="onToggle($event, viewBeanId)"
+              @edit="openBeanEditor(viewBeanId)"
+            />
+          </div>
+        </div>
+
+        <ChoreWeekPanel
+          v-if="dayWeekRows.length"
+          data-area="week"
+          :rows="dayWeekRows"
+          :today-ymd="todayYmd"
+          single
         />
       </div>
-
-      <ChoreWeekRow v-if="dayWeek && dayHasAnyChores" :week="dayWeek" :today-ymd="choreClock.ymd" />
     </template>
 
     <!-- ═══ Home ═══ -->
@@ -547,56 +664,97 @@ const dayWeek = computed(() => (viewBeanId.value ? choreStore.weekFor(viewBeanId
       </div>
 
       <template v-else>
-        <div class="grid items-start gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-          <ChoreBeanCard
-            v-for="bean in homeBeans"
-            :key="bean.member.id"
-            :member="bean.member"
-            :day="bean.day"
-            :has-any-chores="bean.hasAnyChores"
-            :starts="starts"
-            :can-tick="canTickFor(bean.member.id)"
-            :can-edit="isAdult"
-            :is-pending="pendingFor(bean.member.id)"
-            @toggle="onToggle($event, bean.member.id)"
-            @edit-chores="openBeanEditor(bean.member.id)"
-            @open="openDay(bean.member.id)"
-            @copy="openCopy(bean.member.id)"
-          />
-        </div>
+        <div class="grid grid-cols-1 items-start gap-5" :class="{ 'home-grid-rail': homeRail }">
+          <div class="min-w-0">
+            <!-- The cards in lanes (one on a phone, two from 768px): see `lanes`. -->
+            <div
+              class="grid items-start gap-3.5"
+              :class="lanes.length > 1 ? 'grid-cols-2' : 'grid-cols-1'"
+              data-testid="chore-lanes"
+              :data-lanes="lanes.length"
+            >
+              <div
+                v-for="(lane, i) in lanes"
+                :key="i"
+                class="flex min-w-0 flex-col gap-3.5"
+                data-testid="chore-lane"
+              >
+                <ChoreBeanCard
+                  v-for="bean in lane"
+                  :key="bean.member.id"
+                  :member="bean.member"
+                  :day="bean.day"
+                  has-any-chores
+                  :starts="starts"
+                  :can-tick="canTickFor(bean.member.id)"
+                  :can-edit="isAdult"
+                  :is-pending="pendingFor(bean.member.id)"
+                  @toggle="onToggle($event, bean.member.id)"
+                  @edit-chores="openBeanEditor(bean.member.id)"
+                  @open="openDay(bean.member.id)"
+                  @copy="openCopy(bean.member.id)"
+                />
+              </div>
+            </div>
 
-        <!-- Chores whose people have all left the family: remove the ones not needed. -->
-        <section
-          v-if="isAdult && choreStore.orphans.length"
-          class="dark:bg-surface-raised dark:border-line rounded-3xl bg-white p-4 shadow-[var(--card-shadow)] dark:border"
-          data-testid="chore-orphans"
-        >
-          <h2 class="font-outfit dark:text-ink text-secondary-500 text-base font-bold">
-            {{ t('choreboard.orphans.title') }}
-          </h2>
-          <p class="dark:text-ink-soft text-secondary-400 mt-1 mb-3 text-sm">
-            {{ t('choreboard.orphans.hint') }}
-          </p>
-          <div class="flex flex-col gap-1.5">
-            <ChoreRow
-              v-for="c in choreStore.orphans"
-              :key="c.id"
-              :chore="c"
-              member-id=""
-              :done="false"
-              compact
-              :can-tick="false"
-              removable
-              @remove="removeOrphan(c.id)"
+            <!-- Beans with no chores yet: one slim row each. -->
+            <div
+              v-if="slimBeans.length"
+              class="flex flex-wrap gap-2.5"
+              :class="cardBeans.length ? 'mt-3.5' : ''"
+              data-testid="chore-slim-row"
+            >
+              <ChoreBeanCard
+                v-for="m in slimBeans"
+                :key="m.id"
+                class="max-w-96 flex-[1_1_15rem]"
+                :member="m"
+                :day="choreStore.choreDayFor(m.id)"
+                :has-any-chores="false"
+                :starts="starts"
+                :can-edit="isAdult"
+                @edit-chores="openBeanEditor(m.id)"
+              />
+            </div>
+
+            <!-- Chores whose people have all left the family: remove the ones not needed. -->
+            <section
+              v-if="isAdult && choreStore.orphans.length"
+              class="dark:bg-surface-raised dark:border-line mt-3.5 rounded-3xl bg-white p-4 shadow-[var(--card-shadow)] dark:border"
+              data-testid="chore-orphans"
+            >
+              <h2 class="font-outfit dark:text-ink text-secondary-500 text-base font-bold">
+                {{ t('choreboard.orphans.title') }}
+              </h2>
+              <p class="dark:text-ink-soft text-secondary-400 mt-1 mb-3 text-sm">
+                {{ t('choreboard.orphans.hint') }}
+              </p>
+              <div class="flex flex-col gap-1.5">
+                <ChoreRow
+                  v-for="c in choreStore.orphans"
+                  :key="c.id"
+                  :chore="c"
+                  member-id=""
+                  :done="false"
+                  compact
+                  :can-tick="false"
+                  removable
+                  @remove="removeOrphan(c.id)"
+                />
+              </div>
+            </section>
+          </div>
+
+          <div v-if="showBoard" class="min-w-0" :class="{ 'sticky top-4': homeRail }">
+            <ChoreWeekPanel
+              :rows="weekRows"
+              :today-ymd="todayYmd"
+              :orientation="homeRail ? 'down' : 'across'"
+              open-day-action
+              @open-day="openDay"
             />
           </div>
-        </section>
-
-        <ChoreWeekPanel
-          v-if="isAdult && weekRows.length"
-          :rows="weekRows"
-          :today-ymd="choreClock.ymd"
-        />
+        </div>
       </template>
     </template>
 
@@ -622,3 +780,31 @@ const dayWeek = computed(() => (viewBeanId.value ? choreStore.weekFor(viewBeanId
     <ChoreHoursModal :open="hoursOpen" @close="hoursOpen = false" />
   </div>
 </template>
+
+<style scoped>
+/* From 1280px: the cards beside a 20rem rail holding the Chores Done board. */
+.home-grid-rail {
+  grid-template-columns: minmax(0, 1fr) 20rem;
+}
+
+/* From 1280px: the blocks in the main column; the summary and the week in a 22rem rail. */
+.day-grid-rail {
+  column-gap: 1.25rem;
+  grid-template:
+    'main sum' auto
+    'main week' 1fr
+    / minmax(0, 1fr) 22rem;
+}
+
+.day-grid-rail > [data-area='sum'] {
+  grid-area: sum;
+}
+
+.day-grid-rail > [data-area='main'] {
+  grid-area: main;
+}
+
+.day-grid-rail > [data-area='week'] {
+  grid-area: week;
+}
+</style>

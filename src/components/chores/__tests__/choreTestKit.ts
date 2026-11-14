@@ -15,7 +15,7 @@ import {
   indexMarks,
   orphanChores,
   sortChores,
-  weekCounts,
+  choreWeekRecord,
 } from '@/utils/chores';
 import type { Chore, ChoreBlockStarts, ChoreMark, FamilyMember } from '@/types/models';
 
@@ -157,7 +157,11 @@ const choreStoreFake = {
       chores.starts,
       livingIds.value
     ),
-  weekFor: (memberId: string) => weekCounts(markIndex.value, memberId, clock.ymd, 1),
+  get todayYmd() {
+    return clock.ymd;
+  },
+  weekFor: (memberId: string) =>
+    choreWeekRecord(chores.list, markIndex.value, memberId, clock.ymd, 1, livingIds.value),
   ...choreActions,
 };
 

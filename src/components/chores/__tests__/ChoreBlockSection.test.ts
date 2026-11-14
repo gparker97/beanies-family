@@ -6,6 +6,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount } from '@vue/test-utils';
+import { nextTick } from 'vue';
 
 vi.mock(
   '@/composables/useTranslation',
@@ -37,8 +38,9 @@ function block(over: Partial<ChoreDayBlock> = {}): ChoreDayBlock {
   };
 }
 
-function mountSection(props: Record<string, unknown>) {
+function mountSection(props: Record<string, unknown>, attachTo?: HTMLElement) {
   return mount(ChoreBlockSection, {
+    attachTo,
     // Each test supplies `block` and its own extras; the spread loses the prop types.
     props: {
       memberId: 'kid',
@@ -95,20 +97,30 @@ describe('ChoreBlockSection', () => {
     expect(w.findAll('[data-testid="chore-row"]')).toHaveLength(3);
   });
 
-  it('done without celebrate, or on a card: the one-line All Done strip', () => {
+  it('done without celebrate: the one-line All Done strip', () => {
     const items = [{ chore: chore('c1'), done: true }];
     const day = mountSection({ block: block({ chores: items, isNow: false, ended: true }) });
     expect(day.get('[data-testid="chore-block"]').attributes('data-state')).toBe('done');
     expect(day.get('[data-testid="chore-done-strip"]').text()).toContain(
       'choreboard.block.allDone'
     );
-    const card = mountSection({
-      block: block({ chores: items }),
-      variant: 'card',
-      celebrate: true,
-    });
-    expect(card.get('[data-testid="chore-block"]').attributes('data-state')).toBe('done');
-    expect(card.find('[data-testid="chore-done-banner"]').exists()).toBe(false);
+  });
+
+  it('reveal() opens a quiet block and focuses it', async () => {
+    const w = mountSection(
+      {
+        block: block({ chores: [{ chore: chore('c1'), done: false }], isNow: false }),
+        open: false,
+      },
+      document.body
+    );
+    expect(w.find('[data-testid="chore-block-rows"]').exists()).toBe(false);
+    (w.vm as unknown as { reveal: () => void }).reveal();
+    await nextTick();
+    await nextTick();
+    expect(w.find('[data-testid="chore-block-rows"]').exists()).toBe(true);
+    expect(document.activeElement).toBe(w.get('[data-testid="chore-block"]').element);
+    w.unmount();
   });
 
   it('an ended later line counts what is left, in the plural of that number', () => {

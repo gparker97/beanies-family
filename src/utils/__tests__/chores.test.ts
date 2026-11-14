@@ -26,7 +26,8 @@ import {
   orphanChores,
   sameChoreMoment,
   shiftChoreDay,
-  weekCounts,
+  choreDayRecord,
+  choreWeekRecord,
 } from '../chores';
 
 const D = DEFAULT_CHORE_BLOCK_STARTS;
@@ -442,18 +443,119 @@ describe('completesBlock', () => {
   });
 });
 
-describe('weekCounts', () => {
+/** A timestamp at local noon on `ymd`, so the local-day rule reads the same in every zone. */
+const localNoon = (ymd: string) => {
+  const [y, m, d] = ymd.split('-').map(Number);
+  return new Date(y!, m! - 1, d!, 12).toISOString();
+};
+
+describe('choreDayRecord', () => {
+  const MON = '2026-11-09';
+  const THU = '2026-11-12';
+  const list = [
+    chore('bed'),
+    chore('teeth', { block: 'evening' }),
+    chore('school', { days: [1, 2, 3, 4, 5] }),
+    chore('sat-only', { days: [6], block: 'afternoon' }),
+    chore('shared', { assigneeIds: ['kid', 'sib'], block: 'anytime' }),
+    chore('sibs', { assigneeIds: ['sib'] }),
+  ];
+
+  it('the day as it was scheduled: weekdays and assignees, grouped by block in day order', () => {
+    const index = indexMarks([mark('done', 'kid', THU, 'bed'), mark('done', 'kid', THU, 'shared')]);
+    const r = choreDayRecord(list, index, 'kid', THU);
+    expect(r.blocks.map((b) => b.block)).toEqual(['morning', 'evening', 'anytime']);
+    expect(r.blocks[0]!.chores.map((i) => [i.chore.id, i.done])).toEqual([
+      ['bed', true],
+      ['school', false],
+    ]);
+    expect([r.done, r.total]).toEqual([2, 4]);
+    // Saturday has the Saturday chore and not the school one.
+    const sat = choreDayRecord(list, index, 'kid', SAT);
+    expect(sat.blocks.flatMap((b) => b.chores.map((i) => i.chore.id))).toEqual([
+      'bed',
+      'sat-only',
+      'teeth',
+      'shared',
+    ]);
+  });
+
+  it('a shared chore counts once for each of its beans, on their own tick', () => {
+    const index = indexMarks([mark('done', 'sib', THU, 'shared')]);
+    const kid = choreDayRecord(list, index, 'kid', THU);
+    const sib = choreDayRecord(list, index, 'sib', THU);
+    const sharedOf = (r: typeof kid) =>
+      r.blocks.find((b) => b.block === 'anytime')!.chores.find((i) => i.chore.id === 'shared')!;
+    expect(sharedOf(kid).done).toBe(false);
+    expect(sharedOf(sib).done).toBe(true);
+    expect([sib.done, sib.total]).toEqual([1, 2]);
+  });
+
+  it('a chore created after the day is not "not done" on it; one ticked that day stays', () => {
+    const later = [
+      chore('old', { createdAt: localNoon(MON) }),
+      chore('new', { createdAt: localNoon(THU) }),
+      chore('new-ticked', { createdAt: localNoon(FRI) }),
+    ];
+    const index = indexMarks([
+      mark('done', 'kid', MON, 'old'),
+      mark('done', 'kid', MON, 'new-ticked'),
+    ]);
+    const mon = choreDayRecord(later, index, 'kid', MON);
+    expect(mon.blocks[0]!.chores.map((i) => i.chore.id)).toEqual(['old', 'new-ticked']);
+    expect([mon.done, mon.total]).toEqual([2, 2]);
+    // On its own creation day it is due.
+    const thu = choreDayRecord(later, index, 'kid', THU);
+    expect(thu.blocks[0]!.chores.map((i) => i.chore.id)).toEqual(['old', 'new']);
+    // An unreadable createdAt keeps the chore.
+    const odd = choreDayRecord([chore('odd', { createdAt: 'garbage' })], index, 'kid', MON);
+    expect(odd.total).toBe(1);
+  });
+
+  it('a deleted chore and its tick simply do not appear; nor do non-done marks', () => {
+    const index = indexMarks([
+      mark('done', 'kid', THU, 'gone'),
+      mark('done', 'kid', THU, 'bed'),
+      mark('celebrated', 'kid', THU, 'morning'),
+    ]);
+    const r = choreDayRecord(list, index, 'kid', THU);
+    expect(r.blocks.flatMap((b) => b.chores.map((i) => i.chore.id))).not.toContain('gone');
+    expect(r.done).toBe(1);
+  });
+
+  it('today reads the same as the live day', () => {
+    const index = indexMarks([mark('done', 'kid', FRI, 'bed'), mark('done', 'kid', FRI, 'teeth')]);
+    const r = choreDayRecord(list, index, 'kid', FRI);
+    const live = beanChoreDay(list, index, 'kid', { ymd: FRI, hhmm: '07:42' }, D);
+    expect(r.done).toBe(live.blocks.reduce((n, b) => n + b.done, 0));
+    expect(r.total).toBe(live.blocks.reduce((n, b) => n + b.total, 0));
+    for (const b of r.blocks) {
+      const lb = live.blocks.find((x) => x.block === b.block)!;
+      expect([b.done, b.total]).toEqual([lb.done, lb.total]);
+    }
+  });
+
+  it('a removed member has nothing', () => {
+    const index = indexMarks([mark('done', 'kid', THU, 'bed')]);
+    const r = choreDayRecord(list, index, 'kid', THU, new Set(['sib']));
+    expect(r).toEqual({ ymd: THU, blocks: [], done: 0, total: 0 });
+  });
+});
+
+describe('choreWeekRecord', () => {
+  const list = [chore('c1'), chore('c2')];
   const index = indexMarks([
     mark('done', 'kid', '2026-11-09', 'c1'), // Monday
     mark('done', 'kid', '2026-11-09', 'c2'),
-    mark('done', 'kid', FRI, 'deleted-chore'), // still counts
+    mark('done', 'kid', FRI, 'deleted-chore'), // gone with its chore
+    mark('done', 'kid', FRI, 'c1'),
     mark('celebrated', 'kid', FRI, 'morning'), // not a chore
     mark('done', 'kid', '2026-11-08', 'c1'), // the Sunday before (previous Monday week)
     mark('done', 'sib', FRI, 'c1'),
   ]);
 
-  it('seven counts from a Monday start, and a total', () => {
-    const w = weekCounts(index, 'kid', FRI, 1);
+  it('seven day records from a Monday start, each the day record, and the total', () => {
+    const w = choreWeekRecord(list, index, 'kid', FRI, 1);
     expect(w.days.map((d) => d.ymd)).toEqual([
       '2026-11-09',
       '2026-11-10',
@@ -463,18 +565,21 @@ describe('weekCounts', () => {
       '2026-11-14',
       '2026-11-15',
     ]);
-    expect(w.days.map((d) => d.count)).toEqual([2, 0, 0, 0, 1, 0, 0]);
+    expect(w.days.map((d) => d.done)).toEqual([2, 0, 0, 0, 1, 0, 0]);
+    expect(w.days.map((d) => d.total)).toEqual([2, 2, 2, 2, 2, 2, 2]);
     expect(w.total).toBe(3);
+    expect(w.days[4]).toEqual(choreDayRecord(list, index, 'kid', FRI));
   });
 
   it('a Sunday start includes that Sunday', () => {
-    const w = weekCounts(index, 'kid', FRI, 0);
-    expect(w.days[0]).toEqual({ ymd: '2026-11-08', count: 1 });
+    const w = choreWeekRecord(list, index, 'kid', FRI, 0);
+    expect(w.days[0]!.ymd).toBe('2026-11-08');
+    expect(w.days[0]!.done).toBe(1);
     expect(w.total).toBe(4);
   });
 
   it('empty for a malformed date', () => {
-    expect(weekCounts(index, 'kid', 'garbage')).toEqual({ days: [], total: 0 });
+    expect(choreWeekRecord(list, index, 'kid', 'garbage')).toEqual({ days: [], total: 0 });
   });
 });
 
@@ -540,7 +645,7 @@ describe('choreDupKey (the one duplicate rule)', () => {
 });
 
 describe('a mark for a chore that no longer exists', () => {
-  it('is ignored by the day and does not break the week', () => {
+  it('is ignored by the day and by the week', () => {
     const marks = [mark('done', 'kid', '2026-11-13', 'deleted-chore')];
     const index = indexMarks(marks);
     const day = beanChoreDay(
@@ -553,6 +658,7 @@ describe('a mark for a chore that no longer exists', () => {
     );
     expect(day.blocks.flatMap((b) => b.chores.map((i) => i.chore.id))).toEqual(['c1']);
     expect(day.left).toBe(1);
-    expect(() => weekCounts(index, 'kid', '2026-11-13', 1)).not.toThrow();
+    const week = choreWeekRecord([chore('c1')], index, 'kid', '2026-11-13', 1, new Set(['kid']));
+    expect(week.total).toBe(0);
   });
 });

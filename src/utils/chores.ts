@@ -431,34 +431,97 @@ export function completesBlock(day: BeanChoreDay, choreId: string): ChoreBlock |
   return null;
 }
 
-/** A bean's week: chores done per day (seven, from the week's first day) and the total. */
-export interface ChoreWeekCounts {
-  days: { ymd: string; count: number }[];
+/** One block of a bean's record for a day: its chores that day, and how many got a tick. */
+export interface ChoreRecordBlock {
+  block: ChoreBlock;
+  /** In chore order. */
+  chores: ChoreDayItem[];
+  done: number;
+  total: number;
+}
+
+/** What a bean had on one day and what they ticked: the ONE shape the week board reads. */
+export interface ChoreDayRecord {
+  ymd: string;
+  /** Only the blocks with a chore that day, in `CHORE_BLOCKS` order. */
+  blocks: ChoreRecordBlock[];
+  /** Chores that day with a `done` mark (never a count of marks). */
+  done: number;
+  total: number;
+}
+
+/** The device-local day an ISO timestamp falls on, or '' when it does not parse. */
+function localYmdOf(iso: string | undefined): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const mm = `${d.getMonth() + 1}`.padStart(2, '0');
+  const dd = `${d.getDate()}`.padStart(2, '0');
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}
+
+/**
+ * A bean's chores on `ymd` (a past day or today), each done or not, grouped by block. The cells
+ * of the Chores Done board AND the day summary that opens from one both read this, so the
+ * number in a cell and the list behind it cannot disagree. The rules:
+ *  - which chores were due is `choresFor`, the live day's own rule (weekdays, assignees, living
+ *    members), applied to the chores as they are NOW: a chore deleted since simply is not there,
+ *    and neither is its tick;
+ *  - a chore created after `ymd` (its `createdAt` on a later local day) was not due then, so it
+ *    never reads as "not done" on it; one with a tick that day is kept, the tick proves it was
+ *    there, and an unreadable `createdAt` keeps the chore;
+ *  - `done` counts chores with a mark, never marks, so done can never exceed total.
+ */
+export function choreDayRecord(
+  chores: readonly Chore[],
+  index: ChoreMarkIndex,
+  memberId: string,
+  ymd: string,
+  living?: ReadonlySet<string>
+): ChoreDayRecord {
+  const grouped = choresFor(chores, memberId, ymd, living);
+  const marks = marksOn(index, memberId, ymd);
+  let done = 0;
+  let total = 0;
+  const blocks: ChoreRecordBlock[] = [];
+  for (const block of CHORE_BLOCKS) {
+    const items = (grouped.get(block) ?? [])
+      .map((chore) => ({ chore, done: marks.done.has(chore.id) }))
+      .filter((i) => i.done || !(localYmdOf(i.chore.createdAt) > ymd));
+    if (items.length === 0) continue;
+    const blockDone = items.filter((i) => i.done).length;
+    done += blockDone;
+    total += items.length;
+    blocks.push({ block, chores: items, done: blockDone, total: items.length });
+  }
+  return { ymd, blocks, done, total };
+}
+
+/** A bean's week: seven day records from the week's first day, and the chores done in all. */
+export interface ChoreWeekRecord {
+  days: ChoreDayRecord[];
   total: number;
 }
 
 /**
- * Chores done per day for the week holding `weekOfYmd` (`weekStartDay`: 0 = Sunday, 1 =
- * Monday). Counts every `done` mark, including marks for chores since deleted: what was done
- * stays done.
+ * The week holding `weekOfYmd` (`weekStartDay`: 0 = Sunday, 1 = Monday), one `choreDayRecord`
+ * per day, so every count on the board is that day's record and nothing else.
  */
-export function weekCounts(
+export function choreWeekRecord(
+  chores: readonly Chore[],
   index: ChoreMarkIndex,
   memberId: string,
   weekOfYmd: string,
-  weekStartDay: number = 1
-): ChoreWeekCounts {
+  weekStartDay: number = 1,
+  living?: ReadonlySet<string>
+): ChoreWeekRecord {
   const dow = choreDayOfWeek(weekOfYmd);
   if (dow < 0) return { days: [], total: 0 };
   const first = shiftChoreDay(weekOfYmd, -((dow - weekStartDay + 7) % 7));
-  let total = 0;
-  const days = Array.from({ length: 7 }, (_, i) => {
-    const ymd = shiftChoreDay(first, i);
-    const count = marksOn(index, memberId, ymd).done.size;
-    total += count;
-    return { ymd, count };
-  });
-  return { days, total };
+  const days = Array.from({ length: 7 }, (_, i) =>
+    choreDayRecord(chores, index, memberId, shiftChoreDay(first, i), living)
+  );
+  return { days, total: days.reduce((n, d) => n + d.done, 0) };
 }
 
 /** A usable date strictly older than `cutoff` and not in the future. Anything else: KEEP. */

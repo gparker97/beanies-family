@@ -2,8 +2,10 @@
 // the label key and the colour class (`.chore-block-*` in `src/style.css`, which carries the
 // tint, the ink and their dark partners). The block ORDER and every rule about blocks live in
 // `utils/chores.ts`; this file is display data only.
-import { choreDaysKind } from '@/utils/chores';
-import type { ChoreBlock } from '@/types/models';
+import { choreDaysKind, type ChoreDayBlock } from '@/utils/chores';
+import { formatTime12 } from '@/utils/date';
+import { fillTemplate } from '@/utils/fillTemplate';
+import type { ChoreBlock, ChoreBlockStarts } from '@/types/models';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 
 export interface ChoreBlockMeta {
@@ -42,6 +44,27 @@ export const CHORE_BLOCK_META: Readonly<Record<ChoreBlock, ChoreBlockMeta>> = {
     colorClass: 'chore-block-anytime',
   },
 };
+
+/**
+ * The ONE hours hint beside a block's name (a day section, a summary row, the Now pill): the
+ * block happening now says when it ends ("until 12pm"; Evening runs to midnight, so nothing),
+ * a later block says when it starts ("from 5pm"), a block whose time has passed says nothing,
+ * and Anytime says "whenever you like".
+ */
+export function choreBlockHint(
+  b: Pick<ChoreDayBlock, 'block' | 'isNow' | 'ended'>,
+  starts: ChoreBlockStarts,
+  resolve: (key: UIStringKey) => string
+): string {
+  if (b.block === 'anytime') return resolve('choreboard.block.anytimeHint');
+  if (b.isNow) {
+    const end =
+      b.block === 'morning' ? starts.afternoon : b.block === 'afternoon' ? starts.evening : '';
+    return end ? fillTemplate(resolve('choreboard.now.until'), { time: formatTime12(end) }) : '';
+  }
+  if (b.ended) return '';
+  return fillTemplate(resolve('choreboard.block.from'), { time: formatTime12(starts[b.block]) });
+}
 
 /**
  * A chore's picture when none was picked or suggested (`suggestChoreEmoji`), and every chore
