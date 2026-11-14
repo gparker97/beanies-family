@@ -18,7 +18,7 @@ vi.mock('@/stores/familyStore', async () => (await import('./choreTestKit')).fam
 vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: vi.fn() }));
 const celebration = vi.hoisted(() => ({
   held: false,
-  banner: null as null | { praise: string; name: string; calm: boolean },
+  banner: null as null | { words: { text: string; name: boolean }[]; calm: boolean },
 }));
 vi.mock('@/composables/useCelebration', () => ({
   choreBlockHeld: () => celebration.held,
@@ -126,7 +126,14 @@ describe('ChoreBlockSection', () => {
     expect(w.get('[data-testid="chore-block"]').attributes('data-state')).toBe('open');
     expect(w.findAll('[data-testid="chore-row"]')).toHaveLength(2);
     celebration.held = false;
-    celebration.banner = { praise: 'High five, Pip!', name: 'Pip', calm: false };
+    celebration.banner = {
+      words: [
+        { text: 'High', name: false },
+        { text: 'five,', name: false },
+        { text: 'Pip!', name: true },
+      ],
+      calm: false,
+    };
     await w.setProps({ block: block({ chores: [...items] }) });
     expect(w.get('[data-testid="chore-block"]').attributes('data-state')).toBe('banner');
     const banner = w.get('[data-testid="chore-done-banner"]');

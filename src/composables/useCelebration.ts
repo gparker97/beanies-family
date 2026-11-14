@@ -3,12 +3,12 @@ import { playChime, playChoreCelebrationSound, playFanfare } from '@/composables
 import { useTranslationStore } from '@/stores/translationStore';
 import { CHORE_BLOCK_META } from '@/constants/choreBlocks';
 import { logEvent } from '@/services/telemetry/logEvent';
-import { fillTemplate } from '@/utils/fillTemplate';
 import { reportError } from '@/utils/errorReporter';
 import {
   CHORE_CELEBRATION_BEATS as BEATS,
   CHORE_PRAISE,
   SOUND_FOR_MOVE,
+  fillPraise,
   isChoreSoundId,
   moveForDate,
   pickChoreSound,
@@ -17,6 +17,7 @@ import {
   type ChoreCelebrationAnchor,
   type ChoreMoveId,
   type ChoreSoundId,
+  type PraiseWord,
 } from '@/utils/choreCelebration';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import type { ChoreBlock } from '@/types/models';
@@ -27,14 +28,10 @@ import type { ChoreBlock } from '@/types/models';
  * dismissal that never comes, and it never blocks a tap — which is what makes
  * it the right shape for a shared screen (the beanie wall) as well as a phone.
  *
- * `chore` is the choreboard's own (#146): no box, it plays over the board
- * anchored to the block that was just finished (`ChoreCelebration.vue`), and is
- * just as self-dismissing and tap-transparent as a shower.
+ * The choreboard's all-done celebration is not one of these: it has its own
+ * entry point (`celebrateChore` below), anchored to the board.
  */
-type CelebrationType = 'toast' | 'modal' | 'shower' | 'chore';
-
-/** Not routine: these still play on a surface that suppresses the routine ones. */
-const NOT_ROUTINE: ReadonlySet<CelebrationType> = new Set(['shower', 'chore']);
+type CelebrationType = 'toast' | 'modal' | 'shower';
 
 export type CelebrationTrigger =
   | 'setup-complete'
@@ -47,8 +44,7 @@ export type CelebrationTrigger =
   | 'recipe-5star'
   | 'list-complete'
   | 'deck-dealt'
-  | 'check-in-done'
-  | 'chore-block-complete';
+  | 'check-in-done';
 
 interface Celebration {
   id: number;
@@ -163,29 +159,9 @@ const configs: Record<
     messageKey: 'celebration.checkInDone',
     asset: '/brand/beanies_celebrating_circle_transparent_300x300.png',
   },
-  // The choreboard (#146): a bean's last chore in a block was ticked. ONCE per bean, per block,
-  // per day, on every device: `choreStore.toggleChore` fires it only in the same write as the
-  // block's `celebrated` mark. No `onUndo`: a tick is undone by tapping it again, and the
-  // once-only mark stays, so a re-tick shows the banner only. Its own move and sound, not the
-  // shower (`celebrateChore` below); the message is the shower's, kept for the type.
-  'chore-block-complete': {
-    type: 'chore',
-    messageKey: 'celebration.choreBlockComplete',
-    asset: '/brand/beanies_celebrating_line_transparent_560x225.png',
-  },
 };
 
-type ShowerTrigger = Exclude<CelebrationTrigger, 'chore-block-complete'>;
-
-export function celebrate(
-  trigger: 'chore-block-complete',
-  options: { chore: ChoreCelebrationRequest }
-): void;
-export function celebrate(trigger: ShowerTrigger, options?: { onUndo?: () => void }): void;
-export function celebrate(
-  trigger: CelebrationTrigger,
-  options?: { onUndo?: () => void; chore?: ChoreCelebrationRequest }
-): void {
+export function celebrate(trigger: CelebrationTrigger, options?: { onUndo?: () => void }): void {
   const config = configs[trigger];
   if (!config) return;
 
@@ -196,12 +172,7 @@ export function celebrate(
    * black scrim over a shared always-on screen, swallowing the next child's
    * tap. Showers still fire — finishing a whole list is not routine.
    */
-  if (mode.value.suppressRoutine && !NOT_ROUTINE.has(config.type)) return;
-
-  if (config.type === 'chore') {
-    if (options?.chore) celebrateChore(options.chore);
-    return;
-  }
+  if (mode.value.suppressRoutine && config.type !== 'shower') return;
 
   // Resolve translation at call time (store is initialized by this point)
   const translationStore = useTranslationStore();
@@ -249,6 +220,11 @@ export interface ChoreCelebrationRequest {
    * no board on screen) plays a centered version of the same move.
    */
   anchor?: ChoreCelebrationAnchor | null;
+  /**
+   * Is the block still all done? Asked when the banner is due: a bean who unticks a chore during
+   * the burst (a double tap) gets no banner over an undone block; the celebration ends quietly.
+   */
+  stillDone?: () => boolean;
 }
 
 /**
@@ -262,7 +238,10 @@ export interface ActiveChoreCelebration extends ChoreCelebrationRequest {
   anchor: ChoreCelebrationAnchor | null;
   move: ChoreMoveId;
   sound: ChoreSoundId;
+  /** The praise line as text (said aloud) ... */
   praise: string;
+  /** ... and in the pieces that pop in, with the name marked where it was filled. */
+  praiseWords: PraiseWord[];
   /** `performance.now()` at the tick: every beat is timed from here. */
   startedAt: number;
   /** Reduced motion: nothing moves; the banner, its stars and the praise simply appear. */
@@ -274,6 +253,12 @@ export interface ActiveChoreCelebration extends ChoreCelebrationRequest {
 
 /** Shallow: the anchor holds DOM elements, which must never be made reactive. */
 const activeChore = shallowRef<ActiveChoreCelebration | null>(null);
+/**
+ * A block whose last tick is being written right now and will celebrate (`holdChoreBlock`). Set
+ * by the store BEFORE the write's marks refresh, so the surface never tears its rows down between
+ * the tap and the burst: the tick the anchor points at stays the one on screen.
+ */
+const pendingHold = shallowRef<{ memberId: string; block: ChoreBlock } | null>(null);
 let choreTimers: ReturnType<typeof setTimeout>[] = [];
 let lastPraise: number | null = null;
 let lastSound: ChoreSoundId | null = null;
@@ -329,7 +314,32 @@ function clearChoreTimers(): void {
 
 function setChorePhase(id: number, phase: ChoreCelebrationPhase): void {
   const cur = activeChore.value;
-  if (cur?.id === id) activeChore.value = { ...cur, phase };
+  if (cur?.id !== id) return;
+  if (phase === 'banner' && cur.stillDone && !cur.stillDone()) {
+    logEvent({
+      level: 'info',
+      surface: CHORE_CELEBRATION_SURFACE,
+      message: 'chore celebration ended quietly: the block was unticked during the burst',
+      context: { action: 'ended-undone', kind: cur.move, slot: cur.block },
+    });
+    dismissChoreCelebration(id);
+    return;
+  }
+  activeChore.value = { ...cur, phase };
+}
+
+/**
+ * The store is about to write the tick that finishes this bean's block and will celebrate it:
+ * keep the block's rows on screen through the write (see `pendingHold`). Released by
+ * `celebrateChore`, or by `releaseChoreBlock` when the write fails or another device celebrated.
+ */
+export function holdChoreBlock(memberId: string, block: ChoreBlock): void {
+  pendingHold.value = { memberId, block };
+}
+
+export function releaseChoreBlock(memberId: string, block: ChoreBlock): void {
+  const h = pendingHold.value;
+  if (h?.memberId === memberId && h.block === block) pendingHold.value = null;
 }
 
 /** End the chore celebration (`id` guards a stale timer against a newer one). */
@@ -340,12 +350,15 @@ export function dismissChoreCelebration(id?: number): void {
 }
 
 /**
- * Pick, play and time one chore celebration. The phase timers live HERE, not in the (lazy)
- * component, so the banner still arrives and the celebration still ends if the component is
- * slow to load or never does.
+ * Play the choreboard's all-done celebration (#146) for a bean's block: once per bean, block and
+ * day, called only by `choreStore` in the same write as the block's `celebrated` mark. Picks the
+ * move (the device's weekday), the sound and the praise line, plays the sound, and times the two
+ * phases. The timers live HERE, not in the (lazy) component, so the banner still arrives and the
+ * celebration still ends if the component is slow to load or never does.
  */
-function celebrateChore(req: ChoreCelebrationRequest): void {
+export function celebrateChore(req: ChoreCelebrationRequest): void {
   clearChoreTimers();
+  releaseChoreBlock(req.memberId, req.block);
   const t = useTranslationStore().t;
   const calm = prefersReducedMotionNow();
   const move = moveForDate(new Date());
@@ -355,7 +368,7 @@ function celebrateChore(req: ChoreCelebrationRequest): void {
   const praiseIndex = pickPraiseIndex(req.block, lastPraise);
   lastPraise = praiseIndex;
   const meta = CHORE_BLOCK_META[req.block];
-  const praise = fillTemplate(t(CHORE_PRAISE[praiseIndex]!.key), {
+  const praise = fillPraise(t(CHORE_PRAISE[praiseIndex]!.key), {
     name: req.beanName,
     block: t(meta.labelKey),
     blockWord: t(meta.wordKey),
@@ -373,7 +386,8 @@ function celebrateChore(req: ChoreCelebrationRequest): void {
     id,
     move,
     sound,
-    praise,
+    praise: praise.text,
+    praiseWords: praise.words,
     startedAt: performance.now(),
     calm,
     phase: calm ? 'banner' : 'burst',
@@ -407,13 +421,21 @@ function celebrateChore(req: ChoreCelebrationRequest): void {
 
   playChoreCelebrationSound(sound, paired)
     .then((outcome) => {
-      if (outcome !== 'fallback') return;
-      logEvent({
-        level: 'warn',
-        surface: CHORE_CELEBRATION_SURFACE,
-        message: 'chore celebration played the paired sound in place of the cheer',
-        context: { action: 'fallback-sound', detail: paired, kind: move },
-      });
+      if (outcome === 'fallback' || outcome === 'late') {
+        logEvent({
+          level: 'warn',
+          surface: CHORE_CELEBRATION_SURFACE,
+          message: 'chore celebration played the paired sound in place of the cheer',
+          context: { action: 'fallback-sound', detail: paired, kind: move, stage: outcome },
+        });
+      } else if (outcome === 'fanfare') {
+        logEvent({
+          level: 'warn',
+          surface: CHORE_CELEBRATION_SURFACE,
+          message: 'chore celebration sounds were not loaded in time; the fanfare played',
+          context: { action: 'fallback-fanfare', detail: sound, kind: move },
+        });
+      }
     })
     .catch((error: unknown) => {
       reportError({
@@ -432,6 +454,8 @@ function celebrateChore(req: ChoreCelebrationRequest): void {
  * holds a block: a centered one is not about the board on screen.
  */
 export function choreBlockHeld(memberId: string, block: ChoreBlock): boolean {
+  const h = pendingHold.value;
+  if (h?.memberId === memberId && h.block === block) return true;
   const c = activeChore.value;
   return !!c?.anchor && c.phase === 'burst' && c.memberId === memberId && c.block === block;
 }
@@ -448,7 +472,7 @@ export function choreBannerCelebration(
     return null;
   }
   if (bannerMemo?.id !== c.id) {
-    bannerMemo = { id: c.id, value: { praise: c.praise, name: c.beanName, calm: c.calm } };
+    bannerMemo = { id: c.id, value: { words: c.praiseWords, calm: c.calm } };
   }
   return bannerMemo.value;
 }
@@ -460,6 +484,7 @@ export function resetChoreCelebrationForTest(): void {
   lastSound = null;
   storageNoted = false;
   bannerMemo = null;
+  pendingHold.value = null;
 }
 
 export function useCelebration() {

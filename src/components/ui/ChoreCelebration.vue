@@ -13,25 +13,30 @@
  *    (in its celebrating form, drawn by the surface itself) the move plays above it.
  *  - a surface with no banner (the home card's Now block, which folds to a summary row): the
  *    same move over this component's own banner, laid over the block, fading out at the end.
- *  - no anchor (the tick came from elsewhere), or the block is gone: a centered version of the
- *    same move over this component's own banner.
+ *  - no anchor (the tick came from a surface with no board on screen): a centered version of
+ *    the same move over this component's own banner.
  *  - reduced motion: nothing moves; the banner, stars and praise simply appear.
+ *
+ * It ends at once when its premise goes: another page (any route change), or the anchoring block
+ * leaving the screen (watched each frame); it never lays out against a block that is gone. A
+ * block unticked during the burst ends quietly at the phase flip (`useCelebration`).
  *
  * Every animation and timer belongs to the player and is cancelled when the next celebration
  * starts or this unmounts. Dark mode: the glow and the canopy strings switch with the theme
  * (`html.dark` rules below); the banner is the fixed brand gradient in both themes.
  */
-import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch } from 'vue';
+import { computed, inject, nextTick, onBeforeUnmount, ref, shallowRef, watch } from 'vue';
+import { routeLocationKey } from 'vue-router';
 import CelebrationBanner from '@/components/ui/CelebrationBanner.vue';
 import {
   CHORE_CELEBRATION_SURFACE,
+  dismissChoreCelebration,
   useCelebration,
   type ActiveChoreCelebration,
 } from '@/composables/useCelebration';
 import { useTranslation } from '@/composables/useTranslation';
 import { logEvent } from '@/services/telemetry/logEvent';
-import { CHORE_BLOCK_META } from '@/constants/choreBlocks';
-import { fillTemplate } from '@/utils/fillTemplate';
+import { choreDoneBannerText } from '@/constants/choreBlocks';
 import { rectOf, type RectLike } from '@/utils/choreCelebration';
 import {
   createChoreCelebrationPlayer,
@@ -60,7 +65,7 @@ const ghostEl = ref<HTMLElement | null>(null);
 
 const ghostCelebration = computed(() => {
   const c = activeChore.value;
-  return c ? { praise: c.praise, name: c.beanName, calm: c.calm } : null;
+  return c ? { words: c.praiseWords, calm: c.calm } : null;
 });
 
 let player: ChoreCelebrationPlayer | null = null;
@@ -71,6 +76,7 @@ const isPlaying = (c: ActiveChoreCelebration) => playing?.id === c.id;
 let anchored = false;
 let followBase: RectLike | null = null;
 let followFrame = 0;
+let anchorFrame = 0;
 
 function intersect(a: RectLike, b: RectLike): RectLike {
   const x = Math.max(a.x, b.x);
@@ -95,12 +101,28 @@ function clipBox(c: ActiveChoreCelebration): RectLike {
   return intersect(band, { x: sides.x, y: band.y, w: sides.w, h: band.h });
 }
 
-function warnCentered(c: ActiveChoreCelebration, detail: string): void {
+/**
+ * The celebration's premise went away (the bean's block left the screen: another page, or the
+ * surface unmounted): end it now, visuals and timers. A sound already playing finishes its short
+ * tail (at most about two seconds); nothing new starts.
+ */
+function endGone(c: ActiveChoreCelebration, detail: string): void {
   logEvent({
-    level: 'warn',
+    level: 'info',
     surface: CHORE_CELEBRATION_SURFACE,
-    message: 'chore celebration anchor was not on screen; played centered',
-    context: { action: 'fallback-centered', detail, kind: c.move, slot: c.block },
+    message: 'chore celebration ended: its block is no longer on screen',
+    context: { action: 'ended-gone', detail, kind: c.move, slot: c.block },
+  });
+  dismissChoreCelebration(c.id);
+}
+
+/** Watch the anchor's block every frame (a property read, no layout): gone means end. */
+function watchAnchor(c: ActiveChoreCelebration): void {
+  anchorFrame = requestAnimationFrame(() => {
+    anchorFrame = 0;
+    if (!isPlaying(c)) return;
+    if (!c.anchor?.block.isConnected) endGone(c, 'surface-unmounted');
+    else watchAnchor(c);
   });
 }
 
@@ -122,15 +144,23 @@ function stop(): void {
   followBase = null;
   if (followFrame) cancelAnimationFrame(followFrame);
   followFrame = 0;
+  if (anchorFrame) cancelAnimationFrame(anchorFrame);
+  anchorFrame = 0;
   window.removeEventListener('scroll', onScroll, true);
   ghost.value = null;
+  box.value = null;
 }
 
 async function start(c: ActiveChoreCelebration): Promise<void> {
   stop();
   playing = c;
-  anchored = !!c.anchor?.block.isConnected;
-  if (c.anchor && !anchored) warnCentered(c, 'anchor-gone');
+  anchored = !!c.anchor;
+  // Never lay out against a block that is no longer on screen (a zero rect): end instead.
+  if (c.anchor && !c.anchor.block.isConnected) {
+    endGone(c, 'anchor-gone');
+    return;
+  }
+  if (anchored) watchAnchor(c);
   const b = clipBox(c);
   box.value = b;
   await nextTick();
@@ -155,6 +185,8 @@ async function start(c: ActiveChoreCelebration): Promise<void> {
       area: { ...now, x: now.x - b.x, y: now.y - b.y },
       tickEl: c.anchor.tickEl,
       blockEl: c.anchor.block,
+      // Drawing only now, after the banner already arrived (a slow first load): no step-aside.
+      late: c.phase === 'banner',
     });
     window.addEventListener('scroll', onScroll, { capture: true, passive: true });
   } else {
@@ -174,6 +206,10 @@ async function start(c: ActiveChoreCelebration): Promise<void> {
 async function arrive(c: ActiveChoreCelebration): Promise<void> {
   // Not drawing yet (still measuring): `start` calls back here once it is.
   if (!isPlaying(c) || !player) return;
+  if (anchored && !c.anchor?.block.isConnected) {
+    endGone(c, 'anchor-gone');
+    return;
+  }
   const banner = anchored
     ? c.anchor?.block.querySelector<HTMLElement>('[data-celebration-banner]')
     : null;
@@ -183,7 +219,6 @@ async function arrive(c: ActiveChoreCelebration): Promise<void> {
     return;
   }
   const b = box.value ?? { x: 0, y: 0, w: window.innerWidth, h: window.innerHeight };
-  const label = t(CHORE_BLOCK_META[c.block].labelKey);
   const compact = !!c.anchor?.compact;
   let x: number;
   let y: number;
@@ -205,11 +240,7 @@ async function arrive(c: ActiveChoreCelebration): Promise<void> {
     w,
     compact,
     count: c.count,
-    title: fillTemplate(t('choreboard.done.title'), { block: label }),
-    body: fillTemplate(
-      t(c.count === 1 ? 'choreboard.done.body.one' : 'choreboard.done.body.other'),
-      { count: c.count, name: c.beanName }
-    ),
+    ...choreDoneBannerText(c.block, c.count, c.beanName, t),
   };
   await nextTick();
   const el = ghostEl.value;
@@ -243,6 +274,16 @@ watch(
     if (c && phase === 'banner' && was === 'burst') void arrive(c);
   },
   { flush: 'post' }
+);
+
+// Another page (or another bean's day: the query changes too) ends the celebration at once.
+const route = inject(routeLocationKey, null);
+watch(
+  () => route?.fullPath,
+  () => {
+    const c = activeChore.value;
+    if (c) endGone(c, 'route-change');
+  }
 );
 
 onBeforeUnmount(stop);

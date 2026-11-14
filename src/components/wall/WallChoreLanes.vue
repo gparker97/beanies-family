@@ -34,7 +34,7 @@
  * `.chore-block-*` (whose tokens carry their dark values), and the done strip is the fixed
  * brand gradient with white ink in both themes.
  */
-import { computed, inject, ref } from 'vue';
+import { computed, inject, provide, ref } from 'vue';
 import { choreBannerCelebration, choreBlockHeld } from '@/composables/useCelebration';
 import WallBackButton from '@/components/wall/WallBackButton.vue';
 import WallJobList from '@/components/wall/WallJobList.vue';
@@ -45,10 +45,11 @@ import CelebrationBanner from '@/components/ui/CelebrationBanner.vue';
 import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
 import { useWallLock } from '@/components/wall/wallLockKey';
 import { WALL_EDIT } from '@/components/wall/wallEditKey';
+import { WALL_BURST } from '@/components/wall/wallBurstKey';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useChoreStore } from '@/stores/choreStore';
 import { useTranslation } from '@/composables/useTranslation';
-import { CHORE_BLOCK_META } from '@/constants/choreBlocks';
+import { CHORE_BLOCK_META, choreDoneBannerText } from '@/constants/choreBlocks';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { formatTime12 } from '@/utils/date';
 import { choreProgress } from '@/utils/wallJobs';
@@ -56,7 +57,7 @@ import { wallChoreProgressText } from '@/components/wall/wallChoreText';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import type { ChoreBlock, FamilyMember } from '@/types/models';
 import type { WallChoreBlock, WallChoreLane, WallJob, WallPeripheralData } from '@/types/wall';
-import { choreCelebrationAnchor, type ChoreCelebrationAnchor } from '@/utils/choreCelebration';
+import { choreTickAnchor, type ChoreCelebrationAnchor } from '@/utils/choreCelebration';
 
 defineOptions({ inheritAttrs: false });
 
@@ -162,6 +163,30 @@ function blockState(b: WallChoreBlock, memberId: string): BlockState {
 
 const root = ref<HTMLElement | null>(null);
 
+/**
+ * Would this tick finish its block and play the all-done celebration? The same question the
+ * store asks (the last undone chore of a block not yet celebrated today), from the same read
+ * model, answered at the tap: the wall's tick burst is optimistic, so it cannot wait for the
+ * write's answer.
+ */
+function finishesBlock(job: WallJob): boolean {
+  if (job.source !== 'chore' || job.done) return false;
+  const b = props.peripherals
+    .choreLaneFor?.(job.ownerId)
+    ?.blocks.find((x) => x.jobs.some((j) => j.key === job.key));
+  return !!b && !b.celebrated && b.done + 1 === b.total;
+}
+
+/**
+ * The wall's routine tick burst ("One down!" and the beans), except on the tick that finishes a
+ * block: there the celebration plays, and the burst under it was two effects at once.
+ */
+const pageBurst = inject(WALL_BURST, undefined);
+provide(WALL_BURST, (x, y, job) => {
+  if (job && finishesBlock(job)) return;
+  pageBurst?.(x, y, job);
+});
+
 /** A tick, with this lane's block and the tick as the celebration's anchor (compact sizing). */
 function onToggle(job: WallJob, memberId: string, block: ChoreBlock): void {
   const lane = root.value?.querySelector<HTMLElement>(
@@ -170,10 +195,11 @@ function onToggle(job: WallJob, memberId: string, block: ChoreBlock): void {
   const section = lane?.querySelector<HTMLElement>(
     `[data-testid="wall-chore-block"][data-block="${block}"]`
   );
-  const tick = section?.querySelector<HTMLElement>(
-    `[data-job-key="${CSS.escape(job.key)}"] .wall-tick`
+  emit(
+    'toggle',
+    job,
+    choreTickAnchor(section, `[data-job-key="${CSS.escape(job.key)}"] .wall-tick`, true)
   );
-  emit('toggle', job, section ? choreCelebrationAnchor(section, tick ?? null, true) : null);
 }
 
 /** Blocks opened by hand (a quiet line, or a done strip reopened): `${memberId}:${block}`. */
@@ -211,14 +237,8 @@ function quietCount(b: WallChoreBlock): string {
   );
 }
 
-function bannerTitle(b: WallChoreBlock): string {
-  return fillTemplate(t('choreboard.done.title'), { block: label(b.block) });
-}
-function bannerBody(b: WallChoreBlock, member: FamilyMember): string {
-  return fillTemplate(
-    t(b.total === 1 ? 'choreboard.done.body.one' : 'choreboard.done.body.other'),
-    { count: b.total, name: member.name }
-  );
+function bannerText(b: WallChoreBlock, member: FamilyMember): { title: string; body: string } {
+  return choreDoneBannerText(b.block, b.total, member.name, t);
 }
 function expandLabel(memberId: string, b: WallChoreBlock): string {
   return fillTemplate(
@@ -322,8 +342,8 @@ function addChore(memberId: string, title: string): Promise<boolean> {
             <template v-if="blockState(b, member.id) === 'done'">
               <CelebrationBanner
                 compact
-                :title="bannerTitle(b)"
-                :body="bannerBody(b, member)"
+                :title="bannerText(b, member).title"
+                :body="bannerText(b, member).body"
                 :image-alt="t('choreboard.done.imageAlt')"
                 :action-label="
                   t(

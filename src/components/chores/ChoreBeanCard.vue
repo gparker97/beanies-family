@@ -24,7 +24,11 @@ import { useTranslation } from '@/composables/useTranslation';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { firstName } from '@/utils/assignees';
 import type { BeanChoreDay, ChoreDayBlock } from '@/utils/chores';
-import { choreCelebrationAnchor, type ChoreCelebrationAnchor } from '@/utils/choreCelebration';
+import {
+  choreTickAnchor,
+  choreTickSelector,
+  type ChoreCelebrationAnchor,
+} from '@/utils/choreCelebration';
 import type { ChoreBlock, ChoreBlockStarts, FamilyMember } from '@/types/models';
 
 const props = withDefaults(
@@ -98,10 +102,7 @@ function onToggle(block: ChoreBlock, choreId: string): void {
   const row = card.value?.querySelector<HTMLElement>(
     `[data-testid="chore-summary"][data-block="${block}"]`
   );
-  const tick = row?.querySelector<HTMLElement>(
-    `[data-chore-id="${CSS.escape(choreId)}"] [data-testid="chore-tick"]`
-  );
-  emit('toggle', choreId, row ? choreCelebrationAnchor(row, tick ?? null) : null);
+  emit('toggle', choreId, choreTickAnchor(row, choreTickSelector(choreId)));
 }
 
 const name = computed(() => props.member.name);

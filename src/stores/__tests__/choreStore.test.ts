@@ -44,8 +44,16 @@ vi.mock('@/utils/errorReporter', () => ({
   reportError: (...a: unknown[]) => reportError(...a),
 }));
 const celebrate = vi.fn();
+/** What happened in what order: the hold, the marks refresh, the release, the celebration. */
+const order = vi.hoisted(() => [] as string[]);
 vi.mock('@/composables/useCelebration', () => ({
-  celebrate: (...a: unknown[]) => celebrate(...a),
+  celebrateChore: (...a: unknown[]) => {
+    order.push('celebrate');
+    celebrate(...a);
+  },
+  holdChoreBlock: (memberId: string, block: string) => order.push(`hold:${memberId}:${block}`),
+  releaseChoreBlock: (memberId: string, block: string) =>
+    order.push(`release:${memberId}:${block}`),
 }));
 const budget = vi.hoisted(() => ({ allow: true, calls: [] as string[] }));
 vi.mock('@/utils/autoWriteBudget', () => ({
@@ -110,7 +118,10 @@ const writes = {
 };
 vi.mock('@/services/automerge/repositories/choreRepository', () => ({
   getAllChores: async () => [...db.chores.values()].map(clone),
-  getAllChoreMarks: async () => [...db.marks.values()].map(clone),
+  getAllChoreMarks: async () => {
+    order.push('refresh');
+    return [...db.marks.values()].map(clone);
+  },
   createChores: async (
     items: { id: string; input: Omit<Chore, 'id'> }[],
     opts?: { ifAbsent?: boolean }
@@ -362,9 +373,16 @@ describe('the once-only celebration', () => {
     ]);
     expect(celebrate).toHaveBeenCalledTimes(1);
     // The bean's first name and one star per chore; no anchor from this caller (centered).
-    expect(celebrate).toHaveBeenCalledWith('chore-block-complete', {
-      chore: { memberId: 'kid', block: 'morning', beanName: 'kid', count: 2, anchor: undefined },
+    expect(celebrate).toHaveBeenCalledWith({
+      memberId: 'kid',
+      block: 'morning',
+      beanName: 'kid',
+      count: 2,
+      anchor: undefined,
+      stillDone: expect.any(Function),
     });
+    // The block is still done now; the celebration asks again when its banner is due.
+    expect((celebrate.mock.calls[0]![0] as { stillDone: () => boolean }).stillDone()).toBe(true);
     expect(logged('block-complete')[0]!.context).toEqual({
       slot: 'morning',
       count: 2,
@@ -397,15 +415,51 @@ describe('the once-only celebration', () => {
     const anchor = { block: document.createElement('section'), compact: true } as never;
     await store.toggleChore('c1', 'kid', { surface: 'wall', by: 'kid', anchor });
     expect(celebrate).toHaveBeenCalledTimes(1);
-    expect(celebrate.mock.calls[0]![1]).toMatchObject({ chore: { block: 'morning', count: 1 } });
-    expect((celebrate.mock.calls[0]![1] as { chore: { anchor: unknown } }).chore.anchor).toBe(
-      anchor
-    );
+    expect(celebrate.mock.calls[0]![0]).toMatchObject({ block: 'morning', count: 1 });
+    expect((celebrate.mock.calls[0]![0] as { anchor: unknown }).anchor).toBe(anchor);
     // Untick, then tick again with an anchor: banner only, no move and no sound.
     await store.toggleChore('c1', 'kid', { surface: 'wall', by: 'kid', anchor });
     const again = await store.toggleChore('c1', 'kid', { surface: 'wall', by: 'kid', anchor });
     expect(again).toEqual({ action: 'tick', completed: 'morning', celebrated: false });
     expect(celebrate).toHaveBeenCalledTimes(1);
+  });
+
+  it('with an anchor, the block is held BEFORE the marks refresh, so its rows never unmount', async () => {
+    await setup([chore('c1'), chore('c2', { sortOrder: 1 })]);
+    await store.toggleChore('c1', 'kid', { surface: 'app' });
+    order.length = 0;
+    const anchor = { block: document.createElement('section') } as never;
+    await store.toggleChore('c2', 'kid', { surface: 'app', anchor });
+    expect(order).toEqual(['hold:kid:morning', 'refresh', 'celebrate']);
+    // A non-finishing tick holds nothing; neither does a tick with no anchor (centered).
+    order.length = 0;
+    await store.toggleChore('c1', 'kid', { surface: 'app', anchor }); // untick
+    expect(order.filter((o) => o.startsWith('hold'))).toEqual([]);
+  });
+
+  it('a held tick whose write fails releases the hold; so does one another device celebrated', async () => {
+    await setup([chore('c1')]);
+    const anchor = { block: document.createElement('section') } as never;
+    order.length = 0;
+    db.failNext = new Error('boom');
+    expect(await store.toggleChore('c1', 'kid', { surface: 'wall', by: 'kid', anchor })).toBeNull();
+    expect(order).toEqual(['hold:kid:morning', 'release:kid:morning']);
+    // Another device wrote the celebrated mark meanwhile: banner only, hold released.
+    db.marks.set(choreMarkId('celebrated', 'kid', FRI, 'morning'), {
+      id: choreMarkId('celebrated', 'kid', FRI, 'morning'),
+      kind: 'celebrated',
+      memberId: 'kid',
+      date: FRI,
+      ref: 'morning',
+      by: 'kid',
+      createdAt: NOW,
+      updatedAt: NOW,
+    } as never);
+    order.length = 0;
+    const r = await store.toggleChore('c1', 'kid', { surface: 'wall', by: 'kid', anchor });
+    expect(r).toEqual({ action: 'tick', completed: 'morning', celebrated: false });
+    expect(order).toEqual(['hold:kid:morning', 'refresh', 'release:kid:morning']);
+    expect(celebrate).not.toHaveBeenCalled();
   });
 
   it('another device’s celebrated mark (not yet in this store) means banner only', async () => {
@@ -452,9 +506,9 @@ describe('two different chores of one block ticked in quick succession', () => {
     expect(b).toMatchObject({ action: 'tick' });
     expect(db.marks.has(choreMarkId('celebrated', 'kid', FRI, 'morning'))).toBe(true);
     expect(celebrate).toHaveBeenCalledTimes(1);
-    expect(celebrate).toHaveBeenCalledWith('chore-block-complete', {
-      chore: expect.objectContaining({ memberId: 'kid', block: 'morning' }),
-    });
+    expect(celebrate).toHaveBeenCalledWith(
+      expect.objectContaining({ memberId: 'kid', block: 'morning' })
+    );
     expect(logged('block-complete').map((e) => e.context)).toEqual([
       { slot: 'morning', count: 2, detail: 'celebrated' },
     ]);

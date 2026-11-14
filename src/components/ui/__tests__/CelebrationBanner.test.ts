@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { mount } from '@vue/test-utils';
 import CelebrationBanner from '../CelebrationBanner.vue';
+import { fillPraise } from '@/utils/choreCelebration';
 
 const base = { title: 'All done!', body: 'Every chore ticked.', imageAlt: 'Beanies cheering' };
 
@@ -44,7 +45,11 @@ describe('CelebrationBanner', () => {
         ...base,
         stars: 2,
         actionLabel: 'Show Chores',
-        celebration: { praise: 'Woohoo, Pip! All done.', name: 'Pip', calm: false },
+        celebration: {
+          words: fillPraise('Woohoo, {name}! All done.', { name: 'Pip', block: '', blockWord: '' })
+            .words,
+          calm: false,
+        },
       },
     });
     expect(w.classes()).toContain('is-celebrating');
@@ -58,7 +63,11 @@ describe('CelebrationBanner', () => {
 
   it('reduced motion: the calm form (stars lit, only the words swapped)', () => {
     const w = mount(CelebrationBanner, {
-      props: { ...base, stars: 2, celebration: { praise: 'Nice!', name: 'Pip', calm: true } },
+      props: {
+        ...base,
+        stars: 2,
+        celebration: { words: [{ text: 'Nice!', name: false }], calm: true },
+      },
     });
     expect(w.classes()).toContain('is-calm');
     expect(w.classes()).not.toContain('is-celebrating');

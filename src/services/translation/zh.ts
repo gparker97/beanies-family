@@ -3812,7 +3812,6 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'celebration.recipe5Star': '五星好菜！全家一致好评。',
   'celebration.deckDealt': '每张卡片都有人认领了！',
   'celebration.checkInDone': '卡组核对完毕！下次碰头会见。',
-  'celebration.choreBlockComplete': '家务全部完成啦！beanies 在为你欢呼！',
 
   // Setup Progress Modal
   'setupProgress.title': '正在创建{name} Pod',

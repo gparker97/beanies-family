@@ -8,6 +8,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-11-14
+
+### Added
+
+- The choreboard (still switched off while it is tested) now celebrates a finished time of day with dancing beanies, stars and a cheer, and a bean's day opens with every time of day showing.
+
+### Fixed
+
+- Pop-up menus and the time picker now stay inside the bottom of the screen.
+
 ## 2026-11-13
 
 ### Added

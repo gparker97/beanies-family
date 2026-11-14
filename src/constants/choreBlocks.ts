@@ -46,6 +46,27 @@ export const CHORE_BLOCK_META: Readonly<Record<ChoreBlock, ChoreBlockMeta>> = {
 };
 
 /**
+ * The ONE all-done banner's words for a finished block (the bean's day, the wall's done strip and
+ * the celebration's own banner): "Morning, all done!" and "4 stars. Nice work, Pip."
+ */
+export function choreDoneBannerText(
+  block: ChoreBlock,
+  count: number,
+  name: string,
+  resolve: (key: UIStringKey) => string
+): { title: string; body: string } {
+  return {
+    title: fillTemplate(resolve('choreboard.done.title'), {
+      block: resolve(CHORE_BLOCK_META[block].labelKey),
+    }),
+    body: fillTemplate(
+      resolve(count === 1 ? 'choreboard.done.body.one' : 'choreboard.done.body.other'),
+      { count, name }
+    ),
+  };
+}
+
+/**
  * The ONE hours hint beside a block's name (a day section, a summary row, the Now pill): the
  * block happening now says when it ends ("until 12pm"; Evening runs to midnight, so nothing),
  * a later block says when it starts ("from 5pm"), a block whose time has passed says nothing,
@@ -226,8 +247,6 @@ const CHORE_EMOJI_KEYWORDS: readonly {
   },
 ];
 
-const escapeRe = (w: string) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
 /** Each keyword compiled once: whole-word for Latin words, anywhere for Chinese. */
 const KEYWORD_MATCHERS = CHORE_EMOJI_KEYWORDS.flatMap((entry, order) =>
   entry.words.map((word) => ({
@@ -241,8 +260,20 @@ const KEYWORD_MATCHERS = CHORE_EMOJI_KEYWORDS.flatMap((entry, order) =>
 
 function matcherFor(word: string): (title: string) => boolean {
   if (!/[a-z]/.test(word)) return (title) => title.includes(word);
-  const re = new RegExp(`(^|[^a-z])${escapeRe(word)}(s|es)?($|[^a-z])`);
-  return (title) => re.test(title);
+  // Whole word, with an optional plural. Plain string search: no pattern is built from data.
+  const forms = [word, `${word}s`, `${word}es`];
+  return (title) => forms.some((form) => hasWholeWord(title, form));
+}
+
+const isLatinLetter = (ch: string) => ch >= 'a' && ch <= 'z';
+
+function hasWholeWord(title: string, form: string): boolean {
+  for (let at = title.indexOf(form); at !== -1; at = title.indexOf(form, at + 1)) {
+    const before = at === 0 ? '' : title.charAt(at - 1);
+    const after = title.charAt(at + form.length);
+    if (!isLatinLetter(before) && !isLatinLetter(after)) return true;
+  }
+  return false;
 }
 
 /**

@@ -125,6 +125,8 @@ export interface WallChoreBlock {
   total: number;
   /** Every chore done. False for a block with no chores. */
   allDone: boolean;
+  /** The block's once-only celebration has played today (absent = not yet). */
+  celebrated?: boolean;
   isNow: boolean;
   /** The block's window has passed. */
   ended: boolean;

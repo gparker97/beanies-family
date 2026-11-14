@@ -1,10 +1,11 @@
 /**
  * The chore celebration (#146) is code-split: the choreboard's first paint never pays for the
- * component, its choreography or its art. `CelebrationOverlay` loads it on the first
+ * component, its choreography, its sound engine or its art. `CelebrationOverlay` loads it on the first
  * celebration; the choreboard page and the wall warm it (and the art) when the browser is idle,
  * so the first celebration does not wait for the network.
  */
 import { logEvent } from '@/services/telemetry/logEvent';
+import { loadCelebrationSoundEngine } from '@/composables/useSounds';
 import { choreCelebrationArtUrls } from '@/utils/choreCelebration';
 import type { Component } from 'vue';
 
@@ -34,6 +35,16 @@ export function preloadChoreCelebration(): void {
       surface: 'chore-celebration',
       message: 'chore celebration preload failed; it will load on the first celebration',
       context: { action: 'preload-failed' },
+      error,
+    });
+  });
+  // The sound engine too, so the first celebration's sound starts on the tick.
+  loadCelebrationSoundEngine().catch((error: unknown) => {
+    logEvent({
+      level: 'warn',
+      surface: 'chore-celebration',
+      message: 'chore celebration sound preload failed; it will load on the first celebration',
+      context: { action: 'preload-failed', detail: 'sounds' },
       error,
     });
   });

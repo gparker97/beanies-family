@@ -29,7 +29,7 @@ import { defineStore } from 'pinia';
 import { computed, ref, watch } from 'vue';
 import { wrapAsync } from '@/composables/useStoreActions';
 import { showToast } from '@/composables/useToast';
-import { celebrate } from '@/composables/useCelebration';
+import { celebrateChore, holdChoreBlock, releaseChoreBlock } from '@/composables/useCelebration';
 import { useChoreClock } from '@/composables/useChoreClock';
 import { isAdultMember } from '@/composables/useMemberInfo';
 import { isDocLoaded } from '@/services/automerge/docService';
@@ -96,7 +96,7 @@ export interface ToggleChoreOpts {
   by?: string;
   /**
    * Where the all-done celebration plays if this tick finishes its block: the tick surface's
-   * block and tick, measured at the tap (#146). Passed through to `celebrate` untouched; absent,
+   * block and tick, measured at the tap (#146). Passed to `celebrateChore` untouched; absent,
    * the celebration plays centered.
    */
   anchor?: ChoreCelebrationAnchor | null;
@@ -413,7 +413,12 @@ export const useChoreStore = defineStore('chores', () => {
       items.push({ id: celebratedId, input: { ...base, kind: 'celebrated', ref: completed } });
       celebrating.add(latch);
     }
-    let created: ChoreMark[] | null;
+    // This tick should celebrate, from a surface on screen: hold the block's rows BEFORE the
+    // refreshed marks make it "done", so the surface never tears down the tick the celebration
+    // starts from. Released by the celebration, or below when it will not play.
+    const holding = !!celebratedId && !!completed && !!opts.anchor;
+    if (holding) holdChoreBlock(memberId, block);
+    let created: ChoreMark[] | null = null;
     try {
       created = await write(
         action,
@@ -426,6 +431,7 @@ export const useChoreStore = defineStore('chores', () => {
       );
     } finally {
       if (celebratedId) celebrating.delete(latch);
+      if (holding && !created) releaseChoreBlock(memberId, block);
     }
     if (!created) return null;
     log('info', 'chore-ticked', { action: 'tick', slot: block, kind: opts.surface });
@@ -441,6 +447,7 @@ export const useChoreStore = defineStore('chores', () => {
         detail: celebrated ? 'celebrated' : 'banner-only',
       });
       if (celebrated) celebrateBlock(memberId, completed, completedBlock?.total ?? 0, opts.anchor);
+      else if (holding) releaseChoreBlock(memberId, block);
       return { action: 'tick', completed, celebrated };
     }
 
@@ -456,8 +463,14 @@ export const useChoreStore = defineStore('chores', () => {
     anchor: ChoreCelebrationAnchor | null | undefined
   ): void {
     const member = familyStore.members.find((m) => m.id === memberId);
-    celebrate('chore-block-complete', {
-      chore: { memberId, block, beanName: firstName(member?.name), count, anchor },
+    celebrateChore({
+      memberId,
+      block,
+      beanName: firstName(member?.name),
+      count,
+      anchor,
+      stillDone: () =>
+        choreDayFor(memberId).blocks.find((b) => b.block === block)?.allDone ?? false,
     });
   }
 

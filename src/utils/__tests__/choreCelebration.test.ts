@@ -16,7 +16,9 @@ import {
   moveForDate,
   pickChoreSound,
   pickPraiseIndex,
-  praiseWords,
+  choreTickAnchor,
+  choreTickSelector,
+  fillPraise,
   type ChoreSoundId,
 } from '@/utils/choreCelebration';
 
@@ -121,9 +123,18 @@ describe('pickPraiseIndex', () => {
   });
 });
 
-describe('praiseWords', () => {
-  it('splits a spaced language into words and flags the one carrying the name', () => {
-    expect(praiseWords('High five, Pip! Morning is all done.', 'Pip')).toEqual([
+describe('fillPraise', () => {
+  const fill = (template: string, name: string, block = 'Evening', blockWord = 'evening') =>
+    fillPraise(template, { name, block, blockWord });
+  const named = (t: string, n: string, b?: string, w?: string) =>
+    fill(t, n, b, w)
+      .words.filter((x) => x.name)
+      .map((x) => x.text);
+
+  it('fills the text and cuts it into words, the name its own piece with its punctuation', () => {
+    const p = fill('High five, {name}! {block} is all done.', 'Pip', 'Morning');
+    expect(p.text).toBe('High five, Pip! Morning is all done.');
+    expect(p.words).toEqual([
       { text: 'High', name: false },
       { text: 'five,', name: false },
       { text: 'Pip!', name: true },
@@ -134,16 +145,37 @@ describe('praiseWords', () => {
     ]);
   });
 
-  it('splits Chinese into phrases after full-width punctuation', () => {
-    expect(praiseWords('击个掌，Pip！早上全部搞定！', 'Pip')).toEqual([
+  it('marks the name by where it was filled, never by matching text', () => {
+    // "Evening" contains "Eve"; "All" contains "Al"; "Morning" contains "Mo".
+    expect(named('{block}, all done! Nice work, {name}.', 'Eve')).toEqual(['Eve.']);
+    expect(named('What a {blockWord}, {name}! All done.', 'Al')).toEqual(['Al!']);
+    expect(named('High five, {name}! {block} is all done.', 'Mo', 'Morning')).toEqual(['Mo!']);
+  });
+
+  it('a two-word name wiggles whole, as one piece', () => {
+    const p = fill('Woohoo, {name}! Your {blockWord} chores are done.', 'Mary Jo');
+    expect(p.text).toBe('Woohoo, Mary Jo! Your evening chores are done.');
+    expect(p.words.filter((w) => w.name).map((w) => w.text)).toEqual(['Mary Jo!']);
+    expect(p.words.map((w) => w.text)).toContain('Woohoo,');
+  });
+
+  it('Chinese: phrases after full-width punctuation, the name its own piece', () => {
+    const p = fill('击个掌，{name}！{block}全部搞定！', 'Pip', '早上', '早上');
+    expect(p.text).toBe('击个掌，Pip！早上全部搞定！');
+    expect(p.words).toEqual([
       { text: '击个掌，', name: false },
       { text: 'Pip！', name: true },
       { text: '早上全部搞定！', name: false },
     ]);
+    // No space and no punctuation between the name and the words after it.
+    expect(fill('{name}做到了！', '小明').words).toEqual([
+      { text: '小明', name: true },
+      { text: '做到了！', name: false },
+    ]);
   });
 
-  it('an empty name flags nothing', () => {
-    expect(praiseWords('Nice work, .', '').every((w) => !w.name)).toBe(true);
+  it('an empty name marks nothing', () => {
+    expect(fill('Nice work, {name}.', '').words.every((w) => !w.name)).toBe(true);
   });
 });
 
@@ -178,5 +210,24 @@ describe('choreCelebrationAnchor', () => {
     expect(a.tick.y + a.tick.h / 2).toBe(50);
     expect(a.clip).toBeNull();
     expect(a.compact).toBe(false);
+  });
+});
+
+describe('choreTickAnchor', () => {
+  it('finds the tapped tick inside the block by its selector', () => {
+    const block = document.createElement('section');
+    const row = document.createElement('div');
+    row.setAttribute('data-chore-id', 'c 1');
+    const tick = document.createElement('button');
+    tick.setAttribute('data-testid', 'chore-tick');
+    row.append(tick);
+    block.append(row);
+    const a = choreTickAnchor(block, choreTickSelector('c 1'), true);
+    expect(a?.tickEl).toBe(tick);
+    expect(a?.compact).toBe(true);
+  });
+
+  it('no block on screen: no anchor', () => {
+    expect(choreTickAnchor(null, choreTickSelector('c1'))).toBeNull();
   });
 });

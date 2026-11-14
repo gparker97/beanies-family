@@ -23,7 +23,7 @@
  * Slot content and the praise line sit on the gradient, so they keep white ink in both themes.
  */
 import { computed } from 'vue';
-import { praiseWords, type BannerCelebration } from '@/utils/choreCelebration';
+import type { BannerCelebration } from '@/utils/choreCelebration';
 
 const props = withDefaults(
   defineProps<{
@@ -48,9 +48,7 @@ const props = withDefaults(
 );
 defineEmits<{ action: [] }>();
 
-const words = computed(() =>
-  props.celebration ? praiseWords(props.celebration.praise, props.celebration.name) : []
-);
+const words = computed(() => props.celebration?.words ?? []);
 const formClass = computed(() => {
   if (!props.celebration) return '';
   return props.celebration.calm ? 'is-calm' : 'is-celebrating';

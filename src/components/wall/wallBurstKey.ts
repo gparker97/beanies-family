@@ -11,8 +11,12 @@
  * some future non-wall context, should tick without a burst rather than crash.
  */
 import type { InjectionKey } from 'vue';
+import type { WallJob } from '@/types/wall';
 
-/** Fire a burst centred on the given viewport coordinates. */
-export type WallBurstFn = (x: number, y: number) => void;
+/**
+ * Fire a burst centred on the given viewport coordinates, for `job` (so a surface can decline:
+ * the chore lanes skip the tick that finishes a block, where the all-done celebration plays).
+ */
+export type WallBurstFn = (x: number, y: number, job?: WallJob) => void;
 
 export const WALL_BURST: InjectionKey<WallBurstFn> = Symbol('wallBurst');

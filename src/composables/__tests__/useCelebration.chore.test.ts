@@ -1,5 +1,5 @@
 /**
- * The chore celebration's orchestration (#146): `celebrate('chore-block-complete')` picks the
+ * The chore celebration's orchestration (#146): `celebrateChore` picks the
  * weekday's move, a sound (never the last one) and a praise line (never the last one), plays the
  * chore sound (never the list fanfare), and runs its two phases on its own timers. List completion
  * keeps the old shower and fanfare. Reduced motion is calm; no anchor plays centered (and says
@@ -24,7 +24,10 @@ vi.mock('@/stores/translationStore', () => ({
 
 import {
   celebrate,
+  celebrateChore,
   choreBannerCelebration,
+  holdChoreBlock,
+  releaseChoreBlock,
   choreBlockHeld,
   resetCelebrationMode,
   resetChoreCelebrationForTest,
@@ -91,10 +94,10 @@ afterEach(() => {
 
 const active = () => useCelebration().activeChore.value;
 
-describe('celebrate("chore-block-complete")', () => {
+describe('celebrateChore', () => {
   it('plays the weekday move with its chore sound, never the shower or the fanfare', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.9); // no cheer this time
-    celebrate('chore-block-complete', { chore: request() });
+    celebrateChore(request());
     const c = active()!;
     expect(c.move).toBe('bounce-party');
     expect(c.sound).toBe('marimba');
@@ -107,18 +110,21 @@ describe('celebrate("chore-block-complete")', () => {
 
   it('the move follows the device’s day', () => {
     vi.setSystemTime(THURSDAY);
-    celebrate('chore-block-complete', { chore: request() });
+    celebrateChore(request());
     expect(active()!.move).toBe('drop-in');
   });
 
   it('banner at 560 ms, gone at 3060 ms, on its own timers', () => {
-    celebrate('chore-block-complete', { chore: request() });
+    celebrateChore(request());
     expect(choreBlockHeld('pip', 'morning')).toBe(true);
     expect(choreBannerCelebration('pip', 'morning')).toBeNull();
     vi.advanceTimersByTime(560);
     expect(active()!.phase).toBe('banner');
     expect(choreBlockHeld('pip', 'morning')).toBe(false);
-    expect(choreBannerCelebration('pip', 'morning')).toMatchObject({ name: 'Pip', calm: false });
+    expect(choreBannerCelebration('pip', 'morning')).toEqual({
+      words: active()!.praiseWords,
+      calm: false,
+    });
     // Another bean's block, or another block, is never the one celebrating.
     expect(choreBannerCelebration('juno', 'morning')).toBeNull();
     expect(choreBannerCelebration('pip', 'evening')).toBeNull();
@@ -129,10 +135,10 @@ describe('celebrate("chore-block-complete")', () => {
   });
 
   it('a new celebration replaces the last one and cancels its timers', () => {
-    celebrate('chore-block-complete', { chore: request() });
+    celebrateChore(request());
     const first = active()!.id;
     vi.advanceTimersByTime(2000);
-    celebrate('chore-block-complete', { chore: request({ block: 'evening' }) });
+    celebrateChore(request({ block: 'evening' }));
     expect(active()!.id).not.toBe(first);
     expect(active()!.phase).toBe('burst');
     vi.advanceTimersByTime(1100); // the first one's end would have landed here
@@ -141,15 +147,15 @@ describe('celebrate("chore-block-complete")', () => {
 
   it('never the same sound twice in a row, remembered across a reload', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.9);
-    celebrate('chore-block-complete', { chore: request() });
+    celebrateChore(request());
     expect(active()!.sound).toBe('marimba');
     expect(localStorage.getItem('beanies.choreCelebration.lastSound')).toBe('marimba');
-    celebrate('chore-block-complete', { chore: request() });
+    celebrateChore(request());
     expect(active()!.sound).toBe('kids-cheer');
     // A fresh session (memory gone) still reads the last sound from storage.
     resetChoreCelebrationForTest();
     localStorage.setItem('beanies.choreCelebration.lastSound', 'marimba');
-    celebrate('chore-block-complete', { chore: request() });
+    celebrateChore(request());
     expect(active()!.sound).toBe('kids-cheer');
     vi.mocked(Math.random).mockRestore();
   });
@@ -157,7 +163,7 @@ describe('celebrate("chore-block-complete")', () => {
   it('never the same praise line twice in a row', () => {
     let last = '';
     for (let i = 0; i < 40; i++) {
-      celebrate('chore-block-complete', { chore: request() });
+      celebrateChore(request());
       const praise = active()!.praise;
       expect(praise).not.toBe(last);
       last = praise;
@@ -166,7 +172,7 @@ describe('celebrate("chore-block-complete")', () => {
 
   it('reduced motion: calm, the banner from the start, a shorter end, sound still plays', () => {
     reduced = true;
-    celebrate('chore-block-complete', { chore: request() });
+    celebrateChore(request());
     const c = active()!;
     expect(c.calm).toBe(true);
     expect(c.phase).toBe('banner');
@@ -179,7 +185,7 @@ describe('celebrate("chore-block-complete")', () => {
   });
 
   it('no anchor: plays centered, logs a warning, and holds no block on the board', () => {
-    celebrate('chore-block-complete', { chore: request({ anchor: null }) });
+    celebrateChore(request({ anchor: null }));
     expect(active()!.anchor).toBeNull();
     expect(choreBlockHeld('pip', 'morning')).toBe(false);
     vi.advanceTimersByTime(560);
@@ -194,7 +200,7 @@ describe('celebrate("chore-block-complete")', () => {
 
   it('logs one info event with allowlisted context when it plays', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.9);
-    celebrate('chore-block-complete', { chore: request() });
+    celebrateChore(request());
     const info = logEvent.mock.calls.map((c) => c[0]).filter((e) => e.level === 'info');
     expect(info).toHaveLength(1);
     expect(info[0]).toMatchObject({
@@ -214,20 +220,63 @@ describe('celebrate("chore-block-complete")', () => {
 
   it('a cheer that fell back to the paired sound is logged as a warning', async () => {
     sounds.playChoreCelebrationSound.mockResolvedValue('fallback');
-    celebrate('chore-block-complete', { chore: request() });
+    celebrateChore(request());
     await vi.runAllTicks();
     await Promise.resolve();
     expect(logEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         level: 'warn',
-        context: expect.objectContaining({ action: 'fallback-sound', detail: 'marimba' }),
+        context: expect.objectContaining({
+          action: 'fallback-sound',
+          detail: 'marimba',
+          stage: 'fallback',
+        }),
       })
     );
   });
 
+  it('sounds not loaded in time: the fanfare played, logged as a warning', async () => {
+    sounds.playChoreCelebrationSound.mockResolvedValue('fanfare');
+    celebrateChore(request());
+    await vi.runAllTicks();
+    await Promise.resolve();
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'warn',
+        context: expect.objectContaining({ action: 'fallback-fanfare' }),
+      })
+    );
+  });
+
+  it('a block unticked during the burst: no banner, the celebration ends quietly', () => {
+    let done = true;
+    celebrateChore(request({ stillDone: () => done }));
+    done = false;
+    vi.advanceTimersByTime(560);
+    expect(active()).toBeNull();
+    expect(choreBannerCelebration('pip', 'morning')).toBeNull();
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ context: expect.objectContaining({ action: 'ended-undone' }) })
+    );
+  });
+
+  it('the store’s hold keeps the rows before the celebration exists, and hands over to it', () => {
+    holdChoreBlock('pip', 'morning');
+    expect(choreBlockHeld('pip', 'morning')).toBe(true);
+    expect(choreBlockHeld('pip', 'evening')).toBe(false);
+    celebrateChore(request());
+    expect(choreBlockHeld('pip', 'morning')).toBe(true); // now the burst holds it
+    vi.advanceTimersByTime(560);
+    expect(choreBlockHeld('pip', 'morning')).toBe(false); // the hold went with the hand-over
+    // A hold the store releases (the write failed, or another device celebrated first).
+    holdChoreBlock('juno', 'evening');
+    releaseChoreBlock('juno', 'evening');
+    expect(choreBlockHeld('juno', 'evening')).toBe(false);
+  });
+
   it('honours a surface’s shorter cap, and still plays where routine ones are suppressed', () => {
     setCelebrationMode({ autoDismissMs: 1500, suppressRoutine: true });
-    celebrate('chore-block-complete', { chore: request() });
+    celebrateChore(request());
     expect(active()!.endsAt).toBe(1500);
     vi.advanceTimersByTime(1500);
     expect(active()).toBeNull();

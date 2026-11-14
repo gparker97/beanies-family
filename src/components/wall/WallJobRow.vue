@@ -119,7 +119,7 @@ function onTick() {
     // surface where the person who tapped is standing across the room.
     if (tickEl.value) {
       const box = tickEl.value.getBoundingClientRect();
-      burst?.(box.left + box.width / 2, box.top);
+      burst?.(box.left + box.width / 2, box.top, props.job);
     }
   }
   emit('toggle', props.job);

@@ -34,9 +34,18 @@ import ChoreRow from '@/components/chores/ChoreRow.vue';
 import CelebrationBanner from '@/components/ui/CelebrationBanner.vue';
 import { choreBannerCelebration, choreBlockHeld } from '@/composables/useCelebration';
 import { useTranslation } from '@/composables/useTranslation';
-import { CHORE_BLOCK_META, choreBlockHint, choreEmoji } from '@/constants/choreBlocks';
+import {
+  CHORE_BLOCK_META,
+  choreBlockHint,
+  choreDoneBannerText,
+  choreEmoji,
+} from '@/constants/choreBlocks';
 import { fillTemplate } from '@/utils/fillTemplate';
-import { choreCelebrationAnchor, type ChoreCelebrationAnchor } from '@/utils/choreCelebration';
+import {
+  choreTickAnchor,
+  choreTickSelector,
+  type ChoreCelebrationAnchor,
+} from '@/utils/choreCelebration';
 import type { ChoreDayBlock } from '@/utils/chores';
 import type { ChoreBlockStarts } from '@/types/models';
 
@@ -116,14 +125,8 @@ const choresText = computed(() => {
 const peek = computed(() => props.block.chores.slice(0, 4).map((i) => choreEmoji(i.chore)));
 const stars = computed(() => '⭐'.repeat(props.block.total));
 
-const bannerTitle = computed(() =>
-  fillTemplate(t('choreboard.done.title'), { block: label.value })
-);
-const bannerBody = computed(() =>
-  fillTemplate(
-    t(props.block.total === 1 ? 'choreboard.done.body.one' : 'choreboard.done.body.other'),
-    { count: props.block.total, name: props.beanName }
-  )
+const bannerText = computed(() =>
+  choreDoneBannerText(props.block.block, props.block.total, props.beanName, t)
 );
 /** The fold's label: "Hide Morning chores" on an open header, "Show ..." on a folded line. */
 const foldLabel = computed(() =>
@@ -145,11 +148,7 @@ const root = ref<HTMLElement | null>(null);
 
 /** A tick: the intent, and where the celebration would play if this tick finishes the block. */
 function onToggle(choreId: string): void {
-  const el = root.value;
-  const tick = el?.querySelector<HTMLElement>(
-    `[data-chore-id="${CSS.escape(choreId)}"] [data-testid="chore-tick"]`
-  );
-  emit('toggle', choreId, el ? choreCelebrationAnchor(el, tick ?? null) : null);
+  emit('toggle', choreId, choreTickAnchor(root.value, choreTickSelector(choreId)));
 }
 
 /** Open this block (a folded line, a done strip, a banner) and bring it into view with focus. */
@@ -189,8 +188,8 @@ defineExpose({ reveal });
     <!-- The all-done banner: the block happening now (or Anytime). -->
     <template v-if="state === 'banner'">
       <CelebrationBanner
-        :title="bannerTitle"
-        :body="bannerBody"
+        :title="bannerText.title"
+        :body="bannerText.body"
         :image-alt="t('choreboard.done.imageAlt')"
         :action-label="t(expanded ? 'choreboard.block.hideChores' : 'choreboard.block.showChores')"
         :stars="block.total"

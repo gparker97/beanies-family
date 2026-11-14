@@ -8686,10 +8686,6 @@ const STRING_DEFS = {
     en: 'Deck checked! See you at the next check-in.',
     beanie: 'deck checked! see you at the next check-in.',
   },
-  'celebration.choreBlockComplete': {
-    en: 'All chores done! The beanies are cheering!',
-    beanie: 'all chores done! the beanies are going wild!',
-  },
 
   // Setup Progress Modal
   'setupProgress.title': {

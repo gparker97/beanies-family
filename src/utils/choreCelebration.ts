@@ -15,6 +15,7 @@
  *  - `ChoreCelebration.vue` (lazy) draws it, anchored by `choreCelebrationAnchor`;
  *  - the three tick surfaces (the bean's day, the home card, the wall's lanes) build the anchor.
  */
+import { fillTemplate } from '@/utils/fillTemplate';
 import type { ChoreBlock } from '@/types/models';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 
@@ -133,8 +134,14 @@ export function pickPraiseIndex(
 
 export interface PraiseWord {
   text: string;
-  /** This word carries the bean's name (it gets the little wiggle). */
+  /** This piece IS the bean's name (it gets the little wiggle). */
   name: boolean;
+}
+
+/** A praise line: the text (said aloud) and the pieces that pop in one after another. */
+export interface Praise {
+  text: string;
+  words: PraiseWord[];
 }
 
 /**
@@ -142,25 +149,47 @@ export interface PraiseWord {
  * split, not a lookbehind, which older iOS WebViews cannot parse.)
  */
 const CJK_BREAK = /([，。！？、；：])/gu;
-const splitPhrases = (token: string) => token.replace(CJK_BREAK, '$1\u0000').split('\u0000');
+const PHRASE_MARK = '\uE001';
+const splitPhrases = (token: string) =>
+  token.replace(CJK_BREAK, `$1${PHRASE_MARK}`).split(PHRASE_MARK);
+/** Stands in for the name while the template is filled, so only the real name is marked. */
+const NAME_MARK = '\uE000';
+const ONLY_PUNCT = /^[\p{P}\p{S}]+$/u;
 
 /**
- * The praise line in the pieces that pop in one after another: words where the language spaces
- * them, phrases (split after full-width punctuation) where it does not.
+ * Fill a praise template and cut it into its pop-in pieces: words where the language spaces them,
+ * phrases (split after full-width punctuation) where it does not. The name is filled as a marker
+ * first, so it is marked by WHERE it was filled, never by matching text ("Evening" never wiggles
+ * for a bean named Eve). It is always its own piece, whole even with a space in it, and keeps
+ * the punctuation that touches it ("Pip!", "Pip！").
  */
-export function praiseWords(praise: string, name: string): PraiseWord[] {
-  const trimmed = name.trim();
-  return praise
-    .split(/\s+/)
-    .flatMap(splitPhrases)
-    .filter((text) => text.length > 0)
-    .map((text) => ({ text, name: trimmed.length > 0 && text.includes(trimmed) }));
+export function fillPraise(
+  template: string,
+  values: { name: string; block: string; blockWord: string }
+): Praise {
+  const name = values.name;
+  const marked = fillTemplate(template, { ...values, name: NAME_MARK });
+  const words: PraiseWord[] = [];
+  for (const token of marked.split(/\s+/).flatMap(splitPhrases)) {
+    if (!token) continue;
+    const parts = token.split(NAME_MARK);
+    let prefix = '';
+    parts.forEach((part, i) => {
+      if (i > 0 && name) words.push({ text: prefix + name, name: true });
+      prefix = '';
+      if (!part) return;
+      const last = words[words.length - 1];
+      if (ONLY_PUNCT.test(part) && i > 0 && last?.name) last.text += part;
+      else if (ONLY_PUNCT.test(part) && i < parts.length - 1) prefix = part;
+      else words.push({ text: part, name: false });
+    });
+  }
+  return { text: marked.split(NAME_MARK).join(name), words };
 }
 
 /** What a banner shows while it is the one celebrating (`CelebrationBanner`'s `celebration`). */
 export interface BannerCelebration {
-  praise: string;
-  name: string;
+  words: PraiseWord[];
   /** Reduced motion: the stars are lit and only the words are swapped. */
   calm: boolean;
 }
@@ -288,4 +317,23 @@ export function choreCelebrationAnchor(
     clip: block.closest<HTMLElement>('[data-celebration-clip]'),
     compact,
   };
+}
+
+/** The page's chore tick for `choreId` inside a block (the day's section, the home card's row). */
+export function choreTickSelector(choreId: string): string {
+  return `[data-chore-id="${CSS.escape(choreId)}"] [data-testid="chore-tick"]`;
+}
+
+/**
+ * The ONE tap-time anchor for a tick surface: `block` is the block's element, `tickSelector`
+ * finds the tapped tick inside it. Null when the block is not on screen (no celebration anchor:
+ * it plays centered).
+ */
+export function choreTickAnchor(
+  block: HTMLElement | null | undefined,
+  tickSelector: string,
+  compact = false
+): ChoreCelebrationAnchor | null {
+  if (!block) return null;
+  return choreCelebrationAnchor(block, block.querySelector<HTMLElement>(tickSelector), compact);
 }

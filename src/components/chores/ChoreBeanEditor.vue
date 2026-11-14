@@ -202,13 +202,13 @@ const actor = () => me.value?.id ?? null;
 async function withPending<T>(id: string, show: Pending, run: (actorId: string) => Promise<T>) {
   const actorId = actor();
   if (!actorId) return null;
-  const token = ++seq;
-  latest.set(id, token);
+  const turn = ++seq;
+  latest.set(id, turn);
   pending.set(id, { ...pending.get(id), ...show });
   try {
     return await run(actorId);
   } finally {
-    if (latest.get(id) === token) {
+    if (latest.get(id) === turn) {
       pending.delete(id);
       latest.delete(id);
     }

@@ -257,6 +257,7 @@ function choreLane(memberId: string, day: BeanChoreDay): WallChoreLane {
       done: b.done,
       total: b.total,
       allDone: b.allDone,
+      celebrated: b.celebrated,
       isNow: b.isNow,
       ended: b.ended,
     })

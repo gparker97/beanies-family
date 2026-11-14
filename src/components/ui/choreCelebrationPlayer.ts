@@ -103,6 +103,11 @@ export interface BurstInput {
   tickEl: HTMLElement | null;
   /** The block element, which steps aside for the banner. */
   blockEl: HTMLElement | null;
+  /**
+   * Drawing started after the banner already arrived (a slow first load of this code): skip the
+   * block's step-aside, which would otherwise fade the block AND its new banner out.
+   */
+  late?: boolean;
 }
 
 export interface ChoreCelebrationPlayer {
@@ -143,6 +148,7 @@ export function createChoreCelebrationPlayer(opts: PlayerOptions): ChoreCelebrat
   let followed = { dx: 0, dy: 0 };
   let stars: FlyingStar[] = [];
   let aside: Animation | null = null;
+  let arrived = false;
   let cancelled = false;
 
   // Everything drawn lives in one layer above anything the overlay put in the stage.
@@ -752,10 +758,8 @@ export function createChoreCelebrationPlayer(opts: PlayerOptions): ChoreCelebrat
 
   // ── the phases ──
 
-  function burst({ tick, area, tickEl, blockEl }: BurstInput): void {
-    if (cancelled) return;
-    const tc = center(tick);
-    // 1. The tick pops, a ring and pod-colour sparks spring from it, and the stars burst out.
+  /** The tick pops, and a ring and pod-colour sparks spring from it. */
+  function tickPop(tc: { x: number; y: number }, tick: RectLike, tickEl: HTMLElement | null) {
     if (tickEl?.isConnected) {
       anim(
         tickEl,
@@ -797,6 +801,14 @@ export function createChoreCelebrationPlayer(opts: PlayerOptions): ChoreCelebrat
         { duration: 560, easing: 'cubic-bezier(.2,.8,.3,1)', fill: 'forwards' }
       );
     }
+  }
+
+  function burst({ tick, area, tickEl, blockEl, late = false }: BurstInput): void {
+    if (cancelled) return;
+    const tc = center(tick);
+    // 1. The tick pops, a ring and pod-colour sparks spring from it, and the stars burst out.
+    // Started late, the tick is gone (the banner replaced it): only the stars, no ring or pop.
+    if (!late) tickPop(tc, tick, tickEl);
     // The fan aims from the tick toward the middle of the block, so the stars stay on this
     // bean's board instead of spilling off the edge or into a sibling's lane.
     const aim = (Math.atan2(-160, area.x + area.w / 2 - tc.x) * 180) / Math.PI;
@@ -839,8 +851,10 @@ export function createChoreCelebrationPlayer(opts: PlayerOptions): ChoreCelebrat
       return { el, bx, by, r };
     });
 
-    // 2. The block steps aside for the banner.
+    // 2. The block steps aside for the banner (never once the banner is here).
+    if (late || arrived) return;
     later(SWAP - 160, () => {
+      if (arrived) return;
       aside = anim(
         blockEl,
         [
@@ -854,6 +868,7 @@ export function createChoreCelebrationPlayer(opts: PlayerOptions): ChoreCelebrat
 
   function arrive(banner: HTMLElement): void {
     if (cancelled) return;
+    arrived = true;
     // The block element is the banner's parent now: let it show again.
     aside?.cancel();
     aside = null;

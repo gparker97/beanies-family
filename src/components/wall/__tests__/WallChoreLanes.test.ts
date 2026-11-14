@@ -13,6 +13,7 @@ import WallAddRow from '../WallAddRow.vue';
 import CelebrationBanner from '@/components/ui/CelebrationBanner.vue';
 import { WALL_LOCK } from '../wallLockKey';
 import { WALL_EDIT, type WallEditContext } from '../wallEditKey';
+import { WALL_BURST } from '../wallBurstKey';
 import type { ChoreBlock, FamilyMember } from '@/types/models';
 import type { WallChoreBlock, WallChoreLane, WallJob, WallPeripheralData } from '@/types/wall';
 
@@ -196,6 +197,59 @@ describe('WallChoreLanes', () => {
       clip: lane.element,
       compact: true,
     });
+  });
+
+  it('the wall’s tick burst skips only the tick that finishes a block (the celebration plays)', async () => {
+    const burst = vi.fn();
+    const mountWith = (l: WallChoreLane) =>
+      mount(WallChoreLanes, {
+        props: {
+          peripherals: {
+            todosFor: () => [],
+            unassignedTodos: [],
+            allTodos: [],
+            listsFor: () => [],
+            orphanLists: [],
+            visibleMemberIds: null,
+            choreLaneFor: (id: string) => (id === 'pip' ? l : null),
+          },
+          isPending: () => false,
+          backLabel: 'week',
+        },
+        global: { stubs: { BeanieAvatar: true }, provide: { [WALL_BURST as symbol]: burst } },
+      });
+    const tickOf = (w: ReturnType<typeof mountWith>, choreId: string) =>
+      w.get(`[data-job-key="chore:${choreId}:pip"] .wall-tick-hit`);
+
+    // Two to go: an ordinary tick, the burst plays.
+    const two = mountWith(
+      lane('pip', [block('morning', [job('bed', 'pip'), job('teeth', 'pip')], { isNow: true })])
+    );
+    await tickOf(two, 'bed').trigger('click');
+    expect(burst).toHaveBeenCalledTimes(1);
+    expect(burst.mock.calls[0]![2]).toMatchObject({ choreId: 'bed' });
+
+    // The last one: the celebration plays, so no burst under it.
+    burst.mockClear();
+    const last = mountWith(
+      lane('pip', [
+        block('morning', [job('bed', 'pip', true), job('teeth', 'pip')], { isNow: true }),
+      ])
+    );
+    await tickOf(last, 'teeth').trigger('click');
+    expect(burst).not.toHaveBeenCalled();
+
+    // Already celebrated today (a re-tick after an untick): banner only, so the burst plays.
+    const again = mountWith(
+      lane('pip', [
+        block('morning', [job('bed', 'pip', true), job('teeth', 'pip')], {
+          isNow: true,
+          celebrated: true,
+        }),
+      ])
+    );
+    await tickOf(again, 'teeth').trigger('click');
+    expect(burst).toHaveBeenCalledTimes(1);
   });
 
   it('draws no star row: stars appear only on a finished block', () => {

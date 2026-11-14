@@ -91,6 +91,46 @@ describe('choreCelebrationPlayer', () => {
     });
   }
 
+  it('started late (the banner already here): the block never steps aside over its banner', () => {
+    const stage = document.createElement('div');
+    const block = document.createElement('section');
+    const b = banner();
+    block.append(b);
+    document.body.append(stage, block);
+    const opts = {
+      stage,
+      origin: { x: 0, y: 0 },
+      move: 'parade' as const,
+      count: 2,
+      startedAt: performance.now(),
+      compact: false,
+    };
+    const burstInput = {
+      tick: { x: 300, y: 400, w: 52, h: 52 },
+      area: { x: 16, y: 200, w: 368, h: 300 },
+      tickEl: null,
+      blockEl: block,
+    };
+    // Late: the phase had flipped before drawing began.
+    const late = createChoreCelebrationPlayer(opts);
+    late.burst({ ...burstInput, late: true });
+    // The tick is gone by now: no ring or sparks where it used to be, only the stars.
+    expect(stage.querySelector('.cc-ring')).toBeNull();
+    expect(stage.querySelectorAll('.cc-fstar').length).toBe(2);
+    late.arrive(b);
+    vi.advanceTimersByTime(1000);
+    expect(animations.some((a) => a.target === block)).toBe(false);
+    late.cancel();
+    // On time, but the banner arrived before the queued step-aside fired: still never.
+    animations = [];
+    const early = createChoreCelebrationPlayer(opts);
+    early.burst(burstInput);
+    early.arrive(b);
+    vi.advanceTimersByTime(1000);
+    expect(animations.some((a) => a.target === block)).toBe(false);
+    early.cancel();
+  });
+
   it('a star that lands lights its slot and twinkles; a cancelled one does nothing', () => {
     const stage = document.createElement('div');
     document.body.append(stage);
