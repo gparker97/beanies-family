@@ -199,7 +199,11 @@ describe('a child viewer', () => {
     const w = await mountPage({ bean: 'kid' });
     await w.get('[data-chore-id="k1"] [data-testid="chore-tick"]').trigger('click');
     await flushPromises();
-    expect(choreActions.toggleChore).toHaveBeenCalledWith('k1', 'kid', { surface: 'app' });
+    expect(choreActions.toggleChore).toHaveBeenCalledWith('k1', 'kid', {
+      surface: 'app',
+      // Where the all-done celebration plays if this tick finishes the block (#146).
+      anchor: expect.objectContaining({ block: expect.any(HTMLElement) }),
+    });
   });
 
   it('a ?starter= link is ignored and stripped, and the sheet never opens', async () => {
@@ -411,13 +415,30 @@ describe('a grown-up viewer', () => {
     const summary = w.get('[data-testid="chore-day-summary"]');
     const rows = summary.findAll('[data-testid="chore-summary"]');
     expect(rows.map((r) => r.attributes('data-block'))).toEqual(['morning', 'evening']);
-    // Evening is later: a quiet line until its summary row is tapped.
+    // A tap on the Evening row opens Evening's section (whatever its default) and focuses it.
     const evening = () => w.get('[data-testid="chore-block"][data-block="evening"]');
-    expect(evening().find('[data-testid="chore-block-rows"]').exists()).toBe(false);
     await rows[1]!.get('[data-testid="chore-summary-toggle"]').trigger('click');
     await flushPromises();
     expect(evening().find('[data-testid="chore-block-rows"]').exists()).toBe(true);
     expect(w.find('.day-grid-rail').exists()).toBe(false);
+  });
+
+  it('the day: every block opens with its chores; one folded by its header reopens from Today', async () => {
+    const w = await mountPage({ bean: 'kid' });
+    const states = w
+      .findAll('[data-testid="chore-block"]')
+      .map((b) => `${b.attributes('data-block')}:${b.attributes('data-state')}`);
+    expect(states).toEqual(['morning:open', 'evening:open']);
+    const evening = () => w.get('[data-testid="chore-block"][data-block="evening"]');
+    expect(evening().find('[data-testid="chore-block-rows"]').exists()).toBe(true);
+    await evening().get('[data-testid="chore-block-header"]').trigger('click');
+    expect(evening().attributes('data-state')).toBe('later');
+    const rows = w
+      .get('[data-testid="chore-day-summary"]')
+      .findAll('[data-testid="chore-summary"]');
+    await rows[1]!.get('[data-testid="chore-summary-toggle"]').trigger('click');
+    await flushPromises();
+    expect(evening().attributes('data-state')).toBe('open');
   });
 
   it('the day on a phone: the summary is the tile strip; on a wide screen, a rail', async () => {

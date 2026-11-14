@@ -9,8 +9,8 @@
  *    below; Hours and ONE Add Chores (the sheet, for one chore or a whole set); the "No one's"
  *    group for chores whose people have left the family; the "Chores Done" board, in a right
  *    rail (days down) from 1280px and below the cards (days across) under it; an empty state.
- *  - A BEAN'S DAY (`?bean=<id>`): the tick view. "Now" first and biggest, later blocks quieter,
- *    the all-done banner; beside it (from 1280px) or above and below it, the "Today" summary
+ *  - A BEAN'S DAY (`?bean=<id>`): the tick view. Every block open with its chores ("Now" first
+ *    and biggest, each folding by its header for this visit), the all-done banner; beside it (from 1280px) or above and below it, the "Today" summary
  *    (`ChoreBlockSummary`, rows, or the tile strip on a phone; a tap opens and scrolls to that
  *    block) and the bean's own Chores Done week. A child always lands on their own day.
  *
@@ -69,16 +69,17 @@ import { useMediaQuery } from '@/composables/useMediaQuery';
 import { useChoreStore } from '@/stores/choreStore';
 import { useFamilyStore } from '@/stores/familyStore';
 import { logEvent } from '@/services/telemetry/logEvent';
+import { preloadChoreCelebrationWhenIdle } from '@/components/ui/choreCelebrationLoader';
 import { CHORE_BLOCK_META, choreBlockHint } from '@/constants/choreBlocks';
+import type { ChoreCelebrationAnchor } from '@/utils/choreCelebration';
 import { choreStarterSet, type ChoreStarterSetKey } from '@/constants/choreStarterSets';
 import {
   blocksInDisplayOrder,
-  choreBlockRank,
   currentBlock,
   type BeanChoreDay,
   type ChoreDayBlock,
 } from '@/utils/chores';
-import { firstName as firstWord } from '@/utils/assignees';
+import { firstName as firstNameOf } from '@/utils/assignees';
 import { fillTemplate } from '@/utils/fillTemplate';
 import type { ChoreBlock, FamilyMember } from '@/types/models';
 
@@ -97,6 +98,8 @@ const isWide = useMediaQuery('(min-width: 80rem)');
 onMounted(() => {
   // The boot sequence loads chores; this covers a page reached before that finished.
   if (!choreStore.isLoaded) void choreStore.loadChores();
+  // The all-done celebration is code-split; warm it (and its art) while the page is idle.
+  preloadChoreCelebrationWhenIdle();
 });
 
 const me = computed(() => familyStore.currentMember);
@@ -225,8 +228,13 @@ function canTickFor(memberId: string): boolean {
   return isAdult.value || me.value?.id === memberId;
 }
 
-function onToggle(choreId: string, memberId: string): void {
-  void ticks.toggle(choreId, memberId);
+/** A tick, with where its celebration plays if it finishes the block (#146). */
+function onToggle(
+  choreId: string,
+  memberId: string,
+  anchor: ChoreCelebrationAnchor | null = null
+): void {
+  void ticks.toggle(choreId, memberId, anchor);
 }
 
 /** A "No one's" chore's ✕: it has nobody left, so it is deleted (the store toasts a failure). */
@@ -253,7 +261,7 @@ const choreOwners = computed(() => {
   return ids;
 });
 
-const firstName = (m: FamilyMember) => firstWord(m.name) || m.name;
+const firstName = (m: FamilyMember) => firstNameOf(m.name);
 
 // ── Home ────────────────────────────────────────────────────────────────────
 
@@ -308,8 +316,8 @@ const todayYmd = computed(() => choreStore.todayYmd);
 
 const weekRows = computed(() =>
   familyStore.sortedHumans
+    .filter((m) => choreOwners.value.has(m.id))
     .map((member) => ({ member, week: choreStore.weekFor(member.id) }))
-    .filter((r) => choreOwners.value.has(r.member.id) || r.week.total > 0)
 );
 const showBoard = computed(() => isAdult.value && weekRows.value.length > 0);
 /** The home board sits in the right rail (days down) only on a wide screen. */
@@ -340,21 +348,13 @@ const dayHasAnyChores = computed(
   () => !!viewBeanId.value && choreOwners.value.has(viewBeanId.value)
 );
 
-interface DaySection {
-  block: ChoreDayBlock;
-  open: boolean;
-  celebrate: boolean;
-}
-
 /**
- * The one display order (`blocksInDisplayOrder`): now first and biggest, then Anytime, both open;
- * then later blocks and the ones whose time has passed, quiet.
+ * The one display order (`blocksInDisplayOrder`): now first and biggest, then Anytime, then later
+ * blocks and the ones whose time has passed. Every block opens with its chores and a finished one
+ * shows its banner (each section folds by its header, for this visit only).
  */
-const daySections = computed<DaySection[]>(() =>
-  blocksInDisplayOrder((day.value?.blocks ?? []).filter((b) => b.total > 0)).map((block) => {
-    const open = choreBlockRank(block) < 2;
-    return { block, open, celebrate: open };
-  })
+const daySections = computed<ChoreDayBlock[]>(() =>
+  blocksInDisplayOrder((day.value?.blocks ?? []).filter((b) => b.total > 0))
 );
 
 const greeting = computed(() => {
@@ -411,7 +411,7 @@ function revealBlock(block: ChoreBlock): void {
 </script>
 
 <template>
-  <div class="space-y-6" data-testid="choreboard-page">
+  <div class="space-y-6" data-testid="choreboard-page" data-celebration-clip>
     <!-- ═══ A bean's day ═══ -->
     <template v-if="viewBeanId && dayMember && day">
       <div class="flex flex-wrap items-center gap-2">
@@ -576,26 +576,28 @@ function revealBlock(block: ChoreBlock): void {
 
           <div v-else class="flex flex-col gap-3" data-testid="chore-day-sections">
             <ChoreBlockSection
-              v-for="s in daySections"
-              :key="s.block.block"
-              :ref="(el) => setSectionRef(s.block.block, el)"
-              :block="s.block"
+              v-for="b in daySections"
+              :key="b.block"
+              :ref="(el) => setSectionRef(b.block, el)"
+              :block="b"
               :member-id="viewBeanId"
               :bean-name="firstName(dayMember)"
-              :open="s.open"
-              :celebrate="s.celebrate"
+              open
+              celebrate
               :starts="starts"
               :can-tick="canTickFor(viewBeanId)"
               :can-edit="isAdult"
               :is-pending="pendingFor(viewBeanId)"
-              @toggle="onToggle($event, viewBeanId)"
+              @toggle="(choreId, anchor) => onToggle(choreId, viewBeanId!, anchor)"
               @edit="openBeanEditor(viewBeanId)"
             />
           </div>
         </div>
 
+        <!-- Under 768px the margin lets the week clear the floating quick-add button. -->
         <ChoreWeekPanel
           v-if="dayWeekRows.length"
+          class="max-md:mb-20"
           data-area="week"
           :rows="dayWeekRows"
           :today-ymd="todayYmd"
@@ -689,7 +691,7 @@ function revealBlock(block: ChoreBlock): void {
                   :can-tick="canTickFor(bean.member.id)"
                   :can-edit="isAdult"
                   :is-pending="pendingFor(bean.member.id)"
-                  @toggle="onToggle($event, bean.member.id)"
+                  @toggle="(choreId, anchor) => onToggle(choreId, bean.member.id, anchor)"
                   @edit-chores="openBeanEditor(bean.member.id)"
                   @open="openDay(bean.member.id)"
                   @copy="openCopy(bean.member.id)"
@@ -709,7 +711,6 @@ function revealBlock(block: ChoreBlock): void {
                 :key="m.id"
                 class="max-w-96 flex-[1_1_15rem]"
                 :member="m"
-                :day="choreStore.choreDayFor(m.id)"
                 :has-any-chores="false"
                 :starts="starts"
                 :can-edit="isAdult"
@@ -745,7 +746,9 @@ function revealBlock(block: ChoreBlock): void {
             </section>
           </div>
 
-          <div v-if="showBoard" class="min-w-0" :class="{ 'sticky top-4': homeRail }">
+          <!-- Under 768px the quick-add button floats over the page's last rows: the padding lets
+               the board's last row scroll clear of it. -->
+          <div v-if="showBoard" class="min-w-0 max-md:pb-20" :class="{ 'sticky top-4': homeRail }">
             <ChoreWeekPanel
               :rows="weekRows"
               :today-ymd="todayYmd"

@@ -28,6 +28,7 @@ import { buildWallJobs, captureListRemoval, jobWriteKey, sortJobs } from '@/util
 import { plateClock } from '@/utils/todoPlate';
 import { assertNever } from '@/utils/assertNever';
 import { currentBlock, isChoreRefusal, type BeanChoreDay } from '@/utils/chores';
+import type { ChoreCelebrationAnchor } from '@/utils/choreCelebration';
 import { DEFAULT_CHORE_EMOJI } from '@/constants/choreBlocks';
 import { useAuthStore } from '@/stores/authStore';
 import { UNASSIGNED } from '@/utils/wallJobs';
@@ -247,14 +248,22 @@ export function useWallJobs(options: UseWallJobsOptions = {}) {
    * credited to `actor`, the same crediting rule as the other two. The store passes
    * `errorToast: false` for the wall, because `write()` below reports a failed toggle.
    */
-  const writers: Record<WallJob['source'], (job: WallJob, actor: string) => Promise<unknown>> = {
+  const writers: Record<
+    WallJob['source'],
+    (job: WallJob, actor: string, anchor: ChoreCelebrationAnchor | null) => Promise<unknown>
+  > = {
     todo: (job, actor) => todoStore.toggleComplete(job.todoId as string, actor),
     list: (job, actor) => listStore.toggleItem(job.listId as string, job.itemId as string, actor),
-    chore: (job, actor) =>
-      choreStore.toggleChore(job.choreId as string, job.ownerId, { surface: 'wall', by: actor }),
+    chore: (job, actor, anchor) =>
+      choreStore.toggleChore(job.choreId as string, job.ownerId, {
+        surface: 'wall',
+        by: actor,
+        ...(anchor ? { anchor } : {}),
+      }),
   };
 
-  async function toggle(job: WallJob): Promise<void> {
+  /** `anchor`: a chore lane's block and tick, where an all-done celebration plays (#146). */
+  async function toggle(job: WallJob, anchor: ChoreCelebrationAnchor | null = null): Promise<void> {
     const writeKey = jobWriteKey(job);
     if (pending.value.has(writeKey)) return;
     // Credit the job's OWNER, not whoever's session opened the wall. The wall
@@ -277,7 +286,7 @@ export function useWallJobs(options: UseWallJobsOptions = {}) {
       // stores normalise a swallowed failure to null. A chore tick the store
       // refused (already toasted and logged) is `'handled'`, never a failure.
       () =>
-        writers[job.source](job, actor).then((written) =>
+        writers[job.source](job, actor, anchor).then((written) =>
           isChoreRefusal(written) ? 'handled' : written !== null
         ),
       () => reportJobToggleFailed(job.source, job.choreId ?? job.todoId ?? job.listId ?? job.key)

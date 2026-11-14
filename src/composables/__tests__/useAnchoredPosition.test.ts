@@ -100,6 +100,28 @@ describe('useAnchoredPosition', () => {
     scope.stop();
   });
 
+  it('no room below or above: shifts up until the bottom edge fits', () => {
+    Object.defineProperty(window, 'innerHeight', { value: 500, configurable: true });
+    const { popoverStyle, reposition, scope } = setup(
+      anchorAt({ top: 250, bottom: 280, left: 40, right: 140 })
+    );
+    reposition();
+    // Below would end at 286 + 300 = 586 > 500: shifted to 500 - 300 - 8, no cap needed.
+    expect(popoverStyle.value.top).toBe('192px');
+    expect(popoverStyle.value.maxHeight).toBeUndefined();
+    scope.stop();
+  });
+
+  it('taller than the viewport: pinned to the top margin and capped at the room', () => {
+    Object.defineProperty(window, 'innerHeight', { value: 280, configurable: true });
+    const { popoverStyle, reposition, scope } = setup(
+      anchorAt({ top: 100, bottom: 130, left: 40, right: 140 })
+    );
+    reposition();
+    expect(popoverStyle.value).toMatchObject({ top: '8px', maxHeight: '264px' });
+    scope.stop();
+  });
+
   it('end-aligns by default and clamps to the left margin', () => {
     const { popoverStyle, reposition, scope } = setup(
       anchorAt({ top: 100, bottom: 130, left: 0, right: 60 })

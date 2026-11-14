@@ -123,6 +123,17 @@ describe('ChoreDayCell', () => {
     expect(b.attributes('aria-label')).toBe('choreboard.cell.none');
   });
 
+  it('a past day with nothing due: a plain faint cell, not a button, never a miss', () => {
+    const w = cell(rec('2026-11-12', 0, 0));
+    expect(w.find('button').exists()).toBe(false);
+    const span = w.get('[data-testid="chore-day-cell"]');
+    expect(span.attributes('data-state')).toBe('free');
+    expect(span.attributes('role')).toBe('img');
+    expect(span.attributes('aria-label')).toBe('choreboard.cell.free');
+    expect(span.classes()).not.toContain('border-dashed');
+    expect(span.text()).toBe('');
+  });
+
   it('a day to come: a blank outline that is not a button', () => {
     const w = cell(rec('2026-11-14', 0, 3));
     expect(w.find('button').exists()).toBe(false);
@@ -152,6 +163,10 @@ describe('ChoreWeekPanel: the grown-ups board', () => {
     const total = w.get('[data-testid="chore-week-panel-total"][data-member-id="kid"]');
     expect(total.text()).toBe('⭐ 6');
     expect(w.find('[data-testid="chore-week-legend"]').exists()).toBe(true);
+    // Every past day had chores due: no "No Chores Due" entry.
+    expect(w.get('[data-testid="chore-week-legend"]').text()).not.toContain(
+      'choreboard.week.legend.free'
+    );
   });
 
   it('days down (the rail): the same cells, day by day', () => {
@@ -231,6 +246,35 @@ describe('the day summary', () => {
     await flushPromises();
     const items = [...popover()!.querySelectorAll('[data-testid="chore-day-popover-item"]')];
     expect(items.map((i) => i.getAttribute('data-done'))).toEqual(['true', 'false', 'false']);
+  });
+
+  it('a day with nothing due opens nothing', async () => {
+    const weekendOnly = [chore('w', { createdAt: OLD, days: [0, 6] })];
+    const rows = [
+      { member: pip, week: choreWeekRecord(weekendOnly, indexMarks([]), 'kid', clock.ymd, 1) },
+    ];
+    const w = mountPanel({ rows });
+    const mon = cellsOf(w, 'kid')[0]!;
+    expect(mon.attributes('data-state')).toBe('free');
+    await mon.trigger('click');
+    await flushPromises();
+    expect(popover()).toBeNull();
+    expect(w.get('[data-testid="chore-week-panel-total"]').attributes('aria-label')).toBe(
+      'choreboard.week.totalAriaFor.other'
+    );
+    expect(w.get('[data-testid="chore-week-legend"]').text()).toContain(
+      'choreboard.week.legend.free'
+    );
+  });
+
+  it('the board flipping orientation closes an open summary (its cell is gone)', async () => {
+    const w = mountPanel({});
+    await cellsOf(w, 'kid')[0]!.trigger('click');
+    await flushPromises();
+    expect(popover()).not.toBeNull();
+    await w.setProps({ orientation: 'down' });
+    await flushPromises();
+    expect(popover()).toBeNull();
   });
 
   it('a future cell is inert', async () => {

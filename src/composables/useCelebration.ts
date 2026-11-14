@@ -1,15 +1,40 @@
-import { ref } from 'vue';
-import { playChime, playFanfare } from '@/composables/useSounds';
+import { markRaw, ref, shallowRef } from 'vue';
+import { playChime, playChoreCelebrationSound, playFanfare } from '@/composables/useSounds';
 import { useTranslationStore } from '@/stores/translationStore';
+import { CHORE_BLOCK_META } from '@/constants/choreBlocks';
+import { logEvent } from '@/services/telemetry/logEvent';
+import { fillTemplate } from '@/utils/fillTemplate';
+import { reportError } from '@/utils/errorReporter';
+import {
+  CHORE_CELEBRATION_BEATS as BEATS,
+  CHORE_PRAISE,
+  SOUND_FOR_MOVE,
+  isChoreSoundId,
+  moveForDate,
+  pickChoreSound,
+  pickPraiseIndex,
+  type BannerCelebration,
+  type ChoreCelebrationAnchor,
+  type ChoreMoveId,
+  type ChoreSoundId,
+} from '@/utils/choreCelebration';
 import type { UIStringKey } from '@/services/translation/uiStrings';
+import type { ChoreBlock } from '@/types/models';
 
 /**
  * `shower` is a full-viewport, `pointer-events: none`, self-dismissing
  * celebration. Unlike `modal` it can never sit unattended waiting for a
  * dismissal that never comes, and it never blocks a tap — which is what makes
  * it the right shape for a shared screen (the beanie wall) as well as a phone.
+ *
+ * `chore` is the choreboard's own (#146): no box, it plays over the board
+ * anchored to the block that was just finished (`ChoreCelebration.vue`), and is
+ * just as self-dismissing and tap-transparent as a shower.
  */
-type CelebrationType = 'toast' | 'modal' | 'shower';
+type CelebrationType = 'toast' | 'modal' | 'shower' | 'chore';
+
+/** Not routine: these still play on a surface that suppresses the routine ones. */
+const NOT_ROUTINE: ReadonlySet<CelebrationType> = new Set(['shower', 'chore']);
 
 export type CelebrationTrigger =
   | 'setup-complete'
@@ -141,15 +166,26 @@ const configs: Record<
   // The choreboard (#146): a bean's last chore in a block was ticked. ONCE per bean, per block,
   // per day, on every device: `choreStore.toggleChore` fires it only in the same write as the
   // block's `celebrated` mark. No `onUndo`: a tick is undone by tapping it again, and the
-  // once-only mark stays, so a re-tick shows the banner only.
+  // once-only mark stays, so a re-tick shows the banner only. Its own move and sound, not the
+  // shower (`celebrateChore` below); the message is the shower's, kept for the type.
   'chore-block-complete': {
-    type: 'shower',
+    type: 'chore',
     messageKey: 'celebration.choreBlockComplete',
     asset: '/brand/beanies_celebrating_line_transparent_560x225.png',
   },
 };
 
-export function celebrate(trigger: CelebrationTrigger, options?: { onUndo?: () => void }): void {
+type ShowerTrigger = Exclude<CelebrationTrigger, 'chore-block-complete'>;
+
+export function celebrate(
+  trigger: 'chore-block-complete',
+  options: { chore: ChoreCelebrationRequest }
+): void;
+export function celebrate(trigger: ShowerTrigger, options?: { onUndo?: () => void }): void;
+export function celebrate(
+  trigger: CelebrationTrigger,
+  options?: { onUndo?: () => void; chore?: ChoreCelebrationRequest }
+): void {
   const config = configs[trigger];
   if (!config) return;
 
@@ -160,7 +196,12 @@ export function celebrate(trigger: CelebrationTrigger, options?: { onUndo?: () =
    * black scrim over a shared always-on screen, swallowing the next child's
    * tap. Showers still fire — finishing a whole list is not routine.
    */
-  if (mode.value.suppressRoutine && config.type !== 'shower') return;
+  if (mode.value.suppressRoutine && !NOT_ROUTINE.has(config.type)) return;
+
+  if (config.type === 'chore') {
+    if (options?.chore) celebrateChore(options.chore);
+    return;
+  }
 
   // Resolve translation at call time (store is initialized by this point)
   const translationStore = useTranslationStore();
@@ -192,6 +233,235 @@ export function celebrate(trigger: CelebrationTrigger, options?: { onUndo?: () =
   }
 }
 
+// ── The chore celebration (#146) ────────────────────────────────────────────
+
+export const CHORE_CELEBRATION_SURFACE = 'chore-celebration';
+
+export interface ChoreCelebrationRequest {
+  memberId: string;
+  block: ChoreBlock;
+  /** The bean's first name, for the praise line. */
+  beanName: string;
+  /** Chores in the block: one star each. */
+  count: number;
+  /**
+   * Where the last tick was, from the surface that ticked it. Absent (a tick from a surface with
+   * no board on screen) plays a centered version of the same move.
+   */
+  anchor?: ChoreCelebrationAnchor | null;
+}
+
+/**
+ * `burst`: the tick pops and the stars fly out; the block still shows its rows.
+ * `banner`: the banner has arrived (in its celebrating form) and the beanies do their move.
+ */
+export type ChoreCelebrationPhase = 'burst' | 'banner';
+
+export interface ActiveChoreCelebration extends ChoreCelebrationRequest {
+  id: number;
+  anchor: ChoreCelebrationAnchor | null;
+  move: ChoreMoveId;
+  sound: ChoreSoundId;
+  praise: string;
+  /** `performance.now()` at the tick: every beat is timed from here. */
+  startedAt: number;
+  /** Reduced motion: nothing moves; the banner, its stars and the praise simply appear. */
+  calm: boolean;
+  phase: ChoreCelebrationPhase;
+  /** When it ends, in ms from the start: the beats' end, or a surface's shorter cap. */
+  endsAt: number;
+}
+
+/** Shallow: the anchor holds DOM elements, which must never be made reactive. */
+const activeChore = shallowRef<ActiveChoreCelebration | null>(null);
+let choreTimers: ReturnType<typeof setTimeout>[] = [];
+let lastPraise: number | null = null;
+let lastSound: ChoreSoundId | null = null;
+let storageNoted = false;
+/** The last sound this device played, so a reload still never repeats it. */
+const LAST_SOUND_KEY = 'beanies.choreCelebration.lastSound';
+
+/** Storage can be blocked (a private window): noted once, then the in-memory value serves. */
+function noteStorage(detail: 'read' | 'write', error: unknown): void {
+  if (storageNoted) return;
+  storageNoted = true;
+  logEvent({
+    level: 'debug',
+    surface: CHORE_CELEBRATION_SURFACE,
+    message: 'last-sound storage unavailable; remembered in memory only',
+    context: { action: 'last-sound-storage', detail },
+    error,
+  });
+}
+
+function readLastSound(): ChoreSoundId | null {
+  if (lastSound) return lastSound;
+  try {
+    const v = localStorage.getItem(LAST_SOUND_KEY);
+    return isChoreSoundId(v) ? v : null;
+  } catch (e) {
+    noteStorage('read', e);
+    return null;
+  }
+}
+
+function rememberSound(id: ChoreSoundId): void {
+  lastSound = id;
+  try {
+    localStorage.setItem(LAST_SOUND_KEY, id);
+  } catch (e) {
+    noteStorage('write', e);
+  }
+}
+
+function prefersReducedMotionNow(): boolean {
+  return (
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  );
+}
+
+function clearChoreTimers(): void {
+  choreTimers.forEach(clearTimeout);
+  choreTimers = [];
+}
+
+function setChorePhase(id: number, phase: ChoreCelebrationPhase): void {
+  const cur = activeChore.value;
+  if (cur?.id === id) activeChore.value = { ...cur, phase };
+}
+
+/** End the chore celebration (`id` guards a stale timer against a newer one). */
+export function dismissChoreCelebration(id?: number): void {
+  if (id !== undefined && activeChore.value?.id !== id) return;
+  clearChoreTimers();
+  activeChore.value = null;
+}
+
+/**
+ * Pick, play and time one chore celebration. The phase timers live HERE, not in the (lazy)
+ * component, so the banner still arrives and the celebration still ends if the component is
+ * slow to load or never does.
+ */
+function celebrateChore(req: ChoreCelebrationRequest): void {
+  clearChoreTimers();
+  const t = useTranslationStore().t;
+  const calm = prefersReducedMotionNow();
+  const move = moveForDate(new Date());
+  const paired = SOUND_FOR_MOVE[move];
+  const sound = pickChoreSound(move, readLastSound());
+  rememberSound(sound);
+  const praiseIndex = pickPraiseIndex(req.block, lastPraise);
+  lastPraise = praiseIndex;
+  const meta = CHORE_BLOCK_META[req.block];
+  const praise = fillTemplate(t(CHORE_PRAISE[praiseIndex]!.key), {
+    name: req.beanName,
+    block: t(meta.labelKey),
+    blockWord: t(meta.wordKey),
+  });
+  // The wall caps every celebration's time on screen (`autoDismissMs`); this one is shorter
+  // than its cap, so the cap only bites if a surface ever asks for less than three seconds.
+  const natural = calm ? BEATS.calmDone : BEATS.done;
+  const cap = mode.value.autoDismissMs;
+  const endsAt = cap !== null ? Math.min(natural, cap) : natural;
+  const id = nextId++;
+  const anchor = req.anchor ? markRaw(req.anchor) : null;
+  activeChore.value = {
+    ...req,
+    anchor,
+    id,
+    move,
+    sound,
+    praise,
+    startedAt: performance.now(),
+    calm,
+    phase: calm ? 'banner' : 'burst',
+    endsAt,
+  };
+  if (!calm) choreTimers.push(setTimeout(() => setChorePhase(id, 'banner'), BEATS.swap));
+  choreTimers.push(setTimeout(() => dismissChoreCelebration(id), endsAt));
+
+  logEvent({
+    level: 'info',
+    surface: CHORE_CELEBRATION_SURFACE,
+    message: 'chore celebration played',
+    context: {
+      action: 'play',
+      kind: move,
+      detail: sound,
+      count: req.count,
+      slot: req.block,
+      stage: anchor ? 'anchored' : 'centered',
+      format: calm ? 'calm' : 'full',
+    },
+  });
+  if (!anchor) {
+    logEvent({
+      level: 'warn',
+      surface: CHORE_CELEBRATION_SURFACE,
+      message: 'chore celebration had no anchor; played centered',
+      context: { action: 'fallback-centered', detail: 'no-anchor', kind: move, slot: req.block },
+    });
+  }
+
+  playChoreCelebrationSound(sound, paired)
+    .then((outcome) => {
+      if (outcome !== 'fallback') return;
+      logEvent({
+        level: 'warn',
+        surface: CHORE_CELEBRATION_SURFACE,
+        message: 'chore celebration played the paired sound in place of the cheer',
+        context: { action: 'fallback-sound', detail: paired, kind: move },
+      });
+    })
+    .catch((error: unknown) => {
+      reportError({
+        surface: CHORE_CELEBRATION_SURFACE,
+        message: 'a chore celebration sound failed to play; the celebration went on silently',
+        severity: 'warning',
+        error,
+        context: { action: 'sound-failed', detail: sound, kind: move },
+      });
+    });
+}
+
+/**
+ * The tick surface's question while a celebration runs: is this bean's block in its burst,
+ * so it should keep showing its (all ticked) rows a moment longer? Only an anchored celebration
+ * holds a block: a centered one is not about the board on screen.
+ */
+export function choreBlockHeld(memberId: string, block: ChoreBlock): boolean {
+  const c = activeChore.value;
+  return !!c?.anchor && c.phase === 'burst' && c.memberId === memberId && c.block === block;
+}
+
+let bannerMemo: { id: number; value: BannerCelebration } | null = null;
+
+/** The banner's celebrating form for this bean's block, or null when it is not the one. */
+export function choreBannerCelebration(
+  memberId: string,
+  block: ChoreBlock
+): BannerCelebration | null {
+  const c = activeChore.value;
+  if (!c?.anchor || c.phase !== 'banner' || c.memberId !== memberId || c.block !== block) {
+    return null;
+  }
+  if (bannerMemo?.id !== c.id) {
+    bannerMemo = { id: c.id, value: { praise: c.praise, name: c.beanName, calm: c.calm } };
+  }
+  return bannerMemo.value;
+}
+
+/** Tests only: forget the rotation memory and any celebration in flight. */
+export function resetChoreCelebrationForTest(): void {
+  dismissChoreCelebration();
+  lastPraise = null;
+  lastSound = null;
+  storageNoted = false;
+  bannerMemo = null;
+}
+
 export function useCelebration() {
   function dismissModal() {
     activeModal.value = null;
@@ -204,5 +474,14 @@ export function useCelebration() {
     activeShower.value = null;
   }
 
-  return { toasts, activeModal, activeShower, mode, dismissModal, dismissShower };
+  return {
+    toasts,
+    activeModal,
+    activeShower,
+    activeChore,
+    mode,
+    dismissModal,
+    dismissShower,
+    dismissChoreCelebration,
+  };
 }

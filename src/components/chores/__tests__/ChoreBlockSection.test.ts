@@ -1,8 +1,10 @@
 /**
- * A block's four states come from the read model alone: open (with the Now ring and tag),
- * later (one quiet line that opens on the day view), done (the one-line strip) and the all-done
- * banner (with one star per chore, reopenable so a mistaken tick can be undone). A grown-up can
- * tap a chore's name (the page opens the bean's chore list); this section only ticks.
+ * A block's four states come from the read model alone: open (with the Now ring and tag, folded
+ * by its header), later (a folded block: one quiet line that opens again), done (the one-line
+ * strip) and the all-done banner (with one star per chore, reopenable so a mistaken tick can be
+ * undone). A grown-up can tap a chore's name (the page opens the bean's chore list); this section
+ * only ticks, and a tick carries the celebration's anchor (#146). While the celebration plays,
+ * a just-finished block keeps its rows (the burst) and its banner takes the celebrating form.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { mount } from '@vue/test-utils';
@@ -14,6 +16,14 @@ vi.mock(
 );
 vi.mock('@/stores/familyStore', async () => (await import('./choreTestKit')).familyStoreModule);
 vi.mock('@/services/telemetry/logEvent', () => ({ logEvent: vi.fn() }));
+const celebration = vi.hoisted(() => ({
+  held: false,
+  banner: null as null | { praise: string; name: string; calm: boolean },
+}));
+vi.mock('@/composables/useCelebration', () => ({
+  choreBlockHeld: () => celebration.held,
+  choreBannerCelebration: () => celebration.banner,
+}));
 
 import ChoreBlockSection from '../ChoreBlockSection.vue';
 import { chore, resetKit } from './choreTestKit';
@@ -52,7 +62,11 @@ function mountSection(props: Record<string, unknown>, attachTo?: HTMLElement) {
   });
 }
 
-beforeEach(() => resetKit());
+beforeEach(() => {
+  resetKit();
+  celebration.held = false;
+  celebration.banner = null;
+});
 
 describe('ChoreBlockSection', () => {
   it('open + now: the ring, the Now tag, every chore tickable', async () => {
@@ -68,7 +82,60 @@ describe('ChoreBlockSection', () => {
     expect(rows).toHaveLength(2);
     expect(rows[0]!.attributes('data-done')).toBe('true');
     await rows[1]!.get('[data-testid="chore-tick"]').trigger('click');
-    expect(w.emitted('toggle')).toEqual([['c2']]);
+    const [id, anchor] = w.emitted('toggle')![0]!;
+    expect(id).toBe('c2');
+    // The anchor: this block and the tick that was tapped, measured at the tap.
+    expect(anchor).toMatchObject({
+      block: root.element,
+      tickEl: rows[1]!.get('[data-testid="chore-tick"]').element,
+      compact: false,
+    });
+  });
+
+  it('opens by default and folds by its header, for this visit only (every block on a day)', async () => {
+    const w = mountSection({ block: block({ block: 'evening', isNow: false }) });
+    expect(w.get('[data-testid="chore-block"]').attributes('data-state')).toBe('open');
+    expect(w.findAll('[data-testid="chore-row"]')).toHaveLength(2);
+    // Not the block happening now: no ring, no Now tag, the smaller header.
+    expect(w.get('[data-testid="chore-block"]').classes()).not.toContain('ring-2');
+    const header = w.get('[data-testid="chore-block-header"]');
+    expect(header.attributes('aria-expanded')).toBe('true');
+    expect(header.classes()).toContain('text-sm');
+    await header.trigger('click');
+    expect(w.get('[data-testid="chore-block"]').attributes('data-state')).toBe('later');
+    expect(w.find('[data-testid="chore-row"]').exists()).toBe(false);
+    await w.get('[data-testid="chore-block-later"]').trigger('click');
+    expect(w.get('[data-testid="chore-block"]').attributes('data-state')).toBe('open');
+    expect(w.findAll('[data-testid="chore-row"]')).toHaveLength(2);
+  });
+
+  it('an ended block with chores left opens tickable like any other', async () => {
+    const w = mountSection({ block: block({ isNow: false, ended: true }) });
+    expect(w.get('[data-testid="chore-block"]').attributes('data-state')).toBe('open');
+    await w.findAll('[data-testid="chore-tick"]')[1]!.trigger('click');
+    expect(w.emitted('toggle')![0]![0]).toBe('c2');
+  });
+
+  it('a just-finished block keeps its rows during the burst, then its banner celebrates', async () => {
+    const items = [
+      { chore: chore('c1'), done: true },
+      { chore: chore('c2'), done: true },
+    ];
+    celebration.held = true;
+    const w = mountSection({ block: block({ chores: items }), celebrate: true });
+    expect(w.get('[data-testid="chore-block"]').attributes('data-state')).toBe('open');
+    expect(w.findAll('[data-testid="chore-row"]')).toHaveLength(2);
+    celebration.held = false;
+    celebration.banner = { praise: 'High five, Pip!', name: 'Pip', calm: false };
+    await w.setProps({ block: block({ chores: [...items] }) });
+    expect(w.get('[data-testid="chore-block"]').attributes('data-state')).toBe('banner');
+    const banner = w.get('[data-testid="chore-done-banner"]');
+    expect(banner.classes()).toContain('is-celebrating');
+    expect(banner.findAll('[data-praise-word]').map((s) => s.text())).toEqual([
+      'High',
+      'five,',
+      'Pip!',
+    ]);
   });
 
   it('later: one quiet line that opens its chores on the day view', async () => {

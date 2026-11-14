@@ -299,8 +299,14 @@ export default defineConfig({
         // (usePwaUpdater, no skipWaiting/clientsClaim — see the note below) for one route.
         importScripts: ['/share-target-sw.js'],
         // Who Owns What hero art (#109) is .webp; listed narrowly so the blog/help .webp
-        // files under public/ stay out of the install download.
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,json,wasm}', 'brand/cards/*.webp'],
+        // files under public/ stay out of the install download. The chore celebration's art
+        // and its kids cheer (#146, ~100 KB together) are precached so it plays offline.
+        globPatterns: [
+          '**/*.{js,css,html,ico,png,svg,woff2,json,wasm}',
+          'brand/cards/*.webp',
+          'brand/celebration/*.webp',
+          'sounds/*.mp3',
+        ],
         // The per-country public-holiday dataset (~200 files, ~2 MB total) is
         // fetched on demand for the family's country only and cached in
         // IndexedDB (see referenceDataCacheRepository) — never precache it, or

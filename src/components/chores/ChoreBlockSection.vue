@@ -6,18 +6,23 @@
  * decides "done" or "now":
  *
  *  - open:    the colour header (with the Heritage Orange ring and "Now" tag when it is the block
- *             happening now) and its chores, tickable;
- *  - later:   one quiet line in the block colour (tap to open it);
- *  - done:    every chore ticked. The block happening now (and Anytime) shows the all-done
- *             `CelebrationBanner` with one star per chore; any other folds to a one-line
- *             "All Done" strip with its stars. Either can reopen its chores, so a tick made by
- *             mistake can be undone. The celebration itself is the store's (once per
- *             bean, block and day); this only ever draws the banner.
+ *             happening now) and its chores, tickable. On a bean's day every block opens this way
+ *             (`open`), for kids and grown-ups alike; the header folds it (`collapse`);
+ *  - later:   a folded block: one quiet line in the block colour (tap to open it again). The
+ *             fold is this page visit's only, never saved;
+ *  - done:    every chore ticked. With `celebrate` the all-done `CelebrationBanner` with one star
+ *             per chore; without, a one-line "All Done" strip with its stars. Either can reopen
+ *             its chores, so a tick made by mistake can be undone. The celebration itself is the
+ *             store's (once per bean, block and day); this draws the banner, in its celebrating
+ *             form while the celebration plays on it (`choreBannerCelebration`), and keeps the
+ *             ticked rows a moment longer while the stars burst from the last tick
+ *             (`choreBlockHeld`).
  *
  * A grown-up (`canEdit`) can tap a chore's name (`edit`); the page opens the bean's chore list,
- * where chores are edited and reordered (`ChoreBeanEditor`). This section only ticks.
+ * where chores are edited and reordered (`ChoreBeanEditor`). This section only ticks: `toggle`
+ * carries the celebration's anchor (this block and the tick), measured at the tap.
  *
- * `reveal()` (exposed) opens a quiet block and brings it into view with focus: the day's
+ * `reveal()` (exposed) opens a folded block and brings it into view with focus: the day's
  * "Today" summary calls it when a row is tapped.
  *
  * Colours: the block's tint and ink come from `.chore-block-*` (`src/style.css`), which holds
@@ -27,9 +32,11 @@
 import { computed, nextTick, ref } from 'vue';
 import ChoreRow from '@/components/chores/ChoreRow.vue';
 import CelebrationBanner from '@/components/ui/CelebrationBanner.vue';
+import { choreBannerCelebration, choreBlockHeld } from '@/composables/useCelebration';
 import { useTranslation } from '@/composables/useTranslation';
 import { CHORE_BLOCK_META, choreBlockHint, choreEmoji } from '@/constants/choreBlocks';
 import { fillTemplate } from '@/utils/fillTemplate';
+import { choreCelebrationAnchor, type ChoreCelebrationAnchor } from '@/utils/choreCelebration';
 import type { ChoreDayBlock } from '@/utils/chores';
 import type { ChoreBlockStarts } from '@/types/models';
 
@@ -39,7 +46,7 @@ const props = withDefaults(
     memberId: string;
     /** The bean's first name, for the banner's "Nice work, {name}." */
     beanName: string;
-    /** Show the chores (the Now block, Anytime). False draws the quiet "later" line. */
+    /** Open with its chores showing (every block on a bean's day). False starts folded. */
     open?: boolean;
     /** A finished block draws the big banner (true) or the one-line strip (false). */
     celebrate?: boolean;
@@ -58,24 +65,33 @@ const props = withDefaults(
 );
 
 const emit = defineEmits<{
-  toggle: [choreId: string];
+  toggle: [choreId: string, anchor: ChoreCelebrationAnchor | null];
   edit: [choreId: string];
 }>();
 
 const { t } = useTranslation();
 
-/** A later line, a done strip or the banner opened by hand to see its chores. */
+/** Folded by its header (or never opened): this page visit only. */
+const collapsed = ref(!props.open);
+/** A done strip or the banner opened by hand to see its chores. */
 const expanded = ref(false);
 
 const meta = computed(() => CHORE_BLOCK_META[props.block.block]);
 const label = computed(() => t(meta.value.labelKey));
 
+/** The last tick just finished this block: its rows stay while the stars burst out. */
+const held = computed(() => choreBlockHeld(props.memberId, props.block.block));
+const bannerCelebration = computed(() => choreBannerCelebration(props.memberId, props.block.block));
+
 type State = 'open' | 'later' | 'done' | 'banner';
 const state = computed<State>(() => {
+  if (held.value) return 'open';
   if (props.block.allDone) return props.celebrate ? 'banner' : 'done';
-  return props.open ? 'open' : 'later';
+  return collapsed.value ? 'later' : 'open';
 });
-const showRows = computed(() => state.value === 'open' || expanded.value);
+const showRows = computed(
+  () => state.value === 'open' || (state.value !== 'later' && expanded.value)
+);
 
 const subtitle = computed(() => choreBlockHint(props.block, props.starts, t));
 
@@ -109,6 +125,16 @@ const bannerBody = computed(() =>
     { count: props.block.total, name: props.beanName }
   )
 );
+/** The fold's label: "Hide Morning chores" on an open header, "Show ..." on a folded line. */
+const foldLabel = computed(() =>
+  fillTemplate(
+    t(state.value === 'open' ? 'choreboard.block.collapse' : 'choreboard.block.expand'),
+    {
+      block: label.value,
+    }
+  )
+);
+/** The done strip's label (it opens the chores of a finished block). */
 const toggleLabel = computed(() =>
   fillTemplate(t(expanded.value ? 'choreboard.block.collapse' : 'choreboard.block.expand'), {
     block: label.value,
@@ -117,9 +143,19 @@ const toggleLabel = computed(() =>
 
 const root = ref<HTMLElement | null>(null);
 
-/** Open this block (a quiet line, a done strip, a banner) and bring it into view with focus. */
+/** A tick: the intent, and where the celebration would play if this tick finishes the block. */
+function onToggle(choreId: string): void {
+  const el = root.value;
+  const tick = el?.querySelector<HTMLElement>(
+    `[data-chore-id="${CSS.escape(choreId)}"] [data-testid="chore-tick"]`
+  );
+  emit('toggle', choreId, el ? choreCelebrationAnchor(el, tick ?? null) : null);
+}
+
+/** Open this block (a folded line, a done strip, a banner) and bring it into view with focus. */
 function reveal(): void {
-  if (state.value !== 'open') expanded.value = true;
+  if (state.value === 'later') collapsed.value = false;
+  else if (state.value !== 'open') expanded.value = true;
   void nextTick(() => {
     const el = root.value;
     if (!el) return;
@@ -157,13 +193,11 @@ defineExpose({ reveal });
         :body="bannerBody"
         :image-alt="t('choreboard.done.imageAlt')"
         :action-label="t(expanded ? 'choreboard.block.hideChores' : 'choreboard.block.showChores')"
+        :stars="block.total"
+        :celebration="bannerCelebration"
         data-testid="chore-done-banner"
         @action="expanded = !expanded"
-      >
-        <p class="flex flex-wrap justify-center gap-0.5 text-2xl leading-none" aria-hidden="true">
-          {{ stars }}
-        </p>
-      </CelebrationBanner>
+      />
     </template>
 
     <!-- The one-line "All Done" strip, with its stars. -->
@@ -182,16 +216,16 @@ defineExpose({ reveal });
       <span>{{ t('choreboard.block.allDone') }}</span>
     </button>
 
-    <!-- A later block: one quiet line in its colour. -->
+    <!-- A folded block: one quiet line in its colour. -->
     <button
       v-else-if="state === 'later'"
       type="button"
       class="font-outfit flex w-full items-center gap-2.5 rounded-2xl bg-[var(--chore-tint)] px-4 py-2.5 text-left text-sm font-semibold text-[var(--chore-ink)]"
       :class="meta.colorClass"
-      :aria-expanded="expanded ? 'true' : 'false'"
-      :aria-label="toggleLabel"
+      aria-expanded="false"
+      :aria-label="foldLabel"
       data-testid="chore-block-later"
-      @click="expanded = !expanded"
+      @click="collapsed = false"
     >
       <span class="text-lg" aria-hidden="true">{{ meta.emoji }}</span>
       <span class="min-w-0 flex-1 truncate">
@@ -203,8 +237,7 @@ defineExpose({ reveal });
       </span>
       <span class="font-inter text-xs font-medium whitespace-nowrap">{{ choresText }}</span>
       <svg
-        class="h-4 w-4 flex-none transition-transform duration-200"
-        :class="expanded ? 'rotate-90' : ''"
+        class="h-4 w-4 flex-none transition-transform duration-200 motion-reduce:transition-none"
         viewBox="0 0 20 20"
         fill="currentColor"
         aria-hidden="true"
@@ -217,13 +250,21 @@ defineExpose({ reveal });
       </svg>
     </button>
 
-    <!-- An open block's colour header. -->
-    <header
+    <!--
+      An open block's colour header, which folds it. The block happening now keeps the larger
+      header (with its ring and Now tag above), so it stays the biggest thing on the day.
+    -->
+    <button
       v-else
-      class="font-outfit flex items-center gap-2 bg-[var(--chore-tint)] px-4 py-2.5 text-base font-bold text-[var(--chore-ink)]"
-      :class="meta.colorClass"
+      type="button"
+      class="font-outfit focus-visible:ring-sky-silk-300 flex w-full items-center gap-2 bg-[var(--chore-tint)] px-4 text-left font-bold text-[var(--chore-ink)] focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-inset"
+      :class="[meta.colorClass, block.isNow ? 'py-2.5 text-base' : 'py-2 text-sm']"
+      aria-expanded="true"
+      :aria-label="foldLabel"
+      data-testid="chore-block-header"
+      @click="collapsed = true"
     >
-      <span class="text-xl" aria-hidden="true">{{ meta.emoji }}</span>
+      <span :class="block.isNow ? 'text-xl' : 'text-lg'" aria-hidden="true">{{ meta.emoji }}</span>
       <span class="min-w-0 flex-1 truncate">
         {{ label }}
         <span v-if="subtitle" class="font-inter text-xs font-medium">{{ subtitle }}</span>
@@ -235,7 +276,19 @@ defineExpose({ reveal });
         data-testid="chore-now-tag"
         >{{ t('choreboard.now.tag') }}</span
       >
-    </header>
+      <svg
+        class="h-4 w-4 flex-none rotate-90"
+        viewBox="0 0 20 20"
+        fill="currentColor"
+        aria-hidden="true"
+      >
+        <path
+          fill-rule="evenodd"
+          d="M7.2 14.8a.75.75 0 0 1 0-1.06L10.94 10 7.2 6.26a.75.75 0 1 1 1.06-1.06l4.27 4.27a.75.75 0 0 1 0 1.06L8.26 14.8a.75.75 0 0 1-1.06 0Z"
+          clip-rule="evenodd"
+        />
+      </svg>
+    </button>
 
     <div v-if="showRows" class="flex flex-col gap-1.5 p-2" data-testid="chore-block-rows">
       <ChoreRow
@@ -247,7 +300,7 @@ defineExpose({ reveal });
         :can-tick="canTick"
         :can-edit="canEdit"
         :pending="isPending(item.chore.id)"
-        @toggle="emit('toggle', item.chore.id)"
+        @toggle="onToggle(item.chore.id)"
         @edit="emit('edit', item.chore.id)"
       />
     </div>

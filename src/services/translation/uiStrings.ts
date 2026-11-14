@@ -16109,6 +16109,32 @@ const STRING_DEFS = {
     en: 'The beanies cheering',
     beanie: 'the beanies cheering',
   },
+  // The all-done celebration's praise line (#146), one of six, never the same twice in a row.
+  // {name} = the bean's first name, {block} = the block's label, {blockWord} = it in a sentence.
+  'choreboard.praise.allDone': {
+    en: '{block}, all done! Nice work, {name}.',
+    beanie: '{block}, all done! nice work, {name}.',
+  },
+  'choreboard.praise.woohoo': {
+    en: 'Woohoo, {name}! Your {blockWord} chores are done.',
+    beanie: 'woohoo, {name}! your {blockWord} chores are done.',
+  },
+  'choreboard.praise.highFive': {
+    en: 'High five, {name}! {block} is all done.',
+    beanie: 'high five, {name}! {block} is all done.',
+  },
+  'choreboard.praise.didIt': {
+    en: '{name} did it! Every {blockWord} chore, done.',
+    beanie: '{name} did it! every {blockWord} chore, done.',
+  },
+  'choreboard.praise.whatA': {
+    en: 'What a {blockWord}, {name}! All done.',
+    beanie: 'what a {blockWord}, {name}! all done.',
+  },
+  'choreboard.praise.lookAtYou': {
+    en: 'Look at you go, {name}! {block}, all done.',
+    beanie: 'look at you go, {name}! {block}, all done.',
+  },
   'choreboard.row.with': {
     en: 'with {names}',
     beanie: 'with {names}',
@@ -16342,6 +16368,22 @@ const STRING_DEFS = {
   'choreboard.cell.noneYet': {
     en: '{name}, {day}: nothing done yet',
     beanie: '{name}, {day}: nothing done yet',
+  },
+  'choreboard.week.legend.free': {
+    en: 'No Chores Due',
+    beanie: 'no chores due',
+  },
+  'choreboard.cell.free': {
+    en: '{name}, {day}: no chores that day',
+    beanie: '{name}, {day}: no chores that day',
+  },
+  'choreboard.week.totalAriaFor.one': {
+    en: '{name}: {count} chore done this week',
+    beanie: '{name}: {count} chore done this week',
+  },
+  'choreboard.week.totalAriaFor.other': {
+    en: '{name}: {count} chores done this week',
+    beanie: '{name}: {count} chores done this week',
   },
   'choreboard.cell.future': {
     en: '{name}, {day}: still to come',

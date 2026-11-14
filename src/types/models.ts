@@ -1139,6 +1139,11 @@ export interface Chore {
   block: ChoreBlock;
   /** Weekdays 0-6 (0 = Sunday). Absent or empty = every day. */
   days?: number[];
+  /**
+   * When `days` last changed (stamped by `choreStore.updateChore`). Days before it are not judged
+   * by the new weekdays: the Chores Done board leaves an un-ticked chore out of them.
+   */
+  daysChangedAt?: ISODateString;
   /** Keep Parents Posted, same flag and rules as lists and to-dos. */
   notifyParents?: boolean;
   sortOrder: number;

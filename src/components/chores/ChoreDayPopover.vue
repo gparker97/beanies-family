@@ -6,27 +6,20 @@
  * it. It lists the SAME `ChoreDayRecord` the cell counted, handed in by the board, so the number
  * in the cell and the list here cannot disagree.
  *
- * Shapes, as `TimePickerHost` draws them (the app's anchored-overlay pattern):
- *  - PHONE (`useBreakpoint().isMobile`, under 768px): a bottom sheet over a dim.
- *  - 768px AND UP: a card anchored to the cell (teleported, fixed, `useAnchoredPosition`): below
- *    or above it, or beside it on the left when the board sits in the right-hand rail
- *    (`side="start"`), so it covers the page rather than the board.
- * The overlay contract is `useAnchoredOverlay` (Escape on both shapes; the sheet joins the
- * overlay stack with scroll lock; focus returns to the cell on close) plus ONE outside-click
- * path (`useOutsideClick`, capture phase), with the card and the cell as inside: the dim is
- * outside both, so a tap on it closes through the same handler.
+ * The shell is `AnchoredSurface`, shared with the time pickers: a bottom sheet over a dim on a
+ * phone, a card anchored to the cell from 768px (below or above it, or beside it on the left when
+ * the board sits in the right-hand rail, `side="start"`, so it covers the page rather than the
+ * board). Escape, the dim, an outside click and ✕ close it; focus starts on ✕ and returns to the
+ * cell.
  *
  * Dark mode: the card is `surface-overlay` (a popover over a raised card) with a `line-strong`
  * edge; group heads use the block tint and ink (`.chore-block-*`); a chore not done is
  * `ink-soft`; the done mark is the brand gradient with white ink in both themes.
  */
-import { computed, nextTick, ref, toRef, watch } from 'vue';
+import { computed } from 'vue';
+import AnchoredSurface from '@/components/ui/AnchoredSurface.vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
-import { useAnchoredOverlay } from '@/composables/useAnchoredOverlay';
-import { ANCHORED_POPOVER_Z_INDEX, useAnchoredPosition } from '@/composables/useAnchoredPosition';
-import { useElementSize } from '@/composables/useElementSize';
 import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
-import { useOutsideClick } from '@/composables/useOutsideClick';
 import { useTranslation } from '@/composables/useTranslation';
 import { CHORE_BLOCK_META, choreEmoji } from '@/constants/choreBlocks';
 import { fillTemplate } from '@/utils/fillTemplate';
@@ -59,43 +52,15 @@ const { t } = useTranslation();
 const { memberAvatarBindings } = useMemberAvatarBindings();
 
 const isOpen = computed(() => props.open && !!props.record && !!props.member);
-const cardEl = ref<HTMLElement | null>(null);
-const anchorRef = toRef(props, 'anchor');
 
 function close(): void {
   emit('close');
 }
 
-const { isMobile } = useAnchoredOverlay(isOpen, close, { surface: SURFACE });
-useOutsideClick(isOpen, [cardEl, anchorRef], close);
-
-const popoverOpen = computed(() => isOpen.value && !isMobile.value);
-const { popoverStyle, reposition } = useAnchoredPosition({
-  anchorRef,
-  popoverRef: cardEl,
-  active: popoverOpen,
-  align: 'end',
-  side: () => props.side,
-  widthEstimate: 320,
-  heightEstimate: 480,
-});
-const { height: cardHeight } = useElementSize(cardEl, { surface: SURFACE });
-watch([cardHeight, anchorRef], () => {
-  if (popoverOpen.value) reposition();
-});
-
-watch(isOpen, (open) => {
-  if (!open) return;
-  void nextTick(() => {
-    if (popoverOpen.value) reposition();
-    // Into the card, so Escape and Tab start there; the close button is the first stop.
-    cardEl.value?.querySelector<HTMLElement>('[data-testid="chore-day-popover-close"]')?.focus({
-      preventScroll: true,
-    });
-  });
-});
-
-const zIndex = String(ANCHORED_POPOVER_Z_INDEX);
+const SHEET_CLASS =
+  'dark:bg-surface-overlay dark:border-line-strong max-h-[75dvh] overflow-y-auto overscroll-contain rounded-t-3xl border-t border-[var(--tint-slate-10)] bg-white pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-[0_-10px_30px_rgba(44,62,80,0.16)] dark:shadow-[0_-10px_30px_rgba(0,0,0,0.5)]';
+const CARD_CLASS =
+  'dark:bg-surface-overlay dark:border-line-strong max-h-[min(36rem,calc(100dvh-1rem))] w-80 max-w-[calc(100vw-1rem)] overflow-y-auto overscroll-contain rounded-[1.25rem] border border-[var(--tint-slate-10)] bg-white shadow-[0_14px_44px_rgba(44,62,80,0.2)] dark:shadow-[0_14px_44px_rgba(0,0,0,0.45)]';
 
 const title = computed(() =>
   fillTemplate(t(props.isToday ? 'choreboard.pop.titleToday' : 'choreboard.pop.title'), {
@@ -137,52 +102,27 @@ const itemLabel = (title: string, done: boolean) =>
 </script>
 
 <template>
-  <Teleport to="body">
-    <Transition
-      enter-active-class="transition-opacity duration-150 motion-reduce:transition-none"
-      enter-from-class="opacity-0"
-      leave-active-class="transition-opacity duration-100 motion-reduce:transition-none"
-      leave-to-class="opacity-0"
-    >
-      <!-- Phone only. No click handler: the outside-click handler closes on it. `cursor-pointer`
-           is load-bearing: iOS Safari dispatches no click for a tap on a plain div otherwise. -->
-      <div
-        v-if="isOpen && isMobile"
-        class="fixed inset-0 cursor-pointer bg-[rgb(44_62_80/0.35)] dark:bg-black/50"
-        :style="{ zIndex }"
-        data-testid="chore-day-popover-dim"
-        aria-hidden="true"
-      />
-    </Transition>
-    <Transition
-      enter-active-class="transition duration-150 ease-out motion-reduce:transition-none"
-      :enter-from-class="isMobile ? 'translate-y-3 opacity-60' : '-translate-y-1 opacity-0'"
-      leave-active-class="transition duration-100 ease-in motion-reduce:transition-none"
-      leave-to-class="opacity-0"
-    >
-      <div
-        v-if="isOpen && record && member"
-        ref="cardEl"
-        role="dialog"
-        :aria-modal="isMobile ? 'true' : undefined"
-        :aria-label="title"
-        tabindex="-1"
-        class="dark:bg-surface-overlay dark:border-line-strong overflow-y-auto overscroll-contain border border-[var(--tint-slate-10)] bg-white p-3.5 text-left focus:outline-none"
-        :class="
-          isMobile
-            ? 'fixed inset-x-0 bottom-0 max-h-[75dvh] rounded-t-3xl pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-[0_-10px_30px_rgba(44,62,80,0.16)] dark:shadow-[0_-10px_30px_rgba(0,0,0,0.5)]'
-            : 'max-h-[min(36rem,calc(100dvh-1rem))] w-80 max-w-[calc(100vw-1rem)] rounded-[1.25rem] shadow-[0_14px_44px_rgba(44,62,80,0.2)] dark:shadow-[0_14px_44px_rgba(0,0,0,0.45)]'
-        "
-        :style="isMobile ? { zIndex } : popoverStyle"
-        data-testid="chore-day-popover"
-        :data-ymd="record.ymd"
-        :data-member-id="member.id"
-      >
-        <div
-          v-if="isMobile"
-          class="dark:bg-line-strong mx-auto -mt-1 mb-2.5 h-1 w-10 rounded-full bg-[var(--color-border-strong)]"
-          aria-hidden="true"
-        />
+  <AnchoredSurface
+    :open="isOpen"
+    :anchor="anchor"
+    :label="title"
+    :surface="SURFACE"
+    :inside-el="anchor"
+    align="end"
+    :side="side"
+    :width-estimate="320"
+    :height-estimate="480"
+    initial-focus="[data-testid='chore-day-popover-close']"
+    card-testid="chore-day-popover"
+    dim-testid="chore-day-popover-dim"
+    :sheet-class="SHEET_CLASS"
+    :card-class="CARD_CLASS"
+    :data-ymd="record?.ymd"
+    :data-member-id="member?.id"
+    @close="close"
+  >
+    <template #default="{ isSheet }">
+      <div v-if="record && member" class="p-3.5 text-left" :class="isSheet ? 'pt-2' : ''">
         <div class="flex items-center gap-2.5">
           <BeanieAvatar v-bind="memberAvatarBindings(member)" size="sm" />
           <div class="min-w-0 flex-1">
@@ -301,6 +241,6 @@ const itemLabel = (title: string, done: boolean) =>
           <span v-else-if="!isToday">{{ t('choreboard.pop.readOnly') }}</span>
         </div>
       </div>
-    </Transition>
-  </Teleport>
+    </template>
+  </AnchoredSurface>
 </template>

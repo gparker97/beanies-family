@@ -22,7 +22,13 @@ import { cardIdForTarget } from '@/constants/responsibilityCards';
 import { LIST_CATEGORIES } from '@/constants/listCategories';
 import { isAdultMember } from '@/composables/useMemberInfo';
 import { CARD_CHECKIN_PREFIX, CARD_MOVE_PREFIX } from '@/utils/notifications';
-import { addDaysYmd, isWallClockTime, parseLocalDate, toDateInputValue } from '@/utils/date';
+import {
+  addDaysYmd,
+  isWallClockTime,
+  localYmdOf,
+  parseLocalDate,
+  toDateInputValue,
+} from '@/utils/date';
 import { cadenceToRule } from '@/services/recurrence/cadence';
 import { isRuleComplete } from '@/services/recurrence/recurrenceEngine';
 import type {
@@ -153,9 +159,9 @@ export function cardRoute(cardId: string): { path: string; query: { card: string
   return { path: '/who-owns-what', query: { card: cardId } };
 }
 
-/** Local `YYYY-MM-DD` of an ISO timestamp (a ymd passes through). */
+/** Local `YYYY-MM-DD` of an ISO timestamp (a ymd passes through): `localYmdOf`. */
 export function ymdOf(iso: string): string {
-  return iso.length === 10 ? iso : toDateInputValue(new Date(iso));
+  return localYmdOf(iso);
 }
 
 /** The one re-deal predicate: a move from one holder to a different one. */

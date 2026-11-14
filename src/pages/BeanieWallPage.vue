@@ -74,6 +74,8 @@ import {
   wallWeatherSize,
 } from '@/components/wall/wallLayout';
 import type { WallJob, WallPeripheralData, WallSheetTarget, WallViewId } from '@/types/wall';
+import type { ChoreCelebrationAnchor } from '@/utils/choreCelebration';
+import { preloadChoreCelebrationWhenIdle } from '@/components/ui/choreCelebrationLoader';
 
 const SURFACE = 'beanie-wall';
 /** Long enough that a celebration is seen, short enough that it never camps. */
@@ -903,6 +905,8 @@ logEvent({
 if (typeof window !== 'undefined') {
   const idle = window.requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 2000));
   idle(() => prefetchExit());
+  // The chore lanes' all-done celebration is code-split; warm it while the wall is idle.
+  if (choreboardOn) preloadChoreCelebrationWhenIdle();
 }
 
 onScopeDispose(() => {
@@ -918,9 +922,10 @@ onScopeDispose(() => {
   logEvent({ level: 'info', surface: SURFACE, message: 'wall_exit', context: { action: 'exit' } });
 });
 
-function onToggle(job: WallJob) {
+/** A tick; a chore lane's carries where its all-done celebration plays (#146). */
+function onToggle(job: WallJob, anchor: ChoreCelebrationAnchor | null = null) {
   lock.noteActivity();
-  void jobs.toggle(job);
+  void jobs.toggle(job, anchor);
 }
 
 function openSheet(target: WallSheetTarget) {

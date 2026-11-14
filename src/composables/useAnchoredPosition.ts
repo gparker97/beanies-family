@@ -38,7 +38,10 @@ export interface AnchoredPositionOptions {
 
 /**
  * Fixed-position placement for a teleported popover: under its anchor (`align` edge), flipped
- * up when there is no room below but there is above, clamped to the viewport, and painted at
+ * up when there is no room below but there is above, clamped to the viewport on every edge (a
+ * card with room neither below nor above shifts up until its bottom fits; one taller than the
+ * viewport is pinned to the top margin with a `maxHeight` of the room, so its own overflow
+ * scrolls), and painted at
  * `ANCHORED_POPOVER_Z_INDEX`. Teleport + fixed is the overflow-safe idiom (proven on
  * AssigneePickerButton 2026-05-21): a clipping or scrolling ancestor cannot cut it off.
  *
@@ -69,17 +72,23 @@ export function useAnchoredPosition(options: AnchoredPositionOptions) {
     const width = popoverRef.value?.offsetWidth ?? widthEstimate;
     const MARGIN = 8;
     const zIndex = String(ANCHORED_POPOVER_Z_INDEX);
+    const room = window.innerHeight - 2 * MARGIN;
+    // A card as tall as the viewport (or taller) is pinned to the margin and capped at the room
+    // there, so its own overflow scrolls instead of running off the bottom of the screen.
+    const cap: Record<string, string> = height >= room ? { maxHeight: `${room}px` } : {};
+    /** Keep the whole card on screen: shift it up to fit, never above the top margin. */
+    const fit = (top: number) =>
+      Math.max(MARGIN, Math.min(top, window.innerHeight - height - MARGIN));
 
     // Beside the anchor, on its left, when there is room there.
     const GAP = 12;
     if (toValue(side) === 'start' && rect.left - width - GAP >= MARGIN) {
-      const centred = rect.top + rect.height / 2 - height / 2;
-      const top = Math.max(MARGIN, Math.min(centred, window.innerHeight - height - MARGIN));
       popoverStyle.value = {
         position: 'fixed',
-        top: `${top}px`,
+        top: `${fit(rect.top + rect.height / 2 - height / 2)}px`,
         left: `${rect.left - width - GAP}px`,
         zIndex,
+        ...cap,
       };
       return;
     }
@@ -98,9 +107,10 @@ export function useAnchoredPosition(options: AnchoredPositionOptions) {
 
     popoverStyle.value = {
       position: 'fixed',
-      top: `${Math.max(MARGIN, top)}px`,
+      top: `${fit(top)}px`,
       left: `${left}px`,
       zIndex,
+      ...cap,
     };
   }
 

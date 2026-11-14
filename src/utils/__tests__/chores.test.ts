@@ -512,6 +512,31 @@ describe('choreDayRecord', () => {
     expect(odd.total).toBe(1);
   });
 
+  it('a chore ticked that day counts for it even if its weekdays changed since', () => {
+    // Every day -> Weekends, changed on Thursday: Monday's tick stays, done and due.
+    const changed = [chore('c', { days: [0, 6], daysChangedAt: localNoon(THU) })];
+    const index = indexMarks([mark('done', 'kid', MON, 'c')]);
+    const mon = choreDayRecord(changed, index, 'kid', MON);
+    expect([mon.done, mon.total]).toEqual([1, 1]);
+    // Tuesday had no tick: its old schedule is unknown, so it is left out, not "not done".
+    const tue = choreDayRecord(changed, index, 'kid', '2026-11-10');
+    expect(tue.total).toBe(0);
+  });
+
+  it('Weekends -> Every day mid-week does not turn earlier weekdays into misses', () => {
+    const changed = [chore('c', { daysChangedAt: localNoon(THU) })]; // now every day
+    const index = indexMarks([]);
+    // Before the change: left out. From the change day on: due by the new schedule.
+    expect(choreDayRecord(changed, index, 'kid', MON).total).toBe(0);
+    expect(choreDayRecord(changed, index, 'kid', '2026-11-11').total).toBe(0);
+    expect(choreDayRecord(changed, index, 'kid', THU).total).toBe(1);
+    expect(choreDayRecord(changed, index, 'kid', FRI).total).toBe(1);
+    // A perfect day before the change keeps its star.
+    const ticked = indexMarks([mark('done', 'kid', MON, 'c')]);
+    const mon = choreDayRecord(changed, ticked, 'kid', MON);
+    expect([mon.done, mon.total]).toEqual([1, 1]);
+  });
+
   it('a deleted chore and its tick simply do not appear; nor do non-done marks', () => {
     const index = indexMarks([
       mark('done', 'kid', THU, 'gone'),

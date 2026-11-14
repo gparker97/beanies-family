@@ -70,6 +70,8 @@ import { useFamilyStore } from '@/stores/familyStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useTranslationStore } from '@/stores/translationStore';
 import type { UIStringKey } from '@/services/translation/uiStrings';
+import type { ChoreCelebrationAnchor } from '@/utils/choreCelebration';
+import { firstName } from '@/utils/assignees';
 import type { Chore, ChoreBlock, ChoreBlockStarts, ChoreMark } from '@/types/models';
 
 const SURFACE = 'choreboard';
@@ -92,6 +94,12 @@ export interface ToggleChoreOpts {
   surface: 'app' | 'wall';
   /** Wall only: who is credited (the lane's bean when locked). Ignored on `app`. */
   by?: string;
+  /**
+   * Where the all-done celebration plays if this tick finishes its block: the tick surface's
+   * block and tick, measured at the tap (#146). Passed through to `celebrate` untouched; absent,
+   * the celebration plays centered.
+   */
+  anchor?: ChoreCelebrationAnchor | null;
 }
 
 /** A tick or an untick that landed. */
@@ -432,12 +440,25 @@ export const useChoreStore = defineStore('chores', () => {
         count: completedBlock?.total ?? 0,
         detail: celebrated ? 'celebrated' : 'banner-only',
       });
-      if (celebrated) celebrate('chore-block-complete');
+      if (celebrated) celebrateBlock(memberId, completed, completedBlock?.total ?? 0, opts.anchor);
       return { action: 'tick', completed, celebrated };
     }
 
-    const late = await finishLate(memberId, clock.ymd, block, by, latch);
+    const late = await finishLate(memberId, clock.ymd, block, by, latch, opts.anchor);
     return { action: 'tick', completed: late.completed, celebrated: late.celebrated };
+  }
+
+  /** Play the all-done celebration for the bean's block: their first name, one star per chore. */
+  function celebrateBlock(
+    memberId: string,
+    block: ChoreBlock,
+    count: number,
+    anchor: ChoreCelebrationAnchor | null | undefined
+  ): void {
+    const member = familyStore.members.find((m) => m.id === memberId);
+    celebrate('chore-block-complete', {
+      chore: { memberId, block, beanName: firstName(member?.name), count, anchor },
+    });
   }
 
   /**
@@ -455,7 +476,8 @@ export const useChoreStore = defineStore('chores', () => {
     ymd: string,
     block: ChoreBlock,
     by: string,
-    latch: string
+    latch: string,
+    anchor?: ChoreCelebrationAnchor | null
   ): Promise<{ completed: ChoreBlock | null; celebrated: boolean }> {
     const after = choreDayFor(memberId).blocks.find((b) => b.block === block);
     if (!after?.allDone) return { completed: null, celebrated: false };
@@ -488,7 +510,7 @@ export const useChoreStore = defineStore('chores', () => {
       const celebrated = created.some((m) => m.id === id);
       if (celebrated) {
         log('info', 'block-complete', { slot: block, count: after.total, detail: 'celebrated' });
-        celebrate('chore-block-complete');
+        celebrateBlock(memberId, block, after.total, anchor);
       }
       return { completed: block, celebrated };
     } finally {
@@ -582,7 +604,12 @@ export const useChoreStore = defineStore('chores', () => {
       if (!isChoreBlock(patch.block)) return refuse('invalid', action);
       input.block = patch.block;
     }
-    if ('days' in patch) input.days = normalizeChoreDays(patch.days);
+    if ('days' in patch) {
+      input.days = normalizeChoreDays(patch.days);
+      // Stamp a REAL change only, so the board knows earlier days ran on other weekdays.
+      const before = (normalizeChoreDays(current.days) ?? []).join(',');
+      if ((input.days ?? []).join(',') !== before) input.daysChangedAt = new Date().toISOString();
+    }
     const kept = keepLiving(current.assigneeIds ?? []);
     if (kept.length === 0) return refuse('invalid', action);
     if (kept.length !== (current.assigneeIds ?? []).length) input.assigneeIds = kept;

@@ -216,7 +216,7 @@ watch(canEdit, (allowed) => {
     element, which <TransitionGroup> requires, and `job.key` is untouched so the
     FLIP move is unaffected.
   -->
-  <div class="wall-job-row flex w-full items-center gap-3 py-2 text-left">
+  <div class="wall-job-row flex w-full items-center gap-3 py-2 text-left" :data-job-key="job.key">
     <button
       type="button"
       class="wall-tick-hit grid shrink-0 place-items-center"

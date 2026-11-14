@@ -104,6 +104,18 @@ describe('ChoreBeanCard', () => {
     expect(toggle('morning').attributes('aria-expanded')).toBe('false');
   });
 
+  it('folding is per block: when the clock moves on, the newly current block opens', async () => {
+    chores.list = [chore('m1'), chore('a1', { block: 'afternoon' })];
+    const w = mountCard();
+    const shown = () =>
+      w.findAll('[data-testid="chore-row"]').map((r) => r.attributes('data-chore-id'));
+    await w.get('[data-block="morning"] [data-testid="chore-summary-toggle"]').trigger('click');
+    expect(shown()).toEqual([]);
+    clock.hhmm = '12:30';
+    await w.setProps({ day: dayOf() });
+    expect(shown()).toEqual(['a1']);
+  });
+
   it('a finished Now block folds to its stars and All Done', () => {
     chores.list = [chore('m1'), chore('a1', { block: 'afternoon' })];
     chores.marks = [doneMark('kid', 'm1')];
@@ -186,6 +198,12 @@ describe('ChoreBeanCard', () => {
     chores.list = [chore('m1')];
     const w = mountCard();
     await w.get('[data-testid="chore-tick"]').trigger('click');
-    expect(w.emitted('toggle')).toEqual([['m1']]);
+    const [id, anchor] = w.emitted('toggle')![0]!;
+    expect(id).toBe('m1');
+    // The celebration's anchor is the block's summary row (the card has no banner of its own).
+    expect(anchor).toMatchObject({
+      block: w.get('[data-testid="chore-summary"]').element,
+      tickEl: w.get('[data-testid="chore-tick"]').element,
+    });
   });
 });

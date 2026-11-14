@@ -8,6 +8,8 @@
  *             four steps with the share done (`--chore-heat-1..4`);
  *  - perfect: every chore done, the strongest fill and a star badge;
  *  - empty:   a past day (or today) with nothing done, a dashed cell with a soft dot, never "0";
+ *  - free:    a past day (or today) with nothing due, a plain faint cell that opens nothing and
+ *             counts against nothing;
  *  - future:  a blank outline, not interactive (a span, labelled for screen readers).
  * Today carries the Heritage Orange ring. Every past day and today is a real button that asks
  * the board to open the day summary (`open`, with the cell as the anchor).
@@ -49,9 +51,10 @@ const isPerfect = computed(
   () => props.record.total > 0 && props.record.done === props.record.total
 );
 
-type CellState = 'future' | 'empty' | 'done' | 'perfect';
+type CellState = 'future' | 'free' | 'empty' | 'done' | 'perfect';
 const state = computed<CellState>(() => {
   if (isFuture.value) return 'future';
+  if (props.record.total === 0) return 'free';
   if (props.record.done === 0) return 'empty';
   return isPerfect.value ? 'perfect' : 'done';
 });
@@ -69,6 +72,7 @@ const heatClass = computed(() => {
 const label = computed(() => {
   const base = { name: props.name, day: props.weekday };
   if (state.value === 'future') return fillTemplate(t('choreboard.cell.future'), base);
+  if (state.value === 'free') return fillTemplate(t('choreboard.cell.free'), base);
   if (state.value === 'empty') {
     return fillTemplate(
       t(isToday.value ? 'choreboard.cell.noneYet' : 'choreboard.cell.none'),
@@ -88,15 +92,23 @@ function onClick(event: MouseEvent): void {
 </script>
 
 <template>
+  <!-- A day to come (a blank outline) or a day with nothing due (a plain faint cell): nothing to
+       open, so not a button. Today keeps its ring even with nothing due. -->
   <span
-    v-if="state === 'future'"
+    v-if="state === 'future' || state === 'free'"
     role="img"
     :aria-label="label"
-    class="day-cell border-[1.5px] border-[var(--color-border)]"
-    :class="isToday ? 'ring-primary-500 ring-2' : ''"
+    class="day-cell"
+    :class="[
+      state === 'future'
+        ? 'border-[1.5px] border-[var(--color-border)]'
+        : 'bg-[var(--tint-slate-5)]',
+      isToday ? 'ring-primary-500 ring-2' : '',
+    ]"
     data-testid="chore-day-cell"
     :data-ymd="record.ymd"
-    data-state="future"
+    :data-state="state"
+    :data-today="isToday ? 'true' : undefined"
     :data-shape="shape"
   />
   <button
@@ -148,10 +160,15 @@ function onClick(event: MouseEvent): void {
   display: flex;
   flex-direction: column;
   justify-content: center;
+
+  /* Never a slab: one or two beans in a wide column stay day-cell sized, centred. */
+  justify-self: center;
+  max-width: 6rem;
   min-height: 2rem;
   min-width: 0;
   position: relative;
   text-align: center;
+  width: 100%;
 }
 
 .day-cell[data-shape='tall'] {

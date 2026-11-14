@@ -361,7 +361,10 @@ describe('the once-only celebration', () => {
       choreMarkId('celebrated', 'kid', FRI, 'morning'),
     ]);
     expect(celebrate).toHaveBeenCalledTimes(1);
-    expect(celebrate).toHaveBeenCalledWith('chore-block-complete');
+    // The bean's first name and one star per chore; no anchor from this caller (centered).
+    expect(celebrate).toHaveBeenCalledWith('chore-block-complete', {
+      chore: { memberId: 'kid', block: 'morning', beanName: 'kid', count: 2, anchor: undefined },
+    });
     expect(logged('block-complete')[0]!.context).toEqual({
       slot: 'morning',
       count: 2,
@@ -387,6 +390,22 @@ describe('the once-only celebration', () => {
     ]);
     expect(celebrate).toHaveBeenCalledTimes(1);
     expect(logged('block-complete')[0]!.context).toMatchObject({ detail: 'banner-only' });
+  });
+
+  it('the tick surface’s anchor reaches the celebration untouched; a re-tick never plays it', async () => {
+    await setup([chore('c1')]);
+    const anchor = { block: document.createElement('section'), compact: true } as never;
+    await store.toggleChore('c1', 'kid', { surface: 'wall', by: 'kid', anchor });
+    expect(celebrate).toHaveBeenCalledTimes(1);
+    expect(celebrate.mock.calls[0]![1]).toMatchObject({ chore: { block: 'morning', count: 1 } });
+    expect((celebrate.mock.calls[0]![1] as { chore: { anchor: unknown } }).chore.anchor).toBe(
+      anchor
+    );
+    // Untick, then tick again with an anchor: banner only, no move and no sound.
+    await store.toggleChore('c1', 'kid', { surface: 'wall', by: 'kid', anchor });
+    const again = await store.toggleChore('c1', 'kid', { surface: 'wall', by: 'kid', anchor });
+    expect(again).toEqual({ action: 'tick', completed: 'morning', celebrated: false });
+    expect(celebrate).toHaveBeenCalledTimes(1);
   });
 
   it('another device’s celebrated mark (not yet in this store) means banner only', async () => {
@@ -433,7 +452,9 @@ describe('two different chores of one block ticked in quick succession', () => {
     expect(b).toMatchObject({ action: 'tick' });
     expect(db.marks.has(choreMarkId('celebrated', 'kid', FRI, 'morning'))).toBe(true);
     expect(celebrate).toHaveBeenCalledTimes(1);
-    expect(celebrate).toHaveBeenCalledWith('chore-block-complete');
+    expect(celebrate).toHaveBeenCalledWith('chore-block-complete', {
+      chore: expect.objectContaining({ memberId: 'kid', block: 'morning' }),
+    });
     expect(logged('block-complete').map((e) => e.context)).toEqual([
       { slot: 'morning', count: 2, detail: 'celebrated' },
     ]);
@@ -644,6 +665,20 @@ describe('grown-up actions', () => {
     const updated = await store.updateChore('c1', { title: 'Renamed', days: [] }, 'mom');
     expect(updated).toMatchObject({ title: 'Renamed', assigneeIds: ['kid'] });
     expect(updated?.days).toBeUndefined();
+  });
+
+  it('updateChore stamps daysChangedAt only when the weekdays really change', async () => {
+    await setup([chore('c1', { days: [0, 6] })]);
+    // The same days in another order: no stamp.
+    const same = await store.updateChore('c1', { days: [6, 0] }, 'mom');
+    expect(same?.daysChangedAt).toBeUndefined();
+    // Weekends to every day: stamped.
+    const every = await store.updateChore('c1', { days: [] }, 'mom');
+    expect(typeof every?.daysChangedAt).toBe('string');
+    // A title edit leaves it alone.
+    const before = every?.daysChangedAt;
+    const renamed = await store.updateChore('c1', { title: 'Renamed' }, 'mom');
+    expect(renamed?.daysChangedAt).toBe(before);
   });
 
   it('updateChore tells the family when the chore was deleted on another device meanwhile', async () => {

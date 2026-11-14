@@ -179,6 +179,25 @@ describe('WallChoreLanes', () => {
     expect(w.findComponent(WallJobList).exists()).toBe(true);
   });
 
+  it('a tick carries its lane’s block as the celebration anchor, clipped to the lane', () => {
+    const w = mountLanes({ pip: pipMorning() });
+    const lane = w.get('[data-testid="wall-chore-lane"][data-member="pip"]');
+    expect(lane.attributes('data-celebration-clip')).toBeDefined();
+    const morning = pipMorning().blocks[0]!;
+    // The rows are WallJobList's (stubbed here): its toggle is what the lane hears.
+    w.findComponent(WallJobList).vm.$emit('toggle', morning.jobs[1]);
+    const [job, anchor] = w.emitted('toggle')![0]! as [
+      { ownerId: string },
+      Record<string, unknown>,
+    ];
+    expect(job.ownerId).toBe('pip');
+    expect(anchor).toMatchObject({
+      block: lane.get('[data-testid="wall-chore-block"][data-block="morning"]').element,
+      clip: lane.element,
+      compact: true,
+    });
+  });
+
   it('draws no star row: stars appear only on a finished block', () => {
     const w = mountLanes({ pip: pipMorning() });
     expect(w.text()).not.toContain('⭐');

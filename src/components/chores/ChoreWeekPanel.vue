@@ -23,7 +23,7 @@
  * Dark mode: the panel is `surface-raised` with a `line` edge; heads are `ink-faint`, today's
  * head and the totals `accent-lift`.
  */
-import { computed, nextTick, ref } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import ChoreDayCell from '@/components/chores/ChoreDayCell.vue';
 import ChoreDayPopover from '@/components/chores/ChoreDayPopover.vue';
@@ -32,7 +32,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { CHORE_DAY_LABEL_KEYS } from '@/constants/choreBlocks';
 import { choreDayOfWeek, type ChoreDayRecord, type ChoreWeekRecord } from '@/utils/chores';
-import { firstName as firstWord } from '@/utils/assignees';
+import { firstName } from '@/utils/assignees';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { formatUiDate } from '@/utils/uiLocale';
 import type { FamilyMember } from '@/types/models';
@@ -56,8 +56,6 @@ const emit = defineEmits<{ 'open-day': [memberId: string] }>();
 const { t, currentLanguage } = useTranslation();
 const { memberAvatarBindings } = useMemberAvatarBindings();
 
-const firstName = (m: FamilyMember) => firstWord(m.name) || m.name;
-
 /** The week's seven dates, from the first row (every row shares the family's week). */
 const days = computed(() =>
   (props.rows[0]?.week.days ?? []).map((d) => ({
@@ -76,6 +74,84 @@ const totalAria = (n: number) =>
   fillTemplate(t(n === 1 ? 'choreboard.week.totalAria.one' : 'choreboard.week.totalAria.other'), {
     count: n,
   });
+const totalAriaFor = (m: FamilyMember, n: number) =>
+  fillTemplate(
+    t(n === 1 ? 'choreboard.week.totalAriaFor.one' : 'choreboard.week.totalAriaFor.other'),
+    { name: firstName(m.name), count: n }
+  );
+
+type DayHead = (typeof days.value)[number];
+/**
+ * The board's grid as ONE flat list, so every layout draws its cells, heads and totals with the
+ * same markup: `single` is seven heads then seven cells; days DOWN is the beans across the top,
+ * a row per day, then the totals; days ACROSS is the days across the top, then a row per bean
+ * ending in its total.
+ */
+type GridItem =
+  | { kind: 'blank'; key: string }
+  | { kind: 'day'; key: string; day: DayHead; left: boolean }
+  | { kind: 'star'; key: string; left: boolean }
+  | { kind: 'bean'; key: string; member: FamilyMember; column: boolean }
+  | { kind: 'cell'; key: string; member: FamilyMember; record: ChoreDayRecord }
+  | { kind: 'total'; key: string; member: FamilyMember; total: number };
+
+const cellItem = (member: FamilyMember, record: ChoreDayRecord): GridItem => ({
+  kind: 'cell',
+  key: `${member.id}-${record.ymd}`,
+  member,
+  record,
+});
+const totalItem = (member: FamilyMember, total: number): GridItem => ({
+  kind: 'total',
+  key: `t-${member.id}`,
+  member,
+  total,
+});
+
+const gridItems = computed<GridItem[]>(() => {
+  const heads = (left: boolean): GridItem[] =>
+    days.value.map((day) => ({ kind: 'day', key: `h-${day.ymd}`, day, left }));
+  if (props.single) {
+    const row = props.rows[0];
+    return row ? [...heads(false), ...row.week.days.map((r) => cellItem(row.member, r))] : [];
+  }
+  if (isDown.value) {
+    return [
+      { kind: 'blank', key: 'corner' },
+      ...props.rows.map((r): GridItem => ({
+        kind: 'bean',
+        key: `b-${r.member.id}`,
+        member: r.member,
+        column: true,
+      })),
+      ...days.value.flatMap((day, di): GridItem[] => [
+        { kind: 'day', key: `h-${day.ymd}`, day, left: true },
+        ...props.rows.map((r) => cellItem(r.member, r.week.days[di]!)),
+      ]),
+      { kind: 'star', key: 'star', left: true },
+      ...props.rows.map((r) => totalItem(r.member, r.week.total)),
+    ];
+  }
+  return [
+    { kind: 'blank', key: 'corner' },
+    ...heads(false),
+    { kind: 'star', key: 'star', left: false },
+    ...props.rows.flatMap((r): GridItem[] => [
+      { kind: 'bean', key: `b-${r.member.id}`, member: r.member, column: false },
+      ...r.week.days.map((rec) => cellItem(r.member, rec)),
+      totalItem(r.member, r.week.total),
+    ]),
+  ];
+});
+
+/** A past day (or today) with nothing due somewhere on the board: the legend explains it. */
+const hasFreeDay = computed(() =>
+  props.rows.some((r) => r.week.days.some((d) => d.ymd <= props.todayYmd && d.total === 0))
+);
+
+/** Days down: each bean column is capped (5.5rem) and the grid centred, so one or two beans
+ *  read as a deliberate column rather than stretched slabs. */
+const downColumns = computed(() => `2.5rem repeat(${props.rows.length}, minmax(0, 5.5rem))`);
 
 // ── The day summary ─────────────────────────────────────────────────────────
 
@@ -122,6 +198,13 @@ function closePopover(): void {
   openCell.value = null;
 }
 
+// The board re-renders its cells when it flips orientation (the 1280px rail): the open summary's
+// anchor is gone with them, so close it rather than leave it hanging from a detached cell.
+watch(
+  () => props.orientation,
+  () => closePopover()
+);
+
 function onOpenDay(): void {
   const id = openCell.value?.memberId;
   openCell.value = null;
@@ -163,146 +246,71 @@ function onOpenDay(): void {
       }}</span>
     </div>
 
-    <!-- ═══ One bean's own week: seven across ═══ -->
-    <template v-if="single && rows[0]">
-      <div class="grid grid-cols-7 items-center gap-[5px]">
-        <span
-          v-for="d in days"
-          :key="`h-${d.ymd}`"
-          class="font-outfit text-center text-xs font-semibold"
-          :class="
-            d.isToday
-              ? 'text-primary-700 dark:text-accent-lift font-bold'
-              : 'dark:text-ink-faint text-secondary-400'
-          "
-          aria-hidden="true"
-          >{{ d.short }}</span
-        >
-        <ChoreDayCell
-          v-for="rec in rows[0].week.days"
-          :key="rec.ymd"
-          :record="rec"
-          :name="firstName(rows[0].member)"
-          :weekday="weekdayOf(rec.ymd)"
-          :today-ymd="todayYmd"
-          :shape="cellShape"
-          :expanded="isExpanded(rows[0].member.id, rec.ymd)"
-          :data-member-id="rows[0].member.id"
-          @open="onOpen(rows[0].member.id, rec, $event)"
-        />
-      </div>
-      <p class="dark:text-ink-faint text-secondary-400 mt-2 text-xs">
-        {{ t('choreboard.week.panelHint') }}
-      </p>
-    </template>
-
-    <!-- ═══ Days down, beans across (the desktop rail) ═══ -->
+    <!-- ONE grid for all three layouts (see `gridItems`). -->
     <div
-      v-else-if="isDown"
       class="board-grid grid items-center gap-[5px]"
-      :style="{ gridTemplateColumns: `2.5rem repeat(${rows.length}, minmax(0, 1fr))` }"
+      :class="single ? 'grid-cols-7' : isDown ? 'justify-center' : 'board-grid-across'"
+      :style="isDown ? { gridTemplateColumns: downColumns } : undefined"
     >
-      <span />
-      <div
-        v-for="row in rows"
-        :key="`c-${row.member.id}`"
-        class="font-outfit dark:text-ink text-secondary-500 flex min-w-0 flex-col items-center gap-0.5 text-xs font-semibold"
-        aria-hidden="true"
-      >
-        <BeanieAvatar v-bind="memberAvatarBindings(row.member)" size="sm" />
-        <span class="max-w-full truncate">{{ firstName(row.member) }}</span>
-      </div>
-      <template v-for="(d, di) in days" :key="d.ymd">
+      <template v-for="item in gridItems" :key="item.key">
+        <span v-if="item.kind === 'blank'" />
         <span
-          class="font-outfit text-left text-xs font-semibold"
-          :class="
-            d.isToday
+          v-else-if="item.kind === 'day'"
+          class="font-outfit text-xs font-semibold"
+          :class="[
+            item.left ? 'text-left' : 'text-center',
+            item.day.isToday
               ? 'text-primary-700 dark:text-accent-lift font-bold'
-              : 'dark:text-ink-faint text-secondary-400'
+              : 'dark:text-ink-faint text-secondary-400',
+          ]"
+          aria-hidden="true"
+          >{{ item.day.short }}</span
+        >
+        <span
+          v-else-if="item.kind === 'star'"
+          class="dark:text-ink-faint text-secondary-400 text-xs font-semibold"
+          :class="item.left ? 'text-left' : 'text-center'"
+          aria-hidden="true"
+          >⭐</span
+        >
+        <div
+          v-else-if="item.kind === 'bean'"
+          class="font-outfit dark:text-ink text-secondary-500 flex min-w-0 font-semibold"
+          :class="
+            item.column
+              ? 'flex-col items-center gap-0.5 text-xs'
+              : 'items-center gap-1.5 pr-1 text-sm'
           "
           aria-hidden="true"
-          >{{ d.short }}</span
         >
-        <ChoreDayCell
-          v-for="row in rows"
-          :key="`${row.member.id}-${d.ymd}`"
-          :record="row.week.days[di]!"
-          :name="firstName(row.member)"
-          :weekday="d.long"
-          :today-ymd="todayYmd"
-          :shape="cellShape"
-          :expanded="isExpanded(row.member.id, d.ymd)"
-          :data-member-id="row.member.id"
-          @open="onOpen(row.member.id, row.week.days[di]!, $event)"
-        />
-      </template>
-      <span
-        class="dark:text-ink-faint text-secondary-400 text-left text-xs font-semibold"
-        aria-hidden="true"
-        >⭐</span
-      >
-      <span
-        v-for="row in rows"
-        :key="`t-${row.member.id}`"
-        class="font-outfit text-primary-700 dark:text-accent-lift flex justify-center text-sm font-extrabold whitespace-nowrap"
-        :aria-label="`${firstName(row.member)}: ${totalAria(row.week.total)}`"
-        data-testid="chore-week-panel-total"
-        :data-member-id="row.member.id"
-      >
-        <span v-if="row.week.total > 0" aria-hidden="true">⭐ {{ row.week.total }}</span>
-        <span
-          v-else
-          class="block h-[7px] w-[7px] rounded-full bg-[var(--color-border-strong)]"
-          aria-hidden="true"
-        />
-      </span>
-    </div>
-
-    <!-- ═══ Days across, beans down (stacked, phone) ═══ -->
-    <div v-else class="board-grid board-grid-across grid items-center gap-[5px]">
-      <span />
-      <span
-        v-for="d in days"
-        :key="`h-${d.ymd}`"
-        class="font-outfit text-center text-xs font-semibold"
-        :class="
-          d.isToday
-            ? 'text-primary-700 dark:text-accent-lift font-bold'
-            : 'dark:text-ink-faint text-secondary-400'
-        "
-        aria-hidden="true"
-        >{{ d.short }}</span
-      >
-      <span class="dark:text-ink-faint text-secondary-400 text-center text-xs" aria-hidden="true"
-        >⭐</span
-      >
-      <template v-for="row in rows" :key="row.member.id">
-        <div
-          class="font-outfit dark:text-ink text-secondary-500 flex min-w-0 items-center gap-1.5 pr-1 text-sm font-semibold"
-          aria-hidden="true"
-        >
-          <BeanieAvatar class="flex-none" v-bind="memberAvatarBindings(row.member)" size="xs" />
-          <span class="board-name min-w-0 truncate">{{ firstName(row.member) }}</span>
+          <BeanieAvatar
+            class="flex-none"
+            v-bind="memberAvatarBindings(item.member)"
+            :size="item.column ? 'sm' : 'xs'"
+          />
+          <span class="min-w-0 truncate" :class="item.column ? 'max-w-full' : 'board-name'">{{
+            firstName(item.member.name)
+          }}</span>
         </div>
         <ChoreDayCell
-          v-for="rec in row.week.days"
-          :key="rec.ymd"
-          :record="rec"
-          :name="firstName(row.member)"
-          :weekday="weekdayOf(rec.ymd)"
+          v-else-if="item.kind === 'cell'"
+          :record="item.record"
+          :name="firstName(item.member.name)"
+          :weekday="weekdayOf(item.record.ymd)"
           :today-ymd="todayYmd"
           :shape="cellShape"
-          :expanded="isExpanded(row.member.id, rec.ymd)"
-          :data-member-id="row.member.id"
-          @open="onOpen(row.member.id, rec, $event)"
+          :expanded="isExpanded(item.member.id, item.record.ymd)"
+          :data-member-id="item.member.id"
+          @open="onOpen(item.member.id, item.record, $event)"
         />
         <span
+          v-else
           class="board-total font-outfit text-primary-700 dark:text-accent-lift flex justify-center text-sm font-extrabold whitespace-nowrap"
-          :aria-label="`${firstName(row.member)}: ${totalAria(row.week.total)}`"
+          :aria-label="totalAriaFor(item.member, item.total)"
           data-testid="chore-week-panel-total"
-          :data-member-id="row.member.id"
+          :data-member-id="item.member.id"
         >
-          <span v-if="row.week.total > 0" aria-hidden="true">⭐ {{ row.week.total }}</span>
+          <span v-if="item.total > 0" aria-hidden="true">⭐ {{ item.total }}</span>
           <span
             v-else
             class="block h-[7px] w-[7px] rounded-full bg-[var(--color-border-strong)]"
@@ -311,6 +319,9 @@ function onOpenDay(): void {
         </span>
       </template>
     </div>
+    <p v-if="single" class="dark:text-ink-faint text-secondary-400 mt-2 text-xs">
+      {{ t('choreboard.week.panelHint') }}
+    </p>
 
     <!-- The legend: the grown-ups' board only. The cells' own labels say all of this. -->
     <div
@@ -340,13 +351,19 @@ function onOpenDay(): void {
           t('choreboard.week.legend.future')
         }}</span
       >
+      <!-- Only when the board shows such a day, so the legend stays short. -->
+      <span v-if="hasFreeDay" class="inline-flex items-center gap-1.5"
+        ><i class="h-3.5 w-3.5 rounded-[5px] bg-[var(--tint-slate-5)]" />{{
+          t('choreboard.week.legend.free')
+        }}</span
+      >
     </div>
 
     <ChoreDayPopover
       :open="!!openCell"
       :member="openRow?.member ?? null"
       :record="openRecord"
-      :name="openRow ? firstName(openRow.member) : ''"
+      :name="openRow ? firstName(openRow.member.name) : ''"
       :weekday="openCell ? weekdayOf(openCell.ymd) : ''"
       :is-today="openCell?.ymd === todayYmd"
       :anchor="openCell?.anchor ?? null"

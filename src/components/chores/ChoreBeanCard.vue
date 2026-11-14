@@ -18,17 +18,20 @@ import { computed, ref } from 'vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import ChoreBlockSummary from '@/components/chores/ChoreBlockSummary.vue';
 import ChoreRow from '@/components/chores/ChoreRow.vue';
+import { choreBlockHeld } from '@/composables/useCelebration';
 import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
 import { useTranslation } from '@/composables/useTranslation';
 import { fillTemplate } from '@/utils/fillTemplate';
-import { firstName as firstWord } from '@/utils/assignees';
+import { firstName } from '@/utils/assignees';
 import type { BeanChoreDay, ChoreDayBlock } from '@/utils/chores';
+import { choreCelebrationAnchor, type ChoreCelebrationAnchor } from '@/utils/choreCelebration';
 import type { ChoreBlock, ChoreBlockStarts, FamilyMember } from '@/types/models';
 
 const props = withDefaults(
   defineProps<{
     member: FamilyMember;
-    day: BeanChoreDay;
+    /** Today's read model; not needed for the slim row (`hasAnyChores` false). */
+    day?: BeanChoreDay;
     /** The bean has at least one chore on some day (false draws the slim row). */
     hasAnyChores: boolean;
     starts: ChoreBlockStarts;
@@ -36,11 +39,12 @@ const props = withDefaults(
     canEdit?: boolean;
     isPending?: (choreId: string) => boolean;
   }>(),
-  { canTick: true, canEdit: false, isPending: () => false }
+  { day: () => ({ blocks: [], left: 0 }), canTick: true, canEdit: false, isPending: () => false }
 );
 
 const emit = defineEmits<{
-  toggle: [choreId: string];
+  /** A tick, with where the all-done celebration plays if it finishes the block (#146). */
+  toggle: [choreId: string, anchor: ChoreCelebrationAnchor | null];
   /** Open the bean's chore list. */
   'edit-chores': [];
   open: [];
@@ -56,24 +60,52 @@ const done = computed(() => total.value - props.day.left);
 /** The blocks with chores today, in day order (morning, afternoon, evening, anytime). */
 const blocks = computed(() => props.day.blocks.filter((b) => b.total > 0));
 
-/** The Now block, open by default while it has chores to do; a tap folds it. */
-const nowFolded = ref(false);
+/**
+ * The Now block opens by default while it has chores to do; a tap folds it. Folding is kept PER
+ * BLOCK, so when the clock moves on, the newly current block opens even if the last one was
+ * folded.
+ */
+const folded = ref<ReadonlySet<ChoreBlock>>(new Set());
 /** The one other block opened by a tap. */
 const opened = ref<ChoreBlock | null>(null);
 
-const nowOpensItself = (b: ChoreDayBlock) => b.isNow && !b.allDone;
+/**
+ * The Now block opens itself while it has chores to do, and for the moment after its last tick
+ * while the celebration's stars burst from that tick (`choreBlockHeld`, #146).
+ */
+const nowOpensItself = (b: ChoreDayBlock) =>
+  b.isNow && (!b.allDone || choreBlockHeld(props.member.id, b.block));
 
 function isOpen(b: ChoreDayBlock): boolean {
-  return nowOpensItself(b) ? !nowFolded.value : opened.value === b.block;
+  return nowOpensItself(b) ? !folded.value.has(b.block) : opened.value === b.block;
 }
 
 function onActivate(b: ChoreDayBlock): void {
-  if (nowOpensItself(b)) nowFolded.value = !nowFolded.value;
-  else opened.value = opened.value === b.block ? null : b.block;
+  if (nowOpensItself(b)) {
+    const next = new Set(folded.value);
+    if (next.has(b.block)) next.delete(b.block);
+    else next.add(b.block);
+    folded.value = next;
+  } else {
+    opened.value = opened.value === b.block ? null : b.block;
+  }
+}
+
+const card = ref<HTMLElement | null>(null);
+
+/** The block's summary row is the celebration's anchor; the card has no banner of its own. */
+function onToggle(block: ChoreBlock, choreId: string): void {
+  const row = card.value?.querySelector<HTMLElement>(
+    `[data-testid="chore-summary"][data-block="${block}"]`
+  );
+  const tick = row?.querySelector<HTMLElement>(
+    `[data-chore-id="${CSS.escape(choreId)}"] [data-testid="chore-tick"]`
+  );
+  emit('toggle', choreId, row ? choreCelebrationAnchor(row, tick ?? null) : null);
 }
 
 const name = computed(() => props.member.name);
-const first = computed(() => firstWord(props.member.name) || props.member.name);
+const first = computed(() => firstName(props.member.name));
 
 const subline = computed(() => {
   if (total.value === 0) return t('choreboard.card.none');
@@ -122,6 +154,7 @@ const subline = computed(() => {
   <!-- ═══ The card ═══ -->
   <article
     v-else
+    ref="card"
     class="dark:bg-surface-raised dark:border-line flex min-w-0 flex-col gap-2 rounded-3xl bg-white p-3 shadow-[var(--card-shadow)] dark:border"
     data-testid="chore-bean-card"
     :data-member-id="member.id"
@@ -137,7 +170,7 @@ const subline = computed(() => {
         <BeanieAvatar v-bind="memberAvatarBindings(member)" size="md" />
         <span class="min-w-0 flex-1">
           <span
-            class="font-outfit dark:text-ink text-secondary-500 group-hover:text-primary-700 dark:group-hover:text-accent-lift block truncate text-base leading-tight font-bold"
+            class="font-outfit dark:text-ink text-secondary-500 group-hover:text-primary-700 dark:group-hover:text-accent-lift line-clamp-2 text-base leading-tight font-bold break-words"
             >{{ name }}</span
           >
           <span
@@ -217,7 +250,7 @@ const subline = computed(() => {
             :can-tick="canTick"
             :can-edit="canEdit"
             :pending="isPending(item.chore.id)"
-            @toggle="emit('toggle', item.chore.id)"
+            @toggle="onToggle(b.block, item.chore.id)"
             @edit="emit('edit-chores')"
           />
         </div>

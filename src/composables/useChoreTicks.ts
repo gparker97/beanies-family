@@ -1,6 +1,7 @@
 import { shallowRef } from 'vue';
 import { useChoreStore, type ToggleChoreResult } from '@/stores/choreStore';
 import { isChoreRefusal } from '@/utils/chores';
+import type { ChoreCelebrationAnchor } from '@/utils/choreCelebration';
 
 /**
  * The choreboard PAGE's tick path (#146): one in-flight guard keyed `choreId:memberId`, in front
@@ -34,13 +35,23 @@ export function useChoreTicks() {
     pending.value = next;
   }
 
-  /** Tick or untick. `null` while the same tick is already in flight, or on a refusal/failure. */
-  async function toggle(choreId: string, memberId: string): Promise<ToggleChoreResult | null> {
+  /**
+   * Tick or untick. `null` while the same tick is already in flight, or on a refusal/failure.
+   * `anchor` is where the all-done celebration plays if this tick finishes its block.
+   */
+  async function toggle(
+    choreId: string,
+    memberId: string,
+    anchor: ChoreCelebrationAnchor | null = null
+  ): Promise<ToggleChoreResult | null> {
     const key = keyOf(choreId, memberId);
     if (pending.value.has(key)) return null;
     setPending(key, true);
     try {
-      const outcome = await choreStore.toggleChore(choreId, memberId, { surface: 'app' });
+      const outcome = await choreStore.toggleChore(choreId, memberId, {
+        surface: 'app',
+        ...(anchor ? { anchor } : {}),
+      });
       return outcome && !isChoreRefusal(outcome) ? outcome : null;
     } finally {
       setPending(key, false);

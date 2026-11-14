@@ -1,5 +1,8 @@
 import type { DateOfBirth, ISODateString } from '@/types/models';
 import type { UIStringKey } from '@/services/translation/uiStrings';
+// Before the error reporter on purpose: its import chain reaches back into this module (via
+// `useToday`), which calls `toDateInputValue` while this file is still initializing.
+import { localYmdOf, toDateInputValue } from '@/utils/localYmd';
 import { reportError } from '@/utils/errorReporter';
 
 // ── Shared month abbreviations (dd MMM yyyy standard) ──────────────────────
@@ -788,17 +791,9 @@ export function endFollowsStart(oldStart: string, newStart: string, end: string)
   return !end || end === addMinutesToTime(oldStart, 60) || end <= newStart;
 }
 
-/**
- * Format a date for HTML date input (YYYY-MM-DD)
- */
-export function toDateInputValue(date: Date): string {
-  const year = date.getFullYear();
-  const month = date.getMonth() + 1;
-  const day = date.getDate();
-  const monthStr = month < 10 ? `0${month}` : `${month}`;
-  const dayStr = day < 10 ? `0${day}` : `${day}`;
-  return `${year}-${monthStr}-${dayStr}`;
-}
+// The local-day rules live in a dependency-free module (`utils/localYmd.ts`), so pure rule files
+// (`utils/chores.ts`) can use them without pulling this file's imports, and an import cycle, in.
+export { localYmdOf, toDateInputValue };
 
 /**
  * Today in the user's LOCAL timezone as a YYYY-MM-DD string.

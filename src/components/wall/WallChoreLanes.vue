@@ -19,8 +19,11 @@
  *            "Now" tag on the current block) over its rows;
  *   - quiet: a later block (or one whose window has passed) is one line in its colour with a
  *            count. Tapping it opens the rows.
- * No star row: stars appear only on the done strip (plan §5). The celebration is not drawn
- * here: the store plays the existing shower once, under the wall's celebration mode.
+ * No star row: stars appear only on the done strip (plan §5). The celebration is the store's
+ * (once per bean, block and day); a tick carries its anchor (this lane's block and the tick),
+ * the block keeps its rows while the stars burst (`choreBlockHeld`), and the done strip takes
+ * its celebrating form while the beanies' move plays on it (`choreBannerCelebration`). The lane
+ * is the celebration's clip (`data-celebration-clip`), so nothing crosses into a sibling's lane.
  *
  * Editing is one thing only: while unlocked, each lane has an add row that adds a chore for
  * that bean in the block happening now (`WALL_EDIT.addChore`, bound by the page to the grown-up
@@ -32,6 +35,7 @@
  * brand gradient with white ink in both themes.
  */
 import { computed, inject, ref } from 'vue';
+import { choreBannerCelebration, choreBlockHeld } from '@/composables/useCelebration';
 import WallBackButton from '@/components/wall/WallBackButton.vue';
 import WallJobList from '@/components/wall/WallJobList.vue';
 import WallAddRow from '@/components/wall/WallAddRow.vue';
@@ -52,6 +56,7 @@ import { wallChoreProgressText } from '@/components/wall/wallChoreText';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import type { ChoreBlock, FamilyMember } from '@/types/models';
 import type { WallChoreBlock, WallChoreLane, WallJob, WallPeripheralData } from '@/types/wall';
+import { choreCelebrationAnchor, type ChoreCelebrationAnchor } from '@/utils/choreCelebration';
 
 defineOptions({ inheritAttrs: false });
 
@@ -61,7 +66,7 @@ const props = defineProps<{
   isPending: (job: WallJob) => boolean;
   backLabel: string;
 }>();
-const emit = defineEmits<{ toggle: [WallJob]; back: [] }>();
+const emit = defineEmits<{ toggle: [WallJob, ChoreCelebrationAnchor | null]; back: [] }>();
 
 type TimedBlock = Exclude<ChoreBlock, 'anytime'>;
 
@@ -149,9 +154,26 @@ function laneClear(lane: WallChoreLane): boolean {
 }
 
 type BlockState = 'done' | 'open' | 'quiet';
-function blockState(b: WallChoreBlock): BlockState {
-  if (b.allDone) return 'done';
-  return b.isNow || b.block === 'anytime' ? 'open' : 'quiet';
+function blockState(b: WallChoreBlock, memberId: string): BlockState {
+  // The last tick just finished it: the rows stay a moment while the stars burst out.
+  if (b.allDone && !choreBlockHeld(memberId, b.block)) return 'done';
+  return b.isNow || b.block === 'anytime' || b.allDone ? 'open' : 'quiet';
+}
+
+const root = ref<HTMLElement | null>(null);
+
+/** A tick, with this lane's block and the tick as the celebration's anchor (compact sizing). */
+function onToggle(job: WallJob, memberId: string, block: ChoreBlock): void {
+  const lane = root.value?.querySelector<HTMLElement>(
+    `[data-testid="wall-chore-lane"][data-member="${CSS.escape(memberId)}"]`
+  );
+  const section = lane?.querySelector<HTMLElement>(
+    `[data-testid="wall-chore-block"][data-block="${block}"]`
+  );
+  const tick = section?.querySelector<HTMLElement>(
+    `[data-job-key="${CSS.escape(job.key)}"] .wall-tick`
+  );
+  emit('toggle', job, section ? choreCelebrationAnchor(section, tick ?? null, true) : null);
 }
 
 /** Blocks opened by hand (a quiet line, or a done strip reopened): `${memberId}:${block}`. */
@@ -211,7 +233,11 @@ function addChore(memberId: string, title: string): Promise<boolean> {
 </script>
 
 <template>
-  <div class="wall-chore-lanes flex min-h-0 flex-1 flex-col gap-2.5" data-testid="wall-chores-view">
+  <div
+    ref="root"
+    class="wall-chore-lanes flex min-h-0 flex-1 flex-col gap-2.5"
+    data-testid="wall-chores-view"
+  >
     <div class="flex shrink-0 items-center gap-4">
       <WallBackButton :back-label="backLabel" @back="emit('back')" />
       <h2 class="font-outfit text-secondary-500 wall-board-title dark:text-ink font-extrabold">
@@ -250,6 +276,7 @@ function addChore(memberId: string, title: string): Promise<boolean> {
         :style="{ '--bean': member.color }"
         data-testid="wall-chore-lane"
         :data-member="member.id"
+        data-celebration-clip
       >
         <header
           class="wall-chore-lane-head flex shrink-0 items-center gap-2.5 px-3 py-2"
@@ -288,11 +315,11 @@ function addChore(memberId: string, title: string): Promise<boolean> {
             class="flex flex-col gap-1"
             data-testid="wall-chore-block"
             :data-block="b.block"
-            :data-state="blockState(b)"
+            :data-state="blockState(b, member.id)"
             :data-now="b.isNow ? 'true' : 'false'"
           >
             <!-- Done: the strip with its stars, reopenable so a mis-tick can be undone. -->
-            <template v-if="blockState(b) === 'done'">
+            <template v-if="blockState(b, member.id) === 'done'">
               <CelebrationBanner
                 compact
                 :title="bannerTitle(b)"
@@ -305,21 +332,16 @@ function addChore(memberId: string, title: string): Promise<boolean> {
                       : 'choreboard.block.showChores'
                   )
                 "
+                :stars="b.total"
+                :celebration="choreBannerCelebration(member.id, b.block)"
                 data-testid="wall-chore-done-strip"
                 @action="toggleExpanded(member.id, b.block)"
-              >
-                <p
-                  class="flex flex-wrap justify-center gap-0.5 text-lg leading-none"
-                  aria-hidden="true"
-                >
-                  {{ '⭐'.repeat(b.total) }}
-                </p>
-              </CelebrationBanner>
+              />
             </template>
 
             <!-- Open: the block happening now (ringed, tagged) and Anytime. -->
             <div
-              v-else-if="blockState(b) === 'open'"
+              v-else-if="blockState(b, member.id) === 'open'"
               class="dark:bg-surface-overlay overflow-hidden rounded-2xl bg-white"
               :class="b.isNow ? 'ring-primary-500 ring-2' : ''"
             >
@@ -343,7 +365,7 @@ function addChore(memberId: string, title: string): Promise<boolean> {
                 <WallJobList
                   :jobs="b.jobs"
                   :is-pending="isPending"
-                  @toggle="emit('toggle', $event)"
+                  @toggle="onToggle($event, member.id, b.block)"
                 />
               </div>
             </div>
@@ -373,14 +395,14 @@ function addChore(memberId: string, title: string): Promise<boolean> {
 
             <!-- A quiet line or a done strip, opened by hand. -->
             <div
-              v-if="blockState(b) !== 'open' && isExpanded(member.id, b.block)"
+              v-if="blockState(b, member.id) !== 'open' && isExpanded(member.id, b.block)"
               class="dark:bg-surface-overlay rounded-2xl bg-white px-2"
               data-testid="wall-chore-rows"
             >
               <WallJobList
                 :jobs="b.jobs"
                 :is-pending="isPending"
-                @toggle="emit('toggle', $event)"
+                @toggle="onToggle($event, member.id, b.block)"
               />
             </div>
           </section>

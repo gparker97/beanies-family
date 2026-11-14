@@ -1,11 +1,32 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, watch } from 'vue';
+import { computed, defineAsyncComponent, onBeforeUnmount, watch } from 'vue';
 import CelebrationShower from '@/components/ui/CelebrationShower.vue';
-import { useCelebration } from '@/composables/useCelebration';
+import { loadChoreCelebration } from '@/components/ui/choreCelebrationLoader';
+import { CHORE_CELEBRATION_SURFACE, useCelebration } from '@/composables/useCelebration';
 import { useTranslation } from '@/composables/useTranslation';
+import { reportError } from '@/utils/errorReporter';
 
 const { t } = useTranslation();
-const { toasts, activeModal, mode, dismissModal } = useCelebration();
+const { toasts, activeModal, activeChore, mode, dismissModal } = useCelebration();
+
+/**
+ * The choreboard's celebration (#146), code-split: loaded on the first one (or warmed by the
+ * choreboard when idle). If it cannot load, the banner still arrives and settles on its own
+ * (the phases are `useCelebration`'s), so the bean still sees their banner.
+ */
+const ChoreCelebration = defineAsyncComponent({
+  loader: loadChoreCelebration,
+  onError(error, _retry, fail) {
+    reportError({
+      surface: CHORE_CELEBRATION_SURFACE,
+      message: 'the chore celebration could not load; the banner showed without it',
+      severity: 'warning',
+      error,
+      context: { action: 'load-failed' },
+    });
+    fail();
+  },
+});
 
 /**
  * Undo is an EDIT. On a locked shared screen a child must not be able to
@@ -41,6 +62,13 @@ onBeforeUnmount(() => {
 <template>
   <!-- Full-list completion: non-blocking, self-dismissing (see CelebrationShower). -->
   <CelebrationShower />
+  <!-- A finished chore block (#146): anchored to the board, self-dismissing. -->
+  <ChoreCelebration v-if="activeChore" />
+  <!-- Said aloud once: the celebration itself is decoration (aria-hidden). Always mounted, so a
+       screen reader hears the change. -->
+  <p class="sr-only" role="status" aria-live="polite" data-testid="chore-celebration-said">
+    {{ activeChore?.praise ?? '' }}
+  </p>
 
   <Teleport to="body">
     <!-- Modal celebration -->

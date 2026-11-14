@@ -29,6 +29,41 @@ describe('CelebrationBanner', () => {
     expect(html.indexOf('3 chores')).toBeLessThan(html.indexOf('data-testid="stars"'));
   });
 
+  it('draws one star slot per `stars`, lit, with the celebration hooks', () => {
+    const w = mount(CelebrationBanner, { props: { ...base, stars: 3 } });
+    expect(w.findAll('[data-celebration-star]')).toHaveLength(3);
+    expect(w.get('[data-celebration-stars]').text()).toBe('⭐⭐⭐');
+    expect(w.attributes('data-celebration-banner')).toBeDefined();
+    expect(w.classes()).not.toContain('is-celebrating');
+    expect(w.find('[data-celebration-praise]').exists()).toBe(false);
+  });
+
+  it('the chore celebration plays on it: the praise line word by word, the name flagged', () => {
+    const w = mount(CelebrationBanner, {
+      props: {
+        ...base,
+        stars: 2,
+        actionLabel: 'Show Chores',
+        celebration: { praise: 'Woohoo, Pip! All done.', name: 'Pip', calm: false },
+      },
+    });
+    expect(w.classes()).toContain('is-celebrating');
+    const words = w.findAll('[data-praise-word]');
+    expect(words.map((s) => s.text())).toEqual(['Woohoo,', 'Pip!', 'All', 'done.']);
+    expect(words.map((s) => s.attributes('data-praise-name') ?? '')).toEqual(['', 'true', '', '']);
+    // The praise line is decoration (the overlay says it aloud); the real words stay in place.
+    expect(w.get('[data-celebration-praise]').attributes('aria-hidden')).toBe('true');
+    expect(w.text()).toContain('All done!');
+  });
+
+  it('reduced motion: the calm form (stars lit, only the words swapped)', () => {
+    const w = mount(CelebrationBanner, {
+      props: { ...base, stars: 2, celebration: { praise: 'Nice!', name: 'Pip', calm: true } },
+    });
+    expect(w.classes()).toContain('is-calm');
+    expect(w.classes()).not.toContain('is-celebrating');
+  });
+
   it('has a compact strip form (the wall lanes) with a smaller picture and title', () => {
     const full = mount(CelebrationBanner, { props: base });
     const compact = mount(CelebrationBanner, { props: { ...base, compact: true } });

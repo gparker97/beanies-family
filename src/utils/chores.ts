@@ -19,6 +19,7 @@ import type {
   ChoreMarkKind,
   Settings,
 } from '@/types/models';
+import { localYmdOf } from '@/utils/localYmd';
 
 /** The four blocks, in the order every surface lists them. */
 export const CHORE_BLOCKS: readonly ChoreBlock[] = ['morning', 'afternoon', 'evening', 'anytime'];
@@ -450,26 +451,18 @@ export interface ChoreDayRecord {
   total: number;
 }
 
-/** The device-local day an ISO timestamp falls on, or '' when it does not parse. */
-function localYmdOf(iso: string | undefined): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  const mm = `${d.getMonth() + 1}`.padStart(2, '0');
-  const dd = `${d.getDate()}`.padStart(2, '0');
-  return `${d.getFullYear()}-${mm}-${dd}`;
-}
-
 /**
  * A bean's chores on `ymd` (a past day or today), each done or not, grouped by block. The cells
  * of the Chores Done board AND the day summary that opens from one both read this, so the
  * number in a cell and the list behind it cannot disagree. The rules:
- *  - which chores were due is `choresFor`, the live day's own rule (weekdays, assignees, living
- *    members), applied to the chores as they are NOW: a chore deleted since simply is not there,
- *    and neither is its tick;
- *  - a chore created after `ymd` (its `createdAt` on a later local day) was not due then, so it
- *    never reads as "not done" on it; one with a tick that day is kept, the tick proves it was
- *    there, and an unreadable `createdAt` keeps the chore;
+ *  - it reads the chores as they are NOW (assignees, living members): a chore deleted since is
+ *    not there, and neither is its tick;
+ *  - a chore TICKED that day always counts for that day, done and due, even if its weekdays
+ *    have changed since: the tick proves it was due;
+ *  - a chore NOT ticked is due by the live day's weekday rule (`choreOccursOn`), except on a day
+ *    before it existed (`createdAt` on a later local day) or before its weekdays last changed
+ *    (`daysChangedAt` on a later local day): its schedule then is unknown, so it is left out
+ *    rather than judged by the new one. An unreadable timestamp keeps the chore;
  *  - `done` counts chores with a mark, never marks, so done can never exceed total.
  */
 export function choreDayRecord(
@@ -479,20 +472,35 @@ export function choreDayRecord(
   ymd: string,
   living?: ReadonlySet<string>
 ): ChoreDayRecord {
-  const grouped = choresFor(chores, memberId, ymd, living);
+  if (living && !living.has(memberId)) return { ymd, blocks: [], done: 0, total: 0 };
   const marks = marksOn(index, memberId, ymd);
+  const items = new Map<ChoreBlock, ChoreDayItem[]>();
+  for (const chore of sortChores(chores)) {
+    if (!(chore.assigneeIds ?? []).includes(memberId)) continue;
+    const done = marks.done.has(chore.id);
+    if (
+      !done &&
+      (!choreOccursOn(chore, ymd) ||
+        localYmdOf(chore.createdAt) > ymd ||
+        localYmdOf(chore.daysChangedAt) > ymd)
+    ) {
+      continue;
+    }
+    const block = choreBlockOf(chore);
+    const group = items.get(block);
+    if (group) group.push({ chore, done });
+    else items.set(block, [{ chore, done }]);
+  }
   let done = 0;
   let total = 0;
   const blocks: ChoreRecordBlock[] = [];
   for (const block of CHORE_BLOCKS) {
-    const items = (grouped.get(block) ?? [])
-      .map((chore) => ({ chore, done: marks.done.has(chore.id) }))
-      .filter((i) => i.done || !(localYmdOf(i.chore.createdAt) > ymd));
-    if (items.length === 0) continue;
-    const blockDone = items.filter((i) => i.done).length;
+    const group = items.get(block);
+    if (!group) continue;
+    const blockDone = group.filter((i) => i.done).length;
     done += blockDone;
-    total += items.length;
-    blocks.push({ block, chores: items, done: blockDone, total: items.length });
+    total += group.length;
+    blocks.push({ block, chores: group, done: blockDone, total: group.length });
   }
   return { ymd, blocks, done, total };
 }
