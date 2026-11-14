@@ -298,7 +298,7 @@ export const HOW_IT_WORKS_ARTICLES: HelpArticle[] = [
     icon: '\u{1F4CB}',
     readTime: 5,
     popular: true,
-    updatedDate: '2026-11-10',
+    updatedDate: '2026-11-14',
     sections: [
       {
         type: 'heading',
@@ -338,7 +338,7 @@ export const HOW_IT_WORKS_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'The briefing brings together <strong>activities</strong> happening today, <strong>to-dos</strong> that need attention, <strong>helpful hints</strong> beanies added ahead of an upcoming event, changes to your <strong>Who Owns What</strong> cards, and <strong>medication reminders</strong> for anyone in the family with doses to take today. Here\u2019s exactly how each one works.',
+          'The briefing brings together <strong>activities</strong> happening today, <strong>to-dos</strong> that need attention, <strong>chores</strong> from The Choreboard, <strong>helpful hints</strong> beanies added ahead of an upcoming event, changes to your <strong>Who Owns What</strong> cards, and <strong>medication reminders</strong> for anyone in the family with doses to take today. Here\u2019s exactly how each one works.',
       },
       {
         type: 'heading',
@@ -434,6 +434,26 @@ export const HOW_IT_WORKS_ARTICLES: HelpArticle[] = [
         type: 'paragraph',
         content:
           'A <a href="/help/features/repeating-to-dos-and-card-reminders">card reminder</a> set on a Who Owns What card shows up on its day as a \u{1F514} row, <em>"Reminder for Leo: Trash Night at 8:00 PM!"</em>, in place of the usual "asked you" row. Ticking it off moves the repeating to-do to its next date.',
+      },
+      {
+        type: 'heading',
+        content: 'Chores',
+        level: 3,
+        id: 'chores',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'If your family uses <a href="/help/features/the-choreboard">The Choreboard</a>, you get one chore line per person, yours first: <em>"You have 2 morning chores left"</em>, or <em>"Juno has 1 afternoon chore left"</em>. Tap a line to open that person\u2019s day on the choreboard, where the ticking happens. A line goes away once that person\u2019s chores are done.',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>Your own chores</strong> always show, and so does each child\u2019s for that child. Brothers and sisters never see each other\u2019s, and a grown-up\u2019s chores show only for that grown-up.',
+          '<strong>A child\u2019s chores, for grown-ups</strong>: with <strong>Keep Parents Posted</strong> off (it starts off), they show only once a time of day ends with some still undone: Morning chores once Afternoon starts, Afternoon chores once Evening starts. Evening and Anytime chores have no end time, so they don\u2019t show. With it on, you see them all day. It is one switch per child, in that child\u2019s chore list on the choreboard.',
+          '<strong>Dismissing a chore line</strong> hides it for today. If that person has chores left in another time of day, that line can still show, and so can a later line saying a time of day ended with chores undone.',
+        ],
       },
       {
         type: 'heading',

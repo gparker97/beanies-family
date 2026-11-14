@@ -277,13 +277,14 @@ For reference, the current help center contains these articles:
 - Family holidays on the planner
 - Set up the beanie wall on a tablet *(device setup: screen lock, Guided Access / screen pinning, orientation, mounting and charging; linked from the Beanie Wall card in Settings)*
 
-**Features (19):**
+**Features (20):**
 - Managing Accounts
 - Recording Transactions
 - Setting & Tracking Goals
 - Budgets & Category Limits
 - Family To-Do Lists *(includes the "Someday · Maybe" section)*
 - Beanie Lists *(categorized family checklists — one-off & recurring; `popular`)*
+- The Choreboard: chores by time of day *(slug `the-choreboard`: times of day and Hours, Add Chores and sets, a person's chore list, copying, ticking and the once-only celebration, the home page, a person's day, Chores Done and This Week, Keep Parents Posted, the wall's Chores view, briefing and widget lines, things to know)*
 - Who Owns What *(the responsibility deck: first deal, splitting, re-dealing, the board, Card Details and history, the Good to Know panel, the fridge sheet, card-holder defaults; marked beta)*
 - The Family Check-in: How It Works *(slug `family-check-in`: when it's due, which cards come up and why, No Issues / We've Talked / Save for Next Time / Re-deal, Still to Deal, where results show; the support reference)*
 - Put your family's day on your home screen *(slug `home-screen-widgets`: adding the widget on iPhone and Android, the three sizes, my day vs our day and the block picker, lock-screen widgets and the lock-screen titles setting, child view, "later", "open beanies to refresh", privacy; linked from Settings, Reminders)*

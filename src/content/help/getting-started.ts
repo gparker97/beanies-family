@@ -811,7 +811,7 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
       'Turn a spare tablet into the family wall display, and set the two device settings that keep it awake and keep small hands inside the app.',
     icon: '\u{1F9F1}',
     readTime: 6,
-    updatedDate: '2026-11-12',
+    updatedDate: '2026-11-14',
     sections: [
       {
         type: 'paragraph',
@@ -843,7 +843,7 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
           'On the tablet you want to use, open beanies and sign in as yourself',
           'Go to <strong>Settings</strong> and find the <strong>Beanie Wall</strong> card',
           'Tap <strong>Start the wall</strong> (if it says <strong>Set a PIN and start</strong>, it will walk you through the PIN first)',
-          'Pick a view from the switcher: <strong>The week</strong>, <strong>Each bean</strong>, <strong>Today</strong> or <strong>The chore board</strong>',
+          'Pick a view from the switcher: <strong>The week</strong>, <strong>Each bean</strong>, <strong>Today</strong>, <strong>Chores</strong> or <strong>Lists</strong>',
         ],
       },
       {
@@ -1068,11 +1068,16 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
         content: '',
         items: [
           'What is on today and this week, for everyone',
-          'Everyone\u2019s chores and the to-dos due today, ready to tick',
-          'Your beanie lists, including the shared ones like the grocery list',
+          'Everyone\u2019s chores from The Choreboard, a lane per person, and the to-dos due today, ready to tick',
+          'Your beanie lists, including the shared ones like the grocery list, on their own Lists board',
           'An upcoming trip, with its flights, hotels and transport in the order they happen',
           'The meal plan, once that feature is switched on for your family',
         ],
+      },
+      {
+        type: 'paragraph',
+        content:
+          'On <strong>Chores</strong>, each person with chores today gets a lane, with the time of day happening now open first and big ticks for small fingers. Anyone can tick, even while the wall is locked, and finishing a time of day plays the choreboard\u2019s celebration once. Unlocked, each lane gets an add row for a new chore in the time of day happening now; everything else about chores is set up in the app. The <strong>Chores</strong> card on the wall opens this view, and the <strong>Lists</strong> card opens the lists board. More in <a href="/help/features/the-choreboard#beanie-wall">The Choreboard: chores by time of day</a>.',
       },
       {
         type: 'callout',
@@ -1122,7 +1127,7 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          "The wall is only as useful as what is on it. If the week looks empty, add your family's activities on the <strong>Family Planner</strong>, and set up recurring chore lists in <strong>Beanie Lists</strong> so the chore board has something to tick. Both have their own guides in this help center.",
+          'The wall is only as useful as what is on it. If the week looks empty, add your family\'s activities on the <strong>Family Planner</strong>, and set up your children\u2019s chores on <a href="/help/features/the-choreboard">The Choreboard</a> so the Chores view has something to tick. Both have their own guides in this help center.',
       },
     ],
   },

@@ -317,7 +317,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       "A beanies widget shows today's plan right on your phone's Home Screen, so you can see what's on without opening the app, and one tap takes you to the right screen.",
     icon: '\u{1F4F1}',
     readTime: 5,
-    updatedDate: '2026-11-11',
+    updatedDate: '2026-11-14',
     sections: [
       {
         type: 'paragraph',
@@ -438,6 +438,11 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
           '<strong>iPhone:</strong> touch and hold the widget, then tap <strong>Edit Widget</strong>.',
           '<strong>Android:</strong> you choose when you add it. To change it later, touch and hold the widget, then tap its settings or reconfigure option.',
         ],
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Chores from <a href="/help/features/the-choreboard">The Choreboard</a> show among the to-dos as one row per person for today, like <strong>Juno · 2 left</strong> with the time of day, or <strong>Juno · done</strong> once they are finished. They follow the same rule as your briefing: a child’s chores reach a grown-up’s widget only with <strong>Keep Parents Posted</strong> on, or once a time of day has ended with some undone. For now, tapping a chore row opens the Nook.',
       },
       {
         type: 'heading',
@@ -1952,11 +1957,11 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
     category: 'features',
     title: 'Beanie Lists',
     excerpt:
-      'Shared, categorized checklists for the stuff family life runs on — groceries, packing, chores, before-school routines. One-off or auto-repeating.',
+      'Shared, categorized checklists for the stuff family life runs on: groceries, packing, party prep, household jobs. One-off or auto-repeating.',
     icon: '\u{1F9FE}',
     readTime: 6,
     popular: true,
-    updatedDate: '2026-11-13',
+    updatedDate: '2026-11-14',
     sections: [
       { type: 'heading', content: 'Why Beanie Lists?', level: 2, id: 'why' },
       {
@@ -1983,6 +1988,11 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         title: 'Which is which?',
         icon: '\u{1F9ED}',
       },
+      {
+        type: 'paragraph',
+        content:
+          'Kids’ chores have their own home now: <a href="/help/features/the-choreboard">The Choreboard</a>, which sorts each child’s chores into morning, afternoon, evening and anytime, and starts every day fresh without a reset. Beanie Lists are for everything else.',
+      },
 
       { type: 'heading', content: 'Creating a list', level: 2, id: 'creating' },
       {
@@ -2001,6 +2011,32 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
           'Templates are just a head start — they drop in a name and a few starter items (a grocery list arrives with “Bananas, Spinach, Oat milk…”). Once created, the list is yours to rename, add to, and edit however you like.',
         title: 'Templates give you a running start',
         icon: '\u{1F4A1}',
+      },
+      {
+        type: 'heading',
+        content: 'Making a chores list for the kids?',
+        level: 3,
+        id: 'chores-on-the-choreboard',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Chores start on the choreboard, so all of a child’s chores are in one place. In <strong>Start a New List</strong> you’ll see a <strong>Making a chores list for the kids?</strong> row, and the <strong>Kids’ chores</strong> and <strong>Before-school</strong> templates are tagged <strong>On the Choreboard</strong>. Tapping any of the three doesn’t make a list. Instead the sheet says <strong>Chores live on the choreboard</strong>, with a line like “Let’s set up Before-school there for Pip and Juno, so all their chores are in one place.”',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>Go to the Choreboard</strong> closes the sheet and opens <strong>Add Chores</strong> on the choreboard, with a set of chores already on the list: <strong>School Morning</strong> for Before-school, and <strong>Tidy-Up</strong> for Kids’ chores and for the row. Change or remove any of them, then add them.',
+          'Anyone you picked under <strong>Who’s It For?</strong> comes with you. If you didn’t pick anyone, Add Chores starts with all the children selected.',
+          '<strong>Stay Here</strong> takes you back to the sheet just as you left it.',
+          'A child who taps one sees “Ask a grown-up to set up chores on the choreboard.” and <strong>Stay Here</strong>, because only grown-ups set up chores.',
+        ],
+      },
+      {
+        type: 'paragraph',
+        content:
+          'When you start a list from a trip, an activity or a Who Owns What card, the row and the two chore templates aren’t shown, because a list made there is linked to it. Chore lists you made before the choreboard arrived stay in Beanie Lists and keep working; <a href="/help/features/the-choreboard#things-to-know">here’s how to move them over</a> if you’d like.',
       },
 
       { type: 'heading', content: 'One-off or repeating?', level: 2, id: 'one-off-or-repeating' },
@@ -2200,8 +2236,8 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         content: '',
         items: [
           '<strong>Grocery list</strong> — weekly, auto-resets',
-          '<strong>Kids’ chores</strong> — daily reset',
-          '<strong>Before-school</strong> — daily checklist',
+          '<strong>Kids’ chores</strong>: opens the choreboard with the Tidy-Up set (see above)',
+          '<strong>Before-school</strong>: opens the choreboard with the School Morning set (see above)',
           '<strong>Vacation packing</strong> — one-off; link it to a trip',
           '<strong>Honey-do list</strong> — a one-off list for your partner',
           '<strong>Party prep</strong> — one-off; pick a date',
@@ -2221,9 +2257,326 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         type: 'list',
         content: '',
         items: [
+          '<a href="/help/features/the-choreboard">The Choreboard</a>: for kids’ chores, by time of day',
           '<strong>Family To-Do Lists</strong> — for single, shareable tasks',
           '<strong>Travel Plans & Vacations</strong> — link a packing list to your next trip',
           '<strong>Your Daily Briefing</strong> — where your due lists come to find you',
+        ],
+      },
+    ],
+  },
+  {
+    slug: 'the-choreboard',
+    category: 'features',
+    title: 'The Choreboard: chores by time of day',
+    excerpt:
+      'Give each child their own chores for the morning, afternoon and evening, let them tick them off, and celebrate when a time of day is done. Nothing to reset, ever.',
+    icon: '\u{1F9F9}',
+    readTime: 9,
+    updatedDate: '2026-11-14',
+    sections: [
+      {
+        type: 'paragraph',
+        content:
+          'Chores belong to a time of day: make your bed in the morning, feed the dog after school, pajamas at bedtime. <strong>The Choreboard</strong> gives every child (and any grown-up who wants one) their own chores, sorted into <strong>Morning</strong>, <strong>Afternoon</strong>, <strong>Evening</strong> and <strong>Anytime</strong>, so everyone can see what to do right now. Each day starts fresh on its own, and when a child finishes a time of day, beanies throws them a little party.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'By the end of this guide you will have chores set up for your kids, know who can tick what, and know where chores show up around the app: the Nook, your widgets and the beanie wall.',
+      },
+
+      { type: 'heading', content: 'Finding the choreboard', level: 2, id: 'finding-it' },
+      {
+        type: 'paragraph',
+        content:
+          'Go to <strong>The Choreboard</strong> in the Treehouse section of the sidebar, right after Beanie Lists (on a phone, it’s in the <strong>Planning</strong> tab). Grown-ups land on the home page, with a card for each person who has chores. A child goes straight to their own day.',
+      },
+      {
+        type: 'infoBox',
+        content:
+          'A to-do is a single task, and a Beanie List is a checklist like groceries or packing. A chore is something a person does again and again at a certain time of day. Chores now live here, in their own place, so a shopping list never sits in the middle of a child’s chores.',
+        title: 'Chores, lists or to-dos?',
+        icon: '\u{1F9ED}',
+      },
+
+      { type: 'heading', content: 'The four times of day', level: 2, id: 'times-of-day' },
+      {
+        type: 'paragraph',
+        content:
+          'Every chore sits in one of four times of day, each with its own color everywhere it appears. The one happening right now gets an orange ring and a <strong>Now</strong> tag, and the home page shows it at the top, for example <strong>Morning now</strong>, until 12:00 PM.',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>Morning</strong>: from 6:00 AM until Afternoon starts. Before 6:00 AM it is still Morning, so an early riser sees the morning chores.',
+          '<strong>Afternoon</strong>: from 12:00 PM until Evening starts.',
+          '<strong>Evening</strong>: from 5:00 PM until midnight. There is no cut-off before bedtime.',
+          '<strong>Anytime</strong>: shows all day, for chores that can be done whenever (tidying your room, brushing the pet).',
+        ],
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'To change when each time of day starts, tap <strong>Hours</strong> at the top of the choreboard home page',
+          'In <strong>Time of Day Hours</strong>, pick a new <strong>Starts At</strong> time for Morning, Afternoon or Evening',
+          'Tap <strong>Save Hours</strong>',
+        ],
+      },
+      {
+        type: 'paragraph',
+        content:
+          'The hours are the same for the whole family, and the four times of day themselves stay fixed. Morning has to start before Afternoon, and Afternoon before Evening; if they are out of order, beanies tells you and won’t save. Changing the hours never touches anyone’s ticks. It only changes which time of day is happening now. Only grown-ups can change the hours.',
+      },
+
+      { type: 'heading', content: 'Adding chores', level: 2, id: 'adding-chores' },
+      {
+        type: 'paragraph',
+        content:
+          'Add Chores builds one list of chores and gives it to one or several people at once, each with their own copy to tick.',
+      },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'On the choreboard home page, tap <strong>Add Chores</strong> (the orange <strong>+</strong>). On a phone you can also use the <strong>Chore</strong> tile in the quick-add menu.',
+          'Under <strong>Who’s It For?</strong>, choose who gets these chores. It starts with all the children in your family selected.',
+          'To start from a suggestion, tap a set under <strong>Add a Set of Chores</strong>: <strong>School Morning</strong>, <strong>Bedtime</strong>, <strong>Pet Care</strong> or <strong>Tidy-Up</strong>. You’ll see what’s in it first; tap its add button (for example <strong>Add 6 to List</strong>) to drop those chores into your list. Anything your list already has is dimmed and left out.',
+          'To add your own, tap <strong>Add to Morning</strong> (or Afternoon, Evening, Anytime) under <strong>Chores to Add</strong>, type the chore and press Enter. Enter opens another new row in the same time of day, so you can type several in a row.',
+          'Change anything before you add it: tap a chore’s name to rename it, its time of day to move it, its picture to pick another, or the little calendar to choose its days. Tap <strong>✕</strong> to take a chore off the list.',
+          'Tap the button at the bottom, for example <strong>Add 6 Chores Each for Pip and Juno</strong>',
+        ],
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          'Sets are just suggestions. <strong>School Morning</strong> is set to school days (Monday to Friday); the others are every day. <strong>Pet Care</strong> spreads its chores across the morning, afternoon and evening.',
+          'If someone already has a chore with the same name in the same time of day, it is skipped for them, and a message tells you how many were skipped. Nobody gets the same chore twice.',
+          'The list you are building is kept while the app is open, so you can close the sheet and come back to it. <strong>Clear List</strong> starts over. Once you add the chores, the list empties.',
+          'Only grown-ups can add chores.',
+        ],
+      },
+
+      { type: 'heading', content: 'Pictures', level: 2, id: 'pictures' },
+      {
+        type: 'paragraph',
+        content:
+          'Every chore has a picture, so even a child who can’t read yet knows what it is. When you type a chore, beanies picks a picture from its name: “Feed the cat” gets a cat and “Homework” gets a pencil. A chore from a set brings its own picture. To change one, tap the picture beside the chore and choose from <strong>Emoji</strong> or <strong>Beanie Pictures</strong>. Once you pick a picture yourself, beanies stops changing it when you rename the chore.',
+      },
+
+      { type: 'heading', content: 'Editing someone’s chores', level: 2, id: 'editing' },
+      {
+        type: 'paragraph',
+        content:
+          'Each person’s chores are one list, like a Beanie List. Open it from their card on the home page (the pencil, <strong>Edit Chores</strong>), from <strong>Edit Chores</strong> at the top of their day, or by tapping the name of any of their chores. It opens on the side as <strong>Pip’s Chores</strong>, with every chore for every day of the week, under its time of day.',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>Rename</strong>: tap the chore’s name, type, then press Enter or tap away. Esc cancels.',
+          '<strong>Move it to another time of day</strong>: tap its time of day and pick another.',
+          '<strong>Choose its days</strong>: tap the little calendar (or its days, if it already has some) and pick <strong>Every Day</strong>, <strong>School Days</strong> (Monday to Friday), <strong>Weekends</strong> or <strong>Pick Days</strong> to choose the exact weekdays. A chore always keeps at least one day.',
+          '<strong>Reorder</strong>: drag the grip handle (<strong>⠿</strong>) up or down within a time of day.',
+          '<strong>Add more</strong>: use <strong>Add to Morning</strong> (or another time of day) at the foot of each group, or add a set from <strong>Add a Set of Chores</strong> at the top.',
+          '<strong>Remove one</strong>: tap its <strong>✕</strong>. <strong>Remove All</strong> takes every chore off this person’s list, after asking you first.',
+        ],
+      },
+      {
+        type: 'callout',
+        content:
+          'There is no Save button. Every change saves as you make it, and <strong>Done</strong> simply closes the list. Removing a chore happens straight away and has no undo, so check before you tap ✕.',
+        title: 'Changes save as you make them',
+        icon: '\u{1F4BE}',
+      },
+
+      { type: 'heading', content: 'Copying chores to someone else', level: 2, id: 'copying' },
+      {
+        type: 'steps',
+        content: '',
+        items: [
+          'On the person’s card, tap the copy button (📋), or tap <strong>Copy Chores</strong> at the top of their day',
+          'Under <strong>Copy To</strong>, pick one or more people',
+          'Under <strong>Which Chores?</strong>, choose which times of day to copy',
+          'Tap the button at the bottom, for example <strong>Copy 5 Chores to Juno</strong>',
+        ],
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Each person gets their own copy, with the same pictures and days, to change however you like. A chore someone already has by the same name, in the same time of day, is skipped, so nothing doubles up.',
+      },
+
+      { type: 'heading', content: 'Ticking chores off', level: 2, id: 'ticking' },
+      {
+        type: 'paragraph',
+        content:
+          'Tap the big circle beside a chore to tick it. Tap it again to untick it. A ticked chore stays where it is and glows orange, so a child can see everything they’ve done.',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>Children tick their own chores.</strong> A child sees only their own day, and can’t add, change or remove chores.',
+          '<strong>Grown-ups manage everything.</strong> They add and edit chores, and can tick any child’s chores too, from that child’s card or day.',
+          '<strong>On the beanie wall, anyone can tick.</strong> See “On the beanie wall” below.',
+          'Only today’s chores can be ticked. Earlier days are there to look back at, not to change.',
+        ],
+      },
+
+      { type: 'heading', content: 'Finishing a time of day', level: 2, id: 'all-done' },
+      {
+        type: 'paragraph',
+        content:
+          'When a child ticks the last chore in a time of day, stars burst out of that tick, the beanies do a little dance (a different one for each day of the week), a cheer pops up (“High five, Pip! Morning is all done.”) and a happy sound plays. After about three seconds it settles into an all-done banner, like <strong>Morning, all done!</strong> with a star for every chore. Tap <strong>Show Chores</strong> on the banner to see the chores again, for example to untick one ticked by mistake.',
+      },
+      {
+        type: 'callout',
+        content:
+          'The celebration plays <strong>once</strong> per person, per time of day, per day, on every device. If a child unticks a chore and ticks it again, they get the all-done banner, not a second party. That’s on purpose, so ticking and unticking isn’t more fun than the chores themselves. If you add a new chore to a finished time of day, it opens up again, and finishing it shows the banner only.',
+        title: 'One celebration, then the banner',
+        icon: '\u{1F389}',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>Reduce Motion</strong>: if the device is set to reduce motion, there are no flying stars or dancing beanies. The banner and its cheer appear straight away.',
+          '<strong>Sound</strong>: there are eight sounds, taken in turn so the same one doesn’t come round too often. To turn them off, switch off <strong>Sound Effects</strong> in <strong>Settings</strong>, under <strong>Quick Settings</strong>.',
+        ],
+      },
+
+      { type: 'heading', content: 'The home page', level: 2, id: 'home-page' },
+      {
+        type: 'paragraph',
+        content:
+          'Each person with chores has a card. Its top line says how the day is going (<strong>3 left today</strong>, <strong>All done today</strong>, or <strong>No chores today</strong> when all their chores are on other days), with a count like <strong>5 of 11</strong>. Below that is a row for each time of day they have chores in today, with its count and a progress bar. The time of day happening now is open, so you can tick right there; tap any other row to open it. Tap the person’s name at the top of the card to open their day.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'People who don’t have any chores yet are listed together under <strong>No Chores Yet</strong>, each with an <strong>Add Chores</strong> button that opens their chore list. If someone leaves the family, any chores that were only theirs appear under <strong>No One’s Chores</strong>, where you can remove them with ✕.',
+      },
+
+      { type: 'heading', content: 'A person’s day', level: 2, id: 'a-persons-day' },
+      {
+        type: 'paragraph',
+        content:
+          'A person’s day starts with a greeting (“Good morning, Pip!”) and a progress bar for the whole day. Below it, every time of day they have chores in today is open with its chores: the one happening now comes first, then Anytime, then the ones still to come, then the ones that have passed. Tap a time of day’s heading to fold it away (it opens again next time). A <strong>Today</strong> summary shows each time of day at a glance; tap one to jump to it. A time of day whose hours have passed with chores still to do shows how many are left, in orange.',
+      },
+
+      { type: 'heading', content: 'Chores Done and This Week', level: 2, id: 'chores-done' },
+      {
+        type: 'paragraph',
+        content:
+          'Below the cards, grown-ups see <strong>Chores Done</strong>: a square for each person, for each day of this week, and each person’s total for the week. The week starts on the day set under <strong>Week Starts On</strong> in Settings (Monday unless you’ve changed it). A child sees their own week on their day.',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>Some Done</strong>: the square shows how many were done (“3 of 5”), in orange that gets stronger the more was done.',
+          '<strong>All Done</strong>: every chore that day was ticked. The strongest orange, with a star.',
+          '<strong>Nothing Done</strong>: chores were due but none was ticked. A dashed square.',
+          '<strong>No Chores Due</strong>: nothing was due that day. A plain, faint square.',
+          '<strong>Still to Come</strong>: a day later this week. An empty outline.',
+        ],
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Today has an orange ring. Tap today, or an earlier day that had chores due, to see what was ticked, grouped by time of day, with each chore marked done or not done. Earlier days are <strong>Read Only</strong>; to tick today’s chores, open the person’s day (on the home page, today’s summary has an <strong>Open Pip’s Day</strong> button).',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Beside or below it, <strong>This Week</strong> shows each person’s chores done out of the chores due so far this week, from the first day of the week up to today (“32 of 44”), and how many perfect days the family has had. A perfect day is a day when someone had chores due and ticked every one. Days with nothing due don’t count either way. Tap a person’s row to open their day.',
+      },
+
+      { type: 'heading', content: 'Keep Parents Posted', level: 2, id: 'keep-parents-posted' },
+      {
+        type: 'paragraph',
+        content:
+          'Your daily briefing on the Nook and your home-screen widget can tell you how a child’s chores are going. <strong>Keep Parents Posted</strong> decides how much. It is one switch per child, at the bottom of that child’s chore list (open <strong>Edit Chores</strong>), and only grown-ups can see or change it. It starts off.',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>Off</strong>: grown-ups hear about a child’s chores only when a time of day ends with some still to do. Morning chores show up once Afternoon starts, and Afternoon chores once Evening starts. Evening and Anytime chores have no end time, so with the switch off they don’t reach a grown-up’s briefing or widget.',
+          '<strong>On</strong>: grown-ups see the child’s chores in their briefing and widget all day (“Juno has 2 morning chores left”), not just the ones left undone.',
+        ],
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Either way, a child always sees their own chores, brothers and sisters never see each other’s, and the choreboard itself always shows grown-ups every child’s chores. A new chore added for a child follows their switch, so adding chores never turns it off.',
+      },
+
+      { type: 'heading', content: 'On the beanie wall', level: 2, id: 'beanie-wall' },
+      {
+        type: 'paragraph',
+        content:
+          'If your family has a <a href="/help/getting-started/set-up-the-beanie-wall">beanie wall</a>, chores have their own view there. Pick <strong>Chores</strong> in the wall’s view switcher, or tap the <strong>Chores</strong> card (it shows how many of the current time of day’s chores are done, like “7 of 12 morning chores done”). Your Beanie Lists have their own view and card, called <strong>Lists</strong>.',
+      },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          'Each person with chores today gets a lane, with the time of day happening now open first and big ticks for small fingers. Anytime is open too. Later times of day, and ones that have passed, are a single line with a count; tap one to open it.',
+          'Anyone can tick on the wall, even while it is locked. Finishing a time of day plays the same celebration, once, and leaves the all-done banner in that lane.',
+          'Adding chores needs a grown-up. Tap the padlock, choose <strong>Unlock editing</strong> and enter a grown-up’s PIN, and each lane gets an add row (for example <strong>Add a morning chore</strong>). While the wall is unlocked, everyone gets a lane, so you can add someone’s first chore. A chore added there goes in the time of day happening now, every day. To rename, remove, change days or pictures, use the app.',
+        ],
+      },
+
+      {
+        type: 'heading',
+        content: 'Your daily briefing and widgets',
+        level: 2,
+        id: 'briefing-and-widgets',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Your <a href="/help/how-it-works/your-daily-briefing">daily briefing</a> on the Nook shows one chore line per person you follow, with your own first: “You have 2 morning chores left”, or “Juno has 1 afternoon chore left”. Tap a line to open that person’s day on the choreboard. Once someone’s chores are all done, their line goes away. Dismissing a line hides it for today, and if that person has chores left in another time of day, that line can still show.',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'Your <a href="/help/features/home-screen-widgets">home-screen widget</a> shows one row per person among your to-dos, like <strong>Juno · 2 left</strong>, tagged with the time of day (or <strong>overdue</strong> once that time of day has passed), and <strong>Juno · done</strong> once they are finished. For now, tapping a chore row opens the Nook rather than the choreboard. Both follow the Keep Parents Posted rules above.',
+      },
+
+      { type: 'heading', content: 'Things to know', level: 2, id: 'things-to-know' },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<strong>Chores don’t reset.</strong> Nothing is cleared at midnight. Each tick belongs to the day it was made, so a new day simply starts with nothing ticked. Each device works this out from its own clock, so a parent traveling in another time zone may see a different day’s chores than the kids at home.',
+          '<strong>A tick stays with its day.</strong> Moving a chore to another time of day, or renaming it, keeps today’s tick. Earlier days keep theirs too, and you can’t change them.',
+          '<strong>Changing a chore’s days counts from that day on.</strong> It applies straight away, and earlier days aren’t judged by the new days: a chore ticked back then still counts, and one that wasn’t ticked is simply left out of that day.',
+          '<strong>Removing a chore removes it from the week’s counts.</strong> Its ticks drop out of Chores Done and This Week, earlier days included.',
+          '<strong>Several devices at once is fine.</strong> If two phones (or a phone and the wall) tick chores at the same time, even offline, every tick from both is kept once they catch up, and the same chore ticked on both counts once. The one rare exception: two devices that are both offline and both finish the same time of day may each play the celebration once.',
+        ],
+      },
+      {
+        type: 'callout',
+        content:
+          'Chore lists you made in <a href="/help/features/beanie-lists">Beanie Lists</a> before the choreboard arrived stay exactly where they are, and keep working as lists (on the wall, they’re in <strong>Lists</strong>). Nothing is moved for you. To bring them over, add the same chores here with <strong>Add Chores</strong> (a set may get you most of the way), then delete the old list in Beanie Lists. Deleting a list can’t be undone, so add the chores here first.',
+        title: 'Already have a chores list?',
+        icon: '\u{1F9FE}',
+      },
+
+      { type: 'heading', content: 'What’s next?', level: 2, id: 'whats-next' },
+      {
+        type: 'list',
+        content: '',
+        items: [
+          '<a href="/help/features/beanie-lists">Beanie Lists</a>: for groceries, packing and every other checklist',
+          '<a href="/help/getting-started/set-up-the-beanie-wall">Set up the beanie wall on a tablet</a>: put the chores on the kitchen wall',
+          '<a href="/help/how-it-works/your-daily-briefing">Your Daily Briefing</a>: where chore lines come to find you',
         ],
       },
     ],
