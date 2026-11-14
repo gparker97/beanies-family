@@ -41,8 +41,8 @@ describe('QUICK_ADD_ITEMS — invariants', () => {
   });
 
   it('the main FAB menu shows nine Everyday tiles (three full rows) and two Family tiles', () => {
-    // greg, 2026-11-13: Everyday grew from six to nine. Chore (#146) is one of the nine and is
-    // hidden while its gate is off, so production shows eight until the choreboard ships.
+    // greg, 2026-11-13: Everyday grew from six to nine. Chore (#146) is one of the nine; it shipped
+    // on 2026-11-14 and hides again only if the `choreboard` kill switch is turned off.
     const inMainMenu = (g: string) => ITEMS.filter((i) => i.group === g && !i.onlyWhenFiltered);
     expect(inMainMenu('everyday')).toHaveLength(9);
     expect(inMainMenu('everyday').filter((i) => i.requiresFlag === 'choreboard')).toHaveLength(1);

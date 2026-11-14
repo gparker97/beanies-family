@@ -102,15 +102,18 @@ export const FLAG_REGISTRY = [
     // #146. Gates every choreboard SURFACE (nav, route, quick-add, the wall's chore board, the
     // briefing lines, the widget rows and the Beanie Lists redirect), never the data: the chore
     // store loads for everyone, like the meal planner's.
-    // ⚠️ ROLLOUT RULE: do NOT commit this on until the update floor has been raised to the
-    // build that knows both collections (`chores`, `choreMarks`) and the fleet has drained onto
-    // it. An older build that meets an unknown root collection in a merge falls back to a full
-    // projection rebuild (`touchedBetween` answers null); ticks arrive many times a day, so a
-    // stale device would rebuild on nearly every merge. Same sequencing as `podCompaction`.
+    // ⚠️ ROLLOUT RULE: committed ON on 2026-11-14 by the owner's decision, AHEAD of the update
+    // floor (the original rule was floor first, then the flag). The cost is accepted and
+    // temporary: an older build that meets the unknown root collections (`chores`,
+    // `choreMarks`) in a merge falls back to a full projection rebuild (`touchedBetween`
+    // answers null), and ticks arrive many times a day, so a stale device rebuilds on most
+    // merges until it updates. Raise the floor (`web/public/min-app-version.json`) as soon as
+    // the store builds carrying both collections are approved. The flag stays as the kill
+    // switch; flipping it off hides the surfaces and leaves the data alone.
     id: 'choreboard',
     label: 'The Choreboard',
     description:
-      "Chores in their own place under The Treehouse, by time of day, on the wall and in the briefing. Keep OFF until the update floor is raised to the build that knows 'chores' and 'choreMarks'.",
+      "Chores in their own place under The Treehouse, by time of day, on the wall and in the briefing. ON for everyone since 2026-11-14, ahead of the update floor: older builds that meet 'chores' / 'choreMarks' rebuild their projection on merges until the floor is raised to the store builds that know them.",
   },
 ] as const;
 

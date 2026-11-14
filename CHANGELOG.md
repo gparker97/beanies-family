@@ -12,8 +12,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ### Added
 
-- The choreboard (still switched off while it is tested) now celebrates a finished time of day with dancing beanies, stars and a cheer, and a bean's day opens with every time of day showing.
-- The choreboard's home page is now a tidy grid of cards with a "No Chores Yet" strip and the Chores Done board below, and the all-done banner is shorter on larger screens.
+- **The Choreboard is here.** Chores now have their own place under The Treehouse, separate from Beanie Lists.
+- Chores are sorted by time of day, and finishing a morning, afternoon or evening is met with a celebration; Chores Done and This Week show how the week has gone.
+- Chores also appear on the Beanie Wall and in the daily briefing.
 
 ### Fixed
 

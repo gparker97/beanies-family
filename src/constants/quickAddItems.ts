@@ -114,8 +114,8 @@ export const QUICK_ADD_ITEMS = [
     requiresFlag: 'familyLists',
   },
   {
-    // #146. Grown-ups only: kids tick chores, grown-ups make them. A 7th Everyday tile while the
-    // `choreboard` gate is on; which tile makes room for it is decided at gate removal.
+    // #146. Grown-ups only: kids tick chores, grown-ups make them. One of the nine Everyday
+    // tiles; the `choreboard` flag (on since 2026-11-14) stays as its kill switch.
     id: 'chore',
     group: 'everyday',
     order: 7,

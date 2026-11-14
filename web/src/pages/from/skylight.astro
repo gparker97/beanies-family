@@ -158,7 +158,7 @@ const PLUS_YEAR = '$79';
                       </div>
                       <div class="wall-cards">
                         <div class="wall-card">
-                          <h4>chores &amp; lists</h4>
+                          <h4>chores</h4>
                           <span class="wall-row"
                             ><i class="wall-dot" style="background:#2C3E50">G</i>bins out<em>1</em
                             ></span
@@ -269,7 +269,7 @@ const PLUS_YEAR = '$79';
                       </div>
                       <div class="wall-cards">
                         <div class="wall-card">
-                          <h4>chores &amp; lists</h4>
+                          <h4>chores</h4>
                           <span class="wall-row"
                             ><i class="wall-dot" style="background:#2C3E50">G</i>bins out<em>1</em
                             ></span
@@ -359,7 +359,7 @@ const PLUS_YEAR = '$79';
                       </div>
                       <div class="wall-cards">
                         <div class="wall-card">
-                          <h4>chores &amp; lists</h4>
+                          <h4>chores</h4>
                           <span class="wall-row"
                             ><i class="wall-dot" style="background:#2C3E50">G</i>bins out<em>1</em
                             ></span
@@ -399,7 +399,58 @@ const PLUS_YEAR = '$79';
                       </div>
                     </div>
 
-                    <!-- D · the chore board, a peer screen -->
+                    <!-- D · the choreboard: each bean's chores for this time of day -->
+                    <div class="wall-view" data-view="chores">
+                      <div class="wall-board">
+                        <div class="wall-bcols">
+                          <div class="wall-bcol wall-done">
+                            <span class="wall-who"
+                              ><i class="wall-dot" style="background:#E67E22">A</i>amy</span
+                            >
+                            <span class="wall-job"
+                              ><i class="wall-tick wall-on"></i><s>brush teeth</s></span
+                            >
+                            <span class="wall-job"
+                              ><i class="wall-tick wall-on"></i><s>make your bed</s></span
+                            >
+                            <span class="wall-stars">⭐⭐ all done</span>
+                          </div>
+                          <div class="wall-bcol">
+                            <span class="wall-who"
+                              ><i class="wall-dot" style="background:#F15D22">O</i>ollie</span
+                            >
+                            <span class="wall-job"
+                              ><i class="wall-tick wall-on"></i><s>brush teeth</s></span
+                            >
+                            <span class="wall-job"><i class="wall-tick"></i>pack your backpack</span>
+                          </div>
+                          <div class="wall-bcol">
+                            <span class="wall-who"
+                              ><i class="wall-dot" style="background:#7FB3D5">M</i>milo</span
+                            >
+                            <span class="wall-job"
+                              ><i class="wall-tick wall-on"></i><s>brush teeth</s></span
+                            >
+                            <span class="wall-job"><i class="wall-tick"></i>get dressed</span>
+                          </div>
+                          <div class="wall-bcol wall-done">
+                            <span class="wall-who"
+                              ><i class="wall-dot" style="background:#2C3E50">G</i>greg</span
+                            >
+                            <span class="wall-job"
+                              ><i class="wall-tick wall-on"></i><s>walk the dog</s></span
+                            >
+                            <span class="wall-stars">⭐ all done</span>
+                          </div>
+                        </div>
+                        <div class="wall-prog">
+                          <i>5 of 7 morning chores done 🫘</i>
+                          <div class="wall-bar-track"><b></b></div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- E · the lists board, a peer screen -->
                     <div class="wall-view" data-view="jobs">
                       <div class="wall-board">
                         <div class="wall-bcols">
@@ -572,12 +623,15 @@ const PLUS_YEAR = '$79';
             <span class="wall-glyph" aria-hidden="true">☀</span>today
           </button>
           <span class="wall-divider" aria-hidden="true"></span>
+          <button type="button" data-go="chores" aria-pressed="false">
+            <span class="wall-glyph" aria-hidden="true">🧹</span>chores
+          </button>
           <button type="button" data-go="jobs" aria-pressed="false">
-            <span class="wall-glyph" aria-hidden="true">✅</span>the chore board
+            <span class="wall-glyph" aria-hidden="true">✅</span>lists
           </button>
         </div>
         <p class="wall-caption">
-          4 views, laid out the way you want (or need). and your old ipad is thrilled to have a job
+          5 views, laid out the way you want (or need). and your old ipad is thrilled to have a job
           again.
         </p>
 
@@ -640,7 +694,7 @@ const PLUS_YEAR = '$79';
               <tr
                 ><th scope="row">meal planning &amp; chore rewards</th><td class="meh"
                   >on the paid plan</td
-                ><td class="good">✓ included</td></tr
+                ><td class="good">✓ meals and chores included (stars and a celebration, no points system)</td></tr
               >
               <tr
                 ><th scope="row">pop-ups on the family screen</th><td class="warn"
@@ -793,9 +847,12 @@ const PLUS_YEAR = '$79';
             <p>The whole week at a glance. No more "wait, when's football?"</p>
           </div>
           <div class="wall-feature">
-            <div class="wall-feature-glyph" aria-hidden="true">✅</div>
+            <div class="wall-feature-glyph" aria-hidden="true">🧹</div>
             <h3>chores</h3>
-            <p>Big ticks and gold stars. Turns out kids quite like winning.</p>
+            <p>
+              Morning, afternoon and evening, with a celebration when they're done. Turns out kids
+              quite like winning.
+            </p>
           </div>
           <div class="wall-feature">
             <div class="wall-feature-glyph" aria-hidden="true">📝</div>
@@ -1012,7 +1069,7 @@ const PLUS_YEAR = '$79';
 </BaseLayout>
 
 <script>
-  /* The tablet cycles the four real wall views. It is the page's argument, so it
+  /* The tablet cycles the five real wall views. It is the page's argument, so it
      runs on its own, but the switcher is a real control: touch it and the page
      stops deciding for you. Reduced motion holds it on the week. */
   (function () {
@@ -1020,7 +1077,7 @@ const PLUS_YEAR = '$79';
     const btns = Array.from(document.querySelectorAll<HTMLButtonElement>('.wall-switcher button'));
     if (!views.length || !btns.length) return;
 
-    const order = ['days', 'lanes', 'today', 'jobs'];
+    const order = ['days', 'lanes', 'today', 'chores', 'jobs'];
     let i = 0;
     let timer: ReturnType<typeof setInterval> | null = null;
     const still = window.matchMedia('(prefers-reduced-motion: reduce)');
