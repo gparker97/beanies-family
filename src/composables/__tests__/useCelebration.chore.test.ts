@@ -1,10 +1,10 @@
 /**
  * The chore celebration's orchestration (#146): `celebrateChore` picks the weekday's move, a
- * sound (never the last one) and a praise line (never the last one), plays the chore sound
+ * sound (any of the eight, none of the last four) and a praise line (never the last one), plays the chore sound
  * (never the list fanfare), and runs its phases on its own timers, measured from its own start
  * (it starts only once the store has committed). A prediction is only an invisible, keyed hold
  * with a safety release. Celebrations are concurrent per bean and block, and overlapping ones
- * share one sound; only a sound that really started stamps the window and the "last played". List completion keeps the
+ * share one sound; only a sound that really started stamps the window and the history. List completion keeps the
  * old shower and fanfare. Reduced motion is calm; no anchor plays centered (and says so); the
  * surface's cap is honoured.
  */
@@ -44,6 +44,8 @@ import {
 import type { ChoreCelebrationAnchor } from '@/utils/choreCelebration';
 
 const MONDAY = new Date(2026, 10, 16, 7, 42);
+const KEY = 'beanies.choreCelebration.recentSounds';
+const LEGACY_KEY = 'beanies.choreCelebration.lastSound';
 const THURSDAY = new Date(2026, 10, 19, 7, 42);
 
 function anchor(): ChoreCelebrationAnchor {
@@ -108,7 +110,7 @@ const flush = async () => {
 
 describe('celebrateChore', () => {
   it('plays the weekday move with its chore sound, never the shower or the fanfare', () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0.9); // no cheer this time
+    vi.spyOn(Math, 'random').mockReturnValue(0); // the first sound not recently played
     start();
     const c = active()!;
     expect(c.move).toBe('bounce-party');
@@ -146,21 +148,55 @@ describe('celebrateChore', () => {
     expect(active()).toBeNull();
   });
 
-  it('never the same sound twice in a row, remembered across a reload', async () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0.9);
+  it('no sound repeats within five, and the history survives a reload', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const heard: string[] = [];
+    for (let i = 0; i < 5; i++) {
+      start();
+      heard.push(active()!.sound);
+      await flush(); // it started: now it is in the history
+      useCelebration().dismissChoreCelebration();
+      vi.advanceTimersByTime(CELEBRATION_SOUND_GAP_MS);
+    }
+    expect(heard).toEqual(['marimba', 'tada', 'fanfare', 'strum', 'glock']);
+    expect(JSON.parse(localStorage.getItem(KEY)!)).toEqual(['glock', 'strum', 'fanfare', 'tada']);
+    // A fresh session (memory gone) reads the history from storage.
+    resetChoreCelebrationForTest();
+    start();
+    expect(active()!.sound).toBe('marimba'); // the only one of the first four now out of it
+    vi.mocked(Math.random).mockRestore();
+  });
+
+  it('the old last-sound key is read once as a one-item history, then never written', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    localStorage.setItem(LEGACY_KEY, 'marimba');
+    start();
+    expect(active()!.sound).toBe('tada');
+    await flush();
+    expect(JSON.parse(localStorage.getItem(KEY)!)).toEqual(['tada', 'marimba']);
+    expect(localStorage.getItem(LEGACY_KEY)).toBeNull();
+    vi.mocked(Math.random).mockRestore();
+  });
+
+  it('a corrupt or hand-edited history is tolerated', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    localStorage.setItem(KEY, '{not json');
     start();
     expect(active()!.sound).toBe('marimba');
-    await flush(); // it started: now it is the last played
-    expect(localStorage.getItem('beanies.choreCelebration.lastSound')).toBe('marimba');
-    useCelebration().dismissChoreCelebration();
-    vi.advanceTimersByTime(CELEBRATION_SOUND_GAP_MS);
-    start();
-    expect(active()!.sound).toBe('kids-cheer');
-    // A fresh session (memory gone) still reads the last sound from storage.
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'debug',
+        context: { action: 'last-sound-storage', detail: 'corrupt' },
+      })
+    );
     resetChoreCelebrationForTest();
-    localStorage.setItem('beanies.choreCelebration.lastSound', 'marimba');
+    localStorage.setItem(KEY, JSON.stringify(['kazoo', 'marimba', 'marimba', 7]));
     start();
-    expect(active()!.sound).toBe('kids-cheer');
+    expect(active()!.sound).toBe('tada'); // only marimba was a real sound
+    resetChoreCelebrationForTest();
+    localStorage.setItem(KEY, JSON.stringify({ last: 'marimba' }));
+    start();
+    expect(active()!.sound).toBe('marimba');
     vi.mocked(Math.random).mockRestore();
   });
 
@@ -204,7 +240,7 @@ describe('celebrateChore', () => {
   });
 
   it('logs one info event with allowlisted context when it plays', () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0.9);
+    vi.spyOn(Math, 'random').mockReturnValue(0);
     start();
     const info = logEvent.mock.calls.map((c) => c[0]).filter((e) => e.level === 'info');
     expect(info).toHaveLength(1);
@@ -223,21 +259,34 @@ describe('celebrateChore', () => {
     vi.mocked(Math.random).mockRestore();
   });
 
-  it('a cheer that fell back to the paired sound is logged as a warning', async () => {
+  it('a cheer not ready: a synthesized stand-in not recently played, logged, and remembered', async () => {
+    localStorage.setItem(KEY, JSON.stringify(['marimba', 'tada', 'fanfare', 'strum']));
+    vi.spyOn(Math, 'random').mockReturnValue(0.99); // the last of the fresh ones: the cheer
     sounds.playChoreCelebrationSound.mockResolvedValue('fallback');
     start();
-    await vi.runAllTicks();
-    await Promise.resolve();
+    expect(active()!.sound).toBe('kids-cheer');
+    // The stand-in comes from glock, pizz, toot (the cheer and the recent four sit out).
+    expect(sounds.playChoreCelebrationSound).toHaveBeenCalledWith('kids-cheer', 'toot');
+    await flush();
     expect(logEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         level: 'warn',
         context: expect.objectContaining({
           action: 'fallback-sound',
-          detail: 'marimba',
+          detail: 'toot',
           stage: 'fallback',
         }),
       })
     );
+    // What was heard is what the history records.
+    expect(JSON.parse(localStorage.getItem(KEY)!)).toEqual(['toot', 'marimba', 'tada', 'fanfare']);
+    // The play log still names the pick.
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        context: expect.objectContaining({ action: 'play', detail: 'kids-cheer' }),
+      })
+    );
+    vi.mocked(Math.random).mockRestore();
   });
 
   it('sounds not loaded in time: the fanfare played, logged as a warning', async () => {
@@ -251,6 +300,7 @@ describe('celebrateChore', () => {
         context: expect.objectContaining({ action: 'fallback-fanfare', stage: 'late' }),
       })
     );
+    expect(localStorage.getItem(KEY)).toBeNull(); // the fanfare is not one of the eight
   });
 
   it('a block unticked during the burst: no banner, the celebration ends quietly', () => {
@@ -315,12 +365,12 @@ describe('celebrateChore', () => {
     sounds.playChoreCelebrationSound.mockResolvedValue('muted');
     start({ memberId: 'pip' });
     await flush();
-    expect(localStorage.getItem('beanies.choreCelebration.lastSound')).toBeNull();
+    expect(localStorage.getItem(KEY)).toBeNull();
     sounds.playChoreCelebrationSound.mockResolvedValue('superseded');
     start({ memberId: 'juno' }); // straight after: NOT an overlap, nothing has started
     expect(sounds.playChoreCelebrationSound).toHaveBeenCalledTimes(2);
     await flush();
-    expect(localStorage.getItem('beanies.choreCelebration.lastSound')).toBeNull();
+    expect(localStorage.getItem(KEY)).toBeNull();
   });
 
   it('two beans finishing 0 ms apart: both celebrations play whole, one sound', () => {
@@ -346,9 +396,14 @@ describe('celebrateChore', () => {
     start({ memberId: 'pip' });
     await flush(); // its sound started
     vi.advanceTimersByTime(1500);
+    const historyBefore = localStorage.getItem(KEY);
     start({ memberId: 'juno' });
     expect(sounds.cancelChoreCelebrationSound).not.toHaveBeenCalled();
     expect(sounds.playChoreCelebrationSound).toHaveBeenCalledTimes(1);
+    await flush();
+    // The silent one records nothing: the history holds only the first one's sound.
+    expect(localStorage.getItem(KEY)).toBe(historyBefore);
+    expect(JSON.parse(historyBefore!)).toEqual([active('pip:morning')!.sound]);
     vi.advanceTimersByTime(1500);
     expect(active('pip:morning')!.phase).toBe('banner'); // still playing its whole move
     vi.advanceTimersByTime(60);

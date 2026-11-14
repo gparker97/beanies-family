@@ -1,6 +1,6 @@
 /**
  * The chore celebration's rules (#146): the weekday move (by the device's local day), the sound
- * rotation (paired sound usually, the kids cheer takes a turn, never the same twice in a row),
+ * rotation (all eight sounds, the cheer among them, none repeating within five celebrations),
  * the praise rotation (never the same line twice, "What a ..." only for timed blocks), the praise
  * line's pop-in pieces, and the anchor a tick surface builds at the tap.
  */
@@ -9,13 +9,17 @@ import {
   CHEER_SOUND,
   CHORE_MOVES,
   CHORE_PRAISE,
-  SOUND_FOR_MOVE,
+  CHORE_SOUNDS,
+  RECENT_SOUNDS,
   SYNTH_CELEBRATION_SOUNDS,
   choreCelebrationAnchor,
   isChoreSoundId,
   moveForDate,
+  parseSoundHistory,
   pickChoreSound,
   pickPraiseIndex,
+  pickStandInSound,
+  withPlayedSound,
   choreTickAnchor,
   choreTickSelector,
   fillPraise,
@@ -51,45 +55,82 @@ describe('moveForDate', () => {
     expect(moveForDate(new Date(2026, 10, 22, 23, 59))).toBe('parachutes'); // Sunday night
     expect(moveForDate(new Date(2026, 10, 23, 0, 1))).toBe('bounce-party'); // Monday morning
   });
-
-  it('every move has its own paired synthesized sound', () => {
-    const paired = CHORE_MOVES.map((m) => SOUND_FOR_MOVE[m]);
-    expect(new Set(paired).size).toBe(7);
-    expect([...paired].sort()).toEqual([...SYNTH_CELEBRATION_SOUNDS].sort());
-  });
 });
 
 describe('pickChoreSound', () => {
-  it('plays the weekday’s paired sound when the dice say so', () => {
-    expect(pickChoreSound('parade', null, () => 0.9)).toBe('fanfare');
-    expect(pickChoreSound('parade', 'marimba', () => 0.9)).toBe('fanfare');
+  it('eight sounds rotate: the seven synthesized ones and the cheer', () => {
+    expect(CHORE_SOUNDS).toHaveLength(8);
+    expect(new Set(CHORE_SOUNDS)).toEqual(new Set([...SYNTH_CELEBRATION_SOUNDS, CHEER_SOUND]));
   });
 
-  it('the kids cheer takes its turn on a low roll', () => {
-    expect(pickChoreSound('parade', null, () => 0.1)).toBe(CHEER_SOUND);
+  it('picks uniformly among the sounds not recently played', () => {
+    const recent: ChoreSoundId[] = ['marimba', 'tada', 'fanfare', 'strum'];
+    // Four left (glock, pizz, toot, the cheer), one per quarter of the roll.
+    expect(pickChoreSound(recent, () => 0)).toBe('glock');
+    expect(pickChoreSound(recent, () => 0.3)).toBe('pizz');
+    expect(pickChoreSound(recent, () => 0.6)).toBe('toot');
+    expect(pickChoreSound(recent, () => 0.99)).toBe(CHEER_SOUND);
+    expect(pickChoreSound([], () => 0)).toBe('marimba');
   });
 
-  it('the paired sound just played: the cheer, so a second celebration never repeats it', () => {
-    expect(pickChoreSound('parade', 'fanfare', () => 0.99)).toBe(CHEER_SOUND);
-  });
-
-  it('the cheer just played: the paired sound, whatever the roll', () => {
-    expect(pickChoreSound('parade', CHEER_SOUND, () => 0)).toBe('fanfare');
-  });
-
-  it('never the same sound twice in a row over a long run, and the cheer turns up', () => {
-    const rnd = seeded(7);
-    let last: ChoreSoundId | null = null;
-    let cheers = 0;
-    for (let i = 0; i < 500; i++) {
-      const move = CHORE_MOVES[Math.floor(i / 9) % 7]!; // several celebrations a day
-      const next = pickChoreSound(move, last, rnd);
-      expect(next).not.toBe(last);
-      if (next === CHEER_SOUND) cheers++;
-      last = next;
+  it('over a long seeded run: every sound plays, the cheer about one in eight, no repeat within five', () => {
+    for (const seed of [7, 42, 2026]) {
+      const rnd = seeded(seed);
+      let recent: ChoreSoundId[] = [];
+      const played: ChoreSoundId[] = [];
+      const counts = new Map<ChoreSoundId, number>();
+      const N = 8000;
+      for (let i = 0; i < N; i++) {
+        const next = pickChoreSound(recent, rnd);
+        played.push(next);
+        counts.set(next, (counts.get(next) ?? 0) + 1);
+        recent = withPlayedSound(recent, next);
+      }
+      for (const id of CHORE_SOUNDS) {
+        const share = (counts.get(id) ?? 0) / N;
+        expect(share).toBeGreaterThan(0.1);
+        expect(share).toBeLessThan(0.15);
+      }
+      const cheer = (counts.get(CHEER_SOUND) ?? 0) / N;
+      expect(Math.abs(cheer - 1 / 8)).toBeLessThan(0.015);
+      for (let i = 0; i + 5 <= N; i++) {
+        expect(new Set(played.slice(i, i + 5)).size).toBe(5);
+      }
     }
-    expect(cheers).toBeGreaterThan(50);
-    expect(cheers).toBeLessThan(450);
+  });
+
+  it('the cheer’s stand-in is a synthesized sound, never a recent one', () => {
+    const rnd = seeded(11);
+    for (let i = 0; i < 200; i++) {
+      const recent: ChoreSoundId[] = [];
+      while (recent.length < RECENT_SOUNDS) {
+        const id = CHORE_SOUNDS[Math.floor(rnd() * CHORE_SOUNDS.length)]!;
+        if (!recent.includes(id)) recent.push(id);
+      }
+      const standIn = pickStandInSound(recent, rnd);
+      expect(SYNTH_CELEBRATION_SOUNDS).toContain(standIn);
+      expect(recent).not.toContain(standIn);
+    }
+  });
+
+  it('the history: most recent first, no duplicates, four at most', () => {
+    let h: ChoreSoundId[] = [];
+    for (const id of ['marimba', 'tada', 'fanfare', 'strum', 'glock'] as const) {
+      h = withPlayedSound(h, id);
+    }
+    expect(h).toEqual(['glock', 'strum', 'fanfare', 'tada']);
+    expect(withPlayedSound(h, 'fanfare')).toEqual(['fanfare', 'glock', 'strum', 'tada']);
+  });
+
+  it('a stored history is validated: unknown ids, duplicates and non-arrays are dropped', () => {
+    expect(parseSoundHistory(['glock', 'kazoo', 'glock', CHEER_SOUND])).toEqual([
+      'glock',
+      CHEER_SOUND,
+    ]);
+    expect(parseSoundHistory(['marimba', 'tada', 'fanfare', 'strum', 'glock'])).toHaveLength(4);
+    expect(parseSoundHistory('marimba')).toEqual([]);
+    expect(parseSoundHistory(null)).toEqual([]);
+    expect(parseSoundHistory({ 0: 'marimba' })).toEqual([]);
   });
 
   it('isChoreSoundId narrows a stored value', () => {

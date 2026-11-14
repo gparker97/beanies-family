@@ -6,7 +6,7 @@
  * and about three seconds later it settles into the everyday all-done banner. The owner approved
  * the moves, timings and sounds by eye and ear from the v4 mockup
  * (`~/projects/beanies-ops/docs/mockups/chore-celebration-v4-2026-11-14.html`), so the beats and
- * pairings below are the mockup's, unchanged.
+ * moves below are the mockup's. The sounds are not paired with the moves: all eight rotate.
  *
  * Who uses what:
  *  - `useCelebration` picks the move, the sound and the praise line (`moveForDate`,
@@ -33,7 +33,7 @@ export const CHORE_MOVES = [
 ] as const;
 export type ChoreMoveId = (typeof CHORE_MOVES)[number];
 
-/** The seven synthesized sounds, one paired with each move. */
+/** The seven synthesized sounds. */
 export const SYNTH_CELEBRATION_SOUNDS = [
   'marimba',
   'tada',
@@ -49,6 +49,9 @@ export type SynthCelebrationSoundId = (typeof SYNTH_CELEBRATION_SOUNDS)[number];
 export const CHEER_SOUND = 'kids-cheer';
 export type ChoreSoundId = SynthCelebrationSoundId | typeof CHEER_SOUND;
 
+/** All eight sounds in the rotation, the cheer as one among equals. */
+export const CHORE_SOUNDS: readonly ChoreSoundId[] = [...SYNTH_CELEBRATION_SOUNDS, CHEER_SOUND];
+
 /** `Date#getDay` order (Sunday = 0): Mon Bounce party ... Sun Parachutes. */
 const MOVE_BY_WEEKDAY: readonly ChoreMoveId[] = [
   'parachutes',
@@ -60,43 +63,67 @@ const MOVE_BY_WEEKDAY: readonly ChoreMoveId[] = [
   'stadium-wave',
 ];
 
-/** Each move's own sound (the mockup's PAIR table). */
-export const SOUND_FOR_MOVE: Readonly<Record<ChoreMoveId, SynthCelebrationSoundId>> = {
-  'bounce-party': 'marimba',
-  'peek-a-boo': 'tada',
-  parade: 'fanfare',
-  'drop-in': 'strum',
-  'tumble-in': 'glock',
-  'stadium-wave': 'pizz',
-  parachutes: 'toot',
-};
-
 /** The day's move, by the DEVICE's local weekday (never the family's home zone). */
 export function moveForDate(date: Date): ChoreMoveId {
   return MOVE_BY_WEEKDAY[date.getDay()] ?? 'bounce-party';
 }
 
 /**
- * How often the kids cheer takes its turn when the paired sound could play. With the rule below
- * the cheer also plays whenever the paired sound just played, so a second celebration on the
- * same day never repeats the first one's sound.
+ * How many recently played sounds sit out the next pick. With eight sounds and four sitting out,
+ * no sound repeats within five celebrations on one device.
  */
-export const CHEER_SHARE = 0.25;
+export const RECENT_SOUNDS = 4;
 
 /**
- * The sound for this celebration. The weekday's paired sound usually plays; the kids cheer takes
- * a turn (about one in four, and always when the paired sound was the last one played); the same
- * sound never plays twice in a row on one device.
+ * The sound for this celebration, independent of the weekday's move: uniformly at random among
+ * the sounds NOT in `recent` (the last played, most recent first). A shuffle-bag feel without a
+ * bag: by symmetry each sound, the cheer included, comes up one time in eight in the long run.
  */
 export function pickChoreSound(
-  move: ChoreMoveId,
-  last: ChoreSoundId | null,
+  recent: readonly ChoreSoundId[],
   random: () => number = Math.random
 ): ChoreSoundId {
-  const paired = SOUND_FOR_MOVE[move];
-  if (last === paired) return CHEER_SOUND;
-  if (last !== CHEER_SOUND && random() < CHEER_SHARE) return CHEER_SOUND;
-  return paired;
+  return pickFrom(CHORE_SOUNDS, recent, random);
+}
+
+/**
+ * The synthesized sound that stands in when the cheer was picked but its recording is not ready:
+ * the same rule over the seven synthesized sounds (the cheer and the recent ones sit out).
+ */
+export function pickStandInSound(
+  recent: readonly ChoreSoundId[],
+  random: () => number = Math.random
+): SynthCelebrationSoundId {
+  return pickFrom(SYNTH_CELEBRATION_SOUNDS, recent, random);
+}
+
+function pickFrom<T extends ChoreSoundId>(
+  pool: readonly T[],
+  recent: readonly ChoreSoundId[],
+  random: () => number
+): T {
+  const fresh = pool.filter((id) => !recent.includes(id));
+  const from = fresh.length ? fresh : pool;
+  return from[Math.min(from.length - 1, Math.floor(random() * from.length))]!;
+}
+
+/** The history after `id` STARTED: most recent first, no duplicates, at most `RECENT_SOUNDS`. */
+export function withPlayedSound(recent: readonly ChoreSoundId[], id: ChoreSoundId): ChoreSoundId[] {
+  return [id, ...recent.filter((x) => x !== id)].slice(0, RECENT_SOUNDS);
+}
+
+/**
+ * A stored history read back: an array of sound ids, unknown ids and duplicates dropped, at most
+ * `RECENT_SOUNDS`. Anything else (corrupt JSON already parsed, a hand edit) reads as none.
+ */
+export function parseSoundHistory(value: unknown): ChoreSoundId[] {
+  if (!Array.isArray(value)) return [];
+  const out: ChoreSoundId[] = [];
+  for (const v of value) {
+    if (isChoreSoundId(v) && !out.includes(v)) out.push(v);
+    if (out.length === RECENT_SOUNDS) break;
+  }
+  return out;
 }
 
 /** Narrow a stored value back to a sound id (a stale or hand-edited key reads as none). */

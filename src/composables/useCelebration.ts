@@ -12,12 +12,14 @@ import { reportError } from '@/utils/errorReporter';
 import {
   CHORE_CELEBRATION_BEATS as BEATS,
   CHORE_PRAISE,
-  SOUND_FOR_MOVE,
   fillPraise,
   isChoreSoundId,
   moveForDate,
+  parseSoundHistory,
   pickChoreSound,
   pickPraiseIndex,
+  pickStandInSound,
+  withPlayedSound,
   type BannerCelebration,
   type ChoreCelebrationAnchor,
   type ChoreMoveId,
@@ -296,10 +298,13 @@ let lastSoundAt = Number.NEGATIVE_INFINITY;
 /** The celebration whose sound may still be waiting to start (the cheer loading). */
 let soundOwner: string | null = null;
 let lastPraise: number | null = null;
-let lastSound: ChoreSoundId | null = null;
+/** The sounds this device last STARTED, most recent first (null: not read from storage yet). */
+let recentSounds: ChoreSoundId[] | null = null;
 let storageNoted = false;
-/** The last sound this device played, so a reload still never repeats it. */
-const LAST_SOUND_KEY = 'beanies.choreCelebration.lastSound';
+/** The recent-sounds history, as a JSON array, so a reload still never repeats one too soon. */
+const RECENT_SOUNDS_KEY = 'beanies.choreCelebration.recentSounds';
+/** The old single last-sound value: read once as a one-item history, never written again. */
+const LEGACY_LAST_SOUND_KEY = 'beanies.choreCelebration.lastSound';
 
 /** Storage can be blocked (a private window): noted once, then the in-memory value serves. */
 function noteStorage(detail: 'read' | 'write', error: unknown): void {
@@ -308,27 +313,47 @@ function noteStorage(detail: 'read' | 'write', error: unknown): void {
   logEvent({
     level: 'debug',
     surface: CHORE_CELEBRATION_SURFACE,
-    message: 'last-sound storage unavailable; remembered in memory only',
+    message: 'recent-sounds storage unavailable; remembered in memory only',
     context: { action: 'last-sound-storage', detail },
     error,
   });
 }
 
-function readLastSound(): ChoreSoundId | null {
-  if (lastSound) return lastSound;
+function readRecentSounds(): ChoreSoundId[] {
+  if (recentSounds) return recentSounds;
+  let read: ChoreSoundId[] = [];
   try {
-    const v = localStorage.getItem(LAST_SOUND_KEY);
-    return isChoreSoundId(v) ? v : null;
+    const raw = localStorage.getItem(RECENT_SOUNDS_KEY);
+    if (raw !== null) {
+      try {
+        read = parseSoundHistory(JSON.parse(raw));
+      } catch (e) {
+        // A corrupt value reads as no history; the next sound that starts overwrites it.
+        logEvent({
+          level: 'debug',
+          surface: CHORE_CELEBRATION_SURFACE,
+          message: 'recent-sounds history was unreadable; starting a fresh one',
+          context: { action: 'last-sound-storage', detail: 'corrupt' },
+          error: e,
+        });
+      }
+    } else {
+      const legacy = localStorage.getItem(LEGACY_LAST_SOUND_KEY);
+      read = isChoreSoundId(legacy) ? [legacy] : [];
+    }
   } catch (e) {
     noteStorage('read', e);
-    return null;
   }
+  recentSounds = read;
+  return read;
 }
 
+/** Record a sound that actually STARTED. */
 function rememberSound(id: ChoreSoundId): void {
-  lastSound = id;
+  recentSounds = withPlayedSound(readRecentSounds(), id);
   try {
-    localStorage.setItem(LAST_SOUND_KEY, id);
+    localStorage.setItem(RECENT_SOUNDS_KEY, JSON.stringify(recentSounds));
+    localStorage.removeItem(LEGACY_LAST_SOUND_KEY);
   } catch (e) {
     noteStorage('write', e);
   }
@@ -416,7 +441,6 @@ const STARTED = new Set(['played', 'fallback', 'late', 'fanfare-late', 'fanfare-
  * actually started, so a skipped or cancelled sound blocks nothing and repeats nothing.
  */
 function playSoundFor(key: string, sound: ChoreSoundId, move: ChoreMoveId): void {
-  const paired = SOUND_FOR_MOVE[move];
   if (soundOwner !== null || performance.now() - lastSoundAt < CELEBRATION_SOUND_GAP_MS) {
     logEvent({
       level: 'debug',
@@ -427,19 +451,22 @@ function playSoundFor(key: string, sound: ChoreSoundId, move: ChoreMoveId): void
     return;
   }
   soundOwner = key;
-  playChoreCelebrationSound(sound, paired)
+  // Only the cheer can need one: a synthesized sound by the same rule, not a recent one.
+  const standIn = pickStandInSound(readRecentSounds());
+  playChoreCelebrationSound(sound, standIn)
     .then((outcome) => {
       if (soundOwner === key) soundOwner = null;
-      if (STARTED.has(outcome)) {
-        lastSoundAt = performance.now();
-        rememberSound(sound);
-      }
+      if (STARTED.has(outcome)) lastSoundAt = performance.now();
+      // The history records what was HEARD: the pick, or its stand-in. The fanfare (the engine
+      // still loading) is not one of the eight, so it records nothing.
+      if (outcome === 'played') rememberSound(sound);
       if (outcome === 'fallback' || outcome === 'late') {
+        rememberSound(standIn);
         logEvent({
           level: 'warn',
           surface: CHORE_CELEBRATION_SURFACE,
-          message: 'chore celebration played the paired sound in place of the cheer',
-          context: { action: 'fallback-sound', detail: paired, kind: move, stage: outcome },
+          message: 'chore celebration played a synthesized sound in place of the cheer',
+          context: { action: 'fallback-sound', detail: standIn, kind: move, stage: outcome },
         });
       } else if (outcome === 'fanfare-late' || outcome === 'fanfare-failed') {
         const late = outcome === 'fanfare-late';
@@ -497,7 +524,7 @@ export function celebrateChore(req: ChoreCelebrationRequest): string | null {
   const t = useTranslationStore().t;
   const calm = prefersReducedMotionNow();
   const move = moveForDate(new Date());
-  const sound = pickChoreSound(move, readLastSound());
+  const sound = pickChoreSound(readRecentSounds());
   const praiseIndex = pickPraiseIndex(req.block, lastPraise);
   lastPraise = praiseIndex;
   const meta = CHORE_BLOCK_META[req.block];
@@ -597,7 +624,7 @@ export function resetChoreCelebrationForTest(): void {
   for (const timer of holds.value.values()) clearTimeout(timer);
   holds.value = new Map();
   lastPraise = null;
-  lastSound = null;
+  recentSounds = null;
   storageNoted = false;
   bannerMemo.clear();
   lastSoundAt = Number.NEGATIVE_INFINITY;

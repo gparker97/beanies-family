@@ -390,7 +390,7 @@ function reportCheerFailure(err: unknown): void {
   const e = err instanceof CheerLoadError ? err : null;
   reportError({
     surface: 'sounds',
-    message: 'the kids cheer could not be loaded; the paired celebration sound plays instead',
+    message: 'the kids cheer could not be loaded; a synthesized celebration sound plays instead',
     severity: 'warning',
     error: err,
     context: {
@@ -413,8 +413,8 @@ export interface CelebrationSoundGate {
 
 /**
  * - `played`: the requested sound started;
- * - `fallback`: the cheer could not load, so the paired sound played instead;
- * - `late`: the cheer was not ready by the deadline, so the paired sound played (the cheer keeps
+ * - `fallback`: the cheer could not load, so the synthesized stand-in played instead;
+ * - `late`: the cheer was not ready by the deadline, so the stand-in played (the cheer keeps
  *   loading for next time);
  * - `muted`: sound was turned off while it waited; `superseded`: a newer celebration began.
  */
@@ -436,7 +436,7 @@ export async function playCelebrationSound(
   try {
     ready = await raceTimeout(loadCheer(ctx), gate.deadline - performance.now());
   } catch {
-    // Counted and reported once per episode by `loadCheer`; the paired sound stands in.
+    // Counted and reported once per episode by `loadCheer`; the synthesized stand-in plays.
     ready = 'failed';
   }
   if (!gate.enabled()) return 'muted';
