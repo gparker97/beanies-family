@@ -84,7 +84,7 @@
     "pdfjs-dist": "^4.10.38",
     "pinia": "^4.1.0",
     "qrcode": "^1.5.4",
-    "vue": "^3.5.44",
+    "vue": "^3.5.45",
     "vue-chartjs": "^5.3.4",
     "vue-router": "^4.6.4",
     "vuedraggable": "^4.1.0"
@@ -136,7 +136,7 @@
     "stylelint-config-recommended-vue": "^2.0.0",
     "stylelint-config-standard": "^36.0.1",
     "stylelint-order": "^8.1.2",
-    "tailwindcss": "^4.3.3",
+    "tailwindcss": "^4.3.5",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.71.2",
     "vite": "^7.3.7",
