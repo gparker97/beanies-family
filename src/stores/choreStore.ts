@@ -29,11 +29,7 @@ import { defineStore } from 'pinia';
 import { computed, ref, watch } from 'vue';
 import { wrapAsync } from '@/composables/useStoreActions';
 import { showToast } from '@/composables/useToast';
-import {
-  abandonChoreCelebration,
-  celebrateChore,
-  commitChoreCelebration,
-} from '@/composables/useCelebration';
+import { celebrateChore, holdChoreBlock, releaseChoreBlock } from '@/composables/useCelebration';
 import { useChoreClock } from '@/composables/useChoreClock';
 import { isAdultMember } from '@/composables/useMemberInfo';
 import { isDocLoaded } from '@/services/automerge/docService';
@@ -341,8 +337,9 @@ export const useChoreStore = defineStore('chores', () => {
   /**
    * This device's tick AND untick writes in flight, per bean and day (`member:day` → chore id →
    * what the chore becomes, its block, and the write's promise). The finishing-tick prediction
-   * counts them as landed (a chore being unticked counts as NOT done), and a predicted finish
-   * waits for its siblings to settle before it commits.
+   * counts them as landed (a chore being unticked counts as NOT done), a predicted finish waits
+   * for them to settle before it commits, and a second call for a chore already in flight is
+   * refused (a double tap), so the store is safe whatever the surface's own guard does.
    */
   interface InFlightWrite {
     done: boolean;
@@ -354,33 +351,32 @@ export const useChoreStore = defineStore('chores', () => {
   function inFlightFor(memberId: string, ymd: string): ReadonlyMap<string, InFlightWrite> {
     return inFlight.get(inFlightKey(memberId, ymd)) ?? new Map();
   }
-  function trackWrite(
+  /** Track a write until it settles; resolves with its result. */
+  async function tracked<T>(
     memberId: string,
     ymd: string,
     choreId: string,
-    entry: InFlightWrite
-  ): () => void {
+    done: boolean,
+    block: ChoreBlock,
+    run: Promise<T>
+  ): Promise<T> {
     const key = inFlightKey(memberId, ymd);
-    const map = new Map(inFlight.get(key));
-    map.set(choreId, entry);
-    inFlight.set(key, map);
-    return () => {
+    const entry: InFlightWrite = { done, block, settled: run };
+    inFlight.set(key, new Map(inFlight.get(key)).set(choreId, entry));
+    try {
+      return await run;
+    } finally {
       const cur = new Map(inFlight.get(key));
       if (cur.get(choreId) === entry) cur.delete(choreId);
       if (cur.size) inFlight.set(key, cur);
       else inFlight.delete(key);
-    };
+    }
   }
-  /** Wait for this bean's OTHER in-flight writes in `block` to land or fail. */
-  async function siblingsSettled(
-    memberId: string,
-    ymd: string,
-    block: ChoreBlock,
-    choreId: string
-  ): Promise<void> {
-    const waits = [...inFlightFor(memberId, ymd)]
-      .filter(([id, w]) => id !== choreId && w.block === block)
-      .map(([, w]) => w.settled);
+  /** Wait for this bean's in-flight writes in `block` to land or fail. */
+  async function blockSettled(memberId: string, ymd: string, block: ChoreBlock): Promise<void> {
+    const waits = [...inFlightFor(memberId, ymd).values()]
+      .filter((w) => w.block === block)
+      .map((w) => w.settled);
     await Promise.allSettled(waits);
   }
 
@@ -389,8 +385,7 @@ export const useChoreStore = defineStore('chores', () => {
    * `memberId` today finish its block (`completed`), and should that tick play the block's
    * once-only celebration (`celebrates`: the block has not celebrated today and no other tick on
    * this device owns its celebration)? Counts this device's in-flight writes as landed. A
-   * prediction starts the burst on time; the `celebrated` mark is written only once the block is
-   * really done (`toggleChore`).
+   * prediction only HOLDS the block's rows; the celebration starts at the commit (`toggleChore`).
    */
   function finishingTick(
     memberId: string,
@@ -415,29 +410,36 @@ export const useChoreStore = defineStore('chores', () => {
     return finishingTick(memberId, choreId, choreClock.value.ymd).celebrates;
   }
 
+  /** A commit later than this after the tap plays settled (no burst from a tick so long ago). */
+  const LATE_COMMIT_MS = 1200;
+
   /**
    * THE one tick path, for the page and the wall. Every guard runs before any write:
    * the chore exists, `memberId` is one of its (living) assignees, it occurs TODAY (the date
-   * is always the chore clock's, never a parameter), and on the page a non-adult may only
-   * tick their own chores, credited to themselves. Only the wall passes `by`.
+   * is always the chore clock's, never a parameter), on the page a non-adult may only tick their
+   * own chores, credited to themselves (only the wall passes `by`), and the same chore is not
+   * already being written for this bean (a double tap: refused quietly).
    *
-   * Prediction and commitment are separate. At the tap, `finishingTick` predicts whether this
-   * tick finishes its block (counting this device's in-flight ticks and unticks as landed); a
-   * predicted finish starts the celebration's burst at once (so the tick pop is on time, and the
-   * block's rows stay on screen) and takes the per-device latch. The tick's `done` mark is then
-   * written. Only after this bean's other in-flight writes for the block have settled, and the
-   * block is REALLY done, is its `celebrated` mark written (`ifAbsent`), and the celebration
-   * committed when THIS write created it: once per bean, block and day, on every device. If the
-   * block is not done after all (a sibling write failed, an untick was in flight) or another
-   * device celebrated first, no mark is written and the celebration ends quietly after its
-   * burst; the block celebrates normally when it is genuinely finished.
+   * The finishing tick, in three steps:
+   *  1. PREDICT at the tap (`finishingTick`, counting in-flight ticks and unticks). A predicted
+   *     finish only HOLDS the block's rows on screen (`holdChoreBlock`) and takes the per-device
+   *     latch. Nothing plays, nothing is logged, nothing is shown.
+   *  2. WRITE the tick's `done` mark.
+   *  3. COMMIT: once this bean's in-flight writes for the block have settled and the block is
+   *     REALLY done, write its `celebrated` mark (`ifAbsent`). Only when THIS write created it
+   *     does the celebration start: once per bean, block and day, on every device, bursting from
+   *     the still-mounted tick (or `settled` when the commit came late or the tick is gone).
+   * A prediction that does not hold (a failed or refused write, a block not done after all,
+   * another device first) releases the hold; nothing has played, and the block celebrates later
+   * when it is genuinely finished. The hold is released on every exit (and has its own safety
+   * release in `useCelebration`).
    *
-   * A tick that did not predict a finish checks again AFTER its write from the refreshed marks:
-   * when another DEVICE's tick of the block landed in between, the block is found complete only
-   * then, its mark is written and the celebration plays in its settled form (`finishLate`).
+   * A tick that did not predict a finish checks again AFTER its write: when another DEVICE's
+   * tick of the block landed in between, the block is found complete only then, its mark is
+   * written and the celebration plays settled (`finishLate`).
    *
-   * Resolves the landed tick or untick, a `ChoreTickRefused` when a guard refused (already
-   * toasted and logged), or `null` for a failed write (`useWallJobs` reports that one).
+   * Resolves the landed tick or untick, a `ChoreTickRefused` when a guard refused (toasted and
+   * logged, or a quiet double tap), or `null` for a failed write (`useWallJobs` reports that one).
    */
   async function toggleChore(
     choreId: string,
@@ -445,6 +447,7 @@ export const useChoreStore = defineStore('chores', () => {
     opts: ToggleChoreOpts
   ): Promise<ToggleChoreOutcome | null> {
     const action = 'toggleChore';
+    const tappedAt = performance.now();
     const chore = choreById(choreId);
     if (!chore) return refuseTick('not-found');
     if (!(chore.assigneeIds ?? []).includes(memberId) || !livingIds.value.has(memberId)) {
@@ -462,90 +465,101 @@ export const useChoreStore = defineStore('chores', () => {
       by = opts.by ?? memberId;
     }
 
+    if (inFlightFor(memberId, clock.ymd).has(choreId)) {
+      log('info', 'tick-in-flight', { kind: opts.surface, detail: 'double-tap' });
+      return { action: 'refused', detail: 'in-flight' };
+    }
+
     const block = choreBlockOf(chore);
     const doneId = choreMarkId('done', memberId, clock.ymd, choreId);
-    const pendingWrite = inFlightFor(memberId, clock.ymd).get(choreId);
-    const wasDone =
-      pendingWrite?.done ??
-      markIndex.value.get(memberId)?.get(clock.ymd)?.done.has(choreId) ??
-      false;
+    const wasDone = markIndex.value.get(memberId)?.get(clock.ymd)?.done.has(choreId) ?? false;
     const errorToast = opts.surface !== 'wall';
 
     if (wasDone) {
-      const untick = write(
-        action,
-        async () => {
-          await repo.removeChoreMark(doneId);
-          choreMarks.value = await repo.getAllChoreMarks();
-          return true as const;
-        },
-        { errorToast }
-      );
-      const untrack = trackWrite(memberId, clock.ymd, choreId, {
-        done: false,
+      const ok = await tracked(
+        memberId,
+        clock.ymd,
+        choreId,
+        false,
         block,
-        settled: untick,
-      });
-      let ok: true | null = null;
-      try {
-        ok = await untick;
-      } finally {
-        untrack();
-      }
+        write(
+          action,
+          async () => {
+            await repo.removeChoreMark(doneId);
+            choreMarks.value = await repo.getAllChoreMarks();
+            return true as const;
+          },
+          { errorToast }
+        )
+      );
       if (!ok) return null;
       log('info', 'chore-ticked', { action: 'untick', slot: block, kind: opts.surface });
       return { action: 'untick', completed: null, celebrated: false };
     }
 
-    // The prediction, made BEFORE this tick joins the in-flight writes.
+    // 1. Predict, BEFORE this tick joins the in-flight writes.
     const finish = finishingTick(memberId, choreId, clock.ymd);
     const completed = finish.completed;
     const latch = `${memberId}:${clock.ymd}:${block}`;
     const latchHeld = celebrating.has(latch);
     const predicted = !!completed && finish.celebrates;
-    let key: string | null = null;
     if (predicted) {
       celebrating.add(latch);
-      key = celebrateBlock(memberId, block, finish.total, opts.anchor ?? null);
+      if (opts.anchor) holdChoreBlock(memberId, block);
     }
     try {
+      // 2. The tick's done mark.
       const base = { memberId, date: clock.ymd, by };
-      const tick = write(
-        action,
-        async () => {
-          const written = await repo.setChoreMarks(
-            [{ id: doneId, input: { ...base, kind: 'done', ref: choreId } }],
-            { ifAbsent: true }
-          );
-          choreMarks.value = await repo.getAllChoreMarks();
-          return written;
-        },
-        { errorToast }
-      );
-      const untrack = trackWrite(memberId, clock.ymd, choreId, {
-        done: true,
+      const created = await tracked(
+        memberId,
+        clock.ymd,
+        choreId,
+        true,
         block,
-        settled: tick,
-      });
-      let created: ChoreMark[] | null = null;
-      try {
-        created = await tick;
-      } finally {
-        untrack();
-      }
+        write(
+          action,
+          async () => {
+            const written = await repo.setChoreMarks(
+              [{ id: doneId, input: { ...base, kind: 'done', ref: choreId } }],
+              { ifAbsent: true }
+            );
+            choreMarks.value = await repo.getAllChoreMarks();
+            return written;
+          },
+          { errorToast }
+        )
+      );
       if (!created) {
-        if (key) abandonChoreCelebration(key, 'write-failed');
+        if (predicted) logAbandoned(block, 'write-failed');
         return null;
       }
       log('info', 'chore-ticked', { action: 'tick', slot: block, kind: opts.surface });
 
       if (predicted) {
-        const celebrated = await commitFinish(memberId, clock.ymd, block, choreId, by, key);
-        return {
-          action: 'tick',
-          completed: celebrated.done ? block : null,
-          celebrated: celebrated.played,
-        };
+        // 3. Commit.
+        await blockSettled(memberId, clock.ymd, block);
+        const now = choreDayFor(memberId).blocks.find((b) => b.block === block);
+        if (!now?.allDone) {
+          logAbandoned(block, 'not-done');
+          return { action: 'tick', completed: null, celebrated: false };
+        }
+        const mark = now.celebrated
+          ? ('exists' as const)
+          : await writeCelebratedMark(memberId, clock.ymd, block, by);
+        log('info', 'block-complete', {
+          slot: block,
+          count: now.total,
+          detail: mark === 'created' ? 'celebrated' : 'banner-only',
+        });
+        if (mark !== 'created') {
+          logAbandoned(block, mark === 'exists' ? 'already-celebrated' : 'mark-failed');
+          return { action: 'tick', completed: block, celebrated: false };
+        }
+        // An anchored tick no longer on screen plays settled; no anchor at all is the centered form.
+        const tickGone = !!opts.anchor && !opts.anchor.tickEl?.isConnected;
+        const late = performance.now() - tappedAt > LATE_COMMIT_MS;
+        celebrateBlock(memberId, block, now.total, opts.anchor ?? null, late || tickGone);
+        return { action: 'tick', completed: block, celebrated: true };
       }
       if (completed) {
         // A finish that will not celebrate: already celebrated today, or another tick on this
@@ -560,39 +574,33 @@ export const useChoreStore = defineStore('chores', () => {
         return { action: 'tick', completed, celebrated: false };
       }
     } finally {
-      if (predicted) celebrating.delete(latch);
+      if (predicted) {
+        // The celebration (if it started) holds the rows through its own burst now.
+        releaseChoreBlock(memberId, block);
+        celebrating.delete(latch);
+      }
     }
 
     const late = await finishLate(memberId, clock.ymd, block, by, latch, opts.anchor ?? null);
     return { action: 'tick', completed: late.completed, celebrated: late.celebrated };
   }
 
+  /** A held prediction that did not become a celebration: nothing played; the reason, logged. */
+  function logAbandoned(block: ChoreBlock, reason: string): void {
+    log('info', 'prediction-abandoned', { slot: block, detail: reason });
+  }
+
   /**
-   * Commit a predicted finish: wait for this bean's other in-flight writes for the block, then,
-   * only if the block is REALLY done and not yet celebrated, write its `celebrated` mark
-   * (`ifAbsent`) and commit the celebration when THIS write created it. Otherwise no mark, and
-   * the celebration (only a burst so far) ends quietly.
+   * THE one write of a block's `celebrated` mark (`ifAbsent`), for the commit and `finishLate`:
+   * `created` (THIS write made it: celebrate), `exists` (another device or tick did), or
+   * `failed` (reported as a warning, never toasted; the ticks landed and the banner shows).
    */
-  async function commitFinish(
+  async function writeCelebratedMark(
     memberId: string,
     ymd: string,
     block: ChoreBlock,
-    choreId: string,
-    by: string,
-    key: string | null
-  ): Promise<{ done: boolean; played: boolean }> {
-    await siblingsSettled(memberId, ymd, block, choreId);
-    const now = choreDayFor(memberId).blocks.find((b) => b.block === block);
-    if (!now?.allDone) {
-      log('info', 'celebration-withheld', { slot: block, detail: 'not-done' });
-      if (key) abandonChoreCelebration(key, 'not-done');
-      return { done: false, played: false };
-    }
-    if (now.celebrated) {
-      log('info', 'block-complete', { slot: block, count: now.total, detail: 'banner-only' });
-      if (key) abandonChoreCelebration(key, 'already-celebrated');
-      return { done: true, played: false };
-    }
+    by: string
+  ): Promise<'created' | 'exists' | 'failed'> {
     const id = choreMarkId('celebrated', memberId, ymd, block);
     const created = await write(
       'celebrateBlock',
@@ -607,44 +615,28 @@ export const useChoreStore = defineStore('chores', () => {
       { errorToast: false }
     );
     if (!created) {
-      // The block IS done; the bean still gets their celebration. Without its mark, a later
-      // untick and re-tick could celebrate again today: reported, never toasted.
       reportError({
         surface: SURFACE,
         message:
-          'the celebrated mark for a finished block could not be written; it celebrated anyway',
+          'the celebrated mark for a finished block could not be written; the ticks landed and the banner shows',
         severity: 'warning',
         context: { action: 'celebrate-mark-failed', slot: block },
       });
-      if (key) commitChoreCelebration(key);
-      return { done: true, played: !!key };
+      return 'failed';
     }
-    const played = created.some((m) => m.id === id);
-    log('info', 'block-complete', {
-      slot: block,
-      count: now.total,
-      detail: played ? 'celebrated' : 'banner-only',
-    });
-    if (key) {
-      if (played) commitChoreCelebration(key);
-      else abandonChoreCelebration(key, 'other-device');
-    }
-    return { done: true, played: played && !!key };
+    return created.some((m) => m.id === id) ? 'created' : 'exists';
   }
 
-  /**
-   * Start the all-done celebration for the bean's block: their first name, one star per chore.
-   * `settled` (and committed) for a block found done only after its write.
-   */
+  /** Start the all-done celebration for the bean's block: their first name, one star per chore. */
   function celebrateBlock(
     memberId: string,
     block: ChoreBlock,
     count: number,
     anchor: ChoreCelebrationAnchor | null,
-    settled = false
-  ): string | null {
+    settled: boolean
+  ): void {
     const member = familyStore.members.find((m) => m.id === memberId);
-    return celebrateChore({
+    celebrateChore({
       memberId,
       block,
       beanName: firstName(member?.name),
@@ -659,12 +651,9 @@ export const useChoreStore = defineStore('chores', () => {
   /**
    * After a tick that did NOT predict a finish: is the block complete now that the refreshed
    * marks are in (another DEVICE's tick landed in between)? If so, and nobody has celebrated it,
-   * write the `celebrated` mark (`ifAbsent`) under the per-device latch and celebrate, in its
-   * settled form, when THIS write created it. A block that is complete but already celebrated
-   * was finished and logged by the tick that celebrated it, so nothing is logged twice.
-   *
-   * The tick itself has landed, so a failure here does not fail the tick: it is reported as a
-   * warning (no toast, no page) and the banner still shows from the `done` marks.
+   * write the `celebrated` mark under the per-device latch and celebrate, settled, when THIS
+   * write created it. A block that is complete but already celebrated was finished and logged by
+   * the tick that celebrated it, so nothing is logged twice.
    */
   async function finishLate(
     memberId: string,
@@ -679,37 +668,11 @@ export const useChoreStore = defineStore('chores', () => {
     if (after.celebrated || celebrating.has(latch)) return { completed: block, celebrated: false };
     celebrating.add(latch);
     try {
-      const id = choreMarkId('celebrated', memberId, ymd, block);
-      const created = await write(
-        'celebrateBlock',
-        async () => {
-          const written = await repo.setChoreMarks(
-            [{ id, input: { memberId, date: ymd, by, kind: 'celebrated', ref: block } }],
-            { ifAbsent: true }
-          );
-          choreMarks.value = await repo.getAllChoreMarks();
-          return written;
-        },
-        { errorToast: false }
-      );
-      if (!created) {
-        reportError({
-          surface: SURFACE,
-          message:
-            'the celebrated mark for a block finished by another device could not be written; the ticks landed and the banner shows',
-          severity: 'warning',
-          context: { action: 'celebrate-late-failed', slot: block },
-        });
-        return { completed: block, celebrated: false };
-      }
-      const celebrated = created.some((m) => m.id === id);
-      if (celebrated) {
-        log('info', 'block-complete', { slot: block, count: after.total, detail: 'celebrated' });
-        // The block is already showing its banner: the celebration plays on it, settled, with
-        // no burst from a tick that is no longer on screen.
-        celebrateBlock(memberId, block, after.total, anchor, true);
-      }
-      return { completed: block, celebrated };
+      const mark = await writeCelebratedMark(memberId, ymd, block, by);
+      if (mark !== 'created') return { completed: block, celebrated: false };
+      log('info', 'block-complete', { slot: block, count: after.total, detail: 'celebrated' });
+      celebrateBlock(memberId, block, after.total, anchor, true);
+      return { completed: block, celebrated: true };
     } finally {
       celebrating.delete(latch);
     }

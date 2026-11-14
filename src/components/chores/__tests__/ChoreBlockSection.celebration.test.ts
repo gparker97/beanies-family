@@ -1,7 +1,7 @@
 /**
  * The tick a celebration starts from must still be ON SCREEN when the burst plays (#146). The
- * store starts the celebration's burst at the TAP, before the write's marks refresh (the burst
- * holds the block's rows), and commits it once the block is really done, so the section keeps
+ * store HOLDS the block at the tap (invisibly), before the write's marks refresh, and starts the
+ * celebration only once the block is really done and its mark written, so the section keeps
  * the very same rows through the tick: the anchor's tick element is the one the bean tapped,
  * still connected, when `celebrateChore` begins; and the banner mounts once, at the phase flip.
  * Real `useCelebration` here (the section's other tests mock it).
@@ -31,7 +31,8 @@ import ChoreBlockSection from '../ChoreBlockSection.vue';
 import { chore, resetKit } from './choreTestKit';
 import {
   celebrateChore,
-  commitChoreCelebration,
+  holdChoreBlock,
+  releaseChoreBlock,
   resetChoreCelebrationForTest,
   useCelebration,
 } from '@/composables/useCelebration';
@@ -89,8 +90,12 @@ describe('the tick a celebration starts from', () => {
     const anchor = w.emitted('toggle')![0]![1] as ChoreCelebrationAnchor;
     expect(anchor.tickEl).toBe(tapped);
 
-    // The store's order: the burst at the tap, THEN the refreshed marks make the block done,
-    // THEN the commit (its `celebrated` mark written).
+    // The store's order: the hold at the tap, THEN the refreshed marks make the block done,
+    // THEN (its mark written) the celebration starts and the hold goes.
+    holdChoreBlock('kid', 'morning');
+    await w.setProps({ block: block([true, true]) });
+    await nextTick();
+    expect(w.find('[data-testid="chore-done-banner"]').exists()).toBe(false);
     const key = celebrateChore({
       memberId: 'kid',
       block: 'morning',
@@ -98,10 +103,7 @@ describe('the tick a celebration starts from', () => {
       count: 2,
       anchor,
     })!;
-    await w.setProps({ block: block([true, true]) });
-    await nextTick();
-    expect(w.find('[data-testid="chore-done-banner"]').exists()).toBe(false);
-    commitChoreCelebration(key);
+    releaseChoreBlock('kid', 'morning');
     await nextTick();
     expect(useCelebration().activeChores.value.get(key)?.anchor?.tickEl).toBe(tapped);
     expect(tapped.isConnected).toBe(true);
@@ -115,7 +117,7 @@ describe('the tick a celebration starts from', () => {
     w.unmount();
   });
 
-  it('two quick ticks: the second bursts before either lands; its tick is the one at burst', async () => {
+  it('two quick ticks: the second is held before either lands; its tick is the one at burst', async () => {
     const w = mount(ChoreBlockSection, {
       attachTo: document.body,
       props: {
@@ -131,19 +133,20 @@ describe('the tick a celebration starts from', () => {
     const last = w.get('[data-chore-id="c3"] [data-testid="chore-tick"]').element;
     await w.get('[data-chore-id="c3"] [data-testid="chore-tick"]').trigger('click');
     const anchor = w.emitted('toggle')![1]![1] as ChoreCelebrationAnchor;
-    // The store starts the burst on the SECOND tap (the first counts as done while in flight).
-    const key = celebrateChore({
+    // The store holds on the SECOND tap (the first counts as done while in flight).
+    holdChoreBlock('kid', 'morning');
+    await w.setProps({ block: block([true, true, false]) }); // the first write lands
+    await w.setProps({ block: block([true, true, true]) }); // then the second
+    await nextTick();
+    expect(w.find('[data-testid="chore-done-banner"]').exists()).toBe(false);
+    celebrateChore({
       memberId: 'kid',
       block: 'morning',
       beanName: 'Pip',
       count: 3,
       anchor,
-    })!;
-    await w.setProps({ block: block([true, true, false]) }); // the first write lands
-    await w.setProps({ block: block([true, true, true]) }); // then the second
-    await nextTick();
-    expect(w.find('[data-testid="chore-done-banner"]').exists()).toBe(false);
-    commitChoreCelebration(key);
+    });
+    releaseChoreBlock('kid', 'morning');
     await nextTick();
     expect(anchor.tickEl).toBe(last);
     expect(last.isConnected).toBe(true);

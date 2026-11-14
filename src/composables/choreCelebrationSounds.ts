@@ -308,7 +308,7 @@ export const CHEER_URL = `${import.meta.env.BASE_URL}sounds/kids-cheer.mp3`;
 const CHEER_GAIN = 1;
 
 let cheerBuffer: { ctx: BaseAudioContext; buffer: Promise<AudioBuffer> } | null = null;
-/** A failed load retries on the shared ladder (5 min, doubling to an hour), one report an episode. */
+/** A failed load retries on the static-load ladder (15 s, doubling to 5 min), one report an episode. */
 const cheerBackoff = failureBackoff();
 /** A fetch or decode still unsettled after this is abandoned, so nothing is cached forever. */
 const CHEER_LOAD_TIMEOUT_MS = 8000;

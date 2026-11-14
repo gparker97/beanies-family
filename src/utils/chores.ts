@@ -306,11 +306,12 @@ export type ChoreRefusal =
 
 /**
  * A tick the chore store REFUSED (a guard failed before any write). The store has already
- * toasted it and logged `edit-refused`; nothing broke, so a caller must not report it again.
+ * toasted it and logged `edit-refused`, or (`in-flight`, a double tap on a chore whose write is
+ * still landing) quietly ignored it; nothing broke, so a caller must not report it again.
  */
 export interface ChoreTickRefused {
   action: 'refused';
-  detail: ChoreRefusal;
+  detail: ChoreRefusal | 'in-flight';
 }
 
 /** Is this tick answer a refusal the store has already told the family about? */

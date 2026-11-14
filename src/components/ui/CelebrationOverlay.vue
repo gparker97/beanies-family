@@ -66,11 +66,16 @@ onBeforeUnmount(() => {
   <CelebrationShower />
   <!-- A finished chore block (#146): anchored to the board, self-dismissing. -->
   <ChoreCelebration v-for="c in choreCelebrations" :key="c.id" :celebration-key="c.key" />
-  <!-- Said aloud once: the celebration itself is decoration (aria-hidden). Always mounted, so a
-       screen reader hears the change. -->
-  <p class="sr-only" role="status" aria-live="polite" data-testid="chore-celebration-said">
-    {{ choreCelebrations.map((c) => c.praise).join(' ') }}
-  </p>
+  <!-- Said aloud once each: the celebration itself is decoration (aria-hidden). The live region
+       is always mounted and only ADDS a line per celebration (never re-reads earlier ones). -->
+  <div
+    class="sr-only"
+    aria-live="polite"
+    aria-relevant="additions"
+    data-testid="chore-celebration-said"
+  >
+    <p v-for="c in choreCelebrations" :key="c.id">{{ c.praise }}</p>
+  </div>
 
   <Teleport to="body">
     <!-- Modal celebration -->

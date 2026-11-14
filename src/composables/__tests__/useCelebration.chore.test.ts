@@ -1,9 +1,10 @@
 /**
  * The chore celebration's orchestration (#146): `celebrateChore` picks the weekday's move, a
  * sound (never the last one) and a praise line (never the last one), plays the chore sound
- * (never the list fanfare), and runs its phases on its own timers. The banner waits for the
- * store's commit; an abandoned prediction ends quietly after its burst. Celebrations are
- * concurrent per bean and block, and overlapping ones share one sound. List completion keeps the
+ * (never the list fanfare), and runs its phases on its own timers, measured from its own start
+ * (it starts only once the store has committed). A prediction is only an invisible, keyed hold
+ * with a safety release. Celebrations are concurrent per bean and block, and overlapping ones
+ * share one sound; only a sound that really started stamps the window and the "last played". List completion keeps the
  * old shower and fanfare. Reduced motion is calm; no anchor plays centered (and says so); the
  * surface's cap is honoured.
  */
@@ -27,12 +28,13 @@ vi.mock('@/stores/translationStore', () => ({
 
 import {
   CELEBRATION_SOUND_GAP_MS,
-  abandonChoreCelebration,
+  CHORE_HOLD_SAFETY_MS,
   celebrate,
   celebrateChore,
   choreBannerCelebration,
   choreBlockHeld,
-  commitChoreCelebration,
+  holdChoreBlock,
+  releaseChoreBlock,
   resetCelebrationMode,
   resetChoreCelebrationForTest,
   setCelebrationMode,
@@ -97,9 +99,12 @@ afterEach(() => {
 });
 
 const active = (key = 'pip:morning') => useCelebration().activeChores.value.get(key) ?? null;
-/** A committed celebration (the store has written its mark), as most tests want. */
-const start = (over: Partial<ChoreCelebrationRequest> = {}) =>
-  celebrateChore(request(over), { committed: true });
+const start = (over: Partial<ChoreCelebrationRequest> = {}) => celebrateChore(request(over));
+/** Let the (mocked) sound's outcome resolve. */
+const flush = async () => {
+  await Promise.resolve();
+  await Promise.resolve();
+};
 
 describe('celebrateChore', () => {
   it('plays the weekday move with its chore sound, never the shower or the fanfare', () => {
@@ -141,12 +146,14 @@ describe('celebrateChore', () => {
     expect(active()).toBeNull();
   });
 
-  it('never the same sound twice in a row, remembered across a reload', () => {
+  it('never the same sound twice in a row, remembered across a reload', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.9);
     start();
     expect(active()!.sound).toBe('marimba');
+    await flush(); // it started: now it is the last played
     expect(localStorage.getItem('beanies.choreCelebration.lastSound')).toBe('marimba');
     useCelebration().dismissChoreCelebration();
+    vi.advanceTimersByTime(CELEBRATION_SOUND_GAP_MS);
     start();
     expect(active()!.sound).toBe('kids-cheer');
     // A fresh session (memory gone) still reads the last sound from storage.
@@ -168,7 +175,7 @@ describe('celebrateChore', () => {
     }
   });
 
-  it('reduced motion: calm, the banner once committed, a shorter end, sound still plays', () => {
+  it('reduced motion: calm, the banner from the start, a shorter end, sound still plays', () => {
     reduced = true;
     start();
     const c = active()!;
@@ -255,7 +262,7 @@ describe('celebrateChore', () => {
     expect(choreBannerCelebration('pip', 'morning')).toBeNull();
     expect(logEvent).toHaveBeenCalledWith(
       expect.objectContaining({
-        context: expect.objectContaining({ action: 'ended-quietly', detail: 'undone' }),
+        context: expect.objectContaining({ action: 'ended-undone', slot: 'morning' }),
       })
     );
   });
@@ -287,26 +294,33 @@ describe('celebrateChore', () => {
     );
   });
 
-  it('a prediction: the burst at once, the banner only on commit, then on time', () => {
-    const key = celebrateChore(request())!;
+  it('a prediction is only an invisible hold, keyed per bean, released by key or by its safety', () => {
+    holdChoreBlock('pip', 'morning');
+    holdChoreBlock('juno', 'morning');
     expect(choreBlockHeld('pip', 'morning')).toBe(true);
-    vi.advanceTimersByTime(700); // the burst is over, but no commit yet: still holding the rows
-    expect(active()!.phase).toBe('burst');
-    commitChoreCelebration(key);
-    expect(active()!.phase).toBe('banner');
+    expect(choreBlockHeld('juno', 'morning')).toBe(true);
+    // Nothing plays or shows for a hold.
+    expect(useCelebration().activeChores.value.size).toBe(0);
+    expect(sounds.playChoreCelebrationSound).not.toHaveBeenCalled();
+    expect(logEvent).not.toHaveBeenCalled();
+    releaseChoreBlock('pip', 'morning');
+    expect(choreBlockHeld('pip', 'morning')).toBe(false);
+    expect(choreBlockHeld('juno', 'morning')).toBe(true);
+    // A hold whose write never settles is let go by its safety timer.
+    vi.advanceTimersByTime(CHORE_HOLD_SAFETY_MS);
+    expect(choreBlockHeld('juno', 'morning')).toBe(false);
   });
 
-  it('a prediction that does not hold ends quietly after its burst, with its reason', () => {
-    const key = celebrateChore(request())!;
-    abandonChoreCelebration(key, 'not-done');
-    expect(active()).toBeNull();
-    expect(choreBlockHeld('pip', 'morning')).toBe(false);
-    expect(logEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        level: 'info',
-        context: expect.objectContaining({ action: 'ended-quietly', detail: 'not-done' }),
-      })
-    );
+  it('a skipped or cancelled sound neither blocks the next sound nor counts as last played', async () => {
+    sounds.playChoreCelebrationSound.mockResolvedValue('muted');
+    start({ memberId: 'pip' });
+    await flush();
+    expect(localStorage.getItem('beanies.choreCelebration.lastSound')).toBeNull();
+    sounds.playChoreCelebrationSound.mockResolvedValue('superseded');
+    start({ memberId: 'juno' }); // straight after: NOT an overlap, nothing has started
+    expect(sounds.playChoreCelebrationSound).toHaveBeenCalledTimes(2);
+    await flush();
+    expect(localStorage.getItem('beanies.choreCelebration.lastSound')).toBeNull();
   });
 
   it('two beans finishing 0 ms apart: both celebrations play whole, one sound', () => {
@@ -328,8 +342,9 @@ describe('celebrateChore', () => {
     expect(useCelebration().activeChores.value.size).toBe(0);
   });
 
-  it('two beans 1.5 s apart: the first is never cut off; the second plays silently', () => {
+  it('two beans 1.5 s apart: the first is never cut off; the second plays silently', async () => {
     start({ memberId: 'pip' });
+    await flush(); // its sound started
     vi.advanceTimersByTime(1500);
     start({ memberId: 'juno' });
     expect(sounds.cancelChoreCelebrationSound).not.toHaveBeenCalled();

@@ -231,8 +231,9 @@ export interface ChoreCelebrationRequest {
    */
   stillDone?: () => boolean;
   /**
-   * The block already shows its banner (found complete only after the write, so its rows are
-   * gone): no burst from the tick, the move plays on the banner straight away.
+   * No burst from the tick (it is gone, or long ago): the move plays on the banner straight
+   * away. For a block found done only after another device's tick, a commit that took long, or a
+   * tick no longer on screen.
    */
   settled?: boolean;
 }
@@ -254,19 +255,13 @@ export interface ActiveChoreCelebration extends ChoreCelebrationRequest {
   praise: string;
   /** ... and in the pieces that pop in, with the name marked where it was filled. */
   praiseWords: PraiseWord[];
-  /** `performance.now()` at the tick: every beat is timed from here. */
+  /** `performance.now()` when it started: every beat is timed from here. */
   startedAt: number;
   /** Reduced motion: nothing moves; the banner, its stars and the praise simply appear. */
   calm: boolean;
   phase: ChoreCelebrationPhase;
   /** When it ends, in ms from the start: the beats' end, or a surface's shorter cap. */
   endsAt: number;
-  /**
-   * The store has written the block's `celebrated` mark: the banner may arrive. Until then it is
-   * only the burst (started at the tap on a prediction), which ends quietly if the block turns
-   * out not to be done.
-   */
-  committed: boolean;
 }
 
 export const choreCelebrationKey = (memberId: string, block: ChoreBlock) => `${memberId}:${block}`;
@@ -278,14 +273,25 @@ export const choreCelebrationKey = (memberId: string, block: ChoreBlock) => `${m
  */
 const activeChores = shallowRef<ReadonlyMap<string, ActiveChoreCelebration>>(new Map());
 const choreTimers = new Map<string, ReturnType<typeof setTimeout>[]>();
-/** Celebrations whose 560 ms burst is over, waiting only for their commit to show the banner. */
-const swapDue = new Set<string>();
+
+/**
+ * Invisible HOLDS: a bean's block whose finishing tick is being written (predicted at the tap).
+ * A held block keeps its rows mounted, so the celebration (which starts only once the store has
+ * committed) bursts from the very tick that was tapped. Nothing else: no banner, no sound, no
+ * telemetry. Each hold has its own safety release, so a write that never settles cannot hold a
+ * block for ever.
+ */
+const holds = shallowRef<ReadonlyMap<string, ReturnType<typeof setTimeout>>>(new Map());
+export const CHORE_HOLD_SAFETY_MS = 6000;
+
 /**
  * Celebrations overlapping on the wall sound like ONE: a sound starts at most once in this
- * window, and a later celebration inside it plays silently rather than stacking a second full
- * sound on the first (which is never cut). Every celebration sound is under about two seconds.
+ * window, and a later celebration inside it (or while a sound is still waiting to start) plays
+ * silently rather than stacking a second full sound on the first (which is never cut). Every
+ * celebration sound is under about two seconds.
  */
 export const CELEBRATION_SOUND_GAP_MS = 2000;
+/** When a celebration sound last actually STARTED. */
 let lastSoundAt = Number.NEGATIVE_INFINITY;
 /** The celebration whose sound may still be waiting to start (the cheer loading). */
 let soundOwner: string | null = null;
@@ -336,23 +342,49 @@ function prefersReducedMotionNow(): boolean {
   );
 }
 
-function patchChore(key: string, patch: Partial<ActiveChoreCelebration>): void {
-  const cur = activeChores.value.get(key);
-  if (!cur) return;
-  const next = new Map(activeChores.value);
-  next.set(key, { ...cur, ...patch });
-  activeChores.value = next;
+/**
+ * Hold this bean's block (see `holds`) while its predicted finishing tick is written. Released
+ * by `releaseChoreBlock` on every exit, or by its own safety timer.
+ */
+export function holdChoreBlock(memberId: string, block: ChoreBlock): void {
+  const key = choreCelebrationKey(memberId, block);
+  const next = new Map(holds.value);
+  const old = next.get(key);
+  if (old) clearTimeout(old);
+  next.set(
+    key,
+    setTimeout(() => releaseChoreBlock(memberId, block), CHORE_HOLD_SAFETY_MS)
+  );
+  holds.value = next;
 }
 
-/** The banner arrives once the burst is over AND the store has committed (written the mark). */
-function maybeArrive(key: string): void {
+export function releaseChoreBlock(memberId: string, block: ChoreBlock): void {
+  const key = choreCelebrationKey(memberId, block);
+  const timer = holds.value.get(key);
+  if (timer === undefined) return;
+  clearTimeout(timer);
+  const next = new Map(holds.value);
+  next.delete(key);
+  holds.value = next;
+}
+
+/** The banner is due: show it, unless the block was unticked during the burst (then end). */
+function arriveBanner(key: string): void {
   const cur = activeChores.value.get(key);
-  if (!cur || cur.phase === 'banner' || !cur.committed || !swapDue.has(key)) return;
+  if (!cur || cur.phase === 'banner') return;
   if (cur.stillDone && !cur.stillDone()) {
-    abandonChoreCelebration(key, 'undone');
+    logEvent({
+      level: 'info',
+      surface: CHORE_CELEBRATION_SURFACE,
+      message: 'chore celebration ended: the block was unticked during the burst',
+      context: { action: 'ended-undone', kind: cur.move, slot: cur.block },
+    });
+    dismissChoreCelebration(key);
     return;
   }
-  patchChore(key, { phase: 'banner' });
+  const next = new Map(activeChores.value);
+  next.set(key, { ...cur, phase: 'banner' });
+  activeChores.value = next;
 }
 
 /**
@@ -366,7 +398,6 @@ export function dismissChoreCelebration(key?: string): void {
   for (const k of keys) {
     choreTimers.get(k)?.forEach(clearTimeout);
     choreTimers.delete(k);
-    swapDue.delete(k);
     if (soundOwner === k) {
       cancelChoreCelebrationSound();
       soundOwner = null;
@@ -376,37 +407,17 @@ export function dismissChoreCelebration(key?: string): void {
   activeChores.value = next;
 }
 
-/**
- * The store wrote the block's `celebrated` mark: the banner may arrive (now, or when the burst
- * ends). A celebration started settled or committed needs no call.
- */
-export function commitChoreCelebration(key: string): void {
-  patchChore(key, { committed: true });
-  maybeArrive(key);
-}
+/** Outcomes where a sound really started (a fallback is still a sound). */
+const STARTED = new Set(['played', 'fallback', 'late', 'fanfare-late', 'fanfare-failed']);
 
 /**
- * The prediction did not hold (the block is not done after this bean's ticks settled, a write
- * failed, another device celebrated first, or a tick was undone during the burst): end it
- * quietly, having shown only the burst. Logged with the reason.
+ * The sound for a new celebration, unless another one's sound is still in its window or still
+ * waiting to start. The window and the "last played" memory are stamped only once a sound has
+ * actually started, so a skipped or cancelled sound blocks nothing and repeats nothing.
  */
-export function abandonChoreCelebration(key: string, reason: string): void {
-  const cur = activeChores.value.get(key);
-  if (!cur) return;
-  logEvent({
-    level: 'info',
-    surface: CHORE_CELEBRATION_SURFACE,
-    message: 'chore celebration ended quietly after its burst',
-    context: { action: 'ended-quietly', detail: reason, kind: cur.move, slot: cur.block },
-  });
-  dismissChoreCelebration(key);
-}
-
-/** The sound for a new celebration, unless another one's sound is still in its window. */
 function playSoundFor(key: string, sound: ChoreSoundId, move: ChoreMoveId): void {
   const paired = SOUND_FOR_MOVE[move];
-  const now = performance.now();
-  if (now - lastSoundAt < CELEBRATION_SOUND_GAP_MS) {
+  if (soundOwner !== null || performance.now() - lastSoundAt < CELEBRATION_SOUND_GAP_MS) {
     logEvent({
       level: 'debug',
       surface: CHORE_CELEBRATION_SURFACE,
@@ -415,11 +426,14 @@ function playSoundFor(key: string, sound: ChoreSoundId, move: ChoreMoveId): void
     });
     return;
   }
-  lastSoundAt = now;
   soundOwner = key;
   playChoreCelebrationSound(sound, paired)
     .then((outcome) => {
       if (soundOwner === key) soundOwner = null;
+      if (STARTED.has(outcome)) {
+        lastSoundAt = performance.now();
+        rememberSound(sound);
+      }
       if (outcome === 'fallback' || outcome === 'late') {
         logEvent({
           level: 'warn',
@@ -466,27 +480,24 @@ function playSoundFor(key: string, sound: ChoreSoundId, move: ChoreMoveId): void
 }
 
 /**
- * Start the choreboard's all-done celebration (#146) for a bean's block: once per bean, block and
- * day, called only by `choreStore`. On a predicted finish it starts at the TAP, uncommitted
- * (the burst plays at once; the banner waits for `commitChoreCelebration`, and
- * `abandonChoreCelebration` ends it quietly); a block found done only after its write starts it
- * `settled` and committed. Picks the move (the device's weekday), the sound and the praise line,
- * plays the sound, and times the phases. The timers live HERE, not in the (lazy) component, so
- * the banner still arrives and the celebration still ends if the component never loads.
+ * Start the choreboard's all-done celebration (#146) for a bean's block. Called only by
+ * `choreStore`, and only once the block's `celebrated` mark was created by that very write: once
+ * per bean, block and day, on every device. Picks the move (the device's weekday), the sound and
+ * the praise line, plays the sound, and times the phases FROM THIS START (the banner at +560 ms,
+ * the end at +3060 ms). `settled` (a block already showing its banner: found done after another
+ * device's tick, or a commit that took long) skips the burst from the tick. The timers live
+ * HERE, not in the (lazy) component, so the banner still arrives and the celebration still ends
+ * if the component never loads.
  *
  * Returns the celebration's key, or null when that bean's block is already celebrating.
  */
-export function celebrateChore(
-  req: ChoreCelebrationRequest,
-  opts: { committed?: boolean } = {}
-): string | null {
+export function celebrateChore(req: ChoreCelebrationRequest): string | null {
   const key = choreCelebrationKey(req.memberId, req.block);
   if (activeChores.value.has(key)) return null;
   const t = useTranslationStore().t;
   const calm = prefersReducedMotionNow();
   const move = moveForDate(new Date());
   const sound = pickChoreSound(move, readLastSound());
-  rememberSound(sound);
   const praiseIndex = pickPraiseIndex(req.block, lastPraise);
   lastPraise = praiseIndex;
   const meta = CHORE_BLOCK_META[req.block];
@@ -501,7 +512,6 @@ export function celebrateChore(
   const cap = mode.value.autoDismissMs;
   const endsAt = cap !== null ? Math.min(natural, cap) : natural;
   const anchor = req.anchor ? markRaw(req.anchor) : null;
-  const committed = !!opts.committed || !!req.settled;
   const next = new Map(activeChores.value);
   next.set(key, {
     ...req,
@@ -514,24 +524,16 @@ export function celebrateChore(
     praiseWords: praise.words,
     startedAt: performance.now(),
     calm,
-    phase: 'burst',
+    // Calm and settled have no burst: the banner from the start (still checked by `stillDone`
+    // at the flip for the others).
+    phase: calm || req.settled ? 'banner' : 'burst',
     endsAt,
-    committed,
   });
   activeChores.value = next;
-  // Calm and settled have no burst: their banner is due at once (still only when committed).
   const timers: ReturnType<typeof setTimeout>[] = [];
-  if (calm || req.settled) swapDue.add(key);
-  else
-    timers.push(
-      setTimeout(() => {
-        swapDue.add(key);
-        maybeArrive(key);
-      }, BEATS.swap)
-    );
+  if (!calm && !req.settled) timers.push(setTimeout(() => arriveBanner(key), BEATS.swap));
   timers.push(setTimeout(() => dismissChoreCelebration(key), endsAt));
   choreTimers.set(key, timers);
-  maybeArrive(key);
 
   logEvent({
     level: 'info',
@@ -543,7 +545,7 @@ export function celebrateChore(
       detail: sound,
       count: req.count,
       slot: req.block,
-      stage: anchor ? 'anchored' : 'centered',
+      stage: anchor ? (req.settled ? 'settled' : 'anchored') : 'centered',
       format: calm ? 'calm' : 'full',
     },
   });
@@ -560,12 +562,14 @@ export function celebrateChore(
 }
 
 /**
- * The tick surface's question while a celebration runs: is this bean's block in its burst,
- * so it should keep showing its (all ticked) rows a moment longer? Only an anchored celebration
- * holds a block: a centered one is not about the board on screen.
+ * The tick surface's question: should this bean's block keep showing its (all ticked) rows a
+ * moment longer? While its finishing tick is held (being written), and through an anchored
+ * celebration's burst. A centered celebration holds nothing: it is not about the board on screen.
  */
 export function choreBlockHeld(memberId: string, block: ChoreBlock): boolean {
-  const c = activeChores.value.get(choreCelebrationKey(memberId, block));
+  const key = choreCelebrationKey(memberId, block);
+  if (holds.value.has(key)) return true;
+  const c = activeChores.value.get(key);
   return !!c?.anchor && c.phase === 'burst';
 }
 
@@ -587,9 +591,11 @@ export function choreBannerCelebration(
   return value;
 }
 
-/** Tests only: forget the rotation memory, the sound window and every celebration in flight. */
+/** Tests only: forget the rotation memory, the sound window, holds and every celebration. */
 export function resetChoreCelebrationForTest(): void {
   dismissChoreCelebration();
+  for (const timer of holds.value.values()) clearTimeout(timer);
+  holds.value = new Map();
   lastPraise = null;
   lastSound = null;
   storageNoted = false;

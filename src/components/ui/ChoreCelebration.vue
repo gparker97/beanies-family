@@ -6,7 +6,7 @@
  * Mounted by `CelebrationOverlay` (lazily, `choreCelebrationLoader`), ONE layer per celebration
  * playing (`celebrationKey`, `member:block`): two beans finishing together on the wall each get
  * their own stage, clip and player. `useCelebration` owns WHAT plays (move, sound, praise) and
- * WHEN (the burst → banner phase flip, which also waits for the store's commit, and the end);
+ * WHEN (the burst → banner phase flip and the end, timed from the celebration's own start);
  * this component only draws, through `choreCelebrationPlayer`:
  *
  *  - anchored: measured at play time from the anchor the tick surface built. The stage is
@@ -20,8 +20,8 @@
  *  - reduced motion: nothing moves; the banner, stars and praise simply appear.
  *
  * It ends at once when its premise goes: another page (any route change), or the anchoring block
- * leaving the screen (watched each frame); it never lays out against a block that is gone. A
- * celebration the store abandons (the block turned out not to be done) ends after its burst.
+ * leaving the screen (watched each frame); it never lays out against a block that is gone. It
+ * only ever starts once the store has committed (the block really done, its mark written).
  *
  * Every animation and timer belongs to the player and is cancelled when this layer unmounts. Dark mode: the glow and the canopy strings switch with the theme
  * (`html.dark` rules below); the banner is the fixed brand gradient in both themes.
@@ -294,10 +294,9 @@ async function arrive(c: ActiveChoreCelebration): Promise<void> {
   };
   await nextTick();
   const el = ghostEl.value;
-  const own = el?.querySelector<HTMLElement>('[data-celebration-banner]');
-  if (!isPlaying(c) || !player || !el || !own) return;
-  // The banner itself (its strip mark and hooks), not the wrapper that positions it.
-  playOn(c, own);
+  if (!isPlaying(c) || !player || !el) return;
+  // The player finds the banner inside the wrapper itself (`bannerRoot`).
+  playOn(c, el);
   player.fadeOutBy(el, c.endsAt);
 }
 
