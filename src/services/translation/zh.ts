@@ -7142,6 +7142,7 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'travel.live.railLastCheck': '上次核对',
   'travel.live.railNote':
     '每次打开 beanies 时，以及出发当天每隔几小时，都会核对航班。火车、住宿和租车不会实时核对。',
+  'travel.flightTrack.ariaLabel': '在 FlightAware 上实时跟踪 {flight}（在新标签页中打开）',
   'travel.live.hint.landsAfterCheckIn': '现在落地时间晚于 {title} 的入住日。',
   'travel.live.hint.checkInBeforeLanding': '{title} 现在落地时间晚于这里的入住日。',
   'travel.live.hint.landsAfterConnection': '现在落地时间晚于 {title} 的出发时间。',

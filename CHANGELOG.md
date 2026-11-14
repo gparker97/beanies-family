@@ -15,6 +15,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - **The Choreboard is here.** Chores now have their own place under The Treehouse, separate from Beanie Lists.
 - Chores are sorted by time of day, and finishing a morning, afternoon or evening is met with a celebration; Chores Done and This Week show how the week has gone.
 - Chores also appear on the Beanie Wall and in the daily briefing.
+- A flight number in a travel plan can now be tapped around the day of travel to follow the flight live on FlightAware.
 
 ### Fixed
 

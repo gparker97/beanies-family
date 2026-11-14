@@ -28,6 +28,7 @@ import VacationSegmentCard from '@/components/vacation/VacationSegmentCard.vue';
 import SegmentWhenBand from '@/components/travel/SegmentWhenBand.vue';
 import FlightCheckChip from '@/components/travel/FlightCheckChip.vue';
 import FlightChangeNotice from '@/components/travel/FlightChangeNotice.vue';
+import FlightTrackLink from '@/components/travel/FlightTrackLink.vue';
 import LivePill from '@/components/travel/LivePill.vue';
 import MemberChip from '@/components/ui/MemberChip.vue';
 import PhotoThumbnail from '@/components/media/PhotoThumbnail.vue';
@@ -53,6 +54,9 @@ const props = defineProps<{
   verification?: FlightVerification;
   /** The clock the chip and notice measure "checked N min ago" against. */
   nowMs?: number;
+  /** The flight's FlightAware page while it is worth following (`flightStatusStore.trackUrlFor`),
+   *  else null: the flight number row then reads as plain text. */
+  trackUrl?: string | null;
 }>();
 
 const emit = defineEmits<{
@@ -275,6 +279,15 @@ async function copy(value: string): Promise<void> {
             @update:model-value="emit('inline-save', item, row.field!, $event)"
           />
         </div>
+
+        <!-- A flight's number: a link to follow it live around the day of travel, else the
+             plain number (edited via the ✏️ button, like every text field) -->
+        <span
+          v-else-if="row.field === 'flightNumber'"
+          class="font-outfit dark:text-ink min-w-0 text-sm font-medium text-gray-900"
+        >
+          <FlightTrackLink :label="String(row.value ?? '')" :href="trackUrl" />
+        </span>
 
         <!-- Text / prose field — display-only with expand-to-read-more;
              edit via the ✏️ button on the card header -->

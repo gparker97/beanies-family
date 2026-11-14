@@ -260,4 +260,22 @@ describe('TimelineSegmentCard', () => {
     await chips[0]!.trigger('click');
     expect(folded.emitted('show-notice')![0]![0]).toMatchObject({ id: 'seg-1' });
   });
+
+  describe('flight number: follow it live (FlightTrackLink)', () => {
+    const NUMBER_ROW = { label: 'segmentRow.flightNumber', value: 'SQ 321', field: 'flightNumber' };
+    const HREF = 'https://www.flightaware.com/live/flight/SQ321';
+
+    it('links the flight number row to its trackUrl', () => {
+      const w = mountCard({ detailRows: [NUMBER_ROW] }, { trackUrl: HREF });
+      const link = w.get('[data-testid="flight-track-link"]');
+      expect(link.attributes('href')).toBe(HREF);
+      expect(link.text()).toContain('SQ 321');
+    });
+
+    it('reads as the plain number with no trackUrl (outside the window)', () => {
+      const w = mountCard({ detailRows: [NUMBER_ROW] }, { trackUrl: null });
+      expect(w.find('[data-testid="flight-track-link"]').exists()).toBe(false);
+      expect(w.get('[data-testid="flight-track-plain"]').text()).toBe('SQ 321');
+    });
+  });
 });

@@ -103,6 +103,7 @@ import {
 import { isFlightType } from '@/utils/travelCodes';
 import { noticeRevision } from '@/utils/flightStatus/occurrenceNotice';
 import { normaliseFlightNumber } from '@/utils/flightStatus/flightNumber';
+import { flightTrackUrl } from '@/utils/flightStatus/flightAware';
 import { operatedAs, pickLeg } from '@/utils/flightStatus/match';
 import {
   diffTuple,
@@ -360,6 +361,19 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
 
   function verificationFor(segmentId: string): FlightVerification | undefined {
     return verifications.value.get(segmentId);
+  }
+
+  /**
+   * The FlightAware page to link a flight's number to right now, or null (plain text): only a
+   * flight with a usable number, and only from 24 h before departure to 6 h after arrival
+   * (`flightTrackUrl`). Independent of the live-check switches and plan: it is a link the person
+   * chooses to follow, not a check this app makes. Reads `nowMs`, so it moves with the store's
+   * visible-tab tick and foreground runs, with no clock of its own.
+   */
+  function trackUrlFor(segmentId: string): string | null {
+    const c = segmentsById.value.get(segmentId);
+    if (!c || !isFlightType(c.segment.type)) return null;
+    return flightTrackUrl(c.segment, usableCheck(c.segment), homeZone.value, nowMs.value);
   }
 
   /** Epoch ms of this device's most recent successful check, or null. */
@@ -1531,6 +1545,7 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
     candidateSegments,
     verifications,
     verificationFor,
+    trackUrlFor,
     noticeFirstSeen,
     alerts,
     deepLinkFor,

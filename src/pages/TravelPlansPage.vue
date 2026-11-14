@@ -422,6 +422,7 @@ const liveCheckRows = computed(() => {
         label: flightLabel(seg),
         departureDate: seg.departureDate,
         verification: verification!,
+        trackUrl: flightStatusStore.trackUrlFor(seg.id),
       }))
   );
 });
@@ -1456,6 +1457,7 @@ async function addQuickIdea() {
                       :hint="hintMap.get(item.id)"
                       :verification="flightStatusStore.verificationFor(item.id)"
                       :now-ms="flightStatusStore.nowMs"
+                      :track-url="flightStatusStore.trackUrlFor(item.id)"
                       @inline-save="saveInlineField"
                       @edit="openEditModal"
                       @delete="deleteTimelineItem"
@@ -1517,6 +1519,7 @@ async function addQuickIdea() {
               :hint="hintMap.get(item.id)"
               :verification="flightStatusStore.verificationFor(item.id)"
               :now-ms="flightStatusStore.nowMs"
+              :track-url="flightStatusStore.trackUrlFor(item.id)"
               @inline-save="saveInlineField"
               @edit="openEditModal"
               @delete="deleteTimelineItem"

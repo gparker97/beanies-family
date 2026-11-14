@@ -17,6 +17,80 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.11.14',
+    date: '2026-11-14',
+    month: '14 november 2026',
+    spotlight: true,
+    summary: {
+      en: "The Choreboard is here: chores by time of day, with a celebration when they're done.",
+      beanie:
+        "the choreboard is here: chores by time of day, with a celebration when they're done.",
+    },
+    features: [
+      {
+        icon: '🧹',
+        title: { en: 'The Choreboard', beanie: 'the choreboard' },
+        description: {
+          en: 'Each bean gets their own chores for the morning, afternoon and evening, and finishing a time of day sets off a celebration. Every day starts fresh, with nothing to reset. The phone apps get it with their next update.',
+          beanie:
+            'each bean gets their own chores for the morning, afternoon and evening, and finishing a time of day sets off a celebration. every day starts fresh, with nothing to reset. the phone apps get it with their next update.',
+        },
+        tryItRoute: '/choreboard',
+      },
+      {
+        icon: '⭐',
+        title: { en: 'Chores Done and This Week', beanie: 'chores done and this week' },
+        description: {
+          en: "See how everyone's week went at a glance, day by day.",
+          beanie: "see how everyone's week went at a glance, day by day.",
+        },
+      },
+      {
+        icon: '🖼️',
+        title: {
+          en: 'On the wall and in your briefing',
+          beanie: 'on the wall and in your briefing',
+        },
+        description: {
+          en: 'Chores have their own view on the beanie wall, and the daily briefing shows who still has chores to do.',
+          beanie:
+            'chores have their own view on the beanie wall, and the daily briefing shows who still has chores to do.',
+        },
+      },
+      {
+        icon: '📝',
+        title: { en: 'Lists that work like to-dos', beanie: 'lists that work like to-dos' },
+        description: {
+          en: 'A list can now belong to several people, carry a due date, and show up only when it is needed.',
+          beanie:
+            'a list can now belong to several people, carry a due date, and show up only when it is needed.',
+        },
+      },
+      {
+        icon: '✈️',
+        title: { en: 'Follow a flight live', beanie: 'follow a flight live' },
+        description: {
+          en: 'Around the day of travel, a flight number in a travel plan can be tapped to follow the flight on FlightAware.',
+          beanie:
+            'around the day of travel, a flight number in a travel plan can be tapped to follow the flight on flightaware.',
+        },
+      },
+      {
+        icon: '💬',
+        title: { en: 'Join us on Discord', beanie: 'join us on discord' },
+        description: {
+          en: "Get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+          beanie:
+            "get the latest beanies news and tell us what's working (or not) - report any issues or share feedback, and help shape what's next.",
+        },
+        cta: {
+          label: { en: 'Join the Discord', beanie: 'join the discord' },
+          href: 'https://beanies.family/discord',
+        },
+      },
+    ],
+  },
+  {
     version: '2026.11.12',
     date: '2026-11-12',
     month: '12 november 2026',

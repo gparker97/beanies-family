@@ -36,4 +36,18 @@ describe('TripLiveChecksCard', () => {
     await link.trigger('click');
     expect(w.emitted('check-now')).toBeUndefined();
   });
+
+  it("links a row's flight label to its trackUrl, and keeps it plain without one", () => {
+    const href = 'https://www.flightaware.com/live/flight/SQ319';
+    const w = mount(TripLiveChecksCard, {
+      props: {
+        rows: [ROWS[0]!, { ...ROWS[0]!, id: 'seg-2', label: 'SQ319', trackUrl: href }],
+        nowMs: 2,
+      },
+    });
+    const rows = w.findAll('[data-testid="live-check-row"]');
+    expect(rows[0]!.find('[data-testid="flight-track-link"]').exists()).toBe(false);
+    expect(rows[0]!.text()).toContain('SQ318');
+    expect(rows[1]!.get('[data-testid="flight-track-link"]').attributes('href')).toBe(href);
+  });
 });

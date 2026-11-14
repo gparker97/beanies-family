@@ -15775,6 +15775,10 @@ const STRING_DEFS = {
     beanie:
       'flights are checked when you open beanies and every few hours on the day. trains, stays and cars are not checked live.',
   },
+  'travel.flightTrack.ariaLabel': {
+    en: 'Track {flight} live on FlightAware (opens in a new tab)',
+    beanie: 'track {flight} live on flightaware (opens in a new tab)',
+  },
   'travel.live.hint.landsAfterCheckIn': {
     en: 'Now lands after the {title} check-in day.',
     beanie: 'now lands after the {title} check-in day.',

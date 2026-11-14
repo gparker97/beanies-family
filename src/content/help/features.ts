@@ -3979,7 +3979,7 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
       'beanies.family checks your family’s flights against the airline’s live schedule, so the plan you trust is the plan the airline is running.',
     icon: '✈\u{FE0F}',
     readTime: 4,
-    updatedDate: '2026-11-10',
+    updatedDate: '2026-11-14',
     sections: [
       {
         type: 'paragraph',
@@ -4050,6 +4050,17 @@ export const FEATURES_ARTICLES: HelpArticle[] = [
         type: 'paragraph',
         content:
           'On the day, you may also see the <strong>gate</strong>, the <strong>baggage belt</strong> and an <strong>estimated</strong> departure or arrival. These are shown for information only. They are never written into your plan, so a running-late estimate will not change the time you booked.',
+      },
+      {
+        type: 'heading',
+        content: 'Follow a flight live',
+        level: 2,
+        id: 'follow-live',
+      },
+      {
+        type: 'paragraph',
+        content:
+          'From a day before departure until after it has landed, the flight number on the card becomes a link. Tap it to open the flight on <strong>FlightAware</strong> in a new tab, with its full status and real-time updates, so the traveller and everyone watching at home can follow along. It works on every plan, and the link carries only the flight number.',
       },
       {
         type: 'heading',

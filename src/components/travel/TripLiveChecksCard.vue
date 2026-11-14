@@ -9,6 +9,7 @@
  */
 import { computed } from 'vue';
 import FlightCheckChip from '@/components/travel/FlightCheckChip.vue';
+import FlightTrackLink from '@/components/travel/FlightTrackLink.vue';
 import type { FlightVerification } from '@/types/flightStatus';
 import { useTranslation } from '@/composables/useTranslation';
 import { agoText, shortDate } from '@/utils/flightStatus/copy';
@@ -19,6 +20,8 @@ interface LiveCheckRow {
   label: string;
   departureDate?: string;
   verification: FlightVerification;
+  /** The flight's FlightAware page while it is worth following, else null (plain label). */
+  trackUrl?: string | null;
 }
 
 const props = defineProps<{
@@ -46,9 +49,10 @@ const lastCheckedAt = computed<number | null>(() => {
   return latest;
 });
 
-function rowLabel(r: LiveCheckRow): string {
+/** " · 13 Dec" after the flight label, or nothing without a date. */
+function rowDateSuffix(r: LiveCheckRow): string {
   const date = shortDate(r.departureDate, currentLanguage?.value);
-  return date ? `${r.label} · ${date}` : r.label;
+  return date ? ` · ${date}` : '';
 }
 </script>
 
@@ -94,7 +98,9 @@ function rowLabel(r: LiveCheckRow): string {
         class="flex items-center justify-between gap-3 py-2 text-sm"
         data-testid="live-check-row"
       >
-        <span class="text-secondary-500 dark:text-ink min-w-0 truncate">{{ rowLabel(r) }}</span>
+        <span class="text-secondary-500 dark:text-ink min-w-0 truncate"
+          ><FlightTrackLink :label="r.label" :href="r.trackUrl" />{{ rowDateSuffix(r) }}</span
+        >
         <FlightCheckChip :verification="r.verification" :now-ms="nowMs" compact />
       </li>
       <li

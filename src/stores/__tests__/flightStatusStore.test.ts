@@ -1829,3 +1829,25 @@ describe('deepLinkFor (a push tap)', () => {
     expect(store.deepLinkFor('SQ999', '2026-12-13')).toBeNull();
   });
 });
+
+describe('trackUrlFor: the FlightAware link around the day of travel', () => {
+  // makeFlight() leaves 2026-12-13 17:00 Singapore (09:00Z): NOW is exactly 24 h before.
+  it('links from 24 h before departure', () => {
+    const store = useFlightStatusStore();
+    expect(store.trackUrlFor('seg-1')).toBe('https://www.flightaware.com/live/flight/SQ318');
+  });
+
+  it('plain text a minute before the window opens (the store clock is the input)', () => {
+    vi.setSystemTime(NOW - MIN);
+    const store = useFlightStatusStore();
+    expect(store.trackUrlFor('seg-1')).toBeNull();
+  });
+
+  it('does not depend on the live-check switch or plan, and is null for an unknown segment', () => {
+    settings.liveFlightChecksEnabled = false;
+    Object.assign(entitlement, { enforces: true, state: 'expired' });
+    const store = useFlightStatusStore();
+    expect(store.trackUrlFor('seg-1')).not.toBeNull();
+    expect(store.trackUrlFor('nope')).toBeNull();
+  });
+});
