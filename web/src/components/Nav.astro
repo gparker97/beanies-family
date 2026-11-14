@@ -1,7 +1,8 @@
 ---
 import { APP_URL } from '@beanies/brand/nav';
+import { routePath } from '~/lib/routePath';
 
-const currentPath = Astro.url.pathname;
+const currentPath = routePath(Astro.url);
 const isHome = currentPath === '/';
 
 // In-page anchors on the homepage stay as #anchors so the same-page smooth-scroll

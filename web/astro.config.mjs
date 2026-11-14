@@ -3,6 +3,7 @@ import { fileURLToPath, URL } from 'node:url';
 import { defineConfig } from 'astro/config';
 import sitemap from '@astrojs/sitemap';
 import mdx from '@astrojs/mdx';
+import { unified } from '@astrojs/markdown-remark';
 import tailwindcss from '@tailwindcss/vite';
 import rehypeGuideAnnotations from './src/lib/rehype-guide-annotations.mjs';
 import rehypeExternalLinks from './src/lib/rehype-external-links.mjs';
@@ -43,14 +44,22 @@ export default defineConfig({
     // money on a browse-heavy content site.
     inlineStylesheets: 'always',
   },
+  // Astro 7 changed the default from `true` to 'jsx', which drops the space
+  // between adjacent inline elements. Keep the Astro 5 behaviour so the
+  // rendered copy does not change under the upgrade.
+  compressHTML: true,
   markdown: {
-    rehypePlugins: [
-      rehypeGuideAnnotations,
-      rehypeExternalLinks,
-      rehypeImageDims,
-      rehypeTableWrap,
-      rehypeWideImages,
-    ],
+    // Astro 7 renders Markdown with Sätteri by default. Our rehype plugins
+    // are unified (HAST) plugins, so stay on the remark/rehype pipeline.
+    processor: unified({
+      rehypePlugins: [
+        rehypeGuideAnnotations,
+        rehypeExternalLinks,
+        rehypeImageDims,
+        rehypeTableWrap,
+        rehypeWideImages,
+      ],
+    }),
   },
   // Canonical homepage is the apex (beanies.family). Anyone hitting /home
   // gets sent there. /welcome is an app-surface URL — kick it to the PWA so

@@ -19,6 +19,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 - Pop-up menus and the time picker now stay inside the bottom of the screen.
 
+### Security
+
+- The marketing site's build tooling was updated to Astro 7, which clears the open security advisories.
+
 ## 2026-11-13
 
 ### Added

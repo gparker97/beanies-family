@@ -1,4 +1,5 @@
-import { defineCollection, z } from 'astro:content';
+import { defineCollection } from 'astro:content';
+import { z } from 'astro/zod';
 import { glob } from 'astro/loaders';
 
 /**
@@ -130,7 +131,7 @@ const guides = defineCollection({
       .array(
         z.object({
           title: z.string(),
-          url: z.string().url(),
+          url: z.url(),
           description: z.string().optional(),
         })
       )

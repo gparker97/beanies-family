@@ -1,7 +1,8 @@
 ---
 import { APP_URL } from '@beanies/brand/nav';
+import { routePath } from '~/lib/routePath';
 
-const currentPath = Astro.url.pathname;
+const currentPath = routePath(Astro.url);
 const isHome = currentPath === '/';
 const year = new Date().getFullYear();
 ---

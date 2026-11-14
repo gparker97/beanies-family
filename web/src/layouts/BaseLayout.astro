@@ -6,6 +6,7 @@ import JsonLd from '../components/JsonLd.astro';
 import AppLinks from '../components/AppLinks.astro';
 import { ORGANIZATION, WEBSITE } from '@beanies/brand/schema';
 import { SITE_URL } from '@beanies/brand/nav';
+import { routePath } from '~/lib/routePath';
 import '../styles/global.css';
 // Self-hosted variable fonts (shipped with the build, no third-party request).
 // Variable fonts are a single file per family, covering all weights 300-800.
@@ -61,7 +62,7 @@ interface Props {
 const {
   title,
   description,
-  canonicalPath = Astro.url.pathname,
+  canonicalPath = routePath(Astro.url),
   ogImage = `${SITE_URL}/brand/og-default.png`,
   ogImageAlt = 'the beanies family, hugging',
   ogType = 'website',
