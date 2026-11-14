@@ -7,7 +7,8 @@
  *    column, 2 from 768px, 3 from 1280px, cards in a row stretched to its height); beans with no
  *    chores as chips in one "No Chores Yet" strip below; Hours and ONE Add Chores (the sheet, for
  *    one chore or a whole set); the "No one's" group for chores whose people have left the
- *    family; the "Chores Done" board below the cards at every width (days across); an empty
+ *    family; below them, on the same grid, the "Chores Done" board (days across) and the
+ *    "This Week" card (`ChoreWeekSummary`): side by side from 1280px, stacked below; an empty
  *    state.
  *  - A BEAN'S DAY (`?bean=<id>`): the tick view. Every block open with its chores ("Now" first
  *    and biggest, each folding by its header for this visit), the all-done banner (a short
@@ -55,6 +56,7 @@ import ChoreBlockSection from '@/components/chores/ChoreBlockSection.vue';
 import ChoreBlockSummary from '@/components/chores/ChoreBlockSummary.vue';
 import ChoreRow from '@/components/chores/ChoreRow.vue';
 import ChoreWeekPanel from '@/components/chores/ChoreWeekPanel.vue';
+import ChoreWeekSummary from '@/components/chores/ChoreWeekSummary.vue';
 import ChoreBeanEditor from '@/components/chores/ChoreBeanEditor.vue';
 import ChoreAddSheet from '@/components/chores/ChoreAddSheet.vue';
 import ChoreCopyModal from '@/components/chores/ChoreCopyModal.vue';
@@ -644,7 +646,7 @@ function revealBlock(block: ChoreBlock): void {
               768px, three from 1280px, each column capped so one or two beans never stretch.
               Cards in a row share its height (stretch), their content at the top.
             -->
-            <div class="chore-card-grid grid gap-3.5" data-testid="chore-card-grid">
+            <div class="chore-home-grid grid gap-3.5" data-testid="chore-card-grid">
               <ChoreBeanCard
                 v-for="bean in cardBeans"
                 :key="bean.member.id"
@@ -714,13 +716,29 @@ function revealBlock(block: ChoreBlock): void {
             </section>
           </div>
 
-          <!-- Under the cards at every width. Under 768px the quick-add button floats over the
-               page's last rows: the padding lets the board's last row scroll clear of it. -->
-          <div v-if="showBoard" class="min-w-0 max-md:pb-20">
+          <!--
+            The lower row, on the SAME grid as the cards so the edges line up: from 1280px Chores
+            Done spans the first two columns and This Week takes the third; from 768px Chores Done
+            spans both columns with This Week under it; on a phone they stack. Under 768px the
+            quick-add button floats over the page's last rows: the padding lets the last card
+            scroll clear of it.
+          -->
+          <div
+            v-if="showBoard"
+            class="chore-home-grid chore-home-lower grid items-stretch gap-3.5 max-md:pb-20"
+            data-testid="chore-home-lower"
+          >
             <ChoreWeekPanel
+              class="chore-home-board"
               :rows="weekRows"
               :today-ymd="todayYmd"
               open-day-action
+              @open-day="openDay"
+            />
+            <ChoreWeekSummary
+              class="chore-home-summary"
+              :rows="weekRows"
+              :today-ymd="todayYmd"
               @open-day="openDay"
             />
           </div>
@@ -752,20 +770,35 @@ function revealBlock(block: ChoreBlock): void {
 </template>
 
 <style scoped>
-/* The bean cards: 1 column, 2 from 768px, 3 from 1280px, each capped (never a stretched slab). */
-.chore-card-grid {
+/* The home's ONE grid, shared by the bean cards and the lower row (Chores Done, This Week) so
+   their edges line up: 1 column, 2 from 768px, 3 from 1280px, each capped (never a slab). */
+.chore-home-grid {
   grid-template-columns: minmax(0, 1fr);
 }
 
 @media (width >= 48rem) {
-  .chore-card-grid {
+  .chore-home-grid {
     grid-template-columns: repeat(2, minmax(0, 34rem));
+  }
+
+  /* Seven days need both columns; This Week goes under the board. */
+  .chore-home-lower > .chore-home-board,
+  .chore-home-lower > .chore-home-summary {
+    grid-column: 1 / -1;
   }
 }
 
 @media (width >= 80rem) {
-  .chore-card-grid {
+  .chore-home-grid {
     grid-template-columns: repeat(3, minmax(0, 32rem));
+  }
+
+  .chore-home-lower > .chore-home-board {
+    grid-column: 1 / span 2;
+  }
+
+  .chore-home-lower > .chore-home-summary {
+    grid-column: 3;
   }
 }
 

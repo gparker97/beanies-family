@@ -28,6 +28,7 @@ import {
   shiftChoreDay,
   choreDayRecord,
   choreWeekRecord,
+  choreWeekTallies,
 } from '../chores';
 
 const D = DEFAULT_CHORE_BLOCK_STARTS;
@@ -629,6 +630,52 @@ describe('choreWeekRecord', () => {
 
   it('empty for a malformed date', () => {
     expect(choreWeekRecord(list, index, 'kid', 'garbage')).toEqual({ days: [], total: 0 });
+  });
+});
+
+describe('choreWeekTallies', () => {
+  const list = [chore('a'), chore('b', { block: 'evening' })];
+
+  it('mid-week: done and due Monday through today, days to come add nothing', () => {
+    const index = indexMarks([
+      mark('done', 'kid', '2026-11-09', 'a'), // Mon 2 of 2: perfect
+      mark('done', 'kid', '2026-11-09', 'b'),
+      mark('done', 'kid', '2026-11-10', 'a'), // Tue 1 of 2
+      mark('done', 'kid', FRI, 'a'), // today 1 of 2, partly done
+    ]);
+    const week = choreWeekRecord(list, index, 'kid', FRI, 1);
+    const { beans, perfectDays } = choreWeekTallies([week], FRI);
+    // Mon..Fri is five days of two chores: due 10, done 4; Sat and Sun are not counted.
+    expect(beans[0]).toEqual({ done: 4, due: 10, perfectDays: 1 });
+    expect(perfectDays).toBe(1);
+    // The same numbers as the cells: the sum of the day records up to today.
+    const upToToday = week.days.filter((d) => d.ymd <= FRI);
+    expect(beans[0]!.done).toBe(upToToday.reduce((n, d) => n + d.done, 0));
+    expect(beans[0]!.due).toBe(upToToday.reduce((n, d) => n + d.total, 0));
+  });
+
+  it('today all done counts as a perfect day; perfect days add up across beans', () => {
+    const shared = [chore('s', { assigneeIds: ['kid', 'sib'] })];
+    const index = indexMarks([mark('done', 'kid', FRI, 's'), mark('done', 'sib', FRI, 's')]);
+    const weeks = ['kid', 'sib'].map((id) => choreWeekRecord(shared, index, id, FRI, 1));
+    const t = choreWeekTallies(weeks, FRI);
+    expect(t.beans.map((b) => b.perfectDays)).toEqual([1, 1]);
+    expect(t.perfectDays).toBe(2);
+  });
+
+  it('a week with nothing due: zeros, and no perfect days', () => {
+    const weekend = [chore('w', { days: [0, 6] })];
+    const week = choreWeekRecord(weekend, indexMarks([]), 'kid', FRI, 1);
+    expect(choreWeekTallies([week], FRI)).toEqual({
+      beans: [{ done: 0, due: 0, perfectDays: 0 }],
+      perfectDays: 0,
+    });
+  });
+
+  it('a bean whose chores began mid-week: due counts only from then', () => {
+    const late = [chore('n', { createdAt: localNoon('2026-11-12') })]; // Thursday
+    const week = choreWeekRecord(late, indexMarks([]), 'kid', FRI, 1);
+    expect(choreWeekTallies([week], FRI).beans[0]).toEqual({ done: 0, due: 2, perfectDays: 0 });
   });
 });
 

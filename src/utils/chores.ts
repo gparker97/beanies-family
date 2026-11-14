@@ -543,6 +543,39 @@ export function choreWeekRecord(
   return { days, total: days.reduce((n, d) => n + d.done, 0) };
 }
 
+/** One bean's week so far: done and due from the week's first day through today. */
+export interface ChoreWeekTally {
+  done: number;
+  /** What was due Monday (the week's first day) through today; days to come add nothing. */
+  due: number;
+  /** Past days and today with something due and every chore of it done. */
+  perfectDays: number;
+}
+
+/**
+ * The "This Week" card's arithmetic (#146), from the SAME day records the Chores Done cells show
+ * (`choreWeekRecord`), so the card and the cells cannot disagree: per bean, the sum of `done` and
+ * of `total` over the days up to and including `todayYmd`, and the days among those with
+ * something due and all of it done; and the family's perfect days summed across beans. A day
+ * with nothing due adds nothing and is never perfect.
+ */
+export function choreWeekTallies(
+  weeks: readonly ChoreWeekRecord[],
+  todayYmd: string
+): { beans: ChoreWeekTally[]; perfectDays: number } {
+  const beans = weeks.map((week) => {
+    const tally: ChoreWeekTally = { done: 0, due: 0, perfectDays: 0 };
+    for (const day of week.days) {
+      if (day.ymd > todayYmd) continue;
+      tally.done += day.done;
+      tally.due += day.total;
+      if (day.total > 0 && day.done === day.total) tally.perfectDays += 1;
+    }
+    return tally;
+  });
+  return { beans, perfectDays: beans.reduce((n, b) => n + b.perfectDays, 0) };
+}
+
 /** A usable date strictly older than `cutoff` and not in the future. Anything else: KEEP. */
 function isExpiredDate(value: string | undefined, cutoff: string, todayYmd: string): boolean {
   const ymd = typeof value === 'string' ? value.slice(0, 10) : '';

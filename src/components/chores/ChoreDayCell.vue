@@ -161,9 +161,10 @@ function onClick(event: MouseEvent): void {
   flex-direction: column;
   justify-content: center;
 
-  /* Never a slab: a cell stays day-cell sized, centred in its column. */
+  /* Never a slab: a cell stays day-cell sized, centred in its column. The board may raise the
+     cap (`--chore-cell-max`) where it has the room. */
   justify-self: center;
-  max-width: 5.25rem;
+  max-width: var(--chore-cell-max, 5.25rem);
   min-height: 2rem;
   min-width: 0;
   position: relative;

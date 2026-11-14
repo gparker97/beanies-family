@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * "Chores Done" (#146): the week as squarish day cells (`ChoreDayCell`), Monday to Sunday (the
- * family's week start), with each bean's week total and a small legend. Tapping a past day or
+ * family's week start), with each bean's week total (the legend lives in the "This Week" card, `ChoreWeekSummary`). Tapping a past day or
  * today opens that day's read-only summary (`ChoreDayPopover`); days still to come do nothing.
  *
  * Every number is a `choreDayRecord` from `choreStore.weekFor` (rows), and the popover is handed
@@ -9,8 +9,7 @@
  *
  * Two shapes, one component:
  *  - the grown-ups' board, days ACROSS (beans down), below the cards at every width. The day
- *    columns are capped (5.25rem) so the cells stay squarish and tappable on a wide screen,
- *    the grid left-aligned in the card; under 30rem of board (`container-name: chore-board`)
+ *    columns grow with the card up to a cap (6.5rem), the grid centred past it; under 30rem of board (`container-name: chore-board`)
  *    the names fold to avatars and the cells turn square;
  *  - one bean's own week (`single`): seven across, the total in the header, the hint under it,
  *    no legend. It replaces the old "This week" row on a bean's day.
@@ -122,11 +121,6 @@ const gridItems = computed<GridItem[]>(() => {
   ];
 });
 
-/** A past day (or today) with nothing due somewhere on the board: the legend explains it. */
-const hasFreeDay = computed(() =>
-  props.rows.some((r) => r.week.days.some((d) => d.ymd <= props.todayYmd && d.total === 0))
-);
-
 // ── The day summary ─────────────────────────────────────────────────────────
 
 /** Which cell's summary is open. The record is looked up live, so a tick while open shows. */
@@ -188,7 +182,9 @@ function onOpenDay(): void {
       <h2 class="font-outfit dark:text-ink text-secondary-500 text-base font-bold">
         {{ t('choreboard.week.panelTitle') }}
       </h2>
-      <span class="dark:text-ink-faint text-secondary-400 text-xs">{{
+      <!-- On home the "This Week" card sits beside the board, so the sub-label is a bean's
+           own week only. -->
+      <span v-if="single" class="dark:text-ink-faint text-secondary-400 text-xs">{{
         t('choreboard.week.title')
       }}</span>
       <span class="flex-1" />
@@ -275,42 +271,6 @@ function onOpenDay(): void {
       {{ t('choreboard.week.panelHint') }}
     </p>
 
-    <!-- The legend: the grown-ups' board only. The cells' own labels say all of this. -->
-    <div
-      v-if="!single"
-      class="dark:text-ink-faint text-secondary-400 mt-3 flex flex-wrap gap-x-3.5 gap-y-1.5 text-xs"
-      aria-hidden="true"
-      data-testid="chore-week-legend"
-    >
-      <span class="inline-flex items-center gap-1.5"
-        ><i class="h-3.5 w-3.5 rounded-[5px] bg-[var(--chore-heat-2)]" />{{
-          t('choreboard.week.legend.some')
-        }}</span
-      >
-      <span class="inline-flex items-center gap-1.5"
-        ><i class="h-3.5 w-3.5 rounded-[5px] bg-[var(--chore-heat-4)]" />{{
-          t('choreboard.block.allDone')
-        }}
-        ⭐</span
-      >
-      <span class="inline-flex items-center gap-1.5"
-        ><i
-          class="h-3.5 w-3.5 rounded-[5px] border-[1.5px] border-dashed border-[var(--color-border)]"
-        />{{ t('choreboard.week.legend.none') }}</span
-      >
-      <span class="inline-flex items-center gap-1.5"
-        ><i class="h-3.5 w-3.5 rounded-[5px] border-[1.5px] border-[var(--color-border)]" />{{
-          t('choreboard.week.legend.future')
-        }}</span
-      >
-      <!-- Only when the board shows such a day, so the legend stays short. -->
-      <span v-if="hasFreeDay" class="inline-flex items-center gap-1.5"
-        ><i class="h-3.5 w-3.5 rounded-[5px] bg-[var(--tint-slate-5)]" />{{
-          t('choreboard.week.legend.free')
-        }}</span
-      >
-    </div>
-
     <ChoreDayPopover
       :open="!!openCell"
       :member="openRow?.member ?? null"
@@ -331,14 +291,16 @@ function onOpenDay(): void {
   container: chore-board / inline-size;
 }
 
-/* Each day column is capped, so the cells stay squarish (never slabs) on a wide screen; the
-   grid sits at the start of the card. */
+/* Each day column grows with the card up to a cap (6.5rem), so the board fills its two grid
+   columns on home without the cells turning into slabs; past the cap the grid is centred. */
 .board-grid-across {
-  grid-template-columns: minmax(2rem, max-content) repeat(7, minmax(0, 5.25rem)) minmax(
+  --chore-cell-max: 6.5rem;
+
+  grid-template-columns: minmax(2rem, max-content) repeat(7, minmax(0, 6.5rem)) minmax(
       2.25rem,
       max-content
     );
-  justify-content: start;
+  justify-content: center;
 }
 
 /* A narrow board (a phone): the names fold to avatars (each cell's label still names the bean). */

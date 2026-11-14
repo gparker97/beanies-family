@@ -64,6 +64,7 @@ vi.mock('@/composables/useQuickAddIntent', () => ({
 }));
 
 import ChoreboardPage from '../ChoreboardPage.vue';
+import { repoFile } from '@/test/repoFile';
 import { useBreakpoint } from '@/composables/useBreakpoint';
 import { useMediaQuery } from '@/composables/useMediaQuery';
 import {
@@ -285,18 +286,48 @@ describe('a grown-up viewer', () => {
     expect(html.indexOf('chore-card-grid')).toBeLessThan(html.indexOf('chore-week-panel'));
   });
 
-  it('a wide screen: the board stays below the cards, days across, no rail', async () => {
-    setWide(true);
+  it('the lower row: Chores Done then This Week, on the SAME grid as the cards', async () => {
     const w = await mountPage();
-    const html = w.html();
-    expect(html.indexOf('chore-card-grid')).toBeLessThan(html.indexOf('chore-week-panel'));
-    expect(w.find('.home-grid-rail').exists()).toBe(false);
+    const cards = w.get('[data-testid="chore-card-grid"]');
+    const lower = w.get('[data-testid="chore-home-lower"]');
+    // One grid class for both, so the columns (and the edges) are the same.
+    expect(cards.classes()).toContain('chore-home-grid');
+    expect(lower.classes()).toContain('chore-home-grid');
+    const [board, summary] = lower.element.children;
+    expect(board!.getAttribute('data-testid')).toBe('chore-week-panel');
+    expect(summary!.getAttribute('data-testid')).toBe('chore-week-summary');
+    expect(board!.classList).toContain('chore-home-board');
+    expect(summary!.classList).toContain('chore-home-summary');
+    // The legend lives in This Week now, not under the board.
+    expect(summary!.querySelector('[data-testid="chore-week-legend"]')).not.toBeNull();
+    expect(board!.querySelector('[data-testid="chore-week-legend"]')).toBeNull();
+    // A row in This Week opens that bean's day.
+    await lower
+      .get('[data-testid="chore-week-summary-row"][data-member-id="sib"]')
+      .trigger('click');
+    expect(routerFns.push).toHaveBeenCalledWith({ query: { bean: 'sib' } });
   });
 
-  it('a child never sees the "No Chores Yet" strip', async () => {
+  it('the layout switch at the three widths (the page grid rules)', () => {
+    // happy-dom does not lay out media queries, so the rules themselves are pinned: a phone
+    // stacks (one column), 768px spans both columns for each, 1280px puts the board across
+    // columns 1-2 and This Week in column 3.
+    const css = repoFile('src/pages/ChoreboardPage.vue').replace(/\s+/g, ' ');
+    expect(css).toContain('.chore-home-grid { grid-template-columns: minmax(0, 1fr); }');
+    expect(css).toMatch(
+      /@media \(width >= 48rem\) \{ .chore-home-grid \{ grid-template-columns: repeat\(2, [^}]*\} .*?\.chore-home-lower > \.chore-home-summary \{ grid-column: 1 \/ -1; \}/
+    );
+    expect(css).toMatch(
+      /@media \(width >= 80rem\) \{ .chore-home-grid \{ grid-template-columns: repeat\(3, [^}]*\} \.chore-home-lower > \.chore-home-board \{ grid-column: 1 \/ span 2; \} \.chore-home-lower > \.chore-home-summary \{ grid-column: 3; \}/
+    );
+  });
+
+  it('a child never sees the "No Chores Yet" strip, the board or This Week', async () => {
     family.currentMemberId = 'kid';
     const w = await mountPage();
     expect(w.find('[data-testid="chore-no-chores"]').exists()).toBe(false);
+    expect(w.find('[data-testid="chore-week-summary"]').exists()).toBe(false);
+    expect(w.find('[data-testid="chore-home-lower"]').exists()).toBe(false);
   });
 
   it('a card’s Edit Chores opens that bean’s chore list; Add Chores (no chores yet) opens it empty', async () => {

@@ -162,11 +162,9 @@ describe('ChoreWeekPanel: the grown-ups board', () => {
     expect(counts).toEqual(['1', '3', false, false, '2', false, false]);
     const total = w.get('[data-testid="chore-week-panel-total"][data-member-id="kid"]');
     expect(total.text()).toBe('⭐ 6');
-    expect(w.find('[data-testid="chore-week-legend"]').exists()).toBe(true);
-    // Every past day had chores due: no "No Chores Due" entry.
-    expect(w.get('[data-testid="chore-week-legend"]').text()).not.toContain(
-      'choreboard.week.legend.free'
-    );
+    // The legend moved to the "This Week" card; the board's sub-label is not repeated there.
+    expect(w.find('[data-testid="chore-week-legend"]').exists()).toBe(false);
+    expect(w.text()).not.toContain('choreboard.week.title');
   });
 });
 
@@ -243,9 +241,6 @@ describe('the day summary', () => {
     expect(popover()).toBeNull();
     expect(w.get('[data-testid="chore-week-panel-total"]').attributes('aria-label')).toBe(
       'choreboard.week.totalAriaFor.other'
-    );
-    expect(w.get('[data-testid="chore-week-legend"]').text()).toContain(
-      'choreboard.week.legend.free'
     );
   });
 

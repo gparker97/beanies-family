@@ -16365,6 +16365,30 @@ const STRING_DEFS = {
     en: '{name}, {day}: nothing done yet',
     beanie: '{name}, {day}: nothing done yet',
   },
+  'choreboard.weekSummary.perfect.one': {
+    en: '{count} perfect day',
+    beanie: '{count} perfect day',
+  },
+  'choreboard.weekSummary.perfect.other': {
+    en: '{count} perfect days',
+    beanie: '{count} perfect days',
+  },
+  'choreboard.weekSummary.perfectNone': {
+    en: 'No perfect days yet',
+    beanie: 'no perfect days yet',
+  },
+  'choreboard.weekSummary.nothingDue': {
+    en: 'Nothing due yet',
+    beanie: 'nothing due yet',
+  },
+  'choreboard.weekSummary.rowAria': {
+    en: "Open {name}'s day. {done} of {due} done this week",
+    beanie: "open {name}'s day. {done} of {due} done this week",
+  },
+  'choreboard.weekSummary.rowAriaNone': {
+    en: "Open {name}'s day. Nothing due yet this week",
+    beanie: "open {name}'s day. nothing due yet this week",
+  },
   'choreboard.week.legend.free': {
     en: 'No Chores Due',
     beanie: 'no chores due',
