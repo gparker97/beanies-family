@@ -31,7 +31,7 @@
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.12",
-    "@lhci/cli": "^0.15.1",
+    "@lhci/cli": "^0.16.0",
     "sharp": "^0.35.5",
     "typescript": "~5.9.3"
   }
