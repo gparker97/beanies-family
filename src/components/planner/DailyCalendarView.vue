@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { rootFontSizePx } from '@/utils/rootFontSize';
 import type { ActivityOccurrence } from '@/utils/calendar/occurrence';
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import DayTimeline from '@/components/planner/DayTimeline.vue';
@@ -304,7 +305,7 @@ async function scrollToNow(opts: { force?: boolean } = {}) {
   const start = hours.value[0] ?? 7;
   // ROW_HEIGHT is in rem (so the grid participates in Large text-size mode);
   // convert to px here because scrollTop wants pixels.
-  const rootPx = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+  const rootPx = rootFontSizePx();
   const offsetWithinGrid = Math.max(0, (scrollHour - start) * ROW_HEIGHT * rootPx);
   const gridTop = gridRef.value.getBoundingClientRect().top + window.scrollY;
   mainEl.scrollTo({

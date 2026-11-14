@@ -17,7 +17,7 @@ function anchorAt(rect: Partial<DOMRect>): HTMLElement {
 
 function setup(
   anchor: HTMLElement | null,
-  opts: { align?: 'start' | 'end'; side?: 'below' | 'start'; active?: boolean } = {}
+  opts: { align?: 'start' | 'end'; active?: boolean } = {}
 ) {
   const anchorRef = ref<HTMLElement | null>(anchor);
   const popoverRef = ref<HTMLElement | null>(null);
@@ -29,7 +29,6 @@ function setup(
       popoverRef,
       active,
       align: opts.align,
-      side: opts.side,
       widthEstimate: 200,
       heightEstimate: 300,
     })
@@ -46,34 +45,6 @@ afterEach(() => {
 });
 
 describe('useAnchoredPosition', () => {
-  it("side 'start' opens beside the anchor on its left, level with it, clamped to the viewport", () => {
-    const { popoverStyle, reposition, scope } = setup(
-      anchorAt({ top: 400, bottom: 440, left: 700, right: 760, height: 40 }),
-      { side: 'start' }
-    );
-    reposition();
-    // Centred on the anchor: 420 - 300 / 2 = 270; left = 700 - 200 - 12.
-    expect(popoverStyle.value).toMatchObject({ top: '270px', left: '488px' });
-    scope.stop();
-    // Near the bottom: clamped so it stays on screen (800 - 300 - 8).
-    const low = setup(anchorAt({ top: 740, bottom: 780, left: 700, right: 760, height: 40 }), {
-      side: 'start',
-    });
-    low.reposition();
-    expect(low.popoverStyle.value).toMatchObject({ top: '492px', left: '488px' });
-    low.scope.stop();
-  });
-
-  it("side 'start' with no room on the left falls back to below", () => {
-    const { popoverStyle, reposition, scope } = setup(
-      anchorAt({ top: 100, bottom: 130, left: 40, right: 140, height: 30 }),
-      { side: 'start', align: 'start' }
-    );
-    reposition();
-    expect(popoverStyle.value).toMatchObject({ top: '136px', left: '40px' });
-    scope.stop();
-  });
-
   it('drops below the anchor, start-aligned, at the popover z tier', () => {
     const { popoverStyle, reposition, scope } = setup(
       anchorAt({ top: 100, bottom: 130, left: 40, right: 140 }),

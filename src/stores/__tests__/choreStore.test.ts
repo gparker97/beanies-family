@@ -43,17 +43,31 @@ const reportError = vi.fn();
 vi.mock('@/utils/errorReporter', () => ({
   reportError: (...a: unknown[]) => reportError(...a),
 }));
+/** A COMMITTED celebration (the bean sees the whole thing): called with its request. */
 const celebrate = vi.fn();
-/** What happened in what order: the hold, the marks refresh, the release, the celebration. */
+/**
+ * What happened in what order: `start:<member>` (the burst, at the tap, on a prediction), each
+ * marks `refresh`, `commit`, and `abandon:<reason>` (ended quietly after its burst).
+ */
 const order = vi.hoisted(() => [] as string[]);
+const started = vi.hoisted(() => new Map<string, unknown>());
 vi.mock('@/composables/useCelebration', () => ({
-  celebrateChore: (...a: unknown[]) => {
-    order.push('celebrate');
-    celebrate(...a);
+  celebrateChore: (req: { memberId: string; block: string; settled?: boolean }) => {
+    const key = `${req.memberId}:${req.block}`;
+    if (req.settled) {
+      order.push(`settled:${req.memberId}`);
+      celebrate(req);
+      return key;
+    }
+    order.push(`start:${req.memberId}`);
+    started.set(key, req);
+    return key;
   },
-  holdChoreBlock: (memberId: string, block: string) => order.push(`hold:${memberId}:${block}`),
-  releaseChoreBlock: (memberId: string, block: string) =>
-    order.push(`release:${memberId}:${block}`),
+  commitChoreCelebration: (key: string) => {
+    order.push('commit');
+    celebrate(started.get(key));
+  },
+  abandonChoreCelebration: (_key: string, reason: string) => order.push(`abandon:${reason}`),
 }));
 const budget = vi.hoisted(() => ({ allow: true, calls: [] as string[] }));
 vi.mock('@/utils/autoWriteBudget', () => ({
@@ -251,6 +265,8 @@ async function setup(chores: Chore[], marks: ChoreMark[] = []): Promise<void> {
 
 beforeEach(async () => {
   setActivePinia(createPinia());
+  started.clear();
+  order.length = 0;
   db.chores.clear();
   db.marks.clear();
   db.failNext = null;
@@ -356,7 +372,7 @@ describe('ticking', () => {
 });
 
 describe('the once-only celebration', () => {
-  it('the completing tick writes done + celebrated in ONE batch, and celebrates once', async () => {
+  it('the completing tick: done, then (once the block is really done) celebrated, once', async () => {
     await setup([chore('c1'), chore('c2', { sortOrder: 1 })]);
     await store.toggleChore('c1', 'kid', { surface: 'wall', by: 'kid' });
     expect(celebrate).not.toHaveBeenCalled();
@@ -364,12 +380,15 @@ describe('the once-only celebration', () => {
 
     const result = await store.toggleChore('c2', 'kid', { surface: 'wall', by: 'kid' });
     expect(result).toEqual({ action: 'tick', completed: 'morning', celebrated: true });
-    expect(writes.setChoreMarks).toHaveBeenCalledTimes(1);
-    const [items, opts] = writes.setChoreMarks.mock.calls[0]!;
-    expect(opts).toEqual({ ifAbsent: true });
-    expect((items as { id: string }[]).map((i) => i.id)).toEqual([
-      choreMarkId('done', 'kid', FRI, 'c2'),
-      choreMarkId('celebrated', 'kid', FRI, 'morning'),
+    // Prediction and commitment apart: the tick's done mark, then the celebrated mark.
+    expect(
+      writes.setChoreMarks.mock.calls.map(([items, opts]) => [
+        (items as { id: string }[]).map((i) => i.id),
+        opts,
+      ])
+    ).toEqual([
+      [[choreMarkId('done', 'kid', FRI, 'c2')], { ifAbsent: true }],
+      [[choreMarkId('celebrated', 'kid', FRI, 'morning')], { ifAbsent: true }],
     ]);
     expect(celebrate).toHaveBeenCalledTimes(1);
     // The bean's first name and one star per chore; no anchor from this caller (centered).
@@ -378,7 +397,7 @@ describe('the once-only celebration', () => {
       block: 'morning',
       beanName: 'kid',
       count: 2,
-      anchor: undefined,
+      anchor: null,
       settled: false,
       stillDone: expect.any(Function),
     });
@@ -425,17 +444,19 @@ describe('the once-only celebration', () => {
     expect(celebrate).toHaveBeenCalledTimes(1);
   });
 
-  it('with an anchor, the block is held BEFORE the marks refresh, so its rows never unmount', async () => {
+  it('a predicted finish bursts at the TAP, before any refresh, and commits after the mark', async () => {
     await setup([chore('c1'), chore('c2', { sortOrder: 1 })]);
     await store.toggleChore('c1', 'kid', { surface: 'app' });
     order.length = 0;
     const anchor = { block: document.createElement('section') } as never;
     await store.toggleChore('c2', 'kid', { surface: 'app', anchor });
-    expect(order).toEqual(['hold:kid:morning', 'refresh', 'celebrate']);
-    // A non-finishing tick holds nothing; neither does a tick with no anchor (centered).
+    // The burst (which holds the rows) before the done mark refreshes; the commit only after
+    // the celebrated mark is written and read back.
+    expect(order).toEqual(['start:kid', 'refresh', 'refresh', 'commit']);
+    // An untick predicts nothing.
     order.length = 0;
-    await store.toggleChore('c1', 'kid', { surface: 'app', anchor }); // untick
-    expect(order.filter((o) => o.startsWith('hold'))).toEqual([]);
+    await store.toggleChore('c1', 'kid', { surface: 'app', anchor });
+    expect(order.filter((o) => o.startsWith('start'))).toEqual([]);
   });
 
   it('two quick ticks of the last two chores: the second holds first, ONE celebration', async () => {
@@ -453,28 +474,29 @@ describe('the once-only celebration', () => {
       // The first tick may see the block done once both have landed; it never celebrates.
       expect(a).toMatchObject({ action: 'tick', celebrated: false });
       expect(b).toEqual({ action: 'tick', completed: 'morning', celebrated: true });
-      // The hold came before EITHER write refreshed the marks; one celebration, anchored.
-      expect(order[0]).toBe('hold:kid:morning');
-      expect(order.filter((o) => o === 'celebrate')).toHaveLength(1);
+      // The burst started before EITHER write refreshed the marks; one celebration, anchored.
+      expect(order[0]).toBe('start:kid');
+      expect(order.filter((o) => o === 'commit')).toHaveLength(1);
       expect(celebrate).toHaveBeenCalledTimes(1);
       expect(celebrate.mock.calls[0]![0]).toMatchObject({ anchor, block: 'morning' });
       expect((celebrate.mock.calls[0]![0] as { settled?: boolean }).settled).toBeFalsy();
       // Both landed: the block is done; nothing is in flight; the tick is no longer predicted.
       expect(store.choreDayFor('kid').blocks[0]).toMatchObject({ allDone: true, celebrated: true });
       celebrate.mockClear();
+      started.clear();
     }
   });
 
-  it('two beans finishing at the same moment on the wall each hold their own block', async () => {
+  it('two beans finishing at the same moment on the wall each burst and commit their own', async () => {
     await setup([chore('k1'), chore('s1', { assigneeIds: ['sib'] })]);
     order.length = 0;
     const anchor = { block: document.createElement('section') } as never;
     const kid = store.toggleChore('k1', 'kid', { surface: 'wall', by: 'kid', anchor });
     const sib = store.toggleChore('s1', 'sib', { surface: 'wall', by: 'sib', anchor });
     await Promise.all([kid, sib]);
-    // Both holds were taken before either write refreshed the marks; each celebrated once.
-    expect(order.slice(0, 2)).toEqual(['hold:kid:morning', 'hold:sib:morning']);
-    expect(order.filter((o) => o.startsWith('release'))).toEqual([]);
+    // Both bursts started before either write refreshed the marks; each celebrated once.
+    expect(order.slice(0, 2)).toEqual(['start:kid', 'start:sib']);
+    expect(order.filter((o) => o.startsWith('abandon'))).toEqual([]);
     expect(celebrate.mock.calls.map((c) => (c[0] as { memberId: string }).memberId)).toEqual([
       'kid',
       'sib',
@@ -498,18 +520,19 @@ describe('the once-only celebration', () => {
     order.length = 0;
     const r = await store.toggleChore('c2', 'kid', { surface: 'app', anchor });
     expect(r).toEqual({ action: 'tick', completed: 'morning', celebrated: true });
-    expect(order.some((o) => o.startsWith('hold'))).toBe(false); // nothing predicted a finish
+    expect(order.some((o) => o.startsWith('start'))).toBe(false); // nothing predicted a finish
     expect(celebrate.mock.calls[0]![0]).toMatchObject({ settled: true, block: 'morning' });
   });
 
-  it('a held tick whose write fails releases the hold; so does one another device celebrated', async () => {
+  it('a predicted tick whose write fails ends quietly; so does one another device celebrated', async () => {
     await setup([chore('c1')]);
     const anchor = { block: document.createElement('section') } as never;
     order.length = 0;
     db.failNext = new Error('boom');
     expect(await store.toggleChore('c1', 'kid', { surface: 'wall', by: 'kid', anchor })).toBeNull();
-    expect(order).toEqual(['hold:kid:morning', 'release:kid:morning']);
-    // Another device wrote the celebrated mark meanwhile: banner only, hold released.
+    expect(order).toEqual(['start:kid', 'abandon:write-failed']);
+    expect(db.marks.has(choreMarkId('celebrated', 'kid', FRI, 'morning'))).toBe(false);
+    // Another device wrote the celebrated mark meanwhile: banner only, the burst ends quietly.
     db.marks.set(choreMarkId('celebrated', 'kid', FRI, 'morning'), {
       id: choreMarkId('celebrated', 'kid', FRI, 'morning'),
       kind: 'celebrated',
@@ -523,8 +546,60 @@ describe('the once-only celebration', () => {
     order.length = 0;
     const r = await store.toggleChore('c1', 'kid', { surface: 'wall', by: 'kid', anchor });
     expect(r).toEqual({ action: 'tick', completed: 'morning', celebrated: false });
-    expect(order).toEqual(['hold:kid:morning', 'refresh', 'release:kid:morning']);
+    expect(order).toEqual(['start:kid', 'refresh', 'abandon:already-celebrated']);
     expect(celebrate).not.toHaveBeenCalled();
+  });
+
+  it('c1 and c2 ticked quickly with c1’s write failing: no mark, no banner; later it celebrates', async () => {
+    await setup([chore('c1'), chore('c2', { sortOrder: 1 })]);
+    const anchor = { block: document.createElement('section') } as never;
+    order.length = 0;
+    db.failNext = new Error('boom'); // the FIRST write (c1's) fails
+    const [a, b] = await Promise.all([
+      store.toggleChore('c1', 'kid', { surface: 'app', anchor }),
+      store.toggleChore('c2', 'kid', { surface: 'app', anchor }),
+    ]);
+    expect(a).toBeNull();
+    expect(b).toEqual({ action: 'tick', completed: null, celebrated: false });
+    // c2 predicted the finish and burst at once, but the block was not done once c1 settled.
+    expect(order).toContain('start:kid');
+    expect(order).toContain('abandon:not-done');
+    expect(order).not.toContain('commit');
+    expect(db.marks.has(choreMarkId('celebrated', 'kid', FRI, 'morning'))).toBe(false);
+    expect(logged('celebration-withheld')[0]!.context).toMatchObject({ detail: 'not-done' });
+    expect(celebrate).not.toHaveBeenCalled();
+    // c1 ticked again later: the block is genuinely finished, and celebrates fully.
+    order.length = 0;
+    const again = await store.toggleChore('c1', 'kid', { surface: 'app', anchor });
+    expect(again).toEqual({ action: 'tick', completed: 'morning', celebrated: true });
+    expect(order).toEqual(['start:kid', 'refresh', 'refresh', 'commit']);
+    expect(db.marks.has(choreMarkId('celebrated', 'kid', FRI, 'morning'))).toBe(true);
+  });
+
+  it('an untick of c1 in flight, then a tick of c2: no prediction, no celebration, no mark', async () => {
+    await setup(
+      [chore('c1'), chore('c2', { sortOrder: 1 })],
+      [
+        {
+          id: choreMarkId('done', 'kid', FRI, 'c1'),
+          kind: 'done',
+          memberId: 'kid',
+          date: FRI,
+          ref: 'c1',
+          by: 'kid',
+          createdAt: NOW,
+          updatedAt: NOW,
+        } as ChoreMark,
+      ]
+    );
+    order.length = 0;
+    const untick = store.toggleChore('c1', 'kid', { surface: 'app' });
+    expect(store.tickWillCelebrate('kid', 'c2')).toBe(false); // c1 counts as NOT done
+    const tick = store.toggleChore('c2', 'kid', { surface: 'app' });
+    await Promise.all([untick, tick]);
+    expect(order.filter((o) => o.startsWith('start') || o === 'commit')).toEqual([]);
+    expect(celebrate).not.toHaveBeenCalled();
+    expect(db.marks.has(choreMarkId('celebrated', 'kid', FRI, 'morning'))).toBe(false);
   });
 
   it('another device’s celebrated mark (not yet in this store) means banner only', async () => {
@@ -543,7 +618,9 @@ describe('the once-only celebration', () => {
     });
     const result = await store.toggleChore('c1', 'kid', { surface: 'app' });
     expect(result).toEqual({ action: 'tick', completed: 'morning', celebrated: false });
+    // It predicted (this store had not seen the mark), burst, and ended quietly.
     expect(celebrate).not.toHaveBeenCalled();
+    expect(order).toContain('abandon:already-celebrated');
   });
 
   it('a block completed by a delete writes no celebrated mark', async () => {

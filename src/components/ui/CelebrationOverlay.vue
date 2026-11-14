@@ -7,7 +7,9 @@ import { useTranslation } from '@/composables/useTranslation';
 import { reportError } from '@/utils/errorReporter';
 
 const { t } = useTranslation();
-const { toasts, activeModal, activeChore, mode, dismissModal } = useCelebration();
+const { toasts, activeModal, activeChores, mode, dismissModal } = useCelebration();
+/** Every chore celebration playing (two beans can finish together on the wall). */
+const choreCelebrations = computed(() => [...activeChores.value.values()]);
 
 /**
  * The choreboard's celebration (#146), code-split: loaded on the first one (or warmed by the
@@ -63,11 +65,11 @@ onBeforeUnmount(() => {
   <!-- Full-list completion: non-blocking, self-dismissing (see CelebrationShower). -->
   <CelebrationShower />
   <!-- A finished chore block (#146): anchored to the board, self-dismissing. -->
-  <ChoreCelebration v-if="activeChore" />
+  <ChoreCelebration v-for="c in choreCelebrations" :key="c.id" :celebration-key="c.key" />
   <!-- Said aloud once: the celebration itself is decoration (aria-hidden). Always mounted, so a
        screen reader hears the change. -->
   <p class="sr-only" role="status" aria-live="polite" data-testid="chore-celebration-said">
-    {{ activeChore?.praise ?? '' }}
+    {{ choreCelebrations.map((c) => c.praise).join(' ') }}
   </p>
 
   <Teleport to="body">

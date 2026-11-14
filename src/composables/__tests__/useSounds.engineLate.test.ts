@@ -61,8 +61,8 @@ describe('playChoreCelebrationSound with the engine not loaded in time', () => {
       surface: 'sounds',
       context: { action: 'engine-load', stage: 'stalled' },
     });
-    // Five minutes on, it tries again (a fresh, pending load; no second report yet).
-    await vi.advanceTimersByTimeAsync(5 * 60_000);
+    // 15 s on, it tries again (a fresh, pending load; no second report yet).
+    await vi.advanceTimersByTimeAsync(15_000);
     let settled = false;
     loadCelebrationSoundEngine().then(
       () => (settled = true),
@@ -70,10 +70,39 @@ describe('playChoreCelebrationSound with the engine not loaded in time', () => {
     );
     await vi.advanceTimersByTimeAsync(10);
     expect(settled).toBe(false);
-    // Stalls again: the same episode, so still one report; the next wait doubles.
+    // Stalls again: the same episode, so still one report; the next wait doubles (30 s).
     await vi.advanceTimersByTimeAsync(15_000);
     expect(reportError).toHaveBeenCalledTimes(1);
-    await vi.advanceTimersByTimeAsync(5 * 60_000);
+    await vi.advanceTimersByTimeAsync(15_000);
     await expect(loadCelebrationSoundEngine()).rejects.toThrow(/waiting to retry/);
+  });
+
+  it('a failed idle preload arms no backoff: the first real celebration tries at once', async () => {
+    const pre = loadCelebrationSoundEngine({ preload: true });
+    pre.catch(() => {});
+    await vi.advanceTimersByTimeAsync(15_000); // the warm-up stalls out
+    expect(reportError).not.toHaveBeenCalled();
+    let settled = false;
+    loadCelebrationSoundEngine().then(
+      () => (settled = true),
+      () => (settled = true)
+    );
+    await vi.advanceTimersByTimeAsync(10);
+    expect(settled).toBe(false); // a fresh real attempt, not a backoff refusal
+  });
+});
+
+describe('a load that resolves only after its stall deadline', () => {
+  it('is adopted: cached, and the backoff episode ends', async () => {
+    let resolveLoad: (m: never) => void = () => {};
+    const engineModule = { playCelebrationSound: vi.fn(() => Promise.resolve('played')) };
+    resetCelebrationSoundsForTest(() => new Promise<never>((r) => (resolveLoad = r)));
+    const first = loadCelebrationSoundEngine();
+    await vi.advanceTimersByTimeAsync(15_000); // stalled: dropped, backoff armed
+    await expect(loadCelebrationSoundEngine()).rejects.toThrow(/waiting to retry/);
+    resolveLoad(engineModule as never); // ... and then it lands
+    await expect(first).resolves.toBe(engineModule);
+    // Adopted at once, with no wait for the backoff.
+    await expect(loadCelebrationSoundEngine()).resolves.toBe(engineModule);
   });
 });

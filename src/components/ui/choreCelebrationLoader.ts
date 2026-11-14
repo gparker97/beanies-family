@@ -38,12 +38,13 @@ export function preloadChoreCelebration(): void {
       error,
     });
   });
-  // The sound engine too, so the first celebration's sound starts on the tick.
-  loadCelebrationSoundEngine().catch((error: unknown) => {
+  // The sound engine too, so the first celebration's sound starts on the tick. A failed warm-up
+  // arms no backoff: the first real celebration simply tries again.
+  loadCelebrationSoundEngine({ preload: true }).catch((error: unknown) => {
     logEvent({
       level: 'warn',
       surface: 'chore-celebration',
-      message: 'chore celebration sound preload failed; it will load on the first celebration',
+      message: 'chore celebration sound preload failed; the first celebration will try again',
       context: { action: 'preload-failed', detail: 'sounds' },
       error,
     });

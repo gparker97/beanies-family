@@ -3,9 +3,11 @@
  * The choreboard's all-done celebration (#146): no box. It plays over the board, anchored to the
  * block that was just finished, then settles into that block's everyday all-done banner.
  *
- * Mounted by `CelebrationOverlay` (lazily, `choreCelebrationLoader`) while a chore celebration is
- * active. `useCelebration` owns WHAT plays (move, sound, praise) and WHEN (the burst → banner
- * phase flip and the end); this component only draws, through `choreCelebrationPlayer`:
+ * Mounted by `CelebrationOverlay` (lazily, `choreCelebrationLoader`), ONE layer per celebration
+ * playing (`celebrationKey`, `member:block`): two beans finishing together on the wall each get
+ * their own stage, clip and player. `useCelebration` owns WHAT plays (move, sound, praise) and
+ * WHEN (the burst → banner phase flip, which also waits for the store's commit, and the end);
+ * this component only draws, through `choreCelebrationPlayer`:
  *
  *  - anchored: measured at play time from the anchor the tick surface built. The stage is
  *    clipped to the page (or, on the wall, the bean's lane), so nothing crosses into a sibling's
@@ -19,10 +21,9 @@
  *
  * It ends at once when its premise goes: another page (any route change), or the anchoring block
  * leaving the screen (watched each frame); it never lays out against a block that is gone. A
- * block unticked during the burst ends quietly at the phase flip (`useCelebration`).
+ * celebration the store abandons (the block turned out not to be done) ends after its burst.
  *
- * Every animation and timer belongs to the player and is cancelled when the next celebration
- * starts or this unmounts. Dark mode: the glow and the canopy strings switch with the theme
+ * Every animation and timer belongs to the player and is cancelled when this layer unmounts. Dark mode: the glow and the canopy strings switch with the theme
  * (`html.dark` rules below); the banner is the fixed brand gradient in both themes.
  */
 import { computed, inject, nextTick, onBeforeUnmount, ref, shallowRef, watch } from 'vue';
@@ -39,12 +40,19 @@ import { useBreakpoint } from '@/composables/useBreakpoint';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { choreDoneBannerText } from '@/constants/choreBlocks';
 import { rectOf, type RectLike } from '@/utils/choreCelebration';
+import { rootFontSizePx } from '@/utils/rootFontSize';
 import {
   createChoreCelebrationPlayer,
   type ChoreCelebrationPlayer,
 } from '@/components/ui/choreCelebrationPlayer';
 
-const { activeChore } = useCelebration();
+const props = defineProps<{
+  /** Which celebration this layer draws (`member:block`): one layer per celebration playing. */
+  celebrationKey: string;
+}>();
+
+const { activeChores } = useCelebration();
+const activeChore = computed(() => activeChores.value.get(props.celebrationKey) ?? null);
 const { t } = useTranslation();
 const { isMobile } = useBreakpoint();
 /**
@@ -56,8 +64,7 @@ const STRIP_MIN_WIDTH_REM = 28;
 const ghostStrip = computed(() => {
   const g = ghost.value;
   if (!g || g.compact || isMobile.value) return false;
-  const rootPx = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
-  return g.w >= STRIP_MIN_WIDTH_REM * rootPx;
+  return g.w >= STRIP_MIN_WIDTH_REM * rootFontSizePx();
 });
 
 /** The fixed, clipping box (viewport px), or null before the first measure. */
@@ -129,7 +136,7 @@ function endGone(c: ActiveChoreCelebration, detail: string): void {
     message: 'chore celebration ended: its block is no longer on screen',
     context: { action: 'ended-gone', detail, kind: c.move, slot: c.block },
   });
-  dismissChoreCelebration(c.id);
+  dismissChoreCelebration(c.key);
 }
 
 /** Watch the anchor's block every frame (a property read, no layout): gone means end. */
@@ -196,7 +203,7 @@ async function start(c: ActiveChoreCelebration): Promise<void> {
   }
   // The banner is already here (calm; a block found done only after its write; or this code
   // loaded late): there is no tick to burst from any more. `arrive` bursts from the banner.
-  if (c.phase === 'banner') return;
+  if (c.calm || c.phase === 'banner') return;
   if (anchored && c.anchor && followBase) {
     // Correct the tap-time rects for any scroll since the tap.
     const now = followBase;
@@ -254,11 +261,11 @@ async function arrive(c: ActiveChoreCelebration): Promise<void> {
     endGone(c, 'anchor-gone');
     return;
   }
-  const banner = anchored
+  const onBoard = anchored
     ? c.anchor?.block.querySelector<HTMLElement>('[data-celebration-banner]')
     : null;
-  if (banner) {
-    playOn(c, banner);
+  if (onBoard) {
+    playOn(c, onBoard);
     return;
   }
   const b = box.value ?? { x: 0, y: 0, w: window.innerWidth, h: window.innerHeight };
@@ -287,8 +294,10 @@ async function arrive(c: ActiveChoreCelebration): Promise<void> {
   };
   await nextTick();
   const el = ghostEl.value;
-  if (!isPlaying(c) || !player || !el) return;
-  playOn(c, el);
+  const own = el?.querySelector<HTMLElement>('[data-celebration-banner]');
+  if (!isPlaying(c) || !player || !el || !own) return;
+  // The banner itself (its strip mark and hooks), not the wrapper that positions it.
+  playOn(c, own);
   player.fadeOutBy(el, c.endsAt);
 }
 

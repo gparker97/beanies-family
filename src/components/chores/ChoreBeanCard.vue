@@ -36,9 +36,9 @@ import type { ChoreBlock, ChoreBlockStarts, FamilyMember } from '@/types/models'
 const props = withDefaults(
   defineProps<{
     member: FamilyMember;
-    /** Today's read model; not needed for the slim row (`hasAnyChores` false). */
+    /** Today's read model; not needed for the no-chores chip (`hasAnyChores` false). */
     day?: BeanChoreDay;
-    /** The bean has at least one chore on some day (false draws the slim row). */
+    /** The bean has at least one chore on some day (false draws the "No Chores Yet" chip). */
     hasAnyChores: boolean;
     starts: ChoreBlockStarts;
     canTick?: boolean;

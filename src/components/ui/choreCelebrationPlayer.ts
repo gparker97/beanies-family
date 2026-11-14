@@ -8,6 +8,7 @@
  * Transform and opacity only, measured once per phase (the tick at the tap, the banner when it
  * arrives), never interleaved with writes. Loaded only with `ChoreCelebration.vue` (lazy).
  */
+import { rootFontSizePx } from '@/utils/rootFontSize';
 import {
   CHORE_CELEBRATION_ART as ART,
   CHORE_CELEBRATION_BEATS as BEATS,
@@ -167,7 +168,7 @@ export function createChoreCelebrationPlayer(opts: PlayerOptions): ChoreCelebrat
   layer.className = 'cc-layer';
   stage.append(layer);
 
-  const rootPx = parseFloat(getComputedStyle(document.documentElement).fontSize || '16') || 16;
+  const rootPx = rootFontSizePx();
   /** The star glyph's size: the banner's star row (1.5rem, or 1.125rem on the wall). */
   const fs = (compact ? 1.125 : 1.5) * rootPx;
 
@@ -227,6 +228,14 @@ export function createChoreCelebrationPlayer(opts: PlayerOptions): ChoreCelebrat
   }
 
   const q = (root: Element, sel: string) => root.querySelector<HTMLElement>(sel);
+  /**
+   * THE banner root, however the caller holds it (the banner itself, or a wrapper around it such
+   * as the overlay's own banner): every banner hook, the strip mark included, is read from it.
+   */
+  const bannerRoot = (el: HTMLElement) =>
+    el.matches('[data-celebration-banner]')
+      ? el
+      : (el.querySelector<HTMLElement>('[data-celebration-banner]') ?? el);
   const qa = (root: Element, sel: string) => Array.from(root.querySelectorAll<HTMLElement>(sel));
 
   // ── extra sparkle (every move) ──
@@ -356,9 +365,13 @@ export function createChoreCelebrationPlayer(opts: PlayerOptions): ChoreCelebrat
 
   /** The big group shrinks, feet first, into the exact spot of the banner's picture. */
   function shrinkIntoBanner(G: Geometry, act: Actor, banner: HTMLElement, bigW: number): void {
+    // Onto the picture's actual rect: its foot (the group's transform origin) to the picture's
+    // foot, its width to the picture's, on every banner form.
+    const dx = G.px - G.cx;
+    const dy = G.S.y + G.S.h - G.foot;
     anim(
       act.a,
-      [{ transform: 'none' }, { transform: `translateX(${G.px - G.cx}px) scale(${G.S.w / bigW})` }],
+      [{ transform: 'none' }, { transform: `translate(${dx}px, ${dy}px) scale(${G.S.w / bigW})` }],
       {
         duration: 440,
         delay: at(SETTLE),
@@ -436,14 +449,23 @@ export function createChoreCelebrationPlayer(opts: PlayerOptions): ChoreCelebrat
 
   /** The line closes up toward the middle and melts into the banner's holding-hands picture. */
   function settleLine(G: Geometry, line: { s: Slot; act: Actor }[], banner: HTMLElement) {
+    // Each dancer closes in on the picture's actual rect (its centre across, its lower part
+    // down), wherever the picture sits in the banner.
+    const tx = G.px;
+    const ty = G.S.y + G.S.h * 0.75;
     line.forEach(({ s, act }, k) => {
-      const dx = G.px - (s.x + s.w / 2);
+      const dx = tx - (s.x + s.w / 2);
+      const dy = ty - (s.y + s.h);
       anim(
         act.a,
         [
           { transform: 'none', opacity: 1 },
-          { transform: `translate(${dx * 0.45}px, 0) scale(.92)`, opacity: 1, offset: 0.45 },
-          { transform: `translate(${dx}px, 16px) scale(.35)`, opacity: 0 },
+          {
+            transform: `translate(${dx * 0.45}px, ${dy * 0.45}px) scale(.92)`,
+            opacity: 1,
+            offset: 0.45,
+          },
+          { transform: `translate(${dx}px, ${dy}px) scale(.35)`, opacity: 0 },
         ],
         { duration: 420, delay: at(SETTLE + k * 30), easing: 'ease-in', fill: 'forwards' }
       );
@@ -887,9 +909,10 @@ export function createChoreCelebrationPlayer(opts: PlayerOptions): ChoreCelebrat
     });
   }
 
-  function arrive(banner: HTMLElement): void {
+  function arrive(target: HTMLElement): void {
     if (cancelled) return;
     arrived = true;
+    const banner = bannerRoot(target);
     // The block element is the banner's parent now: let it show again.
     aside?.cancel();
     aside = null;
@@ -1057,9 +1080,9 @@ export function createChoreCelebrationPlayer(opts: PlayerOptions): ChoreCelebrat
     });
   }
 
-  function calm(banner: HTMLElement): void {
+  function calm(target: HTMLElement): void {
     if (cancelled) return;
-    settleWords(banner, BEATS.calmPraiseOut, BEATS.calmStdIn, 300);
+    settleWords(bannerRoot(target), BEATS.calmPraiseOut, BEATS.calmStdIn, 300);
   }
 
   function fadeOutBy(el: HTMLElement, endMs: number): void {

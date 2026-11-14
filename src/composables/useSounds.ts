@@ -176,8 +176,9 @@ const engineBackoff = failureBackoff();
 /** The latest celebration's turn: an older (or dismissed) one's sound never starts. */
 let latestCelebration = 0;
 
-function engineFailed(error: unknown, stage: 'import' | 'stalled'): void {
-  if (!engineBackoff.fail()) return;
+function engineFailed(error: unknown, stage: 'import' | 'stalled', preload: boolean): void {
+  // A failed idle warm-up never arms the backoff: the first real celebration retries at once.
+  if (preload || !engineBackoff.fail()) return;
   reportError({
     surface: 'sounds',
     message: 'the celebration sound engine could not load; the fanfare plays until it does',
@@ -189,10 +190,14 @@ function engineFailed(error: unknown, stage: 'import' | 'stalled'): void {
 
 /**
  * Load the engine once and keep it. A failed or stalled load is forgotten and retried on the
- * shared backoff ladder (reported once per failure episode); while it backs off, this rejects
- * at once without trying.
+ * static-load backoff ladder (15 s doubling to 5 min; reported once per failure episode); while
+ * it backs off, this rejects at once without trying. A load that resolves after its stall
+ * deadline is still adopted. `preload` (the idle warm-up): its failure arms no backoff.
  */
-export function loadCelebrationSoundEngine(): Promise<CelebrationEngine> {
+export function loadCelebrationSoundEngine(
+  opts: { preload?: boolean } = {}
+): Promise<CelebrationEngine> {
+  const preload = !!opts.preload;
   if (engine) return engine;
   if (!engineBackoff.ready()) {
     return Promise.reject(new Error('celebration sound engine: waiting to retry'));
@@ -202,18 +207,20 @@ export function loadCelebrationSoundEngine(): Promise<CelebrationEngine> {
   const stalled = setTimeout(() => {
     if (engine !== attempt) return;
     engine = null;
-    engineFailed(new Error('celebration sound engine load stalled'), 'stalled');
+    engineFailed(new Error('celebration sound engine load stalled'), 'stalled', preload);
   }, ENGINE_LOAD_DEADLINE_MS);
   attempt.then(
     () => {
       clearTimeout(stalled);
-      if (engine === attempt) engineBackoff.succeed();
+      // Loaded, even if only after its stall deadline: keep it, and end any failure episode.
+      engine = attempt;
+      engineBackoff.succeed();
     },
     (error: unknown) => {
       clearTimeout(stalled);
       if (engine !== attempt) return;
       engine = null;
-      engineFailed(error, 'import');
+      engineFailed(error, 'import', preload);
     }
   );
   return attempt;

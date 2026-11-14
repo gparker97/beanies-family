@@ -25,11 +25,14 @@ export function nextBackoffMs(failureCount: number, code?: RemoteFetchErrorCode)
 }
 
 /**
- * A load that fails in EPISODES (a sound file, a code chunk): after each failure in a row the
- * next attempt waits the ladder above (5 min, doubling to an hour), so a screen that stays open
- * for weeks (the beanie wall) neither hammers a broken load nor gives up on it for good. `fail`
- * answers true only for the failure that STARTS an episode, so it is reported once per episode,
- * never once per attempt; `succeed` ends the episode.
+ * A load that fails in EPISODES (a code chunk, a static sound file): after each failure in a row
+ * the next attempt waits a doubling ladder, so a screen that stays open for weeks (the beanie
+ * wall) neither hammers a broken load nor gives up on it for good. `fail` answers true only for
+ * the failure that STARTS an episode, so it is reported once per episode, never once per
+ * attempt; `succeed` ends the episode.
+ *
+ * Timed on the MONOTONIC clock (`performance.now`), so a wall-clock correction (a phone's time
+ * syncing, a DST change) can never freeze the retries.
  */
 export interface FailureBackoff {
   /** May a new attempt start now? */
@@ -39,19 +42,25 @@ export interface FailureBackoff {
   succeed(): void;
 }
 
-export function failureBackoff(): FailureBackoff {
+/** Static assets and code chunks: a short ladder, 15 s doubling to 5 min. */
+export const STATIC_LOAD_BACKOFF = { baseMs: 15_000, maxMs: 5 * MINUTE_MS } as const;
+
+export function failureBackoff(
+  ladder: { baseMs: number; maxMs: number } = STATIC_LOAD_BACKOFF
+): FailureBackoff {
   let failures = 0;
-  let retryAt = 0;
+  let retryAt = Number.NEGATIVE_INFINITY;
+  const clock = () => performance.now();
   return {
-    ready: (now = Date.now()) => now >= retryAt,
-    fail(now = Date.now()) {
+    ready: (now = clock()) => now >= retryAt,
+    fail(now = clock()) {
       failures++;
-      retryAt = now + nextBackoffMs(failures);
+      retryAt = now + Math.min(ladder.maxMs, ladder.baseMs * 2 ** Math.min(failures - 1, 10));
       return failures === 1;
     },
     succeed() {
       failures = 0;
-      retryAt = 0;
+      retryAt = Number.NEGATIVE_INFINITY;
     },
   };
 }

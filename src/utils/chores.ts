@@ -421,20 +421,22 @@ export function blocksInDisplayOrder<T extends Pick<ChoreDayBlock, 'block' | 'is
  * Would ticking `choreId` (not yet done) finish its block in `day`? THE finishing-tick question,
  * asked by the store's tick path and by the wall's tick burst alike. True only for the LAST
  * undone chore of a block, so a block completed by a delete or a move never reaches the
- * celebration. `inFlight` holds this bean's chores whose ticks are being written right now: they
- * count as done, so of two quick ticks of a block's last two chores, the second one is the
- * finishing tick before either write lands.
+ * celebration. `pending` holds this bean's writes in flight (chore id → what it becomes: true =
+ * done, false = undone); they count as landed, so of two quick ticks of a block's last two chores
+ * the second is the finishing tick before either write lands, and a chore being unticked counts
+ * as not done.
  */
 export function completesBlock(
   day: BeanChoreDay,
   choreId: string,
-  inFlight: ReadonlySet<string> = new Set()
+  pending: ReadonlyMap<string, boolean> = new Map()
 ): ChoreBlock | null {
+  const isDone = (id: string, done: boolean) => pending.get(id) ?? done;
   for (const b of day.blocks) {
     const item = b.chores.find((i) => i.chore.id === choreId);
     if (!item) continue;
-    if (item.done || inFlight.has(choreId)) return null;
-    const left = b.chores.filter((i) => !i.done && !inFlight.has(i.chore.id));
+    if (isDone(choreId, item.done)) return null;
+    const left = b.chores.filter((i) => !isDone(i.chore.id, i.done));
     return left.length === 1 ? b.block : null;
   }
   return null;

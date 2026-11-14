@@ -13,6 +13,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 ### Added
 
 - The choreboard (still switched off while it is tested) now celebrates a finished time of day with dancing beanies, stars and a cheer, and a bean's day opens with every time of day showing.
+- The choreboard's home page is now a tidy grid of cards with a "No Chores Yet" strip and the Chores Done board below, and the all-done banner is shorter on larger screens.
 
 ### Fixed
 

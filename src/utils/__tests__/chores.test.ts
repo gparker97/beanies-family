@@ -412,11 +412,25 @@ describe('completesBlock', () => {
   it('counts the bean’s in-flight ticks as done: the last of two quick ticks finishes', () => {
     const chores = [chore('m1'), chore('m2', { sortOrder: 1 })];
     const none = beanChoreDay(chores, indexMarks([]), 'kid', clock, D, living);
-    expect(completesBlock(none, 'm2', new Set(['m1']))).toBe('morning');
+    expect(completesBlock(none, 'm2', new Map([['m1', true]]))).toBe('morning');
     // The in-flight chore itself is never the finishing tick again.
-    expect(completesBlock(none, 'm1', new Set(['m1']))).toBeNull();
+    expect(completesBlock(none, 'm1', new Map([['m1', true]]))).toBeNull();
     // Nothing in flight: neither finishes yet.
-    expect(completesBlock(none, 'm2', new Set())).toBeNull();
+    expect(completesBlock(none, 'm2', new Map())).toBeNull();
+  });
+
+  it('a chore being unticked counts as NOT done', () => {
+    const chores = [chore('m1'), chore('m2', { sortOrder: 1 })];
+    const one = beanChoreDay(
+      chores,
+      indexMarks([mark('done', 'kid', FRI, 'm1')]),
+      'kid',
+      clock,
+      D,
+      living
+    );
+    expect(completesBlock(one, 'm2')).toBe('morning');
+    expect(completesBlock(one, 'm2', new Map([['m1', false]]))).toBeNull();
   });
 
   it('true only for the last undone chore of its block', () => {

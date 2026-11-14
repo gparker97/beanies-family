@@ -106,7 +106,6 @@ const itemLabel = (title: string, done: boolean) =>
     :surface="SURFACE"
     :inside-el="anchor"
     align="end"
-    side="below"
     :width-estimate="320"
     :height-estimate="480"
     initial-focus="[data-testid='chore-day-popover-close']"

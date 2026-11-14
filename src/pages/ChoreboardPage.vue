@@ -93,7 +93,7 @@ const { choreClock } = useChoreClock();
 const ticks = useChoreTicks();
 const { memberAvatarBindings } = useMemberAvatarBindings();
 const { isMobile } = useBreakpoint();
-/** Tailwind's `xl`: the desktop right rail (home board, day summary and week). */
+/** Tailwind's `xl`: the bean's day rail (its Today summary and its own week). */
 const isWide = useMediaQuery('(min-width: 80rem)');
 
 onMounted(() => {
@@ -278,7 +278,7 @@ const cardBeans = computed<HomeBean[]>(() =>
     .map((member) => ({ member, day: choreStore.choreDayFor(member.id) }))
 );
 /** Beans with no chores at all: the "No Chores Yet" strip under the cards (grown-ups). */
-const slimBeans = computed(() =>
+const noChoreBeans = computed(() =>
   familyStore.sortedHumans.filter((m) => !choreOwners.value.has(m.id))
 );
 
@@ -665,7 +665,7 @@ function revealBlock(block: ChoreBlock): void {
 
             <!-- Beans with no chores yet: one tidy strip of chips, for grown-ups. -->
             <section
-              v-if="isAdult && slimBeans.length"
+              v-if="isAdult && noChoreBeans.length"
               class="dark:bg-surface-raised dark:border-line rounded-3xl bg-white px-4 py-3.5 shadow-[var(--card-shadow)] dark:border"
               :class="cardBeans.length ? 'mt-3.5' : ''"
               data-testid="chore-no-chores"
@@ -675,7 +675,7 @@ function revealBlock(block: ChoreBlock): void {
               </h2>
               <div class="flex flex-wrap gap-2">
                 <ChoreBeanCard
-                  v-for="m in slimBeans"
+                  v-for="m in noChoreBeans"
                   :key="m.id"
                   :member="m"
                   :has-any-chores="false"

@@ -1,3 +1,4 @@
+import { rootFontSizePx } from '@/utils/rootFontSize';
 import { onBeforeUnmount, onMounted, type Ref } from 'vue';
 import { Chart } from 'chart.js';
 
@@ -40,7 +41,7 @@ export function useChartScale(chartRef: Ref<unknown>): void {
   // no caching, no store dependency, no per-component subscription overhead.
   const apply = (): void => {
     try {
-      const rootPx = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+      const rootPx = rootFontSizePx();
       // The 12-px-at-default-root design choice from Chart.js stays the
       // visual anchor; we just rescale linearly with the current root.
       Chart.defaults.font.size = (12 / 16) * rootPx;

@@ -131,6 +131,48 @@ describe('choreCelebrationPlayer', () => {
     early.cancel();
   });
 
+  it('a strip banner handed as its WRAPPER still gets strip geometry: beanies on its top edge', () => {
+    const stage = document.createElement('div');
+    document.body.append(stage);
+    const rect = (el: Element, left: number, top: number, width: number, height: number) =>
+      ((el as HTMLElement).getBoundingClientRect = () =>
+        ({ left, top, width, height, right: left + width, bottom: top + height }) as DOMRect);
+    const wrapper = document.createElement('div');
+    const b = banner();
+    b.setAttribute('data-celebration-strip', '');
+    wrapper.append(b);
+    document.body.append(wrapper);
+    rect(wrapper, 0, 280, 640, 140); // the wrapper is NOT the banner
+    rect(b, 0, 300, 640, 94);
+    rect(b.querySelector('[data-celebration-picture]')!, 16, 330, 96, 37);
+    b.querySelectorAll('[data-celebration-star]').forEach((el, i) =>
+      rect(el, 140 + i * 24, 360, 20, 20)
+    );
+    Object.defineProperty(stage, 'clientWidth', { value: 900 });
+    const p = createChoreCelebrationPlayer({
+      stage,
+      origin: { x: 0, y: 0 },
+      move: 'bounce-party',
+      count: 2,
+      startedAt: performance.now(),
+      compact: false,
+    });
+    p.arrive(wrapper);
+    const feet = [...stage.querySelectorAll<HTMLElement>('.cc-actor')].map(
+      (a) => parseFloat(a.style.top) + parseFloat(a.style.height)
+    );
+    expect(feet).toHaveLength(5);
+    // On the banner's top edge (300 + 8, give or take each dancer's lift), never down on the
+    // picture inside the strip (its foot is at 367), so the words beside it stay clear.
+    for (const f of feet) {
+      expect(f).toBeGreaterThan(285);
+      expect(f).toBeLessThan(330);
+    }
+    // And the move ran against the banner's own hooks (its words), not the wrapper.
+    expect(animations.some((an) => an.target.hasAttribute('data-praise-word'))).toBe(true);
+    p.cancel();
+  });
+
   it('a star that lands lights its slot and twinkles; a cancelled one does nothing', () => {
     const stage = document.createElement('div');
     document.body.append(stage);

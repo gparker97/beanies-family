@@ -27,6 +27,7 @@
  *
  * Plan: `~/projects/beanies-ops/docs/plans/2026-11-05-calendar-drag-and-drop-142.md`.
  */
+import { rootFontSizePx } from '@/utils/rootFontSize';
 import { getCurrentScope, onScopeDispose } from 'vue';
 import { prefersReducedMotion } from '@/utils/prefersReducedMotion';
 
@@ -46,9 +47,7 @@ const ABOVE_GAP_PX = 12;
 /** The widest a ghost floats (Large reading mode scales it with the root). */
 const MAX_WIDTH_REM = 14;
 
-function rootRemPx(): number {
-  return parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
-}
+const rootRemPx = rootFontSizePx;
 
 export interface Point {
   x: number;

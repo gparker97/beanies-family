@@ -109,6 +109,7 @@ async function settle() {
   await flushPromises();
 }
 
+const KEY = 'pip:morning';
 const request = (
   anchor: ReturnType<typeof choreCelebrationAnchor> | null,
   stillDone: () => boolean = () => true
@@ -117,8 +118,8 @@ const request = (
 describe('ChoreCelebration', () => {
   it('anchored: stars burst from the tick, then the move plays on the surface’s banner', async () => {
     const { block, tick } = board(true);
-    const w = mount(ChoreCelebration, { attachTo: document.body });
-    celebrateChore(request(choreCelebrationAnchor(block, tick)));
+    const w = mount(ChoreCelebration, { attachTo: document.body, props: { celebrationKey: KEY } });
+    celebrateChore(request(choreCelebrationAnchor(block, tick)), { committed: true });
     await settle();
     expect(createPlayer).toHaveBeenCalledTimes(1);
     expect(createPlayer.mock.calls[0]![0]).toMatchObject({ move: 'bounce-party', count: 4 });
@@ -139,8 +140,8 @@ describe('ChoreCelebration', () => {
   });
 
   it('no anchor: a centered version of the same move on its own banner, fading at the end', async () => {
-    const w = mount(ChoreCelebration, { attachTo: document.body });
-    celebrateChore(request(null));
+    const w = mount(ChoreCelebration, { attachTo: document.body, props: { celebrationKey: KEY } });
+    celebrateChore(request(null), { committed: true });
     await settle();
     const p = players[0]!;
     expect(p.burst).toHaveBeenCalledWith(expect.objectContaining({ tickEl: null, blockEl: null }));
@@ -149,7 +150,8 @@ describe('ChoreCelebration', () => {
     const ghost = document.querySelector<HTMLElement>('[data-testid="chore-celebration-ghost"]');
     expect(ghost).not.toBeNull();
     expect(ghost!.querySelector('[data-celebration-banner]')).not.toBeNull();
-    expect(p.arrive).toHaveBeenCalledWith(ghost);
+    // Handed the banner itself (its strip mark and hooks), never the wrapper that places it.
+    expect(p.arrive).toHaveBeenCalledWith(ghost!.querySelector('[data-celebration-banner]'));
     expect(p.fadeOutBy).toHaveBeenCalledWith(ghost, 3060);
     w.unmount();
   });
@@ -158,11 +160,11 @@ describe('ChoreCelebration', () => {
     const { block, tick, clip } = board(true);
     const anchor = choreCelebrationAnchor(block, tick);
     clip.remove();
-    const w = mount(ChoreCelebration, { attachTo: document.body });
-    celebrateChore(request(anchor));
+    const w = mount(ChoreCelebration, { attachTo: document.body, props: { celebrationKey: KEY } });
+    celebrateChore(request(anchor), { committed: true });
     await settle();
     expect(createPlayer).not.toHaveBeenCalled();
-    expect(useCelebration().activeChore.value).toBeNull();
+    expect(useCelebration().activeChores.value.size).toBe(0);
     expect(logEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         context: expect.objectContaining({ action: 'ended-gone', detail: 'anchor-gone' }),
@@ -173,13 +175,13 @@ describe('ChoreCelebration', () => {
 
   it('the anchoring surface unmounts mid-celebration: everything stops at once', async () => {
     const { block, tick, clip } = board(true);
-    const w = mount(ChoreCelebration, { attachTo: document.body });
-    celebrateChore(request(choreCelebrationAnchor(block, tick)));
+    const w = mount(ChoreCelebration, { attachTo: document.body, props: { celebrationKey: KEY } });
+    celebrateChore(request(choreCelebrationAnchor(block, tick)), { committed: true });
     await settle();
     clip.remove();
     vi.advanceTimersByTime(32);
     await settle();
-    expect(useCelebration().activeChore.value).toBeNull();
+    expect(useCelebration().activeChores.value.size).toBe(0);
     expect(players[0]!.cancel).toHaveBeenCalled();
     expect(document.querySelector('[data-testid="chore-celebration"]')).toBeNull();
     w.unmount();
@@ -190,13 +192,14 @@ describe('ChoreCelebration', () => {
     const { block, tick } = board(true);
     const w = mount(ChoreCelebration, {
       attachTo: document.body,
+      props: { celebrationKey: KEY },
       global: { provide: { [routeLocationKey as symbol]: route } },
     });
-    celebrateChore(request(choreCelebrationAnchor(block, tick)));
+    celebrateChore(request(choreCelebrationAnchor(block, tick)), { committed: true });
     await settle();
     route.fullPath = '/nook';
     await settle();
-    expect(useCelebration().activeChore.value).toBeNull();
+    expect(useCelebration().activeChores.value.size).toBe(0);
     expect(players[0]!.cancel).toHaveBeenCalled();
     w.unmount();
   });
@@ -204,8 +207,11 @@ describe('ChoreCelebration', () => {
   it('a block unticked during the burst: no banner and no ghost, it just ends', async () => {
     const { block, tick } = board(false);
     let done = true;
-    const w = mount(ChoreCelebration, { attachTo: document.body });
-    celebrateChore(request(choreCelebrationAnchor(block, tick), () => done));
+    const w = mount(ChoreCelebration, { attachTo: document.body, props: { celebrationKey: KEY } });
+    celebrateChore(
+      request(choreCelebrationAnchor(block, tick), () => done),
+      { committed: true }
+    );
     await settle();
     done = false;
     vi.advanceTimersByTime(560);
@@ -218,7 +224,7 @@ describe('ChoreCelebration', () => {
 
   it('settled (found done after its write): no burst from the tick, the stars from the banner', async () => {
     const { block, tick } = board(true);
-    const w = mount(ChoreCelebration, { attachTo: document.body });
+    const w = mount(ChoreCelebration, { attachTo: document.body, props: { celebrationKey: KEY } });
     celebrateChore({ ...request(choreCelebrationAnchor(block, tick)), settled: true });
     await settle();
     const p = players[0]!;
@@ -232,9 +238,9 @@ describe('ChoreCelebration', () => {
 
   it('drawing starts late (the banner already arrived): the burst skips its step-aside', async () => {
     const { block, tick } = board(true);
-    celebrateChore(request(choreCelebrationAnchor(block, tick)));
+    celebrateChore(request(choreCelebrationAnchor(block, tick)), { committed: true });
     vi.advanceTimersByTime(700); // a slow first load: the phase flipped before we mounted
-    const w = mount(ChoreCelebration, { attachTo: document.body });
+    const w = mount(ChoreCelebration, { attachTo: document.body, props: { celebrationKey: KEY } });
     await settle();
     const p = players[0]!;
     expect(p.burst).toHaveBeenCalledWith(expect.objectContaining({ late: true }));
@@ -249,8 +255,8 @@ describe('ChoreCelebration', () => {
       removeEventListener: () => {},
     }));
     const { block, tick } = board(true);
-    const w = mount(ChoreCelebration, { attachTo: document.body });
-    celebrateChore(request(choreCelebrationAnchor(block, tick)));
+    const w = mount(ChoreCelebration, { attachTo: document.body, props: { celebrationKey: KEY } });
+    celebrateChore(request(choreCelebrationAnchor(block, tick)), { committed: true });
     await settle();
     const p = players[0]!;
     expect(p.burst).not.toHaveBeenCalled();
@@ -259,12 +265,14 @@ describe('ChoreCelebration', () => {
     w.unmount();
   });
 
-  it('a new celebration cancels the last one’s player; unmounting cancels the current one', async () => {
+  it('the next celebration of this block gets a fresh player; unmounting cancels the current one', async () => {
     const { block, tick } = board(true);
-    const w = mount(ChoreCelebration, { attachTo: document.body });
-    celebrateChore(request(choreCelebrationAnchor(block, tick)));
+    const w = mount(ChoreCelebration, { attachTo: document.body, props: { celebrationKey: KEY } });
+    celebrateChore(request(choreCelebrationAnchor(block, tick)), { committed: true });
     await settle();
-    celebrateChore(request(choreCelebrationAnchor(block, tick)));
+    useCelebration().dismissChoreCelebration(KEY);
+    await settle();
+    celebrateChore(request(choreCelebrationAnchor(block, tick)), { committed: true });
     await settle();
     expect(players).toHaveLength(2);
     expect(players[0]!.cancel).toHaveBeenCalled();
@@ -273,10 +281,38 @@ describe('ChoreCelebration', () => {
     expect(players[1]!.cancel).toHaveBeenCalled();
   });
 
+  it('two beans at once: one layer each, each with its own player, both cleaned up', async () => {
+    const pip = board(true);
+    const juno = board(true);
+    const a = mount(ChoreCelebration, { attachTo: document.body, props: { celebrationKey: KEY } });
+    const b = mount(ChoreCelebration, {
+      attachTo: document.body,
+      props: { celebrationKey: 'juno:morning' },
+    });
+    celebrateChore(request(choreCelebrationAnchor(pip.block, pip.tick)), { committed: true });
+    celebrateChore(
+      { ...request(choreCelebrationAnchor(juno.block, juno.tick)), memberId: 'juno' },
+      { committed: true }
+    );
+    await settle();
+    expect(players).toHaveLength(2);
+    vi.advanceTimersByTime(560);
+    await settle();
+    expect(players[0]!.arrive).toHaveBeenCalledWith(
+      pip.block.querySelector('[data-celebration-banner]')
+    );
+    expect(players[1]!.arrive).toHaveBeenCalledWith(
+      juno.block.querySelector('[data-celebration-banner]')
+    );
+    a.unmount();
+    b.unmount();
+    expect(players.every((p) => p.cancel.mock.calls.length > 0)).toBe(true);
+  });
+
   it('the end of the celebration cancels the player and removes the stage', async () => {
     const { block, tick } = board(true);
-    const w = mount(ChoreCelebration, { attachTo: document.body });
-    celebrateChore(request(choreCelebrationAnchor(block, tick)));
+    const w = mount(ChoreCelebration, { attachTo: document.body, props: { celebrationKey: KEY } });
+    celebrateChore(request(choreCelebrationAnchor(block, tick)), { committed: true });
     await settle();
     expect(document.querySelector('[data-testid="chore-celebration"]')).not.toBeNull();
     vi.advanceTimersByTime(3060);

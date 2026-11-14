@@ -8,7 +8,7 @@
  *    on-screen keyboard by `inset`, with a grab handle. With no `initialFocus` the sheet focuses
  *    its own container (`tabindex="-1"`), so a type box inside does not raise the keyboard.
  *  - 768px AND UP: a card anchored to `anchor` (teleported, fixed, flipped and clamped by
- *    `useAnchoredPosition`, `align` and `side`), repositioned when the anchor changes and when
+ *    `useAnchoredPosition` and `align`), repositioned when the anchor changes and when
  *    the card's height changes (the shared `useElementSize`, never a hand-rolled observer).
  *
  * Both shapes, the dim included, paint at `ANCHORED_POPOVER_Z_INDEX`, so the surface shows above
@@ -43,7 +43,6 @@ const props = withDefaults(
     /** An element that counts as inside for the outside click (the trigger's own root). */
     insideEl?: HTMLElement | null;
     align?: 'start' | 'end';
-    side?: 'below' | 'start';
     widthEstimate?: number;
     heightEstimate?: number;
     /** A selector inside the surface to focus on open (both shapes). */
@@ -58,7 +57,6 @@ const props = withDefaults(
   {
     insideEl: null,
     align: 'start',
-    side: 'below',
     widthEstimate: 360,
     heightEstimate: 440,
     initialFocus: undefined,
@@ -106,7 +104,6 @@ const { popoverStyle, reposition } = useAnchoredPosition({
   popoverRef: cardEl,
   active: cardOpen,
   align: props.align,
-  side: () => props.side,
   widthEstimate: props.widthEstimate,
   heightEstimate: props.heightEstimate,
 });

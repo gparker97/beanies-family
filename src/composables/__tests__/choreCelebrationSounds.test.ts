@@ -3,7 +3,7 @@
  * sounds play through one chain; the kids cheer loads on its first need, decodes once, and never
  * starts late: not ready by the deadline, the paired sound plays at once and the cheer keeps
  * loading for next time. A hung fetch or decode is abandoned after 8 s; a failure is reported
- * once per episode and retried on the backoff ladder (5 min, doubling to an hour), never an
+ * once per episode and retried on the static-load ladder (15 s, doubling to 5 min), never an
  * unhandled rejection; turning sound off or a newer celebration during the wait silences it.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -128,20 +128,20 @@ describe('playCelebrationSound', () => {
       severity: 'warning',
       context: { action: 'cheer-load', stage: 'fetch' },
     });
-    // Within five minutes: no fetch at all, straight to the paired sound.
+    // Within 15 s: no fetch at all, straight to the paired sound.
     expect(await play('kids-cheer')).toBe('fallback');
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    // Five minutes on: one retry; it fails too (same episode, no second report).
-    await vi.advanceTimersByTimeAsync(5 * 60_000);
+    // 15 s on: one retry; it fails too (same episode, no second report).
+    await vi.advanceTimersByTimeAsync(15_000);
     expect(await play('kids-cheer')).toBe('fallback');
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(reportError).toHaveBeenCalledTimes(1);
-    // The wait doubles: nothing at five minutes, a retry at ten, which succeeds.
-    await vi.advanceTimersByTimeAsync(5 * 60_000);
+    // The wait doubles: nothing at 15 s, a retry at 30 s, which succeeds.
+    await vi.advanceTimersByTimeAsync(15_000);
     await play('kids-cheer');
     expect(fetchMock).toHaveBeenCalledTimes(2);
     fetchMock.mockImplementation(() => cheerResponse());
-    await vi.advanceTimersByTimeAsync(5 * 60_000);
+    await vi.advanceTimersByTimeAsync(15_000);
     expect(await play('kids-cheer')).toBe('played');
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
@@ -168,7 +168,7 @@ describe('playCelebrationSound', () => {
     expect(reportError.mock.calls[0]![0]).toMatchObject({ context: { stage: 'fetch' } });
     // After the backoff the next try fetches afresh (the hung one was not kept), and succeeds.
     fetchMock.mockImplementation(() => cheerResponse());
-    await vi.advanceTimersByTimeAsync(5 * 60_000);
+    await vi.advanceTimersByTimeAsync(15_000);
     expect(await play('kids-cheer')).toBe('played');
   });
 

@@ -42,6 +42,7 @@
  *
  * `format` is constant for an instance: the page keys the grid by its variant.
  */
+import { rootFontSizePx } from '@/utils/rootFontSize';
 import { computed, nextTick, onMounted, ref, watch, type Ref } from 'vue';
 import { useElementSize } from '@/composables/useElementSize';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -127,7 +128,7 @@ export function useMonthGridFit(
       }
       // Hidden (cold-start skeleton, v-show): keep the last value, no telemetry.
       if (card.offsetParent === null) return;
-      const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+      const rem = rootFontSizePx();
       const cardTop = card.getBoundingClientRect().top;
       const top = cardTop - scroller.getBoundingClientRect().top + scroller.scrollTop;
       const headerPx = body.getBoundingClientRect().top - cardTop;
