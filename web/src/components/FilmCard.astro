@@ -39,6 +39,17 @@ interface Props {
 }
 
 const { film, loc, id } = Astro.props;
+
+/** The caption under the teaser. Shared with the button's name, so the two cannot drift. */
+const CREDIT = 'a beanies original production';
+/**
+ * The button's accessible name STARTS with its visible title (WCAG 2.5.3 Label in Name,
+ * Lighthouse `label-content-name-mismatch`), so "click the morning routine musical" works by
+ * voice, then says the rest in words. The stub's "1:07" and the caption are `aria-hidden`
+ * because the name already speaks them ("1 minute 7 seconds"); left exposed, their spans join
+ * the title with no space between them and the visible text no longer matches the name.
+ */
+const playLabel = `${film.title}, ${CREDIT}, ${durationSpoken(film)}: play it with sound`;
 ---
 
 <div
@@ -56,18 +67,18 @@ const { film, loc, id } = Astro.props;
   <button
     type="button"
     class="film-card-button"
-    aria-label={`Play ${film.title}, ${durationSpoken(film)}, with sound`}
+    aria-label={playLabel}
     data-cta={`${film.eventPrefix}: Play`}
     data-cta-loc={loc}
   >
     <video class="film-card-teaser" muted loop playsinline></video>
     <span class="film-card-stub">
       <span class="film-card-stub-title">{film.title}</span>
-      <span class="film-card-stub-dur">{durationClock(film)}</span>
+      <span class="film-card-stub-dur" aria-hidden="true">{durationClock(film)}</span>
     </span>
     <span class="film-card-play"><span class="film-card-play-tri"></span></span>
-    <span class="film-card-cap">
-      <span class="film-card-cap-text">a beanies original production</span>
+    <span class="film-card-cap" aria-hidden="true">
+      <span class="film-card-cap-text">{CREDIT}</span>
       <svg
         class="film-card-sound"
         viewBox="0 0 24 24"
