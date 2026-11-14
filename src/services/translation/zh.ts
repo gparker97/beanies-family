@@ -7250,7 +7250,7 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'choreboard.empty.child': '还没有家务。请大人帮你加几项吧。',
   'choreboard.empty.childToday': '今天没有要做的事，好好玩吧！',
   'choreboard.empty.forBean': '{name} 还没有家务。',
-  'choreboard.empty.forBeanToday': '{name} 今天没有家务。',
+  'choreboard.empty.forBeanToday': '{name} 今天没有家务，都安排在其他日子。',
   'choreboard.day.back': '返回家务表',
   'choreboard.day.greeting.morning': '早上好，{name}！',
   'choreboard.day.greeting.afternoon': '下午好，{name}！',

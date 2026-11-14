@@ -118,6 +118,35 @@ describe('BeanieFormModal', () => {
     });
   });
 
+  describe('saveTestid and the busy state', () => {
+    it('puts saveTestid on the save button, and none without it', () => {
+      const w = mount(BeanieFormModal, {
+        props: { ...baseProps, variant: 'drawer', saveTestid: 'thing-done' },
+        attachTo: document.body,
+      });
+      expect(document.body.querySelector('[data-testid="thing-done"]')?.textContent).toContain(
+        'action.save'
+      );
+      w.unmount();
+      document.body.innerHTML = '';
+      mount(BeanieFormModal, { props: baseProps, attachTo: document.body });
+      const save = [...document.querySelectorAll('button')].find((b) =>
+        b.textContent?.includes('action.save')
+      )!;
+      expect(save.hasAttribute('data-testid')).toBe(false);
+    });
+
+    it('marks the save button aria-busy only while submitting', () => {
+      mount(BeanieFormModal, {
+        props: { ...baseProps, isSubmitting: true, saveTestid: 'thing-done' },
+        attachTo: document.body,
+      });
+      const btn = document.body.querySelector('[data-testid="thing-done"]')!;
+      expect(btn.getAttribute('aria-busy')).toBe('true');
+      expect(btn.textContent).toContain('common.saving');
+    });
+  });
+
   describe('deleteDisabledReason', () => {
     const deleteTile = () =>
       document.body.querySelector<HTMLButtonElement>('[data-testid="form-modal-delete"]');

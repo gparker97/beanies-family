@@ -21,18 +21,23 @@
  *  - A picture is automatic: a row of the grown-up's own takes one from its title each time the
  *    title is committed (`pictureForTitle`), until its picture is picked by
  *    hand. A suggested row keeps its set's picture.
- *  - Every chooser closes when the sheet closes (`BaseModal` unmounts its body) or its row
- *    leaves the list; the pieces own their Escape tokens.
+ *  - Every chooser closes when the sheet closes (the drawer unmounts its body) or its row
+ *    leaves the list; the pieces own their Escape tokens, above the drawer's own, so Escape
+ *    closes a row edit, chooser or preview first and the drawer after.
  *  - The list is the session's (`useChoreAddDraft`): memory only, kept across close and reopen,
  *    cleared after a successful Add, by "Clear List" and on sign-out.
  *
- * Stays mounted while closed; the people re-seed on every open, the list does not.
+ * It is the right-hand drawer (`BeanieFormModal variant="drawer"`), as a Beanie List and a to-do
+ * are; its primary action is the Add button (disabled with nothing to add, the spinner while the
+ * batch is written, when the drawer cannot be closed). Stays mounted while closed; the people
+ * re-seed on every open, the list does not.
  *
- * Dark mode: the pieces carry their own (see each); the carried hint and the Clear List link are
- * `ink-faint` / `accent-lift` on dark, the footer CTA the brand gradient or `surface-overlay`.
+ * Dark mode: the drawer's raised panel and body (`BeanieFormModal`); the pieces carry their own
+ * (see each); the carried hint and the Clear List link are `ink-faint` / `accent-lift` on dark,
+ * the footer CTA the brand gradient or `surface-overlay` (`BeanieFormModal`'s not-ready look).
  */
 import { computed, nextTick, reactive, ref, watch } from 'vue';
-import BaseModal from '@/components/ui/BaseModal.vue';
+import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import ListPeoplePicker from '@/components/lists/ListPeoplePicker.vue';
 import ChoreSetChips from '@/components/chores/ChoreSetChips.vue';
@@ -270,13 +275,20 @@ async function submit(): Promise<void> {
 </script>
 
 <template>
-  <BaseModal
+  <BeanieFormModal
+    variant="drawer"
     :open="open"
     :title="t('choreboard.addChores')"
     icon="🎒"
-    size="lg"
-    fullscreen-mobile
+    icon-bg="var(--tint-orange-12)"
+    size="narrow"
+    :save-label="ctaLabel"
+    :save-ready="canSubmit"
+    :save-disabled="!canSubmit"
+    :is-submitting="isSubmitting"
+    save-testid="chore-starter-add"
     @close="emit('close')"
+    @save="submit"
   >
     <div class="space-y-5" data-testid="chore-starter-sheet">
       <FormFieldGroup :label="t('choreboard.form.who')">
@@ -335,23 +347,5 @@ async function submit(): Promise<void> {
         />
       </FormFieldGroup>
     </div>
-
-    <template #footer>
-      <button
-        type="button"
-        class="font-outfit w-full rounded-2xl py-3.5 text-sm font-bold transition-all duration-150"
-        :class="
-          canSubmit
-            ? 'from-primary-500 to-terracotta-400 bg-gradient-to-r text-white shadow-[0_4px_12px_rgba(241,93,34,0.2)]'
-            : 'dark:bg-surface-overlay dark:text-ink-soft text-secondary-500 cursor-not-allowed bg-[var(--tint-slate-10)]'
-        "
-        :disabled="!canSubmit || isSubmitting"
-        :aria-busy="isSubmitting ? 'true' : undefined"
-        data-testid="chore-starter-add"
-        @click="submit"
-      >
-        {{ isSubmitting ? t('common.saving') : ctaLabel }}
-      </button>
-    </template>
-  </BaseModal>
+  </BeanieFormModal>
 </template>

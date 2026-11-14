@@ -16186,8 +16186,8 @@ const STRING_DEFS = {
     beanie: 'no chores for {name} yet.',
   },
   'choreboard.empty.forBeanToday': {
-    en: 'Nothing for {name} today.',
-    beanie: 'nothing for {name} today.',
+    en: 'Nothing for {name} today. Their chores are on other days.',
+    beanie: 'nothing for {name} today. their chores are on other days.',
   },
   'choreboard.day.back': {
     en: 'Back to the Choreboard',

@@ -30,7 +30,7 @@
  * takes it off this bean only.
  *
  * Keep Parents Posted is ONE switch for the whole list, for a child only, as lists and to-dos
- * have it. It is on when every chore here has the flag; switching writes the flag on all of them
+ * have it, at the foot of the drawer (after the list: it is a setting, not the list). It is on when every chore here has the flag; switching writes the flag on all of them
  * in one change (`setNotifyParentsFor`). A new chore takes the bean's state wherever it is added
  * (the store decides, `notifyFor`), so adding never turns the switch off. The switch only changes
  * when it is touched: its last state is kept while the list is empty (Remove All, then a set,
@@ -43,12 +43,17 @@
  * Grown-ups only: the page opens it for adults, it renders nothing for anyone else, and the
  * store refuses a child. Stays mounted while closed; it re-seeds on every open.
  *
- * Dark mode: the sheet is `BaseModal`'s raised panel; the pieces carry their own (see each);
- * the hint is `ink-faint`, Remove All `accent-lift` on dark (its confirm is the danger one), Done
- * the brand gradient with white.
+ * It is the right-hand drawer (`BeanieFormModal variant="drawer"`), as a Beanie List and a to-do
+ * are: the panel's Escape token sits under a row's edit, chooser or set preview, which Escape
+ * closes first; the drawer unmounts its body on close, so no chooser outlives it and a row's
+ * unmount commit runs then.
+ *
+ * Dark mode: the drawer's raised panel and body (`BeanieFormModal`); the pieces carry their own
+ * (see each); the hint is `ink-faint`, Remove All `accent-lift` on dark (its confirm is the danger
+ * one), Done the drawer's brand gradient with white.
  */
 import { computed, nextTick, reactive, ref, watch } from 'vue';
-import BaseModal from '@/components/ui/BaseModal.vue';
+import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import FormFieldGroup from '@/components/ui/FormFieldGroup.vue';
 import NotifyParentsToggle from '@/components/ui/NotifyParentsToggle.vue';
 import ChoreSetChips from '@/components/chores/ChoreSetChips.vue';
@@ -519,13 +524,19 @@ async function removeAll(): Promise<void> {
 </script>
 
 <template>
-  <BaseModal
+  <!-- The right-hand drawer, as a Beanie List and a to-do edit in. Changes save as they are made,
+       so the primary action only closes ("Done"), the way ListDetailModal's "Close" does. -->
+  <BeanieFormModal
+    variant="drawer"
     :open="shown"
     :title="title"
     icon="🧹"
-    size="lg"
-    fullscreen-mobile
+    icon-bg="var(--tint-orange-12)"
+    size="narrow"
+    :save-label="t('action.done')"
+    save-testid="chore-bean-editor-done"
     @close="emit('close')"
+    @save="emit('close')"
   >
     <div class="space-y-5" data-testid="chore-bean-editor" :data-member-id="member?.id">
       <p
@@ -534,17 +545,6 @@ async function removeAll(): Promise<void> {
       >
         {{ t('choreboard.editor.hint') }}
       </p>
-
-      <NotifyParentsToggle
-        v-if="notifyShown"
-        :model-value="notifyOn"
-        testid="chore-bean-editor-notify-parents"
-        :hint-keys="{
-          on: 'choreboard.editor.notifyHintOn',
-          off: 'choreboard.editor.notifyHintOff',
-        }"
-        @update:model-value="setNotify"
-      />
 
       <ChoreSetChips :preview="previewOf" :on-keys="fullSets" :busy="busy" @add="addSetHere" />
 
@@ -581,17 +581,18 @@ async function removeAll(): Promise<void> {
           @add-row="addRow"
         />
       </FormFieldGroup>
-    </div>
 
-    <template #footer>
-      <button
-        type="button"
-        class="font-outfit from-primary-500 to-terracotta-400 w-full rounded-2xl bg-gradient-to-r py-3.5 text-sm font-bold text-white shadow-[0_4px_12px_rgba(241,93,34,0.2)]"
-        data-testid="chore-bean-editor-done"
-        @click="emit('close')"
-      >
-        {{ t('action.done') }}
-      </button>
-    </template>
-  </BaseModal>
+      <!-- Last on purpose: a setting for the whole list, not the list itself. -->
+      <NotifyParentsToggle
+        v-if="notifyShown"
+        :model-value="notifyOn"
+        testid="chore-bean-editor-notify-parents"
+        :hint-keys="{
+          on: 'choreboard.editor.notifyHintOn',
+          off: 'choreboard.editor.notifyHintOff',
+        }"
+        @update:model-value="setNotify"
+      />
+    </div>
+  </BeanieFormModal>
 </template>

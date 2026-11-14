@@ -103,6 +103,8 @@ const MANAGE = [
   'chore-edit',
   'chore-row-remove',
   'chore-empty-starters',
+  'chore-day-empty-add',
+  'chore-day-empty-edit',
 ];
 
 /** Controls the old per-chore editing had, gone from every view. */
@@ -185,6 +187,10 @@ describe('a child viewer', () => {
     expect(notToday.get('[data-testid="chore-day-empty"]').text()).toContain(
       'choreboard.empty.childToday'
     );
+    // The friendly card alone: no Add or Edit Chores for a child, in either case.
+    for (const id of ['chore-day-empty-add', 'chore-day-empty-edit', 'chore-day-edit']) {
+      expect(notToday.find(`[data-testid="${id}"]`).exists(), id).toBe(false);
+    }
   });
 
   it('the quick-add intent does nothing for a child', async () => {
@@ -260,6 +266,48 @@ describe('a grown-up viewer', () => {
     await w.get('[data-testid="chore-day-edit"]').trigger('click');
     expect(propsOf(w, EditorStub)).toMatchObject({ open: true, memberId: 'sib' });
     expect(propsOf(w, StarterStub).open).toBe(false);
+  });
+
+  it('a bean with no chores at all: the day reads Add Chores, and so does its empty card', async () => {
+    const w = await mountPage({ bean: 'mom' });
+    const action = w.get('[data-testid="chore-day-edit"]');
+    expect(action.text()).toContain('choreboard.addChores');
+    expect(action.text()).not.toContain('choreboard.day.edit');
+    expect(action.attributes('data-empty')).toBe('true');
+    expect(w.find('[data-testid="chore-day-copy"]').exists()).toBe(false);
+    const card = w.get('[data-testid="chore-day-empty"]');
+    expect(card.text()).toContain('choreboard.empty.forBean');
+    expect(card.text()).not.toContain('choreboard.empty.forBeanToday');
+    expect(card.find('[data-testid="chore-day-empty-edit"]').exists()).toBe(false);
+    await card.get('[data-testid="chore-day-empty-add"]').trigger('click');
+    expect(propsOf(w, EditorStub)).toMatchObject({ open: true, memberId: 'mom' });
+    expect(propsOf(w, StarterStub).open).toBe(false);
+    // The top action opens the same list.
+    w.findComponent(EditorStub).vm.$emit('close');
+    await flushPromises();
+    await action.trigger('click');
+    expect(propsOf(w, EditorStub)).toMatchObject({ open: true, memberId: 'mom' });
+  });
+
+  it('a bean whose chores are all on other days: a plain "nothing today" card with Edit Chores', async () => {
+    chores.list = [chore('sat', { assigneeIds: ['kid'], days: [6] })]; // today is a Friday
+    const w = await mountPage({ bean: 'kid' });
+    const action = w.get('[data-testid="chore-day-edit"]');
+    expect(action.text()).toContain('choreboard.day.edit');
+    expect(action.attributes('data-empty')).toBeUndefined();
+    const card = w.get('[data-testid="chore-day-empty"]');
+    expect(card.text()).toContain('choreboard.empty.forBeanToday');
+    expect(card.find('[data-testid="chore-day-empty-add"]').exists()).toBe(false);
+    const edit = card.get('[data-testid="chore-day-empty-edit"]');
+    expect(edit.text()).toBe('choreboard.day.edit');
+    await edit.trigger('click');
+    expect(propsOf(w, EditorStub)).toMatchObject({ open: true, memberId: 'kid' });
+  });
+
+  it('a bean with chores today has no empty card and no data-empty', async () => {
+    const w = await mountPage({ bean: 'kid' });
+    expect(w.find('[data-testid="chore-day-empty"]').exists()).toBe(false);
+    expect(w.get('[data-testid="chore-day-edit"]').attributes('data-empty')).toBeUndefined();
   });
 
   it('a bean’s day only ticks: no pencils, handles, Select or Other Days; a name opens the list', async () => {

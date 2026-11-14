@@ -10,9 +10,12 @@
  *
  * Editing is per bean, like a Beanie List: the bean's chore list (`ChoreBeanEditor`, "Pip's
  * Chores") opens from the bean's card (Edit Chores, or "+" when it has none), the day's Edit
- * Chores, a chore's name, and Quick Add on a bean's day. The page header's Add Chores, the empty
- * state and the Beanie Lists redirect open the Add Chores sheet (`ChoreAddSheet`), which adds one
- * list to several beans at once. "No one's" chores (their people have left) have a ✕ each.
+ * Chores, a chore's name, and Quick Add on a bean's day. A bean with no chores at all has
+ * nothing to edit, so the day's action reads Add Chores and its empty card has Add Chores too; a
+ * bean whose chores are all on other days gets a plain "nothing today" card with Edit Chores.
+ * The page header's Add Chores, the empty state and the Beanie Lists redirect open the Add Chores
+ * sheet (`ChoreAddSheet`), which adds one list to several beans at once. "No one's" chores
+ * (their people have left) have a ✕ each.
  *
  * MVO: everything read comes from `choreStore` (the one read model, `choreDayFor`); every
  * write is an intent to it, ticks through `useChoreTicks` (the page's in-flight guard). The
@@ -330,6 +333,11 @@ const dayEmptyText = computed(() => {
   );
 });
 
+/** The day's top-right action: Edit Chores, or Add Chores when the bean has none at all. */
+const dayEditLabel = computed(() =>
+  t(dayHasAnyChores.value ? 'choreboard.day.edit' : 'choreboard.addChores')
+);
+
 const dayWeek = computed(() => (viewBeanId.value ? choreStore.weekFor(viewBeanId.value) : null));
 </script>
 
@@ -359,13 +367,17 @@ const dayWeek = computed(() => (viewBeanId.value ? choreStore.weekFor(viewBeanId
           >
             <span aria-hidden="true">📋</span> {{ t('choreboard.day.copy') }}
           </button>
+          <!-- With no chores at all there is nothing to edit: it reads Add Chores. -->
           <button
             type="button"
             class="font-outfit from-primary-500 to-terracotta-400 focus-visible:ring-sky-silk-300 inline-flex items-center gap-1.5 rounded-2xl bg-gradient-to-r px-3.5 py-2 text-sm font-semibold text-white focus-visible:ring-2 focus-visible:outline-none"
             data-testid="chore-day-edit"
+            :data-empty="dayHasAnyChores ? undefined : 'true'"
             @click="openBeanEditor(viewBeanId)"
           >
+            <span v-if="!dayHasAnyChores" aria-hidden="true">+</span>
             <svg
+              v-else
               class="h-4 w-4"
               viewBox="0 0 24 24"
               fill="none"
@@ -377,7 +389,7 @@ const dayWeek = computed(() => (viewBeanId.value ? choreStore.weekFor(viewBeanId
             >
               <path d="M16.9 3.6a2.1 2.1 0 0 1 3 3L8.5 18 4 19.5 5.5 15 16.9 3.6Z" />
             </svg>
-            {{ t('choreboard.day.edit') }}
+            {{ dayEditLabel }}
           </button>
         </template>
       </div>
@@ -432,6 +444,25 @@ const dayWeek = computed(() => (viewBeanId.value ? choreStore.weekFor(viewBeanId
         <p class="font-outfit dark:text-ink text-secondary-500 text-base font-semibold">
           {{ dayEmptyText }}
         </p>
+        <!-- Grown-ups only: no chores at all, Add Chores; chores on other days, Edit Chores.
+             Both open this bean's chore list. A child sees the card alone. -->
+        <div v-if="isAdult" class="mt-5 flex justify-center">
+          <AddEntityButton
+            v-if="!dayHasAnyChores"
+            :label="t('choreboard.addChores')"
+            data-testid="chore-day-empty-add"
+            @click="openBeanEditor(viewBeanId)"
+          />
+          <button
+            v-else
+            type="button"
+            class="font-outfit dark:bg-surface-overlay dark:border-line-strong dark:text-ink text-secondary-500 focus-visible:ring-sky-silk-300 rounded-2xl border border-[var(--color-border-strong)] bg-white px-4 py-2.5 text-sm font-semibold focus-visible:ring-2 focus-visible:outline-none"
+            data-testid="chore-day-empty-edit"
+            @click="openBeanEditor(viewBeanId)"
+          >
+            {{ t('choreboard.day.edit') }}
+          </button>
+        </div>
       </div>
 
       <div v-else class="flex flex-col gap-3" data-testid="chore-day-sections">

@@ -8,7 +8,7 @@
  * already has it, same title and same block, which is dimmed and left out of the count), which
  * sets are already on (`onKeys`, a ✓ chip), and whether an on set can be taken back
  * (`removable`, the sheet's "Remove from List"). The primary action emits `add`, or `remove` for
- * a set on the list; the preview closes after either. It lives inside its host's `BaseModal`
+ * a set on the list; the preview closes after either. It lives inside its host's drawer
  * body, which unmounts when the sheet closes, so its Escape token never outlives the sheet.
  *
  * Dark mode: chips and the preview are `surface-overlay`; an open or added chip is the orange

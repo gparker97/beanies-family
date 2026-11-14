@@ -9,7 +9,7 @@
  * leaves an Escape token behind.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mount, flushPromises, type VueWrapper } from '@vue/test-utils';
+import { mount, flushPromises, type Stubs, type VueWrapper } from '@vue/test-utils';
 import { defineComponent, h } from 'vue';
 
 vi.mock(
@@ -24,7 +24,8 @@ const confirmFn = vi.hoisted(() => vi.fn());
 vi.mock('@/composables/useConfirm', () => ({ confirm: confirmFn }));
 
 import ChoreBeanEditor from '../ChoreBeanEditor.vue';
-import { hasOpenEscapeLayer } from '@/composables/useEscapeClose';
+import { escapeLayerCount, hasOpenEscapeLayer } from '@/composables/useEscapeClose';
+import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import { chore, choreActions, chores, family, resetKit } from './choreTestKit';
 import { choreStarterSet } from '@/constants/choreStarterSets';
 import type { Chore } from '@/types/models';
@@ -56,12 +57,19 @@ const DraggableStub = defineComponent({
   },
 });
 
+/** `BaseSidePanel`, inline: the drawer's header, body and footer while open. */
+const DrawerStub = defineComponent({
+  name: 'BaseSidePanel',
+  props: { open: Boolean, size: String, layer: String, closable: Boolean, customHeader: Boolean },
+  template:
+    '<div v-if="open" data-testid="drawer-stub" :data-size="size"><h1 data-testid="modal-title"><slot name="header" /></h1><slot /><slot name="footer" /></div>',
+});
+
 const stubs = {
-  BaseModal: {
-    props: ['open', 'title'],
-    template:
-      '<div v-if="open"><h1 data-testid="modal-title">{{ title }}</h1><slot /><slot name="footer" /></div>',
-  },
+  // The drawer's panel, without its Teleport and Escape token (a describe below mounts the real
+  // one for the Escape layers); BeanieFormModal itself is real, so its Done/Add button is.
+  BaseSidePanel: DrawerStub,
+  ModalIconTitle: { template: '<span><slot /></span>' },
   FormFieldGroup: {
     props: ['label'],
     template: '<div :data-label="label"><slot name="label-extra" /><slot /></div>',
@@ -75,10 +83,10 @@ const stubs = {
 const VIA = { via: 'bean-editor' };
 
 const mounted: VueWrapper[] = [];
-async function openEditor(memberId = 'kid'): Promise<VueWrapper> {
+async function openEditor(memberId = 'kid', globalStubs: Stubs = stubs): Promise<VueWrapper> {
   const w = mount(ChoreBeanEditor, {
     props: { open: false, memberId },
-    global: { stubs },
+    global: { stubs: globalStubs },
     attachTo: document.body,
   });
   mounted.push(w);
@@ -153,6 +161,38 @@ describe('ChoreBeanEditor: opening', () => {
     expect(w.find('[data-testid="chore-starter-add"]').exists()).toBe(false);
     await w.get('[data-testid="chore-bean-editor-done"]').trigger('click');
     expect(w.emitted('close')).toHaveLength(1);
+  });
+
+  it('is the right-hand drawer, like a list: hint, sets, the list, then Keep Parents Posted', async () => {
+    const w = await openEditor();
+    const drawer = w.findComponent(BeanieFormModal);
+    expect(drawer.props()).toMatchObject({
+      variant: 'drawer',
+      size: 'narrow',
+      saveLabel: 'action.done',
+    });
+    expect(w.get('[data-testid="drawer-stub"]').attributes('data-size')).toBe('narrow');
+    // Top to bottom: the hint, the sets, the list (with Remove All in its header), the switch.
+    const order = [
+      '[data-testid="chore-bean-editor-hint"]',
+      '[data-testid="chore-suggest-chip"]',
+      '[data-label="choreboard.editor.list"]',
+      '[data-testid="chore-bean-editor-remove-all"]',
+      '[data-testid="chore-draft-row"]',
+      '[data-testid="chore-bean-editor-notify-parents"]',
+    ].map((sel) => w.get(sel).element);
+    for (let i = 1; i < order.length; i++) {
+      const prev = order[i - 1]!;
+      const pos = prev.compareDocumentPosition(order[i]!);
+      expect(
+        pos & (Node.DOCUMENT_POSITION_FOLLOWING | Node.DOCUMENT_POSITION_CONTAINED_BY)
+      ).toBeTruthy();
+    }
+    // The switch is the body's last block, after the whole list.
+    const body = w.get('[data-testid="chore-bean-editor"]').element;
+    expect(body.lastElementChild?.getAttribute('data-testid')).toBe(
+      'chore-bean-editor-notify-parents'
+    );
   });
 
   it('a child viewer never sees it, even if asked to open it', async () => {
@@ -700,5 +740,53 @@ describe('ChoreBeanEditor: Escape layers', () => {
     chores.list = chores.list.filter((c) => c.id !== 'k2');
     await flushPromises();
     expect(hasOpenEscapeLayer()).toBe(false);
+  });
+});
+
+describe('ChoreBeanEditor: the real drawer', () => {
+  // The real `BaseSidePanel` (its Teleport inlined), so its own Escape token is in the stack.
+  const realDrawer = { ...stubs, BaseSidePanel: false, teleport: true };
+
+  it('Escape closes an open chooser first, then the drawer; closing releases every token', async () => {
+    const w = await openEditor('kid', realDrawer);
+    expect(escapeLayerCount()).toBe(1); // the drawer
+    await rowOf(w, 'k1').get('[data-testid="chore-draft-days-pick"]').trigger('click');
+    expect(escapeLayerCount()).toBe(2);
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    await flushPromises();
+    expect(w.find('[data-testid="chore-draft-days-choices"]').exists()).toBe(false);
+    expect(w.emitted('close')).toBeUndefined();
+    expect(escapeLayerCount()).toBe(1);
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(w.emitted('close')).toHaveLength(1);
+
+    // The page's close: the body unmounts, so a chooser left open goes with the drawer.
+    await rowOf(w, 'k1').get('[data-testid="chore-draft-days-pick"]').trigger('click');
+    expect(escapeLayerCount()).toBe(2);
+    await w.setProps({ open: false, memberId: null });
+    await flushPromises();
+    expect(w.find('[data-testid="chore-bean-editor"]').exists()).toBe(false);
+    expect(hasOpenEscapeLayer()).toBe(false);
+  });
+
+  it('a row edit and a set preview each take Escape before the drawer; Done closes it', async () => {
+    const w = await openEditor('kid', realDrawer);
+    const input = rowOf(w, 'k2').get('[data-testid="chore-draft-title"]');
+    await input.trigger('focus');
+    await input.setValue('Something else');
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    await flushPromises();
+    expect(titleOf(rowOf(w, 'k2')).value).toBe('Brush teeth');
+    expect(w.emitted('close')).toBeUndefined();
+    expect(escapeLayerCount()).toBe(1);
+
+    await w.get('[data-testid="chore-suggest-chip"][data-set="bedtime"]').trigger('click');
+    expect(escapeLayerCount()).toBe(2);
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    await flushPromises();
+    expect(w.find('[data-testid="chore-set-preview"]').exists()).toBe(false);
+    expect(w.emitted('close')).toBeUndefined();
+    await w.get('[data-testid="chore-bean-editor-done"]').trigger('click');
+    expect(w.emitted('close')).toHaveLength(1);
   });
 });

@@ -10,7 +10,7 @@
  * chooser leaves an Escape token behind when the sheet closes or its row goes.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mount, flushPromises, type VueWrapper } from '@vue/test-utils';
+import { mount, flushPromises, type Stubs, type VueWrapper } from '@vue/test-utils';
 import { defineComponent } from 'vue';
 
 vi.mock(
@@ -24,7 +24,8 @@ vi.mock('@/composables/useToast', () => ({ showToast: toast }));
 
 import ChoreAddSheet from '../ChoreAddSheet.vue';
 import { clearChoreAddDraft, useChoreAddDraft } from '@/composables/useChoreAddDraft';
-import { hasOpenEscapeLayer } from '@/composables/useEscapeClose';
+import { escapeLayerCount, hasOpenEscapeLayer } from '@/composables/useEscapeClose';
+import BeanieFormModal from '@/components/ui/BeanieFormModal.vue';
 import { choreActions, resetKit } from './choreTestKit';
 import {
   CHORE_STARTER_SETS,
@@ -43,12 +44,19 @@ const PictureStub = defineComponent({
   template: '<div data-testid="picture-stub" />',
 });
 
+/** `BaseSidePanel`, inline: the drawer's header, body and footer while open. */
+const DrawerStub = defineComponent({
+  name: 'BaseSidePanel',
+  props: { open: Boolean, size: String, layer: String, closable: Boolean, customHeader: Boolean },
+  template:
+    '<div v-if="open" data-testid="drawer-stub" :data-size="size"><h1 data-testid="modal-title"><slot name="header" /></h1><slot /><slot name="footer" /></div>',
+});
+
 const stubs = {
-  BaseModal: {
-    props: ['open', 'title'],
-    template:
-      '<div v-if="open"><h1 data-testid="modal-title">{{ title }}</h1><slot /><slot name="footer" /></div>',
-  },
+  // The drawer's panel, without its Teleport and Escape token (a describe below mounts the real
+  // one for the Escape layers); BeanieFormModal itself is real, so its Done/Add button is.
+  BaseSidePanel: DrawerStub,
+  ModalIconTitle: { template: '<span><slot /></span>' },
   FormFieldGroup: {
     props: ['label'],
     template: '<div :data-label="label"><slot name="label-extra" /><slot /></div>',
@@ -59,10 +67,13 @@ const stubs = {
 };
 
 const mounted: VueWrapper[] = [];
-async function openSheet(props: Record<string, unknown> = {}): Promise<VueWrapper> {
+async function openSheet(
+  props: Record<string, unknown> = {},
+  globalStubs: Stubs = stubs
+): Promise<VueWrapper> {
   const w = mount(ChoreAddSheet, {
     props: { open: false, ...props },
-    global: { stubs },
+    global: { stubs: globalStubs },
     attachTo: document.body,
   });
   mounted.push(w);
@@ -608,5 +619,69 @@ describe('ChoreAddSheet: adding and the session list', () => {
     await rowOf(w, 'eat-breakfast').get('[data-testid="chore-draft-remove"]').trigger('click');
     await submit(w);
     expect(JSON.stringify(CHORE_STARTER_SETS)).toBe(before);
+  });
+});
+
+describe('ChoreAddSheet: the drawer', () => {
+  it('is the right-hand drawer, and Add is its primary action: not ready, then ready, then busy', async () => {
+    let land: (v: { added: number; skipped: number }) => void = () => {};
+    choreActions.addChores.mockImplementation(() => new Promise((resolve) => (land = resolve)));
+    const w = await openSheet({ presetMemberIds: ['kid'] });
+    const drawer = () => w.findComponent(BeanieFormModal);
+    expect(drawer().props()).toMatchObject({
+      variant: 'drawer',
+      size: 'narrow',
+      saveReady: false,
+      saveDisabled: true,
+      isSubmitting: false,
+    });
+    expect(addButton(w).text()).toBe('choreboard.starter.ctaNone');
+    await addSetVia(w, 'bedtime');
+    expect(drawer().props()).toMatchObject({ saveReady: true, saveDisabled: false });
+    expect(addButton(w).text()).toBe('choreboard.starter.cta.other');
+    await addButton(w).trigger('click');
+    // While the batch is written: the spinner, busy, and the drawer cannot be closed.
+    expect(addButton(w).text()).toBe('common.saving');
+    expect(addButton(w).attributes('aria-busy')).toBe('true');
+    expect(addButton(w).attributes('disabled')).toBeDefined();
+    expect(w.findComponent(DrawerStub).props('closable')).toBe(false);
+    land({ added: 4, skipped: 0 });
+    await flushPromises();
+    expect(w.emitted('close')).toHaveLength(1);
+  });
+
+  it('Escape closes a preview, a chooser or a row edit first, then the drawer', async () => {
+    // The real `BaseSidePanel` (its Teleport inlined), so its own Escape token is in the stack.
+    const w = await openSheet({}, { ...stubs, BaseSidePanel: false, teleport: true });
+    expect(escapeLayerCount()).toBe(1); // the drawer
+    await chip(w, 'school-morning').trigger('click');
+    expect(escapeLayerCount()).toBe(2);
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    await flushPromises();
+    expect(w.find('[data-testid="chore-set-preview"]').exists()).toBe(false);
+    await addSetVia(w, 'school-morning');
+    await rowOf(w, 'pack-bag').get('[data-testid="chore-draft-time"]').trigger('click');
+    expect(escapeLayerCount()).toBe(2);
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    await flushPromises();
+    expect(escapeLayerCount()).toBe(1);
+    const input = rowOf(w, 'pack-bag').get('[data-testid="chore-draft-title"]');
+    const before = titleOf(rowOf(w, 'pack-bag')).value;
+    await input.trigger('focus');
+    await input.setValue('Something else');
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    await flushPromises();
+    expect(titleOf(rowOf(w, 'pack-bag')).value).toBe(before);
+    expect(w.emitted('close')).toBeUndefined();
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(w.emitted('close')).toHaveLength(1);
+
+    // The page's close unmounts the body, so a chooser left open goes with the drawer.
+    await rowOf(w, 'pack-bag').get('[data-testid="chore-draft-time"]').trigger('click');
+    expect(escapeLayerCount()).toBe(2);
+    await w.setProps({ open: false });
+    await flushPromises();
+    expect(w.find('[data-testid="chore-starter-sheet"]').exists()).toBe(false);
+    expect(hasOpenEscapeLayer()).toBe(false);
   });
 });

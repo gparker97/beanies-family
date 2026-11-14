@@ -9,7 +9,7 @@
  * It holds two things and decides nothing else:
  *  - which chooser is open (a row's time tiles, picture or days), one at a time across the list,
  *    with its Escape token. It closes when its row leaves the list and when a time is picked or
- *    a days shortcut is chosen; the list lives inside its host's `BaseModal` body, which unmounts
+ *    a days shortcut is chosen; the list lives inside its host's drawer body, which unmounts
  *    when the sheet closes, so no token outlives what it was for;
  *  - each block's rows as a `vuedraggable` list, dragged by a row's handle and only with
  *    `reorder` (disabled otherwise, the draft sheet), the

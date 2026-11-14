@@ -31,6 +31,8 @@ interface Props {
   isSubmitting?: boolean;
   /** Label shown beside the spinner while submitting. Defaults to `common.saving`. */
   submittingLabel?: string;
+  /** `data-testid` for the primary (save) button, for a caller whose tests or captures find it. */
+  saveTestid?: string;
   showDelete?: boolean;
   /**
    * Why this record can't be deleted (already translated). When set, the delete tile
@@ -77,6 +79,7 @@ const props = withDefaults(defineProps<Props>(), {
   saveDisabled: false,
   isSubmitting: false,
   submittingLabel: undefined,
+  saveTestid: undefined,
   showDelete: false,
   deleteDisabledReason: undefined,
   customHeader: false,
@@ -224,6 +227,8 @@ const containerProps = computed(() => {
           class="font-outfit flex-1 rounded-[16px] py-3.5 text-sm font-bold transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50"
           :class="saveClasses"
           :disabled="saveDisabled || isSubmitting"
+          :aria-busy="isSubmitting ? 'true' : undefined"
+          :data-testid="saveTestid"
           @click="emit('save')"
         >
           <span v-if="isSubmitting" class="flex items-center justify-center gap-2">
