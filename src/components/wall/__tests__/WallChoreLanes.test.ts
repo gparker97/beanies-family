@@ -24,8 +24,13 @@ vi.mock('@/composables/useMemberAvatar', () => ({
   useMemberAvatarBindings: () => ({ memberAvatarBindings: () => ({}) }),
 }));
 vi.mock('@/stores/choreStore', () => ({
-  useChoreStore: () => ({ starts: { morning: '06:00', afternoon: '12:00', evening: '17:00' } }),
+  useChoreStore: () => ({
+    starts: { morning: '06:00', afternoon: '12:00', evening: '17:00' },
+    tickWillCelebrate: (memberId: string, choreId: string) => willCelebrate(memberId, choreId),
+  }),
 }));
+/** The store's finishing-tick decision, as the test sets it. */
+const willCelebrate = vi.hoisted(() => vi.fn((_m: string, _c: string) => false));
 
 const members: FamilyMember[] = [
   { id: 'pip', name: 'Pip', color: '#F15D22' } as FamilyMember,
@@ -199,57 +204,42 @@ describe('WallChoreLanes', () => {
     });
   });
 
-  it('the wall’s tick burst skips only the tick that finishes a block (the celebration plays)', async () => {
+  it('the wall’s tick burst skips exactly the tick the store says will celebrate', async () => {
     const burst = vi.fn();
-    const mountWith = (l: WallChoreLane) =>
-      mount(WallChoreLanes, {
-        props: {
-          peripherals: {
-            todosFor: () => [],
-            unassignedTodos: [],
-            allTodos: [],
-            listsFor: () => [],
-            orphanLists: [],
-            visibleMemberIds: null,
-            choreLaneFor: (id: string) => (id === 'pip' ? l : null),
-          },
-          isPending: () => false,
-          backLabel: 'week',
+    const w = mount(WallChoreLanes, {
+      props: {
+        peripherals: {
+          todosFor: () => [],
+          unassignedTodos: [],
+          allTodos: [],
+          listsFor: () => [],
+          orphanLists: [],
+          visibleMemberIds: null,
+          choreLaneFor: (id: string) =>
+            id === 'pip'
+              ? lane('pip', [
+                  block('morning', [job('bed', 'pip'), job('teeth', 'pip')], { isNow: true }),
+                ])
+              : null,
         },
-        global: { stubs: { BeanieAvatar: true }, provide: { [WALL_BURST as symbol]: burst } },
-      });
-    const tickOf = (w: ReturnType<typeof mountWith>, choreId: string) =>
-      w.get(`[data-job-key="chore:${choreId}:pip"] .wall-tick-hit`);
+        isPending: () => false,
+        backLabel: 'week',
+      },
+      global: { stubs: { BeanieAvatar: true }, provide: { [WALL_BURST as symbol]: burst } },
+    });
+    const tick = (choreId: string) =>
+      w.get(`[data-job-key="chore:${choreId}:pip"] .wall-tick-hit`).trigger('click');
 
-    // Two to go: an ordinary tick, the burst plays.
-    const two = mountWith(
-      lane('pip', [block('morning', [job('bed', 'pip'), job('teeth', 'pip')], { isNow: true })])
-    );
-    await tickOf(two, 'bed').trigger('click');
+    // An ordinary tick: the burst plays, and the store was asked about THIS bean and chore.
+    willCelebrate.mockReturnValue(false);
+    await tick('bed');
     expect(burst).toHaveBeenCalledTimes(1);
-    expect(burst.mock.calls[0]![2]).toMatchObject({ choreId: 'bed' });
-
-    // The last one: the celebration plays, so no burst under it.
-    burst.mockClear();
-    const last = mountWith(
-      lane('pip', [
-        block('morning', [job('bed', 'pip', true), job('teeth', 'pip')], { isNow: true }),
-      ])
-    );
-    await tickOf(last, 'teeth').trigger('click');
-    expect(burst).not.toHaveBeenCalled();
-
-    // Already celebrated today (a re-tick after an untick): banner only, so the burst plays.
-    const again = mountWith(
-      lane('pip', [
-        block('morning', [job('bed', 'pip', true), job('teeth', 'pip')], {
-          isNow: true,
-          celebrated: true,
-        }),
-      ])
-    );
-    await tickOf(again, 'teeth').trigger('click');
+    expect(willCelebrate).toHaveBeenCalledWith('pip', 'bed');
+    // The finishing tick (the store counts a quick earlier tick still in flight): no burst.
+    willCelebrate.mockReturnValue(true);
+    await tick('teeth');
     expect(burst).toHaveBeenCalledTimes(1);
+    expect(willCelebrate).toHaveBeenLastCalledWith('pip', 'teeth');
   });
 
   it('draws no star row: stars appear only on a finished block', () => {

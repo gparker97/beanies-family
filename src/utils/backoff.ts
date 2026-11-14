@@ -23,3 +23,35 @@ export function nextBackoffMs(failureCount: number, code?: RemoteFetchErrorCode)
   const steps = Math.max(0, Math.floor(failureCount) - 1);
   return Math.min(BACKOFF_MAX_MS, BACKOFF_BASE_MS * 2 ** Math.min(steps, 10));
 }
+
+/**
+ * A load that fails in EPISODES (a sound file, a code chunk): after each failure in a row the
+ * next attempt waits the ladder above (5 min, doubling to an hour), so a screen that stays open
+ * for weeks (the beanie wall) neither hammers a broken load nor gives up on it for good. `fail`
+ * answers true only for the failure that STARTS an episode, so it is reported once per episode,
+ * never once per attempt; `succeed` ends the episode.
+ */
+export interface FailureBackoff {
+  /** May a new attempt start now? */
+  ready(now?: number): boolean;
+  /** Record a failure; true when it starts a new episode (report it). */
+  fail(now?: number): boolean;
+  succeed(): void;
+}
+
+export function failureBackoff(): FailureBackoff {
+  let failures = 0;
+  let retryAt = 0;
+  return {
+    ready: (now = Date.now()) => now >= retryAt,
+    fail(now = Date.now()) {
+      failures++;
+      retryAt = now + nextBackoffMs(failures);
+      return failures === 1;
+    },
+    succeed() {
+      failures = 0;
+      retryAt = 0;
+    },
+  };
+}

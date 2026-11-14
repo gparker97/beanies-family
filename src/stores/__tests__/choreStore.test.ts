@@ -379,6 +379,7 @@ describe('the once-only celebration', () => {
       beanName: 'kid',
       count: 2,
       anchor: undefined,
+      settled: false,
       stillDone: expect.any(Function),
     });
     // The block is still done now; the celebration asks again when its banner is due.
@@ -435,6 +436,70 @@ describe('the once-only celebration', () => {
     order.length = 0;
     await store.toggleChore('c1', 'kid', { surface: 'app', anchor }); // untick
     expect(order.filter((o) => o.startsWith('hold'))).toEqual([]);
+  });
+
+  it('two quick ticks of the last two chores: the second holds first, ONE celebration', async () => {
+    for (const surface of ['app', 'wall'] as const) {
+      await setup([chore('c1'), chore('c2', { sortOrder: 1 })]);
+      order.length = 0;
+      const anchor = { block: document.createElement('section') } as never;
+      const opts = surface === 'wall' ? { surface, by: 'kid', anchor } : { surface, anchor };
+      // Neither tick's write has landed when the second is tapped.
+      expect(store.tickWillCelebrate('kid', 'c1')).toBe(false);
+      const first = store.toggleChore('c1', 'kid', opts);
+      expect(store.tickWillCelebrate('kid', 'c2')).toBe(true); // c1 counts while in flight
+      const second = store.toggleChore('c2', 'kid', opts);
+      const [a, b] = await Promise.all([first, second]);
+      // The first tick may see the block done once both have landed; it never celebrates.
+      expect(a).toMatchObject({ action: 'tick', celebrated: false });
+      expect(b).toEqual({ action: 'tick', completed: 'morning', celebrated: true });
+      // The hold came before EITHER write refreshed the marks; one celebration, anchored.
+      expect(order[0]).toBe('hold:kid:morning');
+      expect(order.filter((o) => o === 'celebrate')).toHaveLength(1);
+      expect(celebrate).toHaveBeenCalledTimes(1);
+      expect(celebrate.mock.calls[0]![0]).toMatchObject({ anchor, block: 'morning' });
+      expect((celebrate.mock.calls[0]![0] as { settled?: boolean }).settled).toBeFalsy();
+      // Both landed: the block is done; nothing is in flight; the tick is no longer predicted.
+      expect(store.choreDayFor('kid').blocks[0]).toMatchObject({ allDone: true, celebrated: true });
+      celebrate.mockClear();
+    }
+  });
+
+  it('two beans finishing at the same moment on the wall each hold their own block', async () => {
+    await setup([chore('k1'), chore('s1', { assigneeIds: ['sib'] })]);
+    order.length = 0;
+    const anchor = { block: document.createElement('section') } as never;
+    const kid = store.toggleChore('k1', 'kid', { surface: 'wall', by: 'kid', anchor });
+    const sib = store.toggleChore('s1', 'sib', { surface: 'wall', by: 'sib', anchor });
+    await Promise.all([kid, sib]);
+    // Both holds were taken before either write refreshed the marks; each celebrated once.
+    expect(order.slice(0, 2)).toEqual(['hold:kid:morning', 'hold:sib:morning']);
+    expect(order.filter((o) => o.startsWith('release'))).toEqual([]);
+    expect(celebrate.mock.calls.map((c) => (c[0] as { memberId: string }).memberId)).toEqual([
+      'kid',
+      'sib',
+    ]);
+  });
+
+  it('found done only after the write (another device): plays in its settled form', async () => {
+    await setup([chore('c1'), chore('c2', { sortOrder: 1 })]);
+    const anchor = { block: document.createElement('section') } as never;
+    // Another device's tick of c1 is in the pod but not yet in this store's marks.
+    db.marks.set(choreMarkId('done', 'kid', FRI, 'c1'), {
+      id: choreMarkId('done', 'kid', FRI, 'c1'),
+      kind: 'done',
+      memberId: 'kid',
+      date: FRI,
+      ref: 'c1',
+      by: 'kid',
+      createdAt: NOW,
+      updatedAt: NOW,
+    } as never);
+    order.length = 0;
+    const r = await store.toggleChore('c2', 'kid', { surface: 'app', anchor });
+    expect(r).toEqual({ action: 'tick', completed: 'morning', celebrated: true });
+    expect(order.some((o) => o.startsWith('hold'))).toBe(false); // nothing predicted a finish
+    expect(celebrate.mock.calls[0]![0]).toMatchObject({ settled: true, block: 'morning' });
   });
 
   it('a held tick whose write fails releases the hold; so does one another device celebrated', async () => {

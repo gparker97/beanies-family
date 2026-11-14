@@ -1,7 +1,7 @@
 /**
  * A bean's home card, "four segments": the header (count, "N left today"), one summary row per
  * time of day in day order, the block happening now open with its ticks, other rows opening on
- * a tap (one at a time beside Now); the slim row for a bean with no chores; grown-up controls
+ * a tap (one at a time beside Now); the chip for a bean with no chores; grown-up controls
  * only for grown-ups.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -144,10 +144,12 @@ describe('ChoreBeanCard', () => {
     expect(w.get('[data-testid="chore-bean-left"]').text()).toContain('choreboard.card.allDone');
   });
 
-  it('a bean with no chores is a slim row', () => {
+  it('a bean with no chores is a chip: avatar and name (the strip says "No Chores Yet")', () => {
     const w = mountCard({ hasAnyChores: false });
-    expect(w.get('[data-testid="chore-bean-card"]').attributes('data-slim')).toBe('true');
-    expect(w.get('[data-testid="chore-bean-empty"]').text()).toBe('choreboard.card.noneYet');
+    const chip = w.get('[data-testid="chore-slim-row"]');
+    expect(chip.attributes('data-member-id')).toBe('kid');
+    expect(chip.text()).toContain('Pip');
+    expect(w.find('[data-testid="chore-bean-card"]').exists()).toBe(false);
     expect(w.find('[data-testid="chore-summary"]').exists()).toBe(false);
     expect(w.find('[data-testid="chore-bean-count"]').exists()).toBe(false);
     expect(w.find('[data-testid="chore-bean-open"]').exists()).toBe(false);

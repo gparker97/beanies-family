@@ -7241,7 +7241,7 @@ export const ZH_STRINGS: Record<UIStringKey, string> = {
   'choreboard.row.untick': '取消勾选“{chore}”',
   'choreboard.row.edit': '编辑“{chore}”',
   'choreboard.card.none': '今天没有家务',
-  'choreboard.card.noneYet': '还没有家务',
+  'choreboard.noChores.title': '还没有家务',
   'choreboard.card.openDay': '打开{name}的一天',
   'choreboard.card.copyAria': '复制{name}的家务',
   'choreboard.card.addAria': '为{name}添加家务',

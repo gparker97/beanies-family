@@ -12,6 +12,7 @@ vi.mock('@/composables/choreCelebrationSounds', () => engine);
 
 import {
   CELEBRATION_SOUND_CUTOFF_MS,
+  cancelChoreCelebrationSound,
   playChoreCelebrationSound,
   resetCelebrationSoundsForTest,
   setSoundEnabled,
@@ -62,5 +63,13 @@ describe('playChoreCelebrationSound', () => {
     expect(second.current()).toBe(true);
     setSoundEnabled(false);
     expect(second.enabled()).toBe(false);
+  });
+
+  it('a dismissed celebration’s gate closes: its sound never starts after dismissal', async () => {
+    await playChoreCelebrationSound('kids-cheer', 'tada');
+    const gate = engine.playCelebrationSound.mock.calls[0]![3];
+    expect(gate.current()).toBe(true);
+    cancelChoreCelebrationSound();
+    expect(gate.current()).toBe(false);
   });
 });

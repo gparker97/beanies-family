@@ -16,8 +16,8 @@
  *
  * Size follows the board (`container-name: chore-board`): under 30rem the cell turns square,
  * the number steps down and "of 11" goes, so seven days fit a phone. `shape` sets the aspect
- * ratio for where it sits: `wide` (days across), `tall` (days down, the rail), `square` (a
- * bean's own week).
+ * ratio for where it sits: `wide` (the grown-ups' board, days across), `square` (a bean's own
+ * week).
  *
  * Dark mode: the fills and lines are tokens that switch with the theme; the number is `ink`
  * (6.1:1 on the strongest dark step over surface-raised).
@@ -34,7 +34,7 @@ const props = withDefaults(
     name: string;
     weekday: string;
     todayYmd: string;
-    shape?: 'wide' | 'tall' | 'square';
+    shape?: 'wide' | 'square';
     /** This cell's day summary is open. */
     expanded?: boolean;
   }>(),
@@ -161,9 +161,9 @@ function onClick(event: MouseEvent): void {
   flex-direction: column;
   justify-content: center;
 
-  /* Never a slab: one or two beans in a wide column stay day-cell sized, centred. */
+  /* Never a slab: a cell stays day-cell sized, centred in its column. */
   justify-self: center;
-  max-width: 6rem;
+  max-width: 5.25rem;
   min-height: 2rem;
   min-width: 0;
   position: relative;
@@ -171,15 +171,11 @@ function onClick(event: MouseEvent): void {
   width: 100%;
 }
 
-.day-cell[data-shape='tall'] {
-  aspect-ratio: 1.55 / 1;
-}
-
 .day-cell[data-shape='square'] {
   aspect-ratio: 1 / 1;
 }
 
-/* A narrow board (a phone, the rail): square-ish, a smaller number, no "of 11". */
+/* A narrow board (a phone): square-ish, a smaller number, no "of 11". */
 @container chore-board (max-width: 30rem) {
   .day-cell {
     border-radius: 0.625rem;

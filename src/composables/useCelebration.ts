@@ -1,5 +1,10 @@
 import { markRaw, ref, shallowRef } from 'vue';
-import { playChime, playChoreCelebrationSound, playFanfare } from '@/composables/useSounds';
+import {
+  cancelChoreCelebrationSound,
+  playChime,
+  playChoreCelebrationSound,
+  playFanfare,
+} from '@/composables/useSounds';
 import { useTranslationStore } from '@/stores/translationStore';
 import { CHORE_BLOCK_META } from '@/constants/choreBlocks';
 import { logEvent } from '@/services/telemetry/logEvent';
@@ -225,6 +230,11 @@ export interface ChoreCelebrationRequest {
    * the burst (a double tap) gets no banner over an undone block; the celebration ends quietly.
    */
   stillDone?: () => boolean;
+  /**
+   * The block already shows its banner (found complete only after the write, so its rows are
+   * gone): no burst from the tick, the move plays on the banner straight away.
+   */
+  settled?: boolean;
 }
 
 /**
@@ -258,7 +268,8 @@ const activeChore = shallowRef<ActiveChoreCelebration | null>(null);
  * by the store BEFORE the write's marks refresh, so the surface never tears its rows down between
  * the tap and the burst: the tick the anchor points at stays the one on screen.
  */
-const pendingHold = shallowRef<{ memberId: string; block: ChoreBlock } | null>(null);
+const pendingHolds = shallowRef<ReadonlySet<string>>(new Set());
+const holdKey = (memberId: string, block: ChoreBlock) => `${memberId}:${block}`;
 let choreTimers: ReturnType<typeof setTimeout>[] = [];
 let lastPraise: number | null = null;
 let lastSound: ChoreSoundId | null = null;
@@ -330,22 +341,29 @@ function setChorePhase(id: number, phase: ChoreCelebrationPhase): void {
 
 /**
  * The store is about to write the tick that finishes this bean's block and will celebrate it:
- * keep the block's rows on screen through the write (see `pendingHold`). Released by
+ * keep the block's rows on screen through the write (see `pendingHolds`). Released by
  * `celebrateChore`, or by `releaseChoreBlock` when the write fails or another device celebrated.
  */
 export function holdChoreBlock(memberId: string, block: ChoreBlock): void {
-  pendingHold.value = { memberId, block };
+  pendingHolds.value = new Set(pendingHolds.value).add(holdKey(memberId, block));
 }
 
 export function releaseChoreBlock(memberId: string, block: ChoreBlock): void {
-  const h = pendingHold.value;
-  if (h?.memberId === memberId && h.block === block) pendingHold.value = null;
+  const key = holdKey(memberId, block);
+  if (!pendingHolds.value.has(key)) return;
+  const next = new Set(pendingHolds.value);
+  next.delete(key);
+  pendingHolds.value = next;
 }
 
-/** End the chore celebration (`id` guards a stale timer against a newer one). */
+/**
+ * End the chore celebration (`id` guards a stale timer against a newer one). Its sound, if it is
+ * still waiting to start (the cheer loading), never starts now.
+ */
 export function dismissChoreCelebration(id?: number): void {
   if (id !== undefined && activeChore.value?.id !== id) return;
   clearChoreTimers();
+  if (activeChore.value) cancelChoreCelebrationSound();
   activeChore.value = null;
 }
 
@@ -390,10 +408,11 @@ export function celebrateChore(req: ChoreCelebrationRequest): void {
     praiseWords: praise.words,
     startedAt: performance.now(),
     calm,
-    phase: calm ? 'banner' : 'burst',
+    phase: calm || req.settled ? 'banner' : 'burst',
     endsAt,
   };
-  if (!calm) choreTimers.push(setTimeout(() => setChorePhase(id, 'banner'), BEATS.swap));
+  if (!calm && !req.settled)
+    choreTimers.push(setTimeout(() => setChorePhase(id, 'banner'), BEATS.swap));
   choreTimers.push(setTimeout(() => dismissChoreCelebration(id), endsAt));
 
   logEvent({
@@ -428,12 +447,29 @@ export function celebrateChore(req: ChoreCelebrationRequest): void {
           message: 'chore celebration played the paired sound in place of the cheer',
           context: { action: 'fallback-sound', detail: paired, kind: move, stage: outcome },
         });
-      } else if (outcome === 'fanfare') {
+      } else if (outcome === 'fanfare-late' || outcome === 'fanfare-failed') {
+        const late = outcome === 'fanfare-late';
         logEvent({
           level: 'warn',
           surface: CHORE_CELEBRATION_SURFACE,
-          message: 'chore celebration sounds were not loaded in time; the fanfare played',
-          context: { action: 'fallback-fanfare', detail: sound, kind: move },
+          message: late
+            ? 'chore celebration sounds were still loading at the cutoff; the fanfare played'
+            : 'chore celebration sounds could not load; the fanfare played',
+          context: {
+            action: 'fallback-fanfare',
+            stage: late ? 'late' : 'failed',
+            detail: sound,
+            kind: move,
+          },
+        });
+      } else if (outcome !== 'played') {
+        // Nothing started: muted, superseded by a newer celebration, dismissed while it
+        // waited, or no Web Audio. Logged so the `play` rate can be read against it.
+        logEvent({
+          level: 'debug',
+          surface: CHORE_CELEBRATION_SURFACE,
+          message: 'chore celebration sound did not start',
+          context: { action: 'sound-skipped', stage: outcome, detail: sound, kind: move },
         });
       }
     })
@@ -454,8 +490,7 @@ export function celebrateChore(req: ChoreCelebrationRequest): void {
  * holds a block: a centered one is not about the board on screen.
  */
 export function choreBlockHeld(memberId: string, block: ChoreBlock): boolean {
-  const h = pendingHold.value;
-  if (h?.memberId === memberId && h.block === block) return true;
+  if (pendingHolds.value.has(holdKey(memberId, block))) return true;
   const c = activeChore.value;
   return !!c?.anchor && c.phase === 'burst' && c.memberId === memberId && c.block === block;
 }
@@ -484,7 +519,7 @@ export function resetChoreCelebrationForTest(): void {
   lastSound = null;
   storageNoted = false;
   bannerMemo = null;
-  pendingHold.value = null;
+  pendingHolds.value = new Set();
 }
 
 export function useCelebration() {

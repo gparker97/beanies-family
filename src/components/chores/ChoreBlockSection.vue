@@ -11,7 +11,7 @@
  *  - later:   a folded block: one quiet line in the block colour (tap to open it again). The
  *             fold is this page visit's only, never saved;
  *  - done:    every chore ticked. With `celebrate` the all-done `CelebrationBanner` with one star
- *             per chore; without, a one-line "All Done" strip with its stars. Either can reopen
+ *             per chore (tall on a phone, the short horizontal strip from 768px); without, a one-line "All Done" strip with its stars. Either can reopen
  *             its chores, so a tick made by mistake can be undone. The celebration itself is the
  *             store's (once per bean, block and day); this draws the banner, in its celebrating
  *             form while the celebration plays on it (`choreBannerCelebration`), and keeps the
@@ -34,6 +34,7 @@ import ChoreRow from '@/components/chores/ChoreRow.vue';
 import CelebrationBanner from '@/components/ui/CelebrationBanner.vue';
 import { choreBannerCelebration, choreBlockHeld } from '@/composables/useCelebration';
 import { useTranslation } from '@/composables/useTranslation';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import {
   CHORE_BLOCK_META,
   choreBlockHint,
@@ -79,6 +80,8 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useTranslation();
+/** From 768px the all-done banner is the short strip (desktop is grown-ups; phones keep it tall). */
+const { isMobile } = useBreakpoint();
 
 /** Folded by its header (or never opened): this page visit only. */
 const collapsed = ref(!props.open);
@@ -193,6 +196,7 @@ defineExpose({ reveal });
         :image-alt="t('choreboard.done.imageAlt')"
         :action-label="t(expanded ? 'choreboard.block.hideChores' : 'choreboard.block.showChores')"
         :stars="block.total"
+        :strip="!isMobile"
         :celebration="bannerCelebration"
         data-testid="chore-done-banner"
         @action="expanded = !expanded"

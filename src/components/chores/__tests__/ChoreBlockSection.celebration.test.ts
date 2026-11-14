@@ -20,6 +20,7 @@ vi.mock('@/composables/useSounds', () => ({
   playChime: vi.fn(),
   playFanfare: vi.fn(),
   playChoreCelebrationSound: vi.fn(() => Promise.resolve('played')),
+  cancelChoreCelebrationSound: vi.fn(),
 }));
 vi.mock('@/stores/translationStore', () => ({
   useTranslationStore: () => ({ t: (key: string) => key }),
@@ -36,18 +37,15 @@ import {
 import { DEFAULT_CHORE_BLOCK_STARTS, type ChoreDayBlock } from '@/utils/chores';
 import type { ChoreCelebrationAnchor } from '@/utils/choreCelebration';
 
-function block(done: [boolean, boolean]): ChoreDayBlock {
-  const chores = [
-    { chore: chore('c1'), done: done[0] },
-    { chore: chore('c2'), done: done[1] },
-  ];
+function block(done: boolean[]): ChoreDayBlock {
+  const chores = done.map((d, i) => ({ chore: chore(`c${i + 1}`), done: d }));
   const n = done.filter(Boolean).length;
   return {
     block: 'morning',
     chores,
     done: n,
-    total: 2,
-    allDone: n === 2,
+    total: done.length,
+    allDone: n === done.length,
     celebrated: false,
     isNow: true,
     ended: false,
@@ -106,6 +104,38 @@ describe('the tick a celebration starts from', () => {
     await nextTick();
     const banner = w.get('[data-testid="chore-done-banner"]');
     expect(banner.classes()).toContain('is-celebrating');
+    w.unmount();
+  });
+
+  it('two quick ticks: the second is held before either lands; its tick is the one at burst', async () => {
+    const w = mount(ChoreBlockSection, {
+      attachTo: document.body,
+      props: {
+        block: block([true, false, false]),
+        memberId: 'kid',
+        beanName: 'Pip',
+        starts: DEFAULT_CHORE_BLOCK_STARTS,
+        celebrate: true,
+      },
+      global: { stubs: { CardArt: true } },
+    });
+    await w.get('[data-chore-id="c2"] [data-testid="chore-tick"]').trigger('click');
+    const last = w.get('[data-chore-id="c3"] [data-testid="chore-tick"]').element;
+    await w.get('[data-chore-id="c3"] [data-testid="chore-tick"]').trigger('click');
+    const anchor = w.emitted('toggle')![1]![1] as ChoreCelebrationAnchor;
+    // The store holds on the SECOND tap (the first counts as done while in flight).
+    holdChoreBlock('kid', 'morning');
+    await w.setProps({ block: block([true, true, false]) }); // the first write lands
+    await w.setProps({ block: block([true, true, true]) }); // then the second
+    await nextTick();
+    expect(w.find('[data-testid="chore-done-banner"]').exists()).toBe(false);
+    celebrateChore({ memberId: 'kid', block: 'morning', beanName: 'Pip', count: 3, anchor });
+    await nextTick();
+    expect(anchor.tickEl).toBe(last);
+    expect(last.isConnected).toBe(true);
+    vi.advanceTimersByTime(560);
+    await nextTick();
+    expect(w.findAll('[data-testid="chore-done-banner"]')).toHaveLength(1);
     w.unmount();
   });
 });

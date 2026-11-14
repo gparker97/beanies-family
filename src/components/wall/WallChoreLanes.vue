@@ -164,26 +164,15 @@ function blockState(b: WallChoreBlock, memberId: string): BlockState {
 const root = ref<HTMLElement | null>(null);
 
 /**
- * Would this tick finish its block and play the all-done celebration? The same question the
- * store asks (the last undone chore of a block not yet celebrated today), from the same read
- * model, answered at the tap: the wall's tick burst is optimistic, so it cannot wait for the
- * write's answer.
- */
-function finishesBlock(job: WallJob): boolean {
-  if (job.source !== 'chore' || job.done) return false;
-  const b = props.peripherals
-    .choreLaneFor?.(job.ownerId)
-    ?.blocks.find((x) => x.jobs.some((j) => j.key === job.key));
-  return !!b && !b.celebrated && b.done + 1 === b.total;
-}
-
-/**
  * The wall's routine tick burst ("One down!" and the beans), except on the tick that finishes a
  * block: there the celebration plays, and the burst under it was two effects at once.
  */
 const pageBurst = inject(WALL_BURST, undefined);
 provide(WALL_BURST, (x, y, job) => {
-  if (job && finishesBlock(job)) return;
+  // The store's own finishing-tick decision (counting this bean's ticks still in flight), asked
+  // at the tap: the burst is optimistic, so it cannot wait for the write's answer.
+  const choreId = job?.source === 'chore' && !job.done ? job.choreId : undefined;
+  if (job && choreId && choreStore.tickWillCelebrate(job.ownerId, choreId)) return;
   pageBurst?.(x, y, job);
 });
 

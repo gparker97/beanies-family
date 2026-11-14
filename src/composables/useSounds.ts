@@ -9,7 +9,8 @@
 import type { ChoreSoundId, SynthCelebrationSoundId } from '@/utils/choreCelebration';
 import type { EngineSoundOutcome } from '@/composables/choreCelebrationSounds';
 import { reportError } from '@/utils/errorReporter';
-import { withDeadline } from '@/utils/withDeadline';
+import { raceTimeout } from '@/utils/timing';
+import { failureBackoff } from '@/utils/backoff';
 
 // ---------------------------------------------------------------------------
 // Module-level state
@@ -163,32 +164,74 @@ export function playBlink(): void {
 
 /** No celebration sound may START later than this after the tap. */
 export const CELEBRATION_SOUND_CUTOFF_MS = 400;
+/** A load still unsettled after this is forgotten (never cached forever) and counts as failed. */
+const ENGINE_LOAD_DEADLINE_MS = 15_000;
 
 type CelebrationEngine = typeof import('@/composables/choreCelebrationSounds');
+const importEngine = () => import('@/composables/choreCelebrationSounds');
+/** How the engine is fetched: the dynamic import (tests swap in a hung or failing one). */
+let fetchEngine: () => Promise<CelebrationEngine> = importEngine;
 let engine: Promise<CelebrationEngine> | null = null;
-let engineFailureReported = false;
-/** The latest celebration's token: an older one's sound never starts. */
+const engineBackoff = failureBackoff();
+/** The latest celebration's turn: an older (or dismissed) one's sound never starts. */
 let latestCelebration = 0;
 
-/** Load the engine once (a failed load is forgotten so the next need retries). */
-export function loadCelebrationSoundEngine(): Promise<CelebrationEngine> {
-  engine ??= import('@/composables/choreCelebrationSounds').catch((e: unknown) => {
-    engine = null;
-    throw e;
+function engineFailed(error: unknown, stage: 'import' | 'stalled'): void {
+  if (!engineBackoff.fail()) return;
+  reportError({
+    surface: 'sounds',
+    message: 'the celebration sound engine could not load; the fanfare plays until it does',
+    severity: 'warning',
+    error,
+    context: { action: 'engine-load', stage },
   });
-  return engine;
 }
 
 /**
- * The engine's outcomes, plus `fanfare` (the engine was not loaded within the cutoff, so the
- * everyday fanfare played instead) and `unavailable` (no Web Audio here).
+ * Load the engine once and keep it. A failed or stalled load is forgotten and retried on the
+ * shared backoff ladder (reported once per failure episode); while it backs off, this rejects
+ * at once without trying.
  */
-export type CelebrationSoundOutcome = EngineSoundOutcome | 'fanfare' | 'unavailable';
+export function loadCelebrationSoundEngine(): Promise<CelebrationEngine> {
+  if (engine) return engine;
+  if (!engineBackoff.ready()) {
+    return Promise.reject(new Error('celebration sound engine: waiting to retry'));
+  }
+  const attempt = fetchEngine();
+  engine = attempt;
+  const stalled = setTimeout(() => {
+    if (engine !== attempt) return;
+    engine = null;
+    engineFailed(new Error('celebration sound engine load stalled'), 'stalled');
+  }, ENGINE_LOAD_DEADLINE_MS);
+  attempt.then(
+    () => {
+      clearTimeout(stalled);
+      if (engine === attempt) engineBackoff.succeed();
+    },
+    (error: unknown) => {
+      clearTimeout(stalled);
+      if (engine !== attempt) return;
+      engine = null;
+      engineFailed(error, 'import');
+    }
+  );
+  return attempt;
+}
+
+/**
+ * The engine's outcomes, plus the fanfare fallbacks (the engine was still loading at the cutoff:
+ * `fanfare-late`; it could not load or is backing off: `fanfare-failed`) and `unavailable` (no
+ * Web Audio here).
+ */
+export type CelebrationSoundOutcome =
+  EngineSoundOutcome | 'fanfare-late' | 'fanfare-failed' | 'unavailable';
 
 /**
  * Play a chore celebration sound, on time or not at all: whatever starts, starts within
  * `CELEBRATION_SOUND_CUTOFF_MS` of the tap. The cheer loads on its first need (never at app
- * start); a newer celebration supersedes this one; turning sound off while it waits silences it.
+ * start); a newer celebration, or this one's dismissal (`cancelChoreCelebrationSound`), stops it
+ * from starting; turning sound off while it waits silences it.
  */
 export async function playChoreCelebrationSound(
   id: ChoreSoundId,
@@ -197,41 +240,42 @@ export async function playChoreCelebrationSound(
   if (!enabled) return 'muted';
   const ctx = getContext();
   if (!ctx) return 'unavailable';
-  const token = ++latestCelebration;
+  const turn = ++latestCelebration;
+  const deadline = performance.now() + CELEBRATION_SOUND_CUTOFF_MS;
   const gate = {
     enabled: () => enabled,
-    current: () => token === latestCelebration,
-    deadline: performance.now() + CELEBRATION_SOUND_CUTOFF_MS,
+    current: () => turn === latestCelebration,
+    deadline,
   };
-  let loaded: CelebrationEngine | 'late' | 'failed';
+  let loaded: CelebrationEngine | undefined | 'failed';
   try {
-    loaded = await withDeadline(loadCelebrationSoundEngine(), gate.deadline);
-  } catch (error) {
+    loaded = await raceTimeout(loadCelebrationSoundEngine(), deadline - performance.now());
+  } catch {
+    // Reported once per failure episode by `loadCelebrationSoundEngine`.
     loaded = 'failed';
-    if (!engineFailureReported) {
-      engineFailureReported = true;
-      reportError({
-        surface: 'sounds',
-        message: 'the celebration sound engine could not load; the fanfare played instead',
-        severity: 'warning',
-        error,
-        context: { action: 'engine-load' },
-      });
-    }
   }
   if (!gate.enabled()) return 'muted';
   if (!gate.current()) return 'superseded';
-  if (loaded === 'late' || loaded === 'failed') {
+  if (!loaded || loaded === 'failed') {
     playFanfare();
-    return 'fanfare';
+    return loaded ? 'fanfare-failed' : 'fanfare-late';
   }
   return loaded.playCelebrationSound(ctx, id, fallback, gate);
 }
 
-/** Tests only: forget the context, the engine and the token. */
-export function resetCelebrationSoundsForTest(): void {
+/** The celebration ended: a sound still waiting to start (the cheer loading) never starts. */
+export function cancelChoreCelebrationSound(): void {
+  latestCelebration++;
+}
+
+/**
+ * Tests only: forget the context, the engine, its backoff and the turn; optionally load the
+ * engine some other way (a hung or failing load), else the real dynamic import.
+ */
+export function resetCelebrationSoundsForTest(load?: () => Promise<CelebrationEngine>): void {
+  fetchEngine = load ?? importEngine;
   engine = null;
-  engineFailureReported = false;
+  engineBackoff.succeed();
   latestCelebration = 0;
   audioCtx = null;
 }

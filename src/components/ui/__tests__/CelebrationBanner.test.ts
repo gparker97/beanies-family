@@ -73,6 +73,21 @@ describe('CelebrationBanner', () => {
     expect(w.classes()).not.toContain('is-celebrating');
   });
 
+  it('the short horizontal strip (the app from 768px), marked for the celebration to find', () => {
+    const w = mount(CelebrationBanner, {
+      props: { ...base, strip: true, stars: 3, actionLabel: 'Show Chores' },
+    });
+    expect(w.classes()).toContain('is-strip');
+    expect(w.attributes('data-celebration-strip')).toBeDefined();
+    expect(w.get('[data-celebration-picture]').classes()).toContain('w-24');
+    expect(w.get('h3').classes()).toContain('text-lg');
+    expect(w.findAll('[data-celebration-star]')).toHaveLength(3);
+    // The tall form carries no strip mark.
+    expect(mount(CelebrationBanner, { props: base }).attributes('data-celebration-strip')).toBe(
+      undefined
+    );
+  });
+
   it('has a compact strip form (the wall lanes) with a smaller picture and title', () => {
     const full = mount(CelebrationBanner, { props: base });
     const compact = mount(CelebrationBanner, { props: { ...base, compact: true } });

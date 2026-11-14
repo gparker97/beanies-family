@@ -3,14 +3,15 @@
  * The choreboard (#146): chores in their own place, by time of day. Two views:
  *
  *  - HOME (grown-ups): one card per bean with chores ("four segments": a summary row per time
- *    of day, the block happening now open and tickable), in two lanes from 768px (each next card
- *    into the shorter lane, by an estimate from its blocks and the Now block's chores, so a short
- *    card leaves no hole and a tick never moves a card), beans with no chores as slim rows
- *    below; Hours and ONE Add Chores (the sheet, for one chore or a whole set); the "No one's"
- *    group for chores whose people have left the family; the "Chores Done" board, in a right
- *    rail (days down) from 1280px and below the cards (days across) under it; an empty state.
+ *    of day, the block happening now open and tickable) in ONE regular grid, in family order (1
+ *    column, 2 from 768px, 3 from 1280px, cards in a row stretched to its height); beans with no
+ *    chores as chips in one "No Chores Yet" strip below; Hours and ONE Add Chores (the sheet, for
+ *    one chore or a whole set); the "No one's" group for chores whose people have left the
+ *    family; the "Chores Done" board below the cards at every width (days across); an empty
+ *    state.
  *  - A BEAN'S DAY (`?bean=<id>`): the tick view. Every block open with its chores ("Now" first
- *    and biggest, each folding by its header for this visit), the all-done banner; beside it (from 1280px) or above and below it, the "Today" summary
+ *    and biggest, each folding by its header for this visit), the all-done banner (a short
+ *    horizontal strip from 768px); beside it (from 1280px) or above and below it, the "Today" summary
  *    (`ChoreBlockSummary`, rows, or the tile strip on a phone; a tap opens and scrolls to that
  *    block) and the bean's own Chores Done week. A child always lands on their own day.
  *
@@ -276,38 +277,10 @@ const cardBeans = computed<HomeBean[]>(() =>
     .filter((m) => choreOwners.value.has(m.id))
     .map((member) => ({ member, day: choreStore.choreDayFor(member.id) }))
 );
-/** Beans with no chores at all: the slim rows under the cards. */
+/** Beans with no chores at all: the "No Chores Yet" strip under the cards (grown-ups). */
 const slimBeans = computed(() =>
   familyStore.sortedHumans.filter((m) => !choreOwners.value.has(m.id))
 );
-
-/**
- * A card's height, estimated in summary rows: the header, one row per block, and the Now
- * block's chores (open on the card). It reads only which chores are due when, never which are
- * done, so a tick never moves a card to the other lane.
- */
-function cardWeight(day: BeanChoreDay): number {
-  const blocks = day.blocks.filter((b) => b.total > 0);
-  const now = blocks.find((b) => b.isNow);
-  return 1.6 + blocks.length * 1.1 + (now ? now.total * 1.05 : 0);
-}
-
-/**
- * The cards in lanes: one on a phone (family order), two from 768px, each next card into the
- * shorter lane (ties to the first), so a short card leaves no hole beside a long one. Pure and
- * deterministic: no measuring, so no layout thrash.
- */
-const lanes = computed<HomeBean[][]>(() => {
-  if (isMobile.value) return [cardBeans.value];
-  const out: HomeBean[][] = [[], []];
-  const heights = [0, 0];
-  for (const bean of cardBeans.value) {
-    const i = heights[1]! < heights[0]! ? 1 : 0;
-    out[i]!.push(bean);
-    heights[i]! += cardWeight(bean.day);
-  }
-  return out;
-});
 
 const isEmpty = computed(() => choreStore.isLoaded && choreStore.chores.length === 0);
 
@@ -320,8 +293,6 @@ const weekRows = computed(() =>
     .map((member) => ({ member, week: choreStore.weekFor(member.id) }))
 );
 const showBoard = computed(() => isAdult.value && weekRows.value.length > 0);
-/** The home board sits in the right rail (days down) only on a wide screen. */
-const homeRail = computed(() => isWide.value && showBoard.value);
 
 function openDay(memberId: string): void {
   void router.push({ query: { ...route.query, bean: memberId } });
@@ -666,57 +637,54 @@ function revealBlock(block: ChoreBlock): void {
       </div>
 
       <template v-else>
-        <div class="grid grid-cols-1 items-start gap-5" :class="{ 'home-grid-rail': homeRail }">
+        <div class="flex flex-col gap-3.5">
           <div class="min-w-0">
-            <!-- The cards in lanes (one on a phone, two from 768px): see `lanes`. -->
-            <div
-              class="grid items-start gap-3.5"
-              :class="lanes.length > 1 ? 'grid-cols-2' : 'grid-cols-1'"
-              data-testid="chore-lanes"
-              :data-lanes="lanes.length"
-            >
-              <div
-                v-for="(lane, i) in lanes"
-                :key="i"
-                class="flex min-w-0 flex-col gap-3.5"
-                data-testid="chore-lane"
-              >
-                <ChoreBeanCard
-                  v-for="bean in lane"
-                  :key="bean.member.id"
-                  :member="bean.member"
-                  :day="bean.day"
-                  has-any-chores
-                  :starts="starts"
-                  :can-tick="canTickFor(bean.member.id)"
-                  :can-edit="isAdult"
-                  :is-pending="pendingFor(bean.member.id)"
-                  @toggle="(choreId, anchor) => onToggle(choreId, bean.member.id, anchor)"
-                  @edit-chores="openBeanEditor(bean.member.id)"
-                  @open="openDay(bean.member.id)"
-                  @copy="openCopy(bean.member.id)"
-                />
-              </div>
-            </div>
-
-            <!-- Beans with no chores yet: one slim row each. -->
-            <div
-              v-if="slimBeans.length"
-              class="flex flex-wrap gap-2.5"
-              :class="cardBeans.length ? 'mt-3.5' : ''"
-              data-testid="chore-slim-row"
-            >
+            <!--
+              The cards in ONE regular grid, in family order: one column on a phone, two from
+              768px, three from 1280px, each column capped so one or two beans never stretch.
+              Cards in a row share its height (stretch), their content at the top.
+            -->
+            <div class="chore-card-grid grid gap-3.5" data-testid="chore-card-grid">
               <ChoreBeanCard
-                v-for="m in slimBeans"
-                :key="m.id"
-                class="max-w-96 flex-[1_1_15rem]"
-                :member="m"
-                :has-any-chores="false"
+                v-for="bean in cardBeans"
+                :key="bean.member.id"
+                class="h-full"
+                :member="bean.member"
+                :day="bean.day"
+                has-any-chores
                 :starts="starts"
+                :can-tick="canTickFor(bean.member.id)"
                 :can-edit="isAdult"
-                @edit-chores="openBeanEditor(m.id)"
+                :is-pending="pendingFor(bean.member.id)"
+                @toggle="(choreId, anchor) => onToggle(choreId, bean.member.id, anchor)"
+                @edit-chores="openBeanEditor(bean.member.id)"
+                @open="openDay(bean.member.id)"
+                @copy="openCopy(bean.member.id)"
               />
             </div>
+
+            <!-- Beans with no chores yet: one tidy strip of chips, for grown-ups. -->
+            <section
+              v-if="isAdult && slimBeans.length"
+              class="dark:bg-surface-raised dark:border-line rounded-3xl bg-white px-4 py-3.5 shadow-[var(--card-shadow)] dark:border"
+              :class="cardBeans.length ? 'mt-3.5' : ''"
+              data-testid="chore-no-chores"
+            >
+              <h2 class="font-outfit dark:text-ink text-secondary-500 mb-2.5 text-base font-bold">
+                {{ t('choreboard.noChores.title') }}
+              </h2>
+              <div class="flex flex-wrap gap-2">
+                <ChoreBeanCard
+                  v-for="m in slimBeans"
+                  :key="m.id"
+                  :member="m"
+                  :has-any-chores="false"
+                  :starts="starts"
+                  :can-edit="isAdult"
+                  @edit-chores="openBeanEditor(m.id)"
+                />
+              </div>
+            </section>
 
             <!-- Chores whose people have all left the family: remove the ones not needed. -->
             <section
@@ -746,13 +714,12 @@ function revealBlock(block: ChoreBlock): void {
             </section>
           </div>
 
-          <!-- Under 768px the quick-add button floats over the page's last rows: the padding lets
-               the board's last row scroll clear of it. -->
-          <div v-if="showBoard" class="min-w-0 max-md:pb-20" :class="{ 'sticky top-4': homeRail }">
+          <!-- Under the cards at every width. Under 768px the quick-add button floats over the
+               page's last rows: the padding lets the board's last row scroll clear of it. -->
+          <div v-if="showBoard" class="min-w-0 max-md:pb-20">
             <ChoreWeekPanel
               :rows="weekRows"
               :today-ymd="todayYmd"
-              :orientation="homeRail ? 'down' : 'across'"
               open-day-action
               @open-day="openDay"
             />
@@ -785,9 +752,21 @@ function revealBlock(block: ChoreBlock): void {
 </template>
 
 <style scoped>
-/* From 1280px: the cards beside a 20rem rail holding the Chores Done board. */
-.home-grid-rail {
-  grid-template-columns: minmax(0, 1fr) 20rem;
+/* The bean cards: 1 column, 2 from 768px, 3 from 1280px, each capped (never a stretched slab). */
+.chore-card-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (width >= 48rem) {
+  .chore-card-grid {
+    grid-template-columns: repeat(2, minmax(0, 34rem));
+  }
+}
+
+@media (width >= 80rem) {
+  .chore-card-grid {
+    grid-template-columns: repeat(3, minmax(0, 32rem));
+  }
 }
 
 /* From 1280px: the blocks in the main column; the summary and the week in a 22rem rail. */

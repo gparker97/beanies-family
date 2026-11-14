@@ -7,9 +7,7 @@
  * in the cell and the list here cannot disagree.
  *
  * The shell is `AnchoredSurface`, shared with the time pickers: a bottom sheet over a dim on a
- * phone, a card anchored to the cell from 768px (below or above it, or beside it on the left when
- * the board sits in the right-hand rail, `side="start"`, so it covers the page rather than the
- * board). Escape, the dim, an outside click and ✕ close it; focus starts on ✕ and returns to the
+ * phone, a card anchored to the cell from 768px (below or above it). Escape, the dim, an outside click and ✕ close it; focus starts on ✕ and returns to the
  * cell.
  *
  * Dark mode: the card is `surface-overlay` (a popover over a raised card) with a `line-strong`
@@ -39,11 +37,10 @@ const props = withDefaults(
     isToday: boolean;
     /** The cell it hangs from; focus returns here on close. */
     anchor: HTMLElement | null;
-    side?: 'below' | 'start';
     /** Offer "Open {Name}'s Day" on today's summary. */
     openDayAction?: boolean;
   }>(),
-  { side: 'below', openDayAction: false }
+  { openDayAction: false }
 );
 
 const emit = defineEmits<{ close: []; 'open-day': [] }>();
@@ -109,7 +106,7 @@ const itemLabel = (title: string, done: boolean) =>
     :surface="SURFACE"
     :inside-el="anchor"
     align="end"
-    :side="side"
+    side="below"
     :width-estimate="320"
     :height-estimate="480"
     initial-focus="[data-testid='chore-day-popover-close']"

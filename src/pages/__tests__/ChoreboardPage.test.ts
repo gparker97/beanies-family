@@ -12,8 +12,8 @@
  *  - a bean's day only ticks: no pencils, handles, Select or Other Days;
  *  - "No one's" chores have a ✕ that deletes them;
  *  - ticking goes through the page's guarded tick path with `surface: 'app'`;
- *  - home lays the cards in two lanes (one on a phone), slim rows below, the board in the right
- *    rail on a wide screen; a bean's day has the "Today" summary (a tap opens that block) and
+ *  - home lays the cards in ONE regular grid in family order, beans with none as chips in a
+ *    "No Chores Yet" strip, the board below at every width; a bean's day has the "Today" summary (a tap opens that block) and
  *    the bean's own Chores Done week, for a child too, never the grown-ups' board.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -70,7 +70,6 @@ import {
   chore,
   choreActions,
   chores,
-  doneMark,
   family,
   resetKit,
   route,
@@ -243,7 +242,9 @@ describe('a grown-up viewer', () => {
     const w = await mountPage();
     expect(routerFns.replace).not.toHaveBeenCalled();
     const cards = w.findAll('[data-testid="chore-bean-card"]');
-    expect(cards.map((c) => c.attributes('data-member-id'))).toEqual(['kid', 'sib', 'mom', 'dad']);
+    expect(cards.map((c) => c.attributes('data-member-id'))).toEqual(['kid', 'sib']);
+    const chips = w.findAll('[data-testid="chore-slim-row"]');
+    expect(chips.map((c) => c.attributes('data-member-id'))).toEqual(['mom', 'dad']);
     for (const id of ['chore-open-add', 'chore-open-hours']) {
       expect(w.find(`[data-testid="${id}"]`).exists(), id).toBe(true);
     }
@@ -257,73 +258,45 @@ describe('a grown-up viewer', () => {
     for (const id of GONE) expect(w.find(`[data-testid="${id}"]`).exists(), id).toBe(false);
   });
 
-  it('home: two lanes, each next card into the shorter lane; slim rows for beans with none', async () => {
+  it('home: ONE regular grid in family order; beans with none as chips in one strip', async () => {
     chores.list = [
-      // Pip: a long card (three blocks, three chores now).
       chore('k1', { assigneeIds: ['kid'] }),
       chore('k2', { assigneeIds: ['kid'] }),
-      chore('k3', { assigneeIds: ['kid'] }),
       chore('k4', { assigneeIds: ['kid'], block: 'afternoon' }),
-      chore('k5', { assigneeIds: ['kid'], block: 'evening' }),
-      // Juno and Mama: short cards.
       chore('s1', { assigneeIds: ['sib'] }),
       chore('m1', { assigneeIds: ['mom'], block: 'evening' }),
     ];
     const w = await mountPage();
-    const lanes = w.findAll('[data-testid="chore-lane"]');
-    expect(w.get('[data-testid="chore-lanes"]').attributes('data-lanes')).toBe('2');
-    const ids = (lane: (typeof lanes)[number]) =>
-      lane.findAll('[data-testid="chore-bean-card"]').map((c) => c.attributes('data-member-id'));
-    // Family order is Mama, Pip, Juno. Mama's short card starts the first lane, Pip's long one
-    // the second, and Juno goes to the shorter lane: Mama's, not under Pip's.
-    expect(lanes.map(ids)).toEqual([['mom', 'sib'], ['kid']]);
-    // Papa has no chores: a slim row under the lanes.
-    const slim = w.get('[data-testid="chore-slim-row"]');
+    const grid = w.get('[data-testid="chore-card-grid"]');
+    // Every card in the one grid, in family order (Mama, Pip, Juno), however long each is.
     expect(
-      slim.findAll('[data-testid="chore-bean-card"]').map((c) => c.attributes('data-member-id'))
-    ).toEqual(['dad']);
-    // Below a wide screen the board sits under the cards, days across.
-    expect(w.get('[data-testid="chore-week-panel"]').attributes('data-orientation')).toBe('across');
-  });
-
-  it('home on a phone: one lane, in family order', async () => {
-    setMobile(true);
-    chores.list = [
-      chore('k1', { assigneeIds: ['kid'] }),
-      chore('k2', { assigneeIds: ['kid'] }),
-      chore('s1', { assigneeIds: ['sib'] }),
-      chore('m1', { assigneeIds: ['mom'] }),
-    ];
-    const w = await mountPage();
-    expect(w.get('[data-testid="chore-lanes"]').attributes('data-lanes')).toBe('1');
-    expect(
-      w
-        .findAll('[data-testid="chore-lane"] [data-testid="chore-bean-card"]')
-        .map((c) => c.attributes('data-member-id'))
+      grid.findAll('[data-testid="chore-bean-card"]').map((c) => c.attributes('data-member-id'))
     ).toEqual(['mom', 'kid', 'sib']);
+    // Cards stretch to their row's height.
+    expect(grid.get('[data-testid="chore-bean-card"]').classes()).toContain('h-full');
+    // Papa has no chores: a chip in the "No Chores Yet" strip, with its own Add Chores.
+    const strip = w.get('[data-testid="chore-no-chores"]');
+    expect(strip.text()).toContain('choreboard.noChores.title');
+    const chips = strip.findAll('[data-testid="chore-slim-row"]');
+    expect(chips.map((c) => c.attributes('data-member-id'))).toEqual(['dad']);
+    expect(chips[0]!.find('[data-testid="chore-bean-add"]').exists()).toBe(true);
+    // The board sits below the cards.
+    const html = w.html();
+    expect(html.indexOf('chore-card-grid')).toBeLessThan(html.indexOf('chore-week-panel'));
   });
 
-  it('a tick never moves a card to the other lane', async () => {
-    const before = await mountPage();
-    const lanesOf = (w: VueWrapper) =>
-      w
-        .findAll('[data-testid="chore-lane"]')
-        .map((l) =>
-          l.findAll('[data-testid="chore-bean-card"]').map((c) => c.attributes('data-member-id'))
-        );
-    const first = lanesOf(before);
-    before.unmount();
-    chores.marks = [doneMark('kid', 'k1'), doneMark('sib', 's1')];
-    const after = await mountPage();
-    expect(lanesOf(after)).toEqual(first);
-  });
-
-  it('a wide screen: the board in the right rail, days down, with Open Day on today', async () => {
+  it('a wide screen: the board stays below the cards, days across, no rail', async () => {
     setWide(true);
     const w = await mountPage();
-    const panel = w.get('[data-testid="chore-week-panel"]');
-    expect(panel.attributes('data-orientation')).toBe('down');
-    expect(w.find('.home-grid-rail').exists()).toBe(true);
+    const html = w.html();
+    expect(html.indexOf('chore-card-grid')).toBeLessThan(html.indexOf('chore-week-panel'));
+    expect(w.find('.home-grid-rail').exists()).toBe(false);
+  });
+
+  it('a child never sees the "No Chores Yet" strip', async () => {
+    family.currentMemberId = 'kid';
+    const w = await mountPage();
+    expect(w.find('[data-testid="chore-no-chores"]').exists()).toBe(false);
   });
 
   it('a card’s Edit Chores opens that bean’s chore list; Add Chores (no chores yet) opens it empty', async () => {
@@ -332,7 +305,7 @@ describe('a grown-up viewer', () => {
     expect(propsOf(w, EditorStub)).toMatchObject({ open: true, memberId: 'kid' });
     expect(propsOf(w, StarterStub).open).toBe(false);
     expect(routerFns.push).not.toHaveBeenCalled();
-    // Mama Bean has no chores: her slim row's one affordance is Add Chores.
+    // Mama Bean has no chores: her chip's one affordance is Add Chores.
     expect(w.find('[data-member-id="mom"] [data-testid="chore-bean-edit"]').exists()).toBe(false);
     await w.get('[data-member-id="mom"] [data-testid="chore-bean-add"]').trigger('click');
     expect(propsOf(w, EditorStub)).toMatchObject({ open: true, memberId: 'mom' });

@@ -22,7 +22,8 @@ import {
   type SynthCelebrationSoundId,
 } from '@/utils/choreCelebration';
 import { reportError } from '@/utils/errorReporter';
-import { withDeadline } from '@/utils/withDeadline';
+import { failureBackoff } from '@/utils/backoff';
+import { raceTimeout, timeoutSignal, withTimeout } from '@/utils/timing';
 
 /** The shared output chain for one audio context. */
 export interface CelebrationChain {
@@ -307,11 +308,10 @@ export const CHEER_URL = `${import.meta.env.BASE_URL}sounds/kids-cheer.mp3`;
 const CHEER_GAIN = 1;
 
 let cheerBuffer: { ctx: BaseAudioContext; buffer: Promise<AudioBuffer> } | null = null;
-let cheerFailureReported = false;
-/** Failed loads this session: one retry is allowed, then the paired sound plays every time. */
-let cheerFailures = 0;
-let cheerLastError: unknown = null;
-const CHEER_MAX_ATTEMPTS = 2;
+/** A failed load retries on the shared ladder (5 min, doubling to an hour), one report an episode. */
+const cheerBackoff = failureBackoff();
+/** A fetch or decode still unsettled after this is abandoned, so nothing is cached forever. */
+const CHEER_LOAD_TIMEOUT_MS = 8000;
 
 class CheerLoadError extends Error {
   readonly stage: 'fetch' | 'decode';
@@ -337,13 +337,17 @@ function decode(ctx: BaseAudioContext, bytes: ArrayBuffer): Promise<AudioBuffer>
 }
 
 /**
- * Fetch and decode the cheer once per audio context, kept in memory. A failure is retried once
- * per session at most (the next celebration that picks the cheer), never on every celebration.
+ * Fetch and decode the cheer once per audio context, kept in memory. The fetch aborts and the
+ * decode is abandoned after `CHEER_LOAD_TIMEOUT_MS`, so a hung load is never cached. A failure
+ * is retried on the backoff ladder, not on every celebration; while it waits, this rejects at
+ * once without fetching.
  */
 export function loadCheer(ctx: BaseAudioContext): Promise<AudioBuffer> {
   if (cheerBuffer?.ctx === ctx) return cheerBuffer.buffer;
-  if (cheerFailures >= CHEER_MAX_ATTEMPTS) return Promise.reject(cheerLastError);
-  const buffer = fetch(CHEER_URL)
+  if (!cheerBackoff.ready()) {
+    return Promise.reject(new Error('kids cheer: waiting to retry after a failed load'));
+  }
+  const buffer = fetch(CHEER_URL, { signal: timeoutSignal(CHEER_LOAD_TIMEOUT_MS) })
     .catch((e: unknown) => {
       throw new CheerLoadError('fetch', undefined, e);
     })
@@ -351,14 +355,21 @@ export function loadCheer(ctx: BaseAudioContext): Promise<AudioBuffer> {
       if (!res.ok) throw new CheerLoadError('fetch', res.status, null);
       return res.arrayBuffer();
     })
-    .then((bytes) => decode(ctx, bytes));
+    .then((bytes) =>
+      withTimeout(decode(ctx, bytes), CHEER_LOAD_TIMEOUT_MS, 'kids cheer decode stalled').catch(
+        (e: unknown) => {
+          throw e instanceof CheerLoadError ? e : new CheerLoadError('decode', undefined, e);
+        }
+      )
+    );
   cheerBuffer = { ctx, buffer };
-  buffer.catch((e: unknown) => {
-    cheerFailures++;
-    cheerLastError = e;
-    reportCheerFailure(e);
-    if (cheerBuffer?.buffer === buffer) cheerBuffer = null;
-  });
+  buffer.then(
+    () => cheerBackoff.succeed(),
+    (e: unknown) => {
+      if (cheerBuffer?.buffer === buffer) cheerBuffer = null;
+      if (cheerBackoff.fail()) reportCheerFailure(e);
+    }
+  );
   return buffer;
 }
 
@@ -374,9 +385,8 @@ function startCheer(c: CelebrationChain, buffer: AudioBuffer): void {
   src.start(t);
 }
 
+/** Once per failure episode (`cheerBackoff`), never once per celebration. */
 function reportCheerFailure(err: unknown): void {
-  if (cheerFailureReported) return;
-  cheerFailureReported = true;
   const e = err instanceof CheerLoadError ? err : null;
   reportError({
     surface: 'sounds',
@@ -422,18 +432,18 @@ export async function playCelebrationSound(
     scheduleCelebrationSound(c, id);
     return 'played';
   }
-  let ready: AudioBuffer | 'late' | 'failed';
+  let ready: AudioBuffer | undefined | 'failed';
   try {
-    ready = await withDeadline(loadCheer(ctx), gate.deadline);
+    ready = await raceTimeout(loadCheer(ctx), gate.deadline - performance.now());
   } catch {
-    // Already counted and reported once by `loadCheer`; the paired sound stands in.
+    // Counted and reported once per episode by `loadCheer`; the paired sound stands in.
     ready = 'failed';
   }
   if (!gate.enabled()) return 'muted';
   if (!gate.current()) return 'superseded';
-  if (ready === 'late' || ready === 'failed') {
+  if (!ready || ready === 'failed') {
     scheduleCelebrationSound(c, fallback);
-    return ready === 'late' ? 'late' : 'fallback';
+    return ready ? 'fallback' : 'late';
   }
   startCheer(c, ready);
   return 'played';
@@ -443,7 +453,5 @@ export async function playCelebrationSound(
 export function resetCelebrationEngineForTest(): void {
   chain = null;
   cheerBuffer = null;
-  cheerFailureReported = false;
-  cheerFailures = 0;
-  cheerLastError = null;
+  cheerBackoff.succeed();
 }

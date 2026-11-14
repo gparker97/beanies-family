@@ -78,8 +78,19 @@ interface Geometry {
   S: RectLike;
   /** The wall's sizing. */
   compact: boolean;
+  /**
+   * The app's short horizontal banner (from 768px): no room inside it, so the beanies stand on
+   * its top edge (`foot`), kept over the banner (`cx`), sized to the room above it (`k`), and
+   * settle back into its small picture (`px`). The words beside the picture stay clear.
+   */
+  strip: boolean;
+  /** Where the beanies stand (the picture's centre, kept inside the banner on a strip). */
   cx: number;
+  /** The picture's centre: where the beanies settle. */
+  px: number;
   foot: number;
+  /** Move scale: 1 on the mockup's banners; the picture's share of the tall one on a strip. */
+  k: number;
 }
 
 interface Actor {
@@ -345,12 +356,16 @@ export function createChoreCelebrationPlayer(opts: PlayerOptions): ChoreCelebrat
 
   /** The big group shrinks, feet first, into the exact spot of the banner's picture. */
   function shrinkIntoBanner(G: Geometry, act: Actor, banner: HTMLElement, bigW: number): void {
-    anim(act.a, [{ transform: 'scale(1)' }, { transform: `scale(${G.S.w / bigW})` }], {
-      duration: 440,
-      delay: at(SETTLE),
-      easing: 'cubic-bezier(.4,0,.2,1)',
-      fill: 'forwards',
-    });
+    anim(
+      act.a,
+      [{ transform: 'none' }, { transform: `translateX(${G.px - G.cx}px) scale(${G.S.w / bigW})` }],
+      {
+        duration: 440,
+        delay: at(SETTLE),
+        easing: 'cubic-bezier(.4,0,.2,1)',
+        fill: 'forwards',
+      }
+    );
     anim(q(banner, '[data-celebration-picture]'), [{ opacity: 0 }, { opacity: 1 }], {
       duration: 1,
       delay: at(SETTLE + 440),
@@ -360,7 +375,13 @@ export function createChoreCelebrationPlayer(opts: PlayerOptions): ChoreCelebrat
   }
 
   function bigGroupWidth(G: Geometry): number {
+    if (G.strip) return Math.min(G.B.w * 0.9, 340) * G.k;
     return G.compact ? Math.min(G.B.w * 1.05, 440) : Math.min(G.W - 24, 340);
+  }
+
+  function rowWidth(G: Geometry): number {
+    if (G.strip) return Math.min(G.B.w, 360) * G.k;
+    return G.compact ? Math.min(G.B.w * 1.1, 470) : Math.min(G.W - 16, 360);
   }
 
   // ── the line of five ──
@@ -376,13 +397,13 @@ export function createChoreCelebrationPlayer(opts: PlayerOptions): ChoreCelebrat
 
   /** Where the five dancers stand once in their line: shoulder to shoulder on the picture. */
   function lineSlots(G: Geometry): Slot[] {
-    const rowW = G.compact ? Math.min(G.B.w * 1.1, 470) : Math.min(G.W - 16, 360);
+    const rowW = rowWidth(G);
     const w = rowW / 4.4;
     const gap = (rowW - w) / 4;
-    const lift = [4, -10, -18, -10, 4];
+    const lift = [4, -10, -18, -10, 4].map((l) => l * G.k);
     return ART.dancers.map((d, k) => {
       const h = w * (d.h / d.w);
-      return { k, w, h, x: G.cx - rowW / 2 + k * gap, y: G.foot + 6 + lift[k]! - h, rowW };
+      return { k, w, h, x: G.cx - rowW / 2 + k * gap, y: G.foot + 6 * G.k + lift[k]! - h, rowW };
     });
   }
 
@@ -416,7 +437,7 @@ export function createChoreCelebrationPlayer(opts: PlayerOptions): ChoreCelebrat
   /** The line closes up toward the middle and melts into the banner's holding-hands picture. */
   function settleLine(G: Geometry, line: { s: Slot; act: Actor }[], banner: HTMLElement) {
     line.forEach(({ s, act }, k) => {
-      const dx = G.cx - (s.x + s.w / 2);
+      const dx = G.px - (s.x + s.w / 2);
       anim(
         act.a,
         [
@@ -447,8 +468,8 @@ export function createChoreCelebrationPlayer(opts: PlayerOptions): ChoreCelebrat
           anim(
             act.inner,
             [
-              { transform: 'translateY(90px) scale(.3)', opacity: 0 },
-              { transform: 'translateY(-34px) scale(.95,1.08)', opacity: 1, offset: 0.55 },
+              { transform: `translateY(${90 * G.k}px) scale(.3)`, opacity: 0 },
+              { transform: `translateY(${-34 * G.k}px) scale(.95,1.08)`, opacity: 1, offset: 0.55 },
               { transform: 'translateY(0) scale(1.12,.86)', opacity: 1, offset: 0.8 },
               { transform: 'translateY(0) scale(1)', opacity: 1 },
             ],
@@ -456,7 +477,7 @@ export function createChoreCelebrationPlayer(opts: PlayerOptions): ChoreCelebrat
           );
           const f = feetOf(s);
           miniBurst(f.x, f.y, ENTER + k * 120 + 448);
-          hop(act.inner, FLY + k * 80, k, 38, 520, 2);
+          hop(act.inner, FLY + k * 80, k, 38 * G.k, 520, 2);
         });
         lineConfetti(G, line, 1880);
         settleLine(G, line, banner);
@@ -531,7 +552,7 @@ export function createChoreCelebrationPlayer(opts: PlayerOptions): ChoreCelebrat
           act.inner,
           [
             { transform: 'translateY(0) rotate(-3deg)' },
-            { transform: 'translateY(-16px) rotate(0deg)', offset: 0.5 },
+            { transform: `translateY(${-16 * G.k}px) rotate(0deg)`, offset: 0.5 },
             { transform: 'translateY(0) rotate(3deg)' },
           ],
           {
@@ -579,7 +600,7 @@ export function createChoreCelebrationPlayer(opts: PlayerOptions): ChoreCelebrat
           [
             { transform: 'translateY(0) scale(1,1)' },
             { transform: 'translateY(0) scale(1.18,.74)', offset: 0.18 },
-            { transform: 'translateY(-28px) scale(.92,1.1)', offset: 0.45 },
+            { transform: `translateY(${-28 * G.k}px) scale(.92,1.1)`, offset: 0.45 },
             { transform: 'translateY(0) scale(1.08,.9)', offset: 0.7 },
             { transform: 'translateY(0) scale(.98,1.03)', offset: 0.85 },
             { transform: 'translateY(0) scale(1,1)' },
@@ -594,7 +615,7 @@ export function createChoreCelebrationPlayer(opts: PlayerOptions): ChoreCelebrat
           [
             { transform: 'translateY(0) scale(1)' },
             { transform: 'translateY(0) scale(1.1,.86)', offset: 0.15 },
-            { transform: 'translateY(-42px) scale(.95,1.07)', offset: 0.5 },
+            { transform: `translateY(${-42 * G.k}px) scale(.95,1.07)`, offset: 0.5 },
             { transform: 'translateY(0) scale(1.1,.86)', offset: 0.85 },
             { transform: 'translateY(0) scale(1)' },
           ],
@@ -650,7 +671,7 @@ export function createChoreCelebrationPlayer(opts: PlayerOptions): ChoreCelebrat
           );
           const f = feetOf(s);
           miniBurst(f.x, f.y, land - 30);
-          hop(act.inner, 1820 + k * 60, k, 34, 480);
+          hop(act.inner, 1820 + k * 60, k, 34 * G.k, 480);
         });
         lineConfetti(G, line, 1900);
         settleLine(G, line, banner);
@@ -663,8 +684,8 @@ export function createChoreCelebrationPlayer(opts: PlayerOptions): ChoreCelebrat
           anim(
             act.inner,
             [
-              { transform: 'translateY(70px) scale(.4)', opacity: 0 },
-              { transform: 'translateY(-22px) scale(1.05)', opacity: 1, offset: 0.6 },
+              { transform: `translateY(${70 * G.k}px) scale(.4)`, opacity: 0 },
+              { transform: `translateY(${-22 * G.k}px) scale(1.05)`, opacity: 1, offset: 0.6 },
               { transform: 'translateY(0) scale(1)', opacity: 1 },
             ],
             { duration: 420, delay: at(ENTER + k * 90), easing: 'ease-out', fill: 'both' }
@@ -677,7 +698,7 @@ export function createChoreCelebrationPlayer(opts: PlayerOptions): ChoreCelebrat
               [
                 { transform: 'translateY(0) scale(1)' },
                 { transform: 'translateY(0) scale(1.06,.9)', offset: 0.15 },
-                { transform: 'translateY(-46px) scale(.94,1.1)', offset: 0.5 },
+                { transform: `translateY(${-46 * G.k}px) scale(.94,1.1)`, offset: 0.5 },
                 { transform: 'translateY(0) scale(1.06,.9)', offset: 0.85 },
                 { transform: 'translateY(0) scale(1)' },
               ],
@@ -704,7 +725,7 @@ export function createChoreCelebrationPlayer(opts: PlayerOptions): ChoreCelebrat
             act.inner
           );
           can.append(canopySvg(POD[k % 4]!));
-          const off = (k - 2) * 10 + rand(-6, 6);
+          const off = ((k - 2) * 10 + rand(-6, 6)) * G.k;
           const y0 = -(s.y + s.h + chh + 20);
           anim(
             act.inner,
@@ -726,7 +747,7 @@ export function createChoreCelebrationPlayer(opts: PlayerOptions): ChoreCelebrat
             can,
             [
               { transform: 'none', opacity: 1 },
-              { transform: 'translateY(-46px) rotate(12deg) scale(.8)', opacity: 0 },
+              { transform: `translateY(${-46 * G.k}px) rotate(12deg) scale(.8)`, opacity: 0 },
             ],
             { duration: 480, delay: at(land), easing: 'ease-in', fill: 'forwards' }
           );
@@ -745,7 +766,7 @@ export function createChoreCelebrationPlayer(opts: PlayerOptions): ChoreCelebrat
             act.inner,
             [
               { transform: `translate(${off}px,0)` },
-              { transform: `translate(${off / 2}px,-20px)`, offset: 0.5 },
+              { transform: `translate(${off / 2}px,${-20 * G.k}px)`, offset: 0.5 },
               { transform: 'translate(0,0)' },
             ],
             { duration: 240, delay: at(land + 120), easing: 'ease-in-out', fill: 'forwards' }
@@ -879,7 +900,25 @@ export function createChoreCelebrationPlayer(opts: PlayerOptions): ChoreCelebrat
     const slots = qa(banner, '[data-celebration-star]');
     const slotC = slots.map((s) => center(local(s)));
     const W = stage.clientWidth;
-    const G: Geometry = { W, B, S, compact, cx: S.x + S.w / 2, foot: S.y + S.h };
+    const strip = banner.hasAttribute('data-celebration-strip');
+    const px = S.x + S.w / 2;
+    const G: Geometry = {
+      W,
+      B,
+      S,
+      compact,
+      strip,
+      cx: px,
+      px,
+      // On a strip the beanies stand on the banner's top edge, sized to the room above it.
+      foot: strip ? B.y + 8 : S.y + S.h,
+      k: strip ? Math.max(0.55, Math.min(1, (B.y - 8) / 190)) : 1,
+    };
+    if (strip) {
+      // Keep the whole line (or the group) inside the banner, beside its small picture.
+      const half = Math.max(rowWidth(G), bigGroupWidth(G)) / 2;
+      G.cx = Math.min(B.x + B.w - half, Math.max(B.x + half, px));
+    }
     anim(
       banner,
       [

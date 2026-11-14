@@ -6,13 +6,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { audio, FakeAudioContext } from './fakeAudio';
 
-vi.mock('@/utils/errorReporter', () => ({ reportError: vi.fn() }));
-const engine = vi.hoisted(() => ({ playCelebrationSound: vi.fn() }));
-// The engine's chunk never arrives in this file.
-vi.mock('@/composables/choreCelebrationSounds', () => new Promise(() => {}));
+const reportError = vi.hoisted(() => vi.fn());
+vi.mock('@/utils/errorReporter', () => ({ reportError }));
+const engine = { playCelebrationSound: vi.fn() };
 
 import {
   CELEBRATION_SOUND_CUTOFF_MS,
+  loadCelebrationSoundEngine,
   playChoreCelebrationSound,
   resetCelebrationSoundsForTest,
   setSoundEnabled,
@@ -22,8 +22,10 @@ beforeEach(() => {
   vi.useFakeTimers();
   audio.reset();
   vi.stubGlobal('AudioContext', FakeAudioContext);
-  resetCelebrationSoundsForTest();
+  // The engine's chunk never arrives in this file.
+  resetCelebrationSoundsForTest(() => new Promise<never>(() => {}));
   setSoundEnabled(true);
+  reportError.mockClear();
 });
 
 afterEach(() => {
@@ -35,7 +37,7 @@ describe('playChoreCelebrationSound with the engine not loaded in time', () => {
   it('plays the fanfare at the cutoff, never the engine late', async () => {
     const pending = playChoreCelebrationSound('marimba', 'marimba');
     await vi.advanceTimersByTimeAsync(CELEBRATION_SOUND_CUTOFF_MS);
-    expect(await pending).toBe('fanfare');
+    expect(await pending).toBe('fanfare-late');
     expect(audio.osc).toBe(4); // playFanfare: C5 E5 G5 C6
     expect(engine.playCelebrationSound).not.toHaveBeenCalled();
   });
@@ -46,5 +48,32 @@ describe('playChoreCelebrationSound with the engine not loaded in time', () => {
     await vi.advanceTimersByTimeAsync(CELEBRATION_SOUND_CUTOFF_MS);
     expect(await pending).toBe('muted');
     expect(audio.osc).toBe(0);
+  });
+
+  it('a load that never settles is not cached forever: forgotten, reported once, retried later', async () => {
+    const first = loadCelebrationSoundEngine();
+    first.catch(() => {});
+    await vi.advanceTimersByTimeAsync(15_000);
+    // Forgotten and backing off: rejects at once, without waiting on the hung load.
+    await expect(loadCelebrationSoundEngine()).rejects.toThrow(/waiting to retry/);
+    expect(reportError).toHaveBeenCalledTimes(1);
+    expect(reportError.mock.calls[0]![0]).toMatchObject({
+      surface: 'sounds',
+      context: { action: 'engine-load', stage: 'stalled' },
+    });
+    // Five minutes on, it tries again (a fresh, pending load; no second report yet).
+    await vi.advanceTimersByTimeAsync(5 * 60_000);
+    let settled = false;
+    loadCelebrationSoundEngine().then(
+      () => (settled = true),
+      () => (settled = true)
+    );
+    await vi.advanceTimersByTimeAsync(10);
+    expect(settled).toBe(false);
+    // Stalls again: the same episode, so still one report; the next wait doubles.
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(reportError).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(5 * 60_000);
+    await expect(loadCelebrationSoundEngine()).rejects.toThrow(/waiting to retry/);
   });
 });

@@ -15,6 +15,7 @@ vi.mock('@/composables/useSounds', () => ({
   playFanfare: vi.fn(),
   playChime: vi.fn(),
   playChoreCelebrationSound: vi.fn(() => Promise.resolve('played')),
+  cancelChoreCelebrationSound: vi.fn(),
 }));
 const logEvent = vi.hoisted(() => vi.fn());
 vi.mock('@/services/telemetry/logEvent', () => ({ logEvent }));
@@ -127,7 +128,6 @@ describe('ChoreCelebration', () => {
         tick: { x: 320, y: 420, w: 52, h: 52 },
         tickEl: tick,
         blockEl: block,
-        late: false,
       })
     );
     expect(p.arrive).not.toHaveBeenCalled();
@@ -213,6 +213,20 @@ describe('ChoreCelebration', () => {
     expect(players[0]!.arrive).not.toHaveBeenCalled();
     expect(document.querySelector('[data-testid="chore-celebration-ghost"]')).toBeNull();
     expect(players[0]!.cancel).toHaveBeenCalled();
+    w.unmount();
+  });
+
+  it('settled (found done after its write): no burst from the tick, the stars from the banner', async () => {
+    const { block, tick } = board(true);
+    const w = mount(ChoreCelebration, { attachTo: document.body });
+    celebrateChore({ ...request(choreCelebrationAnchor(block, tick)), settled: true });
+    await settle();
+    const p = players[0]!;
+    expect(p.burst).toHaveBeenCalledTimes(1);
+    expect(p.burst).toHaveBeenCalledWith(
+      expect.objectContaining({ tickEl: null, blockEl: null, late: true })
+    );
+    expect(p.arrive).toHaveBeenCalledWith(block.querySelector('[data-celebration-banner]'));
     w.unmount();
   });
 

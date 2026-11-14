@@ -16151,8 +16151,8 @@ const STRING_DEFS = {
     en: 'No chores today',
     beanie: 'no chores today',
   },
-  'choreboard.card.noneYet': {
-    en: 'No chores yet',
+  'choreboard.noChores.title': {
+    en: 'No Chores Yet',
     beanie: 'no chores yet',
   },
   'choreboard.card.openDay': {

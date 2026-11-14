@@ -1,6 +1,6 @@
 /**
  * "Chores Done": the day cells (done / perfect / past with nothing / future / today), the
- * grown-ups' board in both orientations, a bean's own week, and the day summary that opens from
+ * grown-ups' board (days across, at every width), a bean's own week, and the day summary that opens from
  * a cell (its count agrees with the cell's, a future cell is inert, Escape closes it, and it
  * offers "Open {Name}'s Day" only on today and only where the board asks for it).
  */
@@ -155,7 +155,7 @@ describe('ChoreWeekPanel: the grown-ups board', () => {
   it('days across: per bean seven cells in the right states, and the week total', () => {
     const w = mountPanel({});
     expect(w.attributes('data-testid')).toBe('chore-week-panel');
-    expect(w.attributes('data-orientation')).toBe('across');
+    expect(cellsOf(w, 'kid').map((c) => c.attributes('data-shape'))).toEqual(Array(7).fill('wide'));
     const states = cellsOf(w, 'kid').map((c) => c.attributes('data-state'));
     expect(states).toEqual(['done', 'perfect', 'empty', 'empty', 'done', 'future', 'future']);
     const counts = cellsOf(w, 'kid').map((c) => c.find('b').exists() && c.get('b').text());
@@ -167,24 +167,6 @@ describe('ChoreWeekPanel: the grown-ups board', () => {
     expect(w.get('[data-testid="chore-week-legend"]').text()).not.toContain(
       'choreboard.week.legend.free'
     );
-  });
-
-  it('days down (the rail): the same cells, day by day', () => {
-    const w = mountPanel({ orientation: 'down' });
-    expect(w.attributes('data-orientation')).toBe('down');
-    const all = w.findAll('[data-testid="chore-day-cell"]');
-    // Day-major: Monday's two beans first.
-    expect(all.slice(0, 2).map((c) => c.attributes('data-member-id'))).toEqual(['kid', 'sib']);
-    expect(cellsOf(w, 'kid').map((c) => c.attributes('data-shape'))).toEqual(Array(7).fill('tall'));
-    expect(cellsOf(w, 'kid').map((c) => c.attributes('data-state'))).toEqual([
-      'done',
-      'perfect',
-      'empty',
-      'empty',
-      'done',
-      'future',
-      'future',
-    ]);
   });
 });
 
@@ -265,16 +247,6 @@ describe('the day summary', () => {
     expect(w.get('[data-testid="chore-week-legend"]').text()).toContain(
       'choreboard.week.legend.free'
     );
-  });
-
-  it('the board flipping orientation closes an open summary (its cell is gone)', async () => {
-    const w = mountPanel({});
-    await cellsOf(w, 'kid')[0]!.trigger('click');
-    await flushPromises();
-    expect(popover()).not.toBeNull();
-    await w.setProps({ orientation: 'down' });
-    await flushPromises();
-    expect(popover()).toBeNull();
   });
 
   it('a future cell is inert', async () => {

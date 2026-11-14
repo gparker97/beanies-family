@@ -35,6 +35,7 @@ import {
   type ActiveChoreCelebration,
 } from '@/composables/useCelebration';
 import { useTranslation } from '@/composables/useTranslation';
+import { useBreakpoint } from '@/composables/useBreakpoint';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { choreDoneBannerText } from '@/constants/choreBlocks';
 import { rectOf, type RectLike } from '@/utils/choreCelebration';
@@ -45,6 +46,19 @@ import {
 
 const { activeChore } = useCelebration();
 const { t } = useTranslation();
+const { isMobile } = useBreakpoint();
+/**
+ * The app's banner is the short strip from 768px, and the ghost matches it where it has the
+ * room. Laid over a narrow home card (3 across), a strip wraps its words to three lines, so
+ * there the ghost keeps the tall form. The wall keeps the tall form always.
+ */
+const STRIP_MIN_WIDTH_REM = 28;
+const ghostStrip = computed(() => {
+  const g = ghost.value;
+  if (!g || g.compact || isMobile.value) return false;
+  const rootPx = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+  return g.w >= STRIP_MIN_WIDTH_REM * rootPx;
+});
 
 /** The fixed, clipping box (viewport px), or null before the first measure. */
 const box = ref<RectLike | null>(null);
@@ -77,6 +91,8 @@ let anchored = false;
 let followBase: RectLike | null = null;
 let followFrame = 0;
 let anchorFrame = 0;
+/** The stars have burst for the celebration being drawn. */
+let burstDone = false;
 
 function intersect(a: RectLike, b: RectLike): RectLike {
   const x = Math.max(a.x, b.x);
@@ -138,6 +154,7 @@ function onScroll(): void {
 }
 
 function stop(): void {
+  burstDone = false;
   player?.cancel();
   player = null;
   playing = null;
@@ -173,11 +190,16 @@ async function start(c: ActiveChoreCelebration): Promise<void> {
     startedAt: c.startedAt,
     compact: !!c.anchor?.compact,
   });
-  if (c.calm) return;
   if (anchored && c.anchor) {
-    // Correct the tap-time rects for any scroll since the tap, then follow later scrolls.
-    const now = rectOf(c.anchor.block);
-    followBase = now;
+    followBase = rectOf(c.anchor.block);
+    window.addEventListener('scroll', onScroll, { capture: true, passive: true });
+  }
+  // The banner is already here (calm; a block found done only after its write; or this code
+  // loaded late): there is no tick to burst from any more. `arrive` bursts from the banner.
+  if (c.phase === 'banner') return;
+  if (anchored && c.anchor && followBase) {
+    // Correct the tap-time rects for any scroll since the tap.
+    const now = followBase;
     const dx = now.x - c.anchor.blockAt.x - b.x;
     const dy = now.y - c.anchor.blockAt.y - b.y;
     player.burst({
@@ -185,10 +207,8 @@ async function start(c: ActiveChoreCelebration): Promise<void> {
       area: { ...now, x: now.x - b.x, y: now.y - b.y },
       tickEl: c.anchor.tickEl,
       blockEl: c.anchor.block,
-      // Drawing only now, after the banner already arrived (a slow first load): no step-aside.
-      late: c.phase === 'banner',
     });
-    window.addEventListener('scroll', onScroll, { capture: true, passive: true });
+    burstDone = true;
   } else {
     // Centered: the stars burst from where the banner is about to appear.
     const w = Math.min(b.w - 32, 400);
@@ -199,7 +219,31 @@ async function start(c: ActiveChoreCelebration): Promise<void> {
       tickEl: null,
       blockEl: null,
     });
+    burstDone = true;
   }
+}
+
+/** Play on the banner; without a burst yet, the stars burst from the banner's foot first. */
+function playOn(c: ActiveChoreCelebration, banner: HTMLElement): void {
+  if (!player) return;
+  if (c.calm) {
+    player.calm(banner);
+    return;
+  }
+  if (!burstDone) {
+    const o = box.value ?? { x: 0, y: 0 };
+    const r = rectOf(banner);
+    const area = { x: r.x - o.x, y: r.y - o.y, w: r.w, h: r.h };
+    player.burst({
+      tick: { x: area.x + area.w / 2 - 22, y: area.y + area.h - 44, w: 44, h: 44 },
+      area,
+      tickEl: null,
+      blockEl: null,
+      late: true,
+    });
+    burstDone = true;
+  }
+  player.arrive(banner);
 }
 
 /** The banner has arrived (or, calm, is there from the start): play on it. */
@@ -214,8 +258,7 @@ async function arrive(c: ActiveChoreCelebration): Promise<void> {
     ? c.anchor?.block.querySelector<HTMLElement>('[data-celebration-banner]')
     : null;
   if (banner) {
-    if (c.calm) player.calm(banner);
-    else player.arrive(banner);
+    playOn(c, banner);
     return;
   }
   const b = box.value ?? { x: 0, y: 0, w: window.innerWidth, h: window.innerHeight };
@@ -245,8 +288,7 @@ async function arrive(c: ActiveChoreCelebration): Promise<void> {
   await nextTick();
   const el = ghostEl.value;
   if (!isPlaying(c) || !player || !el) return;
-  if (c.calm) player.calm(el);
-  else player.arrive(el);
+  playOn(c, el);
   player.fadeOutBy(el, c.endsAt);
 }
 
@@ -317,6 +359,7 @@ onBeforeUnmount(stop);
             :body="ghost.body"
             :image-alt="t('choreboard.done.imageAlt')"
             :compact="ghost.compact"
+            :strip="ghostStrip"
             :stars="ghost.count"
             :celebration="ghostCelebration"
           />

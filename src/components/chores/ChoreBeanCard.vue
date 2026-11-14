@@ -7,8 +7,10 @@
  * tap, one at a time beside Now. The header opens the bean's day.
  *
  * A bean with chores on other days only keeps the header with "No chores today". A bean with no
- * chores at all is a slim row with Add Chores (grown-ups), which opens their chore list
- * (`edit-chores`, the page's `ChoreBeanEditor`), as do Edit Chores and a chore's name.
+ * chores at all is a chip (avatar, name, and Add Chores for grown-ups) in the page's "No Chores
+ * Yet" strip; Add Chores opens their chore list (`edit-chores`, the page's `ChoreBeanEditor`), as
+ * do Edit Chores and a chore's name. The chip sits on the strip's raised card, so it is
+ * `surface-overlay` on dark.
  *
  * Reads only the one read model (`BeanChoreDay`); ticks and edits are intents for the page.
  * Dark mode: the card is `surface-raised` with a `line` edge; text is `ink` / `ink-faint`;
@@ -119,30 +121,22 @@ const subline = computed(() => {
 </script>
 
 <template>
-  <!-- ═══ A bean with no chores at all: one slim row ═══ -->
+  <!-- ═══ A bean with no chores at all: a chip in the page's "No Chores Yet" strip ═══ -->
   <div
     v-if="!hasAnyChores"
-    class="dark:bg-surface-raised dark:border-line flex min-w-0 items-center gap-2.5 rounded-[1.25rem] bg-white py-2 pr-2 pl-2.5 shadow-[var(--card-shadow)] dark:border"
-    data-testid="chore-bean-card"
+    class="dark:bg-surface-overlay inline-flex min-w-0 items-center gap-2 rounded-2xl bg-[var(--tint-slate-5)] py-1.5 pr-1.5 pl-1.5"
+    data-testid="chore-slim-row"
     :data-member-id="member.id"
-    data-slim="true"
   >
     <BeanieAvatar v-bind="memberAvatarBindings(member)" size="sm" />
-    <span class="min-w-0 flex-1">
-      <span
-        class="font-outfit dark:text-ink text-secondary-500 block truncate text-sm leading-tight font-bold"
-        >{{ name }}</span
-      >
-      <span
-        class="dark:text-ink-faint text-secondary-400 block text-xs"
-        data-testid="chore-bean-empty"
-        >{{ t('choreboard.card.noneYet') }}</span
-      >
-    </span>
+    <span
+      class="font-outfit dark:text-ink text-secondary-500 max-w-40 truncate text-sm leading-tight font-bold"
+      >{{ name }}</span
+    >
     <button
       v-if="canEdit"
       type="button"
-      class="font-outfit text-primary-700 dark:text-accent-lift focus-visible:ring-sky-silk-300 inline-flex flex-none items-center gap-1 rounded-[0.875rem] bg-[var(--tint-orange-8)] px-3 py-1.5 text-sm font-bold whitespace-nowrap focus-visible:ring-2 focus-visible:outline-none"
+      class="font-outfit text-primary-700 dark:text-accent-lift focus-visible:ring-sky-silk-300 dark:bg-surface-raised inline-flex flex-none items-center gap-1 rounded-[0.875rem] bg-white px-3 py-1.5 text-sm font-bold whitespace-nowrap focus-visible:ring-2 focus-visible:outline-none"
       :aria-label="fillTemplate(t('choreboard.card.addAria'), { name })"
       data-testid="chore-bean-add"
       @click="emit('edit-chores')"

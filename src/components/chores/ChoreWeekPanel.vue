@@ -7,11 +7,11 @@
  * Every number is a `choreDayRecord` from `choreStore.weekFor` (rows), and the popover is handed
  * the very record its cell counted, so a cell and its summary always agree.
  *
- * Three shapes, one component:
- *  - the grown-ups' board, days ACROSS (beans down): the stacked layout and the phone. Under
- *    30rem of board (`container-name: chore-board`) the names fold to avatars and the cells
- *    turn square;
- *  - the grown-ups' board, days DOWN (beans across): the desktop right rail (`orientation`);
+ * Two shapes, one component:
+ *  - the grown-ups' board, days ACROSS (beans down), below the cards at every width. The day
+ *    columns are capped (5.25rem) so the cells stay squarish and tappable on a wide screen,
+ *    the grid left-aligned in the card; under 30rem of board (`container-name: chore-board`)
+ *    the names fold to avatars and the cells turn square;
  *  - one bean's own week (`single`): seven across, the total in the header, the hint under it,
  *    no legend. It replaces the old "This week" row on a bean's day.
  * The board itself is grown-ups only (the page decides); a child sees only their own week.
@@ -23,7 +23,7 @@
  * Dark mode: the panel is `surface-raised` with a `line` edge; heads are `ink-faint`, today's
  * head and the totals `accent-lift`.
  */
-import { computed, nextTick, ref, watch } from 'vue';
+import { computed, nextTick, ref } from 'vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import ChoreDayCell from '@/components/chores/ChoreDayCell.vue';
 import ChoreDayPopover from '@/components/chores/ChoreDayPopover.vue';
@@ -43,12 +43,10 @@ const props = withDefaults(
     todayYmd: string;
     /** One bean's own week (their day page). */
     single?: boolean;
-    /** The grown-ups' board: days across (default) or days down (the desktop rail). */
-    orientation?: 'across' | 'down';
     /** Offer "Open {Name}'s Day" on today's summary (home only). */
     openDayAction?: boolean;
   }>(),
-  { single: false, orientation: 'across', openDayAction: false }
+  { single: false, openDayAction: false }
 );
 
 const emit = defineEmits<{ 'open-day': [memberId: string] }>();
@@ -67,8 +65,7 @@ const days = computed(() =>
 );
 const weekdayOf = (ymd: string) => days.value.find((d) => d.ymd === ymd)?.long ?? '';
 
-const isDown = computed(() => !props.single && props.orientation === 'down');
-const cellShape = computed(() => (props.single ? 'square' : isDown.value ? 'tall' : 'wide'));
+const cellShape = computed(() => (props.single ? 'square' : 'wide'));
 
 const totalAria = (n: number) =>
   fillTemplate(t(n === 1 ? 'choreboard.week.totalAria.one' : 'choreboard.week.totalAria.other'), {
@@ -82,16 +79,15 @@ const totalAriaFor = (m: FamilyMember, n: number) =>
 
 type DayHead = (typeof days.value)[number];
 /**
- * The board's grid as ONE flat list, so every layout draws its cells, heads and totals with the
- * same markup: `single` is seven heads then seven cells; days DOWN is the beans across the top,
- * a row per day, then the totals; days ACROSS is the days across the top, then a row per bean
- * ending in its total.
+ * The board's grid as ONE flat list, so both layouts draw their cells, heads and totals with the
+ * same markup: `single` is seven heads then seven cells; the board is the days across the top,
+ * then a row per bean ending in its total.
  */
 type GridItem =
   | { kind: 'blank'; key: string }
-  | { kind: 'day'; key: string; day: DayHead; left: boolean }
-  | { kind: 'star'; key: string; left: boolean }
-  | { kind: 'bean'; key: string; member: FamilyMember; column: boolean }
+  | { kind: 'day'; key: string; day: DayHead }
+  | { kind: 'star'; key: string }
+  | { kind: 'bean'; key: string; member: FamilyMember }
   | { kind: 'cell'; key: string; member: FamilyMember; record: ChoreDayRecord }
   | { kind: 'total'; key: string; member: FamilyMember; total: number };
 
@@ -109,35 +105,17 @@ const totalItem = (member: FamilyMember, total: number): GridItem => ({
 });
 
 const gridItems = computed<GridItem[]>(() => {
-  const heads = (left: boolean): GridItem[] =>
-    days.value.map((day) => ({ kind: 'day', key: `h-${day.ymd}`, day, left }));
+  const heads = days.value.map((day): GridItem => ({ kind: 'day', key: `h-${day.ymd}`, day }));
   if (props.single) {
     const row = props.rows[0];
-    return row ? [...heads(false), ...row.week.days.map((r) => cellItem(row.member, r))] : [];
-  }
-  if (isDown.value) {
-    return [
-      { kind: 'blank', key: 'corner' },
-      ...props.rows.map((r): GridItem => ({
-        kind: 'bean',
-        key: `b-${r.member.id}`,
-        member: r.member,
-        column: true,
-      })),
-      ...days.value.flatMap((day, di): GridItem[] => [
-        { kind: 'day', key: `h-${day.ymd}`, day, left: true },
-        ...props.rows.map((r) => cellItem(r.member, r.week.days[di]!)),
-      ]),
-      { kind: 'star', key: 'star', left: true },
-      ...props.rows.map((r) => totalItem(r.member, r.week.total)),
-    ];
+    return row ? [...heads, ...row.week.days.map((r) => cellItem(row.member, r))] : [];
   }
   return [
     { kind: 'blank', key: 'corner' },
-    ...heads(false),
-    { kind: 'star', key: 'star', left: false },
+    ...heads,
+    { kind: 'star', key: 'star' },
     ...props.rows.flatMap((r): GridItem[] => [
-      { kind: 'bean', key: `b-${r.member.id}`, member: r.member, column: false },
+      { kind: 'bean', key: `b-${r.member.id}`, member: r.member },
       ...r.week.days.map((rec) => cellItem(r.member, rec)),
       totalItem(r.member, r.week.total),
     ]),
@@ -148,10 +126,6 @@ const gridItems = computed<GridItem[]>(() => {
 const hasFreeDay = computed(() =>
   props.rows.some((r) => r.week.days.some((d) => d.ymd <= props.todayYmd && d.total === 0))
 );
-
-/** Days down: each bean column is capped (5.5rem) and the grid centred, so one or two beans
- *  read as a deliberate column rather than stretched slabs. */
-const downColumns = computed(() => `2.5rem repeat(${props.rows.length}, minmax(0, 5.5rem))`);
 
 // ── The day summary ─────────────────────────────────────────────────────────
 
@@ -198,13 +172,6 @@ function closePopover(): void {
   openCell.value = null;
 }
 
-// The board re-renders its cells when it flips orientation (the 1280px rail): the open summary's
-// anchor is gone with them, so close it rather than leave it hanging from a detached cell.
-watch(
-  () => props.orientation,
-  () => closePopover()
-);
-
 function onOpenDay(): void {
   const id = openCell.value?.memberId;
   openCell.value = null;
@@ -216,7 +183,6 @@ function onOpenDay(): void {
   <section
     class="chore-board dark:bg-surface-raised dark:border-line rounded-3xl bg-white px-4 pt-3.5 pb-3 shadow-[var(--card-shadow)] dark:border"
     :data-testid="single ? 'chore-week-row' : 'chore-week-panel'"
-    :data-orientation="single ? 'single' : orientation"
   >
     <div class="mb-2.5 flex flex-wrap items-baseline gap-x-2 gap-y-1">
       <h2 class="font-outfit dark:text-ink text-secondary-500 text-base font-bold">
@@ -246,19 +212,17 @@ function onOpenDay(): void {
       }}</span>
     </div>
 
-    <!-- ONE grid for all three layouts (see `gridItems`). -->
+    <!-- ONE grid for both layouts (see `gridItems`). -->
     <div
       class="board-grid grid items-center gap-[5px]"
-      :class="single ? 'grid-cols-7' : isDown ? 'justify-center' : 'board-grid-across'"
-      :style="isDown ? { gridTemplateColumns: downColumns } : undefined"
+      :class="single ? 'grid-cols-7' : 'board-grid-across'"
     >
       <template v-for="item in gridItems" :key="item.key">
         <span v-if="item.kind === 'blank'" />
         <span
           v-else-if="item.kind === 'day'"
-          class="font-outfit text-xs font-semibold"
+          class="font-outfit text-center text-xs font-semibold"
           :class="[
-            item.left ? 'text-left' : 'text-center',
             item.day.isToday
               ? 'text-primary-700 dark:text-accent-lift font-bold'
               : 'dark:text-ink-faint text-secondary-400',
@@ -268,29 +232,17 @@ function onOpenDay(): void {
         >
         <span
           v-else-if="item.kind === 'star'"
-          class="dark:text-ink-faint text-secondary-400 text-xs font-semibold"
-          :class="item.left ? 'text-left' : 'text-center'"
+          class="dark:text-ink-faint text-secondary-400 text-center text-xs font-semibold"
           aria-hidden="true"
           >⭐</span
         >
         <div
           v-else-if="item.kind === 'bean'"
-          class="font-outfit dark:text-ink text-secondary-500 flex min-w-0 font-semibold"
-          :class="
-            item.column
-              ? 'flex-col items-center gap-0.5 text-xs'
-              : 'items-center gap-1.5 pr-1 text-sm'
-          "
+          class="font-outfit dark:text-ink text-secondary-500 flex min-w-0 items-center gap-1.5 pr-1 text-sm font-semibold"
           aria-hidden="true"
         >
-          <BeanieAvatar
-            class="flex-none"
-            v-bind="memberAvatarBindings(item.member)"
-            :size="item.column ? 'sm' : 'xs'"
-          />
-          <span class="min-w-0 truncate" :class="item.column ? 'max-w-full' : 'board-name'">{{
-            firstName(item.member.name)
-          }}</span>
+          <BeanieAvatar class="flex-none" v-bind="memberAvatarBindings(item.member)" size="xs" />
+          <span class="board-name min-w-0 truncate">{{ firstName(item.member.name) }}</span>
         </div>
         <ChoreDayCell
           v-else-if="item.kind === 'cell'"
@@ -367,7 +319,6 @@ function onOpenDay(): void {
       :weekday="openCell ? weekdayOf(openCell.ymd) : ''"
       :is-today="openCell?.ymd === todayYmd"
       :anchor="openCell?.anchor ?? null"
-      :side="isDown ? 'start' : 'below'"
       :open-day-action="openDayAction"
       @close="closePopover"
       @open-day="onOpenDay"
@@ -380,11 +331,14 @@ function onOpenDay(): void {
   container: chore-board / inline-size;
 }
 
+/* Each day column is capped, so the cells stay squarish (never slabs) on a wide screen; the
+   grid sits at the start of the card. */
 .board-grid-across {
-  grid-template-columns: minmax(2rem, max-content) repeat(7, minmax(0, 1fr)) minmax(
+  grid-template-columns: minmax(2rem, max-content) repeat(7, minmax(0, 5.25rem)) minmax(
       2.25rem,
       max-content
     );
+  justify-content: start;
 }
 
 /* A narrow board (a phone): the names fold to avatars (each cell's label still names the bean). */

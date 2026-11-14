@@ -39,12 +39,26 @@ const props = withDefaults(
      * finished block folds to a strip instead of taking half a lane.
      */
     compact?: boolean;
+    /**
+     * The short horizontal strip (the app's bean day and home card from 768px, #146): the
+     * picture small at the left, the words and the stars in the middle, the action at the right,
+     * about a third of the tall banner's height. The wall keeps the tall design (kids are there).
+     */
+    strip?: boolean;
     /** A row of this many stars (the choreboard: one per chore). */
     stars?: number;
     /** The chore celebration is playing on this banner (#146). */
     celebration?: BannerCelebration | null;
   }>(),
-  { pills: () => [], actionLabel: '', note: '', compact: false, stars: 0, celebration: null }
+  {
+    pills: () => [],
+    actionLabel: '',
+    note: '',
+    compact: false,
+    strip: false,
+    stars: 0,
+    celebration: null,
+  }
 );
 defineEmits<{ action: [] }>();
 
@@ -58,24 +72,28 @@ const formClass = computed(() => {
 <template>
   <div
     class="celebration-banner flex w-full flex-col items-center rounded-3xl text-center text-white"
-    :class="[compact ? 'gap-1 px-3 py-3' : 'gap-3 px-5 py-6', formClass]"
+    :class="[
+      strip ? 'is-strip px-4 py-3' : compact ? 'gap-1 px-3 py-3' : 'gap-3 px-5 py-6',
+      formClass,
+    ]"
     data-celebration-banner
+    :data-celebration-strip="strip ? '' : undefined"
   >
     <img
       src="/brand/beanies_celebrating_line_transparent_560x225.png"
       :alt="imageAlt"
-      :class="compact ? 'w-24' : 'w-44'"
+      :class="compact || strip ? 'w-24' : 'w-44'"
       data-celebration-picture
     />
-    <div class="relative w-full">
+    <div class="banner-words relative w-full">
       <div
         class="flex flex-col items-center"
-        :class="compact ? 'gap-1' : 'gap-3'"
+        :class="compact ? 'gap-1' : strip ? 'gap-0.5' : 'gap-3'"
         data-celebration-std
       >
         <h3
           class="font-outfit leading-tight font-extrabold text-balance"
-          :class="compact ? 'text-lg' : 'text-2xl'"
+          :class="compact || strip ? 'text-lg' : 'text-2xl'"
         >
           {{ title }}
         </h3>
@@ -87,7 +105,8 @@ const formClass = computed(() => {
       -->
       <p
         v-if="celebration"
-        class="font-outfit absolute inset-x-0 bottom-0 text-xl leading-tight font-extrabold text-balance"
+        class="font-outfit absolute inset-x-0 bottom-0 leading-tight font-extrabold text-balance"
+        :class="strip ? 'text-lg' : 'text-xl'"
         aria-hidden="true"
         data-celebration-praise
       >
@@ -112,7 +131,7 @@ const formClass = computed(() => {
     <p
       v-if="stars > 0"
       class="flex flex-wrap justify-center gap-0.5 leading-none"
-      :class="compact ? 'text-lg' : 'text-2xl'"
+      :class="compact || strip ? 'text-lg' : 'text-2xl'"
       aria-hidden="true"
       data-celebration-stars
     >
@@ -146,6 +165,44 @@ const formClass = computed(() => {
 
 .banner-praise-word {
   margin: 0 0.12em;
+}
+
+/* The strip: picture | words over stars | action. A grid, so the banner keeps one height
+   whether it shows its words or the praise line (both sit in the words cell). */
+.is-strip {
+  align-items: center;
+  display: grid;
+  gap: 0.375rem 1rem;
+  grid-template-areas:
+    'pic words action'
+    'pic stars action';
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  text-align: left;
+}
+
+.is-strip [data-celebration-picture] {
+  grid-area: pic;
+}
+
+.is-strip .banner-words {
+  grid-area: words;
+}
+
+.is-strip [data-celebration-std] {
+  align-items: flex-start;
+}
+
+.is-strip [data-celebration-praise] {
+  text-align: left;
+}
+
+.is-strip [data-celebration-stars] {
+  grid-area: stars;
+  justify-content: flex-start;
+}
+
+.is-strip .banner-action {
+  grid-area: action;
 }
 
 /* The unlit star under each slot: drawn only while the celebration waits for it to land. */

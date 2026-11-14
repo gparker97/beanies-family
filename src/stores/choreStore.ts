@@ -335,6 +335,53 @@ export const useChoreStore = defineStore('chores', () => {
   const celebrating = new Set<string>();
 
   /**
+   * This device's ticks being written right now, per bean and day (`member:day` → chore ids).
+   * Untick writes are not here. The finishing-tick question counts them as done, so the LAST of
+   * several quick ticks is the finishing one before any of their writes land.
+   */
+  const ticking = new Map<string, Set<string>>();
+  const tickingKey = (memberId: string, ymd: string) => `${memberId}:${ymd}`;
+  function inFlightFor(memberId: string, ymd: string): ReadonlySet<string> {
+    return ticking.get(tickingKey(memberId, ymd)) ?? new Set();
+  }
+  function setInFlight(memberId: string, ymd: string, choreId: string, on: boolean): void {
+    const key = tickingKey(memberId, ymd);
+    const set = new Set(ticking.get(key));
+    if (on) set.add(choreId);
+    else set.delete(choreId);
+    if (set.size) ticking.set(key, set);
+    else ticking.delete(key);
+  }
+
+  /**
+   * THE finishing-tick decision (#146), one for every caller: would ticking `choreId` for
+   * `memberId` today finish its block (`completed`), and should that tick play the block's
+   * once-only celebration (`celebrates`: the block has not celebrated today and no other tick on
+   * this device is writing its celebrated mark)? Counts this device's in-flight ticks as done.
+   */
+  function finishingTick(
+    memberId: string,
+    choreId: string,
+    ymd: string
+  ): { completed: ChoreBlock | null; total: number; celebrates: boolean } {
+    const day = choreDayFor(memberId);
+    const completed = completesBlock(day, choreId, inFlightFor(memberId, ymd));
+    const b = completed ? day.blocks.find((x) => x.block === completed) : undefined;
+    const celebrates =
+      !!completed && !b?.celebrated && !celebrating.has(`${memberId}:${ymd}:${completed}`);
+    return { completed, total: b?.total ?? 0, celebrates };
+  }
+
+  /**
+   * Will this tick play the all-done celebration? Asked at the tap by a surface whose own
+   * per-tick feedback would play under it (the wall's tick burst). The store's own answer, from
+   * the same rule the tick path uses.
+   */
+  function tickWillCelebrate(memberId: string, choreId: string): boolean {
+    return finishingTick(memberId, choreId, choreClock.value.ymd).celebrates;
+  }
+
+  /**
    * THE one tick path, for the page and the wall. Every guard runs before any write:
    * the chore exists, `memberId` is one of its (living) assignees, it occurs TODAY (the date
    * is always the chore clock's, never a parameter), and on the page a non-adult may only
@@ -343,10 +390,12 @@ export const useChoreStore = defineStore('chores', () => {
    * A tick that finishes a block writes the `done` mark and, when the block has not
    * celebrated today, its `celebrated` mark, in ONE `ifAbsent` batch; the celebration plays
    * only when THIS write created that mark, so it plays once per bean, block and day on every
-   * device. Completion is decided before the write from the marks this store has read, and
-   * checked again AFTER it from the refreshed marks: when another tick of the same block
-   * landed between the two (two different chores ticked in quick succession), the block is
-   * found complete only afterwards, and its `celebrated` mark is written then (`finishLate`).
+   * device. Completion is decided before the write (`finishingTick`) from the marks this store
+   * has read, counting this device's in-flight ticks of the bean as done, so of two quick ticks
+   * the second is the finishing one and holds the block before its write. It is checked again
+   * AFTER the write from the refreshed marks: when another DEVICE's tick of the block landed in
+   * between, the block is found complete only then, and its `celebrated` mark is written and the
+   * celebration plays in its settled form (`finishLate`).
    *
    * Resolves the landed tick or untick, a `ChoreTickRefused` when a guard refused (already
    * toasted and logged), or `null` for a failed write (`useWallJobs` reports that one).
@@ -374,7 +423,6 @@ export const useChoreStore = defineStore('chores', () => {
       by = opts.by ?? memberId;
     }
 
-    const day = choreDayFor(memberId);
     const block = choreBlockOf(chore);
     const doneId = choreMarkId('done', memberId, clock.ymd, choreId);
     const wasDone = markIndex.value.get(memberId)?.get(clock.ymd)?.done.has(choreId) ?? false;
@@ -395,18 +443,19 @@ export const useChoreStore = defineStore('chores', () => {
       return { action: 'untick', completed: null, celebrated: false };
     }
 
-    const completed = completesBlock(day, choreId);
-    const completedBlock = completed ? day.blocks.find((b) => b.block === completed) : undefined;
+    // Decided BEFORE this tick joins the in-flight set, counting the bean's other in-flight
+    // ticks as done (`finishingTick`). Another tick writing this block's celebrated mark right
+    // now owns the completion (its log, its celebration): this one is then a plain tick.
+    const finish = finishingTick(memberId, choreId, clock.ymd);
+    const completed = finish.completed;
     const base = { memberId, date: clock.ymd, by };
     const items: { id: string; input: repo.ChoreMarkInput }[] = [
       { id: doneId, input: { ...base, kind: 'done', ref: choreId } },
     ];
     const latch = `${memberId}:${clock.ymd}:${block}`;
-    // Another tick of this block is writing its celebrated mark right now: that tick owns the
-    // completion (its log, its celebration), so this one is a plain tick.
     const latchHeld = celebrating.has(latch);
     const celebratedId =
-      completed && !completedBlock?.celebrated && !latchHeld
+      completed && finish.celebrates
         ? choreMarkId('celebrated', memberId, clock.ymd, completed)
         : null;
     if (celebratedId && completed) {
@@ -418,6 +467,7 @@ export const useChoreStore = defineStore('chores', () => {
     // starts from. Released by the celebration, or below when it will not play.
     const holding = !!celebratedId && !!completed && !!opts.anchor;
     if (holding) holdChoreBlock(memberId, block);
+    setInFlight(memberId, clock.ymd, choreId, true);
     let created: ChoreMark[] | null = null;
     try {
       created = await write(
@@ -430,6 +480,7 @@ export const useChoreStore = defineStore('chores', () => {
         { errorToast }
       );
     } finally {
+      setInFlight(memberId, clock.ymd, choreId, false);
       if (celebratedId) celebrating.delete(latch);
       if (holding && !created) releaseChoreBlock(memberId, block);
     }
@@ -443,15 +494,15 @@ export const useChoreStore = defineStore('chores', () => {
       const celebrated = !!celebratedId && created.some((m) => m.id === celebratedId);
       log('info', 'block-complete', {
         slot: completed,
-        count: completedBlock?.total ?? 0,
+        count: finish.total,
         detail: celebrated ? 'celebrated' : 'banner-only',
       });
-      if (celebrated) celebrateBlock(memberId, completed, completedBlock?.total ?? 0, opts.anchor);
+      if (celebrated) celebrateBlock(memberId, completed, finish.total, opts.anchor);
       else if (holding) releaseChoreBlock(memberId, block);
       return { action: 'tick', completed, celebrated };
     }
 
-    const late = await finishLate(memberId, clock.ymd, block, by, latch, opts.anchor);
+    const late = await finishLate(memberId, clock.ymd, block, by, latch, opts.anchor ?? null);
     return { action: 'tick', completed: late.completed, celebrated: late.celebrated };
   }
 
@@ -460,7 +511,8 @@ export const useChoreStore = defineStore('chores', () => {
     memberId: string,
     block: ChoreBlock,
     count: number,
-    anchor: ChoreCelebrationAnchor | null | undefined
+    anchor: ChoreCelebrationAnchor | null | undefined,
+    settled = false
   ): void {
     const member = familyStore.members.find((m) => m.id === memberId);
     celebrateChore({
@@ -469,6 +521,7 @@ export const useChoreStore = defineStore('chores', () => {
       beanName: firstName(member?.name),
       count,
       anchor,
+      settled,
       stillDone: () =>
         choreDayFor(memberId).blocks.find((b) => b.block === block)?.allDone ?? false,
     });
@@ -490,7 +543,7 @@ export const useChoreStore = defineStore('chores', () => {
     block: ChoreBlock,
     by: string,
     latch: string,
-    anchor?: ChoreCelebrationAnchor | null
+    anchor: ChoreCelebrationAnchor | null
   ): Promise<{ completed: ChoreBlock | null; celebrated: boolean }> {
     const after = choreDayFor(memberId).blocks.find((b) => b.block === block);
     if (!after?.allDone) return { completed: null, celebrated: false };
@@ -523,7 +576,10 @@ export const useChoreStore = defineStore('chores', () => {
       const celebrated = created.some((m) => m.id === id);
       if (celebrated) {
         log('info', 'block-complete', { slot: block, count: after.total, detail: 'celebrated' });
-        celebrateBlock(memberId, block, after.total, anchor);
+        // Found complete only after the write (another device's tick landed in between): the
+        // block is already showing its banner, so the celebration plays on it in its settled
+        // form, with no burst from a tick that is no longer on screen.
+        celebrateBlock(memberId, block, after.total, anchor, true);
       }
       return { completed: block, celebrated };
     } finally {
@@ -1056,6 +1112,7 @@ export const useChoreStore = defineStore('chores', () => {
     // Actions
     loadChores,
     toggleChore,
+    tickWillCelebrate,
     createChore,
     updateChore,
     deleteChore,

@@ -12,6 +12,7 @@ const sounds = vi.hoisted(() => ({
   playFanfare: vi.fn(),
   playChime: vi.fn(),
   playChoreCelebrationSound: vi.fn(),
+  cancelChoreCelebrationSound: vi.fn(),
 }));
 vi.mock('@/composables/useSounds', () => sounds);
 const logEvent = vi.hoisted(() => vi.fn());
@@ -236,14 +237,14 @@ describe('celebrateChore', () => {
   });
 
   it('sounds not loaded in time: the fanfare played, logged as a warning', async () => {
-    sounds.playChoreCelebrationSound.mockResolvedValue('fanfare');
+    sounds.playChoreCelebrationSound.mockResolvedValue('fanfare-late');
     celebrateChore(request());
     await vi.runAllTicks();
     await Promise.resolve();
     expect(logEvent).toHaveBeenCalledWith(
       expect.objectContaining({
         level: 'warn',
-        context: expect.objectContaining({ action: 'fallback-fanfare' }),
+        context: expect.objectContaining({ action: 'fallback-fanfare', stage: 'late' }),
       })
     );
   });
@@ -257,6 +258,47 @@ describe('celebrateChore', () => {
     expect(choreBannerCelebration('pip', 'morning')).toBeNull();
     expect(logEvent).toHaveBeenCalledWith(
       expect.objectContaining({ context: expect.objectContaining({ action: 'ended-undone' }) })
+    );
+  });
+
+  it('two beans’ holds are kept apart: each is released by its own key', () => {
+    holdChoreBlock('pip', 'morning');
+    holdChoreBlock('juno', 'morning');
+    expect(choreBlockHeld('pip', 'morning')).toBe(true);
+    expect(choreBlockHeld('juno', 'morning')).toBe(true);
+    releaseChoreBlock('pip', 'morning');
+    expect(choreBlockHeld('pip', 'morning')).toBe(false);
+    expect(choreBlockHeld('juno', 'morning')).toBe(true);
+    // Juno's celebration takes over Juno's hold only.
+    holdChoreBlock('pip', 'evening');
+    celebrateChore(request({ memberId: 'juno' }));
+    expect(choreBlockHeld('pip', 'evening')).toBe(true);
+  });
+
+  it('settled (found done only after its write): the banner from the start, no burst hold', () => {
+    celebrateChore(request({ settled: true }));
+    expect(active()!.phase).toBe('banner');
+    expect(choreBlockHeld('pip', 'morning')).toBe(false);
+    expect(choreBannerCelebration('pip', 'morning')).not.toBeNull();
+  });
+
+  it('dismissed (route change, block gone, no longer done): its waiting sound never starts', () => {
+    celebrateChore(request());
+    expect(sounds.cancelChoreCelebrationSound).not.toHaveBeenCalled();
+    useCelebration().dismissChoreCelebration();
+    expect(sounds.cancelChoreCelebrationSound).toHaveBeenCalledTimes(1);
+  });
+
+  it('a sound that did not start (superseded, muted) is logged at debug, so rates read true', async () => {
+    sounds.playChoreCelebrationSound.mockResolvedValue('superseded');
+    celebrateChore(request());
+    await vi.runAllTicks();
+    await Promise.resolve();
+    expect(logEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        level: 'debug',
+        context: expect.objectContaining({ action: 'sound-skipped', stage: 'superseded' }),
+      })
     );
   });
 
