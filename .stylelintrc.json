@@ -27,5 +27,11 @@
         "message": "Use rem (or @apply text-*). px font-size breaks the Large reading mode (see .claude/skills/beanies-theme/SKILL.md § Text-size accessibility mode). Decorative exception? Add /* stylelint-disable-next-line declaration-property-value-disallowed-list -- decorative ... */"
       }
     ]
-  }
+  },
+  "overrides": [
+    {
+      "files": ["web/**/*.css"],
+      "rules": { "import-notation": "string" }
+    }
+  ]
 }
