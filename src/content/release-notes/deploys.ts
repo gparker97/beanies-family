@@ -17,6 +17,15 @@ import type { ReleaseNote } from './index';
 
 export const DEPLOY_NOTES: ReleaseNote[] = [
   {
+    version: '2026.11.15',
+    date: '2026-11-15',
+    month: '15 november 2026',
+    summary: {
+      en: "The app opens faster, and the beanie wall's Lists board is easier to read.",
+      beanie: "the app opens faster, and the beanie wall's lists board is easier to read.",
+    },
+  },
+  {
     version: '2026.11.14',
     date: '2026-11-14',
     month: '14 november 2026',
