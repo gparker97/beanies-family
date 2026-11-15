@@ -1,5 +1,5 @@
 import { setActivePinia, createPinia } from 'pinia';
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { nextTick } from 'vue';
 import { useSyncStore } from '../syncStore';
 import * as syncService from '@/services/sync/syncService';
@@ -9,6 +9,14 @@ import { features } from '@/config/features';
 import * as registryService from '@/services/registry/registryService';
 import { useFamilyStore } from '../familyStore';
 import { useAuthStore } from '../authStore';
+import {
+  __resetLoadMaintenanceForTesting,
+  __whenLoadMaintenanceIdleForTesting,
+  holdLoadMaintenance,
+  registerLoadMaintenance,
+  runLoadMaintenance,
+} from '@/services/automerge/loadMaintenance';
+import { markAuthoritative, resetProjection } from '@/services/automerge/projection';
 
 /**
  * Terminus 1 of the #61/#65 open-guard baseline: `loadFromFile` must commit the
@@ -28,6 +36,8 @@ import { useAuthStore } from '../authStore';
  */
 
 const REPLACE_DRIVE_HEADS = ['drive-head-replace-aaa'];
+/** An open token with no open window: `endOpen` ignores it, the hold release is what counts. */
+const OPEN_TOKEN = -1;
 const MERGE_DRIVE_HEADS = ['drive-head-merge-zzz'];
 
 const mockGlobalSettings: GlobalSettings = {
@@ -198,12 +208,13 @@ describe('syncStore.loadFromFile — terminus 1 commits the DRIVE heads (#65)', 
 
     await primeStore().loadFromFile(); // no `merge` option => the replace branch
 
+    // The first argument is the read's ticket: null here, the mocked `load()` registers none.
     // Requirement 17: the commit now goes through `confirmRemoteMerged`, which
     // learns the marker `load()` held pending and commits it. The `null` is the
-    // envelope fingerprint slot requirement 15 fills.
-    expect(syncService.confirmRemoteMerged).toHaveBeenCalledWith(REPLACE_DRIVE_HEADS, null);
+    // envelope fingerprint this mock answers (asserted below on its own).
+    expect(syncService.confirmRemoteMerged).toHaveBeenCalledWith(null, REPLACE_DRIVE_HEADS, null);
     // The precise regression: it used to be called, just with null heads.
-    expect(syncService.confirmRemoteMerged).not.toHaveBeenCalledWith(null, null);
+    expect(syncService.confirmRemoteMerged).not.toHaveBeenCalledWith(null, null, null);
   });
 
   it('commits the remote heads on the MERGE branch (unchanged behaviour)', async () => {
@@ -216,8 +227,38 @@ describe('syncStore.loadFromFile — terminus 1 commits the DRIVE heads (#65)', 
 
     await primeStore().loadFromFile({ merge: true });
 
-    expect(syncService.confirmRemoteMerged).toHaveBeenCalledWith(MERGE_DRIVE_HEADS, null);
+    expect(syncService.confirmRemoteMerged).toHaveBeenCalledWith(null, MERGE_DRIVE_HEADS, null);
   });
+
+  it.each<[string, { merge?: boolean }]>([
+    ['REPLACE', {}],
+    ['MERGE', { merge: true }],
+  ])(
+    'confirms with the fingerprint of the envelope DRIVE holds, taken before the merge RPC (%s, requirement 15)',
+    async (_label, opts) => {
+      vi.mocked(syncService.envelopeFingerprintOrNull).mockResolvedValueOnce('drive-env-fp');
+      vi.mocked(docClient.mergeRemoteEnvelope).mockResolvedValue({
+        heads: ['our-doc-head'],
+        dirty: false,
+        changed: false,
+        remoteHeads: MERGE_DRIVE_HEADS,
+      } as never);
+
+      await primeStore().loadFromFile(opts);
+
+      // The parsed remote envelope, not the merged one we hold afterwards.
+      expect(syncService.envelopeFingerprintOrNull).toHaveBeenCalledWith(fakeEnvelope);
+      expect(syncService.confirmRemoteMerged).toHaveBeenCalledWith(
+        null,
+        MERGE_DRIVE_HEADS,
+        'drive-env-fp'
+      );
+      // No await between the merge and its commit: the hash was taken first.
+      const hashedAt = vi.mocked(syncService.envelopeFingerprintOrNull).mock.invocationCallOrder[0];
+      const mergedAt = vi.mocked(docClient.mergeRemoteEnvelope).mock.invocationCallOrder[0];
+      expect(hashedAt).toBeLessThan(mergedAt);
+    }
+  );
 
   it('commits null when the worker cannot say what Drive holds', async () => {
     // The fail-safe direction is preserved: unknown => never skip. A partial
@@ -231,7 +272,7 @@ describe('syncStore.loadFromFile — terminus 1 commits the DRIVE heads (#65)', 
 
     await primeStore().loadFromFile();
 
-    expect(syncService.confirmRemoteMerged).toHaveBeenCalledWith(null, null);
+    expect(syncService.confirmRemoteMerged).toHaveBeenCalledWith(null, null, null);
   });
 
   it('never commits our own doc heads as the Drive baseline', async () => {
@@ -247,6 +288,7 @@ describe('syncStore.loadFromFile — terminus 1 commits the DRIVE heads (#65)', 
     await primeStore().loadFromFile();
 
     expect(syncService.confirmRemoteMerged).not.toHaveBeenCalledWith(
+      null,
       ['our-doc-head-MIGRATED'],
       null
     );
@@ -276,6 +318,158 @@ describe('syncStore.loadFromFile — terminus 1 commits the DRIVE heads (#65)', 
     const rollbackAt = vi.mocked(syncService.rollbackRemoteMarker).mock.invocationCallOrder[0];
     expect(confirmAt ?? Infinity).toBeLessThan(rollbackAt ?? -Infinity);
     expect(syncService.triggerDebouncedSave).toHaveBeenCalled();
+  });
+
+  /**
+   * Requirement 14: the probe that decided a read is handed to `load()`, which
+   * adopts it as its pending marker instead of probing Drive a second time (the
+   * real `load()` side is pinned in `fetchAndMergeRemote.test.ts`, "one probe per
+   * reload").
+   */
+  describe('the deciding probe reaches load() (requirement 14)', () => {
+    const change = {
+      status: 'changed' as const,
+      basis: 'content' as const,
+      revision: 'ver:6',
+      modifiedTime: null,
+      contentId: 'md5:new',
+      adoptRevision: null,
+      drift: null,
+    };
+
+    beforeEach(() => {
+      vi.mocked(docClient.mergeRemoteEnvelope).mockResolvedValue({
+        heads: ['our-doc-head'],
+        dirty: false,
+        changed: false,
+        remoteHeads: MERGE_DRIVE_HEADS,
+      } as never);
+    });
+
+    it('a `changed` poll passes its own probe, and probes once', async () => {
+      vi.mocked(syncService.remoteChanged).mockResolvedValue(change);
+      const store = primeStore();
+      store.isConfigured = true;
+      store.needsPermission = false;
+
+      await store.reloadIfFileChanged();
+
+      expect(syncService.remoteChanged).toHaveBeenCalledTimes(1);
+      expect(syncService.load).toHaveBeenCalledWith({ probed: change, ticket: expect.any(Object) });
+    });
+
+    it('the open guard passes the probe that decided its read', async () => {
+      vi.mocked(syncService.shouldSkipOpenRead).mockResolvedValue({
+        skip: false,
+        reason: 'changed',
+        probed: change,
+      });
+
+      await primeStore().backgroundSyncFromFile();
+
+      expect(syncService.load).toHaveBeenCalledWith({ probed: change, ticket: expect.any(Object) });
+    });
+
+    it('an open that read without probing lets load() probe for itself', async () => {
+      vi.mocked(syncService.shouldSkipOpenRead).mockResolvedValue({
+        skip: false,
+        reason: 'baseline-heads-unknown',
+      });
+
+      await primeStore().backgroundSyncFromFile();
+
+      expect(syncService.load).toHaveBeenCalledWith({ ticket: expect.any(Object) });
+    });
+  });
+
+  /**
+   * Plan 2026-11-15, requirement 2: path 1a holds load maintenance until the open's Drive read
+   * ends, so a daily reset's save cannot land inside the boot download and the reset runs on
+   * merged data. The hold is OWNED: the open hands its release to `backgroundSyncFromFile` with
+   * its token, and that call's `finally` is the release for every outcome; without it the hold
+   * only lapses after two minutes (`HOLD_MAX_MS`). A call that did not take the hold (the header
+   * Refresh, the pod-unreadable retry, the config-heal) can never end it.
+   */
+  describe("the open's Drive read releases the boot maintenance hold", () => {
+    beforeEach(() => {
+      __resetLoadMaintenanceForTesting();
+      markAuthoritative();
+    });
+    afterEach(() => {
+      __resetLoadMaintenanceForTesting();
+      resetProjection();
+    });
+
+    it.each<[string, () => void]>([
+      [
+        'a skipped read (content unchanged)',
+        () =>
+          vi
+            .mocked(syncService.shouldSkipOpenRead)
+            .mockResolvedValue({ skip: true, reason: 'content-unchanged' }),
+      ],
+      [
+        'a read that fails',
+        () => vi.mocked(syncService.load).mockRejectedValue(new Error('network down')),
+      ],
+    ])('%s: maintenance held during the read runs once it ends', async (_label, arrange) => {
+      arrange();
+      const task = vi.fn(async () => {});
+      registerLoadMaintenance('spy', task);
+      const releaseHold = holdLoadMaintenance(); // App.vue path 1a, before the cache paint
+      runLoadMaintenance('reload'); // the paint's reload asks; the hold keeps it
+      await __whenLoadMaintenanceIdleForTesting();
+      expect(task).not.toHaveBeenCalled();
+
+      await primeStore().backgroundSyncFromFile({ token: OPEN_TOKEN, releaseHold });
+      await __whenLoadMaintenanceIdleForTesting();
+
+      expect(task).toHaveBeenCalledTimes(1);
+    });
+
+    it('a token-less read (a header Refresh during the rebuild) does not end the open hold', async () => {
+      vi.mocked(syncService.shouldSkipOpenRead).mockResolvedValue({
+        skip: true,
+        reason: 'content-unchanged',
+      });
+      const task = vi.fn(async () => {});
+      registerLoadMaintenance('spy', task);
+      const releaseHold = holdLoadMaintenance();
+      runLoadMaintenance('reload');
+      const store = primeStore();
+
+      await store.backgroundSyncFromFile(undefined, { manual: true });
+      await store.backgroundSyncFromFile(); // the deferred config-heal
+      await __whenLoadMaintenanceIdleForTesting();
+      expect(task).not.toHaveBeenCalled(); // the boot read has not run yet
+
+      await store.backgroundSyncFromFile({ token: OPEN_TOKEN, releaseHold });
+      await __whenLoadMaintenanceIdleForTesting();
+      expect(task).toHaveBeenCalledTimes(1);
+    });
+
+    it('an open that finds a read in flight ends its hold when THAT read ends, not at once', async () => {
+      let answerProbe!: (v: { skip: boolean; reason: string }) => void;
+      vi.mocked(syncService.shouldSkipOpenRead).mockImplementationOnce(
+        () => new Promise((r) => (answerProbe = r)) as never
+      );
+      const task = vi.fn(async () => {});
+      registerLoadMaintenance('spy', task);
+      const releaseHold = holdLoadMaintenance();
+      runLoadMaintenance('reload');
+      const store = primeStore();
+
+      const refresh = store.backgroundSyncFromFile(); // token-less, still downloading
+      await expect(store.backgroundSyncFromFile({ token: OPEN_TOKEN, releaseHold })).resolves.toBe(
+        'skipped-in-flight'
+      );
+      await __whenLoadMaintenanceIdleForTesting();
+      expect(task).not.toHaveBeenCalled(); // mid-download: the writers stay held
+
+      answerProbe({ skip: true, reason: 'content-unchanged' });
+      await refresh;
+      await vi.waitFor(() => expect(task).toHaveBeenCalledTimes(1));
+    });
   });
 });
 

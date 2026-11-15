@@ -163,6 +163,9 @@ describe('Multi-Family Database Isolation', () => {
         release();
         release(); // idempotent
         await vi.advanceTimersByTimeAsync(5_000);
+        // The save hashes the envelope before it writes (the clean-skip fingerprint), and
+        // that digest resolves off the fake clock: wait for the save itself to settle.
+        await syncService.whenIdle();
         expect(provider.write).toHaveBeenCalledTimes(1);
       } finally {
         vi.useRealTimers();

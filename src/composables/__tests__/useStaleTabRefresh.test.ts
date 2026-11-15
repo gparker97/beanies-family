@@ -71,9 +71,9 @@ let __resetStaleTabRefreshForTesting: typeof import('@/composables/useStaleTabRe
 
 async function flush() {
   // Allow watchers to fire and the awaited refresh chain to settle.
-  // The chain has 5 awaited steps (reloadAllStores → processRecurringItems →
-  // Promise.allSettled → reloadIfFileChanged → finally), so we need enough
-  // microtask cycles to drain all of them.
+  // The chain has 4 awaited steps (reloadAllStores → Promise.allSettled →
+  // reloadIfFileChanged → finally), so we need enough microtask cycles to
+  // drain all of them.
   await nextTick();
   for (let i = 0; i < 10; i++) {
     await Promise.resolve();
@@ -117,7 +117,6 @@ describe('useStaleTabRefresh', () => {
     todayRef.value = '2026-04-28';
     await flush();
     expect(reloadAllStoresMock).toHaveBeenCalledOnce();
-    expect(processRecurringItemsMock).toHaveBeenCalledOnce();
     expect(updateRatesIfStaleMock).toHaveBeenCalledOnce();
     expect(attemptSilentReconnectMock).toHaveBeenCalledOnce();
     expect(reloadIfFileChangedMock).toHaveBeenCalledOnce();
@@ -189,25 +188,23 @@ describe('useStaleTabRefresh', () => {
       'error.backgroundRefreshFailedHelp',
       expect.objectContaining({ surface: 'stale-tab-refresh' })
     );
-    expect(processRecurringItemsMock).not.toHaveBeenCalled();
     expect(updateRatesIfStaleMock).not.toHaveBeenCalled();
     expect(reloadIfFileChangedMock).not.toHaveBeenCalled();
     expect(resumeFilePollingMock).toHaveBeenCalledOnce();
   });
 
-  it('on processRecurringItems failure: logs warning, downstream still runs', async () => {
-    const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    processRecurringItemsMock.mockRejectedValueOnce(new Error('automerge write failed'));
+  // 2026-11-15: recurring transactions are load maintenance (recurringStore), run by the wake's
+  // own `reloadAllStores` once per day and reported by the maintenance runner on failure
+  // (loadMaintenance.test.ts, recurringStore.recurringMaintenance.test.ts). Replaces "on
+  // processRecurringItems failure: logs warning, downstream still runs".
+  it('never generates recurring transactions itself: the reload does, as load maintenance', async () => {
     useStaleTabRefresh();
     todayRef.value = '2026-04-28';
     await flush();
-    expect(consoleWarn).toHaveBeenCalledWith(
-      '[useStaleTabRefresh] processRecurringItems failed (day-changed)',
-      expect.any(Error)
-    );
+    expect(reloadAllStoresMock).toHaveBeenCalledOnce();
+    expect(processRecurringItemsMock).not.toHaveBeenCalled();
     expect(updateRatesIfStaleMock).toHaveBeenCalledOnce();
     expect(reloadIfFileChangedMock).toHaveBeenCalledOnce();
-    expect(showToastMock).not.toHaveBeenCalled();
   });
 
   it('on updateRatesIfStale failure: logs warning, downstream continues', async () => {

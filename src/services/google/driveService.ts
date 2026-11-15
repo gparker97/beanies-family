@@ -196,12 +196,15 @@ export async function updateFile(
   fileId: string,
   content: string,
   contentMimeType: string = 'application/octet-stream'
-): Promise<{ version: string | null }> {
+): Promise<{ version: string | null; md5Checksum: string | null }> {
   // Ask for the resulting revision counter IN the write response (#61 C14b),
   // so there is no separate post-write metadata read for a peer's write to race.
+  // `md5Checksum` (requirement 11) identifies the bytes Drive stored for THIS
+  // write: `version` keeps advancing on Drive's side after an upload, the
+  // checksum does not.
   const res = await driveRequest(
     token,
-    `${DRIVE_UPLOAD_API}/files/${fileId}?uploadType=media&fields=version,headRevisionId`,
+    `${DRIVE_UPLOAD_API}/files/${fileId}?uploadType=media&fields=version,headRevisionId,md5Checksum`,
     {
       method: 'PATCH',
       headers: { 'Content-Type': contentMimeType },
@@ -215,14 +218,16 @@ export async function updateFile(
   // parse failure degrades to { version: null } => the next open re-reads
   // (safe direction), never a lost or duplicated save.
   try {
-    const data = (await res.json()) as { version?: string | null };
-    return { version: data.version ?? null };
+    const data = (await res.json()) as { version?: string | null; md5Checksum?: unknown };
+    // A non-string checksum is "no content id", which keeps the version basis.
+    const md5Checksum = typeof data.md5Checksum === 'string' ? data.md5Checksum : null;
+    return { version: data.version ?? null, md5Checksum };
   } catch (err) {
     console.warn(
       '[driveService.updateFile] write succeeded but ack body was unparseable; baseline not advanced (next open re-reads, no data at risk)',
       err
     );
-    return { version: null };
+    return { version: null, md5Checksum: null };
   }
 }
 

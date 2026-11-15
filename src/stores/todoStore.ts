@@ -54,6 +54,7 @@ import type {
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import { formatNookDate, toISODateString } from '@/utils/date';
 import { isDocLoaded } from '@/services/automerge/docService';
+import { registerLoadMaintenance, storesAuthoritative } from '@/services/automerge/loadMaintenance';
 import { skipWhileReadOnly } from '@/services/automerge/worker/writeGate';
 import { resolveTodoRule } from '@/services/recurrence/adapters';
 import { ruleKey } from '@/services/recurrence/cadence';
@@ -278,10 +279,8 @@ export const useTodoStore = defineStore('todos', () => {
       },
       { action: 'todoStore:loadTodos' }
     );
-    // #123: only AFTER the to-dos are populated, and outside the load's `wrapAsync`, so a
-    // failed roll never reads as a failed load. Runs on first load and every post-merge reload.
-    rollTrigger = 'load';
-    await rollLoop.runNow();
+    // READ-ONLY (2026-11-15). The #123 roll is load maintenance (`rollOnLoad`, registered
+    // below), run after every authoritative store reload, never awaited by the load.
   }
 
   async function createTodo(input: CreateTodoInput): Promise<TodoItem | null> {
@@ -996,12 +995,22 @@ export const useTodoStore = defineStore('todos', () => {
   }
 
   // #123: roll repeating to-dos when the local day advances (midnight, PWA wake). Needed as
-  // well as the `loadTodos` run: `today` is set at module load, so for a session that opens
-  // fresh each day this watcher never fires.
+  // well as the load-maintenance run: `today` is set at module load, so for a session that
+  // opens fresh each day this watcher never fires. Not while the stores hold a snapshot (the
+  // roll would read snapshot copies); the maintenance run after the reload covers that day.
   watch(today, () => {
+    if (!storesAuthoritative.value) return;
     rollTrigger = 'today';
     rollLoop.queue();
   });
+
+  /** The load-maintenance task: the roll after every authoritative store reload (on open and
+   *  after each merge). The roll is idempotent, so a same-day rerun writes nothing. */
+  async function rollOnLoad(): Promise<void> {
+    rollTrigger = 'load';
+    await rollLoop.runNow();
+  }
+  registerLoadMaintenance('todo-roll', rollOnLoad);
 
   return {
     // State

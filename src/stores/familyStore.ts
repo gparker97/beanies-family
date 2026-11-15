@@ -4,6 +4,7 @@ import { ref, computed, watch } from 'vue';
 import * as familyRepo from '@/services/automerge/repositories/familyMemberRepository';
 import { getById as projectionGetById } from '@/services/automerge/projection';
 import { mutate } from '@/services/automerge/worker/docClient';
+import { registerLoadMaintenance } from '@/services/automerge/loadMaintenance';
 import type { MutationOp } from '@/services/automerge/worker/protocol';
 import { reportError } from '@/utils/errorReporter';
 import { wrapAsync } from '@/composables/useStoreActions';
@@ -91,7 +92,7 @@ export const useFamilyStore = defineStore('family', () => {
    *
    * `owner` above picks the first match, which is right for the UI but not for a
    * claim made on the family's behalf: a transient two-owner state (a transfer
-   * merged from another device before `normalizeRoles` settles it) would let
+   * merged from another device before the role heal settles it) would let
    * whichever owner sorts first speak for the pod. The registry owner sync reads
    * THIS, so a two-owner roster never sends an owner change.
    */
@@ -569,7 +570,7 @@ export const useFamilyStore = defineStore('family', () => {
         const loadedRaw = await familyRepo.getAllFamilyMembers();
         // A row whose id the pod records as REMOVED is a resurrection (a concurrent
         // delete/patch race — automergeRepository.ts) and never a member. Filtered BEFORE
-        // `normalizeRoles`, so a removed row can never be promoted or patched.
+        // the role heal, so a removed row can never be promoted or patched.
         const loaded = loadedRaw.filter((m) => !removed.has(m.id));
         if (loaded.length !== loadedRaw.length) {
           logEvent({
@@ -582,7 +583,9 @@ export const useFamilyStore = defineStore('family', () => {
             },
           });
         }
-        const roster = await normalizeRoles(loaded);
+        // READ-ONLY (2026-11-15): the role heal is applied in memory here and WRITTEN by load
+        // maintenance (`writeRolePatches`), never awaited by the load.
+        const roster = applyRolePatches(loaded, computeRolePatches(loaded).patches);
         // Resolve the session member BEFORE publishing the roster. Assigning members.value
         // first left a tick where the roster existed but currentMemberId was still null,
         // and usePermissions (which now refuses to read the session `role` once a roster
@@ -1013,24 +1016,29 @@ export const useFamilyStore = defineStore('family', () => {
     }
   }
 
+  type RolePatch = Partial<
+    Pick<FamilyMember, 'role' | 'canManagePod' | 'canViewFinances' | 'canEditActivities'>
+  >;
+  /** What the role heal would write, and why (the no-owner cases are reported by the writer). */
+  interface RolePlan {
+    patches: Map<string, RolePatch>;
+    noOwner: { promoted: string } | 'pets-only' | null;
+  }
+
   /**
-   * Idempotent self-heal that runs on every load. Ensures exactly one
-   * owner exists and migrates legacy `admin` rows to `member` while
-   * preserving their effective canManagePod permission.
-   *
-   * All mutations happen inside a single `changeDoc()` call for atomicity.
-   * Returns the (possibly mutated) member list with defaults re-applied.
-   * Fast-path: if no writes are needed, returns the input unchanged.
+   * PURE half of the role self-heal: ensures exactly one owner exists and migrates legacy
+   * `admin` rows to `member` while preserving their effective canManagePod permission.
+   * Writes nothing: `loadMembers` applies the patches IN MEMORY (`applyRolePatches`) so a
+   * read-only loader never publishes an ownerless roster, and `writeRolePatches` (load
+   * maintenance) writes them once the stores hold the authoritative document.
    */
-  async function normalizeRoles(list: FamilyMember[]): Promise<FamilyMember[]> {
-    if (list.length === 0) return list;
+  function computeRolePatches(list: FamilyMember[]): RolePlan {
+    const patches = new Map<string, RolePatch>();
+    if (list.length === 0) return { patches, noOwner: null };
+    let noOwner: RolePlan['noOwner'] = null;
 
-    type Patch = Partial<
-      Pick<FamilyMember, 'role' | 'canManagePod' | 'canViewFinances' | 'canEditActivities'>
-    >;
-    const patches = new Map<string, Patch>();
-
-    const merge = (id: string, p: Patch) => patches.set(id, { ...(patches.get(id) ?? {}), ...p });
+    const merge = (id: string, p: RolePatch) =>
+      patches.set(id, { ...(patches.get(id) ?? {}), ...p });
 
     // ⚠️ THE STORED FLAG, NOT THE DEFAULTED ONE (C10). `list` has been through the
     // repository's `applyDefaults`, which fills a missing `canManagePod` with
@@ -1062,19 +1070,9 @@ export const useFamilyStore = defineStore('family', () => {
           canViewFinances: true,
           canEditActivities: true,
         });
-        reportError({
-          surface: 'familyStore.normalize-roles',
-          message: 'No owner found — promoting earliest human to owner',
-          severity: 'warning',
-          context: { candidateId: candidate.id, memberCount: list.length },
-        });
+        noOwner = { promoted: candidate.id };
       } else {
-        reportError({
-          surface: 'familyStore.normalize-roles',
-          message: 'No owner and no human candidate — pod has only pets',
-          severity: 'warning',
-          context: { memberCount: list.length },
-        });
+        noOwner = 'pets-only';
       }
     }
 
@@ -1088,13 +1086,56 @@ export const useFamilyStore = defineStore('family', () => {
         });
       }
     }
+    return { patches, noOwner };
+  }
 
+  /** The roster as it will read once the patches are written: each patched row is the stored
+   *  row plus its patch, through the repository's own defaults (so a demoted owner loses the
+   *  defaulted pod management exactly as the re-read after the write would show). */
+  function applyRolePatches(
+    list: FamilyMember[],
+    patches: ReadonlyMap<string, RolePatch>
+  ): FamilyMember[] {
     if (patches.size === 0) return list;
+    return list.map((m) => {
+      const patch = patches.get(m.id);
+      if (!patch) return m;
+      const stored = projectionGetById('familyMembers', m.id) as FamilyMember | undefined;
+      return familyRepo.applyDefaults({ ...(stored ?? m), ...patch });
+    });
+  }
 
-    // Apply all patches in a single atomic batch. Skip members absent from the
-    // projection (the worker `patch` would reject the whole batch on a missing
-    // entity — the old code skipped them per-member). `{quiet}`: this fires on a
-    // load path where a critical toast is wrong; the reportError below classifies.
+  /**
+   * The WRITING half of the role self-heal, a load-maintenance task: it runs after the
+   * stores were reloaded from the authoritative document. Reads the roster fresh (minus
+   * removed rows, as the loader does), so it never acts on a snapshot copy. All patches go in
+   * ONE batch for atomicity. Never throws: a rejected batch is reported, and the next reload
+   * retries.
+   */
+  async function writeRolePatches(): Promise<void> {
+    const removed = new Set((await getAllRemovedMembers()).map((r) => r.id));
+    const list = (await familyRepo.getAllFamilyMembers()).filter((m) => !removed.has(m.id));
+    const { patches, noOwner } = computeRolePatches(list);
+    if (noOwner === 'pets-only') {
+      reportError({
+        surface: 'familyStore.normalize-roles',
+        message: 'No owner and no human candidate — pod has only pets',
+        severity: 'warning',
+        context: { memberCount: list.length },
+      });
+    } else if (noOwner) {
+      reportError({
+        surface: 'familyStore.normalize-roles',
+        message: 'No owner found — promoting earliest human to owner',
+        severity: 'warning',
+        context: { candidateId: noOwner.promoted, memberCount: list.length },
+      });
+    }
+    if (patches.size === 0) return;
+
+    // Skip members absent from the projection (the worker `patch` would reject the whole
+    // batch on a missing entity — the old code skipped them per-member). `{quiet}`: this is
+    // unattended, where a critical toast is wrong; the reportError below classifies.
     try {
       const ops: MutationOp[] = [];
       for (const [id, patch] of patches) {
@@ -1107,11 +1148,11 @@ export const useFamilyStore = defineStore('family', () => {
         if (Object.keys(p).length)
           ops.push({ op: 'patch', collection: 'familyMembers', id, patch: p });
       }
-      // `system`: the roster heal runs on load and must keep working in a read-only family (#95).
+      // `system`: the roster heal must keep working in a read-only family (#95).
       if (ops.length) await mutate({ op: 'batch', ops }, { quiet: true, system: true });
     } catch (e) {
       console.error(
-        '[familyStore.normalizeRoles] Automerge change rejected. Pod may render without an owner until reload.',
+        '[familyStore.writeRolePatches] Automerge change rejected. The roster shows the heal in memory; it is written on the next reload.',
         e
       );
       reportError({
@@ -1120,14 +1161,9 @@ export const useFamilyStore = defineStore('family', () => {
         error: e,
         context: { patchCount: patches.size },
       });
-      // Return the unmodified list rather than throw — the rest of load
-      // should proceed; the user just won't see the owner crown until next reload.
-      return list;
     }
-
-    // Re-fetch via the repository so applyDefaults runs on the patched records.
-    return familyRepo.getAllFamilyMembers();
   }
+  registerLoadMaintenance('family-roles', writeRolePatches);
 
   /**
    * Transfer the Owner role from the current owner to `toMemberId`.
@@ -1143,7 +1179,7 @@ export const useFamilyStore = defineStore('family', () => {
       // no auth identity bound to the pod). Transferring to such a member would
       // strand the pod with no working owner: the new "owner" can't log in and
       // the previous owner has demoted themselves out of the transfer flow.
-      // normalizeRoles() does NOT self-heal this — it only fires on 0 or >1
+      // the role heal (computeRolePatches) does NOT self-heal this — it only fires on 0 or >1
       // owners, and exactly one owner exists (just an unreachable one).
       if (
         !target ||

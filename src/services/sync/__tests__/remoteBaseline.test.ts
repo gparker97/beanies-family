@@ -21,7 +21,20 @@ import {
   type RemoteMarker,
   revisionAdvance,
   decideMergeConfirm,
+  readStanding,
   type PendingRead,
+  type BaselinePayload,
+  type ChangeResult,
+  type OpenReadInputs,
+  baselineFromMarker,
+  baselineFromRow,
+  classifyWriteAdvance,
+  decideOpenRead,
+  describeChange,
+  isTrustedBasis,
+  markerOf,
+  toStoredContentId,
+  unknownChange,
 } from '../remoteBaseline';
 
 const baseline = (over: Partial<RemoteBaseline> = {}): RemoteBaseline => ({
@@ -29,8 +42,20 @@ const baseline = (over: Partial<RemoteBaseline> = {}): RemoteBaseline => ({
   modifiedTime: '2026-08-13T00:00:00.000Z',
   checkedAt: '2026-08-13T00:00:00.000Z',
   headsFp: null,
+  contentId: null,
+  envelopeFp: null,
   ...over,
 });
+
+/** A row payload in the current codec; unspecified ids are null. */
+const row = (over: Partial<BaselinePayload> = {}): string =>
+  encodeBaselinePayload({
+    revision: null,
+    headsFp: null,
+    contentId: null,
+    envelopeFp: null,
+    ...over,
+  });
 
 const marker = (over: Partial<RemoteMarker> = {}): RemoteMarker => ({
   revision: 'ver:10',
@@ -46,6 +71,121 @@ describe('toStoredRevision', () => {
     expect(toStoredRevision(null)).toBeNull();
     expect(toStoredRevision(undefined)).toBeNull();
     expect(toStoredRevision('')).toBeNull();
+  });
+});
+
+describe('toStoredContentId (requirement 11)', () => {
+  it('prefixes a raw md5Checksum with md5:', () => {
+    expect(toStoredContentId('abc')).toBe('md5:abc');
+  });
+  it('answers null for anything but a non-empty string (=> version basis)', () => {
+    for (const v of [null, undefined, '', 42, {}, ['abc']]) expect(toStoredContentId(v)).toBeNull();
+  });
+});
+
+/**
+ * Requirement 11: equal content ids are the ONLY new trust. Every row where the
+ * content basis is not available must answer exactly as the version basis did.
+ */
+describe('compareMarkers — content basis (requirement 11)', () => {
+  const C1 = 'md5:aaa';
+  const C2 = 'md5:bbb';
+  it.each<[string, RemoteBaseline | null, RemoteMarker, Partial<ChangeResult>]>([
+    [
+      'both present and equal, version equal => unchanged on content, nothing to adopt',
+      baseline({ contentId: C1 }),
+      marker({ contentId: C1 }),
+      { status: 'unchanged', basis: 'content', adoptRevision: null, drift: 0 },
+    ],
+    [
+      'both present and equal, version DRIFTED => unchanged on content, adopt the new revision',
+      baseline({ revision: 'ver:10', contentId: C1 }),
+      marker({ revision: 'ver:12', contentId: C1 }),
+      { status: 'unchanged', basis: 'content', adoptRevision: 'ver:12', drift: 2 },
+    ],
+    [
+      'both present and different, version equal => changed (read), never trusted on version',
+      baseline({ contentId: C1 }),
+      marker({ contentId: C2 }),
+      { status: 'changed', basis: 'content', adoptRevision: null },
+    ],
+    [
+      'probe missing a content id => version compare exactly as before (unchanged)',
+      baseline({ contentId: C1 }),
+      marker({ contentId: null }),
+      { status: 'unchanged', basis: 'revision', adoptRevision: null, drift: null },
+    ],
+    [
+      'probe missing a content id, version moved => changed on version',
+      baseline({ contentId: C1 }),
+      marker({ revision: 'ver:11' }),
+      { status: 'changed', basis: 'revision' },
+    ],
+    [
+      'LEGACY baseline (no content id) => version compare; a drifted version still reads',
+      baseline({ contentId: null }),
+      marker({ revision: 'ver:11', contentId: C1 }),
+      { status: 'changed', basis: 'revision', adoptRevision: null },
+    ],
+    [
+      'no baseline at all => first sight reads, whatever the content id',
+      null,
+      marker({ contentId: C1 }),
+      { status: 'changed', basis: 'revision', reason: 'no-baseline' },
+    ],
+    [
+      'non-Drive provider (no revision, no content id) => mtime basis as before',
+      baseline({ revision: null, modifiedTime: 'T1' }),
+      marker({ revision: null, modifiedTime: 'T1', contentId: undefined }),
+      { status: 'unchanged', basis: 'mtime' },
+    ],
+    [
+      'a malformed content id on either side is no content id (version basis)',
+      baseline({ contentId: 'aaa' }),
+      marker({ contentId: 'aaa' }),
+      { status: 'unchanged', basis: 'revision' },
+    ],
+    [
+      'an empty digest is no content id',
+      baseline({ contentId: 'md5:' }),
+      marker({ revision: 'ver:11', contentId: 'md5:' }),
+      { status: 'changed', basis: 'revision' },
+    ],
+  ])('%s', (_name, b, m, expected) => {
+    expect(compareMarkers(b, m)).toMatchObject(expected);
+  });
+
+  it('carries the probe content id, so a learn after the merge records it', () => {
+    const r = compareMarkers(null, marker({ contentId: C1 }));
+    expect(markerOf(r)).toEqual({
+      revision: 'ver:10',
+      modifiedTime: '2026-08-13T00:00:00.000Z',
+      contentId: C1,
+    });
+  });
+
+  it('an unknown never carries a content id or a revision to adopt', () => {
+    expect(
+      compareMarkers(baseline({ contentId: C1 }), { revision: null, modifiedTime: null })
+    ).toEqual(unknownChange('no-evidence'));
+  });
+});
+
+describe('isTrustedBasis / describeChange', () => {
+  it('trusts content and version, never mtime or none', () => {
+    expect(isTrustedBasis('content')).toBe(true);
+    expect(isTrustedBasis('revision')).toBe(true);
+    expect(isTrustedBasis('mtime')).toBe(false);
+    expect(isTrustedBasis('none')).toBe(false);
+  });
+  it('names the basis content|version and the drift for the change-probe detail', () => {
+    const drifted = compareMarkers(
+      baseline({ contentId: 'md5:a' }),
+      marker({ revision: 'ver:13', contentId: 'md5:a' })
+    );
+    expect(describeChange(drifted)).toBe('status=unchanged;basis=content;drift=3');
+    const onVersion = compareMarkers(baseline(), marker());
+    expect(describeChange(onVersion)).toBe('status=unchanged;basis=version;drift=none');
   });
 });
 
@@ -168,26 +308,63 @@ describe('headsFingerprint / hasUnpushedChanges (#65)', () => {
   });
 });
 
-describe('encodeBaselinePayload / decodeBaselinePayload (#65)', () => {
+const decoded = (over: Partial<BaselinePayload> = {}): BaselinePayload => ({
+  revision: null,
+  headsFp: null,
+  contentId: null,
+  envelopeFp: null,
+  ...over,
+});
+
+describe('encodeBaselinePayload / decodeBaselinePayload (#65, requirement 11)', () => {
   it('round-trips a revision WITH a fingerprint', () => {
     const fp = headsFingerprint(['h1', 'h2']);
-    expect(decodeBaselinePayload(encodeBaselinePayload('ver:12', fp))).toEqual({
-      revision: 'ver:12',
-      headsFp: fp,
-    });
+    expect(decodeBaselinePayload(row({ revision: 'ver:12', headsFp: fp }))).toEqual(
+      decoded({ revision: 'ver:12', headsFp: fp })
+    );
   });
 
-  it('round-trips a revision with NO fingerprint (terminus could not prove Drive content)', () => {
-    expect(decodeBaselinePayload(encodeBaselinePayload('ver:12', null))).toEqual({
+  it('round-trips the content id (c) and envelope fingerprint (e)', () => {
+    const full = decoded({
       revision: 'ver:12',
-      headsFp: null,
+      headsFp: 'h',
+      contentId: 'md5:abc',
+      envelopeFp: 'ef',
     });
+    expect(JSON.parse(encodeBaselinePayload(full))).toEqual({
+      r: 'ver:12',
+      h: 'h',
+      c: 'md5:abc',
+      e: 'ef',
+    });
+    expect(decodeBaselinePayload(encodeBaselinePayload(full))).toEqual(full);
+  });
+
+  it('tolerates a row written before c/e existed: both decode as null', () => {
+    expect(decodeBaselinePayload('{"r":"ver:3","h":"h"}')).toEqual(
+      decoded({ revision: 'ver:3', headsFp: 'h' })
+    );
+  });
+
+  it('a revision-less row never carries content trust, even if c is present', () => {
+    expect(decodeBaselinePayload('{"r":null,"h":"h","c":"md5:abc","e":"ef"}')).toEqual(
+      decoded({ headsFp: 'h', envelopeFp: 'ef' })
+    );
+  });
+
+  it('a malformed c or e decodes as null, never a guess', () => {
+    expect(decodeBaselinePayload('{"r":"ver:3","h":null,"c":"abc","e":7}')).toEqual(
+      decoded({ revision: 'ver:3' })
+    );
+    expect(decodeBaselinePayload('{"r":"ver:3","h":null,"c":42}')).toEqual(
+      decoded({ revision: 'ver:3' })
+    );
   });
 
   it('reads a LEGACY pre-#65 row (bare namespaced revision) as revision-only', () => {
     // The upgrade path: usable revision, unknown heads => declines once, then the
     // next terminus rewrites the row in the new format. No migration.
-    expect(decodeBaselinePayload('ver:7')).toEqual({ revision: 'ver:7', headsFp: null });
+    expect(decodeBaselinePayload('ver:7')).toEqual(decoded({ revision: 'ver:7' }));
   });
 
   it('returns null for an empty payload (=> no baseline => read)', () => {
@@ -202,16 +379,40 @@ describe('encodeBaselinePayload / decodeBaselinePayload (#65)', () => {
   });
 
   it('ignores a non-string fingerprint rather than trusting it', () => {
-    expect(decodeBaselinePayload('{"r":"ver:3","h":99}')).toEqual({
-      revision: 'ver:3',
-      headsFp: null,
-    });
+    expect(decodeBaselinePayload('{"r":"ver:3","h":99}')).toEqual(decoded({ revision: 'ver:3' }));
   });
 
   it('never throws on arbitrary garbage', () => {
     for (const junk of ['{', '\u0000', 'ver:', '{"r":""}', '{"r":null}']) {
       expect(() => decodeBaselinePayload(junk)).not.toThrow();
     }
+  });
+});
+
+describe('baselineFromRow / baselineFromMarker', () => {
+  it('seeds the in-memory baseline from a row, checkedAt from the row', () => {
+    const payload = row({ revision: 'ver:4', headsFp: 'h', contentId: 'md5:c', envelopeFp: 'e' });
+    expect(baselineFromRow({ payload, checkedAt: 'T0' })).toEqual({
+      revision: 'ver:4',
+      headsFp: 'h',
+      contentId: 'md5:c',
+      envelopeFp: 'e',
+      modifiedTime: null,
+      checkedAt: 'T0',
+    });
+    expect(baselineFromRow(null)).toBeNull();
+    expect(baselineFromRow({ payload: '{"nope":1}', checkedAt: 'T0' })).toBeNull();
+  });
+
+  it('a learned marker keeps its content id and starts heads and envelope unknown', () => {
+    expect(
+      baselineFromMarker({ revision: 'ver:4', modifiedTime: null, contentId: 'md5:c' }, 'T1')
+    ).toEqual(
+      baseline({ revision: 'ver:4', modifiedTime: null, checkedAt: 'T1', contentId: 'md5:c' })
+    );
+    expect(
+      baselineFromMarker({ revision: 'ver:4', modifiedTime: null }, 'T1').contentId
+    ).toBeNull();
   });
 });
 
@@ -265,26 +466,23 @@ describe('baseline payload round-trip', () => {
    * now reads it for both arms, so they cannot disagree again.
    */
   it('round-trips an EMPTY heads fingerprint on the revision-less arm', () => {
-    const decoded = decodeBaselinePayload(encodeBaselinePayload(null, ''));
-    expect(decoded).toEqual({ revision: null, headsFp: '' });
+    expect(decodeBaselinePayload(row({ headsFp: '' }))).toEqual(decoded({ headsFp: '' }));
   });
 
   it('round-trips an empty heads fingerprint on the revision arm too', () => {
-    const decoded = decodeBaselinePayload(encodeBaselinePayload('ver:1', ''));
-    expect(decoded).toEqual({ revision: 'ver:1', headsFp: '' });
+    expect(decodeBaselinePayload(row({ revision: 'ver:1', headsFp: '' }))).toEqual(
+      decoded({ revision: 'ver:1', headsFp: '' })
+    );
   });
 
   it('still decodes a NULL fingerprint as null on both arms', () => {
-    // "We committed a baseline and could not prove what the remote held" — the
-    // fail-safe row, which must keep reading as `dirty`.
-    expect(decodeBaselinePayload(encodeBaselinePayload(null, null))).toEqual({
-      revision: null,
-      headsFp: null,
-    });
-    expect(decodeBaselinePayload(encodeBaselinePayload('ver:1', null))).toEqual({
-      revision: 'ver:1',
-      headsFp: null,
-    });
+    // "We committed a baseline and could not prove what the remote held" (a terminus
+    // that could not prove Drive content) — the fail-safe row, which must keep
+    // reading as `dirty`.
+    expect(decodeBaselinePayload(row())).toEqual(decoded());
+    expect(decodeBaselinePayload(row({ revision: 'ver:1' }))).toEqual(
+      decoded({ revision: 'ver:1' })
+    );
   });
 });
 
@@ -302,6 +500,173 @@ describe('revisionAdvance (audit C4 write-race check)', () => {
     expect(revisionAdvance('ver:x', 'ver:2')).toBeNull();
     // A partial ack (not even a string) must not throw after a write that landed.
     expect(revisionAdvance('ver:1', 42 as never)).toBeNull();
+  });
+});
+
+describe('classifyWriteAdvance (requirement 12)', () => {
+  const m = (revision: string, contentId: string | null = null) => ({
+    revision,
+    modifiedTime: null,
+    contentId,
+  });
+  it.each<
+    [
+      string,
+      string | null,
+      Parameters<typeof classifyWriteAdvance>[1],
+      ReturnType<typeof classifyWriteAdvance>,
+    ]
+  >([
+    [
+      'advance of exactly 1 is clean, as today',
+      'ver:10',
+      { revision: 'ver:11' },
+      { kind: 'clean', advance: 1, marker: m('ver:11') },
+    ],
+    [
+      'advance of 1 with a content id is clean and learns the content id',
+      'ver:10',
+      { revision: 'ver:11', contentId: 'md5:ours' },
+      { kind: 'clean', advance: 1, marker: m('ver:11', 'md5:ours') },
+    ],
+    [
+      'advance above 1 WITH a content id on the ack is own-bytes (commit + confirm by probe)',
+      'ver:10',
+      { revision: 'ver:13', contentId: 'md5:ours' },
+      { kind: 'own-bytes', advance: 3, marker: m('ver:13', 'md5:ours') },
+    ],
+    [
+      'advance above 1 WITHOUT a content id is raced, exactly as today',
+      'ver:10',
+      { revision: 'ver:13' },
+      { kind: 'raced', advance: 3 },
+    ],
+    [
+      'a malformed content id on the ack is no content id => raced',
+      'ver:10',
+      { revision: 'ver:13', contentId: 'ours' },
+      { kind: 'raced', advance: 3 },
+    ],
+    [
+      'no probe revision => advance unknown => clean (no evidence is never a race)',
+      null,
+      { revision: 'ver:13' },
+      { kind: 'clean', advance: null, marker: m('ver:13') },
+    ],
+    [
+      'no ack revision (malformed 2xx) => no-ack, the caller re-probes',
+      'ver:10',
+      { revision: null },
+      { kind: 'no-ack' },
+    ],
+    ['no ack at all (void provider) => no-ack', 'ver:10', null, { kind: 'no-ack' }],
+  ])('%s', (_name, probe, ack, expected) => {
+    expect(classifyWriteAdvance(probe, ack)).toEqual(expected);
+  });
+});
+
+/**
+ * Requirement 13: the open-read ladder, one rung per call. The shell answers
+ * `check-heads` and `probe`; these rows feed those answers in directly.
+ */
+describe('decideOpenRead (requirement 13)', () => {
+  const NOW = Date.parse('2026-11-15T12:00:00.000Z');
+  const fresh = new Date(NOW - 60_000).toISOString();
+  const old = new Date(NOW - 3 * BASELINE_MAX_TRUST_MS).toISOString();
+  const contentBase = baseline({ contentId: 'md5:a', headsFp: 'h', checkedAt: old });
+  const versionBase = baseline({ headsFp: 'h', checkedAt: fresh });
+  const probe = (b: RemoteBaseline, over: Partial<RemoteMarker> = {}) =>
+    compareMarkers(b, marker(over));
+  const run = (i: Partial<OpenReadInputs>) => decideOpenRead({ baseline: null, nowMs: NOW, ...i });
+
+  it.each<[string, Partial<OpenReadInputs>, ReturnType<typeof decideOpenRead>]>([
+    [
+      'no baseline reads without any I/O',
+      {},
+      { kind: 'read', reason: 'no-baseline', probed: null },
+    ],
+    [
+      'version baseline with no revision reads without I/O',
+      { baseline: baseline({ revision: null, checkedAt: fresh }) },
+      { kind: 'read', reason: 'no-baseline', probed: null },
+    ],
+    [
+      'version baseline past the trust window reads without I/O (unchanged)',
+      { baseline: baseline({ headsFp: 'h', checkedAt: old }) },
+      { kind: 'read', reason: 'trust-expired', probed: null },
+    ],
+    [
+      'a CONTENT baseline past the trust window still asks for the heads check',
+      { baseline: contentBase },
+      { kind: 'check-heads' },
+    ],
+    [
+      'heads that differ from the baseline read, before any probe',
+      { baseline: contentBase, headsBlock: 'unpushed-local-changes' },
+      { kind: 'read', reason: 'unpushed-local-changes', probed: null },
+    ],
+    [
+      'an unknown (null) heads fingerprint reads, before any probe',
+      { baseline: { ...contentBase, headsFp: null }, headsBlock: 'baseline-heads-unknown' },
+      { kind: 'read', reason: 'baseline-heads-unknown', probed: null },
+    ],
+    [
+      'clean heads ask for the probe',
+      { baseline: contentBase, headsBlock: null },
+      { kind: 'probe' },
+    ],
+    [
+      'content unchanged AND heads equal skip at ANY baseline age',
+      {
+        baseline: contentBase,
+        headsBlock: null,
+        change: probe(contentBase, { contentId: 'md5:a', revision: 'ver:99' }),
+      },
+      { kind: 'skip', reason: 'content-unchanged' },
+    ],
+    [
+      'version baseline, in window, unchanged on version skips as before',
+      { baseline: versionBase, headsBlock: null, change: probe(versionBase) },
+      { kind: 'skip', reason: 'unchanged-revision-in-window' },
+    ],
+    [
+      'an unknown probe reads and hands no marker to the load',
+      { baseline: contentBase, headsBlock: null, change: unknownChange('auth') },
+      { kind: 'read', reason: 'auth', probed: null },
+    ],
+  ])('%s', (_name, inputs, expected) => {
+    expect(run(inputs)).toEqual(expected);
+  });
+
+  it('content changed reads and hands the deciding probe to the load (requirement 14)', () => {
+    const change = probe(contentBase, { contentId: 'md5:b' });
+    expect(run({ baseline: contentBase, headsBlock: null, change })).toEqual({
+      kind: 'read',
+      reason: 'changed',
+      probed: change,
+    });
+  });
+
+  it('a content baseline whose probe has no content id falls back to the trust window', () => {
+    const change = probe(contentBase, { contentId: null });
+    expect(change.basis).toBe('revision');
+    expect(run({ baseline: contentBase, headsBlock: null, change })).toEqual({
+      kind: 'read',
+      reason: 'trust-expired',
+      probed: change,
+    });
+    const inWindow = { ...contentBase, checkedAt: fresh };
+    expect(
+      run({ baseline: inWindow, headsBlock: null, change: probe(inWindow, { contentId: null }) })
+    ).toEqual({ kind: 'skip', reason: 'unchanged-revision-in-window' });
+  });
+
+  it('never skips on an mtime basis', () => {
+    const change = compareMarkers(versionBase, { revision: null, modifiedTime: 'T' });
+    expect(run({ baseline: versionBase, headsBlock: null, change })).toMatchObject({
+      kind: 'read',
+      reason: 'no-revision',
+    });
   });
 });
 
@@ -341,5 +706,27 @@ describe('decideMergeConfirm (requirement 17)', () => {
     ['commits nothing when no read is pending (reset or rollback)', null, 3, { kind: 'no-read' }],
   ])('%s', (_name, p, seqNow, expected) => {
     expect(decideMergeConfirm(p, seqNow)).toEqual(expected);
+  });
+});
+
+describe('readStanding: a confirm or rollback acts only on its own read', () => {
+  const read = (over: Partial<PendingRead> = {}): PendingRead => ({
+    marker: null,
+    commitSeq: 0,
+    ...over,
+  });
+  const mine = read();
+  const newer = read();
+  const done = read({ settled: true });
+
+  it.each<[string, PendingRead | null, PendingRead | null, ReturnType<typeof readStanding>]>([
+    ['the newest outstanding read acts', mine, mine, 'own'],
+    ['an older read, while a newer one is outstanding, is superseded', mine, newer, 'superseded'],
+    ['an older read after every read settled is superseded', mine, null, 'superseded'],
+    ['a settled read never acts again', done, null, 'settled'],
+    ['a settled read never acts, even if still named newest', done, done, 'settled'],
+    ['no read registered (load returned early) is a no-op', null, mine, 'settled'],
+  ])('%s', (_name, r, newest, expected) => {
+    expect(readStanding(r, newest)).toBe(expected);
   });
 });

@@ -29,35 +29,51 @@ import { logEvent } from '@/services/telemetry';
 import { utf8ByteLength } from '@/utils/encoding';
 import { bump as bumpOpenCycle } from '@/services/telemetry/openCycle';
 import { getActiveFamilyId, clearUnpushedAtSignOutMarker } from '@/services/indexeddb/database';
-import { createFamilyWithId } from '@/services/familyContext';
 import type { StorageProvider, StorageProviderType } from './storageProvider';
 import { getAuxStore } from './storageProvider';
 import {
   compareMarkers,
-  withinTrustWindow,
   type RemoteBaseline,
   type RemoteMarker,
   type ChangeResult,
-  decodeBaselinePayload,
+  type ChangeStatus,
   encodeBaselinePayload,
   hasUnpushedChanges,
   headsFingerprint,
   decodeHeadsFingerprint,
-  revisionAdvance,
   decideMergeConfirm,
+  readStanding,
+  type MergeConfirm,
   type PendingRead,
+  type ReadTicket,
+  baselineFromMarker,
+  baselineFromRow,
+  classifyWriteAdvance,
+  decideOpenRead,
+  describeChange,
+  markerOf,
+  unknownChange,
+  type OpenReadInputs,
 } from './remoteBaseline';
+import { createChangeGate } from '@/services/telemetry/emitPolicy';
 import { isChunkName } from './chunkNames';
 import { LocalStorageProvider } from './providers/localProvider';
 import { CapacitorFileProvider } from './providers/capacitorFileProvider';
 import { DriveApiError } from '@/services/google/driveService';
 import { TokenExpiredError } from '@/services/google/googleAuth';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
-import { mergeEnvelopes, withoutPayload } from './envelopeMerge';
+import { envelopeFingerprint, mergeEnvelopes, withoutPayload } from './envelopeMerge';
+import {
+  evaluateCleanSkip,
+  type CleanSkipDecision,
+  type CleanSkipLocal,
+  type CleanSkipTrigger,
+} from './cleanSkip';
 import { logRecoveryKitsExhausted, logRevokedEntriesFiltered } from './revocationLog';
 import {
   enqueueOfflineSave,
   enqueueSeqNow,
+  hasPendingSave,
   noteSaveLanded,
   setFlushProvider,
   setResaveHandler,
@@ -244,8 +260,39 @@ export function noteRemoteUnreadable(err: PayloadLoadError): void {
  * a stale document without the worker's lineage guard running (2026-11-12). A
  * save in that window now compares against the PREVIOUS baseline and reads for
  * itself. `null` means no open read is outstanding.
+ *
+ * This is the NEWEST outstanding read; `openReads` holds every one. Reads can
+ * overlap (the poll guards on `isReloading`/`isCheckingFile`, a background or
+ * Refresh read on `isBackgroundSyncing`), so each read is its own handle and
+ * a confirm or rollback acts only on the read it names (`readStanding`).
  */
 let pendingMarker: PendingRead | null = null;
+const openReads = new Set<PendingRead>();
+
+/**
+ * Mark a read settled and forget it. When it was the newest, the slot passes to the newest read
+ * STILL OPEN (`openReads` keeps registration order), never to null while one is: a newer read
+ * that failed must not leave an older one that then merges judged `superseded` by a read that no
+ * longer exists (nothing committed, the baseline left null, a whole re-download on the next
+ * poll). Committing that older read's OWN pre-read marker is sound: it predates its download,
+ * so any later remote change still compares `changed`. An older read still never commits while
+ * a newer one is outstanding, since the slot only ever moves to the newest open read.
+ */
+function settleRead(read: PendingRead): void {
+  read.settled = true;
+  openReads.delete(read);
+  if (pendingMarker !== read) return;
+  let newest: PendingRead | null = null;
+  for (const open of openReads) newest = open;
+  pendingMarker = newest;
+}
+
+/** A reset, provider change or unbind: no read in flight may touch the next baseline. */
+function discardOpenReads(): void {
+  for (const read of openReads) read.settled = true;
+  openReads.clear();
+  pendingMarker = null;
+}
 
 /**
  * Bumped by EVERY `commitRemoteBaseline` (both arms, writes and merges alike), so
@@ -255,17 +302,29 @@ let pendingMarker: PendingRead | null = null;
 let baselineCommitSeq = 0;
 
 /**
- * The caller merged the text `load()` returned: learn its marker and commit the
- * baseline, unless a newer commit landed meanwhile (then commit nothing). Called
+ * The caller merged the text `load()` returned for `read` (its ticket): learn
+ * that read's marker and commit the baseline, unless a newer commit landed
+ * meanwhile or a newer read is outstanding (then commit nothing; the baseline
+ * stays older than the document, so the next probe reads again). Called
  * straight after the merge, so a later throw cannot roll back what did merge.
- * `envelopeFp` is a required slot that requirement 15 fills; callers pass `null`.
+ *
+ * `envelopeFp` is the fingerprint of the envelope DRIVE holds, as just merged
+ * (`envelopeFingerprintOrNull` of the parsed remote, taken before the merge
+ * RPC). Pass null only when it cannot be vouched for; null turns the clean skip
+ * on tab hide off until a later commit records one.
  */
 export function confirmRemoteMerged(
+  read: PendingRead | null,
   driveHeads: readonly string[] | null,
   envelopeFp: string | null
 ): void {
-  const decision = decideMergeConfirm(pendingMarker, baselineCommitSeq);
-  pendingMarker = null;
+  const standing = readStanding(read, pendingMarker);
+  // Only the newest outstanding read decides; any other confirm is a no-op.
+  const decision: MergeConfirm =
+    standing === 'superseded'
+      ? { kind: 'superseded' }
+      : decideMergeConfirm(standing === 'own' ? read : null, baselineCommitSeq);
+  if (read) settleRead(read);
   clearRemoteUnreadable();
   if (decision.kind === 'superseded' || decision.kind === 'no-read') {
     const context = { action: `confirm-${decision.kind}` };
@@ -282,12 +341,14 @@ export function confirmRemoteMerged(
  * The caller could NOT merge what `load()` returned. Drop the baseline so the
  * next change check reads again instead of skipping — the safe direction, and
  * the one thing standing between an unreadable remote and a save that
- * overwrites it. Keyed on an outstanding read (even one whose probe failed),
- * which is when `load()` used to null the baseline itself.
+ * overwrites it. Keyed on the caller's own outstanding read (even one whose
+ * probe failed), which is when `load()` used to null the baseline itself. A
+ * settled read (confirmed, rolled back, or discarded by a reset) is a no-op; a
+ * superseded one still nulls the baseline but leaves the newer read pending.
  */
-export function rollbackRemoteMarker(): void {
-  if (pendingMarker === null) return;
-  pendingMarker = null;
+export function rollbackRemoteMarker(read: PendingRead | null): void {
+  if (readStanding(read, pendingMarker) === 'settled' || !read) return;
+  settleRead(read);
   remoteBaseline = null;
 }
 
@@ -1090,7 +1151,7 @@ export function setProvider(provider: StorageProvider, familyId?: string | null)
   // `rebindPodFile` — the supported repair for an unreadable pod — actually
   // repair it, without the store needing a clearing hook of its own.
   clearRemoteUnreadable();
-  pendingMarker = null; // see `reset()`
+  discardOpenReads(); // see `reset()`
   currentProvider = provider;
   currentProviderFamilyId = familyId ?? getActiveFamilyId();
   // #61: a new provider means a DIFFERENT file (migrate to Drive, rebind pod
@@ -1133,7 +1194,7 @@ export function clearProvider(): void {
   cancelPendingSave();
   stopPolling();
   clearRemoteUnreadable();
-  pendingMarker = null;
+  discardOpenReads();
   currentProvider = null;
   currentProviderFamilyId = null;
   remoteBaseline = null;
@@ -1256,7 +1317,7 @@ export function reset(): void {
   // rollback null a baseline that was legitimately earned minutes ago, after
   // which every poll, save and open does a full multi-megabyte read forever.
   clearRemoteUnreadable();
-  pendingMarker = null;
+  discardOpenReads();
   cancelPendingSave();
   stopPolling();
   currentProvider = null;
@@ -1271,11 +1332,15 @@ export function reset(): void {
   heldSaveIntent = false;
   keySwappedUnderHold = false;
   raceRemergeArmed = false;
+  raceConfirmAdvance = null;
   remoteMergesInFlight.clear();
   remoteBaseline = null;
   lastPersistedBytes = null;
   probeFailureReason = null;
   probeFailureCount = 0;
+  changeProbeGate = createChangeGate(); // a new session's first probe always speaks
+  cleanSkipDeclineGate = createChangeGate();
+  envelopeFpFailureLogged = false;
   resetSaveFailures();
   // Clear the durability banner on teardown, but SILENTLY — a logout / family-switch
   // is not a recovery; emitting "cache-persist recovered" here would corrupt the metric.
@@ -1315,6 +1380,9 @@ async function probeRemoteMarker(): Promise<RemoteMarker> {
  * classification, so nothing is swallowed.
  */
 export async function remoteChanged(): Promise<ChangeResult> {
+  // Sampled BEFORE the probe await, as `load()` does, so a probe reused by a load
+  // (requirement 14) is superseded by any commit that landed while it was out.
+  const commitSeqAtProbe = baselineCommitSeq;
   try {
     const probe = await probeRemoteMarker();
     // Recovery is an OUTCOME, and outcomes ship on the success path too (CLAUDE.md
@@ -1336,7 +1404,16 @@ export async function remoteChanged(): Promise<ChangeResult> {
       probeFailureReason = null;
       probeFailureCount = 0;
     }
-    return compareMarkers(remoteBaseline, probe);
+    const result = compareMarkers(remoteBaseline, probe);
+    // Requirement 11: equal content, drifted `version`. Move ONLY the in-memory
+    // revision (not `learnRemoteMarker`, which would reset `checkedAt` and null
+    // `headsFp`), so a later write-advance check measures from where Drive is.
+    if (result.adoptRevision !== null && remoteBaseline) {
+      remoteBaseline.revision = result.adoptRevision;
+    }
+    if (result.status !== 'unknown') probeCommitSeqs.set(result, commitSeqAtProbe);
+    logChangeProbe(result);
+    return result;
   } catch (e) {
     // Distinguish a MISSING file (404) from an AUTH failure (401 / expired token):
     // the poll path surfaces the former as the "file missing" banner + stops
@@ -1375,8 +1452,26 @@ export async function remoteChanged(): Promise<ChangeResult> {
         context: { action: 'remote-changed-unknown', error_code: reason },
       });
     }
-    return { status: 'unknown', basis: 'none', revision: null, modifiedTime: null, reason };
+    return unknownChange(reason);
   }
+}
+
+/**
+ * The baseline-commit counter at the moment each answered probe started, keyed
+ * on the result object, so `load({ probed })` can reuse a probe the caller
+ * already made (requirement 14) with the same supersede check as its own.
+ */
+const probeCommitSeqs = new WeakMap<ChangeResult, number>();
+
+// Change-gated: the 10s poll probes 6x/min, and an identical answer adds nothing.
+let changeProbeGate = createChangeGate();
+
+/** `change-probe`: which basis decided, and how far `version` drifted under equal content. */
+function logChangeProbe(result: ChangeResult): void {
+  const detail = describeChange(result);
+  if (!changeProbeGate(detail)) return;
+  const context = { action: 'change-probe', detail };
+  logEvent({ level: 'info', surface: 'sync-change-detect', message: 'change probe', context });
 }
 
 /**
@@ -1526,28 +1621,29 @@ async function unpushedLocalChangesCheck(
   return { skip: false, reason: 'unpushed-local-changes' };
 }
 
-export async function shouldSkipOpenRead(): Promise<{ skip: boolean; reason: string }> {
-  // Cheap LOCAL checks FIRST — never spend a metadata probe on an open we already
-  // know will read. This is the common daily-user case: the 1h trust window is
-  // always expired between once-a-day opens, so probing here and then re-probing
-  // in load() would be a pure +1 round-trip for zero skip benefit.
-  if (!remoteBaseline || remoteBaseline.revision === null) {
-    return { skip: false, reason: 'no-baseline' };
+/**
+ * The I/O shell over the pure `decideOpenRead` ladder (requirement 13): it asks
+ * for the heads check or the probe, in the order the ladder wants them, and
+ * nothing else. `probed` is the probe that decided a read, for
+ * `load({ probed })` to reuse instead of probing again (requirement 14).
+ */
+export async function shouldSkipOpenRead(): Promise<{
+  skip: boolean;
+  reason: string;
+  probed?: ChangeResult;
+}> {
+  const inputs: OpenReadInputs = { baseline: null, nowMs: Date.now() };
+  for (;;) {
+    inputs.baseline = remoteBaseline; // live, as each rung of the old ladder read it
+    const step = decideOpenRead(inputs);
+    if (step.kind === 'skip') return { skip: true, reason: step.reason };
+    if (step.kind === 'read')
+      return { skip: false, reason: step.reason, probed: step.probed ?? undefined };
+    if (step.kind === 'probe') inputs.change = await remoteChanged();
+    else
+      inputs.headsBlock =
+        (await unpushedLocalChangesCheck(remoteBaseline?.headsFp ?? null))?.reason ?? null;
   }
-  if (!withinTrustWindow(remoteBaseline.checkedAt, Date.now())) {
-    return { skip: false, reason: 'trust-expired' };
-  }
-  // #65: one cheap worker round-trip, still BEFORE the network probe — an open
-  // carrying unsynced local changes must read+merge+re-push, so paying a metadata
-  // probe first would be pure waste.
-  const blocked = await unpushedLocalChangesCheck(remoteBaseline.headsFp);
-  if (blocked) return blocked;
-  // In-window with a revision baseline — now the probe can actually save a read.
-  const result = await remoteChanged();
-  if (result.status === 'unknown') return { skip: false, reason: result.reason ?? 'unknown' };
-  if (result.basis !== 'revision') return { skip: false, reason: 'no-revision' };
-  if (result.status !== 'unchanged') return { skip: false, reason: result.reason ?? 'changed' };
-  return { skip: true, reason: 'unchanged-revision-in-window' };
 }
 
 /**
@@ -1557,16 +1653,11 @@ export async function shouldSkipOpenRead(): Promise<{ skip: boolean; reason: str
  * `commitRemoteBaseline`, where the worker's doc provably contains that state.
  */
 function learnRemoteMarker(marker: RemoteMarker): void {
-  remoteBaseline = {
-    revision: marker.revision,
-    modifiedTime: marker.modifiedTime,
-    checkedAt: new Date().toISOString(),
-    // #65: a marker probe knows the REVISION, never the heads behind it. Null is
-    // the safe direction — unknown => never skip. A terminus that follows fills it
-    // in. (`load()`'s pre-read probe no longer comes through here until its merge
-    // is confirmed: requirement 17, `confirmRemoteMerged`.)
-    headsFp: null,
-  };
+  // #65: a marker probe knows the REVISION (and content id), never the heads
+  // behind it: `headsFp` starts null, the safe direction (unknown => never skip),
+  // and a terminus that follows fills it in. (`load()`'s pre-read probe no longer
+  // comes through here until its merge is confirmed: requirement 17.)
+  remoteBaseline = baselineFromMarker(marker, new Date().toISOString());
 }
 
 /**
@@ -1576,21 +1667,9 @@ function learnRemoteMarker(marker: RemoteMarker): void {
  * This is the easiest mistake to make in the design; keep it a plain setter.
  */
 export function seedRemoteBaseline(row: { payload: string; checkedAt: string } | null): void {
-  if (!row) {
-    remoteBaseline = null;
-    return;
-  }
-  // #65: the row's payload is opaque to the worker; this module owns the format.
-  // An undecodable payload degrades to "no baseline" => the guard reads.
-  const decoded = decodeBaselinePayload(row.payload);
-  remoteBaseline = decoded
-    ? {
-        revision: decoded.revision,
-        modifiedTime: null,
-        checkedAt: row.checkedAt,
-        headsFp: decoded.headsFp,
-      }
-    : null;
+  // #65: the row's payload is opaque to the worker; `remoteBaseline.ts` owns the
+  // format. An undecodable payload degrades to "no baseline" => the guard reads.
+  remoteBaseline = baselineFromRow(row);
 }
 
 /**
@@ -1603,13 +1682,20 @@ export function seedRemoteBaseline(row: { payload: string; checkedAt: string } |
  * an unconditional last-write-wins set (C10b) — correctness is from WHERE it is
  * called, never from comparing revisions. Every call bumps `baselineCommitSeq`.
  *
- * `envelopeFp` is accepted and not yet stored: requirement 15 persists it.
+ * `envelopeFp` is stored into the row (`e`) and the in-memory baseline as given
+ * (requirement 15): at a write terminus, the fingerprint of the envelope as
+ * held at the write (`envelopeToWrite`, never the re-encrypted file); at a merge
+ * terminus, the fingerprint of the envelope Drive holds, as just merged. Both
+ * are computed before the write or merge RPC, so no await sits between the
+ * acknowledgement and this commit. Null only when it cannot be vouched for (a
+ * hash that threw, a re-probed malformed acknowledgement), which turns the
+ * clean skip on tab hide off until a later commit records one. The content id
+ * (`c`) rides the in-memory baseline, which the learn before each commit set.
  */
 export function commitRemoteBaseline(
   driveHeads: readonly string[] | null,
   envelopeFp: string | null
 ): void {
-  void envelopeFp; // requirement 15 persists the envelope fingerprint
   baselineCommitSeq++;
   // ⚠️ THE IN-MEMORY VALUE IS THE RIGHT KEY, AND A REVIEW ROUND SAID OTHERWISE.
   // The objection: a Drive family whose in-memory baseline has been nulled takes
@@ -1641,14 +1727,17 @@ export function commitRemoteBaseline(
     // assignment here instead left a fingerprint proven against an OLDER remote
     // standing, which is the false-skip this whole mechanism exists to prevent.
     const fpOnly = driveHeads === null ? null : headsFingerprint(driveHeads);
+    // No revision => no content id either (`decodeBaselinePayload` drops one on a
+    // revision-less row): a content id is only ever trusted beside its revision.
+    const row = { revision: null, headsFp: fpOnly, contentId: null, envelopeFp };
     if (remoteBaseline) {
-      remoteBaseline.headsFp = fpOnly;
+      Object.assign(remoteBaseline, { headsFp: fpOnly, contentId: null, envelopeFp });
     } else if (fpOnly !== null) {
       // No `checkedAt` of our own invention: a trust window nothing probed
-      // would be a claim we cannot support. `shouldSkipOpenRead` gates on
-      // `revision !== null` first, so this row can only ever feed the lineage
-      // context and `isFullySynced`, which is exactly what it is for.
-      remoteBaseline = { revision: null, modifiedTime: null, checkedAt: null, headsFp: fpOnly };
+      // would be a claim we cannot support. `decideOpenRead` reads a baseline
+      // with neither a revision nor a content id, so this row can only ever feed
+      // the lineage context and `isFullySynced`, which is exactly what it is for.
+      remoteBaseline = { ...row, modifiedTime: null, checkedAt: null };
     }
     // ⚠️ AND PERSIST IT. This branch used to `return` here, so a provider with
     // no revision — a local file, the Capacitor filesystem — never wrote a
@@ -1672,7 +1761,7 @@ export function commitRemoteBaseline(
     // lineage verdict is computed against an older remote — the exact false
     // claim the symmetric in-memory null above exists to prevent. Writing the
     // null keeps the durable row and the in-memory one saying the same thing.
-    docClient.noteRemoteBaseline(encodeBaselinePayload(null, fpOnly));
+    docClient.noteRemoteBaseline(encodeBaselinePayload(row));
     return;
   }
   // #65: `driveHeads` MUST be the heads of the content DRIVE HOLDS at `revision`
@@ -1689,8 +1778,11 @@ export function commitRemoteBaseline(
   // forever, polluting the metric. Only `headsFp` is touched: refreshing `checkedAt`
   // here would silently extend the trust window, which is the design's easiest
   // mistake (see `seedRemoteBaseline`).
-  if (remoteBaseline) remoteBaseline.headsFp = headsFp;
-  docClient.noteRemoteBaseline(encodeBaselinePayload(revision, headsFp));
+  // (`remoteBaseline` is non-null here: `revision` was read from it.)
+  const base = remoteBaseline as RemoteBaseline;
+  base.headsFp = headsFp;
+  base.envelopeFp = envelopeFp;
+  docClient.noteRemoteBaseline(encodeBaselinePayload(base));
 }
 
 /**
@@ -1984,9 +2076,20 @@ interface FetchMergeResult {
    * raced another writer.
    */
   probeRevision: string | null;
+  /**
+   * What that probe answered (`null` when there was none). The race re-merge of
+   * an own-bytes write reads it to say which way the race went (requirement 12).
+   */
+  probeStatus: ChangeStatus | null;
 }
 
-const NO_PROBE: FetchMergeResult = { probeRevision: null };
+const NO_PROBE: FetchMergeResult = { probeRevision: null, probeStatus: null };
+
+/** The result for a run that probed. */
+const probedResult = (change: ChangeResult): FetchMergeResult => ({
+  probeRevision: change.revision,
+  probeStatus: change.status,
+});
 
 function fetchAndMergeRemote(opts: FetchMergeOptions = {}): Promise<FetchMergeResult> {
   const run = fetchAndMergeRemoteOnce(opts);
@@ -2037,12 +2140,12 @@ async function fetchAndMergeRemoteOnce(opts: FetchMergeOptions): Promise<FetchMe
   // passes `readOnUnknown` and reads: it is about to overwrite the whole file.
   const change = await remoteChanged();
   if (currentProvider !== providerAtRead) return NO_PROBE; // switched mid-probe
-  if (change.status === 'unchanged') return { probeRevision: change.revision };
+  if (change.status === 'unchanged') return probedResult(change);
   if (change.status === 'unknown' && !opts.readOnUnknown) return NO_PROBE;
   // Requirement 17: an open's read is still downloading, and this save compared
   // against the PREVIOUS baseline, so it reads and merges (through the lineage
   // guard) for itself. One duplicate download in a rare overlap, by design.
-  if (opts.readOnUnknown && pendingMarker !== null) {
+  if (opts.readOnUnknown && openReads.size > 0) {
     const context = { action: 'read-overlap' };
     logEvent({ level: 'info', surface: 'sync-save', message: 'save read during open', context });
   }
@@ -2056,7 +2159,7 @@ async function fetchAndMergeRemoteOnce(opts: FetchMergeOptions): Promise<FetchMe
   // caller's classifier intact. On the save path it refuses the write (audit C4).
   const text = await providerAtRead.read();
   if (currentProvider !== providerAtRead) return NO_PROBE; // switched mid-read
-  if (!text) return { probeRevision: change.revision };
+  if (!text) return probedResult(change);
 
   // ⚠️ CLASSIFIED, not bare. A torn upload or a pod written by a newer app
   // version throws here — AFTER the bytes were read — and a plain `Error`
@@ -2098,6 +2201,13 @@ async function fetchAndMergeRemoteOnce(opts: FetchMergeOptions): Promise<FetchMe
       'The bound file belongs to a different family; refusing to merge or write it'
     );
   }
+
+  // Requirement 15: the fingerprint of the envelope DRIVE HOLDS, for the merge terminus
+  // below. Taken HERE, before the merge RPC, so no await sits between the merge and its
+  // commit. Drive's envelope, not ours after the merge: when the merge left us holding
+  // key material the file lacks, the two differ and the clean skip uploads, as it must.
+  const driveEnvelopeFp = await envelopeFingerprintOrNull(remoteEnvelope);
+  if (currentProvider !== providerAtRead) return NO_PROBE; // switched mid-hash
 
   // ⚠️ LINEAGE GUARD (terminus 3), and this is the one that makes a compaction
   // able to SPREAD. A peer's first post-compaction sync arrives right here, so
@@ -2230,7 +2340,7 @@ async function fetchAndMergeRemoteOnce(opts: FetchMergeOptions): Promise<FetchMe
     // "a save is running" (in-flight OR the promoted trailing run), which is
     // what this guard is about.
     if (!saveFlight.pending()) triggerDebouncedSave();
-    return { probeRevision: change.revision };
+    return probedResult(change);
   }
   const { dirty, remoteHeads } = merged;
 
@@ -2258,7 +2368,7 @@ async function fetchAndMergeRemoteOnce(opts: FetchMergeOptions): Promise<FetchMe
   // remote reads as 'unchanged', is never read, and the next save writes over
   // it. `commitRemoteBaseline` below has always been guarded for exactly this.
   if (currentProvider === providerAtRead) {
-    learnRemoteMarker({ revision: change.revision, modifiedTime: change.modifiedTime });
+    learnRemoteMarker(markerOf(change));
     // A remote we could not read a moment ago has now been read and merged.
     clearRemoteUnreadable();
   }
@@ -2273,7 +2383,9 @@ async function fetchAndMergeRemoteOnce(opts: FetchMergeOptions): Promise<FetchMe
   // #65: `remoteHeads` is the heads of the bytes Drive holds (captured pre-migrate,
   // pre-merge). `?? null` mirrors this file's fail-safe-default discipline — a
   // partial test double degrades to "unknown => read", never to a false skip.
-  if (currentProvider === providerAtRead) commitRemoteBaseline(remoteHeads ?? null, null);
+  if (currentProvider === providerAtRead) {
+    commitRemoteBaseline(remoteHeads ?? null, driveEnvelopeFp);
+  }
 
   // The poll path's ONLY re-upload trigger: re-push a converged doc that still
   // carries local unsynced changes (heads-derived dirty), without ping-ponging
@@ -2286,7 +2398,7 @@ async function fetchAndMergeRemoteOnce(opts: FetchMergeOptions): Promise<FetchMe
   // runs this very merge before its own upload.
   if (dirty) triggerDebouncedSave();
   else if (envelopeNeedsPublish && !saveFlight.pending()) triggerDebouncedSave();
-  return { probeRevision: change.revision };
+  return probedResult(change);
 }
 
 /**
@@ -2583,6 +2695,13 @@ async function doSaveRun(opts: SaveOptions = {}): Promise<boolean> {
     // adopted a peer's keys into it, and writing the entry snapshot would drop them.
     const envelopeToWrite = currentEnvelope as BeanpodFileV4;
     const fileContent = reEncryptEnvelope(envelopeToWrite, payload, lineage, { hasCounters });
+    // Requirement 15: the fingerprint of the envelope AS HELD (its canonical text is taken in
+    // this same tick, so it describes exactly these bytes), never of `fileContent`:
+    // `reEncryptEnvelope` restamps `version` and `writerVersion`, and the written file's
+    // fingerprint would never match ours again after an app update. Before the write, so no
+    // await sits between the acknowledgement and its commit.
+    const envelopeFp = await envelopeFingerprintOrNull(envelopeToWrite);
+    if (!stillCurrent()) return abort('fingerprint');
     const fileBytes = utf8ByteLength(fileContent);
     at.bytes = fileBytes;
     // The writer says which version it ACTUALLY chose. Calling the pure
@@ -2687,7 +2806,6 @@ async function doSaveRun(opts: SaveOptions = {}): Promise<boolean> {
     // committed. Same hazard C1 guards for the provider below.
     noteWrittenVersion(versionDetail, familyIdAtWrite);
     recordPersistedBytes(fileBytes); // capture size for the registry usage signal
-    const ackRevision = ack ? ack.revision : null;
 
     // ⚠️ DID ANOTHER WRITER LAND INSIDE OUR WINDOW? (audit C4) Drive has no write
     // precondition, so a peer's upload between our probe and our write is overwritten with
@@ -2696,12 +2814,14 @@ async function doSaveRun(opts: SaveOptions = {}): Promise<boolean> {
     // does not pretend to recover them: it refuses to certify a baseline it cannot vouch
     // for and re-merges once, which publishes again only if the re-read shows we lack
     // something. The peer still holds its edit and re-pushes it on its next save.
-    const advance = revisionAdvance(probeRevision, ackRevision);
-    const raced = advance !== null && advance > 1;
+    // Requirement 12: Drive also advances `version` on its own, so an advance above one
+    // with a content id on the ack is `own-bytes`: certified like a clean write, and the
+    // re-merge's probe then settles it on content for the price of one metadata call.
+    const write = classifyWriteAdvance(probeRevision, ack ?? null);
 
     if (!writeStillCurrent()) {
       // A family switch or a key swap landed mid-write — do not touch the baseline (C1).
-    } else if (raced) {
+    } else if (write.kind === 'raced') {
       logEvent({
         level: 'warn',
         surface: 'sync-save',
@@ -2709,7 +2829,7 @@ async function doSaveRun(opts: SaveOptions = {}): Promise<boolean> {
         context: {
           action: 'write-raced',
           provider_type: providerTypeForDiag,
-          detail: `advance=${advance}`,
+          detail: `advance=${write.advance}`,
           ...writePerf(),
         },
       });
@@ -2720,30 +2840,31 @@ async function doSaveRun(opts: SaveOptions = {}): Promise<boolean> {
       // and only then commits a baseline (its merge terminus) or publishes (dirty). Nulling
       // here made every open until then a full read and dropped the persisted row for nothing.
       scheduleRaceRemerge(providerAtWrite);
-    } else if (ackRevision !== null) {
+    } else if (write.kind !== 'no-ack') {
       // Round 3: the success-path counterpart of `write-raced`, so the race RATE is measurable.
-      logEvent({
-        level: 'info',
-        surface: 'sync-save',
-        message: 'write landed',
-        context: {
-          action: 'write-advance',
-          provider_type: providerTypeForDiag,
-          detail: `advance=${advance ?? 'unknown'}`,
-          ...writePerf(),
-        },
-      });
+      // An own-bytes write logs it from its re-merge, once the probe says which way it went.
+      if (write.kind === 'clean') {
+        const detail = `advance=${write.advance ?? 'unknown'}`;
+        const context = { action: 'write-advance', provider_type: providerTypeForDiag, detail };
+        logEvent({
+          level: 'info',
+          surface: 'sync-save',
+          message: 'write landed',
+          context: { ...context, ...writePerf() },
+        });
+      }
       // Terminus 3 (C10): the file IS what we just wrote. Learn our own write's
-      // revision and commit — for Drive this REPLACES the old post-write metadata
-      // read, removing one network round-trip per save.
-      learnRemoteMarker({ revision: ackRevision, modifiedTime: null });
+      // revision (and content id) and commit — for Drive this REPLACES the old
+      // post-write metadata read, removing one network round-trip per save.
+      learnRemoteMarker(write.marker);
       // `?? null` is the same fail-safe every other call site applies: an older or
       // partial worker double omits `heads`, and `headsFingerprint(undefined)`
       // would throw HERE — after the upload already landed — converting a
       // successful save into a reported failure that advances the save-failure
       // escalation ladder.
-      commitRemoteBaseline(exportedHeads ?? null, null);
+      commitRemoteBaseline(exportedHeads ?? null, envelopeFp);
       noteCachePushed(familyIdAtWrite);
+      if (write.kind === 'own-bytes') scheduleRaceRemerge(providerAtWrite, write.advance);
     } else if (providerAtWrite.getRemoteMarker) {
       // Drive write whose ack body was unparseable: RE-PROBE the real revision
       // rather than nulling the basis. Nulling would re-download our own 2-3MB
@@ -2752,12 +2873,17 @@ async function doSaveRun(opts: SaveOptions = {}): Promise<boolean> {
       try {
         const marker = await providerAtWrite.getRemoteMarker();
         if (writeStillCurrent()) {
-          learnRemoteMarker(marker);
+          // Requirement 13: and NO content id, for the same reason as the null heads
+          // below. A content id here could make a later probe answer `unchanged` on
+          // bytes a peer wrote in the gap; without one the probe compares `version`.
+          learnRemoteMarker({ ...marker, contentId: null });
           // NOT `exportedHeads`. This revision was probed AFTER our write, so a peer
           // may have written in the gap — pairing their revision with our heads would
           // certify a (revision, heads) pair that never existed on Drive, and the next
           // in-window open would skip past their edits. `null` costs one extra read,
-          // which is what every other uncertain branch of this design costs.
+          // which is what every other uncertain branch of this design costs. No envelope
+          // fingerprint either, for the same reason: the clean skip stays off until a
+          // commit we can vouch for.
           commitRemoteBaseline(null, null);
         }
       } catch (e) {
@@ -2878,14 +3004,24 @@ function noteCachePushed(familyId: string): void {
 
 /** One race re-merge at a time; cleared by `reset()`. */
 let raceRemergeArmed = false;
+/** The `version` advance an own-bytes write waits for the re-merge to confirm, or null. */
+let raceConfirmAdvance: number | null = null;
 
 /**
  * Re-read and merge once after a raced write (the `write-raced` branch of `doSave`).
  * Runs the ordinary merge, which arms a publish only when the re-read leaves us dirty — so
  * a false positive (a metadata change bumping `version`) costs one read, never a loop of
  * writes. Waits behind a running save; dropped if the provider changed meanwhile.
+ *
+ * `confirmAdvance` (requirement 12): an own-bytes write already committed its ack, so the
+ * merge's probe compares content and reads only when a peer wrote after us; the outcome is
+ * logged as `write-advance` with `confirmed=own-bytes|peer-after`.
  */
-function scheduleRaceRemerge(provider: StorageProvider): void {
+function scheduleRaceRemerge(
+  provider: StorageProvider,
+  confirmAdvance: number | null = null
+): void {
+  if (confirmAdvance !== null) raceConfirmAdvance = confirmAdvance;
   if (raceRemergeArmed) return;
   raceRemergeArmed = true;
   setTimeout(() => {
@@ -2894,7 +3030,8 @@ function scheduleRaceRemerge(provider: StorageProvider): void {
         const inFlight = saveFlight.pending();
         if (inFlight) await inFlight.catch(() => false);
         if (currentProvider !== provider || !raceRemergeArmed) return;
-        await fetchAndMergeRemote({ readOnUnknown: true });
+        const merged = await fetchAndMergeRemote({ readOnUnknown: true });
+        logWriteConfirmed(merged.probeStatus);
       } catch (e) {
         // Blockers latch and report themselves; anything else is logged here.
         if (!isRemoteBlocker(e)) {
@@ -2911,16 +3048,46 @@ function scheduleRaceRemerge(provider: StorageProvider): void {
         }
       } finally {
         raceRemergeArmed = false;
+        raceConfirmAdvance = null;
       }
     })();
   }, 0);
 }
 
+/** An own-bytes write's `write-advance`, once its re-merge probe has answered. */
+function logWriteConfirmed(probeStatus: ChangeStatus | null): void {
+  if (raceConfirmAdvance === null) return;
+  // Drive still holds our upload => own bytes; other bytes => a peer wrote after us.
+  const confirmed =
+    probeStatus === 'unchanged'
+      ? 'own-bytes'
+      : probeStatus === 'changed'
+        ? 'peer-after'
+        : 'unverified';
+  const context = {
+    action: 'write-advance',
+    detail: `advance=${raceConfirmAdvance};confirmed=${confirmed}`,
+  };
+  logEvent({ level: 'info', surface: 'sync-save', message: 'write landed', context });
+}
+
 /**
  * Load the raw file content from the storage provider.
  * Returns the raw text, or null if the file is empty/missing.
+ *
+ * `probed` (requirement 14): the `remoteChanged()` answer that decided this read
+ * (the poll's `changed`, the open guard's probe). It becomes the pending marker
+ * with the commit counter IT sampled, so the load does not probe Drive again.
+ * Anything not answered by `remoteChanged()` in this module is re-probed.
+ *
+ * `ticket`: receives the read this call registers. The caller settles exactly
+ * that read with `confirmRemoteMerged(ticket.read, ...)` or
+ * `rollbackRemoteMarker(ticket.read)`, so an overlapping read can never
+ * consume it. A read nobody settles stays outstanding until the next reset.
  */
-export async function load(): Promise<string | null> {
+export async function load(
+  opts: { probed?: ChangeResult; ticket?: ReadTicket } = {}
+): Promise<string | null> {
   if (!currentProvider) {
     updateState({ lastError: 'No file configured' });
     return null;
@@ -2957,12 +3124,18 @@ export async function load(): Promise<string | null> {
     // until 2026-11-15) made a debounced save firing mid-download answer
     // 'unchanged' and upload a stale document without the lineage guard running.
     // The store calls `confirmRemoteMerged()` straight after its merge, or
-    // `rollbackRemoteMarker()` on every other exit. The commit counter is sampled
-    // BEFORE the probe await, so a commit landing during the probe also supersedes.
-    const pending: PendingRead = { marker: null, commitSeq: baselineCommitSeq };
-    pendingMarker = pending;
+    // `rollbackRemoteMarker()` on every other exit, each with THIS read's ticket.
+    // The commit counter is sampled BEFORE the probe await, so a commit landing
+    // during the probe also supersedes.
+    const reusedSeq = opts.probed ? probeCommitSeqs.get(opts.probed) : undefined;
+    if (opts.probed) probeCommitSeqs.delete(opts.probed); // one load per probe
+    const pending: PendingRead = { marker: null, commitSeq: reusedSeq ?? baselineCommitSeq };
+    pendingMarker = pending; // the newest read: an older one still in flight is superseded
+    openReads.add(pending);
+    if (opts.ticket) opts.ticket.read = pending;
     try {
-      pending.marker = await probeRemoteMarker();
+      pending.marker =
+        opts.probed && reusedSeq !== undefined ? markerOf(opts.probed) : await probeRemoteMarker();
     } catch (e) {
       // Not the load's failure: the read below proceeds and re-raises any real error.
       console.warn(
@@ -3025,52 +3198,6 @@ export async function load(): Promise<string | null> {
     logLoadFailure('read-failed');
     updateState({ isSyncing: false, lastError: (e as Error).message });
     return null;
-  }
-}
-
-/**
- * Load file and parse as V4 envelope.
- * Returns the envelope (caller decrypts with family key), or flags for needsPassword.
- */
-export async function loadAndParseV4(): Promise<{
-  success: boolean;
-  envelope?: BeanpodFileV4;
-  needsPassword?: boolean;
-  fileNotFound?: boolean;
-}> {
-  const text = await load();
-  if (!text) {
-    const lastError = getState().lastError;
-    if (lastError?.startsWith('DriveApiError:404:')) {
-      return { success: false, fileNotFound: true };
-    }
-    return { success: false };
-  }
-
-  try {
-    const envelope = parseBeanpodV4(text);
-
-    // Guard: familyId must match active family
-    let activeFamilyId = getActiveFamilyId();
-    if (envelope.familyId && activeFamilyId && envelope.familyId !== activeFamilyId) {
-      console.warn(
-        `[syncService] File familyId (${envelope.familyId}) does not match active family (${activeFamilyId}). Skipping.`
-      );
-      updateState({ lastError: 'Sync file belongs to a different family', isConfigured: false });
-      return { success: false };
-    }
-
-    // If no active family, adopt from file
-    if (!activeFamilyId && envelope.familyId) {
-      await createFamilyWithId(envelope.familyId, envelope.familyName ?? 'My Family');
-      activeFamilyId = envelope.familyId;
-    }
-
-    // File is V4 and encrypted — needs family key to decrypt
-    return { success: true, envelope, needsPassword: true };
-  } catch (e) {
-    updateState({ lastError: (e as Error).message });
-    return { success: false };
   }
 }
 
@@ -3373,15 +3500,25 @@ export function triggerDebouncedSave(): void {
 }
 
 /**
+ * `saveNow` options. `skipIfClean` is for the tab-hide and `beforeunload` callers ONLY
+ * (requirement 15): every other caller (sign-out, compaction, manual sync, the debounced
+ * autosave, token recovery) uploads exactly as before.
+ */
+export type SaveNowOptions =
+  { skipIfClean?: false } | { skipIfClean: true; trigger: CleanSkipTrigger };
+
+/**
  * Cancel any pending debounced save and perform an immediate save.
  */
-export async function saveNow(): Promise<boolean> {
-  return (await saveNowDetailed()).saved;
+export async function saveNow(opts: SaveNowOptions = {}): Promise<boolean> {
+  return (await saveNowDetailed(opts)).saved;
 }
 
 /** `saveNow()` with the reason it did not land; the unsaved-work probe's entry point. */
-export async function saveNowDetailed(): Promise<SaveResult> {
-  cancelPendingSave();
+export async function saveNowDetailed(opts: SaveNowOptions = {}): Promise<SaveResult> {
+  // The cancel's RETURN is the clean skip's debounce input: read after it, the timer is
+  // always gone, and an armed save would be silently dropped.
+  const debouncePending = cancelPendingSave();
   if (!currentFamilyKey || !currentEnvelope) {
     if (!noKeyWarnedOnce) {
       console.warn('[syncService] saveNow skipped: no family key or envelope');
@@ -3390,7 +3527,81 @@ export async function saveNowDetailed(): Promise<SaveResult> {
     noteSaveDeferredNoKey('save-now');
     return { saved: false, outcome: null };
   }
+  // Decided BEFORE `saveFlight.call`, so the flag never enters the `SaveOptions` merge.
+  if (opts.skipIfClean && (await skipCleanSave(debouncePending, opts.trigger))) {
+    return { saved: true, outcome: null }; // Drive already holds everything we have
+  }
   return saveDetailed();
+}
+
+/** Requirement 15: may this hide/unload save upload nothing? Logs the verdict. */
+async function skipCleanSave(
+  debouncePending: boolean,
+  trigger: CleanSkipTrigger
+): Promise<boolean> {
+  const verdict = await evaluateCleanSkip(cleanSkipLocal(debouncePending), {
+    // A failed heads probe answers `dirty`, which uploads.
+    headsClean: async () => (await docPushedAgainst(remoteBaseline?.headsFp ?? null)) === 'clean',
+    currentEnvelopeFp: () => envelopeFingerprintOrNull(currentEnvelope),
+  });
+  logCleanSkip(verdict, trigger);
+  return verdict.skip;
+}
+
+/** The clean skip's local facts, read from module state in one tick. */
+function cleanSkipLocal(debouncePending: boolean): CleanSkipLocal {
+  return {
+    debouncePending,
+    saveInFlight: saveFlight.pending() !== null,
+    mergeInFlight: remoteMergesInFlight.size > 0,
+    savesHeld: saveHolds.size > 0 || heldSaveIntent,
+    offlineQueued: hasPendingSave() || state.saveQueued,
+    lastSaveFailed: consecutiveFailures > 0,
+    remoteBlocked: remoteBlocked !== null,
+    baselineEnvelopeFp: remoteBaseline?.envelopeFp ?? null,
+  };
+}
+
+// Change-gated: a tab that hides every minute for the same reason says it once.
+let cleanSkipDeclineGate = createChangeGate();
+
+/** `sync-save` `skipped-clean` on every skip (the rate); a decline names its reason. */
+function logCleanSkip(verdict: CleanSkipDecision, trigger: CleanSkipTrigger): void {
+  const detail = verdict.skip
+    ? `trigger=${trigger}`
+    : `trigger=${trigger};reason=${verdict.reason}`;
+  if (!verdict.skip && !cleanSkipDeclineGate(detail)) return;
+  const action = verdict.skip ? 'skipped-clean' : 'skip-declined';
+  const message = verdict.skip ? 'save skipped: Drive holds everything' : 'clean skip declined';
+  logEvent({ level: 'info', surface: 'sync-save', message, context: { action, detail } });
+}
+
+let envelopeFpFailureLogged = false;
+
+/**
+ * Requirement 15: the envelope fingerprint for a baseline commit or the clean skip, or
+ * null when it cannot be taken (null => the skip declines with `no-envelope-fp`). Callers
+ * take it BEFORE an upload or a merge RPC, never between one and its baseline commit.
+ */
+export async function envelopeFingerprintOrNull(env: BeanpodFileV4 | null): Promise<string | null> {
+  if (!env) return null;
+  try {
+    return await envelopeFingerprint(env);
+  } catch (e) {
+    if (!envelopeFpFailureLogged) {
+      envelopeFpFailureLogged = true; // once per session: it fails the same way every time
+      const error = e instanceof Error ? e : undefined;
+      const context = { action: 'envelope-fp-failed' };
+      logEvent({
+        level: 'warn',
+        surface: 'sync-save',
+        message: 'envelope fingerprint failed',
+        error,
+        context,
+      });
+    }
+    return null;
+  }
 }
 
 /**
@@ -3474,7 +3685,7 @@ export async function disconnect(): Promise<void> {
   remoteBaseline = null;
   // Requirement 17: the confirm LEARNS the pending marker, so an open read of the
   // OLD file must not survive into the next one.
-  pendingMarker = null;
+  discardOpenReads();
   // ⚠️ AND THE BREAKER. It describes a file this service is no longer bound to,
   // and nothing else cleared it: `selectSyncFile`/`selectNativeLocalFile` assign
   // `currentProvider` directly, so a latch armed on the OLD pod survived a

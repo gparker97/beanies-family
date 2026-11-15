@@ -444,6 +444,30 @@ describe('driveService', () => {
       const headers = call[1]?.headers as Record<string, string>;
       expect(headers['Content-Type']).toBe('image/jpeg');
     });
+
+    it('asks for md5Checksum in the ack and returns it beside the version (requirement 11)', async () => {
+      globalThis.fetch = mockFetch({ version: '42', md5Checksum: 'abc123' });
+
+      await expect(updateFile(mockToken, 'file-1', 'x')).resolves.toEqual({
+        version: '42',
+        md5Checksum: 'abc123',
+      });
+      const url = (fetch as ReturnType<typeof vi.fn>).mock.calls[0]![0] as string;
+      expect(url).toContain('fields=version,headRevisionId,md5Checksum');
+    });
+
+    it('answers a null checksum for an absent or non-string one, never a guess', async () => {
+      globalThis.fetch = mockFetch({ version: '42' });
+      await expect(updateFile(mockToken, 'file-1', 'x')).resolves.toEqual({
+        version: '42',
+        md5Checksum: null,
+      });
+      globalThis.fetch = mockFetch({ version: '42', md5Checksum: 7 });
+      await expect(updateFile(mockToken, 'file-1', 'x')).resolves.toEqual({
+        version: '42',
+        md5Checksum: null,
+      });
+    });
   });
 
   describe('patchFileMetadata', () => {

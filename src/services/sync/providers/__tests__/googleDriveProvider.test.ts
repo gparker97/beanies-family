@@ -103,34 +103,62 @@ describe('GoogleDriveProvider', () => {
       expect(mockUpdateFile).toHaveBeenCalledWith('mock-token', 'file-123', '{"data":"test"}');
     });
 
-    it('returns the write ack with a namespaced revision (#61 C14b)', async () => {
-      mockUpdateFile.mockResolvedValueOnce({ version: '42' });
+    it('returns the write ack with a namespaced revision and content id (#61 C14b, req. 11)', async () => {
+      mockUpdateFile.mockResolvedValueOnce({ version: '42', md5Checksum: 'abc123' });
       const ack = await provider.write('{"data":"test"}');
-      expect(ack).toEqual({ revision: 'ver:42' });
+      expect(ack).toEqual({ revision: 'ver:42', contentId: 'md5:abc123' });
     });
 
-    it('returns { revision: null } when the write ack has no version (malformed body)', async () => {
-      mockUpdateFile.mockResolvedValueOnce({ version: null });
+    it('returns nulls when the write ack has no version or checksum (malformed body)', async () => {
+      mockUpdateFile.mockResolvedValueOnce({ version: null, md5Checksum: null });
       const ack = await provider.write('{"data":"test"}');
-      expect(ack).toEqual({ revision: null });
+      expect(ack).toEqual({ revision: null, contentId: null });
+    });
+
+    it('a version without a checksum keeps the version and no content id (version basis)', async () => {
+      mockUpdateFile.mockResolvedValueOnce({ version: '42' });
+      const ack = await provider.write('{"data":"test"}');
+      expect(ack).toEqual({ revision: 'ver:42', contentId: null });
     });
   });
 
   describe('getRemoteMarker (#61 C14a)', () => {
-    it('returns the namespaced revision + mtime in one probe', async () => {
+    it('returns the namespaced revision, mtime and content id in one probe', async () => {
       mockGetFileMetadata.mockResolvedValueOnce({
         modifiedTime: '2026-08-13T00:00:00Z',
         version: '7',
         headRevisionId: 'abc',
+        md5Checksum: 'd41d8cd98f00b204e9800998ecf8427e',
       });
       const marker = await provider.getRemoteMarker();
-      expect(marker).toEqual({ revision: 'ver:7', modifiedTime: '2026-08-13T00:00:00Z' });
+      expect(marker).toEqual({
+        revision: 'ver:7',
+        modifiedTime: '2026-08-13T00:00:00Z',
+        contentId: 'md5:d41d8cd98f00b204e9800998ecf8427e',
+      });
+      // One more field on the SAME call; no new endpoint.
+      expect(mockGetFileMetadata).toHaveBeenCalledWith(
+        'mock-token',
+        'file-123',
+        'modifiedTime,version,headRevisionId,md5Checksum'
+      );
     });
 
-    it('returns null revision + mtime when the probe fails transiently', async () => {
+    it('a missing or non-string checksum is no content id, never a guess', async () => {
+      mockGetFileMetadata.mockResolvedValueOnce({ modifiedTime: 'T', version: '7' });
+      expect((await provider.getRemoteMarker()).contentId).toBeNull();
+      mockGetFileMetadata.mockResolvedValueOnce({
+        modifiedTime: 'T',
+        version: '7',
+        md5Checksum: 5,
+      });
+      expect((await provider.getRemoteMarker()).contentId).toBeNull();
+    });
+
+    it('returns nulls when the probe fails transiently', async () => {
       mockGetFileMetadata.mockRejectedValueOnce(new Error('transient network'));
       const marker = await provider.getRemoteMarker();
-      expect(marker).toEqual({ revision: null, modifiedTime: null });
+      expect(marker).toEqual({ revision: null, modifiedTime: null, contentId: null });
     });
   });
 

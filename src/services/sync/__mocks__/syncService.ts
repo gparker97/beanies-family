@@ -90,13 +90,15 @@ export const remoteChanged = vi.fn(async () => ({
   basis: 'revision' as const,
   revision: null as string | null,
   modifiedTime: null as string | null,
+  contentId: null as string | null,
+  adoptRevision: null as string | null,
+  drift: null as number | null,
 }));
 export const shouldSkipOpenRead = vi.fn(async () => ({ skip: false, reason: 'changed' }));
 export const commitRemoteBaseline = vi.fn();
 export const seedRemoteBaseline = vi.fn();
 export const load = vi.fn(async () => null);
 export const loadAndImport = vi.fn(async () => ({ success: true }));
-export const loadAndParseV4 = vi.fn(async () => ({ success: false }));
 export const openAndLoadFile = vi.fn(async () => ({ success: true }));
 export const loadDroppedFile = vi.fn(async () => ({ success: true }));
 export const decryptAndImport = vi.fn(async () => ({ success: true }));
@@ -125,6 +127,9 @@ export const isRemoteBlocked = vi.fn<() => Error | null>(() => null);
  * back. No-ops here — a suite that cares asserts on the calls.
  */
 export const confirmRemoteMerged = vi.fn();
+export const envelopeFingerprintOrNull = vi.fn(
+  async (_env: unknown): Promise<string | null> => null
+);
 export const rollbackRemoteMarker = vi.fn();
 export const noteRemoteUnreadable = vi.fn();
 

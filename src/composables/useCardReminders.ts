@@ -25,6 +25,7 @@ import { useFamilyStore } from '@/stores/familyStore';
 import { useTodoStore } from '@/stores/todoStore';
 import { useResponsibilityStore } from '@/stores/responsibilityStore';
 import { isDocLoaded } from '@/services/automerge/docService';
+import { storesAuthoritative } from '@/services/automerge/loadMaintenance';
 import { skipWhileReadOnly } from '@/services/automerge/worker/writeGate';
 import { withAppInitiatedWrites } from '@/services/analytics/plausible';
 import { createChangeGate, type ChangeGate } from '@/services/telemetry/emitPolicy';
@@ -126,6 +127,9 @@ export function useCardReminders(): void {
 
   async function reconcile(): Promise<void> {
     if (!isDocLoaded() || !responsibilityStore.isLoaded) return skip('not-loaded');
+    // Never on a projection snapshot (the diff would act on last session's copy); silent, as
+    // every snapshot open passes through here. The watch re-runs this when it turns true.
+    if (!storesAuthoritative.value) return;
     const me = familyStore.currentMember;
     if (!me) return skip('no-member');
     // Only grown-ups write cards, so only grown-up sessions maintain their to-dos.
@@ -174,6 +178,7 @@ export function useCardReminders(): void {
         () => watchKey.value,
         () => familyStore.currentMember?.id,
         () => responsibilityStore.isLoaded,
+        () => storesAuthoritative.value,
       ],
       () => reconcileLoop.queue()
     );

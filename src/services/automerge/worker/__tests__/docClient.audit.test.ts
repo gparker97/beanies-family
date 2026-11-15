@@ -116,6 +116,38 @@ describe('the authoritative flag (F6 hand-off)', () => {
     await initDoc();
     expect(markAuthoritative).toHaveBeenCalledTimes(1);
   });
+
+  it('a cache open that skipped its projection push still marks authoritative, and passes `projected` and the miss reason through', async () => {
+    useWorkers([
+      (req) =>
+        req.method === 'loadProjectionSnapshot'
+          ? ok(req, { hit: false, reason: 'collections' })
+          : req.method === 'initAndLoadCache'
+            ? ok(req, { loaded: true, remoteBaseline: null, projected: false })
+            : null,
+    ]);
+    expect(await loadProjectionSnapshot('fam')).toEqual({ hit: false, reason: 'collections' });
+    const res = await initAndLoadCache('fam');
+    expect(res.projected).toBe(false);
+    expect(markAuthoritative).toHaveBeenCalledTimes(1);
+  });
+
+  it("logs the worker's baseline-row read failure once, with the error name, and still paints", async () => {
+    useWorkers([
+      (req) =>
+        req.method === 'loadProjectionSnapshot'
+          ? ok(req, { hit: true, baselineReadError: 'UnknownError' })
+          : null,
+    ]);
+    expect(await loadProjectionSnapshot('fam')).toMatchObject({ hit: true });
+    const events = eventsWith('baseline-read-failed');
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      level: 'warn',
+      surface: 'open-snapshot',
+      context: { action: 'baseline-read-failed', error_code: 'UnknownError' },
+    });
+  });
 });
 
 describe('C5c: the cache-replay event', () => {

@@ -74,7 +74,15 @@ vi.mock('@/utils/beanpodFilename', () => ({ isConflictFilename: vi.fn(() => fals
 import * as syncService from '../syncService';
 import * as docClient from '@/services/automerge/worker/docClient';
 import { logEvent } from '@/services/telemetry';
-import { encodeBaselinePayload, headsFingerprint } from '../remoteBaseline';
+import { encodeBaselinePayload as encodeRow, headsFingerprint } from '../remoteBaseline';
+import type { ReadTicket } from '../remoteBaseline';
+
+/** A baseline row in the current codec (requirement 11), content and envelope ids optional. */
+const encodeBaselinePayload = (
+  revision: string | null,
+  headsFp: string | null,
+  contentId: string | null = null
+): string => encodeRow({ revision, headsFp, contentId, envelopeFp: null });
 import { PodLineageError } from '@/services/sync/podLineage';
 
 const KEY = {} as CryptoKey;
@@ -156,7 +164,9 @@ describe('requirement 17: a read does not stamp the baseline until its merge is 
     // Drive moved to ver:6 since this (stale) device last knew it at ver:5.
     const { provider, releaseLoadRead } = bind({ probe: 'ver:6', ack: 'ver:7' });
 
-    const loading = syncService.load();
+    const t: ReadTicket = { read: null };
+
+    const loading = syncService.load({ ticket: t });
     await loadIsDownloading(provider);
     // Only the load's PENDING marker exists. The baseline is still the old one,
     // so the change check says `changed`, never the old false `unchanged`.
@@ -187,7 +197,9 @@ describe('requirement 17: a read does not stamp the baseline until its merge is 
     );
     const { provider, releaseLoadRead } = bind({ probe: 'ver:6', ack: 'ver:7' });
 
-    const loading = syncService.load();
+    const t: ReadTicket = { read: null };
+
+    const loading = syncService.load({ ticket: t });
     await loadIsDownloading(provider);
     await expect(syncService.save()).resolves.toBe(false);
 
@@ -199,7 +211,8 @@ describe('requirement 17: a read does not stamp the baseline until its merge is 
 
   it('a confirm superseded by that save commits nothing: revision and heads stay the save’s', async () => {
     const { provider, releaseLoadRead } = bind({ probe: 'ver:6', ack: 'ver:7' });
-    const loading = syncService.load();
+    const t: ReadTicket = { read: null };
+    const loading = syncService.load({ ticket: t });
     await loadIsDownloading(provider);
     await syncService.save();
     releaseLoadRead();
@@ -208,7 +221,7 @@ describe('requirement 17: a read does not stamp the baseline until its merge is 
 
     // The open's merge finishes last; its marker (ver:6) is older than the
     // save's acknowledgement (ver:7).
-    syncService.confirmRemoteMerged(['h-load-read'], null);
+    syncService.confirmRemoteMerged(t.read, ['h-load-read'], null);
 
     expect(docClient.noteRemoteBaseline).not.toHaveBeenCalled();
     expect(syncService.getRemoteBaselineHeadsFp()).toBe(headsFingerprint(['h-save-export']));
@@ -219,13 +232,14 @@ describe('requirement 17: a read does not stamp the baseline until its merge is 
 
   it('an unsuperseded confirm learns the pending marker and commits it with the merged heads', async () => {
     const { provider, releaseLoadRead } = bind({ probe: 'ver:6', ack: 'ver:7' });
-    const loading = syncService.load();
+    const t: ReadTicket = { read: null };
+    const loading = syncService.load({ ticket: t });
     releaseLoadRead();
     await loading;
     // Still the old baseline until the confirm.
     expect(syncService.getRemoteBaselineHeadsFp()).toBe(headsFingerprint(OLD.heads));
 
-    syncService.confirmRemoteMerged(['h-load-read'], null);
+    syncService.confirmRemoteMerged(t.read, ['h-load-read'], null);
 
     expect(docClient.noteRemoteBaseline).toHaveBeenCalledWith(
       encodeBaselinePayload('ver:6', headsFingerprint(['h-load-read']))
@@ -236,11 +250,12 @@ describe('requirement 17: a read does not stamp the baseline until its merge is 
 
   it('a confirm with no pending marker (the probe failed) nulls the revision', async () => {
     const { releaseLoadRead } = bind({ probe: 'ver:6', ack: 'ver:7', probeThrows: true });
-    const loading = syncService.load();
+    const t: ReadTicket = { read: null };
+    const loading = syncService.load({ ticket: t });
     releaseLoadRead();
     await loading;
 
-    syncService.confirmRemoteMerged(['h-load-read'], null);
+    syncService.confirmRemoteMerged(t.read, ['h-load-read'], null);
 
     // The heads the read proved are kept; the revision nothing vouched for is not.
     expect(docClient.noteRemoteBaseline).toHaveBeenCalledWith(
@@ -251,13 +266,14 @@ describe('requirement 17: a read does not stamp the baseline until its merge is 
 
   it('a throw after the confirm does not roll the baseline back', async () => {
     const { releaseLoadRead } = bind({ probe: 'ver:6', ack: 'ver:7' });
-    const loading = syncService.load();
+    const t: ReadTicket = { read: null };
+    const loading = syncService.load({ ticket: t });
     releaseLoadRead();
     await loading;
-    syncService.confirmRemoteMerged(['h-load-read'], null);
+    syncService.confirmRemoteMerged(t.read, ['h-load-read'], null);
 
     // `loadFromFile`'s `finally` always rolls back; after a confirm it is a no-op.
-    syncService.rollbackRemoteMarker();
+    syncService.rollbackRemoteMarker(t.read);
 
     expect(syncService.getRemoteBaselineHeadsFp()).toBe(headsFingerprint(['h-load-read']));
     expect((await syncService.remoteChanged()).status).toBe('unchanged');
@@ -267,18 +283,139 @@ describe('requirement 17: a read does not stamp the baseline until its merge is 
     for (const probeThrows of [false, true]) {
       syncService.reset();
       const { releaseLoadRead } = bind({ probe: 'ver:6', ack: 'ver:7', probeThrows });
-      const loading = syncService.load();
+      const t: ReadTicket = { read: null };
+      const loading = syncService.load({ ticket: t });
       releaseLoadRead();
       await loading;
 
-      syncService.rollbackRemoteMarker();
+      syncService.rollbackRemoteMarker(t.read);
 
       expect(syncService.getRemoteBaselineHeadsFp()).toBeNull();
       expect((await syncService.shouldSkipOpenRead()).reason).toBe('no-baseline');
       // The pending marker is gone: a stray confirm afterwards commits nothing.
       vi.mocked(docClient.noteRemoteBaseline).mockClear();
-      syncService.confirmRemoteMerged(['h-load-read'], null);
+      syncService.confirmRemoteMerged(t.read, ['h-load-read'], null);
       expect(docClient.noteRemoteBaseline).not.toHaveBeenCalled();
     }
+  });
+});
+
+/**
+ * Two reads can overlap: the Drive poll guards on `isReloading`/`isCheckingFile` and a
+ * background or Refresh read on `isBackgroundSyncing`, and neither excludes the other. With
+ * one shared pending slot, one read's confirm or rollback consumed the other's marker. Each
+ * read is now its own ticket, and only the newest outstanding read may commit.
+ */
+describe('overlapping reads each settle only their own pending marker', () => {
+  /** Read A is downloading (held); Drive then moves to ver:8 and read B reads it in full. */
+  async function overlap() {
+    const d = bind({ probe: 'ver:6', ack: 'ver:7' });
+    const a: ReadTicket = { read: null };
+    const loadingA = syncService.load({ ticket: a });
+    await loadIsDownloading(d.provider);
+    d.provider.getRemoteMarker.mockResolvedValue({ revision: 'ver:8', modifiedTime: null });
+    const b: ReadTicket = { read: null };
+    await syncService.load({ ticket: b });
+    d.releaseLoadRead();
+    await loadingA;
+    vi.mocked(docClient.noteRemoteBaseline).mockClear();
+    return { ...d, a, b };
+  }
+
+  it("an older read's confirm never certifies the newer read's marker", async () => {
+    const { a, b } = await overlap();
+
+    // A merged content as of ver:6. Learning B's ver:8 here would certify bytes this
+    // document does not hold, and a save in the gap would skip its read and overwrite them.
+    syncService.confirmRemoteMerged(a.read, ['h-a'], null);
+    expect(docClient.noteRemoteBaseline).not.toHaveBeenCalled();
+    expect((await syncService.remoteChanged()).status).toBe('changed');
+    expect(actions()).toContain('confirm-superseded');
+
+    // B, the newest read, still confirms: it holds ver:8.
+    syncService.confirmRemoteMerged(b.read, ['h-b'], null);
+    expect(docClient.noteRemoteBaseline).toHaveBeenCalledWith(
+      encodeBaselinePayload('ver:8', headsFingerprint(['h-b']))
+    );
+    expect((await syncService.remoteChanged()).status).toBe('unchanged');
+  });
+
+  it("an older read's rollback nulls the baseline but cannot discard the newer read", async () => {
+    const { a, b } = await overlap();
+
+    syncService.rollbackRemoteMarker(a.read);
+    expect(syncService.getRemoteBaselineHeadsFp()).toBeNull(); // the safe direction
+
+    syncService.confirmRemoteMerged(b.read, ['h-b'], null);
+    expect(docClient.noteRemoteBaseline).toHaveBeenCalledWith(
+      encodeBaselinePayload('ver:8', headsFingerprint(['h-b']))
+    );
+  });
+
+  it('a newer read that fails hands the slot back: the older read still open commits its OWN marker', async () => {
+    const { a, b } = await overlap();
+
+    // B (a manual Refresh) could not merge: the baseline drops, the safe direction.
+    syncService.rollbackRemoteMarker(b.read);
+    expect(syncService.getRemoteBaselineHeadsFp()).toBeNull();
+
+    // A (the poll) then merges. No newer read exists, so it is the newest outstanding one: it
+    // commits ver:6, its own pre-read probe, never B's ver:8. Judged `superseded`, it committed
+    // nothing and the next poll re-downloaded the whole file.
+    syncService.confirmRemoteMerged(a.read, ['h-a'], null);
+    expect(docClient.noteRemoteBaseline).toHaveBeenCalledWith(
+      encodeBaselinePayload('ver:6', headsFingerprint(['h-a']))
+    );
+    expect(actions()).not.toContain('confirm-superseded');
+    // Drive is at ver:8, past what A merged: the next check still reads.
+    expect((await syncService.remoteChanged()).status).toBe('changed');
+  });
+
+  it('the slot passes to the NEWEST read still open, so an older one stays superseded', async () => {
+    const d = bind({ probe: 'ver:6', ack: 'ver:7' });
+    const a: ReadTicket = { read: null };
+    const loadingA = syncService.load({ ticket: a });
+    await loadIsDownloading(d.provider);
+    const b: ReadTicket = { read: null };
+    const c: ReadTicket = { read: null };
+    await syncService.load({ ticket: b });
+    await syncService.load({ ticket: c });
+    d.releaseLoadRead();
+    await loadingA;
+    vi.mocked(docClient.noteRemoteBaseline).mockClear();
+
+    syncService.rollbackRemoteMarker(c.read); // the newest fails: B is now the newest open read
+    syncService.confirmRemoteMerged(a.read, ['h-a'], null);
+    expect(docClient.noteRemoteBaseline).not.toHaveBeenCalled(); // A is older than B
+    expect(actions()).toContain('confirm-superseded');
+
+    syncService.confirmRemoteMerged(b.read, ['h-b'], null);
+    expect(docClient.noteRemoteBaseline).toHaveBeenCalledWith(
+      encodeBaselinePayload('ver:6', headsFingerprint(['h-b']))
+    );
+  });
+
+  it('an older read finishing after the newer one confirmed commits nothing', async () => {
+    const { a, b } = await overlap();
+    syncService.confirmRemoteMerged(b.read, ['h-b'], null);
+    vi.mocked(docClient.noteRemoteBaseline).mockClear();
+
+    syncService.confirmRemoteMerged(a.read, ['h-a'], null);
+    syncService.rollbackRemoteMarker(a.read);
+
+    expect(docClient.noteRemoteBaseline).not.toHaveBeenCalled();
+    expect(syncService.getRemoteBaselineHeadsFp()).toBe(headsFingerprint(['h-b']));
+  });
+
+  it("a reset discards every read in flight: a stale ticket cannot null the next family's baseline", async () => {
+    const { a } = await overlap();
+    syncService.reset();
+    bind({ probe: 'ver:6', ack: 'ver:7' });
+
+    syncService.rollbackRemoteMarker(a.read);
+    syncService.confirmRemoteMerged(a.read, ['h-a'], null);
+
+    expect(syncService.getRemoteBaselineHeadsFp()).toBe(headsFingerprint(OLD.heads));
+    expect(docClient.noteRemoteBaseline).not.toHaveBeenCalled();
   });
 });

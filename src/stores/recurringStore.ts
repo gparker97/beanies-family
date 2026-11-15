@@ -3,9 +3,19 @@ import { ref, computed } from 'vue';
 import { useAccountsStore } from './accountsStore';
 import { useMemberFilterStore } from './memberFilterStore';
 import { useTransactionsStore } from './transactionsStore';
+import { useGoalsStore } from './goalsStore';
 import { wrapAsync } from '@/composables/useStoreActions';
 import { convertToBaseCurrency } from '@/utils/currency';
-import { toDateInputValue, parseLocalDate, addDays, extractDatePart } from '@/utils/date';
+import {
+  toDateInputValue,
+  parseLocalDate,
+  addDays,
+  extractDatePart,
+  localToday,
+} from '@/utils/date';
+import { processRecurringItems } from '@/services/recurring/recurringProcessor';
+import { registerLoadMaintenance } from '@/services/automerge/loadMaintenance';
+import { getActiveFamilyId } from '@/services/indexeddb/database';
 import * as recurringRepo from '@/services/automerge/repositories/recurringItemRepository';
 import { monthlyFactor } from '@/services/recurrence/recurrenceEngine';
 import { resolveTransactionRule, isRecurringItemLive } from '@/services/recurrence/adapters';
@@ -289,10 +299,33 @@ export const useRecurringStore = defineStore('recurring', () => {
     return newItem;
   }
 
+  // ── Recurring transactions: load maintenance, once a day ─────────────────────
+  /** `<family>:<local day>` of this session's last fully successful run (the day cursor). */
+  let recurringRanFor: string | null = null;
+
+  /**
+   * The load-maintenance task (2026-11-15): generate the due recurring transactions, once per
+   * family per local day per session, after the stores were reloaded from the authoritative
+   * document. It used to be awaited on every open path, so the open waited on its writes; and
+   * a post-merge reload must not re-walk every item. The cursor is set only on a clean run, so
+   * a failed instance is retried on the next reload. `TransactionsPage` keeps its own calls.
+   */
+  async function processRecurringOncePerDay(): Promise<void> {
+    const key = `${getActiveFamilyId() ?? ''}:${localToday()}`;
+    if (recurringRanFor === key) return;
+    const result = await processRecurringItems();
+    if (result.processed > 0) {
+      await Promise.all([useTransactionsStore().loadTransactions(), useGoalsStore().loadGoals()]);
+    }
+    if (result.errors.length === 0) recurringRanFor = key;
+  }
+  registerLoadMaintenance('recurring-items', processRecurringOncePerDay);
+
   function resetState() {
     recurringItems.value = [];
     isLoading.value = false;
     error.value = null;
+    recurringRanFor = null;
   }
 
   return {

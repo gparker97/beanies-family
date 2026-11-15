@@ -22,6 +22,7 @@
 import { defineStore } from 'pinia';
 import { computed, watch } from 'vue';
 import { docVersion, isDocLoaded } from '@/services/automerge/docService';
+import { storesAuthoritative } from '@/services/automerge/loadMaintenance';
 import { list as projectionList } from '@/services/automerge/projection';
 import { toISODateString, localToday, addDaysYmd } from '@/utils/date';
 import { getDeviceId } from '@/utils/deviceId';
@@ -460,6 +461,7 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
   let pollHandle: PollWhileVisibleHandle | null = null;
   let stopActivityWatch: (() => void) | null = null;
   let editDebounce: ReturnType<typeof setTimeout> | null = null;
+  let stopAuthoritativeWatch: (() => void) | null = null;
   let started = false;
 
   // ── Per-connection reconcile ────────────────────────────────────────────────
@@ -1787,15 +1789,30 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
 
   // ── Triggers (registered only when the flag is on) ──────────────────────────
 
+  /** The AUTOMATIC reconcile entry (poll, wake, activity edits): never while the stores hold a
+   *  projection snapshot, whose connection rows it would write back. `syncNow` (a person's
+   *  tap) is not gated. */
+  function autoReconcile(opts: { verifyExisting: boolean }): Promise<void> {
+    if (!storesAuthoritative.value) return Promise.resolve();
+    return reconcileAll(opts);
+  }
+
   function start(): void {
     if (started || !isFlagEnabled(FLAG)) return;
     started = true;
 
     // Periodic full verify reconcile + a verify pass on every become-visible.
     pollHandle = usePollWhileVisible(
-      () => reconcileAll({ verifyExisting: true }),
+      () => autoReconcile({ verifyExisting: true }),
       RECONCILE_POLL_MS,
       { fireImmediatelyOnVisible: true, surface: 'calendar-sync' }
+    );
+    // The open's first verify pass, when the immediate one above met a snapshot.
+    stopAuthoritativeWatch = watch(
+      () => storesAuthoritative.value,
+      (ok) => {
+        if (ok) void autoReconcile({ verifyExisting: true });
+      }
     );
 
     // Activity edits → a fast, no-verify push (debounced to coalesce bulk edits).
@@ -1809,7 +1826,7 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
       () => {
         if (editDebounce) clearTimeout(editDebounce);
         editDebounce = setTimeout(() => {
-          if (isVisible.value) void reconcileAll({ verifyExisting: false });
+          if (isVisible.value) void autoReconcile({ verifyExisting: false });
         }, EDIT_DEBOUNCE_MS);
       }
     );
@@ -1821,6 +1838,8 @@ export const useCalendarSyncStore = defineStore('calendarSync', () => {
     pollHandle = null;
     stopActivityWatch?.();
     stopActivityWatch = null;
+    stopAuthoritativeWatch?.();
+    stopAuthoritativeWatch = null;
     if (editDebounce) clearTimeout(editDebounce);
     editDebounce = null;
     // Reset module-level engine state so a new session/family starts clean (F7).

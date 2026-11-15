@@ -3,7 +3,19 @@ import type { ExportedPayload } from '@/services/automerge/worker/protocol';
 import * as docClient from '@/services/automerge/worker/docClient';
 import * as fileSync from '../fileSync';
 import { UnsupportedBeanpodVersionError } from '@/types/sync';
-import { encodeBaselinePayload, headsFingerprint } from '../remoteBaseline';
+import { encodeBaselinePayload as encodeRow, headsFingerprint } from '../remoteBaseline';
+import { envelopeFingerprint } from '../envelopeMerge';
+
+/** A baseline row in the current codec (requirement 11), content and envelope ids optional. */
+const encodeBaselinePayload = (
+  revision: string | null,
+  headsFp: string | null,
+  contentId: string | null = null,
+  envelopeFp: string | null = null
+): string => encodeRow({ revision, headsFp, contentId, envelopeFp });
+
+/** Requirement 15: a landed write records the fingerprint of the envelope it wrote. */
+const heldEnvelopeFp = (): Promise<string> => envelopeFingerprint(syncService.getEnvelope()!);
 
 // Must reset modules between tests to clear module-level state
 let syncService: typeof import('../syncService');
@@ -245,7 +257,12 @@ describe('syncService — save failure tracking', () => {
 
       expect(result).toBe(true);
       expect(docClient.noteRemoteBaseline).toHaveBeenCalledWith(
-        encodeBaselinePayload('ver:9', headsFingerprint(['h-uploaded']))
+        encodeBaselinePayload(
+          'ver:9',
+          headsFingerprint(['h-uploaded']),
+          null,
+          await heldEnvelopeFp()
+        )
       );
     });
 
@@ -407,7 +424,7 @@ describe('syncService — save failure tracking', () => {
 
       expect(result).toBe(true);
       expect(docClient.noteRemoteBaseline).toHaveBeenCalledWith(
-        encodeBaselinePayload('ver:9', null)
+        encodeBaselinePayload('ver:9', null, null, await heldEnvelopeFp())
       );
     });
   });

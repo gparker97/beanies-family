@@ -2,6 +2,20 @@ import { setActivePinia, createPinia, getActivePinia } from 'pinia';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { flushPromises } from '@vue/test-utils';
 import type { FamilyMember, RecurrenceRule, TodoItem } from '@/types/models';
+import {
+  __resetLoadMaintenanceForTesting,
+  __whenLoadMaintenanceIdleForTesting,
+  runLoadMaintenance,
+  __setStoresAuthoritativeForTesting,
+} from '@/services/automerge/loadMaintenance';
+import { markAuthoritative, resetProjection } from '@/services/automerge/projection';
+
+/** What `reloadAllStores` does after its read-only loaders: the load-maintenance run. */
+async function runMaintenance(): Promise<void> {
+  markAuthoritative();
+  runLoadMaintenance('reload');
+  await __whenLoadMaintenanceIdleForTesting();
+}
 
 vi.mock('@/services/automerge/repositories/todoRepository', () => ({
   getAllTodos: vi.fn().mockResolvedValue([]),
@@ -1184,6 +1198,8 @@ describe('todoStore: reconcileRepeatingTodos, the auto-roll (#123)', () => {
     setActivePinia(createPinia());
     vi.clearAllMocks();
     __resetWriteGateForTesting();
+    __resetLoadMaintenanceForTesting();
+    resetProjection();
     todayRef.value = '2026-10-09';
     docLoaded.value = true;
     vi.mocked(todoRepo.getAllTodos).mockResolvedValue(all);
@@ -1192,13 +1208,25 @@ describe('todoStore: reconcileRepeatingTodos, the auto-roll (#123)', () => {
 
   afterEach(() => {
     __resetWriteGateForTesting();
+    __resetLoadMaintenanceForTesting();
+    resetProjection();
     vi.mocked(todoRepo.getAllTodos).mockResolvedValue([]);
   });
 
-  it('on load: one batch rolling only overdue, off-rule and already-logged repeating to-dos', async () => {
+  it('loadTodos is read-only: it never rolls (the roll is load maintenance)', async () => {
     const store = useTodoStore();
 
     await store.loadTodos();
+
+    expect(store.todos).toHaveLength(all.length);
+    expect(todoRepo.patchTodosEach).not.toHaveBeenCalled();
+  });
+
+  it('load maintenance: one batch rolling only overdue, off-rule and already-logged repeating to-dos', async () => {
+    const store = useTodoStore();
+
+    await store.loadTodos();
+    await runMaintenance();
 
     expect(todoRepo.patchTodosEach).toHaveBeenCalledTimes(1);
     expect(vi.mocked(todoRepo.patchTodosEach).mock.calls[0]).toEqual([
@@ -1223,6 +1251,7 @@ describe('todoStore: reconcileRepeatingTodos, the auto-roll (#123)', () => {
     const store = useTodoStore();
 
     await store.loadTodos();
+    await runMaintenance();
 
     expect(todoRepo.patchTodosEach).not.toHaveBeenCalled();
   });
@@ -1232,7 +1261,9 @@ describe('todoStore: reconcileRepeatingTodos, the auto-roll (#123)', () => {
     const store = useTodoStore();
 
     await store.loadTodos();
+    await runMaintenance();
     await store.loadTodos();
+    await runMaintenance();
 
     expect(todoRepo.patchTodosEach).not.toHaveBeenCalled();
     const skips = logEventMock.mock.calls
@@ -1245,6 +1276,7 @@ describe('todoStore: reconcileRepeatingTodos, the auto-roll (#123)', () => {
   it('the day advancing rolls again, coalescing a burst of triggers into one run', async () => {
     const store = useTodoStore();
     store.todos = [current];
+    __setStoresAuthoritativeForTesting(true);
 
     todayRef.value = '2026-10-15';
     await Promise.resolve();
@@ -1261,11 +1293,28 @@ describe('todoStore: reconcileRepeatingTodos, the auto-roll (#123)', () => {
     );
   });
 
+  it('the day advancing does NOT roll while the stores hold a snapshot (maintenance covers it)', async () => {
+    const store = useTodoStore();
+    store.todos = [current];
+
+    todayRef.value = '2026-10-15';
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    expect(todoRepo.patchTodosEach).not.toHaveBeenCalled();
+
+    vi.mocked(todoRepo.getAllTodos).mockResolvedValue([current]);
+    await store.loadTodos();
+    await runMaintenance(); // the authoritative reload's run rolls the day that advanced
+    expect(vi.mocked(todoRepo.patchTodosEach).mock.calls[0]![0]).toEqual([
+      { id: 'current', patch: { dueDate: '2026-10-21' } },
+    ]);
+  });
+
   it('a failed write is reported once (toast, surface) and retried on the next trigger', async () => {
     vi.mocked(todoRepo.patchTodosEach).mockRejectedValueOnce(new Error('worker down'));
     const store = useTodoStore();
 
     await store.loadTodos();
+    await runMaintenance();
 
     expect(showToastMock).toHaveBeenCalledTimes(1);
     expect(showToastMock.mock.calls[0]![3]).toMatchObject({

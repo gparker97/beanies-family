@@ -290,6 +290,39 @@ export interface InitAndLoadResult {
   replay?: CacheReplay;
   /** Present whenever a cache was read (not on a miss or the empty-cache reseed). */
   docStats?: DocStats;
+  /**
+   * Set on the cache-install path (no live document). `false`: the worker did NOT push the full
+   * projection, because the snapshot `loadProjectionSnapshot` pushed just before, for this
+   * family, was built from a document with the same heads by this same build, so the main
+   * projection already shows exactly this document. `true`: it pushed. Absent on every other
+   * path (a miss, a merge into a live document, an older worker). Test it as
+   * `projected === false`; anything else means the projection was rewritten or is unknown.
+   * A skipped push still installed the document: `docClient` marks it authoritative as usual.
+   */
+  projected?: boolean;
+}
+
+/** Why `loadProjectionSnapshot` painted nothing (main logs it as `snap=miss-<reason>`). */
+export type SnapshotMissReason =
+  /** No snapshot row for this family. */
+  | 'absent'
+  /** Another `SNAPSHOT_MANUAL_REV`, or a payload that is not a snapshot's shape. */
+  | 'version'
+  /** A delta names a collection this build does not know; refused before any chunk is pushed. */
+  | 'collections'
+  /** The row would not open, decrypt or parse, or the push threw. */
+  | 'error';
+
+/** What `loadProjectionSnapshot` answers. `reason` is set whenever `hit` is false. */
+export interface SnapshotLoadResult {
+  hit: boolean;
+  reason?: SnapshotMissReason;
+  /** ISO time of the last committed Drive baseline in this cache (the wall stamp's time while the
+   *  rebuild runs); absent when the device has none. */
+  baselineCheckedAt?: string;
+  /** The error name when reading that baseline row failed (the paint is unaffected); the
+   *  main thread logs it once per open. */
+  baselineReadError?: string;
 }
 
 // ─── Mutation ops (main → worker; the `changeDoc` closures, made declarative) ─

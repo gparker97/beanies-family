@@ -46,6 +46,35 @@ import { logEvent } from './logEvent';
  */
 export type OpenPath = 'unknown' | 'path1a' | 'path1b' | 'path2' | 'path3';
 
+/**
+ * The open guard's read reasons that are the guard WORKING as designed, not a
+ * fall-open on uncertainty. A read for any other reason that then succeeds is
+ * an `open-fail-open`, so a rising fail-open rate is visible without a repro.
+ * Every reason still reaches CloudWatch as `error_code`.
+ */
+const CLEAN_READ_REASONS: ReadonlySet<string> = new Set([
+  'changed',
+  'no-baseline',
+  // #65: the guard declining a skip because local work never reached Drive.
+  // Counting it would inflate the very rate #61 added to alert on.
+  'unpushed-local-changes',
+  // The upgrade cohort: every device shipped before #65 decodes a legacy
+  // bare-`ver:` row to an unknown fingerprint on its FIRST open after that
+  // release. Benign, one-shot and self-clearing at the next terminus, but it
+  // fires fleet-wide at once; counting it would desensitise the alert exactly
+  // when it is most needed.
+  'baseline-heads-unknown',
+  // Requirement 13: an ordinary open more than an hour after the last commit, on
+  // a baseline with no content id. It was the most common "fail-open" and is
+  // simply the trust window doing its job.
+  'trust-expired',
+]);
+
+/** Did the open guard read on uncertainty (true) rather than by design (false)? */
+export function isFailOpenReason(reason: string): boolean {
+  return !CLEAN_READ_REASONS.has(reason);
+}
+
 /** Opaque handle proving which window a caller opened. */
 export type OpenToken = number;
 
@@ -126,6 +155,11 @@ export function beginOpen(path: OpenPath = 'unknown'): OpenToken {
 export function setOpenPath(path: OpenPath): void {
   if (!current) return;
   current.path = path;
+}
+
+/** The furthest branch the open in flight has reached, or null when no window is open. */
+export function currentOpenPath(): OpenPath | null {
+  return current ? current.path : null;
 }
 
 /** Increment a counter. No-op when no window is open — see the window discipline above. */

@@ -69,3 +69,15 @@ Adopt a two-phase architecture, captured here as one target so both phases point
 **What remains forbidden.** A dirty-skip (not uploading at all because the heads look unchanged) is still ruled out without an envelope-inclusive fingerprint: the heads do not cover the envelope key dicts (invite and passkey wraps), so a skip could leave a wrap unpublished. Every `save()` still uploads.
 
 **Where it lives.** The `INVARIANT` comment at the write site in `syncService.doSave` cross-links this addendum; the helper documents its no-re-entrancy rule (`doSave` and anything it awaits must never call `save()`).
+
+## Addendum - 2026-11-15: the clean skip (envelope-inclusive fingerprint)
+
+**Status:** the dirty-skip the 2026-10-06 addendum ruled out "without an envelope-inclusive fingerprint" now exists, in one narrow form (plan `2026-11-15-instant-open-and-no-needless-reloads`, requirement 15; `src/services/sync/cleanSkip.ts`). The envelope-inclusive fingerprint is `envelopeFingerprint(env)` in `envelopeMerge.ts`: a SHA-256 over the canonical JSON of every non-payload envelope field, so invite, passkey and recovery wraps, device approval keys and any future field are covered without a list to maintain.
+
+**Conditions (all must hold; any doubt is an ordinary upload).** The document's heads equal the committed baseline's heads; the current envelope fingerprint equals the one the baseline recorded; no debounced save is armed, no save is in flight or queued, no merge is in flight, saves are not held, the offline queue is empty, the last attempt did not fail, and the remote is not latched unreadable or unmergeable. A missing fingerprint on either side declines (`no-envelope-fp`).
+
+**Scope.** Only the tab-hide and `beforeunload` callers pass `skipIfClean`. Every other `save()` still uploads, so the invariant that every save writes the full compacted base stands for all of them. The skip does not coalesce edits: it applies only when Drive already holds everything this device has.
+
+**What the recorded fingerprint means.** At a landed write it is the fingerprint of the envelope just uploaded. At a merge it is the fingerprint of the envelope Drive holds, not of the merged result. A device holding key material Drive lacks therefore differs from its baseline and uploads.
+
+**Observability.** `sync-save` logs `skipped-clean` on each skip and `skip-declined` (change-gated, with `reason`) when a hide or unload save went ahead.

@@ -82,7 +82,9 @@ import { TokenExpiredError } from '@/services/google/googleAuth';
 import { DriveApiError } from '@/services/google/driveService';
 
 /** Provider whose marker probe is driven by a swappable impl. */
-function makeProbeProvider(getMarker: () => Promise<{ revision: string | null }>) {
+function makeProbeProvider(
+  getMarker: () => Promise<{ revision: string | null; contentId?: string | null }>
+) {
   return {
     type: 'google_drive' as const,
     read: vi.fn(),
@@ -90,7 +92,11 @@ function makeProbeProvider(getMarker: () => Promise<{ revision: string | null }>
     getLastModified: vi.fn(async () => '2026-08-24T00:00:00Z'),
     getRemoteMarker: vi.fn(async () => {
       const m = await getMarker();
-      return { revision: m.revision, modifiedTime: '2026-08-24T00:00:00Z' };
+      return {
+        revision: m.revision,
+        modifiedTime: '2026-08-24T00:00:00Z',
+        contentId: m.contentId ?? null,
+      };
     }),
     getDisplayName: () => 'pod.beanpod',
     getFileId: () => 'file-1',
@@ -99,11 +105,16 @@ function makeProbeProvider(getMarker: () => Promise<{ revision: string | null }>
   };
 }
 
-/** Only the events this surface emits — other surfaces are noise here. */
-function probeEvents() {
+/** Every event on this surface, including the success-path `change-probe`. */
+function surfaceEvents() {
   return logEventMock.mock.calls
     .map((c) => c[0] as { level: string; surface: string; context?: Record<string, unknown> })
     .filter((e) => e.surface === 'sync-change-detect');
+}
+
+/** The degradation pair only: the `change-probe` outcome event has its own tests below. */
+function probeEvents() {
+  return surfaceEvents().filter((e) => e.context?.action !== 'change-probe');
 }
 
 describe('remoteChanged — degradation logging', () => {
@@ -206,5 +217,68 @@ describe('remoteChanged — degradation logging', () => {
     await syncService.remoteChanged();
 
     expect(probeEvents().filter((e) => e.level === 'warn')).toHaveLength(2);
+  });
+});
+
+/**
+ * Requirement 11's success-path signal: `change-probe`, change-gated, carrying the
+ * basis that decided (`content` or `version`) and the `version` drift under equal
+ * content, so assumption 2 (the checksum holds still while `version` drifts) is
+ * measurable after a deploy.
+ */
+describe('remoteChanged — change-probe outcome event (requirement 11)', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    syncService.reset();
+  });
+
+  const changeProbes = () => surfaceEvents().filter((e) => e.context?.action === 'change-probe');
+
+  it('emits once for a run of identical answers, then again when the answer changes', async () => {
+    let revision = 'ver:1';
+    const provider = makeProbeProvider(async () => ({ revision }));
+    syncService.setProvider(provider as never);
+
+    for (let i = 0; i < 3; i++) await syncService.remoteChanged();
+    expect(changeProbes()).toHaveLength(1);
+    expect(changeProbes()[0]).toMatchObject({
+      level: 'info',
+      context: { detail: 'status=changed;basis=version;drift=none' },
+    });
+
+    revision = 'ver:2';
+    syncService.seedRemoteBaseline({
+      payload: JSON.stringify({ r: 'ver:2', h: null, c: null, e: null }),
+      checkedAt: new Date().toISOString(),
+    });
+    await syncService.remoteChanged();
+    expect(changeProbes()).toHaveLength(2);
+    expect(changeProbes()[1].context).toMatchObject({
+      detail: 'status=unchanged;basis=version;drift=none',
+    });
+  });
+
+  it('reports the content basis and the drift when content is equal and version moved', async () => {
+    const provider = makeProbeProvider(async () => ({ revision: 'ver:9', contentId: 'md5:aaa' }));
+    syncService.setProvider(provider as never);
+    syncService.seedRemoteBaseline({
+      payload: JSON.stringify({ r: 'ver:6', h: null, c: 'md5:aaa', e: null }),
+      checkedAt: new Date().toISOString(),
+    });
+
+    const r = await syncService.remoteChanged();
+    expect(r).toMatchObject({ status: 'unchanged', basis: 'content', drift: 3 });
+    expect(changeProbes()[0].context).toMatchObject({
+      detail: 'status=unchanged;basis=content;drift=3',
+    });
+  });
+
+  it('says nothing on a failed probe beyond the degradation warn', async () => {
+    const provider = makeProbeProvider(async () => {
+      throw new TokenExpiredError();
+    });
+    syncService.setProvider(provider as never);
+    await syncService.remoteChanged();
+    expect(changeProbes()).toHaveLength(0);
   });
 });

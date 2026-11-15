@@ -2,6 +2,12 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { setActivePinia, createPinia } from 'pinia';
 import { installInlineBackend } from '@/services/automerge/worker/__tests__/inlineHarness';
 import { useCalendarSyncStore, setCalendarClientForTesting } from '../calendarSyncStore';
+import { createCalendarConnection } from '@/services/automerge/repositories/calendarRepository';
+import { createActivity } from '@/services/automerge/repositories/activityRepository';
+import { makeCalendarClientStub } from '@/services/calendar/__tests__/fakeCalendarClient';
+import { __setStoresAuthoritativeForTesting } from '@/services/automerge/loadMaintenance';
+import { toISODateString } from '@/utils/date';
+import type { CreateFamilyActivityInput } from '@/types/models';
 
 // P3 — token keep-warm parity guarantee (regression pin).
 //
@@ -37,6 +43,8 @@ describe('calendarSyncStore — token keep-warm parity (P3)', () => {
   });
   afterEach(() => {
     setCalendarClientForTesting(null);
+    useCalendarSyncStore().stop();
+    __setStoresAuthoritativeForTesting(false);
     localStorage.clear();
   });
 
@@ -52,5 +60,50 @@ describe('calendarSyncStore — token keep-warm parity (P3)', () => {
     // The wake-refresh guarantee: every hidden→visible transition reconciles,
     // which mints a fresh per-connection access token on demand.
     expect(options).toMatchObject({ fireImmediatelyOnVisible: true });
+  });
+
+  // 2026-11-15: the AUTOMATIC reconcile writes connection rows back, so it never runs on a
+  // projection snapshot; the open's first verify pass runs when the stores turn authoritative.
+  // A person's "Sync now" is not gated.
+  it('the poll reconciles nothing on a snapshot, and runs once the stores are authoritative', async () => {
+    const inserts: string[] = [];
+    setCalendarClientForTesting(
+      makeCalendarClientStub({
+        async insertEvent(_c, _cal, eventId) {
+          inserts.push(eventId);
+        },
+        async eventExists() {
+          return false;
+        },
+      })
+    );
+    await createCalendarConnection({
+      provider: 'google',
+      accountEmail: 'mum@example.com',
+      destinationCalendarId: 'primary',
+      refreshToken: 'refresh-xyz',
+      grantedScopes: ['https://www.googleapis.com/auth/calendar.events.owned'],
+      status: 'ok',
+    });
+    await createActivity({
+      title: 'Soccer practice',
+      date: toISODateString(new Date()).slice(0, 10),
+      recurrence: 'none',
+      category: 'sports',
+      feeSchedule: 'none',
+      reminderMinutes: 0,
+      isActive: true,
+      createdBy: 'm0',
+    } as unknown as CreateFamilyActivityInput);
+
+    const store = useCalendarSyncStore();
+    __setStoresAuthoritativeForTesting(false);
+    store.start();
+    const [poll] = pollSpy.mock.calls[0]!;
+    await poll(); // the immediate become-visible pass, on a snapshot
+    expect(inserts).toEqual([]);
+
+    __setStoresAuthoritativeForTesting(true);
+    await vi.waitFor(() => expect(inserts).toHaveLength(1));
   });
 });

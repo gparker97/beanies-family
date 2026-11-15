@@ -81,9 +81,16 @@ const now = ref(Date.now());
 const ticker = setInterval(() => (now.value = Date.now()), 30_000);
 onScopeDispose(() => clearInterval(ticker));
 
+/**
+ * While the full rebuild runs after open `lastSync` is still null, but the device
+ * already holds the last committed Drive baseline. Show that time instead of an
+ * attention-styled dash. A brand new device has neither, and keeps the dash.
+ */
+const stampTime = computed(() => syncStore.lastSync ?? syncStore.committedBaselineAt ?? null);
+
 const relative = computed(() => {
   void now.value;
-  return formatRelativeTime(syncStore.lastSync);
+  return formatRelativeTime(stampTime.value);
 });
 
 /**
@@ -97,14 +104,14 @@ const label = computed(() => {
   if (blocked.value)
     return isLineage.value ? t('wall.status.needsAttention') : t('wall.status.blocked');
   if (!isOnline.value) return t('wall.status.offline');
-  if (presentation.value.attention || !syncStore.lastSync) {
+  if (presentation.value.attention || !stampTime.value) {
     return fillTemplate(t('wall.status.stale'), { when: relative.value || '—' });
   }
   return fillTemplate(t('wall.status.saved'), { when: relative.value });
 });
 
 const attention = computed(
-  () => blocked.value || !isOnline.value || presentation.value.attention || !syncStore.lastSync
+  () => blocked.value || !isOnline.value || presentation.value.attention || !stampTime.value
 );
 const visible = computed(() => presentation.value.visible || attention.value);
 

@@ -59,6 +59,7 @@ import * as docClient from '@/services/automerge/worker/docClient';
 import { logEvent } from '@/services/telemetry';
 import { CorruptPayloadError, RemoteMergeError } from '@/types/sync';
 import { clearUnpushedAtSignOutMarker } from '@/services/indexeddb/database';
+import { envelopeFingerprint } from '../envelopeMerge';
 
 const KEY = {} as CryptoKey;
 
@@ -76,20 +77,52 @@ function envelope(over: Partial<BeanpodFileV4> = {}): BeanpodFileV4 {
   };
 }
 
-/** A Drive-shaped provider with a scripted revision counter. */
-function drive(opts: { probe: string; ack: string }) {
+/** A Drive-shaped provider with a scripted revision counter (and, optionally, content ids). */
+function drive(opts: { probe: string; ack: string; probeContent?: string; ackContent?: string }) {
   return {
     type: 'google_drive' as const,
     read: vi.fn(async () => JSON.stringify(envelope())),
-    write: vi.fn(async () => ({ revision: opts.ack })),
+    write: vi.fn(async (): Promise<{ revision: string | null; contentId?: string | null }> => ({
+      revision: opts.ack,
+      contentId: opts.ackContent ?? null,
+    })),
     getLastModified: vi.fn(async () => null),
-    getRemoteMarker: vi.fn(async () => ({ revision: opts.probe, modifiedTime: null })),
+    getRemoteMarker: vi.fn(
+      async (): Promise<{ revision: string; modifiedTime: null; contentId?: string | null }> => ({
+        revision: opts.probe,
+        modifiedTime: null,
+        contentId: opts.probeContent ?? null,
+      })
+    ),
     getDisplayName: () => 'pod.beanpod',
     getFileId: () => 'file',
     getAccountEmail: () => null,
     supportsLocalPolling: () => false,
   };
 }
+
+/** A persisted baseline row as the codec writes it (requirement 11: `c` and `e` always present). */
+const rowOf = (
+  r: string | null,
+  h: string | null,
+  c: string | null = null,
+  e: string | null = null
+): string => JSON.stringify({ r, h, c, e });
+
+/**
+ * Requirement 15: the envelope fingerprint a landed write or merge records. Drive's file and
+ * ours are the same `envelope()` here, so the merge and the write record the same value.
+ */
+const heldFp = (): Promise<string> => envelopeFingerprint(envelope());
+
+const committed = (): string[] =>
+  vi.mocked(docClient.noteRemoteBaseline).mock.calls.map((c) => c[0] as string);
+
+const advanceDetails = (): unknown[] =>
+  vi
+    .mocked(logEvent)
+    .mock.calls.filter((c) => (c[0].context as { action?: string }).action === 'write-advance')
+    .map((c) => (c[0].context as { detail?: unknown }).detail);
 
 const actions = (): unknown[] =>
   vi
@@ -102,7 +135,7 @@ beforeEach(() => {
 });
 
 describe('write race detection (audit C4)', () => {
-  it('a revision that jumped by MORE than one is logged as write-raced and re-merged once', async () => {
+  it('WITHOUT a content id, a revision that jumped by MORE than one is logged as write-raced and re-merged once', async () => {
     const p = drive({ probe: 'ver:10', ack: 'ver:13' });
     // The file really is at the ack's revision once the write lands.
     p.write.mockImplementation(async () => {
@@ -119,18 +152,15 @@ describe('write race detection (audit C4)', () => {
     expect(actions()).toContain('write-raced');
     // Round 3: the raced ack neither certifies nor NULLS the baseline. The last commit is
     // still the pre-write merge's (the probe revision), never `{r:null}`.
-    const committed = () =>
-      vi.mocked(docClient.noteRemoteBaseline).mock.calls.map((c) => c[0] as string);
-    expect(committed()).not.toContain(JSON.stringify({ r: null, h: null }));
-    expect(committed().at(-1)).toBe(JSON.stringify({ r: 'ver:10', h: 'h' }));
+    expect(committed()).not.toContain(rowOf(null, null));
+    expect(committed().at(-1)).toBe(rowOf('ver:10', 'h', null, await heldFp()));
 
     // The scheduled re-merge reads again (the file's revision moved past the baseline's),
     // compares heads in the merge, and only THEN commits the file's revision.
     await vi.waitFor(() => expect(p.read).toHaveBeenCalledTimes(2));
-    await vi.waitFor(() =>
-      expect(committed().at(-1)).toBe(JSON.stringify({ r: 'ver:13', h: 'h' }))
-    );
-    expect(committed()).not.toContain(JSON.stringify({ r: null, h: null }));
+    const fp = await heldFp();
+    await vi.waitFor(() => expect(committed().at(-1)).toBe(rowOf('ver:13', 'h', null, fp)));
+    expect(committed()).not.toContain(rowOf(null, null));
     expect(p.write).toHaveBeenCalledTimes(1);
   });
 
@@ -147,8 +177,89 @@ describe('write race detection (audit C4)', () => {
       .mock.calls.find((c) => (c[0].context as { action?: string }).action === 'write-advance');
     expect(advance?.[0].context).toMatchObject({ detail: 'advance=1' });
     expect(vi.mocked(docClient.noteRemoteBaseline).mock.calls.at(-1)?.[0]).toBe(
-      JSON.stringify({ r: 'ver:11', h: 'h' })
+      rowOf('ver:11', 'h', null, await heldFp())
     );
+  });
+});
+
+/**
+ * Requirement 12: Drive advances `version` on its own after an upload, so "+2" with a
+ * content id on the ack is not evidence of a race. The write commits clean, and the
+ * re-merge's probe settles it on content: one metadata call, no download, unless a peer
+ * really wrote after us.
+ */
+describe('a false race costs one probe, not a download (requirement 12)', () => {
+  it('own bytes: commits the ack clean, the re-merge probe answers unchanged, nothing is read again', async () => {
+    const p = drive({
+      probe: 'ver:10',
+      probeContent: 'md5:old',
+      ack: 'ver:13',
+      ackContent: 'md5:ours',
+    });
+    p.write.mockImplementation(async () => {
+      // After the upload Drive still holds our bytes; only `version` drifted.
+      p.getRemoteMarker.mockImplementation(async () => ({
+        revision: 'ver:14',
+        modifiedTime: null,
+        contentId: 'md5:ours',
+      }));
+      return { revision: 'ver:13', contentId: 'md5:ours' };
+    });
+    syncService.setProvider(p as never, 'fam');
+    syncService.setFamilyKey(KEY, envelope());
+
+    await expect(syncService.save()).resolves.toBe(true);
+    expect(actions()).not.toContain('write-raced');
+    expect(committed().at(-1)).toBe(rowOf('ver:13', 'h', 'md5:ours', await heldFp()));
+    expect(clearUnpushedAtSignOutMarker).toHaveBeenCalledWith('fam');
+
+    await vi.waitFor(() => expect(advanceDetails()).toContain('advance=3;confirmed=own-bytes'));
+    expect(p.read).toHaveBeenCalledTimes(1); // the pre-save read only
+    expect(p.getRemoteMarker).toHaveBeenCalledTimes(2); // pre-save probe + the confirm
+    expect(committed().at(-1)).toBe(rowOf('ver:13', 'h', 'md5:ours', await heldFp())); // the drift is not persisted
+  });
+
+  it('peer after: the re-merge probe sees other bytes, reads and merges as today', async () => {
+    const p = drive({
+      probe: 'ver:10',
+      probeContent: 'md5:old',
+      ack: 'ver:13',
+      ackContent: 'md5:ours',
+    });
+    p.write.mockImplementation(async () => {
+      p.getRemoteMarker.mockImplementation(async () => ({
+        revision: 'ver:14',
+        modifiedTime: null,
+        contentId: 'md5:peer',
+      }));
+      return { revision: 'ver:13', contentId: 'md5:ours' };
+    });
+    syncService.setProvider(p as never, 'fam');
+    syncService.setFamilyKey(KEY, envelope());
+
+    await expect(syncService.save()).resolves.toBe(true);
+    await vi.waitFor(() => expect(advanceDetails()).toContain('advance=3;confirmed=peer-after'));
+    expect(p.read).toHaveBeenCalledTimes(2);
+    const fp = await heldFp();
+    await vi.waitFor(() => expect(committed().at(-1)).toBe(rowOf('ver:14', 'h', 'md5:peer', fp)));
+    expect(p.write).toHaveBeenCalledTimes(1);
+  });
+
+  it('a malformed ack (no revision) re-probes and commits NULL heads AND a NULL content id', async () => {
+    const p = drive({ probe: 'ver:10', probeContent: 'md5:old', ack: 'unused' });
+    p.write.mockImplementation(async () => {
+      p.getRemoteMarker.mockImplementation(async () => ({
+        revision: 'ver:15',
+        modifiedTime: null,
+        contentId: 'md5:maybe-a-peer',
+      }));
+      return { revision: null, contentId: null };
+    });
+    syncService.setProvider(p as never, 'fam');
+    syncService.setFamilyKey(KEY, envelope());
+
+    await expect(syncService.save()).resolves.toBe(true);
+    expect(committed().at(-1)).toBe(rowOf('ver:15', null, null));
   });
 });
 
@@ -352,6 +463,9 @@ describe('a save with no family key is deferred, not dropped (audit C12)', () =>
       syncService.setFamilyKey(KEY, envelope());
       expect(actions()).toContain('save-deferred-rearmed');
       await vi.advanceTimersByTimeAsync(3_000);
+      // The save's envelope fingerprint (requirement 15) is a real digest, which
+      // resolves off the fake clock: wait for the save the timer started.
+      await syncService.whenIdle();
       expect(p.write).toHaveBeenCalledTimes(1);
     } finally {
       vi.useRealTimers();
@@ -452,6 +566,7 @@ describe('a cancelled pick restores the pending save it cancelled (audit C12)', 
       const r = await syncService.openAndLoadFile(); // fallback picker resolves null = cancel
       expect(r.cancelled).toBe(true);
       await vi.advanceTimersByTimeAsync(3_000);
+      await syncService.whenIdle(); // the save's digest resolves off the fake clock
       expect(p.write).toHaveBeenCalledTimes(1);
     } finally {
       vi.useRealTimers();

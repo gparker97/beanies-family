@@ -91,6 +91,7 @@ import type {
   CounterRebase,
   CachePersistFailureDetail,
   CacheClearResult,
+  SnapshotLoadResult,
   WorkerSignal,
   DispatchReply,
   CacheReplay,
@@ -262,6 +263,19 @@ let snapshotInFlight: Promise<void> = Promise.resolve();
  * session, since this function swallows its failures by design. */
 let lastSnapshotHeads: Heads | null = null;
 /**
+ * The heads and build of the projection snapshot `loadProjectionSnapshot` last PUSHED, and the
+ * family it was pushed for: what the main projection is showing while the rebuild runs. The
+ * next `initAndLoadCache` skips its full push when the document it installs has these heads
+ * and this build wrote the snapshot (2026-11-15, instant open, requirement 7).
+ *
+ * ⚠️ ONE-SHOT. Taken and cleared by the next `initAndLoadCache` whatever it does, cleared by
+ * every `loadProjectionSnapshot` before it reads, and by `resetDocCursors` (every drop, reset,
+ * replace and family re-point). Never consulted over a live document: a live document's
+ * projection is its own, not the snapshot's. A stale value here would leave the screen on a
+ * snapshot the rebuild never corrected, so every doubt clears it and costs only a repaint.
+ */
+let pushedSnapshot: { familyId: string; heads: Heads; build: string } | null = null;
+/**
  * The open-guard remote baseline (#61) waiting to be committed durably: the
  * namespaced revision our doc now provably contains, set by `noteRemoteBaseline`
  * AFTER main has merged that remote state (plan C10). It is a value learned at a
@@ -353,6 +367,7 @@ const SETTLE_TIMEOUT_MS = 5_000;
 function resetDocCursors(): void {
   lastPersistedHeads = null;
   lastSnapshotHeads = null;
+  pushedSnapshot = null;
   pendingRemoteBaseline = null;
   // C5d: any persist still in flight describes the document that was just replaced; its
   // cursor advance must not land on this one.
@@ -551,7 +566,12 @@ async function persistSnapshotOnce(): Promise<void> {
   try {
     const start = performance.now();
     const deltas = buildFullProjection(doc);
-    await cache.persistProjectionSnapshot(key, { version: cache.SNAPSHOT_VERSION, deltas });
+    await cache.persistProjectionSnapshot(key, {
+      version: cache.SNAPSHOT_VERSION,
+      deltas,
+      heads: captureHeads,
+      build: cache.snapshotBuildId(),
+    });
     // Advance ONLY on success, and only if the doc we captured is still the live
     // one — this function swallows failures, so an eager or cross-doc advance
     // would silently disable snapshots for the rest of the session.
@@ -566,23 +586,63 @@ async function persistSnapshotOnce(): Promise<void> {
   }
 }
 
+/** How long the snapshot reply may wait for the baseline row once the snapshot is ready. */
+const BASELINE_READ_BOUND_MS = 100;
+
+type BaselineStamp = Pick<SnapshotLoadResult, 'baselineCheckedAt' | 'baselineReadError'>;
+
+/**
+ * Wrap the started baseline read so that awaiting it waits at most `BASELINE_READ_BOUND_MS`,
+ * counted from the await (the read has been running alongside the snapshot read until then).
+ */
+function boundedBaselineRead(read: Promise<BaselineStamp>): () => Promise<BaselineStamp> {
+  return () => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const lost = new Promise<BaselineStamp>((resolve) => {
+      timer = setTimeout(() => resolve({ baselineReadError: 'TimedOut' }), BASELINE_READ_BOUND_MS);
+    });
+    return Promise.race([read, lost]).finally(() => clearTimeout(timer));
+  };
+}
+
 /**
  * Load + push the display-only projection snapshot for a fast first paint. Installs
  * NO `currentDoc` (the authoritative rebuild owns that). Any failure — absent,
- * version mismatch, or decrypt/parse — returns `{ hit: false, reason }` after
- * logging, so the caller falls back to the rebuild and the main thread never sees a
- * raw throw. Opens the cache DB itself (idempotent) so it does not depend on the
- * rebuild RPC having run first.
+ * another manual revision, an unknown collection, or decrypt/parse — returns
+ * `{ hit: false, reason }` after logging, so the caller falls back to the rebuild and
+ * the main thread never sees a raw throw. Every check runs BEFORE the first chunk is
+ * pushed. Opens the cache DB itself (idempotent) so it does not depend on the rebuild
+ * RPC having run first. On a hit it remembers what it pushed (`pushedSnapshot`).
  */
-async function loadProjectionSnapshot(id: string): Promise<{ hit: boolean; reason?: string }> {
+async function loadProjectionSnapshot(id: string): Promise<SnapshotLoadResult> {
+  pushedSnapshot = null; // whatever an earlier push described is superseded by this attempt
   try {
     await openCacheFor(id);
     const key = requireKey('loadProjectionSnapshot');
+    // The time of the last committed Drive baseline, for the wall's status stamp while the
+    // rebuild runs. Started ALONGSIDE the snapshot read; the reply waits for it at most
+    // `BASELINE_READ_BOUND_MS` more (the main thread paints only after this reply, and the
+    // serial worker queue is held until it), so a transient IndexedDB error (`withIdbRetry`
+    // sleeps 250 ms) or a stalled read never delays first paint: on that rare open the value
+    // is omitted and the stamp shows its dash until the rebuild. A failure is "no time" for
+    // the stamp, never a failed paint; it rides back as `baselineReadError` (`TimedOut` when it
+    // lost the race) and the main thread logs it (`docClient.loadProjectionSnapshot`).
+    const baselineRead = boundedBaselineRead(
+      cache.readRemoteBaseline().then(
+        (row) => ({ baselineCheckedAt: row?.checkedAt ?? undefined }),
+        (e: unknown) => ({ baselineReadError: e instanceof Error ? e.name : 'unknown' })
+      )
+    );
     const snap = await time2('snapshot.workerLoad', () => cache.loadProjectionSnapshot(key));
-    if (!snap) return { hit: false, reason: 'absent' };
-    if (snap.version !== cache.SNAPSHOT_VERSION) return { hit: false, reason: 'version' };
+    if (!snap) return { hit: false, reason: 'absent', ...(await baselineRead()) };
+    const miss = cache.snapshotMissReason(snap);
+    if (miss) return { hit: false, reason: miss, ...(await baselineRead()) };
     pushDeltas(snap.deltas);
-    return { hit: true };
+    // Remembered only once every chunk was handed over: a push that threw part-way is an
+    // `error` miss, and the rebuild must repaint over whatever half of it landed.
+    const identity = cache.snapshotIdentity(snap);
+    pushedSnapshot = identity ? { familyId: id, ...identity } : null;
+    return { hit: true, ...(await baselineRead()) };
   } catch (e) {
     console.warn('[applyAndProject] projection snapshot load failed — falling back', e);
     return { hit: false, reason: 'error' };
@@ -994,6 +1054,10 @@ export async function initAndLoadCache(id: string): Promise<InitAndLoadResult> {
   // on any load failure the whole document (`dropDoc`), were gone. Now: write what is pending
   // (bounded), read the cache, and merge it in.
   const live = currentDoc !== null && docFamilyId === id;
+  // Requirement 7: taken (so cleared) at entry, whatever this open goes on to do. Over a live
+  // document it is discarded: that document's projection is on screen, not the snapshot's.
+  const onScreen = takePushedSnapshot(id);
+  const snapshotOnScreen = live ? null : onScreen;
   if (live) await settlePersists(docOwnsOpenCache());
   // C18: clear any leftover pending baseline for the PREVIOUS family's doc BEFORE the DB
   // re-point — else the next persist for THIS family's doc would commit it. (After the settle
@@ -1214,11 +1278,33 @@ export async function initAndLoadCache(id: string): Promise<InitAndLoadResult> {
     lastPersistedHeads = preHeads;
   }
   const doc = currentDoc;
-  time('automerge.pushProjection', () => pushProjection(doc), {
-    perf_entity_count: countEntities(doc),
-  });
+  // Requirement 7: the screen already shows exactly this document when the snapshot it painted
+  // has these heads (after migrate, so a migration change repaints) and this build wrote it (a
+  // forgotten SNAPSHOT_MANUAL_REV bump is healed by the push on the first open of a new build).
+  const projected = !(
+    snapshotOnScreen &&
+    snapshotOnScreen.build === cache.snapshotBuildId() &&
+    headsEqual(snapshotOnScreen.heads, headsOf(doc))
+  );
+  if (projected) {
+    time('automerge.pushProjection', () => pushProjection(doc), {
+      perf_entity_count: countEntities(doc),
+    });
+  } else {
+    // The stored snapshot IS this document's projection (same heads, same build), so the
+    // refresh below would rebuild, re-encrypt and rewrite identical bytes. Recording its heads
+    // lets `persistSnapshotOnce`'s heads guard skip it; the next real change still persists.
+    lastSnapshotHeads = headsOf(doc);
+  }
   scheduleSnapshotPersist(); // refresh the fast-paint snapshot from the authoritative load
-  return { loaded: true, remoteBaseline: await baselineFor(), replay, docStats };
+  return { loaded: true, remoteBaseline: await baselineFor(), replay, docStats, projected };
+}
+
+/** Take the one-shot `pushedSnapshot`, answering it only when it was pushed for `id`. */
+function takePushedSnapshot(id: string): { heads: Heads; build: string } | null {
+  const taken = pushedSnapshot;
+  pushedSnapshot = null;
+  return taken && taken.familyId === id ? taken : null;
 }
 
 /** `doc` without the changes it buffered for missing deps: its applied history, re-applied. */
@@ -2717,6 +2803,15 @@ export function __resetApplyAndProjectForTesting(): void {
   // #124: a family-list test must not bleed into the suites that rely on this reset.
   scalarPolicy = emptyDataPolicy();
   setScalarMint(null);
+}
+
+/** Test-only: the remembered snapshot identity (`pushedSnapshot`), without taking it. */
+export function __pushedSnapshotForTesting(): {
+  familyId: string;
+  heads: Heads;
+  build: string;
+} | null {
+  return pushedSnapshot;
 }
 
 /** Test-only: peek at whether a doc is currently loaded. */

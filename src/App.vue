@@ -109,7 +109,12 @@ import {
   isAuthoritativeLoaded as isAuthoritativeDocLoaded,
   getSettings as getProjectedSettings,
 } from '@/services/automerge/projection';
-import { processRecurringItems } from '@/services/recurring/recurringProcessor';
+import {
+  beginLoadPhase,
+  endLoadPhase,
+  holdLoadMaintenance,
+  runLoadMaintenance,
+} from '@/services/automerge/loadMaintenance';
 import { useAccountsStore } from '@/stores/accountsStore';
 import { useAssetsStore } from '@/stores/assetsStore';
 import { useFamilyStore } from '@/stores/familyStore';
@@ -154,6 +159,7 @@ import { useFatalErrorStore } from '@/stores/fatalErrorStore';
 import { isRemoteBlocker, type RemoteBlocker, type PayloadLoadError } from '@/types/sync';
 import { surfaceBlockerFatal } from '@/utils/payloadFailureSurface';
 import { logEvent } from '@/services/telemetry/logEvent';
+import { noteOpenPaint } from '@/services/telemetry/openPaint';
 import { useNotificationsStore } from '@/stores/notificationsStore';
 import { setSoundEnabled } from '@/composables/useSounds';
 import { showToast } from '@/composables/useToast';
@@ -164,6 +170,7 @@ import { useToday } from '@/composables/useToday';
 import { useStaleTabRefresh } from '@/composables/useStaleTabRefresh';
 import { attemptSilentReconnect } from '@/utils/silentReconnect';
 import { saveNow, hasFamilyKey, setFamilyKey } from '@/services/sync/syncService';
+import type { CleanSkipTrigger } from '@/services/sync/cleanSkip';
 // ADR-032: photo collections are now statically registered at module load in
 // `worker/photoOps.ts` (the pure, worker-shared registry) — no App.vue runtime
 // registration needed.
@@ -862,6 +869,12 @@ async function loadFamilyDataInner(openToken: OpenToken): Promise<'handed-off' |
       setOpenPath('path1a');
       initBreadcrumbs.push('path1a: trying persistence cache for fast start');
       console.log('[loadFamilyData] path1a: trying cache-first load...');
+      // Load maintenance waits for this open's Drive read. `releaseHold` is the ONLY way to end
+      // this hold: it travels with the open token to `backgroundSyncFromFile` (which ends it
+      // when this open's read ends), or runs in the `finally` below on every exit that does not
+      // hand off. A sign-out or family switch voids it (`clearStoresAuthoritative`).
+      const releaseHold = holdLoadMaintenance();
+      let handedOff = false;
       try {
         // The snapshot fast-paint fires `onEarlyPaint` the instant the stores hold the
         // snapshot data (well under 1s), so the placeholder lifts THEN — not after the
@@ -882,17 +895,16 @@ async function loadFamilyDataInner(openToken: OpenToken): Promise<'handed-off' |
             memberFilterStore.initialize();
             isLoadingData.value = false; // Show real data immediately (no snapshot → after rebuild)
           }
-          const result = await processRecurringItems();
-          if (result.processed > 0) {
-            await Promise.all([transactionsStore.loadTransactions(), goalsStore.loadGoals()]);
-          }
+          // Recurring items are load maintenance now (recurringStore), run after this read.
           // Fire-and-forget: fetch fresh data from Drive in background.
           // It owns the open-cycle terminal from here (success, skip, or failure)
           // — see the wrapper's doc-comment.
-          // The token travels with the hand-off: `backgroundSyncFromFile` is also
-          // reachable from the header Refresh button and the config-heal, and only
-          // the holder of this token may close this open's window.
-          syncStore.backgroundSyncFromFile(openToken);
+          // The token and the hold's release travel with the hand-off:
+          // `backgroundSyncFromFile` is also reachable from the header Refresh button and
+          // the config-heal, and only the holder of this token may close this open's window
+          // or end its maintenance hold.
+          syncStore.backgroundSyncFromFile({ token: openToken, releaseHold });
+          handedOff = true;
           return 'handed-off';
         }
         // ⚠️ ONLY the too-large half dead-ends here. Falling through to 1b would
@@ -919,6 +931,8 @@ async function loadFamilyDataInner(openToken: OpenToken): Promise<'handed-off' |
         console.log('[loadFamilyData] path1a: cache miss — falling back to Drive');
       } catch {
         initBreadcrumbs.push('path1a: cache error — falling through to Drive fetch');
+      } finally {
+        if (!handedOff) releaseHold();
       }
     }
 
@@ -933,11 +947,10 @@ async function loadFamilyDataInner(openToken: OpenToken): Promise<'handed-off' |
       initBreadcrumbs.push(`path1b: loadFromFile result=${loadResult.success}`);
       console.log('[loadFamilyData] path1b: loadFromFile returned', loadResult);
       if (loadResult.success) {
+        noteOpenPaint({ kind: 'drive', snapshot: null });
+        // The skeleton lifts as soon as the stores are loaded: recurring items run afterwards
+        // as load maintenance, never awaited here.
         memberFilterStore.initialize();
-        const result = await processRecurringItems();
-        if (result.processed > 0) {
-          await Promise.all([transactionsStore.loadTransactions(), goalsStore.loadGoals()]);
-        }
         syncStore.setupAutoSync();
         return;
       }
@@ -963,11 +976,9 @@ async function loadFamilyDataInner(openToken: OpenToken): Promise<'handed-off' |
           return 'failed';
         }
         if (success) {
+          // The cold-boot route: no key in memory, so the download above decrypted here.
+          noteOpenPaint({ kind: 'drive', snapshot: null });
           memberFilterStore.initialize();
-          const result = await processRecurringItems();
-          if (result.processed > 0) {
-            await Promise.all([transactionsStore.loadTransactions(), goalsStore.loadGoals()]);
-          }
           return;
         }
 
@@ -1086,10 +1097,6 @@ async function loadFamilyDataInner(openToken: OpenToken): Promise<'handed-off' |
         if (cacheResult.success) {
           console.log('[loadFamilyData] Loaded from persistence cache');
           memberFilterStore.initialize();
-          const result = await processRecurringItems();
-          if (result.processed > 0) {
-            await Promise.all([transactionsStore.loadTransactions(), goalsStore.loadGoals()]);
-          }
           return;
         }
       } catch (err) {
@@ -1129,44 +1136,48 @@ async function loadFamilyDataInner(openToken: OpenToken): Promise<'handed-off' |
       }
     }
 
-    // Load stores from the (empty) Automerge doc
-    await settingsStore.loadSettings();
-    await familyStore.loadMembers();
+    // Load stores from the (empty) Automerge doc. Loaders are read-only (the load phase
+    // reports a write); load-time writers (recurring items too) run after, as load maintenance.
+    beginLoadPhase();
+    try {
+      await settingsStore.loadSettings();
+      await familyStore.loadMembers();
 
-    if (familyStore.isSetupComplete) {
-      memberFilterStore.initialize();
+      if (familyStore.isSetupComplete) {
+        memberFilterStore.initialize();
 
-      await Promise.all([
-        accountsStore.loadAccounts(),
-        transactionsStore.loadTransactions(),
-        assetsStore.loadAssets(),
-        goalsStore.loadGoals(),
-        recurringStore.loadRecurringItems(),
-        todoStore.loadTodos(),
-        listStore.loadLists(),
-        activityStore.loadActivities(),
-        vacationStore.loadVacations(),
-        budgetStore.loadBudgets(),
-        favoritesStore.loadFavorites(),
-        sayingsStore.loadSayings(),
-        memberNotesStore.loadMemberNotes(),
-        allergiesStore.loadAllergies(),
-        medicationsStore.loadMedications(),
-        recipesStore.loadRecipes(),
-        mealPlanStore.loadMealPlans(),
-        // Same batch as activities/meals: the deck must be loaded before useHelpfulHints'
-        // first debounced reconcile, or a hint created in that gap keeps its default audience.
-        responsibilityStore.load(),
-        // The choreboard (#146): loads whatever the flag says (the gate hides surfaces, not data).
-        choreStore.loadChores(),
-        emergencyContactsStore.loadEmergencyContacts(),
-      ]);
-
-      const result = await processRecurringItems();
-      if (result.processed > 0) {
-        await Promise.all([transactionsStore.loadTransactions(), goalsStore.loadGoals()]);
+        await Promise.all([
+          accountsStore.loadAccounts(),
+          transactionsStore.loadTransactions(),
+          assetsStore.loadAssets(),
+          goalsStore.loadGoals(),
+          recurringStore.loadRecurringItems(),
+          todoStore.loadTodos(),
+          listStore.loadLists(),
+          activityStore.loadActivities(),
+          vacationStore.loadVacations(),
+          budgetStore.loadBudgets(),
+          favoritesStore.loadFavorites(),
+          sayingsStore.loadSayings(),
+          memberNotesStore.loadMemberNotes(),
+          allergiesStore.loadAllergies(),
+          medicationsStore.loadMedications(),
+          recipesStore.loadRecipes(),
+          mealPlanStore.loadMealPlans(),
+          // Same batch as activities/meals: the deck must be loaded before useHelpfulHints'
+          // first debounced reconcile, or a hint created in that gap keeps its default audience.
+          responsibilityStore.load(),
+          // The choreboard (#146): loads whatever the flag says (the gate hides surfaces, not data).
+          choreStore.loadChores(),
+          emergencyContactsStore.loadEmergencyContacts(),
+        ]);
       }
+    } finally {
+      endLoadPhase();
     }
+    // Only when family data is in the stores (a fresh empty document paints nothing).
+    if (familyStore.isSetupComplete) noteOpenPaint({ kind: 'direct', snapshot: null });
+    runLoadMaintenance('direct');
   } catch (err) {
     throw new Error(
       `Failed to initialize document: ${err instanceof Error ? err.message : String(err)}`
@@ -1600,7 +1611,7 @@ onMounted(async () => {
     initBreadcrumbs.push('shell: app shell visible, loading data...');
 
     // Step 5: Load family data from the active per-family DB
-    // Defer file polling until after processRecurringItems to prevent the
+    // Defer file polling until after the open's load-time writes to prevent the
     // reload cascade (init mutations → file poll detects "change" → reload → loop).
     syncStore.deferPolling();
     initBreadcrumbs.push('data: loading family data');
@@ -1940,18 +1951,23 @@ async function handleClearDataAndSignOut() {
 // reactive `isVisible` ref. `useStaleTabRefresh` (wired below) handles the
 // heavy refresh on wake / day-change.
 
-/** Restore syncService key from store if out of sync, then save. */
-function saveWithKeyRecovery() {
+/**
+ * Restore syncService key from store if out of sync, then save. These are the ONLY two
+ * callers that may skip a save with nothing to upload (requirement 15); a save that first
+ * had to restore the key uploads as it always has.
+ */
+function saveWithKeyRecovery(trigger: CleanSkipTrigger) {
   if (!syncStore.hasSessionPassword) return;
-  if (!hasFamilyKey()) {
+  const keyRestored = !hasFamilyKey();
+  if (keyRestored) {
     setFamilyKey(syncStore.familyKey!, syncStore.envelope!);
   }
-  saveNow().catch(console.warn);
+  saveNow(keyRestored ? {} : { skipIfClean: true, trigger }).catch(console.warn);
 }
 
 const { isVisible: isTabVisible } = useToday();
 watch(isTabVisible, (visible) => {
-  if (!visible) saveWithKeyRecovery();
+  if (!visible) saveWithKeyRecovery('hide');
 });
 
 useStaleTabRefresh();
@@ -2096,9 +2112,9 @@ function handleBeforeUnload(event: BeforeUnloadEvent): void {
     event.preventDefault();
     event.returnValue = ''; // legacy spec — required for Chrome/Edge
   }
-  // Best-effort save regardless of write-in-flight; harmless if there's
-  // nothing to save.
-  saveWithKeyRecovery();
+  // Best-effort save regardless of write-in-flight; uploads nothing when
+  // there is nothing to save.
+  saveWithKeyRecovery('unload');
 }
 
 function handleOnline() {

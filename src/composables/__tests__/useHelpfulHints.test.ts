@@ -10,6 +10,7 @@
  * `reconcileHints` (the diff) is the real one.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { __setStoresAuthoritativeForTesting } from '@/services/automerge/loadMaintenance';
 import { nextTick } from 'vue';
 import type { DesiredHint } from '@/utils/helpfulHints';
 import type { CreateTodoInput, TodoItem } from '@/types/models';
@@ -142,6 +143,8 @@ beforeEach(() => {
   vi.setSystemTime(new Date('2026-11-12T08:00:00'));
   vi.clearAllMocks();
   warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  // The stores hold the authoritative document unless a test says otherwise.
+  __setStoresAuthoritativeForTesting(true);
   __resetHelpfulHintsForTesting();
   __resetAttemptBudgetForTests();
   __resetWriteGateForTesting();
@@ -166,6 +169,20 @@ beforeEach(() => {
 afterEach(() => {
   warn.mockRestore();
   vi.useRealTimers();
+});
+
+describe('useHelpfulHints and the projection snapshot', () => {
+  it('never reconciles against snapshot copies; runs once the stores are authoritative', async () => {
+    __setStoresAuthoritativeForTesting(false);
+    h.desired.value = desiredHints(2);
+    useHelpfulHints();
+    await settle();
+    expect(h.createTodo).not.toHaveBeenCalled();
+    expect(h.deleteTodo).not.toHaveBeenCalled();
+    __setStoresAuthoritativeForTesting(true); // a watch source: the reconcile re-runs
+    await settle();
+    expect(h.createTodo).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe('useHelpfulHints automatic-write cap', () => {

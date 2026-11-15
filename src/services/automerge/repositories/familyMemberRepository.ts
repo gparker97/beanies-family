@@ -18,7 +18,7 @@ import type {
  * canManagePod=true on every legacy admin before this default takes
  * effect, so existing admins keep their effective permissions.
  */
-function applyDefaults(member: FamilyMember): FamilyMember {
+export function applyDefaults(member: FamilyMember): FamilyMember {
   // Read the effective age ONCE, before the literal below defaults it, so the
   // finance rule and the stored `ageGroup` can never disagree.
   const ageGroup = member.ageGroup ?? 'adult';

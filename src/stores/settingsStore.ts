@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed, watch, toRaw } from 'vue';
 import { showToast } from '@/composables/useToast';
+import { wrapAsync } from '@/composables/useStoreActions';
 import { useTranslation } from '@/composables/useTranslation';
 import { STORAGE_KEYS } from '@/constants/storageKeys';
 import * as settingsRepo from '@/services/automerge/repositories/settingsRepository';
@@ -354,15 +355,16 @@ export const useSettingsStore = defineStore('settings', () => {
    * Load per-family settings from the active family DB.
    */
   async function loadSettings() {
-    isLoading.value = true;
-    error.value = null;
-    try {
-      settings.value = await settingsRepo.getSettings();
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Failed to load settings';
-    } finally {
-      isLoading.value = false;
-    }
+    // Through `wrapAsync` like every other loader, so `reloadAllStores` sees a failure here
+    // (`storeActionFailureCount`). No toast, as before: the settings read has never toasted.
+    await wrapAsync(
+      isLoading,
+      error,
+      async () => {
+        settings.value = await settingsRepo.getSettings();
+      },
+      { action: 'settingsStore:loadSettings', errorToast: false }
+    );
   }
 
   async function setBaseCurrency(currency: CurrencyCode): Promise<void> {

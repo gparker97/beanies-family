@@ -43,7 +43,7 @@ import { PayloadLoadError, type PayloadLoadStep } from '@/types/sync';
 import * as Automerge from '@automerge/automerge';
 import { COLLECTION_NAMES, type FamilyDocument } from '@/types/automerge';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
-import type { ProjectionDelta } from './protocol';
+import type { Heads, ProjectionDelta, SnapshotMissReason } from './protocol';
 
 type Doc = Automerge.Doc<FamilyDocument>;
 
@@ -500,16 +500,26 @@ export async function quarantinePendingRows(): Promise<number> {
 // ─── Projection snapshot (display-only fast first paint) ──────────────────────
 
 /**
- * `SNAPSHOT_VERSION` guards a stored projection snapshot against a shape it can no
- * longer be rendered into. It is `<manual-rev>:<collections-fingerprint>`:
- *   - the fingerprint is a stable hash of `COLLECTION_NAMES`, so ADD/REMOVE/RENAME
- *     of a collection changes the version AUTOMATICALLY (a stale snapshot naming an
- *     unknown collection can never be applied), and
+ * `SNAPSHOT_VERSION` is the shape stamp a projection snapshot is WRITTEN with:
+ * `<manual-rev>:<collections-fingerprint>`.
  *   - `SNAPSHOT_MANUAL_REV` is bumped BY HAND on any change to a persisted ENTITY
  *     shape that a stale snapshot would render wrong even though collection names
  *     are unchanged.
- * On any mismatch the snapshot is ignored and the authoritative rebuild is the sole
- * source — so a forgotten manual bump only costs a one-open fallback, never a crash.
+ *   - The fingerprint (a stable hash of `COLLECTION_NAMES`) is still written so an
+ *     OLDER build, which compares the whole string, keeps rejecting a snapshot whose
+ *     collections it does not know.
+ *
+ * ⚠️ THIS BUILD READS ONLY THE MANUAL REVISION (`snapshotMissReason`). Comparing the
+ * fingerprint discarded every device's snapshot whenever a collection was ADDED, which
+ * cannot break a paint (the added collection is simply empty until the rebuild lands):
+ * six forced misses between August and November 2026. What the fingerprint really
+ * protected against, a snapshot naming a collection this build does not know (`mapFor`
+ * throws on it mid-stream, leaving a half-applied projection), is now checked against the
+ * deltas themselves before anything is pushed.
+ *
+ * On any miss the snapshot is ignored and the authoritative rebuild is the sole source.
+ * A forgotten manual bump is healed by the rebuild's full push, which a matching snapshot
+ * may skip only when it was written by this very build (`snapshotBuildId`).
  */
 // 2 (data-layer audit C9, 2026-10-03): `foldDoc` now stores the UNFLOORED absolute, so a
 // snapshot written by an earlier build can hold a floored value a fresh rebuild would not.
@@ -529,6 +539,69 @@ export const SNAPSHOT_VERSION = `${SNAPSHOT_MANUAL_REV}:${collectionsFingerprint
 export interface ProjectionSnapshot {
   version: string;
   deltas: ProjectionDelta[];
+  /**
+   * The heads of the document the deltas were built from, and the build that built them.
+   * Together they let the authoritative rebuild skip re-pushing an identical projection
+   * (`initAndLoadCache`). Absent on a snapshot written by an older build, which always
+   * repaints.
+   */
+  heads?: Heads;
+  build?: string;
+}
+
+/**
+ * The identity of the running app build, as stamped on a snapshot. The SHA alone is `'dev'`
+ * on every build without `VITE_BUILD_SHA` (local and self-hosted builds), which would let a
+ * self-hoster's upgrade keep painting an old build's projection, so the build time joins it.
+ * Both are `define`d in `vite.config.ts`, which the worker bundle receives too. Read at call
+ * time so a test can stub it.
+ */
+export function snapshotBuildId(): string {
+  return `${import.meta.env.VITE_BUILD_SHA ?? 'dev'}@${import.meta.env.VITE_BUILD_TIME ?? ''}`;
+}
+
+const KNOWN_COLLECTIONS: ReadonlySet<string> = new Set(COLLECTION_NAMES);
+
+/** Does every delta (recursing into `multi`) name a collection this build knows? */
+function deltasKnown(deltas: readonly ProjectionDelta[]): boolean {
+  return deltas.every((d) => {
+    switch (d.kind) {
+      case 'settings':
+        return true;
+      case 'multi':
+        return Array.isArray(d.deltas) && deltasKnown(d.deltas);
+      default:
+        // An unknown `kind` names no known collection either, and is refused the same way.
+        return KNOWN_COLLECTIONS.has(d.collection);
+    }
+  });
+}
+
+/**
+ * Why a stored snapshot must not be painted, or `null` when it may be. Pure; called BEFORE
+ * any delta is pushed, so a refused snapshot never leaves a half-applied projection.
+ *  - `version`: another manual revision (or a payload that is not this shape at all).
+ *  - `collections`: a delta names a collection this build does not know (one removed or
+ *    renamed since it was written). A collection ADDED since is fine: it stays empty until
+ *    the rebuild lands.
+ */
+export function snapshotMissReason(
+  snap: ProjectionSnapshot
+): Extract<SnapshotMissReason, 'version' | 'collections'> | null {
+  const rev = typeof snap.version === 'string' ? snap.version.split(':')[0] : null;
+  if (rev !== String(SNAPSHOT_MANUAL_REV) || !Array.isArray(snap.deltas)) return 'version';
+  return deltasKnown(snap.deltas) ? null : 'collections';
+}
+
+/**
+ * The heads and build a snapshot was written with, or `null` when it lacks either (an older
+ * build wrote it), in which case nothing may be inferred from it and the rebuild repaints.
+ */
+export function snapshotIdentity(snap: ProjectionSnapshot): { heads: Heads; build: string } | null {
+  const { heads, build } = snap;
+  if (!Array.isArray(heads) || !heads.every((h) => typeof h === 'string')) return null;
+  if (typeof build !== 'string' || build === '') return null;
+  return { heads, build };
 }
 
 /**

@@ -8,6 +8,7 @@ import { syncEntityLinkedRecurringItem } from '@/utils/linkedRecurringItem';
 import { useAccountsStore } from './accountsStore';
 import { useRecurringStore } from './recurringStore';
 import { trackFeature, withAppInitiatedWrites } from '@/services/analytics/plausible';
+import { registerLoadMaintenance } from '@/services/automerge/loadMaintenance';
 import type {
   Asset,
   CreateAssetInput,
@@ -160,8 +161,8 @@ export const useAssetsStore = defineStore('assets', () => {
 
   // One-time migration: create linked accounts for existing assets with loans
   //
-  // Runs from `loadAssets`, so it fires on app open with no user involved. The
-  // mirror accounts it creates must not report `feature_used` — a family with
+  // Runs as load maintenance (`migrateLinkedLoansOnce`), so it fires on app open with no user
+  // involved. The mirror accounts it creates must not report `feature_used` — a family with
   // three loan-bearing assets would otherwise emit three interactive events
   // before touching anything, and `account` adoption would track loan ownership
   // rather than account use.
@@ -185,16 +186,21 @@ export const useAssetsStore = defineStore('assets', () => {
   }
 
   // Actions
+  // READ-ONLY (2026-11-15): the linked-loan migration is load maintenance (below).
   async function loadAssets() {
     await wrapAsync(isLoading, error, async () => {
       assets.value = await assetRepo.getAllAssets();
     });
-    // Run migration after loading (creates linked loan accounts for existing assets)
-    if (!linkedLoanMigrationRan) {
-      linkedLoanMigrationRan = true;
-      await migrateLinkedLoanAccounts();
-    }
   }
+
+  /** The load-maintenance task: the one-per-session linked-loan migration, run once the
+   *  stores hold the authoritative document (assets AND accounts loaded). */
+  async function migrateLinkedLoansOnce(): Promise<void> {
+    if (linkedLoanMigrationRan) return;
+    linkedLoanMigrationRan = true;
+    await migrateLinkedLoanAccounts();
+  }
+  registerLoadMaintenance('linked-loan-migration', migrateLinkedLoansOnce);
 
   async function createAsset(input: CreateAssetInput): Promise<Asset | null> {
     const result = await wrapAsync(isLoading, error, async () => {

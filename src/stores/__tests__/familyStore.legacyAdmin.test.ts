@@ -3,9 +3,13 @@
  *
  * Run through the REAL repository `applyDefaults` and the real projection, which is the
  * whole point: `applyDefaults` fills a missing `canManagePod` with `role === 'owner'`, so
- * the defaulted list `normalizeRoles` receives already says `false` for a legacy admin, and
- * `m.canManagePod ?? true` never reached its `true`. The mocked-repository suite could not
- * see that, because its fixture handed `normalizeRoles` an un-defaulted row.
+ * the defaulted list the role heal (`computeRolePatches`) receives already says `false` for a
+ * legacy admin, and `m.canManagePod ?? true` never reached its `true`. The mocked-repository
+ * suite could not see that, because its fixture handed the heal an un-defaulted row.
+ *
+ * 2026-11-15: the loader applies the heal in memory and load maintenance writes it, so each
+ * case checks the roster after `loadMembers` (nothing written) and the stored row after the
+ * maintenance run.
  */
 import { setActivePinia, createPinia } from 'pinia';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -46,8 +50,24 @@ vi.mock('@/stores/authStore', () => ({
 }));
 
 import { useFamilyStore } from '../familyStore';
-import { applyDelta, getById, resetProjection } from '@/services/automerge/projection';
+import {
+  applyDelta,
+  getById,
+  markAuthoritative,
+  resetProjection,
+} from '@/services/automerge/projection';
 import { mutate } from '@/services/automerge/worker/docClient';
+import {
+  __resetLoadMaintenanceForTesting,
+  __whenLoadMaintenanceIdleForTesting,
+  runLoadMaintenance,
+} from '@/services/automerge/loadMaintenance';
+
+async function runMaintenance(): Promise<void> {
+  markAuthoritative();
+  runLoadMaintenance('reload');
+  await __whenLoadMaintenanceIdleForTesting();
+}
 
 function seed(row: Record<string, unknown>): void {
   applyDelta({
@@ -70,16 +90,25 @@ beforeEach(() => {
   setActivePinia(createPinia());
   vi.clearAllMocks();
   resetProjection();
+  __resetLoadMaintenanceForTesting();
 });
 
-describe('normalizeRoles reads the stored flag, not the defaulted one (C10)', () => {
+describe('the role heal reads the stored flag, not the defaulted one (C10)', () => {
   it('a legacy admin with no stored canManagePod becomes a member WHO STILL MANAGES the pod', async () => {
     seed({ id: 'owner', role: 'owner', createdAt: '2025-01-01T00:00:00.000Z' });
     seed({ id: 'legacy-admin', role: 'admin' }); // no canManagePod stored at all
 
     const store = useFamilyStore();
     await store.loadMembers();
+    // In memory at load (the loader is read-only)...
+    expect(mutate).not.toHaveBeenCalled();
+    expect(store.members.find((m) => m.id === 'legacy-admin')).toMatchObject({
+      role: 'member',
+      canManagePod: true,
+    });
 
+    // ...and written by load maintenance.
+    await runMaintenance();
     expect(mutate).toHaveBeenCalledOnce();
     const stored = getById('familyMembers', 'legacy-admin') as unknown as Record<string, unknown>;
     expect(stored.role).toBe('member');
@@ -93,6 +122,8 @@ describe('normalizeRoles reads the stored flag, not the defaulted one (C10)', ()
 
     const store = useFamilyStore();
     await store.loadMembers();
+    expect(store.members.find((m) => m.id === 'demoted-admin')?.canManagePod).toBe(false);
+    await runMaintenance();
 
     const stored = getById('familyMembers', 'demoted-admin') as unknown as Record<string, unknown>;
     expect(stored.role).toBe('member');

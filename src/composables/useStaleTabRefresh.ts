@@ -2,7 +2,6 @@ import { ref, readonly, watch, effectScope, type EffectScope, type Ref } from 'v
 import { useToday } from '@/composables/useToday';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useSyncStore } from '@/stores/syncStore';
-import { processRecurringItems } from '@/services/recurring/recurringProcessor';
 import { updateRatesIfStale } from '@/services/exchangeRate/exchangeRateService';
 import { attemptSilentReconnect } from '@/utils/silentReconnect';
 import { showToast } from '@/composables/useToast';
@@ -12,9 +11,10 @@ import { reportError } from '@/utils/errorReporter';
 /**
  * Heavy refresh on tab wake or day change.
  *
- * Owns the wake-time refresh sequence: reload Pinia stores from Automerge,
- * generate today's recurring transactions, refresh exchange rates and Google
- * token, then pull remote Drive deltas. This is the SINGLE place in the
+ * Owns the wake-time refresh sequence: reload Pinia stores from Automerge
+ * (whose load maintenance then generates today's recurring transactions, once
+ * per day), refresh exchange rates and Google token, then pull remote Drive
+ * deltas. This is the SINGLE place in the
  * codebase that knows the wake-time refresh ordering.
  *
  * Registers no DOM event listeners of its own — `useToday` is the single
@@ -38,13 +38,11 @@ let scope: EffectScope | null = null;
 
 /**
  * Step ordering is deliberate. Local state is made current first
- * (reloadAllStores) so subsequent steps work against fresh data.
- * `reloadIfFileChanged` runs LAST and may overwrite freshly-generated
- * recurring tx with a slightly-older Drive view — accepted because:
- *   (a) processRecurringItems is idempotent via `alreadyExists` dedup, so
- *       the next wake re-generates anything truncated; and
- *   (b) doing the Drive delta first would risk generating recurring tx
- *       against stale local state, which is harder to detect.
+ * (reloadAllStores) so subsequent steps work against fresh data. That reload
+ * also runs load maintenance (never awaited), which generates today's
+ * recurring transactions once per day: `processRecurringItems` is idempotent
+ * via `alreadyExists` dedup, so a later `reloadIfFileChanged` merge can never
+ * make it double-write.
  */
 async function run(reason: 'day-changed' | 'long-absence'): Promise<void> {
   const familyStore = useFamilyStore();
@@ -74,22 +72,8 @@ async function run(reason: 'day-changed' | 'long-absence'): Promise<void> {
       return;
     }
 
-    // 2. Non-critical, sequential — depends on step 1's current state.
-    //    Idempotent via `alreadyExists` dedup, safe to retry next wake.
-    //    Failure is silent to the user (recurring tx will retry next wake)
-    //    but support still gets notified via reportError so we can see the
-    //    pattern if it's persistent.
-    try {
-      await processRecurringItems();
-    } catch (e) {
-      console.warn(`[useStaleTabRefresh] processRecurringItems failed (${reason})`, e);
-      reportError({
-        surface: 'stale-tab-refresh',
-        message: 'processRecurringItems failed',
-        error: e,
-        context: { action: reason },
-      });
-    }
+    // 2. Recurring transactions: load maintenance, run by step 1's reload (reported by the
+    //    runner on failure, retried on the next reload).
 
     // 3. Non-critical, parallel — independent subsystems.
     const [rates, reconnect] = await Promise.allSettled([

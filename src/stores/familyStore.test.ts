@@ -6,7 +6,13 @@ vi.mock('@/services/automerge/repositories/removedMemberRepository', () => ({
   getAllRemovedMembers: vi.fn(async () => []),
   removeMemberAndRecord: vi.fn(async () => {}),
 }));
-vi.mock('@/services/automerge/repositories/familyMemberRepository', () => ({
+vi.mock('@/services/automerge/repositories/familyMemberRepository', async (importOriginal) => ({
+  // The REAL defaults: the loader re-applies them to a row it heals in memory.
+  applyDefaults: (
+    await importOriginal<
+      typeof import('@/services/automerge/repositories/familyMemberRepository')
+    >()
+  ).applyDefaults,
   getAllFamilyMembers: vi.fn(),
   getFamilyMemberById: vi.fn(),
   createFamilyMember: vi.fn(),
@@ -16,12 +22,12 @@ vi.mock('@/services/automerge/repositories/familyMemberRepository', () => ({
   getOwner: vi.fn(),
 }));
 
-// ADR-032: normalizeRoles/transferOwnership now read the projection to confirm a
-// member is present, then write via a single docClient.mutate batch op (was a
-// changeDoc closure). Mock both — getById returns truthy so patched members are
-// included in the batch; mutate is asserted for the batch shape.
+// ADR-032: the role heal and transferOwnership read the projection (the stored row, and
+// whether a member is present), then write via a single docClient.mutate batch op. Mock both;
+// mutate is asserted for the batch shape. `isAuthoritativeLoaded` lets load maintenance run.
 vi.mock('@/services/automerge/projection', () => ({
   getById: vi.fn(),
+  isAuthoritativeLoaded: () => true,
 }));
 
 vi.mock('@/services/automerge/worker/docClient', () => ({
@@ -44,6 +50,12 @@ import * as familyRepo from '@/services/automerge/repositories/familyMemberRepos
 import { getById as projectionGetById } from '@/services/automerge/projection';
 import { mutate } from '@/services/automerge/worker/docClient';
 import { useAuthStore } from '@/stores/authStore';
+import { reportError } from '@/utils/errorReporter';
+import {
+  __resetLoadMaintenanceForTesting,
+  __whenLoadMaintenanceIdleForTesting,
+  runLoadMaintenance,
+} from '@/services/automerge/loadMaintenance';
 
 function makeMember(overrides: Partial<FamilyMember>): FamilyMember {
   return {
@@ -65,29 +77,44 @@ function makeMember(overrides: Partial<FamilyMember>): FamilyMember {
   };
 }
 
-describe('familyStore — normalizeRoles', () => {
+/** The roster the document holds: the repository read AND the projection's stored rows. */
+function holdRoster(list: FamilyMember[]): void {
+  vi.mocked(familyRepo.getAllFamilyMembers).mockResolvedValue(list);
+  vi.mocked(projectionGetById).mockImplementation(((_c: string, id: string) =>
+    list.find((m) => m.id === id)) as never);
+}
+
+/** What `reloadAllStores` does after its read-only loaders. */
+async function runMaintenance(): Promise<void> {
+  runLoadMaintenance('reload');
+  await __whenLoadMaintenanceIdleForTesting();
+}
+
+// 2026-11-15: `loadMembers` is READ-ONLY. It applies the role heal IN MEMORY (so an ownerless
+// or two-owner roster is never published) and the load-maintenance task `writeRolePatches`
+// writes it after the authoritative reload. Each case asserts both halves.
+describe('familyStore — the role heal (computeRolePatches + writeRolePatches)', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     setActivePinia(createPinia());
-    // Re-establish defaults after resetAllMocks: every member is present in the
-    // projection (truthy) and the mutate batch resolves.
-    vi.mocked(projectionGetById).mockReturnValue({ id: 'present' } as never);
+    __resetLoadMaintenanceForTesting();
     vi.mocked(mutate).mockResolvedValue(undefined as never);
   });
 
   it('no-ops when exactly one owner exists', async () => {
     const owner = makeMember({ id: 'owner-1', role: 'owner', requiresPassword: false });
     const member = makeMember({ id: 'm-2', role: 'member' });
-    vi.mocked(familyRepo.getAllFamilyMembers).mockResolvedValue([owner, member]);
+    holdRoster([owner, member]);
 
     const store = useFamilyStore();
     await store.loadMembers();
+    await runMaintenance();
 
     expect(mutate).not.toHaveBeenCalled();
     expect(store.owner?.id).toBe('owner-1');
   });
 
-  it('demotes later owner when two are present (keeps earliest createdAt)', async () => {
+  it('demotes later owner when two are present (keeps earliest createdAt): in memory at load, written by maintenance', async () => {
     const earlier = makeMember({
       id: 'owner-old',
       role: 'owner',
@@ -98,21 +125,27 @@ describe('familyStore — normalizeRoles', () => {
       role: 'owner',
       createdAt: '2026-02-01T00:00:00.000Z',
     });
-    vi.mocked(familyRepo.getAllFamilyMembers)
-      .mockResolvedValueOnce([earlier, later])
-      .mockResolvedValueOnce([earlier, { ...later, role: 'member' }]);
+    holdRoster([earlier, later]);
 
     const store = useFamilyStore();
     await store.loadMembers();
 
-    expect(mutate).toHaveBeenCalledOnce();
-    // #95: the roster heal runs on load, so it must pass the read-only write gate.
-    expect(mutate).toHaveBeenCalledWith(expect.objectContaining({ op: 'batch' }), {
-      quiet: true,
-      system: true,
-    });
-    // The mocked second getAllFamilyMembers returns the demoted state.
+    expect(mutate).not.toHaveBeenCalled(); // the loader is read-only
     expect(store.owner?.id).toBe('owner-old');
+    expect(store.members.find((m) => m.id === 'owner-new')?.role).toBe('member');
+
+    await runMaintenance();
+    expect(mutate).toHaveBeenCalledOnce();
+    // #95: the roster heal is unattended, so it must pass the read-only write gate.
+    expect(mutate).toHaveBeenCalledWith(
+      {
+        op: 'batch',
+        ops: [
+          { op: 'patch', collection: 'familyMembers', id: 'owner-new', patch: { role: 'member' } },
+        ],
+      },
+      { quiet: true, system: true }
+    );
   });
 
   it('promotes earliest non-password-required human when no owner exists', async () => {
@@ -128,15 +161,18 @@ describe('familyStore — normalizeRoles', () => {
       requiresPassword: true,
       createdAt: '2026-03-01T00:00:00.000Z',
     });
-    vi.mocked(familyRepo.getAllFamilyMembers)
-      .mockResolvedValueOnce([creator, joinedLater])
-      .mockResolvedValueOnce([{ ...creator, role: 'owner', canManagePod: true }, joinedLater]);
+    holdRoster([creator, joinedLater]);
 
     const store = useFamilyStore();
     await store.loadMembers();
+    expect(mutate).not.toHaveBeenCalled();
+    expect(store.owner?.id).toBe('creator'); // never an ownerless roster, even before the write
 
+    await runMaintenance();
     expect(mutate).toHaveBeenCalledOnce();
-    expect(store.owner?.id).toBe('creator');
+    expect(reportError).toHaveBeenCalledWith(
+      expect.objectContaining({ context: { candidateId: 'creator', memberCount: 2 } })
+    );
   });
 
   it('falls back to earliest human when no requiresPassword=false candidate exists', async () => {
@@ -152,9 +188,7 @@ describe('familyStore — normalizeRoles', () => {
       requiresPassword: true,
       createdAt: '2026-02-01T00:00:00.000Z',
     });
-    vi.mocked(familyRepo.getAllFamilyMembers)
-      .mockResolvedValueOnce([m1, m2])
-      .mockResolvedValueOnce([{ ...m1, role: 'owner' }, m2]);
+    holdRoster([m1, m2]);
 
     const store = useFamilyStore();
     await store.loadMembers();
@@ -164,43 +198,48 @@ describe('familyStore — normalizeRoles', () => {
 
   it('migrates legacy admin → member preserving canManagePod=true default', async () => {
     const owner = makeMember({ id: 'o', role: 'owner', createdAt: '2026-01-01T00:00:00.000Z' });
-    const legacyAdmin = makeMember({
-      id: 'admin',
-      role: 'admin',
+    // No STORED flag at all (`makeMember` would default it to false).
+    const legacyAdmin = {
+      ...makeMember({ id: 'admin', role: 'admin' }),
       canManagePod: undefined as unknown as boolean,
-    });
-    vi.mocked(familyRepo.getAllFamilyMembers)
-      .mockResolvedValueOnce([owner, legacyAdmin])
-      .mockResolvedValueOnce([owner, { ...legacyAdmin, role: 'member', canManagePod: true }]);
+    };
+    holdRoster([owner, legacyAdmin]);
 
     const store = useFamilyStore();
     await store.loadMembers();
 
-    expect(mutate).toHaveBeenCalledOnce();
     const adminAfter = store.members.find((m) => m.id === 'admin');
     expect(adminAfter?.role).toBe('member');
     expect(adminAfter?.canManagePod).toBe(true);
+    expect(mutate).not.toHaveBeenCalled();
+
+    await runMaintenance();
+    expect(mutate).toHaveBeenCalledOnce();
   });
 
-  it('returns input unchanged when the mutate batch throws', async () => {
+  it('a rejected batch is reported, never thrown; the roster still shows the heal', async () => {
     const owner = makeMember({ id: 'o', role: 'owner' });
     const legacyAdmin = makeMember({ id: 'admin', role: 'admin' });
-    vi.mocked(familyRepo.getAllFamilyMembers).mockResolvedValue([owner, legacyAdmin]);
+    holdRoster([owner, legacyAdmin]);
     vi.mocked(mutate).mockRejectedValue(new Error('boom'));
 
     const store = useFamilyStore();
     await store.loadMembers();
+    await runMaintenance();
 
-    // Pod still functions: store.members has the original (un-normalized) list.
     expect(store.members).toHaveLength(2);
-    // No throw bubbles up.
+    expect(store.members.find((m) => m.id === 'admin')?.role).toBe('member');
+    expect(reportError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'mutation batch rejected during role normalization' })
+    );
   });
 
   it('handles empty member list', async () => {
-    vi.mocked(familyRepo.getAllFamilyMembers).mockResolvedValue([]);
+    holdRoster([]);
 
     const store = useFamilyStore();
     await store.loadMembers();
+    await runMaintenance();
 
     expect(mutate).not.toHaveBeenCalled();
     expect(store.members).toEqual([]);

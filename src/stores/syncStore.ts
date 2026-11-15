@@ -1,7 +1,17 @@
 import { defineStore } from 'pinia';
-import type { LineageBasis, CachePersistFailureDetail } from '@/services/automerge/worker/protocol';
+import type {
+  LineageBasis,
+  CachePersistFailureDetail,
+  SnapshotLoadResult,
+} from '@/services/automerge/worker/protocol';
 import { decodeBaselinePayload, decodeHeadsFingerprint } from '@/services/sync/remoteBaseline';
-import { ref, computed, shallowRef, nextTick, watch, onScopeDispose } from 'vue';
+import type { ChangeResult, ReadTicket } from '@/services/sync/remoteBaseline';
+import { ref, computed, shallowRef, nextTick, watch, onScopeDispose, effectScope } from 'vue';
+import {
+  usePollWhileVisible,
+  type PollWhileVisibleHandle,
+} from '@/composables/usePollWhileVisible';
+import { storeActionFailureCount } from '@/composables/useStoreActions';
 
 // Import stores for auto-sync and reload
 import { useAccountsStore } from './accountsStore';
@@ -30,7 +40,16 @@ import { useFamilyContextStore } from './familyContextStore';
 import { useAuthStore } from './authStore';
 import { useTransactionsStore } from './transactionsStore';
 import { useSyncHighlightStore } from './syncHighlightStore';
-import { isLoaded as isProjectionLoaded } from '@/services/automerge/projection';
+import {
+  isLoaded as isProjectionLoaded,
+  isAuthoritativeLoaded,
+} from '@/services/automerge/projection';
+import {
+  beginLoadPhase,
+  endLoadPhase,
+  runLoadMaintenance,
+  type ReleaseLoadMaintenance,
+} from '@/services/automerge/loadMaintenance';
 import * as settingsRepo from '@/services/automerge/repositories/settingsRepository';
 import { getSyncCapabilities, canAutoSync, getPlatform } from '@/services/sync/capabilities';
 import {
@@ -76,12 +95,14 @@ import { severityFor } from '@/utils/pagingPolicy';
 import { cacheFailureCause } from '@/utils/cacheFailureCause';
 import { useTranslationStore } from '@/stores/translationStore';
 import { logEvent } from '@/services/telemetry/logEvent';
+import { noteOpenPaint } from '@/services/telemetry/openPaint';
 import { createSampler } from '@/services/telemetry/emitPolicy';
 import { isDemoSession } from '@/utils/reviewDemo';
 import {
   bump as bumpOpenCycle,
   noteSnapshot as noteOpenCycleSnapshot,
   endOpen,
+  isFailOpenReason,
 } from '@/services/telemetry/openCycle';
 import type { OpenToken, OpenOutcome } from '@/services/telemetry/openCycle';
 import { slackNotify } from '@/utils/slackNotify';
@@ -236,6 +257,17 @@ export type RefreshOutcome =
   /** This device already established it cannot open the pod. See `podUnopenable`. */
   | 'skipped-unopenable'
   | 'skipped-in-flight';
+
+/**
+ * What an OPEN hands `backgroundSyncFromFile` (App.vue path 1a): its open-cycle token and the
+ * release of the load-maintenance hold it took. They travel together, so only the open that
+ * took the hold can end it, and it ends when THAT open's Drive read ends. The header Refresh,
+ * the pod-unreadable retry and the config-heal pass none and release nothing.
+ */
+export interface OpenHandOff {
+  token: OpenToken;
+  releaseHold: ReleaseLoadMaintenance;
+}
 
 /**
  * Does a cache-init failure leave something of OURS to protect?
@@ -749,6 +781,7 @@ export const useSyncStore = defineStore('sync', () => {
     syncService.setEnvelope(null);
     // A new session must not inherit the previous family's "snapshot painted" state.
     snapshotPaintedThisSession.value = false;
+    lastSnapshotResult.value = null;
   }
 
   /**
@@ -1368,6 +1401,8 @@ export const useSyncStore = defineStore('sync', () => {
 
   // Background sync state (cache-first loading)
   const isBackgroundSyncing = ref(false);
+  /** Settles when the `backgroundSyncFromFile` read in flight ends; null when none is. */
+  let backgroundSyncRun: Promise<void> | null = null;
   const backgroundSyncError = ref<string | null>(null);
   // True once the instant-open snapshot has painted cached data into the stores
   // this session (the user is looking at their data), regardless of whether the
@@ -1377,6 +1412,14 @@ export const useSyncStore = defineStore('sync', () => {
   // degraded read-only state, not data loss (don't page)". Reset on sign-out /
   // disconnect via clearEnvelope.
   const snapshotPaintedThisSession = ref(false);
+  /** This open's projection-snapshot answer (`hit`, or why it missed), for open telemetry.
+   *  Null until an open asks for a snapshot; reset with the envelope. */
+  const lastSnapshotResult = shallowRef<SnapshotLoadResult | null>(null);
+  /** ISO time of the last committed Drive baseline this device holds (read with the snapshot),
+   *  so the wall's status stamp has a time while the rebuild runs. Null on a brand new device. */
+  const committedBaselineAt = computed(() => lastSnapshotResult.value?.baselineCheckedAt ?? null);
+  /** Whether any loader failed during the last `reloadAllStores` (`storeActionFailureCount`). */
+  let lastReloadLeftError = false;
   /**
    * Classifies why `backgroundSyncError` is set so consumers can pick an
    * appropriate UI response:
@@ -2288,6 +2331,11 @@ export const useSyncStore = defineStore('sync', () => {
        * and the lineage basis becomes `user-file`, which never blocks.
        */
       userChoseThisFile?: boolean;
+      /**
+       * The `remoteChanged()` answer that decided this read (requirement 14):
+       * `load()` adopts it as its pending marker instead of probing Drive again.
+       */
+      probed?: ChangeResult;
     } = {}
   ): Promise<{
     success: boolean;
@@ -2345,10 +2393,13 @@ export const useSyncStore = defineStore('sync', () => {
     // warns about. The honest question is "as of the last thing we KNEW Drive
     // held, is our document ahead?", and that is this value, read here.
     const baselineFpBeforeLoad = syncService.getRemoteBaselineHeadsFp();
+    // THIS call's read: its confirm and rollback settle it and no other (reads can overlap).
+    const ticket: ReadTicket = { read: null };
 
     try {
       console.log('[syncStore.loadFromFile] calling syncService.load()...');
-      const text = await syncService.load();
+      const probed = options.probed;
+      const text = await syncService.load(probed ? { probed, ticket } : { ticket });
       console.log('[syncStore.loadFromFile] load returned', text ? `${text.length} chars` : 'null');
       if (!text) {
         const lastError = syncService.getState().lastError;
@@ -2402,6 +2453,9 @@ export const useSyncStore = defineStore('sync', () => {
       // pre-call was a second full JSON.parse of the whole multi-megabyte file
       // purely to read one field, then thrown away.
       const remoteEnvelope = parseBeanpodV4(text);
+      // Requirement 15: the fingerprint of the envelope Drive holds, for the confirm below.
+      // Taken BEFORE the merge RPC, so no await sits between the merge and its commit.
+      const driveEnvelopeFp = await syncService.envelopeFingerprintOrNull(remoteEnvelope);
 
       // If we already have a family key, the worker decrypts + merges/adopts.
       // Captured ONCE, here, where the ref is provably non-null: everything
@@ -2552,9 +2606,10 @@ export const useSyncStore = defineStore('sync', () => {
           // Zero-network (a worker RPC).
           // ⚠️ HERE, STRAIGHT AFTER THE MERGE (requirement 17), not after the
           // reloads below: they are awaited and can throw, and a throw must not
-          // roll back (in `finally`) a baseline that did merge. The `null` is the
-          // envelope fingerprint slot requirement 15 fills.
-          syncService.confirmRemoteMerged(driveHeads, null);
+          // roll back (in `finally`) a baseline that did merge. With Drive's envelope
+          // fingerprint: when the merge left us holding key material the file lacks,
+          // ours differs from it and the clean skip uploads.
+          syncService.confirmRemoteMerged(ticket.read, driveHeads, driveEnvelopeFp);
 
           // `dirty` is derived purely from Automerge doc heads, so it can NEVER be
           // true for an envelope-only change. But a save publishes the envelope key
@@ -2634,7 +2689,7 @@ export const useSyncStore = defineStore('sync', () => {
             // committed.) Roll it back, and latch — this is the
             // Drive cohort's read path, which never goes through
             // `fetchAndMergeRemote` and so never armed the breaker.
-            syncService.rollbackRemoteMarker();
+            syncService.rollbackRemoteMarker(ticket.read);
             syncService.noteRemoteBlocked(e);
             throw e;
           }
@@ -2661,7 +2716,7 @@ export const useSyncStore = defineStore('sync', () => {
       // every path safe by construction; `confirmRemoteMerged` has already
       // cleared it on the one path that earned it, so a throw after the
       // confirm leaves the committed baseline alone (requirement 17).
-      syncService.rollbackRemoteMarker();
+      syncService.rollbackRemoteMarker(ticket.read);
       if (merging && isReloading) {
         isReloading = false;
       }
@@ -3093,6 +3148,7 @@ export const useSyncStore = defineStore('sync', () => {
     options?: { preservePermissionState?: boolean; onEarlyPaint?: () => void }
   ): Promise<{ success: boolean; payloadError?: PayloadLoadError }> {
     let paintedFromSnapshot = false;
+    let snapshotReloadClean = false;
     try {
       // Import family key directly from base64 (not password-derived), post it to
       // the worker, then open the cache DB + load the cached doc + envelope.
@@ -3114,6 +3170,7 @@ export const useSyncStore = defineStore('sync', () => {
 
       try {
         const snap = await snapPromise;
+        lastSnapshotResult.value = snap;
         noteOpenCycleSnapshot(snap.hit); // no-op outside an open window
         if (snap.hit) {
           if (!options?.preservePermissionState) {
@@ -3121,6 +3178,8 @@ export const useSyncStore = defineStore('sync', () => {
             needsPermission.value = true;
           }
           await reloadAllStores();
+          noteOpenPaint({ kind: 'snapshot', snapshot: snap });
+          snapshotReloadClean = !lastReloadLeftError;
           paintedFromSnapshot = true;
           snapshotPaintedThisSession.value = true; // user is now looking at cached data
           isBackgroundSyncing.value = true; // reuse the existing orange bar until authoritative
@@ -3145,7 +3204,7 @@ export const useSyncStore = defineStore('sync', () => {
       // AUTHORITATIVE rebuild result — the existing state-setup flow, unchanged.
       // Also carries the open-guard baseline row (#61 C-5), read in the SAME
       // round-trip as the cache so the two can never be out of step.
-      const { loaded, remoteBaseline: baselineRow } = await loadedPromise;
+      const { loaded, remoteBaseline: baselineRow, projected } = await loadedPromise;
       const { envelope: cachedEnvelope } = await docClient.readEnvelope();
       if (!cachedEnvelope || !loaded) {
         if (paintedFromSnapshot) isBackgroundSyncing.value = false;
@@ -3171,13 +3230,20 @@ export const useSyncStore = defineStore('sync', () => {
       // Authoritative re-hydrate: the Pinia stores are a COPY of the projection taken
       // here, not a reactive binding, so this MUST run after the rebuild's overwrite —
       // and the bar clears only after it (never on the raw projection overwrite).
-      await reloadAllStores();
+      // SKIPPED only when the worker did not repush (`projected === false`: the document has
+      // the snapshot's heads and build, so the stores already show it) AND the snapshot reload
+      // left no loader error (the second reload is that loader's retry). Maintenance still runs.
+      const repaintSkipped = paintedFromSnapshot && projected === false && snapshotReloadClean;
+      if (repaintSkipped) runLoadMaintenance('reload');
+      else await reloadAllStores();
+      noteOpenPaint({ kind: 'cache', snapshot: lastSnapshotResult.value });
       if (paintedFromSnapshot) {
         isBackgroundSyncing.value = false;
         logEvent({
           level: 'info',
           surface: 'open-snapshot',
           message: 'authoritative landed, snapshot superseded',
+          context: { detail: `repaint=${repaintSkipped ? 'skipped' : 'full'}` },
         });
       }
       await reconcileDriveTokenForMember();
@@ -4674,6 +4740,9 @@ export const useSyncStore = defineStore('sync', () => {
     // earlier attempt to clear from `runPostLoadDriveHousekeeping` disarmed the
     // breaker there and let the poller straight back on.
     bumpOpenCycle('storeReload'); // no-op outside an open window
+    // Captured at ENTRY: the flag can flip while a snapshot-phase reload is still awaiting,
+    // and maintenance must never run on the snapshot copies that reload put in the stores.
+    const maintenanceDue = isAuthoritativeLoaded();
     isReloading = true;
     // ⚠️ CANCEL, BUT REMEMBER. The cancel buys a quiet window for the
     // projection; it is not a decision that the pending publish was unwanted.
@@ -4727,6 +4796,9 @@ export const useSyncStore = defineStore('sync', () => {
       // every merge. `Promise.all` gives no real parallelism here (it's all
       // synchronous WASM materialization on one thread), so its wall-clock is
       // effectively main-thread-blocking time.
+      const failuresBefore = storeActionFailureCount();
+      lastReloadLeftError = true; // until the loaders resolve: a rejection counts as a failure
+      beginLoadPhase(); // loaders are read-only; `docClient.mutate` reports a write in here
       await measureAsync('stores.reloadAll', () =>
         Promise.all([
           familyStoreInst.loadMembers(),
@@ -4753,7 +4825,11 @@ export const useSyncStore = defineStore('sync', () => {
           choreStoreInst.loadChores(),
           emergencyContactsStoreInst.loadEmergencyContacts(),
         ])
-      );
+      ).finally(endLoadPhase);
+
+      // ANY loader failure, whatever ref it reports through (`error`, `cyclesError`, ...):
+      // every loader runs through `wrapAsync`, which counts its failures.
+      lastReloadLeftError = storeActionFailureCount() !== failuresBefore;
 
       // Diagnostic: detect permission changes after reload
       const newMember = familyStoreInst.currentMember;
@@ -4791,6 +4867,8 @@ export const useSyncStore = defineStore('sync', () => {
     if (isCrossDeviceReload) {
       useSyncHighlightStore().detectChanges();
     }
+    // Load-time writers run now, on the authoritative store data (never awaited).
+    if (maintenanceDue) runLoadMaintenance('reload');
   }
 
   /**
@@ -4917,9 +4995,10 @@ export const useSyncStore = defineStore('sync', () => {
    * Non-blocking — UI remains interactive throughout.
    */
   async function backgroundSyncFromFile(
-    openToken?: OpenToken,
+    open?: OpenHandOff,
     opts?: { manual?: boolean }
   ): Promise<RefreshOutcome> {
+    const openToken = open?.token;
     // ⚠️ The latch gates the WORK, not just the timer. `AppHeader`'s Refresh
     // calls this directly and `useStaleTabRefresh` calls `reloadIfFileChanged`
     // directly, so a latch checked only inside `startFilePolling` let every tab
@@ -4942,6 +5021,7 @@ export const useSyncStore = defineStore('sync', () => {
     // is actually about to happen.
     if (isBackgroundSyncing.value && opts?.manual) {
       endOpen('open-complete', openToken, { detailSuffix: 'sync-already-in-flight' });
+      releaseHoldAfterInFlightRead(open);
       logManualRefreshOutcome('skipped-in-flight');
       return 'skipped-in-flight';
     }
@@ -4952,6 +5032,7 @@ export const useSyncStore = defineStore('sync', () => {
       // as `open-abandoned` with zero reads) and made this the one
       // `RefreshOutcome` with no manual-refresh telemetry at all.
       endOpen('open-complete', openToken);
+      open?.releaseHold(); // path 1a's boot hold: no read will run
       if (opts?.manual) logManualRefreshOutcome('skipped-unopenable');
       return 'skipped-unopenable';
     }
@@ -4964,6 +5045,7 @@ export const useSyncStore = defineStore('sync', () => {
       // success (the false-success #69 targets) — the in-flight sync + progress
       // bar are the user's feedback.
       endOpen('open-complete', openToken, { detailSuffix: 'sync-already-in-flight' });
+      releaseHoldAfterInFlightRead(open); // this call reads nothing: the in-flight read decides
       if (opts?.manual) logManualRefreshOutcome('skipped-in-flight');
       return 'skipped-in-flight';
     }
@@ -4978,46 +5060,32 @@ export const useSyncStore = defineStore('sync', () => {
     isBackgroundSyncing.value = true;
     backgroundSyncError.value = null;
     backgroundSyncErrorKind.value = null;
+    let endRun!: () => void;
+    backgroundSyncRun = new Promise<void>((resolve) => (endRun = resolve));
 
     try {
-      // #61 OPEN GUARD: if the file's revision has not advanced past the state we
-      // durably cached (within the 1h trust window), the whole open-path download +
-      // remoteLoad + merge + reloads + ungated upload is waste — skip it. The
-      // envelope on this path came from `loadFromPersistenceCache`'s `setFamilyKey`
-      // (cachedMerged) and stays correct because an envelope-only change (peer key
-      // rotation / member add) rewrites the file and advances `version`, so the
-      // guard reads (C21). Every uncertainty falls through to a normal read.
-      const { skip, reason } = await syncService.shouldSkipOpenRead();
+      // #61 OPEN GUARD: if the file's content (or, without a content id, its
+      // revision within the 1h trust window) has not moved past the state we
+      // durably cached, the whole open-path download + remoteLoad + merge +
+      // reloads + ungated upload is waste — skip it. The envelope on this path
+      // came from `loadFromPersistenceCache`'s `setFamilyKey` (cachedMerged) and
+      // stays correct because an envelope-only change (peer key rotation / member
+      // add) rewrites the file, which changes both its checksum and `version`, so
+      // the guard reads (C21). Every uncertainty falls through to a normal read.
+      // `probed` is the probe that decided a read, reused by the load (req. 14).
+      const { skip, reason, probed } = await syncService.shouldSkipOpenRead();
       openFailReason = reason;
       if (skip) {
         openOutcome = 'open-skip';
         await runPostLoadDriveHousekeeping(); // same terminus as the load path (Req 12)
         return refreshResult; // 'refreshed' — the file is confirmed unchanged
       }
-      // The guard fell open on UNCERTAINTY (not a clean `changed`/`no-baseline`) —
-      // record it as `open-fail-open` on a successful read (C7), so a rising
-      // fail-open rate is visible without a repro.
-      // `unpushed-local-changes` (#65) joins these: it is the guard working exactly
-      // as designed on a path that then completes successfully, NOT a fail-open on
-      // uncertainty. Counting it as one would inflate the very fail-open rate #61
-      // added to alert on, and emit a warn per crash-window recovery. Its sibling
-      // reasons `baseline-heads-unknown` and `heads-probe-failed` stay OUT — those
-      // are genuine uncertainty. All three still reach CloudWatch as `error_code`.
-      const CLEAN_READ_REASONS = new Set([
-        'changed',
-        'no-baseline',
-        'unpushed-local-changes',
-        // The upgrade cohort: every device shipped before #65 decodes a legacy
-        // bare-`ver:` row to an unknown fingerprint on its FIRST open after this
-        // release. Benign, one-shot, and self-clearing at the next terminus — but
-        // it fires simultaneously fleet-wide, and counting it as uncertainty would
-        // desensitise the fail-open alert exactly when it is most needed. Still
-        // reaches CloudWatch as `error_code`, so it stays countable.
-        'baseline-heads-unknown',
-      ]);
-      const fellOpen = !CLEAN_READ_REASONS.has(reason);
+      // The guard fell open on UNCERTAINTY rather than by design — record it as
+      // `open-fail-open` on a successful read (C7), so a rising fail-open rate is
+      // visible without a repro. Which reasons are clean lives in `openCycle.ts`.
+      const fellOpen = isFailOpenReason(reason);
 
-      const loadResult = await loadFromFile({ merge: true });
+      const loadResult = await loadFromFile({ merge: true, probed });
 
       if (loadResult.success) {
         clearPodUnopenable(); // a read really succeeded
@@ -5131,6 +5199,12 @@ export const useSyncStore = defineStore('sync', () => {
       if (isAuth) scheduleColdStartReconnectEscalation(msg);
     } finally {
       isBackgroundSyncing.value = false;
+      backgroundSyncRun = null;
+      endRun(); // an open that found this read in flight ends its hold now
+      // THIS open's Drive read is over (merged, skipped or failed): load maintenance held since
+      // path 1a began now runs, on merged data, and its save cannot land inside the download.
+      // Only the open that took the hold passes its release; a token-less call releases nothing.
+      open?.releaseHold();
       // Always start polling — even on error, next poll may succeed. A payload
       // failure is filtered inside `startFilePolling` by the `podUnopenable`
       // latch, which is the only place that cannot be walked around.
@@ -5153,6 +5227,19 @@ export const useSyncStore = defineStore('sync', () => {
     return refreshResult;
   }
 
+  /**
+   * An open found a read already in flight (a header Refresh or the config-heal started during
+   * its rebuild): that read IS its Drive read, and its merge reload parks maintenance under the
+   * open's hold, so the hold ends when that read ends. With none in flight (the snapshot-paint
+   * bar is the only other setter of `isBackgroundSyncing`, and it is down before path 1a hands
+   * off), there is nothing to wait for and the hold ends now.
+   */
+  function releaseHoldAfterInFlightRead(open: OpenHandOff | undefined): void {
+    if (!open) return;
+    if (backgroundSyncRun) void backgroundSyncRun.then(open.releaseHold);
+    else open.releaseHold();
+  }
+
   /** Emit the single manual-refresh outcome event (MVO: store-owned telemetry). */
   function logManualRefreshOutcome(outcome: RefreshOutcome): void {
     logEvent({
@@ -5166,9 +5253,11 @@ export const useSyncStore = defineStore('sync', () => {
   // Track the stop handle so we never register duplicate watchers
   let autoSyncStopHandle: (() => void) | null = null;
 
-  // File polling for cross-device sync detection
+  // File polling for cross-device sync detection. Visible tabs only (requirement 16): a
+  // hidden tab issues no probe, and one probe goes out the moment it becomes visible again.
   const FILE_POLL_INTERVAL = 10_000;
-  let filePollingTimer: ReturnType<typeof setInterval> | null = null;
+  /** The running visible-only poller (`startFilePolling`), or null when polling is off. */
+  let filePollingTimer: PollWhileVisibleHandle | null = null;
   let isCheckingFile = false;
   let isCrossDeviceReload = false;
 
@@ -5205,7 +5294,9 @@ export const useSyncStore = defineStore('sync', () => {
 
       isCrossDeviceReload = true;
       try {
-        const loadResult = await loadFromFile({ merge: true });
+        // Requirement 14: the probe that said `changed` is the load's marker, so a
+        // reload costs one metadata call, not two.
+        const loadResult = await loadFromFile({ merge: true, probed: change });
         if (loadResult.success) {
           clearPodUnopenable(); // a read really succeeded
           reloaded = true;
@@ -5573,7 +5664,28 @@ export const useSyncStore = defineStore('sync', () => {
     // `useStaleTabRefresh` call those directly rather than through the timer.
     // The latch itself is `syncService`'s; see `remoteUnreadable()`.
     if (remoteUnreadable()) return;
-    filePollingTimer = setInterval(() => {
+    // In its own DETACHED scope, as the local-file poll does (`syncService`): created
+    // inside a component's setup, the poller would otherwise stop when that component
+    // unmounts, and `stop()` below disposes everything it made. It also probes once on
+    // creation (accepted: `isCheckingFile` single-flights it).
+    const scope = effectScope(true);
+    const poller = scope.run(() =>
+      usePollWhileVisible(pollFileOnce, FILE_POLL_INTERVAL, {
+        fireImmediatelyOnVisible: true,
+        surface: 'drive-poll',
+      })
+    );
+    filePollingTimer = {
+      stop: () => {
+        poller?.stop();
+        scope.stop();
+      },
+    };
+  }
+
+  /** One Drive poll: reload if the file changed, then mirror the service's latch. */
+  function pollFileOnce(): Promise<void> {
+    return (
       reloadIfFileChanged()
         // ⚠️ MIRROR WHAT THE SERVICE DECIDED. `syncService` arms the breaker on
         // paths this store never sees — its own local-file poll and the pre-save
@@ -5592,13 +5704,13 @@ export const useSyncStore = defineStore('sync', () => {
             console.warn('[syncStore] mirrorServiceLatch threw', e);
           }
         })
-        .catch(console.warn);
-    }, FILE_POLL_INTERVAL);
+        .then(() => undefined, console.warn)
+    );
   }
 
   function stopFilePolling(): void {
     if (filePollingTimer) {
-      clearInterval(filePollingTimer);
+      filePollingTimer.stop();
       filePollingTimer = null;
     }
   }
@@ -5615,7 +5727,7 @@ export const useSyncStore = defineStore('sync', () => {
 
   // When true, setupAutoSync marks itself ready but defers file polling
   // until startDeferredPolling() is called. Prevents the reload cascade
-  // during init (processRecurringItems creates mutations → file polling
+  // during init (load maintenance creates mutations → file polling
   // detects "change" → triggers reload → more mutations → loop).
   let pollingDeferred = false;
 
@@ -7994,6 +8106,8 @@ export const useSyncStore = defineStore('sync', () => {
     isBackgroundSyncing,
     backgroundSyncError,
     snapshotPaintedThisSession,
+    lastSnapshotResult,
+    committedBaselineAt,
     backgroundSyncErrorKind,
     // Actions
     initialize,

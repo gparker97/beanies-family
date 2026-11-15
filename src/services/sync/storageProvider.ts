@@ -14,11 +14,20 @@ import type { TransientFailure } from '@/utils/transientFailure';
 export interface RemoteMarker {
   revision: string | null;
   modifiedTime: string | null;
+  /**
+   * The file's CONTENT identifier, namespaced (`md5:<hex>`, see
+   * `toStoredContentId`), or absent/null when the backend has none. Only Drive
+   * sets it. Opaque here: every comparison of it lives in `remoteBaseline.ts`
+   * (`compareMarkers`), and nothing else reads it.
+   */
+  contentId?: string | null;
 }
 
 /** The ack a `write()` returns (#61): the revision the file is at after our write. */
 export interface WriteAck {
   revision: string | null;
+  /** The content id of the bytes Drive stored for this write (see {@link RemoteMarker}). */
+  contentId?: string | null;
   /**
    * The bytes did NOT reach the backend — they were queued for when the
    * connection returns.
@@ -108,6 +117,7 @@ export interface StorageProvider {
    * a revision (local / capacitor / memory) are untouched. Only Google Drive
    * implements it (Drive's `version` field). The returned revision is already
    * namespaced (`ver:` prefix) — an opaque string compared with `!==` only.
+   * Drive also returns its `md5Checksum` as `contentId` (requirement 11).
    */
   getRemoteMarker?(): Promise<RemoteMarker>;
 

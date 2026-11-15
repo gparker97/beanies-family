@@ -147,7 +147,15 @@ vi.mock('@/services/sync/offlineQueue', () => ({
 import * as syncService from '../syncService';
 import { UnsupportedBeanpodVersionError, CorruptPayloadError } from '@/types/sync';
 import { reportError } from '@/utils/errorReporter';
-import { encodeBaselinePayload, headsFingerprint } from '../remoteBaseline';
+import { encodeBaselinePayload as encodeRow, headsFingerprint } from '../remoteBaseline';
+import type { ReadTicket } from '../remoteBaseline';
+
+/** A baseline row in the current codec (requirement 11), content and envelope ids optional. */
+const encodeBaselinePayload = (
+  revision: string | null,
+  headsFp: string | null,
+  contentId: string | null = null
+): string => encodeRow({ revision, headsFp, contentId, envelopeFp: null });
 import * as docClient from '@/services/automerge/worker/docClient';
 
 function buildEnvelope(over: Partial<BeanpodFileV4> = {}): BeanpodFileV4 {
@@ -310,7 +318,7 @@ describe('syncService.save → fetchAndMergeRemote — local-wins merge', () => 
 // ─── #61 open-guard I/O shell (remoteChanged / shouldSkipOpenRead) ────────────
 
 function markerProvider(opts: {
-  marker?: { revision: string | null; modifiedTime: string | null };
+  marker?: { revision: string | null; modifiedTime: string | null; contentId?: string | null };
   markerThrows?: unknown;
   lastModified?: string | null;
   hasGetRemoteMarker?: boolean;
@@ -351,17 +359,8 @@ describe('syncService.remoteChanged / shouldSkipOpenRead (#61 C14)', () => {
     expect(r.basis).toBe('mtime');
   });
 
-  it('skips when the revision matches the seeded baseline and is within the trust window', async () => {
-    const { provider } = markerProvider({ marker: { revision: 'ver:5', modifiedTime: null } });
-    syncService.setProvider(provider as never);
-    syncService.seedRemoteBaseline({
-      payload: encodeBaselinePayload('ver:5', headsFingerprint(['h-remote'])),
-      checkedAt: new Date().toISOString(),
-    });
-    const { skip } = await syncService.shouldSkipOpenRead();
-    expect(skip).toBe(true);
-  });
-
+  // The no-content-id skip within the window: "still SKIPS when the doc heads match Drive"
+  // below (it also asserts the reason).
   it('reads (no skip) when the revision advanced', async () => {
     const { provider } = markerProvider({ marker: { revision: 'ver:6', modifiedTime: null } });
     syncService.setProvider(provider as never);
@@ -372,19 +371,6 @@ describe('syncService.remoteChanged / shouldSkipOpenRead (#61 C14)', () => {
     const { skip, reason } = await syncService.shouldSkipOpenRead();
     expect(skip).toBe(false);
     expect(reason).toBe('changed');
-  });
-
-  it('reads (no skip) when the baseline is older than the trust window', async () => {
-    const { provider } = markerProvider({ marker: { revision: 'ver:5', modifiedTime: null } });
-    syncService.setProvider(provider as never);
-    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
-    syncService.seedRemoteBaseline({
-      payload: encodeBaselinePayload('ver:5', headsFingerprint(['h-remote'])),
-      checkedAt: twoHoursAgo,
-    });
-    const { skip, reason } = await syncService.shouldSkipOpenRead();
-    expect(skip).toBe(false);
-    expect(reason).toBe('trust-expired');
   });
 
   it('reads (no skip) on a probe throw, classifying it as unknown/auth and NOT rethrowing', async () => {
@@ -413,7 +399,9 @@ describe('syncService.remoteChanged / shouldSkipOpenRead (#61 C14)', () => {
     expect(reason).toBe('no-revision');
   });
 
-  it('does NOT probe when the baseline is already trust-expired (daily-user perf)', async () => {
+  // THE one shell-level test of the no-content-id trust window (legacy rows, the version
+  // basis). The content-id path has its own tests below ("content id (requirement 13)").
+  it('a baseline WITHOUT a content id reads once trust-expired, with no metadata probe and no heads probe', async () => {
     const { provider, getRemoteMarker } = markerProvider({
       marker: { revision: 'ver:5', modifiedTime: null },
     });
@@ -427,6 +415,7 @@ describe('syncService.remoteChanged / shouldSkipOpenRead (#61 C14)', () => {
     expect(skip).toBe(false);
     expect(reason).toBe('trust-expired');
     expect(getRemoteMarker).not.toHaveBeenCalled(); // no wasted metadata round-trip
+    expect(docClient.getHeads).not.toHaveBeenCalled(); // nor a worker round-trip
   });
 
   it('does NOT probe when there is no baseline yet (first sight reads without a probe)', async () => {
@@ -453,6 +442,179 @@ describe('syncService.remoteChanged / shouldSkipOpenRead (#61 C14)', () => {
     const r = await syncService.remoteChanged();
     expect(r.status).toBe('unknown');
     expect(r.reason).toBe('file-not-found');
+  });
+});
+
+// ─── Requirement 13/14: the content-id open read and the single probe ────────
+
+describe('syncService.shouldSkipOpenRead — content id (requirement 13)', () => {
+  const twoHoursAgo = () => new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    syncService.reset();
+    vi.mocked(docClient.getHeads).mockResolvedValue({ heads: ['h-remote'] });
+  });
+
+  it('skips at ANY age when the content is unchanged and the heads are equal', async () => {
+    const { provider, getRemoteMarker } = markerProvider({
+      // Drive's own `version` drift: the content is what decides.
+      marker: { revision: 'ver:9', modifiedTime: null, contentId: 'md5:a' },
+    });
+    syncService.setProvider(provider as never);
+    syncService.seedRemoteBaseline({
+      payload: encodeBaselinePayload('ver:5', headsFingerprint(['h-remote']), 'md5:a'),
+      checkedAt: twoHoursAgo(),
+    });
+    await expect(syncService.shouldSkipOpenRead()).resolves.toEqual({
+      skip: true,
+      reason: 'content-unchanged',
+    });
+    expect(getRemoteMarker).toHaveBeenCalledTimes(1);
+  });
+
+  it('reads when the content changed, handing the deciding probe to the load', async () => {
+    const { provider } = markerProvider({
+      marker: { revision: 'ver:6', modifiedTime: null, contentId: 'md5:b' },
+    });
+    syncService.setProvider(provider as never);
+    syncService.seedRemoteBaseline({
+      payload: encodeBaselinePayload('ver:5', headsFingerprint(['h-remote']), 'md5:a'),
+      checkedAt: twoHoursAgo(),
+    });
+    const r = await syncService.shouldSkipOpenRead();
+    expect(r).toMatchObject({ skip: false, reason: 'changed' });
+    expect(r.probed).toMatchObject({ status: 'changed', basis: 'content' });
+  });
+
+  it('reads on a NULL heads fingerprint even when the content is unchanged, without probing', async () => {
+    const { provider, getRemoteMarker } = markerProvider({
+      marker: { revision: 'ver:5', modifiedTime: null, contentId: 'md5:a' },
+    });
+    syncService.setProvider(provider as never);
+    syncService.seedRemoteBaseline({
+      payload: encodeBaselinePayload('ver:5', null, 'md5:a'),
+      checkedAt: new Date().toISOString(),
+    });
+    await expect(syncService.shouldSkipOpenRead()).resolves.toMatchObject({
+      skip: false,
+      reason: 'baseline-heads-unknown',
+    });
+    expect(getRemoteMarker).not.toHaveBeenCalled();
+  });
+
+  it('reads when the document heads differ from the baseline, content unchanged or not', async () => {
+    const { provider, getRemoteMarker } = markerProvider({
+      marker: { revision: 'ver:5', modifiedTime: null, contentId: 'md5:a' },
+    });
+    syncService.setProvider(provider as never);
+    syncService.seedRemoteBaseline({
+      payload: encodeBaselinePayload('ver:5', headsFingerprint(['h-remote']), 'md5:a'),
+      checkedAt: new Date().toISOString(),
+    });
+    vi.mocked(docClient.getHeads).mockResolvedValue({ heads: ['h-other'] });
+    await expect(syncService.shouldSkipOpenRead()).resolves.toMatchObject({
+      skip: false,
+      reason: 'unpushed-local-changes',
+    });
+    expect(getRemoteMarker).not.toHaveBeenCalled();
+  });
+
+  it('a content baseline whose probe lacks a content id keeps the trust window', async () => {
+    const { provider } = markerProvider({ marker: { revision: 'ver:5', modifiedTime: null } });
+    syncService.setProvider(provider as never);
+    syncService.seedRemoteBaseline({
+      payload: encodeBaselinePayload('ver:5', headsFingerprint(['h-remote']), 'md5:a'),
+      checkedAt: twoHoursAgo(),
+    });
+    await expect(syncService.shouldSkipOpenRead()).resolves.toMatchObject({
+      skip: false,
+      reason: 'trust-expired',
+    });
+  });
+});
+
+describe('content drift moves only the in-memory revision (requirement 11)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    syncService.reset();
+    vi.mocked(docClient.getHeads).mockResolvedValue({ heads: ['h-remote'] });
+  });
+
+  it('adopts the drifted version in memory, persists nothing, keeps heads and checkedAt', async () => {
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+    const { provider, getRemoteMarker } = markerProvider({
+      marker: { revision: 'ver:8', modifiedTime: null, contentId: 'md5:a' },
+    });
+    syncService.setProvider(provider as never);
+    syncService.seedRemoteBaseline({
+      payload: encodeBaselinePayload('ver:5', headsFingerprint(['h-remote']), 'md5:a'),
+      checkedAt: twoHoursAgo,
+    });
+
+    const first = await syncService.remoteChanged();
+    expect(first).toMatchObject({ status: 'unchanged', basis: 'content', drift: 3 });
+    // The in-memory revision moved: the same probe now shows no drift.
+    expect((await syncService.remoteChanged()).drift).toBe(0);
+    expect(docClient.noteRemoteBaseline).not.toHaveBeenCalled();
+    expect(syncService.getRemoteBaselineHeadsFp()).toBe(headsFingerprint(['h-remote']));
+    // checkedAt was NOT refreshed (`learnRemoteMarker` would have): a version-only probe
+    // at the adopted revision is still outside the trust window.
+    getRemoteMarker!.mockResolvedValue({ revision: 'ver:8', modifiedTime: null });
+    expect((await syncService.shouldSkipOpenRead()).reason).toBe('trust-expired');
+  });
+});
+
+describe('one probe per reload (requirement 14)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    syncService.reset();
+  });
+
+  function bindChanged() {
+    const { provider, getRemoteMarker } = markerProvider({
+      marker: { revision: 'ver:6', modifiedTime: null, contentId: 'md5:new' },
+    });
+    provider.read.mockResolvedValue('remote-bytes' as never);
+    syncService.setProvider(provider as never);
+    syncService.seedRemoteBaseline({
+      payload: encodeBaselinePayload('ver:5', headsFingerprint(['h-old']), 'md5:old'),
+      checkedAt: new Date().toISOString(),
+    });
+    return { provider, getRemoteMarker };
+  }
+
+  it('a `changed` poll probes exactly once: the load adopts the poll probe as its marker', async () => {
+    const { getRemoteMarker } = bindChanged();
+    const change = await syncService.remoteChanged();
+    expect(change.status).toBe('changed');
+
+    const ticket: ReadTicket = { read: null };
+    await expect(syncService.load({ probed: change, ticket })).resolves.toBe('remote-bytes');
+    syncService.confirmRemoteMerged(ticket.read, ['h-new'], null);
+
+    expect(getRemoteMarker).toHaveBeenCalledTimes(1);
+    expect(docClient.noteRemoteBaseline).toHaveBeenLastCalledWith(
+      encodeBaselinePayload('ver:6', headsFingerprint(['h-new']), 'md5:new')
+    );
+  });
+
+  it('a result this module did not answer is re-probed, never trusted', async () => {
+    const { getRemoteMarker } = bindChanged();
+    const forged = { ...(await syncService.remoteChanged()) };
+    await syncService.load({ probed: forged });
+    expect(getRemoteMarker).toHaveBeenCalledTimes(2);
+  });
+
+  it('a commit that lands after the poll probe supersedes it (nothing older is learned)', async () => {
+    bindChanged();
+    const change = await syncService.remoteChanged();
+    syncService.commitRemoteBaseline(['h-save'], null); // an overlapping save's terminus
+    vi.mocked(docClient.noteRemoteBaseline).mockClear();
+    const ticket: ReadTicket = { read: null };
+    await syncService.load({ probed: change, ticket });
+    syncService.confirmRemoteMerged(ticket.read, ['h-new'], null);
+    expect(docClient.noteRemoteBaseline).not.toHaveBeenCalled();
   });
 });
 
@@ -548,18 +710,8 @@ describe('syncService.shouldSkipOpenRead — unpushed local changes (#65)', () =
     expect(docClient.getHeads).not.toHaveBeenCalled();
   });
 
-  it('does NOT probe doc heads when the trust window has already expired', async () => {
-    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
-    const { provider } = markerProvider({ marker: { revision: 'ver:5', modifiedTime: null } });
-    syncService.setProvider(provider as never);
-    syncService.seedRemoteBaseline({
-      payload: encodeBaselinePayload('ver:5', headsFingerprint(['h-remote'])),
-      checkedAt: twoHoursAgo,
-    });
-    const { reason } = await syncService.shouldSkipOpenRead();
-    expect(reason).toBe('trust-expired');
-    expect(docClient.getHeads).not.toHaveBeenCalled();
-  });
+  // (No heads probe once a no-content-id baseline is trust-expired: asserted in the
+  // trust-expired test of the describe above.)
 });
 
 describe('syncService.commitRemoteBaseline — records DRIVE heads only (#65)', () => {

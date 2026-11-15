@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { __setStoresAuthoritativeForTesting } from '@/services/automerge/loadMaintenance';
 import { nextTick } from 'vue';
 import type { ResponsibilityCardDef } from '@/constants/responsibilityCards';
 import type {
@@ -123,6 +124,8 @@ function asStored(input: TodoItem): TodoItem {
 beforeEach(() => {
   vi.useFakeTimers();
   vi.clearAllMocks();
+  // The stores hold the authoritative document unless a test says otherwise.
+  __setStoresAuthoritativeForTesting(true);
   __resetCardRemindersForTesting();
   __resetWriteGateForTesting();
   h.docLoaded.value = true;
@@ -183,6 +186,18 @@ describe('useCardReminders guards', () => {
     await settle();
     expect(storeCalls()).toBe(0);
     h.deck.isLoaded = true;
+    await settle();
+    expect(h.createTodos).toHaveBeenCalledTimes(1);
+  });
+
+  it('never writes while the stores hold a projection snapshot; runs once they are authoritative', async () => {
+    __setStoresAuthoritativeForTesting(false);
+    setCard('greg');
+    useCardReminders();
+    await settle();
+    expect(storeCalls()).toBe(0);
+    expect(events('skipped')).toEqual([]); // silent: every snapshot open passes through here
+    __setStoresAuthoritativeForTesting(true);
     await settle();
     expect(h.createTodos).toHaveBeenCalledTimes(1);
   });

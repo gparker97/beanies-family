@@ -23,6 +23,7 @@ import { useInstallNudge } from '@/composables/useInstallNudge';
 import { useFeedbackModal } from '@/composables/useFeedbackModal';
 import { useToday } from '@/composables/useToday';
 import { isDocLoaded } from '@/services/automerge/docService';
+import { storesAuthoritative } from '@/services/automerge/loadMaintenance';
 import { getAllReleaseNotes } from '@/content/release-notes';
 import { whatsNewId } from '@/utils/notifications';
 import { consumeFamilyJustCreated } from '@/utils/newFamilyFlag';
@@ -53,6 +54,11 @@ export function useNotifications(): void {
     authStore.isAuthenticated &&
     settingsStore.onboardingCompleted &&
     Boolean(familyStore.currentMember);
+  // The gate for every write this composable makes to the FAMILY DOCUMENT (the What's New
+  // read-state seed + prune, the new-family seed, the auto-open's read marks): session-ready AND
+  // the stores hold the authoritative document, never snapshot copies. The only one: the
+  // migration below relies on its caller holding it rather than re-checking.
+  const readyForDocWrites = (): boolean => ready() && storesAuthoritative.value;
 
   // 1. Advance the derive-clock so time-based notifications activate while open
   //    and immediately on tab wake. The poll catches + reports a throwing tick.
@@ -82,7 +88,9 @@ export function useNotifications(): void {
   // 3. One-time What's-New migration: seed synced read-state for every release
   //    version ≤ the legacy localStorage marker (string `<=`, date-based zero-
   //    padded versions — never parseFloat), so prior releases don't resurface as
-  //    unread. Then prune stale read-state. Runs once, after a doc + member exist.
+  //    unread. Then prune stale read-state. Runs once, after a doc + member exist. Called ONLY
+  //    under `readyForDocWrites` (the watcher below): on a snapshot open it would prune and seed
+  //    against snapshot read-state.
   let migrationDone = false;
   function runWhatsNewMigrationOnce(): void {
     if (migrationDone || !isDocLoaded() || !familyStore.currentMember) return;
@@ -101,13 +109,17 @@ export function useNotifications(): void {
     store.pruneReads();
   }
 
-  // 4. Gate: once signed-in + onboarded + a member is known, run the one-time
-  //    migration and auto-open to the latest unseen release. Suppressed in E2E
-  //    (the drawer would block test interactions; mirrors the old WhatsNew gate).
-  //    Also issues today's tip alongside the migration — both are session-ready
+  // 4. Gate: once signed-in + onboarded + a member is known, AND the stores hold the
+  //    authoritative document, run the one-time migration and auto-open to the latest unseen
+  //    release. Suppressed in E2E (the drawer would block test interactions; mirrors the old
+  //    WhatsNew gate). Also issues today's tip alongside the migration — both are session-ready
   //    side-effects that need the same gate.
+  //    ⚠️ ONE gate for the migration AND the auto-open, in that order. On a snapshot open the
+  //    member is known long before the rebuild lands; gating only the migration let the
+  //    auto-open run first, so a device whose sole record of a dismissed release is the legacy
+  //    `lastSeenWhatsNew` marker reopened it (and snapshot read-state can be stale too).
   watch(
-    () => ready(),
+    readyForDocWrites,
     (isReady) => {
       if (!isReady) return;
       if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('e2e_auto_auth')) return;
@@ -151,6 +163,9 @@ export function useNotifications(): void {
   //    same-flush double-fires (session-ready + day-roll) are safely idempotent.
   //    NOT `immediate: true` — the first call comes from the session-ready
   //    watcher above; this watcher only handles day-roll while the tab is open.
+  //    Gated on `ready()`, not `readyForDocWrites`: the tip and both nudges write per-member,
+  //    per-device localStorage (`createPerMemberStore`), never the family document, so a
+  //    snapshot open spanning midnight cannot write snapshot-era data into the pod.
   watch(today, () => {
     if (!ready()) return;
     beanTips.ensureTodayTipIssued();

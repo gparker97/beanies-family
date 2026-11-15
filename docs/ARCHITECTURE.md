@@ -247,6 +247,28 @@ FamilyMember (0..1) ───▶ (N) Goal
 - Sync guards validate `familyId` on save, load, and decrypt to prevent cross-family data leakage
 - See [ADR-018](adr/018-automerge-crdt-migration.md) for the migration decision
 
+### App-open sequence and load-time work
+
+1. **Path 1a (local cache).** `loadFromPersistenceCache` posts the projection-snapshot RPC first and the authoritative rebuild second (serial worker FIFO). A snapshot hit fills the stores through `reloadAllStores` and lifts the loading gate at once (`onEarlyPaint`); the `BackgroundSyncBar` shows "refreshing" until the rebuild lands. A miss (absent, version, collections, error) falls through to the rebuild. The rebuild sets `lastSync`; when it did not re-push a projection (heads and build match the snapshot) the second store reload is skipped.
+2. **Path 1b (Drive).** With no usable cache, `loadFromFile` reads and decrypts the `.beanpod`, installs the document and reloads the stores.
+3. **`open-paint`** fires once, the first time the stores hold data on either path (`snapshot`, `cache`, `drive` or `direct`). See PERFORMANCE.md.
+4. **Load-time maintenance runs last.** `reloadAllStores` then calls `runLoadMaintenance`, which runs the registered writers once the stores come from the authoritative document.
+
+**Rule: store loaders are read-only.** A loader that awaits a document write makes the open wait for the whole rebuild, because every write queues behind it in the worker. Writers that act on load (daily list reset, to-do roll, recurring items, chore mark sweep, family roles, linked-loan migration) register with `registerLoadMaintenance` in `src/services/automerge/loadMaintenance.ts` and run after the authoritative load, never awaited by the reload. Automatic writers guard their own entry on `storesAuthoritative`.
+
+**Load-phase guard.** `reloadAllStores` brackets its loaders with `beginLoadPhase` / `endLoadPhase`. A `docClient.mutate` inside one is a defect: unit tests throw and fail, production still sends the write and reports `load-phase-write` once per session. See [ADR-047](adr/047-load-time-writers-after-authoritative-load.md) and [ADR-032](adr/032-off-main-thread-automerge.md).
+
+### Reload only when the content changed
+
+The Drive change probe (`remoteBaseline.ts`, `compareMarkers`) is the one comparator for "did the file change". Everything below sits on the same open and poll sequence as above.
+
+- **Content id first.** The probe and the upload acknowledgement carry Drive's `md5Checksum`, stored as `md5:<hex>`. When both sides have one, equal ids mean unchanged whatever `version` says, and a different id means read. Without an id on either side (legacy baseline rows, the local-file, Capacitor and memory providers) the comparison falls back to the `version` counter. Every upload re-encrypts with a fresh IV, so new bytes always get a new id.
+- **A `version` jump is not a race by itself.** Drive keeps advancing `version` after an upload while the bytes stay the same. A write whose `version` advance is above 1 is committed as clean when its acknowledgement carries a content id, and the follow-up probe decides: `unchanged` when Drive still holds our own bytes, `changed` only when a peer wrote after us.
+- **The boot read is skipped when nothing changed.** On path 1a, a baseline with a content id probes first; equal content and equal document heads mean no download and no second Automerge load, whatever the baseline's age. Differing or unknown heads always read, because an inequality cannot tell "ahead" from "behind". The one-hour trust window survives only for baselines without a content id.
+- **A read does not stamp the baseline until its merge is confirmed.** `load()` keeps its pre-read probe in a pending marker and leaves the baseline alone. `confirmRemoteMerged(heads, envelopeFp)` learns the marker and commits straight after the merge; it commits nothing when a newer baseline commit landed meanwhile, and nulls the revision when the probe failed. Why: a save that fires while the download is still running used to see the freshly stamped baseline, answer "unchanged", skip its own read and upload without the lineage guard ever running. With the marker pending, that save compares against the previous baseline, reads and merges for itself (logged as `read-overlap`), and so passes the lineage guard before writing.
+- **Hidden tabs do not poll.** The 10 s Drive poll runs only while the document is visible, and a tab probes at once each time it becomes visible. The always-on wall holds a wake lock and stays visible, so it keeps polling.
+- **The save on tab hide and unload skips only when nothing changed.** Only those two callers pass `skipIfClean`. The skip needs the document heads to equal the committed baseline's and the envelope fingerprint to equal the one recorded at the last landed write or merge, with no save pending, in flight, queued offline or failed. Document and envelope must both match. See the 2026-11-15 addendum to [ADR-032](adr/032-off-main-thread-automerge.md). Every other save path still uploads.
+
 ### Write-path rule: the worker reconciles
 
 - Stores and repositories send **whole-value `patch`es** plus a `base`. The repository attaches `base` from the projection automatically (`patchOp` in `automergeRepository.ts`; `saveSettings` for settings), so call sites do not pass it.

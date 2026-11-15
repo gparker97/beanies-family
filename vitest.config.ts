@@ -9,6 +9,8 @@ export default defineConfig({
   test: {
     environment: 'happy-dom',
     globals: true,
+    // The load-phase guard's global `afterEach` (a store loader that writes fails its test).
+    setupFiles: ['src/test/setup.ts'],
     // `src/**` is the app suite; `scripts/**/*.mjs` picks up build-script helpers
     // (e.g. derive-store-version). The registry Lambda's handler logic (the PUT
     // server-stamp / preserve-merge) is vitest-authored, so it runs in the gate;

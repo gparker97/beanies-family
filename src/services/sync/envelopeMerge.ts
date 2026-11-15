@@ -26,6 +26,8 @@
  */
 
 import type { BeanpodFileV4, EnvelopeTombstone } from '@/types/syncFileV4';
+import { canonicalJson } from '@/utils/canonicalJson';
+import { sha256Hex } from '@/utils/encoding';
 
 /**
  * The same envelope WITHOUT its encrypted payload.
@@ -45,6 +47,24 @@ import type { BeanpodFileV4, EnvelopeTombstone } from '@/types/syncFileV4';
  */
 export function withoutPayload(env: BeanpodFileV4): BeanpodFileV4 {
   return { ...env, encryptedPayload: '' };
+}
+
+/**
+ * Fingerprint of everything in the envelope EXCEPT the payload (requirement 15):
+ * SHA-256 hex of its sorted-key JSON. Every non-payload field counts, so every
+ * key dict in `ENVELOPE_KEY_DICTS`, `recoveryPassphrase`, `revokedKeys` and any
+ * field added later are covered with no list to maintain (a count, like
+ * `keyDictSize`, is blind to an in-place rotation; this is not). Key order never
+ * counts. The clean skip on tab hide rests on it: equal fingerprints mean this
+ * device holds no key material the file lacks.
+ *
+ * The canonical text is taken synchronously, at the call; only the hash is
+ * awaited, so an envelope changed after the call cannot leak into the result.
+ * Rejects when `crypto.subtle` is unavailable; callers treat that as "no
+ * fingerprint", which means "upload".
+ */
+export function envelopeFingerprint(env: BeanpodFileV4): Promise<string> {
+  return sha256Hex(canonicalJson(withoutPayload(env)) ?? '');
 }
 
 /**

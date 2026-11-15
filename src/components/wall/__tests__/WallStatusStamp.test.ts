@@ -11,6 +11,7 @@ const { syncState, onlineState } = vi.hoisted(() => ({
   syncState: {
     saveStatus: 'saved' as string,
     lastSync: '2026-09-06T10:00:00.000Z' as string | null,
+    committedBaselineAt: null as string | null,
     driveFileNotFound: false,
     podAccessError: null as unknown,
     cachePersistFailed: false,
@@ -36,6 +37,7 @@ describe('WallStatusStamp', () => {
     Object.assign(syncState, {
       saveStatus: 'saved',
       lastSync: '2026-09-06T10:00:00.000Z',
+      committedBaselineAt: null,
       driveFileNotFound: false,
       podAccessError: null,
       cachePersistFailed: false,
@@ -64,6 +66,21 @@ describe('WallStatusStamp', () => {
     const text = mount(WallStatusStamp).text();
     expect(text).toContain('wall.status.needsAttention');
     expect(text).not.toContain('wall.status.blocked');
+  });
+
+  it('shows the last committed baseline time while the rebuild has not set lastSync', () => {
+    syncState.lastSync = null;
+    syncState.committedBaselineAt = new Date(Date.now() - 5 * 60_000).toISOString();
+    const w = mount(WallStatusStamp);
+    expect(w.text()).toContain('wall.status.saved');
+    expect(w.text()).not.toContain('wall.status.stale');
+    expect(w.text()).not.toContain('\u2014');
+  });
+
+  it('keeps the attention dash on a brand new device with no baseline', () => {
+    syncState.lastSync = null;
+    syncState.committedBaselineAt = null;
+    expect(mount(WallStatusStamp).text()).toContain('wall.status.stale');
   });
 
   it('shows a healthy stamp when nothing is wrong', () => {

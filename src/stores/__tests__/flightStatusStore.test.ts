@@ -8,6 +8,7 @@
  * the Lambda call, the vacation store's write and the platform composables are faked.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { __setStoresAuthoritativeForTesting } from '@/services/automerge/loadMaintenance';
 import { createPinia, setActivePinia } from 'pinia';
 import { reactive, ref } from 'vue';
 import type { FamilyVacation, VacationTravelSegment } from '@/types/models';
@@ -177,6 +178,8 @@ beforeEach(() => {
   vi.stubEnv('DEV', false);
   localStorage.clear();
   setActivePinia(createPinia());
+  // The stores hold the authoritative document unless a test says otherwise.
+  __setStoresAuthoritativeForTesting(true);
   h.logEvent.mockReset();
   h.fetchFlightLegs.mockReset();
   h.writeResult = 'saved';
@@ -248,6 +251,21 @@ describe('run → check → apply', () => {
     await store.run('tick');
     expect(h.fetchFlightLegs).toHaveBeenCalledTimes(2);
     expect(updateSegment).toHaveBeenCalledTimes(1);
+  });
+
+  it('an airline change found while the stores hold a snapshot is written once they are authoritative, from the cache', async () => {
+    __setStoresAuthoritativeForTesting(false);
+    h.fetchFlightLegs.mockResolvedValue(answer([moved]));
+    const store = useFlightStatusStore();
+    await store.run('open');
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(1);
+    expect(updateSegment).not.toHaveBeenCalled(); // never a write onto a snapshot copy
+
+    __setStoresAuthoritativeForTesting(true);
+    await store.run('tick'); // the answer is fresh: an owed write, retried from the cache
+    expect(h.fetchFlightLegs).toHaveBeenCalledTimes(1);
+    expect(updateSegment).toHaveBeenCalledTimes(1);
+    expect(segment()).toMatchObject({ departureTime: '18:30', terminal: '3' });
   });
 
   it("the store's own date move is not a refetch (freshness is by time)", async () => {

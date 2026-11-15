@@ -205,6 +205,11 @@ vi.mock('@/services/automerge/repositories/choreRepository', () => ({
 }));
 
 import { useChoreStore } from '@/stores/choreStore';
+import {
+  __whenLoadMaintenanceIdleForTesting,
+  runLoadMaintenance,
+} from '@/services/automerge/loadMaintenance';
+import { markAuthoritative, resetProjection } from '@/services/automerge/projection';
 import { choreMarkId, shiftChoreDay, MAX_MARK_SWEEP_DELETES } from '@/utils/chores';
 import { CHORE_MARK_SWEEP_KEY, LIST_CYCLE_SWEEP_KEY } from '@/utils/cycleSweepClock';
 import * as clockModule from '@/composables/useChoreClock';
@@ -276,7 +281,7 @@ beforeEach(async () => {
   settings.settings = {};
   budget.allow = true;
   budget.calls = [];
-  // A swept-today cursor so `loadChores`' own sweep stays quiet in the tick tests.
+  // A swept-today cursor so the sweep stays quiet in the tick tests.
   localStorage.clear();
   localStorage.setItem(CHORE_MARK_SWEEP_KEY, FRI);
   setClock(FRI, '09:00');
@@ -1408,6 +1413,21 @@ describe('the retention sweep', () => {
     expect(reportError).toHaveBeenCalledWith(
       expect.objectContaining({ surface: 'choreboard', severity: 'warning' })
     );
+  });
+
+  // 2026-11-15: `loadChores` is READ-ONLY; the sweep is load maintenance.
+  it('loadChores never sweeps; the load-maintenance run does, once', async () => {
+    localStorage.setItem(CHORE_MARK_SWEEP_KEY, shiftChoreDay(FRI, -1));
+    await setup([], [oldMark(1)]);
+    expect(writes.removeChoreMarks).not.toHaveBeenCalled();
+    expect(db.marks.size).toBe(1);
+
+    markAuthoritative();
+    runLoadMaintenance('reload');
+    await __whenLoadMaintenanceIdleForTesting();
+    expect(writes.removeChoreMarks).toHaveBeenCalledTimes(1);
+    expect(db.marks.size).toBe(0);
+    resetProjection();
   });
 
   it('keeps its own cursor, apart from the list cycle sweep', () => {

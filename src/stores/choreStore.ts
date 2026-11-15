@@ -33,6 +33,7 @@ import { celebrateChore, holdChoreBlock, releaseChoreBlock } from '@/composables
 import { useChoreClock } from '@/composables/useChoreClock';
 import { isAdultMember } from '@/composables/useMemberInfo';
 import { isDocLoaded } from '@/services/automerge/docService';
+import { registerLoadMaintenance, storesAuthoritative } from '@/services/automerge/loadMaintenance';
 import * as repo from '@/services/automerge/repositories/choreRepository';
 import type { CreateChoreInput } from '@/services/automerge/repositories/choreRepository';
 import { logEvent } from '@/services/telemetry/logEvent';
@@ -318,9 +319,9 @@ export const useChoreStore = defineStore('chores', () => {
       },
       { action: 'choreStore:loadChores', surface: SURFACE }
     );
-    // Where the list cycle sweep runs: on open and after each remote merge (both reload the
-    // stores). The day cursor makes it at most once per device per day.
-    await sweepExpiredMarks();
+    // READ-ONLY (2026-11-15): the mark sweep is load maintenance (registered below), run on
+    // open and after each remote merge once the stores hold the authoritative document. The
+    // day cursor makes it at most once per device per day.
   }
 
   // ========== TICKING ==========
@@ -1171,9 +1172,12 @@ export const useChoreStore = defineStore('chores', () => {
   watch(
     () => choreClock.value.ymd,
     () => {
+      // Not on snapshot copies; the maintenance run after the authoritative reload covers it.
+      if (!storesAuthoritative.value) return;
       void sweepExpiredMarks();
     }
   );
+  registerLoadMaintenance('chore-marks-sweep', sweepExpiredMarks);
 
   function resetState(): void {
     chores.value = [];

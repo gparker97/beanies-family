@@ -32,6 +32,8 @@ import {
   persistProjectionSnapshot,
   loadProjectionSnapshot,
   SNAPSHOT_VERSION,
+  snapshotMissReason,
+  snapshotIdentity,
   readRemoteBaseline,
   writeRemoteBaseline,
   clearRemoteBaseline,
@@ -335,7 +337,71 @@ describe('worker/cache', () => {
     });
 
     it('SNAPSHOT_VERSION is a stable `<rev>:<fingerprint>` string', () => {
+      // Still WRITTEN with the fingerprint, so an older build (which compares the whole
+      // string) keeps refusing a snapshot whose collections it does not know.
       expect(SNAPSHOT_VERSION).toMatch(/^\d+:\d+$/);
+    });
+
+    it('round-trips the heads and build a snapshot was written with', async () => {
+      const doc = setAccount(base(), 'a1', 10);
+      const snap = { ...snapshotOf(doc), heads: getHeads(doc), build: 'sha@time' };
+      await persistProjectionSnapshot(key, snap);
+      const loaded = await loadProjectionSnapshot(key);
+      expect(loaded).toEqual(snap);
+      expect(snapshotIdentity(loaded!)).toEqual({ heads: getHeads(doc), build: 'sha@time' });
+    });
+
+    it('snapshotIdentity is null for a snapshot without heads or build (an older build wrote it)', () => {
+      const snap = snapshotOf(base());
+      expect(snapshotIdentity(snap)).toBeNull();
+      expect(snapshotIdentity({ ...snap, heads: getHeads(base()) })).toBeNull();
+      expect(snapshotIdentity({ ...snap, build: 'sha@time' })).toBeNull();
+      expect(snapshotIdentity({ ...snap, heads: [1] as never, build: 'sha@time' })).toBeNull();
+    });
+
+    describe('snapshotMissReason (only the manual revision and the collections themselves)', () => {
+      const [rev, fingerprint] = SNAPSHOT_VERSION.split(':');
+      const deltas = () => buildFullProjection(setAccount(base(), 'a1', 1));
+      const unknownBulk = {
+        kind: 'bulk',
+        collection: 'notACollection',
+        reset: true,
+        entities: [],
+      } as never;
+
+      it.each([
+        ['the current version', SNAPSHOT_VERSION, null],
+        ['another collections fingerprint (a collection added since)', `${rev}:1`, null],
+        ['the bare manual revision', `${rev}`, null],
+        ['another manual revision', `${Number(rev) + 1}:${fingerprint}`, 'version'],
+        ['a pre-format string', 'stale:0', 'version'],
+        ['a non-string version', 7 as unknown as string, 'version'],
+      ])('%s → %s', (_label, version, expected) => {
+        expect(snapshotMissReason({ version, deltas: deltas() })).toBe(expected);
+      });
+
+      it('a payload whose deltas are not an array is not this shape', () => {
+        expect(snapshotMissReason({ version: SNAPSHOT_VERSION, deltas: {} as never })).toBe(
+          'version'
+        );
+      });
+
+      it('an unknown collection, top-level or inside a multi, is `collections`', () => {
+        expect(
+          snapshotMissReason({ version: SNAPSHOT_VERSION, deltas: [...deltas(), unknownBulk] })
+        ).toBe('collections');
+        expect(
+          snapshotMissReason({
+            version: SNAPSHOT_VERSION,
+            deltas: [...deltas(), { kind: 'multi', deltas: [unknownBulk] }],
+          })
+        ).toBe('collections');
+      });
+
+      it('a snapshot missing a collection (added since it was written) is accepted', () => {
+        const partial = deltas().filter((d) => d.kind !== 'bulk' || d.collection !== 'accounts');
+        expect(snapshotMissReason({ version: SNAPSHOT_VERSION, deltas: partial })).toBeNull();
+      });
     });
 
     it('is dropped by clearCache (whole-DB delete), like every other cache row', async () => {

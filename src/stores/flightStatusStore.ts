@@ -55,6 +55,7 @@ import type {
 } from '@/types/flightStatus';
 import type { FamilyVacation, UUID, VacationTravelSegment } from '@/types/models';
 import { docVersion, isDocLoaded } from '@/services/automerge/docService';
+import { storesAuthoritative } from '@/services/automerge/loadMaintenance';
 import {
   FlightStatusApiError,
   fetchFlightLegs,
@@ -696,8 +697,11 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
     return result;
   }
 
-  /** Write the check's change when it is due; null = nothing was due. */
+  /** Write the check's change when it is due; null = nothing was due. The AUTOMATIC write
+   *  entry: not while the stores hold a projection snapshot (the segment it patches is a
+   *  snapshot copy). The answer stays cached, so the next run retries it as owed. */
   async function applyIfDue(c: Candidate, check: FlightCheck): Promise<SegmentWriteResult | null> {
+    if (!storesAuthoritative.value) return null;
     const leg = check.leg;
     if (!leg || !shouldApply(c.segment, leg, check.arrivalLeg)) return null;
     const patch = planChange(c.segment, leg, check.arrivalLeg, Date.now(), copy());
@@ -1522,7 +1526,8 @@ export const useFlightStatusStore = defineStore('flightStatus', () => {
       // A rotated push token: re-subscribe every desired flight under it (a no-op on web).
       onTokenChanged(() => void request('push-token'));
       let timer: ReturnType<typeof setTimeout> | null = null;
-      watch([candidateSignature, isEnabled], () => {
+      // `storesAuthoritative`: a write held back on a snapshot is retried once it turns true.
+      watch([candidateSignature, isEnabled, storesAuthoritative], () => {
         if (timer) clearTimeout(timer);
         timer = setTimeout(() => {
           timer = null;

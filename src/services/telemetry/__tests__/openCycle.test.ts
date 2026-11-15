@@ -20,6 +20,7 @@ import {
   bump,
   noteSnapshot,
   endOpen,
+  isFailOpenReason,
   __resetOpenCycleForTesting,
 } from '../openCycle';
 
@@ -215,4 +216,27 @@ describe('openCycle', () => {
 
     expect(Object.keys(emitted()!.context).sort()).toEqual(['action', 'detail', 'error_code']);
   });
+});
+
+/**
+ * Requirement 13: which open-guard read reasons count as a fall-open. `trust-expired`
+ * (an ordinary open more than an hour after the last commit) is the trust window doing
+ * its job, not uncertainty, so it is clean. Genuine uncertainty stays a fail-open.
+ */
+describe('isFailOpenReason', () => {
+  it.each([
+    'changed',
+    'no-baseline',
+    'unpushed-local-changes',
+    'baseline-heads-unknown',
+    'trust-expired',
+  ])('%s is a clean read, not a fail-open', (reason) => {
+    expect(isFailOpenReason(reason)).toBe(false);
+  });
+  it.each(['heads-probe-failed', 'no-revision', 'auth', 'file-not-found', 'unknown'])(
+    '%s is uncertainty: a fail-open',
+    (reason) => {
+      expect(isFailOpenReason(reason)).toBe(true);
+    }
+  );
 });

@@ -33,6 +33,7 @@ import type { HelpfulHintType, TodoItem } from '@/types/models';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import { withAppInitiatedWrites } from '@/services/analytics/plausible';
 import { skipWhileReadOnly } from '@/services/automerge/worker/writeGate';
+import { storesAuthoritative } from '@/services/automerge/loadMaintenance';
 import { takeAutoWrite } from '@/utils/autoWriteBudget';
 
 const DEBOUNCE_MS = 1000;
@@ -143,6 +144,9 @@ export function useHelpfulHints(): void {
     // Family doc not loaded → never reconcile against an empty world (mirrors the
     // reminder path's null-guard), else we'd delete every hint on a cold start.
     if (!currentMember) return;
+    // Nor against a projection snapshot: the stores are a copy of the last session, and the
+    // diff would delete and recreate hints from it. The watch re-runs this when it turns true.
+    if (!storesAuthoritative.value) return;
     // A read-only family would refuse every write below, so do not attempt them:
     // a refused write must never spend the automatic-write budget.
     if (skipWhileReadOnly(SURFACE)) return;
@@ -408,6 +412,7 @@ export function useHelpfulHints(): void {
       // A dismissal synced from another device removes this device's copy promptly.
       () => settingsStore.dismissedHintKeys,
       cardHolderKey,
+      () => storesAuthoritative.value,
     ],
     queueReconcile,
     { immediate: true, deep: true }

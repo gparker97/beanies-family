@@ -33,6 +33,7 @@ import {
   reset,
   __resetApplyAndProjectForTesting,
   __hasDocForTesting,
+  __pushedSnapshotForTesting,
   exportSnapshot,
   postingSink,
   type WorkerSink,
@@ -127,6 +128,59 @@ describe('worker/applyAndProject', () => {
       expect(chunks).toHaveLength(0);
     });
 
+    it('a stalled baseline read never holds the reply: it is omitted after a short bound', async () => {
+      setKey(key);
+      await initAndLoadCache(FAMILY_ID);
+      initDoc();
+      mutate({ op: 'set', collection: 'accounts', id: 'a1', entity: { id: 'a1', balance: 1 } });
+      await flush();
+      // Never answers (a stalled IndexedDB read): the main thread paints only after this reply,
+      // and the serial worker queue is held until it, so waiting on it would delay first paint.
+      const read = vi
+        .spyOn(cache, 'readRemoteBaseline')
+        .mockImplementationOnce(() => new Promise(() => {}));
+      try {
+        chunks = [];
+        const started = performance.now();
+        const res = await dispatch('loadProjectionSnapshot', { familyId: FAMILY_ID });
+        expect(performance.now() - started).toBeLessThan(1_000);
+        expect(res.result).toEqual({ hit: true, baselineReadError: 'TimedOut' });
+        expect(chunks.some((c) => c.final)).toBe(true);
+      } finally {
+        read.mockRestore();
+      }
+    });
+
+    it('a failing baseline read still paints, and names the error instead of swallowing it', async () => {
+      setKey(key);
+      await initAndLoadCache(FAMILY_ID);
+      initDoc();
+      mutate({ op: 'set', collection: 'accounts', id: 'a1', entity: { id: 'a1', balance: 1 } });
+      await flush();
+      const failure = Object.assign(new Error('idb gone'), { name: 'UnknownError' });
+      const read = vi.spyOn(cache, 'readRemoteBaseline').mockRejectedValueOnce(failure);
+      try {
+        chunks = [];
+        const res = await dispatch('loadProjectionSnapshot', { familyId: FAMILY_ID });
+        expect(res.result).toEqual({ hit: true, baselineReadError: 'UnknownError' });
+        expect(chunks.some((c) => c.final)).toBe(true);
+      } finally {
+        read.mockRestore();
+      }
+    });
+
+    it('carries the committed baseline time so the wall stamp has one before the rebuild', async () => {
+      setKey(key);
+      await initAndLoadCache(FAMILY_ID);
+      initDoc();
+      mutate({ op: 'set', collection: 'accounts', id: 'a1', entity: { id: 'a1', balance: 1 } });
+      noteRemoteBaseline('ver:5');
+      await flush();
+      const row = await cache.readRemoteBaseline();
+      const res = await dispatch('loadProjectionSnapshot', { familyId: FAMILY_ID });
+      expect((res.result as { baselineCheckedAt?: string }).baselineCheckedAt).toBe(row?.checkedAt);
+    });
+
     it('flush persists a snapshot that loadProjectionSnapshot then streams (hit) — without a rebuild', async () => {
       setKey(key);
       await initAndLoadCache(FAMILY_ID);
@@ -153,13 +207,224 @@ describe('worker/applyAndProject', () => {
       expect(bulkFor('accounts').flatMap((d) => d.entities.map(([id]) => id))).toContain('a1');
     });
 
-    it('loadProjectionSnapshot → {hit:false, reason:version} on a shape-version mismatch', async () => {
+    // A version miss: "a snapshot of another manual revision misses with reason version" and
+    // "a miss clears what an earlier hit remembered" below (only the manual revision counts now).
+  });
+
+  // 2026-11-15 instant open, requirements 6 and 7: the snapshot survives an added collection,
+  // and the rebuild does not repaint a projection the snapshot already shows.
+  describe('projection snapshot: tolerant version check and the no-op repaint skip', () => {
+    const REV = cache.SNAPSHOT_VERSION.split(':')[0]!;
+    const sinkInto = (): WorkerSink => ({
+      pushChunk: (delta, final) => chunks.push({ delta, final }),
+      perf: (label) => perf.push(label),
+      cachePersistFailed: () => {},
+      cacheReleased: () => {},
+    });
+
+    /**
+     * Seed this family's cache with a document and the snapshot `flush` writes for it, then drop
+     * the realm's document as a fresh app open would find it. Answers the document's heads.
+     */
+    async function seedAndCloseRealm(): Promise<string[]> {
       setKey(key);
       await initAndLoadCache(FAMILY_ID);
-      await cache.persistProjectionSnapshot(key, { version: 'stale:0', deltas: [] });
+      initDoc();
+      mutate({ op: 'set', collection: 'accounts', id: 'a1', entity: { id: 'a1', balance: 7 } });
+      await flush();
+      const heads = Automerge.getHeads(Automerge.load(exportSnapshot().binary));
+      await reset();
+      configure(sinkInto());
+      setKey(key);
+      await cache.initPersistenceDB(FAMILY_ID);
       chunks = [];
-      const res = await dispatch('loadProjectionSnapshot', { familyId: FAMILY_ID });
-      expect(res.result).toEqual({ hit: false, reason: 'version' });
+      return heads;
+    }
+
+    const openSnapshot = async () =>
+      (await dispatch('loadProjectionSnapshot', { familyId: FAMILY_ID })).result;
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it('a persisted snapshot carries the heads of the document it was built from and this build', async () => {
+      const heads = await seedAndCloseRealm();
+      const snap = await cache.loadProjectionSnapshot(key);
+      expect(snap!.heads).toEqual(heads);
+      expect(snap!.build).toBe(cache.snapshotBuildId());
+    });
+
+    it('does not push the projection again when the rebuilt heads and the build both match the snapshot', async () => {
+      await seedAndCloseRealm();
+      expect(await openSnapshot()).toEqual({ hit: true });
+      chunks = [];
+      const res = await initAndLoadCache(FAMILY_ID);
+      expect(res.loaded).toBe(true);
+      expect(res.projected).toBe(false);
+      expect(chunks).toHaveLength(0);
+      // The document is still installed: later writes work and stream their own deltas.
+      expect(__hasDocForTesting()).toBe(true);
+      const { delta } = mutate({
+        op: 'set',
+        collection: 'accounts',
+        id: 'a2',
+        entity: { id: 'a2', balance: 1 },
+      });
+      expect(delta).toBeDefined();
+    });
+
+    it('a skipped push does not rewrite the identical snapshot; the next real change still does', async () => {
+      await seedAndCloseRealm();
+      expect(await openSnapshot()).toEqual({ hit: true });
+      const persist = vi.spyOn(cache, 'persistProjectionSnapshot');
+      try {
+        expect((await initAndLoadCache(FAMILY_ID)).projected).toBe(false);
+        await flush(); // folds the coarse snapshot persist the load scheduled
+        expect(persist).not.toHaveBeenCalled();
+
+        mutate({ op: 'set', collection: 'accounts', id: 'a2', entity: { id: 'a2', balance: 1 } });
+        await flush();
+        expect(persist).toHaveBeenCalledTimes(1);
+      } finally {
+        persist.mockRestore();
+      }
+    });
+
+    it('pushes the projection when the heads match but another build wrote the snapshot', async () => {
+      await seedAndCloseRealm();
+      expect(await openSnapshot()).toEqual({ hit: true });
+      chunks = [];
+      vi.stubEnv('VITE_BUILD_SHA', 'a-newer-build');
+      const res = await initAndLoadCache(FAMILY_ID);
+      expect(res.projected).toBe(true);
+      expect(chunks.filter((c) => c.final)).toHaveLength(1);
+    });
+
+    it('pushes the projection when the document moved past the snapshot', async () => {
+      setKey(key);
+      await initAndLoadCache(FAMILY_ID);
+      initDoc();
+      mutate({ op: 'set', collection: 'accounts', id: 'a1', entity: { id: 'a1', balance: 7 } });
+      await flush();
+      // A later write reaches the doc cache but not the (coarse) snapshot row.
+      const snap = await cache.loadProjectionSnapshot(key);
+      mutate({ op: 'set', collection: 'accounts', id: 'a2', entity: { id: 'a2', balance: 8 } });
+      await flush();
+      await cache.persistProjectionSnapshot(key, snap!);
+      await reset();
+      configure(sinkInto());
+      setKey(key);
+      await cache.initPersistenceDB(FAMILY_ID);
+      expect(await openSnapshot()).toEqual({ hit: true });
+      chunks = [];
+      const res = await initAndLoadCache(FAMILY_ID);
+      expect(res.projected).toBe(true);
+      expect(bulkFor('accounts').flatMap((d) => d.entities.map(([id]) => id))).toContain('a2');
+    });
+
+    it('a snapshot without heads or build (an older build wrote it) repaints as today', async () => {
+      await seedAndCloseRealm();
+      const snap = await cache.loadProjectionSnapshot(key);
+      await cache.persistProjectionSnapshot(key, { version: snap!.version, deltas: snap!.deltas });
+      expect(await openSnapshot()).toEqual({ hit: true });
+      expect(__pushedSnapshotForTesting()).toBeNull();
+      chunks = [];
+      const res = await initAndLoadCache(FAMILY_ID);
+      expect(res.projected).toBe(true);
+      expect(chunks.filter((c) => c.final)).toHaveLength(1);
+    });
+
+    it('the remembered snapshot is one-shot: taken by the next open, never used over a live document', async () => {
+      await seedAndCloseRealm();
+      expect(await openSnapshot()).toEqual({ hit: true });
+      expect(__pushedSnapshotForTesting()).toMatchObject({ familyId: FAMILY_ID });
+      expect((await initAndLoadCache(FAMILY_ID)).projected).toBe(false);
+      expect(__pushedSnapshotForTesting()).toBeNull();
+
+      // Over the now-live document: a snapshot pushed again is discarded, not matched.
+      expect(await openSnapshot()).toEqual({ hit: true });
+      expect(__pushedSnapshotForTesting()).not.toBeNull();
+      const live = await initAndLoadCache(FAMILY_ID);
+      expect(live.loaded).toBe(true);
+      expect(live.projected).toBeUndefined(); // the live-merge arm, never the skip
+      expect(__pushedSnapshotForTesting()).toBeNull();
+    });
+
+    it('the remembered snapshot is cleared by a reset and never answers for another family', async () => {
+      await seedAndCloseRealm();
+      expect(await openSnapshot()).toEqual({ hit: true });
+      await reset();
+      expect(__pushedSnapshotForTesting()).toBeNull();
+
+      configure(sinkInto());
+      setKey(key);
+      await cache.initPersistenceDB(FAMILY_ID);
+      expect(await openSnapshot()).toEqual({ hit: true });
+      // Another family's open takes it too (one-shot) without matching it.
+      const other = await initAndLoadCache('aap-other-family');
+      expect(other.projected).toBeUndefined();
+      expect(__pushedSnapshotForTesting()).toBeNull();
+      await cache.clearCache('aap-other-family').catch(() => {});
+    });
+
+    it('a miss clears what an earlier hit remembered', async () => {
+      await seedAndCloseRealm();
+      expect(await openSnapshot()).toEqual({ hit: true });
+      await cache.persistProjectionSnapshot(key, { version: 'stale:0', deltas: [] });
+      expect(await openSnapshot()).toEqual({ hit: false, reason: 'version' });
+      expect(__pushedSnapshotForTesting()).toBeNull();
+    });
+
+    it('a snapshot written before a collection was added still hits (only the manual revision is compared)', async () => {
+      await seedAndCloseRealm();
+      const snap = await cache.loadProjectionSnapshot(key);
+      // As an older build wrote it: its collection list lacked one, so its fingerprint differs.
+      const dropped = COLLECTION_NAMES[COLLECTION_NAMES.length - 1]!;
+      const deltas = snap!.deltas.filter((d) => !('collection' in d) || d.collection !== dropped);
+      await cache.persistProjectionSnapshot(key, { version: `${REV}:12345`, deltas });
+      expect(await openSnapshot()).toEqual({ hit: true });
+      expect(bulkFor(dropped)).toHaveLength(0);
+      expect(bulkFor('accounts').flatMap((d) => d.entities.map(([id]) => id))).toContain('a1');
+      expect(chunks.filter((c) => c.final)).toHaveLength(1);
+    });
+
+    it('a snapshot naming an unknown collection misses with reason collections before any chunk is pushed', async () => {
+      await seedAndCloseRealm();
+      const snap = await cache.loadProjectionSnapshot(key);
+      const unknown = {
+        kind: 'bulk',
+        collection: 'aRemovedCollection',
+        reset: true,
+        entities: [],
+      } as unknown as ProjectionDelta;
+      // LAST, so a check made while streaming would already have pushed every other chunk.
+      await cache.persistProjectionSnapshot(key, { ...snap!, deltas: [...snap!.deltas, unknown] });
+      expect(await openSnapshot()).toEqual({ hit: false, reason: 'collections' });
+      expect(chunks).toHaveLength(0);
+      expect(__pushedSnapshotForTesting()).toBeNull();
+
+      // Nested inside a `multi` too.
+      const nested = { kind: 'multi', deltas: [unknown] } as unknown as ProjectionDelta;
+      await cache.persistProjectionSnapshot(key, { ...snap!, deltas: [...snap!.deltas, nested] });
+      expect(await openSnapshot()).toEqual({ hit: false, reason: 'collections' });
+      expect(chunks).toHaveLength(0);
+
+      // The rebuild then paints the authoritative document in full.
+      const res = await initAndLoadCache(FAMILY_ID);
+      expect(res.projected).toBe(true);
+      expect(chunks.filter((c) => c.final)).toHaveLength(1);
+    });
+
+    it('a snapshot of another manual revision misses with reason version', async () => {
+      await seedAndCloseRealm();
+      const snap = await cache.loadProjectionSnapshot(key);
+      const fingerprint = cache.SNAPSHOT_VERSION.split(':')[1];
+      await cache.persistProjectionSnapshot(key, {
+        ...snap!,
+        version: `${Number(REV) + 1}:${fingerprint}`,
+      });
+      expect(await openSnapshot()).toEqual({ hit: false, reason: 'version' });
       expect(chunks).toHaveLength(0);
     });
   });

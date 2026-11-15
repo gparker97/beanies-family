@@ -5,6 +5,7 @@ import { createMemberFiltered } from '@/composables/useMemberFiltered';
 import { wrapAsync } from '@/composables/useStoreActions';
 import { useToday } from '@/composables/useToday';
 import { isDocLoaded } from '@/services/automerge/docService';
+import { registerLoadMaintenance, storesAuthoritative } from '@/services/automerge/loadMaintenance';
 import * as listRepo from '@/services/automerge/repositories/listRepository';
 import * as cycleRepo from '@/services/automerge/repositories/listCycleRepository';
 import { buildCycleSnapshot, expiredCycleIds, CYCLE_SWEEP_ENABLED } from '@/utils/listCycles';
@@ -426,9 +427,9 @@ export const useListStore = defineStore('lists', () => {
     );
     auditLists(lists.value, today.value);
     await loadCycles();
-    // Only AFTER the collections are populated, so a watcher race can't run against an
-    // empty set. Idempotent — a same-day re-run is a no-op.
-    await runDailyMaintenance();
+    // READ-ONLY (2026-11-15): the daily reset is load maintenance (registered below), run
+    // after the stores were reloaded from the authoritative document. Awaiting it here made a
+    // snapshot paint wait for the whole Automerge rebuild.
   }
 
   /**
@@ -461,9 +462,10 @@ export const useListStore = defineStore('lists', () => {
    * a PWA resume can overlap, and two concurrent passes over the same list would both
    * read its pre-reset state.
    *
-   * Called from BOTH `loadLists` and the watcher, and both are required: `watch(today)`
-   * is not `immediate` and `today` is set at module load, so for a user who opens the app
-   * fresh each day the watcher never fires in that session.
+   * Called from BOTH load maintenance (after every authoritative store reload) and the
+   * watcher, and both are required: `watch(today)` is not `immediate` and `today` is set at
+   * module load, so for a user who opens the app fresh each day the watcher never fires in
+   * that session.
    */
   let maintaining = false;
   async function runDailyMaintenance(): Promise<void> {
@@ -1630,9 +1632,13 @@ export const useListStore = defineStore('lists', () => {
 
   // Reset recurring lists when the local day advances (PWA wake / midnight /
   // tab restore). Guarded against an empty set; idempotent on same-day re-runs.
+  // Not while the stores hold a snapshot: the reset would be computed from snapshot copies.
+  // The maintenance run after the authoritative reload covers a day that rolled meanwhile.
   watch(today, () => {
+    if (!storesAuthoritative.value) return;
     void runDailyMaintenance();
   });
+  registerLoadMaintenance('list-daily', runDailyMaintenance);
 
   return {
     // State

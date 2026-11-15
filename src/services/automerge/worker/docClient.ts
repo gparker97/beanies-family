@@ -67,6 +67,7 @@ import {
   type MergeOutcome,
   type DispatchReply,
   type InitAndLoadResult,
+  type SnapshotLoadResult,
   type DocStats,
   type CacheReplay,
   type ProjectionDelta,
@@ -79,6 +80,12 @@ import { ReadOnlyError, readWriteGate, setWriteGate, type WriteGateVerdict } fro
 import type { CollectionName } from '@/types/automerge';
 import type { BeanpodFileV4 } from '@/types/syncFileV4';
 import { bump as bumpOpenCycle } from '@/services/telemetry/openCycle';
+import {
+  clearStoresAuthoritative,
+  inLoadPhase,
+  noteDocWrite,
+  noteLoadPhaseWrite,
+} from '../loadMaintenance';
 import { createChangeGate } from '@/services/telemetry/emitPolicy';
 
 /** Minimal Worker surface — real `Worker` satisfies it; tests inject a fake. */
@@ -1839,7 +1846,9 @@ export async function initAndLoadCache(familyId: string): Promise<InitAndLoadRes
   if (res.loaded) bumpOpenCycle('reconstruction');
   // The one fact main can hold about this family's cache, from the one call that
   // is told it. `bootstrap.ts`'s rehydrator routes through here, so it learns it
-  // for free and needs no writer of its own.
+  // for free and needs no writer of its own. On `loaded` regardless of `res.projected`: a
+  // skipped projection push (the snapshot on screen already shows this document) is still an
+  // install, so the authoritative flag must still flip here.
   if (res.loaded) noteDocInstalled();
   else noteCacheProvenEmpty(familyId);
   return res;
@@ -1997,11 +2006,19 @@ export function reseedCacheFromLiveDoc(familyId: string): Promise<{ reseeded: bo
  * failure resolves `{ hit: false, reason }` (never throws); the caller falls back to
  * the authoritative rebuild. Installs no doc — the rebuild owns the source of truth.
  */
-export async function loadProjectionSnapshot(
-  familyId: string
-): Promise<{ hit: boolean; reason?: string }> {
+export async function loadProjectionSnapshot(familyId: string): Promise<SnapshotLoadResult> {
   setCurrentFamily(familyId);
-  return request('loadProjectionSnapshot', { familyId });
+  const result = await request<SnapshotLoadResult>('loadProjectionSnapshot', { familyId });
+  // The worker cannot telemeter: its baseline-row read failure rides back on the result.
+  if (result.baselineReadError) {
+    logEvent({
+      level: 'warn',
+      surface: 'open-snapshot',
+      message: 'baseline row read failed; the wall stamp has no time until the rebuild',
+      context: { action: 'baseline-read-failed', error_code: result.baselineReadError },
+    });
+  }
+  return result;
 }
 
 /** Open the family's cache DB WITHOUT loading a cached doc (create-family — the
@@ -2018,9 +2035,13 @@ export async function openCache(familyId: string): Promise<{ loaded: false }> {
  * nothing) leaves heads unchanged and schedules no save/persist (F10). */
 export async function mutate<T = unknown>(op: MutationOp, opts?: RequestOpts): Promise<T> {
   assertWritable(op, opts);
+  // A write while store loaders run is the 2026-11-15 class of bug (a loader that awaits a
+  // write makes the snapshot paint wait for the whole rebuild). See `loadMaintenance.ts`.
+  if (inLoadPhase()) noteLoadPhaseWrite(gatedKind(op) ?? op.op);
   const { result, changed, notes, heads } = await requestMutate<T>(op, opts);
   logReconcileNotes(notes);
   if (changed) {
+    noteDocWrite();
     noteAcknowledgedWrite(heads);
     localChangeHandler?.();
   }
@@ -2538,6 +2559,7 @@ export async function reset(): Promise<void> {
   // Clear the main-thread mirror too — a worker-only reset would leave a stale
   // projection readable across a family-switch (cross-session data bleed).
   resetProjection();
+  clearStoresAuthoritative();
 }
 /**
  * Close + delete the encrypted cache DB (sign-out / clear data / forget family),
@@ -2556,6 +2578,7 @@ export async function reset(): Promise<void> {
 export async function clearCache(familyId: string): Promise<CacheClearResult> {
   const result = (await request('clearCache', { familyId })) as CacheClearResult | undefined;
   resetProjection();
+  clearStoresAuthoritative();
   if (result?.deleted === true) {
     // The success-path counter, so the blocked RATE is measurable.
     logEvent({

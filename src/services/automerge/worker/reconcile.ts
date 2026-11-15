@@ -55,6 +55,7 @@
 
 // Automerge-free (this module must stay pure), so importable here.
 import { docValue, isMapValue, str } from './scalarStrings';
+import { canonicalJson as canonicalJsonOf } from '@/utils/canonicalJson';
 
 type AnyRecord = Record<string, unknown>;
 
@@ -121,17 +122,8 @@ type Reconcile = (
 
 // ─── Equality and copies ─────────────────────────────────────────────────────
 
-function sortKeys(_key: string, value: unknown): unknown {
-  if (!isMapValue(value)) return value;
-  const sorted: AnyRecord = {};
-  for (const k of Object.keys(value).sort()) sorted[k] = value[k];
-  return sorted;
-}
-
-/** Sorted-key JSON. `undefined` stays `undefined`; undefined-valued keys drop out. */
-function canonicalJson(value: unknown): string | undefined {
-  return JSON.stringify(value, sortKeys);
-}
+/** Sorted-key JSON (`@/utils/canonicalJson`) with the worker's own map predicate. */
+const canonicalJson = (value: unknown): string | undefined => canonicalJsonOf(value, isMapValue);
 
 /** The worker's one equality: canonical (sorted-key) JSON, so key order never counts. */
 export function canonicalEqual(a: unknown, b: unknown): boolean {

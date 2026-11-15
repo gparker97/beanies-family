@@ -395,6 +395,26 @@ Full design + review: `docs/plans/2026-08-12-app-open-instant-projection-snapsho
 
 ---
 
+### 9a. The open budget and the `open-paint` event
+
+**Budget.** On a snapshot hit the family sees its data within about 1s of the page starting, whatever the size of the pod; the full Automerge rebuild runs behind it and must not delay the paint. Without a snapshot the paint waits for the cache rebuild or the Drive read. A slow open is `perf_duration_ms > 3000`.
+
+**How to read it.** One `open-paint` event per app open (CloudWatch surface `open-paint`, level `info`, never dropped by the 250 ms perf floor), emitted when the stores first hold family data, so it covers the beanie wall route too (no skeleton). Fields:
+
+- `perf_duration_ms`: milliseconds from `performance.timeOrigin` to that moment.
+- `kind`: what the first data came from, `snapshot`, `cache`, `drive`, or `direct` (path 3's in-memory document: sign-up, an E2E seed, the memory provider).
+- `stage`: the open path, read from the open window rather than passed in: `1a` (local cache), `1b` (Drive, including the cold-boot cached-key decrypt), `2` (the cache while file permission is pending), `3` (no file configured), `unknown` outside an open.
+- `detail`: `snap=hit|miss-version|miss-collections|miss-absent|miss-error|n/a;tasks=<n>`. `n/a` is an open that never asked for a snapshot (paths 1b and 3); `tasks` is the number of registered load-time writers.
+
+Slow-open rate: `perf_duration_ms > 3000` over all `open-paint`. A slow `kind=snapshot` means the paint itself regressed; a slow `kind=cache` with `snap=miss-*` names why the snapshot did not help. Load-time writers run after the paint and are reported separately (`load-maintenance`, `load-phase-write`; ADR-047).
+
+### 9b. Reading the change-probe and clean-skip events (2026-11-15)
+
+- **`sync-change-detect` `change-probe`** (change-gated): `detail=status=<changed|unchanged|unknown>;basis=<content|version|mtime|none>;drift=<n|none>`. `basis=content` means Drive's `md5Checksum` decided; `basis=version` means no content id was available and the `version` counter decided. `drift` is how far `version` advanced while the content was equal, so `status=unchanged;basis=content;drift>0` is a reload the old `version` compare would have made for nothing. A run of `basis=version` points at a provider or baseline row without a content id.
+- **`sync-save` `skipped-clean`**: a tab-hide or unload save that uploaded nothing because Drive already held everything (`detail=trigger=hide|unload`). Its rate against all hide and unload saves is the saving.
+- **`sync-save` `skip-declined`** (change-gated): the same callers, but the save went ahead; `detail` carries `reason` (`pending`, `in-flight`, `heads-differ`, `envelope-differs`, `no-envelope-fp`, `failed-last` and so on). Many `no-envelope-fp` declines mean the envelope fingerprint is not being taken or recorded.
+- **`open-cycle` `content-unchanged`**: a boot read skipped on content equality.
+
 ### 10. Open-Cycle Redundancy Elimination — revision-gated Drive read (#61)
 
 **Problem.** Even with the fast-paint snapshot, an app open still did the full Drive-side round-trip on **every** open, whether or not the file had changed: download + `automerge.remoteLoad` + CRDT merge + store re-projections. That is a second full reconstruction (`rec=2`) and a whole-file read for zero new information on an unchanged file.

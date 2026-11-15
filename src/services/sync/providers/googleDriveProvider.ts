@@ -6,7 +6,7 @@
  * On 401, attempts token refresh and retries once.
  */
 import type { StorageProvider } from '../storageProvider';
-import { toStoredRevision } from '../remoteBaseline';
+import { toStoredContentId, toStoredRevision } from '../remoteBaseline';
 import type { WriteAck, RemoteMarker } from '../remoteBaseline';
 import type { TransientFailure } from '@/utils/transientFailure';
 import {
@@ -303,7 +303,10 @@ export class GoogleDriveProvider implements StorageProvider {
     // retry once silently disabled the open-guard optimisation for every refresh save.
     const upload = async (token: string): Promise<WriteAck> => {
       const ack = await withRetry(() => updateFile(token, this.fileId, content));
-      return { revision: toStoredRevision(ack.version) };
+      return {
+        revision: toStoredRevision(ack.version),
+        contentId: toStoredContentId(ack.md5Checksum),
+      };
     };
     const token = await getValidTokenSilent();
     try {
@@ -446,15 +449,21 @@ export class GoogleDriveProvider implements StorageProvider {
    * evidence. The returned revision is namespaced via `toStoredRevision`; a null
    * probe (transient failure) yields `{ revision: null, modifiedTime: null }` so
    * the guard reads.
+   *
+   * `md5Checksum` (requirement 11) is the content id: `version` advances on
+   * Drive's side after an upload while the bytes stay the same, so equal
+   * checksums mean unchanged content. Namespaced via `toStoredContentId`; absent
+   * or non-string => null => the guard compares `version` as before.
    */
   async getRemoteMarker(): Promise<RemoteMarker> {
     const meta = await this.metadataProbe((token) =>
-      getFileMetadata(token, this.fileId, 'modifiedTime,version,headRevisionId')
+      getFileMetadata(token, this.fileId, 'modifiedTime,version,headRevisionId,md5Checksum')
     );
-    if (meta === null) return { revision: null, modifiedTime: null };
+    if (meta === null) return { revision: null, modifiedTime: null, contentId: null };
     return {
       revision: toStoredRevision((meta.version as string | undefined) ?? null),
       modifiedTime: (meta.modifiedTime as string | undefined) ?? null,
+      contentId: toStoredContentId(meta.md5Checksum),
     };
   }
 

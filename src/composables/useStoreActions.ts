@@ -48,6 +48,19 @@ function isEnginePanic(message: string): boolean {
   return ENGINE_PANIC_PATTERNS.some((p) => p.test(message));
 }
 
+/** Failed `wrapAsync` actions this session (a refused read-only write is not a failure). */
+let failureCount = 0;
+
+/**
+ * Monotonic count of `wrapAsync` failures, whatever error ref each reported through. A caller
+ * that runs many actions (`reloadAllStores`) compares it before and after to learn whether
+ * ANY of them failed, so a store that reports through a secondary ref (`cyclesError`) or a
+ * loader added later cannot be missed.
+ */
+export function storeActionFailureCount(): number {
+  return failureCount;
+}
+
 /**
  * Wraps an async store action with loading/error state management.
  * Automatically shows error toasts on failure.
@@ -81,6 +94,7 @@ export async function wrapAsync<T>(
     // has already shown its info toast and logged it, so no error toast, no `reportError`, and
     // `error.value` stays null (nothing went wrong that a view should render).
     if (e instanceof ReadOnlyError) return undefined;
+    failureCount++;
     const rawMessage = e instanceof Error ? e.message : safeT()('unexpectedError');
     error.value = rawMessage;
     if (errorToast) {

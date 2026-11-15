@@ -22,6 +22,8 @@ const projection = vi.hoisted(() => ({ cycles: [] as unknown[], lists: [] as unk
 vi.mock('@/services/automerge/projection', () => ({
   list: (name: string) =>
     name === 'listCycles' ? projection.cycles : name === 'lists' ? projection.lists : [],
+  // Load maintenance runs only over an authoritative document.
+  isAuthoritativeLoaded: () => true,
 }));
 // Doc is "loaded" for store-logic tests — loadLists/reconcile no-op without it.
 vi.mock('@/services/automerge/docService', () => ({ isDocLoaded: () => true }));
@@ -59,6 +61,12 @@ import * as listRepo from '@/services/automerge/repositories/listRepository';
 import * as cycleRepo from '@/services/automerge/repositories/listCycleRepository';
 import { celebrate } from '@/composables/useCelebration';
 import * as todayMod from '@/composables/useToday';
+import {
+  __resetLoadMaintenanceForTesting,
+  __setStoresAuthoritativeForTesting,
+  __whenLoadMaintenanceIdleForTesting,
+  runLoadMaintenance,
+} from '@/services/automerge/loadMaintenance';
 
 const setToday = (v: string): void =>
   (todayMod as unknown as { __setToday: (v: string) => void }).__setToday(v);
@@ -1731,3 +1739,61 @@ describe('listStore', () => {
  * un-filing and the celebration behave exactly as they do when a family ticks
  * the last box by hand — and it is ONE write, not one per item.
  */
+
+// 2026-11-15: `loadLists` is READ-ONLY. The daily reset is load maintenance, run after the
+// stores were reloaded from the authoritative document (never awaited by a load), and the
+// day-advance watcher does not reset snapshot copies.
+describe('listStore — the daily reset is load maintenance', () => {
+  const due = () =>
+    list({
+      id: 'r',
+      lifecycle: 'recurring',
+      frequency: 'daily',
+      lastResetDate: '2026-06-16', // yesterday relative to mockToday 2026-06-17
+      items: [item({ id: 'i1', completed: true })],
+    });
+
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+    __resetLoadMaintenanceForTesting();
+    setToday('2026-06-17');
+    vi.mocked(listRepo.getAllLists).mockResolvedValue([due()]);
+    vi.mocked(listRepo.getListById).mockResolvedValue({ ...due(), lastResetDate: '2026-06-17' });
+  });
+
+  it('loadLists never resets a due list itself', async () => {
+    const store = useListStore();
+    await store.loadLists();
+    expect(store.lists.map((l) => l.id)).toEqual(['r']);
+    expect(cycleRepo.archiveCycleAndReset).not.toHaveBeenCalled();
+  });
+
+  it('the load-maintenance run resets it, once', async () => {
+    const store = useListStore();
+    await store.loadLists();
+    runLoadMaintenance('reload');
+    await __whenLoadMaintenanceIdleForTesting();
+    expect(cycleRepo.archiveCycleAndReset).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(cycleRepo.archiveCycleAndReset).mock.calls[0]![1]).toBe('r');
+  });
+
+  it('the day advancing does not reset while the stores hold a snapshot, and does once they are authoritative', async () => {
+    const store = useListStore();
+    setToday('2026-06-16');
+    await store.loadLists();
+    setToday('2026-06-17');
+    await new Promise((r) => setTimeout(r, 0));
+    expect(cycleRepo.archiveCycleAndReset).not.toHaveBeenCalled(); // no store resets a snapshot
+
+    __setStoresAuthoritativeForTesting(true);
+    setToday('2026-06-18');
+    // (Stores from earlier tests in this file still watch the shared `today` ref, so count
+    // only this store's list.)
+    await vi.waitFor(() =>
+      expect(vi.mocked(cycleRepo.archiveCycleAndReset).mock.calls.some((c) => c[1] === 'r')).toBe(
+        true
+      )
+    );
+  });
+});
