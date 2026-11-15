@@ -198,9 +198,12 @@ describe('syncStore.loadFromFile — terminus 1 commits the DRIVE heads (#65)', 
 
     await primeStore().loadFromFile(); // no `merge` option => the replace branch
 
-    expect(syncService.commitRemoteBaseline).toHaveBeenCalledWith(REPLACE_DRIVE_HEADS);
-    // The precise regression: it used to be called, just with null.
-    expect(syncService.commitRemoteBaseline).not.toHaveBeenCalledWith(null);
+    // Requirement 17: the commit now goes through `confirmRemoteMerged`, which
+    // learns the marker `load()` held pending and commits it. The `null` is the
+    // envelope fingerprint slot requirement 15 fills.
+    expect(syncService.confirmRemoteMerged).toHaveBeenCalledWith(REPLACE_DRIVE_HEADS, null);
+    // The precise regression: it used to be called, just with null heads.
+    expect(syncService.confirmRemoteMerged).not.toHaveBeenCalledWith(null, null);
   });
 
   it('commits the remote heads on the MERGE branch (unchanged behaviour)', async () => {
@@ -213,7 +216,7 @@ describe('syncStore.loadFromFile — terminus 1 commits the DRIVE heads (#65)', 
 
     await primeStore().loadFromFile({ merge: true });
 
-    expect(syncService.commitRemoteBaseline).toHaveBeenCalledWith(MERGE_DRIVE_HEADS);
+    expect(syncService.confirmRemoteMerged).toHaveBeenCalledWith(MERGE_DRIVE_HEADS, null);
   });
 
   it('commits null when the worker cannot say what Drive holds', async () => {
@@ -228,7 +231,7 @@ describe('syncStore.loadFromFile — terminus 1 commits the DRIVE heads (#65)', 
 
     await primeStore().loadFromFile();
 
-    expect(syncService.commitRemoteBaseline).toHaveBeenCalledWith(null);
+    expect(syncService.confirmRemoteMerged).toHaveBeenCalledWith(null, null);
   });
 
   it('never commits our own doc heads as the Drive baseline', async () => {
@@ -243,7 +246,36 @@ describe('syncStore.loadFromFile — terminus 1 commits the DRIVE heads (#65)', 
 
     await primeStore().loadFromFile();
 
-    expect(syncService.commitRemoteBaseline).not.toHaveBeenCalledWith(['our-doc-head-MIGRATED']);
+    expect(syncService.confirmRemoteMerged).not.toHaveBeenCalledWith(
+      ['our-doc-head-MIGRATED'],
+      null
+    );
+  });
+
+  it('confirms exactly once, straight after the merge and before anything that can throw', async () => {
+    // Requirement 17: the second confirm after the reloads is gone. A throw in
+    // the work after the merge (here: the re-upload trigger) reaches `finally`,
+    // whose rollback must come AFTER the confirm, so it is a no-op on a baseline
+    // that did merge (pinned against the real module in
+    // `confirmedMergeBaseline.test.ts`).
+    vi.mocked(docClient.mergeRemoteEnvelope).mockResolvedValue({
+      heads: ['our-doc-head'],
+      dirty: true,
+      changed: false,
+      remoteHeads: MERGE_DRIVE_HEADS,
+    } as never);
+    vi.mocked(syncService.triggerDebouncedSave).mockImplementationOnce(() => {
+      throw new Error('boom after the merge');
+    });
+
+    await primeStore().loadFromFile({ merge: true });
+
+    expect(syncService.confirmRemoteMerged).toHaveBeenCalledTimes(1);
+    expect(syncService.commitRemoteBaseline).not.toHaveBeenCalled();
+    const confirmAt = vi.mocked(syncService.confirmRemoteMerged).mock.invocationCallOrder[0];
+    const rollbackAt = vi.mocked(syncService.rollbackRemoteMarker).mock.invocationCallOrder[0];
+    expect(confirmAt ?? Infinity).toBeLessThan(rollbackAt ?? -Infinity);
+    expect(syncService.triggerDebouncedSave).toHaveBeenCalled();
   });
 });
 

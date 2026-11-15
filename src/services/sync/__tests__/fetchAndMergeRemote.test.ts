@@ -573,7 +573,7 @@ describe('syncService.commitRemoteBaseline — records DRIVE heads only (#65)', 
       payload: encodeBaselinePayload('ver:5', null),
       checkedAt: new Date().toISOString(),
     });
-    syncService.commitRemoteBaseline(['h-drive']);
+    syncService.commitRemoteBaseline(['h-drive'], null);
     expect(docClient.noteRemoteBaseline).toHaveBeenCalledWith(
       encodeBaselinePayload('ver:5', headsFingerprint(['h-drive']))
     );
@@ -584,7 +584,7 @@ describe('syncService.commitRemoteBaseline — records DRIVE heads only (#65)', 
       payload: encodeBaselinePayload('ver:5', headsFingerprint(['stale'])),
       checkedAt: new Date().toISOString(),
     });
-    syncService.commitRemoteBaseline(null);
+    syncService.commitRemoteBaseline(null, null);
     expect(docClient.noteRemoteBaseline).toHaveBeenCalledWith(encodeBaselinePayload('ver:5', null));
   });
 
@@ -601,7 +601,7 @@ describe('syncService.commitRemoteBaseline — records DRIVE heads only (#65)', 
 
     // Before the commit: unknown => declines.
     expect((await syncService.shouldSkipOpenRead()).reason).toBe('baseline-heads-unknown');
-    syncService.commitRemoteBaseline(['h-drive']);
+    syncService.commitRemoteBaseline(['h-drive'], null);
     // After: in-memory baseline knows what Drive holds => skips.
     expect((await syncService.shouldSkipOpenRead()).skip).toBe(true);
   });
@@ -614,7 +614,7 @@ describe('syncService.commitRemoteBaseline — records DRIVE heads only (#65)', 
       payload: encodeBaselinePayload('ver:5', null),
       checkedAt: twoHoursAgo,
     });
-    syncService.commitRemoteBaseline(['h-drive']);
+    syncService.commitRemoteBaseline(['h-drive'], null);
     expect((await syncService.shouldSkipOpenRead()).reason).toBe('trust-expired');
   });
 });
@@ -955,7 +955,7 @@ describe('a baseline WITHOUT a revision still records its heads fingerprint', ()
     // where they should adopt.
     expect(syncService.getRemoteBaselineHeadsFp()).toBeNull();
 
-    syncService.commitRemoteBaseline(['h-a', 'h-b']);
+    syncService.commitRemoteBaseline(['h-a', 'h-b'], null);
 
     const fp = syncService.getRemoteBaselineHeadsFp();
     expect(fp).not.toBeNull();
@@ -966,7 +966,7 @@ describe('a baseline WITHOUT a revision still records its heads fingerprint', ()
   it('records nothing when there are no heads to record', () => {
     // `null` heads means "we cannot prove what Drive holds" and must stay the
     // fail-safe unknown, never a fingerprint of nothing.
-    syncService.commitRemoteBaseline(null);
+    syncService.commitRemoteBaseline(null, null);
     expect(syncService.getRemoteBaselineHeadsFp()).toBeNull();
   });
 });

@@ -2333,9 +2333,10 @@ export const useSyncStore = defineStore('sync', () => {
       restorePendingSave = syncService.cancelPendingSave();
     }
 
-    // ⚠️ CAPTURE BEFORE `load()`, WHICH DESTROYS IT. `load()` nulls
-    // `remoteBaseline` and then `learnRemoteMarker` re-seeds it with
-    // `headsFp: null`, so asking for the fingerprint AFTER the download always
+    // ⚠️ CAPTURE BEFORE `load()`. `load()` used to null `remoteBaseline` and
+    // re-seed it with `headsFp: null` (since requirement 17 it leaves the
+    // baseline alone, but the capture stays: it is the honest value either
+    // way). Asking for the fingerprint AFTER the download then always
     // answered null → `docPushedAgainst(null)` → 'dirty' → the terminus-4 guard
     // could only ever BLOCK. The moment any device published a compaction,
     // every peer's poll threw, latched and stopped, and a manual Refresh looped
@@ -2447,7 +2448,7 @@ export const useSyncStore = defineStore('sync', () => {
             // post-compaction edit and republishing the hybrid fleet-wide.
             //
             // `baselineFpBeforeLoad` is captured BEFORE `syncService.load()`,
-            // which nulls the baseline and re-seeds it with a null fingerprint —
+            // which used to null the baseline and re-seed a null fingerprint —
             // reading it after the download could only ever answer "unknown",
             // which is `dirty`, which BLOCKS. That made the guard unable to ever
             // adopt, so no peer could take a compaction and none could
@@ -2545,10 +2546,15 @@ export const useSyncStore = defineStore('sync', () => {
           syncService.setFamilyKey(liveKey, merged);
 
           // Terminus 1 (#61 C10): the worker's doc now provably contains the remote
-          // state `syncService.load()` sampled BEFORE the download, so commit that
-          // revision as the durable open-guard baseline. Zero-network (a worker RPC).
-          // This replaces the old getFileTimestamp round-trip that used to sit here.
-          syncService.commitRemoteBaseline(driveHeads);
+          // state `syncService.load()` sampled BEFORE the download, so confirm it:
+          // learn that marker and commit it as the durable open-guard baseline
+          // (unless an overlapping save committed a newer one meanwhile).
+          // Zero-network (a worker RPC).
+          // ⚠️ HERE, STRAIGHT AFTER THE MERGE (requirement 17), not after the
+          // reloads below: they are awaited and can throw, and a throw must not
+          // roll back (in `finally`) a baseline that did merge. The `null` is the
+          // envelope fingerprint slot requirement 15 fills.
+          syncService.confirmRemoteMerged(driveHeads, null);
 
           // `dirty` is derived purely from Automerge doc heads, so it can NEVER be
           // true for an envelope-only change. But a save publishes the envelope key
@@ -2606,11 +2612,6 @@ export const useSyncStore = defineStore('sync', () => {
             syncService.triggerDebouncedSave();
           }
 
-          // The text `syncService.load()` handed us has now been MERGED, so the
-          // revision marker it stamped provisionally is earned. Without this the
-          // baseline would be dropped on the next check and every open would do
-          // a full read.
-          syncService.confirmRemoteMerged();
           restorePendingSave = false; // the merge's own `dirty` arm decided above
           await runPostLoadDriveHousekeeping();
           return { success: true };
@@ -2625,11 +2626,12 @@ export const useSyncStore = defineStore('sync', () => {
           // resume flow both classify it.
           if (isRemoteBlocker(e)) {
             // ⚠️ THE OTHER HALF, and it is the one that loses other people's
-            // data. `syncService.load()` already stamped this revision as the
-            // baseline; leaving it there makes the next change check answer
-            // 'unchanged', so `fetchAndMergeRemote` returns without throwing and
-            // the following save writes a full base over a revision this
-            // document never contained. Roll it back, and latch — this is the
+            // data. `syncService.load()` holds this revision as a pending
+            // marker; the rollback discards it AND nulls the baseline, so the
+            // next change check reads rather than letting a save write a full
+            // base over a remote this document could not take. (After the
+            // confirm above the rollback is a no-op: what merged stays
+            // committed.) Roll it back, and latch — this is the
             // Drive cohort's read path, which never goes through
             // `fetchAndMergeRemote` and so never armed the breaker.
             syncService.rollbackRemoteMarker();
@@ -2650,15 +2652,15 @@ export const useSyncStore = defineStore('sync', () => {
       });
       return { success: false, needsPassword: true };
     } finally {
-      // ⚠️ TOTAL, not per-branch. `syncService.load()` stamps the remote's
-      // revision BEFORE the download, and only two of this function's exits
-      // called confirm or rollback. A transient read failure, an `auth` return,
-      // a `not-found` return or the `needsPassword` return all left a baseline
-      // claiming a revision nothing merged — after which the next change check
-      // answers 'unchanged', `fetchAndMergeRemote` returns without throwing, and
-      // the following save writes over it. Rolling back anything still pending
-      // at exit makes every path safe by construction; `confirmRemoteMerged`
-      // has already cleared it on the one path that earned it.
+      // ⚠️ TOTAL, not per-branch. `syncService.load()` samples the remote's
+      // revision BEFORE the download into a pending marker, and only two of
+      // this function's exits called confirm or rollback. A transient read
+      // failure, an `auth` return, a `not-found` return or the `needsPassword`
+      // return would otherwise leave that marker outstanding for a later
+      // confirm to learn. Rolling back anything still pending at exit makes
+      // every path safe by construction; `confirmRemoteMerged` has already
+      // cleared it on the one path that earned it, so a throw after the
+      // confirm leaves the committed baseline alone (requirement 17).
       syncService.rollbackRemoteMarker();
       if (merging && isReloading) {
         isReloading = false;

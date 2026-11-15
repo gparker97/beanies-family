@@ -376,3 +376,50 @@ export function revisionAdvance(
   if (a === null || b === null) return null;
   return Number(b - a);
 }
+
+/**
+ * What an open's read sampled BEFORE its download (requirement 17). It is held
+ * apart from the baseline until the caller confirms the merge, because until
+ * then it describes content the document does not yet contain: a save firing
+ * mid-download that compared against it would answer `unchanged`, skip its own
+ * read, and upload without the worker's lineage guard ever running (the
+ * 2026-11-12 incident).
+ *
+ * `marker: null` means the probe failed (or has not answered yet).
+ * `commitSeq` is the baseline-commit counter at the moment of sampling.
+ */
+export interface PendingRead {
+  marker: RemoteMarker | null;
+  commitSeq: number;
+}
+
+/**
+ * What confirming a merged read does to the baseline. Only `learn` and
+ * `no-marker` commit anything.
+ *  - `learn`: adopt the sampled marker, then commit.
+ *  - `no-marker`: the probe failed; commit with NO revision (the read still
+ *    proved the heads), which is what `load()`'s up-front null used to do.
+ *  - `superseded`: a baseline commit landed after the sample (an overlapping
+ *    save's own read or write). Its acknowledgement is newer than our marker,
+ *    so commit NOTHING, neither marker nor heads.
+ *  - `no-read`: nothing is pending (a reset, a provider change or a disconnect
+ *    cleared it mid-read). Commit nothing; the baseline belongs to whatever
+ *    replaced the read.
+ */
+export type MergeConfirm =
+  | { kind: 'learn'; marker: RemoteMarker }
+  | { kind: 'no-marker' }
+  | { kind: 'superseded' }
+  | { kind: 'no-read' };
+
+/** Decide what confirming a merged read may commit (requirement 17). PURE. */
+export function decideMergeConfirm(
+  pending: PendingRead | null,
+  commitSeqNow: number
+): MergeConfirm {
+  if (pending === null) return { kind: 'no-read' };
+  if (commitSeqNow !== pending.commitSeq) return { kind: 'superseded' };
+  return pending.marker === null
+    ? { kind: 'no-marker' }
+    : { kind: 'learn', marker: pending.marker };
+}

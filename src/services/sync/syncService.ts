@@ -44,6 +44,8 @@ import {
   headsFingerprint,
   decodeHeadsFingerprint,
   revisionAdvance,
+  decideMergeConfirm,
+  type PendingRead,
 } from './remoteBaseline';
 import { isChunkName } from './chunkNames';
 import { LocalStorageProvider } from './providers/localProvider';
@@ -235,25 +237,53 @@ export function noteRemoteUnreadable(err: PayloadLoadError): void {
 }
 
 /**
- * The marker `load()` stamped provisionally, kept so it can be rolled back.
- *
- * `load()` samples the remote's revision BEFORE the download (deliberately —
- * C13), but the merge happens in the CALLER. Until the caller says it merged,
- * this baseline is a promise the document has not kept.
+ * The marker `load()` sampled BEFORE its download (C13), held HERE and only here
+ * until the caller confirms the merge (requirement 17). It never touches
+ * `remoteBaseline` early: stamping it there before the merge let a debounced
+ * save that fired mid-download answer `unchanged`, skip its own read, and upload
+ * a stale document without the worker's lineage guard running (2026-11-12). A
+ * save in that window now compares against the PREVIOUS baseline and reads for
+ * itself. `null` means no open read is outstanding.
  */
-let pendingMarker: RemoteMarker | null = null;
+let pendingMarker: PendingRead | null = null;
 
-/** The caller merged the text `load()` returned. The baseline is now earned. */
-export function confirmRemoteMerged(): void {
+/**
+ * Bumped by EVERY `commitRemoteBaseline` (both arms, writes and merges alike), so
+ * a confirm can tell that something newer than its marker was committed while it
+ * downloaded. Monotonic for the process; never reset.
+ */
+let baselineCommitSeq = 0;
+
+/**
+ * The caller merged the text `load()` returned: learn its marker and commit the
+ * baseline, unless a newer commit landed meanwhile (then commit nothing). Called
+ * straight after the merge, so a later throw cannot roll back what did merge.
+ * `envelopeFp` is a required slot that requirement 15 fills; callers pass `null`.
+ */
+export function confirmRemoteMerged(
+  driveHeads: readonly string[] | null,
+  envelopeFp: string | null
+): void {
+  const decision = decideMergeConfirm(pendingMarker, baselineCommitSeq);
   pendingMarker = null;
   clearRemoteUnreadable();
+  if (decision.kind === 'superseded' || decision.kind === 'no-read') {
+    const context = { action: `confirm-${decision.kind}` };
+    logEvent({ level: 'info', surface: 'sync-load', message: 'merge confirm skipped', context });
+    return;
+  }
+  // A failed probe gives no revision to vouch for: null it, as `load()` used to.
+  if (decision.kind === 'learn') learnRemoteMarker(decision.marker);
+  else remoteBaseline = null;
+  commitRemoteBaseline(driveHeads, envelopeFp);
 }
 
 /**
  * The caller could NOT merge what `load()` returned. Drop the baseline so the
  * next change check reads again instead of skipping — the safe direction, and
  * the one thing standing between an unreadable remote and a save that
- * overwrites it.
+ * overwrites it. Keyed on an outstanding read (even one whose probe failed),
+ * which is when `load()` used to null the baseline itself.
  */
 export function rollbackRemoteMarker(): void {
   if (pendingMarker === null) return;
@@ -1533,10 +1563,8 @@ function learnRemoteMarker(marker: RemoteMarker): void {
     checkedAt: new Date().toISOString(),
     // #65: a marker probe knows the REVISION, never the heads behind it. Null is
     // the safe direction — unknown => never skip. A terminus that follows fills it
-    // in, but NOT every caller is a terminus: `load()`'s pre-read probe opens a
-    // fresh trust window here, and `loadFromFile` can then exit without any commit
-    // (unsupported version, needsPassword, decrypt failure). Those opens correctly
-    // decline for the rest of the window rather than skipping on an unknown.
+    // in. (`load()`'s pre-read probe no longer comes through here until its merge
+    // is confirmed: requirement 17, `confirmRemoteMerged`.)
     headsFp: null,
   };
 }
@@ -1568,14 +1596,21 @@ export function seedRemoteBaseline(row: { payload: string; checkedAt: string } |
 /**
  * Commit the current in-memory baseline durably (#61 C10). Called from EXACTLY
  * three termini where the worker's `currentDoc` provably contains the remote
- * state: after `loadFromFile`'s merge succeeds (via syncStore), after
+ * state: after `loadFromFile`'s merge succeeds (via `confirmRemoteMerged`), after
  * `fetchAndMergeRemote`'s merge resolves, and after `doSave`'s write resolves. A
  * no-op when there is no revision (never persist an mtime). Fire-and-forget
  * through the worker; the FIFO orders it after the already-resolved merge. It is
  * an unconditional last-write-wins set (C10b) — correctness is from WHERE it is
- * called, never from comparing revisions.
+ * called, never from comparing revisions. Every call bumps `baselineCommitSeq`.
+ *
+ * `envelopeFp` is accepted and not yet stored: requirement 15 persists it.
  */
-export function commitRemoteBaseline(driveHeads: readonly string[] | null): void {
+export function commitRemoteBaseline(
+  driveHeads: readonly string[] | null,
+  envelopeFp: string | null
+): void {
+  void envelopeFp; // requirement 15 persists the envelope fingerprint
+  baselineCommitSeq++;
   // ⚠️ THE IN-MEMORY VALUE IS THE RIGHT KEY, AND A REVIEW ROUND SAID OTHERWISE.
   // The objection: a Drive family whose in-memory baseline has been nulled takes
   // the revision-less arm and writes `revision: null` over a durable row that
@@ -2004,6 +2039,13 @@ async function fetchAndMergeRemoteOnce(opts: FetchMergeOptions): Promise<FetchMe
   if (currentProvider !== providerAtRead) return NO_PROBE; // switched mid-probe
   if (change.status === 'unchanged') return { probeRevision: change.revision };
   if (change.status === 'unknown' && !opts.readOnUnknown) return NO_PROBE;
+  // Requirement 17: an open's read is still downloading, and this save compared
+  // against the PREVIOUS baseline, so it reads and merges (through the lineage
+  // guard) for itself. One duplicate download in a rare overlap, by design.
+  if (opts.readOnUnknown && pendingMarker !== null) {
+    const context = { action: 'read-overlap' };
+    logEvent({ level: 'info', surface: 'sync-save', message: 'save read during open', context });
+  }
 
   // Remote has newer data — fetch, decrypt, and merge. INVARIANT (ADR-032 addendum):
   // the base is the sole source of a peer's edits (change-chunks retired 2026-07-15).
@@ -2231,7 +2273,7 @@ async function fetchAndMergeRemoteOnce(opts: FetchMergeOptions): Promise<FetchMe
   // #65: `remoteHeads` is the heads of the bytes Drive holds (captured pre-migrate,
   // pre-merge). `?? null` mirrors this file's fail-safe-default discipline — a
   // partial test double degrades to "unknown => read", never to a false skip.
-  if (currentProvider === providerAtRead) commitRemoteBaseline(remoteHeads ?? null);
+  if (currentProvider === providerAtRead) commitRemoteBaseline(remoteHeads ?? null, null);
 
   // The poll path's ONLY re-upload trigger: re-push a converged doc that still
   // carries local unsynced changes (heads-derived dirty), without ping-ponging
@@ -2700,7 +2742,7 @@ async function doSaveRun(opts: SaveOptions = {}): Promise<boolean> {
       // would throw HERE — after the upload already landed — converting a
       // successful save into a reported failure that advances the save-failure
       // escalation ladder.
-      commitRemoteBaseline(exportedHeads ?? null);
+      commitRemoteBaseline(exportedHeads ?? null, null);
       noteCachePushed(familyIdAtWrite);
     } else if (providerAtWrite.getRemoteMarker) {
       // Drive write whose ack body was unparseable: RE-PROBE the real revision
@@ -2716,7 +2758,7 @@ async function doSaveRun(opts: SaveOptions = {}): Promise<boolean> {
           // certify a (revision, heads) pair that never existed on Drive, and the next
           // in-window open would skip past their edits. `null` costs one extra read,
           // which is what every other uncertain branch of this design costs.
-          commitRemoteBaseline(null);
+          commitRemoteBaseline(null, null);
         }
       } catch (e) {
         console.warn(
@@ -2906,19 +2948,21 @@ export async function load(): Promise<string | null> {
     // can then only ever describe content we actually merged — a peer write landing
     // AFTER this probe advances the counter, so the NEXT open reads (safe). This
     // ordering is LOAD-BEARING: it looks like a harmless reorder and it is not.
-    // Non-throwing: a probe failure nulls the baseline (=> read next open) and must
-    // NOT fail the load; the read proceeds and re-raises any real auth error.
-    remoteBaseline = null;
+    // Non-throwing: a probe failure leaves `pending.marker` null (=> the confirm
+    // commits no revision) and must NOT fail the load; the read proceeds and
+    // re-raises any real auth error.
+    //
+    // ⚠️ REQUIREMENT 17: the marker goes into `pendingMarker` ONLY, and
+    // `remoteBaseline` is left exactly as it was. Learning it here (as this did
+    // until 2026-11-15) made a debounced save firing mid-download answer
+    // 'unchanged' and upload a stale document without the lineage guard running.
+    // The store calls `confirmRemoteMerged()` straight after its merge, or
+    // `rollbackRemoteMarker()` on every other exit. The commit counter is sampled
+    // BEFORE the probe await, so a commit landing during the probe also supersedes.
+    const pending: PendingRead = { marker: null, commitSeq: baselineCommitSeq };
+    pendingMarker = pending;
     try {
-      // ⚠️ PROVISIONAL until the caller confirms it merged. `load()` hands the
-      // text back and `syncStore` calls `docClient.mergeRemoteEnvelope`
-      // DIRECTLY, so a payload failure there used to leave this marker standing
-      // — the next `remoteChanged()` answered 'unchanged', `fetchAndMergeRemote`
-      // returned without throwing, and the save wrote a base over a revision the
-      // doc provably never contained. `confirmRemoteMerged()` / `rollbackRemoteMarker()`
-      // close that: the store calls one of them on every outcome.
-      pendingMarker = await probeRemoteMarker();
-      learnRemoteMarker(pendingMarker);
+      pending.marker = await probeRemoteMarker();
     } catch (e) {
       // Not the load's failure: the read below proceeds and re-raises any real error.
       console.warn(
@@ -3428,6 +3472,9 @@ export async function disconnect(): Promise<void> {
   // skip against a file this service is no longer bound to. #65 widens the leak —
   // the surviving object also carries `headsFp` and a live `checkedAt`.
   remoteBaseline = null;
+  // Requirement 17: the confirm LEARNS the pending marker, so an open read of the
+  // OLD file must not survive into the next one.
+  pendingMarker = null;
   // ⚠️ AND THE BREAKER. It describes a file this service is no longer bound to,
   // and nothing else cleared it: `selectSyncFile`/`selectNativeLocalFile` assign
   // `currentProvider` directly, so a latch armed on the OLD pod survived a

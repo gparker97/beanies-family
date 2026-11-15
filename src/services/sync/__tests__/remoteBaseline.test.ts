@@ -20,6 +20,8 @@ import {
   type RemoteBaseline,
   type RemoteMarker,
   revisionAdvance,
+  decideMergeConfirm,
+  type PendingRead,
 } from '../remoteBaseline';
 
 const baseline = (over: Partial<RemoteBaseline> = {}): RemoteBaseline => ({
@@ -300,5 +302,44 @@ describe('revisionAdvance (audit C4 write-race check)', () => {
     expect(revisionAdvance('ver:x', 'ver:2')).toBeNull();
     // A partial ack (not even a string) must not throw after a write that landed.
     expect(revisionAdvance('ver:1', 42 as never)).toBeNull();
+  });
+});
+
+describe('decideMergeConfirm (requirement 17)', () => {
+  const marker: RemoteMarker = { revision: 'ver:6', modifiedTime: null };
+  const pending = (over: Partial<PendingRead> = {}): PendingRead => ({
+    marker,
+    commitSeq: 3,
+    ...over,
+  });
+
+  it.each<[string, PendingRead | null, number, ReturnType<typeof decideMergeConfirm>]>([
+    [
+      'learns the sampled marker when nothing committed since',
+      pending(),
+      3,
+      { kind: 'learn', marker },
+    ],
+    [
+      'commits with no revision when the probe failed',
+      pending({ marker: null }),
+      3,
+      { kind: 'no-marker' },
+    ],
+    [
+      'commits nothing when any commit landed after the sample',
+      pending(),
+      4,
+      { kind: 'superseded' },
+    ],
+    [
+      'superseded wins over a failed probe (no heads either)',
+      pending({ marker: null }),
+      5,
+      { kind: 'superseded' },
+    ],
+    ['commits nothing when no read is pending (reset or rollback)', null, 3, { kind: 'no-read' }],
+  ])('%s', (_name, p, seqNow, expected) => {
+    expect(decideMergeConfirm(p, seqNow)).toEqual(expected);
   });
 });
