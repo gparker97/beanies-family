@@ -5,7 +5,7 @@
  * only while the wall is unlocked.
  */
 import { mount } from '@vue/test-utils';
-import { ref } from 'vue';
+import { nextTick, ref } from 'vue';
 import { describe, it, expect, vi } from 'vitest';
 import WallChoreLanes from '../WallChoreLanes.vue';
 import WallJobList from '../WallJobList.vue';
@@ -267,11 +267,13 @@ describe('WallChoreLanes', () => {
     expect(w.find('[data-testid="wall-chore-add"]').exists()).toBe(false);
   });
 
-  it('keeps a bean with no chores today slim, and gives them a lane once unlocked', () => {
+  it('gives a bean with no chores today no lane, and one once unlocked', () => {
     const lanes = { pip: pipMorning(), juno: lane('juno', []) };
     const locked = mountLanes(lanes);
     expect(locked.findAll('[data-testid="wall-chore-lane"]')).toHaveLength(1);
-    expect(locked.find('[data-testid="wall-chores-idle"]').text()).toContain('Juno');
+    // No row is spent on who has nothing: the footer's chips name every bean.
+    expect(locked.text()).not.toContain('Juno');
+    expect(locked.find('[data-testid="wall-chores-empty"]').exists()).toBe(false);
     const unlocked = mountLanes(lanes, {
       unlocked: true,
       edit: { addChore: async () => true },
@@ -279,13 +281,36 @@ describe('WallChoreLanes', () => {
     expect(unlocked.findAll('[data-testid="wall-chore-lane"]')).toHaveLength(2);
   });
 
-  it('shows the morning count in the header and every bean idle with no lanes at all', () => {
+  it('shows the morning count in the header, and one line when nobody has a chore', () => {
     const w = mountLanes({ pip: pipMorning() });
     expect(w.find('[data-testid="wall-chores-progress"]').text()).toBe(
       'wall.chores.progress.morning.other'
     );
     const none = mountLanes(null);
     expect(none.find('[data-testid="wall-chore-lanes"]').exists()).toBe(false);
-    expect(none.find('[data-testid="wall-chores-idle"]').exists()).toBe(true);
+    expect(none.find('[data-testid="wall-chores-empty"]').text()).toBe('wall.jobs.allClear');
+  });
+
+  it('brings a block opened at the bottom of a lane into view', async () => {
+    // jsdom has no layout, so the boxes are stated: the Evening block ends 120px below the
+    // lane body's bottom edge, with 300px of room above its own header.
+    const w = mountLanes({ pip: pipMorning() });
+    const later = w.find('[data-testid="wall-chore-block"][data-block="evening"]');
+    const body = later.element.parentElement!;
+    const box = (top: number, bottom: number) => ({ top, bottom }) as DOMRect;
+    body.getBoundingClientRect = () => box(100, 500);
+    later.element.getBoundingClientRect = () => box(400, 620);
+    const scrollBy = vi.fn();
+    body.scrollBy = scrollBy as unknown as typeof body.scrollBy;
+
+    await later.find('[data-testid="wall-chore-quiet"]').trigger('click');
+    await nextTick();
+    expect(scrollBy).toHaveBeenCalledTimes(1);
+    expect(scrollBy.mock.calls[0]![0]).toMatchObject({ top: 128 });
+
+    // Closing it again scrolls nothing.
+    await later.find('[data-testid="wall-chore-quiet"]').trigger('click');
+    await nextTick();
+    expect(scrollBy).toHaveBeenCalledTimes(1);
   });
 });

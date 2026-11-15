@@ -34,7 +34,7 @@
  * `.chore-block-*` (whose tokens carry their dark values), and the done strip is the fixed
  * brand gradient with white ink in both themes.
  */
-import { computed, inject, provide, ref } from 'vue';
+import { computed, inject, nextTick, provide, ref } from 'vue';
 import { choreBannerCelebration, choreBlockHeld } from '@/composables/useCelebration';
 import WallBackButton from '@/components/wall/WallBackButton.vue';
 import WallJobList from '@/components/wall/WallJobList.vue';
@@ -58,6 +58,7 @@ import type { UIStringKey } from '@/services/translation/uiStrings';
 import type { ChoreBlock, FamilyMember } from '@/types/models';
 import type { WallChoreBlock, WallChoreLane, WallJob, WallPeripheralData } from '@/types/wall';
 import { choreTickAnchor, type ChoreCelebrationAnchor } from '@/utils/choreCelebration';
+import { prefersReducedMotion } from '@/utils/prefersReducedMotion';
 
 defineOptions({ inheritAttrs: false });
 
@@ -104,22 +105,24 @@ const members = computed(() => {
 });
 
 /**
- * Every visible bean, partitioned once per render: a lane when they have chores today (or the
- * wall is unlocked, so a grown-up can add their first), else the slim "no chores today" strip.
- * Every bean lands in exactly one of the two, as on the lists board.
+ * The lanes, built once per render: a bean has one when they have chores today (or the wall is
+ * unlocked, so a grown-up can add their first).
+ *
+ * A bean with no chores today gets nothing here. They used to be named on a "no chores today"
+ * strip under the lanes, which spent a row of a kitchen screen on an absence; the footer's
+ * chips name every bean on every view, so nobody goes missing from the wall without it. When
+ * NO bean has a lane the board says so in one line (the empty state below).
  */
-const partitioned = computed(() => {
-  const active: { member: FamilyMember; lane: WallChoreLane }[] = [];
-  const idle: FamilyMember[] = [];
+const lanes = computed(() => {
+  const built: { member: FamilyMember; lane: WallChoreLane }[] = [];
   for (const member of members.value) {
     const lane = props.peripherals.choreLaneFor?.(member.id) ?? null;
-    if (lane && (lane.total > 0 || canAdd.value)) active.push({ member, lane });
-    else idle.push(member);
+    if (lane && (lane.total > 0 || canAdd.value)) built.push({ member, lane });
   }
-  return { active, idle };
+  return built;
 });
 
-const progress = computed(() => choreProgress(partitioned.value.active.map((a) => a.lane)));
+const progress = computed(() => choreProgress(lanes.value.map((a) => a.lane)));
 const progressText = computed(() => wallChoreProgressText(progress.value, t));
 const percent = computed(() =>
   progress.value.total ? Math.round((progress.value.done / progress.value.total) * 100) : 0
@@ -176,18 +179,27 @@ provide(WALL_BURST, (x, y, job) => {
   pageBurst?.(x, y, job);
 });
 
-/** A tick, with this lane's block and the tick as the celebration's anchor (compact sizing). */
-function onToggle(job: WallJob, memberId: string, block: ChoreBlock): void {
+/** One bean's block section in this board, or nothing while it is not drawn. */
+function blockSection(memberId: string, block: ChoreBlock): HTMLElement | null {
   const lane = root.value?.querySelector<HTMLElement>(
     `[data-testid="wall-chore-lane"][data-member="${CSS.escape(memberId)}"]`
   );
-  const section = lane?.querySelector<HTMLElement>(
-    `[data-testid="wall-chore-block"][data-block="${block}"]`
+  return (
+    lane?.querySelector<HTMLElement>(`[data-testid="wall-chore-block"][data-block="${block}"]`) ??
+    null
   );
+}
+
+/** A tick, with this lane's block and the tick as the celebration's anchor (compact sizing). */
+function onToggle(job: WallJob, memberId: string, block: ChoreBlock): void {
   emit(
     'toggle',
     job,
-    choreTickAnchor(section, `[data-job-key="${CSS.escape(job.key)}"] .wall-tick`, true)
+    choreTickAnchor(
+      blockSection(memberId, block),
+      `[data-job-key="${CSS.escape(job.key)}"] .wall-tick`,
+      true
+    )
   );
 }
 
@@ -200,9 +212,35 @@ function isExpanded(memberId: string, block: ChoreBlock): boolean {
 function toggleExpanded(memberId: string, block: ChoreBlock): void {
   const next = new Set(expanded.value);
   const key = expandKey(memberId, block);
-  if (next.has(key)) next.delete(key);
-  else next.add(key);
+  const opening = !next.has(key);
+  if (opening) next.add(key);
+  else next.delete(key);
   expanded.value = next;
+  if (opening) void nextTick(() => revealBlock(memberId, block));
+}
+
+/** Breathing room under a block brought into view, so its last row is not flush to the edge. */
+const REVEAL_MARGIN_PX = 8;
+
+/**
+ * Bring a block opened by hand into view inside its lane.
+ *
+ * The lane's body scrolls, and the last block of a lane (usually Evening) sits at its bottom
+ * edge, so its rows opened BELOW the fold: the tap looked like it did nothing. Scrolls the lane
+ * body only (never `scrollIntoView`, which also moves the wall's clipped ancestors), by just
+ * enough to show the whole block, and never so far that the block's own header leaves the top.
+ */
+function revealBlock(memberId: string, block: ChoreBlock): void {
+  const section = blockSection(memberId, block);
+  const body = section?.parentElement;
+  if (!section || !body) return;
+  const sectionBox = section.getBoundingClientRect();
+  const bodyBox = body.getBoundingClientRect();
+  const below = sectionBox.bottom + REVEAL_MARGIN_PX - bodyBox.bottom;
+  const room = sectionBox.top - bodyBox.top;
+  const top = Math.min(below, room);
+  if (top <= 0) return;
+  body.scrollBy({ top, behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
 }
 
 function label(block: ChoreBlock): string {
@@ -272,13 +310,13 @@ function addChore(memberId: string, title: string): Promise<boolean> {
 
     <!-- The track max stays `1fr`: see `WallChoreBoard`, whose grid this mirrors. -->
     <div
-      v-if="partitioned.active.length"
+      v-if="lanes.length"
       class="wall-chore-lane-grid grid min-h-0 flex-1 justify-center justify-items-center gap-2.5"
       style="grid-template-columns: repeat(auto-fit, minmax(210px, 1fr))"
       data-testid="wall-chore-lanes"
     >
       <section
-        v-for="{ member, lane } in partitioned.active"
+        v-for="{ member, lane } in lanes"
         :key="member.id"
         class="wall-chore-lane dark:border-line flex min-h-0 w-full max-w-[420px] flex-col overflow-hidden rounded-[22px] shadow-[var(--card-shadow)] dark:border"
         :class="laneAllDone(lane) ? 'ring-[2.5px] ring-[#27AE60]' : ''"
@@ -427,39 +465,14 @@ function addChore(memberId: string, title: string): Promise<boolean> {
       </section>
     </div>
 
+    <!-- Nobody has a chore today: one line, and it says which board is empty. -->
     <p
-      v-if="!partitioned.active.length && !partitioned.idle.length"
-      class="font-caveat dark:text-ink-soft m-auto text-[var(--muted-text)]"
+      v-else
+      class="font-caveat dark:text-ink-soft m-auto text-2xl text-[var(--muted-text)]"
       data-testid="wall-chores-empty"
     >
-      {{ t('wall.jobs.none') }}
+      {{ t('wall.jobs.allClear') }}
     </p>
-
-    <!-- Beans with no chores today: one slim row, everyone still named. -->
-    <div
-      v-if="partitioned.idle.length"
-      class="dark:bg-surface-raised flex flex-wrap items-center gap-x-4 gap-y-2 rounded-[22px] bg-white px-4 py-3 shadow-[var(--card-shadow)]"
-      :class="partitioned.active.length ? 'shrink-0' : 'min-h-0 flex-1 justify-center'"
-      data-testid="wall-chores-idle"
-    >
-      <p class="font-outfit text-secondary-500 dark:text-ink text-sm font-bold uppercase">
-        {{ t('wall.jobs.allClear') }}
-      </p>
-      <WallFaceButton
-        v-for="member in partitioned.idle"
-        :key="member.id"
-        :name="member.name"
-        source="face-chore"
-        class="flex shrink-0 items-center gap-1.5"
-      >
-        <BeanieAvatar v-bind="memberAvatarBindings(member)" fallback="initials" size="sm" />
-        <span
-          class="font-inter wall-bean-count dark:text-ink-soft text-[var(--muted-text,#4d5d6c)]"
-        >
-          {{ member.name }}
-        </span>
-      </WallFaceButton>
-    </div>
   </div>
 </template>
 
@@ -488,8 +501,8 @@ html.dark .wall-chore-lane-head {
 /*
  * Rows share the grid's height instead of sizing to their content. An `auto` row grew to fit a
  * long lane and ran past the bottom of the grid, so a lane with six chores at 1280x800 had its
- * last row painted under the "No chores today" strip. Bounded, the lane's own body
- * (`overflow-y-auto`) scrolls, every row stays reachable, and the strip stays in view.
+ * last row painted below the board. Bounded, the lane's own body (`overflow-y-auto`) scrolls
+ * and every row stays reachable.
  */
 .wall-chore-lane-grid {
   grid-auto-rows: minmax(0, 1fr);

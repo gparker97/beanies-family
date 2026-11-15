@@ -8073,12 +8073,13 @@ const STRING_DEFS = {
   // Used when the wall is browsing a day that is not today, where "{count} today"
   // would be a plain lie. `{day}` is a short weekday name.
   'wall.lane.onDay': { en: '{count} on {day}', beanie: '{count} on {day}' },
-  // Labels the beans with no chores, on the chore board's footer strip.
-  // ⚠️ Scoped to CHORES deliberately. It was "All clear", which is a claim about
-  // a whole person — and this board only knows about chore lists, so a bean with
-  // to-dos still due was being publicly called clear. Still phrased as a state
-  // rather than a lack: this is a row of children's faces on a kitchen wall.
+  // A wall board with nothing on it today, named for what THAT board shows: the chore lanes
+  // (and the gate-off chore board) say chores, the Lists board says lists.
+  // ⚠️ Scoped deliberately. It was "All clear", which is a claim about a whole person, and
+  // each board only knows its own kind of job, so a bean with to-dos still due was being
+  // publicly called clear.
   'wall.jobs.allClear': { en: 'No chores today', beanie: 'no chores today' },
+  'wall.lists.allClear': { en: 'No lists today', beanie: 'no lists today' },
   'lists.cycle.archiveFailed': {
     en: 'Couldn’t save this list’s history. It’ll try again next time you open the app.',
     beanie: 'couldn’t save this list’s history. it’ll try again next time you open beanies.',
@@ -8379,7 +8380,6 @@ const STRING_DEFS = {
   },
   'wall.memories.title': { en: 'Our Family Scrapbook', beanie: 'our family scrapbook' },
   'wall.memories.titleFor': { en: "{name}'s Moments", beanie: "{name}'s moments" },
-  'wall.memories.newestFirst': { en: 'Newest first', beanie: 'newest first' },
   'wall.memories.openFor': {
     en: '{name}: open the family scrapbook',
     beanie: '{name}: open the family scrapbook',
@@ -16289,14 +16289,11 @@ const STRING_DEFS = {
     en: 'This Week',
     beanie: 'this week',
   },
-  'choreboard.week.totalAria.one': {
-    en: '{count} chore done this week',
-    beanie: '{count} chore done this week',
+  'choreboard.week.totalAria': {
+    en: '{done} of {due} chores done this week, {pct} percent',
+    beanie: '{done} of {due} chores done this week, {pct} percent',
   },
-  'choreboard.week.totalAria.other': {
-    en: '{count} chores done this week',
-    beanie: '{count} chores done this week',
-  },
+  'choreboard.week.percent': { en: '{pct}%', beanie: '{pct}%' },
   'choreboard.card.left.one': {
     en: '{count} left today',
     beanie: '{count} left today',
@@ -16401,13 +16398,9 @@ const STRING_DEFS = {
     en: '{name}, {day}: no chores that day',
     beanie: '{name}, {day}: no chores that day',
   },
-  'choreboard.week.totalAriaFor.one': {
-    en: '{name}: {count} chore done this week',
-    beanie: '{name}: {count} chore done this week',
-  },
-  'choreboard.week.totalAriaFor.other': {
-    en: '{name}: {count} chores done this week',
-    beanie: '{name}: {count} chores done this week',
+  'choreboard.week.totalAriaFor': {
+    en: '{name}: {done} of {due} chores done this week, {pct} percent',
+    beanie: '{name}: {done} of {due} chores done this week, {pct} percent',
   },
   'choreboard.cell.future': {
     en: '{name}, {day}: still to come',

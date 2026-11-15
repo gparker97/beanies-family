@@ -8,6 +8,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ---
 
+## 2026-11-15
+
+### Changed
+
+- Chores Done now shows each person's week as done out of what was due, with a percentage (for example "8 of 8, 100%"), so the totals are fair when kids have different numbers of chores.
+- On the Beanie Wall, the Choreboard and Lists no longer spend a row on who has nothing today; an empty board says "No chores today" or "No lists today".
+- The "Newest first" label is gone from the Beanie Wall scrapbook.
+
+### Fixed
+
+- On the Beanie Wall's Choreboard, tapping a time of day at the bottom of the screen now scrolls its chores into view.
+
 ## 2026-11-14
 
 ### Added

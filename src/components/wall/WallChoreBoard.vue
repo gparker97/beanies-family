@@ -109,54 +109,25 @@ const columnByMember = computed(() => {
 });
 
 /**
- * Beans with chores, and beans without — computed once, in one pass.
+ * The beans with lists today, each with their column, computed once per render.
  *
- * ⚠️ Every bean lands in exactly one of the two. An earlier attempt excluded
- * beans who had outstanding to-dos from BOTH, on the reasoning that calling
- * them clear was a false claim — and that was true, but the cure was worse: it
- * created a third state nothing renders, so a family who keeps to-dos but has
- * never made a list saw a completely blank board, and any bean in that state
- * simply vanished from the wall, indistinguishable from having been removed
- * from the family.
+ * The template reads `entry.column` and never calls a function: it asks about each column a
+ * dozen times (the ring, the count, the lists, the stars), on a screen that re-renders every
+ * 20s, forever, on a tablet.
  *
- * The false claim was in the WORD, not the partition. This board knows about
- * chores and nothing else, so it now says "no chores today" — true of the
- * column it is standing in — rather than "all clear", which is a claim about a
- * whole person that this screen has no standing to make.
- *
- * ⚠️ This also fixes a performance regression the old `columnFor()` helper
- * reintroduced at the call site: the template asked it for each member THIRTEEN
- * times per render (the ring, the count, the lists, the overflow, the total and
- * the stars), on a screen that re-renders every 20s forever, on a tablet. That
- * is the exact cost `columnByMember`'s docblock above exists to prevent. The
- * template now reads `entry.column` and never calls a function.
- *
- * `total === 0` is the ONLY definition of idle. A bean who has FINISHED their
- * jobs is `done === total` with `total > 0`, keeps a full column, and keeps the
- * green ring and the row of stars — that is the reward, and collapsing it would
- * punish the one bean who did everything asked.
+ * `total === 0` is the ONLY definition of "nothing today", and such a bean gets no column. They
+ * used to be named on a strip under the board, which spent a row of a kitchen screen on an
+ * absence; the footer's chips name every bean on every view, so nobody goes missing from the
+ * wall without it. A bean who has FINISHED their jobs is `done === total` with `total > 0`,
+ * keeps a full column, and keeps the green ring and the row of stars.
  */
-const partitioned = computed(() => {
-  const active: { member: FamilyMember; column: ReturnType<typeof buildColumn> }[] = [];
-  const idle: FamilyMember[] = [];
+const columns = computed(() => {
+  const built: { member: FamilyMember; column: BoardColumn }[] = [];
   for (const member of members.value) {
-    // `members` and `columnByMember` are built from the same filtered list in the
-    // same tick, so a miss is impossible today. `continue` rather than `!` so a
-    // future edit that breaks that invariant drops one chip from a kitchen wall
-    // instead of throwing the whole board away.
     const column = columnByMember.value.get(member.id);
-    if (!column) {
-      // Impossible today — both maps are built from the same list in the same
-      // tick — but silently dropping a bean off a family's wall is exactly the
-      // kind of failure that must not be quiet. Treated as having no chores, so
-      // they stay visible and named.
-      idle.push(member);
-      continue;
-    }
-    if (column.total > 0) active.push({ member, column });
-    else idle.push(member);
+    if (column && column.total > 0) built.push({ member, column });
   }
-  return { active, idle };
+  return built;
 });
 
 /**
@@ -168,7 +139,15 @@ const partitioned = computed(() => {
  * column was built to prevent.
  */
 const hasBoard = computed(
-  () => partitioned.value.active.length > 0 || props.peripherals.orphanLists.length > 0
+  () => columns.value.length > 0 || props.peripherals.orphanLists.length > 0
+);
+
+/**
+ * What an empty board says. The page passes `boardTitle` exactly while this board shows lists
+ * only (#146), and there "no chores" would be the wrong word: chores have their own board.
+ */
+const emptyText = computed(() =>
+  props.boardTitle ? t('wall.lists.allClear') : t('wall.jobs.allClear')
 );
 
 const boardProgress = computed(() => {
@@ -196,7 +175,10 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
       <h2 class="font-outfit text-secondary-500 wall-board-title dark:text-ink font-extrabold">
         {{ boardTitle ?? t('wall.jobsBoard.title') }}
       </h2>
-      <p class="font-inter wall-board-sum text-[var(--muted-text,#4d5d6c)]">
+      <p
+        v-if="boardProgress.total"
+        class="font-inter wall-board-sum dark:text-ink-soft text-[var(--muted-text,#4d5d6c)]"
+      >
         {{
           fillTemplate(t('wall.jobsBoard.progress'), {
             done: boardProgress.done,
@@ -205,6 +187,7 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
         }}
       </p>
       <span
+        v-if="boardProgress.total"
         class="h-2.5 max-w-[340px] flex-1 overflow-hidden rounded-full bg-[var(--tint-slate-10)]"
       >
         <span
@@ -236,7 +219,7 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
       style="grid-template-columns: repeat(auto-fit, minmax(210px, 1fr))"
     >
       <div
-        v-for="{ member, column } in partitioned.active"
+        v-for="{ member, column } in columns"
         :key="member.id"
         data-test="board-column"
         class="dark:bg-surface-raised flex min-h-0 w-full max-w-[420px] flex-col overflow-hidden rounded-[22px] bg-white shadow-[var(--card-shadow)]"
@@ -347,56 +330,17 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
     </div>
 
     <!--
-      ⚠️ No beans at all. A BACKSTOP now rather than a live path: the wall's person filter used
-      not to be reconciled when the roster changed underneath a mounted wall, so a cross-device
-      merge that removed a member — or re-tagged a human as a pet — left `visibleMemberIds`
-      pointing at nobody with no chip lit to explain it. `useWallMemberFocus` now derives the
-      focus from the live roster, so THAT route is closed — but this is still LIVE, not a relic:
-      an all-pets family, or the first frames before the doc loads, both give an empty
-      `sortedHumans` and land here. A board with a title, a 0 / 0 bar and an empty void is never
-      the right thing to render.
+      Nothing to draw: nobody has a list today (or there are no beans yet, as in the first
+      frames before the family loads). One line that names what is empty, never a title over
+      a blank board.
     -->
     <p
-      v-if="!hasBoard && !partitioned.idle.length"
+      v-else
       data-test="board-empty"
-      class="font-caveat m-auto text-[var(--muted-text)]"
+      class="font-caveat dark:text-ink-soft m-auto text-2xl text-[var(--muted-text)]"
     >
-      {{ t('wall.jobs.none') }}
+      {{ emptyText }}
     </p>
-
-    <!--
-      Beans with nothing on. A collapsed column would still cost a full track of
-      visual weight while saying nothing, and a grey sliver per child every day
-      reads as an absence on a family's kitchen wall. One row, everyone still
-      named, and phrased as a state rather than a lack.
-
-      When no bean has jobs this IS the board (`flex-1`), rather than a strip
-      under an empty grid.
-    -->
-    <div
-      v-if="partitioned.idle.length"
-      data-test="idle-strip"
-      class="dark:bg-surface-raised flex flex-wrap items-center gap-x-4 gap-y-2 rounded-[22px] bg-white px-4 py-3 shadow-[var(--card-shadow)]"
-      :class="hasBoard ? 'wall-idle-strip shrink-0' : 'min-h-0 flex-1 justify-center'"
-    >
-      <p class="font-outfit text-secondary-500 wall-list-title dark:text-ink font-bold uppercase">
-        {{ t('wall.jobs.allClear') }}
-      </p>
-      <WallFaceButton
-        v-for="member in partitioned.idle"
-        :key="member.id"
-        :name="member.name"
-        source="face-chore"
-        class="flex shrink-0 items-center gap-1.5"
-      >
-        <BeanieAvatar v-bind="memberAvatarBindings(member)" fallback="initials" size="sm" />
-        <span
-          class="font-inter wall-bean-count dark:text-ink-soft text-[var(--muted-text,#4d5d6c)]"
-        >
-          {{ member.name }}
-        </span>
-      </WallFaceButton>
-    </div>
   </div>
 </template>
 
@@ -427,49 +371,6 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
  * family too wide for the wall scrolls sideways — the same answer the footer
  * chips already use, and a far better one than showing nobody anything.
  */
-
-/*
- * ─── The "all clear" strip earns its height on a short wall ──────────────────
- *
- * It says one short sentence and names the beans with nothing on, and it was
- * costing ~60px of an 853x533 wall — about a chore and a half per column, spent
- * on an absence. Tighter padding, smaller faces, and it may not wrap onto a
- * second line; a family too wide for the row scrolls sideways instead, the same
- * answer the board and the footer chips already use.
- *
- * Only in STRIP mode (`.wall-idle-strip`, applied when there is a board above
- * it). When nobody has jobs this element IS the board, and shrinking the only
- * thing on screen would be the opposite of the point.
- *
- * Short OR narrow: a portrait wall has height to spare but the strip is just as
- * much of an absence there, and the saving buys a chore in every column.
- */
-@media (height <= 699px), (width <= 700px) {
-  .wall-idle-strip {
-    flex-wrap: nowrap;
-    gap: 0.75rem;
-    overflow-x: auto;
-    padding: 0.4rem 0.75rem;
-    scrollbar-width: none;
-  }
-
-  /*
-   * ⚠️ The avatar's WRAPPER, never its `img`.
-   *
-   * `BeanieAvatar` draws the member's colour on the wrapper — a tinted fill and
-   * a 2px border — and the `img` inside is `h-full w-full object-contain`, so it
-   * already fills whatever the wrapper is. Sizing the image instead shrinks the
-   * photo into the top-left corner and leaves the bean's colour showing around
-   * it, which is exactly what it did here.
-   *
-   * There is no `.beanie-avatar` CLASS either; the wrapper is identified by
-   * `data-testid`, so half the selector that caused this matched nothing at all.
-   */
-  .wall-idle-strip :deep([data-testid='beanie-avatar']) {
-    height: 1.35rem;
-    width: 1.35rem;
-  }
-}
 
 @media (height <= 699px) {
   .wall-chore-grid {

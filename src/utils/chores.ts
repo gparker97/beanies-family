@@ -552,6 +552,11 @@ export interface ChoreWeekTally {
   perfectDays: number;
 }
 
+/** A tally as a whole percentage of what was due (0 when nothing was). */
+export function choreWeekPercent(tally: Pick<ChoreWeekTally, 'done' | 'due'>): number {
+  return tally.due ? Math.round((tally.done / tally.due) * 100) : 0;
+}
+
 /**
  * The "This Week" card's arithmetic (#146), from the SAME day records the Chores Done cells show
  * (`choreWeekRecord`), so the card and the cells cannot disagree: per bean, the sum of `done` and

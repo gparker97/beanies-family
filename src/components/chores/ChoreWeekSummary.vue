@@ -21,7 +21,7 @@ import { computed } from 'vue';
 import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
 import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
 import { useTranslation } from '@/composables/useTranslation';
-import { choreWeekTallies, type ChoreWeekRecord } from '@/utils/chores';
+import { choreWeekPercent, choreWeekTallies, type ChoreWeekRecord } from '@/utils/chores';
 import { firstName } from '@/utils/assignees';
 import { fillTemplate } from '@/utils/fillTemplate';
 import type { FamilyMember } from '@/types/models';
@@ -52,7 +52,7 @@ const beans = computed(() =>
       member: r.member,
       name,
       tally,
-      pct: tally.due ? Math.round((tally.done / tally.due) * 100) : 0,
+      pct: choreWeekPercent(tally),
       count: tally.due
         ? fillTemplate(t('choreboard.block.count'), { done: tally.done, total: tally.due })
         : t('choreboard.weekSummary.nothingDue'),

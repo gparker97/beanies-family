@@ -58,8 +58,8 @@ function group(listId: string, jobs: WallJob[]): WallListGroup {
 }
 
 /**
- * `listsFor` decides who gets a COLUMN; `todosFor` decides who may be called
- * clear. They are not the same question — see the "All clear" test below.
+ * `listsFor` decides who gets a COLUMN. `todosFor` is carried because the bundle has it; this
+ * board never reads it, which the "never renders a board with nothing on it" test leans on.
  */
 function mountBoard(
   byMember: Record<string, WallListGroup[]>,
@@ -104,30 +104,30 @@ describe('WallChoreBoard', () => {
     setActivePinia(createPinia());
   });
 
-  it('gives columns only to beans with jobs, and chips to the rest', () => {
+  it('gives columns only to beans with jobs, and spends no row on the rest', () => {
     const w = mountBoard({ m1: [group('l1', [job('j1', false)])] });
 
-    // One column for Leo; Milo and Ana are named in the strip, not given tracks.
+    // One column for Leo. Milo and Ana have nothing today and are not named on the board
+    // (the wall's footer chips name every bean).
     expect(w.findAll('[data-test="board-column"]')).toHaveLength(1);
-    expect(w.find('[data-test="idle-strip"]').exists()).toBe(true);
-    expect(w.find('[data-test="idle-strip"]').text()).toContain('Milo');
-    expect(w.find('[data-test="idle-strip"]').text()).toContain('Ana');
-    expect(w.find('[data-test="idle-strip"]').text()).not.toContain('Leo');
+    expect(w.text()).toContain('Leo');
+    expect(w.text()).not.toContain('Milo');
+    expect(w.text()).not.toContain('Ana');
+    expect(w.find('[data-test="board-empty"]').exists()).toBe(false);
   });
 
   it('⭐ keeps a FINISHED bean’s full column, ring and stars', () => {
     // done === total, total > 0. This is the reward mechanic — it must not be
-    // mistaken for "nothing on" and collapsed into a chip.
+    // mistaken for "nothing on" and dropped.
     const w = mountBoard({ m1: [group('l1', [job('j1', true), job('j2', true)])] });
 
     const columns = w.findAll('[data-test="board-column"]');
     expect(columns).toHaveLength(1);
     expect(columns[0]!.classes().join(' ')).toContain('ring-[#27AE60]');
     expect(columns[0]!.text()).toContain('⭐');
-    expect(w.find('[data-test="idle-strip"]').text()).not.toContain('Leo');
   });
 
-  it('gives every bean a column when they all have jobs, and shows no strip', () => {
+  it('gives every bean a column when they all have jobs', () => {
     const w = mountBoard({
       m1: [group('l1', [job('j1', false)])],
       m2: [group('l2', [job('j2', false)])],
@@ -135,31 +135,24 @@ describe('WallChoreBoard', () => {
     });
 
     expect(w.findAll('[data-test="board-column"]')).toHaveLength(3);
-    expect(w.find('[data-test="idle-strip"]').exists()).toBe(false);
+    expect(w.find('[data-test="board-empty"]').exists()).toBe(false);
   });
 
-  it('turns the strip into the board when nobody has anything on', () => {
+  it('says so in one line when nobody has anything on', () => {
     const w = mountBoard({});
 
     expect(w.findAll('[data-test="board-column"]')).toHaveLength(0);
-    const strip = w.find('[data-test="idle-strip"]');
-    expect(strip.exists()).toBe(true);
-    // It fills the space rather than sitting as a thin bar under an empty grid.
-    expect(strip.classes()).toContain('flex-1');
-    for (const m of members) expect(strip.text()).toContain(m.name);
+    expect(w.find('[data-test="board-empty"]').exists()).toBe(true);
   });
 
   it('⚠️ still renders an orphan list when every bean is clear', () => {
-    // Orphan lists live in the grid but are not a member. Hiding the grid on an
-    // all-idle board would make an unowned list vanish — the exact failure the
-    // orphan column exists to prevent.
+    // Orphan lists live in the grid but are not a member. Hiding the grid when no bean has
+    // a column would make an unowned list vanish — the exact failure the orphan column
+    // exists to prevent.
     const w = mountBoard({}, [group('lx', [job('jx', false)])]);
 
     expect(w.find('[data-test="orphan-column"]').exists()).toBe(true);
-    const strip = w.find('[data-test="idle-strip"]');
-    expect(strip.exists()).toBe(true);
-    // A grid is present, so the strip is a footer again, not the board.
-    expect(strip.classes()).toContain('shrink-0');
+    expect(w.find('[data-test="board-empty"]').exists()).toBe(false);
   });
 
   it('treats a list whose items are all deduped away as no chore column', () => {
@@ -167,24 +160,12 @@ describe('WallChoreBoard', () => {
     const w = mountBoard({ m1: [group('l1', [])] });
 
     expect(w.findAll('[data-test="board-column"]')).toHaveLength(0);
-    expect(w.find('[data-test="idle-strip"]').text()).toContain('Leo');
-  });
-
-  it('⚠️ every bean lands in exactly one group — never in neither', () => {
-    // An earlier fix excluded beans with outstanding to-dos from BOTH the
-    // columns and the strip, to avoid calling them clear. That made them vanish
-    // from the wall entirely, indistinguishable from having left the family —
-    // and a family who keeps to-dos but no lists got a blank board.
-    const w = mountBoard({ m1: [group('l1', [])] }, [], { m1: [job('t1', false)] });
-
-    const named = w.find('[data-test="idle-strip"]').text();
-    for (const m of members) expect(named).toContain(m.name);
-    expect(w.findAll('[data-test="board-column"]')).toHaveLength(0);
+    expect(w.find('[data-test="board-empty"]').exists()).toBe(true);
   });
 
   it('never renders a board with nothing on it at all', () => {
     // The blank-board regression, stated directly: whatever the inputs, the
-    // screen shows either columns or the strip.
+    // screen shows columns, the orphan column, or the one-line empty state.
     for (const w of [
       mountBoard({}),
       mountBoard({}, [], { m1: [job('t1', false)] }),
@@ -192,20 +173,24 @@ describe('WallChoreBoard', () => {
     ]) {
       const hasSomething =
         w.findAll('[data-test="board-column"]').length > 0 ||
-        w.find('[data-test="idle-strip"]').exists() ||
+        w.find('[data-test="board-empty"]').exists() ||
         w.find('[data-test="orphan-column"]').exists();
       expect(hasSomething).toBe(true);
     }
   });
 
-  it('scopes its claim to chores, since chores are all it knows about', () => {
-    // The strip must not make a whole-person claim: this board never sees
-    // to-dos, so "no chores today" is the most it can honestly say.
-    const w = mountBoard({});
-    expect(w.find('[data-test="idle-strip"]').text()).toContain('wall.jobs.allClear');
+  it('names what is empty: chores on the chore board, lists on the Lists board', async () => {
+    // The empty line must not make a whole-person claim (this board never sees to-dos), and
+    // must not say "chores" once the page has made this the Lists board (#146).
+    const chores = mountBoard({});
+    expect(chores.find('[data-test="board-empty"]').text()).toBe('wall.jobs.allClear');
+
+    const lists = mountBoard({});
+    await lists.setProps({ boardTitle: 'Lists' });
+    expect(lists.find('[data-test="board-empty"]').text()).toBe('wall.lists.allClear');
   });
 
-  it('honours the wall’s person filter — a hidden bean is absent, not idle', () => {
+  it('honours the wall’s person filter — a hidden bean is absent', () => {
     const w = mount(WallChoreBoard, {
       props: {
         peripherals: {
@@ -223,8 +208,8 @@ describe('WallChoreBoard', () => {
     });
 
     expect(w.findAll('[data-test="board-column"]')).toHaveLength(1);
-    // Milo and Ana are filtered out entirely; they must not reappear as chips.
-    expect(w.find('[data-test="idle-strip"]').exists()).toBe(false);
+    expect(w.text()).not.toContain('Milo');
+    expect(w.text()).not.toContain('Ana');
   });
 
   /**

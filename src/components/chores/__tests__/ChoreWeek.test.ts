@@ -161,7 +161,10 @@ describe('ChoreWeekPanel: the grown-ups board', () => {
     const counts = cellsOf(w, 'kid').map((c) => c.find('b').exists() && c.get('b').text());
     expect(counts).toEqual(['1', '3', false, false, '2', false, false]);
     const total = w.get('[data-testid="chore-week-panel-total"][data-member-id="kid"]');
-    expect(total.text()).toBe('⭐ 6');
+    // Done out of what was due so far, then the percentage (never a bare count of stars).
+    expect(total.text()).toContain('⭐ choreboard.block.count');
+    expect(total.text()).toContain('choreboard.week.percent');
+    expect(total.attributes('aria-label')).toBe('choreboard.week.totalAriaFor');
     // The legend moved to the "This Week" card; the board's sub-label is not repeated there.
     expect(w.find('[data-testid="chore-week-legend"]').exists()).toBe(false);
     expect(w.text()).not.toContain('choreboard.week.title');
@@ -174,7 +177,10 @@ describe('ChoreWeekPanel: a bean’s own week', () => {
     expect(w.attributes('data-testid')).toBe('chore-week-row');
     expect(cellsOf(w, 'kid')).toHaveLength(7);
     expect(cellsOf(w, 'kid')[0]!.attributes('data-shape')).toBe('square');
-    expect(w.get('[data-testid="chore-week-total"]').text()).toBe('⭐ 6');
+    const total = w.get('[data-testid="chore-week-total"]');
+    expect(total.text()).toContain('⭐ choreboard.block.count');
+    expect(total.text()).toContain('choreboard.week.percent');
+    expect(total.attributes('aria-label')).toBe('choreboard.week.totalAria');
     expect(w.find('[data-testid="chore-week-legend"]').exists()).toBe(false);
   });
 
@@ -240,7 +246,7 @@ describe('the day summary', () => {
     await flushPromises();
     expect(popover()).toBeNull();
     expect(w.get('[data-testid="chore-week-panel-total"]').attributes('aria-label')).toBe(
-      'choreboard.week.totalAriaFor.other'
+      'choreboard.week.totalAriaFor'
     );
   });
 

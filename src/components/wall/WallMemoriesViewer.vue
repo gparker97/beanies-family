@@ -74,11 +74,6 @@ onMounted(() => {
         >
           {{ heading }}
         </h2>
-        <span
-          class="font-caveat wall-memories-hand text-primary-700 dark:text-accent-lift shrink-0 text-xl font-bold"
-        >
-          {{ t('wall.memories.newestFirst') }}
-        </span>
         <button
           ref="closeButton"
           type="button"

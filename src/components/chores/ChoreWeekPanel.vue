@@ -30,7 +30,13 @@ import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
 import { useTranslation } from '@/composables/useTranslation';
 import { logEvent } from '@/services/telemetry/logEvent';
 import { CHORE_DAY_LABEL_KEYS } from '@/constants/choreBlocks';
-import { choreDayOfWeek, type ChoreDayRecord, type ChoreWeekRecord } from '@/utils/chores';
+import {
+  choreDayOfWeek,
+  choreWeekPercent,
+  choreWeekTallies,
+  type ChoreDayRecord,
+  type ChoreWeekRecord,
+} from '@/utils/chores';
 import { firstName } from '@/utils/assignees';
 import { fillTemplate } from '@/utils/fillTemplate';
 import { formatUiDate } from '@/utils/uiLocale';
@@ -66,15 +72,44 @@ const weekdayOf = (ymd: string) => days.value.find((d) => d.ymd === ymd)?.long ?
 
 const cellShape = computed(() => (props.single ? 'square' : 'wide'));
 
-const totalAria = (n: number) =>
-  fillTemplate(t(n === 1 ? 'choreboard.week.totalAria.one' : 'choreboard.week.totalAria.other'), {
-    count: n,
-  });
-const totalAriaFor = (m: FamilyMember, n: number) =>
-  fillTemplate(
-    t(n === 1 ? 'choreboard.week.totalAriaFor.one' : 'choreboard.week.totalAriaFor.other'),
-    { name: firstName(m.name), count: n }
-  );
+/**
+ * A bean's week total: done out of what was DUE so far, with the percentage beside it.
+ *
+ * It was a bare count of stars, which is unfair between beans with different numbers of
+ * chores: 9 of 10 read as more than 8 of 8. The numbers are `choreWeekTallies`, the same tally
+ * the "This Week" card shows, so the two cannot disagree.
+ */
+interface WeekTotal {
+  done: number;
+  due: number;
+  /** "8 of 8". */
+  count: string;
+  /** "100%". */
+  percent: string;
+  aria: string;
+}
+const totals = computed<WeekTotal[]>(() =>
+  choreWeekTallies(
+    props.rows.map((r) => r.week),
+    props.todayYmd
+  ).beans.map((tally, i) => {
+    const vars = { done: tally.done, due: tally.due, pct: choreWeekPercent(tally) };
+    const member = props.rows[i]?.member;
+    return {
+      done: tally.done,
+      due: tally.due,
+      count: fillTemplate(t('choreboard.block.count'), { done: tally.done, total: tally.due }),
+      percent: fillTemplate(t('choreboard.week.percent'), vars),
+      aria:
+        props.single || !member
+          ? fillTemplate(t('choreboard.week.totalAria'), vars)
+          : fillTemplate(t('choreboard.week.totalAriaFor'), {
+              ...vars,
+              name: firstName(member.name),
+            }),
+    };
+  })
+);
 
 type DayHead = (typeof days.value)[number];
 /**
@@ -88,7 +123,7 @@ type GridItem =
   | { kind: 'star'; key: string }
   | { kind: 'bean'; key: string; member: FamilyMember }
   | { kind: 'cell'; key: string; member: FamilyMember; record: ChoreDayRecord }
-  | { kind: 'total'; key: string; member: FamilyMember; total: number };
+  | { kind: 'total'; key: string; member: FamilyMember; total: WeekTotal | undefined };
 
 const cellItem = (member: FamilyMember, record: ChoreDayRecord): GridItem => ({
   kind: 'cell',
@@ -96,7 +131,7 @@ const cellItem = (member: FamilyMember, record: ChoreDayRecord): GridItem => ({
   member,
   record,
 });
-const totalItem = (member: FamilyMember, total: number): GridItem => ({
+const totalItem = (member: FamilyMember, total: WeekTotal | undefined): GridItem => ({
   kind: 'total',
   key: `t-${member.id}`,
   member,
@@ -113,10 +148,10 @@ const gridItems = computed<GridItem[]>(() => {
     { kind: 'blank', key: 'corner' },
     ...heads,
     { kind: 'star', key: 'star' },
-    ...props.rows.flatMap((r): GridItem[] => [
+    ...props.rows.flatMap((r, i): GridItem[] => [
       { kind: 'bean', key: `b-${r.member.id}`, member: r.member },
       ...r.week.days.map((rec) => cellItem(r.member, rec)),
-      totalItem(r.member, r.week.total),
+      totalItem(r.member, totals.value[i]),
     ]),
   ];
 });
@@ -190,12 +225,18 @@ function onOpenDay(): void {
       <span class="flex-1" />
       <template v-if="single">
         <span
-          v-if="rows[0] && rows[0].week.total > 0"
-          class="font-outfit text-primary-700 dark:text-accent-lift text-sm font-extrabold"
-          :aria-label="totalAria(rows[0].week.total)"
+          v-if="totals[0] && totals[0].done > 0"
+          class="font-outfit text-primary-700 dark:text-accent-lift flex items-baseline gap-1.5 text-sm font-extrabold"
+          :aria-label="totals[0].aria"
           data-testid="chore-week-total"
-          ><span aria-hidden="true">⭐ {{ rows[0].week.total }}</span></span
         >
+          <span aria-hidden="true"> ⭐ {{ totals[0].count }} </span>
+          <span
+            class="font-inter dark:text-ink-soft text-secondary-400 text-xs font-medium"
+            aria-hidden="true"
+            >{{ totals[0].percent }}</span
+          >
+        </span>
         <span
           v-else
           class="dark:text-ink-faint text-secondary-400 text-xs"
@@ -253,12 +294,19 @@ function onOpenDay(): void {
         />
         <span
           v-else
-          class="board-total font-outfit text-primary-700 dark:text-accent-lift flex justify-center text-sm font-extrabold whitespace-nowrap"
-          :aria-label="totalAriaFor(item.member, item.total)"
+          class="board-total font-outfit text-primary-700 dark:text-accent-lift flex items-baseline justify-center gap-x-1.5 text-sm font-extrabold whitespace-nowrap"
+          :aria-label="item.total?.aria"
           data-testid="chore-week-panel-total"
           :data-member-id="item.member.id"
         >
-          <span v-if="item.total > 0" aria-hidden="true">⭐ {{ item.total }}</span>
+          <template v-if="item.total && item.total.done > 0">
+            <span aria-hidden="true"> ⭐ {{ item.total.count }} </span>
+            <span
+              class="font-inter dark:text-ink-soft text-secondary-400 text-xs font-medium"
+              aria-hidden="true"
+              >{{ item.total.percent }}</span
+            >
+          </template>
           <span
             v-else
             class="block h-[7px] w-[7px] rounded-full bg-[var(--color-border-strong)]"
@@ -314,7 +362,10 @@ function onOpenDay(): void {
     display: none;
   }
 
+  /* The count over its percentage: side by side they squeeze the seven day cells. */
   .board-total {
+    align-items: center;
+    flex-direction: column;
     font-size: 0.75rem;
   }
 }

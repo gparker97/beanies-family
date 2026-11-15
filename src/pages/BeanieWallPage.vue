@@ -1835,12 +1835,6 @@ watch(activeView, () => (sheet.value = null));
   font-size: 1.9rem;
 }
 
-.wall-root :deep(.wall-memories-hand) {
-  /* Caveat runs small; 1.5rem is the top of its 14-24px range. */
-  font-size: 1.5rem;
-  line-height: 1;
-}
-
 .wall-root :deep(.wall-memories-close) {
   font-size: 1.1rem;
   min-height: calc(var(--wall-tap) + 0.25rem);
