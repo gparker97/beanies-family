@@ -135,7 +135,10 @@ export async function navigateToAddMembers(page: Page): Promise<void> {
   // E2E fixture already installed it.
   await guardSubstack(page);
   const createPodButton = page.getByTestId('create-pod-button');
-  await createPodButton.waitFor({ state: 'visible', timeout: 5000 });
+  // Same budget as `bypassLoginIfNeeded`'s gate wait below: a 5 s probe lost the race on a
+  // cold worker under parallel load, the gate rendering just after the probe gave up
+  // (E2E_HEALTH 2026-11-15, `setup-flow.spec.ts:8`, webkit).
+  await createPodButton.waitFor({ state: 'visible', timeout: 30000 });
 
   // Set auto-auth flag before clicking create so InviteGateOverlay and
   // TrustDeviceModal are both suppressed in E2E.

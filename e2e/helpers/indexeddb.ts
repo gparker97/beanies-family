@@ -211,6 +211,16 @@ export class IndexedDBHelper {
   }
 
   async exportData(): Promise<ExportedData> {
+    // The bridge is installed by a dynamic import in `main.ts`, so on a document that has
+    // only just committed it is not there yet. `gotoRoute` returns on `commit` and
+    // `waitForURL` is satisfied by the URL alone, so a caller that exports straight after
+    // navigating would read `undefined.exportData` (planner.spec.ts:459, chromium CI,
+    // 2026-11-15; see E2E_HEALTH). Wait for the bridge itself, never a fixed delay.
+    await this.page.waitForFunction(
+      () => Boolean((window as unknown as Record<string, unknown>).__e2eDataBridge),
+      undefined,
+      { timeout: 30000 }
+    );
     return await this.page.evaluate(() =>
       (window as unknown as Record<string, any>).__e2eDataBridge.exportData()
     );
