@@ -811,7 +811,7 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
       'Turn a spare tablet into the family wall display, and set the two device settings that keep it awake and keep small hands inside the app.',
     icon: '\u{1F9F1}',
     readTime: 6,
-    updatedDate: '2026-11-14',
+    updatedDate: '2026-11-15',
     sections: [
       {
         type: 'paragraph',
@@ -1044,7 +1044,7 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
       {
         type: 'paragraph',
         content:
-          'Tap a bean\u2019s face on the wall (on a chore column, or in an activity\u2019s details) to open the family scrapbook as a timeline, newest first, to read. In the bottom row, tapping a bean filters the wall to them; tapping that same bean again while it is the only one lit opens the scrapbook too. <strong>Everyone</strong> clears the filter.',
+          'Tap the scrapbook picture at the bottom of the wall, beside the beanies.family name, to open the family scrapbook as a timeline, newest first, to read. A bean\u2019s face opens it too, on a lane in <strong>Chores</strong> or in an activity\u2019s details. In the bottom row, tapping a bean filters the wall to them; tapping that same bean again while it is the only one lit opens the scrapbook as well. <strong>Everyone</strong> clears the filter.',
       },
       {
         type: 'list',
@@ -1069,7 +1069,7 @@ export const GETTING_STARTED_ARTICLES: HelpArticle[] = [
         items: [
           'What is on today and this week, for everyone',
           'Everyone\u2019s chores from The Choreboard, a lane per person, and the to-dos due today, ready to tick',
-          'Your beanie lists, including the shared ones like the grocery list, on their own Lists board',
+          'Your beanie lists, including the shared ones like the grocery list, on their own Lists board, where every list has its own card and the to-dos that are late or due today come first, on one family card',
           'An upcoming trip, with its flights, hotels and transport in the order they happen',
           'The meal plan, once that feature is switched on for your family',
         ],

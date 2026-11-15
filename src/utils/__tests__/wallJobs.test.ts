@@ -4,6 +4,7 @@ import {
   buildWallJobs,
   captureListRemoval,
   choreProgress,
+  dueTodoJobs,
   jobWriteKey,
   jobOwnerIds,
   jobsProgress,
@@ -461,6 +462,38 @@ describe('uniqueTodoJobs (combined views)', () => {
     const r = build([todo({ assigneeIds: ['greg', 'leo'] })], []);
     uniqueTodoJobs(r.todos);
     expect(r.todos.every((j) => j.ownerIds === undefined)).toBe(true);
+  });
+});
+
+describe('dueTodoJobs (the Today card and the Lists board)', () => {
+  /** The bundle's two due-now accessors, read straight off a build. */
+  const source = (r: ReturnType<typeof build>) => ({
+    todosFor: (id: string) => r.todos.filter((j) => j.ownerId === id),
+    unassignedTodos: r.todos.filter((j) => j.ownerId === UNASSIGNED),
+  });
+
+  it('lists a to-do shared by two beans on show once, with both owners', () => {
+    const r = build([todo({ assigneeIds: ['greg', 'leo'] })], []);
+    const due = dueTodoJobs(source(r), ['greg', 'leo']);
+    expect(due).toHaveLength(1);
+    expect(due[0].ownerIds).toEqual(['greg', 'leo']);
+  });
+
+  it('takes only the beans it is given, and drops a hidden owner from a shared row', () => {
+    const r = build(
+      [todo({ assigneeIds: ['greg', 'leo'] }), todo({ id: 't2', assigneeIds: ['milo'] })],
+      []
+    );
+    const due = dueTodoJobs(source(r), ['leo']);
+    expect(due.map((j) => j.todoId)).toEqual(['t1']);
+    expect(due[0].ownerIds).toEqual(['leo']);
+  });
+
+  it('keeps unclaimed work whoever is on show, after the beans’ own', () => {
+    const r = build([todo({ id: 't2', assigneeIds: [] }), todo()], []);
+    const due = dueTodoJobs(source(r), ['milo']);
+    expect(due.map((j) => j.ownerId)).toEqual([UNASSIGNED]);
+    expect(dueTodoJobs(source(r), ['leo']).map((j) => j.todoId)).toEqual(['t1', 't2']);
   });
 });
 

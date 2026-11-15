@@ -10,6 +10,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 
 ## 2026-11-15
 
+### Added
+
+- A scrapbook button is now at the bottom of the Beanie Wall. A tap opens the family scrapbook, even while the wall is locked.
+
 ### Performance
 
 - The app now opens without waiting when a daily list or a repeating to-do is due that day; the family's data appears at once from the device and updates in the background.
@@ -22,6 +26,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Ent
 - On the Beanie Wall, the Choreboard and Lists no longer spend a row on who has nothing today; an empty board says "No chores today" or "No lists today".
 - The "Newest first" label is gone from the Beanie Wall scrapbook.
 - On the Beanie Wall's Choreboard, a finished time of day is now one slim line in its own colour ("Morning all done") at the bottom of the list, instead of a tall orange banner. The celebration still plays when the last chore is ticked.
+- On the Beanie Wall's Lists board, every list now has its own card, and the family's to-dos that are late or due today are shown first, on one card.
 
 ### Fixed
 

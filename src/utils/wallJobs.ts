@@ -52,6 +52,7 @@ import type {
   WallJobsInput,
   WallJobsResult,
   WallListGroup,
+  WallPeripheralData,
   WallTodoBucket,
 } from '@/types/wall';
 import { listAssignees, normalizeAssignees } from '@/utils/assignees';
@@ -474,6 +475,23 @@ export function uniqueTodoJobs(
     out.push(first);
   }
   return out;
+}
+
+/**
+ * The family's due to-dos (late or due today) for the beans on show, one row per to-do:
+ * each bean's `todosFor`, then the unclaimed ones. The Today card and the Lists board's
+ * to-dos card read this one selection, so they cannot disagree about what is due.
+ *
+ * Selects and does NOT sort: the Today card derives its group order from this array.
+ */
+export function dueTodoJobs(
+  source: Pick<WallPeripheralData, 'todosFor' | 'unassignedTodos'>,
+  memberIds: readonly string[]
+): WallJob[] {
+  return uniqueTodoJobs([
+    ...memberIds.flatMap((id) => source.todosFor(id)),
+    ...source.unassignedTodos,
+  ]);
 }
 
 /**

@@ -11,8 +11,9 @@
 import ActivityOwnerStack from '@/components/ui/ActivityOwnerStack.vue';
 import { useTranslation } from '@/composables/useTranslation';
 import type { FamilyMember } from '@/types/models';
+import type { WallOwnerSize } from '@/types/wall';
 
-withDefaults(defineProps<{ members: FamilyMember[]; size?: 'xs' | 'sm' }>(), { size: 'sm' });
+withDefaults(defineProps<{ members: FamilyMember[]; size?: WallOwnerSize }>(), { size: 'sm' });
 
 const { t } = useTranslation();
 </script>

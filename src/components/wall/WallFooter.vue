@@ -27,6 +27,7 @@ import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
 import { WALL_MEMORIES } from '@/components/wall/wallMemoriesKey';
+import WallScrapbookButton from '@/components/wall/WallScrapbookButton.vue';
 
 /** `focused` is EMPTY for everyone — never a list that matches nobody. */
 const props = defineProps<{ focused: readonly string[] }>();
@@ -56,8 +57,8 @@ const popupFor = (id: string) => (memories?.opensOnTap(id) ? 'dialog' : undefine
 </script>
 
 <template>
-  <!-- ⚠️ `overflow-x-auto`, and deliberately NOT `flex-wrap`.
-       A clipped chip can be a LIT one, and every focused bean being visible is the one
+  <!-- ⚠️ The chips scroll (`overflow-x-auto`), and deliberately do NOT `flex-wrap`.
+       A clipped chip can be a LIT one, and every focused bean being reachable is the one
        mitigation this control relies on — `.wall-root` is `overflow-hidden`, the wall's floor is
        600px, and "everyone" plus five avatar chips plus the brand lockup does not fit in the
        ~544px left after the padding.
@@ -65,42 +66,50 @@ const popupFor = (id: string) => (memories?.opensOnTap(id) ? 'dialog' : undefine
        inside a `100dvh` column, taken out of `<main>` — but every layout decision on this page
        measures `window.innerHeight`, which does not move, so the band and the time grid keep
        being sized for height that is no longer there. Scrolling costs nothing vertically and
-       reaches every chip. -->
-  <div class="flex shrink-0 items-center gap-2 overflow-x-auto px-7 pt-3 pb-4">
-    <button
-      type="button"
-      class="font-outfit wall-chip-person rounded-full px-3.5 py-1.5 font-semibold shadow-[var(--card-shadow)]"
-      :class="
-        isEveryone
-          ? 'bg-secondary-500 text-white'
-          : 'text-secondary-500 dark:bg-surface-raised dark:text-ink bg-white'
-      "
-      :aria-pressed="isEveryone"
-      @click="emit('clear')"
-    >
-      {{ t('wall.filter.everyone') }}
-    </button>
-    <button
-      v-for="member in members"
-      :key="member.id"
-      type="button"
-      class="font-outfit wall-chip-person flex items-center gap-2 rounded-full py-1 pr-3.5 pl-1 font-semibold shadow-[var(--card-shadow)]"
-      :class="
-        isFocused(member.id)
-          ? 'bg-secondary-500 text-white'
-          : 'text-secondary-500 dark:bg-surface-raised dark:text-ink bg-white'
-      "
-      :aria-pressed="isFocused(member.id)"
-      :aria-haspopup="popupFor(member.id)"
-      @click="emit('select', member.id)"
-    >
-      <BeanieAvatar v-bind="memberAvatarBindings(member)" fallback="initials" size="sm" />
-      {{ member.name }}
-    </button>
+       reaches every chip.
+       Only the CHIPS scroll: the scrapbook button and the brand sit in a `shrink-0` sibling, so
+       on a narrow wall the button is never scrolled out of sight, nor its tilt and focus
+       outline clipped by the strip. -->
+  <div class="flex shrink-0 items-center gap-2 pr-7">
+    <div class="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto pt-3 pb-4 pl-7">
+      <button
+        type="button"
+        class="font-outfit wall-chip-person rounded-full px-3.5 py-1.5 font-semibold shadow-[var(--card-shadow)]"
+        :class="
+          isEveryone
+            ? 'bg-secondary-500 text-white'
+            : 'text-secondary-500 dark:bg-surface-raised dark:text-ink bg-white'
+        "
+        :aria-pressed="isEveryone"
+        @click="emit('clear')"
+      >
+        {{ t('wall.filter.everyone') }}
+      </button>
+      <button
+        v-for="member in members"
+        :key="member.id"
+        type="button"
+        class="font-outfit wall-chip-person flex items-center gap-2 rounded-full py-1 pr-3.5 pl-1 font-semibold shadow-[var(--card-shadow)]"
+        :class="
+          isFocused(member.id)
+            ? 'bg-secondary-500 text-white'
+            : 'text-secondary-500 dark:bg-surface-raised dark:text-ink bg-white'
+        "
+        :aria-pressed="isFocused(member.id)"
+        :aria-haspopup="popupFor(member.id)"
+        @click="emit('select', member.id)"
+      >
+        <BeanieAvatar v-bind="memberAvatarBindings(member)" fallback="initials" size="sm" />
+        {{ member.name }}
+      </button>
+    </div>
 
-    <span class="font-outfit wall-brand ml-auto font-bold opacity-70">
-      <span class="text-[var(--muted-text,#4d5d6c)]">beanies</span
-      ><span class="text-[var(--heritage-orange)]">.family</span>
-    </span>
+    <div class="flex shrink-0 items-center gap-3 pt-3 pb-4">
+      <WallScrapbookButton />
+      <span class="font-outfit wall-brand font-bold opacity-70">
+        <span class="text-[var(--muted-text,#4d5d6c)]">beanies</span
+        ><span class="text-[var(--heritage-orange)]">.family</span>
+      </span>
+    </div>
   </div>
 </template>

@@ -2,8 +2,9 @@
  * The family memories viewer on the beanie wall (#140): ALL of its state, so the wall page
  * creates this once, provides it as `WALL_MEMORIES`, and gains almost nothing itself.
  *
- * Two ways in, one rule each:
- *  - a tap on a face that does nothing today (the chore board, a details sheet), via
+ * Three ways in, one rule each:
+ *  - the scrapbook button in the footer (`WallScrapbookButton`), which calls `open` directly;
+ *  - a tap on a face that does nothing today (the chore lanes, a details sheet), via
  *    `WallFaceButton`, which calls `open` directly;
  *  - a SECOND tap on the only lit bean in the footer or a lane header. `opensOnTap` is the
  *    one place that rule lives, read by the page to route the tap and by the footer and the
@@ -31,7 +32,7 @@ export const WALL_MEMORIES_IDLE_MS = 3 * 60_000;
 
 /** Which door opened the viewer. Logged, so "did anyone find it" has an answer. */
 export type WallMemoriesOpenSource =
-  'face-chore' | 'face-sheet' | 'chip-second-tap' | 'lane-second-tap';
+  'face-chore' | 'face-sheet' | 'chip-second-tap' | 'lane-second-tap' | 'footer-button';
 
 export type WallMemoriesCloseKind = 'button' | 'escape' | 'idle' | 'night';
 

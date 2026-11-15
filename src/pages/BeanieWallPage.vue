@@ -1514,10 +1514,6 @@ watch(activeView, () => (sheet.value = null));
   font-size: 0.8rem;
 }
 
-.wall-root :deep(.wall-stars) {
-  font-size: 0.95rem;
-}
-
 .wall-root :deep(.wall-chip-person) {
   font-size: 0.9rem;
 }

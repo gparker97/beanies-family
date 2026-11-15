@@ -72,6 +72,9 @@ export interface WallJob {
   ownerIds?: string[];
 }
 
+/** An owner face's size on a wall row: `sm` by default, `xs` in a narrow card. */
+export type WallOwnerSize = 'xs' | 'sm';
+
 /** A short chip on a drawer row: how late it is, or the time it is due by. */
 export interface WallJobNote {
   text: string;

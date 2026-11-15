@@ -87,14 +87,23 @@ describe('opening and closing', () => {
     memories.close('button');
     memories.open('lane-second-tap');
     memories.close('escape');
+    memories.open('footer-button');
+    memories.close('button');
 
     expect(kinds('wall_memories_open')).toEqual([
       'face-chore',
       'face-sheet',
       'chip-second-tap',
       'lane-second-tap',
+      'footer-button',
     ]);
-    expect(kinds('wall_memories_close')).toEqual(['button', 'escape', 'button', 'escape']);
+    expect(kinds('wall_memories_close')).toEqual([
+      'button',
+      'escape',
+      'button',
+      'escape',
+      'button',
+    ]);
     expect(logEvent.mock.calls.every(([e]) => e.surface === 'beanie-wall')).toBe(true);
   });
 

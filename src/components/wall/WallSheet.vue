@@ -40,14 +40,9 @@ import { activityDetailRows } from '@/utils/activityDetails';
 import { bookingProgress, daysUntilTrip, tripCountdownKey, tripTypeEmoji } from '@/utils/vacation';
 import type { UIStringKey } from '@/services/translation/uiStrings';
 import type { FamilyMember, FamilyActivity } from '@/types/models';
-import { jobOwnerIds, uniqueListGroups, uniqueTodoJobs } from '@/utils/wallJobs';
-import type {
-  WallJob,
-  WallJobNote,
-  WallListGroup,
-  WallSheetTarget,
-  WallTodoBucket,
-} from '@/types/wall';
+import { uniqueListGroups, uniqueTodoJobs } from '@/utils/wallJobs';
+import { useWallTodoRows } from '@/composables/useWallTodoRows';
+import type { WallJob, WallListGroup, WallSheetTarget, WallTodoBucket } from '@/types/wall';
 
 const props = defineProps<{
   target: WallSheetTarget;
@@ -289,31 +284,8 @@ const celebratingActivity = computed(() => {
   return identityFor(value).celebration.celebrating ? value.id : null;
 });
 
-/** Who owes this to-do, as members; empty when nobody has claimed it (the row shows "?"). */
-function todoOwners(job: WallJob): FamilyMember[] {
-  return jobOwnerIds(job)
-    .map((id) => familyStore.members.find((m) => m.id === id))
-    .filter((m): m is FamilyMember => Boolean(m));
-}
-
-/** The row's chip: how late an overdue to-do is, or the time a today one is due by. */
-function todoNote(job: WallJob): WallJobNote | null {
-  if (job.bucket === 'overdue' && job.daysLate) {
-    const text =
-      job.daysLate === 1
-        ? t('date.yesterday')
-        : fillTemplate(t('wall.todo.daysLate'), { n: job.daysLate });
-    return { text, tone: 'late' };
-  }
-  // Late today (past its time, same day): no day count to show, so keep the time, in the late tone.
-  if (job.bucket === 'overdue' && job.dueTime) {
-    return { text: fillTemplate(t('wall.todo.byTime'), { time: job.dueTime }), tone: 'late' };
-  }
-  if (job.bucket === 'today' && job.dueTime) {
-    return { text: fillTemplate(t('wall.todo.byTime'), { time: job.dueTime }), tone: 'time' };
-  }
-  return null;
-}
+/** Each to-do row's faces and chip, shared with the Lists board's to-dos card. */
+const { todoOwners, todoNote } = useWallTodoRows();
 
 /**
  * Each bucket's heading. Late is the one loud block (Heritage Orange band, white text);

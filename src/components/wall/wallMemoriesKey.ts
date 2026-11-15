@@ -1,8 +1,8 @@
 /**
- * The wall's family memories channel (#140). The faces that open the viewer sit inside the
- * chore board, the details sheet, the footer and the lane headers, and the wall views are
- * rendered through one generic `<component :is>`, so a prop would fall through to every
- * view. One typed provide instead, the `WALL_LOCK` precedent.
+ * The wall's family memories channel (#140). The doors to the viewer sit inside the chore
+ * lanes, the details sheet, the footer (its chips and its button) and the lane headers, and
+ * the wall views are rendered through one generic `<component :is>`, so a prop would fall
+ * through to every view. One typed provide instead, the `WALL_LOCK` precedent.
  *
  * Optional at every consumer: `inject(WALL_MEMORIES, null)`. With no provider a face stays
  * a plain picture and a chip keeps filtering, which is also what lets the existing tests

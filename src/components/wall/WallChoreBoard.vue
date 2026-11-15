@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * The chore board — every list, under the person whose list it is.
+ * The Lists board: one card per list, after one card for the family's due to-dos.
  *
  * A PEER of the calendar, not a drawer. This is the reason a family hangs a
  * screen in the kitchen, so it gets the whole screen.
@@ -8,52 +8,73 @@
  * ALL lists are treated equally. The board used to show only repeating lists in
  * the columns and park one-off lists in a thin strip along the bottom, which
  * made half of them easy to miss and drew a lifecycle distinction no family
- * thinks in — "leo's jobs" and "swim bag" are both Leo's list. Each column now
- * stacks that bean's lists under their own titles.
+ * thinks in — "leo's jobs" and "swim bag" are both Leo's list.
+ *
+ * ONE CARD PER LIST. The board then drew a column per bean and stacked that bean's lists in
+ * it, so a second list started below the first, often off the bottom of the card, and was
+ * missed. Each list now has its own card, its title the headline and its people under it. A
+ * shared list is one card with everyone on it, placed under its first visible assignee, so a
+ * bean's cards still sit together, in the family's order.
+ *
+ * TO-DOS ARE ONE FAMILY LIST, not one per bean. When anything is late or due today for the
+ * beans on show, the first card is the family's to-dos (the Today card's selection,
+ * `dueTodoJobs`), with a face on every row. It is absent when nothing is due; the to-do sheet
+ * its head opens holds everything else.
  *
  * NOTHING IS HIDDEN. The column used to stop at seven rows and offer "+N more",
- * which opened the drawer — while the column body already scrolled, so the cap
- * was trimming a list that had somewhere to go. Worse, that button opened the
- * ALL-lists drawer rather than the list being read, so a child who tapped "+4
- * more" under Leo's swim bag landed in a grid of everybody's lists and lost
- * their place. The orphan column below has always rendered uncapped and simply
- * scrolled; the columns now do the same.
+ * which opened the ALL-lists drawer rather than the list being read, while the
+ * column body already scrolled. Every card body scrolls instead, uncapped.
  *
  * Lists whose owner is not a member the wall knows about get their own labelled
- * block instead of being dropped. That is rare (a deleted member, an unsynced
+ * card instead of being dropped. That is rare (a deleted member, an unsynced
  * one), but a list nobody can find is worse than an odd-looking one.
  */
 import { computed, inject } from 'vue';
 import WallBackButton from '@/components/wall/WallBackButton.vue';
+import WallBoardCard from '@/components/wall/WallBoardCard.vue';
 import WallJobList from '@/components/wall/WallJobList.vue';
-import WallFaceButton from '@/components/wall/WallFaceButton.vue';
-import BeanieAvatar from '@/components/ui/BeanieAvatar.vue';
-import { useMemberAvatarBindings } from '@/composables/useMemberAvatar';
+import ActivityOwnerStack from '@/components/ui/ActivityOwnerStack.vue';
 import { useWallLock } from '@/components/wall/wallLockKey';
 import { WALL_EDIT } from '@/components/wall/wallEditKey';
 import WallAddRow from '@/components/wall/WallAddRow.vue';
 import { useFamilyStore } from '@/stores/familyStore';
 import { useTranslation } from '@/composables/useTranslation';
+import { useListPeople } from '@/composables/useListPeople';
+import { useWallTodoRows } from '@/composables/useWallTodoRows';
 import { fillTemplate } from '@/utils/fillTemplate';
-import { jobsProgress } from '@/utils/wallJobs';
+import { dueTodoJobs, jobsProgress, sortJobs, uniqueListGroups } from '@/utils/wallJobs';
 import { isRecurring } from '@/utils/listLifecycle';
 import type { WallJob, WallListGroup, WallPeripheralData, WallSheetTarget } from '@/types/wall';
 import type { FamilyMember } from '@/types/models';
 
 defineOptions({ inheritAttrs: false });
 
-/** One bean's board column: their lists, whole, plus their tally. */
-interface BoardColumn {
-  groups: WallListGroup[];
+/** One list's card, every value the template reads already worked out. */
+interface ListCard {
+  group: WallListGroup;
+  /** The first visible assignee's colour: the bean whose lane the card is placed in. */
+  color: string;
+  owners: FamilyMember[];
+  names: string;
+  recurring: boolean;
+  tally: string;
   done: number;
   total: number;
+  allDone: boolean;
+}
+
+/** A list nobody the wall knows owns. */
+interface OrphanCard {
+  group: WallListGroup;
+  tally: string;
 }
 
 const props = defineProps<{
   /**
    * The job/list bundle, the same object the calendar views forward to their
-   * shell. The board reads `listsFor`, `orphanLists` and `visibleMemberIds` from
-   * it — one shape for the wall's job data, rather than a second spelling here.
+   * shell. The board reads `listsFor`, `orphanLists`, `todosFor`, `unassignedTodos` and
+   * `visibleMemberIds` from it: one shape for the wall's job data, rather than a second
+   * spelling here.
    */
   peripherals: WallPeripheralData;
   isPending: (job: WallJob) => boolean;
@@ -69,6 +90,8 @@ const emit = defineEmits<{ toggle: [WallJob]; back: []; open: [WallSheetTarget] 
 const familyStore = useFamilyStore();
 const { t } = useTranslation();
 const { canEdit } = useWallLock();
+const { peopleOf, namesOf } = useListPeople();
+const { todoOwners, todoNote } = useWallTodoRows();
 
 /**
  * The write channel. Optional: a board mounted without it renders read-plus-tick
@@ -83,52 +106,72 @@ const members = computed(() => {
   return humans.filter((m) => allowed.has(m.id));
 });
 
-/**
- * A column's lists, whole. Groups with no jobs are dropped: a list every one of
- * whose items is deduped away (they are all to-dos due today) would otherwise
- * render as a heading with nothing under it.
- */
-function buildColumn(memberId: string): BoardColumn {
-  const groups = props.peripherals.listsFor(memberId).filter((group) => group.jobs.length);
-  // `jobsProgress` already supplies `total`; spelling it again just invited the
-  // two to drift.
-  return { groups, ...jobsProgress(groups.flatMap((g) => g.jobs)) };
-}
+const tallyText = (progress: { done: number; total: number }) =>
+  fillTemplate(t('wall.list.progress'), progress);
 
 /**
- * Computed once per render, not per call. The template asks about each column
- * ten times (the ring, the count, the lists, the overflow, the stars), and every
- * call re-flattened and re-counted that bean's lists from scratch — on a screen
- * that re-renders every 20s, forever, on a tablet. Same fix as the board this
- * replaced; it must not regress with the rewrite.
- */
-const columnByMember = computed(() => {
-  const map = new Map<string, ReturnType<typeof buildColumn>>();
-  for (const member of members.value) map.set(member.id, buildColumn(member.id));
-  return map;
-});
-
-/**
- * The beans with lists today, each with their column, computed once per render.
+ * Every list's card, computed once per render, not per call: the template reads each card
+ * a dozen times (the ring, the tint, the faces, the names, the tally, the rows), on a screen
+ * that re-renders every 20s, forever, on a tablet. It must not regress to calling functions
+ * from the template.
  *
- * The template reads `entry.column` and never calls a function: it asks about each column a
- * dozen times (the ring, the count, the lists, the stars), on a screen that re-renders every
- * 20s, forever, on a tablet.
+ * Groups with no jobs are dropped BEFORE the dedupe: a list every one of whose items is
+ * deduped away in one bean's lane (they are all that bean's to-dos due today) would otherwise
+ * render as a heading with nothing under it, or hide the same list's rows in another lane.
  *
- * `total === 0` is the ONLY definition of "nothing today", and such a bean gets no column. They
- * used to be named on a strip under the board, which spent a row of a kitchen screen on an
- * absence; the footer's chips name every bean on every view, so nobody goes missing from the
- * wall without it. A bean who has FINISHED their jobs is `done === total` with `total > 0`,
- * keeps a full column, and keeps the green ring and the row of stars.
+ * `total === 0` is the ONLY definition of "nothing today", and such a list gets no card. A
+ * FINISHED list is `done === total` with `total > 0`, keeps its card, and gets the green ring.
  */
-const columns = computed(() => {
-  const built: { member: FamilyMember; column: BoardColumn }[] = [];
+const listCards = computed<ListCard[]>(() => {
+  const laneOf = new Map<string, FamilyMember>();
+  const groups: WallListGroup[] = [];
   for (const member of members.value) {
-    const column = columnByMember.value.get(member.id);
-    if (column && column.total > 0) built.push({ member, column });
+    for (const group of props.peripherals.listsFor(member.id)) {
+      if (!group.jobs.length) continue;
+      if (!laneOf.has(group.list.id)) laneOf.set(group.list.id, member);
+      groups.push(group);
+    }
   }
-  return built;
+  return uniqueListGroups(groups).map((group) => {
+    const progress = jobsProgress(group.jobs);
+    return {
+      group,
+      color: laneOf.get(group.list.id)?.color ?? '',
+      owners: peopleOf(group.list),
+      names: namesOf(group.list),
+      recurring: isRecurring(group.list),
+      tally: tallyText(progress),
+      ...progress,
+      allDone: progress.total > 0 && progress.done === progress.total,
+    };
+  });
 });
+
+const orphanCards = computed<OrphanCard[]>(() =>
+  props.peripherals.orphanLists.map((group) => ({
+    group,
+    tally: tallyText(jobsProgress(group.jobs)),
+  }))
+);
+
+/**
+ * The family's to-dos that are late or due today, for the beans on show, outstanding first.
+ * A done one stays (struck through, last) until it leaves the due set, so a tick never makes
+ * a row vanish under the finger.
+ */
+const todoJobs = computed(() =>
+  sortJobs(
+    dueTodoJobs(
+      props.peripherals,
+      members.value.map((m) => m.id)
+    )
+  )
+);
+const todoProgress = computed(() => jobsProgress(todoJobs.value));
+const todoTally = computed(() => tallyText(todoProgress.value));
+const todosAllDone = computed(
+  () => todoProgress.value.total > 0 && todoProgress.value.done === todoProgress.value.total
+);
 
 /**
  * Is there a grid to draw at all?
@@ -136,10 +179,13 @@ const columns = computed(() => {
  * ⚠️ Orphan lists count. They live in the grid but are NOT a member, so a board
  * where every bean is clear but an unowned list exists must still render the
  * grid — otherwise that list vanishes, which is the exact failure the orphan
- * column was built to prevent.
+ * card was built to prevent. Due to-dos count too: they are a card of their own.
  */
 const hasBoard = computed(
-  () => columns.value.length > 0 || props.peripherals.orphanLists.length > 0
+  () =>
+    todoJobs.value.length > 0 ||
+    listCards.value.length > 0 ||
+    props.peripherals.orphanLists.length > 0
 );
 
 /**
@@ -150,12 +196,16 @@ const emptyText = computed(() =>
   props.boardTitle ? t('wall.lists.allClear') : t('wall.jobs.allClear')
 );
 
+/**
+ * Lists only: the to-dos card is not counted, and orphans never were. Summed over the cards,
+ * so a list shared by two beans counts once.
+ */
 const boardProgress = computed(() => {
   let done = 0;
   let total = 0;
-  for (const column of columnByMember.value.values()) {
-    done += column.done;
-    total += column.total;
+  for (const card of listCards.value) {
+    done += card.done;
+    total += card.total;
   }
   return { done, total };
 });
@@ -164,8 +214,6 @@ const percent = computed(() =>
     ? Math.round((boardProgress.value.done / boardProgress.value.total) * 100)
     : 0
 );
-
-const { memberAvatarBindings } = useMemberAvatarBindings();
 </script>
 
 <template>
@@ -199,11 +247,11 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
 
     <!--
       ⚠️ The track max stays `1fr`. A definite max (`minmax(210px, 420px)`) looks
-      like the obvious way to stop one bean's list becoming a billboard, but
+      like the obvious way to stop one list becoming a billboard, but
       auto-fit computes its repetition count from the track's MAX when that max
       is definite — so 420px HALVED the column count at every size: five columns
-      became two at 1280px, three became one at 800px, and the surplus beans
-      wrapped onto rows this grid has no room to show and no overflow to scroll.
+      became two at 1280px, three became one at 800px, and the surplus cards
+      wrapped onto rows this grid had no room to show and no overflow to scroll.
       jsdom has no layout engine, so no unit test here can catch it.
 
       The cap belongs on the CARD instead, inside a `1fr` track that still counts
@@ -218,121 +266,105 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
       class="wall-chore-grid grid min-h-0 flex-1 justify-center justify-items-center gap-2.5"
       style="grid-template-columns: repeat(auto-fit, minmax(210px, 1fr))"
     >
-      <div
-        v-for="{ member, column } in columns"
-        :key="member.id"
-        data-test="board-column"
-        class="dark:bg-surface-raised flex min-h-0 w-full max-w-[420px] flex-col overflow-hidden rounded-[22px] bg-white shadow-[var(--card-shadow)]"
-        :class="column.total && column.done === column.total ? 'ring-[2.5px] ring-[#27AE60]' : ''"
+      <!-- the family's due to-dos: first, and only while something is due -->
+      <WallBoardCard
+        v-if="todoJobs.length"
+        key="todos"
+        data-test="todos-card"
+        class="wall-todos-card"
+        emoji="✅"
+        :title="t('wall.card.todos')"
+        :subtitle="t('wall.todos.dueNow')"
+        :tally="todoTally"
+        :ring="todosAllDone ? 'done' : undefined"
+        @open="emit('open', { kind: 'todos' })"
       >
-        <!--
-          The column's bean header. Stacked by default; on a short wall it turns
-          into a single row (see the scoped rule below), because at 533px of
-          height this block was ~170px of the ~370px a column gets, which left
-          room for exactly ONE chore.
-        -->
-        <div
-          class="wall-chore-head dark:border-line flex flex-col items-center gap-1 border-b border-[rgba(44,62,80,0.06)] px-2.5 py-2 text-center"
-          :style="{ background: `${member.color}2e` }"
-        >
-          <WallFaceButton :name="member.name" source="face-chore" class="inline-flex">
-            <BeanieAvatar v-bind="memberAvatarBindings(member)" fallback="initials" size="lg" />
-          </WallFaceButton>
-          <div>
-            <p class="font-outfit text-secondary-500 wall-bean-name dark:text-ink font-bold">
-              {{ member.name }}
-            </p>
-            <p class="font-inter wall-bean-count text-[var(--muted-text,#4d5d6c)]">
-              {{ `${column.done} / ${column.total}` }}
-            </p>
-          </div>
-        </div>
+        <WallJobList
+          :jobs="todoJobs"
+          :is-pending="isPending"
+          :owners="todoOwners"
+          :note="todoNote"
+          owner-size="xs"
+          @toggle="emit('toggle', $event)"
+        />
+      </WallBoardCard>
 
-        <div
-          class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-3 py-2"
-          :style="{ background: `${member.color}0d` }"
-        >
-          <div v-for="group in column.groups" :key="group.list.id">
-            <button
-              type="button"
-              class="font-outfit wall-list-title mb-0.5 flex w-full items-center gap-1.5 text-left font-bold tracking-[0.06em] text-[var(--muted-text,#4d5d6c)] uppercase"
-              @click="emit('open', { kind: 'list', listId: group.list.id })"
-            >
-              <span aria-hidden="true">{{ group.list.emoji }}</span>
-              <span class="truncate">{{ group.list.title }}</span>
-              <span
-                v-if="isRecurring(group.list)"
-                class="font-outfit wall-pill text-primary-500 rounded-full bg-[var(--tint-orange-15)] px-1.5 font-extrabold"
-              >
-                {{ t('wall.list.repeats') }}
-              </span>
-            </button>
-            <WallJobList
-              :jobs="group.jobs"
-              :is-pending="isPending"
-              @toggle="emit('toggle', $event)"
-            />
-            <!--
-              Add straight to THIS list, rather than sending a child to the
-              drawer to find it again. Only while the wall is unlocked.
-            -->
-            <WallAddRow
-              v-if="canEdit && edit"
-              :placeholder="t('wall.list.addItem')"
-              :submit="(title: string) => edit!.addListItem(group.list.id, title)"
-            />
-          </div>
-        </div>
-
-        <p class="wall-stars shrink-0 px-3 pt-1 pb-3 tracking-[2px]" aria-hidden="true">
-          <span v-for="n in column.done" :key="`s${n}`">⭐</span>
-          <span v-for="n in column.total - column.done" :key="`d${n}`" class="text-[#d7dee5]"
-            >·</span
-          >
-        </p>
-      </div>
-
-      <!-- lists whose owner the wall cannot resolve — labelled, not hidden -->
-      <div
-        v-if="peripherals.orphanLists.length"
-        data-test="orphan-column"
-        class="ring-dashed dark:bg-surface-raised dark:ring-line-strong flex min-h-0 w-full max-w-[420px] flex-col overflow-hidden rounded-[22px] bg-white shadow-[var(--card-shadow)] ring-1 ring-[rgba(44,62,80,0.18)]"
+      <WallBoardCard
+        v-for="card in listCards"
+        :key="card.group.list.id"
+        data-test="board-card"
+        :emoji="card.group.list.emoji"
+        :title="card.group.list.title"
+        :subtitle="card.names"
+        :tally="card.tally"
+        :color="card.color"
+        :ring="card.allDone ? 'done' : undefined"
+        @open="emit('open', { kind: 'list', listId: card.group.list.id })"
       >
-        <div
-          class="dark:border-line flex flex-col items-center gap-1 border-b border-[rgba(44,62,80,0.06)] px-2.5 py-2 text-center"
-        >
-          <!-- a neutral disc, to match the initials the real columns now use -->
+        <template v-if="card.recurring" #pill>
           <span
-            class="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#95a5a6] text-lg text-white"
+            class="font-outfit wall-pill text-primary-500 dark:text-accent-lift shrink-0 rounded-full bg-[var(--tint-orange-15)] px-1.5 font-extrabold"
+          >
+            {{ t('wall.list.repeats') }}
+          </span>
+        </template>
+        <!-- The stack labels itself with the names, which follow as text: hidden here so a
+             screen reader hears each name once. -->
+        <template v-if="card.owners.length" #who>
+          <span class="shrink-0" aria-hidden="true">
+            <ActivityOwnerStack :members="card.owners" size="xs" />
+          </span>
+        </template>
+        <WallJobList
+          :jobs="card.group.jobs"
+          :is-pending="isPending"
+          hide-list-emoji
+          @toggle="emit('toggle', $event)"
+        />
+        <!--
+          Add straight to THIS list, rather than sending a child to the
+          drawer to find it again. Only while the wall is unlocked.
+        -->
+        <WallAddRow
+          v-if="canEdit && edit"
+          :placeholder="t('wall.list.addItem')"
+          :submit="(title: string) => edit!.addListItem(card.group.list.id, title)"
+        />
+      </WallBoardCard>
+
+      <!-- lists whose owner the wall cannot resolve: labelled, not hidden, and nobody's to add to -->
+      <WallBoardCard
+        v-for="card in orphanCards"
+        :key="card.group.list.id"
+        data-test="orphan-card"
+        :emoji="card.group.list.emoji"
+        :title="card.group.list.title"
+        :subtitle="t('wall.orphanLists')"
+        :tally="card.tally"
+        ring="neutral"
+        display-only
+      >
+        <!-- a neutral disc where a list's faces would be -->
+        <template #who>
+          <span
+            class="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[#95a5a6] text-xs text-white"
             aria-hidden="true"
             >📦</span
           >
-          <p class="font-outfit text-secondary-500 wall-bean-name dark:text-ink font-bold">
-            {{ t('wall.orphanLists') }}
-          </p>
-        </div>
-        <div class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-3 py-2">
-          <div v-for="group in peripherals.orphanLists" :key="group.list.id">
-            <p
-              class="font-outfit wall-list-title mb-0.5 flex items-center gap-1.5 font-bold tracking-[0.06em] text-[var(--muted-text,#4d5d6c)] uppercase"
-            >
-              <span aria-hidden="true">{{ group.list.emoji }}</span>
-              <span class="truncate">{{ group.list.title }}</span>
-            </p>
-            <WallJobList
-              :jobs="group.jobs"
-              :is-pending="isPending"
-              @toggle="emit('toggle', $event)"
-            />
-          </div>
-        </div>
-      </div>
+        </template>
+        <WallJobList
+          :jobs="card.group.jobs"
+          :is-pending="isPending"
+          hide-list-emoji
+          @toggle="emit('toggle', $event)"
+        />
+      </WallBoardCard>
     </div>
 
     <!--
-      Nothing to draw: nobody has a list today (or there are no beans yet, as in the first
-      frames before the family loads). One line that names what is empty, never a title over
-      a blank board.
+      Nothing to draw: nothing is due and nobody has a list today (or there are no beans yet, as
+      in the first frames before the family loads). One line that names what is empty, never a
+      title over a blank board.
     -->
     <p
       v-else
@@ -346,88 +378,67 @@ const { memberAvatarBindings } = useMemberAvatarBindings();
 
 <style scoped>
 /*
- * ─── A short wall gets a one-row bean header ─────────────────────────────────
+ * A SHORT wall puts every card on ONE row.
  *
- * The stacked avatar-over-name-over-count block is right on a mounted 10" wall
- * and wrong on an 8" one: at 533px of height it took ~170px of the ~370px each
- * column has, so a bean with 44 chores showed one of them.
- *
- * Laid out as a row it costs roughly a third of that, which is three or four
- * chores visible instead of one. Same information, same order, far less height.
- * `WallLanesView` already does exactly this for its own lanes through
- * `WallBeanHeader`'s `inline` mode; this is the same idea for the board.
- *
- * Keyed on HEIGHT, not on the tier or the orientation: the board's problem is
- * vertical, and a 961x601 landscape wall needs this as much as a 853x533 one.
- */
-
-/*
- * A SHORT wall puts every column on ONE row.
- *
- * `auto-fit minmax(210px, 1fr)` fits three columns across an 853px wall, so a
- * fourth bean wrapped to a second row and the grid's height split between them:
- * ~130px per card, which after the header left a clipped list title and not one
- * visible chore. One row gives every column the full height instead, and a
- * family too wide for the wall scrolls sideways — the same answer the footer
+ * `auto-fit minmax(210px, 1fr)` fits three cards across an 853px wall, so a
+ * fourth wrapped to a second row and the grid's height split between them:
+ * ~130px per card, which after the header left a clipped title and not one
+ * visible row. One row gives every card the full height instead, and a board
+ * too wide for the wall scrolls sideways, the same answer the footer
  * chips already use, and a far better one than showing nobody anything.
  */
 
+/*
+ * Both layouts make the grid a scroll box, which clips at its padding edge. The padding keeps
+ * a finished card's ring (drawn 2.5px outside the card) and the card shadow inside it.
+ */
+.wall-chore-grid {
+  /* The margin gives the width back, so the column count and the cards' left edge are
+     what they were without the padding. */
+  margin: -4px;
+  padding: 4px;
+}
+
 @media (height <= 699px) {
   .wall-chore-grid {
-    grid-auto-columns: minmax(11rem, 1fr);
+    /* The floor lives on the cards (`min-width` below), so one card can ask for more: the
+       to-dos card carries a face and a chip on every row, and at 11rem its titles broke
+       mid-word. `auto`, not `min-content`: the cards clip their overflow, so `auto` resolves
+       to their `min-width`, where `min-content` grew each track to its longest title. */
+    grid-auto-columns: minmax(auto, 1fr);
     grid-auto-flow: column;
     grid-template-columns: none !important;
+
+    /* Not centred: a centred row that overflows spills off BOTH edges, and the left spill
+       cannot be scrolled to, which hid the first cards. The `1fr` tracks already fill the
+       row when it fits. (An unlayered scoped rule beats the `justify-center` utility.) */
+    justify-content: start;
     overflow-x: auto;
     scrollbar-width: none;
+  }
+
+  .wall-chore-grid > * {
+    min-width: 11rem;
+  }
+
+  .wall-chore-grid > .wall-todos-card {
+    min-width: 15rem;
   }
 }
 
 /*
- * The one-row bean header applies on a NARROW wall as well as a short one. In
- * portrait the board gets two columns and two rows, so each card is ~300px, and
- * a ~170px stacked header still leaves room for barely one chore.
+ * A TALL wall wraps cards onto rows, and the rows share the grid's height until each would
+ * fall under 14rem; past that the board scrolls. With no row rule an `auto` row grew to its
+ * longest list and ran off the bottom with nothing to scroll (the bug `WallChoreLanes` hit).
+ *
+ * `height > 699px`, the exact complement of the short rule: with `>= 700px` a fractional
+ * viewport height (699.4px on a scaled tablet) matched neither and got no row rule at all.
  */
-@media (width <= 700px) {
-  .wall-chore-head {
-    flex-direction: row;
-    gap: 0.5rem;
-    justify-content: center;
-    padding-bottom: 0.375rem;
-    padding-top: 0.375rem;
-    text-align: left;
-  }
-
-  /* The face's wrapper (`WallFaceButton`) and the avatar inside it, which is what has the
-     size: capping only the wrapper would leave a 3rem face spilling out of a 2.25rem box. */
-  .wall-chore-head > :first-child {
-    flex-shrink: 0;
-  }
-
-  .wall-chore-head > :first-child :deep([data-testid='beanie-avatar']) {
-    height: 2.25rem;
-    width: 2.25rem;
-  }
-}
-
-@media (height <= 699px) {
-  .wall-chore-head {
-    flex-direction: row;
-    gap: 0.5rem;
-    justify-content: center;
-    padding-bottom: 0.375rem;
-    padding-top: 0.375rem;
-    text-align: left;
-  }
-
-  /* The avatar is the tall part, and its size is a prop, so it is capped here (inside its
-     `WallFaceButton` wrapper, as above). */
-  .wall-chore-head > :first-child {
-    flex-shrink: 0;
-  }
-
-  .wall-chore-head > :first-child :deep([data-testid='beanie-avatar']) {
-    height: 2.25rem;
-    width: 2.25rem;
+@media (height > 699px) {
+  .wall-chore-grid {
+    grid-auto-rows: minmax(14rem, 1fr);
+    overflow-y: auto;
+    scrollbar-width: none;
   }
 }
 </style>

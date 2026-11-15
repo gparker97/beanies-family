@@ -6,10 +6,14 @@
  * there is no way to reach a filter that matches nobody.
  */
 import { mount } from '@vue/test-utils';
+import { computed } from 'vue';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 
 import WallFooter from '../WallFooter.vue';
+import WallScrapbookButton from '../WallScrapbookButton.vue';
+import { WALL_MEMORIES } from '../wallMemoriesKey';
+import type { WallMemoriesContext } from '@/composables/useWallMemories';
 import type { FamilyMember } from '@/types/models';
 
 vi.mock('@/composables/useTranslation', () => ({
@@ -64,6 +68,33 @@ describe('what the wall says it is showing', () => {
   it('stops lighting "everyone" as soon as anyone is focused', () => {
     // Both lit at once would read as "everything is filtered" rather than "no filter".
     expect(pressed(mountFooter(['m2']))).not.toContain('wall.filter.everyone');
+  });
+});
+
+describe('the scrapbook button', () => {
+  it('is mounted in the footer', () => {
+    expect(mountFooter([]).findComponent(WallScrapbookButton).exists()).toBe(true);
+  });
+
+  it('sits outside the scrolling chips, so a narrow wall never scrolls it out of sight', () => {
+    const memories = {
+      enabled: computed(() => true),
+      opensOnTap: () => false,
+      open: vi.fn(),
+    } as unknown as WallMemoriesContext;
+    const w = mount(WallFooter, {
+      props: { focused: [] },
+      global: {
+        stubs: { BeanieAvatar: true },
+        provide: { [WALL_MEMORIES as symbol]: memories },
+      },
+    });
+
+    const button = w.find('[data-test="wall-scrapbook-button"]');
+    expect(button.exists()).toBe(true);
+    expect(w.find('.overflow-x-auto').find('[data-test="wall-scrapbook-button"]').exists()).toBe(
+      false
+    );
   });
 });
 

@@ -8053,6 +8053,8 @@ const STRING_DEFS = {
     beanie: '{done} of {total} done · tap for the board',
   },
   'wall.card.todos': { en: 'Family To-Dos', beanie: 'family to-dos' },
+  // The Lists board's to-dos card, under its title: what the card holds.
+  'wall.todos.dueNow': { en: 'Late or due today', beanie: 'late or due today' },
   'wall.card.todosProgress': {
     en: '{done} of {total} done today',
     beanie: '{done} of {total} done today',
@@ -8383,6 +8385,11 @@ const STRING_DEFS = {
   'wall.memories.openFor': {
     en: '{name}: open the family scrapbook',
     beanie: '{name}: open the family scrapbook',
+  },
+  // The footer's picture button: no word on screen, so this is its only name.
+  'wall.memories.open': {
+    en: 'Open the family scrapbook',
+    beanie: 'open the family scrapbook',
   },
   'wall.memories.empty.typesOff': {
     en: 'Nothing to show here yet. Turn on a kind of memory in the wall settings.',

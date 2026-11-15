@@ -17,7 +17,7 @@
  */
 import WallJobRow from '@/components/wall/WallJobRow.vue';
 import type { FamilyMember } from '@/types/models';
-import type { WallJob, WallJobNote } from '@/types/wall';
+import type { WallJob, WallJobNote, WallOwnerSize } from '@/types/wall';
 
 defineProps<{
   jobs: WallJob[];
@@ -26,6 +26,10 @@ defineProps<{
   owners?: (job: WallJob) => FamilyMember[];
   /** Optional per-row chip (see `WallJobRow.note`). */
   note?: (job: WallJob) => WallJobNote | null;
+  /** See `WallJobRow.ownerSize`. */
+  ownerSize?: WallOwnerSize;
+  /** See `WallJobRow.hideListEmoji`. */
+  hideListEmoji?: boolean;
 }>();
 const emit = defineEmits<{ toggle: [WallJob] }>();
 </script>
@@ -39,6 +43,8 @@ const emit = defineEmits<{ toggle: [WallJob] }>();
       :pending="isPending(job)"
       :owners="owners?.(job)"
       :note="note?.(job)"
+      :owner-size="ownerSize"
+      :hide-list-emoji="hideListEmoji"
       @toggle="emit('toggle', $event)"
     />
   </TransitionGroup>

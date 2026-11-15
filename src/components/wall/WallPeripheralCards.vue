@@ -33,11 +33,11 @@ import { fillTemplate } from '@/utils/fillTemplate';
 import { isRecurring } from '@/utils/listLifecycle';
 import {
   choreProgress,
+  dueTodoJobs,
   jobOwnerIds,
   jobsProgress,
   openLaterTodoJobs,
   uniqueListGroups,
-  uniqueTodoJobs,
   UNASSIGNED,
 } from '@/utils/wallJobs';
 import { wallChoreProgressText } from '@/components/wall/wallChoreText';
@@ -124,10 +124,10 @@ const beans = computed(() => {
  * listed twice nor counted twice.
  */
 const visibleTodos = computed(() =>
-  uniqueTodoJobs([
-    ...beans.value.flatMap((m) => props.peripherals.todosFor(m.id)),
-    ...props.peripherals.unassignedTodos,
-  ])
+  dueTodoJobs(
+    props.peripherals,
+    beans.value.map((m) => m.id)
+  )
 );
 const todoProgress = computed(() => jobsProgress(visibleTodos.value));
 

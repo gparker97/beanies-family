@@ -30,7 +30,7 @@ import { useTranslation } from '@/composables/useTranslation';
 import { fillTemplate } from '@/utils/fillTemplate';
 import WallOwnerFaces from '@/components/wall/WallOwnerFaces.vue';
 import type { FamilyMember } from '@/types/models';
-import type { WallJob, WallJobNote } from '@/types/wall';
+import type { WallJob, WallJobNote, WallOwnerSize } from '@/types/wall';
 
 /** Long enough to cover the spring; short enough never to double-fire. */
 const POP_MS = 460;
@@ -45,6 +45,13 @@ const props = defineProps<{
   owners?: FamilyMember[];
   /** A chip after the title (how late, or due by when). Hidden once the job is done. */
   note?: WallJobNote | null;
+  /** Smaller owner faces, for a narrow card where the title needs the width. */
+  ownerSize?: WallOwnerSize;
+  /**
+   * Leave out the row's list emoji. For a surface where every row already sits under its own
+   * list's heading, so the per-row copy only takes width.
+   */
+  hideListEmoji?: boolean;
 }>();
 const emit = defineEmits<{ toggle: [WallJob] }>();
 
@@ -270,38 +277,50 @@ watch(canEdit, (allowed) => {
       :disabled="pending"
       @click="onTitleTap"
     >
-      <span
-        class="font-inter wall-job-title min-w-0 flex-1 leading-tight"
-        :class="
-          isDone ? 'text-secondary-400 dark:text-ink-faint' : 'text-secondary-500 dark:text-ink'
-        "
-      >
-        <!--
+      <!--
+        The title and its chip WRAP as a pair. On one unwrapping line a narrow card (the Lists
+        board's to-dos card) squeezed the title to nothing and its words ran under the chip;
+        with a 6rem basis the chip drops to its own line instead, and a wide sheet still has
+        room for both on one.
+      -->
+      <span class="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-0.5">
+        <span
+          class="font-inter wall-job-title min-w-0 flex-[1_1_6rem] leading-tight break-words"
+          :class="
+            isDone ? 'text-secondary-400 dark:text-ink-faint' : 'text-secondary-500 dark:text-ink'
+          "
+        >
+          <!--
           The strike lives on an INLINE span wrapping just the words. On the
           `flex-1` element it sized to the whole row, so the line shot out past
           the text and across the column.
         -->
-        <span class="wall-strike" :class="isDone ? 'is-done' : ''">{{ job.title }}</span>
+          <span class="wall-strike" :class="isDone ? 'is-done' : ''">{{ job.title }}</span>
+        </span>
+        <span
+          v-if="note && !isDone"
+          class="font-inter wall-job-done-at wall-job-note shrink-0 rounded-full px-2 py-0.5 font-semibold whitespace-nowrap"
+          :class="
+            note.tone === 'late'
+              ? 'text-primary-700 dark:text-accent-lift bg-[var(--tint-orange-15)]'
+              : 'text-secondary-500 dark:text-ink-soft bg-[var(--tint-slate-5)]'
+          "
+        >
+          {{ note.text }}
+        </span>
       </span>
-      <span
-        v-if="note && !isDone"
-        class="font-inter wall-job-done-at wall-job-note shrink-0 rounded-full px-2 py-0.5 font-semibold whitespace-nowrap"
-        :class="
-          note.tone === 'late'
-            ? 'text-primary-700 dark:text-accent-lift bg-[var(--tint-orange-15)]'
-            : 'text-secondary-500 dark:text-ink-soft bg-[var(--tint-slate-5)]'
-        "
-      >
-        {{ note.text }}
-      </span>
-      <WallOwnerFaces v-if="owners" :members="owners" class="wall-job-owner" />
+      <WallOwnerFaces v-if="owners" :members="owners" :size="ownerSize" class="wall-job-owner" />
       <span
         v-if="doneAt"
         class="font-inter wall-job-done-at shrink-0 text-[var(--muted-text,#4d5d6c)] opacity-70"
       >
         {{ doneAt }}
       </span>
-      <span v-if="job.listEmoji" class="wall-job-tag shrink-0 opacity-60" aria-hidden="true">
+      <span
+        v-if="job.listEmoji && !hideListEmoji"
+        class="wall-job-tag shrink-0 opacity-60"
+        aria-hidden="true"
+      >
         {{ job.listEmoji }}
       </span>
     </button>
