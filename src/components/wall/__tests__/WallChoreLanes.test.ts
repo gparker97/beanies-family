@@ -165,7 +165,7 @@ describe('WallChoreLanes', () => {
     );
   });
 
-  it('folds a finished block to the all-done strip with one star per chore', async () => {
+  it('folds a finished block to one slim line in its own colour, with its star count', async () => {
     const w = mountLanes({
       pip: lane('pip', [
         block('morning', [job('bed', 'pip', true), job('teeth', 'pip', true)], { isNow: true }),
@@ -173,16 +173,63 @@ describe('WallChoreLanes', () => {
     });
     const strip = w.find('[data-testid="wall-chore-done-strip"]');
     expect(strip.exists()).toBe(true);
-    const banner = w.findComponent(CelebrationBanner);
-    expect(banner.props('compact')).toBe(true);
-    expect(banner.props('title')).toBe('choreboard.done.title');
-    expect(strip.text()).toContain('⭐⭐');
-    expect(strip.text()).not.toContain('⭐⭐⭐');
+    // A line, not the orange banner: the banner is the celebration only.
+    expect(w.findComponent(CelebrationBanner).exists()).toBe(false);
+    // Told apart by the block's own colour, and it says which block and that it is done.
+    expect(strip.classes()).toContain('chore-block-morning');
+    expect(strip.text()).toContain('wall.chores.lane.allDone');
+    expect(strip.text()).toContain('⭐ 2');
+    expect(strip.attributes('aria-expanded')).toBe('false');
     expect(w.find('[data-testid="wall-chore-lane-count"]').text()).toBe('wall.chores.lane.allDone');
-    // The rows fold away, and can be reopened to undo a mis-tick.
+    // The rows fold away, and a tap on the line reopens them to undo a mis-tick.
     expect(w.findComponent(WallJobList).exists()).toBe(false);
-    await w.find('[data-testid="celebration-banner-action"]').trigger('click');
+    await strip.trigger('click');
+    expect(strip.attributes('aria-expanded')).toBe('true');
     expect(w.findComponent(WallJobList).exists()).toBe(true);
+  });
+
+  it('sinks finished blocks to the bottom of the lane, what is left to do first', () => {
+    // Anytime is done and sits second in the lane's own order (now, Anytime, later): drawn
+    // there it was an orange slab in the middle of the list.
+    const w = mountLanes({
+      pip: lane('pip', [
+        block('morning', [job('bed', 'pip')], { isNow: true }),
+        block('anytime', [job('plants', 'pip', true)]),
+        block('evening', [job('bath', 'pip')]),
+      ]),
+    });
+    const order = w
+      .findAll('[data-testid="wall-chore-block"]')
+      .map((b) => [b.attributes('data-block'), b.attributes('data-state')]);
+    expect(order).toEqual([
+      ['morning', 'open'],
+      ['evening', 'quiet'],
+      ['anytime', 'done'],
+    ]);
+  });
+
+  it('keeps several finished blocks in the lane’s order, each in its own colour', () => {
+    const w = mountLanes({
+      pip: lane('pip', [
+        block('evening', [job('bath', 'pip')], { isNow: true }),
+        block('anytime', [job('plants', 'pip', true)]),
+        block('morning', [job('bed', 'pip', true)]),
+        block('afternoon', [job('toys', 'pip', true)]),
+      ]),
+    });
+    const blocks = w.findAll('[data-testid="wall-chore-block"]');
+    expect(blocks.map((b) => b.attributes('data-block'))).toEqual([
+      'evening',
+      'anytime',
+      'morning',
+      'afternoon',
+    ]);
+    const strips = w.findAll('[data-testid="wall-chore-done-strip"]');
+    expect(strips.map((x) => x.classes().find((c) => c.startsWith('chore-block-')))).toEqual([
+      'chore-block-anytime',
+      'chore-block-morning',
+      'chore-block-afternoon',
+    ]);
   });
 
   it('a tick carries its lane’s block as the celebration anchor, clipped to the lane', () => {

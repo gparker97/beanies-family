@@ -13,8 +13,13 @@
  * guard, the crediting and the failure report. There is no wall twin of the chore row.
  *
  * Per lane, per block (in the lane's order: now, Anytime, later, past):
- *   - done:  a compact `CelebrationBanner` strip with one star per chore. Its action reopens
- *            the chores, so a mis-tick of the last one can be undone at the wall;
+ *   - done:  one slim line in the block's own colour (its emoji, "Morning all done", a green
+ *            tick and the star count), so morning, afternoon, evening and anytime are told
+ *            apart at a glance and four finished blocks cost four lines, not four banners.
+ *            Tapping it reopens the chores, so a mis-tick of the last one can be undone at the
+ *            wall. The orange `CelebrationBanner` appears only for the celebration itself, then
+ *            folds to the line. Finished blocks sink to the bottom of the lane (in day order),
+ *            so what is left to do is always at the top;
  *   - open:  the block happening now and Anytime: a colour header (the Heritage Orange ring and
  *            "Now" tag on the current block) over its rows;
  *   - quiet: a later block (or one whose window has passed) is one line in its colour with a
@@ -22,7 +27,8 @@
  * No star row: stars appear only on the done strip (plan §5). The celebration is the store's
  * (once per bean, block and day); a tick carries its anchor (this lane's block and the tick),
  * the block keeps its rows while the stars burst (`choreBlockHeld`), and the done strip takes
- * its celebrating form while the beanies' move plays on it (`choreBannerCelebration`). The lane
+ * its celebrating form while the beanies' move plays on it (`choreBannerCelebration`); a block
+ * never moves while it is celebrating. The lane
  * is the celebration's clip (`data-celebration-clip`), so nothing crosses into a sibling's lane.
  *
  * Editing is one thing only: while unlocked, each lane has an add row that adds a chore for
@@ -31,8 +37,10 @@
  *
  * Dark mode: the lane and its header are the bean's colour mixed into `surface-raised` (scoped
  * `html.dark` partners below), open blocks sit on `surface-overlay`, block colours come from
- * `.chore-block-*` (whose tokens carry their dark values), and the done strip is the fixed
- * brand gradient with white ink in both themes.
+ * `.chore-block-*` (whose tokens carry their dark values, so the done line switches with
+ * them), the done line's tick is a fixed Success Green disc with white ink in both themes
+ * (a filled mark, like a filled button), and the celebration banner is the fixed brand
+ * gradient with white ink in both themes.
  */
 import { computed, inject, nextTick, provide, ref } from 'vue';
 import { choreBannerCelebration, choreBlockHeld } from '@/composables/useCelebration';
@@ -203,7 +211,22 @@ function onToggle(job: WallJob, memberId: string, block: ChoreBlock): void {
   );
 }
 
-/** Blocks opened by hand (a quiet line, or a done strip reopened): `${memberId}:${block}`. */
+/**
+ * A finished block that has stopped celebrating: it folds to its slim line and sinks to the
+ * bottom. While the celebration still plays on it, it stays where the bean ticked it.
+ */
+function settledDone(b: WallChoreBlock, memberId: string): boolean {
+  return blockState(b, memberId) === 'done' && !choreBannerCelebration(memberId, b.block);
+}
+
+/** A lane's blocks as drawn: what is left to do first, finished blocks last, each in lane order. */
+function laneBlocks(lane: WallChoreLane, memberId: string): WallChoreBlock[] {
+  const settled = lane.blocks.filter((b) => settledDone(b, memberId));
+  if (!settled.length) return lane.blocks;
+  return [...lane.blocks.filter((b) => !settledDone(b, memberId)), ...settled];
+}
+
+/** Blocks opened by hand (a quiet line, or a done line reopened): `${memberId}:${block}`. */
 const expanded = ref<Set<string>>(new Set());
 const expandKey = (memberId: string, block: ChoreBlock) => `${memberId}:${block}`;
 function isExpanded(memberId: string, block: ChoreBlock): boolean {
@@ -266,6 +289,11 @@ function quietCount(b: WallChoreBlock): string {
 
 function bannerText(b: WallChoreBlock, member: FamilyMember): { title: string; body: string } {
   return choreDoneBannerText(b.block, b.total, member.name, t);
+}
+/** "Morning all done. Show Morning chores": the done line says its state, then what a tap does. */
+function doneLabel(memberId: string, b: WallChoreBlock): string {
+  const done = fillTemplate(t('wall.chores.lane.allDone'), { block: label(b.block) });
+  return `${done}. ${expandLabel(memberId, b)}`;
 }
 function expandLabel(memberId: string, b: WallChoreBlock): string {
   return fillTemplate(
@@ -357,7 +385,7 @@ function addChore(memberId: string, title: string): Promise<boolean> {
           </p>
 
           <section
-            v-for="b in lane.blocks"
+            v-for="b in laneBlocks(lane, member.id)"
             :key="b.block"
             class="flex flex-col gap-1"
             data-testid="wall-chore-block"
@@ -365,25 +393,51 @@ function addChore(memberId: string, title: string): Promise<boolean> {
             :data-state="blockState(b, member.id)"
             :data-now="b.isNow ? 'true' : 'false'"
           >
-            <!-- Done: the strip with its stars, reopenable so a mis-tick can be undone. -->
+            <!-- Done. The banner is the celebration only; settled, the block is one slim line
+                 in its own colour, reopenable so a mis-tick can be undone. -->
             <template v-if="blockState(b, member.id) === 'done'">
               <CelebrationBanner
+                v-if="choreBannerCelebration(member.id, b.block)"
                 compact
                 :title="bannerText(b, member).title"
                 :body="bannerText(b, member).body"
                 :image-alt="t('choreboard.done.imageAlt')"
-                :action-label="
-                  t(
-                    isExpanded(member.id, b.block)
-                      ? 'choreboard.block.hideChores'
-                      : 'choreboard.block.showChores'
-                  )
-                "
                 :stars="b.total"
                 :celebration="choreBannerCelebration(member.id, b.block)"
-                data-testid="wall-chore-done-strip"
-                @action="toggleExpanded(member.id, b.block)"
+                data-testid="wall-chore-done-banner"
               />
+              <button
+                v-else
+                type="button"
+                class="font-outfit wall-chore-done flex w-full items-center gap-2 rounded-2xl bg-[var(--chore-tint)] px-3 py-2 text-left text-sm font-semibold text-[var(--chore-ink)]"
+                :class="CHORE_BLOCK_META[b.block].colorClass"
+                :aria-expanded="isExpanded(member.id, b.block) ? 'true' : 'false'"
+                :aria-label="doneLabel(member.id, b)"
+                data-testid="wall-chore-done-strip"
+                @click="toggleExpanded(member.id, b.block)"
+              >
+                <span aria-hidden="true">{{ CHORE_BLOCK_META[b.block].emoji }}</span>
+                <span class="min-w-0 flex-1 truncate">{{
+                  fillTemplate(t('wall.chores.lane.allDone'), { block: label(b.block) })
+                }}</span>
+                <span
+                  class="grid h-5 w-5 flex-none place-items-center rounded-full bg-[#27AE60] text-white"
+                  aria-hidden="true"
+                >
+                  <svg viewBox="0 0 16 16" class="h-3 w-3" fill="none">
+                    <path
+                      d="M3.5 8.5l3 3 6-7"
+                      stroke="currentColor"
+                      stroke-width="2.2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                </span>
+                <span class="font-inter text-xs font-medium whitespace-nowrap" aria-hidden="true"
+                  >⭐ {{ b.total }}</span
+                >
+              </button>
             </template>
 
             <!-- Open: the block happening now (ringed, tagged) and Anytime. -->
@@ -509,7 +563,8 @@ html.dark .wall-chore-lane-head {
 }
 
 .wall-chore-block-head,
-.wall-chore-quiet {
+.wall-chore-quiet,
+.wall-chore-done {
   font-size: 0.95rem;
   min-height: 2.75rem;
 }
